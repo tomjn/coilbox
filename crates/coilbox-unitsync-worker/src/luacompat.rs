@@ -102,7 +102,7 @@ pub fn render(lib: &str, game_archive: &str) -> LuaCompatOutput {
 /// archive takes a file name. A dependency that is itself an installed game is
 /// turned into a file through that game's entry. One that is neither a file nor
 /// an installed game is returned as unresolved.
-fn archives_to_scan(us: &Unitsync, game_archive: &str) -> (Vec<String>, Vec<String>) {
+pub(crate) fn archives_to_scan(us: &Unitsync, game_archive: &str) -> (Vec<String>, Vec<String>) {
     let mut archives = vec![game_archive.to_string()];
     let mut unresolved = Vec::new();
 

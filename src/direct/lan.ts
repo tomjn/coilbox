@@ -1,3 +1,4 @@
+import { describeUiError, parseUiError } from "../i18n/uiError";
 import { addressOfKey } from "../lobby-servers/hostForms";
 import type { Battle } from "../multiplayer/bindings";
 import type { DirectLanRoom } from "./bindings";
@@ -148,6 +149,10 @@ export function joinRoomFailure(
   port: number,
 ): string {
   const raw = error instanceof Error ? error.message : String(error ?? "");
+  // A login the room refused arrives with its own code and words. Matching
+  // "refused" in them would tell somebody nothing is hosting where it is.
+  const coded = parseUiError(raw);
+  if (coded.code !== null) return describeUiError(coded);
   const lower = raw.toLowerCase();
   const where = `${address}:${port}`;
   if (lower.includes("refused")) {

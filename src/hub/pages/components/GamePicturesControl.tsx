@@ -3,6 +3,7 @@ import { useMemo, useState } from "react";
 import { OptionSelect } from "@/components/OptionSelect";
 import type { GameItem } from "@/content/bindings";
 import { useUnitsyncScan } from "@/content/config";
+import { describeError } from "@/i18n/uiError";
 import { formatDateTime } from "@/lib/format";
 import { withoutGeneratedGames } from "@/lib/generatedGames";
 import { usePreferredTarget } from "@/play/config";
@@ -81,7 +82,7 @@ export function GamePicturesControl({
       setReport(done);
       setSwept(lastSweptAt());
     } catch (e) {
-      setFailed(e instanceof Error ? e.message : String(e));
+      setFailed(describeError(e));
     } finally {
       setRunning(false);
       setProgress(null);

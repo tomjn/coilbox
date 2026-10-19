@@ -32,6 +32,7 @@
 pub mod beforepost;
 pub mod cached;
 pub mod cachekey;
+pub mod defsenv;
 pub mod matchsetup;
 /// The shapes the worker prints and the cache files hold. Declared here and not in
 /// the binary so the plugin can read a cached answer without starting a worker
@@ -49,6 +50,7 @@ pub enum Mode {
     UnitModels(UnitModelsArgs),
     Convert3do(Convert3doArgs),
     LuaCompat(LuaCompatArgs),
+    CompatPalette(CompatPaletteArgs),
     UnitRenderKeys(UnitRenderKeysArgs),
     /// `--config`: read the curated set of engine settings. No fields of its
     /// own beyond the flag, so this is a unit variant rather than an empty
@@ -94,6 +96,7 @@ impl Mode {
             Mode::UnitModels(args) => args.to_args(),
             Mode::Convert3do(args) => args.to_args(),
             Mode::LuaCompat(args) => args.to_args(),
+            Mode::CompatPalette(args) => args.to_args(),
             Mode::UnitRenderKeys(args) => args.to_args(),
             Mode::Config => vec!["--config".to_string()],
             Mode::ConfigSet(args) => args.to_args(),
@@ -523,6 +526,40 @@ impl LuaCompatArgs {
         match game {
             Some(game) if !game.trim().is_empty() => Ok(LuaCompatArgs { game }),
             _ => Err("--lua-compat needs --game <archive>".into()),
+        }
+    }
+}
+
+/// `--compat-palette`: the Total Annihilation palette a 3do conversion of a
+/// game would read now, and the archive it comes from, for the compat plugin
+/// to tell whether a mutator's model colours are stale (issue #4642).
+#[derive(Debug, Clone, PartialEq)]
+pub struct CompatPaletteArgs {
+    pub game: String,
+}
+
+impl CompatPaletteArgs {
+    pub fn to_args(&self) -> Vec<String> {
+        vec![
+            "--compat-palette".to_string(),
+            "--game".to_string(),
+            self.game.clone(),
+        ]
+    }
+
+    /// Recover a `--compat-palette` invocation from a worker argv, which may
+    /// carry unrelated flags, as for [`LuaCompatArgs::from_args`].
+    pub fn from_args(args: &[String]) -> Result<Self, String> {
+        let mut game = None;
+        let mut it = args.iter();
+        while let Some(a) = it.next() {
+            if a == "--game" {
+                game = it.next().cloned();
+            }
+        }
+        match game {
+            Some(game) if !game.trim().is_empty() => Ok(CompatPaletteArgs { game }),
+            _ => Err("--compat-palette needs --game <archive>".into()),
         }
     }
 }
@@ -2989,6 +3026,19 @@ mod tests {
         assert!(a.contains(&"--lua-compat".to_string()));
         let recovered = LuaCompatArgs::from_args(&a).expect("valid argv");
         assert_eq!(recovered, original);
+    }
+
+    #[test]
+    fn compat_palette_round_trips_and_refuses_a_missing_or_blank_game() {
+        let original = CompatPaletteArgs {
+            game: "xta-9.65.sd7".into(),
+        };
+        let a = Mode::CompatPalette(original.clone()).to_args();
+        assert!(a.contains(&"--compat-palette".to_string()));
+        assert_eq!(CompatPaletteArgs::from_args(&a).unwrap(), original);
+        assert!(CompatPaletteArgs::from_args(&["--compat-palette".to_string()]).is_err());
+        let blank = ["--compat-palette".to_string(), "--game".into(), " ".into()];
+        assert!(CompatPaletteArgs::from_args(&blank).is_err());
     }
 
     #[test]

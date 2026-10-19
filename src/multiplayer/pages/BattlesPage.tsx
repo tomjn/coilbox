@@ -42,6 +42,7 @@ import {
 import { stopHostedRoom } from "../../direct/stopRoom";
 import { useLanRooms } from "../../direct/useLanRooms";
 import { VpnWarning } from "../../direct/VpnWarning";
+import { describeError } from "../../i18n/uiError";
 import { useLastLogin } from "../../lobby-servers/config";
 import { getGameMatcher } from "../../profile/profile";
 import { battleRoomHref } from "../battle/battleRoomKey";
@@ -663,7 +664,7 @@ function BattlesPage() {
       await directStopRoom({
         reason: "the host could not join their own room",
       }).catch(() => {});
-      throw e;
+      throw new Error(describeError(e));
     } finally {
       setRoomBusy(false);
     }

@@ -11,6 +11,7 @@
  */
 
 import { dlFetchText } from "../downloads/bindings";
+import { describeError } from "../i18n/uiError";
 import type { FetchText } from "./fetchImport";
 
 export const fetchImportText: FetchText = async (url) => {
@@ -20,7 +21,7 @@ export const fetchImportText: FetchText = async (url) => {
   } catch (err) {
     return {
       ok: false,
-      reason: err instanceof Error ? err.message : String(err),
+      reason: describeError(err),
     };
   }
 };

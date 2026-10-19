@@ -26,13 +26,13 @@ use coilbox_unitsync_worker::{cached, RenderSource};
 use picoframe_core::CliResult;
 use sidecar::{
     build_archive_extract_args, build_archive_file_args, build_archive_tree_args, build_args,
-    build_config_args, build_config_set_args, build_convert_3do_args, build_custom_params_args,
-    build_defs_probe_args, build_faction_logos_args, build_game_args, build_game_headers_args,
-    build_height_field_args, build_heightmap_args, build_lua_args, build_lua_compat_args,
-    build_lua_repl_args, build_map_info_args, build_map_meta_args, build_map_skybox_args,
-    build_metalmap_args, build_minimap_args, build_skirmish_ai_args, build_thumbnails_args,
-    build_unit_buildpics_args, build_unit_dataset_args, build_unit_defs_args,
-    build_unit_model_args, build_unit_models_args, build_unit_render_args,
+    build_compat_palette_args, build_config_args, build_config_set_args, build_convert_3do_args,
+    build_custom_params_args, build_defs_probe_args, build_faction_logos_args, build_game_args,
+    build_game_headers_args, build_height_field_args, build_heightmap_args, build_lua_args,
+    build_lua_compat_args, build_lua_repl_args, build_map_info_args, build_map_meta_args,
+    build_map_skybox_args, build_metalmap_args, build_minimap_args, build_skirmish_ai_args,
+    build_thumbnails_args, build_unit_buildpics_args, build_unit_dataset_args,
+    build_unit_defs_args, build_unit_model_args, build_unit_models_args, build_unit_render_args,
     build_unit_render_keys_args, build_unit_script_args, find_unitsync, resolve_sidecar,
 };
 use std::collections::HashMap;
@@ -2190,6 +2190,21 @@ pub fn lua_compat_scan_blocking(
     )
 }
 
+/// The palette a 3do conversion of `archive` would read now, as the worker's
+/// `--compat-palette` answer. Blocking, and not a command of its own: the
+/// compat plugin compares it with the palette a mutator was built with
+/// (issue #4642).
+pub fn compat_palette_blocking(
+    engine_path: &str,
+    data_dir: &str,
+    archive: &str,
+) -> Result<String, String> {
+    let (bin, libpath, engine_dir) = prepare(engine_path)?;
+    let args = build_compat_palette_args(&libpath.to_string_lossy(), data_dir, archive);
+    let envs = loader_envs(&engine_dir, data_dir);
+    run_worker_blocking(bin, args, envs, SCAN_TIMEOUT, "compat palette".into(), None)
+}
+
 /// Convert every `.3do` in `archive` into `out_dir`, as `unitsync_convert_3do`
 /// does, and answer with the worker's result line. Blocking, with no progress
 /// and no cancel: the compat plugin calls it from a blocking task to put a
@@ -2308,6 +2323,35 @@ pub fn unit_defs_blocking(
     let args = build_unit_defs_args(&libpath.to_string_lossy(), data_dir, archive, None);
     let envs = loader_envs(&engine_dir, data_dir);
     run_worker_blocking(bin, args, envs, SCAN_TIMEOUT, "unit defs".into(), None)
+}
+
+/// The game environment a def script expects under unitsync, for a script
+/// [`lua_exec_blocking`] runs that loads the game's defs.
+pub use coilbox_unitsync_worker::defsenv::DEFS_ENV_SHIM;
+
+/// [`unitsync_lua_exec`], blocking, for a script that loads the game's defs:
+/// the worker's `{ result?, error?, errors }` answer for `source` run with
+/// `archive` mounted. It has the time a read of the defs has, as
+/// [`unit_defs_blocking`] does. The compat build runs its def fixes over the
+/// game's defs this way (issue #4686).
+pub fn lua_exec_blocking(
+    engine_path: &str,
+    data_dir: &str,
+    archive: &str,
+    source: &str,
+) -> Result<String, String> {
+    let (bin, libpath, engine_dir) = prepare(engine_path)?;
+    let script = write_temp_script(source)?;
+    let args = build_lua_args(
+        &libpath.to_string_lossy(),
+        data_dir,
+        archive,
+        &script.to_string_lossy(),
+    );
+    let envs = loader_envs(&engine_dir, data_dir);
+    let out = run_worker_blocking(bin, args, envs, SCAN_TIMEOUT, "lua exec".into(), None);
+    let _ = std::fs::remove_file(&script);
+    out
 }
 
 /// What the scan says about an installed game, for matching an adapter to it

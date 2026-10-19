@@ -62,6 +62,8 @@ struct Answer {
     #[serde(default)]
     groups: Vec<Group>,
     #[serde(default)]
+    palette: Option<coilbox_compat::Palette>,
+    #[serde(default)]
     errors: Vec<String>,
 }
 
@@ -78,6 +80,10 @@ pub struct Models {
     /// Where the converter wrote them, or `None` when nothing was converted.
     pub dir: Option<PathBuf>,
     pub conversion: Conversion,
+    /// The palette the conversion read, which the marker records (issue
+    /// #4642). `None` when no model was written, since then it colours
+    /// nothing.
+    pub palette: Option<coilbox_compat::Palette>,
     /// Why the models are not used, when they cannot be. Empty is the ordinary
     /// case.
     pub notes: Vec<String>,
@@ -150,17 +156,22 @@ pub fn convert_reading(
             ..Models::default()
         });
     }
-    let conversion = parse_conversion(&run()?)?;
+    let (conversion, palette) = parse_conversion(&run()?)?;
     Ok(Models {
         dir: Some(staging.to_path_buf()),
         conversion,
+        palette,
         notes: Vec::new(),
     })
 }
 
-/// The converter's result line, or an error when it converted nothing and said
-/// why.
-pub fn parse_conversion(line: &str) -> Result<Conversion, String> {
+/// The converter's result line and the palette it read, or an error when it
+/// converted nothing and said why. The palette is `None` when no model was
+/// written, and a line that wrote a model without naming its palette is an
+/// error, since the marker could not record it.
+pub fn parse_conversion(
+    line: &str,
+) -> Result<(Conversion, Option<coilbox_compat::Palette>), String> {
     let a: Answer = serde_json::from_str(line)
         .map_err(|e| format!("could not read the 3do converter's answer: {e}"))?;
     if a.models_written == 0 && !a.errors.is_empty() {
@@ -169,14 +180,52 @@ pub fn parse_conversion(line: &str) -> Result<Conversion, String> {
             a.errors.join("; ")
         ));
     }
+    let palette = match (a.models_written, a.palette) {
+        (0, _) => None,
+        (_, Some(palette)) => Some(palette),
+        (_, None) => return Err("the 3do converter did not say which palette it read".into()),
+    };
     let mut did_not_fit: Vec<String> = a.groups.into_iter().flat_map(|g| g.did_not_fit).collect();
     did_not_fit.sort();
-    Ok(Conversion {
+    let conversion = Conversion {
         models_found: a.models_found,
         models_written: a.models_written,
         unreadable: a.unreadable,
         did_not_fit,
         errors: a.errors,
+    };
+    Ok((conversion, palette))
+}
+
+/// The palette a conversion of `archive` would read now, through the worker
+/// of the engine at `engine_path`.
+pub fn current_palette(
+    engine_path: &str,
+    data_dir: &str,
+    archive: &str,
+) -> Result<coilbox_compat::Palette, String> {
+    parse_palette(&tauri_plugin_coilbox_unitsync::compat_palette_blocking(
+        engine_path,
+        data_dir,
+        archive,
+    )?)
+}
+
+/// The palette in the worker's `--compat-palette` answer.
+pub fn parse_palette(line: &str) -> Result<coilbox_compat::Palette, String> {
+    #[derive(Deserialize)]
+    struct Answer {
+        palette: Option<coilbox_compat::Palette>,
+        #[serde(default)]
+        errors: Vec<String>,
+    }
+    let a: Answer = serde_json::from_str(line)
+        .map_err(|e| format!("could not read the worker's answer about the palette: {e}"))?;
+    a.palette.ok_or_else(|| {
+        format!(
+            "could not read the palette the game's models take their colours from: {}",
+            a.errors.join("; ")
+        )
     })
 }
 
@@ -447,13 +496,52 @@ mod tests {
     #[test]
     fn a_conversion_that_wrote_nothing_and_said_why_is_an_error() {
         assert!(parse_conversion(r#"{"errors":["could not open archive x"]}"#).is_err());
-        let c = parse_conversion(
-            r#"{"modelsFound":3,"modelsWritten":2,"groups":[{"didNotFit":["b (needs t)"]},{"didNotFit":["a (needs t)"]}],"errors":[]}"#,
+        let (c, _) = parse_conversion(
+            r#"{"modelsFound":3,"modelsWritten":2,"groups":[{"didNotFit":["b (needs t)"]},{"didNotFit":["a (needs t)"]}],"palette":{"source":null,"sha256":null},"errors":[]}"#,
         )
         .unwrap();
         assert_eq!(c.did_not_fit, ["a (needs t)", "b (needs t)"]);
-        let none = parse_conversion(r#"{"modelsFound":0,"modelsWritten":0}"#).unwrap();
+        let (none, _) = parse_conversion(r#"{"modelsFound":0,"modelsWritten":0}"#).unwrap();
         assert_eq!(none.models_found, 0);
+    }
+
+    /// Issue #4642: the palette goes in the marker only when a model was
+    /// written, and a written model whose palette is not named is refused.
+    #[test]
+    fn the_palette_is_kept_only_when_a_model_was_written() {
+        let palette = r#""palette":{"source":"springcontent.sdz","sha256":"ab"}"#;
+        let (_, kept) = parse_conversion(&format!(
+            r#"{{"modelsFound":1,"modelsWritten":1,{palette}}}"#
+        ))
+        .unwrap();
+        assert_eq!(
+            kept,
+            Some(coilbox_compat::Palette {
+                source: Some("springcontent.sdz".into()),
+                sha256: Some("ab".into())
+            })
+        );
+        let (_, dropped) = parse_conversion(&format!(
+            r#"{{"modelsFound":1,"modelsWritten":0,{palette}}}"#
+        ))
+        .unwrap();
+        assert_eq!(dropped, None);
+        let err = parse_conversion(r#"{"modelsFound":1,"modelsWritten":1}"#).unwrap_err();
+        assert!(err.contains("palette"), "{err}");
+    }
+
+    #[test]
+    fn the_workers_palette_answer_is_read_or_its_errors_given() {
+        let found = parse_palette(r#"{"palette":{"source":null,"sha256":null},"errors":[]}"#);
+        assert_eq!(
+            found,
+            Ok(coilbox_compat::Palette {
+                source: None,
+                sha256: None
+            })
+        );
+        let err = parse_palette(r#"{"errors":["could not open archive x.sd7"]}"#).unwrap_err();
+        assert!(err.contains("could not open archive x.sd7"), "{err}");
     }
 
     #[test]

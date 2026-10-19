@@ -55,7 +55,8 @@ use serde::Serialize;
 
 use crate::ffi::Unitsync;
 use crate::unitmodel::{
-    find_with_ext, palette_in, teamtex_in, MODEL_DIR, MODEL_READ_CAP, TATEX_DIR, TEXTURE_READ_CAP,
+    find_with_ext, teamtex_in, MODEL_DIR, MODEL_READ_CAP, PALETTE_FILE, PALETTE_READ_CAP,
+    TATEX_DIR, TEXTURE_READ_CAP,
 };
 
 /// Where the sheets go inside the output, under `unittextures/` so an `.s3o`'s
@@ -77,10 +78,25 @@ pub struct Convert3doOutput {
     /// the same problem: this one is a file coilbox cannot read, and that one is
     /// a file it read fine and had nowhere to paint.
     pub unreadable: BTreeMap<String, String>,
-    /// Every `.3do` found under `objects3d/`.
+    /// Every `.3do` found under `objects3d/`, less those left for the game's
+    /// own `.s3o` of the same name (see `coilbox_compat::keeps_game_s3o`).
     pub models_found: usize,
     /// How many became an `.s3o`.
     pub models_written: usize,
+    /// The palette the conversion read, which the compat marker records
+    /// (issue #4642). `None` when the run stopped before reading it.
+    pub palette: Option<coilbox_compat::Palette>,
+    pub errors: Vec<String>,
+}
+
+/// What `--compat-palette` prints: the palette a conversion of the game would
+/// read now, for the compat plugin to compare with the one a mutator was
+/// built with (issue #4642).
+#[derive(Debug, Default, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CompatPaletteOutput {
+    /// `None` when the game could not be mounted.
+    pub palette: Option<coilbox_compat::Palette>,
     pub errors: Vec<String>,
 }
 
@@ -190,42 +206,88 @@ pub fn render(lib: &str, game_archive: &str, out_dir: &Path, writer: u32) -> Con
         }
     };
     us.init(false, 0);
-    let mut out = convert(&us, game_archive, out_dir, writer);
+    let mut out = Convert3doOutput::default();
+    let mut errors = us.drain_errors();
+    with_mounted(&us, game_archive, &mut errors, |files, errors| {
+        convert_files(files, out_dir, &mut out, writer);
+        errors.append(&mut out.errors);
+    });
+    out.errors = errors;
     out.out_dir = out_dir.display().to_string();
     us.uninit();
     out
 }
 
-/// The run itself, against a session the caller has initialised.
-fn convert(us: &Unitsync, game_archive: &str, out_dir: &Path, writer: u32) -> Convert3doOutput {
-    let mut out = Convert3doOutput {
+/// `--compat-palette`: the palette a conversion of `game_archive` would read,
+/// and the archive it comes from.
+pub fn render_palette(lib: &str, game_archive: &str) -> CompatPaletteOutput {
+    let us = match unsafe { Unitsync::load(Path::new(lib)) } {
+        Ok(u) => u,
+        Err(e) => {
+            return CompatPaletteOutput {
+                errors: vec![e],
+                ..Default::default()
+            }
+        }
+    };
+    us.init(false, 0);
+    let mut out = CompatPaletteOutput {
         errors: us.drain_errors(),
         ..Default::default()
     };
+    out.palette = with_mounted(&us, game_archive, &mut out.errors, |files, _| {
+        read_palette(files).1
+    });
+    us.uninit();
+    out
+}
 
+/// Print a `CompatPaletteOutput` carrying only an error, on the panic path.
+pub fn emit_palette_error(msg: String) {
+    let out = CompatPaletteOutput {
+        errors: vec![msg],
+        ..Default::default()
+    };
+    println!("{}", serde_json::to_string(&out).unwrap_or_default());
+}
+
+/// Mount `game_archive` with its dependencies, open its own archive, and run
+/// `run` on it, against a session the caller has initialised. Unitsync's
+/// errors go into `errors`, and `None` means the game could not be mounted.
+fn with_mounted<T>(
+    us: &Unitsync,
+    game_archive: &str,
+    errors: &mut Vec<String>,
+    run: impl FnOnce(&Mounted<'_>, &mut Vec<String>) -> T,
+) -> Option<T> {
     if !us.add_all_archives(game_archive) {
-        out.errors
-            .push("this engine's libunitsync can't load game archives".into());
-        return out;
+        errors.push("this engine's libunitsync can't load game archives".into());
+        return None;
     }
-    out.errors.extend(us.drain_errors());
+    errors.extend(us.drain_errors());
 
     let handle = crate::archive::resolve_open_path(us, game_archive)
         .as_deref()
         .and_then(|p| us.open_archive(p));
     let Some(handle) = handle else {
         us.remove_all_archives();
-        out.errors
-            .push(format!("could not open archive {game_archive}"));
-        return out;
+        errors.push(format!("could not open archive {game_archive}"));
+        return None;
     };
 
-    convert_files(&Mounted { us, handle }, out_dir, &mut out, writer);
+    let answer = run(
+        &Mounted {
+            us,
+            handle,
+            game: game_archive,
+        },
+        errors,
+    );
 
     us.close_archive(handle);
-    out.errors.extend(us.drain_errors());
+    errors.extend(us.drain_errors());
     us.remove_all_archives();
-    out
+    Some(answer)
 }
 
 /// What a conversion reads out of a game. The run answers it from unitsync,
@@ -239,12 +301,17 @@ pub(crate) trait GameFiles {
     /// A file anywhere the engine would look for it: the game, its
     /// dependencies and the engine's base content.
     fn vfs(&self, path: &str, cap: usize) -> Option<Vec<u8>>;
+    /// The file name of the archive that holds `path` as `bytes`, which
+    /// [`GameFiles::vfs`] gave, or `None` when none can be named.
+    fn source_of(&self, path: &str, bytes: &[u8]) -> Option<String>;
 }
 
 /// The game a unitsync session has mounted, and its own archive opened.
 struct Mounted<'a> {
     us: &'a Unitsync,
     handle: i32,
+    /// The game's own archive, by file name.
+    game: &'a str,
 }
 
 impl GameFiles for Mounted<'_> {
@@ -265,6 +332,42 @@ impl GameFiles for Mounted<'_> {
     fn vfs(&self, path: &str, cap: usize) -> Option<Vec<u8>> {
         self.us.read_vfs_file(path, cap)
     }
+
+    /// Unitsync cannot say which archive a VFS read came from, so each archive
+    /// of the game's set is opened in turn and asked for the member: the
+    /// game's own first, then its dependencies in the order unitsync lists
+    /// them, then the engine's base content. The first that holds the same
+    /// bytes is named.
+    fn source_of(&self, path: &str, bytes: &[u8]) -> Option<String> {
+        let (mut archives, _) = crate::luacompat::archives_to_scan(self.us, self.game);
+        archives.push(BASE_CONTENT.to_string());
+        archives.into_iter().find(|name| {
+            crate::archive::resolve_open_path(self.us, name)
+                .and_then(|file| {
+                    // One byte past, so a longer member is not cut down to a match.
+                    crate::archive::read_archive_member(self.us, &file, path, bytes.len() + 1)
+                })
+                .is_some_and(|found| found == bytes)
+        })
+    }
+}
+
+/// The engine's base content, which every game's archive set ends with
+/// (`GetSpringBaseContentName` in `rts/System/FileSystem/ArchiveScanner.cpp`
+/// names it, and `cont/base/CMakeLists.txt` builds it under this file name).
+const BASE_CONTENT: &str = "springcontent.sdz";
+
+/// The palette in `files`' VFS: parsed for the conversion, and recorded with
+/// the archive it came from for the compat marker (issue #4642).
+fn read_palette(files: &impl GameFiles) -> (Option<coilbox_3do::Palette>, coilbox_compat::Palette) {
+    let bytes = files.vfs(PALETTE_FILE, PALETTE_READ_CAP);
+    let source = bytes
+        .as_deref()
+        .and_then(|bytes| files.source_of(PALETTE_FILE, bytes));
+    (
+        bytes.as_deref().and_then(coilbox_3do::read_palette),
+        coilbox_compat::Palette::of(bytes.as_deref(), source),
+    )
 }
 
 /// Convert every `.3do` in `files` into `out_dir`, adding to `out`, as compat
@@ -276,9 +379,10 @@ fn convert_files(files: &impl GameFiles, out_dir: &Path, out: &mut Convert3doOut
         .map(|path| (path.to_lowercase(), path))
         .collect();
     let teamtex = teamtex_in(&list, |member, cap| files.member(member, cap));
-    let palette = palette_in(|path, cap| files.vfs(path, cap));
+    let (palette, record) = read_palette(files);
+    out.palette = Some(record);
 
-    let groups = plan(&list);
+    let groups = plan(&list, writer);
     out.models_found = groups.iter().map(|g| g.members.len()).sum();
     report(Progress {
         phase: "scan",
@@ -328,8 +432,8 @@ struct Planned {
 /// The naming happens here rather than inside the loop because telling two
 /// folders apart is a question about the whole set of them, and a folder
 /// considered on its own has nothing to be told apart from.
-fn plan(list: &[(String, String)]) -> Vec<Planned> {
-    let groups = group_models(list);
+fn plan(list: &[(String, String)], writer: u32) -> Vec<Planned> {
+    let groups = group_models(list, writer);
     let mut names = sheet_names(groups.keys().cloned());
     groups
         .into_iter()
@@ -349,14 +453,25 @@ fn plan(list: &[(String, String)]) -> Vec<Planned> {
 /// its top folder's sheet and keeps its own path on the way out, because "one
 /// atlas per subfolder" is about how a game groups a faction and a game that
 /// nests further has not made a second faction by doing so.
-fn group_models(list: &[(String, String)]) -> BTreeMap<String, Vec<String>> {
+///
+/// From writer 3 a `.3do` is left out when the game ships an `.s3o` at the same
+/// path in lower case (see `coilbox_compat::keeps_game_s3o`).
+fn group_models(list: &[(String, String)], writer: u32) -> BTreeMap<String, Vec<String>> {
     let prefix = format!("{MODEL_DIR}/");
+    let keeps_s3o = coilbox_compat::keeps_game_s3o(writer);
+    let s3o: BTreeSet<&str> = list
+        .iter()
+        .filter_map(|(lower, _)| lower.strip_suffix(".s3o"))
+        .collect();
     let mut groups: BTreeMap<String, Vec<String>> = BTreeMap::new();
     for (lower, real) in list {
         let Some(rest) = lower.strip_prefix(&prefix) else {
             continue;
         };
-        if !rest.ends_with(".3do") {
+        let Some(stem) = lower.strip_suffix(".3do") else {
+            continue;
+        };
+        if keeps_s3o && s3o.contains(stem) {
             continue;
         }
         let folder = match rest.split_once('/') {
@@ -857,15 +972,18 @@ mod tests {
     /// and shares one sheet, and the models at the top level share one more.
     #[test]
     fn groups_by_the_first_folder_below_objects3d() {
-        let groups = group_models(&listing(&[
-            "Objects3D/armcom.3do",
-            "objects3d/corcom.3do",
-            "objects3d/arm/mech.3do",
-            "objects3d/arm/deep/deeper.3do",
-            "objects3d/core/tank.3do",
-            "objects3d/armcom.s3o",
-            "scripts/armcom.3do",
-        ]));
+        let groups = group_models(
+            &listing(&[
+                "Objects3D/armcom.3do",
+                "objects3d/corcom.3do",
+                "objects3d/arm/mech.3do",
+                "objects3d/arm/deep/deeper.3do",
+                "objects3d/core/tank.3do",
+                "objects3d/other.s3o",
+                "scripts/armcom.3do",
+            ]),
+            coilbox_compat::WRITER,
+        );
 
         assert_eq!(
             groups.keys().collect::<Vec<_>>(),
@@ -888,9 +1006,44 @@ mod tests {
     /// a unit model, so neither is picked up.
     #[test]
     fn takes_only_the_3do_files_under_objects3d() {
-        let groups = group_models(&listing(&["objects3d/a.s3o", "features/b.3do"]));
+        let groups = group_models(
+            &listing(&["objects3d/a.s3o", "features/b.3do"]),
+            coilbox_compat::WRITER,
+        );
 
         assert!(groups.is_empty(), "{groups:?}");
+    }
+
+    /// Issue #4697: from writer 3 a `.3do` is left alone when the game ships an
+    /// `.s3o` at the same path, compared in lower case as the engine does, so
+    /// the game's own model is the one in use. Writer 2 converted it, and the
+    /// converted file covered up the game's.
+    #[test]
+    fn leaves_a_3do_with_a_same_named_s3o_from_writer_3() {
+        let list = listing(&[
+            "objects3d/core_commander.3do",
+            "Objects3D/CORE_COMMANDER.s3o",
+            "objects3d/arm/Mech.3do",
+            "objects3d/arm/mech.s3o",
+            "objects3d/arm/other.3do",
+            "objects3d/tank.3do",
+            "objects3d/arm/tank.s3o",
+        ]);
+
+        let old = group_models(&list, 2);
+        assert_eq!(
+            old[""],
+            ["objects3d/core_commander.3do", "objects3d/tank.3do"]
+        );
+        assert_eq!(
+            old["arm"],
+            ["objects3d/arm/Mech.3do", "objects3d/arm/other.3do"]
+        );
+
+        // tank.3do stays, because the tank.s3o is in another folder.
+        let new = group_models(&list, 3);
+        assert_eq!(new[""], ["objects3d/tank.3do"]);
+        assert_eq!(new["arm"], ["objects3d/arm/other.3do"]);
     }
 
     #[test]
@@ -909,11 +1062,14 @@ mod tests {
     /// without anything failing.
     #[test]
     fn gives_two_folders_different_sheets_when_their_names_sanitise_the_same() {
-        let planned = plan(&listing(&[
-            "objects3d/a b/one.3do",
-            "objects3d/a_b/two.3do",
-            "objects3d/top.3do",
-        ]));
+        let planned = plan(
+            &listing(&[
+                "objects3d/a b/one.3do",
+                "objects3d/a_b/two.3do",
+                "objects3d/top.3do",
+            ]),
+            coilbox_compat::WRITER,
+        );
 
         let stems: Vec<&str> = planned.iter().map(|g| g.stem.as_str()).collect();
         assert_eq!(stems.len(), 3);
@@ -926,11 +1082,14 @@ mod tests {
     /// is converted twice and nothing is dropped before the run starts.
     #[test]
     fn the_plan_covers_every_model_once() {
-        let planned = plan(&listing(&[
-            "objects3d/top.3do",
-            "objects3d/arm/one.3do",
-            "objects3d/arm/two.3do",
-        ]));
+        let planned = plan(
+            &listing(&[
+                "objects3d/top.3do",
+                "objects3d/arm/one.3do",
+                "objects3d/arm/two.3do",
+            ]),
+            coilbox_compat::WRITER,
+        );
 
         let all: Vec<&String> = planned.iter().flat_map(|g| g.members.iter()).collect();
         assert_eq!(all.len(), 3);
@@ -1060,11 +1219,14 @@ mod tests {
         );
     }
 
-    /// A game held in memory, with the VFS answering only `palette.pal`.
+    /// A game held in memory, with the VFS answering only `palette.pal`,
+    /// which it says comes from [`PALETTE_ARCHIVE`].
     struct InMemory {
         files: Vec<(String, Vec<u8>)>,
-        palette: Vec<u8>,
+        palette: Option<Vec<u8>>,
     }
+
+    const PALETTE_ARCHIVE: &str = "springcontent.sdz";
 
     impl GameFiles for InMemory {
         fn list(&self) -> Vec<String> {
@@ -1077,8 +1239,14 @@ mod tests {
         }
 
         fn vfs(&self, path: &str, cap: usize) -> Option<Vec<u8>> {
+            let palette = self.palette.as_ref()?;
             (path == "unittextures/tatex/palette.pal")
-                .then(|| self.palette[..self.palette.len().min(cap)].to_vec())
+                .then(|| palette[..palette.len().min(cap)].to_vec())
+        }
+
+        fn source_of(&self, path: &str, bytes: &[u8]) -> Option<String> {
+            (path == "unittextures/tatex/palette.pal" && self.palette.as_deref() == Some(bytes))
+                .then(|| PALETTE_ARCHIVE.to_string())
         }
     }
 
@@ -1199,6 +1367,8 @@ mod tests {
                 "objects3d/arm/deep/flyer.3do",
                 a_3do(&[Named("armtex"), Palette(3)]),
             ),
+            // The game's own model of flyer.3do's name (issue #4697).
+            ("Objects3D/Arm/Deep/FLYER.s3o", b"the game's own".to_vec()),
             ("objects3d/a b/x.3do", a_3do(&[Named("armtex")])),
             ("objects3d/a_b/y.3do", a_3do(&[Named("bare")])),
             ("objects3d/huge/one.3do", a_3do(&[Named("big")])),
@@ -1251,7 +1421,7 @@ mod tests {
                 .into_iter()
                 .map(|(path, bytes)| (path.to_string(), bytes))
                 .collect(),
-            palette,
+            palette: Some(palette),
         }
     }
 
@@ -1285,10 +1455,19 @@ mod tests {
     /// The fixed game converted by compat writer `writer`, as every file
     /// written.
     fn convert_the_game(name: &str, writer: u32) -> (Convert3doOutput, Vec<(String, Vec<u8>)>) {
+        convert_game(&a_game(), name, writer)
+    }
+
+    /// `game` converted by compat writer `writer`, as every file written.
+    fn convert_game(
+        game: &InMemory,
+        name: &str,
+        writer: u32,
+    ) -> (Convert3doOutput, Vec<(String, Vec<u8>)>) {
         let dir = std::env::temp_dir().join(format!("cbx-{name}-{writer}-{}", std::process::id()));
         let _ = std::fs::remove_dir_all(&dir);
         let mut out = Convert3doOutput::default();
-        convert_files(&a_game(), &dir, &mut out, writer);
+        convert_files(game, &dir, &mut out, writer);
         let files = written(&dir);
         let _ = std::fs::remove_dir_all(&dir);
         (out, files)
@@ -1306,7 +1485,10 @@ mod tests {
         let (out, files) = convert_the_game("rules", coilbox_compat::WRITER);
         let paths: Vec<&str> = files.iter().map(|(p, _)| p.as_str()).collect();
         assert!(out.errors.is_empty(), "{:?}", out.errors);
-        assert_eq!(out.models_found, 10);
+        assert_eq!(
+            out.models_found, 9,
+            "flyer.3do is left for the game's own .s3o"
+        );
         assert!(out.unreadable.contains_key("objects3d/broken.3do"));
         assert!(paths.contains(&"objects3d/armcom.s3o"), "{paths:?}");
         assert!(
@@ -1349,6 +1531,63 @@ mod tests {
         assert_eq!(huge.models_written, 2);
     }
 
+    /// Issue #4697, through the whole conversion: the game ships its own
+    /// `flyer.s3o`, so writer 3 writes none of its own over it, and the rest of
+    /// the `arm` folder is still converted.
+    #[test]
+    fn a_model_the_game_ships_as_an_s3o_is_not_written_from_writer_3() {
+        let flyer = "objects3d/arm/deep/flyer.s3o";
+        let (old, files) = convert_the_game("keep-old", 2);
+        assert!(files.iter().any(|(p, _)| p == flyer));
+        assert_eq!(old.models_found, 10);
+
+        let (new, files) = convert_the_game("keep-new", 3);
+        let paths: Vec<&str> = files.iter().map(|(p, _)| p.as_str()).collect();
+        assert!(!paths.contains(&flyer), "{paths:?}");
+        assert!(paths.contains(&"objects3d/arm/mech.s3o"), "{paths:?}");
+        assert_eq!(new.models_found, 9);
+        assert_eq!(group(&new, "objects3d/arm").models_written, 1);
+        assert_eq!(new.models_written, old.models_written - 1);
+    }
+
+    /// Issue #4642: the conversion says which palette it read and where from,
+    /// for the compat marker to record.
+    #[test]
+    fn a_conversion_records_the_palette_it_read() {
+        let game = a_game();
+        let (out, _) = convert_game(&game, "palette-record", coilbox_compat::WRITER);
+        let record = out.palette.expect("a palette record");
+        assert_eq!(record.source.as_deref(), Some(PALETTE_ARCHIVE));
+        assert_eq!(
+            record,
+            coilbox_compat::Palette::of(game.palette.as_deref(), Some(PALETTE_ARCHIVE.into()))
+        );
+    }
+
+    /// Another `palette.pal`, or none at all, changes the colours the faces
+    /// that name no texture get, and the record says so.
+    #[test]
+    fn another_palette_or_none_is_recorded_as_such() {
+        let (first, _) = convert_game(&a_game(), "palette-a", coilbox_compat::WRITER);
+        let mut other = a_game();
+        other.palette.as_mut().unwrap()[3 * 4] = 11;
+        let (second, _) = convert_game(&other, "palette-b", coilbox_compat::WRITER);
+        let (first, second) = (first.palette.unwrap(), second.palette.unwrap());
+        assert!(!first.same_bytes(&second));
+
+        let mut none = a_game();
+        none.palette = None;
+        let (out, _) = convert_game(&none, "palette-none", coilbox_compat::WRITER);
+        assert_eq!(
+            out.palette,
+            Some(coilbox_compat::Palette {
+                source: None,
+                sha256: None
+            })
+        );
+        assert_eq!(group(&out, "objects3d").palette_faces, 2, "both grey now");
+    }
+
     /// Every file one conversion of the fixed game writes, hashed, for each
     /// compat writer. The models and sheets go into a compat mutator, which two
     /// players have to build byte for byte from one manifest (issue #4629). A
@@ -1362,6 +1601,10 @@ mod tests {
         (
             2,
             "9a3e39f798db4c265b252fb6acadab8653f81735544764d9ac0d4f9779c4bf02",
+        ),
+        (
+            3,
+            "438e539e2546638f9a29237044b9f3d99a779f14f9dbdbc7fae5dddc4475bc09",
         ),
     ];
 

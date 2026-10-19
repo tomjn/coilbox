@@ -15,9 +15,10 @@ The folder holds:
 - The old game's Lua entry files, each with the prelude loaded first: `LuaRules/main.lua`, `LuaRules/draw.lua`, `LuaGaia/main.lua`, `LuaGaia/draw.lua`, `luaui.lua` or else `LuaUI/main.lua`, and `LuaIntro/main.lua`. Only the files the game has are written. The `VFS.Include` of the prelude goes on the original's first line, so every line keeps its number in an error.
 - `LuaRules/Gadgets/coilbox_compat_<name>.lua`, one per gadget fix.
 - `gamedata/defs_post.lua`, which points units, features and weapons at the converted models, runs the def fixes for that file, and then runs the engine's own copy.
+- `compat/models/standin-<x>x<z>.s3o` and `compat/models/standin.tga`, the boxes the def fix `defs-missing-model-standin` points a def at when its model is missing. The build runs that fix over the game's defs through the unitsync worker to learn which footprints need a box, and always writes the 1x1 one. A build whose run fails stops, because the boxes are part of the folder's bytes.
 - `gamedata/weapondefs_post.lua`, which runs the weapon def fixes and then the engine's own copy.
 - The converted models under `objects3d/`, with their textures under `unittextures/3do/`.
-- `.coilbox-compat.json`, which records the manifest version, the writer, the old game's checksum and the coilbox version that built it.
+- `.coilbox-compat.json`, which records the manifest version, the writer, the old game's checksum, the coilbox version that built it, and the palette the converted models took their colours from.
 
 A game that ships its own `gamedata/defs_post.lua` or `gamedata/weapondefs_post.lua` would have it covered up by the generated one. So coilbox writes neither file for such a game, and the player's build result says so. The same happens when the game's own `gamedata/defs.lua` or `gamedata/weapondefs.lua` never loads the file.
 
@@ -27,13 +28,15 @@ Players in a multiplayer battle compare archive checksums. Coilbox writes the fo
 
 The record file is the one file that differs, because it names the coilbox version. Its name starts with a dot, and the engine leaves such files out of an archive's checksum (`CreateIgnoreFilter` in `rts/System/FileSystem/ArchiveScanner.cpp`).
 
+One input of the build is not in the old game's archive. A `.3do` face that names no texture takes its colour from `unittextures/tatex/palette.pal`, which the worker reads through the engine's file system, so it can come from a dependency or the engine's own `springcontent.sdz`. The game's checksum does not cover it. So when a build converts any model, the record file names the archive the palette came from and the SHA-256 of its bytes, and coilbox reads the palette again each time it checks whether the build is current. Different bytes, or a palette that is no longer there, mark the build out of date. The same bytes from another archive do not, because they give the same colours.
+
 Nobody downloads a generated game. A player who joins a battle on `<game> (compat <n>)` has coilbox build manifest `<n>` from their own copy of the old game.
 
 ## How the fixes run in a game
 
 Each prelude fix and def fix runs as a function inside `pcall`. A fix that fails logs `coilbox compat fix <id> failed: <error>` to the `coilbox-compat` log section, and the game's own Lua still loads.
 
-The prelude's first fix, `compat-callin-hooks`, gives the others `compat.define`. That puts a function in place only when nothing is there already, so a game that defines its own keeps it.
+The prelude's first fix, `compat-callin-hooks-v2` (`compat-callin-hooks` in manifests 2 to 8), gives the others `compat.define`. That puts a function in place only when nothing is there already, so a game that defines its own keeps it.
 
 Each gadget decides when the game loads whether the game needs it, from the game's own files. Every game built from one manifest gets the same gadget files. A gadget's name starts with `coilbox_compat_`, so it can be told apart from the game's own in the log.
 
@@ -98,18 +101,18 @@ To change a fix, add a new fix with a new id, and a new manifest that lists it i
 
 `hashes.txt` is what holds this in place. The test `recorded_hashes_match_the_embedded_fixes` in `coilbox-compat` fails for a listed fix whose file no longer matches its recorded hash, with "changed after it was listed. Add a new fix with a new id instead".
 
-The call-in adapters in `ADAPTERS` in `crates/coilbox-compat/src/lib.rs` follow the same rule. They decide which of the `UnitDamaged` and `AllowCommand` fixes a game gets, so changing one needs a new manifest too.
+The call-in adapters in `ADAPTERS` in `crates/coilbox-compat/src/lib.rs` follow the same rule. They decide which of the `UnitDamaged`, `AllowCommand` and `Spring.GetTeamInfo` fixes a game gets, so changing one needs a new manifest too. A call-in adapter reads the arguments a game's handlers take. The `Spring.GetTeamInfo` one reads the names a game's calls put the results in, such as `teamOptions` in `local _, _, _, _, _, _, teamOptions = Spring.GetTeamInfo(teamID)`. A call inside `select` is not read, so it decides nothing.
 
 ## Add a fix
 
 1. Write the fix as `lua/compat/<id>.lua`, `lua/compat/gadgets/<id>.lua` or `lua/compat/defs/<id>.lua`, with the header above. The file must end in a newline and have no carriage returns. All of it must be your own code. Copy nothing from the engine's `examples/Widgets` or `cont/LuaUI`, or from any game.
 2. Add `(id, include_str!(...))` to `FIXES` in `crates/coilbox-compat/src/lib.rs`, which is in alphabetical order by id.
-3. Copy the newest manifest to `lua/compat/manifests/<n>.json`, with `<n>` one higher. Set `version` to `<n>` and add the new id to `fixes`. `compat-callin-hooks` must stay first among the prelude fixes, and `defs-helpers` first among the def fixes.
+3. Copy the newest manifest to `lua/compat/manifests/<n>.json`, with `<n>` one higher. Set `version` to `<n>` and add the new id to `fixes`. `compat-callin-hooks-v2` must stay first among the prelude fixes, and `defs-helpers` first among the def fixes.
 4. Add `(<n>, include_str!("../../../lua/compat/manifests/<n>.json"))` to `MANIFESTS` in the same file.
 5. Record the hash. Run `shasum -a 256` on the fix file and add a line of the hash, two spaces and the id to `lua/compat/manifests/hashes.txt`.
-6. For a def fix, add its id to `COUNTED` in `crates/tauri-plugin-coilbox-compat/src/defs.rs` and count the definitions it changes in `changed` there. The test `every_def_fix_but_the_helpers_is_counted` fails until you do.
+6. For a def fix, add its id to `COUNTED` in `crates/tauri-plugin-coilbox-compat/src/defs.rs` and count the definitions it changes in `changed` there. The test `every_def_fix_but_the_helpers_is_counted` fails until you do. `defs-missing-model-standin` is the exception: the build counts what it changes from its own run of the fix, in `standins.rs`.
 7. For a gadget fix, add what it would act on to `gadgetFinding` in `src/content/compatReport.ts`, so the report's "Compatibility gadgets a build turns on" row lists it.
-8. Add tests to `lua/compat/tests/`, in `prelude_test.lua`, `gadgets_test.lua` or `defs_test.lua`, and run `scripts/mission-tests.sh`.
+8. Add tests to `lua/compat/tests/`, in `prelude_test.lua`, `gadgets_test.lua` or `defs_test.lua`, and run `scripts/mission-tests.sh`. The tests run a synced fix in a state without `rawequal`, `rawget`, `rawset`, `newproxy`, `gcinfo`, `collectgarbage` and the file loaders, as the engine's synced Lua has none of them. A fix that calls one fails there.
 9. Add the golden line. Run `cargo test -p tauri-plugin-coilbox-compat the_fixed_games_build_the_same_bytes_from_every_manifest`. It fails and prints the hash it built for each manifest. Add the new manifest's line to `GOLDEN` in `crates/tauri-plugin-coilbox-compat/src/lib.rs`. Every older line must come out the same as before. If one has moved, read the next section first.
 
 Players get the new manifest when they update coilbox. Their switches stay on, and each game shows Rebuild until they rebuild it.
@@ -133,9 +136,9 @@ A line that moves for a manifest that already shipped is a bug, never a hash to 
 3. Add a manifest that names the new writer.
 4. Add the new manifest's golden line, and the new writer's hash where a worker test keeps one per writer. Every older line stays the same.
 
-A coilbox also refuses a manifest whose `converter` does not match its own `coilbox-3do-convert` version. That pin has one version per coilbox, so moving it makes every older manifest one the new coilbox cannot build.
+The 3do converter follows the same rule. A manifest's `converter` records the `coilbox-3do-convert` version it was made with, but coilbox does not check that version when it builds, so raising the crate's version leaves every manifest buildable. A change to what the converter writes for a model or a sheet is a writer change like any other. Keep the old output for the older writers by passing the writer down to the converter, and put the new output behind a check beside `WRITER`. Two more golden tests fail when the converter's output moves, `a_fixed_conversion_writes_the_same_bytes` and `the_sheet_png_is_the_same_bytes` in `crates/coilbox-3do-convert/src/lib.rs`.
 
-The test `the_lua_tests_load_the_preludes_this_crate_builds` checks the preludes for manifest 2 that the Lua tests load from `lua/compat/tests/fixtures/`. After a deliberate change to how a prelude is built, run it with `COILBOX_WRITE_FIXTURE=1` to write them again.
+The test `the_lua_tests_load_the_preludes_this_crate_builds` checks the preludes for manifests 9, 11, 12, 14 and 15 that the Lua tests load from `lua/compat/tests/fixtures/`. After a deliberate change to how a prelude is built, run it with `COILBOX_WRITE_FIXTURE=1` to write them again.
 
 ## Run the tests
 

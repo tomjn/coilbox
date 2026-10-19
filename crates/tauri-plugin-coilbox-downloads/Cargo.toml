@@ -18,6 +18,7 @@ serde_json = { workspace = true }
 picoframe-core = "0.0.4"
 coilbox-proc = { path = "../coilbox-proc" }
 coilbox-portable = { path = "../coilbox-portable" }
+coilbox-ui-error = { path = "../coilbox-ui-error" }
 # Rapid-repo browsing: fetch gzipped index files over HTTPS and inflate them.
 # rustls-tls avoids an OpenSSL build dependency across platforms.
 reqwest = { version = "0.12", default-features = false, features = ["rustls-tls"] }

@@ -22,6 +22,7 @@
 
 import { defineCommand } from "@picoframe/plugin-sdk";
 import { Channel } from "@tauri-apps/api/core";
+import { describeError } from "@/i18n/uiError";
 import {
   type AssetOutcome,
   reportAssetUploadFailure,
@@ -168,7 +169,7 @@ export async function uploadAssetsToHub(
     });
     return { outcomes, written: written(outcomes), error: null };
   } catch (e) {
-    const said = e instanceof Error ? e.message : String(e);
+    const said = describeError(e);
     reportAssetUploadFailure(said, assets.length, options.startedBy, run);
     return { outcomes: [], written: 0, error: said };
   }

@@ -98,6 +98,7 @@ pub use package::write_sdz_entries;
 pub use preflight::{preflight, PreflightReport};
 pub use tweak_pack::{pack as pack_tweak_slots, TweakSlotPack};
 
+use coilbox_ui_error::UiError;
 use picoframe_core::CliResult;
 use serde::Serialize;
 use std::collections::BTreeMap;
@@ -105,6 +106,33 @@ use tauri::{
     plugin::{Builder, TauriPlugin},
     AppHandle, Runtime,
 };
+
+/// Codes for the refusals a player reads (issue #4596). The frontend's message
+/// table in `src/i18n/uiError.ts` has an entry for each.
+pub mod codes {
+    pub const TEST_NO_EDITS: &str = "workshop.test.no_edits";
+    pub const PACKAGE_NO_EDITS: &str = "workshop.package.no_edits";
+    pub const PACKAGE_BLOCKERS: &str = "workshop.package.blockers";
+    pub const TWEAK_SLOTS_EXPLOSION_EFFECT: &str = "workshop.tweak_slots.explosion_effect";
+    pub const TWEAK_SLOTS_NO_EDITS: &str = "workshop.tweak_slots.no_edits";
+    pub const TWEAK_SLOTS_BLOCKERS: &str = "workshop.tweak_slots.blockers";
+}
+
+/// The refusal for a preflight that found blockers. The frontend pluralises
+/// `count`, and `blockers` is the checks' own English text, joined.
+fn blockers_error(code: &'static str, blockers: &[String], fallback_tail: &str) -> UiError {
+    let count = blockers.len();
+    let joined = blockers.join("; ");
+    UiError::new(
+        code,
+        format!(
+            "{count} blocker{} {fallback_tail}: {joined}",
+            if count == 1 { "" } else { "s" },
+        ),
+    )
+    .param("count", count)
+    .param("blockers", joined)
+}
 
 /// A payload in the envelope the frontend unwraps.
 ///
@@ -187,9 +215,10 @@ fn workshop_test_mutator(
         &base_copies.unwrap_or_default(),
     );
     if compiled.files.is_empty() {
-        return CliResult::err(
+        return CliResult::err(UiError::new(
+            codes::TEST_NO_EDITS,
             "This project has no edits a mutator archive can carry, so there is nothing to test.",
-        );
+        ));
     }
     let dir = match mutator::mutator_dir(&data_dir) {
         Ok(dir) => dir,
@@ -307,17 +336,17 @@ fn workshop_package_mutator(
     let project = loads_as::with_written(&project, &written.unwrap_or_default());
     let compiled = compile(&project);
     if compiled.files.is_empty() {
-        return CliResult::err(
+        return CliResult::err(UiError::new(
+            codes::PACKAGE_NO_EDITS,
             "This project has no edits a mutator archive can carry, so there is nothing to package.",
-        );
+        ));
     }
     let report = preflight(&project, &compiled);
     if !report.blockers.is_empty() {
-        return CliResult::err(format!(
-            "{} blocker{} would reach whoever plays this broken, so it was not packaged: {}",
-            report.blockers.len(),
-            if report.blockers.len() == 1 { "" } else { "s" },
-            report.blockers.join("; "),
+        return CliResult::err(blockers_error(
+            codes::PACKAGE_BLOCKERS,
+            &report.blockers,
+            "would reach whoever plays this broken, so it was not packaged",
         ));
     }
     let files = package::versioned_files(&project, compiled.files, version);
@@ -357,23 +386,24 @@ fn workshop_pack_tweak_slots(project: ModProject, written: Option<loads_as::Writ
     // way an empty project is, rather than packed with a reference nothing
     // in the lobby will deliver.
     if !project.edits.explosion_generators.is_empty() {
-        return CliResult::err(
+        return CliResult::err(UiError::new(
+            codes::TWEAK_SLOTS_EXPLOSION_EFFECT,
             "This project has a custom explosion effect. A tweak slot cannot carry the effects file it needs, so packing it into a lobby chat line would silently break it. Use the mutator or edit-in-place route instead.",
-        );
+        ));
     }
     let compiled = compile(&project);
     if compiled.chunks.is_empty() {
-        return CliResult::err(
+        return CliResult::err(UiError::new(
+            codes::TWEAK_SLOTS_NO_EDITS,
             "This project has no edits, so there is nothing to pack for a lobby.",
-        );
+        ));
     }
     let report = preflight(&project, &compiled);
     if !report.blockers.is_empty() {
-        return CliResult::err(format!(
-            "{} blocker{} would reach the lobby broken, so it was not packed: {}",
-            report.blockers.len(),
-            if report.blockers.len() == 1 { "" } else { "s" },
-            report.blockers.join("; "),
+        return CliResult::err(blockers_error(
+            codes::TWEAK_SLOTS_BLOCKERS,
+            &report.blockers,
+            "would reach the lobby broken, so it was not packed",
         ));
     }
     envelope(&tweak_pack::pack(&compiled.chunks))
@@ -717,6 +747,15 @@ mod tests {
     use crate::model::BuildMenuOp;
     use serde_json::Value;
 
+    /// The `UiError` a refused command carries in its `error` string.
+    fn refusal(response: &Value) -> UiError {
+        let text = response
+            .get("error")
+            .and_then(Value::as_str)
+            .expect("an error string");
+        UiError::parse(text).expect("a UiError, not plain text")
+    }
+
     /// One project in the shape the frame settings store really holds, written
     /// by `src/workshop/savedProjectGolden.test.ts` from the five stores' own
     /// functions. See that file for how it stays current.
@@ -941,10 +980,7 @@ mod tests {
         let response = serde_json::to_value(&result).expect("the answer serialises");
 
         assert_eq!(response.get("success"), Some(&Value::Bool(false)));
-        assert!(response
-            .get("error")
-            .and_then(Value::as_str)
-            .is_some_and(|e| e.contains("nothing to test")));
+        assert_eq!(refusal(&response).code, codes::TEST_NO_EDITS);
     }
 
     /// The same empty-project refusal, for the packaging route (issue #1283).
@@ -964,10 +1000,7 @@ mod tests {
         let response = serde_json::to_value(&result).expect("the answer serialises");
 
         assert_eq!(response.get("success"), Some(&Value::Bool(false)));
-        assert!(response
-            .get("error")
-            .and_then(Value::as_str)
-            .is_some_and(|e| e.contains("nothing to package")));
+        assert_eq!(refusal(&response).code, codes::PACKAGE_NO_EDITS);
         assert!(!dest.exists(), "nothing should have been written");
     }
 
@@ -1057,10 +1090,9 @@ mod tests {
         let response = serde_json::to_value(&result).expect("the answer serialises");
 
         assert_eq!(response.get("success"), Some(&Value::Bool(false)));
-        assert!(response
-            .get("error")
-            .and_then(Value::as_str)
-            .is_some_and(|e| e.contains("blocker") && e.contains("supercom")));
+        let error = refusal(&response);
+        assert_eq!(error.code, codes::PACKAGE_BLOCKERS);
+        assert!(error.params["blockers"].contains("supercom"));
         assert!(!dest.exists(), "nothing should have been written");
     }
 
@@ -1072,10 +1104,7 @@ mod tests {
             .expect("the answer serialises");
 
         assert_eq!(response.get("success"), Some(&Value::Bool(false)));
-        assert!(response
-            .get("error")
-            .and_then(Value::as_str)
-            .is_some_and(|e| e.contains("nothing to pack")));
+        assert_eq!(refusal(&response).code, codes::TWEAK_SLOTS_NO_EDITS);
     }
 
     /// A lobby chat line going out to other people is exactly the case a
@@ -1099,10 +1128,20 @@ mod tests {
             .expect("the answer serialises");
 
         assert_eq!(response.get("success"), Some(&Value::Bool(false)));
-        assert!(response
-            .get("error")
-            .and_then(Value::as_str)
-            .is_some_and(|e| e.contains("blocker") && e.contains("supercom")));
+        let error = refusal(&response);
+        assert_eq!(error.code, codes::TWEAK_SLOTS_BLOCKERS);
+        assert!(error.params["blockers"].contains("supercom"));
+    }
+
+    #[test]
+    fn a_blockers_refusal_carries_the_count_for_the_frontend_to_pluralise() {
+        let one = blockers_error(codes::PACKAGE_BLOCKERS, &["a".into()], "tail");
+        assert_eq!(one.params["count"], "1");
+        assert_eq!(one.fallback, "1 blocker tail: a");
+        let two = blockers_error(codes::PACKAGE_BLOCKERS, &["a".into(), "b".into()], "tail");
+        assert_eq!(two.params["count"], "2");
+        assert_eq!(two.params["blockers"], "a; b");
+        assert_eq!(two.fallback, "2 blockers tail: a; b");
     }
 
     /// A patch against a unit's second weapon and not its first (issue
@@ -1154,10 +1193,7 @@ mod tests {
         let result = workshop_pack_tweak_slots(project, None);
         let response = serde_json::to_value(&result).expect("the answer serialises");
         assert_eq!(response.get("success"), Some(&Value::Bool(false)));
-        assert!(response["error"]
-            .as_str()
-            .expect("error string")
-            .contains("explosion effect"));
+        assert_eq!(refusal(&response).code, codes::TWEAK_SLOTS_EXPLOSION_EFFECT);
     }
 
     /// The whole point of the fixture: a project saved by the app, through the

@@ -8,6 +8,7 @@ import { loadBrandingCatalog, resolveBranding } from "@/content/branding";
 import { isSddName, isSdpName } from "@/content/format";
 import { buildTechForest } from "@/content/techForest";
 import { dlRapidReleaseArchives } from "@/downloads/bindings";
+import { describeError } from "@/i18n/uiError";
 import type {
   HubSweepProgress,
   HubSweepReport,
@@ -447,7 +448,7 @@ export async function sweepGameFacts(
     } catch (e) {
       report.failed.push({
         game: name,
-        said: e instanceof Error ? e.message : String(e),
+        said: describeError(e),
       });
     }
   }

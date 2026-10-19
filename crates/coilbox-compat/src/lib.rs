@@ -35,7 +35,7 @@
 
 use std::collections::BTreeMap;
 
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 
 /// The `license` every fix carries, as in `lua/LICENSE.md`.
@@ -51,6 +51,13 @@ const MANIFESTS: &[(u32, &str)] = &[
     (6, include_str!("../../../lua/compat/manifests/6.json")),
     (7, include_str!("../../../lua/compat/manifests/7.json")),
     (8, include_str!("../../../lua/compat/manifests/8.json")),
+    (9, include_str!("../../../lua/compat/manifests/9.json")),
+    (10, include_str!("../../../lua/compat/manifests/10.json")),
+    (11, include_str!("../../../lua/compat/manifests/11.json")),
+    (12, include_str!("../../../lua/compat/manifests/12.json")),
+    (13, include_str!("../../../lua/compat/manifests/13.json")),
+    (14, include_str!("../../../lua/compat/manifests/14.json")),
+    (15, include_str!("../../../lua/compat/manifests/15.json")),
 ];
 
 /// Every fix file, by id.
@@ -68,6 +75,10 @@ const FIXES: &[(&str, &str)] = &[
         include_str!("../../../lua/compat/compat-callin-hooks.lua"),
     ),
     (
+        "compat-callin-hooks-v2",
+        include_str!("../../../lua/compat/compat-callin-hooks-v2.lua"),
+    ),
+    (
         "defs-commander-85",
         include_str!("../../../lua/compat/defs/defs-commander-85.lua"),
     ),
@@ -76,8 +87,16 @@ const FIXES: &[(&str, &str)] = &[
         include_str!("../../../lua/compat/defs/defs-helpers.lua"),
     ),
     (
+        "defs-icon-type-2025",
+        include_str!("../../../lua/compat/defs/defs-icon-type-2025.lua"),
+    ),
+    (
         "defs-manual-bomb-settings-92",
         include_str!("../../../lua/compat/defs/defs-manual-bomb-settings-92.lua"),
+    ),
+    (
+        "defs-missing-model-standin",
+        include_str!("../../../lua/compat/defs/defs-missing-model-standin.lua"),
     ),
     (
         "defs-model-center-offset-89",
@@ -116,12 +135,36 @@ const FIXES: &[(&str, &str)] = &[
         include_str!("../../../lua/compat/game-identity.lua"),
     ),
     (
+        "game-version-104",
+        include_str!("../../../lua/compat/game-version-104.lua"),
+    ),
+    (
+        "luaui-main-include",
+        include_str!("../../../lua/compat/luaui-main-include.lua"),
+    ),
+    (
         "gl-smoothing",
         include_str!("../../../lua/compat/gl-smoothing.lua"),
     ),
     (
+        "snext-spairs-sipairs",
+        include_str!("../../../lua/compat/snext-spairs-sipairs.lua"),
+    ),
+    (
+        "spring-get-team-info-105",
+        include_str!("../../../lua/compat/spring-get-team-info-105.lua"),
+    ),
+    (
+        "spring-ground-info-105",
+        include_str!("../../../lua/compat/spring-ground-info-105.lua"),
+    ),
+    (
         "spring-make-font",
         include_str!("../../../lua/compat/spring-make-font.lua"),
+    ),
+    (
+        "spring-rules-param-105",
+        include_str!("../../../lua/compat/spring-rules-param-105.lua"),
     ),
     (
         "spring-set-unit-to-feature",
@@ -130,6 +173,10 @@ const FIXES: &[(&str, &str)] = &[
     (
         "spring-sun-parameters",
         include_str!("../../../lua/compat/spring-sun-parameters.lua"),
+    ),
+    (
+        "spring-unit-lineage",
+        include_str!("../../../lua/compat/spring-unit-lineage.lua"),
     ),
     (
         "spring-unit-travel",
@@ -175,7 +222,7 @@ pub struct Converter {
 /// the bytes keeps the old behaviour for the writers that had it and puts the
 /// new one behind a new writer: move this, add a manifest that names it, and
 /// record the new writer's hashes beside the old ones.
-pub const WRITER: u32 = 2;
+pub const WRITER: u32 = 3;
 
 /// Whether this build can write a manifest that names `writer`.
 pub fn knows_writer(writer: u32) -> bool {
@@ -196,13 +243,20 @@ pub fn copies_entry_bytes(writer: u32) -> bool {
     writer >= 2
 }
 
+/// Whether `writer` leaves a `.3do` unconverted when the game ships an `.s3o`
+/// at the same path, compared in lower case (issue #4697). Writer 2 converted
+/// it, and the converted file covered up the game's own model.
+pub fn keeps_game_s3o(writer: u32) -> bool {
+    writer >= 3
+}
+
 /// The writer of manifests 1 and 2, which predate the `writer` field.
 fn first_writer() -> u32 {
     1
 }
 
-/// One compat version: the fixes that make it up and the converter and writer
-/// it pins.
+/// One compat version: the fixes that make it up, the converter it was made
+/// with and the writer it pins.
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
 pub struct Manifest {
     pub version: u32,
@@ -251,6 +305,38 @@ fn hex(bytes: &[u8]) -> String {
 /// The SHA-256 of a fix's source, as lowercase hex.
 pub fn fix_hash(source: &str) -> String {
     hex(&Sha256::digest(source.as_bytes()))
+}
+
+/// The Total Annihilation palette a mutator's 3do conversion read (issue
+/// #4642). A face that names no texture takes its colour from
+/// `unittextures/tatex/palette.pal`, which the worker reads through the VFS,
+/// so it can come from the game, a dependency or the engine's base content.
+/// The base archive's checksum covers none but the first, so the marker
+/// records this, and a mutator whose palette has changed since is stale.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Palette {
+    /// The file name of the archive in the game's set that holds those bytes,
+    /// or `None` when there were none or no archive in the set could be named.
+    pub source: Option<String>,
+    /// The SHA-256 of the bytes, or `None` when nothing answered to the name.
+    pub sha256: Option<String>,
+}
+
+impl Palette {
+    /// The record of `bytes`, the palette file the VFS gave, found in `source`.
+    pub fn of(bytes: Option<&[u8]>, source: Option<String>) -> Palette {
+        Palette {
+            source: bytes.and(source),
+            sha256: bytes.map(|b| hex(&Sha256::digest(b))),
+        }
+    }
+
+    /// Whether `other` gives a conversion the same colours. Only the bytes
+    /// decide that, so the same file found in another archive is the same.
+    pub fn same_bytes(&self, other: &Palette) -> bool {
+        self.sha256 == other.sha256
+    }
 }
 
 /// Reads `<hash>  <id>` lines, skipping blanks and `#` comments.
@@ -586,20 +672,44 @@ pub fn defs_block(manifest: &Manifest, file: DefsFile) -> Option<String> {
     Some(out)
 }
 
-/// A prelude fix that puts a call-in's arguments back in an older order, and
-/// how to tell a handler written for the current order.
+/// A prelude fix that puts a call-in's arguments or a function's results back
+/// in an older order, and how to tell Lua written for the current order.
 struct Adapter {
     fix: &'static str,
     /// The catalogue entry the fix addresses, which the scan of a game's Lua
-    /// names a handler's call-in by.
+    /// names a handler's call-in or a called function by.
     entry: &'static str,
-    /// The 0-based position of the first argument the change moved.
-    moved: usize,
-    /// How many arguments the old list had.
-    old_len: usize,
-    /// Part of the name of the argument the change added, lower case. The old
-    /// list has nothing by that name.
-    added: &'static str,
+    change: Change,
+}
+
+enum Change {
+    /// A call-in's arguments, which a handler names.
+    Arguments {
+        /// The 0-based position of the first argument the change moved.
+        moved: usize,
+        /// How many arguments the old list had.
+        old_len: usize,
+        /// Part of the name of the argument the change added, lower case. The
+        /// old list has nothing by that name.
+        added: &'static str,
+    },
+    /// A function's results, which a call names by assigning them, where the
+    /// change put one result in front of the old list.
+    Results {
+        /// Part of the name of each old result, lower case, in the old order.
+        old: &'static [&'static str],
+        /// Part of the name of the result the change put first.
+        added: &'static str,
+    },
+    /// A function's results, which a call names by assigning them, where the
+    /// change swapped results around and the list kept its length.
+    Swapped {
+        /// The 0-based position of the first result the change moved.
+        moved: usize,
+        /// 0-based positions, each with words whose presence in the name
+        /// there, lower case, means the call reads the new order.
+        new: &'static [(usize, &'static [&'static str])],
+    },
 }
 
 /// Changing this changes the mutator two players build from the same manifest,
@@ -608,22 +718,49 @@ const ADAPTERS: &[Adapter] = &[
     Adapter {
         fix: "callin-unit-damaged-95",
         entry: "signature:UnitDamaged@95.0",
-        moved: 6,
-        old_len: 9,
-        added: "proj",
+        change: Change::Arguments {
+            moved: 6,
+            old_len: 9,
+            added: "proj",
+        },
     },
     Adapter {
         fix: "callin-allow-command-105",
         entry: "signature:AllowCommand@105.0",
-        moved: 7,
-        old_len: 8,
-        added: "player",
+        change: Change::Arguments {
+            moved: 7,
+            old_len: 8,
+            added: "player",
+        },
+    },
+    Adapter {
+        fix: "spring-ground-info-105",
+        entry: "signature:Spring.GetGroundInfo@105.0",
+        change: Change::Results {
+            old: &[
+                "name", "metal", "hard", "tank", "kbot", "hover", "ship", "track",
+            ],
+            added: "index",
+        },
+    },
+    // A count does not decide this one: XTA and Expand and Exterminate take
+    // nine results, the team colours GetTeamInfo returned before Spring 0.76,
+    // and read the old order.
+    Adapter {
+        fix: "spring-get-team-info-105",
+        entry: "signature:Spring.GetTeamInfo@105.0",
+        change: Change::Swapped {
+            moved: 6,
+            new: &[(6, &["income", "mult"]), (7, &["key", "custom", "opt"])],
+        },
     },
 ];
 
-/// A call-in handler a game's Lua defines, as the scan of it reports one: the
-/// catalogue entry of the call-in, such as `signature:UnitDamaged@95.0`, and
-/// the arguments the handler takes from the engine.
+/// Where a game's Lua takes values from the engine, as the scan of it reports
+/// one: the catalogue entry, such as `signature:UnitDamaged@95.0`, and the
+/// names the Lua gives the values. For a call-in those are the arguments its
+/// handler takes. For a function they are the names one call assigns its
+/// results to.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Handler {
     pub entry: String,
@@ -644,12 +781,56 @@ fn order(adapter: &Adapter, params: &[String]) -> Order {
         .filter(|p| *p != "...")
         .map(|p| p.to_ascii_lowercase())
         .collect();
-    if named.len() > adapter.old_len || named.iter().any(|p| p.contains(adapter.added)) {
-        Order::New
-    } else if named.len() > adapter.moved {
-        Order::Old
-    } else {
-        Order::Either
+    match adapter.change {
+        Change::Arguments {
+            moved,
+            old_len,
+            added,
+        } => {
+            if named.len() > old_len || named.iter().any(|p| p.contains(added)) {
+                Order::New
+            } else if named.len() > moved {
+                Order::Old
+            } else {
+                Order::Either
+            }
+        }
+        Change::Results { old, added } => {
+            if named.len() > old.len() {
+                return Order::New;
+            }
+            // Each result whose name fits its place in one order and not the
+            // other says which order the call reads.
+            let (mut reads_old, mut reads_new) = (false, false);
+            for (i, name) in named.iter().enumerate() {
+                let fits = |word: Option<&&str>| word.is_some_and(|w| name.contains(*w));
+                let new_word = if i == 0 { Some(&added) } else { old.get(i - 1) };
+                match (fits(old.get(i)), fits(new_word)) {
+                    (true, false) => reads_old = true,
+                    (false, true) => reads_new = true,
+                    _ => {}
+                }
+            }
+            match (reads_old, reads_new) {
+                (true, false) => Order::Old,
+                (false, true) => Order::New,
+                _ => Order::Either,
+            }
+        }
+        Change::Swapped { moved, new } => {
+            let reads_new = new.iter().any(|(at, words)| {
+                named
+                    .get(*at)
+                    .is_some_and(|p| words.iter().any(|w| p.contains(w)))
+            });
+            if reads_new {
+                Order::New
+            } else if named.len() > moved {
+                Order::Old
+            } else {
+                Order::Either
+            }
+        }
     }
 }
 
@@ -762,6 +943,33 @@ mod tests {
         let json = "{}";
         assert_eq!(latest_of(&[(2, json), (10, json), (3, json)]), 10);
         assert_eq!(latest_of(&[(1, json)]), 1);
+    }
+
+    #[test]
+    fn a_palette_is_recorded_by_its_bytes_and_where_they_came_from() {
+        let found = Palette::of(Some(b"abc"), Some("springcontent.sdz".into()));
+        assert_eq!(found.source.as_deref(), Some("springcontent.sdz"));
+        assert_eq!(
+            found.sha256.as_deref(),
+            Some("ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad")
+        );
+        let none = Palette::of(None, Some("springcontent.sdz".into()));
+        assert_eq!(
+            none,
+            Palette {
+                source: None,
+                sha256: None
+            }
+        );
+    }
+
+    #[test]
+    fn only_a_palettes_bytes_decide_whether_it_is_the_same() {
+        let game = Palette::of(Some(b"abc"), Some("xta.sd7".into()));
+        let engine = Palette::of(Some(b"abc"), Some("springcontent.sdz".into()));
+        assert!(game.same_bytes(&engine));
+        assert!(!game.same_bytes(&Palette::of(Some(b"abd"), Some("xta.sd7".into()))));
+        assert!(!game.same_bytes(&Palette::of(None, None)));
     }
 
     #[test]
@@ -1081,6 +1289,88 @@ mod tests {
         assert!(copies_entry_bytes(eight.writer));
     }
 
+    /// Writer 3 leaves a `.3do` unconverted when the game has an `.s3o` of the
+    /// same name (issue #4697), and the fixes stay those of manifest 12.
+    #[test]
+    fn manifest_13_is_manifest_12_built_by_writer_3() {
+        let (twelve, thirteen) = (manifest(12).unwrap(), manifest(13).unwrap());
+        assert_eq!(thirteen.fixes, twelve.fixes);
+        assert_eq!(thirteen.converter, twelve.converter);
+        assert_eq!((twelve.writer, thirteen.writer), (2, 3));
+        assert!(!keeps_game_s3o(twelve.writer));
+        assert!(keeps_game_s3o(thirteen.writer));
+        assert!(keeps_palette_tiles(thirteen.writer) && copies_entry_bytes(thirteen.writer));
+    }
+
+    /// Manifests 2 to 8 hook call-ins with `rawget` and `rawset`, which a
+    /// synced state lacks (issue #4685). Manifest 9 swaps in hooks that do not.
+    #[test]
+    fn manifest_9_is_manifest_8_with_hooks_that_need_no_raw_functions() {
+        let (eight, nine) = (manifest(8).unwrap(), manifest(9).unwrap());
+        let swapped: Vec<String> = eight
+            .fixes
+            .iter()
+            .map(|id| match id.as_str() {
+                "compat-callin-hooks" => "compat-callin-hooks-v2".to_string(),
+                _ => id.clone(),
+            })
+            .collect();
+        assert_eq!(nine.fixes, swapped);
+        assert_eq!(nine.converter, eight.converter);
+        assert_eq!(nine.writer, eight.writer);
+    }
+
+    /// What `CSyncedLuaHandle::Init` sets to nil. The Lua tests run the synced
+    /// prelude without these too, so this catches a use the tests do not reach.
+    #[test]
+    fn the_latest_synced_prelude_calls_nothing_the_synced_state_removes() {
+        let removed = [
+            "rawequal",
+            "rawget",
+            "rawset",
+            "newproxy",
+            "gcinfo",
+            "collectgarbage",
+            "dofile",
+            "loadfile",
+            "loadlib",
+            "require",
+        ];
+        let m = manifest(latest()).unwrap();
+        for (id, src) in prelude_fixes(&m, LuaState::Synced) {
+            for line in src.lines().filter(|l| !l.trim_start().starts_with("--")) {
+                let mut words = line.split(|c: char| !(c.is_alphanumeric() || c == '_'));
+                if let Some(word) = words.find(|w| removed.contains(w)) {
+                    panic!("{id} uses {word}, which synced Lua lacks: {line}");
+                }
+            }
+        }
+    }
+
+    /// Issue #4686: manifest 10 adds the def fix that gives a def whose model
+    /// is missing a stand-in, and keeps the writer of manifest 9.
+    #[test]
+    fn manifest_10_is_manifest_9_with_the_missing_model_standin() {
+        let (nine, ten) = (manifest(9).unwrap(), manifest(10).unwrap());
+        let added: Vec<&String> = ten
+            .fixes
+            .iter()
+            .filter(|id| !nine.fixes.contains(id))
+            .collect();
+        assert_eq!(added, ["defs-missing-model-standin"]);
+        let kept: Vec<&String> = ten
+            .fixes
+            .iter()
+            .filter(|id| nine.fixes.contains(id))
+            .collect();
+        assert_eq!(kept, nine.fixes.iter().collect::<Vec<_>>());
+        assert_eq!((&ten.converter, ten.writer), (&nine.converter, nine.writer));
+        assert_eq!(
+            defs_fixes(&ten, DefsFile::DefsPost).last(),
+            Some(&"defs-missing-model-standin")
+        );
+    }
+
     #[test]
     fn the_def_fixes_are_the_files_in_defs_and_name_only_files_that_exist() {
         let in_folder = fix_files_in(compat_dir().join("defs"));
@@ -1189,7 +1479,12 @@ mod tests {
                 })
                 .collect();
             if let Some(first) = prelude.first() {
-                assert_eq!(*first, "compat-callin-hooks", "manifest {}", m.version);
+                let hooks = if m.version < 9 {
+                    "compat-callin-hooks"
+                } else {
+                    "compat-callin-hooks-v2"
+                };
+                assert_eq!(*first, hooks, "manifest {}", m.version);
             }
         }
     }
@@ -1373,6 +1668,233 @@ mod tests {
         assert_eq!(left_out(&[short, new]), ["callin-unit-damaged-95"]);
     }
 
+    const GROUND: &str = "signature:Spring.GetGroundInfo@105.0";
+
+    fn left_out_of_11(handlers: &[Handler]) -> Vec<String> {
+        let full = manifest(11).unwrap();
+        let picked = for_game(&full, handlers);
+        full.fixes
+            .into_iter()
+            .filter(|id| !picked.fixes.contains(id))
+            .collect()
+    }
+
+    #[test]
+    fn a_call_that_reads_the_metal_second_keeps_the_ground_info_adapter() {
+        // Spring 1944's game_flagManager.lua, written for the old order.
+        let old = handler(GROUND, &["_", "curMetal"]);
+        assert!(left_out_of_11(std::slice::from_ref(&old)).is_empty());
+        let old = handler(GROUND, &["typeName", "metal", "hardness"]);
+        assert!(left_out_of_11(&[old]).is_empty());
+    }
+
+    #[test]
+    fn a_call_that_reads_the_new_order_leaves_the_ground_info_adapter_out() {
+        for new in [
+            handler(GROUND, &["_", "_", "metal"]),
+            handler(GROUND, &["ttIndex", "ttName"]),
+            handler(GROUND, &["_", "name", "_", "hardness"]),
+        ] {
+            assert_eq!(
+                left_out_of_11(std::slice::from_ref(&new)),
+                ["spring-ground-info-105"],
+                "{new:?}"
+            );
+        }
+        let nine: Vec<String> = (0..9).map(|i| format!("v{i}")).collect();
+        let nine: Vec<&str> = nine.iter().map(String::as_str).collect();
+        assert_eq!(
+            left_out_of_11(&[handler(GROUND, &nine)]),
+            ["spring-ground-info-105"]
+        );
+    }
+
+    #[test]
+    fn a_call_whose_names_say_nothing_about_the_order_decides_nothing() {
+        let unclear = handler(GROUND, &["a", "b", "c"]);
+        assert!(left_out_of_11(std::slice::from_ref(&unclear)).is_empty());
+        let new = handler(GROUND, &["_", "_", "metal"]);
+        assert_eq!(
+            left_out_of_11(&[unclear, new.clone()]),
+            ["spring-ground-info-105"]
+        );
+        // Calls of both orders keep what the game shipped with.
+        let old = handler(GROUND, &["_", "metal"]);
+        assert!(left_out_of_11(&[old, new]).is_empty());
+    }
+
+    /// Issue #4695: manifest 11 adds `Game.version` and the old
+    /// `Spring.GetGroundInfo` order, and keeps the writer of manifest 10.
+    #[test]
+    fn manifest_11_is_manifest_10_with_game_version_and_the_old_ground_info() {
+        let (ten, eleven) = (manifest(10).unwrap(), manifest(11).unwrap());
+        let added: Vec<&String> = eleven
+            .fixes
+            .iter()
+            .filter(|id| !ten.fixes.contains(id))
+            .collect();
+        assert_eq!(added, ["game-version-104", "spring-ground-info-105"]);
+        let kept: Vec<&String> = eleven
+            .fixes
+            .iter()
+            .filter(|id| ten.fixes.contains(id))
+            .collect();
+        assert_eq!(kept, ten.fixes.iter().collect::<Vec<_>>());
+        assert_eq!(
+            (&eleven.converter, eleven.writer),
+            (&ten.converter, ten.writer)
+        );
+        for state in [LuaState::Synced, LuaState::Unsynced] {
+            let ids: Vec<&str> = prelude_fixes(&eleven, state)
+                .iter()
+                .map(|(id, _)| *id)
+                .collect();
+            assert!(ids.contains(&"game-version-104"), "{state:?}");
+            assert!(ids.contains(&"spring-ground-info-105"), "{state:?}");
+        }
+    }
+
+    /// Issue #4698: manifest 15 adds the unsynced fix that skips LuaUI's
+    /// include of its own entry file, and keeps the writer of manifest 14.
+    #[test]
+    fn manifest_15_is_manifest_14_with_the_luaui_entry_include_skipped() {
+        let (fourteen, fifteen) = (manifest(14).unwrap(), manifest(15).unwrap());
+        let mut expected = fourteen.fixes.clone();
+        expected.push("luaui-main-include".into());
+        assert_eq!(fifteen.fixes, expected);
+        assert_eq!(
+            (&fifteen.converter, fifteen.writer),
+            (&fourteen.converter, fourteen.writer)
+        );
+        let ids = |state| -> Vec<&str> {
+            prelude_fixes(&fifteen, state)
+                .iter()
+                .map(|(id, _)| *id)
+                .collect()
+        };
+        assert!(ids(LuaState::Unsynced).contains(&"luaui-main-include"));
+        assert!(!ids(LuaState::Synced).contains(&"luaui-main-include"));
+    }
+
+    /// Issues #4700 and #4699: manifest 14 stores a numeric string given to a
+    /// rules param as a number, and reads an icon type the game does not
+    /// define as "default", as 104.0 did, and keeps the writer of manifest 13.
+    #[test]
+    fn manifest_14_is_manifest_13_with_the_old_rules_params_and_icon_types() {
+        let (thirteen, fourteen) = (manifest(13).unwrap(), manifest(14).unwrap());
+        let added: Vec<&String> = fourteen
+            .fixes
+            .iter()
+            .filter(|id| !thirteen.fixes.contains(id))
+            .collect();
+        assert_eq!(added, ["spring-rules-param-105", "defs-icon-type-2025"]);
+        assert_eq!(
+            defs_fixes(&fourteen, DefsFile::DefsPost).last(),
+            Some(&"defs-icon-type-2025")
+        );
+        assert!(!defs_fixes(&fourteen, DefsFile::WeaponDefsPost).contains(&"defs-icon-type-2025"));
+        let kept: Vec<&String> = fourteen
+            .fixes
+            .iter()
+            .filter(|id| thirteen.fixes.contains(id))
+            .collect();
+        assert_eq!(kept, thirteen.fixes.iter().collect::<Vec<_>>());
+        assert_eq!(
+            (&fourteen.converter, fourteen.writer),
+            (&thirteen.converter, thirteen.writer)
+        );
+        let ids = |state| -> Vec<&str> {
+            prelude_fixes(&fourteen, state)
+                .iter()
+                .map(|(id, _)| *id)
+                .collect()
+        };
+        assert!(ids(LuaState::Synced).contains(&"spring-rules-param-105"));
+        assert!(!ids(LuaState::Unsynced).contains(&"spring-rules-param-105"));
+    }
+
+    /// Issues #4692 to #4694: manifest 12 adds the unsynced fix that puts
+    /// back snext, spairs and sipairs, the synced one that keeps unit lineage
+    /// and the adapter for Spring.GetTeamInfo's results, and keeps the writer
+    /// of manifest 11.
+    #[test]
+    fn manifest_12_is_manifest_11_with_the_iterators_lineage_and_team_info() {
+        let (eleven, twelve) = (manifest(11).unwrap(), manifest(12).unwrap());
+        assert_eq!(twelve.fixes[..eleven.fixes.len()], eleven.fixes[..]);
+        assert_eq!(
+            twelve.fixes[eleven.fixes.len()..],
+            [
+                "snext-spairs-sipairs",
+                "spring-unit-lineage",
+                "spring-get-team-info-105"
+            ]
+        );
+        assert_eq!(
+            (&twelve.converter, twelve.writer),
+            (&eleven.converter, eleven.writer)
+        );
+        let ids = |state| -> Vec<&str> {
+            prelude_fixes(&twelve, state)
+                .iter()
+                .map(|(id, _)| *id)
+                .collect()
+        };
+        let (synced, unsynced) = (ids(LuaState::Synced), ids(LuaState::Unsynced));
+        assert!(
+            unsynced.contains(&"snext-spairs-sipairs") && !synced.contains(&"snext-spairs-sipairs")
+        );
+        assert!(
+            synced.contains(&"spring-unit-lineage") && !unsynced.contains(&"spring-unit-lineage")
+        );
+        for ids in [&synced, &unsynced] {
+            assert!(ids.contains(&"spring-get-team-info-105"));
+        }
+    }
+
+    const TEAM_INFO: &str = "signature:Spring.GetTeamInfo@105.0";
+
+    /// The fixes manifest 12 leaves out for a game whose Lua takes
+    /// `Spring.GetTeamInfo`'s results into these names.
+    fn team_info_left_out(sites: &[&[&str]]) -> Vec<String> {
+        let full = manifest(12).unwrap();
+        let handlers: Vec<Handler> = sites.iter().map(|s| handler(TEAM_INFO, s)).collect();
+        let picked = for_game(&full, &handlers);
+        full.fixes
+            .into_iter()
+            .filter(|id| !picked.fixes.contains(id))
+            .collect()
+    }
+
+    /// Issue #4694: XTA and Expand and Exterminate read the custom keys 7th.
+    #[test]
+    fn a_call_that_reads_the_custom_keys_seventh_keeps_the_team_info_adapter() {
+        let keys = ["_", "_", "_", "_", "_", "_", "teamOptions"];
+        assert!(team_info_left_out(&[&keys]).is_empty());
+        // The colours GetTeamInfo returned before Spring 0.76 read past the
+        // 7th, and are no sign of the new order.
+        let colours = ["_", "_", "_", "_", "_", "_", "r", "g", "b"];
+        assert!(team_info_left_out(&[&colours, &["_", "_", "_", "isDead"]]).is_empty());
+    }
+
+    #[test]
+    fn a_call_that_reads_the_new_order_leaves_the_team_info_adapter_out() {
+        let income = ["_", "_", "_", "_", "_", "_", "incomeMultiplier"];
+        assert_eq!(team_info_left_out(&[&income]), ["spring-get-team-info-105"]);
+        let keys = ["_", "_", "_", "_", "_", "_", "_", "customKeys"];
+        assert_eq!(team_info_left_out(&[&keys]), ["spring-get-team-info-105"]);
+        let opts = [
+            "id", "leader", "dead", "ai", "side", "ally", "mult", "teamOpts",
+        ];
+        assert_eq!(team_info_left_out(&[&opts]), ["spring-get-team-info-105"]);
+        let old = ["_", "_", "_", "_", "_", "_", "teamOptions"];
+        assert!(team_info_left_out(&[&income, &old]).is_empty());
+        // Reading no further than the side decides nothing.
+        assert_eq!(
+            team_info_left_out(&[&income, &["_", "_", "_", "_", "side"]]),
+            ["spring-get-team-info-105"]
+        );
+    }
+
     #[test]
     fn a_manifest_without_the_adapter_is_left_as_it_is() {
         let m = manifest(1).unwrap();
@@ -1425,12 +1947,14 @@ mod tests {
         }
     }
 
-    /// The preludes for manifests 2 and 6, as the Lua tests in
-    /// `lua/compat/tests/` load them. `COILBOX_WRITE_FIXTURE=1` writes them
-    /// again after a deliberate change to how a prelude is built.
+    /// The preludes for manifests 9, 11, 12, 14 and 15, as the Lua tests in
+    /// `lua/compat/tests/` load them. Earlier manifests' synced preludes call
+    /// `rawget`, which the tests' synced state lacks, so they are not kept.
+    /// `COILBOX_WRITE_FIXTURE=1` writes them again after a deliberate change to
+    /// how a prelude is built.
     #[test]
     fn the_lua_tests_load_the_preludes_this_crate_builds() {
-        for n in [2, 6] {
+        for n in [9, 11, 12, 14, 15] {
             let m = manifest(n).unwrap();
             for state in [LuaState::Synced, LuaState::Unsynced] {
                 let built = prelude(&m, state).unwrap();

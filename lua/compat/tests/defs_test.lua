@@ -20,7 +20,36 @@ local function run(fixes, units, weapons, opts)
 	opts = opts or {}
 	local env = setmetatable({}, { __index = _G })
 	env._G = env
-	env.DEFS = { unitDefs = units or {}, weaponDefs = weapons or {} }
+	env.DEFS = { unitDefs = units or {}, weaponDefs = weapons or {}, featureDefs = opts.features or {} }
+	if opts.files then
+		-- VFS.FileExists over the game's files, by lower case path. A path the
+		-- engine refuses to look up answers with nothing, as LuaParser does.
+		env.VFS = {
+			FileExists = function(path)
+				if path:find("..", 1, true) then
+					return
+				end
+				return opts.files[path:lower()] == true
+			end,
+		}
+	end
+	if opts.sources then
+		-- VFS.Include over Lua sources by path, run in the environment it is
+		-- given, as LuaParser's Include runs a file. It raises for a file that
+		-- is not there, as the engine's does.
+		env.VFS = env.VFS or {}
+		env.VFS.MOD, env.VFS.BASE = "M", "b"
+		env.VFS.Include = function(path, fenv, mode)
+			opts.included = { path = path, mode = mode }
+			local source = opts.sources[path]
+			if source == nil then
+				error("Include() file missing '" .. path .. "'")
+			end
+			local chunk = assert(loadstring(source, path))
+			setfenv(chunk, fenv or env)
+			return chunk()
+		end
+	end
 	if opts.weaponDefsGlobal then
 		env.WeaponDefs = env.DEFS.weaponDefs
 	end
@@ -51,6 +80,8 @@ for _, id in ipairs({
 	"defs-model-center-offset-89",
 	"defs-weapon-consts-87",
 	"defs-manual-bomb-settings-92",
+	"defs-missing-model-standin",
+	"defs-icon-type-2025",
 }) do
 	local source = assert(io.open(DEFS_DIR .. id .. ".lua")):read("*a")
 	check(id .. ": its header names the file", source:match("^%-%- id: ([%w-]+)\n") == id)
@@ -205,6 +236,133 @@ do
 	local units = { armthud = { weapondefs = { bomb = inner } } }
 	run({ "defs-manual-bomb-settings-92" }, units, {}, { weaponDefsGlobal = true })
 	check("bomb: a bomb the unit declares inside itself is worked out too", inner.burst == 2)
+end
+
+--------------------------------------------------------------------------------
+-- Missing models
+--------------------------------------------------------------------------------
+
+do
+	local files = {
+		["objects3d/arm_infinite_dead.3do"] = true,
+		["objects3d/tree.3do"] = true,
+		["objects3d/rock.s3o"] = true,
+		["objects3d/ship.glb"] = true,
+		["objects3d/notes.txt"] = true,
+		["root.s3o"] = true,
+		["compat/models/standin-1x1.s3o"] = true,
+		["compat/models/standin-3x2.s3o"] = true,
+		["compat/models/standin-2x2.s3o"] = true,
+	}
+	local features = {
+		arm_infinity_dead = { object = "arm_infinity_dead", footprintX = 3, footprintZ = 2, metal = 120 },
+		atgun_destroyed = { Object = "atgun_destroyed.s3o", footprintx = "2.7", footprintz = 2 },
+		tree = { object = "Objects3D/Tree" },
+		rock = { object = "rock.s3o" },
+		ship = { object = "ship" },
+		root = { object = "root.s3o" },
+		notes = { object = "notes.txt" },
+		up = { object = "../escape" },
+		bare = { footprintx = 4 },
+		empty = { object = "" },
+		odd = { object = "big_dead", footprintx = 9, footprintz = 9 },
+		flat = { object = "flat_dead", footprintx = 0, footprintz = -3 },
+	}
+	local units = { armfoo = { objectName = "armfoo", footprintx = "2", footprintz = "2" } }
+	local weapons = { shell = { model = "shell.3do" }, beam = { range = 300 } }
+	local compat = run({ "defs-missing-model-standin" }, units, weapons, { features = features, files = files })
+
+	check("standin: a feature whose model is missing gets the box of its footprint", features.arm_infinity_dead.object == "compat/models/standin-3x2.s3o")
+	check("standin: its numbers are kept", features.arm_infinity_dead.metal == 120 and features.arm_infinity_dead.footprintX == 3)
+	check("standin: the key is written as the game spelled it", features.atgun_destroyed.Object == "compat/models/standin-2x2.s3o" and features.atgun_destroyed.object == nil)
+	check("standin: a near-miss spelling is not taken for the model", features.arm_infinity_dead.object ~= "arm_infinite_DEAD")
+	check("standin: a name with no extension found under objects3d is kept", features.tree.object == "Objects3D/Tree")
+	check("standin: a name with an extension found under objects3d is kept", features.rock.object == "rock.s3o")
+	check("standin: a glb is a model", features.ship.object == "ship")
+	check("standin: a model at the root is kept", features.root.object == "root.s3o")
+	check("standin: a file no parser reads is not a model", features.notes.object == "compat/models/standin-1x1.s3o")
+	check("standin: a name the VFS will not look up is left alone", features.up.object == "../escape")
+	check("standin: a feature with no model is unchanged", features.bare.object == nil and features.empty.object == "")
+	check("standin: a footprint with no box of its own gets the 1x1 one", features.odd.object == "compat/models/standin-1x1.s3o")
+	check("standin: a footprint under 1 is 1", features.flat.object == "compat/models/standin-1x1.s3o")
+	check("standin: a unit's objectName is a model", units.armfoo.objectName == "compat/models/standin-2x2.s3o")
+	check("standin: a weapon's model is a model", weapons.shell.model == "compat/models/standin-1x1.s3o")
+	check("standin: a weapon with no model is unchanged", weapons.beam.model == nil)
+	check("standin: seven defs changed", count(compat.changed) == 7, tostring(count(compat.changed)))
+
+	local listed = {}
+	for _, s in ipairs(compat.standins) do
+		listed[s.kind .. " " .. s.name] = s
+	end
+	check("standin: each change is listed", #compat.standins == 7)
+	local inf = listed["feature arm_infinity_dead"]
+	check("standin: a listing names the model the def asked for", inf and inf.model == "arm_infinity_dead" and inf.standin == "compat/models/standin-3x2.s3o")
+	local odd = listed["feature odd"]
+	check("standin: a listing names the box the footprint asks for, whether or not it is there", odd and odd.standin == "compat/models/standin-9x9.s3o")
+	check("standin: the unit and the weapon are listed by kind", listed["unit armfoo"] ~= nil and listed["weapon shell"] ~= nil)
+end
+
+--------------------------------------------------------------------------------
+-- An icon type icontypes.lua does not define, which 104.0 read as "default"
+-- (issue #4699)
+--------------------------------------------------------------------------------
+
+do
+	-- Spring 1944's icontypes.lua is a local table it returns. The engine
+	-- lowers its keys, so "Tank" defines "tank".
+	local icontypes = [[
+		local iconTypes = {
+			default = { bitmap = "icons/alert.tga" },
+			rifle = { bitmap = "icons/rifle.tga" },
+			Tank = { bitmap = "icons/tank.tga" },
+			[5] = { bitmap = "icons/five.tga" },
+			["7"] = { bitmap = "icons/seven.tga" },
+		}
+		leaked = true
+		return iconTypes
+	]]
+	local units = {
+		gersiebelfahre = { iconType = "pontoon", buildCostMetal = 300 },
+		rifleman = { iconType = "rifle" },
+		panzer = { IconType = "tank" },
+		tiger = { iconType = "Tank" },
+		bare = {},
+		plain = { iconType = "default" },
+		numbered = { iconType = 5 },
+		seven = { iconType = 7 },
+		odd = { iconType = true },
+	}
+	local opts = { sources = { ["gamedata/icontypes.lua"] = icontypes } }
+	local compat = run({ "defs-icon-type-2025" }, units, {}, opts)
+	check("icon: a type icontypes.lua does not define reads default", units.gersiebelfahre.iconType == "default")
+	check("icon: the def keeps its other tags", units.gersiebelfahre.buildCostMetal == 300)
+	check("icon: a type it defines is kept", units.rifleman.iconType == "rifle")
+	check("icon: a lower case key matches the def's tag in any spelling of the key", units.panzer.IconType == "tank" and units.panzer.iconType == nil)
+	check("icon: a type that is not lower case matches no key, as in 104.0", units.tiger.iconType == "default")
+	check("icon: a def with no type is unchanged", units.bare.iconType == nil)
+	check("icon: default is kept", units.plain.iconType == "default")
+	check("icon: a number key defines no type, as the engine reads only string keys", units.numbered.iconType == "default")
+	check("icon: a number type matches its string key", units.seven.iconType == 7)
+	check("icon: a type that is not text is left to the engine", units.odd.iconType == true)
+	check("icon: three defs changed", count(compat.changed) == 3, tostring(count(compat.changed)))
+	table.sort(compat.icons)
+	check("icon: each change is listed by name", table.concat(compat.icons, ",") == "gersiebelfahre,numbered,tiger", table.concat(compat.icons, ","))
+	check("icon: the file is read from the game, then the base content", opts.included.path == "gamedata/icontypes.lua" and opts.included.mode == "Mb", tostring(opts.included.mode))
+	check("icon: the file sets no global of the defs", leaked == nil and rawget(_G, "leaked") == nil)
+end
+
+do
+	local units = { gersiebelfahre = { iconType = "pontoon" } }
+	local compat = run({ "defs-icon-type-2025" }, units, {}, { sources = {} })
+	check("icon: without icontypes.lua the defs are left alone", units.gersiebelfahre.iconType == "pontoon")
+	check("icon: and none is listed", #compat.icons == 0)
+	local broken = { sources = { ["gamedata/icontypes.lua"] = "error('broken')" } }
+	units = { a = { iconType = "pontoon" } }
+	run({ "defs-icon-type-2025" }, units, {}, broken)
+	check("icon: an icontypes.lua that raises leaves the defs alone", units.a.iconType == "pontoon")
+	broken = { sources = { ["gamedata/icontypes.lua"] = "return 5" } }
+	run({ "defs-icon-type-2025" }, units, {}, broken)
+	check("icon: an icontypes.lua that returns no table leaves the defs alone", units.a.iconType == "pontoon")
 end
 
 support.report()

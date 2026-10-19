@@ -27,7 +27,7 @@ Engine versions in the details name the engine as it was called at the time. Up 
 
 | Row | What it means | What compatibility mode does |
 | --- | --- | --- |
-| .3do models | Models in Total Annihilation's format, with a count | Converts them to `.s3o` and points the game's units, features and weapons at the copies |
+| .3do models | Models in Total Annihilation's format, with a count | Converts them to `.s3o` and points the game's units, features and weapons at the copies. A model the game also ships as an `.s3o` of the same name is left as the game has it |
 | .fbi or .tdf unit definitions | Unit files in the old text formats | Leaves the files alone. The def fixes still run on the units they define |
 | Lua calls to removed or changed APIs | Calls to functions the engine removed or renamed. The details give each file, line and the change | Puts back the functions listed in [What it changes](#what-it-changes). Calls to anything else stay broken |
 | Removed def tags in use | Unit or weapon definitions that set a tag the engine stopped reading, with the units that set it | Puts back the tags listed in [What it changes](#what-it-changes) |
@@ -87,6 +87,7 @@ A Rebuild button appears beside the switch when the folder no longer matches wha
 - "built from compatibility version 4, now 5" means a newer coilbox has more fixes.
 - "written by an older coilbox" means a newer coilbox writes the files differently.
 - "the game has changed since it was built" means the old game's archive is not the one it was built from.
+- "the palette its models take their colours from has changed" means the Total Annihilation `palette.pal` the models were coloured from is different now, or has gone. That file can come from the engine or another archive rather than the game, so a new engine can cause it.
 - "its record of what it was built from is missing" means the folder's record file is gone or unreadable.
 
 So after you update coilbox, a game with the switch on may refuse to launch until you rebuild it.
@@ -121,7 +122,7 @@ Coilbox cannot host a compatibility mode battle yet. A battle you host uses the 
 - Maps.
 - A game that ships its own `gamedata/defs_post.lua`, or whose own `gamedata/defs.lua` never loads it, gets no converted models and none of the def fixes that run there. Issue #4628 covers converting those models.
 - A game that ships its own `gamedata/weapondefs_post.lua`, or whose own `gamedata/weapondefs.lua` never loads it, gets none of the weapon def fixes.
-- A `.3do` face that names a colour from the Total Annihilation palette is drawn flat grey when no `palette.pal` can be found. That file can come from the engine or another archive rather than the game, and a change to it does not mark the build out of date. Issue #4642 covers this.
+- A `.3do` face that names a colour from the Total Annihilation palette is drawn flat grey when no `palette.pal` can be found.
 
 When a model or def fix is skipped, the build result under the switch says which and why.
 
@@ -129,20 +130,31 @@ If one of the fixes fails while the game runs, the game still loads. The engine'
 
 ## What it changes
 
-This is compatibility version 5, the newest.
+This is compatibility version 15, the newest.
 
 Lua functions it puts back:
 
 - `Spring.GetUnitTravel` and `Spring.SetUnitTravel`, removed in Spring 105.0. They work again, and keep their values per unit.
 - `Spring.SetUnitToFeature`, removed in Spring 105.0.
+- `Spring.SetUnitLineage` and `Spring.GetUnitLineage`, last in Spring 0.82.7.1. They work again, and keep each unit's lineage, but a team's units no longer die with its lineage root.
 - `gl.Smoothing`, removed in Spring 104.0. It does nothing.
 - `Spring.SetSunParameters` and `Spring.SetSunManualControl`, removed in Spring 104.0. They do nothing.
 - `Spring.UpdateInfoTexture`, removed in Spring 99.0. It does nothing and returns false.
 - `Spring.MakeFont`, last in Spring 0.81.2.1. It makes no font and returns nil.
+- `snext`, `spairs` and `sipairs`, removed in Recoil 2025.01.1. In a game's unsynced gadgets they are `next`, `pairs` and `ipairs` again, as they were from Spring 97.0.
 
 Call-ins whose arguments moved:
 
 - `UnitDamaged`, changed in Spring 95.0, and `AllowCommand`, changed in Spring 105.0. The game's handlers get the arguments in the old order. Coilbox reads the game's Lua first, and leaves this out for a game whose handlers already take the new order.
+- `Spring.GetTeamInfo`, changed in Spring 105.0. The game gets the team's custom keys 7th and its income multiplier 8th, as before. Coilbox leaves this out for a game whose Lua already reads them the new way round.
+
+Values the engine now keeps differently:
+
+- `Spring.SetUnitRulesParam`, and the game, team and feature versions, changed in Spring 105.0. A number written as text, such as `"30"`, is stored as a number again, so the game reads back a number it can compare.
+
+Files the engine no longer installs as they were:
+
+- `LuaUI/main.lua`, the basic widget handler beside the engine, which Recoil 2025.01.1 changed. A game whose own `LuaUI/main.lua` includes that file, as Spring 1944 does, skips the include, so the game's own widget handler runs on its own.
 
 Gadgets, which each decide when the game loads whether the game needs them:
 
@@ -157,5 +169,7 @@ Unit and weapon definitions:
 - `modelCenterOffset`, removed in Spring 89.0, is copied to the unit's custom parameters for the gadget above.
 - A bomb's burst is worked out from its reload time as it was before Spring 92.0, unless the weapon sets `manualBombSettings` to true.
 - `areaOfEffect` and `maxVelocity`, which Lua lost in Spring 87.0, are kept in each weapon's custom parameters under those names in lower case.
+- A unit whose `iconType` names an icon the game's `gamedata/icontypes.lua` does not have reads as `default` in Lua, as it did before Recoil 2025.06.07. The engine draws it with the default icon either way.
+- A unit, feature or weapon whose model is not in the game is drawn as a plain grey box the size of its footprint, because the engine stops loading a game on any model it cannot find. A wreck keeps its metal and still blocks the ground it covers. The build result names each one. A name close to a model the game has is not taken for it, so XTA's `arm_infinity_dead` gets a box even though the game has `arm_infinite_DEAD`.
 
 For how fixes are added and why a fix never changes once it ships, see [Compatibility mode fixes](../developers/compatibility-mode.md).

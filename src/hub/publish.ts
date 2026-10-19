@@ -7,6 +7,7 @@ import {
   moduleGeometryRefusal,
 } from "@/container/container";
 import { MAX_IMPORT_BYTES } from "@/deeplink/fetchImport";
+import { describeError } from "@/i18n/uiError";
 import { isSetUp } from "@/scenario/listing";
 import { parseScenarioPayload } from "@/scenario/transfer";
 import {
@@ -193,7 +194,7 @@ export async function publishToHub(
       tags: publication.tags,
     });
   } catch (e) {
-    return { ok: false, reason: e instanceof Error ? e.message : String(e) };
+    return { ok: false, reason: describeError(e) };
   }
 
   if (answer.status < 200 || answer.status >= 300) {

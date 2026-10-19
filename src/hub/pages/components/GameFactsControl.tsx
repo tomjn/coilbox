@@ -1,5 +1,6 @@
 import { Button } from "@picoframe/frame";
 import { useState } from "react";
+import { describeError } from "@/i18n/uiError";
 import { usePreferredTarget } from "@/play/config";
 import {
   type GameSweepProgress,
@@ -62,7 +63,7 @@ export function GameFactsControl({
       );
       setReport(done);
     } catch (e) {
-      setFailed(e instanceof Error ? e.message : String(e));
+      setFailed(describeError(e));
     } finally {
       setRunning(false);
       setProgress(null);

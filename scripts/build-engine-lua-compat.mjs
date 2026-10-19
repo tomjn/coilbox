@@ -195,6 +195,15 @@ const entries = finalise(
     mergeEntries(removed, fromChangelog),
     overrides,
     changelogText,
+    (sha) =>
+      spawnSync("git", [
+        "-C",
+        ENGINE,
+        "merge-base",
+        "--is-ancestor",
+        sha,
+        NEW_TAG,
+      ]).status === 0,
   ),
 );
 

@@ -31,8 +31,7 @@ local function load(file, opts)
 		files = opts.files or {},
 		random = opts.random or {},
 	}
-	local env = setmetatable({}, { __index = _G })
-	env._G = env
+	local env = support.sandbox(opts.synced ~= false)
 	env.gadget = env
 	env.gadgetHandler = {
 		IsSyncedCode = function()

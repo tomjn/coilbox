@@ -60,6 +60,7 @@ export async function resolveCompatTarget(opts: {
     }
     const status = await compatStatus({
       dataDir: target.dataDir,
+      enginePath: target.enginePath,
       archiveName: game.primaryArchive.name,
       baseChecksum: info.checksum,
     });

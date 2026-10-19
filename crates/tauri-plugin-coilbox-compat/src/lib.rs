@@ -15,6 +15,7 @@ mod handlers;
 mod identical_builds;
 pub mod models;
 pub mod mutator;
+pub mod standins;
 
 use picoframe_core::CliResult;
 use serde::Serialize;
@@ -69,10 +70,10 @@ pub fn build(
     manifest_version: u32,
     coilbox_version: &str,
 ) -> Result<Built, String> {
+    let manifest = coilbox_compat::manifest(manifest_version)
+        .ok_or_else(|| format!("there is no compat manifest {manifest_version}"))?;
     // The models are converted as the writer the manifest names converts them.
-    let writer = coilbox_compat::manifest(manifest_version)
-        .ok_or_else(|| format!("there is no compat manifest {manifest_version}"))?
-        .writer;
+    let writer = manifest.writer;
     let scan = tauri_plugin_coilbox_unitsync::lua_compat_scan_blocking(
         engine_path,
         data_dir,
@@ -89,7 +90,7 @@ pub fn build(
         game_name,
         &declared,
         base_checksum,
-        manifest_version,
+        &manifest,
         coilbox_version,
         &handlers,
         |file| {
@@ -110,6 +111,14 @@ pub fn build(
         },
         || models::convert(engine_path, data_dir, archive_name, staging.path(), writer),
         || tauri_plugin_coilbox_unitsync::unit_defs_blocking(engine_path, data_dir, archive_name),
+        |source| {
+            tauri_plugin_coilbox_unitsync::lua_exec_blocking(
+                engine_path,
+                data_dir,
+                archive_name,
+                source,
+            )
+        },
     )
 }
 
@@ -130,7 +139,7 @@ fn build_reading(
     convert: impl FnOnce() -> Result<models::Models, String>,
     read_defs: impl FnOnce() -> Result<String, String>,
 ) -> Result<Built, String> {
-    build_with(
+    build_reading_with_lua(
         data_dir,
         archive_name,
         game_name,
@@ -139,20 +148,68 @@ fn build_reading(
         manifest_version,
         coilbox_version,
         handlers,
+        read,
+        convert,
+        read_defs,
+        |_| Ok(standins_answer("[]")),
+    )
+}
+
+/// The worker's answer to the stand-in script (see `standins`) for a game
+/// whose defs the fix changes as the JSON list `standins` says.
+#[cfg(test)]
+fn standins_answer(standins: &str) -> String {
+    let json = format!(r#"{{"loaded":true,"ran":true,"standins":{standins},"failed":[]}}"#);
+    let quoted = format!("\"{}\"", json.replace('\\', "\\\\").replace('"', "\\\""));
+    serde_json::json!({ "result": quoted, "errors": [] }).to_string()
+}
+
+/// [`build_reading`], with `run_lua` answering for the worker that runs the
+/// stand-in script.
+#[cfg(test)]
+#[allow(clippy::too_many_arguments)]
+fn build_reading_with_lua(
+    data_dir: &str,
+    archive_name: &str,
+    game_name: &str,
+    declared: &DeclaredGame,
+    base_checksum: &str,
+    manifest_version: u32,
+    coilbox_version: &str,
+    handlers: &[coilbox_compat::Handler],
+    read: impl Fn(&str) -> Result<Option<String>, String>,
+    convert: impl FnOnce() -> Result<models::Models, String>,
+    read_defs: impl FnOnce() -> Result<String, String>,
+    run_lua: impl FnOnce(&str) -> Result<String, String>,
+) -> Result<Built, String> {
+    let manifest = coilbox_compat::manifest(manifest_version)
+        .ok_or_else(|| format!("there is no compat manifest {manifest_version}"))?;
+    build_with(
+        data_dir,
+        archive_name,
+        game_name,
+        declared,
+        base_checksum,
+        &manifest,
+        coilbox_version,
+        handlers,
         &read,
         |file| Ok(read(file)?.map(String::into_bytes)),
         convert,
         read_defs,
+        run_lua,
     )
 }
 
-/// [`build`], with `read` returning a file of the base game by path as the
+/// [`build`] from `manifest`, with `read` returning a file of the base game by path as the
 /// worker's text read gives it, `read_bytes` the same file's bytes, `handlers`
 /// the call-in handlers the base game's Lua defines, `convert` its converted
 /// models, and `read_defs` its defs as `unitsync_unit_defs` reads them.
 /// `convert` runs once the request is known to be sound, and before anything is
 /// written. `read_defs` runs only when def fixes were written, to count the
-/// defs they change.
+/// defs they change. `run_lua` runs a script through the worker with the game
+/// mounted, and only when the def fix for missing models is written, to find
+/// the defs it changes (see `standins`).
 ///
 /// The entry files the prelude wraps come from `read_bytes` for a manifest
 /// whose writer copies them byte for byte, and from `read` for one whose
@@ -164,18 +221,18 @@ fn build_with(
     game_name: &str,
     declared: &DeclaredGame,
     base_checksum: &str,
-    manifest_version: u32,
+    manifest: &coilbox_compat::Manifest,
     coilbox_version: &str,
     handlers: &[coilbox_compat::Handler],
     mut read: impl FnMut(&str) -> Result<Option<String>, String>,
     mut read_bytes: impl FnMut(&str) -> Result<Option<Vec<u8>>, String>,
     convert: impl FnOnce() -> Result<models::Models, String>,
     read_defs: impl FnOnce() -> Result<String, String>,
+    run_lua: impl FnOnce(&str) -> Result<String, String>,
 ) -> Result<Built, String> {
-    let manifest = coilbox_compat::manifest(manifest_version)
-        .ok_or_else(|| format!("there is no compat manifest {manifest_version}"))?;
-    mutator::check_pins(&manifest)?;
-    let manifest = coilbox_compat::for_game(&manifest, handlers);
+    let manifest_version = manifest.version;
+    mutator::check_pins(manifest)?;
+    let manifest = coilbox_compat::for_game(manifest, handlers);
     if base_checksum.trim().is_empty() {
         return Err(format!(
             "unitsync gave no checksum for {archive_name}, so a change to it could not be noticed"
@@ -184,11 +241,12 @@ fn build_with(
     let folder = mutator::folder(archive_name, manifest_version)?;
     let dir = mutator::games_dir(data_dir)?.join(&folder);
     coilbox_portable::refuse_in_bundle(&dir)?;
-    let marker = Marker {
+    let mut marker = Marker {
         manifest_version,
         writer: manifest.writer,
         base_checksum: base_checksum.to_string(),
         coilbox_version: coilbox_version.to_string(),
+        palette: None,
     };
     let copies_bytes = coilbox_compat::copies_entry_bytes(manifest.writer);
     let entry = |file: &str| -> Result<Option<Vec<u8>>, String> {
@@ -200,7 +258,24 @@ fn build_with(
     };
     let mut files = mutator::files(&manifest, game_name, declared, &marker, entry)?;
     let defs = defs::plan(&manifest, &mut read)?;
+    let standins = if standins::wanted(&manifest, &defs) {
+        let found = standins::parse(&run_lua(&standins::script(&manifest)?)?)?;
+        let at = files.len().saturating_sub(1);
+        files.splice(at..at, standins::files(&found.standins)?);
+        found
+    } else {
+        standins::Found::default()
+    };
     let models = convert()?;
+    // The palette is known only once the models are converted, so the marker
+    // that ends `files` is written again with it.
+    if models.palette.is_some() {
+        marker.palette = models.palette.clone();
+        match files.last_mut() {
+            Some(last) if last.path == mutator::MARKER => *last = mutator::marker_file(&marker)?,
+            _ => return Err("the mutator's files do not end with its marker".into()),
+        }
+    }
     let prelude_fixes = manifest
         .fixes
         .iter()
@@ -216,8 +291,10 @@ fn build_with(
         .collect();
     let mut notes = models.notes.clone();
     notes.extend(defs.notes.iter().cloned());
+    notes.extend(standins::note(&standins));
     let files = write_with_models(&dir, &mut files, &models, &defs, manifest_version)?;
-    let mut def_overrides = models::model_keys(&files).len();
+    let mut def_overrides =
+        models::model_keys(&files).len() + standins.standins.len() + standins.icons.len();
     if !defs.written.is_empty() {
         match read_defs().and_then(|read| defs::changed(&manifest, &defs.written, &read)) {
             Ok(n) => def_overrides += n,
@@ -305,9 +382,28 @@ pub struct Status {
 }
 
 /// Whether the newest compat mutator built for `archive_name` under
-/// `data_dir` matches the latest manifest, the writer this build carries, and
-/// the archive's current checksum.
-pub fn status(data_dir: &str, archive_name: &str, base_checksum: &str) -> Result<Status, String> {
+/// `data_dir` matches the latest manifest, the writer this build carries, the
+/// archive's current checksum, and the palette its models take their colours
+/// from, which the worker of the engine at `engine_path` reads.
+pub fn status(
+    data_dir: &str,
+    engine_path: &str,
+    archive_name: &str,
+    base_checksum: &str,
+) -> Result<Status, String> {
+    status_with(data_dir, archive_name, base_checksum, || {
+        models::current_palette(engine_path, data_dir, archive_name)
+    })
+}
+
+/// [`status`], with `palette_now` reading the palette a conversion would read
+/// now. It is only called for a mutator whose marker records one.
+fn status_with(
+    data_dir: &str,
+    archive_name: &str,
+    base_checksum: &str,
+    palette_now: impl FnOnce() -> Result<coilbox_compat::Palette, String>,
+) -> Result<Status, String> {
     let latest = coilbox_compat::latest();
     let games = mutator::games_dir(data_dir)?;
     let Some((folder, _)) = mutator::newest_built(&games, archive_name)? else {
@@ -325,7 +421,8 @@ pub fn status(data_dir: &str, archive_name: &str, base_checksum: &str) -> Result
             latest,
             coilbox_compat::WRITER,
             base_checksum,
-        ),
+            palette_now,
+        )?,
         folder: Some(folder),
     })
 }
@@ -361,7 +458,8 @@ pub struct Exported {
 }
 
 /// Pack the compat mutator built for `archive_name` under `data_dir` into a
-/// `.sdz` at `dest`, for somebody who does not run coilbox (issue #4568).
+/// `.sdz` at `dest`, for somebody who does not run coilbox (issue #4568). The
+/// worker of the engine at `engine_path` reads the palette [`status`] checks.
 ///
 /// Refused when there is no mutator, or when [`status`] says it is stale, since
 /// the export would hand out a mutator coilbox itself would rebuild. The folder
@@ -370,11 +468,25 @@ pub struct Exported {
 /// in, so two exports of one folder are the same bytes.
 pub fn export(
     data_dir: &str,
+    engine_path: &str,
     archive_name: &str,
     base_checksum: &str,
     dest: &str,
 ) -> Result<Exported, String> {
-    let current = status(data_dir, archive_name, base_checksum)?;
+    export_with(data_dir, archive_name, base_checksum, dest, || {
+        models::current_palette(engine_path, data_dir, archive_name)
+    })
+}
+
+/// [`export`], with `palette_now` as for [`status_with`].
+fn export_with(
+    data_dir: &str,
+    archive_name: &str,
+    base_checksum: &str,
+    dest: &str,
+    palette_now: impl FnOnce() -> Result<coilbox_compat::Palette, String>,
+) -> Result<Exported, String> {
+    let current = status_with(data_dir, archive_name, base_checksum, palette_now)?;
     let Some(folder) = current.folder else {
         return Err(format!(
             "there is no compat mutator built for {archive_name} to export"
@@ -445,10 +557,21 @@ async fn compat_build<R: Runtime>(
     envelope(result)
 }
 
-/// [`status`].
+/// [`status`]. On a blocking task, since a mutator with converted models has
+/// the worker read the palette.
 #[tauri::command]
-async fn compat_status(data_dir: String, archive_name: String, base_checksum: String) -> CliResult {
-    envelope(status(&data_dir, &archive_name, &base_checksum))
+async fn compat_status(
+    data_dir: String,
+    engine_path: String,
+    archive_name: String,
+    base_checksum: String,
+) -> CliResult {
+    let result = tauri::async_runtime::spawn_blocking(move || {
+        status(&data_dir, &engine_path, &archive_name, &base_checksum)
+    })
+    .await
+    .unwrap_or_else(|e| Err(format!("the compat status task failed: {e}")));
+    envelope(result)
 }
 
 /// [`remove`].
@@ -464,12 +587,19 @@ async fn compat_remove(data_dir: String, archive_name: String) -> CliResult {
 #[tauri::command]
 async fn compat_export(
     data_dir: String,
+    engine_path: String,
     archive_name: String,
     base_checksum: String,
     dest: String,
 ) -> CliResult {
     let result = tauri::async_runtime::spawn_blocking(move || {
-        export(&data_dir, &archive_name, &base_checksum, &dest)
+        export(
+            &data_dir,
+            &engine_path,
+            &archive_name,
+            &base_checksum,
+            &dest,
+        )
     })
     .await
     .unwrap_or_else(|e| Err(format!("the compat export task failed: {e}")));
@@ -505,17 +635,59 @@ mod tests {
         Err("no defs in this test".into())
     }
 
+    /// For a mutator whose marker records no palette, which must not read one.
+    fn unread() -> Result<coilbox_compat::Palette, String> {
+        panic!("read the palette for a mutator whose marker records none")
+    }
+
+    /// The palette the converted models in these tests were coloured from.
+    fn a_palette() -> coilbox_compat::Palette {
+        coilbox_compat::Palette::of(Some(b"the palette"), Some("springcontent.sdz".into()))
+    }
+
+    fn same_palette() -> Result<coilbox_compat::Palette, String> {
+        Ok(a_palette())
+    }
+
     fn root() -> (tempfile::TempDir, String) {
         let dir = tempfile::tempdir().unwrap();
         let path = dir.path().to_string_lossy().into_owned();
         (dir, path)
     }
 
+    /// Issue #4699: a unit def the icon type fix gives "default" is a def
+    /// override, counted from the same run of the def fixes as the boxes.
+    #[test]
+    fn the_unit_defs_given_the_default_icon_are_counted() {
+        let (_keep, data) = root();
+        let json = r#"{"loaded":true,"ran":true,"standins":[],"icons":["gersiebelfahre","usbarge"],"failed":[]}"#;
+        let quoted = format!("\"{}\"", json.replace('\\', "\\\\").replace('"', "\\\""));
+        let answer = serde_json::json!({ "result": quoted, "errors": [] }).to_string();
+        let built = build_reading_with_lua(
+            &data,
+            "spring_1944-2.31.sdz",
+            "Spring: 1944 2.31",
+            &DeclaredGame::default(),
+            "1234abcd",
+            coilbox_compat::latest(),
+            "1.2.3",
+            &[],
+            no_file,
+            no_models,
+            || Ok(r#"{"units":{"gersiebelfahre":{},"usbarge":{}},"weaponDefs":{}}"#.into()),
+            move |_| Ok(answer),
+        )
+        .unwrap();
+        assert_eq!(built.def_overrides, 2);
+        assert!(built.notes.is_empty(), "{:?}", built.notes);
+    }
+
     #[test]
     fn a_build_writes_the_folder_and_status_finds_it_current() {
         let (_keep, data) = root();
         let n = coilbox_compat::latest();
-        let built = build_reading(
+        let asked = std::cell::RefCell::new(String::new());
+        let built = build_reading_with_lua(
             &data,
             "xta-9.65.sd7",
             "XTA 9.65",
@@ -527,8 +699,17 @@ mod tests {
             no_file,
             no_models,
             || Ok(r#"{"units":{"armcom":{"commander":1},"armpw":{}},"weaponDefs":{}}"#.into()),
+            |source| {
+                *asked.borrow_mut() = source.to_string();
+                Ok(standins_answer(
+                    r#"[{"kind":"feature","name":"arm_infinity_dead","model":"arm_infinity_dead","standin":"compat/models/standin-3x2.s3o"}]"#,
+                ))
+            },
         )
         .unwrap();
+        assert!(asked
+            .borrow()
+            .contains("-- fix: defs-missing-model-standin\n"));
         assert_eq!(built.folder, format!("coilbox-compat-xta-9.65-{n}.sdd"));
         let gadgets: Vec<String> =
             coilbox_compat::gadget_files(&coilbox_compat::manifest(n).unwrap())
@@ -538,6 +719,9 @@ mod tests {
         let expected: Vec<String> = gadgets
             .into_iter()
             .chain([
+                "compat/models/standin-1x1.s3o".to_string(),
+                "compat/models/standin-3x2.s3o".to_string(),
+                "compat/models/standin.tga".to_string(),
                 models::DEFS_POST.to_string(),
                 "gamedata/weapondefs_post.lua".to_string(),
                 "modinfo.lua".to_string(),
@@ -545,9 +729,11 @@ mod tests {
             ])
             .collect();
         assert_eq!(built.files, expected);
-        // The commander the def fixes give customparams.iscommander.
-        assert_eq!(built.def_overrides, 1);
-        assert!(built.notes.is_empty(), "{:?}", built.notes);
+        // The commander the def fixes give customparams.iscommander, and the
+        // wreck whose model is missing (issue #4686).
+        assert_eq!(built.def_overrides, 2);
+        assert_eq!(built.notes.len(), 1, "{:?}", built.notes);
+        assert!(built.notes[0].contains("feature arm_infinity_dead (arm_infinity_dead)"));
         let manifest = coilbox_compat::manifest(n).unwrap();
         let def_fixes = manifest
             .fixes
@@ -571,10 +757,11 @@ mod tests {
                 writer: coilbox_compat::WRITER,
                 base_checksum: "1234abcd".into(),
                 coilbox_version: "1.2.3".into(),
+                palette: None,
             }
         );
         assert_eq!(
-            status(&data, "xta-9.65.sd7", "1234abcd").unwrap(),
+            status_with(&data, "xta-9.65.sd7", "1234abcd", unread).unwrap(),
             Status {
                 latest: coilbox_compat::latest(),
                 folder: Some(built.folder),
@@ -600,7 +787,7 @@ mod tests {
             no_defs,
         )
         .unwrap();
-        let s = status(&data, "xta-9.65.sd7", "99999999").unwrap();
+        let s = status_with(&data, "xta-9.65.sd7", "99999999", unread).unwrap();
         assert_eq!(
             s.stale,
             [Stale::BaseChecksum {
@@ -640,7 +827,7 @@ mod tests {
             serde_json::to_string(&marker).unwrap(),
         )
         .unwrap();
-        let s = status(&data, "xta-9.65.sd7", "1234abcd").unwrap();
+        let s = status_with(&data, "xta-9.65.sd7", "1234abcd", unread).unwrap();
         assert_eq!(
             s.stale,
             [Stale::Manifest {
@@ -694,13 +881,14 @@ mod tests {
                 "XTA 9.65",
                 &DeclaredGame::default(),
                 "1234abcd",
-                n,
+                &coilbox_compat::manifest(n).unwrap(),
                 "1.2.3",
                 &[],
                 |file| Ok((file == main).then(|| String::from_utf8_lossy(raw).into_owned())),
                 |file| Ok((file == main).then(|| raw.to_vec())),
                 no_models,
                 no_defs,
+                |_| Ok(standins_answer("[]")),
             )
             .unwrap();
             std::fs::read(std::path::Path::new(&built.dir).join(main)).unwrap()
@@ -794,7 +982,9 @@ mod tests {
         assert!(!std::path::Path::new(&second.dir).exists());
         assert!(std::path::Path::new(&other.dir).is_dir());
         assert_eq!(
-            status(&data, "xta-9.65.sd7", "1234abcd").unwrap().folder,
+            status_with(&data, "xta-9.65.sd7", "1234abcd", unread)
+                .unwrap()
+                .folder,
             None
         );
         assert!(remove(&data, "xta-9.65.sd7").unwrap().is_empty());
@@ -803,7 +993,7 @@ mod tests {
     #[test]
     fn nothing_built_is_not_stale() {
         let (_keep, data) = root();
-        let s = status(&data, "xta-9.65.sd7", "1234abcd").unwrap();
+        let s = status_with(&data, "xta-9.65.sd7", "1234abcd", unread).unwrap();
         assert_eq!(s.folder, None);
         assert!(s.stale.is_empty());
     }
@@ -842,7 +1032,7 @@ mod tests {
         )
         .unwrap();
         assert!(!leftover.exists());
-        assert!(status(&data, "xta-9.65.sd7", "5678")
+        assert!(status_with(&data, "xta-9.65.sd7", "5678", unread)
             .unwrap()
             .stale
             .is_empty());
@@ -929,6 +1119,13 @@ mod tests {
         "function gadget:AllowCommand(u, d, t, cmdID, params, options, tag, synced)\nend\n";
     const NEW_COMMAND: &str =
         "function AllowCommand(u, d, t, cmdID, params, options, tag, playerID, fromSynced)\nend\n";
+    const OLD_GROUND: &str =
+        "local GetGroundInfo = Spring.GetGroundInfo\nlocal _, metal = GetGroundInfo(x, z)\n";
+    const NEW_GROUND: &str = "local _, _, metal = Spring.GetGroundInfo(x, z)\n";
+    const OLD_TEAM_INFO: &str =
+        "local _, _, _, _, _, _, teamOptions = Spring.GetTeamInfo(teamID)\n";
+    const NEW_TEAM_INFO: &str =
+        "local _, _, _, _, _, _, incomeMultiplier = Spring.GetTeamInfo(teamID)\n";
 
     /// One game with every entry file, written for the old call-in orders,
     /// with a dependency written for the new ones. One updated for one change
@@ -953,6 +1150,8 @@ mod tests {
             lua: &[
                 ("xta-9.65.sd7", OLD_DAMAGED),
                 ("xta-9.65.sd7", OLD_COMMAND),
+                ("xta-9.65.sd7", OLD_GROUND),
+                ("xta-9.65.sd7", OLD_TEAM_INFO),
                 ("otherdep.sdz", NEW_DAMAGED),
                 ("otherdep.sdz", NEW_COMMAND),
             ],
@@ -971,6 +1170,8 @@ mod tests {
                 ("BA-V9.79.SDZ", "function gadget:UnitDamaged(u, ...)\nend\n"),
                 ("BA-V9.79.SDZ", OLD_COMMAND),
                 ("BA-V9.79.SDZ", NEW_COMMAND),
+                ("BA-V9.79.SDZ", NEW_GROUND),
+                ("BA-V9.79.SDZ", NEW_TEAM_INFO),
             ],
         },
         Fixture {
@@ -1019,7 +1220,7 @@ mod tests {
             std::fs::create_dir_all(p.parent().unwrap()).unwrap();
             std::fs::write(p, bytes).unwrap();
         }
-        Ok(r#"{"modelsFound":3,"modelsWritten":2,"errors":[]}"#.into())
+        Ok(r#"{"modelsFound":3,"modelsWritten":2,"palette":{"source":null,"sha256":null},"errors":[]}"#.into())
     }
 
     /// Every file but the marker of the mutator built for `fixture` from
@@ -1027,6 +1228,14 @@ mod tests {
     /// engine lowercases names when it checksums an archive, and a
     /// case-insensitive filesystem merges `Objects3D/` and `objects3d/`.
     fn golden_build(n: u32, fixture: &Fixture) -> Vec<(String, Vec<u8>)> {
+        golden_build_of(&coilbox_compat::manifest(n).unwrap(), fixture)
+    }
+
+    /// [`golden_build`] from `manifest` as given.
+    fn golden_build_of(
+        manifest: &coilbox_compat::Manifest,
+        fixture: &Fixture,
+    ) -> Vec<(String, Vec<u8>)> {
         let (_keep, data) = root();
         let staging = tempfile::tempdir().unwrap();
         let read = |file: &str| -> Result<Option<String>, String> {
@@ -1037,7 +1246,7 @@ mod tests {
                 .map(|(_, text)| text.to_string()))
         };
         let handlers = handlers::handlers_in(&scan_of(fixture), fixture.archive).unwrap();
-        let built = build_reading(
+        let built = build_with(
             &data,
             fixture.archive,
             fixture.game,
@@ -1047,12 +1256,14 @@ mod tests {
                 version: fixture.declared.1.map(String::from),
             },
             "1234abcd",
-            n,
+            manifest,
             "1.2.3",
             &handlers,
             read,
+            |file| Ok(read(file)?.map(String::into_bytes)),
             || models::convert_reading(read, || run_converter(staging.path()), staging.path()),
             no_defs,
+            |_| Ok(standins_answer(GOLDEN_STANDINS)),
         )
         .unwrap();
         let dir = std::path::Path::new(&built.dir);
@@ -1065,6 +1276,13 @@ mod tests {
         out.sort();
         out
     }
+
+    /// The defs the golden build's games give a stand-in, as the worker would
+    /// find them: a wreck with a footprint and a weapon without one.
+    const GOLDEN_STANDINS: &str = r#"[
+        {"kind":"feature","name":"arm_infinity_dead","model":"arm_infinity_dead","standin":"compat/models/standin-3x2.s3o"},
+        {"kind":"weapon","name":"shell","model":"shell.3do","standin":"compat/models/standin-1x1.s3o"}
+    ]"#;
 
     /// What the golden build's games are there to cover, so a change to the
     /// fixtures that stops covering it fails here and not in silence.
@@ -1134,16 +1352,77 @@ mod tests {
         let defs_only = golden_build(5, &FIXTURES[2]);
         assert!(text(&defs_only, models::DEFS_POST).is_none());
         assert!(text(&defs_only, weapons).unwrap().contains(bombs));
+
+        let boxes = [
+            "compat/models/standin-1x1.s3o",
+            "compat/models/standin-3x2.s3o",
+            "compat/models/standin.tga",
+        ];
+        let with_boxes = golden_build(10, &FIXTURES[0]);
+        for path in boxes {
+            assert!(paths(&with_boxes).iter().any(|p| p == path), "{path}");
+        }
+        assert!(text(&with_boxes, models::DEFS_POST)
+            .unwrap()
+            .contains("-- fix: defs-missing-model-standin\n"));
+        assert!(!paths(&golden_build(9, &FIXTURES[0]))
+            .iter()
+            .any(|p| p.starts_with("compat/models/")));
+        // A game with its own defs_post.lua runs no def fix there, so it gets
+        // no boxes.
+        assert!(!paths(&golden_build(10, &FIXTURES[2]))
+            .iter()
+            .any(|p| p.starts_with("compat/models/")));
+
+        // A game that reads GetGroundInfo the old way keeps the adapter, and
+        // one that reads it the new way does not.
+        let ground = "-- fix: spring-ground-info-105\n";
+        let eleven = golden_build(11, &FIXTURES[0]);
+        for path in ["compat/prelude-synced.lua", "compat/prelude-unsynced.lua"] {
+            let prelude = text(&eleven, path).unwrap();
+            assert!(prelude.contains("-- fix: game-version-104\n"), "{path}");
+            assert!(prelude.contains(ground), "{path}");
+        }
+        let updated = golden_build(11, &FIXTURES[1]);
+        let synced = text(&updated, "compat/prelude-synced.lua").unwrap();
+        assert!(!synced.contains(ground) && synced.contains("-- fix: game-version-104\n"));
+
+        // Every game built from 14 stores a numeric string as a number, in the
+        // synced state, where the rules params are set.
+        let rules = "-- fix: spring-rules-param-105\n";
+        for fixture in &FIXTURES[..2] {
+            let fourteen = golden_build(14, fixture);
+            let synced = text(&fourteen, "compat/prelude-synced.lua").unwrap();
+            assert!(synced.contains(rules), "{}", fixture.archive);
+            if let Some(unsynced) = text(&fourteen, "compat/prelude-unsynced.lua") {
+                assert!(!unsynced.contains(rules), "{}", fixture.archive);
+            }
+        }
+        assert!(
+            !text(&golden_build(13, &FIXTURES[0]), "compat/prelude-synced.lua")
+                .unwrap()
+                .contains(rules)
+        );
+        // Issue #4694: a game that reads GetTeamInfo's custom keys 7th gets
+        // the old order, and one that reads the income multiplier there does
+        // not.
+        let team_info = "-- fix: spring-get-team-info-105\n";
+        let synced_of = |n: u32, fixture: &Fixture| {
+            text(&golden_build(n, fixture), "compat/prelude-synced.lua").unwrap()
+        };
+        assert!(synced_of(12, &FIXTURES[0]).contains(team_info));
+        assert!(!synced_of(12, &FIXTURES[1]).contains(team_info));
+        assert!(!synced_of(11, &FIXTURES[0]).contains(team_info));
     }
 
-    /// The hash of every fixed game built from manifest `n`.
-    fn golden_hash(n: u32) -> String {
+    /// The hash of every fixed game built from `manifest`.
+    fn golden_hash(manifest: &coilbox_compat::Manifest) -> String {
         use sha2::{Digest, Sha256};
         let mut hash = Sha256::new();
         for fixture in FIXTURES {
             hash.update(fixture.archive.as_bytes());
             hash.update([0]);
-            for (path, bytes) in golden_build(n, fixture) {
+            for (path, bytes) in golden_build_of(manifest, fixture) {
                 hash.update(path.as_bytes());
                 hash.update([0]);
                 hash.update((bytes.len() as u64).to_le_bytes());
@@ -1191,12 +1470,40 @@ mod tests {
             8,
             "989268ce40bf5778182d3bd9bff7f52a9295ab593598973e02bdd4dc5c11a121",
         ),
+        (
+            9,
+            "fe0773afdc7d89040e08cd849ad9456074ef00d43aa0d42c9dcfb5eba9744e79",
+        ),
+        (
+            10,
+            "a2e6d720dd4c31135410c9cb3e9a39a527bbb1e3d089cfc14cc41fe6464cbed3",
+        ),
+        (
+            11,
+            "e9e8dcfc7caf88da395188e572c100824ed837091fac9b15efbc8f680466ec5e",
+        ),
+        (
+            12,
+            "8fd6fd648ea8959561fb60c20eaa2703623487809b6fefa294402dee85e6d326",
+        ),
+        (
+            13,
+            "1e30d5f81d9a4fc76655ade256635e9b281973aecfeeb2448f8019ba3b51ab07",
+        ),
+        (
+            14,
+            "60ac951dea79f66e71caabbd77c24cc1ef9b3aa8ac8311f7bf473ff556b9efb9",
+        ),
+        (
+            15,
+            "960100bc92a0aa92aa72ab30c0b49b630b4068f274d04210ff677e8683d4627f",
+        ),
     ];
 
     #[test]
     fn the_fixed_games_build_the_same_bytes_from_every_manifest() {
         let built: Vec<(u32, String)> = (1..=coilbox_compat::latest())
-            .map(|n| (n, golden_hash(n)))
+            .map(|n| (n, golden_hash(&coilbox_compat::manifest(n).unwrap())))
             .collect();
         let recorded: Vec<(u32, String)> =
             GOLDEN.iter().map(|(n, h)| (*n, h.to_string())).collect();
@@ -1207,6 +1514,25 @@ mod tests {
              the change behind a new coilbox_compat::WRITER and add a compat manifest \
              that names it:\n{built:#?}"
         );
+    }
+
+    /// Issue #4678: once `coilbox-3do-convert` moves past the version a manifest
+    /// names, the build still takes that manifest and writes the bytes its
+    /// golden line records. A changed pin stands in for the raised crate, since
+    /// either way the two versions differ.
+    #[test]
+    fn a_raised_converter_version_still_builds_every_manifest_to_its_golden_bytes() {
+        let raised = {
+            let (major, rest) = coilbox_3do_convert::VERSION.split_once('.').unwrap();
+            let minor: u32 = rest.split('.').next().unwrap().parse().unwrap();
+            format!("{major}.{}.0", minor + 1)
+        };
+        for (n, golden) in GOLDEN {
+            let mut manifest = coilbox_compat::manifest(*n).unwrap();
+            assert_ne!(manifest.converter.version, raised);
+            manifest.converter.version = raised.clone();
+            assert_eq!(golden_hash(&manifest), *golden, "manifest {n}");
+        }
     }
 
     fn some_models(staging: &std::path::Path) -> Result<models::Models, String> {
@@ -1222,6 +1548,7 @@ mod tests {
                 models_written: 1,
                 ..Default::default()
             },
+            palette: Some(a_palette()),
             notes: Vec::new(),
         })
     }
@@ -1252,6 +1579,8 @@ mod tests {
                 "LuaRules/Gadgets/coilbox_compat_model_center_offset.lua",
                 "LuaRules/Gadgets/coilbox_compat_only_forward_aim.lua",
                 "Objects3D/armcom.s3o",
+                "compat/models/standin-1x1.s3o",
+                "compat/models/standin.tga",
                 models::DEFS_POST,
                 "gamedata/weapondefs_post.lua",
                 "modinfo.lua",
@@ -1268,6 +1597,81 @@ mod tests {
         assert!(post.contains(r#"["armcom"] = true,"#), "{post}");
         assert_eq!(built.models.models_written, 1);
         assert!(mutator::read_marker(dir).is_some());
+    }
+
+    /// Issue #4642: a build records the palette its models were coloured
+    /// from, and is stale once a different `palette.pal` is reachable, as it
+    /// is when the engine or a dependency that holds it changes.
+    #[test]
+    fn a_different_reachable_palette_makes_the_earlier_build_stale() {
+        let (_keep, data) = root();
+        let built = build_with_models(&data);
+        let marker = mutator::read_marker(std::path::Path::new(&built.dir)).unwrap();
+        assert_eq!(marker.palette, Some(a_palette()));
+        let current = status_with(&data, "xta-9.65.sd7", "1234abcd", same_palette).unwrap();
+        assert!(current.stale.is_empty(), "{:?}", current.stale);
+
+        let other =
+            coilbox_compat::Palette::of(Some(b"another palette"), Some("ba-deps.sdz".into()));
+        let s = status_with(&data, "xta-9.65.sd7", "1234abcd", || Ok(other.clone())).unwrap();
+        assert_eq!(
+            s.stale,
+            [Stale::Palette {
+                built: a_palette(),
+                now: other.clone()
+            }]
+        );
+        let out = tempfile::tempdir().unwrap();
+        let dest = out.path().join("xta-compat.sdz");
+        let err = export_with(
+            &data,
+            "xta-9.65.sd7",
+            "1234abcd",
+            dest.to_str().unwrap(),
+            || Ok(other),
+        )
+        .unwrap_err();
+        assert!(err.contains("out of date"), "{err}");
+    }
+
+    /// The marker sits in the folder, so the palette it records must not
+    /// change what two players compare: the engine leaves dot files out of an
+    /// archive's checksum, and every other file is the same bytes.
+    #[test]
+    fn recording_the_palette_changes_no_file_but_the_marker() {
+        let files = |palette: Option<coilbox_compat::Palette>| {
+            let (_keep, data) = root();
+            let staging = tempfile::tempdir().unwrap();
+            let built = build_reading(
+                &data,
+                "xta-9.65.sd7",
+                "XTA 9.65",
+                &DeclaredGame::default(),
+                "1234abcd",
+                coilbox_compat::latest(),
+                "1.2.3",
+                &[],
+                no_file,
+                || {
+                    let mut models = some_models(staging.path())?;
+                    models.palette = palette;
+                    Ok(models)
+                },
+                no_defs,
+            )
+            .unwrap();
+            let dir = std::path::Path::new(&built.dir);
+            built
+                .files
+                .iter()
+                .map(|path| (path.clone(), std::fs::read(dir.join(path)).unwrap()))
+                .collect::<Vec<_>>()
+        };
+        let (with, without) = (files(Some(a_palette())), files(None));
+        let marker = |files: &[(String, Vec<u8>)]| files.last().unwrap().clone();
+        assert_eq!(marker(&with).0, mutator::MARKER);
+        assert_ne!(marker(&with).1, marker(&without).1);
+        assert_eq!(with[..with.len() - 1], without[..without.len() - 1]);
     }
 
     /// The prelude's wrapped entry files and the converted models land in the
@@ -1384,6 +1788,33 @@ mod tests {
         assert!(!std::path::Path::new(&data).join("games").exists());
     }
 
+    /// Issue #4686: the boxes are part of the mutator's bytes, so a build that
+    /// could not find which defs need one stops, rather than write a mutator
+    /// another player's build would not match.
+    #[test]
+    fn a_failed_search_for_missing_models_writes_nothing() {
+        let (_keep, data) = root();
+        let failed = build_reading_with_lua(
+            &data,
+            "xta.sd7",
+            "XTA",
+            &DeclaredGame::default(),
+            "1",
+            coilbox_compat::latest(),
+            "1",
+            &[],
+            no_file,
+            no_models,
+            no_defs,
+            |_| Err("unitsync lua exec timed out after 300s".into()),
+        );
+        assert_eq!(
+            failed.err(),
+            Some("unitsync lua exec timed out after 300s".into())
+        );
+        assert!(!std::path::Path::new(&data).join("games").exists());
+    }
+
     fn build_with_models(data: &str) -> Built {
         let staging = tempfile::tempdir().unwrap();
         build_reading(
@@ -1424,7 +1855,14 @@ mod tests {
         let out = tempfile::tempdir().unwrap();
         let dest = out.path().join("xta-compat.sdz");
 
-        let exported = export(&data, "xta-9.65.sd7", "1234abcd", dest.to_str().unwrap()).unwrap();
+        let exported = export_with(
+            &data,
+            "xta-9.65.sd7",
+            "1234abcd",
+            dest.to_str().unwrap(),
+            same_palette,
+        )
+        .unwrap();
 
         assert_eq!(exported.folder, built.folder);
         assert_eq!(exported.files, built.files);
@@ -1451,8 +1889,22 @@ mod tests {
         build_with_models(&data);
         let out = tempfile::tempdir().unwrap();
         let (a, b) = (out.path().join("a.sdz"), out.path().join("b.sdz"));
-        export(&data, "xta-9.65.sd7", "1234abcd", a.to_str().unwrap()).unwrap();
-        export(&data, "xta-9.65.sd7", "1234abcd", b.to_str().unwrap()).unwrap();
+        export_with(
+            &data,
+            "xta-9.65.sd7",
+            "1234abcd",
+            a.to_str().unwrap(),
+            same_palette,
+        )
+        .unwrap();
+        export_with(
+            &data,
+            "xta-9.65.sd7",
+            "1234abcd",
+            b.to_str().unwrap(),
+            same_palette,
+        )
+        .unwrap();
         assert_eq!(std::fs::read(a).unwrap(), std::fs::read(b).unwrap());
     }
 
@@ -1462,7 +1914,14 @@ mod tests {
         build_with_models(&data);
         let out = tempfile::tempdir().unwrap();
         let dest = out.path().join("xta-compat.sdz");
-        let err = export(&data, "xta-9.65.sd7", "99999999", dest.to_str().unwrap()).unwrap_err();
+        let err = export_with(
+            &data,
+            "xta-9.65.sd7",
+            "99999999",
+            dest.to_str().unwrap(),
+            same_palette,
+        )
+        .unwrap_err();
         assert!(err.contains("out of date"), "{err}");
         assert!(!dest.exists());
     }
@@ -1472,12 +1931,26 @@ mod tests {
         let (_keep, data) = root();
         let out = tempfile::tempdir().unwrap();
         let dest = out.path().join("xta-compat.sdz");
-        let err = export(&data, "xta-9.65.sd7", "1234abcd", dest.to_str().unwrap()).unwrap_err();
+        let err = export_with(
+            &data,
+            "xta-9.65.sd7",
+            "1234abcd",
+            dest.to_str().unwrap(),
+            same_palette,
+        )
+        .unwrap_err();
         assert!(err.contains("no compat mutator"), "{err}");
 
         build_with_models(&data);
         let wrong = out.path().join("xta-compat.zip");
-        let err = export(&data, "xta-9.65.sd7", "1234abcd", wrong.to_str().unwrap()).unwrap_err();
+        let err = export_with(
+            &data,
+            "xta-9.65.sd7",
+            "1234abcd",
+            wrong.to_str().unwrap(),
+            same_palette,
+        )
+        .unwrap_err();
         assert!(err.contains("does not end in .sdz"), "{err}");
         assert!(!dest.exists() && !wrong.exists());
     }

@@ -24,6 +24,30 @@
     "changelog": "make Spring.Get{Unit,Factory}Commands always expect a second argument"
   },
   {
+    "id": "removed:snext",
+    "kind": "removed",
+    "name": "snext",
+    "since": "2025.01.1",
+    "note": "From 97.0 the unsynced half of LuaRules and LuaGaia had snext as the same function as next (rts/Lua/LuaSyncedTable.cpp), and the engine's LuaGadgets/system.lua put it in every gadget's System table. Removed in commit d083766c74.",
+    "changelog": "removed `snext`, `spairs` and `sipairs`. These functions can be replaced by the regular `next`, `pairs`, and `ipairs` respectively with no change in behaviour."
+  },
+  {
+    "id": "removed:spairs",
+    "kind": "removed",
+    "name": "spairs",
+    "since": "2025.01.1",
+    "note": "From 97.0 the unsynced half of LuaRules and LuaGaia had spairs as the same function as pairs (rts/Lua/LuaSyncedTable.cpp), and the engine's LuaGadgets/system.lua put it in every gadget's System table. Removed in commit d083766c74.",
+    "changelog": "removed `snext`, `spairs` and `sipairs`. These functions can be replaced by the regular `next`, `pairs`, and `ipairs` respectively with no change in behaviour."
+  },
+  {
+    "id": "removed:sipairs",
+    "kind": "removed",
+    "name": "sipairs",
+    "since": "2025.01.1",
+    "note": "From 97.0 the unsynced half of LuaRules and LuaGaia had sipairs as the same function as ipairs (rts/Lua/LuaSyncedTable.cpp), and the engine's LuaGadgets/system.lua put it in every gadget's System table. Removed in commit d083766c74.",
+    "changelog": "removed `snext`, `spairs` and `sipairs`. These functions can be replaced by the regular `next`, `pairs`, and `ipairs` respectively with no change in behaviour."
+  },
+  {
     "id": "defTag:UnitDefs.commander",
     "kind": "defTag",
     "name": "UnitDefs.commander",
@@ -46,5 +70,45 @@
     "since": "92.0",
     "note": "The engine no longer works out the burst of an AircraftBomb weapon. The engine's own gamedata/weapondefs_post.lua does it instead, but only for a weapon that sets manualBombSettings, the reverse of what the tag meant, and not at all in a game that ships its own weapondefs_post.lua.",
     "changelog": "remove of manualBombSettings (backward-compatibility code in weapondefs_post.lua)"
+  },
+  {
+    "id": "signature:Spring.SetGameRulesParam@105.0",
+    "kind": "signature",
+    "name": "Spring.SetGameRulesParam",
+    "since": "105.0",
+    "note": "A string that reads as a number, such as \"30\", is stored and read back as a string. Before 105.0 it was stored as a number, so Lua that sets a param from a def's custom parameter and then compares it with a number fails.",
+    "commit": "ffafcbc51a0d74cdf957798002e0d4ee979c7c1c"
+  },
+  {
+    "id": "signature:Spring.SetTeamRulesParam@105.0",
+    "kind": "signature",
+    "name": "Spring.SetTeamRulesParam",
+    "since": "105.0",
+    "note": "A string that reads as a number, such as \"30\", is stored and read back as a string. Before 105.0 it was stored as a number, so Lua that sets a param from a def's custom parameter and then compares it with a number fails.",
+    "commit": "ffafcbc51a0d74cdf957798002e0d4ee979c7c1c"
+  },
+  {
+    "id": "signature:Spring.SetUnitRulesParam@105.0",
+    "kind": "signature",
+    "name": "Spring.SetUnitRulesParam",
+    "since": "105.0",
+    "note": "A string that reads as a number, such as \"30\", is stored and read back as a string. Before 105.0 it was stored as a number, so Lua that sets a param from a def's custom parameter and then compares it with a number fails.",
+    "commit": "ffafcbc51a0d74cdf957798002e0d4ee979c7c1c"
+  },
+  {
+    "id": "signature:Spring.SetFeatureRulesParam@105.0",
+    "kind": "signature",
+    "name": "Spring.SetFeatureRulesParam",
+    "since": "105.0",
+    "note": "A string that reads as a number, such as \"30\", is stored and read back as a string. Before 105.0 it was stored as a number, so Lua that sets a param from a def's custom parameter and then compares it with a number fails.",
+    "commit": "ffafcbc51a0d74cdf957798002e0d4ee979c7c1c"
+  },
+  {
+    "id": "signature:UnitDefs.iconType@2025.06.07",
+    "kind": "signature",
+    "name": "UnitDefs.iconType",
+    "since": "2025.06.07",
+    "note": "A unit def's iconType is returned as the def gave it, even when gamedata/icontypes.lua does not define that icon. Before 2025.06.07 such a def read \"default\", so Lua that looks up every icon type other than \"default\" in icontypes.lua indexes nil.",
+    "commit": "24ae98356d4f52b38d7745ae9c184f2ba4db9f6e"
   }
 ]

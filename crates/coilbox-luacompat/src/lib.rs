@@ -11,7 +11,9 @@
 //! - A member chain such as `Spring.GetUnitTravel` or `UnitDefs.canCapture`,
 //!   wherever it is written: called, assigned to a local, or passed on. The
 //!   whole chain has to match, so `MySpring.GetUnitTravel` and
-//!   `obj.Spring.GetUnitTravel` do not.
+//!   `obj.Spring.GetUnitTravel` do not. The hit carries the names its calls
+//!   assign their results to, which pick the adapters for a function whose
+//!   results moved (issue #4695).
 //! - A call-in such as `UnitDamaged`, where the code defines it: `function
 //!   gadget:UnitDamaged(`, `function UnitDamaged(`, or `gadget.UnitDamaged =`.
 //!   A call-in is a name the engine calls, so calling it is not a use. The hit
@@ -20,6 +22,12 @@
 //!
 //! A definition of a chain (`function Spring.GetUnitTravel()`) is not a use
 //! either. It is a game supplying the function itself.
+//!
+//! A removed or renamed name with no dot, such as `spairs`, is a global
+//! function rather than a call-in, so it is a use wherever it is read, as a
+//! chain is. Declaring it local or assigning to it is not a use. A parameter
+//! or an assignment target after the first that has its name is taken as a
+//! read, as the scan does not follow those lists.
 //!
 //! Comments and strings never produce a hit. Catalogue entries of kind `file`
 //! are names of files, not of Lua, and are not matched here.
@@ -56,6 +64,8 @@ pub struct Catalogue {
     chains: HashMap<String, Vec<String>>,
     /// Entry ids by bare call-in name, such as `UnitDamaged`.
     call_ins: HashMap<String, Vec<String>>,
+    /// Entry ids by removed or renamed global function, such as `spairs`.
+    globals: HashMap<String, Vec<String>>,
 }
 
 impl Catalogue {
@@ -70,6 +80,8 @@ impl Catalogue {
             }
             let map = if entry.name.contains('.') {
                 &mut out.chains
+            } else if entry.kind == "removed" || entry.kind == "renamed" {
+                &mut out.globals
             } else {
                 &mut out.call_ins
             };
@@ -107,12 +119,22 @@ pub struct Hit {
     /// for a call-in assigned something other than a function.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub params: Option<Vec<String>>,
+    /// For a member chain, the names each call of it assigns its results to,
+    /// in source order: `local _, metal = Spring.GetGroundInfo(x, z)` gives
+    /// `["_", "metal"]`. Calls through a `local f = Spring.GetGroundInfo` alias
+    /// later in the file count, and are reported here on the alias's hit
+    /// rather than as hits of their own. A call whose results go anywhere but a
+    /// list of plain names is left out. `None` when no call is left.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub results: Option<Vec<Vec<String>>>,
 }
 
 /// Every use of a name in `catalogue` found in `source`, in source order.
 pub fn scan(source: &str, catalogue: &Catalogue) -> Vec<Hit> {
     let toks = lex(source);
     let mut hits = Vec::new();
+    // The local aliases of a chain, by name, with the hits of the chain.
+    let mut aliases: HashMap<String, Vec<usize>> = HashMap::new();
     let mut i = 0;
     while i < toks.len() {
         let t = &toks[i];
@@ -135,7 +157,7 @@ pub fn scan(source: &str, catalogue: &Catalogue) -> Vec<Hit> {
                 definition(&toks, i, catalogue, &mut hits)
             };
         } else {
-            i = chain_use(&toks, i, catalogue, &mut hits);
+            i = chain_use(&toks, i, catalogue, &mut hits, &mut aliases);
         }
     }
     hits
@@ -187,8 +209,52 @@ fn arguments(toks: &[Token], open: usize, receiver: bool) -> Option<Vec<String>>
     None
 }
 
+/// The plain names a statement assigns to, when the `=` at `eq` ends a list
+/// of them: `local a, b =` or `a, b =`. `None` when there is no such list, or
+/// when a target is a field or an index, as in `t.a, b =` or `t[1] =`.
+fn targets(toks: &[Token], eq: usize) -> Option<Vec<String>> {
+    if !toks.get(eq)?.is_sym("=") {
+        return None;
+    }
+    let mut names = Vec::new();
+    let mut at = eq;
+    loop {
+        let name = toks.get(at.checked_sub(1)?)?;
+        if name.kind != Kind::Ident {
+            return None;
+        }
+        let before = at.checked_sub(2).and_then(|b| toks.get(b));
+        if before.is_some_and(|t| t.is_sym(".") || t.is_sym(":")) {
+            return None;
+        }
+        names.push(name.text.clone());
+        match before {
+            Some(t) if t.is_sym(",") => at -= 2,
+            _ => break,
+        }
+    }
+    names.reverse();
+    Some(names)
+}
+
+/// Adds one call's result names to each hit in `at`.
+fn add_results(hits: &mut [Hit], at: &[usize], names: Vec<String>) {
+    for &i in at {
+        hits[i]
+            .results
+            .get_or_insert_with(Vec::new)
+            .push(names.clone());
+    }
+}
+
 /// A chain of names joined by `.`, starting at `at`. Returns the index after it.
-fn chain_use(toks: &[Token], at: usize, catalogue: &Catalogue, hits: &mut Vec<Hit>) -> usize {
+fn chain_use(
+    toks: &[Token],
+    at: usize,
+    catalogue: &Catalogue,
+    hits: &mut Vec<Hit>,
+    aliases: &mut HashMap<String, Vec<usize>>,
+) -> usize {
     let mut end = at + 1;
     while toks.get(end).is_some_and(|t| t.is_sym("."))
         && toks.get(end + 1).is_some_and(|t| t.kind == Kind::Ident)
@@ -197,9 +263,36 @@ fn chain_use(toks: &[Token], at: usize, catalogue: &Catalogue, hits: &mut Vec<Hi
     }
     let parts = &toks[at..end];
     let joined: String = parts.iter().map(|t| t.text.as_str()).collect();
+    let called = toks.get(end).is_some_and(|t| t.is_sym("("));
+    let assigned_to = at.checked_sub(1).and_then(|eq| targets(toks, eq));
+    if parts.len() == 1 {
+        // A name set again no longer holds the chain it was an alias of.
+        if toks.get(end).is_some_and(|t| t.is_sym("=")) {
+            aliases.remove(&joined);
+        }
+        if let (true, Some(names), Some(alias)) = (called, &assigned_to, aliases.get(&joined)) {
+            add_results(hits, alias, names.clone());
+        }
+    }
     // `parts` alternates names and dots, so joining it gives `a.b.c`.
     if catalogue.chains.contains_key(&joined) {
+        let first = hits.len();
         push(hits, &catalogue.chains, &joined, parts, None);
+        let pushed: Vec<usize> = (first..hits.len()).collect();
+        match assigned_to {
+            Some(names) if called => add_results(hits, &pushed, names),
+            // `local f = Spring.GetGroundInfo`, which later calls of `f` read.
+            Some(names) if names.len() == 1 && at >= 3 && toks[at - 3].is_ident("local") => {
+                aliases.insert(names[0].clone(), pushed);
+            }
+            _ => {}
+        }
+    }
+
+    let declared =
+        toks.get(end).is_some_and(|t| t.is_sym("=")) || (at > 0 && toks[at - 1].is_ident("local"));
+    if parts.len() == 1 && !declared {
+        push(hits, &catalogue.globals, &joined, parts, None);
     }
 
     // `gadget.UnitDamaged = function` or a bare global `UnitDamaged = ...`.
@@ -242,6 +335,7 @@ fn push(
             column: first.column,
             text: text.clone(),
             params: params.clone(),
+            results: None,
         });
     }
 }
@@ -282,7 +376,86 @@ mod tests {
                 column: 11,
                 text: "Spring.GetUnitTravel".into(),
                 params: None,
+                results: Some(vec![vec!["x".into()]]),
             }]
+        );
+    }
+
+    fn results(src: &str) -> Vec<Option<Vec<Vec<String>>>> {
+        scan(src, &catalogue())
+            .into_iter()
+            .map(|h| h.results)
+            .collect()
+    }
+
+    fn calls(lists: &[&[&str]]) -> Option<Vec<Vec<String>>> {
+        Some(
+            lists
+                .iter()
+                .map(|l| l.iter().map(|s| s.to_string()).collect())
+                .collect(),
+        )
+    }
+
+    #[test]
+    fn a_call_reports_the_names_its_results_are_assigned_to() {
+        assert_eq!(
+            results("local _, period = Spring.GetUnitTravel(unitID)"),
+            [calls(&[&["_", "period"]])]
+        );
+        assert_eq!(
+            results("if x then a, b = Spring.GetUnitTravel(u) end"),
+            [calls(&[&["a", "b"]])]
+        );
+        assert_eq!(
+            results("local t = Spring.GetUnitTravel(u) or 0"),
+            [calls(&[&["t"]])]
+        );
+    }
+
+    #[test]
+    fn a_call_whose_results_go_anywhere_but_a_list_of_names_reports_none() {
+        for src in [
+            "return Spring.GetUnitTravel(u)",
+            "local t = { Spring.GetUnitTravel(u) }",
+            "local a, b = c, Spring.GetUnitTravel(u)",
+            "t.a, b = Spring.GetUnitTravel(u)",
+            "a, t[1] = Spring.GetUnitTravel(u)",
+            "local same = x == Spring.GetUnitTravel(u)",
+            "local f = Spring.GetUnitTravel",
+            "f(Spring.GetUnitTravel(u))",
+        ] {
+            assert_eq!(results(src), [None], "{src}");
+        }
+    }
+
+    #[test]
+    fn calls_through_a_local_alias_are_reported_on_the_alias() {
+        let src = "local GetTravel = Spring.GetUnitTravel\n\
+                   local function f(u, v, w)\n\
+                   \tlocal _, period = GetTravel(u)\n\
+                   \tlocal t = GetTravel(v)\n\
+                   \tprint(GetTravel(w))\n\
+                   end\n";
+        let hits = scan(src, &catalogue());
+        assert_eq!(hits.len(), 1, "an alias's calls add no hits of their own");
+        assert_eq!(hits[0].text, "Spring.GetUnitTravel");
+        assert_eq!(hits[0].results, calls(&[&["_", "period"], &["t"]]));
+    }
+
+    #[test]
+    fn an_alias_counts_only_while_it_holds_the_function() {
+        assert_eq!(
+            results("local a = G(1)\nlocal G = Spring.GetUnitTravel"),
+            [None]
+        );
+        assert_eq!(
+            results("local G = Spring.GetUnitTravel\nG = other\nlocal a, b = G(1)"),
+            [None]
+        );
+        assert_eq!(
+            results("local G = Spring.GetUnitTravel\nlocal a = t.G(1)"),
+            [None]
         );
     }
 
@@ -443,6 +616,57 @@ mod tests {
             ids("Spring.MakeFont()\nlocal s = \"never closed\n--[[ never closed"),
             ["removed:Spring.MakeFont"]
         );
+    }
+
+    fn with_globals() -> Catalogue {
+        Catalogue::from_json(
+            r#"{"entries":[
+              {"id":"removed:snext","kind":"removed","name":"snext"},
+              {"id":"removed:spairs","kind":"removed","name":"spairs"}
+            ]}"#,
+        )
+        .unwrap()
+    }
+
+    fn global_hits(src: &str) -> Vec<(String, u32)> {
+        scan(src, &with_globals())
+            .into_iter()
+            .map(|h| (h.entry_id, h.column))
+            .collect()
+    }
+
+    /// Issue #4692: a removed global such as `spairs` is a use wherever it is
+    /// read, as a chain is, and not only where it is defined, as a call-in is.
+    #[test]
+    fn a_removed_global_is_a_use_where_it_is_read() {
+        assert_eq!(
+            global_hits("for k, v in spairs(t) do end"),
+            [("removed:spairs".to_string(), 13)]
+        );
+        assert_eq!(
+            global_hits("local snext = snext"),
+            [("removed:snext".to_string(), 15)]
+        );
+        assert_eq!(
+            global_hits("System = { snext = snext }"),
+            [("removed:snext".to_string(), 20)]
+        );
+    }
+
+    #[test]
+    fn defining_or_naming_a_field_after_a_removed_global_is_not_a_use() {
+        assert!(global_hits("function snext(t, k) end").is_empty());
+        assert!(global_hits("snext = next").is_empty());
+        assert!(global_hits("local spairs = pairs").is_empty());
+        assert!(global_hits("t.snext(x) t:spairs()").is_empty());
+        assert!(global_hits("if snext == nil then end").len() == 1);
+    }
+
+    #[test]
+    fn the_embedded_catalogue_lists_the_synced_iterators_as_removed_globals() {
+        let hits = scan("snext(t) spairs(t) sipairs(t)", Catalogue::embedded());
+        let ids: Vec<&str> = hits.iter().map(|h| h.entry_id.as_str()).collect();
+        assert_eq!(ids, ["removed:snext", "removed:spairs", "removed:sipairs"]);
     }
 
     #[test]

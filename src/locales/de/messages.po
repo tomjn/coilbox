@@ -7,6 +7,14 @@ msgstr ""
 "X-Generator: @lingui/cli\n"
 "Language: de\n"
 
+#: src/i18n/uiError.ts
+msgid "{count, plural, one {# blocker would reach the lobby broken, so it was not packed: {blockers}} other {# blockers would reach the lobby broken, so it was not packed: {blockers}}}"
+msgstr ""
+
+#: src/i18n/uiError.ts
+msgid "{count, plural, one {# blocker would reach whoever plays this broken, so it was not packaged: {blockers}} other {# blockers would reach whoever plays this broken, so it was not packaged: {blockers}}}"
+msgstr ""
+
 #: src/downloads/downloadRate.ts
 msgid "{hours}h"
 msgstr ""
@@ -115,6 +123,10 @@ msgstr ""
 msgid "Confirm this before it runs."
 msgstr ""
 
+#: src/i18n/uiError.ts
+msgid "Could not reach the host."
+msgstr ""
+
 #: src/i18n/frameStrings.ts
 msgid "Crimson"
 msgstr ""
@@ -185,6 +197,10 @@ msgstr ""
 
 #: src/i18n/frameStrings.ts
 msgid "Hover-reveal sidebar"
+msgstr ""
+
+#: src/i18n/uiError.ts
+msgid "Import URLs must be https."
 msgstr ""
 
 #: src/i18n/frameStrings.ts
@@ -340,6 +356,58 @@ msgstr ""
 msgid "Teal"
 msgstr ""
 
+#: src/i18n/uiError.ts
+msgid "That address answered, but it is not a coilbox hub."
+msgstr ""
+
+#: src/i18n/uiError.ts
+msgid "That import is not a coilbox import."
+msgstr ""
+
+#: src/i18n/uiError.ts
+msgid "That import is too large to be a coilbox import."
+msgstr ""
+
+#: src/i18n/uiError.ts
+msgid "the connection ended before the login finished"
+msgstr ""
+
+#: src/i18n/uiError.ts
+msgid "The download failed part way through."
+msgstr ""
+
+#: src/i18n/uiError.ts
+msgid "The game did not answer within {seconds} seconds. Its infolog says why."
+msgstr ""
+
+#: src/i18n/uiError.ts
+msgid "The game has not connected to coilbox."
+msgstr ""
+
+#: src/i18n/uiError.ts
+msgid "The game has not started yet."
+msgstr ""
+
+#: src/i18n/uiError.ts
+msgid "The host returned an error ({status})."
+msgstr ""
+
+#: src/i18n/uiError.ts
+msgid "The host took too long to respond."
+msgstr ""
+
+#: src/i18n/uiError.ts
+msgid "The hub stopped answering part way through."
+msgstr ""
+
+#: src/i18n/uiError.ts
+msgid "the login did not finish within {seconds}s"
+msgstr ""
+
+#: src/i18n/uiError.ts
+msgid "the server refused the login"
+msgstr ""
+
 #: src/i18n/frameStrings.ts
 msgid "The top bar loses its background and sits over the content as it scrolls."
 msgstr ""
@@ -350,6 +418,22 @@ msgstr ""
 
 #: src/i18n/frameStrings.ts
 msgid "Theme and visual preferences."
+msgstr ""
+
+#: src/i18n/uiError.ts
+msgid "This project has a custom explosion effect. A tweak slot cannot carry the effects file it needs, so packing it into a lobby chat line would silently break it. Use the mutator or edit-in-place route instead."
+msgstr ""
+
+#: src/i18n/uiError.ts
+msgid "This project has no edits a mutator archive can carry, so there is nothing to package."
+msgstr ""
+
+#: src/i18n/uiError.ts
+msgid "This project has no edits a mutator archive can carry, so there is nothing to test."
+msgstr ""
+
+#: src/i18n/uiError.ts
+msgid "This project has no edits, so there is nothing to pack for a lobby."
 msgstr ""
 
 #: src/i18n/frameStrings.ts

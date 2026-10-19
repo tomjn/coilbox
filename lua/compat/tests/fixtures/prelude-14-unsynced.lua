@@ -1,4 +1,4 @@
--- Written by coilbox's compatibility mode from compat manifest 6, unsynced state.
+-- Written by coilbox's compatibility mode from compat manifest 14, unsynced state.
 -- Each fix below is a file in lua/compat/ in the coilbox repository.
 -- license: MIT or GNU GPL, v2 or later
 
@@ -13,16 +13,21 @@ local function failed(id, err)
 	end
 end
 
--- fix: compat-callin-hooks
+-- fix: compat-callin-hooks-v2
 do
 local ok, err = pcall(function(...)
--- id: compat-callin-hooks
+-- id: compat-callin-hooks-v2
 -- catalogue:
 -- states: synced, unsynced
 -- license: MIT or GNU GPL, v2 or later
 
 -- The helpers every other fix in the prelude uses. It must come first in a
 -- manifest.
+--
+-- This replaces compat-callin-hooks, which called rawget and rawset. A synced
+-- Lua state has neither (rts/Lua/LuaHandleSynced.cpp, CSyncedLuaHandle::Init).
+-- This version reads and writes the global table plainly, with its metatable
+-- taken off for the moment, so it needs no function a synced state lacks.
 --
 -- compat.define(t, name, fn) puts fn at t[name] only when nothing is there, so
 -- a function the engine still has is left alone.
@@ -49,8 +54,32 @@ local ok, err = pcall(function(...)
 
 local compat = ...
 
-local rawget, rawset, type = rawget, rawset, type
+local type = type
 local getmetatable, setmetatable = getmetatable, setmetatable
+
+-- A raw read and a raw write of the global table: the metatable is taken off
+-- around the access, so neither __index nor __newindex runs.
+local function getGlobal(name)
+	local meta = getmetatable(_G)
+	if type(meta) ~= "table" then
+		return _G[name]
+	end
+	setmetatable(_G, nil)
+	local value = _G[name]
+	setmetatable(_G, meta)
+	return value
+end
+
+local function setGlobal(name, value)
+	local meta = getmetatable(_G)
+	if type(meta) ~= "table" then
+		_G[name] = value
+		return
+	end
+	setmetatable(_G, nil)
+	_G[name] = value
+	setmetatable(_G, meta)
+end
 
 function compat.define(t, name, fn)
 	if type(t) ~= "table" or t[name] ~= nil then
@@ -88,14 +117,14 @@ end
 -- Takes whatever the handler has put in the global, keeps it as the end of the
 -- chain, and puts the chain's own function there instead.
 local function refresh(name)
-	local current = rawget(_G, name)
+	local current = getGlobal(name)
 	if current ~= composites[name] then
 		handlers[name] = current
 	end
 	if handlers[name] ~= nil or kept[name] then
-		rawset(_G, name, composites[name])
+		setGlobal(name, composites[name])
 	else
-		rawset(_G, name, nil)
+		setGlobal(name, nil)
 	end
 end
 
@@ -122,7 +151,7 @@ if meta == nil then
 end
 if type(meta) == "table" and meta.__newindex == nil then
 	meta.__newindex = function(t, name, value)
-		rawset(t, name, value)
+		setGlobal(name, value)
 		if hooks[name] ~= nil then
 			refresh(name)
 		end
@@ -139,7 +168,7 @@ if type(Script) == "table" and type(Script.UpdateCallIn) == "function" then
 	end
 end
 end, compat)
-if not ok then failed("compat-callin-hooks", err) end
+if not ok then failed("compat-callin-hooks-v2", err) end
 end
 
 -- fix: gl-smoothing
@@ -241,6 +270,77 @@ end, compat)
 if not ok then failed("spring-sun-parameters", err) end
 end
 
+-- fix: game-version-104
+do
+local ok, err = pcall(function(...)
+-- id: game-version-104
+-- catalogue: renamed:Game.version, renamed:Game.versionFull, renamed:Game.versionPatchSet
+-- states: synced, unsynced
+-- license: MIT or GNU GPL, v2 or later
+
+-- Game.version, Game.versionFull and Game.versionPatchSet, read from Engine.
+--
+-- Changelog, 104.0: "Game.{version,versionFull,versionPatchSet,buildFlags} now
+-- reside in the Engine table". The engine still fills Engine's in every Lua
+-- state (rts/Lua/LuaConstEngine.cpp), so this copies each into Game where Game
+-- has nothing by that name. A game that reads Game.version, as Spring 1944's
+-- unit_weaponToggle.lua does, gets the current engine's version string.
+
+if type(Game) == "table" and type(Engine) == "table" then
+	for _, key in ipairs({ "version", "versionFull", "versionPatchSet" }) do
+		if Game[key] == nil then
+			Game[key] = Engine[key]
+		end
+	end
+end
+end, compat)
+if not ok then failed("game-version-104", err) end
+end
+
+-- fix: spring-ground-info-105
+do
+local ok, err = pcall(function(...)
+-- id: spring-ground-info-105
+-- catalogue: signature:Spring.GetGroundInfo@105.0
+-- states: synced, unsynced
+-- license: MIT or GNU GPL, v2 or later
+
+-- Spring.GetGroundInfo with the results in their 104 order.
+--
+-- Changelog, 105.0: "return the terrain-type index from Spring.GetGroundInfo
+-- and Spring.GetTerrainTypeData. These functions now push [number index,
+-- string name, ...] rather than [string name, ...]". In 103.0 it returned the
+-- terrain type's name, the metal, hardness, the tank, kbot, hover and ship
+-- speeds and receiveTracks (rts/Lua/LuaSyncedRead.cpp, PushTerrainTypeData).
+-- The current engine returns the type's index in front of those, so a game
+-- that reads the metal second, as Spring 1944's game_flagManager.lua does, gets
+-- the name, a string.
+--
+-- This drops the index. It wraps only a GetGroundInfo whose first result is a
+-- number, which the old order never gives, so running the prelude a second
+-- time in one state leaves the order alone. A game whose Lua reads the new
+-- order does not get this fix (see coilbox_compat::for_game).
+
+local Spring = Spring
+if type(Spring) ~= "table" or type(Spring.GetGroundInfo) ~= "function" then
+	return
+end
+
+local getGroundInfo = Spring.GetGroundInfo
+local ok, first = pcall(getGroundInfo, 0, 0)
+if not ok or type(first) ~= "number" then
+	return
+end
+
+local select = select
+
+Spring.GetGroundInfo = function(x, z)
+	return select(2, getGroundInfo(x, z))
+end
+end, compat)
+if not ok then failed("spring-ground-info-105", err) end
+end
+
 -- fix: callin-unit-damaged-95
 do
 local ok, err = pcall(function(...)
@@ -300,4 +400,136 @@ if type(Game) == "table" and type(VFS) == "table" and type(VFS.Include) == "func
 end
 end, compat)
 if not ok then failed("game-identity", err) end
+end
+
+-- fix: snext-spairs-sipairs
+do
+local ok, err = pcall(function(...)
+-- id: snext-spairs-sipairs
+-- catalogue: removed:snext, removed:spairs, removed:sipairs
+-- states: unsynced
+-- license: MIT or GNU GPL, v2 or later
+
+-- snext, spairs and sipairs, as next, pairs and ipairs.
+--
+-- Changelog, 2025.01.1: "removed `snext`, `spairs` and `sipairs`. These
+-- functions can be replaced by the regular `next`, `pairs`, and `ipairs`
+-- respectively with no change in behaviour." (commit d083766c74).
+--
+-- Before 97.0 they walked the old SYNCED proxy. From 97.0 a read of SYNCED
+-- gives a copy, and LuaSyncedTable::PushEntries (rts/Lua/LuaSyncedTable.cpp)
+-- set the three globals to the state's own next, pairs and ipairs. The engine
+-- called it only in the unsynced half of LuaRules and LuaGaia, the same call
+-- that sets SYNCED, so this defines them only where SYNCED is a table. LuaUI
+-- never had them.
+--
+-- The engine's LuaGadgets/gadgets.lua gives each gadget a copy of the System
+-- table its system.lua builds, not the globals, and that file listed the three
+-- until the same commit. Old games load the engine's handler, so this also adds
+-- them to System when it is first set.
+
+local compat = ...
+
+if type(SYNCED) ~= "table" then
+	return
+end
+
+local type, getmetatable, setmetatable, rawset = type, getmetatable, setmetatable, rawset
+
+local aliases = { snext = next, spairs = pairs, sipairs = ipairs }
+
+local function fill(t)
+	for name, fn in pairs(aliases) do
+		compat.define(t, name, fn)
+	end
+end
+
+fill(_G)
+
+if type(System) == "table" then
+	fill(System)
+	return
+end
+
+local meta = getmetatable(_G)
+if meta == nil then
+	meta = {}
+	setmetatable(_G, meta)
+end
+if type(meta) ~= "table" then
+	return
+end
+
+-- The global table has no System yet, so its first assignment goes through
+-- __newindex. Whatever handled that before still does.
+local previous = meta.__newindex
+meta.__newindex = function(t, name, value)
+	if name == "System" and type(value) == "table" then
+		fill(value)
+	end
+	if type(previous) == "function" then
+		return previous(t, name, value)
+	elseif type(previous) == "table" then
+		previous[name] = value
+	else
+		rawset(t, name, value)
+	end
+end
+end, compat)
+if not ok then failed("snext-spairs-sipairs", err) end
+end
+
+-- fix: spring-get-team-info-105
+do
+local ok, err = pcall(function(...)
+-- id: spring-get-team-info-105
+-- catalogue: signature:Spring.GetTeamInfo@105.0
+-- states: synced, unsynced
+-- license: MIT or GNU GPL, v2 or later
+
+-- Spring.GetTeamInfo with its last two results in the order they had before
+-- 105.0.
+--
+-- Changelog, 105.0: "Spring.GetTeamInfo: switched the last two return values
+-- around (incomeMultiplier is now 7th, customKeys is now 8th)".
+--
+-- From 83.0 to 104.0.1 GetTeamInfo(teamID) returned teamID, leader, isDead,
+-- hasAI, side, allyTeam, the table of the team's custom keys and then its
+-- income multiplier, or nothing for a team that does not exist
+-- (rts/Lua/LuaSyncedRead.cpp). A game written for that order reads the keys
+-- 7th, and now gets a number there. This swaps the two back.
+--
+-- The engine since takes a second argument, and returns no keys and only
+-- seven values when it is false. An old game never passes it, and those seven
+-- are passed on as they are.
+--
+-- Coilbox leaves this fix out for a game whose own Lua already reads the new
+-- order (crates/coilbox-compat, ADAPTERS).
+
+local Spring = Spring
+if type(Spring) ~= "table" or type(Spring.GetTeamInfo) ~= "function" then
+	return
+end
+
+local select = select
+local GetTeamInfo = Spring.GetTeamInfo
+
+local function counted(...)
+	return select("#", ...), ...
+end
+
+local function reorder(n, teamID, leader, isDead, hasAI, side, allyTeam, incomeMultiplier, customKeys)
+	if n == 0 then
+		return
+	elseif n == 8 then
+		return teamID, leader, isDead, hasAI, side, allyTeam, customKeys, incomeMultiplier
+	end
+	return teamID, leader, isDead, hasAI, side, allyTeam, incomeMultiplier
+end
+
+Spring.GetTeamInfo = function(...)
+	return reorder(counted(GetTeamInfo(...)))
+end
+end, compat)
+if not ok then failed("spring-get-team-info-105", err) end
 end
