@@ -56,6 +56,7 @@ const MANIFESTS: &[(u32, &str)] = &[
     (11, include_str!("../../../lua/compat/manifests/11.json")),
     (12, include_str!("../../../lua/compat/manifests/12.json")),
     (13, include_str!("../../../lua/compat/manifests/13.json")),
+    (14, include_str!("../../../lua/compat/manifests/14.json")),
 ];
 
 /// Every fix file, by id.
@@ -216,7 +217,7 @@ pub struct Converter {
 /// the bytes keeps the old behaviour for the writers that had it and puts the
 /// new one behind a new writer: move this, add a manifest that names it, and
 /// record the new writer's hashes beside the old ones.
-pub const WRITER: u32 = 2;
+pub const WRITER: u32 = 3;
 
 /// Whether this build can write a manifest that names `writer`.
 pub fn knows_writer(writer: u32) -> bool {
@@ -235,6 +236,13 @@ pub fn keeps_palette_tiles(writer: u32) -> bool {
 /// with U+FFFD.
 pub fn copies_entry_bytes(writer: u32) -> bool {
     writer >= 2
+}
+
+/// Whether `writer` leaves a `.3do` unconverted when the game ships an `.s3o`
+/// at the same path, compared in lower case (issue #4697). Writer 2 converted
+/// it, and the converted file covered up the game's own model.
+pub fn keeps_game_s3o(writer: u32) -> bool {
+    writer >= 3
 }
 
 /// The writer of manifests 1 and 2, which predate the `writer` field.
@@ -1276,6 +1284,19 @@ mod tests {
         assert!(copies_entry_bytes(eight.writer));
     }
 
+    /// Writer 3 leaves a `.3do` unconverted when the game has an `.s3o` of the
+    /// same name (issue #4697), and the fixes stay those of manifest 12.
+    #[test]
+    fn manifest_13_is_manifest_12_built_by_writer_3() {
+        let (twelve, thirteen) = (manifest(12).unwrap(), manifest(13).unwrap());
+        assert_eq!(thirteen.fixes, twelve.fixes);
+        assert_eq!(thirteen.converter, twelve.converter);
+        assert_eq!((twelve.writer, thirteen.writer), (2, 3));
+        assert!(!keeps_game_s3o(twelve.writer));
+        assert!(keeps_game_s3o(thirteen.writer));
+        assert!(keeps_palette_tiles(thirteen.writer) && copies_entry_bytes(thirteen.writer));
+    }
+
     /// Manifests 2 to 8 hook call-ins with `rawget` and `rawset`, which a
     /// synced state lacks (issue #4685). Manifest 9 swaps in hooks that do not.
     #[test]
@@ -1728,35 +1749,35 @@ mod tests {
         }
     }
 
-    /// Issues #4700 and #4699: manifest 13 stores a numeric string given to a
+    /// Issues #4700 and #4699: manifest 14 stores a numeric string given to a
     /// rules param as a number, and reads an icon type the game does not
-    /// define as "default", as 104.0 did, and keeps the writer of manifest 12.
+    /// define as "default", as 104.0 did, and keeps the writer of manifest 13.
     #[test]
-    fn manifest_13_is_manifest_12_with_the_old_rules_params_and_icon_types() {
-        let (twelve, thirteen) = (manifest(12).unwrap(), manifest(13).unwrap());
-        let added: Vec<&String> = thirteen
+    fn manifest_14_is_manifest_13_with_the_old_rules_params_and_icon_types() {
+        let (thirteen, fourteen) = (manifest(13).unwrap(), manifest(14).unwrap());
+        let added: Vec<&String> = fourteen
             .fixes
             .iter()
-            .filter(|id| !twelve.fixes.contains(id))
+            .filter(|id| !thirteen.fixes.contains(id))
             .collect();
         assert_eq!(added, ["spring-rules-param-105", "defs-icon-type-2025"]);
         assert_eq!(
-            defs_fixes(&thirteen, DefsFile::DefsPost).last(),
+            defs_fixes(&fourteen, DefsFile::DefsPost).last(),
             Some(&"defs-icon-type-2025")
         );
-        assert!(!defs_fixes(&thirteen, DefsFile::WeaponDefsPost).contains(&"defs-icon-type-2025"));
-        let kept: Vec<&String> = thirteen
+        assert!(!defs_fixes(&fourteen, DefsFile::WeaponDefsPost).contains(&"defs-icon-type-2025"));
+        let kept: Vec<&String> = fourteen
             .fixes
             .iter()
-            .filter(|id| twelve.fixes.contains(id))
+            .filter(|id| thirteen.fixes.contains(id))
             .collect();
-        assert_eq!(kept, twelve.fixes.iter().collect::<Vec<_>>());
+        assert_eq!(kept, thirteen.fixes.iter().collect::<Vec<_>>());
         assert_eq!(
-            (&thirteen.converter, thirteen.writer),
-            (&twelve.converter, twelve.writer)
+            (&fourteen.converter, fourteen.writer),
+            (&thirteen.converter, thirteen.writer)
         );
         let ids = |state| -> Vec<&str> {
-            prelude_fixes(&thirteen, state)
+            prelude_fixes(&fourteen, state)
                 .iter()
                 .map(|(id, _)| *id)
                 .collect()
@@ -1899,14 +1920,14 @@ mod tests {
         }
     }
 
-    /// The preludes for manifests 9, 11, 12 and 13, as the Lua tests in
+    /// The preludes for manifests 9, 11, 12 and 14, as the Lua tests in
     /// `lua/compat/tests/` load them. Earlier manifests' synced preludes call
     /// `rawget`, which the tests' synced state lacks, so they are not kept.
     /// `COILBOX_WRITE_FIXTURE=1` writes them again after a deliberate change to
     /// how a prelude is built.
     #[test]
     fn the_lua_tests_load_the_preludes_this_crate_builds() {
-        for n in [9, 11, 12, 13] {
+        for n in [9, 11, 12, 14] {
             let m = manifest(n).unwrap();
             for state in [LuaState::Synced, LuaState::Unsynced] {
                 let built = prelude(&m, state).unwrap();

@@ -1387,19 +1387,19 @@ mod tests {
         let synced = text(&updated, "compat/prelude-synced.lua").unwrap();
         assert!(!synced.contains(ground) && synced.contains("-- fix: game-version-104\n"));
 
-        // Every game built from 13 stores a numeric string as a number, in the
+        // Every game built from 14 stores a numeric string as a number, in the
         // synced state, where the rules params are set.
         let rules = "-- fix: spring-rules-param-105\n";
         for fixture in &FIXTURES[..2] {
-            let thirteen = golden_build(13, fixture);
-            let synced = text(&thirteen, "compat/prelude-synced.lua").unwrap();
+            let fourteen = golden_build(14, fixture);
+            let synced = text(&fourteen, "compat/prelude-synced.lua").unwrap();
             assert!(synced.contains(rules), "{}", fixture.archive);
-            if let Some(unsynced) = text(&thirteen, "compat/prelude-unsynced.lua") {
+            if let Some(unsynced) = text(&fourteen, "compat/prelude-unsynced.lua") {
                 assert!(!unsynced.contains(rules), "{}", fixture.archive);
             }
         }
         assert!(
-            !text(&golden_build(12, &FIXTURES[0]), "compat/prelude-synced.lua")
+            !text(&golden_build(13, &FIXTURES[0]), "compat/prelude-synced.lua")
                 .unwrap()
                 .contains(rules)
         );
@@ -1488,7 +1488,11 @@ mod tests {
         ),
         (
             13,
-            "e57963b986e61c2e7a449bd802ef25527dbc449e4439e45fa39fcb97ba2acb99",
+            "1e30d5f81d9a4fc76655ade256635e9b281973aecfeeb2448f8019ba3b51ab07",
+        ),
+        (
+            14,
+            "60ac951dea79f66e71caabbd77c24cc1ef9b3aa8ac8311f7bf473ff556b9efb9",
         ),
     ];
 

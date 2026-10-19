@@ -429,7 +429,7 @@ end
 
 do
 	local spring, params = rulesEngine()
-	local engine = newEngine({ manifest = 13, spring = spring })
+	local engine = newEngine({ manifest = 14, spring = spring })
 	prelude(engine)
 	local S = engine.env.Spring
 	-- Spring 1944's game_ammo.lua, lines 252 and 178.
@@ -464,15 +464,15 @@ do
 end
 
 do
-	local engine = newEngine({ manifest = 13 })
+	local engine = newEngine({ manifest = 14 })
 	prelude(engine)
 	check("without the rules param functions none is defined", engine.env.Spring.SetUnitRulesParam == nil and engine.env.Spring.SetGameRulesParam == nil)
 	check("without the rules param functions no fix failed", #engine.logs == 0, table.concat(engine.logs, "; "))
 	local player = function() end
-	local only = newEngine({ manifest = 13, spring = { SetPlayerRulesParam = player } })
+	local only = newEngine({ manifest = 14, spring = { SetPlayerRulesParam = player } })
 	prelude(only)
 	check("SetPlayerRulesParam, which 104.0 did not have, is left alone", only.env.Spring.SetPlayerRulesParam == player)
-	local unsynced = newEngine({ synced = false, manifest = 13, spring = { SetUnitRulesParam = player } })
+	local unsynced = newEngine({ synced = false, manifest = 14, spring = { SetUnitRulesParam = player } })
 	prelude(unsynced)
 	check("the unsynced state is left alone", unsynced.env.Spring.SetUnitRulesParam == player)
 end

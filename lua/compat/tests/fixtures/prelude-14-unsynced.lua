@@ -1,4 +1,4 @@
--- Written by coilbox's compatibility mode from compat manifest 13, synced state.
+-- Written by coilbox's compatibility mode from compat manifest 14, unsynced state.
 -- Each fix below is a file in lua/compat/ in the coilbox repository.
 -- license: MIT or GNU GPL, v2 or later
 
@@ -171,190 +171,103 @@ end, compat)
 if not ok then failed("compat-callin-hooks-v2", err) end
 end
 
--- fix: spring-unit-travel
+-- fix: gl-smoothing
 do
 local ok, err = pcall(function(...)
--- id: spring-unit-travel
--- catalogue: removed:Spring.GetUnitTravel, removed:Spring.SetUnitTravel
--- states: synced
+-- id: gl-smoothing
+-- catalogue: removed:gl.Smoothing
+-- states: unsynced
 -- license: MIT or GNU GPL, v2 or later
 
--- Spring.SetUnitTravel and Spring.GetUnitTravel, kept in a table per unit.
+-- gl.Smoothing, which does nothing.
 --
--- Changelog, 105.0: "remove Spring.{Set,Get}UnitTravel". The engine still
--- registers both, but GetUnitTravel returns 0, 0 for any argument and
--- SetUnitTravel does nothing (rts/Lua/LuaSyncedRead.cpp and LuaSyncedCtrl.cpp).
---
--- In 104.0.1 SetUnitTravel(unitID, travel, period) stored either number, and on
--- every frame a unit that was neither being built nor dead had its speed added
--- to travel, wrapped by period, while period was not 0 (rts/Sim/Units/Unit.cpp,
--- CUnit::Update). GetUnitTravel(unitID) returned travel and period, or nothing
--- for a unit that does not exist.
---
--- This adds the distance when it is read rather than on every frame, using the
--- unit's speed at the time of reading. A unit that speeds up or slows down
--- between two reads is credited at the later speed. Only the synced state keeps
--- a table, so unsynced code keeps the engine's 0, 0.
+-- Changelog, 104.0: "remove gl.Smoothing". In 103.0.1 it turned OpenGL point,
+-- line and polygon smoothing on or off (rts/Lua/LuaOpenGL.cpp) and returned
+-- nothing. The engine no longer offers the switch, so a call changes nothing.
 
 local compat = ...
 
-local Spring = Spring
-if type(Spring) ~= "table" then
-	return
+if type(gl) == "table" then
+	compat.define(gl, "Smoothing", function() end)
 end
-
--- True when the function is gone or is the engine's 105.0 stub. The stub
--- answers 0, 0 for an ID no unit can have, and a working GetUnitTravel answers
--- nothing for it.
-local function stubbed(get)
-	if get == nil then
-		return true
-	end
-	local ok, travel = pcall(get, -1)
-	return ok and travel ~= nil
-end
-
-if not stubbed(Spring.GetUnitTravel) then
-	return
-end
-
-local fmod, tonumber = math.fmod, tonumber
-local ValidUnitID = Spring.ValidUnitID
-local GetGameFrame = Spring.GetGameFrame
-local GetUnitVelocity = Spring.GetUnitVelocity
-local GetUnitIsBeingBuilt = Spring.GetUnitIsBeingBuilt
-
-local units = {}
-
--- Brings a unit's travel up to the current frame.
-local function advance(unitID, state)
-	local frame = GetGameFrame()
-	local frames = frame - state.frame
-	state.frame = frame
-	if state.period == 0 or frames <= 0 then
-		return
-	end
-	if GetUnitIsBeingBuilt and GetUnitIsBeingBuilt(unitID) then
-		return
-	end
-	local speed = select(4, GetUnitVelocity(unitID)) or 0
-	state.travel = fmod(state.travel + speed * frames, state.period)
-end
-
-Spring.SetUnitTravel = function(unitID, travel, period)
-	if not ValidUnitID(unitID) then
-		return
-	end
-	local state = units[unitID]
-	if state == nil then
-		state = { travel = 0, period = 0, frame = GetGameFrame() }
-		units[unitID] = state
-	else
-		advance(unitID, state)
-	end
-	travel, period = tonumber(travel), tonumber(period)
-	if travel ~= nil then
-		state.travel = travel
-	end
-	if period ~= nil then
-		state.period = period
-	end
-end
-
-Spring.GetUnitTravel = function(unitID)
-	if not ValidUnitID(unitID) then
-		return
-	end
-	local state = units[unitID]
-	if state == nil then
-		return 0, 0
-	end
-	advance(unitID, state)
-	return state.travel, state.period
-end
-
--- A destroyed unit's ID can be given to a new unit, which starts at 0, 0. The
--- game's own UnitDestroyed still reads the old values.
-compat.hook("UnitDestroyed", function(nextFn, unitID, ...)
-	nextFn(unitID, ...)
-	units[unitID] = nil
-end, true)
 end, compat)
-if not ok then failed("spring-unit-travel", err) end
+if not ok then failed("gl-smoothing", err) end
 end
 
--- fix: spring-set-unit-to-feature
+-- fix: spring-make-font
 do
 local ok, err = pcall(function(...)
--- id: spring-set-unit-to-feature
--- catalogue: removed:Spring.SetUnitToFeature
--- states: synced
+-- id: spring-make-font
+-- catalogue: removed:Spring.MakeFont
+-- states: unsynced
 -- license: MIT or GNU GPL, v2 or later
 
--- Spring.SetUnitToFeature, through the AllowFeatureCreation call-in.
+-- Spring.MakeFont, which makes no font and returns nil.
 --
--- Changelog, 105.0: "remove Spring.SetUnitToFeature (use the AllowFeatureCreation
--- callin to block features from being spawned)".
---
--- In 104.0.1 SetUnitToFeature(bool) set one switch for the whole game, true at
--- the start (rts/Sim/Units/Unit.cpp, CUnit::spawnFeature). A unit whose def has
--- isFeature turns into its wreck feature when it is finished. With the switch
--- off it was left as a unit instead. The argument had to be a boolean.
---
--- The current engine makes that wreck in CUnit::FinishedBuilding straight after
--- the UnitFinished call-in, and leaves the unit alone when AllowFeatureCreation
--- refuses it. So with the switch off, UnitFinished notes an isFeature unit's
--- wreck and the next AllowFeatureCreation for that wreck on that frame refuses.
+-- Last registered in 0.81.2.1, where it wrote a bitmap font from a TrueType
+-- file (rts/Lua/LuaUnsyncedCtrl.cpp). Current Lua loads a font with
+-- gl.LoadFont instead. Returning nil lets code that only made a font at start
+-- carry on.
 
 local compat = ...
 
-local Spring = Spring
-if type(Spring) ~= "table" or Spring.SetUnitToFeature ~= nil then
-	return
-end
-
-local spawn = true
-local pending = nil
-
-Spring.SetUnitToFeature = function(value)
-	if type(value) ~= "boolean" then
-		error("bad argument #1 to 'SetUnitToFeature' (boolean expected, got " .. type(value) .. ")", 2)
-	end
-	spawn = value
-end
-
--- The FeatureDef ID of a unit def's wreck, as CUnit::PreInit looks it up.
-local function wreckOf(unitDefID)
-	local def = UnitDefs and UnitDefs[unitDefID]
-	if def == nil or not def.isFeature or type(def.wreckName) ~= "string" then
+if type(Spring) == "table" then
+	compat.define(Spring, "MakeFont", function()
 		return nil
-	end
-	local feature = FeatureDefNames and FeatureDefNames[def.wreckName:lower()]
-	return feature and feature.id
+	end)
+end
+end, compat)
+if not ok then failed("spring-make-font", err) end
 end
 
-compat.hook("UnitFinished", function(nextFn, unitID, unitDefID, ...)
-	pending = nil
-	local result = nextFn(unitID, unitDefID, ...)
-	if not spawn then
-		local featureDefID = wreckOf(unitDefID)
-		if featureDefID ~= nil then
-			pending = { featureDefID = featureDefID, frame = Spring.GetGameFrame() }
-		end
-	end
-	return result
-end, true)
+-- fix: spring-update-info-texture
+do
+local ok, err = pcall(function(...)
+-- id: spring-update-info-texture
+-- catalogue: removed:Spring.UpdateInfoTexture
+-- states: unsynced
+-- license: MIT or GNU GPL, v2 or later
 
-compat.hook("AllowFeatureCreation", function(nextFn, featureDefID, ...)
-	local wreck = pending
-	pending = nil
-	if wreck ~= nil and wreck.featureDefID == featureDefID and wreck.frame == Spring.GetGameFrame() then
+-- Spring.UpdateInfoTexture, which updates nothing and returns false.
+--
+-- Changelog, 99.0: "remove Spring.UpdateInfoTexture". In 98.0.1 it updated one
+-- of the ground info textures in the background and returned whether it did
+-- (rts/Lua/LuaUnsyncedCtrl.cpp). false is what it returned when it could not.
+
+local compat = ...
+
+if type(Spring) == "table" then
+	compat.define(Spring, "UpdateInfoTexture", function()
 		return false
-	end
-	return nextFn(featureDefID, ...)
-end, true)
+	end)
+end
 end, compat)
-if not ok then failed("spring-set-unit-to-feature", err) end
+if not ok then failed("spring-update-info-texture", err) end
+end
+
+-- fix: spring-sun-parameters
+do
+local ok, err = pcall(function(...)
+-- id: spring-sun-parameters
+-- catalogue: removed:Spring.SetSunParameters, removed:Spring.SetSunManualControl
+-- states: unsynced
+-- license: MIT or GNU GPL, v2 or later
+
+-- Spring.SetSunParameters and Spring.SetSunManualControl, which do nothing.
+--
+-- Changelog, 104.0: "remove Spring.SetSunParameters and
+-- Spring.SetSunManualControl". In 103.0.1 both worked only on a map with a
+-- dynamic sun and returned nothing (rts/Lua/LuaUnsyncedCtrl.cpp). The current
+-- engine has no dynamic sun, so the sun stays where the map puts it.
+
+local compat = ...
+
+if type(Spring) == "table" then
+	compat.define(Spring, "SetSunParameters", function() end)
+	compat.define(Spring, "SetSunManualControl", function() end)
+end
+end, compat)
+if not ok then failed("spring-sun-parameters", err) end
 end
 
 -- fix: game-version-104
@@ -428,68 +341,6 @@ end, compat)
 if not ok then failed("spring-ground-info-105", err) end
 end
 
--- fix: spring-rules-param-105
-do
-local ok, err = pcall(function(...)
--- id: spring-rules-param-105
--- catalogue: signature:Spring.SetGameRulesParam@105.0, signature:Spring.SetTeamRulesParam@105.0, signature:Spring.SetUnitRulesParam@105.0, signature:Spring.SetFeatureRulesParam@105.0
--- states: synced
--- license: MIT or GNU GPL, v2 or later
-
--- Spring.Set{Game,Team,Unit,Feature}RulesParam storing a string that reads as
--- a number as that number, as 104.0 did.
---
--- In 104.0, SetRulesParam (rts/Lua/LuaSyncedCtrl.cpp) stored any value
--- lua_isnumber accepts as a number, and lua_isnumber accepts a string such as
--- "30". RecoilEngine commit ffafcbc51a, "Coerce to number less often in
--- *SetRulesParam" (#511, first in 105.0), changed the test to
--- lua_israwnumber, so "30" is now stored and read back as a string. Spring
--- 1944's game_ammo.lua sets a unit's ammo from a def's custom parameter, which
--- is a string, and then compares it with a number.
---
--- The four functions share SetRulesParam, and these are the ones 104.0 had.
--- Spring.SetPlayerRulesParam came later, so no game written for 104.0 calls it.
---
--- tonumber reads a string the way lua_isnumber does, through the same
--- luaO_str2d, so the value changes only where the two engines differ. Any
--- other value, a number included, is passed on as it came.
-
-local Spring = Spring
-if type(Spring) ~= "table" then
-	return
-end
-
-local tonumber, type = tonumber, type
-
-local function number(value)
-	if type(value) == "string" then
-		local n = tonumber(value)
-		if n ~= nil then
-			return n
-		end
-	end
-	return value
-end
-
-local set = Spring.SetGameRulesParam
-if type(set) == "function" then
-	Spring.SetGameRulesParam = function(name, value, ...)
-		return set(name, number(value), ...)
-	end
-end
-
-for _, key in ipairs({ "SetTeamRulesParam", "SetUnitRulesParam", "SetFeatureRulesParam" }) do
-	local setOne = Spring[key]
-	if type(setOne) == "function" then
-		Spring[key] = function(id, name, value, ...)
-			return setOne(id, name, number(value), ...)
-		end
-	end
-end
-end, compat)
-if not ok then failed("spring-rules-param-105", err) end
-end
-
 -- fix: callin-unit-damaged-95
 do
 local ok, err = pcall(function(...)
@@ -515,37 +366,6 @@ compat.hook("UnitDamaged", function(nextFn, unitID, unitDefID, unitTeam, damage,
 end)
 end, compat)
 if not ok then failed("callin-unit-damaged-95", err) end
-end
-
--- fix: callin-allow-command-105
-do
-local ok, err = pcall(function(...)
--- id: callin-allow-command-105
--- catalogue: signature:AllowCommand@105.0
--- states: synced
--- license: MIT or GNU GPL, v2 or later
-
--- The AllowCommand call-in with the arguments it had before 105.0.
---
--- Changelog, 105.0: "change {Allow,Unit}Command callin parameters
--- AllowCommand(..., cmdTag, fromSynced) --> AllowCommand(..., cmdTag, playerID,
--- fromSynced, fromLua)".
---
--- Up to 104.0.1 the eighth argument was fromSynced (rts/Lua/LuaHandleSynced.cpp).
--- Now it is playerID, which a handler written for the old list reads as
--- fromSynced, and a number is always true. This drops playerID and fromLua
--- before the game's handler sees the call, and passes its answer back.
---
--- UnitCommand changed in the same release, but only by gaining arguments at
--- the end, which an old handler never reads.
-
-local compat = ...
-
-compat.hook("AllowCommand", function(nextFn, unitID, unitDefID, unitTeam, cmdID, cmdParams, cmdOptions, cmdTag, playerID, fromSynced, fromLua)
-	return nextFn(unitID, unitDefID, unitTeam, cmdID, cmdParams, cmdOptions, cmdTag, fromSynced)
-end)
-end, compat)
-if not ok then failed("callin-allow-command-105", err) end
 end
 
 -- fix: game-identity
@@ -582,107 +402,81 @@ end, compat)
 if not ok then failed("game-identity", err) end
 end
 
--- fix: spring-unit-lineage
+-- fix: snext-spairs-sipairs
 do
 local ok, err = pcall(function(...)
--- id: spring-unit-lineage
--- catalogue: removed:Spring.SetUnitLineage, removed:Spring.GetUnitLineage
--- states: synced
+-- id: snext-spairs-sipairs
+-- catalogue: removed:snext, removed:spairs, removed:sipairs
+-- states: unsynced
 -- license: MIT or GNU GPL, v2 or later
 
--- Spring.SetUnitLineage and Spring.GetUnitLineage, kept in a table per unit.
+-- snext, spairs and sipairs, as next, pairs and ipairs.
 --
--- Commit 4c3273c343 removed both, with the lineage tracker and the game end
--- conditions it served, so 0.82.7.1 is the last release with them.
+-- Changelog, 2025.01.1: "removed `snext`, `spairs` and `sipairs`. These
+-- functions can be replaced by the regular `next`, `pairs`, and `ipairs`
+-- respectively with no change in behaviour." (commit d083766c74).
 --
--- In 0.82.7.1 a unit's lineage was the team it was made on, or the lineage of
--- the unit that built it, made it in a factory or resurrected it
--- (rts/Sim/Units/Unit.cpp, Builder.cpp and Factory.cpp). SetUnitLineage(unitID,
--- teamID, isRoot) set the unit's lineage to teamID, and with isRoot true made
--- the unit that team's lineage root (rts/Lua/LuaSyncedCtrl.cpp). A unit ID that
--- is not a number, or a team that does not exist, raised an error. A unit that
--- does not exist was ignored. GetUnitLineage(unitID) returned the lineage and
--- whether the unit was the root of its own current team, or nothing for a unit
--- that does not exist (rts/Lua/LuaSyncedRead.cpp).
+-- Before 97.0 they walked the old SYNCED proxy. From 97.0 a read of SYNCED
+-- gives a copy, and LuaSyncedTable::PushEntries (rts/Lua/LuaSyncedTable.cpp)
+-- set the three globals to the state's own next, pairs and ipairs. The engine
+-- called it only in the unsynced half of LuaRules and LuaGaia, the same call
+-- that sets SYNCED, so this defines them only where SYNCED is a table. LuaUI
+-- never had them.
 --
--- The engine also killed a root's lineage when the root died, but only in the
--- lineage game mode, which went with the same commit, so this does not.
--- A captured unit took its captor's lineage, which no call-in shows, so here it
--- keeps its own. A destroyed unit stops being a root, so a new unit that gets
--- its ID is not one. Only the synced state keeps the table.
+-- The engine's LuaGadgets/gadgets.lua gives each gadget a copy of the System
+-- table its system.lua builds, not the globals, and that file listed the three
+-- until the same commit. Old games load the engine's handler, so this also adds
+-- them to System when it is first set.
 
 local compat = ...
 
-local Spring = Spring
-if type(Spring) ~= "table" or Spring.SetUnitLineage ~= nil or Spring.GetUnitLineage ~= nil then
+if type(SYNCED) ~= "table" then
 	return
 end
 
-local type, error, tostring = type, error, tostring
-local ValidUnitID = Spring.ValidUnitID
-local GetUnitTeam = Spring.GetUnitTeam
-local GetTeamInfo = Spring.GetTeamInfo
+local type, getmetatable, setmetatable, rawset = type, getmetatable, setmetatable, rawset
 
-local lineages = {}
-local roots = {}
+local aliases = { snext = next, spairs = pairs, sipairs = ipairs }
 
-local function lineageOf(unitID)
-	local lineage = lineages[unitID]
-	if lineage == nil then
-		return GetUnitTeam(unitID)
-	end
-	return lineage
-end
-
-Spring.SetUnitLineage = function(unitID, teamID, isRoot)
-	if type(unitID) ~= "number" then
-		error("SetUnitLineage(): Bad unitID", 2)
-	end
-	if not ValidUnitID(unitID) then
-		return
-	end
-	if type(teamID) ~= "number" then
-		error("SetUnitLineage(): Bad teamID", 2)
-	end
-	if GetTeamInfo(teamID) == nil then
-		error("SetUnitLineage(): Bad teamID: " .. tostring(teamID), 2)
-	end
-	lineages[unitID] = teamID
-	if isRoot == true then
-		roots[teamID] = unitID
+local function fill(t)
+	for name, fn in pairs(aliases) do
+		compat.define(t, name, fn)
 	end
 end
 
-Spring.GetUnitLineage = function(unitID)
-	if type(unitID) ~= "number" then
-		error("Bad unitID parameter in GetUnitLineage()", 2)
-	end
-	if not ValidUnitID(unitID) then
-		return
-	end
-	return lineageOf(unitID), roots[GetUnitTeam(unitID)] == unitID
+fill(_G)
+
+if type(System) == "table" then
+	fill(System)
+	return
 end
 
-compat.hook("UnitCreated", function(nextFn, unitID, unitDefID, unitTeam, builderID, ...)
-	if builderID ~= nil and ValidUnitID(builderID) then
-		lineages[unitID] = lineageOf(builderID)
+local meta = getmetatable(_G)
+if meta == nil then
+	meta = {}
+	setmetatable(_G, meta)
+end
+if type(meta) ~= "table" then
+	return
+end
+
+-- The global table has no System yet, so its first assignment goes through
+-- __newindex. Whatever handled that before still does.
+local previous = meta.__newindex
+meta.__newindex = function(t, name, value)
+	if name == "System" and type(value) == "table" then
+		fill(value)
+	end
+	if type(previous) == "function" then
+		return previous(t, name, value)
+	elseif type(previous) == "table" then
+		previous[name] = value
 	else
-		lineages[unitID] = unitTeam
+		rawset(t, name, value)
 	end
-	return nextFn(unitID, unitDefID, unitTeam, builderID, ...)
-end, true)
-
-compat.hook("UnitDestroyed", function(nextFn, unitID, ...)
-	nextFn(unitID, ...)
-	lineages[unitID] = nil
-	for teamID, root in pairs(roots) do
-		if root == unitID then
-			roots[teamID] = nil
-		end
-	end
-end, true)
+end
 end, compat)
-if not ok then failed("spring-unit-lineage", err) end
+if not ok then failed("snext-spairs-sipairs", err) end
 end
 
 -- fix: spring-get-team-info-105
