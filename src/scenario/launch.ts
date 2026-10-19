@@ -29,6 +29,7 @@ import { isSdd } from "../content/format";
 import { dependencyBlockReason } from "../content/gameDependencies";
 import { isMutatorArchive } from "../lib/generatedGames";
 import type { BattleConfig } from "../play/bindings";
+import type { CompatTarget } from "../play/compatTarget";
 import { missingLaunchDependency } from "../play/launchContent";
 import { applyRestrictions, toBattleConfig } from "../play/participants";
 import {
@@ -362,6 +363,14 @@ export interface ScenarioLaunchInput {
    * rather than on the game directly.
    */
   unitsGame?: string;
+  /**
+   * The scenario's game's compatibility mode mutator, when its switch is on and
+   * the mutator is fresh (issue #4664). The scenario plays on top of it: an
+   * adopted game launches as the mutator, and the test mutator depends on it
+   * rather than on the game directly. `unitsGame` already depends on it, so it
+   * takes precedence where both are given.
+   */
+  compat?: Extract<CompatTarget, { kind: "use" }>;
 }
 
 export type ScenarioLaunchResult =
@@ -605,7 +614,11 @@ export async function launchScenario(
     origin,
     difficulty,
     unitsGame,
+    compat,
   } = input;
+  // What the scenario's game is launched as: the units game over it, else its
+  // compatibility mutator, else the game itself.
+  const baseType = unitsGame ?? compat?.gameType;
   const wanted = scenario.setup.gameName;
   const game = games.find((g) => g.name === wanted);
   if (!game) {
@@ -675,7 +688,7 @@ export async function launchScenario(
       map,
       units,
       source,
-      unitsGame,
+      baseType,
     );
     dir = mutator.dir;
     written = { mission: missionPath(scenario.id), issues: mutator.issues };
@@ -698,7 +711,7 @@ export async function launchScenario(
   // first: the engine reads its game list from the archive cache unitsync
   // writes, so a forced rescan both registers the generated game and tells us
   // the name a start script has to ask for.
-  let gameType = unitsGame ?? game.name;
+  let gameType = baseType ?? game.name;
   if (!adopted && !shipped) {
     const found = (await rescan()).find((g) =>
       isMutatorArchive(g.primaryArchive.name),
@@ -722,6 +735,7 @@ export async function launchScenario(
       participants: scenario.setup.participants,
       mapName: scenario.setup.mapName,
       gameType,
+      compatBase: compat?.baseName,
       startPosType: scenario.setup.startPosType,
       disabledUnits: [
         ...(captured?.disabledUnits ?? []),

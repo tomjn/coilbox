@@ -29,10 +29,12 @@ import {
   CollapsibleTrigger,
 } from "@/components/ui/collapsible";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
+import { useCompatSettings } from "@/content/compatSettings";
 import { primeScan, useUnitsyncScan } from "@/content/config";
 import { loadReplays } from "@/content/replayList";
 import { useGameUnits } from "@/content/useGameUnits";
 import { playInfolog } from "@/play/bindings";
+import { resolveCompatTarget } from "@/play/compatTarget";
 import {
   gameOptionSchema,
   mapOptionSchema,
@@ -170,6 +172,7 @@ export function ScenarioTestDrawer({
   const testing = mode === "test";
   const { target, loading: targetLoading } = usePreferredTarget();
   const scan = useUnitsyncScan(target?.enginePath, target?.dataDir);
+  const [compatSettings] = useCompatSettings();
   // How big the map is, so the validator can say a position is past its far edge
   // as well as before its near one. A map that has not answered yet leaves the
   // extent out rather than blocking the launch, which drops the far-edge half of
@@ -270,6 +273,23 @@ export function ScenarioTestDrawer({
       // so they are materialised before anything is compiled. A no-op for every
       // scenario that came from anywhere else.
       await ensureBundledScenarioMedia(scenario.id);
+      // With the scenario's game's compatibility switch on, it plays over that
+      // game's mutator (issue #4664). Off, nothing about the mutator is read. A
+      // game that is not installed is left to `launchScenario` to refuse.
+      const wanted = scan.data?.games.find(
+        (g) => g.name === scenario.setup.gameName,
+      );
+      const compat = wanted
+        ? await resolveCompatTarget({
+            target,
+            game: wanted,
+            settings: compatSettings,
+          })
+        : ({ kind: "off" } as const);
+      if (compat.kind === "blocked") {
+        setPhase({ state: "failed", message: compat.message, issues: [] });
+        return;
+      }
       const result = await launchScenario({
         scenario,
         origin,
@@ -283,6 +303,7 @@ export function ScenarioTestDrawer({
         // Left out for a scenario that does not vary by it, so its start script
         // is the one it has always been.
         difficulty: varies ? difficulty : undefined,
+        compat: compat.kind === "use" ? compat : undefined,
         rescan: async () => {
           setPhase({ state: "scanning" });
           const rescanned = await primeScan(

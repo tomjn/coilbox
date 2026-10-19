@@ -470,6 +470,53 @@ describe("launchScenario", () => {
     );
   });
 
+  // Issue #4664. With the game's compatibility switch on, the scenario plays
+  // on top of the compat mutator rather than the game.
+  const COMPAT = {
+    kind: "use",
+    gameType: "Spring: 1944 (compat 2)",
+    gameArchive: "coilbox-compat-s44-2.sdd",
+    baseName: "Spring: 1944",
+  } as const;
+
+  it("plays an adopted game as its compat mutator and names the base game", async () => {
+    const result = await run(build(), [LOOSE], { compat: COMPAT });
+
+    expect(result.ok && result.config.gameType).toBe("Spring: 1944 (compat 2)");
+    expect(result.ok && result.config.modOptions?.coilbox_compat_base).toBe(
+      "Spring: 1944",
+    );
+  });
+
+  it("has the test mutator depend on the compat mutator", async () => {
+    const result = await run(build(), [PACKAGED], { compat: COMPAT });
+
+    const { modinfo } = testMutatorMock.mock.calls[0][0] as {
+      modinfo: string;
+    };
+    expect(modinfo).toContain('"Spring: 1944 (compat 2)"');
+    expect(result.ok && result.config.gameType).toBe(
+      "Coilbox mission test test",
+    );
+  });
+
+  it("keeps the units mutator, which already depends on the compat mutator", async () => {
+    const result = await run(build(), [LOOSE], {
+      compat: COMPAT,
+      unitsGame: "Coilbox campaign c1",
+    });
+
+    expect(result.ok && result.config.gameType).toBe("Coilbox campaign c1");
+  });
+
+  it("launches the game itself and writes no compat option when the switch is off", async () => {
+    const result = await run(build(), [LOOSE]);
+
+    expect(result.ok && result.config.modOptions?.coilbox_compat_base).toBe(
+      undefined,
+    );
+  });
+
   /**
    * Issue #2160. The game brought the mission with it, so there is nothing to
    * write and nowhere to write it. The archive is read and the game plays as
