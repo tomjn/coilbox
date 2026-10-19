@@ -464,8 +464,9 @@ pub struct Exported {
 /// Refused when there is no mutator, or when [`status`] says it is stale, since
 /// the export would hand out a mutator coilbox itself would rebuild. The folder
 /// is read as it is on disk, so the archive holds the very files a build wrote.
-/// They go in sorted by path with the marker last, the order a build lists them
-/// in, so two exports of one folder are the same bytes.
+/// Dot files other than the marker are left out, as the engine leaves them out
+/// of the folder. They go in sorted by path with the marker last, the order a
+/// build lists them in, so two exports of one folder are the same bytes.
 pub fn export(
     data_dir: &str,
     engine_path: &str,
@@ -507,8 +508,10 @@ fn export_with(
     }
     let dir = mutator::games_dir(data_dir)?.join(&folder);
     let mut files = models::list(&dir)?;
-    // `list` sorts, which puts the dot file first.
-    files.retain(|f| f != mutator::MARKER);
+    // The engine skips dot files at any depth in a folder but hashes nested
+    // ones in a zip, so a stray `.DS_Store` would change the checksum (#4713).
+    // `list` sorts, which puts the marker first.
+    files.retain(|f| !f.split('/').any(|part| part.starts_with('.')));
     files.push(mutator::MARKER.to_string());
     tauri_plugin_coilbox_workshop::write_sdz_entries(dest_path, &files, |path| {
         let at = dir.join(path);
@@ -1885,6 +1888,35 @@ mod tests {
                 .1,
             [0u8, 1, 2, 255]
         );
+    }
+
+    /// Issue #4713: the engine leaves nested dot files out of a folder's
+    /// checksum but not a zip's, so the export leaves them out.
+    #[test]
+    fn an_export_leaves_out_stray_dot_files() {
+        let (_keep, data) = root();
+        let built = build_with_models(&data);
+        let dir = std::path::Path::new(&built.dir);
+        std::fs::write(dir.join(".DS_Store"), b"x").unwrap();
+        std::fs::write(dir.join("Objects3D/.DS_Store"), b"x").unwrap();
+        std::fs::create_dir(dir.join(".hidden")).unwrap();
+        std::fs::write(dir.join(".hidden/file.lua"), b"x").unwrap();
+        let out = tempfile::tempdir().unwrap();
+        let dest = out.path().join("xta-compat.sdz");
+
+        let exported = export_with(
+            &data,
+            "xta-9.65.sd7",
+            "1234abcd",
+            dest.to_str().unwrap(),
+            same_palette,
+        )
+        .unwrap();
+
+        assert_eq!(exported.files, built.files);
+        let entries = zip_entries(&dest);
+        let names: Vec<&str> = entries.iter().map(|(n, _)| n.as_str()).collect();
+        assert_eq!(names, built.files);
     }
 
     #[test]
