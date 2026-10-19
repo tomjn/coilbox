@@ -213,7 +213,7 @@ Two things to get right for this to behave:
 - **Version your archive filenames.** `splinterfaction_1.3.sdz` → `splinterfaction_1.4.sdz` gives you "same version = matched, new version = update" for free. A filename that never changes (`splinterfaction.sdz`) would always look installed, so no update ever prompts.
 - **Point the download folder at a portable location** (Settings > Content folders, under "New content goes to") if you want updates to land inside the package rather than in a per-user folder. Otherwise the bundled archive and any downloaded update end up in different places.
 
-If instead you'd rather ship a thin package and have players fetch the game on first run, skip bundling and rely on `release` alone, or leave the Downloads pages visible so they can grab it themselves.
+If instead you'd rather ship a thin package and have players fetch the game on first run, skip bundling and rely on `release` alone, or leave the Library's Games page visible so they can grab it themselves.
 
 ## Get the binaries
 

@@ -4,7 +4,7 @@ The Coilbox hub is a website where players share what they make in coilbox: sing
 
 Browsing and importing need no account. To share something, you sign in to the hub with Discord.
 
-Open it from Downloads > Coilbox hub in the sidebar.
+Open it from Library > Community in the sidebar.
 
 ## The Coilbox hub page
 
@@ -60,7 +60,7 @@ Coilbox opens the page where that kind of thing lives, with the item ready to ad
 | Singleplayer preset | Play > Singleplayer |
 | Conquest challenge | Play > Conquest |
 | Warpath challenge | Play > Warpath |
-| Setup pack | Downloads > Maps |
+| Setup pack | Library > Maps |
 | Scenario | Play > Scenarios |
 | Base blueprint | Library > Blueprints |
 | Unit tweak project | Unit tweaks, which needs Advanced mode turned on in Settings > General |
@@ -166,9 +166,9 @@ With the switch on, opening a blueprint's page also sends pictures of the buildi
 
 Settings > Coilbox hub has:
 
-- the hub address coilbox is using
-- Your hub address, to point coilbox at a different hub. Leave it blank to use the default. Clear override puts it back.
 - Your hub account, with Sign in with Discord or Sign out
 - the controls in [Share your maps and games](#share-your-maps-and-games)
+
+Which hub coilbox uses is in Settings, then Library > Sources. It shows the hub address coilbox is using. Type in Your hub address to point coilbox at a different hub. Leave it blank to use the default. Clear override puts it back.
 
 You can also reach it from the Coilbox hub page. Select your name at the top right, then Account and sharing settings. Sign out is in the same menu.
