@@ -130,7 +130,7 @@ If one of the fixes fails while the game runs, the game still loads. The engine'
 
 ## What it changes
 
-This is compatibility version 16, the newest.
+This is compatibility version 17, the newest.
 
 Lua functions it puts back:
 
@@ -142,12 +142,19 @@ Lua functions it puts back:
 - `Spring.UpdateInfoTexture`, removed in Spring 99.0. It does nothing and returns false.
 - `Spring.MakeFont`, last in Spring 0.81.2.1. It makes no font and returns nil.
 - `snext`, `spairs` and `sipairs`, removed in Recoil 2025.01.1. In a game's unsynced gadgets they are `next`, `pairs` and `ipairs` again, as they were from Spring 97.0.
+- `Spring.GetHasLag`, removed in Spring 105.0. It says whether the game has fallen behind, which the engine now gives as the 4th result of `Spring.GetGameState`.
 
 Call-ins whose arguments moved:
 
 - `UnitDamaged`, changed in Spring 95.0, and `AllowCommand`, changed in Spring 105.0. The game's handlers get the arguments in the old order. Coilbox reads the game's Lua first, and leaves this out for a game whose handlers already take the new order.
 - `Spring.GetTeamInfo`, changed in Spring 105.0. The game gets the team's custom keys 7th and its income multiplier 8th, as before. Coilbox leaves this out for a game whose Lua already reads them the new way round.
 - `Spring.GetSelectedUnitsCounts` and `Spring.GetSelectedUnitsSorted`, whose tables lost their `n` key in BAR105 1544. The tables have it again, holding the number of unit types selected, and are all the functions return, as before. Coilbox leaves this out for a game whose Lua already takes that number as the second result.
+
+Values Lua can read again:
+
+- `CMD.AISELECT` and `CMD.SET_WANTED_MAX_SPEED`, removed in Recoil 2025.01.1 and Spring 105.0. The names are back with their old numbers, 30 and 70. An order given with either does nothing.
+- The `n` key that Spring 83.0 took off lists such as the units `Spring.GetTeamUnits` returns, and off each unit's `weapons` in `UnitDefs`. It holds how many entries the list has. A game that walks the list with `pairs` does not see it. Gadgets do not get the `weapons` one.
+- `WeaponDefs[id].areaOfEffect` and `maxVelocity`, which Lua lost in Spring 87.0. Widgets can read them again, but gadgets still get nothing.
 
 Values the engine now keeps differently:
 
