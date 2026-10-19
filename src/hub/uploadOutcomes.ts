@@ -1,3 +1,4 @@
+import { describeError } from "@/i18n/uiError";
 import type { NotifyInput } from "@/notify/notify";
 import { notify, recordQuietly } from "@/notify/notify";
 
@@ -95,7 +96,7 @@ export interface AssetOutcome {
 /** The first thing anybody actually said, or null when nobody did. */
 function firstWords(outcomes: AssetOutcome[]): string | null {
   for (const outcome of outcomes) {
-    const said = outcome.said?.trim();
+    const said = outcome.said ? describeError(outcome.said).trim() : "";
     if (said) return said;
   }
   return null;
@@ -162,7 +163,7 @@ export function assetUploadReports(
     // The fallback names the game because it is the one branch here with no
     // sentence from the hub, and the hub's sentences name the picture.
     const why =
-      stopped.said?.trim() ||
+      (stopped.said ? describeError(stopped.said).trim() : "") ||
       `The hub would not take any more ${pictures(0, game)} just now.`;
     reports.push({
       title: "Picture uploads stopped early",
