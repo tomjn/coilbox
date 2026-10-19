@@ -30,10 +30,15 @@ import {
   contentUnitCheckCancel,
   type UnitCheckReport,
 } from "../../../content/bindings";
+import { useCompatSettings } from "../../../content/compatSettings";
 import { useUnitsyncGameHeaders } from "../../../content/config";
 import { describeError } from "../../../i18n/uiError";
 import { SCRATCH_FOLDER } from "../../../lib/generatedGames";
 import { playAskLuaRules } from "../../../play/bindings";
+import {
+  type CompatTarget,
+  resolveCompatTarget,
+} from "../../../play/compatTarget";
 import {
   gameOptionSchema,
   initialParticipants,
@@ -134,6 +139,7 @@ export function TestDrawer({ open, onOpenChange, project, pack, raw }: Props) {
     target?.dataDir,
   );
   const { running, launch, cancel } = usePlay();
+  const [compatSettings] = useCompatSettings();
   // The test game's own weapons, which a game weapon the unit names is checked
   // against, and the workshop a library weapon is read from (issue #4264).
   const { projects: workshopProjects } = useModProjects();
@@ -197,15 +203,34 @@ export function TestDrawer({ open, onOpenChange, project, pack, raw }: Props) {
 
   const waiting = targetLoading || (!!target && !scan.data && scan.loading);
 
+  /**
+   * The game the scratch game is written over. With the picked game's
+   * compatibility switch on that is its mutator, so the unit is tested over the
+   * fixes (issue #4664). Off, nothing about the mutator is read. A stale or
+   * missing mutator throws its message, which the callers show as the failure.
+   */
+  async function compatTarget(): Promise<CompatTarget> {
+    if (!target || !game) return { kind: "off" };
+    const compat = await resolveCompatTarget({
+      target,
+      game,
+      settings: compatSettings,
+    });
+    if (compat.kind === "blocked") throw new Error(compat.message);
+    return compat;
+  }
+
   async function scratchGame(
+    compat: CompatTarget,
     sandbox?: ScratchSandbox,
   ): Promise<(WrittenScratchUnit & { name: string }) | null> {
     if (!target || !game) return null;
     setPhase({ state: "writing" });
     const written = await writeScratchGame({
       target,
-      baseGame: game.name,
-      baseArchive: game.primaryArchive.name,
+      baseGame: compat.kind === "use" ? compat.gameType : game.name,
+      baseArchive:
+        compat.kind === "use" ? compat.gameArchive : game.primaryArchive.name,
       project,
       pack,
       raw,
@@ -241,8 +266,9 @@ export function TestDrawer({ open, onOpenChange, project, pack, raw }: Props) {
     setAction(next);
     try {
       setPhase({ state: "writing" });
+      const compat = await compatTarget();
       const { sandbox, participants, startPosType, modOptions } = await setup();
-      const written = await scratchGame(sandbox);
+      const written = await scratchGame(compat, sandbox);
       if (!written) return;
       const scratchName = written.name;
 
@@ -261,8 +287,11 @@ export function TestDrawer({ open, onOpenChange, project, pack, raw }: Props) {
       if (sandbox) {
         setSandboxRun({
           runId: null,
-          baseGame: game.name,
-          baseArchive: game.primaryArchive.name,
+          baseGame: compat.kind === "use" ? compat.gameType : game.name,
+          baseArchive:
+            compat.kind === "use"
+              ? compat.gameArchive
+              : game.primaryArchive.name,
           sandbox,
           loaded: loadedFrom(written),
         });
@@ -273,6 +302,7 @@ export function TestDrawer({ open, onOpenChange, project, pack, raw }: Props) {
           participants,
           mapName: map.name,
           gameType: scratchName,
+          compatBase: compat.kind === "use" ? compat.baseName : undefined,
           startPosType,
           modOptions,
           // The scratch game is a mutator over the picked game and declares no
@@ -436,7 +466,7 @@ export function TestDrawer({ open, onOpenChange, project, pack, raw }: Props) {
     setCheck(null);
     setAction("check");
     try {
-      const written = await scratchGame();
+      const written = await scratchGame(await compatTarget());
       if (!written) return;
       const scratchName = written.name;
 
