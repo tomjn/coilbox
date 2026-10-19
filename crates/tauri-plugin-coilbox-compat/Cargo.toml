@@ -44,3 +44,5 @@ sha2 = { workspace = true }
 # fixture model, in place of the worker, which needs unitsync.
 coilbox-3do = { path = "../coilbox-3do" }
 coilbox-s3o = { path = "../coilbox-s3o" }
+# Reads the exported archive back, to check its files and their order.
+zip = { workspace = true }

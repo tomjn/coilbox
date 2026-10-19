@@ -347,6 +347,68 @@ pub fn remove(data_dir: &str, archive_name: &str) -> Result<Vec<String>, String>
     Ok(removed)
 }
 
+/// What an export wrote.
+#[derive(Debug, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Exported {
+    /// The archive written, as given.
+    pub path: String,
+    /// The mutator folder it was packed from.
+    pub folder: String,
+    /// Every file in the archive, in archive order: sorted by path, with the
+    /// marker last, as a build lists them.
+    pub files: Vec<String>,
+}
+
+/// Pack the compat mutator built for `archive_name` under `data_dir` into a
+/// `.sdz` at `dest`, for somebody who does not run coilbox (issue #4568).
+///
+/// Refused when there is no mutator, or when [`status`] says it is stale, since
+/// the export would hand out a mutator coilbox itself would rebuild. The folder
+/// is read as it is on disk, so the archive holds the very files a build wrote.
+/// They go in sorted by path with the marker last, the order a build lists them
+/// in, so two exports of one folder are the same bytes.
+pub fn export(
+    data_dir: &str,
+    archive_name: &str,
+    base_checksum: &str,
+    dest: &str,
+) -> Result<Exported, String> {
+    let current = status(data_dir, archive_name, base_checksum)?;
+    let Some(folder) = current.folder else {
+        return Err(format!(
+            "there is no compat mutator built for {archive_name} to export"
+        ));
+    };
+    if !current.stale.is_empty() {
+        return Err(format!(
+            "{folder} is out of date, so it was not exported. Rebuild it first"
+        ));
+    }
+    let dest_path = std::path::Path::new(dest);
+    let names_an_sdz = dest_path
+        .extension()
+        .and_then(|e| e.to_str())
+        .is_some_and(|e| e.eq_ignore_ascii_case("sdz"));
+    if !names_an_sdz {
+        return Err(format!("{dest} does not end in .sdz"));
+    }
+    let dir = mutator::games_dir(data_dir)?.join(&folder);
+    let mut files = models::list(&dir)?;
+    // `list` sorts, which puts the dot file first.
+    files.retain(|f| f != mutator::MARKER);
+    files.push(mutator::MARKER.to_string());
+    tauri_plugin_coilbox_workshop::write_sdz_entries(dest_path, &files, |path| {
+        let at = dir.join(path);
+        std::fs::read(&at).map_err(|e| format!("could not read {}: {e}", at.display()))
+    })?;
+    Ok(Exported {
+        path: dest.to_string(),
+        folder,
+        files,
+    })
+}
+
 fn envelope<T: Serialize>(result: Result<T, String>) -> CliResult {
     match result.and_then(|v| serde_json::to_value(v).map_err(|e| e.to_string())) {
         Ok(v) => CliResult::ok(v),
@@ -398,6 +460,22 @@ async fn compat_remove(data_dir: String, archive_name: String) -> CliResult {
     envelope(result)
 }
 
+/// [`export`].
+#[tauri::command]
+async fn compat_export(
+    data_dir: String,
+    archive_name: String,
+    base_checksum: String,
+    dest: String,
+) -> CliResult {
+    let result = tauri::async_runtime::spawn_blocking(move || {
+        export(&data_dir, &archive_name, &base_checksum, &dest)
+    })
+    .await
+    .unwrap_or_else(|e| Err(format!("the compat export task failed: {e}")));
+    envelope(result)
+}
+
 /// Build the plugin. Registered as `"coilbox-compat"` (crate name minus the
 /// `tauri-plugin-` prefix).
 pub fn init<R: Runtime>() -> TauriPlugin<R> {
@@ -405,7 +483,8 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
         .invoke_handler(tauri::generate_handler![
             compat_build,
             compat_status,
-            compat_remove
+            compat_remove,
+            compat_export
         ])
         .build()
 }
@@ -1303,5 +1382,103 @@ mod tests {
         );
         assert!(failed.is_err());
         assert!(!std::path::Path::new(&data).join("games").exists());
+    }
+
+    fn build_with_models(data: &str) -> Built {
+        let staging = tempfile::tempdir().unwrap();
+        build_reading(
+            data,
+            "xta-9.65.sd7",
+            "XTA 9.65",
+            &DeclaredGame::default(),
+            "1234abcd",
+            coilbox_compat::latest(),
+            "1.2.3",
+            &[],
+            no_file,
+            || some_models(staging.path()),
+            no_defs,
+        )
+        .unwrap()
+    }
+
+    fn zip_entries(path: &std::path::Path) -> Vec<(String, Vec<u8>)> {
+        use std::io::Read;
+        let mut zip = zip::ZipArchive::new(std::fs::File::open(path).unwrap()).unwrap();
+        (0..zip.len())
+            .map(|i| {
+                let mut entry = zip.by_index(i).unwrap();
+                let mut bytes = Vec::new();
+                entry.read_to_end(&mut bytes).unwrap();
+                (entry.name().to_string(), bytes)
+            })
+            .collect()
+    }
+
+    /// Issue #4568: the archive holds the folder's files, in the order a build
+    /// lists them, with the bytes the folder holds, binary models included.
+    #[test]
+    fn an_export_holds_the_folder_s_files_in_build_order() {
+        let (_keep, data) = root();
+        let built = build_with_models(&data);
+        let out = tempfile::tempdir().unwrap();
+        let dest = out.path().join("xta-compat.sdz");
+
+        let exported = export(&data, "xta-9.65.sd7", "1234abcd", dest.to_str().unwrap()).unwrap();
+
+        assert_eq!(exported.folder, built.folder);
+        assert_eq!(exported.files, built.files);
+        let entries = zip_entries(&dest);
+        let names: Vec<&str> = entries.iter().map(|(n, _)| n.as_str()).collect();
+        assert_eq!(names, built.files);
+        let dir = std::path::Path::new(&built.dir);
+        for (name, bytes) in &entries {
+            assert_eq!(&std::fs::read(dir.join(name)).unwrap(), bytes, "{name}");
+        }
+        assert_eq!(
+            entries
+                .iter()
+                .find(|(n, _)| n == "Objects3D/armcom.s3o")
+                .unwrap()
+                .1,
+            [0u8, 1, 2, 255]
+        );
+    }
+
+    #[test]
+    fn two_exports_of_one_folder_are_the_same_bytes() {
+        let (_keep, data) = root();
+        build_with_models(&data);
+        let out = tempfile::tempdir().unwrap();
+        let (a, b) = (out.path().join("a.sdz"), out.path().join("b.sdz"));
+        export(&data, "xta-9.65.sd7", "1234abcd", a.to_str().unwrap()).unwrap();
+        export(&data, "xta-9.65.sd7", "1234abcd", b.to_str().unwrap()).unwrap();
+        assert_eq!(std::fs::read(a).unwrap(), std::fs::read(b).unwrap());
+    }
+
+    #[test]
+    fn a_stale_mutator_is_not_exported() {
+        let (_keep, data) = root();
+        build_with_models(&data);
+        let out = tempfile::tempdir().unwrap();
+        let dest = out.path().join("xta-compat.sdz");
+        let err = export(&data, "xta-9.65.sd7", "99999999", dest.to_str().unwrap()).unwrap_err();
+        assert!(err.contains("out of date"), "{err}");
+        assert!(!dest.exists());
+    }
+
+    #[test]
+    fn nothing_is_exported_without_a_built_mutator_or_an_sdz_path() {
+        let (_keep, data) = root();
+        let out = tempfile::tempdir().unwrap();
+        let dest = out.path().join("xta-compat.sdz");
+        let err = export(&data, "xta-9.65.sd7", "1234abcd", dest.to_str().unwrap()).unwrap_err();
+        assert!(err.contains("no compat mutator"), "{err}");
+
+        build_with_models(&data);
+        let wrong = out.path().join("xta-compat.zip");
+        let err = export(&data, "xta-9.65.sd7", "1234abcd", wrong.to_str().unwrap()).unwrap_err();
+        assert!(err.contains("does not end in .sdz"), "{err}");
+        assert!(!dest.exists() && !wrong.exists());
     }
 }

@@ -1,5 +1,5 @@
 "$schema" = "schemas/schema.json"
 
 [default]
-description = "Allows building and removing the compatibility mode mutator and reading whether it is stale."
-permissions = ["allow-compat-build", "allow-compat-status", "allow-compat-remove"]
+description = "Allows building, removing and exporting the compatibility mode mutator and reading whether it is stale."
+permissions = ["allow-compat-build", "allow-compat-status", "allow-compat-remove", "allow-compat-export"]

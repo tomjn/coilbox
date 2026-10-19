@@ -77,3 +77,20 @@ export const compatRemove = defineCommand<
   { dataDir: string; archiveName: string },
   string[]
 >("coilbox-compat", "compat_remove");
+
+/** What an export wrote. */
+export interface CompatExported {
+  path: string;
+  folder: string;
+  /** Every file in the archive, in archive order. */
+  files: string[];
+}
+
+/**
+ * Pack the current mutator built for a game into a `.sdz` at `dest`. Refused
+ * when the mutator is stale or missing.
+ */
+export const compatExport = defineCommand<
+  { dataDir: string; archiveName: string; baseChecksum: string; dest: string },
+  CompatExported
+>("coilbox-compat", "compat_export");
