@@ -411,4 +411,109 @@ for _, case in ipairs({
 	check(case.name .. ": no fix failed", #engine.logs == 0, table.concat(engine.logs, "; "))
 end
 
+--------------------------------------------------------------------------------
+-- Unit lineage (issue #4693)
+--------------------------------------------------------------------------------
+
+-- A synced state whose units have teams, and teams 0 to 3.
+local function lineageEngine(opts)
+	opts = opts or {}
+	opts.manifest = 11
+	local engine = newEngine(opts)
+	local Spring = engine.env.Spring
+	Spring.GetUnitTeam = function(unitID)
+		local unit = engine.units[unitID]
+		return unit and unit.team
+	end
+	Spring.GetTeamInfo = function(teamID)
+		if teamID >= 0 and teamID < 4 then
+			return teamID
+		end
+	end
+	return engine
+end
+
+do
+	local engine = lineageEngine()
+	prelude(engine)
+	support.load(engine, "")
+	local Spring = engine.env.Spring
+	check("synced: Spring.SetUnitLineage and GetUnitLineage are defined", type(Spring.SetUnitLineage) == "function" and type(Spring.GetUnitLineage) == "function")
+	check("the call-ins lineage needs are registered when the game has none", engine.registered.UnitCreated and engine.registered.UnitDestroyed)
+
+	-- XTA's CommOption.lua: the start unit is its team's lineage root.
+	engine.units[10] = { team = 1 }
+	call(engine, "UnitCreated", 10, 5, 1)
+	local lineage, root = Spring.GetUnitLineage(10)
+	check("a new unit's lineage is its team", lineage == 1 and root == false, tostring(lineage) .. " " .. tostring(root))
+	Spring.SetUnitLineage(10, 1, true)
+	lineage, root = Spring.GetUnitLineage(10)
+	check("SetUnitLineage with true makes the unit its team's root", lineage == 1 and root == true)
+
+	-- unit_morph.lua: the new unit takes the old one's lineage and is the root.
+	engine.units[12] = { team = 1 }
+	call(engine, "UnitCreated", 12, 7, 1)
+	Spring.SetUnitLineage(12, (Spring.GetUnitLineage(10)), true)
+	lineage, root = Spring.GetUnitLineage(12)
+	check("a morphed unit takes the old one's lineage and becomes the root", lineage == 1 and root == true)
+	check("a team has one root", select(2, Spring.GetUnitLineage(10)) == false)
+
+	-- A unit built by a unit takes its builder's lineage.
+	Spring.SetUnitLineage(12, 2)
+	check("SetUnitLineage without true keeps the root", select(2, Spring.GetUnitLineage(12)) == true)
+	engine.units[11] = { team = 1 }
+	call(engine, "UnitCreated", 11, 6, 1, 12)
+	lineage, root = Spring.GetUnitLineage(11)
+	check("a built unit takes its builder's lineage", lineage == 2 and root == false, tostring(lineage))
+
+	-- As in 0.82, true makes the unit the root of the team it is given, and
+	-- GetUnitLineage asks whether it is the root of its own team.
+	Spring.SetUnitLineage(11, 3, true)
+	lineage, root = Spring.GetUnitLineage(11)
+	check("a unit made root of another team is not its own team's root", lineage == 3 and root == false)
+
+	check("a unit that does not exist has no lineage", select("#", Spring.GetUnitLineage(99)) == 0)
+	check("SetUnitLineage on a unit that does not exist does nothing", select("#", Spring.SetUnitLineage(99, 1, true)) == 0 and select(2, Spring.GetUnitLineage(12)) == true)
+	check("SetUnitLineage wants a unit ID", not pcall(Spring.SetUnitLineage, "a", 1))
+	check("SetUnitLineage wants a team ID", not pcall(Spring.SetUnitLineage, 12, nil))
+	check("SetUnitLineage wants a team that exists", not pcall(Spring.SetUnitLineage, 12, 9))
+	check("GetUnitLineage wants a unit ID", not pcall(Spring.GetUnitLineage, {}))
+
+	local seen
+	handler(engine, {
+		UnitDestroyed = function(unitID)
+			seen = { Spring.GetUnitLineage(unitID) }
+		end,
+	})
+	call(engine, "UnitDestroyed", 12, 7, 1)
+	check("the game's UnitDestroyed still reads a dying unit's lineage", seen[1] == 2 and seen[2] == true)
+	engine.units[12] = { team = 3 }
+	call(engine, "UnitCreated", 12, 7, 3)
+	lineage, root = Spring.GetUnitLineage(12)
+	check("a destroyed unit's ID starts again as a unit of its new team", lineage == 3 and root == false, tostring(lineage))
+	check("synced: no fix failed", #engine.logs == 0, table.concat(engine.logs, "; "))
+end
+
+do
+	-- A unit made before the call-in was registered reads as its team's.
+	local engine = lineageEngine()
+	prelude(engine)
+	engine.units[4] = { team = 2 }
+	local lineage, root = engine.env.Spring.GetUnitLineage(4)
+	check("a unit the fix never saw made has its team's lineage", lineage == 2 and root == false)
+end
+
+do
+	local own = function() end
+	local engine = lineageEngine({ spring = { SetUnitLineage = own } })
+	prelude(engine)
+	check("an existing Spring.SetUnitLineage is left alone", engine.env.Spring.SetUnitLineage == own)
+end
+
+do
+	local engine = newEngine({ synced = false, manifest = 11 })
+	prelude(engine)
+	check("unsynced: no lineage functions, as the table lives in the synced state", engine.env.Spring.SetUnitLineage == nil and engine.env.Spring.GetUnitLineage == nil)
+end
+
 support.report()

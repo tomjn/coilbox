@@ -136,6 +136,7 @@ Lua functions it puts back:
 
 - `Spring.GetUnitTravel` and `Spring.SetUnitTravel`, removed in Spring 105.0. They work again, and keep their values per unit.
 - `Spring.SetUnitToFeature`, removed in Spring 105.0.
+- `Spring.SetUnitLineage` and `Spring.GetUnitLineage`, last in Spring 0.82.7.1. They work again, and keep each unit's lineage, but a team's units no longer die with its lineage root.
 - `gl.Smoothing`, removed in Spring 104.0. It does nothing.
 - `Spring.SetSunParameters` and `Spring.SetSunManualControl`, removed in Spring 104.0. They do nothing.
 - `Spring.UpdateInfoTexture`, removed in Spring 99.0. It does nothing and returns false.

@@ -147,6 +147,10 @@ const FIXES: &[(&str, &str)] = &[
         include_str!("../../../lua/compat/spring-sun-parameters.lua"),
     ),
     (
+        "spring-unit-lineage",
+        include_str!("../../../lua/compat/spring-unit-lineage.lua"),
+    ),
+    (
         "spring-unit-travel",
         include_str!("../../../lua/compat/spring-unit-travel.lua"),
     ),
@@ -1224,13 +1228,17 @@ mod tests {
         );
     }
 
-    /// Issue #4692: manifest 11 adds the unsynced fix that puts back snext,
-    /// spairs and sipairs, and keeps the writer of manifest 10.
+    /// Issues #4692 and #4693: manifest 11 adds the unsynced fix that puts
+    /// back snext, spairs and sipairs and the synced one that keeps unit
+    /// lineage, and keeps the writer of manifest 10.
     #[test]
     fn manifest_11_is_manifest_10_with_the_synced_iterators() {
         let (ten, eleven) = (manifest(10).unwrap(), manifest(11).unwrap());
         assert_eq!(eleven.fixes[..ten.fixes.len()], ten.fixes[..]);
-        assert_eq!(eleven.fixes[ten.fixes.len()..], ["snext-spairs-sipairs"]);
+        assert_eq!(
+            eleven.fixes[ten.fixes.len()..],
+            ["snext-spairs-sipairs", "spring-unit-lineage"]
+        );
         assert_eq!(
             (&eleven.converter, eleven.writer),
             (&ten.converter, ten.writer)
@@ -1239,6 +1247,8 @@ mod tests {
         assert!(unsynced.contains("-- fix: snext-spairs-sipairs\n"));
         let synced = prelude(&eleven, LuaState::Synced).unwrap();
         assert!(!synced.contains("snext-spairs-sipairs"));
+        assert!(synced.contains("-- fix: spring-unit-lineage\n"));
+        assert!(!unsynced.contains("spring-unit-lineage"));
     }
 
     #[test]

@@ -21,7 +21,8 @@
     "defs-manual-bomb-settings-92",
     "defs-missing-model-standin",
     "game-identity",
-    "snext-spairs-sipairs"
+    "snext-spairs-sipairs",
+    "spring-unit-lineage"
   ],
   "converter": {
     "crate": "coilbox-3do-convert",
