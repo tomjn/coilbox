@@ -429,7 +429,7 @@ export default function ConquestListPage() {
               ) : (
                 <Button
                   variant="outline"
-                  onClick={() => navigate("/downloads/games")}
+                  onClick={() => navigate("/library/games")}
                 >
                   Browse games to download
                 </Button>

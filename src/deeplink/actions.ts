@@ -124,7 +124,7 @@ export function prepareImport(code: string): PrepareImportResult {
         ok: true,
         plan: {
           ...(base as ImportPlan),
-          route: importRoute("/downloads/maps", code),
+          route: importRoute("/library/maps", code),
           label: containerKindName("setup-pack"),
         },
       };

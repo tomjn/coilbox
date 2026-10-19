@@ -152,7 +152,7 @@ function NeedRow({
           offer: its notice sends the player to Settings. */}
       {(need.kind === "map" || need.kind === "game") && (
         <Link
-          to={need.kind === "map" ? "/downloads/maps" : "/downloads/games"}
+          to={need.kind === "map" ? "/library/maps" : "/library/games"}
           className="inline-flex w-fit items-center gap-1 text-xs text-muted-foreground hover:underline"
         >
           Find it in Downloads <ChevronRight className="size-3.5" />

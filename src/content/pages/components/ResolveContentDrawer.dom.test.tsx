@@ -93,7 +93,7 @@ describe("ResolveContentGate for a missing dependency archive", () => {
     expect(screen.getByText(/Zero-K Benchmark v3 depends on it/)).toBeTruthy();
     expect(
       screen.getByRole("link", { name: /game downloads/ }).getAttribute("href"),
-    ).toBe("/downloads/games");
+    ).toBe("/library/games");
     expect(screen.queryByRole("button", { name: /^Download/ })).toBeNull();
   });
 });

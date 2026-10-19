@@ -77,10 +77,9 @@ function LinkChip({ item }: { item: NavItem }) {
   // Mirror the sidebar and the tool card: an item gated off via `useVisible` is
   // hidden here too. Resolved before the early return, in a per-item component,
   // so the hook order is stable.
-  const { visible, label, icon: Icon } = useResolvedNavItem(item);
-  if (!visible || !item.href) return null;
+  const { visible, label, icon: Icon, href } = useResolvedNavItem(item);
+  if (!visible || !href) return null;
 
-  const href = item.href;
   return (
     <Button
       type="button"

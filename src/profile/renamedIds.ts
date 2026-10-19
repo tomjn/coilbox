@@ -18,7 +18,8 @@
  * Old id to new, for every id a shipped profile could be holding.
  *
  * The bare `content` entry is the settings group, which renamed alongside the
- * nav group of the same name. `content.setupPacks` is deliberately absent: it
+ * nav group of the same name. The bare `downloads` entry is the settings section,
+ * which became Sources. `content.setupPacks` is deliberately absent: it
  * gates the hub screen's "Share a pack" button rather than anything in the
  * Library, so it kept its name.
  *
@@ -36,6 +37,14 @@ export const RENAMED_PROFILE_IDS: ReadonlyMap<string, string> = new Map([
   ["content.games", "library.games"],
   ["content.blueprints", "library.blueprints"],
   ["content.archives", "library.archives"],
+  // The Downloads group went into Library (issue #4584). Its Maps and Games
+  // pages are the Library's own now, so a profile that hid game downloads hides
+  // the Games page that replaced them. The settings section of the same name
+  // became Sources.
+  ["downloads", "sources"],
+  ["downloads.browse", "library.rapid"],
+  ["downloads.maps", "library.maps"],
+  ["downloads.games", "library.games"],
 ]);
 
 /** The current id for one a profile may have written under an older name. */

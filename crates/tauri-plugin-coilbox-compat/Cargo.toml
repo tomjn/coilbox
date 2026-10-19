@@ -40,5 +40,9 @@ coilbox-springlua = { path = "../coilbox-springlua" }
 # Hashes the files a fixed build writes, so a change to them fails a test until
 # the compat writer moves (issue #4629).
 sha2 = { workspace = true }
+# The converter crates the identical builds test (issue #4563) runs on its
+# fixture model, in place of the worker, which needs unitsync.
+coilbox-3do = { path = "../coilbox-3do" }
+coilbox-s3o = { path = "../coilbox-s3o" }
 # Reads the exported archive back, to check its files and their order.
 zip = { workspace = true }

@@ -35,8 +35,8 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { useScanTargetSelection, useUnitsyncScan } from "@/content/config";
+import { EmptyState } from "@/content/pages/components/states";
 import { useOneShotParam } from "@/deeplink/useOneShotParam";
-import { EmptyState } from "@/downloads/pages/components/states";
 import { resolveHome } from "@/home/config";
 import { useHomeBackdropStyle } from "@/home/useHomeBackdropStyle";
 import { formatDate as formatLocaleDate } from "@/lib/format";
@@ -741,13 +741,12 @@ export default function BrowsePage() {
                       </Button>
                     )
                   }
-                >
-                  {emptyReason(
+                  label={emptyReason(
                     filtersActive,
                     pinnedMatcher !== null,
                     pinnedGame,
                   )}
-                </EmptyState>
+                />
               )}
               {page && page.items.length > 0 && (
                 <ul className="grid grid-cols-[repeat(auto-fill,minmax(18rem,1fr))] gap-3">

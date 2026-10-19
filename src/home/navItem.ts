@@ -1,6 +1,18 @@
 import type { NavItem } from "@picoframe/plugin-sdk";
 import { openUrl } from "@tauri-apps/plugin-opener";
 
+declare module "@picoframe/plugin-sdk" {
+  interface NavItem {
+    /**
+     * Reactive override for {@link NavItem.href}, for an external link whose
+     * address is a setting. Only the home page reads it, because picoframe's
+     * own sidebar takes `href` as a fixed string. Keep `href` set to the
+     * fallback, since `splitGroupItems` sorts links from tools by it.
+     */
+    useHref?: () => string;
+  }
+}
+
 /**
  * Resolve a nav item's live presentation, in one fixed hook-call order.
  *
@@ -19,6 +31,7 @@ export function useResolvedNavItem(item: NavItem) {
     label: item.useLabel ? item.useLabel() : item.label,
     icon: item.useIcon ? item.useIcon() : item.icon,
     description: item.useDescription ? item.useDescription() : item.description,
+    href: item.useHref ? item.useHref() : item.href,
     // biome-ignore-end lint/correctness/useHookAtTopLevel: end of the guarded resolver
   };
 }

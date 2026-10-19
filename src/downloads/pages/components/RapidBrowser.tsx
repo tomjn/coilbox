@@ -14,6 +14,11 @@ import { Link } from "react-router";
 import { OptionSelect } from "@/components/OptionSelect";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
+import {
+  EmptyState,
+  ErrorBanner,
+} from "../../../content/pages/components/states";
+import { errorText } from "../../../lib/helpers";
 import { refreshedLabel } from "../../../lib/relativeTime";
 import {
   dlRepos,
@@ -26,7 +31,6 @@ import { useDownloadsConfig } from "../../config";
 import { identityOf, useDownloadQueue } from "../../DownloadQueueProvider";
 import { orderRapidVersions } from "../../rapidVersionOrder";
 import { QueueProgress } from "./ProgressBar";
-import { EmptyState, errMessage } from "./states";
 
 const DEFAULT_MASTER = "https://repos.springrts.com";
 
@@ -44,7 +48,7 @@ function SidecarWarning() {
       await dlVersion(undefined);
       setError(null);
     } catch (e) {
-      setError(errMessage(e));
+      setError(errorText(e));
     }
   }, []);
 
@@ -111,7 +115,7 @@ export function RapidBrowser({ writePath }: { writePath?: string }) {
     } catch (e) {
       setRepos(null);
       setReposAge(null);
-      setReposError(errMessage(e));
+      setReposError(errorText(e));
     } finally {
       setReposLoading(false);
     }
@@ -141,7 +145,7 @@ export function RapidBrowser({ writePath }: { writePath?: string }) {
       setVersions(orderRapidVersions(versions));
       setVersionsAge(ageSecs);
     } catch (e) {
-      setVersionsError(errMessage(e));
+      setVersionsError(errorText(e));
     } finally {
       setVersionsLoading(false);
     }
@@ -172,9 +176,9 @@ export function RapidBrowser({ writePath }: { writePath?: string }) {
             No rapid repositories configured. Add one in{" "}
             <Link
               className="underline underline-offset-4"
-              to="/settings/downloads"
+              to="/settings/sources"
             >
-              Downloads settings
+              Sources settings
             </Link>
             .
           </p>
@@ -242,17 +246,17 @@ export function RapidBrowser({ writePath }: { writePath?: string }) {
           )}
           <div className="min-h-0 flex-1 overflow-auto">
             {reposError && (
-              <Alert variant="destructive" className="m-3">
-                <AlertCircle size={14} />
-                <AlertDescription className="text-xs text-destructive">
-                  {reposError}
-                </AlertDescription>
-              </Alert>
+              <div className="m-3">
+                <ErrorBanner message={reposError} />
+              </div>
             )}
             {!repos && !reposError && (
-              <EmptyState icon={Package}>
-                Load a rapid master to list its repositories.
-              </EmptyState>
+              <div className="m-3">
+                <EmptyState
+                  icon={Package}
+                  label="Load a rapid master to list its repositories."
+                />
+              </div>
             )}
             {repos && filteredRepos?.length === 0 && (
               <p className="px-4 py-3 text-xs text-muted-foreground">
@@ -283,9 +287,12 @@ export function RapidBrowser({ writePath }: { writePath?: string }) {
         {/* Right: versions in the selected repository */}
         <section className="flex min-h-0 flex-col">
           {!selected ? (
-            <EmptyState icon={FolderOpen}>
-              Select a repository to see its downloadable versions.
-            </EmptyState>
+            <div className="m-6">
+              <EmptyState
+                icon={FolderOpen}
+                label="Select a repository to see its downloadable versions."
+              />
+            </div>
           ) : (
             <>
               <div className="flex items-center gap-2 border-b border-border px-6 py-3">
@@ -341,24 +348,27 @@ export function RapidBrowser({ writePath }: { writePath?: string }) {
                   </p>
                 )}
                 {versionsError && (
-                  <Alert variant="destructive" className="m-6">
-                    <AlertCircle size={15} />
-                    <AlertDescription className="text-destructive">
-                      {versionsError}
-                    </AlertDescription>
-                  </Alert>
+                  <div className="m-6">
+                    <ErrorBanner message={versionsError} />
+                  </div>
                 )}
                 {versions?.length === 0 && (
-                  <EmptyState icon={Package}>
-                    No versions in this repository.
-                  </EmptyState>
+                  <div className="m-6">
+                    <EmptyState
+                      icon={Package}
+                      label="No versions in this repository."
+                    />
+                  </div>
                 )}
                 {versions &&
                   versions.length > 0 &&
                   filteredVersions?.length === 0 && (
-                    <EmptyState icon={Search}>
-                      No versions match “{versionFilter.trim()}”.
-                    </EmptyState>
+                    <div className="m-6">
+                      <EmptyState
+                        icon={Search}
+                        label={`No versions match “${versionFilter.trim()}”.`}
+                      />
+                    </div>
                   )}
                 <ul className="divide-y divide-border">
                   {filteredVersions?.map((v) => {

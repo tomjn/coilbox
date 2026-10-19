@@ -1,24 +1,36 @@
 import type { FramePlugin } from "@picoframe/plugin-sdk";
-import {
-  Download,
-  Gamepad2,
-  Globe,
-  History,
-  Map as MapIcon,
-  Package,
-} from "lucide-react";
+import { Download, Globe, History, Package } from "lucide-react";
+import { makeLegacyRedirect } from "../content/pages/LegacyRedirect";
+import { gateAdvanced, useAdvancedMode } from "../general/advanced";
 import CoilMark from "../general/CoilMark";
+import { DEFAULT_HUB_URL, useHubUrl } from "../hub/config";
 import { gateProfileHidden, isProfileHidden } from "../profile/hidden";
 import DownloadQueueBadge from "./DownloadQueueBadge";
 import { DownloadsProvider } from "./DownloadsProvider";
 import DownloadsSettings from "./pages/SettingsSection";
 
 /**
- * The downloads plugin's frontend half. Contributes a nav group and a single
- * lazy route: a rapid-repo explorer that lists downloadable content and triggers
- * downloads through the bundled `pr-downloader` sidecar. A settings section
- * (rapid repositories + downloading on join) is hosted in the frame settings
- * page at `/settings/downloads`. Pair it with the
+ * The browser paths of the Downloads group, retired when its pages went into the
+ * Library (issue #4584), each with the page that replaced it.
+ *
+ * One map, read twice: once to build the redirect routes, and once by the test
+ * that checks each one is registered. A player's bookmark, a Discord message and a
+ * notification already in the history all point at these, and none of them can be
+ * edited from here. The query string is kept, which a `coilbox://import` link
+ * for a setup pack needs: its code rides on `/downloads/maps?import=`.
+ */
+export const RETIRED_DOWNLOADS_PATHS: Readonly<Record<string, string>> = {
+  downloads: "/library/downloads",
+  "downloads/maps": "/library/maps",
+  "downloads/games": "/library/games",
+};
+
+/**
+ * The downloads plugin's frontend half. It contributes the download queue and its
+ * history page, a rapid-repo explorer for advanced users, and the Sources settings
+ * section. Downloads are triggered through the bundled `pr-downloader` sidecar. The
+ * items sit in the Library nav group the content plugin declares, because what a
+ * mirror offers and what is on disk are one list there. Pair it with the
  * `tauri-plugin-coilbox-downloads` crate (ACL id `coilbox-downloads`).
  *
  * The settings Component is imported eagerly (not lazy): the frame settings page
@@ -34,63 +46,45 @@ const downloadsPlugin: FramePlugin = {
   slots: [{ slot: "topbar.right", order: 2, Component: DownloadQueueBadge }],
   nav: [
     {
-      // The queue and its history, in the Library group the content plugin
-      // declares (issue #4583). Groups merge by id across plugins.
+      // Groups merge by id across plugins.
       id: "library",
       label: "Library",
       order: 15,
       items: [
         {
+          // The queue and its history (issue #4583).
           id: "library.downloads",
           label: "Downloads",
           to: "/library/downloads",
           order: 1.75,
           icon: History,
         },
-      ],
-    },
-    {
-      id: "downloads",
-      label: "Downloads",
-      order: 20,
-      items: [
         {
-          id: "downloads.browse",
-          label: "Browse Rapid",
-          to: "/downloads",
-          end: true,
-          order: 0,
+          // Beside Archives: a tool for people who run their own rapid master,
+          // so it is behind advanced mode like the archive explorer.
+          id: "library.rapid",
+          label: "Rapid repositories",
+          to: "/library/rapid",
+          order: 2.5,
           icon: Package,
-          useVisible: () => !isProfileHidden("downloads.browse"),
-        },
-        {
-          id: "downloads.maps",
-          label: "Maps",
-          to: "/downloads/maps",
-          order: 1,
-          icon: MapIcon,
-        },
-        {
-          id: "downloads.games",
-          label: "Games",
-          to: "/downloads/games",
-          order: 2,
-          icon: Gamepad2,
-          // A distribution bundled with a single game can hide game downloads.
-          useVisible: () => !isProfileHidden("downloads.games"),
+          useVisible: () =>
+            useAdvancedMode() && !isProfileHidden("library.rapid"),
         },
         // External references, home launcher only (sidebar: false), opened in
-        // the system browser via the Tauri opener.
+        // the system browser via the Tauri opener. The hub's address is the
+        // player's setting, so the home page reads it through `useHref` and
+        // `href` is only what a surface that cannot run a hook would use.
         {
-          id: "downloads.hub",
+          id: "library.hubSite",
           label: "Coilbox Hub",
-          href: "https://coilbox-hub.vercel.app",
+          href: DEFAULT_HUB_URL,
+          useHref: useHubUrl,
           icon: CoilMark,
           sidebar: false,
           order: 3,
         },
         {
-          id: "downloads.springfiles",
+          id: "library.springfiles",
           label: "Springfiles",
           href: "https://springfiles.springrts.com/",
           icon: Globe,
@@ -107,32 +101,25 @@ const downloadsPlugin: FramePlugin = {
       crumb: "Downloads",
     },
     {
-      path: "downloads",
-      lazy: gateProfileHidden(
-        "downloads.browse",
-        () => import("./pages/ExplorerPage"),
+      path: "library/rapid",
+      lazy: gateAdvanced(
+        gateProfileHidden(
+          "library.rapid",
+          () => import("./pages/ExplorerPage"),
+        ),
       ),
-      crumb: "Browse Rapid",
+      crumb: "Rapid repositories",
     },
-    {
-      path: "downloads/maps",
-      lazy: () => import("./pages/MapsPage"),
-      crumb: "Maps",
-    },
-    {
-      path: "downloads/games",
-      lazy: gateProfileHidden(
-        "downloads.games",
-        () => import("./pages/GamesPage"),
-      ),
-      crumb: "Games",
-    },
+    ...Object.entries(RETIRED_DOWNLOADS_PATHS).map(([path, target]) => ({
+      path,
+      lazy: async () => ({ default: makeLegacyRedirect(target) }),
+    })),
   ],
   settings: [
     {
-      id: "downloads",
-      title: "Downloads",
-      description: "Where downloads come from and where they land.",
+      id: "sources",
+      title: "Sources",
+      description: "Where games and maps come from.",
       parent: "library",
       order: 30,
       icon: Download,

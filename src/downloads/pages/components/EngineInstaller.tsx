@@ -11,6 +11,7 @@ import { Link } from "react-router";
 import { OptionSelect } from "@/components/OptionSelect";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { formatBytes } from "@/lib/format";
+import { errorText } from "@/lib/helpers";
 import { useWriteRoot } from "../../config";
 import {
   type EnqueueInput,
@@ -23,7 +24,6 @@ import {
 } from "../../emptyEngineList";
 import { loadRecoilEngines, loadSpringfilesEngines } from "../../engineLists";
 import { QueueProgress } from "./ProgressBar";
-import { errMessage } from "./states";
 
 type Source = EngineSource;
 
@@ -104,9 +104,9 @@ export function EngineInstaller() {
           })),
         );
       }
-      if (failure !== undefined) setError(errMessage(failure));
+      if (failure !== undefined) setError(errorText(failure));
     } catch (e) {
-      setError(errMessage(e));
+      setError(errorText(e));
     } finally {
       setLoading(false);
     }

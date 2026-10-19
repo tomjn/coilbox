@@ -99,7 +99,7 @@ describe("settings declarations", () => {
     expect(childrenOf("library")).toEqual([
       "content-folders",
       "engines",
-      "downloads",
+      "sources",
       "storage",
       "import",
     ]);
