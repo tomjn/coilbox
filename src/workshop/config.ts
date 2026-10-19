@@ -26,6 +26,7 @@ import {
   unitsyncUnitDefs,
 } from "@/content/bindings";
 import { shareInFlight } from "@/content/inFlight";
+import { describeError } from "@/i18n/uiError";
 
 /** How the read is going, in the vocabulary `content/config.ts` already uses. */
 export type UnitDefsStatus = "idle" | "loading" | "ready" | "error";
@@ -153,7 +154,7 @@ export function useUnitDefs(
         setDefs(null);
         setDefsFor(null);
         setStatus("error");
-        setError(e instanceof Error ? e.message : String(e));
+        setError(describeError(e));
       });
     return () => {
       cancelled = true;

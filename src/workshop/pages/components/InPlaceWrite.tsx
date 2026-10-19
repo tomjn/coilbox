@@ -47,6 +47,7 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import { useUnitsyncScan } from "@/content/config";
+import { describeError } from "@/i18n/uiError";
 import { usePreferredTarget } from "@/play/config";
 import { isCloneMutatorOnly } from "../../cloneMutatorOnly";
 import {
@@ -75,7 +76,7 @@ import { DiskDiffDrawer } from "./DiskDiffDrawer";
 type Busy = "settling" | "write" | "undo" | "accept" | null;
 
 function message(e: unknown): string {
-  return e instanceof Error ? e.message : String(e);
+  return describeError(e);
 }
 
 function plural(n: number, word: string): string {

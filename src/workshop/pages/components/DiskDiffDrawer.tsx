@@ -26,6 +26,7 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
+import { describeError } from "@/i18n/uiError";
 import { collapseContext } from "../../diskDiff";
 import {
   type FileDiff,
@@ -39,7 +40,7 @@ import type { InPlaceDone } from "../../inPlaceProject";
 type Busy = "undo" | "accept" | null;
 
 function message(e: unknown): string {
-  return e instanceof Error ? e.message : String(e);
+  return describeError(e);
 }
 
 function plural(n: number, word: string): string {

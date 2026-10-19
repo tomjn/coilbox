@@ -1,3 +1,4 @@
+import { t } from "@lingui/core/macro";
 import { Button } from "@picoframe/frame";
 import { openUrl } from "@tauri-apps/plugin-opener";
 import type { ReactNode } from "react";
@@ -40,7 +41,11 @@ export function ServerMessageBoxDialog({
         if (!open) onDismiss();
       }}
     >
-      <DialogContent className="sm:max-w-lg" aria-describedby={undefined}>
+      <DialogContent
+        className="sm:max-w-lg"
+        aria-describedby={undefined}
+        closeLabel={t`Close`}
+      >
         <DialogHeader>
           <DialogTitle>
             {serverName

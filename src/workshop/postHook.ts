@@ -39,6 +39,7 @@
 import { useEffect, useRef, useState } from "react";
 import type { Archive, ArchiveFileEntry } from "@/content/bindings";
 import { unitsyncArchiveTree } from "@/content/bindings";
+import { describeError } from "@/i18n/uiError";
 import type { CompiledMod } from "./compile";
 
 /**
@@ -146,7 +147,7 @@ export function usePostHookCheck(
           setFound({
             key,
             archive: null,
-            error: e instanceof Error ? e.message : String(e),
+            error: describeError(e),
           });
       });
     return () => {

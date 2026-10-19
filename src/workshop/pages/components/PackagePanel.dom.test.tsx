@@ -149,6 +149,18 @@ vi.mock("@/play/config", () => ({
 
 const { PackagePanel } = await import("./PackagePanel");
 
+/** What the backend rejects with when the `.sdd` folder is already there. */
+function targetExists() {
+  return new Error(
+    JSON.stringify({
+      code: "workshop.package.target_exists",
+      params: { path: "/home/tom/faster-commanders-v1.sdd" },
+      fallback:
+        "/home/tom/faster-commanders-v1.sdd already exists; confirm a replace before packaging over it",
+    }),
+  );
+}
+
 function compiled(files: { path: string; contents: string }[]) {
   return {
     compiled: { files, chunks: [], notes: [], tweakdefs: null },
@@ -356,9 +368,7 @@ describe("PackagePanel", () => {
     it("confirms before replacing a folder that already exists, then retries with overwrite", async () => {
       mockCompiled = compiled([{ path: "modinfo.lua", contents: "return {}" }]);
       workshopPackageMutator
-        .mockRejectedValueOnce(
-          new Error("/home/tom/faster-commanders-v1.sdd already exists"),
-        )
+        .mockRejectedValueOnce(targetExists())
         .mockResolvedValueOnce({
           path: "/home/tom/faster-commanders-v1.sdd",
           files: ["modinfo.lua"],
@@ -387,15 +397,29 @@ describe("PackagePanel", () => {
 
     it("writes nothing when the author declines to replace the existing folder", async () => {
       mockCompiled = compiled([{ path: "modinfo.lua", contents: "return {}" }]);
-      workshopPackageMutator.mockRejectedValueOnce(
-        new Error("/home/tom/faster-commanders-v1.sdd already exists"),
-      );
+      workshopPackageMutator.mockRejectedValueOnce(targetExists());
       ask.mockResolvedValue(false);
       draw();
       chooseSddShape();
       fireEvent.click(screen.getByRole("button", { name: /save as \.sdd/i }));
 
       await vi.waitFor(() => expect(ask).toHaveBeenCalledTimes(1));
+      expect(workshopPackageMutator).toHaveBeenCalledTimes(1);
+    });
+
+    it("does not offer a replace for English text that merely says already exists", async () => {
+      mockCompiled = compiled([{ path: "modinfo.lua", contents: "return {}" }]);
+      workshopPackageMutator.mockRejectedValueOnce(
+        new Error("/home/tom/faster-commanders-v1.sdd already exists"),
+      );
+      draw();
+      chooseSddShape();
+      fireEvent.click(screen.getByRole("button", { name: /save as \.sdd/i }));
+
+      await vi.waitFor(() =>
+        expect(screen.getByText(/already exists/)).toBeTruthy(),
+      );
+      expect(ask).not.toHaveBeenCalled();
       expect(workshopPackageMutator).toHaveBeenCalledTimes(1);
     });
   });
