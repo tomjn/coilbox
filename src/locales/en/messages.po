@@ -7,6 +7,14 @@ msgstr ""
 "X-Generator: @lingui/cli\n"
 "Language: en\n"
 
+#: src/i18n/uiError.ts
+msgid "{count, plural, one {# blocker would reach the lobby broken, so it was not packed: {blockers}} other {# blockers would reach the lobby broken, so it was not packed: {blockers}}}"
+msgstr "{count, plural, one {# blocker would reach the lobby broken, so it was not packed: {blockers}} other {# blockers would reach the lobby broken, so it was not packed: {blockers}}}"
+
+#: src/i18n/uiError.ts
+msgid "{count, plural, one {# blocker would reach whoever plays this broken, so it was not packaged: {blockers}} other {# blockers would reach whoever plays this broken, so it was not packaged: {blockers}}}"
+msgstr "{count, plural, one {# blocker would reach whoever plays this broken, so it was not packaged: {blockers}} other {# blockers would reach whoever plays this broken, so it was not packaged: {blockers}}}"
+
 #: src/downloads/downloadRate.ts
 msgid "{hours}h"
 msgstr "{hours}h"
@@ -47,6 +55,10 @@ msgstr "Check for updates"
 msgid "Checking…"
 msgstr "Checking…"
 
+#: src/i18n/uiError.ts
+msgid "Could not reach the host."
+msgstr "Could not reach the host."
+
 #: src/updater/pages/UpdatesSettingsSection.tsx
 msgid "Current version"
 msgstr "Current version"
@@ -54,6 +66,10 @@ msgstr "Current version"
 #: src/updater/pages/UpdatesSettingsSection.tsx
 msgid "Download & install"
 msgstr "Download & install"
+
+#: src/i18n/uiError.ts
+msgid "Import URLs must be https."
+msgstr "Import URLs must be https."
 
 #: src/updater/pages/UpdatesSettingsSection.tsx
 msgid "Installed — restart to apply."
@@ -86,6 +102,74 @@ msgstr "Restart now"
 #: src/general/pages/SettingsSection.tsx
 msgid "System"
 msgstr "System"
+
+#: src/i18n/uiError.ts
+msgid "That address answered, but it is not a coilbox hub."
+msgstr "That address answered, but it is not a coilbox hub."
+
+#: src/i18n/uiError.ts
+msgid "That import is not a coilbox import."
+msgstr "That import is not a coilbox import."
+
+#: src/i18n/uiError.ts
+msgid "That import is too large to be a coilbox import."
+msgstr "That import is too large to be a coilbox import."
+
+#: src/i18n/uiError.ts
+msgid "the connection ended before the login finished"
+msgstr "the connection ended before the login finished"
+
+#: src/i18n/uiError.ts
+msgid "The download failed part way through."
+msgstr "The download failed part way through."
+
+#: src/i18n/uiError.ts
+msgid "The game did not answer within {seconds} seconds. Its infolog says why."
+msgstr "The game did not answer within {seconds} seconds. Its infolog says why."
+
+#: src/i18n/uiError.ts
+msgid "The game has not connected to coilbox."
+msgstr "The game has not connected to coilbox."
+
+#: src/i18n/uiError.ts
+msgid "The game has not started yet."
+msgstr "The game has not started yet."
+
+#: src/i18n/uiError.ts
+msgid "The host returned an error ({status})."
+msgstr "The host returned an error ({status})."
+
+#: src/i18n/uiError.ts
+msgid "The host took too long to respond."
+msgstr "The host took too long to respond."
+
+#: src/i18n/uiError.ts
+msgid "The hub stopped answering part way through."
+msgstr "The hub stopped answering part way through."
+
+#: src/i18n/uiError.ts
+msgid "the login did not finish within {seconds}s"
+msgstr "the login did not finish within {seconds}s"
+
+#: src/i18n/uiError.ts
+msgid "the server refused the login"
+msgstr "the server refused the login"
+
+#: src/i18n/uiError.ts
+msgid "This project has a custom explosion effect. A tweak slot cannot carry the effects file it needs, so packing it into a lobby chat line would silently break it. Use the mutator or edit-in-place route instead."
+msgstr "This project has a custom explosion effect. A tweak slot cannot carry the effects file it needs, so packing it into a lobby chat line would silently break it. Use the mutator or edit-in-place route instead."
+
+#: src/i18n/uiError.ts
+msgid "This project has no edits a mutator archive can carry, so there is nothing to package."
+msgstr "This project has no edits a mutator archive can carry, so there is nothing to package."
+
+#: src/i18n/uiError.ts
+msgid "This project has no edits a mutator archive can carry, so there is nothing to test."
+msgstr "This project has no edits a mutator archive can carry, so there is nothing to test."
+
+#: src/i18n/uiError.ts
+msgid "This project has no edits, so there is nothing to pack for a lobby."
+msgstr "This project has no edits, so there is nothing to pack for a lobby."
 
 #: src/updater/pages/UpdatesSettingsSection.tsx
 msgid "Updates are disabled in development builds."
