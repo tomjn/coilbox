@@ -384,6 +384,21 @@ pub fn build_lua_compat_args(lib: &str, datadir: &str, game: &str) -> Vec<String
     args
 }
 
+/// Build args for `--compat-palette` mode: the game whose 3do conversion's
+/// palette is read.
+///
+/// The mode's field and its rule that the game is required live in the
+/// worker's `CompatPaletteArgs`, so this cannot send an argv the worker refuses.
+pub fn build_compat_palette_args(lib: &str, datadir: &str, game: &str) -> Vec<String> {
+    let mode =
+        coilbox_unitsync_worker::Mode::CompatPalette(coilbox_unitsync_worker::CompatPaletteArgs {
+            game: game.into(),
+        });
+    let mut args = build_args(lib, datadir);
+    args.extend(mode.to_args());
+    args
+}
+
 /// Build args for `--unit-render` mode: the unit whose render this is, the frame
 /// it was taken in, the file the pixels are in, and where the encoded asset goes.
 ///
@@ -1837,6 +1852,17 @@ mod tests {
 
         assert_eq!(recovered.game, "xta-9.65.sd7");
         assert!(args.contains(&"--lua-compat".to_string()));
+    }
+
+    #[test]
+    fn build_compat_palette_args_round_trips_through_the_worker_s_own_parser() {
+        use coilbox_unitsync_worker::CompatPaletteArgs;
+
+        let args = build_compat_palette_args("/lib.so", "/data", "xta-9.65.sd7");
+        let recovered = CompatPaletteArgs::from_args(&args).expect("the worker parses it back");
+
+        assert_eq!(recovered.game, "xta-9.65.sd7");
+        assert!(args.contains(&"--compat-palette".to_string()));
     }
 
     /// The whole point of sharing `UnitModelsArgs` with the worker: what

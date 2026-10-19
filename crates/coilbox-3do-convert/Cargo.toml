@@ -12,13 +12,12 @@ coilbox-3do = { path = "../coilbox-3do" }
 coilbox-s3o = { path = "../coilbox-s3o" }
 # The sheet is drawn pixel by pixel. A caller decodes its own tiles, so nothing
 # here reads or writes a file. PNG only to encode the finished sheet, whose bytes
-# a compat manifest's pin on this crate covers (issue #4557).
+# go into a compat mutator (issue #4557).
 image = { workspace = true, features = ["png"] }
 # The sidecar that records where every tile landed.
 serde = { workspace = true }
 serde_json = { workspace = true }
 
 [dev-dependencies]
-# Hashes the output of a fixed conversion, so a change to it fails a test and
-# the version above moves with it.
+# Hashes the output of a fixed conversion, so a change to it fails a test.
 sha2 = { workspace = true }

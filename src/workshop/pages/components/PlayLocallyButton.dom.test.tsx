@@ -440,6 +440,7 @@ describe("PlayLocallyButton", () => {
       await vi.waitFor(() => expect(launch).toHaveBeenCalledTimes(1));
       expect(compatStatus).toHaveBeenCalledWith({
         dataDir: "/data",
+        enginePath: "/engines/105",
         archiveName: "ba.sdd",
         baseChecksum: "abc123",
       });

@@ -82,6 +82,7 @@ export function useCompatBattle(opts: {
         }
         const { latest } = await compatStatus({
           dataDir,
+          enginePath,
           archiveName: p.archiveName,
           baseChecksum: info.checksum,
         });

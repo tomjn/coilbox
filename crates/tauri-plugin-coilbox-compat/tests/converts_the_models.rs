@@ -95,6 +95,21 @@ fn the_models_are_converted_the_same_twice_and_the_units_name_them() {
         assert!(bytes == &y[file], "{file} differs between two builds");
     }
 
+    // Issue #4642: the marker records the palette the conversion read, and the
+    // worker reads the same one again for the status check.
+    let marker =
+        tauri_plugin_coilbox_compat::mutator::read_marker(Path::new(&first.dir)).expect("a marker");
+    eprintln!("palette {:?}", marker.palette);
+    assert!(marker.palette.is_some());
+    let status = tauri_plugin_coilbox_compat::status(
+        &a.path().to_string_lossy(),
+        &engine.to_string_lossy(),
+        &archive,
+        "0",
+    )
+    .expect("status");
+    assert!(status.stale.is_empty(), "{:?}", status.stale);
+
     let out = tauri_plugin_coilbox_unitsync::unit_defs_blocking(
         &engine.to_string_lossy(),
         &a.path().to_string_lossy(),

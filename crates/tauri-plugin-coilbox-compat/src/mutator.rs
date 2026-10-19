@@ -90,6 +90,11 @@ pub struct Marker {
     /// The base archive's checksum as unitsync reports it.
     pub base_checksum: String,
     pub coilbox_version: String,
+    /// The palette the model conversion read (issue #4642), which the base
+    /// checksum does not cover. Left out when no model was converted, so the
+    /// palette coloured nothing, and by markers from before the field.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub palette: Option<coilbox_compat::Palette>,
 }
 
 fn first_writer() -> u32 {
@@ -197,17 +202,27 @@ pub fn files(
         });
     }
     files.sort_by(|a, b| a.path.cmp(&b.path));
-    let marker = serde_json::to_string_pretty(marker).map_err(|e| e.to_string())? + "\n";
-    files.push(File {
-        path: MARKER.into(),
-        contents: marker.into_bytes(),
-    });
+    files.push(marker_file(marker)?);
     Ok(files)
 }
 
-/// Refuse a manifest whose converter is not the one this build carries, or
-/// whose writer is newer than the newest this build keeps: its mutator could
-/// not be reproduced byte for byte.
+/// [`MARKER`] recording `marker`.
+pub fn marker_file(marker: &Marker) -> Result<File, String> {
+    let text = serde_json::to_string_pretty(marker).map_err(|e| e.to_string())? + "\n";
+    Ok(File {
+        path: MARKER.into(),
+        contents: text.into_bytes(),
+    })
+}
+
+/// Refuse a manifest whose writer is newer than the newest this build keeps,
+/// or whose converter is not `coilbox-3do-convert`: its mutator could not be
+/// reproduced byte for byte.
+///
+/// The converter's version is not checked (issue #4678). This build carries
+/// one converter, and a version check would stop it building every manifest
+/// made with an older one. A change to what the converter writes goes behind a
+/// compat writer instead, so the writer the manifest names decides the bytes.
 pub fn check_pins(manifest: &coilbox_compat::Manifest) -> Result<(), String> {
     if !coilbox_compat::knows_writer(manifest.writer) {
         return Err(format!(
@@ -218,13 +233,10 @@ pub fn check_pins(manifest: &coilbox_compat::Manifest) -> Result<(), String> {
         ));
     }
     let pin = &manifest.converter;
-    if pin.name != "coilbox-3do-convert" || pin.version != coilbox_3do_convert::VERSION {
+    if pin.name != "coilbox-3do-convert" {
         return Err(format!(
-            "compat {} needs {} {}, and this coilbox has coilbox-3do-convert {}",
-            manifest.version,
-            pin.name,
-            pin.version,
-            coilbox_3do_convert::VERSION
+            "compat {} needs the converter {}, and this coilbox has coilbox-3do-convert",
+            manifest.version, pin.name
         ));
     }
     Ok(())
@@ -240,21 +252,29 @@ pub enum Stale {
     Writer { built: u32, now: u32 },
     /// The base archive has changed since.
     BaseChecksum { built: String, now: String },
+    /// The palette the models take their colours from has other bytes now,
+    /// or is there now and was not, or the other way round.
+    Palette {
+        built: coilbox_compat::Palette,
+        now: coilbox_compat::Palette,
+    },
     /// The folder has no marker coilbox can read.
     NoMarker,
 }
 
 /// Why a mutator built as `marker` is stale against manifest `now`, the
-/// writer that manifest names, and the base archive's current checksum. Empty
-/// means it is current.
+/// writer that manifest names, the base archive's current checksum, and the
+/// palette a conversion would read now. `palette_now` reads that, and is only
+/// called for a marker that records a palette. Empty means it is current.
 pub fn staleness(
     marker: Option<&Marker>,
     now: u32,
     writer: u32,
     base_checksum: &str,
-) -> Vec<Stale> {
+    palette_now: impl FnOnce() -> Result<coilbox_compat::Palette, String>,
+) -> Result<Vec<Stale>, String> {
     let Some(marker) = marker else {
-        return vec![Stale::NoMarker];
+        return Ok(vec![Stale::NoMarker]);
     };
     let mut why = Vec::new();
     if marker.manifest_version != now {
@@ -275,7 +295,16 @@ pub fn staleness(
             now: base_checksum.to_string(),
         });
     }
-    why
+    if let Some(built) = &marker.palette {
+        let now = palette_now()?;
+        if !built.same_bytes(&now) {
+            why.push(Stale::Palette {
+                built: built.clone(),
+                now,
+            });
+        }
+    }
+    Ok(why)
 }
 
 /// The marker in `dir`, or `None` when there is none or it does not parse.
@@ -356,7 +385,17 @@ mod tests {
             writer: coilbox_compat::WRITER,
             base_checksum: checksum.into(),
             coilbox_version: "1.2.3".into(),
+            palette: None,
         }
+    }
+
+    /// For a marker that records no palette, which must not read one.
+    fn unread() -> Result<coilbox_compat::Palette, String> {
+        panic!("read the palette for a marker that records none")
+    }
+
+    fn palette(bytes: &[u8], source: &str) -> coilbox_compat::Palette {
+        coilbox_compat::Palette::of(Some(bytes), Some(source.into()))
     }
 
     #[test]
@@ -679,8 +718,10 @@ mod tests {
         let m = coilbox_compat::manifest(coilbox_compat::latest()).unwrap();
         assert_eq!(check_pins(&m), Ok(()));
         let mut other = m.clone();
-        other.converter.version = "0.0.0".into();
-        assert!(check_pins(&other).is_err());
+        other.converter.name = "another-3do-convert".into();
+        assert!(check_pins(&other)
+            .unwrap_err()
+            .contains("another-3do-convert"));
         let mut other = m.clone();
         other.writer = coilbox_compat::WRITER + 1;
         assert!(check_pins(&other).unwrap_err().contains("writer"));
@@ -698,15 +739,28 @@ mod tests {
         }
     }
 
+    /// Issue #4678: a manifest made with another version of the converter
+    /// still passes, older or newer.
+    #[test]
+    fn the_converter_version_a_manifest_names_is_not_a_pin() {
+        for version in ["0.0.1", "0.2.0", "1.0.0"] {
+            let mut m = coilbox_compat::manifest(1).unwrap();
+            m.converter.version = version.into();
+            assert_eq!(check_pins(&m), Ok(()), "{version}");
+        }
+    }
+
     #[test]
     fn a_mutator_built_as_now_is_current() {
-        assert!(staleness(Some(&marker(1, "ABC")), 1, W, "abc").is_empty());
+        assert!(staleness(Some(&marker(1, "ABC")), 1, W, "abc", unread)
+            .unwrap()
+            .is_empty());
     }
 
     #[test]
     fn a_new_manifest_makes_it_stale() {
         assert_eq!(
-            staleness(Some(&marker(1, "abc")), 2, W, "abc"),
+            staleness(Some(&marker(1, "abc")), 2, W, "abc", unread).unwrap(),
             [Stale::Manifest { built: 1, now: 2 }]
         );
     }
@@ -714,12 +768,69 @@ mod tests {
     #[test]
     fn a_changed_base_archive_makes_it_stale() {
         assert_eq!(
-            staleness(Some(&marker(1, "abc")), 1, W, "def"),
+            staleness(Some(&marker(1, "abc")), 1, W, "def", unread).unwrap(),
             [Stale::BaseChecksum {
                 built: "abc".into(),
                 now: "def".into()
             }]
         );
+    }
+
+    /// Issue #4642: the palette can come from the engine or a dependency,
+    /// which the base checksum does not cover.
+    #[test]
+    fn a_palette_with_other_bytes_makes_it_stale() {
+        let mut built = marker(1, "abc");
+        built.palette = Some(palette(b"one", "springcontent.sdz"));
+        let now = palette(b"two", "springcontent.sdz");
+        assert_eq!(
+            staleness(Some(&built), 1, W, "abc", || Ok(now.clone())).unwrap(),
+            [Stale::Palette {
+                built: built.palette.clone().unwrap(),
+                now
+            }]
+        );
+    }
+
+    /// The dependency that held it has gone, so the faces would draw grey.
+    #[test]
+    fn a_palette_that_is_no_longer_there_makes_it_stale() {
+        let mut built = marker(1, "abc");
+        built.palette = Some(palette(b"one", "ba-deps.sdz"));
+        let gone = coilbox_compat::Palette::of(None, None);
+        let why = staleness(Some(&built), 1, W, "abc", || Ok(gone)).unwrap();
+        assert!(matches!(why[..], [Stale::Palette { .. }]), "{why:?}");
+    }
+
+    #[test]
+    fn the_same_palette_bytes_from_another_archive_are_current() {
+        let mut built = marker(1, "abc");
+        built.palette = Some(palette(b"one", "xta-9.65.sd7"));
+        let moved = palette(b"one", "springcontent.sdz");
+        assert!(staleness(Some(&built), 1, W, "abc", || Ok(moved))
+            .unwrap()
+            .is_empty());
+    }
+
+    #[test]
+    fn a_palette_that_cannot_be_read_now_is_an_error() {
+        let mut built = marker(1, "abc");
+        built.palette = Some(palette(b"one", "xta-9.65.sd7"));
+        assert_eq!(
+            staleness(Some(&built), 1, W, "abc", || Err("no worker".into())),
+            Err("no worker".into())
+        );
+    }
+
+    #[test]
+    fn a_marker_records_the_palette_only_when_it_has_one() {
+        let without = String::from_utf8(marker_file(&marker(1, "abc")).unwrap().contents).unwrap();
+        assert!(!without.contains("palette"), "{without}");
+        let mut with = marker(1, "abc");
+        with.palette = Some(palette(b"one", "springcontent.sdz"));
+        let file = marker_file(&with).unwrap();
+        let back: Marker = serde_json::from_slice(&file.contents).unwrap();
+        assert_eq!(back, with);
     }
 
     const W: u32 = coilbox_compat::WRITER;
@@ -729,7 +840,7 @@ mod tests {
         let mut old = marker(1, "abc");
         old.writer = W + 1;
         assert_eq!(
-            staleness(Some(&old), 1, W, "abc"),
+            staleness(Some(&old), 1, W, "abc", unread).unwrap(),
             [Stale::Writer {
                 built: W + 1,
                 now: W
@@ -745,9 +856,21 @@ mod tests {
         assert_eq!(marker.writer, 1);
     }
 
+    /// Markers written before the field record no palette, and read as one
+    /// whose build converted no model.
+    #[test]
+    fn a_marker_without_a_palette_still_reads() {
+        let old = r#"{"manifestVersion": 8, "writer": 2, "baseChecksum": "abc", "coilboxVersion": "1.2.3"}"#;
+        let marker: Marker = serde_json::from_str(old).unwrap();
+        assert_eq!(marker.palette, None);
+    }
+
     #[test]
     fn a_folder_without_a_marker_is_stale() {
-        assert_eq!(staleness(None, 1, W, "abc"), [Stale::NoMarker]);
+        assert_eq!(
+            staleness(None, 1, W, "abc", unread).unwrap(),
+            [Stale::NoMarker]
+        );
     }
 
     #[test]
