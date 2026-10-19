@@ -1,11 +1,10 @@
-import { occupancy } from "../battles/battleFilters";
 import type { Battle } from "../bindings";
 
 /** Why a follow ended without the player ending it. */
 export type FollowStop = "disconnected" | "unfriended" | "leftByHand";
 
 /** Why the friend's battle cannot be entered. */
-export type FollowBlock = "locked" | "full" | "passworded";
+export type FollowBlock = "locked" | "passworded";
 
 /** What following a friend calls for next. */
 export type FollowAction =
@@ -50,22 +49,13 @@ export interface FollowNow {
   target: number | null;
   mine: number | null;
   /** The friend's battle, when the server has told us about it. */
-  battle: Pick<
-    Battle,
-    "passworded" | "locked" | "host" | "members" | "playerCount" | "maxPlayers"
-  > | null;
-  /** That battle has started, so joining it is spectating. */
-  running: boolean;
+  battle: Pick<Battle, "passworded" | "locked"> | null;
 }
 
-/** Why the battle cannot be walked into, or null when it can. A running battle
- * is never full, as in the battle list: a late joiner spectates. */
-function blockOf(
-  battle: NonNullable<FollowNow["battle"]>,
-  running: boolean,
-): FollowBlock | null {
+/** Why the battle cannot be walked into, or null when it can. A full battle
+ * does not block, as in the battle list: the joiner spectates. */
+function blockOf(battle: NonNullable<FollowNow["battle"]>): FollowBlock | null {
   if (battle.locked) return "locked";
-  if (!running && occupancy(battle) >= battle.maxPlayers) return "full";
   return battle.passworded ? "passworded" : null;
 }
 
@@ -75,10 +65,10 @@ function blockOf(
  * holds, where `followStep` reports it once.
  */
 export function followBlock(
-  now: Pick<FollowNow, "target" | "mine" | "battle" | "running">,
+  now: Pick<FollowNow, "target" | "mine" | "battle">,
 ): FollowBlock | null {
   if (now.target == null || now.mine === now.target || !now.battle) return null;
-  return blockOf(now.battle, now.running);
+  return blockOf(now.battle);
 }
 
 /**
@@ -139,7 +129,7 @@ export function followStep(
 
   // Tachyon lists a lobby before it says anything about it.
   if (!now.battle) return act({ kind: "none" });
-  const reason = blockOf(now.battle, now.running);
+  const reason = blockOf(now.battle);
   if (reason) {
     return once(
       { kind: "blocked", id: target, reason },

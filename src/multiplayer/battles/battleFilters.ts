@@ -51,11 +51,11 @@ export interface BattleRowAction {
 
 /**
  * Decide the action for a battle row you are not already in. An open battle offers
- * Join, gated on being joinable and not full. A running battle (host in-game)
- * is joined too, and never blocked by a full roster: nobody walking into a running
- * room takes a player slot in the match. Joining starts no engine. The room's own
- * button offers to watch, once you are in it. Both require `canJoin` (connected,
- * not busy, not already in a battle). Pure — no snapshot access.
+ * Join, or Spectate when every player slot is taken, since the player cap does not
+ * count spectators and a joiner lands as one. A running battle (host in-game) is
+ * joined too. Joining starts no engine. The room's own button offers to watch,
+ * once you are in it. Both require `canJoin` (connected, not busy, not already in
+ * a battle). Pure, with no snapshot access.
  */
 export function battleRowAction(
   b: Battle,
@@ -65,7 +65,11 @@ export function battleRowAction(
     return { kind: "watch", label: "Join", disabled: !opts.canJoin };
   }
   const full = occupancy(b) >= b.maxPlayers;
-  return { kind: "join", label: "Join", disabled: !opts.canJoin || full };
+  return {
+    kind: "join",
+    label: full ? "Spectate" : "Join",
+    disabled: !opts.canJoin,
+  };
 }
 
 export type BattleGroupKey = "open" | "passworded" | "running" | "locked";

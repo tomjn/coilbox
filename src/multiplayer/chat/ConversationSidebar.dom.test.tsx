@@ -322,14 +322,14 @@ describe("ConversationSidebar: join or watch a friend's battle (#3381)", () => {
     expect(button.disabled).toBe(true);
   });
 
-  it("says Full and cannot be pressed for a full battle", () => {
+  it("offers to spectate a full battle", () => {
     friendInBattle({ maxPlayers: 2 });
     renderSidebar();
 
     const button = screen.getByRole("button", {
-      name: "Full Skirmish",
+      name: "Spectate Skirmish",
     }) as HTMLButtonElement;
-    expect(button.disabled).toBe(true);
+    expect(button.disabled).toBe(false);
   });
 
   it("asks for the password instead of joining at once", async () => {

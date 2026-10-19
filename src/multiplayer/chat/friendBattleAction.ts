@@ -48,7 +48,9 @@ export function friendBattleAction(input: {
   if (session.joinedId === battle.id) return null;
 
   const kind = running ? "watch" : "join";
-  const verb = running ? "Watch" : "Join";
+  // A full room still takes spectators, which is what a joiner lands as.
+  const full = !running && occupancy(battle) >= battle.maxPlayers;
+  const verb = running ? "Watch" : full ? "Spectate" : "Join";
   const asksPassword = battle.passworded;
   const refuse = (label: string, reason: string): FriendBattleAction => ({
     kind,
@@ -59,9 +61,6 @@ export function friendBattleAction(input: {
   });
 
   if (battle.locked) return refuse("Locked", "This battle is locked");
-  if (!running && occupancy(battle) >= battle.maxPlayers) {
-    return refuse("Full", "This battle is full");
-  }
   if (!session.ready) return refuse(verb, "Not connected yet");
   if (session.busy) return refuse(verb, "Another action is in progress");
   if (session.joinedId != null) {

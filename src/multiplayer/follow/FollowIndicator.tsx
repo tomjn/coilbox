@@ -10,7 +10,6 @@ import {
 import { notify } from "../../notify/notify";
 import { battleRoomHref } from "../battle/battleRoomKey";
 import { leaveBattle } from "../battle/leaveBattle";
-import { isBattleRunning } from "../battles/battleFilters";
 import { joinBattle } from "../battles/joinBattle";
 import { useOneBattleRule } from "../battles/oneBattle";
 import { FriendBattleButton } from "../chat/FriendBattleButton";
@@ -41,7 +40,6 @@ const STOPPED: Record<FollowStop, string> = {
 
 const BLOCKED: Record<Exclude<FollowBlock, "passworded">, string> = {
   locked: "Their battle is locked.",
-  full: "Their battle is full.",
 };
 
 /**
@@ -79,7 +77,6 @@ function useFollowDriver(follow: Follow | null): FollowBlock | null {
     target,
     mine,
     battle: battle ?? null,
-    running: battle ? isBattleRunning(battle, state?.users) : false,
   };
 
   // The memo belongs to one follow, so a new one starts it again.
@@ -173,7 +170,6 @@ const WHY_NOT: Record<FollowBlock, string> = {
   passworded:
     "It has a password, so you were not moved. Enter the password to join them.",
   locked: "It is locked, so you were not moved. You join if it is unlocked.",
-  full: "It is full, so you were not moved. You join when there is space.",
 };
 
 /**
