@@ -51,6 +51,7 @@ const MANIFESTS: &[(u32, &str)] = &[
     (6, include_str!("../../../lua/compat/manifests/6.json")),
     (7, include_str!("../../../lua/compat/manifests/7.json")),
     (8, include_str!("../../../lua/compat/manifests/8.json")),
+    (9, include_str!("../../../lua/compat/manifests/9.json")),
     (10, include_str!("../../../lua/compat/manifests/10.json")),
 ];
 
@@ -67,6 +68,10 @@ const FIXES: &[(&str, &str)] = &[
     (
         "compat-callin-hooks",
         include_str!("../../../lua/compat/compat-callin-hooks.lua"),
+    ),
+    (
+        "compat-callin-hooks-v2",
+        include_str!("../../../lua/compat/compat-callin-hooks-v2.lua"),
     ),
     (
         "defs-commander-85",
@@ -1145,6 +1150,51 @@ mod tests {
         assert!(copies_entry_bytes(eight.writer));
     }
 
+    /// Manifests 2 to 8 hook call-ins with `rawget` and `rawset`, which a
+    /// synced state lacks (issue #4685). Manifest 9 swaps in hooks that do not.
+    #[test]
+    fn manifest_9_is_manifest_8_with_hooks_that_need_no_raw_functions() {
+        let (eight, nine) = (manifest(8).unwrap(), manifest(9).unwrap());
+        let swapped: Vec<String> = eight
+            .fixes
+            .iter()
+            .map(|id| match id.as_str() {
+                "compat-callin-hooks" => "compat-callin-hooks-v2".to_string(),
+                _ => id.clone(),
+            })
+            .collect();
+        assert_eq!(nine.fixes, swapped);
+        assert_eq!(nine.converter, eight.converter);
+        assert_eq!(nine.writer, eight.writer);
+    }
+
+    /// What `CSyncedLuaHandle::Init` sets to nil. The Lua tests run the synced
+    /// prelude without these too, so this catches a use the tests do not reach.
+    #[test]
+    fn the_latest_synced_prelude_calls_nothing_the_synced_state_removes() {
+        let removed = [
+            "rawequal",
+            "rawget",
+            "rawset",
+            "newproxy",
+            "gcinfo",
+            "collectgarbage",
+            "dofile",
+            "loadfile",
+            "loadlib",
+            "require",
+        ];
+        let m = manifest(latest()).unwrap();
+        for (id, src) in prelude_fixes(&m, LuaState::Synced) {
+            for line in src.lines().filter(|l| !l.trim_start().starts_with("--")) {
+                let mut words = line.split(|c: char| !(c.is_alphanumeric() || c == '_'));
+                if let Some(word) = words.find(|w| removed.contains(w)) {
+                    panic!("{id} uses {word}, which synced Lua lacks: {line}");
+                }
+            }
+        }
+    }
+
     /// Issue #4686: manifest 10 adds the def fix that gives a def whose model
     /// is missing a stand-in, and keeps the writer of manifest 9.
     #[test]
@@ -1154,7 +1204,7 @@ mod tests {
         assert_eq!(added, ["defs-missing-model-standin"]);
         let kept: Vec<&String> = ten.fixes.iter().filter(|id| nine.fixes.contains(id)).collect();
         assert_eq!(kept, nine.fixes.iter().collect::<Vec<_>>());
-        assert_eq!((ten.converter, ten.writer), (nine.converter, nine.writer));
+        assert_eq!((&ten.converter, ten.writer), (&nine.converter, nine.writer));
         assert_eq!(
             defs_fixes(&ten, DefsFile::DefsPost).last(),
             Some(&"defs-missing-model-standin")
@@ -1269,7 +1319,12 @@ mod tests {
                 })
                 .collect();
             if let Some(first) = prelude.first() {
-                assert_eq!(*first, "compat-callin-hooks", "manifest {}", m.version);
+                let hooks = if m.version < 9 {
+                    "compat-callin-hooks"
+                } else {
+                    "compat-callin-hooks-v2"
+                };
+                assert_eq!(*first, hooks, "manifest {}", m.version);
             }
         }
     }
@@ -1505,12 +1560,14 @@ mod tests {
         }
     }
 
-    /// The preludes for manifests 2 and 6, as the Lua tests in
-    /// `lua/compat/tests/` load them. `COILBOX_WRITE_FIXTURE=1` writes them
-    /// again after a deliberate change to how a prelude is built.
+    /// The preludes for manifest 9, as the Lua tests in `lua/compat/tests/`
+    /// load them. Earlier manifests' synced preludes call `rawget`, which the
+    /// tests' synced state lacks, so they are not kept.
+    /// `COILBOX_WRITE_FIXTURE=1` writes them again after a deliberate change to
+    /// how a prelude is built.
     #[test]
     fn the_lua_tests_load_the_preludes_this_crate_builds() {
-        for n in [2, 6] {
+        for n in [9] {
             let m = manifest(n).unwrap();
             for state in [LuaState::Synced, LuaState::Unsynced] {
                 let built = prelude(&m, state).unwrap();

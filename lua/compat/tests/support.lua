@@ -44,17 +44,42 @@ local function preludes(n)
 	}
 end
 
+--- What the engine removes from a Lua state before any game Lua runs, as
+--- CSyncedLuaHandle::Init and CUnsyncedLuaHandle::Init do in
+--- rts/Lua/LuaHandleSynced.cpp. loadstring is replaced rather than removed, so
+--- it stays.
+M.REMOVED_UNSYNCED = { "dofile", "loadfile", "loadlib", "require" }
+M.REMOVED_SYNCED = {
+	"dofile", "loadfile", "loadlib", "require",
+	"rawequal", "rawget", "rawset", "newproxy", "gcinfo", "collectgarbage",
+}
+
+--- A global table holding a copy of the standard library minus what the
+--- engine removes for that state. It has no metatable, as in the engine, so a
+--- fix that calls a removed function fails here as it does there.
+function M.sandbox(synced)
+	local globals = {}
+	for key, value in pairs(_G) do
+		globals[key] = value
+	end
+	for _, name in ipairs(synced and M.REMOVED_SYNCED or M.REMOVED_UNSYNCED) do
+		globals[name] = nil
+	end
+	globals._G = globals
+	return globals
+end
+
 --- A fresh engine state. `synced` picks which prelude it loads and whether it
 --- has gl. `spring` adds to or replaces entries of the Spring table.
---- `manifest` picks which manifest's prelude it loads, 2 by default. `game`
+--- `manifest` picks which manifest's prelude it loads, 9 by default. Only manifest 9 has a fixture, because the
+--- synced preludes of manifests 2 to 8 need rawget, which the synced state
+--- lacks. `game`
 --- is the Game table the engine builds, and `modinfo` is what the mutator's
 --- modinfo.lua returns.
 function M.newEngine(opts)
 	opts = opts or {}
 	local engine = { registered = {}, logs = {}, frame = 0, units = {} }
-	local env = {}
-	env._G = env
-	setmetatable(env, { __index = _G })
+	local env = M.sandbox(opts.synced ~= false)
 	engine.env = env
 
 	local Spring = {
@@ -112,7 +137,7 @@ function M.newEngine(opts)
 	env.UnitDefs = opts.unitDefs or {}
 	env.FeatureDefNames = opts.featureDefNames or {}
 	env.Game = opts.game
-	local files = preludes(opts.manifest or 2)
+	local files = preludes(opts.manifest or 9)
 	env.VFS = {
 		MOD = "M",
 		Include = function(path)

@@ -35,7 +35,7 @@ Nobody downloads a generated game. A player who joins a battle on `<game> (compa
 
 Each prelude fix and def fix runs as a function inside `pcall`. A fix that fails logs `coilbox compat fix <id> failed: <error>` to the `coilbox-compat` log section, and the game's own Lua still loads.
 
-The prelude's first fix, `compat-callin-hooks`, gives the others `compat.define`. That puts a function in place only when nothing is there already, so a game that defines its own keeps it.
+The prelude's first fix, `compat-callin-hooks-v2` (`compat-callin-hooks` in manifests 2 to 8), gives the others `compat.define`. That puts a function in place only when nothing is there already, so a game that defines its own keeps it.
 
 Each gadget decides when the game loads whether the game needs it, from the game's own files. Every game built from one manifest gets the same gadget files. A gadget's name starts with `coilbox_compat_`, so it can be told apart from the game's own in the log.
 
@@ -106,12 +106,12 @@ The call-in adapters in `ADAPTERS` in `crates/coilbox-compat/src/lib.rs` follow 
 
 1. Write the fix as `lua/compat/<id>.lua`, `lua/compat/gadgets/<id>.lua` or `lua/compat/defs/<id>.lua`, with the header above. The file must end in a newline and have no carriage returns. All of it must be your own code. Copy nothing from the engine's `examples/Widgets` or `cont/LuaUI`, or from any game.
 2. Add `(id, include_str!(...))` to `FIXES` in `crates/coilbox-compat/src/lib.rs`, which is in alphabetical order by id.
-3. Copy the newest manifest to `lua/compat/manifests/<n>.json`, with `<n>` one higher. Set `version` to `<n>` and add the new id to `fixes`. `compat-callin-hooks` must stay first among the prelude fixes, and `defs-helpers` first among the def fixes.
+3. Copy the newest manifest to `lua/compat/manifests/<n>.json`, with `<n>` one higher. Set `version` to `<n>` and add the new id to `fixes`. `compat-callin-hooks-v2` must stay first among the prelude fixes, and `defs-helpers` first among the def fixes.
 4. Add `(<n>, include_str!("../../../lua/compat/manifests/<n>.json"))` to `MANIFESTS` in the same file.
 5. Record the hash. Run `shasum -a 256` on the fix file and add a line of the hash, two spaces and the id to `lua/compat/manifests/hashes.txt`.
 6. For a def fix, add its id to `COUNTED` in `crates/tauri-plugin-coilbox-compat/src/defs.rs` and count the definitions it changes in `changed` there. The test `every_def_fix_but_the_helpers_is_counted` fails until you do.
 7. For a gadget fix, add what it would act on to `gadgetFinding` in `src/content/compatReport.ts`, so the report's "Compatibility gadgets a build turns on" row lists it.
-8. Add tests to `lua/compat/tests/`, in `prelude_test.lua`, `gadgets_test.lua` or `defs_test.lua`, and run `scripts/mission-tests.sh`.
+8. Add tests to `lua/compat/tests/`, in `prelude_test.lua`, `gadgets_test.lua` or `defs_test.lua`, and run `scripts/mission-tests.sh`. The tests run a synced fix in a state without `rawequal`, `rawget`, `rawset`, `newproxy`, `gcinfo`, `collectgarbage` and the file loaders, as the engine's synced Lua has none of them. A fix that calls one fails there.
 9. Add the golden line. Run `cargo test -p tauri-plugin-coilbox-compat the_fixed_games_build_the_same_bytes_from_every_manifest`. It fails and prints the hash it built for each manifest. Add the new manifest's line to `GOLDEN` in `crates/tauri-plugin-coilbox-compat/src/lib.rs`. Every older line must come out the same as before. If one has moved, read the next section first.
 
 Players get the new manifest when they update coilbox. Their switches stay on, and each game shows Rebuild until they rebuild it.

@@ -5,7 +5,7 @@
 --
 --   luajit lua/compat/tests/prelude_test.lua
 --
--- It loads the preludes coilbox-compat builds for manifest 2, kept in
+-- It loads the preludes coilbox-compat builds for manifest 9, kept in
 -- tests/fixtures/. After changing a fix or how a prelude is built, write them
 -- again with:
 --
@@ -14,6 +14,20 @@
 local support = dofile((arg[0]:match("^(.*)/[^/]+$") or ".") .. "/support.lua")
 local check, newEngine, prelude, call, handler =
 	support.check, support.newEngine, support.prelude, support.call, support.handler
+
+--------------------------------------------------------------------------------
+-- The stand-in states lack what the engine removes (issue #4685)
+--------------------------------------------------------------------------------
+
+do
+	local synced, unsynced = newEngine().env, newEngine({ synced = false }).env
+	for _, name in ipairs({ "rawget", "rawset", "rawequal", "newproxy", "gcinfo", "collectgarbage" }) do
+		check("synced: " .. name .. " is removed", synced[name] == nil)
+	end
+	check("synced: getmetatable and setmetatable stay", synced.getmetatable ~= nil and synced.setmetatable ~= nil)
+	check("unsynced: rawget and rawset stay", unsynced.rawget ~= nil and unsynced.rawset ~= nil)
+	check("a global table has no metatable, as in the engine", getmetatable(synced) == nil)
+end
 
 --------------------------------------------------------------------------------
 -- Defining what is missing, and only that
@@ -261,7 +275,7 @@ do
 end
 
 --------------------------------------------------------------------------------
--- Game identity (manifest 6)
+-- Game identity
 --------------------------------------------------------------------------------
 
 -- The mutator's own values, as the engine reads them from its modinfo.lua, and
@@ -269,7 +283,6 @@ end
 local function identity(synced)
 	return newEngine({
 		synced = synced,
-		manifest = 6,
 		game = { gameName = "XTA 9.65 (compat 6)", gameVersion = "6", gameShortName = "XTA" },
 		modinfo = { name = "XTA 9.65 (compat 6)", version = "6", compatbasename = "XTA", compatbaseversion = "9.65" },
 	})
@@ -289,7 +302,6 @@ end
 do
 	-- A base game with no version reads as the empty string, as it does unwrapped.
 	local engine = newEngine({
-		manifest = 6,
 		game = { gameName = "Bare (compat 6)", gameVersion = "6" },
 		modinfo = { compatbasename = "Bare", compatbaseversion = "" },
 	})
@@ -300,13 +312,26 @@ end
 do
 	-- A modinfo that does not carry the base game's values changes nothing.
 	local engine = newEngine({
-		manifest = 6,
 		game = { gameName = "Own (compat 6)", gameVersion = "6" },
 		modinfo = { name = "Own (compat 6)", version = "6" },
 	})
 	prelude(engine)
 	check("without the base values Game is left alone", engine.env.Game.gameName == "Own (compat 6)" and engine.env.Game.gameVersion == "6")
 	check("without the base values no fix failed", #engine.logs == 0, table.concat(engine.logs, "; "))
+end
+
+do
+	-- A strict game's global table errors on a read of an undefined call-in. The
+	-- hooks read the global without going through that, and put the metatable back.
+	local engine = newEngine()
+	support.load(engine, 'setmetatable(_G, { __index = function(_, k) if k == "UnitDamaged" or k == "AllowCommand" then error("undefined " .. k) end end })')
+	prelude(engine)
+	local got
+	handler(engine, { UnitDamaged = function(...) got = { ... } end })
+	call(engine, "UnitDamaged", 1, 2, 3, 4, false, 5, 6, 7, 8, 9)
+	check("a strict global table still gets hooked", got ~= nil and got[7] == 7)
+	check("no fix failed under a strict global table", #engine.logs == 0, table.concat(engine.logs, "; "))
+	check("the game's metatable is back", getmetatable(engine.env).__index ~= nil and getmetatable(engine.env).__newindex ~= nil)
 end
 
 support.report()
