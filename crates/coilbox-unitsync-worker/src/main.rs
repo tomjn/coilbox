@@ -215,6 +215,11 @@ struct Args {
     /// `coilbox_unitsync_worker::LuaCompatArgs`, shared with the sidecar plugin
     /// that builds this flag's argv.
     lua_compat: Option<Mode>,
+    /// `--compat-palette`: the palette a 3do conversion of a game would read,
+    /// and the archive it comes from (issue #4642). Its field lives once in
+    /// `coilbox_unitsync_worker::CompatPaletteArgs`, shared with the sidecar
+    /// plugin that builds this flag's argv.
+    compat_palette: Option<Mode>,
     /// `--unit-script`: find and read a unit's animation script inside a
     /// game, following the unit script framework's own resolution order. Its
     /// fields live once in `coilbox_unitsync_worker::UnitScriptArgs`, shared
@@ -631,6 +636,17 @@ fn dispatch(args: &Args) -> i32 {
             || luacompat::render(&args.lib, &mode.game),
             print_ok,
             || luacompat::emit_error("worker panicked while scanning Lua".into()),
+        );
+    }
+
+    // Compat palette: the palette a 3do conversion of a game would read now,
+    // so the compat plugin can tell a mutator's colours are stale (issue
+    // #4642). Keys off --game, so it is checked before the --game modes.
+    if let Some(Mode::CompatPalette(mode)) = &args.compat_palette {
+        return run_mode(
+            || convert3do::render_palette(&args.lib, &mode.game),
+            print_ok,
+            || convert3do::emit_palette_error("worker panicked while reading the palette".into()),
         );
     }
 
@@ -1077,6 +1093,8 @@ fn parse_args(raw: &[String]) -> Result<Args, String> {
     // `--lua-compat`'s own field (game) is not collected into a local here:
     // `Mode::LuaCompat`'s `from_args` below re-scans `raw` for it.
     let mut lua_compat_flag = false;
+    // `--compat-palette`'s own field (game) is re-scanned the same way.
+    let mut compat_palette_flag = false;
     // `--unit-render`'s own flags (angle, footprint, pixels, dimensions, render
     // source) are not collected into locals here: `Mode::UnitRender`'s
     // `from_args` below re-scans `raw` for those, which is the single place
@@ -1174,6 +1192,7 @@ fn parse_args(raw: &[String]) -> Result<Args, String> {
                 it.next();
             }
             "--lua-compat" => lua_compat_flag = true,
+            "--compat-palette" => compat_palette_flag = true,
             "--out-dir" => {
                 it.next();
             }
@@ -1410,6 +1429,13 @@ fn parse_args(raw: &[String]) -> Result<Args, String> {
         lua_compat: if lua_compat_flag {
             Some(Mode::LuaCompat(
                 coilbox_unitsync_worker::LuaCompatArgs::from_args(raw)?,
+            ))
+        } else {
+            None
+        },
+        compat_palette: if compat_palette_flag {
+            Some(Mode::CompatPalette(
+                coilbox_unitsync_worker::CompatPaletteArgs::from_args(raw)?,
             ))
         } else {
             None
@@ -2309,6 +2335,7 @@ mod tests {
             unit_models: None,
             convert_3do: None,
             lua_compat: None,
+            compat_palette: None,
             unit_render: None,
             unit_render_keys: None,
             unit_script: None,

@@ -35,7 +35,7 @@
 
 use std::collections::BTreeMap;
 
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 
 /// The `license` every fix carries, as in `lua/LICENSE.md`.
@@ -251,6 +251,38 @@ fn hex(bytes: &[u8]) -> String {
 /// The SHA-256 of a fix's source, as lowercase hex.
 pub fn fix_hash(source: &str) -> String {
     hex(&Sha256::digest(source.as_bytes()))
+}
+
+/// The Total Annihilation palette a mutator's 3do conversion read (issue
+/// #4642). A face that names no texture takes its colour from
+/// `unittextures/tatex/palette.pal`, which the worker reads through the VFS,
+/// so it can come from the game, a dependency or the engine's base content.
+/// The base archive's checksum covers none but the first, so the marker
+/// records this, and a mutator whose palette has changed since is stale.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Palette {
+    /// The file name of the archive in the game's set that holds those bytes,
+    /// or `None` when there were none or no archive in the set could be named.
+    pub source: Option<String>,
+    /// The SHA-256 of the bytes, or `None` when nothing answered to the name.
+    pub sha256: Option<String>,
+}
+
+impl Palette {
+    /// The record of `bytes`, the palette file the VFS gave, found in `source`.
+    pub fn of(bytes: Option<&[u8]>, source: Option<String>) -> Palette {
+        Palette {
+            source: bytes.and(source),
+            sha256: bytes.map(|b| hex(&Sha256::digest(b))),
+        }
+    }
+
+    /// Whether `other` gives a conversion the same colours. Only the bytes
+    /// decide that, so the same file found in another archive is the same.
+    pub fn same_bytes(&self, other: &Palette) -> bool {
+        self.sha256 == other.sha256
+    }
 }
 
 /// Reads `<hash>  <id>` lines, skipping blanks and `#` comments.
@@ -762,6 +794,33 @@ mod tests {
         let json = "{}";
         assert_eq!(latest_of(&[(2, json), (10, json), (3, json)]), 10);
         assert_eq!(latest_of(&[(1, json)]), 1);
+    }
+
+    #[test]
+    fn a_palette_is_recorded_by_its_bytes_and_where_they_came_from() {
+        let found = Palette::of(Some(b"abc"), Some("springcontent.sdz".into()));
+        assert_eq!(found.source.as_deref(), Some("springcontent.sdz"));
+        assert_eq!(
+            found.sha256.as_deref(),
+            Some("ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad")
+        );
+        let none = Palette::of(None, Some("springcontent.sdz".into()));
+        assert_eq!(
+            none,
+            Palette {
+                source: None,
+                sha256: None
+            }
+        );
+    }
+
+    #[test]
+    fn only_a_palettes_bytes_decide_whether_it_is_the_same() {
+        let game = Palette::of(Some(b"abc"), Some("xta.sd7".into()));
+        let engine = Palette::of(Some(b"abc"), Some("springcontent.sdz".into()));
+        assert!(game.same_bytes(&engine));
+        assert!(!game.same_bytes(&Palette::of(Some(b"abd"), Some("xta.sd7".into()))));
+        assert!(!game.same_bytes(&Palette::of(None, None)));
     }
 
     #[test]

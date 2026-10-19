@@ -55,7 +55,8 @@ use serde::Serialize;
 
 use crate::ffi::Unitsync;
 use crate::unitmodel::{
-    find_with_ext, palette_in, teamtex_in, MODEL_DIR, MODEL_READ_CAP, TATEX_DIR, TEXTURE_READ_CAP,
+    find_with_ext, teamtex_in, MODEL_DIR, MODEL_READ_CAP, PALETTE_FILE, PALETTE_READ_CAP,
+    TATEX_DIR, TEXTURE_READ_CAP,
 };
 
 /// Where the sheets go inside the output, under `unittextures/` so an `.s3o`'s
@@ -81,6 +82,20 @@ pub struct Convert3doOutput {
     pub models_found: usize,
     /// How many became an `.s3o`.
     pub models_written: usize,
+    /// The palette the conversion read, which the compat marker records
+    /// (issue #4642). `None` when the run stopped before reading it.
+    pub palette: Option<coilbox_compat::Palette>,
+    pub errors: Vec<String>,
+}
+
+/// What `--compat-palette` prints: the palette a conversion of the game would
+/// read now, for the compat plugin to compare with the one a mutator was
+/// built with (issue #4642).
+#[derive(Debug, Default, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CompatPaletteOutput {
+    /// `None` when the game could not be mounted.
+    pub palette: Option<coilbox_compat::Palette>,
     pub errors: Vec<String>,
 }
 
@@ -190,42 +205,88 @@ pub fn render(lib: &str, game_archive: &str, out_dir: &Path, writer: u32) -> Con
         }
     };
     us.init(false, 0);
-    let mut out = convert(&us, game_archive, out_dir, writer);
+    let mut out = Convert3doOutput::default();
+    let mut errors = us.drain_errors();
+    with_mounted(&us, game_archive, &mut errors, |files, errors| {
+        convert_files(files, out_dir, &mut out, writer);
+        errors.append(&mut out.errors);
+    });
+    out.errors = errors;
     out.out_dir = out_dir.display().to_string();
     us.uninit();
     out
 }
 
-/// The run itself, against a session the caller has initialised.
-fn convert(us: &Unitsync, game_archive: &str, out_dir: &Path, writer: u32) -> Convert3doOutput {
-    let mut out = Convert3doOutput {
+/// `--compat-palette`: the palette a conversion of `game_archive` would read,
+/// and the archive it comes from.
+pub fn render_palette(lib: &str, game_archive: &str) -> CompatPaletteOutput {
+    let us = match unsafe { Unitsync::load(Path::new(lib)) } {
+        Ok(u) => u,
+        Err(e) => {
+            return CompatPaletteOutput {
+                errors: vec![e],
+                ..Default::default()
+            }
+        }
+    };
+    us.init(false, 0);
+    let mut out = CompatPaletteOutput {
         errors: us.drain_errors(),
         ..Default::default()
     };
+    out.palette = with_mounted(&us, game_archive, &mut out.errors, |files, _| {
+        read_palette(files).1
+    });
+    us.uninit();
+    out
+}
 
+/// Print a `CompatPaletteOutput` carrying only an error, on the panic path.
+pub fn emit_palette_error(msg: String) {
+    let out = CompatPaletteOutput {
+        errors: vec![msg],
+        ..Default::default()
+    };
+    println!("{}", serde_json::to_string(&out).unwrap_or_default());
+}
+
+/// Mount `game_archive` with its dependencies, open its own archive, and run
+/// `run` on it, against a session the caller has initialised. Unitsync's
+/// errors go into `errors`, and `None` means the game could not be mounted.
+fn with_mounted<T>(
+    us: &Unitsync,
+    game_archive: &str,
+    errors: &mut Vec<String>,
+    run: impl FnOnce(&Mounted<'_>, &mut Vec<String>) -> T,
+) -> Option<T> {
     if !us.add_all_archives(game_archive) {
-        out.errors
-            .push("this engine's libunitsync can't load game archives".into());
-        return out;
+        errors.push("this engine's libunitsync can't load game archives".into());
+        return None;
     }
-    out.errors.extend(us.drain_errors());
+    errors.extend(us.drain_errors());
 
     let handle = crate::archive::resolve_open_path(us, game_archive)
         .as_deref()
         .and_then(|p| us.open_archive(p));
     let Some(handle) = handle else {
         us.remove_all_archives();
-        out.errors
-            .push(format!("could not open archive {game_archive}"));
-        return out;
+        errors.push(format!("could not open archive {game_archive}"));
+        return None;
     };
 
-    convert_files(&Mounted { us, handle }, out_dir, &mut out, writer);
+    let answer = run(
+        &Mounted {
+            us,
+            handle,
+            game: game_archive,
+        },
+        errors,
+    );
 
     us.close_archive(handle);
-    out.errors.extend(us.drain_errors());
+    errors.extend(us.drain_errors());
     us.remove_all_archives();
-    out
+    Some(answer)
 }
 
 /// What a conversion reads out of a game. The run answers it from unitsync,
@@ -239,12 +300,17 @@ pub(crate) trait GameFiles {
     /// A file anywhere the engine would look for it: the game, its
     /// dependencies and the engine's base content.
     fn vfs(&self, path: &str, cap: usize) -> Option<Vec<u8>>;
+    /// The file name of the archive that holds `path` as `bytes`, which
+    /// [`GameFiles::vfs`] gave, or `None` when none can be named.
+    fn source_of(&self, path: &str, bytes: &[u8]) -> Option<String>;
 }
 
 /// The game a unitsync session has mounted, and its own archive opened.
 struct Mounted<'a> {
     us: &'a Unitsync,
     handle: i32,
+    /// The game's own archive, by file name.
+    game: &'a str,
 }
 
 impl GameFiles for Mounted<'_> {
@@ -265,6 +331,42 @@ impl GameFiles for Mounted<'_> {
     fn vfs(&self, path: &str, cap: usize) -> Option<Vec<u8>> {
         self.us.read_vfs_file(path, cap)
     }
+
+    /// Unitsync cannot say which archive a VFS read came from, so each archive
+    /// of the game's set is opened in turn and asked for the member: the
+    /// game's own first, then its dependencies in the order unitsync lists
+    /// them, then the engine's base content. The first that holds the same
+    /// bytes is named.
+    fn source_of(&self, path: &str, bytes: &[u8]) -> Option<String> {
+        let (mut archives, _) = crate::luacompat::archives_to_scan(self.us, self.game);
+        archives.push(BASE_CONTENT.to_string());
+        archives.into_iter().find(|name| {
+            crate::archive::resolve_open_path(self.us, name)
+                .and_then(|file| {
+                    // One byte past, so a longer member is not cut down to a match.
+                    crate::archive::read_archive_member(self.us, &file, path, bytes.len() + 1)
+                })
+                .is_some_and(|found| found == bytes)
+        })
+    }
+}
+
+/// The engine's base content, which every game's archive set ends with
+/// (`GetSpringBaseContentName` in `rts/System/FileSystem/ArchiveScanner.cpp`
+/// names it, and `cont/base/CMakeLists.txt` builds it under this file name).
+const BASE_CONTENT: &str = "springcontent.sdz";
+
+/// The palette in `files`' VFS: parsed for the conversion, and recorded with
+/// the archive it came from for the compat marker (issue #4642).
+fn read_palette(files: &impl GameFiles) -> (Option<coilbox_3do::Palette>, coilbox_compat::Palette) {
+    let bytes = files.vfs(PALETTE_FILE, PALETTE_READ_CAP);
+    let source = bytes
+        .as_deref()
+        .and_then(|bytes| files.source_of(PALETTE_FILE, bytes));
+    (
+        bytes.as_deref().and_then(coilbox_3do::read_palette),
+        coilbox_compat::Palette::of(bytes.as_deref(), source),
+    )
 }
 
 /// Convert every `.3do` in `files` into `out_dir`, adding to `out`, as compat
@@ -276,7 +378,8 @@ fn convert_files(files: &impl GameFiles, out_dir: &Path, out: &mut Convert3doOut
         .map(|path| (path.to_lowercase(), path))
         .collect();
     let teamtex = teamtex_in(&list, |member, cap| files.member(member, cap));
-    let palette = palette_in(|path, cap| files.vfs(path, cap));
+    let (palette, record) = read_palette(files);
+    out.palette = Some(record);
 
     let groups = plan(&list);
     out.models_found = groups.iter().map(|g| g.members.len()).sum();
@@ -1060,11 +1163,14 @@ mod tests {
         );
     }
 
-    /// A game held in memory, with the VFS answering only `palette.pal`.
+    /// A game held in memory, with the VFS answering only `palette.pal`,
+    /// which it says comes from [`PALETTE_ARCHIVE`].
     struct InMemory {
         files: Vec<(String, Vec<u8>)>,
-        palette: Vec<u8>,
+        palette: Option<Vec<u8>>,
     }
+
+    const PALETTE_ARCHIVE: &str = "springcontent.sdz";
 
     impl GameFiles for InMemory {
         fn list(&self) -> Vec<String> {
@@ -1077,8 +1183,14 @@ mod tests {
         }
 
         fn vfs(&self, path: &str, cap: usize) -> Option<Vec<u8>> {
+            let palette = self.palette.as_ref()?;
             (path == "unittextures/tatex/palette.pal")
-                .then(|| self.palette[..self.palette.len().min(cap)].to_vec())
+                .then(|| palette[..palette.len().min(cap)].to_vec())
+        }
+
+        fn source_of(&self, path: &str, bytes: &[u8]) -> Option<String> {
+            (path == "unittextures/tatex/palette.pal" && self.palette.as_deref() == Some(bytes))
+                .then(|| PALETTE_ARCHIVE.to_string())
         }
     }
 
@@ -1251,7 +1363,7 @@ mod tests {
                 .into_iter()
                 .map(|(path, bytes)| (path.to_string(), bytes))
                 .collect(),
-            palette,
+            palette: Some(palette),
         }
     }
 
@@ -1285,10 +1397,19 @@ mod tests {
     /// The fixed game converted by compat writer `writer`, as every file
     /// written.
     fn convert_the_game(name: &str, writer: u32) -> (Convert3doOutput, Vec<(String, Vec<u8>)>) {
+        convert_game(&a_game(), name, writer)
+    }
+
+    /// `game` converted by compat writer `writer`, as every file written.
+    fn convert_game(
+        game: &InMemory,
+        name: &str,
+        writer: u32,
+    ) -> (Convert3doOutput, Vec<(String, Vec<u8>)>) {
         let dir = std::env::temp_dir().join(format!("cbx-{name}-{writer}-{}", std::process::id()));
         let _ = std::fs::remove_dir_all(&dir);
         let mut out = Convert3doOutput::default();
-        convert_files(&a_game(), &dir, &mut out, writer);
+        convert_files(game, &dir, &mut out, writer);
         let files = written(&dir);
         let _ = std::fs::remove_dir_all(&dir);
         (out, files)
@@ -1347,6 +1468,44 @@ mod tests {
         assert!(huge.palette_models.is_empty());
         assert_eq!(huge.did_not_fit, ["one.3do (needs big, which did not fit)"]);
         assert_eq!(huge.models_written, 2);
+    }
+
+    /// Issue #4642: the conversion says which palette it read and where from,
+    /// for the compat marker to record.
+    #[test]
+    fn a_conversion_records_the_palette_it_read() {
+        let game = a_game();
+        let (out, _) = convert_game(&game, "palette-record", coilbox_compat::WRITER);
+        let record = out.palette.expect("a palette record");
+        assert_eq!(record.source.as_deref(), Some(PALETTE_ARCHIVE));
+        assert_eq!(
+            record,
+            coilbox_compat::Palette::of(game.palette.as_deref(), Some(PALETTE_ARCHIVE.into()))
+        );
+    }
+
+    /// Another `palette.pal`, or none at all, changes the colours the faces
+    /// that name no texture get, and the record says so.
+    #[test]
+    fn another_palette_or_none_is_recorded_as_such() {
+        let (first, _) = convert_game(&a_game(), "palette-a", coilbox_compat::WRITER);
+        let mut other = a_game();
+        other.palette.as_mut().unwrap()[3 * 4] = 11;
+        let (second, _) = convert_game(&other, "palette-b", coilbox_compat::WRITER);
+        let (first, second) = (first.palette.unwrap(), second.palette.unwrap());
+        assert!(!first.same_bytes(&second));
+
+        let mut none = a_game();
+        none.palette = None;
+        let (out, _) = convert_game(&none, "palette-none", coilbox_compat::WRITER);
+        assert_eq!(
+            out.palette,
+            Some(coilbox_compat::Palette {
+                source: None,
+                sha256: None
+            })
+        );
+        assert_eq!(group(&out, "objects3d").palette_faces, 2, "both grey now");
     }
 
     /// Every file one conversion of the fixed game writes, hashed, for each
