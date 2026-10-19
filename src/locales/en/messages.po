@@ -31,9 +31,41 @@ msgstr "{next}h"
 msgid "{next}m"
 msgstr "{next}m"
 
+#: src/i18n/frameStrings.ts
+msgid "{op} failed"
+msgstr "{op} failed"
+
 #: src/downloads/downloadRate.ts
 msgid "{total}s"
 msgstr "{total}s"
+
+#: src/i18n/frameStrings.ts
+msgid "Accent color"
+msgstr "Accent color"
+
+#: src/i18n/frameStrings.ts
+msgid "Amber"
+msgstr "Amber"
+
+#: src/i18n/frameStrings.ts
+msgid "Appearance"
+msgstr "Appearance"
+
+#: src/i18n/frameStrings.ts
+msgid "Back"
+msgstr "Back"
+
+#: src/i18n/frameStrings.ts
+msgid "Back/forward buttons"
+msgstr "Back/forward buttons"
+
+#: src/i18n/frameStrings.ts
+msgid "Base color"
+msgstr "Base color"
+
+#: src/i18n/frameStrings.ts
+msgid "Blue"
+msgstr "Blue"
 
 #: src/updater/pages/UpdatesSettingsSection.tsx
 msgid "Check for updates"
@@ -43,13 +75,117 @@ msgstr "Check for updates"
 msgid "Checking…"
 msgstr "Checking…"
 
+#: src/i18n/frameStrings.ts
+msgid "Choose a tool to get started."
+msgstr "Choose a tool to get started."
+
+#: src/deeplink/ConfirmDialog.tsx
+#: src/lego/pages/components/ShortcutSheet.tsx
+#: src/multiplayer/ServerMessageBoxDialog.tsx
+#: src/play/pages/SkirmishPage.tsx
+#: src/workshop/pages/components/CommandPalette.tsx
+msgid "Close"
+msgstr "Close"
+
+#: src/i18n/frameStrings.ts
+msgid "Close menu"
+msgstr "Close menu"
+
+#: src/i18n/frameStrings.ts
+msgid "Collapse breadcrumb"
+msgstr "Collapse breadcrumb"
+
+#: src/i18n/frameStrings.ts
+msgid "Collapse sidebar on narrow windows"
+msgstr "Collapse sidebar on narrow windows"
+
+#: src/i18n/frameStrings.ts
+msgid "Collapsing the sidebar hides it fully instead of showing an icon rail."
+msgstr "Collapsing the sidebar hides it fully instead of showing an icon rail."
+
+#: src/workshop/pages/components/CommandPalette.tsx
+msgid "Command palette"
+msgstr "Command palette"
+
+#: src/deeplink/ConfirmDialog.tsx
+msgid "Confirm this before it runs."
+msgstr "Confirm this before it runs."
+
+#: src/i18n/frameStrings.ts
+msgid "Crimson"
+msgstr "Crimson"
+
 #: src/updater/pages/UpdatesSettingsSection.tsx
 msgid "Current version"
 msgstr "Current version"
 
+#: src/i18n/frameStrings.ts
+msgid "Cyan"
+msgstr "Cyan"
+
+#: src/i18n/frameStrings.ts
+msgid "Dark"
+msgstr "Dark"
+
+#: src/i18n/frameStrings.ts
+msgid "Default"
+msgstr "Default"
+
+#: src/i18n/frameStrings.ts
+msgid "Done"
+msgstr "Done"
+
 #: src/updater/pages/UpdatesSettingsSection.tsx
 msgid "Download & install"
 msgstr "Download & install"
+
+#: src/i18n/frameStrings.ts
+msgid "Drawer"
+msgstr "Drawer"
+
+#: src/i18n/frameStrings.ts
+msgid "Emerald"
+msgstr "Emerald"
+
+#: src/i18n/frameStrings.ts
+msgid "Floating top bar"
+msgstr "Floating top bar"
+
+#: src/i18n/frameStrings.ts
+msgid "Forward"
+msgstr "Forward"
+
+#: src/i18n/frameStrings.ts
+msgid "Fuchsia"
+msgstr "Fuchsia"
+
+#: src/i18n/frameStrings.ts
+msgid "Gray"
+msgstr "Gray"
+
+#: src/i18n/frameStrings.ts
+msgid "Green"
+msgstr "Green"
+
+#: src/i18n/frameStrings.ts
+msgid "Hide sidebar when collapsed"
+msgstr "Hide sidebar when collapsed"
+
+#: src/i18n/frameStrings.ts
+msgid "Hide the sidebar and open it from a menu button instead."
+msgstr "Hide the sidebar and open it from a menu button instead."
+
+#: src/i18n/frameStrings.ts
+msgid "Home"
+msgstr "Home"
+
+#: src/i18n/frameStrings.ts
+msgid "Hover-reveal sidebar"
+msgstr "Hover-reveal sidebar"
+
+#: src/i18n/frameStrings.ts
+msgid "Indigo"
+msgstr "Indigo"
 
 #: src/updater/pages/UpdatesSettingsSection.tsx
 msgid "Installed — restart to apply."
@@ -58,6 +194,10 @@ msgstr "Installed — restart to apply."
 #: src/updater/pages/UpdatesSettingsSection.tsx
 msgid "Installing…"
 msgstr "Installing…"
+
+#: src/workshop/pages/components/CommandPalette.tsx
+msgid "Jump to a unit, a field, a section or an action"
+msgstr "Jump to a unit, a field, a section or an action"
 
 #: src/lib/relativeTime.ts
 msgid "just now"
@@ -71,17 +211,146 @@ msgstr "Language"
 msgid "Last checked {lastCheckedTime}"
 msgstr "Last checked {lastCheckedTime}"
 
+#: src/i18n/frameStrings.ts
+msgid "Layout"
+msgstr "Layout"
+
+#: src/i18n/frameStrings.ts
+msgid "Light"
+msgstr "Light"
+
+#: src/i18n/frameStrings.ts
+msgid "Lime"
+msgstr "Lime"
+
+#: src/i18n/frameStrings.ts
+msgid "Menu"
+msgstr "Menu"
+
+#: src/i18n/frameStrings.ts
+msgid "Navy"
+msgstr "Navy"
+
+#: src/i18n/frameStrings.ts
+msgid "Neutral"
+msgstr "Neutral"
+
+#: src/i18n/frameStrings.ts
+msgid "No settings available."
+msgstr "No settings available."
+
+#: src/i18n/frameStrings.ts
+msgid "No tools available yet."
+msgstr "No tools available yet."
+
+#: src/i18n/frameStrings.ts
+msgid "On a narrow window, the sidebar becomes a menu button and opens fullscreen."
+msgstr "On a narrow window, the sidebar becomes a menu button and opens fullscreen."
+
+#: src/i18n/frameStrings.ts
+msgid "Opal"
+msgstr "Opal"
+
+#: src/i18n/frameStrings.ts
+msgid "Orange"
+msgstr "Orange"
+
+#: src/i18n/frameStrings.ts
+msgid "Pink"
+msgstr "Pink"
+
+#: src/i18n/frameStrings.ts
+msgid "Purple"
+msgstr "Purple"
+
+#: src/i18n/frameStrings.ts
+msgid "Rainbow"
+msgstr "Rainbow"
+
+#: src/i18n/frameStrings.ts
+msgid "Red"
+msgstr "Red"
+
 #: src/lib/relativeTime.ts
 msgid "refreshed {ago}"
 msgstr "refreshed {ago}"
+
+#: src/i18n/frameStrings.ts
+msgid "Resize sidebar"
+msgstr "Resize sidebar"
 
 #: src/updater/pages/UpdatesSettingsSection.tsx
 msgid "Restart now"
 msgstr "Restart now"
 
+#: src/i18n/frameStrings.ts
+msgid "Reveal sidebar"
+msgstr "Reveal sidebar"
+
+#: src/i18n/frameStrings.ts
+msgid "Rose"
+msgstr "Rose"
+
+#: src/components/ui/message-scroller.tsx
+msgid "Scroll to end"
+msgstr "Scroll to end"
+
+#: src/components/ui/message-scroller.tsx
+msgid "Scroll to start"
+msgstr "Scroll to start"
+
+#: src/i18n/frameStrings.ts
+msgid "Settings"
+msgstr "Settings"
+
+#: src/i18n/frameStrings.ts
+msgid "Show only the current page; reveal the full path on hover."
+msgstr "Show only the current page; reveal the full path on hover."
+
+#: src/i18n/frameStrings.ts
+msgid "Show the back and forward navigation buttons in the top bar."
+msgstr "Show the back and forward navigation buttons in the top bar."
+
+#: src/i18n/frameStrings.ts
+msgid "Sidebar as popover menu"
+msgstr "Sidebar as popover menu"
+
+#: src/i18n/frameStrings.ts
+msgid "Sky"
+msgstr "Sky"
+
+#: src/i18n/frameStrings.ts
+msgid "Slate"
+msgstr "Slate"
+
+#: src/i18n/frameStrings.ts
+msgid "Stone"
+msgstr "Stone"
+
 #: src/general/pages/SettingsSection.tsx
+#: src/i18n/frameStrings.ts
 msgid "System"
 msgstr "System"
+
+#: src/i18n/frameStrings.ts
+msgid "Teal"
+msgstr "Teal"
+
+#: src/i18n/frameStrings.ts
+msgid "The top bar loses its background and sits over the content as it scrolls."
+msgstr "The top bar loses its background and sits over the content as it scrolls."
+
+#: src/i18n/frameStrings.ts
+msgid "Theme"
+msgstr "Theme"
+
+#: src/i18n/frameStrings.ts
+msgid "Theme and visual preferences."
+msgstr "Theme and visual preferences."
+
+#: src/i18n/frameStrings.ts
+msgid "Toggle sidebar"
+msgstr "Toggle sidebar"
 
 #: src/updater/pages/UpdatesSettingsSection.tsx
 msgid "Updates are disabled in development builds."
@@ -95,6 +364,26 @@ msgstr "Updates for this build are managed by its distributor."
 msgid "Version {newVersion} available"
 msgstr "Version {newVersion} available"
 
+#: src/i18n/frameStrings.ts
+msgid "Violet"
+msgstr "Violet"
+
+#: src/i18n/frameStrings.ts
+msgid "When collapsed, hide the sidebar and slide it out on hovering the left edge."
+msgstr "When collapsed, hide the sidebar and slide it out on hovering the left edge."
+
+#: src/i18n/frameStrings.ts
+msgid "Working: {op}"
+msgstr "Working: {op}"
+
+#: src/i18n/frameStrings.ts
+msgid "Yellow"
+msgstr "Yellow"
+
 #: src/updater/pages/UpdatesSettingsSection.tsx
 msgid "You're up to date."
 msgstr "You're up to date."
+
+#: src/i18n/frameStrings.ts
+msgid "Zinc"
+msgstr "Zinc"
