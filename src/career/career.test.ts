@@ -120,6 +120,49 @@ describe("createGameResolver", () => {
     );
   });
 
+  it("keeps a game apart from another that shares its shortname", () => {
+    const zk = installed("Zero-K v1.14.10.3", "ZK", "v1.14.10.3");
+    const bench = installed("Zero-K Benchmark v3", "ZK", "v3");
+    const r = createGameResolver([bench, zk]);
+    expect(r.byName(zk.name).key).not.toBe(r.byName(bench.name).key);
+    expect(r.byName(zk.name).title).toBe("Zero-K");
+    expect(r.byName(bench.name).title).toBe("Zero-K Benchmark");
+    expect(r.byShortname("zk")).toMatchObject({
+      key: "zk",
+      title: "Zero-K",
+    });
+    expect(r.byName("Zero-K v1.15.0.0").key).toBe("zk");
+    expect(r.byName("Zero-K Benchmark v4").key).toBe(r.byName(bench.name).key);
+  });
+
+  it("groups versions joined to the name by an underscore", () => {
+    const geo = (v: string, version: string) =>
+      installed(`UltimateAI_GEOFlip_${v}`, "", version);
+    const r = createGameResolver([geo("5.5", "5.5"), geo("5.6", "v5.6")]);
+    const a = r.byName("UltimateAI_GEOFlip_5.5");
+    expect(r.byName("UltimateAI_GEOFlip_5.6").key).toBe(a.key);
+    expect(a.title).toBe("UltimateAI_GEOFlip");
+  });
+
+  it("groups versions whose shortname carries the release", () => {
+    const r = createGameResolver([
+      installed("wallmap_1.1", "wallmap_1.1", "1.1"),
+      installed("wallmap_1.3", "wallmap_1.3", "1.3"),
+    ]);
+    expect(r.byName("wallmap_1.1").key).toBe(r.byName("wallmap_1.3").key);
+    expect(r.byShortname("wallmap").title).toBe("wallmap");
+  });
+
+  it("cuts the version from a name that writes it with or without its v", () => {
+    const r = createGameResolver([
+      installed("Zero-K v1.14.10.3", "", "1.14.10.3"),
+      installed("Spring 1944 2.31", "s44", "2.31"),
+    ]);
+    expect(r.byName("Zero-K v1.14.10.3").title).toBe("Zero-K");
+    expect(r.byName("Spring 1944 2.31").title).toBe("Spring 1944");
+    expect(r.byShortname("s44").installed).toBe(true);
+  });
+
   it("puts a blank name under one unknown game", () => {
     const r = createGameResolver([]);
     expect(r.byName("").key).toBe(r.byName(undefined).key);

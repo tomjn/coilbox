@@ -38,6 +38,16 @@ describe("gameForIdentity", () => {
     ).toBe("SplinterFaction 0.1.84");
   });
 
+  it("prefers the same game over another sharing its shortname", () => {
+    const zk = [
+      game("Zero-K v1.14.10.3", "ZK", "v1.14.10.3"),
+      game("Zero-K Benchmark v3", "ZK", "v3"),
+    ];
+    expect(gameForIdentity(zk, "Zero-K v1.14.9.0", "ZK")?.name).toBe(
+      "Zero-K v1.14.10.3",
+    );
+  });
+
   it("finds nothing for a game this machine has not got at all", () => {
     expect(gameForIdentity(INSTALLED, "Zero-K 1.2", "ZK")).toBeUndefined();
   });
