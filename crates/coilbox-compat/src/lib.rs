@@ -1182,8 +1182,8 @@ mod tests {
         let m = manifest(latest()).unwrap();
         for (id, src) in prelude_fixes(&m, LuaState::Synced) {
             for line in src.lines().filter(|l| !l.trim_start().starts_with("--")) {
-                let words = line.split(|c: char| !(c.is_alphanumeric() || c == '_'));
-                for word in words.filter(|w| removed.contains(w)) {
+                let mut words = line.split(|c: char| !(c.is_alphanumeric() || c == '_'));
+                if let Some(word) = words.find(|w| removed.contains(w)) {
                     panic!("{id} uses {word}, which synced Lua lacks: {line}");
                 }
             }
