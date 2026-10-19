@@ -176,6 +176,14 @@ const FIXES: &[(&str, &str)] = &[
         include_str!("../../../lua/compat/spring-rules-param-105.lua"),
     ),
     (
+        "spring-selected-units-counts-n",
+        include_str!("../../../lua/compat/spring-selected-units-counts-n.lua"),
+    ),
+    (
+        "spring-selected-units-sorted-n",
+        include_str!("../../../lua/compat/spring-selected-units-sorted-n.lua"),
+    ),
+    (
         "spring-set-unit-to-feature",
         include_str!("../../../lua/compat/spring-set-unit-to-feature.lua"),
     ),
@@ -711,6 +719,13 @@ enum Change {
         added: &'static str,
     },
     /// A function's results, which a call names by assigning them, where the
+    /// change added results after the old list. Only a call that names more
+    /// than the old list can tell which shape it reads.
+    Appended {
+        /// How many results the old list had.
+        old_len: usize,
+    },
+    /// A function's results, which a call names by assigning them, where the
     /// change swapped results around and the list kept its length.
     Swapped {
         /// The 0-based position of the first result the change moved.
@@ -762,6 +777,19 @@ const ADAPTERS: &[Adapter] = &[
             moved: 6,
             new: &[(6, &["income", "mult"]), (7, &["key", "custom", "opt"])],
         },
+    },
+    // Both lost the `n` key on their table and gained the number of unit defs
+    // as a second result, so only a call that takes that result reads the new
+    // shape.
+    Adapter {
+        fix: "spring-selected-units-counts-n",
+        entry: "signature:Spring.GetSelectedUnitsCounts@BAR105 1544",
+        change: Change::Appended { old_len: 1 },
+    },
+    Adapter {
+        fix: "spring-selected-units-sorted-n",
+        entry: "signature:Spring.GetSelectedUnitsSorted@BAR105 1544",
+        change: Change::Appended { old_len: 1 },
     },
 ];
 
@@ -824,6 +852,13 @@ fn order(adapter: &Adapter, params: &[String]) -> Order {
                 (true, false) => Order::Old,
                 (false, true) => Order::New,
                 _ => Order::Either,
+            }
+        }
+        Change::Appended { old_len } => {
+            if named.len() > old_len {
+                Order::New
+            } else {
+                Order::Either
             }
         }
         Change::Swapped { moved, new } => {
@@ -1732,6 +1767,41 @@ mod tests {
         assert!(left_out_of_11(&[old, new]).is_empty());
     }
 
+    const COUNTS: &str = "signature:Spring.GetSelectedUnitsCounts@BAR105 1544";
+    const SORTED: &str = "signature:Spring.GetSelectedUnitsSorted@BAR105 1544";
+
+    fn left_out_of_16(handlers: &[Handler]) -> Vec<String> {
+        let full = manifest(16).unwrap();
+        let picked = for_game(&full, handlers);
+        full.fixes
+            .into_iter()
+            .filter(|id| !picked.fixes.contains(id))
+            .collect()
+    }
+
+    #[test]
+    fn a_call_that_takes_the_number_of_unit_defs_second_leaves_n_out() {
+        let new = handler(COUNTS, &["counts", "unitDefsCount"]);
+        assert_eq!(
+            left_out_of_16(std::slice::from_ref(&new)),
+            ["spring-selected-units-counts-n"]
+        );
+        let new = handler(SORTED, &["_", "n"]);
+        assert_eq!(left_out_of_16(&[new]), ["spring-selected-units-sorted-n"]);
+    }
+
+    #[test]
+    fn a_call_that_takes_only_the_table_decides_nothing_about_n() {
+        // Spring 1944's gui_s44_supplyradius.lua.
+        let one = handler(COUNTS, &["selectedUnitsCounts"]);
+        assert!(left_out_of_16(std::slice::from_ref(&one)).is_empty());
+        let new = handler(COUNTS, &["counts", "n"]);
+        assert_eq!(
+            left_out_of_16(&[one, new]),
+            ["spring-selected-units-counts-n"]
+        );
+    }
+
     /// Issue #4695: manifest 11 adds `Game.version` and the old
     /// `Spring.GetGroundInfo` order, and keeps the writer of manifest 10.
     #[test]
@@ -1763,17 +1833,22 @@ mod tests {
         }
     }
 
-    /// Issue #4705: manifest 16 adds the unsynced fixes that give widgets run by
-    /// LuaHandler the `fontHandler` and `widgetHandler:InTweakMode` of 104's
-    /// basic widget handler, and keeps the writer of manifest 15.
+    const ADDED_IN_16: [&str; 4] = [
+        "luaui-font-handler-104",
+        "luaui-in-tweak-mode-104",
+        "spring-selected-units-counts-n",
+        "spring-selected-units-sorted-n",
+    ];
+
+    /// Issues #4705 and #4706: manifest 16 adds the unsynced fixes that give
+    /// widgets run by LuaHandler the `fontHandler` and
+    /// `widgetHandler:InTweakMode` of 104's basic widget handler, and the `n`
+    /// key of the selected units tables, and keeps the writer of manifest 15.
     #[test]
-    fn manifest_16_is_manifest_15_with_the_basic_widget_handler_shims() {
+    fn manifest_16_is_manifest_15_with_the_basic_widget_handler_shims_and_n() {
         let (fifteen, sixteen) = (manifest(15).unwrap(), manifest(16).unwrap());
         let mut expected = fifteen.fixes.clone();
-        expected.extend([
-            "luaui-font-handler-104".into(),
-            "luaui-in-tweak-mode-104".into(),
-        ]);
+        expected.extend(ADDED_IN_16.map(String::from));
         assert_eq!(sixteen.fixes, expected);
         assert_eq!(
             (&sixteen.converter, sixteen.writer),
@@ -1785,7 +1860,7 @@ mod tests {
                 .map(|(id, _)| *id)
                 .collect()
         };
-        for id in ["luaui-font-handler-104", "luaui-in-tweak-mode-104"] {
+        for id in ADDED_IN_16 {
             assert!(ids(LuaState::Unsynced).contains(&id), "{id}");
             assert!(!ids(LuaState::Synced).contains(&id), "{id}");
         }

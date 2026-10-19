@@ -101,7 +101,7 @@ To change a fix, add a new fix with a new id, and a new manifest that lists it i
 
 `hashes.txt` is what holds this in place. The test `recorded_hashes_match_the_embedded_fixes` in `coilbox-compat` fails for a listed fix whose file no longer matches its recorded hash, with "changed after it was listed. Add a new fix with a new id instead".
 
-The call-in adapters in `ADAPTERS` in `crates/coilbox-compat/src/lib.rs` follow the same rule. They decide which of the `UnitDamaged`, `AllowCommand` and `Spring.GetTeamInfo` fixes a game gets, so changing one needs a new manifest too. A call-in adapter reads the arguments a game's handlers take. The `Spring.GetTeamInfo` one reads the names a game's calls put the results in, such as `teamOptions` in `local _, _, _, _, _, _, teamOptions = Spring.GetTeamInfo(teamID)`. A call inside `select` is not read, so it decides nothing.
+The call-in adapters in `ADAPTERS` in `crates/coilbox-compat/src/lib.rs` follow the same rule. They decide which of the `UnitDamaged`, `AllowCommand`, `Spring.GetTeamInfo`, `Spring.GetSelectedUnitsCounts` and `Spring.GetSelectedUnitsSorted` fixes a game gets, so changing one needs a new manifest too. A call-in adapter reads the arguments a game's handlers take. The `Spring.GetTeamInfo` one reads the names a game's calls put the results in, such as `teamOptions` in `local _, _, _, _, _, _, teamOptions = Spring.GetTeamInfo(teamID)`. The two selected units ones count those names, as only a call that takes the second result, such as `local counts, n = Spring.GetSelectedUnitsCounts()`, reads the new shape. A call inside `select` is not read, so it decides nothing.
 
 ## Add a fix
 

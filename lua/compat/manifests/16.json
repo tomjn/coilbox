@@ -30,7 +30,9 @@
     "spring-get-team-info-105",
     "luaui-main-include",
     "luaui-font-handler-104",
-    "luaui-in-tweak-mode-104"
+    "luaui-in-tweak-mode-104",
+    "spring-selected-units-counts-n",
+    "spring-selected-units-sorted-n"
   ],
   "converter": {
     "crate": "coilbox-3do-convert",

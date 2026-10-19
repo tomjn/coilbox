@@ -900,4 +900,100 @@ for _, name in ipairs({ "LuaRules", "LuaGaia", "LuaIntro" }) do
 	check(name .. ": no InTweakMode is given", engine.env.handler.addons[1].widgetHandler.InTweakMode == nil)
 end
 
+--------------------------------------------------------------------------------
+-- The n key of Spring.GetSelectedUnitsCounts and GetSelectedUnitsSorted
+-- (issue #4706)
+--------------------------------------------------------------------------------
+
+-- The engine's functions now: a table keyed by unit def ID with no n, and the
+-- number of unit defs second.
+local selected = { [12] = { 101, 102 }, [30] = { 103 } }
+
+local function currentSelection()
+	return {
+		GetSelectedUnitsCounts = function()
+			local counts, n = {}, 0
+			for defID, units in pairs(selected) do
+				counts[defID], n = #units, n + 1
+			end
+			return counts, n
+		end,
+		GetSelectedUnitsSorted = function()
+			local sorted, n = {}, 0
+			for defID, units in pairs(selected) do
+				sorted[defID], n = units, n + 1
+			end
+			return sorted, n
+		end,
+	}
+end
+
+do
+	local before = newEngine({ synced = false, manifest = 15, spring = currentSelection() })
+	prelude(before)
+	check("manifest 15: the counts have no n", before.env.Spring.GetSelectedUnitsCounts().n == nil)
+
+	local engine = newEngine({ synced = false, manifest = 16, spring = currentSelection() })
+	prelude(engine)
+	local Spring = engine.env.Spring
+	for _, name in ipairs({ "GetSelectedUnitsCounts", "GetSelectedUnitsSorted" }) do
+		local units = Spring[name]()
+		check(name .. ": n is the number of unit defs", units.n == 2, tostring(units.n))
+		check(name .. ": the table is all it returns, as on 104.0", select("#", Spring[name]()) == 1)
+		check(name .. ": the unit defs are still there", units[12] ~= nil and units[30] ~= nil)
+	end
+	check("the counts are still the counts", Spring.GetSelectedUnitsCounts()[12] == 2)
+	check("no fix failed", #engine.logs == 0, table.concat(engine.logs, "; "))
+
+	-- What gui_s44_selbuttons.lua does with the counts: SortedUnits passes on
+	-- every result, and DrawScreen takes the second as a transport's unit ID.
+	local function sortedUnits()
+		return Spring.GetSelectedUnitsCounts()
+	end
+	local counts, transID = sortedUnits()
+	local ok, err = pcall(function()
+		return counts.n + 1
+	end)
+	check("arithmetic on n works", ok, tostring(err))
+	check("no transport ID comes second", transID == nil, tostring(transID))
+end
+
+do
+	-- Nothing selected.
+	local engine = newEngine({
+		synced = false,
+		manifest = 16,
+		spring = {
+			GetSelectedUnitsCounts = function()
+				return {}, 0
+			end,
+		},
+	})
+	prelude(engine)
+	check("nothing selected: n is 0", engine.env.Spring.GetSelectedUnitsCounts().n == 0)
+end
+
+do
+	-- An engine that still sets n keeps its own.
+	local engine = newEngine({
+		synced = false,
+		manifest = 16,
+		spring = {
+			GetSelectedUnitsSorted = function()
+				return { [4] = { 1 }, n = 7 }
+			end,
+		},
+	})
+	prelude(engine)
+	check("the engine's own n is kept", engine.env.Spring.GetSelectedUnitsSorted().n == 7)
+	check("a missing function stays missing", engine.env.Spring.GetSelectedUnitsCounts == nil)
+end
+
+do
+	local counts = currentSelection().GetSelectedUnitsCounts
+	local engine = newEngine({ manifest = 16, spring = { GetSelectedUnitsCounts = counts } })
+	prelude(engine)
+	check("synced: GetSelectedUnitsCounts is left alone", engine.env.Spring.GetSelectedUnitsCounts == counts)
+end
+
 support.report()
