@@ -581,265 +581,225 @@ end, compat)
 if not ok then failed("luaui-main-include", err) end
 end
 
--- fix: cmd-removed-ids
+-- fix: luaui-font-handler-104
 do
 local ok, err = pcall(function(...)
--- id: cmd-removed-ids
+-- id: luaui-font-handler-104
 -- catalogue:
--- states: synced, unsynced
+-- states: unsynced
 -- license: MIT or GNU GPL, v2 or later
 
--- CMD.AISELECT and CMD.SET_WANTED_MAX_SPEED, with their IDs 30 and 70.
+-- A global fontHandler for widgets that the engine's LuaHandler addon handler
+-- runs, as that handler never had one.
 --
--- Changelog, 105.0: "remove CMD_SET_WANTED_MAX_SPEED". Recoil 2025.01.1 then
--- removed CMD_AISELECT, which did nothing (commit d33c07aa26, "Get rid of
--- CMD_AISELECT"). Until then rts/Lua/LuaConstCMD.cpp put each in the CMD
--- table both ways, name to ID and ID to name, with the IDs
--- rts/Sim/Units/CommandAI/Command.h gave them.
+-- On 104.0 the engine's basic widget handler, cont/LuaUI/main.lua, set up a
+-- global fontHandler that drew text with fonts of its own. Spring 1944 2.31
+-- starts LuaHandler/handler.lua and then ran the basic handler on top, which
+-- compat manifest 15 skips (luaui-main-include). Its gui_buildEta.lua and
+-- gui_flagIncome.lua still call fontHandler.UseDefaultFont() and then draw with
+-- gl.Text. On 104.0 that call only chose the font fontHandler's own drawing
+-- functions use, and returned nothing, so here it does nothing.
 --
--- Complete Annihilation stable-8405 uses both as table keys, and a nil key
--- stops ca_layout.lua, gui_chili_commandmenu.lua and gui_jumpjets.lua as they
--- load. No command a current engine has uses either ID. An order a game gives
--- with one is handed to the game's CommandFallback and then dropped, as any
--- command the engine does not know is (rts/Sim/Units/CommandAI/CommandAI.cpp),
--- so the order does nothing, as AISELECT already did.
+-- LuaHandler/handler.lua copies the globals into each addon's environment
+-- when it starts, so fontHandler is set as that file is included, and only
+-- when nothing is there. A game that runs the basic handler never includes
+-- that file, so the basic handler's fonts.lua still sets up its own.
 
-local CMD = CMD
-if type(CMD) ~= "table" then
-	return
+local compat = ...
+
+local function useDefaultFont()
 end
 
-local function restore(name, id)
-	if CMD[name] == nil and CMD[id] == nil then
-		CMD[name] = id
-		CMD[id] = name
-	end
-end
-
-restore("AISELECT", 30)
-restore("SET_WANTED_MAX_SPEED", 70)
-end, compat)
-if not ok then failed("cmd-removed-ids", err) end
-end
-
--- fix: spring-array-n-83
-do
-local ok, err = pcall(function(...)
--- id: spring-array-n-83
--- catalogue:
--- states: synced, unsynced
--- license: MIT or GNU GPL, v2 or later
-
--- The n key on the arrays of IDs and names the functions below return.
---
--- Changelog, 83.0: "remove the "n" field from array-like tables returned by
--- API functions" (commits 1874b58f97 and 40c0a0af81). In 0.82.7.1 each of these
--- functions set n to how many entries its array had (rts/Lua/LuaSyncedRead.cpp
--- and LuaUnsyncedRead.cpp). Complete Annihilation stable-8405's gui_buildbar.lua
--- counts to Spring.GetTeamUnits(teamID).n, and on a current engine stops on a
--- nil loop limit.
---
--- n is given by a metatable whose __index answers #t for it, rather than set
--- on the table. pairs and next then see only the IDs, so a game written for 83.0
--- or later that walks one of these arrays with pairs is not given an extra key.
--- A table that already has a metatable is left alone. Every other result is
--- passed on as it is.
---
--- These are the flat arrays the change took n from that a current engine still
--- has. The keyed tables of Spring.GetTeamUnitsSorted and
--- Spring.GetTeamUnitsCounts kept their n, and the command queues, command
--- descriptions and key bindings are not covered.
-
-local Spring = Spring
-if type(Spring) ~= "table" then
-	return
-end
-
-local type, getmetatable, setmetatable = type, getmetatable, setmetatable
-
-local counted = {
-	__index = function(t, key)
-		if key == "n" then
-			return #t
+if type(compat.hook) == "function" and type(compat.define) == "function"
+	and type(Script) == "table" and type(Script.GetName) == "function" and Script.GetName() == "LuaUI"
+then
+	compat.hook("include", function(nextFn, filename, ...)
+		if type(filename) == "string" and filename:gsub("\\", "/"):lower() == "luahandler/handler.lua" then
+			compat.define(_G, "fontHandler", { UseDefaultFont = useDefaultFont })
 		end
-	end,
-}
-
-local function withN(t, ...)
-	if type(t) == "table" and getmetatable(t) == nil then
-		setmetatable(t, counted)
-	end
-	return t, ...
+		return nextFn(filename, ...)
+	end)
+end
+end, compat)
+if not ok then failed("luaui-font-handler-104", err) end
 end
 
-local function wrap(name)
-	local original = Spring[name]
-	if type(original) ~= "function" then
+-- fix: luaui-in-tweak-mode-104
+do
+local ok, err = pcall(function(...)
+-- id: luaui-in-tweak-mode-104
+-- catalogue:
+-- states: unsynced
+-- license: MIT or GNU GPL, v2 or later
+
+-- widgetHandler:InTweakMode() for widgets that the engine's LuaHandler addon
+-- handler runs, as that handler never had it.
+--
+-- On 104.0 the engine's basic widget handler, cont/LuaUI/widgets.lua, gave each
+-- widget a widgetHandler whose InTweakMode said whether the player had the
+-- tweak mode on, in which widgets are moved about the screen. Spring 1944 2.31
+-- starts LuaHandler/handler.lua and then ran the basic handler on top, which
+-- compat manifest 15 skips (luaui-main-include). Its gui_buildbar.lua,
+-- gui_plane_autoselect.lua and gui_s44_selbuttons.lua still call
+-- widgetHandler:InTweakMode(). LuaHandler has no tweak mode to turn on, so
+-- here it always says false, which is what 104.0 said with it off.
+--
+-- LuaHandler makes a widget's environment in handler:NewAddon. A revision 1
+-- widget gets a widgetHandler table of its own there, and every other widget
+-- gets the handler itself. handler.lua defines NewAddon and then includes the
+-- game's config.lua before it loads any widget, so that include is where
+-- NewAddon is wrapped. A widgetHandler that already has InTweakMode keeps it.
+
+local compat = ...
+
+local type = type
+
+local function inTweakMode()
+	return false
+end
+
+local function give(widgetHandler)
+	if type(widgetHandler) == "table" and widgetHandler.InTweakMode == nil then
+		widgetHandler.InTweakMode = inTweakMode
+	end
+end
+
+local wrapped
+
+local function wrap()
+	local h = handler
+	if h == wrapped or type(h) ~= "table" or h.name ~= "widgetHandler" or type(h.NewAddon) ~= "function" then
 		return
 	end
-	Spring[name] = function(...)
-		return withN(original(...))
+	wrapped = h
+	give(h)
+	local NewAddon = h.NewAddon
+	h.NewAddon = function(...)
+		local addon = NewAddon(...)
+		if type(addon) == "table" then
+			give(addon.widgetHandler)
+		end
+		return addon
 	end
 end
 
--- rts/Lua/LuaSyncedRead.cpp, in both states.
-wrap("GetAllyTeamList")
-wrap("GetTeamList")
-wrap("GetPlayerList")
-wrap("GetAllUnits")
-wrap("GetTeamUnits")
-wrap("GetTeamUnitsByDefs")
-wrap("GetUnitsInRectangle")
-wrap("GetUnitsInBox")
-wrap("GetUnitsInCylinder")
-wrap("GetUnitsInSphere")
-wrap("GetUnitsInPlanes")
-wrap("GetFeaturesInRectangle")
-wrap("GetUnitIsTransporting")
-wrap("GetAllFeatures")
-wrap("GetUnitPieceList")
-
--- rts/Lua/LuaUnsyncedRead.cpp, in the unsynced state only.
-wrap("GetSelectedUnits")
-wrap("GetGroupUnits")
+if type(compat.hook) == "function"
+	and type(Script) == "table" and type(Script.GetName) == "function" and Script.GetName() == "LuaUI"
+then
+	compat.hook("include", function(nextFn, ...)
+		wrap()
+		return nextFn(...)
+	end)
+end
 end, compat)
-if not ok then failed("spring-array-n-83", err) end
+if not ok then failed("luaui-in-tweak-mode-104", err) end
 end
 
--- fix: spring-get-has-lag
+-- fix: spring-selected-units-counts-n
 do
 local ok, err = pcall(function(...)
--- id: spring-get-has-lag
--- catalogue: removed:Spring.GetHasLag
+-- id: spring-selected-units-counts-n
+-- catalogue: signature:Spring.GetSelectedUnitsCounts@BAR105 1544
 -- states: unsynced
 -- license: MIT or GNU GPL, v2 or later
 
--- Spring.GetHasLag, removed in 105.0 (commit 13a636710e, "nuke
--- Spring.GetHasLag").
+-- The n key on the table Spring.GetSelectedUnitsCounts returns.
 --
--- In 104.0.1 GetHasLag(maxLatency) returned whether the simulation was behind,
--- from CGame::IsLagging with maxLatency defaulting to 500 milliseconds
--- (rts/Lua/LuaUnsyncedRead.cpp). The same commit renamed that to
--- CGame::IsSimLagging, and a current engine returns its answer, for the same
--- argument and default, 4th from Spring.GetGameState. Complete Annihilation
--- stable-8405's dbg_dcicon.lua calls GetHasLag in DrawScreen.
+-- The engine's doc/changelog.txt, under the breaking changes since 105.0,
+-- says the tables Spring.GetSelectedUnitsSorted and
+-- Spring.GetSelectedUnitsCounts return no longer have that key, and that the
+-- number of unit defs is now their second result instead.
+--
+-- On 104.0 the table held the number of selected units of each unit def,
+-- keyed by unit def ID, and n held how many unit defs it had, 0 when nothing
+-- was selected (rts/Lua/LuaUnsyncedRead.cpp). Spring 1944 2.31's
+-- gui_s44_selbuttons.lua reads n and does arithmetic on it. This counts the
+-- table's keys into n when the engine has not set it.
+--
+-- 104.0 returned the table alone. The widget passes on every result of
+-- Spring.GetSelectedUnitsCounts from a function whose second result it takes
+-- as a transport's unit ID, so the count the engine now returns second is
+-- dropped.
+--
+-- Coilbox leaves this fix out for a game whose own Lua already takes that
+-- second result (crates/coilbox-compat, ADAPTERS).
 
 local Spring = Spring
-if type(Spring) ~= "table" or Spring.GetHasLag ~= nil or type(Spring.GetGameState) ~= "function" then
+if type(Spring) ~= "table" or type(Spring.GetSelectedUnitsCounts) ~= "function" then
 	return
 end
 
-local select = select
-local GetGameState = Spring.GetGameState
+local type, pairs = type, pairs
+local GetSelectedUnitsCounts = Spring.GetSelectedUnitsCounts
 
-Spring.GetHasLag = function(maxLatency)
-	return select(4, GetGameState(maxLatency)) == true
+local function withN(units)
+	if type(units) == "table" and units.n == nil then
+		local n = 0
+		for _ in pairs(units) do
+			n = n + 1
+		end
+		units.n = n
+	end
+	return units
+end
+
+Spring.GetSelectedUnitsCounts = function(...)
+	return withN(GetSelectedUnitsCounts(...))
 end
 end, compat)
-if not ok then failed("spring-get-has-lag", err) end
+if not ok then failed("spring-selected-units-counts-n", err) end
 end
 
--- fix: unit-defs-weapons-n-83
+-- fix: spring-selected-units-sorted-n
 do
 local ok, err = pcall(function(...)
--- id: unit-defs-weapons-n-83
--- catalogue:
+-- id: spring-selected-units-sorted-n
+-- catalogue: signature:Spring.GetSelectedUnitsSorted@BAR105 1544
 -- states: unsynced
 -- license: MIT or GNU GPL, v2 or later
 
--- The n key on UnitDefs[id].weapons in unsynced Lua.
+-- The n key on the table Spring.GetSelectedUnitsSorted returns.
 --
--- Changelog, 83.0: "remove the "n" field from array-like tables returned by
--- API functions" (commit 1874b58f97). In 0.82.7.1 the weapons table of a unit
--- def had n set to how many weapons it held (rts/Lua/LuaUnitDefs.cpp,
--- WeaponsTable). Complete Annihilation stable-8405's unit_healthbars.lua,
--- gui_defenserange.lua and unit_customformations2.lua count to
--- ud.weapons.n, and on a current engine stop on a nil loop limit.
+-- The engine's doc/changelog.txt, under the breaking changes since 105.0,
+-- says the tables Spring.GetSelectedUnitsSorted and
+-- Spring.GetSelectedUnitsCounts return no longer have that key, and that the
+-- number of unit defs is now their second result instead.
 --
--- Each entry of UnitDefs is a proxy that builds a new weapons table on every
--- read, and whose __newindex refuses the name. So this reads it once per unit
--- def and writes it back with rawset, with a metatable whose __index answers
--- #t for n, as spring-array-n-83 does. Every later read then gets that same
--- table rather than a new one, so a widget that changes it changes it for
--- every widget. The synced state has no rawset (rts/Lua/LuaHandleSynced.cpp),
--- so it is not given this fix. buildOptions lost its n in the same change and
--- is not covered.
+-- On 104.0 the table held an array of the selected units of each unit def,
+-- keyed by unit def ID, and n held how many unit defs it had, 0 when nothing
+-- was selected (rts/Lua/LuaUnsyncedRead.cpp). Spring 1944 2.31's
+-- gui_s44_selbuttons.lua compares n with the count it keeps. This counts the
+-- table's keys into n when the engine has not set it.
+--
+-- 104.0 returned the table alone, so the count the engine now returns second
+-- is dropped, as spring-selected-units-counts-n does for
+-- Spring.GetSelectedUnitsCounts.
+--
+-- Coilbox leaves this fix out for a game whose own Lua already takes that
+-- second result (crates/coilbox-compat, ADAPTERS).
 
-local UnitDefs = UnitDefs
-if type(UnitDefs) ~= "table" or type(rawset) ~= "function" or type(rawget) ~= "function" then
+local Spring = Spring
+if type(Spring) ~= "table" or type(Spring.GetSelectedUnitsSorted) ~= "function" then
 	return
 end
 
-local type, pairs, rawget, rawset = type, pairs, rawget, rawset
-local getmetatable, setmetatable = getmetatable, setmetatable
+local type, pairs = type, pairs
+local GetSelectedUnitsSorted = Spring.GetSelectedUnitsSorted
 
-local counted = {
-	__index = function(t, key)
-		if key == "n" then
-			return #t
+local function withN(units)
+	if type(units) == "table" and units.n == nil then
+		local n = 0
+		for _ in pairs(units) do
+			n = n + 1
 		end
-	end,
-}
-
-for _, ud in pairs(UnitDefs) do
-	if type(ud) == "table" and rawget(ud, "weapons") == nil then
-		local weapons = ud.weapons
-		if type(weapons) == "table" and getmetatable(weapons) == nil then
-			rawset(ud, "weapons", setmetatable(weapons, counted))
-		end
+		units.n = n
 	end
+	return units
+end
+
+Spring.GetSelectedUnitsSorted = function(...)
+	return withN(GetSelectedUnitsSorted(...))
 end
 end, compat)
-if not ok then failed("unit-defs-weapons-n-83", err) end
-end
-
--- fix: weapon-defs-lua-consts-87
-do
-local ok, err = pcall(function(...)
--- id: weapon-defs-lua-consts-87
--- catalogue:
--- states: unsynced
--- license: MIT or GNU GPL, v2 or later
-
--- WeaponDefs[id].areaOfEffect and WeaponDefs[id].maxVelocity in unsynced Lua.
---
--- Changelog, 87.0: "remove the following Lua consts: wdef[id].areaOfEffect,
--- wdef[id].maxVelocity & wdef[id].onlyTargetCategories". The engine still
--- knows the two names, so reading one logs "ERROR_TYPE for key" and gives nil
--- (rts/Lua/LuaWeaponDefs.cpp, ADD_DEPRECATED_LUADEF_KEY). Complete
--- Annihilation stable-8405's gui_attack_aoe.lua compares areaOfEffect with a
--- number and stops.
---
--- In 86.0 (rts/Lua/LuaWeaponDefs.cpp and rts/Sim/Weapons/WeaponDefHandler.cpp)
--- areaOfEffect was damageAreaOfEffect, half the def's areaOfEffect tag, and
--- maxVelocity was projectilespeed times 30, the game's frames per second. A
--- current engine still gives Lua both damageAreaOfEffect and projectilespeed,
--- worked out from the same tags, so this copies them under the old names.
---
--- Each entry of WeaponDefs is a proxy whose __newindex refuses both names, so
--- the values are written with rawset, and a raw value means __index is never
--- asked. The synced state has no rawset (rts/Lua/LuaHandleSynced.cpp), so it is
--- not given this fix. onlyTargetCategories is not put back either.
-
-local WeaponDefs = WeaponDefs
-if type(WeaponDefs) ~= "table" or type(rawset) ~= "function" or type(rawget) ~= "function" then
-	return
-end
-
-local type, pairs, rawget, rawset = type, pairs, rawget, rawset
-
-for _, wd in pairs(WeaponDefs) do
-	if type(wd) == "table" then
-		local area = wd.damageAreaOfEffect
-		if type(area) == "number" and rawget(wd, "areaOfEffect") == nil then
-			rawset(wd, "areaOfEffect", area)
-		end
-		local speed = wd.projectilespeed
-		if type(speed) == "number" and rawget(wd, "maxVelocity") == nil then
-			rawset(wd, "maxVelocity", speed * 30)
-		end
-	end
-end
-end, compat)
-if not ok then failed("weapon-defs-lua-consts-87", err) end
+if not ok then failed("spring-selected-units-sorted-n", err) end
 end
