@@ -48,6 +48,7 @@ describe("resolveCompatTarget", () => {
     expect(await resolve()).toEqual({
       kind: "use",
       gameType: "XTA 9.65 (compat 2)",
+      gameArchive: MUTATOR.primaryArchive.name,
       baseName: "XTA 9.65",
     });
     expect(compatStatus).toHaveBeenCalledWith({

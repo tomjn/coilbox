@@ -21,8 +21,12 @@ export const COMPAT_BASE_OPTION = "coilbox_compat_base";
 export type CompatTarget =
   /** The switch is off, or the game has no entry. Launch the game itself. */
   | { kind: "off" }
-  /** Launch `gameType`, the mutator's unitsync name, in place of `baseName`. */
-  | { kind: "use"; gameType: string; baseName: string }
+  /**
+   * Launch `gameType`, the mutator's unitsync name, in place of `baseName`.
+   * `gameArchive` is the mutator's archive, for a launch that stacks its own
+   * mutator on it.
+   */
+  | { kind: "use"; gameType: string; gameArchive: string; baseName: string }
   /** Do not launch. `message` says why and where to fix it. */
   | { kind: "blocked"; message: string };
 
@@ -80,7 +84,12 @@ export async function resolveCompatTarget(opts: {
     if (!found) {
       return blocked(`the engine did not find ${status.folder}.`);
     }
-    return { kind: "use", gameType: found.name, baseName: game.name };
+    return {
+      kind: "use",
+      gameType: found.name,
+      gameArchive: found.primaryArchive.name,
+      baseName: game.name,
+    };
   } catch (e) {
     return blocked(
       `its mutator could not be checked (${e instanceof Error ? e.message : String(e)}).`,
