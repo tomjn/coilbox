@@ -13,6 +13,7 @@
  */
 import { defineCommand } from "@picoframe/plugin-sdk";
 import { useEffect, useRef, useState } from "react";
+import { describeError } from "@/i18n/uiError";
 import type { ModProject } from "./project";
 
 /** Where a change landed in the numbered tweak export. */
@@ -109,7 +110,7 @@ export function useChangeLedger(
           setState({
             ledger: null,
             loading: false,
-            error: e instanceof Error ? e.message : String(e),
+            error: describeError(e),
           });
       });
     return () => {

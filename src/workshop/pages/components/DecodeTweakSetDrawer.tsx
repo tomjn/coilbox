@@ -22,6 +22,7 @@ import { useState } from "react";
 import { Field } from "@/components/Field";
 import { Textarea } from "@/components/ui/textarea";
 import type { GameItem } from "@/content/bindings";
+import { describeError } from "@/i18n/uiError";
 import { GamePickerButton } from "@/play/pages/components/GamePickerButton";
 import { GamePickerPanel } from "@/play/pages/components/GamePickerPanel";
 import {
@@ -78,7 +79,7 @@ export function DecodeTweakSetDrawer({
     } catch (error) {
       setPhase({
         state: "failed",
-        message: error instanceof Error ? error.message : String(error),
+        message: describeError(error),
       });
     }
   }

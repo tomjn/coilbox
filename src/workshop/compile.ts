@@ -15,6 +15,7 @@
  */
 import { defineCommand } from "@picoframe/plugin-sdk";
 import { useEffect, useRef, useState } from "react";
+import { describeError } from "@/i18n/uiError";
 import type { Written } from "./loadsAs";
 import type { ModProject } from "./project";
 
@@ -139,7 +140,7 @@ export function useCompiledProject(
           setState({
             compiled: null,
             loading: false,
-            error: e instanceof Error ? e.message : String(e),
+            error: describeError(e),
           });
       });
     return () => {

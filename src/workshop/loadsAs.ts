@@ -19,6 +19,7 @@
  * keystroke.
  */
 import { defineCommand } from "@picoframe/plugin-sdk";
+import { describeError } from "@/i18n/uiError";
 import type { ModProject } from "./project";
 
 /** A value to write in place of a typed one. */
@@ -179,7 +180,7 @@ export async function settleTypedValues(
   } catch (e) {
     return {
       ok: false,
-      message: `Coilbox could not load the game to check typed values, so they are written as typed: ${e instanceof Error ? e.message : String(e)}`,
+      message: `Coilbox could not load the game to check typed values, so they are written as typed: ${describeError(e)}`,
     };
   }
 }
@@ -195,7 +196,7 @@ export async function settleTypedValuesInPlace(
   } catch (e) {
     return {
       ok: false,
-      message: `Coilbox could not load the game to check typed values, so they are written as typed: ${e instanceof Error ? e.message : String(e)}`,
+      message: `Coilbox could not load the game to check typed values, so they are written as typed: ${describeError(e)}`,
     };
   }
 }
@@ -211,7 +212,7 @@ export async function settleTypedValuesTweaks(
   } catch (e) {
     return {
       ok: false,
-      message: `Coilbox could not load the game to check typed values, so they are written as typed: ${e instanceof Error ? e.message : String(e)}`,
+      message: `Coilbox could not load the game to check typed values, so they are written as typed: ${describeError(e)}`,
     };
   }
 }

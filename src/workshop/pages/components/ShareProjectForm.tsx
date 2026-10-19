@@ -16,11 +16,11 @@ import { Button } from "@picoframe/frame";
 import { save } from "@tauri-apps/plugin-dialog";
 import { Download } from "lucide-react";
 import { useState } from "react";
-
 import { ChallengeCodeView } from "@/challenge/ChallengeCodeView";
 import type { InstalledGameInfo } from "@/container/gameIdentity";
 import { contentWriteFile } from "@/content/bindings";
 import { ErrorBanner } from "@/content/pages/components/states";
+import { describeError } from "@/i18n/uiError";
 import {
   type ModProject,
   modProjectCode,
@@ -57,7 +57,7 @@ export function ShareProjectForm({
     try {
       await saveFile();
     } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
+      setError(describeError(e));
     } finally {
       setBusy(false);
     }

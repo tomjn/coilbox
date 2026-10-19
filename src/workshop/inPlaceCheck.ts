@@ -16,6 +16,7 @@
  * afresh rather than trusting what the old file said.
  */
 import { useEffect, useState } from "react";
+import { describeError } from "@/i18n/uiError";
 import {
   type FieldCheck,
   type FieldProbe,
@@ -98,7 +99,7 @@ export function useInPlaceChecks(
         setError(null);
       })
       .catch((e: unknown) => {
-        setError({ key, message: e instanceof Error ? e.message : String(e) });
+        setError({ key, message: describeError(e) });
       })
       .finally(() => {
         for (const p of missing) inFlight.delete(p.field);

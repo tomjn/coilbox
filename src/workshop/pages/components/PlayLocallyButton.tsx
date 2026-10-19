@@ -28,6 +28,7 @@ import {
   useUnitsyncScan,
   useUnitsyncThumbnails,
 } from "@/content/config";
+import { describeError } from "@/i18n/uiError";
 import {
   isWorkshopMutatorArchive,
   WORKSHOP_MUTATOR_FOLDER,
@@ -108,9 +109,7 @@ async function findGeneratedGame(target: {
     target.dataDir,
     true,
   ).catch((error) => {
-    throw new Error(
-      `The content scan failed: ${error instanceof Error ? error.message : String(error)}`,
-    );
+    throw new Error(`The content scan failed: ${describeError(error)}`);
   });
   return rescanned.games.find((g) =>
     isWorkshopMutatorArchive(g.primaryArchive.name),
@@ -403,7 +402,7 @@ export function PlayLocallyButton({
     } catch (error) {
       setPhase({
         state: "failed",
-        message: error instanceof Error ? error.message : String(error),
+        message: describeError(error),
       });
     }
   }
