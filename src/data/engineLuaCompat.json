@@ -1296,6 +1296,20 @@
       "note": "LuaSynced*: make {S,G}et{Unit,Feature}Blocking signatures match Get{Unit,Feature}Blocking(number objectID) --> boolean isBlocking, boolean isSolidObjectCollidable, boolean isProjectileCollidable, boolean isRaySegmentCollidable, boolean crushable, boolean blockEnemyPushing, boolean blockHeightChanges"
     },
     {
+      "id": "signature:Spring.SetFeatureRulesParam@105.0",
+      "kind": "signature",
+      "name": "Spring.SetFeatureRulesParam",
+      "since": "105.0",
+      "note": "A string that reads as a number, such as \"30\", is stored and read back as a string. Before 105.0 it was stored as a number, so Lua that sets a param from a def's custom parameter and then compares it with a number fails."
+    },
+    {
+      "id": "signature:Spring.SetGameRulesParam@105.0",
+      "kind": "signature",
+      "name": "Spring.SetGameRulesParam",
+      "since": "105.0",
+      "note": "A string that reads as a number, such as \"30\", is stored and read back as a string. Before 105.0 it was stored as a number, so Lua that sets a param from a def's custom parameter and then compares it with a number fails."
+    },
+    {
       "id": "signature:Spring.SetLosViewColors@100.0",
       "kind": "signature",
       "name": "Spring.SetLosViewColors",
@@ -1310,6 +1324,13 @@
       "note": "LuaSynced*: slightly change {Get,Set}ProjectileTarget signatures GetProjectileTarget now returns a number instead of a string to indicate target-type GetProjectileTarget now always returns two arguments (if given projectileID is valid) GetProjectileTarget now always returns a target position if projectile has no target object SetProjectileTarget now takes a number instead of a string to indicate target-type"
     },
     {
+      "id": "signature:Spring.SetTeamRulesParam@105.0",
+      "kind": "signature",
+      "name": "Spring.SetTeamRulesParam",
+      "since": "105.0",
+      "note": "A string that reads as a number, such as \"30\", is stored and read back as a string. Before 105.0 it was stored as a number, so Lua that sets a param from a def's custom parameter and then compares it with a number fails."
+    },
+    {
       "id": "signature:Spring.SetUnitBlocking@95.0",
       "kind": "signature",
       "name": "Spring.SetUnitBlocking",
@@ -1322,6 +1343,13 @@
       "name": "Spring.SetUnitPieceCollisionVolumeData",
       "since": "101.0",
       "note": "{Set,Get}UnitPieceCollisionVolumeData now receive 1-based piece index argument (was 0-based)."
+    },
+    {
+      "id": "signature:Spring.SetUnitRulesParam@105.0",
+      "kind": "signature",
+      "name": "Spring.SetUnitRulesParam",
+      "since": "105.0",
+      "note": "A string that reads as a number, such as \"30\", is stored and read back as a string. Before 105.0 it was stored as a number, so Lua that sets a param from a def's custom parameter and then compares it with a number fails."
     },
     {
       "id": "signature:StockpileChanged@101.0",

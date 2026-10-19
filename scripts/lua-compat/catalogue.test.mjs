@@ -341,6 +341,57 @@ describe("assembling the catalogue", () => {
     );
   });
 
+  it("takes an engine commit for a change the changelog never mentions", () => {
+    const override = {
+      kind: "signature",
+      name: "Spring.SetUnitRulesParam",
+      since: "105.0",
+      note: "A numeric string stays a string.",
+      commit: "ffafcbc51a0d74cdf957798002e0d4ee979c7c1c",
+    };
+    const asked = [];
+    const inRelease = (sha) => {
+      asked.push(sha);
+      return true;
+    };
+    const out = applyOverrides(merged, [override], CHANGELOG, inRelease);
+    expect(asked).toEqual([override.commit]);
+    expect(out.find((e) => e.name === "Spring.SetUnitRulesParam")).toEqual({
+      id: "signature:Spring.SetUnitRulesParam@105.0",
+      kind: "signature",
+      name: "Spring.SetUnitRulesParam",
+      since: "105.0",
+      note: "A numeric string stays a string.",
+    });
+  });
+
+  it("refuses an override whose commit is not in the release", () => {
+    const override = {
+      kind: "signature",
+      name: "Spring.SetUnitRulesParam",
+      since: "105.0",
+      note: "made up",
+      commit: "0000000000000000000000000000000000000000",
+    };
+    expect(() =>
+      applyOverrides(merged, [override], CHANGELOG, () => false),
+    ).toThrow(/commit not in the release/);
+    expect(() => applyOverrides(merged, [override], CHANGELOG)).toThrow(
+      /commit not in the release/,
+    );
+  });
+
+  it("refuses an override with neither a changelog line nor a commit, or both", () => {
+    const base = { kind: "signature", name: "X", since: "105.0", note: "x" };
+    expect(() => applyOverrides(merged, [base], CHANGELOG, () => true)).toThrow(
+      /missing changelog or commit/,
+    );
+    const both = { ...base, changelog: "remove gl.Smoothing", commit: "ab" };
+    expect(() => applyOverrides(merged, [both], CHANGELOG, () => true)).toThrow(
+      /both a changelog line and a commit/,
+    );
+  });
+
   it("refuses an override whose id does not match its fields", () => {
     const override = {
       id: "signature:UnitDamaged",

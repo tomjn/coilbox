@@ -46,5 +46,37 @@
     "since": "92.0",
     "note": "The engine no longer works out the burst of an AircraftBomb weapon. The engine's own gamedata/weapondefs_post.lua does it instead, but only for a weapon that sets manualBombSettings, the reverse of what the tag meant, and not at all in a game that ships its own weapondefs_post.lua.",
     "changelog": "remove of manualBombSettings (backward-compatibility code in weapondefs_post.lua)"
+  },
+  {
+    "id": "signature:Spring.SetGameRulesParam@105.0",
+    "kind": "signature",
+    "name": "Spring.SetGameRulesParam",
+    "since": "105.0",
+    "note": "A string that reads as a number, such as \"30\", is stored and read back as a string. Before 105.0 it was stored as a number, so Lua that sets a param from a def's custom parameter and then compares it with a number fails.",
+    "commit": "ffafcbc51a0d74cdf957798002e0d4ee979c7c1c"
+  },
+  {
+    "id": "signature:Spring.SetTeamRulesParam@105.0",
+    "kind": "signature",
+    "name": "Spring.SetTeamRulesParam",
+    "since": "105.0",
+    "note": "A string that reads as a number, such as \"30\", is stored and read back as a string. Before 105.0 it was stored as a number, so Lua that sets a param from a def's custom parameter and then compares it with a number fails.",
+    "commit": "ffafcbc51a0d74cdf957798002e0d4ee979c7c1c"
+  },
+  {
+    "id": "signature:Spring.SetUnitRulesParam@105.0",
+    "kind": "signature",
+    "name": "Spring.SetUnitRulesParam",
+    "since": "105.0",
+    "note": "A string that reads as a number, such as \"30\", is stored and read back as a string. Before 105.0 it was stored as a number, so Lua that sets a param from a def's custom parameter and then compares it with a number fails.",
+    "commit": "ffafcbc51a0d74cdf957798002e0d4ee979c7c1c"
+  },
+  {
+    "id": "signature:Spring.SetFeatureRulesParam@105.0",
+    "kind": "signature",
+    "name": "Spring.SetFeatureRulesParam",
+    "since": "105.0",
+    "note": "A string that reads as a number, such as \"30\", is stored and read back as a string. Before 105.0 it was stored as a number, so Lua that sets a param from a def's custom parameter and then compares it with a number fails.",
+    "commit": "ffafcbc51a0d74cdf957798002e0d4ee979c7c1c"
   }
 ]

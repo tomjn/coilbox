@@ -1352,6 +1352,18 @@ mod tests {
         let updated = golden_build(11, &FIXTURES[1]);
         let synced = text(&updated, "compat/prelude-synced.lua").unwrap();
         assert!(!synced.contains(ground) && synced.contains("-- fix: game-version-104\n"));
+
+        // Every game built from 12 stores a numeric string as a number, in the
+        // synced state, where the rules params are set.
+        let rules = "-- fix: spring-rules-param-105\n";
+        for fixture in &FIXTURES[..2] {
+            let twelve = golden_build(12, fixture);
+            let synced = text(&twelve, "compat/prelude-synced.lua").unwrap();
+            assert!(synced.contains(rules), "{}", fixture.archive);
+            if let Some(unsynced) = text(&twelve, "compat/prelude-unsynced.lua") {
+                assert!(!unsynced.contains(rules), "{}", fixture.archive);
+            }
+        }
     }
 
     /// The hash of every fixed game built from `manifest`.
@@ -1420,6 +1432,10 @@ mod tests {
         (
             11,
             "e9e8dcfc7caf88da395188e572c100824ed837091fac9b15efbc8f680466ec5e",
+        ),
+        (
+            12,
+            "cd58a35bdb696ba6d1e3f23fd28882e7a460df024a7de8416362e9d758910d06",
         ),
     ];
 

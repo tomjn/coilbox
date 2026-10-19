@@ -402,4 +402,79 @@ do
 	check("without GetGroundInfo no fix failed", #missing.logs == 0, table.concat(missing.logs, "; "))
 end
 
+--------------------------------------------------------------------------------
+-- Set*RulesParam, which 105.0 stopped turning a numeric string into a number
+-- (issue #4700)
+--------------------------------------------------------------------------------
+
+-- The engine's SetRulesParam now (rts/Lua/LuaSyncedCtrl.cpp): a number is kept
+-- as a number and a string as a string, and nil erases the param.
+local function rulesEngine()
+	local params = {}
+	local function store(scope, name, value, los)
+		params[scope] = params[scope] or {}
+		params[scope][name] = value
+		params.los = los
+	end
+	local spring = {
+		SetGameRulesParam = function(name, value, los) store("game", name, value, los) end,
+		GetGameRulesParam = function(name) return (params.game or {})[name] end,
+	}
+	for _, kind in ipairs({ "Team", "Unit", "Feature" }) do
+		spring["Set" .. kind .. "RulesParam"] = function(id, name, value, los) store(kind .. id, name, value, los) end
+		spring["Get" .. kind .. "RulesParam"] = function(id, name) return (params[kind .. id] or {})[name] end
+	end
+	return spring, params
+end
+
+do
+	local spring, params = rulesEngine()
+	local engine = newEngine({ manifest = 12, spring = spring })
+	prelude(engine)
+	local S = engine.env.Spring
+	-- Spring 1944's game_ammo.lua, lines 252 and 178.
+	S.SetUnitRulesParam(7, "ammo", "30")
+	local ammo = S.GetUnitRulesParam(7, "ammo")
+	check("a unit's numeric string is stored as a number", type(ammo) == "number" and ammo == 30, type(ammo))
+	local ok, err = pcall(function() return S.GetUnitRulesParam(7, "ammo") < 5 end)
+	check("game_ammo.lua's comparison works", ok, tostring(err))
+	S.SetGameRulesParam("gravity", " 1.5 ")
+	check("a game param's numeric string is a number", S.GetGameRulesParam("gravity") == 1.5)
+	S.SetTeamRulesParam(2, "supplies", "-4")
+	check("a team param's numeric string is a number", S.GetTeamRulesParam(2, "supplies") == -4)
+	S.SetFeatureRulesParam(9, "metal", "1e2", { public = true })
+	check("a feature param's numeric string is a number", S.GetFeatureRulesParam(9, "metal") == 100)
+	check("the los table is passed on", type(params.los) == "table" and params.los.public == true)
+	S.SetUnitRulesParam(7, "name", "Pzkw IV")
+	check("a string that is not a number stays a string", S.GetUnitRulesParam(7, "name") == "Pzkw IV")
+	S.SetUnitRulesParam(7, "empty", "")
+	check("an empty string stays a string", S.GetUnitRulesParam(7, "empty") == "")
+	S.SetUnitRulesParam(7, "speed", 2.5)
+	check("a number is passed on as it came", S.GetUnitRulesParam(7, "speed") == 2.5)
+	S.SetUnitRulesParam(7, "flag", true)
+	check("a boolean is passed on as it came", S.GetUnitRulesParam(7, "flag") == true)
+	S.SetUnitRulesParam(7, "ammo", nil)
+	check("nil still erases the param", S.GetUnitRulesParam(7, "ammo") == nil)
+	check("no fix failed", #engine.logs == 0, table.concat(engine.logs, "; "))
+
+	-- A game that includes its own entry file runs the prelude a second time.
+	prelude(engine)
+	S.SetUnitRulesParam(7, "ammo", "12")
+	check("a second prelude still stores a number", S.GetUnitRulesParam(7, "ammo") == 12)
+end
+
+do
+	local engine = newEngine({ manifest = 12 })
+	prelude(engine)
+	check("without the rules param functions none is defined", engine.env.Spring.SetUnitRulesParam == nil and engine.env.Spring.SetGameRulesParam == nil)
+	check("without the rules param functions no fix failed", #engine.logs == 0, table.concat(engine.logs, "; "))
+	local player = function() end
+	local only = newEngine({ manifest = 12, spring = { SetPlayerRulesParam = player } })
+	prelude(only)
+	check("SetPlayerRulesParam, which 104.0 did not have, is left alone", only.env.Spring.SetPlayerRulesParam == player)
+	local unsynced = newEngine({ synced = false, manifest = 12, spring = { SetUnitRulesParam = player } })
+	prelude(unsynced)
+	check("the unsynced state is left alone", unsynced.env.Spring.SetUnitRulesParam == player)
+end
+
 support.report()

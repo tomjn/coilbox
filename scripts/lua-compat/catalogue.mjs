@@ -886,24 +886,42 @@ export function mergeEntries(removed, fromChangelog) {
 /**
  * Fold the hand-curated overrides in. Each must quote the changelog line that
  * justifies it, and the quote must be found in the changelog, so an override
- * cannot drift away from the engine's own record. An override with the id of a
- * generated entry replaces it.
+ * cannot drift away from the engine's own record. A change the changelog never
+ * mentions names the engine commit that made it instead, which `inRelease`
+ * must find in the newest release. An override with the id of a generated
+ * entry replaces it.
  */
-export function applyOverrides(entries, overrides, changelogText) {
+export function applyOverrides(
+  entries,
+  overrides,
+  changelogText,
+  inRelease = () => false,
+) {
   const haystack = squash(changelogText);
   const byId = new Map(entries.map((e) => [e.id, e]));
+  const given = (v) => typeof v === "string" && v !== "";
   for (const o of overrides) {
-    for (const key of ["kind", "name", "since", "note", "changelog"]) {
-      if (typeof o[key] !== "string" || o[key] === "") {
-        throw new Error(`override ${o.id ?? o.name}: missing ${key}`);
+    const label = `override ${o.id ?? o.name}`;
+    for (const key of ["kind", "name", "since", "note"]) {
+      if (!given(o[key])) {
+        throw new Error(`${label}: missing ${key}`);
       }
     }
-    if (!haystack.includes(squash(o.changelog))) {
+    if (given(o.changelog) && given(o.commit)) {
       throw new Error(
-        `override ${o.id ?? o.name}: changelog line not found: ${o.changelog}`,
+        `${label}: has both a changelog line and a commit, give one`,
       );
     }
-    const { changelog, ...rest } = o;
+    if (given(o.commit)) {
+      if (!inRelease(o.commit)) {
+        throw new Error(`${label}: commit not in the release: ${o.commit}`);
+      }
+    } else if (!given(o.changelog)) {
+      throw new Error(`${label}: missing changelog or commit`);
+    } else if (!haystack.includes(squash(o.changelog))) {
+      throw new Error(`${label}: changelog line not found: ${o.changelog}`);
+    }
+    const { changelog, commit, ...rest } = o;
     const id = entryId(rest);
     if (o.id !== undefined && o.id !== id) {
       throw new Error(`override ${o.id}: its id should be ${id}`);

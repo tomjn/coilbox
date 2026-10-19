@@ -54,6 +54,7 @@ const MANIFESTS: &[(u32, &str)] = &[
     (9, include_str!("../../../lua/compat/manifests/9.json")),
     (10, include_str!("../../../lua/compat/manifests/10.json")),
     (11, include_str!("../../../lua/compat/manifests/11.json")),
+    (12, include_str!("../../../lua/compat/manifests/12.json")),
 ];
 
 /// Every fix file, by id.
@@ -141,6 +142,10 @@ const FIXES: &[(&str, &str)] = &[
     (
         "spring-make-font",
         include_str!("../../../lua/compat/spring-make-font.lua"),
+    ),
+    (
+        "spring-rules-param-105",
+        include_str!("../../../lua/compat/spring-rules-param-105.lua"),
     ),
     (
         "spring-set-unit-to-feature",
@@ -1672,6 +1677,37 @@ mod tests {
         }
     }
 
+    /// Issue #4700: manifest 12 stores a numeric string given to a rules param
+    /// as a number, as 104.0 did, and keeps the writer of manifest 11.
+    #[test]
+    fn manifest_12_is_manifest_11_with_the_old_rules_params() {
+        let (eleven, twelve) = (manifest(11).unwrap(), manifest(12).unwrap());
+        let added: Vec<&String> = twelve
+            .fixes
+            .iter()
+            .filter(|id| !eleven.fixes.contains(id))
+            .collect();
+        assert_eq!(added, ["spring-rules-param-105"]);
+        let kept: Vec<&String> = twelve
+            .fixes
+            .iter()
+            .filter(|id| eleven.fixes.contains(id))
+            .collect();
+        assert_eq!(kept, eleven.fixes.iter().collect::<Vec<_>>());
+        assert_eq!(
+            (&twelve.converter, twelve.writer),
+            (&eleven.converter, eleven.writer)
+        );
+        let ids = |state| -> Vec<&str> {
+            prelude_fixes(&twelve, state)
+                .iter()
+                .map(|(id, _)| *id)
+                .collect()
+        };
+        assert!(ids(LuaState::Synced).contains(&"spring-rules-param-105"));
+        assert!(!ids(LuaState::Unsynced).contains(&"spring-rules-param-105"));
+    }
+
     #[test]
     fn a_manifest_without_the_adapter_is_left_as_it_is() {
         let m = manifest(1).unwrap();
@@ -1724,14 +1760,14 @@ mod tests {
         }
     }
 
-    /// The preludes for manifests 9 and 11, as the Lua tests in
+    /// The preludes for manifests 9, 11 and 12, as the Lua tests in
     /// `lua/compat/tests/` load them. Earlier manifests' synced preludes call
     /// `rawget`, which the tests' synced state lacks, so they are not kept.
     /// `COILBOX_WRITE_FIXTURE=1` writes them again after a deliberate change to
     /// how a prelude is built.
     #[test]
     fn the_lua_tests_load_the_preludes_this_crate_builds() {
-        for n in [9, 11] {
+        for n in [9, 11, 12] {
             let m = manifest(n).unwrap();
             for state in [LuaState::Synced, LuaState::Unsynced] {
                 let built = prelude(&m, state).unwrap();
