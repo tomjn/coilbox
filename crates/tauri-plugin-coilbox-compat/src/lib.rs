@@ -159,7 +159,7 @@ fn build_reading(
 /// whose defs the fix changes as the JSON list `standins` says.
 #[cfg(test)]
 fn standins_answer(standins: &str) -> String {
-    let json = format!(r#"{{"ran":true,"standins":{standins},"failed":[]}}"#);
+    let json = format!(r#"{{"loaded":true,"ran":true,"standins":{standins},"failed":[]}}"#);
     let quoted = format!("\"{}\"", json.replace('\\', "\\\\").replace('"', "\\\""));
     serde_json::json!({ "result": quoted, "errors": [] }).to_string()
 }
@@ -261,10 +261,10 @@ fn build_with(
     let standins = if standins::wanted(&manifest, &defs) {
         let found = standins::parse(&run_lua(&standins::script(&manifest)?)?)?;
         let at = files.len().saturating_sub(1);
-        files.splice(at..at, standins::files(&found)?);
+        files.splice(at..at, standins::files(&found.standins)?);
         found
     } else {
-        Vec::new()
+        standins::Found::default()
     };
     let models = convert()?;
     // The palette is known only once the models are converted, so the marker
@@ -293,7 +293,7 @@ fn build_with(
     notes.extend(defs.notes.iter().cloned());
     notes.extend(standins::note(&standins));
     let files = write_with_models(&dir, &mut files, &models, &defs, manifest_version)?;
-    let mut def_overrides = models::model_keys(&files).len() + standins.len();
+    let mut def_overrides = models::model_keys(&files).len() + standins.standins.len();
     if !defs.written.is_empty() {
         match read_defs().and_then(|read| defs::changed(&manifest, &defs.written, &read)) {
             Ok(n) => def_overrides += n,
@@ -679,7 +679,9 @@ mod tests {
             },
         )
         .unwrap();
-        assert!(asked.borrow().contains("-- fix: defs-missing-model-standin\n"));
+        assert!(asked
+            .borrow()
+            .contains("-- fix: defs-missing-model-standin\n"));
         assert_eq!(built.folder, format!("coilbox-compat-xta-9.65-{n}.sdd"));
         let gadgets: Vec<String> =
             coilbox_compat::gadget_files(&coilbox_compat::manifest(n).unwrap())

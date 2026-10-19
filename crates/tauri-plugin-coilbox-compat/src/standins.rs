@@ -74,40 +74,47 @@ pub fn wanted(manifest: &Manifest, plan: &defs::Plan) -> bool {
 pub fn script(manifest: &Manifest) -> Result<String, String> {
     let block = coilbox_compat::defs_block(manifest, DefsFile::DefsPost)
         .ok_or("the manifest has no def fixes for defs_post.lua")?;
-    Ok(format!(
-        "{DEFS_ENV_SHIM}\n\
-         local __cb_failed = {{}}\n\
-         local __cb_log = Spring.Log\n\
-         Spring.Log = function(section, level, msg, ...)\n\
-         \x20 if section == 'coilbox-compat' then __cb_failed[#__cb_failed + 1] = tostring(msg) end\n\
-         \x20 if type(__cb_log) == 'function' then return __cb_log(section, level, msg, ...) end\n\
-         end\n\
-         local __cb_defs = VFS.Include('gamedata/defs.lua')\n\
-         DEFS = {{\n\
-         \x20 unitDefs = __cb_defs.unitdefs, featureDefs = __cb_defs.featuredefs,\n\
-         \x20 weaponDefs = __cb_defs.weapondefs, armorDefs = __cb_defs.armordefs,\n\
-         \x20 moveDefs = __cb_defs.movedefs,\n\
-         }}\n\
-         local __cb_exists = VFS.FileExists\n\
-         VFS.FileExists = function(path, modes) return __cb_exists(path, modes or 'Mmeb') end\n\
-         \n\
-         {block}\n\
-         local function __cb_json(s)\n\
-         \x20 return '\"' .. (tostring(s):gsub('[%c\"\\\\\\128-\\255]', function(c)\n\
-         \x20   return string.format('\\\\u%04x', string.byte(c))\n\
-         \x20 end)) .. '\"'\n\
-         end\n\
-         local __cb_out = {{}}\n\
-         for _, s in ipairs(compat.standins or {{}}) do\n\
-         \x20 __cb_out[#__cb_out + 1] = '{{\"kind\":' .. __cb_json(s.kind) .. ',\"name\":' .. __cb_json(s.name)\n\
-         \x20   .. ',\"model\":' .. __cb_json(s.model) .. ',\"standin\":' .. __cb_json(s.standin) .. '}}'\n\
-         end\n\
-         local __cb_fails = {{}}\n\
-         for _, m in ipairs(__cb_failed) do __cb_fails[#__cb_fails + 1] = __cb_json(m) end\n\
-         return '{{\"ran\":' .. tostring(compat.standins ~= nil) .. ',\"standins\":[' .. table.concat(__cb_out, ',')\n\
-         \x20 .. '],\"failed\":[' .. table.concat(__cb_fails, ',') .. ']}}'\n"
-    ))
+    Ok(SCRIPT
+        .replace("--[[shim]]", DEFS_ENV_SHIM)
+        .replace("--[[fixes]]", &block))
 }
+
+/// [`script`], before the shim and the fixes go in.
+const SCRIPT: &str = r#"--[[shim]]
+local function __cb_json(s)
+  return '"' .. (tostring(s):gsub('[%c"\\\128-\255]', function(c)
+    return string.format('\\u%04x', string.byte(c))
+  end)) .. '"'
+end
+local __cb_failed = {}
+local __cb_log = Spring.Log
+Spring.Log = function(section, level, msg, ...)
+  if section == 'coilbox-compat' then __cb_failed[#__cb_failed + 1] = tostring(msg) end
+  if type(__cb_log) == 'function' then return __cb_log(section, level, msg, ...) end
+end
+local __cb_loaded, __cb_defs = pcall(VFS.Include, 'gamedata/defs.lua')
+if not __cb_loaded or type(__cb_defs) ~= 'table' then
+  return '{"loaded":false,"why":' .. __cb_json(__cb_loaded and 'gamedata/defs.lua returned no table' or __cb_defs) .. '}'
+end
+DEFS = {
+  unitDefs = __cb_defs.unitdefs, featureDefs = __cb_defs.featuredefs,
+  weaponDefs = __cb_defs.weapondefs, armorDefs = __cb_defs.armordefs,
+  moveDefs = __cb_defs.movedefs,
+}
+local __cb_exists = VFS.FileExists
+VFS.FileExists = function(path, modes) return __cb_exists(path, modes or 'Mmeb') end
+
+--[[fixes]]
+local __cb_out = {}
+for _, s in ipairs(compat.standins or {}) do
+  __cb_out[#__cb_out + 1] = '{"kind":' .. __cb_json(s.kind) .. ',"name":' .. __cb_json(s.name)
+    .. ',"model":' .. __cb_json(s.model) .. ',"standin":' .. __cb_json(s.standin) .. '}'
+end
+local __cb_fails = {}
+for _, m in ipairs(__cb_failed) do __cb_fails[#__cb_fails + 1] = __cb_json(m) end
+return '{"loaded":true,"ran":' .. tostring(compat.standins ~= nil) .. ',"standins":['
+  .. table.concat(__cb_out, ',') .. '],"failed":[' .. table.concat(__cb_fails, ',') .. ']}'
+"#;
 
 /// The worker's answer to `--lua`.
 #[derive(Deserialize)]
@@ -118,9 +125,26 @@ struct Answer {
 
 #[derive(Deserialize)]
 struct Ran {
+    loaded: bool,
+    #[serde(default)]
+    why: String,
+    #[serde(default)]
     ran: bool,
+    #[serde(default)]
     standins: Vec<Standin>,
+    #[serde(default)]
     failed: Vec<String>,
+}
+
+/// What a run of [`script`] found.
+#[derive(Debug, Default, PartialEq, Eq)]
+pub struct Found {
+    /// The defs the fix changed, sorted.
+    pub standins: Vec<Standin>,
+    /// Why the game's defs did not load under unitsync, when they did not.
+    /// The fix then still gives every def whose model is missing the 1x1 box
+    /// when the game loads, and only the boxes for other footprints are lost.
+    pub unread: Option<String>,
 }
 
 /// A string as Lua's `%q` writes it, read back. The script escapes every
@@ -142,17 +166,30 @@ fn unquote(q: &str) -> Option<String> {
     Some(out)
 }
 
-/// The defs the fix changed, sorted, from the worker's answer to [`script`].
-pub fn parse(answer: &str) -> Result<Vec<Standin>, String> {
+/// What the worker's answer to [`script`] found.
+///
+/// A game whose defs raise under unitsync raises the same way on every
+/// computer, so that is a finding: no def is known to need a box, and the 1x1
+/// one is written as ever. Anything else that goes wrong is an error, since
+/// another computer's run could find what this one did not.
+pub fn parse(answer: &str) -> Result<Found, String> {
     let fail = |why: String| format!("could not find the defs whose model is missing: {why}");
     let a: Answer =
         serde_json::from_str(answer).map_err(|e| fail(format!("the worker's answer: {e}")))?;
     if let Some(e) = a.error {
         return Err(fail(e));
     }
-    let result = a.result.ok_or_else(|| fail("the worker gave no result".into()))?;
+    let result = a
+        .result
+        .ok_or_else(|| fail("the worker gave no result".into()))?;
     let json = unquote(&result).ok_or_else(|| fail(format!("not a string: {result}")))?;
     let ran: Ran = serde_json::from_str(&json).map_err(|e| fail(format!("{e}: {json}")))?;
+    if !ran.loaded {
+        return Ok(Found {
+            standins: Vec::new(),
+            unread: Some(ran.why),
+        });
+    }
     if let Some(m) = ran.failed.iter().find(|m| m.contains(FIX)) {
         return Err(fail(m.clone()));
     }
@@ -161,7 +198,10 @@ pub fn parse(answer: &str) -> Result<Vec<Standin>, String> {
     }
     let mut standins = ran.standins;
     standins.sort();
-    Ok(standins)
+    Ok(Found {
+        standins,
+        unread: None,
+    })
 }
 
 /// The footprint a box is named for, or `None` for a name that is not a box.
@@ -191,27 +231,57 @@ fn box_model(x: u32, z: u32) -> coilbox_s3o::Model {
     let faces: [([f32; 3], [[f32; 3]; 4]); 6] = [
         (
             [1.0, 0.0, 0.0],
-            [[hx, 0.0, hz], [hx, 0.0, -hz], [hx, HEIGHT, -hz], [hx, HEIGHT, hz]],
+            [
+                [hx, 0.0, hz],
+                [hx, 0.0, -hz],
+                [hx, HEIGHT, -hz],
+                [hx, HEIGHT, hz],
+            ],
         ),
         (
             [-1.0, 0.0, 0.0],
-            [[-hx, 0.0, -hz], [-hx, 0.0, hz], [-hx, HEIGHT, hz], [-hx, HEIGHT, -hz]],
+            [
+                [-hx, 0.0, -hz],
+                [-hx, 0.0, hz],
+                [-hx, HEIGHT, hz],
+                [-hx, HEIGHT, -hz],
+            ],
         ),
         (
             [0.0, 1.0, 0.0],
-            [[-hx, HEIGHT, hz], [hx, HEIGHT, hz], [hx, HEIGHT, -hz], [-hx, HEIGHT, -hz]],
+            [
+                [-hx, HEIGHT, hz],
+                [hx, HEIGHT, hz],
+                [hx, HEIGHT, -hz],
+                [-hx, HEIGHT, -hz],
+            ],
         ),
         (
             [0.0, -1.0, 0.0],
-            [[-hx, 0.0, -hz], [hx, 0.0, -hz], [hx, 0.0, hz], [-hx, 0.0, hz]],
+            [
+                [-hx, 0.0, -hz],
+                [hx, 0.0, -hz],
+                [hx, 0.0, hz],
+                [-hx, 0.0, hz],
+            ],
         ),
         (
             [0.0, 0.0, 1.0],
-            [[-hx, 0.0, hz], [hx, 0.0, hz], [hx, HEIGHT, hz], [-hx, HEIGHT, hz]],
+            [
+                [-hx, 0.0, hz],
+                [hx, 0.0, hz],
+                [hx, HEIGHT, hz],
+                [-hx, HEIGHT, hz],
+            ],
         ),
         (
             [0.0, 0.0, -1.0],
-            [[hx, 0.0, -hz], [-hx, 0.0, -hz], [-hx, HEIGHT, -hz], [hx, HEIGHT, -hz]],
+            [
+                [hx, 0.0, -hz],
+                [-hx, 0.0, -hz],
+                [-hx, HEIGHT, -hz],
+                [hx, HEIGHT, -hz],
+            ],
         ),
     ];
     let mut vertices = Vec::new();
@@ -280,9 +350,15 @@ pub fn files(standins: &[Standin]) -> Result<Vec<mutator::File>, String> {
     Ok(out)
 }
 
-/// The build's note naming every def the fix changes, or `None` when it
-/// changes none.
-pub fn note(standins: &[Standin]) -> Option<String> {
+/// The build's note naming every def the fix changes, or saying why it could
+/// not tell, or `None` when it changes none.
+pub fn note(found: &Found) -> Option<String> {
+    if let Some(why) = &found.unread {
+        return Some(format!(
+            "Could not load the game's defs to find the models it does not have, so a def whose model is missing is drawn as the smallest box: {why}"
+        ));
+    }
+    let standins = &found.standins;
     if standins.is_empty() {
         return None;
     }
@@ -323,14 +399,15 @@ mod tests {
     #[test]
     fn the_answer_is_read_back_sorted() {
         let got = parse(&answer(
-            r#"{"ran":true,"standins":[
+            r#"{"loaded":true,"ran":true,"standins":[
                 {"kind":"weapon","name":"shell","model":"shell.3do","standin":"compat/models/standin-1x1.s3o"},
                 {"kind":"feature","name":"arm_infinity_dead","model":"arm_infinity_dead","standin":"compat/models/standin-3x2.s3o"}
             ],"failed":["coilbox compat fix defs-commander-85 failed: x"]}"#,
         ))
         .unwrap();
+        assert_eq!(got.unread, None);
         assert_eq!(
-            got,
+            got.standins,
             [
                 standin(
                     "feature",
@@ -343,13 +420,27 @@ mod tests {
         );
     }
 
+    /// The game's own defs raising is the same on every computer, so the
+    /// build goes on with the 1x1 box and says why.
+    #[test]
+    fn defs_that_do_not_load_are_noted_and_get_the_smallest_box() {
+        let got = parse(&answer(
+            r#"{"loaded":false,"why":"[string \"gamedata/defs.lua\"]:2: attempt to call global 'LoadDefs' (a nil value)"}"#,
+        ))
+        .unwrap();
+        assert!(got.standins.is_empty());
+        let note = note(&got).unwrap();
+        assert!(note.starts_with("Could not load the game's defs"), "{note}");
+        assert!(note.contains("'LoadDefs'"), "{note}");
+    }
+
     #[test]
     fn a_run_that_failed_or_never_ran_the_fix_fails() {
         let failed = format!(
-            r#"{{"ran":true,"standins":[],"failed":["coilbox compat fix {FIX} failed: boom"]}}"#
+            r#"{{"loaded":true,"ran":true,"standins":[],"failed":["coilbox compat fix {FIX} failed: boom"]}}"#
         );
         assert!(parse(&answer(&failed)).unwrap_err().contains("boom"));
-        let skipped = r#"{"ran":false,"standins":[],"failed":[]}"#;
+        let skipped = r#"{"loaded":true,"ran":false,"standins":[],"failed":[]}"#;
         assert!(parse(&answer(skipped)).unwrap_err().contains("did not run"));
         let raised = r#"{"error":"defs.lua: no such file","errors":[]}"#;
         assert!(parse(raised).unwrap_err().contains("no such file"));
@@ -412,7 +503,11 @@ mod tests {
         let model = box_model(2, 1);
         let v = &model.root.vertices;
         for t in model.root.indices.chunks(3) {
-            let [a, b, c] = [v[t[0] as usize].pos, v[t[1] as usize].pos, v[t[2] as usize].pos];
+            let [a, b, c] = [
+                v[t[0] as usize].pos,
+                v[t[1] as usize].pos,
+                v[t[2] as usize].pos,
+            ];
             let (e1, e2) = (
                 [b[0] - a[0], b[1] - a[1], b[2] - a[2]],
                 [c[0] - a[0], c[1] - a[1], c[2] - a[2]],
@@ -423,7 +518,10 @@ mod tests {
                 e1[0] * e2[1] - e1[1] * e2[0],
             ];
             let n = v[t[0] as usize].normal;
-            assert!(cross[0] * n[0] + cross[1] * n[1] + cross[2] * n[2] > 0.0, "{t:?}");
+            assert!(
+                cross[0] * n[0] + cross[1] * n[1] + cross[2] * n[2] > 0.0,
+                "{t:?}"
+            );
         }
     }
 
@@ -437,15 +535,25 @@ mod tests {
 
     #[test]
     fn the_note_names_every_def_changed() {
-        assert_eq!(note(&[]), None);
-        let n = note(&[
-            standin("feature", "gdakula2_dead", "gdakula2_dead", FALLBACK),
-            standin("weapon", "shell", "shell.3do", FALLBACK),
-        ])
+        assert_eq!(note(&Found::default()), None);
+        let n = note(&Found {
+            standins: vec![
+                standin("feature", "gdakula2_dead", "gdakula2_dead", FALLBACK),
+                standin("weapon", "shell", "shell.3do", FALLBACK),
+            ],
+            unread: None,
+        })
         .unwrap();
         assert!(n.starts_with("2 defs name a model"), "{n}");
-        let one = note(&[standin("feature", "a", "a", FALLBACK)]).unwrap();
-        assert!(one.starts_with("1 def names a model the game does not have, so it is drawn"), "{one}");
+        let one = note(&Found {
+            standins: vec![standin("feature", "a", "a", FALLBACK)],
+            unread: None,
+        })
+        .unwrap();
+        assert!(
+            one.starts_with("1 def names a model the game does not have, so it is drawn"),
+            "{one}"
+        );
         assert!(n.contains("feature gdakula2_dead (gdakula2_dead), weapon shell (shell.3do)"));
     }
 
@@ -465,16 +573,13 @@ mod tests {
         ]);
         let lua = coilbox_springlua::SpringLua::with_files(root.path(), files).unwrap();
         let got = lua
-            .eval_value_raw(
-                &format!("return (function()\n{source}\nend)()"),
-                "standins",
-            )
+            .eval_value_raw(&format!("return (function()\n{source}\nend)()"), "standins")
             .unwrap();
         let json = got.as_str().expect("a string").to_string();
         let quoted = format!("\"{}\"", json.replace('\\', "\\\\").replace('"', "\\\""));
         let read = parse(&serde_json::json!({ "result": quoted }).to_string()).unwrap();
         assert_eq!(
-            read,
+            read.standins,
             [standin(
                 "feature",
                 "arm_infinity_dead",

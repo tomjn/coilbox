@@ -84,7 +84,16 @@ fn the_models_are_converted_the_same_twice_and_the_units_name_them() {
         first.models.did_not_fit.len(),
         first.notes,
     );
-    assert!(first.notes.is_empty(), "{:?}", first.notes);
+    // XTA names a wreck model it does not have, which the build says it draws
+    // as a box (issue #4686). Nothing else is noted.
+    assert!(
+        first
+            .notes
+            .iter()
+            .all(|n| n.contains("a model the game does not have")),
+        "{:?}",
+        first.notes
+    );
     assert!(first.models.models_written > 0, "{:?}", first.models);
     assert!(first
         .files
