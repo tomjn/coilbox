@@ -58,6 +58,8 @@ const MANIFESTS: &[(u32, &str)] = &[
     (13, include_str!("../../../lua/compat/manifests/13.json")),
     (14, include_str!("../../../lua/compat/manifests/14.json")),
     (15, include_str!("../../../lua/compat/manifests/15.json")),
+    (16, include_str!("../../../lua/compat/manifests/16.json")),
+    (17, include_str!("../../../lua/compat/manifests/17.json")),
 ];
 
 /// Every fix file, by id.
@@ -69,6 +71,10 @@ const FIXES: &[(&str, &str)] = &[
     (
         "callin-unit-damaged-95",
         include_str!("../../../lua/compat/callin-unit-damaged-95.lua"),
+    ),
+    (
+        "cmd-removed-ids",
+        include_str!("../../../lua/compat/cmd-removed-ids.lua"),
     ),
     (
         "compat-callin-hooks",
@@ -139,6 +145,14 @@ const FIXES: &[(&str, &str)] = &[
         include_str!("../../../lua/compat/game-version-104.lua"),
     ),
     (
+        "luaui-font-handler-104",
+        include_str!("../../../lua/compat/luaui-font-handler-104.lua"),
+    ),
+    (
+        "luaui-in-tweak-mode-104",
+        include_str!("../../../lua/compat/luaui-in-tweak-mode-104.lua"),
+    ),
+    (
         "luaui-main-include",
         include_str!("../../../lua/compat/luaui-main-include.lua"),
     ),
@@ -149,6 +163,14 @@ const FIXES: &[(&str, &str)] = &[
     (
         "snext-spairs-sipairs",
         include_str!("../../../lua/compat/snext-spairs-sipairs.lua"),
+    ),
+    (
+        "spring-array-n-83",
+        include_str!("../../../lua/compat/spring-array-n-83.lua"),
+    ),
+    (
+        "spring-get-has-lag",
+        include_str!("../../../lua/compat/spring-get-has-lag.lua"),
     ),
     (
         "spring-get-team-info-105",
@@ -165,6 +187,14 @@ const FIXES: &[(&str, &str)] = &[
     (
         "spring-rules-param-105",
         include_str!("../../../lua/compat/spring-rules-param-105.lua"),
+    ),
+    (
+        "spring-selected-units-counts-n",
+        include_str!("../../../lua/compat/spring-selected-units-counts-n.lua"),
+    ),
+    (
+        "spring-selected-units-sorted-n",
+        include_str!("../../../lua/compat/spring-selected-units-sorted-n.lua"),
     ),
     (
         "spring-set-unit-to-feature",
@@ -185,6 +215,14 @@ const FIXES: &[(&str, &str)] = &[
     (
         "spring-update-info-texture",
         include_str!("../../../lua/compat/spring-update-info-texture.lua"),
+    ),
+    (
+        "unit-defs-weapons-n-83",
+        include_str!("../../../lua/compat/unit-defs-weapons-n-83.lua"),
+    ),
+    (
+        "weapon-defs-lua-consts-87",
+        include_str!("../../../lua/compat/weapon-defs-lua-consts-87.lua"),
     ),
 ];
 
@@ -702,6 +740,13 @@ enum Change {
         added: &'static str,
     },
     /// A function's results, which a call names by assigning them, where the
+    /// change added results after the old list. Only a call that names more
+    /// than the old list can tell which shape it reads.
+    Appended {
+        /// How many results the old list had.
+        old_len: usize,
+    },
+    /// A function's results, which a call names by assigning them, where the
     /// change swapped results around and the list kept its length.
     Swapped {
         /// The 0-based position of the first result the change moved.
@@ -753,6 +798,19 @@ const ADAPTERS: &[Adapter] = &[
             moved: 6,
             new: &[(6, &["income", "mult"]), (7, &["key", "custom", "opt"])],
         },
+    },
+    // Both lost the `n` key on their table and gained the number of unit defs
+    // as a second result, so only a call that takes that result reads the new
+    // shape.
+    Adapter {
+        fix: "spring-selected-units-counts-n",
+        entry: "signature:Spring.GetSelectedUnitsCounts@BAR105 1544",
+        change: Change::Appended { old_len: 1 },
+    },
+    Adapter {
+        fix: "spring-selected-units-sorted-n",
+        entry: "signature:Spring.GetSelectedUnitsSorted@BAR105 1544",
+        change: Change::Appended { old_len: 1 },
     },
 ];
 
@@ -815,6 +873,13 @@ fn order(adapter: &Adapter, params: &[String]) -> Order {
                 (true, false) => Order::Old,
                 (false, true) => Order::New,
                 _ => Order::Either,
+            }
+        }
+        Change::Appended { old_len } => {
+            if named.len() > old_len {
+                Order::New
+            } else {
+                Order::Either
             }
         }
         Change::Swapped { moved, new } => {
@@ -1723,6 +1788,41 @@ mod tests {
         assert!(left_out_of_11(&[old, new]).is_empty());
     }
 
+    const COUNTS: &str = "signature:Spring.GetSelectedUnitsCounts@BAR105 1544";
+    const SORTED: &str = "signature:Spring.GetSelectedUnitsSorted@BAR105 1544";
+
+    fn left_out_of_16(handlers: &[Handler]) -> Vec<String> {
+        let full = manifest(16).unwrap();
+        let picked = for_game(&full, handlers);
+        full.fixes
+            .into_iter()
+            .filter(|id| !picked.fixes.contains(id))
+            .collect()
+    }
+
+    #[test]
+    fn a_call_that_takes_the_number_of_unit_defs_second_leaves_n_out() {
+        let new = handler(COUNTS, &["counts", "unitDefsCount"]);
+        assert_eq!(
+            left_out_of_16(std::slice::from_ref(&new)),
+            ["spring-selected-units-counts-n"]
+        );
+        let new = handler(SORTED, &["_", "n"]);
+        assert_eq!(left_out_of_16(&[new]), ["spring-selected-units-sorted-n"]);
+    }
+
+    #[test]
+    fn a_call_that_takes_only_the_table_decides_nothing_about_n() {
+        // Spring 1944's gui_s44_supplyradius.lua.
+        let one = handler(COUNTS, &["selectedUnitsCounts"]);
+        assert!(left_out_of_16(std::slice::from_ref(&one)).is_empty());
+        let new = handler(COUNTS, &["counts", "n"]);
+        assert_eq!(
+            left_out_of_16(&[one, new]),
+            ["spring-selected-units-counts-n"]
+        );
+    }
+
     /// Issue #4695: manifest 11 adds `Game.version` and the old
     /// `Spring.GetGroundInfo` order, and keeps the writer of manifest 10.
     #[test]
@@ -1754,6 +1854,39 @@ mod tests {
         }
     }
 
+    const ADDED_IN_16: [&str; 4] = [
+        "luaui-font-handler-104",
+        "luaui-in-tweak-mode-104",
+        "spring-selected-units-counts-n",
+        "spring-selected-units-sorted-n",
+    ];
+
+    /// Issues #4705 and #4706: manifest 16 adds the unsynced fixes that give
+    /// widgets run by LuaHandler the `fontHandler` and
+    /// `widgetHandler:InTweakMode` of 104's basic widget handler, and the `n`
+    /// key of the selected units tables, and keeps the writer of manifest 15.
+    #[test]
+    fn manifest_16_is_manifest_15_with_the_basic_widget_handler_shims_and_n() {
+        let (fifteen, sixteen) = (manifest(15).unwrap(), manifest(16).unwrap());
+        let mut expected = fifteen.fixes.clone();
+        expected.extend(ADDED_IN_16.map(String::from));
+        assert_eq!(sixteen.fixes, expected);
+        assert_eq!(
+            (&sixteen.converter, sixteen.writer),
+            (&fifteen.converter, fifteen.writer)
+        );
+        let ids = |state| -> Vec<&str> {
+            prelude_fixes(&sixteen, state)
+                .iter()
+                .map(|(id, _)| *id)
+                .collect()
+        };
+        for id in ADDED_IN_16 {
+            assert!(ids(LuaState::Unsynced).contains(&id), "{id}");
+            assert!(!ids(LuaState::Synced).contains(&id), "{id}");
+        }
+    }
+
     /// Issue #4698: manifest 15 adds the unsynced fix that skips LuaUI's
     /// include of its own entry file, and keeps the writer of manifest 14.
     #[test]
@@ -1774,6 +1907,48 @@ mod tests {
         };
         assert!(ids(LuaState::Unsynced).contains(&"luaui-main-include"));
         assert!(!ids(LuaState::Synced).contains(&"luaui-main-include"));
+    }
+
+    /// Issue #4708: manifest 17 adds the fixes Complete Annihilation's widgets
+    /// need, and keeps the writer of manifest 16. The two that write to def
+    /// proxies with rawset run only in the unsynced state, which has it.
+    #[test]
+    fn manifest_17_is_manifest_16_with_complete_annihilations_widget_fixes() {
+        let (sixteen, seventeen) = (manifest(16).unwrap(), manifest(17).unwrap());
+        let added = [
+            "cmd-removed-ids",
+            "spring-array-n-83",
+            "spring-get-has-lag",
+            "unit-defs-weapons-n-83",
+            "weapon-defs-lua-consts-87",
+        ];
+        let mut expected = sixteen.fixes.clone();
+        expected.extend(added.iter().map(|id| id.to_string()));
+        assert_eq!(seventeen.fixes, expected);
+        assert_eq!(
+            (&seventeen.converter, seventeen.writer),
+            (&sixteen.converter, sixteen.writer)
+        );
+        let ids = |state| -> Vec<&str> {
+            prelude_fixes(&seventeen, state)
+                .iter()
+                .map(|(id, _)| *id)
+                .collect()
+        };
+        let (synced, unsynced) = (ids(LuaState::Synced), ids(LuaState::Unsynced));
+        for id in added {
+            assert!(unsynced.contains(&id), "{id} runs unsynced");
+        }
+        for id in ["cmd-removed-ids", "spring-array-n-83"] {
+            assert!(synced.contains(&id), "{id} runs synced");
+        }
+        for id in [
+            "spring-get-has-lag",
+            "unit-defs-weapons-n-83",
+            "weapon-defs-lua-consts-87",
+        ] {
+            assert!(!synced.contains(&id), "{id} stays out of synced");
+        }
     }
 
     /// Issues #4700 and #4699: manifest 14 stores a numeric string given to a
@@ -1947,14 +2122,14 @@ mod tests {
         }
     }
 
-    /// The preludes for manifests 9, 11, 12, 14 and 15, as the Lua tests in
+    /// The preludes for manifests 9, 11, 12, 14, 15, 16 and 17, as the Lua tests in
     /// `lua/compat/tests/` load them. Earlier manifests' synced preludes call
     /// `rawget`, which the tests' synced state lacks, so they are not kept.
     /// `COILBOX_WRITE_FIXTURE=1` writes them again after a deliberate change to
     /// how a prelude is built.
     #[test]
     fn the_lua_tests_load_the_preludes_this_crate_builds() {
-        for n in [9, 11, 12, 14, 15] {
+        for n in [9, 11, 12, 14, 15, 16, 17] {
             let m = manifest(n).unwrap();
             for state in [LuaState::Synced, LuaState::Unsynced] {
                 let built = prelude(&m, state).unwrap();
