@@ -57,6 +57,7 @@ const MANIFESTS: &[(u32, &str)] = &[
     (12, include_str!("../../../lua/compat/manifests/12.json")),
     (13, include_str!("../../../lua/compat/manifests/13.json")),
     (14, include_str!("../../../lua/compat/manifests/14.json")),
+    (15, include_str!("../../../lua/compat/manifests/15.json")),
 ];
 
 /// Every fix file, by id.
@@ -136,6 +137,10 @@ const FIXES: &[(&str, &str)] = &[
     (
         "game-version-104",
         include_str!("../../../lua/compat/game-version-104.lua"),
+    ),
+    (
+        "luaui-main-include",
+        include_str!("../../../lua/compat/luaui-main-include.lua"),
     ),
     (
         "gl-smoothing",
@@ -1749,6 +1754,28 @@ mod tests {
         }
     }
 
+    /// Issue #4698: manifest 15 adds the unsynced fix that skips LuaUI's
+    /// include of its own entry file, and keeps the writer of manifest 14.
+    #[test]
+    fn manifest_15_is_manifest_14_with_the_luaui_entry_include_skipped() {
+        let (fourteen, fifteen) = (manifest(14).unwrap(), manifest(15).unwrap());
+        let mut expected = fourteen.fixes.clone();
+        expected.push("luaui-main-include".into());
+        assert_eq!(fifteen.fixes, expected);
+        assert_eq!(
+            (&fifteen.converter, fifteen.writer),
+            (&fourteen.converter, fourteen.writer)
+        );
+        let ids = |state| -> Vec<&str> {
+            prelude_fixes(&fifteen, state)
+                .iter()
+                .map(|(id, _)| *id)
+                .collect()
+        };
+        assert!(ids(LuaState::Unsynced).contains(&"luaui-main-include"));
+        assert!(!ids(LuaState::Synced).contains(&"luaui-main-include"));
+    }
+
     /// Issues #4700 and #4699: manifest 14 stores a numeric string given to a
     /// rules param as a number, and reads an icon type the game does not
     /// define as "default", as 104.0 did, and keeps the writer of manifest 13.
@@ -1920,14 +1947,14 @@ mod tests {
         }
     }
 
-    /// The preludes for manifests 9, 11, 12 and 14, as the Lua tests in
+    /// The preludes for manifests 9, 11, 12, 14 and 15, as the Lua tests in
     /// `lua/compat/tests/` load them. Earlier manifests' synced preludes call
     /// `rawget`, which the tests' synced state lacks, so they are not kept.
     /// `COILBOX_WRITE_FIXTURE=1` writes them again after a deliberate change to
     /// how a prelude is built.
     #[test]
     fn the_lua_tests_load_the_preludes_this_crate_builds() {
-        for n in [9, 11, 12, 14] {
+        for n in [9, 11, 12, 14, 15] {
             let m = manifest(n).unwrap();
             for state in [LuaState::Synced, LuaState::Unsynced] {
                 let built = prelude(&m, state).unwrap();

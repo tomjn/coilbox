@@ -75,7 +75,9 @@ end
 --- manifests 9, 11 and 12 have fixtures, because the synced preludes of
 --- manifests 2 to 8 need rawget, which the synced state lacks. `game`
 --- is the Game table the engine builds, `engine` its Engine table, and
---- `modinfo` is what the mutator's modinfo.lua returns.
+--- `modinfo` is what the mutator's modinfo.lua returns. `name` is what
+--- Script.GetName returns. `files` maps a path to Lua source the VFS serves,
+--- and gives the VFS a FileExists that finds those paths and the preludes.
 function M.newEngine(opts)
 	opts = opts or {}
 	local engine = { registered = {}, logs = {}, frame = 0, units = {} }
@@ -138,12 +140,28 @@ function M.newEngine(opts)
 	env.FeatureDefNames = opts.featureDefNames or {}
 	env.Game = opts.game
 	env.Engine = opts.engine
+	if opts.name then
+		env.Script.GetName = function()
+			return opts.name
+		end
+	end
 	local files = preludes(opts.manifest or 9)
+	local sources = opts.files
 	env.VFS = {
 		MOD = "M",
-		Include = function(path)
+		Include = function(path, envTable)
 			if path == "modinfo.lua" and opts.modinfo then
 				return opts.modinfo
+			end
+			if sources and sources[path] then
+				local chunk = assert(loadstring(sources[path], path))
+				-- With no environment the engine runs the file in that of the
+				-- function that called VFS.Include (LuaUtils::PushCurrentFuncEnv).
+				-- A Lua caller that tail calls this stand-in is gone from the
+				-- stack, so that one gets the global table.
+				local ok, callerEnv = pcall(getfenv, 3)
+				setfenv(chunk, envTable or (ok and callerEnv) or env)
+				return chunk()
 			end
 			local file = files[path]
 			assert(file, "no such file in the test VFS: " .. path)
@@ -152,6 +170,11 @@ function M.newEngine(opts)
 			return chunk()
 		end,
 	}
+	if sources then
+		env.VFS.FileExists = function(path)
+			return sources[path] ~= nil or files[path] ~= nil
+		end
+	end
 	return engine
 end
 
