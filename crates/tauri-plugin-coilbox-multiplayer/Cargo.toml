@@ -38,6 +38,7 @@ serde = { workspace = true }
 serde_json = { workspace = true }
 picoframe-core = "0.0.4"
 coilbox-portable = { path = "../coilbox-portable" }
+coilbox-ui-error = { path = "../coilbox-ui-error" }
 coilbox-lobby-protocol = { path = "../coilbox-lobby-protocol" }
 coilbox-tachyon-protocol = { path = "../coilbox-tachyon-protocol" }
 coilbox-zerok-protocol = { path = "../coilbox-zerok-protocol" }

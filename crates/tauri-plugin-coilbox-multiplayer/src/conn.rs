@@ -15,6 +15,7 @@ use coilbox_lobby_protocol::{
     command, parse_line, record_outgoing_private, redact_line, reduce_at, ChatKind, Delta,
     LobbyState, LoginConfig, LoginMachine, LoginPhase, RingHost, ServerMessage,
 };
+use coilbox_ui_error::UiError;
 use futures_util::{SinkExt, StreamExt};
 use serde::Serialize;
 use tauri::ipc::Channel;
@@ -120,6 +121,12 @@ pub type EventSink = Arc<Mutex<Channel<LobbyEvent>>>;
 /// answer a waiter needs.
 pub type PhaseSlot = watch::Receiver<LoginPhase>;
 
+/// Codes for the failures [`wait_until_ready`] reports (issue #4596). The
+/// frontend's message table in `src/i18n/uiError.ts` has an entry for each.
+pub const LOGIN_REFUSED: &str = "multiplayer.login.refused";
+pub const LOGIN_ENDED: &str = "multiplayer.login.ended";
+pub const LOGIN_TIMEOUT: &str = "multiplayer.login.timeout";
+
 /// How long [`wait_until_ready`] waits before calling a login failed.
 ///
 /// Generous, because a real server behind a slow link is not a failure, and
@@ -154,14 +161,20 @@ pub async fn wait_until_ready(
         // The sending half is the connection task's, so a closed channel means
         // that task has ended: a refused login, a dropped socket, or a logout.
         Ok(Err(_)) => Err(if *phase.borrow() == LoginPhase::Denied {
-            "the server refused the login".to_string()
+            UiError::new(LOGIN_REFUSED, "the server refused the login").into()
         } else {
-            "the connection ended before the login finished".to_string()
+            UiError::new(
+                LOGIN_ENDED,
+                "the connection ended before the login finished",
+            )
+            .into()
         }),
-        Err(_) => Err(format!(
-            "the login did not finish within {}s",
-            timeout.as_secs()
-        )),
+        Err(_) => Err(UiError::new(
+            LOGIN_TIMEOUT,
+            format!("the login did not finish within {}s", timeout.as_secs()),
+        )
+        .param("seconds", timeout.as_secs())
+        .into()),
     }
 }
 
