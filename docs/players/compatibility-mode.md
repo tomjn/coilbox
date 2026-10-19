@@ -130,7 +130,7 @@ If one of the fixes fails while the game runs, the game still loads. The engine'
 
 ## What it changes
 
-This is compatibility version 14, the newest.
+This is compatibility version 15, the newest.
 
 Lua functions it puts back:
 
@@ -151,6 +151,10 @@ Call-ins whose arguments moved:
 Values the engine now keeps differently:
 
 - `Spring.SetUnitRulesParam`, and the game, team and feature versions, changed in Spring 105.0. A number written as text, such as `"30"`, is stored as a number again, so the game reads back a number it can compare.
+
+Files the engine no longer installs as they were:
+
+- `LuaUI/main.lua`, the basic widget handler beside the engine, which Recoil 2025.01.1 changed. A game whose own `LuaUI/main.lua` includes that file, as Spring 1944 does, skips the include, so the game's own widget handler runs on its own.
 
 Gadgets, which each decide when the game loads whether the game needs them:
 
