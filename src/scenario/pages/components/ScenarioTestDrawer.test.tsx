@@ -24,7 +24,9 @@ const {
   contentListReplays,
   detectBattleResult,
   recordWin,
+  resolveCompatTarget,
 } = vi.hoisted(() => ({
+  resolveCompatTarget: vi.fn(),
   launchScenario: vi.fn(),
   playInfolog: vi.fn(),
   contentListReplays: vi.fn(),
@@ -32,7 +34,7 @@ const {
   recordWin: vi.fn(),
   // Set by the tests where the scan failed: the hook answers `data: null`
   // with the engine's reason.
-  scanState: { error: null as string | null },
+  scanState: { error: null as string | null, games: [] as unknown[] },
   primeScan: vi.fn(async () => ({ games: [] as unknown[] })),
 }));
 
@@ -65,12 +67,16 @@ vi.mock("@/play/config", () => ({
 }));
 vi.mock("@/content/config", () => ({
   useUnitsyncScan: () => ({
-    data: scanState.error ? null : { games: [] },
+    data: scanState.error ? null : { games: scanState.games },
     error: scanState.error,
     loading: false,
   }),
   primeScan,
 }));
+vi.mock("@/content/compatSettings", () => ({
+  useCompatSettings: () => [{}],
+}));
+vi.mock("@/play/compatTarget", () => ({ resolveCompatTarget }));
 vi.mock("@/content/useGameUnits", () => ({
   useGameUnits: () => ({ units: [], archive: null }),
 }));
@@ -141,6 +147,8 @@ async function press(mode: "test" | "play") {
 beforeEach(() => {
   vi.clearAllMocks();
   scanState.error = null;
+  scanState.games = [];
+  resolveCompatTarget.mockResolvedValue({ kind: "off" });
   clean();
   contentListReplays.mockResolvedValue({ replays: [{ path: "/old.sdfz" }] });
   detectBattleResult.mockResolvedValue({ outcome: "ambiguous", replay: null });
@@ -381,5 +389,59 @@ describe("a scan that failed", () => {
     screen.getByRole("button", { name: "Test in game" }).click();
 
     expect(await screen.findByText(/no space left on device/)).toBeTruthy();
+  });
+});
+
+/** Issue #4664. The scenario's game's compatibility switch decides the launch. */
+describe("a game with compatibility mode", () => {
+  const GAME = {
+    name: "Demo Game",
+    primaryArchive: { name: "demo-game.sd7" },
+  };
+  function scenarioOnGame(): Scenario {
+    const scenario = newScenario("Demo");
+    return { ...scenario, setup: { ...scenario.setup, gameName: GAME.name } };
+  }
+  function press() {
+    render(<ScenarioTestDrawer scenario={scenarioOnGame()} mode="play" />);
+    screen.getByRole("button", { name: "Play" }).click();
+  }
+
+  beforeEach(() => {
+    scanState.games = [GAME];
+  });
+
+  it("resolves the scenario's game and hands the mutator to the launch", async () => {
+    const use = {
+      kind: "use",
+      gameType: "Demo Game (compat 1)",
+      gameArchive: "coilbox-compat-demo-game-1.sdd",
+      baseName: "Demo Game",
+    };
+    resolveCompatTarget.mockResolvedValue(use);
+    press();
+
+    await screen.findByText(/The game has closed/);
+    expect(resolveCompatTarget.mock.calls[0][0].game).toBe(GAME);
+    expect(launchScenario.mock.calls[0][0].compat).toEqual(use);
+  });
+
+  it("launches the game itself when the switch is off", async () => {
+    press();
+
+    await screen.findByText(/The game has closed/);
+    expect(launchScenario.mock.calls[0][0].compat).toBeUndefined();
+  });
+
+  it.each([
+    "its mutator has not been built.",
+    "its mutator is out of date: the fixes changed.",
+  ])("does not launch, and says why, when %s", async (why) => {
+    const message = `Compatibility mode is on for Demo Game, but ${why} Open Demo Game under Library > Games and choose Rebuild.`;
+    resolveCompatTarget.mockResolvedValue({ kind: "blocked", message });
+    press();
+
+    expect(await screen.findByText(message)).toBeTruthy();
+    expect(launchScenario).not.toHaveBeenCalled();
   });
 });

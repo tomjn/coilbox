@@ -3,6 +3,7 @@ import { composeUnits, type UnitsOwner } from "../campaign/units";
 import type { GameRef, NodeScenario } from "../conquest/model";
 import type { SkirmishAi } from "../content/bindings";
 import { useBrandingEntry } from "../content/branding";
+import { useCompatSettings } from "../content/compatSettings";
 import { useUnitsyncScan } from "../content/config";
 import { loadReplays } from "../content/replayList";
 import type { ReplayProvenance } from "../content/replayUserState";
@@ -15,6 +16,7 @@ import {
   storeScenarioMedia,
 } from "../scenario/playerLaunch";
 import type { BattleConfig } from "./bindings";
+import { resolveCompatTarget } from "./compatTarget";
 import {
   applyRestrictions,
   gameOptionSchema,
@@ -168,6 +170,7 @@ export function useBattleRun<TResolved>(opts: UseBattleRunOptions<TResolved>) {
   const scan = useUnitsyncScan(target?.enginePath, target?.dataDir);
   const { running, launch } = usePlay();
   const { setProvenance } = useReplayUserState();
+  const [compatSettings] = useCompatSettings();
 
   const [phase, setPhase] = useState<BattleRunPhase>("briefing");
   const [error, setError] = useState<string | null>(null);
@@ -310,6 +313,19 @@ export function useBattleRun<TResolved>(opts: UseBattleRunOptions<TResolved>) {
 
   const start = useCallback(async () => {
     if (!target || !hasDomainState || !installedGame) return;
+    // With the game's compatibility switch on, the battle runs over its
+    // mutator, and the units mutator depends on the mutator rather than the
+    // game (issue #4664). Off, nothing about the mutator is read. A stale or
+    // missing mutator stops the launch rather than launching without it.
+    const compat = await resolveCompatTarget({
+      target,
+      game: installedGame,
+      settings: compatSettings,
+    });
+    if (compat.kind === "blocked") {
+      setError(compat.message);
+      return;
+    }
     const startEngine = (config: BattleConfig) =>
       launch(launchMode, {
         config,
@@ -321,10 +337,16 @@ export function useBattleRun<TResolved>(opts: UseBattleRunOptions<TResolved>) {
     // are none, so the battle launches the game itself as it always did.
     const unitsGame = async (): Promise<string | undefined> => {
       if (!units) return undefined;
-      const composed = await composeUnits(units, target, {
-        name: installedGame.name,
-        archive: installedGame.primaryArchive.name,
-      });
+      const composed = await composeUnits(
+        units,
+        target,
+        compat.kind === "use"
+          ? { name: compat.gameType, archive: compat.gameArchive }
+          : {
+              name: installedGame.name,
+              archive: installedGame.primaryArchive.name,
+            },
+      );
       setLeftOut(composed?.leftOut ?? []);
       return composed?.name;
     };
@@ -350,6 +372,7 @@ export function useBattleRun<TResolved>(opts: UseBattleRunOptions<TResolved>) {
           launch: startEngine,
           difficulty: scenarioDifficulty,
           unitsGame: await unitsGame(),
+          compat: compat.kind === "use" ? compat : undefined,
         });
         if (!result.ok) return { refused: result.message };
         // The scenario's own setup names the player, not this hook.
@@ -366,7 +389,8 @@ export function useBattleRun<TResolved>(opts: UseBattleRunOptions<TResolved>) {
         toBattleConfig({
           participants: draft.participants,
           mapName: draft.mapName,
-          gameType: draft.gameName,
+          gameType: compat.kind === "use" ? compat.gameType : draft.gameName,
+          compatBase: compat.kind === "use" ? compat.baseName : undefined,
           startPosType: draft.startPosType,
           startRects: draft.startRects,
           modOptions: draft.modOptionValues,
@@ -467,6 +491,7 @@ export function useBattleRun<TResolved>(opts: UseBattleRunOptions<TResolved>) {
     scenarioDifficulty,
     games,
     units,
+    compatSettings,
   ]);
 
   const recordVictory = useCallback(

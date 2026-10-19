@@ -29,6 +29,7 @@
 import { act, renderHook } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { DemoInfo, ReplayFile } from "../content/bindings";
+import { newScenario } from "../scenario/create";
 import type { BattleRestrictions, SkirmishDraft } from "./drafts";
 import type { InstalledGame } from "./installedGames";
 import {
@@ -43,11 +44,14 @@ const scanOverride = vi.hoisted(() => ({
 
 const {
   applyRestrictions,
+  composeUnits,
   contentDemoInfo,
   contentListReplays,
   gameOptionSchema,
   launch,
+  launchScenarioForPlayer,
   mapOptionSchema,
+  resolveCompatTarget,
   setProvenance,
   toBattleConfig,
 } = vi.hoisted(() => ({
@@ -57,16 +61,32 @@ const {
       restrictions,
     }),
   ),
+  composeUnits: vi.fn(),
   contentDemoInfo: vi.fn(),
   contentListReplays: vi.fn(),
   gameOptionSchema: vi.fn(async () => []),
   launch: vi.fn(),
+  launchScenarioForPlayer: vi.fn(),
+  resolveCompatTarget: vi.fn(),
   mapOptionSchema: vi.fn(async () => []),
   setProvenance: vi.fn(),
   toBattleConfig: vi.fn((opts: Record<string, unknown>) => ({ ...opts })),
 }));
 
 vi.mock("../content/bindings", () => ({ contentDemoInfo, contentListReplays }));
+vi.mock("../content/compatSettings", () => ({
+  useCompatSettings: () => [{}],
+}));
+vi.mock("./compatTarget", () => ({ resolveCompatTarget }));
+vi.mock("../campaign/units", async (importActual) => ({
+  ...(await importActual<typeof import("../campaign/units")>()),
+  composeUnits,
+}));
+vi.mock("../scenario/playerLaunch", async (importActual) => ({
+  ...(await importActual<typeof import("../scenario/playerLaunch")>()),
+  launchScenarioForPlayer,
+  storeScenarioMedia: async () => {},
+}));
 vi.mock("../content/branding", () => ({ useBrandingEntry: () => null }));
 vi.mock("../content/replayUserState", () => ({
   useReplayUserState: () => ({ setProvenance }),
@@ -203,6 +223,11 @@ beforeEach(() => {
   mapOptionSchema.mockClear();
   setProvenance.mockClear();
   scanOverride.current = null;
+  composeUnits.mockReset();
+  composeUnits.mockResolvedValue(null);
+  launchScenarioForPlayer.mockReset();
+  resolveCompatTarget.mockReset();
+  resolveCompatTarget.mockResolvedValue({ kind: "off" });
 });
 
 afterEach(() => {
@@ -671,5 +696,124 @@ describe("which game a battle launches (issue #3465)", () => {
     );
     expect(declined.result.current.canStart).toBe(true);
     expect(declined.result.current.gameOffer).toBeNull();
+  });
+});
+
+// Issue #4664. A game with its compatibility switch on is fought over its
+// mutator, and the run's units mutator depends on that mutator.
+describe("a battle on a game with compatibility mode", () => {
+  const USE = {
+    kind: "use",
+    gameType: "Balanced Annihilation (compat 1)",
+    gameArchive: "coilbox-compat-ba-1.sdd",
+    baseName: "Balanced Annihilation",
+  };
+  const persist = vi.fn(async () => {});
+  const resolveOutcome = vi.fn((outcome: "victory" | "defeat") => outcome);
+
+  async function start(overrides: Partial<UseBattleRunOptions<string>> = {}) {
+    contentListReplays.mockResolvedValue({ replays: [] });
+    launch.mockResolvedValue({ exitCode: null, signal: null });
+    const { result } = renderHook(() =>
+      useBattleRun(baseOpts<string>({ persist, resolveOutcome, ...overrides })),
+    );
+    await act(async () => {
+      await result.current.start();
+    });
+    return result;
+  }
+
+  it("resolves the game the run is on", async () => {
+    await start();
+
+    expect(resolveCompatTarget.mock.calls[0][0].game.name).toBe(
+      "Balanced Annihilation",
+    );
+  });
+
+  it("launches the mutator and names the base game", async () => {
+    resolveCompatTarget.mockResolvedValue(USE);
+    await start();
+
+    expect(toBattleConfig.mock.calls[0][0]).toMatchObject({
+      gameType: "Balanced Annihilation (compat 1)",
+      compatBase: "Balanced Annihilation",
+    });
+    expect(launch).toHaveBeenCalledTimes(1);
+  });
+
+  it("launches the game itself and names no base when the switch is off", async () => {
+    await start();
+
+    const opts = toBattleConfig.mock.calls[0][0];
+    expect(opts.gameType).toBe("Balanced Annihilation");
+    expect(opts.compatBase).toBeUndefined();
+  });
+
+  it("writes the units mutator over the compat mutator and launches that", async () => {
+    resolveCompatTarget.mockResolvedValue(USE);
+    composeUnits.mockResolvedValue({ name: "Coilbox run r1", leftOut: [] });
+    await start({
+      units: { id: "r1", scope: "warpath", units: [{}] } as never,
+    });
+
+    expect(composeUnits.mock.calls[0][2]).toEqual({
+      name: "Balanced Annihilation (compat 1)",
+      archive: "coilbox-compat-ba-1.sdd",
+    });
+    expect(launch.mock.calls[0][1].config.gameType).toBe("Coilbox run r1");
+    expect(launch.mock.calls[0][1].config.compatBase).toBe(
+      "Balanced Annihilation",
+    );
+  });
+
+  it("writes the units mutator over the game when the switch is off", async () => {
+    composeUnits.mockResolvedValue({ name: "Coilbox run r1", leftOut: [] });
+    await start({
+      units: { id: "r1", scope: "warpath", units: [{}] } as never,
+    });
+
+    expect(composeUnits.mock.calls[0][2]).toEqual({
+      name: "Balanced Annihilation",
+      archive: "ba.sdz",
+    });
+  });
+
+  it("hands a scenario location the mutator", async () => {
+    resolveCompatTarget.mockResolvedValue(USE);
+    launchScenarioForPlayer.mockResolvedValue({
+      ok: true,
+      config: { myPlayerName: "You" },
+      exitCode: null,
+    });
+    const doc = newScenario("Hold the pass");
+    await start({
+      scenario: {
+        file: "pass.json",
+        media: {},
+        doc: {
+          ...doc,
+          setup: { ...doc.setup, gameName: "Balanced Annihilation" },
+        },
+      },
+    });
+
+    expect(launchScenarioForPlayer.mock.calls[0][0].compat).toEqual(USE);
+  });
+
+  it.each([
+    "its mutator has not been built.",
+    "its mutator is out of date: the fixes changed.",
+  ])("launches nothing and says why when %s", async (why) => {
+    const message = `Compatibility mode is on for Balanced Annihilation, but ${why} Open Balanced Annihilation under Library > Games and choose Rebuild.`;
+    resolveCompatTarget.mockResolvedValue({ kind: "blocked", message });
+    const result = await start({
+      units: { id: "r1", scope: "warpath", units: [{}] } as never,
+    });
+
+    expect(result.current.error).toBe(message);
+    expect(composeUnits).not.toHaveBeenCalled();
+    expect(toBattleConfig).not.toHaveBeenCalled();
+    expect(launch).not.toHaveBeenCalled();
   });
 });

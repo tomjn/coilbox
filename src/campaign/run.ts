@@ -1,10 +1,12 @@
 import { useCallback, useEffect, useState } from "react";
+import { useCompatSettings } from "../content/compatSettings";
 import { useUnitsyncScan } from "../content/config";
 import { dependencyBlockReason } from "../content/gameDependencies";
 import { loadReplays } from "../content/replayList";
 import { useReplayUserState } from "../content/replayUserState";
 import { loadPack } from "../lego/pack";
 import type { BattleConfig } from "../play/bindings";
+import { resolveCompatTarget } from "../play/compatTarget";
 import {
   gameOptionSchema,
   mapOptionSchema,
@@ -150,6 +152,7 @@ export function useMissionRun(campaign: Campaign, mission: CampaignMission) {
   const { running, launch } = usePlay();
   const { progress, save } = useCampaignProgress();
   const { setProvenance } = useReplayUserState();
+  const [compatSettings] = useCompatSettings();
 
   const [phase, setPhase] = useState<MissionRunPhase>("briefing");
   const [error, setError] = useState<string | null>(null);
@@ -293,11 +296,32 @@ export function useMissionRun(campaign: Campaign, mission: CampaignMission) {
       const unitsBase = mission.scenario
         ? games.find((g) => g.name === mission.scenario?.setup.gameName)
         : game;
-      const units = unitsBase
-        ? await composeUnits(campaign, target, {
-            name: unitsBase.name,
-            archive: unitsBase.primaryArchive.name,
+      // With that game's compatibility switch on, the mission plays over its
+      // mutator, and the units mutator depends on the mutator rather than the
+      // game (issue #4664). Off, nothing about the mutator is read. A game that
+      // is not installed is left to the scenario launch to refuse.
+      const compat = unitsBase
+        ? await resolveCompatTarget({
+            target,
+            game: unitsBase,
+            settings: compatSettings,
           })
+        : ({ kind: "off" } as const);
+      if (compat.kind === "blocked") {
+        setError(compat.message);
+        return;
+      }
+      const units = unitsBase
+        ? await composeUnits(
+            campaign,
+            target,
+            compat.kind === "use"
+              ? { name: compat.gameType, archive: compat.gameArchive }
+              : {
+                  name: unitsBase.name,
+                  archive: unitsBase.primaryArchive.name,
+                },
+          )
         : null;
       if (units) setLeftOut(units.leftOut);
       let exitCode: number | null;
@@ -328,6 +352,7 @@ export function useMissionRun(campaign: Campaign, mission: CampaignMission) {
           // script they always did.
           difficulty: variesByDifficulty ? difficulty : undefined,
           unitsGame: units?.name,
+          compat: compat.kind === "use" ? compat : undefined,
           launch: startEngine,
         });
         if (!result.ok) {
@@ -345,7 +370,10 @@ export function useMissionRun(campaign: Campaign, mission: CampaignMission) {
         launched = toBattleConfig({
           participants: snapshot.participants,
           mapName: map.name,
-          gameType: units?.name ?? game.name,
+          gameType:
+            units?.name ??
+            (compat.kind === "use" ? compat.gameType : game.name),
+          compatBase: compat.kind === "use" ? compat.baseName : undefined,
           startPosType: snapshot.startPosType,
           modOptions: snapshot.modOptionValues,
           optionSchema: await gameOptionSchema(
@@ -427,6 +455,7 @@ export function useMissionRun(campaign: Campaign, mission: CampaignMission) {
     variesByDifficulty,
     difficulty,
     dependencyBlock,
+    compatSettings,
   ]);
 
   /**

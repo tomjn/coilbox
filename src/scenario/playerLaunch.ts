@@ -13,6 +13,7 @@ import type { GameItem } from "../content/bindings";
 import { primeScan } from "../content/config";
 import { sameGameFamily } from "../content/resolveContent";
 import type { BattleConfig } from "../play/bindings";
+import type { CompatTarget } from "../play/compatTarget";
 import {
   gameOptionSchema,
   mapOptionSchema,
@@ -35,6 +36,8 @@ export interface PlayerScenarioLaunch {
   difficulty?: Difficulty;
   /** A generated game carrying a campaign's builder units. See `launchScenario`. */
   unitsGame?: string;
+  /** The game's compatibility mutator, when its switch is on. See `launchScenario`. */
+  compat?: Extract<CompatTarget, { kind: "use" }>;
 }
 
 export async function launchScenarioForPlayer(
@@ -48,6 +51,7 @@ export async function launchScenarioForPlayer(
     disabledUnits,
     difficulty,
     unitsGame,
+    compat,
   } = opts;
   // A scenario runs as itself or as a mutator over its game, so the options
   // are that game's either way. A game that is not installed has none to read,
@@ -64,6 +68,7 @@ export async function launchScenarioForPlayer(
     disabledUnits,
     difficulty,
     unitsGame,
+    compat,
     // A rescan whose unitsync `Init` failed throws the engine's reason. It is
     // worded as a scan failure here so the briefing's error does not read as a
     // bare engine message.
