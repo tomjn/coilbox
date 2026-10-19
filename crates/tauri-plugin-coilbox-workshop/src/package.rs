@@ -23,8 +23,14 @@
 use crate::compile::{modinfo_versioned, CompiledFile};
 use crate::model::ModProject;
 use coilbox_portable::is_safe_rel;
+use coilbox_ui_error::UiError;
 use std::io::Write;
 use std::path::Path;
+
+/// The code [`write_sdd`] refuses with when `dest` is already there. The
+/// frontend's `UI_ERROR_CODES.packageTargetExists` is the same string, and its
+/// packaging panel asks the author to confirm a replace on seeing it.
+pub const TARGET_EXISTS: &str = "workshop.package.target_exists";
 
 /// Swap the placeholder `modinfo.lua` `compile::compile` wrote for one
 /// carrying the version this export is being published as. Nothing else
@@ -143,10 +149,15 @@ pub fn write_sdd(dest: &Path, files: &[CompiledFile], overwrite: bool) -> Result
     }
     if dest.exists() {
         if !overwrite {
-            return Err(format!(
-                "{} already exists; confirm a replace before packaging over it",
-                dest.display()
-            ));
+            return Err(UiError::new(
+                TARGET_EXISTS,
+                format!(
+                    "{} already exists; confirm a replace before packaging over it",
+                    dest.display()
+                ),
+            )
+            .param("path", dest.display())
+            .into());
         }
         // `exists()` follows symlinks, so it is checked again here without
         // following one. A symlink could point anywhere, and clearing
@@ -342,7 +353,13 @@ mod tests {
         std::fs::write(&stray, "leftover from something else").expect("write stray");
 
         let err = write_sdd(&dest, &files, false).expect_err("should refuse");
-        assert!(err.contains("already exists"));
+        let refusal = UiError::parse(&err).expect("a UiError, not plain text");
+        assert_eq!(refusal.code, TARGET_EXISTS);
+        assert_eq!(
+            refusal.params.get("path"),
+            Some(&dest.display().to_string())
+        );
+        assert!(refusal.fallback.contains("already exists"));
         // Refused outright: the stray file must still be there.
         assert!(stray.exists());
     }
