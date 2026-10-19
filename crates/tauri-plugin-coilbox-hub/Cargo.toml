@@ -17,6 +17,7 @@ serde = { workspace = true }
 serde_json = { workspace = true }
 picoframe-core = "0.0.4"
 coilbox-oauth = { path = "../coilbox-oauth" }
+coilbox-ui-error = { path = "../coilbox-ui-error" }
 # The variant names the have check's keys are built from, read from the same
 # shared/asset-vocabulary.json the hub agrees to.
 coilbox-assets = { path = "../coilbox-assets" }

@@ -15,6 +15,7 @@
 use std::time::Duration;
 
 use coilbox_oauth::HTTP_TIMEOUT;
+use coilbox_ui_error::UiError;
 use url::Url;
 
 use crate::upload::{verdict_for, Verdict, RETRY_BACKOFF, UPLOAD_ATTEMPTS};
@@ -27,6 +28,11 @@ const REQUEST_TIMEOUT: Duration = Duration::from_secs(60);
 /// Bound the initial connect on its own, so a dead host fails before any of the
 /// above is spent waiting.
 const CONNECT_TIMEOUT: Duration = HTTP_TIMEOUT;
+
+/// Codes for the refusals [`read_capped`] reports (issue #4596). The frontend's
+/// message table in `src/i18n/uiError.ts` has an entry for each.
+pub const NOT_A_HUB: &str = "hub.endpoint.not_a_hub";
+pub const STOPPED_ANSWERING: &str = "hub.endpoint.stopped_answering";
 
 /// Where a route on a hub lives, or why this address cannot carry a token.
 ///
@@ -66,12 +72,22 @@ pub async fn read_capped(mut response: reqwest::Response, limit: usize) -> Resul
         match response.chunk().await {
             Ok(Some(chunk)) => {
                 if buf.len() + chunk.len() > limit {
-                    return Err("That address answered, but it is not a coilbox hub.".to_owned());
+                    return Err(UiError::new(
+                        NOT_A_HUB,
+                        "That address answered, but it is not a coilbox hub.",
+                    )
+                    .into());
                 }
                 buf.extend_from_slice(&chunk);
             }
             Ok(None) => return Ok(buf),
-            Err(_) => return Err("The hub stopped answering part way through.".to_owned()),
+            Err(_) => {
+                return Err(UiError::new(
+                    STOPPED_ANSWERING,
+                    "The hub stopped answering part way through.",
+                )
+                .into())
+            }
         }
     }
 }
@@ -211,5 +227,34 @@ mod tests {
         let refused = api_url("http://hub.example", "/api/v1/anything", "Sending").unwrap_err();
         assert!(refused.contains("https"), "{refused}");
         assert!(refused.starts_with("Sending"), "{refused}");
+    }
+
+    /// An answer past the cap is what a plain website looks like: the code is
+    /// what the frontend translates, so the test pins it and not the sentence.
+    #[tokio::test]
+    async fn an_answer_past_the_cap_is_refused_as_not_a_hub() {
+        use tokio::io::AsyncWriteExt;
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let port = listener.local_addr().unwrap().port();
+        tokio::spawn(async move {
+            let (mut socket, _) = listener.accept().await.unwrap();
+            let body = "x".repeat(64);
+            let head = format!(
+                "HTTP/1.1 200 OK\r\nContent-Length: {}\r\nConnection: close\r\n\r\n",
+                body.len()
+            );
+            let _ = socket.write_all(head.as_bytes()).await;
+            let _ = socket.write_all(body.as_bytes()).await;
+        });
+        let response = reqwest::Client::new()
+            .get(format!("http://127.0.0.1:{port}/"))
+            .send()
+            .await
+            .unwrap();
+
+        let refused = read_capped(response, 8).await.unwrap_err();
+
+        let error = UiError::parse(&refused).expect("a UiError, not plain text");
+        assert_eq!(error.code, NOT_A_HUB);
     }
 }
