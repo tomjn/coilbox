@@ -7,11 +7,18 @@
 //! that address as one datagram. `docs/developers/engine-reload.md` has the
 //! engine source this follows and the test it was proved in.
 
+use coilbox_ui_error::UiError;
 use std::net::{SocketAddr, UdpSocket};
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Condvar, Mutex};
 use std::time::{Duration, Instant};
+
+/// Codes for the refusals a player reads (issue #4596). The frontend's message
+/// table in `src/i18n/uiError.ts` has an entry for each.
+pub const NOT_CONNECTED: &str = "play.autohost.not_connected";
+pub const NOT_STARTED: &str = "play.autohost.not_started";
+pub const NO_ANSWER: &str = "play.autohost.no_answer";
 
 /// The message types this reads, from `EVENT` in the engine's
 /// `rts/Net/AutohostInterface.cpp`. Everything else it ignores.
@@ -123,10 +130,12 @@ impl Autohost {
         }
         let mut state = self.state.lock().unwrap();
         let Some(engine) = state.engine else {
-            return Err("The game has not connected to coilbox.".into());
+            return Err(
+                UiError::new(NOT_CONNECTED, "The game has not connected to coilbox.").into(),
+            );
         };
         if !state.playing {
-            return Err("The game has not started yet.".into());
+            return Err(UiError::new(NOT_STARTED, "The game has not started yet.").into());
         }
         state.lua.clear();
         let started = Instant::now();
@@ -138,10 +147,15 @@ impl Autohost {
             }
             let now = Instant::now();
             if now >= deadline || self.closed.load(Ordering::SeqCst) {
-                return Err(format!(
-                    "The game did not answer within {} seconds. Its infolog says why.",
-                    wait.as_secs()
-                ));
+                let seconds = wait.as_secs();
+                return Err(UiError::new(
+                    NO_ANSWER,
+                    format!(
+                        "The game did not answer within {seconds} seconds. Its infolog says why."
+                    ),
+                )
+                .param("seconds", seconds)
+                .into());
             }
             state = self.changed.wait_timeout(state, deadline - now).unwrap().0;
         }
@@ -273,7 +287,7 @@ mod tests {
         let err = host
             .ask_lua_rules(ASK, REPLY, Duration::from_secs(1))
             .expect_err("refused");
-        assert!(err.contains("not connected"), "{err}");
+        assert_eq!(UiError::parse(&err).expect("a UiError").code, NOT_CONNECTED);
         host.close();
     }
 
@@ -292,7 +306,7 @@ mod tests {
         let err = host
             .ask_lua_rules(ASK, REPLY, Duration::from_secs(1))
             .expect_err("refused");
-        assert!(err.contains("not started"), "{err}");
+        assert_eq!(UiError::parse(&err).expect("a UiError").code, NOT_STARTED);
         host.close();
     }
 
@@ -330,7 +344,9 @@ mod tests {
         let err = host
             .ask_lua_rules(ASK, REPLY, Duration::from_millis(300))
             .expect_err("nothing answered this message");
-        assert!(err.contains("did not answer"), "{err}");
+        let err = UiError::parse(&err).expect("a UiError, not plain text");
+        assert_eq!(err.code, NO_ANSWER);
+        assert_eq!(err.params["seconds"], "0");
         assert_eq!(engine.heard(), "/luarules coilbox_sandbox reload_scripts");
         host.close();
     }
