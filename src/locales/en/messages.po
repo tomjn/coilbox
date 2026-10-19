@@ -31,6 +31,10 @@ msgstr "{next}h"
 msgid "{next}m"
 msgstr "{next}m"
 
+#: src/i18n/uiError.ts
+msgid "{path} already exists; confirm a replace before packaging over it"
+msgstr "{path} already exists; confirm a replace before packaging over it"
+
 #: src/downloads/downloadRate.ts
 msgid "{total}s"
 msgstr "{total}s"
