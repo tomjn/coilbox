@@ -1094,6 +1094,10 @@ mod tests {
     const OLD_GROUND: &str =
         "local GetGroundInfo = Spring.GetGroundInfo\nlocal _, metal = GetGroundInfo(x, z)\n";
     const NEW_GROUND: &str = "local _, _, metal = Spring.GetGroundInfo(x, z)\n";
+    const OLD_TEAM_INFO: &str =
+        "local _, _, _, _, _, _, teamOptions = Spring.GetTeamInfo(teamID)\n";
+    const NEW_TEAM_INFO: &str =
+        "local _, _, _, _, _, _, incomeMultiplier = Spring.GetTeamInfo(teamID)\n";
 
     /// One game with every entry file, written for the old call-in orders,
     /// with a dependency written for the new ones. One updated for one change
@@ -1119,6 +1123,7 @@ mod tests {
                 ("xta-9.65.sd7", OLD_DAMAGED),
                 ("xta-9.65.sd7", OLD_COMMAND),
                 ("xta-9.65.sd7", OLD_GROUND),
+                ("xta-9.65.sd7", OLD_TEAM_INFO),
                 ("otherdep.sdz", NEW_DAMAGED),
                 ("otherdep.sdz", NEW_COMMAND),
             ],
@@ -1138,6 +1143,7 @@ mod tests {
                 ("BA-V9.79.SDZ", OLD_COMMAND),
                 ("BA-V9.79.SDZ", NEW_COMMAND),
                 ("BA-V9.79.SDZ", NEW_GROUND),
+                ("BA-V9.79.SDZ", NEW_TEAM_INFO),
             ],
         },
         Fixture {
@@ -1352,6 +1358,17 @@ mod tests {
         let updated = golden_build(11, &FIXTURES[1]);
         let synced = text(&updated, "compat/prelude-synced.lua").unwrap();
         assert!(!synced.contains(ground) && synced.contains("-- fix: game-version-104\n"));
+
+        // Issue #4694: a game that reads GetTeamInfo's custom keys 7th gets
+        // the old order, and one that reads the income multiplier there does
+        // not.
+        let team_info = "-- fix: spring-get-team-info-105\n";
+        let synced_of = |n: u32, fixture: &Fixture| {
+            text(&golden_build(n, fixture), "compat/prelude-synced.lua").unwrap()
+        };
+        assert!(synced_of(12, &FIXTURES[0]).contains(team_info));
+        assert!(!synced_of(12, &FIXTURES[1]).contains(team_info));
+        assert!(!synced_of(11, &FIXTURES[0]).contains(team_info));
     }
 
     /// The hash of every fixed game built from `manifest`.
@@ -1420,6 +1437,10 @@ mod tests {
         (
             11,
             "e9e8dcfc7caf88da395188e572c100824ed837091fac9b15efbc8f680466ec5e",
+        ),
+        (
+            12,
+            "8fd6fd648ea8959561fb60c20eaa2703623487809b6fefa294402dee85e6d326",
         ),
     ];
 

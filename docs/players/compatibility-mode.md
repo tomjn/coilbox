@@ -130,20 +130,23 @@ If one of the fixes fails while the game runs, the game still loads. The engine'
 
 ## What it changes
 
-This is compatibility version 10, the newest.
+This is compatibility version 12, the newest.
 
 Lua functions it puts back:
 
 - `Spring.GetUnitTravel` and `Spring.SetUnitTravel`, removed in Spring 105.0. They work again, and keep their values per unit.
 - `Spring.SetUnitToFeature`, removed in Spring 105.0.
+- `Spring.SetUnitLineage` and `Spring.GetUnitLineage`, last in Spring 0.82.7.1. They work again, and keep each unit's lineage, but a team's units no longer die with its lineage root.
 - `gl.Smoothing`, removed in Spring 104.0. It does nothing.
 - `Spring.SetSunParameters` and `Spring.SetSunManualControl`, removed in Spring 104.0. They do nothing.
 - `Spring.UpdateInfoTexture`, removed in Spring 99.0. It does nothing and returns false.
 - `Spring.MakeFont`, last in Spring 0.81.2.1. It makes no font and returns nil.
+- `snext`, `spairs` and `sipairs`, removed in Recoil 2025.01.1. In a game's unsynced gadgets they are `next`, `pairs` and `ipairs` again, as they were from Spring 97.0.
 
 Call-ins whose arguments moved:
 
 - `UnitDamaged`, changed in Spring 95.0, and `AllowCommand`, changed in Spring 105.0. The game's handlers get the arguments in the old order. Coilbox reads the game's Lua first, and leaves this out for a game whose handlers already take the new order.
+- `Spring.GetTeamInfo`, changed in Spring 105.0. The game gets the team's custom keys 7th and its income multiplier 8th, as before. Coilbox leaves this out for a game whose Lua already reads them the new way round.
 
 Gadgets, which each decide when the game loads whether the game needs them:
 
