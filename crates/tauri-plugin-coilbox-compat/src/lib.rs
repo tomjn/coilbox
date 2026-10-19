@@ -1399,6 +1399,10 @@ mod tests {
             10,
             "a2e6d720dd4c31135410c9cb3e9a39a527bbb1e3d089cfc14cc41fe6464cbed3",
         ),
+        (
+            11,
+            "1ece819fbe807c3cf243b1acbc0bfa464d77bdb3482f367cd0129c7516d945d1",
+        ),
     ];
 
     #[test]

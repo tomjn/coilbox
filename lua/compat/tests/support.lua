@@ -71,9 +71,9 @@ end
 
 --- A fresh engine state. `synced` picks which prelude it loads and whether it
 --- has gl. `spring` adds to or replaces entries of the Spring table.
---- `manifest` picks which manifest's prelude it loads, 9 by default. Only manifest 9 has a fixture, because the
---- synced preludes of manifests 2 to 8 need rawget, which the synced state
---- lacks. `game`
+--- `manifest` picks which manifest's prelude it loads, 9 by default. Only
+--- manifests 9 and 11 have fixtures, because the synced preludes of manifests 2
+--- to 8 need rawget, which the synced state lacks. `game`
 --- is the Game table the engine builds, and `modinfo` is what the mutator's
 --- modinfo.lua returns.
 function M.newEngine(opts)

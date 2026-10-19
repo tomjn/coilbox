@@ -876,6 +876,27 @@
       "note": "Last registered in 105.0.1 (rts/Lua/LuaOpenGL.cpp)."
     },
     {
+      "id": "removed:sipairs",
+      "kind": "removed",
+      "name": "sipairs",
+      "since": "2025.01.1",
+      "note": "From 97.0 the unsynced half of LuaRules and LuaGaia had sipairs as the same function as ipairs (rts/Lua/LuaSyncedTable.cpp), and the engine's LuaGadgets/system.lua put it in every gadget's System table. Removed in commit d083766c74."
+    },
+    {
+      "id": "removed:snext",
+      "kind": "removed",
+      "name": "snext",
+      "since": "2025.01.1",
+      "note": "From 97.0 the unsynced half of LuaRules and LuaGaia had snext as the same function as next (rts/Lua/LuaSyncedTable.cpp), and the engine's LuaGadgets/system.lua put it in every gadget's System table. Removed in commit d083766c74."
+    },
+    {
+      "id": "removed:spairs",
+      "kind": "removed",
+      "name": "spairs",
+      "since": "2025.01.1",
+      "note": "From 97.0 the unsynced half of LuaRules and LuaGaia had spairs as the same function as pairs (rts/Lua/LuaSyncedTable.cpp), and the engine's LuaGadgets/system.lua put it in every gadget's System table. Removed in commit d083766c74."
+    },
+    {
       "id": "renamed:Game.buildFlags",
       "kind": "renamed",
       "name": "Game.buildFlags",

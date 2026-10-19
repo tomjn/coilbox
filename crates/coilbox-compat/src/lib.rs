@@ -53,6 +53,7 @@ const MANIFESTS: &[(u32, &str)] = &[
     (8, include_str!("../../../lua/compat/manifests/8.json")),
     (9, include_str!("../../../lua/compat/manifests/9.json")),
     (10, include_str!("../../../lua/compat/manifests/10.json")),
+    (11, include_str!("../../../lua/compat/manifests/11.json")),
 ];
 
 /// Every fix file, by id.
@@ -128,6 +129,10 @@ const FIXES: &[(&str, &str)] = &[
     (
         "gl-smoothing",
         include_str!("../../../lua/compat/gl-smoothing.lua"),
+    ),
+    (
+        "snext-spairs-sipairs",
+        include_str!("../../../lua/compat/snext-spairs-sipairs.lua"),
     ),
     (
         "spring-make-font",
@@ -1219,6 +1224,23 @@ mod tests {
         );
     }
 
+    /// Issue #4692: manifest 11 adds the unsynced fix that puts back snext,
+    /// spairs and sipairs, and keeps the writer of manifest 10.
+    #[test]
+    fn manifest_11_is_manifest_10_with_the_synced_iterators() {
+        let (ten, eleven) = (manifest(10).unwrap(), manifest(11).unwrap());
+        assert_eq!(eleven.fixes[..ten.fixes.len()], ten.fixes[..]);
+        assert_eq!(eleven.fixes[ten.fixes.len()..], ["snext-spairs-sipairs"]);
+        assert_eq!(
+            (&eleven.converter, eleven.writer),
+            (&ten.converter, ten.writer)
+        );
+        let unsynced = prelude(&eleven, LuaState::Unsynced).unwrap();
+        assert!(unsynced.contains("-- fix: snext-spairs-sipairs\n"));
+        let synced = prelude(&eleven, LuaState::Synced).unwrap();
+        assert!(!synced.contains("snext-spairs-sipairs"));
+    }
+
     #[test]
     fn the_def_fixes_are_the_files_in_defs_and_name_only_files_that_exist() {
         let in_folder = fix_files_in(compat_dir().join("defs"));
@@ -1568,14 +1590,14 @@ mod tests {
         }
     }
 
-    /// The preludes for manifest 9, as the Lua tests in `lua/compat/tests/`
-    /// load them. Earlier manifests' synced preludes call `rawget`, which the
-    /// tests' synced state lacks, so they are not kept.
+    /// The preludes for manifests 9 and 11, as the Lua tests in
+    /// `lua/compat/tests/` load them. Earlier manifests' synced preludes call
+    /// `rawget`, which the tests' synced state lacks, so they are not kept.
     /// `COILBOX_WRITE_FIXTURE=1` writes them again after a deliberate change to
     /// how a prelude is built.
     #[test]
     fn the_lua_tests_load_the_preludes_this_crate_builds() {
-        for n in [9] {
+        for n in [9, 11] {
             let m = manifest(n).unwrap();
             for state in [LuaState::Synced, LuaState::Unsynced] {
                 let built = prelude(&m, state).unwrap();

@@ -130,7 +130,7 @@ If one of the fixes fails while the game runs, the game still loads. The engine'
 
 ## What it changes
 
-This is compatibility version 10, the newest.
+This is compatibility version 11, the newest.
 
 Lua functions it puts back:
 
@@ -140,6 +140,7 @@ Lua functions it puts back:
 - `Spring.SetSunParameters` and `Spring.SetSunManualControl`, removed in Spring 104.0. They do nothing.
 - `Spring.UpdateInfoTexture`, removed in Spring 99.0. It does nothing and returns false.
 - `Spring.MakeFont`, last in Spring 0.81.2.1. It makes no font and returns nil.
+- `snext`, `spairs` and `sipairs`, removed in Recoil 2025.01.1. In a game's unsynced gadgets they are `next`, `pairs` and `ipairs` again, as they were from Spring 97.0.
 
 Call-ins whose arguments moved:
 

@@ -21,6 +21,12 @@
 //! A definition of a chain (`function Spring.GetUnitTravel()`) is not a use
 //! either. It is a game supplying the function itself.
 //!
+//! A removed or renamed name with no dot, such as `spairs`, is a global
+//! function rather than a call-in, so it is a use wherever it is read, as a
+//! chain is. Declaring it local or assigning to it is not a use. A parameter
+//! or an assignment target after the first that has its name is taken as a
+//! read, as the scan does not follow those lists.
+//!
 //! Comments and strings never produce a hit. Catalogue entries of kind `file`
 //! are names of files, not of Lua, and are not matched here.
 
@@ -56,6 +62,8 @@ pub struct Catalogue {
     chains: HashMap<String, Vec<String>>,
     /// Entry ids by bare call-in name, such as `UnitDamaged`.
     call_ins: HashMap<String, Vec<String>>,
+    /// Entry ids by removed or renamed global function, such as `spairs`.
+    globals: HashMap<String, Vec<String>>,
 }
 
 impl Catalogue {
@@ -70,6 +78,8 @@ impl Catalogue {
             }
             let map = if entry.name.contains('.') {
                 &mut out.chains
+            } else if entry.kind == "removed" || entry.kind == "renamed" {
+                &mut out.globals
             } else {
                 &mut out.call_ins
             };
@@ -200,6 +210,11 @@ fn chain_use(toks: &[Token], at: usize, catalogue: &Catalogue, hits: &mut Vec<Hi
     // `parts` alternates names and dots, so joining it gives `a.b.c`.
     if catalogue.chains.contains_key(&joined) {
         push(hits, &catalogue.chains, &joined, parts, None);
+    }
+    let declared =
+        toks.get(end).is_some_and(|t| t.is_sym("=")) || (at > 0 && toks[at - 1].is_ident("local"));
+    if parts.len() == 1 && !declared {
+        push(hits, &catalogue.globals, &joined, parts, None);
     }
 
     // `gadget.UnitDamaged = function` or a bare global `UnitDamaged = ...`.
@@ -443,6 +458,57 @@ mod tests {
             ids("Spring.MakeFont()\nlocal s = \"never closed\n--[[ never closed"),
             ["removed:Spring.MakeFont"]
         );
+    }
+
+    fn with_globals() -> Catalogue {
+        Catalogue::from_json(
+            r#"{"entries":[
+              {"id":"removed:snext","kind":"removed","name":"snext"},
+              {"id":"removed:spairs","kind":"removed","name":"spairs"}
+            ]}"#,
+        )
+        .unwrap()
+    }
+
+    fn global_hits(src: &str) -> Vec<(String, u32)> {
+        scan(src, &with_globals())
+            .into_iter()
+            .map(|h| (h.entry_id, h.column))
+            .collect()
+    }
+
+    /// Issue #4692: a removed global such as `spairs` is a use wherever it is
+    /// read, as a chain is, and not only where it is defined, as a call-in is.
+    #[test]
+    fn a_removed_global_is_a_use_where_it_is_read() {
+        assert_eq!(
+            global_hits("for k, v in spairs(t) do end"),
+            [("removed:spairs".to_string(), 13)]
+        );
+        assert_eq!(
+            global_hits("local snext = snext"),
+            [("removed:snext".to_string(), 15)]
+        );
+        assert_eq!(
+            global_hits("System = { snext = snext }"),
+            [("removed:snext".to_string(), 20)]
+        );
+    }
+
+    #[test]
+    fn defining_or_naming_a_field_after_a_removed_global_is_not_a_use() {
+        assert!(global_hits("function snext(t, k) end").is_empty());
+        assert!(global_hits("snext = next").is_empty());
+        assert!(global_hits("local spairs = pairs").is_empty());
+        assert!(global_hits("t.snext(x) t:spairs()").is_empty());
+        assert!(global_hits("if snext == nil then end").len() == 1);
+    }
+
+    #[test]
+    fn the_embedded_catalogue_lists_the_synced_iterators_as_removed_globals() {
+        let hits = scan("snext(t) spairs(t) sipairs(t)", Catalogue::embedded());
+        let ids: Vec<&str> = hits.iter().map(|h| h.entry_id.as_str()).collect();
+        assert_eq!(ids, ["removed:snext", "removed:spairs", "removed:sipairs"]);
     }
 
     #[test]

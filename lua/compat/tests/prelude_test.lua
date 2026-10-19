@@ -5,7 +5,7 @@
 --
 --   luajit lua/compat/tests/prelude_test.lua
 --
--- It loads the preludes coilbox-compat builds for manifest 9, kept in
+-- It loads the preludes coilbox-compat builds for manifests 9 and 11, kept in
 -- tests/fixtures/. After changing a fix or how a prelude is built, write them
 -- again with:
 --
@@ -332,6 +332,83 @@ do
 	check("a strict global table still gets hooked", got ~= nil and got[7] == 7)
 	check("no fix failed under a strict global table", #engine.logs == 0, table.concat(engine.logs, "; "))
 	check("the game's metatable is back", getmetatable(engine.env).__index ~= nil and getmetatable(engine.env).__newindex ~= nil)
+end
+
+--------------------------------------------------------------------------------
+-- snext, spairs and sipairs (issue #4692)
+--------------------------------------------------------------------------------
+
+-- The unsynced half of LuaRules or LuaGaia, which has the SYNCED proxy.
+local function splitUnsynced(opts)
+	opts = opts or {}
+	opts.synced, opts.manifest = false, 11
+	local engine = newEngine(opts)
+	engine.env.SYNCED = {}
+	return engine
+end
+
+do
+	local engine = splitUnsynced()
+	prelude(engine)
+	local env = engine.env
+	check("unsynced rules: snext is next", env.snext == next)
+	check("unsynced rules: spairs is pairs", env.spairs == pairs)
+	check("unsynced rules: sipairs is ipairs", env.sipairs == ipairs)
+	check("unsynced rules: no fix failed", #engine.logs == 0, table.concat(engine.logs, "; "))
+
+	-- The engine's LuaGadgets/system.lua builds System, and its gadget handler
+	-- gives each gadget a copy of it rather than the globals.
+	support.load(engine, "System = { pairs = pairs, SYNCED = SYNCED }")
+	local System = env.System
+	check("System gets snext, spairs and sipairs", System.snext == next and System.spairs == pairs and System.sipairs == ipairs)
+	check("System keeps what system.lua put in it", System.pairs == pairs and System.SYNCED == env.SYNCED)
+
+	local seen = {}
+	support.load(engine, "for k, v in System.spairs({ a = 1 }) do SEEN = k end for i, v in System.sipairs({ 7 }) do SEEN2 = v end")
+	check("spairs and sipairs iterate as pairs and ipairs", env.SEEN == "a" and env.SEEN2 == 7)
+	support.load(engine, "OTHER = 1")
+	check("other globals are set as normal", rawget(env, "OTHER") == 1)
+end
+
+do
+	-- A game's own system.lua that lists them reads the globals.
+	local engine = splitUnsynced()
+	prelude(engine)
+	support.load(engine, "System = { snext = snext, spairs = spairs }")
+	check("a system.lua that lists them gets the globals", engine.env.System.snext == next and engine.env.System.spairs == pairs)
+end
+
+do
+	local own = function() return "own" end
+	local engine = splitUnsynced()
+	engine.env.snext = own
+	prelude(engine)
+	support.load(engine, "System = { snext = MINE }")
+	engine.env.MINE = nil
+	check("a game's own snext is left alone", engine.env.snext == own)
+end
+
+do
+	-- The call-in hooks still see a call-in set once the iterators are in.
+	local engine = splitUnsynced()
+	prelude(engine)
+	local got
+	support.load(engine, "System = {}")
+	handler(engine, { UnitDamaged = function(...) got = { ... } end })
+	call(engine, "UnitDamaged", 1, 2, 3, 4, false, 5, 6, 7, 8, 9)
+	check("the hooks still work after System is set", got ~= nil and got[7] == 7)
+end
+
+for _, case in ipairs({
+	{ name = "LuaUI", engine = function() return newEngine({ synced = false, manifest = 11 }) end },
+	{ name = "synced", engine = function() return newEngine({ manifest = 11 }) end },
+}) do
+	local engine = case.engine()
+	prelude(engine)
+	support.load(engine, "System = {}")
+	check(case.name .. ": no snext, spairs or sipairs, as the engine never gave it them",
+		engine.env.snext == nil and engine.env.spairs == nil and engine.env.sipairs == nil and engine.env.System.snext == nil)
+	check(case.name .. ": no fix failed", #engine.logs == 0, table.concat(engine.logs, "; "))
 end
 
 support.report()
