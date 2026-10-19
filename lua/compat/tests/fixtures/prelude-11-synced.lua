@@ -357,6 +357,77 @@ end, compat)
 if not ok then failed("spring-set-unit-to-feature", err) end
 end
 
+-- fix: game-version-104
+do
+local ok, err = pcall(function(...)
+-- id: game-version-104
+-- catalogue: renamed:Game.version, renamed:Game.versionFull, renamed:Game.versionPatchSet
+-- states: synced, unsynced
+-- license: MIT or GNU GPL, v2 or later
+
+-- Game.version, Game.versionFull and Game.versionPatchSet, read from Engine.
+--
+-- Changelog, 104.0: "Game.{version,versionFull,versionPatchSet,buildFlags} now
+-- reside in the Engine table". The engine still fills Engine's in every Lua
+-- state (rts/Lua/LuaConstEngine.cpp), so this copies each into Game where Game
+-- has nothing by that name. A game that reads Game.version, as Spring 1944's
+-- unit_weaponToggle.lua does, gets the current engine's version string.
+
+if type(Game) == "table" and type(Engine) == "table" then
+	for _, key in ipairs({ "version", "versionFull", "versionPatchSet" }) do
+		if Game[key] == nil then
+			Game[key] = Engine[key]
+		end
+	end
+end
+end, compat)
+if not ok then failed("game-version-104", err) end
+end
+
+-- fix: spring-ground-info-105
+do
+local ok, err = pcall(function(...)
+-- id: spring-ground-info-105
+-- catalogue: signature:Spring.GetGroundInfo@105.0
+-- states: synced, unsynced
+-- license: MIT or GNU GPL, v2 or later
+
+-- Spring.GetGroundInfo with the results in their 104 order.
+--
+-- Changelog, 105.0: "return the terrain-type index from Spring.GetGroundInfo
+-- and Spring.GetTerrainTypeData. These functions now push [number index,
+-- string name, ...] rather than [string name, ...]". In 103.0 it returned the
+-- terrain type's name, the metal, hardness, the tank, kbot, hover and ship
+-- speeds and receiveTracks (rts/Lua/LuaSyncedRead.cpp, PushTerrainTypeData).
+-- The current engine returns the type's index in front of those, so a game
+-- that reads the metal second, as Spring 1944's game_flagManager.lua does, gets
+-- the name, a string.
+--
+-- This drops the index. It wraps only a GetGroundInfo whose first result is a
+-- number, which the old order never gives, so running the prelude a second
+-- time in one state leaves the order alone. A game whose Lua reads the new
+-- order does not get this fix (see coilbox_compat::for_game).
+
+local Spring = Spring
+if type(Spring) ~= "table" or type(Spring.GetGroundInfo) ~= "function" then
+	return
+end
+
+local getGroundInfo = Spring.GetGroundInfo
+local ok, first = pcall(getGroundInfo, 0, 0)
+if not ok or type(first) ~= "number" then
+	return
+end
+
+local select = select
+
+Spring.GetGroundInfo = function(x, z)
+	return select(2, getGroundInfo(x, z))
+end
+end, compat)
+if not ok then failed("spring-ground-info-105", err) end
+end
+
 -- fix: callin-unit-damaged-95
 do
 local ok, err = pcall(function(...)
@@ -447,162 +518,4 @@ if type(Game) == "table" and type(VFS) == "table" and type(VFS.Include) == "func
 end
 end, compat)
 if not ok then failed("game-identity", err) end
-end
-
--- fix: spring-unit-lineage
-do
-local ok, err = pcall(function(...)
--- id: spring-unit-lineage
--- catalogue: removed:Spring.SetUnitLineage, removed:Spring.GetUnitLineage
--- states: synced
--- license: MIT or GNU GPL, v2 or later
-
--- Spring.SetUnitLineage and Spring.GetUnitLineage, kept in a table per unit.
---
--- Commit 4c3273c343 removed both, with the lineage tracker and the game end
--- conditions it served, so 0.82.7.1 is the last release with them.
---
--- In 0.82.7.1 a unit's lineage was the team it was made on, or the lineage of
--- the unit that built it, made it in a factory or resurrected it
--- (rts/Sim/Units/Unit.cpp, Builder.cpp and Factory.cpp). SetUnitLineage(unitID,
--- teamID, isRoot) set the unit's lineage to teamID, and with isRoot true made
--- the unit that team's lineage root (rts/Lua/LuaSyncedCtrl.cpp). A unit ID that
--- is not a number, or a team that does not exist, raised an error. A unit that
--- does not exist was ignored. GetUnitLineage(unitID) returned the lineage and
--- whether the unit was the root of its own current team, or nothing for a unit
--- that does not exist (rts/Lua/LuaSyncedRead.cpp).
---
--- The engine also killed a root's lineage when the root died, but only in the
--- lineage game mode, which went with the same commit, so this does not.
--- A captured unit took its captor's lineage, which no call-in shows, so here it
--- keeps its own. A destroyed unit stops being a root, so a new unit that gets
--- its ID is not one. Only the synced state keeps the table.
-
-local compat = ...
-
-local Spring = Spring
-if type(Spring) ~= "table" or Spring.SetUnitLineage ~= nil or Spring.GetUnitLineage ~= nil then
-	return
-end
-
-local type, error, tostring = type, error, tostring
-local ValidUnitID = Spring.ValidUnitID
-local GetUnitTeam = Spring.GetUnitTeam
-local GetTeamInfo = Spring.GetTeamInfo
-
-local lineages = {}
-local roots = {}
-
-local function lineageOf(unitID)
-	local lineage = lineages[unitID]
-	if lineage == nil then
-		return GetUnitTeam(unitID)
-	end
-	return lineage
-end
-
-Spring.SetUnitLineage = function(unitID, teamID, isRoot)
-	if type(unitID) ~= "number" then
-		error("SetUnitLineage(): Bad unitID", 2)
-	end
-	if not ValidUnitID(unitID) then
-		return
-	end
-	if type(teamID) ~= "number" then
-		error("SetUnitLineage(): Bad teamID", 2)
-	end
-	if GetTeamInfo(teamID) == nil then
-		error("SetUnitLineage(): Bad teamID: " .. tostring(teamID), 2)
-	end
-	lineages[unitID] = teamID
-	if isRoot == true then
-		roots[teamID] = unitID
-	end
-end
-
-Spring.GetUnitLineage = function(unitID)
-	if type(unitID) ~= "number" then
-		error("Bad unitID parameter in GetUnitLineage()", 2)
-	end
-	if not ValidUnitID(unitID) then
-		return
-	end
-	return lineageOf(unitID), roots[GetUnitTeam(unitID)] == unitID
-end
-
-compat.hook("UnitCreated", function(nextFn, unitID, unitDefID, unitTeam, builderID, ...)
-	if builderID ~= nil and ValidUnitID(builderID) then
-		lineages[unitID] = lineageOf(builderID)
-	else
-		lineages[unitID] = unitTeam
-	end
-	return nextFn(unitID, unitDefID, unitTeam, builderID, ...)
-end, true)
-
-compat.hook("UnitDestroyed", function(nextFn, unitID, ...)
-	nextFn(unitID, ...)
-	lineages[unitID] = nil
-	for teamID, root in pairs(roots) do
-		if root == unitID then
-			roots[teamID] = nil
-		end
-	end
-end, true)
-end, compat)
-if not ok then failed("spring-unit-lineage", err) end
-end
-
--- fix: spring-get-team-info-105
-do
-local ok, err = pcall(function(...)
--- id: spring-get-team-info-105
--- catalogue: signature:Spring.GetTeamInfo@105.0
--- states: synced, unsynced
--- license: MIT or GNU GPL, v2 or later
-
--- Spring.GetTeamInfo with its last two results in the order they had before
--- 105.0.
---
--- Changelog, 105.0: "Spring.GetTeamInfo: switched the last two return values
--- around (incomeMultiplier is now 7th, customKeys is now 8th)".
---
--- From 83.0 to 104.0.1 GetTeamInfo(teamID) returned teamID, leader, isDead,
--- hasAI, side, allyTeam, the table of the team's custom keys and then its
--- income multiplier, or nothing for a team that does not exist
--- (rts/Lua/LuaSyncedRead.cpp). A game written for that order reads the keys
--- 7th, and now gets a number there. This swaps the two back.
---
--- The engine since takes a second argument, and returns no keys and only
--- seven values when it is false. An old game never passes it, and those seven
--- are passed on as they are.
---
--- Coilbox leaves this fix out for a game whose own Lua already reads the new
--- order (crates/coilbox-compat, ADAPTERS).
-
-local Spring = Spring
-if type(Spring) ~= "table" or type(Spring.GetTeamInfo) ~= "function" then
-	return
-end
-
-local select = select
-local GetTeamInfo = Spring.GetTeamInfo
-
-local function counted(...)
-	return select("#", ...), ...
-end
-
-local function reorder(n, teamID, leader, isDead, hasAI, side, allyTeam, incomeMultiplier, customKeys)
-	if n == 0 then
-		return
-	elseif n == 8 then
-		return teamID, leader, isDead, hasAI, side, allyTeam, customKeys, incomeMultiplier
-	end
-	return teamID, leader, isDead, hasAI, side, allyTeam, incomeMultiplier
-end
-
-Spring.GetTeamInfo = function(...)
-	return reorder(counted(GetTeamInfo(...)))
-end
-end, compat)
-if not ok then failed("spring-get-team-info-105", err) end
 end

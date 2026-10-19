@@ -1,7 +1,6 @@
 //! The call-in handlers a base game's own Lua defines, read from the worker's
 //! Lua compat scan (issue #4622), so its mutator gets only the call-in adapters
-//! the game needs. See [`coilbox_compat::for_game`]. A call whose results the
-//! code takes into names counts too, by those names (issue #4694).
+//! the game needs. See [`coilbox_compat::for_game`].
 //!
 //! Only the base archive's own files count. The scan also reads the archives
 //! the game depends on, but which of those a machine resolves depends on what
@@ -53,11 +52,15 @@ pub fn handlers_in(scan: &str, archive: &str) -> Result<Vec<Handler>, String> {
         .into_iter()
         .filter(|f| f.archive == archive)
         .flat_map(|f| f.hits)
-        .filter_map(|hit| {
-            Some(Handler {
-                entry: hit.entry_id,
-                params: hit.params.or(hit.results)?,
-            })
+        .flat_map(|hit| {
+            let entry = hit.entry_id;
+            hit.params
+                .into_iter()
+                .chain(hit.results.into_iter().flatten())
+                .map(move |params| Handler {
+                    entry: entry.clone(),
+                    params,
+                })
         })
         .collect())
 }
@@ -99,26 +102,24 @@ mod tests {
         );
     }
 
-    /// Issue #4694: a call whose results changed order is read by the names
-    /// it takes them into.
     #[test]
-    fn a_call_s_results_count_as_its_handler_s_arguments() {
+    fn each_call_that_names_a_function_s_results_is_one_handler() {
         let scan = r#"{
           "files": [
-            {"archive": "ee.sdz", "path": "LuaRules/Gadgets/a.lua", "hits": [
-              {"entryId": "signature:Spring.GetTeamInfo@105.0", "line": 59, "column": 28,
-               "text": "Spring.GetTeamInfo", "results": ["_", "keys"]}
+            {"archive": "s44.sdz", "path": "LuaRules/Gadgets/a.lua", "hits": [
+              {"entryId": "signature:Spring.GetGroundInfo@105.0", "line": 20, "column": 30,
+               "text": "Spring.GetGroundInfo", "results": [["_", "curMetal"], ["_", "metal"]]}
             ]}
           ],
-          "archives": ["ee.sdz"],
+          "archives": ["s44.sdz"],
           "errors": []
         }"#;
         assert_eq!(
-            handlers_in(scan, "ee.sdz").unwrap(),
-            [handler(
-                "signature:Spring.GetTeamInfo@105.0",
-                &["_", "keys"]
-            )]
+            handlers_in(scan, "s44.sdz").unwrap(),
+            [
+                handler("signature:Spring.GetGroundInfo@105.0", &["_", "curMetal"]),
+                handler("signature:Spring.GetGroundInfo@105.0", &["_", "metal"]),
+            ]
         );
     }
 

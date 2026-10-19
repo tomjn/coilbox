@@ -5,7 +5,7 @@
 --
 --   luajit lua/compat/tests/prelude_test.lua
 --
--- It loads the preludes coilbox-compat builds for manifests 9 and 11, kept in
+-- It loads the preludes coilbox-compat builds for manifests 9, 11 and 12, kept in
 -- tests/fixtures/. After changing a fix or how a prelude is built, write them
 -- again with:
 --
@@ -335,13 +335,81 @@ do
 end
 
 --------------------------------------------------------------------------------
+-- Game.version, which 104.0 moved to Engine.version (issue #4695)
+--------------------------------------------------------------------------------
+
+local ENGINE = { version = "2026.09.01", versionFull = "2026.09.01 release", versionPatchSet = "0" }
+
+for _, synced in ipairs({ true, false }) do
+	local state = synced and "synced" or "unsynced"
+	local engine = newEngine({ synced = synced, manifest = 11, game = { gameName = "S44" }, engine = ENGINE, modinfo = {} })
+	prelude(engine)
+	local Game = engine.env.Game
+	check(state .. ": Game.version reads Engine.version", Game.version == "2026.09.01", tostring(Game.version))
+	check(state .. ": Game.versionFull reads Engine.versionFull", Game.versionFull == "2026.09.01 release")
+	check(state .. ": Game.versionPatchSet reads Engine.versionPatchSet", Game.versionPatchSet == "0")
+	-- Spring 1944's unit_weaponToggle.lua, line 33.
+	local ok, err = pcall(function() return Game.version:find("100") == 1 end)
+	check(state .. ": a gadget that reads Game.version loads", ok, tostring(err))
+	check(state .. ": no fix failed", #engine.logs == 0, table.concat(engine.logs, "; "))
+end
+
+do
+	local engine = newEngine({ manifest = 11, game = { version = "own" }, engine = ENGINE, modinfo = {} })
+	prelude(engine)
+	check("a Game.version that is set is left alone", engine.env.Game.version == "own")
+	local bare = newEngine({ manifest = 11 })
+	prelude(bare)
+	check("without Game or Engine no fix failed", #bare.logs == 0, table.concat(bare.logs, "; "))
+end
+
+--------------------------------------------------------------------------------
+-- Spring.GetGroundInfo, which 105.0 gave a terrain type index first (issue #4695)
+--------------------------------------------------------------------------------
+
+-- The engine's order now (rts/Lua/LuaSyncedRead.cpp, PushTerrainTypeData):
+-- index, name, metal, hardness, tank, kbot, hover, ship, receiveTracks.
+local function groundInfo(x, z)
+	return 3, "sand", x + z, 1.5, 1, 0.9, 0.8, 0.7, true
+end
+
+for _, synced in ipairs({ true, false }) do
+	local state = synced and "synced" or "unsynced"
+	local engine = newEngine({ synced = synced, manifest = 11, spring = { GetGroundInfo = groundInfo } })
+	prelude(engine)
+	local got = { engine.env.Spring.GetGroundInfo(10, 2) }
+	check(state .. ": GetGroundInfo gives the 104 order", #got == 8 and got[1] == "sand" and got[2] == 12 and got[3] == 1.5 and got[8] == true,
+		table.concat({ tostring(got[1]), tostring(got[2]), tostring(#got) }, ","))
+	-- Spring 1944's game_flagManager.lua, line 152.
+	local _, curMetal = engine.env.Spring.GetGroundInfo(0, 0)
+	check(state .. ": the metal is the second value", type(curMetal) == "number" and curMetal == 0, tostring(curMetal))
+	check(state .. ": no fix failed", #engine.logs == 0, table.concat(engine.logs, "; "))
+
+	-- A game that includes its own entry file runs the prelude a second time.
+	prelude(engine)
+	got = { engine.env.Spring.GetGroundInfo(10, 2) }
+	check(state .. ": a second prelude does not move the order again", got[1] == "sand" and got[2] == 12, tostring(got[1]))
+end
+
+do
+	local old = function() return "sand", 4 end
+	local engine = newEngine({ manifest = 11, spring = { GetGroundInfo = old } })
+	prelude(engine)
+	check("a GetGroundInfo that gives the name first is left alone", engine.env.Spring.GetGroundInfo == old)
+	local missing = newEngine({ manifest = 11 })
+	prelude(missing)
+	check("without GetGroundInfo it is not defined", missing.env.Spring.GetGroundInfo == nil)
+	check("without GetGroundInfo no fix failed", #missing.logs == 0, table.concat(missing.logs, "; "))
+end
+
+--------------------------------------------------------------------------------
 -- snext, spairs and sipairs (issue #4692)
 --------------------------------------------------------------------------------
 
 -- The unsynced half of LuaRules or LuaGaia, which has the SYNCED proxy.
 local function splitUnsynced(opts)
 	opts = opts or {}
-	opts.synced, opts.manifest = false, 11
+	opts.synced, opts.manifest = false, 12
 	local engine = newEngine(opts)
 	engine.env.SYNCED = {}
 	return engine
@@ -400,8 +468,8 @@ do
 end
 
 for _, case in ipairs({
-	{ name = "LuaUI", engine = function() return newEngine({ synced = false, manifest = 11 }) end },
-	{ name = "synced", engine = function() return newEngine({ manifest = 11 }) end },
+	{ name = "LuaUI", engine = function() return newEngine({ synced = false, manifest = 12 }) end },
+	{ name = "synced", engine = function() return newEngine({ manifest = 12 }) end },
 }) do
 	local engine = case.engine()
 	prelude(engine)
@@ -418,7 +486,7 @@ end
 -- A synced state whose units have teams, and teams 0 to 3.
 local function lineageEngine(opts)
 	opts = opts or {}
-	opts.manifest = 11
+	opts.manifest = 12
 	local engine = newEngine(opts)
 	local Spring = engine.env.Spring
 	Spring.GetUnitTeam = function(unitID)
@@ -511,7 +579,7 @@ do
 end
 
 do
-	local engine = newEngine({ synced = false, manifest = 11 })
+	local engine = newEngine({ synced = false, manifest = 12 })
 	prelude(engine)
 	check("unsynced: no lineage functions, as the table lives in the synced state", engine.env.Spring.SetUnitLineage == nil and engine.env.Spring.GetUnitLineage == nil)
 end
@@ -535,7 +603,7 @@ end
 
 for _, synced in ipairs({ true, false }) do
 	local state = synced and "synced" or "unsynced"
-	local engine = newEngine({ synced = synced, manifest = 11, spring = { GetTeamInfo = currentGetTeamInfo } })
+	local engine = newEngine({ synced = synced, manifest = 12, spring = { GetTeamInfo = currentGetTeamInfo } })
 	prelude(engine)
 	local GetTeamInfo = engine.env.Spring.GetTeamInfo
 	local got = { GetTeamInfo(0) }

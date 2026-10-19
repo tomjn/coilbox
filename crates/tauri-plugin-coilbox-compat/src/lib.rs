@@ -1091,7 +1091,11 @@ mod tests {
         "function gadget:AllowCommand(u, d, t, cmdID, params, options, tag, synced)\nend\n";
     const NEW_COMMAND: &str =
         "function AllowCommand(u, d, t, cmdID, params, options, tag, playerID, fromSynced)\nend\n";
-    const OLD_TEAM_INFO: &str = "local teamOptions = select(7, Spring.GetTeamInfo(teamID))\n";
+    const OLD_GROUND: &str =
+        "local GetGroundInfo = Spring.GetGroundInfo\nlocal _, metal = GetGroundInfo(x, z)\n";
+    const NEW_GROUND: &str = "local _, _, metal = Spring.GetGroundInfo(x, z)\n";
+    const OLD_TEAM_INFO: &str =
+        "local _, _, _, _, _, _, teamOptions = Spring.GetTeamInfo(teamID)\n";
     const NEW_TEAM_INFO: &str =
         "local _, _, _, _, _, _, incomeMultiplier = Spring.GetTeamInfo(teamID)\n";
 
@@ -1118,6 +1122,7 @@ mod tests {
             lua: &[
                 ("xta-9.65.sd7", OLD_DAMAGED),
                 ("xta-9.65.sd7", OLD_COMMAND),
+                ("xta-9.65.sd7", OLD_GROUND),
                 ("xta-9.65.sd7", OLD_TEAM_INFO),
                 ("otherdep.sdz", NEW_DAMAGED),
                 ("otherdep.sdz", NEW_COMMAND),
@@ -1137,6 +1142,7 @@ mod tests {
                 ("BA-V9.79.SDZ", "function gadget:UnitDamaged(u, ...)\nend\n"),
                 ("BA-V9.79.SDZ", OLD_COMMAND),
                 ("BA-V9.79.SDZ", NEW_COMMAND),
+                ("BA-V9.79.SDZ", NEW_GROUND),
                 ("BA-V9.79.SDZ", NEW_TEAM_INFO),
             ],
         },
@@ -1340,6 +1346,19 @@ mod tests {
             .iter()
             .any(|p| p.starts_with("compat/models/")));
 
+        // A game that reads GetGroundInfo the old way keeps the adapter, and
+        // one that reads it the new way does not.
+        let ground = "-- fix: spring-ground-info-105\n";
+        let eleven = golden_build(11, &FIXTURES[0]);
+        for path in ["compat/prelude-synced.lua", "compat/prelude-unsynced.lua"] {
+            let prelude = text(&eleven, path).unwrap();
+            assert!(prelude.contains("-- fix: game-version-104\n"), "{path}");
+            assert!(prelude.contains(ground), "{path}");
+        }
+        let updated = golden_build(11, &FIXTURES[1]);
+        let synced = text(&updated, "compat/prelude-synced.lua").unwrap();
+        assert!(!synced.contains(ground) && synced.contains("-- fix: game-version-104\n"));
+
         // Issue #4694: a game that reads GetTeamInfo's custom keys 7th gets
         // the old order, and one that reads the income multiplier there does
         // not.
@@ -1347,9 +1366,9 @@ mod tests {
         let synced_of = |n: u32, fixture: &Fixture| {
             text(&golden_build(n, fixture), "compat/prelude-synced.lua").unwrap()
         };
-        assert!(synced_of(11, &FIXTURES[0]).contains(team_info));
-        assert!(!synced_of(11, &FIXTURES[1]).contains(team_info));
-        assert!(!synced_of(10, &FIXTURES[0]).contains(team_info));
+        assert!(synced_of(12, &FIXTURES[0]).contains(team_info));
+        assert!(!synced_of(12, &FIXTURES[1]).contains(team_info));
+        assert!(!synced_of(11, &FIXTURES[0]).contains(team_info));
     }
 
     /// The hash of every fixed game built from `manifest`.
@@ -1417,7 +1436,11 @@ mod tests {
         ),
         (
             11,
-            "30f35afd625c4e02099a57468aa2ad6f2b0b68b06efc416be204b22ee129f3e1",
+            "e9e8dcfc7caf88da395188e572c100824ed837091fac9b15efbc8f680466ec5e",
+        ),
+        (
+            12,
+            "8fd6fd648ea8959561fb60c20eaa2703623487809b6fefa294402dee85e6d326",
         ),
     ];
 

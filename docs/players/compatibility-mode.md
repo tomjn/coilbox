@@ -130,7 +130,7 @@ If one of the fixes fails while the game runs, the game still loads. The engine'
 
 ## What it changes
 
-This is compatibility version 11, the newest.
+This is compatibility version 12, the newest.
 
 Lua functions it puts back:
 

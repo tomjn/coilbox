@@ -11,7 +11,9 @@
 //! - A member chain such as `Spring.GetUnitTravel` or `UnitDefs.canCapture`,
 //!   wherever it is written: called, assigned to a local, or passed on. The
 //!   whole chain has to match, so `MySpring.GetUnitTravel` and
-//!   `obj.Spring.GetUnitTravel` do not.
+//!   `obj.Spring.GetUnitTravel` do not. The hit carries the names its calls
+//!   assign their results to, which pick the adapters for a function whose
+//!   results moved (issue #4695).
 //! - A call-in such as `UnitDamaged`, where the code defines it: `function
 //!   gadget:UnitDamaged(`, `function UnitDamaged(`, or `gadget.UnitDamaged =`.
 //!   A call-in is a name the engine calls, so calling it is not a use. The hit
@@ -117,19 +119,22 @@ pub struct Hit {
     /// for a call-in assigned something other than a function.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub params: Option<Vec<String>>,
-    /// For a member chain called as the whole right side of an assignment,
-    /// the names its results go to, in order. `local a, b = f()` gives `a, b`,
-    /// and `local c = select(3, f())` gives `_, _, c`. An operator after the
-    /// call keeps only the first. `None` for a call whose results go anywhere
-    /// else, and for anything that is not a call.
+    /// For a member chain, the names each call of it assigns its results to,
+    /// in source order: `local _, metal = Spring.GetGroundInfo(x, z)` gives
+    /// `["_", "metal"]`. Calls through a `local f = Spring.GetGroundInfo` alias
+    /// later in the file count, and are reported here on the alias's hit
+    /// rather than as hits of their own. A call whose results go anywhere but a
+    /// list of plain names is left out. `None` when no call is left.
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub results: Option<Vec<String>>,
+    pub results: Option<Vec<Vec<String>>>,
 }
 
 /// Every use of a name in `catalogue` found in `source`, in source order.
 pub fn scan(source: &str, catalogue: &Catalogue) -> Vec<Hit> {
     let toks = lex(source);
     let mut hits = Vec::new();
+    // The local aliases of a chain, by name, with the hits of the chain.
+    let mut aliases: HashMap<String, Vec<usize>> = HashMap::new();
     let mut i = 0;
     while i < toks.len() {
         let t = &toks[i];
@@ -152,7 +157,7 @@ pub fn scan(source: &str, catalogue: &Catalogue) -> Vec<Hit> {
                 definition(&toks, i, catalogue, &mut hits)
             };
         } else {
-            i = chain_use(&toks, i, catalogue, &mut hits);
+            i = chain_use(&toks, i, catalogue, &mut hits, &mut aliases);
         }
     }
     hits
@@ -204,8 +209,52 @@ fn arguments(toks: &[Token], open: usize, receiver: bool) -> Option<Vec<String>>
     None
 }
 
+/// The plain names a statement assigns to, when the `=` at `eq` ends a list
+/// of them: `local a, b =` or `a, b =`. `None` when there is no such list, or
+/// when a target is a field or an index, as in `t.a, b =` or `t[1] =`.
+fn targets(toks: &[Token], eq: usize) -> Option<Vec<String>> {
+    if !toks.get(eq)?.is_sym("=") {
+        return None;
+    }
+    let mut names = Vec::new();
+    let mut at = eq;
+    loop {
+        let name = toks.get(at.checked_sub(1)?)?;
+        if name.kind != Kind::Ident {
+            return None;
+        }
+        let before = at.checked_sub(2).and_then(|b| toks.get(b));
+        if before.is_some_and(|t| t.is_sym(".") || t.is_sym(":")) {
+            return None;
+        }
+        names.push(name.text.clone());
+        match before {
+            Some(t) if t.is_sym(",") => at -= 2,
+            _ => break,
+        }
+    }
+    names.reverse();
+    Some(names)
+}
+
+/// Adds one call's result names to each hit in `at`.
+fn add_results(hits: &mut [Hit], at: &[usize], names: Vec<String>) {
+    for &i in at {
+        hits[i]
+            .results
+            .get_or_insert_with(Vec::new)
+            .push(names.clone());
+    }
+}
+
 /// A chain of names joined by `.`, starting at `at`. Returns the index after it.
-fn chain_use(toks: &[Token], at: usize, catalogue: &Catalogue, hits: &mut Vec<Hit>) -> usize {
+fn chain_use(
+    toks: &[Token],
+    at: usize,
+    catalogue: &Catalogue,
+    hits: &mut Vec<Hit>,
+    aliases: &mut HashMap<String, Vec<usize>>,
+) -> usize {
     let mut end = at + 1;
     while toks.get(end).is_some_and(|t| t.is_sym("."))
         && toks.get(end + 1).is_some_and(|t| t.kind == Kind::Ident)
@@ -214,15 +263,32 @@ fn chain_use(toks: &[Token], at: usize, catalogue: &Catalogue, hits: &mut Vec<Hi
     }
     let parts = &toks[at..end];
     let joined: String = parts.iter().map(|t| t.text.as_str()).collect();
-    // `parts` alternates names and dots, so joining it gives `a.b.c`.
-    if catalogue.chains.contains_key(&joined) {
-        let from = hits.len();
-        push(hits, &catalogue.chains, &joined, parts, None);
-        let taken = results(toks, at, end);
-        for hit in &mut hits[from..] {
-            hit.results = taken.clone();
+    let called = toks.get(end).is_some_and(|t| t.is_sym("("));
+    let assigned_to = at.checked_sub(1).and_then(|eq| targets(toks, eq));
+    if parts.len() == 1 {
+        // A name set again no longer holds the chain it was an alias of.
+        if toks.get(end).is_some_and(|t| t.is_sym("=")) {
+            aliases.remove(&joined);
+        }
+        if let (true, Some(names), Some(alias)) = (called, &assigned_to, aliases.get(&joined)) {
+            add_results(hits, alias, names.clone());
         }
     }
+    // `parts` alternates names and dots, so joining it gives `a.b.c`.
+    if catalogue.chains.contains_key(&joined) {
+        let first = hits.len();
+        push(hits, &catalogue.chains, &joined, parts, None);
+        let pushed: Vec<usize> = (first..hits.len()).collect();
+        match assigned_to {
+            Some(names) if called => add_results(hits, &pushed, names),
+            // `local f = Spring.GetGroundInfo`, which later calls of `f` read.
+            Some(names) if names.len() == 1 && at >= 3 && toks[at - 3].is_ident("local") => {
+                aliases.insert(names[0].clone(), pushed);
+            }
+            _ => {}
+        }
+    }
+
     let declared =
         toks.get(end).is_some_and(|t| t.is_sym("=")) || (at > 0 && toks[at - 1].is_ident("local"));
     if parts.len() == 1 && !declared {
@@ -249,81 +315,6 @@ fn chain_use(toks: &[Token], at: usize, catalogue: &Catalogue, hits: &mut Vec<Hi
         );
     }
     end
-}
-
-/// The index of the `)` that closes the `(` at `open`.
-fn closing(toks: &[Token], open: usize) -> Option<usize> {
-    let mut depth = 0usize;
-    for (i, t) in toks.iter().enumerate().skip(open) {
-        if t.is_sym("(") {
-            depth += 1;
-        } else if t.is_sym(")") {
-            depth -= 1;
-            if depth == 0 {
-                return Some(i);
-            }
-        }
-    }
-    None
-}
-
-/// [`Hit::results`] for the chain at `at..end`.
-fn results(toks: &[Token], at: usize, end: usize) -> Option<Vec<String>> {
-    if !toks.get(end)?.is_sym("(") {
-        return None;
-    }
-    let close = closing(toks, end)?;
-    // `= f(...)`, or `= select(N, f(...))`, which skips N - 1 results.
-    let (eq, skipped, after) = if toks[at.checked_sub(1)?].is_sym("=") {
-        (at - 1, 0, close + 1)
-    } else {
-        let sel = at.checked_sub(4)?;
-        let n: usize = toks[at - 2].text.parse().ok()?;
-        let shape = toks[sel].is_ident("select")
-            && toks[sel + 1].is_sym("(")
-            && toks[at - 2].kind == Kind::Number
-            && toks[at - 1].is_sym(",")
-            && toks.get(close + 1)?.is_sym(")")
-            && n > 0;
-        if !shape || !toks[sel.checked_sub(1)?].is_sym("=") {
-            return None;
-        }
-        (sel - 1, n - 1, close + 2)
-    };
-    let mut names = Vec::new();
-    let mut i = eq;
-    loop {
-        let name = toks.get(i.checked_sub(1)?)?;
-        if name.kind != Kind::Ident {
-            return None;
-        }
-        names.push(name.text.clone());
-        i -= 1;
-        if i > 0 && toks[i - 1].is_sym(",") {
-            i -= 1;
-        } else {
-            break;
-        }
-    }
-    if i > 0 && (toks[i - 1].is_sym(".") || toks[i - 1].is_sym(":")) {
-        return None;
-    }
-    names.reverse();
-    let mut out = vec!["_".to_string(); skipped];
-    out.extend(names);
-    match toks.get(after) {
-        None => Some(out),
-        Some(t) if t.is_sym(";") => Some(out),
-        Some(t) if t.is_ident("and") || t.is_ident("or") => Some(out[..=skipped].to_vec()),
-        Some(t) if t.kind == Kind::Ident => Some(out),
-        Some(t)
-            if t.kind == Kind::Sym
-                && !["(", ")", ",", ".", ":", "[", "{"].contains(&t.text.as_str()) =>
-        {
-            Some(out[..=skipped].to_vec())
-        }
-        Some(_) => None,
-    }
 }
 
 /// Add a hit for each entry stored under `key`, with the source text of `parts`.
@@ -385,8 +376,86 @@ mod tests {
                 column: 11,
                 text: "Spring.GetUnitTravel".into(),
                 params: None,
-                results: Some(vec!["x".into()]),
+                results: Some(vec![vec!["x".into()]]),
             }]
+        );
+    }
+
+    fn results(src: &str) -> Vec<Option<Vec<Vec<String>>>> {
+        scan(src, &catalogue())
+            .into_iter()
+            .map(|h| h.results)
+            .collect()
+    }
+
+    fn calls(lists: &[&[&str]]) -> Option<Vec<Vec<String>>> {
+        Some(
+            lists
+                .iter()
+                .map(|l| l.iter().map(|s| s.to_string()).collect())
+                .collect(),
+        )
+    }
+
+    #[test]
+    fn a_call_reports_the_names_its_results_are_assigned_to() {
+        assert_eq!(
+            results("local _, period = Spring.GetUnitTravel(unitID)"),
+            [calls(&[&["_", "period"]])]
+        );
+        assert_eq!(
+            results("if x then a, b = Spring.GetUnitTravel(u) end"),
+            [calls(&[&["a", "b"]])]
+        );
+        assert_eq!(
+            results("local t = Spring.GetUnitTravel(u) or 0"),
+            [calls(&[&["t"]])]
+        );
+    }
+
+    #[test]
+    fn a_call_whose_results_go_anywhere_but_a_list_of_names_reports_none() {
+        for src in [
+            "return Spring.GetUnitTravel(u)",
+            "local t = { Spring.GetUnitTravel(u) }",
+            "local a, b = c, Spring.GetUnitTravel(u)",
+            "t.a, b = Spring.GetUnitTravel(u)",
+            "a, t[1] = Spring.GetUnitTravel(u)",
+            "local same = x == Spring.GetUnitTravel(u)",
+            "local f = Spring.GetUnitTravel",
+            "f(Spring.GetUnitTravel(u))",
+        ] {
+            assert_eq!(results(src), [None], "{src}");
+        }
+    }
+
+    #[test]
+    fn calls_through_a_local_alias_are_reported_on_the_alias() {
+        let src = "local GetTravel = Spring.GetUnitTravel\n\
+                   local function f(u, v, w)\n\
+                   \tlocal _, period = GetTravel(u)\n\
+                   \tlocal t = GetTravel(v)\n\
+                   \tprint(GetTravel(w))\n\
+                   end\n";
+        let hits = scan(src, &catalogue());
+        assert_eq!(hits.len(), 1, "an alias's calls add no hits of their own");
+        assert_eq!(hits[0].text, "Spring.GetUnitTravel");
+        assert_eq!(hits[0].results, calls(&[&["_", "period"], &["t"]]));
+    }
+
+    #[test]
+    fn an_alias_counts_only_while_it_holds_the_function() {
+        assert_eq!(
+            results("local a = G(1)\nlocal G = Spring.GetUnitTravel"),
+            [None]
+        );
+        assert_eq!(
+            results("local G = Spring.GetUnitTravel\nG = other\nlocal a, b = G(1)"),
+            [None]
+        );
+        assert_eq!(
+            results("local G = Spring.GetUnitTravel\nlocal a = t.G(1)"),
+            [None]
         );
     }
 
@@ -591,74 +660,6 @@ mod tests {
         assert!(global_hits("local spairs = pairs").is_empty());
         assert!(global_hits("t.snext(x) t:spairs()").is_empty());
         assert!(global_hits("if snext == nil then end").len() == 1);
-    }
-
-    fn results(src: &str) -> Vec<Option<Vec<String>>> {
-        scan(src, &catalogue())
-            .into_iter()
-            .map(|h| h.results)
-            .collect()
-    }
-
-    /// Issue #4694: how a call site takes a function's results tells whether
-    /// it was written for the order they came in before a change.
-    #[test]
-    fn a_call_assigned_to_names_reports_them_as_its_results() {
-        assert_eq!(
-            results("local _, _, isDead = Spring.GetUnitTravel(team.id)"),
-            [names(&["_", "_", "isDead"])]
-        );
-        assert_eq!(
-            results("travel, period = Spring.GetUnitTravel(u);"),
-            [names(&["travel", "period"])]
-        );
-        assert_eq!(
-            results("local _,_,_,_,_,_,r,g,b = Spring.GetUnitTravel(t); return r,g,b"),
-            [names(&["_", "_", "_", "_", "_", "_", "r", "g", "b"])]
-        );
-    }
-
-    #[test]
-    fn a_call_inside_select_reports_the_results_select_skips() {
-        assert_eq!(
-            results("local teamOptions = select(7, Spring.GetUnitTravel(teamID))\nlocal m = 1"),
-            [names(&["_", "_", "_", "_", "_", "_", "teamOptions"])]
-        );
-        assert_eq!(
-            results("local a, b = select(2, Spring.GetUnitTravel(x))"),
-            [names(&["_", "a", "b"])]
-        );
-    }
-
-    #[test]
-    fn an_operator_after_the_call_keeps_only_the_first_result() {
-        assert_eq!(
-            results("local a, b = Spring.GetUnitTravel(x) or 0"),
-            [names(&["a"])]
-        );
-        assert_eq!(
-            results("local dead = select(3, Spring.GetUnitTravel(x)) == true"),
-            [names(&["_", "_", "dead"])]
-        );
-    }
-
-    #[test]
-    fn a_call_whose_results_go_anywhere_else_reports_none() {
-        for src in [
-            "Spring.GetUnitTravel(x)",
-            "return Spring.GetUnitTravel(x)",
-            "local f = Spring.GetUnitTravel",
-            "local a, b = Spring.GetUnitTravel(x), 1",
-            "local a = Spring.GetUnitTravel(x).y",
-            "local a = Spring.GetUnitTravel(x)[1]",
-            "obj.a, b = Spring.GetUnitTravel(x)",
-            "local n = g(select(2, Spring.GetUnitTravel(x)))",
-            "local n = select('#', Spring.GetUnitTravel(x))",
-            "local n = t.select(2, Spring.GetUnitTravel(x))",
-            "local a = Spring.GetUnitTravel{x}",
-        ] {
-            assert_eq!(results(src), [None], "{src}");
-        }
     }
 
     #[test]

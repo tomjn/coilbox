@@ -8,6 +8,8 @@
     "spring-make-font",
     "spring-update-info-texture",
     "spring-sun-parameters",
+    "game-version-104",
+    "spring-ground-info-105",
     "callin-unit-damaged-95",
     "callin-allow-command-105",
     "gadget-aircraft-crash-83-v3",
@@ -20,10 +22,7 @@
     "defs-weapon-consts-87",
     "defs-manual-bomb-settings-92",
     "defs-missing-model-standin",
-    "game-identity",
-    "snext-spairs-sipairs",
-    "spring-unit-lineage",
-    "spring-get-team-info-105"
+    "game-identity"
   ],
   "converter": {
     "crate": "coilbox-3do-convert",
