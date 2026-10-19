@@ -130,7 +130,7 @@ If one of the fixes fails while the game runs, the game still loads. The engine'
 
 ## What it changes
 
-This is compatibility version 5, the newest.
+This is compatibility version 10, the newest.
 
 Lua functions it puts back:
 
@@ -158,5 +158,6 @@ Unit and weapon definitions:
 - `modelCenterOffset`, removed in Spring 89.0, is copied to the unit's custom parameters for the gadget above.
 - A bomb's burst is worked out from its reload time as it was before Spring 92.0, unless the weapon sets `manualBombSettings` to true.
 - `areaOfEffect` and `maxVelocity`, which Lua lost in Spring 87.0, are kept in each weapon's custom parameters under those names in lower case.
+- A unit, feature or weapon whose model is not in the game is drawn as a plain grey box the size of its footprint, because the engine stops loading a game on any model it cannot find. A wreck keeps its metal and still blocks the ground it covers. The build result names each one. A name close to a model the game has is not taken for it, so XTA's `arm_infinity_dead` gets a box even though the game has `arm_infinite_DEAD`.
 
 For how fixes are added and why a fix never changes once it ships, see [Compatibility mode fixes](../developers/compatibility-mode.md).
