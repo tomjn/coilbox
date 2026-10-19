@@ -85,13 +85,12 @@ coilbox-3do-convert = { path = "../coilbox-3do-convert" }
 # The scanner behind `--lua-compat`, which finds the Lua calls a current engine
 # removed or changed (issue #4553).
 coilbox-luacompat = { path = "../coilbox-luacompat" }
+# The compat writers, since `--convert-3do` converts a compat mutator's models
+# as the writer its manifest names does (issues #4629, #4640).
+coilbox-compat = { path = "../coilbox-compat" }
 
 [dev-dependencies]
 # Stock Lua 5.1 used ONLY to unit-test the injected serializer + wrapper against a
 # faithful interpreter (the real test target, unitsync's LuaParser, needs a live
 # libunitsync and is exercised manually).
 mlua = { version = "0.11", features = ["lua51", "vendored"] }
-# The compat writer the golden conversion and scan tests name, since what
-# `--convert-3do` and `--lua-compat` decide goes into a compat mutator (issue
-# #4629).
-coilbox-compat = { path = "../coilbox-compat" }

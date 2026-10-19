@@ -169,9 +169,7 @@ fn two_builds_of_the_fixture_are_byte_identical_from_every_manifest() {
     let game = fixture();
     let latest = coilbox_compat::latest();
     let mut list = Vec::new();
-    for n in (1..=latest).filter(|n| {
-        coilbox_compat::manifest(*n).is_some_and(|m| m.writer == coilbox_compat::WRITER)
-    }) {
+    for n in 1..=latest {
         let (_first_root, first) = build_fixture(n, &game);
         let (_second_root, second) = build_fixture(n, &game);
         assert_eq!(first.files, second.files, "manifest {n}");

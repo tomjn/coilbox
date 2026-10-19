@@ -50,6 +50,7 @@ const MANIFESTS: &[(u32, &str)] = &[
     (5, include_str!("../../../lua/compat/manifests/5.json")),
     (6, include_str!("../../../lua/compat/manifests/6.json")),
     (7, include_str!("../../../lua/compat/manifests/7.json")),
+    (8, include_str!("../../../lua/compat/manifests/8.json")),
 ];
 
 /// Every fix file, by id.
@@ -156,20 +157,44 @@ pub struct Converter {
     pub version: String,
 }
 
-/// The version of the code that turns a manifest and a game into a mutator's
-/// bytes (issue #4629). The fixes are pinned by their hashes, but the code
-/// around them decides the bytes too: how the prelude wraps the fixes and the
-/// entry files, which call-in adapters a game's handlers pick, how the scan
+/// The newest version of the code that turns a manifest and a game into a
+/// mutator's bytes (issue #4629). The fixes are pinned by their hashes, but the
+/// code around them decides the bytes too: how the prelude wraps the fixes and
+/// the entry files, which call-in adapters a game's handlers pick, how the scan
 /// reads those handlers, the `modinfo.lua` and `defs_post.lua` text, and how
 /// the worker loads the tiles and converts the models.
 ///
-/// Every manifest names the writer it was built with, and a build refuses a
-/// manifest that names another. The marker records it, so a mutator built by
-/// another writer is stale. Golden tests in the compat plugin and in the worker
-/// hash a fixed build and fail when the bytes change. When one fails, move
-/// this, add a manifest that names the new writer, and only then record the
-/// new hashes.
-pub const WRITER: u32 = 1;
+/// Every manifest names the writer it is built with, and the marker records
+/// it. A build keeps the behaviour of every writer up to this one and builds a
+/// manifest with the writer it names, so a manifest players may already have
+/// built goes on building the same bytes. It refuses a manifest that names a
+/// newer writer (see [`knows_writer`]).
+///
+/// Golden tests in the compat plugin and in the worker hash a fixed build for
+/// each manifest and each writer, and fail when the bytes change. A change to
+/// the bytes keeps the old behaviour for the writers that had it and puts the
+/// new one behind a new writer: move this, add a manifest that names it, and
+/// record the new writer's hashes beside the old ones.
+pub const WRITER: u32 = 2;
+
+/// Whether this build can write a manifest that names `writer`.
+pub fn knows_writer(writer: u32) -> bool {
+    (1..=WRITER).contains(&writer)
+}
+
+/// Whether `writer` keeps a full 3do sheet's flat colour tiles until every
+/// named tile has gone, and names a model that lost one (issue #4640). Writer
+/// 1 gave them up first and drew those faces grey.
+pub fn keeps_palette_tiles(writer: u32) -> bool {
+    writer >= 2
+}
+
+/// Whether `writer` copies a game's entry files byte for byte (issue #4641).
+/// Writer 1 read them as text, which replaced every byte that is not UTF-8
+/// with U+FFFD.
+pub fn copies_entry_bytes(writer: u32) -> bool {
+    writer >= 2
+}
 
 /// The writer of manifests 1 and 2, which predate the `writer` field.
 fn first_writer() -> u32 {
@@ -434,12 +459,15 @@ fn fix_chunk(id: &str, src: &str) -> String {
     )
 }
 
-/// An entry file with its state's prelude included in front of the original.
+/// An entry file with its state's prelude included in front of the original,
+/// whose bytes follow unchanged.
 ///
 /// The include goes on the original's first line, so every line of the game's
 /// code keeps its number in an error message.
-pub fn wrap_entry(original: &str, state: LuaState) -> String {
-    format!("VFS.Include(\"{}\") {original}", state.prelude_path())
+pub fn wrap_entry(original: &[u8], state: LuaState) -> Vec<u8> {
+    let mut out = format!("VFS.Include(\"{}\") ", state.prelude_path()).into_bytes();
+    out.extend_from_slice(original);
+    out
 }
 
 /// Whether the fix `id` is part of the prelude, which [`prelude_files`] writes.
@@ -657,17 +685,17 @@ pub fn for_game(manifest: &Manifest, handlers: &[Handler]) -> Manifest {
 
 /// Every Lua file the prelude adds to a compat mutator built from `manifest`:
 /// the prelude for each state that has fixes, and each entry file the base
-/// game has for that state, wrapped. `read` returns the base game's copy of a
-/// path, or `None` when it has none, and an error from it stops the build so a
-/// failed read never leaves a handle without its prelude. The files are sorted
-/// by path.
+/// game has for that state, wrapped. `read` returns the bytes of the base
+/// game's copy of a path, or `None` when it has none, and an error from it
+/// stops the build so a failed read never leaves a handle without its prelude.
+/// The files are sorted by path.
 ///
 /// A game with no file for a handle gets none written, so the engine runs
 /// nothing there, as it would for the game alone.
 pub fn prelude_files<E>(
     manifest: &Manifest,
-    mut read: impl FnMut(&str) -> Result<Option<String>, E>,
-) -> Result<Vec<(String, String)>, E> {
+    mut read: impl FnMut(&str) -> Result<Option<Vec<u8>>, E>,
+) -> Result<Vec<(String, Vec<u8>)>, E> {
     let mut files = Vec::new();
     for state in [LuaState::Synced, LuaState::Unsynced] {
         let Some(prelude) = prelude(manifest, state) else {
@@ -684,7 +712,7 @@ pub fn prelude_files<E>(
             }
         }
         if used {
-            files.push((state.prelude_path().to_string(), prelude));
+            files.push((state.prelude_path().to_string(), prelude.into_bytes()));
         }
     }
     files.sort();
@@ -718,7 +746,11 @@ mod tests {
         m: &Manifest,
         mut read: impl FnMut(&str) -> Option<String>,
     ) -> Vec<(String, String)> {
-        prelude_files::<()>(m, |path| Ok(read(path))).unwrap()
+        prelude_files::<()>(m, |path| Ok(read(path).map(String::into_bytes)))
+            .unwrap()
+            .into_iter()
+            .map(|(path, bytes)| (path, String::from_utf8(bytes).unwrap()))
+            .collect()
     }
 
     fn all_manifests() -> Vec<Manifest> {
@@ -772,6 +804,17 @@ mod tests {
     #[test]
     fn the_latest_manifest_names_the_writer_this_build_carries() {
         assert_eq!(manifest(latest()).unwrap().writer, WRITER);
+    }
+
+    /// A newer coilbox builds the older manifest a host is on (issue #4564),
+    /// so every manifest's writer stays one this build knows.
+    #[test]
+    fn this_build_knows_every_manifests_writer_and_no_newer_one() {
+        for m in all_manifests() {
+            assert!(knows_writer(m.writer), "manifest {}", m.version);
+        }
+        assert!(!knows_writer(0));
+        assert!(!knows_writer(WRITER + 1));
     }
 
     #[test]
@@ -1024,6 +1067,20 @@ mod tests {
         assert_eq!(src, fix_source("gadget-aircraft-crash-83-v3").unwrap());
     }
 
+    /// Writer 2 changes how a build writes the bytes (issue #4640), and the
+    /// fixes stay those of manifest 7.
+    #[test]
+    fn manifest_8_is_manifest_7_built_by_writer_2() {
+        let (seven, eight) = (manifest(7).unwrap(), manifest(8).unwrap());
+        assert_eq!(eight.fixes, seven.fixes);
+        assert_eq!(eight.converter, seven.converter);
+        assert_eq!((seven.writer, eight.writer), (1, 2));
+        assert!(!keeps_palette_tiles(seven.writer));
+        assert!(keeps_palette_tiles(eight.writer));
+        assert!(!copies_entry_bytes(seven.writer));
+        assert!(copies_entry_bytes(eight.writer));
+    }
+
     #[test]
     fn the_def_fixes_are_the_files_in_defs_and_name_only_files_that_exist() {
         let in_folder = fix_files_in(compat_dir().join("defs"));
@@ -1188,14 +1245,30 @@ mod tests {
     #[test]
     fn a_wrapped_entry_file_keeps_the_original_on_its_own_line_numbers() {
         let original = "local a = 1\nreturn a\n";
-        let wrapped = wrap_entry(original, LuaState::Synced);
+        let wrapped = String::from_utf8(wrap_entry(original.as_bytes(), LuaState::Synced)).unwrap();
         assert_eq!(
             wrapped,
             "VFS.Include(\"compat/prelude-synced.lua\") local a = 1\nreturn a\n"
         );
         assert_eq!(wrapped.lines().count(), original.lines().count());
-        assert!(wrap_entry("", LuaState::Unsynced)
-            .starts_with("VFS.Include(\"compat/prelude-unsynced.lua\")"));
+        assert!(wrap_entry(b"", LuaState::Unsynced)
+            .starts_with(b"VFS.Include(\"compat/prelude-unsynced.lua\")"));
+    }
+
+    /// Issue #4641: games of the Total Annihilation era carry Latin-1 text in
+    /// their Lua, and the game has to see the bytes it shipped.
+    #[test]
+    fn a_wrapped_entry_file_keeps_bytes_that_are_not_utf8() {
+        let original = b"local name = \"Caf\xe9\"\n\xff\n";
+        let wrapped = wrap_entry(original, LuaState::Synced);
+        let include = b"VFS.Include(\"compat/prelude-synced.lua\") ";
+        assert_eq!(&wrapped[..include.len()], include);
+        assert_eq!(&wrapped[include.len()..], original);
+        let files = prelude_files::<()>(&manifest(8).unwrap(), |path| {
+            Ok((path == "LuaRules/main.lua").then(|| original.to_vec()))
+        })
+        .unwrap();
+        assert_eq!(files[0], ("LuaRules/main.lua".to_string(), wrapped));
     }
 
     #[test]
@@ -1220,7 +1293,7 @@ mod tests {
             if path == "LuaRules/draw.lua" {
                 Err(format!("could not read {path}"))
             } else {
-                Ok(Some(String::new()))
+                Ok(Some(Vec::new()))
             }
         });
         assert_eq!(got, Err("could not read LuaRules/draw.lua".to_string()));
@@ -1347,7 +1420,8 @@ mod tests {
             } else {
                 LuaState::Unsynced
             };
-            assert_eq!(text, &wrap_entry(&format!("-- {path}\n"), state), "{path}");
+            let wrapped = wrap_entry(format!("-- {path}\n").as_bytes(), state);
+            assert_eq!(text.as_bytes(), wrapped, "{path}");
         }
     }
 

@@ -69,6 +69,10 @@ pub fn build(
     manifest_version: u32,
     coilbox_version: &str,
 ) -> Result<Built, String> {
+    // The models are converted as the writer the manifest names converts them.
+    let writer = coilbox_compat::manifest(manifest_version)
+        .ok_or_else(|| format!("there is no compat manifest {manifest_version}"))?
+        .writer;
     let scan = tauri_plugin_coilbox_unitsync::lua_compat_scan_blocking(
         engine_path,
         data_dir,
@@ -79,7 +83,7 @@ pub fn build(
         .map_err(|e| format!("could not make a folder to convert the models into: {e}"))?;
     let declared =
         tauri_plugin_coilbox_unitsync::game_declared_blocking(engine_path, data_dir, game_name)?;
-    build_reading(
+    build_with(
         data_dir,
         archive_name,
         game_name,
@@ -96,17 +100,22 @@ pub fn build(
                 file,
             )
         },
-        || models::convert(engine_path, data_dir, archive_name, staging.path()),
+        |file| {
+            tauri_plugin_coilbox_unitsync::archive_bytes_blocking(
+                engine_path,
+                data_dir,
+                archive_name,
+                file,
+            )
+        },
+        || models::convert(engine_path, data_dir, archive_name, staging.path(), writer),
         || tauri_plugin_coilbox_unitsync::unit_defs_blocking(engine_path, data_dir, archive_name),
     )
 }
 
-/// [`build`], with `read` returning a file of the base game by path,
-/// `handlers` the call-in handlers the base game's Lua defines, `convert` its
-/// converted models, and `read_defs` its defs as `unitsync_unit_defs` reads
-/// them. `convert` runs once the request is known to be sound, and before
-/// anything is written. `read_defs` runs only when def fixes were written, to
-/// count the defs they change.
+/// [`build_with`], for a base game whose files `read` returns as text, so
+/// their bytes are that text's.
+#[cfg(test)]
 #[allow(clippy::too_many_arguments)]
 fn build_reading(
     data_dir: &str,
@@ -117,7 +126,49 @@ fn build_reading(
     manifest_version: u32,
     coilbox_version: &str,
     handlers: &[coilbox_compat::Handler],
+    read: impl Fn(&str) -> Result<Option<String>, String>,
+    convert: impl FnOnce() -> Result<models::Models, String>,
+    read_defs: impl FnOnce() -> Result<String, String>,
+) -> Result<Built, String> {
+    build_with(
+        data_dir,
+        archive_name,
+        game_name,
+        declared,
+        base_checksum,
+        manifest_version,
+        coilbox_version,
+        handlers,
+        &read,
+        |file| Ok(read(file)?.map(String::into_bytes)),
+        convert,
+        read_defs,
+    )
+}
+
+/// [`build`], with `read` returning a file of the base game by path as the
+/// worker's text read gives it, `read_bytes` the same file's bytes, `handlers`
+/// the call-in handlers the base game's Lua defines, `convert` its converted
+/// models, and `read_defs` its defs as `unitsync_unit_defs` reads them.
+/// `convert` runs once the request is known to be sound, and before anything is
+/// written. `read_defs` runs only when def fixes were written, to count the
+/// defs they change.
+///
+/// The entry files the prelude wraps come from `read_bytes` for a manifest
+/// whose writer copies them byte for byte, and from `read` for one whose
+/// writer does not (see [`coilbox_compat::copies_entry_bytes`]).
+#[allow(clippy::too_many_arguments)]
+fn build_with(
+    data_dir: &str,
+    archive_name: &str,
+    game_name: &str,
+    declared: &DeclaredGame,
+    base_checksum: &str,
+    manifest_version: u32,
+    coilbox_version: &str,
+    handlers: &[coilbox_compat::Handler],
     mut read: impl FnMut(&str) -> Result<Option<String>, String>,
+    mut read_bytes: impl FnMut(&str) -> Result<Option<Vec<u8>>, String>,
     convert: impl FnOnce() -> Result<models::Models, String>,
     read_defs: impl FnOnce() -> Result<String, String>,
 ) -> Result<Built, String> {
@@ -139,7 +190,15 @@ fn build_reading(
         base_checksum: base_checksum.to_string(),
         coilbox_version: coilbox_version.to_string(),
     };
-    let mut files = mutator::files(&manifest, game_name, declared, &marker, &mut read)?;
+    let copies_bytes = coilbox_compat::copies_entry_bytes(manifest.writer);
+    let entry = |file: &str| -> Result<Option<Vec<u8>>, String> {
+        if copies_bytes {
+            read_bytes(file)
+        } else {
+            Ok(read(file)?.map(String::into_bytes))
+        }
+    };
+    let mut files = mutator::files(&manifest, game_name, declared, &marker, entry)?;
     let defs = defs::plan(&manifest, &mut read)?;
     let models = convert()?;
     let prelude_fixes = manifest
@@ -185,7 +244,7 @@ fn build_reading(
 /// the marker last.
 fn write_with_models(
     dir: &std::path::Path,
-    files: &mut Vec<tauri_plugin_coilbox_workshop::CompiledFile>,
+    files: &mut Vec<mutator::File>,
     models: &models::Models,
     defs: &defs::Plan,
     manifest_version: u32,
@@ -203,9 +262,23 @@ fn write_with_models(
         defs.defs_post.as_deref(),
         manifest_version,
     );
-    files.extend(post.into_iter().chain(defs.weapondefs_post.clone()));
+    files.extend(
+        post.into_iter()
+            .chain(defs.weapondefs_post.clone())
+            .map(mutator::File::from),
+    );
     files.sort_by(|a, b| a.path.cmp(&b.path));
-    tauri_plugin_coilbox_workshop::write_mutator(dir, files)?;
+    // Clears the folder, and then the files go in as bytes.
+    tauri_plugin_coilbox_workshop::write_mutator(dir, &[])?;
+    for file in files.iter() {
+        let at = dir.join(&file.path);
+        if let Some(parent) = at.parent() {
+            std::fs::create_dir_all(parent)
+                .map_err(|e| format!("could not create {}: {e}", parent.display()))?;
+        }
+        std::fs::write(&at, &file.contents)
+            .map_err(|e| format!("could not write {}: {e}", at.display()))?;
+    }
     if let Some(from) = &models.dir {
         models::copy(from, &converted, dir)?;
     }
@@ -546,7 +619,7 @@ mod tests {
             "XTA 9.65",
             &DeclaredGame::default(),
             "1234abcd",
-            1,
+            coilbox_compat::latest(),
             "1.2.3",
             &[],
             no_file,
@@ -604,6 +677,43 @@ mod tests {
         );
         assert!(dir.join("compat/prelude-synced.lua").is_file());
         assert!(!dir.join("compat/prelude-unsynced.lua").exists());
+    }
+
+    /// Issue #4641: a Total Annihilation era game's Lua often holds Latin-1
+    /// text. From writer 2 the entry file is copied from its bytes, and
+    /// writer 1 keeps the text read, which replaced the byte with U+FFFD.
+    #[test]
+    fn an_entry_file_that_is_not_utf8_is_copied_as_it_is_from_writer_2() {
+        let raw: &[u8] = b"local name = \"Caf\xe9\"\n";
+        let main = "LuaRules/main.lua";
+        let entry = |n: u32| -> Vec<u8> {
+            let (_keep, data) = root();
+            let built = build_with(
+                &data,
+                "xta-9.65.sd7",
+                "XTA 9.65",
+                &DeclaredGame::default(),
+                "1234abcd",
+                n,
+                "1.2.3",
+                &[],
+                |file| Ok((file == main).then(|| String::from_utf8_lossy(raw).into_owned())),
+                |file| Ok((file == main).then(|| raw.to_vec())),
+                no_models,
+                no_defs,
+            )
+            .unwrap();
+            std::fs::read(std::path::Path::new(&built.dir).join(main)).unwrap()
+        };
+        let include = b"VFS.Include(\"compat/prelude-synced.lua\") ";
+        let new = entry(8);
+        assert_eq!(&new[..include.len()], include);
+        assert_eq!(&new[include.len()..], raw);
+        let old = entry(7);
+        assert_eq!(
+            &old[include.len()..],
+            "local name = \"Caf\u{fffd}\"\n".as_bytes()
+        );
     }
 
     #[test]
@@ -1043,11 +1153,11 @@ mod tests {
         hash.finalize().iter().map(|b| format!("{b:02x}")).collect()
     }
 
-    /// The hash of the fixed games built from each manifest this writer builds.
-    /// Adding a manifest adds a line. A line that changes means the plugin, the
-    /// prelude, the adapter choice or the handler scan writes different bytes
-    /// than before for a manifest players may already have built (issue
-    /// #4629).
+    /// The hash of the fixed games built from each manifest, with the writer
+    /// it names. Adding a manifest adds a line. A line that changes means the
+    /// plugin, the prelude, the adapter choice or the handler scan writes
+    /// different bytes than before for a manifest players may already have
+    /// built (issue #4629).
     const GOLDEN: &[(u32, &str)] = &[
         (
             1,
@@ -1077,24 +1187,25 @@ mod tests {
             7,
             "991aba4284bf08486778b34d436818176d6304d7c2828a349f976a11b363d33b",
         ),
+        (
+            8,
+            "989268ce40bf5778182d3bd9bff7f52a9295ab593598973e02bdd4dc5c11a121",
+        ),
     ];
 
     #[test]
     fn the_fixed_games_build_the_same_bytes_from_every_manifest() {
         let built: Vec<(u32, String)> = (1..=coilbox_compat::latest())
-            .filter(|n| {
-                coilbox_compat::manifest(*n).is_some_and(|m| m.writer == coilbox_compat::WRITER)
-            })
             .map(|n| (n, golden_hash(n)))
             .collect();
         let recorded: Vec<(u32, String)> =
             GOLDEN.iter().map(|(n, h)| (*n, h.to_string())).collect();
-        assert_eq!(coilbox_compat::WRITER, 1);
         assert!(
             recorded == built,
             "the mutator a manifest builds changed. If a line below is new, add it. \
-             If one moved, move coilbox_compat::WRITER, add a compat manifest that names \
-             the new writer, and only then record the hashes:\n{built:#?}"
+             If one moved, keep the old bytes for the writer that manifest names, put \
+             the change behind a new coilbox_compat::WRITER and add a compat manifest \
+             that names it:\n{built:#?}"
         );
     }
 
