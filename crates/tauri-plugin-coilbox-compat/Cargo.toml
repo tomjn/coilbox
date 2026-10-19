@@ -29,6 +29,9 @@ tauri-plugin-coilbox-unitsync = { path = "../tauri-plugin-coilbox-unitsync" }
 # The hits the Lua compat scan reports, which name the call-in handlers a game
 # defines, so the mutator gets only the call-in adapters the game needs.
 coilbox-luacompat = { path = "../coilbox-luacompat" }
+# Writes the box a def whose model is missing is drawn as (issue #4686), and
+# the identical builds test writes the fixture's converted model with it.
+coilbox-s3o = { path = "../coilbox-s3o" }
 # The folder the converter writes into before it is copied into the mutator.
 tempfile = { workspace = true }
 
@@ -44,6 +47,5 @@ sha2 = { workspace = true }
 # The converter crates the identical builds test (issue #4563) runs on its
 # fixture model, in place of the worker, which needs unitsync.
 coilbox-3do = { path = "../coilbox-3do" }
-coilbox-s3o = { path = "../coilbox-s3o" }
 # Reads the exported archive back, to check its files and their order.
 zip = { workspace = true }

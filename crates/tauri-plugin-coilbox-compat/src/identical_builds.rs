@@ -104,7 +104,7 @@ fn build_fixture(n: u32, game: &[(String, Vec<u8>)]) -> (tempfile::TempDir, Buil
             .map(|(_, bytes)| String::from_utf8(bytes.clone()).unwrap()))
     };
     let handlers = handlers::handlers_in(&scan_of(game), ARCHIVE).unwrap();
-    let built = build_reading(
+    let built = build_reading_with_lua(
         &root.path().to_string_lossy(),
         ARCHIVE,
         "Fixture Game 1",
@@ -126,6 +126,14 @@ fn build_fixture(n: u32, game: &[(String, Vec<u8>)]) -> (tempfile::TempDir, Buil
             )
         },
         || Ok(r#"{"units":{"testcom":{"commander":1},"testscout":{},"testtank":{}},"weaponDefs":{}}"#.into()),
+        // The two units whose .3do the fixture does not have, with no
+        // footprint, as the worker's run of the fix finds them.
+        |_| {
+            Ok(standins_answer(
+                r#"[{"kind":"unit","name":"testscout","model":"testscout.3do","standin":"compat/models/standin-1x1.s3o"},
+                    {"kind":"unit","name":"testtank","model":"testtank.3do","standin":"compat/models/standin-1x1.s3o"}]"#,
+            ))
+        },
     )
     .unwrap();
     (root, built)
@@ -190,6 +198,9 @@ fn two_builds_of_the_fixture_are_byte_identical_from_every_manifest() {
             assert!(paths(&x).iter().any(|p| p == path), "manifest {n}: {path}");
         }
         if n == latest {
+            for path in ["compat/models/standin-1x1.s3o", "compat/models/standin.tga"] {
+                assert!(paths(&x).iter().any(|p| p == path), "manifest {n}: {path}");
+            }
             let synced = &x
                 .iter()
                 .find(|(path, _)| path == "compat/prelude-synced.lua")
