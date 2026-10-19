@@ -1,3 +1,4 @@
+import { t } from "@lingui/core/macro";
 import { Button } from "@picoframe/frame";
 import {
   MessageScroller as MessageScrollerPrimitive,
@@ -231,7 +232,7 @@ function MessageScrollerButton({
         <>
           <ArrowDownIcon />
           <span className="sr-only">
-            {direction === "end" ? "Scroll to end" : "Scroll to start"}
+            {direction === "end" ? t`Scroll to end` : t`Scroll to start`}
           </span>
         </>
       )}
