@@ -1200,9 +1200,17 @@ mod tests {
     #[test]
     fn manifest_10_is_manifest_9_with_the_missing_model_standin() {
         let (nine, ten) = (manifest(9).unwrap(), manifest(10).unwrap());
-        let added: Vec<&String> = ten.fixes.iter().filter(|id| !nine.fixes.contains(id)).collect();
+        let added: Vec<&String> = ten
+            .fixes
+            .iter()
+            .filter(|id| !nine.fixes.contains(id))
+            .collect();
         assert_eq!(added, ["defs-missing-model-standin"]);
-        let kept: Vec<&String> = ten.fixes.iter().filter(|id| nine.fixes.contains(id)).collect();
+        let kept: Vec<&String> = ten
+            .fixes
+            .iter()
+            .filter(|id| nine.fixes.contains(id))
+            .collect();
         assert_eq!(kept, nine.fixes.iter().collect::<Vec<_>>());
         assert_eq!((&ten.converter, ten.writer), (&nine.converter, nine.writer));
         assert_eq!(
