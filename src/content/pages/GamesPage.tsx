@@ -1,6 +1,7 @@
 import { CloudOff } from "lucide-react";
 import { useMemo, useState } from "react";
 import { Link, useSearchParams } from "react-router";
+import { PageHeader } from "@/components/PageHeader";
 import { errorText } from "@/lib/helpers";
 import { useWriteRoot } from "../../downloads/config";
 import {
@@ -32,7 +33,7 @@ import {
 import { type CatalogueRequest, useLibrary } from "../useLibrary";
 import { usePlayGame } from "../usePlayGame";
 import { useUpdateSources } from "../useUpdates";
-import { BrowserToolbar } from "./components/BrowserToolbar";
+import { NoEngines, RescanButton } from "./components/BrowserToolbar";
 import { FilterBar } from "./components/FilterBar";
 import { GameCard } from "./components/GameCard";
 import { SuggestionsList } from "./components/SuggestionsList";
@@ -63,7 +64,7 @@ const EMPTY_CHIP: Record<GameChip, string> = {
  * session.
  */
 export default function GamesPage() {
-  const { targets, selected, selectedKey } = useScanTargetSelection();
+  const { targets, selected } = useScanTargetSelection();
   const {
     data,
     unvouched,
@@ -178,20 +179,20 @@ export default function GamesPage() {
 
   return (
     <div className="flex flex-col gap-4 p-4">
-      <header className="flex flex-col gap-1">
-        <h1 className="text-lg font-semibold">Games</h1>
-        <p className="text-sm text-muted-foreground">
-          Everything you can play, and everything the hub knows how to fetch.
-        </p>
-      </header>
-
-      <BrowserToolbar
-        targets={targets}
-        selectedKey={selectedKey}
-        onRescan={() => run(true)}
-        scanning={loading}
-        onCancel={cancel}
+      <PageHeader
+        title="Games"
+        description="Everything you can play, and everything the hub knows how to fetch."
+        actions={
+          targets.length > 0 && (
+            <RescanButton
+              onRescan={() => run(true)}
+              scanning={loading}
+              onCancel={cancel}
+            />
+          )
+        }
       />
+      {targets.length === 0 && <NoEngines />}
 
       {unchecked && (
         <SavedListStatus checking={status === "checking"} reason={error} />

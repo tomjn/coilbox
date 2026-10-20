@@ -2,6 +2,7 @@ import { Button, useDrawer } from "@picoframe/frame";
 import { CloudOff, Loader2, Map as MapIcon } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router";
+import { PageHeader } from "@/components/PageHeader";
 import { useImportParam } from "../../deeplink/useImportParam";
 import { useWriteRoot } from "../../downloads/config";
 import { useDownloadQueue } from "../../downloads/DownloadQueueProvider";
@@ -35,7 +36,7 @@ import {
 } from "../libraryMaps";
 import { useLibrary } from "../useLibrary";
 import { usePlayMap } from "../usePlayMap";
-import { BrowserToolbar } from "./components/BrowserToolbar";
+import { NoEngines, RescanButton } from "./components/BrowserToolbar";
 import { FilterBar } from "./components/FilterBar";
 import { LibraryMapCard } from "./components/LibraryMapCard";
 import { SuggestionsList } from "./components/SuggestionsList";
@@ -76,7 +77,7 @@ const NONE_CHECKED: Record<PlayType, string> = {
  * and the play type the 1v1, Team and Water chips filter on.
  */
 export default function MapsPage() {
-  const { targets, selected, selectedKey } = useScanTargetSelection();
+  const { targets, selected } = useScanTargetSelection();
   const {
     data,
     unvouched,
@@ -233,20 +234,20 @@ export default function MapsPage() {
 
   return (
     <div className="flex flex-col gap-4 p-4">
-      <header className="flex flex-col gap-1">
-        <h1 className="text-lg font-semibold">Maps</h1>
-        <p className="text-sm text-muted-foreground">
-          Every map you have, and every map the mirrors carry.
-        </p>
-      </header>
-
-      <BrowserToolbar
-        targets={targets}
-        selectedKey={selectedKey}
-        onRescan={() => run(true)}
-        scanning={loading}
-        onCancel={cancel}
+      <PageHeader
+        title="Maps"
+        description="Every map you have, and every map the mirrors carry."
+        actions={
+          targets.length > 0 && (
+            <RescanButton
+              onRescan={() => run(true)}
+              scanning={loading}
+              onCancel={cancel}
+            />
+          )
+        }
       />
+      {targets.length === 0 && <NoEngines />}
 
       <MapPacksBanner
         writePath={writePath}

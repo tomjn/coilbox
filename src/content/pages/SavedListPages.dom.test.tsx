@@ -123,6 +123,8 @@ vi.mock("../../downloads/pages/components/MapPacksBanner", () => ({
 }));
 vi.mock("./components/BrowserToolbar", () => ({
   BrowserToolbar: () => null,
+  NoEngines: () => null,
+  RescanButton: () => null,
 }));
 vi.mock("./components/MapThumb", () => ({
   MapThumb: () => null,

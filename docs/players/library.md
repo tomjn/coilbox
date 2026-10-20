@@ -16,9 +16,9 @@ Each installed map and game has its own page, and each game has a page for every
 
 ## Which engine the Library uses
 
-The Maps and Games pages read your content with your preferred engine. The line beside Rescan names it. To use another engine, make it your preferred one in Settings, then Library > Engines. See [Engines](#engines).
+The Maps and Games pages read your content with your preferred engine. To use another engine, make it your preferred one in Settings, then Library > Engines. See [Engines](#engines).
 
-Rescan reads your content folders again, for example after you copy a map in. While it runs, it changes to Cancel scan.
+Rescan, beside the page's heading, reads your content folders again, for example after you copy a map in. While it runs, it changes to Cancel scan.
 
 ## The Games page
 
