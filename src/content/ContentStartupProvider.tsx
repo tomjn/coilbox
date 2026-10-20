@@ -129,8 +129,9 @@ export default function ContentStartupProvider({
     if (dlConfig.writeRootId) return;
     loadContentState()
       .then((state) => {
-        // Never the bundled content folder, which coilbox does not write into.
-        const first = state.roots.find((r) => !r.bundled);
+        // Never the bundled content folder or a read only one, which coilbox
+        // does not write into.
+        const first = state.roots.find((r) => !r.bundled && !r.readOnly);
         if (first) setDlConfig({ ...dlConfig, writeRootId: first.id });
       })
       .catch(() => {});

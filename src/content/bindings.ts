@@ -64,6 +64,13 @@ export interface ContentRoot {
    * before the field existed.
    */
   bundled?: boolean;
+  /**
+   * Coilbox reads this folder as usual but never writes into it. On by default
+   * for a Zero-K Steam install, always on for the bundled folder, and the
+   * player can change it on any other. Absent from a snapshot written before
+   * the field existed.
+   */
+  readOnly?: boolean;
   /** Present when a manual root was added despite failing validation. */
   forced?: boolean;
   counts: RootCounts;
@@ -125,6 +132,15 @@ export const contentRemoveRoot = defineCommand<
   { path: string },
   { state: ContentState }
 >("coilbox-content", "content_remove_root");
+
+/**
+ * Set whether coilbox may write into a tracked root. Returns the new state.
+ * The bundled folder is always read only and refuses a change.
+ */
+export const contentSetReadOnly = defineCommand<
+  { path: string; readOnly: boolean },
+  { state: ContentState }
+>("coilbox-content", "content_set_read_only");
 
 /** Create the OS-standard content folder on disk and register it (forced). */
 export const contentCreateStandardRoot = defineCommand<

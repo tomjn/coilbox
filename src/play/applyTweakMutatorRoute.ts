@@ -13,7 +13,9 @@
  * Pulled out of `SkirmishPage` so this settle-then-write flow can be tested
  * on its own rather than through the whole page.
  */
+
 import { primeScan } from "@/content/config";
+import { resolveMutatorDataDir } from "@/downloads/config";
 import { isWorkshopMutatorArchive } from "@/lib/generatedGames";
 import { settledSummary, settleTypedValues } from "@/workshop/loadsAs";
 import { workshopTestMutator } from "@/workshop/mutator";
@@ -55,7 +57,7 @@ export async function applyTweakMutatorRoute({
         message: `${gameName} is not installed here, so typed values are written as typed and the game may load some of them as something else.`,
       } as const);
   const written = await workshopTestMutator({
-    dataDir: target.dataDir,
+    dataDir: await resolveMutatorDataDir(target.dataDir),
     project,
     written: settled.ok ? settled.settled.written : undefined,
   });

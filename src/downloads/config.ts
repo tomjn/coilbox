@@ -2,11 +2,13 @@ import { useSetting } from "@picoframe/frame";
 import { useCallback, useEffect, useMemo, useRef } from "react";
 import type { ContentState } from "../content/bindings";
 import { loadContentState, useContentState } from "../content/contentState";
+import { readStoredSetting } from "../lib/storedSetting";
 import { getProfileRoot } from "../profile/profile";
 import { dlSetEngineDirs } from "./bindings";
 import { DEFAULT_RAPID_MASTERS } from "./rapidMasters";
 import {
   healWriteRoot,
+  mutatorDataDir,
   packageDirOf,
   pickWriteRoot,
   type WriteRootKind,
@@ -83,7 +85,7 @@ export function useDefaultWriteRoot(): (state: ContentState) => void {
   return useCallback(
     (state: ContentState) => {
       if (cfg.writeRootId) return;
-      const first = state.roots.find((r) => !r.bundled);
+      const first = state.roots.find((r) => !r.bundled && !r.readOnly);
       if (first) setCfg({ ...cfg, writeRootId: first.id });
     },
     [cfg, setCfg],
@@ -213,3 +215,22 @@ export function useWriteRootPath(kind?: WriteRootKind): string | undefined {
 // a map's preview thumbnail, its size and its player count. Every one of those
 // callers is gone, as part of coilbox retiring its use of BAR-hosted content.
 // The list itself is still fetched by the Maps browse page, which lists it.
+
+/**
+ * Where a test mutator is written for an engine whose own folder is `dataDir`:
+ * that folder, or the default write folder when coilbox may not write into it.
+ * See {@link mutatorDataDir}.
+ */
+export async function resolveMutatorDataDir(dataDir: string): Promise<string> {
+  const state = await loadContentState();
+  const cfg = readStoredSetting<DownloadsConfig>(
+    "downloads.config",
+    defaultConfig,
+  );
+  const writeRoot = healWriteRoot(
+    state.roots,
+    cfg.writeRootId,
+    packageDirOf(getProfileRoot()),
+  );
+  return mutatorDataDir(state.roots, dataDir, writeRoot?.path);
+}

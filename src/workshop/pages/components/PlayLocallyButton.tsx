@@ -28,6 +28,7 @@ import {
   useUnitsyncScan,
   useUnitsyncThumbnails,
 } from "@/content/config";
+import { resolveMutatorDataDir } from "@/downloads/config";
 import { describeError } from "@/i18n/uiError";
 import {
   isWorkshopMutatorArchive,
@@ -342,7 +343,7 @@ export function PlayLocallyButton({
         );
         setPhase({ state: "writing" });
         const written = await workshopTestMutator({
-          dataDir: target.dataDir,
+          dataDir: await resolveMutatorDataDir(target.dataDir),
           project: { ...project, gameName: baseGame },
           written: settled.ok ? settled.settled.written : undefined,
           ...copyArg,

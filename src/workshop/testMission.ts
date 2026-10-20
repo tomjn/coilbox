@@ -15,6 +15,7 @@
  */
 import type { GameItem } from "../content/bindings";
 import { isSdd } from "../content/format";
+import { resolveMutatorDataDir } from "../downloads/config";
 import { WORKSHOP_MUTATOR_FOLDER } from "../lib/generatedGames";
 import type { Participant } from "../play/participants";
 import { compileScenario, luaString } from "../scenario/compile";
@@ -182,7 +183,7 @@ export async function writeStartWithUnit(opts: {
     ? await installedRuntime(root, isSdd(game.primaryArchive))
     : null;
   const written = await workshopTestMission({
-    dataDir,
+    dataDir: await resolveMutatorDataDir(dataDir),
     missionId: scenario.id,
     mission,
     ...(modinfo === undefined ? {} : { modinfo }),
