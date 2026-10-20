@@ -9,11 +9,11 @@ Each game has its own switch, and coilbox builds nothing until you turn it on.
 ## Check a game
 
 1. Open Library > Games and select the game.
-2. On the Overview tab, find the Compatibility section.
+2. Select the Compatibility tab.
 
-The section only appears when coilbox finds something. If a game has no Compatibility section, the report found nothing and the game needs no switch.
+The tab only appears when coilbox finds something. If a game has no Compatibility tab, the report found nothing and the game needs no switch.
 
-An archive's page in Library > Archives has a Convert models button for a game with `.3do` models. It opens this section.
+An archive's page in Library > Archives has a Convert models button for a game with `.3do` models. It opens this tab.
 
 ## Read the report
 
@@ -46,11 +46,11 @@ Engine versions in the details name the engine as it was called at the time. Up 
 
 ### Maps
 
-A map's page has a Compatibility section too. It lists things such as SM3 maps, `.3do` feature models and `.pcx` textures. Compatibility mode does not change maps, and a map page has no switch.
+A map's page has a Compatibility section on its page rather than a tab of its own. It lists things such as SM3 maps, `.3do` feature models and `.pcx` textures. Compatibility mode does not change maps, and a map page has no switch.
 
 ## Turn it on
 
-1. In the game's Compatibility section, turn on Compatibility mode.
+1. On the game's Compatibility tab, turn on Compatibility mode.
 2. Wait while it shows Building.
 
 When the build ends, the section shows the folder it wrote and what is in it: how many models were converted, how many prelude functions and def overrides were written, and which gadgets are enabled. If something could not be done, a line under that says why.

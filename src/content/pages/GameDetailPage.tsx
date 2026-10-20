@@ -131,12 +131,6 @@ export default function GameDetailPage() {
   const [params] = useSearchParams();
   const wantsCompat = params.get("section") === "compat";
   const hasFindings = compat.findings.length > 0;
-  useEffect(() => {
-    if (wantsCompat && hasFindings)
-      document
-        .getElementById("compat")
-        ?.scrollIntoView?.({ block: "start", behavior: "smooth" });
-  }, [wantsCompat, hasFindings]);
   const brand = useBrandingEntry(game);
   const factionNames = useMemo(
     () => gameInfo?.sides.map((s) => s.name) ?? [],
@@ -185,6 +179,10 @@ export default function GameDetailPage() {
   // The Versions and Sources tabs and the library facts above them (#4580).
   const lib = useGameLibrary(decoded, data);
   const [tab, setTab] = useState("overview");
+  // The findings arrive after the page, so the tab opens once there are some.
+  useEffect(() => {
+    if (wantsCompat && hasFindings) setTab("compat");
+  }, [wantsCompat, hasFindings]);
 
   if (error && !data)
     return (
@@ -271,28 +269,17 @@ export default function GameDetailPage() {
         onPlay={() => playGame(game.name)}
       />
 
-      <GameLibrarySummary
-        game={game}
-        record={lib.record}
-        installedFrom={lib.installedFrom}
-        engine={selected?.engineVersion}
-        updatesOn={lib.updatesOn}
-        onUpdatesChange={(on) => setGameUpdates(lib.prefKey, on)}
-        canUpdate={!!lib.writePath && !!lib.record}
-        updating={lib.updating}
-        onUpdate={lib.update}
-      />
-      {lib.updateFailure && (
-        <p role="alert" className="break-words text-xs text-destructive">
-          {lib.updateFailure}
-        </p>
-      )}
-
-      <Tabs value={tab} onValueChange={setTab}>
+      <Tabs
+        value={tab === "compat" && !hasFindings ? "overview" : tab}
+        onValueChange={setTab}
+      >
         <TabsList>
           <TabsTrigger value="overview">Overview</TabsTrigger>
           <TabsTrigger value="versions">Versions</TabsTrigger>
           <TabsTrigger value="sources">Sources</TabsTrigger>
+          {hasFindings && (
+            <TabsTrigger value="compat">Compatibility</TabsTrigger>
+          )}
         </TabsList>
         <TabsContent value="versions">
           <GameVersionsTab
@@ -312,7 +299,52 @@ export default function GameDetailPage() {
             onPin={(step) => setGamePin(lib.prefKey, step)}
           />
         </TabsContent>
+        {hasFindings && (
+          <TabsContent value="compat" className="flex flex-col gap-2">
+            {selected?.enginePath && selected.rootPath && (
+              <CompatMode
+                enginePath={selected.enginePath}
+                dataDir={selected.rootPath}
+                archiveName={game.primaryArchive.name}
+                gameName={game.name}
+                checksum={gameInfo?.checksum}
+              />
+            )}
+            <FindingList
+              findings={compat.findings}
+              actions={{
+                "models-3do": selected && (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="gap-1.5"
+                    onClick={openConvert}
+                  >
+                    <Boxes className="size-4" /> Convert models
+                  </Button>
+                ),
+              }}
+            />
+          </TabsContent>
+        )}
         <TabsContent value="overview" className="flex flex-col gap-5">
+          <GameLibrarySummary
+            game={game}
+            record={lib.record}
+            installedFrom={lib.installedFrom}
+            engine={selected?.engineVersion}
+            updatesOn={lib.updatesOn}
+            onUpdatesChange={(on) => setGameUpdates(lib.prefKey, on)}
+            canUpdate={!!lib.writePath && !!lib.record}
+            updating={lib.updating}
+            onUpdate={lib.update}
+          />
+          {lib.updateFailure && (
+            <p role="alert" className="break-words text-xs text-destructive">
+              {lib.updateFailure}
+            </p>
+          )}
+
           {generated && (
             <Alert>
               <AlertDescription className="max-w-prose">
@@ -352,36 +384,6 @@ export default function GameDetailPage() {
           {game.warnings?.length ? (
             <WarningBanner warnings={game.warnings} noun="game" />
           ) : null}
-
-          {hasFindings && (
-            <section id="compat" className="flex scroll-mt-4 flex-col gap-2">
-              <h2 className="text-sm font-medium">Compatibility</h2>
-              {selected?.enginePath && selected.rootPath && (
-                <CompatMode
-                  enginePath={selected.enginePath}
-                  dataDir={selected.rootPath}
-                  archiveName={game.primaryArchive.name}
-                  gameName={game.name}
-                  checksum={gameInfo?.checksum}
-                />
-              )}
-              <FindingList
-                findings={compat.findings}
-                actions={{
-                  "models-3do": selected && (
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      className="gap-1.5"
-                      onClick={openConvert}
-                    >
-                      <Boxes className="size-4" /> Convert models
-                    </Button>
-                  ),
-                }}
-              />
-            </section>
-          )}
 
           {(gameInfoLoading ||
             (gameInfo &&
