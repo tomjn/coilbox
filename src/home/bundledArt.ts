@@ -765,6 +765,195 @@ const stats: Drawing = {
   },
 };
 
+/**
+ * A transcript, filed back in time: rows of messages, each a name and a line,
+ * with one row lit under a lens. Chat logs are for finding what was said.
+ */
+const chatLogs: Drawing = {
+  pools: [
+    [210, 104, 110, 0.18],
+    [64, 44, 90, 0.1],
+  ],
+  paint: (p) => {
+    const widths = [148, 112, 104, 152, 96, 120];
+    const rows = widths
+      .map((w, i) => {
+        const y = 32 + i * 24;
+        const lit = i === 3;
+        const o = lit ? 0.85 : round(0.4 - i * 0.04);
+        const ink = lit ? p.spark : p.line;
+        return (
+          `<circle cx="34" cy="${y + 4}" r="2" fill="${p.faint}" fill-opacity="${round(o * 0.6)}"/>` +
+          `<rect x="46" y="${y}" width="${24 + (i % 3) * 6}" height="8" rx="4" fill="${ink}" fill-opacity="${round(o * 0.8)}"/>` +
+          `<rect x="${84 + (i % 3) * 6}" y="${y + 1}" width="${w}" height="6" rx="3" fill="${lit ? p.spark : p.faint}" fill-opacity="${round(o * 0.6)}"/>`
+        );
+      })
+      .join("");
+    return (
+      `<path d="M34 20 L34 168" fill="none" stroke="${p.faint}" stroke-width="1" stroke-opacity="0.16"/>` +
+      rows +
+      // The lens over the hit.
+      `<circle cx="226" cy="108" r="26" fill="${p.line}" fill-opacity="0.06"/>` +
+      `<circle cx="226" cy="108" r="26" fill="none" stroke="${p.spark}" stroke-width="2.4" stroke-opacity="0.7"/>` +
+      `<path d="M245 127 L268 150" fill="none" stroke="${p.spark}" stroke-width="5" stroke-opacity="0.7" stroke-linecap="round"/>`
+    );
+  },
+};
+
+/**
+ * Rank chevrons under a star, the top one lit, with service ribbons beside
+ * them. Career is the record of everything played, so it reads as rank earned.
+ */
+const career: Drawing = {
+  pools: [
+    [176, 86, 120, 0.2],
+    [56, 140, 86, 0.09],
+  ],
+  paint: (p) => {
+    const chevron = (y: number, colour: string, o: number) =>
+      `<path d="M128 ${y} L176 ${y - 26} L224 ${y}" fill="none" stroke="${colour}" stroke-width="9" stroke-opacity="${o}" stroke-linecap="round" stroke-linejoin="round"/>`;
+    const star = Array.from({ length: 10 }, (_, i) => {
+      const a = -Math.PI / 2 + (i * Math.PI) / 5;
+      const r = i % 2 === 0 ? 15 : 6.5;
+      return `${round(176 + r * Math.cos(a))},${round(48 + r * Math.sin(a))}`;
+    }).join(" ");
+    const ribbons = [0, 1, 2]
+      .map((row) =>
+        [0, 1]
+          .map((col) => {
+            const x = 34 + col * 34;
+            const y = 70 + row * 18;
+            const o = round(0.34 - row * 0.06);
+            return (
+              `<rect x="${x}" y="${y}" width="30" height="12" rx="2" fill="${p.line}" fill-opacity="${round(o * 0.6)}"/>` +
+              `<rect x="${x + 12}" y="${y}" width="6" height="12" fill="${(row + col) % 2 === 0 ? p.spark : p.faint}" fill-opacity="${o}"/>`
+            );
+          })
+          .join(""),
+      )
+      .join("");
+    return (
+      ribbons +
+      chevron(158, p.faint, 0.26) +
+      chevron(130, p.line, 0.42) +
+      chevron(102, p.spark, 0.8) +
+      `<polygon points="${star}" fill="${p.spark}" fill-opacity="0.85"/>`
+    );
+  },
+};
+
+/**
+ * Two sides of three players, each drawn in along a line to one lit point
+ * where the match is made. The middle pair are the ones just paired.
+ */
+const matchmaking: Drawing = {
+  pools: [
+    [160, 100, 118, 0.2],
+    [40, 52, 76, 0.08],
+    [280, 148, 76, 0.08],
+  ],
+  paint: (p) => {
+    const ys = [48, 100, 152];
+    const player = (x: number, y: number, ink: string, o: number) =>
+      `<circle cx="${x}" cy="${y - 7}" r="6.5" fill="${ink}" fill-opacity="${o}"/>` +
+      `<polygon points="${curve(x - 11, y + 11, x, y - 3, x + 11, y + 11).join(" ")}" fill="${ink}" fill-opacity="${o}"/>`;
+    const side = (x: number, dir: 1 | -1) =>
+      ys
+        .map((y, i) => {
+          const lit = i === 1;
+          const from = x + dir * 18;
+          const bend = 160 - dir * 52;
+          const to = 160 - dir * 14;
+          return (
+            `<path d="M${from} ${y} C${bend} ${y} ${bend} 100 ${to} 100" fill="none" stroke="${lit ? p.spark : p.faint}" stroke-width="${lit ? 2.2 : 1.4}" stroke-opacity="${lit ? 0.6 : 0.26}"${lit ? "" : ' stroke-dasharray="2 6"'} stroke-linecap="round"/>` +
+            player(x, y, lit ? p.spark : p.line, lit ? 0.8 : 0.36)
+          );
+        })
+        .join("");
+    // The rest of the pool, still waiting, smaller and cut by the edges.
+    const waiting = [
+      [10, 74],
+      [16, 128],
+      [310, 70],
+      [304, 126],
+    ]
+      .map(
+        ([x, y]) =>
+          `<circle cx="${x}" cy="${y - 5}" r="4.5" fill="${p.line}" fill-opacity="0.18"/>` +
+          `<polygon points="${curve(x - 8, y + 8, x, y - 2, x + 8, y + 8).join(" ")}" fill="${p.line}" fill-opacity="0.18"/>`,
+      )
+      .join("");
+    return (
+      waiting +
+      side(46, 1) +
+      side(274, -1) +
+      `<g fill="none" stroke="${p.faint}">` +
+      '<circle cx="160" cy="100" r="34" stroke-width="1" stroke-opacity="0.14"/>' +
+      '<circle cx="160" cy="100" r="23" stroke-width="1.2" stroke-opacity="0.22"/>' +
+      "</g>" +
+      `<circle cx="160" cy="100" r="13" fill="none" stroke="${p.spark}" stroke-width="2" stroke-opacity="0.6"/>` +
+      `<circle cx="160" cy="100" r="5.5" fill="${p.spark}" fill-opacity="0.9"/>`
+    );
+  },
+};
+
+/**
+ * A rack of three servers, one with its light lit, and a shield in front of it
+ * with a lit keyhole. Admin holds the keys to the server.
+ */
+const serverAdmin: Drawing = {
+  pools: [
+    [116, 92, 116, 0.17],
+    [238, 112, 90, 0.14],
+  ],
+  paint: (p) => {
+    const unit = (y: number, i: number) => {
+      const lit = i === 1;
+      const vents = [0, 1, 2, 3, 4]
+        .map(
+          (v) =>
+            `<path d="M${62 + v * 7} ${y + 10} L${62 + v * 7} ${y + 22}"/>`,
+        )
+        .join("");
+      return (
+        `<rect x="44" y="${y}" width="160" height="32" rx="4" fill="${p.line}" fill-opacity="0.14"/>` +
+        `<rect x="44" y="${y}" width="160" height="32" rx="4" fill="none" stroke="${p.faint}" stroke-width="1.3" stroke-opacity="0.32"/>` +
+        `<g fill="none" stroke="${p.faint}" stroke-width="1.6" stroke-opacity="0.3" stroke-linecap="round">${vents}</g>` +
+        `<rect x="104" y="${y + 13}" width="40" height="6" rx="3" fill="${p.faint}" fill-opacity="0.22"/>` +
+        `<circle cx="158" cy="${y + 16}" r="3" fill="${lit ? p.spark : p.faint}" fill-opacity="${lit ? 0.95 : 0.3}"/>` +
+        `<circle cx="168" cy="${y + 16}" r="3" fill="${p.faint}" fill-opacity="0.3"/>`
+      );
+    };
+    // The top point, the half width, then where the sides stop and the tip.
+    const outline = (top: number, r: number, side: number, tip: number) => {
+      const shoulder = top + round(r / 3);
+      const bend = round(side + (tip - side) * 0.66);
+      return [
+        `222,${top}`,
+        `${222 + r},${shoulder}`,
+        ...curve(222 + r, side, 222 + r, bend, 222, tip),
+        ...curve(222, tip, 222 - r, bend, 222 - r, side).slice(1),
+        `${222 - r},${shoulder}`,
+      ].join(" ");
+    };
+    const shield = outline(70, 38, 112, 160);
+    return (
+      // The rack's posts, past the top and bottom unit.
+      `<g fill="none" stroke="${p.faint}" stroke-width="1" stroke-opacity="0.18">` +
+      '<path d="M48 22 L48 178"/><path d="M200 22 L200 178"/>' +
+      "</g>" +
+      [40, 82, 124].map(unit).join("") +
+      // Opaque underneath, so the shield stands in front of the rack.
+      `<polygon points="${shield}" fill="${p.fieldFoot}"/>` +
+      `<polygon points="${shield}" fill="${p.line}" fill-opacity="0.14"/>` +
+      `<polygon points="${shield}" fill="none" stroke="${p.spark}" stroke-width="2" stroke-opacity="0.7" stroke-linejoin="round"/>` +
+      `<polygon points="${outline(78, 30, 112, 151)}" fill="none" stroke="${p.faint}" stroke-width="1" stroke-opacity="0.3" stroke-linejoin="round"/>` +
+      `<circle cx="222" cy="105" r="8" fill="${p.spark}" fill-opacity="0.9"/>` +
+      `<polygon points="218,109 215,130 229,130 226,109" fill="${p.spark}" fill-opacity="0.9"/>`
+    );
+  },
+};
+
 /** A shelf of games, one pulled forward. What you have, not what you could get. */
 const games: Drawing = {
   pools: [
@@ -1679,6 +1868,10 @@ const DRAWINGS: Record<string, Drawing> = {
   "multiplayer.battles": battles,
   "multiplayer.battle": battleRoom,
   "multiplayer.stats": stats,
+  "multiplayer.chatlogs": chatLogs,
+  "multiplayer.matchmaking": matchmaking,
+  "multiplayer.admin": serverAdmin,
+  "career.overview": career,
   "library.maps": maps,
   "library.games": games,
   "library.blueprints": blueprints,
@@ -1981,6 +2174,28 @@ function chevron(x: number, y: number, dir: 1 | -1): string {
 }
 
 /** A diamond as a polygon, so the legibility checker can measure its area. */
+/**
+ * Points along a quadratic curve, so a curved outline can be filled as a
+ * polygon, which the art tests can measure where they cannot a filled path.
+ */
+function curve(
+  x0: number,
+  y0: number,
+  cx: number,
+  cy: number,
+  x1: number,
+  y1: number,
+  steps = 8,
+): string[] {
+  return Array.from({ length: steps + 1 }, (_, i) => {
+    const t = i / steps;
+    const u = 1 - t;
+    const x = u * u * x0 + 2 * u * t * cx + t * t * x1;
+    const y = u * u * y0 + 2 * u * t * cy + t * t * y1;
+    return `${round(x)},${round(y)}`;
+  });
+}
+
 function diamond(x: number, y: number, r: number): string {
   return `<polygon points="${x},${y - r} ${x + r},${y} ${x},${y + r} ${x - r},${y}"/>`;
 }
