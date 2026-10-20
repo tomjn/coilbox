@@ -77,6 +77,7 @@ local sinceSelection = 0
 local selectionKey = ""
 local vsx, vsy = 0, 0
 local layout = nil
+local relayout
 local layoutVersion = -1
 local layoutW, layoutH = 0, 0
 
@@ -85,6 +86,10 @@ local placing = nil
 -- Ghosts left after a partial placement, already in world space.
 local remainder = nil
 local messageUntil = 0
+-- A press on the pill or the panel's title, which is a click if the mouse
+-- comes up where it went down and a drag once it moves further than the
+-- engine's own threshold for starting a selection box.
+local drag = nil
 -- What the widget handler stored for us last time. The handler hands it over
 -- when the widget loads, before Initialize runs.
 local saved = nil
@@ -94,7 +99,7 @@ local saved = nil
 --------------------------------------------------------------------------------
 
 local shader
-local locProj, locView, locRect, locUseTex
+local locProj, locView, locRect, locUseTex, locPicRadius
 local quadVAO, quadVBO, quadIBO
 -- The panel's and the ground marks' buffers, grown as needed by upload().
 local panelSet = { capacity = 0 }
@@ -109,6 +114,7 @@ local VERTEX_LAYOUT = {
 	{ id = 0, name = "pos", size = 3 },
 	{ id = 1, name = "uv", size = 2 },
 	{ id = 2, name = "color", size = 4 },
+	{ id = 3, name = "shape", size = 4 },
 }
 
 local VERTEX_SHADER = [[
@@ -117,16 +123,21 @@ local VERTEX_SHADER = [[
 layout(location = 0) in vec3 pos;
 layout(location = 1) in vec2 uv;
 layout(location = 2) in vec4 color;
+layout(location = 3) in vec4 shape;
 uniform mat4 proj;
 uniform mat4 view;
 uniform vec4 rect;
+uniform float picRadius;
 out vec2 vUv;
 out vec4 vColor;
+out vec4 vShape;
 void main() {
 	vec3 p = vec3(pos.xy * rect.zw + rect.xy, pos.z);
 	gl_Position = proj * view * vec4(p, 1.0);
 	vUv = uv;
 	vColor = color;
+	// The unit quad's shape is 1 by 1, so a picture takes its size from rect.
+	vShape = vec4(shape.xy * rect.zw, shape.z + picRadius, shape.w);
 }
 ]]
 
@@ -136,12 +147,24 @@ uniform sampler2D tex;
 uniform int useTex;
 in vec2 vUv;
 in vec4 vColor;
+in vec4 vShape;
 out vec4 fragColor;
 void main() {
 	vec4 c = vColor;
 	if (useTex == 1) {
 		c *= texture(tex, vUv);
 	}
+	// Distance to the edge of a rounded box, in the box's own units. Half a
+	// unit either side of the edge fades out, and a border keeps only a ring.
+	vec2 half = vShape.xy * 0.5;
+	float r = min(vShape.z, min(half.x, half.y));
+	vec2 q = abs((vUv - 0.5) * vShape.xy) - half + r;
+	float d = length(max(q, 0.0)) + min(max(q.x, q.y), 0.0) - r;
+	float a = clamp(0.5 - d, 0.0, 1.0);
+	if (vShape.w > 0.0) {
+		a *= clamp(0.5 + d + vShape.w, 0.0, 1.0);
+	}
+	c.a *= a;
 	fragColor = c;
 }
 ]]
@@ -183,6 +206,7 @@ local function makeGL()
 		vertex = VERTEX_SHADER,
 		fragment = FRAGMENT_SHADER,
 		uniformInt = { tex = 0, useTex = 0 },
+		uniformFloat = { picRadius = 0 },
 	})
 	if not shader then
 		log(LOG.ERROR, "shader failed: " .. tostring(gl.GetShaderLog()))
@@ -192,6 +216,7 @@ local function makeGL()
 	locView = gl.GetUniformLocation(shader, "view")
 	locRect = gl.GetUniformLocation(shader, "rect")
 	locUseTex = gl.GetUniformLocation(shader, "useTex")
+	locPicRadius = gl.GetUniformLocation(shader, "picRadius")
 
 	quadVBO, quadIBO, quadVAO = makeBuffers(1)
 	if not quadVAO then
@@ -487,7 +512,7 @@ function widget:SetConfigData(data)
 end
 
 function widget:GetConfigData()
-	return { seen = true }
+	return { seen = true, pos = panel and panel.pos }
 end
 
 function widget:Initialize()
@@ -523,6 +548,9 @@ function widget:Initialize()
 		end,
 	})
 	panel = MODEL.new()
+	if saved and MODEL.validPos(saved.pos) then
+		panel.pos = saved.pos
+	end
 	can = PLACE.capabilities({})
 
 	if not makeGL() then
@@ -625,7 +653,12 @@ function widget:MousePress(x, y, button)
 		local action = MODEL.hit(layout, x, y)
 		if action then
 			if button == 1 then
-				act(action)
+				if action.kind == "toggle" then
+					local right = panel.pos == nil or panel.pos.right
+					drag = { x = x, y = y, box = layout.box, right = right, moved = false }
+				else
+					act(action)
+				end
 			end
 			return true
 		end
@@ -640,6 +673,37 @@ function widget:MousePress(x, y, button)
 		end
 	end
 	return false
+end
+
+function widget:MouseMove(x, y)
+	if not drag then
+		return
+	end
+	local dx, dy = x - drag.x, y - drag.y
+	if not drag.moved then
+		-- 4 is the engine's own default, in rts/Game/UI/MouseHandler.cpp.
+		local slop = Spring.GetConfigInt("MouseDragSelectionThreshold", 4)
+		if dx * dx + dy * dy <= slop * slop then
+			return
+		end
+		drag.moved = true
+	end
+	MODEL.drag(panel, drag.box, drag.right, dx, dy, { w = vsx, h = vsy })
+end
+
+function widget:MouseRelease()
+	if not drag then
+		return false
+	end
+	local moved = drag.moved
+	drag = nil
+	if moved then
+		relayout()
+		MODEL.settle(panel, layout, { w = vsx, h = vsy })
+	else
+		toggle()
+	end
+	return true
 end
 
 function widget:MouseWheel(up, value)
@@ -683,7 +747,7 @@ local function colourCode(c)
 	return string.char(255, math.floor(c[1] * 254) + 1, math.floor(c[2] * 254) + 1, math.floor(c[3] * 254) + 1)
 end
 
-local function relayout()
+function relayout()
 	if layoutVersion == panel.version and layoutW == vsx and layoutH == vsy then
 		return
 	end
@@ -712,22 +776,16 @@ function widget:DrawScreen()
 		for _, pic in ipairs(layout.pics) do
 			gl.Texture(0, "#" .. pic.defID)
 			gl.Uniform(locRect, pic.x, pic.y, pic.w, pic.h)
+			gl.Uniform(locPicRadius, pic.radius)
 			quadVAO:DrawElements(GL.TRIANGLES, 6, 0)
 		end
+		gl.Uniform(locPicRadius, 0)
 		gl.Texture(0, false)
 		gl.UniformInt(locUseTex, 0)
 	end
 	gl.UseShader(0)
 	for _, t in ipairs(layout.texts) do
-		if t.rotate then
-			gl.PushMatrix()
-			gl.Translate(t.x, t.y, 0)
-			gl.Rotate(t.rotate, 0, 0, 1)
-			gl.Text(colourCode(t.color) .. t.text, 0, 0, t.size, "")
-			gl.PopMatrix()
-		else
-			gl.Text(colourCode(t.color) .. t.text, t.x, t.y, t.size, "")
-		end
+		gl.Text(colourCode(t.color) .. t.text, t.x, t.y, t.size, "")
 	end
 end
 

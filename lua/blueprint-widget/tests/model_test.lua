@@ -92,7 +92,9 @@ state.tab = "now"
 local L = MODEL.layout(state, measure, VIEW)
 
 check("layout has a background rect first", L.rects[1].kind == "panel", show(L.rects[1]))
-check("the panel is flush with the right edge, inside the view", L.rects[1].x + L.rects[1].w == VIEW.w and L.rects[1].y >= 0 and L.rects[1].y + L.rects[1].h <= VIEW.h, show(L.rects[1]))
+check("the panel sits a margin in from the right edge, inside the view", L.rects[1].x + L.rects[1].w == VIEW.w - MODEL.PAD and L.rects[1].y >= 0 and L.rects[1].y + L.rects[1].h <= VIEW.h, show(L.rects[1]))
+check("the panel has rounded corners", L.rects[1].radius == MODEL.RADIUS, show(L.rects[1]))
+check("the layout reports the panel as the box to drag", same(L.box, { x = L.rects[1].x, y = L.rects[1].y, w = L.rects[1].w, h = L.rects[1].h }), show(L.box))
 
 local function textsWith(layout, needle)
 	local found = {}
@@ -103,7 +105,7 @@ local function textsWith(layout, needle)
 	end
 	return found
 end
-check("the title is drawn on the panel and on its tab", #textsWith(L, "Blueprints") == 2)
+check("the title is drawn once, in capitals", #textsWith(L, "BLUEPRINTS") == 1, show(L.texts))
 check("tabs show their counts", #textsWith(L, "Now 3") == 1 and #textsWith(L, "Partly 2") == 1 and #textsWith(L, "All 6") == 1, show(L.texts))
 check("every visible row has its name", #textsWith(L, "Eco") == 1 and #textsWith(L, "BAR one") == 1)
 check("a row says where it came from", #textsWith(L, "BAR") >= 1 and #textsWith(L, "saved") == 1, show(L.texts))
@@ -111,13 +113,13 @@ check("an ordered entry says so", #textsWith(L, "ordered") >= 1, show(textsWith(
 
 local pics = L.pics
 check("rows show build pictures by def id", #pics > 0 and pics[1].defID == 1, show(pics[1]))
-check("a row shows at most five pictures", (function()
+check("a row shows at most PICS pictures", (function()
 	local perRow = {}
 	for _, p in ipairs(pics) do
 		perRow[p.row] = (perRow[p.row] or 0) + 1
 	end
 	for _, n in pairs(perRow) do
-		if n > 5 then
+		if n > MODEL.PICS then
 			return false
 		end
 	end
@@ -136,11 +138,30 @@ end
 check("each row is clickable to place", #hitsOf(L, "place") == 3 and hitsOf(L, "place")[1].action.key == "library:eco", show(hitsOf(L, "place")))
 check("tabs are clickable", #hitsOf(L, "tab") == 3 and hitsOf(L, "tab")[2].action.tab == "partly")
 check("there is a save button and no separate close button", #hitsOf(L, "save") == 1 and #hitsOf(L, "close") == 0)
-check("the open panel keeps the tab on its outer left edge", (function()
+check("the title is the toggle, across the header left of the tabs", (function()
 	local t = hitsOf(L, "toggle")[1]
-	return t ~= nil and t.x + t.w == L.rects[1].x
+	local firstTab = hitsOf(L, "tab")[1]
+	local p = L.rects[1]
+	return #hitsOf(L, "toggle") == 1 and t.x == p.x and t.y + t.h == p.y + p.h and t.x + t.w < firstTab.x
 end)(), show(hitsOf(L, "toggle")))
-check("the open tab's arrow points at the edge", #textsWith(L, ">") == 1, show(L.texts))
+check("tabs are pills", (function()
+	for _, r in ipairs(L.rects) do
+		if r.kind == "tab" and r.radius ~= r.h / 2 then
+			return false
+		end
+	end
+	return true
+end)())
+check("rows are rounded cards inset from the panel's sides", (function()
+	local p = L.rects[1]
+	for _, r in ipairs(L.rects) do
+		if r.kind == "row" and (r.radius == nil or r.x ~= p.x + MODEL.PAD or r.x + r.w ~= p.x + p.w - MODEL.PAD) then
+			return false
+		end
+	end
+	return true
+end)())
+check("pictures have rounded corners", pics[1].radius == MODEL.PIC_RADIUS, show(pics[1]))
 
 local rowHit = hitsOf(L, "place")[1]
 local inside = MODEL.hit(L, rowHit.x + 1, rowHit.y + 1)
@@ -149,11 +170,10 @@ check("hit outside the panel is nil", MODEL.hit(L, 1, 1) == nil)
 check("a point inside the panel but on nothing is the panel itself", MODEL.hit(L, L.rects[1].x + 2, L.rects[1].y + 2) ~= nil and MODEL.hit(L, L.rects[1].x + 2, L.rects[1].y + 2).kind == "panel")
 
 check("rows stack downward from the top", hitsOf(L, "place")[1].y > hitsOf(L, "place")[2].y)
-check("every text lands inside the panel or its tab", (function()
+check("every text lands inside the panel", (function()
 	local p = L.rects[1]
 	for _, t in ipairs(L.texts) do
-		local inPanel = t.x >= p.x and t.x <= p.x + p.w and t.y >= p.y and t.y <= p.y + p.h
-		if not inPanel and t.x >= p.x then
+		if t.x < p.x or t.x > p.x + p.w or t.y < p.y or t.y > p.y + p.h then
 			return false
 		end
 	end
@@ -225,6 +245,14 @@ check("the active row is highlighted", (function()
 	end
 	return false
 end)())
+check("the active row has a gold outline", (function()
+	for _, r in ipairs(LP.rects) do
+		if r.kind == "outline" then
+			return r.border > 0 and same(r.color, MODEL.COLORS.gold)
+		end
+	end
+	return false
+end)())
 state.placing, state.remainder, state.message = nil, nil, nil
 
 -- empty tabs explain themselves
@@ -239,53 +267,75 @@ nothing.open = true
 nothing.tab = "all"
 check("an empty library says where to get blueprints", #textsWith(MODEL.layout(nothing, measure, VIEW), "coilbox") >= 1)
 
--- a closed panel leaves an opener on the edge
+-- a closed panel leaves a pill that opens it
 state.open = false
 local LC = MODEL.layout(state, measure, VIEW)
 check("a closed panel shows only the opener", #LC.rects == 1 and LC.rects[1].kind == "opener", show(LC.rects))
-check("the opener is a vertical tab", LC.rects[1].h > LC.rects[1].w, show(LC.rects[1]))
-check("the opener's label reads downward", (function()
-	for _, t in ipairs(LC.texts) do
-		if t.text == "Blueprints" then
-			return t.rotate == -90
-		end
-	end
-	return false
-end)(), show(LC.texts))
-check("the opener carries an arrow", #textsWith(LC, "<") == 1, show(LC.texts))
-check("the opener hugs the right edge, vertically centred", (function()
+check("the opener is a horizontal pill", LC.rects[1].w > LC.rects[1].h and LC.rects[1].radius == LC.rects[1].h / 2, show(LC.rects[1]))
+check("the opener sits a margin in from the right edge, vertically centred", (function()
 	local r = LC.rects[1]
 	local centred = math.abs((r.y - 0) - (VIEW.h - r.y - r.h)) <= 1
-	return r.x + r.w == VIEW.w and centred
+	return r.x + r.w == VIEW.w - MODEL.PAD and centred
 end)(), show(LC.rects[1]))
-check("the opener names the panel", #textsWith(LC, "Blueprints") == 1)
+check("the opener names the panel", #textsWith(LC, "BLUEPRINTS") == 1)
+check("the opener is the box to drag", same(LC.box, { x = LC.rects[1].x, y = LC.rects[1].y, w = LC.rects[1].w, h = LC.rects[1].h }), show(LC.box))
 check("clicking the opener toggles", #LC.hits == 1 and LC.hits[1].action.kind == "toggle")
 check("hit finds the opener", MODEL.hit(LC, LC.rects[1].x + 2, LC.rects[1].y + 2) ~= nil and MODEL.hit(LC, LC.rects[1].x + 2, LC.rects[1].y + 2).kind == "toggle")
 state.open = true
 
 -- scale and placement
-check("the default scale is two", state.scale == 2)
+check("the default scale follows the view's height", state.scale == nil and MODEL.scaleFor(state, VIEW) == 1 and MODEL.scaleFor(state, { w = 3840, h = 2160 }) == 2)
 check("the panel is vertically centred", (function()
 	local p = L.rects[1]
 	return math.abs(p.y - (VIEW.h - p.y - p.h)) <= 2
 end)(), show(L.rects[1]))
-check("scale multiplies the panel's sizes", (function()
-	local small = MODEL.new()
-	MODEL.refresh(small, ENTRIES, PLACE, game, CAN)
-	small.open = true
-	small.scale = 1
-	local LS = MODEL.layout(small, measure, VIEW)
-	local p1, p3 = LS.rects[1], L.rects[1]
-	return p3.w == p1.w * 2 and math.abs(p3.h - p1.h * 2) <= 2
-end)())
+local big = MODEL.new()
+MODEL.refresh(big, ENTRIES, PLACE, game, CAN)
+big.open = true
+big.scale = 2
+local LB = MODEL.layout(big, measure, VIEW)
+check("scale multiplies the panel's sizes", LB.rects[1].w == L.rects[1].w * 2 and math.abs(LB.rects[1].h - L.rects[1].h * 2) <= 2, LB.rects[1].w .. " vs " .. L.rects[1].w)
 check("text sizes scale with the panel", (function()
-	for _, t in ipairs(L.texts) do
+	for _, t in ipairs(LB.texts) do
 		if t.size >= MODEL.FONT * 2 then
 			return true
 		end
 	end
 	return false
-end)(), show(L.texts[1]))
+end)(), show(LB.texts[1]))
+
+--------------------------------------------------------------------------------
+-- dragging
+--------------------------------------------------------------------------------
+
+check("a saved position must be fractions of the view with a side", MODEL.validPos({ x = 0.5, y = 0.5, right = false }) and not MODEL.validPos({ x = 1.5, y = 0.5, right = true }) and not MODEL.validPos({ x = 0.5, y = 0.5 }) and not MODEL.validPos(nil))
+
+local moved = MODEL.new()
+MODEL.refresh(moved, ENTRIES, PLACE, game, CAN)
+local before = MODEL.layout(moved, measure, VIEW).box
+MODEL.drag(moved, before, true, -300, 100, VIEW)
+local after = MODEL.layout(moved, measure, VIEW).box
+check("a drag moves the pill by the mouse's travel", after.x == before.x - 300 and after.y == before.y + 100, show({ before, after }))
+
+MODEL.drag(moved, before, true, -5000, 5000, VIEW)
+local clamped = MODEL.layout(moved, measure, VIEW).box
+check("a drag cannot take the pill off screen", clamped.x == 0 and clamped.y + clamped.h == VIEW.h, show(clamped))
+
+MODEL.settle(moved, MODEL.layout(moved, measure, VIEW), VIEW)
+check("dropped on the left half, the pill hangs from its left corner", moved.pos.right == false and moved.pos.x == 0 and moved.pos.y == 1, show(moved.pos))
+local settled = MODEL.layout(moved, measure, VIEW).box
+check("settling does not move the pill", same(settled, clamped), show({ settled, clamped }))
+moved.open = true
+local openLeft = MODEL.layout(moved, measure, VIEW)
+check("opened there, the panel hangs from the same corner", openLeft.box.x == 0 and openLeft.box.y + openLeft.box.h == VIEW.h, show(openLeft.box))
+
+MODEL.drag(moved, openLeft.box, false, 1500, -200, VIEW)
+MODEL.settle(moved, MODEL.layout(moved, measure, VIEW), VIEW)
+local openRight = MODEL.layout(moved, measure, VIEW).box
+check("dropped on the right half, the panel hangs from its right corner", moved.pos.right == true and math.abs(moved.pos.x * VIEW.w - (openRight.x + openRight.w)) < 1e-6, show(moved.pos))
+moved.open = false
+local pillRight = MODEL.layout(moved, measure, VIEW).box
+check("closing it there leaves the pill under the panel's right corner", pillRight.x + pillRight.w == openRight.x + openRight.w and pillRight.y + pillRight.h == openRight.y + openRight.h, show({ pillRight, openRight }))
 
 --------------------------------------------------------------------------------
 -- scrolling
@@ -326,12 +376,15 @@ local verts, idx = MODEL.pack({
 	{ x = 10, y = 20, w = 100, h = 50, color = { 1, 0, 0, 1 } },
 	{ x = 0, y = 0, w = 1, h = 1, color = { 0, 0, 1, 0.5 } },
 })
-check("pack emits nine floats per vertex, four vertices per rect", #verts == 2 * 4 * 9, #verts)
+check("pack emits STRIDE floats per vertex, four vertices per rect", #verts == 2 * 4 * MODEL.STRIDE, #verts)
 check("pack emits six indices per rect", #idx == 12, #idx)
 check("the first vertex is the bottom left corner at depth zero with its colour", same({ verts[1], verts[2], verts[3], verts[6], verts[7], verts[8], verts[9] }, { 10, 20, 0, 1, 0, 0, 1 }), show(verts))
-check("the third vertex is the top right corner", verts[19] == 110 and verts[20] == 70, verts[19] .. "," .. verts[20])
+check("the third vertex is the top right corner", verts[27] == 110 and verts[28] == 70, verts[27] .. "," .. verts[28])
+check("each vertex carries the rect's shape, no radius or border by default", same({ verts[10], verts[11], verts[12], verts[13] }, { 100, 50, 0, 0 }), show(verts))
+local rv = MODEL.pack({ { x = 0, y = 0, w = 40, h = 20, radius = 6, border = 2, color = { 1, 1, 1, 1 } } })
+check("a rect's radius and border reach every vertex", rv[12] == 6 and rv[13] == 2 and rv[51] == 6 and rv[52] == 2, show(rv))
 check("indices are zero based and the second rect starts at four", same(idx, { 0, 1, 2, 0, 2, 3, 4, 5, 6, 4, 6, 7 }), show(idx))
-check("uvs span the unit square", verts[4] == 0 and verts[5] == 0 and verts[22] == 1 and verts[23] == 1)
+check("uvs span the unit square", verts[4] == 0 and verts[5] == 0 and verts[30] == 1 and verts[31] == 1)
 
 local none, noneIdx = MODEL.pack({})
 check("packing nothing is empty", #none == 0 and #noneIdx == 0)
@@ -341,11 +394,12 @@ local gv, gi = MODEL.packGround({
 	{ x = 320, y = 10, z = 320, defID = 1, facing = 0, blocked = true, def = { xsize = 8, zsize = 4 } },
 	{ x = 0, y = 0, z = 0, defID = 1, facing = 1, blocked = false, def = { xsize = 8, zsize = 4 } },
 }, { 1, 0, 0, 0.4 }, { 0, 1, 0, 0.4 })
-check("ground marks pack one quad per position", #gv == 2 * 4 * 9 and #gi == 12)
-check("a mark spans the footprint about the centre, half the size in elmos each way", gv[1] == 320 - 32 and gv[3] == 320 - 16 and gv[19] == 320 + 32 and gv[21] == 320 + 16, show({ gv[1], gv[3], gv[19], gv[21] }))
+check("ground marks pack one quad per position", #gv == 2 * 4 * MODEL.STRIDE and #gi == 12)
+check("a mark spans the footprint about the centre, half the size in elmos each way", gv[1] == 320 - 32 and gv[3] == 320 - 16 and gv[27] == 320 + 32 and gv[29] == 320 + 16, show({ gv[1], gv[3], gv[27], gv[29] }))
 check("a mark floats just above the ground", gv[2] == 10 + 2)
-check("an odd facing swaps the span", gv[37] == -16 and gv[39] == -32, show({ gv[37], gv[39] }))
-check("a blocked mark takes the first colour and an open one the second", gv[6] == 1 and gv[43] == 1, show({ gv[6], gv[43] }))
+check("an odd facing swaps the span", gv[53] == -16 and gv[55] == -32, show({ gv[53], gv[55] }))
+check("a blocked mark takes the first colour and an open one the second", gv[6] == 1 and gv[59] == 1, show({ gv[6], gv[59] }))
+check("a mark is a square cornered box its own size", same({ gv[10], gv[11], gv[12], gv[13] }, { 64, 32, 0, 0 }), show({ gv[10], gv[11], gv[12], gv[13] }))
 
 --------------------------------------------------------------------------------
 -- the orthographic matrix for the shader

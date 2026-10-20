@@ -9,53 +9,61 @@
 
 local M = {}
 
-M.WIDTH = 320
+M.WIDTH = 280
 M.PAD = 8
-M.ROW = 44
+M.GAP = 4
+M.ROW = 40
 M.HEADER = 30
-M.TABS = 26
-M.LINE = 26
-M.FOOTER = 36
+M.LINE = 24
+M.FOOTER = 32
 M.MAX_ROWS = 10
 --- The panel never shrinks below this many rows, so one entry does not make
 -- a sliver and an empty tab has room to explain itself.
 M.MIN_ROWS = 3
-M.PIC = 28
-M.FONT = 13
-M.SMALL = 11
---- How many times the base sizes the panel is drawn at. The engine hands
--- physical pixels, so 1 is small on any modern screen and 3 crowds it.
-M.SCALE = 2
+M.PIC = 26
+M.PICS = 3
+M.FONT = 12
+M.SMALL = 10
+M.RADIUS = 8
+M.CARD_RADIUS = 5
+M.PIC_RADIUS = 4
+--- The sizes above are for a view this many pixels tall. The panel scales
+-- with the view's height, so it covers the same share of any screen.
+M.BASE_HEIGHT = 1080
+--- Floats per vertex in pack(): position 3, uv 2, colour 4, shape 4.
+M.STRIDE = 13
 
 local C = {
-	panel = { 0.06, 0.07, 0.09, 0.9 },
-	header = { 0.12, 0.14, 0.18, 1 },
-	tab = { 0.16, 0.18, 0.22, 1 },
-	tabActive = { 0.32, 0.34, 0.38, 1 },
-	row = { 0.10, 0.12, 0.15, 0.95 },
-	rowAlt = { 0.13, 0.15, 0.19, 0.95 },
-	rowActive = { 0.30, 0.32, 0.38, 1 },
-	rowNever = { 0.09, 0.09, 0.10, 0.95 },
-	button = { 0.24, 0.28, 0.34, 1 },
-	buttonWarm = { 0.55, 0.30, 0.14, 1 },
+	panel = { 0.15, 0.17, 0.20, 0.92 },
+	card = { 0.20, 0.22, 0.26, 1 },
+	cardActive = { 0.26, 0.28, 0.33, 1 },
+	cardNever = { 0.17, 0.18, 0.21, 1 },
+	pill = { 0.24, 0.26, 0.31, 1 },
+	pillActive = { 0.27, 0.60, 0.68, 1 },
+	button = { 0.24, 0.26, 0.31, 1 },
 	scroll = { 0.35, 0.38, 0.45, 1 },
+	gold = { 0.93, 0.76, 0.25, 1 },
 	text = { 1, 1, 1, 1 },
+	title = { 0.66, 0.68, 0.72, 1 },
 	dim = { 0.72, 0.74, 0.78, 1 },
 	faint = { 0.5, 0.5, 0.55, 1 },
 	warn = { 1, 0.75, 0.4, 1 },
 }
 M.COLORS = C
 
+local TITLE = "BLUEPRINTS"
 local TABS_LIST = { "now", "partly", "all" }
 local TAB_LABELS = { now = "Now", partly = "Partly", all = "All" }
 local SOURCE_TAGS = { library = "coilbox", spool = "saved", bar = "BAR" }
 
---- A fresh, closed panel.
+--- A fresh, closed panel. scale nil follows the view's height, and pos nil
+-- puts it at the right edge, vertically centred.
 function M.new()
 	return {
 		open = false,
 		tab = "now",
-		scale = M.SCALE,
+		scale = nil,
+		pos = nil,
 		scroll = 0,
 		items = {},
 		counts = { now = 0, partly = 0, all = 0 },
@@ -186,14 +194,14 @@ local function rowDetail(item)
 	return table.concat(parts, " | ")
 end
 
---- Up to five distinct def ids, in layout order.
+--- Up to PICS distinct def ids, in layout order.
 local function rowPics(item)
 	local out, seen = {}, {}
 	for _, b in ipairs(item.resolved.buildings) do
 		if not seen[b.defID] then
 			seen[b.defID] = true
 			out[#out + 1] = b.defID
-			if #out == 5 then
+			if #out == M.PICS then
 				break
 			end
 		end
@@ -211,20 +219,75 @@ local function emptyText(state)
 	return "Nothing under this tab."
 end
 
+--- The scale the panel is drawn at for a view.
+function M.scaleFor(state, view)
+	return state.scale or view.h / M.BASE_HEIGHT
+end
+
+--- Whether a saved position is one the layout can use.
+function M.validPos(pos)
+	return type(pos) == "table"
+		and type(pos.x) == "number"
+		and type(pos.y) == "number"
+		and pos.x >= 0
+		and pos.x <= 1
+		and pos.y >= 0
+		and pos.y <= 1
+		and type(pos.right) == "boolean"
+end
+
+--- Where a box of w by h goes. With no position it sits at the right edge,
+-- vertically centred. Otherwise it hangs from a top corner kept as fractions
+-- of the view, the right corner when pos.right is set. Either way it stays
+-- inside the view.
+local function placeBox(state, view, w, h, margin)
+	local x, y
+	local pos = state.pos
+	if pos then
+		x = pos.right and pos.x * view.w - w or pos.x * view.w
+		y = pos.y * view.h - h
+	else
+		x = view.w - margin - w
+		y = (view.h - h) / 2
+	end
+	x = math.max(0, math.min(view.w - w, x))
+	y = math.max(0, math.min(view.h - h, y))
+	return math.floor(x), math.floor(y)
+end
+
+--- Move the box by a drag. box is where it was when the drag began, and the
+-- corner it hangs from stays the one it had then, so it does not jump.
+function M.drag(state, box, right, dx, dy, view)
+	local cx = (right and box.x + box.w or box.x) + dx
+	state.pos = { x = cx / view.w, y = (box.y + box.h + dy) / view.h, right = right }
+	M.touch(state)
+end
+
+--- After a drag, hang the box from the top corner on its side of the screen,
+-- so it opens toward the middle. The box itself does not move.
+function M.settle(state, L, view)
+	local b = L.box
+	local right = b.x + b.w / 2 > view.w / 2
+	state.pos = { x = (right and b.x + b.w or b.x) / view.w, y = (b.y + b.h) / view.h, right = right }
+	M.touch(state)
+end
+
 --- Lay the panel out.
 -- @param state table
 -- @param measure function(text, size) -> width in pixels
 -- @param view table w, h of the screen
--- @return table rects, texts, pics, hits. Each rect is { x, y, w, h, color,
---   kind, key?, active? }, each text { x, y, size, text, color }, each pic
---   { x, y, w, h, defID, row }, each hit { x, y, w, h, action }.
+-- @return table rects, texts, pics, hits and box. Each rect is { x, y, w, h,
+--   color, kind, radius?, border?, key?, active? }, each text { x, y, size,
+--   text, color }, each pic { x, y, w, h, radius, defID, row }, each hit
+--   { x, y, w, h, action }. box is the pill or the panel, whichever is shown.
 function M.layout(state, measure, view)
 	local L = { rects = {}, texts = {}, pics = {}, hits = {} }
 	local rects, texts, pics, hits = L.rects, L.texts, L.pics, L.hits
-	local S = state.scale or M.SCALE
-	local PAD, W = M.PAD * S, M.WIDTH * S
-	local ROW, HEADER, TABS, LINE, FOOTER = M.ROW * S, M.HEADER * S, M.TABS * S, M.LINE * S, M.FOOTER * S
+	local S = M.scaleFor(state, view)
+	local PAD, GAP, W = M.PAD * S, M.GAP * S, M.WIDTH * S
+	local ROW, HEADER, LINE, FOOTER = M.ROW * S, M.HEADER * S, M.LINE * S, M.FOOTER * S
 	local PIC, FONT, SMALL = M.PIC * S, M.FONT * S, M.SMALL * S
+	local PILL = SMALL + 8 * S
 
 	local function hovered(action)
 		return state.hover ~= nil and state.hover == M.actionId(action)
@@ -249,39 +312,26 @@ function M.layout(state, measure, view)
 	local function hit(x, y, w, h, action)
 		hits[#hits + 1] = { x = x, y = y, w = w, h = h, action = action }
 	end
-	local function button(x, y, w, h, label, action, color)
-		local base = color or C.button
-		rect(x, y, w, h, hovered(action) and lift(base) or base, "button")
-		local tw = measure(label, SMALL)
-		text(x + (w - tw) / 2, y + (h - SMALL) / 2, SMALL, label)
-		hit(x, y, w, h, action)
+	local function buttonW(label)
+		return measure(label, SMALL) + 2 * PAD
+	end
+	local function button(x, y, label, action)
+		local w = buttonW(label)
+		rect(x, y, w, PILL, hovered(action) and lift(C.button) or C.button, "button", { radius = PILL / 2 })
+		text(x + PAD, y + (PILL - SMALL) / 2, SMALL, label)
+		hit(x, y, w, PILL, action)
 	end
 
-	-- The vertical tab that opens and closes the panel: an arrow, then the
-	-- name reading downward. On the screen edge when closed, on the panel's
-	-- outer left edge when open. The widget turns a text with a rotate field.
-	local function edgeTab(rightX, arrow)
-		local label = "Blueprints"
-		local action = { kind = "toggle" }
-		local w = LINE + PAD
-		local h = measure(label, SMALL) + 3 * PAD + SMALL
-		local x = rightX - w
-		local y = math.floor((view.h - h) / 2)
-		rect(x, y, w, h, hovered(action) and lift(C.header) or C.header, "opener")
-		text(x + (w - measure(arrow, SMALL)) / 2, y + h - PAD - SMALL, SMALL, arrow, C.dim)
-		texts[#texts + 1] = {
-			x = x + w / 2 - SMALL * 0.35,
-			y = y + h - 2 * PAD - SMALL,
-			size = SMALL,
-			text = label,
-			color = C.text,
-			rotate = -90,
-		}
-		hit(x, y, w, h, action)
-	end
+	local toggle = { kind = "toggle" }
 
+	-- Closed, the panel is a pill that opens it and can be dragged.
 	if not state.open then
-		edgeTab(view.w, "<")
+		local w = measure(TITLE, SMALL) + 2 * PAD
+		local x, y = placeBox(state, view, w, LINE, PAD)
+		rect(x, y, w, LINE, hovered(toggle) and lift(C.panel) or C.panel, "opener", { radius = LINE / 2 })
+		text(x + PAD, y + (LINE - SMALL) / 2, SMALL, TITLE, hovered(toggle) and C.text or C.title)
+		hit(x, y, w, LINE, toggle)
+		L.box = { x = x, y = y, w = w, h = LINE }
 		return L
 	end
 
@@ -289,7 +339,7 @@ function M.layout(state, measure, view)
 
 	-- The panel's fixed parts, and however many rows fit under them in the
 	-- view. Without the clamp a tall library would push the panel off screen.
-	local chrome = HEADER + TABS + FOOTER + PAD
+	local chrome = HEADER + FOOTER
 	if state.placing then
 		chrome = chrome + LINE
 	end
@@ -311,92 +361,101 @@ function M.layout(state, measure, view)
 	local bodyRows = math.min(fit, math.max(M.MIN_ROWS, rowsShown))
 	local height = chrome + bodyRows * ROW
 
-	local px = view.w - W
-	local py = math.max(PAD, math.floor((view.h - height) / 2))
+	local px, py = placeBox(state, view, W, height, PAD)
 	local top = py + height
-	local panel = rect(px, py, W, height, C.panel, "panel")
-	edgeTab(px, ">")
+	local panel = rect(px, py, W, height, C.panel, "panel", { radius = M.RADIUS * S })
+	L.box = { x = px, y = py, w = W, h = height }
 
-	-- header
+	-- header: tab pills on the right, and left of them the title, which
+	-- closes the panel on a click and moves it on a drag
 	local y = top - HEADER
-	rect(px, y, W, HEADER, C.header, "header")
-	text(px + PAD, y + (HEADER - FONT) / 2, FONT, "Blueprints")
-
-	-- tabs
-	y = y - TABS
-	local tabW = W / #TABS_LIST
-	for i, tab in ipairs(TABS_LIST) do
-		local tx = px + (i - 1) * tabW
+	local ty = y + (HEADER - PILL) / 2
+	local tx = px + W - PAD
+	for i = #TABS_LIST, 1, -1 do
+		local tab = TABS_LIST[i]
 		local active = tab == state.tab
-		local base = active and C.tabActive or C.tab
+		local base = active and C.pillActive or C.pill
 		local tabAction = { kind = "tab", tab = tab }
-		rect(tx, y, tabW, TABS, hovered(tabAction) and lift(base) or base, "tab", { tab = tab, active = active })
 		local label = TAB_LABELS[tab] .. " " .. state.counts[tab]
-		text(tx + (tabW - measure(label, SMALL)) / 2, y + (TABS - SMALL) / 2, SMALL, label)
-		hit(tx, y, tabW, TABS, tabAction)
+		local tw = measure(label, SMALL) + 2 * 6 * S
+		tx = tx - tw
+		rect(tx, ty, tw, PILL, hovered(tabAction) and lift(base) or base, "tab", { tab = tab, active = active, radius = PILL / 2 })
+		text(tx + 6 * S, ty + (PILL - SMALL) / 2, SMALL, label, active and C.text or C.dim)
+		hit(tx, ty, tw, PILL, tabAction)
+		tx = tx - GAP
 	end
+	local handleW = tx - px
+	text(px + PAD, y + (HEADER - FONT) / 2, FONT, M.truncate(TITLE, handleW - 2 * PAD, measure, FONT), hovered(toggle) and C.text or C.title)
+	hit(px, y, handleW, HEADER, toggle)
 
 	-- placing
 	if state.placing then
 		y = y - LINE
+		local cancelW = buttonW("Cancel")
 		local label = "Placing " .. state.placing.name .. ", turned " .. (state.placing.rotation * 90)
-		text(px + PAD, y + (LINE - SMALL) / 2, SMALL, M.truncate(label, W - 2 * PAD - 70 * S, measure, SMALL), C.warn)
-		button(px + W - PAD - 60 * S, y + 3 * S, 60 * S, LINE - 6 * S, "Cancel", { kind = "cancel" })
+		text(px + PAD, y + (LINE - SMALL) / 2, SMALL, M.truncate(label, W - 3 * PAD - cancelW, measure, SMALL), C.warn)
+		button(px + W - PAD - cancelW, y + (LINE - PILL) / 2, "Cancel", { kind = "cancel" })
 	end
 
 	-- remainder
 	if state.remainder then
 		y = y - LINE
 		local n = state.remainder.count
+		local dismissW, placeW = buttonW("Dismiss"), buttonW("Place")
 		text(px + PAD, y + (LINE - SMALL) / 2, SMALL, n .. " left to build", C.warn)
-		button(px + W - PAD - 130 * S, y + 3 * S, 60 * S, LINE - 6 * S, "Place", { kind = "remainder" })
-		button(px + W - PAD - 64 * S, y + 3 * S, 64 * S, LINE - 6 * S, "Dismiss", { kind = "dismiss" })
+		button(px + W - PAD - dismissW - GAP - placeW, y + (LINE - PILL) / 2, "Place", { kind = "remainder" })
+		button(px + W - PAD - dismissW, y + (LINE - PILL) / 2, "Dismiss", { kind = "dismiss" })
 	end
 
-	-- rows
+	-- rows, each a card with a gap above it
 	if rowsShown == 0 then
 		y = y - ROW
 		text(px + PAD, y + (ROW - SMALL) / 2, SMALL, M.truncate(emptyText(state), W - 2 * PAD, measure, SMALL), C.dim)
 	end
-	local picsW = 5 * (PIC + 2 * S)
+	local cardX, cardW, cardH = px + PAD, W - 2 * PAD, ROW - GAP
+	local inset = 6 * S
+	local picsW = M.PICS * (PIC + GAP)
 	for i = first, last do
 		local item = visible[i]
 		y = y - ROW
 		local active = state.placing ~= nil and state.placing.key == item.entry.key
 		local rowAction = { kind = "place", key = item.entry.key }
-		local color = C.row
+		local color = C.card
 		if active then
-			color = C.rowActive
+			color = C.cardActive
 		elseif item.tab == "never" then
-			color = C.rowNever
-		elseif i % 2 == 0 then
-			color = C.rowAlt
+			color = C.cardNever
 		end
-		rect(px, y, W, ROW, hovered(rowAction) and lift(color) or color, "row", { key = item.entry.key, active = active })
+		local radius = M.CARD_RADIUS * S
+		rect(cardX, y, cardW, cardH, hovered(rowAction) and lift(color) or color, "row", { key = item.entry.key, active = active, radius = radius })
+		if active then
+			rect(cardX, y, cardW, cardH, C.gold, "outline", { radius = radius, border = 1.5 * S })
+		end
 		local nameColor = item.tab == "never" and C.faint or C.text
-		local nameW = W - 2 * PAD - picsW - PAD
-		text(px + PAD, y + ROW - PAD - FONT, FONT, M.truncate(item.entry.name, nameW, measure, FONT), nameColor)
-		text(px + PAD, y + PAD - 2 * S, SMALL, M.truncate(rowDetail(item), nameW, measure, SMALL), C.dim)
+		local nameW = cardW - 2 * inset - picsW
+		text(cardX + inset, y + cardH - inset - FONT, FONT, M.truncate(item.entry.name, nameW, measure, FONT), nameColor)
+		text(cardX + inset, y + inset, SMALL, M.truncate(rowDetail(item), nameW, measure, SMALL), C.dim)
 		local defIDs = rowPics(item)
 		for p, defID in ipairs(defIDs) do
 			pics[#pics + 1] = {
-				x = px + W - PAD - (#defIDs - p + 1) * (PIC + 2 * S),
-				y = y + (ROW - PIC) / 2,
+				x = cardX + cardW - inset + GAP - (#defIDs - p + 1) * (PIC + GAP),
+				y = y + (cardH - PIC) / 2,
 				w = PIC,
 				h = PIC,
+				radius = M.PIC_RADIUS * S,
 				defID = defID,
 				row = i,
 			}
 		end
-		hit(px, y, W, ROW, rowAction)
+		hit(cardX, y, cardW, cardH, rowAction)
 	end
 
-	-- scrollbar
+	-- scrollbar, in the margin right of the cards
 	if #visible > rowsShown and rowsShown > 0 then
 		local trackH = rowsShown * ROW
 		local thumbH = math.max(12 * S, trackH * rowsShown / #visible)
 		local thumbY = y + trackH - thumbH - (trackH - thumbH) * (state.scroll / (#visible - rowsShown))
-		rect(px + W - 4 * S, thumbY, 3 * S, thumbH, C.scroll, "scroll")
+		rect(px + W - PAD / 2 - 1.5 * S, thumbY, 3 * S, thumbH, C.scroll, "scroll", { radius = 1.5 * S })
 	end
 
 	-- message
@@ -407,9 +466,11 @@ function M.layout(state, measure, view)
 
 	-- footer
 	y = py
-	button(px + PAD, y + PAD, 120 * S, FOOTER - PAD, "Save selection", { kind = "save" })
-	local hint = "[ ] turn, right click cancels"
-	text(px + W - PAD - measure(hint, SMALL), y + (FOOTER - SMALL) / 2 + PAD / 2, SMALL, hint, C.faint)
+	local by = y + (FOOTER - PILL) / 2
+	local saveW = buttonW("Save selection")
+	button(px + PAD, by, "Save selection", { kind = "save" })
+	local hint = M.truncate("[ ] turn, right click cancels", W - 3 * PAD - saveW, measure, SMALL)
+	text(px + W - PAD - measure(hint, SMALL), by + (PILL - SMALL) / 2, SMALL, hint, C.faint)
 
 	panel.h = top - py
 	return L
@@ -431,12 +492,13 @@ function M.hit(L, x, y)
 	return nil
 end
 
-local function quad(verts, idx, v, n, corners, c, i)
+local function quad(verts, idx, v, n, corners, c, shape, i)
 	for _, p in ipairs(corners) do
 		verts[v + 1], verts[v + 2], verts[v + 3] = p[1], p[2], p[3]
 		verts[v + 4], verts[v + 5] = p[4], p[5]
 		verts[v + 6], verts[v + 7], verts[v + 8], verts[v + 9] = c[1], c[2], c[3], c[4]
-		v = v + 9
+		verts[v + 10], verts[v + 11], verts[v + 12], verts[v + 13] = shape[1], shape[2], shape[3], shape[4]
+		v = v + M.STRIDE
 	end
 	local base = (i - 1) * 4
 	idx[n + 1], idx[n + 2], idx[n + 3] = base, base + 1, base + 2
@@ -445,8 +507,9 @@ local function quad(verts, idx, v, n, corners, c, i)
 end
 
 --- Flatten rectangles for the vertex buffer.
--- @param rects table[] x, y, w, h, color
--- @return number[] vertices, nine floats each (x, y, z, u, v, r, g, b, a),
+-- @param rects table[] x, y, w, h, color, and radius and border if set
+-- @return number[] vertices, STRIDE floats each (x, y, z, u, v, r, g, b, a,
+--   then the shape w, h, radius, border the shader rounds the corners with),
 --   four per rect, bottom left first, anticlockwise, z always 0
 -- @return number[] indices, zero based, six per rect
 function M.pack(rects)
@@ -458,7 +521,7 @@ function M.pack(rects)
 			{ r.x + r.w, r.y, 0, 1, 0 },
 			{ r.x + r.w, r.y + r.h, 0, 1, 1 },
 			{ r.x, r.y + r.h, 0, 0, 1 },
-		}, r.color, i)
+		}, r.color, { r.w, r.h, r.radius or 0, r.border or 0 }, i)
 	end
 	return verts, idx
 end
@@ -491,7 +554,7 @@ function M.packGround(positions, blockedColor, openColor)
 			{ p.x + hw, y, p.z - hd, 1, 0 },
 			{ p.x + hw, y, p.z + hd, 1, 1 },
 			{ p.x - hw, y, p.z + hd, 0, 1 },
-		}, p.blocked and blockedColor or openColor, i)
+		}, p.blocked and blockedColor or openColor, { 2 * hw, 2 * hd, 0, 0 }, i)
 	end
 	return verts, idx
 end
