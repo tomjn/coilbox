@@ -7,12 +7,15 @@ import {
 } from "../downloads/engineLists";
 import {
   GAME_REPOS,
+  type GameRepo,
   githubRepoForGame,
   mergeGameRepos,
 } from "../downloads/gameRepos";
 import { loadRapidTags, type RapidTag } from "../downloads/rapidTags";
+import type { HubGame } from "../hub/api";
+import { matchHubGame, useHubGames } from "../hub/gameIcons";
 import { getProfile } from "../profile/profile";
-import type { ScanResult } from "./bindings";
+import type { GameItem, ScanResult } from "./bindings";
 import { loadGithubGameRepos } from "./branding";
 import { useScanTargetSelection } from "./config";
 import { useContentState } from "./contentState";
@@ -60,6 +63,31 @@ export function useEngineUpdate(): string | undefined {
 }
 
 /**
+ * The GitHub repos to read releases from for the installed games: the one the
+ * branding catalog or the built-in list names, and any the hub lists as a
+ * download for that game. Only installed games, since each repo is a GitHub
+ * request, and a game not yet installed is fetched from the hub's own list.
+ */
+export function installedGameRepos(
+  games: readonly GameItem[],
+  catalogRepos: GameRepo[],
+  hubGames: readonly HubGame[] | null,
+  skipRepo?: string,
+): string[] {
+  const repos = mergeGameRepos(catalogRepos, GAME_REPOS);
+  const found = new Set<string>();
+  for (const g of games) {
+    const repo = githubRepoForGame(repos, g.name);
+    if (repo) found.add(repo);
+    for (const d of matchHubGame(hubGames, g.name, games)?.downloads ?? []) {
+      if (d.kind === "github") found.add(d.value);
+    }
+  }
+  if (skipRepo) found.delete(skipRepo);
+  return [...found];
+}
+
+/**
  * What the library needs to judge updates for the games in `scan`: the GitHub
  * release lists of the installed games' repos, and where each rapid tag the
  * download history names points now. Reads the indexes the app already holds,
@@ -90,15 +118,17 @@ export function useUpdateSources(
     };
   }, []);
 
-  const catalogues = useMemo((): CatalogueRequest[] => {
-    const repos = mergeGameRepos(catalogRepos, GAME_REPOS);
-    const found = new Set<string>();
-    for (const g of scan?.games ?? []) {
-      const repo = githubRepoForGame(repos, g.name);
-      if (repo && repo !== skipRepo) found.add(repo);
-    }
-    return [...found].map((repo) => ({ source: "github", kind: "game", repo }));
-  }, [scan, catalogRepos, skipRepo]);
+  const hubGames = useHubGames();
+  const catalogues = useMemo(
+    (): CatalogueRequest[] =>
+      installedGameRepos(
+        scan?.games ?? [],
+        catalogRepos,
+        hubGames,
+        skipRepo,
+      ).map((repo) => ({ source: "github", kind: "game", repo })),
+    [scan, catalogRepos, hubGames, skipRepo],
+  );
 
   const tags = useMemo(
     () =>
