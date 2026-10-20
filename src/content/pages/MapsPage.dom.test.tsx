@@ -101,6 +101,8 @@ vi.mock("../../profile/profile", () => ({
 }));
 vi.mock("./components/BrowserToolbar", () => ({
   BrowserToolbar: () => null,
+  NoEngines: () => null,
+  RescanButton: () => null,
 }));
 
 import MapsPage from "./MapsPage";

@@ -93,6 +93,8 @@ vi.mock("../../hub/gameIcons", async (original) => ({
 vi.mock("../../hub/config", () => ({ useTrustedHubUrl: () => null }));
 vi.mock("./components/BrowserToolbar", () => ({
   BrowserToolbar: () => null,
+  NoEngines: () => null,
+  RescanButton: () => null,
 }));
 
 import GamesPage from "./GamesPage";
