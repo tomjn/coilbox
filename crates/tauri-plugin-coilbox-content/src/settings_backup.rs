@@ -351,6 +351,9 @@ pub(crate) async fn content_config_restore<R: Runtime>(
     slug: String,
     overwrite: Option<bool>,
 ) -> CliResult {
+    if let Err(e) = coilbox_portable::refuse_read_only(Path::new(&root_path)) {
+        return CliResult::err(e);
+    }
     let dir = match profiles_dir(&app) {
         Ok(d) => d,
         Err(e) => return CliResult::err(e),

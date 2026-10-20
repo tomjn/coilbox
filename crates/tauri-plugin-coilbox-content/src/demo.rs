@@ -571,6 +571,10 @@ pub fn delete_listed_replays(
             refused.push(format!("{name}: not in a folder the Replays list reads"));
             continue;
         }
+        if coilbox_portable::refuse_read_only(path).is_err() {
+            refused.push(format!("{name}: in a content folder set to read only"));
+            continue;
+        }
         let len = std::fs::metadata(path).map(|m| m.len()).ok();
         if only_unfinished && len.is_some_and(|len| len > 0) {
             refused.push(format!(
@@ -2418,6 +2422,10 @@ pub(crate) async fn content_rewrite_demo(
     engine_version: Option<String>,
 ) -> CliResult {
     let src = PathBuf::from(&replay_path);
+    // The remix is written beside the source replay.
+    if let Err(e) = coilbox_portable::refuse_read_only(&src) {
+        return CliResult::err(e);
+    }
     match tauri::async_runtime::spawn_blocking(move || {
         rewrite_demo(&src, &target_gametype, engine_version.as_deref())
     })
@@ -2518,6 +2526,10 @@ pub(crate) async fn content_delete_replays<R: Runtime>(
 #[tauri::command]
 pub(crate) async fn content_gather_replays(root: String, apply: bool) -> CliResult {
     let p = PathBuf::from(&root);
+    // Replays move out of the engine folders under this root into its `demos/`.
+    if let Err(e) = coilbox_portable::refuse_read_only(&p) {
+        return CliResult::err(e);
+    }
     let now_ms = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
         .map(|d| d.as_millis() as u64)

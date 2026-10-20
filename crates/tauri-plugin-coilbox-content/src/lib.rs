@@ -38,8 +38,8 @@ mod unit_check;
 mod widget;
 
 use model::{
-    load_store, save_store, ContentRoot, ContentState, Engine, RootCounts, RootKind, RootSource,
-    ReadOnlyOverride, StoreFile, UserRoot, SCHEMA_VERSION,
+    load_store, save_store, ContentRoot, ContentState, Engine, ReadOnlyOverride, RootCounts,
+    RootKind, RootSource, StoreFile, UserRoot, SCHEMA_VERSION,
 };
 use paths::{candidate_roots, current_os, BaseDirs, Candidate};
 use picoframe_core::CliResult;
@@ -1944,19 +1944,35 @@ mod tests {
     #[test]
     fn a_zerok_root_is_read_only_by_default() {
         assert!(effective_read_only(&origins(&["zerok"]), false, None));
-        assert!(effective_read_only(&origins(&["steam", "zerok"]), false, None));
+        assert!(effective_read_only(
+            &origins(&["steam", "zerok"]),
+            false,
+            None
+        ));
         assert!(!effective_read_only(&origins(&["standard"]), false, None));
     }
 
     #[test]
     fn an_override_wins_over_the_default() {
-        assert!(!effective_read_only(&origins(&["zerok"]), false, Some(false)));
-        assert!(effective_read_only(&origins(&["standard"]), false, Some(true)));
+        assert!(!effective_read_only(
+            &origins(&["zerok"]),
+            false,
+            Some(false)
+        ));
+        assert!(effective_read_only(
+            &origins(&["standard"]),
+            false,
+            Some(true)
+        ));
     }
 
     #[test]
     fn the_bundle_is_read_only_whatever_the_override_says() {
-        assert!(effective_read_only(&origins(&["bundled"]), true, Some(false)));
+        assert!(effective_read_only(
+            &origins(&["bundled"]),
+            true,
+            Some(false)
+        ));
     }
 
     #[test]

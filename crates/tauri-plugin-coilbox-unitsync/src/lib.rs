@@ -1916,6 +1916,10 @@ async fn unitsync_engine_config_set(
     key: String,
     value: String,
 ) -> CliResult {
+    // A portable engine keeps its `springsettings.cfg` beside itself.
+    if let Err(e) = coilbox_portable::refuse_read_only(Path::new(&engine_path)) {
+        return CliResult::err(e);
+    }
     let (bin, libpath, engine_dir) = match prepare(&engine_path) {
         Ok(v) => v,
         Err(e) => return CliResult::err(e),
