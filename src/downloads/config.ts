@@ -222,15 +222,21 @@ export function useWriteRootPath(kind?: WriteRootKind): string | undefined {
  * See {@link mutatorDataDir}.
  */
 export async function resolveMutatorDataDir(dataDir: string): Promise<string> {
-  const state = await loadContentState();
-  const cfg = readStoredSetting<DownloadsConfig>(
-    "downloads.config",
-    defaultConfig,
-  );
-  const writeRoot = healWriteRoot(
-    state.roots,
-    cfg.writeRootId,
-    packageDirOf(getProfileRoot()),
-  );
-  return mutatorDataDir(state.roots, dataDir, writeRoot?.path);
+  try {
+    const state = await loadContentState();
+    const cfg = readStoredSetting<DownloadsConfig>(
+      "downloads.config",
+      defaultConfig,
+    );
+    const writeRoot = healWriteRoot(
+      state.roots,
+      cfg.writeRootId,
+      packageDirOf(getProfileRoot()),
+    );
+    return mutatorDataDir(state.roots, dataDir, writeRoot?.path);
+  } catch {
+    // Without the folder list the engine's folder stands, and the write itself
+    // is refused with the reason if that folder is read only.
+    return dataDir;
+  }
 }
