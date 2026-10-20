@@ -6,7 +6,8 @@ Coilbox installs `luaui/` into the content root as `LuaUI/` when you press the b
 
 ## What the player gets
 
-- a panel, opened with the `coilbox_blueprints` action (bind a key, or type `/coilbox_blueprints` in the console), listing the blueprints for the game being played
+- a panel, opened from a small Blueprints button or with the `coilbox_blueprints` action (bind a key, or type `/coilbox_blueprints` in the console), listing the blueprints for the game being played
+- the button and the panel's title drag the panel anywhere on screen, and the widget's config keeps where it was left
 - three tabs: what the selected builders can build now, what they can build in part, and everything
 - pick a row and the layout follows the cursor as ghosts, with the squares the ground refuses marked red
 - `[` and `]` turn it, left click places it, right click or escape puts it down
@@ -41,7 +42,9 @@ Every module under `coilbox_blueprints/` takes the engine tables it reads as arg
 
 ## Drawing
 
-No immediate mode. The panel's rectangles go into one vertex buffer through `gl.GetVBO` and `gl.GetVAO`, drawn with one `DrawElements`, re-uploaded only when the layout changes. Build pictures are one textured quad each through the same shader. Text is `gl.Text`, which the engine batches. Ghosts are `gl.UnitShape`. Footprint squares on the ground are a second buffer, refilled when the snapped anchor or rotation changes.
+No immediate mode. The panel's rectangles, each with its size, corner radius and border, go into one vertex buffer through `gl.GetVBO` and `gl.GetVAO`, drawn with one `DrawElements`, re-uploaded only when the layout changes. Build pictures are one textured quad each through the same shader. The fragment shader rounds the corners from that shape, and a border keeps only the outline. Text is `gl.Text`, which the engine batches. Ghosts are `gl.UnitShape`. Footprint squares on the ground are a second buffer, refilled when the snapped anchor or rotation changes.
+
+The panel is laid out at sizes for a view 1080 pixels tall and scales with the view's height.
 
 The shader is `#version 130` with `GL_ARB_explicit_attrib_location`, the lowest floor that lets `VBO:Define` attribute ids match `layout(location)`.
 

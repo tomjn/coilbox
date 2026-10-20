@@ -88,13 +88,15 @@ The widget panel opens by itself the first time you start a match. If it never a
 ### Place a blueprint
 
 1. Start a match in the blueprint's game.
-2. Open the panel. Select the Blueprints tab on the right edge of the screen, or type /coilbox_blueprints in the game's chat.
+2. Open the panel. Select the Blueprints button on the right of the screen, or type /coilbox_blueprints in the game's chat.
 3. Select one or more builders.
 4. Select a blueprint in the list. Its buildings follow the cursor. Squares the ground will not take are marked red.
 5. Press [ or ] to turn it.
 6. Left click to place it.
 
 Each builder you selected is ordered to build the buildings it can. Right click or Escape puts the blueprint away without placing it. Hold Shift when you click to add the orders after what the builders are already doing, and to keep the blueprint on the cursor for another copy.
+
+If the panel is in the way, drag the Blueprints button, or the panel's title, somewhere else. Selecting the title closes the panel. The game remembers where you put it.
 
 The panel only lists blueprints for the game you are playing. It has three tabs:
 
