@@ -373,7 +373,7 @@ export interface HubGameDownload {
  * source first - the caller is expected to try the next one when a source
  * comes up empty, never to stop at the first entry.
  *
- * `logo`/`card` can be a root-relative path (e.g. `/assets/games/...`) rather
+ * `logo`/`card`/`banner` can be a root-relative path (e.g. `/assets/games/...`) rather
  * than a full address, since the hub does not know its own public origin for a
  * picture still waiting for promotion. A caller that wants to show one has to
  * resolve it against the hub host it just called.
@@ -386,6 +386,8 @@ export interface HubGame {
   downloads: HubGameDownload[];
   logo: string | null;
   card: string | null;
+  /** Absent from a hub that predates it. */
+  banner?: string | null;
   faction_count: number;
   unit_count: number;
   item_count: number;

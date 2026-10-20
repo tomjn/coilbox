@@ -264,6 +264,7 @@ export default function GameDetailPage() {
     <div className="flex flex-col gap-5 p-4">
       <GameHeader
         game={game}
+        installed={data?.games ?? null}
         enginePath={selected?.enginePath}
         dataDir={selected?.rootPath}
         onPlay={() => playGame(game.name)}

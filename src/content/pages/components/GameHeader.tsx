@@ -1,9 +1,14 @@
 import { Button } from "@picoframe/frame";
 import { ArrowLeft, Play } from "lucide-react";
 import { Link } from "react-router";
+import { useHubGameArtUrl } from "@/hub/gameIcons";
 import { versionLabel } from "@/lib/utils";
 import type { GameItem } from "../../bindings";
-import { useBrandingEntry, useBrandingImage } from "../../branding";
+import {
+  useBrandingEntry,
+  useBrandingImage,
+  useCachedImage,
+} from "../../branding";
 import { useUnitsyncGameHeaders } from "../../config";
 import { isSdd } from "../../format";
 import { GameArt } from "./GameArt";
@@ -17,11 +22,14 @@ import { SddBadge } from "./SddBadge";
  */
 export function GameHeader({
   game,
+  installed,
   enginePath,
   dataDir,
   onPlay,
 }: {
   game: GameItem;
+  /** Every installed game, so the hub match tells this game from a sibling. */
+  installed: readonly GameItem[] | null;
   enginePath?: string;
   dataDir?: string;
   onPlay: () => void;
@@ -33,8 +41,10 @@ export function GameHeader({
   const { headers } = useUnitsyncGameHeaders(enginePath, dataDir);
   const brand = useBrandingEntry(game);
   const brandBanner = useBrandingImage(brand?.banner, true);
-  // Catalog art wins; the game's own loading-screen art is the fallback.
-  const artUrl = brandBanner ?? headers.get(game.name);
+  const hubBannerUrl = useHubGameArtUrl(game.name, installed, "banner");
+  const hubBanner = useCachedImage(hubBannerUrl ? [hubBannerUrl] : undefined);
+  // The hub's banner, then the catalog's, then the game's own loading screen.
+  const artUrl = hubBanner ?? brandBanner ?? headers.get(game.name);
 
   return (
     <header className="relative -mx-4 -mt-4 h-[292px] overflow-hidden">
