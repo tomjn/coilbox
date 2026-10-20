@@ -765,6 +765,83 @@ const stats: Drawing = {
   },
 };
 
+/**
+ * A transcript, filed back in time: rows of messages, each a name and a line,
+ * with one row lit under a lens. Chat logs are for finding what was said.
+ */
+const chatLogs: Drawing = {
+  pools: [
+    [210, 104, 110, 0.18],
+    [64, 44, 90, 0.1],
+  ],
+  paint: (p) => {
+    const widths = [148, 112, 104, 152, 96, 120];
+    const rows = widths
+      .map((w, i) => {
+        const y = 32 + i * 24;
+        const lit = i === 3;
+        const o = lit ? 0.85 : round(0.4 - i * 0.04);
+        const ink = lit ? p.spark : p.line;
+        return (
+          `<circle cx="34" cy="${y + 4}" r="2" fill="${p.faint}" fill-opacity="${round(o * 0.6)}"/>` +
+          `<rect x="46" y="${y}" width="${24 + (i % 3) * 6}" height="8" rx="4" fill="${ink}" fill-opacity="${round(o * 0.8)}"/>` +
+          `<rect x="${84 + (i % 3) * 6}" y="${y + 1}" width="${w}" height="6" rx="3" fill="${lit ? p.spark : p.faint}" fill-opacity="${round(o * 0.6)}"/>`
+        );
+      })
+      .join("");
+    return (
+      `<path d="M34 20 L34 168" fill="none" stroke="${p.faint}" stroke-width="1" stroke-opacity="0.16"/>` +
+      rows +
+      // The lens over the hit.
+      `<circle cx="226" cy="108" r="26" fill="${p.line}" fill-opacity="0.06"/>` +
+      `<circle cx="226" cy="108" r="26" fill="none" stroke="${p.spark}" stroke-width="2.4" stroke-opacity="0.7"/>` +
+      `<path d="M245 127 L268 150" fill="none" stroke="${p.spark}" stroke-width="5" stroke-opacity="0.7" stroke-linecap="round"/>`
+    );
+  },
+};
+
+/**
+ * Rank chevrons under a star, the top one lit, with service ribbons beside
+ * them. Career is the record of everything played, so it reads as rank earned.
+ */
+const career: Drawing = {
+  pools: [
+    [176, 86, 120, 0.2],
+    [56, 140, 86, 0.09],
+  ],
+  paint: (p) => {
+    const chevron = (y: number, colour: string, o: number) =>
+      `<path d="M128 ${y} L176 ${y - 26} L224 ${y}" fill="none" stroke="${colour}" stroke-width="9" stroke-opacity="${o}" stroke-linecap="round" stroke-linejoin="round"/>`;
+    const star = Array.from({ length: 10 }, (_, i) => {
+      const a = -Math.PI / 2 + (i * Math.PI) / 5;
+      const r = i % 2 === 0 ? 15 : 6.5;
+      return `${round(176 + r * Math.cos(a))},${round(48 + r * Math.sin(a))}`;
+    }).join(" ");
+    const ribbons = [0, 1, 2]
+      .map((row) =>
+        [0, 1]
+          .map((col) => {
+            const x = 34 + col * 34;
+            const y = 70 + row * 18;
+            const o = round(0.34 - row * 0.06);
+            return (
+              `<rect x="${x}" y="${y}" width="30" height="12" rx="2" fill="${p.line}" fill-opacity="${round(o * 0.6)}"/>` +
+              `<rect x="${x + 12}" y="${y}" width="6" height="12" fill="${(row + col) % 2 === 0 ? p.spark : p.faint}" fill-opacity="${o}"/>`
+            );
+          })
+          .join(""),
+      )
+      .join("");
+    return (
+      ribbons +
+      chevron(158, p.faint, 0.26) +
+      chevron(130, p.line, 0.42) +
+      chevron(102, p.spark, 0.8) +
+      `<polygon points="${star}" fill="${p.spark}" fill-opacity="0.85"/>`
+    );
+  },
+};
+
 /** A shelf of games, one pulled forward. What you have, not what you could get. */
 const games: Drawing = {
   pools: [
@@ -1679,6 +1756,8 @@ const DRAWINGS: Record<string, Drawing> = {
   "multiplayer.battles": battles,
   "multiplayer.battle": battleRoom,
   "multiplayer.stats": stats,
+  "multiplayer.chatlogs": chatLogs,
+  "career.overview": career,
   "library.maps": maps,
   "library.games": games,
   "library.blueprints": blueprints,
