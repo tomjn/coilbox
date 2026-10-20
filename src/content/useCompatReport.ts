@@ -69,12 +69,17 @@ export function useCompatReport(
   dataDir?: string,
   gameArchive?: string,
 ) {
-  const { tree } = useUnitsyncArchiveTree(enginePath, dataDir, gameArchive);
+  const { tree, loading: treeLoading } = useUnitsyncArchiveTree(
+    enginePath,
+    dataDir,
+    gameArchive,
+  );
   const lua = useLuaCompatScan(enginePath, dataDir, gameArchive);
   const {
     defs,
     defsFor,
     error: defsError,
+    loading: defsLoading,
   } = useUnitDefs(enginePath, dataDir, gameArchive);
   const findings = useMemo(() => {
     if (!tree) return [];
@@ -90,5 +95,14 @@ export function useCompatReport(
       errors,
     });
   }, [tree, lua, defs, defsFor, defsError, gameArchive]);
-  return { findings, archivePath: tree?.archivePath };
+  const asked = !!(enginePath && dataDir && gameArchive);
+  return {
+    findings,
+    archivePath: tree?.archivePath,
+    /** A read is still out, so more findings may join. */
+    checking:
+      asked && (treeLoading || (!lua.result && !lua.error) || defsLoading),
+    /** The member list was read, so an empty report means nothing was found. */
+    read: tree != null,
+  };
 }

@@ -90,7 +90,7 @@ At the top of the Overview tab, a box sums up the game in your library:
 - Engine is the engine the page reads the game with.
 - Show updates decides whether coilbox offers updates for this game. Turn it off to keep the game off the Updates list and out of the count in the top bar.
 
-The page has three tabs: Overview, Versions and Sources. A fourth, Compatibility, appears when coilbox finds something in the game that the engine no longer does. See [Compatibility mode](compatibility-mode.md).
+The page has five tabs: Overview, Versions, Sources, Options and Compatibility. Compatibility lists anything in the game that the engine no longer does. See [Compatibility mode](compatibility-mode.md). With Advanced mode on there is a sixth tab, Advanced.
 
 ### Versions
 
@@ -137,13 +137,20 @@ Sides lists each faction in the game, with how many units it has and its startin
 
 A game that declares no factions shows Units instead, with All units beside it.
 
-Under Sides:
+Your record by faction, under Sides, shows how often you won with each faction.
 
-- Metadata lists what the game says about itself.
-- Your record by faction shows how often you won with each faction.
-- Game options lists every setting the game offers. Select it to open it.
+### Options
+
+Options lists every setting the game offers, with its key and what it does.
+
+### Advanced
+
+The Advanced tab only shows with [Advanced mode](settings.md#advanced-mode) turned on in Settings > General.
+
 - Primary archive is the game's own file. Open folder shows it on your computer. Delete removes it after you confirm.
 - Dependencies lists the other archives the game needs.
+- Metadata lists what the game says about itself.
+- Mission runtime shows whether the game has the coilbox mission runtime, which scenarios need.
 
 ## The unit list
 
