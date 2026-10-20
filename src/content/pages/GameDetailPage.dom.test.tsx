@@ -274,8 +274,8 @@ describe("GameDetailPage's Sides section", () => {
   });
 });
 
-describe("GameDetailPage's Game options section", () => {
-  it("starts closed and shows an option's description only once opened", async () => {
+describe("GameDetailPage's Options tab", () => {
+  it("shows an option's description only once the tab is opened", async () => {
     renderPage({
       sides: [],
       units: [],
@@ -288,18 +288,22 @@ describe("GameDetailPage's Game options section", () => {
         },
       ],
     });
-    const trigger = await screen.findByRole("button", {
-      name: /Game options \(1\)/,
-    });
+    const trigger = await screen.findByRole("tab", { name: "Options" });
     expect(
       screen.queryByText("Allies are set before the game starts."),
     ).toBeNull();
 
-    fireEvent.click(trigger);
+    fireEvent.mouseDown(trigger);
 
     expect(
       await screen.findByText("Allies are set before the game starts."),
     ).toBeTruthy();
+  });
+
+  it("says so when the game has no options", async () => {
+    renderPage({ sides: [], units: [], datasetStatus: "ready" });
+    fireEvent.mouseDown(await screen.findByRole("tab", { name: "Options" }));
+    expect(screen.getByText("This game has no options.")).toBeTruthy();
   });
 });
 

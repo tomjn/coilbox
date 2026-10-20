@@ -53,7 +53,7 @@ import { GameLibrarySummary } from "./components/GameLibrarySummary";
 import { GameSourcesTab } from "./components/GameSourcesTab";
 import { GameVersionsTab } from "./components/GameVersionsTab";
 import { MissionRuntimeSection } from "./components/MissionRuntimeSection";
-import { OptionsList } from "./components/OptionsList";
+import { OptionCards } from "./components/OptionsList";
 import { StartModeActions } from "./components/StartModeActions";
 import { TallyBar } from "./components/StatWidgets";
 import {
@@ -280,6 +280,7 @@ export default function GameDetailPage() {
           <TabsTrigger value="overview">Overview</TabsTrigger>
           <TabsTrigger value="versions">Versions</TabsTrigger>
           <TabsTrigger value="sources">Sources</TabsTrigger>
+          <TabsTrigger value="options">Options</TabsTrigger>
           <TabsTrigger value="compat">Compatibility</TabsTrigger>
           {advanced && <TabsTrigger value="advanced">Advanced</TabsTrigger>}
         </TabsList>
@@ -300,6 +301,27 @@ export default function GameDetailPage() {
             rows={lib.sources}
             onPin={(step) => setGamePin(lib.prefKey, step)}
           />
+        </TabsContent>
+        <TabsContent value="options">
+          {gameInfoLoading ? (
+            <p
+              role="status"
+              className="flex items-center gap-2 text-sm text-muted-foreground"
+            >
+              <Loader2 className="size-4 animate-spin" />
+              Reading this game&apos;s options…
+            </p>
+          ) : !gameInfo ? (
+            <p className="text-sm text-muted-foreground">
+              Could not read this game&apos;s options.
+            </p>
+          ) : gameInfo.options.length === 0 ? (
+            <p className="text-sm text-muted-foreground">
+              This game has no options.
+            </p>
+          ) : (
+            <OptionCards options={gameInfo.options} />
+          )}
         </TabsContent>
         <TabsContent value="compat">
           <section className="flex flex-col gap-2 rounded-lg border border-border/60 bg-card p-4">
@@ -525,13 +547,6 @@ export default function GameDetailPage() {
               )}
             </section>
           )}
-
-          {/* A long list on its own, so it opens collapsed. */}
-          <OptionsList
-            options={gameInfo?.options ?? []}
-            title="Game options"
-            defaultOpen={false}
-          />
         </TabsContent>
         {advanced && (
           <TabsContent value="advanced" className="flex flex-col gap-5">
