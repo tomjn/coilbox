@@ -144,9 +144,9 @@ check("the title is the toggle, across the header left of the tabs", (function()
 	local p = L.rects[1]
 	return #hitsOf(L, "toggle") == 1 and t.x == p.x and t.y + t.h == p.y + p.h and t.x + t.w < firstTab.x
 end)(), show(hitsOf(L, "toggle")))
-check("tabs are pills", (function()
+check("tabs and buttons are rectangles with rounded corners, not pills", (function()
 	for _, r in ipairs(L.rects) do
-		if r.kind == "tab" and r.radius ~= r.h / 2 then
+		if (r.kind == "tab" or r.kind == "button") and r.radius ~= MODEL.BUTTON_RADIUS then
 			return false
 		end
 	end
@@ -271,7 +271,15 @@ check("an empty library says where to get blueprints", #textsWith(MODEL.layout(n
 state.open = false
 local LC = MODEL.layout(state, measure, VIEW)
 check("a closed panel shows only the opener", #LC.rects == 1 and LC.rects[1].kind == "opener", show(LC.rects))
-check("the opener is a horizontal pill", LC.rects[1].w > LC.rects[1].h and LC.rects[1].radius == LC.rects[1].h / 2, show(LC.rects[1]))
+check("the opener is a vertical tab with rounded corners", LC.rects[1].h > LC.rects[1].w and LC.rects[1].radius == MODEL.BUTTON_RADIUS, show(LC.rects[1]))
+check("the opener's label reads downward", (function()
+	for _, t in ipairs(LC.texts) do
+		if t.text == "BLUEPRINTS" then
+			return t.rotate == -90
+		end
+	end
+	return false
+end)(), show(LC.texts))
 check("the opener sits a margin in from the right edge, vertically centred", (function()
 	local r = LC.rects[1]
 	local centred = math.abs((r.y - 0) - (VIEW.h - r.y - r.h)) <= 1

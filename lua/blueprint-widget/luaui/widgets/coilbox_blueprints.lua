@@ -156,9 +156,9 @@ void main() {
 	}
 	// Distance to the edge of a rounded box, in the box's own units. Half a
 	// unit either side of the edge fades out, and a border keeps only a ring.
-	vec2 half = vShape.xy * 0.5;
-	float r = min(vShape.z, min(half.x, half.y));
-	vec2 q = abs((vUv - 0.5) * vShape.xy) - half + r;
+	vec2 halfSize = vShape.xy * 0.5;
+	float r = min(vShape.z, min(halfSize.x, halfSize.y));
+	vec2 q = abs((vUv - 0.5) * vShape.xy) - halfSize + r;
 	float d = length(max(q, 0.0)) + min(max(q.x, q.y), 0.0) - r;
 	float a = clamp(0.5 - d, 0.0, 1.0);
 	if (vShape.w > 0.0) {
@@ -785,7 +785,15 @@ function widget:DrawScreen()
 	end
 	gl.UseShader(0)
 	for _, t in ipairs(layout.texts) do
-		gl.Text(colourCode(t.color) .. t.text, t.x, t.y, t.size, "")
+		if t.rotate then
+			gl.PushMatrix()
+			gl.Translate(t.x, t.y, 0)
+			gl.Rotate(t.rotate, 0, 0, 1)
+			gl.Text(colourCode(t.color) .. t.text, 0, 0, t.size, "")
+			gl.PopMatrix()
+		else
+			gl.Text(colourCode(t.color) .. t.text, t.x, t.y, t.size, "")
+		end
 	end
 end
 
