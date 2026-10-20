@@ -41,6 +41,8 @@ interface GameUpdatesContextValue {
    * engine. The topbar badge shows this.
    */
   updateCount: number;
+  /** A name for each of those, in the same order the badge links to them. */
+  updateNames: string[];
   /** Where the badge goes: the first place that has something to update. */
   updateTo: string;
   installing: boolean;
@@ -95,6 +97,7 @@ export function GameUpdatesProvider({ children }: { children: ReactNode }) {
     },
     count: libraryUpdates,
     games: updatedGames,
+    engine: engineUpdate,
   } = useUpdates();
 
   const runCheck = useCallback(async () => {
@@ -125,6 +128,14 @@ export function GameUpdatesProvider({ children }: { children: ReactNode }) {
     );
   }, [release, filesRead, installedGames]);
   const updateCount = libraryUpdates + (updateAvailable ? 1 : 0);
+  const updateNames = useMemo(
+    () => [
+      ...(updateAvailable && release ? [release.name || release.tag] : []),
+      ...updatedGames.map((g) => g.title),
+      ...(engineUpdate ? [`Engine ${engineUpdate}`] : []),
+    ],
+    [updateAvailable, release, updatedGames, engineUpdate],
+  );
 
   const notifiedRef = useRef(false);
   useEffect(() => {
@@ -218,10 +229,11 @@ export function GameUpdatesProvider({ children }: { children: ReactNode }) {
         error,
         updateAvailable,
         updateCount,
+        updateNames,
         updateTo: updateAvailable
           ? "/settings/game-updates"
           : updatedGames.length > 0
-            ? "/library/games"
+            ? "/library/games?filter=updates"
             : "/settings/engines",
         installing,
         installed,

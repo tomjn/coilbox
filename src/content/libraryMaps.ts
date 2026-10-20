@@ -28,13 +28,13 @@ export function catalogueLabel(c: CatalogueRequest): string {
 }
 
 /**
- * The Maps page's filter chips, in the order they are shown. All and
- * Installed narrow by state. The other three are play types, read off the
- * hub's facts for the map (see {@link mapPlayTypes}).
+ * The Maps page's filter chips, in the order they are shown. My Maps and New
+ * Maps narrow by state. The other three are play types over every map, read
+ * off the hub's facts for the map (see {@link mapPlayTypes}).
  */
 export const MAP_CHIPS = [
-  { value: "all", label: "All" },
-  { value: "installed", label: "Installed" },
+  { value: "installed", label: "My Maps" },
+  { value: "notInstalled", label: "New Maps" },
   { value: "1v1", label: "1v1" },
   { value: "team", label: "Team" },
   { value: "water", label: "Water" },
@@ -76,7 +76,9 @@ export function isMapOnDisk(m: LibraryMap): boolean {
 /** Whether a state chip shows the map. A play type chip shows every map its
  *  facts match, so it asks {@link matchesPlayType} instead. */
 export function matchesMapScope(m: LibraryMap, chip: MapChip): boolean {
-  return chip === "installed" ? isMapOnDisk(m) : true;
+  if (chip === "installed") return isMapOnDisk(m);
+  if (chip === "notInstalled") return !isMapOnDisk(m);
+  return true;
 }
 
 export function matchesPlayType(

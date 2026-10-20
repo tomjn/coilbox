@@ -1,6 +1,6 @@
 import { CloudOff } from "lucide-react";
 import { useMemo, useState } from "react";
-import { Link } from "react-router";
+import { Link, useSearchParams } from "react-router";
 import { errorText } from "@/lib/helpers";
 import { useWriteRoot } from "../../downloads/config";
 import {
@@ -48,7 +48,6 @@ import {
 
 /** What a chip with nothing in it says. */
 const EMPTY_CHIP: Record<GameChip, string> = {
-  all: "No games.",
   installed: "No games installed.",
   updates: "Every installed game is up to date.",
   featured: "The hub features no games.",
@@ -90,7 +89,12 @@ export default function GamesPage() {
 
   const [search, setSearch] = useState("");
   const [sort, setSort] = useState<GameSort>("featured");
-  const [chip, setChip] = useState<GameChip>("all");
+  // The topbar's update badge links here with ?filter=updates.
+  const [params] = useSearchParams();
+  const [picked, setChip] = useState<GameChip | null>(
+    () =>
+      GAME_CHIPS.find((c) => c.value === params.get("filter"))?.value ?? null,
+  );
 
   // A failed Init leaves data null and the engine's reason in error. The raw
   // result stays in unvouched, which this page still lists from, unless there
@@ -120,6 +124,9 @@ export default function GamesPage() {
     [library.games],
   );
   const counts = useMemo(() => chipCounts(records), [records]);
+  // The player's own games until they pick a chip, or the games they could
+  // get when they have none yet.
+  const chip = picked ?? (counts.installed > 0 ? "installed" : "notInstalled");
   const shown = useMemo(
     () =>
       sortGames(
@@ -163,7 +170,11 @@ export default function GamesPage() {
     }
   }
 
-  const chips = GAME_CHIPS.map((c) => ({ ...c, count: counts[c.value] }));
+  // An Updates chip reading 0 offers nothing, so it shows only when there is
+  // an update or it is the chip already chosen.
+  const chips = GAME_CHIPS.filter(
+    (c) => c.value !== "updates" || counts.updates > 0 || chip === "updates",
+  ).map((c) => ({ ...c, count: counts[c.value] }));
 
   return (
     <div className="flex flex-col gap-4 p-4">

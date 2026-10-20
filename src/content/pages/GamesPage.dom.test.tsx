@@ -105,9 +105,9 @@ beforeEach(() => {
 });
 afterEach(cleanup);
 
-function renderPage() {
+function renderPage(path = "/library/games") {
   return render(
-    <MemoryRouter>
+    <MemoryRouter initialEntries={[path]}>
       <GamesPage />
     </MemoryRouter>,
   );
@@ -119,17 +119,44 @@ const cardTitles = () =>
     .map((li) => li.querySelector("p[title]")?.getAttribute("title"));
 
 describe("Games page", () => {
-  it("lists every hub game and every installed game, featured first", () => {
+  it("splits the games between My Games and New Games, featured first", () => {
     renderPage();
     expect(cardTitles()).toEqual([
       "SplinterFaction",
-      "Zero-K",
       "Balanced Annihilation",
+      "My Test Game",
+    ]);
+    fireEvent.click(screen.getByRole("radio", { name: /New Games/ }));
+    expect(cardTitles()).toEqual([
+      "Zero-K",
       "Evolution RTS",
       "Metal Factions",
-      "My Test Game",
       "Tech Annihilation",
     ]);
+  });
+
+  it("opens on the player's own games", () => {
+    renderPage();
+    expect(
+      screen
+        .getByRole("radio", { name: /My Games/ })
+        .getAttribute("aria-checked"),
+    ).toBe("true");
+    expect(cardTitles()).toHaveLength(3);
+  });
+
+  it("opens on New Games when the player has none", () => {
+    hoisted.input = {
+      ...LIBRARY_GAMES_INPUT,
+      scan: { games: [], maps: [] },
+      files: { games: [], maps: [] },
+    };
+    renderPage();
+    expect(
+      screen
+        .getByRole("radio", { name: /New Games/ })
+        .getAttribute("aria-checked"),
+    ).toBe("true");
   });
 
   it("gives each chip its count and filters by it", () => {
@@ -139,15 +166,25 @@ describe("Games page", () => {
       within(chips)
         .getAllByRole("radio")
         .map((c) => c.textContent),
-    ).toEqual([
-      "All7",
-      "Installed3",
-      "Updates1",
-      "Featured2",
-      "Not installed4",
-    ]);
+    ).toEqual(["My Games3", "New Games4", "Updates1", "Featured2"]);
     fireEvent.click(within(chips).getByRole("radio", { name: /Updates/ }));
     expect(cardTitles()).toEqual(["SplinterFaction"]);
+  });
+
+  it("opens on the chip the link names", () => {
+    renderPage("/library/games?filter=updates");
+    expect(
+      screen
+        .getByRole("radio", { name: /Updates/ })
+        .getAttribute("aria-checked"),
+    ).toBe("true");
+    expect(cardTitles()).toEqual(["SplinterFaction"]);
+  });
+
+  it("hides the Updates chip when nothing has an update", () => {
+    hoisted.input = { ...LIBRARY_GAMES_INPUT, catalogues: [] };
+    renderPage();
+    expect(screen.queryByRole("radio", { name: /Updates/ })).toBeNull();
   });
 
   it("says when a chip has nothing in it", () => {
@@ -155,15 +192,14 @@ describe("Games page", () => {
       ...LIBRARY_GAMES_INPUT,
       catalogues: [],
     };
-    renderPage();
-    fireEvent.click(screen.getByRole("radio", { name: /Updates/ }));
+    renderPage("/library/games?filter=updates");
     expect(
       screen.getByText("Every installed game is up to date."),
     ).toBeTruthy();
   });
 
   it("queues the hub's first source when Install is pressed", async () => {
-    renderPage();
+    renderPage("/library/games?filter=notInstalled");
     await act(async () => {
       fireEvent.click(screen.getByRole("button", { name: "Install" }));
     });
@@ -175,7 +211,7 @@ describe("Games page", () => {
   });
 
   it("cancels the running download", () => {
-    renderPage();
+    renderPage("/library/games?filter=notInstalled");
     fireEvent.click(screen.getAllByRole("button", { name: "Cancel" })[0]);
     expect(hoisted.cancel).toHaveBeenCalledWith("q1");
   });

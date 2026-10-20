@@ -55,7 +55,6 @@ describe("the Games grid", () => {
 
   it("counts each chip", () => {
     expect(chipCounts(grid)).toEqual({
-      all: 7,
       installed: 3,
       updates: 1,
       featured: 2,

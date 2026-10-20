@@ -54,8 +54,8 @@ const PAGE = 200;
 
 /** What a chip with nothing in it says. */
 const EMPTY_CHIP: Record<MapChip, string> = {
-  all: "No maps.",
   installed: "No maps installed.",
+  notInstalled: "Every map is installed.",
   "1v1": "No 1v1 maps.",
   team: "No team maps.",
   water: "No water maps.",
@@ -101,7 +101,7 @@ export default function MapsPage() {
 
   const [search, setSearch] = useState("");
   const [sort, setSort] = useState<MapSort>("name-asc");
-  const [chip, setChip] = useState<MapChip>("all");
+  const [picked, setChip] = useState<MapChip | null>(null);
   const [limit, setLimit] = useState(PAGE);
 
   // A failed Init leaves data null and the engine's reason in error. The raw
@@ -115,6 +115,18 @@ export default function MapsPage() {
   const records = library.maps;
   const installedFiles = library.installedFiles.maps;
   const thumbOf = (m: LibraryMap) => thumbs.get(m.installed?.name ?? m.id);
+
+  const counts = useMemo(
+    () => ({
+      all: records.length,
+      installed: records.filter(isMapOnDisk).length,
+      notInstalled: records.filter((m) => !isMapOnDisk(m)).length,
+    }),
+    [records],
+  );
+  // The player's own maps until they pick a chip, or the maps they could get
+  // when they have none yet.
+  const chip = picked ?? (counts.installed > 0 ? "installed" : "notInstalled");
 
   // Sorted by the sizes known without the hub, so the facts that arrive for
   // the cards on screen never move which cards are on screen.
@@ -142,20 +154,10 @@ export default function MapsPage() {
     : page;
   const remaining = scoped.length - page.length;
 
-  const counts = useMemo(
-    () => ({
-      all: records.length,
-      installed: records.filter(isMapOnDisk).length,
-    }),
-    [records],
-  );
   const chips = MAP_CHIPS.filter((c) => hubOn || !isPlayType(c.value)).map(
     (c) => ({
       ...c,
-      count:
-        c.value === "all" || c.value === "installed"
-          ? counts[c.value]
-          : undefined,
+      count: isPlayType(c.value) ? undefined : counts[c.value],
     }),
   );
 

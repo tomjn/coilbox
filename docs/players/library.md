@@ -54,7 +54,7 @@ Select anywhere else on an installed game to open its page. A warning icon on a 
 
 To narrow the grid:
 
-- Select a button at the top: All, Installed, Updates, Featured or Not installed. Each one says how many games it holds. Featured is the games the hub features. Updates is the games with a newer version.
+- Select a button at the top: My Games, New Games, Updates or Featured. Each one says how many games it holds. My Games is the games you have, and the page opens on it when you have any. New Games is the games you do not have, and the page opens on it when you have none. Featured is the games the hub features. Updates is the games with a newer version, and is hidden when there are none.
 - Type in Search games… to match part of a game's name.
 - Pick a sort from the list beside it: Featured first, Name A–Z or Name Z–A. Featured first is the default.
 
@@ -63,7 +63,7 @@ If the hub could not be read, a line above the grid says why. Your installed gam
 ### Install a game
 
 1. Open Library > Games.
-2. Find the game. Select Not installed to see only the games you do not have.
+2. Find the game. Select New Games to see only the games you do not have.
 3. Select Install.
 
 Coilbox tries the download sources the hub gives for the game, in the hub's order. If you pinned a source for the game, it tries that one first. See [Sources](#sources). If the hub gives no source, coilbox downloads the newest version a mirror has.
@@ -205,7 +205,7 @@ Select anywhere else on an installed map to open its page.
 
 To narrow the grid:
 
-- Select a button at the top: All, Installed, 1v1, Team or Water. All and Installed say how many maps they hold.
+- Select a button at the top: My Maps, New Maps, 1v1, Team or Water. My Maps is the maps you have and New Maps is the maps you do not, and each says how many it holds. The page opens on My Maps when you have any maps, and on New Maps when you have none. 1v1, Team and Water look through every map.
 - Type in Search maps… to match part of a map's name.
 - Pick a sort from the list beside it: Name A–Z, Name Z–A, Largest or Smallest. Name A–Z is the default.
 
