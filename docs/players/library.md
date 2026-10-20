@@ -139,11 +139,17 @@ A game that declares no factions shows Units instead, with All units beside it.
 
 Under Sides:
 
-- Metadata lists what the game says about itself.
 - Your record by faction shows how often you won with each faction.
 - Game options lists every setting the game offers. Select it to open it.
+
+### Advanced
+
+The Advanced tab only shows with [Advanced mode](settings.md#advanced-mode) turned on in Settings > General.
+
 - Primary archive is the game's own file. Open folder shows it on your computer. Delete removes it after you confirm.
 - Dependencies lists the other archives the game needs.
+- Metadata lists what the game says about itself.
+- Mission runtime shows whether the game has the coilbox mission runtime, which scenarios need.
 
 ## The unit list
 

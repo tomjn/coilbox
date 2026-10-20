@@ -27,8 +27,19 @@ vi.mock("@picoframe/frame", async () => ({
 }));
 
 let mockFindings: Finding[] = [];
+let mockChecking = false;
+let mockRead = true;
 vi.mock("../useCompatReport", () => ({
-  useCompatReport: () => ({ findings: mockFindings, archivePath: undefined }),
+  useCompatReport: () => ({
+    findings: mockFindings,
+    archivePath: undefined,
+    checking: mockChecking,
+    read: mockRead,
+  }),
+}));
+let mockAdvanced = false;
+vi.mock("@/general/advanced", () => ({
+  useAdvancedMode: () => mockAdvanced,
 }));
 vi.mock("./components/Convert3doDrawer", () => ({
   Convert3doDrawer: () => null,
@@ -142,6 +153,9 @@ const { default: GameDetailPage } = await import("./GameDetailPage");
 afterEach(() => {
   cleanup();
   mockFindings = [];
+  mockChecking = false;
+  mockRead = true;
+  mockAdvanced = false;
   drawerOpen.mockClear();
 });
 
@@ -311,10 +325,31 @@ describe("GameDetailPage's Compatibility tab", () => {
     },
   ];
 
-  it("is absent when the report finds nothing", async () => {
+  const openTab = async (name: string) =>
+    fireEvent.mouseDown(await screen.findByRole("tab", { name }));
+
+  it("says so when the report finds nothing", async () => {
     renderPage({ sides: [], units: [], datasetStatus: "ready" });
-    await screen.findByText("Primary archive");
-    expect(screen.queryByRole("tab", { name: "Compatibility" })).toBeNull();
+    await openTab("Compatibility");
+    expect(
+      screen.getByText(
+        "Nothing found that would stop this game running on this engine.",
+      ),
+    ).toBeTruthy();
+  });
+
+  it("shows a spinner while the reads are out", async () => {
+    mockChecking = true;
+    renderPage({ sides: [], units: [], datasetStatus: "ready" });
+    await openTab("Compatibility");
+    expect(screen.getByRole("status").textContent).toBe("Checking this game…");
+  });
+
+  it("says when the game's files could not be read", async () => {
+    mockRead = false;
+    renderPage({ sides: [], units: [], datasetStatus: "ready" });
+    await openTab("Compatibility");
+    expect(screen.getByText("Could not read this game's files.")).toBeTruthy();
   });
 
   it("lists each finding with its count and expands the Lua hits", async () => {
@@ -360,5 +395,23 @@ describe("GameDetailPage's Compatibility tab", () => {
         .getByRole("tab", { name: "Compatibility" })
         .getAttribute("aria-selected"),
     ).toBe("true");
+  });
+});
+
+describe("GameDetailPage's Advanced tab", () => {
+  it("is absent with advanced mode off, and so is the archive", async () => {
+    renderPage({ sides: [], units: [], datasetStatus: "ready" });
+    await screen.findByRole("tab", { name: "Overview" });
+    expect(screen.queryByRole("tab", { name: "Advanced" })).toBeNull();
+    expect(screen.queryByText("Primary archive")).toBeNull();
+  });
+
+  it("holds the archive and its dependencies with advanced mode on", async () => {
+    mockAdvanced = true;
+    renderPage({ sides: [], units: [], datasetStatus: "ready" });
+    expect(screen.queryByText("Primary archive")).toBeNull();
+    fireEvent.mouseDown(await screen.findByRole("tab", { name: "Advanced" }));
+    expect(screen.getByText("Primary archive")).toBeTruthy();
+    expect(screen.getByText("Dependencies (0)")).toBeTruthy();
   });
 });

@@ -13,6 +13,7 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useFactionLogos } from "@/factions/logos";
+import { useAdvancedMode } from "@/general/advanced";
 import { nextDrawerKey } from "@/general/drawerKey";
 import { generatedGameNote } from "@/lib/generatedGames";
 import { isProfileHidden } from "@/profile/hidden";
@@ -178,11 +179,11 @@ export default function GameDetailPage() {
 
   // The Versions and Sources tabs and the library facts above them (#4580).
   const lib = useGameLibrary(decoded, data);
-  const [tab, setTab] = useState("overview");
-  // The findings arrive after the page, so the tab opens once there are some.
+  const [tab, setTab] = useState(wantsCompat ? "compat" : "overview");
   useEffect(() => {
-    if (wantsCompat && hasFindings) setTab("compat");
-  }, [wantsCompat, hasFindings]);
+    if (wantsCompat) setTab("compat");
+  }, [wantsCompat]);
+  const advanced = useAdvancedMode();
 
   if (error && !data)
     return (
@@ -271,16 +272,16 @@ export default function GameDetailPage() {
       />
 
       <Tabs
-        value={tab === "compat" && !hasFindings ? "overview" : tab}
+        className="gap-4"
+        value={tab === "advanced" && !advanced ? "overview" : tab}
         onValueChange={setTab}
       >
         <TabsList>
           <TabsTrigger value="overview">Overview</TabsTrigger>
           <TabsTrigger value="versions">Versions</TabsTrigger>
           <TabsTrigger value="sources">Sources</TabsTrigger>
-          {hasFindings && (
-            <TabsTrigger value="compat">Compatibility</TabsTrigger>
-          )}
+          <TabsTrigger value="compat">Compatibility</TabsTrigger>
+          {advanced && <TabsTrigger value="advanced">Advanced</TabsTrigger>}
         </TabsList>
         <TabsContent value="versions">
           <GameVersionsTab
@@ -300,9 +301,9 @@ export default function GameDetailPage() {
             onPin={(step) => setGamePin(lib.prefKey, step)}
           />
         </TabsContent>
-        {hasFindings && (
-          <TabsContent value="compat" className="flex flex-col gap-2">
-            {selected?.enginePath && selected.rootPath && (
+        <TabsContent value="compat">
+          <section className="flex flex-col gap-2 rounded-lg border border-border/60 bg-card p-4">
+            {hasFindings && selected?.enginePath && selected.rootPath && (
               <CompatMode
                 enginePath={selected.enginePath}
                 dataDir={selected.rootPath}
@@ -311,23 +312,40 @@ export default function GameDetailPage() {
                 checksum={gameInfo?.checksum}
               />
             )}
-            <FindingList
-              findings={compat.findings}
-              actions={{
-                "models-3do": selected && (
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    className="gap-1.5"
-                    onClick={openConvert}
-                  >
-                    <Boxes className="size-4" /> Convert models
-                  </Button>
-                ),
-              }}
-            />
-          </TabsContent>
-        )}
+            {hasFindings && (
+              <FindingList
+                findings={compat.findings}
+                actions={{
+                  "models-3do": selected && (
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="gap-1.5"
+                      onClick={openConvert}
+                    >
+                      <Boxes className="size-4" /> Convert models
+                    </Button>
+                  ),
+                }}
+              />
+            )}
+            {compat.checking ? (
+              <p
+                role="status"
+                className="flex items-center gap-2 text-sm text-muted-foreground"
+              >
+                <Loader2 className="size-4 animate-spin" />
+                {hasFindings ? "Still checking…" : "Checking this game…"}
+              </p>
+            ) : !hasFindings ? (
+              <p className="text-sm text-muted-foreground">
+                {compat.read
+                  ? "Nothing found that would stop this game running on this engine."
+                  : "Could not read this game's files."}
+              </p>
+            ) : null}
+          </section>
+        </TabsContent>
         <TabsContent value="overview" className="flex flex-col gap-5">
           <GameLibrarySummary
             game={game}
@@ -463,22 +481,6 @@ export default function GameDetailPage() {
             </section>
           )}
 
-          {otherInfo.length > 0 && (
-            <section className="flex flex-col gap-2">
-              <h2 className="text-sm font-medium">Metadata</h2>
-              <dl className="grid grid-cols-[minmax(8rem,auto)_1fr] gap-x-4 gap-y-1 rounded-lg border border-border/50 bg-card p-3 text-sm">
-                {otherInfo.map(([k, v]) => (
-                  <div key={k} className="contents">
-                    <dt className="font-mono text-xs text-muted-foreground">
-                      {k}
-                    </dt>
-                    <dd className="break-words">{v}</dd>
-                  </div>
-                ))}
-              </dl>
-            </section>
-          )}
-
           {/* What converting a layout of this game between its sides has been
           told, which is a fact about the game rather than about any layout, so
           it belongs here and not on a blueprint (issue #1533). Nothing at all
@@ -525,67 +527,84 @@ export default function GameDetailPage() {
             </section>
           )}
 
-          {/* Both this and the mission runtime below can run long enough on their
-          own to push the primary archive and dependencies off the first
-          screen, so they open collapsed. */}
+          {/* A long list on its own, so it opens collapsed. */}
           <OptionsList
             options={gameInfo?.options ?? []}
             title="Game options"
             defaultOpen={false}
           />
-
-          <MissionRuntimeSection game={game} />
-
-          <section className="flex flex-col gap-2">
-            <div className="flex items-center justify-between gap-2">
-              <h2 className="text-sm font-medium">Primary archive</h2>
-              <div className="flex items-center gap-2">
-                {game.primaryArchive.path && (
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    className="gap-1.5"
-                    onClick={() => openFolder(game.primaryArchive)}
-                  >
-                    <FolderOpen className="size-4" /> Open folder
-                  </Button>
-                )}
-                {game.primaryArchive.path &&
-                  isDeletableArchive(game.primaryArchive.path) && (
-                    <DeleteArchiveButton
-                      path={game.primaryArchive.path}
-                      name={game.primaryArchive.name}
-                      onDeleted={() => navigate("/library/games")}
-                    />
-                  )}
-              </div>
-            </div>
-            <ul>
-              <ArchiveRow archive={game.primaryArchive} />
-            </ul>
-          </section>
-
-          <section className="flex flex-col gap-2">
-            <h2 className="text-sm font-medium">
-              Dependencies ({game.dependencyArchives.length})
-            </h2>
-            {game.dependencyArchives.length === 0 ? (
-              <p className="text-sm text-muted-foreground">
-                This game depends on no other archives.
-              </p>
-            ) : (
-              <ul className="flex flex-col gap-2">
-                {game.dependencyArchives.map((a) => (
-                  <ArchiveRow
-                    key={a.name}
-                    archive={a}
-                    classification={classifyArchive(data, a.name)}
-                  />
-                ))}
-              </ul>
-            )}
-          </section>
         </TabsContent>
+        {advanced && (
+          <TabsContent value="advanced" className="flex flex-col gap-5">
+            <section className="flex flex-col gap-2">
+              <div className="flex items-center justify-between gap-2">
+                <h2 className="text-sm font-medium">Primary archive</h2>
+                <div className="flex items-center gap-2">
+                  {game.primaryArchive.path && (
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="gap-1.5"
+                      onClick={() => openFolder(game.primaryArchive)}
+                    >
+                      <FolderOpen className="size-4" /> Open folder
+                    </Button>
+                  )}
+                  {game.primaryArchive.path &&
+                    isDeletableArchive(game.primaryArchive.path) && (
+                      <DeleteArchiveButton
+                        path={game.primaryArchive.path}
+                        name={game.primaryArchive.name}
+                        onDeleted={() => navigate("/library/games")}
+                      />
+                    )}
+                </div>
+              </div>
+              <ul>
+                <ArchiveRow archive={game.primaryArchive} />
+              </ul>
+            </section>
+
+            <section className="flex flex-col gap-2">
+              <h2 className="text-sm font-medium">
+                Dependencies ({game.dependencyArchives.length})
+              </h2>
+              {game.dependencyArchives.length === 0 ? (
+                <p className="text-sm text-muted-foreground">
+                  This game depends on no other archives.
+                </p>
+              ) : (
+                <ul className="flex flex-col gap-2">
+                  {game.dependencyArchives.map((a) => (
+                    <ArchiveRow
+                      key={a.name}
+                      archive={a}
+                      classification={classifyArchive(data, a.name)}
+                    />
+                  ))}
+                </ul>
+              )}
+            </section>
+
+            {otherInfo.length > 0 && (
+              <section className="flex flex-col gap-2">
+                <h2 className="text-sm font-medium">Metadata</h2>
+                <dl className="grid grid-cols-[minmax(8rem,auto)_1fr] gap-x-4 gap-y-1 rounded-lg border border-border/50 bg-card p-3 text-sm">
+                  {otherInfo.map(([k, v]) => (
+                    <div key={k} className="contents">
+                      <dt className="font-mono text-xs text-muted-foreground">
+                        {k}
+                      </dt>
+                      <dd className="break-words">{v}</dd>
+                    </div>
+                  ))}
+                </dl>
+              </section>
+            )}
+
+            <MissionRuntimeSection game={game} />
+          </TabsContent>
+        )}
       </Tabs>
     </div>
   );

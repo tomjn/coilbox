@@ -11,7 +11,7 @@ Each game has its own switch, and coilbox builds nothing until you turn it on.
 1. Open Library > Games and select the game.
 2. Select the Compatibility tab.
 
-The tab only appears when coilbox finds something. If a game has no Compatibility tab, the report found nothing and the game needs no switch.
+The tab shows a spinner while coilbox checks the game. If it finds nothing, the tab says so and the game needs no switch.
 
 An archive's page in Library > Archives has a Convert models button for a game with `.3do` models. It opens this tab.
 
