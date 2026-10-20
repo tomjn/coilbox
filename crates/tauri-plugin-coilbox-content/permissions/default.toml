@@ -11,6 +11,7 @@ permissions = [
   "allow-content-create-standard-root",
   "allow-content-recreate-root",
   "allow-content-remove-root",
+  "allow-content-set-read-only",
   "allow-content-list-engines",
   "allow-content-verify-engine",
   "allow-content-open-path",

@@ -21,7 +21,7 @@
 //! Detection is lazy + memoized, so there's nothing to wire up in `main()`.
 
 use std::path::{Component, Path, PathBuf};
-use std::sync::OnceLock;
+use std::sync::{OnceLock, RwLock};
 
 use tauri::{AppHandle, Manager, Runtime};
 
@@ -147,7 +147,7 @@ fn bundle_dir_in(root: Option<&Path>, is_dir: impl Fn(&Path) -> bool) -> Option<
 ///
 /// It is a read-only extra content root, searched after the player's own. It is
 /// not [`data_dir`], which is coilbox's own state, and it is never where anything
-/// is written. See [`refuse_in_bundle`].
+/// is written. See [`refuse_read_only`].
 pub fn bundle_dir() -> Option<PathBuf> {
     bundle_dir_in(portable_root().as_deref(), |p| p.is_dir())
 }
@@ -172,14 +172,36 @@ fn resolve_existing(path: &Path) -> PathBuf {
     }
 }
 
-/// Pure core of [`refuse_in_bundle`], with the bundle folder passed in.
-fn refuse_in(path: &Path, bundle: Option<&Path>) -> Result<(), String> {
-    let Some(bundle) = bundle else {
-        return Ok(());
-    };
-    if resolve_existing(path).starts_with(resolve_existing(bundle)) {
+/// Content folders the player has set to read only, published by the content
+/// plugin whenever its roots change.
+static READ_ONLY_ROOTS: RwLock<Vec<PathBuf>> = RwLock::new(Vec::new());
+
+/// Publish the content folders coilbox must not write into, replacing the
+/// previous list. The content plugin calls this on every persist and load.
+pub fn set_read_only_roots(roots: Vec<PathBuf>) {
+    if let Ok(mut guard) = READ_ONLY_ROOTS.write() {
+        *guard = roots;
+    }
+}
+
+/// Pure core of [`refuse_read_only`], with the bundle folder and the read only
+/// roots passed in.
+fn refuse_in(path: &Path, bundle: Option<&Path>, roots: &[PathBuf]) -> Result<(), String> {
+    let target = resolve_existing(path);
+    if let Some(bundle) = bundle {
+        if target.starts_with(resolve_existing(bundle)) {
+            return Err(format!(
+                "{} is part of the content this distribution bundles, and coilbox does not write into it.",
+                path.display()
+            ));
+        }
+    }
+    if roots
+        .iter()
+        .any(|root| target.starts_with(resolve_existing(root)))
+    {
         return Err(format!(
-            "{} is part of the content this distribution bundles, and coilbox does not write into it.",
+            "{} is in a content folder set to read only in coilbox.",
             path.display()
         ));
     }
@@ -187,11 +209,16 @@ fn refuse_in(path: &Path, bundle: Option<&Path>) -> Result<(), String> {
 }
 
 /// Refuse a write, delete or install aimed inside the distribution's bundled
-/// content folder. Every command that writes into a game or a content root
-/// calls this, so the bundle stays exactly as the distributor shipped it
-/// whether or not the player's file system would allow the write.
-pub fn refuse_in_bundle(path: &Path) -> Result<(), String> {
-    refuse_in(path, bundle_dir().as_deref())
+/// content folder or a content folder the player set to read only. Every
+/// command that writes into a game or a content root calls this, so those
+/// folders stay as they are whether or not the player's file system would
+/// allow the write.
+pub fn refuse_read_only(path: &Path) -> Result<(), String> {
+    let roots = READ_ONLY_ROOTS
+        .read()
+        .map(|g| g.clone())
+        .unwrap_or_default();
+    refuse_in(path, bundle_dir().as_deref(), &roots)
 }
 
 /// Reject anything that could escape a resolved root: absolute paths, a Windows
@@ -284,12 +311,52 @@ mod tests {
         let tmp = tempfile::tempdir().unwrap();
         let bundle = tmp.path().join("content");
         std::fs::create_dir_all(bundle.join("games")).unwrap();
-        assert!(refuse_in(&bundle, Some(&bundle)).is_err());
-        assert!(refuse_in(&bundle.join("games/x.sdd"), Some(&bundle)).is_err());
+        assert!(refuse_in(&bundle, Some(&bundle), &[]).is_err());
+        assert!(refuse_in(&bundle.join("games/x.sdd"), Some(&bundle), &[]).is_err());
         // A sibling whose name merely starts the same way is not inside it.
-        assert!(refuse_in(&tmp.path().join("content-other"), Some(&bundle)).is_ok());
-        assert!(refuse_in(tmp.path(), Some(&bundle)).is_ok());
-        assert!(refuse_in(&bundle, None).is_ok());
+        assert!(refuse_in(&tmp.path().join("content-other"), Some(&bundle), &[]).is_ok());
+        assert!(refuse_in(tmp.path(), Some(&bundle), &[]).is_ok());
+        assert!(refuse_in(&bundle, None, &[]).is_ok());
+    }
+
+    #[test]
+    fn refuse_in_blocks_a_read_only_root_and_what_is_under_it() {
+        let tmp = tempfile::tempdir().unwrap();
+        let root = tmp.path().join("Zero-K");
+        std::fs::create_dir_all(root.join("games")).unwrap();
+        let roots = vec![root.clone()];
+        let err = refuse_in(&root.join("games"), None, &roots).unwrap_err();
+        assert!(err.contains("read only"));
+        // A file that does not exist yet is judged by the folder it will sit in.
+        assert!(refuse_in(&root.join("games/new.sdz"), None, &roots).is_err());
+        assert!(refuse_in(&root.join("not/yet/there.sdz"), None, &roots).is_err());
+    }
+
+    #[test]
+    fn refuse_in_allows_a_sibling_sharing_a_prefix_with_a_read_only_root() {
+        let tmp = tempfile::tempdir().unwrap();
+        let root = tmp.path().join("Zero-K");
+        let sibling = tmp.path().join("Zero-K2");
+        std::fs::create_dir_all(&root).unwrap();
+        std::fs::create_dir_all(&sibling).unwrap();
+        assert!(refuse_in(&sibling.join("games"), None, &[root]).is_ok());
+    }
+
+    #[test]
+    fn refuse_in_still_blocks_the_bundle_beside_read_only_roots() {
+        let tmp = tempfile::tempdir().unwrap();
+        let bundle = tmp.path().join("content");
+        let root = tmp.path().join("Zero-K");
+        std::fs::create_dir_all(&bundle).unwrap();
+        std::fs::create_dir_all(&root).unwrap();
+        let err = refuse_in(&bundle, Some(&bundle), &[root]).unwrap_err();
+        assert!(err.contains("bundles"));
+    }
+
+    #[test]
+    fn refuse_in_allows_everything_with_no_bundle_and_no_roots() {
+        let tmp = tempfile::tempdir().unwrap();
+        assert!(refuse_in(tmp.path(), None, &[]).is_ok());
     }
 
     #[cfg(unix)]
@@ -300,7 +367,7 @@ mod tests {
         std::fs::create_dir_all(bundle.join("maps")).unwrap();
         let link = tmp.path().join("elsewhere");
         std::os::unix::fs::symlink(bundle.join("maps"), &link).unwrap();
-        assert!(refuse_in(&link, Some(&bundle)).is_err());
+        assert!(refuse_in(&link, Some(&bundle), &[]).is_err());
     }
 
     #[test]

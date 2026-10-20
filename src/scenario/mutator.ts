@@ -15,6 +15,7 @@
  * offer it, live in `src/lib/generatedGames.ts` alongside lego's.
  */
 
+import { resolveMutatorDataDir } from "../downloads/config";
 import { MUTATOR_FOLDER } from "../lib/generatedGames";
 import { scenarioTestMutator } from "./bindings";
 import { compileScenario, luaString } from "./compile";
@@ -107,7 +108,7 @@ export async function writeTestMutator(
   dependOn?: string,
 ): Promise<TestMutator> {
   const result = await scenarioTestMutator({
-    dataDir,
+    dataDir: await resolveMutatorDataDir(dataDir),
     scenarioId: scenario.id,
     modinfo: buildMutatorModInfo(
       dependOn ?? scenario.setup.gameName,

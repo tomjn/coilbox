@@ -180,6 +180,9 @@ pub(crate) async fn content_keybinds_read(config_dir: String) -> CliResult {
 /// `.bak` of a file coilbox did not write.
 #[tauri::command]
 pub(crate) async fn content_keybinds_write(config_dir: String, text: String) -> CliResult {
+    if let Err(e) = coilbox_portable::refuse_read_only(Path::new(&config_dir)) {
+        return CliResult::err(e);
+    }
     let res = tauri::async_runtime::spawn_blocking(move || write(&config_dir, &text)).await;
     match res {
         Ok(Ok(r)) => CliResult::ok(json!(r)),

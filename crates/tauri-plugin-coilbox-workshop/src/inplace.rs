@@ -170,7 +170,7 @@ pub(crate) fn require_loose_game(game_dir: &Path) -> Result<(), String> {
             game_dir.display()
         ));
     }
-    coilbox_portable::refuse_in_bundle(game_dir)
+    coilbox_portable::refuse_read_only(game_dir)
 }
 
 /// A project path as the patcher's steps.

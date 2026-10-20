@@ -240,7 +240,7 @@ fn build_with(
     }
     let folder = mutator::folder(archive_name, manifest_version)?;
     let dir = mutator::games_dir(data_dir)?.join(&folder);
-    coilbox_portable::refuse_in_bundle(&dir)?;
+    coilbox_portable::refuse_read_only(&dir)?;
     let mut marker = Marker {
         manifest_version,
         writer: manifest.writer,
@@ -435,7 +435,7 @@ pub fn remove(data_dir: &str, archive_name: &str) -> Result<Vec<String>, String>
     let mut removed = Vec::new();
     for (folder, _) in mutator::built_folders(&games, archive_name)? {
         let dir = games.join(&folder);
-        coilbox_portable::refuse_in_bundle(&dir)?;
+        coilbox_portable::refuse_read_only(&dir)?;
         std::fs::remove_dir_all(&dir)
             .map_err(|e| format!("could not delete {}: {e}", dir.display()))?;
         removed.push(folder);

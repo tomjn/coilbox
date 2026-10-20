@@ -657,7 +657,7 @@ fn checked_write_root(write_path: &str) -> Result<PathBuf, String> {
     if !p.is_absolute() || !p.is_dir() {
         return Err(format!("the download folder {write_path} does not exist"));
     }
-    coilbox_portable::refuse_in_bundle(&p)?;
+    coilbox_portable::refuse_read_only(&p)?;
     Ok(p)
 }
 

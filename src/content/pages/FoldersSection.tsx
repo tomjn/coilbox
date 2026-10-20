@@ -15,6 +15,7 @@ import {
   contentRemoveRoot,
   contentRescan,
   contentScanRoot,
+  contentSetReadOnly,
 } from "../bindings";
 import { useContentPrefs, useContentState, useSetupStatus } from "../config";
 import { DownloadFolders } from "./components/DownloadFolders";
@@ -141,6 +142,17 @@ export default function FoldersSection() {
     try {
       const { state } = await contentRemoveRoot({ path });
       setState(state);
+    } catch (e) {
+      setActionError(msg(e));
+    }
+  };
+
+  const setReadOnly = async (path: string, readOnly: boolean) => {
+    setActionError(null);
+    try {
+      const { state } = await contentSetReadOnly({ path, readOnly });
+      setState(state);
+      ensureWriteRoot(state);
     } catch (e) {
       setActionError(msg(e));
     }
@@ -284,6 +296,7 @@ export default function FoldersSection() {
                 busy={busyRoot === root.path}
                 onRescan={rescanRoot}
                 onRemove={removeRoot}
+                onSetReadOnly={setReadOnly}
                 onOpen={openRoot}
               />
             ))}

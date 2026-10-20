@@ -1,5 +1,6 @@
 import { Button } from "@picoframe/frame";
 import { FolderOpen, Loader2, RefreshCw, Trash2 } from "lucide-react";
+import { CheckField } from "@/components/Field";
 import { Card } from "@/components/ui/card";
 import { formatDateTime } from "@/lib/format";
 import type { ContentRoot } from "../../bindings";
@@ -27,6 +28,7 @@ export function RootCard({
   busy,
   onRescan,
   onRemove,
+  onSetReadOnly,
   onOpen,
 }: {
   root: ContentRoot;
@@ -36,6 +38,7 @@ export function RootCard({
   busy: boolean;
   onRescan: (path: string) => void;
   onRemove: (path: string) => void;
+  onSetReadOnly: (path: string, readOnly: boolean) => void;
   onOpen: (path: string) => void;
 }) {
   const isManual = root.source === "manual";
@@ -64,6 +67,8 @@ export function RootCard({
             ) : null}
             {root.bundled ? (
               <StatusBadge tone="info">bundled, read only</StatusBadge>
+            ) : root.readOnly ? (
+              <StatusBadge tone="info">read only</StatusBadge>
             ) : null}
             {root.valid ? (
               <StatusBadge tone="good">valid</StatusBadge>
@@ -94,6 +99,13 @@ export function RootCard({
           scanned {fmtTime(root.lastScannedAt)}
         </span>
         <div className="flex items-center gap-2">
+          {!root.bundled && (
+            <CheckField
+              label="Read only"
+              checked={root.readOnly === true}
+              onChange={(v) => onSetReadOnly(root.path, v)}
+            />
+          )}
           <Button
             type="button"
             variant="outline"

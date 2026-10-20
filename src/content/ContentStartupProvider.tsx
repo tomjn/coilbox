@@ -1,6 +1,7 @@
 import { useSetting } from "@picoframe/frame";
 import { type ReactNode, useCallback, useEffect, useRef } from "react";
 import { useDownloadsConfig } from "../downloads/config";
+import { backfillWriteRootId } from "../downloads/writeRoot";
 import { useTrustedHubUrl } from "../hub/config";
 import { useSkirmishDraft } from "../play/drafts";
 import { BundledEngineSetup } from "./BundledEngineSetup";
@@ -126,12 +127,10 @@ export default function ContentStartupProvider({
   // destination works without a trip to Content folders settings. Never overrides
   // a value the user (or a prior run of this effect) already set.
   useEffect(() => {
-    if (dlConfig.writeRootId) return;
     loadContentState()
       .then((state) => {
-        // Never the bundled content folder, which coilbox does not write into.
-        const first = state.roots.find((r) => !r.bundled);
-        if (first) setDlConfig({ ...dlConfig, writeRootId: first.id });
+        const id = backfillWriteRootId(state.roots, dlConfig.writeRootId);
+        if (id) setDlConfig({ ...dlConfig, writeRootId: id });
       })
       .catch(() => {});
   }, [dlConfig, setDlConfig]);

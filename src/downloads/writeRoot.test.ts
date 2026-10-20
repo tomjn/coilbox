@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import {
+  backfillWriteRootId,
   healWriteRoot,
+  mutatorDataDir,
   packageDirOf,
   pickWriteRoot,
   type WriteRootCandidate,
@@ -78,6 +80,18 @@ describe("healWriteRoot", () => {
     expect(healWriteRoot([bundle, insideSub], undefined, pkg)).toBe(insideSub);
     expect(healWriteRoot([bundle], "bundle", null)).toBeUndefined();
   });
+
+  it("never picks a read only folder, even when it is configured", () => {
+    const steam: WriteRootCandidate = {
+      id: "steam",
+      path: "E:\\Coilbox-test\\Zero-K",
+      portable: true,
+      readOnly: true,
+    };
+    expect(healWriteRoot([steam, inside], "steam", pkg)).toBe(inside);
+    expect(healWriteRoot([steam, insideSub], undefined, pkg)).toBe(insideSub);
+    expect(healWriteRoot([steam], "steam", null)).toBeUndefined();
+  });
 });
 
 describe("pickWriteRoot", () => {
@@ -119,6 +133,20 @@ describe("pickWriteRoot", () => {
     expect(pickWriteRoot([a, bundle], ids, "maps", null)).toBe(a);
   });
 
+  it("never answers a read only folder for a kind", () => {
+    const steam: WriteRootCandidate = {
+      id: "steam",
+      path: "/data/steam",
+      portable: false,
+      readOnly: true,
+    };
+    const ids = { writeRootId: "a", gamesRootId: "steam" };
+    expect(pickWriteRoot([a, steam], ids, "games", null)).toBe(a);
+    expect(
+      pickWriteRoot([steam, a], { writeRootId: "steam" }, undefined, null),
+    ).toBeUndefined();
+  });
+
   it("keeps a portable install's kind folders inside the package", () => {
     const pkg = "/opt/game";
     const inside: WriteRootCandidate = {
@@ -147,5 +175,71 @@ describe("pickWriteRoot", () => {
 
   it("is undefined when there is no default and no folder for the kind", () => {
     expect(pickWriteRoot(roots, {}, "games", null)).toBeUndefined();
+  });
+});
+
+describe("mutatorDataDir", () => {
+  const own: WriteRootCandidate = {
+    id: "own",
+    path: "/data/own",
+    portable: false,
+  };
+  const steam: WriteRootCandidate = {
+    id: "steam",
+    path: "/steam/Zero-K",
+    portable: false,
+    readOnly: true,
+  };
+
+  it("keeps the engine's folder when coilbox may write into it", () => {
+    expect(mutatorDataDir([own, steam], "/data/own", "/data/other")).toBe(
+      "/data/own",
+    );
+  });
+
+  it("moves to the default write folder when the engine's folder is read only", () => {
+    expect(mutatorDataDir([own, steam], "/steam/Zero-K/", "/data/own")).toBe(
+      "/data/own",
+    );
+  });
+
+  it("leaves the folder alone with nowhere to fall back to, so the write is refused", () => {
+    expect(mutatorDataDir([steam], "/steam/Zero-K", undefined)).toBe(
+      "/steam/Zero-K",
+    );
+  });
+});
+
+describe("backfillWriteRootId", () => {
+  const own: WriteRootCandidate = {
+    id: "own",
+    path: "/data/own",
+    portable: false,
+  };
+  const steam: WriteRootCandidate = {
+    id: "steam",
+    path: "/steam/Zero-K",
+    portable: false,
+    readOnly: true,
+  };
+
+  it("picks the first writable folder when none is set", () => {
+    expect(backfillWriteRootId([steam, own], undefined)).toBe("own");
+  });
+
+  it("moves off a folder that has become read only", () => {
+    expect(backfillWriteRootId([steam, own], "steam")).toBe("own");
+  });
+
+  it("leaves a writable choice alone", () => {
+    expect(backfillWriteRootId([steam, own], "own")).toBeUndefined();
+  });
+
+  it("keeps a choice whose folder is not listed, such as an unplugged drive", () => {
+    expect(backfillWriteRootId([own], "usb")).toBeUndefined();
+  });
+
+  it("has nothing to pick when every folder is read only", () => {
+    expect(backfillWriteRootId([steam], "steam")).toBeUndefined();
   });
 });

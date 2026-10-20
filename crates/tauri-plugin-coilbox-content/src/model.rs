@@ -75,6 +75,11 @@ pub struct ContentRoot {
     /// is copied into the player's own folder before it runs.
     #[serde(default)]
     pub bundled: bool,
+    /// Effective read only flag. When set, coilbox reads this folder as usual
+    /// but never writes into it. A Zero-K Steam install is read only unless the
+    /// player's override says otherwise, and the bundled folder always is.
+    #[serde(default)]
+    pub read_only: bool,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub forced: Option<bool>,
     pub counts: RootCounts,
@@ -103,6 +108,15 @@ pub struct UserRoot {
     pub forced: bool,
 }
 
+/// The player's choice of read only for one content folder, overriding the
+/// default for that folder.
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct ReadOnlyOverride {
+    pub path: String,
+    pub read_only: bool,
+}
+
 /// The durable on-disk store: the user's manual roots plus the last computed
 /// snapshot (so reads are instant without rescanning).
 #[derive(Serialize, Deserialize, Default)]
@@ -112,6 +126,8 @@ pub struct StoreFile {
     pub schema_version: u32,
     #[serde(default)]
     pub user_roots: Vec<UserRoot>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub read_only: Vec<ReadOnlyOverride>,
     #[serde(default)]
     pub snapshot: Option<ContentState>,
 }

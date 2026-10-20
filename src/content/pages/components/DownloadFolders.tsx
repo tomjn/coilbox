@@ -17,9 +17,9 @@ const SAME_AS_DEFAULT = "same-as-default";
  */
 export function DownloadFolders({ roots }: { roots: ContentRoot[] }) {
   const [cfg, setCfg] = useDownloadsConfig();
-  // The bundled content folder is read-only to coilbox, so it is never
-  // offered as somewhere to download to.
-  const usable = roots.filter((r) => !r.bundled);
+  // The bundled content folder and any folder set to read only are never
+  // written into, so they are never offered as somewhere to download to.
+  const usable = roots.filter((r) => !r.bundled && !r.readOnly);
   if (usable.length === 0) return null;
 
   const folders = usable.map((root) => ({

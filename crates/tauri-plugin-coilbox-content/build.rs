@@ -11,6 +11,7 @@ const COMMANDS: &[&str] = &[
     "content_create_standard_root",
     "content_recreate_root",
     "content_remove_root",
+    "content_set_read_only",
     "content_list_engines",
     "content_verify_engine",
     "content_open_path",

@@ -18,7 +18,7 @@ serde = { workspace = true }
 serde_json = { workspace = true }
 # The manifests that say what each compat version holds.
 coilbox-compat = { path = "../coilbox-compat" }
-# `refuse_in_bundle`, so a distribution's bundled content is never written into.
+# `refuse_read_only`, so a distribution's bundled content is never written into.
 coilbox-portable = { path = "../coilbox-portable" }
 # `write_mutator` and `lua_string`, the writers the workshop test mutator uses.
 tauri-plugin-coilbox-workshop = { path = "../tauri-plugin-coilbox-workshop" }

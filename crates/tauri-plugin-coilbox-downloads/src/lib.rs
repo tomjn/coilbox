@@ -602,6 +602,9 @@ async fn dl_download(
     }
     let mut args = vec!["--download-game".to_string(), tag.clone()];
     if let Some(wp) = write_path.filter(|s| !s.trim().is_empty()) {
+        if let Err(e) = coilbox_portable::refuse_read_only(std::path::Path::new(&wp)) {
+            return CliResult::err(e);
+        }
         args.push("--filesystem-writepath".to_string());
         args.push(wp);
     }
@@ -803,6 +806,9 @@ async fn dl_download_map(
     }
     let mut args = vec!["--download-map".to_string(), spring_name.clone()];
     if let Some(wp) = write_path.filter(|s| !s.trim().is_empty()) {
+        if let Err(e) = coilbox_portable::refuse_read_only(std::path::Path::new(&wp)) {
+            return CliResult::err(e);
+        }
         args.push("--filesystem-writepath".to_string());
         args.push(wp);
     }
@@ -846,6 +852,9 @@ async fn dl_download_file(
 ) -> CliResult {
     if url.trim().is_empty() || filename.trim().is_empty() {
         return CliResult::err("url and filename are required");
+    }
+    if let Err(e) = coilbox_portable::refuse_read_only(std::path::Path::new(&dest_dir)) {
+        return CliResult::err(e);
     }
     let (cancel, _child_slot) = cancel_slots(&op_id);
     let res = download_to(&url, &dest_dir, &filename, &on_progress, &cancel).await;
@@ -1345,6 +1354,9 @@ async fn dl_download_engine_recoil(
     if version.trim().is_empty() || asset_url.trim().is_empty() || write_path.trim().is_empty() {
         return CliResult::err("version, asset_url and write_path are required");
     }
+    if let Err(e) = coilbox_portable::refuse_read_only(std::path::Path::new(&write_path)) {
+        return CliResult::err(e);
+    }
     let (cancel, _child_slot) = cancel_slots(&op_id);
     let res = install_recoil_engine(&version, &asset_url, &write_path, &on_progress, &cancel).await;
     if let Some(id) = &op_id {
@@ -1464,6 +1476,11 @@ async fn dl_download_engine_spring(
         return CliResult::err("version is required");
     }
     let mut args = vec!["--download-engine".to_string(), version.clone()];
+    if let Some(wp) = write_path.as_deref().filter(|s| !s.trim().is_empty()) {
+        if let Err(e) = coilbox_portable::refuse_read_only(std::path::Path::new(wp)) {
+            return CliResult::err(e);
+        }
+    }
     // Without a write path pr-downloader picks its own spring dir, which coilbox
     // does not know, so there is nothing to sweep afterwards.
     let engine_root = write_path.filter(|s| !s.trim().is_empty()).map(|wp| {
@@ -1628,6 +1645,15 @@ async fn dl_install_archive(
     games_root: Option<String>,
     maps_root: Option<String>,
 ) -> CliResult {
+    for root in [games_root.as_deref(), maps_root.as_deref()]
+        .into_iter()
+        .flatten()
+        .filter(|r| !r.trim().is_empty())
+    {
+        if let Err(e) = coilbox_portable::refuse_read_only(std::path::Path::new(root)) {
+            return CliResult::err(e);
+        }
+    }
     let installed = tauri::async_runtime::spawn_blocking(move || {
         install::install(
             std::path::Path::new(&path),

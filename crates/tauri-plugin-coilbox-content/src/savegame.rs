@@ -170,6 +170,9 @@ pub(crate) async fn content_list_saves(root: String) -> CliResult {
 #[tauri::command]
 pub(crate) async fn content_delete_save(path: String) -> CliResult {
     let p = PathBuf::from(&path);
+    if let Err(e) = coilbox_portable::refuse_read_only(&p) {
+        return CliResult::err(e);
+    }
     let ok_ext = p
         .extension()
         .and_then(|e| e.to_str())

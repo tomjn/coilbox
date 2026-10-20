@@ -38,7 +38,9 @@ pub fn mutator_dir(data_dir: &str) -> Result<PathBuf, String> {
     if !root.is_absolute() || !root.is_dir() {
         return Err(format!("not a content root: {data_dir}"));
     }
-    Ok(root.join("games").join(FOLDER))
+    let dir = root.join("games").join(FOLDER);
+    coilbox_portable::refuse_read_only(&dir)?;
+    Ok(dir)
 }
 
 /// Replace the mutator folder's contents with exactly the files a compile

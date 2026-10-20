@@ -594,6 +594,9 @@ async fn mc_compile<R: Runtime>(
         None => return Ok(CliResult::err(missing("mapcompile"))),
     };
     let out_dir = PathBuf::from(&out_dir);
+    if let Err(e) = coilbox_portable::refuse_read_only(&out_dir) {
+        return Ok(CliResult::err(e));
+    }
     if let Err(e) = std::fs::create_dir_all(&out_dir) {
         return Ok(CliResult::err(format!("could not create output dir: {e}")));
     }
