@@ -39,7 +39,7 @@ mod widget;
 
 use model::{
     load_store, save_store, ContentRoot, ContentState, Engine, RootCounts, RootKind, RootSource,
-    StoreFile, UserRoot, SCHEMA_VERSION,
+    ReadOnlyOverride, StoreFile, UserRoot, SCHEMA_VERSION,
 };
 use paths::{candidate_roots, current_os, BaseDirs, Candidate};
 use picoframe_core::CliResult;
@@ -235,6 +235,8 @@ struct Acc {
     portable: bool,
     /// The distribution's bundled content folder — surfaced as `ContentRoot.bundled`.
     bundled: bool,
+    /// Effective read only flag, surfaced as `ContentRoot.read_only`.
+    read_only: bool,
 }
 
 /// Whether `canon` is the distribution's bundled content folder.
@@ -275,6 +277,7 @@ fn build_root(a: Acc, with_counts: bool, now: u64) -> ContentRoot {
         valid: kind_opt.is_some() || a.forced,
         portable: a.portable,
         bundled: a.bundled,
+        read_only: a.read_only,
         forced: if a.forced { Some(true) } else { None },
         counts,
         engines,
@@ -309,6 +312,7 @@ fn auto_accs(portable_app_dir: Option<PathBuf>, candidates: Vec<Candidate>) -> V
             forced: true,
             portable: true,
             bundled: false,
+            read_only: false,
         }];
     }
     let mut accs: Vec<Acc> = Vec::new();
@@ -328,6 +332,7 @@ fn auto_accs(portable_app_dir: Option<PathBuf>, candidates: Vec<Candidate>) -> V
                 forced: false,
                 portable: false,
                 bundled: false,
+                read_only: false,
             }),
         }
     }
@@ -349,6 +354,7 @@ fn add_bundle_acc(accs: &mut Vec<Acc>, bundle: Option<PathBuf>) {
     if let Some(i) = accs.iter().position(|a| a.canon == canon) {
         let mut a = accs.remove(i);
         a.bundled = true;
+        a.read_only = true;
         accs.push(a);
         return;
     }
@@ -360,6 +366,7 @@ fn add_bundle_acc(accs: &mut Vec<Acc>, bundle: Option<PathBuf>) {
         forced: false,
         portable: true,
         bundled: true,
+        read_only: true,
     });
 }
 
@@ -407,12 +414,20 @@ fn compute_state<R: Runtime>(
                 forced: u.forced,
                 portable,
                 bundled: false,
+                read_only: false,
             }),
         }
     }
     add_bundle_acc(&mut accs, coilbox_portable::bundle_dir());
 
     let now = now_ms();
+    for a in accs.iter_mut() {
+        a.read_only = effective_read_only(
+            &a.origins,
+            a.bundled,
+            override_for(&store.read_only, &a.canon),
+        );
+    }
     let mut roots: Vec<ContentRoot> = accs
         .into_iter()
         .map(|a| build_root(a, with_counts, now))
@@ -428,6 +443,36 @@ fn compute_state<R: Runtime>(
     }
 }
 
+/// The player's override for the folder at `canon`, matched by canonical path
+/// the way user roots are.
+fn override_for(overrides: &[ReadOnlyOverride], canon: &Path) -> Option<bool> {
+    overrides
+        .iter()
+        .find(|o| canonical(&resolve_stored(&o.path)) == canon)
+        .map(|o| o.read_only)
+}
+
+/// A root's read only value. The bundled folder always is. Otherwise the
+/// player's override wins, and without one a Zero-K Steam install is.
+fn effective_read_only(origins: &[String], bundled: bool, over: Option<bool>) -> bool {
+    bundled || over.unwrap_or_else(|| origins.iter().any(|o| o == "zerok"))
+}
+
+/// The default `effective_read_only` gives a root with no override.
+fn default_read_only(r: &ContentRoot) -> bool {
+    effective_read_only(&r.origins, r.bundled, None)
+}
+
+/// Re-derive every root's read only flag from its origins and the overrides.
+/// A snapshot written before the flag existed, or before an override changed,
+/// reads back with the value it was saved with otherwise.
+fn apply_read_only(roots: &mut [ContentRoot], overrides: &[ReadOnlyOverride]) {
+    for r in roots.iter_mut() {
+        let canon = canonical(Path::new(&r.path));
+        r.read_only = effective_read_only(&r.origins, r.bundled, override_for(overrides, &canon));
+    }
+}
+
 /// Tell the plugins that start an engine or a unitsync worker which content
 /// folders exist, so either one sees them all. Runs wherever a state is about to
 /// reach the frontend, which is before the frontend can ask for a scan of it.
@@ -438,6 +483,14 @@ fn publish_roots(state: &ContentState) {
             .iter()
             .filter(|r| r.exists && r.valid)
             .map(|r| r.path.clone())
+            .collect(),
+    );
+    coilbox_portable::set_read_only_roots(
+        state
+            .roots
+            .iter()
+            .filter(|r| r.read_only)
+            .map(|r| canonical(Path::new(&r.path)))
             .collect(),
     );
 }
@@ -580,6 +633,7 @@ fn ensure_portable_seed_in(
         forced: true,
         portable: true,
         bundled: false,
+        read_only: false,
     };
     roots.push(build_root(acc, false, now_ms()));
     roots
@@ -667,8 +721,9 @@ async fn content_state_load<R: Runtime>(app: AppHandle<R>) -> CliResult {
     // runs off the async runtime.
     let result = tauri::async_runtime::spawn_blocking(move || {
         let store = load_store(&path)?;
-        let mut state = refresh_against_disk(store.snapshot.unwrap_or_default());
+        let mut state = refresh_against_disk(store.snapshot.clone().unwrap_or_default());
         state.roots = ensure_portable_seed(state.roots);
+        apply_read_only(&mut state.roots, &store.read_only);
         publish_roots(&state);
         Ok::<_, String>(state)
     })
@@ -697,9 +752,11 @@ async fn content_rescan<R: Runtime>(
     };
     let app2 = app.clone();
     let user_roots = store.user_roots.clone();
+    let read_only = store.read_only.clone();
     let result = tauri::async_runtime::spawn_blocking(move || {
         let s = StoreFile {
             user_roots,
+            read_only,
             ..Default::default()
         };
         compute_state(
@@ -756,6 +813,7 @@ async fn content_scan_root<R: Runtime>(app: AppHandle<R>, path: String) -> CliRe
             forced: r.forced.unwrap_or(false),
             portable,
             bundled: r.bundled,
+            read_only: r.read_only,
         },
         None => Acc {
             canon: canon.clone(),
@@ -769,6 +827,7 @@ async fn content_scan_root<R: Runtime>(app: AppHandle<R>, path: String) -> CliRe
             forced: false,
             portable,
             bundled: is_bundle(&canon),
+            read_only: false,
         },
     };
 
@@ -778,6 +837,11 @@ async fn content_scan_root<R: Runtime>(app: AppHandle<R>, path: String) -> CliRe
         Ok(r) => r,
         Err(e) => return CliResult::err(format!("scan task failed: {e}")),
     };
+    root.read_only = effective_read_only(
+        &root.origins,
+        root.bundled,
+        override_for(&store.read_only, &canon),
+    );
     // Before the entry is replaced below, which is the only copy of what its
     // engines had reported.
     if let Some(snap) = store.snapshot.as_ref() {
@@ -897,6 +961,59 @@ async fn content_remove_root<R: Runtime>(app: AppHandle<R>, path: String) -> Cli
         return CliResult::err(e);
     }
     CliResult::ok(json!({ "state": state }))
+}
+
+/// `content_set_read_only` — set whether coilbox may write into a tracked root.
+/// A value equal to the root's default clears the override instead of storing a
+/// redundant one. Returns the new state.
+#[tauri::command]
+async fn content_set_read_only<R: Runtime>(
+    app: AppHandle<R>,
+    path: String,
+    read_only: bool,
+) -> CliResult {
+    let sp = match store_path(&app) {
+        Ok(p) => p,
+        Err(e) => return CliResult::err(e),
+    };
+    let canon = canonical(&resolve_stored(&path));
+    let mut store = match load_store(&sp) {
+        Ok(s) => s,
+        Err(e) => return CliResult::err(e),
+    };
+    let mut state = live_snapshot(&store);
+    let Some(root) = state
+        .roots
+        .iter()
+        .find(|r| canonical(Path::new(&r.path)) == canon)
+    else {
+        return CliResult::err(format!("{path} is not a tracked content folder."));
+    };
+    if root.bundled {
+        return CliResult::err("The bundled content folder is always read only.");
+    }
+    let default = default_read_only(root);
+    set_override(&mut store.read_only, &canon, read_only, default);
+    apply_read_only(&mut state.roots, &store.read_only);
+    if let Err(e) = persist(&sp, store, &mut state) {
+        return CliResult::err(e);
+    }
+    CliResult::ok(json!({ "state": state }))
+}
+
+/// Record `read_only` for `canon`, or drop the override when it equals `default`.
+fn set_override(
+    overrides: &mut Vec<ReadOnlyOverride>,
+    canon: &Path,
+    read_only: bool,
+    default: bool,
+) {
+    overrides.retain(|o| canonical(&resolve_stored(&o.path)) != canon);
+    if read_only == default {
+        return;
+    }
+    let path = stored_root_path(false, canon).unwrap_or_else(|_| display_path(canon));
+    overrides.push(ReadOnlyOverride { path, read_only });
 }
 
 /// `content_recreate_root` — recreate the on-disk folder for a configured root
@@ -1145,6 +1262,7 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
             content_create_standard_root,
             content_recreate_root,
             content_remove_root,
+            content_set_read_only,
             content_list_engines,
             content_verify_engine,
             content_open_path,
@@ -1366,6 +1484,7 @@ mod tests {
             valid: true,
             portable: false,
             bundled: false,
+            read_only: false,
             forced: if forced { Some(true) } else { None },
             counts: RootCounts {
                 games: 9,
@@ -1391,6 +1510,7 @@ mod tests {
         let store = StoreFile {
             schema_version: SCHEMA_VERSION,
             user_roots: Vec::new(),
+            read_only: Vec::new(),
             snapshot: Some(ContentState {
                 schema_version: SCHEMA_VERSION,
                 roots: vec![stale_root(&display_path(&root), RootSource::Manual, false)],
@@ -1727,6 +1847,7 @@ mod tests {
                 forced: false,
                 portable: false,
                 bundled: false,
+                read_only: false,
             },
             Acc {
                 canon: PathBuf::from("/a"),
@@ -1736,6 +1857,7 @@ mod tests {
                 forced: true,
                 portable: true,
                 bundled: false,
+                read_only: false,
             },
         ];
         add_bundle_acc(&mut accs, Some(PathBuf::from("/b")));
@@ -1813,5 +1935,87 @@ mod tests {
         );
 
         let _ = std::fs::remove_dir_all(&base);
+    }
+
+    fn origins(o: &[&str]) -> Vec<String> {
+        o.iter().map(|s| s.to_string()).collect()
+    }
+
+    #[test]
+    fn a_zerok_root_is_read_only_by_default() {
+        assert!(effective_read_only(&origins(&["zerok"]), false, None));
+        assert!(effective_read_only(&origins(&["steam", "zerok"]), false, None));
+        assert!(!effective_read_only(&origins(&["standard"]), false, None));
+    }
+
+    #[test]
+    fn an_override_wins_over_the_default() {
+        assert!(!effective_read_only(&origins(&["zerok"]), false, Some(false)));
+        assert!(effective_read_only(&origins(&["standard"]), false, Some(true)));
+    }
+
+    #[test]
+    fn the_bundle_is_read_only_whatever_the_override_says() {
+        assert!(effective_read_only(&origins(&["bundled"]), true, Some(false)));
+    }
+
+    #[test]
+    fn apply_read_only_matches_overrides_by_canonical_path() {
+        let tmp = tempfile::tempdir().unwrap();
+        let dir = tmp.path().join("data");
+        std::fs::create_dir_all(&dir).unwrap();
+        let mut zk = stale_root(&display_path(&canonical(&dir)), RootSource::Auto, false);
+        zk.origins = origins(&["zerok"]);
+        let mut roots = vec![zk];
+        apply_read_only(&mut roots, &[]);
+        assert!(roots[0].read_only);
+        let over = vec![ReadOnlyOverride {
+            path: display_path(&dir),
+            read_only: false,
+        }];
+        apply_read_only(&mut roots, &over);
+        assert!(!roots[0].read_only);
+        assert!(matches!(roots[0].source, RootSource::Auto));
+    }
+
+    #[test]
+    fn set_override_stores_only_a_value_that_differs_from_the_default() {
+        let tmp = tempfile::tempdir().unwrap();
+        let canon = canonical(tmp.path());
+        let mut overrides = Vec::new();
+        set_override(&mut overrides, &canon, true, false);
+        assert_eq!(overrides.len(), 1);
+        assert!(overrides[0].read_only);
+        set_override(&mut overrides, &canon, false, false);
+        assert!(overrides.is_empty());
+    }
+
+    #[test]
+    fn overrides_survive_a_store_round_trip_and_an_old_store_still_loads() {
+        let tmp = tempfile::tempdir().unwrap();
+        let p = tmp.path().join("state.json");
+        let store = StoreFile {
+            schema_version: SCHEMA_VERSION,
+            read_only: vec![ReadOnlyOverride {
+                path: "/games/Zero-K".into(),
+                read_only: false,
+            }],
+            ..Default::default()
+        };
+        save_store(&p, &store).unwrap();
+        let back = load_store(&p).unwrap();
+        assert_eq!(back.read_only, store.read_only);
+
+        let old = tmp.path().join("old.json");
+        std::fs::write(&old, r#"{"schemaVersion":1,"userRoots":[]}"#).unwrap();
+        assert!(load_store(&old).unwrap().read_only.is_empty());
+    }
+
+    #[test]
+    fn a_state_without_the_read_only_field_reads_as_writable() {
+        let mut v = serde_json::to_value(stale_root("/x", RootSource::Auto, false)).unwrap();
+        v.as_object_mut().unwrap().remove("readOnly");
+        let root: ContentRoot = serde_json::from_value(v).unwrap();
+        assert!(!root.read_only);
     }
 }
