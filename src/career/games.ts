@@ -67,20 +67,63 @@ interface InstalledEntry {
   version: string;
 }
 
-function entryFor(game: InstalledGame): InstalledEntry {
+/**
+ * `name` without a trailing `version`, with or without the `v` either one puts
+ * before it, and without the space, `_` or `-` that joined them, so
+ * `UltimateAI_GEOFlip_5.5` at `v5.5` is `UltimateAI_GEOFlip`. Null when the
+ * name does not end in the version, or is nothing but the version.
+ */
+function cutVersion(name: string, version: string): string | null {
+  const bare = version.replace(/^v(?=\d)/i, "").toLowerCase();
+  if (!bare || !name.toLowerCase().endsWith(bare)) return null;
+  const cut = name
+    .slice(0, name.length - bare.length)
+    .replace(/(^|[\s_-])v$/i, "$1")
+    .replace(/[\s_-]+$/, "");
+  return cut || null;
+}
+
+function entryFor(game: InstalledGame): Omit<InstalledEntry, "key"> {
   const version = (game.info.version ?? "").trim();
-  const shortname = (game.info.shortname ?? "").trim().toLowerCase();
-  const base =
-    version && game.name.endsWith(version)
-      ? game.name.slice(0, game.name.length - version.length).trim()
-      : stripVersion(game.name);
-  return {
-    key: shortname || base.toLowerCase(),
-    base,
-    baseLc: base.toLowerCase(),
-    shortname,
-    version,
-  };
+  const rawShortname = (game.info.shortname ?? "").trim().toLowerCase();
+  // A shortname that carries the release after a separator, as some small
+  // games' do, is still the same game's. One without a separator is left
+  // alone, so `s44` at version 4 stays `s44`.
+  const cutShort = cutVersion(rawShortname, version);
+  const shortname =
+    cutShort && /^[\s_-]/.test(rawShortname.slice(cutShort.length))
+      ? cutShort
+      : rawShortname;
+  const base = cutVersion(game.name.trim(), version) ?? stripVersion(game.name);
+  return { base, baseLc: base.toLowerCase(), shortname, version };
+}
+
+/**
+ * The key for each entry: its shortname, or its name without the version when
+ * it has none. Games that share a shortname but not a name are told apart.
+ * Zero-K Benchmark ships as `ZK` like Zero-K. The shortest name keeps the bare
+ * shortname, as the game the others are built on, and each other name gets the
+ * shortname plus its own.
+ */
+function keyEntries(
+  entries: readonly Omit<InstalledEntry, "key">[],
+): InstalledEntry[] {
+  const primary = new Map<string, string>();
+  for (const e of entries) {
+    if (!e.shortname) continue;
+    const have = primary.get(e.shortname);
+    if (have === undefined || e.baseLc.length < have.length) {
+      primary.set(e.shortname, e.baseLc);
+    }
+  }
+  return entries.map((e) => ({
+    ...e,
+    key: !e.shortname
+      ? e.baseLc
+      : primary.get(e.shortname) === e.baseLc
+        ? e.shortname
+        : `${e.shortname}:${e.baseLc}`,
+  }));
 }
 
 export interface GameResolver {
@@ -104,8 +147,10 @@ export function createGameResolver(
   const byKey = new Map<string, InstalledEntry>();
   const entries: InstalledEntry[] = [];
 
-  for (const game of installed ?? []) {
-    const entry = entryFor(game);
+  const games = installed ?? [];
+  const keyed = keyEntries(games.map(entryFor));
+  games.forEach((game, i) => {
+    const entry = keyed[i];
     exact.set(game.name, entry);
     entries.push(entry);
     // Newest version names the game.
@@ -113,10 +158,11 @@ export function createGameResolver(
     if (!newest || compareGameVersions(entry.version, newest.version) > 0) {
       byKey.set(entry.key, entry);
     }
-    if (entry.shortname && !installedByShortname.has(entry.shortname)) {
-      installedByShortname.set(entry.shortname, entry);
+    // A bare shortname means the game that keeps it, not one built on it.
+    if (entry.key === entry.shortname && !installedByShortname.has(entry.key)) {
+      installedByShortname.set(entry.key, entry);
     }
-  }
+  });
   // Longest base first, so "Balanced Annihilation Remix" wins over a game
   // called "Balanced Annihilation" when both are installed.
   entries.sort((a, b) => b.baseLc.length - a.baseLc.length);

@@ -16,6 +16,7 @@ import { usePreferredTarget } from "@/play/config";
 import { compareGameVersions } from "@/play/installedGames";
 import type { UnitDatasetEntry } from "./bindings";
 import { useUnitsyncScan, useUnitsyncUnitDataset } from "./config";
+import { sameGameFamily } from "./resolveContent";
 
 export interface GameUnits {
   /** Every unit the game has, unsorted. Empty until it has been read. */
@@ -66,9 +67,14 @@ export function gameForIdentity<T extends Installed>(
   if (exact) return exact;
   const want = shortname?.trim().toLowerCase();
   if (!want) return undefined;
+  const sharing = games.filter(
+    (g) => (g.info.shortname ?? "").trim().toLowerCase() === want,
+  );
+  // Zero-K Benchmark ships as `ZK` like Zero-K, so a game of the same name
+  // comes before any other that only shares the shortname.
+  const family = sharing.filter((g) => sameGameFamily(g.name, name));
   let newest: T | undefined;
-  for (const game of games) {
-    if ((game.info.shortname ?? "").trim().toLowerCase() !== want) continue;
+  for (const game of family.length > 0 ? family : sharing) {
     if (
       !newest ||
       compareGameVersions(game.info.version ?? "", newest.info.version ?? "") >
