@@ -819,7 +819,7 @@ end
 local function groundMarks(foot, key, blocked, open)
 	if groundKey ~= key then
 		groundKey = key
-		local verts, idx = MODEL.packGround(foot, blocked, open)
+		local verts, idx = MODEL.packGround(foot, blocked, open, Spring.GetGroundHeight)
 		groundIndices = upload(groundSet, verts, idx)
 	end
 end
@@ -830,7 +830,6 @@ function widget:DrawWorld()
 		return
 	end
 	local teamID = Spring.GetMyTeamID()
-	gl.DepthTest(true)
 	gl.Blending(GL.SRC_ALPHA, GL.ONE_MINUS_SRC_ALPHA)
 
 	local marks, key, blockedColor, openColor
@@ -844,6 +843,9 @@ function widget:DrawWorld()
 		blockedColor, openColor = LEFT, LEFT
 	end
 	groundMarks(marks, key, blockedColor, openColor)
+	-- The marks follow the heightmap, but the terrain the engine draws is
+	-- simplified with distance, so a depth test would still let it cut them.
+	gl.DepthTest(false)
 	if groundIndices > 0 and groundSet.vao then
 		gl.UseShader(shader)
 		gl.UniformMatrix(locProj, "projection")
@@ -853,6 +855,8 @@ function widget:DrawWorld()
 		groundSet.vao:DrawElements(GL.TRIANGLES, groundIndices, 0)
 		gl.UseShader(0)
 	end
+
+	gl.DepthTest(true)
 
 	if foot then
 		for _, p in ipairs(foot) do

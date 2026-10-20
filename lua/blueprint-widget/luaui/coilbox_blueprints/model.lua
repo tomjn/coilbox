@@ -9,10 +9,10 @@
 
 local M = {}
 
-M.WIDTH = 280
+M.WIDTH = 300
 M.PAD = 8
 M.GAP = 4
-M.ROW = 40
+M.ROW = 50
 M.HEADER = 30
 M.LINE = 24
 M.FOOTER = 32
@@ -31,6 +31,8 @@ M.BUTTON_RADIUS = 4
 --- The sizes above are for a view this many pixels tall. The panel scales
 -- with the view's height, so it covers the same share of any screen.
 M.BASE_HEIGHT = 1080
+--- One heightmap square in elmos, SQUARE_SIZE in the engine.
+M.HEIGHT_SQUARE = 8
 --- Floats per vertex in pack(): position 3, uv 2, colour 4, shape 4.
 M.STRIDE = 13
 
@@ -44,6 +46,9 @@ local C = {
 	button = { 0.16, 0.18, 0.22, 1 },
 	scroll = { 0.35, 0.38, 0.45, 1 },
 	gold = { 0.93, 0.76, 0.25, 1 },
+	map = { 0.05, 0.06, 0.07, 1 },
+	building = { 0.45, 0.66, 0.74, 1 },
+	buildingNever = { 0.35, 0.36, 0.40, 1 },
 	text = { 1, 1, 1, 1 },
 	title = { 0.66, 0.68, 0.72, 1 },
 	dim = { 0.72, 0.74, 0.78, 1 },
@@ -206,6 +211,38 @@ local function rowPics(item)
 				break
 			end
 		end
+	end
+	return out
+end
+
+--- Where each building sits in a size by size map of the layout: its
+-- footprint at its offset, x to the right and z down the screen, the way the
+-- map is seen from above. The layout is scaled to fit and centred.
+-- @return table[] { x, y, w, h } from the map's bottom left corner
+function M.layoutMap(resolved, size)
+	local boxes = {}
+	local minX, minZ, maxX, maxZ = math.huge, math.huge, -math.huge, -math.huge
+	for _, b in ipairs(resolved.buildings) do
+		local hw, hd = M.halfSpan(b.def, b.facing)
+		local box = { x0 = b.offset.x - hw, x1 = b.offset.x + hw, z0 = b.offset.z - hd, z1 = b.offset.z + hd }
+		boxes[#boxes + 1] = box
+		minX, maxX = math.min(minX, box.x0), math.max(maxX, box.x1)
+		minZ, maxZ = math.min(minZ, box.z0), math.max(maxZ, box.z1)
+	end
+	local out = {}
+	if #boxes == 0 then
+		return out
+	end
+	local spanX, spanZ = maxX - minX, maxZ - minZ
+	local scale = size / math.max(spanX, spanZ)
+	local ox, oz = (size - spanX * scale) / 2, (size - spanZ * scale) / 2
+	for i, box in ipairs(boxes) do
+		out[i] = {
+			x = ox + (box.x0 - minX) * scale,
+			y = size - oz - (box.z1 - minZ) * scale,
+			w = (box.x1 - box.x0) * scale,
+			h = (box.z1 - box.z0) * scale,
+		}
 	end
 	return out
 end
@@ -442,10 +479,21 @@ function M.layout(state, measure, view)
 		if active then
 			rect(cardX, y, cardW, cardH, C.gold, "outline", { radius = radius, border = 1.5 * S })
 		end
+		-- the layout from above, so its shape shows before it is placed
+		local mapSize = cardH - 2 * inset
+		local mx, my = cardX + inset, y + inset
+		rect(mx, my, mapSize, mapSize, C.map, "map", { radius = M.PIC_RADIUS * S })
+		local fill = item.tab == "never" and C.buildingNever or C.building
+		-- a pixel's gap between neighbours, so touching buildings stay apart
+		for _, box in ipairs(M.layoutMap(item.resolved, mapSize - 4 * S)) do
+			local w, h = math.max(1, box.w - S), math.max(1, box.h - S)
+			rect(mx + 2 * S + box.x, my + 2 * S + box.y, w, h, fill, "building", { radius = math.min(w, h) / 4 })
+		end
 		local nameColor = item.tab == "never" and C.faint or C.text
-		local nameW = cardW - 2 * inset - picsW
-		text(cardX + inset, y + cardH - inset - FONT, FONT, M.truncate(item.entry.name, nameW, measure, FONT), nameColor)
-		text(cardX + inset, y + inset, SMALL, M.truncate(rowDetail(item), nameW, measure, SMALL), C.dim)
+		local textX = mx + mapSize + inset
+		local nameW = cardX + cardW - inset - picsW - textX
+		text(textX, y + cardH - inset - FONT, FONT, M.truncate(item.entry.name, nameW, measure, FONT), nameColor)
+		text(textX, y + inset, SMALL, M.truncate(rowDetail(item), nameW, measure, SMALL), C.dim)
 		local defIDs = rowPics(item)
 		for p, defID in ipairs(defIDs) do
 			pics[#pics + 1] = {
@@ -548,24 +596,57 @@ function M.halfSpan(def, facing)
 	return xs * 4, zs * 4
 end
 
---- Flatten footprint squares on the ground for the vertex buffer, in world
--- space: x and z span the footprint, y sits two elmos above the ground.
+--- Grid lines across a span: both edges, and every heightmap line between.
+local function gridLines(lo, hi)
+	local out = { lo }
+	local line = (math.floor(lo / M.HEIGHT_SQUARE) + 1) * M.HEIGHT_SQUARE
+	while line < hi do
+		out[#out + 1] = line
+		line = line + M.HEIGHT_SQUARE
+	end
+	out[#out + 1] = hi
+	return out
+end
+
+--- Flatten footprint marks on the ground for the vertex buffer, in world
+-- space. Each mark is a grid with a vertex on every heightmap point inside
+-- it, at the ground's height there, and each square is split along the
+-- diagonal the engine uses (Map/Ground.cpp), so the mark lies on the ground
+-- rather than cutting through a slope.
 -- @param positions table[] from place.footprint
 -- @param blockedColor number[] rgba for a blocked position
 -- @param openColor number[] rgba for the rest
--- @return number[] vertices, number[] indices, as M.pack
-function M.packGround(positions, blockedColor, openColor)
+-- @param heightAt function(x, z) -> the ground's height
+-- @return number[] vertices, number[] indices, as M.pack, with uv spanning
+--   each whole mark
+function M.packGround(positions, blockedColor, openColor, heightAt)
 	local verts, idx = {}, {}
-	local v, n = 0, 0
-	for i, p in ipairs(positions) do
+	local v, n, base = 0, 0, 0
+	for _, p in ipairs(positions) do
 		local hw, hd = M.halfSpan(p.def, p.facing)
-		local y = p.y + 2
-		v, n = quad(verts, idx, v, n, {
-			{ p.x - hw, y, p.z - hd, 0, 0 },
-			{ p.x + hw, y, p.z - hd, 1, 0 },
-			{ p.x + hw, y, p.z + hd, 1, 1 },
-			{ p.x - hw, y, p.z + hd, 0, 1 },
-		}, p.blocked and blockedColor or openColor, { 2 * hw, 2 * hd, 0, 0 }, i)
+		local x0, z0 = p.x - hw, p.z - hd
+		local xs, zs = gridLines(x0, p.x + hw), gridLines(z0, p.z + hd)
+		local c = p.blocked and blockedColor or openColor
+		for _, z in ipairs(zs) do
+			for _, x in ipairs(xs) do
+				verts[v + 1], verts[v + 2], verts[v + 3] = x, heightAt(x, z), z
+				verts[v + 4], verts[v + 5] = (x - x0) / (2 * hw), (z - z0) / (2 * hd)
+				verts[v + 6], verts[v + 7], verts[v + 8], verts[v + 9] = c[1], c[2], c[3], c[4]
+				verts[v + 10], verts[v + 11], verts[v + 12], verts[v + 13] = 2 * hw, 2 * hd, 0, 0
+				v = v + M.STRIDE
+			end
+		end
+		local row = #xs
+		for j = 0, #zs - 2 do
+			for i = 0, row - 2 do
+				local a = base + j * row + i
+				local b, cc, d = a + 1, a + row, a + row + 1
+				idx[n + 1], idx[n + 2], idx[n + 3] = a, b, cc
+				idx[n + 4], idx[n + 5], idx[n + 6] = b, d, cc
+				n = n + 6
+			end
+		end
+		base = base + row * #zs
 	end
 	return verts, idx
 end

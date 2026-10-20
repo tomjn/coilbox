@@ -42,7 +42,7 @@ Every module under `coilbox_blueprints/` takes the engine tables it reads as arg
 
 ## Drawing
 
-No immediate mode. The panel's rectangles, each with its size, corner radius and border, go into one vertex buffer through `gl.GetVBO` and `gl.GetVAO`, drawn with one `DrawElements`, re-uploaded only when the layout changes. Build pictures are one textured quad each through the same shader. The fragment shader rounds the corners from that shape, and a border keeps only the outline. Text is `gl.Text`, which the engine batches. Ghosts are `gl.UnitShape`. Footprint squares on the ground are a second buffer, refilled when the snapped anchor or rotation changes.
+No immediate mode. The panel's rectangles, each with its size, corner radius and border, go into one vertex buffer through `gl.GetVBO` and `gl.GetVAO`, drawn with one `DrawElements`, re-uploaded only when the layout changes. Build pictures are one textured quad each through the same shader. The fragment shader rounds the corners from that shape, and a border keeps only the outline. Text is `gl.Text`, which the engine batches. Ghosts are `gl.UnitShape`. Footprint marks on the ground are a second buffer, refilled when the snapped anchor or rotation changes. Each mark is a grid with a vertex on every heightmap point, at the ground's height, split along the engine's own diagonal, and drawn without the depth test because the terrain the engine draws is simplified with distance.
 
 The panel is laid out at sizes for a view 1080 pixels tall and scales with the view's height.
 

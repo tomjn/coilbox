@@ -397,17 +397,80 @@ check("uvs span the unit square", verts[4] == 0 and verts[5] == 0 and verts[30] 
 local none, noneIdx = MODEL.pack({})
 check("packing nothing is empty", #none == 0 and #noneIdx == 0)
 
--- ground marks: a footprint square on the x, z plane at the building's height
+-- ground marks: a grid over each footprint that follows the ground
+local function slope(x, z)
+	return x * 0.5 + z * 0.25
+end
 local gv, gi = MODEL.packGround({
-	{ x = 320, y = 10, z = 320, defID = 1, facing = 0, blocked = true, def = { xsize = 8, zsize = 4 } },
-	{ x = 0, y = 0, z = 0, defID = 1, facing = 1, blocked = false, def = { xsize = 8, zsize = 4 } },
-}, { 1, 0, 0, 0.4 }, { 0, 1, 0, 0.4 })
-check("ground marks pack one quad per position", #gv == 2 * 4 * MODEL.STRIDE and #gi == 12)
-check("a mark spans the footprint about the centre, half the size in elmos each way", gv[1] == 320 - 32 and gv[3] == 320 - 16 and gv[27] == 320 + 32 and gv[29] == 320 + 16, show({ gv[1], gv[3], gv[27], gv[29] }))
-check("a mark floats just above the ground", gv[2] == 10 + 2)
-check("an odd facing swaps the span", gv[53] == -16 and gv[55] == -32, show({ gv[53], gv[55] }))
-check("a blocked mark takes the first colour and an open one the second", gv[6] == 1 and gv[59] == 1, show({ gv[6], gv[59] }))
-check("a mark is a square cornered box its own size", same({ gv[10], gv[11], gv[12], gv[13] }, { 64, 32, 0, 0 }), show({ gv[10], gv[11], gv[12], gv[13] }))
+	{ x = 320, y = 10, z = 320, defID = 1, facing = 0, blocked = true, def = { xsize = 4, zsize = 2 } },
+	{ x = 96, y = 0, z = 96, defID = 1, facing = 1, blocked = false, def = { xsize = 4, zsize = 2 } },
+}, { 1, 0, 0, 0.4 }, { 0, 1, 0, 0.4 }, slope)
+local K = MODEL.STRIDE
+local function vert(i)
+	local o = (i - 1) * K
+	return { x = gv[o + 1], y = gv[o + 2], z = gv[o + 3], u = gv[o + 4], v = gv[o + 5], r = gv[o + 6], g = gv[o + 7], w = gv[o + 10], h = gv[o + 11] }
+end
+-- the first mark is 32 by 16 elmos: 5 by 3 grid points, 4 by 2 squares
+check("a mark has a vertex on every heightmap point inside it", #gv == (5 * 3 + 3 * 5) * K, #gv / K)
+check("a mark has two triangles per heightmap square", #gi == (4 * 2 + 2 * 4) * 6, #gi)
+check("a mark spans the footprint about the centre", vert(1).x == 320 - 16 and vert(1).z == 320 - 8 and vert(15).x == 320 + 16 and vert(15).z == 320 + 8, show({ vert(1), vert(15) }))
+check("every vertex sits on the ground", (function()
+	for i = 1, #gv / K do
+		local p = vert(i)
+		if p.y ~= slope(p.x, p.z) then
+			return false
+		end
+	end
+	return true
+end)())
+check("squares split along the engine's diagonal, top right to bottom left", gi[1] == 0 and gi[2] == 1 and gi[3] == 5 and gi[4] == 1 and gi[5] == 6 and gi[6] == 5, show({ gi[1], gi[2], gi[3], gi[4], gi[5], gi[6] }))
+check("uvs span each whole mark", vert(1).u == 0 and vert(1).v == 0 and vert(15).u == 1 and vert(15).v == 1 and vert(3).u == 0.5)
+check("each vertex carries the mark's size", vert(1).w == 32 and vert(1).h == 16)
+check("the second mark's indices start after the first's vertices", gi[8 * 6 + 1] == 15, gi[8 * 6 + 1])
+check("an odd facing swaps the span", vert(16).x == 96 - 8 and vert(16).z == 96 - 16, show(vert(16)))
+check("a blocked mark takes the first colour and an open one the second", vert(1).r == 1 and vert(16).g == 1)
+local _, offGrid = MODEL.packGround({ { x = 4, y = 0, z = 4, defID = 1, facing = 0, def = { xsize = 2, zsize = 2 } } }, { 1, 0, 0, 1 }, { 0, 1, 0, 1 }, slope)
+-- 16 elmos about x = 4 runs from -4 to 12, so it crosses the lines at 0 and 8
+check("a mark off the heightmap grid still meets every line inside it", #offGrid == 3 * 3 * 6, #offGrid)
+
+-- the layout map in each row
+local cross = {
+	buildings = {
+		{ def = { xsize = 4, zsize = 4 }, facing = 0, offset = { x = 0, z = -32 } },
+		{ def = { xsize = 4, zsize = 4 }, facing = 0, offset = { x = -32, z = 0 } },
+		{ def = { xsize = 4, zsize = 4 }, facing = 0, offset = { x = 32, z = 0 } },
+		{ def = { xsize = 4, zsize = 4 }, facing = 0, offset = { x = 0, z = 32 } },
+	},
+}
+local map = MODEL.layoutMap(cross, 30)
+check("a cross of four comes out as a cross", (function()
+	local north, west, east, south = map[1], map[2], map[3], map[4]
+	return north.x == south.x and west.y == east.y and west.x < north.x and east.x > north.x and north.y > west.y and south.y < west.y
+end)(), show(map))
+check("the map fills the box along the longer side", (function()
+	local minX, maxX = math.huge, -math.huge
+	for _, r in ipairs(map) do
+		minX, maxX = math.min(minX, r.x), math.max(maxX, r.x + r.w)
+	end
+	return minX == 0 and maxX == 30
+end)(), show(map))
+local wide = MODEL.layoutMap({ buildings = {
+	{ def = { xsize = 4, zsize = 4 }, facing = 0, offset = { x = 0, z = 0 } },
+	{ def = { xsize = 4, zsize = 4 }, facing = 0, offset = { x = 64, z = 0 } },
+} }, 30)
+check("a wide layout is centred top to bottom", math.abs(wide[1].y - (30 - wide[1].y - wide[1].h)) < 1e-9, show(wide))
+check("an empty layout maps to nothing", #MODEL.layoutMap({ buildings = {} }, 30) == 0)
+check("each row draws its layout map", (function()
+	local maps, buildings = 0, 0
+	for _, r in ipairs(L.rects) do
+		if r.kind == "map" then
+			maps = maps + 1
+		elseif r.kind == "building" then
+			buildings = buildings + 1
+		end
+	end
+	return maps == #hitsOf(L, "place") and buildings > 0
+end)())
 
 --------------------------------------------------------------------------------
 -- the orthographic matrix for the shader
