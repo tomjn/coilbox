@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  backfillWriteRootId,
   healWriteRoot,
   mutatorDataDir,
   packageDirOf,
@@ -206,5 +207,39 @@ describe("mutatorDataDir", () => {
     expect(mutatorDataDir([steam], "/steam/Zero-K", undefined)).toBe(
       "/steam/Zero-K",
     );
+  });
+});
+
+describe("backfillWriteRootId", () => {
+  const own: WriteRootCandidate = {
+    id: "own",
+    path: "/data/own",
+    portable: false,
+  };
+  const steam: WriteRootCandidate = {
+    id: "steam",
+    path: "/steam/Zero-K",
+    portable: false,
+    readOnly: true,
+  };
+
+  it("picks the first writable folder when none is set", () => {
+    expect(backfillWriteRootId([steam, own], undefined)).toBe("own");
+  });
+
+  it("moves off a folder that has become read only", () => {
+    expect(backfillWriteRootId([steam, own], "steam")).toBe("own");
+  });
+
+  it("leaves a writable choice alone", () => {
+    expect(backfillWriteRootId([steam, own], "own")).toBeUndefined();
+  });
+
+  it("keeps a choice whose folder is not listed, such as an unplugged drive", () => {
+    expect(backfillWriteRootId([own], "usb")).toBeUndefined();
+  });
+
+  it("has nothing to pick when every folder is read only", () => {
+    expect(backfillWriteRootId([steam], "steam")).toBeUndefined();
   });
 });

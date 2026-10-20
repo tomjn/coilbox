@@ -3,6 +3,7 @@ import { type ReactNode, useCallback, useEffect, useRef } from "react";
 import { useDownloadsConfig } from "../downloads/config";
 import { useTrustedHubUrl } from "../hub/config";
 import { useSkirmishDraft } from "../play/drafts";
+import { backfillWriteRootId } from "../downloads/writeRoot";
 import { BundledEngineSetup } from "./BundledEngineSetup";
 import { fetchListsInBackground } from "./backgroundFetch";
 import { contentRescan } from "./bindings";
@@ -126,13 +127,10 @@ export default function ContentStartupProvider({
   // destination works without a trip to Content folders settings. Never overrides
   // a value the user (or a prior run of this effect) already set.
   useEffect(() => {
-    if (dlConfig.writeRootId) return;
     loadContentState()
       .then((state) => {
-        // Never the bundled content folder or a read only one, which coilbox
-        // does not write into.
-        const first = state.roots.find((r) => !r.bundled && !r.readOnly);
-        if (first) setDlConfig({ ...dlConfig, writeRootId: first.id });
+        const id = backfillWriteRootId(state.roots, dlConfig.writeRootId);
+        if (id) setDlConfig({ ...dlConfig, writeRootId: id });
       })
       .catch(() => {});
   }, [dlConfig, setDlConfig]);

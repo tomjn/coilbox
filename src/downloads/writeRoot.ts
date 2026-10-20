@@ -76,6 +76,24 @@ export function healWriteRoot(
   );
 }
 
+/**
+ * The root id to store as the default download destination, or `undefined` to
+ * leave `writeRootId` as it is. An unset id, or one naming a listed root that
+ * coilbox may not write into, moves to the first writable root. An id naming a
+ * root that is not listed is kept, because that is usually a drive that is not
+ * plugged in.
+ */
+export function backfillWriteRootId(
+  roots: WriteRootCandidate[],
+  writeRootId: string | undefined,
+): string | undefined {
+  if (writeRootId) {
+    const current = roots.find((r) => r.id === writeRootId);
+    if (!current || isWritable(current)) return undefined;
+  }
+  return roots.find(isWritable)?.id;
+}
+
 const trimEnd = (p: string): string => p.replace(/[\\/]+$/, "");
 
 /**

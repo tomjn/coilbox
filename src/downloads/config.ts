@@ -7,6 +7,7 @@ import { getProfileRoot } from "../profile/profile";
 import { dlSetEngineDirs } from "./bindings";
 import { DEFAULT_RAPID_MASTERS } from "./rapidMasters";
 import {
+  backfillWriteRootId,
   healWriteRoot,
   mutatorDataDir,
   packageDirOf,
@@ -84,9 +85,8 @@ export function useDefaultWriteRoot(): (state: ContentState) => void {
   const [cfg, setCfg] = useDownloadsConfig();
   return useCallback(
     (state: ContentState) => {
-      if (cfg.writeRootId) return;
-      const first = state.roots.find((r) => !r.bundled && !r.readOnly);
-      if (first) setCfg({ ...cfg, writeRootId: first.id });
+      const id = backfillWriteRootId(state.roots, cfg.writeRootId);
+      if (id) setCfg({ ...cfg, writeRootId: id });
     },
     [cfg, setCfg],
   );
