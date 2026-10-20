@@ -347,6 +347,7 @@ export default function GameDetailPage() {
           </section>
         </TabsContent>
         <TabsContent value="overview" className="flex flex-col gap-5">
+          <StartModeActions gameName={game.name} />
           <GameLibrarySummary
             game={game}
             record={lib.record}
@@ -389,8 +390,6 @@ export default function GameDetailPage() {
               </p>
             )}
           </div>
-
-          <StartModeActions gameName={game.name} />
 
           {brand && <BrandingLinks entry={brand} />}
           {brand?.screenshots?.length ? (
