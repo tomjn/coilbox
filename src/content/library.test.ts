@@ -532,6 +532,25 @@ describe("buildLibrary maps named by different archives (#4657)", () => {
     ]);
   });
 
+  it("joins a file-only mirror to a scanned map whose archive is its spring name", () => {
+    // The scan names the archive `1 Pass Greenland Redux v3`, and hakora
+    // lists 1_pass_greenland_redux_v3.sdz.
+    const name = "1 Pass Greenland Redux v3";
+    const { maps } = buildLibrary({
+      ...bare,
+      scan: { games: [], maps: [scannedMap(name, name)] },
+      files: { games: [], maps: ["1_pass_greenland_redux_v3.sdz"] },
+      catalogues: [
+        {
+          source: "hakora",
+          entries: [hakoraFile("1_pass_greenland_redux_v3.sdz")],
+        },
+      ],
+    });
+    expect(maps.map((m) => [m.id, m.state])).toEqual([[name, "installed"]]);
+    expect(maps[0].sources.map((s) => s.kind)).toEqual(["hakora"]);
+  });
+
   it("leaves an unlisted second copy on disk with the scanned map", () => {
     const { maps } = buildLibrary({
       ...bare,

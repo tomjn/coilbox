@@ -162,10 +162,14 @@ const stem = (filename: string) => filename.replace(/\.(sd7|sdz|sdd)$/i, "");
  * lower case, and without a v in front of the version. Springfiles has
  * `all_that_glitters_v1.2.sd7` where beyond-all-reason/Maps has
  * `all_that_glitters_1.2.sd7`, and a folder and an archive of one map differ
- * by extension (issue #4657).
+ * by extension (issue #4657). A space and an underscore are the same, because
+ * the scan names a map's archive by its spring name, `1 Pass Greenland Redux
+ * v3`, where hakora has `1_pass_greenland_redux_v3.sd7`.
  */
 const matchKey = (filename: string) =>
-  lc(stem(filename)).replace(/(?<=[_\s-])v(?=\d)/g, "");
+  lc(stem(filename))
+    .replace(/\s/g, "_")
+    .replace(/(?<=[_-])v(?=\d)/g, "");
 
 /**
  * A name in the raw disk listing that may have a record of its own: a Spring
