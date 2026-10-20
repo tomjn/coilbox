@@ -82,7 +82,7 @@ To stop coilbox offering updates for one game, turn off Show updates on the game
 
 The banner at the top shows the game's art, its name and its version. Games at the top left goes back to the list. Play opens Singleplayer with this game picked.
 
-Under the banner, a box sums up the game in your library:
+At the top of the Overview tab, a box sums up the game in your library:
 
 - Installed is the version you have. If coilbox downloaded it, it also says where from and when.
 - Update is the newer version on offer and where it comes from. Update beside it downloads it.
@@ -90,7 +90,7 @@ Under the banner, a box sums up the game in your library:
 - Engine is the engine the page reads the game with.
 - Show updates decides whether coilbox offers updates for this game. Turn it off to keep the game off the Updates list and out of the count in the top bar.
 
-The page has three tabs: Overview, Versions and Sources.
+The page has three tabs: Overview, Versions and Sources. A fourth, Compatibility, appears when coilbox finds something in the game that the engine no longer does. See [Compatibility mode](compatibility-mode.md).
 
 ### Versions
 
@@ -120,7 +120,7 @@ To make coilbox try one source first for this game, select Use this on its row. 
 
 ### Overview
 
-Overview has everything else about the game.
+Overview has the box above and everything else about the game.
 
 The buttons at the top start a mode with this game already picked:
 

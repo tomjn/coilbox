@@ -27,7 +27,6 @@ vi.mock("@picoframe/frame", async () => ({
 }));
 
 let mockFindings: Finding[] = [];
-const scrolledTo: string[] = [];
 vi.mock("../useCompatReport", () => ({
   useCompatReport: () => ({ findings: mockFindings, archivePath: undefined }),
 }));
@@ -144,7 +143,6 @@ afterEach(() => {
   cleanup();
   mockFindings = [];
   drawerOpen.mockClear();
-  scrolledTo.length = 0;
 });
 
 function unit(name: string, buildOptions: string[] = []): UnitDatasetEntry {
@@ -291,7 +289,7 @@ describe("GameDetailPage's Game options section", () => {
   });
 });
 
-describe("GameDetailPage's Compatibility section", () => {
+describe("GameDetailPage's Compatibility tab", () => {
   const FINDINGS: Finding[] = [
     {
       kind: "models-3do",
@@ -316,13 +314,16 @@ describe("GameDetailPage's Compatibility section", () => {
   it("is absent when the report finds nothing", async () => {
     renderPage({ sides: [], units: [], datasetStatus: "ready" });
     await screen.findByText("Primary archive");
-    expect(screen.queryByText("Compatibility")).toBeNull();
+    expect(screen.queryByRole("tab", { name: "Compatibility" })).toBeNull();
   });
 
   it("lists each finding with its count and expands the Lua hits", async () => {
     mockFindings = FINDINGS;
     renderPage({ sides: [], units: [], datasetStatus: "ready" });
-    expect(await screen.findByText("Compatibility")).toBeTruthy();
+    expect(screen.queryByText(".3do models")).toBeNull();
+    fireEvent.mouseDown(
+      await screen.findByRole("tab", { name: "Compatibility" }),
+    );
     expect(screen.getByText(".3do models")).toBeTruthy();
     expect(screen.getByText("765")).toBeTruthy();
     expect(screen.queryByText("LuaUI/modfonts.lua")).toBeNull();
@@ -336,29 +337,28 @@ describe("GameDetailPage's Compatibility section", () => {
   it("opens the model converter from the .3do row", async () => {
     mockFindings = FINDINGS;
     renderPage({ sides: [], units: [], datasetStatus: "ready" });
-    fireEvent.click(await screen.findByText("Convert models"));
+    fireEvent.mouseDown(
+      await screen.findByRole("tab", { name: "Compatibility" }),
+    );
+    fireEvent.click(screen.getByText("Convert models"));
     expect(drawerOpen).toHaveBeenCalledWith(
       expect.objectContaining({ title: "Convert .3do models" }),
     );
   });
 
-  it("scrolls to the section when a link asks for it", async () => {
+  it("opens the tab when a link asks for it", async () => {
     mockFindings = FINDINGS;
-    const original = HTMLElement.prototype.scrollIntoView;
-    HTMLElement.prototype.scrollIntoView = function (this: HTMLElement) {
-      scrolledTo.push(this.id);
-    };
-    try {
-      renderPage({
-        sides: [],
-        units: [],
-        datasetStatus: "ready",
-        search: "?section=compat",
-      });
-      await screen.findByText("Compatibility");
-      expect(scrolledTo).toEqual(["compat"]);
-    } finally {
-      HTMLElement.prototype.scrollIntoView = original;
-    }
+    renderPage({
+      sides: [],
+      units: [],
+      datasetStatus: "ready",
+      search: "?section=compat",
+    });
+    expect(await screen.findByText(".3do models")).toBeTruthy();
+    expect(
+      screen
+        .getByRole("tab", { name: "Compatibility" })
+        .getAttribute("aria-selected"),
+    ).toBe("true");
   });
 });
