@@ -169,19 +169,20 @@ export function useHubGames(): HubGame[] | null {
 }
 
 /**
- * The picture address for a game's hub logo, for the trusted hub, or undefined
- * when there is no such hub, no matching game, no logo, or a logo that is not an
- * address coilbox will fetch.
+ * The picture address for one of a game's hub pictures, for the trusted hub, or
+ * undefined when there is no such hub, no matching game, no such picture, or one
+ * that is not an address coilbox will fetch.
  */
-export function useHubGameLogoUrl(
+export function useHubGameArtUrl(
   name: string,
   installed: readonly GameItem[] | null,
+  art: "logo" | "card" | "banner",
 ): string | undefined {
   const hubUrl = useTrustedHubUrl();
   const games = useHubGames();
   if (!hubUrl) return undefined;
   const match = matchHubGame(games, name, installed);
-  return hubIconUrl(match?.logo, hubUrl, assetCdnBase()) ?? undefined;
+  return hubIconUrl(match?.[art], hubUrl, assetCdnBase()) ?? undefined;
 }
 
 /**

@@ -11,7 +11,7 @@ import {
   useUnitsyncScan,
 } from "@/content/config";
 import { gameIconArt } from "@/content/gameIcon";
-import { useHubGameLogoUrl } from "@/hub/gameIcons";
+import { useHubGameArtUrl } from "@/hub/gameIcons";
 import { cn } from "@/lib/utils";
 
 interface IconSrc {
@@ -25,8 +25,8 @@ const MAX_LOGO_ASPECT = 1.5;
 
 /**
  * The pictures for the game a name refers to, best first: the trusted hub's
- * logo, then the branding catalog's logo, then its banner, then the game's own
- * loading-screen art. Empty while none has resolved, and when none exists.
+ * logo, then the branding catalog's logo, then its banner, then the hub's
+ * banner, then the game's own loading-screen art. Empty while none has resolved, and when none exists.
  *
  * Nothing here waits on the network. The hub's game list is read once per
  * session and fails silently, and every picture arrives through the cached image
@@ -46,8 +46,10 @@ function useGameIconCandidates(name: string): IconSrc[] {
     () => gameIconArt(name, data?.games ?? null, entries),
     [name, data, entries],
   );
-  const hubLogoUrl = useHubGameLogoUrl(name, data?.games ?? null);
+  const hubLogoUrl = useHubGameArtUrl(name, data?.games ?? null, "logo");
   const hubLogo = useCachedImage(hubLogoUrl ? [hubLogoUrl] : undefined);
+  const hubBannerUrl = useHubGameArtUrl(name, data?.games ?? null, "banner");
+  const hubBanner = useCachedImage(hubBannerUrl ? [hubBannerUrl] : undefined);
   const logo = useBrandingImage(art.logo);
   const banner = useBrandingImage(art.banner, true);
   const header = art.headerGame ? headers.get(art.headerGame) : undefined;
@@ -55,6 +57,7 @@ function useGameIconCandidates(name: string): IconSrc[] {
   if (hubLogo) found.push({ src: hubLogo, fit: "contain" });
   if (logo) found.push({ src: logo, fit: "contain" });
   if (banner) found.push({ src: banner, fit: "cover" });
+  if (hubBanner) found.push({ src: hubBanner, fit: "cover" });
   if (header) found.push({ src: header, fit: "cover" });
   return found;
 }

@@ -123,6 +123,16 @@ describe("hub game list", () => {
     expect(img()?.getAttribute("src")).toBe(`cache://${SF_LOGO}`);
   });
 
+  it("falls back to the hub's banner for a game with no logo or local art", async () => {
+    const banner = "https://assets.example/coilbox-assets/games/SF/banner.png";
+    hoisted.fetchHubGames.mockImplementation(() =>
+      answer([{ ...hubGame("SF", null), banner }]),
+    );
+    render(<GameIcon name="Splinter Faction 0.1.86" />);
+    await act(async () => {});
+    expect(img()?.getAttribute("src")).toBe(`cache://${banner}`);
+  });
+
   it("shows a returning visit's hub logo on the first render, with no swap", async () => {
     hoisted.local = "cache://local-art.png";
     hoisted.fetchHubGames.mockImplementation(() =>

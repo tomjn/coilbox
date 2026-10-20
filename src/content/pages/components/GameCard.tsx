@@ -83,8 +83,8 @@ const RAISED = "pointer-events-auto relative z-10";
 /**
  * A card on the Games grid for one library record: the art, the title, the
  * installed version or the source kinds, a state badge, and the action the
- * state calls for. Art is the hub's card, then the branding banner, then the
- * game's own loading screen.
+ * state calls for. Art is the hub's card, then the hub's banner, then the
+ * branding banner, then the game's own loading screen.
  *
  * An installed card links to the game's detail page through a stretched
  * overlay, with the buttons raised above it so a `<button>` never sits inside
@@ -135,7 +135,11 @@ export function GameCard({
     ? hubIconUrl(game.hub?.card, hubUrl, assetCdnBase())
     : null;
   const hubCard = useCachedImage(cardUrl ? [cardUrl] : undefined);
-  const art = hubCard ?? brandBanner ?? headerUrl;
+  const bannerUrl = hubUrl
+    ? hubIconUrl(game.hub?.banner, hubUrl, assetCdnBase())
+    : null;
+  const hubBanner = useCachedImage(bannerUrl ? [bannerUrl] : undefined);
+  const art = hubCard ?? hubBanner ?? brandBanner ?? headerUrl;
   const title = brand?.title ?? game.title;
   const { state } = game;
   const running = state === "downloading" || state === "queued";

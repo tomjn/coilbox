@@ -52,7 +52,7 @@ vi.mock("@/content/branding", () => ({
   useCachedImage: () => undefined,
 }));
 // No hub in these tests: the icon falls back to the local art.
-vi.mock("@/hub/gameIcons", () => ({ useHubGameLogoUrl: () => undefined }));
+vi.mock("@/hub/gameIcons", () => ({ useHubGameArtUrl: () => undefined }));
 
 import CareerPage from "./CareerPage";
 
