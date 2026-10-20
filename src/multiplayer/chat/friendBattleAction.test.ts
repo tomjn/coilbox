@@ -78,17 +78,18 @@ describe("friendBattleAction", () => {
     });
   });
 
-  it("says Full and disables the button on a full open battle", () => {
+  it("offers Spectate on a full open battle", () => {
     // host plus one member is 2 of 2
     expect(act({ battle: { maxPlayers: 2 } })).toMatchObject({
-      label: "Full",
-      disabled: true,
+      kind: "join",
+      label: "Spectate",
+      disabled: false,
     });
   });
 
   it("counts players from playerCount when the server supplies it", () => {
     const a = act({ battle: { playerCount: 8, maxPlayers: 8 } });
-    expect(a).toMatchObject({ label: "Full", disabled: true });
+    expect(a).toMatchObject({ label: "Spectate", disabled: false });
   });
 
   it("does not call a running battle full, since watching takes no slot", () => {

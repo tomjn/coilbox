@@ -85,13 +85,12 @@ describe("battleRowAction", () => {
     expect(a).toEqual({ kind: "join", label: "Join", disabled: false });
   });
 
-  it("disables Join when a full open battle", () => {
+  it("offers Spectate on a full open battle", () => {
     const a = battleRowAction(mk({ maxPlayers: 2, members: { x: M } }), {
       canJoin: true,
       inProgress: false,
     });
-    expect(a.kind).toBe("join");
-    expect(a.disabled).toBe(true);
+    expect(a).toEqual({ kind: "join", label: "Spectate", disabled: false });
   });
 
   it("disables Join when not joinable", () => {

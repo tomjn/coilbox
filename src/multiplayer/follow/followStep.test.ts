@@ -26,7 +26,6 @@ function now(over: Partial<FollowNow> = {}): FollowNow {
     target: null,
     mine: null,
     battle: null,
-    running: false,
     ...over,
   };
 }
@@ -141,12 +140,9 @@ describe("followStep", () => {
     );
   });
 
-  it("treats a full battle as blocked, unless it is running", () => {
+  it("follows into a full battle, where the player spectates", () => {
     const full = { ...open, maxPlayers: 1 };
     expect(run([{ target: 5, battle: full }])).toEqual([
-      { kind: "blocked", id: 5, reason: "full" },
-    ]);
-    expect(run([{ target: 5, battle: full, running: true }])).toEqual([
       { kind: "join", id: 5 },
     ]);
   });
