@@ -262,7 +262,7 @@ pub(crate) async fn content_storage_overview(root: String) -> CliResult {
 /// be turned into an arbitrary recursive delete.
 #[tauri::command]
 pub(crate) async fn content_delete_engine(path: String) -> CliResult {
-    if let Err(e) = coilbox_portable::refuse_in_bundle(Path::new(&path)) {
+    if let Err(e) = coilbox_portable::refuse_read_only(Path::new(&path)) {
         return CliResult::err(e);
     }
     let p = PathBuf::from(&path);

@@ -319,7 +319,7 @@ pub(crate) async fn content_widget_install<R: Runtime>(
     app: AppHandle<R>,
     root_path: String,
 ) -> CliResult {
-    if let Err(e) = coilbox_portable::refuse_in_bundle(Path::new(&root_path)) {
+    if let Err(e) = coilbox_portable::refuse_read_only(Path::new(&root_path)) {
         return CliResult::err(e);
     }
     let src = match widget_dir(&app) {
@@ -339,7 +339,7 @@ pub(crate) async fn content_widget_install<R: Runtime>(
 /// The library file and the spool are data rather than the widget, and stay.
 #[tauri::command]
 pub(crate) async fn content_widget_remove(root_path: String) -> CliResult {
-    if let Err(e) = coilbox_portable::refuse_in_bundle(Path::new(&root_path)) {
+    if let Err(e) = coilbox_portable::refuse_read_only(Path::new(&root_path)) {
         return CliResult::err(e);
     }
     let res = tauri::async_runtime::spawn_blocking(move || remove(Path::new(&root_path))).await;

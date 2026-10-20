@@ -404,7 +404,7 @@ fn writable_game_dir(root: &str) -> Result<PathBuf, String> {
         return Err(format!("not a loose game folder: {root}"));
     }
     // A game the distribution bundles is read-only, the same as a packaged one.
-    coilbox_portable::refuse_in_bundle(&path)?;
+    coilbox_portable::refuse_read_only(&path)?;
     Ok(path)
 }
 
