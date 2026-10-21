@@ -1,3 +1,5 @@
+import { t } from "@lingui/core/macro";
+import { useLingui as useLocale } from "@lingui/react";
 import { useEffect, useState } from "react";
 import { cn } from "@/lib/utils";
 import { type DirectVpnRoute, directVpnRoute } from "./bindings";
@@ -49,9 +51,9 @@ type VpnWarningPlace = "host" | "join";
 /** The warning itself, naming the interface it is about. Pure. */
 function vpnWarningText(place: VpnWarningPlace, interfaceName: string): string {
   if (place === "join") {
-    return `Your internet traffic goes through a VPN (${interfaceName}). Everything you send goes to the VPN's server first, so your ping will be worse than it needs to be. Turn the VPN off while you play.`;
+    return t`Your internet traffic goes through a VPN (${interfaceName}). Everything you send goes to the VPN's server first, so your ping will be worse than it needs to be. Turn the VPN off while you play.`;
   }
-  return `Your internet traffic goes through a VPN (${interfaceName}). Players may not be able to reach you directly, and everything anybody sends you goes through the VPN's server first, so pings will be worse for the whole battle. Turn the VPN off while you play.`;
+  return t`Your internet traffic goes through a VPN (${interfaceName}). Players may not be able to reach you directly, and everything anybody sends you goes through the VPN's server first, so pings will be worse for the whole battle. Turn the VPN off while you play.`;
 }
 
 /**
@@ -77,6 +79,8 @@ export function VpnWarning({
    *  no VPN on it is not left holding an empty box with padding on it. */
   className?: string;
 }) {
+  // Subscribes to the language, since vpnWarningText reads it when called.
+  useLocale();
   const vpn = useVpnRoute();
   if (!vpn) return null;
   return (

@@ -1,3 +1,4 @@
+import { plural, t } from "@lingui/core/macro";
 import { battlePasswordProblem } from "../deeplink/parse";
 import type { LobbyServer } from "../lobby-servers/config";
 import { addressOfKey } from "../lobby-servers/hostForms";
@@ -47,7 +48,7 @@ export function directServer(
   const own = host === LOOPBACK_HOST;
   return {
     id: DIRECT_SERVER_ID,
-    name: own ? "Room on this machine" : `Room at ${host}`,
+    name: own ? t`Room on this machine` : t`Room at ${host}`,
     host,
     port,
     tls: false,
@@ -88,7 +89,8 @@ export function hostBlockedReason(
   roomKey: string | null,
 ): string | null {
   if (!roomKey) return null;
-  return `You are in a room already, at ${addressOfKey(roomKey)}. Leave it first: coilbox can be in one room at a time.`;
+  const address = addressOfKey(roomKey);
+  return t`You are in a room already, at ${address}. Leave it first: coilbox can be in one room at a time.`;
 }
 
 /**
@@ -154,9 +156,9 @@ export function startRoomFailure(error: unknown, port: number): string {
     lower.includes("in use") ||
     lower.includes("usage of each socket address")
   ) {
-    return `Port ${port} is already in use. Another coilbox, or a room you left running, has it. Pick another port or stop the other room.`;
+    return t`Port ${port} is already in use. Another coilbox, or a room you left running, has it. Pick another port or stop the other room.`;
   }
-  return raw || `Could not start a room on port ${port}.`;
+  return raw || t`Could not start a room on port ${port}.`;
 }
 
 /**
@@ -167,8 +169,8 @@ export function startButtonLabel(
   busy: boolean,
   checksumsReady: boolean,
 ): string {
-  if (busy) return "Starting…";
-  return checksumsReady ? "Start room" : "Reading content…";
+  if (busy) return t`Starting…`;
+  return checksumsReady ? t`Start room` : t`Reading content…`;
 }
 
 /**
@@ -186,13 +188,13 @@ export function roomSummary(room: DirectRoomStatus): string {
   const joined = Math.max(0, room.peers - 1);
   const who =
     joined === 0
-      ? "nobody has joined yet"
-      : joined === 1
-        ? "1 player joined"
-        : `${joined} players joined`;
-  const parts = [`Hosting on port ${room.port} as ${room.host}`, who];
+      ? t`nobody has joined yet`
+      : plural(joined, { one: "# player joined", other: "# players joined" });
+  const port = room.port;
+  const host = room.host;
+  const parts = [t`Hosting on port ${port} as ${host}`, who];
   if (room.battle) {
-    parts.push(room.battle.passworded ? "password needed" : "no password");
+    parts.push(room.battle.passworded ? t`password needed` : t`no password`);
   }
   return parts.join(", ");
 }
@@ -213,12 +215,12 @@ export function roomSummary(room: DirectRoomStatus): string {
  */
 export function announcementNote(advertise: boolean, heard: boolean): string {
   if (!advertise) {
-    return "Not announced on this network, so give joiners your address.";
+    return t`Not announced on this network, so give joiners your address.`;
   }
   if (!heard) {
-    return "Not heard announcing itself yet. If it stays that way, people on this network will need your address rather than finding the room themselves.";
+    return t`Not heard announcing itself yet. If it stays that way, people on this network will need your address rather than finding the room themselves.`;
   }
-  return "Announced on this network.";
+  return t`Announced on this network.`;
 }
 
 /**
@@ -245,10 +247,10 @@ export function announcementNote(advertise: boolean, heard: boolean): string {
 export function gameAddressNote(ip: string, previous: string | null): string {
   const now =
     ip === LOOPBACK_HOST
-      ? `The room hands joiners ${ip} for the game itself, which points back at their own machine rather than yours.`
-      : `The room hands joiners ${ip} for the game itself.`;
+      ? t`The room hands joiners ${ip} for the game itself, which points back at their own machine rather than yours.`
+      : t`The room hands joiners ${ip} for the game itself.`;
   if (!previous) return now;
-  return `${now} It was handing out ${previous} earlier.`;
+  return `${now} ${t`It was handing out ${previous} earlier.`}`;
 }
 
 /**
@@ -279,10 +281,9 @@ export function gameAddressNote(ip: string, previous: string | null): string {
  */
 export function roomMovedNotice(ip: string, previous: string | null): string {
   if (!previous) return "";
-  const moved = `Your room has moved onto a different address. It was handing out ${previous} earlier and now hands joiners ${ip} for the game itself`;
   return ip === LOOPBACK_HOST
-    ? `${moved}, which points back at their own machine rather than yours.`
-    : `${moved}.`;
+    ? t`Your room has moved onto a different address. It was handing out ${previous} earlier and now hands joiners ${ip} for the game itself, which points back at their own machine rather than yours.`
+    : t`Your room has moved onto a different address. It was handing out ${previous} earlier and now hands joiners ${ip} for the game itself.`;
 }
 
 /** How often the host's own room is asked what it holds. The command reads a
@@ -297,8 +298,10 @@ export const ROOM_POLL_MS = 2000;
  * read as a set of buttons and the sentence is what a host skims.
  */
 export function pendingJoinsHeadline(count: number): string {
-  if (count === 1) return "Somebody is waiting to join";
-  return `${count} people are waiting to join`;
+  return plural(count, {
+    one: "Somebody is waiting to join",
+    other: "# people are waiting to join",
+  });
 }
 
 /**
@@ -327,13 +330,15 @@ export function waitingJoinNotice(names: string[]): {
   title: string;
   body: string;
 } {
-  const who =
-    names.length === 1
-      ? names[0]
-      : `${names.slice(0, -1).join(", ")} and ${names[names.length - 1]}`;
+  const front = names.slice(0, -1).join(", ");
+  const last = names[names.length - 1];
+  const who = names.length === 1 ? last : t`${front} and ${last}`;
   return {
     title: pendingJoinsHeadline(names.length),
-    body: `${who} ${names.length === 1 ? "is" : "are"} waiting for you to let them into your room. Open the battle room to answer.`,
+    body:
+      names.length === 1
+        ? t`${who} is waiting for you to let them into your room. Open the battle room to answer.`
+        : t`${who} are waiting for you to let them into your room. Open the battle room to answer.`,
   };
 }
 
@@ -347,10 +352,10 @@ export function waitingJoinNotice(names: string[]): {
  */
 export function roomPortProblem(typed: string): string | null {
   const value = typed.trim();
-  if (!value) return "Enter a port.";
-  if (!/^\d+$/.test(value)) return "Ports are whole numbers.";
+  if (!value) return t`Enter a port.`;
+  if (!/^\d+$/.test(value)) return t`Ports are whole numbers.`;
   const port = Number(value);
-  if (port < 1 || port > 65535) return "Ports run from 1 to 65535.";
+  if (port < 1 || port > 65535) return t`Ports run from 1 to 65535.`;
   return null;
 }
 
@@ -364,9 +369,9 @@ export function roomPortProblem(typed: string): string | null {
  */
 export function playerNameProblem(typed: string): string | null {
   const name = typed.trim();
-  if (!name) return "Enter the name others will see.";
+  if (!name) return t`Enter the name others will see.`;
   if (/\s/.test(name)) {
-    return "No spaces in your name. A room announces names in single wire fields, so a name with a space in it does not survive the trip.";
+    return t`No spaces in your name. A room announces names in single wire fields, so a name with a space in it does not survive the trip.`;
   }
   return null;
 }
@@ -382,7 +387,7 @@ export function playerNameProblem(typed: string): string | null {
  */
 export function roomPasswordProblem(typed: string): string | null {
   if (/\s/.test(typed.trim())) {
-    return "No spaces in a room password. A room sends it in a single wire field, so a password with a space in it does not survive the trip.";
+    return t`No spaces in a room password. A room sends it in a single wire field, so a password with a space in it does not survive the trip.`;
   }
   // Anything else the join line cannot carry, by the rule a joiner is held to.
   return battlePasswordProblem(typed);
@@ -394,7 +399,7 @@ export function roomPasswordProblem(typed: string): string | null {
  * nothing to join is worse than no room, because it looks like hosting works
  * (issue #1587). */
 export function noBattleFailure(): string {
-  return "The room started but its battle never opened, so the room has been stopped. Try again, and if it keeps happening, host on another port.";
+  return t`The room started but its battle never opened, so the room has been stopped. Try again, and if it keeps happening, host on another port.`;
 }
 
 /** How long to wait for the battle before calling a start failed, and how often

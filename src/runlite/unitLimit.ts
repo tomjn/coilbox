@@ -1,3 +1,4 @@
+import { plural, t } from "@lingui/core/macro";
 import type { UnitDatasetEntry } from "../content/bindings";
 import { buildEdgeMap, reachableFrom } from "../content/buildTree";
 import type { UnitsyncInfoStatus } from "../content/config";
@@ -185,14 +186,14 @@ export function noLimitMessage(
   startUnit: string | undefined,
   gameName: string,
 ): string {
-  const tail = "so coilbox cannot limit your units. Every unit is available.";
+  const startUnitName = startUnit ?? "";
   switch (reason) {
     case "no-start-unit":
-      return `This run has no start unit, ${tail}`;
+      return t`This run has no start unit, so coilbox cannot limit your units. Every unit is available.`;
     case "start-unit-not-in-data":
-      return `${startUnit}, this run's start unit, is not one of the units in ${gameName}, ${tail}`;
+      return t`${startUnitName}, this run's start unit, is not one of the units in ${gameName}, so coilbox cannot limit your units. Every unit is available.`;
     case "reaches-nothing":
-      return `Nothing can be built from ${startUnit}, this run's start unit, ${tail}`;
+      return t`Nothing can be built from ${startUnitName}, this run's start unit, so coilbox cannot limit your units. Every unit is available.`;
   }
 }
 
@@ -202,13 +203,12 @@ export function limitHold(
 ): { label: string; busy: boolean; error?: string } | null {
   switch (readiness.kind) {
     case "loading":
-      return { label: "Loading unit data…", busy: true, error: undefined };
+      return { label: t`Loading unit data…`, busy: true, error: undefined };
     case "failed":
       return {
-        label: "Cannot launch without unit data",
+        label: t`Cannot launch without unit data`,
         busy: false,
-        error:
-          "Coilbox could not read this game's unit data, so it cannot work out your unit limit. The battle will not launch until it can.",
+        error: t`Coilbox could not read this game's unit data, so it cannot work out your unit limit. The battle will not launch until it can.`,
       };
     case "ready":
       return null;
@@ -228,21 +228,19 @@ export function setupLimitWarning(input: {
   units?: UnitDatasetEntry[];
 }): string | null {
   const { gameName, sideName, startUnit, status, units } = input;
-  const tail =
-    "so coilbox cannot limit your units. Rewards will offer perks only and every unit will be available from the first battle.";
   if (status === "error" || (status === "ready" && !units)) {
-    return "Coilbox could not read this game's unit data, so it cannot limit your units. Rewards will offer perks only and every unit will be available from the first battle.";
+    return t`Coilbox could not read this game's unit data, so it cannot limit your units. Rewards will offer perks only and every unit will be available from the first battle.`;
   }
   if (status !== "ready" && status !== "unsyncable") return null;
   if (!startUnit)
-    return `${sideName} has no start unit in ${gameName}, ${tail}`;
+    return t`${sideName} has no start unit in ${gameName}, so coilbox cannot limit your units. Rewards will offer perks only and every unit will be available from the first battle.`;
   if (startSetFor(startUnit, units ?? []).derived) return null;
   const reason = noLimitReason(startUnit, buildEdgeMap(units ?? []));
   if (reason === "start-unit-not-in-data") {
-    return `The start unit for ${sideName}, ${startUnit}, is not one of the units in ${gameName}, ${tail}`;
+    return t`The start unit for ${sideName}, ${startUnit}, is not one of the units in ${gameName}, so coilbox cannot limit your units. Rewards will offer perks only and every unit will be available from the first battle.`;
   }
   if (reason === "reaches-nothing") {
-    return `Nothing can be built from ${startUnit}, the start unit for ${sideName}, ${tail}`;
+    return t`Nothing can be built from ${startUnit}, the start unit for ${sideName}, so coilbox cannot limit your units. Rewards will offer perks only and every unit will be available from the first battle.`;
   }
   return null;
 }
@@ -263,5 +261,9 @@ export function setupLimitNote(input: {
   if ((status !== "ready" && status !== "unsyncable") || !units) return null;
   const set = startSetFor(startUnit, units);
   if (!set.derived) return null;
-  return `${sideName} has no usable start unit in ${gameName}, so the unit limit is based on the ${set.roots.length} mobile units that can build and that no other unit builds or morphs into.`;
+  const rootCount = set.roots.length;
+  return plural(rootCount, {
+    one: `${sideName} has no usable start unit in ${gameName}, so the unit limit is based on the # mobile unit that can build and that no other unit builds or morphs into.`,
+    other: `${sideName} has no usable start unit in ${gameName}, so the unit limit is based on the # mobile units that can build and that no other unit builds or morphs into.`,
+  });
 }

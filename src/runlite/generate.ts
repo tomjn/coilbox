@@ -1,3 +1,4 @@
+import { t } from "@lingui/core/macro";
 import type { MapDownloadHint } from "../campaign/model";
 import type { NodeMaps } from "../challenge/nodeMaps";
 import {
@@ -281,11 +282,33 @@ function drawUnlock(
   };
 }
 
+// Getters, so a perk drawn takes its label in the language active at the time
+// (the spread in `drawPerk` reads the getter once).
 const PERK_POOL: Omit<Perk, "value">[] = [
-  { kind: "advantage", label: "Overclocked Reactor" },
-  { kind: "income", label: "Salvage Refinery" },
-  { kind: "advantage", label: "Veteran Cadre" },
-  { kind: "income", label: "Efficient Logistics" },
+  {
+    kind: "advantage",
+    get label() {
+      return t`Overclocked Reactor`;
+    },
+  },
+  {
+    kind: "income",
+    get label() {
+      return t`Salvage Refinery`;
+    },
+  },
+  {
+    kind: "advantage",
+    get label() {
+      return t`Veteran Cadre`;
+    },
+  },
+  {
+    kind: "income",
+    get label() {
+      return t`Efficient Logistics`;
+    },
+  },
 ];
 
 function drawPerk(rng: Rng, tier: number): Perk {
@@ -313,7 +336,7 @@ function makeReward(
     }
   }
   options.push({ kind: "perk", perk: drawPerk(rng, tier) });
-  return { title: "Salvage Cache", options };
+  return { title: t`Salvage Cache`, options };
 }
 
 // ---------------------------------------------------------------------------
@@ -324,47 +347,49 @@ function makeReward(
 function makeEvent(rng: Rng, tier: number): EventSpec {
   const salvage = 40 + tier * 20;
   const hullCost = 8 + tier * 3;
+  const cacheSalvage = Math.round(salvage / 2);
+  const repairedHull = hullCost * 2;
   const cards: EventSpec[] = [
     {
-      title: "Derelict Hulk",
-      body: "A dead warship drifts in the debris field. Boarding it is a risk — the reactor may still be live.",
+      title: t`Derelict Hulk`,
+      body: t`A dead warship drifts in the debris field. Boarding it is a risk — the reactor may still be live.`,
       choices: [
         {
-          label: "Strip it for salvage",
-          detail: `+${salvage} salvage, -${hullCost} hull`,
+          label: t`Strip it for salvage`,
+          detail: t`+${salvage} salvage, -${hullCost} hull`,
           salvage,
           hull: -hullCost,
         },
-        { label: "Leave it be", detail: "No change" },
+        { label: t`Leave it be`, detail: t`No change` },
       ],
     },
     {
-      title: "Distress Signal",
-      body: "A stranded engineering crew hails you. They offer expertise in exchange for passage.",
+      title: t`Distress Signal`,
+      body: t`A stranded engineering crew hails you. They offer expertise in exchange for passage.`,
       choices: [
         {
-          label: "Take them aboard",
-          detail: "Gain a field upgrade",
+          label: t`Take them aboard`,
+          detail: t`Gain a field upgrade`,
           perk: drawPerk(rng, tier),
         },
         {
-          label: "Requisition their cache",
-          detail: `+${Math.round(salvage / 2)} salvage`,
-          salvage: Math.round(salvage / 2),
+          label: t`Requisition their cache`,
+          detail: t`+${cacheSalvage} salvage`,
+          salvage: cacheSalvage,
         },
       ],
     },
     {
-      title: "Repair Bay",
-      body: "An automated depot offers to patch your hull — for a price in salvage.",
+      title: t`Repair Bay`,
+      body: t`An automated depot offers to patch your hull — for a price in salvage.`,
       choices: [
         {
-          label: "Dock and repair",
-          detail: `+${hullCost * 2} hull, -${salvage} salvage`,
-          hull: hullCost * 2,
+          label: t`Dock and repair`,
+          detail: t`+${repairedHull} hull, -${salvage} salvage`,
+          hull: repairedHull,
           salvage: -salvage,
         },
-        { label: "Press on", detail: "No change" },
+        { label: t`Press on`, detail: t`No change` },
       ],
     },
   ];

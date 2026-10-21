@@ -1,3 +1,5 @@
+import { t as coreT } from "@lingui/core/macro";
+import { Trans, useLingui } from "@lingui/react/macro";
 import { Button, useDrawer, useHideSidebar } from "@picoframe/frame";
 import { ArrowLeft, Check, X } from "lucide-react";
 import { useCallback, useMemo, useState } from "react";
@@ -60,6 +62,7 @@ import { RunHud } from "./components/RunHud";
 export default function RunPage() {
   // The node map wants the full width. The nav stays reachable from the top bar.
   useHideSidebar();
+  const { t } = useLingui();
   const { runId } = useParams();
   const { run: savedRun, loading, error: loadError, save } = useRun(runId);
   // A replay's "back to node" link deep-links here as `?node=<id>`, honoured
@@ -115,8 +118,9 @@ export default function RunPage() {
   const mapProblem = useMemo(() => {
     if (handmadeMap.problem) return handmadeMap.problem;
     if (!run || !handmadeDoc || runLocations(run, handmadeDoc)) return null;
-    return `The hand-made map "${handmadeDoc.title}" has changed since this warpath began, and the run no longer fits it.`;
-  }, [handmadeMap.problem, handmadeDoc, run?.nodes, run?.edges]);
+    const mapTitle = handmadeDoc.title;
+    return t`The hand-made map "${mapTitle}" has changed since this warpath began, and the run no longer fits it.`;
+  }, [handmadeMap.problem, handmadeDoc, run?.nodes, run?.edges, t]);
   // What to say about the run's game and engine on opening the run (issue
   // #3369). The map a battle needs is checked by that battle's own briefing.
   const gameNotice = run
@@ -177,9 +181,8 @@ export default function RunPage() {
     run && dataset && run.startUnit
       ? () =>
           drawer.open({
-            title: "Arsenal",
-            description:
-              "Units unlocked into your shared arsenal, lit up against the faction's full build tree.",
+            title: t`Arsenal`,
+            description: t`Units unlocked into your shared arsenal, lit up against the faction's full build tree.`,
             width: "40rem",
             content: (
               <UnitPicker
@@ -196,7 +199,7 @@ export default function RunPage() {
                     : []
                 }
                 selected={run.progress.unlockedUnits}
-                selectedLabel="unlocked"
+                selectedLabel={t`unlocked`}
                 enginePath={target?.enginePath}
                 dataDir={target?.dataDir}
                 gameArchive={game?.primaryArchive.name}
@@ -224,14 +227,16 @@ export default function RunPage() {
       <div className="p-6">
         {loadError ? (
           <ErrorBanner
-            message={`Your warpath runs could not be read. Nothing has been changed. ${loadError}`}
+            message={t`Your warpath runs could not be read. Nothing has been changed. ${loadError}`}
           />
         ) : (
-          <EmptyState label="No active warpath." />
+          <EmptyState label={t`No active warpath.`} />
         )}
         <div className="mt-4">
           <Link to="/warpath">
-            <Button>{loadError ? "Back to warpath" : "Start a warpath"}</Button>
+            <Button>
+              {loadError ? t`Back to warpath` : t`Start a warpath`}
+            </Button>
           </Link>
         </div>
       </div>
@@ -334,7 +339,7 @@ export default function RunPage() {
             <span
               className={`${MAP_BAND_CLASS} px-1.5 py-0.5 text-[10px] tracking-wide ${MAP_DIM_INK_CLASS}`}
             >
-              Imported challenge
+              <Trans>Imported challenge</Trans>
             </span>
           )}
           <ChallengeRecordLine
@@ -352,7 +357,7 @@ export default function RunPage() {
             <button
               type="button"
               onClick={() => setSelectedId(null)}
-              aria-label="Back to map"
+              aria-label={t`Back to map`}
               className={`pointer-events-auto flex items-center justify-center px-3 text-muted-foreground transition-colors hover:text-foreground ${HUD_CARD_CLASS}`}
             >
               <ArrowLeft className="size-5" aria-hidden />
@@ -360,7 +365,7 @@ export default function RunPage() {
           ) : (
             <Link
               to="/warpath"
-              aria-label="Back to warpath hub"
+              aria-label={t`Back to warpath hub`}
               className={`pointer-events-auto flex items-center justify-center px-3 text-muted-foreground transition-colors hover:text-foreground ${HUD_CARD_CLASS}`}
             >
               <ArrowLeft className="size-5" aria-hidden />
@@ -392,8 +397,11 @@ export default function RunPage() {
             role="alert"
             className={`pointer-events-auto max-w-xl p-3 text-sm ${HUD_CARD_CLASS}`}
           >
-            {mapProblem} This warpath is drawn in columns until the map is back
-            as it was, and it can still be played.
+            {mapProblem}{" "}
+            <Trans>
+              This warpath is drawn in columns until the map is back as it was,
+              and it can still be played.
+            </Trans>
           </p>
         )}
         {selectedId && !active && (
@@ -461,15 +469,24 @@ export default function RunPage() {
   );
 }
 
-const NODE_TITLE: Record<RunNodeType, string> = {
-  start: "Command",
-  battle: "Battle",
-  elite: "Elite garrison",
-  boss: "Sector warlord",
-  reward: "Salvage cache",
-  event: "Signal",
-  shop: "Depot",
-};
+function nodeTitle(type: RunNodeType): string {
+  switch (type) {
+    case "start":
+      return coreT`Command`;
+    case "battle":
+      return coreT`Battle`;
+    case "elite":
+      return coreT`Elite garrison`;
+    case "boss":
+      return coreT`Sector warlord`;
+    case "reward":
+      return coreT`Salvage cache`;
+    case "event":
+      return coreT`Signal`;
+    case "shop":
+      return coreT`Depot`;
+  }
+}
 
 /** Per-type accent colour, matching the node tokens on the map. */
 const NODE_TINT: Record<RunNodeType, string> = {
@@ -482,32 +499,43 @@ const NODE_TINT: Record<RunNodeType, string> = {
   boss: "#ff5468",
 };
 
-const NODE_DESC: Record<RunNodeType, string> = {
-  start:
-    "Your commander deploys here. Chart a course onward toward the warlord.",
-  battle:
-    "A hostile garrison. Win to bank salvage; lose and you retreat, scarred.",
-  elite: "A veteran garrison — tougher, but the salvage is richer.",
-  boss: "The sector warlord. Break it to win the run.",
-  reward:
-    "Recover a schematic to widen the arsenal, or a field upgrade for yourself.",
-  event: "A choice on the wire — no battle.",
-  shop: "Spend salvage on unlocks, perks, and repairs.",
-};
+function nodeDescription(type: RunNodeType): string {
+  switch (type) {
+    case "start":
+      return coreT`Your commander deploys here. Chart a course onward toward the warlord.`;
+    case "battle":
+      return coreT`A hostile garrison. Win to bank salvage; lose and you retreat, scarred.`;
+    case "elite":
+      return coreT`A veteran garrison — tougher, but the salvage is richer.`;
+    case "boss":
+      return coreT`The sector warlord. Break it to win the run.`;
+    case "reward":
+      return coreT`Recover a schematic to widen the arsenal, or a field upgrade for yourself.`;
+    case "event":
+      return coreT`A choice on the wire — no battle.`;
+    case "shop":
+      return coreT`Spend salvage on unlocks, perks, and repairs.`;
+  }
+}
 
 /** A short stat preview for a node, so you can read what it holds before
  * committing your course. */
 function previewRows(node: RunNode): [string, string][] {
   if (node.battle) {
     const b = node.battle;
+    const hostileCount = b.enemyAiCount;
+    const hostileHandicap = b.handicap;
+    const reward = salvageReward(node);
     return [
       [
-        "Opposition",
-        `${b.enemyAiCount} × hostile${b.handicap > 0 ? ` (+${b.handicap}%)` : ""}`,
+        coreT`Opposition`,
+        b.handicap > 0
+          ? coreT`${hostileCount} × hostile (+${hostileHandicap}%)`
+          : coreT`${hostileCount} × hostile`,
       ],
-      ["Tech tier", `${b.techTier}`],
-      ["Health at risk", `-${hullLoss(node)}`],
-      ["Reward", `+${salvageReward(node)} salvage`],
+      [coreT`Tech tier`, `${b.techTier}`],
+      [coreT`Health at risk`, `-${hullLoss(node)}`],
+      [coreT`Reward`, coreT`+${reward} salvage`],
     ];
   }
   if (node.reward) {
@@ -515,20 +543,18 @@ function previewRows(node: RunNode): [string, string][] {
       (o) => o.kind === "unlock",
     ).length;
     const perks = node.reward.options.length - unlocks;
-    return [["Choose one of", `${unlocks} unlock, ${perks} perk`]];
+    return [[coreT`Choose one of`, coreT`${unlocks} unlock, ${perks} perk`]];
   }
-  if (node.event) return [["A choice awaits", "no battle"]];
+  if (node.event) return [[coreT`A choice awaits`, coreT`no battle`]];
   if (node.shop) {
     const cheapest = Math.min(...node.shop.offers.map((o) => o.cost));
+    const restHull = node.shop.restHull;
     return [
-      ["Offers", `${node.shop.offers.length}`],
+      [coreT`Offers`, `${node.shop.offers.length}`],
       // Surface the price floor so you can weigh a depot against your salvage
       // before charting a course to it — depots are rare, so a wasted visit hurts.
-      ["Cheapest", `${cheapest} salvage`],
-      [
-        "Rest & repair",
-        node.shop.restHull ? `+${node.shop.restHull} hull` : "—",
-      ],
+      [coreT`Cheapest`, coreT`${cheapest} salvage`],
+      [coreT`Rest & repair`, restHull ? coreT`+${restHull} hull` : "—"],
     ];
   }
   return [];
@@ -557,6 +583,7 @@ function InspectPanel({
   onRestoreMap: (nodeId: string) => Promise<void>;
   onClose: () => void;
 }) {
+  const { t } = useLingui();
   if (!node) return null;
   const rows = previewRows(node);
   const tint = NODE_TINT[node.type];
@@ -575,7 +602,7 @@ function InspectPanel({
               className="font-display text-[10px] font-semibold uppercase tracking-wider"
               style={{ color: tint }}
             >
-              {NODE_TITLE[node.type]}
+              {nodeTitle(node.type)}
             </div>
             {node.battle && (
               <div className="mt-1 text-sm">
@@ -588,7 +615,7 @@ function InspectPanel({
               </div>
             )}
             <p className="mt-1 text-xs text-muted-foreground">
-              {NODE_DESC[node.type]}
+              {nodeDescription(node.type)}
             </p>
           </div>
           <button
@@ -612,7 +639,7 @@ function InspectPanel({
         {isBattleNode(node.type) && (
           <div className="flex flex-col gap-1.5">
             <span className="font-display text-[10px] uppercase tracking-wider text-muted-foreground">
-              Battle history
+              <Trans>Battle history</Trans>
             </span>
             <ReplayHistoryList
               dataDir={dataDir}
@@ -621,7 +648,7 @@ function InspectPanel({
                 p.runId === runId &&
                 p.nodeId === node.id
               }
-              emptyLabel="No battles fought here yet."
+              emptyLabel={t`No battles fought here yet.`}
             />
           </div>
         )}
@@ -636,7 +663,7 @@ function InspectPanel({
         )}
         {isChoice && (
           <Button size="sm" onClick={onEnter} className="w-full">
-            Chart a course here
+            <Trans>Chart a course here</Trans>
           </Button>
         )}
       </div>

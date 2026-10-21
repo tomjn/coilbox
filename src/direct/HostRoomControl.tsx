@@ -1,3 +1,5 @@
+import { useLingui as useLocale } from "@lingui/react";
+import { Trans, useLingui } from "@lingui/react/macro";
 import { Button, useDrawer } from "@picoframe/frame";
 import { useEffect, useRef } from "react";
 import { nextDrawerKey } from "@/general/drawerKey";
@@ -99,6 +101,9 @@ function RunningRoom({
   error: string | null;
   onStop: () => void;
 }) {
+  // Subscribes to the language, since the lines below come from functions in
+  // room.ts that read it when called.
+  useLocale();
   return (
     <div className="flex flex-col items-end gap-1">
       <div className="flex items-center gap-2">
@@ -115,7 +120,7 @@ function RunningRoom({
           disabled={busy}
           onClick={onStop}
         >
-          Stop room
+          <Trans>Stop room</Trans>
         </Button>
       </div>
       {/* The room used to prove this by turning up in the list of rooms on the
@@ -152,6 +157,7 @@ function RunningRoom({
  */
 function GameAddress({ ip }: { ip: string }) {
   const movedFrom = useRoomMovedFrom();
+  useLocale();
   return (
     <span role="status" className="text-right text-xs text-muted-foreground">
       {gameAddressNote(ip, movedFrom)}
@@ -176,9 +182,10 @@ function HostRoomDrawerButton({
   onStart: (args: StartRoomArgs) => Promise<string | undefined>;
 }) {
   const drawer = useDrawer();
+  const { t } = useLingui();
   const openForm = () =>
     drawer.open({
-      title: "Host on LAN",
+      title: t`Host on LAN`,
       // No description. The page this button sits on has already said a room
       // needs no server and no account, and repeating it costs a line the
       // form needs to stand up in one short laptop window.
@@ -216,7 +223,7 @@ function HostRoomDrawerButton({
         className="h-8 px-3"
         onClick={() =>
           drawer.open({
-            title: "Host against the computer",
+            title: t`Host against the computer`,
             width: "30rem",
             content: (
               <QuickRoom
@@ -230,10 +237,10 @@ function HostRoomDrawerButton({
           })
         }
       >
-        Host vs computer
+        <Trans>Host vs computer</Trans>
       </Button>
       <Button variant="secondary" className="h-8 px-3" onClick={openForm}>
-        Host on LAN
+        <Trans>Host on LAN</Trans>
       </Button>
     </div>
   );

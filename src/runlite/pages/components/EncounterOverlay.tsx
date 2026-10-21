@@ -1,3 +1,5 @@
+import { t as coreT } from "@lingui/core/macro";
+import { Trans, useLingui } from "@lingui/react/macro";
 import { Button } from "@picoframe/frame";
 import { Swords } from "lucide-react";
 import { SubstitutedMapNote } from "../../../challenge/SubstitutedMapNote";
@@ -50,6 +52,7 @@ export function EncounterOverlay({
   /** The scenario this node plays, read from the run's hand-made map. */
   scenario?: NodeScenario;
 }) {
+  const { t } = useLingui();
   const enc = useRunEncounter(run, node, onResolved, runId, scenario);
   // The node names a scenario and the map could not give it, so the node's
   // own encounter is fought and the briefing says why.
@@ -66,6 +69,7 @@ export function EncounterOverlay({
     target?.dataDir,
     offered?.primaryArchive.name,
   );
+  const offeredName = offered?.name;
   const offerNote = offered
     ? offeredDataset
       ? moveNote(
@@ -75,22 +79,25 @@ export function EncounterOverlay({
             offeredDataset.units.map((u) => u.name),
           ),
         )
-      : `Checking that your units exist in ${offered.name}…`
+      : t`Checking that your units exist in ${offeredName}…`
     : undefined;
   const hold = limitHold(enc.limit);
   const spec = node.battle;
   const kindLabel =
     node.type === "boss"
-      ? "Warlord"
+      ? t`Warlord`
       : node.type === "elite"
-        ? "Elite"
-        : "Battle";
+        ? t`Elite`
+        : t`Battle`;
+  const mapNameForPreset = spec?.mapName ?? t`battle`;
+  const hostileCount = spec?.enemyAiCount;
+  const hostileHandicap = spec?.handicap;
 
   return (
     <div className="absolute inset-0 z-20 flex items-end justify-center p-4 pb-10">
       <button
         type="button"
-        aria-label="Back to map"
+        aria-label={t`Back to map`}
         onClick={onClose}
         className="absolute inset-0 cursor-default"
       />
@@ -103,7 +110,7 @@ export function EncounterOverlay({
           // A scenario is not a skirmish setup, so there is no preset to save.
           installedGame={!!enc.installedGame && !scenario}
           getDraft={() => enc.lastSnapshot ?? enc.snapshot()}
-          defaultName={`${kindLabel} — ${spec?.mapName ?? "battle"}`}
+          defaultName={`${kindLabel} — ${mapNameForPreset}`}
         />
         <header className="flex flex-col gap-1">
           <h1 className="flex items-center gap-2 font-display text-lg font-semibold uppercase tracking-wide">
@@ -116,19 +123,22 @@ export function EncounterOverlay({
           <div className="flex flex-col gap-3">
             <dl className="flex flex-col gap-1.5 text-sm">
               {enc.installedGame && (
-                <Row label="Game" value={enc.installedGame.name} />
+                <Row label={t`Game`} value={enc.installedGame.name} />
               )}
               {scenario ? (
                 // A scenario sets its own map and forces, and the run's unit
                 // limit is not applied to it.
                 <>
-                  <Row label="Battlefield" value={scenario.doc.setup.mapName} />
-                  <Row label="Scenario" value={scenario.doc.name} />
+                  <Row
+                    label={t`Battlefield`}
+                    value={scenario.doc.setup.mapName}
+                  />
+                  <Row label={t`Scenario`} value={scenario.doc.name} />
                   {/* Set by the run's difficulty and how far along it this
                       location is, not picked here (issue #3593). */}
                   {enc.scenarioDifficulty && (
                     <Row
-                      label="Difficulty"
+                      label={t`Difficulty`}
                       value={DIFFICULTY_LABEL[enc.scenarioDifficulty]}
                     />
                   )}
@@ -136,24 +146,28 @@ export function EncounterOverlay({
               ) : (
                 <>
                   <Row
-                    label="Battlefield"
+                    label={t`Battlefield`}
                     value={spec.mapName}
                     note={spec.mapSubstitutedFrom}
                     onRestoreNote={() => onRestoreMap(node.id)}
                   />
                   <Row
-                    label="Opposition"
-                    value={`${spec.enemyAiCount} × hostile${spec.handicap > 0 ? ` (+${spec.handicap}%)` : ""}`}
+                    label={t`Opposition`}
+                    value={
+                      spec.handicap > 0
+                        ? t`${hostileCount} × hostile (+${hostileHandicap}%)`
+                        : t`${hostileCount} × hostile`
+                    }
                   />
-                  <Row label="Tech tier" value={`${spec.techTier}`} />
+                  <Row label={t`Tech tier`} value={`${spec.techTier}`} />
                 </>
               )}
             </dl>
             {scenario ? (
               <p className="text-sm text-muted-foreground">
-                This location is a scenario, not a skirmish.
+                <Trans>This location is a scenario, not a skirmish.</Trans>
                 {scenario.doc.description ? ` ${scenario.doc.description}` : ""}{" "}
-                Win it to clear the location.
+                <Trans>Win it to clear the location.</Trans>
               </p>
             ) : (
               <UnitLimitNote
@@ -168,13 +182,17 @@ export function EncounterOverlay({
             )}
             {scenarioLost && (
               <p className={`text-xs ${HUD_ACCENT_INK.amber}`}>
-                This location plays a scenario from the hand-made map, and the
-                scenario could not be read. It is a skirmish on the same
-                battlefield until the map is back as it was.
+                <Trans>
+                  This location plays a scenario from the hand-made map, and the
+                  scenario could not be read. It is a skirmish on the same
+                  battlefield until the map is back as it was.
+                </Trans>
               </p>
             )}
             <p className="text-xs text-muted-foreground">
-              Defeat costs health, not the warpath — you retreat and press on.
+              <Trans>
+                Defeat costs health, not the warpath — you retreat and press on.
+              </Trans>
             </p>
             <BattleLaunchGate
               error={enc.error ?? (scenario ? undefined : hold?.error)}
@@ -207,7 +225,7 @@ export function EncounterOverlay({
                 onClick={enc.reloadUnitData}
                 className="w-full"
               >
-                Try reading the unit data again
+                <Trans>Try reading the unit data again</Trans>
               </Button>
             )}
           </div>
@@ -229,16 +247,16 @@ export function EncounterOverlay({
             <h2
               className={`font-display text-2xl font-bold uppercase tracking-wide ${enc.phase === "victory" ? "text-emerald-400" : HUD_ACCENT_INK.danger}`}
             >
-              {enc.phase === "victory" ? "Victory" : "Defeat"}
+              {enc.phase === "victory" ? t`Victory` : t`Defeat`}
             </h2>
             <p className="text-sm text-muted-foreground">
               {enc.phase === "victory"
-                ? "Salvage recovered — chart your next course."
-                : "You retreat, hull scarred."}
+                ? t`Salvage recovered — chart your next course.`
+                : t`You retreat, hull scarred.`}
             </p>
             {enc.autoDetected && (
               <p className="text-xs text-muted-foreground">
-                Result detected from the replay.
+                <Trans>Result detected from the replay.</Trans>
               </p>
             )}
             <Button
@@ -247,7 +265,7 @@ export function EncounterOverlay({
                 onClose();
               }}
             >
-              Return to the map
+              <Trans>Return to the map</Trans>
             </Button>
           </div>
         )}
@@ -259,11 +277,14 @@ export function EncounterOverlay({
 /** What to tell the player about moving the run's units to another game. */
 function moveNote(gameName: string, missing: string[]): string {
   if (missing.length === 0) {
-    return `Your start unit and unlocked units are all in ${gameName}.`;
+    return coreT`Your start unit and unlocked units are all in ${gameName}.`;
   }
   const shown = missing.slice(0, 8).join(", ");
-  const more = missing.length > 8 ? ` and ${missing.length - 8} more` : "";
-  return `${gameName} does not have these units from your run: ${shown}${more}. They will not be available if you move.`;
+  if (missing.length > 8) {
+    const extra = missing.length - 8;
+    return coreT`${gameName} does not have these units from your run: ${shown} and ${extra} more. They will not be available if you move.`;
+  }
+  return coreT`${gameName} does not have these units from your run: ${shown}. They will not be available if you move.`;
 }
 
 function Row({

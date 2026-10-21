@@ -1,3 +1,4 @@
+import { Trans, useLingui } from "@lingui/react/macro";
 import { Button, useDrawer } from "@picoframe/frame";
 import { ChevronRight, Lock, Users } from "lucide-react";
 import { useState } from "react";
@@ -82,7 +83,7 @@ export function LanRooms({
               collapsed ? "" : "rotate-90"
             }`}
           />
-          Local Network
+          <Trans>Local Network</Trans>
           <span>{rooms.length}</span>
         </button>
         {/* Outside the collapse on purpose. A room heard on nobody's network is
@@ -100,8 +101,11 @@ export function LanRooms({
           worth reading and a count of 0 that does not explain itself. */}
       {error && (
         <p role="alert" className="text-xs text-destructive">
-          {error} Rooms on this network will not be listed, but you can still
-          join one by address.
+          {error}{" "}
+          <Trans>
+            Rooms on this network will not be listed, but you can still join one
+            by address.
+          </Trans>
         </p>
       )}
 
@@ -109,9 +113,11 @@ export function LanRooms({
         (rooms.length === 0 ? (
           !error && (
             <p className="text-left text-xs text-muted-foreground">
-              No rooms found. Some networks stop devices seeing each other, so a
-              room that is up may still not be listed here. Ask the host for
-              their address and join by address.
+              <Trans>
+                No rooms found. Some networks stop devices seeing each other, so
+                a room that is up may still not be listed here. Ask the host for
+                their address and join by address.
+              </Trans>
             </p>
           )
         ) : (
@@ -157,6 +163,9 @@ function LanRoomRow({
   dataDir?: string;
   onJoin: (args: JoinRoomArgs) => Promise<void>;
 }) {
+  const { t } = useLingui();
+  const mapName = room.map;
+  const hostName = room.host;
   const { url, loading } = useUnitsyncMinimap(
     enginePath,
     dataDir,
@@ -169,7 +178,7 @@ function LanRoomRow({
         <MapThumb
           url={url ?? undefined}
           loading={loading}
-          alt={`Minimap of ${room.map}`}
+          alt={t`Minimap of ${mapName}`}
         />
       </div>
       <div className="min-w-0 flex-1">
@@ -177,13 +186,13 @@ function LanRoomRow({
           {room.passworded && (
             <Lock
               className="size-3.5 shrink-0 text-muted-foreground"
-              aria-label="Passworded"
+              aria-label={t`Passworded`}
             />
           )}
           <span className="truncate">{room.title}</span>
         </p>
         <p className="truncate text-xs text-muted-foreground">
-          {room.map} · {room.game} · host {room.host}
+          {room.map} · {room.game} · <Trans>host {hostName}</Trans>
         </p>
       </div>
       <div className="flex shrink-0 items-center gap-1 text-xs text-muted-foreground">
@@ -226,6 +235,8 @@ function JoinRoomDrawerButton({
   onJoin: (args: JoinRoomArgs) => Promise<void>;
 }) {
   const drawer = useDrawer();
+  const { t } = useLingui();
+  const roomTitle = target?.title;
   return (
     // Deliberately not disabled while a join is unavailable: a
     // button that does nothing and says nothing is the failure this milestone is
@@ -233,12 +244,10 @@ function JoinRoomDrawerButton({
     <Button
       variant="secondary"
       className="h-8 shrink-0 px-3"
-      aria-label={
-        target?.title ? `Join ${target.title}` : "Join a room by address"
-      }
+      aria-label={roomTitle ? t`Join ${roomTitle}` : t`Join a room by address`}
       onClick={() =>
         drawer.open({
-          title: target?.title ? `Join ${target.title}` : "Join by address",
+          title: roomTitle ? t`Join ${roomTitle}` : t`Join by address`,
           width: "30rem",
           content: (
             <JoinRoomForm
@@ -253,7 +262,7 @@ function JoinRoomDrawerButton({
         })
       }
     >
-      {target?.title ? "Join" : "Join by address"}
+      {roomTitle ? t`Join` : t`Join by address`}
     </Button>
   );
 }

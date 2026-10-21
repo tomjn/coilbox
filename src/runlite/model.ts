@@ -1,3 +1,4 @@
+import { t } from "@lingui/core/macro";
 import type { CampaignUnit, MapDownloadHint } from "../campaign/model";
 import { parseMapDownload, parseUnits } from "../campaign/model";
 import { type HandmadeMapRef, parseHandmadeMapRef } from "../challenge/mapRef";
@@ -481,7 +482,7 @@ function parseReward(value: unknown): RewardSpec | undefined {
     ? value.options.map(parseRewardOption).filter((o): o is RewardOption => !!o)
     : [];
   return {
-    title: typeof value.title === "string" ? value.title : "Salvage",
+    title: typeof value.title === "string" ? value.title : t`Salvage`,
     options,
   };
 }
@@ -492,7 +493,7 @@ function parseEvent(value: unknown): EventSpec | undefined {
     ? value.choices.filter(isRecord).map((c): EventChoice => {
         const perk = parsePerk(c.perk);
         return {
-          label: typeof c.label === "string" ? c.label : "Continue",
+          label: typeof c.label === "string" ? c.label : t`Continue`,
           detail: typeof c.detail === "string" ? c.detail : undefined,
           hull:
             typeof c.hull === "number" && Number.isFinite(c.hull)
@@ -511,7 +512,7 @@ function parseEvent(value: unknown): EventSpec | undefined {
       })
     : [];
   return {
-    title: typeof value.title === "string" ? value.title : "Signal",
+    title: typeof value.title === "string" ? value.title : t`Signal`,
     body: typeof value.body === "string" ? value.body : "",
     choices,
   };

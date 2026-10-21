@@ -12,6 +12,7 @@
  * held here for that reason: the form asking is the form told.
  */
 
+import { Trans, useLingui } from "@lingui/react/macro";
 import { Button, Input, useDrawer } from "@picoframe/frame";
 import { useState } from "react";
 import { battlePasswordProblem } from "@/deeplink/parse";
@@ -69,6 +70,10 @@ export function JoinRoomForm({
   onJoin: (args: JoinRoomArgs) => Promise<void>;
 }) {
   const drawer = useDrawer();
+  const { t } = useLingui();
+  const linkAddress = target?.address;
+  const linkPort = target?.port;
+  const roomTitle = target?.title;
   const [address, setAddress] = useState(target?.address ?? "");
   // Held as typed rather than as a number, so the field can be emptied and a bad
   // value can be shown back rather than corrected underneath.
@@ -143,21 +148,25 @@ export function JoinRoomForm({
           there rather than here (see `joinRoomFailure`). */}
       {target?.from === "link" && (
         <p className="text-sm text-muted-foreground">
-          From a link, to a room at {target.address}:{target.port}. Nothing
-          connects until you press Join, and if the host has stopped hosting you
-          will be told so.
+          <Trans>
+            From a link, to a room at {linkAddress}:{linkPort}. Nothing connects
+            until you press Join, and if the host has stopped hosting you will
+            be told so.
+          </Trans>
         </p>
       )}
       {target?.from === "network" && (
         <p className="text-sm text-muted-foreground">
-          Joining {target.title}, found on this network.
+          <Trans>Joining {roomTitle}, found on this network.</Trans>
         </p>
       )}
 
       <div className="flex gap-2">
         {/* biome-ignore lint/a11y/noLabelWithoutControl: wraps the control (implicit label association) */}
         <label className="flex flex-[2] flex-col gap-1 text-sm">
-          <span className="font-medium">Host address</span>
+          <span className="font-medium">
+            <Trans>Host address</Trans>
+          </span>
           <Input
             value={address}
             onChange={(e) => setAddress(e.target.value)}
@@ -170,7 +179,9 @@ export function JoinRoomForm({
 
         {/* biome-ignore lint/a11y/noLabelWithoutControl: wraps the control (implicit label association) */}
         <label className="flex flex-1 flex-col gap-1 text-sm">
-          <span className="font-medium">Port</span>
+          <span className="font-medium">
+            <Trans>Port</Trans>
+          </span>
           {/* Shows the port that will be dialled, which is the one in the
               address while there is one. Typing here takes it back off the
               address, so this field is never showing one port and the join
@@ -194,11 +205,13 @@ export function JoinRoomForm({
 
       {/* biome-ignore lint/a11y/noLabelWithoutControl: wraps the control (implicit label association) */}
       <label className="flex flex-col gap-1 text-sm">
-        <span className="font-medium">Your name</span>
+        <span className="font-medium">
+          <Trans>Your name</Trans>
+        </span>
         <Input
           value={name}
           onChange={(e) => setName(e.target.value)}
-          placeholder="The name others see"
+          placeholder={t`The name others see`}
           {...identifierFieldProps}
         />
         {nameProblem && (
@@ -212,15 +225,19 @@ export function JoinRoomForm({
       {/* biome-ignore lint/a11y/noLabelWithoutControl: wraps the control (implicit label association) */}
       <label className="flex flex-col gap-1 text-sm">
         <span className="font-medium">
-          {target?.passworded
-            ? "Room password"
-            : "Password (if the host set one)"}
+          {target?.passworded ? (
+            <Trans>Room password</Trans>
+          ) : (
+            <Trans>Password (if the host set one)</Trans>
+          )}
         </span>
         <Input
           type="password"
           value={password}
           onChange={(e) => setPassword(e.target.value)}
-          placeholder={target?.passworded ? "" : "Leave blank for an open room"}
+          placeholder={
+            target?.passworded ? "" : t`Leave blank for an open room`
+          }
           {...identifierFieldProps}
         />
       </label>
@@ -243,10 +260,14 @@ export function JoinRoomForm({
           className="h-9"
           onClick={() => drawer.close()}
         >
-          Cancel
+          <Trans>Cancel</Trans>
         </Button>
         <Button type="submit" className="h-9" disabled={!canJoin}>
-          {joining ? "Joining…" : leaves ? leaveAndLabel("join") : "Join room"}
+          {joining
+            ? t`Joining…`
+            : leaves
+              ? leaveAndLabel("join")
+              : t`Join room`}
         </Button>
       </div>
     </form>

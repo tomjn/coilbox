@@ -1,3 +1,4 @@
+import { t } from "@lingui/core/macro";
 import type { DirectLocalAddress } from "./bindings";
 import {
   type DirectReachability,
@@ -90,19 +91,21 @@ export function shareAddresses(
       ? reachability.publicAddress
       : null;
   const named = local.filter((a) => a.address !== publicHost).length > 1;
-  const shared: ShareAddress[] = local.map((a) =>
-    a.address === publicHost
-      ? outsideAddress(a.address, port, announced)
-      : {
-          scope: "network",
-          label: named ? `On ${a.interface}` : "On this network",
-          address: a.address,
-          port,
-          who: named
-            ? `for somebody on the same network as this machine's ${a.interface}`
-            : "for somebody on the same network as you",
-        },
-  );
+  const shared: ShareAddress[] = local.map((a) => {
+    if (a.address === publicHost) {
+      return outsideAddress(a.address, port, announced);
+    }
+    const interfaceName = a.interface;
+    return {
+      scope: "network",
+      label: named ? t`On ${interfaceName}` : t`On this network`,
+      address: a.address,
+      port,
+      who: named
+        ? t`for somebody on the same network as this machine's ${interfaceName}`
+        : t`for somebody on the same network as you`,
+    };
+  });
 
   // Already `address:port`, and the port in it is the router's rather than the
   // room's whenever the router handed back a different one. Skipped when the
@@ -150,32 +153,33 @@ function outsideAddress(
 ): ShareAddress {
   const row: ShareAddress = {
     scope: "internet",
-    label: "From outside",
+    label: t`From outside`,
     address,
     port,
-    who: "for somebody who is not on your network",
+    who: t`for somebody who is not on your network`,
   };
   if (announced === address) return row;
   return {
     ...row,
-    who: `${row.who}, who can join this room and chat but cannot start the game`,
-    caveat: `They can join this room and chat. They cannot start the game, because the room gives everybody in it ${announced}, which nothing outside your network can dial.`,
+    who: t`for somebody who is not on your network, who can join this room and chat but cannot start the game`,
+    caveat: t`They can join this room and chat. They cannot start the game, because the room gives everybody in it ${announced}, which nothing outside your network can dial.`,
   };
 }
 
 /** What a host reads when there is nothing to hand out. Every row is an address
  *  somebody else can use, so an empty list is a machine on no network. */
-export const NO_ADDRESS =
-  "This room has no address another computer can reach, because this machine is on no network.";
+export function noAddressNote(): string {
+  return t`This room has no address another computer can reach, because this machine is on no network.`;
+}
 
 /** The one line above the addresses, which changes with what there is to say.
  *  Pure. */
 export function shareHeadline(addresses: ShareAddress[]): string {
-  if (addresses.length === 0) return NO_ADDRESS;
+  if (addresses.length === 0) return noAddressNote();
   if (addresses.filter((a) => a.scope === "network").length > 1) {
-    return "Give joiners the address for the network they are on.";
+    return t`Give joiners the address for the network they are on.`;
   }
-  return "Give joiners this address.";
+  return t`Give joiners this address.`;
 }
 
 /**
@@ -196,7 +200,7 @@ export function shareNotices(
   addresses: ShareAddress[],
   advertise: boolean,
 ): string[] {
-  if (addresses.length === 0) return [NO_ADDRESS];
+  if (addresses.length === 0) return [noAddressNote()];
   const notices: string[] = [];
   for (const a of addresses) {
     if (a.caveat) notices.push(`${a.label}: ${a.caveat}`);

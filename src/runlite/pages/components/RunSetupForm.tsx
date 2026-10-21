@@ -1,3 +1,4 @@
+import { Trans, useLingui } from "@lingui/react/macro";
 import { Button, useSetting } from "@picoframe/frame";
 import { Loader2, Swords } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
@@ -90,6 +91,7 @@ export function RunSetupForm({
    */
   initialGameName?: string;
 }) {
+  const { t } = useLingui();
   const { target } = usePreferredTarget();
   const scan = useUnitsyncScan(target?.enginePath, target?.dataDir);
   const { saveRun } = useRuns();
@@ -264,7 +266,7 @@ export function RunSetupForm({
   // Said before the run starts, so the player knows when no unit limit applies.
   const limitInput = {
     gameName: game?.name ?? "",
-    sideName: sideName || "this game",
+    sideName: sideName || t`this game`,
     startUnit: side?.startUnit,
     status: datasetStatus,
     units: dataset?.units,
@@ -360,13 +362,15 @@ export function RunSetupForm({
         throw e;
       }
     } catch (e) {
-      setStartError(
-        `The warpath was not started. ${e instanceof Error ? e.message : String(e)}`,
-      );
+      const reason = e instanceof Error ? e.message : String(e);
+      setStartError(t`The warpath was not started. ${reason}`);
       return;
     }
     onStarted(id);
   };
+
+  const landLocationCount = landSizes ? landSizes[length] : 0;
+  const landLocationNoun = landSizes ? locationNoun(skin).many : "";
 
   const toggleItem =
     "rounded-md border border-border/60 px-4 data-[state=on]:border-primary data-[state=on]:bg-primary/10";
@@ -374,7 +378,7 @@ export function RunSetupForm({
   return (
     <div className="flex flex-col gap-4">
       {!forcedSingleGame && (
-        <Field label="Game">
+        <Field label={t`Game`}>
           <GameSelectCard
             game={game}
             games={games}
@@ -391,11 +395,11 @@ export function RunSetupForm({
       ) : null}
 
       {(sides.length > 0 || gameLoading) && (
-        <Field label="Faction / side">
+        <Field label={t`Faction / side`}>
           {gameLoading ? (
             <div className="flex items-center gap-2 text-sm text-muted-foreground">
               <Loader2 className="size-4 animate-spin" aria-hidden />
-              Loading the game's factions…
+              <Trans>Loading the game's factions…</Trans>
             </div>
           ) : (
             <ToggleGroup
@@ -433,12 +437,12 @@ export function RunSetupForm({
 
       {!metaLoading && metaError && (
         <ErrorBanner
-          message={`Warpath records could not be read. Only the standard options are offered. The file has not been changed. ${metaError}`}
+          message={t`Warpath records could not be read. Only the standard options are offered. The file has not been changed. ${metaError}`}
         />
       )}
 
       {loadouts.length > 1 && (
-        <Field label="Loadout">
+        <Field label={t`Loadout`}>
           <ToggleGroup
             type="single"
             value={loadoutId}
@@ -456,7 +460,7 @@ export function RunSetupForm({
 
       {/* A hand-made map decides how long its run is. */}
       {!handmadeMap && (
-        <Field label="Length">
+        <Field label={t`Length`}>
           <ToggleGroup
             type="single"
             value={length}
@@ -469,20 +473,26 @@ export function RunSetupForm({
                 value={l}
                 className={`${toggleItem} capitalize`}
               >
-                {l}
+                {l === "quick"
+                  ? t`quick`
+                  : l === "standard"
+                    ? t`standard`
+                    : t`long`}
               </ToggleGroupItem>
             ))}
           </ToggleGroup>
           {landSizes && (
             <span className="text-xs text-muted-foreground">
-              The map decides how long this warpath is. This length crosses a
-              map of {landSizes[length]} {locationNoun(skin).many}.
+              <Trans>
+                The map decides how long this warpath is. This length crosses a
+                map of {landLocationCount} {landLocationNoun}.
+              </Trans>
             </span>
           )}
         </Field>
       )}
 
-      <Field label={`Difficulty — level ${difficulty}`}>
+      <Field label={t`Difficulty — level ${difficulty}`}>
         <Slider
           min={1}
           max={5}
@@ -494,14 +504,14 @@ export function RunSetupForm({
       </Field>
 
       <div className="grid grid-cols-2 gap-4">
-        <Field label="Map style">
+        <Field label={t`Map style`}>
           {stylesLoading ? (
             <div
               className="flex items-center gap-2 text-sm text-muted-foreground"
               role="status"
             >
               <Loader2 className="size-4 animate-spin" aria-hidden />
-              Checking which maps this game carries…
+              <Trans>Checking which maps this game carries…</Trans>
             </div>
           ) : (
             <OptionSelect
@@ -515,16 +525,19 @@ export function RunSetupForm({
               }}
               options={[
                 ...(ownMapsOnly ? [] : MAP_STYLE_OPTIONS),
-                ...handmadeMaps.map((m) => ({
-                  value: `${HANDMADE_PREFIX}${m.id}`,
-                  label: `${m.title} (hand-made map)`,
-                })),
+                ...handmadeMaps.map((m) => {
+                  const mapTitle = m.title;
+                  return {
+                    value: `${HANDMADE_PREFIX}${m.id}`,
+                    label: t`${mapTitle} (hand-made map)`,
+                  };
+                }),
               ]}
             />
           )}
         </Field>
         {landSizes && (
-          <Field label="Planet">
+          <Field label={t`Planet`}>
             <OptionSelect
               value={planet}
               onValueChange={(v) => choose({ planet: v })}
@@ -533,13 +546,13 @@ export function RunSetupForm({
           </Field>
         )}
         {ascensionTier > 0 && (
-          <Field label="Ascension">
+          <Field label={t`Ascension`}>
             <OptionSelect
               value={String(ascension)}
               onValueChange={(v) => choose({ ascension: Number(v) })}
               options={Array.from({ length: ascensionTier + 1 }, (_, i) => ({
                 value: String(i),
-                label: `Tier ${i}`,
+                label: t`Tier ${i}`,
               }))}
             />
           </Field>
@@ -549,7 +562,7 @@ export function RunSetupForm({
       <StartingUnits
         label={
           <span className="text-xs font-medium text-muted-foreground">
-            Units from the builder
+            <Trans>Units from the builder</Trans>
           </span>
         }
         picked={units}
@@ -558,7 +571,7 @@ export function RunSetupForm({
 
       {handmadeError && (
         <ErrorBanner
-          message={`The hand-made maps could not be listed, so none is offered here. ${handmadeError}`}
+          message={t`The hand-made maps could not be listed, so none is offered here. ${handmadeError}`}
         />
       )}
 
@@ -570,11 +583,12 @@ export function RunSetupForm({
         {gameLoading ? (
           <>
             <Loader2 className="mr-1.5 size-4 animate-spin" aria-hidden />
-            Loading game data…
+            <Trans>Loading game data…</Trans>
           </>
         ) : (
           <>
-            <Swords className="mr-1.5 size-4" aria-hidden /> Begin warpath
+            <Swords className="mr-1.5 size-4" aria-hidden />{" "}
+            <Trans>Begin warpath</Trans>
           </>
         )}
       </Button>

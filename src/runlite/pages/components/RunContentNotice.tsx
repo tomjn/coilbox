@@ -1,3 +1,4 @@
+import { Trans, useLingui } from "@lingui/react/macro";
 import { Link } from "react-router";
 import type { GameRef } from "../../../conquest/model";
 import { HUD_CARD_CLASS } from "../../../conquest/pages/components/hudChrome";
@@ -30,14 +31,16 @@ export function RunContentNotice({
   refreshTarget: () => Promise<void>;
   refreshScan: () => Promise<void>;
 }) {
+  const { t } = useLingui();
   if (notice.kind === "none") return null;
+  const reason = notice.kind === "unreadable" ? notice.reason : null;
   if (notice.kind === "no-engine") {
     return (
       <div className="pointer-events-auto max-w-xl">
         <NoEngineNotice
           targetLoading={targetLoading}
           refresh={refreshTarget}
-          playing="this warpath"
+          playing={t`this warpath`}
         />
       </div>
     );
@@ -51,8 +54,11 @@ export function RunContentNotice({
       {notice.kind === "download" ? (
         <>
           <p>
-            This warpath needs the game{" "}
-            <span className="font-medium">{name}</span>, which is not installed.
+            <Trans>
+              This warpath needs the game{" "}
+              <span className="font-medium">{name}</span>, which is not
+              installed.
+            </Trans>
           </p>
           <DownloadGameButton
             game={game}
@@ -62,23 +68,32 @@ export function RunContentNotice({
         </>
       ) : notice.kind === "unreadable" ? (
         <p>
-          The engine could not read your games, so this warpath cannot check for{" "}
-          <span className="font-medium">{name}</span>. Open{" "}
-          <Link className={linkClass} to="/library/games">
-            Content &gt; Games
-          </Link>{" "}
-          to see what it did find, or pick another engine in Settings.
-          {notice.reason && <> unitsync said: {notice.reason}</>}
+          <Trans>
+            The engine could not read your games, so this warpath cannot check
+            for <span className="font-medium">{name}</span>. Open{" "}
+            <Link className={linkClass} to="/library/games">
+              Content &gt; Games
+            </Link>{" "}
+            to see what it did find, or pick another engine in Settings.
+          </Trans>
+          {notice.reason && (
+            <>
+              {" "}
+              <Trans>unitsync said: {reason}</Trans>
+            </>
+          )}
         </p>
       ) : (
         <p>
-          This warpath needs the game{" "}
-          <span className="font-medium">{name}</span>, which is not installed
-          and has no download coilbox knows about. Add it in{" "}
-          <Link className={linkClass} to="/library/games">
-            Content &gt; Games
-          </Link>
-          .
+          <Trans>
+            This warpath needs the game{" "}
+            <span className="font-medium">{name}</span>, which is not installed
+            and has no download coilbox knows about. Add it in{" "}
+            <Link className={linkClass} to="/library/games">
+              Content &gt; Games
+            </Link>
+            .
+          </Trans>
         </p>
       )}
     </div>

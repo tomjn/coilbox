@@ -1,3 +1,4 @@
+import { Trans } from "@lingui/react/macro";
 import { Button } from "@picoframe/frame";
 import { Check } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
@@ -72,10 +73,10 @@ export function CopyButton({
       {result === "copied" ? (
         <>
           <Check className="size-3.5" />
-          Copied
+          <Trans>Copied</Trans>
         </>
       ) : result === "failed" ? (
-        "Couldn't copy"
+        <Trans>Couldn't copy</Trans>
       ) : (
         children
       )}

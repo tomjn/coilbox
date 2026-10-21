@@ -1,3 +1,5 @@
+import { useLingui as useLocale } from "@lingui/react";
+import { Trans, useLingui } from "@lingui/react/macro";
 import { Button } from "@picoframe/frame";
 import { Copy, Share2, TriangleAlert } from "lucide-react";
 import { useEffect, useState } from "react";
@@ -48,6 +50,9 @@ export function ShareRoomButton({
   /** Appended to the trigger's classes, for a row that wants a smaller button. */
   className?: string;
 }) {
+  // Subscribes to the language, since the headline and notices come from
+  // functions in share.ts that read it when called.
+  useLocale();
   const [addresses, setAddresses] = useState<DirectLocalAddress[] | null>(null);
   const [report, setReport] = useState<DirectReachability | null>(null);
   useEffect(() => {
@@ -77,14 +82,16 @@ export function ShareRoomButton({
       <PopoverTrigger asChild>
         <Button variant="outline" className={cn("relative", className)}>
           <Share2 className="size-4" />
-          Share
+          <Trans>Share</Trans>
           {notices.length > 0 && (
             <>
               <span
                 aria-hidden
                 className="absolute -right-1 -top-1 size-2.5 rounded-full border border-background bg-amber-500"
               />
-              <span className="sr-only">, has a warning</span>
+              <span className="sr-only">
+                <Trans>, has a warning</Trans>
+              </span>
             </>
           )}
         </Button>
@@ -94,7 +101,9 @@ export function ShareRoomButton({
         className="max-h-[min(32rem,var(--radix-popover-content-available-height))] w-80 space-y-4 overflow-y-auto"
       >
         <div className="space-y-1">
-          <h2 className="text-sm font-semibold">Invite people to this room</h2>
+          <h2 className="text-sm font-semibold">
+            <Trans>Invite people to this room</Trans>
+          </h2>
           {shared && shared.length > 0 && (
             <p className="text-xs text-muted-foreground">
               {shareHeadline(shared)}
@@ -102,7 +111,7 @@ export function ShareRoomButton({
           )}
           {!shared && (
             <p className="text-xs text-muted-foreground">
-              Looking up this machine&apos;s addresses…
+              <Trans>Looking up this machine's addresses…</Trans>
             </p>
           )}
         </div>
@@ -141,7 +150,9 @@ function AddressBlock({
   address: ShareAddress;
   first: boolean;
 }) {
+  const { t } = useLingui();
   const text = addressText(address);
+  const who = address.who;
   const link = buildRoomLink(address.address, address.port);
   return (
     <li
@@ -159,19 +170,19 @@ function AddressBlock({
             value={link}
             variant="default"
             className="h-8 px-3"
-            label={`Copy a link that joins at ${text}, ${address.who}`}
+            label={t`Copy a link that joins at ${text}, ${who}`}
           >
-            Copy link
+            <Trans>Copy link</Trans>
           </CopyButton>
         )}
         <CopyButton
           value={text}
           variant={link ? "ghost" : "default"}
           className="h-8 px-3"
-          label={`Copy ${text}, ${address.who}`}
+          label={t`Copy ${text}, ${who}`}
         >
           <Copy className="size-3.5" />
-          Copy address
+          <Trans>Copy address</Trans>
         </CopyButton>
       </div>
     </li>
