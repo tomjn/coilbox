@@ -10,6 +10,7 @@ vi.mock("@picoframe/plugin-sdk", () => ({
 import { newScenario } from "../scenario/create";
 import { parseStoredScenario } from "../scenario/storage";
 import { encodeScenarioExport } from "../scenario/transfer";
+import { describeJsonError } from "./jsonError";
 import { describeScenarioFailure } from "./scenarioFailure";
 
 /**
@@ -75,7 +76,15 @@ describe("describeScenarioFailure", () => {
     expect(parseStoredScenario(json)).toBeNull();
     const failure = describeScenarioFailure(json);
     expect(failure.name).toBe("(unnamed)");
-    expect(failure.error).toMatch(/line/i);
+    // Located only where the engine says where (V8). JavaScriptCore, which the
+    // tests and the macOS and Linux webviews run on, gives its message alone.
+    let parseError: unknown;
+    try {
+      JSON.parse(json);
+    } catch (e) {
+      parseError = e;
+    }
+    expect(failure.error).toBe(describeJsonError(json, parseError).message);
   });
 
   it("calls a file that is not a coilbox file at all what it is", () => {
