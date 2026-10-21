@@ -1,3 +1,4 @@
+import { Trans, useLingui } from "@lingui/react/macro";
 import { Button, Input } from "@picoframe/frame";
 import { useState } from "react";
 import { Field } from "@/components/Field";
@@ -25,17 +26,13 @@ import {
  * rather than relying on the user backspacing everything by hand.
  */
 export function HubAddressField() {
+  const { t } = useLingui();
   const [userUrl, setUserUrl] = useHubUrlSetting();
   const [draft, setDraft] = useState(userUrl);
   const [error, setError] = useState<string | null>(null);
 
   const profileUrl = getProfile().hubUrl?.trim();
   const effective = resolveHubUrl(userUrl, profileUrl);
-  const source = userUrl.trim()
-    ? "your own address, set below"
-    : profileUrl
-      ? "the address your distribution set"
-      : "the built-in default";
 
   const change = (value: string) => {
     setDraft(value);
@@ -44,7 +41,7 @@ export function HubAddressField() {
       setUserUrl(value.trim());
     } else {
       setError(
-        "Enter a web address starting with http:// or https://, or clear the field.",
+        t`Enter a web address starting with http:// or https://, or clear the field.`,
       );
     }
   };
@@ -58,12 +55,29 @@ export function HubAddressField() {
   return (
     <div className="space-y-3">
       <p className="text-sm text-muted-foreground">
-        Coilbox is using <span className="font-mono text-xs">{effective}</span>,{" "}
-        {source}.
+        {userUrl.trim() ? (
+          <Trans>
+            Coilbox is using{" "}
+            <span className="font-mono text-xs">{effective}</span>, your own
+            address, set below.
+          </Trans>
+        ) : profileUrl ? (
+          <Trans>
+            Coilbox is using{" "}
+            <span className="font-mono text-xs">{effective}</span>, the address
+            your distribution set.
+          </Trans>
+        ) : (
+          <Trans>
+            Coilbox is using{" "}
+            <span className="font-mono text-xs">{effective}</span>, the built-in
+            default.
+          </Trans>
+        )}
       </p>
       <Field
-        label="Your hub address"
-        hint="Leave blank to use the default, or your distribution's address if it sets one."
+        label={t`Your hub address`}
+        hint={t`Leave blank to use the default, or your distribution's address if it sets one.`}
       >
         <div className="flex gap-2">
           <Input
@@ -74,7 +88,7 @@ export function HubAddressField() {
           />
           {userUrl.trim() !== "" && (
             <Button variant="outline" size="sm" onClick={clearOverride}>
-              Clear override
+              <Trans>Clear override</Trans>
             </Button>
           )}
         </div>

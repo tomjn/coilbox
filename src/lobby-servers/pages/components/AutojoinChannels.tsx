@@ -1,3 +1,4 @@
+import { Trans, useLingui } from "@lingui/react/macro";
 import { Button, Input } from "@picoframe/frame";
 import { Hash, Plus, Trash2 } from "lucide-react";
 import { identifierFieldProps } from "../../../lib/identifierField";
@@ -19,6 +20,7 @@ import { useConnection } from "../../../multiplayer/store";
  * shared low-sensitivity secrets stored in plaintext settings, matching SpringLobby.
  */
 export function AutojoinChannels({ serverKey }: { serverKey: string }) {
+  const { t } = useLingui();
   const [all, setAll] = useJoinedChannels();
   const list = normalizeChannelList(all[serverKey]);
 
@@ -46,23 +48,31 @@ export function AutojoinChannels({ serverKey }: { serverKey: string }) {
 
   const removeRow = (i: number) => persist(list.filter((_, idx) => idx !== i));
 
+  const removeLabel = (name: string) => {
+    const channel = name || t`channel`;
+    return t`Remove ${channel}`;
+  };
+
   const addRow = () => persist([...list, { name: "" }]);
 
   return (
     <div className="space-y-2">
       <div className="flex items-center gap-2 text-sm font-medium">
         <Hash size={14} className="text-muted-foreground" />
-        Auto-join channels
+        <Trans>Auto-join channels</Trans>
       </div>
       {list.length === 0 ? (
         <p className="text-xs text-muted-foreground">
-          None. Channels you join are added here; add one to auto-join it on
-          connect.
+          <Trans>
+            None. Channels you join are added here; add one to auto-join it on
+            connect.
+          </Trans>
         </p>
       ) : (
         <ul className="space-y-2">
           {list.map((c, i) => {
             const failure = c.name ? failures[c.name] : undefined;
+            const failureReason = failure || "";
             return (
               <li
                 // biome-ignore lint/suspicious/noArrayIndexKey: rows are positional (names may be blank/duplicate while editing)
@@ -73,8 +83,8 @@ export function AutojoinChannels({ serverKey }: { serverKey: string }) {
                   <Input
                     value={c.name}
                     onChange={(e) => updateRow(i, { name: e.target.value })}
-                    placeholder="channel"
-                    aria-label="Channel name"
+                    placeholder={t`channel`}
+                    aria-label={t`Channel name`}
                     {...identifierFieldProps}
                   />
                   <Input
@@ -82,23 +92,32 @@ export function AutojoinChannels({ serverKey }: { serverKey: string }) {
                     onChange={(e) =>
                       updateRow(i, { key: e.target.value || undefined })
                     }
-                    placeholder="key (optional)"
-                    aria-label="Channel key"
+                    placeholder={t`key (optional)`}
+                    aria-label={t`Channel key`}
                     {...identifierFieldProps}
                   />
                   <Button
                     variant="outline"
                     size="sm"
                     onClick={() => removeRow(i)}
-                    aria-label={`Remove ${c.name || "channel"}`}
+                    aria-label={removeLabel(c.name)}
                   >
                     <Trash2 />
                   </Button>
                 </div>
                 {failure !== undefined && (
                   <p className="text-xs text-destructive">
-                    Last join failed{failure ? `: ${failure}` : ""}. Remove it
-                    if you no longer have access.
+                    {failure ? (
+                      <Trans>
+                        Last join failed: {failureReason}. Remove it if you no
+                        longer have access.
+                      </Trans>
+                    ) : (
+                      <Trans>
+                        Last join failed. Remove it if you no longer have
+                        access.
+                      </Trans>
+                    )}
                   </p>
                 )}
               </li>
@@ -107,7 +126,7 @@ export function AutojoinChannels({ serverKey }: { serverKey: string }) {
         </ul>
       )}
       <Button variant="outline" size="sm" onClick={addRow}>
-        <Plus /> Add channel
+        <Plus /> <Trans>Add channel</Trans>
       </Button>
     </div>
   );

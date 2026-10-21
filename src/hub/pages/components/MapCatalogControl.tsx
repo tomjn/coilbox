@@ -1,3 +1,6 @@
+import type { MessageDescriptor } from "@lingui/core";
+import { msg } from "@lingui/core/macro";
+import { Trans, useLingui } from "@lingui/react/macro";
 import { Button } from "@picoframe/frame";
 import { useState } from "react";
 import { Progress } from "@/components/ui/progress";
@@ -35,6 +38,7 @@ export function MapCatalogControl({
    *  worse than one that is not offered yet. */
   agreed: boolean;
 }) {
+  const { t, i18n } = useLingui();
   const { target } = usePreferredTarget();
   const [running, setRunning] = useState(false);
   const [progress, setProgress] = useState<SweepProgress | null>(null);
@@ -70,17 +74,22 @@ export function MapCatalogControl({
   return (
     <section className="space-y-2">
       <h3 className="text-sm font-medium leading-none">
-        Sending what your maps say
+        <Trans>Sending what your maps say</Trans>
       </h3>
       <p className="text-sm text-muted-foreground">
-        Coilbox can read the maps on this computer and tell the hub what is in
-        them: how big each one is, how high its ground goes, how much of it is
-        under water, how much wind and tidal power it has, and where players
-        start. It sends no pictures and no files, only those measurements.
+        <Trans>
+          Coilbox can read the maps on this computer and tell the hub what is in
+          them: how big each one is, how high its ground goes, how much of it is
+          under water, how much wind and tidal power it has, and where players
+          start. It sends no pictures and no files, only those measurements.
+        </Trans>
       </p>
       <p className="text-sm text-muted-foreground">
-        It asks the hub what it already knows first, so most of a library costs
-        nothing to check. Reading the rest takes a while on a large collection.
+        <Trans>
+          It asks the hub what it already knows first, so most of a library
+          costs nothing to check. Reading the rest takes a while on a large
+          collection.
+        </Trans>
       </p>
       <div className="flex items-center gap-3 pt-1">
         <Button
@@ -89,11 +98,11 @@ export function MapCatalogControl({
           onClick={run}
           disabled={running || !target?.enginePath}
         >
-          {running ? "Reading your maps…" : "Send what your maps say"}
+          {running ? t`Reading your maps…` : t`Send what your maps say`}
         </Button>
         {progress && (
           <span className="text-sm text-muted-foreground">
-            {phaseWords(progress)}
+            {i18n._(phaseWords(progress))}
           </span>
         )}
       </div>
@@ -101,12 +110,14 @@ export function MapCatalogControl({
         <Progress
           value={progressPercent(progress)}
           className="h-1.5 bg-muted"
-          aria-label="Reading and sending your maps"
+          aria-label={t`Reading and sending your maps`}
         />
       )}
       {!target?.enginePath && (
         <p className="text-sm text-muted-foreground">
-          Coilbox needs an engine installed before it can read your maps.
+          <Trans>
+            Coilbox needs an engine installed before it can read your maps.
+          </Trans>
         </p>
       )}
       {report && (
@@ -118,11 +129,16 @@ export function MapCatalogControl({
 }
 
 /** What a phase is called while it is running, counting maps. */
-function phaseWords({ phase, done, total }: SweepProgress): string {
-  const of = total > 0 ? ` ${done} of ${total}` : "";
-  if (phase === "asking") return `Asking the hub about${of || " your maps"}`;
-  if (phase === "sending") return `Sending${of || ""}`;
-  return total > 0 ? `Read${of}` : "Reading your maps";
+function phaseWords({ phase, done, total }: SweepProgress): MessageDescriptor {
+  if (phase === "asking") {
+    return total > 0
+      ? msg`Asking the hub about ${done} of ${total}`
+      : msg`Asking the hub about your maps`;
+  }
+  if (phase === "sending") {
+    return total > 0 ? msg`Sending ${done} of ${total}` : msg`Sending`;
+  }
+  return total > 0 ? msg`Read ${done} of ${total}` : msg`Reading your maps`;
 }
 
 /** How far a phase has got, 0 to 100. Zero before a total is known, which is

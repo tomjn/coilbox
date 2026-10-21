@@ -1,3 +1,5 @@
+import { i18n, type MessageDescriptor } from "@lingui/core";
+import { plural } from "@lingui/core/macro";
 /**
  * What the four hub background sweeps have in common (issue #2442):
  * `hub/assets/pictureSweep.ts`, `hub/maps/pictureSweep.ts`,
@@ -80,7 +82,7 @@ export interface HubSweepReport<Skipped> {
 export function skipSummary<Reason extends string>(
   skipped: readonly { reason: Reason }[],
   order: readonly Reason[],
-  clauses: Record<Reason, string>,
+  clauses: Record<Reason, string | MessageDescriptor>,
 ): string | null {
   if (skipped.length === 0) return null;
   const counts = new Map<Reason, number>();
@@ -90,11 +92,18 @@ export function skipSummary<Reason extends string>(
   const parts = order
     .map((reason) => {
       const n = counts.get(reason);
-      return n ? `${n} ${clauses[reason]}` : null;
+      const clause = clauses[reason];
+      return n
+        ? `${n} ${typeof clause === "string" ? clause : i18n._(clause)}`
+        : null;
     })
     .filter((part): part is string => part !== null);
-  const noun = skipped.length === 1 ? "map was" : "maps were";
-  return `${skipped.length} ${noun} skipped: ${parts.join(", ")}.`;
+  const count = skipped.length;
+  const list = parts.join(", ");
+  return plural(count, {
+    one: `# map was skipped: ${list}.`,
+    other: `# maps were skipped: ${list}.`,
+  });
 }
 
 export function createSweptAtTracker(key: string): {

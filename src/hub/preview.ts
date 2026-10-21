@@ -22,6 +22,7 @@
  * app generates a real galaxy or run with, so a preview cannot drift from it.
  */
 
+import { plural, t } from "@lingui/core/macro";
 import { BUILD_SQUARE, facedFootprint } from "@/blueprint/footprint";
 import {
   type BlueprintPayload,
@@ -271,13 +272,13 @@ function member(p: Partial<Participant>, index: number): PresetMember {
 }
 
 function memberLabel(p: Partial<Participant>): string {
-  if (p.kind === "you") return p.name || "You";
-  return p.ai?.name || p.ai?.shortName || p.name || "Open slot";
+  if (p.kind === "you") return p.name || t`You`;
+  return p.ai?.name || p.ai?.shortName || p.name || t`Open slot`;
 }
 
 function sideLabel(side: string | undefined): string | null {
   if (!side) return null;
-  return side === RANDOM_SIDE ? "Random" : side;
+  return side === RANDOM_SIDE ? t`Random` : side;
 }
 
 /** Play-side colours are floats from 0 to 1, not bytes: reading them as bytes
@@ -383,8 +384,8 @@ function challengePreview(payload: Record<string, unknown>): HubPreview | null {
         },
         // `factionCount` is the enemy count. The app's own wizard calls it
         // "enemy factions", and the drawing has the player as a colour too.
-        { label: "Enemies", value: String(parsed.factionCount) },
-        { label: "Layout", value: parsed.layout },
+        { label: t`Enemies`, value: String(parsed.factionCount) },
+        { label: t`Layout`, value: parsed.layout },
       ],
     };
   }
@@ -392,13 +393,13 @@ function challengePreview(payload: Record<string, unknown>): HubPreview | null {
   if (payload.mode === "warpath") {
     const stats: PreviewStat[] = [];
     if (typeof settings.length === "string") {
-      stats.push({ label: "Length", value: settings.length });
+      stats.push({ label: t`Length`, value: settings.length });
     }
     if (typeof settings.difficulty === "number") {
-      stats.push({ label: "Difficulty", value: String(settings.difficulty) });
+      stats.push({ label: t`Difficulty`, value: String(settings.difficulty) });
     }
     if (typeof settings.ascension === "number" && settings.ascension > 0) {
-      stats.push({ label: "Ascension", value: String(settings.ascension) });
+      stats.push({ label: t`Ascension`, value: String(settings.ascension) });
     }
     const run = rebuildRun(settings);
     return stats.length > 0 || run
@@ -706,12 +707,12 @@ function scenarioPreview(payload: Record<string, unknown>): HubPreview | null {
       ? setup.mapName
       : null;
   const stats = [
-    { label: "Objectives", n: count(scenario.objectives) },
-    { label: "Triggers", n: count(scenario.triggers) },
-    { label: "Zones", n: count(scenario.zones) },
-    { label: "Teams", n: count(scenario.teams) },
-    { label: "Actors", n: count(scenario.actors) },
-    { label: "Dialogue", n: count(scenario.dialogue) },
+    { label: t`Objectives`, n: count(scenario.objectives) },
+    { label: t`Triggers`, n: count(scenario.triggers) },
+    { label: t`Zones`, n: count(scenario.zones) },
+    { label: t`Teams`, n: count(scenario.teams) },
+    { label: t`Actors`, n: count(scenario.actors) },
+    { label: t`Dialogue`, n: count(scenario.dialogue) },
   ]
     .filter((s) => s.n > 0)
     .map((s) => ({ label: s.label, value: String(s.n) }));
@@ -907,10 +908,9 @@ function squareBleed(
  */
 export function planLabel(shape: BlueprintShape): string {
   const buildings = shape.squares.length;
-  return (
-    `${buildings} building${buildings === 1 ? "" : "s"} over ` +
-    `${Math.round(shape.width)} by ${Math.round(shape.height)} build squares`
-  );
+  const width = Math.round(shape.width);
+  const height = Math.round(shape.height);
+  return t`${plural(buildings, { one: "# building", other: "# buildings" })} over ${width} by ${height} build squares`;
 }
 
 /**

@@ -1,3 +1,6 @@
+import type { MessageDescriptor } from "@lingui/core";
+import { msg, plural } from "@lingui/core/macro";
+import { Trans, useLingui } from "@lingui/react/macro";
 import { Button } from "@picoframe/frame";
 import { useMemo, useState } from "react";
 import { OptionSelect } from "@/components/OptionSelect";
@@ -48,6 +51,7 @@ export function GamePicturesControl({
    *  worse than one that is not offered yet. */
   agreed: boolean;
 }) {
+  const { t, i18n } = useLingui();
   const { target } = usePreferredTarget();
   const { data: scan } = useUnitsyncScan(target?.enginePath, target?.dataDir);
   const games = useMemo(
@@ -91,31 +95,38 @@ export function GamePicturesControl({
 
   if (!agreed) return null;
 
+  const angleCount = RENDER_ANGLES.length;
+  const lastRun = swept === null ? null : formatDateTime(new Date(swept));
+
   return (
     <section className="space-y-2">
       <h3 className="text-sm font-medium leading-none">
-        Sending pictures of your games
+        <Trans>Sending pictures of your games</Trans>
       </h3>
       <p className="text-sm text-muted-foreground">
-        Coilbox can draw every unit in the games on this computer and send the
-        pictures to the hub: the icon the game ships, and {RENDER_ANGLES.length}{" "}
-        views of the model drawn here. It asks the hub what it already has
-        first, so a game somebody else has covered costs one question.
+        <Trans>
+          Coilbox can draw every unit in the games on this computer and send the
+          pictures to the hub: the icon the game ships, and {angleCount} views
+          of the model drawn here. It asks the hub what it already has first, so
+          a game somebody else has covered costs one question.
+        </Trans>
       </p>
       <p className="text-sm text-muted-foreground">
-        A big game takes several goes. Every upload spends part of an hourly
-        allowance the whole community shares, so one press covers what is left
-        of this hour and picks up where it stopped the next time you press it.
+        <Trans>
+          A big game takes several goes. Every upload spends part of an hourly
+          allowance the whole community shares, so one press covers what is left
+          of this hour and picks up where it stopped the next time you press it.
+        </Trans>
       </p>
       <div className="flex items-center gap-3 pt-1">
         <OptionSelect
           value={only}
           onValueChange={setOnly}
-          options={[{ value: ALL_GAMES, label: "All games" }, ...games]}
+          options={[{ value: ALL_GAMES, label: t`All games` }, ...games]}
           disabled={running}
           size="sm"
           className="w-56"
-          ariaLabel="Which game to send pictures of"
+          ariaLabel={t`Which game to send pictures of`}
         />
         <Button
           variant="outline"
@@ -123,22 +134,24 @@ export function GamePicturesControl({
           onClick={run}
           disabled={running || !target?.enginePath}
         >
-          {running ? "Drawing your units…" : "Send pictures of your games"}
+          {running ? t`Drawing your units…` : t`Send pictures of your games`}
         </Button>
         {progress && (
           <span className="text-sm text-muted-foreground">
-            {phaseWords(progress)}
+            {i18n._(phaseWords(progress))}
           </span>
         )}
       </div>
       {!target?.enginePath && (
         <p className="text-sm text-muted-foreground">
-          Coilbox needs an engine installed before it can draw your units.
+          <Trans>
+            Coilbox needs an engine installed before it can draw your units.
+          </Trans>
         </p>
       )}
       {swept !== null && !running && (
         <p className="text-sm text-muted-foreground">
-          Last run {formatDateTime(new Date(swept))}.
+          <Trans>Last run {lastRun}.</Trans>
         </p>
       )}
       {report && (
@@ -149,15 +162,20 @@ export function GamePicturesControl({
           {report.games.length > 0 && (
             <ul className="text-sm text-muted-foreground">
               {report.games.map((one) => (
-                <li key={one.shortname}>{gameWords(one)}</li>
+                <li key={one.shortname}>{i18n._(gameWords(one))}</li>
               ))}
             </ul>
           )}
-          {report.failed.map((one) => (
-            <p className="text-sm text-destructive" key={one.game}>
-              Coilbox could not read {one.game}: {one.said}
-            </p>
-          ))}
+          {report.failed.map((one) => {
+            const { game, said } = one;
+            return (
+              <p className="text-sm text-destructive" key={game}>
+                <Trans>
+                  Coilbox could not read {game}: {said}
+                </Trans>
+              </p>
+            );
+          })}
         </>
       )}
       {failed && <p className="text-sm text-destructive">{failed}</p>}
@@ -197,15 +215,25 @@ export function phaseWords({
   done,
   total,
   game,
-}: PictureSweepProgress): string {
-  if (phase === "scanning") return "Looking for your games";
+}: PictureSweepProgress): MessageDescriptor {
+  if (phase === "scanning") return msg`Looking for your games`;
   // `done` counts games finished, so the one being worked on is the next along,
   // except on the last sample where there is no next one.
   const at = Math.min(done + 1, total);
-  const of = total > 0 ? ` ${at} of ${total}` : "";
-  const named = game ? `: ${game}` : "";
-  if (phase === "filling") return `Drawing${of}${named}`;
-  return `Reading${of}${named}`;
+  if (phase === "filling") {
+    if (total > 0) {
+      return game
+        ? msg`Drawing ${at} of ${total}: ${game}`
+        : msg`Drawing ${at} of ${total}`;
+    }
+    return game ? msg`Drawing: ${game}` : msg`Drawing`;
+  }
+  if (total > 0) {
+    return game
+      ? msg`Reading ${at} of ${total}: ${game}`
+      : msg`Reading ${at} of ${total}`;
+  }
+  return game ? msg`Reading: ${game}` : msg`Reading`;
 }
 
 /**
@@ -216,13 +244,24 @@ export function phaseWords({
  * missing one angle of four hundred units is not four hundred pictures of work
  * to anybody reading this, it is four hundred units.
  */
-export function gameWords(one: GamePictures): string {
+export function gameWords(one: GamePictures): MessageDescriptor {
   const left = Math.max(0, one.wanted - one.covered);
-  if (one.units === 0) return `${one.game}: coilbox could not read its units.`;
+  const { game, units, covered } = one;
+  if (units === 0) return msg`${game}: coilbox could not read its units.`;
   if (one.wanted === 0) {
-    return `${one.game}: the hub has all ${one.units} units.`;
+    return msg`${game}: ${plural(units, {
+      one: "the hub has the # unit.",
+      other: "the hub has all # units.",
+    })}`;
   }
-  const covered = one.covered > 0 ? `sent ${one.covered} of them, ` : "";
-  const waiting = left === 1 ? "1 unit" : `${left} units`;
-  return `${one.game}: ${covered}${waiting} still waiting out of ${one.units}.`;
+  if (covered > 0) {
+    return msg`${game}: sent ${covered} of them, ${plural(left, {
+      one: "# unit",
+      other: "# units",
+    })} still waiting out of ${units}.`;
+  }
+  return msg`${game}: ${plural(left, {
+    one: "# unit",
+    other: "# units",
+  })} still waiting out of ${units}.`;
 }
