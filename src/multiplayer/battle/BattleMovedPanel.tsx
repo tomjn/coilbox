@@ -1,5 +1,5 @@
 import { MapPin } from "lucide-react";
-import { BATTLE_MOVED_NOTICE, useBattleMoved } from "./battleMoved";
+import { battleMovedNotice, useBattleMoved } from "./battleMoved";
 
 /**
  * Tells everybody in a battle that the battle has moved onto a different
@@ -48,7 +48,7 @@ export function BattleMovedPanel({
       className="flex items-center gap-2 border-b border-border bg-muted/40 px-4 py-2 text-sm text-muted-foreground"
     >
       <MapPin className="size-4 shrink-0" />
-      {BATTLE_MOVED_NOTICE}
+      {battleMovedNotice()}
     </p>
   );
 }

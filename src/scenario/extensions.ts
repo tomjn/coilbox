@@ -26,6 +26,7 @@
  * Arithmetic on plain values, so it is tested without a browser.
  */
 
+import { t } from "@lingui/core/macro";
 import {
   ACTION_TYPES,
   CONDITION_TYPES,
@@ -88,14 +89,17 @@ function asList(value: unknown): unknown[] {
 function readParam(
   raw: unknown,
 ): { name: string; spec: ParamSpec } | { error: string } {
-  if (!isRecord(raw)) return { error: "a parameter that is not a table" };
+  if (!isRecord(raw)) return { error: t`a parameter that is not a table` };
   const name = raw.name;
   if (typeof name !== "string" || name.trim() === "") {
-    return { error: "a parameter with no name" };
+    return { error: t`a parameter with no name` };
   }
   const kind = raw.kind;
   if (typeof kind !== "string" || !KINDS.has(kind)) {
-    return { error: `parameter ${name} has no kind coilbox knows: ${kind}` };
+    const shownKind = String(kind);
+    return {
+      error: t`parameter ${name} has no kind coilbox knows: ${shownKind}`,
+    };
   }
   const spec: ParamSpec = { kind: kind as ParamKind };
   if (raw.optional === true) spec.optional = true;
@@ -104,7 +108,7 @@ function readParam(
       (v): v is string => typeof v === "string",
     );
     if (values.length === 0) {
-      return { error: `parameter ${name} is an enum with no values` };
+      return { error: t`parameter ${name} is an enum with no values` };
     }
     spec.values = values;
   }
@@ -117,22 +121,25 @@ function readType(
   reserved: Set<string>,
   taken: Set<string>,
 ): ExtensionType | { error: string } {
-  if (!isRecord(raw)) return { error: "an entry that is not a table" };
+  if (!isRecord(raw)) return { error: t`an entry that is not a table` };
   const type = raw.type;
   if (typeof type !== "string" || type.trim() === "") {
-    return { error: "an entry with no type name" };
+    return { error: t`an entry with no type name` };
   }
   if (reserved.has(type)) {
     return {
-      error: `${type} is the runtime's own type, which an extension may not redefine`,
+      error: t`${type} is the runtime's own type, which an extension may not redefine`,
     };
   }
-  if (taken.has(type)) return { error: `${type} is declared twice` };
+  if (taken.has(type)) return { error: t`${type} is declared twice` };
 
   const spec: TypeSpec = {};
   for (const entry of asList(raw.params)) {
     const param = readParam(entry);
-    if ("error" in param) return { error: `${type}: ${param.error}` };
+    if ("error" in param) {
+      const reason = param.error;
+      return { error: t`${type}: ${reason}` };
+    }
     spec[param.name] = param.spec;
   }
 

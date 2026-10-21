@@ -1,3 +1,6 @@
+import type { I18n, MessageDescriptor } from "@lingui/core";
+import { msg } from "@lingui/core/macro";
+import { Plural, Trans, useLingui } from "@lingui/react/macro";
 import { Button, Input } from "@picoframe/frame";
 import { openUrl } from "@tauri-apps/plugin-opener";
 import {
@@ -39,7 +42,7 @@ import { EmptyState } from "@/content/pages/components/states";
 import { useOneShotParam } from "@/deeplink/useOneShotParam";
 import { resolveHome } from "@/home/config";
 import { useHomeBackdropStyle } from "@/home/useHomeBackdropStyle";
-import { formatDate as formatLocaleDate } from "@/lib/format";
+import { formatDate } from "@/lib/format";
 import { withoutGeneratedGames } from "@/lib/generatedGames";
 import { isTypingTarget } from "@/lib/scenarioEditing/history";
 import { getGameMatcher, getProfile } from "@/profile/profile";
@@ -114,8 +117,8 @@ const SEARCH_DEBOUNCE_MS = 400;
 
 /** The single-value filters set by clicking a card's game or map chip. */
 const SINGLE_CLICKABLE = [
-  { key: "game", label: "Game" },
-  { key: "map", label: "Map" },
+  { key: "game", label: msg`Game` },
+  { key: "map", label: msg`Map` },
 ] as const;
 
 type SingleClickableKey = (typeof SINGLE_CLICKABLE)[number]["key"];
@@ -123,17 +126,17 @@ type SingleClickableKey = (typeof SINGLE_CLICKABLE)[number]["key"];
 /** The filters that carry several values at once (issue #2595), set by
  * clicking an author or tag chip on more than one card. */
 const MULTI_CLICKABLE = [
-  { key: "author", label: "By" },
-  { key: "tag", label: "Tag" },
+  { key: "author", label: msg`By` },
+  { key: "tag", label: msg`Tag` },
 ] as const;
 
 type MultiClickableKey = (typeof MULTI_CLICKABLE)[number]["key"];
 
 /** The two orders the hub accepts (issue #2595). Newest first is the
  * server's own default, so it needs no separate "unset" option here. */
-const SORT_OPTIONS: { value: HubSort; label: string }[] = [
-  { value: "newest", label: "Newest first" },
-  { value: "title", label: "Title" },
+const SORT_OPTIONS: { value: HubSort; label: MessageDescriptor }[] = [
+  { value: "newest", label: msg`Newest first` },
+  { value: "title", label: msg`Title` },
 ];
 
 /** The tail of an item id, to tell two same-titled cards apart. Short enough to
@@ -159,14 +162,8 @@ const SearchInput = Input as unknown as (
   },
 ) => ReturnType<typeof Input>;
 
-function formatDate(iso: string): string {
-  const date = new Date(iso);
-  return Number.isNaN(date.getTime())
-    ? ""
-    : formatLocaleDate(date, { dateStyle: "medium" });
-}
-
 export default function BrowsePage() {
+  const { t, i18n } = useLingui();
   const hubUrl = useHubUrl();
   const navigate = useNavigate();
   const presenceOf = useHubItemPresence();
@@ -419,6 +416,10 @@ export default function BrowsePage() {
     setFilters({ page: 1 });
   }, []);
 
+  const kinds = kindsPlural();
+  const searchText = filters.q;
+  const total = page?.total ?? 0;
+  const scanned = page?.truncated?.scanned ?? 0;
   const lastPage = page?.lastPage ?? 1;
   const current = page?.page ?? filters.page ?? 1;
 
@@ -429,14 +430,14 @@ export default function BrowsePage() {
           className="gap-3 border-b border-border px-6 py-4"
           title={
             <>
-              <CoilboxGlyph size={18} /> Coilbox hub
+              <CoilboxGlyph size={18} /> <Trans>Coilbox hub</Trans>
             </>
           }
           description={
             <>
               {/* Built from the kinds the chips below offer, so the sentence
                 cannot say four when there are five (issue #1502). */}
-              {kindsPlural()} shared by other players.
+              <Trans>{kinds} shared by other players.</Trans>
             </>
           }
           // One short sentence with the whole header width free beside it
@@ -453,15 +454,24 @@ export default function BrowsePage() {
                 size="sm"
                 onClick={() => void openUrl(hubUrl)}
               >
-                <CoilboxGlyph size={16} /> Hub website
+                <CoilboxGlyph size={16} /> <Trans>Hub website</Trans>
               </Button>
             </>
           }
         >
           {pinnedMatcher && (
             <p className="text-sm text-muted-foreground">
-              This copy of Coilbox is set up for {pinnedGame ?? "one game"}, so
-              the hub shows its things, plus anything not tied to a game.
+              {pinnedGame ? (
+                <Trans>
+                  This copy of Coilbox is set up for {pinnedGame}, so the hub
+                  shows its things, plus anything not tied to a game.
+                </Trans>
+              ) : (
+                <Trans>
+                  This copy of Coilbox is set up for one game, so the hub shows
+                  its things, plus anything not tied to a game.
+                </Trans>
+              )}
             </p>
           )}
           <div className="flex flex-wrap items-center gap-2">
@@ -475,8 +485,8 @@ export default function BrowsePage() {
                 type="search"
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
-                placeholder="Search titles and descriptions…"
-                aria-label="Search the hub"
+                placeholder={t`Search titles and descriptions…`}
+                aria-label={t`Search the hub`}
                 className="h-9 pl-7"
               />
             </div>
@@ -485,8 +495,10 @@ export default function BrowsePage() {
                 value={filters.game ?? ""}
                 onCommit={(v) => setFilter("game", v)}
                 options={gameOptions}
-                placeholder="Game"
-                ariaLabel="Filter by game"
+                placeholder={t`Game`}
+                searchPlaceholder={t`Search games…`}
+                anyLabel={t`Any game`}
+                ariaLabel={t`Filter by game`}
                 className="h-9 w-36"
               />
             )}
@@ -494,8 +506,10 @@ export default function BrowsePage() {
               value={filters.map ?? ""}
               onCommit={(v) => setFilter("map", v)}
               options={installedMaps}
-              placeholder="Map"
-              ariaLabel="Filter by map"
+              placeholder={t`Map`}
+              searchPlaceholder={t`Search maps…`}
+              anyLabel={t`Any map`}
+              ariaLabel={t`Filter by map`}
               className="h-9 w-36"
             />
             {/* Newest first and by title (issue #2595): the two orders the
@@ -510,8 +524,11 @@ export default function BrowsePage() {
                   page: 1,
                 }))
               }
-              options={SORT_OPTIONS}
-              ariaLabel="Sort"
+              options={SORT_OPTIONS.map((o) => ({
+                value: o.value,
+                label: i18n._(o.label),
+              }))}
+              ariaLabel={t`Sort`}
               className="h-9 w-36"
             />
           </div>
@@ -545,10 +562,10 @@ export default function BrowsePage() {
               onPressedChange={(pressed) => {
                 if (pressed) clearKindFilter();
               }}
-              aria-label="All kinds"
+              aria-label={t`All kinds`}
               className="w-auto min-w-0 shrink-0 px-3 data-[state=on]:border-primary data-[state=on]:bg-primary/10"
             >
-              All
+              <Trans>All</Trans>
             </Toggle>
             <ToggleGroup
               type="multiple"
@@ -563,7 +580,7 @@ export default function BrowsePage() {
                   page: 1,
                 }))
               }
-              aria-label="Kind"
+              aria-label={t`Kind`}
               className="flex-wrap"
             >
               {HUB_KINDS.map((kind) => (
@@ -585,7 +602,7 @@ export default function BrowsePage() {
                 className="flex shrink-0 items-center gap-1.5 whitespace-nowrap text-sm text-muted-foreground"
               >
                 {loading && <Loader2 size={13} className="animate-spin" />}
-                {page.total} {page.total === 1 ? "item" : "items"}
+                <Plural value={total} one="# item" other="# items" />
               </span>
             )}
             {/* Beside the count rather than below the grid (issue #2567):
@@ -593,9 +610,11 @@ export default function BrowsePage() {
               that the list stops short of everything the hub holds. */}
             {page?.truncated && (
               <span className="max-w-prose text-xs text-muted-foreground">
-                Only the first {page.truncated.scanned} items on the hub were
-                read, so there may be more for this game than are listed here.
-                Search to narrow it down.
+                <Trans>
+                  Only the first {scanned} items on the hub were read, so there
+                  may be more for this game than are listed here. Search to
+                  narrow it down.
+                </Trans>
               </span>
             )}
           </div>
@@ -604,19 +623,24 @@ export default function BrowsePage() {
               {/* One token per selected kind (issue #2595), rather than one
                 token for the filter as a whole, so removing "Presets" while
                 "Blueprints" is also selected leaves Blueprints in place. */}
-              {(filters.kind ?? []).map((kind) => (
-                <Button
-                  key={kind}
-                  variant="outline"
-                  size="sm"
-                  className="h-7 gap-1.5 text-xs"
-                  onClick={() => toggleMultiFilter("kind", kind)}
-                >
-                  Kind: {kindLabelPlural(kind as HubKind)}
-                  <X className="size-3" aria-hidden />
-                  <span className="sr-only">Clear this filter</span>
-                </Button>
-              ))}
+              {(filters.kind ?? []).map((kind) => {
+                const kindLabel = kindLabelPlural(kind as HubKind);
+                return (
+                  <Button
+                    key={kind}
+                    variant="outline"
+                    size="sm"
+                    className="h-7 gap-1.5 text-xs"
+                    onClick={() => toggleMultiFilter("kind", kind)}
+                  >
+                    <Trans>Kind: {kindLabel}</Trans>
+                    <X className="size-3" aria-hidden />
+                    <span className="sr-only">
+                      <Trans>Clear this filter</Trans>
+                    </span>
+                  </Button>
+                );
+              })}
               {activeSingle.map((f) => (
                 <Button
                   key={f.key}
@@ -625,10 +649,12 @@ export default function BrowsePage() {
                   className="h-7 gap-1.5 text-xs"
                   onClick={() => setFilter(f.key, "")}
                 >
-                  {f.label}:{" "}
+                  {i18n._(f.label)}:{" "}
                   {f.key === "game" ? gameFilterLabel : filters[f.key]}
                   <X className="size-3" aria-hidden />
-                  <span className="sr-only">Clear this filter</span>
+                  <span className="sr-only">
+                    <Trans>Clear this filter</Trans>
+                  </span>
                 </Button>
               ))}
               {/* Likewise one token per author and per tag, so a second
@@ -643,9 +669,11 @@ export default function BrowsePage() {
                     className="h-7 gap-1.5 text-xs"
                     onClick={() => toggleMultiFilter(f.key, value)}
                   >
-                    {f.label}: {value}
+                    {i18n._(f.label)}: {value}
                     <X className="size-3" aria-hidden />
-                    <span className="sr-only">Clear this filter</span>
+                    <span className="sr-only">
+                      <Trans>Clear this filter</Trans>
+                    </span>
                   </Button>
                 )),
               )}
@@ -656,9 +684,11 @@ export default function BrowsePage() {
                   className="h-7 gap-1.5 text-xs"
                   onClick={clearSearch}
                 >
-                  Search: {filters.q}
+                  <Trans>Search: {searchText}</Trans>
                   <X className="size-3" aria-hidden />
-                  <span className="sr-only">Clear this filter</span>
+                  <span className="sr-only">
+                    <Trans>Clear this filter</Trans>
+                  </span>
                 </Button>
               )}
               {activeCount > 1 && (
@@ -668,7 +698,7 @@ export default function BrowsePage() {
                   className="h-7 text-xs"
                   onClick={clearAllFilters}
                 >
-                  Clear all
+                  <Trans>Clear all</Trans>
                 </Button>
               )}
             </div>
@@ -698,7 +728,7 @@ export default function BrowsePage() {
             // paging can land a keyboard user here rather than leaving them
             // at the pager (issue #2567).
             tabIndex={-1}
-            aria-label="Hub results"
+            aria-label={t`Hub results`}
             className="h-full overflow-auto p-4"
           >
             {loading && !page && (
@@ -706,7 +736,8 @@ export default function BrowsePage() {
                 role="status"
                 className="flex items-center gap-2 p-6 text-sm text-muted-foreground"
               >
-                <Loader2 size={15} className="animate-spin" /> Loading the hub…
+                <Loader2 size={15} className="animate-spin" />{" "}
+                <Trans>Loading the hub…</Trans>
               </p>
             )}
             {error && (
@@ -715,8 +746,8 @@ export default function BrowsePage() {
                 <AlertDescription className="flex flex-wrap items-center gap-3 text-destructive">
                   {error}
                   <Button variant="outline" size="sm" onClick={retry}>
-                    <RotateCw className="mr-1.5 size-3.5" aria-hidden /> Try
-                    again
+                    <RotateCw className="mr-1.5 size-3.5" aria-hidden />{" "}
+                    <Trans>Try again</Trans>
                   </Button>
                 </AlertDescription>
               </Alert>
@@ -737,11 +768,12 @@ export default function BrowsePage() {
                         size="sm"
                         onClick={clearAllFilters}
                       >
-                        Clear filters
+                        <Trans>Clear filters</Trans>
                       </Button>
                     )
                   }
                   label={emptyReason(
+                    i18n,
                     filtersActive,
                     pinnedMatcher !== null,
                     pinnedGame,
@@ -752,6 +784,7 @@ export default function BrowsePage() {
                 <ul className="grid grid-cols-[repeat(auto-fill,minmax(18rem,1fr))] gap-3">
                   {page.items.map((item) => {
                     const presence = presenceOf(item);
+                    const authorName = item.author_name;
                     return (
                       <li
                         key={item.id}
@@ -788,7 +821,11 @@ export default function BrowsePage() {
                               {describeItem(item.kind, item.mode)}
                             </Badge>
                             <span className="ml-auto shrink-0 whitespace-nowrap text-xs text-muted-foreground">
-                              {formatDate(item.created_at)}
+                              {Number.isNaN(Date.parse(item.created_at))
+                                ? ""
+                                : formatDate(item.created_at, {
+                                    dateStyle: "medium",
+                                  })}
                             </span>
                           </span>
                           {item.description && (
@@ -827,7 +864,7 @@ export default function BrowsePage() {
                             />
                           )}
                           <FilterChip
-                            label={`by ${item.author_name}`}
+                            label={t`by ${authorName}`}
                             filterValue={item.author_name}
                             onClick={() =>
                               toggleMultiFilter("author", item.author_name)
@@ -860,10 +897,12 @@ export default function BrowsePage() {
                     disabled={current <= 1}
                     onClick={() => goToPage(Math.max(1, current - 1))}
                   >
-                    Previous
+                    <Trans>Previous</Trans>
                   </Button>
                   <span className="text-sm text-muted-foreground">
-                    Page {current} of {lastPage}
+                    <Trans>
+                      Page {current} of {lastPage}
+                    </Trans>
                   </span>
                   <Button
                     variant="outline"
@@ -871,7 +910,7 @@ export default function BrowsePage() {
                     disabled={current >= lastPage}
                     onClick={() => goToPage(current + 1)}
                   >
-                    Next
+                    <Trans>Next</Trans>
                   </Button>
                 </div>
               )}
@@ -913,6 +952,8 @@ function ItemActions({
   presence: HubItemPresence;
   onOpen: (route: string) => void;
 }) {
+  const { t } = useLingui();
+  const title = item.title;
   if (presence.state !== "here") return null;
 
   return (
@@ -925,12 +966,12 @@ function ItemActions({
         variant="outline"
         size="sm"
         onClick={() => onOpen(presence.route)}
-        aria-label={`Open ${item.title}`}
+        aria-label={t`Open ${title}`}
       >
-        <ArrowRight /> Open
+        <ArrowRight /> <Trans>Open</Trans>
       </Button>
       <Badge variant="outline" className="gap-1">
-        <Check className="size-3" aria-hidden /> Imported
+        <Check className="size-3" aria-hidden /> <Trans>Imported</Trans>
       </Badge>
     </div>
   );
@@ -943,15 +984,26 @@ function ItemActions({
  * dead service.
  */
 function emptyReason(
+  i18n: I18n,
   filtered: boolean,
   pinned: boolean,
   pinnedGame: string | null,
 ): string {
-  if (filtered) return "Nothing on the hub matches those filters yet.";
-  if (pinned) {
-    return `The hub has nothing for ${pinnedGame ?? "this game"} yet. This copy of Coilbox lists only that game's things, so there may be other games' things on the hub.`;
+  if (filtered) {
+    return i18n._(msg`Nothing on the hub matches those filters yet.`);
   }
-  return "The hub has nothing on it yet. Anything you share will show up here.";
+  if (pinned) {
+    return pinnedGame
+      ? i18n._(
+          msg`The hub has nothing for ${pinnedGame} yet. This copy of Coilbox lists only that game's things, so there may be other games' things on the hub.`,
+        )
+      : i18n._(
+          msg`The hub has nothing for this game yet. This copy of Coilbox lists only that game's things, so there may be other games' things on the hub.`,
+        );
+  }
+  return i18n._(
+    msg`The hub has nothing on it yet. Anything you share will show up here.`,
+  );
 }
 
 /**
@@ -997,7 +1049,9 @@ function FilterChip({
           />
         </button>
       </TooltipTrigger>
-      <TooltipContent>Show only {filterValue}</TooltipContent>
+      <TooltipContent>
+        <Trans>Show only {filterValue}</Trans>
+      </TooltipContent>
     </Tooltip>
   );
 }

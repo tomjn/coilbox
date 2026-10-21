@@ -1,3 +1,4 @@
+import { Trans, useLingui } from "@lingui/react/macro";
 import { Button, cn, Input } from "@picoframe/frame";
 import { Smile } from "lucide-react";
 import { useEffect, useState } from "react";
@@ -44,6 +45,7 @@ export interface EmojiPickerProps {
  * client landed on anyway.
  */
 export function EmojiPicker({ onPick, disabled = false }: EmojiPickerProps) {
+  const { t } = useLingui();
   const [open, setOpen] = useState(false);
   const [entries, setEntries] = useState<EmojiEntry[] | null>(null);
   const [group, setGroup] = useState(EMOJI_GROUPS[0].group);
@@ -85,8 +87,8 @@ export function EmojiPicker({ onPick, disabled = false }: EmojiPickerProps) {
           disabled={disabled}
           variant="ghost"
           size="icon"
-          aria-label="Emoji"
-          title="Emoji"
+          aria-label={t`Emoji`}
+          title={t`Emoji`}
           className="size-7 shrink-0 rounded-md text-muted-foreground"
         >
           <Smile className="size-4" />
@@ -96,8 +98,8 @@ export function EmojiPicker({ onPick, disabled = false }: EmojiPickerProps) {
         <Input
           value={search}
           onChange={(e) => setSearch(e.target.value)}
-          placeholder="Search emoji"
-          aria-label="Search emoji"
+          placeholder={t`Search emoji`}
+          aria-label={t`Search emoji`}
           className="mb-2 h-8"
         />
         {!query && (
@@ -139,7 +141,7 @@ export function EmojiPicker({ onPick, disabled = false }: EmojiPickerProps) {
             <PickerSkeleton />
           ) : shown.length === 0 ? (
             <p className="px-1 py-4 text-center text-sm text-muted-foreground">
-              No emoji match "{query}".
+              <Trans>No emoji match "{query}".</Trans>
             </p>
           ) : (
             <div className="grid grid-cols-8 gap-0.5">

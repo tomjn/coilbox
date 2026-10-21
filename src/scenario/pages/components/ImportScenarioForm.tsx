@@ -12,6 +12,7 @@
  * not have offers to fetch it rather than landing and failing at launch.
  */
 
+import { useLingui } from "@lingui/react/macro";
 import { open } from "@tauri-apps/plugin-dialog";
 import { useState } from "react";
 import { ChallengeCodeInput } from "@/challenge/ChallengeCodeInput";
@@ -41,6 +42,7 @@ export function ImportScenarioForm({
 }) {
   const [pending, setPending] = useState<ScenarioExport | null>(null);
   const { target, loading: targetLoading } = usePreferredTarget();
+  const { t } = useLingui();
 
   const decode = async (text: string) => {
     const read = readScenarioExport(text);
@@ -51,7 +53,8 @@ export function ImportScenarioForm({
       const id = identify(text);
       if (id.warnings.length > 0) throw new Error(id.warnings[0]);
       if (id.kind !== "unknown" && id.kind !== "scenario") {
-        throw new Error(`That code is a coilbox ${id.kind}, not a scenario.`);
+        const kind = id.kind;
+        throw new Error(t`That code is a coilbox ${kind}, not a scenario.`);
       }
       throw new Error(scenarioImportErrorMessage(read.error));
     }
@@ -63,9 +66,9 @@ export function ImportScenarioForm({
 
   const pickFile = async () => {
     const src = await open({
-      title: "Import scenario",
+      title: t`Import scenario`,
       multiple: false,
-      filters: [{ name: "Coilbox scenario", extensions: ["json"] }],
+      filters: [{ name: t`Coilbox scenario`, extensions: ["json"] }],
     });
     if (typeof src !== "string") return null;
     const { text } = await scenarioImport({ src });
@@ -86,19 +89,19 @@ export function ImportScenarioForm({
   return (
     <>
       <ChallengeCodeInput
-        helpText="Paste a scenario code someone shared, or browse to a scenario file. Either way you get the mission, its dialogue clips, and an offer to download the game and map it needs."
-        placeholder="Paste a scenario code…"
-        submitLabel="Import scenario"
-        busyLabel="Checking…"
-        fileButtonLabel="Import from file…"
+        helpText={t`Paste a scenario code someone shared, or browse to a scenario file. Either way you get the mission, its dialogue clips, and an offer to download the game and map it needs.`}
+        placeholder={t`Paste a scenario code…`}
+        submitLabel={t`Import scenario`}
+        busyLabel={t`Checking…`}
+        fileButtonLabel={t`Import from file…`}
         initialCode={initialCode}
         onImport={decode}
         onPickFile={pickFile}
       />
       {pending && (
         <ResolveContentGate
-          title="Set up this scenario"
-          description="This scenario is played on a game or a map you don't have. Download what is missing below, or cancel. Nothing is imported until it is all here."
+          title={t`Set up this scenario`}
+          description={t`This scenario is played on a game or a map you don't have. Download what is missing below, or cancel. Nothing is imported until it is all here.`}
           requirements={scenarioContentRequirements(pending.scenario)}
           target={target ?? undefined}
           targetLoading={targetLoading}

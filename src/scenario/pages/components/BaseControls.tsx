@@ -60,6 +60,8 @@
  * sentence about the same building would only repeat it.
  */
 
+import { plural, t } from "@lingui/core/macro";
+import { Trans, useLingui } from "@lingui/react/macro";
 import { Button, useDrawer } from "@picoframe/frame";
 import {
   ArrowDown,
@@ -135,7 +137,8 @@ function buildingProblem(
     baseId,
     `buildings[${index}].${field}`,
   );
-  return problem ? `Building ${index + 1}: ${problem}` : null;
+  const building = index + 1;
+  return problem ? t`Building ${building}: ${problem}` : null;
 }
 
 export function BaseControls({
@@ -264,9 +267,12 @@ export function BaseControls({
   onDelete: () => void;
 }) {
   const drawer = useDrawer();
+  const { t } = useLingui();
   // The selection is one of the base's buildings, so this is always one of them.
   const building = buildings[index];
+  const buildingDef = building.def;
   const queue = building.queue ?? [];
+  const queuedCount = queue.length;
   const repeat = building.repeat === true;
   // Null while the dataset is unread and for a def the game has not got, which
   // is why the picker below falls back to every unit rather than to nothing.
@@ -317,7 +323,7 @@ export function BaseControls({
           value={base.team}
           onValueChange={(team) => onEdit({ team })}
           className="w-32"
-          ariaLabel="Team"
+          ariaLabel={t`Team`}
           ariaInvalid={teamProblem !== null}
           describedBy={teamDescribedBy}
         />
@@ -334,8 +340,16 @@ export function BaseControls({
             >
               <Hammer className="size-3.5" />
               {queue.length === 0
-                ? "Queue"
-                : `${queue.length} queued${repeat ? " · loops" : ""}`}
+                ? t`Queue`
+                : repeat
+                  ? plural(queuedCount, {
+                      one: "# queued · loops",
+                      other: "# queued · loops",
+                    })
+                  : plural(queuedCount, {
+                      one: "# queued",
+                      other: "# queued",
+                    })}
             </Button>
           </PopoverTrigger>
           <PopoverContent align="start" className="w-80 space-y-3">
@@ -345,21 +359,29 @@ export function BaseControls({
                 there and will never be built. */}
             {!queueable && (
               <p className="rounded bg-amber-950/60 px-2 py-1.5 text-[11px] text-amber-200">
-                <span className="font-mono">{building.def}</span> builds nothing
-                in this game, so nothing queued on it will ever be built. Take
-                the queue off, or the mission places a factory that stands idle.
+                <Trans>
+                  <span className="font-mono">{buildingDef}</span> builds
+                  nothing in this game, so nothing queued on it will ever be
+                  built. Take the queue off, or the mission places a factory
+                  that stands idle.
+                </Trans>
               </p>
             )}
             {buildable === null && (
               <p className="text-xs text-muted-foreground">
-                The game's units could not be read, so this list is every unit
-                rather than the ones this building can make.
+                <Trans>
+                  The game's units could not be read, so this list is every unit
+                  rather than the ones this building can make.
+                </Trans>
               </p>
             )}
 
             {queue.length === 0 ? (
               <p className="text-xs text-muted-foreground">
-                Units this factory builds once the base is on the map, in order.
+                <Trans>
+                  Units this factory builds once the base is on the map, in
+                  order.
+                </Trans>
               </p>
             ) : (
               <ol className="space-y-1.5">
@@ -379,7 +401,7 @@ export function BaseControls({
                       size="sm"
                       variant="ghost"
                       className="size-7 p-0"
-                      aria-label={`Move ${def} up`}
+                      aria-label={t`Move ${def} up`}
                       disabled={at === 0}
                       onClick={() =>
                         onQueue(movedQueued(queue, at, -1), repeat)
@@ -391,7 +413,7 @@ export function BaseControls({
                       size="sm"
                       variant="ghost"
                       className="size-7 p-0"
-                      aria-label={`Move ${def} down`}
+                      aria-label={t`Move ${def} down`}
                       disabled={at === queue.length - 1}
                       onClick={() => onQueue(movedQueued(queue, at, 1), repeat)}
                     >
@@ -401,7 +423,7 @@ export function BaseControls({
                       size="sm"
                       variant="ghost"
                       className="size-7 p-0 text-destructive hover:text-destructive"
-                      aria-label={`Take ${def} out of the queue`}
+                      aria-label={t`Take ${def} out of the queue`}
                       onClick={() => onQueue(withoutQueued(queue, at), repeat)}
                     >
                       <X className="size-3.5" />
@@ -415,14 +437,14 @@ export function BaseControls({
               units={buildable ?? units}
               value=""
               loading={unitsLoading}
-              placeholder="Add to the queue"
+              placeholder={t`Add to the queue`}
               size="sm"
               onValueChange={(def) => onQueue(plusQueued(queue, def), repeat)}
             />
 
             <div className="flex items-center justify-between gap-3 border-t border-border/60 pt-3">
               <Label htmlFor="base-repeat" className="text-xs font-medium">
-                Build the queue over and over
+                <Trans>Build the queue over and over</Trans>
               </Label>
               <Switch
                 id="base-repeat"
@@ -445,8 +467,9 @@ export function BaseControls({
             <Blocks className="size-3.5 shrink-0" />
             <span className="truncate">
               {layoutTriggerLabel(layoutName, buildings.length)}
-              {sharedWith > 0 &&
-                (sharedEdit ? " · editing shared" : " · shared")}
+              {sharedWith > 0 && (
+                <> {sharedEdit ? t`· editing shared` : t`· shared`}</>
+              )}
             </span>
           </Button>
         </PopoverTrigger>
@@ -465,20 +488,20 @@ export function BaseControls({
           {sharedWith > 0 && (
             <div className="space-y-2 rounded bg-sky-950/60 px-2 py-1.5 text-[11px] text-sky-100">
               <p>
-                {sharedWith === 1
-                  ? "One other base is"
-                  : `${sharedWith} other bases are`}{" "}
-                placed from this blueprint.{" "}
+                {plural(sharedWith, {
+                  one: "One other base is placed from this blueprint.",
+                  other: "# other bases are placed from this blueprint.",
+                })}{" "}
                 {sharedEdit
-                  ? "Adding, moving, turning, converting or deleting a building here changes it for all of them."
-                  : "Adding, moving, turning, converting or deleting a building here gives this base a copy of its own and leaves the rest where they stand."}
+                  ? t`Adding, moving, turning, converting or deleting a building here changes it for all of them.`
+                  : t`Adding, moving, turning, converting or deleting a building here gives this base a copy of its own and leaves the rest where they stand.`}
               </p>
               <div className="flex items-center justify-between gap-3">
                 <Label
                   htmlFor="base-shared-layout"
                   className="text-[11px] font-medium"
                 >
-                  Edit the blueprint they all use
+                  <Trans>Edit the blueprint they all use</Trans>
                 </Label>
                 <Switch
                   id="base-shared-layout"
@@ -490,8 +513,10 @@ export function BaseControls({
           )}
 
           <p className="text-xs text-muted-foreground">
-            Every building sits at an offset from the base's origin. Dragging
-            one moves it within the base. Moving the base takes the lot.
+            <Trans>
+              Every building sits at an offset from the base's origin. Dragging
+              one moves it within the base. Moving the base takes the lot.
+            </Trans>
           </p>
 
           <LayoutNotes
@@ -516,7 +541,7 @@ export function BaseControls({
               className="h-7 w-full gap-1.5 px-2 text-xs"
               onClick={() =>
                 drawer.open({
-                  title: `Convert ${layoutName}`,
+                  title: t`Convert ${layoutName}`,
                   width: "32rem",
                   content: (
                     <div key={nextDrawerKey()} className="flex flex-col">
@@ -537,7 +562,8 @@ export function BaseControls({
                 })
               }
             >
-              <Repeat className="size-3.5" /> Say it in another side's buildings
+              <Repeat className="size-3.5" />{" "}
+              <Trans>Say it in another side's buildings</Trans>
             </Button>
           )}
 
@@ -564,7 +590,7 @@ export function BaseControls({
             onClick={() => onMove(!moving)}
           >
             <Move className="size-3.5" />
-            {moving ? "Click the map" : "Move the whole base"}
+            {moving ? t`Click the map` : t`Move the whole base`}
           </Button>
 
           <Button
@@ -573,7 +599,7 @@ export function BaseControls({
             className="h-7 w-full gap-1.5 px-2 text-xs text-destructive hover:text-destructive"
             onClick={onDelete}
           >
-            <Trash2 className="size-3.5" /> Delete the whole base
+            <Trash2 className="size-3.5" /> <Trans>Delete the whole base</Trans>
           </Button>
         </PopoverContent>
       </Popover>

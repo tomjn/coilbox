@@ -7,6 +7,9 @@
  * can actually be played with, since the engine numbers ally teams and teams in
  * four bits each.
  */
+
+import { t } from "@lingui/core/macro";
+
 export interface NewLobbyForm {
   name: string;
   mapName: string;
@@ -25,13 +28,15 @@ export const PLAYERS_PER_TEAM_RANGE = { min: 1, max: 16 } as const;
  * can. Pure.
  */
 export function newLobbyProblem(form: NewLobbyForm): string | null {
-  if (!form.name.trim()) return "Give the lobby a name.";
-  if (!form.mapName) return "Choose a map.";
+  if (!form.name.trim()) return t`Give the lobby a name.`;
+  if (!form.mapName) return t`Choose a map.`;
   if (!inRange(form.allyTeams, ALLY_TEAM_RANGE)) {
-    return `A lobby has between ${ALLY_TEAM_RANGE.min} and ${ALLY_TEAM_RANGE.max} sides.`;
+    const { min, max } = ALLY_TEAM_RANGE;
+    return t`A lobby has between ${min} and ${max} sides.`;
   }
   if (!inRange(form.playersPerTeam, PLAYERS_PER_TEAM_RANGE)) {
-    return `Each side takes between ${PLAYERS_PER_TEAM_RANGE.min} and ${PLAYERS_PER_TEAM_RANGE.max} players.`;
+    const { min, max } = PLAYERS_PER_TEAM_RANGE;
+    return t`Each side takes between ${min} and ${max} players.`;
   }
   return null;
 }

@@ -1,3 +1,4 @@
+import { useLingui } from "@lingui/react/macro";
 import type { GameItem, MapItem } from "@/content/bindings";
 import {
   useUnitsyncMapMeta,
@@ -82,6 +83,7 @@ export function BattleMapCard({
   onChangeMap: (name: string, maphash: number) => void;
   onRescan: () => Promise<ContentPresence>;
 }) {
+  const { t } = useLingui();
   const minimap = useUnitsyncMinimap(enginePath, dataDir, battle.map);
   const { thumbs } = useUnitsyncThumbnails(enginePath, dataDir);
   const { meta } = useUnitsyncMapMeta(enginePath, dataDir);
@@ -200,9 +202,9 @@ export function BattleMapCard({
         selectLabel={
           canChangeMap
             ? pendingMap
-              ? "Changing map…"
-              : "Change map"
-            : "Suggest map"
+              ? t`Changing map…`
+              : t`Change map`
+            : t`Suggest map`
         }
         overlayInteractive={editBoxes}
         overlay={

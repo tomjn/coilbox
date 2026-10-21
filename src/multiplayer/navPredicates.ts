@@ -1,3 +1,4 @@
+import { useLingui } from "@lingui/react/macro";
 import { useEffect, useState } from "react";
 import { isProfileHidden } from "../profile/hidden";
 import { useInBattleKey } from "./battle/useBattleRoomKey";
@@ -97,10 +98,11 @@ export function useMpServerAdmin(): boolean {
  * changes (`NavItem.useLabel`).
  */
 export function useBattleRoomLabel(): string {
+  const { t } = useLingui();
   const state = useConnection(useInBattleKey())?.mirror.state;
   const battle =
     state?.currentBattle != null
       ? state.battles[String(state.currentBattle)]
       : undefined;
-  return battle?.title?.trim() || "Battle Room";
+  return battle?.title?.trim() || t`Battle Room`;
 }

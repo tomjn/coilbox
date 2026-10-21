@@ -1,3 +1,4 @@
+import { plural, t } from "@lingui/core/macro";
 import { describeError } from "@/i18n/uiError";
 import type { NotifyInput } from "@/notify/notify";
 import { notify, recordQuietly } from "@/notify/notify";
@@ -130,8 +131,13 @@ export interface UploadRun {
  * the plural by passing anything else.
  */
 function pictures(count: number, game: string | null | undefined): string {
-  const noun = count === 1 ? "picture" : "pictures";
-  return game ? `${noun} for ${game}` : noun;
+  if (game) {
+    return plural(count, {
+      one: `picture for ${game}`,
+      other: `pictures for ${game}`,
+    });
+  }
+  return plural(count, { one: "picture", other: "pictures" });
 }
 
 /**
@@ -154,19 +160,22 @@ export function assetUploadReports(
     const untried = outcomes.filter((o) => o.result === "not_attempted").length;
     // Nothing left is the ordinary end of a run that stopped on its last
     // picture, and there is no number worth saying about it.
+    const untriedNoun = pictures(untried, game);
     const left =
       untried === 0
         ? ""
-        : untried === 1
-          ? ` One more ${pictures(1, game)} was not tried.`
-          : ` ${untried} more ${pictures(untried, game)} were not tried.`;
+        : ` ${plural(untried, {
+            one: `One more ${untriedNoun} was not tried.`,
+            other: `# more ${untriedNoun} were not tried.`,
+          })}`;
     // The fallback names the game because it is the one branch here with no
     // sentence from the hub, and the hub's sentences name the picture.
+    const anyNoun = pictures(0, game);
     const why =
       (stopped.said ? describeError(stopped.said).trim() : "") ||
-      `The hub would not take any more ${pictures(0, game)} just now.`;
+      t`The hub would not take any more ${anyNoun} just now.`;
     reports.push({
-      title: "Picture uploads stopped early",
+      title: t`Picture uploads stopped early`,
       body: `${why}${left}`,
       level: "info",
     });
@@ -174,30 +183,35 @@ export function assetUploadReports(
 
   const terminal = outcomes.filter((o) => o.verdict === "terminal");
   if (terminal.length > 0) {
-    const one = terminal.length === 1;
+    const refusedCount = terminal.length;
     const said = firstWords(terminal);
     if (outOfDate) {
       // One cause for the whole run, so the count is the only number worth
       // saying and the hub's own words are not: they describe a picture, and
       // what is wrong is the build that made every one of them.
-      const refused = one
-        ? `The hub refused a ${pictures(1, game)}`
-        : `The hub refused all ${terminal.length} ${pictures(terminal.length, game)}`;
+      const refusedNoun = pictures(refusedCount, game);
+      const refused = plural(refusedCount, {
+        one: `The hub refused a ${refusedNoun}`,
+        other: `The hub refused all # ${refusedNoun}`,
+      });
       reports.push({
-        title: "Coilbox is out of date",
-        body: `${refused} because this copy of coilbox makes them the way an older hub took them. Update coilbox and they will go.`,
+        title: t`Coilbox is out of date`,
+        body: t`${refused} because this copy of coilbox makes them the way an older hub took them. Update coilbox and they will go.`,
         level: "error",
       });
     } else {
       // The reason in front of the consequence, because the reason is the only
       // part that says which picture and what was wrong with it.
-      const consequence = one
-        ? "Coilbox will not send it again: the same bytes get the same answer."
-        : "Coilbox will not send them again: the same bytes get the same answer.";
+      const consequence = plural(refusedCount, {
+        one: "Coilbox will not send it again: the same bytes get the same answer.",
+        other:
+          "Coilbox will not send them again: the same bytes get the same answer.",
+      });
       reports.push({
-        title: one
-          ? "The hub would not take a picture"
-          : `The hub would not take ${terminal.length} pictures`,
+        title: plural(refusedCount, {
+          one: "The hub would not take a picture",
+          other: "The hub would not take # pictures",
+        }),
         body: said ? `${said} ${consequence}` : consequence,
         level: "error",
       });
@@ -225,13 +239,14 @@ export function assetUploadFailureReport(
   run: UploadRun = {},
 ): NotifyInput {
   const { game = null } = run;
-  const left =
-    assets === 1
-      ? `One ${pictures(1, game)} was not sent.`
-      : `${assets} ${pictures(assets, game)} were not sent.`;
+  const assetNoun = pictures(assets, game);
+  const left = plural(assets, {
+    one: `One ${assetNoun} was not sent.`,
+    other: `# ${assetNoun} were not sent.`,
+  });
   return {
-    title: "Picture uploads stopped early",
-    body: `${said.trim() || "The hub would not take any just now."} ${left}`,
+    title: t`Picture uploads stopped early`,
+    body: `${said.trim() || t`The hub would not take any just now.`} ${left}`,
     level: "info",
   };
 }
@@ -252,15 +267,15 @@ export function assetUploadStoppedReport(
   run: UploadRun = {},
 ): NotifyInput {
   const { game = null } = run;
-  const already =
-    sent === 0
-      ? "Nothing had been sent, so nothing was added to the hub."
-      : sent === 1
-        ? "One picture had already gone, and it stays on the hub."
-        : `${sent} pictures had already gone, and they stay on the hub.`;
+  const already = plural(sent, {
+    0: "Nothing had been sent, so nothing was added to the hub.",
+    one: "One picture had already gone, and it stays on the hub.",
+    other: "# pictures had already gone, and they stay on the hub.",
+  });
+  const sendingNoun = pictures(0, game);
   return {
-    title: "You stopped the picture uploads",
-    body: `Coilbox has stopped sending ${pictures(0, game)}. ${already}`,
+    title: t`You stopped the picture uploads`,
+    body: t`Coilbox has stopped sending ${sendingNoun}. ${already}`,
     level: "info",
   };
 }

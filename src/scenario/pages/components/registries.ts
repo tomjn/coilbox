@@ -24,6 +24,7 @@
  * parameters are rewritten, which is what a caller with no game to read has.
  */
 
+import { t } from "@lingui/core/macro";
 import type { UnitDatasetEntry } from "@/content/bindings";
 import type { LockedUnit } from "@/lego/locks";
 import type { ExtensionTypes } from "../../extensions";
@@ -61,8 +62,8 @@ export function nameIssue(
   self?: string,
 ): string | null {
   const name = wanted.trim();
-  if (!name) return "Needs a name";
-  if (name !== self && new Set(taken).has(name)) return "Already taken";
+  if (!name) return t`Needs a name`;
+  if (name !== self && new Set(taken).has(name)) return t`Already taken`;
   return null;
 }
 
@@ -340,15 +341,18 @@ export function withLockedUnits(
 ): UnitDatasetEntry[] {
   if (locked.length === 0) return units;
   const lockedNames = new Set(locked.map((l) => l.name));
-  const marked = units.map((unit) =>
-    lockedNames.has(unit.name.toLowerCase())
-      ? { ...unit, fullName: `${unit.fullName?.trim() || unit.name} (locked)` }
-      : unit,
-  );
+  const marked = units.map((unit) => {
+    if (!lockedNames.has(unit.name.toLowerCase())) return unit;
+    const unitName = unit.fullName?.trim() || unit.name;
+    return { ...unit, fullName: t`${unitName} (locked)` };
+  });
   const have = new Set(units.map((u) => u.name.toLowerCase()));
   const added = locked
     .filter((l) => !have.has(l.name))
-    .map((l) => ({ name: l.name, fullName: `${l.label} (locked)` }));
+    .map((l) => {
+      const label = l.label;
+      return { name: l.name, fullName: t`${label} (locked)` };
+    });
   return [...marked, ...added];
 }
 
@@ -447,6 +451,6 @@ export function buildableWarning(scenario: Scenario): string | null {
   const buildable = scenario.restrictions.buildable;
   if (!buildable || buildable.units.length > 0) return null;
   return buildable.mode === "allow"
-    ? "Nothing is on the list, so no team the scenario declares can build anything."
-    : "Nothing is on the list, so this rule does nothing.";
+    ? t`Nothing is on the list, so no team the scenario declares can build anything.`
+    : t`Nothing is on the list, so this rule does nothing.`;
 }

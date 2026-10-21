@@ -1,3 +1,4 @@
+import { Trans } from "@lingui/react/macro";
 import { Switch } from "@/components/ui/switch";
 
 /**
@@ -35,35 +36,42 @@ export function AssetUploadControl({
   return (
     <section className="space-y-2">
       <h3 className="text-sm font-medium leading-none">
-        Sending pictures to the hub
+        <Trans>Sending pictures to the hub</Trans>
       </h3>
       {offered ? (
         <>
           <p className="text-sm text-muted-foreground">
-            Off unless you turn it on. When it is on, Coilbox reads the game and
-            map files on this computer, makes pictures of the units and maps
-            inside them, and sends those pictures to the hub under your account,
-            with your name on them. It can also send what it measured about a
-            map, such as its size, its height range and where players start.
+            <Trans>
+              Off unless you turn it on. When it is on, Coilbox reads the game
+              and map files on this computer, makes pictures of the units and
+              maps inside them, and sends those pictures to the hub under your
+              account, with your name on them. It can also send what it measured
+              about a map, such as its size, its height range and where players
+              start.
+            </Trans>
           </p>
           <p className="text-sm text-muted-foreground">
-            What you send is public and hard to take back. It goes into a public
-            repository and stays in its history, so it is not like deleting a
-            file you uploaded by mistake. The pictures are made from other
-            people's game and map archives, and not every archive is clear about
-            what you may do with what is inside it. Every upload also spends
-            storage the whole community shares.
+            <Trans>
+              What you send is public and hard to take back. It goes into a
+              public repository and stays in its history, so it is not like
+              deleting a file you uploaded by mistake. The pictures are made
+              from other people's game and map archives, and not every archive
+              is clear about what you may do with what is inside it. Every
+              upload also spends storage the whole community shares.
+            </Trans>
           </p>
           <p className="text-sm text-muted-foreground">
-            Leave this off unless you are happy to publish pictures made from
-            the games and maps you have installed.
+            <Trans>
+              Leave this off unless you are happy to publish pictures made from
+              the games and maps you have installed.
+            </Trans>
           </p>
           <label
             htmlFor="hub-asset-uploads"
             className="flex items-center justify-between gap-4 pt-1"
           >
             <span className="text-sm font-medium">
-              Send pictures of your games and maps to the hub
+              <Trans>Send pictures of your games and maps to the hub</Trans>
             </span>
             <Switch
               id="hub-asset-uploads"
@@ -74,8 +82,10 @@ export function AssetUploadControl({
         </>
       ) : (
         <p className="text-sm text-muted-foreground">
-          Your distribution has switched off sending pictures to the hub, so
-          Coilbox will not upload any.
+          <Trans>
+            Your distribution has switched off sending pictures to the hub, so
+            Coilbox will not upload any.
+          </Trans>
         </p>
       )}
     </section>

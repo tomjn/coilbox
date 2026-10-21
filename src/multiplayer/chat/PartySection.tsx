@@ -1,3 +1,5 @@
+import { t as coreT } from "@lingui/core/macro";
+import { Trans, useLingui } from "@lingui/react/macro";
 import { Button } from "@picoframe/frame";
 import { Check, LogOut, Users, X } from "lucide-react";
 import type { ReactNode } from "react";
@@ -53,62 +55,65 @@ function RowAction({
  * Tachyon connection rather than reading the app's globally active one.
  */
 export function PartySection({ serverKey }: { serverKey: string }) {
+  const { t } = useLingui();
   const connection = useConnection(serverKey);
   const state = connection?.mirror.state;
   const party = state?.party ?? null;
   const invites = state?.partyInvites ?? [];
   const me = state?.myUsername ?? null;
+  const memberCount = party?.members.length ?? 0;
+  const maxMembers = party?.maxMembers ?? 0;
 
   const key = serverKey;
   const swallow = () => {};
 
   return (
-    <Section title="Party">
+    <Section title={t`Party`}>
       {invites.length > 0 && (
         <ul className="flex flex-col gap-1 px-2 pb-1">
-          {invites.map((invite) => (
-            <li
-              key={invite.id}
-              className="flex items-center gap-2 rounded-md px-2 py-1.5 text-sm"
-            >
-              <Users className="size-4 shrink-0 text-muted-foreground" />
-              <span
-                className="truncate"
-                title={`Invitation from ${nameOf(invite.members)}`}
+          {invites.map((invite) => {
+            const who = nameOf(invite.members);
+            return (
+              <li
+                key={invite.id}
+                className="flex items-center gap-2 rounded-md px-2 py-1.5 text-sm"
               >
-                {nameOf(invite.members)}
-              </span>
-              <div className="ml-auto flex gap-1">
-                <RowAction
-                  icon={<Check className="size-4" />}
-                  label={`Join the party with ${nameOf(invite.members)}`}
-                  onClick={() =>
-                    mpPartyAcceptInvite({
-                      serverKey: key,
-                      partyId: invite.id,
-                    }).catch(swallow)
-                  }
-                />
-                <RowAction
-                  icon={<X className="size-4" />}
-                  label={`Turn down the invitation from ${nameOf(invite.members)}`}
-                  onClick={() =>
-                    mpPartyDeclineInvite({
-                      serverKey: key,
-                      partyId: invite.id,
-                    }).catch(swallow)
-                  }
-                />
-              </div>
-            </li>
-          ))}
+                <Users className="size-4 shrink-0 text-muted-foreground" />
+                <span className="truncate" title={t`Invitation from ${who}`}>
+                  {who}
+                </span>
+                <div className="ml-auto flex gap-1">
+                  <RowAction
+                    icon={<Check className="size-4" />}
+                    label={t`Join the party with ${who}`}
+                    onClick={() =>
+                      mpPartyAcceptInvite({
+                        serverKey: key,
+                        partyId: invite.id,
+                      }).catch(swallow)
+                    }
+                  />
+                  <RowAction
+                    icon={<X className="size-4" />}
+                    label={t`Turn down the invitation from ${who}`}
+                    onClick={() =>
+                      mpPartyDeclineInvite({
+                        serverKey: key,
+                        partyId: invite.id,
+                      }).catch(swallow)
+                    }
+                  />
+                </div>
+              </li>
+            );
+          })}
         </ul>
       )}
 
       {!party && (
         <div className="px-2 pb-2">
           <p className="px-2 py-1.5 text-xs text-muted-foreground">
-            A party stays together from one battle to the next.
+            <Trans>A party stays together from one battle to the next.</Trans>
           </p>
           <Button
             variant="secondary"
@@ -116,7 +121,7 @@ export function PartySection({ serverKey }: { serverKey: string }) {
             onClick={() => mpPartyCreate({ serverKey: key }).catch(swallow)}
           >
             <Users className="size-4" />
-            Start a party
+            <Trans>Start a party</Trans>
           </Button>
         </div>
       )}
@@ -132,14 +137,14 @@ export function PartySection({ serverKey }: { serverKey: string }) {
                 <span className="truncate">{name}</span>
                 {name === me && (
                   <span className="shrink-0 text-xs text-muted-foreground">
-                    you
+                    <Trans>you</Trans>
                   </span>
                 )}
                 {name !== me && (
                   <div className="ml-auto">
                     <RowAction
                       icon={<X className="size-4" />}
-                      label={`Put ${name} out of the party`}
+                      label={t`Put ${name} out of the party`}
                       onClick={() =>
                         mpPartyKickMember({
                           serverKey: key,
@@ -157,11 +162,13 @@ export function PartySection({ serverKey }: { serverKey: string }) {
                 className="flex items-center gap-2 rounded-md px-2 py-1.5 text-sm text-muted-foreground"
               >
                 <span className="truncate">{name}</span>
-                <span className="shrink-0 text-xs">invited</span>
+                <span className="shrink-0 text-xs">
+                  <Trans>invited</Trans>
+                </span>
                 <div className="ml-auto">
                   <RowAction
                     icon={<X className="size-4" />}
-                    label={`Withdraw the invitation to ${name}`}
+                    label={t`Withdraw the invitation to ${name}`}
                     onClick={() =>
                       mpPartyCancelInvite({
                         serverKey: key,
@@ -176,7 +183,7 @@ export function PartySection({ serverKey }: { serverKey: string }) {
           <div className="flex items-center gap-2 px-4 py-2">
             <UserPicker
               serverKey={key}
-              label="Invite someone to your party"
+              label={t`Invite someone to your party`}
               exclude={[...party.members, ...party.invited]}
               onPick={(username) =>
                 mpPartyInvite({ serverKey: key, username }).catch(swallow)
@@ -188,10 +195,12 @@ export function PartySection({ serverKey }: { serverKey: string }) {
               onClick={() => mpPartyLeave({ serverKey: key }).catch(swallow)}
             >
               <LogOut className="size-4" />
-              Leave
+              <Trans>Leave</Trans>
             </Button>
             <span className="ml-auto text-xs text-muted-foreground">
-              {party.members.length} of {party.maxMembers}
+              <Trans>
+                {memberCount} of {maxMembers}
+              </Trans>
             </span>
           </div>
         </>
@@ -206,5 +215,5 @@ export function PartySection({ serverKey }: { serverKey: string }) {
  * rather than to the server's id, which would mean nothing to a reader.
  */
 function nameOf(members: string[]): string {
-  return members.length > 0 ? members.join(", ") : "a party";
+  return members.length > 0 ? members.join(", ") : coreT`a party`;
 }

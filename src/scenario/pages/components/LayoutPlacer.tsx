@@ -14,6 +14,7 @@
  * `./layoutPlacing.ts` says why.
  */
 
+import { Trans, useLingui } from "@lingui/react/macro";
 import { Blocks } from "lucide-react";
 import { useMemo } from "react";
 import { blueprintArrival } from "@/blueprint/arrival";
@@ -146,6 +147,7 @@ export function LayoutPlacer({
    *  one build square. */
   units: readonly UnitDatasetEntry[];
 }) {
+  const { t } = useLingui();
   const footprintOf = useMemo(() => footprintsFromUnits([...units]), [units]);
   const options = useMemo(
     () =>
@@ -168,7 +170,7 @@ export function LayoutPlacer({
         onValueChange={(next) => onChoice(parseLayoutChoice(next))}
         options={options}
         placeholder={
-          options.length === 0 ? "No blueprints yet" : "Pick a blueprint…"
+          options.length === 0 ? t`No blueprints yet` : t`Pick a blueprint…`
         }
         disabled={options.length === 0}
       />
@@ -180,15 +182,19 @@ export function LayoutPlacer({
 
       {options.length === 0 && (
         <p className="w-full text-[11px] text-muted-foreground">
-          There is nothing to place. Draw a base with Bases, or keep one in
-          Library &gt; Blueprints.
+          <Trans>
+            There is nothing to place. Draw a base with Bases, or keep one in
+            Library &gt; Blueprints.
+          </Trans>
         </p>
       )}
 
       {participants.length === 0 && (
         <p className="w-full rounded bg-amber-950/60 px-2 py-1 text-[11px] text-amber-200">
-          This scenario has no participants yet, and a base on the map belongs
-          to one. Add a participant in the setup below the map first.
+          <Trans>
+            This scenario has no participants yet, and a base on the map belongs
+            to one. Add a participant in the setup below the map first.
+          </Trans>
         </p>
       )}
 
@@ -208,9 +214,11 @@ export function LayoutPlacer({
       {placement && choice?.from === "library" && (
         <p className="w-full text-[11px] text-muted-foreground">
           <Blocks className="mr-1 inline size-3" aria-hidden />
-          Placing this copies it into the scenario, so what you share carries
-          the layout rather than pointing at your library. It arrives with
-          nothing a trigger can address and nothing queued.
+          <Trans>
+            Placing this copies it into the scenario, so what you share carries
+            the layout rather than pointing at your library. It arrives with
+            nothing a trigger can address and nothing queued.
+          </Trans>
         </p>
       )}
     </>

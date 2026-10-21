@@ -19,6 +19,7 @@
  * `useMapKeyboard.ts`.
  */
 
+import { plural, t } from "@lingui/core/macro";
 import type { FootprintMark, SnapBuilding } from "@/blueprint/footprint";
 import type { LayoutEdit } from "@/lib/scenarioEditing/bases";
 import {
@@ -205,13 +206,38 @@ export function facingIn(things: MapThings, key: string): Facing | null {
 
 /** The engine's facings as words: 0 south, 1 east, 2 north, 3 west. */
 export function facingWords(facing: Facing): string {
-  return ["south", "east", "north", "west"][facing];
+  switch (facing) {
+    case 0:
+      return t`south`;
+    case 1:
+      return t`east`;
+    case 2:
+      return t`north`;
+    default:
+      return t`west`;
+  }
+}
+
+/** A compass heading as it is read out. */
+export function headingWords(heading: Heading): string {
+  switch (heading) {
+    case "north":
+      return t`north`;
+    case "south":
+      return t`south`;
+    case "east":
+      return t`east`;
+    default:
+      return t`west`;
+  }
 }
 
 /** A position as it is read out. Named axes rather than a bare pair, because
  *  "1024, 2048" on its own says nothing about which way either number runs. */
 export function spotWords(pos: Point): string {
-  return `x ${Math.round(pos.x)}, z ${Math.round(pos.z)}`;
+  const x = Math.round(pos.x);
+  const z = Math.round(pos.z);
+  return t`x ${x}, z ${z}`;
 }
 
 /**
@@ -227,7 +253,9 @@ export function thingWords(things: MapThings, key: string): string {
   const zone = parseZoneKey(key);
   if (zone) {
     const found = things.scenario.zones.find((one) => one.id === zone.id);
-    return found ? `zone ${found.name}` : "a zone that is gone";
+    if (!found) return t`a zone that is gone`;
+    const zoneName = found.name;
+    return t`zone ${zoneName}`;
   }
 
   const path = parsePathKey(key);
@@ -235,39 +263,47 @@ export function thingWords(things: MapThings, key: string): string {
     const source = things.paths.find((one) => one.id === path.groupId);
     const order = source?.orders[path.order];
     const total = order && orderWaypoints(order)?.length;
-    const of = total ? ` of ${total}` : "";
-    return `${pathLabel(things.paths, path.groupId)}, point ${
-      path.waypoint + 1
-    }${of}`;
+    const label = pathLabel(things.paths, path.groupId);
+    const point = path.waypoint + 1;
+    return total
+      ? t`${label}, point ${point} of ${total}`
+      : t`${label}, point ${point}`;
   }
 
   const placement = things.placements.find((one) => one.key === key);
-  if (!placement) return "nothing";
+  if (!placement) return t`nothing`;
   const entry = things.entries.find(
     (one) => one.kind === placement.kind && one.id === placement.id,
   );
+  const place = placement.index + 1;
   const where =
     placement.kind === "actor"
-      ? "actor"
+      ? t`actor`
       : placement.kind === "group"
-        ? `unit ${placement.index + 1}`
-        : `building ${placement.index + 1}`;
+        ? t`unit ${place}`
+        : t`building ${place}`;
   // An actor nobody has named is listed under its own unit type, so saying the
   // entry's name as well would be saying "armcom, actor, armcom".
-  const named =
-    entry && entry.label !== placement.def ? `${entry.label}, ` : "";
-  return `${named}${where}, ${placement.def}`;
+  const def = placement.def;
+  if (entry && entry.label !== def) {
+    const entryLabel = entry.label;
+    return t`${entryLabel}, ${where}, ${def}`;
+  }
+  return t`${where}, ${def}`;
 }
 
 /** What is selected, said in full: what it is, which way it faces, and where it
  *  stands. The sentence an author hears every time the selection moves. */
 export function selectionWords(things: MapThings, key: string | null): string {
-  if (!key) return "Nothing selected.";
+  if (!key) return t`Nothing selected.`;
   const pos = positionIn(things, key);
-  if (!pos) return "Nothing selected.";
+  if (!pos) return t`Nothing selected.`;
   const facing = facingIn(things, key);
-  const way = facing === null ? "" : `, facing ${facingWords(facing)}`;
-  return `${thingWords(things, key)}${way}, at ${spotWords(pos)}.`;
+  const thing = thingWords(things, key);
+  const spot = spotWords(pos);
+  if (facing === null) return t`${thing}, at ${spot}.`;
+  const way = facingWords(facing);
+  return t`${thing}, facing ${way}, at ${spot}.`;
 }
 
 /**
@@ -299,16 +335,17 @@ export function buildTrouble(
   const mark = marks.find((one) => one.key === key);
   if (!mark) return "";
   const reasons: string[] = [];
-  if (mark.overlapping) reasons.push("overlapping another building, in red");
+  if (mark.overlapping) reasons.push(t`overlapping another building, in red`);
   if (mark.standing === "slope") {
-    reasons.push("on ground too steep for it, in amber");
+    reasons.push(t`on ground too steep for it, in amber`);
   } else if (mark.standing === "too-deep") {
-    reasons.push("in water too deep for it, in cyan");
+    reasons.push(t`in water too deep for it, in cyan`);
   } else if (mark.standing === "too-shallow") {
-    reasons.push("not in deep enough water, in cyan");
+    reasons.push(t`not in deep enough water, in cyan`);
   }
   if (reasons.length === 0) return "";
-  return ` Cannot be built here: ${reasons.join(", ")}.`;
+  const list = reasons.join(", ");
+  return ` ${t`Cannot be built here: ${list}.`}`;
 }
 
 /** What a move did, said after the document has taken it. */
@@ -320,8 +357,10 @@ export function movedWords(
   marks: readonly FootprintMark[],
 ): string {
   const pos = positionIn(things, key);
-  if (!pos) return "Nothing moved.";
-  return `Moved ${step} ${heading}, now at ${spotWords(pos)}.${buildTrouble(marks, key)}`;
+  if (!pos) return t`Nothing moved.`;
+  const way = headingWords(heading);
+  const spot = spotWords(pos);
+  return `${t`Moved ${step} ${way}, now at ${spot}.`}${buildTrouble(marks, key)}`;
 }
 
 /**
@@ -345,8 +384,9 @@ export function addedPointWords(
     order
   ];
   const total = found && orderWaypoints(found)?.length;
-  if (!total) return "Nothing added.";
-  return `Added ${pathLabel(paths, groupId)}, point ${total} of ${total}.`;
+  if (!total) return t`Nothing added.`;
+  const label = pathLabel(paths, groupId);
+  return t`Added ${label}, point ${total} of ${total}.`;
 }
 
 /**
@@ -361,8 +401,9 @@ export function addedPointWords(
  */
 export function originMovedWords(after: Scenario, baseId: string): string {
   const base = after.bases.find((one) => one.id === baseId);
-  if (!base) return "Nothing moved.";
-  return `Moved the base's origin, now at ${spotWords(base.origin)}.`;
+  if (!base) return t`Nothing moved.`;
+  const spot = spotWords(base.origin);
+  return t`Moved the base's origin, now at ${spot}.`;
 }
 
 /** What a turn did. The position comes with it because a turn does not move a
@@ -373,8 +414,9 @@ export function turnedWords(
   marks: readonly FootprintMark[],
 ): string {
   const facing = facingIn(things, key);
-  if (facing === null) return "This does not turn.";
-  return `Facing ${facingWords(facing)}.${buildTrouble(marks, key)}`;
+  if (facing === null) return t`This does not turn.`;
+  const way = facingWords(facing);
+  return `${t`Facing ${way}.`}${buildTrouble(marks, key)}`;
 }
 
 /**
@@ -389,7 +431,13 @@ export function turnedWords(
  */
 export function mapProblemsWords(marks: readonly FootprintMark[]): string {
   const count = previewCount(marks);
-  if (count.total === 0) return "Nothing built yet.";
+  if (count.total === 0) return t`Nothing built yet.`;
+  const buildingCount = count.total;
+  const clashCount = count.clashes;
+  const unstableCount = count.unstable;
+  const tooDeepCount = count.tooDeep;
+  const tooShallowCount = count.tooShallow;
+  const absentCount = count.absent;
   const bad =
     count.clashes +
     count.unstable +
@@ -397,64 +445,79 @@ export function mapProblemsWords(marks: readonly FootprintMark[]): string {
     count.tooShallow +
     count.absent;
   if (bad === 0) {
-    const room =
-      count.total === 1
-        ? "1 building, and it can be built where it stands."
-        : `${count.total} buildings, and every one of them can be built where it stands.`;
+    const room = plural(buildingCount, {
+      one: "# building, and it can be built where it stands.",
+      other: "# buildings, and every one of them can be built where it stands.",
+    });
     return room + unjudgedClause(count);
   }
   const parts: string[] = [];
   if (count.clashes > 0) {
     parts.push(
-      count.clashes === 1
-        ? "1 overlapping another building"
-        : `${count.clashes} overlapping other buildings`,
+      plural(clashCount, {
+        one: "# overlapping another building",
+        other: "# overlapping other buildings",
+      }),
     );
   }
   if (count.unstable > 0) {
     parts.push(
-      count.unstable === 1
-        ? "1 on ground too steep for it"
-        : `${count.unstable} on ground too steep for them`,
+      plural(unstableCount, {
+        one: "# on ground too steep for it",
+        other: "# on ground too steep for them",
+      }),
     );
   }
   if (count.tooDeep > 0) {
     parts.push(
-      count.tooDeep === 1
-        ? "1 in water too deep for it"
-        : `${count.tooDeep} in water too deep for them`,
+      plural(tooDeepCount, {
+        one: "# in water too deep for it",
+        other: "# in water too deep for them",
+      }),
     );
   }
   if (count.tooShallow > 0) {
     parts.push(
-      count.tooShallow === 1
-        ? "1 without enough water under it"
-        : `${count.tooShallow} without enough water under them`,
+      plural(tooShallowCount, {
+        one: "# without enough water under it",
+        other: "# without enough water under them",
+      }),
     );
   }
   if (count.absent > 0) {
     parts.push(
-      count.absent === 1
-        ? "1 a unit this game has not got"
-        : `${count.absent} units this game has not got`,
+      plural(absentCount, {
+        one: "# a unit this game has not got",
+        other: "# units this game has not got",
+      }),
     );
   }
-  const of = bad === count.total ? "" : ` of ${count.total}`;
-  const stand = bad === 1 ? "it stands" : "they stand";
-  return (
-    `${bad}${of} cannot be built where ${stand}: ${parts.join(", ")}.` +
-    unjudgedClause(count)
-  );
+  const list = parts.join(", ");
+  const total = count.total;
+  const verdict =
+    bad === total
+      ? plural(bad, {
+          one: `# cannot be built where it stands: ${list}.`,
+          other: `# cannot be built where they stand: ${list}.`,
+        })
+      : plural(bad, {
+          one: `# of ${total} cannot be built where it stands: ${list}.`,
+          other: `# of ${total} cannot be built where they stand: ${list}.`,
+        });
+  return verdict + unjudgedClause(count);
 }
 
 /** A zone's size, in elmos: what a resize changed and the number a resize
  *  announcement has to carry. A box says width and height because a resize
  *  can leave the two different. A circle says its one radius. */
 function zoneSizeWords(zone: ScenarioZone): string {
-  if (zone.shape === "circle") return `radius ${Math.round(zone.radius)} elmos`;
+  if (zone.shape === "circle") {
+    const radius = Math.round(zone.radius);
+    return t`radius ${radius} elmos`;
+  }
   const width = Math.round(zone.max.x - zone.min.x);
   const height = Math.round(zone.max.z - zone.min.z);
-  return `${width} by ${height} elmos`;
+  return t`${width} by ${height} elmos`;
 }
 
 /** The zone a key names, read out of the document, or null when the key does
@@ -475,17 +538,20 @@ export function resizedWords(
   step: number,
 ): string {
   const zone = zoneNamed(things, key);
-  if (!zone) return "Nothing resized.";
-  const verb = heading === "north" || heading === "east" ? "Grew" : "Shrank";
-  return `${verb} ${step}, now ${zoneSizeWords(zone)}.`;
+  if (!zone) return t`Nothing resized.`;
+  const size = zoneSizeWords(zone);
+  return heading === "north" || heading === "east"
+    ? t`Grew ${step}, now ${size}.`
+    : t`Shrank ${step}, now ${size}.`;
 }
 
 /** What is said when a resize asked for no change at all: the zone is already
  *  as small as one gets to be. Growing has no such ceiling. */
 export function resizeLimitWords(things: MapThings, key: string): string {
   const zone = zoneNamed(things, key);
-  if (!zone) return "Nothing resized.";
-  return `Already as small as a zone gets, ${zoneSizeWords(zone)}.`;
+  if (!zone) return t`Nothing resized.`;
+  const size = zoneSizeWords(zone);
+  return t`Already as small as a zone gets, ${size}.`;
 }
 
 /**
@@ -502,19 +568,19 @@ export function resizeModeWords(
   on: boolean,
 ): string {
   const zone = zoneNamed(things, key);
-  if (!zone) return "Nothing selected.";
-  if (!on) return "Move mode. Arrows move it again.";
-  return (
-    `Resize mode, ${zoneSizeWords(zone)}. Arrows change its size instead of its position: ` +
-    "north and east make it bigger, south and west make it smaller. Press S again for move."
-  );
+  if (!zone) return t`Nothing selected.`;
+  if (!on) return t`Move mode. Arrows move it again.`;
+  const size = zoneSizeWords(zone);
+  return t`Resize mode, ${size}. Arrows change its size instead of its position: north and east make it bigger, south and west make it smaller. Press S again for move.`;
 }
 
 /** Where the view's own cursor is, for an author placing something without a
  *  pointer. The ground height comes with it because whether a spot is a hilltop
  *  or a valley floor is the thing the 3D view says and speech cannot. */
 export function cursorWords(pos: Point, height: number): string {
-  return `Cursor at ${spotWords(pos)}, ground height ${Math.round(height)}.`;
+  const spot = spotWords(pos);
+  const ground = Math.round(height);
+  return t`Cursor at ${spot}, ground height ${ground}.`;
 }
 
 /**
@@ -641,7 +707,9 @@ export function placeInList(
   const here = contentsSelection(entries, selected);
   const at = here ? entries.findIndex((entry) => entry.key === here) : -1;
   if (at < 0) return "";
-  return ` ${at + 1} of ${entries.length}.`;
+  const place = at + 1;
+  const total = entries.length;
+  return ` ${t`${place} of ${total}.`}`;
 }
 
 /**
@@ -678,23 +746,11 @@ export function pointFrom(
  * the focus and again whenever the author asks. A keyboard interface nobody can
  * discover is not one.
  */
-export const MAP_KEY_HELP =
-  "Map keys. Full stop and comma step through what is on the map, " +
-  "including a path's points, which follow the group they belong to. " +
-  "Arrow keys move what is selected one build square north, south, east or west. " +
-  "Hold Shift for ten squares, Alt for one elmo. " +
-  "With nothing selected the arrows move the view's cursor instead. " +
-  "R turns, Shift R turns the other way. Delete removes. " +
-  "T turns everything selected as one shape instead, so a base swings round " +
-  "its own middle rather than each building spinning where it stands, and " +
-  "Shift T swings it the other way. " +
-  "S toggles resize mode on a selected zone: arrows then change its size instead of its position, in the same steps. " +
-  "North and east make it bigger, south and west make it smaller. " +
-  "Enter acts at the cursor: it answers whatever the map is waiting for, or places what the current mode places. " +
-  "Escape lets go of the selection. " +
-  "More than one thing can be selected at once, and then every one of those keys acts on all of it. " +
-  "Full stop and comma replace the selection rather than growing it. " +
-  "A steps to the next thing and adds it to what is already selected, Shift A steps to the previous thing and adds it the same way; landing on something already selected takes it back out. " +
-  "Contents' Shift with Enter on a row adds that row the same way. " +
-  "P reads how many of the buildings on the map cannot be built where they stand. " +
-  "Question mark reads this out again.";
+export function mapKeyHelp(): string {
+  return t`Map keys. Full stop and comma step through what is on the map, including a path's points, which follow the group they belong to. Arrow keys move what is selected one build square north, south, east or west. Hold Shift for ten squares, Alt for one elmo. With nothing selected the arrows move the view's cursor instead. R turns, Shift R turns the other way. Delete removes. T turns everything selected as one shape instead, so a base swings round its own middle rather than each building spinning where it stands, and Shift T swings it the other way. S toggles resize mode on a selected zone: arrows then change its size instead of its position, in the same steps. North and east make it bigger, south and west make it smaller. Enter acts at the cursor: it answers whatever the map is waiting for, or places what the current mode places. Escape lets go of the selection. More than one thing can be selected at once, and then every one of those keys acts on all of it. Full stop and comma replace the selection rather than growing it. A steps to the next thing and adds it to what is already selected, Shift A steps to the previous thing and adds it the same way; landing on something already selected takes it back out. Contents' Shift with Enter on a row adds that row the same way. P reads how many of the buildings on the map cannot be built where they stand. Question mark reads this out again.`;
+}
+
+/** The key list in the language active when this module loaded. Kept for the
+ *  existing tests, which read it as a constant. The app reads
+ *  {@link mapKeyHelp} so a language change is picked up. */
+export const MAP_KEY_HELP = mapKeyHelp();

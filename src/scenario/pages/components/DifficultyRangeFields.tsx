@@ -16,6 +16,9 @@
  * document with no difficulty in it, compiling to the bytes it always did.
  */
 
+import type { I18n, MessageDescriptor } from "@lingui/core";
+import { msg } from "@lingui/core/macro";
+import { useLingui } from "@lingui/react/macro";
 import { useId } from "react";
 import { OptionSelect } from "@/components/OptionSelect";
 import {
@@ -36,17 +39,20 @@ const ANY = "any";
  * of them. The field's own label already asks the question, so "Only from: Any"
  * says the whole thing and the word it lost was the one being repeated.
  */
-const ANY_LABEL = "Any";
+const ANY_LABEL = msg`Any`;
 
-const LABEL: Record<Difficulty, string> = {
-  easy: "Easy",
-  normal: "Normal",
-  hard: "Hard",
+const LABEL: Record<Difficulty, MessageDescriptor> = {
+  easy: msg`Easy`,
+  normal: msg`Normal`,
+  hard: msg`Hard`,
 };
 
-const options = () => [
-  { value: ANY, label: ANY_LABEL },
-  ...DIFFICULTIES.map((level) => ({ value: level, label: LABEL[level] })),
+const options = (i18n: I18n) => [
+  { value: ANY, label: i18n._(ANY_LABEL) },
+  ...DIFFICULTIES.map((level) => ({
+    value: level,
+    label: i18n._(LABEL[level]),
+  })),
 ];
 
 const read = (value: string): Difficulty | undefined =>
@@ -92,27 +98,28 @@ export function DifficultyRangeFields({
 }) {
   const range = value ?? {};
   const describedBy = useId();
+  const { t, i18n } = useLingui();
 
   return (
     <div className="flex flex-col gap-0.5">
       <div className="grid grid-cols-2 gap-2">
-        <Field label="Only from">
+        <Field label={t`Only from`}>
           <OptionSelect
             size="sm"
             value={range.atLeast ?? ANY}
             onValueChange={(next) =>
               onChange(rangeWith(value, "atLeast", next))
             }
-            options={options()}
+            options={options(i18n)}
             describedBy={describedBy}
           />
         </Field>
-        <Field label="Only up to">
+        <Field label={t`Only up to`}>
           <OptionSelect
             size="sm"
             value={range.atMost ?? ANY}
             onValueChange={(next) => onChange(rangeWith(value, "atMost", next))}
-            options={options()}
+            options={options(i18n)}
             describedBy={describedBy}
           />
         </Field>

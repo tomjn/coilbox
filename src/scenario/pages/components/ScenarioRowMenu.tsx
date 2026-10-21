@@ -17,6 +17,8 @@
  * what a bundled scenario and a game's own mission may do.
  */
 
+import { msg } from "@lingui/core/macro";
+import { Trans, useLingui } from "@lingui/react/macro";
 import { Button, useDrawer } from "@picoframe/frame";
 import { Copy, MoreVertical, Pencil, Share2, Trash2 } from "lucide-react";
 import { useState } from "react";
@@ -32,8 +34,7 @@ import type { Scenario } from "../../model";
 
 /** Shared with the editor's own delete confirmation, so the drawer description
  *  is written once (issue #2281). */
-export const DELETE_SCENARIO_DESCRIPTION =
-  "Deleting a scenario cannot be undone.";
+export const DELETE_SCENARIO_DESCRIPTION = msg`Deleting a scenario cannot be undone.`;
 
 export function ScenarioRowMenu({
   scenario,
@@ -60,13 +61,15 @@ export function ScenarioRowMenu({
 }) {
   const navigate = useNavigate();
   const drawer = useDrawer();
+  const { t, i18n } = useLingui();
+  const name = scenario.name;
 
   /** A drawer rather than a box hanging off a menu item, because the menu has
    *  closed by the time the confirmation is on screen. */
   const confirmDelete = () =>
     drawer.open({
-      title: `Delete ${scenario.name}`,
-      description: DELETE_SCENARIO_DESCRIPTION,
+      title: t`Delete ${name}`,
+      description: i18n._(DELETE_SCENARIO_DESCRIPTION),
       width: "24rem",
       content: (
         <DeleteScenarioForm
@@ -86,7 +89,7 @@ export function ScenarioRowMenu({
           size="icon"
           variant="ghost"
           className="size-8 shrink-0 text-muted-foreground opacity-60 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100 data-[state=open]:opacity-100"
-          aria-label={`Actions for ${scenario.name}`}
+          aria-label={t`Actions for ${name}`}
         >
           <MoreVertical className="size-4" aria-hidden="true" />
         </Button>
@@ -96,22 +99,24 @@ export function ScenarioRowMenu({
           <DropdownMenuItem
             onSelect={() => navigate(`/scenario-builder/${scenario.id}`)}
           >
-            <Pencil className="size-4" aria-hidden="true" /> Edit
+            <Pencil className="size-4" aria-hidden="true" /> <Trans>Edit</Trans>
           </DropdownMenuItem>
         )}
         {/* Above Share, because duplicating is part of writing a scenario and
             sharing is what happens once it is written (issue #2183). */}
         {onDuplicate && (
           <DropdownMenuItem onSelect={onDuplicate}>
-            <Copy className="size-4" aria-hidden="true" /> Duplicate
+            <Copy className="size-4" aria-hidden="true" />{" "}
+            <Trans>Duplicate</Trans>
           </DropdownMenuItem>
         )}
         <DropdownMenuItem onSelect={onShare}>
-          <Share2 className="size-4" aria-hidden="true" /> Share
+          <Share2 className="size-4" aria-hidden="true" /> <Trans>Share</Trans>
         </DropdownMenuItem>
         {deletable && (
           <DropdownMenuItem variant="destructive" onSelect={confirmDelete}>
-            <Trash2 className="size-4" aria-hidden="true" /> Delete
+            <Trash2 className="size-4" aria-hidden="true" />{" "}
+            <Trans>Delete</Trans>
           </DropdownMenuItem>
         )}
       </DropdownMenuContent>
@@ -136,8 +141,10 @@ export function DeleteScenarioForm({
   onDelete: () => Promise<void>;
   onDone: () => void;
 }) {
+  const { t } = useLingui();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const name = scenario.name;
 
   const remove = async () => {
     setBusy(true);
@@ -154,10 +161,18 @@ export function DeleteScenarioForm({
   return (
     <div className="flex flex-col gap-3">
       <p className="text-sm">
-        Delete <span className="font-medium">{scenario.name}</span>
-        {attached
-          ? "? A campaign mission uses it, so its dialogue clips stay behind for that mission. This can't be undone."
-          : " and its dialogue clips? This can't be undone."}
+        {attached ? (
+          <Trans>
+            Delete <span className="font-medium">{name}</span>? A campaign
+            mission uses it, so its dialogue clips stay behind for that mission.
+            This can't be undone.
+          </Trans>
+        ) : (
+          <Trans>
+            Delete <span className="font-medium">{name}</span> and its dialogue
+            clips? This can't be undone.
+          </Trans>
+        )}
       </p>
       {error && <ErrorBanner message={error} />}
       <Button
@@ -167,7 +182,7 @@ export function DeleteScenarioForm({
         onClick={() => void remove()}
       >
         <Trash2 className="size-4" aria-hidden="true" />{" "}
-        {busy ? "Deleting…" : "Delete"}
+        {busy ? t`Deleting…` : t`Delete`}
       </Button>
     </div>
   );

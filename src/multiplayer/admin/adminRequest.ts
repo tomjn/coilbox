@@ -1,3 +1,4 @@
+import { t } from "@lingui/core/macro";
 import { useCallback, useRef, useState } from "react";
 import {
   type AdminOutcome,
@@ -92,7 +93,7 @@ export function useAdminRequest(serverKey: string | null) {
         return state;
       };
       if (!serverKey) {
-        return show({ status: "failed", error: "Not connected." });
+        return show({ status: "failed", error: t`Not connected.` });
       }
       show({ status: "sending" });
       try {

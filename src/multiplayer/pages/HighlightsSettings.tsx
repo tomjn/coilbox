@@ -1,3 +1,4 @@
+import { Trans, useLingui } from "@lingui/react/macro";
 import { Button, Input, useSetting } from "@picoframe/frame";
 import { Plus, Trash2 } from "lucide-react";
 import { Link } from "react-router";
@@ -15,6 +16,7 @@ import { HIGHLIGHT_OWN_KEY, HIGHLIGHT_WORDS_KEY } from "../chat/highlight";
  * than two screens owning one behaviour between them.
  */
 export default function HighlightsSettings() {
+  const { t } = useLingui();
   const [words, setWords] = useSetting<string[]>(HIGHLIGHT_WORDS_KEY, []);
   const [ownEnabled, setOwnEnabled] = useSetting<boolean>(
     HIGHLIGHT_OWN_KEY,
@@ -36,9 +38,11 @@ export default function HighlightsSettings() {
         className="flex items-center justify-between gap-4"
       >
         <span className="flex flex-col">
-          <span className="text-sm font-medium">Highlight my username</span>
+          <span className="text-sm font-medium">
+            <Trans>Highlight my username</Trans>
+          </span>
           <span className="text-xs text-muted-foreground">
-            Flag messages that mention your logged-in username.
+            <Trans>Flag messages that mention your logged-in username.</Trans>
           </span>
         </span>
         <Switch
@@ -49,23 +53,31 @@ export default function HighlightsSettings() {
       </label>
 
       <p className="text-xs text-muted-foreground">
-        A matching message flashes the window and plays a sound. Choose which
-        sound, and how loud, under{" "}
-        <Link to="/settings/sound" className="underline underline-offset-2">
-          Sound
-        </Link>
-        .
+        <Trans>
+          A matching message flashes the window and plays a sound. Choose which
+          sound, and how loud, under{" "}
+          <Link to="/settings/sound" className="underline underline-offset-2">
+            Sound
+          </Link>
+          .
+        </Trans>
       </p>
 
       <div className="flex flex-col gap-2">
-        <span className="text-sm font-medium">Highlight words</span>
+        <span className="text-sm font-medium">
+          <Trans>Highlight words</Trans>
+        </span>
         <span className="text-xs text-muted-foreground">
-          Whole-word, case-insensitive. Messages containing any of these are
-          visually flagged.
+          <Trans>
+            Whole-word, case-insensitive. Messages containing any of these are
+            visually flagged.
+          </Trans>
         </span>
         {words.length === 0 ? (
           <p className="text-xs text-muted-foreground">
-            None yet. Add a word to have it flag matching chat messages.
+            <Trans>
+              None yet. Add a word to have it flag matching chat messages.
+            </Trans>
           </p>
         ) : (
           <ul className="space-y-2">
@@ -78,14 +90,14 @@ export default function HighlightsSettings() {
                 <Input
                   value={w}
                   onChange={(e) => updateWord(i, e.target.value)}
-                  placeholder="word"
-                  aria-label="Highlight word"
+                  placeholder={t`word`}
+                  aria-label={t`Highlight word`}
                 />
                 <Button
                   variant="outline"
                   size="sm"
                   onClick={() => removeWord(i)}
-                  aria-label={`Remove ${w || "word"}`}
+                  aria-label={w ? t`Remove ${w}` : t`Remove word`}
                 >
                   <Trash2 />
                 </Button>
@@ -95,7 +107,7 @@ export default function HighlightsSettings() {
         )}
         <div>
           <Button variant="outline" size="sm" onClick={addWord}>
-            <Plus /> Add word
+            <Plus /> <Trans>Add word</Trans>
           </Button>
         </div>
       </div>

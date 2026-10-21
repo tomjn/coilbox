@@ -1,3 +1,4 @@
+import { useLingui } from "@lingui/react/macro";
 import { cn } from "@picoframe/frame";
 import { ChevronUp, Globe } from "lucide-react";
 import type { Rating } from "./bindings";
@@ -29,6 +30,7 @@ export function CountryFlag({
   country: string;
   className?: string;
 }) {
+  const { t } = useLingui();
   const code = country.trim().toLowerCase();
   if (!/^[a-z]{2}$/.test(code)) {
     return (
@@ -40,8 +42,8 @@ export function CountryFlag({
         )}
         style={FLAG_SIZE}
         role="img"
-        aria-label="Country: unknown"
-        title="Unknown"
+        aria-label={t`Country: unknown`}
+        title={t`Unknown`}
       >
         <Globe className="size-2.5" />
       </span>
@@ -53,7 +55,7 @@ export function CountryFlag({
       className={cn(`fi fi-${code}`, FLAG_FRAME, className)}
       style={FLAG_SIZE}
       role="img"
-      aria-label={`Country: ${label}`}
+      aria-label={t`Country: ${label}`}
       title={label}
     />
   );
@@ -82,11 +84,12 @@ export function RatingBadge({
   /** Plain words added after the summary, for a surface with a caveat to carry. */
   detail?: string;
 }) {
+  const { t } = useLingui();
   const parts = ratingParts(rating);
   const first = parts[0];
   const base = ratingSummary(rating);
   if (!first || !base) return null;
-  const summary = detail ? `${base}. ${detail}` : base;
+  const summary = detail ? t`${base}. ${detail}` : base;
   return (
     <span
       className={cn(
@@ -123,8 +126,10 @@ export function RankBadge({
   rank: number;
   className?: string;
 }) {
+  const { t } = useLingui();
   if (!Number.isFinite(rank) || rank < 1) return null;
   const n = Math.min(Math.trunc(rank), 7);
+  const rankLabel = t`Rank ${n} of 7`;
   return (
     <span
       className={cn(
@@ -133,8 +138,8 @@ export function RankBadge({
         className,
       )}
       role="img"
-      aria-label={`Rank ${n} of 7`}
-      title={`Rank ${n} of 7`}
+      aria-label={rankLabel}
+      title={rankLabel}
     >
       <ChevronUp className="size-3" strokeWidth={3} aria-hidden />
       {n}

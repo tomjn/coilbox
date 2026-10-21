@@ -1,3 +1,4 @@
+import { Trans, useLingui } from "@lingui/react/macro";
 import { Button } from "@picoframe/frame";
 import { StickyNote } from "lucide-react";
 import { useState } from "react";
@@ -38,6 +39,7 @@ export function NoteButton({
   /** Classes for the trigger button, to size it for a denser list. */
   className?: string;
 }) {
+  const { t } = useLingui();
   const [open, setOpen] = useState(false);
   const hasNote = note.trim().length > 0;
 
@@ -47,10 +49,12 @@ export function NoteButton({
         <button
           type="button"
           aria-label={
-            hasNote ? `Edit note for ${name}` : `Add note for ${name}`
+            hasNote ? t`Edit note for ${name}` : t`Add note for ${name}`
           }
           title={
-            hasNote ? note : (statsSummary ?? undefined) || "Add a private note"
+            hasNote
+              ? note
+              : (statsSummary ?? undefined) || t`Add a private note`
           }
           className={cn(
             "inline-flex size-7 shrink-0 items-center justify-center rounded text-muted-foreground hover:bg-accent hover:text-foreground",
@@ -95,6 +99,7 @@ export function NoteForm({
   statsSummary?: string | null;
   onDone: () => void;
 }) {
+  const { t } = useLingui();
   const [draft, setDraft] = useState(note);
   const hasNote = note.trim().length > 0;
   return (
@@ -106,7 +111,9 @@ export function NoteForm({
         onDone();
       }}
     >
-      <p className="px-1 text-sm font-medium">Note: {name}</p>
+      <p className="px-1 text-sm font-medium">
+        <Trans>Note: {name}</Trans>
+      </p>
       {statsSummary && (
         <p className="px-1 text-xs text-muted-foreground">
           {statsSummary}{" "}
@@ -114,7 +121,7 @@ export function NoteForm({
             to={`/stats/${encodeURIComponent(name)}/matchup`}
             className="text-primary hover:underline"
           >
-            See the matchup
+            <Trans>See the matchup</Trans>
           </Link>
         </p>
       )}
@@ -122,8 +129,8 @@ export function NoteForm({
         value={draft}
         onChange={(e) => setDraft(e.target.value.slice(0, NOTE_MAX_LENGTH))}
         maxLength={NOTE_MAX_LENGTH}
-        placeholder="Private note, only visible to you…"
-        aria-label={`Note for ${name}`}
+        placeholder={t`Private note, only visible to you…`}
+        aria-label={t`Note for ${name}`}
         autoFocus
         className="min-h-20 text-sm"
       />
@@ -143,11 +150,11 @@ export function NoteForm({
                 onDone();
               }}
             >
-              Clear
+              <Trans>Clear</Trans>
             </Button>
           )}
           <Button type="submit" size="sm" className="h-7">
-            Save
+            <Trans>Save</Trans>
           </Button>
         </div>
       </div>

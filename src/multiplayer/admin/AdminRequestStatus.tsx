@@ -1,3 +1,4 @@
+import { Trans, useLingui } from "@lingui/react/macro";
 import { Loader2, TriangleAlert } from "lucide-react";
 import type { ReactNode } from "react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
@@ -18,8 +19,8 @@ import type { AdminRequestState } from "./adminRequest";
  */
 export function AdminRequestStatus({
   state,
-  sending = "Waiting for the server…",
-  unanswered = "The server did not answer.",
+  sending,
+  unanswered,
   children,
 }: {
   state: AdminRequestState;
@@ -34,14 +35,15 @@ export function AdminRequestStatus({
   /** How this tool shows its answer. Without it, an answer reads "Done." */
   children?: (reply: AdminReply) => ReactNode;
 }) {
+  const { t } = useLingui();
   if (state.status === "refused" || state.status === "failed") {
     return (
       <Alert variant="destructive">
         <TriangleAlert />
         <AlertTitle>
           {state.status === "refused"
-            ? "The server refused"
-            : "Not sent to the server"}
+            ? t`The server refused`
+            : t`Not sent to the server`}
         </AlertTitle>
         <AlertDescription>
           {state.status === "refused" ? state.reason : state.error}
@@ -62,12 +64,20 @@ export function AdminRequestStatus({
       {state.status === "sending" && (
         <span className="flex items-center gap-1.5">
           <Loader2 className="size-3.5 shrink-0 motion-safe:animate-spin" />
-          {sending}
+          {sending ?? t`Waiting for the server…`}
         </span>
       )}
-      {state.status === "unanswered" && <span>{unanswered}</span>}
+      {state.status === "unanswered" && (
+        <span>{unanswered ?? t`The server did not answer.`}</span>
+      )}
       {state.status === "answered" &&
-        (children ? children(state.reply) : <span>Done.</span>)}
+        (children ? (
+          children(state.reply)
+        ) : (
+          <span>
+            <Trans>Done.</Trans>
+          </span>
+        ))}
     </div>
   );
 }

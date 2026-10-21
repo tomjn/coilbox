@@ -1,3 +1,4 @@
+import { t } from "@lingui/core/macro";
 import type { RuntimeMarker } from "./bindings";
 
 /**
@@ -89,9 +90,11 @@ export function capabilityNote(
   available: RuntimeMarker | null,
 ): string | null {
   if (status === "supported") return null;
-  if (status === "extra") return "Not in coilbox's runtime";
+  if (status === "extra") return t`Not in coilbox's runtime`;
   if (!installed) return null;
-  if (available && installed.version < available.version)
-    return `Needs runtime ${available.version}`;
-  return "Not in this game's runtime";
+  if (available && installed.version < available.version) {
+    const version = available.version;
+    return t`Needs runtime ${version}`;
+  }
+  return t`Not in this game's runtime`;
 }

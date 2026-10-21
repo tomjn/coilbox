@@ -1,3 +1,4 @@
+import { t } from "@lingui/core/macro";
 import { useCallback, useMemo } from "react";
 import type { ChatMsg, User } from "../bindings";
 import {
@@ -133,12 +134,13 @@ export function useConversation(
 
   const battle =
     desc?.kind === "battle" ? state?.battles[String(desc.id)] : undefined;
+  const battleId = desc?.kind === "battle" ? desc.id : 0;
   const title = !desc
     ? ""
     : desc.kind === "channel"
       ? `#${desc.name}`
       : desc.kind === "battle"
-        ? battle?.title || `Battle ${desc.id}`
+        ? battle?.title || t`Battle ${battleId}`
         : desc.peer;
   const subtitle =
     desc?.kind === "channel"

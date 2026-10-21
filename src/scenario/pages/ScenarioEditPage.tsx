@@ -1,3 +1,4 @@
+import { Trans, useLingui } from "@lingui/react/macro";
 import { Button, Drawer, Input, useDrawer } from "@picoframe/frame";
 import {
   ArrowLeft,
@@ -120,6 +121,7 @@ const BACK = "/scenario-builder";
  * scenario, the game's own `missions/<folder>/` for one of a game's missions.
  */
 export default function ScenarioEditPage() {
+  const { t, i18n } = useLingui();
   const { id } = useParams();
   const { scenarios, loading } = useScenarios();
   const drawer = useDrawer();
@@ -355,10 +357,10 @@ export default function ScenarioEditPage() {
   const openTest = useCallback(() => {
     const current = scenarioRef.current;
     if (!current) return;
+    const name = current.name;
     drawer.open({
-      title: `Test ${current.name} in game`,
-      description:
-        "Compiles the mission, checks it loads, then starts the engine.",
+      title: t`Test ${name} in game`,
+      description: t`Compiles the mission, checks it loads, then starts the engine.`,
       width: "32rem",
       content: (
         <ScenarioTestDrawer
@@ -367,7 +369,7 @@ export default function ScenarioEditPage() {
         />
       ),
     });
-  }, [drawer]);
+  }, [drawer, t]);
 
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
@@ -403,7 +405,7 @@ export default function ScenarioEditPage() {
   if (loaded && !isEditable(loaded)) {
     return <ReadOnlyScenario loaded={loaded} />;
   }
-  if (!scenario) return <NotFound backTo={BACK} label="scenario" />;
+  if (!scenario) return <NotFound backTo={BACK} label={t`scenario`} />;
 
   // Share: the same code, link and file the list offers (issue #1336), loaded
   // on demand so the editor does not carry the export path until it is asked
@@ -412,10 +414,10 @@ export default function ScenarioEditPage() {
     const { ShareScenarioForm } = await import(
       "./components/ShareScenarioForm"
     );
+    const name = scenario.name;
     drawer.open({
-      title: `Share ${scenario.name}`,
-      description:
-        "Get the code, link and file that let someone else load this scenario.",
+      title: t`Share ${name}`,
+      description: t`Get the code, link and file that let someone else load this scenario.`,
       width: "28rem",
       content: (
         <ShareScenarioForm
@@ -431,8 +433,8 @@ export default function ScenarioEditPage() {
   // sits with Share and Delete rather than beside Test in game.
   const openShortcuts = () =>
     drawer.open({
-      title: "Keyboard shortcuts",
-      description: "What this editor answers to, beyond the mouse.",
+      title: t`Keyboard shortcuts`,
+      description: t`What this editor answers to, beyond the mouse.`,
       width: "24rem",
       content: <ShortcutsList />,
     });
@@ -477,10 +479,11 @@ export default function ScenarioEditPage() {
     campaigns.map((c) => c.campaign),
     scenario.id,
   );
-  const confirmDelete = () =>
-    drawer.open({
-      title: `Delete ${scenario.name}`,
-      description: DELETE_SCENARIO_DESCRIPTION,
+  const confirmDelete = () => {
+    const name = scenario.name;
+    return drawer.open({
+      title: t`Delete ${name}`,
+      description: i18n._(DELETE_SCENARIO_DESCRIPTION),
       width: "24rem",
       content: (
         <DeleteScenarioForm
@@ -495,17 +498,21 @@ export default function ScenarioEditPage() {
         />
       ),
     });
+  };
 
   // Held loosely, the way a base being moved is: a step that has been deleted
   // stops the map waiting for a point nothing would receive.
   const asked = pick && stepAt(scenario, pick.ref);
+  const scenarioName = scenario.name;
+  const askedLabel = asked ? stepLabel(asked.type) : "";
+  const askedParam = pick?.param;
   const picking =
     pick && asked
       ? {
           message:
             pick.order === undefined
-              ? `Click the map to put ${stepLabel(asked.type)}'s ${pick.param} there`
-              : `Click the map to add points to ${stepLabel(asked.type)}`,
+              ? t`Click the map to put ${askedLabel}'s ${askedParam} there`
+              : t`Click the map to add points to ${askedLabel}`,
           // Which path the points are going into, so the map draws that one with
           // knobs while it is being drawn (#847).
           pathId:
@@ -549,7 +556,7 @@ export default function ScenarioEditPage() {
             to={BACK}
             className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:underline"
           >
-            <ArrowLeft className="size-3.5" /> Back to scenarios
+            <ArrowLeft className="size-3.5" /> <Trans>Back to scenarios</Trans>
           </Link>
           {/* Every edit here writes to disk as it is made, with no save
             button, so this is the only sign an author gets that a write
@@ -589,10 +596,10 @@ export default function ScenarioEditPage() {
                 <Check className="size-4" />
               )}
               {problemsPhase === "checking"
-                ? "Checking…"
+                ? t`Checking…`
                 : problemsPhase === "problems"
                   ? problemCount
-                  : "No problems"}
+                  : t`No problems`}
             </Button>
             {/* The file the engine is handed, beside the problems found in it:
               an author who has read a problem and does not believe it reads the
@@ -602,7 +609,7 @@ export default function ScenarioEditPage() {
               variant="outline"
               onClick={() => setShowLua(true)}
             >
-              <FileCode2 className="size-4" /> Mission Lua
+              <FileCode2 className="size-4" /> <Trans>Mission Lua</Trans>
             </Button>
             {/* Testing belongs with the setup, because the setup is all a launch
               consumes: the game named there decides whether the scenario is
@@ -611,7 +618,7 @@ export default function ScenarioEditPage() {
               <Tooltip>
                 <TooltipTrigger asChild>
                   <Button size="sm" onClick={openTest}>
-                    <Rocket className="size-4" /> Test in game
+                    <Rocket className="size-4" /> <Trans>Test in game</Trans>
                   </Button>
                 </TooltipTrigger>
                 <TooltipContent>{modKeyLabel()} Enter</TooltipContent>
@@ -633,7 +640,7 @@ export default function ScenarioEditPage() {
                   size="icon"
                   variant="ghost"
                   className="size-8 shrink-0 text-muted-foreground"
-                  aria-label={`Actions for ${scenario.name}`}
+                  aria-label={t`Actions for ${scenarioName}`}
                 >
                   <MoreVertical className="size-4" aria-hidden="true" />
                 </Button>
@@ -641,22 +648,25 @@ export default function ScenarioEditPage() {
               <DropdownMenuContent align="end" className="w-48">
                 {duplicable && (
                   <DropdownMenuItem onSelect={() => void duplicate()}>
-                    <Copy className="size-4" aria-hidden="true" /> Duplicate
+                    <Copy className="size-4" aria-hidden="true" />{" "}
+                    <Trans>Duplicate</Trans>
                   </DropdownMenuItem>
                 )}
                 <DropdownMenuItem onSelect={() => void openShare()}>
-                  <Share2 className="size-4" aria-hidden="true" /> Share
+                  <Share2 className="size-4" aria-hidden="true" />{" "}
+                  <Trans>Share</Trans>
                 </DropdownMenuItem>
                 <DropdownMenuItem onSelect={openShortcuts}>
-                  <Keyboard className="size-4" aria-hidden="true" /> Keyboard
-                  shortcuts
+                  <Keyboard className="size-4" aria-hidden="true" />{" "}
+                  <Trans>Keyboard shortcuts</Trans>
                 </DropdownMenuItem>
                 {deletable && (
                   <DropdownMenuItem
                     variant="destructive"
                     onSelect={confirmDelete}
                   >
-                    <Trash2 className="size-4" aria-hidden="true" /> Delete
+                    <Trash2 className="size-4" aria-hidden="true" />{" "}
+                    <Trans>Delete</Trans>
                   </DropdownMenuItem>
                 )}
               </DropdownMenuContent>
@@ -670,8 +680,8 @@ export default function ScenarioEditPage() {
         <Drawer
           open={showProblems}
           onOpenChange={setShowProblems}
-          title={`Problems in ${scenario.name}`}
-          description="Issues found while compiling the mission, with a fix where one exists."
+          title={t`Problems in ${scenarioName}`}
+          description={t`Issues found while compiling the mission, with a fix where one exists.`}
           width="32rem"
           onCloseAutoFocus={(event) => {
             const pending = pendingProblemFocusRef.current;
@@ -694,8 +704,8 @@ export default function ScenarioEditPage() {
         <Drawer
           open={showLua}
           onOpenChange={setShowLua}
-          title={`${scenario.name} as mission.lua`}
-          description="The compiled mission.lua, updated as you edit."
+          title={t`${scenarioName} as mission.lua`}
+          description={t`The compiled mission.lua, updated as you edit.`}
           width="44rem"
         >
           <MissionLuaView scenario={scenario} />
@@ -705,7 +715,7 @@ export default function ScenarioEditPage() {
 
         <header className="flex flex-col gap-3">
           <Input
-            aria-label="Scenario name"
+            aria-label={t`Scenario name`}
             value={scenario.name}
             onChange={(e) => {
               setScenario((s) => (s ? { ...s, name: e.target.value } : s));
@@ -715,9 +725,9 @@ export default function ScenarioEditPage() {
             className="text-base font-semibold"
           />
           <Textarea
-            aria-label="Scenario description"
+            aria-label={t`Scenario description`}
             value={scenario.description}
-            placeholder="Description"
+            placeholder={t`Description`}
             className="min-h-16"
             onChange={(e) => {
               setScenario((s) =>
@@ -766,11 +776,13 @@ export default function ScenarioEditPage() {
           fallback={
             <div className="rounded-lg border border-destructive/40 bg-destructive/5 p-6 text-center text-sm text-muted-foreground">
               <p className="font-medium text-foreground">
-                The map could not be drawn.
+                <Trans>The map could not be drawn.</Trans>
               </p>
               <p className="mt-1">
-                Everything else on this page still works, and the scenario is
-                safe. Reload to try the map again.
+                <Trans>
+                  Everything else on this page still works, and the scenario is
+                  safe. Reload to try the map again.
+                </Trans>
               </p>
             </div>
           }
@@ -863,21 +875,24 @@ export default function ScenarioEditPage() {
  * its own reason rather than one generic message.
  */
 function ReadOnlyScenario({ loaded }: { loaded: LoadedScenario }) {
+  const { t } = useLingui();
+  const gameName = loaded.origin?.gameName ?? t`this game`;
+  const name = loaded.scenario.name;
   const reason =
     loaded.source === "game"
-      ? `This mission ships inside ${loaded.origin?.gameName ?? "this game"}, which is packaged, so it cannot be edited here. Share it to make a copy of your own.`
-      : "It came with this copy of coilbox, so it is read-only. Play it from Scenarios, or Export it and import that file back to get a copy you can edit.";
+      ? t`This mission ships inside ${gameName}, which is packaged, so it cannot be edited here. Share it to make a copy of your own.`
+      : t`It came with this copy of coilbox, so it is read-only. Play it from Scenarios, or Export it and import that file back to get a copy you can edit.`;
   return (
     <div className="flex flex-col gap-4 p-4">
       <Link
         to={BACK}
         className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:underline"
       >
-        <ArrowLeft className="size-3.5" /> Back to scenarios
+        <ArrowLeft className="size-3.5" /> <Trans>Back to scenarios</Trans>
       </Link>
       <div className="flex flex-col items-center gap-2 rounded-lg border border-dashed p-10 text-center">
         <p className="text-sm font-medium">
-          {loaded.scenario.name} can't be edited
+          <Trans>{name} can't be edited</Trans>
         </p>
         <p className="text-sm text-muted-foreground">{reason}</p>
       </div>

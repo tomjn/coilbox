@@ -1,3 +1,4 @@
+import { Trans, useLingui } from "@lingui/react/macro";
 import { Button } from "@picoframe/frame";
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router";
@@ -174,6 +175,7 @@ function OurRelay({
   heardFrom,
   overTls,
 }: OurCarrying & { serverKey: string }) {
+  const { t } = useLingui();
   const navigate = useNavigate();
   const [open, setOpen] = useState(false);
   const [confirming, setConfirming] = useState(false);
@@ -192,9 +194,10 @@ function OurRelay({
       await leaveBattle(serverKey);
       navigate("/battles");
     } catch (e) {
+      const reason = e instanceof Error ? e.message : String(e);
       void notify({
-        title: "The battle is still open",
-        body: `Coilbox could not close it: ${e instanceof Error ? e.message : String(e)}.`,
+        title: t`The battle is still open`,
+        body: t`Coilbox could not close it: ${reason}.`,
         level: "error",
       });
     }
@@ -214,8 +217,10 @@ function OurRelay({
         {confirming ? (
           <>
             <p className="text-sm">
-              Close this battle? Everyone will be removed and it will disappear
-              from the battle list.
+              <Trans>
+                Close this battle? Everyone will be removed and it will
+                disappear from the battle list.
+              </Trans>
             </p>
             <div className="flex justify-end gap-2">
               <Button
@@ -223,24 +228,28 @@ function OurRelay({
                 size="sm"
                 onClick={() => setConfirming(false)}
               >
-                Cancel
+                <Trans>Cancel</Trans>
               </Button>
               <Button variant="destructive" size="sm" onClick={close}>
-                Close battle
+                <Trans>Close battle</Trans>
               </Button>
             </div>
           </>
         ) : (
           <>
             <p className="text-sm">
-              Your battle goes through the server's relay, so players reach it
-              through the lobby server rather than connecting to you directly.
+              <Trans>
+                Your battle goes through the server's relay, so players reach it
+                through the lobby server rather than connecting to you directly.
+              </Trans>
             </p>
             {overTls && (
               <p className="text-sm">
-                Your network gave no answer over the relay's usual route, so
-                coilbox reaches the relay over TLS instead. This can add delay
-                to the game.
+                <Trans>
+                  Your network gave no answer over the relay's usual route, so
+                  coilbox reaches the relay over TLS instead. This can add delay
+                  to the game.
+                </Trans>
               </p>
             )}
             <p className="text-xs text-muted-foreground">
@@ -258,14 +267,14 @@ function OurRelay({
                   navigate(battleRoomHref(serverKey));
                 }}
               >
-                Go to battle
+                <Trans>Go to battle</Trans>
               </Button>
               <Button
                 variant="outline"
                 size="sm"
                 onClick={() => setConfirming(true)}
               >
-                Close
+                <Trans>Close</Trans>
               </Button>
             </div>
           </>
@@ -293,16 +302,20 @@ function RelayPeers({
   return (
     <div className="space-y-1">
       <dl className="grid grid-cols-[1fr_auto] gap-x-3 gap-y-1 text-sm">
-        <dt className="text-muted-foreground">Addresses let through</dt>
+        <dt className="text-muted-foreground">
+          <Trans>Addresses let through</Trans>
+        </dt>
         <dd className="tabular-nums">{letThrough}</dd>
         <dt className="text-muted-foreground">
-          Heard from in the last 15 seconds
+          <Trans>Heard from in the last 15 seconds</Trans>
         </dt>
         <dd className="tabular-nums">{heardFrom}</dd>
       </dl>
       <p className="text-xs text-muted-foreground">
-        Nobody is heard from until the game starts, because only the game itself
-        sends through the relay.
+        <Trans>
+          Nobody is heard from until the game starts, because only the game
+          itself sends through the relay.
+        </Trans>
       </p>
     </div>
   );
@@ -342,13 +355,17 @@ function LeftRelay({ bytesPerSecond }: Carrying) {
       </PopoverTrigger>
       <PopoverContent align="end" className="w-80">
         {agent === null ? (
-          <p className="text-sm text-muted-foreground">Looking for it…</p>
+          <p className="text-sm text-muted-foreground">
+            <Trans>Looking for it…</Trans>
+          </p>
         ) : agent === "unreadable" ? (
           <p className="text-sm">
-            Coilbox could not read which process the relay is.
+            <Trans>Coilbox could not read which process the relay is.</Trans>
           </p>
         ) : agent.pid === null ? (
-          <p className="text-sm">It has stopped.</p>
+          <p className="text-sm">
+            <Trans>It has stopped.</Trans>
+          </p>
         ) : (
           <LeftoverRelayAgent pid={agent.pid} ours={agent.ours} />
         )}

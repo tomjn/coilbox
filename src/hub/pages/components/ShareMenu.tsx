@@ -1,3 +1,4 @@
+import { Trans, useLingui } from "@lingui/react/macro";
 import { Button, useDrawer } from "@picoframe/frame";
 import { Package2, Share2, Upload } from "lucide-react";
 import {
@@ -26,6 +27,7 @@ import { ShareAssetsPanel } from "./ShareAssetsPanel";
  * same way the pack drawer already asks for it (`../../PublishSection.tsx`).
  */
 export function ShareMenu({ hubUrl }: { hubUrl: string }) {
+  const { t } = useLingui();
   const drawer = useDrawer();
 
   const openExport = async () => {
@@ -33,7 +35,7 @@ export function ShareMenu({ hubUrl }: { hubUrl: string }) {
       "../../../packs/pages/components/ExportPackForm"
     );
     drawer.open({
-      title: "Share a setup pack",
+      title: t`Share a setup pack`,
       width: "26rem",
       content: <ExportPackForm />,
     });
@@ -41,7 +43,7 @@ export function ShareMenu({ hubUrl }: { hubUrl: string }) {
 
   const openAssets = () => {
     drawer.open({
-      title: "Share your maps and games",
+      title: t`Share your maps and games`,
       width: "26rem",
       content: <ShareAssetsPanel hubUrl={hubUrl} />,
     });
@@ -51,18 +53,19 @@ export function ShareMenu({ hubUrl }: { hubUrl: string }) {
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
         <Button variant="outline" size="sm">
-          <Share2 className="size-4" aria-hidden="true" /> Share
+          <Share2 className="size-4" aria-hidden="true" /> <Trans>Share</Trans>
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end">
         {!isProfileHidden("content.setupPacks") && (
           <DropdownMenuItem onSelect={() => void openExport()}>
-            <Package2 className="size-4" aria-hidden="true" /> Share a pack
+            <Package2 className="size-4" aria-hidden="true" />{" "}
+            <Trans>Share a pack</Trans>
           </DropdownMenuItem>
         )}
         <DropdownMenuItem onSelect={openAssets}>
-          <Upload className="size-4" aria-hidden="true" /> Share your maps and
-          games
+          <Upload className="size-4" aria-hidden="true" />{" "}
+          <Trans>Share your maps and games</Trans>
         </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>

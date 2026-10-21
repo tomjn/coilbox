@@ -38,6 +38,7 @@
  * (issue #2346).
  */
 
+import { Trans, useLingui } from "@lingui/react/macro";
 import { Button, Input } from "@picoframe/frame";
 import { SlidersHorizontal } from "lucide-react";
 import { useId } from "react";
@@ -60,14 +61,6 @@ import { FieldProblem, RowProblem } from "./panels";
 import { TeamSelect } from "./TeamSelect";
 import { entryFieldProblem } from "./triggerProblems";
 
-/** The engine's four facings, in the order it numbers them. */
-const FACINGS: { value: string; label: string }[] = [
-  { value: "0", label: "Faces south" },
-  { value: "1", label: "Faces east" },
-  { value: "2", label: "Faces north" },
-  { value: "3", label: "Faces west" },
-];
-
 export function ActorControls({
   actor,
   participants,
@@ -84,6 +77,14 @@ export function ActorControls({
   /** Replace the actor's overrides, which are normalised on the way in. */
   onState: (state: ActorState) => void;
 }) {
+  const { t } = useLingui();
+  // The engine's four facings, in the order it numbers them.
+  const facings = [
+    { value: "0", label: t`Faces south` },
+    { value: "1", label: t`Faces east` },
+    { value: "2", label: t`Faces north` },
+    { value: "3", label: t`Faces west` },
+  ];
   const state = actor.state ?? {};
   const [shown, setShown] = useFieldText(
     String(Math.round((state.hp ?? 1) * 100)),
@@ -111,7 +112,7 @@ export function ActorControls({
           value={actor.team}
           onValueChange={(team) => onEdit({ team })}
           className="w-32"
-          ariaLabel="Team"
+          ariaLabel={t`Team`}
           ariaInvalid={teamProblem !== null}
           describedBy={teamDescribedBy}
         />
@@ -124,26 +125,26 @@ export function ActorControls({
             variant="ghost"
             className="h-7 gap-1.5 px-2 text-xs"
           >
-            <SlidersHorizontal className="size-3.5" /> Details
+            <SlidersHorizontal className="size-3.5" /> <Trans>Details</Trans>
           </Button>
         </PopoverTrigger>
         <PopoverContent align="start" className="w-72 space-y-3">
           <RowProblem problem={posProblem} />
           <RowProblem problem={unitDefProblem} />
-          <Field label="Facing">
+          <Field label={t`Facing`}>
             <OptionSelect
               size="sm"
               value={String(actor.facing)}
               onValueChange={(value) =>
                 onEdit({ facing: (Number(value) % 4) as Facing })
               }
-              options={FACINGS}
+              options={facings}
             />
           </Field>
 
-          <Field label={`Starting health: ${health}%`}>
+          <Field label={t`Starting health: ${health}%`}>
             <Slider
-              aria-label="Starting health"
+              aria-label={t`Starting health`}
               min={MIN_ACTOR_HP * 100}
               max={100}
               step={1}
@@ -155,21 +156,21 @@ export function ActorControls({
 
           <Toggle
             id="actor-invulnerable"
-            label="Invulnerable"
+            label={t`Invulnerable`}
             checked={state.invulnerable === true}
             onCheckedChange={(on) => onState({ ...state, invulnerable: on })}
           />
           <Toggle
             id="actor-unselectable"
-            label="Unselectable"
+            label={t`Unselectable`}
             checked={state.unselectable === true}
             onCheckedChange={(on) => onState({ ...state, unselectable: on })}
           />
 
-          <Field label="Display name">
+          <Field label={t`Display name`}>
             <Input
-              aria-label="Display name"
-              placeholder="Shown over the unit"
+              aria-label={t`Display name`}
+              placeholder={t`Shown over the unit`}
               value={name}
               onChange={(e) => setName(e.target.value)}
               onBlur={() => onState({ ...state, name })}
