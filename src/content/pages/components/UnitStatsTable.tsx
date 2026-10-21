@@ -1,3 +1,6 @@
+import type { MessageDescriptor } from "@lingui/core";
+import { msg } from "@lingui/core/macro";
+import { Trans, useLingui } from "@lingui/react/macro";
 import {
   Table,
   TableBody,
@@ -31,14 +34,14 @@ import type { UnitDatasetEntry } from "../../bindings";
  * many columns the grid currently has.
  */
 
-const STAT_LABELS: [key: string, label: string][] = [
-  ["health", "Health"],
-  ["metalCost", "Metal cost"],
-  ["energyCost", "Energy cost"],
-  ["buildTime", "Build time"],
-  ["sightDistance", "Sight distance"],
-  ["maxVelocity", "Speed"],
-  ["range", "Range"],
+const STAT_LABELS: [key: string, label: MessageDescriptor][] = [
+  ["health", msg`Health`],
+  ["metalCost", msg`Metal cost`],
+  ["energyCost", msg`Energy cost`],
+  ["buildTime", msg`Build time`],
+  ["sightDistance", msg`Sight distance`],
+  ["maxVelocity", msg`Speed`],
+  ["range", msg`Range`],
 ];
 
 interface WeaponStat {
@@ -57,6 +60,7 @@ function isWeaponArray(value: unknown): value is WeaponStat[] {
 }
 
 export function UnitStatsTable({ unit }: { unit: UnitDatasetEntry }) {
+  const { t } = useLingui();
   const stats = unit.stats;
   if (!stats) return null;
 
@@ -71,7 +75,7 @@ export function UnitStatsTable({ unit }: { unit: UnitDatasetEntry }) {
         <dl className="grid grid-cols-[minmax(8rem,auto)_1fr] gap-x-4 gap-y-1 rounded-lg border border-border/50 bg-card p-3 text-sm lg:grid-cols-[minmax(8rem,auto)_1fr_minmax(8rem,auto)_1fr]">
           {rows.map(([key, label]) => (
             <div key={key} className="contents">
-              <dt className="text-muted-foreground">{label}</dt>
+              <dt className="text-muted-foreground">{t(label)}</dt>
               <dd>{String(stats[key])}</dd>
             </div>
           ))}
@@ -82,10 +86,18 @@ export function UnitStatsTable({ unit }: { unit: UnitDatasetEntry }) {
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead>Damage</TableHead>
-              <TableHead>Reload</TableHead>
-              <TableHead>Range</TableHead>
-              <TableHead>Projectile</TableHead>
+              <TableHead>
+                <Trans>Damage</Trans>
+              </TableHead>
+              <TableHead>
+                <Trans>Reload</Trans>
+              </TableHead>
+              <TableHead>
+                <Trans>Range</Trans>
+              </TableHead>
+              <TableHead>
+                <Trans>Projectile</Trans>
+              </TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>

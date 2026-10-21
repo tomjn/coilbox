@@ -1,3 +1,5 @@
+import { plural, t } from "@lingui/core/macro";
+import { Plural, Trans, useLingui } from "@lingui/react/macro";
 import { Button, cn } from "@picoframe/frame";
 import {
   ChevronRight,
@@ -50,14 +52,22 @@ const msg = (e: unknown): string =>
   e instanceof Error ? e.message : String(e);
 
 /** What the button says, per {@link runtimeInstallState}. */
-const LABEL = {
-  unavailable: "Mission runtime unavailable",
-  missing: "Install the mission runtime",
-  broken: "Repair the mission runtime",
-  outdated: "Update the mission runtime",
-  current: "Reinstall the mission runtime",
-  newer: "Replace with coilbox's mission runtime",
-} as const;
+function installLabel(state: RuntimeInstallState): string {
+  switch (state) {
+    case "unavailable":
+      return t`Mission runtime unavailable`;
+    case "missing":
+      return t`Install the mission runtime`;
+    case "broken":
+      return t`Repair the mission runtime`;
+    case "outdated":
+      return t`Update the mission runtime`;
+    case "current":
+      return t`Reinstall the mission runtime`;
+    case "newer":
+      return t`Replace with coilbox's mission runtime`;
+  }
+}
 
 /** Where this game stands, in a sentence. */
 function summary(
@@ -66,21 +76,24 @@ function summary(
   available: RuntimeMarker | null,
   installedError: string | null,
 ): string {
+  const installedVersion = installed?.version ?? "";
+  const availableVersion = available?.version ?? "";
+  const loadError = installedError ?? "";
   switch (state) {
     case "unavailable":
       return installed
-        ? `This game bundles runtime version ${installed.version}. This build of coilbox has no runtime of its own to measure it against.`
-        : "This build of coilbox has no mission runtime to install.";
+        ? t`This game bundles runtime version ${installedVersion}. This build of coilbox has no runtime of its own to measure it against.`
+        : t`This build of coilbox has no mission runtime to install.`;
     case "missing":
-      return "Coilbox found no runtime marker in this game, so it cannot play scenarios yet. Installing writes coilbox's luarules, luaui and missions folders into the game folder.";
+      return t`Coilbox found no runtime marker in this game, so it cannot play scenarios yet. Installing writes coilbox's luarules, luaui and missions folders into the game folder.`;
     case "broken":
       // The error names the file and the line itself, so this does not repeat
       // the path it used to spell out (issue #915).
-      return `This game has a runtime marker, but it would not load: ${installedError}. Until that is fixed the engine will not read it either, so coilbox cannot tell what this runtime supports. Repairing overwrites it with the version ${available?.version} coilbox ships.`;
+      return t`This game has a runtime marker, but it would not load: ${loadError}. Until that is fixed the engine will not read it either, so coilbox cannot tell what this runtime supports. Repairing overwrites it with the version ${availableVersion} coilbox ships.`;
     case "newer":
-      return `This game bundles runtime version ${installed?.version}, newer than the version ${available?.version} coilbox ships. Installing would take it backwards.`;
+      return t`This game bundles runtime version ${installedVersion}, newer than the version ${availableVersion} coilbox ships. Installing would take it backwards.`;
     default:
-      return `This game bundles runtime version ${installed?.version}. Coilbox ships version ${available?.version}.`;
+      return t`This game bundles runtime version ${installedVersion}. Coilbox ships version ${availableVersion}.`;
   }
 }
 
@@ -94,9 +107,12 @@ function formatNote(
   available: RuntimeMarker | null,
 ): string | null {
   if (!installed) return null;
-  if (available && installed.schemaVersion !== available.schemaVersion)
-    return `It reads mission format ${installed.schemaVersion}, and coilbox compiles format ${available.schemaVersion}. A scenario compiled here may not load until those match.`;
-  return `It reads mission format ${installed.schemaVersion}.`;
+  const installedFormat = installed.schemaVersion;
+  if (available && installedFormat !== available.schemaVersion) {
+    const availableFormat = available.schemaVersion;
+    return t`It reads mission format ${installedFormat}, and coilbox compiles format ${availableFormat}. A scenario compiled here may not load until those match.`;
+  }
+  return t`It reads mission format ${installedFormat}.`;
 }
 
 /** What the capability list is counting, above the list itself. */
@@ -105,9 +121,13 @@ function capabilityHeadline(
   conditions: Capability[],
   actions: Capability[],
 ): string {
+  const conditionCount = conditions.length;
+  const actionCount = actions.length;
   if (!installed)
-    return `Installing adds ${conditions.length} conditions and ${actions.length} actions`;
-  return `Supports ${supportedCount(conditions)} of ${conditions.length} conditions and ${supportedCount(actions)} of ${actions.length} actions`;
+    return t`Installing adds ${conditionCount} conditions and ${actionCount} actions`;
+  const supportedConditions = supportedCount(conditions);
+  const supportedActions = supportedCount(actions);
+  return t`Supports ${supportedConditions} of ${conditionCount} conditions and ${supportedActions} of ${actionCount} actions`;
 }
 
 function CapabilityList({
@@ -169,6 +189,7 @@ function CapabilityPanel({
   installed: RuntimeMarker | null;
   available: RuntimeMarker | null;
 }) {
+  const { t } = useLingui();
   if (conditions.length + actions.length === 0) return null;
   return (
     <Collapsible className="border-t border-border/50 pt-3">
@@ -179,13 +200,13 @@ function CapabilityPanel({
       <CollapsibleContent>
         <div className="mt-3 grid gap-4 sm:grid-cols-2">
           <CapabilityList
-            heading="Conditions"
+            heading={t`Conditions`}
             items={conditions}
             installed={installed}
             available={available}
           />
           <CapabilityList
-            heading="Actions"
+            heading={t`Actions`}
             items={actions}
             installed={installed}
             available={available}
@@ -214,7 +235,7 @@ function MissionRow({
         </span>
         {!mission.name && (
           <Badge variant="outline" className="text-[10px]">
-            no scenario here any more
+            <Trans>no scenario here any more</Trans>
           </Badge>
         )}
       </div>
@@ -230,7 +251,7 @@ function MissionRow({
         ) : (
           <Trash2 className="size-4" />
         )}
-        Remove
+        <Trans>Remove</Trans>
       </Button>
     </li>
   );
@@ -285,13 +306,18 @@ function ShippedMissions({ root }: { root: string }) {
     <Collapsible className="border-t border-border/50 pt-3">
       <CollapsibleTrigger className="group flex w-full cursor-pointer items-center gap-1 text-left text-sm text-muted-foreground hover:text-foreground">
         <ChevronRight className="size-4 shrink-0 transition-transform group-data-[state=open]:rotate-90" />
-        This game ships {shipped.length} mission
-        {shipped.length === 1 ? "" : "s"}
+        <Plural
+          value={shipped.length}
+          one="This game ships # mission"
+          other="This game ships # missions"
+        />
       </CollapsibleTrigger>
       <CollapsibleContent>
         <p className="mt-3 max-w-prose text-sm text-muted-foreground">
-          These come with the game and play as the game itself. They are listed
-          under Play, and coilbox neither wrote them nor removes them.
+          <Trans>
+            These come with the game and play as the game itself. They are
+            listed under Play, and coilbox neither wrote them nor removes them.
+          </Trans>
         </p>
         <ul className="mt-3 flex flex-col gap-2">
           {shipped.map((mission) => {
@@ -327,6 +353,7 @@ function ShippedMissions({ root }: { root: string }) {
  * nothing here removes them.
  */
 function WrittenMissions({ root }: { root: string }) {
+  const { t } = useLingui();
   const { scenarios: loaded } = useScenarios();
   const scenarios = loaded.map((l) => l.scenario);
   const [folders, setFolders] = useState<string[]>([]);
@@ -350,15 +377,19 @@ function WrittenMissions({ root }: { root: string }) {
   const missions = gameMissions(folders, scenarios).filter((m) => m.ours);
   if (missions.length === 0) return null;
 
-  const headline = `Coilbox has written ${missions.length} mission${missions.length === 1 ? "" : "s"} into this game`;
+  const headline = plural(missions.length, {
+    one: "Coilbox has written # mission into this game",
+    other: "Coilbox has written # missions into this game",
+  });
 
   const remove = async (mission: GameMission) => {
     setRemoving(mission.id);
     try {
+      const missionName = mission.name ?? mission.id;
       await scenarioDeleteMission({ root, scenarioId: mission.id });
       setFolders((current) => current.filter((id) => id !== mission.id));
       void notify({
-        title: `Removed ${mission.name ?? mission.id} from the game.`,
+        title: t`Removed ${missionName} from the game.`,
         level: "success",
       });
     } catch (e) {
@@ -376,10 +407,12 @@ function WrittenMissions({ root }: { root: string }) {
       </CollapsibleTrigger>
       <CollapsibleContent>
         <p className="mt-3 max-w-prose text-sm text-muted-foreground">
-          Testing a scenario here leaves its compiled mission in the game
-          folder. Removing one takes the folder and its dialogue clips, and
-          nothing else. The mission runtime stays, and testing that scenario
-          again writes it back.
+          <Trans>
+            Testing a scenario here leaves its compiled mission in the game
+            folder. Removing one takes the folder and its dialogue clips, and
+            nothing else. The mission runtime stays, and testing that scenario
+            again writes it back.
+          </Trans>
         </p>
         <ul className="mt-3 flex flex-col gap-2">
           {missions.map((mission) => (
@@ -420,6 +453,7 @@ function DuplicateFolders({
   root: string;
   onDone: () => void;
 }) {
+  const { t } = useLingui();
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const [applying, setApplying] = useState(false);
@@ -447,8 +481,9 @@ function DuplicateFolders({
     setError(null);
     try {
       const result = await scenarioRuntimeConsolidate({ root, apply: true });
+      const removedCount = result.files.length;
       void notify({
-        title: `Merged the runtime folders, ${result.files.length} duplicate files removed.`,
+        title: t`Merged the runtime folders, ${removedCount} duplicate files removed.`,
         level: "success",
       });
       setOpen(false);
@@ -465,23 +500,31 @@ function DuplicateFolders({
       <PopoverTrigger asChild>
         <Button type="button" size="sm" variant="outline" className="gap-1.5">
           <FolderSync className="size-4" />
-          Merge the runtime folders
+          <Trans>Merge the runtime folders</Trans>
         </Button>
       </PopoverTrigger>
       <PopoverContent align="end" className="w-80">
         {loading ? (
           <p className="flex items-center gap-2 text-sm text-muted-foreground">
             <Loader2 className="size-4 animate-spin" />
-            Looking for duplicate runtime files...
+            <Trans>Looking for duplicate runtime files...</Trans>
           </p>
         ) : error ? (
           <p className="break-words text-sm text-destructive">{error}</p>
         ) : preview ? (
           <div className="flex flex-col gap-3">
             <p className="text-sm">
-              {preview.length === 0
-                ? "Nothing to merge - this game has one of each runtime folder."
-                : `Removes ${preview.length} runtime ${preview.length === 1 ? "file" : "files"} from the folder coilbox no longer writes to, then installs again into the game's own.`}
+              {preview.length === 0 ? (
+                <Trans>
+                  Nothing to merge - this game has one of each runtime folder.
+                </Trans>
+              ) : (
+                <Plural
+                  value={preview.length}
+                  one="Removes # runtime file from the folder coilbox no longer writes to, then installs again into the game's own."
+                  other="Removes # runtime files from the folder coilbox no longer writes to, then installs again into the game's own."
+                />
+              )}
             </p>
             {preview.length > 0 && (
               <>
@@ -493,8 +536,10 @@ function DuplicateFolders({
                   ))}
                 </ul>
                 <p className="text-xs text-muted-foreground">
-                  Only coilbox's own files. The game's gadgets, widgets and
-                  missions stay where they are. This can't be undone.
+                  <Trans>
+                    Only coilbox's own files. The game's gadgets, widgets and
+                    missions stay where they are. This can't be undone.
+                  </Trans>
                 </p>
               </>
             )}
@@ -505,7 +550,7 @@ function DuplicateFolders({
                 size="sm"
                 onClick={() => setOpen(false)}
               >
-                {preview.length === 0 ? "Close" : "Cancel"}
+                {preview.length === 0 ? t`Close` : t`Cancel`}
               </Button>
               {preview.length > 0 && (
                 <Button
@@ -520,7 +565,7 @@ function DuplicateFolders({
                   ) : (
                     <FolderSync className="size-4" />
                   )}
-                  Merge
+                  <Trans>Merge</Trans>
                 </Button>
               )}
             </div>
@@ -543,7 +588,9 @@ function RuntimeSectionShell({ children }: { children: ReactNode }) {
     <Collapsible className="flex flex-col gap-2">
       <CollapsibleTrigger className="group flex w-fit cursor-pointer items-center gap-1 text-left">
         <ChevronRight className="size-4 shrink-0 text-muted-foreground transition-transform group-data-[state=open]:rotate-90" />
-        <h2 className="text-sm font-medium">Mission runtime</h2>
+        <h2 className="text-sm font-medium">
+          <Trans>Mission runtime</Trans>
+        </h2>
       </CollapsibleTrigger>
       <CollapsibleContent className="mt-2 flex flex-col gap-2">
         {children}
@@ -569,8 +616,11 @@ function PackagedOffer({
   gameName: string;
   available: RuntimeMarker | null;
 }) {
+  const { t } = useLingui();
   const { reason, offer, limit } = mutatorOffer(gameName, available);
   const { conditions, actions } = runtimeCapabilities(available, available);
+  const conditionCount = conditions.length;
+  const actionCount = actions.length;
   return (
     <RuntimeSectionShell>
       <div className="flex flex-col gap-3 rounded-lg border border-border/50 bg-card p-3">
@@ -580,7 +630,7 @@ function PackagedOffer({
           {limit && <p>{limit}</p>}
         </div>
         <CapabilityPanel
-          headline={`The test mutator brings ${conditions.length} conditions and ${actions.length} actions`}
+          headline={t`The test mutator brings ${conditionCount} conditions and ${actionCount} actions`}
           conditions={conditions}
           actions={actions}
           installed={available}
@@ -607,6 +657,7 @@ function PackagedOffer({
  * ships there itself. Nothing here is a player's to maintain.
  */
 export function MissionRuntimeSection({ game }: { game: GameItem }) {
+  const { t } = useLingui();
   const archive = game.primaryArchive;
   const root = archive.path;
   const generated = isGeneratedGame(archive.name);
@@ -650,8 +701,10 @@ export function MissionRuntimeSection({ game }: { game: GameItem }) {
       const result = await scenarioRuntimeInstall({ root });
       setInstalled(result.installed);
       setInstalledError(null);
+      const installedVersion = result.installed.version;
+      const fileCount = result.files.length;
       void notify({
-        title: `Mission runtime version ${result.installed.version} installed, ${result.files.length} files.`,
+        title: t`Mission runtime version ${installedVersion} installed, ${fileCount} files.`,
         level: "success",
       });
       // An install can leave the game with a second spelling of a tree it did
@@ -688,18 +741,18 @@ export function MissionRuntimeSection({ game }: { game: GameItem }) {
               ) : (
                 <Download className="size-4" />
               )}
-              {LABEL[state]}
+              {installLabel(state)}
             </Button>
           )}
         </div>
         {duplicates.length > 0 && (
           <div className="flex flex-wrap items-center justify-between gap-3 rounded-md border border-border/50 p-2">
             <p className="max-w-prose text-sm text-muted-foreground">
-              This game has {duplicates.length} runtime{" "}
-              {duplicates.length === 1 ? "file" : "files"} under a second
-              spelling of a runtime folder. The engine reads both folders as
-              one, so it may load the older copy of a file rather than the one
-              coilbox wrote.
+              <Plural
+                value={duplicates.length}
+                one="This game has # runtime file under a second spelling of a runtime folder. The engine reads both folders as one, so it may load the older copy of a file rather than the one coilbox wrote."
+                other="This game has # runtime files under a second spelling of a runtime folder. The engine reads both folders as one, so it may load the older copy of a file rather than the one coilbox wrote."
+              />
             </p>
             <DuplicateFolders root={root} onDone={refresh} />
           </div>

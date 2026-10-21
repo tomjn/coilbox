@@ -1,3 +1,4 @@
+import { Trans } from "@lingui/react/macro";
 import { Button, cn } from "@picoframe/frame";
 import { Loader2, RefreshCw } from "lucide-react";
 import { Link } from "react-router";
@@ -8,18 +9,20 @@ import { TargetPicker } from "./TargetPicker";
 export function NoEngines() {
   return (
     <div className="rounded-lg border border-dashed p-6 text-sm text-muted-foreground">
-      No engines found in your content folders. Add a folder in{" "}
-      <Link
-        to="/settings/content-folders"
-        className="underline underline-offset-4"
-      >
-        Content folders
-      </Link>{" "}
-      or install one from{" "}
-      <Link to="/settings/engines" className="underline underline-offset-4">
-        Engines
-      </Link>
-      .
+      <Trans>
+        No engines found in your content folders. Add a folder in{" "}
+        <Link
+          to="/settings/content-folders"
+          className="underline underline-offset-4"
+        >
+          Content folders
+        </Link>{" "}
+        or install one from{" "}
+        <Link to="/settings/engines" className="underline underline-offset-4">
+          Engines
+        </Link>
+        .
+      </Trans>
     </div>
   );
 }
@@ -48,7 +51,7 @@ export function RescanButton({
       className={cn("shrink-0 gap-1.5", className)}
     >
       <Loader2 className="size-4 animate-spin" />
-      Cancel scan
+      <Trans>Cancel scan</Trans>
     </Button>
   ) : (
     <Button
@@ -61,7 +64,7 @@ export function RescanButton({
       ) : (
         <RefreshCw className="size-4" />
       )}
-      Rescan
+      <Trans>Rescan</Trans>
     </Button>
   );
 }
@@ -94,6 +97,8 @@ export function BrowserToolbar({
   const current =
     targets.find((t) => targetKey(t) === selectedKey) ?? targets[0];
 
+  const currentLabel = targetLabel(current);
+
   return (
     <div className="flex items-center gap-2">
       {onSelect && targets.length > 1 ? (
@@ -108,7 +113,7 @@ export function BrowserToolbar({
           className="min-w-0 truncate text-xs text-muted-foreground"
           title={current.enginePath}
         >
-          via {targetLabel(current)}
+          <Trans>via {currentLabel}</Trans>
         </span>
       )}
       <RescanButton

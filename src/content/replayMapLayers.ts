@@ -13,6 +13,7 @@
  * height from the top. Start boxes are stored as the same fractions.
  */
 
+import { t } from "@lingui/core/macro";
 import type { HeatPoints } from "@/lib/heatField";
 import type {
   BuildOrder,
@@ -145,7 +146,7 @@ export function startDots(
 /** What a dot is called: the names on the team, or a plain word for a team
  *  the setup does not describe. */
 export function startDotName(dot: Pick<StartDot, "names">): string {
-  return dot.names.length > 0 ? dot.names.join(", ") : "Unnamed player";
+  return dot.names.length > 0 ? dot.names.join(", ") : t`Unnamed player`;
 }
 
 /**

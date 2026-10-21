@@ -1,3 +1,4 @@
+import { Trans, useLingui } from "@lingui/react/macro";
 import { Button } from "@picoframe/frame";
 import { ArrowLeft, Play } from "lucide-react";
 import { Link } from "react-router";
@@ -34,6 +35,7 @@ export function GameHeader({
   dataDir?: string;
   onPlay: () => void;
 }) {
+  const { t } = useLingui();
   // Same art source as the Games grid: the batch loader keyed on cheap file
   // identity. Unlike the old per-game loader it needs no sync checksum (which
   // some engine builds don't expose), so the banner resolves whenever the grid
@@ -45,6 +47,7 @@ export function GameHeader({
   const hubBanner = useCachedImage(hubBannerUrl ? [hubBannerUrl] : undefined);
   // The hub's banner, then the catalog's, then the game's own loading screen.
   const artUrl = hubBanner ?? brandBanner ?? headers.get(game.name);
+  const gameName = game.name;
 
   return (
     <header className="relative -mx-4 -mt-4 h-[292px] overflow-hidden">
@@ -56,7 +59,7 @@ export function GameHeader({
         <GameArt
           name={game.name}
           artUrl={artUrl}
-          alt={`${game.name} loading screen`}
+          alt={t`${gameName} loading screen`}
         />
       </div>
       {/* Scrim: fade into the page background along the bottom for text contrast.
@@ -70,7 +73,7 @@ export function GameHeader({
         to="/library/games"
         className="absolute left-3 top-3 inline-flex items-center gap-1 rounded bg-black/40 px-2 py-1 text-xs text-white backdrop-blur-sm hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-white"
       >
-        <ArrowLeft className="size-3.5" /> Games
+        <ArrowLeft className="size-3.5" /> <Trans>Games</Trans>
       </Link>
 
       <div className="absolute inset-x-4 bottom-3 flex items-end justify-between gap-3">
@@ -88,7 +91,7 @@ export function GameHeader({
           )}
         </div>
         <Button size="sm" className="shrink-0 gap-1.5" onClick={onPlay}>
-          <Play className="size-4 fill-current" /> Play
+          <Play className="size-4 fill-current" /> <Trans>Play</Trans>
         </Button>
       </div>
     </header>

@@ -1,3 +1,4 @@
+import { t } from "@lingui/core/macro";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { heatGridSize } from "@/lib/heatField";
 import {
@@ -86,7 +87,7 @@ export function useMapReplayCounts(
             answer.grid.width !== want.width ||
             answer.grid.height !== want.height
           )
-            throw new Error("the counts are not on this map's grid");
+            throw new Error(t`the counts are not on this map's grid`);
           const [raw] = answer.replays;
           if (raw) held.set(key, decodeReplayGrids(raw));
           else

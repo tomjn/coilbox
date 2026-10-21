@@ -1,4 +1,4 @@
-import { formatNumber } from "@/lib/format";
+import { plural, t } from "@lingui/core/macro";
 import {
   HEAT_ALPHA_MAX,
   HEAT_ALPHA_MIN,
@@ -188,13 +188,14 @@ export interface ImageWords {
 export function filtersSentence(info: MapExportInfo): string {
   const f = info.filters;
   const parts = [f.players, f.sides, f.analysed];
-  if (f.playedFrom) parts.push(`played from ${f.playedFrom}`);
-  if (f.playedUntil) parts.push(`played until ${f.playedUntil}`);
-  if (f.replaySet) parts.push(`replay set ${f.replaySet}`);
+  const { playedFrom, playedUntil, replaySet } = f;
+  if (playedFrom) parts.push(t`played from ${playedFrom}`);
+  if (playedUntil) parts.push(t`played until ${playedUntil}`);
+  if (replaySet) parts.push(t`replay set ${replaySet}`);
   parts.push(
     f.includesShort
-      ? "matches under a minute included"
-      : "matches under a minute left out",
+      ? t`matches under a minute included`
+      : t`matches under a minute left out`,
   );
   return `${parts.join(", ")}.`;
 }
@@ -210,44 +211,66 @@ export function filtersSentence(info: MapExportInfo): string {
 export function imageBlocks(w: ImageWords): TextBlock[] {
   const { info } = w;
   const windowed = w.window.kind !== "whole";
-  const inWindow = windowed ? ` in ${windowLabel(w.window)}` : "";
-  const some = w.contributing === 1 ? "has" : "have";
+  const window = windowLabel(w.window);
+  const inWindow = windowed ? t` in ${window}` : "";
+  const layerLabel = LAYER_LABEL[w.layer];
+  const layerSentence = w.layerSentence;
+  const legend = w.legend;
+  const matches = matchCount(info.matches);
+  const events = layerEvents(w.layer, w.events);
+  const scaling = NORMALISE_LABEL[w.normalise];
+  const mapVersions = info.mapVersions.join("; ");
+  const gameVersions = info.gameVersions.join("; ");
+  const filters = filtersSentence(info);
+  const made = w.appVersion
+    ? t`Made with coilbox ${w.appVersion}`
+    : t`Made with coilbox`;
+  const exported = info.exportedUtc.slice(0, 10);
   const blocks: TextBlock[] = [
     { role: "title", text: info.mapName },
     {
       role: "layer",
-      text: `${LAYER_LABEL[w.layer]}. ${w.layerSentence}.`,
+      text: t`${layerLabel}. ${layerSentence}.`,
     },
-    { role: "body", text: `Brightest spot: ${w.legend}.` },
+    { role: "body", text: t`Brightest spot: ${legend}.` },
     {
       role: "body",
-      text: `Replays: ${matchCount(info.matches)} of this map. ${formatNumber(w.contributing)} ${some} something on this layer, ${layerEvents(w.layer, w.events)}${inWindow}.`,
+      text: plural(w.contributing, {
+        one: `Replays: ${matches} of this map. # has something on this layer, ${events}${inWindow}.`,
+        other: `Replays: ${matches} of this map. # have something on this layer, ${events}${inWindow}.`,
+      }),
     },
     {
       role: "body",
       text: windowed
-        ? `Time window: ${windowLabel(w.window)} of each match, by its own clock.`
-        : "Time window: the whole match.",
+        ? t`Time window: ${window} of each match, by its own clock.`
+        : t`Time window: the whole match.`,
     },
-    { role: "body", text: `Scaling: ${NORMALISE_LABEL[w.normalise]}.` },
+    { role: "body", text: t`Scaling: ${scaling}.` },
     {
       role: "body",
-      text: `Map ${info.mapVersions.length === 1 ? "version" : "versions"}: ${info.mapVersions.join("; ")}.`,
+      text: plural(info.mapVersions.length, {
+        one: `Map version: ${mapVersions}.`,
+        other: `Map versions: ${mapVersions}.`,
+      }),
     },
     {
       role: "body",
-      text: `Game and ${info.gameVersions.length === 1 ? "version" : "versions"}: ${info.gameVersions.join("; ")}.`,
+      text: plural(info.gameVersions.length, {
+        one: `Game and version: ${gameVersions}.`,
+        other: `Game and versions: ${gameVersions}.`,
+      }),
     },
-    { role: "body", text: `Filters: ${filtersSentence(info)}` },
+    { role: "body", text: t`Filters: ${filters}` },
   ];
   if (w.marks)
     blocks.push({
       role: "small",
-      text: "White dots are where one team's start was set before one match. Numbered circles are start positions the matches share.",
+      text: t`White dots are where one team's start was set before one match. Numbered circles are start positions the matches share.`,
     });
   blocks.push({
     role: "small",
-    text: `Colours compare places on this map with each other, not with another picture. Made with coilbox${w.appVersion ? ` ${w.appVersion}` : ""} on ${info.exportedUtc.slice(0, 10)}.`,
+    text: t`Colours compare places on this map with each other, not with another picture. ${made} on ${exported}.`,
   });
   return blocks;
 }
@@ -572,10 +595,10 @@ function drawPlace(ctx: Draw2D, layout: ImageLayout, place: MarkPlace) {
  */
 export async function loadMinimap(url: string): Promise<ImageBitmap> {
   const response = await fetch(url);
-  if (!response.ok)
-    throw new Error(
-      `The minimap could not be read: ${response.status} ${response.statusText}`.trim(),
-    );
+  if (!response.ok) {
+    const failure = `${response.status} ${response.statusText}`.trim();
+    throw new Error(t`The minimap could not be read: ${failure}`);
+  }
   return createImageBitmap(await response.blob());
 }
 
@@ -584,7 +607,7 @@ export function canvasPng(canvas: HTMLCanvasElement): Promise<Uint8Array> {
   return new Promise((resolve, reject) => {
     canvas.toBlob((blob) => {
       if (!blob) {
-        reject(new Error("The picture could not be encoded as a PNG."));
+        reject(new Error(t`The picture could not be encoded as a PNG.`));
         return;
       }
       blob

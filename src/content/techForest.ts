@@ -1,3 +1,4 @@
+import { t } from "@lingui/core/macro";
 import type { UnitDatasetEntry } from "./bindings";
 import { buildEdgeMap } from "./buildTree";
 import { groupOf, morphEdgeMap, morphGroups } from "./morphGraph";
@@ -141,7 +142,7 @@ export function factionGroups(
     units: (byRoot.get(root) ?? []).sort(byName),
   }));
   if (rest.length > 0) {
-    groups.push({ id: "", label: "Other units", units: rest.sort(byName) });
+    groups.push({ id: "", label: t`Other units`, units: rest.sort(byName) });
   }
   return groups.filter((g) => g.units.length > 0);
 }

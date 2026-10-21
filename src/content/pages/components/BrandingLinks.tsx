@@ -1,3 +1,4 @@
+import { Trans, useLingui } from "@lingui/react/macro";
 import { Button } from "@picoframe/frame";
 import { openUrl } from "@tauri-apps/plugin-opener";
 import { ExternalLink, Play } from "lucide-react";
@@ -8,6 +9,7 @@ import type { BrandingEntry } from "../../branding";
  * Everything opens in the system browser; videos are never embedded.
  */
 export function BrandingLinks({ entry }: { entry: BrandingEntry }) {
+  const { t } = useLingui();
   const videos = entry.videos ?? [];
   const links = entry.links ?? [];
   if (videos.length === 0 && links.length === 0) return null;
@@ -17,7 +19,9 @@ export function BrandingLinks({ entry }: { entry: BrandingEntry }) {
 
   return (
     <section className="flex flex-col gap-2">
-      <h2 className="text-sm font-medium">Links</h2>
+      <h2 className="text-sm font-medium">
+        <Trans>Links</Trans>
+      </h2>
       <div className="flex flex-wrap gap-2">
         {links.map((l) => (
           <Button
@@ -38,7 +42,7 @@ export function BrandingLinks({ entry }: { entry: BrandingEntry }) {
             className="gap-1.5"
             onClick={() => openUrl(videoUrl(v)).catch(() => {})}
           >
-            <Play className="size-4 fill-current" /> {v.title ?? "Video"}
+            <Play className="size-4 fill-current" /> {v.title ?? t`Video`}
           </Button>
         ))}
       </div>

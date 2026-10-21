@@ -1,3 +1,4 @@
+import { useLingui } from "@lingui/react/macro";
 import {
   Select,
   SelectContent,
@@ -26,10 +27,11 @@ export function TargetPicker({
   onChange: (key: string) => void;
   disabled?: boolean;
 }) {
+  const { t } = useLingui();
   return (
     <Select value={value} onValueChange={onChange} disabled={disabled}>
       <SelectTrigger className="w-full sm:w-[28rem]">
-        <SelectValue placeholder="Select an engine" />
+        <SelectValue placeholder={t`Select an engine`} />
       </SelectTrigger>
       <SelectContent>
         {targets.map((t) => (

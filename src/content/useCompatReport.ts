@@ -1,3 +1,4 @@
+import { useLingui } from "@lingui/react/macro";
 import { useEffect, useMemo, useState } from "react";
 import { useUnitDefs } from "@/workshop/config";
 import { type LuaCompatResult, unitsyncLuaCompatScan } from "./bindings";
@@ -81,12 +82,13 @@ export function useCompatReport(
     error: defsError,
     loading: defsLoading,
   } = useUnitDefs(enginePath, dataDir, gameArchive);
+  const { t } = useLingui();
   const findings = useMemo(() => {
     if (!tree) return [];
     const errors = [
       ...tree.errors,
-      ...(lua.error ? [`Lua scan: ${lua.error}`] : []),
-      ...(defsError ? [`Unit defs: ${defsError}`] : []),
+      ...(lua.error ? [t`Lua scan: ${lua.error}`] : []),
+      ...(defsError ? [t`Unit defs: ${defsError}`] : []),
     ];
     return buildReport({
       files: tree.files.map((f) => f.path),
@@ -94,7 +96,7 @@ export function useCompatReport(
       defs: defsFor === gameArchive ? defs : null,
       errors,
     });
-  }, [tree, lua, defs, defsFor, defsError, gameArchive]);
+  }, [tree, lua, defs, defsFor, defsError, gameArchive, t]);
   const asked = !!(enginePath && dataDir && gameArchive);
   return {
     findings,

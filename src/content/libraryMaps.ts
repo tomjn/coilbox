@@ -1,3 +1,5 @@
+import type { MessageDescriptor } from "@lingui/core";
+import { t as coreT, msg, plural } from "@lingui/core/macro";
 import { formatBytes } from "@/lib/format";
 import type { EnqueueInput } from "../downloads/DownloadQueueProvider";
 import { parseApacheSize } from "../downloads/queueLanes";
@@ -33,11 +35,11 @@ export function catalogueLabel(c: CatalogueRequest): string {
  * off the hub's facts for the map (see {@link mapPlayTypes}).
  */
 export const MAP_CHIPS = [
-  { value: "installed", label: "My Maps" },
-  { value: "notInstalled", label: "New Maps" },
-  { value: "1v1", label: "1v1" },
-  { value: "team", label: "Team" },
-  { value: "water", label: "Water" },
+  { value: "installed", label: msg`My Maps` },
+  { value: "notInstalled", label: msg`New Maps` },
+  { value: "1v1", label: msg`1v1` },
+  { value: "team", label: msg`Team` },
+  { value: "water", label: msg`Water` },
 ] as const;
 
 export type MapChip = (typeof MAP_CHIPS)[number]["value"];
@@ -99,12 +101,13 @@ export function matchesMapSearch(m: LibraryMap, query: string): boolean {
 
 export type MapSort = "name-asc" | "name-desc" | "area-desc" | "area-asc";
 
-export const MAP_SORT_OPTIONS: { value: MapSort; label: string }[] = [
-  { value: "name-asc", label: "Name A–Z" },
-  { value: "name-desc", label: "Name Z–A" },
-  { value: "area-desc", label: "Largest" },
-  { value: "area-asc", label: "Smallest" },
-];
+export const MAP_SORT_OPTIONS: { value: MapSort; label: MessageDescriptor }[] =
+  [
+    { value: "name-asc", label: msg`Name A–Z` },
+    { value: "name-desc", label: msg`Name Z–A` },
+    { value: "area-desc", label: msg`Largest` },
+    { value: "area-asc", label: msg`Smallest` },
+  ];
 
 /**
  * The map's size in squares: the local thumbnail pass for an installed map,
@@ -173,15 +176,15 @@ export function mapCaption(
   const starts = facts?.points.start.length ?? 0;
   const where =
     m.state === "local"
-      ? "not on any mirror"
+      ? coreT`not on any mirror`
       : kinds.length > 2
-        ? `${kinds.length} sources`
+        ? plural(kinds.length, { one: "# source", other: "# sources" })
         : kinds.join(" · ");
   return [
     squares
       ? `${Math.round(squares.width)} × ${Math.round(squares.height)}`
       : null,
-    starts > 0 ? `${starts} start${starts === 1 ? "" : "s"}` : null,
+    starts > 0 ? plural(starts, { one: "# start", other: "# starts" }) : null,
     where || null,
   ]
     .filter(Boolean)

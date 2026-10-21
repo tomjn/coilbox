@@ -1,3 +1,4 @@
+import { useLingui } from "@lingui/react/macro";
 import { useEffect, useMemo, useState } from "react";
 import { errorText } from "@/lib/helpers";
 import { useWriteRootPath } from "../downloads/config";
@@ -38,6 +39,7 @@ export function useGameLibrary(
   name: string,
   scan: Pick<ScanResult, "games" | "maps"> | null,
 ) {
+  const { t } = useLingui();
   const writePath = useWriteRootPath("games");
   const history = useDownloadHistory();
   const prefs = useGamePrefs();
@@ -100,9 +102,10 @@ export function useGameLibrary(
     const age = Math.max(...rapid.repos.map((r) => r.ageSecs));
     const hosts = [
       ...new Set(rapid.repos.map((r) => hostOf(r.masterUrl) ?? r.masterUrl)),
-    ];
-    return `Rapid index ${refreshedLabel(age)} from ${hosts.join(", ")}`;
-  }, [rapid.repos]);
+    ].join(", ");
+    const refreshed = refreshedLabel(age);
+    return t`Rapid index ${refreshed} from ${hosts}`;
+  }, [rapid.repos, t]);
 
   const catalogRepo = githubRepoForGame(
     mergeGameRepos(catalogRepos, GAME_REPOS),

@@ -1,3 +1,4 @@
+import { useLingui } from "@lingui/react/macro";
 import { Badge } from "@/components/ui/badge";
 
 /**
@@ -5,11 +6,12 @@ import { Badge } from "@/components/ui/badge";
  * distinguish work-in-progress maps/games from packaged `.sd7`/`.sdz` archives.
  */
 export function SddBadge() {
+  const { t } = useLingui();
   return (
     <Badge
       variant="ghost"
       className="shrink-0 rounded bg-amber-500/15 px-1.5 py-0.5 font-mono text-[0.625rem] font-medium uppercase tracking-wide text-amber-700 dark:text-amber-400"
-      title="Loose .sdd directory (uncompressed)"
+      title={t`Loose .sdd directory (uncompressed)`}
     >
       SDD
     </Badge>

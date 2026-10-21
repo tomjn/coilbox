@@ -1,3 +1,4 @@
+import { useLingui } from "@lingui/react/macro";
 import { cn } from "@picoframe/frame";
 import { Loader2, Map as MapIcon } from "lucide-react";
 
@@ -20,6 +21,7 @@ export function MapThumb({
   alt: string;
   loading?: boolean;
 }) {
+  const { t } = useLingui();
   // Fill the constraining dimension so the minimap is as large as it can be —
   // touching two edges (never floating with a border all round); the other axis
   // letterboxes only when the map is non-square.
@@ -29,7 +31,7 @@ export function MapThumb({
       {loading ? (
         <div
           role="status"
-          aria-label="Loading minimap"
+          aria-label={t`Loading minimap`}
           className="flex size-full items-center justify-center"
         >
           <Loader2

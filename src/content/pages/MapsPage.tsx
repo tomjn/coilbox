@@ -1,3 +1,6 @@
+import type { MessageDescriptor } from "@lingui/core";
+import { t as coreT, msg } from "@lingui/core/macro";
+import { Trans, useLingui } from "@lingui/react/macro";
 import { Button, useDrawer } from "@picoframe/frame";
 import { CloudOff, Loader2, Map as MapIcon } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
@@ -54,20 +57,25 @@ import {
 const PAGE = 200;
 
 /** What a chip with nothing in it says. */
-const EMPTY_CHIP: Record<MapChip, string> = {
-  installed: "No maps installed.",
-  notInstalled: "Every map is installed.",
-  "1v1": "No 1v1 maps.",
-  team: "No team maps.",
-  water: "No water maps.",
+const EMPTY_CHIP: Record<MapChip, MessageDescriptor> = {
+  installed: msg`No maps installed.`,
+  notInstalled: msg`Every map is installed.`,
+  "1v1": msg`No 1v1 maps.`,
+  team: msg`No team maps.`,
+  water: msg`No water maps.`,
 };
 
 /** What a play type chip says when the cards checked so far hold none. */
-const NONE_CHECKED: Record<PlayType, string> = {
-  "1v1": "No 1v1 maps",
-  team: "No team maps",
-  water: "No water maps",
-};
+function noneChecked(type: PlayType, checked: number): string {
+  switch (type) {
+    case "1v1":
+      return coreT`No 1v1 maps in the first ${checked}.`;
+    case "team":
+      return coreT`No team maps in the first ${checked}.`;
+    case "water":
+      return coreT`No water maps in the first ${checked}.`;
+  }
+}
 
 /**
  * Every map the player has and every map the mirrors carry, in one grid. The
@@ -77,6 +85,7 @@ const NONE_CHECKED: Record<PlayType, string> = {
  * and the play type the 1v1, Team and Water chips filter on.
  */
 export default function MapsPage() {
+  const { t, i18n } = useLingui();
   const { targets, selected } = useScanTargetSelection();
   const {
     data,
@@ -158,6 +167,7 @@ export default function MapsPage() {
   const chips = MAP_CHIPS.filter((c) => hubOn || !isPlayType(c.value)).map(
     (c) => ({
       ...c,
+      label: i18n._(c.label),
       count: isPlayType(c.value) ? undefined : counts[c.value],
     }),
   );
@@ -195,7 +205,7 @@ export default function MapsPage() {
       "../../packs/pages/components/ImportPackForm"
     );
     drawer.open({
-      title: "Import a setup pack",
+      title: t`Import a setup pack`,
       width: "26rem",
       content: (
         // A fresh form every time, because the last one may still be mounted and
@@ -221,6 +231,7 @@ export default function MapsPage() {
     if (importCode) void openPackImport(importCode);
   }, [importCode]);
 
+  const query = search.trim();
   const resetPage = () => setLimit(PAGE);
   const showMore = (
     <Button
@@ -228,15 +239,15 @@ export default function MapsPage() {
       size="sm"
       onClick={() => setLimit((l) => l + PAGE)}
     >
-      Show more ({remaining} remaining)
+      <Trans>Show more ({remaining} remaining)</Trans>
     </Button>
   );
 
   return (
     <div className="flex flex-col gap-4 p-4">
       <PageHeader
-        title="Maps"
-        description="Every map you have, and every map the mirrors carry."
+        title={t`Maps`}
+        description={t`Every map you have, and every map the mirrors carry.`}
         actions={
           targets.length > 0 && (
             <RescanButton
@@ -265,7 +276,7 @@ export default function MapsPage() {
           className="flex items-center gap-1.5 text-xs text-muted-foreground"
         >
           <Loader2 className="size-3.5 shrink-0 animate-spin motion-reduce:animate-none" />
-          Reading the mirror indexes…
+          <Trans>Reading the mirror indexes…</Trans>
         </p>
       )}
       {library.catalogueFailures.map((f) => (
@@ -283,14 +294,16 @@ export default function MapsPage() {
 
       {writeRoot && !writeRoot.loading && !writePath && records.length > 0 && (
         <p className="text-xs text-muted-foreground">
-          Set a download folder in{" "}
-          <Link
-            className="underline underline-offset-4"
-            to="/settings/content-folders"
-          >
-            Content folders
-          </Link>{" "}
-          to install maps.
+          <Trans>
+            Set a download folder in{" "}
+            <Link
+              className="underline underline-offset-4"
+              to="/settings/content-folders"
+            >
+              Content folders
+            </Link>{" "}
+            to install maps.
+          </Trans>
         </p>
       )}
 
@@ -302,51 +315,57 @@ export default function MapsPage() {
             setChip(v as MapChip);
             resetPage();
           }}
-          chipsLabel="Show"
+          chipsLabel={t`Show`}
           search={search}
           onSearch={(v) => {
             setSearch(v);
             resetPage();
           }}
-          searchPlaceholder="Search maps…"
-          searchLabel="Search maps"
+          searchPlaceholder={t`Search maps…`}
+          searchLabel={t`Search maps`}
           sort={sort}
           onSort={(v) => {
             setSort(v as MapSort);
             resetPage();
           }}
-          sortOptions={MAP_SORT_OPTIONS}
+          sortOptions={MAP_SORT_OPTIONS.map((o) => ({
+            ...o,
+            label: i18n._(o.label),
+          }))}
           total={isPlayType(chip) ? counts.all : counts[chip]}
           shown={scoped.length}
-          noun="maps"
+          noun={t`maps`}
         />
       )}
 
       {error && !scanFailure && !unchecked && <ErrorBanner message={error} />}
       {result?.errors?.length ? <Diagnostics errors={result.errors} /> : null}
       {scanFailure && records.length > 0 && scanned.length === 0 && (
-        <ScanFailed noun="maps" reason={scanFailure} />
+        <ScanFailed noun={t`maps`} reason={scanFailure} />
       )}
 
       {targets.length === 0 ? null : busy && !unchecked ? (
         <SkeletonList grid />
       ) : cancelled && records.length === 0 ? (
-        <EmptyState label="Scan cancelled. Press Rescan to load maps." />
+        <EmptyState label={t`Scan cancelled. Press Rescan to load maps.`} />
       ) : records.length === 0 && scanFailure ? (
-        <ScanFailed noun="maps" reason={scanFailure} />
+        <ScanFailed noun={t`maps`} reason={scanFailure} />
       ) : records.length === 0 ? (
         !library.cataloguesRead ? (
           <SkeletonList grid />
         ) : suggestions.length > 0 ? (
           <SuggestionsList
             kind="map"
-            heading="No maps yet — try one of these"
+            heading={t`No maps yet — try one of these`}
             items={suggestions}
             writeRoot={writeRoot}
             onComplete={() => run(true)}
           />
         ) : (
-          <EmptyState icon={MapIcon} label="No maps found for this engine." />
+          <EmptyState
+            icon={MapIcon}
+            label={t`No maps found for this engine.`}
+          />
         )
       ) : shown.length === 0 ? (
         isPlayType(chip) && !answered ? (
@@ -356,10 +375,10 @@ export default function MapsPage() {
             icon={MapIcon}
             label={
               search.trim()
-                ? `No maps match “${search.trim()}”.`
+                ? t`No maps match “${query}”.`
                 : isPlayType(chip) && remaining > 0
-                  ? `${NONE_CHECKED[chip]} in the first ${page.length}.`
-                  : EMPTY_CHIP[chip]
+                  ? noneChecked(chip, page.length)
+                  : i18n._(EMPTY_CHIP[chip])
             }
             action={remaining > 0 ? showMore : undefined}
           />

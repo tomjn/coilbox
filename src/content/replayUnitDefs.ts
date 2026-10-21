@@ -7,6 +7,7 @@
  * a unit dataset, and the check that says whether a list fits a replay at all.
  */
 
+import { t } from "@lingui/core/macro";
 import { formatDate } from "@/lib/format";
 import type {
   BuildOrder,
@@ -190,14 +191,17 @@ export function listDate(link: Pick<UnitDefLink, "takenAtMs">): string {
  */
 export function storedListSentence(
   link: UnitDefLink,
-  subject = "Unit names",
+  subject = t`Unit names`,
 ): string {
   const date = listDate(link);
   if (link.origin === "engine") {
-    return `${subject} come from the unit list the engine wrote when this replay was analysed on ${date}, on ${link.game}.`;
+    const game = link.game;
+    return t`${subject} come from the unit list the engine wrote when this replay was analysed on ${date}, on ${game}.`;
   }
   if (link.origin === "folder") {
-    return `${subject} come from the unit list recorded when this replay was read on ${date}, from ${link.game}, a loose game folder that can change under that name.`;
+    const game = link.game;
+    return t`${subject} come from the unit list recorded when this replay was read on ${date}, from ${game}, a loose game folder that can change under that name.`;
   }
-  return `${subject} come from the unit list recorded when this replay was read on ${date}, from ${link.game}.`;
+  const game = link.game;
+  return t`${subject} come from the unit list recorded when this replay was read on ${date}, from ${game}.`;
 }

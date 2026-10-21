@@ -1,3 +1,5 @@
+import { t } from "@lingui/core/macro";
+
 /**
  * What to tell the player about a game whose dependency archives are not all
  * installed (issue #3482). The scan names each one in `missingDependencies`,
@@ -7,7 +9,7 @@ export function missingDependencyNotes(game: {
   missingDependencies?: string[];
 }): string[] {
   return (game.missingDependencies ?? []).map(
-    (name) => `Depends on "${name}", which is not installed.`,
+    (name) => t`Depends on "${name}", which is not installed.`,
   );
 }
 
@@ -16,5 +18,5 @@ export function missingDependencyNotes(game: {
  * #3489). One sentence pair for every place that stops a launch on it.
  */
 export function dependencyBlockReason(archive: string, gameName: string) {
-  return `Archive not installed: ${archive}. ${gameName} depends on it.`;
+  return t`Archive not installed: ${archive}. ${gameName} depends on it.`;
 }

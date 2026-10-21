@@ -1,3 +1,5 @@
+import { msg } from "@lingui/core/macro";
+import { Trans, useLingui } from "@lingui/react/macro";
 import { Button, cn } from "@picoframe/frame";
 import { Download, Play, X } from "lucide-react";
 import type { ReactNode } from "react";
@@ -14,16 +16,19 @@ import { GameCardShell } from "./GameCardShell";
 import { MapThumb } from "./MapThumb";
 
 const BADGES = {
-  installed: { label: "Installed", tone: "bg-emerald-600 text-white" },
-  downloading: { label: "Downloading", tone: "bg-sky-600 text-white" },
-  queued: { label: "Queued", tone: "bg-sky-600 text-white" },
-  local: { label: "Local", tone: "bg-slate-600 text-white" },
+  installed: { label: msg`Installed`, tone: "bg-emerald-600 text-white" },
+  downloading: { label: msg`Downloading`, tone: "bg-sky-600 text-white" },
+  queued: { label: msg`Queued`, tone: "bg-sky-600 text-white" },
+  local: { label: msg`Local`, tone: "bg-slate-600 text-white" },
 } as const;
 
 function StateBadge({ state }: { state: LibraryMap["state"] }) {
+  const { i18n } = useLingui();
   if (!(state in BADGES)) return null;
   const { label, tone } = BADGES[state as keyof typeof BADGES];
-  return <Badge className={cn("rounded-sm shadow-sm", tone)}>{label}</Badge>;
+  return (
+    <Badge className={cn("rounded-sm shadow-sm", tone)}>{i18n._(label)}</Badge>
+  );
 }
 
 /** Sits above the card's stretched detail link so it takes its own clicks. */
@@ -68,6 +73,9 @@ export function LibraryMapCard({
   onInstall: () => void;
   onCancel: () => void;
 }) {
+  const { t } = useLingui();
+  const mapName = map.id;
+  const minimapAlt = t`Minimap of ${mapName}`;
   const remote = map.sources.find((s) => s.thumb)?.thumb;
   const remoteThumb = useCachedImage(
     !thumbUrl && remote ? [remote] : undefined,
@@ -88,7 +96,7 @@ export function LibraryMapCard({
         onClick={onCancel}
       >
         <X className="size-4" />
-        Cancel
+        <Trans>Cancel</Trans>
       </Button>,
     );
   }
@@ -103,7 +111,7 @@ export function LibraryMapCard({
         onClick={onInstall}
       >
         <Download className="size-4" />
-        Install
+        <Trans>Install</Trans>
       </Button>,
     );
   }
@@ -117,7 +125,7 @@ export function LibraryMapCard({
         disabled={playDisabled}
       >
         <Play className="size-4 fill-current" />
-        Play
+        <Trans>Play</Trans>
       </Button>,
     );
   }
@@ -126,7 +134,7 @@ export function LibraryMapCard({
     <GameCardShell
       name={map.id}
       title={map.id}
-      alt={`Minimap of ${map.id}`}
+      alt={minimapAlt}
       className="h-full"
       artClassName=""
       art={
@@ -134,7 +142,7 @@ export function LibraryMapCard({
           url={thumbUrl ?? remoteThumb}
           width={squares?.width}
           height={squares?.height}
-          alt={`Minimap of ${map.id}`}
+          alt={minimapAlt}
           loading={loading}
         />
       }

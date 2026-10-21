@@ -1,3 +1,4 @@
+import { Trans, useLingui } from "@lingui/react/macro";
 import { X } from "lucide-react";
 import { useState } from "react";
 import type { BrandingScreenshot } from "../../branding";
@@ -37,13 +38,16 @@ export function BrandingScreenshots({
 }: {
   shots: BrandingScreenshot[];
 }) {
+  const { t } = useLingui();
   const [open, setOpen] = useState<{ url: string; caption?: string } | null>(
     null,
   );
   if (shots.length === 0) return null;
   return (
     <section className="flex flex-col gap-2">
-      <h2 className="text-sm font-medium">Screenshots</h2>
+      <h2 className="text-sm font-medium">
+        <Trans>Screenshots</Trans>
+      </h2>
       <div className="flex gap-2 overflow-x-auto pb-1">
         {shots.map((s, i) => (
           <Thumb
@@ -60,13 +64,13 @@ export function BrandingScreenshots({
           onKeyDown={(e) => e.key === "Escape" && setOpen(null)}
           role="dialog"
           aria-modal="true"
-          aria-label={open.caption ?? "Screenshot"}
+          aria-label={open.caption ?? t`Screenshot`}
         >
           <button
             type="button"
             className="absolute right-4 top-4 rounded bg-white/10 p-2 text-white hover:bg-white/20"
             onClick={() => setOpen(null)}
-            aria-label="Close"
+            aria-label={t`Close`}
           >
             <X className="size-5" />
           </button>

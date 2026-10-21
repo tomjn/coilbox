@@ -1,3 +1,4 @@
+import { Trans, useLingui } from "@lingui/react/macro";
 import { Button } from "@picoframe/frame";
 import { save } from "@tauri-apps/plugin-dialog";
 import { Download, ImageDown, Loader2 } from "lucide-react";
@@ -71,18 +72,18 @@ export function MapExportButtons({
   places: readonly MarkPlace[];
   showStarts: boolean;
 }) {
+  const { t } = useLingui();
   const [busy, setBusy] = useState<Kind | null>(null);
   const stamped = () => stampExport(basis, new Date());
 
   const field = drawn?.field && drawn.field.peak > 0 ? drawn.field : null;
-  const nothing =
-    "Nothing in the picture has anything on this layer, so there is nothing to write.";
-  const choose = "Choose a density layer first.";
+  const nothing = t`Nothing in the picture has anything on this layer, so there is nothing to write.`;
+  const choose = t`Choose a density layer first.`;
   const layerReason = !layer ? choose : !drawn?.grid ? nothing : null;
   const imageReason = !layer ? choose : !field ? nothing : null;
   const startsReason =
     rows.length === 0
-      ? "No start position is counted for these matches."
+      ? t`No start position is counted for these matches.`
       : null;
 
   async function run(
@@ -100,8 +101,9 @@ export function MapExportButtons({
       await write(dest);
       void notify({ title: done, level: "success" });
     } catch (e) {
+      const reason = e instanceof Error ? e.message : String(e);
       void notify({
-        title: `Export failed: ${e instanceof Error ? e.message : e}`,
+        title: t`Export failed: ${reason}`,
         level: "error",
       });
     } finally {
@@ -116,10 +118,10 @@ export function MapExportButtons({
     const info = stamped();
     return run(
       "image",
-      "Export the picture",
+      t`Export the picture`,
       layerImageFileName(info, layer),
-      { name: "PNG image", extensions: ["png"] },
-      "Picture exported.",
+      { name: t`PNG image`, extensions: ["png"] },
+      t`Picture exported.`,
       async (dest) => {
         const appVersion = await currentVersion().catch(() => null);
         const bytes = await renderMapImage({
@@ -153,10 +155,10 @@ export function MapExportButtons({
     const grid = drawn.grid;
     return run(
       "layer",
-      "Export the layer as CSV",
+      t`Export the layer as CSV`,
       layerCsvFileName(info, layer),
       csv,
-      "Layer exported.",
+      t`Layer exported.`,
       (dest) =>
         contentWriteFile({
           dest,
@@ -176,10 +178,10 @@ export function MapExportButtons({
     const info = stamped();
     return run(
       "starts",
-      "Export the start positions as CSV",
+      t`Export the start positions as CSV`,
       startsCsvFileName(info),
       csv,
-      "Start positions exported.",
+      t`Start positions exported.`,
       (dest) =>
         contentWriteFile({
           dest,
@@ -208,12 +210,12 @@ export function MapExportButtons({
         disabled={busy !== null || imageReason !== null}
         title={
           imageReason ??
-          "Saves the map with this layer on it, the legend, and the map, replays, versions, window and filters written under it."
+          t`Saves the map with this layer on it, the legend, and the map, replays, versions, window and filters written under it.`
         }
         onClick={exportImage}
       >
         {icon("image", ImageDown)}
-        Export picture
+        <Trans>Export picture</Trans>
       </Button>
       <Button
         type="button"
@@ -223,12 +225,12 @@ export function MapExportButtons({
         disabled={busy !== null || layerReason !== null}
         title={
           layerReason ??
-          "Writes this layer's cells before smoothing, one row each, with the numbers behind them. A cell that is not in the file holds nothing."
+          t`Writes this layer's cells before smoothing, one row each, with the numbers behind them. A cell that is not in the file holds nothing.`
         }
         onClick={exportLayer}
       >
         {icon("layer", Download)}
-        Export layer CSV
+        <Trans>Export layer CSV</Trans>
       </Button>
       <Button
         type="button"
@@ -238,12 +240,12 @@ export function MapExportButtons({
         disabled={busy !== null || startsReason !== null}
         title={
           startsReason ??
-          "Writes each start position with how many times it was taken and how many of those won."
+          t`Writes each start position with how many times it was taken and how many of those won.`
         }
         onClick={exportStarts}
       >
         {icon("starts", Download)}
-        Export start positions CSV
+        <Trans>Export start positions CSV</Trans>
       </Button>
     </div>
   );

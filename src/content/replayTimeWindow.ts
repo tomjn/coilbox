@@ -9,6 +9,7 @@
  * same code. The control that edits the window is `ReplayTimeWindowControl`.
  */
 
+import { t } from "@lingui/core/macro";
 import type { HeatPoints } from "@/lib/heatField";
 import type { DemoInfo, DemoTrailer, Metric } from "./bindings";
 import { FRAMES_PER_SECOND } from "./chatClock";
@@ -167,16 +168,16 @@ export interface WindowPreset {
 export function windowPresets(domainSec: number): WindowPreset[] {
   const length = PRESET_MINUTES * 60;
   if (!(domainSec > length)) return [];
-  const label = `${PRESET_MINUTES} minutes`;
+  const minutes = PRESET_MINUTES;
   return [
     {
       id: "first",
-      label: `First ${label}`,
+      label: t`First ${minutes} minutes`,
       window: { startSec: 0, endSec: length },
     },
     {
       id: "last",
-      label: `Last ${label}`,
+      label: t`Last ${minutes} minutes`,
       window: {
         startSec: Math.ceil(domainSec) - length,
         endSec: Math.ceil(domainSec),
@@ -263,7 +264,8 @@ export function activitySeries(
     "perMinute",
   );
   const points = sumRows(rows, series);
+  const metricLabel = metric.label;
   return points.length > 0
-    ? { label: `${metric.label} per minute`, points }
+    ? { label: t`${metricLabel} per minute`, points }
     : null;
 }

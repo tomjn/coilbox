@@ -1,3 +1,4 @@
+import { Trans } from "@lingui/react/macro";
 import { Button } from "@picoframe/frame";
 import { Milestone, Orbit, Rocket } from "lucide-react";
 import { useNavigate } from "react-router";
@@ -34,7 +35,7 @@ export function StartModeActions({ gameName }: { gameName: string }) {
           className="gap-1.5"
           onClick={() => navigate(withGame("/conquest"))}
         >
-          <Orbit className="size-4" /> Start a conquest
+          <Orbit className="size-4" /> <Trans>Start a conquest</Trans>
         </Button>
       )}
       {showWarpath && (
@@ -44,7 +45,7 @@ export function StartModeActions({ gameName }: { gameName: string }) {
           className="gap-1.5"
           onClick={() => navigate(withGame("/warpath"))}
         >
-          <Rocket className="size-4" /> Start a warpath run
+          <Rocket className="size-4" /> <Trans>Start a warpath run</Trans>
         </Button>
       )}
       {showCampaign && (
@@ -54,7 +55,7 @@ export function StartModeActions({ gameName }: { gameName: string }) {
           className="gap-1.5"
           onClick={() => navigate(withGame("/campaign-builder"))}
         >
-          <Milestone className="size-4" /> New campaign
+          <Milestone className="size-4" /> <Trans>New campaign</Trans>
         </Button>
       )}
     </div>

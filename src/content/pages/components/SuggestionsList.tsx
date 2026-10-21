@@ -1,3 +1,5 @@
+import { t as coreT } from "@lingui/core/macro";
+import { Trans, useLingui } from "@lingui/react/macro";
 import { Button, cn } from "@picoframe/frame";
 import { AlertCircle, CheckCircle2, Download, Loader2 } from "lucide-react";
 import { useMemo, useState } from "react";
@@ -104,7 +106,7 @@ async function suggestionRequest(
             a.filename.toLowerCase().includes(dl.asset?.toLowerCase() ?? ""),
           )
         : archives[0];
-      if (!pick) throw new Error(`No release archive found for ${repo}.`);
+      if (!pick) throw new Error(coreT`No release archive found for ${repo}.`);
       return {
         kind: "file",
         label,
@@ -133,6 +135,7 @@ export function SuggestionsList({
   onComplete,
   heading,
 }: SuggestionsListProps) {
+  const { t } = useLingui();
   const writePath = writeRoot.path;
   const noWriteRoot = !writeRoot.loading && !writePath;
   const entries = useBrandingCatalog();
@@ -155,7 +158,8 @@ export function SuggestionsList({
   if (items.length === 0) return null;
 
   function onDownloaded(item: Suggestion) {
-    setResult({ ok: true, message: `${item.title} downloaded.` });
+    const title = item.title;
+    setResult({ ok: true, message: t`${title} downloaded.` });
     setDoneIds((prev) => new Set(prev).add(item.id));
     // The queue forgot the scans when the download finished, so the new game
     // or map appears without a manual rescan.
@@ -168,19 +172,21 @@ export function SuggestionsList({
         <h2 className="text-sm font-semibold">
           {heading ??
             (kind === "game"
-              ? "Get started — download a game"
-              : "Get started — download a map")}
+              ? t`Get started — download a game`
+              : t`Get started — download a map`)}
         </h2>
         {noWriteRoot && (
           <p className="text-xs text-muted-foreground">
-            Set a download folder in{" "}
-            <Link
-              className="underline underline-offset-4"
-              to="/settings/content-folders"
-            >
-              Content folders settings
-            </Link>{" "}
-            to enable downloads.
+            <Trans>
+              Set a download folder in{" "}
+              <Link
+                className="underline underline-offset-4"
+                to="/settings/content-folders"
+              >
+                Content folders settings
+              </Link>{" "}
+              to enable downloads.
+            </Trans>
           </p>
         )}
       </div>
@@ -253,6 +259,8 @@ function SuggestionCard({
   onDownloaded: () => void;
   onFailed: (message: string) => void;
 }) {
+  const { t } = useLingui();
+  const title = item.title;
   const imageUrl = useBrandingImage(art, true);
   const dl = useQueuedDownload();
   const active = dl.busy;
@@ -264,7 +272,7 @@ function SuggestionCard({
       const request = await suggestionRequest(
         item.download,
         kind,
-        `${kind === "game" ? "Game" : "Map"}: ${item.title}`,
+        kind === "game" ? t`Game: ${title}` : t`Map: ${title}`,
         writePath,
         repos,
       );
@@ -305,9 +313,7 @@ function SuggestionCard({
             size="sm"
             onClick={onDownload}
             disabled={disabled || done}
-            aria-label={
-              done ? `${item.title} downloaded` : `Download ${item.title}`
-            }
+            aria-label={done ? t`${title} downloaded` : t`Download ${title}`}
           >
             {done ? (
               <CheckCircle2 className="text-emerald-500" />
@@ -317,12 +323,12 @@ function SuggestionCard({
               <Download />
             )}
             {done
-              ? "Downloaded"
+              ? t`Downloaded`
               : dl.status === "queued"
-                ? "Queued…"
+                ? t`Queued…`
                 : active
-                  ? "Downloading…"
-                  : "Download"}
+                  ? t`Downloading…`
+                  : t`Download`}
           </Button>
           <QueueProgress item={dl} />
         </div>

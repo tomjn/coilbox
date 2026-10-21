@@ -1,3 +1,5 @@
+import { plural } from "@lingui/core/macro";
+import { Trans, useLingui } from "@lingui/react/macro";
 import {
   Button,
   buttonVariants,
@@ -72,6 +74,7 @@ const HEADLINE_KEYS = new Set(["name", "shortname", "version", "description"]);
  * on, and the full modinfo key/value set.
  */
 export default function GameDetailPage() {
+  const { t } = useLingui();
   const { name } = useParams();
   const decoded = name ?? "";
   const playGame = usePlayGame();
@@ -194,8 +197,10 @@ export default function GameDetailPage() {
       />
     );
   if (!data || loading) return <DetailLoading backTo="/library/games" />;
-  if (!game) return <NotFound backTo="/library/games" label="game" />;
+  if (!game) return <NotFound backTo="/library/games" label={t`game`} />;
 
+  const checksum = gameInfo?.checksum;
+  const dependencyCount = game.dependencyArchives.length;
   const otherInfo = Object.entries(game.info).filter(
     ([k]) => !HEADLINE_KEYS.has(k),
   );
@@ -209,11 +214,16 @@ export default function GameDetailPage() {
   const gameDir = isSdd(game.primaryArchive)
     ? (compat.archivePath ?? game.primaryArchive.path ?? null)
     : null;
+  const archiveName = game.primaryArchive.name;
   const openConvert = () => {
     if (!selected?.enginePath || !selected?.rootPath || !models) return;
+    const legacyModels = plural(models, {
+      one: "# legacy model",
+      other: "# legacy models",
+    });
     drawer.open({
-      title: "Convert .3do models",
-      description: `Turn ${game.primaryArchive.name}'s ${models} legacy models into .s3o, one shared texture per folder.`,
+      title: t`Convert .3do models`,
+      description: t`Turn ${archiveName}'s ${legacyModels} into .s3o, one shared texture per folder.`,
       width: "44rem",
       content: (
         <Convert3doDrawer
@@ -247,8 +257,15 @@ export default function GameDetailPage() {
   // "Units · 30" rather than "Units · 30 units", which the sides heading can
   // say because its own noun is different.
   const sectionHeading = hasSides
-    ? `Sides${unitCount > 0 ? ` · ${unitCount} units` : ""}`
-    : `Units${unitCount > 0 ? ` · ${unitCount}` : ""}`;
+    ? unitCount > 0
+      ? plural(unitCount, {
+          one: "Sides · # unit",
+          other: "Sides · # units",
+        })
+      : t`Sides`
+    : unitCount > 0
+      ? t`Units · ${unitCount}`
+      : t`Units`;
 
   // Gated on "ready" (a genuine read, checksum and all) rather than just
   // `dataset` being non-null, or this reads true for a heartbeat while the
@@ -277,12 +294,26 @@ export default function GameDetailPage() {
         onValueChange={setTab}
       >
         <TabsList>
-          <TabsTrigger value="overview">Overview</TabsTrigger>
-          <TabsTrigger value="versions">Versions</TabsTrigger>
-          <TabsTrigger value="sources">Sources</TabsTrigger>
-          <TabsTrigger value="options">Options</TabsTrigger>
-          <TabsTrigger value="compat">Compatibility</TabsTrigger>
-          {advanced && <TabsTrigger value="advanced">Advanced</TabsTrigger>}
+          <TabsTrigger value="overview">
+            <Trans>Overview</Trans>
+          </TabsTrigger>
+          <TabsTrigger value="versions">
+            <Trans>Versions</Trans>
+          </TabsTrigger>
+          <TabsTrigger value="sources">
+            <Trans>Sources</Trans>
+          </TabsTrigger>
+          <TabsTrigger value="options">
+            <Trans>Options</Trans>
+          </TabsTrigger>
+          <TabsTrigger value="compat">
+            <Trans>Compatibility</Trans>
+          </TabsTrigger>
+          {advanced && (
+            <TabsTrigger value="advanced">
+              <Trans>Advanced</Trans>
+            </TabsTrigger>
+          )}
         </TabsList>
         <TabsContent value="versions">
           <GameVersionsTab
@@ -309,15 +340,15 @@ export default function GameDetailPage() {
               className="flex items-center gap-2 text-sm text-muted-foreground"
             >
               <Loader2 className="size-4 animate-spin" />
-              Reading this game&apos;s options…
+              <Trans>Reading this game's options…</Trans>
             </p>
           ) : !gameInfo ? (
             <p className="text-sm text-muted-foreground">
-              Could not read this game&apos;s options.
+              <Trans>Could not read this game's options.</Trans>
             </p>
           ) : gameInfo.options.length === 0 ? (
             <p className="text-sm text-muted-foreground">
-              This game has no options.
+              <Trans>This game has no options.</Trans>
             </p>
           ) : (
             <OptionCards options={gameInfo.options} />
@@ -345,7 +376,7 @@ export default function GameDetailPage() {
                       className="gap-1.5"
                       onClick={openConvert}
                     >
-                      <Boxes className="size-4" /> Convert models
+                      <Boxes className="size-4" /> <Trans>Convert models</Trans>
                     </Button>
                   ),
                 }}
@@ -357,13 +388,13 @@ export default function GameDetailPage() {
                 className="flex items-center gap-2 text-sm text-muted-foreground"
               >
                 <Loader2 className="size-4 animate-spin" />
-                {hasFindings ? "Still checking…" : "Checking this game…"}
+                {hasFindings ? t`Still checking…` : t`Checking this game…`}
               </p>
             ) : !hasFindings ? (
               <p className="text-sm text-muted-foreground">
                 {compat.read
-                  ? "Nothing found that would stop this game running on this engine."
-                  : "Could not read this game's files."}
+                  ? t`Nothing found that would stop this game running on this engine.`
+                  : t`Could not read this game's files.`}
               </p>
             ) : null}
           </section>
@@ -390,9 +421,11 @@ export default function GameDetailPage() {
           {generated && (
             <Alert>
               <AlertDescription className="max-w-prose">
-                {generated} It is not offered anywhere a game is picked, which
-                is why you will not find it in Singleplayer or in a
-                scenario&apos;s setup.
+                <Trans>
+                  {generated} It is not offered anywhere a game is picked, which
+                  is why you will not find it in Singleplayer or in a scenario's
+                  setup.
+                </Trans>
               </AlertDescription>
             </Alert>
           )}
@@ -402,8 +435,10 @@ export default function GameDetailPage() {
               {game.info.shortname && (
                 <span className="font-mono">{game.info.shortname}</span>
               )}
-              {gameInfo?.checksum && (
-                <span className="font-mono">checksum {gameInfo.checksum}</span>
+              {checksum && (
+                <span className="font-mono">
+                  <Trans>checksum {checksum}</Trans>
+                </span>
               )}
             </div>
             {game.info.description && (
@@ -422,7 +457,7 @@ export default function GameDetailPage() {
             <MissingDependencyBanner notes={missingDependencyNotes(game)} />
           )}
           {game.warnings?.length ? (
-            <WarningBanner warnings={game.warnings} noun="game" />
+            <WarningBanner warnings={game.warnings} noun={t`game`} />
           ) : null}
 
           {(gameInfoLoading ||
@@ -438,7 +473,7 @@ export default function GameDetailPage() {
                 link to either. */}
                 {datasetStatus === "error" ? (
                   <Button type="button" variant="outline" size="sm" disabled>
-                    All units
+                    <Trans>All units</Trans>
                   </Button>
                 ) : (
                   <Link
@@ -447,7 +482,7 @@ export default function GameDetailPage() {
                       buttonVariants({ variant: "outline", size: "sm" }),
                     )}
                   >
-                    All units
+                    <Trans>All units</Trans>
                   </Link>
                 )}
               </div>
@@ -456,7 +491,9 @@ export default function GameDetailPage() {
               failure, not the game shipping none. */}
               {datasetStatus === "error" && (
                 <Alert variant="destructive">
-                  <AlertTitle>Could not read this game&apos;s units</AlertTitle>
+                  <AlertTitle>
+                    <Trans>Could not read this game's units</Trans>
+                  </AlertTitle>
                   <AlertDescription>
                     <ul className="flex flex-col gap-1 font-mono text-xs">
                       {(dataset?.errors ?? []).map((e) => (
@@ -476,15 +513,17 @@ export default function GameDetailPage() {
               roster it lists never depended on a side resolving. */}
               {noSideReachesAnything && (
                 <p className="text-xs text-muted-foreground">
-                  None of this game&apos;s sides resolve to a start unit in its
-                  roster, so every build tree below is empty. All units still
-                  lists the full roster.
+                  <Trans>
+                    None of this game's sides resolve to a start unit in its
+                    roster, so every build tree below is empty. All units still
+                    lists the full roster.
+                  </Trans>
                 </p>
               )}
               {gameInfoLoading || !gameInfo || !selected ? (
                 <div className="flex h-12 items-center justify-center gap-2 rounded-lg border border-border/50 bg-card text-xs text-muted-foreground">
                   <Loader2 className="size-4 animate-spin" />
-                  Loading sides…
+                  <Trans>Loading sides…</Trans>
                 </div>
               ) : hasSides ? (
                 <FactionBuildList
@@ -512,7 +551,7 @@ export default function GameDetailPage() {
             <section className="rounded-lg border border-border/60 bg-card p-4">
               <h2 className="mb-1 flex items-center gap-2 text-sm font-medium">
                 <Trophy className="size-4 text-muted-foreground" />
-                Your record by faction
+                <Trans>Your record by faction</Trans>
               </h2>
               {statsIngesting && statRecords.length === 0 ? (
                 <Skeleton className="h-12 rounded bg-muted" />
@@ -531,12 +570,14 @@ export default function GameDetailPage() {
                       </span>
                       {f.games === 0 ? (
                         <span className="shrink-0 text-xs text-muted-foreground">
-                          No games recorded
+                          <Trans>No games recorded</Trans>
                         </span>
                       ) : f.decided === 0 ? (
                         <span className="shrink-0 text-xs text-muted-foreground">
-                          {f.games} game{f.games === 1 ? "" : "s"} · outcome
-                          unknown
+                          {plural(f.games, {
+                            one: "# game · outcome unknown",
+                            other: "# games · outcome unknown",
+                          })}
                         </span>
                       ) : (
                         <TallyBar games={f.games} wins={f.wins} />
@@ -552,7 +593,9 @@ export default function GameDetailPage() {
           <TabsContent value="advanced" className="flex flex-col gap-5">
             <section className="flex flex-col gap-2">
               <div className="flex items-center justify-between gap-2">
-                <h2 className="text-sm font-medium">Primary archive</h2>
+                <h2 className="text-sm font-medium">
+                  <Trans>Primary archive</Trans>
+                </h2>
                 <div className="flex items-center gap-2">
                   {game.primaryArchive.path && (
                     <Button
@@ -561,7 +604,8 @@ export default function GameDetailPage() {
                       className="gap-1.5"
                       onClick={() => openFolder(game.primaryArchive)}
                     >
-                      <FolderOpen className="size-4" /> Open folder
+                      <FolderOpen className="size-4" />{" "}
+                      <Trans>Open folder</Trans>
                     </Button>
                   )}
                   {game.primaryArchive.path &&
@@ -581,11 +625,11 @@ export default function GameDetailPage() {
 
             <section className="flex flex-col gap-2">
               <h2 className="text-sm font-medium">
-                Dependencies ({game.dependencyArchives.length})
+                <Trans>Dependencies ({dependencyCount})</Trans>
               </h2>
               {game.dependencyArchives.length === 0 ? (
                 <p className="text-sm text-muted-foreground">
-                  This game depends on no other archives.
+                  <Trans>This game depends on no other archives.</Trans>
                 </p>
               ) : (
                 <ul className="flex flex-col gap-2">
@@ -602,7 +646,9 @@ export default function GameDetailPage() {
 
             {otherInfo.length > 0 && (
               <section className="flex flex-col gap-2">
-                <h2 className="text-sm font-medium">Metadata</h2>
+                <h2 className="text-sm font-medium">
+                  <Trans>Metadata</Trans>
+                </h2>
                 <dl className="grid grid-cols-[minmax(8rem,auto)_1fr] gap-x-4 gap-y-1 rounded-lg border border-border/50 bg-card p-3 text-sm">
                   {otherInfo.map(([k, v]) => (
                     <div key={k} className="contents">

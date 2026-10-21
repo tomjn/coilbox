@@ -1,3 +1,5 @@
+import { i18n } from "@lingui/core";
+import { msg, plural, t } from "@lingui/core/macro";
 import {
   type AggregateFilters,
   type AggregateMatch,
@@ -73,23 +75,27 @@ export interface FilterSummary {
   includesShort: boolean;
 }
 
-const ANALYSED: Record<AggregateFilters["analysed"], string> = {
-  any: "analysed or not",
-  yes: "analysed",
-  no: "not analysed",
-};
+const ANALYSED = {
+  any: msg`analysed or not`,
+  yes: msg`analysed`,
+  no: msg`not analysed`,
+} as const;
 
 export function filterSummary(
   filters: AggregateFilters,
   replaySet: string,
 ): FilterSummary {
+  const playerCount = filters.playerCount;
   return {
     players:
-      filters.playerCount === null
-        ? "any number of players"
-        : `${filters.playerCount} players`,
-    sides: filters.format === null ? "any sides" : FORMAT_LABEL[filters.format],
-    analysed: ANALYSED[filters.analysed],
+      playerCount === null
+        ? t`any number of players`
+        : plural(playerCount, { one: "# player", other: "# players" }),
+    sides:
+      filters.format === null
+        ? t`any sides`
+        : i18n._(FORMAT_LABEL[filters.format]),
+    analysed: i18n._(ANALYSED[filters.analysed]),
     playedFrom: filters.from,
     playedUntil: filters.to,
     replaySet,
@@ -321,12 +327,21 @@ export function startsCsv(input: StartsCsvInput): string {
   return [head.join(","), ...lines].join(EOL) + EOL;
 }
 
+/** The layer's part of a file name. A file name is not translated. */
+const LAYER_FILE_PART: Record<HeatLayerId, string> = {
+  buildings: "building-density",
+  defence: "defences",
+  economy: "economy",
+  orders: "order-density",
+  deaths: "deaths",
+};
+
 /** A name from the map and the layer, slugged as the match CSV's is. */
 export function layerCsvFileName(
   info: MapExportInfo,
   layer: HeatLayerId,
 ): string {
-  const parts = [slug(info.mapName), slug(LAYER_LABEL[layer])].filter(Boolean);
+  const parts = [slug(info.mapName), LAYER_FILE_PART[layer]].filter(Boolean);
   return `${parts.length > 0 ? parts.join("-") : "map-density"}.csv`;
 }
 
@@ -343,7 +358,7 @@ export function layerImageFileName(
 ): string {
   const parts = [
     slug(info.mapName),
-    layer ? slug(LAYER_LABEL[layer]) : "",
+    layer ? LAYER_FILE_PART[layer] : "",
   ].filter(Boolean);
   return `${parts.length > 0 ? parts.join("-") : "map-density"}.png`;
 }

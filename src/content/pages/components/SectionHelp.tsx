@@ -1,3 +1,4 @@
+import { Trans, useLingui } from "@lingui/react/macro";
 import { Button } from "@picoframe/frame";
 import { openUrl } from "@tauri-apps/plugin-opener";
 import { CircleHelp } from "lucide-react";
@@ -39,6 +40,8 @@ export function SectionHelp({
   detail?: string;
   children?: ReactNode;
 }) {
+  const { t } = useLingui();
+  const aboutSection = t`About ${section}`;
   return (
     <Popover>
       <PopoverTrigger asChild>
@@ -46,14 +49,14 @@ export function SectionHelp({
           variant="ghost"
           size="icon"
           className="size-6 shrink-0 text-muted-foreground"
-          aria-label={`About ${section}`}
+          aria-label={aboutSection}
         >
           <CircleHelp className="size-3.5" />
         </Button>
       </PopoverTrigger>
       <PopoverContent
         align="start"
-        aria-label={`About ${section}`}
+        aria-label={aboutSection}
         className="flex max-h-[70vh] w-96 max-w-[calc(100vw-2rem)] flex-col gap-2 overflow-y-auto p-3 text-xs"
       >
         {source && (
@@ -68,7 +71,7 @@ export function SectionHelp({
           className="w-fit rounded-sm underline hover:no-underline focus-visible:ring-1 focus-visible:ring-ring"
           onClick={() => openUrl(REPLAY_SOURCES_DOC_URL).catch(() => {})}
         >
-          Where these numbers come from
+          <Trans>Where these numbers come from</Trans>
         </button>
       </PopoverContent>
     </Popover>

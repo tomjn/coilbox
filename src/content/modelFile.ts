@@ -1,3 +1,4 @@
+import { t } from "@lingui/core/macro";
 import type { UnitModelResult } from "@/content/bindings";
 import { unitModelTextureUrl } from "@/lib/assetUrl";
 
@@ -10,6 +11,9 @@ import { unitModelTextureUrl } from "@/lib/assetUrl";
  */
 export async function readCachedModel(file: string): Promise<UnitModelResult> {
   const res = await fetch(unitModelTextureUrl(file));
-  if (!res.ok) throw new Error(`could not read model ${file}: ${res.status}`);
+  if (!res.ok) {
+    const status = res.status;
+    throw new Error(t`could not read model ${file}: ${status}`);
+  }
   return (await res.json()) as UnitModelResult;
 }

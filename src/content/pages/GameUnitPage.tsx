@@ -1,8 +1,9 @@
+import { plural } from "@lingui/core/macro";
+import { Trans, useLingui } from "@lingui/react/macro";
 import { buttonVariants, cn } from "@picoframe/frame";
 import { ArrowDown, ArrowLeft, CheckCircle2 } from "lucide-react";
 import { Link, useParams } from "react-router";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { formatNumber } from "@/lib/format";
 import { useModProjects } from "@/workshop/project";
 import { unitEditPath } from "@/workshop/routes";
 import {
@@ -37,6 +38,7 @@ import { useUnitRenders } from "./components/useUnitRenders";
  */
 export default function GameUnitPage() {
   const { name, unit: unitParam } = useParams();
+  const { t } = useLingui();
   const decoded = name ?? "";
   const id = unitParam ? unitParam.toLowerCase() : "";
 
@@ -217,10 +219,12 @@ export default function GameUnitPage() {
           to={unitsBackTo}
           className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:underline"
         >
-          {game.name} units
+          <Trans>{game.name} units</Trans>
         </Link>
         <Alert variant="destructive">
-          <AlertTitle>Could not read this game&apos;s units</AlertTitle>
+          <AlertTitle>
+            <Trans>Could not read this game's units</Trans>
+          </AlertTitle>
           <AlertDescription>
             <ul className="flex flex-col gap-1 font-mono text-xs">
               {(dataset?.errors ?? []).map((e) => (
@@ -253,11 +257,11 @@ export default function GameUnitPage() {
           to={unitsBackTo}
           className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:underline"
         >
-          <ArrowLeft className="size-3.5" /> Back
+          <ArrowLeft className="size-3.5" /> <Trans>Back</Trans>
         </Link>
         <div className="flex flex-col items-center gap-2 rounded-lg border border-dashed p-10 text-center">
           <p className="text-sm text-muted-foreground">
-            That unit is not in this game.
+            <Trans>That unit is not in this game.</Trans>
           </p>
         </div>
       </div>
@@ -334,12 +338,25 @@ export default function GameUnitPage() {
   // bound the def leaves at the sentinel says nothing, so it is dropped
   // rather than spelled out as "any": a unit declaring only a maximum reads
   // as "600 deep", not "any to 600 elmos".
+  const minDepth = unit.minWaterDepth;
+  const maxDepth = unit.maxWaterDepth;
   const waterDepthText =
     hasMinWaterLimit && hasMaxWaterLimit
-      ? `${unit.minWaterDepth} to ${unit.maxWaterDepth} deep`
+      ? t`${minDepth} to ${maxDepth} deep`
       : hasMaxWaterLimit
-        ? `${unit.maxWaterDepth} deep`
-        : `${unit.minWaterDepth} deep`;
+        ? t`${maxDepth} deep`
+        : t`${minDepth} deep`;
+  const triangleCount = model?.root ? countTriangles(model.root) : 0;
+  const pieceCount = model?.root ? countPieces(model.root) : 0;
+  const trianglesText = plural(triangleCount, {
+    one: "# triangle",
+    other: "# triangles",
+  });
+  const piecesText = plural(pieceCount, { one: "# piece", other: "# pieces" });
+  const unitName = unitLabel(unit, id);
+  const footprintX = unit.footprintX;
+  const footprintZ = unit.footprintZ;
+  const maxSlope = unit.maxSlope;
 
   return (
     <div className="flex flex-col gap-4 p-4">
@@ -347,7 +364,7 @@ export default function GameUnitPage() {
         to={unitsBackTo}
         className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:underline"
       >
-        <ArrowLeft className="size-3.5" /> Back
+        <ArrowLeft className="size-3.5" /> <Trans>Back</Trans>
       </Link>
 
       <UnitHero
@@ -372,7 +389,7 @@ export default function GameUnitPage() {
             <span aria-hidden className="size-16 shrink-0 rounded bg-muted" />
           )}
           <div>
-            <h1 className="text-xl font-semibold">{unitLabel(unit, id)}</h1>
+            <h1 className="text-xl font-semibold">{unitName}</h1>
             <p className="font-mono text-xs text-muted-foreground">{id}</p>
             {faction && (
               <p className="text-xs text-muted-foreground">{faction}</p>
@@ -391,7 +408,7 @@ export default function GameUnitPage() {
             "shrink-0",
           )}
         >
-          Edit in Unit tweaks
+          <Trans>Edit in Unit tweaks</Trans>
         </Link>
       </div>
 
@@ -401,7 +418,9 @@ export default function GameUnitPage() {
 
       {builds.length > 0 && (
         <section className="flex flex-col gap-2">
-          <h2 className="text-sm font-medium">What it builds</h2>
+          <h2 className="text-sm font-medium">
+            <Trans>What it builds</Trans>
+          </h2>
           <ul className="flex flex-wrap gap-3">
             {builds.map((targetId) => (
               <li key={targetId}>
@@ -418,7 +437,9 @@ export default function GameUnitPage() {
 
       {builtBy.length > 0 && (
         <section className="flex flex-col gap-2">
-          <h2 className="text-sm font-medium">What builds it</h2>
+          <h2 className="text-sm font-medium">
+            <Trans>What builds it</Trans>
+          </h2>
           <ul className="flex flex-wrap gap-3">
             {builtBy.map((builderId) => (
               <li key={builderId}>
@@ -435,7 +456,9 @@ export default function GameUnitPage() {
 
       {upgradesInto.length > 0 && (
         <section className="flex flex-col gap-2">
-          <h2 className="text-sm font-medium">Upgrades into</h2>
+          <h2 className="text-sm font-medium">
+            <Trans>Upgrades into</Trans>
+          </h2>
           <ul className="flex flex-wrap gap-3">
             {upgradesInto.map((targetId) => (
               <li key={targetId}>
@@ -452,7 +475,9 @@ export default function GameUnitPage() {
 
       {upgradesFrom.length > 0 && (
         <section className="flex flex-col gap-2">
-          <h2 className="text-sm font-medium">Can be upgraded from</h2>
+          <h2 className="text-sm font-medium">
+            <Trans>Can be upgraded from</Trans>
+          </h2>
           <ul className="flex flex-wrap gap-3">
             {upgradesFrom.map((sourceId) => (
               <li key={sourceId}>
@@ -481,7 +506,9 @@ export default function GameUnitPage() {
           collide. */}
       {stageChain.length > 1 && (
         <section className="flex flex-col gap-2">
-          <h2 className="text-sm font-medium">Upgrade path</h2>
+          <h2 className="text-sm font-medium">
+            <Trans>Upgrade path</Trans>
+          </h2>
           <ol className="flex flex-col gap-1.5">
             {stageChain.map((stageId, i) => {
               const conditions =
@@ -521,31 +548,43 @@ export default function GameUnitPage() {
 
       {isStationary && (
         <section className="flex flex-col gap-2">
-          <h2 className="text-sm font-medium">Where it can be built</h2>
+          <h2 className="text-sm font-medium">
+            <Trans>Where it can be built</Trans>
+          </h2>
           <dl className="grid grid-cols-[minmax(8rem,auto)_1fr] gap-x-4 gap-y-1 rounded-lg border border-border/50 bg-card p-3 text-sm">
             {unit.footprintX !== undefined && unit.footprintZ !== undefined && (
               <div className="contents">
-                <dt className="text-muted-foreground">Footprint</dt>
+                <dt className="text-muted-foreground">
+                  <Trans>Footprint</Trans>
+                </dt>
                 <dd>
-                  {unit.footprintX} by {unit.footprintZ} squares
+                  <Trans>
+                    {footprintX} by {footprintZ} squares
+                  </Trans>
                 </dd>
               </div>
             )}
             {unit.maxSlope !== undefined && (
               <div className="contents">
-                <dt className="text-muted-foreground">Maximum slope</dt>
-                <dd>{unit.maxSlope}°</dd>
+                <dt className="text-muted-foreground">
+                  <Trans>Maximum slope</Trans>
+                </dt>
+                <dd>{maxSlope}°</dd>
               </div>
             )}
             {unit.floatOnWater !== undefined && (
               <div className="contents">
-                <dt className="text-muted-foreground">Floats</dt>
-                <dd>{unit.floatOnWater ? "Yes" : "No"}</dd>
+                <dt className="text-muted-foreground">
+                  <Trans>Floats</Trans>
+                </dt>
+                <dd>{unit.floatOnWater ? t`Yes` : t`No`}</dd>
               </div>
             )}
             {hasWaterLimit && (
               <div className="contents">
-                <dt className="text-muted-foreground">Water depth</dt>
+                <dt className="text-muted-foreground">
+                  <Trans>Water depth</Trans>
+                </dt>
                 <dd>{waterDepthText}</dd>
               </div>
             )}
@@ -559,29 +598,38 @@ export default function GameUnitPage() {
       {model?.root && object && (
         <section className="flex flex-col gap-2">
           <h2 className="text-sm font-medium text-muted-foreground">
-            Model file
+            <Trans>Model file</Trans>
           </h2>
           <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1.5 rounded-lg border border-border/50 bg-card px-3 py-2 text-xs">
-            <dt className="text-muted-foreground">Model</dt>
+            <dt className="text-muted-foreground">
+              <Trans>Model</Trans>
+            </dt>
             <dd className="break-all font-mono">{model.path}</dd>
 
-            <dt className="text-muted-foreground">Format</dt>
+            <dt className="text-muted-foreground">
+              <Trans>Format</Trans>
+            </dt>
             <dd>{modelFormatLabel(model.format)}</dd>
 
-            <dt className="text-muted-foreground">Size</dt>
+            <dt className="text-muted-foreground">
+              <Trans>Size</Trans>
+            </dt>
             <dd>
-              {formatNumber(countTriangles(model.root))} triangles in{" "}
-              {formatNumber(countPieces(model.root))} pieces
+              <Trans>
+                {trianglesText} in {piecesText}
+              </Trans>
             </dd>
 
-            <dt className="text-muted-foreground">Textures</dt>
+            <dt className="text-muted-foreground">
+              <Trans>Textures</Trans>
+            </dt>
             <dd className="break-all font-mono">
               {model.textures.length === 0
-                ? "none"
+                ? t`none`
                 : model.textures
-                    .filter((t) => !t.teamColour)
-                    .map((t) => t.name)
-                    .join(", ") || "none"}
+                    .filter((tex) => !tex.teamColour)
+                    .map((tex) => tex.name)
+                    .join(", ") || t`none`}
             </dd>
           </dl>
         </section>
@@ -632,7 +680,7 @@ function UpgradeStageRow({
       </div>
       {current && (
         <StatusBadge tone="info" className="shrink-0">
-          <CheckCircle2 /> Current
+          <CheckCircle2 /> <Trans>Current</Trans>
         </StatusBadge>
       )}
     </>

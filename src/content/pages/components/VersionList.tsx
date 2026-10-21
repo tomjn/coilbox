@@ -1,3 +1,4 @@
+import { Trans, useLingui } from "@lingui/react/macro";
 import { CheckField } from "@/components/Field";
 import { formatNumber } from "@/lib/format";
 import { matchCount } from "../../mapAggregate";
@@ -29,6 +30,7 @@ export function VersionList({
   items: readonly VersionItem[];
   onToggle: (name: string, included: boolean) => void;
 }) {
+  const { t } = useLingui();
   return (
     <fieldset
       className="m-0 flex min-w-0 flex-col gap-1.5 border-0 p-0"
@@ -36,15 +38,19 @@ export function VersionList({
     >
       <legend className="mb-1.5 p-0 text-xs font-medium">{label}</legend>
       <div className="flex flex-wrap gap-x-5 gap-y-2">
-        {items.map((v) => (
-          <CheckField
-            key={v.name}
-            label={v.name}
-            hint={`${matchCount(v.matches)}${v.note ? `, ${v.note}` : ""}`}
-            checked={v.included}
-            onChange={(on) => onToggle(v.name, on)}
-          />
-        ))}
+        {items.map((v) => {
+          const matches = matchCount(v.matches);
+          const note = v.note;
+          return (
+            <CheckField
+              key={v.name}
+              label={v.name}
+              hint={note ? t`${matches}, ${note}` : matches}
+              checked={v.included}
+              onChange={(on) => onToggle(v.name, on)}
+            />
+          );
+        })}
       </div>
     </fieldset>
   );
@@ -59,9 +65,10 @@ export function VersionSpan({
   testId: string;
 }) {
   if (versions < 2) return null;
+  const count = formatNumber(versions);
   return (
     <p className="text-xs font-medium" data-testid={testId}>
-      Across {formatNumber(versions)} versions of this map
+      <Trans>Across {count} versions of this map</Trans>
     </p>
   );
 }

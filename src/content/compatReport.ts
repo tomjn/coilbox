@@ -1,3 +1,4 @@
+import { t } from "@lingui/core/macro";
 import catalogueFile from "@/data/engineLuaCompat.json";
 import type { LuaCompatResult } from "./bindings";
 
@@ -73,7 +74,7 @@ export function buildReport(inputs: CompatReportInputs): Finding[] {
   if (models > 0)
     out.push({
       kind: "models-3do",
-      label: ".3do models",
+      label: t`.3do models`,
       severity: "problem",
       count: models,
     });
@@ -82,7 +83,7 @@ export function buildReport(inputs: CompatReportInputs): Finding[] {
   if (defs > 0)
     out.push({
       kind: "defs-fbi",
-      label: ".fbi or .tdf unit definitions",
+      label: t`.fbi or .tdf unit definitions`,
       severity: "problem",
       count: defs,
     });
@@ -101,14 +102,14 @@ export function buildReport(inputs: CompatReportInputs): Finding[] {
   if (!hasWidgets)
     out.push({
       kind: "no-widgets",
-      label: hasLuaui ? "No luaui/widgets folder" : "No luaui folder",
+      label: hasLuaui ? t`No luaui/widgets folder` : t`No luaui folder`,
       severity: "problem",
     });
 
   if (has("modinfo.tdf") && !has("modinfo.lua"))
     out.push({
       kind: "modinfo-tdf",
-      label: "modinfo.tdf instead of modinfo.lua",
+      label: t`modinfo.tdf instead of modinfo.lua`,
       severity: "problem",
     });
 
@@ -128,10 +129,10 @@ export function buildReport(inputs: CompatReportInputs): Finding[] {
   if (unresolved.length > 0)
     out.push({
       kind: "lua-unresolved",
-      label: "Dependencies not scanned for Lua",
+      label: t`Dependencies not scanned for Lua`,
       severity: "info",
       count: unresolved.length,
-      details: [{ heading: "Not installed", lines: unresolved }],
+      details: [{ heading: t`Not installed`, lines: unresolved }],
     });
 
   const errors = readErrorsFinding([
@@ -227,7 +228,7 @@ function gadgetFinding(
   if (details.length === 0) return null;
   return {
     kind: "compat-gadgets",
-    label: "Compatibility gadgets a build turns on",
+    label: t`Compatibility gadgets a build turns on`,
     severity: "info",
     count: details.length,
     details,
@@ -240,10 +241,10 @@ export function readErrorsFinding(errors: string[]): Finding | null {
   if (errors.length === 0) return null;
   return {
     kind: "read-errors",
-    label: "Could not check everything",
+    label: t`Could not check everything`,
     severity: "info",
     count: errors.length,
-    details: [{ heading: "Errors", lines: errors }],
+    details: [{ heading: t`Errors`, lines: errors }],
   };
 }
 
@@ -267,23 +268,29 @@ export function engineVersion(since: string): string {
 
 /** What changed about one entry, in a few words. */
 function changeOf(entry: CompatEntry | undefined): string {
-  if (!entry) return "changed";
-  const since = entry.since ? ` in ${engineVersion(entry.since)}` : "";
+  if (!entry) return t`changed`;
+  const version = entry.since ? engineVersion(entry.since) : null;
+  const replacement = entry.replacement;
   switch (entry.kind) {
     case "renamed":
-      return entry.replacement
-        ? `renamed to ${entry.replacement}${since}`
-        : `renamed${since}`;
+      if (replacement && version)
+        return t`renamed to ${replacement} in ${version}`;
+      if (replacement) return t`renamed to ${replacement}`;
+      return version ? t`renamed in ${version}` : t`renamed`;
     case "signature":
-      return `arguments changed${since}`;
+      return version
+        ? t`arguments changed in ${version}`
+        : t`arguments changed`;
     case "defTag":
-      return entry.replacement
-        ? `replaced by ${entry.replacement}${since}`
-        : `changed${since}`;
+      if (replacement && version)
+        return t`replaced by ${replacement} in ${version}`;
+      if (replacement) return t`replaced by ${replacement}`;
+      return version ? t`changed in ${version}` : t`changed`;
     default:
-      return entry.replacement
-        ? `replaced by ${entry.replacement}${since}`
-        : `removed${since}`;
+      if (replacement && version)
+        return t`replaced by ${replacement} in ${version}`;
+      if (replacement) return t`replaced by ${replacement}`;
+      return version ? t`removed in ${version}` : t`removed`;
   }
 }
 
@@ -341,13 +348,13 @@ function luaFindings(
     build(
       (id) => !isSignature(id),
       "lua-api",
-      "Lua calls to removed or changed APIs",
+      t`Lua calls to removed or changed APIs`,
       "problem",
     ),
     build(
       isSignature,
       "lua-signature",
-      "Lua calls to functions whose behaviour changed",
+      t`Lua calls to functions whose behaviour changed`,
       "info",
     ),
   ].filter((f): f is Finding => f !== null);
@@ -393,15 +400,18 @@ function defTagFinding(
       .map(([name]) => name)
       .sort();
     if (users.length === 0) continue;
+    const tag = entry.name;
+    const change = changeOf(entry);
+    const userCount = users.length;
     details.push({
-      heading: `${entry.name}, ${changeOf(entry)} (${users.length})`,
+      heading: t`${tag}, ${change} (${userCount})`,
       lines: users,
     });
   }
   if (details.length === 0) return null;
   return {
     kind: "def-tags",
-    label: "Removed def tags in use",
+    label: t`Removed def tags in use`,
     severity: "problem",
     count: details.length,
     details,

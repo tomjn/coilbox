@@ -1,3 +1,5 @@
+import { msg } from "@lingui/core/macro";
+import { Trans, useLingui } from "@lingui/react/macro";
 import { cn } from "@picoframe/frame";
 import { Badge } from "@/components/ui/badge";
 import type { ArchiveKind } from "../../config";
@@ -8,14 +10,15 @@ const STYLES: Record<ArchiveKind, string> = {
   other: "bg-muted text-muted-foreground",
 };
 
-const LABELS: Record<ArchiveKind, string> = {
-  game: "Game",
-  map: "Map",
-  other: "Other",
-};
+const LABELS = {
+  game: msg`Game`,
+  map: msg`Map`,
+  other: msg`Other`,
+} as const;
 
 /** A small chip marking an archive's type (map / game / other). */
 export function ArchiveTypeBadge({ kind }: { kind: ArchiveKind }) {
+  const { t } = useLingui();
   return (
     <Badge
       variant="ghost"
@@ -24,20 +27,21 @@ export function ArchiveTypeBadge({ kind }: { kind: ArchiveKind }) {
         STYLES[kind],
       )}
     >
-      {LABELS[kind]}
+      {t(LABELS[kind])}
     </Badge>
   );
 }
 
 /** A chip marking a game's primary (own) archive. */
 export function PrimaryBadge() {
+  const { t } = useLingui();
   return (
     <Badge
       variant="ghost"
       className="shrink-0 rounded bg-sky-500/15 px-1.5 py-0.5 font-mono text-[0.625rem] font-medium uppercase tracking-wide text-sky-700 dark:text-sky-400"
-      title="This is a game's primary archive"
+      title={t`This is a game's primary archive`}
     >
-      Primary
+      <Trans>Primary</Trans>
     </Badge>
   );
 }

@@ -1,3 +1,4 @@
+import { Plural, Trans, useLingui } from "@lingui/react/macro";
 import { Button } from "@picoframe/frame";
 import { Channel } from "@tauri-apps/api/core";
 import { open } from "@tauri-apps/plugin-dialog";
@@ -62,6 +63,7 @@ export function Convert3doDrawer({
    */
   gameDir?: string | null;
 }) {
+  const { t } = useLingui();
   const [outDir, setOutDir] = useState<string | null>(null);
   const [progress, setProgress] = useState<Convert3doProgress | null>(null);
   const [result, setResult] = useState<Convert3doResult | null>(null);
@@ -73,7 +75,7 @@ export function Convert3doDrawer({
     const picked = await open({
       directory: true,
       multiple: false,
-      title: "Choose a folder for the converted models",
+      title: t`Choose a folder for the converted models`,
     });
     if (typeof picked === "string") setOutDir(picked);
   };
@@ -115,17 +117,34 @@ export function Convert3doDrawer({
   const percent =
     progress && progress.total > 0 ? (done / progress.total) * 100 : 0;
 
+  let progressText: string;
+  if (!progress) progressText = t`Reading the archive`;
+  else if (progress.phase === "atlas") {
+    const folder = progress.folder;
+    progressText = t`Building the sheet for ${folder}`;
+  } else {
+    const total = progress.total;
+    const member = progress.member;
+    progressText = member
+      ? t`${done} of ${total}: ${member}`
+      : t`${done} of ${total}`;
+  }
+
   return (
     <div className="flex flex-col gap-4 text-sm">
       <p className="text-muted-foreground">
-        Every <code>.3do</code> under <code>objects3d/</code> becomes an{" "}
-        <code>.s3o</code>. Each folder's models share one texture, so the engine
-        binds one sheet for a faction rather than one per unit. This archive has{" "}
-        {models} of them.
+        <Trans>
+          Every <code>.3do</code> under <code>objects3d/</code> becomes an{" "}
+          <code>.s3o</code>. Each folder's models share one texture, so the
+          engine binds one sheet for a faction rather than one per unit. This
+          archive has {models} of them.
+        </Trans>
       </p>
 
       <div className="flex flex-col gap-1">
-        <span className="font-medium">Output folder</span>
+        <span className="font-medium">
+          <Trans>Output folder</Trans>
+        </span>
         <div className="flex items-center gap-2">
           <Button
             type="button"
@@ -134,10 +153,10 @@ export function Convert3doDrawer({
             disabled={running}
             onClick={chooseFolder}
           >
-            <FolderOpen className="size-4" /> Choose folder
+            <FolderOpen className="size-4" /> <Trans>Choose folder</Trans>
           </Button>
           <span className="min-w-0 flex-1 truncate font-mono text-xs text-muted-foreground">
-            {outDir ?? "nothing picked yet"}
+            {outDir ?? t`nothing picked yet`}
           </span>
         </div>
       </div>
@@ -150,7 +169,7 @@ export function Convert3doDrawer({
             className="h-9"
             onClick={cancel}
           >
-            Cancel
+            <Trans>Cancel</Trans>
           </Button>
         )}
         <Button
@@ -159,28 +178,28 @@ export function Convert3doDrawer({
           disabled={!outDir || running}
           onClick={convert}
         >
-          {running ? "Converting..." : "Convert models"}
+          {running ? t`Converting...` : t`Convert models`}
         </Button>
       </div>
 
       {running && (
         <div className="flex flex-col gap-1">
           <Progress value={percent} />
-          <p className="text-xs text-muted-foreground">
-            {progress?.phase === "atlas"
-              ? `Building the sheet for ${progress.folder}`
-              : progress
-                ? `${done} of ${progress.total}${progress.member ? `: ${progress.member}` : ""}`
-                : "Reading the archive"}
-          </p>
+          <p className="text-xs text-muted-foreground">{progressText}</p>
         </div>
       )}
 
       {error && (
         <p className="rounded-md border border-destructive/40 bg-destructive/10 p-2 text-xs">
           {error}
-          {error.includes("cancelled") &&
-            " Whatever had already been written is still in the output folder."}
+          {error.includes("cancelled") && (
+            <>
+              {" "}
+              <Trans>
+                Whatever had already been written is still in the output folder.
+              </Trans>
+            </>
+          )}
         </p>
       )}
 
@@ -214,14 +233,24 @@ function Report({
   dataDir: string;
   archive: string;
 }) {
+  const { t } = useLingui();
   const unreadable = Object.entries(result.unreadable);
+  const modelsWritten = result.modelsWritten;
+  const modelsFound = result.modelsFound;
+  const unreadableCount = unreadable.length;
   return (
     <div className="flex flex-col gap-3 border-t border-border/50 pt-3">
       <div className="flex items-center justify-between gap-2">
         <p>
-          Wrote {result.modelsWritten} of {result.modelsFound} models into{" "}
-          {result.groups.length}{" "}
-          {result.groups.length === 1 ? "sheet" : "sheets"}.
+          <Trans>
+            Wrote {modelsWritten} of {modelsFound} models into{" "}
+            <Plural
+              value={result.groups.length}
+              one="# sheet"
+              other="# sheets"
+            />
+            .
+          </Trans>
         </p>
         <Button
           type="button"
@@ -233,24 +262,28 @@ function Report({
             contentOpenPath({ path: result.outDir }).catch(() => {});
           }}
         >
-          <FolderOpen className="size-4" /> Open folder
+          <FolderOpen className="size-4" /> <Trans>Open folder</Trans>
         </Button>
       </div>
 
       <p className="text-xs text-muted-foreground">
-        No model has a second texture. A <code>.3do</code> carries no glow, no
-        shine and no cut-out mask, so there is nothing to put there and coilbox
-        leaves it empty rather than writing a stand-in that would fix all three
-        at one value for every unit.
+        <Trans>
+          No model has a second texture. A <code>.3do</code> carries no glow, no
+          shine and no cut-out mask, so there is nothing to put there and
+          coilbox leaves it empty rather than writing a stand-in that would fix
+          all three at one value for every unit.
+        </Trans>
       </p>
 
       <p className="text-xs text-muted-foreground">
-        Copying the output over the game is not enough on its own: the engine
-        tries <code>.3do</code> before <code>.s3o</code> for a unit whose{" "}
-        <code>objectname</code> has no extension, so it keeps loading the old
-        models while both are there. The original <code>.3do</code> files have
-        to go, and any unit definition that spells <code>.3do</code> in its{" "}
-        <code>objectname</code> has to lose it too.
+        <Trans>
+          Copying the output over the game is not enough on its own: the engine
+          tries <code>.3do</code> before <code>.s3o</code> for a unit whose{" "}
+          <code>objectname</code> has no extension, so it keeps loading the old
+          models while both are there. The original <code>.3do</code> files have
+          to go, and any unit definition that spells <code>.3do</code> in its{" "}
+          <code>objectname</code> has to lose it too.
+        </Trans>
       </p>
 
       <InstallPanel
@@ -270,7 +303,7 @@ function Report({
       )}
 
       {unreadable.length > 0 && (
-        <Section title={`Could not be read at all (${unreadable.length})`}>
+        <Section title={t`Could not be read at all (${unreadableCount})`}>
           {unreadable.map(([member, why]) => (
             <li key={member}>
               <span className="font-mono">{member}</span>: {why}
@@ -313,6 +346,7 @@ function InstallPanel({
   dataDir: string;
   archive: string;
 }) {
+  const { t } = useLingui();
   const [backups, setBackups] = useState<number | null>(null);
   const [busy, setBusy] = useState(false);
   const [confirmOpen, setConfirmOpen] = useState(false);
@@ -344,7 +378,7 @@ function InstallPanel({
       );
       if (status) setBackups(status.backups);
       void notify({
-        title: `Installed the conversion into ${archive}.`,
+        title: t`Installed the conversion into ${archive}.`,
         level: "success",
       });
     } catch (e) {
@@ -365,7 +399,7 @@ function InstallPanel({
       setBackups(0);
       refreshTree();
       void notify({
-        title: `Restored ${archive}'s original models and unit definitions.`,
+        title: t`Restored ${archive}'s original models and unit definitions.`,
         level: "success",
       });
     } catch (e) {
@@ -375,14 +409,19 @@ function InstallPanel({
     }
   };
 
+  const missingNames = outcome?.missingOriginal.join(", ") ?? "";
+
   if (!gameDir) {
     return (
       <p className="rounded-md border border-border/50 bg-muted/40 p-2 text-xs text-muted-foreground">
-        {archive} is a packed archive, so coilbox cannot install into it
-        directly. Copy the output folder over the game yourself, remove the
-        original <code>.3do</code> files, and fix any unit definition that
-        spells <code>.3do</code> in its <code>objectname</code>. Or extract the
-        game to a <code>.sdd</code> copy first and run this again from there.
+        <Trans>
+          {archive} is a packed archive, so coilbox cannot install into it
+          directly. Copy the output folder over the game yourself, remove the
+          original <code>.3do</code> files, and fix any unit definition that
+          spells <code>.3do</code> in its <code>objectname</code>. Or extract
+          the game to a <code>.sdd</code> copy first and run this again from
+          there.
+        </Trans>
       </p>
     );
   }
@@ -391,10 +430,12 @@ function InstallPanel({
     <div className="flex flex-col gap-2 rounded-md border border-border/50 p-2">
       <div className="flex items-center justify-between gap-2">
         <p className="text-xs text-muted-foreground">
-          Install writes the converted files into {archive}, moves each original{" "}
-          <code>.3do</code> aside rather than deleting it, and fixes any unit
-          definition that names one. Reversible with Undo, for as long as the
-          moved-aside originals are still there.
+          <Trans>
+            Install writes the converted files into {archive}, moves each
+            original <code>.3do</code> aside rather than deleting it, and fixes
+            any unit definition that names one. Reversible with Undo, for as
+            long as the moved-aside originals are still there.
+          </Trans>
         </p>
         <div className="flex shrink-0 gap-2">
           {!!backups && (
@@ -411,7 +452,7 @@ function InstallPanel({
               ) : (
                 <Undo2 className="size-4" />
               )}
-              Undo
+              <Trans>Undo</Trans>
             </Button>
           )}
           <Popover open={confirmOpen} onOpenChange={setConfirmOpen}>
@@ -423,19 +464,21 @@ function InstallPanel({
                 disabled={busy}
               >
                 {busy ? <Loader2 className="size-4 animate-spin" /> : null}
-                Install into game
+                <Trans>Install into game</Trans>
               </Button>
             </PopoverTrigger>
             <PopoverContent align="end" className="flex w-80 flex-col gap-3">
               <div className="flex flex-col gap-1">
                 <h3 className="text-sm font-medium">
-                  Install this conversion?
+                  <Trans>Install this conversion?</Trans>
                 </h3>
                 <p className="break-words text-xs text-muted-foreground">
-                  This copies the converted models and textures into {archive},
-                  and moves every original <code>.3do</code> they replace aside
-                  so the conversion actually takes effect. It does not delete
-                  anything, and Undo puts it all back.
+                  <Trans>
+                    This copies the converted models and textures into {archive}
+                    , and moves every original <code>.3do</code> they replace
+                    aside so the conversion actually takes effect. It does not
+                    delete anything, and Undo puts it all back.
+                  </Trans>
                 </p>
               </div>
               <div className="flex justify-end gap-2">
@@ -446,7 +489,7 @@ function InstallPanel({
                   onClick={() => setConfirmOpen(false)}
                   disabled={busy}
                 >
-                  Cancel
+                  <Trans>Cancel</Trans>
                 </Button>
                 <Button
                   type="button"
@@ -454,7 +497,7 @@ function InstallPanel({
                   onClick={install}
                   disabled={busy}
                 >
-                  Install
+                  <Trans>Install</Trans>
                 </Button>
               </div>
             </PopoverContent>
@@ -466,25 +509,62 @@ function InstallPanel({
 
       {outcome && (
         <p className="text-xs text-muted-foreground">
-          Moved {outcome.originalsMovedAside.length} original{" "}
-          {outcome.originalsMovedAside.length === 1 ? "model" : "models"} aside
-          {outcome.unitDefsPatched.length > 0
-            ? ` and fixed ${outcome.unitDefsPatched.length} unit ${outcome.unitDefsPatched.length === 1 ? "definition" : "definitions"} that named a .3do extension`
-            : ""}
-          .
-          {outcome.alreadyInstalled.length > 0
-            ? ` ${outcome.alreadyInstalled.length} ${outcome.alreadyInstalled.length === 1 ? "model was" : "models were"} already installed.`
-            : ""}
-          {outcome.missingOriginal.length > 0
-            ? ` ${outcome.missingOriginal.length} converted ${outcome.missingOriginal.length === 1 ? "model has" : "models have"} no original .3do to replace: ${outcome.missingOriginal.join(", ")}.`
-            : ""}
+          {outcome.unitDefsPatched.length > 0 ? (
+            <Trans>
+              Moved{" "}
+              <Plural
+                value={outcome.originalsMovedAside.length}
+                one="# original model"
+                other="# original models"
+              />{" "}
+              aside and fixed{" "}
+              <Plural
+                value={outcome.unitDefsPatched.length}
+                one="# unit definition"
+                other="# unit definitions"
+              />{" "}
+              that named a .3do extension.
+            </Trans>
+          ) : (
+            <Trans>
+              Moved{" "}
+              <Plural
+                value={outcome.originalsMovedAside.length}
+                one="# original model"
+                other="# original models"
+              />{" "}
+              aside.
+            </Trans>
+          )}
+          {outcome.alreadyInstalled.length > 0 && (
+            <>
+              {" "}
+              <Plural
+                value={outcome.alreadyInstalled.length}
+                one="# model was already installed."
+                other="# models were already installed."
+              />
+            </>
+          )}
+          {outcome.missingOriginal.length > 0 && (
+            <>
+              {" "}
+              <Plural
+                value={outcome.missingOriginal.length}
+                one={`# converted model has no original .3do to replace: ${missingNames}.`}
+                other={`# converted models have no original .3do to replace: ${missingNames}.`}
+              />
+            </>
+          )}
         </p>
       )}
 
       {restored !== null && (
         <p className="text-xs text-muted-foreground">
-          Restored {restored} {restored === 1 ? "file" : "files"} to how they
-          were before the install.
+          <Trans>
+            Restored <Plural value={restored} one="# file" other="# files" /> to
+            how they were before the install.
+          </Trans>
         </p>
       )}
     </div>
@@ -492,23 +572,45 @@ function InstallPanel({
 }
 
 function GroupReport({ group }: { group: Convert3doGroup }) {
+  const { t } = useLingui();
   const missing = Object.entries(group.missingTextures);
   const undecodable = Object.entries(group.undecodableTextures);
+  const modelsWritten = group.modelsWritten;
+  const atlasSide = group.atlasSide;
+  const tilesPacked = group.tilesPacked;
+  const atlas = group.atlas;
+  const triangleCount = formatNumber(group.triangles);
+  const vertexCount = formatNumber(group.vertices);
+  const didNotFitCount = group.didNotFit.length;
+  const missingCount = missing.length;
+  const undecodableCount = undecodable.length;
+  const paletteFaces = group.paletteFaces;
+  const missingTextureFaces = group.missingTextureFaces;
   return (
     <div className="flex flex-col gap-2 rounded-md border border-border/50 p-2">
       <p className="font-medium">{group.folder}</p>
       <p className="text-xs text-muted-foreground">
-        {group.modelsWritten} models on a {group.atlasSide} pixel sheet of{" "}
-        {group.tilesPacked} tiles ({group.atlas})
-        {group.reusedAtlas
-          ? ", kept from an earlier run so the models it already wrote stay correct"
-          : ""}
-        . {formatNumber(group.triangles)} triangles,{" "}
-        {formatNumber(group.vertices)} vertices.
+        <Trans>
+          {modelsWritten} models on a {atlasSide} pixel sheet of {tilesPacked}{" "}
+          tiles ({atlas})
+        </Trans>
+        {group.reusedAtlas && (
+          <>
+            {", "}
+            <Trans>
+              kept from an earlier run so the models it already wrote stay
+              correct
+            </Trans>
+          </>
+        )}
+        {". "}
+        <Trans>
+          {triangleCount} triangles, {vertexCount} vertices.
+        </Trans>
       </p>
 
       {group.didNotFit.length > 0 && (
-        <Section title={`Did not fit on the sheet (${group.didNotFit.length})`}>
+        <Section title={t`Did not fit on the sheet (${didNotFitCount})`}>
           {group.didNotFit.map((name) => (
             <li key={name}>{name}</li>
           ))}
@@ -516,11 +618,13 @@ function GroupReport({ group }: { group: Convert3doGroup }) {
       )}
 
       {missing.length > 0 && (
-        <Section title={`Textures the game does not ship (${missing.length})`}>
+        <Section title={t`Textures the game does not ship (${missingCount})`}>
           {missing.map(([name, models]) => (
             <li key={name}>
-              <span className="font-mono">{name}</span>, wanted by {models}{" "}
-              {models === 1 ? "model" : "models"}
+              <Trans>
+                <span className="font-mono">{name}</span>, wanted by{" "}
+                <Plural value={models} one="# model" other="# models" />
+              </Trans>
             </li>
           ))}
         </Section>
@@ -528,28 +632,48 @@ function GroupReport({ group }: { group: Convert3doGroup }) {
 
       {undecodable.length > 0 && (
         <Section
-          title={`Textures coilbox could not decode (${undecodable.length})`}
+          title={t`Textures coilbox could not decode (${undecodableCount})`}
         >
           {undecodable.map(([name, at]) => (
             <li key={name}>
-              <span className="font-mono">{name}</span> is{" "}
-              <span className="font-mono">{at.member}</span>, wanted by{" "}
-              {at.wantedBy} {at.wantedBy === 1 ? "model" : "models"}
+              <Trans>
+                <span className="font-mono">{name}</span> is{" "}
+                <span className="font-mono">{at.member}</span>, wanted by{" "}
+                <Plural value={at.wantedBy} one="# model" other="# models" />
+              </Trans>
             </li>
           ))}
         </Section>
       )}
 
       <p className="text-xs text-muted-foreground">
-        {group.paletteFaces} faces took a palette colour nothing could resolve
-        {group.paletteModels.length > 0
-          ? `, across ${group.paletteModels.length} models`
-          : ""}
-        . {group.missingTextureFaces} faces are flat because their tile is
-        missing.
-        {group.droppedPieces > 0
-          ? ` ${group.droppedPieces} inert same-named pieces were dropped.`
-          : ""}
+        <Trans>
+          {paletteFaces} faces took a palette colour nothing could resolve
+        </Trans>
+        {group.paletteModels.length > 0 && (
+          <>
+            {", "}
+            <Plural
+              value={group.paletteModels.length}
+              one="across # model"
+              other="across # models"
+            />
+          </>
+        )}
+        {". "}
+        <Trans>
+          {missingTextureFaces} faces are flat because their tile is missing.
+        </Trans>
+        {group.droppedPieces > 0 && (
+          <>
+            {" "}
+            <Plural
+              value={group.droppedPieces}
+              one="# inert same-named piece was dropped."
+              other="# inert same-named pieces were dropped."
+            />
+          </>
+        )}
       </p>
     </div>
   );

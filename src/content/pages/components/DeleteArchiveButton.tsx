@@ -1,3 +1,4 @@
+import { Trans, useLingui } from "@lingui/react/macro";
 import { Button } from "@picoframe/frame";
 import { Loader2, Trash2 } from "lucide-react";
 import { useState } from "react";
@@ -38,6 +39,7 @@ export function DeleteArchiveButton({
   /** Leave the detail page, which now describes content that is gone. */
   onDeleted: () => void;
 }) {
+  const { t } = useLingui();
   const [open, setOpen] = useState(false);
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -51,8 +53,8 @@ export function DeleteArchiveButton({
       const freed = formatBytes(bytes);
       void notify({
         title: freed
-          ? `Deleted ${name}, freeing ${freed}.`
-          : `Deleted ${name}.`,
+          ? t`Deleted ${name}, freeing ${freed}.`
+          : t`Deleted ${name}.`,
         level: "success",
       });
       // The scan caches still list it, and the root's counts are now stale. The
@@ -78,15 +80,19 @@ export function DeleteArchiveButton({
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
         <Button type="button" size="sm" variant="outline" className="gap-1.5">
-          <Trash2 className="size-4" /> Delete
+          <Trash2 className="size-4" /> <Trans>Delete</Trans>
         </Button>
       </PopoverTrigger>
       <PopoverContent align="end" className="flex w-80 flex-col gap-3">
         <div className="flex flex-col gap-1">
-          <h3 className="text-sm font-medium">Delete this archive?</h3>
+          <h3 className="text-sm font-medium">
+            <Trans>Delete this archive?</Trans>
+          </h3>
           <p className="break-words text-xs text-muted-foreground">
-            {name} is deleted from disk and you would have to download it again.
-            Replays and saves that need it stop working.
+            <Trans>
+              {name} is deleted from disk and you would have to download it
+              again. Replays and saves that need it stop working.
+            </Trans>
           </p>
         </div>
         <div className="flex justify-end gap-2">
@@ -97,7 +103,7 @@ export function DeleteArchiveButton({
             onClick={() => setOpen(false)}
             disabled={pending}
           >
-            Cancel
+            <Trans>Cancel</Trans>
           </Button>
           <Button
             type="button"
@@ -112,7 +118,7 @@ export function DeleteArchiveButton({
             ) : (
               <Trash2 className="size-4" />
             )}
-            Delete
+            <Trans>Delete</Trans>
           </Button>
         </div>
         {error && (

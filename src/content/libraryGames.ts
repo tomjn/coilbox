@@ -1,3 +1,5 @@
+import type { MessageDescriptor } from "@lingui/core";
+import { msg, t } from "@lingui/core/macro";
 import type { EnqueueInput } from "../downloads/DownloadQueueProvider";
 import { downloadKey, hostOf } from "../downloads/downloadHistory";
 import {
@@ -12,22 +14,28 @@ import { hubGameDownloadRequest } from "../hub/games/download";
 import { compareGameVersions } from "../play/installedGames";
 import type { LibraryGame, LibrarySource } from "./library";
 
-/** The Games page's filter chips, in the order they are shown. */
+/**
+ * The Games page's filter chips, in the order they are shown. The labels are
+ * descriptors, resolved at render.
+ */
 export const GAME_CHIPS = [
-  { value: "installed", label: "My Games" },
-  { value: "notInstalled", label: "New Games" },
-  { value: "updates", label: "Updates" },
-  { value: "featured", label: "Featured" },
+  { value: "installed", label: msg`My Games` },
+  { value: "notInstalled", label: msg`New Games` },
+  { value: "updates", label: msg`Updates` },
+  { value: "featured", label: msg`Featured` },
 ] as const;
 
 export type GameChip = (typeof GAME_CHIPS)[number]["value"];
 
 export type GameSort = "featured" | "name-asc" | "name-desc";
 
-export const GAME_SORT_OPTIONS: { value: GameSort; label: string }[] = [
-  { value: "featured", label: "Featured first" },
-  { value: "name-asc", label: "Name A–Z" },
-  { value: "name-desc", label: "Name Z–A" },
+export const GAME_SORT_OPTIONS: {
+  value: GameSort;
+  label: MessageDescriptor;
+}[] = [
+  { value: "featured", label: msg`Featured first` },
+  { value: "name-asc", label: msg`Name A–Z` },
+  { value: "name-desc", label: msg`Name Z–A` },
 ];
 
 /** Some version of the game is on disk. */
@@ -222,7 +230,10 @@ export async function installRequest(
   }
   const source = bestSource(g);
   const request = source && sourceRequest(source, g.title, writePath);
-  if (!request) throw new Error(`No download source for ${g.title}.`);
+  if (!request) {
+    const title = g.title;
+    throw new Error(t`No download source for ${title}.`);
+  }
   return request;
 }
 

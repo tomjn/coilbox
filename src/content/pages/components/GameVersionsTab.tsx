@@ -1,3 +1,5 @@
+import { plural } from "@lingui/core/macro";
+import { Trans, useLingui } from "@lingui/react/macro";
 import { Button } from "@picoframe/frame";
 import { CheckCircle2, Loader2 } from "lucide-react";
 import { useState } from "react";
@@ -20,8 +22,21 @@ const dateOf = (iso: string) =>
 /** Where a row's download stands in the queue, or null when it has none. */
 export type RowStatus = "queued" | "active" | "done" | "error" | null;
 
-function KindCell({ row }: { row: GameVersionRow }) {
-  const parts: string[] = [row.kind];
+function KindCell({
+  row,
+  installed,
+}: {
+  row: GameVersionRow;
+  installed: boolean;
+}) {
+  const { t } = useLingui();
+  const kind =
+    row.kind === "release"
+      ? t`release`
+      : row.kind === "branch"
+        ? t`branch`
+        : t`snapshot`;
+  const parts: string[] = installed ? [t`installed`, kind] : [kind];
   if (row.date) parts.push(dateOf(row.date));
   if (row.size !== undefined) parts.push(formatBytes(row.size));
   return <>{parts.join(" · ")}</>;
@@ -54,7 +69,11 @@ function Action({
     return (
       <span className="inline-flex items-center gap-1 text-xs text-muted-foreground">
         <Loader2 className="size-3.5 animate-spin" />
-        {status === "active" ? "Downloading" : "Queued"}
+        {status === "active" ? (
+          <Trans>Downloading</Trans>
+        ) : (
+          <Trans>Queued</Trans>
+        )}
       </span>
     );
   }
@@ -66,7 +85,7 @@ function Action({
       disabled={!canInstall || !row.request}
       onClick={() => onInstall(row)}
     >
-      Install
+      <Trans>Install</Trans>
     </Button>
   );
 }
@@ -96,30 +115,50 @@ export function GameVersionsTab({
   onInstall: (row: GameVersionRow) => void;
   onRemoved: () => void;
 }) {
+  const { t } = useLingui();
   const [showSnapshots, setShowSnapshots] = useState(false);
   const rows = showSnapshots ? [...table.rows, ...table.snapshots] : table.rows;
+  const snapshotCount = table.snapshots.length;
   const empty = table.rows.length === 0 && table.snapshots.length === 0;
 
   return (
     <div className="flex flex-col gap-2">
       {empty ? (
         <p className="text-sm text-muted-foreground">
-          {loading ? "Reading the rapid index…" : "No source lists a version."}
+          {loading ? (
+            <Trans>Reading the rapid index…</Trans>
+          ) : (
+            <Trans>No source lists a version.</Trans>
+          )}
         </p>
       ) : (
         <Table>
           <TableHeader>
             <TableRow>
               <TableHead className="w-6">
-                <span className="sr-only">Installed</span>
+                <span className="sr-only">
+                  <Trans>Installed</Trans>
+                </span>
               </TableHead>
-              <TableHead>Version</TableHead>
-              <TableHead>Where from</TableHead>
-              <TableHead>Kind</TableHead>
-              <TableHead>Package</TableHead>
-              <TableHead>Needs</TableHead>
               <TableHead>
-                <span className="sr-only">Action</span>
+                <Trans>Version</Trans>
+              </TableHead>
+              <TableHead>
+                <Trans>Where from</Trans>
+              </TableHead>
+              <TableHead>
+                <Trans>Kind</Trans>
+              </TableHead>
+              <TableHead>
+                <Trans>Package</Trans>
+              </TableHead>
+              <TableHead>
+                <Trans>Needs</Trans>
+              </TableHead>
+              <TableHead>
+                <span className="sr-only">
+                  <Trans>Action</Trans>
+                </span>
               </TableHead>
             </TableRow>
           </TableHeader>
@@ -133,15 +172,14 @@ export function GameVersionsTab({
                   {row.installed && (
                     <CheckCircle2
                       className="size-4 text-emerald-500"
-                      aria-label="Installed"
+                      aria-label={t`Installed`}
                     />
                   )}
                 </TableCell>
                 <TableCell className="font-medium">{row.version}</TableCell>
                 <TableCell className="font-mono text-xs">{row.from}</TableCell>
                 <TableCell className="text-xs">
-                  {row.installed ? "installed · " : ""}
-                  <KindCell row={row} />
+                  <KindCell row={row} installed={row.installed} />
                 </TableCell>
                 <TableCell className="font-mono text-xs" title={row.pkg}>
                   {row.pkg}
@@ -173,8 +211,14 @@ export function GameVersionsTab({
                     onClick={() => setShowSnapshots((v) => !v)}
                   >
                     {showSnapshots
-                      ? `Hide ${table.snapshots.length} commit snapshots`
-                      : `Show ${table.snapshots.length} commit snapshots`}
+                      ? plural(snapshotCount, {
+                          one: "Hide # commit snapshot",
+                          other: "Hide # commit snapshots",
+                        })
+                      : plural(snapshotCount, {
+                          one: "Show # commit snapshot",
+                          other: "Show # commit snapshots",
+                        })}
                   </Button>
                 </TableCell>
               </TableRow>

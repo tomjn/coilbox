@@ -1,3 +1,5 @@
+import { t as coreT, plural } from "@lingui/core/macro";
+import { Trans, useLingui } from "@lingui/react/macro";
 import { Button, useSetting } from "@picoframe/frame";
 import {
   ArrowLeft,
@@ -64,7 +66,7 @@ import {
 } from "./components/states";
 
 function playedAt(ms: number): string {
-  if (!ms) return "never";
+  if (!ms) return coreT`never`;
   return formatDate(new Date(ms), { dateStyle: "medium" });
 }
 
@@ -73,6 +75,7 @@ const HEADLINE_KEYS = new Set(["name", "description"]);
 
 /** A single map: a minimap preview, its metadata, and the archives it's from. */
 export default function MapDetailPage() {
+  const { t } = useLingui();
   const { name } = useParams();
   const decoded = name ?? "";
   const navigate = useNavigate();
@@ -181,7 +184,7 @@ export default function MapDetailPage() {
     );
   if (!data || loading) return <DetailLoading backTo="/library/maps" />;
   const scanned = data.maps.find((m) => m.name === decoded);
-  if (!scanned) return <NotFound backTo="/library/maps" label="map" />;
+  if (!scanned) return <NotFound backTo="/library/maps" label={t`map`} />;
   // Proportions and mapinfo arrive after the scan now, so fold in whichever of
   // those tiers has landed.
   const [map] = mergeMapTiers([scanned], thumbs, meta);
@@ -201,6 +204,14 @@ export default function MapDetailPage() {
     ([k]) => !HEADLINE_KEYS.has(k),
   );
   const size = mapSizeLabel(map.width, map.height);
+  const checksum = mapInfo.info?.checksum;
+  const mapTitle = map.name;
+  const archiveCount = map.archives.length;
+  const startCount = minimap.startPositions.length;
+  const wins = mapRecord.wins;
+  const losses = mapRecord.losses;
+  const factionWins = mapRecord.favouriteFaction?.wins;
+  const factionGames = mapRecord.favouriteFaction?.games;
 
   // Start positions are in world coords; the map's world size is its metal-map
   // dimension * 16, so normalise to 0..1 for overlaying on the (object-fill,
@@ -254,13 +265,13 @@ export default function MapDetailPage() {
         });
       } else {
         void notify({
-          title: "Couldn't locate this map's archive on disk.",
+          title: t`Couldn't locate this map's archive on disk.`,
           level: "error",
         });
       }
     } catch {
       void notify({
-        title: "Couldn't open this map in mapconv.",
+        title: t`Couldn't open this map in mapconv.`,
         level: "error",
       });
     } finally {
@@ -275,15 +286,13 @@ export default function MapDetailPage() {
           to="/library/maps"
           className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:underline"
         >
-          <ArrowLeft className="size-3.5" /> Maps
+          <ArrowLeft className="size-3.5" /> <Trans>Maps</Trans>
         </Link>
         <h1 className="break-words text-lg font-semibold">{map.name}</h1>
         <div className="flex flex-wrap gap-x-3 gap-y-1 font-mono text-xs text-muted-foreground">
           {size && <span>{size}</span>}
           {map.fileName && <span className="break-all">{map.fileName}</span>}
-          {mapInfo.info?.checksum && (
-            <span>checksum {mapInfo.info.checksum}</span>
-          )}
+          {mapInfo.info?.checksum && <span>{t`checksum ${checksum}`}</span>}
         </div>
         {map.info.description && (
           <p className="mt-1 max-w-prose text-sm text-muted-foreground">
@@ -294,7 +303,7 @@ export default function MapDetailPage() {
 
       <section className="flex flex-wrap items-center gap-2">
         <Button size="sm" className="gap-1.5" onClick={() => playMap(map.name)}>
-          <Play className="size-4" /> Play this map
+          <Play className="size-4" /> <Trans>Play this map</Trans>
         </Button>
         <Button
           size="sm"
@@ -302,7 +311,7 @@ export default function MapDetailPage() {
           className="gap-1.5"
           onClick={() => navigate("/battles", { state: { hostMap: map.name } })}
         >
-          <Swords className="size-4" /> Host a battle here
+          <Swords className="size-4" /> <Trans>Host a battle here</Trans>
         </Button>
         <Button
           size="sm"
@@ -312,7 +321,7 @@ export default function MapDetailPage() {
             navigate(`/play/replays?map=${encodeURIComponent(map.name)}`)
           }
         >
-          <Clapperboard className="size-4" /> Replays on this map
+          <Clapperboard className="size-4" /> <Trans>Replays on this map</Trans>
         </Button>
         {advanced && archiveName && (
           <Button
@@ -323,7 +332,7 @@ export default function MapDetailPage() {
             disabled={decompiling}
           >
             <PackageOpen className="size-4" />
-            {decompiling ? "Opening…" : "Open in mapconv decompile"}
+            {decompiling ? t`Opening…` : t`Open in mapconv decompile`}
           </Button>
         )}
         {archivePath && isDeletableArchive(archivePath) && (
@@ -336,12 +345,14 @@ export default function MapDetailPage() {
       </section>
 
       {mapInfo.info?.warnings?.length ? (
-        <WarningBanner warnings={mapInfo.info.warnings} noun="map" />
+        <WarningBanner warnings={mapInfo.info.warnings} noun={t`map`} />
       ) : null}
 
       {compatFindings.length > 0 && (
         <section className="flex flex-col gap-2">
-          <h2 className="text-sm font-medium">Compatibility</h2>
+          <h2 className="text-sm font-medium">
+            <Trans>Compatibility</Trans>
+          </h2>
           <FindingList findings={compatFindings} />
         </section>
       )}
@@ -350,24 +361,24 @@ export default function MapDetailPage() {
         <section className="rounded-lg border border-border/60 bg-card p-4">
           <h2 className="mb-3 flex items-center gap-2 text-sm font-medium">
             <Trophy className="size-4 text-muted-foreground" />
-            Your record on this map
+            <Trans>Your record on this map</Trans>
           </h2>
           {statsIngesting && statRecords.length === 0 ? (
             <Skeleton className="h-16 rounded bg-muted" />
           ) : mapRecord.games === 0 ? (
             <p className="text-sm text-muted-foreground">
-              No replays recorded on this map yet.
+              <Trans>No replays recorded on this map yet.</Trans>
             </p>
           ) : (
             <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
               <StatCard
                 icon={<Swords className="size-3.5" />}
-                label="Games"
+                label={t`Games`}
                 value={String(mapRecord.games)}
               />
               <StatCard
                 icon={<Trophy className="size-3.5" />}
-                label="Win rate"
+                label={t`Win rate`}
                 value={
                   mapRecord.winRate == null
                     ? "—"
@@ -375,22 +386,22 @@ export default function MapDetailPage() {
                 }
                 sub={
                   mapRecord.decided > 0
-                    ? `${mapRecord.wins}W · ${mapRecord.losses}L`
-                    : "outcome unknown"
+                    ? t`${wins}W · ${losses}L`
+                    : t`outcome unknown`
                 }
               />
               <StatCard
                 icon={<Calendar className="size-3.5" />}
-                label="Last played"
+                label={t`Last played`}
                 value={playedAt(mapRecord.lastPlayedMs)}
               />
               <StatCard
                 icon={<Flag className="size-3.5" />}
-                label="Top faction"
+                label={t`Top faction`}
                 value={mapRecord.favouriteFaction?.key ?? "—"}
                 sub={
                   mapRecord.favouriteFaction
-                    ? `${mapRecord.favouriteFaction.wins}W of ${mapRecord.favouriteFaction.games}`
+                    ? t`${factionWins}W of ${factionGames}`
                     : undefined
                 }
               />
@@ -402,10 +413,12 @@ export default function MapDetailPage() {
       <section className="flex flex-col gap-2">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <h2 className="text-sm font-medium">
-            Preview
-            {minimap.startPositions.length > 0
-              ? ` · ${minimap.startPositions.length} start positions`
-              : ""}
+            {startCount > 0
+              ? plural(startCount, {
+                  one: "Preview · # start position",
+                  other: "Preview · # start positions",
+                })
+              : t`Preview`}
           </h2>
           {minimap.url && (
             <MapLayerToggle layer={overlay.layer} onChange={overlay.setLayer} />
@@ -434,7 +447,7 @@ export default function MapDetailPage() {
               >
                 <img
                   src={previewUrl}
-                  alt={`Minimap of ${map.name}`}
+                  alt={t`Minimap of ${mapTitle}`}
                   className={`absolute inset-0 size-full object-fill${
                     overlay.overlayUrl ? " brightness-[0.55]" : ""
                   }`}
@@ -449,7 +462,7 @@ export default function MapDetailPage() {
                     style={{ left: `${m.left}%`, top: `${m.top}%` }}
                     title={
                       startNames.find((e) => e.key === `d${i + 1}`)?.name ??
-                      `Start position ${i + 1}`
+                      t`Start position ${i + 1}`
                     }
                   />
                 ))}
@@ -457,7 +470,9 @@ export default function MapDetailPage() {
             ) : (
               <div className="flex size-64 max-w-full flex-col items-center justify-center gap-1 text-muted-foreground">
                 <ImageOff className="size-6" />
-                <span className="text-xs">No minimap</span>
+                <span className="text-xs">
+                  <Trans>No minimap</Trans>
+                </span>
               </div>
             )}
           </div>
@@ -501,7 +516,9 @@ export default function MapDetailPage() {
 
       {otherInfo.length > 0 && (
         <section className="flex flex-col gap-2">
-          <h2 className="text-sm font-medium">Metadata</h2>
+          <h2 className="text-sm font-medium">
+            <Trans>Metadata</Trans>
+          </h2>
           <dl className="grid grid-cols-[minmax(8rem,auto)_1fr] gap-x-4 gap-y-1 rounded-lg border border-border/50 bg-card p-3 text-sm">
             {otherInfo.map(([k, v]) => (
               <div key={k} className="contents">
@@ -513,15 +530,18 @@ export default function MapDetailPage() {
         </section>
       )}
 
-      <OptionsList options={mapInfo.info?.options ?? []} title="Map options" />
+      <OptionsList
+        options={mapInfo.info?.options ?? []}
+        title={t`Map options`}
+      />
 
       <section className="flex flex-col gap-2">
         <h2 className="text-sm font-medium">
-          Archives ({map.archives.length})
+          <Trans>Archives ({archiveCount})</Trans>
         </h2>
         {map.archives.length === 0 ? (
           <p className="text-sm text-muted-foreground">
-            No archives reported for this map.
+            <Trans>No archives reported for this map.</Trans>
           </p>
         ) : (
           <ul className="flex flex-col gap-2">
@@ -550,27 +570,38 @@ export default function MapDetailPage() {
  * why, and stays off. Exclusion is additive, so there is nothing to re-enable.
  */
 function MapEligibilitySection({ mapName }: { mapName: string }) {
+  const { t } = useLingui();
   const { verdictFor, setPlayerExcluded } = useMapEligibility();
   const verdict = verdictFor(mapName);
   const curated = verdict !== null && verdict.source !== "player";
+  const hiddenBy = (catalog: boolean, reason: string | undefined) => {
+    if (catalog) {
+      return reason
+        ? t`Hidden by the branding catalog: ${reason}`
+        : t`Hidden by the branding catalog.`;
+    }
+    return reason
+      ? t`Hidden by the distribution profile: ${reason}`
+      : t`Hidden by the distribution profile.`;
+  };
 
   return (
     <section className="flex flex-col gap-2">
-      <h2 className="text-sm font-medium">Warpath and Galactic Conquest</h2>
+      <h2 className="text-sm font-medium">
+        <Trans>Warpath and Galactic Conquest</Trans>
+      </h2>
       <label
         htmlFor="map-mode-eligibility"
         className="flex items-center justify-between gap-4 rounded-lg border border-border/50 bg-card p-3"
       >
         <span className="flex flex-col">
-          <span className="text-sm font-medium">Hide this map</span>
+          <span className="text-sm font-medium">
+            <Trans>Hide this map</Trans>
+          </span>
           <span className="text-xs text-muted-foreground">
             {curated
-              ? `Hidden by the ${
-                  verdict.source === "catalog"
-                    ? "branding catalog"
-                    : "distribution profile"
-                }${verdict.reason ? `: ${verdict.reason}` : "."}`
-              : "Keep this map out of generated warpaths and conquests. It stays playable in skirmish and multiplayer."}
+              ? hiddenBy(verdict.source === "catalog", verdict.reason)
+              : t`Keep this map out of generated warpaths and conquests. It stays playable in skirmish and multiplayer.`}
           </span>
         </span>
         <Switch
