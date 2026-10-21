@@ -1,3 +1,4 @@
+import { plural, t } from "@lingui/core/macro";
 import type { HandmadeMapRef } from "../challenge/mapRef";
 import { loadChallengeMap } from "../conquest/handmade/challenge";
 import { loadHandmadeMap } from "../conquest/handmade/library";
@@ -41,20 +42,23 @@ export function handmadeRunSource(doc: GalaxyDoc): RunMapSource | null {
 function readProblem(id: string, result: HandmadeMapResult): string | null {
   if (result.ok) return null;
   const [first, ...rest] = result.errors;
-  if (!first) return `The hand-made map "${id}" could not be read.`;
+  const base = t`The hand-made map "${id}" could not be read.`;
+  if (!first) return base;
   // The library's own sentence for a map that is not installed.
   if (first.code === "file-missing" && rest.length === 0) return first.message;
   const more =
     rest.length === 0
       ? ""
-      : rest.length === 1
-        ? " There is 1 more problem with it."
-        : ` There are ${rest.length} more problems with it.`;
-  return `The hand-made map "${id}" could not be read. ${first.message}${more}`;
+      : ` ${plural(rest.length, {
+          one: "There is # more problem with it.",
+          other: "There are # more problems with it.",
+        })}`;
+  return `${base} ${first.message}${more}`;
 }
 
 function listProblem(e: unknown): string {
-  return `The hand-made maps could not be listed. ${e instanceof Error ? e.message : String(e)}`;
+  const reason = e instanceof Error ? e.message : String(e);
+  return t`The hand-made maps could not be listed. ${reason}`;
 }
 
 export type HandmadeRunMap =
@@ -77,10 +81,11 @@ export async function loadHandmadeRunMap(id: string): Promise<HandmadeRunMap> {
     return { ok: false, message: readProblem(id, result) ?? "" };
   }
   const source = handmadeRunSource(result.doc);
+  const mapTitle = result.doc.title;
   if (!source) {
     return {
       ok: false,
-      message: `The hand-made map "${result.doc.title}" has no Warpath start and goal, so it can only be played in Conquest.`,
+      message: t`The hand-made map "${mapTitle}" has no Warpath start and goal, so it can only be played in Conquest.`,
     };
   }
   return { ok: true, source };
@@ -99,10 +104,11 @@ export async function loadChallengeRunMap(
   const checked = await loadChallengeMap(ref, gameName);
   if (!checked.ok) return checked;
   const source = handmadeRunSource(checked.map);
+  const mapTitle = checked.map.title;
   if (!source) {
     return {
       ok: false,
-      message: `This challenge is a Warpath run on the hand-made map "${checked.map.title}", and the copy installed here has no Warpath start and goal, so the challenge was not started.`,
+      message: t`This challenge is a Warpath run on the hand-made map "${mapTitle}", and the copy installed here has no Warpath start and goal, so the challenge was not started.`,
     };
   }
   return { ok: true, source };

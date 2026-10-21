@@ -1,3 +1,4 @@
+import { useLingui } from "@lingui/react/macro";
 import { useDrawer } from "@picoframe/frame";
 import { useEffect, useRef } from "react";
 import { nextDrawerKey } from "@/general/drawerKey";
@@ -37,6 +38,7 @@ export function LinkedRoomJoin({
   onJoin: (args: JoinRoomArgs) => Promise<void>;
 }) {
   const drawer = useDrawer();
+  const { t } = useLingui();
   // One drawer per link followed. Without this, every re-render of the page
   // reopens the form over whatever the person moved on to, because the link is
   // held in router state and outlives the arrival.
@@ -48,7 +50,7 @@ export function LinkedRoomJoin({
     if (opened.current === key) return;
     opened.current = key;
     drawer.open({
-      title: "Join by address",
+      title: t`Join by address`,
       width: "30rem",
       content: (
         <JoinRoomForm
@@ -69,7 +71,7 @@ export function LinkedRoomJoin({
         />
       ),
     });
-  }, [target, drawer, defaultName, blocked, leaves, onJoin]);
+  }, [target, drawer, t, defaultName, blocked, leaves, onJoin]);
 
   return null;
 }

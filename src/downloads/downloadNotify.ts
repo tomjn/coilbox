@@ -1,3 +1,4 @@
+import { t } from "@lingui/core/macro";
 import { notify } from "../notify/notify";
 
 /** Cancellations are intentional — never surface them as a failure. */
@@ -32,7 +33,7 @@ export function withDownloadNotify<A, D>(
     try {
       const result = await fn(args);
       void notify({
-        title: "Download complete",
+        title: t`Download complete`,
         body: safeLabel(label, args),
         level: "success",
         to: "/library/downloads",
@@ -41,7 +42,7 @@ export function withDownloadNotify<A, D>(
     } catch (e) {
       if (!isCancellation(e)) {
         void notify({
-          title: "Download failed",
+          title: t`Download failed`,
           body: safeLabel(label, args),
           level: "error",
           to: "/library/downloads",

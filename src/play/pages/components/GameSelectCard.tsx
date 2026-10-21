@@ -1,3 +1,4 @@
+import { Trans, useLingui } from "@lingui/react/macro";
 import { useState } from "react";
 import type { GameItem } from "@/content/bindings";
 import { useBrandingEntry, useBrandingImage } from "@/content/branding";
@@ -32,20 +33,22 @@ export function GameSelectCard({
   onSelectGame: (name: string) => void;
   disabled?: boolean;
 }) {
+  const { t } = useLingui();
   const [pickerOpen, setPickerOpen] = useState(false);
   const blocked = disabled || gamesLoading;
   // Catalog branding art wins over the game's own loading-screen art.
   const brand = useBrandingEntry(game ?? undefined);
   const brandBanner = useBrandingImage(brand?.banner, true);
+  const gameName = game?.name ?? "";
 
   return (
     <GameCardShell
       name={game?.name ?? ""}
       title={
-        game?.name ?? (gamesLoading ? "Loading games…" : "No game selected")
+        game?.name ?? (gamesLoading ? t`Loading games…` : t`No game selected`)
       }
       artUrl={game ? (brandBanner ?? headers.get(game.name)) : undefined}
-      alt={game ? `${game.name} loading screen` : "No game selected"}
+      alt={game ? t`${gameName} loading screen` : t`No game selected`}
       art={
         game ? undefined : (
           <div className="absolute inset-0 bg-muted/40" aria-hidden />
@@ -56,7 +59,7 @@ export function GameSelectCard({
       warnings={game?.warnings}
       action={
         <span className="shrink-0 rounded-md border border-border/60 bg-muted/40 px-2 py-1 text-xs font-medium text-foreground group-hover:bg-muted">
-          Choose game
+          <Trans>Choose game</Trans>
         </span>
       }
     >
@@ -66,7 +69,7 @@ export function GameSelectCard({
         disabled={blocked}
         onClick={() => setPickerOpen(true)}
         aria-label={
-          game ? `Choose game (current: ${game.name})` : "Choose game"
+          game ? t`Choose game (current: ${gameName})` : t`Choose game`
         }
         className="absolute inset-0 rounded-lg focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-ring disabled:cursor-default"
       />

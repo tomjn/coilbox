@@ -1,3 +1,4 @@
+import { t } from "@lingui/core/macro";
 import type {
   NodeBodyKind,
   NodeEmphasis,
@@ -34,15 +35,24 @@ const TYPE_COLOR: Record<RunNodeType, string> = {
   boss: "#ff5468",
 };
 
-const TYPE_LABEL: Record<RunNodeType, string> = {
-  start: "Command",
-  battle: "Battle",
-  elite: "Elite",
-  event: "Event",
-  reward: "Salvage",
-  shop: "Depot",
-  boss: "Warlord",
-};
+function typeLabel(type: RunNodeType): string {
+  switch (type) {
+    case "start":
+      return t`Command`;
+    case "battle":
+      return t`Battle`;
+    case "elite":
+      return t`Elite`;
+    case "event":
+      return t`Event`;
+    case "reward":
+      return t`Salvage`;
+    case "shop":
+      return t`Depot`;
+    case "boss":
+      return t`Warlord`;
+  }
+}
 
 const RUN_TYPES = Object.keys(TYPE_COLOR) as RunNodeType[];
 
@@ -89,12 +99,12 @@ const typeFaction = (type: RunNodeType) => `type-${type}`;
 /** The factions a run's nodes are drawn as: you, cleared, and one per type. */
 function runFactions(): Faction[] {
   return [
-    { id: PLAYER_FACTION, name: "You", color: TYPE_COLOR.start },
-    { id: DONE_FACTION, name: "Cleared", color: "#5a6577" },
-    ...RUN_TYPES.map((t) => ({
-      id: typeFaction(t),
-      name: TYPE_LABEL[t],
-      color: TYPE_COLOR[t],
+    { id: PLAYER_FACTION, name: t`You`, color: TYPE_COLOR.start },
+    { id: DONE_FACTION, name: t`Cleared`, color: "#5a6577" },
+    ...RUN_TYPES.map((type) => ({
+      id: typeFaction(type),
+      name: typeLabel(type),
+      color: TYPE_COLOR[type],
     })),
   ];
 }
@@ -112,7 +122,7 @@ export function runToGalaxyDoc(run: RogueliteRun): GalaxyDoc {
 
   const nodes = run.nodes.map((n) => ({
     id: n.id,
-    name: TYPE_LABEL[n.type],
+    name: typeLabel(n.type),
     pos: [n.col, n.row - ((perCol.get(n.col) ?? 1) - 1) / 2] as [
       number,
       number,
@@ -137,7 +147,7 @@ export function runToGalaxyDoc(run: RogueliteRun): GalaxyDoc {
     // nebula placement), so this is what makes each run's sky its own.
     id: `run-${run.settings.seed}`,
     type: "conquest-galaxy",
-    title: "Warpath",
+    title: t`Warpath`,
     description: "",
     game: run.settings.game,
     playerFactionId: PLAYER_FACTION,
@@ -412,14 +422,14 @@ export function mapRunToGalaxyDoc(
 
   return {
     ...map,
-    title: "Warpath",
+    title: t`Warpath`,
     game: run.settings.game,
     playerFactionId: PLAYER_FACTION,
     playableFactionIds: undefined,
     rules: undefined,
     factions: [
       ...runFactions(),
-      { id: TAKEN_FACTION, name: "Taken", color: TYPE_COLOR.start },
+      { id: TAKEN_FACTION, name: t`Taken`, color: TYPE_COLOR.start },
     ],
     nodes: map.nodes.map((place) => {
       const n = nodeAt.get(place.id);

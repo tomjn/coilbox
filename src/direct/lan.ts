@@ -1,3 +1,4 @@
+import { t } from "@lingui/core/macro";
 import { describeUiError, parseUiError } from "../i18n/uiError";
 import { addressOfKey } from "../lobby-servers/hostForms";
 import type { Battle } from "../multiplayer/bindings";
@@ -102,10 +103,10 @@ export function splitHostPort(typed: string): {
  */
 export function addressProblem(typed: string): string | null {
   const value = typed.trim();
-  if (!value) return "Enter the host's address.";
-  if (/\s/.test(value)) return "An address has no spaces in it.";
+  if (!value) return t`Enter the host's address.`;
+  if (/\s/.test(value)) return t`An address has no spaces in it.`;
   if (value.includes("//") || value.includes("/")) {
-    return "Just the address, with no http:// and no path after it.";
+    return t`Just the address, with no http:// and no path after it.`;
   }
   return null;
 }
@@ -129,10 +130,11 @@ export function joinBlockedReason(
   hosting: boolean,
 ): string | null {
   if (hosting) {
-    return "Stop your own room first. Coilbox can be in one room at a time.";
+    return t`Stop your own room first. Coilbox can be in one room at a time.`;
   }
   if (roomKey) {
-    return `You are in a room already, at ${addressOfKey(roomKey)}. Leave it first: coilbox can be in one room at a time.`;
+    const address = addressOfKey(roomKey);
+    return t`You are in a room already, at ${address}. Leave it first: coilbox can be in one room at a time.`;
   }
   return null;
 }
@@ -156,7 +158,7 @@ export function joinRoomFailure(
   const lower = raw.toLowerCase();
   const where = `${address}:${port}`;
   if (lower.includes("refused")) {
-    return `Nothing is hosting on ${where}. Check the port with the host, and that their room is still up.`;
+    return t`Nothing is hosting on ${where}. Check the port with the host, and that their room is still up.`;
   }
   if (
     lower.includes("timed out") ||
@@ -164,7 +166,7 @@ export function joinRoomFailure(
     lower.includes("unreachable") ||
     lower.includes("no route")
   ) {
-    return `Could not reach ${where}. You may be on a different network from the host, or a firewall is in the way.`;
+    return t`Could not reach ${where}. You may be on a different network from the host, or a firewall is in the way.`;
   }
   if (
     lower.includes("dns") ||
@@ -172,14 +174,14 @@ export function joinRoomFailure(
     lower.includes("nodename") ||
     lower.includes("not known")
   ) {
-    return `No machine called ${address}. Check the spelling, or use its address instead of its name.`;
+    return t`No machine called ${address}. Check the spelling, or use its address instead of its name.`;
   }
-  return raw || `Could not join ${where}.`;
+  return raw || t`Could not join ${where}.`;
 }
 
 /** What to tell somebody who reached a room with nothing to join in it. Pure. */
 export function noRoomBattleFailure(): string {
-  return "That room is up but has no battle open in it, so there is nothing to join. Ask the host to start it again.";
+  return t`That room is up but has no battle open in it, so there is nothing to join. Ask the host to start it again.`;
 }
 
 /** How long to wait for the room's battle to arrive, and how often to look.

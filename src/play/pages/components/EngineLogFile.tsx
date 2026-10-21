@@ -1,3 +1,4 @@
+import { Trans } from "@lingui/react/macro";
 import { Button } from "@picoframe/frame";
 import { revealItemInDir } from "@tauri-apps/plugin-opener";
 import { ExternalLink, FolderSearch } from "lucide-react";
@@ -29,6 +30,7 @@ export function EngineLogFile({
   log: InfologTail | null;
   children?: ReactNode;
 }) {
+  const writtenAt = log ? when(log.modifiedMs) : "";
   return (
     <>
       <div className="flex flex-wrap items-center gap-2">
@@ -42,7 +44,8 @@ export function EngineLogFile({
                 void contentOpenPath({ path: log.path }).catch(() => {});
               }}
             >
-              <ExternalLink className="size-4" /> Open the log file
+              <ExternalLink className="size-4" />{" "}
+              <Trans>Open the log file</Trans>
             </Button>
             <Button
               variant="outline"
@@ -51,7 +54,7 @@ export function EngineLogFile({
                 void revealItemInDir(log.path).catch(() => {});
               }}
             >
-              <FolderSearch className="size-4" /> Show in folder
+              <FolderSearch className="size-4" /> <Trans>Show in folder</Trans>
             </Button>
           </>
         ) : null}
@@ -60,7 +63,7 @@ export function EngineLogFile({
         <p className="break-all text-sm">
           <code>{log.path}</code>
           <span className="block text-xs text-muted-foreground">
-            Written {when(log.modifiedMs)}
+            <Trans>Written {writtenAt}</Trans>
           </span>
         </p>
       ) : null}

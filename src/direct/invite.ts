@@ -1,3 +1,4 @@
+import { t } from "@lingui/core/macro";
 import { buildJoinLink, buildRoomLink } from "@/deeplink/build";
 import { splitHostPort } from "./lan";
 import { LOOPBACK_HOST } from "./room";
@@ -54,5 +55,5 @@ export function inviteLinkProblem(
   address: string | null | undefined,
 ): string | null {
   if (!address?.includes("%")) return null;
-  return "This server's address names a network card on this computer, so it would mean nothing to a friend. Save the server under its full IPv6 address, without the % part, to get a link.";
+  return t`This server's address names a network card on this computer, so it would mean nothing to a friend. Save the server under its full IPv6 address, without the % part, to get a link.`;
 }

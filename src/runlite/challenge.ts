@@ -1,3 +1,4 @@
+import { t } from "@lingui/core/macro";
 import {
   decodeChallenge,
   encodeChallenge,
@@ -135,7 +136,7 @@ export function runFromChallenge(
   const source = resolveRunMap(settings.map, settings.game, env.handmadeMap);
   if (!source) {
     throw new Error(
-      "This challenge is played on a map this install cannot find or rebuild.",
+      t`This challenge is played on a map this install cannot find or rebuild.`,
     );
   }
   // The caller is expected to have checked this and said so in full (see
@@ -147,7 +148,7 @@ export function runFromChallenge(
     source.map.handmade?.fingerprint !== settings.map.fingerprint
   ) {
     throw new Error(
-      "This challenge was made on a different version of its hand-made map than the one installed here.",
+      t`This challenge was made on a different version of its hand-made map than the one installed here.`,
     );
   }
   const run = generateMapRun({ ...opts, ...source, mapRef: settings.map });

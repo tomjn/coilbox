@@ -1,3 +1,4 @@
+import { Trans } from "@lingui/react/macro";
 import { useWriteRootPath } from "../config";
 import { RapidBrowser } from "./components/RapidBrowser";
 
@@ -13,11 +14,13 @@ export default function ExplorerPage() {
     <div className="flex h-full flex-col">
       <header className="space-y-1 border-b border-border px-6 py-4">
         <h1 className="text-lg font-semibold leading-none">
-          Rapid repositories
+          <Trans>Rapid repositories</Trans>
         </h1>
         <p className="max-w-prose text-sm text-muted-foreground">
-          Browse Spring/Recoil rapid content and download a tag through the
-          bundled sidecar.
+          <Trans>
+            Browse Spring/Recoil rapid content and download a tag through the
+            bundled sidecar.
+          </Trans>
         </p>
       </header>
       <div className="min-h-0 flex-1">

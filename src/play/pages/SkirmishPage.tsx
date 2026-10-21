@@ -1,4 +1,5 @@
-import { t } from "@lingui/core/macro";
+import { plural, t } from "@lingui/core/macro";
+import { Trans, useLingui } from "@lingui/react/macro";
 import { Button } from "@picoframe/frame";
 import { open, save } from "@tauri-apps/plugin-dialog";
 import { Bookmark, Play, Swords } from "lucide-react";
@@ -161,18 +162,28 @@ import { PresetsDrawer } from "./components/PresetsDrawer";
 function restrictionSummary(r: BattleRestrictions): string {
   const parts: string[] = [];
   const units = r.disabledUnits?.length ?? 0;
-  if (units > 0) parts.push(`${units} unit${units === 1 ? "" : "s"} disabled`);
-  if (r.advantage) parts.push(`+${Math.round(r.advantage * 100)}% advantage`);
-  if (r.incomeMultiplier)
-    parts.push(`+${Math.round(r.incomeMultiplier * 100)}% income`);
+  if (units > 0)
+    parts.push(
+      plural(units, { one: "# unit disabled", other: "# units disabled" }),
+    );
+  if (r.advantage) {
+    const advantagePercent = Math.round(r.advantage * 100);
+    parts.push(t`+${advantagePercent}% advantage`);
+  }
+  if (r.incomeMultiplier) {
+    const incomePercent = Math.round(r.incomeMultiplier * 100);
+    parts.push(t`+${incomePercent}% income`);
+  }
+  const summary = parts.join(" · ");
   return parts.length > 0
-    ? `Restricted battle — ${parts.join(" · ")}`
-    : "Restricted battle";
+    ? t`Restricted battle — ${summary}`
+    : t`Restricted battle`;
 }
 
 /** Basic singleplayer (skirmish) launcher: pick a game, map and opponents, then
  * launch the engine. Uses the preferred engine silently (no picker). */
 export default function SkirmishPage() {
+  const { t } = useLingui();
   const navigate = useNavigate();
   const {
     target,
@@ -717,7 +728,8 @@ export default function SkirmishPage() {
         dataDir: target.dataDir,
       });
       if (res.exitCode && res.exitCode !== 0) {
-        setError(`Engine exited with code ${res.exitCode}.`);
+        const exitCode = res.exitCode;
+        setError(t`Engine exited with code ${exitCode}.`);
       }
       // Cancelled before the game started: nothing to debrief.
       if (res.exitCode === null) return;
@@ -761,8 +773,8 @@ export default function SkirmishPage() {
   const saveFromReplay = (name: string, draft: SkirmishDraft) => {
     savePreset(name, draft);
     notify({
-      title: "Saved to Singleplayer presets",
-      body: `"${name}" — replay it from Singleplayer → Presets.`,
+      title: t`Saved to Singleplayer presets`,
+      body: t`"${name}" — replay it from Singleplayer → Presets.`,
       level: "success",
     });
   };
@@ -794,9 +806,11 @@ export default function SkirmishPage() {
         ...selection,
         parts: selection.parts.filter((part) => !stranded.includes(part)),
       };
+      const missingGame = p.gameName;
+      const presetName = p.name;
       void notify({
-        title: `You do not have ${p.gameName}`,
-        body: `The rest of "${p.name}" was loaded onto ${gameName}. Install the game to load it whole.`,
+        title: t`You do not have ${missingGame}`,
+        body: t`The rest of "${presetName}" was loaded onto ${gameName}. Install the game to load it whole.`,
         level: "warning",
       });
     }
@@ -846,7 +860,7 @@ export default function SkirmishPage() {
    * options here are still the ones the setup chose.
    */
   async function applyTweakMutator(project: ModProject) {
-    if (!target) throw new Error("No engine selected.");
+    if (!target) throw new Error(t`No engine selected.`);
     const applied = await applyTweakMutatorRoute({
       target,
       gameArchive,
@@ -855,10 +869,11 @@ export default function SkirmishPage() {
     });
     prevArchive.current = applied.archiveName;
     setGameName(applied.gameType);
+    const projectName = project.name;
     notify({
-      title: `Playing with "${project.name}"`,
+      title: t`Playing with "${projectName}"`,
       body: [
-        `${gameName} has no tweak slots, so the project is carried by a generated game that depends on it.`,
+        t`${gameName} has no tweak slots, so the project is carried by a generated game that depends on it.`,
         applied.typedNote,
       ]
         .filter(Boolean)
@@ -874,9 +889,9 @@ export default function SkirmishPage() {
     setError(null);
     try {
       const dest = await save({
-        title: "Export preset",
+        title: t`Export preset`,
         defaultPath: `${preset.name || "preset"}.json`,
-        filters: [{ name: "Coilbox preset", extensions: ["json"] }],
+        filters: [{ name: t`Coilbox preset`, extensions: ["json"] }],
       });
       if (!dest) return;
       await playExportPreset({
@@ -915,15 +930,15 @@ export default function SkirmishPage() {
     setError(null);
     try {
       const src = await open({
-        title: "Import preset",
+        title: t`Import preset`,
         multiple: false,
-        filters: [{ name: "Coilbox preset", extensions: ["json"] }],
+        filters: [{ name: t`Coilbox preset`, extensions: ["json"] }],
       });
       if (typeof src !== "string") return;
       const { json } = await playImportPreset({ src });
       const parsed = parsePresetJson(json);
       if (!parsed) {
-        setError("That file isn't a valid coilbox preset.");
+        setError(t`That file isn't a valid coilbox preset.`);
         return;
       }
       // Take the preset's word for the shortname of the build it pins, so a
@@ -944,12 +959,12 @@ export default function SkirmishPage() {
     if (!presetImportCode) return;
     const parsed = parsePresetJson(presetImportCode);
     if (!parsed) {
-      setError("That link isn't a valid coilbox preset.");
+      setError(t`That link isn't a valid coilbox preset.`);
       return;
     }
     rememberCarriedShortname(identify(presetImportCode).game);
     setPendingPreset(parsed);
-  }, [presetImportCode]);
+  }, [presetImportCode, t]);
 
   // Opening one saved preset by address (issue #1372, `presetRoute`). Loads it
   // into the setup, which is what the drawer's own Load does, so arriving by
@@ -969,23 +984,28 @@ export default function SkirmishPage() {
     const preset = presets.find((p) => p.id === openPresetId);
     if (!preset) {
       void notify({
-        title: "That preset isn't here any more. It may have been deleted.",
+        title: t`That preset isn't here any more. It may have been deleted.`,
         level: "warning",
       });
       return;
     }
     loadPreset(preset);
+    const loadedName = preset.name;
     void notify({
-      title: `Loaded the preset "${preset.name}".`,
+      title: t`Loaded the preset "${loadedName}".`,
       level: "success",
     });
   }, [openPresetId, scan.loading, presets]);
+
+  const rematchMapName = selectedMap?.name;
 
   return (
     <div className="flex flex-col gap-5 p-4">
       <TooltipProvider>
         <header className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
-          <h1 className="text-lg font-semibold">Singleplayer</h1>
+          <h1 className="text-lg font-semibold">
+            <Trans>Singleplayer</Trans>
+          </h1>
           <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
             {you && (
               <label
@@ -1000,7 +1020,7 @@ export default function SkirmishPage() {
                     updateParticipant(you.id, { spectator: v === true })
                   }
                 />
-                Spectate
+                <Trans>Spectate</Trans>
               </label>
             )}
             <Tooltip>
@@ -1008,14 +1028,16 @@ export default function SkirmishPage() {
                 <Button
                   variant="outline"
                   size="icon"
-                  aria-label="Presets"
+                  aria-label={t`Presets`}
                   onClick={() => setPresetsOpen(true)}
                   disabled={running}
                 >
                   <Bookmark className="size-4" />
                 </Button>
               </TooltipTrigger>
-              <TooltipContent>Presets</TooltipContent>
+              <TooltipContent>
+                <Trans>Presets</Trans>
+              </TooltipContent>
             </Tooltip>
             <Button
               variant="outline"
@@ -1029,11 +1051,11 @@ export default function SkirmishPage() {
                 running || !selectedGame || !selectedMap || !!dependencyBlock
               }
             >
-              <Swords className="size-4" /> Host
+              <Swords className="size-4" /> <Trans>Host</Trans>
             </Button>
             <Button onClick={() => onStart()} disabled={!canStart}>
               <Play className="size-4 fill-current" />{" "}
-              {running ? "Game running…" : "Start Game"}
+              {running ? t`Game running…` : t`Start Game`}
             </Button>
           </div>
         </header>
@@ -1076,7 +1098,7 @@ export default function SkirmishPage() {
 
       {pendingPreset && (
         <ResolveContentGate
-          title="Set up this preset"
+          title={t`Set up this preset`}
           requirements={[
             exactGameRequirement(pendingPreset.gameName),
             exactMapRequirement(pendingPreset.mapName),
@@ -1085,7 +1107,7 @@ export default function SkirmishPage() {
           targetLoading={targetLoading}
           onContinue={() => {
             const saved = savePreset(
-              pendingPreset.name?.trim() || "Imported preset",
+              pendingPreset.name?.trim() || t`Imported preset`,
               pendingPreset,
             );
             recordHubImport(hubItemId, [saved.id], presetRoute(saved.id));
@@ -1097,7 +1119,7 @@ export default function SkirmishPage() {
 
       {pendingHost && (
         <ResolveContentGate
-          title="Set up this battle for hosting"
+          title={t`Set up this battle for hosting`}
           requirements={launchRequirements({
             game: pendingHost.draft.gameName,
             map: pendingHost.draft.mapName,
@@ -1127,7 +1149,9 @@ export default function SkirmishPage() {
         >
           <DialogContent className="sm:max-w-sm" closeLabel={t`Close`}>
             <DialogHeader>
-              <DialogTitle>Where do you want to host this?</DialogTitle>
+              <DialogTitle>
+                <Trans>Where do you want to host this?</Trans>
+              </DialogTitle>
             </DialogHeader>
             <div className="flex flex-col gap-2">
               {hostableKeys.map((serverKey) => (
@@ -1155,14 +1179,16 @@ export default function SkirmishPage() {
                   proceedHost(picked.draft, picked.title, NEW_ROOM_TARGET);
                 }}
               >
-                A room on this computer
+                <Trans>A room on this computer</Trans>
               </Button>
               {roomBlocked ? (
                 <p className="text-xs text-muted-foreground">{roomBlocked}</p>
               ) : (
                 <p className="text-xs text-muted-foreground">
-                  A room needs no server and no account. Friends join with a
-                  link or an address.
+                  <Trans>
+                    A room needs no server and no account. Friends join with a
+                    link or an address.
+                  </Trans>
                 </p>
               )}
             </div>
@@ -1178,7 +1204,7 @@ export default function SkirmishPage() {
         onRematchWithTweak={onRematchWithTweak}
         getDraft={currentDraft}
         defaultPresetName={
-          selectedMap ? `Rematch: ${selectedMap.name}` : "Rematch"
+          selectedMap ? t`Rematch: ${rematchMapName}` : t`Rematch`
         }
         disabled={!canStart}
       />
@@ -1187,7 +1213,9 @@ export default function SkirmishPage() {
         <NoEngineNotice targetLoading={targetLoading} refresh={refreshTarget} />
       )}
 
-      {scan.error && <ScanFailed noun="games and maps" reason={scan.error} />}
+      {scan.error && (
+        <ScanFailed noun={t`games and maps`} reason={scan.error} />
+      )}
 
       {dependencyBlock && <DependencyBlocked reason={dependencyBlock} />}
 
@@ -1201,13 +1229,17 @@ export default function SkirmishPage() {
 
       {running && (
         <div className="flex items-center justify-between gap-3 rounded-md border border-border/50 bg-card p-3 text-sm text-muted-foreground">
-          <p>Game running — settings are frozen until the engine exits.</p>
+          <p>
+            <Trans>
+              Game running — settings are frozen until the engine exits.
+            </Trans>
+          </p>
           {/* An engine that hangs on the way out never reports ending, and
               the setup stays frozen with it. A relayed game is left to the top
               bar, which asks first because ending it ends it for everybody. */}
           {!relayed && (
             <Button variant="outline" size="sm" onClick={cancel}>
-              End game
+              <Trans>End game</Trans>
             </Button>
           )}
         </div>
@@ -1215,7 +1247,7 @@ export default function SkirmishPage() {
 
       {checkingResult && (
         <p className="rounded-md border border-border/50 bg-card p-3 text-sm text-muted-foreground">
-          Checking match result…
+          <Trans>Checking match result…</Trans>
         </p>
       )}
 
@@ -1233,7 +1265,7 @@ export default function SkirmishPage() {
                   size="sm"
                   onClick={() => setAiNotice(null)}
                 >
-                  Dismiss
+                  <Trans>Dismiss</Trans>
                 </Button>
               </AlertDescription>
             </Alert>
@@ -1248,7 +1280,7 @@ export default function SkirmishPage() {
                   disabled={running}
                   onClick={() => setRestrictions(undefined)}
                 >
-                  Clear
+                  <Trans>Clear</Trans>
                 </Button>
               </AlertDescription>
             </Alert>

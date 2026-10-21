@@ -1,3 +1,4 @@
+import { Trans, useLingui } from "@lingui/react/macro";
 import { Button } from "@picoframe/frame";
 import { X } from "lucide-react";
 import { useEffect, useState } from "react";
@@ -10,7 +11,7 @@ import { mpRelayTraffic } from "@/multiplayer/bindings";
 import { usePlay } from "./PlayProvider";
 import {
   ASK_EVERY_MS,
-  RELAY_CARRYING_DETAIL,
+  relayCarryingDetail,
   relayCarryingLabel,
 } from "./relayCarrying";
 
@@ -54,6 +55,7 @@ import {
  * never renders any of the below.
  */
 export default function InGameBadge() {
+  const { t } = useLingui();
   const { running, relayed, focusGame, cancel } = usePlay();
   const relay = useRelayCarrying(running && relayed);
   const [confirmEnd, setConfirmEnd] = useState(false);
@@ -63,14 +65,14 @@ export default function InGameBadge() {
       <button
         type="button"
         onClick={focusGame}
-        title="Return to the game"
+        title={t`Return to the game`}
         className="flex items-center gap-1.5"
       >
         <span className="size-2 rounded-full bg-orange-500" />
-        In game
+        <Trans>In game</Trans>
       </button>
       {relay.relaying && (
-        <span title={RELAY_CARRYING_DETAIL} className="border-l pl-2">
+        <span title={relayCarryingDetail()} className="border-l pl-2">
           {relayCarryingLabel(relay.bytesPerSecond)}
         </span>
       )}
@@ -80,8 +82,8 @@ export default function InGameBadge() {
           variant="ghost"
           size="sm"
           onClick={cancel}
-          title="End game"
-          aria-label="End game"
+          title={t`End game`}
+          aria-label={t`End game`}
           className="h-6 shrink-0 px-1 text-orange-600 hover:bg-orange-500/25 hover:text-orange-700 dark:text-orange-400"
         >
           <X size={12} />
@@ -93,8 +95,8 @@ export default function InGameBadge() {
               type="button"
               variant="ghost"
               size="sm"
-              title="End game"
-              aria-label="End game"
+              title={t`End game`}
+              aria-label={t`End game`}
               className="h-6 shrink-0 px-1 text-orange-600 hover:bg-orange-500/25 hover:text-orange-700 dark:text-orange-400"
             >
               <X size={12} />
@@ -102,8 +104,10 @@ export default function InGameBadge() {
           </PopoverTrigger>
           <PopoverContent align="end" className="w-64 space-y-3">
             <p className="text-sm">
-              This game runs through your machine's relay. Ending it here ends
-              it for everybody playing in it, not just for you.
+              <Trans>
+                This game runs through your machine's relay. Ending it here ends
+                it for everybody playing in it, not just for you.
+              </Trans>
             </p>
             <div className="flex justify-end gap-2">
               <Button
@@ -111,7 +115,7 @@ export default function InGameBadge() {
                 size="sm"
                 onClick={() => setConfirmEnd(false)}
               >
-                Keep playing
+                <Trans>Keep playing</Trans>
               </Button>
               <Button
                 variant="destructive"
@@ -121,7 +125,7 @@ export default function InGameBadge() {
                   cancel();
                 }}
               >
-                End it for everybody
+                <Trans>End it for everybody</Trans>
               </Button>
             </div>
           </PopoverContent>

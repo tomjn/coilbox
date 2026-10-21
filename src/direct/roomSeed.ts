@@ -1,3 +1,4 @@
+import { plural, t } from "@lingui/core/macro";
 import { reconcileAi } from "@/conquest/ai";
 import { defaultSkirmishDraft, type SkirmishDraft } from "@/play/drafts";
 import { effectiveTeams, initialParticipants } from "@/play/participants";
@@ -93,13 +94,20 @@ export function draftToRoomSeed(opts: {
 /** What the room form tells the host the setup brings with it. Pure. */
 export function roomSeedSummary(seed: RoomSeed): string {
   const n = seed.bots.length;
-  const bots = n === 0 ? "no bots" : n === 1 ? "1 bot" : `${n} bots`;
+  const bots = plural(n, { 0: "no bots", one: "# bot", other: "# bots" });
   const s = seed.openHumanSlots;
-  const seats = s === 1 ? "1 seat is left open" : `${s} seats are left open`;
-  const parts = [`Opens with ${bots}.`, `${seats} for people.`];
+  const seats = plural(s, {
+    one: "# seat is left open",
+    other: "# seats are left open",
+  });
+  const parts = [t`Opens with ${bots}.`, t`${seats} for people.`];
   if (seed.skippedBots.length > 0) {
+    const skipped = seed.skippedBots.join(", ");
     parts.push(
-      `This game offers no AI for ${seed.skippedBots.join(", ")}, so ${seed.skippedBots.length === 1 ? "it is" : "they are"} left out.`,
+      plural(seed.skippedBots.length, {
+        one: `This game offers no AI for ${skipped}, so it is left out.`,
+        other: `This game offers no AI for ${skipped}, so they are left out.`,
+      }),
     );
   }
   return parts.join(" ");

@@ -1,3 +1,4 @@
+import { Trans, useLingui } from "@lingui/react/macro";
 import { Button } from "@picoframe/frame";
 import { ArrowLeftRight } from "lucide-react";
 import { useState } from "react";
@@ -61,6 +62,7 @@ export function StartBoxControls({
   onSetBox: (ally: number, rect: StartRect) => void;
   onClearBox: (ally: number) => void;
 }) {
+  const { t } = useLingui();
   const hasBoxes = Object.keys(rects).length > 0;
   const clearAll = () => {
     for (const k of Object.keys(rects)) onClearBox(Number(k));
@@ -76,6 +78,7 @@ export function StartBoxControls({
   for (let i = 0; i < swaps % Math.max(allyList.length, 1); i++)
     allyOrder = rotateOrder(allyOrder);
 
+  const activeLetter = allyLetter(activeAlly);
   const boxHolders = allyList.filter((a) => rects[String(a)]).length;
   // Rotating only ever reassigns boxes that already exist, so it sends each
   // changed ally through onSetBox and clears nothing.
@@ -93,11 +96,14 @@ export function StartBoxControls({
           the thing you reach for before anything else here. The buttons below
           act on boxes that already exist, so they come second. */}
       <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5">
-        <span className="font-semibold">Start boxes</span>
+        <span className="font-semibold">
+          <Trans>Start boxes</Trans>
+        </span>
         <div className="flex flex-wrap items-center gap-1.5">
           {allyList.map((a) => {
             const color = allyPaletteColor(a);
             const active = a === activeAlly;
+            const letter = allyLetter(a);
             return (
               <button
                 key={a}
@@ -106,7 +112,11 @@ export function StartBoxControls({
                 onClick={() => onPickAlly(a)}
                 className={`flex size-6 items-center justify-center rounded font-bold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${active ? "ring-2 ring-foreground" : "opacity-70 hover:opacity-100"}`}
                 style={{ background: color, color: readableText(color) }}
-                title={`Draw ally ${allyLetter(a)}'s box${rects[String(a)] ? " (has one already)" : ""}`}
+                title={
+                  rects[String(a)]
+                    ? t`Draw ally ${letter}'s box (has one already)`
+                    : t`Draw ally ${letter}'s box`
+                }
               >
                 {allyLetter(a)}
               </button>
@@ -129,15 +139,15 @@ export function StartBoxControls({
           disabled={boxHolders < 2}
           title={
             boxHolders < 2
-              ? "Needs at least two allies with a box"
+              ? t`Needs at least two allies with a box`
               : boxHolders === 2
-                ? "Swap the two allies' boxes"
-                : `Move each of the ${boxHolders} boxes on to the next ally`
+                ? t`Swap the two allies' boxes`
+                : t`Move each of the ${boxHolders} boxes on to the next ally`
           }
           onClick={swapBoxes}
         >
           <ArrowLeftRight className="size-3.5" />
-          Swap
+          <Trans>Swap</Trans>
         </Button>
         <Button
           variant="outline"
@@ -145,13 +155,15 @@ export function StartBoxControls({
           disabled={!hasBoxes}
           onClick={clearAll}
         >
-          Clear all
+          <Trans>Clear all</Trans>
         </Button>
       </div>
 
       <p className="text-muted-foreground">
-        Drag on the map to draw ally {allyLetter(activeAlly)}'s box. Drag a box
-        to move it, its handles to resize, its cross to clear it.
+        <Trans>
+          Drag on the map to draw ally {activeLetter}'s box. Drag a box to move
+          it, its handles to resize, its cross to clear it.
+        </Trans>
       </p>
     </div>
   );

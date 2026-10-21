@@ -1,3 +1,4 @@
+import { t } from "@lingui/core/macro";
 import { MAX_DIFFICULTY, MIN_DIFFICULTY } from "../conquest/model";
 import { MAX_THREAT_LEVEL, readThreatLevel } from "../conquest/threat";
 import { clamp } from "../lib/helpers";
@@ -27,9 +28,17 @@ import {
 
 /** How each level is written on a briefing, as the campaign writes it. */
 export const DIFFICULTY_LABEL: Record<Difficulty, string> = {
-  easy: "Easy",
-  normal: "Normal",
-  hard: "Hard",
+  // Getters, so each read uses the language active at that moment. Callers
+  // index this record while rendering.
+  get easy() {
+    return t`Easy`;
+  },
+  get normal() {
+    return t`Normal`;
+  },
+  get hard() {
+    return t`Hard`;
+  },
 };
 
 /** A whole number from `lo` to `hi`, and `lo` for anything that is not a

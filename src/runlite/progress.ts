@@ -1,3 +1,4 @@
+import { t } from "@lingui/core/macro";
 import {
   HISTORY_CAP,
   type RewardOption,
@@ -170,8 +171,8 @@ export function applyReward(
  * resolved node can show what you chose). */
 export function rewardOptionLabel(option: RewardOption): string {
   return option.kind === "unlock"
-    ? `Unlocked ${option.unitName}`
-    : `Perk: ${option.perk.label}`;
+    ? t`Unlocked ${option.unitName}`
+    : t`Perk: ${option.perk.label}`;
 }
 
 /** Take one choice at an event node, applying its effects, then resolve it. */

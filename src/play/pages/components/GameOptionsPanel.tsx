@@ -1,3 +1,5 @@
+import { plural } from "@lingui/core/macro";
+import { Plural, Trans, useLingui } from "@lingui/react/macro";
 import { Button, Input } from "@picoframe/frame";
 import { ChevronDown, RotateCcw } from "lucide-react";
 import { useState } from "react";
@@ -66,6 +68,7 @@ export function GameOptionsPanel({
   onOptionValuesChange?: (values: Record<string, string>) => void;
   disabled?: boolean;
 }) {
+  const { t } = useLingui();
   const groups = groupOptions(options);
   const changed = changedOptions(options, (o) => optionValues[o.key]).length;
   const resetGroup = onOptionValuesChange
@@ -73,8 +76,10 @@ export function GameOptionsPanel({
         onOptionValuesChange(resetOptionValues(members, optionValues))
     : undefined;
   const summary = [
-    selectedGame?.name ?? "No game",
-    changed > 0 ? `${changed} options changed` : "default options",
+    selectedGame?.name ?? t`No game`,
+    changed > 0
+      ? plural(changed, { one: "# option changed", other: "# options changed" })
+      : t`default options`,
   ].join(" · ");
 
   return (
@@ -84,7 +89,9 @@ export function GameOptionsPanel({
     >
       <div className="flex items-center gap-1 pr-3">
         <CollapsibleTrigger className="flex min-w-0 flex-1 items-baseline gap-3 rounded-lg px-4 py-3 text-left hover:bg-muted/30">
-          <span className="text-sm font-semibold">Game options</span>
+          <span className="text-sm font-semibold">
+            <Trans>Game options</Trans>
+          </span>
           <span className="truncate text-xs text-muted-foreground">
             {summary}
           </span>
@@ -92,7 +99,7 @@ export function GameOptionsPanel({
         {resetGroup && !disabled && (
           <GroupReset
             count={changed}
-            label="Game options"
+            label={t`Game options`}
             onConfirm={() => resetGroup(options)}
           />
         )}
@@ -115,12 +122,12 @@ export function GameOptionsPanel({
               onto nothing at all. Say so instead. */}
           {groups.length === 0 ? (
             <p className="text-xs text-muted-foreground">
-              This game declares no options.
+              <Trans>This game declares no options.</Trans>
             </p>
           ) : (
             <>
               <div className="mb-2 text-[11px] uppercase tracking-wide text-muted-foreground">
-                Mod options
+                <Trans>Mod options</Trans>
               </div>
               <ModOptionGroups
                 options={options}
@@ -226,6 +233,7 @@ function OptionGrid({ group, readValue, disabled, onChange }: GroupProps) {
  * so a non-default setting can never hide behind a collapsed header.
  */
 function OptionSection(props: GroupProps) {
+  const { t } = useLingui();
   const { group, readValue, disabled, onResetGroup } = props;
   const changed = changedOptions(group.options, readValue).length;
 
@@ -244,13 +252,13 @@ function OptionSection(props: GroupProps) {
             {group.name}
           </span>
           <span className="ml-auto shrink-0 text-[11px] text-muted-foreground">
-            {changed > 0 ? `${changed} changed` : group.options.length}
+            {changed > 0 ? t`${changed} changed` : group.options.length}
           </span>
         </CollapsibleTrigger>
         {onResetGroup && !disabled && (
           <GroupReset
             count={changed}
-            label={group.name ?? "section"}
+            label={group.name ?? t`section`}
             onConfirm={() => onResetGroup(group.options)}
           />
         )}
@@ -309,18 +317,23 @@ function ChangedMark({
   /** Put this one option back to its default. Absent where it cannot be edited. */
   onReset?: () => void;
 }) {
+  const { t } = useLingui();
   if (!isChanged(option, value)) return null;
+  const optionName = option.name;
+  const defaultText = defaultLabel(option);
   return (
     <span className="mt-1 flex flex-wrap items-center gap-1.5 text-[10px] text-muted-foreground">
       <span className="shrink-0 rounded-full bg-primary/15 px-1.5 font-medium text-primary">
-        changed
+        <Trans>changed</Trans>
       </span>
-      <span className="truncate">Default: {defaultLabel(option)}</span>
+      <span className="truncate">
+        <Trans>Default: {defaultText}</Trans>
+      </span>
       {onReset && (
         <button
           type="button"
-          aria-label={`Reset ${option.name} to its default`}
-          title="Reset to default"
+          aria-label={t`Reset ${optionName} to its default`}
+          title={t`Reset to default`}
           onClick={onReset}
           className="shrink-0 rounded p-0.5 text-muted-foreground hover:bg-muted hover:text-foreground"
         >
@@ -349,6 +362,7 @@ export function GroupReset({
   /** A previous reset is still being sent. */
   busy?: boolean;
 }) {
+  const { t } = useLingui();
   const [open, setOpen] = useState(false);
   if (count === 0) return null;
   return (
@@ -359,19 +373,22 @@ export function GroupReset({
           size="sm"
           className="h-6 shrink-0 px-2 text-[11px]"
           disabled={busy}
-          aria-label={`Reset ${label}`}
+          aria-label={t`Reset ${label}`}
         >
-          Reset
+          <Trans>Reset</Trans>
         </Button>
       </PopoverTrigger>
       <PopoverContent align="end" className="flex w-64 flex-col gap-3">
         <p className="text-sm">
-          Reset {count} {count === 1 ? "option" : "options"} to{" "}
-          {count === 1 ? "its default" : "their defaults"}?
+          <Plural
+            value={count}
+            one="Reset # option to its default?"
+            other="Reset # options to their defaults?"
+          />
         </p>
         <div className="flex justify-end gap-2">
           <Button variant="ghost" size="sm" onClick={() => setOpen(false)}>
-            Cancel
+            <Trans>Cancel</Trans>
           </Button>
           <Button
             size="sm"
@@ -380,7 +397,7 @@ export function GroupReset({
               onConfirm();
             }}
           >
-            Reset
+            <Trans>Reset</Trans>
           </Button>
         </div>
       </PopoverContent>

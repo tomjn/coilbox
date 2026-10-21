@@ -13,6 +13,7 @@
  * handed an element and keeps it.
  */
 
+import { Trans, useLingui } from "@lingui/react/macro";
 import { Button } from "@picoframe/frame";
 import { useEffect, useRef, useState } from "react";
 import { Link } from "react-router";
@@ -47,6 +48,7 @@ export function QuickRoom({
   defaultName?: string;
   onStart: (args: StartRoomArgs) => Promise<string | undefined>;
 }) {
+  const { t } = useLingui();
   const content = useHostContent();
   const name = (defaultName ?? "Player").trim();
   const nameProblem = playerNameProblem(name);
@@ -113,21 +115,23 @@ export function QuickRoom({
   if (content.noEngine) {
     return (
       <p className="text-sm text-muted-foreground">
-        No engine found. Add a content folder with an engine in{" "}
-        <Link
-          className="font-medium underline underline-offset-4"
-          to="/settings/content-folders"
-        >
-          Settings → Content folders
-        </Link>{" "}
-        first.
+        <Trans>
+          No engine found. Add a content folder with an engine in{" "}
+          <Link
+            className="font-medium underline underline-offset-4"
+            to="/settings/content-folders"
+          >
+            Settings → Content folders
+          </Link>{" "}
+          first.
+        </Trans>
       </p>
     );
   }
   if (nameProblem) {
     return (
       <p className="text-sm text-muted-foreground">
-        {nameProblem} Use Host on LAN to pick a name.
+        {nameProblem} <Trans>Use Host on LAN to pick a name.</Trans>
       </p>
     );
   }
@@ -153,7 +157,7 @@ export function QuickRoom({
           {error}
         </p>
         <p className="text-xs text-muted-foreground">
-          Host on LAN lets you pick another port.
+          <Trans>Host on LAN lets you pick another port.</Trans>
         </p>
         <div className="flex justify-end">
           <Button
@@ -164,7 +168,7 @@ export function QuickRoom({
               setAttempt((a) => a + 1);
             }}
           >
-            Try again
+            <Trans>Try again</Trans>
           </Button>
         </div>
       </div>
@@ -190,8 +194,8 @@ export function QuickRoom({
   return (
     <p role="status" className="text-sm text-muted-foreground">
       {ready
-        ? `Starting a room for you and the computer on ${mapName}.`
-        : "Reading the game and the map."}
+        ? t`Starting a room for you and the computer on ${mapName}.`
+        : t`Reading the game and the map.`}
     </p>
   );
 }

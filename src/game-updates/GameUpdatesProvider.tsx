@@ -1,3 +1,5 @@
+import { t as coreT } from "@lingui/core/macro";
+import { useLingui } from "@lingui/react/macro";
 import { relaunch } from "@tauri-apps/plugin-process";
 import {
   createContext,
@@ -70,6 +72,7 @@ export function useGameUpdates(): GameUpdatesContextValue {
 }
 
 export function GameUpdatesProvider({ children }: { children: ReactNode }) {
+  const { t } = useLingui();
   const repo = getProfile().release?.repo ?? null;
   const writePath = useWriteRootPath("games");
   const { selected } = useScanTargetSelection();
@@ -132,9 +135,9 @@ export function GameUpdatesProvider({ children }: { children: ReactNode }) {
     () => [
       ...(updateAvailable && release ? [release.name || release.tag] : []),
       ...updatedGames.map((g) => g.title),
-      ...(engineUpdate ? [`Engine ${engineUpdate}`] : []),
+      ...(engineUpdate ? [t`Engine ${engineUpdate}`] : []),
     ],
-    [updateAvailable, release, updatedGames, engineUpdate],
+    [updateAvailable, release, updatedGames, engineUpdate, t],
   );
 
   const notifiedRef = useRef(false);
@@ -142,8 +145,8 @@ export function GameUpdatesProvider({ children }: { children: ReactNode }) {
     if (updateAvailable && !notifiedRef.current) {
       notifiedRef.current = true;
       void notify({
-        title: "Game update available",
-        body: "A newer game version is available to download.",
+        title: coreT`Game update available`,
+        body: coreT`A newer game version is available to download.`,
         level: "info",
         to: "/settings/game-updates",
       });
@@ -160,14 +163,17 @@ export function GameUpdatesProvider({ children }: { children: ReactNode }) {
       setCurrentFile(filename);
       const id = enqueue({
         kind: "file",
-        label: `Game update: ${filename}`,
+        label: coreT`Game update: ${filename}`,
         args: { url, destDir, filename },
       });
       setQueueId(id);
       const settled = await waitFor(id);
-      if (settled?.status === "canceled") throw new Error("Download canceled");
+      if (settled?.status === "canceled")
+        throw new Error(coreT`Download canceled`);
       if (settled?.status !== "done")
-        throw new Error(settled?.error ?? `Could not download ${filename}`);
+        throw new Error(
+          settled?.error ?? coreT`Could not download ${filename}`,
+        );
     },
     [enqueue, waitFor],
   );

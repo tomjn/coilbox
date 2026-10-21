@@ -1,3 +1,6 @@
+import type { MessageDescriptor } from "@lingui/core";
+import { msg, t } from "@lingui/core/macro";
+import { Trans, useLingui } from "@lingui/react/macro";
 import { Button } from "@picoframe/frame";
 import {
   Cpu,
@@ -25,28 +28,31 @@ import {
 import { contentOf, type QueueContent, queuedSize } from "./queueLanes";
 
 /** The same icons the sidebar uses for the maps, games and rapid pages. */
-const CONTENT_ICONS: Record<QueueContent, { icon: LucideIcon; name: string }> =
-  {
-    map: { icon: MapIcon, name: "Map" },
-    game: { icon: Gamepad2, name: "Game" },
-    rapid: { icon: Package, name: "Rapid" },
-    engine: { icon: Cpu, name: "Engine" },
-    file: { icon: File, name: "File" },
-  };
+const CONTENT_ICONS: Record<
+  QueueContent,
+  { icon: LucideIcon; name: MessageDescriptor }
+> = {
+  map: { icon: MapIcon, name: msg`Map` },
+  game: { icon: Gamepad2, name: msg`Game` },
+  rapid: { icon: Package, name: msg`Rapid` },
+  engine: { icon: Cpu, name: msg`Engine` },
+  file: { icon: File, name: msg`File` },
+};
 
 /**
  * An icon saying what a download is. It carries the kind as its accessible
  * name, so a screen reader hears "Map" before the map's name.
  */
 function ContentIcon({ content }: { content: QueueContent | null }) {
+  const { i18n } = useLingui();
   const { icon: Icon, name } = content
     ? CONTENT_ICONS[content]
-    : { icon: Download, name: "Download" };
+    : { icon: Download, name: msg`Download` };
   return (
     <Icon
       size={14}
       role="img"
-      aria-label={name}
+      aria-label={i18n._(name)}
       className="shrink-0 text-muted-foreground"
     />
   );
@@ -58,12 +64,13 @@ function ContentIcon({ content }: { content: QueueContent | null }) {
  * passing a partial total off as the whole.
  */
 export function queuedHeading(items: { sizeBytes?: number }[]): string {
-  const base = `Queued (${items.length})`;
+  const count = items.length;
   const size = queuedSize(items);
-  if (!size) return base;
+  if (!size) return t`Queued (${count})`;
   const total = formatBytes(size.bytes);
-  if (size.unknown === 0) return `${base} · ${total}`;
-  return `${base} · ${total} + ${size.unknown} of unknown size`;
+  if (size.unknown === 0) return t`Queued (${count}) · ${total}`;
+  const unknown = size.unknown;
+  return t`Queued (${count}) · ${total} + ${unknown} of unknown size`;
 }
 
 /**
@@ -78,7 +85,8 @@ export function queuedHeading(items: { sizeBytes?: number }[]): string {
 export function badgeSummary(item: ProgressSource | null): string | null {
   if (!item?.progress) return null;
   if (item.rate.secondsLeft != null) {
-    return `${formatDuration(item.rate.secondsLeft)} left`;
+    const left = formatDuration(item.rate.secondsLeft);
+    return t`${left} left`;
   }
   if (item.progress.percent != null)
     return `${Math.round(item.progress.percent)}%`;
@@ -99,6 +107,8 @@ function RunningDownload({
   content: QueueContent | null;
   onCancel?: () => void;
 }) {
+  const { t } = useLingui();
+  const label = item.label;
   return (
     <div className="space-y-2">
       <div className="flex items-center justify-between gap-2">
@@ -112,7 +122,7 @@ function RunningDownload({
             size="sm"
             className="h-6 shrink-0 px-2"
             onClick={onCancel}
-            aria-label={`Cancel downloading ${item.label}`}
+            aria-label={t`Cancel downloading ${label}`}
           >
             <X size={14} />
           </Button>
@@ -121,7 +131,9 @@ function RunningDownload({
       {item.progress ? (
         <QueueProgress item={item} />
       ) : (
-        <p className="text-xs text-muted-foreground">Starting…</p>
+        <p className="text-xs text-muted-foreground">
+          <Trans>Starting…</Trans>
+        </p>
       )}
     </div>
   );
@@ -141,6 +153,8 @@ function RunningDownload({
  * downloading (issue #1790).
  */
 export default function DownloadQueueBadge() {
+  const { t } = useLingui();
+  const removeLabel = (itemLabel: string) => t`Remove ${itemLabel} from queue`;
   const { running, active, queued, reported, cancel } = useDownloadQueue();
   if (running.length === 0 && queued.length === 0 && reported.length === 0)
     return null;
@@ -155,8 +169,8 @@ export default function DownloadQueueBadge() {
           className="flex items-center gap-1.5 rounded-full bg-primary/10 px-3 py-1 text-xs font-medium text-primary hover:bg-primary/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
           aria-label={
             summary
-              ? `Downloads: ${count} in progress, ${summary}`
-              : `Downloads: ${count} in progress`
+              ? t`Downloads: ${count} in progress, ${summary}`
+              : t`Downloads: ${count} in progress`
           }
         >
           <Download
@@ -164,7 +178,9 @@ export default function DownloadQueueBadge() {
             className="animate-pulse motion-reduce:animate-none"
           />
           <span className="tabular-nums">
-            {count} downloading{summary ? ` · ${summary}` : ""}
+            {summary
+              ? t`${count} downloading · ${summary}`
+              : t`${count} downloading`}
           </span>
         </button>
       </PopoverTrigger>
@@ -213,7 +229,7 @@ export default function DownloadQueueBadge() {
                     size="sm"
                     className="h-6 shrink-0 px-2"
                     onClick={() => cancel(item.id)}
-                    aria-label={`Remove ${item.label} from queue`}
+                    aria-label={removeLabel(item.label)}
                   >
                     <X size={14} />
                   </Button>
@@ -226,7 +242,7 @@ export default function DownloadQueueBadge() {
           to="/library/downloads"
           className="shrink-0 border-t border-border px-4 py-2 text-xs text-muted-foreground hover:text-foreground hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
         >
-          All downloads
+          <Trans>All downloads</Trans>
         </Link>
       </PopoverContent>
     </Popover>

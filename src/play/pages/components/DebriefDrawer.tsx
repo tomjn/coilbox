@@ -1,3 +1,4 @@
+import { Trans, useLingui } from "@lingui/react/macro";
 import { Button } from "@picoframe/frame";
 import {
   Film,
@@ -43,6 +44,7 @@ export function DebriefDrawer({
   defaultPresetName: string;
   disabled?: boolean;
 }) {
+  const { t, i18n } = useLingui();
   const [tweak, setTweak] = useState(HANDICAP_TWEAKS[1].value);
 
   if (!debrief) return null;
@@ -62,8 +64,11 @@ export function DebriefDrawer({
         ? "text-destructive"
         : "text-muted-foreground";
 
+  const duration =
+    durationSec != null ? formatDuration(durationSec) : t`unknown`;
+
   const rematchWithTweak = () => {
-    const delta = HANDICAP_TWEAKS.find((t) => t.value === tweak)?.delta ?? 0;
+    const delta = HANDICAP_TWEAKS.find((h) => h.value === tweak)?.delta ?? 0;
     onRematchWithTweak(delta);
   };
 
@@ -74,10 +79,10 @@ export function DebriefDrawer({
         <DialogPrimitive.Content className="fixed inset-y-0 right-0 z-50 flex w-[420px] max-w-[92vw] flex-col border-l border-border bg-background shadow-xl duration-200 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:slide-out-to-right data-[state=open]:slide-in-from-right">
           <div className="flex items-center justify-between border-b border-border/60 px-5 py-4">
             <DialogPrimitive.Title className="text-base font-semibold">
-              Match debrief
+              <Trans>Match debrief</Trans>
             </DialogPrimitive.Title>
             <DialogPrimitive.Close asChild>
-              <Button variant="ghost" size="icon" aria-label="Close">
+              <Button variant="ghost" size="icon" aria-label={t`Close`}>
                 <X className="size-4" />
               </Button>
             </DialogPrimitive.Close>
@@ -89,10 +94,7 @@ export function DebriefDrawer({
               <div className="flex flex-col gap-1">
                 <p className="text-sm font-medium">{headline}</p>
                 <p className="text-xs text-muted-foreground">
-                  Duration:{" "}
-                  {durationSec != null
-                    ? formatDuration(durationSec)
-                    : "unknown"}
+                  <Trans>Duration: {duration}</Trans>
                 </p>
                 {presetLine && <p className="text-sm">{presetLine}</p>}
               </div>
@@ -103,11 +105,12 @@ export function DebriefDrawer({
                 to={`/play/replays/${encodeURIComponent(replayFilename)}`}
                 className="inline-flex items-center gap-1.5 text-sm font-medium text-primary underline-offset-4 hover:underline"
               >
-                <Film className="size-4" /> View replay
+                <Film className="size-4" /> <Trans>View replay</Trans>
               </Link>
             ) : (
               <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                <Film className="size-4" /> No replay available for this match.
+                <Film className="size-4" />{" "}
+                <Trans>No replay available for this match.</Trans>
               </p>
             )}
 
@@ -117,16 +120,16 @@ export function DebriefDrawer({
                 disabled={disabled}
                 className="gap-1.5"
               >
-                <RefreshCw className="size-4" /> Rematch
+                <RefreshCw className="size-4" /> <Trans>Rematch</Trans>
               </Button>
 
               <div className="flex flex-col gap-2">
                 <OptionSelect
                   value={tweak}
                   onValueChange={setTweak}
-                  options={HANDICAP_TWEAKS.map((t) => ({
-                    value: t.value,
-                    label: t.label,
+                  options={HANDICAP_TWEAKS.map((h) => ({
+                    value: h.value,
+                    label: i18n._(h.label),
                   }))}
                   size="sm"
                   className="w-full"
@@ -137,7 +140,8 @@ export function DebriefDrawer({
                   disabled={disabled}
                   className="w-full gap-1.5"
                 >
-                  <SlidersHorizontal className="size-4" /> Rematch with tweak
+                  <SlidersHorizontal className="size-4" />{" "}
+                  <Trans>Rematch with tweak</Trans>
                 </Button>
               </div>
 

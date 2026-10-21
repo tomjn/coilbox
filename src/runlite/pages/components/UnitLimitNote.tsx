@@ -1,3 +1,4 @@
+import { useLingui } from "@lingui/react";
 import { type LimitReadiness, noLimitMessage } from "../../unitLimit";
 
 /**
@@ -13,6 +14,8 @@ export function UnitLimitNote({
   startUnit?: string;
   gameName: string;
 }) {
+  // Subscribes to the language, since noLimitMessage reads it when called.
+  useLingui();
   if (limit.kind !== "ready" || limit.limit.kind !== "none") return null;
   return (
     <p className="text-xs text-muted-foreground">

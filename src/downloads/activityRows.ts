@@ -1,3 +1,4 @@
+import { t } from "@lingui/core/macro";
 import type { EnqueueInput, QueueItem } from "./DownloadQueueProvider";
 import {
   type DownloadHistory,
@@ -41,22 +42,32 @@ export interface ActivityRow {
   at: number | null;
 }
 
-export const SOURCE_LABELS: Record<DownloadSourceKind, string> = {
-  rapid: "Rapid",
-  github: "GitHub",
-  springfiles: "Springfiles",
-  hakora: "Hakora",
-  evolutionrts: "EvolutionRTS",
-  url: "Direct",
-  file: "File",
-};
+/** The source's name. Only the generic ones are translated, the rest are brands. */
+function sourceLabel(source: DownloadSourceKind): string {
+  switch (source) {
+    case "rapid":
+      return "Rapid";
+    case "github":
+      return "GitHub";
+    case "springfiles":
+      return "Springfiles";
+    case "hakora":
+      return "Hakora";
+    case "evolutionrts":
+      return "EvolutionRTS";
+    case "url":
+      return t`Direct`;
+    case "file":
+      return t`File`;
+  }
+}
 
 /** "Springfiles · mirror.test", or the source alone when it has no host. */
 export function sourceText(step: {
   source: DownloadSourceKind;
   mirror: string | null;
 }): string {
-  const label = SOURCE_LABELS[step.source];
+  const label = sourceLabel(step.source);
   return step.mirror ? `${label} · ${step.mirror}` : label;
 }
 
@@ -66,9 +77,10 @@ export function sourceText(step: {
  * springfiles, so it is named for what it is.
  */
 export function retryLabel(next: SourceStep, content: QueueContent): string {
-  if (next.mirror) return "Try next mirror";
-  if (next.source === "rapid" && content === "map") return "Try pr-downloader";
-  return `Try ${SOURCE_LABELS[next.source]}`;
+  if (next.mirror) return t`Try next mirror`;
+  if (next.source === "rapid" && content === "map") return t`Try pr-downloader`;
+  const label = sourceLabel(next.source);
+  return t`Try ${label}`;
 }
 
 /**
@@ -133,7 +145,7 @@ function itemSource(item: QueueItem): string | null {
         mirror: hostOf(item.args.assetUrl),
       });
     case "engineBundled":
-      return "Bundled";
+      return t`Bundled`;
     default:
       return null;
   }

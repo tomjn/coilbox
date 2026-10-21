@@ -1,3 +1,5 @@
+import { plural } from "@lingui/core/macro";
+import { useLingui } from "@lingui/react/macro";
 import { Input } from "@picoframe/frame";
 import { Search } from "lucide-react";
 import { useMemo, useState } from "react";
@@ -27,14 +29,16 @@ function GameTile({
   selected: boolean;
   onSelect: () => void;
 }) {
+  const { t } = useLingui();
   const brand = useBrandingEntry(game);
   const brandBanner = useBrandingImage(brand?.banner, true);
+  const gameName = game.name;
   return (
     <GameCardShell
       name={game.name}
       title={brand?.title ?? game.name}
       artUrl={brandBanner ?? headers.get(game.name)}
-      alt={`${game.name} loading screen`}
+      alt={t`${gameName} loading screen`}
       version={game.info.version}
       sdd={isSdd(game.primaryArchive)}
       warnings={game.warnings}
@@ -78,6 +82,7 @@ export function GamePickerGrid({
    *  claim that nothing is installed. */
   scanError?: string | null;
 }) {
+  const { t } = useLingui();
   const [query, setQuery] = useState("");
   // A distribution profile can preset a game filter. When it does, the picker
   // only offers that game (matched on name). No profile offers every game.
@@ -95,9 +100,10 @@ export function GamePickerGrid({
     );
   }, [scoped, query]);
 
-  let empty = `No games match “${query}”.`;
+  const gameCount = scoped.length;
+  let empty = t`No games match “${query}”.`;
   if (scoped.length === 0)
-    empty = gamesLoading ? "Reading your games…" : "No games are installed.";
+    empty = gamesLoading ? t`Reading your games…` : t`No games are installed.`;
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
@@ -107,8 +113,11 @@ export function GamePickerGrid({
           <Input
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            placeholder={`Search ${scoped.length} games…`}
-            aria-label="Search games"
+            placeholder={plural(gameCount, {
+              one: "Search # game…",
+              other: "Search # games…",
+            })}
+            aria-label={t`Search games`}
             className="pl-9"
           />
         </div>
@@ -127,7 +136,7 @@ export function GamePickerGrid({
           ))}
           {filtered.length === 0 && scanError && (
             <div className="col-span-2">
-              <ScanFailed noun="games" reason={scanError} />
+              <ScanFailed noun={t`games`} reason={scanError} />
             </div>
           )}
           {filtered.length === 0 && !scanError && (

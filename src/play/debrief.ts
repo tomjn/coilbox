@@ -1,3 +1,5 @@
+import type { MessageDescriptor } from "@lingui/core";
+import { msg, t } from "@lingui/core/macro";
 import type { DetectedResult } from "./detect";
 import type { Participant } from "./participants";
 
@@ -21,23 +23,23 @@ export function describeOutcome(reason: DebriefReason): {
 } {
   switch (reason) {
     case "victory":
-      return { outcome: "victory", headline: "Victory!" };
+      return { outcome: "victory", headline: t`Victory!` };
     case "defeat":
-      return { outcome: "defeat", headline: "Defeat." };
+      return { outcome: "defeat", headline: t`Defeat.` };
     case "no-replay":
       return {
         outcome: "unknown",
-        headline: "Outcome unknown — no replay was found for this match.",
+        headline: t`Outcome unknown — no replay was found for this match.`,
       };
     case "decode-failed":
       return {
         outcome: "unknown",
-        headline: "Outcome unknown — the replay couldn't be read.",
+        headline: t`Outcome unknown — the replay couldn't be read.`,
       };
     default:
       return {
         outcome: "unknown",
-        headline: "Outcome unknown — the winner couldn't be determined.",
+        headline: t`Outcome unknown — the winner couldn't be determined.`,
       };
   }
 }
@@ -47,12 +49,12 @@ export function describeOutcome(reason: DebriefReason): {
  * unit of the bonus control in the participants table. */
 export const HANDICAP_TWEAKS: readonly {
   value: string;
-  label: string;
+  label: MessageDescriptor;
   delta: number;
 }[] = [
-  { value: "-10", label: "-10% AI handicap (easier)", delta: -10 },
-  { value: "10", label: "+10% AI handicap (harder)", delta: 10 },
-  { value: "25", label: "+25% AI handicap (harder)", delta: 25 },
+  { value: "-10", label: msg`-10% AI handicap (easier)`, delta: -10 },
+  { value: "10", label: msg`+10% AI handicap (harder)`, delta: 10 },
+  { value: "25", label: msg`+25% AI handicap (harder)`, delta: 25 },
 ];
 
 /**

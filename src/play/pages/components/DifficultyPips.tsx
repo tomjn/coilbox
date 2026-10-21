@@ -1,3 +1,4 @@
+import { useLingui } from "@lingui/react/macro";
 import { cn } from "@/lib/utils";
 import { PIP_SCALE } from "@/play/gameAi";
 
@@ -13,11 +14,14 @@ const POSITIONS = Array.from({ length: PIP_SCALE }, (_, i) => i);
  * absent reading never reads as "the easiest AI here".
  */
 export function DifficultyPips({ filled }: { filled: number }) {
+  const { t } = useLingui();
+  const scale = PIP_SCALE;
+  const label = t`Difficulty ${filled} of ${scale}`;
   return (
     <span
       role="img"
-      aria-label={`Difficulty ${filled} of ${PIP_SCALE}`}
-      title={`Difficulty ${filled} of ${PIP_SCALE}`}
+      aria-label={label}
+      title={label}
       className="flex shrink-0 items-center gap-0.5"
     >
       {POSITIONS.map((p) => (

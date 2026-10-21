@@ -1,3 +1,5 @@
+import { t as coreT, plural } from "@lingui/core/macro";
+import { Trans, useLingui } from "@lingui/react/macro";
 import { Button } from "@picoframe/frame";
 import { Gift, Sparkles, Store } from "lucide-react";
 import { BackToMapButton } from "../../../conquest/pages/components/BackToMapButton";
@@ -30,11 +32,12 @@ function Overlay({
   onClose: () => void;
   children: React.ReactNode;
 }) {
+  const { t } = useLingui();
   return (
     <div className="absolute inset-0 z-20 flex items-center justify-center bg-background/60 p-4 backdrop-blur-sm">
       <button
         type="button"
-        aria-label="Back to map"
+        aria-label={t`Back to map`}
         onClick={onClose}
         className="absolute inset-0 cursor-default"
       />
@@ -64,10 +67,14 @@ function optionText(o: RewardOption): {
   tag: string;
 } {
   if (o.kind === "unlock") {
+    const unitCount = o.opens.length + 1;
     return {
       name: o.unitName,
-      desc: `Unlocks ${o.opens.length + 1} unit${o.opens.length ? "s" : ""} along the build tree.`,
-      tag: "raises tech ceiling · both sides",
+      desc: plural(unitCount, {
+        one: "Unlocks # unit along the build tree.",
+        other: "Unlocks # units along the build tree.",
+      }),
+      tag: coreT`raises tech ceiling · both sides`,
     };
   }
   const pct = Math.round(o.perk.value * 100);
@@ -75,9 +82,9 @@ function optionText(o: RewardOption): {
     name: o.perk.label,
     desc:
       o.perk.kind === "advantage"
-        ? `+${pct}% resource advantage for your commander.`
-        : `+${pct}% income for your commander.`,
-    tag: "you only · per-team",
+        ? coreT`+${pct}% resource advantage for your commander.`
+        : coreT`+${pct}% income for your commander.`,
+    tag: coreT`you only · per-team`,
   };
 }
 
@@ -92,6 +99,7 @@ export function RewardOverlay({
   onApply: Apply;
   onClose: () => void;
 }) {
+  const { t } = useLingui();
   const options = node.reward?.options ?? [];
   const take = async (i: number) => {
     await onApply(applyReward(run, node.id, i));
@@ -104,13 +112,13 @@ export function RewardOverlay({
   return (
     <Overlay
       icon={<Gift className="size-5 text-yellow-300" aria-hidden />}
-      title={node.reward?.title ?? "Salvage cache"}
-      lede="Take a schematic to widen the arsenal, or a field upgrade for your command alone."
+      title={node.reward?.title ?? t`Salvage cache`}
+      lede={t`Take a schematic to widen the arsenal, or a field upgrade for your command alone.`}
       onClose={onClose}
     >
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
         {options.map((o, i) => {
-          const t = optionText(o);
+          const text = optionText(o);
           const key = o.kind === "unlock" ? `u-${o.unit}` : `p-${o.perk.label}`;
           return (
             <button
@@ -120,12 +128,12 @@ export function RewardOverlay({
               className="flex flex-col gap-2 rounded-md border border-border/60 bg-muted/30 p-4 text-left transition-colors hover:border-primary"
             >
               <span className="text-[10px] uppercase tracking-wider text-muted-foreground">
-                {o.kind === "unlock" ? "Schematic" : "Field upgrade"}
+                {o.kind === "unlock" ? t`Schematic` : t`Field upgrade`}
               </span>
-              <span className="font-semibold">{t.name}</span>
-              <span className="text-xs text-muted-foreground">{t.desc}</span>
+              <span className="font-semibold">{text.name}</span>
+              <span className="text-xs text-muted-foreground">{text.desc}</span>
               <span className="mt-auto text-[10px] uppercase tracking-wider text-muted-foreground">
-                {t.tag}
+                {text.tag}
               </span>
             </button>
           );
@@ -136,7 +144,7 @@ export function RewardOverlay({
         onClick={skip}
         className="self-center text-xs text-muted-foreground underline-offset-2 hover:underline"
       >
-        Leave it — press on
+        <Trans>Leave it — press on</Trans>
       </button>
     </Overlay>
   );
@@ -153,6 +161,7 @@ export function EventOverlay({
   onApply: Apply;
   onClose: () => void;
 }) {
+  const { t } = useLingui();
   const ev = node.event;
   const choose = async (i: number) => {
     await onApply(applyEvent(run, node.id, i));
@@ -163,7 +172,7 @@ export function EventOverlay({
       icon={
         <Sparkles className={`size-5 ${HUD_ACCENT_INK.violet}`} aria-hidden />
       }
-      title={ev?.title ?? "Signal"}
+      title={ev?.title ?? t`Signal`}
       lede={ev?.body}
       onClose={onClose}
     >
@@ -197,8 +206,11 @@ export function ShopOverlay({
   onApply: Apply;
   onClose: () => void;
 }) {
+  const { t } = useLingui();
   const shop = node.shop;
   const salvage = run.progress.salvage;
+  const restHull = shop?.restHull;
+  const restCost = shop?.restCost ?? 0;
   const buy = (i: number) => onApply(buyOffer(run, node.id, i));
   const rest = () => onApply(restAtShop(run, node.id));
   const leave = async () => {
@@ -220,13 +232,14 @@ export function ShopOverlay({
   return (
     <Overlay
       icon={<Store className="size-5 text-emerald-400" aria-hidden />}
-      title="Salvage depot"
-      lede={`Salvage: ${salvage} · cheapest ${cheapest} salvage`}
+      title={t`Salvage depot`}
+      lede={t`Salvage: ${salvage} · cheapest ${cheapest} salvage`}
       onClose={onClose}
     >
       <div className="flex flex-col gap-2">
         {(shop?.offers ?? []).map((offer, i) => {
-          const t = optionText(offer.option);
+          const text = optionText(offer.option);
+          const offerCost = offer.cost;
           const affordable = salvage >= offer.cost;
           const key =
             offer.option.kind === "unlock"
@@ -238,9 +251,9 @@ export function ShopOverlay({
               className="flex items-center justify-between gap-3 rounded-md border border-border/60 bg-muted/30 px-4 py-3"
             >
               <div className="min-w-0">
-                <div className="font-medium">{t.name}</div>
+                <div className="font-medium">{text.name}</div>
                 <div className="truncate text-xs text-muted-foreground">
-                  {t.desc}
+                  {text.desc}
                 </div>
               </div>
               <Button
@@ -249,7 +262,7 @@ export function ShopOverlay({
                 disabled={!affordable}
                 onClick={() => buy(i)}
               >
-                {offer.cost} salvage
+                <Trans>{offerCost} salvage</Trans>
               </Button>
             </div>
           );
@@ -257,9 +270,11 @@ export function ShopOverlay({
         {shop?.restHull != null && (
           <div className="flex items-center justify-between gap-3 rounded-md border border-dashed border-border/60 px-4 py-3">
             <div>
-              <div className="font-medium">Rest &amp; repair</div>
+              <div className="font-medium">
+                <Trans>Rest &amp; repair</Trans>
+              </div>
               <div className="text-xs text-muted-foreground">
-                +{shop.restHull} hull
+                <Trans>+{restHull} hull</Trans>
               </div>
             </div>
             <Button
@@ -268,22 +283,26 @@ export function ShopOverlay({
               disabled={!canRest}
               onClick={rest}
             >
-              {shop.restCost ?? 0} salvage
+              <Trans>{restCost} salvage</Trans>
             </Button>
           </div>
         )}
       </div>
       {!canAffordAny && (
         <p className="text-center text-xs text-muted-foreground">
-          Nothing here is within budget yet
-          {canRest
-            ? " — patch up and press on"
-            : " — press on and win more salvage"}
-          .
+          {canRest ? (
+            <Trans>
+              Nothing here is within budget yet — patch up and press on.
+            </Trans>
+          ) : (
+            <Trans>
+              Nothing here is within budget yet — press on and win more salvage.
+            </Trans>
+          )}
         </p>
       )}
       <Button className="self-center" variant="ghost" onClick={leave}>
-        Leave the depot
+        <Trans>Leave the depot</Trans>
       </Button>
     </Overlay>
   );

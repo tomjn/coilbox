@@ -1,3 +1,5 @@
+import { t as coreT } from "@lingui/core/macro";
+import { Trans, useLingui } from "@lingui/react/macro";
 import {
   Heart,
   HelpCircle,
@@ -25,21 +27,27 @@ import {
 import type { RogueliteRun } from "../../model";
 
 /** Difficulty tier -> flavour word for the trailing badge. */
-const DIFFICULTY_WORD = [
-  "Standard",
-  "Recruit",
-  "Standard",
-  "Veteran",
-  "Elite",
-  "Nightmare",
-];
+function difficultyWord(difficulty: number): string {
+  switch (difficulty) {
+    case 1:
+      return coreT`Recruit`;
+    case 3:
+      return coreT`Veteran`;
+    case 4:
+      return coreT`Elite`;
+    case 5:
+      return coreT`Nightmare`;
+    default:
+      return coreT`Standard`;
+  }
+}
 
 /** Hull % -> a status word + accent, so health reads at a glance. */
 function hullStatus(pct: number): { word: string; accent: HudAccent } {
-  if (pct >= 75) return { word: "Stable", accent: "teal" };
-  if (pct >= 40) return { word: "Strained", accent: "amber" };
-  if (pct >= 15) return { word: "Critical", accent: "danger" };
-  return { word: "Failing", accent: "danger" };
+  if (pct >= 75) return { word: coreT`Stable`, accent: "teal" };
+  if (pct >= 40) return { word: coreT`Strained`, accent: "amber" };
+  if (pct >= 15) return { word: coreT`Critical`, accent: "danger" };
+  return { word: coreT`Failing`, accent: "danger" };
 }
 
 /**
@@ -80,6 +88,7 @@ export function RunHud({
   /** Open the read-only arsenal tech-tree. Adds an inspect control when given. */
   onInspectArsenal?: () => void;
 }) {
+  const { t } = useLingui();
   const p = run.progress;
   const maxCol = Math.max(...run.nodes.map((n) => n.col), 1);
   const depth = Math.max(
@@ -96,7 +105,9 @@ export function RunHud({
 
   const difficulty = run.settings.difficulty;
   const ascension = run.settings.ascension;
-  const diffWord = DIFFICULTY_WORD[difficulty] ?? "Standard";
+  const sectorNumeral = toRoman(Math.max(1, depth));
+  const techNumeral = tier ? toRoman(tier) : "";
+  const diffWord = difficultyWord(difficulty);
 
   return (
     <div className="flex flex-wrap items-stretch gap-3">
@@ -108,14 +119,14 @@ export function RunHud({
 
       <StatCard
         icon={<Heart className="size-3.5 text-cyan-400" aria-hidden />}
-        label="Hull"
+        label={t`Hull`}
         meta={`${p.hull} / ${p.maxHull}`}
         value={hull.word}
         accent={hull.accent}
         action={
           <HelpDot
-            label="Hull"
-            help="Your warpath ends when this reaches zero. Losing a battle costs hull — you retreat and press on — while events and depots can restore it."
+            label={t`Hull`}
+            help={t`Your warpath ends when this reaches zero. Losing a battle costs hull — you retreat and press on — while events and depots can restore it.`}
           />
         }
       >
@@ -129,14 +140,14 @@ export function RunHud({
 
       <StatCard
         icon={<Layers className="size-3.5 text-amber-400" aria-hidden />}
-        label="Depth"
+        label={t`Depth`}
         meta={`${depth} / ${maxCol}`}
-        value={`Sector ${toRoman(Math.max(1, depth))}`}
+        value={t`Sector ${sectorNumeral}`}
         accent="amber"
         action={
           <HelpDot
-            label="Depth"
-            help="How far you've crossed the map. Reach and beat the warlord at the far end to win the warpath."
+            label={t`Depth`}
+            help={t`How far you've crossed the map. Reach and beat the warlord at the far end to win the warpath.`}
           />
         }
       >
@@ -158,26 +169,26 @@ export function RunHud({
 
       <StatCard
         icon={<Sparkles className="size-3.5 text-yellow-300" aria-hidden />}
-        label="Salvage"
+        label={t`Salvage`}
         value={`${p.salvage}`}
         accent="neutral"
         action={
           <HelpDot
-            label="Salvage"
-            help="Currency dropped by winning battles (more for elites and bosses). Spend it at depots on unit unlocks, perks, and repairs."
+            label={t`Salvage`}
+            help={t`Currency dropped by winning battles (more for elites and bosses). Spend it at depots on unit unlocks, perks, and repairs.`}
           />
         }
       >
         <p className="mt-1 font-display text-[10px] uppercase tracking-[0.18em] text-muted-foreground">
-          Spend at depots
+          <Trans>Spend at depots</Trans>
         </p>
       </StatCard>
 
       <StatCard
         icon={<Wrench className="size-3.5 text-muted-foreground" aria-hidden />}
-        label="Arsenal"
+        label={t`Arsenal`}
         meta={arsenalTotal ? `${unlocked} / ${arsenalTotal}` : undefined}
-        value={tier ? `Tech ${toRoman(tier)}` : `${unlocked}`}
+        value={tier ? t`Tech ${techNumeral}` : `${unlocked}`}
         accent="neutral"
         action={
           <div className="flex items-center gap-1">
@@ -185,22 +196,22 @@ export function RunHud({
               <button
                 type="button"
                 onClick={onInspectArsenal}
-                aria-label="View the arsenal tech tree"
-                title="View arsenal tree"
+                aria-label={t`View the arsenal tech tree`}
+                title={t`View arsenal tree`}
                 className="pointer-events-auto -m-1 flex size-5 items-center justify-center rounded text-muted-foreground transition-colors hover:text-foreground focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring"
               >
                 <ListTree className="size-3" aria-hidden />
               </button>
             )}
             <HelpDot
-              label="Arsenal"
-              help="The units you can currently build, out of your faction's full tree. Rewards and depots unlock more, but unlocking raises a shared tech ceiling, so the enemy escalates with you. Your personal edge comes from perks, not unlocks."
+              label={t`Arsenal`}
+              help={t`The units you can currently build, out of your faction's full tree. Rewards and depots unlock more, but unlocking raises a shared tech ceiling, so the enemy escalates with you. Your personal edge comes from perks, not unlocks.`}
             />
           </div>
         }
       >
         <p className="mt-1 font-display text-[10px] uppercase tracking-[0.18em] text-muted-foreground">
-          Shared ceiling
+          <Trans>Shared ceiling</Trans>
         </p>
       </StatCard>
 
@@ -223,12 +234,13 @@ export function RunHud({
 
 /** A subtle top-right help affordance for a stat tile. */
 function HelpDot({ label, help }: { label: string; help: string }) {
+  const { t } = useLingui();
   return (
     <Popover>
       <PopoverTrigger asChild>
         <button
           type="button"
-          aria-label={`What is ${label}?`}
+          aria-label={t`What is ${label}?`}
           className="pointer-events-auto -m-1 flex size-5 items-center justify-center rounded text-muted-foreground transition-colors hover:text-foreground focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring"
         >
           <HelpCircle className="size-3" aria-hidden />

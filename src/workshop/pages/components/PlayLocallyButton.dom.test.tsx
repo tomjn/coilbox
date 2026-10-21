@@ -309,7 +309,7 @@ describe("PlayLocallyButton", () => {
     // grid rather than a plain dropdown (issue #3164).
     fireEvent.click(screen.getByRole("button", { name: MAP.name }));
     const picker = screen.getByRole("dialog", { name: "Choose a map" });
-    expect(within(picker).getByPlaceholderText(/Search 1 maps/)).toBeTruthy();
+    expect(within(picker).getByPlaceholderText(/Search 1 map…/)).toBeTruthy();
 
     // Picking the map's card closes the picker and leaves the Test drawer's
     // own trigger showing the chosen map, still open underneath.

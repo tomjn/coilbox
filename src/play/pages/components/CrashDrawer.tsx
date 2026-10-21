@@ -1,3 +1,4 @@
+import { Trans, useLingui } from "@lingui/react/macro";
 import { Button } from "@picoframe/frame";
 import { AlertTriangle, ClipboardCopy, X } from "lucide-react";
 import { Dialog as DialogPrimitive } from "radix-ui";
@@ -27,6 +28,7 @@ export function CrashDrawer({
   onOpenChange: (open: boolean) => void;
   triage: CrashTriage | null;
 }) {
+  const { t } = useLingui();
   const [copied, setCopied] = useState(false);
 
   if (!triage) return null;
@@ -55,10 +57,10 @@ export function CrashDrawer({
         <DialogPrimitive.Content className="fixed inset-y-0 right-0 z-50 flex w-[680px] max-w-[96vw] flex-col border-l border-border bg-background shadow-xl duration-200 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:slide-out-to-right data-[state=open]:slide-in-from-right">
           <div className="flex items-center justify-between border-b border-border/60 px-5 py-4">
             <DialogPrimitive.Title className="text-base font-semibold">
-              The game stopped unexpectedly
+              <Trans>The game stopped unexpectedly</Trans>
             </DialogPrimitive.Title>
             <DialogPrimitive.Close asChild>
-              <Button variant="ghost" size="icon" aria-label="Close">
+              <Button variant="ghost" size="icon" aria-label={t`Close`}>
                 <X className="size-4" />
               </Button>
             </DialogPrimitive.Close>
@@ -73,29 +75,39 @@ export function CrashDrawer({
               <div className="flex flex-col gap-1">
                 <p className="text-sm font-medium">{describeExit(outcome)}</p>
                 <dl className="grid grid-cols-[auto_1fr] gap-x-3 text-xs text-muted-foreground">
-                  <dt>Playing</dt>
+                  <dt>
+                    <Trans>Playing</Trans>
+                  </dt>
                   <dd>{runKind}</dd>
                   {game ? (
                     <>
-                      <dt>Game</dt>
+                      <dt>
+                        <Trans>Game</Trans>
+                      </dt>
                       <dd>{game}</dd>
                     </>
                   ) : null}
                   {map ? (
                     <>
-                      <dt>Map</dt>
+                      <dt>
+                        <Trans>Map</Trans>
+                      </dt>
                       <dd>{map}</dd>
                     </>
                   ) : null}
                   {file ? (
                     <>
-                      <dt>File</dt>
+                      <dt>
+                        <Trans>File</Trans>
+                      </dt>
                       <dd className="break-all">{file}</dd>
                     </>
                   ) : null}
                   {engine ? (
                     <>
-                      <dt>Engine</dt>
+                      <dt>
+                        <Trans>Engine</Trans>
+                      </dt>
                       <dd className="break-all">{engine}</dd>
                     </>
                   ) : null}
@@ -108,15 +120,15 @@ export function CrashDrawer({
             ) : (
               <p className="text-sm text-muted-foreground">
                 {stale
-                  ? "The engine wrote no log for this run, so it stopped before it got that far. The newest log on disk is from an earlier session, and would tell you nothing about this."
-                  : "No engine log was found, so there is nothing to show beyond how it exited."}
+                  ? t`The engine wrote no log for this run, so it stopped before it got that far. The newest log on disk is from an earlier session, and would tell you nothing about this.`
+                  : t`No engine log was found, so there is nothing to show beyond how it exited.`}
               </p>
             )}
 
             <div className="flex flex-wrap gap-2 border-t border-border/60 pt-4">
               <Button onClick={copyReport} className="gap-1.5">
                 <ClipboardCopy className="size-4" />
-                {copied ? "Copied" : "Copy details"}
+                {copied ? t`Copied` : t`Copy details`}
               </Button>
             </div>
           </div>

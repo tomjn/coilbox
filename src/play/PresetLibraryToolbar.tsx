@@ -1,3 +1,4 @@
+import { Trans, useLingui } from "@lingui/react/macro";
 import { Button, Input } from "@picoframe/frame";
 import { Check, Save, Upload, X } from "lucide-react";
 import { useState } from "react";
@@ -35,6 +36,7 @@ export function PresetLibraryToolbar({
   onBrowseHub: () => void;
   disabled?: boolean;
 }) {
+  const { t } = useLingui();
   const [naming, setNaming] = useState(false);
   const [name, setName] = useState("");
 
@@ -63,7 +65,7 @@ export function PresetLibraryToolbar({
                 if (e.key === "Enter") commit();
                 if (e.key === "Escape") cancel();
               }}
-              placeholder="Preset name"
+              placeholder={t`Preset name`}
               className="h-8 flex-1"
             />
             <Button
@@ -71,7 +73,7 @@ export function PresetLibraryToolbar({
               size="icon"
               onClick={commit}
               disabled={!name.trim()}
-              aria-label="Save preset"
+              aria-label={t`Save preset`}
             >
               <Check className="size-4" />
             </Button>
@@ -79,7 +81,7 @@ export function PresetLibraryToolbar({
               variant="ghost"
               size="icon"
               onClick={cancel}
-              aria-label="Cancel"
+              aria-label={t`Cancel`}
             >
               <X className="size-4" />
             </Button>
@@ -101,7 +103,7 @@ export function PresetLibraryToolbar({
               onClick={onImport}
               disabled={disabled}
             >
-              <Upload className="size-4" /> Import
+              <Upload className="size-4" /> <Trans>Import</Trans>
             </Button>
           </>
         )}
@@ -122,7 +124,7 @@ export function PresetLibraryToolbar({
           onClick={onBrowseHub}
           disabled={disabled}
         >
-          <CoilboxGlyph size={16} /> Browse the hub
+          <CoilboxGlyph size={16} /> <Trans>Browse the hub</Trans>
         </Button>
       </div>
     </>

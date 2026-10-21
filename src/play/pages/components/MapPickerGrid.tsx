@@ -1,3 +1,5 @@
+import { plural } from "@lingui/core/macro";
+import { Trans, useLingui } from "@lingui/react/macro";
 import { Input } from "@picoframe/frame";
 import { Check, ImageOff, Loader2, Search } from "lucide-react";
 import { useMemo, useState } from "react";
@@ -37,6 +39,7 @@ export function MapPickerGrid({
    *  claim that nothing is installed. */
   scanError?: string | null;
 }) {
+  const { t } = useLingui();
   const [query, setQuery] = useState("");
   const filtered = useMemo(() => {
     // De-dupe by name + own-archive: collapses true duplicates (same map listed
@@ -66,6 +69,8 @@ export function MapPickerGrid({
       : unique;
   }, [maps, query]);
 
+  const mapCount = maps.length;
+
   return (
     <div className="flex min-h-0 flex-1 flex-col">
       <div className="px-5 pb-1 pt-4">
@@ -74,7 +79,10 @@ export function MapPickerGrid({
           <Input
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            placeholder={`Search ${maps.length} maps…`}
+            placeholder={plural(mapCount, {
+              one: "Search # map…",
+              other: "Search # maps…",
+            })}
             className="pl-9"
           />
         </div>
@@ -88,6 +96,7 @@ export function MapPickerGrid({
             // The map's own archive disambiguates same-named variants (e.g. a
             // packaged `.sd7` vs a decompiled `.sdd`).
             const archiveName = m.archives[0]?.name;
+            const mapName = m.name;
             return (
               <button
                 key={mapId(m)}
@@ -108,7 +117,7 @@ export function MapPickerGrid({
                   {thumb ? (
                     <img
                       src={thumb.url}
-                      alt={`Minimap of ${m.name}`}
+                      alt={t`Minimap of ${mapName}`}
                       className="size-full object-contain"
                     />
                   ) : (
@@ -133,7 +142,7 @@ export function MapPickerGrid({
           })}
           {filtered.length === 0 && scanError && (
             <div className="col-span-3">
-              <ScanFailed noun="maps" reason={scanError} />
+              <ScanFailed noun={t`maps`} reason={scanError} />
             </div>
           )}
           {filtered.length === 0 &&
@@ -141,16 +150,16 @@ export function MapPickerGrid({
             (mapsLoading ? (
               <div className="col-span-3 flex items-center justify-center gap-2 py-8 text-sm text-muted-foreground">
                 <Loader2 className="size-4 animate-spin" aria-hidden />
-                Scanning maps…
+                <Trans>Scanning maps…</Trans>
               </div>
             ) : maps.length === 0 ? (
               <div className="col-span-3 flex flex-col items-center gap-2 py-8 text-center text-sm text-muted-foreground">
                 <ImageOff className="size-6" aria-hidden />
-                No maps installed.
+                <Trans>No maps installed.</Trans>
               </div>
             ) : (
               <p className="col-span-3 py-8 text-center text-sm text-muted-foreground">
-                No maps match "{query}".
+                <Trans>No maps match "{query}".</Trans>
               </p>
             ))}
         </div>

@@ -1,3 +1,6 @@
+import { t } from "@lingui/core/macro";
+import { useLingui as useLocale } from "@lingui/react";
+import { Trans, useLingui } from "@lingui/react/macro";
 import { CircleCheck, CircleX, Info, Loader2 } from "lucide-react";
 import { Fragment, type ReactNode, useEffect, useState } from "react";
 import { Details, ResultCard, Verdict } from "@/components/ResultCard";
@@ -106,7 +109,9 @@ export function ReachablePorts({
   if (always) {
     return (
       <div className="flex flex-col gap-1.5">
-        <span className="text-sm font-medium">Game port</span>
+        <span className="text-sm font-medium">
+          <Trans>Game port</Trans>
+        </span>
         {help && <span className="text-xs text-muted-foreground">{help}</span>}
         {answer}
       </div>
@@ -123,7 +128,9 @@ export function ReachablePorts({
           className="mt-0.5"
         />
         <span className="flex flex-col gap-0.5">
-          <span className="font-medium">Open ports on my router</span>
+          <span className="font-medium">
+            <Trans>Open ports on my router</Trans>
+          </span>
           <span className="text-xs text-muted-foreground">{help}</span>
         </span>
       </label>
@@ -158,6 +165,9 @@ function Answer({
   /** The ports being asked for, named while the check runs. */
   asked: PortSpec[] | null;
 }) {
+  // Subscribes to the language, since readout and the helpers in reachability.ts
+  // read it when called.
+  useLocale();
   if (busy || (!report && !error)) {
     return (
       <ResultCard tone="quiet" role="status">
@@ -166,8 +176,13 @@ function Answer({
             <Loader2 className="size-3.5 shrink-0 motion-safe:animate-spin" />
           }
         >
-          Asking your router to open{" "}
-          {asked && asked.length > 0 ? <Ports ports={asked} /> : "the ports"}…
+          {asked && asked.length > 0 ? (
+            <Trans>
+              Asking your router to open <Ports ports={asked} />…
+            </Trans>
+          ) : (
+            <Trans>Asking your router to open the ports…</Trans>
+          )}
         </Verdict>
       </ResultCard>
     );
@@ -176,7 +191,7 @@ function Answer({
     return (
       <ResultCard tone="alarm" role="alert">
         <Verdict icon={<CircleX className="size-3.5 shrink-0" />}>
-          Could not check your router
+          <Trans>Could not check your router</Trans>
         </Verdict>
         <Details lines={[error]} />
       </ResultCard>
@@ -234,92 +249,110 @@ function readout(
   more: string[];
 } {
   const lan = report.lanAddress;
+  const method = methodLabel(report.method);
   switch (reachabilityState(report)) {
     case "direct":
       return {
-        title: "Players can reach you",
-        note: "This machine is on the internet under its own address.",
+        title: <Trans>Players can reach you</Trans>,
+        note: (
+          <Trans>This machine is on the internet under its own address.</Trans>
+        ),
         more: [],
       };
     case "open":
       return {
-        title: "Players can reach you",
+        title: <Trans>Players can reach you</Trans>,
         note: (
-          <>
-            {methodLabel(report.method)} opened <Ports ports={report.ports} />.
-          </>
+          <Trans>
+            {method} opened <Ports ports={report.ports} />.
+          </Trans>
         ),
         more: [],
       };
     case "noAddress":
       return {
-        title: (
-          <>
-            <Ports ports={report.ports} /> {isOrAre(report.ports)} open
-          </>
-        ),
-        note: "No server would say what your public address is.",
+        title:
+          report.ports.length > 1 ? (
+            <Trans>
+              <Ports ports={report.ports} /> are open
+            </Trans>
+          ) : (
+            <Trans>
+              <Ports ports={report.ports} /> is open
+            </Trans>
+          ),
+        note: <Trans>No server would say what your public address is.</Trans>,
         fix: lan ? (
-          <>
+          <Trans>
             Find it another way, or on this network use <Code>{lan}</Code>.
-          </>
+          </Trans>
         ) : (
-          "Find it another way to share it."
+          <Trans>Find it another way to share it.</Trans>
         ),
         more: [],
       };
     case "doubleNat":
       return {
-        title: "Your internet provider blocks the way in",
+        title: <Trans>Your internet provider blocks the way in</Trans>,
         note: (
-          <>
+          <Trans>
             Your router opened <Ports ports={report.ports} />, but your
             provider's own NAT sits in front of it.
-          </>
+          </Trans>
         ),
-        fix: "No router setting fixes this. Ask your provider for a public address.",
+        fix: (
+          <Trans>
+            No router setting fixes this. Ask your provider for a public
+            address.
+          </Trans>
+        ),
         more: report.routerAddress
           ? [
-              `Your router's own address is ${report.routerAddress}, which the internet does not route to.`,
+              t`Your router's own address is ${report.routerAddress}, which the internet does not route to.`,
             ]
           : [],
       };
     case "refused":
       return {
-        title: (
-          <>
-            <Ports ports={report.wanted} />{" "}
-            {report.wanted.length > 1 ? "aren't" : "isn't"} open
-          </>
-        ),
+        title:
+          report.wanted.length > 1 ? (
+            <Trans>
+              <Ports ports={report.wanted} /> aren't open
+            </Trans>
+          ) : (
+            <Trans>
+              <Ports ports={report.wanted} /> isn't open
+            </Trans>
+          ),
         // One line: why the fix is worth doing, which depends on what happens
         // without it, then the fix. With the relay carrying the battle it buys
         // a direct connection, and without one it is the only way in.
         fix: (
           <>
-            {relayWillCarry
-              ? "Fix this so players outside your network can connect without the relay."
-              : "Fix this so players outside your network can join."}{" "}
-            Enable UPnP or NAT-PMP in your router, or forward{" "}
-            <Ports ports={report.wanted} />
-            {lan ? (
-              <>
-                {" "}
-                to <Code>{lan}</Code>
-              </>
+            {relayWillCarry ? (
+              <Trans>
+                Fix this so players outside your network can connect without the
+                relay.
+              </Trans>
             ) : (
-              " by hand"
+              <Trans>Fix this so players outside your network can join.</Trans>
+            )}{" "}
+            {lan ? (
+              <Trans>
+                Enable UPnP or NAT-PMP in your router, or forward{" "}
+                <Ports ports={report.wanted} /> to <Code>{lan}</Code>.
+              </Trans>
+            ) : (
+              <Trans>
+                Enable UPnP or NAT-PMP in your router, or forward{" "}
+                <Ports ports={report.wanted} /> by hand.
+              </Trans>
             )}
-            .
           </>
         ),
         more: [],
       };
   }
-}
-
-function isOrAre(ports: { port: number }[]): string {
-  return ports.length > 1 ? "are" : "is";
 }
 
 /** Ports as a router's settings page names them, each one set as code. */
@@ -330,7 +363,12 @@ function Ports({
 }) {
   return ports.map((p, i) => (
     <Fragment key={`${p.transport}-${p.port}`}>
-      {i > 0 && " and "}
+      {i > 0 && (
+        <>
+          {" "}
+          <Trans>and</Trans>{" "}
+        </>
+      )}
       <Code>{`${p.transport.toUpperCase()} ${p.port}`}</Code>
     </Fragment>
   ));
@@ -346,6 +384,7 @@ function Code({ children }: { children: ReactNode }) {
 
 /** The address to send a friend, and one press to put it on the clipboard. */
 function CopyableAddress({ address }: { address: string }) {
+  const { t } = useLingui();
   return (
     <span className="flex items-center gap-2">
       <code className="select-all rounded bg-background px-1.5 py-0.5 font-mono text-foreground">
@@ -353,9 +392,9 @@ function CopyableAddress({ address }: { address: string }) {
       </code>
       <CopyButton
         value={address}
-        label={`Copy ${address}, the address somebody outside your network joins at`}
+        label={t`Copy ${address}, the address somebody outside your network joins at`}
       >
-        Copy
+        <Trans>Copy</Trans>
       </CopyButton>
     </span>
   );

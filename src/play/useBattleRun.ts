@@ -1,3 +1,4 @@
+import { t } from "@lingui/core/macro";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { composeUnits, type UnitsOwner } from "../campaign/units";
 import type { GameRef, NodeScenario } from "../conquest/model";
@@ -358,8 +359,11 @@ export function useBattleRun<TResolved>(opts: UseBattleRunOptions<TResolved>) {
     if (scenario) {
       const onGame = scenarioOnGame(scenario.doc, installedGame.name);
       if (!onGame) {
+        const scenarioName = scenario.doc.name;
+        const scenarioGame = scenario.doc.setup.gameName;
+        const installedName = installedGame.name;
         setError(
-          `The scenario "${scenario.doc.name}" was made for ${scenario.doc.setup.gameName}, which is a different game from ${installedGame.name}. It cannot be played here.`,
+          t`The scenario "${scenarioName}" was made for ${scenarioGame}, which is a different game from ${installedName}. It cannot be played here.`,
         );
         return;
       }

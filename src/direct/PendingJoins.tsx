@@ -1,3 +1,4 @@
+import { Trans, useLingui } from "@lingui/react/macro";
 import { Button } from "@picoframe/frame";
 import { DoorOpen } from "lucide-react";
 import { useCallback } from "react";
@@ -65,10 +66,11 @@ export function PendingJoinsPanel({
   pending: string[];
   onAnswer: (username: string, allow: boolean) => void;
 }) {
+  const { t } = useLingui();
   if (pending.length === 0) return null;
   return (
     <section
-      aria-label="Joins waiting for you"
+      aria-label={t`Joins waiting for you`}
       className="flex flex-wrap items-center gap-x-4 gap-y-2 border-b border-amber-500/40 bg-amber-500/10 px-4 py-3"
     >
       <div className="flex items-center gap-2">
@@ -84,7 +86,7 @@ export function PendingJoinsPanel({
         {pending.map((name) => (
           <li key={name} className="flex items-center gap-2">
             <Button size="sm" onClick={() => onAnswer(name, true)}>
-              Approve {name}
+              <Trans>Approve {name}</Trans>
             </Button>
             {/* Said in a tooltip rather than in the label, because the label is
                 what a screen reader announces and "Reject bob" is the whole of
@@ -92,10 +94,10 @@ export function PendingJoinsPanel({
             <Button
               size="sm"
               variant="secondary"
-              title={`${name} cannot ask again while this battle is open.`}
+              title={t`${name} cannot ask again while this battle is open.`}
               onClick={() => onAnswer(name, false)}
             >
-              Reject {name}
+              <Trans>Reject {name}</Trans>
             </Button>
           </li>
         ))}

@@ -1,3 +1,4 @@
+import { t } from "@lingui/core/macro";
 import { handmadeMapRefFor } from "../challenge/mapRef";
 import { generateCities } from "../conquest/cities";
 import type { GenerateOptions } from "../conquest/generate";
@@ -120,18 +121,21 @@ export function routeAcrossMap(
   const adj = neighbours(map);
   for (const id of [startId, goalId]) {
     if (!adj.has(id)) {
-      throw new MapRouteError(`The map has no location "${id}".`);
+      throw new MapRouteError(t`The map has no location "${id}".`);
     }
   }
   if (startId === goalId) {
+    const place = label(map, startId);
     throw new MapRouteError(
-      `The start and the goal are both "${label(map, startId)}". They must be different locations.`,
+      t`The start and the goal are both "${place}". They must be different locations.`,
     );
   }
   const dist = distancesFrom(adj, startId);
   if (!dist.has(goalId)) {
+    const goal = label(map, goalId);
+    const start = label(map, startId);
     throw new MapRouteError(
-      `The goal "${label(map, goalId)}" cannot be reached from the start "${label(map, startId)}".`,
+      t`The goal "${goal}" cannot be reached from the start "${start}".`,
     );
   }
   return routeFrom(map, adj, dist, startId, goalId);
@@ -258,7 +262,7 @@ export function pickEnds(map: RouteMap, rng: Rng): [string, string] {
     }
   }
   if (furthest === 0) {
-    throw new MapRouteError("The map has no two locations joined by a link.");
+    throw new MapRouteError(t`The map has no two locations joined by a link.`);
   }
 
   let best: RouteChoice = { fewest: -1, points: -1 };
@@ -435,7 +439,7 @@ export function generateMapRun(opts: GenerateMapRunOpts): RogueliteRun {
   const rng = mulberry32(hashString(`warpath-map:${opts.seed >>> 0}`));
   if ((opts.startId === undefined) !== (opts.goalId === undefined)) {
     throw new MapRouteError(
-      "A map needs both a start and a goal, or neither of them.",
+      t`A map needs both a start and a goal, or neither of them.`,
     );
   }
   const [startId, goalId] =
@@ -602,7 +606,7 @@ export function generateStyledRun(opts: GenerateRunOpts): RogueliteRun {
     const source = resolveRunMap(mapRef, opts.game);
     if (!source) {
       throw new MapRouteError(
-        "The map for this warpath could not be generated.",
+        t`The map for this warpath could not be generated.`,
       );
     }
     return generateMapRun({ ...opts, ...source, mapRef });

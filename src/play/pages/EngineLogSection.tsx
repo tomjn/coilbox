@@ -1,3 +1,4 @@
+import { Trans, useLingui } from "@lingui/react/macro";
 import { Button } from "@picoframe/frame";
 import { getVersion } from "@tauri-apps/api/app";
 import { ClipboardCopy, RefreshCw } from "lucide-react";
@@ -29,6 +30,7 @@ function describeSystem(s: SystemInfo): string {
  * root, so this is also the quickest way to find out where that is.
  */
 export default function EngineLogSection() {
+  const { t } = useLingui();
   const { target } = usePreferredTarget();
   const dataDir = target?.dataDir;
   const [log, setLog] = useState<InfologTail | null>(null);
@@ -71,20 +73,21 @@ export default function EngineLogSection() {
   if (!target) {
     return (
       <p className="text-sm text-muted-foreground">
-        No engine is installed, so nothing has written a log yet.
+        <Trans>No engine is installed, so nothing has written a log yet.</Trans>
       </p>
     );
   }
 
   const rows: [string, string][] = [];
-  if (system) rows.push(["System", describeSystem(system)]);
+  if (system) rows.push([t`System`, describeSystem(system)]);
   if (appVersion) rows.push(["Coilbox", appVersion]);
-  rows.push(["Engine", target.engineVersion]);
+  rows.push([t`Engine`, target.engineVersion]);
 
   const copySystemInfo = () => {
+    const logPath = log?.path ?? t`none found`;
     const text = [
       ...rows.map(([k, v]) => `${k}: ${v}`),
-      `Log: ${log?.path ?? "none found"}`,
+      t`Log: ${logPath}`,
     ].join("\n");
     navigator.clipboard
       .writeText(text)
@@ -101,12 +104,12 @@ export default function EngineLogSection() {
           onClick={() => void load()}
           disabled={loading}
         >
-          <RefreshCw className="size-4" /> {loading ? "Reading" : "Reload"}
+          <RefreshCw className="size-4" /> {loading ? t`Reading` : t`Reload`}
         </Button>
       </EngineLogFile>
       {log ? null : (
         <p className="text-sm text-muted-foreground">
-          {error ?? "Looking for the engine log."}
+          {error ?? t`Looking for the engine log.`}
         </p>
       )}
 
@@ -121,7 +124,7 @@ export default function EngineLogSection() {
         </dl>
         <Button variant="outline" className="gap-1.5" onClick={copySystemInfo}>
           <ClipboardCopy className="size-4" />
-          {copied ? "Copied" : "Copy system info"}
+          {copied ? t`Copied` : t`Copy system info`}
         </Button>
       </div>
     </div>

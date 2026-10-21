@@ -1,3 +1,4 @@
+import { useLingui } from "@lingui/react/macro";
 import { open } from "@tauri-apps/plugin-dialog";
 import { useState } from "react";
 import { identify } from "@/container/container";
@@ -29,21 +30,22 @@ export type PendingPreset = SkirmishDraft & { name?: string };
  * saving something that cannot be launched.
  */
 export function usePresetImport(onError: (message: string | null) => void) {
+  const { t } = useLingui();
   const [pending, setPending] = useState<PendingPreset | null>(null);
 
   const importFromFile = async () => {
     onError(null);
     try {
       const src = await open({
-        title: "Import preset",
+        title: t`Import preset`,
         multiple: false,
-        filters: [{ name: "Coilbox preset", extensions: ["json"] }],
+        filters: [{ name: t`Coilbox preset`, extensions: ["json"] }],
       });
       if (typeof src !== "string") return;
       const { json } = await playImportPreset({ src });
       const parsed = parsePresetJson(json);
       if (!parsed) {
-        onError("That file isn't a valid coilbox preset.");
+        onError(t`That file isn't a valid coilbox preset.`);
         return;
       }
       // Take the preset's word for the shortname of the build it pins, so a
@@ -73,10 +75,11 @@ export function PresetImportGate({
   onContinue: (preset: PendingPreset) => void;
   onCancel: () => void;
 }) {
+  const { t } = useLingui();
   if (!pending) return null;
   return (
     <ResolveContentGate
-      title="Set up this preset"
+      title={t`Set up this preset`}
       requirements={[
         exactGameRequirement(pending.gameName),
         exactMapRequirement(pending.mapName),

@@ -11,6 +11,7 @@
  * already-pasted pack code breaks.
  */
 
+import { t } from "@lingui/core/macro";
 import {
   type ContainerCodeResult,
   decodeContainerText,
@@ -85,12 +86,12 @@ export function decodePackEnvelope<S>(
 export function packDecodeErrorMessage(error: PackDecodeError): string {
   switch (error) {
     case "unknown-format":
-      return "That doesn't look like a coilbox setup pack.";
+      return t`That doesn't look like a coilbox setup pack.`;
     case "unsupported-version":
-      return "This setup pack was made by a newer version of coilbox.";
+      return t`This setup pack was made by a newer version of coilbox.`;
     case "wrong-kind":
-      return "That code isn't a setup pack.";
+      return t`That code isn't a setup pack.`;
     default:
-      return "That setup pack is corrupted or incomplete.";
+      return t`That setup pack is corrupted or incomplete.`;
   }
 }

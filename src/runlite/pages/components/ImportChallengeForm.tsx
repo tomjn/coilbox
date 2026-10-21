@@ -1,3 +1,4 @@
+import { useLingui } from "@lingui/react/macro";
 import { ImportChallengeForm as SharedImportChallengeForm } from "../../../challenge/ImportChallengeForm";
 import { warpathIdentity } from "../../../challenge/identity";
 import { ImportHold } from "../../../challenge/importHold";
@@ -74,6 +75,7 @@ export function ImportChallengeForm({
   /** A confirmed `coilbox://` import code to prefill and run once (issue #388). */
   initialCode?: string;
 }) {
+  const { t } = useLingui();
   const { target } = usePreferredTarget();
   const scan = useUnitsyncScan(target?.enginePath, target?.dataDir);
   const { eligible } = useMapEligibility();
@@ -94,12 +96,14 @@ export function ImportChallengeForm({
       candidateGames(settings.game, games)[0];
     if (!installedGame) {
       if (scan.error) {
+        const scanError = scan.error;
         throw new Error(
-          `The content scan failed, so this challenge's game could not be looked for: ${scan.error}`,
+          t`The content scan failed, so this challenge's game could not be looked for: ${scanError}`,
         );
       }
+      const gameShortname = settings.game.shortname;
       throw new Error(
-        `This challenge needs "${settings.game.shortname}", which isn't installed. Install it from Content → Games, then try again.`,
+        t`This challenge needs "${gameShortname}", which isn't installed. Install it from Content → Games, then try again.`,
       );
     }
 
@@ -135,9 +139,10 @@ export function ImportChallengeForm({
     // Without it the run has no limit and offers perks only, which the player
     // must hear about before the run exists (issue #3488).
     const read = await readUnitData(target, archive, settings.side);
+    const fixedSide = settings.side;
     const warning = setupLimitWarning({
       gameName: installedGame.name,
-      sideName: settings.side ?? "this game",
+      sideName: settings.side ?? t`this game`,
       startUnit: read.startUnit,
       status: read.failure === undefined ? "ready" : "error",
       units: read.units ?? [],
@@ -147,16 +152,16 @@ export function ImportChallengeForm({
         ? new ImportHold({
             message: warning,
             note: settings.side
-              ? `This challenge code fixes the side to ${settings.side}, so you cannot choose another.`
-              : "This challenge code names no side, so you cannot choose one.",
+              ? t`This challenge code fixes the side to ${fixedSide}, so you cannot choose another.`
+              : t`This challenge code names no side, so you cannot choose one.`,
             canRetry: false,
-            acceptLabel: "Create run anyway",
+            acceptLabel: t`Create run anyway`,
           })
         : new ImportHold({
             message: warning,
             detail: read.failure,
             canRetry: true,
-            acceptLabel: "Create run with no unit limit",
+            acceptLabel: t`Create run with no unit limit`,
           });
     }
     const build = read.units
@@ -176,8 +181,8 @@ export function ImportChallengeForm({
 
   return (
     <SharedImportChallengeForm
-      helpText="Paste a challenge code shared by another player to generate the identical warpath on your own install."
-      substitutedNoun="encounters"
+      helpText={t`Paste a challenge code shared by another player to generate the identical warpath on your own install.`}
+      substitutedNoun={t`encounters`}
       initialCode={initialCode}
       decode={decodeWarpathChallenge}
       identityOf={warpathIdentity}

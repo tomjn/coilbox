@@ -1,3 +1,4 @@
+import { Trans, useLingui } from "@lingui/react/macro";
 import { Button } from "@picoframe/frame";
 import { Download, Loader2 } from "lucide-react";
 import { useEffect, useState } from "react";
@@ -22,14 +23,16 @@ const boxClass =
 export function NoEngineNotice({
   targetLoading,
   refresh,
-  playing = "a skirmish",
+  playing,
 }: {
   targetLoading: boolean;
   refresh: () => Promise<void>;
   /** What the engine is for, finishing "to play ...". */
   playing?: string;
 }) {
+  const { t } = useLingui();
   const writeRoot = useWriteRoot();
+  const playingText = playing ?? t`a skirmish`;
   const { ensureContent } = useLaunchContent();
   const [newest, setNewest] = useState<{
     loaded: boolean;
@@ -64,7 +67,7 @@ export function NoEngineNotice({
     try {
       const check = await ensureContent({
         requirements: launchRequirements({ engineVersion: version }),
-        title: "Download an engine to play",
+        title: t`Download an engine to play`,
       });
       if (check.ready) await refresh();
     } finally {
@@ -73,11 +76,14 @@ export function NoEngineNotice({
   }
 
   if (offer.kind === "download") {
+    const engineVersion = offer.version;
     return (
       <div className={`${boxClass} flex flex-col items-start gap-2`}>
         <p>
-          No engine is installed. Download engine {offer.version} to play{" "}
-          {playing}.
+          <Trans>
+            No engine is installed. Download engine {engineVersion} to play{" "}
+            {playingText}.
+          </Trans>
         </p>
         <Button
           size="sm"
@@ -89,7 +95,7 @@ export function NoEngineNotice({
           ) : (
             <Download className="size-4" />
           )}
-          Download engine
+          <Trans>Download engine</Trans>
         </Button>
       </div>
     );
@@ -98,14 +104,16 @@ export function NoEngineNotice({
   if (offer.kind === "settings") {
     return (
       <p className={boxClass}>
-        No engine found. Add a content folder with an engine in{" "}
-        <Link
-          className="font-medium underline underline-offset-4"
-          to="/settings/content-folders"
-        >
-          Settings → Content folders
-        </Link>{" "}
-        first.
+        <Trans>
+          No engine found. Add a content folder with an engine in{" "}
+          <Link
+            className="font-medium underline underline-offset-4"
+            to="/settings/content-folders"
+          >
+            Settings → Content folders
+          </Link>{" "}
+          first.
+        </Trans>
       </p>
     );
   }

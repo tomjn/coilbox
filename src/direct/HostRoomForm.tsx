@@ -13,6 +13,7 @@
  * the only thing that needs them, and it always knows them first hand.
  */
 
+import { Trans, useLingui } from "@lingui/react/macro";
 import { Button, Input, useDrawer } from "@picoframe/frame";
 import { ChevronLeft, ImageOff } from "lucide-react";
 import { useState } from "react";
@@ -136,6 +137,8 @@ export function HostRoomForm({
   onStart: (args: StartRoomArgs) => Promise<string | undefined>;
 }) {
   const drawer = useDrawer();
+  const { t } = useLingui();
+  const hostPort = DEFAULT_HOST_PORT;
   const content = useHostContent(
     draft?.gameName || undefined,
     draft?.mapName || undefined,
@@ -254,14 +257,16 @@ export function HostRoomForm({
   if (content.noEngine) {
     return (
       <p className="text-sm text-muted-foreground">
-        No engine found. Add a content folder with an engine in{" "}
-        <Link
-          className="font-medium underline underline-offset-4"
-          to="/settings/content-folders"
-        >
-          Settings → Content folders
-        </Link>{" "}
-        first.
+        <Trans>
+          No engine found. Add a content folder with an engine in{" "}
+          <Link
+            className="font-medium underline underline-offset-4"
+            to="/settings/content-folders"
+          >
+            Settings → Content folders
+          </Link>{" "}
+          first.
+        </Trans>
       </p>
     );
   }
@@ -279,7 +284,7 @@ export function HostRoomForm({
         selectedName={content.gameName}
         onSelect={content.setGameName}
         onBack={() => setPickingGame(false)}
-        backLabel="Back to the room form"
+        backLabel={t`Back to the room form`}
         gamesLoading={content.scanning}
         scanError={content.scanError}
       />
@@ -294,12 +299,14 @@ export function HostRoomForm({
             type="button"
             variant="ghost"
             size="icon"
-            aria-label="Back to the room form"
+            aria-label={t`Back to the room form`}
             onClick={() => setPickingMap(false)}
           >
             <ChevronLeft className="size-4" />
           </Button>
-          <h2 className="text-sm font-semibold">Choose a map</h2>
+          <h2 className="text-sm font-semibold">
+            <Trans>Choose a map</Trans>
+          </h2>
         </div>
         <MapPickerGrid
           maps={content.maps}
@@ -323,21 +330,25 @@ export function HostRoomForm({
       <div className="flex gap-2">
         {/* biome-ignore lint/a11y/noLabelWithoutControl: wraps the control (implicit label association) */}
         <label className="flex flex-1 flex-col gap-1 text-sm">
-          <span className="font-medium">Room name</span>
+          <span className="font-medium">
+            <Trans>Room name</Trans>
+          </span>
           <Input
             value={title}
             onChange={(e) => setTitle(e.target.value)}
-            placeholder={`${trimmedName || "Your"}'s room`}
+            placeholder={trimmedName ? t`${trimmedName}'s room` : t`Your room`}
           />
         </label>
 
         {/* biome-ignore lint/a11y/noLabelWithoutControl: wraps the control (implicit label association) */}
         <label className="flex flex-1 flex-col gap-1 text-sm">
-          <span className="font-medium">Your name</span>
+          <span className="font-medium">
+            <Trans>Your name</Trans>
+          </span>
           <Input
             value={name}
             onChange={(e) => setName(e.target.value)}
-            placeholder="The name others see"
+            placeholder={t`The name others see`}
             {...identifierFieldProps}
           />
         </label>
@@ -347,18 +358,22 @@ export function HostRoomForm({
       )}
 
       <div className="flex flex-col gap-1 text-sm">
-        <span className="font-medium">Game</span>
+        <span className="font-medium">
+          <Trans>Game</Trans>
+        </span>
         <GamePickerButton
           value={content.gameName}
           games={content.games}
           headers={gameHeaders}
-          placeholder={content.scanning ? "Scanning…" : "Select a game"}
+          placeholder={content.scanning ? t`Scanning…` : t`Select a game`}
           onClick={() => setPickingGame(true)}
         />
       </div>
 
       <div className="flex flex-col gap-1 text-sm">
-        <span className="font-medium">Map</span>
+        <span className="font-medium">
+          <Trans>Map</Trans>
+        </span>
         <button
           type="button"
           onClick={() => setPickingMap(true)}
@@ -377,7 +392,7 @@ export function HostRoomForm({
           </span>
           <span className="min-w-0 flex-1 truncate">
             {content.mapName ||
-              (content.scanning ? "Scanning…" : "Select a map")}
+              (content.scanning ? t`Scanning…` : t`Select a map`)}
           </span>
         </button>
       </div>
@@ -385,7 +400,9 @@ export function HostRoomForm({
       <div className="flex gap-2">
         {/* biome-ignore lint/a11y/noLabelWithoutControl: wraps the control (implicit label association) */}
         <label className="flex flex-1 flex-col gap-1 text-sm">
-          <span className="font-medium">Max players</span>
+          <span className="font-medium">
+            <Trans>Max players</Trans>
+          </span>
           <Input
             type="number"
             min={2}
@@ -400,7 +417,9 @@ export function HostRoomForm({
         </label>
         {/* biome-ignore lint/a11y/noLabelWithoutControl: wraps the control (implicit label association) */}
         <label className="flex flex-1 flex-col gap-1 text-sm">
-          <span className="font-medium">Room port</span>
+          <span className="font-medium">
+            <Trans>Room port</Trans>
+          </span>
           <Input
             type="number"
             min={1}
@@ -416,12 +435,14 @@ export function HostRoomForm({
 
       {/* biome-ignore lint/a11y/noLabelWithoutControl: wraps the control (implicit label association) */}
       <label className="flex flex-col gap-1 text-sm">
-        <span className="font-medium">Password (optional)</span>
+        <span className="font-medium">
+          <Trans>Password (optional)</Trans>
+        </span>
         <Input
           type="password"
           value={password}
           onChange={(e) => setPassword(e.target.value)}
-          placeholder="Leave blank for an open room"
+          placeholder={t`Leave blank for an open room`}
           {...identifierFieldProps}
         />
         {passwordProblem && (
@@ -437,17 +458,21 @@ export function HostRoomForm({
           className="mt-0.5"
         />
         <span className="flex flex-col gap-0.5">
-          <span className="font-medium">Advertise on the local network</span>
+          <span className="font-medium">
+            <Trans>Advertise on the local network</Trans>
+          </span>
           <span className="text-xs text-muted-foreground">
-            People on this network see your room without being told an address.
-            Turn it off and they need your address and port.
+            <Trans>
+              People on this network see your room without being told an
+              address. Turn it off and they need your address and port.
+            </Trans>
           </span>
         </span>
       </label>
 
       <ReachablePorts
         ports={portProblem ? null : roomPorts(Number(port), DEFAULT_HOST_PORT)}
-        help={`Asks your router to forward the room's port and the game's port ${DEFAULT_HOST_PORT} so people outside this network can join. Both, because opening only the room's gets everybody in and then fails at launch.`}
+        help={t`Asks your router to forward the room's port and the game's port ${hostPort} so people outside this network can join. Both, because opening only the room's gets everybody in and then fails at launch.`}
         onReport={setReachability}
       />
 
@@ -463,10 +488,14 @@ export function HostRoomForm({
           className="mt-0.5"
         />
         <span className="flex flex-col gap-0.5">
-          <span className="font-medium">Approve joins</span>
+          <span className="font-medium">
+            <Trans>Approve joins</Trans>
+          </span>
           <span className="text-xs text-muted-foreground">
-            Nobody gets in until you say so. You are asked in the battle room,
-            and whoever is asking waits until you answer.
+            <Trans>
+              Nobody gets in until you say so. You are asked in the battle room,
+              and whoever is asking waits until you answer.
+            </Trans>
           </span>
         </span>
       </label>
@@ -488,7 +517,7 @@ export function HostRoomForm({
                 className="h-6 shrink-0 px-2"
                 onClick={content.gameInfo.reload}
               >
-                Retry
+                <Trans>Retry</Trans>
               </Button>
             </div>
           )}
@@ -507,7 +536,7 @@ export function HostRoomForm({
                 className="h-6 shrink-0 px-2"
                 onClick={content.mapInfo.reload}
               >
-                Retry
+                <Trans>Retry</Trans>
               </Button>
             </div>
           )}
@@ -544,7 +573,7 @@ export function HostRoomForm({
           className="h-9"
           onClick={() => drawer.close()}
         >
-          Cancel
+          <Trans>Cancel</Trans>
         </Button>
         <Button type="submit" className="h-9" disabled={!canStart}>
           {leaves && !starting && content.checksumsReady

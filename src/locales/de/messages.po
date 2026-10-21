@@ -7,8 +7,24 @@ msgstr ""
 "X-Generator: @lingui/cli\n"
 "Language: de\n"
 
+#: src/play/debrief.ts
+msgid "-10% AI handicap (easier)"
+msgstr ""
+
+#: src/direct/ShareRoomButton.tsx
+msgid ", has a warning"
+msgstr ""
+
 #: src/profile/health.ts
 msgid "''{id}'' is now ''{current}''"
+msgstr ""
+
+#: src/play/pages/SkirmishPage.tsx
+msgid "\"{name}\" — replay it from Singleplayer → Presets."
+msgstr ""
+
+#: src/play/pages/components/SaveAsPresetButton.tsx
+msgid "\"{trimmed}\" — replay it from Singleplayer → Presets."
 msgstr ""
 
 #: src/general/ErrorBoundary.tsx
@@ -23,6 +39,16 @@ msgstr ""
 #. placeholder {0}: rest.length
 #: src/home/zones/Greeting.tsx
 msgid "{0, plural, one {{first} and # other} other {{first} and # others}}"
+msgstr ""
+
+#. placeholder {0}: record.attempts
+#: src/play/presetRecord.ts
+msgid "{0, plural, one {# attempt} other {# attempts}}"
+msgstr ""
+
+#. placeholder {0}: layouts.length
+#: src/packs/pages/components/ImportPackForm.tsx
+msgid "{0, plural, one {# blueprint added to your library.} other {# blueprints added to your library.}}"
 msgstr ""
 
 #. placeholder {0}: unknown.length
@@ -40,9 +66,39 @@ msgstr ""
 msgid "{0, plural, one {# link icon unknown} other {# link icons unknown}}"
 msgstr ""
 
+#. placeholder {0}: counts.plain
+#: src/play/presetParts.ts
+msgid "{0, plural, one {# option} other {# options}}"
+msgstr ""
+
+#. placeholder {0}: draft.participants.length
+#: src/play/presetParts.ts
+msgid "{0, plural, one {# player} other {# players}}"
+msgstr ""
+
+#. placeholder {0}: bundled.length
+#: src/packs/pages/components/ImportPackForm.tsx
+msgid "{0, plural, one {# preset added. Load it from Singleplayer → Presets.} other {# presets added. Load one from Singleplayer → Presets.}}"
+msgstr ""
+
 #. placeholder {0}: home.issues.length
 #: src/profile/health.ts
 msgid "{0, plural, one {# problem in `home`} other {# problems in `home`}}"
+msgstr ""
+
+#. placeholder {0}: counts.tweak
+#: src/play/presetParts.ts
+msgid "{0, plural, one {# tweak slot} other {# tweak slots}}"
+msgstr ""
+
+#. placeholder {0}: r.disabledUnits.length
+#: src/play/presetParts.ts
+msgid "{0, plural, one {# unit disabled} other {# units disabled}}"
+msgstr ""
+
+#. placeholder {0}: record.wins
+#: src/play/presetRecord.ts
+msgid "{0, plural, one {# win} other {# wins}}"
 msgstr ""
 
 #. placeholder {0}: hide.length
@@ -55,9 +111,24 @@ msgstr ""
 msgid "{0, plural, one {Hide settings: # id, which matches a section} other {Hide settings: # ids, all match a section}}"
 msgstr ""
 
+#. placeholder {0}: offers.length
+#: src/downloads/installArchive.ts
+msgid "{0, plural, one {Install # archive} other {Install # archives}}"
+msgstr ""
+
 #. placeholder {0}: icons.length
 #: src/profile/health.ts
 msgid "{0, plural, one {Link icons: # set, and it is recognised} other {Link icons: # set, all recognised}}"
+msgstr ""
+
+#. placeholder {0}: rest.length
+#: src/runlite/handmadeMap.ts
+msgid "{0, plural, one {There is # more problem with it.} other {There are # more problems with it.}}"
+msgstr ""
+
+#. placeholder {0}: seed.skippedBots.length
+#: src/direct/roomSeed.ts
+msgid "{0, plural, one {This game offers no AI for {skipped}, so it is left out.} other {This game offers no AI for {skipped}, so they are left out.}}"
 msgstr ""
 
 #. placeholder {0}: offers.length
@@ -65,12 +136,58 @@ msgstr ""
 msgid "{0, plural, other {# archives}}"
 msgstr ""
 
+#. placeholder {0}: suggestion.result
+#: src/play/pages/components/ParticipantsTable.tsx
+msgid "{0, select, win {You won your last game against {aiName} {at}. Try {suggested}?} other {You lost your last game against {aiName} {at}. Try {suggested}?}}"
+msgstr ""
+
+#. placeholder {0}: gamesText || mapsText
+#: src/packs/pages/components/ImportPackForm.tsx
+msgid "{0} ready."
+msgstr ""
+
 #: src/home/zones/Continue.tsx
 msgid "{action}: {runTitle}"
 msgstr ""
 
+#: src/play/presetParts.ts
+msgid "{advantagePercent}% advantage"
+msgstr ""
+
+#: src/play/PresetList.tsx
+msgid "{ai, plural, one {# AI opponent} other {# AI opponents}}"
+msgstr ""
+
+#: src/play/pages/components/ParticipantsTable.tsx
+msgid "{aiShortName} isn't available in this game"
+msgstr ""
+
 #: src/content/index.ts
 msgid "{archiveName} · Lua REPL"
+msgstr ""
+
+#: src/play/PresetList.tsx
+msgid "{attempts, plural, one {Clear the record for \"{presetName}\"? That forgets # attempt and the best time. Your replays stay.} other {Clear the record for \"{presetName}\"? That forgets # attempts and the best time. Your replays stay.}}"
+msgstr ""
+
+#: src/play/PresetList.tsx
+msgid "{attempts, plural, one {Clear the record for \"{presetName}\"? That forgets # attempt. Your replays stay.} other {Clear the record for \"{presetName}\"? That forgets # attempts. Your replays stay.}}"
+msgstr ""
+
+#: src/play/presetRecord.ts
+msgid "{attempts}, no wins"
+msgstr ""
+
+#: src/downloads/pages/components/MapPacksBanner.tsx
+msgid "{available, plural, one {# pack available · curated map sets} other {# packs available · curated map sets}}"
+msgstr ""
+
+#: src/play/presetParts.ts
+msgid "{bots, plural, one {# bot} other {# bots}}"
+msgstr ""
+
+#: src/play/presetParts.ts
+msgid "{boxes, plural, one {# box} other {# boxes}}"
 msgstr ""
 
 #: src/profile/health.ts
@@ -79,6 +196,26 @@ msgstr ""
 
 #: src/profile/health.ts
 msgid "{campaignFailureCount} campaign(s) failed to load"
+msgstr ""
+
+#: src/play/pages/components/GameOptionsPanel.tsx
+msgid "{changed, plural, one {# option changed} other {# options changed}}"
+msgstr ""
+
+#: src/play/pages/components/GameOptionsPanel.tsx
+msgid "{changed} changed"
+msgstr ""
+
+#: src/runlite/pages/RunPage.tsx
+msgid "{cheapest} salvage"
+msgstr ""
+
+#: src/play/PresetPartsView.tsx
+msgid "{count, plural, one {{verb} # part} other {{verb} # parts}}"
+msgstr ""
+
+#: src/play/PresetPartsView.tsx
+msgid "{count, plural, one {{verb} all # part} other {{verb} all # parts}}"
 msgstr ""
 
 #: src/i18n/uiError.ts
@@ -93,16 +230,48 @@ msgstr ""
 msgid "{count, plural, one {# track found.} other {# tracks found.}}"
 msgstr ""
 
+#: src/game-updates/GameUpdateBadge.tsx
+msgid "{count, plural, one {# update} other {# updates}}"
+msgstr ""
+
 #: src/profile/health.ts
 msgid "{count, plural, one {Game filter matches # installed game} other {Game filter matches # installed games}}"
+msgstr ""
+
+#: src/play/pages/components/GameOptionsPanel.tsx
+msgid "{count, plural, one {Reset # option to its default?} other {Reset # options to their defaults?}}"
+msgstr ""
+
+#: src/direct/room.ts
+msgid "{count, plural, one {Somebody is waiting to join} other {# people are waiting to join}}"
+msgstr ""
+
+#: src/downloads/DownloadQueueBadge.tsx
+msgid "{count} downloading"
+msgstr ""
+
+#: src/downloads/DownloadQueueBadge.tsx
+msgid "{count} downloading · {summary}"
 msgstr ""
 
 #: src/notify/NotificationsBell.tsx
 msgid "{days}d"
 msgstr ""
 
+#: src/downloads/pages/components/MapPacksDrawer.tsx
+msgid "{done} / {total} downloaded"
+msgstr ""
+
+#: src/downloads/pages/components/ProgressBar.tsx
+msgid "{downloaded} of {total}"
+msgstr ""
+
 #: src/home/continue.ts
 msgid "{earlier} and {last}"
+msgstr ""
+
+#: src/downloads/pages/components/ProgressBar.tsx
+msgid "{elapsed} elapsed"
 msgstr ""
 
 #: src/profile/health.ts
@@ -117,12 +286,79 @@ msgstr ""
 msgid "{engines} engine(s), {games} game(s) found"
 msgstr ""
 
+#: src/downloads/installArchive.ts
+msgid "{fileName} is not a .sdz or .sd7 archive."
+msgstr ""
+
+#: src/downloads/installArchive.ts
+msgid "{fileName}, a game, is copied to {destDir}."
+msgstr ""
+
+#: src/downloads/installArchive.ts
+msgid "{fileName}, a map, is copied to {destDir}."
+msgstr ""
+
 #: src/home/zones/Greeting.tsx
 msgid "{first} and {second}"
 msgstr ""
 
+#: src/play/pages/components/ParticipantsTable.tsx
+msgid "{fromText} on another version"
+msgstr ""
+
+#: src/direct/room.ts
+msgid "{front} and {last}"
+msgstr ""
+
+#: src/packs/pages/components/ImportPackForm.tsx
+msgid "{gameCount, plural, one {# game} other {# games}}"
+msgstr ""
+
+#: src/play/pages/components/GamePickerGrid.tsx
+msgid "{gameCount, plural, one {Search # game…} other {Search # games…}}"
+msgstr ""
+
 #: src/profile/health.ts
 msgid "{gameCount} game(s), {mapCount} map(s), {engineText}"
+msgstr ""
+
+#: src/runlite/pages/components/EncounterOverlay.tsx
+msgid "{gameName} does not have these units from your run: {shown} and {extra} more. They will not be available if you move."
+msgstr ""
+
+#: src/runlite/pages/components/EncounterOverlay.tsx
+msgid "{gameName} does not have these units from your run: {shown}. They will not be available if you move."
+msgstr ""
+
+#: src/play/PresetTweaksView.tsx
+msgid "{gameName} has no tweak slots to carry a project here"
+msgstr ""
+
+#: src/play/pages/SkirmishPage.tsx
+msgid "{gameName} has no tweak slots, so the project is carried by a generated game that depends on it."
+msgstr ""
+
+#: src/play/applyTweakMutatorRoute.ts
+msgid "{gameName} is not installed here, so typed values are written as typed and the game may load some of them as something else."
+msgstr ""
+
+#: src/play/pages/components/GamePickerGrid.tsx
+#: src/play/pages/components/GameSelectCard.tsx
+msgid "{gameName} loading screen"
+msgstr ""
+
+#: src/packs/pages/components/ImportPackForm.tsx
+msgid "{gamesText} and {mapsText} ready."
+msgstr ""
+
+#: src/runlite/pages/components/EncounterOverlay.tsx
+#: src/runlite/pages/RunPage.tsx
+msgid "{hostileCount} × hostile"
+msgstr ""
+
+#: src/runlite/pages/components/EncounterOverlay.tsx
+#: src/runlite/pages/RunPage.tsx
+msgid "{hostileCount} × hostile (+{hostileHandicap}%)"
 msgstr ""
 
 #: src/downloads/downloadRate.ts
@@ -138,6 +374,10 @@ msgstr ""
 msgid "{iconError}. `icon` is a PNG file, by its path relative to the .coilbox folder."
 msgstr ""
 
+#: src/play/presetParts.ts
+msgid "{incomeMultiplier}x income"
+msgstr ""
+
 #: src/profile/health.ts
 msgid "{installedCount, plural, one {Filter ({filterDesc}) matched none of the # installed game: {sample}{more}. Adjust it to match one of these.} other {Filter ({filterDesc}) matched none of the # installed games: {sample}{more}. Adjust it to match one of these.}}"
 msgstr ""
@@ -146,12 +386,41 @@ msgstr ""
 msgid "{installedCount, plural, other {Installed # archives}}"
 msgstr ""
 
+#: src/direct/room.ts
+msgid "{joined, plural, one {# player joined} other {# players joined}}"
+msgstr ""
+
 #: src/sound/LevelRow.tsx
 msgid "{label} volume"
 msgstr ""
 
 #: src/home/config.ts
 msgid "{layout}, {zoneCount} zone(s), {tracking}"
+msgstr ""
+
+#: src/downloads/DownloadQueueBadge.tsx
+#: src/downloads/pages/components/ProgressBar.tsx
+msgid "{left} left"
+msgstr ""
+
+#: src/packs/pages/components/ImportPackForm.tsx
+msgid "{mapCount, plural, one {# map} other {# maps}}"
+msgstr ""
+
+#: src/play/pages/components/MapPickerGrid.tsx
+msgid "{mapCount, plural, one {Search # map…} other {Search # maps…}}"
+msgstr ""
+
+#: src/play/PresetList.tsx
+msgid "{mapName} · {gameName} · {opponents}"
+msgstr ""
+
+#: src/runlite/pages/components/RunSetupForm.tsx
+msgid "{mapTitle} (hand-made map)"
+msgstr ""
+
+#: src/direct/ReachablePorts.tsx
+msgid "{method} opened <0/>."
 msgstr ""
 
 #: src/downloads/downloadRate.ts
@@ -163,12 +432,28 @@ msgstr ""
 msgid "{mins}m {rest}s"
 msgstr ""
 
+#: src/direct/roomSeed.ts
+msgid "{n, plural, =0 {no bots} one {# bot} other {# bots}}"
+msgstr ""
+
+#: src/play/presetParts.ts
+msgid "{n, plural, one {# map option} other {# map options}}"
+msgstr ""
+
+#: src/direct/PendingJoins.tsx
+msgid "{name} cannot ask again while this battle is open."
+msgstr ""
+
 #: src/downloads/downloadRate.ts
 msgid "{next}h"
 msgstr ""
 
 #: src/downloads/downloadRate.ts
 msgid "{next}m"
+msgstr ""
+
+#: src/runlite/pages/components/NodeOverlays.tsx
+msgid "{offerCost} salvage"
 msgstr ""
 
 #: src/i18n/frameStrings.ts
@@ -183,28 +468,88 @@ msgstr ""
 msgid "{path} already exists; confirm a replace before packaging over it"
 msgstr ""
 
+#: src/play/pages/components/ParticipantsTable.tsx
+msgid "{playerName} ally"
+msgstr ""
+
+#: src/play/pages/components/ParticipantsTable.tsx
+msgid "{playerName} colour"
+msgstr ""
+
+#: src/play/presetParts.ts
+msgid "{players}, {botCount}"
+msgstr ""
+
 #: src/home/continue.ts
 msgid "{presetGame} on {presetMap}"
+msgstr ""
+
+#: src/startbox/StartBoxPresetsPopover.tsx
+msgid "{presetLabel}: {shownBoxes} of {totalBoxes} boxes for your {allyCount} allies. Click again for the next set."
 msgstr ""
 
 #: src/profile/health.ts
 msgid "{problemCount} problem(s) in the bundled content"
 msgstr ""
 
+#: src/game-updates/pages/GameUpdatesSection.tsx
+msgid "{releaseName} available"
+msgstr ""
+
 #: src/profile/health.ts
 msgid "{renames}. The old names still work."
+msgstr ""
+
+#: src/downloads/downloadGame.ts
+msgid "{repo} has no release matching \"{gameName}\" in its latest {releaseCount} release(s) (newest: {newest})"
+msgstr ""
+
+#: src/runlite/pages/components/NodeOverlays.tsx
+msgid "{restCost} salvage"
+msgstr ""
+
+#: src/runlite/unitLimit.ts
+msgid "{rootCount, plural, one {{sideName} has no usable start unit in {gameName}, so the unit limit is based on the # mobile unit that can build and that no other unit builds or morphs into.} other {{sideName} has no usable start unit in {gameName}, so the unit limit is based on the # mobile units that can build and that no other unit builds or morphs into.}}"
 msgstr ""
 
 #: src/profile/health.ts
 msgid "{rootCount} content folder(s), {portableRoots} portable"
 msgstr ""
 
+#: src/direct/roomSeed.ts
+msgid "{s, plural, one {# seat is left open} other {# seats are left open}}"
+msgstr ""
+
 #: src/profile/health.ts
 msgid "{scenarioFailureCount} scenario(s) failed to load"
 msgstr ""
 
+#: src/direct/roomSeed.ts
+msgid "{seats} for people."
+msgstr ""
+
 #: src/home/continue.ts
 msgid "{shortname} · health {hull}/{maxHull}"
+msgstr ""
+
+#: src/downloads/pages/components/RapidBrowser.tsx
+msgid "{shownVersions} / {totalVersions} versions"
+msgstr ""
+
+#: src/runlite/unitLimit.ts
+msgid "{sideName} has no start unit in {gameName}, so coilbox cannot limit your units. Rewards will offer perks only and every unit will be available from the first battle."
+msgstr ""
+
+#: src/play/pages/components/ParticipantsTable.tsx
+msgid "{startPosCount, plural, one {This map only defines # start position; extra teams get engine-picked spots.} other {This map only defines # start positions; extra teams get engine-picked spots.}}"
+msgstr ""
+
+#: src/play/pages/components/MapCard.tsx
+msgid "{startPositionCount, plural, one {# start position} other {# start positions}}"
+msgstr ""
+
+#: src/runlite/unitLimit.ts
+msgid "{startUnitName}, this run's start unit, is not one of the units in {gameName}, so coilbox cannot limit your units. Every unit is available."
 msgstr ""
 
 #: src/profile/SettingsSection.tsx
@@ -215,6 +560,26 @@ msgstr ""
 msgid "{total}s"
 msgstr ""
 
+#: src/downloads/pages/components/RapidBrowser.tsx
+msgid "{totalVersions, plural, one {# version} other {# versions}}"
+msgstr ""
+
+#: src/direct/HostRoomForm.tsx
+msgid "{trimmedName}'s room"
+msgstr ""
+
+#: src/runlite/pages/components/NodeOverlays.tsx
+msgid "{unitCount, plural, one {Unlocks # unit along the build tree.} other {Unlocks # units along the build tree.}}"
+msgstr ""
+
+#: src/play/pages/SkirmishPage.tsx
+msgid "{units, plural, one {# unit disabled} other {# units disabled}}"
+msgstr ""
+
+#: src/runlite/pages/RunPage.tsx
+msgid "{unlocks} unlock, {perks} perk"
+msgstr ""
+
 #: src/profile/health.ts
 msgid "{unmatched}. Hideable ids: {hideableIds}."
 msgstr ""
@@ -223,8 +588,40 @@ msgstr ""
 msgid "{unmatched}. Section ids: {sectionIds}."
 msgstr ""
 
+#: src/runlite/pages/RunListPage.tsx
+msgid "{unreadableCount, plural, one {# warpath run could not be read. It is kept in the file and has not been changed.} other {# warpath runs could not be read. They are kept in the file and have not been changed.}}"
+msgstr ""
+
 #: src/profile/health.ts
 msgid "{unrecognised}."
+msgstr ""
+
+#: src/downloads/failureReason.ts
+msgid "{who} answered {code} for {file}"
+msgstr ""
+
+#: src/direct/room.ts
+msgid "{who} are waiting for you to let them into your room. Open the battle room to answer."
+msgstr ""
+
+#: src/downloads/failureReason.ts
+msgid "{who} did not answer in time for {file}"
+msgstr ""
+
+#: src/direct/room.ts
+msgid "{who} is waiting for you to let them into your room. Open the battle room to answer."
+msgstr ""
+
+#: src/downloads/failureReason.ts
+msgid "{who} stopped sending {file}"
+msgstr ""
+
+#: src/downloads/failureReason.ts
+msgid "{who} stopped sending {file} for {duration}"
+msgstr ""
+
+#: src/play/presetRecord.ts
+msgid "{wins} in {attempts}"
 msgstr ""
 
 #: src/profile/onlyOwnMaps.ts
@@ -271,6 +668,75 @@ msgstr ""
 msgid "`start` needs content the bundle does not carry"
 msgstr ""
 
+#: src/play/pages/components/ParticipantsTable.tsx
+msgid "+ Add AI opponent"
+msgstr ""
+
+#: src/play/pages/SkirmishPage.tsx
+msgid "+{advantagePercent}% advantage"
+msgstr ""
+
+#: src/runlite/generate.ts
+msgid "+{cacheSalvage} salvage"
+msgstr ""
+
+#: src/play/pages/SkirmishPage.tsx
+msgid "+{incomePercent}% income"
+msgstr ""
+
+#: src/play/pages/components/ParticipantsTable.tsx
+msgid "+{n}%"
+msgstr ""
+
+#: src/runlite/pages/components/NodeOverlays.tsx
+msgid "+{pct}% income for your commander."
+msgstr ""
+
+#: src/runlite/pages/components/NodeOverlays.tsx
+msgid "+{pct}% resource advantage for your commander."
+msgstr ""
+
+#: src/runlite/generate.ts
+msgid "+{repairedHull} hull, -{salvage} salvage"
+msgstr ""
+
+#: src/runlite/pages/components/NodeOverlays.tsx
+#: src/runlite/pages/RunPage.tsx
+msgid "+{restHull} hull"
+msgstr ""
+
+#: src/runlite/pages/RunPage.tsx
+msgid "+{reward} salvage"
+msgstr ""
+
+#: src/runlite/generate.ts
+msgid "+{salvage} salvage, -{hullCost} hull"
+msgstr ""
+
+#: src/play/debrief.ts
+msgid "+10% AI handicap (harder)"
+msgstr ""
+
+#: src/play/debrief.ts
+msgid "+25% AI handicap (harder)"
+msgstr ""
+
+#: src/direct/ReachablePorts.tsx
+msgid "<0/> are open"
+msgstr ""
+
+#: src/direct/ReachablePorts.tsx
+msgid "<0/> aren't open"
+msgstr ""
+
+#: src/direct/ReachablePorts.tsx
+msgid "<0/> is open"
+msgstr ""
+
+#: src/direct/ReachablePorts.tsx
+msgid "<0/> isn't open"
+msgstr ""
+
 #: src/profile/pages.ts
 msgid "> **Include error:** could not read `{include}`"
 msgstr ""
@@ -283,6 +749,14 @@ msgstr ""
 msgid "> **Include error:** include nesting too deep at `{include}`"
 msgstr ""
 
+#: src/startbox/presets.ts
+msgid "4 corners"
+msgstr ""
+
+#: src/startbox/presets.ts
+msgid "4 sides"
+msgstr ""
+
 #: src/deeplink/readImport.ts
 msgid "a {label}"
 msgstr ""
@@ -291,8 +765,20 @@ msgstr ""
 msgid "a {label} for {name}"
 msgstr ""
 
+#: src/runlite/pages/RunPage.tsx
+msgid "A choice awaits"
+msgstr ""
+
+#: src/runlite/pages/RunPage.tsx
+msgid "A choice on the wire — no battle."
+msgstr ""
+
 #: src/home/config.ts
 msgid "a custom `html` entry"
+msgstr ""
+
+#: src/runlite/generate.ts
+msgid "A dead warship drifts in the debris field. Boarding it is a risk — the reactor may still be live."
 msgstr ""
 
 #: src/profile/SettingsSection.tsx
@@ -307,12 +793,24 @@ msgstr ""
 msgid "A folder is read-only"
 msgstr ""
 
+#: src/play/pages/SavegamesPage.tsx
+msgid "A game is already running."
+msgstr ""
+
 #: src/profile/health.ts
 msgid "A game with no hand-made map to offer keeps them, so there is always something to pick."
 msgstr ""
 
+#: src/runlite/pages/RunPage.tsx
+msgid "A hostile garrison. Win to bank salvage; lose and you retreat, scarred."
+msgstr ""
+
 #: src/uberstress/index.ts
 msgid "A load tester for uberserver lobby servers."
+msgstr ""
+
+#: src/runlite/mapRun.ts
+msgid "A map needs both a start and a goal, or neither of them."
 msgstr ""
 
 #: src/sound/events.ts
@@ -323,8 +821,48 @@ msgstr ""
 msgid "A new player is asked to download {missingNames} before the first lesson. Copy it into .coilbox/content/games/ or .coilbox/content/maps/."
 msgstr ""
 
+#: src/game-updates/GameUpdatesProvider.tsx
+msgid "A newer game version is available to download."
+msgstr ""
+
 #: src/profile/SettingsSection.tsx
 msgid "A profile is already there: <0/>. Edit that file, then restart Coilbox to pick it up."
+msgstr ""
+
+#: src/play/pages/SkirmishPage.tsx
+msgid "A room needs no server and no account. Friends join with a link or an address."
+msgstr ""
+
+#: src/play/pages/SkirmishPage.tsx
+msgid "A room on this computer"
+msgstr ""
+
+#: src/play/pages/components/NoEngineNotice.tsx
+msgid "a skirmish"
+msgstr ""
+
+#: src/runlite/generate.ts
+msgid "A stranded engineering crew hails you. They offer expertise in exchange for passage."
+msgstr ""
+
+#: src/runlite/pages/RunPage.tsx
+msgid "A veteran garrison — tougher, but the salvage is richer."
+msgstr ""
+
+#: src/runlite/pages/RunListPage.tsx
+msgid "Abandon"
+msgstr ""
+
+#: src/runlite/pages/RunListPage.tsx
+msgid "Abandon {runName}?"
+msgstr ""
+
+#: src/runlite/pages/RunListPage.tsx
+msgid "Abandon warpath"
+msgstr ""
+
+#: src/runlite/pages/RunListPage.tsx
+msgid "Abandoning…"
 msgstr ""
 
 #: src/general/pages/AboutCoilbox.tsx
@@ -347,8 +885,21 @@ msgstr ""
 msgid "Accounts"
 msgstr ""
 
+#: src/downloads/pages/ActivityPage.tsx
+msgid "Actions"
+msgstr ""
+
 #: src/profile/health.ts
 msgid "Add a Content Folder so Coilbox can find the game."
+msgstr ""
+
+#: src/downloads/pages/SettingsSection.tsx
+msgid "Add repository"
+msgstr ""
+
+#: src/downloads/pages/components/EngineInstaller.tsx
+#: src/downloads/pages/components/RapidBrowser.tsx
+msgid "Add to queue"
 msgstr ""
 
 #: src/general/index.ts
@@ -363,12 +914,40 @@ msgstr ""
 msgid "Advanced tools"
 msgstr ""
 
+#: src/direct/HostRoomForm.tsx
+msgid "Advertise on the local network"
+msgstr ""
+
+#: src/play/pages/components/NewPresetFromReplayButton.tsx
+msgid "AI to fill every player"
+msgstr ""
+
+#: src/runlite/meta.ts
+msgid "Air superiority"
+msgstr ""
+
 #: src/sound/events.ts
 msgid "Alerts"
 msgstr ""
 
+#: src/downloads/pages/ActivityPage.tsx
+msgid "All"
+msgstr ""
+
 #: src/profile/health.ts
 msgid "All campaigns loaded"
+msgstr ""
+
+#: src/downloads/pages/components/MapPacksDrawer.tsx
+msgid "All downloaded"
+msgstr ""
+
+#: src/downloads/DownloadQueueBadge.tsx
+msgid "All downloads"
+msgstr ""
+
+#: src/downloads/pages/components/MapPacksBanner.tsx
+msgid "All packs downloaded"
 msgstr ""
 
 #: src/profile/health.ts
@@ -379,6 +958,18 @@ msgstr ""
 msgid "All settings"
 msgstr ""
 
+#: src/play/pages/components/ParticipantsTable.tsx
+msgid "Ally"
+msgstr ""
+
+#: src/startbox/StartBoxPresetsPopover.tsx
+msgid "ally {letter}"
+msgstr ""
+
+#: src/startbox/StartBoxPresetsPopover.tsx
+msgid "Already saved"
+msgstr ""
+
 #: src/i18n/frameStrings.ts
 msgid "Amber"
 msgstr ""
@@ -387,12 +978,28 @@ msgstr ""
 msgid "Ambient effects"
 msgstr ""
 
+#: src/direct/lan.ts
+msgid "An address has no spaces in it."
+msgstr ""
+
+#: src/runlite/generate.ts
+msgid "An automated depot offers to patch your hull — for a price in salvage."
+msgstr ""
+
+#: src/direct/ReachablePorts.tsx
+msgid "and"
+msgstr ""
+
 #: src/animation/index.ts
 msgid "animation"
 msgstr ""
 
 #: src/animation/index.ts
 msgid "Animation"
+msgstr ""
+
+#: src/direct/room.ts
+msgid "Announced on this network."
 msgstr ""
 
 #: src/deeplink/DeepLinkHandler.tsx
@@ -411,6 +1018,14 @@ msgstr ""
 msgid "Any launch of your own: a skirmish, a battle, a campaign mission, a saved game or a replay."
 msgstr ""
 
+#: src/runlite/pages/RunListPage.tsx
+msgid "Anyone who pastes this code into Import challenge (needs the same game installed) plays the identical warpath, so results are directly comparable."
+msgstr ""
+
+#: src/packs/pages/components/ExportPackForm.tsx
+msgid "Anyone who pastes this into Import setup pack gets its games and maps offered as downloads (or confirmed already installed), plus any presets and blueprints you included."
+msgstr ""
+
 #: src/deeplink/pages/ImportSection.tsx
 msgid "Anything coilbox shares goes here: {kindsSentence}."
 msgstr ""
@@ -425,6 +1040,30 @@ msgstr ""
 msgid "Appearance"
 msgstr ""
 
+#: src/play/PresetTweaksView.tsx
+msgid "Applied \"{projectName}\""
+msgstr ""
+
+#: src/play/PresetTweaksView.tsx
+msgid "Applied over whatever the options already say, so a preset first and a project after gives you both."
+msgstr ""
+
+#: src/play/PresetTweaksRow.tsx
+msgid "Apply a project over the options"
+msgstr ""
+
+#: src/startbox/StartBoxPresetsPopover.tsx
+msgid "Apply saved layout {number}: {allies}"
+msgstr ""
+
+#: src/direct/PendingJoins.tsx
+msgid "Approve {name}"
+msgstr ""
+
+#: src/direct/HostRoomForm.tsx
+msgid "Approve joins"
+msgstr ""
+
 #: src/content/index.ts
 msgid "Archive"
 msgstr ""
@@ -433,8 +1072,45 @@ msgstr ""
 msgid "Archives"
 msgstr ""
 
+#: src/runlite/meta.ts
+msgid "Armoured vanguard"
+msgstr ""
+
+#: src/runlite/pages/components/RunHud.tsx
+#: src/runlite/pages/RunPage.tsx
+msgid "Arsenal"
+msgstr ""
+
+#: src/runlite/pages/components/RunSetupForm.tsx
+msgid "Ascension"
+msgstr ""
+
+#: src/direct/ReachablePorts.tsx
+msgid "Asking your router to open <0/>…"
+msgstr ""
+
+#: src/direct/ReachablePorts.tsx
+msgid "Asking your router to open the ports…"
+msgstr ""
+
+#: src/direct/HostRoomForm.tsx
+msgid "Asks your router to forward the room's port and the game's port {hostPort} so people outside this network can join. Both, because opening only the room's gets everybody in and then fails at launch."
+msgstr ""
+
 #: src/home/groupDescription.ts
 msgid "Assemble units from parts and inspect s3o models."
+msgstr ""
+
+#: src/play/pages/components/ParticipantsTable.tsx
+msgid "at {fromPercent}"
+msgstr ""
+
+#: src/play/presetRecord.ts
+msgid "Attempt recorded on {name}, with no winner."
+msgstr ""
+
+#: src/play/presetRecord.ts
+msgid "Attempt recorded on {name}."
 msgstr ""
 
 #: src/profile/SettingsSection.tsx
@@ -449,6 +1125,33 @@ msgstr ""
 msgid "Back"
 msgstr ""
 
+#: src/downloads/pages/components/MapPacksDrawer.tsx
+msgid "Back to all packs"
+msgstr ""
+
+#: src/runlite/pages/components/EncounterOverlay.tsx
+#: src/runlite/pages/components/NodeOverlays.tsx
+#: src/runlite/pages/RunPage.tsx
+msgid "Back to map"
+msgstr ""
+
+#: src/play/pages/components/PresetsDrawer.tsx
+msgid "Back to presets"
+msgstr ""
+
+#: src/direct/HostRoomForm.tsx
+msgid "Back to the room form"
+msgstr ""
+
+#: src/runlite/pages/RunPage.tsx
+msgid "Back to warpath"
+msgstr ""
+
+#: src/runlite/pages/components/RunEndScreen.tsx
+#: src/runlite/pages/RunPage.tsx
+msgid "Back to warpath hub"
+msgstr ""
+
 #: src/i18n/frameStrings.ts
 msgid "Back/forward buttons"
 msgstr ""
@@ -457,12 +1160,50 @@ msgstr ""
 msgid "Base color"
 msgstr ""
 
+#: src/runlite/pages/components/EncounterOverlay.tsx
+msgid "battle"
+msgstr ""
+
+#: src/runlite/galaxyAdapter.ts
+#: src/runlite/pages/components/EncounterOverlay.tsx
+#: src/runlite/pages/RunPage.tsx
+msgid "Battle"
+msgstr ""
+
+#: src/runlite/pages/RunPage.tsx
+msgid "Battle history"
+msgstr ""
+
 #: src/multiplayer/index.tsx
 msgid "Battle Room"
 msgstr ""
 
+#: src/runlite/pages/components/EncounterOverlay.tsx
+msgid "Battlefield"
+msgstr ""
+
 #: src/multiplayer/index.tsx
 msgid "Battles"
+msgstr ""
+
+#: src/runlite/pages/components/RunEndScreen.tsx
+msgid "Battles won"
+msgstr ""
+
+#: src/runlite/pages/components/RunSetupForm.tsx
+msgid "Begin warpath"
+msgstr ""
+
+#: src/play/PresetPartsView.tsx
+msgid "Belongs to {presetGame}, and this room is running {currentGameName}."
+msgstr ""
+
+#: src/play/PresetPartsView.tsx
+msgid "Belongs to {presetGame}. Take the game as well, or leave this out."
+msgstr ""
+
+#: src/play/presetRecord.ts
+msgid "Best win {bestTime} · {wins} in {attempts}"
 msgstr ""
 
 #: src/i18n/frameStrings.ts
@@ -473,18 +1214,51 @@ msgstr ""
 msgid "Blueprints"
 msgstr ""
 
+#: src/packs/pages/components/ExportPackForm.tsx
+msgid "Blueprints (optional)"
+msgstr ""
+
+#: src/play/pages/components/ParticipantsTable.tsx
+msgid "Bonus"
+msgstr ""
+
+#: src/play/pages/components/ParticipantsTable.tsx
+msgid "Bonus for every AI"
+msgstr ""
+
 #: src/animation/index.ts
 msgid "BOS → Lua"
+msgstr ""
+
+#: src/startbox/StartBoxPresetsPopover.tsx
+msgid "Box presets"
+msgstr ""
+
+#: src/startbox/StartBoxPresetsPopover.tsx
+msgid "Box size"
+msgstr ""
+
+#: src/downloads/pages/ExplorerPage.tsx
+msgid "Browse Spring/Recoil rapid content and download a tag through the bundled sidecar."
+msgstr ""
+
+#: src/play/PresetLibraryToolbar.tsx
+msgid "Browse the hub"
 msgstr ""
 
 #: src/home/groupDescription.ts
 msgid "Build your own campaigns and scenarios."
 msgstr ""
 
+#: src/runlite/RunMapView.tsx
+msgid "Building the land…"
+msgstr ""
+
 #: src/profile/health.ts
 msgid "Bundle or download the game archive (.sdz/.sd7). {scanned}"
 msgstr ""
 
+#: src/downloads/activityRows.ts
 #: src/sound/MusicSource.tsx
 msgid "Bundled"
 msgstr ""
@@ -506,6 +1280,10 @@ msgstr ""
 msgid "Campaign Builder"
 msgstr ""
 
+#: src/play/PlayProvider.tsx
+msgid "Campaign mission"
+msgstr ""
+
 #: src/campaign/index.ts
 msgid "Campaigns"
 msgstr ""
@@ -516,7 +1294,25 @@ msgstr ""
 
 #: src/components/ConfirmPopover.tsx
 #: src/deeplink/ConfirmDialog.tsx
+#: src/direct/HostRoomForm.tsx
+#: src/direct/JoinRoomForm.tsx
+#: src/downloads/pages/ActivityPage.tsx
+#: src/play/pages/components/GameOptionsPanel.tsx
+#: src/play/pages/SavegamesPage.tsx
+#: src/play/PresetLibraryToolbar.tsx
 msgid "Cancel"
+msgstr ""
+
+#: src/downloads/DownloadQueueBadge.tsx
+msgid "Cancel downloading {label}"
+msgstr ""
+
+#: src/downloads/pages/ActivityPage.tsx
+msgid "Cancelled"
+msgstr ""
+
+#: src/runlite/unitLimit.ts
+msgid "Cannot launch without unit data"
 msgstr ""
 
 #: src/career/index.ts
@@ -525,6 +1321,14 @@ msgstr ""
 
 #: src/home/groupDescription.ts
 msgid "Change what a game's units cost, carry and can do."
+msgstr ""
+
+#: src/play/pages/components/GameOptionsPanel.tsx
+msgid "changed"
+msgstr ""
+
+#: src/runlite/pages/RunPage.tsx
+msgid "Chart a course here"
 msgstr ""
 
 #: src/multiplayer/index.tsx
@@ -539,17 +1343,46 @@ msgstr ""
 msgid "Chat logs"
 msgstr ""
 
+#: src/runlite/pages/RunPage.tsx
+msgid "Cheapest"
+msgstr ""
+
+#: src/game-updates/pages/GameUpdatesSection.tsx
 #: src/updater/pages/UpdatesSettingsSection.tsx
 msgid "Check for updates"
+msgstr ""
+
+#: src/play/pages/SkirmishPage.tsx
+msgid "Checking match result…"
 msgstr ""
 
 #: src/notify/NotificationsSettings.tsx
 msgid "Checking permission…"
 msgstr ""
 
+#: src/runlite/pages/components/EncounterOverlay.tsx
+msgid "Checking that your units exist in {offeredName}…"
+msgstr ""
+
+#: src/runlite/pages/components/RunSetupForm.tsx
+msgid "Checking which maps this game carries…"
+msgstr ""
+
 #: src/deeplink/pages/ImportSection.tsx
+#: src/game-updates/pages/GameUpdatesSection.tsx
+#: src/packs/pages/components/ImportPackForm.tsx
 #: src/updater/pages/UpdatesSettingsSection.tsx
 msgid "Checking…"
+msgstr ""
+
+#: src/play/pages/components/GamePickerDrawer.tsx
+#: src/play/pages/components/GamePickerPanel.tsx
+msgid "Choose a game"
+msgstr ""
+
+#: src/direct/HostRoomForm.tsx
+#: src/play/pages/components/MapPickerDrawer.tsx
+msgid "Choose a map"
 msgstr ""
 
 #: src/home/zones/Greeting.tsx
@@ -557,15 +1390,74 @@ msgstr ""
 msgid "Choose a tool to get started."
 msgstr ""
 
+#: src/startbox/mode.ts
+msgid "Choose before game"
+msgstr ""
+
+#: src/play/pages/components/GameSelectCard.tsx
+msgid "Choose game"
+msgstr ""
+
+#: src/play/pages/components/GameSelectCard.tsx
+msgid "Choose game (current: {gameName})"
+msgstr ""
+
+#: src/startbox/mode.ts
+msgid "Choose in-game (start boxes)"
+msgstr ""
+
+#: src/play/presetParts.ts
+msgid "Choose in-game, {boxCount}"
+msgstr ""
+
+#: src/play/pages/components/MapCard.tsx
+msgid "Choose map"
+msgstr ""
+
+#: src/runlite/pages/RunPage.tsx
+msgid "Choose one of"
+msgstr ""
+
+#: src/play/pages/SkirmishPage.tsx
+msgid "Clear"
+msgstr ""
+
+#: src/play/pages/components/ParticipantsTable.tsx
+msgid "Clear AIs"
+msgstr ""
+
 #: src/notify/NotificationsBell.tsx
+#: src/startbox/StartBoxControls.tsx
 msgid "Clear all"
+msgstr ""
+
+#: src/startbox/StartBoxEditor.tsx
+msgid "Clear ally {letter}'s start box"
+msgstr ""
+
+#: src/play/PresetList.tsx
+msgid "Clear record"
+msgstr ""
+
+#: src/play/PresetList.tsx
+msgid "Clear the record for {presetName}"
+msgstr ""
+
+#: src/runlite/galaxyAdapter.ts
+msgid "Cleared"
 msgstr ""
 
 #: src/components/SlideDrawer.tsx
 #: src/components/ui/dialog.tsx
 #: src/deeplink/ConfirmDialog.tsx
+#: src/downloads/pages/components/MapPacksDrawer.tsx
 #: src/lego/pages/components/ShortcutSheet.tsx
 #: src/multiplayer/ServerMessageBoxDialog.tsx
+#: src/play/pages/components/CrashDrawer.tsx
+#: src/play/pages/components/DebriefDrawer.tsx
+#: src/play/pages/components/GamePickerDrawer.tsx
+#: src/play/pages/components/MapPickerDrawer.tsx
+#: src/play/pages/components/PresetsDrawer.tsx
 #: src/play/pages/SkirmishPage.tsx
 #: src/workshop/pages/components/CommandPalette.tsx
 msgid "Close"
@@ -577,6 +1469,10 @@ msgstr ""
 
 #: src/i18n/frameStrings.ts
 msgid "Close menu"
+msgstr ""
+
+#: src/play/pages/components/ParticipantsTable.tsx
+msgid "Co-player"
 msgstr ""
 
 #: src/animation/index.ts
@@ -600,6 +1496,18 @@ msgstr ""
 msgid "coilbox campaign"
 msgstr ""
 
+#: src/runlite/pages/RunListPage.tsx
+msgid "Coilbox challenge"
+msgstr ""
+
+#: src/runlite/unitLimit.ts
+msgid "Coilbox could not read this game's unit data, so it cannot limit your units. Rewards will offer perks only and every unit will be available from the first battle."
+msgstr ""
+
+#: src/runlite/unitLimit.ts
+msgid "Coilbox could not read this game's unit data, so it cannot work out your unit limit. The battle will not launch until it can."
+msgstr ""
+
 #: src/settings-storage.ts
 msgid "Coilbox could not save your settings"
 msgstr ""
@@ -620,6 +1528,7 @@ msgstr ""
 msgid "Coilbox has not contacted it yet. Only continue if you trust this link."
 msgstr ""
 
+#: src/downloads/pages/SettingsSection.tsx
 #: src/hub/index.tsx
 msgid "Coilbox hub"
 msgstr ""
@@ -634,6 +1543,11 @@ msgstr ""
 
 #: src/general/pages/AboutCoilbox.tsx
 msgid "Coilbox on GitHub"
+msgstr ""
+
+#: src/play/pages/SkirmishPage.tsx
+#: src/play/presetImport.tsx
+msgid "Coilbox preset"
 msgstr ""
 
 #: src/sound/events.ts
@@ -665,6 +1579,11 @@ msgstr ""
 msgid "Colour scheme"
 msgstr ""
 
+#: src/runlite/galaxyAdapter.ts
+#: src/runlite/pages/RunPage.tsx
+msgid "Command"
+msgstr ""
+
 #: src/workshop/pages/components/CommandPalette.tsx
 msgid "Command palette"
 msgstr ""
@@ -677,6 +1596,26 @@ msgstr ""
 msgid "Community"
 msgstr ""
 
+#: src/play/compatTarget.ts
+msgid "Compatibility mode is on for {gameName}, but its mutator could not be checked ({reason}). Open {gameName} under Library > Games and choose Rebuild."
+msgstr ""
+
+#: src/play/compatTarget.ts
+msgid "Compatibility mode is on for {gameName}, but its mutator has not been built. Open {gameName} under Library > Games and choose Rebuild."
+msgstr ""
+
+#: src/play/compatTarget.ts
+msgid "Compatibility mode is on for {gameName}, but its mutator is out of date: {staleReasons}. Open {gameName} under Library > Games and choose Rebuild."
+msgstr ""
+
+#: src/play/compatTarget.ts
+msgid "Compatibility mode is on for {gameName}, but the engine did not find {folderName}. Open {gameName} under Library > Games and choose Rebuild."
+msgstr ""
+
+#: src/play/compatTarget.ts
+msgid "Compatibility mode is on for {gameName}, but the game could not be read to check its mutator. Open {gameName} under Library > Games and choose Rebuild."
+msgstr ""
+
 #: src/mapconv/index.ts
 msgid "Compile"
 msgstr ""
@@ -685,13 +1624,25 @@ msgstr ""
 msgid "Compile and decompile maps."
 msgstr ""
 
+#: src/downloads/pages/components/MapPacksDrawer.tsx
+msgid "Complete"
+msgstr ""
+
 #: src/deeplink/ConfirmDialog.tsx
 msgid "Confirm this before it runs."
+msgstr ""
+
+#: src/play/pages/components/GameChoiceOffer.tsx
+msgid "conquest"
 msgstr ""
 
 #: src/conquest/index.ts
 #: src/home/continue.ts
 msgid "Conquest"
+msgstr ""
+
+#: src/play/PlayProvider.tsx
+msgid "Conquest battle"
 msgstr ""
 
 #: src/deeplink/DeepLinkHandler.tsx
@@ -705,14 +1656,22 @@ msgstr ""
 #: src/components/ContinueBadge.tsx
 #: src/deeplink/DeepLinkHandler.tsx
 #: src/deeplink/pages/ImportSection.tsx
+#: src/runlite/model.ts
 msgid "Continue"
+msgstr ""
+
+#: src/play/pages/components/GameChoiceOffer.tsx
+msgid "Continue on {newerName}"
 msgstr ""
 
 #: src/home/groupDescription.ts
 msgid "Convert BOS to Lua, and work with COB scripts."
 msgstr ""
 
+#: src/direct/CopyButton.tsx
 #: src/general/ErrorBoundary.tsx
+#: src/play/pages/components/CrashDrawer.tsx
+#: src/play/pages/EngineLogSection.tsx
 msgid "Copied"
 msgstr ""
 
@@ -720,20 +1679,74 @@ msgstr ""
 msgid "Copied to {destDir}."
 msgstr ""
 
+#: src/direct/ReachablePorts.tsx
+msgid "Copy"
+msgstr ""
+
+#: src/direct/ReachablePorts.tsx
+msgid "Copy {address}, the address somebody outside your network joins at"
+msgstr ""
+
+#: src/direct/ShareRoomButton.tsx
+msgid "Copy {text}, {who}"
+msgstr ""
+
+#: src/direct/ShareRoomButton.tsx
+msgid "Copy a link that joins at {text}, {who}"
+msgstr ""
+
+#: src/direct/ShareRoomButton.tsx
+msgid "Copy address"
+msgstr ""
+
 #: src/general/ErrorBoundary.tsx
+#: src/play/pages/components/CrashDrawer.tsx
 msgid "Copy details"
+msgstr ""
+
+#: src/direct/ShareRoomButton.tsx
+#: src/play/pages/components/PresetsDrawer.tsx
+msgid "Copy link"
+msgstr ""
+
+#: src/play/pages/EngineLogSection.tsx
+msgid "Copy system info"
 msgstr ""
 
 #: src/deeplink/DeepLinkHandler.tsx
 msgid "Copying {installing}."
 msgstr ""
 
+#: src/direct/ReachablePorts.tsx
+msgid "Could not check your router"
+msgstr ""
+
+#: src/play/engineConfirmation.ts
+msgid "Could not confirm that engine {engineLabel} is installed: {why}"
+msgstr ""
+
+#: src/downloads/failureReason.ts
+msgid "could not connect to {who} for {file}"
+msgstr ""
+
+#: src/game-updates/GameUpdatesProvider.tsx
+msgid "Could not download {filename}"
+msgstr ""
+
 #: src/deeplink/DeepLinkHandler.tsx
 msgid "Could not install an archive"
 msgstr ""
 
+#: src/direct/lan.ts
+msgid "Could not join {where}."
+msgstr ""
+
 #: src/profile/openBundledFile.ts
 msgid "Could not open that file"
+msgstr ""
+
+#: src/direct/lan.ts
+msgid "Could not reach {where}. You may be on a different network from the host, or a firewall is in the way."
 msgstr ""
 
 #: src/i18n/uiError.ts
@@ -748,20 +1761,60 @@ msgstr ""
 msgid "Could not read {reference}"
 msgstr ""
 
+#: src/direct/room.ts
+msgid "Could not start a room on port {port}."
+msgstr ""
+
+#: src/direct/CopyButton.tsx
+msgid "Couldn't copy"
+msgstr ""
+
 #: src/deeplink/copyLink.ts
 msgid "Couldn't copy the link"
+msgstr ""
+
+#: src/play/pages/components/SaveAsPresetButton.tsx
+msgid "Couldn't save preset"
+msgstr ""
+
+#: src/play/pages/components/NewPresetFromReplayButton.tsx
+msgid "Create from replay"
+msgstr ""
+
+#: src/packs/pages/components/ExportPackForm.tsx
+msgid "Create pack code"
 msgstr ""
 
 #: src/profile/SettingsSection.tsx
 msgid "Create profile.json"
 msgstr ""
 
+#: src/runlite/pages/components/ImportChallengeForm.tsx
+msgid "Create run anyway"
+msgstr ""
+
+#: src/runlite/pages/components/ImportChallengeForm.tsx
+msgid "Create run with no unit limit"
+msgstr ""
+
 #: src/i18n/frameStrings.ts
 msgid "Crimson"
 msgstr ""
 
+#: src/runlite/pages/components/RunHud.tsx
+msgid "Critical"
+msgstr ""
+
+#: src/runlite/pages/RunListPage.tsx
+msgid "Cross a forward-only map once — fight, take rewards, grow your build, and reach the warlord before your health runs out. Win or die, then set out again."
+msgstr ""
+
 #: src/home/zones/SuggestedMap.tsx
 msgid "Curated map"
+msgstr ""
+
+#: src/runlite/pages/components/RunHud.tsx
+msgid "Currency dropped by winning battles (more for elites and bosses). Spend it at depots on unit unlocks, perks, and repairs."
 msgstr ""
 
 #: src/updater/pages/UpdatesSettingsSection.tsx
@@ -790,8 +1843,73 @@ msgstr ""
 msgid "Default"
 msgstr ""
 
+#: src/play/pages/components/NewPresetFromReplayButton.tsx
+msgid "Default AI"
+msgstr ""
+
 #: src/home/config.ts
 msgid "Default layout"
+msgstr ""
+
+#: src/play/pages/components/GameOptionsPanel.tsx
+msgid "default options"
+msgstr ""
+
+#: src/play/pages/components/GameOptionsPanel.tsx
+msgid "Default: {defaultText}"
+msgstr ""
+
+#: src/runlite/pages/components/EncounterOverlay.tsx
+msgid "Defeat"
+msgstr ""
+
+#: src/runlite/pages/components/EncounterOverlay.tsx
+msgid "Defeat costs health, not the warpath — you retreat and press on."
+msgstr ""
+
+#: src/play/debrief.ts
+msgid "Defeat."
+msgstr ""
+
+#: src/play/pages/SavegamesPage.tsx
+msgid "Delete"
+msgstr ""
+
+#: src/play/pages/components/PresetsDrawer.tsx
+msgid "Delete preset"
+msgstr ""
+
+#: src/startbox/StartBoxPresetsPopover.tsx
+msgid "Delete saved layout {number}"
+msgstr ""
+
+#: src/play/pages/SavegamesPage.tsx
+msgid "Delete savegame {saveFilename}"
+msgstr ""
+
+#: src/play/pages/SavegamesPage.tsx
+msgid "Delete this savegame? This can't be undone."
+msgstr ""
+
+#: src/downloads/pages/components/RapidBrowser.tsx
+msgid "Depends on {dependencies}"
+msgstr ""
+
+#: src/runlite/galaxyAdapter.ts
+#: src/runlite/pages/RunPage.tsx
+msgid "Depot"
+msgstr ""
+
+#: src/runlite/pages/components/RunHud.tsx
+msgid "Depth"
+msgstr ""
+
+#: src/runlite/pages/components/RunEndScreen.tsx
+msgid "Depth reached"
+msgstr ""
+
+#: src/runlite/generate.ts
+msgid "Derelict Hulk"
 msgstr ""
 
 #: src/notify/NotificationsSettings.tsx
@@ -800,6 +1918,27 @@ msgstr ""
 
 #: src/components/ResultCard.tsx
 msgid "Details"
+msgstr ""
+
+#: src/runlite/pages/components/EncounterOverlay.tsx
+msgid "Difficulty"
+msgstr ""
+
+#: src/runlite/pages/components/RunSetupForm.tsx
+msgid "Difficulty — level {difficulty}"
+msgstr ""
+
+#: src/play/pages/components/DifficultyPips.tsx
+msgid "Difficulty {filled} of {scale}"
+msgstr ""
+
+#: src/direct/hostingRoute.ts
+#: src/downloads/activityRows.ts
+msgid "Direct"
+msgstr ""
+
+#: src/play/pages/SkirmishPage.tsx
+msgid "Dismiss"
 msgstr ""
 
 #: src/profile/Splash.tsx
@@ -815,25 +1954,71 @@ msgstr ""
 msgid "Display"
 msgstr ""
 
+#: src/runlite/generate.ts
+msgid "Distress Signal"
+msgstr ""
+
 #: src/profile/index.ts
 #: src/profile/SettingsSection.tsx
 msgid "Distribution profile"
 msgstr ""
 
+#: src/runlite/generate.ts
+msgid "Dock and repair"
+msgstr ""
+
+#: src/downloads/pages/ActivityPage.tsx
+#: src/downloads/pages/components/EngineInstaller.tsx
+#: src/downloads/pages/components/RapidBrowser.tsx
 #: src/i18n/frameStrings.ts
 msgid "Done"
+msgstr ""
+
+#: src/downloads/pages/ActivityPage.tsx
+msgid "Done · {finished}"
+msgstr ""
+
+#: src/downloads/DownloadQueueBadge.tsx
+#: src/downloads/pages/components/MapPacksDrawer.tsx
+#: src/downloads/pages/components/RapidBrowser.tsx
+msgid "Download"
+msgstr ""
+
+#: src/play/pages/components/DownloadGameButton.tsx
+msgid "Download {gameLabel}"
 msgstr ""
 
 #: src/home/continue.ts
 msgid "Download {list} first"
 msgstr ""
 
+#: src/downloads/pages/components/RapidBrowser.tsx
+msgid "Download {tag}"
+msgstr ""
+
+#: src/game-updates/pages/GameUpdatesSection.tsx
 #: src/updater/pages/UpdatesSettingsSection.tsx
 msgid "Download & install"
 msgstr ""
 
 #: src/profile/health.ts
 msgid "Download + data folders are writable"
+msgstr ""
+
+#: src/downloads/pages/components/MapPacksDrawer.tsx
+msgid "Download all ({pending})"
+msgstr ""
+
+#: src/downloads/pages/components/MapPacksDrawer.tsx
+msgid "Download all maps in {packTitle}"
+msgstr ""
+
+#: src/downloads/pages/components/EngineInstaller.tsx
+msgid "Download an engine"
+msgstr ""
+
+#: src/play/pages/components/NoEngineNotice.tsx
+msgid "Download an engine to play"
 msgstr ""
 
 #: src/deeplink/DeepLinkHandler.tsx
@@ -844,6 +2029,42 @@ msgstr ""
 msgid "Download and start"
 msgstr ""
 
+#: src/game-updates/GameUpdatesProvider.tsx
+msgid "Download canceled"
+msgstr ""
+
+#: src/downloads/downloadNotify.ts
+msgid "Download complete"
+msgstr ""
+
+#: src/play/pages/components/NoEngineNotice.tsx
+msgid "Download engine"
+msgstr ""
+
+#: src/downloads/pages/components/EngineInstaller.tsx
+msgid "Download engine {engineName}"
+msgstr ""
+
+#: src/downloads/downloadNotify.ts
+msgid "Download failed"
+msgstr ""
+
+#: src/downloads/pages/components/MapPacksDrawer.tsx
+msgid "Download map"
+msgstr ""
+
+#: src/downloads/pages/SettingsSection.tsx
+msgid "Download missing content automatically"
+msgstr ""
+
+#: src/downloads/pages/components/ProgressBar.tsx
+msgid "Download progress"
+msgstr ""
+
+#: src/play/LaunchContentProvider.tsx
+msgid "Download what this game needs"
+msgstr ""
+
 #: src/profile/health.ts
 msgid "Download write root is inside the package"
 msgstr ""
@@ -852,20 +2073,59 @@ msgstr ""
 msgid "Download write root is outside the package"
 msgstr ""
 
+#: src/downloads/pages/ActivityPage.tsx
+msgid "Downloading"
+msgstr ""
+
+#: src/game-updates/pages/GameUpdatesSection.tsx
+msgid "Downloading {fileName}"
+msgstr ""
+
 #: src/deeplink/DeepLinkHandler.tsx
 msgid "Downloading an import"
 msgstr ""
 
+#: src/downloads/pages/components/MapPacksDrawer.tsx
+#: src/downloads/pages/components/RapidBrowser.tsx
 #: src/home/zones/SuggestedMap.tsx
 msgid "Downloading…"
 msgstr ""
 
+#: src/downloads/pages/ActivityPage.tsx
+msgid "downloads"
+msgstr ""
+
 #: src/downloads/index.ts
+#: src/downloads/pages/ActivityPage.tsx
 msgid "Downloads"
 msgstr ""
 
 #: src/profile/health.ts
 msgid "Downloads and updates will fail — the folder is read-only ({badReason}). Move the package somewhere writable — not a mounted disk image or a protected system folder."
+msgstr ""
+
+#: src/downloads/DownloadQueueBadge.tsx
+msgid "Downloads: {count} in progress"
+msgstr ""
+
+#: src/downloads/DownloadQueueBadge.tsx
+msgid "Downloads: {count} in progress, {summary}"
+msgstr ""
+
+#: src/startbox/StartBoxControls.tsx
+msgid "Drag on the map to draw ally {activeLetter}'s box. Drag a box to move it, its handles to resize, its cross to clear it."
+msgstr ""
+
+#: src/startbox/StartBoxControls.tsx
+msgid "Draw ally {letter}'s box"
+msgstr ""
+
+#: src/startbox/StartBoxControls.tsx
+msgid "Draw ally {letter}'s box (has one already)"
+msgstr ""
+
+#: src/startbox/StartBoxPresetsPopover.tsx
+msgid "Draw some boxes first"
 msgstr ""
 
 #: src/i18n/frameStrings.ts
@@ -876,24 +2136,111 @@ msgstr ""
 msgid "Drop to install"
 msgstr ""
 
+#: src/play/pages/components/DebriefDrawer.tsx
+msgid "Duration: {duration}"
+msgstr ""
+
+#: src/packs/pages/components/ExportPackForm.tsx
+msgid "e.g. Popular water maps"
+msgstr ""
+
 #: src/sound/SoundSettings.tsx
 msgid "Each of these plays a sound you can change. A sound's final volume is the master, times the group it sits under, times its own. Play lets you hear one whether or not it is muted."
+msgstr ""
+
+#: src/startbox/mode.ts
+msgid "Each team spawns at its numbered map position. Pick a team in the player list to choose yours."
+msgstr ""
+
+#: src/play/scenarioDifficulty.ts
+msgid "Easy"
 msgstr ""
 
 #: src/campaign/index.ts
 msgid "Edit"
 msgstr ""
 
+#: src/runlite/generate.ts
+msgid "Efficient Logistics"
+msgstr ""
+
+#: src/runlite/galaxyAdapter.ts
+#: src/runlite/pages/components/EncounterOverlay.tsx
+#: src/runlite/pages/components/RunHud.tsx
+msgid "Elite"
+msgstr ""
+
+#: src/runlite/pages/RunPage.tsx
+msgid "Elite garrison"
+msgstr ""
+
 #: src/i18n/frameStrings.ts
 msgid "Emerald"
+msgstr ""
+
+#: src/play/modOptions.ts
+msgid "empty"
 msgstr ""
 
 #: src/deeplink/parse.ts
 msgid "Empty link."
 msgstr ""
 
+#: src/direct/ReachablePorts.tsx
+msgid "Enable UPnP or NAT-PMP in your router, or forward <0/> by hand."
+msgstr ""
+
+#: src/direct/ReachablePorts.tsx
+msgid "Enable UPnP or NAT-PMP in your router, or forward <0/> to <1>{lan}</1>."
+msgstr ""
+
+#: src/runlite/pages/components/ImportChallengeForm.tsx
+msgid "encounters"
+msgstr ""
+
+#: src/play/InGameBadge.tsx
+#: src/play/pages/SkirmishPage.tsx
+msgid "End game"
+msgstr ""
+
+#: src/play/InGameBadge.tsx
+msgid "End it for everybody"
+msgstr ""
+
+#: src/downloads/pages/ActivityPage.tsx
+msgid "engine"
+msgstr ""
+
+#: src/downloads/DownloadQueueBadge.tsx
+#: src/play/pages/components/CrashDrawer.tsx
+#: src/play/pages/EngineLogSection.tsx
+msgid "Engine"
+msgstr ""
+
+#: src/downloads/pages/components/EngineInstaller.tsx
+msgid "Engine {engineTitle}"
+msgstr ""
+
+#: src/game-updates/GameUpdatesProvider.tsx
+msgid "Engine {engineUpdate}"
+msgstr ""
+
 #: src/profile/health.ts
 msgid "engine {engineVersions}"
+msgstr ""
+
+#: src/downloads/bindings.ts
+msgid "Engine {version}"
+msgstr ""
+
+#: src/play/pages/components/ParticipantsTable.tsx
+msgid "Engine AIs"
+msgstr ""
+
+#: src/play/detect.ts
+#: src/play/pages/SavegamesPage.tsx
+#: src/play/pages/SkirmishPage.tsx
+msgid "Engine exited with code {exitCode}."
 msgstr ""
 
 #: src/play/index.ts
@@ -916,24 +2263,146 @@ msgstr ""
 msgid "Engines"
 msgstr ""
 
+#: src/direct/room.ts
+msgid "Enter a port."
+msgstr ""
+
 #: src/general/fullscreen.tsx
 msgid "Enter fullscreen"
+msgstr ""
+
+#: src/direct/lan.ts
+msgid "Enter the host's address."
+msgstr ""
+
+#: src/direct/room.ts
+msgid "Enter the name others will see."
 msgstr ""
 
 #: src/general/ErrorBoundary.tsx
 msgid "Error details"
 msgstr ""
 
+#: src/runlite/galaxyAdapter.ts
+msgid "Event"
+msgstr ""
+
+#: src/play/pages/components/ParticipantsTable.tsx
+msgid "every AI"
+msgstr ""
+
+#: src/direct/hostingRoute.ts
+msgid "Every battle, for when players cannot join even though the check says they can."
+msgstr ""
+
+#: src/play/pages/components/NewPresetFromReplayButton.tsx
+msgid "Every seated player becomes an AI opponent, keeping the map, factions, colours and options."
+msgstr ""
+
 #: src/general/fullscreen.tsx
 msgid "Exit fullscreen"
+msgstr ""
+
+#: src/play/pages/components/PresetsDrawer.tsx
+msgid "Export"
+msgstr ""
+
+#: src/runlite/pages/RunListPage.tsx
+msgid "Export challenge"
+msgstr ""
+
+#: src/play/pages/SkirmishPage.tsx
+msgid "Export preset"
+msgstr ""
+
+#: src/play/pages/components/ParticipantsTable.tsx
+msgid "Extra resource income for the AI. 0 means no bonus. Applies when the game starts."
+msgstr ""
+
+#: src/downloads/pages/components/ProgressBar.tsx
+msgid "Extracting…"
+msgstr ""
+
+#: src/play/pages/components/ParticipantsTable.tsx
+msgid "Faction"
+msgstr ""
+
+#: src/runlite/pages/components/RunSetupForm.tsx
+msgid "Faction / side"
+msgstr ""
+
+#: src/downloads/pages/ActivityPage.tsx
+msgid "failed"
+msgstr ""
+
+#: src/downloads/pages/ActivityPage.tsx
+msgid "Failed"
+msgstr ""
+
+#: src/downloads/pages/ActivityPage.tsx
+msgid "Failed: {reason}"
+msgstr ""
+
+#: src/runlite/pages/components/RunHud.tsx
+msgid "Failing"
 msgstr ""
 
 #: src/deeplink/DeepLinkHandler.tsx
 msgid "Fetch and check"
 msgstr ""
 
+#: src/runlite/pages/components/NodeOverlays.tsx
+msgid "Field upgrade"
+msgstr ""
+
+#: src/downloads/pages/ActivityPage.tsx
+msgid "file"
+msgstr ""
+
+#: src/downloads/activityRows.ts
+#: src/downloads/DownloadQueueBadge.tsx
+#: src/play/pages/components/CrashDrawer.tsx
+msgid "File"
+msgstr ""
+
 #: src/profile/health.ts
 msgid "Filter ({filterDesc}) has nothing to match yet — no games are installed. Install the game, or check the filter."
+msgstr ""
+
+#: src/downloads/pages/components/RapidBrowser.tsx
+msgid "Filter repositories"
+msgstr ""
+
+#: src/downloads/pages/components/RapidBrowser.tsx
+msgid "Filter repositories…"
+msgstr ""
+
+#: src/play/pages/SavegamesPage.tsx
+msgid "Filter savegames"
+msgstr ""
+
+#: src/play/pages/SavegamesPage.tsx
+msgid "Filter savegames…"
+msgstr ""
+
+#: src/downloads/pages/components/RapidBrowser.tsx
+msgid "Filter versions"
+msgstr ""
+
+#: src/downloads/pages/components/RapidBrowser.tsx
+msgid "Filter versions…"
+msgstr ""
+
+#: src/direct/ReachablePorts.tsx
+msgid "Find it another way to share it."
+msgstr ""
+
+#: src/direct/ReachablePorts.tsx
+msgid "Find it another way, or on this network use <0>{lan}</0>."
+msgstr ""
+
+#: src/play/presetRecord.ts
+msgid "First win on {name}, in {time}."
 msgstr ""
 
 #: src/profile/health.ts
@@ -942,6 +2411,30 @@ msgstr ""
 
 #: src/profile/health.ts
 msgid "Fix the JSON in .coilbox/scenarios/ (bundled) or the app data scenarios folder (local):"
+msgstr ""
+
+#: src/direct/ReachablePorts.tsx
+msgid "Fix this so players outside your network can connect without the relay."
+msgstr ""
+
+#: src/direct/ReachablePorts.tsx
+msgid "Fix this so players outside your network can join."
+msgstr ""
+
+#: src/startbox/mode.ts
+msgid "Fixed"
+msgstr ""
+
+#: src/startbox/mode.ts
+msgid "Fixed (map)"
+msgstr ""
+
+#: src/play/presetParts.ts
+msgid "Fixed map positions"
+msgstr ""
+
+#: src/play/pages/components/ParticipantsTable.tsx
+msgid "Fixed start positions: team N spawns at the map's start position N."
 msgstr ""
 
 #: src/i18n/frameStrings.ts
@@ -956,12 +2449,36 @@ msgstr ""
 msgid "Follow system"
 msgstr ""
 
+#: src/direct/share.ts
+msgid "for somebody on the same network as this machine's {interfaceName}"
+msgstr ""
+
+#: src/direct/share.ts
+msgid "for somebody on the same network as you"
+msgstr ""
+
+#: src/direct/share.ts
+msgid "for somebody who is not on your network"
+msgstr ""
+
+#: src/direct/share.ts
+msgid "for somebody who is not on your network, who can join this room and chat but cannot start the game"
+msgstr ""
+
 #: src/i18n/frameStrings.ts
 msgid "Forward"
 msgstr ""
 
 #: src/sound/MusicSource.tsx
 msgid "From a game"
+msgstr ""
+
+#: src/direct/JoinRoomForm.tsx
+msgid "From a link, to a room at {linkAddress}:{linkPort}. Nothing connects until you press Join, and if the host has stopped hosting you will be told so."
+msgstr ""
+
+#: src/direct/share.ts
+msgid "From outside"
 msgstr ""
 
 #: src/i18n/frameStrings.ts
@@ -980,12 +2497,30 @@ msgstr ""
 msgid "Fullscreen, resolution and vsync."
 msgstr ""
 
+#: src/runlite/generate.ts
+msgid "Gain a field upgrade"
+msgstr ""
+
 #: src/conquest/index.ts
 msgid "Galaxy"
 msgstr ""
 
+#: src/downloads/pages/ActivityPage.tsx
+msgid "game"
+msgstr ""
+
 #: src/content/index.ts
+#: src/direct/HostRoomForm.tsx
+#: src/downloads/DownloadQueueBadge.tsx
+#: src/play/pages/components/CrashDrawer.tsx
+#: src/play/presetParts.ts
+#: src/runlite/pages/components/EncounterOverlay.tsx
+#: src/runlite/pages/components/RunSetupForm.tsx
 msgid "Game"
+msgstr ""
+
+#: src/play/pages/components/ParticipantsTable.tsx
+msgid "Game AIs (Lua)"
 msgstr ""
 
 #: src/profile/SettingsSection.tsx
@@ -1000,24 +2535,73 @@ msgstr ""
 msgid "Game filter regex is invalid"
 msgstr ""
 
+#: src/play/pages/components/GameOptionsPanel.tsx
+msgid "Game options"
+msgstr ""
+
+#: src/direct/ReachablePorts.tsx
+msgid "Game port"
+msgstr ""
+
+#: src/play/pages/SkirmishPage.tsx
+msgid "Game running — settings are frozen until the engine exits."
+msgstr ""
+
+#: src/play/pages/SkirmishPage.tsx
+msgid "Game running…"
+msgstr ""
+
 #: src/sound/MusicSource.tsx
 msgid "Game to take music from"
+msgstr ""
+
+#: src/game-updates/GameUpdatesProvider.tsx
+msgid "Game update available"
+msgstr ""
+
+#: src/game-updates/GameUpdatesProvider.tsx
+msgid "Game update: {filename}"
 msgstr ""
 
 #: src/game-updates/index.ts
 msgid "Game updates"
 msgstr ""
 
+#: src/play/pages/components/NewPresetFromReplayButton.tsx
+msgid "Game version"
+msgstr ""
+
+#: src/play/pages/components/GamePickerGrid.tsx
+msgid "games"
+msgstr ""
+
 #: src/content/index.ts
+#: src/packs/pages/components/ExportPackForm.tsx
 msgid "Games"
+msgstr ""
+
+#: src/play/pages/SkirmishPage.tsx
+msgid "games and maps"
 msgstr ""
 
 #: src/sound/MusicSource.tsx
 msgid "Games often ship their own soundtrack. Coilbox can play it in the lobby, though it was written to score a battle rather than a menu."
 msgstr ""
 
+#: src/play/pages/components/NewPresetFromReplayButton.tsx
+msgid "games or maps"
+msgstr ""
+
 #: src/general/index.ts
 msgid "General"
+msgstr ""
+
+#: src/direct/share.ts
+msgid "Give joiners the address for the network they are on."
+msgstr ""
+
+#: src/direct/share.ts
+msgid "Give joiners this address."
 msgstr ""
 
 #: src/notify/NotificationsSettings.tsx
@@ -1040,8 +2624,24 @@ msgstr ""
 msgid "Groups"
 msgstr ""
 
+#: src/play/scenarioDifficulty.ts
+msgid "Hard"
+msgstr ""
+
 #: src/profile/HealthChecklist.tsx
 msgid "Health"
+msgstr ""
+
+#: src/runlite/pages/RunListPage.tsx
+msgid "health {hull}/{maxHull}"
+msgstr ""
+
+#: src/runlite/pages/RunPage.tsx
+msgid "Health at risk"
+msgstr ""
+
+#: src/play/pages/components/MapOverlay.tsx
+msgid "Height"
 msgstr ""
 
 #: src/profile/SettingsSection.tsx
@@ -1152,12 +2752,68 @@ msgstr ""
 msgid "home: ignoring unknown zone {zoneName}"
 msgstr ""
 
+#: src/startbox/presets.ts
+msgid "Horizontal"
+msgstr ""
+
+#: src/play/pages/SkirmishPage.tsx
+msgid "Host"
+msgstr ""
+
+#: src/direct/LanRooms.tsx
+msgid "host {hostName}"
+msgstr ""
+
+#: src/direct/JoinRoomForm.tsx
+msgid "Host address"
+msgstr ""
+
+#: src/direct/HostRoomControl.tsx
+msgid "Host against the computer"
+msgstr ""
+
+#: src/play/pages/components/PresetsDrawer.tsx
+msgid "Host as battle"
+msgstr ""
+
+#: src/direct/HostRoomControl.tsx
+msgid "Host on LAN"
+msgstr ""
+
+#: src/direct/QuickRoom.tsx
+msgid "Host on LAN lets you pick another port."
+msgstr ""
+
+#: src/direct/HostRoomControl.tsx
+msgid "Host vs computer"
+msgstr ""
+
+#: src/direct/room.ts
+msgid "Hosting on port {port} as {host}"
+msgstr ""
+
 #: src/i18n/frameStrings.ts
 msgid "Hover-reveal sidebar"
 msgstr ""
 
+#: src/runlite/pages/components/RunHud.tsx
+msgid "How far you've crossed the map. Reach and beat the warlord at the far end to win the warpath."
+msgstr ""
+
 #: src/content/index.ts
 msgid "How the game itself looks, sounds and handles."
+msgstr ""
+
+#: src/runlite/pages/components/RunHud.tsx
+msgid "Hull"
+msgstr ""
+
+#: src/runlite/pages/components/RunEndScreen.tsx
+msgid "Hull remaining"
+msgstr ""
+
+#: src/play/pages/components/ParticipantsTable.tsx
+msgid "Human · host"
 msgstr ""
 
 #: src/deeplink/DeepLinkHandler.tsx
@@ -1174,6 +2830,7 @@ msgstr ""
 
 #: src/deeplink/index.ts
 #: src/deeplink/pages/ImportSection.tsx
+#: src/play/PresetLibraryToolbar.tsx
 msgid "Import"
 msgstr ""
 
@@ -1189,8 +2846,21 @@ msgstr ""
 msgid "Import a {planLabel} shared with you?"
 msgstr ""
 
+#: src/runlite/pages/RunListPage.tsx
+msgid "Import challenge"
+msgstr ""
+
 #: src/deeplink/DeepLinkHandler.tsx
 msgid "Import from a link"
+msgstr ""
+
+#: src/play/pages/SkirmishPage.tsx
+#: src/play/presetImport.tsx
+msgid "Import preset"
+msgstr ""
+
+#: src/packs/pages/components/ImportPackForm.tsx
+msgid "Import setup pack"
 msgstr ""
 
 #: src/deeplink/build.ts
@@ -1200,7 +2870,17 @@ msgstr ""
 msgid "Import URLs must be https."
 msgstr ""
 
+#: src/runlite/pages/RunListPage.tsx
+#: src/runlite/pages/RunPage.tsx
+msgid "Imported challenge"
+msgstr ""
+
+#: src/play/pages/SkirmishPage.tsx
+msgid "Imported preset"
+msgstr ""
+
 #: src/content/index.ts
+#: src/play/InGameBadge.tsx
 msgid "In game"
 msgstr ""
 
@@ -1213,6 +2893,7 @@ msgid "Input and camera"
 msgstr ""
 
 #: src/deeplink/DeepLinkHandler.tsx
+#: src/downloads/pages/components/EngineInstaller.tsx
 #: src/home/zones/SuggestedMap.tsx
 msgid "Install"
 msgstr ""
@@ -1221,12 +2902,46 @@ msgstr ""
 msgid "Install {mapTitle}"
 msgstr ""
 
+#: src/downloads/installArchive.ts
+msgid "Install a game"
+msgstr ""
+
+#: src/downloads/installArchive.ts
+msgid "Install a map"
+msgstr ""
+
+#: src/runlite/pages/RunListPage.tsx
+msgid "Install an engine first (<0>Settings → Engines</0>)."
+msgstr ""
+
+#: src/play/pages/SavegamesPage.tsx
+msgid "Install an engine to resume savegames."
+msgstr ""
+
+#: src/play/pages/components/NewPresetFromReplayButton.tsx
+msgid "Install it first from the Replays screen."
+msgstr ""
+
 #: src/profile/health.ts
 msgid "Install or bundle an engine — the game can't launch without one. {scanned}"
 msgstr ""
 
+#: src/downloads/installArchive.ts
+msgid "Install the game {fileName}?"
+msgstr ""
+
+#: src/downloads/installArchive.ts
+msgid "Install the map {fileName}?"
+msgstr ""
+
+#: src/downloads/pages/components/MapPacksDrawer.tsx
+#: src/downloads/pages/components/RapidBrowser.tsx
 #: src/home/zones/SuggestedMap.tsx
 msgid "Installed"
+msgstr ""
+
+#: src/game-updates/pages/GameUpdatesSection.tsx
+msgid "Installed — restart to apply the updated profile."
 msgstr ""
 
 #: src/updater/pages/UpdatesSettingsSection.tsx
@@ -1237,6 +2952,10 @@ msgstr ""
 msgid "Installed {fileName}"
 msgstr ""
 
+#: src/game-updates/pages/GameUpdatesSection.tsx
+msgid "Installed and ready."
+msgstr ""
+
 #: src/deeplink/DeepLinkHandler.tsx
 msgid "Installing"
 msgstr ""
@@ -1245,8 +2964,13 @@ msgstr ""
 msgid "Installing update"
 msgstr ""
 
+#: src/downloads/pages/components/EngineInstaller.tsx
 #: src/updater/pages/UpdatesSettingsSection.tsx
 msgid "Installing…"
+msgstr ""
+
+#: src/downloads/pages/components/EngineInstaller.tsx
+msgid "Installs an engine matching this platform into the configured content folder's <0>engine/</0> directory (set the destination in <1>Content folders settings</1>)."
 msgstr ""
 
 #: src/sound/events.ts
@@ -1266,8 +2990,20 @@ msgstr ""
 msgid "Invalid regex: {regexError}"
 msgstr ""
 
+#: src/direct/ShareRoomButton.tsx
+msgid "Invite people to this room"
+msgstr ""
+
+#: src/play/engineConfirmation.ts
+msgid "it did not report a version"
+msgstr ""
+
 #: src/deeplink/actions.ts
 msgid "It is added to your modules, which needs Advanced mode turned on in Settings."
+msgstr ""
+
+#: src/downloads/installArchive.ts
+msgid "It is copied to {destDir}. The file you opened stays where it is."
 msgstr ""
 
 #: src/deeplink/actions.ts
@@ -1287,16 +3023,62 @@ msgstr ""
 msgid "It opens in the keybinds editor, unsaved."
 msgstr ""
 
+#: src/direct/room.ts
+msgid "It was handing out {previous} earlier."
+msgstr ""
+
+#: src/downloads/pages/ActivityPage.tsx
 #: src/hub/index.tsx
 msgid "Item"
+msgstr ""
+
+#: src/play/pages/components/NewPresetFromReplayButton.tsx
+msgid "Its exact game couldn't be confirmed from the replay, so this is a name-only check."
+msgstr ""
+
+#: src/direct/LanRooms.tsx
+msgid "Join"
+msgstr ""
+
+#: src/direct/LanRooms.tsx
+msgid "Join {roomTitle}"
 msgstr ""
 
 #: src/deeplink/DeepLinkHandler.tsx
 msgid "Join a room"
 msgstr ""
 
+#: src/direct/LanRooms.tsx
+msgid "Join a room by address"
+msgstr ""
+
+#: src/direct/LanRooms.tsx
+#: src/direct/LinkedRoomJoin.tsx
+msgid "Join by address"
+msgstr ""
+
+#: src/direct/JoinRoomForm.tsx
+msgid "Join room"
+msgstr ""
+
 #: src/deeplink/DeepLinkHandler.tsx
 msgid "Join the room at {roomAddress}:{roomPort}?"
+msgstr ""
+
+#: src/direct/JoinRoomForm.tsx
+msgid "Joining {roomTitle}, found on this network."
+msgstr ""
+
+#: src/downloads/pages/SettingsSection.tsx
+msgid "Joining a battle"
+msgstr ""
+
+#: src/direct/JoinRoomForm.tsx
+msgid "Joining…"
+msgstr ""
+
+#: src/direct/PendingJoins.tsx
+msgid "Joins waiting for you"
 msgstr ""
 
 #: src/workshop/pages/components/CommandPalette.tsx
@@ -1307,8 +3089,28 @@ msgstr ""
 msgid "just now"
 msgstr ""
 
+#: src/direct/lan.ts
+msgid "Just the address, with no http:// and no path after it."
+msgstr ""
+
 #: src/content/index.ts
 msgid "Keep a copy of your whole engine config, and put it back."
+msgstr ""
+
+#: src/play/PresetList.tsx
+msgid "Keep it"
+msgstr ""
+
+#: src/play/PresetPartsPicker.tsx
+msgid "Keep options this preset does not set"
+msgstr ""
+
+#: src/play/InGameBadge.tsx
+msgid "Keep playing"
+msgstr ""
+
+#: src/play/PresetPartsPicker.tsx
+msgid "Keep tweak slots this preset does not set"
 msgstr ""
 
 #: src/content/index.ts
@@ -1323,6 +3125,10 @@ msgstr ""
 msgid "Last checked {lastCheckedTime}"
 msgstr ""
 
+#: src/game-updates/pages/GameUpdatesSection.tsx
+msgid "Latest: {releaseName}"
+msgstr ""
+
 #: src/i18n/frameStrings.ts
 msgid "Layout"
 msgstr ""
@@ -1335,8 +3141,29 @@ msgstr ""
 msgid "Least"
 msgstr ""
 
+#: src/direct/HostRoomForm.tsx
+#: src/direct/JoinRoomForm.tsx
+msgid "Leave blank for an open room"
+msgstr ""
+
+#: src/runlite/pages/components/NodeOverlays.tsx
+msgid "Leave it — press on"
+msgstr ""
+
+#: src/runlite/generate.ts
+msgid "Leave it be"
+msgstr ""
+
+#: src/runlite/pages/components/NodeOverlays.tsx
+msgid "Leave the depot"
+msgstr ""
+
 #: src/lego/index.ts
 msgid "Lego Parts"
+msgstr ""
+
+#: src/runlite/pages/components/RunSetupForm.tsx
+msgid "Length"
 msgstr ""
 
 #: src/notify/NotificationsSettings.tsx
@@ -1369,8 +3196,76 @@ msgstr ""
 msgid "link icon ''{n}'' is unknown — falls back to a generic icon"
 msgstr ""
 
+#: src/play/pages/components/PresetsDrawer.tsx
+msgid "Load"
+msgstr ""
+
+#: src/downloads/pages/components/RapidBrowser.tsx
+msgid "Load a rapid master to list its repositories."
+msgstr ""
+
+#: src/downloads/pages/components/RapidBrowser.tsx
+msgid "Load repos"
+msgstr ""
+
+#: src/play/pages/SkirmishPage.tsx
+msgid "Loaded the preset \"{loadedName}\"."
+msgstr ""
+
+#: src/downloads/pages/components/EngineInstaller.tsx
+msgid "loading engines…"
+msgstr ""
+
+#: src/runlite/pages/components/RunSetupForm.tsx
+msgid "Loading game data…"
+msgstr ""
+
+#: src/play/pages/components/GameSelectCard.tsx
+msgid "Loading games…"
+msgstr ""
+
+#: src/play/pages/components/MapCard.tsx
+msgid "Loading maps…"
+msgstr ""
+
+#: src/play/pages/components/MinimapPreview.tsx
+msgid "Loading minimap"
+msgstr ""
+
+#: src/play/pages/components/NewPresetFromReplayButton.tsx
+msgid "Loading replays…"
+msgstr ""
+
+#: src/runlite/pages/components/RunSetupForm.tsx
+msgid "Loading the game's factions…"
+msgstr ""
+
+#: src/runlite/unitLimit.ts
+msgid "Loading unit data…"
+msgstr ""
+
+#: src/downloads/pages/components/RapidBrowser.tsx
+msgid "loading versions…"
+msgstr ""
+
+#: src/downloads/pages/components/RapidBrowser.tsx
+msgid "Loading…"
+msgstr ""
+
+#: src/runlite/pages/components/RunSetupForm.tsx
+msgid "Loadout"
+msgstr ""
+
 #: src/lobby-servers/index.ts
 msgid "Lobby servers"
+msgstr ""
+
+#: src/direct/LanRooms.tsx
+msgid "Local Network"
+msgstr ""
+
+#: src/downloads/pages/ActivityPage.tsx
+msgid "Log"
 msgstr ""
 
 #: src/home/zones/ResumeRail.tsx
@@ -1381,8 +3276,28 @@ msgstr ""
 msgid "Log in to a lobby server, chat, and join battles."
 msgstr ""
 
+#: src/play/pages/EngineLogSection.tsx
+msgid "Log: {logPath}"
+msgstr ""
+
 #: src/multiplayer/index.tsx
 msgid "Login"
+msgstr ""
+
+#: src/runlite/pages/components/RunSetupForm.tsx
+msgid "long"
+msgstr ""
+
+#: src/runlite/pages/RunListPage.tsx
+msgid "Looking for an engine…"
+msgstr ""
+
+#: src/play/pages/EngineLogSection.tsx
+msgid "Looking for the engine log."
+msgstr ""
+
+#: src/direct/ShareRoomButton.tsx
+msgid "Looking up this machine's addresses…"
 msgstr ""
 
 #: src/animation/index.ts
@@ -1393,8 +3308,38 @@ msgstr ""
 msgid "Lua REPL"
 msgstr ""
 
+#: src/downloads/pages/ActivityPage.tsx
+msgid "map"
+msgstr ""
+
 #: src/content/index.ts
+#: src/direct/HostRoomForm.tsx
+#: src/downloads/DownloadQueueBadge.tsx
+#: src/play/pages/components/CrashDrawer.tsx
+#: src/play/pages/components/MapOverlay.tsx
+#: src/play/presetParts.ts
 msgid "Map"
+msgstr ""
+
+#: src/play/presetParts.ts
+msgid "Map options"
+msgstr ""
+
+#: src/play/pages/components/MapOverlay.tsx
+msgid "Map overlay"
+msgstr ""
+
+#: src/downloads/pages/components/MapPacksBanner.tsx
+#: src/downloads/pages/components/MapPacksDrawer.tsx
+msgid "Map packs"
+msgstr ""
+
+#: src/play/pages/components/MapCard.tsx
+msgid "Map size"
+msgstr ""
+
+#: src/runlite/pages/components/RunSetupForm.tsx
+msgid "Map style"
 msgstr ""
 
 #: src/mapconv/index.ts
@@ -1409,16 +3354,37 @@ msgstr ""
 msgid "Mapping Wiki"
 msgstr ""
 
+#: src/play/pages/components/MapPickerGrid.tsx
+msgid "maps"
+msgstr ""
+
 #: src/content/index.ts
+#: src/packs/pages/components/ExportPackForm.tsx
 msgid "Maps"
+msgstr ""
+
+#: src/play/pages/components/MapCard.tsx
+msgid "Maps by {author} on the Coilbox hub"
+msgstr ""
+
+#: src/downloads/pages/SettingsSection.tsx
+msgid "Master URL"
 msgstr ""
 
 #: src/sound/SoundSettings.tsx
 msgid "Master volume"
 msgstr ""
 
+#: src/play/pages/components/DebriefDrawer.tsx
+msgid "Match debrief"
+msgstr ""
+
 #: src/home/continue.ts
 msgid "Match in progress · hosted by {host}"
+msgstr ""
+
+#: src/play/presetRecord.ts
+msgid "Matches your best on {name}, {best}."
 msgstr ""
 
 #: src/multiplayer/index.tsx
@@ -1433,6 +3399,10 @@ msgstr ""
 msgid "Matchup"
 msgstr ""
 
+#: src/direct/HostRoomForm.tsx
+msgid "Max players"
+msgstr ""
+
 #: src/sound/events.ts
 msgid "Mentioned in chat"
 msgstr ""
@@ -1441,8 +3411,28 @@ msgstr ""
 msgid "Menu"
 msgstr ""
 
+#: src/play/pages/components/MapOverlay.tsx
+msgid "Metal"
+msgstr ""
+
+#: src/direct/LanRooms.tsx
+#: src/play/pages/components/MapCard.tsx
+#: src/play/pages/components/MapPickerGrid.tsx
+#: src/play/PresetList.tsx
+msgid "Minimap of {mapName}"
+msgstr ""
+
+#: src/downloads/pages/components/MapPacksDrawer.tsx
+msgid "Minimap of {mapTitle}"
+msgstr ""
+
 #: src/campaign/index.ts
 msgid "Mission"
+msgstr ""
+
+#: src/play/pages/components/GameOptionsPanel.tsx
+#: src/play/presetParts.ts
+msgid "Mod options"
 msgstr ""
 
 #: src/lego/index.ts
@@ -1469,12 +3459,21 @@ msgstr ""
 msgid "Motion & effects"
 msgstr ""
 
+#: src/startbox/StartBoxControls.tsx
+msgid "Move each of the {boxHolders} boxes on to the next ally"
+msgstr ""
+
+#: src/play/pages/components/GameChoiceOffer.tsx
+msgid "Move to {newerName}"
+msgstr ""
+
 #: src/home/zones/ResumeRail.tsx
 #: src/multiplayer/index.tsx
 msgid "Multiplayer"
 msgstr ""
 
 #: src/home/continue.ts
+#: src/play/PlayProvider.tsx
 msgid "Multiplayer battle"
 msgstr ""
 
@@ -1499,6 +3498,20 @@ msgstr ""
 msgid "Mute all sound"
 msgstr ""
 
+#: src/downloads/pages/ActivityPage.tsx
+#: src/downloads/pages/SettingsSection.tsx
+#: src/packs/pages/components/ExportPackForm.tsx
+msgid "Name"
+msgstr ""
+
+#: src/play/pages/SavegamesPage.tsx
+msgid "Name A–Z"
+msgstr ""
+
+#: src/play/pages/SavegamesPage.tsx
+msgid "Name Z–A"
+msgstr ""
+
 #: src/profile/health.ts
 msgid "names [{filterNames}]"
 msgstr ""
@@ -1507,12 +3520,76 @@ msgstr ""
 msgid "Navy"
 msgstr ""
 
+#: src/startbox/presets.ts
+msgid "NE-SW"
+msgstr ""
+
+#: src/play/navBadges.tsx
+msgid "Needs a game"
+msgstr ""
+
+#: src/startbox/StartBoxControls.tsx
+msgid "Needs at least two allies with a box"
+msgstr ""
+
 #: src/i18n/frameStrings.ts
 msgid "Neutral"
 msgstr ""
 
+#: src/play/presetRecord.ts
+msgid "New best on {name}: {faster} faster than before."
+msgstr ""
+
+#: src/play/pages/components/NewPresetFromReplayButton.tsx
+msgid "New preset from replay"
+msgstr ""
+
 #: src/workshop/index.ts
 msgid "New project"
+msgstr ""
+
+#: src/runlite/pages/RunListPage.tsx
+msgid "New warpath"
+msgstr ""
+
+#: src/play/pages/SavegamesPage.tsx
+msgid "Newest"
+msgstr ""
+
+#: src/downloads/pages/ActivityPage.tsx
+msgid "Newest first"
+msgstr ""
+
+#: src/runlite/pages/components/RunHud.tsx
+msgid "Nightmare"
+msgstr ""
+
+#: src/runlite/pages/RunPage.tsx
+msgid "No active warpath."
+msgstr ""
+
+#: src/play/pages/components/ParticipantsTable.tsx
+msgid "No AIs found"
+msgstr ""
+
+#: src/play/pages/components/NewPresetFromReplayButton.tsx
+msgid "No AIs found for this game."
+msgstr ""
+
+#: src/runlite/pages/RunPage.tsx
+msgid "no battle"
+msgstr ""
+
+#: src/runlite/pages/RunPage.tsx
+msgid "No battles fought here yet."
+msgstr ""
+
+#: src/play/pages/components/ParticipantsTable.tsx
+msgid "no bonus"
+msgstr ""
+
+#: src/runlite/generate.ts
+msgid "No change"
 msgstr ""
 
 #: src/profile/health.ts
@@ -1535,8 +3612,16 @@ msgstr ""
 msgid "No distribution profile loaded — standard Coilbox."
 msgstr ""
 
+#: src/downloads/pages/components/EngineInstaller.tsx
+msgid "No download destination set — choose a content folder in <0>Content folders settings</0> to enable engine downloads."
+msgstr ""
+
 #: src/profile/health.ts
 msgid "No download write root set"
+msgstr ""
+
+#: src/downloads/pages/ActivityPage.tsx
+msgid "No downloads match \"{query}\"."
 msgstr ""
 
 #: src/profile/health.ts
@@ -1547,12 +3632,94 @@ msgstr ""
 msgid "No engine found"
 msgstr ""
 
+#: src/direct/HostRoomForm.tsx
+#: src/direct/QuickRoom.tsx
+#: src/play/pages/components/NoEngineNotice.tsx
+msgid "No engine found. Add a content folder with an engine in <0>Settings → Content folders</0> first."
+msgstr ""
+
+#: src/play/pages/EngineLogSection.tsx
+msgid "No engine is installed, so nothing has written a log yet."
+msgstr ""
+
+#: src/play/pages/components/NoEngineNotice.tsx
+msgid "No engine is installed. Download engine {engineVersion} to play {playingText}."
+msgstr ""
+
+#: src/play/pages/components/CrashDrawer.tsx
+msgid "No engine log was found, so there is nothing to show beyond how it exited."
+msgstr ""
+
+#: src/play/pages/SkirmishPage.tsx
+msgid "No engine selected."
+msgstr ""
+
+#: src/downloads/pages/ActivityPage.tsx
+msgid "No failed downloads."
+msgstr ""
+
+#: src/downloads/pages/ActivityPage.tsx
+msgid "No finished downloads."
+msgstr ""
+
+#: src/play/pages/components/GameOptionsPanel.tsx
+msgid "No game"
+msgstr ""
+
 #: src/profile/health.ts
 msgid "No game filter set"
 msgstr ""
 
+#: src/play/pages/components/GameSelectCard.tsx
+msgid "No game selected"
+msgstr ""
+
+#: src/play/pages/components/GamePickerGrid.tsx
+msgid "No games are installed."
+msgstr ""
+
 #: src/profile/health.ts
 msgid "No games found"
+msgstr ""
+
+#: src/packs/pages/components/ExportPackForm.tsx
+msgid "No games installed for this engine."
+msgstr ""
+
+#: src/runlite/pages/RunListPage.tsx
+msgid "No games installed. Add one from <0>Content → Games</0>."
+msgstr ""
+
+#: src/play/pages/components/GamePickerGrid.tsx
+msgid "No games match “{query}”."
+msgstr ""
+
+#: src/downloads/gameRepos.ts
+msgid "No GitHub repo declared for source \"{sourceKey}\"."
+msgstr ""
+
+#: src/direct/lan.ts
+msgid "No machine called {address}. Check the spelling, or use its address instead of its name."
+msgstr ""
+
+#: src/play/pages/components/MapCard.tsx
+msgid "No map selected"
+msgstr ""
+
+#: src/packs/pages/components/ExportPackForm.tsx
+msgid "No maps installed for this engine."
+msgstr ""
+
+#: src/play/pages/components/MapPickerGrid.tsx
+msgid "No maps installed."
+msgstr ""
+
+#: src/play/pages/components/MapPickerGrid.tsx
+msgid "No maps match \"{query}\"."
+msgstr ""
+
+#: src/play/pages/components/MinimapPreview.tsx
+msgid "No minimap"
 msgstr ""
 
 #: src/sound/MusicSource.tsx
@@ -1567,8 +3734,96 @@ msgstr ""
 msgid "No notifications yet."
 msgstr ""
 
+#: src/direct/room.ts
+msgid "no password"
+msgstr ""
+
+#: src/play/pages/components/PresetsDrawer.tsx
+msgid "No presets yet. Save your current setup above, or import a shared one."
+msgstr ""
+
+#: src/play/PresetTweaksView.tsx
+msgid "No projects for {gameName} yet"
+msgstr ""
+
+#: src/downloads/pages/components/RapidBrowser.tsx
+msgid "No rapid repositories configured. Add one in <0>Sources settings</0>."
+msgstr ""
+
+#: src/downloads/pages/SettingsSection.tsx
+msgid "No rapid repositories. Add one to browse and download games from it."
+msgstr ""
+
+#: src/downloads/pages/ActivityPage.tsx
+msgid "no reason given"
+msgstr ""
+
+#: src/downloads/emptyEngineList.ts
+msgid "No Recoil builds for this platform ({platform}). On macOS, add an engine manually."
+msgstr ""
+
+#: src/play/pages/components/DebriefDrawer.tsx
+msgid "No replay available for this match."
+msgstr ""
+
+#: src/play/pages/components/NewPresetFromReplayButton.tsx
+msgid "No replays found."
+msgstr ""
+
+#: src/downloads/pages/components/RapidBrowser.tsx
+msgid "No repositories match “{repoQuery}”."
+msgstr ""
+
+#: src/direct/LanRooms.tsx
+msgid "No rooms found. Some networks stop devices seeing each other, so a room that is up may still not be listed here. Ask the host for their address and join by address."
+msgstr ""
+
+#: src/direct/ReachablePorts.tsx
+msgid "No router setting fixes this. Ask your provider for a public address."
+msgstr ""
+
+#: src/packs/pages/components/ExportPackForm.tsx
+msgid "No saved blueprints to include."
+msgstr ""
+
+#: src/packs/pages/components/ExportPackForm.tsx
+msgid "No saved presets to include."
+msgstr ""
+
+#: src/play/pages/SavegamesPage.tsx
+msgid "No savegames found. Saves you make in-game appear here."
+msgstr ""
+
+#: src/play/pages/SavegamesPage.tsx
+msgid "No savegames match “{trimmedFilter}”."
+msgstr ""
+
+#: src/direct/ReachablePorts.tsx
+msgid "No server would say what your public address is."
+msgstr ""
+
 #: src/i18n/frameStrings.ts
 msgid "No settings available."
+msgstr ""
+
+#: src/downloads/downloadGame.ts
+msgid "No source could provide \"{gameName}\". {errors}"
+msgstr ""
+
+#: src/downloads/downloadMap.ts
+msgid "No source could provide \"{mapName}\". {errors}"
+msgstr ""
+
+#: src/direct/room.ts
+msgid "No spaces in a room password. A room sends it in a single wire field, so a password with a space in it does not survive the trip."
+msgstr ""
+
+#: src/direct/room.ts
+msgid "No spaces in your name. A room announces names in single wire fields, so a name with a space in it does not survive the trip."
+msgstr ""
+
+#: src/startbox/mode.ts
+msgid "No start boxes yet, so every team may start anywhere on the map."
 msgstr ""
 
 #: src/home/zones/Greeting.tsx
@@ -1576,16 +3831,68 @@ msgstr ""
 msgid "No tools available yet."
 msgstr ""
 
+#: src/downloads/pages/components/RapidBrowser.tsx
+msgid "No versions in this repository."
+msgstr ""
+
+#: src/downloads/pages/components/RapidBrowser.tsx
+msgid "No versions match “{versionQuery}”."
+msgstr ""
+
+#: src/runlite/pages/RunListPage.tsx
+msgid "No warpath in progress. Start a new warpath to begin."
+msgstr ""
+
+#: src/direct/HostRoomForm.tsx
+msgid "Nobody gets in until you say so. You are asked in the battle room, and whoever is asking waits until you answer."
+msgstr ""
+
+#: src/direct/room.ts
+msgid "nobody has joined yet"
+msgstr ""
+
+#: src/direct/hostingRoute.ts
+msgid "Nobody outside this network can reach this room, so it is for the people on this network."
+msgstr ""
+
 #: src/profile/SettingsSection.tsx
 msgid "None"
+msgstr ""
+
+#: src/play/pages/EngineLogSection.tsx
+msgid "none found"
+msgstr ""
+
+#: src/play/scenarioDifficulty.ts
+msgid "Normal"
 msgstr ""
 
 #: src/sound/MusicSource.tsx
 msgid "Nostalgia"
 msgstr ""
 
+#: src/play/presetRecord.ts
+msgid "Not a new best on {name}. This win was {slower} slower than {best}."
+msgstr ""
+
+#: src/direct/room.ts
+msgid "Not announced on this network, so give joiners your address."
+msgstr ""
+
+#: src/direct/room.ts
+msgid "Not heard announcing itself yet. If it stays that way, people on this network will need your address rather than finding the room themselves."
+msgstr ""
+
+#: src/play/PresetPartsPicker.tsx
+msgid "Not in this preset"
+msgstr ""
+
 #: src/profile/health.ts
 msgid "Not portable (standard per-user install)"
+msgstr ""
+
+#: src/direct/hostingRoute.ts
+msgid "Not reachable"
 msgstr ""
 
 #: src/components/SaveStatus.tsx
@@ -1594,6 +3901,22 @@ msgstr ""
 
 #: src/profile/health.ts
 msgid "not writable"
+msgstr ""
+
+#: src/runlite/unitLimit.ts
+msgid "Nothing can be built from {startUnit}, the start unit for {sideName}, so coilbox cannot limit your units. Rewards will offer perks only and every unit will be available from the first battle."
+msgstr ""
+
+#: src/runlite/unitLimit.ts
+msgid "Nothing can be built from {startUnitName}, this run's start unit, so coilbox cannot limit your units. Every unit is available."
+msgstr ""
+
+#: src/downloads/pages/ActivityPage.tsx
+msgid "Nothing downloaded yet."
+msgstr ""
+
+#: src/direct/hostingRoute.ts
+msgid "Nothing has confirmed a way in yet, so players connect straight to this machine, which only works if the port is already open."
 msgstr ""
 
 #: src/profile/health.ts
@@ -1608,8 +3931,52 @@ msgstr ""
 msgid "Nothing has scanned the content folders yet. Let the scan finish, then re-run this."
 msgstr ""
 
+#: src/runlite/pages/components/NodeOverlays.tsx
+msgid "Nothing here is within budget yet — patch up and press on."
+msgstr ""
+
+#: src/runlite/pages/components/NodeOverlays.tsx
+msgid "Nothing here is within budget yet — press on and win more salvage."
+msgstr ""
+
+#: src/downloads/pages/ActivityPage.tsx
+msgid "Nothing is downloading."
+msgstr ""
+
+#: src/direct/lan.ts
+msgid "Nothing is hosting on {where}. Check the port with the host, and that their room is still up."
+msgstr ""
+
+#: src/startbox/StartBoxPresetsPopover.tsx
+msgid "Nothing saved for this map yet. Draw a layout and keep it here."
+msgstr ""
+
+#: src/play/PresetPartsView.tsx
+msgid "Nothing selected"
+msgstr ""
+
 #: src/deeplink/DeepLinkHandler.tsx
 msgid "Nothing was installed"
+msgstr ""
+
+#: src/downloads/pages/ActivityPage.tsx
+msgid "Nothing was recorded."
+msgstr ""
+
+#: src/direct/hostingRoute.ts
+msgid "Nothing would open the ports and this server has no relay, so only players who can already reach this machine can join."
+msgstr ""
+
+#: src/direct/hostingRoute.ts
+msgid "Nothing would open the ports, and you have asked not to be relayed, so only players who can already reach this machine can join."
+msgstr ""
+
+#: src/direct/hostingRoute.ts
+msgid "Nothing would open the ports, so only players who can already reach this machine can join."
+msgstr ""
+
+#: src/direct/hostingRoute.ts
+msgid "Nothing would open the ports, so this battle goes through the server's relay."
 msgstr ""
 
 #: src/notify/NotificationsSettings.tsx
@@ -1629,20 +3996,50 @@ msgstr ""
 msgid "now"
 msgstr ""
 
+#: src/startbox/presets.ts
+msgid "NW-SE"
+msgstr ""
+
+#: src/play/modOptions.ts
 #: src/profile/SettingsSection.tsx
 msgid "Off"
 msgstr ""
 
+#: src/runlite/pages/RunPage.tsx
+msgid "Offers"
+msgstr ""
+
+#: src/downloads/pages/ActivityPage.tsx
+msgid "ok"
+msgstr ""
+
+#: src/play/pages/SavegamesPage.tsx
+msgid "Oldest"
+msgstr ""
+
+#: src/play/modOptions.ts
 #: src/profile/SettingsSection.tsx
 msgid "On"
+msgstr ""
+
+#: src/direct/share.ts
+msgid "On {interfaceName}"
 msgstr ""
 
 #: src/i18n/frameStrings.ts
 msgid "On a narrow window, the sidebar becomes a menu button and opens fullscreen."
 msgstr ""
 
+#: src/direct/share.ts
+msgid "On this network"
+msgstr ""
+
 #: src/profile/health.ts
 msgid "Only own maps: generated map styles are hidden"
+msgstr ""
+
+#: src/direct/hostingRoute.ts
+msgid "Only when players cannot reach you directly."
 msgstr ""
 
 #: src/i18n/frameStrings.ts
@@ -1681,6 +4078,10 @@ msgstr ""
 msgid "Open Conquest."
 msgstr ""
 
+#: src/direct/ReachablePorts.tsx
+msgid "Open ports on my router"
+msgstr ""
+
 #: src/home/continue.ts
 msgid "Open setup"
 msgstr ""
@@ -1695,6 +4096,10 @@ msgstr ""
 
 #: src/deeplink/DeepLinkHandler.tsx
 msgid "Open the join form"
+msgstr ""
+
+#: src/play/pages/components/EngineLogFile.tsx
+msgid "Open the log file"
 msgstr ""
 
 #: src/deeplink/actions.ts
@@ -1717,12 +4122,57 @@ msgstr ""
 msgid "Opening \"{screenName}\" needs an id."
 msgstr ""
 
+#: src/direct/roomSeed.ts
+msgid "Opens with {bots}."
+msgstr ""
+
+#: src/runlite/pages/components/EncounterOverlay.tsx
+#: src/runlite/pages/RunPage.tsx
+msgid "Opposition"
+msgstr ""
+
 #: src/i18n/frameStrings.ts
 msgid "Orange"
 msgstr ""
 
+#: src/play/debrief.ts
+msgid "Outcome unknown — no replay was found for this match."
+msgstr ""
+
+#: src/play/debrief.ts
+msgid "Outcome unknown — the replay couldn't be read."
+msgstr ""
+
+#: src/play/debrief.ts
+msgid "Outcome unknown — the winner couldn't be determined."
+msgstr ""
+
+#: src/runlite/generate.ts
+msgid "Overclocked Reactor"
+msgstr ""
+
 #: src/lego/index.ts
 msgid "Parts pack format"
+msgstr ""
+
+#: src/direct/JoinRoomForm.tsx
+msgid "Password (if the host set one)"
+msgstr ""
+
+#: src/direct/HostRoomForm.tsx
+msgid "Password (optional)"
+msgstr ""
+
+#: src/direct/room.ts
+msgid "password needed"
+msgstr ""
+
+#: src/direct/LanRooms.tsx
+msgid "Passworded"
+msgstr ""
+
+#: src/runlite/pages/components/ImportChallengeForm.tsx
+msgid "Paste a challenge code shared by another player to generate the identical warpath on your own install."
 msgstr ""
 
 #: src/deeplink/pages/ImportSection.tsx
@@ -1731,6 +4181,14 @@ msgstr ""
 
 #: src/deeplink/readImport.ts
 msgid "Paste a coilbox link, a share code, or the contents of a coilbox .json file."
+msgstr ""
+
+#: src/packs/pages/components/ImportPackForm.tsx
+msgid "Paste a setup pack code shared by another player to install its games and maps, and add any presets and blueprints it includes."
+msgstr ""
+
+#: src/packs/pages/components/ImportPackForm.tsx
+msgid "Paste a setup pack code…"
 msgstr ""
 
 #: src/deeplink/index.ts
@@ -1749,12 +4207,29 @@ msgstr ""
 msgid "Pause music"
 msgstr ""
 
+#: src/direct/hostingRoute.ts
+msgid "People on this network can join. Turn on \"Open ports on my router\" above to find out whether anybody outside can."
+msgstr ""
+
+#: src/direct/HostRoomForm.tsx
+msgid "People on this network see your room without being told an address. Turn it off and they need your address and port."
+msgstr ""
+
 #: src/multiplayer/index.tsx
 msgid "People whose messages coilbox hides from you."
 msgstr ""
 
 #: src/general/pages/SettingsSection.tsx
 msgid "Performance mode"
+msgstr ""
+
+#. placeholder {0}: option.perk.label
+#: src/runlite/progress.ts
+msgid "Perk: {0}"
+msgstr ""
+
+#: src/runlite/pages/components/RunEndScreen.tsx
+msgid "Perks earned"
 msgstr ""
 
 #: src/notify/NotificationsSettings.tsx
@@ -1773,6 +4248,18 @@ msgstr ""
 msgid "Pick a game to see what it ships."
 msgstr ""
 
+#: src/play/pages/components/NewPresetFromReplayButton.tsx
+msgid "Pick a replay"
+msgstr ""
+
+#: src/play/pages/components/ParticipantsTable.tsx
+msgid "Pick an AI"
+msgstr ""
+
+#: src/packs/pages/components/ExportPackForm.tsx
+msgid "Pick at least one game or map first."
+msgstr ""
+
 #: src/home/zones/Greeting.tsx
 msgid "Pick up where you left off."
 msgstr ""
@@ -1783,6 +4270,10 @@ msgstr ""
 
 #: src/home/config.ts
 msgid "pinned"
+msgstr ""
+
+#: src/runlite/pages/components/RunSetupForm.tsx
+msgid "Planet"
 msgstr ""
 
 #: src/campaign/index.ts
@@ -1798,6 +4289,7 @@ msgid "Play music"
 msgstr ""
 
 #: src/multiplayer/index.tsx
+#: src/play/pages/components/ParticipantsTable.tsx
 msgid "Player"
 msgstr ""
 
@@ -1805,8 +4297,72 @@ msgstr ""
 msgid "Player stats"
 msgstr ""
 
+#: src/direct/ReachablePorts.tsx
+msgid "Players can reach you"
+msgstr ""
+
+#: src/direct/hostingRoute.ts
+msgid "Players connect straight to you or not at all."
+msgstr ""
+
+#: src/play/pages/components/CrashDrawer.tsx
+msgid "Playing"
+msgstr ""
+
+#: src/play/pages/SkirmishPage.tsx
+msgid "Playing with \"{projectName}\""
+msgstr ""
+
+#: src/direct/JoinRoomForm.tsx
+msgid "Port"
+msgstr ""
+
+#: src/direct/room.ts
+msgid "Port {port} is already in use. Another coilbox, or a room you left running, has it. Pick another port or stop the other room."
+msgstr ""
+
+#: src/direct/hostingRoute.ts
+msgid "Port opened"
+msgstr ""
+
 #: src/profile/health.ts
 msgid "Portable mode active — {portableRoot}"
+msgstr ""
+
+#: src/direct/room.ts
+msgid "Ports are whole numbers."
+msgstr ""
+
+#: src/direct/room.ts
+msgid "Ports run from 1 to 65535."
+msgstr ""
+
+#: src/downloads/pages/components/RapidBrowser.tsx
+msgid "pr-downloader sidecar unavailable"
+msgstr ""
+
+#: src/downloads/pages/components/EngineInstaller.tsx
+msgid "pre-release"
+msgstr ""
+
+#: src/play/pages/components/NewPresetFromReplayButton.tsx
+#: src/play/pages/components/SaveAsPresetButton.tsx
+#: src/play/PresetLibraryToolbar.tsx
+msgid "Preset name"
+msgstr ""
+
+#: src/play/pages/components/PresetsDrawer.tsx
+#: src/play/pages/SkirmishPage.tsx
+#: src/startbox/StartBoxPresetsPopover.tsx
+msgid "Presets"
+msgstr ""
+
+#: src/packs/pages/components/ExportPackForm.tsx
+msgid "Presets (optional)"
+msgstr ""
+
+#: src/runlite/generate.ts
+msgid "Press on"
 msgstr ""
 
 #: src/sound/SoundSettings.tsx
@@ -1825,6 +4381,10 @@ msgstr ""
 msgid "profile.json failed to parse"
 msgstr ""
 
+#: src/downloads/pages/ActivityPage.tsx
+msgid "Progress"
+msgstr ""
+
 #: src/workshop/index.ts
 msgid "Project"
 msgstr ""
@@ -1837,8 +4397,32 @@ msgstr ""
 msgid "Purple"
 msgstr ""
 
+#: src/downloads/pages/ActivityPage.tsx
+#: src/downloads/pages/components/EngineInstaller.tsx
+#: src/downloads/pages/components/MapPacksDrawer.tsx
+#: src/downloads/pages/components/RapidBrowser.tsx
 #: src/home/zones/SuggestedMap.tsx
 msgid "Queued"
+msgstr ""
+
+#: src/downloads/pages/ActivityPage.tsx
+msgid "Queued · {queuedSize}"
+msgstr ""
+
+#: src/downloads/DownloadQueueBadge.tsx
+msgid "Queued ({count})"
+msgstr ""
+
+#: src/downloads/DownloadQueueBadge.tsx
+msgid "Queued ({count}) · {total}"
+msgstr ""
+
+#: src/downloads/DownloadQueueBadge.tsx
+msgid "Queued ({count}) · {total} + {unknown} of unknown size"
+msgstr ""
+
+#: src/runlite/pages/components/RunSetupForm.tsx
+msgid "quick"
 msgstr ""
 
 #: src/general/quit.tsx
@@ -1853,7 +4437,26 @@ msgstr ""
 msgid "Rainbow"
 msgstr ""
 
+#: src/runlite/pages/components/NodeOverlays.tsx
+msgid "raises tech ceiling · both sides"
+msgstr ""
+
+#: src/play/pages/components/ParticipantsTable.tsx
+#: src/startbox/mode.ts
+msgid "Random"
+msgstr ""
+
+#: src/play/presetParts.ts
+msgid "Random positions"
+msgstr ""
+
+#: src/downloads/DownloadQueueBadge.tsx
+msgid "Rapid"
+msgstr ""
+
 #: src/downloads/index.ts
+#: src/downloads/pages/ExplorerPage.tsx
+#: src/downloads/pages/SettingsSection.tsx
 msgid "Rapid repositories"
 msgstr ""
 
@@ -1865,12 +4468,40 @@ msgstr ""
 msgid "Read in place from {bundlePath}. Only the engine is copied, once, into the download folder."
 msgstr ""
 
+#: src/play/pages/EngineLogSection.tsx
+msgid "Reading"
+msgstr ""
+
+#: src/direct/room.ts
+msgid "Reading content…"
+msgstr ""
+
+#: src/play/pages/components/NewPresetFromReplayButton.tsx
+msgid "Reading replay…"
+msgstr ""
+
 #: src/sound/MusicSource.tsx
 msgid "Reading the archive…"
 msgstr ""
 
+#: src/direct/QuickRoom.tsx
+msgid "Reading the game and the map."
+msgstr ""
+
+#: src/play/pages/components/GamePickerGrid.tsx
+msgid "Reading your games…"
+msgstr ""
+
 #: src/home/continue.ts
 msgid "Ready to install"
+msgstr ""
+
+#: src/downloads/pages/components/EngineInstaller.tsx
+msgid "Recoil (GitHub releases)"
+msgstr ""
+
+#: src/runlite/meta.ts
+msgid "Recon doctrine"
 msgstr ""
 
 #: src/home/zones/ResumeRail.tsx
@@ -1879,6 +4510,14 @@ msgstr ""
 
 #: src/recordsGroup.ts
 msgid "Records"
+msgstr ""
+
+#: src/runlite/pages/RunPage.tsx
+msgid "Recover a schematic to widen the arsenal, or a field upgrade for yourself."
+msgstr ""
+
+#: src/runlite/pages/components/RunHud.tsx
+msgid "Recruit"
 msgstr ""
 
 #: src/i18n/frameStrings.ts
@@ -1894,6 +4533,15 @@ msgstr ""
 msgid "Reference"
 msgstr ""
 
+#: src/downloads/pages/components/EngineInstaller.tsx
+#: src/downloads/pages/components/RapidBrowser.tsx
+msgid "Refresh"
+msgstr ""
+
+#: src/downloads/pages/components/RapidBrowser.tsx
+msgid "Refresh {repoName} versions"
+msgstr ""
+
 #: src/lib/relativeTime.ts
 msgid "refreshed {ago}"
 msgstr ""
@@ -1902,11 +4550,36 @@ msgstr ""
 msgid "regex /{filterRegex}/i"
 msgstr ""
 
+#: src/direct/PendingJoins.tsx
+msgid "Reject {name}"
+msgstr ""
+
 #: src/home/continue.ts
 msgid "Rejoin battle"
 msgstr ""
 
+#: src/play/relayCarrying.ts
+msgid "Relay running"
+msgstr ""
+
+#: src/play/relayCarrying.ts
+msgid "Relay running, no traffic"
+msgstr ""
+
+#: src/direct/hostingRoute.ts
+msgid "Relayed"
+msgstr ""
+
+#: src/play/relayCarrying.ts
+msgid "Relaying {speed}"
+msgstr ""
+
+#: src/downloads/pages/components/RapidBrowser.tsx
+msgid "Release"
+msgstr ""
+
 #: src/general/ErrorBoundary.tsx
+#: src/play/pages/EngineLogSection.tsx
 msgid "Reload"
 msgstr ""
 
@@ -1918,11 +4591,46 @@ msgstr ""
 msgid "Reload re-reads .coilbox/profile.json and applies it to this window, so editing a profile does not need an app restart. You stay on this page, but anything in progress elsewhere resets."
 msgstr ""
 
+#: src/play/pages/components/DebriefDrawer.tsx
+#: src/play/pages/SkirmishPage.tsx
+msgid "Rematch"
+msgstr ""
+
+#: src/play/pages/components/DebriefDrawer.tsx
+msgid "Rematch with tweak"
+msgstr ""
+
+#: src/play/pages/SkirmishPage.tsx
+msgid "Rematch: {rematchMapName}"
+msgstr ""
+
+#: src/downloads/DownloadQueueBadge.tsx
+msgid "Remove {itemLabel} from queue"
+msgstr ""
+
+#: src/play/pages/components/ParticipantsTable.tsx
+msgid "Remove {playerName}"
+msgstr ""
+
+#: src/downloads/pages/SettingsSection.tsx
+msgid "Remove {repoName}"
+msgstr ""
+
+#: src/downloads/pages/ActivityPage.tsx
+msgid "Remove from queue"
+msgstr ""
+
 #: src/general/pages/SettingsSection.tsx
 msgid "Renders 3D views at a lower resolution with fewer particles — for laptops and older GPUs."
 msgstr ""
 
+#: src/runlite/generate.ts
+msgid "Repair Bay"
+msgstr ""
+
 #: src/play/index.ts
+#: src/play/pages/components/NewPresetFromReplayButton.tsx
+#: src/play/PlayProvider.tsx
 msgid "Replay"
 msgstr ""
 
@@ -1935,28 +4643,79 @@ msgstr ""
 msgid "Report an issue"
 msgstr ""
 
+#: src/downloads/pages/components/RapidBrowser.tsx
+msgid "Repositories"
+msgstr ""
+
+#: src/downloads/pages/SettingsSection.tsx
+msgid "repository"
+msgstr ""
+
+#: src/runlite/generate.ts
+msgid "Requisition their cache"
+msgstr ""
+
+#: src/play/pages/components/GameOptionsPanel.tsx
+msgid "Reset"
+msgstr ""
+
 #: src/sound/SoundSettings.tsx
 msgid "Reset {eventLabel} to {defaultSoundLabel}"
+msgstr ""
+
+#: src/play/pages/components/GameOptionsPanel.tsx
+msgid "Reset {label}"
+msgstr ""
+
+#: src/play/pages/components/GameOptionsPanel.tsx
+msgid "Reset {optionName} to its default"
 msgstr ""
 
 #: src/components/ViewControls.tsx
 msgid "Reset the view"
 msgstr ""
 
+#: src/play/pages/components/GameOptionsPanel.tsx
+msgid "Reset to default"
+msgstr ""
+
 #: src/i18n/frameStrings.ts
 msgid "Resize sidebar"
+msgstr ""
+
+#: src/runlite/pages/components/NodeOverlays.tsx
+#: src/runlite/pages/RunPage.tsx
+msgid "Rest & repair"
 msgstr ""
 
 #: src/profile/SettingsSection.tsx
 msgid "Restart Coilbox"
 msgstr ""
 
+#: src/game-updates/pages/GameUpdatesSection.tsx
 #: src/updater/pages/UpdatesSettingsSection.tsx
 msgid "Restart now"
 msgstr ""
 
 #: src/updater/UpdateBadge.tsx
 msgid "Restart to update"
+msgstr ""
+
+#: src/play/pages/SkirmishPage.tsx
+msgid "Restricted battle"
+msgstr ""
+
+#: src/play/pages/SkirmishPage.tsx
+msgid "Restricted battle — {summary}"
+msgstr ""
+
+#: src/runlite/pages/components/EncounterOverlay.tsx
+msgid "Result detected from the replay."
+msgstr ""
+
+#: src/play/pages/SavegamesPage.tsx
+#: src/runlite/pages/RunListPage.tsx
+msgid "Resume"
 msgstr ""
 
 #: src/home/continue.ts
@@ -1971,7 +4730,13 @@ msgstr ""
 msgid "Resume run"
 msgstr ""
 
+#: src/play/pages/SavegamesPage.tsx
+msgid "Resuming…"
+msgstr ""
+
 #: src/components/SaveStatus.tsx
+#: src/direct/HostRoomForm.tsx
+#: src/downloads/pages/components/RapidBrowser.tsx
 #: src/home/zones/SuggestedMap.tsx
 msgid "Retry"
 msgstr ""
@@ -1980,8 +4745,44 @@ msgstr ""
 msgid "Retry installing {mapTitle}"
 msgstr ""
 
+#: src/play/InGameBadge.tsx
+msgid "Return to the game"
+msgstr ""
+
+#: src/runlite/pages/components/EncounterOverlay.tsx
+msgid "Return to the map"
+msgstr ""
+
 #: src/i18n/frameStrings.ts
 msgid "Reveal sidebar"
+msgstr ""
+
+#: src/runlite/pages/RunPage.tsx
+msgid "Reward"
+msgstr ""
+
+#: src/direct/room.ts
+msgid "Room at {host}"
+msgstr ""
+
+#: src/direct/HostRoomForm.tsx
+msgid "Room name"
+msgstr ""
+
+#: src/direct/room.ts
+msgid "Room on this machine"
+msgstr ""
+
+#: src/direct/JoinRoomForm.tsx
+msgid "Room password"
+msgstr ""
+
+#: src/direct/HostRoomForm.tsx
+msgid "Room port"
+msgstr ""
+
+#: src/direct/LanRooms.tsx
+msgid "Rooms on this network will not be listed, but you can still join one by address."
 msgstr ""
 
 #: src/i18n/frameStrings.ts
@@ -2012,16 +4813,103 @@ msgstr ""
 msgid "S3O Blender Tools"
 msgstr ""
 
+#: src/runlite/galaxyAdapter.ts
+#: src/runlite/model.ts
+#: src/runlite/pages/components/RunHud.tsx
+msgid "Salvage"
+msgstr ""
+
+#: src/runlite/pages/components/RunEndScreen.tsx
+msgid "Salvage banked"
+msgstr ""
+
+#: src/runlite/pages/components/NodeOverlays.tsx
+#: src/runlite/pages/RunPage.tsx
+msgid "Salvage cache"
+msgstr ""
+
+#: src/runlite/generate.ts
+msgid "Salvage Cache"
+msgstr ""
+
+#: src/runlite/pages/components/NodeOverlays.tsx
+msgid "Salvage depot"
+msgstr ""
+
+#: src/runlite/pages/components/EncounterOverlay.tsx
+msgid "Salvage recovered — chart your next course."
+msgstr ""
+
+#: src/runlite/generate.ts
+msgid "Salvage Refinery"
+msgstr ""
+
+#: src/runlite/pages/components/NodeOverlays.tsx
+msgid "Salvage: {salvage} · cheapest {cheapest} salvage"
+msgstr ""
+
+#: src/play/pages/components/NewPresetFromReplayButton.tsx
+#: src/play/pages/components/SaveAsPresetButton.tsx
+msgid "Save"
+msgstr ""
+
+#: src/play/pages/components/SaveAsPresetButton.tsx
+msgid "Save as preset"
+msgstr ""
+
+#: src/startbox/StartBoxPresetsPopover.tsx
+msgid "Save current boxes"
+msgstr ""
+
+#: src/play/pages/components/PresetsDrawer.tsx
+msgid "Save current setup"
+msgstr ""
+
 #: src/play/index.ts
+#: src/play/pages/SavegamesPage.tsx
 msgid "Save Games"
+msgstr ""
+
+#: src/play/PresetLibraryToolbar.tsx
+msgid "Save preset"
+msgstr ""
+
+#: src/startbox/StartBoxPresetsPopover.tsx
+msgid "Save these boxes for {mapName}"
+msgstr ""
+
+#. placeholder {0}: i + 1
+#: src/startbox/StartBoxPresetsPopover.tsx
+msgid "Saved {0}"
 msgstr ""
 
 #: src/components/SaveStatus.tsx
 msgid "Saved {savedAt}"
 msgstr ""
 
+#: src/play/pages/components/SaveAsPresetButton.tsx
+msgid "Saved as preset"
+msgstr ""
+
 #: src/content/index.ts
 msgid "Saved configs"
+msgstr ""
+
+#: src/play/pages/components/SaveAsPresetButton.tsx
+#: src/play/pages/SkirmishPage.tsx
+msgid "Saved to Singleplayer presets"
+msgstr ""
+
+#: src/play/pages/components/SaveAsPresetButton.tsx
+msgid "Saved to your Singleplayer presets to replay later."
+msgstr ""
+
+#: src/play/PlayProvider.tsx
+msgid "Savegame"
+msgstr ""
+
+#: src/play/pages/SavegamesPage.tsx
+msgid "savegames"
 msgstr ""
 
 #: src/components/SaveStatus.tsx
@@ -2040,6 +4928,19 @@ msgstr ""
 msgid "Scanned {scanRootCount} content folder(s): {scanRootPaths}."
 msgstr ""
 
+#: src/runlite/pages/RunListPage.tsx
+msgid "Scanning installed games…"
+msgstr ""
+
+#: src/play/pages/components/MapPickerGrid.tsx
+msgid "Scanning maps…"
+msgstr ""
+
+#: src/direct/HostRoomForm.tsx
+msgid "Scanning…"
+msgstr ""
+
+#: src/runlite/pages/components/EncounterOverlay.tsx
 #: src/scenario/index.ts
 msgid "Scenario"
 msgstr ""
@@ -2056,6 +4957,10 @@ msgstr ""
 msgid "Scenarios guide"
 msgstr ""
 
+#: src/runlite/pages/components/NodeOverlays.tsx
+msgid "Schematic"
+msgstr ""
+
 #: src/components/ui/message-scroller.tsx
 msgid "Scroll to end"
 msgstr ""
@@ -2064,8 +4969,56 @@ msgstr ""
 msgid "Scroll to start"
 msgstr ""
 
+#: src/downloads/pages/ActivityPage.tsx
+msgid "Search downloads"
+msgstr ""
+
+#: src/downloads/pages/ActivityPage.tsx
+msgid "Search downloads…"
+msgstr ""
+
 #: src/components/ui/command.tsx
 msgid "Search for a command to run..."
+msgstr ""
+
+#: src/play/pages/components/GamePickerGrid.tsx
+msgid "Search games"
+msgstr ""
+
+#: src/play/pages/components/GameOptionsPanel.tsx
+msgid "section"
+msgstr ""
+
+#: src/runlite/pages/components/RunHud.tsx
+msgid "Sector {sectorNumeral}"
+msgstr ""
+
+#: src/runlite/pages/RunPage.tsx
+msgid "Sector warlord"
+msgstr ""
+
+#: src/play/pages/components/ParticipantsTable.tsx
+msgid "See that game"
+msgstr ""
+
+#: src/direct/HostRoomForm.tsx
+msgid "Select a game"
+msgstr ""
+
+#: src/direct/HostRoomForm.tsx
+msgid "Select a map"
+msgstr ""
+
+#: src/downloads/pages/components/RapidBrowser.tsx
+msgid "Select a rapid repository…"
+msgstr ""
+
+#: src/downloads/pages/components/RapidBrowser.tsx
+msgid "Select a repository to see its downloadable versions."
+msgstr ""
+
+#: src/play/PresetPartsView.tsx
+msgid "Select all"
 msgstr ""
 
 #: src/notify/NotificationsSettings.tsx
@@ -2076,8 +5029,33 @@ msgstr ""
 msgid "Server admin"
 msgstr ""
 
+#: src/play/pages/components/ParticipantsTable.tsx
+msgid "Set"
+msgstr ""
+
+#: src/game-updates/pages/GameUpdatesSection.tsx
+msgid "Set a download folder in <0>Content folders settings</0> to enable updates."
+msgstr ""
+
 #: src/home/zones/SuggestedMap.tsx
 msgid "Set a download folder in <0>Content folders settings</0> to install it."
+msgstr ""
+
+#: src/play/pages/components/ParticipantsTable.tsx
+msgid "Set all"
+msgstr ""
+
+#: src/play/pages/SkirmishPage.tsx
+msgid "Set up this battle for hosting"
+msgstr ""
+
+#: src/packs/pages/components/ImportPackForm.tsx
+msgid "Set up this pack"
+msgstr ""
+
+#: src/play/pages/SkirmishPage.tsx
+#: src/play/presetImport.tsx
+msgid "Set up this preset"
 msgstr ""
 
 #: src/general/index.ts
@@ -2085,8 +5063,36 @@ msgstr ""
 msgid "Settings"
 msgstr ""
 
+#: src/packs/pages/components/ImportPackForm.tsx
+msgid "Setup pack imported"
+msgstr ""
+
 #: src/content/index.ts
 msgid "Shadows, water, particles and anti-aliasing."
+msgstr ""
+
+#: src/direct/ShareRoomButton.tsx
+msgid "Share"
+msgstr ""
+
+#: src/runlite/pages/RunListPage.tsx
+msgid "Share {runName} as a challenge code"
+msgstr ""
+
+#: src/runlite/pages/RunListPage.tsx
+msgid "Share challenge"
+msgstr ""
+
+#: src/runlite/pages/components/RunHud.tsx
+msgid "Shared ceiling"
+msgstr ""
+
+#: src/play/pages/components/ParticipantsTable.tsx
+msgid "Shares a team with {leaderName} — team settings come from the first member"
+msgstr ""
+
+#: src/downloads/pages/ActivityPage.tsx
+msgid "Show"
 msgstr ""
 
 #: src/notify/NotificationsSettings.tsx
@@ -2095,6 +5101,18 @@ msgstr ""
 
 #: src/general/pages/SettingsSection.tsx
 msgid "Show frame rate"
+msgstr ""
+
+#: src/play/pages/components/EngineLogFile.tsx
+msgid "Show in folder"
+msgstr ""
+
+#: src/downloads/pages/ActivityPage.tsx
+msgid "Show in Games"
+msgstr ""
+
+#: src/downloads/pages/ActivityPage.tsx
+msgid "Show in Maps"
 msgstr ""
 
 #: src/i18n/frameStrings.ts
@@ -2125,12 +5143,27 @@ msgstr ""
 msgid "Sidebar as popover menu"
 msgstr ""
 
+#: src/runlite/model.ts
+#: src/runlite/pages/components/NodeOverlays.tsx
+#: src/runlite/pages/RunPage.tsx
+msgid "Signal"
+msgstr ""
+
 #: src/sound/SoundSettings.tsx
 msgid "Silence everything without losing your volume setting."
 msgstr ""
 
 #: src/play/index.ts
+#: src/play/pages/SkirmishPage.tsx
 msgid "Singleplayer"
+msgstr ""
+
+#: src/play/pages/SavegamesPage.tsx
+msgid "Singleplayer saves in your content folder. Resume one to launch the engine into it."
+msgstr ""
+
+#: src/downloads/pages/components/ProgressBar.tsx
+msgid "Size unknown"
 msgstr ""
 
 #: src/animation/index.ts
@@ -2139,6 +5172,10 @@ msgstr ""
 
 #: src/animation/index.ts
 msgid "Skeletor S3O"
+msgstr ""
+
+#: src/play/PlayProvider.tsx
+msgid "Skirmish"
 msgstr ""
 
 #: src/home/continue.ts
@@ -2155,6 +5192,10 @@ msgstr ""
 
 #: src/sound/events.ts
 msgid "Small sounds as Coilbox gets on with things."
+msgstr ""
+
+#: src/downloads/pages/components/RapidBrowser.tsx
+msgid "Snapshot"
 msgstr ""
 
 #: src/sound/events.ts
@@ -2191,12 +5232,61 @@ msgstr ""
 msgid "Sounds that want your attention, like a ring or a mention."
 msgstr ""
 
+#: src/downloads/pages/ActivityPage.tsx
+msgid "Source"
+msgstr ""
+
 #: src/downloads/index.ts
 msgid "Sources"
 msgstr ""
 
+#. placeholder {0}: i + 1
+#: src/play/pages/components/ParticipantsTable.tsx
+msgid "Spawns at map position {0}"
+msgstr ""
+
+#: src/play/pages/SkirmishPage.tsx
+msgid "Spectate"
+msgstr ""
+
+#: src/runlite/pages/components/RunHud.tsx
+msgid "Spend at depots"
+msgstr ""
+
+#: src/runlite/pages/RunPage.tsx
+msgid "Spend salvage on unlocks, perks, and repairs."
+msgstr ""
+
 #: src/downloads/index.ts
 msgid "Springfiles"
+msgstr ""
+
+#: src/downloads/emptyEngineList.ts
+msgid "springfiles has no engines for this kind of machine. Recoil does, so switch the source above to Recoil."
+msgstr ""
+
+#: src/downloads/emptyEngineList.ts
+msgid "springfiles has no engines to offer right now. Try again in a moment, or switch the source above to Recoil."
+msgstr ""
+
+#: src/runlite/pages/components/RunHud.tsx
+msgid "Stable"
+msgstr ""
+
+#: src/downloads/pages/components/ProgressBar.tsx
+msgid "stalled"
+msgstr ""
+
+#: src/runlite/pages/components/RunSetupForm.tsx
+msgid "standard"
+msgstr ""
+
+#: src/runlite/pages/components/RunHud.tsx
+msgid "Standard"
+msgstr ""
+
+#: src/runlite/meta.ts
+msgid "Standard deployment"
 msgstr ""
 
 #: src/general/pages/AboutCoilbox.tsx
@@ -2215,6 +5305,14 @@ msgstr ""
 msgid "Start a skirmish, run a campaign, or pick up a Warpath run."
 msgstr ""
 
+#: src/runlite/pages/RunPage.tsx
+msgid "Start a warpath"
+msgstr ""
+
+#: src/startbox/StartBoxControls.tsx
+msgid "Start boxes"
+msgstr ""
+
 #: src/profile/start.ts
 msgid "start campaign ''{campaignId}'' is a local campaign, not a bundled one. Players will not have it until its export is in .coilbox/campaigns/"
 msgstr ""
@@ -2225,6 +5323,10 @@ msgstr ""
 
 #: src/profile/start.ts
 msgid "start campaign ''{campaignTitle}'' has no missions"
+msgstr ""
+
+#: src/play/pages/SkirmishPage.tsx
+msgid "Start Game"
 msgstr ""
 
 #: src/profile/health.ts
@@ -2241,6 +5343,23 @@ msgstr ""
 
 #: src/profile/start.ts
 msgid "start mission ''{missionId}'' is not in campaign ''{campaignTitle}''"
+msgstr ""
+
+#: src/play/pages/components/MinimapPreview.tsx
+msgid "Start position {position}"
+msgstr ""
+
+#: src/play/pages/components/MinimapPreview.tsx
+msgid "Start position {position} (unclaimed)"
+msgstr ""
+
+#: src/play/presetParts.ts
+#: src/startbox/StartPosCard.tsx
+msgid "Start positions"
+msgstr ""
+
+#: src/direct/room.ts
+msgid "Start room"
 msgstr ""
 
 #: src/profile/start.ts
@@ -2263,8 +5382,26 @@ msgstr ""
 msgid "Start: scenario ''{scenarioName}''"
 msgstr ""
 
+#: src/direct/QuickRoom.tsx
+msgid "Starting a room for you and the computer on {mapName}."
+msgstr ""
+
+#: src/direct/room.ts
+#: src/downloads/DownloadQueueBadge.tsx
+#: src/downloads/pages/components/ProgressBar.tsx
+msgid "Starting…"
+msgstr ""
+
 #: src/general/pages/SettingsSection.tsx
 msgid "Startup splash"
+msgstr ""
+
+#: src/downloads/pages/ActivityPage.tsx
+msgid "State"
+msgstr ""
+
+#: src/play/pages/components/GameChoiceOffer.tsx
+msgid "Stay on {currentName}"
 msgstr ""
 
 #: src/i18n/frameStrings.ts
@@ -2275,6 +5412,14 @@ msgstr ""
 msgid "Stop {eventLabel}"
 msgstr ""
 
+#: src/direct/HostRoomControl.tsx
+msgid "Stop room"
+msgstr ""
+
+#: src/direct/lan.ts
+msgid "Stop your own room first. Coilbox can be in one room at a time."
+msgstr ""
+
 #: src/general/pages/SettingsSection.tsx
 msgid "Stops ambient animation — the galaxy twinkle, scrolling panoramas, spinning map previews and result flourishes. \"Follow system\" respects your OS accessibility preference."
 msgstr ""
@@ -2283,17 +5428,67 @@ msgstr ""
 msgid "Storage"
 msgstr ""
 
+#: src/runlite/pages/components/RunHud.tsx
+msgid "Strained"
+msgstr ""
+
+#: src/runlite/generate.ts
+msgid "Strip it for salvage"
+msgstr ""
+
 #: src/home/zones/SuggestedMap.tsx
 msgid "Suggested map"
 msgstr ""
 
+#: src/startbox/StartBoxControls.tsx
+msgid "Swap"
+msgstr ""
+
+#: src/startbox/StartBoxControls.tsx
+msgid "Swap the two allies' boxes"
+msgstr ""
+
 #: src/general/pages/SettingsSection.tsx
 #: src/i18n/frameStrings.ts
+#: src/play/pages/EngineLogSection.tsx
 msgid "System"
+msgstr ""
+
+#: src/runlite/pages/components/NodeOverlays.tsx
+msgid "Take a schematic to widen the arsenal, or a field upgrade for your command alone."
+msgstr ""
+
+#: src/play/PresetPartsView.tsx
+msgid "Take only the parts you want. Everything you leave unticked stays as you have it."
+msgstr ""
+
+#: src/runlite/generate.ts
+msgid "Take them aboard"
+msgstr ""
+
+#: src/runlite/galaxyAdapter.ts
+msgid "Taken"
 msgstr ""
 
 #: src/i18n/frameStrings.ts
 msgid "Teal"
+msgstr ""
+
+#: src/play/pages/components/ParticipantsTable.tsx
+msgid "Team"
+msgstr ""
+
+#: src/play/presetParts.ts
+msgid "Teams and bots"
+msgstr ""
+
+#: src/runlite/pages/components/RunHud.tsx
+msgid "Tech {techNumeral}"
+msgstr ""
+
+#: src/runlite/pages/components/EncounterOverlay.tsx
+#: src/runlite/pages/RunPage.tsx
+msgid "Tech tier"
 msgstr ""
 
 #: src/notify/NotificationsSettings.tsx
@@ -2302,6 +5497,23 @@ msgstr ""
 
 #: src/i18n/uiError.ts
 msgid "That address answered, but it is not a coilbox hub."
+msgstr ""
+
+#: src/packs/pages/components/ImportPackForm.tsx
+msgid "That code is a coilbox {kind}, not a setup pack."
+msgstr ""
+
+#: src/packs/envelope.ts
+msgid "That code isn't a setup pack."
+msgstr ""
+
+#: src/packs/envelope.ts
+msgid "That doesn't look like a coilbox setup pack."
+msgstr ""
+
+#: src/play/pages/SkirmishPage.tsx
+#: src/play/presetImport.tsx
+msgid "That file isn't a valid coilbox preset."
 msgstr ""
 
 #: src/i18n/uiError.ts
@@ -2324,6 +5536,26 @@ msgstr ""
 msgid "That is not a valid link."
 msgstr ""
 
+#: src/play/pages/SkirmishPage.tsx
+msgid "That link isn't a valid coilbox preset."
+msgstr ""
+
+#: src/play/pages/SkirmishPage.tsx
+msgid "That preset isn't here any more. It may have been deleted."
+msgstr ""
+
+#: src/direct/lan.ts
+msgid "That room is up but has no battle open in it, so there is nothing to join. Ask the host to start it again."
+msgstr ""
+
+#: src/runlite/runs.ts
+msgid "That run id is taken by a run that could not be read, so nothing was saved."
+msgstr ""
+
+#: src/packs/envelope.ts
+msgid "That setup pack is corrupted or incomplete."
+msgstr ""
+
 #: src/deeplink/readImport.ts
 msgid "That starts like a coilbox code, but the rest is damaged or cut short. Copy the whole code and paste it again."
 msgstr ""
@@ -2336,12 +5568,24 @@ msgstr ""
 msgid "the \"{kind}\" zone"
 msgstr ""
 
+#: src/packs/pages/components/ImportPackForm.tsx
+msgid "The blueprints were not all saved: {reason}"
+msgstr ""
+
 #: src/i18n/uiError.ts
 msgid "the connection ended before the login finished"
 msgstr ""
 
 #: src/profile/SettingsSection.tsx
 msgid "The content scan failed, so the profile could not be seeded with the installed games. unitsync said: {scanError}"
+msgstr ""
+
+#: src/runlite/pages/components/ImportChallengeForm.tsx
+msgid "The content scan failed, so this challenge's game could not be looked for: {scanError}"
+msgstr ""
+
+#: src/play/applyTweakMutatorRoute.ts
+msgid "The content scan failed: {reason}"
 msgstr ""
 
 #: src/i18n/uiError.ts
@@ -2352,8 +5596,40 @@ msgstr ""
 msgid "the engine"
 msgstr ""
 
+#: src/play/PlayProvider.tsx
+msgid "The engine at {executable} is no longer installed."
+msgstr ""
+
+#: src/runlite/pages/components/RunContentNotice.tsx
+msgid "The engine could not read your games, so this warpath cannot check for <0>{name}</0>. Open <1>Content > Games</1> to see what it did find, or pick another engine in Settings."
+msgstr ""
+
+#: src/play/crash.ts
+msgid "The engine crashed. It was killed by signal {sig}."
+msgstr ""
+
+#: src/play/crash.ts
+msgid "The engine exited normally."
+msgstr ""
+
+#: src/play/crash.ts
+msgid "The engine stopped with an error. It exited with code {exitCode}."
+msgstr ""
+
 #: src/content/index.ts
 msgid "The engine versions you have, and getting more."
+msgstr ""
+
+#: src/play/pages/components/CrashDrawer.tsx
+msgid "The engine wrote no log for this run, so it stopped before it got that far. The newest log on disk is from an earlier session, and would tell you nothing about this."
+msgstr ""
+
+#: src/downloads/failureReason.ts
+msgid "the file"
+msgstr ""
+
+#: src/downloads/installArchive.ts
+msgid "The files you opened stay where they are."
 msgstr ""
 
 #: src/content/index.ts
@@ -2376,6 +5652,14 @@ msgstr ""
 msgid "The game has not started yet."
 msgstr ""
 
+#: src/play/pages/components/CrashDrawer.tsx
+msgid "The game stopped unexpectedly"
+msgstr ""
+
+#: src/play/crash.ts
+msgid "The game was cancelled."
+msgstr ""
+
 #: src/profile/health.ts
 msgid "The games scan failed, so it is not known what is installed. unitsync said: {scanError} {scanned}"
 msgstr ""
@@ -2388,8 +5672,40 @@ msgstr ""
 msgid "The generated map styles stay on: {mapsIssue}."
 msgstr ""
 
+#: src/runlite/mapRun.ts
+msgid "The goal \"{goal}\" cannot be reached from the start \"{start}\"."
+msgstr ""
+
+#: src/runlite/handmadeMap.ts
+msgid "The hand-made map \"{id}\" could not be read."
+msgstr ""
+
+#: src/runlite/pages/RunPage.tsx
+msgid "The hand-made map \"{mapTitle}\" has changed since this warpath began, and the run no longer fits it."
+msgstr ""
+
+#: src/runlite/handmadeMap.ts
+msgid "The hand-made map \"{mapTitle}\" has no Warpath start and goal, so it can only be played in Conquest."
+msgstr ""
+
+#: src/runlite/pages/components/RunSetupForm.tsx
+msgid "The hand-made maps could not be listed, so none is offered here. {handmadeError}"
+msgstr ""
+
+#: src/runlite/handmadeMap.ts
+msgid "The hand-made maps could not be listed. {reason}"
+msgstr ""
+
 #: src/profile/health.ts
 msgid "The home page shows no start card: {startIssue}."
+msgstr ""
+
+#: src/direct/hostingRoute.ts
+msgid "The host could not be reached directly, so this battle goes through the lobby server's relay. Your ping to the host is higher than it would be in a direct game."
+msgstr ""
+
+#: src/startbox/mode.ts
+msgid "The host hasn't set start boxes yet."
 msgstr ""
 
 #: src/i18n/uiError.ts
@@ -2416,6 +5732,10 @@ msgstr ""
 msgid "The join form opens filled in. Nothing connects until you press Join in it."
 msgstr ""
 
+#: src/runlite/RunMapView.tsx
+msgid "The land of this map could not be built. {landError}"
+msgstr ""
+
 #: src/account/index.ts
 msgid "The lobby account you are signed in to."
 msgstr ""
@@ -2428,12 +5748,73 @@ msgstr ""
 msgid "The map compiler coilbox builds and takes apart maps with."
 msgstr ""
 
+#: src/runlite/pages/components/RunSetupForm.tsx
+msgid "The map decides how long this warpath is. This length crosses a map of {landLocationCount} {landLocationNoun}."
+msgstr ""
+
+#: src/runlite/mapRun.ts
+msgid "The map for this warpath could not be generated."
+msgstr ""
+
+#: src/runlite/mapRun.ts
+msgid "The map has no location \"{id}\"."
+msgstr ""
+
+#: src/runlite/mapRun.ts
+msgid "The map has no two locations joined by a link."
+msgstr ""
+
+#: src/downloads/failureReason.ts
+msgid "the mirror"
+msgstr ""
+
+#: src/direct/HostRoomForm.tsx
+#: src/direct/JoinRoomForm.tsx
+msgid "The name others see"
+msgstr ""
+
 #: src/profile/health.ts
 msgid "The profile's `icon` was not applied"
 msgstr ""
 
+#: src/play/pages/SkirmishPage.tsx
+msgid "The rest of \"{presetName}\" was loaded onto {gameName}. Install the game to load it whole."
+msgstr ""
+
+#: src/direct/room.ts
+msgid "The room hands joiners {ip} for the game itself, which points back at their own machine rather than yours."
+msgstr ""
+
+#: src/direct/room.ts
+msgid "The room hands joiners {ip} for the game itself."
+msgstr ""
+
+#: src/direct/room.ts
+msgid "The room started but its battle never opened, so the room has been stopped. Try again, and if it keeps happening, host on another port."
+msgstr ""
+
+#: src/packs/pages/components/ExportPackForm.tsx
+msgid "The scan failed, so no games are listed. unitsync said: {scanError}"
+msgstr ""
+
+#: src/packs/pages/components/ExportPackForm.tsx
+msgid "The scan failed, so no maps are listed. unitsync said: {scanError}"
+msgstr ""
+
+#: src/play/useBattleRun.ts
+msgid "The scenario \"{scenarioName}\" was made for {scenarioGame}, which is a different game from {installedName}. It cannot be played here."
+msgstr ""
+
 #: src/general/ErrorBoundary.tsx
 msgid "The screen you were on hit an unexpected error. Reloading usually clears it. If this keeps happening, copy the details below and report it so it can be fixed."
+msgstr ""
+
+#: src/runlite/pages/components/RunEndScreen.tsx
+msgid "The sector warlord is broken. The warpath is yours."
+msgstr ""
+
+#: src/runlite/pages/RunPage.tsx
+msgid "The sector warlord. Break it to win the run."
 msgstr ""
 
 #: src/i18n/uiError.ts
@@ -2452,12 +5833,32 @@ msgstr ""
 msgid "The soundtrack, whichever one you pick above."
 msgstr ""
 
+#: src/runlite/mapRun.ts
+msgid "The start and the goal are both \"{place}\". They must be different locations."
+msgstr ""
+
+#: src/runlite/unitLimit.ts
+msgid "The start unit for {sideName}, {startUnit}, is not one of the units in {gameName}, so coilbox cannot limit your units. Rewards will offer perks only and every unit will be available from the first battle."
+msgstr ""
+
 #: src/profile/health.ts
 msgid "The start's game and map are installed"
 msgstr ""
 
 #: src/i18n/frameStrings.ts
 msgid "The top bar loses its background and sits over the content as it scrolls."
+msgstr ""
+
+#: src/runlite/pages/components/RunHud.tsx
+msgid "The units you can currently build, out of your faction's full tree. Rewards and depots unlock more, but unlocking raises a shared tech ceiling, so the enemy escalates with you. Your personal edge comes from perks, not unlocks."
+msgstr ""
+
+#: src/runlite/pages/RunListPage.tsx
+msgid "The warpath was not abandoned. {reason}"
+msgstr ""
+
+#: src/runlite/pages/components/RunSetupForm.tsx
+msgid "The warpath was not started. {reason}"
 msgstr ""
 
 #: src/i18n/frameStrings.ts
@@ -2488,6 +5889,39 @@ msgstr ""
 msgid "There's nothing to share yet."
 msgstr ""
 
+#: src/startbox/StartBoxPresetsPopover.tsx
+msgid "These boxes are already saved for {mapName}"
+msgstr ""
+
+#: src/play/PresetPartsView.tsx
+msgid "These boxes were drawn for {presetMap}, not the map you are on."
+msgstr ""
+
+#: src/direct/share.ts
+msgid "They can join this room and chat. They cannot start the game, because the room gives everybody in it {announced}, which nothing outside your network can dial."
+msgstr ""
+
+#. placeholder {0}: offer.candidates.length
+#: src/play/pages/components/GameChoiceOffer.tsx
+msgid "This {nounText} does not say which game it was started on, and {0, plural, one {# installed game} other {# installed games}} could be it. Pick the one to play it on. The {nounText} remembers your answer."
+msgstr ""
+
+#: src/play/pages/components/GameChoiceOffer.tsx
+msgid "This {nounText} is on <0>{currentName}</0>. <1>{newerName}</1> is now installed. Move the {nounText} to it?"
+msgstr ""
+
+#: src/play/pages/components/GameChoiceOffer.tsx
+msgid "This {nounText} was started on <0>{pinnedName}</0>, which is not installed. Another version of that game is installed. Continue on <1>{newerName}</1>?"
+msgstr ""
+
+#: src/play/pages/components/SaveAsPresetButton.tsx
+msgid "This battle can't be captured yet."
+msgstr ""
+
+#: src/direct/hostingRoute.ts
+msgid "This battle goes through the server's relay, as you asked."
+msgstr ""
+
 #: src/deeplink/build.ts
 msgid "This battle has no id to join."
 msgstr ""
@@ -2500,12 +5934,69 @@ msgstr ""
 msgid "This battle's password cannot go in a link."
 msgstr ""
 
+#: src/game-updates/pages/GameUpdatesSection.tsx
+msgid "This build has no game-update source configured."
+msgstr ""
+
 #: src/sound/MusicSource.tsx
 msgid "This build ships no music."
 msgstr ""
 
+#: src/play/LaunchContentProvider.tsx
+msgid "This cannot start until the content below is installed. Download it and the game starts when it is ready."
+msgstr ""
+
+#: src/runlite/pages/components/ImportChallengeForm.tsx
+msgid "This challenge code fixes the side to {fixedSide}, so you cannot choose another."
+msgstr ""
+
+#: src/runlite/pages/components/ImportChallengeForm.tsx
+msgid "This challenge code names no side, so you cannot choose one."
+msgstr ""
+
+#: src/runlite/handmadeMap.ts
+msgid "This challenge is a Warpath run on the hand-made map \"{mapTitle}\", and the copy installed here has no Warpath start and goal, so the challenge was not started."
+msgstr ""
+
+#: src/runlite/challenge.ts
+msgid "This challenge is played on a map this install cannot find or rebuild."
+msgstr ""
+
 #: src/deeplink/actions.ts
 msgid "This challenge link is for an unknown game mode."
+msgstr ""
+
+#: src/runlite/pages/components/ImportChallengeForm.tsx
+msgid "This challenge needs \"{gameShortname}\", which isn't installed. Install it from Content → Games, then try again."
+msgstr ""
+
+#: src/runlite/challenge.ts
+msgid "This challenge was made on a different version of its hand-made map than the one installed here."
+msgstr ""
+
+#: src/runlite/pages/RunListPage.tsx
+msgid "This deletes the warpath for good, including its progress ({progressText}). It cannot be undone."
+msgstr ""
+
+#: src/runlite/pages/RunListPage.tsx
+msgid "This engine could not read your games. Try another from <0>Settings → Engines</0>, or see what it found in <1>Content → Games</1>."
+msgstr ""
+
+#: src/runlite/pages/components/ImportChallengeForm.tsx
+#: src/runlite/pages/components/RunSetupForm.tsx
+msgid "this game"
+msgstr ""
+
+#: src/play/pages/components/GameOptionsPanel.tsx
+msgid "This game declares no options."
+msgstr ""
+
+#: src/play/relayCarrying.ts
+msgid "This game goes through your machine's relay, so every other player's traffic passes through here. This is how much went through in the last second."
+msgstr ""
+
+#: src/play/InGameBadge.tsx
+msgid "This game runs through your machine's relay. Ending it here ends it for everybody playing in it, not just for you."
 msgstr ""
 
 #: src/deeplink/build.ts
@@ -2576,12 +6067,45 @@ msgstr ""
 msgid "This link is not a coilbox import."
 msgstr ""
 
+#: src/runlite/pages/components/EncounterOverlay.tsx
+msgid "This location is a scenario, not a skirmish."
+msgstr ""
+
+#: src/runlite/pages/components/EncounterOverlay.tsx
+msgid "This location plays a scenario from the hand-made map, and the scenario could not be read. It is a skirmish on the same battlefield until the map is back as it was."
+msgstr ""
+
+#: src/direct/hostingRoute.ts
+msgid "This machine is on the internet under its own address, so players connect straight to it."
+msgstr ""
+
+#: src/direct/ReachablePorts.tsx
+msgid "This machine is on the internet under its own address."
+msgstr ""
+
+#: src/startbox/StartBoxPresetsPopover.tsx
+msgid "This map"
+msgstr ""
+
+#. placeholder {0}: savedForMap.length
+#: src/startbox/StartBoxPresetsPopover.tsx
+msgid "This map ({0})"
+msgstr ""
+
 #: src/deeplink/parse.ts
 msgid "This open link has no screen."
 msgstr ""
 
 #: src/deeplink/parse.ts
 msgid "This open link's id is not a name."
+msgstr ""
+
+#: src/packs/manifest.ts
+msgid "This pack is {packSize}, past the {limit} a share code can carry. Take some blueprints out."
+msgstr ""
+
+#: src/play/PresetTweaksView.tsx
+msgid "This project does not pack into the slots {gameName} has, so none of it was applied. Open it in the workshop and use Package to see which edits will not fit."
 msgstr ""
 
 #: src/i18n/uiError.ts
@@ -2598,6 +6122,22 @@ msgstr ""
 
 #: src/i18n/uiError.ts
 msgid "This project has no edits, so there is nothing to pack for a lobby."
+msgstr ""
+
+#: src/play/pages/components/NewPresetFromReplayButton.tsx
+msgid "This replay has no seated players to refight."
+msgstr ""
+
+#: src/play/pages/components/NewPresetFromReplayButton.tsx
+msgid "This replay's game isn't installed."
+msgstr ""
+
+#: src/play/pages/components/NewPresetFromReplayButton.tsx
+msgid "This replay's map isn't installed."
+msgstr ""
+
+#: src/direct/share.ts
+msgid "This room has no address another computer can reach, because this machine is on no network."
 msgstr ""
 
 #: src/deeplink/build.ts
@@ -2624,12 +6164,48 @@ msgstr ""
 msgid "This room link's port is not a port."
 msgstr ""
 
+#: src/runlite/unitLimit.ts
+msgid "This run has no start unit, so coilbox cannot limit your units. Every unit is available."
+msgstr ""
+
+#: src/direct/invite.ts
+msgid "This server's address names a network card on this computer, so it would mean nothing to a friend. Save the server under its full IPv6 address, without the % part, to get a link."
+msgstr ""
+
+#: src/packs/envelope.ts
+msgid "This setup pack was made by a newer version of coilbox."
+msgstr ""
+
 #: src/deeplink/build.ts
 msgid "This URL is too long for a link."
 msgstr ""
 
+#: src/runlite/pages/components/RunContentNotice.tsx
+msgid "this warpath"
+msgstr ""
+
+#: src/runlite/pages/RunPage.tsx
+msgid "This warpath is drawn in columns until the map is back as it was, and it can still be played."
+msgstr ""
+
+#: src/runlite/pages/components/RunContentNotice.tsx
+msgid "This warpath needs the game <0>{name}</0>, which is not installed and has no download coilbox knows about. Add it in <1>Content > Games</1>."
+msgstr ""
+
+#: src/runlite/pages/components/RunContentNotice.tsx
+msgid "This warpath needs the game <0>{name}</0>, which is not installed."
+msgstr ""
+
 #: src/deeplink/readImport.ts
 msgid "This was made by a newer version of coilbox. Update coilbox to open it."
+msgstr ""
+
+#: src/play/pages/components/MapCard.tsx
+msgid "Tidal strength"
+msgstr ""
+
+#: src/runlite/pages/components/RunSetupForm.tsx
+msgid "Tier {i}"
 msgstr ""
 
 #: src/profile/SettingsSection.tsx
@@ -2648,12 +6224,36 @@ msgstr ""
 msgid "tracking the default"
 msgstr ""
 
+#: src/downloads/activityRows.ts
+msgid "Try {label}"
+msgstr ""
+
+#: src/direct/QuickRoom.tsx
+msgid "Try again"
+msgstr ""
+
+#: src/downloads/activityRows.ts
+msgid "Try next mirror"
+msgstr ""
+
+#: src/downloads/activityRows.ts
+msgid "Try pr-downloader"
+msgstr ""
+
+#: src/runlite/pages/components/EncounterOverlay.tsx
+msgid "Try reading the unit data again"
+msgstr ""
+
 #: src/home/continue.ts
 msgid "Turn {turn}"
 msgstr ""
 
 #: src/uberstress/index.ts
 msgid "uberstress"
+msgstr ""
+
+#: src/downloads/pages/components/MapPacksDrawer.tsx
+msgid "Unavailable"
 msgstr ""
 
 #: src/content/index.ts
@@ -2668,12 +6268,39 @@ msgstr ""
 msgid "Unit builder guide"
 msgstr ""
 
+#: src/play/presetParts.ts
+msgid "Unit restrictions"
+msgstr ""
+
+#: src/play/pages/components/PresetsDrawer.tsx
+#: src/play/presetParts.ts
+#: src/play/PresetTweaksRow.tsx
 #: src/workshop/index.ts
 msgid "Unit tweaks"
 msgstr ""
 
 #: src/content/index.ts
 msgid "Units"
+msgstr ""
+
+#: src/runlite/pages/components/RunSetupForm.tsx
+msgid "Units from the builder"
+msgstr ""
+
+#: src/runlite/pages/components/RunEndScreen.tsx
+msgid "Units unlocked"
+msgstr ""
+
+#: src/runlite/pages/RunPage.tsx
+msgid "Units unlocked into your shared arsenal, lit up against the faction's full build tree."
+msgstr ""
+
+#: src/runlite/pages/components/RunContentNotice.tsx
+msgid "unitsync said: {reason}"
+msgstr ""
+
+#: src/play/pages/components/DebriefDrawer.tsx
+msgid "unknown"
 msgstr ""
 
 #: src/deeplink/parse.ts
@@ -2688,8 +6315,25 @@ msgstr ""
 msgid "Unknown widget: <0>@widget/{name}</0>"
 msgstr ""
 
+#: src/runlite/pages/RunPage.tsx
+msgid "unlocked"
+msgstr ""
+
+#. placeholder {0}: option.unitName
+#: src/runlite/progress.ts
+msgid "Unlocked {0}"
+msgstr ""
+
 #: src/components/SaveStatus.tsx
 msgid "Unsaved changes"
+msgstr ""
+
+#: src/game-updates/GameUpdateBadge.tsx
+msgid "Update {first}"
+msgstr ""
+
+#: src/game-updates/GameUpdateBadge.tsx
+msgid "Update {first} +{others}"
 msgstr ""
 
 #: src/updater/UpdateBadge.tsx
@@ -2705,12 +6349,24 @@ msgstr ""
 msgid "Update repo"
 msgstr ""
 
+#: src/game-updates/pages/GameUpdatesSection.tsx
+msgid "Update source"
+msgstr ""
+
 #: src/updater/pages/UpdatesSettingsSection.tsx
 msgid "Updates are disabled in development builds."
 msgstr ""
 
 #: src/updater/pages/UpdatesSettingsSection.tsx
 msgid "Updates for this build are managed by its distributor."
+msgstr ""
+
+#: src/play/pages/components/ParticipantsTable.tsx
+msgid "Use {suggested}"
+msgstr ""
+
+#: src/direct/QuickRoom.tsx
+msgid "Use Host on LAN to pick a name."
 msgstr ""
 
 #: src/deeplink/pages/ImportSection.tsx
@@ -2737,6 +6393,42 @@ msgstr ""
 msgid "Version {newVersion} available"
 msgstr ""
 
+#: src/startbox/presets.ts
+msgid "Vertical"
+msgstr ""
+
+#: src/runlite/pages/components/RunHud.tsx
+msgid "Veteran"
+msgstr ""
+
+#: src/runlite/generate.ts
+msgid "Veteran Cadre"
+msgstr ""
+
+#: src/runlite/pages/components/EncounterOverlay.tsx
+msgid "Victory"
+msgstr ""
+
+#: src/play/debrief.ts
+msgid "Victory!"
+msgstr ""
+
+#: src/runlite/pages/RunListPage.tsx
+msgid "View"
+msgstr ""
+
+#: src/runlite/pages/components/RunHud.tsx
+msgid "View arsenal tree"
+msgstr ""
+
+#: src/play/pages/components/DebriefDrawer.tsx
+msgid "View replay"
+msgstr ""
+
+#: src/runlite/pages/components/RunHud.tsx
+msgid "View the arsenal tech tree"
+msgstr ""
+
 #: src/i18n/frameStrings.ts
 msgid "Violet"
 msgstr ""
@@ -2749,12 +6441,49 @@ msgstr ""
 msgid "Volume, channel by channel."
 msgstr ""
 
+#: src/runlite/galaxyAdapter.ts
+#: src/runlite/pages/components/EncounterOverlay.tsx
+msgid "Warlord"
+msgstr ""
+
+#: src/play/pages/components/GameChoiceOffer.tsx
+msgid "warpath"
+msgstr ""
+
+#: src/runlite/galaxyAdapter.ts
 #: src/runlite/index.ts
+#: src/runlite/pages/RunListPage.tsx
 msgid "Warpath"
+msgstr ""
+
+#: src/play/PlayProvider.tsx
+msgid "Warpath battle"
+msgstr ""
+
+#: src/runlite/pages/components/RunEndScreen.tsx
+#: src/runlite/pages/RunListPage.tsx
+msgid "Warpath complete"
+msgstr ""
+
+#: src/runlite/pages/components/RunEndScreen.tsx
+#: src/runlite/pages/RunListPage.tsx
+msgid "Warpath ended"
+msgstr ""
+
+#: src/runlite/pages/RunListPage.tsx
+msgid "Warpath in progress"
+msgstr ""
+
+#: src/runlite/pages/components/RunSetupForm.tsx
+msgid "Warpath records could not be read. Only the standard options are offered. The file has not been changed. {metaError}"
 msgstr ""
 
 #: src/home/continue.ts
 msgid "Warpath run"
+msgstr ""
+
+#: src/play/PresetList.tsx
+msgid "Watch the best replay for {presetName}"
 msgstr ""
 
 #: src/home/zones/Greeting.tsx
@@ -2773,6 +6502,10 @@ msgstr ""
 msgid "What every key does, on a keyboard you can click."
 msgstr ""
 
+#: src/runlite/pages/components/RunHud.tsx
+msgid "What is {label}?"
+msgstr ""
+
 #: src/content/index.ts
 msgid "What is taking up space, and clearing it out."
 msgstr ""
@@ -2785,6 +6518,14 @@ msgstr ""
 msgid "When collapsed, hide the sidebar and slide it out on hovering the left edge."
 msgstr ""
 
+#: src/downloads/pages/SettingsSection.tsx
+msgid "When you join a battle whose game or map you don't have, start the download straight away instead of waiting for a click. The Download button stays available to pause or retry."
+msgstr ""
+
+#: src/play/pages/SkirmishPage.tsx
+msgid "Where do you want to host this?"
+msgstr ""
+
 #: src/downloads/index.ts
 msgid "Where games and maps come from."
 msgstr ""
@@ -2795,6 +6536,22 @@ msgstr ""
 
 #: src/content/index.ts
 msgid "Where your games, maps and engines live, and where new ones come from."
+msgstr ""
+
+#: src/runlite/pages/components/EncounterOverlay.tsx
+msgid "Win it to clear the location."
+msgstr ""
+
+#: src/play/presetRecord.ts
+msgid "Win recorded on {name}, but the replay gave no time."
+msgstr ""
+
+#: src/play/pages/components/MapCard.tsx
+msgid "Wind"
+msgstr ""
+
+#: src/play/pages/components/ParticipantsTable.tsx
+msgid "with no bonus"
 msgstr ""
 
 #: src/multiplayer/index.tsx
@@ -2817,20 +6574,54 @@ msgstr ""
 msgid "Write root portability n/a (not portable)"
 msgstr ""
 
+#: src/play/pages/components/EngineLogFile.tsx
+msgid "Written {writtenAt}"
+msgstr ""
+
 #: src/profile/SettingsSection.tsx
 msgid "Wrote <0/>. Restart Coilbox to load it."
+msgstr ""
+
+#: src/play/applyTweakMutatorRoute.ts
+msgid "Wrote the archive to {archiveDir} but the rescan did not find it."
 msgstr ""
 
 #: src/i18n/frameStrings.ts
 msgid "Yellow"
 msgstr ""
 
+#: src/play/pages/components/ParticipantsTable.tsx
+#: src/runlite/galaxyAdapter.ts
+msgid "You"
+msgstr ""
+
+#: src/direct/lan.ts
+#: src/direct/room.ts
+msgid "You are in a room already, at {address}. Leave it first: coilbox can be in one room at a time."
+msgstr ""
+
+#: src/play/pages/SkirmishPage.tsx
+msgid "You do not have {missingGame}"
+msgstr ""
+
 #: src/home/continue.ts
 msgid "You have {installedVersion}"
 msgstr ""
 
+#: src/game-updates/pages/GameUpdatesSection.tsx
+msgid "You have the latest game version ({releaseTag})."
+msgstr ""
+
 #: src/sound/events.ts
 msgid "You launch a game"
+msgstr ""
+
+#: src/runlite/pages/components/NodeOverlays.tsx
+msgid "you only · per-team"
+msgstr ""
+
+#: src/runlite/pages/components/EncounterOverlay.tsx
+msgid "You retreat, hull scarred."
 msgstr ""
 
 #: src/updater/pages/UpdatesSettingsSection.tsx
@@ -2853,12 +6644,82 @@ msgstr ""
 msgid "Your clipboard holds a coilbox link."
 msgstr ""
 
+#: src/runlite/pages/RunPage.tsx
+msgid "Your commander deploys here. Chart a course onward toward the warlord."
+msgstr ""
+
+#: src/direct/ReachablePorts.tsx
+msgid "Your internet provider blocks the way in"
+msgstr ""
+
+#: src/direct/VpnWarning.tsx
+msgid "Your internet traffic goes through a VPN ({interfaceName}). Everything you send goes to the VPN's server first, so your ping will be worse than it needs to be. Turn the VPN off while you play."
+msgstr ""
+
+#: src/direct/VpnWarning.tsx
+msgid "Your internet traffic goes through a VPN ({interfaceName}). Players may not be able to reach you directly, and everything anybody sends you goes through the VPN's server first, so pings will be worse for the whole battle. Turn the VPN off while you play."
+msgstr ""
+
 #: src/home/groupDescription.ts
 msgid "Your maps, games and blueprints, what other players have shared, and what is downloading."
 msgstr ""
 
+#: src/direct/HostRoomForm.tsx
+#: src/direct/JoinRoomForm.tsx
+msgid "Your name"
+msgstr ""
+
 #: src/content/index.ts
 msgid "Your player name and team highlighting."
+msgstr ""
+
+#: src/direct/HostRoomForm.tsx
+msgid "Your room"
+msgstr ""
+
+#: src/direct/room.ts
+msgid "Your room has moved onto a different address. It was handing out {previous} earlier and now hands joiners {ip} for the game itself, which points back at their own machine rather than yours."
+msgstr ""
+
+#: src/direct/room.ts
+msgid "Your room has moved onto a different address. It was handing out {previous} earlier and now hands joiners {ip} for the game itself."
+msgstr ""
+
+#: src/direct/ReachablePorts.tsx
+msgid "Your router opened <0/>, but your provider's own NAT sits in front of it."
+msgstr ""
+
+#: src/direct/hostingRoute.ts
+msgid "Your router opened the port, so players connect straight to this machine."
+msgstr ""
+
+#: src/direct/hostingRoute.ts
+msgid "Your router opened the ports, so somebody outside can reach this room. They still will not get into the game, because the room gives everybody in it this machine's address on this network, and nothing outside this network can dial that."
+msgstr ""
+
+#. placeholder {0}: report.routerAddress
+#: src/direct/ReachablePorts.tsx
+msgid "Your router's own address is {0}, which the internet does not route to."
+msgstr ""
+
+#: src/runlite/pages/components/RunEndScreen.tsx
+msgid "Your ship gave out. The warpath is over."
+msgstr ""
+
+#: src/runlite/pages/components/EncounterOverlay.tsx
+msgid "Your start unit and unlocked units are all in {gameName}."
+msgstr ""
+
+#: src/runlite/pages/components/RunHud.tsx
+msgid "Your warpath ends when this reaches zero. Losing a battle costs hull — you retreat and press on — while events and depots can restore it."
+msgstr ""
+
+#: src/runlite/pages/RunPage.tsx
+msgid "Your warpath runs could not be read. Nothing has been changed. {loadError}"
+msgstr ""
+
+#: src/runlite/pages/RunListPage.tsx
+msgid "Your warpath runs could not be read. Nothing has been changed. {runsError}"
 msgstr ""
 
 #: src/i18n/frameStrings.ts

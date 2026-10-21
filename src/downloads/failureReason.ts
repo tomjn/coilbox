@@ -1,3 +1,5 @@
+import { t } from "@lingui/core/macro";
+
 /** Which host and file a failed download was fetching, when known. */
 export interface FailureContext {
   host: string | null;
@@ -26,28 +28,35 @@ export function stripSidecarPrefix(text: string): string {
  * with the build path taken off the front.
  */
 export function describeFailure(raw: string, ctx: FailureContext): string {
-  const who = ctx.host ?? "the mirror";
-  const file = ctx.filename ?? "the file";
+  const who = ctx.host ?? t`the mirror`;
+  const file = ctx.filename ?? t`the file`;
 
   if (/cancel/i.test(raw)) return raw;
 
   const status = /HTTP status [^(]*\((\d{3})\b/i.exec(raw);
-  if (status) return `${who} answered ${status[1]} for ${file}`;
+  if (status) {
+    const code = status[1];
+    return t`${who} answered ${code} for ${file}`;
+  }
 
   if (/stalled|no data received/i.test(raw)) {
     const minutes = /(\d+) minutes?/.exec(raw);
-    return `${who} stopped sending ${file}${minutes ? ` for ${minutes[0]}` : ""}`;
+    if (minutes) {
+      const duration = minutes[0];
+      return t`${who} stopped sending ${file} for ${duration}`;
+    }
+    return t`${who} stopped sending ${file}`;
   }
 
   if (/timed out|took too long|timeout/i.test(raw))
-    return `${who} did not answer in time for ${file}`;
+    return t`${who} did not answer in time for ${file}`;
 
   if (
     /error sending request|connection (?:refused|reset|closed)|dns error|failed to connect/i.test(
       raw,
     )
   )
-    return `could not connect to ${who} for ${file}`;
+    return t`could not connect to ${who} for ${file}`;
 
   return stripSidecarPrefix(raw);
 }

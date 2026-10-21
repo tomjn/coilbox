@@ -1,3 +1,4 @@
+import { Trans, useLingui } from "@lingui/react/macro";
 import { ImageOff, Loader2 } from "lucide-react";
 import type { ReactNode } from "react";
 import type { StartPos } from "@/content/bindings";
@@ -58,6 +59,7 @@ export function MinimapPreview({
    * Only affects this component's own image, not overlays passed as children. */
   dim?: boolean;
 }) {
+  const { t } = useLingui();
   const worldW = (width ?? 0) * 16;
   const worldH = (height ?? 0) * 16;
   const ratio = width && height ? width / height : 1;
@@ -83,7 +85,7 @@ export function MinimapPreview({
     loading && !shownUrl ? (
       <div
         role="status"
-        aria-label="Loading minimap"
+        aria-label={t`Loading minimap`}
         className="flex aspect-square w-full items-center justify-center"
       >
         <Loader2
@@ -111,6 +113,7 @@ export function MinimapPreview({
         />
         {markers.map((m, i) => {
           const claimed = m.color != null;
+          const position = i + 1;
           return (
             <span
               key={m.key}
@@ -126,8 +129,8 @@ export function MinimapPreview({
               }}
               title={
                 claimed
-                  ? `Start position ${i + 1}`
-                  : `Start position ${i + 1} (unclaimed)`
+                  ? t`Start position ${position}`
+                  : t`Start position ${position} (unclaimed)`
               }
             >
               {i + 1}
@@ -143,7 +146,9 @@ export function MinimapPreview({
     ) : (
       <div className="flex aspect-square w-full flex-col items-center justify-center gap-1 text-muted-foreground">
         <ImageOff className="size-6" />
-        <span className="text-xs">No minimap</span>
+        <span className="text-xs">
+          <Trans>No minimap</Trans>
+        </span>
       </div>
     );
 

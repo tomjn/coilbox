@@ -1,3 +1,5 @@
+import { msg } from "@lingui/core/macro";
+import { Trans, useLingui } from "@lingui/react/macro";
 import { Button } from "@picoframe/frame";
 import { Play, Trash2, TriangleAlert } from "lucide-react";
 import { useMemo, useState } from "react";
@@ -20,10 +22,10 @@ import { usePlay } from "../PlayProvider";
 type SortKey = "date-desc" | "date-asc" | "name-asc" | "name-desc";
 
 const SORT_OPTIONS = [
-  { value: "date-desc", label: "Newest" },
-  { value: "date-asc", label: "Oldest" },
-  { value: "name-asc", label: "Name A–Z" },
-  { value: "name-desc", label: "Name Z–A" },
+  { value: "date-desc", label: msg`Newest` },
+  { value: "date-asc", label: msg`Oldest` },
+  { value: "name-asc", label: msg`Name A–Z` },
+  { value: "name-desc", label: msg`Name Z–A` },
 ];
 
 function savedAt(ms: number): string {
@@ -42,6 +44,7 @@ function savedAt(ms: number): string {
  * root and the engine is that root's selected engine.
  */
 export default function SavegamesPage() {
+  const { t, i18n } = useLingui();
   const { targets, selected, selectedKey } = useScanTargetSelection();
   const { state } = useContentState();
   const { saves, loading, error, refresh, ready } = useSaves(
@@ -102,7 +105,8 @@ export default function SavegamesPage() {
         dataDir: selected.rootPath,
       });
       if (res.exitCode && res.exitCode !== 0) {
-        setActionError(`Engine exited with code ${res.exitCode}.`);
+        const exitCode = res.exitCode;
+        setActionError(t`Engine exited with code ${exitCode}.`);
       }
     } catch (e) {
       setActionError(e instanceof Error ? e.message : String(e));
@@ -123,14 +127,19 @@ export default function SavegamesPage() {
   };
 
   const busy = loading || (!!selected && !ready);
+  const trimmedFilter = filter.trim();
 
   return (
     <div className="flex flex-col gap-4 p-4">
       <header className="flex flex-col gap-1">
-        <h1 className="text-lg font-semibold">Save Games</h1>
+        <h1 className="text-lg font-semibold">
+          <Trans>Save Games</Trans>
+        </h1>
         <p className="text-sm text-muted-foreground">
-          Singleplayer saves in your content folder. Resume one to launch the
-          engine into it.
+          <Trans>
+            Singleplayer saves in your content folder. Resume one to launch the
+            engine into it.
+          </Trans>
         </p>
       </header>
 
@@ -145,14 +154,17 @@ export default function SavegamesPage() {
         <FilterBar
           search={filter}
           onSearch={setFilter}
-          searchPlaceholder="Filter savegames…"
-          searchLabel="Filter savegames"
+          searchPlaceholder={t`Filter savegames…`}
+          searchLabel={t`Filter savegames`}
           sort={sort}
           onSort={(v) => setSort(v as SortKey)}
-          sortOptions={SORT_OPTIONS}
+          sortOptions={SORT_OPTIONS.map((o) => ({
+            value: o.value,
+            label: i18n._(o.label),
+          }))}
           total={saves.length}
           shown={sorted.length}
-          noun="savegames"
+          noun={t`savegames`}
         />
       )}
 
@@ -162,9 +174,11 @@ export default function SavegamesPage() {
       {targets.length === 0 ? null : busy ? (
         <SkeletonList />
       ) : saves.length === 0 ? (
-        <EmptyState label="No savegames found. Saves you make in-game appear here." />
+        <EmptyState
+          label={t`No savegames found. Saves you make in-game appear here.`}
+        />
       ) : sorted.length === 0 ? (
-        <EmptyState label={`No savegames match “${filter.trim()}”.`} />
+        <EmptyState label={t`No savegames match “${trimmedFilter}”.`} />
       ) : (
         <ul className="flex flex-col gap-2">
           {sorted.map((s) => {
@@ -173,6 +187,7 @@ export default function SavegamesPage() {
               formatBytes(s.sizeBytes),
             ].filter(Boolean);
             const confirming = confirmDelete === s.path;
+            const saveFilename = s.filename;
             return (
               <li
                 key={s.path}
@@ -202,22 +217,22 @@ export default function SavegamesPage() {
                       disabled={running || !executable}
                       title={
                         !executable
-                          ? "Install an engine to resume savegames."
+                          ? t`Install an engine to resume savegames.`
                           : running && !pending
-                            ? "A game is already running."
+                            ? t`A game is already running.`
                             : undefined
                       }
                       className="gap-1.5"
                     >
                       <Play className="size-4 fill-current" />
-                      {pending ? "Resuming…" : "Resume"}
+                      {pending ? t`Resuming…` : t`Resume`}
                     </Button>
                     <Button
                       variant="ghost"
                       size="icon"
                       onClick={() => setConfirmDelete(s.path)}
                       disabled={running}
-                      aria-label={`Delete savegame ${s.filename}`}
+                      aria-label={t`Delete savegame ${saveFilename}`}
                     >
                       <Trash2 className="size-4" />
                     </Button>
@@ -227,7 +242,7 @@ export default function SavegamesPage() {
                   <div className="mt-2 flex items-center justify-between gap-2 rounded border border-amber-500/40 bg-amber-500/10 p-2 text-xs">
                     <span className="flex items-center gap-1.5 text-amber-700 dark:text-amber-400">
                       <TriangleAlert className="size-4 shrink-0" />
-                      Delete this savegame? This can't be undone.
+                      <Trans>Delete this savegame? This can't be undone.</Trans>
                     </span>
                     <div className="flex shrink-0 gap-1">
                       <Button
@@ -235,14 +250,14 @@ export default function SavegamesPage() {
                         size="sm"
                         onClick={() => setConfirmDelete(null)}
                       >
-                        Cancel
+                        <Trans>Cancel</Trans>
                       </Button>
                       <Button
                         variant="destructive"
                         size="sm"
                         onClick={() => remove(s.path)}
                       >
-                        Delete
+                        <Trans>Delete</Trans>
                       </Button>
                     </div>
                   </div>

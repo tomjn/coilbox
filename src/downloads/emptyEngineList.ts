@@ -1,3 +1,5 @@
+import { t } from "@lingui/core/macro";
+
 /**
  * What the engine installer says when a source has nothing to offer.
  *
@@ -26,10 +28,10 @@ export function emptyEngineListMessage({
   listsThisPlatform,
 }: EmptyEngineList): string {
   if (source === "recoil") {
-    return `No Recoil builds for this platform (${platform}). On macOS, add an engine manually.`;
+    return t`No Recoil builds for this platform (${platform}). On macOS, add an engine manually.`;
   }
   if (!listsThisPlatform) {
-    return "springfiles has no engines for this kind of machine. Recoil does, so switch the source above to Recoil.";
+    return t`springfiles has no engines for this kind of machine. Recoil does, so switch the source above to Recoil.`;
   }
-  return "springfiles has no engines to offer right now. Try again in a moment, or switch the source above to Recoil.";
+  return t`springfiles has no engines to offer right now. Try again in a moment, or switch the source above to Recoil.`;
 }

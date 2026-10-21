@@ -1,3 +1,5 @@
+import { plural } from "@lingui/core/macro";
+import { Trans, useLingui } from "@lingui/react/macro";
 import { Button, useDrawer } from "@picoframe/frame";
 import { save } from "@tauri-apps/plugin-dialog";
 import {
@@ -52,6 +54,7 @@ import { RunSetupForm } from "./components/RunSetupForm";
  * list + its "Generate a map" drawer.
  */
 export default function RunListPage() {
+  const { t } = useLingui();
   const navigate = useNavigate();
   const drawer = useDrawer();
   const {
@@ -74,9 +77,8 @@ export default function RunListPage() {
     try {
       await deleteRun(id);
     } catch (e) {
-      setAbandonError(
-        `The warpath was not abandoned. ${e instanceof Error ? e.message : String(e)}`,
-      );
+      const reason = e instanceof Error ? e.message : String(e);
+      setAbandonError(t`The warpath was not abandoned. ${reason}`);
     }
   };
 
@@ -101,7 +103,7 @@ export default function RunListPage() {
 
   const openSetup = (initialGameName?: string) =>
     drawer.open({
-      title: "New warpath",
+      title: t`New warpath`,
       width: "30rem",
       content: (
         <RunSetupForm
@@ -116,7 +118,7 @@ export default function RunListPage() {
 
   const openImportChallenge = (initialCode?: string) =>
     drawer.open({
-      title: "Import challenge",
+      title: t`Import challenge`,
       width: "26rem",
       content: (
         // A fresh form every time, because the last one may still be mounted
@@ -154,19 +156,21 @@ export default function RunListPage() {
       <PageHeader
         title={
           <>
-            <Rocket className="size-5 text-primary" aria-hidden /> Warpath
+            <Rocket className="size-5 text-primary" aria-hidden />{" "}
+            <Trans>Warpath</Trans>
           </>
         }
-        description="Cross a forward-only map once — fight, take rewards, grow your build, and reach the warlord before your health runs out. Win or die, then set out again."
+        description={t`Cross a forward-only map once — fight, take rewards, grow your build, and reach the warlord before your health runs out. Win or die, then set out again.`}
         actions={
           hasGames && (
             <>
               <Button variant="outline" onClick={() => openImportChallenge()}>
-                <Download className="mr-1.5 size-4" aria-hidden /> Import
-                challenge
+                <Download className="mr-1.5 size-4" aria-hidden />{" "}
+                <Trans>Import challenge</Trans>
               </Button>
               <Button onClick={() => openSetup()}>
-                <Rocket className="mr-1.5 size-4" aria-hidden /> New warpath
+                <Rocket className="mr-1.5 size-4" aria-hidden />{" "}
+                <Trans>New warpath</Trans>
               </Button>
             </>
           )
@@ -175,34 +179,34 @@ export default function RunListPage() {
 
       {!runsLoading && runsError && (
         <ErrorBanner
-          message={`Your warpath runs could not be read. Nothing has been changed. ${runsError}`}
+          message={t`Your warpath runs could not be read. Nothing has been changed. ${runsError}`}
         />
       )}
       {abandonError && <ErrorBanner message={abandonError} />}
       {!runsLoading && unreadableCount > 0 && (
         <ErrorBanner
-          message={
-            unreadableCount === 1
-              ? "1 warpath run could not be read. It is kept in the file and has not been changed."
-              : `${unreadableCount} warpath runs could not be read. They are kept in the file and have not been changed.`
-          }
+          message={plural(unreadableCount, {
+            one: "# warpath run could not be read. It is kept in the file and has not been changed.",
+            other:
+              "# warpath runs could not be read. They are kept in the file and have not been changed.",
+          })}
         />
       )}
 
       {state === "finding-engine" ? (
         <div className="flex items-center gap-2 text-sm text-muted-foreground">
           <Loader2 className="size-4 animate-spin" aria-hidden />
-          Looking for an engine…
+          <Trans>Looking for an engine…</Trans>
         </div>
       ) : state === "scanning" ? (
         <div className="flex items-center gap-2 text-sm text-muted-foreground">
           <Loader2 className="size-4 animate-spin" aria-hidden />
-          Scanning installed games…
+          <Trans>Scanning installed games…</Trans>
         </div>
       ) : state === "no-engine" ? (
         <EmptyState
           label={
-            <>
+            <Trans>
               Install an engine first (
               <Link
                 className="underline underline-offset-4"
@@ -211,7 +215,7 @@ export default function RunListPage() {
                 Settings → Engines
               </Link>
               ).
-            </>
+            </Trans>
           }
         />
       ) : state === "unreadable" ? (
@@ -219,7 +223,7 @@ export default function RunListPage() {
           {scanFailure && <ScanFailed noun="games" reason={scanFailure} />}
           <EmptyState
             label={
-              <>
+              <Trans>
                 This engine could not read your games. Try another from{" "}
                 <Link
                   className="underline underline-offset-4"
@@ -235,7 +239,7 @@ export default function RunListPage() {
                   Content → Games
                 </Link>
                 .
-              </>
+              </Trans>
             }
           />
           <Diagnostics errors={scanErrors} />
@@ -243,7 +247,7 @@ export default function RunListPage() {
       ) : !hasGames ? (
         <EmptyState
           label={
-            <>
+            <Trans>
               No games installed. Add one from{" "}
               <Link
                 className="underline underline-offset-4"
@@ -252,7 +256,7 @@ export default function RunListPage() {
                 Content → Games
               </Link>
               .
-            </>
+            </Trans>
           }
         />
       ) : runEntries.length > 0 ? (
@@ -269,7 +273,9 @@ export default function RunListPage() {
           ))}
         </ul>
       ) : runsError ? null : (
-        <EmptyState label="No warpath in progress. Start a new warpath to begin." />
+        <EmptyState
+          label={t`No warpath in progress. Start a new warpath to begin.`}
+        />
       )}
     </div>
   );
@@ -288,25 +294,26 @@ function RunCard({
   onResume: () => void;
   onAbandon: () => void | Promise<void>;
 }) {
+  const { t } = useLingui();
   const drawer = useDrawer();
   const exportChallengeFile = async () => {
     const dest = await save({
-      title: "Export challenge",
+      title: t`Export challenge`,
       defaultPath: `${run.settings.game.shortname || "warpath"}-challenge.json`,
-      filters: [{ name: "Coilbox challenge", extensions: ["json"] }],
+      filters: [{ name: t`Coilbox challenge`, extensions: ["json"] }],
     });
     if (!dest) return;
     await challengeExport({ text: encodeWarpathChallengeFile(run), dest });
   };
   const openShareChallenge = () =>
     drawer.open({
-      title: "Share challenge",
+      title: t`Share challenge`,
       width: "26rem",
       content: (
         <ChallengeShare
           identity={runIdentity(run)}
           code={encodeWarpathChallenge(run)}
-          helpText="Anyone who pastes this code into Import challenge (needs the same game installed) plays the identical warpath, so results are directly comparable."
+          helpText={t`Anyone who pastes this code into Import challenge (needs the same game installed) plays the identical warpath, so results are directly comparable.`}
           onExportFile={exportChallengeFile}
         />
       ),
@@ -336,10 +343,14 @@ function RunCard({
     map?.source === "generated" ? (map.planet ?? "temperate") : null;
   const label =
     status === "won"
-      ? "Warpath complete"
+      ? t`Warpath complete`
       : status === "lost"
-        ? "Warpath ended"
-        : "Warpath in progress";
+        ? t`Warpath ended`
+        : t`Warpath in progress`;
+  const gameShortname = run.settings.game.shortname;
+  const runName = run.name;
+  const progressText =
+    status === "active" ? t`health ${hull}/${maxHull}` : label.toLowerCase();
 
   return (
     <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-primary/40 bg-primary/5 p-4">
@@ -357,14 +368,17 @@ function RunCard({
             {run.name}
             {run.importedChallenge && (
               <span className="rounded bg-muted px-1.5 py-0.5 text-xs text-muted-foreground">
-                Imported challenge
+                <Trans>Imported challenge</Trans>
               </span>
             )}
             {resume && <ContinueBadge />}
           </div>
           <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
             <span>
-              {label} · {run.settings.game.shortname} · health {hull}/{maxHull}
+              {label} · {gameShortname} ·{" "}
+              <Trans>
+                health {hull}/{maxHull}
+              </Trans>
               {planet && ` · ${planetOf(planet).label}`}
             </span>
             {planet ? (
@@ -385,29 +399,26 @@ function RunCard({
         <Button
           variant="ghost"
           size="icon"
-          aria-label={`Share ${run.name} as a challenge code`}
-          title="Share challenge"
+          aria-label={t`Share ${runName} as a challenge code`}
+          title={t`Share challenge`}
           onClick={openShareChallenge}
         >
           <Share2 className="size-4" aria-hidden />
         </Button>
         <Button onClick={onResume}>
           <Play className="mr-1.5 size-4" aria-hidden />
-          {status === "active" ? "Resume" : "View"}
+          {status === "active" ? t`Resume` : t`View`}
         </Button>
         <ConfirmPopover
           triggerProps={{ variant: "outline" }}
-          heading={`Abandon ${run.name}?`}
-          description={`This deletes the warpath for good, including its progress (${
-            status === "active"
-              ? `health ${hull}/${maxHull}`
-              : label.toLowerCase()
-          }). It cannot be undone.`}
-          confirmLabel="Abandon warpath"
-          busyLabel="Abandoning…"
+          heading={t`Abandon ${runName}?`}
+          description={t`This deletes the warpath for good, including its progress (${progressText}). It cannot be undone.`}
+          confirmLabel={t`Abandon warpath`}
+          busyLabel={t`Abandoning…`}
           onConfirm={onAbandon}
         >
-          <Trash2 className="mr-1.5 size-4" aria-hidden /> Abandon
+          <Trash2 className="mr-1.5 size-4" aria-hidden />{" "}
+          <Trans>Abandon</Trans>
         </ConfirmPopover>
       </div>
     </div>

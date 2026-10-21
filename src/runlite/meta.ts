@@ -1,3 +1,4 @@
+import { t } from "@lingui/core/macro";
 import {
   emptyRecord,
   META_SCHEMA_VERSION,
@@ -30,10 +31,36 @@ export interface Loadout {
 
 /** The always-available default plus the unlockable doctrines. */
 export const LOADOUTS: Loadout[] = [
-  { id: "standard", label: "Standard deployment", branchIndex: -1 },
-  { id: "vanguard", label: "Armoured vanguard", branchIndex: 0 },
-  { id: "air", label: "Air superiority", branchIndex: 1 },
-  { id: "recon", label: "Recon doctrine", branchIndex: 2 },
+  // Getters, so the label follows the language when it is read rather than the
+  // one the app started in.
+  {
+    id: "standard",
+    get label() {
+      return t`Standard deployment`;
+    },
+    branchIndex: -1,
+  },
+  {
+    id: "vanguard",
+    get label() {
+      return t`Armoured vanguard`;
+    },
+    branchIndex: 0,
+  },
+  {
+    id: "air",
+    get label() {
+      return t`Air superiority`;
+    },
+    branchIndex: 1,
+  },
+  {
+    id: "recon",
+    get label() {
+      return t`Recon doctrine`;
+    },
+    branchIndex: 2,
+  },
 ];
 
 /** Win counts at which each doctrine unlocks. */

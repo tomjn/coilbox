@@ -1,3 +1,4 @@
+import { Trans } from "@lingui/react/macro";
 import { Button } from "@picoframe/frame";
 import { ChevronLeft } from "lucide-react";
 import type { GameItem } from "@/content/bindings";
@@ -41,7 +42,9 @@ export function GamePickerPanel({
         >
           <ChevronLeft className="size-4" />
         </Button>
-        <h2 className="text-sm font-semibold">Choose a game</h2>
+        <h2 className="text-sm font-semibold">
+          <Trans>Choose a game</Trans>
+        </h2>
       </div>
       <GamePickerGrid
         games={games}

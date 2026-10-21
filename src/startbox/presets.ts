@@ -1,3 +1,5 @@
+import type { MessageDescriptor } from "@lingui/core";
+import { msg } from "@lingui/core/macro";
 import { GRID, MIN_BOX, type StartRect } from "./geometry";
 
 /**
@@ -18,7 +20,7 @@ export type PresetKind =
 
 export interface PresetDef {
   kind: PresetKind;
-  label: string;
+  label: MessageDescriptor;
   /** How many boxes the pattern produces (allies beyond this get no box). */
   slots: number;
 }
@@ -28,12 +30,12 @@ export interface PresetDef {
 // Labelled by compass points: the pattern is the whole of what a corner preset
 // is, so naming the direction says more than "2 corners" twice would.
 export const PRESETS: PresetDef[] = [
-  { kind: "vertical", label: "Vertical", slots: 2 },
-  { kind: "horizontal", label: "Horizontal", slots: 2 },
-  { kind: "corners2", label: "NW-SE", slots: 2 },
-  { kind: "corners2alt", label: "NE-SW", slots: 2 },
-  { kind: "corners4", label: "4 corners", slots: 4 },
-  { kind: "sides4", label: "4 sides", slots: 4 },
+  { kind: "vertical", label: msg`Vertical`, slots: 2 },
+  { kind: "horizontal", label: msg`Horizontal`, slots: 2 },
+  { kind: "corners2", label: msg`NW-SE`, slots: 2 },
+  { kind: "corners2alt", label: msg`NE-SW`, slots: 2 },
+  { kind: "corners4", label: msg`4 corners`, slots: 4 },
+  { kind: "sides4", label: msg`4 sides`, slots: 4 },
 ];
 
 /**

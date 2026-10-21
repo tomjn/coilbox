@@ -1,3 +1,5 @@
+import { plural } from "@lingui/core/macro";
+import { Trans, useLingui } from "@lingui/react/macro";
 import { Button, cn, Input } from "@picoframe/frame";
 import {
   AlertCircle,
@@ -65,11 +67,13 @@ function SidecarWarning() {
     >
       <AlertCircle size={16} />
       <div className="min-w-0 flex-1">
-        <p className="font-medium">pr-downloader sidecar unavailable</p>
+        <p className="font-medium">
+          <Trans>pr-downloader sidecar unavailable</Trans>
+        </p>
         <p className="break-words text-destructive/90">{error}</p>
       </div>
       <Button variant="outline" size="sm" onClick={check}>
-        Retry
+        <Trans>Retry</Trans>
       </Button>
     </Alert>
   );
@@ -82,6 +86,7 @@ function SidecarWarning() {
  * Shared by the Browse Rapid page and the Games page's rapid source.
  */
 export function RapidBrowser({ writePath }: { writePath?: string }) {
+  const { t } = useLingui();
   const { enqueue, itemFor, active } = useDownloadQueue();
   const [cfg] = useDownloadsConfig();
   const [masterUrl, setMasterUrl] = useState(
@@ -168,19 +173,26 @@ export function RapidBrowser({ writePath }: { writePath?: string }) {
     );
   }, [versions, versionFilter]);
 
+  const repoQuery = repoFilter.trim();
+  const versionQuery = versionFilter.trim();
+  const shownVersions = filteredVersions?.length ?? 0;
+  const totalVersions = versions?.length ?? 0;
+  const repoName = selected?.name ?? "";
   return (
     <div className="@container flex h-full flex-col">
       <div className="flex items-center gap-2 border-b border-border px-6 py-4">
         {cfg.rapidRepos.length === 0 ? (
           <p className="text-sm text-muted-foreground">
-            No rapid repositories configured. Add one in{" "}
-            <Link
-              className="underline underline-offset-4"
-              to="/settings/sources"
-            >
-              Sources settings
-            </Link>
-            .
+            <Trans>
+              No rapid repositories configured. Add one in{" "}
+              <Link
+                className="underline underline-offset-4"
+                to="/settings/sources"
+              >
+                Sources settings
+              </Link>
+              .
+            </Trans>
           </p>
         ) : (
           <>
@@ -190,7 +202,7 @@ export function RapidBrowser({ writePath }: { writePath?: string }) {
                 setMasterUrl(url);
                 loadRepos(url);
               }}
-              placeholder="Select a rapid repository…"
+              placeholder={t`Select a rapid repository…`}
               className="max-w-xs"
               options={cfg.rapidRepos.map((r) => ({
                 value: r.url,
@@ -202,7 +214,7 @@ export function RapidBrowser({ writePath }: { writePath?: string }) {
               disabled={reposLoading}
             >
               {reposLoading && <Loader2 className="animate-spin" />}
-              {reposLoading ? "Loading…" : "Load repos"}
+              {reposLoading ? t`Loading…` : t`Load repos`}
             </Button>
             {reposAge !== null && (
               <span className="text-xs text-muted-foreground">
@@ -219,7 +231,9 @@ export function RapidBrowser({ writePath }: { writePath?: string }) {
         {/* Left: repositories */}
         <aside className="flex min-h-0 flex-col border-b border-border bg-card/30 @[38rem]:border-r @[38rem]:border-b-0">
           <div className="flex items-center justify-between px-4 py-2.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-            <span>Repositories</span>
+            <span>
+              <Trans>Repositories</Trans>
+            </span>
             {repos && (
               <span className="font-normal normal-case">
                 {repoFilter.trim() && filteredRepos
@@ -238,8 +252,8 @@ export function RapidBrowser({ writePath }: { writePath?: string }) {
                 type="text"
                 value={repoFilter}
                 onChange={(e) => setRepoFilter(e.target.value)}
-                placeholder="Filter repositories…"
-                aria-label="Filter repositories"
+                placeholder={t`Filter repositories…`}
+                aria-label={t`Filter repositories`}
                 className="h-8 pl-7 text-xs"
               />
             </div>
@@ -254,13 +268,13 @@ export function RapidBrowser({ writePath }: { writePath?: string }) {
               <div className="m-3">
                 <EmptyState
                   icon={Package}
-                  label="Load a rapid master to list its repositories."
+                  label={t`Load a rapid master to list its repositories.`}
                 />
               </div>
             )}
             {repos && filteredRepos?.length === 0 && (
               <p className="px-4 py-3 text-xs text-muted-foreground">
-                No repositories match “{repoFilter.trim()}”.
+                <Trans>No repositories match “{repoQuery}”.</Trans>
               </p>
             )}
             {filteredRepos?.map((repo) => (
@@ -290,7 +304,7 @@ export function RapidBrowser({ writePath }: { writePath?: string }) {
             <div className="m-6">
               <EmptyState
                 icon={FolderOpen}
-                label="Select a repository to see its downloadable versions."
+                label={t`Select a repository to see its downloadable versions.`}
               />
             </div>
           ) : (
@@ -302,9 +316,11 @@ export function RapidBrowser({ writePath }: { writePath?: string }) {
                   <span className="text-sm text-muted-foreground">
                     ·{" "}
                     {versionFilter.trim() && filteredVersions
-                      ? `${filteredVersions.length} / ${versions.length}`
-                      : versions.length}{" "}
-                    versions
+                      ? t`${shownVersions} / ${totalVersions} versions`
+                      : plural(totalVersions, {
+                          one: "# version",
+                          other: "# versions",
+                        })}
                   </span>
                 )}
                 {versionsAge !== null && (
@@ -317,11 +333,11 @@ export function RapidBrowser({ writePath }: { writePath?: string }) {
                   size="sm"
                   onClick={() => selectRepo(selected, true)}
                   disabled={versionsLoading}
-                  aria-label={`Refresh ${selected.name} versions`}
+                  aria-label={t`Refresh ${repoName} versions`}
                   className={versions && versions.length > 0 ? "" : "ml-auto"}
                 >
                   <RefreshCw />
-                  Refresh
+                  <Trans>Refresh</Trans>
                 </Button>
                 {versions && versions.length > 0 && (
                   <div className="relative ml-auto">
@@ -333,8 +349,8 @@ export function RapidBrowser({ writePath }: { writePath?: string }) {
                       type="text"
                       value={versionFilter}
                       onChange={(e) => setVersionFilter(e.target.value)}
-                      placeholder="Filter versions…"
-                      aria-label="Filter versions"
+                      placeholder={t`Filter versions…`}
+                      aria-label={t`Filter versions`}
                       className="h-8 w-56 pl-7 text-xs"
                     />
                   </div>
@@ -343,8 +359,8 @@ export function RapidBrowser({ writePath }: { writePath?: string }) {
               <div className="min-h-0 flex-1 overflow-auto">
                 {versionsLoading && (
                   <p className="flex items-center gap-2 p-6 text-sm text-muted-foreground">
-                    <Loader2 size={15} className="animate-spin" /> loading
-                    versions…
+                    <Loader2 size={15} className="animate-spin" />{" "}
+                    <Trans>loading versions…</Trans>
                   </p>
                 )}
                 {versionsError && (
@@ -356,7 +372,7 @@ export function RapidBrowser({ writePath }: { writePath?: string }) {
                   <div className="m-6">
                     <EmptyState
                       icon={Package}
-                      label="No versions in this repository."
+                      label={t`No versions in this repository.`}
                     />
                   </div>
                 )}
@@ -366,7 +382,7 @@ export function RapidBrowser({ writePath }: { writePath?: string }) {
                     <div className="m-6">
                       <EmptyState
                         icon={Search}
-                        label={`No versions match “${versionFilter.trim()}”.`}
+                        label={t`No versions match “${versionQuery}”.`}
                       />
                     </div>
                   )}
@@ -380,6 +396,8 @@ export function RapidBrowser({ writePath }: { writePath?: string }) {
                     const item = itemFor(identityOf(input));
                     const status = item?.status ?? null;
                     const installed = v.installed || status === "done";
+                    const tag = v.tag;
+                    const dependencies = v.depends.join(", ");
                     return (
                       <li
                         key={v.tag}
@@ -392,12 +410,14 @@ export function RapidBrowser({ writePath }: { writePath?: string }) {
                                 {v.name}
                               </p>
                               <Badge variant="outline">
-                                {v.kind === "snapshot" ? "Snapshot" : "Release"}
+                                {v.kind === "snapshot"
+                                  ? t`Snapshot`
+                                  : t`Release`}
                               </Badge>
                               {installed && (
                                 <Badge variant="secondary">
                                   <CheckCircle2 className="text-emerald-500" />
-                                  Installed
+                                  <Trans>Installed</Trans>
                                 </Badge>
                               )}
                             </div>
@@ -414,7 +434,7 @@ export function RapidBrowser({ writePath }: { writePath?: string }) {
                             )}
                             {v.depends.length > 0 && (
                               <p className="truncate text-xs text-muted-foreground">
-                                Depends on {v.depends.join(", ")}
+                                <Trans>Depends on {dependencies}</Trans>
                               </p>
                             )}
                           </div>
@@ -427,7 +447,7 @@ export function RapidBrowser({ writePath }: { writePath?: string }) {
                               status === "active" ||
                               status === "done"
                             }
-                            aria-label={`Download ${v.tag}`}
+                            aria-label={t`Download ${tag}`}
                           >
                             {status === "active" ? (
                               <Loader2 className="animate-spin" />
@@ -437,14 +457,14 @@ export function RapidBrowser({ writePath }: { writePath?: string }) {
                               <Download />
                             )}
                             {status === "active"
-                              ? "Downloading…"
+                              ? t`Downloading…`
                               : status === "queued"
-                                ? "Queued"
+                                ? t`Queued`
                                 : status === "done"
-                                  ? "Done"
+                                  ? t`Done`
                                   : active
-                                    ? "Add to queue"
-                                    : "Download"}
+                                    ? t`Add to queue`
+                                    : t`Download`}
                           </Button>
                         </div>
                         <QueueProgress item={item} />

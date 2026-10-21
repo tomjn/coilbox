@@ -1,3 +1,4 @@
+import { Plural, useLingui } from "@lingui/react/macro";
 import { Button } from "@picoframe/frame";
 import { openUrl } from "@tauri-apps/plugin-opener";
 import {
@@ -18,6 +19,7 @@ import type { MapItem, StartPos } from "@/content/bindings";
 import type { MapThumbData } from "@/content/config";
 import { mapSizeLabel } from "@/content/pages/components/MapThumb";
 import { hubAuthorMapsUrl, useHubUrl } from "@/hub/config";
+import { formatNumber } from "@/lib/format";
 import { isHubEnabled } from "@/profile/profile";
 import { MapPickerDrawer } from "./MapPickerDrawer";
 import { MinimapPreview } from "./MinimapPreview";
@@ -40,6 +42,7 @@ const PILL =
  */
 function AuthorPill({ author }: { author: string }) {
   const hubUrl = useHubUrl();
+  const { t } = useLingui();
   const reachable = isHubEnabled();
   const icon = <UserRoundPen className="size-3 shrink-0" aria-hidden />;
 
@@ -55,7 +58,7 @@ function AuthorPill({ author }: { author: string }) {
     <button
       type="button"
       className={`${PILL} hover:bg-accent hover:text-accent-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring`}
-      title={`Maps by ${author} on the Coilbox hub`}
+      title={t`Maps by ${author} on the Coilbox hub`}
       onClick={() => {
         openUrl(hubAuthorMapsUrl(hubUrl, author)).catch(() => {});
       }}
@@ -111,7 +114,7 @@ export function MapCard({
   scanError,
   onSelectMap,
   disabled,
-  selectLabel = "Choose map",
+  selectLabel,
   overlay,
   overlayInteractive,
   placeholder,
@@ -144,7 +147,10 @@ export function MapCard({
   /** Dim the base minimap image (e.g. while a terrain overlay is shown on top). */
   dimBase?: boolean;
 }) {
+  const { t } = useLingui();
   const [pickerOpen, setPickerOpen] = useState(false);
+  const mapName = map?.name ?? "";
+  const startPositionCount = startPositions.length;
   const size = map ? mapSizeLabel(map.width, map.height) : null;
   const description = map?.info.description;
   const tags = map
@@ -152,13 +158,13 @@ export function MapCard({
     : [];
   const wind =
     env?.minWind !== undefined && env?.maxWind !== undefined
-      ? `${Math.round(env.minWind)}–${Math.round(env.maxWind)}`
+      ? `${formatNumber(Math.round(env.minWind))}–${formatNumber(Math.round(env.maxWind))}`
       : null;
   // A map declaring no tidal power reports 0 rather than nothing, so the chip
   // would otherwise read a tidal strength of 0 on most maps.
   const tidal =
     env?.tidalStrength !== undefined && env.tidalStrength > 0
-      ? String(Math.round(env.tidalStrength))
+      ? formatNumber(Math.round(env.tidalStrength))
       : null;
 
   return (
@@ -173,10 +179,10 @@ export function MapCard({
         loading={mapsLoading || minimapLoading}
         alt={
           mapsLoading
-            ? "Loading maps…"
+            ? t`Loading maps…`
             : map
-              ? `Minimap of ${map.name}`
-              : "No map selected"
+              ? t`Minimap of ${mapName}`
+              : t`No map selected`
         }
         onClick={
           disabled || mapsLoading ? undefined : () => setPickerOpen(true)
@@ -191,7 +197,7 @@ export function MapCard({
       <div className="mt-3">
         <div className="flex items-center justify-between gap-3">
           <h2 className="min-w-0 truncate text-sm font-semibold">
-            {map?.name ?? (mapsLoading ? "Loading maps…" : "No map selected")}
+            {map?.name ?? (mapsLoading ? t`Loading maps…` : t`No map selected`)}
           </h2>
           <Button
             variant="outline"
@@ -200,7 +206,7 @@ export function MapCard({
             disabled={disabled || mapsLoading}
             onClick={() => setPickerOpen(true)}
           >
-            {selectLabel}
+            {selectLabel ?? t`Choose map`}
           </Button>
         </div>
         {/* Each fact is an icon and a number rather than a word and a number,
@@ -208,15 +214,23 @@ export function MapCard({
             the tooltips, which is also what names each icon for a reader. */}
         <TooltipProvider>
           <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
-            {size && <MapFact icon={MapIcon} label="Map size" value={size} />}
-            {startPositions.length > 0 && (
-              <span>{startPositions.length} start positions</span>
+            {size && (
+              <MapFact icon={MapIcon} label={t`Map size`} value={size} />
             )}
-            {wind && <MapFact icon={Wind} label="Wind" value={wind} />}
+            {startPositions.length > 0 && (
+              <span>
+                <Plural
+                  value={startPositionCount}
+                  one="# start position"
+                  other="# start positions"
+                />
+              </span>
+            )}
+            {wind && <MapFact icon={Wind} label={t`Wind`} value={wind} />}
             {tidal && (
               <MapFact
                 icon={WavesHorizontal}
-                label="Tidal strength"
+                label={t`Tidal strength`}
                 value={tidal}
               />
             )}

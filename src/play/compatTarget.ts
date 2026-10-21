@@ -9,6 +9,7 @@
  * current engine without its fixes is the failure compatibility mode exists to
  * prevent.
  */
+import { t } from "@lingui/core/macro";
 import { compatStatus } from "../compat/bindings";
 import { staleReason } from "../compat/staleReason";
 import type { CompatSettings } from "../content/compatSettings";
@@ -47,10 +48,10 @@ export async function resolveCompatTarget(opts: {
   const { target, game, settings } = opts;
   if (!settings[game.primaryArchive.name]?.enabled) return { kind: "off" };
 
-  const rebuild = `Open ${game.name} under Library > Games and choose Rebuild.`;
-  const blocked = (why: string): CompatTarget => ({
+  const gameName = game.name;
+  const blocked = (message: string): CompatTarget => ({
     kind: "blocked",
-    message: `Compatibility mode is on for ${game.name}, but ${why} ${rebuild}`,
+    message,
   });
 
   try {
@@ -60,7 +61,9 @@ export async function resolveCompatTarget(opts: {
       game.primaryArchive.name,
     );
     if (!info.checksum) {
-      return blocked("the game could not be read to check its mutator.");
+      return blocked(
+        t`Compatibility mode is on for ${gameName}, but the game could not be read to check its mutator. Open ${gameName} under Library > Games and choose Rebuild.`,
+      );
     }
     const status = await compatStatus({
       dataDir: target.dataDir,
@@ -68,10 +71,14 @@ export async function resolveCompatTarget(opts: {
       archiveName: game.primaryArchive.name,
       baseChecksum: info.checksum,
     });
-    if (!status.folder) return blocked("its mutator has not been built.");
-    if (status.stale.length > 0) {
+    if (!status.folder)
       return blocked(
-        `its mutator is out of date: ${status.stale.map(staleReason).join("; ")}.`,
+        t`Compatibility mode is on for ${gameName}, but its mutator has not been built. Open ${gameName} under Library > Games and choose Rebuild.`,
+      );
+    if (status.stale.length > 0) {
+      const staleReasons = status.stale.map(staleReason).join("; ");
+      return blocked(
+        t`Compatibility mode is on for ${gameName}, but its mutator is out of date: ${staleReasons}. Open ${gameName} under Library > Games and choose Rebuild.`,
       );
     }
     const folder = status.folder.toLowerCase();
@@ -82,7 +89,10 @@ export async function resolveCompatTarget(opts: {
       named((await primeScan(target.enginePath, target.dataDir)).games) ??
       named((await primeScan(target.enginePath, target.dataDir, true)).games);
     if (!found) {
-      return blocked(`the engine did not find ${status.folder}.`);
+      const folderName = status.folder;
+      return blocked(
+        t`Compatibility mode is on for ${gameName}, but the engine did not find ${folderName}. Open ${gameName} under Library > Games and choose Rebuild.`,
+      );
     }
     return {
       kind: "use",
@@ -91,8 +101,9 @@ export async function resolveCompatTarget(opts: {
       baseName: game.name,
     };
   } catch (e) {
+    const reason = e instanceof Error ? e.message : String(e);
     return blocked(
-      `its mutator could not be checked (${e instanceof Error ? e.message : String(e)}).`,
+      t`Compatibility mode is on for ${gameName}, but its mutator could not be checked (${reason}). Open ${gameName} under Library > Games and choose Rebuild.`,
     );
   }
 }

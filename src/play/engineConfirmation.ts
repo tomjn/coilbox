@@ -9,6 +9,7 @@
  * again. Pure, so every outcome is tested without React or a Tauri command.
  */
 
+import { t } from "@lingui/core/macro";
 import type { ContentRequirement } from "@/content/resolveContent";
 
 export interface InstalledEngine {
@@ -85,11 +86,12 @@ function concludeOne(
 
   const silent = answers.find((a) => a.answer && a.answer.reported === null);
   if (silent) {
-    const why = silent.answer?.reason ?? "it did not report a version";
+    const why = silent.answer?.reason ?? t`it did not report a version`;
+    const engineLabel = req.label;
     return {
       kind: "unconfirmed",
       executable: silent.engine.executable,
-      reason: `Could not confirm that engine ${req.label} is installed: ${why}`,
+      reason: t`Could not confirm that engine ${engineLabel} is installed: ${why}`,
     };
   }
   return { kind: "missing" };

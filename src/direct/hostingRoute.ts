@@ -1,3 +1,4 @@
+import { t } from "@lingui/core/macro";
 import { useSyncExternalStore } from "react";
 import {
   type DirectReachability,
@@ -101,11 +102,11 @@ export const RELAY_EXPLAINED =
 export function relayModeMeaning(mode: RelayMode): string {
   switch (mode) {
     case "auto":
-      return "Only when players cannot reach you directly.";
+      return t`Only when players cannot reach you directly.`;
     case "always":
-      return "Every battle, for when players cannot join even though the check says they can.";
+      return t`Every battle, for when players cannot join even though the check says they can.`;
     case "never":
-      return "Players connect straight to you or not at all.";
+      return t`Players connect straight to you or not at all.`;
   }
 }
 /**
@@ -255,25 +256,25 @@ export function hostingRouteSummary(
 ): string {
   switch (route) {
     case "direct":
-      return "This machine is on the internet under its own address, so players connect straight to it.";
+      return t`This machine is on the internet under its own address, so players connect straight to it.`;
     case "portMapped":
       if (lanRoom)
-        return "Your router opened the ports, so somebody outside can reach this room. They still will not get into the game, because the room gives everybody in it this machine's address on this network, and nothing outside this network can dial that.";
-      return "Your router opened the port, so players connect straight to this machine.";
+        return t`Your router opened the ports, so somebody outside can reach this room. They still will not get into the game, because the room gives everybody in it this machine's address on this network, and nothing outside this network can dial that.`;
+      return t`Your router opened the port, so players connect straight to this machine.`;
     case "relay":
       return relayAlways
-        ? "This battle goes through the server's relay, as you asked."
-        : "Nothing would open the ports, so this battle goes through the server's relay.";
+        ? t`This battle goes through the server's relay, as you asked.`
+        : t`Nothing would open the ports, so this battle goes through the server's relay.`;
     case "unreachable":
       if (lanRoom)
-        return "Nobody outside this network can reach this room, so it is for the people on this network.";
+        return t`Nobody outside this network can reach this room, so it is for the people on this network.`;
       return relayDeclined
-        ? "Nothing would open the ports, and you have asked not to be relayed, so only players who can already reach this machine can join."
-        : "Nothing would open the ports and this server has no relay, so only players who can already reach this machine can join.";
+        ? t`Nothing would open the ports, and you have asked not to be relayed, so only players who can already reach this machine can join.`
+        : t`Nothing would open the ports and this server has no relay, so only players who can already reach this machine can join.`;
     case "unchecked":
       return lanRoom
-        ? 'People on this network can join. Turn on "Open ports on my router" above to find out whether anybody outside can.'
-        : "Nothing has confirmed a way in yet, so players connect straight to this machine, which only works if the port is already open.";
+        ? t`People on this network can join. Turn on "Open ports on my router" above to find out whether anybody outside can.`
+        : t`Nothing has confirmed a way in yet, so players connect straight to this machine, which only works if the port is already open.`;
   }
 }
 
@@ -313,15 +314,13 @@ export function battleRouteLabel(
   switch (route) {
     case "direct":
       return {
-        word: "Direct",
-        detail:
-          "This machine is on the internet under its own address, so players connect straight to it.",
+        word: t`Direct`,
+        detail: t`This machine is on the internet under its own address, so players connect straight to it.`,
       };
     case "portMapped":
       return {
-        word: "Port opened",
-        detail:
-          "Your router opened the port, so players connect straight to this machine.",
+        word: t`Port opened`,
+        detail: t`Your router opened the port, so players connect straight to this machine.`,
       };
     case "relay":
       // Said in the top bar instead, on every page and with the way back to
@@ -334,9 +333,8 @@ export function battleRouteLabel(
       // is where the difference between them is worth drawing.
       if (lanRoom) return null;
       return {
-        word: "Not reachable",
-        detail:
-          "Nothing would open the ports, so only players who can already reach this machine can join.",
+        word: t`Not reachable`,
+        detail: t`Nothing would open the ports, so only players who can already reach this machine can join.`,
       };
   }
 }
@@ -359,9 +357,8 @@ export function joinedBattleRouteLabel(
 ): { word: string; detail: string } | null {
   if (!relayed) return null;
   return {
-    word: "Relayed",
-    detail:
-      "The host could not be reached directly, so this battle goes through the lobby server's relay. Your ping to the host is higher than it would be in a direct game.",
+    word: t`Relayed`,
+    detail: t`The host could not be reached directly, so this battle goes through the lobby server's relay. Your ping to the host is higher than it would be in a direct game.`,
   };
 }
 

@@ -1,3 +1,4 @@
+import { useLingui } from "@lingui/react/macro";
 import { useId } from "react";
 import { Checkbox } from "@/components/ui/checkbox";
 import type { SkirmishDraft } from "./drafts";
@@ -40,6 +41,7 @@ export function PresetPartsPicker({
   /** A caution shown under a part that is being taken. */
   warnings?: Partial<Record<PresetPart, string>>;
 }) {
+  const { t, i18n } = useLingui();
   const idPrefix = useId();
 
   const toggle = (part: PresetPart, on: boolean) =>
@@ -58,7 +60,7 @@ export function PresetPartsPicker({
         const summary = partSummary(preset, part);
         const reason =
           disabledReasons[part] ??
-          (summary === null ? "Not in this preset" : undefined);
+          (summary === null ? t`Not in this preset` : undefined);
         const disabled = reason !== undefined;
         const checked = !disabled && selection.parts.includes(part);
         const mergeable = part === "modOptions" || part === "tweakSlots";
@@ -76,7 +78,7 @@ export function PresetPartsPicker({
               />
               <span className="flex flex-col gap-0.5">
                 <label htmlFor={id} className="font-medium leading-none">
-                  {PART_LABELS[part]}
+                  {i18n._(PART_LABELS[part])}
                 </label>
                 <span className="text-xs leading-snug text-muted-foreground">
                   {reason ?? summary}
@@ -107,8 +109,8 @@ export function PresetPartsPicker({
                   className="text-xs leading-snug text-muted-foreground"
                 >
                   {part === "modOptions"
-                    ? "Keep options this preset does not set"
-                    : "Keep tweak slots this preset does not set"}
+                    ? t`Keep options this preset does not set`
+                    : t`Keep tweak slots this preset does not set`}
                 </label>
               </div>
             )}

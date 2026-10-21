@@ -59,6 +59,8 @@ const playPlugin: FramePlugin = {
       ],
     },
   ],
+  // The URL segment above every page here, which has no route of its own.
+  crumbs: { "/play": lazyText(msg`Play`) },
   routes: [
     {
       path: "play/skirmish",

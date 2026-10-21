@@ -1,3 +1,4 @@
+import { useLingui } from "@lingui/react/macro";
 import { useMemo } from "react";
 import { GalaxyView } from "../conquest/galaxy3d/GalaxyView";
 import { MapLoading } from "../conquest/galaxy3d/MapLoading";
@@ -182,17 +183,19 @@ export function RunMapView({
   const modelSources = usePlacedModelSources(doc, modelGame ?? NO_MODEL_GAME);
   const reduceMotion = useReduceMotion();
   const effects = useEffectsEnabled();
+  const { t } = useLingui();
   const performanceMode = usePerformanceMode();
 
+  const landError = terrain.error;
   if (handmadeMap?.loading) return <div className={className} />;
   if (terrain.pending) {
-    return <MapLoading label="Building the land…" className={className} />;
+    return <MapLoading label={t`Building the land…`} className={className} />;
   }
   if (terrain.error) {
     return (
       <div className={className}>
         <ErrorBanner
-          message={`The land of this map could not be built. ${terrain.error}`}
+          message={t`The land of this map could not be built. ${landError}`}
         />
       </div>
     );

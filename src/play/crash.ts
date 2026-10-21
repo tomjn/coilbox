@@ -1,3 +1,4 @@
+import { t } from "@lingui/core/macro";
 import type { LaunchOutcome } from "./bindings";
 
 /**
@@ -47,14 +48,16 @@ export function describeExit(o: LaunchOutcome): string {
     case "signal": {
       const name = SIGNAL_NAMES[o.signal as number];
       const sig = name ? `${o.signal} (${name})` : String(o.signal);
-      return `The engine crashed. It was killed by signal ${sig}.`;
+      return t`The engine crashed. It was killed by signal ${sig}.`;
     }
-    case "failed":
-      return `The engine stopped with an error. It exited with code ${o.exitCode}.`;
+    case "failed": {
+      const exitCode = String(o.exitCode);
+      return t`The engine stopped with an error. It exited with code ${exitCode}.`;
+    }
     case "cancelled":
-      return "The game was cancelled.";
+      return t`The game was cancelled.`;
     default:
-      return "The engine exited normally.";
+      return t`The engine exited normally.`;
   }
 }
 
@@ -115,7 +118,8 @@ export interface CrashReport {
 
 /**
  * A plain-text note about a crash to paste into Discord or a bug report. It
- * names the log file so the reader can attach the whole of it.
+ * names the log file so the reader can attach the whole of it. The labels stay
+ * English, because the report usually ends up with the maintainers.
  */
 export function buildCrashReport(r: CrashReport): string {
   const out: string[] = [

@@ -1,3 +1,6 @@
+import type { MessageDescriptor } from "@lingui/core";
+import { msg } from "@lingui/core/macro";
+import { Trans, useLingui } from "@lingui/react/macro";
 import { Button, buttonVariants, useDrawer } from "@picoframe/frame";
 import { Download } from "lucide-react";
 import { useMemo, useState } from "react";
@@ -10,7 +13,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { formatBytes } from "@/lib/format";
+import { formatBytes, formatDateTime } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import { FilterBar } from "../../content/pages/components/FilterBar";
 import { EmptyState } from "../../content/pages/components/states";
@@ -29,23 +32,23 @@ import { QueueProgress, StartingBar } from "./components/ProgressBar";
 type ActivityChip = "all" | "downloading" | "failed" | "done";
 type ActivitySort = "newest" | "name";
 
-const CHIPS: { value: ActivityChip; label: string }[] = [
-  { value: "all", label: "All" },
-  { value: "downloading", label: "Downloading" },
-  { value: "failed", label: "Failed" },
-  { value: "done", label: "Done" },
+const CHIPS: { value: ActivityChip; label: MessageDescriptor }[] = [
+  { value: "all", label: msg`All` },
+  { value: "downloading", label: msg`Downloading` },
+  { value: "failed", label: msg`Failed` },
+  { value: "done", label: msg`Done` },
 ];
 
-const SORT_OPTIONS: { value: ActivitySort; label: string }[] = [
-  { value: "newest", label: "Newest first" },
-  { value: "name", label: "Name" },
+const SORT_OPTIONS: { value: ActivitySort; label: MessageDescriptor }[] = [
+  { value: "newest", label: msg`Newest first` },
+  { value: "name", label: msg`Name` },
 ];
 
-const EMPTY_CHIP: Record<ActivityChip, string> = {
-  all: "Nothing downloaded yet.",
-  downloading: "Nothing is downloading.",
-  failed: "No failed downloads.",
-  done: "No finished downloads.",
+const EMPTY_CHIP: Record<ActivityChip, MessageDescriptor> = {
+  all: msg`Nothing downloaded yet.`,
+  downloading: msg`Nothing is downloading.`,
+  failed: msg`No failed downloads.`,
+  done: msg`No finished downloads.`,
 };
 
 const CHIP_STATES: Record<ActivityChip, readonly ActivityState[]> = {
@@ -55,36 +58,40 @@ const CHIP_STATES: Record<ActivityChip, readonly ActivityState[]> = {
   done: ["done"],
 };
 
-const DOT: Record<ActivityState, { className: string; label: string }> = {
-  active: { className: "bg-primary animate-pulse", label: "Downloading" },
-  queued: { className: "bg-muted-foreground/50", label: "Queued" },
-  failed: { className: "bg-destructive", label: "Failed" },
-  canceled: { className: "bg-amber-500", label: "Cancelled" },
-  done: { className: "bg-emerald-500", label: "Done" },
+const DOT: Record<
+  ActivityState,
+  { className: string; label: MessageDescriptor }
+> = {
+  active: {
+    className: "bg-primary animate-pulse",
+    label: msg`Downloading`,
+  },
+  queued: { className: "bg-muted-foreground/50", label: msg`Queued` },
+  failed: { className: "bg-destructive", label: msg`Failed` },
+  canceled: { className: "bg-amber-500", label: msg`Cancelled` },
+  done: { className: "bg-emerald-500", label: msg`Done` },
 };
 
-const KIND_WORD: Record<ActivityRow["content"], string> = {
-  map: "map",
-  game: "game",
-  rapid: "game",
-  engine: "engine",
-  file: "file",
+const KIND_WORD: Record<ActivityRow["content"], MessageDescriptor> = {
+  map: msg`map`,
+  game: msg`game`,
+  rapid: msg`game`,
+  engine: msg`engine`,
+  file: msg`file`,
 };
 
 const SHOW_LINK = buttonVariants({ variant: "ghost", size: "sm" });
 
 const when = (ms: number) =>
-  new Date(ms).toLocaleString(undefined, {
-    dateStyle: "medium",
-    timeStyle: "short",
-  });
+  formatDateTime(ms, { dateStyle: "medium", timeStyle: "short" });
 
 function StateDot({ state }: { state: ActivityState }) {
+  const { i18n } = useLingui();
   const dot = DOT[state];
   return (
     <span
       role="img"
-      aria-label={dot.label}
+      aria-label={i18n._(dot.label)}
       className={cn(
         "inline-block size-2.5 rounded-full motion-reduce:animate-none",
         dot.className,
@@ -94,6 +101,7 @@ function StateDot({ state }: { state: ActivityState }) {
 }
 
 function Result({ row }: { row: ActivityRow }) {
+  const { t } = useLingui();
   switch (row.state) {
     case "active":
       return row.item?.progress ? (
@@ -103,31 +111,41 @@ function Result({ row }: { row: ActivityRow }) {
       );
     case "queued": {
       const size = row.item?.sizeBytes;
+      const queuedSize = size ? formatBytes(size) : "";
       return (
         <span className="text-muted-foreground">
-          Queued{size ? ` · ${formatBytes(size)}` : ""}
+          {size ? t`Queued · ${queuedSize}` : t`Queued`}
         </span>
       );
     }
-    case "failed":
+    case "failed": {
+      const reason = row.failure ?? t`no reason given`;
       return (
         <span className="line-clamp-2 break-words text-destructive">
-          Failed: {row.failure ?? "no reason given"}
+          <Trans>Failed: {reason}</Trans>
         </span>
       );
+    }
     case "canceled":
-      return <span className="text-muted-foreground">Cancelled</span>;
-    case "done":
       return (
         <span className="text-muted-foreground">
-          Done{row.at ? ` · ${when(row.at)}` : ""}
+          <Trans>Cancelled</Trans>
         </span>
       );
+    case "done": {
+      const finished = row.at ? when(row.at) : "";
+      return (
+        <span className="text-muted-foreground">
+          {row.at ? t`Done · ${finished}` : t`Done`}
+        </span>
+      );
+    }
   }
 }
 
 /** The full text behind a failed or cancelled row, for its drawer. */
 export function ActivityLog({ row }: { row: ActivityRow }) {
+  const { t } = useLingui();
   return (
     <div className="flex flex-col gap-4 text-sm">
       {row.failure && (
@@ -143,7 +161,7 @@ export function ActivityLog({ row }: { row: ActivityRow }) {
               className="flex flex-col gap-1"
             >
               <span className="font-medium">
-                {sourceText(r)} · {r.outcome === "ok" ? "ok" : "failed"}
+                {sourceText(r)} · {r.outcome === "ok" ? t`ok` : t`failed`}
               </span>
               <span className="text-xs text-muted-foreground">
                 {when(Date.parse(r.at))}
@@ -160,7 +178,9 @@ export function ActivityLog({ row }: { row: ActivityRow }) {
         </ol>
       )}
       {!row.failure && row.records.length === 0 && (
-        <p className="text-muted-foreground">Nothing was recorded.</p>
+        <p className="text-muted-foreground">
+          <Trans>Nothing was recorded.</Trans>
+        </p>
       )}
     </div>
   );
@@ -184,12 +204,12 @@ function Actions({
     <div className="flex justify-end gap-1.5">
       {row.state === "active" && (
         <Button size="sm" variant="ghost" onClick={() => onCancel(row)}>
-          Cancel
+          <Trans>Cancel</Trans>
         </Button>
       )}
       {row.state === "queued" && (
         <Button size="sm" variant="ghost" onClick={() => onCancel(row)}>
-          Remove from queue
+          <Trans>Remove from queue</Trans>
         </Button>
       )}
       {canRetry && row.next && (
@@ -204,18 +224,18 @@ function Actions({
       )}
       {(row.state === "failed" || row.state === "canceled") && hasLog && (
         <Button size="sm" variant="ghost" onClick={() => onLog(row)}>
-          Log
+          <Trans>Log</Trans>
         </Button>
       )}
       {row.state === "done" && row.content === "map" && (
         <Link to="/library/maps" className={SHOW_LINK}>
-          Show in Maps
+          <Trans>Show in Maps</Trans>
         </Link>
       )}
       {row.state === "done" &&
         (row.content === "game" || row.content === "rapid") && (
           <Link to="/library/games" className={SHOW_LINK}>
-            Show in Games
+            <Trans>Show in Games</Trans>
           </Link>
         )}
     </div>
@@ -237,6 +257,7 @@ export function DownloadsActivity({
   onRetry: (row: ActivityRow) => void;
   onLog: (row: ActivityRow) => void;
 }) {
+  const { t, i18n } = useLingui();
   const [chip, setChip] = useState<ActivityChip>("all");
   const [search, setSearch] = useState("");
   const [sort, setSort] = useState<ActivitySort>("newest");
@@ -262,36 +283,44 @@ export function DownloadsActivity({
       : list;
   }, [rows, chip, search, sort]);
 
+  const query = search.trim();
   if (rows.length === 0) {
-    return <EmptyState icon={Download} label={EMPTY_CHIP.all} />;
+    return <EmptyState icon={Download} label={i18n._(EMPTY_CHIP.all)} />;
   }
 
   return (
     <>
       <FilterBar
-        chips={CHIPS.map((c) => ({ ...c, count: counts[c.value] }))}
+        chips={CHIPS.map((c) => ({
+          ...c,
+          label: i18n._(c.label),
+          count: counts[c.value],
+        }))}
         chip={chip}
         onChip={(v) => setChip(v as ActivityChip)}
-        chipsLabel="Show"
+        chipsLabel={t`Show`}
         search={search}
         onSearch={setSearch}
-        searchPlaceholder="Search downloads…"
-        searchLabel="Search downloads"
+        searchPlaceholder={t`Search downloads…`}
+        searchLabel={t`Search downloads`}
         sort={sort}
         onSort={(v) => setSort(v as ActivitySort)}
-        sortOptions={SORT_OPTIONS}
+        sortOptions={SORT_OPTIONS.map((o) => ({
+          ...o,
+          label: i18n._(o.label),
+        }))}
         sortClassName="w-40"
         total={counts[chip]}
         shown={shown.length}
-        noun="downloads"
+        noun={t`downloads`}
       />
       {shown.length === 0 ? (
         <EmptyState
           icon={Download}
           label={
             search.trim()
-              ? `No downloads match "${search.trim()}".`
-              : EMPTY_CHIP[chip]
+              ? t`No downloads match "${query}".`
+              : i18n._(EMPTY_CHIP[chip])
           }
         />
       ) : (
@@ -299,13 +328,23 @@ export function DownloadsActivity({
           <TableHeader>
             <TableRow>
               <TableHead className="w-6">
-                <span className="sr-only">State</span>
+                <span className="sr-only">
+                  <Trans>State</Trans>
+                </span>
               </TableHead>
-              <TableHead>Item</TableHead>
-              <TableHead>Source</TableHead>
-              <TableHead>Progress</TableHead>
               <TableHead>
-                <span className="sr-only">Actions</span>
+                <Trans>Item</Trans>
+              </TableHead>
+              <TableHead>
+                <Trans>Source</Trans>
+              </TableHead>
+              <TableHead>
+                <Trans>Progress</Trans>
+              </TableHead>
+              <TableHead>
+                <span className="sr-only">
+                  <Trans>Actions</Trans>
+                </span>
               </TableHead>
             </TableRow>
           </TableHeader>
@@ -318,7 +357,7 @@ export function DownloadsActivity({
                 <TableCell className="max-w-64">
                   <span className="block truncate font-medium">{row.name}</span>
                   <span className="text-xs text-muted-foreground">
-                    {KIND_WORD[row.content]}
+                    {i18n._(KIND_WORD[row.content])}
                   </span>
                 </TableCell>
                 <TableCell className="max-w-56 truncate text-xs text-muted-foreground">
@@ -361,7 +400,9 @@ export default function ActivityPage() {
   return (
     <div className="flex flex-col gap-4 p-4">
       <header className="flex flex-col gap-1">
-        <h1 className="text-lg font-semibold">Downloads</h1>
+        <h1 className="text-lg font-semibold">
+          <Trans>Downloads</Trans>
+        </h1>
       </header>
       <DownloadsActivity
         rows={rows}

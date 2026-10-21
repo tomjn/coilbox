@@ -1,3 +1,5 @@
+import type { MessageDescriptor } from "@lingui/core";
+import { msg, plural, t } from "@lingui/core/macro";
 import { isTweakSlotKey } from "@/workshop/deliveryRoutes";
 import type { SkirmishDraft } from "./drafts";
 
@@ -39,15 +41,15 @@ export const PRESET_PARTS: readonly PresetPart[] = [
 ];
 
 /** Short label for each part, shared by both pickers. */
-export const PART_LABELS: Record<PresetPart, string> = {
-  game: "Game",
-  map: "Map",
-  startPositions: "Start positions",
-  modOptions: "Mod options",
-  tweakSlots: "Unit tweaks",
-  mapOptions: "Map options",
-  teams: "Teams and bots",
-  restrictions: "Unit restrictions",
+export const PART_LABELS: Record<PresetPart, MessageDescriptor> = {
+  game: msg`Game`,
+  map: msg`Map`,
+  startPositions: msg`Start positions`,
+  modOptions: msg`Mod options`,
+  tweakSlots: msg`Unit tweaks`,
+  mapOptions: msg`Map options`,
+  teams: msg`Teams and bots`,
+  restrictions: msg`Unit restrictions`,
 };
 
 /**
@@ -187,8 +189,6 @@ export function optionCounts(draft: SkirmishDraft): {
   return { plain: Object.keys(plain).length, tweak: Object.keys(tweak).length };
 }
 
-const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? "" : "s"}`;
-
 /**
  * A line describing what this preset holds for one part, or null when it holds
  * nothing for it. The picker shows the null rows disabled rather than hiding
@@ -208,33 +208,54 @@ export function partSummary(
       const boxes = Object.keys(draft.startRects ?? {}).length;
       if (draft.startPosType !== 2)
         return draft.startPosType === 0
-          ? "Fixed map positions"
-          : "Random positions";
-      return `Choose in-game, ${plural(boxes, "box")}`;
+          ? t`Fixed map positions`
+          : t`Random positions`;
+      const boxCount = plural(boxes, { one: "# box", other: "# boxes" });
+      return t`Choose in-game, ${boxCount}`;
     }
     case "modOptions":
-      return counts.plain > 0 ? plural(counts.plain, "option") : null;
+      return counts.plain > 0
+        ? plural(counts.plain, { one: "# option", other: "# options" })
+        : null;
     case "mapOptions": {
       const n = Object.keys(draft.mapOptionValues ?? {}).length;
-      return n > 0 ? plural(n, "map option") : null;
+      return n > 0
+        ? plural(n, { one: "# map option", other: "# map options" })
+        : null;
     }
     case "tweakSlots":
-      return counts.tweak > 0 ? plural(counts.tweak, "tweak slot") : null;
+      return counts.tweak > 0
+        ? plural(counts.tweak, { one: "# tweak slot", other: "# tweak slots" })
+        : null;
     case "teams": {
       if (draft.participants.length === 0) return null;
       const bots = draft.participants.filter((p) => p.kind === "ai").length;
-      return `${plural(draft.participants.length, "player")}, ${plural(bots, "bot")}`;
+      const players = plural(draft.participants.length, {
+        one: "# player",
+        other: "# players",
+      });
+      const botCount = plural(bots, { one: "# bot", other: "# bots" });
+      return t`${players}, ${botCount}`;
     }
     case "restrictions": {
       const r = draft.restrictions;
       if (!r) return null;
       const bits: string[] = [];
       if (r.disabledUnits?.length)
-        bits.push(`${plural(r.disabledUnits.length, "unit")} disabled`);
-      if (r.advantage !== undefined)
-        bits.push(`${Math.round(r.advantage * 100)}% advantage`);
-      if (r.incomeMultiplier !== undefined)
-        bits.push(`${r.incomeMultiplier}x income`);
+        bits.push(
+          plural(r.disabledUnits.length, {
+            one: "# unit disabled",
+            other: "# units disabled",
+          }),
+        );
+      if (r.advantage !== undefined) {
+        const advantagePercent = Math.round(r.advantage * 100);
+        bits.push(t`${advantagePercent}% advantage`);
+      }
+      if (r.incomeMultiplier !== undefined) {
+        const incomeMultiplier = r.incomeMultiplier;
+        bits.push(t`${incomeMultiplier}x income`);
+      }
       return bits.length > 0 ? bits.join(", ") : null;
     }
   }

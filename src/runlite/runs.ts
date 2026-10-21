@@ -1,3 +1,4 @@
+import { t } from "@lingui/core/macro";
 import { useCallback } from "react";
 import { discardUnits } from "../campaign/units";
 import { createDocumentStore } from "../lib/documentStore";
@@ -72,7 +73,7 @@ export function useRuns() {
   const saveRun = useCallback(async (id: string, run: RogueliteRun) => {
     if (id in unreadable) {
       throw new Error(
-        "That run id is taken by a run that could not be read, so nothing was saved.",
+        t`That run id is taken by a run that could not be read, so nothing was saved.`,
       );
     }
     await persist({ ...store.getForWrite(), [id]: run });

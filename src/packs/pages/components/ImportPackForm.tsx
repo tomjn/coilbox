@@ -1,3 +1,5 @@
+import { plural } from "@lingui/core/macro";
+import { useLingui } from "@lingui/react/macro";
 import { useRef, useState } from "react";
 import { summarizeSubstitutions } from "@/conquest/ai";
 import { reconcileParticipantAis } from "@/play/reconcileAi";
@@ -47,6 +49,7 @@ export function ImportPackForm({
     content: { games: string[]; maps: string[] },
   ) => void;
 }) {
+  const { t } = useLingui();
   const { presets, savePreset } = useSkirmishPresets();
   const [pending, setPending] = useState<SetupPackManifest | null>(null);
   // The pack's blueprints as library records, minted once per pack. A failed
@@ -88,7 +91,8 @@ export function ImportPackForm({
       const id = identify(code);
       if (id.warnings.length > 0) throw new Error(id.warnings[0]);
       if (id.kind !== "unknown" && id.kind !== "setup-pack") {
-        throw new Error(`That code is a coilbox ${id.kind}, not a setup pack.`);
+        const kind = id.kind;
+        throw new Error(t`That code is a coilbox ${kind}, not a setup pack.`);
       }
       throw new Error(packDecodeErrorMessage(result.error));
     }
@@ -120,13 +124,15 @@ export function ImportPackForm({
       try {
         await saveBlueprints(unsaved);
       } catch (e) {
-        throw new Error(
-          `The blueprints were not all saved: ${e instanceof Error ? e.message : String(e)}`,
-        );
+        const reason = e instanceof Error ? e.message : String(e);
+        throw new Error(t`The blueprints were not all saved: ${reason}`);
       }
     }
     const layoutsAdded = layouts.length
-      ? `${layouts.length} blueprint${layouts.length === 1 ? "" : "s"} added to your library.`
+      ? plural(layouts.length, {
+          one: "# blueprint added to your library.",
+          other: "# blueprints added to your library.",
+        })
       : "";
 
     const bundled = pending.presets ?? [];
@@ -147,30 +153,37 @@ export function ImportPackForm({
         );
       });
       const subNotice = summarizeSubstitutions(allSubs);
-      const base = `${bundled.length} preset${bundled.length === 1 ? "" : "s"} added. Load ${bundled.length === 1 ? "it" : "one"} from Singleplayer → Presets.`;
+      const base = plural(bundled.length, {
+        one: "# preset added. Load it from Singleplayer → Presets.",
+        other: "# presets added. Load one from Singleplayer → Presets.",
+      });
       notify({
-        title: "Setup pack imported",
+        title: t`Setup pack imported`,
         body: [base, subNotice, layoutsAdded].filter(Boolean).join(" "),
         level: "success",
       });
     } else if (layoutsAdded) {
       notify({
-        title: "Setup pack imported",
+        title: t`Setup pack imported`,
         body: layoutsAdded,
         level: "success",
       });
     } else {
-      const counts = [
-        pending.games?.length
-          ? `${pending.games.length} game${pending.games.length === 1 ? "" : "s"}`
-          : null,
-        pending.maps?.length
-          ? `${pending.maps.length} map${pending.maps.length === 1 ? "" : "s"}`
-          : null,
-      ].filter(Boolean);
+      const gameCount = pending.games?.length ?? 0;
+      const mapCount = pending.maps?.length ?? 0;
+      const gamesText = gameCount
+        ? plural(gameCount, { one: "# game", other: "# games" })
+        : "";
+      const mapsText = mapCount
+        ? plural(mapCount, { one: "# map", other: "# maps" })
+        : "";
+      const ready =
+        gamesText && mapsText
+          ? t`${gamesText} and ${mapsText} ready.`
+          : t`${gamesText || mapsText} ready.`;
       notify({
-        title: "Setup pack imported",
-        body: `${counts.join(" and ")} ready.`,
+        title: t`Setup pack imported`,
+        body: ready,
         level: "success",
       });
     }
@@ -185,16 +198,16 @@ export function ImportPackForm({
   return (
     <>
       <ChallengeCodeInput
-        helpText="Paste a setup pack code shared by another player to install its games and maps, and add any presets and blueprints it includes."
-        placeholder="Paste a setup pack code…"
-        submitLabel="Import setup pack"
-        busyLabel="Checking…"
+        helpText={t`Paste a setup pack code shared by another player to install its games and maps, and add any presets and blueprints it includes.`}
+        placeholder={t`Paste a setup pack code…`}
+        submitLabel={t`Import setup pack`}
+        busyLabel={t`Checking…`}
         initialCode={initialCode}
         onImport={importCode}
       />
       {pending && (
         <ResolveContentGate
-          title={pending.title ?? "Set up this pack"}
+          title={pending.title ?? t`Set up this pack`}
           requirements={requirementsForPack(pending)}
           target={target ?? undefined}
           targetLoading={targetLoading}
