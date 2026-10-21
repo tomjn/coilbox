@@ -17,6 +17,8 @@
  * comes back as a new `scenario`, the way the map scene works.
  */
 
+import { plural } from "@lingui/core/macro";
+import { Trans, useLingui } from "@lingui/react/macro";
 import { Button, Input } from "@picoframe/frame";
 import { ArrowDown, ArrowUp, Copy, Plus, Trash2, Zap } from "lucide-react";
 import {
@@ -158,6 +160,7 @@ export const TriggerPanel = forwardRef<
   },
   ref,
 ) {
+  const { t } = useLingui();
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const selected = selectedTrigger(scenario.triggers, selectedId);
   const unitDefs = useMemo(() => units.map((u) => u.name), [units]);
@@ -201,6 +204,8 @@ export const TriggerPanel = forwardRef<
   }, [focus?.id, focus?.token]);
 
   const count = scenario.triggers.length;
+  const gameName = scenario.setup.gameName;
+  const problems = extensions.problems.join("; ");
   const create = () => {
     const id = nextTriggerId(scenario);
     onChange(addTrigger(scenario, id));
@@ -210,18 +215,20 @@ export const TriggerPanel = forwardRef<
   return (
     <EditorPanel
       ref={panelRef}
-      title="Triggers"
+      title={t`Triggers`}
       icon={Zap}
       summary={
         count === 0
-          ? "Nothing happens yet"
-          : `${count} trigger${count === 1 ? "" : "s"}`
+          ? t`Nothing happens yet`
+          : plural(count, { one: "# trigger", other: "# triggers" })
       }
     >
       {note && (
         <p className="mb-3 max-w-prose text-[11px] text-muted-foreground">
-          {note} Types it does not implement are listed but cannot be added, and
-          a step already in a trigger that needs one is flagged.
+          <Trans>
+            {note} Types it does not implement are listed but cannot be added,
+            and a step already in a trigger that needs one is flagged.
+          </Trans>
         </p>
       )}
       {extensions.problems.length > 0 && (
@@ -229,16 +236,20 @@ export const TriggerPanel = forwardRef<
         // reading this, so it says what was dropped rather than asking them to
         // fix it.
         <p className="mb-3 max-w-prose text-[11px] text-amber-300">
-          {scenario.setup.gameName} declares trigger types coilbox could not
-          read, so they are not offered: {extensions.problems.join("; ")}
+          <Trans>
+            {gameName} declares trigger types coilbox could not read, so they
+            are not offered: {problems}
+          </Trans>
         </p>
       )}
       <div className="flex flex-col gap-4 lg:flex-row">
         <div className="flex shrink-0 flex-col gap-2 lg:w-72">
           {count === 0 ? (
             <p className="text-xs text-muted-foreground">
-              A trigger runs its actions when its conditions hold. Everything a
-              mission does beyond placing units is one of these.
+              <Trans>
+                A trigger runs its actions when its conditions hold. Everything
+                a mission does beyond placing units is one of these.
+              </Trans>
             </p>
           ) : (
             <ul className="flex flex-col gap-1">
@@ -263,7 +274,7 @@ export const TriggerPanel = forwardRef<
             className="h-7 gap-1.5 px-2 text-xs"
             onClick={create}
           >
-            <Plus className="size-3.5" /> New trigger
+            <Plus className="size-3.5" /> <Trans>New trigger</Trans>
           </Button>
         </div>
 
@@ -289,8 +300,10 @@ export const TriggerPanel = forwardRef<
         )}
         {!selected && count > 0 && (
           <p className="min-w-0 flex-1 text-xs text-muted-foreground">
-            The trigger you were on has gone. Pick one from the list, or step
-            back to bring it back.
+            <Trans>
+              The trigger you were on has gone. Pick one from the list, or step
+              back to bring it back.
+            </Trans>
           </p>
         )}
       </div>
@@ -313,6 +326,8 @@ function TriggerRow({
    *  and focus it (issue #2271). */
   rowRef?: (el: HTMLButtonElement | null) => void;
 }) {
+  const { t } = useLingui();
+  const cooldown = trigger.cooldown;
   return (
     <button
       ref={rowRef}
@@ -329,11 +344,13 @@ function TriggerRow({
           {trigger.name}
         </span>
         {!trigger.enabled && (
-          <span className="shrink-0 text-[10px] text-amber-300">disarmed</span>
+          <span className="shrink-0 text-[10px] text-amber-300">
+            <Trans>disarmed</Trans>
+          </span>
         )}
         {trigger.repeat && (
           <span className="shrink-0 text-[10px] text-muted-foreground">
-            repeats{trigger.cooldown ? ` · ${trigger.cooldown}s` : ""}
+            {cooldown ? t`repeats · ${cooldown}s` : t`repeats`}
           </span>
         )}
       </span>
@@ -381,6 +398,7 @@ function TriggerForm({
   onDuplicate: () => void;
   onUndo: () => void;
 }) {
+  const { t } = useLingui();
   const at = scenario.triggers.indexOf(trigger);
   const edit = (patch: Partial<Omit<ScenarioTrigger, "id">>) =>
     onChange(editTrigger(scenario, trigger.id, patch));
@@ -393,7 +411,7 @@ function TriggerForm({
             name={trigger.name}
             onRename={(name) => {
               const next = renameTrigger(scenario, trigger.id, name);
-              if (next === scenario) return "A trigger needs a name";
+              if (next === scenario) return t`A trigger needs a name`;
               onChange(next);
               return null;
             }}
@@ -402,7 +420,7 @@ function TriggerForm({
             size="sm"
             variant="ghost"
             className="size-7 p-0"
-            aria-label="Move this trigger up"
+            aria-label={t`Move this trigger up`}
             disabled={at <= 0}
             onClick={() => onChange(moveTrigger(scenario, trigger.id, -1))}
           >
@@ -412,7 +430,7 @@ function TriggerForm({
             size="sm"
             variant="ghost"
             className="size-7 p-0"
-            aria-label="Move this trigger down"
+            aria-label={t`Move this trigger down`}
             disabled={at < 0 || at >= scenario.triggers.length - 1}
             onClick={() => onChange(moveTrigger(scenario, trigger.id, 1))}
           >
@@ -426,7 +444,7 @@ function TriggerForm({
                 className="ml-auto h-7 gap-1.5 px-2 text-xs"
                 onClick={onDuplicate}
               >
-                <Copy className="size-3.5" /> Duplicate
+                <Copy className="size-3.5" /> <Trans>Duplicate</Trans>
               </Button>
             </TooltipTrigger>
             <TooltipContent>{modKeyLabel()} D</TooltipContent>
@@ -442,17 +460,20 @@ function TriggerForm({
             onClick={() => {
               onChange(removeTrigger(scenario, trigger.id));
               onPick(null);
-              notifyDeleted(`Deleted trigger "${trigger.name}".`, onUndo);
+              const name = trigger.name;
+              notifyDeleted(t`Deleted trigger "${name}".`, onUndo);
             }}
           >
-            <Trash2 className="size-3.5" /> Delete
+            <Trash2 className="size-3.5" /> <Trans>Delete</Trans>
           </Button>
         </div>
       </TooltipProvider>
 
       <p className="text-[11px] text-muted-foreground">
-        Triggers are evaluated in this order, and other triggers point at this
-        one by its name.
+        <Trans>
+          Triggers are evaluated in this order, and other triggers point at this
+          one by its name.
+        </Trans>
       </p>
 
       <div className="flex flex-wrap items-center gap-x-5 gap-y-2">
@@ -463,7 +484,7 @@ function TriggerForm({
             onCheckedChange={(enabled) => edit({ enabled })}
           />
           <Label htmlFor="trigger-enabled" className="text-xs font-medium">
-            Armed at the start
+            <Trans>Armed at the start</Trans>
           </Label>
         </div>
         <div className="flex items-center gap-2">
@@ -473,7 +494,7 @@ function TriggerForm({
             onCheckedChange={(repeat) => edit({ repeat })}
           />
           <Label htmlFor="trigger-repeat" className="text-xs font-medium">
-            Fires every time
+            <Trans>Fires every time</Trans>
           </Label>
         </div>
         {(trigger.repeat || trigger.cooldown !== undefined) && (
@@ -549,13 +570,14 @@ function TriggerName({
   /** Null commits the rename. A reason puts the old name back and shows why. */
   onRename: (name: string) => string | null;
 }) {
+  const { t } = useLingui();
   const [name, setName] = useFieldText(stored);
   const { problem, refuse, clear, describedBy } = useFieldProblem();
 
   return (
     <div className="flex flex-col gap-0.5">
       <Input
-        aria-label="Trigger name"
+        aria-label={t`Trigger name`}
         aria-invalid={problem !== null}
         aria-describedby={describedBy}
         value={name}
@@ -601,6 +623,7 @@ function CooldownField({
   seconds: number | undefined;
   onChange: (seconds: number | undefined) => void;
 }) {
+  const { t } = useLingui();
   const [text, setText] = useFieldText(
     seconds === undefined ? "" : String(seconds),
   );
@@ -615,7 +638,7 @@ function CooldownField({
     }
     const next = Number(trimmed);
     if (!Number.isFinite(next) || next <= 0) {
-      refuse("Cooldown is a number of seconds");
+      refuse(t`Cooldown is a number of seconds`);
       setText("");
       return onChange(undefined);
     }
@@ -628,7 +651,7 @@ function CooldownField({
     <div className="flex flex-col gap-0.5">
       <div className="flex items-center gap-2">
         <Label htmlFor="trigger-cooldown" className="text-xs font-medium">
-          Waits
+          <Trans>Waits</Trans>
         </Label>
         <Input
           id="trigger-cooldown"
@@ -649,7 +672,7 @@ function CooldownField({
           className="h-7 w-20 text-xs"
         />
         <span className="text-xs text-muted-foreground">
-          seconds between firings
+          <Trans>seconds between firings</Trans>
         </span>
       </div>
       <FieldProblem id={describedBy} problem={problem} />
@@ -688,14 +711,16 @@ function StepSection({
   onPick: (target: PointTarget | null) => void;
   onChange: (next: Scenario) => void;
 }) {
+  const { t } = useLingui();
   const steps = stepsOf(trigger, list);
   const conditions = list === "conditions";
+  const stepCount = steps.length;
 
   return (
     <section className="flex flex-col gap-2 rounded-md border border-border/50 p-2">
       <header className="flex items-center gap-2">
         <h3 className="text-xs font-medium">
-          {conditions ? "Fires when" : "Then"}
+          {conditions ? t`Fires when` : t`Then`}
         </h3>
         {conditions && (
           <OptionSelect
@@ -713,8 +738,8 @@ function StepSection({
               )
             }
             options={[
-              { value: "all", label: "all of these hold" },
-              { value: "any", label: "any of these hold" },
+              { value: "all", label: t`all of these hold` },
+              { value: "any", label: t`any of these hold` },
             ]}
           />
         )}
@@ -722,10 +747,15 @@ function StepSection({
           {steps.length === 0
             ? conditions
               ? trigger.conditions.op === "all"
-                ? "with none, it fires on the first pass"
-                : "with none, it never fires"
-              : "with none, firing does nothing"
-            : `${steps.length} ${conditions ? "condition" : "action"}${steps.length === 1 ? "" : "s"}`}
+                ? t`with none, it fires on the first pass`
+                : t`with none, it never fires`
+              : t`with none, firing does nothing`
+            : conditions
+              ? plural(stepCount, {
+                  one: "# condition",
+                  other: "# conditions",
+                })
+              : plural(stepCount, { one: "# action", other: "# actions" })}
         </span>
       </header>
 

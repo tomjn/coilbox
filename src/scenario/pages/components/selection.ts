@@ -31,7 +31,9 @@
  * where the reason it does not creep is written down.
  */
 
+import { plural, t } from "@lingui/core/macro";
 import type { FootprintMark, SnapBuilding } from "@/blueprint/footprint";
+import type { Heading } from "@/placement/mapKeys";
 import {
   type Placement,
   parsePlacementKey,
@@ -47,6 +49,7 @@ import type { ContentEntry } from "./contents";
 import { groupSize, orderWaypoints, parsePathKey, pathKey } from "./groups";
 import {
   buildTrouble,
+  headingWords,
   type LayoutEditFor,
   moveOnMap,
   removeOnMap,
@@ -454,12 +457,6 @@ export function countSelection(selection: MapSelection): SelectionCount {
   };
 }
 
-/** A count and its noun, singular or plural. */
-function some(count: number, one: string, many = `${one}s`): string | null {
-  if (count === 0) return null;
-  return `${count} ${count === 1 ? one : many}`;
-}
-
 /**
  * What is selected, as a tally rather than as a list.
  *
@@ -472,31 +469,52 @@ function some(count: number, one: string, many = `${one}s`): string | null {
  */
 export function countWords(selection: MapSelection): string {
   const count = countSelection(selection);
-  const parts = [
-    some(count.actors, "actor"),
-    some(count.groups, "group"),
-    some(count.buildings, "base building"),
-    some(count.zones, "zone"),
-    some(count.points, "path point"),
-  ].filter((part): part is string => part !== null);
+  const parts: string[] = [];
+  const actorCount = count.actors;
+  const groupCount = count.groups;
+  const buildingCount = count.buildings;
+  const zoneCount = count.zones;
+  const pointCount = count.points;
+  if (count.actors > 0)
+    parts.push(plural(actorCount, { one: "# actor", other: "# actors" }));
+  if (count.groups > 0)
+    parts.push(plural(groupCount, { one: "# group", other: "# groups" }));
+  if (count.buildings > 0)
+    parts.push(
+      plural(buildingCount, {
+        one: "# base building",
+        other: "# base buildings",
+      }),
+    );
+  if (count.zones > 0)
+    parts.push(plural(zoneCount, { one: "# zone", other: "# zones" }));
+  if (count.points > 0)
+    parts.push(
+      plural(pointCount, { one: "# path point", other: "# path points" }),
+    );
   if (parts.length === 0) return "";
   if (parts.length === 1) return parts[0];
-  return `${parts.slice(0, -1).join(", ")} and ${parts[parts.length - 1]}`;
+  const head = parts.slice(0, -1).join(", ");
+  const last = parts[parts.length - 1];
+  return t`${head} and ${last}`;
 }
 
 /** How many things are selected, said in full: the number and what they are.
  *  What every announcement about a selection of more than one ends with. */
 export function selectionCountWords(selection: MapSelection): string {
   const count = countSelection(selection);
-  if (count.total === 0) return "Nothing selected.";
-  if (count.total === 1) return `${countWords(selection)} selected.`;
-  return `${count.total} selected: ${countWords(selection)}.`;
+  if (count.total === 0) return t`Nothing selected.`;
+  const words = countWords(selection);
+  if (count.total === 1) return t`${words} selected.`;
+  const total = count.total;
+  return t`${total} selected: ${words}.`;
 }
 
 /** Just the tally, for a sentence that has already said what happened. */
 function howMany(selection: MapSelection): string {
   const count = countSelection(selection);
-  return count.total === 0 ? "Nothing selected." : `${count.total} selected.`;
+  const total = count.total;
+  return total === 0 ? t`Nothing selected.` : t`${total} selected.`;
 }
 
 /**
@@ -509,12 +527,12 @@ function howMany(selection: MapSelection): string {
  * it, which for the map is `thingWords`.
  */
 export function addedWords(what: string, after: MapSelection): string {
-  return `Added ${what}. ${howMany(after)}`;
+  return `${t`Added ${what}.`} ${howMany(after)}`;
 }
 
 /** What a second Shift-click took back out. */
 export function removedWords(what: string, after: MapSelection): string {
-  return `Removed ${what}. ${howMany(after)}`;
+  return `${t`Removed ${what}.`} ${howMany(after)}`;
 }
 
 /**
@@ -526,7 +544,7 @@ export function removedWords(what: string, after: MapSelection): string {
  * same and only one of them is worth trying again.
  */
 export function marqueeWords(caught: number, after: MapSelection): string {
-  if (caught === 0) return `Nothing in that box. ${howMany(after)}`;
+  if (caught === 0) return `${t`Nothing in that box.`} ${howMany(after)}`;
   return selectionCountWords(after);
 }
 
@@ -548,8 +566,10 @@ export function manyBuildTrouble(
     (key) => buildTrouble(marks, key) !== "",
   ).length;
   if (troubled === 0) return "";
-  const stand = troubled === 1 ? "it stands" : "they stand";
-  return ` ${troubled} cannot be built where ${stand}.`;
+  return ` ${plural(troubled, {
+    one: "# cannot be built where it stands.",
+    other: "# cannot be built where they stand.",
+  })}`;
 }
 
 /** What a move of more than one thing did. No position, because there is no one
@@ -558,12 +578,18 @@ export function manyBuildTrouble(
  *  #2315). */
 export function movedManyWords(
   before: MapSelection,
-  heading: string,
+  heading: Heading,
   step: number,
   marks: readonly FootprintMark[],
 ): string {
   const count = countSelection(before);
-  return `Moved ${count.total} things ${step} ${heading}.${manyBuildTrouble(before, marks)}`;
+  const total = count.total;
+  const way = headingWords(heading);
+  const moved = plural(total, {
+    one: `Moved # thing ${step} ${way}.`,
+    other: `Moved # things ${step} ${way}.`,
+  });
+  return `${moved}${manyBuildTrouble(before, marks)}`;
 }
 
 /**
@@ -581,10 +607,12 @@ export function turnedManyWords(
   marks: readonly FootprintMark[],
 ): string {
   if (turned === 0)
-    return "None of these turn. A group's units all face south.";
-  const done = `Turned ${turned}.`;
+    return t`None of these turn. A group's units all face south.`;
+  const done = t`Turned ${turned}.`;
   const rest =
-    left === 0 ? "" : ` ${left} ${left === 1 ? "does" : "do"} not turn.`;
+    left === 0
+      ? ""
+      : ` ${plural(left, { one: "# does not turn.", other: "# do not turn." })}`;
   return `${done}${rest}${manyBuildTrouble(selection, marks)}`;
 }
 
@@ -593,5 +621,7 @@ export function turnedManyWords(
  *  by. */
 export function deletedManyWords(before: MapSelection): string {
   const count = countSelection(before);
-  return `Deleted ${count.total}: ${countWords(before)}. Nothing selected.`;
+  const total = count.total;
+  const words = countWords(before);
+  return t`Deleted ${total}: ${words}. Nothing selected.`;
 }

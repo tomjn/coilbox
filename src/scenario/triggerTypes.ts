@@ -17,6 +17,9 @@
  * single place that knowledge lives.
  */
 
+import { i18n, type MessageDescriptor } from "@lingui/core";
+import { msg, t } from "@lingui/core/macro";
+
 /**
  * What a trigger parameter holds. The id kinds are string cross-references:
  * `zoneId` → `Scenario.zones`, `actorId` → `actors`, `groupId` → `groups`,
@@ -73,6 +76,25 @@ export interface ParamSpec {
   default?: number;
 }
 
+/**
+ * A table of strings that is translated when it is read rather than when the
+ * module loads, so it follows the Language picker. The values are the English
+ * source in tests and dev, like `lazyText`, and stay `Record<string, string>`
+ * for every caller that already reads one.
+ */
+function resolvedOnRead(
+  messages: Record<string, MessageDescriptor>,
+): Record<string, string> {
+  const table: Record<string, string> = {};
+  for (const [key, descriptor] of Object.entries(messages)) {
+    Object.defineProperty(table, key, {
+      enumerable: true,
+      get: () => i18n._(descriptor),
+    });
+  }
+  return table;
+}
+
 /** The parameters one condition or action type takes, keyed by parameter name. */
 export type TypeSpec = Record<string, ParamSpec>;
 
@@ -120,15 +142,51 @@ export const CONDITION_TYPES: Record<string, TypeSpec> = {
   units_in_zone: {
     zone: { kind: "zoneId" },
     team: { kind: "teamId", optional: true },
-    unitDefs: { kind: "strings", optional: true, label: "unit types" },
-    min: { kind: "number", optional: true, label: "at least" },
-    max: { kind: "number", optional: true, label: "at most" },
+    unitDefs: {
+      kind: "strings",
+      optional: true,
+      get label() {
+        return t`unit types`;
+      },
+    },
+    min: {
+      kind: "number",
+      optional: true,
+      get label() {
+        return t`at least`;
+      },
+    },
+    max: {
+      kind: "number",
+      optional: true,
+      get label() {
+        return t`at most`;
+      },
+    },
   },
   unit_count: {
     team: { kind: "teamId" },
-    unitDefs: { kind: "strings", optional: true, label: "unit types" },
-    min: { kind: "number", optional: true, label: "at least" },
-    max: { kind: "number", optional: true, label: "at most" },
+    unitDefs: {
+      kind: "strings",
+      optional: true,
+      get label() {
+        return t`unit types`;
+      },
+    },
+    min: {
+      kind: "number",
+      optional: true,
+      get label() {
+        return t`at least`;
+      },
+    },
+    max: {
+      kind: "number",
+      optional: true,
+      get label() {
+        return t`at most`;
+      },
+    },
   },
   unit_dead: {
     actor: { kind: "actorId" },
@@ -136,18 +194,34 @@ export const CONDITION_TYPES: Record<string, TypeSpec> = {
   unit_health_below: {
     actor: { kind: "actorId" },
     /** Fraction of maximum health, 0 to 1. */
-    fraction: { kind: "number", label: "health fraction" },
+    fraction: {
+      kind: "number",
+      get label() {
+        return t`health fraction`;
+      },
+    },
   },
   unit_built: {
     team: { kind: "teamId" },
-    unitDef: { kind: "string", label: "unit type" },
+    unitDef: {
+      kind: "string",
+      get label() {
+        return t`unit type`;
+      },
+    },
     // Matches the runtime's own fallback in coilbox_unit_conditions.lua.
     count: { kind: "number", optional: true, default: 1 },
   },
   unit_captured: {
     actor: { kind: "actorId" },
     /** The capturing team. Absent means any. */
-    team: { kind: "teamId", optional: true, label: "capturing team" },
+    team: {
+      kind: "teamId",
+      optional: true,
+      get label() {
+        return t`capturing team`;
+      },
+    },
   },
   /**
    * Holds while a player has a unit selected. With no unit type and no placed
@@ -159,8 +233,20 @@ export const CONDITION_TYPES: Record<string, TypeSpec> = {
   unit_selected: {
     /** Whose selection. Absent means any player's. */
     team: { kind: "teamId", optional: true },
-    unitDef: { kind: "string", optional: true, label: "unit type" },
-    actor: { kind: "actorId", optional: true, label: "placed unit" },
+    unitDef: {
+      kind: "string",
+      optional: true,
+      get label() {
+        return t`unit type`;
+      },
+    },
+    actor: {
+      kind: "actorId",
+      optional: true,
+      get label() {
+        return t`placed unit`;
+      },
+    },
   },
   /**
    * Holds once a player has given an order since the trigger was armed, or
@@ -171,7 +257,13 @@ export const CONDITION_TYPES: Record<string, TypeSpec> = {
     /** Whose order. Absent means any player's. */
     team: { kind: "teamId", optional: true },
     command: { kind: "enum", values: GIVEN_COMMANDS, optional: true },
-    unitDef: { kind: "string", optional: true, label: "unit to build" },
+    unitDef: {
+      kind: "string",
+      optional: true,
+      get label() {
+        return t`unit to build`;
+      },
+    },
   },
   /**
    * Holds once a player has clicked away a line the mission held on screen,
@@ -179,14 +271,30 @@ export const CONDITION_TYPES: Record<string, TypeSpec> = {
    * carries on after the player has read an instruction (issue #3552).
    */
   dialogue_dismissed: {
-    line: { kind: "dialogueId", label: "dialogue line" },
+    line: {
+      kind: "dialogueId",
+      get label() {
+        return t`dialogue line`;
+      },
+    },
   },
   time_elapsed: {
     seconds: { kind: "number" },
   },
   var: {
-    name: { kind: "varName", label: "variable" },
-    op: { kind: "enum", values: VAR_OPS, label: "comparison" },
+    name: {
+      kind: "varName",
+      get label() {
+        return t`variable`;
+      },
+    },
+    op: {
+      kind: "enum",
+      values: VAR_OPS,
+      get label() {
+        return t`comparison`;
+      },
+    },
     /** A number, or another var to compare against: "kills reached the quota"
      *  when the quota is itself a var (issue #808). */
     value: { kind: "amount" },
@@ -200,7 +308,13 @@ export const CONDITION_TYPES: Record<string, TypeSpec> = {
      * the zone, so "hold the keep" is not satisfied by a scout parked in a
      * keep an enemy army is also sitting in (issue #802). Gaia is not anyone.
      */
-    uncontested: { kind: "boolean", optional: true, label: "uncontested only" },
+    uncontested: {
+      kind: "boolean",
+      optional: true,
+      get label() {
+        return t`uncontested only`;
+      },
+    },
   },
 };
 
@@ -220,14 +334,29 @@ export const ACTION_TYPES: Record<string, TypeSpec> = {
    *  are: this is the mission letting go, not a transfer (issue #812). */
   release_group: { group: { kind: "groupId" } },
   set_var: {
-    name: { kind: "varName", label: "variable" },
+    name: {
+      kind: "varName",
+      get label() {
+        return t`variable`;
+      },
+    },
     value: { kind: "amount" },
   },
   /** Move a var by a number, or by what another var holds: "add the bonus to
    *  the score" (issue #808). */
   add_var: {
-    name: { kind: "varName", label: "variable" },
-    value: { kind: "amount", label: "amount" },
+    name: {
+      kind: "varName",
+      get label() {
+        return t`variable`;
+      },
+    },
+    value: {
+      kind: "amount",
+      get label() {
+        return t`amount`;
+      },
+    },
   },
   enable_trigger: { trigger: { kind: "triggerId" } },
   disable_trigger: { trigger: { kind: "triggerId" } },
@@ -239,7 +368,13 @@ export const ACTION_TYPES: Record<string, TypeSpec> = {
    */
   dialogue: {
     line: { kind: "dialogueId" },
-    hold: { kind: "boolean", optional: true, label: "wait for the player" },
+    hold: {
+      kind: "boolean",
+      optional: true,
+      get label() {
+        return t`wait for the player`;
+      },
+    },
   },
   /** A sound file beside the compiled mission, by name. */
   play_sound: { sound: { kind: "string" } },
@@ -249,19 +384,34 @@ export const ACTION_TYPES: Record<string, TypeSpec> = {
     seconds: { kind: "number", optional: true },
   },
   unlock_unit: {
-    unitDef: { kind: "string", label: "unit type" },
+    unitDef: {
+      kind: "string",
+      get label() {
+        return t`unit type`;
+      },
+    },
     team: { kind: "teamId", optional: true },
   },
   /** Whose camera moves, and whose map gets the label. Absent means everyone,
    *  which is what a single player scenario wants (issue #827). */
   camera_pan: {
-    pos: { kind: "point", label: "position" },
+    pos: {
+      kind: "point",
+      get label() {
+        return t`position`;
+      },
+    },
     // Matches M.DEFAULT_PAN_SECONDS in coilbox_view.lua.
     seconds: { kind: "number", optional: true, default: 1 },
     team: { kind: "teamId", optional: true },
   },
   map_marker: {
-    pos: { kind: "point", label: "position" },
+    pos: {
+      kind: "point",
+      get label() {
+        return t`position`;
+      },
+    },
     text: { kind: "string", optional: true },
     team: { kind: "teamId", optional: true },
   },
@@ -281,7 +431,12 @@ export const ACTION_TYPES: Record<string, TypeSpec> = {
    * a global: `GG.MyGame.StartTheStorm`.
    */
   call_lua: {
-    func: { kind: "string", label: "function name" },
+    func: {
+      kind: "string",
+      get label() {
+        return t`function name`;
+      },
+    },
   },
   /**
    * Tell one of the mission's units to build something.
@@ -291,12 +446,35 @@ export const ACTION_TYPES: Record<string, TypeSpec> = {
    * instead, which is the same order with the same shape.
    */
   build_unit: {
-    builder: { kind: "actorId", label: "builder" },
-    unitDef: { kind: "string", label: "unit type" },
-    pos: { kind: "point", optional: true, label: "where to build it" },
+    builder: {
+      kind: "actorId",
+      get label() {
+        return t`builder`;
+      },
+    },
+    unitDef: {
+      kind: "string",
+      get label() {
+        return t`unit type`;
+      },
+    },
+    pos: {
+      kind: "point",
+      optional: true,
+      get label() {
+        return t`where to build it`;
+      },
+    },
     facing: { kind: "number", optional: true, default: 0 },
     // Matches M.DEFAULT_BUILD_COUNT in coilbox_groups.lua.
-    count: { kind: "number", optional: true, default: 1, label: "how many" },
+    count: {
+      kind: "number",
+      optional: true,
+      default: 1,
+      get label() {
+        return t`how many`;
+      },
+    },
   },
   /**
    * Move a team's bank once: a gift when the number is positive, a drain when
@@ -317,14 +495,38 @@ export const ACTION_TYPES: Record<string, TypeSpec> = {
    */
   set_income: {
     team: { kind: "teamId" },
-    metal: { kind: "amount", optional: true, label: "metal per second" },
-    energy: { kind: "amount", optional: true, label: "energy per second" },
+    metal: {
+      kind: "amount",
+      optional: true,
+      get label() {
+        return t`metal per second`;
+      },
+    },
+    energy: {
+      kind: "amount",
+      optional: true,
+      get label() {
+        return t`energy per second`;
+      },
+    },
   },
   /** Move how much a team can hold, which is the ceiling a gift is clamped to. */
   give_storage: {
     team: { kind: "teamId" },
-    metal: { kind: "amount", optional: true, label: "metal storage" },
-    energy: { kind: "amount", optional: true, label: "energy storage" },
+    metal: {
+      kind: "amount",
+      optional: true,
+      get label() {
+        return t`metal storage`;
+      },
+    },
+    energy: {
+      kind: "amount",
+      optional: true,
+      get label() {
+        return t`energy storage`;
+      },
+    },
   },
   /**
    * Stop the game clock, and start it again. Single player only: the runtime
@@ -348,67 +550,50 @@ export const ACTION_TYPES: Record<string, TypeSpec> = {
  * One map for both tables, same as `TYPE_RUNTIME_VERSION`, because a condition
  * and an action never share a name.
  */
-export const TYPE_DESCRIPTIONS: Record<string, string> = {
-  units_in_zone:
-    "Watches how many units are standing in a zone against the count you set.",
-  unit_count:
-    "Counts a team's units anywhere on the map, not just inside a zone.",
-  unit_dead: "Becomes true the moment a named actor is destroyed.",
-  unit_health_below:
-    "Trips once an actor's health drops below the fraction you set.",
-  unit_built: "Holds once a team has finished building enough of a unit type.",
-  unit_captured:
-    "True once an actor changes hands, whether captured or gifted away.",
-  unit_selected:
-    "Holds while a player has a unit selected: any unit, one of a type, or one you placed.",
-  command_given:
-    "Holds once a player has given an order after this trigger was armed: any order, one command, or building a unit type.",
-  dialogue_dismissed:
-    "Holds once a player has clicked away a dialogue line that was set to wait for them.",
-  time_elapsed:
-    "True once a set number of seconds has passed since the mission began.",
-  var: "Compares a variable to a number, or to another variable.",
-  zone_held_for:
-    "Holds once a team has kept a zone for the time you set, optionally only while uncontested.",
-  spawn_group:
-    "Places a group's units on the map, holding position until wake group or give orders sets them moving.",
-  wake_group:
-    "Places a group on the map if it isn't there yet, and sends it off on its orders.",
-  give_orders:
-    "Replaces a group's orders and puts it in motion on the new ones.",
-  gift_units:
-    "Hands a group's units to another team, though the mission keeps ordering them.",
-  release_group:
-    "Lets go of a group: its units stay put and keep their owner, and the mission stops ordering them.",
-  set_var: "Sets a variable to a number, or to what another variable holds.",
-  add_var: "Adds a number, or another variable's value, to a variable.",
-  enable_trigger: "Arms a trigger so its conditions are checked again.",
-  disable_trigger: "Disarms a trigger until something enables it again.",
-  complete_objective: "Marks an objective as done.",
-  fail_objective: "Marks an objective as failed.",
-  dialogue:
-    "Plays one of the mission's dialogue lines, and can keep it on screen until the player clicks it away.",
-  play_sound: "Plays a named sound file.",
-  reveal_area:
-    "Lifts the fog over a zone for a team, for a set time or the rest of the mission.",
-  unlock_unit: "Frees a team to build a unit type the mission had restricted.",
-  camera_pan: "Moves a team's camera to a point on the map.",
-  map_marker: "Drops a point on a team's map, labelled if you give it text.",
-  victory: "Ends the mission with a team's side winning.",
-  defeat:
-    "Ends the mission with a team's side losing, and everyone else winning.",
-  call_lua: "Calls a function the game already has, by name.",
-  build_unit:
-    "Tells one of the mission's units to build something, at a point or into a factory queue.",
-  give_resources:
-    "Moves a team's metal or energy once, up for a gift and down for a drain.",
-  set_income:
-    "Sets what a team is paid per second from now on. A negative number bleeds it instead.",
-  give_storage: "Moves how much metal or energy a team can hold.",
-  pause_game:
-    "Pauses the game, in single player only. Unpause from a trigger the player wakes, such as one waiting on a dismissed dialogue line.",
-  unpause_game: "Starts a paused game again, in single player only.",
+const TYPE_DESCRIPTION_MESSAGES: Record<string, MessageDescriptor> = {
+  units_in_zone: msg`Watches how many units are standing in a zone against the count you set.`,
+  unit_count: msg`Counts a team's units anywhere on the map, not just inside a zone.`,
+  unit_dead: msg`Becomes true the moment a named actor is destroyed.`,
+  unit_health_below: msg`Trips once an actor's health drops below the fraction you set.`,
+  unit_built: msg`Holds once a team has finished building enough of a unit type.`,
+  unit_captured: msg`True once an actor changes hands, whether captured or gifted away.`,
+  unit_selected: msg`Holds while a player has a unit selected: any unit, one of a type, or one you placed.`,
+  command_given: msg`Holds once a player has given an order after this trigger was armed: any order, one command, or building a unit type.`,
+  dialogue_dismissed: msg`Holds once a player has clicked away a dialogue line that was set to wait for them.`,
+  time_elapsed: msg`True once a set number of seconds has passed since the mission began.`,
+  var: msg`Compares a variable to a number, or to another variable.`,
+  zone_held_for: msg`Holds once a team has kept a zone for the time you set, optionally only while uncontested.`,
+  spawn_group: msg`Places a group's units on the map, holding position until wake group or give orders sets them moving.`,
+  wake_group: msg`Places a group on the map if it isn't there yet, and sends it off on its orders.`,
+  give_orders: msg`Replaces a group's orders and puts it in motion on the new ones.`,
+  gift_units: msg`Hands a group's units to another team, though the mission keeps ordering them.`,
+  release_group: msg`Lets go of a group: its units stay put and keep their owner, and the mission stops ordering them.`,
+  set_var: msg`Sets a variable to a number, or to what another variable holds.`,
+  add_var: msg`Adds a number, or another variable's value, to a variable.`,
+  enable_trigger: msg`Arms a trigger so its conditions are checked again.`,
+  disable_trigger: msg`Disarms a trigger until something enables it again.`,
+  complete_objective: msg`Marks an objective as done.`,
+  fail_objective: msg`Marks an objective as failed.`,
+  dialogue: msg`Plays one of the mission's dialogue lines, and can keep it on screen until the player clicks it away.`,
+  play_sound: msg`Plays a named sound file.`,
+  reveal_area: msg`Lifts the fog over a zone for a team, for a set time or the rest of the mission.`,
+  unlock_unit: msg`Frees a team to build a unit type the mission had restricted.`,
+  camera_pan: msg`Moves a team's camera to a point on the map.`,
+  map_marker: msg`Drops a point on a team's map, labelled if you give it text.`,
+  victory: msg`Ends the mission with a team's side winning.`,
+  defeat: msg`Ends the mission with a team's side losing, and everyone else winning.`,
+  call_lua: msg`Calls a function the game already has, by name.`,
+  build_unit: msg`Tells one of the mission's units to build something, at a point or into a factory queue.`,
+  give_resources: msg`Moves a team's metal or energy once, up for a gift and down for a drain.`,
+  set_income: msg`Sets what a team is paid per second from now on. A negative number bleeds it instead.`,
+  give_storage: msg`Moves how much metal or energy a team can hold.`,
+  pause_game: msg`Pauses the game, in single player only. Unpause from a trigger the player wakes, such as one waiting on a dismissed dialogue line.`,
+  unpause_game: msg`Starts a paused game again, in single player only.`,
 };
+
+export const TYPE_DESCRIPTIONS: Record<string, string> = resolvedOnRead(
+  TYPE_DESCRIPTION_MESSAGES,
+);
 
 /**
  * The band a condition or action sits under in the add-step dropdown (issue
@@ -426,6 +611,29 @@ export const TYPE_DESCRIPTIONS: Record<string, string> = {
  *  declaration says nothing about which of coilbox's bands it belongs in.
  *  Always offered last, after every built-in band. */
 export const GAME_TYPE_GROUP = "Game types";
+
+/**
+ * What a band is called on screen. The band names in `TYPE_GROUPS` and the
+ * group orders stay English because they are keys for grouping and sorting, so
+ * a caller that shows one passes it through here.
+ */
+export function groupLabel(group: string): string {
+  const labels: Record<string, MessageDescriptor> = {
+    Units: msg`Units`,
+    Player: msg`Player`,
+    Variables: msg`Variables`,
+    Time: msg`Time`,
+    Economy: msg`Economy`,
+    "Trigger flow": msg`Trigger flow`,
+    Objectives: msg`Objectives`,
+    Presentation: msg`Presentation`,
+    Ending: msg`Ending`,
+    "Game code": msg`Game code`,
+    [GAME_TYPE_GROUP]: msg`Game types`,
+  };
+  const descriptor = labels[group];
+  return descriptor ? i18n._(descriptor) : group;
+}
 
 export const TYPE_GROUPS: Record<string, string> = {
   // Conditions.

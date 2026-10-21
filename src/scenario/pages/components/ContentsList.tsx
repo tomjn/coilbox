@@ -16,6 +16,7 @@
  * it.
  */
 
+import { Trans, useLingui } from "@lingui/react/macro";
 import { Button, cn } from "@picoframe/frame";
 import {
   Blocks,
@@ -78,7 +79,7 @@ export function ContentsList({
   if (entries.length === 0 && layouts.length === 0)
     return (
       <p className="p-2 text-xs text-muted-foreground">
-        Nothing placed yet. Pick a mode above and click the map.
+        <Trans>Nothing placed yet. Pick a mode above and click the map.</Trans>
       </p>
     );
 
@@ -86,7 +87,9 @@ export function ContentsList({
     <div className="max-h-80 overflow-y-auto">
       {entries.length > 0 && (
         <p className="px-2 py-1 text-[11px] text-muted-foreground">
-          Shift-click a row to select it as well, rather than instead.
+          <Trans>
+            Shift-click a row to select it as well, rather than instead.
+          </Trans>
         </p>
       )}
       <ul>
@@ -126,7 +129,11 @@ export function ContentsList({
                 {/* Said rather than only shown, because the tick is the one
                     thing on the row that says it is part of a selection an
                     author cannot see the whole of. */}
-                {current && <span className="sr-only">selected</span>}
+                {current && (
+                  <span className="sr-only">
+                    <Trans>selected</Trans>
+                  </span>
+                )}
                 <span className="shrink-0 font-mono text-[11px] text-muted-foreground">
                   {entry.detail}
                 </span>
@@ -169,59 +176,65 @@ function UnplacedLayouts({
   onPlace: (layout: LayoutEntry) => void;
   onDelete: (layout: LayoutEntry) => void;
 }) {
+  const { t } = useLingui();
   return (
     <section className="mt-1 border-t border-border/60 pt-1">
       <h3 className="px-2 pb-1 text-[11px] font-medium text-muted-foreground">
-        Not placed
+        <Trans>Not placed</Trans>
       </h3>
       <ul>
-        {layouts.map((layout) => (
-          <li
-            key={layout.id}
-            className="flex items-center gap-2 px-2 py-1.5 text-xs"
-          >
-            <Blocks className="size-3.5 shrink-0 text-muted-foreground" />
-            <span className="min-w-0 flex-1 truncate">{layout.name}</span>
-            <span className="shrink-0 font-mono text-[11px] text-muted-foreground">
-              {layout.detail}
-            </span>
-            {/* gap-3 rather than the row's default gap-2: Delete has no
+        {layouts.map((layout) => {
+          const layoutName = layout.name;
+          return (
+            <li
+              key={layout.id}
+              className="flex items-center gap-2 px-2 py-1.5 text-xs"
+            >
+              <Blocks className="size-3.5 shrink-0 text-muted-foreground" />
+              <span className="min-w-0 flex-1 truncate">{layout.name}</span>
+              <span className="shrink-0 font-mono text-[11px] text-muted-foreground">
+                {layout.detail}
+              </span>
+              {/* gap-3 rather than the row's default gap-2: Delete has no
                 confirmation, so it gets more room than the row's default
                 spacing rather than the same amount (#2284). */}
-            <div className="flex shrink-0 items-center gap-3">
-              <Button
-                size="sm"
-                variant="ghost"
-                className="size-7 p-0"
-                aria-label={`Place ${layout.name}`}
-                title={`Place ${layout.name} on the map`}
-                // A layout with nothing in it would place a base that draws
-                // nothing and can never be selected again.
-                disabled={layout.empty}
-                onClick={() => onPlace(layout)}
-              >
-                <MapPin className="size-3.5" />
-              </Button>
-              {/* Ghost-destructive, matching the row menu's delete item
+              <div className="flex shrink-0 items-center gap-3">
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  className="size-7 p-0"
+                  aria-label={t`Place ${layoutName}`}
+                  title={t`Place ${layoutName} on the map`}
+                  // A layout with nothing in it would place a base that draws
+                  // nothing and can never be selected again.
+                  disabled={layout.empty}
+                  onClick={() => onPlace(layout)}
+                >
+                  <MapPin className="size-3.5" />
+                </Button>
+                {/* Ghost-destructive, matching the row menu's delete item
                   (ScenarioRowMenu), so Delete reads as different from
                   Place. */}
-              <Button
-                size="sm"
-                variant="ghost"
-                className="size-7 p-0 text-destructive hover:bg-destructive/10 hover:text-destructive dark:hover:bg-destructive/20"
-                aria-label={`Delete ${layout.name}`}
-                title={`Delete ${layout.name}`}
-                onClick={() => onDelete(layout)}
-              >
-                <Trash2 className="size-3.5" />
-              </Button>
-            </div>
-          </li>
-        ))}
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  className="size-7 p-0 text-destructive hover:bg-destructive/10 hover:text-destructive dark:hover:bg-destructive/20"
+                  aria-label={t`Delete ${layoutName}`}
+                  title={t`Delete ${layoutName}`}
+                  onClick={() => onDelete(layout)}
+                >
+                  <Trash2 className="size-3.5" />
+                </Button>
+              </div>
+            </li>
+          );
+        })}
       </ul>
       <p className="px-2 py-1 text-[11px] text-muted-foreground">
-        Kept in this scenario until you delete them. Place one back on the map
-        with the pin, or edit it under Base blueprints below the map.
+        <Trans>
+          Kept in this scenario until you delete them. Place one back on the map
+          with the pin, or edit it under Base blueprints below the map.
+        </Trans>
       </p>
     </section>
   );

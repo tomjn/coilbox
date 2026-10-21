@@ -8,6 +8,7 @@
  * has one home and there is no pair to drift.
  */
 
+import { t } from "@lingui/core/macro";
 import type { GameItem } from "../content/bindings";
 import { isSdd } from "../content/format";
 import { scenarioDeleteMission, scenarioWriteGameMission } from "./bindings";
@@ -61,8 +62,9 @@ export async function putMissionInGame(
 ): Promise<GameOrigin> {
   const archivePath = game.primaryArchive.path;
   if (!archivePath || !isSdd(game.primaryArchive)) {
+    const gameName = game.name;
     throw new Error(
-      `${game.name} is packaged, so nothing can be written into it.`,
+      t`${gameName} is packaged, so nothing can be written into it.`,
     );
   }
   const named = missionFolderName(folder);
@@ -89,7 +91,7 @@ export async function takeMissionOutOfGame(
 ): Promise<Scenario> {
   const origin = loaded.origin;
   if (!origin?.loose) {
-    throw new Error("This mission is not in a game coilbox can write to.");
+    throw new Error(t`This mission is not in a game coilbox can write to.`);
   }
   const saved = await saveScenario(loaded.scenario);
   await scenarioDeleteMission({

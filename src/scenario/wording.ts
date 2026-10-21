@@ -16,6 +16,8 @@
  * is one place to read every refusal coilbox makes about a scenario.
  */
 
+import { plural, t } from "@lingui/core/macro";
+
 /** Who is being told. */
 export type ScenarioReader = "author" | "player";
 
@@ -30,12 +32,14 @@ export function gameNotInstalled(
   reader: ScenarioReader,
   gameName: string,
 ): string {
-  const missing = gameName
-    ? `${gameName} is not installed.`
-    : "The game this scenario is set in is not installed.";
+  if (!gameName) {
+    return reader === "player"
+      ? t`The game this scenario is set in is not installed. Install it from Content to play this scenario.`
+      : t`The game this scenario is set in is not installed. Install it from Content, or set the scenario up on a game you have.`;
+  }
   return reader === "player"
-    ? `${missing} Install it from Content to play this scenario.`
-    : `${missing} Install it from Content, or set the scenario up on a game you have.`;
+    ? t`${gameName} is not installed. Install it from Content to play this scenario.`
+    : t`${gameName} is not installed. Install it from Content, or set the scenario up on a game you have.`;
 }
 
 /** The scenario's map is not installed. */
@@ -44,8 +48,8 @@ export function mapNotInstalled(
   mapName: string,
 ): string {
   return reader === "player"
-    ? `${mapName} is not installed. Install it from Content to play this scenario.`
-    : `${mapName} is not installed. Install it from Content, or set the scenario up on a map you have.`;
+    ? t`${mapName} is not installed. Install it from Content to play this scenario.`
+    : t`${mapName} is not installed. Install it from Content, or set the scenario up on a map you have.`;
 }
 
 /**
@@ -54,7 +58,7 @@ export function mapNotInstalled(
  * that it plays and that their copy of the game is left as it was.
  */
 function coilboxSetsItUp(gameName: string): string {
-  return `${gameName} cannot play a scenario on its own, so coilbox sets up what it needs. Your copy of ${gameName} is not changed.`;
+  return t`${gameName} cannot play a scenario on its own, so coilbox sets up what it needs. Your copy of ${gameName} is not changed.`;
 }
 
 /**
@@ -69,7 +73,7 @@ export function packagedGameRoute(
 ): string {
   return reader === "player"
     ? coilboxSetsItUp(gameName)
-    : `${gameName} is a packaged archive, which cannot be written into. The scenario is played through coilbox's test mutator instead.`;
+    : t`${gameName} is a packaged archive, which cannot be written into. The scenario is played through coilbox's test mutator instead.`;
 }
 
 /** A loose game whose archive does not bundle the mission runtime. */
@@ -79,7 +83,7 @@ export function unadoptedGameRoute(
 ): string {
   return reader === "player"
     ? coilboxSetsItUp(gameName)
-    : `${gameName} has not adopted coilbox's mission runtime, so it cannot play a scenario itself. The scenario is played through the test mutator instead.`;
+    : t`${gameName} has not adopted coilbox's mission runtime, so it cannot play a scenario itself. The scenario is played through the test mutator instead.`;
 }
 
 /** A game whose bundled runtime is older than the scenario needs. */
@@ -91,7 +95,7 @@ export function olderRuntimeRoute(
 ): string {
   return reader === "player"
     ? coilboxSetsItUp(gameName)
-    : `${gameName} bundles mission runtime version ${installed}, and this scenario needs version ${required}. The scenario is played through the test mutator instead.`;
+    : t`${gameName} bundles mission runtime version ${installed}, and this scenario needs version ${required}. The scenario is played through the test mutator instead.`;
 }
 
 /** A game that bundles a runtime new enough to play the scenario itself. */
@@ -101,8 +105,8 @@ export function adoptedGameRoute(
   installed: number,
 ): string {
   return reader === "player"
-    ? `${gameName} plays this scenario itself.`
-    : `${gameName} bundles mission runtime version ${installed}, so it plays the scenario itself.`;
+    ? t`${gameName} plays this scenario itself.`
+    : t`${gameName} bundles mission runtime version ${installed}, so it plays the scenario itself.`;
 }
 
 /**
@@ -114,8 +118,8 @@ export function gameOwnMissionRoute(
   gameName: string,
 ): string {
   return reader === "player"
-    ? `This mission comes with ${gameName}, which plays it itself.`
-    : `${gameName} ships this mission in its own archive, so it plays it itself and coilbox writes nothing.`;
+    ? t`This mission comes with ${gameName}, which plays it itself.`
+    : t`${gameName} ships this mission in its own archive, so it plays it itself and coilbox writes nothing.`;
 }
 
 /**
@@ -129,7 +133,7 @@ export function missionDriftedFromDocument(
 ): string {
   return reader === "player"
     ? ""
-    : `The mission ${gameName} ships does not match the document beside it. The shipped mission is what played.`;
+    : t`The mission ${gameName} ships does not match the document beside it. The shipped mission is what played.`;
 }
 
 /**
@@ -143,8 +147,8 @@ export function coilboxTooOld(
   shipped: number,
 ): string {
   return reader === "player"
-    ? "This scenario was made for a newer version of coilbox. Update coilbox to play it."
-    : `This scenario needs mission runtime version ${required}, and this build of coilbox ships version ${shipped}. Update coilbox to play it.`;
+    ? t`This scenario was made for a newer version of coilbox. Update coilbox to play it.`
+    : t`This scenario needs mission runtime version ${required}, and this build of coilbox ships version ${shipped}. Update coilbox to play it.`;
 }
 
 /** The generated game coilbox just wrote, which the engine did not then find. */
@@ -153,8 +157,8 @@ export function setupNotFound(
   gameName: string,
 ): string {
   return reader === "player"
-    ? `Coilbox could not set this scenario up to play. Check that ${gameName} is still installed.`
-    : `The engine did not pick up coilbox's test mutator. Check that ${gameName} is still installed.`;
+    ? t`Coilbox could not set this scenario up to play. Check that ${gameName} is still installed.`
+    : t`The engine did not pick up coilbox's test mutator. Check that ${gameName} is still installed.`;
 }
 
 /**
@@ -166,10 +170,16 @@ export function setupNotFound(
  * one is go back to whoever shared it, so that is what this says.
  */
 export function missionProblems(reader: ScenarioReader, count: number): string {
-  const problems = `${count} problem${count === 1 ? "" : "s"}`;
   return reader === "player"
-    ? `This scenario has ${problems}, so it did not start. Whoever made it has to fix it.`
-    : `The compiled mission has ${problems}, so it was not launched.`;
+    ? plural(count, {
+        one: "This scenario has # problem, so it did not start. Whoever made it has to fix it.",
+        other:
+          "This scenario has # problems, so it did not start. Whoever made it has to fix it.",
+      })
+    : plural(count, {
+        one: "The compiled mission has # problem, so it was not launched.",
+        other: "The compiled mission has # problems, so it was not launched.",
+      });
 }
 
 /**
@@ -178,10 +188,17 @@ export function missionProblems(reader: ScenarioReader, count: number): string {
  * refuse one.
  */
 export function missionWarnings(reader: ScenarioReader, count: number): string {
-  const things = count === 1 ? "one thing" : `${count} things`;
   return reader === "player"
-    ? `It played, but ${things} in it looked wrong. Worth telling whoever shared it:`
-    : `The mission played, but ${things} in it ${count === 1 ? "reads" : "read"} to a player as a bug:`;
+    ? plural(count, {
+        1: "It played, but one thing in it looked wrong. Worth telling whoever shared it:",
+        other:
+          "It played, but # things in it looked wrong. Worth telling whoever shared it:",
+      })
+    : plural(count, {
+        1: "The mission played, but one thing in it reads to a player as a bug:",
+        other:
+          "The mission played, but # things in it read to a player as a bug:",
+      });
 }
 
 /* -------------------------------------------------------------------------- *
@@ -193,9 +210,6 @@ export function missionWarnings(reader: ScenarioReader, count: number): string {
  * has happened or been refused, and none of them is true of a document sitting
  * mid-edit, so these are their own.
  * -------------------------------------------------------------------------- */
-
-const plural = (count: number, noun: string) =>
-  `${count} ${noun}${count === 1 ? "" : "s"}`;
 
 /**
  * The count in the editor header. Blocking issues and warnings are counted
@@ -209,20 +223,29 @@ export function missionProblemCount(
   warnings: number,
 ): string {
   const said: string[] = [];
-  if (blocking > 0) said.push(plural(blocking, "problem"));
-  if (warnings > 0) said.push(plural(warnings, "warning"));
+  if (blocking > 0) {
+    said.push(plural(blocking, { one: "# problem", other: "# problems" }));
+  }
+  if (warnings > 0) {
+    said.push(plural(warnings, { one: "# warning", other: "# warnings" }));
+  }
   return said.join(", ");
 }
 
 /** The lead-in to the issues that stop the mission being played at all. */
 export function missionProblemsStopPlay(count: number): string {
-  return `${plural(count, "problem")} ${count === 1 ? "stops" : "stop"} this mission from playing:`;
+  return plural(count, {
+    one: "# problem stops this mission from playing:",
+    other: "# problems stop this mission from playing:",
+  });
 }
 
 /** The lead-in to the issues the mission plays with, and a player reads as a bug. */
 export function missionProblemsLookWrong(count: number): string {
-  const things = count === 1 ? "One thing" : `${count} things`;
-  return `${things} ${count === 1 ? "plays" : "play"}, and ${count === 1 ? "reads" : "read"} to a player as a bug:`;
+  return plural(count, {
+    1: "One thing plays, and reads to a player as a bug:",
+    other: "# things play, and read to a player as a bug:",
+  });
 }
 
 /* -------------------------------------------------------------------------- *
@@ -236,14 +259,18 @@ export function missionProblemsLookWrong(count: number): string {
 
 /** The lead-in to what the mission runtime itself reported while it played. */
 export function missionRuntimeProblems(count: number): string {
-  return `The mission runtime reported ${plural(count, "problem")} while it played:`;
+  return plural(count, {
+    one: "The mission runtime reported # problem while it played:",
+    other: "The mission runtime reported # problems while it played:",
+  });
 }
 
 /** The lead-in to the engine's own errors and warnings from the same run. */
 export function engineRunProblems(count: number): string {
-  return count === 1
-    ? "The engine logged one error or warning of its own during the run:"
-    : `The engine logged ${count} errors and warnings of its own during the run:`;
+  return plural(count, {
+    1: "The engine logged one error or warning of its own during the run:",
+    other: "The engine logged # errors and warnings of its own during the run:",
+  });
 }
 
 /**
@@ -253,10 +280,10 @@ export function engineRunProblems(count: number): string {
  * document.
  */
 export function missionRuntimeSaidNothing(): string {
-  return "The mission runtime reported nothing, so everything the scenario asked for reached the map.";
+  return t`The mission runtime reported nothing, so everything the scenario asked for reached the map.`;
 }
 
 /** No log to read: none was found, or the newest one predates this run. */
 export function missionRunLogMissing(): string {
-  return "The engine's log could not be read for this run, so there is nothing here about what it did.";
+  return t`The engine's log could not be read for this run, so there is nothing here about what it did.`;
 }

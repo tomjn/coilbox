@@ -10,6 +10,7 @@
  * thumbnail sits inside it, so an image and a span are all this may be.
  */
 
+import { Trans, useLingui } from "@lingui/react/macro";
 import { AlertTriangle } from "lucide-react";
 import type { MapThumbData } from "@/content/config";
 import { MapThumb } from "@/content/pages/components/MapThumb";
@@ -33,6 +34,7 @@ export function ScenarioMapThumb({
   /** Whether the minimaps are still rendering. */
   loading: boolean;
 }) {
+  const { t } = useLingui();
   const thumb = mapName ? thumbs.get(mapName) : undefined;
   // The two empty slots are different facts, so they are drawn differently. A
   // scenario with no map is unfinished and its author knows it, and gets the
@@ -50,7 +52,9 @@ export function ScenarioMapThumb({
             className="size-5 text-amber-600 dark:text-amber-400"
             aria-hidden="true"
           />
-          <span className="sr-only">{mapName} is not installed</span>
+          <span className="sr-only">
+            <Trans>{mapName} is not installed</Trans>
+          </span>
         </div>
       ) : (
         <>
@@ -58,10 +62,14 @@ export function ScenarioMapThumb({
             url={thumb?.url}
             width={thumb?.width}
             height={thumb?.height}
-            alt={mapName ? `Minimap of ${mapName}` : ""}
+            alt={mapName ? t`Minimap of ${mapName}` : ""}
             loading={!!mapName && loading && !thumb}
           />
-          {!mapName && <span className="sr-only">No map yet</span>}
+          {!mapName && (
+            <span className="sr-only">
+              <Trans>No map yet</Trans>
+            </span>
+          )}
         </>
       )}
     </div>

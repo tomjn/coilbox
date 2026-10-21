@@ -13,6 +13,7 @@
  * editor never offers dormancy as if it were sleep.
  */
 
+import { plural, t } from "@lingui/core/macro";
 import type { BaseBlueprint } from "@/blueprint/model";
 import {
   baseBuildings,
@@ -379,7 +380,9 @@ export function drapePoints(
  *  distinguishing two groups of the same units. */
 export function groupLabel(groups: ScenarioGroup[], id: string): string {
   const at = groups.findIndex((group) => group.id === id);
-  return at < 0 ? "a group that is gone" : `Group ${at + 1}`;
+  if (at < 0) return t`a group that is gone`;
+  const position = at + 1;
+  return t`Group ${position}`;
 }
 
 /**
@@ -401,7 +404,7 @@ export function baseLabels(
     bases.map(
       (base) =>
         blueprints.find((b) => b.id === base.blueprint)?.name ??
-        "a blueprint that is gone",
+        t`a blueprint that is gone`,
     ),
   );
 }
@@ -446,11 +449,15 @@ export function buildingTargets(
       .filter((building): building is PlacedBuilding & { id: string } =>
         Boolean(building.id),
       )
-      .map((building) => ({
-        id: building.id,
-        label: `${baseNames[i]}'s ${building.def}`,
-        def: building.def,
-      })),
+      .map((building) => {
+        const baseName = baseNames[i];
+        const def = building.def;
+        return {
+          id: building.id,
+          label: t`${baseName}'s ${def}`,
+          def,
+        };
+      }),
   );
   const labels = uniqueLabels(found.map((building) => building.label));
   return found.map((building, i) => ({ ...building, label: labels[i] }));
@@ -471,24 +478,39 @@ export function targetOptions(
   const actorLabels = uniqueLabels(
     scenario.actors.map((actor) => actor.state?.name?.trim() || actor.unitDef),
   );
-  const actors = scenario.actors.map((actor, i) => ({
-    value: actor.id,
-    label: actorLabels[i],
-    description: `actor · ${actor.unitDef}`,
-  }));
-  const buildings = buildingTargets(scenario).map((building) => ({
-    value: building.id,
-    label: building.label,
-    description: `building · ${building.def}`,
-  }));
+  const actors = scenario.actors.map((actor, i) => {
+    const unitDef = actor.unitDef;
+    return {
+      value: actor.id,
+      label: actorLabels[i],
+      description: t`actor · ${unitDef}`,
+    };
+  });
+  const buildings = buildingTargets(scenario).map((building) => {
+    const def = building.def;
+    return {
+      value: building.id,
+      label: building.label,
+      description: t`building · ${def}`,
+    };
+  });
   const groups = scenario.groups
-    .map((group, i) => ({ group, label: `Group ${i + 1}` }))
+    .map((group) => ({
+      group,
+      label: groupLabel(scenario.groups, group.id),
+    }))
     .filter(({ group }) => group.id !== exceptGroup)
-    .map(({ group, label }) => ({
-      value: group.id,
-      label,
-      description: `group · ${groupSize(group)} units`,
-    }));
+    .map(({ group, label }) => {
+      const units = groupSize(group);
+      return {
+        value: group.id,
+        label,
+        description: plural(units, {
+          one: "group · # unit",
+          other: "group · # units",
+        }),
+      };
+    });
   return [...actors, ...buildings, ...groups];
 }
 
@@ -498,9 +520,9 @@ export function targetLabel(
   scenario: Pick<Scenario, "actors" | "groups" | "bases" | "blueprints">,
   target: string,
 ): string {
-  if (!target) return "nothing yet";
+  if (!target) return t`nothing yet`;
   return (
     targetOptions(scenario).find((option) => option.value === target)?.label ??
-    "something that is gone"
+    t`something that is gone`
   );
 }

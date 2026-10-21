@@ -14,6 +14,7 @@
  * page stays where it is and says the scenario landed.
  */
 
+import { Trans, useLingui } from "@lingui/react/macro";
 import { Button, useDrawer } from "@picoframe/frame";
 import { Download } from "lucide-react";
 import { useEffect } from "react";
@@ -31,11 +32,12 @@ export function ScenarioImportButton({
   onImported: (scenario: Scenario) => void;
 }) {
   const drawer = useDrawer();
+  const { t } = useLingui();
 
   const openImport = async (code?: string) => {
     const { ImportScenarioForm } = await import("./ImportScenarioForm");
     drawer.open({
-      title: "Import a scenario",
+      title: t`Import a scenario`,
       width: "28rem",
       content: (
         // A fresh form every time, because the last one may still be mounted
@@ -63,7 +65,7 @@ export function ScenarioImportButton({
       className="gap-1.5"
       onClick={() => void openImport()}
     >
-      <Download className="size-4" /> Import
+      <Download className="size-4" /> <Trans>Import</Trans>
     </Button>
   );
 }
