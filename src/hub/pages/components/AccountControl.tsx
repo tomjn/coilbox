@@ -1,3 +1,5 @@
+import { msg } from "@lingui/core/macro";
+import { Trans, useLingui } from "@lingui/react/macro";
 import { Button } from "@picoframe/frame";
 import { RotateCw } from "lucide-react";
 import { useHubAccount } from "../../account";
@@ -29,20 +31,24 @@ export function AccountControl({ hubUrl }: { hubUrl: string }) {
     signIn,
     signOut,
   } = useHubAccount(hubUrl);
+  const { t, i18n } = useLingui();
+  const accountName = account?.name;
 
   return (
     <section className="space-y-2">
-      <h3 className="text-sm font-medium leading-none">Your hub account</h3>
+      <h3 className="text-sm font-medium leading-none">
+        <Trans>Your hub account</Trans>
+      </h3>
       {loading ? (
         <p className="text-sm text-muted-foreground">
-          Checking whether you are signed in.
+          <Trans>Checking whether you are signed in.</Trans>
         </p>
       ) : signedIn ? (
         <>
           <p className="text-sm text-muted-foreground">
-            {account
-              ? `Signed in as ${account.name}.`
-              : "Signed in. Coilbox could not check the name this time."}
+            {accountName
+              ? t`Signed in as ${accountName}.`
+              : t`Signed in. Coilbox could not check the name this time.`}
           </p>
           <Button
             variant="outline"
@@ -51,11 +57,13 @@ export function AccountControl({ hubUrl }: { hubUrl: string }) {
             disabled={busy}
             aria-busy={busy}
           >
-            Sign out
+            <Trans>Sign out</Trans>
           </Button>
           <p className="text-xs leading-snug text-muted-foreground">
-            Signing out only affects this computer. It does not remove anything
-            you have already shared.
+            <Trans>
+              Signing out only affects this computer. It does not remove
+              anything you have already shared.
+            </Trans>
           </p>
         </>
       ) : unknown ? (
@@ -65,7 +73,9 @@ export function AccountControl({ hubUrl }: { hubUrl: string }) {
         // not ask the question again. The sign-in stays beside it, because it
         // works whatever the keychain said a moment ago.
         <>
-          <p className="text-sm text-muted-foreground">{COULD_NOT_CHECK}</p>
+          <p className="text-sm text-muted-foreground">
+            {i18n._(COULD_NOT_CHECK)}
+          </p>
           <div className="flex flex-wrap gap-2">
             <TryAgainButton onRecheck={recheck} />
             <SignInButton busy={busy} onSignIn={signIn} size="sm" />
@@ -74,8 +84,10 @@ export function AccountControl({ hubUrl }: { hubUrl: string }) {
       ) : (
         <>
           <p className="text-sm text-muted-foreground">
-            You need an account to share things on the hub. Browsing and
-            importing need no account.
+            <Trans>
+              You need an account to share things on the hub. Browsing and
+              importing need no account.
+            </Trans>
           </p>
           <SignInButton
             busy={busy}
@@ -85,8 +97,10 @@ export function AccountControl({ hubUrl }: { hubUrl: string }) {
           />
           {busy && (
             <p className="text-xs leading-snug text-muted-foreground">
-              Finish signing in the browser window that opened. Coilbox stops
-              waiting after a minute.
+              <Trans>
+                Finish signing in the browser window that opened. Coilbox stops
+                waiting after a minute.
+              </Trans>
             </p>
           )}
         </>
@@ -103,8 +117,7 @@ export function AccountControl({ hubUrl }: { hubUrl: string }) {
  * Written once because all three surfaces say it, and because the difference
  * between this and "you are signed out" is the whole point of the state.
  */
-export const COULD_NOT_CHECK =
-  "Coilbox could not tell whether you are signed in.";
+export const COULD_NOT_CHECK = msg`Coilbox could not tell whether you are signed in.`;
 
 /**
  * The one way out of a check that could not find out (issues #1456, #1470).
@@ -132,7 +145,8 @@ export function TryAgainButton({
       className={className}
       onClick={() => void onRecheck()}
     >
-      <RotateCw className="mr-1.5 size-4" aria-hidden /> Try again
+      <RotateCw className="mr-1.5 size-4" aria-hidden />{" "}
+      <Trans>Try again</Trans>
     </Button>
   );
 }
@@ -153,6 +167,7 @@ export function SignInButton({
   size?: "sm" | "default";
   variant?: "default" | "outline";
 }) {
+  const { t } = useLingui();
   return (
     <Button
       size={size}
@@ -161,7 +176,7 @@ export function SignInButton({
       disabled={busy}
       aria-busy={busy}
     >
-      {busy ? "Waiting for your browser" : "Sign in with Discord"}
+      {busy ? t`Waiting for your browser` : t`Sign in with Discord`}
     </Button>
   );
 }

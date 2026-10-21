@@ -1,3 +1,6 @@
+import type { I18n } from "@lingui/core";
+import { msg } from "@lingui/core/macro";
+import { Trans, useLingui } from "@lingui/react/macro";
 import { Button } from "@picoframe/frame";
 import { openUrl } from "@tauri-apps/plugin-opener";
 import {
@@ -29,7 +32,7 @@ import type { ImportPlan } from "@/deeplink/actions";
 import { ConfirmDialog, type Pending } from "@/deeplink/ConfirmDialog";
 import { fetchImportPlan } from "@/deeplink/fetchImport";
 import { fetchImportText } from "@/deeplink/fetchText";
-import { formatDate as formatLocaleDate } from "@/lib/format";
+import { formatDate } from "@/lib/format";
 import { getGameMatcher, getProfile } from "@/profile/profile";
 import { describeItem, fetchHubItem, type HubItemDetail } from "../api";
 import { MapPictureCard } from "../assets/MapPicture";
@@ -86,13 +89,6 @@ import { ItemPreview } from "./components/ItemPreview";
  * end rather than a narrower gallery.
  */
 
-function formatDate(iso: string): string {
-  const date = new Date(iso);
-  return Number.isNaN(date.getTime())
-    ? ""
-    : formatLocaleDate(date, { dateStyle: "long" });
-}
-
 /** The hub's host, for saying where an import comes from. */
 function hostOf(url: string): string {
   try {
@@ -114,6 +110,7 @@ interface Fetched {
 }
 
 export default function ItemPage() {
+  const { t, i18n } = useLingui();
   const { id: rawId } = useParams();
   const id = rawId ?? "";
   const hubUrl = useHubUrl();
@@ -175,8 +172,9 @@ export default function ItemPage() {
       const notes = [...result.plan.warnings];
       if (result.plan.kind !== item.kind) {
         const listed = describeItem(item.kind, item.mode).toLowerCase();
+        const sent = result.plan.label;
         notes.push(
-          `The hub lists this as a ${listed}, but what it sent is a ${result.plan.label}.`,
+          t`The hub lists this as a ${listed}, but what it sent is a ${sent}.`,
         );
       }
       const container = asContainer(decodeContainerText(result.text));
@@ -186,7 +184,7 @@ export default function ItemPage() {
         notes,
       });
     },
-    [item],
+    [item, t],
   );
 
   // One fetch per item. A failure leaves the reason showing and no container,
@@ -239,7 +237,13 @@ export default function ItemPage() {
   // which has to open a container per card just to learn this.
   const containerMapName =
     fetched?.preview?.kind === "scenario" ? fetched.preview.map : null;
+  const hubHost = hostOf(hubUrl);
+  const authorName = item?.author_name;
   const mapName = item?.map_name ?? containerMapName;
+  const createdAt =
+    item?.created_at && !Number.isNaN(Date.parse(item.created_at))
+      ? formatDate(item.created_at, { dateStyle: "long" })
+      : null;
 
   return (
     <div className="flex h-full flex-col">
@@ -248,7 +252,8 @@ export default function ItemPage() {
           to="/hub"
           className="inline-flex w-fit items-center gap-1 text-xs text-muted-foreground hover:underline"
         >
-          <ArrowLeft className="size-3.5" aria-hidden /> Coilbox hub
+          <ArrowLeft className="size-3.5" aria-hidden />{" "}
+          <Trans>Coilbox hub</Trans>
         </Link>
         {item && (
           <>
@@ -259,7 +264,8 @@ export default function ItemPage() {
               </Badge>
               {presence.state === "here" && (
                 <Badge variant="outline" className="gap-1">
-                  <Check className="size-3" aria-hidden /> Imported
+                  <Check className="size-3" aria-hidden />{" "}
+                  <Trans>Imported</Trans>
                 </Badge>
               )}
             </div>
@@ -267,8 +273,13 @@ export default function ItemPage() {
               {item.title}
             </h1>
             <p className="text-sm text-muted-foreground">
-              Shared by {item.author_name}
-              {item.created_at ? ` on ${formatDate(item.created_at)}` : ""}
+              {createdAt ? (
+                <Trans>
+                  Shared by {authorName} on {createdAt}
+                </Trans>
+              ) : (
+                <Trans>Shared by {authorName}</Trans>
+              )}
             </p>
           </>
         )}
@@ -277,7 +288,8 @@ export default function ItemPage() {
       <div className="min-h-0 flex-1 overflow-auto p-6">
         {loading && (
           <p className="flex items-center gap-2 text-sm text-muted-foreground">
-            <Loader2 size={15} className="animate-spin" /> loading the hub…
+            <Loader2 size={15} className="animate-spin" />{" "}
+            <Trans>loading the hub…</Trans>
           </p>
         )}
         {error && (
@@ -286,7 +298,8 @@ export default function ItemPage() {
             <AlertDescription className="flex flex-wrap items-center gap-3 text-destructive">
               {error}
               <Button variant="outline" size="sm" onClick={() => load()}>
-                <RotateCw className="mr-1.5 size-3.5" aria-hidden /> Try again
+                <RotateCw className="mr-1.5 size-3.5" aria-hidden />{" "}
+                <Trans>Try again</Trans>
               </Button>
             </AlertDescription>
           </Alert>
@@ -297,15 +310,15 @@ export default function ItemPage() {
               <p className="max-w-prose whitespace-pre-wrap text-sm leading-relaxed">
                 {item.description || (
                   <span className="text-muted-foreground">
-                    Whoever shared this wrote no description.
+                    <Trans>Whoever shared this wrote no description.</Trans>
                   </span>
                 )}
               </p>
 
               {fetching && (
                 <p className="flex items-center gap-2 text-sm text-muted-foreground">
-                  <Loader2 size={15} className="animate-spin" /> reading what is
-                  in it…
+                  <Loader2 size={15} className="animate-spin" />{" "}
+                  <Trans>reading what is in it…</Trans>
                 </p>
               )}
               {fetched?.preview && <ItemPreview preview={fetched.preview} />}
@@ -333,8 +346,8 @@ export default function ItemPage() {
                       onClick={() => void loadContainer()}
                       disabled={fetching}
                     >
-                      <RotateCw className="mr-1.5 size-3.5" aria-hidden /> Try
-                      again
+                      <RotateCw className="mr-1.5 size-3.5" aria-hidden />{" "}
+                      <Trans>Try again</Trans>
                     </Button>
                   </AlertDescription>
                 </Alert>
@@ -349,29 +362,37 @@ export default function ItemPage() {
                 <ItemMapPicture mapName={mapName} />
               )}
               <dl className="grid grid-cols-[auto_1fr] gap-x-6 gap-y-2 text-sm">
-                <Meta label="Game">
+                <Meta label={t`Game`}>
                   {item.game_name ?? (
                     <span className="text-muted-foreground">
-                      Not tied to one game
+                      <Trans>Not tied to one game</Trans>
                     </span>
                   )}
                   {offPin && (
                     <span className="mt-1 block text-xs text-muted-foreground">
-                      This copy of Coilbox is set up for{" "}
-                      {pinnedGame ?? "another game"}, so this is not in its hub
-                      list. You can still import it.
+                      {pinnedGame ? (
+                        <Trans>
+                          This copy of Coilbox is set up for {pinnedGame}, so
+                          this is not in its hub list. You can still import it.
+                        </Trans>
+                      ) : (
+                        <Trans>
+                          This copy of Coilbox is set up for another game, so
+                          this is not in its hub list. You can still import it.
+                        </Trans>
+                      )}
                     </span>
                   )}
                 </Meta>
-                <Meta label="Map">
+                <Meta label={t`Map`}>
                   {mapName ?? (
                     <span className="text-muted-foreground">
-                      Not tied to one map
+                      <Trans>Not tied to one map</Trans>
                     </span>
                   )}
                 </Meta>
                 {item.tags.length > 0 && (
-                  <Meta label="Tags">
+                  <Meta label={t`Tags`}>
                     <span className="flex flex-wrap gap-1.5">
                       {item.tags.map((tag) => (
                         <Badge key={tag} variant="outline">
@@ -391,15 +412,17 @@ export default function ItemPage() {
                         variant="outline"
                         onClick={() => navigate(presence.route)}
                       >
-                        <ArrowRight /> Open
+                        <ArrowRight /> <Trans>Open</Trans>
                       </Button>
                       {removal && (
                         <Button
                           variant="ghost"
                           className="text-destructive hover:text-destructive"
-                          onClick={() => setPending(confirmRemoval(removal))}
+                          onClick={() =>
+                            setPending(confirmRemoval(removal, i18n))
+                          }
                         >
-                          <Trash2 /> Remove
+                          <Trash2 /> <Trans>Remove</Trans>
                         </Button>
                       )}
                     </>
@@ -424,31 +447,42 @@ export default function ItemPage() {
                       ) : (
                         <Download />
                       )}
-                      {importLabel(fetching, fetched?.notes.length ?? 0)}
+                      {fetching
+                        ? t`Fetching…`
+                        : (fetched?.notes.length ?? 0) > 0
+                          ? t`Import anyway`
+                          : t`Import`}
                     </Button>
                   )}
                 </div>
                 <p className="text-xs text-muted-foreground">
-                  No account needed. What this page shows above is what you get,
-                  fetched before you press the button.
+                  <Trans>
+                    No account needed. What this page shows above is what you
+                    get, fetched before you press the button.
+                  </Trans>
                 </p>
                 <p className="text-xs text-muted-foreground">
-                  {presence.state === "gone" &&
-                    "You imported this before. Nothing of it is here now. "}
-                  Coilbox downloads it from {hostOf(hubUrl)} and opens it in the
-                  importer, which resolves any missing content before saving.
+                  {presence.state === "gone" && (
+                    <Trans>
+                      You imported this before. Nothing of it is here now.
+                    </Trans>
+                  )}{" "}
+                  <Trans>
+                    Coilbox downloads it from {hubHost} and opens it in the
+                    importer, which resolves any missing content before saving.
+                  </Trans>
                 </p>
                 <div className="flex flex-wrap items-center gap-2 pt-1">
                   <Button variant="ghost" size="sm" onClick={copyLink}>
                     {copied ? <Check /> : <LinkIcon />}
-                    {copied ? "Link copied" : "Copy link"}
+                    {copied ? t`Link copied` : t`Copy link`}
                   </Button>
                   <Button
                     variant="ghost"
                     size="sm"
                     onClick={() => void openUrl(pageUrl)}
                   >
-                    <ExternalLink /> View on the hub
+                    <ExternalLink /> <Trans>View on the hub</Trans>
                   </Button>
                 </div>
               </div>
@@ -469,24 +503,19 @@ export default function ItemPage() {
  * this is undoable by importing it again. Anything the removal found using it
  * goes in as a warning.
  */
-function confirmRemoval(removal: HubRemoval): Pending {
+function confirmRemoval(removal: HubRemoval, i18n: I18n): Pending {
   return {
     title: removal.summary,
     lines: [
-      "Coilbox deletes it from this computer. It stays on the hub, so you can import it again.",
+      i18n._(
+        msg`Coilbox deletes it from this computer. It stays on the hub, so you can import it again.`,
+      ),
     ],
     warnings: removal.warning ? [removal.warning] : [],
-    confirmLabel: "Delete",
+    confirmLabel: i18n._(msg`Delete`),
     run: () => void removal.run(),
     icon: Trash2,
   };
-}
-
-/** What the import button says. "Import anyway" when the page is already showing
- * something about the container that the reader should have seen first. */
-function importLabel(fetching: boolean, notes: number): string {
-  if (fetching) return "Fetching…";
-  return notes > 0 ? "Import anyway" : "Import";
 }
 
 /**

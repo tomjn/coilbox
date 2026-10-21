@@ -8,6 +8,7 @@
  * child fiber that mounts/unmounts cleanly as the sidebar collapses, rather than
  * changing the parent item's hook count.
  */
+import { useLingui } from "@lingui/react/macro";
 import { useSetting } from "@picoframe/frame";
 import { startedAgo, useNow } from "../battle/runningMatch";
 import { useInBattleKey } from "../battle/useBattleRoomKey";
@@ -63,6 +64,7 @@ export function ChatNavBadge() {
  * shown even at zero unread. Read off the connection the battle is on.
  */
 export function BattleNavBadge() {
+  const { t } = useLingui();
   const { unreadFor } = useMultiplayer();
   // The battle's own connection, which need not be the focused one (issue
   // #2844). With no battle anywhere there is nothing to count.
@@ -82,10 +84,9 @@ export function BattleNavBadge() {
     state.currentBattle === null
       ? null
       : (state.battles[String(state.currentBattle)]?.runningSince ?? null);
+  const started = since === null ? "" : startedAgo(since, now);
   const liveLabel =
-    since === null
-      ? "Game in progress"
-      : `Game in progress. ${startedAgo(since, now)}`;
+    since === null ? t`Game in progress` : t`Game in progress. ${started}`;
 
   return (
     <span className="flex items-center gap-1.5">

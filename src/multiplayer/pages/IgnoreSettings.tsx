@@ -1,3 +1,4 @@
+import { Trans, useLingui } from "@lingui/react/macro";
 import { Button, Input } from "@picoframe/frame";
 import { Plus, Trash2, UserX } from "lucide-react";
 import { useState } from "react";
@@ -17,6 +18,7 @@ import { liveConnectionKeys, useMultiplayer } from "../store";
  * where supported.
  */
 export default function IgnoreSettings() {
+  const { t } = useLingui();
   const { connections, activeKey } = useMultiplayer();
   const liveKeys = liveConnectionKeys(connections, activeKey);
   const [manualPick, setManualPick] = useState<string | null>(null);
@@ -31,8 +33,10 @@ export default function IgnoreSettings() {
   if (!pickedKey) {
     return (
       <p className="text-sm text-muted-foreground">
-        Ignores are per-account. Connect to a lobby server to manage the ignore
-        list for that account.
+        <Trans>
+          Ignores are per-account. Connect to a lobby server to manage the
+          ignore list for that account.
+        </Trans>
       </p>
     );
   }
@@ -47,7 +51,9 @@ export default function IgnoreSettings() {
   return (
     <div className="flex flex-col gap-4">
       <p className="text-sm text-muted-foreground">
-        Hidden users' channel and private messages are hidden in the client.
+        <Trans>
+          Hidden users' channel and private messages are hidden in the client.
+        </Trans>
       </p>
 
       {liveKeys.length > 1 && (
@@ -68,19 +74,21 @@ export default function IgnoreSettings() {
         <Input
           value={draft}
           onChange={(e) => setDraft(e.target.value)}
-          placeholder="username"
-          aria-label="Username to ignore"
+          placeholder={t`username`}
+          aria-label={t`Username to ignore`}
           {...identifierFieldProps}
         />
         <Button type="submit" disabled={!draft.trim()}>
-          <Plus className="size-4" /> Ignore
+          <Plus className="size-4" /> <Trans>Ignore</Trans>
         </Button>
       </form>
 
       {list.length === 0 ? (
         <p className="text-xs text-muted-foreground">
-          No ignored users. Add one above, or use the ignore action next to a
-          user in chat.
+          <Trans>
+            No ignored users. Add one above, or use the ignore action next to a
+            user in chat.
+          </Trans>
         </p>
       ) : (
         <ul className="flex flex-col gap-1">
@@ -96,7 +104,7 @@ export default function IgnoreSettings() {
                 size="sm"
                 className="ml-auto"
                 onClick={() => unignore(name)}
-                aria-label={`Stop ignoring ${name}`}
+                aria-label={t`Stop ignoring ${name}`}
               >
                 <Trash2 className="size-4" />
               </Button>

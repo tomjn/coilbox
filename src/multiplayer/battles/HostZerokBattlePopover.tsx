@@ -1,3 +1,4 @@
+import { Trans, useLingui } from "@lingui/react/macro";
 import { Button, Input, useSetting } from "@picoframe/frame";
 import { memo, useMemo, useState } from "react";
 import { OptionSelect } from "@/components/OptionSelect";
@@ -75,6 +76,7 @@ export const HostZerokBattlePopover = memo(function HostZerokBattlePopover({
    *  null. Said above the button, which then confirms leaving. */
   leaves?: string | null;
 }) {
+  const { t } = useLingui();
   const [open, setOpen] = useState(!!autoOpen);
   const { target } = usePreferredTarget();
   const scan = useUnitsyncScan(target?.enginePath, target?.dataDir);
@@ -114,17 +116,17 @@ export const HostZerokBattlePopover = memo(function HostZerokBattlePopover({
   // scrolled to.
   const mapOptions = useMemo(
     () => [
-      { value: SERVER_PICKS, label: "Let the server pick" },
+      { value: SERVER_PICKS, label: t`Let the server pick` },
       // A map we were sent to host but do not have is still a map the server
       // can run. Listed rather than left out, because a value with no option
       // behind it shows as an empty picker over a form that would go on to ask
       // for that map anyway.
       ...(named && !maps.some((m) => m.name === mapName)
-        ? [{ value: mapName, label: `${mapName} (not installed)` }]
+        ? [{ value: mapName, label: t`${mapName} (not installed)` }]
         : []),
       ...maps.map((m) => ({ value: m.name, label: m.name })),
     ],
-    [maps, mapName, named],
+    [maps, mapName, named, t],
   );
   const problem = newZerokBattleProblem({ title, mode, maxPlayers });
   const seated = seatedBy(mode, maxPlayers);
@@ -162,31 +164,39 @@ export const HostZerokBattlePopover = memo(function HostZerokBattlePopover({
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
         <Button variant="secondary" className="h-8 px-3" disabled={disabled}>
-          Host a battle
+          <Trans>Host a battle</Trans>
         </Button>
       </PopoverTrigger>
       <PopoverContent align="end" className="w-80">
         <form className="flex flex-col gap-3" onSubmit={submit}>
-          <span className="text-sm font-semibold">Host a battle</span>
+          <span className="text-sm font-semibold">
+            <Trans>Host a battle</Trans>
+          </span>
           <p className="text-xs text-muted-foreground">
-            The server runs the game, so there is nothing to forward and no
-            address to give out. Founding the room is what lets you set the map
-            and start the match without putting either to a vote.
+            <Trans>
+              The server runs the game, so there is nothing to forward and no
+              address to give out. Founding the room is what lets you set the
+              map and start the match without putting either to a vote.
+            </Trans>
           </p>
 
           {/* biome-ignore lint/a11y/noLabelWithoutControl: wraps the control (implicit label association) */}
           <label className="flex flex-col gap-1 text-sm">
-            <span className="font-medium">Title</span>
+            <span className="font-medium">
+              <Trans>Title</Trans>
+            </span>
             <Input
               value={title}
               onChange={(e) => setTitle(e.target.value)}
-              placeholder="A name for the room"
+              placeholder={t`A name for the room`}
             />
           </label>
 
           {/* biome-ignore lint/a11y/noLabelWithoutControl: wraps the control (implicit label association) */}
           <label className="flex flex-col gap-1 text-sm">
-            <span className="font-medium">Mode</span>
+            <span className="font-medium">
+              <Trans>Mode</Trans>
+            </span>
             <OptionSelect
               value={mode}
               onValueChange={(v) => setMode(v as ZerokBattleMode)}
@@ -198,19 +208,23 @@ export const HostZerokBattlePopover = memo(function HostZerokBattlePopover({
 
           {/* biome-ignore lint/a11y/noLabelWithoutControl: wraps the control (implicit label association) */}
           <label className="flex flex-col gap-1 text-sm">
-            <span className="font-medium">Map</span>
+            <span className="font-medium">
+              <Trans>Map</Trans>
+            </span>
             <OptionSelect
               value={mapName}
               onValueChange={setMapName}
               options={mapOptions}
-              placeholder={scan.loading ? "Scanning…" : "Let the server pick"}
+              placeholder={scan.loading ? t`Scanning…` : t`Let the server pick`}
               size="sm"
             />
           </label>
 
           {/* biome-ignore lint/a11y/noLabelWithoutControl: wraps the control (implicit label association) */}
           <label className="flex flex-col gap-1 text-sm">
-            <span className="font-medium">Max players</span>
+            <span className="font-medium">
+              <Trans>Max players</Trans>
+            </span>
             <Input
               type="number"
               min={MAX_PLAYERS_RANGE.min}
@@ -221,18 +235,22 @@ export const HostZerokBattlePopover = memo(function HostZerokBattlePopover({
           </label>
           {seated !== maxPlayers && !problem && (
             <p className="text-xs text-muted-foreground">
-              This mode seats {seated}, whatever the room asks for.
+              <Trans>
+                This mode seats {seated}, whatever the room asks for.
+              </Trans>
             </p>
           )}
 
           {/* biome-ignore lint/a11y/noLabelWithoutControl: wraps the control (implicit label association) */}
           <label className="flex flex-col gap-1 text-sm">
-            <span className="font-medium">Password (optional)</span>
+            <span className="font-medium">
+              <Trans>Password (optional)</Trans>
+            </span>
             <Input
               type="password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              placeholder="Leave blank for an open battle"
+              placeholder={t`Leave blank for an open battle`}
             />
           </label>
 
@@ -253,10 +271,10 @@ export const HostZerokBattlePopover = memo(function HostZerokBattlePopover({
 
           <Button type="submit" className="h-8" disabled={!!problem || hosting}>
             {hosting
-              ? "Hosting…"
+              ? t`Hosting…`
               : leaves
                 ? leaveAndLabel("host")
-                : "Host battle"}
+                : t`Host battle`}
           </Button>
         </form>
       </PopoverContent>

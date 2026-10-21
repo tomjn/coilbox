@@ -1,3 +1,4 @@
+import { t } from "@lingui/core/macro";
 /**
  * Reading and writing one console entry on a Tachyon connection.
  *
@@ -160,7 +161,7 @@ export function buildTachyonRequest(
   dataText: string,
 ): TachyonRequest {
   const command = commandId.trim();
-  if (!command) return { ok: false, error: "Enter a command id." };
+  if (!command) return { ok: false, error: t`Enter a command id.` };
 
   const text = dataText.trim();
   if (!text) return { ok: true, request: { commandId: command, data: null } };
@@ -169,10 +170,11 @@ export function buildTachyonRequest(
   try {
     data = JSON.parse(text);
   } catch (e) {
-    return { ok: false, error: `Data is not JSON: ${(e as Error).message}` };
+    const reason = (e as Error).message;
+    return { ok: false, error: t`Data is not JSON: ${reason}` };
   }
   if (typeof data !== "object" || data === null || Array.isArray(data)) {
-    return { ok: false, error: "Data has to be a JSON object." };
+    return { ok: false, error: t`Data has to be a JSON object.` };
   }
   return { ok: true, request: { commandId: command, data } };
 }

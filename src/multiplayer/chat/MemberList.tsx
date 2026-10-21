@@ -1,3 +1,4 @@
+import { Trans, useLingui } from "@lingui/react/macro";
 import { cn, useSetting } from "@picoframe/frame";
 import { X } from "lucide-react";
 import {
@@ -83,6 +84,8 @@ export function MemberList({
   // Reserve the swatch column only when at least one member has a colour, so
   // colour-less members (e.g. the host) still line up, while plain channel/DM
   // lists (no colours at all) stay flush without a leading gap.
+  const { t } = useLingui();
+  const memberCount = members.length;
   const showSwatches = colorFor ? members.some((u) => colorFor(u.name)) : false;
 
   // The stored width is clamped each time it is drawn and never rewritten for
@@ -117,13 +120,13 @@ export function MemberList({
         }}
       />
       <div className="flex items-center justify-between gap-2 border-b border-border py-1.5 pr-2 pl-4 text-sm font-semibold">
-        Members ({members.length})
+        <Trans>Members ({memberCount})</Trans>
         {onClose && (
           <button
             type="button"
             onClick={onClose}
-            aria-label="Close members"
-            title="Close members"
+            aria-label={t`Close members`}
+            title={t`Close members`}
             className="inline-flex size-8 shrink-0 items-center justify-center rounded text-muted-foreground hover:bg-accent hover:text-foreground"
           >
             <X className="size-4" />
@@ -213,7 +216,7 @@ export function MemberList({
           })}
           {members.length === 0 && (
             <li className="px-2 py-1.5 text-sm text-muted-foreground">
-              No members.
+              <Trans>No members.</Trans>
             </li>
           )}
         </ul>

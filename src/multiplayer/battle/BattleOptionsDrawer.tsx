@@ -1,3 +1,4 @@
+import { Trans, useLingui } from "@lingui/react/macro";
 import { Button } from "@picoframe/frame";
 import { Settings2, X } from "lucide-react";
 import { Dialog as DialogPrimitive } from "radix-ui";
@@ -100,6 +101,7 @@ export function BattleOptionsDrawer({
   /** Whether we opened this battle, which decides whether a workshop project's
    *  slots are written as script tags or asked of the autohost (issue #1279). */
 }) {
+  const { t } = useLingui();
   const [open, setOpen] = useState(false);
   const { pending, setOption, setOptions } = useBattleOptions(
     battle.scriptTags,
@@ -149,6 +151,7 @@ export function BattleOptionsDrawer({
     { scope: "map" as const, options: mapOptionsSchema },
     { scope: "mod" as const, options: mapFromGame },
   ];
+  const modname = battle.modname;
   const reset = (parts: { scope: OptionScope; options: ConfigOption[] }[]) => {
     if (resetRunning) return;
     const edits = resetEdits(parts, battle.scriptTags, pending);
@@ -167,10 +170,10 @@ export function BattleOptionsDrawer({
         >
           <span className="flex items-center gap-2 text-sm font-semibold">
             <Settings2 className="size-4 text-muted-foreground" />
-            Battle options
+            <Trans>Battle options</Trans>
           </span>
           <span className="text-xs text-muted-foreground">
-            {changed > 0 ? `${changed} changed` : "defaults"}
+            {changed > 0 ? t`${changed} changed` : t`defaults`}
           </span>
         </button>
       </div>
@@ -181,10 +184,10 @@ export function BattleOptionsDrawer({
           <DialogPrimitive.Content className="fixed inset-y-0 right-0 z-50 flex w-[760px] max-w-[96vw] flex-col border-l border-border bg-background shadow-xl duration-200 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:slide-out-to-right data-[state=open]:slide-in-from-right">
             <div className="flex items-center justify-between border-b border-border/60 px-5 py-4">
               <DialogPrimitive.Title className="text-base font-semibold">
-                Battle options
+                <Trans>Battle options</Trans>
               </DialogPrimitive.Title>
               <DialogPrimitive.Close asChild>
-                <Button variant="ghost" size="icon" aria-label="Close">
+                <Button variant="ghost" size="icon" aria-label={t`Close`}>
                   <X className="size-4" />
                 </Button>
               </DialogPrimitive.Close>
@@ -192,7 +195,9 @@ export function BattleOptionsDrawer({
 
             {!canEdit && (
               <p className="border-b border-border/60 px-5 py-2 text-xs text-muted-foreground">
-                Read-only. Only the host can change battle options.
+                <Trans>
+                  Read-only. Only the host can change battle options.
+                </Trans>
               </p>
             )}
 
@@ -200,7 +205,7 @@ export function BattleOptionsDrawer({
               <div className="border-b border-border/60 px-5 py-3">
                 <DeliveryProgressPanel
                   progress={delivery.progress}
-                  retryHint="Reset again to send the ones that did not land. Options already at their default are skipped."
+                  retryHint={t`Reset again to send the ones that did not land. Options already at their default are skipped.`}
                 />
               </div>
             )}
@@ -210,16 +215,20 @@ export function BattleOptionsDrawer({
               className="flex min-h-0 flex-1 flex-col gap-0"
             >
               <TabsList className="mx-5 mt-3 self-start">
-                <TabsTrigger value="battle">Battle</TabsTrigger>
+                <TabsTrigger value="battle">
+                  <Trans>Battle</Trans>
+                </TabsTrigger>
                 <TabsTrigger value="game">
-                  Game
+                  <Trans>Game</Trans>
                   <ChangedCount count={gameChanged} />
                 </TabsTrigger>
                 <TabsTrigger value="map">
-                  Map
+                  <Trans>Map</Trans>
                   <ChangedCount count={mapChanged} />
                 </TabsTrigger>
-                <TabsTrigger value="units">Units</TabsTrigger>
+                <TabsTrigger value="units">
+                  <Trans>Units</Trans>
+                </TabsTrigger>
               </TabsList>
 
               <TabsContent
@@ -228,7 +237,7 @@ export function BattleOptionsDrawer({
               >
                 <section>
                   <div className="mb-2 text-[11px] uppercase tracking-wide text-muted-foreground">
-                    Start positions
+                    <Trans>Start positions</Trans>
                   </div>
                   {startPositionsUnavailable ? (
                     <p className="text-xs text-muted-foreground">
@@ -253,13 +262,13 @@ export function BattleOptionsDrawer({
               >
                 <TabReset
                   count={gameChanged}
-                  label="Game options"
+                  label={t`all Game options`}
                   canEdit={canEdit}
                   busy={resetRunning}
                   onConfirm={() => reset(gameParts)}
                 />
                 <OptionSection
-                  title="Mod options"
+                  title={t`Mod options`}
                   scope="mod"
                   schema={gameOptions}
                   missing={gameMissing}
@@ -282,13 +291,13 @@ export function BattleOptionsDrawer({
               >
                 <TabReset
                   count={mapChanged}
-                  label="Map options"
+                  label={t`all Map options`}
                   canEdit={canEdit}
                   busy={resetRunning}
                   onConfirm={() => reset(mapParts)}
                 />
                 <OptionSection
-                  title="Map options"
+                  title={t`Map options`}
                   scope="map"
                   schema={mapOptionsSchema}
                   missing={mapMissing}
@@ -300,7 +309,7 @@ export function BattleOptionsDrawer({
                 />
                 {mapFromGame.length > 0 && (
                   <OptionSection
-                    title={`Declared by ${battle.modname}`}
+                    title={t`Declared by ${modname}`}
                     scope="mod"
                     schema={mapFromGame}
                     missing={gameMissing}
@@ -338,7 +347,7 @@ function ChangedCount({ count }: { count: number }) {
   if (count === 0) return null;
   return (
     <span className="rounded-full bg-primary/15 px-1.5 text-[10px] font-medium text-primary">
-      {count} changed
+      <Trans>{count} changed</Trans>
     </span>
   );
 }
@@ -363,10 +372,12 @@ function TabReset({
   if (!canEdit || count === 0) return null;
   return (
     <div className="flex items-center justify-end gap-2 text-xs text-muted-foreground">
-      <span>{count} changed</span>
+      <span>
+        <Trans>{count} changed</Trans>
+      </span>
       <GroupReset
         count={count}
-        label={`all ${label}`}
+        label={label}
         busy={busy}
         onConfirm={onConfirm}
       />
@@ -433,7 +444,7 @@ function OptionSection({
       ) : missing && raw.length > 0 ? (
         <div className="space-y-1">
           <p className="text-xs text-muted-foreground">
-            Content not installed — showing raw values.
+            <Trans>Content not installed — showing raw values.</Trans>
           </p>
           <ul className="space-y-1 text-sm">
             {raw.map((e) => (
@@ -445,7 +456,9 @@ function OptionSection({
           </ul>
         </div>
       ) : (
-        <p className="text-xs text-muted-foreground">No options.</p>
+        <p className="text-xs text-muted-foreground">
+          <Trans>No options.</Trans>
+        </p>
       )}
     </section>
   );
@@ -490,7 +503,7 @@ function RestrictSection({
   return (
     <section className="flex min-h-0 flex-1 flex-col">
       <div className="mb-2 text-[11px] uppercase tracking-wide text-muted-foreground">
-        Unit restrictions
+        <Trans>Unit restrictions</Trans>
       </div>
       {unavailable ? (
         <p className="text-xs text-muted-foreground">{unavailable}</p>
@@ -507,7 +520,9 @@ function RestrictSection({
           }}
         />
       ) : disabled.length === 0 ? (
-        <p className="text-xs text-muted-foreground">No restrictions.</p>
+        <p className="text-xs text-muted-foreground">
+          <Trans>No restrictions.</Trans>
+        </p>
       ) : (
         <ul className="space-y-1 text-sm">
           {disabled.map((name) => (

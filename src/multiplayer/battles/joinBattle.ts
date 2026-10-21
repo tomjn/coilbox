@@ -1,3 +1,4 @@
+import { t } from "@lingui/core/macro";
 import { notify } from "../../notify/notify";
 import { type Battle, mpJoinBattle } from "../bindings";
 import { newScriptPassword } from "../scriptPassword";
@@ -24,9 +25,10 @@ export async function joinBattle(args: {
   try {
     await leaveOther();
   } catch (e) {
+    const reason = e instanceof Error ? e.message : String(e);
     void notify({
-      title: "You are still in your other battle",
-      body: `Coilbox could not leave it: ${e instanceof Error ? e.message : String(e)}.`,
+      title: t`You are still in your other battle`,
+      body: t`Coilbox could not leave it: ${reason}.`,
       level: "error",
     });
     return;

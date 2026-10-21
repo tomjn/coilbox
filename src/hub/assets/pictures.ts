@@ -28,6 +28,7 @@
  * a caller that wants to say something can, and so the tests can read it.
  */
 
+import { t } from "@lingui/core/macro";
 import { serverError } from "../api";
 import type { AssetIdentity } from "./have";
 import type { AssetTier } from "./tier";
@@ -147,14 +148,14 @@ export function readPicturesBody(
   if (typeof body !== "object" || body === null) {
     return {
       ok: false,
-      reason: "The hub sent something coilbox could not read.",
+      reason: t`The hub sent something coilbox could not read.`,
     };
   }
   const shape = body as Record<string, unknown>;
   if (shape.format !== PICTURES_FORMAT) {
     return {
       ok: false,
-      reason: "That address answered, but it is not a coilbox hub.",
+      reason: t`That address answered, but it is not a coilbox hub.`,
     };
   }
   if (
@@ -163,15 +164,16 @@ export function readPicturesBody(
   ) {
     return {
       ok: false,
-      reason:
-        "This hub answers with a newer picture lookup than this copy of coilbox understands. Update coilbox.",
+      reason: t`This hub answers with a newer picture lookup than this copy of coilbox understands. Update coilbox.`,
     };
   }
   const results = shape.results;
   if (!Array.isArray(results) || results.length !== asked.length) {
+    const answered = Array.isArray(results) ? results.length : 0;
+    const requested = asked.length;
     return {
       ok: false,
-      reason: `The hub answered ${Array.isArray(results) ? results.length : 0} of ${asked.length} keys.`,
+      reason: t`The hub answered ${answered} of ${requested} keys.`,
     };
   }
 
@@ -180,14 +182,14 @@ export function readPicturesBody(
     if (typeof result !== "object" || result === null) {
       return {
         ok: false,
-        reason: `The hub's answer ${index} is not a result.`,
+        reason: t`The hub's answer ${index} is not a result.`,
       };
     }
     const record = result as Record<string, unknown>;
     if (!echoes(asked[index], record)) {
       return {
         ok: false,
-        reason: `The hub answered key ${index} with a different key.`,
+        reason: t`The hub answered key ${index} with a different key.`,
       };
     }
     pictures.push(readPicture(record.picture));
@@ -213,7 +215,8 @@ async function ask(
       signal,
     });
   } catch {
-    return { ok: false, reason: `Could not reach the hub at ${hostOf(url)}.` };
+    const host = hostOf(url);
+    return { ok: false, reason: t`Could not reach the hub at ${host}.` };
   }
 
   let body: unknown = null;
@@ -223,17 +226,17 @@ async function ask(
     if (response.ok) {
       return {
         ok: false,
-        reason: "The hub sent something coilbox could not read.",
+        reason: t`The hub sent something coilbox could not read.`,
       };
     }
   }
 
   if (!response.ok) {
     const said = serverError(body);
+    const status = response.status;
     return {
       ok: false,
-      reason:
-        said ?? `The hub refused the picture lookup (HTTP ${response.status}).`,
+      reason: said ?? t`The hub refused the picture lookup (HTTP ${status}).`,
     };
   }
   return readPicturesBody(body, keys);

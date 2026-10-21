@@ -1,6 +1,7 @@
+import { useLingui } from "@lingui/react/macro";
 import { cn } from "@picoframe/frame";
 import { Star, User, Users } from "lucide-react";
-import { NAME_MARK_CLASS, NAME_MARK_LABEL, type NameMark } from "./nameMark";
+import { NAME_MARK_CLASS, type NameMark } from "./nameMark";
 
 const ICON: Record<NameMark, typeof Star> = {
   you: User,
@@ -20,11 +21,15 @@ export function NameMarkIcon({
   mark: NameMark;
   className?: string;
 }) {
+  const { t } = useLingui();
   const Icon = ICON[mark];
+  const label = { you: t`You`, friend: t`Friend`, party: t`In your party` }[
+    mark
+  ];
   return (
     <Icon
       role="img"
-      aria-label={NAME_MARK_LABEL[mark]}
+      aria-label={label}
       className={cn("size-3.5 shrink-0", NAME_MARK_CLASS[mark], className)}
     />
   );

@@ -1,3 +1,5 @@
+import { t as coreT } from "@lingui/core/macro";
+import { Trans, useLingui } from "@lingui/react/macro";
 import { Button } from "@picoframe/frame";
 import { AlertTriangle, Loader2 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
@@ -65,13 +67,17 @@ function battleRowHref(serverKey: string, battle: number): string {
 function actionLabel(offer: InviteOffer, andJoin: boolean): string | null {
   switch (offer.kind) {
     case "join":
-      return andJoin ? "Join battle" : null;
-    case "connect":
-      return `Connect as ${offer.account.username}${andJoin ? " and join" : ""}`;
+      return andJoin ? coreT`Join battle` : null;
+    case "connect": {
+      const username = offer.account.username;
+      return andJoin
+        ? coreT`Connect as ${username} and join`
+        : coreT`Connect as ${username}`;
+    }
     case "login":
-      return "Open the login screen";
+      return coreT`Open the login screen`;
     case "unknown":
-      return "Add this server";
+      return coreT`Add this server`;
   }
 }
 
@@ -93,6 +99,7 @@ function actionLabel(offer: InviteOffer, andJoin: boolean): string | null {
  * Mounted once, inside the multiplayer provider and the router.
  */
 export function InviteLinkHost() {
+  const { t } = useLingui();
   const { prompt, intent } = useInviteState();
   const navigate = useNavigate();
   const {
@@ -160,10 +167,12 @@ export function InviteLinkHost() {
     if (step.kind === "wait") return;
     setInviteIntent(null);
     const { link } = intent;
+    const linkBattle = link.battle;
+    const linkAddress = link.address;
     if (step.kind === "elsewhere") {
       void notify({
-        title: "Invite dropped",
-        body: `You logged in to another server, so coilbox did not join battle ${link.battle} on ${link.address}. Open the link again to join it.`,
+        title: coreT`Invite dropped`,
+        body: coreT`You logged in to another server, so coilbox did not join battle ${linkBattle} on ${linkAddress}. Open the link again to join it.`,
       });
       return;
     }
@@ -173,8 +182,8 @@ export function InviteLinkHost() {
     const battle = state?.battles[String(link.battle)];
     if (!state || !battle) {
       void notify({
-        title: "The battle has gone",
-        body: `Battle ${link.battle} is no longer open on ${name}.`,
+        title: coreT`The battle has gone`,
+        body: coreT`Battle ${linkBattle} is no longer open on ${name}.`,
         level: "error",
       });
       return;
@@ -185,16 +194,16 @@ export function InviteLinkHost() {
     }
     if (state.currentBattle != null) {
       void notify({
-        title: "You are in another battle",
-        body: `Leave your battle on ${name}, then join this one from the battle list.`,
+        title: coreT`You are in another battle`,
+        body: coreT`Leave your battle on ${name}, then join this one from the battle list.`,
       });
       navigate(battleRowHref(serverKey, battle.id));
       return;
     }
     if (battle.passworded && !link.password) {
       void notify({
-        title: "This battle needs a password",
-        body: "Enter it on the battle's row to join.",
+        title: coreT`This battle needs a password`,
+        body: coreT`Enter it on the battle's row to join.`,
       });
       navigate(battleRowHref(serverKey, battle.id));
       return;
@@ -209,9 +218,10 @@ export function InviteLinkHost() {
             link.password,
           );
     if (key === null) {
+      const refusal = BATTLE_PASSWORD_REFUSAL;
       void notify({
-        title: "This battle's password cannot be sent",
-        body: `${BATTLE_PASSWORD_REFUSAL} Enter it on the battle's row to join.`,
+        title: coreT`This battle's password cannot be sent`,
+        body: coreT`${refusal} Enter it on the battle's row to join.`,
         level: "error",
       });
       navigate(battleRowHref(serverKey, battle.id));
@@ -222,9 +232,13 @@ export function InviteLinkHost() {
     // which asks.
     const other = otherBattleKey(connections, activeKey, serverKey);
     if (roomLeaveIsStale(intent.leavesKey, other)) {
+      const leaves = leavesBattleNotice(
+        serverNameFor(other ?? "", protocolServers),
+        "join",
+      );
       void notify({
-        title: "You are in another battle",
-        body: `${leavesBattleNotice(serverNameFor(other ?? "", protocolServers), "join")} Join from the battle list to go ahead.`,
+        title: coreT`You are in another battle`,
+        body: coreT`${leaves} Join from the battle list to go ahead.`,
       });
       navigate(battleRowHref(serverKey, battle.id));
       return;
@@ -270,7 +284,7 @@ export function InviteLinkHost() {
     if (refused) {
       setLanding(null);
       void notify({
-        title: "Could not join the battle",
+        title: coreT`Could not join the battle`,
         body: refused,
         level: "error",
         to: "/battles",
@@ -281,12 +295,14 @@ export function InviteLinkHost() {
   const offer = prompt ? offerFor(prompt) : null;
   const waiting = intent ? offerFor(intent.link) : null;
   const waitingLabel = waiting ? actionLabel(waiting, false) : null;
+  const heldBattle = intent?.link.battle;
+  const heldAddress = intent?.link.address;
 
   return (
     <>
       <SlideDrawer
         open={prompt !== null}
-        title="Join a battle"
+        title={t`Join a battle`}
         onClose={closeInvitePrompt}
       >
         {prompt && offer && (
@@ -313,19 +329,20 @@ export function InviteLinkHost() {
             role="status"
             className="fixed bottom-4 right-4 z-30 flex w-80 max-w-[calc(100vw-2rem)] flex-col gap-2 rounded-md border border-border bg-background p-3 text-sm shadow-lg"
           >
-            <p className="font-medium">Invite waiting</p>
+            <p className="font-medium">
+              <Trans>Invite waiting</Trans>
+            </p>
             <p className="text-muted-foreground">
-              Coilbox joins battle {intent.link.battle} once you are logged in
-              to{" "}
-              <code className="break-all text-foreground">
-                {intent.link.address}
-              </code>
-              .
+              <Trans>
+                Coilbox joins battle {heldBattle} once you are logged in to{" "}
+                <code className="break-all text-foreground">{heldAddress}</code>
+                .
+              </Trans>
             </p>
             {waiting.kind === "join" && (
               <p className="flex items-center gap-2 text-muted-foreground">
                 <Loader2 className="size-4 animate-spin" />
-                Logging in
+                <Trans>Logging in</Trans>
               </p>
             )}
             {error && (
@@ -339,7 +356,7 @@ export function InviteLinkHost() {
                 size="sm"
                 onClick={() => setInviteIntent(null)}
               >
-                Cancel invite
+                <Trans>Cancel invite</Trans>
               </Button>
               {waitingLabel && (
                 <Button size="sm" onClick={() => act(intent.link, waiting)}>
@@ -372,6 +389,9 @@ function InvitePrompt({
   onAct: () => void;
   onCancel: () => void;
 }) {
+  const { t } = useLingui();
+  const linkBattle = link.battle;
+  const accountName = offer.kind === "connect" ? offer.account.username : "";
   const name =
     offer.kind === "join"
       ? offer.serverName
@@ -382,46 +402,58 @@ function InvitePrompt({
     <>
       <div className="flex flex-1 flex-col gap-3 overflow-y-auto p-4 text-sm">
         <p>
-          This link is an invite to battle {link.battle}
-          {name ? ` on ${name}` : ""}.
+          {name ? (
+            <Trans>
+              This link is an invite to battle {linkBattle} on {name}.
+            </Trans>
+          ) : (
+            <Trans>This link is an invite to battle {linkBattle}.</Trans>
+          )}
         </p>
         <div>
-          <p className="text-xs text-muted-foreground">Server address</p>
+          <p className="text-xs text-muted-foreground">
+            <Trans>Server address</Trans>
+          </p>
           <code className="break-all font-mono text-base">{link.address}</code>
         </div>
         {offer.kind === "unknown" && (
           <p className="flex items-start gap-2 rounded-md border border-amber-500/30 bg-amber-500/5 p-2 text-xs">
             <AlertTriangle className="mt-0.5 size-4 shrink-0 text-amber-600 dark:text-amber-400" />
             <span>
-              Coilbox does not know this server. It is not in your server list,
-              and none of your saved logins are for it. Check the address before
-              you go on, and do not give it a password you use elsewhere.
+              <Trans>
+                Coilbox does not know this server. It is not in your server
+                list, and none of your saved logins are for it. Check the
+                address before you go on, and do not give it a password you use
+                elsewhere.
+              </Trans>
             </span>
           </p>
         )}
         <p className="text-muted-foreground">
           {offer.kind === "join" &&
             (offer.ready
-              ? "You are logged in to this server."
-              : "You are logging in to this server. Coilbox joins the battle once you are in.")}
+              ? t`You are logged in to this server.`
+              : t`You are logging in to this server. Coilbox joins the battle once you are in.`)}
           {offer.kind === "connect" &&
-            `Coilbox has not connected to it. It will log in as ${offer.account.username}, with the password saved for this server, and then join the battle.`}
+            t`Coilbox has not connected to it. It will log in as ${accountName}, with the password saved for this server, and then join the battle.`}
           {offer.kind === "login" &&
-            "Coilbox has not connected to it. The login screen opens for this server, and coilbox joins the battle once you are logged in."}
+            t`Coilbox has not connected to it. The login screen opens for this server, and coilbox joins the battle once you are logged in.`}
           {offer.kind === "unknown" &&
-            "Coilbox has not connected to it. The add server form opens with this address filled in. Nothing connects until you add the server and log in, and coilbox joins the battle once you have."}
+            t`Coilbox has not connected to it. The add server form opens with this address filled in. Nothing connects until you add the server and log in, and coilbox joins the battle once you have.`}
         </p>
         {link.password && (
           <p className="text-muted-foreground">
-            The link carries a password for the battle, which is sent to this
-            server when you join.
+            <Trans>
+              The link carries a password for the battle, which is sent to this
+              server when you join.
+            </Trans>
           </p>
         )}
         {leaves && <p>{leaves}</p>}
       </div>
       <footer className="flex items-center justify-end gap-2 border-t border-border px-4 py-3">
         <Button variant="outline" size="sm" onClick={onCancel}>
-          Cancel
+          <Trans>Cancel</Trans>
         </Button>
         <Button size="sm" onClick={onAct}>
           {actionLabel(offer, true)}

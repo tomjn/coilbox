@@ -1,3 +1,4 @@
+import { t } from "@lingui/core/macro";
 import type { Rating } from "./bindings";
 
 /**
@@ -31,13 +32,13 @@ export function ratingParts(rating: Rating | undefined): RatingPart[] {
   if (!rating) return [];
   const parts: RatingPart[] = [];
   if (rating.casual != null)
-    parts.push({ label: "Casual", value: rating.casual });
+    parts.push({ label: t`Casual`, value: rating.casual });
   if (rating.matchmaking != null) {
-    parts.push({ label: "Matchmaking", value: rating.matchmaking });
+    parts.push({ label: t`Matchmaking`, value: rating.matchmaking });
   }
   // No category, because the server named none.
   if (rating.overall != null)
-    parts.push({ label: "Rating", value: rating.overall });
+    parts.push({ label: t`Rating`, value: rating.overall });
   return parts;
 }
 

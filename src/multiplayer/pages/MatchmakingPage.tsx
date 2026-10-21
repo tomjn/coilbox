@@ -1,3 +1,5 @@
+import { plural } from "@lingui/core/macro";
+import { Trans } from "@lingui/react/macro";
 import { Button, NavGate } from "@picoframe/frame";
 import { Loader2, Swords, Users } from "lucide-react";
 import { useEffect } from "react";
@@ -51,11 +53,15 @@ function MatchmakingPage() {
   if (keys.length === 0) {
     return (
       <main className="flex flex-col items-center justify-center gap-4 p-10 text-center">
-        <h1 className="text-lg font-semibold">Matchmaking</h1>
+        <h1 className="text-lg font-semibold">
+          <Trans>Matchmaking</Trans>
+        </h1>
         <p className="text-sm text-muted-foreground">
-          You are not connected to a lobby server.
+          <Trans>You are not connected to a lobby server.</Trans>
         </p>
-        <Button onClick={openLoginPopover}>Connect…</Button>
+        <Button onClick={openLoginPopover}>
+          <Trans>Connect…</Trans>
+        </Button>
       </main>
     );
   }
@@ -67,9 +73,13 @@ function MatchmakingPage() {
   return (
     <main className="flex h-full min-h-0 flex-col">
       <header className="flex items-center gap-2 border-b border-border p-4">
-        <h1 className="text-lg font-semibold">Matchmaking</h1>
+        <h1 className="text-lg font-semibold">
+          <Trans>Matchmaking</Trans>
+        </h1>
         <span className="text-sm text-muted-foreground">
-          The server puts a match together and picks where it runs.
+          <Trans>
+            The server puts a match together and picks where it runs.
+          </Trans>
         </span>
       </header>
 
@@ -113,6 +123,10 @@ function QueueSection({
   if (!matchmaking) return null;
 
   const searching = searchingIn(matchmaking);
+  const searchingNames = searching.join(", ");
+  const partyNames = party?.members.join(", ") ?? "";
+  const username = usernameFromKey(serverKey);
+  const serverName = serverNameFor(serverKey, servers);
 
   const body = (
     <div
@@ -124,8 +138,10 @@ function QueueSection({
     >
       {!matchmaking.supported && (
         <p className="text-sm text-muted-foreground">
-          This server has not built matchmaking yet, so there is nothing to
-          search in.
+          <Trans>
+            This server has not built matchmaking yet, so there is nothing to
+            search in.
+          </Trans>
         </p>
       )}
 
@@ -134,12 +150,14 @@ function QueueSection({
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <Loader2 className="size-4 animate-spin" />
-              Searching in {searching.join(", ")}
+              <Trans>Searching in {searchingNames}</Trans>
             </CardTitle>
             <CardDescription>
-              This server does not report how many other players are searching,
-              so coilbox cannot say how long this will take. Leave it running
-              and accept the match when it appears.
+              <Trans>
+                This server does not report how many other players are
+                searching, so coilbox cannot say how long this will take. Leave
+                it running and accept the match when it appears.
+              </Trans>
             </CardDescription>
           </CardHeader>
           <CardContent className="flex items-center gap-3">
@@ -147,12 +165,12 @@ function QueueSection({
               variant="secondary"
               onClick={() => mpMatchmakingCancel({ serverKey }).catch(() => {})}
             >
-              Stop searching
+              <Trans>Stop searching</Trans>
             </Button>
             {party && party.members.length > 1 && (
               <span className="flex items-center gap-2 text-sm text-muted-foreground">
                 <Users className="size-4" />
-                Searching with {party.members.join(", ")}
+                <Trans>Searching with {partyNames}</Trans>
               </span>
             )}
           </CardContent>
@@ -163,13 +181,15 @@ function QueueSection({
         <>
           {party && party.members.length > 1 && (
             <p className="text-sm text-muted-foreground">
-              Your party searches as one, so this puts{" "}
-              {party.members.join(", ")} in the queue together.
+              <Trans>
+                Your party searches as one, so this puts {partyNames} in the
+                queue together.
+              </Trans>
             </p>
           )}
           {matchmaking.queues.length === 0 && (
             <p className="text-sm text-muted-foreground">
-              The server has not sent its queues yet.
+              <Trans>The server has not sent its queues yet.</Trans>
             </p>
           )}
           <ul className="grid gap-3 md:grid-cols-2">
@@ -196,7 +216,9 @@ function QueueSection({
     return (
       <section className="border-b border-border">
         <h2 className="px-4 pt-3 pb-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-          {usernameFromKey(serverKey)} on {serverNameFor(serverKey, servers)}
+          <Trans>
+            {username} on {serverName}
+          </Trans>
         </h2>
         {body}
       </section>
@@ -206,9 +228,13 @@ function QueueSection({
   return (
     <main className="flex h-full min-h-0 flex-col">
       <header className="flex items-center gap-2 border-b border-border p-4">
-        <h1 className="text-lg font-semibold">Matchmaking</h1>
+        <h1 className="text-lg font-semibold">
+          <Trans>Matchmaking</Trans>
+        </h1>
         <span className="text-sm text-muted-foreground">
-          The server puts a match together and picks where it runs.
+          <Trans>
+            The server puts a match together and picks where it runs.
+          </Trans>
         </span>
       </header>
       {body}
@@ -224,12 +250,17 @@ function QueueCard({
   queue: MatchQueue;
   onSearch: () => void;
 }) {
+  const mapCount = queue.maps.length;
   return (
     <Card className="h-full">
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
           {queue.name}
-          {queue.ranked && <Badge variant="secondary">Ranked</Badge>}
+          {queue.ranked && (
+            <Badge variant="secondary">
+              <Trans>Ranked</Trans>
+            </Badge>
+          )}
         </CardTitle>
         <CardDescription>{describeQueue(queue)}</CardDescription>
       </CardHeader>
@@ -240,11 +271,11 @@ function QueueCard({
         >
           {queue.maps.length === 1
             ? queue.maps[0]
-            : `${queue.maps.length} maps`}
+            : plural(mapCount, { one: "# map", other: "# maps" })}
         </span>
         <Button onClick={onSearch} className="gap-2">
           <Swords className="size-4" />
-          Search
+          <Trans>Search</Trans>
         </Button>
       </CardContent>
     </Card>

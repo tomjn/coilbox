@@ -35,13 +35,6 @@ export function nameMarkFor(
   return null;
 }
 
-/** What a mark is called, read out for the icon that carries it. */
-export const NAME_MARK_LABEL: Record<NameMark, string> = {
-  you: "You",
-  friend: "Friend",
-  party: "In your party",
-};
-
 /**
  * The text colour of each mark, as a light value and a `dark:` one. Three hues
  * a long way apart (blue, pink, teal), and none of them the amber of the host's

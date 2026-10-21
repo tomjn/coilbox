@@ -1,3 +1,6 @@
+import type { MessageDescriptor } from "@lingui/core";
+import { msg } from "@lingui/core/macro";
+import { Trans, useLingui } from "@lingui/react/macro";
 import { Button } from "@picoframe/frame";
 import { useState } from "react";
 import { describeError } from "@/i18n/uiError";
@@ -40,6 +43,7 @@ export function GameFactsControl({
    *  worse than one that is not offered yet. */
   agreed: boolean;
 }) {
+  const { t, i18n } = useLingui();
   const { target } = usePreferredTarget();
   const [running, setRunning] = useState(false);
   const [progress, setProgress] = useState<GameSweepProgress | null>(null);
@@ -75,16 +79,21 @@ export function GameFactsControl({
   return (
     <section className="space-y-2">
       <h3 className="text-sm font-medium leading-none">
-        Sending what your games say
+        <Trans>Sending what your games say</Trans>
       </h3>
       <p className="text-sm text-muted-foreground">
-        Coilbox can read the games on this computer and tell the hub what units
-        each one has: their names, what each one builds, and which faction they
-        belong to. It sends no pictures and no files, only those names.
+        <Trans>
+          Coilbox can read the games on this computer and tell the hub what
+          units each one has: their names, what each one builds, and which
+          faction they belong to. It sends no pictures and no files, only those
+          names.
+        </Trans>
       </p>
       <p className="text-sm text-muted-foreground">
-        Released games only. A game you are working on in a loose folder stays
-        on this machine, and so do the games coilbox writes for itself.
+        <Trans>
+          Released games only. A game you are working on in a loose folder stays
+          on this machine, and so do the games coilbox writes for itself.
+        </Trans>
       </p>
       <div className="flex items-center gap-3 pt-1">
         <Button
@@ -93,17 +102,19 @@ export function GameFactsControl({
           onClick={run}
           disabled={running || !target?.enginePath}
         >
-          {running ? "Reading your games…" : "Send what your games say"}
+          {running ? t`Reading your games…` : t`Send what your games say`}
         </Button>
         {progress && (
           <span className="text-sm text-muted-foreground">
-            {phaseWords(progress)}
+            {i18n._(phaseWords(progress))}
           </span>
         )}
       </div>
       {!target?.enginePath && (
         <p className="text-sm text-muted-foreground">
-          Coilbox needs an engine installed before it can read your games.
+          <Trans>
+            Coilbox needs an engine installed before it can read your games.
+          </Trans>
         </p>
       )}
       {report && (
@@ -126,13 +137,28 @@ export function GameFactsControl({
 }
 
 /** What a phase is called while it is running, counting games. */
-function phaseWords({ phase, done, total, game }: GameSweepProgress): string {
-  if (phase === "scanning") return "Looking for your games";
+function phaseWords({
+  phase,
+  done,
+  total,
+  game,
+}: GameSweepProgress): MessageDescriptor {
+  if (phase === "scanning") return msg`Looking for your games`;
   // `done` counts games finished, so the one being worked on is the next along,
   // except on the last sample where there is no next one.
   const at = Math.min(done + 1, total);
-  const of = total > 0 ? ` ${at} of ${total}` : "";
-  const named = game ? `: ${game}` : "";
-  if (phase === "sending") return `Sending${of}${named}`;
-  return `Reading${of}${named}`;
+  if (phase === "sending") {
+    if (total > 0) {
+      return game
+        ? msg`Sending ${at} of ${total}: ${game}`
+        : msg`Sending ${at} of ${total}`;
+    }
+    return game ? msg`Sending: ${game}` : msg`Sending`;
+  }
+  if (total > 0) {
+    return game
+      ? msg`Reading ${at} of ${total}: ${game}`
+      : msg`Reading ${at} of ${total}`;
+  }
+  return game ? msg`Reading: ${game}` : msg`Reading`;
 }
