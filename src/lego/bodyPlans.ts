@@ -15,6 +15,7 @@
  * of one.
  */
 
+import { t } from "@lingui/core/macro";
 import type { AppliedPreset, PresetParam } from "./animPresets";
 import { BUILDING, TURRET_BUILDING } from "./buildingPlans";
 import { AIRCRAFT, HOVER, SHIP } from "./hoverAirShipPlans";
@@ -110,7 +111,7 @@ const THIGH_SHARE = 0.395;
 
 function elmos(
   id: string,
-  label: string,
+  label: () => string,
   min: number,
   max: number,
   fallback: number,
@@ -118,7 +119,9 @@ function elmos(
 ): BodyPlanProportion {
   return {
     id,
-    label,
+    get label() {
+      return label();
+    },
     unit: "elmo",
     min,
     max,
@@ -128,19 +131,19 @@ function elmos(
   };
 }
 
-const LEG_LENGTH = elmos("legLength", "Leg length", 5, 40, 18.8, {
+const LEG_LENGTH = elmos("legLength", () => t`Leg length`, 5, 40, 18.8, {
   bone: "thigh.l1",
   axis: 1,
 });
-const STANCE = elmos("stance", "Stance width", 10, 60, 29.8, {
+const STANCE = elmos("stance", () => t`Stance width`, 10, 60, 29.8, {
   bone: "foot.l1",
   axis: 0,
 });
-const BODY_HEIGHT = elmos("bodyHeight", "Body height", 0, 25, 5.4, {
+const BODY_HEIGHT = elmos("bodyHeight", () => t`Body height`, 0, 25, 5.4, {
   bone: "torso",
   axis: 1,
 });
-const BODY_LENGTH = elmos("bodyLength", "Body length", 5, 70, 27.7, {
+const BODY_LENGTH = elmos("bodyLength", () => t`Body length`, 5, 70, 27.7, {
   bone: "thigh.l1",
   axis: 2,
 });
@@ -242,8 +245,12 @@ function measureLegs(joints: Joints, body: string, pairs: number[]) {
 
 export const BIPED: BodyPlan = {
   id: "biped",
-  label: "Two legs",
-  description: "A hip on two legs, walking.",
+  get label() {
+    return t`Two legs`;
+  },
+  get description() {
+    return t`A hip on two legs, walking.`;
+  },
   proportions: [LEG_LENGTH, STANCE, BODY_HEIGHT],
   bones(proportions) {
     return [
@@ -257,8 +264,12 @@ export const BIPED: BodyPlan = {
 
 export const QUADRUPED: BodyPlan = {
   id: "quadruped",
-  label: "Four legs",
-  description: "A body on four legs, trotting.",
+  get label() {
+    return t`Four legs`;
+  },
+  get description() {
+    return t`A body on four legs, trotting.`;
+  },
   proportions: [LEG_LENGTH, STANCE, BODY_HEIGHT, BODY_LENGTH],
   bones(proportions) {
     const half = (proportions.bodyLength as number) / 2;
@@ -285,7 +296,7 @@ export const QUADRUPED: BodyPlan = {
  * more than two pairs. No six or eight legged model has been measured, so it is
  * the four legged plan's gap between its two pairs, 27.7, and its range.
  */
-const LEG_GAP = elmos("legGap", "Gap between leg pairs", 5, 70, 27.7, {
+const LEG_GAP = elmos("legGap", () => t`Gap between leg pairs`, 5, 70, 27.7, {
   bone: "thigh.l1",
   axis: 2,
 });
@@ -297,15 +308,19 @@ const LEG_GAP = elmos("legGap", "Gap between leg pairs", 5, 70, 27.7, {
  */
 function manyLegs(
   id: string,
-  label: string,
-  description: string,
+  label: () => string,
+  description: () => string,
   pairs: number,
 ): BodyPlan {
   const numbers = Array.from({ length: pairs }, (_, i) => i + 1);
   return {
     id,
-    label,
-    description,
+    get label() {
+      return label();
+    },
+    get description() {
+      return description();
+    },
     proportions: [LEG_LENGTH, STANCE, BODY_HEIGHT, LEG_GAP],
     bones(proportions) {
       const gap = proportions.legGap as number;
@@ -346,15 +361,15 @@ function manyLegs(
 
 export const HEXAPOD = manyLegs(
   "hexapod",
-  "Six legs",
-  "A body on six legs, walking three at a time.",
+  () => t`Six legs`,
+  () => t`A body on six legs, walking three at a time.`,
   3,
 );
 
 export const OCTOPOD = manyLegs(
   "octopod",
-  "Eight legs",
-  "A body on eight legs, walking four at a time.",
+  () => t`Eight legs`,
+  () => t`A body on eight legs, walking four at a time.`,
   4,
 );
 

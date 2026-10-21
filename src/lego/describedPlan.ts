@@ -28,6 +28,7 @@
  *   mount and the nozzle carries the point.
  */
 
+import { t } from "@lingui/core/macro";
 import {
   BODY_PLANS,
   type BodyPlan,
@@ -40,14 +41,54 @@ import { between, rise } from "./planMeasure";
 
 /** The movement answers, in the order the form lists them. */
 export const MOVES = [
-  { id: "biped", label: "Two legs" },
-  { id: "quadruped", label: "Four legs" },
-  { id: "hexapod", label: "Six legs" },
-  { id: "octopod", label: "Eight legs" },
-  { id: "wheeled", label: "Wheels" },
-  { id: "tracked", label: "Tracks" },
-  { id: "hover", label: "Hovers" },
-  { id: "static", label: "Does not move" },
+  {
+    id: "biped",
+    get label() {
+      return t`Two legs`;
+    },
+  },
+  {
+    id: "quadruped",
+    get label() {
+      return t`Four legs`;
+    },
+  },
+  {
+    id: "hexapod",
+    get label() {
+      return t`Six legs`;
+    },
+  },
+  {
+    id: "octopod",
+    get label() {
+      return t`Eight legs`;
+    },
+  },
+  {
+    id: "wheeled",
+    get label() {
+      return t`Wheels`;
+    },
+  },
+  {
+    id: "tracked",
+    get label() {
+      return t`Tracks`;
+    },
+  },
+  {
+    id: "hover",
+    get label() {
+      return t`Hovers`;
+    },
+  },
+  {
+    id: "static",
+    get label() {
+      return t`Does not move`;
+    },
+  },
 ] as const;
 
 export type MoveId = (typeof MOVES)[number]["id"];
@@ -83,7 +124,9 @@ const MOUNT: Record<string, string> = {
 
 const NANO_RISE: BodyPlanProportion = {
   id: "nanoRise",
-  label: "Nano point height",
+  get label() {
+    return t`Nano point height`;
+  },
   unit: "elmo",
   min: 0,
   max: 90,
@@ -183,8 +226,14 @@ export function withGroups(
   const mount = MOUNT[base.id] ?? "base";
   return {
     id: `${base.id}${weapon ? "+gun" : ""}${groups.builds ? "+build" : ""}`,
-    label: `${base.label}${weapon ? ", gun" : ""}${groups.builds ? ", builds" : ""}`,
-    description: base.description,
+    get label() {
+      const plan = base.label;
+      if (weapon && groups.builds) return t`${plan}, gun, builds`;
+      return weapon ? t`${plan}, gun` : t`${plan}, builds`;
+    },
+    get description() {
+      return base.description;
+    },
     basedOn: base.id,
     proportions: [
       ...base.proportions,

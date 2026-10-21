@@ -39,6 +39,7 @@
  * above the ground.
  */
 
+import { t } from "@lingui/core/macro";
 import type { BodyPlan, BodyPlanBone, BodyPlanProportion } from "./bodyPlans";
 import { between, type Joints, mean, spacingAlongZ } from "./planMeasure";
 
@@ -49,7 +50,7 @@ const ROAD_WHEEL_HEIGHT = 0.34;
 
 function proportion(
   id: string,
-  label: string,
+  label: () => string,
   unit: BodyPlanProportion["unit"],
   min: number,
   max: number,
@@ -58,7 +59,9 @@ function proportion(
 ): BodyPlanProportion {
   return {
     id,
-    label,
+    get label() {
+      return label();
+    },
     unit,
     min,
     max,
@@ -127,19 +130,23 @@ function along(i: number, count: number, spacing: number): number {
 
 export const WHEELED: BodyPlan = {
   id: "wheeled",
-  label: "Wheels",
-  description: "A body on axles of wheels that turn while it moves.",
+  get label() {
+    return t`Wheels`;
+  },
+  get description() {
+    return t`A body on axles of wheels that turn while it moves.`;
+  },
   proportions: [
-    proportion("axles", "Axles", "count", 2, 5, 2),
-    proportion("axleSpacing", "Axle spacing", "elmo", 3, 75, 19.6, {
+    proportion("axles", () => t`Axles`, "count", 2, 5, 2),
+    proportion("axleSpacing", () => t`Axle spacing`, "elmo", 3, 75, 19.6, {
       bone: "wheel.l1",
       axis: 2,
     }),
-    proportion("trackWidth", "Track width", "elmo", 5, 100, 28, {
+    proportion("trackWidth", () => t`Track width`, "elmo", 5, 100, 28, {
       bone: "wheel.l1",
       axis: 0,
     }),
-    proportion("wheelHeight", "Wheel height", "elmo", 1, 20, 4.7, {
+    proportion("wheelHeight", () => t`Wheel height`, "elmo", 1, 20, 4.7, {
       bone: "body",
       axis: 1,
     }),
@@ -182,23 +189,26 @@ export const WHEELED: BodyPlan = {
  */
 export const TRACKED: BodyPlan = {
   id: "tracked",
-  label: "Tracks",
-  description:
-    "A body on two tracks, with road wheels that turn while it moves.",
+  get label() {
+    return t`Tracks`;
+  },
+  get description() {
+    return t`A body on two tracks, with road wheels that turn while it moves.`;
+  },
   proportions: [
-    proportion("trackLength", "Track length", "elmo", 25, 65, 47.4, {
+    proportion("trackLength", () => t`Track length`, "elmo", 25, 65, 47.4, {
       bone: "wheel.l1",
       axis: 2,
     }),
-    proportion("trackWidth", "Track width", "elmo", 10, 25, 18.3, {
+    proportion("trackWidth", () => t`Track width`, "elmo", 10, 25, 18.3, {
       bone: "track.l",
       axis: 0,
     }),
-    proportion("trackHeight", "Track height", "elmo", 5, 15, 8.8, {
+    proportion("trackHeight", () => t`Track height`, "elmo", 5, 15, 8.8, {
       bone: "body",
       axis: 1,
     }),
-    proportion("roadWheels", "Road wheels a side", "count", 3, 11, 6),
+    proportion("roadWheels", () => t`Road wheels a side`, "count", 3, 11, 6),
   ],
   bones({ trackLength, trackWidth, trackHeight, roadWheels }) {
     const count = roadWheels as number;

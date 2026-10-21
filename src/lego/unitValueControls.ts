@@ -1,3 +1,5 @@
+import { t } from "@lingui/core/macro";
+
 /**
  * Which control a unit value id should be edited with, and how to read and
  * write the number it stores.
@@ -56,26 +58,68 @@ const PERCENTS = new Set([
 ]);
 
 const MOVE_ORDERS = [
-  { value: 0, label: "Hold position" },
-  { value: 1, label: "Manoeuvre" },
-  { value: 2, label: "Roam" },
+  {
+    value: 0,
+    get label() {
+      return t`Hold position`;
+    },
+  },
+  {
+    value: 1,
+    get label() {
+      return t`Manoeuvre`;
+    },
+  },
+  {
+    value: 2,
+    get label() {
+      return t`Roam`;
+    },
+  },
 ];
 
 const FIRE_ORDERS = [
-  { value: 0, label: "Hold fire" },
-  { value: 1, label: "Return fire" },
-  { value: 2, label: "Fire at will" },
+  {
+    value: 0,
+    get label() {
+      return t`Hold fire`;
+    },
+  },
+  {
+    value: 1,
+    get label() {
+      return t`Return fire`;
+    },
+  },
+  {
+    value: 2,
+    get label() {
+      return t`Fire at will`;
+    },
+  },
 ];
 
 /** A nicer label than sentence-casing the engine's own name would give.
  *  Everything else falls back to that instead. */
 const LABELS: Record<string, string> = {
-  HEALTH: "Health",
-  INBUILDSTANCE: "Build stance",
-  STANDINGMOVEORDERS: "Move orders",
-  STANDINGFIREORDERS: "Fire orders",
-  HEADING: "Heading",
-  CURRENT_SPEED: "Speed",
+  get HEALTH() {
+    return t`Health`;
+  },
+  get INBUILDSTANCE() {
+    return t`Build stance`;
+  },
+  get STANDINGMOVEORDERS() {
+    return t`Move orders`;
+  },
+  get STANDINGFIREORDERS() {
+    return t`Fire orders`;
+  },
+  get HEADING() {
+    return t`Heading`;
+  },
+  get CURRENT_SPEED() {
+    return t`Speed`;
+  },
 };
 
 /** `YARD_OPEN` becomes "Yard open": lower-cased, underscores to spaces, and
@@ -97,7 +141,7 @@ const identity = (value: number) => value;
  * gives Lua, and an id nothing named still needs something to edit it with.
  */
 export function controlFor(id: number, name: string | null): UnitValueControl {
-  if (name === null) return { kind: "number", label: `Value ${id}` };
+  if (name === null) return { kind: "number", label: t`Value ${id}` };
 
   const label = LABELS[name] ?? sentenceCase(name);
 

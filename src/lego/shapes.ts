@@ -14,6 +14,7 @@
  * viewport treat it like a part.
  */
 
+import { t } from "@lingui/core/macro";
 import * as THREE from "three";
 
 /** A piece's generated shape, as the document stores it. */
@@ -1326,7 +1327,9 @@ export const SHAPE_KINDS: ShapeKind[] = [
   {
     id: "cylinder",
     kind: "cylinder",
-    label: "Cylinder",
+    get label() {
+      return t`Cylinder`;
+    },
     size: [1, 1, 1],
     options: { axis: 1, sides: DEFAULT_CYLINDER_SIDES },
     tags: ["round"],
@@ -1334,7 +1337,9 @@ export const SHAPE_KINDS: ShapeKind[] = [
   {
     id: "tube",
     kind: "tube",
-    label: "Tube",
+    get label() {
+      return t`Tube`;
+    },
     size: [1, 1, 1],
     // The hole's radius: the tube's 0.5, less a wall of 0.25.
     options: { axis: 1, sides: DEFAULT_CYLINDER_SIDES, inner: 0.25 },
@@ -1343,7 +1348,9 @@ export const SHAPE_KINDS: ShapeKind[] = [
   {
     id: "cone",
     kind: "cone",
-    label: "Cone",
+    get label() {
+      return t`Cone`;
+    },
     size: [1, 1, 1],
     options: { axis: 1, sides: DEFAULT_CYLINDER_SIDES, top: 0 },
     tags: ["round", "point"],
@@ -1351,7 +1358,9 @@ export const SHAPE_KINDS: ShapeKind[] = [
   {
     id: "sphere",
     kind: "sphere",
-    label: "Sphere",
+    get label() {
+      return t`Sphere`;
+    },
     size: [1, 1, 1],
     options: { keep: SPHERE_WHOLE },
     tags: ["round", "ball"],
@@ -1359,7 +1368,9 @@ export const SHAPE_KINDS: ShapeKind[] = [
   {
     id: "dome",
     kind: "sphere",
-    label: "Dome",
+    get label() {
+      return t`Dome`;
+    },
     size: [1, 0.5, 1],
     options: { keep: SPHERE_DOME },
     tags: ["round", "half"],
@@ -1367,7 +1378,9 @@ export const SHAPE_KINDS: ShapeKind[] = [
   {
     id: "wedge",
     kind: "wedge",
-    label: "Wedge",
+    get label() {
+      return t`Wedge`;
+    },
     size: [1, 1, 1],
     options: { low: 0, flip: 0 },
     tags: ["slope", "ramp"],

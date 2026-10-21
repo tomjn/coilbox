@@ -11,6 +11,7 @@
  * as timing: what the user picked from is the thing that has to make sense.
  */
 
+import { t } from "@lingui/core/macro";
 import type { GroundShape } from "./environment";
 
 /** A call-in to fire, and when. Frames are counted from the start of the run. */
@@ -467,8 +468,12 @@ const FIRING_EVENTS: ScriptEvent[] = [
 export const SCENARIOS: Scenario[] = [
   {
     id: "moving",
-    label: "Moving",
-    description: "Created, then told to move and left moving.",
+    get label() {
+      return t`Moving`;
+    },
+    get description() {
+      return t`Created, then told to move and left moving.`;
+    },
     // Half a second in, not on the frame the unit was made. A `Create` that
     // sleeps is suspended mid-way through setting the unit up, and what it
     // writes after the sleep is often what the move animation reads: flove's
@@ -480,8 +485,12 @@ export const SCENARIOS: Scenario[] = [
   },
   {
     id: "starting-stopping",
-    label: "Starting and stopping",
-    description: "Moves for half the preview, then stops, so both are visible.",
+    get label() {
+      return t`Starting and stopping`;
+    },
+    get description() {
+      return t`Moves for half the preview, then stops, so both are visible.`;
+    },
     events: [
       ...CREATED,
       // After `Create` has finished, for the reason the scenario above gives.
@@ -491,9 +500,12 @@ export const SCENARIOS: Scenario[] = [
   },
   {
     id: "driving",
-    label: "Driving along a path",
-    description:
-      "Drives forwards along a path, slowing for turns, and stops at the end. Ground units only, not aircraft.",
+    get label() {
+      return t`Driving along a path`;
+    },
+    get description() {
+      return t`Drives forwards along a path, slowing for turns, and stops at the end. Ground units only, not aircraft.`;
+    },
     drive: true,
     // What the scenario fires, for the marks on the picker. The real frames
     // depend on the path and the unit's speed, so `drive.ts` works them out
@@ -506,21 +518,32 @@ export const SCENARIOS: Scenario[] = [
   },
   {
     id: "idle",
-    label: "Standing still",
-    description: "Created and nothing else. Shows what a script does unasked.",
+    get label() {
+      return t`Standing still`;
+    },
+    get description() {
+      return t`Created and nothing else. Shows what a script does unasked.`;
+    },
     events: CREATED,
   },
   {
     id: "active",
-    label: "Switched on",
-    description: "Activated, for a unit that opens or spins up when it is on.",
+    get label() {
+      return t`Switched on`;
+    },
+    get description() {
+      return t`Activated, for a unit that opens or spins up when it is on.`;
+    },
     events: [...CREATED, { frame: 0, callin: "Activate" }],
   },
   {
     id: "take-off-landing",
-    label: "Take off and land",
-    description:
-      "Activated as an aircraft takes off, then deactivated once it has landed, as the engine does for both air move types.",
+    get label() {
+      return t`Take off and land`;
+    },
+    get description() {
+      return t`Activated as an aircraft takes off, then deactivated once it has landed, as the engine does for both air move types.`;
+    },
     events: [
       ...CREATED,
       { frame: at(1), callin: "Activate" },
@@ -529,9 +552,12 @@ export const SCENARIOS: Scenario[] = [
   },
   {
     id: "building",
-    label: "Building (mobile)",
-    description:
-      "A construction unit reaching one way, stopping, then reaching the other, with something there to build. Its nanolathe is aimed, so this is the one with angles in it.",
+    get label() {
+      return t`Building (mobile)`;
+    },
+    get description() {
+      return t`A construction unit reaching one way, stopping, then reaching the other, with something there to build. Its nanolathe is aimed, so this is the one with angles in it.`;
+    },
     nano: "builder",
     events: [
       ...CREATED,
@@ -581,9 +607,12 @@ export const SCENARIOS: Scenario[] = [
   },
   {
     id: "building-factory",
-    label: "Building (factory)",
-    description:
-      "A factory opening its yard and waiting for its own script to be ready before it builds, which is a different pair of call-ins from a construction unit's.",
+    get label() {
+      return t`Building (factory)`;
+    },
+    get description() {
+      return t`A factory opening its yard and waiting for its own script to be ready before it builds, which is a different pair of call-ins from a construction unit's.`;
+    },
     nano: "factory",
     events: [
       ...CREATED,
@@ -619,9 +648,12 @@ export const SCENARIOS: Scenario[] = [
   },
   {
     id: "destroyed",
-    label: "Hit and destroyed",
-    description:
-      "Takes a hit, then dies. A unit's death is usually its biggest animation: pieces are thrown off and the rest is hidden.",
+    get label() {
+      return t`Hit and destroyed`;
+    },
+    get description() {
+      return t`Takes a hit, then dies. A unit's death is usually its biggest animation: pieces are thrown off and the rest is hidden.`;
+    },
     events: [
       ...CREATED,
       // `HitByWeapon(dirX, dirZ, weaponDefID, damage)`, the direction the hit
@@ -638,9 +670,12 @@ export const SCENARIOS: Scenario[] = [
   },
   {
     id: "destroyed-light",
-    label: "Lightly hit and destroyed",
-    description:
-      "Dies with a fifth of its health taken in the last few seconds, the lightest grade of death a script has.",
+    get label() {
+      return t`Lightly hit and destroyed`;
+    },
+    get description() {
+      return t`Dies with a fifth of its health taken in the last few seconds, the lightest grade of death a script has.`;
+    },
     events: [
       ...CREATED,
       { frame: at(1), callin: "HitByWeapon", args: [0, 1, 0, 20] },
@@ -649,9 +684,12 @@ export const SCENARIOS: Scenario[] = [
   },
   {
     id: "destroyed-heavy",
-    label: "Hit hard and destroyed",
-    description:
-      "Dies with one and a half times its health taken in the last few seconds, the heaviest grade of death a script has.",
+    get label() {
+      return t`Hit hard and destroyed`;
+    },
+    get description() {
+      return t`Dies with one and a half times its health taken in the last few seconds, the heaviest grade of death a script has.`;
+    },
     events: [
       ...CREATED,
       { frame: at(1), callin: "HitByWeapon", args: [0, 1, 0, 150] },
@@ -660,17 +698,23 @@ export const SCENARIOS: Scenario[] = [
   },
   {
     id: "firing",
-    label: "Aiming and firing",
-    description:
-      "Aims at a target that keeps moving and fires two volleys at it.",
+    get label() {
+      return t`Aiming and firing`;
+    },
+    get description() {
+      return t`Aims at a target that keeps moving and fires two volleys at it.`;
+    },
     movingTarget: true,
     events: [...CREATED, ...FIRING_EVENTS],
   },
   {
     id: "driving-firing",
-    label: "Aiming and firing while driving",
-    description:
-      "Drives along a path while its weapon keeps aiming at a target that keeps moving, from where the unit is and which way it faces.",
+    get label() {
+      return t`Aiming and firing while driving`;
+    },
+    get description() {
+      return t`Drives along a path while its weapon keeps aiming at a target that keeps moving, from where the unit is and which way it faces.`;
+    },
     drive: true,
     movingTarget: true,
     // The drive's own call-ins come from `drive.ts`, so the marks on the
@@ -679,9 +723,12 @@ export const SCENARIOS: Scenario[] = [
   },
   {
     id: "transport-pickup",
-    label: "Loading and unloading a ship or hover transport",
-    description:
-      "A ship, hovercraft or ground transport picking something up, then putting it back down where it found it. It is told what to load and reaches for it, and the script decides where it goes in between.",
+    get label() {
+      return t`Loading and unloading a ship or hover transport`;
+    },
+    get description() {
+      return t`A ship, hovercraft or ground transport picking something up, then putting it back down where it found it. It is told what to load and reaches for it, and the script decides where it goes in between.`;
+    },
     events: [
       ...CREATED,
       // The engine's other arm: anything that is not an air transport stops,
@@ -719,9 +766,12 @@ export const SCENARIOS: Scenario[] = [
   },
   {
     id: "transport-load",
-    label: "Loading and unloading a transport",
-    description:
-      "An air transport picking something up on the piece the script names, carrying it, then landing and letting it go.",
+    get label() {
+      return t`Loading and unloading a transport`;
+    },
+    get description() {
+      return t`An air transport picking something up on the piece the script names, carrying it, then landing and letting it go.`;
+    },
     events: [
       ...CREATED,
       // The engine's air arm calls `BeginTransport`, then attaches the

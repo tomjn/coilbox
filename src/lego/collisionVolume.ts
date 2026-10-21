@@ -25,6 +25,7 @@
  * something else instead: see `pieceCollisionScript.ts`.
  */
 
+import { t } from "@lingui/core/macro";
 import { aimPoint } from "./aimPoint";
 import {
   type CollisionVolumeType,
@@ -39,12 +40,24 @@ import type { BakedPiece, UnitBounds } from "./s3oBuild";
 /** What each shape is called in the picker. Keyed by the type, so a shape
  *  added to the union has to be named here before this compiles. */
 export const COLLISION_VOLUME_LABELS: Record<CollisionVolumeType, string> = {
-  box: "Box",
-  sphere: "Sphere",
-  ellipsoid: "Ellipsoid",
-  cylx: "Cylinder along x",
-  cyly: "Cylinder along y",
-  cylz: "Cylinder along z",
+  get box() {
+    return t`Box`;
+  },
+  get sphere() {
+    return t`Sphere`;
+  },
+  get ellipsoid() {
+    return t`Ellipsoid`;
+  },
+  get cylx() {
+    return t`Cylinder along x`;
+  },
+  get cyly() {
+    return t`Cylinder along y`;
+  },
+  get cylz() {
+    return t`Cylinder along z`;
+  },
 };
 
 /**
