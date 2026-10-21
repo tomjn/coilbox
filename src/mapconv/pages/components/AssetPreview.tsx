@@ -1,3 +1,4 @@
+import { Trans, useLingui } from "@lingui/react/macro";
 import { ImageOff, Loader2 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { getImageInfo } from "../../imageCache";
@@ -21,6 +22,7 @@ export function AssetPreview({
     height: number;
   } | null>(null);
   const [failed, setFailed] = useState(false);
+  const { t } = useLingui();
 
   // biome-ignore lint/correctness/useExhaustiveDependencies: refetch on path only; onInfo is a reporting callback, not an input
   useEffect(() => {
@@ -45,7 +47,7 @@ export function AssetPreview({
   if (failed) {
     return (
       <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
-        <ImageOff size={13} /> No preview available.
+        <ImageOff size={13} /> <Trans>No preview available.</Trans>
       </p>
     );
   }
@@ -59,7 +61,7 @@ export function AssetPreview({
           />
         </div>
         <span className="font-mono text-xs text-muted-foreground">
-          generating preview…
+          <Trans>generating preview…</Trans>
         </span>
       </div>
     );
@@ -68,7 +70,7 @@ export function AssetPreview({
     <div className="flex items-center gap-3">
       <img
         src={info.thumb}
-        alt="Selected asset preview"
+        alt={t`Selected asset preview`}
         className="h-16 w-16 shrink-0 rounded border border-border bg-muted/30 object-contain"
       />
       <span className="font-mono text-xs text-muted-foreground">
