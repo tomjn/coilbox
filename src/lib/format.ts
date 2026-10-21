@@ -61,6 +61,22 @@ export function formatDateTime(
   return new Date(d).toLocaleString(getLocale(), opts);
 }
 
+/**
+ * A short date and time of the ISO timestamp `iso` in the app language, for a
+ * chart axis. Returns `iso` unchanged when it does not parse.
+ */
+export function formatShortDateTime(iso: string): string {
+  const d = new Date(iso);
+  return Number.isNaN(d.getTime())
+    ? iso
+    : formatDateTime(d, {
+        month: "short",
+        day: "numeric",
+        hour: "2-digit",
+        minute: "2-digit",
+      });
+}
+
 const BYTE_UNITS = ["kilobyte", "megabyte", "gigabyte", "terabyte"] as const;
 
 /**
