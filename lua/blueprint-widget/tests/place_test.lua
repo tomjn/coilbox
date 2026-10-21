@@ -162,12 +162,24 @@ metal[6 * 10 + 8] = 2
 for x = 0, 9 do
 	metal[4 * 10 + x] = 1
 end
-local found = PLACE.metalSpots(10, 8, function(x, z)
+local function amount(x, z)
 	return metal[z * 10 + x] or 0
-end, 16, 48)
+end
+local found = PLACE.metalSpots(PLACE.newMetalScan(10, 8, amount, 16), 48)
 check("each patch of metal no wider than an extractor reaches is a spot", #found == 2, show(found))
 check("a spot sits at its patch's middle, weighted by metal", found[1].x == (1.75 + 0.5) * 16 and found[1].z == 2.5 * 16, show(found[1]))
 check("a lone square is a spot at its own middle", found[2].x == 8.5 * 16 and found[2].z == 6.5 * 16, show(found[2]))
+local stepped = PLACE.newMetalScan(10, 8, amount, 16)
+local steps = 0
+while not PLACE.stepMetalScan(stepped, 3) do
+	steps = steps + 1
+end
+check("a scan run a few squares at a time, pausing inside patches, finds the same spots", steps > 10 and same(PLACE.metalSpots(stepped, 48), found), steps .. " " .. show(PLACE.metalSpots(stepped, 48)))
+local partial = PLACE.newMetalScan(10, 8, amount, 16)
+PLACE.stepMetalScan(partial, 25)
+check("asking for spots part way through finishes the scan at once", not partial.done and same(PLACE.metalSpots(partial, 48), found) and partial.done)
+check("a wider extractor counts a wider patch as a spot", #PLACE.metalSpots(stepped, 160) == 3)
+check("an empty metal map is done before it starts", PLACE.newMetalScan(0, 0, amount, 16).done)
 
 local px, pz = PLACE.pivotAt(pivotLayout, 2, 0, nil, 500, 500)
 check("the pivot lands on the grid the engine snaps it to", px == 504 and pz == 504, px .. "," .. pz)

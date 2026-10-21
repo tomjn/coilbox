@@ -194,50 +194,84 @@ function M.nearestSpot(spots, x, z, reach)
 	return best
 end
 
---- Metal spots worked out from the map's metal, for a game that publishes
--- no list of its own: each patch of touching squares holding metal, as long
--- as it is no wider than one extractor reaches. A wider patch is open ground
--- with metal everywhere, not a spot.
+--- A scan of the map's metal for patches of touching squares that hold
+-- metal, for a game that publishes no list of metal spots. It runs a little
+-- at a time with M.stepMetalScan, and pauses part way through a patch.
 -- @param sizeX integer the metal map's width in squares
 -- @param sizeZ integer and its depth
 -- @param amountAt function(x, z) -> metal on a square
 -- @param square number elmos per square
+function M.newMetalScan(sizeX, sizeZ, amountAt, square)
+	return { sizeX = sizeX, sizeZ = sizeZ, amountAt = amountAt, square = square, x = 0, z = 0, seen = {}, patches = {}, done = sizeX <= 0 or sizeZ <= 0 }
+end
+
+-- Take the next square of the patch being filled, adding its neighbours.
+local function fillOne(scan)
+	local f = scan.flood
+	local x, z = f.queue[f.i][1], f.queue[f.i][2]
+	f.i = f.i + 1
+	local metal = scan.amountAt(x, z)
+	f.sum, f.sx, f.sz = f.sum + metal, f.sx + metal * x, f.sz + metal * z
+	f.minX, f.maxX = math.min(f.minX, x), math.max(f.maxX, x)
+	f.minZ, f.maxZ = math.min(f.minZ, z), math.max(f.maxZ, z)
+	for dz = -1, 1 do
+		for dx = -1, 1 do
+			local nx, nz = x + dx, z + dz
+			local k = nz * scan.sizeX + nx
+			if nx >= 0 and nz >= 0 and nx < scan.sizeX and nz < scan.sizeZ and not scan.seen[k] and scan.amountAt(nx, nz) > 0 then
+				scan.seen[k] = true
+				f.queue[#f.queue + 1] = { nx, nz }
+			end
+		end
+	end
+	if not f.queue[f.i] then
+		local q = scan.square
+		scan.patches[#scan.patches + 1] = {
+			x = (f.sx / f.sum + 0.5) * q,
+			z = (f.sz / f.sum + 0.5) * q,
+			wide = math.max(f.maxX - f.minX + 1, f.maxZ - f.minZ + 1) * q,
+		}
+		scan.flood = nil
+	end
+end
+
+--- Look at up to budget more squares, counting those a patch takes in.
+-- @return boolean whether the scan is finished
+function M.stepMetalScan(scan, budget)
+	local n = 0
+	while not scan.done and n < budget do
+		n = n + 1
+		if scan.flood then
+			fillOne(scan)
+		else
+			local k = scan.z * scan.sizeX + scan.x
+			if not scan.seen[k] and scan.amountAt(scan.x, scan.z) > 0 then
+				scan.seen[k] = true
+				scan.flood = { queue = { { scan.x, scan.z } }, i = 1, sum = 0, sx = 0, sz = 0, minX = scan.x, maxX = scan.x, minZ = scan.z, maxZ = scan.z }
+			end
+			scan.x = scan.x + 1
+			if scan.x >= scan.sizeX then
+				scan.x, scan.z = 0, scan.z + 1
+			end
+		end
+		if scan.z >= scan.sizeZ and not scan.flood then
+			scan.done = true
+		end
+	end
+	return scan.done
+end
+
+--- The metal spots for an extractor: each patch no wider than one extractor
+-- covers. A wider patch is open ground with metal everywhere, not a spot.
+-- Finishes the scan first if it is not done.
 -- @param span number elmos one extractor covers, edge to edge
 -- @return table[] { x, z } at each patch's middle, weighted by its metal
-function M.metalSpots(sizeX, sizeZ, amountAt, square, span)
-	local seen, out = {}, {}
-	local function key(x, z)
-		return z * sizeX + x
-	end
-	for z0 = 0, sizeZ - 1 do
-		for x0 = 0, sizeX - 1 do
-			if not seen[key(x0, z0)] and amountAt(x0, z0) > 0 then
-				seen[key(x0, z0)] = true
-				local queue, i = { { x0, z0 } }, 1
-				local sum, sx, sz = 0, 0, 0
-				local minX, maxX, minZ, maxZ = x0, x0, z0, z0
-				while queue[i] do
-					local x, z = queue[i][1], queue[i][2]
-					local metal = amountAt(x, z)
-					sum, sx, sz = sum + metal, sx + metal * x, sz + metal * z
-					minX, maxX = math.min(minX, x), math.max(maxX, x)
-					minZ, maxZ = math.min(minZ, z), math.max(maxZ, z)
-					for dz = -1, 1 do
-						for dx = -1, 1 do
-							local nx, nz = x + dx, z + dz
-							if nx >= 0 and nz >= 0 and nx < sizeX and nz < sizeZ and not seen[key(nx, nz)] and amountAt(nx, nz) > 0 then
-								seen[key(nx, nz)] = true
-								queue[#queue + 1] = { nx, nz }
-							end
-						end
-					end
-					i = i + 1
-				end
-				local wide = math.max(maxX - minX + 1, maxZ - minZ + 1) * square
-				if wide <= span then
-					out[#out + 1] = { x = (sx / sum + 0.5) * square, z = (sz / sum + 0.5) * square }
-				end
-			end
+function M.metalSpots(scan, span)
+	M.stepMetalScan(scan, math.huge)
+	local out = {}
+	for _, patch in ipairs(scan.patches) do
+		if patch.wide <= span then
+			out[#out + 1] = { x = patch.x, z = patch.z }
 		end
 	end
 	return out

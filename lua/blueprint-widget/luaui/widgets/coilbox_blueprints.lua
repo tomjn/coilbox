@@ -488,9 +488,11 @@ end
 -- map's geothermal features, which every game has. Metal spots are whichever
 -- list the game's own widgets publish: BAR and Zero-K style games keep
 -- WG.metalSpots or WG.resource_spot_finder.metalSpotsList, Splinter Faction
--- WG.metalMakerSpots and WG.mapmetalspots. For any other game they are
--- worked out from the map's metal once, for the extractor's reach.
-local mapMetal = {}
+-- WG.metalMakerSpots and WG.mapmetalspots. For any other game they come
+-- from the scan of the map's metal, which runs a row's worth of squares a
+-- frame from when the widget loads and finishes at once if it is needed
+-- first.
+local metalScan = nil
 local function spotsFor(kind, def)
 	if kind == "geo" then
 		local out = {}
@@ -514,11 +516,10 @@ local function spotsFor(kind, def)
 	if span <= 0 then
 		span = math.max(def.xsize, def.zsize) * 8
 	end
-	if not mapMetal[span] then
-		local sizeX, sizeZ = Spring.GetMetalMapSize()
-		mapMetal[span] = PLACE.metalSpots(sizeX, sizeZ, Spring.GetMetalAmount, Game.metalMapSquareSize, span)
+	if not metalScan then
+		return {}
 	end
-	return mapMetal[span]
+	return PLACE.metalSpots(metalScan, span)
 end
 
 local function stopPlacing()
@@ -1019,6 +1020,15 @@ function widget:Initialize()
 	vsx, vsy = Spring.GetViewGeometry()
 	capHeight = gl.GetTextHeight("H")
 
+	-- start finding metal spots now if anything in the game is an extractor
+	for _, def in pairs(UnitDefs) do
+		if PLACE.spotKind(def) == "metal" then
+			local sizeX, sizeZ = Spring.GetMetalMapSize()
+			metalScan = PLACE.newMetalScan(sizeX, sizeZ, Spring.GetMetalAmount, Game.metalMapSquareSize)
+			break
+		end
+	end
+
 	-- "t" reaches the console and "p" a key bound in uikeys.txt. Without the
 	-- second, bind x coilbox_blueprints would do nothing.
 	keyActions = {
@@ -1176,6 +1186,9 @@ end
 
 function widget:Update(dt)
 	clock = clock + dt
+	if metalScan and not metalScan.done then
+		PLACE.stepMetalScan(metalScan, metalScan.sizeX)
+	end
 	if not avoided and layout then
 		if not spawnedAt and #(Spring.GetTeamUnits(Spring.GetMyTeamID()) or {}) > 0 then
 			spawnedAt = clock
