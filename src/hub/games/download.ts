@@ -1,3 +1,4 @@
+import { t } from "@lingui/core/macro";
 import type { EnqueueInput } from "../../downloads/DownloadQueueProvider";
 import { loadGithubReleases } from "../../downloads/githubReleases";
 import type { HubGameDownload } from "../api";
@@ -78,7 +79,7 @@ export async function hubGameDownloadRequest(
 
   throw new Error(
     downloads.length === 0
-      ? `The hub named no download source for ${label}.`
-      : `No usable download source for ${label}. ${errors.join("; ")}`,
+      ? t`The hub named no download source for ${label}.`
+      : `${t`No usable download source for ${label}.`} ${errors.join("; ")}`,
   );
 }

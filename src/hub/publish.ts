@@ -1,3 +1,4 @@
+import { t } from "@lingui/core/macro";
 import { defineCommand } from "@picoframe/plugin-sdk";
 import {
   asContainer,
@@ -11,14 +12,14 @@ import { describeError } from "@/i18n/uiError";
 import { isSetUp } from "@/scenario/listing";
 import { parseScenarioPayload } from "@/scenario/transfer";
 import {
-  COLD_START,
+  coldStart,
   HUB_KINDS,
   type HubItemDetail,
   type HubResult,
   isPermanentRefusal,
   readItemBody,
   serverError,
-  WILL_NOT_ACCEPT,
+  willNotAccept,
 } from "./api";
 
 /**
@@ -68,15 +69,15 @@ export function splitTags(text: string): string[] {
  */
 export function whyNotPublishable(publication: Publication): string | null {
   const code = publication.code.trim();
-  if (code === "") return "There is nothing to publish yet.";
+  if (code === "") return t`There is nothing to publish yet.`;
 
   const found = identify(code);
   if (found.kind === "unknown") {
-    return "That is not something coilbox made, so the hub will not take it.";
+    return t`That is not something coilbox made, so the hub will not take it.`;
   }
 
   const decoded = decodeContainerText(code);
-  if (decoded === null) return "That share code could not be read.";
+  if (decoded === null) return t`That share code could not be read.`;
   const container =
     asContainer(decoded) ??
     makeContainer(found.kind, found.version || 1, decoded);
@@ -90,14 +91,15 @@ export function whyNotPublishable(publication: Publication): string | null {
   }
 
   if (!(HUB_KINDS as readonly string[]).includes(found.kind)) {
-    return `The hub does not carry ${found.kind}s yet.`;
+    const kind = found.kind;
+    return t`The hub does not carry ${kind}s yet.`;
   }
 
   // The ceiling the hub enforces, measured the way it measures it: on the
   // container's JSON, not on the code, which is compressed and much shorter.
   const size = new TextEncoder().encode(JSON.stringify(container)).byteLength;
   if (size > MAX_IMPORT_BYTES) {
-    return "This is too large to share. Coilbox would refuse to import it.";
+    return t`This is too large to share. Coilbox would refuse to import it.`;
   }
 
   // A scenario naming no game and map is a draft, not a valid empty value
@@ -107,12 +109,12 @@ export function whyNotPublishable(publication: Publication): string | null {
   if (found.kind === "scenario") {
     const parsed = parseScenarioPayload(container.payload);
     if (parsed && !isSetUp(parsed.scenario)) {
-      return "This scenario names no game and map, so there is nothing to play yet. Set both before sharing it.";
+      return t`This scenario names no game and map, so there is nothing to play yet. Set both before sharing it.`;
     }
   }
 
   if (publication.title.trim() === "") {
-    return "Give it a title so people know what it is.";
+    return t`Give it a title so people know what it is.`;
   }
   return null;
 }
@@ -147,7 +149,7 @@ const hubPublish = defineCommand<
  * Three of these are the failures that will actually happen. A 429 is the hub's
  * rate limit, which is a database trigger and arrives as a message about a
  * failed insert, so it is named here as the hourly cap it is. A 5xx is most
- * often the free tier waking up, which is the same {@link COLD_START} the read
+ * often the free tier waking up, which is the same {@link coldStart} the read
  * side already says rather than a second wording of it.
  *
  * The third is a 5xx that is not an outage at all. The hub answers every
@@ -160,16 +162,16 @@ const hubPublish = defineCommand<
 export function publishFailureMessage(status: number, body: unknown): string {
   const said = serverError(body);
   if (status === 401) {
-    return "The hub would not accept your sign-in. Sign out and back in under Settings > Coilbox hub, then try again.";
+    return t`The hub would not accept your sign-in. Sign out and back in under Settings > Coilbox hub, then try again.`;
   }
   if (status === 429) {
-    return "This account has published 20 things in the last hour, which is the hub's limit. Try again later.";
+    return t`This account has published 20 things in the last hour, which is the hub's limit. Try again later.`;
   }
   if (status >= 500) {
-    if (isPermanentRefusal(said)) return `${said} ${WILL_NOT_ACCEPT}`;
-    return `${said ?? "The hub could not publish it."} ${COLD_START}`;
+    if (isPermanentRefusal(said)) return `${said} ${willNotAccept()}`;
+    return `${said ?? t`The hub could not publish it.`} ${coldStart()}`;
   }
-  return said ?? `The hub refused that request (HTTP ${status}).`;
+  return said ?? t`The hub refused that request (HTTP ${status}).`;
 }
 
 /**
