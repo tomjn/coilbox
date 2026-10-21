@@ -1,3 +1,4 @@
+import { useLingui } from "@lingui/react/macro";
 import { cn } from "@/lib/utils";
 import type { FactionLogoSrc } from "./fallback";
 
@@ -31,8 +32,9 @@ export function FactionLogo({
   tint?: string;
   className?: string;
 }) {
+  const { t } = useLingui();
   if (!logo) return null;
-  const label = sideName ? `${sideName} emblem` : "Faction emblem";
+  const label = sideName ? t`${sideName} emblem` : t`Faction emblem`;
   const style = { width: size, height: size };
 
   if (logo.kind === "inline") {
