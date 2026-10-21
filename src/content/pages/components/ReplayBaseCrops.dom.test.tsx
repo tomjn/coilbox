@@ -231,6 +231,7 @@ describe("the Bases layer", () => {
   });
 
   it("is remembered with the other layers", () => {
+    ORDERS = PLACED;
     show();
     fireEvent.click(toggle("Bases"));
     expect(
