@@ -1,3 +1,4 @@
+import { msg, t } from "@lingui/core/macro";
 import type { FramePlugin } from "@picoframe/plugin-sdk";
 import {
   AtSign,
@@ -14,6 +15,7 @@ import {
 } from "lucide-react";
 import type { ReactNode } from "react";
 import { HostedRoomProvider } from "../direct/HostedRoomProvider";
+import { lazyText } from "../i18n/pluginText";
 import { isProfileHidden } from "../profile/hidden";
 import { RECORDS_GROUP } from "../recordsGroup";
 import FollowIndicator from "./follow/FollowIndicator";
@@ -67,13 +69,13 @@ const multiplayerPlugin: FramePlugin = {
   nav: [
     {
       id: "multiplayer",
-      label: "Multiplayer",
+      label: lazyText(msg`Multiplayer`),
       // Directly under Singleplayer (play = 5), above Content (15).
       order: 10,
       items: [
         {
           id: "multiplayer.lobby",
-          label: "Login",
+          label: lazyText(msg`Login`),
           to: "/lobby",
           end: true,
           order: 0,
@@ -83,7 +85,7 @@ const multiplayerPlugin: FramePlugin = {
         },
         {
           id: "multiplayer.chat",
-          label: "Chat",
+          label: lazyText(msg`Chat`),
           to: "/chat",
           end: true,
           order: 1,
@@ -95,7 +97,7 @@ const multiplayerPlugin: FramePlugin = {
         },
         {
           id: "multiplayer.battles",
-          label: "Battles",
+          label: lazyText(msg`Battles`),
           to: "/battles",
           end: true,
           order: 2,
@@ -108,7 +110,7 @@ const multiplayerPlugin: FramePlugin = {
         },
         {
           id: "multiplayer.matchmaking",
-          label: "Matchmaking",
+          label: lazyText(msg`Matchmaking`),
           to: "/matchmaking",
           end: true,
           order: 3,
@@ -119,7 +121,7 @@ const multiplayerPlugin: FramePlugin = {
         {
           id: "multiplayer.battle",
           // Static fallback; the live battle title comes from `useLabel`.
-          label: "Battle Room",
+          label: lazyText(msg`Battle Room`),
           to: "/battle",
           end: true,
           order: 4,
@@ -132,7 +134,7 @@ const multiplayerPlugin: FramePlugin = {
         },
         {
           id: "multiplayer.chatlogs",
-          label: "Chat logs",
+          label: lazyText(msg`Chat logs`),
           to: "/chatlogs",
           end: true,
           order: 5,
@@ -143,7 +145,7 @@ const multiplayerPlugin: FramePlugin = {
         },
         {
           id: "multiplayer.admin",
-          label: "Server admin",
+          label: lazyText(msg`Server admin`),
           to: "/admin",
           end: true,
           order: 6,
@@ -159,7 +161,7 @@ const multiplayerPlugin: FramePlugin = {
       items: [
         {
           id: "multiplayer.stats",
-          label: "Player stats",
+          label: lazyText(msg`Player stats`),
           to: "/stats",
           // Between Career (0) and Replays (2): the detail behind the summary.
           order: 1,
@@ -174,52 +176,52 @@ const multiplayerPlugin: FramePlugin = {
     {
       path: "lobby",
       lazy: () => import("./pages/LobbyPage"),
-      crumb: "Login",
+      crumb: lazyText(msg`Login`),
     },
     {
       path: "chat",
       lazy: () => import("./pages/ChatPage"),
-      crumb: "Chat",
+      crumb: lazyText(msg`Chat`),
     },
     {
       path: "battles",
       lazy: () => import("./pages/BattlesPage"),
-      crumb: "Battles",
+      crumb: lazyText(msg`Battles`),
     },
     {
       path: "matchmaking",
       lazy: () => import("./pages/MatchmakingPage"),
-      crumb: "Matchmaking",
+      crumb: lazyText(msg`Matchmaking`),
     },
     {
       path: "chatlogs",
       lazy: () => import("./pages/ChatLogPage"),
-      crumb: "Chat logs",
+      crumb: lazyText(msg`Chat logs`),
     },
     {
       path: "stats",
       lazy: () => import("../content/pages/StatsPage"),
-      crumb: "Player stats",
+      crumb: lazyText(msg`Player stats`),
     },
     {
       path: "stats/:name",
       lazy: () => import("../content/pages/PlayerDossierPage"),
-      crumb: (c) => c.params.name ?? "Player",
+      crumb: (c) => c.params.name ?? t`Player`,
     },
     {
       path: "stats/:name/matchup",
       lazy: () => import("../content/pages/MatchupPage"),
-      crumb: "Matchup",
+      crumb: lazyText(msg`Matchup`),
     },
     {
       path: "battle",
       lazy: () => import("./pages/BattleRoomPage"),
-      crumb: "Battle Room",
+      crumb: lazyText(msg`Battle Room`),
     },
     {
       path: "admin",
       lazy: () => import("./pages/ServerAdminPage"),
-      crumb: "Server admin",
+      crumb: lazyText(msg`Server admin`),
     },
   ],
   settings: [
@@ -228,15 +230,19 @@ const multiplayerPlugin: FramePlugin = {
     // by naming this id as its parent.
     {
       id: "multiplayer",
-      title: "Multiplayer",
-      description: "The servers you play on, and who you hear from there.",
+      title: lazyText(msg`Multiplayer`),
+      description: lazyText(
+        msg`The servers you play on, and who you hear from there.`,
+      ),
       order: 70,
       icon: Users,
     },
     {
       id: "chat-highlights",
-      title: "Chat highlights",
-      description: "Words that light up a chat tab when somebody says them.",
+      title: lazyText(msg`Chat highlights`),
+      description: lazyText(
+        msg`Words that light up a chat tab when somebody says them.`,
+      ),
       parent: "multiplayer",
       order: 20,
       icon: AtSign,
@@ -244,8 +250,8 @@ const multiplayerPlugin: FramePlugin = {
     },
     {
       id: "ignored-users",
-      title: "Ignored users",
-      description: "People whose messages coilbox hides from you.",
+      title: lazyText(msg`Ignored users`),
+      description: lazyText(msg`People whose messages coilbox hides from you.`),
       parent: "multiplayer",
       order: 30,
       icon: UserX,
