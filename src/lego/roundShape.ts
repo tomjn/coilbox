@@ -9,6 +9,7 @@
  * at the low end of the axis. Setting it makes the shape round again.
  */
 
+import { t } from "@lingui/core/macro";
 import type { LegoProject } from "./model";
 import type { LoadedPack } from "./pack";
 import {
@@ -83,24 +84,23 @@ export function withRoundNumber(
   value: number,
 ): { shape: LegoShape } | { problem: string } {
   const next = { ...roundNumbers(shape), [name]: value };
-  if (!(next.radius > 0)) return { problem: "Radius must be above 0." };
-  if (!(next.length > 0)) return { problem: "Length must be above 0." };
+  if (!(next.radius > 0)) return { problem: t`Radius must be above 0.` };
+  if (!(next.length > 0)) return { problem: t`Length must be above 0.` };
   if (!Number.isInteger(next.sides) || next.sides < 3) {
-    return { problem: "Sides must be a whole number, 3 or more." };
+    return { problem: t`Sides must be a whole number, 3 or more.` };
   }
   if (next.wall !== undefined && !(next.wall > 0 && next.wall < next.radius)) {
-    return { problem: "Wall must be above 0 and below the radius." };
+    return { problem: t`Wall must be above 0 and below the radius.` };
   }
   if (next.top !== undefined) {
     if (next.top === next.radius) {
       return {
-        problem:
-          "A top as wide as the bottom is a cylinder. Add a cylinder instead.",
+        problem: t`A top as wide as the bottom is a cylinder. Add a cylinder instead.`,
       };
     }
     if (!(next.top >= 0 && next.top < next.radius)) {
       return {
-        problem: "Top radius must be 0 or more and below the bottom radius.",
+        problem: t`Top radius must be 0 or more and below the bottom radius.`,
       };
     }
   }

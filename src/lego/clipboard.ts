@@ -18,6 +18,7 @@
  * not control.
  */
 
+import { t } from "@lingui/core/macro";
 import { markLifted } from "./liftPiece";
 import {
   LEGO_SCHEMA_VERSION,
@@ -101,22 +102,28 @@ export function parseClipboardPiece(
   try {
     data = JSON.parse(text);
   } catch {
-    return { ok: false, reason: "The clipboard does not hold JSON." };
+    return { ok: false, reason: t`The clipboard does not hold JSON.` };
   }
 
   if (typeof data !== "object" || data === null) {
-    return { ok: false, reason: "The clipboard does not hold a lego piece." };
+    return {
+      ok: false,
+      reason: t`The clipboard does not hold a lego piece.`,
+    };
   }
   const envelope = data as Record<string, unknown>;
   if (envelope.marker !== CLIPBOARD_MARKER) {
-    return { ok: false, reason: "The clipboard does not hold a lego piece." };
+    return {
+      ok: false,
+      reason: t`The clipboard does not hold a lego piece.`,
+    };
   }
 
   const project = parseLegoProjectData(envelope.project);
   if (!project) {
     return {
       ok: false,
-      reason: "The clipboard's lego piece could not be read.",
+      reason: t`The clipboard's lego piece could not be read.`,
     };
   }
 

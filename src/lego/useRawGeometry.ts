@@ -13,6 +13,7 @@
  * hierarchy would look like the pieces had been lost.
  */
 
+import { t } from "@lingui/core/macro";
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import { legoTextureUrl } from "../lib/assetUrl";
@@ -192,8 +193,9 @@ async function checkTextures(
       there = false;
     }
     if (!there) {
+      const textureName = texture.name ?? texture.key;
       missing.push(
-        `${texture.name} is not in coilbox's texture store any more, so this unit draws without it. Point it at the file again to put it back.`,
+        t`${textureName} is not in coilbox's texture store any more, so this unit draws without it. Point it at the file again to put it back.`,
       );
     }
   }

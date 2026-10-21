@@ -8,6 +8,7 @@
  * because the unit's document names it.
  */
 
+import { t } from "@lingui/core/macro";
 import { gzipSync } from "fflate";
 
 import { legoGeometrySave } from "./bindings";
@@ -59,9 +60,8 @@ async function copyMeshes(
   const [own, from] = await Promise.all([
     loadRawGeometryIfAny(unitId),
     loadRawGeometry(fromId).catch((error: unknown) => {
-      throw new Error(
-        `The meshes of ${name} could not be read: ${error instanceof Error ? error.message : String(error)}`,
-      );
+      const reason = error instanceof Error ? error.message : String(error);
+      throw new Error(t`The meshes of ${name} could not be read: ${reason}`);
     }),
   ]);
   const merged = mergeRawGeometry(own, from, keys);
@@ -85,7 +85,7 @@ async function writeNamedMeshes(
   fromId: string,
   toId: string,
   module: LegoProject,
-  where: string,
+  where: "unit" | "lifted",
 ): Promise<RawGeometry | null> {
   const keys = new Map<string, string>();
   for (const piece of module.pieces) {
@@ -94,14 +94,19 @@ async function writeNamedMeshes(
   if (keys.size === 0) return null;
 
   const from = await loadRawGeometry(fromId).catch((error: unknown) => {
+    const moduleName = module.name;
+    const reason = error instanceof Error ? error.message : String(error);
     throw new Error(
-      `The meshes of ${module.name} could not be read: ${error instanceof Error ? error.message : String(error)}`,
+      t`The meshes of ${moduleName} could not be read: ${reason}`,
     );
   });
   const raw = mergeRawGeometry(null, from, keys);
   if (raw.byId.size < keys.size) {
+    const moduleName = module.name;
     throw new Error(
-      `${module.name} names meshes ${where} geometry file does not hold.`,
+      where === "unit"
+        ? t`${moduleName} names meshes this unit's geometry file does not hold.`
+        : t`${moduleName} names meshes the lifted model's geometry file does not hold.`,
     );
   }
   await legoGeometrySave({
@@ -120,7 +125,7 @@ export function saveModuleMeshes(
   unitId: string,
   module: LegoProject,
 ): Promise<RawGeometry | null> {
-  return writeNamedMeshes(unitId, module.id, module, "this unit's");
+  return writeNamedMeshes(unitId, module.id, module, "unit");
 }
 
 /**
@@ -132,7 +137,7 @@ export function saveModuleMeshes(
 export function trimLiftedMeshes(
   module: LegoProject,
 ): Promise<RawGeometry | null> {
-  return writeNamedMeshes(module.id, module.id, module, "the lifted model's");
+  return writeNamedMeshes(module.id, module.id, module, "lifted");
 }
 
 /**

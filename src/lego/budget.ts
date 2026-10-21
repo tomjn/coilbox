@@ -7,6 +7,7 @@
  * and never blocks editing or export.
  */
 
+import { t } from "@lingui/core/macro";
 import { loadoutUnit } from "./loadouts";
 import { type LegoProject, parseBudget } from "./model";
 
@@ -47,10 +48,11 @@ function figure(value: number): string {
 /** The warning for a unit over budget, or null when it is not. */
 export function budgetProblem(standing: BudgetStanding | null): Problem | null {
   if (!standing?.over) return null;
+  const over = figure(-standing.left);
   return problem(
     "budget",
     "warning",
-    `Over budget by ${figure(-standing.left)}. Export is not blocked.`,
+    t`Over budget by ${over}. Export is not blocked.`,
   );
 }
 

@@ -16,6 +16,7 @@
  * pieces and save it, rather than taking one out of somebody else's game.
  */
 
+import { t } from "@lingui/core/macro";
 import * as THREE from "three";
 import {
   type AppliedPreset,
@@ -283,16 +284,19 @@ export function adoptHeldPresets(
 export function describePresets(outcome: PresetOutcome): string | null {
   const parts: string[] = [];
   const label = (id: string) => presetById(id)?.label ?? id;
-  if (outcome.added.length > 0)
-    parts.push(`Added ${outcome.added.map(label).join(", ")}.`);
-  if (outcome.present.length > 0)
-    parts.push(
-      `Already on the unit: ${outcome.present.map(label).join(", ")}.`,
-    );
-  for (const held of outcome.held)
-    parts.push(
-      `${label(held.presetId)} not added, the unit has no ${held.missing.join(", ")}.`,
-    );
+  if (outcome.added.length > 0) {
+    const added = outcome.added.map(label).join(", ");
+    parts.push(t`Added ${added}.`);
+  }
+  if (outcome.present.length > 0) {
+    const present = outcome.present.map(label).join(", ");
+    parts.push(t`Already on the unit: ${present}.`);
+  }
+  for (const held of outcome.held) {
+    const preset = label(held.presetId);
+    const missing = held.missing.join(", ");
+    parts.push(t`${preset} not added, the unit has no ${missing}.`);
+  }
   return parts.length > 0 ? parts.join(" ") : null;
 }
 
@@ -337,13 +341,13 @@ export function validateCompoundName(
   name: string,
 ): string | null {
   const trimmed = name.trim();
-  if (trimmed === "") return "Name cannot be empty";
+  if (trimmed === "") return t`Name cannot be empty`;
   const clash = compounds.some(
     (compound) =>
       compound.id !== id &&
       compound.name.trim().toLowerCase() === trimmed.toLowerCase(),
   );
-  if (clash) return "Another module already has this name";
+  if (clash) return t`Another module already has this name`;
   return null;
 }
 

@@ -38,6 +38,7 @@
  * one: no glow, no shine, fully visible.
  */
 
+import { t } from "@lingui/core/macro";
 import { vZeroAtTop } from "@/lib/springTexture";
 import { exportTextureName, unitAtlas } from "./atlas";
 import { liftCredit } from "./liftPiece";
@@ -161,8 +162,9 @@ export function sheetSources(
     if (pieceMesh(raw, piece) !== null) {
       const texture = piece.lifted?.texture;
       if (!piece.lifted || !texture) {
+        const pieceName = piece.name;
         return {
-          refused: `${piece.name} has no texture recorded from the model it came from, so it cannot go on this unit's texture sheet.`,
+          refused: t`${pieceName} has no texture recorded from the model it came from, so it cannot go on this unit's texture sheet.`,
         };
       }
       const texture2 = piece.lifted.texture2;
@@ -197,9 +199,10 @@ export function sheetSources(
     // What the builder draws the parts with, which is the base atlas when the
     // unit's own is not installed. The sheet holds those pixels.
     const atlas = unitAtlas(project, pack.library.atlases).drawWith;
+    const atlasName = atlas.tex1;
     sources.set("atlas", {
       id: "atlas",
-      label: `${atlas.tex1}, the parts atlas`,
+      label: t`${atlasName}, the parts atlas`,
       part: true,
       colour: {
         atlas: {

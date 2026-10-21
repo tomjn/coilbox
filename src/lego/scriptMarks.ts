@@ -6,6 +6,7 @@
  * would bury everything else, and `build-start` already says where it starts.
  */
 
+import { t } from "@lingui/core/macro";
 import { type ScriptOutput, STAND_IN_UNIT_ID } from "./scriptPlayback";
 
 /** Every event on frames that land on the same pixel of the scrubber, and the
@@ -56,12 +57,9 @@ export function scrubberMarks(
  *  counter beside the scrubber counts, and the first thing that happened. */
 export function markLabel(mark: ScrubberMark): string {
   const more = mark.events.length - 1;
-  const first = describeOutput(mark.events[0]);
-  return `Frame ${mark.frame + 1}: ${first}${more > 0 ? `, and ${more} more` : ""}`;
-}
-
-function unitName(unit: number): string {
-  return unit === STAND_IN_UNIT_ID ? "stand-in" : `unit ${unit}`;
+  const frame = mark.frame + 1;
+  const first = `${t`Frame ${frame}`}: ${describeOutput(mark.events[0])}`;
+  return more > 0 ? `${first}${t`, and ${more} more`}` : first;
 }
 
 /** Whether an event gets a mark under the scrubber. */
@@ -71,64 +69,109 @@ export function isMarked(event: ScriptOutput): boolean {
 
 export function describeOutput(event: ScriptOutput): string {
   switch (event.kind) {
-    case "sfx":
-      return `EmitSfx ${event.sfx} from ${event.piece} (${sfxName(event.sfx)})`;
-    case "explode":
-      return `Explode ${event.piece} (${explodeFlags(event.flags)})`;
-    case "sound":
-      return event.name === null
-        ? "Sound, which a TA script does not name"
-        : `Sound ${event.name}`;
-    case "attach":
-      return event.piece === null
-        ? `Attach ${unitName(event.unit)} to the void`
-        : `Attach ${unitName(event.unit)} to ${event.piece}`;
-    case "drop":
-      return `Drop ${unitName(event.unit)}`;
-    case "nano":
-      return event.piece === null
-        ? "Nano spray from no piece"
-        : `Nano spray from ${event.piece}`;
+    case "sfx": {
+      const { sfx, piece } = event;
+      return `${t`EmitSfx ${sfx} from ${piece}`} (${sfxName(sfx)})`;
+    }
+    case "explode": {
+      const { piece } = event;
+      return `${t`Explode ${piece}`} (${explodeFlags(event.flags)})`;
+    }
+    case "sound": {
+      const { name } = event;
+      return name === null
+        ? t`Sound, which a TA script does not name`
+        : t`Sound ${name}`;
+    }
+    case "attach": {
+      const { piece, unit } = event;
+      if (unit === STAND_IN_UNIT_ID) {
+        return piece === null
+          ? t`Attach stand-in to the void`
+          : t`Attach stand-in to ${piece}`;
+      }
+      return piece === null
+        ? t`Attach unit ${unit} to the void`
+        : t`Attach unit ${unit} to ${piece}`;
+    }
+    case "drop": {
+      const { unit } = event;
+      return unit === STAND_IN_UNIT_ID
+        ? t`Drop stand-in`
+        : t`Drop unit ${unit}`;
+    }
+    case "nano": {
+      const { piece } = event;
+      return piece === null
+        ? t`Nano spray from no piece`
+        : t`Nano spray from ${piece}`;
+    }
     case "build-start":
-      return "Factory starts building";
-    case "flare":
-      return `Flare from ${event.piece}`;
-    case "shot":
-      return `Shot, weapon ${event.weapon} from ${event.piece ?? "no piece"}`;
+      return t`Factory starts building`;
+    case "flare": {
+      const { piece } = event;
+      return t`Flare from ${piece}`;
+    }
+    case "shot": {
+      const { weapon, piece } = event;
+      return piece === null
+        ? t`Shot, weapon ${weapon} from no piece`
+        : t`Shot, weapon ${weapon} from ${piece}`;
+    }
   }
 }
 
 /** The built-in effects, by the number `rts/Sim/Units/Scripts/CobDefines.h:9-16`
  *  gives them. */
-const BUILT_IN_SFX: Record<number, string> = {
-  0: "VTOL",
-  2: "wake",
-  3: "wake",
-  4: "reverse wake",
-  5: "reverse wake",
-  257: "white smoke",
-  258: "black smoke",
-  259: "bubbles",
-};
+function builtInSfx(sfx: number): string | undefined {
+  switch (sfx) {
+    case 0:
+      return t`VTOL`;
+    case 2:
+    case 3:
+      return t`wake`;
+    case 4:
+    case 5:
+      return t`reverse wake`;
+    case 257:
+      return t`white smoke`;
+    case 258:
+      return t`black smoke`;
+    case 259:
+      return t`bubbles`;
+  }
+}
 
 /** The range bits, in the order `CUnitScript::EmitSfx` tests them
  *  (`UnitScript.cpp:597-790`), each with what it means. */
 const SFX_RANGES: [number, (index: number) => string][] = [
-  [16384, (index) => `global CEG ${index}`],
-  [1024, (index) => `CEG ${index}`],
+  [16384, (index) => t`global CEG ${index}`],
+  [1024, (index) => t`CEG ${index}`],
   // A unit definition counts its weapons from one.
-  [2048, (index) => `fires weapon ${index + 1}`],
-  [4096, (index) => `detonates weapon ${index + 1}`],
+  [
+    2048,
+    (index) => {
+      const weapon = index + 1;
+      return t`fires weapon ${weapon}`;
+    },
+  ],
+  [
+    4096,
+    (index) => {
+      const weapon = index + 1;
+      return t`detonates weapon ${weapon}`;
+    },
+  ],
 ];
 
 /** An effect number in words, as the engine would read it. */
 export function sfxName(sfx: number): string {
-  const builtIn = BUILT_IN_SFX[sfx];
+  const builtIn = builtInSfx(sfx);
   if (builtIn) return builtIn;
   for (const [bit, name] of SFX_RANGES) {
     if ((sfx & bit) !== 0) return name(sfx - bit);
   }
-  return "not an effect the engine knows";
+  return t`not an effect the engine knows`;
 }
 
 /**
@@ -164,5 +207,5 @@ export function explodeFlags(flags: number): string {
     }
   }
   if (rest !== 0) names.push(String(rest));
-  return names.length > 0 ? names.join(" | ") : "no flags";
+  return names.length > 0 ? names.join(" | ") : t`no flags`;
 }

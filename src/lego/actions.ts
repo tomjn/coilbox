@@ -11,6 +11,7 @@
  * the script this writes, so what is shown is what an export would do.
  */
 
+import { plural, t } from "@lingui/core/macro";
 import type { LuaHook } from "./animPresets";
 import { PRESETS } from "./animPresets";
 import type { LegoAction, LegoPiece, LegoPose, LegoProject } from "./model";
@@ -103,11 +104,11 @@ export function triggerProblem(
 ): string | null {
   if (isHookTrigger(project, trigger)) return null;
   if (!/^[A-Za-z_]\w*$/.test(trigger)) {
-    return "The function name needs letters, digits and underscores, and cannot start with a digit.";
+    return t`The function name needs letters, digits and underscores, and cannot start with a digit.`;
   }
-  if (RESERVED_WORDS.has(trigger)) return `${trigger} is a Lua keyword.`;
+  if (RESERVED_WORDS.has(trigger)) return t`${trigger} is a Lua keyword.`;
   if (ENGINE_NAMES.test(trigger)) {
-    return `${trigger} is a call-in this script already defines or the engine does not let an action start from.`;
+    return t`${trigger} is a call-in this script already defines or the engine does not let an action start from.`;
   }
   return null;
 }
@@ -713,8 +714,8 @@ export function actionClashes(project: LegoProject): ActionClash[] {
 /** What happens to a shared piece, in a few words. */
 export function sharedOutcome(project: LegoProject): string {
   return unitBlends(project)
-    ? "The one started last takes it."
-    : "The one called last wins.";
+    ? t`The one started last takes it.`
+    : t`The one called last wins.`;
 }
 
 /** Whether any action of the unit eases in or out, which is what makes its
@@ -741,12 +742,16 @@ export function actionProblems(project: LegoProject): Problem[] {
     const missing = action.keys.filter(
       (key) => !project.poses?.some((pose) => pose.id === key.pose),
     ).length;
+    const actionName = action.name;
     if (missing > 0) {
       found.push(
         problem(
           "actions",
           "warning",
-          `${action.name}: ${missing} ${missing === 1 ? "key names a pose" : "keys name poses"} that no longer exist, so ${missing === 1 ? "it is" : "they are"} skipped.`,
+          plural(missing, {
+            one: `${actionName}: # key names a pose that no longer exists, so it is skipped.`,
+            other: `${actionName}: # keys name poses that no longer exist, so they are skipped.`,
+          }),
         ),
       );
     }
@@ -755,7 +760,7 @@ export function actionProblems(project: LegoProject): Problem[] {
         problem(
           "actions",
           "note",
-          `${action.name}: a looping action needs two keys to loop.`,
+          t`${actionName}: a looping action needs two keys to loop.`,
         ),
       );
     }
@@ -776,11 +781,13 @@ export function actionProblems(project: LegoProject): Problem[] {
   }
   for (const group of byPiece.values()) {
     const { action, with: other } = group[0];
+    const actionName = action.name;
+    const pieces = group.map((c) => c.piece.name).join(", ");
     found.push(
       problem(
         "actions",
         "warning",
-        `${action.name} and ${other} both move ${group.map((c) => c.piece.name).join(", ")}. ${sharedOutcome(project)}`,
+        `${t`${actionName} and ${other} both move ${pieces}.`} ${sharedOutcome(project)}`,
         group.map((c) => c.piece.id),
       ),
     );

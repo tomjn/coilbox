@@ -22,6 +22,7 @@
  * new box.
  */
 
+import { t } from "@lingui/core/macro";
 import * as THREE from "three";
 
 import { resolveConnections } from "./connectors";
@@ -295,18 +296,18 @@ export function resizeReadout(
   wanted: number,
   unit: number,
 ): string {
-  const none = "No other size in the pack on this axis";
-  if (choices.length < 2) return none;
+  if (choices.length < 2) return t`No other size in the pack on this axis`;
   const chosen = nearestSize(choices, wanted);
-  if (!chosen) return none;
-  const size = `${shown(chosen.size)} elmos, ${shown(chosen.size / unit)} units`;
+  if (!chosen) return t`No other size in the pack on this axis`;
+  const elmos = shown(chosen.size);
+  const units = shown(chosen.size / unit);
   if (wanted > choices[choices.length - 1].size + SIZE_TOLERANCE) {
-    return `No longer part in the pack. Longest is ${size}`;
+    return t`No longer part in the pack. Longest is ${elmos} elmos, ${units} units`;
   }
   if (wanted < choices[0].size - SIZE_TOLERANCE) {
-    return `No shorter part in the pack. Shortest is ${size}`;
+    return t`No shorter part in the pack. Shortest is ${elmos} elmos, ${units} units`;
   }
   return Math.abs(chosen.size - wanted) < SIZE_TOLERANCE
-    ? size
-    : `Snapped to ${size}`;
+    ? t`${elmos} elmos, ${units} units`
+    : t`Snapped to ${elmos} elmos, ${units} units`;
 }

@@ -8,6 +8,7 @@
  * loadouts, so what sits on each mount is read per loadout.
  */
 
+import { t } from "@lingui/core/macro";
 import { pieceConnectors } from "./connectors";
 import {
   type LegoMountPoint,
@@ -121,11 +122,13 @@ export function mountRefusal(
 ): string | null {
   const mount = mountPointAt(pieceById(project, parentId), connector);
   if (!mount) return null;
-  if (mount.accepts.length === 0) return `${mount.name} takes no category yet.`;
+  const mountName = mount.name;
+  if (mount.accepts.length === 0) return t`${mountName} takes no category yet.`;
   const category = module.category?.trim();
   if (category && mount.accepts.some((c) => sameCategory(c, category)))
     return null;
-  return `${mount.name} takes ${mount.accepts.join(", ")} only.`;
+  const accepted = mount.accepts.join(", ");
+  return t`${mountName} takes ${accepted} only.`;
 }
 
 /** Why a plain part may not go on the connector, or null when it may. */
@@ -135,7 +138,9 @@ export function mountPartRefusal(
   connector: string,
 ): string | null {
   const mount = mountPointAt(pieceById(project, parentId), connector);
-  return mount ? `${mount.name} takes modules only.` : null;
+  if (!mount) return null;
+  const mountName = mount.name;
+  return t`${mountName} takes modules only.`;
 }
 
 /**

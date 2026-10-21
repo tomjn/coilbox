@@ -12,6 +12,7 @@
  * plane is x and z, so a point on it is `[x, z]`.
  */
 
+import { t } from "@lingui/core/macro";
 import { formatNumber } from "@/lib/format";
 import { childrenOf, type LegoProject } from "./model";
 import type { LoadedPack } from "./pack";
@@ -371,8 +372,7 @@ export function checkBalance(
   if (supports.length === 0) {
     return {
       status: "notApplicable",
-      reason:
-        "No piece has a foot or wheel role, so there is no ground it stands on.",
+      reason: t`No piece has a foot or wheel role, so there is no ground it stands on.`,
     };
   }
 
@@ -394,7 +394,7 @@ export function checkBalance(
   if (weight <= 0) {
     return {
       status: "notApplicable",
-      reason: "The pieces have no volume to weigh.",
+      reason: t`The pieces have no volume to weigh.`,
     };
   }
   const centre: GroundPoint = [sum[0] / weight, sum[2] / weight];
@@ -412,9 +412,10 @@ export function checkBalance(
     }
   }
   if (resting.length === 0) {
+    const height = formatNumber(lowestSupport, { maximumFractionDigits: 2 });
     return {
       status: "notApplicable",
-      reason: `The lowest foot or wheel is ${formatNumber(lowestSupport, { maximumFractionDigits: 2 })} elmos above the ground.`,
+      reason: t`The lowest foot or wheel is ${height} elmos above the ground.`,
     };
   }
 
@@ -442,28 +443,34 @@ export function checkBalance(
   };
 }
 
-const GUESSED = "Support guessed from the lowest pieces.";
-
 /** What the viewport says about a result, kept short. */
 export function balanceSummary(result: BalanceResult): string {
   const text = summaryText(result);
   return result.status !== "notApplicable" && result.guessed
-    ? `${text} ${GUESSED}`
+    ? `${text} ${t`Support guessed from the lowest pieces.`}`
     : text;
 }
 
 function summaryText(result: BalanceResult): string {
   switch (result.status) {
     case "notApplicable":
-      return `Balance not checked. ${result.reason}`;
+      return `${t`Balance not checked.`} ${result.reason}`;
     case "noWidth":
       return result.resting.length === 1
-        ? "One foot or wheel on the ground, so the support area has no width."
-        : "The feet or wheels on the ground are in a line, so the support area has no width.";
-    case "outside":
-      return `Weight centre is ${formatNumber(result.outsideBy, { maximumFractionDigits: 2 })} elmos outside the feet.`;
-    case "inside":
-      return `Weight centre is ${formatNumber(-result.outsideBy, { maximumFractionDigits: 2 })} elmos inside the feet.`;
+        ? t`One foot or wheel on the ground, so the support area has no width.`
+        : t`The feet or wheels on the ground are in a line, so the support area has no width.`;
+    case "outside": {
+      const distance = formatNumber(result.outsideBy, {
+        maximumFractionDigits: 2,
+      });
+      return t`Weight centre is ${distance} elmos outside the feet.`;
+    }
+    case "inside": {
+      const distance = formatNumber(-result.outsideBy, {
+        maximumFractionDigits: 2,
+      });
+      return t`Weight centre is ${distance} elmos inside the feet.`;
+    }
   }
 }
 
@@ -472,12 +479,15 @@ function summaryText(result: BalanceResult): string {
  * and wheels the weight should be over.
  */
 export function balanceProblem(result: BalanceResult): Problem | null {
-  return result.status === "outside"
-    ? problem(
-        "balance",
-        "warning",
-        `Looks as if it would tip: the weight centre is ${formatNumber(result.outsideBy, { maximumFractionDigits: 2 })} elmos outside the feet.${result.guessed ? ` ${GUESSED}` : ""}`,
-        result.resting,
-      )
-    : null;
+  if (result.status !== "outside") return null;
+  const distance = formatNumber(result.outsideBy, { maximumFractionDigits: 2 });
+  const tip = t`Looks as if it would tip: the weight centre is ${distance} elmos outside the feet.`;
+  return problem(
+    "balance",
+    "warning",
+    result.guessed
+      ? `${tip} ${t`Support guessed from the lowest pieces.`}`
+      : tip,
+    result.resting,
+  );
 }

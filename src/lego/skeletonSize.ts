@@ -35,6 +35,7 @@
  * is held to it, and the size that results is what `skeletonSize` then reports.
  */
 
+import { t } from "@lingui/core/macro";
 import { formatNumber } from "@/lib/format";
 import { type BodyPlan, planProportions, projectFromPlan } from "./bodyPlans";
 import type { LegoProject, SkeletonTarget } from "./model";
@@ -336,11 +337,16 @@ export function describeSize(size: SkeletonSize): string {
   const round = (n: number) => formatNumber(n, { maximumFractionDigits: 1 });
   const parts: string[] = [];
   if (size.x !== null && size.z !== null) {
-    parts.push(
-      `${footprintSteps(size.x)} by ${footprintSteps(size.z)} steps (${round(size.x)} by ${round(size.z)} elmos)`,
-    );
+    const stepsX = footprintSteps(size.x);
+    const stepsZ = footprintSteps(size.z);
+    const elmosX = round(size.x);
+    const elmosZ = round(size.z);
+    parts.push(t`${stepsX} by ${stepsZ} steps (${elmosX} by ${elmosZ} elmos)`);
   }
-  if (size.height !== null) parts.push(`${round(size.height)} elmos tall`);
+  if (size.height !== null) {
+    const height = round(size.height);
+    parts.push(t`${height} elmos tall`);
+  }
   return parts.join(", ");
 }
 

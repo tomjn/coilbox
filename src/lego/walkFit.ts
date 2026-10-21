@@ -36,6 +36,7 @@
  * ground to a whole number, which the script needs (`walkPoses`).
  */
 
+import { t } from "@lingui/core/macro";
 import {
   type AnimPreset,
   type AppliedPreset,
@@ -367,7 +368,7 @@ export function walkProblems(project: LegoProject): Problem[] {
         problem(
           "skeleton",
           "warning",
-          `The legs do not hang down from their joints, so "${label}" cannot keep the feet planted.`,
+          t`The legs do not hang down from their joints, so "${label}" cannot keep the feet planted.`,
           thighs,
         ),
       );
@@ -385,7 +386,7 @@ export function walkProblems(project: LegoProject): Problem[] {
         problem(
           "skeleton",
           "warning",
-          `"${label}" strides further than the legs reach, so the feet slide.`,
+          t`"${label}" strides further than the legs reach, so the feet slide.`,
           thighs,
         ),
       );

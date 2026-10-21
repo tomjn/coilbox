@@ -22,6 +22,7 @@
  * builder would write otherwise.
  */
 
+import { t } from "@lingui/core/macro";
 import { armorClassOf } from "@/workshop/armorClasses";
 import {
   field,
@@ -62,17 +63,21 @@ function categoriesOf(def: Record<string, unknown> | undefined): string[] {
 function armourRow(unitKey: string, game: GameFitData): FitRow {
   const className = armorClassOf(game.armorDefs, undefined, unitKey);
   if (className !== "default")
-    return { id: "armour", status: "ok", text: `Armour class: ${className}.` };
+    return {
+      id: "armour",
+      status: "ok",
+      text: t`Armour class: ${className}.`,
+    };
   if (Object.keys(game.armorDefs).length === 0)
     return {
       id: "armour",
       status: "ok",
-      text: "Armour class: default. The game declares no other class.",
+      text: t`Armour class: default. The game declares no other class.`,
     };
   return {
     id: "armour",
     status: "warn",
-    text: "Armour class: default. No class in the game's armordefs.lua lists this unit, so damage that depends on class does not apply to it.",
+    text: t`Armour class: default. No class in the game's armordefs.lua lists this unit, so damage that depends on class does not apply to it.`,
   };
 }
 
@@ -111,19 +116,22 @@ function categoryRow(def: Record<string, unknown>, game: GameFitData): FitRow {
     return {
       id: "category",
       status: "warn",
-      text: "No category. No weapon can target this unit.",
+      text: t`No category. No weapon can target this unit.`,
       suggested: similarCategories(def, game, own),
     };
   const used = new Set(Object.values(game.units).flatMap(categoriesOf));
   const unknown = own.filter((name) => !used.has(name));
-  if (unknown.length > 0)
+  if (unknown.length > 0) {
+    const names = unknown.join(", ");
     return {
       id: "category",
       status: "warn",
-      text: `Category ${unknown.join(", ")}: no unit in the game uses it, so no weapon is set to look for it.`,
+      text: t`Category ${names}: no unit in the game uses it, so no weapon is set to look for it.`,
       suggested: similarCategories(def, game, own),
     };
-  return { id: "category", status: "ok", text: `Category: ${own.join(" ")}.` };
+  }
+  const names = own.join(" ");
+  return { id: "category", status: "ok", text: t`Category: ${names}.` };
 }
 
 function movementRow(
@@ -134,14 +142,18 @@ function movementRow(
   const problem = moveClassProblem(def);
   if (problem) return { id: "movement", status: "warn", text: problem };
   if (!flag(field(def, "canmove")))
-    return { id: "movement", status: "ok", text: "This unit does not move." };
+    return {
+      id: "movement",
+      status: "ok",
+      text: t`This unit does not move.`,
+    };
   const name = moveClassOf(def);
   return declaresMoveClass(game, name)
-    ? { id: "movement", status: "ok", text: `Movement class: ${name}.` }
+    ? { id: "movement", status: "ok", text: t`Movement class: ${name}.` }
     : {
         id: "movement",
         status: "warn",
-        text: `The game has no movement class ${name}, so the engine drops this unit at load.`,
+        text: t`The game has no movement class ${name}, so the engine drops this unit at load.`,
       };
 }
 
