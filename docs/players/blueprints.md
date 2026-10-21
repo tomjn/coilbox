@@ -39,6 +39,8 @@ The name, the game and the number of buildings are at the top. Blueprints at the
 
 Under them is a flat build grid with the buildings drawn on it. There is no map, because a blueprint is not tied to one. Drag or middle drag to pan, right drag to turn the view and scroll to zoom.
 
+When the blueprint's game is installed, every drawing of it colours buildings the same way the in-game widget does.
+
 Every change saves itself a moment after you make it. There is no save button.
 
 ### Add, move and remove buildings
