@@ -1,5 +1,6 @@
 import { useMemo } from "react";
 import { LayoutPlan } from "@/blueprint/LayoutPlan";
+import { useBuildingRoles } from "@/blueprint/useBuildingRoles";
 import { locationNoun } from "@/conquest/mapStyle";
 import type { RunNodeType } from "@/runlite/model";
 import { useHeldUnitPictures } from "../../assets/useUnitPictures";
@@ -131,12 +132,16 @@ function BlueprintLayout({
     [shape],
   );
   const pictures = useHeldUnitPictures(game, defs);
+  // From this machine's copy of the game, so a layout for a game that is not
+  // installed is drawn in the plan's own colour.
+  const roles = useBuildingRoles({ shortname: game });
 
   return (
     <div className="flex flex-col gap-3">
       <LayoutPlan
         shape={shape}
         pictures={pictures}
+        roles={roles}
         // A sheet of fixed proportions rather than a box the shape of the base.
         // A base can be a long thin wall or a tall narrow column, and either one
         // at the column's full width is a shape nobody can take in at a glance.

@@ -14,6 +14,7 @@ import { RENDER_BLEED_SQUARES, renderFrame } from "@/hub/assets/vocabulary";
 import { BUILDING_GAP, blueprintShape } from "@/hub/preview";
 import { LayoutPlan } from "./LayoutPlan";
 import type { BlueprintPayload } from "./payload";
+import { buildingRoles } from "./role";
 
 /** A solar collector on one square and a lab on six, four squares apart. */
 const LAYOUT: BlueprintPayload = {
@@ -155,5 +156,21 @@ describe("LayoutPlan", () => {
       />,
     );
     expect(drawn(same, "image")).toHaveLength(1);
+  });
+
+  it("colours a building by what it does, and leaves one it cannot place alone", () => {
+    const shape = blueprintShape(LAYOUT);
+    if (!shape) throw new Error("nothing to draw");
+    const roles = buildingRoles([
+      { name: "armsolar", stats: { energyMake: 20 } },
+    ]);
+    const html = renderToStaticMarkup(
+      <LayoutPlan shape={shape} roles={roles} />,
+    );
+    const rects = [...html.matchAll(/<rect [^>]*>/g)].map((match) => match[0]);
+    expect(rects[0]).toContain('fill="#f2cc40"');
+    expect(rects[0]).toContain('stroke="#f2cc40"');
+    // The lab is not in the game's units, so it keeps the plan's colour.
+    expect(rects[1]).toContain('fill="currentColor"');
   });
 });

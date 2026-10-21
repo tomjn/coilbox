@@ -266,3 +266,42 @@ describe("footprintStyle, a spot being offered", () => {
     expect(offered("no-ground").fill).toBe(0);
   });
 });
+
+/** The in-game widget's colours for what a building does, on the squares a
+ *  building nothing is wrong with stands on. */
+describe("footprintStyle, coloured by what the building does", () => {
+  const ENERGY = 0xf2cc40;
+  const role = (
+    standing: Standing,
+    overlapping = false,
+    as: "standing" | "held" | "offered" = "standing",
+    selected = false,
+  ) => footprintStyle({ standing, overlapping }, as, selected, true, ENERGY);
+
+  it("draws a building nothing is wrong with in its role's colour", () => {
+    expect(role("fine").color).toBe(ENERGY);
+    expect(role("fine").fill).toBe(style("fine").fill);
+  });
+
+  it("keeps the grey for a building with no role", () => {
+    expect(footprintStyle({ standing: "fine", overlapping: false }).color).toBe(
+      style("fine").color,
+    );
+  });
+
+  it("lets a refusal, a missing verdict and a held building keep their colours", () => {
+    expect(role("fine", true).color).toBe(style("fine", true).color);
+    expect(role("slope").color).toBe(style("slope").color);
+    expect(role("no-ground").color).toBe(style("no-ground").color);
+    expect(role("fine", false, "held").color).toBe(held("fine").color);
+    expect(role("fine", false, "offered").color).toBe(offered("fine").color);
+  });
+
+  it("still picks out the selected building at its edge", () => {
+    const chosenRole = role("fine", false, "standing", true);
+    expect(chosenRole.color).toBe(ENERGY);
+    expect(chosenRole.edge).not.toBe(ENERGY);
+    expect(chosenRole.edge).toBe(chosen("fine").edge);
+    expect(chosenRole.band).toBeGreaterThan(0);
+  });
+});

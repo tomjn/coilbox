@@ -29,6 +29,9 @@ export function useScenarioFootprints(
   /** Which of them the author has selected, whose square says so (issue
    *  #1716). Only the document's own squares have one. */
   selected: string | null = null,
+  /** The colour of what each def does, from `@/blueprint/role`. Left out, every
+   *  building nothing is wrong with is the quiet grey. */
+  colorOf?: (def: string) => number | undefined,
 ): void {
   const { worldWidth, worldHeight } = map;
   // Behind a ref for the same reason the starts' reader is: the heightmap
@@ -66,6 +69,6 @@ export function useScenarioFootprints(
 
   // biome-ignore lint/correctness/useExhaustiveDependencies: `groundAt` is not read here, it is the signal that the relief the footprints lie on has arrived
   useEffect(() => {
-    layer?.draw(marks, as, selected);
-  }, [layer, marks, as, selected, groundAt]);
+    layer?.draw(marks, as, selected, colorOf);
+  }, [layer, marks, as, selected, colorOf, groundAt]);
 }

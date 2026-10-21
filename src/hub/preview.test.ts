@@ -210,6 +210,7 @@ describe("readPreview", () => {
         blueprints: [
           {
             name: "Opening solars",
+            game: { name: "BAR test-1", shortname: "BYAR" },
             buildings: [
               { def: "armsolar", offset: { x: 0, z: 0 }, facing: 0 },
               { def: "armlab", offset: { x: 96, z: 0 }, facing: 1 },
@@ -228,6 +229,12 @@ describe("readPreview", () => {
     ]);
     expect(preview.blueprints[0].layout?.squares).toHaveLength(2);
     expect(preview.blueprints[1].layout).toBeNull();
+    // Carried so the pack page can colour each layout from its own game.
+    expect(preview.blueprints[0].game).toEqual({
+      name: "BAR test-1",
+      shortname: "BYAR",
+    });
+    expect(preview.blueprints[1].game).toBeUndefined();
   });
 
   it("names a map a pack lists twice once, and drops the blanks", () => {

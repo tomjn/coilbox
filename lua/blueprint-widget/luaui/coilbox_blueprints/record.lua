@@ -19,9 +19,9 @@ function M.use(engine)
 end
 
 --- The selected buildings as a spool entry.
--- @param opts table spoolCount (how many entries the spool already holds, for
---   the name), now (seconds, for recordedAt). designedFor is the map, the
---   same field the library uses for the map a layout was drawn on.
+-- @param opts table nameFor (function(defs) -> a name saying what they are),
+--   now (seconds, for recordedAt). designedFor is the map, the same field the
+--   library uses for the map a layout was drawn on.
 -- @return table? entry, or nil and a message when there is nothing to record
 function M.selection(opts)
 	local selected = Spring.GetSelectedUnits()
@@ -47,13 +47,14 @@ function M.selection(opts)
 	end
 	local ax = math.floor(minX / BUILD_SQUARE) * BUILD_SQUARE
 	local az = math.floor(minZ / BUILD_SQUARE) * BUILD_SQUARE
-	local buildings, footprints = {}, {}
+	local buildings, footprints, defs = {}, {}, {}
 	for i, b in ipairs(found) do
+		defs[i] = b.def
 		buildings[i] = { def = b.def.name, offset = { x = b.x - ax, z = b.z - az }, facing = b.facing % 4 }
 		footprints[b.def.name:lower()] = { x = b.def.xsize / 2, z = b.def.zsize / 2 }
 	end
 	return {
-		name = "Base on " .. Game.mapName .. " " .. (opts.spoolCount + 1),
+		name = opts.nameFor(defs),
 		-- modName, not gameName: coilbox calls a game by its archive name, the
 		-- versioned one unitsync reports, and gameName is modinfo's name with no
 		-- version on it. Recording gameName gives an entry naming a game no

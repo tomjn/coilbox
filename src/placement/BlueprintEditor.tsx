@@ -31,6 +31,7 @@ import {
 } from "@/blueprint/footprint";
 import type { BaseBlueprint } from "@/blueprint/model";
 import { offGridBuildings, onBuildGrid } from "@/blueprint/offGrid";
+import { buildingColors } from "@/blueprint/role";
 import {
   Popover,
   PopoverContent,
@@ -149,6 +150,8 @@ export function BlueprintEditor({
   const { units, loading: unitsLoading } = useGameUnits(gameName);
   const buildings = useMemo(() => buildingUnits(units), [units]);
   const snap = useMemo(() => buildGridSnap(units), [units]);
+  // What each building does, coloured the way the in-game widget colours it.
+  const colorOf = useMemo(() => buildingColors(units), [units]);
 
   /**
    * The layout being watched go up, and how much of it is standing.
@@ -240,6 +243,7 @@ export function BlueprintEditor({
     drawn.groundAt,
     "standing",
     selected,
+    colorOf,
   );
 
   // The ground the selected building stands on: what says it is selected, and

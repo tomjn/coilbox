@@ -50,6 +50,9 @@ vi.mock("@/content/config", () => ({
   useUnitsyncGameHeaders: () => ({ headers: new Map(), loading: false }),
 }));
 vi.mock("@/play/config", () => ({ usePreferredTarget: () => ({}) }));
+// The card's thumbnail colours its buildings from the game's units, a read
+// this page test does not stand up. It is tested in `../role.test.ts`.
+vi.mock("../useBuildingRoles", () => ({ useBuildingRoles: () => undefined }));
 // The widget file sync reaches the play state and the engine config, which
 // neither page test stands up. What it does is tested on its own.
 vi.mock("../useWidgetFiles", () => ({ useWidgetFiles: () => {} }));

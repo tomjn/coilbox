@@ -31,6 +31,7 @@
 
 import type { ReactNode } from "react";
 import { LayoutPlan } from "@/blueprint/LayoutPlan";
+import { useBuildingRoles } from "@/blueprint/useBuildingRoles";
 import { useScanTargetSelection, useUnitsyncMinimap } from "@/content/config";
 import { MapPictureCard } from "../../assets/MapPicture";
 import { useMapPictureLadder } from "../../assets/useMapPicture";
@@ -114,10 +115,15 @@ export function SetupPackContents({ pack }: { pack: PackContents }) {
 /** One layout a pack bundles, drawn as the plan the hub draws of it alone. */
 function PackLayout({ blueprint }: { blueprint: PackBlueprint }) {
   const buildings = blueprint.layout?.squares.length ?? 0;
+  const roles = useBuildingRoles(blueprint.game);
   return (
     <div className="flex flex-col gap-2">
       {blueprint.layout && (
-        <LayoutPlan shape={blueprint.layout} className="aspect-[4/3] w-full" />
+        <LayoutPlan
+          shape={blueprint.layout}
+          roles={roles}
+          className="aspect-[4/3] w-full"
+        />
       )}
       <div className="flex flex-col">
         <span className="text-sm">{blueprint.name}</span>

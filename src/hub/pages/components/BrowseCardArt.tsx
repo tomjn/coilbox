@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { LayoutPlan } from "@/blueprint/LayoutPlan";
+import { useBuildingRoles } from "@/blueprint/useBuildingRoles";
 import { asContainer, decodeContainerText } from "@/container/container";
 import {
   THUMB_MINIMAP_MIP,
@@ -127,12 +128,16 @@ function MapArt({ mapName }: { mapName: string }) {
 function BlueprintArt({ item }: { item: HubItem }) {
   const hubUrl = useHubUrl();
   const layout = useBlueprintCardLayout(hubUrl, item.id);
+  const roles = useBuildingRoles({
+    name: item.game_name,
+    shortname: item.game_key,
+  });
 
   if (!layout) return <KindArt item={item} />;
 
   return (
     <div className="flex size-full items-center justify-center p-2">
-      <LayoutPlan shape={layout} className="size-full" />
+      <LayoutPlan shape={layout} roles={roles} className="size-full" />
     </div>
   );
 }

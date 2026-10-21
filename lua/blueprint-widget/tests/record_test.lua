@@ -29,12 +29,19 @@ local E = support.engine({ SOLAR, LLT, WIN, CON }, {
 })
 RECORD.use(E)
 
-local entry, err = RECORD.selection({ spoolCount = 2, now = 5000 })
+local named
+local entry, err = RECORD.selection({
+	now = 5000,
+	nameFor = function(defs)
+		named = defs
+		return "named by contents"
+	end,
+})
 check("record returns an entry", entry ~= nil, err)
 check("record keeps only buildings, in selection order", #entry.buildings == 3 and entry.buildings[1].def == "armllt" and entry.buildings[3].def == "armwin", show(entry.buildings))
 check("record anchors at the lowest x and z, floored to the grid", same(entry.buildings[2], { def = "armsolar", offset = { x = 32, z = 0 }, facing = 0 }), show(entry.buildings[2]))
 check("record keeps each building's facing", entry.buildings[1].facing == 1 and entry.buildings[3].facing == 3)
-check("record names the base after the map and the spool count", entry.name == "Base on Test Map v2 3", entry.name)
+check("record names the entry from the buildings' defs, in selection order", entry.name == "named by contents" and #named == 3 and named[1] == LLT and named[2] == SOLAR and named[3] == WIN, entry.name)
 check("record binds the game by its archive name, not modinfo's unversioned one", same(entry.game, { name = "Test Game 1.0", shortname = "TEST" }), show(entry.game))
 check("record says which map it was drawn on, and when", entry.designedFor == "Test Map v2" and entry.recordedAt == 5000)
 check("record is not ordered", entry.ordered == false)
@@ -45,11 +52,11 @@ check(
 )
 
 E.selected = { 202 }
-local none, nerr = RECORD.selection({ spoolCount = 0, now = 0 })
+local none, nerr = RECORD.selection({ nameFor = tostring, now = 0 })
 check("a selection with no buildings is refused with a message", none == nil and type(nerr) == "string", nerr)
 
 E.selected = {}
-local empty, eerr = RECORD.selection({ spoolCount = 0, now = 0 })
+local empty, eerr = RECORD.selection({ nameFor = tostring, now = 0 })
 check("an empty selection is refused", empty == nil and type(eerr) == "string", eerr)
 
 support.report()

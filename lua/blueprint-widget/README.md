@@ -6,11 +6,20 @@ Coilbox installs `luaui/` into the content root as `LuaUI/` when you press the b
 
 ## What the player gets
 
-- a panel, opened with the `coilbox_blueprints` action (bind a key, or type `/coilbox_blueprints` in the console), listing the blueprints for the game being played
-- three tabs: what the selected builders can build now, what they can build in part, and everything
-- pick a row and the layout follows the cursor as ghosts, with the squares the ground refuses marked red
-- `[` and `]` turn it, left click places it, right click or escape puts it down
-- a partial placement leaves what nobody selected could build as a remainder, and the panel offers to place that with whatever is selected later
+- a panel, opened from a small Blueprints button or with the `coilbox_blueprints` action (bind a key, or type `/coilbox_blueprints` in the console), listing the blueprints for the game being played
+- the button and the panel's title drag the panel anywhere on screen, snapping to an edge near one. Once, when the game's panels are up, which is the first time a unit is selected or five seconds after the team's first unit appears, it asks RmlUi which element is drawn at points over the panel, and every other widget's `IsAbove`, and slides up or down to the nearest place nothing answers for. Splinter Faction's panels are RmlUi documents and answer only the first. That needs the handler itself, so `GetInfo` sets `handler = true` and actions go through `widgetHandler.actionHandler`. Panels the engine draws answer to nothing and are not avoided, and the widget's config keeps where it was left and whether it shows a list or a grid
+- each blueprint's layout drawn from above, with energy yellow, builders green and weapons red
+- three tabs: what the selected builders can build now, what they can build in part, and everything, a page at a time, turned with the arrows in the footer or the mouse wheel
+- pick a row or a tile and the layout follows the cursor as ghosts over marks in the same colours, striped with a dashed red rim where the ground refuses a building
+- while it is placed, a second panel beside the first shows its cost and build time with the selected builders, and buttons for each key
+- the cursor holds the building nearest the middle of the layout, and turns and flips go round it. A layout with an extractor or a geothermal is held by that instead, and within 90 elmos of a spot for it the layout jumps so it sits on the spot. Geothermal spots are the map's geothermal features. Metal spots come from whichever list the game publishes: `WG.metalSpots`, `WG.resource_spot_finder.metalSpotsList`, or Splinter Faction's `WG.metalMakerSpots` and `WG.mapmetalspots`. For any other game they come from the map's metal: each patch of touching metal squares no wider than one extractor covers, twice its `extractRange` or its footprint. The scan for patches starts when the widget loads, a row's worth of squares a frame, and finishes at once if a layout needs it sooner. `[` and `]` turn it, F and G flip it side to side and top to bottom as in Factorio before 2.0, Shift+`[` and Shift+`]` step to the previous or next blueprint, left click places it, right click or escape puts it down
+- a drag lays copies in a line, each touching the last, along whichever of x and z the drag covers more, placed on release
+- a building reaching past the map's edge is refused like one the ground refuses
+- a layout with buildings the team can never build is for another side: it stays under All, says how many, and cannot be picked up. What a team can build is everything its units build, what those build, and what any of them morph into, read from `gamedata/morph_defs.lua` or `LuaRules/Configs/morph_defs.lua` and the `morphto` and `evolution_target` custom params
+- a building the team only gets by morphing is ordered as the first def back along the morph chain that the team can build, such as a tech 1 factory for a tech 2 one, and the row says how many are left to upgrade
+- what nobody selected can build stays on the map as a plan, drawn as ghosts. Pointing at a plan with builders selected outlines the building under the cursor in white, crosses it out if they cannot build it and sets the build cursor to match. A right click builds that building, a shift right click builds the whole plan after the builders' current orders, and a right click with nothing selected removes the plan
+- builders either help each other, each taking every building it can build, or split up, each building going to the nearest builder until it has its share of the build time. Splitting is for games such as Splinter Faction that stop a second builder joining a nanoframe, where the stopped builder loses its whole queue. The choice is kept per game
+- the panel counts what the plans hold, and offers to build them all with whatever is selected, or to dismiss them
 - Save selection writes the selected buildings to a spool file that coilbox collects into the library next time it runs
 
 BAR's own `LuaUI/Config/blueprints.json` is read too, so a BAR player sees the layouts they already have. It is never written.
@@ -41,17 +50,21 @@ Every module under `coilbox_blueprints/` takes the engine tables it reads as arg
 
 ## Drawing
 
-No immediate mode. The panel's rectangles go into one vertex buffer through `gl.GetVBO` and `gl.GetVAO`, drawn with one `DrawElements`, re-uploaded only when the layout changes. Build pictures are one textured quad each through the same shader. Text is `gl.Text`, which the engine batches. Ghosts are `gl.UnitShape`. Footprint squares on the ground are a second buffer, refilled when the snapped anchor or rotation changes.
+No immediate mode. The panel's rectangles, each with its size, corner radius and border, go into one vertex buffer through `gl.GetVBO` and `gl.GetVAO`, drawn with one `DrawElements`, re-uploaded only when the layout changes. Build pictures are one textured quad each through the same shader. The fragment shader rounds the corners from that shape, and a border keeps only the outline. Text is `gl.Text`, which the engine batches. Ghosts are `gl.UnitShape`. Footprint marks on the ground are a second buffer, refilled when the snapped anchor or rotation changes. Each mark is a grid with a vertex on every heightmap point, at the ground's height, split along the engine's own diagonal, and drawn without the depth test because the terrain the engine draws is simplified with distance. The same shader rounds the marks, with a `ground` uniform that adds the rim and the stripes.
+
+Text is placed by the middle of its capitals and drawn from the baseline, using the height of "H" from `gl.GetTextHeight`, so a label sits in the middle of its button whatever letters it has.
+
+The panel is laid out at sizes for a view 1080 pixels tall and scales with the view's height.
 
 The shader is `#version 130` with `GL_ARB_explicit_attrib_location`, the lowest floor that lets `VBO:Define` attribute ids match `layout(location)`.
 
 ## Other widgets and games
 
-`WG.CoilboxBlueprints` offers `open`, `close`, `toggle`, `list`, `place(key)`, `save` and `rotate(turns)` to a game's own interface.
+`WG.CoilboxBlueprints` offers `open`, `close`, `toggle`, `list`, `place(key)`, `save`, `rotate(turns)`, `flip(axis)` with `"x"` or `"z"`, `step(direction)` and `assist(mode)` with `"help"` or `"split"` to a game's own interface.
 
-Widget actions: `coilbox_blueprints`, `coilbox_blueprints_save`, `coilbox_blueprints_rotate_left`, `coilbox_blueprints_rotate_right`.
+Widget actions: `coilbox_blueprints`, `coilbox_blueprints_save`, `coilbox_blueprints_rotate_left`, `coilbox_blueprints_rotate_right`, `coilbox_blueprints_prev`, `coilbox_blueprints_next`, `coilbox_blueprints_flip_x`, `coilbox_blueprints_flip_z`.
 
-A game that binds `[` and `]` to its own actions, as BAR does for build facing, takes those keys before the widget sees them. The rotate actions are there for that case.
+When the widget loads it binds `[`, `]`, `Shift+[`, `Shift+]`, `f` and `g` to the turn, step and flip actions, each only if nothing is bound to that action yet, and unbinds them when it shuts down. A key in `uikeys.txt`, or a `bind` typed in the console, replaces the default. The engine binds `[` and `]` to `buildfacing` and `f` and `g` to `fight` and `guard`. H and V, Factorio 2.0's flip keys, are not the defaults because Splinter Faction's share menu unbinds everything on H when it loads and takes H itself. LuaUI is offered a key's actions before the engine runs them, and the turn and flip actions take the key only while there is something to turn, the step actions only while the panel is open, so the rest of the time the key does its usual job. The placing panel labels its buttons with whichever keys are bound. Some widget handlers never run a widget action from a key: Splinter Faction's calls `actionHandler:KeyAction` without the key's bound actions, so the stock handler gives up and the engine runs the key's first engine action. The widget's `KeyPress` looks up the key's bindings itself and runs its own actions, which covers those handlers. A handler that does route the key has run the action and stopped the key already.
 
 ## Tests
 

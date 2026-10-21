@@ -13,14 +13,24 @@ local M = {}
 --- One build square in elmos.
 M.BUILD_SQUARE = 16
 
-local Spring, UnitDefs, UnitDefNames
+local Spring, UnitDefs, UnitDefNames, Game
 
 --- Hand over the engine tables. A test passes a stub.
--- @param engine table Spring, UnitDefs, UnitDefNames
+-- @param engine table Spring, UnitDefs, UnitDefNames, and Game for the map's
+--   size
 function M.use(engine)
 	Spring = engine.Spring
 	UnitDefs = engine.UnitDefs
 	UnitDefNames = engine.UnitDefNames
+	Game = engine.Game
+end
+
+--- Whether a footprint reaches past the edge of the map.
+local function offMap(x, z, hw, hd)
+	if not (Game and Game.mapSizeX) then
+		return false
+	end
+	return x - hw < 0 or z - hd < 0 or x + hw > Game.mapSizeX or z + hd > Game.mapSizeZ
 end
 
 --- A point turned n quarter turns about the origin, facing 1 sending (x, z)
@@ -75,30 +85,338 @@ function M.resolve(entry)
 	return out
 end
 
---- Where every building of a resolved entry lands, for a given anchor and
--- rotation, snapped and tested against the ground.
+--- A facing flipped side to side (east and west swap) or top to bottom
+-- (south and north swap). Facing 0 is south, 1 east, 2 north, 3 west.
+function M.flippedFacing(facing, flipX, flipZ)
+	if flipX and facing % 2 == 1 then
+		facing = (facing + 2) % 4
+	end
+	if flipZ and facing % 2 == 0 then
+		facing = (facing + 2) % 4
+	end
+	return facing
+end
+
+--- Where every building of a resolved entry lands, for a given anchor,
+-- rotation and flip, snapped and tested against the ground. The flip comes
+-- after the turn, so it is always along the map's own x or z. Both turn and
+-- flip about the origin, a point in the layout that lands on the anchor.
 -- @param resolved table from M.resolve
 -- @param rotation integer quarter turns
 -- @param ax number anchor x, elmos
 -- @param az number anchor z, elmos
+-- @param flip table? { x = boolean, z = boolean }
+-- @param origin table? { x, z } in the layout's own offsets, 0, 0 if nil
 -- @return table[] { defID, def, x, y, z, facing, blocked }
-function M.footprint(resolved, rotation, ax, az)
+function M.footprint(resolved, rotation, ax, az, flip, origin)
+	local flipX, flipZ = flip and flip.x, flip and flip.z
+	local cx, cz = origin and origin.x or 0, origin and origin.z or 0
 	local out = {}
 	for i, b in ipairs(resolved.buildings) do
-		local ox, oz = M.turned(b.offset.x, b.offset.z, rotation)
-		local facing = (b.facing + rotation) % 4
+		local ox, oz = M.turned(b.offset.x - cx, b.offset.z - cz, rotation)
+		if flipX then
+			ox = -ox
+		end
+		if flipZ then
+			oz = -oz
+		end
+		local facing = M.flippedFacing((b.facing + rotation) % 4, flipX, flipZ)
 		local x, y, z = Spring.Pos2BuildPos(b.defID, ax + ox, 0, az + oz, facing)
 		local status = Spring.TestBuildOrder(b.defID, x, y, z, facing)
-		out[i] = { defID = b.defID, def = b.def, x = x, y = y, z = z, facing = facing, blocked = status == 0 }
+		local hw, hd = M.halfSpan(b.def, facing)
+		out[i] = { defID = b.defID, def = b.def, x = x, y = y, z = z, facing = facing, blocked = status == 0 or offMap(x, z, hw, hd) }
 	end
 	return out
 end
 
---- What the selected units can build.
+--- Half a footprint's width and depth in elmos, for a facing. xsize and
+-- zsize are in the engine's 8 elmo half squares.
+function M.halfSpan(def, facing)
+	local xs, zs = def.xsize, def.zsize
+	if facing % 2 == 1 then
+		xs, zs = zs, xs
+	end
+	return xs * 4, zs * 4
+end
+
+--- How far a layout reaches from its anchor once turned and flipped, edge to
+-- edge.
+-- @return number minX, maxX, minZ, maxZ in elmos, all 0 for an empty layout
+function M.extent(resolved, rotation, flip)
+	local flipX, flipZ = flip and flip.x, flip and flip.z
+	local minX, maxX, minZ, maxZ = math.huge, -math.huge, math.huge, -math.huge
+	for _, b in ipairs(resolved.buildings) do
+		local ox, oz = M.turned(b.offset.x, b.offset.z, rotation)
+		if flipX then
+			ox = -ox
+		end
+		if flipZ then
+			oz = -oz
+		end
+		local hw, hd = M.halfSpan(b.def, (b.facing + rotation) % 4)
+		minX, maxX = math.min(minX, ox - hw), math.max(maxX, ox + hw)
+		minZ, maxZ = math.min(minZ, oz - hd), math.max(maxZ, oz + hd)
+	end
+	if minX == math.huge then
+		return 0, 0, 0, 0
+	end
+	return minX, maxX, minZ, maxZ
+end
+
+-- How far from the cursor a spot pulls a spot-bound building onto it, in
+-- elmos. The distance Splinter Faction's own extractor snapping uses.
+M.SPOT_SNAP = 90
+
+--- Whether a def only builds on a spot: "geo" for a geothermal, which the
+-- engine only allows on a geothermal feature, "metal" for an extractor,
+-- marked by the engine's extractsMetal or Splinter Faction's metal_extractor
+-- custom param, and nil for anything else.
+function M.spotKind(def)
+	if def.needGeo then
+		return "geo"
+	end
+	if (def.extractsMetal or 0) > 0 or (def.customParams and def.customParams.metal_extractor) then
+		return "metal"
+	end
+	return nil
+end
+
+--- The spot nearest a point within reach, or nil.
+-- @param spots table[] { x, z }
+function M.nearestSpot(spots, x, z, reach)
+	local best, bestD = nil, reach * reach
+	for _, spot in ipairs(spots or {}) do
+		local d = (spot.x - x) ^ 2 + (spot.z - z) ^ 2
+		if d <= bestD then
+			best, bestD = spot, d
+		end
+	end
+	return best
+end
+
+--- A scan of the map's metal for patches of touching squares that hold
+-- metal, for a game that publishes no list of metal spots. It runs a little
+-- at a time with M.stepMetalScan, and pauses part way through a patch.
+-- @param sizeX integer the metal map's width in squares
+-- @param sizeZ integer and its depth
+-- @param amountAt function(x, z) -> metal on a square
+-- @param square number elmos per square
+function M.newMetalScan(sizeX, sizeZ, amountAt, square)
+	return { sizeX = sizeX, sizeZ = sizeZ, amountAt = amountAt, square = square, x = 0, z = 0, seen = {}, patches = {}, done = sizeX <= 0 or sizeZ <= 0 }
+end
+
+-- Take the next square of the patch being filled, adding its neighbours.
+local function fillOne(scan)
+	local f = scan.flood
+	local x, z = f.queue[f.i][1], f.queue[f.i][2]
+	f.i = f.i + 1
+	local metal = scan.amountAt(x, z)
+	f.sum, f.sx, f.sz = f.sum + metal, f.sx + metal * x, f.sz + metal * z
+	f.minX, f.maxX = math.min(f.minX, x), math.max(f.maxX, x)
+	f.minZ, f.maxZ = math.min(f.minZ, z), math.max(f.maxZ, z)
+	for dz = -1, 1 do
+		for dx = -1, 1 do
+			local nx, nz = x + dx, z + dz
+			local k = nz * scan.sizeX + nx
+			if nx >= 0 and nz >= 0 and nx < scan.sizeX and nz < scan.sizeZ and not scan.seen[k] and scan.amountAt(nx, nz) > 0 then
+				scan.seen[k] = true
+				f.queue[#f.queue + 1] = { nx, nz }
+			end
+		end
+	end
+	if not f.queue[f.i] then
+		local q = scan.square
+		scan.patches[#scan.patches + 1] = {
+			x = (f.sx / f.sum + 0.5) * q,
+			z = (f.sz / f.sum + 0.5) * q,
+			wide = math.max(f.maxX - f.minX + 1, f.maxZ - f.minZ + 1) * q,
+		}
+		scan.flood = nil
+	end
+end
+
+--- Look at up to budget more squares, counting those a patch takes in.
+-- @return boolean whether the scan is finished
+function M.stepMetalScan(scan, budget)
+	local n = 0
+	while not scan.done and n < budget do
+		n = n + 1
+		if scan.flood then
+			fillOne(scan)
+		else
+			local k = scan.z * scan.sizeX + scan.x
+			if not scan.seen[k] and scan.amountAt(scan.x, scan.z) > 0 then
+				scan.seen[k] = true
+				scan.flood = { queue = { { scan.x, scan.z } }, i = 1, sum = 0, sx = 0, sz = 0, minX = scan.x, maxX = scan.x, minZ = scan.z, maxZ = scan.z }
+			end
+			scan.x = scan.x + 1
+			if scan.x >= scan.sizeX then
+				scan.x, scan.z = 0, scan.z + 1
+			end
+		end
+		if scan.z >= scan.sizeZ and not scan.flood then
+			scan.done = true
+		end
+	end
+	return scan.done
+end
+
+--- The metal spots for an extractor: each patch no wider than one extractor
+-- covers. A wider patch is open ground with metal everywhere, not a spot.
+-- Finishes the scan first if it is not done.
+-- @param span number elmos one extractor covers, edge to edge
+-- @return table[] { x, z } at each patch's middle, weighted by its metal
+function M.metalSpots(scan, span)
+	M.stepMetalScan(scan, math.huge)
+	local out = {}
+	for _, patch in ipairs(scan.patches) do
+		if patch.wide <= span then
+			out[#out + 1] = { x = patch.x, z = patch.z }
+		end
+	end
+	return out
+end
+
+--- The building a layout is held by while it is placed. The first that only
+-- builds on a spot, so the layout can snap to one, otherwise the one nearest
+-- the middle of the layout, the first in layout order on a tie. The cursor
+-- holds it, and the layout turns and flips about it.
+-- @return integer? its index in resolved.buildings, nil for an empty layout
+function M.pivot(resolved)
+	for i, b in ipairs(resolved.buildings) do
+		if M.spotKind(b.def) then
+			return i
+		end
+	end
+	local minX, maxX, minZ, maxZ = M.extent(resolved, 0)
+	local mx, mz = (minX + maxX) / 2, (minZ + maxZ) / 2
+	local best, bestD
+	for i, b in ipairs(resolved.buildings) do
+		local d = (b.offset.x - mx) ^ 2 + (b.offset.z - mz) ^ 2
+		if not best or d < bestD then
+			best, bestD = i, d
+		end
+	end
+	return best
+end
+
+--- Where the pivot lands for a point on the ground: snapped to the build
+-- grid the way the engine snaps that building, at its facing once turned and
+-- flipped. The layout's other buildings keep their place around it.
+-- @return number x, number z
+function M.pivotAt(resolved, pivot, rotation, flip, x, z)
+	local b = resolved.buildings[pivot]
+	local facing = M.flippedFacing((b.facing + rotation) % 4, flip and flip.x, flip and flip.z)
+	local px, _, pz = Spring.Pos2BuildPos(b.defID, x, 0, z, facing)
+	return px, pz
+end
+
+--- Anchors for copies of a layout laid in a line from one anchor toward
+-- another, along whichever of x and z the line runs further, each copy
+-- touching the last.
+-- @return table[] { x, z }, the first always the start
+function M.line(sx, sz, ex, ez, minX, maxX, minZ, maxZ)
+	local dx, dz = ex - sx, ez - sz
+	local alongX = math.abs(dx) >= math.abs(dz)
+	local span = alongX and (maxX - minX) or (maxZ - minZ)
+	local step = math.max(M.BUILD_SQUARE, math.ceil(span / M.BUILD_SQUARE) * M.BUILD_SQUARE)
+	local reach = alongX and dx or dz
+	local sign = reach < 0 and -1 or 1
+	local out = {}
+	for i = 0, math.floor(math.abs(reach) / step + 0.5) do
+		if alongX then
+			out[#out + 1] = { x = sx + sign * i * step, z = sz }
+		else
+			out[#out + 1] = { x = sx, z = sz + sign * i * step }
+		end
+	end
+	return out
+end
+
+--- What each unit def can turn into besides by building: morph and
+-- evolution targets. Games keep these in different places, so this reads the
+-- unit defs' custom params (Zero-K's morphto, BAR's evolution_target) and any
+-- morph config tables the widget could load, keyed by unit name with a value
+-- of { into = name } or a list of those (Splinter Faction, Metal Factions,
+-- Spring 1944).
+-- @param configs table[] loaded morph config tables
+-- @return table defID -> defID[]
+function M.morphTargets(configs)
+	local out = {}
+	local function add(fromName, intoName)
+		local from, into = defByName(fromName), type(intoName) == "string" and defByName(intoName)
+		if from and into then
+			out[from.id] = out[from.id] or {}
+			table.insert(out[from.id], into.id)
+		end
+	end
+	for _, def in pairs(UnitDefs) do
+		local params = def.customParams or {}
+		for key, value in pairs(params) do
+			if key == "morphto" or key:match("^morphto_%d+$") or key == "evolution_target" then
+				add(def.name, value)
+			end
+		end
+	end
+	for _, config in ipairs(configs) do
+		if type(config) == "table" then
+			for fromName, value in pairs(config) do
+				if type(fromName) == "string" and type(value) == "table" then
+					if value.into then
+						add(fromName, value.into)
+					end
+					for _, each in ipairs(value) do
+						if type(each) == "table" then
+							add(fromName, each.into)
+						end
+					end
+				end
+			end
+		end
+	end
+	return out
+end
+
+--- Every def a team can reach from the units it has: what they build, what
+-- that builds in turn, and what any of them morph into.
+-- @param defIDs integer[] the def ids of the team's units
+-- @param morphs table from M.morphTargets
+-- @return table defID -> true
+function M.reach(defIDs, morphs)
+	local seen, queue = {}, {}
+	for _, id in ipairs(defIDs) do
+		if not seen[id] then
+			seen[id] = true
+			queue[#queue + 1] = id
+		end
+	end
+	local i = 1
+	while queue[i] do
+		local def = UnitDefs[queue[i]]
+		local next = {}
+		for _, id in ipairs(def and def.buildOptions or {}) do
+			next[#next + 1] = id
+		end
+		for _, id in ipairs(morphs[queue[i]] or {}) do
+			next[#next + 1] = id
+		end
+		for _, id in ipairs(next) do
+			if not seen[id] then
+				seen[id] = true
+				queue[#queue + 1] = id
+			end
+		end
+		i = i + 1
+	end
+	return seen
+end
+
+--- What the selected units can build, and how fast.
 -- @param unitIDs integer[]
--- @return table { union = { defID = true }, byUnit = { unitID = { defID = true } }, builders = unitID[] }
+-- @return table { union = { defID = true }, byUnit = { unitID = { defID = true } },
+--   builders = unitID[], speed = { unitID = build speed } }
 function M.capabilities(unitIDs)
-	local out = { union = {}, byUnit = {}, builders = {} }
+	local out = { union = {}, byUnit = {}, builders = {}, speed = {} }
 	for _, unitID in ipairs(unitIDs) do
 		local defID = Spring.GetUnitDefID(unitID)
 		local def = defID and UnitDefs[defID]
@@ -111,9 +429,89 @@ function M.capabilities(unitIDs)
 			end
 			out.byUnit[unitID] = own
 			out.builders[#out.builders + 1] = unitID
+			out.speed[unitID] = def.buildSpeed or 0
 		end
 	end
 	return out
+end
+
+--- What to build in place of a def the team only gets by morphing, such as
+-- a tech 2 factory that is a tech 1 factory upgraded: the first def back
+-- along the morph chain that something the team has, or can build, builds.
+-- @param reach table from M.reach
+-- @param morphs table from M.morphTargets
+-- @return table defID -> the defID to build instead
+function M.standIns(reach, morphs)
+	local buildable = {}
+	for id in pairs(reach) do
+		local def = UnitDefs[id]
+		for _, option in ipairs(def and def.buildOptions or {}) do
+			buildable[option] = true
+		end
+	end
+	local from = {}
+	for source, targets in pairs(morphs) do
+		for _, target in ipairs(targets) do
+			from[target] = from[target] or {}
+			table.insert(from[target], source)
+		end
+	end
+	local out = {}
+	for id in pairs(reach) do
+		if not buildable[id] and from[id] then
+			local seen, queue, i = { [id] = true }, { id }, 1
+			while queue[i] and not out[id] do
+				for _, source in ipairs(from[queue[i]] or {}) do
+					if buildable[source] then
+						out[id] = source
+						break
+					elseif not seen[source] then
+						seen[source] = true
+						queue[#queue + 1] = source
+					end
+				end
+				i = i + 1
+			end
+		end
+	end
+	return out
+end
+
+--- A resolved layout with each building the team only gets by morphing
+-- swapped for its stand-in, which keeps the place and facing. Each swapped
+-- building keeps the def it becomes as upgradesTo.
+-- @return table resolved, integer how many were swapped
+function M.substitute(resolved, standIns)
+	if not standIns then
+		return resolved, 0
+	end
+	local out, n = { buildings = {}, missing = resolved.missing }, 0
+	for i, b in ipairs(resolved.buildings) do
+		local source = standIns[b.defID]
+		if source then
+			n = n + 1
+			out.buildings[i] = { defID = source, def = UnitDefs[source], offset = b.offset, facing = b.facing, upgradesTo = b.def }
+		else
+			out.buildings[i] = b
+		end
+	end
+	return out, n
+end
+
+--- How many of a layout's buildings the team can never build, from
+-- M.reach. Nil reach, as for a spectator or before the team has units,
+-- counts none.
+function M.foreign(resolved, reach)
+	if not reach then
+		return 0
+	end
+	local n = 0
+	for _, b in ipairs(resolved.buildings) do
+		if not reach[b.defID] then
+			n = n + 1
+		end
+	end
+	return n
 end
 
 --- Which tab a resolved entry belongs under for these capabilities.
@@ -134,14 +532,78 @@ function M.classify(resolved, can)
 	return "never"
 end
 
+--- Who builds each position when builders split the work. Each building
+-- goes to the nearest builder able to build it, until that builder has its
+-- fair share of the build time, its build speed's part of the whole. The
+-- buildings that most clearly belong to one builder, by how much further the
+-- next nearest is, are given out first.
+-- @return table position index -> unitID
+local function split(foot, can)
+	local at, totalSpeed = {}, 0
+	for _, unitID in ipairs(can.builders) do
+		local x, _, z = Spring.GetUnitPosition(unitID)
+		at[unitID] = x and { x = x, z = z } or { x = 0, z = 0 }
+		totalSpeed = totalSpeed + (can.speed[unitID] or 0)
+	end
+	local jobs, work = {}, 0
+	for i, p in ipairs(foot) do
+		if not p.blocked then
+			local options = {}
+			for _, unitID in ipairs(can.builders) do
+				if can.byUnit[unitID][p.defID] then
+					local d = math.sqrt((p.x - at[unitID].x) ^ 2 + (p.z - at[unitID].z) ^ 2)
+					options[#options + 1] = { unitID = unitID, d = d }
+				end
+			end
+			if #options > 0 then
+				table.sort(options, function(a, b)
+					return a.d < b.d
+				end)
+				local regret = options[2] and options[2].d - options[1].d or math.huge
+				jobs[#jobs + 1] = { i = i, options = options, regret = regret, time = p.def.buildTime or 0 }
+				work = work + (p.def.buildTime or 0)
+			end
+		end
+	end
+	table.sort(jobs, function(a, b)
+		if a.regret ~= b.regret then
+			return a.regret > b.regret
+		end
+		return a.i < b.i
+	end)
+	-- a builder's fair share, in build time, before it stops taking more
+	local share, load = {}, {}
+	for _, unitID in ipairs(can.builders) do
+		share[unitID] = totalSpeed > 0 and work * (can.speed[unitID] or 0) / totalSpeed or math.huge
+		load[unitID] = 0
+	end
+	local who = {}
+	for _, job in ipairs(jobs) do
+		local pick = job.options[1].unitID
+		for _, option in ipairs(job.options) do
+			if load[option.unitID] < share[option.unitID] then
+				pick = option.unitID
+				break
+			end
+		end
+		who[job.i] = pick
+		load[pick] = load[pick] + job.time
+	end
+	return who
+end
+
 --- Turn a footprint into orders.
 -- @param foot table[] from M.footprint
 -- @param can table from M.capabilities
 -- @param shift boolean whether the player holds shift, which appends everything
+-- @param mode string? "help", the default, gives every builder every building
+--   it can build, so they help each other with each one in turn. "split"
+--   gives each building to one builder, for games that stop builders helping.
 -- @return table { orders = { { unitID, cmds } }, remainder = foot entries nobody
 --   can build, blocked = count of positions skipped because the ground refused }
-function M.plan(foot, can, shift)
+function M.plan(foot, can, shift, mode)
 	local out = { orders = {}, remainder = {}, blocked = 0 }
+	local who = mode == "split" and split(foot, can) or nil
 	local taken = {}
 	for _, unitID in ipairs(can.builders) do
 		local own = can.byUnit[unitID]
@@ -149,7 +611,7 @@ function M.plan(foot, can, shift)
 		for i, p in ipairs(foot) do
 			if own[p.defID] then
 				taken[i] = true
-				if not p.blocked then
+				if not p.blocked and (not who or who[i] == unitID) then
 					local opts = (shift or #cmds > 0) and { "shift" } or {}
 					cmds[#cmds + 1] = { -p.defID, { p.x, p.y, p.z, p.facing }, opts }
 				end
@@ -167,6 +629,30 @@ function M.plan(foot, can, shift)
 		end
 	end
 	return out
+end
+
+--- What a layout costs, and how long the selected builders take to build
+-- the part they can, working together.
+-- @param resolved table from M.resolve
+-- @param can table from M.capabilities
+-- @return number metal, number energy, number? seconds, nil with no builder
+--   for any of it
+function M.cost(resolved, can)
+	local metal, energy, work, speed = 0, 0, 0, 0
+	for _, b in ipairs(resolved.buildings) do
+		metal = metal + (b.def.metalCost or 0)
+		energy = energy + (b.def.energyCost or 0)
+		if can.union[b.defID] then
+			work = work + (b.def.buildTime or 0)
+		end
+	end
+	for _, unitID in ipairs(can.builders) do
+		speed = speed + (can.speed[unitID] or 0)
+	end
+	if work == 0 or speed <= 0 then
+		return metal, energy, nil
+	end
+	return metal, energy, work / speed
 end
 
 --- Send a plan's orders to the engine.

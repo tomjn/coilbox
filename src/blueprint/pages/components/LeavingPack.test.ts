@@ -11,11 +11,18 @@
 
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import { hubSource, type StoredBlueprint } from "../../library";
 import { packStrips } from "../../pack";
 import { LeavingPack } from "./LeavingPack";
+
+// The thumbnail colours its buildings from the game's units, a read this
+// render does not stand up. What colour a building gets is tested in
+// `../../role.test.ts`.
+vi.mock("../../useBuildingRoles", () => ({
+  useBuildingRoles: () => undefined,
+}));
 
 const record = (
   id: string,

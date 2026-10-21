@@ -232,6 +232,12 @@ export interface FootprintStyle {
  * move. A refusal still keeps its colour, because a turn that will land a
  * building in its neighbour is exactly what this is for.
  *
+ * `role` is the colour of what the building does, the way the in-game widget
+ * colours it (`@/blueprint/role`). It only replaces the quiet grey of a building
+ * nothing is wrong with. A refusal, a missing verdict, a held building and an
+ * offered spot keep their own colours, because those say something about where
+ * the building is and the role does not.
+ *
  * `selected` is the building the author is working on (issue #1716), and it says
  * so entirely at the edge: the border is thickened inwards and breathes, and the
  * patch inside it is left exactly as it was.
@@ -250,8 +256,10 @@ export function footprintStyle(
   selected = false,
   /** Whether motion is wanted, which is the only thing the pulse turns on. */
   motion = true,
+  /** The colour of what the building does, or undefined to keep the grey. */
+  role?: number,
 ): FootprintStyle {
-  const verdict = verdictStyle(mark, as);
+  const verdict = verdictStyle(mark, as, role);
   const plain = { edge: verdict.color, band: 0, pulse: false };
   if (!selected) return { ...verdict, ...plain };
   return {
@@ -272,6 +280,7 @@ export function footprintStyle(
 function verdictStyle(
   mark: Pick<FootprintMark, "overlapping" | "standing">,
   as: MarkAs,
+  role?: number,
 ): Omit<FootprintStyle, "edge" | "band" | "pulse"> & { refused: boolean } {
   const held = as === "held";
   const offered = as === "offered";
@@ -318,7 +327,7 @@ function verdictStyle(
     };
   }
   return {
-    color: GROUND_COLOR,
+    color: role ?? GROUND_COLOR,
     fill: 0.12,
     outline: 0.55,
     dashed: false,
@@ -352,8 +361,14 @@ export interface FootprintsLayer {
   /** Draw this list, replacing whatever was drawn before. `as` says what the
    *  marks are about: ground being stood on, the building the pointer is
    *  carrying, or a spot being offered. `selected` is the mark key the author
-   *  has picked, whose square says so (issue #1716). */
-  draw: (marks: FootprintMark[], as?: MarkAs, selected?: string | null) => void;
+   *  has picked, whose square says so (issue #1716). `colorOf` is the colour
+   *  of what each def does, from `@/blueprint/role`. */
+  draw: (
+    marks: FootprintMark[],
+    as?: MarkAs,
+    selected?: string | null,
+    colorOf?: (def: string) => number | undefined,
+  ) => void;
   dispose: () => void;
 }
 
@@ -501,8 +516,9 @@ export function createFootprintsLayer(
     as: MarkAs,
     selected: boolean,
     born: number,
+    role: number | undefined,
   ): Drawn => {
-    const style = footprintStyle(mark, as, selected, moving());
+    const style = footprintStyle(mark, as, selected, moving(), role);
     const width = mark.rect.maxX - mark.rect.minX;
     const depth = mark.rect.maxZ - mark.rect.minZ;
     const spent: { dispose: () => void }[] = [];
@@ -673,7 +689,7 @@ export function createFootprintsLayer(
 
   return {
     root,
-    draw: (marks, as = "standing", selected = null) => {
+    draw: (marks, as = "standing", selected = null, colorOf) => {
       const now = performance.now();
       // Two buildings of one def can stand on one patch of ground, which is a
       // clash rather than an impossibility, so a name that is already taken
@@ -712,6 +728,7 @@ export function createFootprintsLayer(
           as,
           mark.key === selected,
           had?.born ?? now,
+          colorOf?.(mark.def),
         );
         root.add(square.group);
         next.set(name, square);
