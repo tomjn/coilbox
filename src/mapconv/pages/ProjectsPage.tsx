@@ -66,11 +66,13 @@ export default function ProjectsPage() {
             <LayoutGrid size={18} /> <Trans>Projects</Trans>
           </>
         }
-        description={<Trans>
-              Maps you've decompiled or compiled. Open one to recompile with its
-              remembered options, or reveal its folder. Decompiling extracts to
-              a <code>.sdd</code> directory the engine can load directly.
-            </Trans>}
+        description={
+          <Trans>
+            Maps you've decompiled or compiled. Open one to recompile with its
+            remembered options, or reveal its folder. Decompiling extracts to a{" "}
+            <code>.sdd</code> directory the engine can load directly.
+          </Trans>
+        }
         actions={
           <Button variant="outline" size="sm" onClick={importFolder}>
             <FolderInput /> <Trans>Import .sdd folder…</Trans>
