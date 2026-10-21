@@ -239,7 +239,12 @@ describe("the chrome on the warpath map that is not in a frame", () => {
   function tagAround(marker: string): string {
     const at = page.indexOf(marker);
     expect(at, `no ${marker} in RunPage.tsx`).toBeGreaterThan(-1);
-    return page.slice(page.lastIndexOf("<", at), page.indexOf(">", at));
+    // Text wrapped in `<Trans>` for translation belongs to the tag around that.
+    let start = page.lastIndexOf("<", at);
+    if (page.startsWith("<Trans>", start)) {
+      start = page.lastIndexOf("<", start - 1);
+    }
+    return page.slice(start, page.indexOf(">", at));
   }
 
   it("bands the imported-challenge chip, as the run name beside it is banded", () => {
@@ -250,8 +255,8 @@ describe("the chrome on the warpath map that is not in a frame", () => {
   });
 
   for (const control of [
-    'aria-label="Back to map"',
-    'aria-label="Back to warpath hub"',
+    "aria-label={t`Back to map`}",
+    "aria-label={t`Back to warpath hub`}",
   ]) {
     it(`puts the measured card under ${control}`, () => {
       // `text-muted-foreground` is fine on these, and only on these, because the
