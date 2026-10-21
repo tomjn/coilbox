@@ -6,6 +6,7 @@
  * that into the one line the drawer leads with.
  */
 
+import { plural, t } from "@lingui/core/macro";
 import type { UnitCheckReport } from "@/content/bindings";
 
 import { SPAWN_FRAME } from "./scratchGame";
@@ -20,34 +21,44 @@ export const CHECK_FRAMES = PREVIEW_FRAMES;
 /** The frame the unit is spawned on, the scratch game's own spawn frame. */
 export const CHECK_SPAWN_FRAME = SPAWN_FRAME;
 
-function plural(count: number, one: string, many: string): string {
-  return `${count} ${count === 1 ? one : many}`;
-}
-
 /** The line the drawer leads with. */
 export function describeCheck(report: UnitCheckReport, unit: string): string {
   switch (report.outcome) {
-    case "loaded":
-      return `${unit} loaded and ran for ${PREVIEW_SECONDS} seconds with no errors. How it looks is not checked.`;
-    case "problems":
-      return `${plural(report.problems.length, "problem", "problems")} with ${unit}.`;
+    case "loaded": {
+      const seconds = PREVIEW_SECONDS;
+      return t`${unit} loaded and ran for ${seconds} seconds with no errors. How it looks is not checked.`;
+    }
+    case "problems": {
+      const count = report.problems.length;
+      return plural(count, {
+        one: `# problem with ${unit}.`,
+        other: `# problems with ${unit}.`,
+      });
+    }
     case "gameDidNotLoad":
-      return `The game did not load with ${unit} in it.`;
+      return t`The game did not load with ${unit} in it.`;
     case "unfinished": {
       const { exit } = report;
-      if (exit.cancelled) return "The check was stopped.";
-      if (exit.timedOut) return "The engine ran out of time and was stopped.";
-      if (exit.signal !== null)
-        return `The engine crashed with signal ${exit.signal} before the check finished.`;
-      return `The engine stopped with code ${exit.code ?? "unknown"} before the check finished.`;
+      if (exit.cancelled) return t`The check was stopped.`;
+      if (exit.timedOut) return t`The engine ran out of time and was stopped.`;
+      if (exit.signal !== null) {
+        const signal = exit.signal;
+        return t`The engine crashed with signal ${signal} before the check finished.`;
+      }
+      const code = exit.code ?? t`unknown`;
+      return t`The engine stopped with code ${code} before the check finished.`;
     }
   }
 }
 
 /** The note on errors that are not about the unit, or null when there are none. */
 export function describeOtherErrors(report: UnitCheckReport): string | null {
-  if (report.otherErrors === 0) return null;
-  return `${plural(report.otherErrors, "other error", "other errors")} in the log ${report.otherErrors === 1 ? "is" : "are"} not about this unit.`;
+  const count = report.otherErrors;
+  if (count === 0) return null;
+  return plural(count, {
+    one: "# other error in the log is not about this unit.",
+    other: "# other errors in the log are not about this unit.",
+  });
 }
 
 /**
@@ -56,5 +67,10 @@ export function describeOtherErrors(report: UnitCheckReport): string | null {
  */
 export function describeMove(report: UnitCheckReport): string | null {
   if (report.movedElmos === null || report.moveClass === null) return null;
-  return `Moved ${plural(report.movedElmos, "elmo", "elmos")} on ${report.moveClass} when ordered to.`;
+  const elmos = report.movedElmos;
+  const moveClass = report.moveClass;
+  return plural(elmos, {
+    one: `Moved # elmo on ${moveClass} when ordered to.`,
+    other: `Moved # elmos on ${moveClass} when ordered to.`,
+  });
 }
