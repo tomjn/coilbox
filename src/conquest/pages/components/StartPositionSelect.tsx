@@ -1,16 +1,18 @@
+import { t } from "@lingui/core/macro";
+import { Trans } from "@lingui/react/macro";
 import { Lock } from "lucide-react";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import type { StartPosition } from "../../startPosition";
-import { startPositionRequirement } from "../../unlocks";
+import { requirementSentence } from "../../unlocks";
 
 /** The edge start is the galaxy as it has always been, and carries no value. */
 export type StartChoice = "edge" | StartPosition;
 
-const NOTES: Record<StartChoice, string> = {
-  edge: "You start on the western edge, with your rivals far across the map.",
-  centre:
-    "You start in the middle, and your rivals start out on the rim all around you.",
-};
+function startNote(choice: StartChoice): string {
+  return choice === "edge"
+    ? t`You start on the western edge, with your rivals far across the map.`
+    : t`You start in the middle, and your rivals start out on the rim all around you.`;
+}
 
 /**
  * The start position choice on the conquest setup (issue #3432). The edge start
@@ -33,7 +35,7 @@ export function StartPositionSelect({
   return (
     <div className="flex flex-col gap-1.5 text-sm">
       <span className="font-medium" id="conquest-start-label">
-        Start position
+        <Trans>Start position</Trans>
       </span>
       <ToggleGroup
         type="single"
@@ -44,28 +46,30 @@ export function StartPositionSelect({
         onValueChange={(v) => v && onChange(v as StartChoice)}
         aria-labelledby="conquest-start-label"
       >
-        <ToggleGroupItem value="edge">Edge</ToggleGroupItem>
+        <ToggleGroupItem value="edge">
+          <Trans>Edge</Trans>
+        </ToggleGroupItem>
         <ToggleGroupItem
           value="centre"
           disabled={!unlocked}
           aria-describedby={unlocked ? undefined : "conquest-start-locked"}
         >
           {!unlocked && <Lock className="size-3.5" aria-hidden />}
-          Centre
+          <Trans>Centre</Trans>
         </ToggleGroupItem>
       </ToggleGroup>
       <span
         className="text-xs text-muted-foreground"
         data-testid="start-position-note"
       >
-        {NOTES[value]}
+        {startNote(value)}
       </span>
       {!unlocked && (
         <span
           className="text-xs text-muted-foreground"
           id="conquest-start-locked"
         >
-          Centre is locked. {startPositionRequirement()}.
+          <Trans>Centre is locked.</Trans> {requirementSentence(0)}
         </span>
       )}
     </div>

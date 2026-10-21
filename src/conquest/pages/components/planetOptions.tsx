@@ -1,3 +1,4 @@
+import { t } from "@lingui/core/macro";
 import { PLANETS, planetOf } from "../../planets";
 import { PlanetSwatch } from "./PlanetSwatch";
 
@@ -5,7 +6,10 @@ import { PlanetSwatch } from "./PlanetSwatch";
 export const PLANET_OPTIONS = [
   {
     value: "random",
-    label: "Surprise me",
+    // Read when the picker draws, so it follows the language.
+    get label() {
+      return t`Surprise me`;
+    },
     icon: <PlanetSwatch planet="random" />,
   },
   ...PLANETS.map((id) => ({
