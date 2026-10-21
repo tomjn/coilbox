@@ -1,3 +1,4 @@
+import { Trans } from "@lingui/react/macro";
 import { useState } from "react";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { useUnitsyncHeightmap, useUnitsyncMetalmap } from "@/content/config";
@@ -66,7 +67,7 @@ export function MapLayerToggle({
   return (
     <div className="flex items-center justify-between gap-2">
       <span className="text-xs font-medium text-muted-foreground">
-        Map overlay
+        <Trans>Map overlay</Trans>
       </span>
       <ToggleGroup
         type="single"
@@ -75,9 +76,15 @@ export function MapLayerToggle({
         value={layer}
         onValueChange={(v) => onChange((v as MapOverlayLayer) || "off")}
       >
-        <ToggleGroupItem value="off">Map</ToggleGroupItem>
-        <ToggleGroupItem value="metal">Metal</ToggleGroupItem>
-        <ToggleGroupItem value="height">Height</ToggleGroupItem>
+        <ToggleGroupItem value="off">
+          <Trans>Map</Trans>
+        </ToggleGroupItem>
+        <ToggleGroupItem value="metal">
+          <Trans>Metal</Trans>
+        </ToggleGroupItem>
+        <ToggleGroupItem value="height">
+          <Trans>Height</Trans>
+        </ToggleGroupItem>
       </ToggleGroup>
     </div>
   );

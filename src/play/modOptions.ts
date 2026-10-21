@@ -1,3 +1,4 @@
+import { t } from "@lingui/core/macro";
 import type { ConfigOption } from "@/content/bindings";
 
 /**
@@ -164,10 +165,10 @@ export function resetOptionValues(
  */
 export function defaultLabel(o: ConfigOption): string {
   const d = o.default ?? "";
-  if (o.type === "bool") return parseBool(d) ? "On" : "Off";
+  if (o.type === "bool") return parseBool(d) ? t`On` : t`Off`;
   if (o.type === "list")
-    return o.listItems?.find((it) => it.key === d)?.name ?? (d || "empty");
-  return d === "" ? "empty" : d;
+    return o.listItems?.find((it) => it.key === d)?.name ?? (d || t`empty`);
+  return d === "" ? t`empty` : d;
 }
 
 /**

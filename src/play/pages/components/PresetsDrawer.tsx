@@ -1,3 +1,4 @@
+import { Trans, useLingui } from "@lingui/react/macro";
 import { Button } from "@picoframe/frame";
 import {
   ArrowLeft,
@@ -110,6 +111,7 @@ export function PresetsDrawer({
   onHostAsBattle?: (preset: SkirmishPreset) => void;
   disabled?: boolean;
 }) {
+  const { t } = useLingui();
   // Which preset's parts are on screen, if any. The drawer switches to them in
   // place rather than stacking a popover over itself.
   const [viewing, setViewing] = useState<SkirmishPreset | null>(null);
@@ -154,16 +156,16 @@ export function PresetsDrawer({
                   setViewing(null);
                   setTweaksOpen(false);
                 }}
-                aria-label="Back to presets"
+                aria-label={t`Back to presets`}
               >
                 <ArrowLeft className="size-4" />
               </Button>
             )}
             <DialogPrimitive.Title className="min-w-0 flex-1 truncate text-base font-semibold">
-              {tweaksOpen ? "Unit tweaks" : (viewing?.name ?? "Presets")}
+              {tweaksOpen ? t`Unit tweaks` : (viewing?.name ?? t`Presets`)}
             </DialogPrimitive.Title>
             <DialogPrimitive.Close asChild>
-              <Button variant="ghost" size="icon" aria-label="Close">
+              <Button variant="ghost" size="icon" aria-label={t`Close`}>
                 <X className="size-4" />
               </Button>
             </DialogPrimitive.Close>
@@ -198,7 +200,7 @@ export function PresetsDrawer({
               key={viewing.id}
               preset={viewing}
               currentGameName={currentGameName}
-              verb="Load"
+              verb={t`Load`}
               disabled={disabled}
               onConfirm={(selection) => load(viewing, selection)}
               actions={
@@ -215,7 +217,8 @@ export function PresetsDrawer({
                         disabled={disabled}
                         onClick={() => onHostAsBattle(viewing)}
                       >
-                        <Swords className="size-4" /> Host as battle
+                        <Swords className="size-4" />{" "}
+                        <Trans>Host as battle</Trans>
                       </Button>
                     )}
                     <Button
@@ -225,7 +228,7 @@ export function PresetsDrawer({
                       disabled={disabled}
                       onClick={() => onExportPreset(viewing)}
                     >
-                      <Share2 className="size-4" /> Export
+                      <Share2 className="size-4" /> <Trans>Export</Trans>
                     </Button>
                     <Button
                       variant="outline"
@@ -234,7 +237,7 @@ export function PresetsDrawer({
                       disabled={disabled}
                       onClick={() => onCopyPresetLink(viewing)}
                     >
-                      <LinkIcon className="size-4" /> Copy link
+                      <LinkIcon className="size-4" /> <Trans>Copy link</Trans>
                     </Button>
                   </div>
                   {/* Set apart, because it is the one action here that cannot
@@ -251,7 +254,7 @@ export function PresetsDrawer({
                       setViewing(null);
                     }}
                   >
-                    <Trash2 className="size-4" /> Delete preset
+                    <Trash2 className="size-4" /> <Trans>Delete preset</Trans>
                   </Button>
                 </>
               }
@@ -259,7 +262,7 @@ export function PresetsDrawer({
           ) : (
             <>
               <PresetLibraryToolbar
-                saveLabel="Save current setup"
+                saveLabel={t`Save current setup`}
                 onSave={onSave}
                 onImport={onImport}
                 onSaveFromReplay={onSaveFromReplay}
@@ -281,7 +284,7 @@ export function PresetsDrawer({
                   records={records}
                   replayExists={replayExists}
                   onClearRecord={onClearRecord}
-                  empty="No presets yet. Save your current setup above, or import a shared one."
+                  empty={t`No presets yet. Save your current setup above, or import a shared one.`}
                 />
               </div>
             </>

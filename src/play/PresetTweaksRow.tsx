@@ -1,3 +1,4 @@
+import { Trans, useLingui } from "@lingui/react/macro";
 import { ChevronRight, Wrench } from "lucide-react";
 
 /**
@@ -17,6 +18,7 @@ export function PresetTweaksRow({
   unavailable?: string | null;
   onOpen: () => void;
 }) {
+  const { t } = useLingui();
   return (
     <button
       type="button"
@@ -26,9 +28,11 @@ export function PresetTweaksRow({
     >
       <Wrench className="size-4 shrink-0 text-muted-foreground" />
       <span className="min-w-0 flex-1">
-        <span className="block truncate text-sm font-medium">Unit tweaks</span>
+        <span className="block truncate text-sm font-medium">
+          <Trans>Unit tweaks</Trans>
+        </span>
         <span className="mt-0.5 block truncate text-xs text-muted-foreground">
-          {unavailable ?? "Apply a project over the options"}
+          {unavailable ?? t`Apply a project over the options`}
         </span>
       </span>
       {!unavailable && (

@@ -1,3 +1,6 @@
+import type { MessageDescriptor } from "@lingui/core";
+import { msg, select, t } from "@lingui/core/macro";
+import { Plural, Trans, useLingui } from "@lingui/react/macro";
 import { Button } from "@picoframe/frame";
 import { AlertTriangle, Dices, X } from "lucide-react";
 import { Link } from "react-router";
@@ -60,10 +63,9 @@ const aiValue = (a: { kind: string; shortName: string }) =>
 const aiLabel = (a: { name?: string; shortName: string }) =>
   (a.name ?? a.shortName).replace(/\s*\(game-specific AI\)\s*$/i, "");
 
-const BONUS_HELP =
-  "Extra resource income for the AI. 0 means no bonus. Applies when the game starts.";
+const BONUS_HELP: MessageDescriptor = msg`Extra resource income for the AI. 0 means no bonus. Applies when the game starts.`;
 
-const percentText = (n: number) => (n === 0 ? "no bonus" : `+${n}%`);
+const percentText = (n: number) => (n === 0 ? t`no bonus` : t`+${n}%`);
 
 /**
  * A bonus to try, with the game it came from and a button to take it. Never
@@ -80,22 +82,25 @@ function BonusSuggestionNote({
   disabled?: boolean;
   onApply: (percent: number) => void;
 }) {
-  const at = `${
-    suggestion.from === 0
-      ? "with no bonus"
-      : `at ${percentText(suggestion.from)}`
-  }${suggestion.otherVersion ? " on another version" : ""}`;
+  const fromPercent = percentText(suggestion.from);
+  const fromText =
+    suggestion.from === 0 ? t`with no bonus` : t`at ${fromPercent}`;
+  const at = suggestion.otherVersion
+    ? t`${fromText} on another version`
+    : fromText;
+  const suggested = percentText(suggestion.percent);
+  const sentence = select(suggestion.result, {
+    win: `You won your last game against ${aiName} ${at}. Try ${suggested}?`,
+    other: `You lost your last game against ${aiName} ${at}. Try ${suggested}?`,
+  });
   return (
     <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px] text-muted-foreground">
-      <span>
-        You {suggestion.result === "win" ? "won" : "lost"} your last game
-        against {aiName} {at}. Try {percentText(suggestion.percent)}?
-      </span>
+      <span>{sentence}</span>
       <Link
         to={`/play/replays/${encodeURIComponent(suggestion.filename)}`}
         className="underline underline-offset-2"
       >
-        See that game
+        <Trans>See that game</Trans>
       </Link>
       <Button
         variant="outline"
@@ -104,7 +109,7 @@ function BonusSuggestionNote({
         disabled={disabled}
         onClick={() => onApply(suggestion.percent)}
       >
-        Use {percentText(suggestion.percent)}
+        <Trans>Use {suggested}</Trans>
       </Button>
     </div>
   );
@@ -156,6 +161,9 @@ export function ParticipantsTable({
   /** Bonuses to try from your recent results. Absent while none are known. */
   bonusSuggestions?: BonusSuggestions;
 }) {
+  // `t` is the core macro: this component subscribes to language changes here,
+  // and `t` reads the active locale as it renders.
+  const { i18n } = useLingui();
   // Effective (compacted) team index per participant, plus each team's leader —
   // the row whose ally/colour/side the engine team takes when rows share a slot.
   const { teamIndexById, leaderIdByTeam } = effectiveTeams(participants);
@@ -187,7 +195,7 @@ export function ParticipantsTable({
   const sideOptions = [
     {
       value: RANDOM_SIDE,
-      label: "Random",
+      label: t`Random`,
       icon: <Dices className="size-4 text-muted-foreground" />,
     },
     ...sides.map((s) => {
@@ -220,7 +228,7 @@ export function ParticipantsTable({
       // Under fixed start positions the team number *is* the spawn choice — say
       // so in the picker, mirroring the multiplayer team dropdown (#456).
       description:
-        startPosType === 0 ? `Spawns at map position ${i + 1}` : undefined,
+        startPosType === 0 ? t`Spawns at map position ${i + 1}` : undefined,
       icon: (
         <span
           aria-hidden
@@ -271,18 +279,18 @@ export function ParticipantsTable({
         <TableHeader>
           <TableRow className="text-[11px] uppercase tracking-wide text-muted-foreground border-border/40 hover:bg-transparent">
             <TableHead className="w-full px-3 pb-2 pt-3 text-left font-medium text-muted-foreground">
-              Player
+              <Trans>Player</Trans>
             </TableHead>
             {showFaction && (
               <TableHead className="px-2 pb-2 pt-3 text-left font-medium text-muted-foreground">
-                Faction
+                <Trans>Faction</Trans>
               </TableHead>
             )}
             <TableHead className="px-2 pb-2 pt-3 text-left font-medium text-muted-foreground">
-              Team
+              <Trans>Team</Trans>
             </TableHead>
             <TableHead className="px-2 pb-2 pt-3 text-left font-medium text-muted-foreground">
-              Ally
+              <Trans>Ally</Trans>
             </TableHead>
             <TableHead className="pb-2 pl-1 pr-2 pt-3" />
           </TableRow>
@@ -297,8 +305,11 @@ export function ParticipantsTable({
             // An AI row is taller than its picker, which has the bonus under it.
             // Its other cells sit at the top so every picker shares one line.
             const top = p.kind === "ai" && "align-top";
+            const leaderName = leader.name;
+            const playerName = p.name;
+            const aiShortName = p.ai?.shortName;
             const sharedTitle = sharer
-              ? `Shares a team with ${leader.name} — team settings come from the first member`
+              ? t`Shares a team with ${leaderName} — team settings come from the first member`
               : undefined;
             return (
               <TableRow
@@ -329,7 +340,7 @@ export function ParticipantsTable({
                     ) : (
                       <input
                         type="color"
-                        aria-label={`${p.name} colour`}
+                        aria-label={t`${playerName} colour`}
                         value={rgbToHex(p.color)}
                         disabled={disabled}
                         onChange={(e) =>
@@ -340,9 +351,11 @@ export function ParticipantsTable({
                     )}
                     {p.kind === "you" ? (
                       <div className="leading-tight">
-                        <div>You</div>
+                        <div>
+                          <Trans>You</Trans>
+                        </div>
                         <div className="text-[11px] text-muted-foreground">
-                          Human · host
+                          <Trans>Human · host</Trans>
                         </div>
                       </div>
                     ) : (
@@ -370,12 +383,14 @@ export function ParticipantsTable({
                             className="w-full"
                             aria-invalid={!p.ai}
                           >
-                            <SelectValue placeholder="Pick an AI" />
+                            <SelectValue placeholder={t`Pick an AI`} />
                           </SelectTrigger>
                           <SelectContent>
                             {nativeAis.length > 0 && (
                               <SelectGroup>
-                                <SelectLabel>Engine AIs</SelectLabel>
+                                <SelectLabel>
+                                  <Trans>Engine AIs</Trans>
+                                </SelectLabel>
                                 {nativeAis.map((a) => (
                                   <SelectItem
                                     key={aiValue(a)}
@@ -390,7 +405,9 @@ export function ParticipantsTable({
                             )}
                             {luaAis.length > 0 && (
                               <SelectGroup>
-                                <SelectLabel>Game AIs (Lua)</SelectLabel>
+                                <SelectLabel>
+                                  <Trans>Game AIs (Lua)</Trans>
+                                </SelectLabel>
                                 {luaAis.map((a) => (
                                   <SelectItem
                                     key={aiValue(a)}
@@ -405,7 +422,7 @@ export function ParticipantsTable({
                             )}
                             {ais.length === 0 && (
                               <div className="px-2 py-1.5 text-xs text-muted-foreground">
-                                No AIs found
+                                <Trans>No AIs found</Trans>
                               </div>
                             )}
                           </SelectContent>
@@ -416,13 +433,15 @@ export function ParticipantsTable({
                             column, which would push Remove off the card. */}
                         {!sharer && (
                           <div className="mt-1 flex items-center gap-1 text-[11px] text-muted-foreground">
-                            <span>Bonus</span>
+                            <span>
+                              <Trans>Bonus</Trans>
+                            </span>
                             <BonusButton
                               name={p.name}
                               confirmed={p.handicap ?? 0}
                               onSend={(v) => onSetAiBonus(p.id, v)}
-                              help={BONUS_HELP}
-                              actionLabel="Set"
+                              help={i18n._(BONUS_HELP)}
+                              actionLabel={t`Set`}
                               disabled={disabled}
                             />
                           </div>
@@ -438,7 +457,9 @@ export function ParticipantsTable({
                         {aiInvalid(p) && (
                           <span className="mt-1 flex items-center gap-1 text-[11px] text-amber-600 dark:text-amber-400">
                             <AlertTriangle className="size-3.5 shrink-0" />
-                            {p.ai?.shortName} isn't available in this game
+                            <Trans>
+                              {aiShortName} isn't available in this game
+                            </Trans>
                           </span>
                         )}
                       </div>
@@ -459,7 +480,7 @@ export function ParticipantsTable({
                           borderColor: rgbToHex(leader.color),
                         }}
                       >
-                        Co-player
+                        <Trans>Co-player</Trans>
                       </Badge>
                     ) : (
                       <OptionSelect
@@ -513,7 +534,7 @@ export function ParticipantsTable({
                       value={String(p.allyTeam)}
                       size="sm"
                       className="w-16"
-                      ariaLabel={`${p.name} ally`}
+                      ariaLabel={t`${playerName} ally`}
                       disabled={disabled}
                       options={allyOptions}
                       onValueChange={(v) =>
@@ -529,7 +550,7 @@ export function ParticipantsTable({
                       variant="ghost"
                       size="icon"
                       className="size-8"
-                      aria-label={`Remove ${p.name}`}
+                      aria-label={t`Remove ${playerName}`}
                       disabled={disabled}
                       onClick={() => onRemove(p.id)}
                     >
@@ -545,29 +566,39 @@ export function ParticipantsTable({
 
       {startPosType === 0 && (
         <div className="border-t border-border/40 px-3 py-2 text-xs text-muted-foreground">
-          Fixed start positions: team N spawns at the map's start position N.
+          <Trans>
+            Fixed start positions: team N spawns at the map's start position N.
+          </Trans>
           {startPosCount !== undefined &&
-            startPosCount < leaderIdByTeam.length &&
-            ` This map only defines ${startPosCount} start position${
-              startPosCount === 1 ? "" : "s"
-            }; extra teams get engine-picked spots.`}
+            startPosCount < leaderIdByTeam.length && (
+              <>
+                {" "}
+                <Plural
+                  value={startPosCount}
+                  one="This map only defines # start position; extra teams get engine-picked spots."
+                  other="This map only defines # start positions; extra teams get engine-picked spots."
+                />
+              </>
+            )}
         </div>
       )}
 
       <div className="flex flex-wrap items-center gap-x-4 gap-y-1 border-t border-border/40 p-3">
         <Button variant="ghost" size="sm" disabled={disabled} onClick={onAddAi}>
-          + Add AI opponent
+          <Trans>+ Add AI opponent</Trans>
         </Button>
         {aiRows.length > 1 && (
           // One place for everything that acts on every AI's bonus at once.
           <div className="flex items-center gap-1 text-xs text-muted-foreground">
-            <span>Bonus for every AI</span>
+            <span>
+              <Trans>Bonus for every AI</Trans>
+            </span>
             <BonusButton
-              name="every AI"
+              name={t`every AI`}
               confirmed={sharedBonus}
               onSend={onSetAllAiBonus}
-              help={BONUS_HELP}
-              actionLabel="Set all"
+              help={i18n._(BONUS_HELP)}
+              actionLabel={t`Set all`}
               disabled={disabled}
             />
           </div>
@@ -580,7 +611,7 @@ export function ParticipantsTable({
             disabled={disabled}
             onClick={onClearAis}
           >
-            Clear AIs
+            <Trans>Clear AIs</Trans>
           </Button>
         )}
         {bonusSuggestions?.all && aiRows[0]?.ai && (

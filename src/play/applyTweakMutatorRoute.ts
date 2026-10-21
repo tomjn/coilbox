@@ -14,6 +14,7 @@
  * on its own rather than through the whole page.
  */
 
+import { t } from "@lingui/core/macro";
 import { primeScan } from "@/content/config";
 import { resolveMutatorDataDir } from "@/downloads/config";
 import { isWorkshopMutatorArchive } from "@/lib/generatedGames";
@@ -54,7 +55,7 @@ export async function applyTweakMutatorRoute({
       })
     : ({
         ok: false,
-        message: `${gameName} is not installed here, so typed values are written as typed and the game may load some of them as something else.`,
+        message: t`${gameName} is not installed here, so typed values are written as typed and the game may load some of them as something else.`,
       } as const);
   const written = await workshopTestMutator({
     dataDir: await resolveMutatorDataDir(target.dataDir),
@@ -66,17 +67,18 @@ export async function applyTweakMutatorRoute({
     target.dataDir,
     true,
   ).catch((error) => {
-    throw new Error(
-      `The content scan failed: ${error instanceof Error ? error.message : String(error)}`,
-    );
+    const reason = error instanceof Error ? error.message : String(error);
+    throw new Error(t`The content scan failed: ${reason}`);
   });
   const found = rescanned.games.find((g) =>
     isWorkshopMutatorArchive(g.primaryArchive.name),
   );
-  if (!found)
+  if (!found) {
+    const archiveDir = written.dir;
     throw new Error(
-      `Wrote the archive to ${written.dir} but the rescan did not find it.`,
+      t`Wrote the archive to ${archiveDir} but the rescan did not find it.`,
     );
+  }
   return {
     gameType: found.name,
     archiveName: found.primaryArchive.name,

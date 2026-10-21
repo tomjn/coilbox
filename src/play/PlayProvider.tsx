@@ -1,3 +1,5 @@
+import { i18n, type MessageDescriptor } from "@lingui/core";
+import { msg, t } from "@lingui/core/macro";
 import { Channel } from "@tauri-apps/api/core";
 import {
   createContext,
@@ -39,14 +41,14 @@ export type RunKind =
 /** What each run kind is called when the crash drawer says what died. Warpath
  * keeps its internal name `runlite` everywhere else, so it is spelled out here
  * rather than shown raw. */
-const RUN_LABELS: Record<RunKind, string> = {
-  skirmish: "Skirmish",
-  battle: "Multiplayer battle",
-  replay: "Replay",
-  save: "Savegame",
-  campaign: "Campaign mission",
-  conquest: "Conquest battle",
-  runlite: "Warpath battle",
+const RUN_LABELS: Record<RunKind, MessageDescriptor> = {
+  skirmish: msg`Skirmish`,
+  battle: msg`Multiplayer battle`,
+  replay: msg`Replay`,
+  save: msg`Savegame`,
+  campaign: msg`Campaign mission`,
+  conquest: msg`Conquest battle`,
+  runlite: msg`Warpath battle`,
 };
 
 interface LaunchOpts {
@@ -158,7 +160,7 @@ async function assertEngineInstalled(executable?: string): Promise<void> {
     r.engines.some((e) => e.executable === executable),
   );
   if (!listed) {
-    throw new Error(`The engine at ${executable} is no longer installed.`);
+    throw new Error(t`The engine at ${executable} is no longer installed.`);
   }
 }
 
@@ -256,7 +258,7 @@ export function PlayProvider({ children }: { children: ReactNode }) {
         if (activeRunIdRef.current === runId) {
           void inspect({
             ...ctx,
-            runKind: RUN_LABELS[runKind],
+            runKind: i18n._(RUN_LABELS[runKind]),
             outcome,
             startedAtMs,
           });

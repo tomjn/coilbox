@@ -1,3 +1,5 @@
+import { plural } from "@lingui/core/macro";
+import { Plural, Trans, useLingui } from "@lingui/react/macro";
 import { Button } from "@picoframe/frame";
 import { ChevronRight, Film, ImageOff, RotateCcw } from "lucide-react";
 import { useState } from "react";
@@ -11,13 +13,6 @@ import type { MapThumbData } from "@/content/config";
 import type { ResultRecord } from "../records/bestResult";
 import { presetRecordKey, recordSummary } from "./presetRecord";
 import type { SkirmishPreset } from "./presets";
-
-/** A short, derived summary of a preset: its map, game and opponent count. No
- * description is stored on a preset, so this is computed at render time. */
-function describePreset(p: SkirmishPreset): string {
-  const ai = p.participants.filter((x) => x.kind === "ai").length;
-  return `${p.mapName} · ${p.gameName} · ${ai} AI opponent${ai === 1 ? "" : "s"}`;
-}
 
 /**
  * The list of saved skirmish presets, as a column of rows that open one.
@@ -50,6 +45,19 @@ export function PresetList({
   /** Forget one preset's record. Absent hides the button. */
   onClearRecord?: (preset: SkirmishPreset) => void;
 }) {
+  const { t } = useLingui();
+  // A short, derived summary of a preset: its map, game and opponent count. No
+  // description is stored on a preset, so this is computed at render time.
+  const describePreset = (p: SkirmishPreset): string => {
+    const ai = p.participants.filter((x) => x.kind === "ai").length;
+    const mapName = p.mapName;
+    const gameName = p.gameName;
+    const opponents = plural(ai, {
+      one: "# AI opponent",
+      other: "# AI opponents",
+    });
+    return t`${mapName} · ${gameName} · ${opponents}`;
+  };
   if (presets.length === 0)
     return (
       <p className="py-8 text-center text-sm text-muted-foreground">{empty}</p>
@@ -61,6 +69,8 @@ export function PresetList({
         const thumb = thumbs.get(p.mapName);
         const record = records?.[presetRecordKey(p)];
         const bestReplay = record?.best?.replayFilename;
+        const mapName = p.mapName;
+        const presetName = p.name;
         return (
           <li key={p.id}>
             <div className="group flex items-stretch rounded-lg border border-border/50 bg-card transition-colors hover:border-border hover:bg-accent/40">
@@ -74,7 +84,7 @@ export function PresetList({
                   {thumb ? (
                     <img
                       src={thumb.url}
-                      alt={`Minimap of ${p.mapName}`}
+                      alt={t`Minimap of ${mapName}`}
                       style={{
                         // unitsync thumbnails are square, so stretch back to
                         // the map's real proportions, letterboxed by fixing
@@ -122,7 +132,7 @@ export function PresetList({
                   {bestReplay && replayExists?.(bestReplay) && (
                     <Link
                       to={`/play/replays/${encodeURIComponent(bestReplay)}`}
-                      aria-label={`Watch the best replay for ${p.name}`}
+                      aria-label={t`Watch the best replay for ${presetName}`}
                       className="inline-flex size-9 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
                     >
                       <Film className="size-4" />
@@ -158,7 +168,10 @@ function ClearRecordButton({
   disabled?: boolean;
   onClear: (preset: SkirmishPreset) => void;
 }) {
+  const { t } = useLingui();
   const [open, setOpen] = useState(false);
+  const presetName = preset.name;
+  const attempts = record.attempts;
   return (
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
@@ -166,7 +179,7 @@ function ClearRecordButton({
           variant="ghost"
           size="icon"
           disabled={disabled}
-          aria-label={`Clear the record for ${preset.name}`}
+          aria-label={t`Clear the record for ${presetName}`}
         >
           <RotateCcw className="size-4" />
         </Button>
@@ -174,13 +187,23 @@ function ClearRecordButton({
       <PopoverContent align="end" className="w-72">
         <div className="flex flex-col gap-3">
           <p className="text-sm">
-            Clear the record for "{preset.name}"? That forgets {record.attempts}{" "}
-            {record.attempts === 1 ? "attempt" : "attempts"}
-            {record.best ? " and the best time" : ""}. Your replays stay.
+            {record.best ? (
+              <Plural
+                value={attempts}
+                one={`Clear the record for "${presetName}"? That forgets # attempt and the best time. Your replays stay.`}
+                other={`Clear the record for "${presetName}"? That forgets # attempts and the best time. Your replays stay.`}
+              />
+            ) : (
+              <Plural
+                value={attempts}
+                one={`Clear the record for "${presetName}"? That forgets # attempt. Your replays stay.`}
+                other={`Clear the record for "${presetName}"? That forgets # attempts. Your replays stay.`}
+              />
+            )}
           </p>
           <div className="flex justify-end gap-2">
             <Button variant="outline" size="sm" onClick={() => setOpen(false)}>
-              Keep it
+              <Trans>Keep it</Trans>
             </Button>
             <Button
               variant="destructive"
@@ -190,7 +213,7 @@ function ClearRecordButton({
                 onClear(preset);
               }}
             >
-              Clear record
+              <Trans>Clear record</Trans>
             </Button>
           </div>
         </div>

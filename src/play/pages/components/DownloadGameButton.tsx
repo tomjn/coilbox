@@ -1,3 +1,4 @@
+import { Trans, useLingui } from "@lingui/react/macro";
 import { Button } from "@picoframe/frame";
 import { Download, Loader2 } from "lucide-react";
 import { useState } from "react";
@@ -27,7 +28,9 @@ export function DownloadGameButton({
   variant?: "default" | "outline";
   className?: string;
 }) {
+  const { t } = useLingui();
   const { ensureContent } = useLaunchContent();
+  const gameLabel = download.label;
   const [busy, setBusy] = useState(false);
 
   async function onClick() {
@@ -35,7 +38,7 @@ export function DownloadGameButton({
     try {
       const check = await ensureContent({
         requirements: [gameRequirement(game, download)],
-        title: `Download ${download.label}`,
+        title: t`Download ${gameLabel}`,
       });
       // The queue forgot the scans when the download finished.
       if (check.ready) await onReady();
@@ -56,7 +59,7 @@ export function DownloadGameButton({
       ) : (
         <Download className="mr-1.5 size-4" aria-hidden />
       )}
-      Download {download.label}
+      <Trans>Download {gameLabel}</Trans>
     </Button>
   );
 }

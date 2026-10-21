@@ -1,3 +1,4 @@
+import { Trans, useLingui } from "@lingui/react/macro";
 import { Button, Input } from "@picoframe/frame";
 import { Bookmark } from "lucide-react";
 import { type ComponentProps, useState } from "react";
@@ -42,7 +43,7 @@ export function SaveAsPresetButton({
   variant = "outline",
   size,
   className,
-  label = "Save as preset",
+  label,
 }: {
   /** Capture the current battle as a draft, or null if it can't be captured yet. */
   getDraft: () => SkirmishDraft | null;
@@ -57,6 +58,7 @@ export function SaveAsPresetButton({
   className?: string;
   label?: string;
 }) {
+  const { t } = useLingui();
   const { presets, savePreset } = useSkirmishPresets();
   const [open, setOpen] = useState(false);
   const [name, setName] = useState("");
@@ -83,21 +85,21 @@ export function SaveAsPresetButton({
     const draft = getDraft();
     if (!draft) {
       notify({
-        title: "Couldn't save preset",
-        body: "This battle can't be captured yet.",
+        title: t`Couldn't save preset`,
+        body: t`This battle can't be captured yet.`,
         level: "error",
       });
       return;
     }
     savePreset(trimmed, draft);
     notify({
-      title: "Saved to Singleplayer presets",
-      body: `"${trimmed}" — replay it from Singleplayer → Presets.`,
+      title: t`Saved to Singleplayer presets`,
+      body: t`"${trimmed}" — replay it from Singleplayer → Presets.`,
       level: "success",
     });
   };
 
-  const title = saved ? "Saved as preset" : label;
+  const title = saved ? t`Saved as preset` : (label ?? t`Save as preset`);
   const gutter = appearance === "gutter";
 
   const trigger = gutter ? (
@@ -139,9 +141,11 @@ export function SaveAsPresetButton({
         className="w-72 space-y-2"
       >
         <div className="space-y-0.5">
-          <p className="text-sm font-medium">Save as preset</p>
+          <p className="text-sm font-medium">
+            <Trans>Save as preset</Trans>
+          </p>
           <p className="text-xs text-muted-foreground">
-            Saved to your Singleplayer presets to replay later.
+            <Trans>Saved to your Singleplayer presets to replay later.</Trans>
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -153,11 +157,11 @@ export function SaveAsPresetButton({
               if (e.key === "Enter") commit();
               if (e.key === "Escape") setOpen(false);
             }}
-            placeholder="Preset name"
+            placeholder={t`Preset name`}
             className="h-8 flex-1"
           />
           <Button size="sm" onClick={commit} disabled={!name.trim()}>
-            Save
+            <Trans>Save</Trans>
           </Button>
         </div>
       </PopoverContent>

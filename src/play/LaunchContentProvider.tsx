@@ -1,3 +1,4 @@
+import { useLingui } from "@lingui/react/macro";
 import {
   createContext,
   type ReactNode,
@@ -75,6 +76,7 @@ function LaunchContentGate({
   request: LaunchContentRequest;
   onSettle: (result: LaunchContentResult) => void;
 }) {
+  const { t } = useLingui();
   const {
     target: preferred,
     targets: read,
@@ -100,7 +102,7 @@ function LaunchContentGate({
   const { conclusion } = confirmation;
   const unconfirmed =
     conclusion?.kind === "unconfirmed"
-      ? (targets.find((t) => t.executable === conclusion.executable) ?? null)
+      ? (targets.find((x) => x.executable === conclusion.executable) ?? null)
       : null;
   const run = confirmed ?? unconfirmed;
   const namesEngine = request.requirements.some((r) => r.kind === "engine");
@@ -138,8 +140,8 @@ function LaunchContentGate({
   return (
     <ResolveContentGate
       quiet
-      title={request.title ?? "Download what this game needs"}
-      description="This cannot start until the content below is installed. Download it and the game starts when it is ready."
+      title={request.title ?? t`Download what this game needs`}
+      description={t`This cannot start until the content below is installed. Download it and the game starts when it is ready.`}
       requirements={request.requirements}
       target={scan ?? undefined}
       targetLoading={loading || confirmation.confirming}

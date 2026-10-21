@@ -1,3 +1,4 @@
+import { t } from "@lingui/core/macro";
 import { formatSpeed } from "@/downloads/pages/components/ProgressBar";
 
 /**
@@ -28,6 +29,12 @@ export const ASK_EVERY_MS = 1000;
  * number reads for itself and the fact that this host is carrying everybody
  * else's traffic does not.
  */
+export function relayCarryingDetail(): string {
+  return t`This game goes through your machine's relay, so every other player's traffic passes through here. This is how much went through in the last second.`;
+}
+
+/** The English wording of {@link relayCarryingDetail}, which the DOM test looks
+ * the pill up by. The pill itself reads the translated text. */
 export const RELAY_CARRYING_DETAIL =
   "This game goes through your machine's relay, so every other player's traffic passes through here. This is how much went through in the last second.";
 
@@ -53,7 +60,8 @@ export const RELAY_CARRYING_DETAIL =
  * stale.
  */
 export function relayCarryingLabel(bytesPerSecond: number | null): string {
-  if (bytesPerSecond === null) return "Relay running";
-  if (!(bytesPerSecond > 0)) return "Relay running, no traffic";
-  return `Relaying ${formatSpeed(bytesPerSecond)}`;
+  if (bytesPerSecond === null) return t`Relay running`;
+  if (!(bytesPerSecond > 0)) return t`Relay running, no traffic`;
+  const speed = formatSpeed(bytesPerSecond);
+  return t`Relaying ${speed}`;
 }

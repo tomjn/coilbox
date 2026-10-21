@@ -15,6 +15,7 @@
  * child fiber that mounts/unmounts cleanly as the sidebar collapses, matching
  * the pattern in `multiplayer/nav/navBadges.tsx`.
  */
+import { Trans } from "@lingui/react/macro";
 import { Badge } from "@/components/ui/badge";
 import { usePlayReadiness } from "./config";
 import { shouldShowNeedsGameBadge } from "./navBadgeLogic";
@@ -33,7 +34,7 @@ export function NeedsGameNavBadge() {
       variant="outline"
       className="px-1.5 py-0 text-[10px] font-normal text-muted-foreground"
     >
-      Needs a game
+      <Trans>Needs a game</Trans>
     </Badge>
   );
 }

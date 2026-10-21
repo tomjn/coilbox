@@ -1,3 +1,4 @@
+import { Trans, useLingui } from "@lingui/react/macro";
 import { Button, Input } from "@picoframe/frame";
 import { FilePlus2, Loader2 } from "lucide-react";
 import { useState } from "react";
@@ -38,7 +39,7 @@ export function NewPresetFromReplayButton({
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
         <Button variant="outline" size="sm" disabled={disabled}>
-          <FilePlus2 className="size-4" /> Create from replay
+          <FilePlus2 className="size-4" /> <Trans>Create from replay</Trans>
         </Button>
       </PopoverTrigger>
       <PopoverContent align="start" className="flex w-80 flex-col gap-3">
@@ -60,6 +61,7 @@ function ReplayPickerForm({
 }: {
   onSaved: (name: string, draft: SkirmishDraft) => void;
 }) {
+  const { t } = useLingui();
   const { target } = usePreferredTarget();
   const { replays, loading: replaysLoading } = useReplays(target?.dataDir);
   const [replayPath, setReplayPath] = useState("");
@@ -133,25 +135,35 @@ function ReplayPickerForm({
   return (
     <>
       <div className="flex flex-col gap-1">
-        <h3 className="text-sm font-medium">New preset from replay</h3>
+        <h3 className="text-sm font-medium">
+          <Trans>New preset from replay</Trans>
+        </h3>
         <p className="text-xs text-muted-foreground">
-          Every seated player becomes an AI opponent, keeping the map, factions,
-          colours and options.
+          <Trans>
+            Every seated player becomes an AI opponent, keeping the map,
+            factions, colours and options.
+          </Trans>
         </p>
       </div>
 
       <div className="flex flex-col gap-1.5">
-        <span className="text-xs font-medium">Replay</span>
+        <span className="text-xs font-medium">
+          <Trans>Replay</Trans>
+        </span>
         {replaysLoading ? (
-          <p className="text-xs text-muted-foreground">Loading replays…</p>
+          <p className="text-xs text-muted-foreground">
+            <Trans>Loading replays…</Trans>
+          </p>
         ) : replays.length === 0 ? (
-          <p className="text-xs text-muted-foreground">No replays found.</p>
+          <p className="text-xs text-muted-foreground">
+            <Trans>No replays found.</Trans>
+          </p>
         ) : (
           <OptionSelect
             value={replayPath}
             onValueChange={setReplayPath}
             options={replayOptions}
-            placeholder="Pick a replay"
+            placeholder={t`Pick a replay`}
             size="sm"
           />
         )}
@@ -159,23 +171,29 @@ function ReplayPickerForm({
 
       {replayPath && (infoLoading || scanLoading || optionsLoading) && (
         <div className="flex items-center gap-2 text-xs text-muted-foreground">
-          <Loader2 className="size-3.5 animate-spin" /> Reading replay…
+          <Loader2 className="size-3.5 animate-spin" />{" "}
+          <Trans>Reading replay…</Trans>
         </div>
       )}
 
       {ready && scanFailure && (
-        <ScanFailed noun="games or maps" reason={scanFailure} />
+        <ScanFailed noun={t`games or maps`} reason={scanFailure} />
       )}
 
       {ready && (missingGame || missingMap) && (
         <p className="text-xs text-destructive">
-          {missingGame ? "This replay's game isn't installed. " : ""}
-          {missingMap ? "This replay's map isn't installed. " : ""}
-          Install it first from the Replays screen.
-          {missingGame &&
-            shortGameId &&
-            !shortGameId.exact &&
-            " Its exact game couldn't be confirmed from the replay, so this is a name-only check."}
+          {missingGame ? t`This replay's game isn't installed.` : ""}{" "}
+          {missingMap ? t`This replay's map isn't installed.` : ""}{" "}
+          <Trans>Install it first from the Replays screen.</Trans>
+          {missingGame && shortGameId && !shortGameId.exact && (
+            <>
+              {" "}
+              <Trans>
+                Its exact game couldn't be confirmed from the replay, so this is
+                a name-only check.
+              </Trans>
+            </>
+          )}
         </p>
       )}
 
@@ -183,7 +201,9 @@ function ReplayPickerForm({
         <>
           {gameCandidates.length > 1 && (
             <div className="flex flex-col gap-1.5">
-              <span className="text-xs font-medium">Game version</span>
+              <span className="text-xs font-medium">
+                <Trans>Game version</Trans>
+              </span>
               <OptionSelect
                 value={selectedGameName}
                 onValueChange={setSelectedGameName}
@@ -193,24 +213,26 @@ function ReplayPickerForm({
             </div>
           )}
           <div className="flex flex-col gap-1.5">
-            <span className="text-xs font-medium">AI to fill every player</span>
+            <span className="text-xs font-medium">
+              <Trans>AI to fill every player</Trans>
+            </span>
             {ais.length === 0 ? (
               <p className="text-xs text-muted-foreground">
-                No AIs found for this game.
+                <Trans>No AIs found for this game.</Trans>
               </p>
             ) : (
               <OptionSelect
                 value={aiKey}
                 onValueChange={setAiKey}
                 options={aiOptions}
-                placeholder="Default AI"
+                placeholder={t`Default AI`}
                 size="sm"
               />
             )}
           </div>
           {!draft ? (
             <p className="text-xs text-destructive">
-              This replay has no seated players to refight.
+              <Trans>This replay has no seated players to refight.</Trans>
             </p>
           ) : (
             <div className="flex items-center gap-2">
@@ -220,11 +242,11 @@ function ReplayPickerForm({
                 onKeyDown={(e) => {
                   if (e.key === "Enter") save();
                 }}
-                placeholder="Preset name"
+                placeholder={t`Preset name`}
                 className="h-8 flex-1"
               />
               <Button size="sm" disabled={!canSave} onClick={save}>
-                Save
+                <Trans>Save</Trans>
               </Button>
             </div>
           )}

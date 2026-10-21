@@ -1,3 +1,5 @@
+import { plural } from "@lingui/core/macro";
+import { Trans, useLingui } from "@lingui/react/macro";
 import { Button } from "@picoframe/frame";
 import type { ReactNode } from "react";
 import { useState } from "react";
@@ -58,6 +60,7 @@ export function PresetPartsView({
    *  button. Singleplayer puts hosting, sharing and deleting here. */
   actions?: ReactNode;
 }) {
+  const { t } = useLingui();
   const offered = PRESET_PARTS.filter((part) => !omit.includes(part));
   const [selection, setSelection] = useState<PresetSelection>({
     ...ALL_PARTS,
@@ -72,9 +75,10 @@ export function PresetPartsView({
     preset.gameName !== currentGameName && !selection.parts.includes("game");
   // Where the game is not on offer there is nothing to tell the reader to do,
   // so the reason says what is true instead of asking for the impossible.
+  const presetGame = preset.gameName;
   const reason = omit.includes("game")
-    ? `Belongs to ${preset.gameName}, and this room is running ${currentGameName}.`
-    : `Belongs to ${preset.gameName}. Take the game as well, or leave this out.`;
+    ? t`Belongs to ${presetGame}, and this room is running ${currentGameName}.`
+    : t`Belongs to ${presetGame}. Take the game as well, or leave this out.`;
   const disabledReasons: Partial<Record<PresetPart, string>> = {
     ...(crossGame
       ? { modOptions: reason, tweakSlots: reason, restrictions: reason }
@@ -117,11 +121,12 @@ export function PresetPartsView({
     ),
   };
 
+  const presetMap = preset.mapName;
   const warnings: Partial<Record<PresetPart, string>> =
     effective.parts.includes("startPositions") &&
     !effective.parts.includes("map")
       ? {
-          startPositions: `These boxes were drawn for ${preset.mapName}, not the map you are on.`,
+          startPositions: t`These boxes were drawn for ${presetMap}, not the map you are on.`,
         }
       : {};
 
@@ -132,8 +137,10 @@ export function PresetPartsView({
     <div className="flex min-h-0 flex-1 flex-col">
       <div className="flex items-start justify-between gap-3 border-b border-border/60 px-5 py-3">
         <p className="text-xs text-muted-foreground">
-          Take only the parts you want. Everything you leave unticked stays as
-          you have it.
+          <Trans>
+            Take only the parts you want. Everything you leave unticked stays as
+            you have it.
+          </Trans>
         </p>
         {!everything && (
           <Button
@@ -142,7 +149,7 @@ export function PresetPartsView({
             className="shrink-0 text-xs"
             onClick={() => setSelection({ ...selection, parts: offered })}
           >
-            Select all
+            <Trans>Select all</Trans>
           </Button>
         )}
       </div>
@@ -168,10 +175,16 @@ export function PresetPartsView({
           {blockedLabel
             ? blockedLabel
             : count === 0
-              ? "Nothing selected"
+              ? t`Nothing selected`
               : everything
-                ? `${verb} all ${count} parts`
-                : `${verb} ${count} part${count === 1 ? "" : "s"}`}
+                ? plural(count, {
+                    one: `${verb} all # part`,
+                    other: `${verb} all # parts`,
+                  })
+                : plural(count, {
+                    one: `${verb} # part`,
+                    other: `${verb} # parts`,
+                  })}
         </Button>
         {actions}
       </div>

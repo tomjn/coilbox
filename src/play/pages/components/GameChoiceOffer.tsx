@@ -1,3 +1,4 @@
+import { Plural, Trans, useLingui } from "@lingui/react/macro";
 import { Button } from "@picoframe/frame";
 import type { ReactNode } from "react";
 import type { GameOffer } from "../../installedGames";
@@ -26,14 +27,26 @@ export function GameChoiceOffer({
   /** Stay on the current version, and do not offer this newer one again. */
   onDecline: (declinedName: string) => void;
 }) {
+  const { t } = useLingui();
+  const nounText = noun === "warpath" ? t`warpath` : t`conquest`;
+  const pinnedName = offer.kind === "continue" ? offer.pinnedName : "";
+  const currentName = offer.kind === "upgrade" ? offer.current.name : "";
+  const newerName = offer.kind === "choose" ? "" : offer.newer.name;
   return (
     <div className="flex flex-col gap-2 text-sm">
       {offer.kind === "choose" && (
         <>
           <p>
-            This {noun} does not say which game it was started on, and{" "}
-            {offer.candidates.length} installed games could be it. Pick the one
-            to play it on. The {noun} remembers your answer.
+            <Trans>
+              This {nounText} does not say which game it was started on, and{" "}
+              <Plural
+                value={offer.candidates.length}
+                one="# installed game"
+                other="# installed games"
+              />{" "}
+              could be it. Pick the one to play it on. The {nounText} remembers
+              your answer.
+            </Trans>
           </p>
           <div className="flex flex-col gap-2">
             {offer.candidates.map((g) => (
@@ -52,34 +65,38 @@ export function GameChoiceOffer({
       {offer.kind === "continue" && (
         <>
           <p>
-            This {noun} was started on{" "}
-            <span className="font-medium">{offer.pinnedName}</span>, which is
-            not installed. Another version of that game is installed. Continue
-            on <span className="font-medium">{offer.newer.name}</span>?
+            <Trans>
+              This {nounText} was started on{" "}
+              <span className="font-medium">{pinnedName}</span>, which is not
+              installed. Another version of that game is installed. Continue on{" "}
+              <span className="font-medium">{newerName}</span>?
+            </Trans>
           </p>
           <Button disabled={busy} onClick={() => onChoose(offer.newer.name)}>
-            Continue on {offer.newer.name}
+            <Trans>Continue on {newerName}</Trans>
           </Button>
         </>
       )}
       {offer.kind === "upgrade" && (
         <>
           <p>
-            This {noun} is on{" "}
-            <span className="font-medium">{offer.current.name}</span>.{" "}
-            <span className="font-medium">{offer.newer.name}</span> is now
-            installed. Move the {noun} to it?
+            <Trans>
+              This {nounText} is on{" "}
+              <span className="font-medium">{currentName}</span>.{" "}
+              <span className="font-medium">{newerName}</span> is now installed.
+              Move the {nounText} to it?
+            </Trans>
           </p>
           <div className="flex flex-wrap gap-2">
             <Button disabled={busy} onClick={() => onChoose(offer.newer.name)}>
-              Move to {offer.newer.name}
+              <Trans>Move to {newerName}</Trans>
             </Button>
             <Button
               variant="outline"
               disabled={busy}
               onClick={() => onDecline(offer.newer.name)}
             >
-              Stay on {offer.current.name}
+              <Trans>Stay on {currentName}</Trans>
             </Button>
           </div>
         </>

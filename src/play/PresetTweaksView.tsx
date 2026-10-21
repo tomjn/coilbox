@@ -1,3 +1,4 @@
+import { Trans, useLingui } from "@lingui/react/macro";
 import { ChevronRight, Loader2 } from "lucide-react";
 import type { ReactNode } from "react";
 import { useMemo, useState } from "react";
@@ -42,6 +43,7 @@ export function usePresetTweaks(
   /** Whether this surface can fall back to a mutator archive. */
   canMutator: boolean,
 ): { projects: ModProject[]; unavailable: string | null } {
+  const { t } = useLingui();
   const { projects } = useModProjects();
   const mine = useMemo(
     () => projects.filter((p) => p.gameName === gameName),
@@ -55,10 +57,10 @@ export function usePresetTweaks(
   if (!slots && !canMutator)
     return {
       projects: mine,
-      unavailable: `${gameName} has no tweak slots to carry a project here`,
+      unavailable: t`${gameName} has no tweak slots to carry a project here`,
     };
   if (mine.length === 0)
-    return { projects: mine, unavailable: `No projects for ${gameName} yet` };
+    return { projects: mine, unavailable: t`No projects for ${gameName} yet` };
   return { projects: mine, unavailable: null };
 }
 
@@ -105,6 +107,7 @@ export function PresetTweaksView({
    *  instead of claiming the game is not installed. */
   scanFailure?: string | null;
 }) {
+  const { t } = useLingui();
   const [packing, setPacking] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -155,7 +158,7 @@ export function PresetTweaksView({
       const missing = pack.oversized.length + pack.unplaced.length;
       if (missing > 0 || !fit.fits) {
         setError(
-          `This project does not pack into the slots ${gameName} has, so none of it was applied. Open it in the workshop and use Package to see which edits will not fit.`,
+          t`This project does not pack into the slots ${gameName} has, so none of it was applied. Open it in the workshop and use Package to see which edits will not fit.`,
         );
         return;
       }
@@ -167,8 +170,9 @@ export function PresetTweaksView({
         ? settledSummary(settled.settled)
         : settled.message;
       if (note) {
+        const projectName = project.name;
         notify({
-          title: `Applied "${project.name}"`,
+          title: t`Applied "${projectName}"`,
           body: note,
           level: settled.ok ? "success" : "warning",
         });
@@ -184,8 +188,10 @@ export function PresetTweaksView({
   return (
     <div className="flex min-h-0 flex-1 flex-col">
       <p className="border-b border-border/60 px-5 py-3 text-xs text-muted-foreground">
-        Applied over whatever the options already say, so a preset first and a
-        project after gives you both.
+        <Trans>
+          Applied over whatever the options already say, so a preset first and a
+          project after gives you both.
+        </Trans>
       </p>
 
       {progress && (

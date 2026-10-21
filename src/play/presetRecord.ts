@@ -1,3 +1,4 @@
+import { plural, t } from "@lingui/core/macro";
 import { formatDuration } from "../lib/format";
 import type { ResultChange, ResultRecord } from "../records/bestResult";
 import type { SkirmishDraft } from "./drafts";
@@ -35,16 +36,17 @@ export function launchedPreset(
   return match ? { key, name: match.name } : null;
 }
 
-const plural = (n: number, one: string, many = `${one}s`) =>
-  `${n} ${n === 1 ? one : many}`;
-
 /** One line for a preset's row. No best is shown unless a timed win exists. */
 export function recordSummary(record: ResultRecord): string {
-  const attempts = plural(record.attempts, "attempt");
-  if (record.wins === 0) return `${attempts}, no wins`;
-  const wins = plural(record.wins, "win");
-  if (!record.best) return `${wins} in ${attempts}`;
-  return `Best win ${formatDuration(record.best.durationSec)} · ${wins} in ${attempts}`;
+  const attempts = plural(record.attempts, {
+    one: "# attempt",
+    other: "# attempts",
+  });
+  if (record.wins === 0) return t`${attempts}, no wins`;
+  const wins = plural(record.wins, { one: "# win", other: "# wins" });
+  if (!record.best) return t`${wins} in ${attempts}`;
+  const bestTime = formatDuration(record.best.durationSec);
+  return t`Best win ${bestTime} · ${wins} in ${attempts}`;
 }
 
 /** The debrief's line about a game that counted, or null when there is none. */
@@ -56,19 +58,28 @@ export function describeChange(
   switch (change.kind) {
     case "duplicate":
       return null;
-    case "first-win":
-      return `First win on ${name}, in ${formatDuration(change.durationSec)}.`;
-    case "faster":
-      return `New best on ${name}: ${formatDuration(change.bySec)} faster than before.`;
-    case "slower":
-      return `Not a new best on ${name}. This win was ${formatDuration(change.bySec)} slower than ${formatDuration(change.bestSec)}.`;
-    case "equal":
-      return `Matches your best on ${name}, ${formatDuration(change.bestSec)}.`;
+    case "first-win": {
+      const time = formatDuration(change.durationSec);
+      return t`First win on ${name}, in ${time}.`;
+    }
+    case "faster": {
+      const faster = formatDuration(change.bySec);
+      return t`New best on ${name}: ${faster} faster than before.`;
+    }
+    case "slower": {
+      const slower = formatDuration(change.bySec);
+      const best = formatDuration(change.bestSec);
+      return t`Not a new best on ${name}. This win was ${slower} slower than ${best}.`;
+    }
+    case "equal": {
+      const best = formatDuration(change.bestSec);
+      return t`Matches your best on ${name}, ${best}.`;
+    }
     case "loss":
-      return `Attempt recorded on ${name}.`;
+      return t`Attempt recorded on ${name}.`;
     case "no-winner":
-      return `Attempt recorded on ${name}, with no winner.`;
+      return t`Attempt recorded on ${name}, with no winner.`;
     case "win-no-time":
-      return `Win recorded on ${name}, but the replay gave no time.`;
+      return t`Win recorded on ${name}, but the replay gave no time.`;
   }
 }

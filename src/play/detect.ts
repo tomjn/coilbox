@@ -1,3 +1,4 @@
+import { t } from "@lingui/core/macro";
 import {
   contentDemoInfo,
   type DemoInfo,
@@ -125,5 +126,5 @@ export function engineFailureMessage(
   replayFound: boolean,
 ): string | null {
   if (exitCode === 0 || replayFound) return null;
-  return `Engine exited with code ${exitCode}.`;
+  return t`Engine exited with code ${exitCode}.`;
 }
