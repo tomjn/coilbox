@@ -17,6 +17,7 @@
  * `BlueprintOnMap.tsx`.
  */
 
+import { t } from "@lingui/core/macro";
 import type {
   Footprint,
   FootprintMark,
@@ -97,7 +98,9 @@ export function checkSpot(
 /** Where the layout is standing, in the map's own coordinates, so a spot worth
  *  keeping can be written down and typed into a mission. */
 export function spotSentence(spot: Point): string {
-  return `Standing at ${Math.round(spot.x)}, ${Math.round(spot.z)}.`;
+  const x = Math.round(spot.x);
+  const z = Math.round(spot.z);
+  return t`Standing at ${x}, ${z}.`;
 }
 
 /**

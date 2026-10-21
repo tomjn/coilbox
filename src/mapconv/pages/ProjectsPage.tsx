@@ -1,3 +1,4 @@
+import { Trans, useLingui } from "@lingui/react/macro";
 import { Button } from "@picoframe/frame";
 import { open } from "@tauri-apps/plugin-dialog";
 import {
@@ -25,12 +26,13 @@ import { type MapProject, useMapProjects } from "../projects";
  * and out to the file manager.
  */
 export default function ProjectsPage() {
+  const { t } = useLingui();
   const { projects, upsertProject, removeProject } = useMapProjects();
   const navigate = useNavigate();
 
   async function importFolder() {
     const picked = await open({
-      title: "Import a .sdd map folder",
+      title: t`Import a .sdd map folder`,
       directory: true,
       multiple: false,
     });
@@ -61,19 +63,19 @@ export default function ProjectsPage() {
         className="border-b border-border px-6 py-4"
         title={
           <>
-            <LayoutGrid size={18} /> Projects
+            <LayoutGrid size={18} /> <Trans>Projects</Trans>
           </>
         }
         description={
-          <>
+          <Trans>
             Maps you've decompiled or compiled. Open one to recompile with its
             remembered options, or reveal its folder. Decompiling extracts to a{" "}
             <code>.sdd</code> directory the engine can load directly.
-          </>
+          </Trans>
         }
         actions={
           <Button variant="outline" size="sm" onClick={importFolder}>
-            <FolderInput /> Import .sdd folder…
+            <FolderInput /> <Trans>Import .sdd folder…</Trans>
           </Button>
         }
       />
@@ -82,10 +84,14 @@ export default function ProjectsPage() {
         {projects.length === 0 ? (
           <div className="flex h-full flex-col items-center justify-center gap-2 text-center text-sm text-muted-foreground">
             <LayoutGrid size={28} className="opacity-30" />
-            <p>No projects yet.</p>
+            <p>
+              <Trans>No projects yet.</Trans>
+            </p>
             <p className="max-w-xs text-xs">
-              Decompile or compile a map and it'll appear here, or import an
-              existing <code>.sdd</code> folder.
+              <Trans>
+                Decompile or compile a map and it'll appear here, or import an
+                existing <code>.sdd</code> folder.
+              </Trans>
             </p>
           </div>
         ) : (
@@ -102,7 +108,7 @@ export default function ProjectsPage() {
                       {p.name}
                     </h2>
                     <span className="shrink-0 rounded-sm border border-border px-1.5 py-0.5 text-[10px] uppercase tracking-wide text-muted-foreground">
-                      {p.kind === "compile" ? "compile" : "decompiled"}
+                      {p.kind === "compile" ? t`compile` : t`decompiled`}
                     </span>
                   </div>
                   <p
@@ -118,7 +124,7 @@ export default function ProjectsPage() {
                       size="sm"
                       onClick={() => openInCompile(p)}
                     >
-                      <Hammer /> Compile
+                      <Hammer /> <Trans>Compile</Trans>
                     </Button>
                     <Button
                       variant="outline"
@@ -127,13 +133,13 @@ export default function ProjectsPage() {
                         mcOpenPath({ path: p.folderPath }).catch(() => {})
                       }
                     >
-                      <FolderOpen /> Folder
+                      <FolderOpen /> <Trans>Folder</Trans>
                     </Button>
                     <Button
                       variant="ghost"
                       size="sm"
                       onClick={() => removeProject(p.id)}
-                      aria-label={`Remove ${p.name} from projects`}
+                      aria-label={t`Remove ${{ name: p.name }} from projects`}
                     >
                       <Trash2 />
                     </Button>
@@ -156,6 +162,7 @@ function joinPath(dir: string, name: string): string {
 
 /** A project's preview thumbnail, regenerated on demand from its folder image. */
 function ProjectThumb({ path, name }: { path?: string; name: string }) {
+  const { t } = useLingui();
   const [thumb, setThumb] = useState<string | null>(null);
   const [failed, setFailed] = useState(false);
 
@@ -183,7 +190,7 @@ function ProjectThumb({ path, name }: { path?: string; name: string }) {
     return (
       <img
         src={thumb}
-        alt={`${name} preview`}
+        alt={t`${name} preview`}
         className="h-32 w-full border-b border-border object-cover"
       />
     );

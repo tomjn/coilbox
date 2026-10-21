@@ -149,6 +149,10 @@ msgstr "(next rank at {nextRankRating})"
 msgid "(no username)"
 msgstr "(no username)"
 
+#: src/mapconv/pages/components/PathField.tsx
+msgid "(none)"
+msgstr "(none)"
+
 #: src/multiplayer/DebriefingDrawer.tsx
 msgid "(now {xp})"
 msgstr "(now {xp})"
@@ -883,9 +887,21 @@ msgstr "{0} ready."
 msgid "{0} units"
 msgstr "{0} units"
 
+#: src/placement/preview.ts
+msgid "{absent, plural, one {# is a unit this game has not got, in violet.} other {# are units this game has not got, in violet.}}"
+msgstr "{absent, plural, one {# is a unit this game has not got, in violet.} other {# are units this game has not got, in violet.}}"
+
+#: src/placement/preview.ts
+msgid "{absent, plural, one {# of {total} is a unit this game has not got, in violet.} other {# of {total} are units this game has not got, in violet.}}"
+msgstr "{absent, plural, one {# of {total} is a unit this game has not got, in violet.} other {# of {total} are units this game has not got, in violet.}}"
+
 #: src/scenario/pages/components/mapKeyboard.ts
 msgid "{absentCount, plural, one {# a unit this game has not got} other {# units this game has not got}}"
 msgstr "{absentCount, plural, one {# a unit this game has not got} other {# units this game has not got}}"
+
+#: src/placement/LayoutControls.tsx
+msgid "{absentCount, plural, one {Building {absentList} is marked in violet.} other {Buildings {absentList} are marked in violet.}}"
+msgstr "{absentCount, plural, one {Building {absentList} is marked in violet.} other {Buildings {absentList} are marked in violet.}}"
 
 #: src/home/zones/Continue.tsx
 msgid "{action}: {runTitle}"
@@ -1095,6 +1111,7 @@ msgstr "{buildings, plural, one {# building, in build order} other {# buildings,
 
 #: src/hub/pages/components/ItemPreview.tsx
 #: src/hub/pages/components/SetupPackContents.tsx
+#: src/placement/LayoutControls.tsx
 #: src/scenario/pages/components/BlueprintPanel.tsx
 msgid "{buildings, plural, one {# building} other {# buildings}}"
 msgstr "{buildings, plural, one {# building} other {# buildings}}"
@@ -1122,6 +1139,10 @@ msgstr "{bundlePath} has {summary}. Each line below is one thing to fix."
 #: src/content/pages/components/MapRecords.tsx
 msgid "{byAi, plural, one {# start was taken by an AI and is counted.} other {# starts were taken by an AI and are counted.}}"
 msgstr "{byAi, plural, one {# start was taken by an AI and is counted.} other {# starts were taken by an AI and are counted.}}"
+
+#: src/animation/pages/CobPage.tsx
+msgid "{bytes, plural, one {Compiled to {output} (# byte).} other {Compiled to {output} (# bytes).}}"
+msgstr "{bytes, plural, one {Compiled to {output} (# byte).} other {Compiled to {output} (# bytes).}}"
 
 #: src/scenario/pages/ScenarioBuilderPage.tsx
 msgid "{campaignCount, plural, one {In campaign} other {In # campaigns}}"
@@ -1166,6 +1187,10 @@ msgstr "{cheapest} salvage"
 #: src/scenario/pages/components/mapKeyboard.ts
 msgid "{clashCount, plural, one {# overlapping another building} other {# overlapping other buildings}}"
 msgstr "{clashCount, plural, one {# overlapping another building} other {# overlapping other buildings}}"
+
+#: src/placement/preview.ts
+msgid "{clashes, plural, one {# of {total} wants ground another building has, in red.} other {# of {total} want ground another building has, in red.}}"
+msgstr "{clashes, plural, one {# of {total} wants ground another building has, in red.} other {# of {total} want ground another building has, in red.}}"
 
 #: src/content/pages/components/ReplayRoster.tsx
 msgid "{clicks} mouse clicks"
@@ -1414,6 +1439,10 @@ msgstr "{defs, plural, one {# tweakdefs slot} other {# tweakdefs slots}}"
 msgid "{deleted, plural, one {Deleted # unfinished recording.} other {Deleted # unfinished recordings.}}"
 msgstr "{deleted, plural, one {Deleted # unfinished recording.} other {Deleted # unfinished recordings.}}"
 
+#: src/placement/SurfaceBars.tsx
+msgid "{delLabel} all {count}"
+msgstr "{delLabel} all {count}"
+
 #: src/multiplayer/battle/contentBlock.ts
 msgid "{dependencyBlock} The battle cannot start for you until it is installed."
 msgstr "{dependencyBlock} The battle cannot start for you until it is installed."
@@ -1530,6 +1559,12 @@ msgstr "{excludedManual, plural, one {# manual-fire weapon} other {# manual-fire
 msgid "{excludedSlaved, plural, one {# slaved weapon} other {# slaved weapons}}"
 msgstr "{excludedSlaved, plural, one {# slaved weapon} other {# slaved weapons}}"
 
+#: src/animation/pages/CobPage.tsx
+msgid "{existing} already exists.\n"
+"Overwrite it?"
+msgstr "{existing} already exists.\n"
+"Overwrite it?"
+
 #: src/content/pages/components/UnitPicker.tsx
 msgid "{extra, plural, one {{name}, # upgrade} other {{name}, # upgrades}}"
 msgstr "{extra, plural, one {{name}, # upgrade} other {{name}, # upgrades}}"
@@ -1561,6 +1596,10 @@ msgstr "{failedGames} left out: the replay could not be read."
 #: src/content/AnalysisQueueBadge.tsx
 msgid "{failureCount, plural, one {# analysis failed} other {# analyses failed}}"
 msgstr "{failureCount, plural, one {# analysis failed} other {# analyses failed}}"
+
+#: src/placement/preview.ts
+msgid "{far, plural, one {# square {way}} other {# squares {way}}}"
+msgstr "{far, plural, one {# square {way}} other {# squares {way}}}"
 
 #: src/workshop/compatibility.ts
 msgid "{fieldCount, plural, one {{gameName} has no unit called {unit} any more, so # change here changes nothing.} other {{gameName} has no unit called {unit} any more, so # changes here change nothing.}}"
@@ -1594,6 +1633,10 @@ msgstr "{fileCount, plural, one {Cleared # file ({size}).} other {Cleared # file
 msgid "{filename} · {mirrorCount}"
 msgstr "{filename} · {mirrorCount}"
 
+#: src/animation/pages/Bos2LuaPage.tsx
+msgid "{fileName} includes {includes}, which could not be found beside it or in a scripts folder above it, so it cannot be converted."
+msgstr "{fileName} includes {includes}, which could not be found beside it or in a scripts folder above it, so it cannot be converted."
+
 #: src/downloads/installArchive.ts
 msgid "{fileName} is not a .sdz or .sd7 archive."
 msgstr "{fileName} is not a .sdz or .sd7 archive."
@@ -1617,6 +1660,10 @@ msgstr "{fired, plural, one {# place} other {# places}}"
 #: src/home/zones/Greeting.tsx
 msgid "{first} and {second}"
 msgstr "{first} and {second}"
+
+#: src/placement/preview.ts
+msgid "{firstWords} and {secondFar} {secondWay}"
+msgstr "{firstWords} and {secondFar} {secondWay}"
 
 #: src/content/pages/GameUnitPage.tsx
 msgid "{footprintX} by {footprintZ} squares"
@@ -1808,6 +1855,10 @@ msgstr "{gameName} is not installed here, so typed values are written as typed a
 msgid "{gameName} is not installed here."
 msgstr "{gameName} is not installed here."
 
+#: src/placement/BlueprintEditor.tsx
+msgid "{gameName} is not installed, so nothing can be drawn with its models."
+msgstr "{gameName} is not installed, so nothing can be drawn with its models."
+
 #: src/scenario/wording.ts
 msgid "{gameName} is not installed. Install it from Content to play this scenario."
 msgstr "{gameName} is not installed. Install it from Content to play this scenario."
@@ -1981,6 +2032,11 @@ msgstr "{incomeMultiplier}x income"
 #: src/content/pages/components/MapAggregate.tsx
 msgid "{incomplete, plural, one {# replay could not be read to the end and may be missing later orders.} other {# replays could not be read to the end and may be missing later orders.}}"
 msgstr "{incomplete, plural, one {# replay could not be read to the end and may be missing later orders.} other {# replays could not be read to the end and may be missing later orders.}}"
+
+#: src/animation/pages/Bos2LuaPage.tsx
+#: src/animation/pages/CobPage.tsx
+msgid "{infoCount, plural, one {# note} other {# notes}}"
+msgstr "{infoCount, plural, one {# note} other {# notes}}"
 
 #: src/content/pages/components/ReplayTimeWindowControl.tsx
 msgid "{inside} of {total} {countNoun}."
@@ -2192,6 +2248,10 @@ msgstr "{leftCount, plural, one {# more map is still waiting.} other {# more map
 msgid "{leftOutCount, plural, one {{leftOut} is left out, so each match counts once.} other {{leftOut} are left out, so each match counts once.}}"
 msgstr "{leftOutCount, plural, one {{leftOut} is left out, so each match counts once.} other {{leftOut} are left out, so each match counts once.}}"
 
+#: src/placement/preview.ts
+msgid "{limit, plural, one {Nothing within # square of here fits.} other {Nothing within # squares of here fits.}}"
+msgstr "{limit, plural, one {Nothing within # square of here fits.} other {Nothing within # squares of here fits.}}"
+
 #: src/workshop/pages/components/LuaTableValue.tsx
 msgid "{lines, plural, one {# line} other {# lines}}"
 msgstr "{lines, plural, one {# line} other {# lines}}"
@@ -2233,10 +2293,15 @@ msgstr "{mapName} · {gameName} · {opponents}"
 msgid "{mapName} · {modeHint} · middle-drag to pan · drag a unit to move it · drag a zone's middle handle to move it · right-drag to turn the view"
 msgstr "{mapName} · {modeHint} · middle-drag to pan · drag a unit to move it · drag a zone's middle handle to move it · right-drag to turn the view"
 
+#: src/placement/BlueprintOnMap.tsx
+msgid "{mapName} · click or drag to stand the layout somewhere else · this changes the layout in no way · right-drag to turn the view"
+msgstr "{mapName} · click or drag to stand the layout somewhere else · this changes the layout in no way · right-drag to turn the view"
+
 #: src/multiplayer/battles/HostZerokBattlePopover.tsx
 msgid "{mapName} (not installed)"
 msgstr "{mapName} (not installed)"
 
+#: src/placement/BlueprintOnMap.tsx
 #: src/scenario/pages/components/ScenarioMapScene.tsx
 msgid "{mapName} could not be read. It is most likely not installed for the engine coilbox is using."
 msgstr "{mapName} could not be read. It is most likely not installed for the engine coilbox is using."
@@ -2257,6 +2322,10 @@ msgstr "{mapName} is not installed. Install it from Content, or set the scenario
 msgid "{mapTitle} (hand-made map)"
 msgstr "{mapTitle} (hand-made map)"
 
+#: src/mapconv/pages/DecompilePage.tsx
+msgid "{mapx} × {mapy} squares"
+msgstr "{mapx} × {mapy} squares"
+
 #: src/content/pages/components/VersionList.tsx
 msgid "{matches}, {note}"
 msgstr "{matches}, {note}"
@@ -2264,6 +2333,10 @@ msgstr "{matches}, {note}"
 #: src/content/pages/components/ReplayAnalysisEvents.tsx
 msgid "{matchingCount} of {totalCount} events match."
 msgstr "{matchingCount} of {totalCount} events match."
+
+#: src/animation/pages/Bos2LuaPage.tsx
+msgid "{matchPosition} of {matchTotal}"
+msgstr "{matchPosition} of {matchTotal}"
 
 #: src/multiplayer/chat/compose.ts
 msgid "{MAX_COMPOSE_LINES, plural, one {a message can be at most # line (this one is {lineCount})} other {a message can be at most # lines (this one is {lineCount})}}"
@@ -2391,6 +2464,7 @@ msgstr "{missing} not in your library. They stay in the set."
 msgid "{missing} with no {lowerFigure}"
 msgstr "{missing} with no {lowerFigure}"
 
+#: src/placement/BlueprintEditor.tsx
 #: src/scenario/pages/components/ScenarioMapBars.tsx
 msgid "{missingCount, plural, one {# unit type not in {gameName}, drawn as boxes: {missingList}} other {# unit types not in {gameName}, drawn as boxes: {missingList}}}"
 msgstr "{missingCount, plural, one {# unit type not in {gameName}, drawn as boxes: {missingList}} other {# unit types not in {gameName}, drawn as boxes: {missingList}}}"
@@ -2590,6 +2664,10 @@ msgstr "{name} is ready to play."
 msgid "{name} owns {holds}."
 msgstr "{name} owns {holds}."
 
+#: src/mapconv/pages/ProjectsPage.tsx
+msgid "{name} preview"
+msgstr "{name} preview"
+
 #: src/scenario/saveIntoGame.ts
 msgid "{name} ships inside {gameName}, which is packaged, so it cannot be saved there."
 msgstr "{name} ships inside {gameName}, which is packaged, so it cannot be saved there."
@@ -2645,6 +2723,10 @@ msgstr "{noResultTeams, plural, one {# more match of two teams has no result.} o
 #: src/content/pages/components/MapRecords.tsx
 msgid "{noSeat, plural, one {# start for a team that no player or AI held.} other {# starts for a team that no player or AI held.}}"
 msgstr "{noSeat, plural, one {# start for a team that no player or AI held.} other {# starts for a team that no player or AI held.}}"
+
+#: src/placement/LayoutControls.tsx
+msgid "{noSlopeCount, plural, one {Building {noSlopeList} is dashed because this game gives it no slope to check against, so nothing can say whether the ground will take it.} other {Buildings {noSlopeList} are dashed because this game gives them no slope to check against, so nothing can say whether the ground will take them.}}"
+msgstr "{noSlopeCount, plural, one {Building {noSlopeList} is dashed because this game gives it no slope to check against, so nothing can say whether the ground will take it.} other {Buildings {noSlopeList} are dashed because this game gives them no slope to check against, so nothing can say whether the ground will take them.}}"
 
 #: src/content/pages/components/MapRecords.tsx
 msgid "{noStarts, plural, one {# match with no start recorded.} other {# matches with no start recorded.}}"
@@ -2768,6 +2850,10 @@ msgstr "{outside} outside this view"
 msgid "{overallGames} against {other}: {overallRecord}."
 msgstr "{overallGames} against {other}: {overallRecord}."
 
+#: src/placement/LayoutControls.tsx
+msgid "{overlapCount, plural, one {Building {overlapList} stands on ground another building wants, marked in red. The engine builds one of them and refuses the rest.} other {Buildings {overlapList} stand on ground another building wants, marked in red. The engine builds one of them and refuses the rest.}}"
+msgstr "{overlapCount, plural, one {Building {overlapList} stands on ground another building wants, marked in red. The engine builds one of them and refuses the rest.} other {Buildings {overlapList} stand on ground another building wants, marked in red. The engine builds one of them and refuses the rest.}}"
+
 #: src/content/pages/components/ReplayEventLayers.tsx
 msgid "{own} of it a player did to their own units."
 msgstr "{own} of it a player did to their own units."
@@ -2885,9 +2971,17 @@ msgstr "{pixels} pixels of mouse travel"
 msgid "{place} of {total}."
 msgstr "{place} of {total}."
 
+#: src/placement/BlueprintEditor.tsx
+msgid "{placed, plural, one {# building} other {# buildings}}"
+msgstr "{placed, plural, one {# building} other {# buildings}}"
+
 #: src/scenario/pages/components/ScenarioMapBars.tsx
 msgid "{placed, plural, one {# unit} other {# units}}"
 msgstr "{placed, plural, one {# unit} other {# units}}"
+
+#: src/placement/BlueprintEditor.tsx
+msgid "{placed, plural, one {drawing # building} other {drawing # buildings}}"
+msgstr "{placed, plural, one {drawing # building} other {drawing # buildings}}"
 
 #: src/scenario/pages/components/SetupPanel.tsx
 msgid "{placed} stand somewhere on the current map, and the same position is a different place on {mapName}."
@@ -3157,6 +3251,11 @@ msgstr "{serverName} does not offer password recovery in Coilbox. Reset it on th
 msgid "{sets, plural, one {# unit list is} other {# unit lists are}} kept for {replays, plural, one {# replay} other {# replays}}, using {size}. They let a replay name its units after its game is updated or removed, and each goes when the last replay that uses it is deleted."
 msgstr "{sets, plural, one {# unit list is} other {# unit lists are}} kept for {replays, plural, one {# replay} other {# replays}}, using {size}. They let a replay name its units after its game is updated or removed, and each goes when the last replay that uses it is deleted."
 
+#: src/animation/pages/Bos2LuaPage.tsx
+#: src/animation/pages/CobPage.tsx
+msgid "{severeCount, plural, one {# check} other {# checks}}"
+msgstr "{severeCount, plural, one {# check} other {# checks}}"
+
 #: src/multiplayer/battles/CreateLobbyPopover.tsx
 msgid "{shape} on {mapName}"
 msgstr "{shape} on {mapName}"
@@ -3212,6 +3311,10 @@ msgstr "{shownVersions} / {totalVersions} versions"
 #: src/content/matchStats.ts
 msgid "{side} (won)"
 msgstr "{side} (won)"
+
+#: src/factions/FactionLogo.tsx
+msgid "{sideName} emblem"
+msgstr "{sideName} emblem"
 
 #: src/runlite/unitLimit.ts
 msgid "{sideName} has no start unit in {gameName}, so coilbox cannot limit your units. Rewards will offer perks only and every unit will be available from the first battle."
@@ -3295,6 +3398,10 @@ msgstr "{STEP_SECONDS, plural, one {Back # second} other {Back # seconds}}"
 msgid "{STEP_SECONDS, plural, one {Forward # second} other {Forward # seconds}}"
 msgstr "{STEP_SECONDS, plural, one {Forward # second} other {Forward # seconds}}"
 
+#: src/placement/SurfaceBars.tsx
+msgid "{step} of {total}"
+msgstr "{step} of {total}"
+
 #: src/scenario/pages/components/TriggerPanel.tsx
 msgid "{stepCount, plural, one {# action} other {# actions}}"
 msgstr "{stepCount, plural, one {# action} other {# actions}}"
@@ -3303,6 +3410,10 @@ msgstr "{stepCount, plural, one {# action} other {# actions}}"
 msgid "{stepCount, plural, one {# condition} other {# conditions}}"
 msgstr "{stepCount, plural, one {# condition} other {# conditions}}"
 
+#: src/placement/LayoutControls.tsx
+msgid "{stepCount, plural, one {Build order · # step} other {Build order · # steps}}"
+msgstr "{stepCount, plural, one {Build order · # step} other {Build order · # steps}}"
+
 #: src/content/pages/components/ReplayStartUnitLayer.tsx
 msgid "{still, plural, one {# did not move and shows as a dot alone.} other {# did not move and show as a dot alone.}}"
 msgstr "{still, plural, one {# did not move and shows as a dot alone.} other {# did not move and show as a dot alone.}}"
@@ -3310,6 +3421,10 @@ msgstr "{still, plural, one {# did not move and shows as a dot alone.} other {# 
 #: src/content/pages/components/ReplayStartUnitLayer.tsx
 msgid "{still, plural, one {# did not move in this window and shows as a dot alone.} other {# did not move in this window and show as a dot alone.}}"
 msgstr "{still, plural, one {# did not move in this window and shows as a dot alone.} other {# did not move in this window and show as a dot alone.}}"
+
+#: src/placement/LayoutControls.tsx
+msgid "{strayCount, plural, one {{strayList} is not a building in this game, so it will spawn off the build grid. Mobile units belong in a group or as an actor.} other {{strayList} are not a building in this game, so they will spawn off the build grid. Mobile units belong in a group or as an actor.}}"
+msgstr "{strayCount, plural, one {{strayList} is not a building in this game, so it will spawn off the build grid. Mobile units belong in a group or as an actor.} other {{strayList} are not a building in this game, so they will spawn off the build grid. Mobile units belong in a group or as an actor.}}"
 
 #: src/content/pages/StatsPage.tsx
 msgid "{streak, plural, one {# win} other {# wins}}"
@@ -3423,17 +3538,45 @@ msgstr "{title} would have fit a slot on its own, but every slot the game expose
 msgid "{togetherLabel} on the same team not counted."
 msgstr "{togetherLabel} on the same team not counted."
 
+#: src/placement/preview.ts
+msgid "{tooDeep, plural, one {# is in water too deep for it, in cyan.} other {# are in water too deep for them, in cyan.}}"
+msgstr "{tooDeep, plural, one {# is in water too deep for it, in cyan.} other {# are in water too deep for them, in cyan.}}"
+
+#: src/placement/preview.ts
+msgid "{tooDeep, plural, one {# of {total} is in water too deep for it, in cyan.} other {# of {total} are in water too deep for them, in cyan.}}"
+msgstr "{tooDeep, plural, one {# of {total} is in water too deep for it, in cyan.} other {# of {total} are in water too deep for them, in cyan.}}"
+
 #: src/scenario/pages/components/mapKeyboard.ts
 msgid "{tooDeepCount, plural, one {# in water too deep for it} other {# in water too deep for them}}"
 msgstr "{tooDeepCount, plural, one {# in water too deep for it} other {# in water too deep for them}}"
+
+#: src/placement/LayoutControls.tsx
+msgid "{tooDeepCount, plural, one {Building {tooDeepList} stands in water too deep for it, marked in cyan. The engine refuses a building with more water over it than its def allows, so it wants shallower water, or dry land.} other {Buildings {tooDeepList} stand in water too deep for them, marked in cyan. The engine refuses a building with more water over it than its def allows, so they want shallower water, or dry land.}}"
+msgstr "{tooDeepCount, plural, one {Building {tooDeepList} stands in water too deep for it, marked in cyan. The engine refuses a building with more water over it than its def allows, so it wants shallower water, or dry land.} other {Buildings {tooDeepList} stand in water too deep for them, marked in cyan. The engine refuses a building with more water over it than its def allows, so they want shallower water, or dry land.}}"
+
+#: src/placement/preview.ts
+msgid "{tooShallow, plural, one {# is not in deep enough water, in cyan.} other {# are not in deep enough water, in cyan.}}"
+msgstr "{tooShallow, plural, one {# is not in deep enough water, in cyan.} other {# are not in deep enough water, in cyan.}}"
+
+#: src/placement/preview.ts
+msgid "{tooShallow, plural, one {# of {total} is not in deep enough water, in cyan.} other {# of {total} are not in deep enough water, in cyan.}}"
+msgstr "{tooShallow, plural, one {# of {total} is not in deep enough water, in cyan.} other {# of {total} are not in deep enough water, in cyan.}}"
 
 #: src/scenario/pages/components/mapKeyboard.ts
 msgid "{tooShallowCount, plural, one {# without enough water under it} other {# without enough water under them}}"
 msgstr "{tooShallowCount, plural, one {# without enough water under it} other {# without enough water under them}}"
 
+#: src/placement/LayoutControls.tsx
+msgid "{tooShallowCount, plural, one {Building {tooShallowList} is not in deep enough water, marked in cyan. The engine refuses a naval building out of the sea, so it wants deeper water.} other {Buildings {tooShallowList} are not in deep enough water, marked in cyan. The engine refuses a naval building out of the sea, so they want deeper water.}}"
+msgstr "{tooShallowCount, plural, one {Building {tooShallowList} is not in deep enough water, marked in cyan. The engine refuses a naval building out of the sea, so it wants deeper water.} other {Buildings {tooShallowList} are not in deep enough water, marked in cyan. The engine refuses a naval building out of the sea, so they want deeper water.}}"
+
 #: src/multiplayer/pages/BattleRoomPage.tsx
 msgid "{total, plural, one {{failed} of # bot couldn't be added. {names}} other {{failed} of # bots couldn't be added. {names}}}"
 msgstr "{total, plural, one {{failed} of # bot couldn't be added. {names}} other {{failed} of # bots couldn't be added. {names}}}"
+
+#: src/placement/preview.ts
+msgid "{total, plural, one {# building, and it has room here.} other {# buildings, and they all have room here.}}"
+msgstr "{total, plural, one {# building, and it has room here.} other {# buildings, and they all have room here.}}"
 
 #: src/content/pages/components/ReplayAnalysisEvents.tsx
 msgid "{total, plural, one {# event} other {# events}}"
@@ -3451,6 +3594,10 @@ msgstr "{total, plural, one {# item} other {# items}}"
 #: src/content/pages/GameUnitsPage.tsx
 msgid "{total, plural, one {# unit} other {# units}}"
 msgstr "{total, plural, one {# unit} other {# units}}"
+
+#: src/placement/preview.ts
+msgid "{total, plural, one {It has not been checked against the ground.} other {None of them has been checked against the ground.}}"
+msgstr "{total, plural, one {It has not been checked against the ground.} other {None of them has been checked against the ground.}}"
 
 #: src/scenario/pages/components/selection.ts
 msgid "{total, plural, one {Moved # thing {step} {way}.} other {Moved # things {step} {way}.}}"
@@ -3689,6 +3836,10 @@ msgstr "{units} · {orders}"
 msgid "{unitsInScope} in scope, {changed} will change."
 msgstr "{unitsInScope} in scope, {changed} will change."
 
+#: src/placement/preview.ts
+msgid "{unjudged, plural, one {# of them has not been checked against the ground.} other {# of them have not been checked against the ground.}}"
+msgstr "{unjudged, plural, one {# of them has not been checked against the ground.} other {# of them have not been checked against the ground.}}"
+
 #: src/content/pages/MatchupPage.tsx
 msgid "{unknownLabel} with an unknown team not counted."
 msgstr "{unknownLabel} with an unknown team not counted."
@@ -3737,9 +3888,21 @@ msgstr "{unreadableCount, plural, one {# warpath run could not be read. It is ke
 msgid "{unrecognised}."
 msgstr "{unrecognised}."
 
+#: src/placement/preview.ts
+msgid "{unstable, plural, one {# is on ground too steep for it, in amber.} other {# are on ground too steep for them, in amber.}}"
+msgstr "{unstable, plural, one {# is on ground too steep for it, in amber.} other {# are on ground too steep for them, in amber.}}"
+
+#: src/placement/preview.ts
+msgid "{unstable, plural, one {# of {total} is on ground too steep for it, in amber.} other {# of {total} are on ground too steep for them, in amber.}}"
+msgstr "{unstable, plural, one {# of {total} is on ground too steep for it, in amber.} other {# of {total} are on ground too steep for them, in amber.}}"
+
 #: src/scenario/pages/components/mapKeyboard.ts
 msgid "{unstableCount, plural, one {# on ground too steep for it} other {# on ground too steep for them}}"
 msgstr "{unstableCount, plural, one {# on ground too steep for it} other {# on ground too steep for them}}"
+
+#: src/placement/LayoutControls.tsx
+msgid "{unstableCount, plural, one {Building {unstableList} stands on ground too steep for it, marked in amber. The engine refuses to build on a slope past what the unit allows.} other {Buildings {unstableList} stand on ground too steep for them, marked in amber. The engine refuses to build on a slope past what the unit allows.}}"
+msgstr "{unstableCount, plural, one {Building {unstableList} stands on ground too steep for it, marked in amber. The engine refuses to build on a slope past what the unit allows.} other {Buildings {unstableList} stand on ground too steep for them, marked in amber. The engine refuses to build on a slope past what the unit allows.}}"
 
 #: src/scenario/pages/components/BlueprintPanel.tsx
 msgid "{unstatedCount, plural, one {This game has no {unstatedNames}, so nothing is recorded about how much ground it stands on and the picture draws it as one build square.} other {This game has no {unstatedNames}, so nothing is recorded about how much ground they stand on and the picture draws them as one build square.}}"
@@ -4010,6 +4173,10 @@ msgstr "{won} of {decided}"
 msgid "{words} selected."
 msgstr "{words} selected."
 
+#: src/mapconv/pages/DecompilePage.tsx
+msgid "{worldWidth} × {worldHeight} elmos"
+msgstr "{worldWidth} × {worldHeight} elmos"
+
 #: src/workshop/compatibility.ts
 msgid "{written, plural, one {# name or description you wrote for {unit}} other {# names and descriptions you wrote for {unit}}}"
 msgstr "{written, plural, one {# name or description you wrote for {unit}} other {# names and descriptions you wrote for {unit}}}"
@@ -4257,6 +4424,11 @@ msgstr "0 to 1. At 0, the unit misjudges target speed by up to double or half. A
 msgid "0.5 in each channel means no change; 1.0 is twice as bright."
 msgstr "0.5 in each channel means no change; 1.0 is twice as bright."
 
+#: src/mapconv/pages/CompilePage.tsx
+#: src/mapconv/pages/SettingsSection.tsx
+msgid "1 — No compression"
+msgstr "1 — No compression"
+
 #: src/content/pages/components/ReplaySetsManager.tsx
 msgid "1 not in your library. It stays in the set."
 msgstr "1 not in your library. It stays in the set."
@@ -4278,6 +4450,22 @@ msgstr "1v1"
 msgid "1v1, cheese, teaching"
 msgstr "1v1, cheese, teaching"
 
+#: src/mapconv/pages/SettingsSection.tsx
+msgid "2 — Fast"
+msgstr "2 — Fast"
+
+#: src/mapconv/pages/CompilePage.tsx
+msgid "2 — Fast (compare last N tiles)"
+msgstr "2 — Fast (compare last N tiles)"
+
+#: src/mapconv/pages/SettingsSection.tsx
+msgid "3 — Insane (slow)"
+msgstr "3 — Insane (slow)"
+
+#: src/mapconv/pages/CompilePage.tsx
+msgid "3 — Insane (whole map; very slow)"
+msgstr "3 — Insane (whole map; very slow)"
+
 #: src/content/stats.ts
 msgid "30 minutes to 1 hour"
 msgstr "30 minutes to 1 hour"
@@ -4285,6 +4473,19 @@ msgstr "30 minutes to 1 hour"
 #: src/content/unitFieldNotes.ts
 msgid "3D model"
 msgstr "3D model"
+
+#: src/mapconv/pages/components/MapPreview3D.tsx
+msgid "3D preview unavailable."
+msgstr "3D preview unavailable."
+
+#: src/mapconv/pages/CompilePage.tsx
+#: src/mapconv/pages/SettingsSection.tsx
+msgid "4 — High quality fast"
+msgstr "4 — High quality fast"
+
+#: src/mapconv/pages/CompilePage.tsx
+msgid "4 (high quality fast) is a good default"
+msgstr "4 (high quality fast) is a good default"
 
 #: src/startbox/presets.ts
 msgid "4 corners"
@@ -4357,6 +4558,10 @@ msgstr "A big game takes several goes. Every upload spends part of an hourly all
 #: src/content/unitFieldNotes.ts
 msgid "A bit mask matched against the mask the game's Lua has painted on each map square. A building only goes down where the two share a bit. Bit 1 is the ordinary case."
 msgstr "A bit mask matched against the mask the game's Lua has painted on each map square. A building only goes down where the two share a bit. Bit 1 is the ordinary case."
+
+#: src/placement/BlueprintEditor.tsx
+msgid "A blueprint is a shape rather than a place, so there is no map here and no team. Every building sits at an offset from the blueprint's own middle, and the squares under them are the ground the engine will give them."
+msgstr "A blueprint is a shape rather than a place, so there is no map here and no team. Every building sits at an offset from the blueprint's own middle, and the squares under them are the ground the engine will give them."
 
 #: src/scenario/pages/components/BlueprintPanel.tsx
 msgid "A blueprint is a shape rather than a place, so this draws on a build grid and loads no map. Editing it here edits the blueprint itself, so every base placed from it changes. To change one base only, drag its buildings on the map above."
@@ -4706,6 +4911,10 @@ msgstr "A project changes one game. Start another for a second game."
 #: src/workshop/pages/ProjectsPage.tsx
 msgid "A project is one game's edits under a name, saved as you work and exportable as a file somebody else can open. Open one to change what its game's units cost, carry and can do."
 msgstr "A project is one game's edits under a name, saved as you work and exportable as a file somebody else can open. Open one to change what its game's units cost, carry and can do."
+
+#: src/placement/SurfaceBars.tsx
+msgid "A quarter turn. A unit faces one of four ways and nothing in between."
+msgstr "A quarter turn. A unit faces one of four ways and nothing in between."
 
 #: src/content/pages/components/PlayerMatchFigures.tsx
 msgid "A ratio is one figure over another for the same army, and is not per minute. A game where the lower figure is zero has no ratio. It is left out of the average and counted beside it."
@@ -5254,6 +5463,10 @@ msgstr "Add it anyway"
 msgid "Add login"
 msgstr "Add login"
 
+#: src/animation/pages/Bos2LuaPage.tsx
+msgid "Add lualibs/cob_vars.lua to the game"
+msgstr "Add lualibs/cob_vars.lua to the game"
+
 #: src/multiplayer/NoteButton.tsx
 msgid "Add note for {name}"
 msgstr "Add note for {name}"
@@ -5405,6 +5618,14 @@ msgstr "Advanced"
 #: src/general/pages/SettingsSection.tsx
 msgid "Advanced mode"
 msgstr "Advanced mode"
+
+#: src/mapconv/pages/CompilePage.tsx
+msgid "Advanced options"
+msgstr "Advanced options"
+
+#: src/mapconv/pages/CompilePage.tsx
+msgid "Advanced options ({advancedCount})"
+msgstr "Advanced options ({advancedCount})"
 
 #: src/general/pages/SettingsSection.tsx
 msgid "Advanced tools"
@@ -6286,6 +6507,10 @@ msgstr "Assemble units from parts and inspect s3o models."
 msgid "Assets"
 msgstr "Assets"
 
+#: src/mapconv/pages/components/AdvancedOptions.tsx
+msgid "Assigns a terrain type per pixel (each pixel value is an index into the map's terrain types, which set speed/hardness for units)."
+msgstr "Assigns a terrain type per pixel (each pixel value is an index into the map's terrain types, which set speed/hardness for units)."
+
 #: src/content/replayAnalysisEvents.ts
 msgid "at"
 msgstr "at"
@@ -6366,6 +6591,10 @@ msgstr "Automatic"
 msgid "Autosave {when}"
 msgstr "Autosave {when}"
 
+#: src/mapconv/pages/SettingsSection.tsx
+msgid "available"
+msgstr "available"
+
 #: src/content/pages/ReplaysPage.tsx
 msgid "Average non-spectator player skill, with the min-max range below"
 msgstr "Average non-spectator player skill, with the min-max range below"
@@ -6406,6 +6635,10 @@ msgstr "Away"
 #: src/multiplayer/LobbyStatusButton.tsx
 msgid "Back"
 msgstr "Back"
+
+#: src/placement/SurfaceBars.tsx
+msgid "Back a step"
+msgstr "Back a step"
 
 #: src/content/replayMapView/timelineKeys.ts
 msgid "Back one frame"
@@ -6450,6 +6683,10 @@ msgstr "Back to the battle form"
 #: src/workshop/pages/components/DecodeTweakSetDrawer.tsx
 msgid "Back to the decoded payload"
 msgstr "Back to the decoded payload"
+
+#: src/placement/PlacementSurface.tsx
+msgid "Back to the page (Esc)"
+msgstr "Back to the page (Esc)"
 
 #: src/workshop/pages/components/ProjectDetailsDrawer.tsx
 msgid "Back to the project details"
@@ -6578,6 +6815,10 @@ msgstr "Bans {email} for 28 days."
 msgid "Bans and mutes"
 msgstr "Bans and mutes"
 
+#: src/placement/SurfaceBars.tsx
+msgid "bare ground"
+msgstr "bare ground"
+
 #: src/scenario/validate.ts
 msgid "Base"
 msgstr "Base"
@@ -6605,6 +6846,10 @@ msgstr "base building {number}"
 #: src/i18n/frameStrings.ts
 msgid "Base color"
 msgstr "Base color"
+
+#: src/mapconv/pages/CompilePage.tsx
+msgid "basename for the .smf/.smt (no extension)"
+msgstr "basename for the .smf/.smt (no extension)"
 
 #: src/content/pages/components/ReplayBaseCrops.tsx
 #: src/content/pages/components/ReplayMap.tsx
@@ -6826,6 +7071,10 @@ msgstr "Before this project's edits: {gameValue} ({change})"
 msgid "Begin warpath"
 msgstr "Begin warpath"
 
+#: src/mapconv/pages/CompilePage.tsx
+msgid "Beginner guide"
+msgstr "Beginner guide"
+
 #: src/content/pages/components/ReplayTimeWindowControl.tsx
 msgid "Behind the range, {activityLabel} across all teams."
 msgstr "Behind the range, {activityLabel} across all teams."
@@ -6915,6 +7164,10 @@ msgstr "Blue"
 msgid "Blueprint"
 msgstr "Blueprint"
 
+#: src/placement/LayoutControls.tsx
+msgid "Blueprint name"
+msgstr "Blueprint name"
+
 #: src/content/index.ts
 #: src/scenario/pages/components/BlueprintPanel.tsx
 #: src/scenario/pages/components/modes.tsx
@@ -6928,6 +7181,10 @@ msgstr "Blueprints (optional)"
 #: src/scenario/pages/components/BlueprintPanel.tsx
 msgid "Blueprints in this scenario"
 msgstr "Blueprints in this scenario"
+
+#: src/mapconv/pages/components/AdvancedOptions.tsx
+msgid "Blur the main texture before compiling."
+msgstr "Blur the main texture before compiling."
 
 #: src/multiplayer/chat/ChatPane.tsx
 msgid "Bold"
@@ -6943,8 +7200,13 @@ msgid "Bonus for every AI"
 msgstr "Bonus for every AI"
 
 #: src/animation/index.ts
+#: src/animation/pages/Bos2LuaPage.tsx
 msgid "BOS → Lua"
 msgstr "BOS → Lua"
+
+#: src/animation/pages/Bos2LuaPage.tsx
+msgid "BOS, from <0>{path}</0>"
+msgstr "BOS, from <0>{path}</0>"
 
 #: src/hub/pages/components/ItemPreview.tsx
 #: src/multiplayer/battle/MemberRow.tsx
@@ -7079,9 +7341,14 @@ msgstr "Broadcast"
 msgid "Broadcast (dialog)"
 msgstr "Broadcast (dialog)"
 
+#: src/mapconv/pages/components/PathField.tsx
 #: src/workshop/pages/components/UnitFieldRow.tsx
 msgid "Browse"
 msgstr "Browse"
+
+#: src/mapconv/pages/DecompilePage.tsx
+msgid "browse a file, drag one onto the window, or pick a .sdd folder · archives are extracted then decompiled"
+msgstr "browse a file, drag one onto the window, or pick a .sdd folder · archives are extracted then decompiled"
 
 #: src/multiplayer/pages/BattleRoomPage.tsx
 msgid "Browse battles"
@@ -7091,6 +7358,10 @@ msgstr "Browse battles"
 #: src/multiplayer/chat/ConversationSidebar.tsx
 msgid "Browse channels"
 msgstr "Browse channels"
+
+#: src/mapconv/pages/components/PathField.tsx
+msgid "Browse for {label}"
+msgstr "Browse for {label}"
 
 #: src/workshop/pages/components/UnitFieldRow.tsx
 msgid "Browse for {rowLabel}"
@@ -7108,6 +7379,18 @@ msgstr "Browse the hub"
 msgid "Browse units"
 msgstr "Browse units"
 
+#: src/placement/LayoutControls.tsx
+msgid "Build {def} later"
+msgstr "Build {def} later"
+
+#: src/placement/LayoutControls.tsx
+msgid "Build {def} sooner"
+msgstr "Build {def} sooner"
+
+#: src/mapconv/pages/CompilePage.tsx
+msgid "Build a Spring <0>.smf</0>/<1>.smt</1> from a main texture and optional source maps."
+msgstr "Build a Spring <0>.smf</0>/<1>.smt</1> from a main texture and optional source maps."
+
 #: src/multiplayer/battle/compatBattle.ts
 msgid "Build failed"
 msgstr "Build failed"
@@ -7119,6 +7402,10 @@ msgstr "Build menu"
 #: src/scenario/pages/components/BlueprintPanel.tsx
 msgid "build order"
 msgstr "build order"
+
+#: src/placement/LayoutControls.tsx
+msgid "Build order"
+msgstr "Build order"
 
 #: src/content/pages/components/ReplayBuildOrders.tsx
 msgid "build orders"
@@ -7151,6 +7438,10 @@ msgstr "Build range is a sphere"
 #: src/scenario/pages/components/BaseControls.tsx
 msgid "Build the queue over and over"
 msgstr "Build the queue over and over"
+
+#: src/placement/LayoutControls.tsx
+msgid "Build these in this order"
+msgstr "Build these in this order"
 
 #: src/content/pages/components/UnitStatsTable.tsx
 #: src/content/unitFieldNotes.ts
@@ -7200,6 +7491,10 @@ msgstr "building · {def}"
 msgid "Building {building}: {problem}"
 msgstr "Building {building}: {problem}"
 
+#: src/placement/BlueprintEditor.tsx
+msgid "building {number}"
+msgstr "building {number}"
+
 #: src/scenario/pages/components/mapKeyboard.ts
 msgid "building {place}"
 msgstr "building {place}"
@@ -7207,6 +7502,10 @@ msgstr "building {place}"
 #: src/multiplayer/battle/CompatBattleCard.tsx
 msgid "Building <0>{baseName} (compat {version})</0>"
 msgstr "Building <0>{baseName} (compat {version})</0>"
+
+#: src/mapconv/pages/components/MapPreview3D.tsx
+msgid "Building 3D preview…"
+msgstr "Building 3D preview…"
 
 #: src/content/mapAggregate.ts
 #: src/content/pages/components/ReplayMap.tsx
@@ -7343,6 +7642,10 @@ msgstr "Busy week"
 #: src/hub/pages/BrowsePage.tsx
 msgid "By"
 msgstr "By"
+
+#: src/mapconv/pages/DecompilePage.tsx
+msgid "by {author}"
+msgstr "by {author}"
 
 #: src/hub/pages/BrowsePage.tsx
 msgid "by {authorName}"
@@ -7532,6 +7835,8 @@ msgstr "Can't damage its own unit"
 #: src/downloads/pages/ActivityPage.tsx
 #: src/lobby-servers/pages/SettingsSection.tsx
 #: src/lobby-servers/PasswordRecoveryForm.tsx
+#: src/mapconv/pages/CompilePage.tsx
+#: src/mapconv/pages/DecompilePage.tsx
 #: src/multiplayer/battle/BattleRoomHeader.tsx
 #: src/multiplayer/battles/HostBattleForm.tsx
 #: src/multiplayer/chat/ChannelTopicMenu.tsx
@@ -7988,6 +8293,10 @@ msgstr "Checking your router…"
 msgid "Checking your sign-in"
 msgstr "Checking your sign-in"
 
+#: src/mapconv/pages/SettingsSection.tsx
+msgid "checking…"
+msgstr "checking…"
+
 #: src/content/pages/components/states.tsx
 #: src/content/pages/components/UnitRendersRow.tsx
 #: src/deeplink/pages/ImportSection.tsx
@@ -8014,6 +8323,8 @@ msgstr "Checkpoints"
 msgid "Checkpoints, {checkpointCount} saved"
 msgstr "Checkpoints, {checkpointCount} saved"
 
+#: src/animation/pages/Bos2LuaPage.tsx
+#: src/animation/pages/CobPage.tsx
 #: src/workshop/routes.ts
 msgid "Checks"
 msgstr "Checks"
@@ -8059,6 +8370,7 @@ msgstr "Choose a game."
 
 #: src/direct/HostRoomForm.tsx
 #: src/multiplayer/battles/HostBattleForm.tsx
+#: src/placement/BlueprintOnMap.tsx
 #: src/play/pages/components/MapPickerDrawer.tsx
 msgid "Choose a map"
 msgstr "Choose a map"
@@ -8163,6 +8475,7 @@ msgstr "Cleanup…"
 msgid "Clear"
 msgstr "Clear"
 
+#: src/mapconv/pages/components/PathField.tsx
 #: src/scenario/pages/components/TriggerSteps.tsx
 msgid "Clear {label}"
 msgstr "Clear {label}"
@@ -8229,6 +8542,14 @@ msgstr "Cleared"
 #: src/multiplayer/admin/MaintenanceSection.tsx
 msgid "Clears out inconsistent server state left over from a crash or a bug. Announces the attempt in #moderator, then the result there and here."
 msgstr "Clears out inconsistent server state left over from a crash or a bug. Announces the attempt in #moderator, then the result there and here."
+
+#: src/placement/BlueprintEditor.tsx
+msgid "Click the ground to put one down. Escape stops placing. Drag a building to move it within the blueprint."
+msgstr "Click the ground to put one down. Escape stops placing. Drag a building to move it within the blueprint."
+
+#: src/placement/BlueprintOnMap.tsx
+msgid "Click the ground to stand it somewhere else."
+msgstr "Click the ground to stand it somewhere else."
 
 #: src/scenario/pages/components/BaseControls.tsx
 #: src/scenario/pages/components/GroupControls.tsx
@@ -8367,6 +8688,7 @@ msgid "COB identifier"
 msgstr "COB identifier"
 
 #: src/animation/index.ts
+#: src/animation/pages/CobPage.tsx
 msgid "COB tools"
 msgstr "COB tools"
 
@@ -8415,6 +8737,10 @@ msgstr "Coilbox can read the minimap out of every map on this computer and send 
 #: src/workshop/pages/components/AssetPreview.tsx
 msgid "Coilbox cannot draw this picture. The game can still read it."
 msgstr "Coilbox cannot draw this picture. The game can still read it."
+
+#: src/mapconv/skyboxNote.ts
+msgid "Coilbox cannot read this map's skybox. The map ships one, in a DDS format the reader does not handle, so the preview draws the map's sky colour instead."
+msgstr "Coilbox cannot read this map's skybox. The map ships one, in a DDS format the reader does not handle, so the preview draws the map's sky colour instead."
 
 #: src/content/buildPicMissing.ts
 msgid "Coilbox cannot read this unit's build pic. The game ships one, in a format the decoder does not handle."
@@ -8628,6 +8954,10 @@ msgstr "Coilbox has not contacted it yet. Only continue if you trust this link."
 msgid "Coilbox has not read this game's units yet, so nothing here has been checked against them. This file holds every blueprint every game sharing a data directory has saved, and another game's looks exactly like this one's until the names are checked."
 msgstr "Coilbox has not read this game's units yet, so nothing here has been checked against them. This file holds every blueprint every game sharing a data directory has saved, and another game's looks exactly like this one's until the names are checked."
 
+#: src/placement/LayoutControls.tsx
+msgid "Coilbox has not read this game's units. Nothing here has been checked against the ground, so every square is dashed rather than clean."
+msgstr "Coilbox has not read this game's units. Nothing here has been checked against the ground, so every square is dashed rather than clean."
+
 #: src/hub/uploadOutcomes.ts
 msgid "Coilbox has stopped sending {sendingNoun}. {already}"
 msgstr "Coilbox has stopped sending {sendingNoun}. {already}"
@@ -8706,6 +9036,7 @@ msgstr "Coilbox on GitHub"
 msgid "Coilbox preset"
 msgstr "Coilbox preset"
 
+#: src/placement/BlueprintOnMap.tsx
 #: src/scenario/pages/components/ScenarioMapScene.tsx
 msgid "Coilbox reads maps through an engine, and there is no engine installed to read {mapName} with."
 msgstr "Coilbox reads maps through an engine, and there is no engine installed to read {mapName} with."
@@ -8944,6 +9275,10 @@ msgstr "Community"
 msgid "Compare"
 msgstr "Compare"
 
+#: src/mapconv/pages/components/AdvancedOptions.tsx
+msgid "Compare count (-ccount)"
+msgstr "Compare count (-ccount)"
+
 #: src/content/pages/GameUnitsPage.tsx
 #: src/workshop/pages/components/UnitCompareDrawer.tsx
 msgid "Compare units"
@@ -8990,17 +9325,47 @@ msgstr "Compatibility mode is on for {gameName}, but the engine did not find {fo
 msgid "Compatibility mode is on for {gameName}, but the game could not be read to check its mutator. Open {gameName} under Library > Games and choose Rebuild."
 msgstr "Compatibility mode is on for {gameName}, but the game could not be read to check its mutator. Open {gameName} under Library > Games and choose Rebuild."
 
+#: src/mapconv/pages/ProjectsPage.tsx
+msgid "compile"
+msgstr "compile"
+
 #: src/mapconv/index.ts
+#: src/mapconv/pages/CompilePage.tsx
+#: src/mapconv/pages/ProjectsPage.tsx
 msgid "Compile"
 msgstr "Compile"
+
+#: src/animation/pages/CobPage.tsx
+msgid "Compile .bos…"
+msgstr "Compile .bos…"
+
+#: src/animation/pages/CobPage.tsx
+msgid "Compile a <0>.bos</0> unit script to <1>.cob</1>, or open a <2>.cob</2> and read it back as source, as bytes, and as the instructions it holds."
+msgstr "Compile a <0>.bos</0> unit script to <1>.cob</1>, or open a <2>.cob</2> and read it back as source, as bytes, and as the instructions it holds."
 
 #: src/home/groupDescription.ts
 msgid "Compile and decompile maps."
 msgstr "Compile and decompile maps."
 
+#: src/mapconv/pages/CompilePage.tsx
+msgid "Compile map"
+msgstr "Compile map"
+
+#: src/mapconv/pages/CompilePage.tsx
+msgid "Compile output streams here."
+msgstr "Compile output streams here."
+
+#: src/mapconv/pages/CompilePage.tsx
+msgid "Compiled <0>{smfPath}</0>"
+msgstr "Compiled <0>{smfPath}</0>"
+
 #: src/scenario/pages/components/MissionLuaCode.tsx
 msgid "Compiled mission.lua"
 msgstr "Compiled mission.lua"
+
+#: src/animation/pages/CobPage.tsx
+msgid "Compiled unit script"
+msgstr "Compiled unit script"
 
 #: src/scenario/pages/ScenarioEditPage.tsx
 msgid "Compiles the mission, checks it loads, then starts the engine."
@@ -9010,6 +9375,10 @@ msgstr "Compiles the mission, checks it loads, then starts the engine."
 msgid "Compiling the mission"
 msgstr "Compiling the mission"
 
+#: src/mapconv/pages/CompilePage.tsx
+msgid "compiling…"
+msgstr "compiling…"
+
 #: src/workshop/pages/components/CompiledLuaPanel.tsx
 msgid "Compiling…"
 msgstr "Compiling…"
@@ -9017,6 +9386,14 @@ msgstr "Compiling…"
 #: src/downloads/pages/components/MapPacksDrawer.tsx
 msgid "Complete"
 msgstr "Complete"
+
+#: src/mapconv/pages/components/AdvancedOptions.tsx
+msgid "Compression tuning"
+msgstr "Compression tuning"
+
+#: src/mapconv/pages/CompilePage.tsx
+msgid "Compression type (-ct)"
+msgstr "Compression type (-ct)"
 
 #: src/scenario/validate.ts
 msgid "Condition"
@@ -9171,6 +9548,14 @@ msgstr "Continue on {newerName}"
 msgid "Controls how fast the damage shockwave spreads outward. Units can't dodge it: they're tagged for damage immediately and only take it after a delay."
 msgstr "Controls how fast the damage shockwave spreads outward. Units can't dodge it: they're tagged for damage immediately and only take it after a delay."
 
+#: src/mapconv/pages/components/AdvancedOptions.tsx
+msgid "Controls where engine grass/vegetation grows. A grayscale image where brighter = denser grass."
+msgstr "Controls where engine grass/vegetation grows. A grayscale image where brighter = denser grass."
+
+#: src/animation/pages/Bos2LuaPage.tsx
+msgid "Conversion warnings"
+msgstr "Conversion warnings"
+
 #: src/content/pages/ArchiveDetailPage.tsx
 #: src/content/pages/GameDetailPage.tsx
 msgid "Convert .3do models"
@@ -9179,6 +9564,10 @@ msgstr "Convert .3do models"
 #: src/scenario/pages/components/BaseControls.tsx
 msgid "Convert {layoutName}"
 msgstr "Convert {layoutName}"
+
+#: src/animation/pages/Bos2LuaPage.tsx
+msgid "Convert a <0>.bos</0> unit script to Lua."
+msgstr "Convert a <0>.bos</0> unit script to Lua."
 
 #: src/content/pages/components/OldConversionNotice.tsx
 msgid "Convert again"
@@ -9193,6 +9582,14 @@ msgstr "Convert BOS to Lua, and work with COB scripts."
 #: src/content/pages/GameDetailPage.tsx
 msgid "Convert models"
 msgstr "Convert models"
+
+#: src/animation/pages/Bos2LuaPage.tsx
+msgid "Converted Lua"
+msgstr "Converted Lua"
+
+#: src/animation/pages/Bos2LuaPage.tsx
+msgid "Converted Lua appears here as you type."
+msgstr "Converted Lua appears here as you type."
 
 #: src/content/pages/components/Convert3doDrawer.tsx
 msgid "Converting..."
@@ -9214,10 +9611,12 @@ msgstr "Coop"
 msgid "Cooperative"
 msgstr "Cooperative"
 
+#: src/animation/pages/Bos2LuaPage.tsx
 #: src/content/pages/components/FilePreview.tsx
 #: src/direct/CopyButton.tsx
 #: src/general/ErrorBoundary.tsx
 #: src/hub/PublishSection.tsx
+#: src/placement/LayoutControls.tsx
 #: src/play/pages/components/CrashDrawer.tsx
 #: src/play/pages/EngineLogSection.tsx
 #: src/scenario/pages/components/MissionLuaView.tsx
@@ -9315,6 +9714,10 @@ msgstr "Copy an invite link for this battle"
 msgid "Copy and equip"
 msgstr "Copy and equip"
 
+#: src/placement/LayoutControls.tsx
+msgid "Copy as a build order"
+msgstr "Copy as a build order"
+
 #: src/hub/PublishSection.tsx
 msgid "Copy code & open hub"
 msgstr "Copy code & open hub"
@@ -9323,6 +9726,10 @@ msgstr "Copy code & open hub"
 #: src/play/pages/components/CrashDrawer.tsx
 msgid "Copy details"
 msgstr "Copy details"
+
+#: src/animation/pages/Bos2LuaPage.tsx
+msgid "Copy file"
+msgstr "Copy file"
 
 #: src/multiplayer/battle/BattleRoomHeader.tsx
 #: src/multiplayer/battles/BattleRow.tsx
@@ -9335,6 +9742,10 @@ msgstr "Copy invite link"
 #: src/play/pages/components/PresetsDrawer.tsx
 msgid "Copy link"
 msgstr "Copy link"
+
+#: src/animation/pages/Bos2LuaPage.tsx
+msgid "Copy Lua"
+msgstr "Copy Lua"
 
 #: src/play/pages/EngineLogSection.tsx
 msgid "Copy system info"
@@ -10007,8 +10418,29 @@ msgid "Decoding…"
 msgstr "Decoding…"
 
 #: src/mapconv/index.ts
+#: src/mapconv/pages/DecompilePage.tsx
 msgid "Decompile"
 msgstr "Decompile"
+
+#: src/mapconv/pages/DecompilePage.tsx
+msgid "Decompile map"
+msgstr "Decompile map"
+
+#: src/mapconv/pages/ProjectsPage.tsx
+msgid "Decompile or compile a map and it'll appear here, or import an existing <0>.sdd</0> folder."
+msgstr "Decompile or compile a map and it'll appear here, or import an existing <0>.sdd</0> folder."
+
+#: src/mapconv/pages/DecompilePage.tsx
+msgid "Decompile output streams here."
+msgstr "Decompile output streams here."
+
+#: src/mapconv/pages/ProjectsPage.tsx
+msgid "decompiled"
+msgstr "decompiled"
+
+#: src/mapconv/pages/DecompilePage.tsx
+msgid "decompiling…"
+msgstr "decompiling…"
 
 #: src/workshop/pages/components/ArmorClassPanel.tsx
 msgid "default"
@@ -10030,6 +10462,10 @@ msgstr "default {defaultValue}"
 msgid "Default AI"
 msgstr "Default AI"
 
+#: src/mapconv/pages/SettingsSection.tsx
+msgid "Default compression type"
+msgstr "Default compression type"
+
 #: src/content/unitFieldNotes.ts
 msgid "Default damage"
 msgstr "Default damage"
@@ -10049,6 +10485,10 @@ msgstr "Default: {defaultText}"
 #: src/multiplayer/battle/BattleOptionsDrawer.tsx
 msgid "defaults"
 msgstr "defaults"
+
+#: src/mapconv/pages/SettingsSection.tsx
+msgid "Defaults"
+msgstr "Defaults"
 
 #: src/content/unitFieldNotes.ts
 msgid "Defaults to on for anything with no ground movement, and the game's transport settings can force it on for a whole move class."
@@ -10088,6 +10528,10 @@ msgstr "Defence"
 msgid "Defences"
 msgstr "Defences"
 
+#: src/mapconv/pages/components/AdvancedOptions.tsx
+msgid "Defines the terrain elevation. A grayscale image where <0>white is the highest point and black the lowest</0>. Greys are heights in between. It should be <1>(texture ÷ 8) + 1</1> pixels on each side (e.g. an 8192px texture needs a 1025px heightmap)."
+msgstr "Defines the terrain elevation. A grayscale image where <0>white is the highest point and black the lowest</0>. Greys are heights in between. It should be <1>(texture ÷ 8) + 1</1> pixels on each side (e.g. an 8192px texture needs a 1025px heightmap)."
+
 #: src/content/unitFieldNotes.ts
 msgid "Delay between shots in a burst"
 msgstr "Delay between shots in a burst"
@@ -10099,6 +10543,7 @@ msgstr "Delay between shots in a burst"
 #: src/content/pages/components/MapRecords.tsx
 #: src/content/pages/ReplayDetailPage.tsx
 #: src/hub/pages/ItemPage.tsx
+#: src/placement/SurfaceBars.tsx
 #: src/play/pages/SavegamesPage.tsx
 #: src/scenario/pages/components/DialoguePanel.tsx
 #: src/scenario/pages/components/ObjectivePanel.tsx
@@ -10118,6 +10563,10 @@ msgstr "Delete {checkpointName}"
 #: src/workshop/pages/components/CollectionsPanel.tsx
 msgid "Delete {collectionName}"
 msgstr "Delete {collectionName}"
+
+#: src/placement/SurfaceBars.tsx
+msgid "Delete {count}"
+msgstr "Delete {count}"
 
 #: src/content/pages/components/KeymapsPanel.tsx
 msgid "Delete {itemName}"
@@ -10168,6 +10617,10 @@ msgstr "Delete account"
 #: src/multiplayer/admin/PlayerLookupSection.tsx
 msgid "Delete account…"
 msgstr "Delete account…"
+
+#: src/placement/SurfaceBars.tsx
+msgid "Delete all {count} of them"
+msgstr "Delete all {count} of them"
 
 #: src/content/pages/components/ReplayAnalysisSection.tsx
 msgid "Delete analysis"
@@ -10488,6 +10941,10 @@ msgstr "Direct messages"
 msgid "Disable {unitName}"
 msgstr "Disable {unitName}"
 
+#: src/mapconv/pages/components/AdvancedOptions.tsx
+msgid "Disable height clamping (-noclamp)"
+msgstr "Disable height clamping (-noclamp)"
+
 #: src/workshop/pages/components/BuildMenuPanel.tsx
 msgid "disabled"
 msgstr "disabled"
@@ -10622,6 +11079,7 @@ msgstr "Dominant"
 #: src/downloads/pages/components/RapidBrowser.tsx
 #: src/i18n/frameStrings.ts
 #: src/lobby-servers/pages/SettingsSection.tsx
+#: src/placement/SurfaceBars.tsx
 #: src/scenario/pages/components/ScenarioMapBars.tsx
 #: src/workshop/pages/components/ExplosionGeneratorEditor.tsx
 msgid "Done"
@@ -10630,6 +11088,10 @@ msgstr "Done"
 #: src/downloads/pages/ActivityPage.tsx
 msgid "Done · {finished}"
 msgstr "Done · {finished}"
+
+#: src/placement/BlueprintOnMap.tsx
+msgid "Done with the map"
+msgstr "Done with the map"
 
 #: src/multiplayer/admin/AdminRequestStatus.tsx
 #: src/multiplayer/admin/StaffSection.tsx
@@ -10961,6 +11423,10 @@ msgstr "Drawing: {game}"
 msgid "Drawing…"
 msgstr "Drawing…"
 
+#: src/placement/LayoutControls.tsx
+msgid "Drawn for {designedFor}. A blueprint shaped around one map's terrain does not always fit another's."
+msgstr "Drawn for {designedFor}. A blueprint shaped around one map's terrain does not always fit another's."
+
 #. placeholder {0}: data.counted
 #: src/content/pages/components/PlayerMatchFigures.tsx
 msgid "Drawn from {0} of {gameCount}."
@@ -10989,6 +11455,14 @@ msgstr "Draws a trail on the ground behind the unit as it moves."
 #: src/content/unitFieldNotes.ts
 msgid "Draws the projectile even outside sight."
 msgstr "Draws the projectile even outside sight."
+
+#: src/animation/pages/CobPage.tsx
+msgid "Drop a .bos or .cob file."
+msgstr "Drop a .bos or .cob file."
+
+#: src/mapconv/pages/DecompilePage.tsx
+msgid "Drop a .smf, .sdz, .sd7, or .sdd folder."
+msgstr "Drop a .smf, .sdz, .sd7, or .sdd folder."
 
 #: src/deeplink/DeepLinkHandler.tsx
 msgid "Drop to install"
@@ -11142,6 +11616,7 @@ msgstr "Each team spawns at its numbered map position. Pick a team in the player
 msgid "Earned"
 msgstr "Earned"
 
+#: src/placement/preview.ts
 #: src/scenario/pages/components/mapKeyboard.ts
 msgid "east"
 msgstr "east"
@@ -11699,6 +12174,10 @@ msgstr "Every map is installed."
 msgid "Every map you have, and every map the mirrors carry."
 msgstr "Every map you have, and every map the mirrors carry."
 
+#: src/placement/LayoutControls.tsx
+msgid "Every one of them is marked in violet."
+msgstr "Every one of them is marked in violet."
+
 #: src/multiplayer/admin/MaintenanceSection.tsx
 msgid "Every open battle a bot-flagged account hosts on an older engine closes immediately, after uberserver posts a notice in its chat."
 msgstr "Every open battle a bot-flagged account hosts on an older engine closes immediately, after uberserver posts a notice in its chat."
@@ -11795,6 +12274,10 @@ msgstr "Everything else"
 msgid "Everything else on this page still works, and the scenario is safe. Reload to try the map again."
 msgstr "Everything else on this page still works, and the scenario is safe. Reload to try the map again."
 
+#: src/placement/SurfaceBars.tsx
+msgid "Everything selected goes, not just the one the bar names."
+msgstr "Everything selected goes, not just the one the bar names."
+
 #: src/scenario/pages/components/ScenarioMapSceneChrome.tsx
 msgid "Everything this scenario holds, placed or not"
 msgstr "Everything this scenario holds, placed or not"
@@ -11803,11 +12286,16 @@ msgstr "Everything this scenario holds, placed or not"
 msgid "Everything you can play, and everything the hub knows how to fetch."
 msgstr "Everything you can play, and everything the hub knows how to fetch."
 
+#: src/placement/mapLoad.ts
+msgid "Exact heights"
+msgstr "Exact heights"
+
 #: src/content/unitFieldNotes.ts
 msgid "Exclusive interception"
 msgstr "Exclusive interception"
 
 #: src/general/fullscreen.tsx
+#: src/mapconv/pages/components/MapPreview3D.tsx
 msgid "Exit fullscreen"
 msgstr "Exit fullscreen"
 
@@ -11966,6 +12454,14 @@ msgstr "Extra resource income for the AI. 0 means no bonus. Applies when the gam
 msgid "Extra velocity given to the flare, along the unit's own right, up and forward axes."
 msgstr "Extra velocity given to the flare, along the unit's own right, up and forward axes."
 
+#: src/mapconv/pages/DecompilePage.tsx
+msgid "Extract the source images (texture, heightmap, metal/type maps, features) from a Spring <0>.smf</0>, from a packaged <1>.sdz</1>/<2>.sd7</2> archive (extracted automatically to a <3>.sdd</3> folder), or from an existing <4>.sdd</4> directory archive."
+msgstr "Extract the source images (texture, heightmap, metal/type maps, features) from a Spring <0>.smf</0>, from a packaged <1>.sdz</1>/<2>.sd7</2> archive (extracted automatically to a <3>.sdd</3> folder), or from an existing <4>.sdd</4> directory archive."
+
+#: src/mapconv/pages/DecompilePage.tsx
+msgid "Extracted into <0>{directory}</0>"
+msgstr "Extracted into <0>{directory}</0>"
+
 #: src/downloads/pages/components/ProgressBar.tsx
 msgid "Extracting…"
 msgstr "Extracting…"
@@ -12008,6 +12504,10 @@ msgstr "Faction"
 #: src/runlite/pages/components/RunSetupForm.tsx
 msgid "Faction / side"
 msgstr "Faction / side"
+
+#: src/factions/FactionLogo.tsx
+msgid "Faction emblem"
+msgstr "Faction emblem"
 
 #: src/multiplayer/battle/BattleMembersTable.tsx
 msgid "Faction for the new AI"
@@ -12093,6 +12593,10 @@ msgstr "Featured"
 msgid "Featured first"
 msgstr "Featured first"
 
+#: src/mapconv/pages/components/AdvancedOptions.tsx
+msgid "Features file (-features)"
+msgstr "Features file (-features)"
+
 #: src/deeplink/DeepLinkHandler.tsx
 msgid "Fetch and check"
 msgstr "Fetch and check"
@@ -12164,6 +12668,10 @@ msgstr "File size"
 #: src/content/pages/StorageSection.tsx
 msgid "Files"
 msgstr "Files"
+
+#: src/placement/PlacementSurface.tsx
+msgid "Fill the window"
+msgstr "Fill the window"
 
 #: src/profile/health.ts
 msgid "Filter ({filterDesc}) has nothing to match yet — no games are installed. Install the game, or check the filter."
@@ -12249,6 +12757,7 @@ msgstr "Filters and sorting"
 msgid "Filters: {filters}"
 msgstr "Filters: {filters}"
 
+#: src/animation/pages/Bos2LuaPage.tsx
 #: src/scenario/pages/components/MissionLuaView.tsx
 msgid "Find (Cmd+F)"
 msgstr "Find (Cmd+F)"
@@ -12264,6 +12773,14 @@ msgstr "Find a weapon"
 #: src/scenario/pages/components/MissionLuaView.tsx
 msgid "Find in mission.lua"
 msgstr "Find in mission.lua"
+
+#: src/animation/pages/Bos2LuaPage.tsx
+msgid "Find in the BOS"
+msgstr "Find in the BOS"
+
+#: src/animation/pages/Bos2LuaPage.tsx
+msgid "Find in the BOS (Cmd+F)"
+msgstr "Find in the BOS (Cmd+F)"
 
 #: src/direct/ReachablePorts.tsx
 msgid "Find it another way to share it."
@@ -12481,6 +12998,10 @@ msgstr "Flat addition to cratering strength, applied after altitude reduction bu
 msgid "Flat impulse bonus"
 msgstr "Flat impulse bonus"
 
+#: src/mapconv/skyboxNote.ts
+msgid "flat sky"
+msgstr "flat sky"
+
 #: src/content/unitFieldNotes.ts
 msgid "Flattens the ground"
 msgstr "Flattens the ground"
@@ -12524,6 +13045,10 @@ msgstr "Floats on water"
 #: src/content/unitFieldNotes.ts
 msgid "Fly over the smoothed map"
 msgstr "Fly over the smoothed map"
+
+#: src/mapconv/pages/ProjectsPage.tsx
+msgid "Folder"
+msgstr "Folder"
 
 #: src/workshop/pages/components/PackagePanel.tsx
 msgid "Folder (.sdd)"
@@ -12692,9 +13217,18 @@ msgstr "Founder"
 msgid "Founder (optional, defaults to you)"
 msgstr "Founder (optional, defaults to you)"
 
+#: src/placement/PlacementSurface.tsx
+msgid "Frame"
+msgstr "Frame"
+
 #: src/content/replayAnalysis.ts
 msgid "Frame {current} of {last}"
 msgstr "Frame {current} of {last}"
+
+#: src/placement/BlueprintEditor.tsx
+#: src/placement/BlueprintOnMap.tsx
+msgid "Frame blueprint"
+msgstr "Frame blueprint"
 
 #: src/content/unitFieldNotes.ts
 msgid "Frame columns, rows and playback rate for texture1's flipbook animation, and the default for texture2, 3 and 4 too."
@@ -12836,6 +13370,10 @@ msgstr "Full motion"
 #: src/general/pages/SettingsSection.tsx
 msgid "Fullscreen"
 msgstr "Fullscreen"
+
+#: src/mapconv/pages/components/MapPreview3D.tsx
+msgid "Fullscreen preview"
+msgstr "Fullscreen preview"
 
 #: src/content/index.ts
 msgid "Fullscreen, resolution and vsync."
@@ -13108,6 +13646,10 @@ msgstr "Generated test game"
 msgid "Generated thumbnails, headers, icons and branding art. All regenerate on demand, so clearing them only frees disk space."
 msgstr "Generated thumbnails, headers, icons and branding art. All regenerate on demand, so clearing them only frees disk space."
 
+#: src/mapconv/pages/components/AssetPreview.tsx
+msgid "generating preview…"
+msgstr "generating preview…"
+
 #: src/multiplayer/chat/MemberActionsMenu.tsx
 msgid "Get IP"
 msgstr "Get IP"
@@ -13259,6 +13801,14 @@ msgstr "Gravity override"
 #: src/i18n/frameStrings.ts
 msgid "Gray"
 msgstr "Gray"
+
+#: src/mapconv/pages/components/AdvancedOptions.tsx
+msgid "grayscale; brightness = grass density"
+msgstr "grayscale; brightness = grass density"
+
+#: src/mapconv/pages/components/AdvancedOptions.tsx
+msgid "grayscale; white = high, black = low"
+msgstr "grayscale; white = high, black = low"
 
 #: src/i18n/frameStrings.ts
 msgid "Green"
@@ -13457,9 +14007,14 @@ msgstr "Heat cloud"
 msgid "heatfalloff: how fast the cloud's heat drains, not a fixed frame count. This class has no colour of its own."
 msgstr "heatfalloff: how fast the cloud's heat drains, not a fixed frame count. This class has no colour of its own."
 
+#: src/mapconv/pages/DecompilePage.tsx
 #: src/play/pages/components/MapOverlay.tsx
 msgid "Height"
 msgstr "Height"
+
+#: src/mapconv/pages/components/MapPreview3D.tsx
+msgid "height {minHeight} → {maxHeight} · drag to orbit"
+msgstr "height {minHeight} → {maxHeight} · drag to orbit"
 
 #: src/content/unitFieldNotes.ts
 msgid "Height difference multiplier"
@@ -13468,6 +14023,18 @@ msgstr "Height difference multiplier"
 #: src/content/unitFieldNotes.ts
 msgid "Height difference multiplier (case variant)"
 msgstr "Height difference multiplier (case variant)"
+
+#: src/mapconv/pages/components/AdvancedOptions.tsx
+msgid "Height range"
+msgstr "Height range"
+
+#: src/mapconv/pages/components/AdvancedOptions.tsx
+msgid "Heightmap (-h)"
+msgstr "Heightmap (-h)"
+
+#: src/mapconv/pages/components/Help.tsx
+msgid "Help"
+msgstr "Help"
 
 #: src/content/pages/components/UnitListNotes.tsx
 msgid "Here {reasonList}."
@@ -13956,6 +14523,10 @@ msgstr "How often a unit lands each rarity. Not required to add up to 100."
 msgid "How often the trail adds a new vertex. Lower is smoother but costs more performance; useful for fast-turning homing missiles to avoid jagged trails."
 msgstr "How often the trail adds a new vertex. Lower is smoother but costs more performance; useful for fast-turning homing missiles to avoid jagged trails."
 
+#: src/mapconv/pages/CompilePage.tsx
+msgid "How the <0>.smt</0> tile texture is compressed — a trade-off of file size, speed and quality:<1/>1 — none (largest file, fastest build)<2/>2 — fast (compares the last N tiles)<3/>3 — insane (compares the whole map; smallest, very slow)<4/>4 — high quality fast (recommended)"
+msgstr "How the <0>.smt</0> tile texture is compressed — a trade-off of file size, speed and quality:<1/>1 — none (largest file, fastest build)<2/>2 — fast (compares the last N tiles)<3/>3 — insane (compares the whole map; smallest, very slow)<4/>4 — high quality fast (recommended)"
+
 #: src/content/index.ts
 msgid "How the game itself looks, sounds and handles."
 msgstr "How the game itself looks, sounds and handles."
@@ -14070,6 +14641,11 @@ msgstr "Ignores are per-account. Connect to a lobby server to manage the ignore 
 msgid "Image"
 msgstr "Image"
 
+#: src/mapconv/pages/CompilePage.tsx
+#: src/mapconv/pages/components/AdvancedOptions.tsx
+msgid "Images"
+msgstr "Images"
+
 #: src/content/unitFieldNotes.ts
 #: src/workshop/pages/components/WeaponSlotsPanel.tsx
 msgid "Impact effect"
@@ -14109,9 +14685,17 @@ msgstr "Impact sound volume (underwater)"
 msgid "Import"
 msgstr "Import"
 
+#: src/mapconv/pages/ProjectsPage.tsx
+msgid "Import .sdd folder…"
+msgstr "Import .sdd folder…"
+
 #: src/deeplink/pages/ImportSection.tsx
 msgid "Import {phrase}"
 msgstr "Import {phrase}"
+
+#: src/mapconv/pages/ProjectsPage.tsx
+msgid "Import a .sdd map folder"
+msgstr "Import a .sdd map folder"
 
 #: src/deeplink/DeepLinkHandler.tsx
 msgid "Import a {planLabel} downloaded from {host}?"
@@ -14343,6 +14927,7 @@ msgstr "Install a game"
 msgid "Install a map"
 msgstr "Install a map"
 
+#: src/placement/BlueprintOnMap.tsx
 #: src/scenario/pages/components/ScenarioMapScene.tsx
 msgid "Install an engine"
 msgstr "Install an engine"
@@ -14952,6 +15537,10 @@ msgstr "Kept in this game's {unitsFile}, not in the unit definition. This game n
 msgid "Kept in this scenario until you delete them. Place one back on the map with the pin, or edit it under Base blueprints below the map."
 msgstr "Kept in this scenario until you delete them. Place one back on the map with the pin, or edit it under Base blueprints below the map."
 
+#: src/animation/pages/CobPage.tsx
+msgid "Kept the existing .cob, not overwritten."
+msgstr "Kept the existing .cob, not overwritten."
+
 #: src/lobby-servers/pages/components/AutojoinChannels.tsx
 msgid "key (optional)"
 msgstr "key (optional)"
@@ -15185,6 +15774,10 @@ msgstr "Layout \"{layoutName}\""
 msgid "Leading accuracy"
 msgstr "Leading accuracy"
 
+#: src/mapconv/pages/components/Help.tsx
+msgid "Learn more"
+msgstr "Learn more"
+
 #: src/components/HeatLegend.tsx
 msgid "Least"
 msgstr "Least"
@@ -15241,6 +15834,10 @@ msgstr "Leave it — press on"
 #: src/runlite/generate.ts
 msgid "Leave it be"
 msgstr "Leave it be"
+
+#: src/animation/pages/Bos2LuaPage.tsx
+msgid "Leave out unused code"
+msgstr "Leave out unused code"
 
 #: src/runlite/pages/components/NodeOverlays.tsx
 msgid "Leave the depot"
@@ -15431,6 +16028,11 @@ msgstr "Light"
 msgid "Lime"
 msgstr "Lime"
 
+#: src/animation/pages/Bos2LuaPage.tsx
+#: src/animation/pages/LintProblems.tsx
+msgid "line {line}"
+msgstr "line {line}"
+
 #: src/profile/jsonError.ts
 msgid "Line {line}, column {column}: {raw}"
 msgstr "Line {line}, column {column}: {raw}"
@@ -15460,6 +16062,10 @@ msgstr "listed twice in the library"
 #: src/play/pages/components/PresetsDrawer.tsx
 msgid "Load"
 msgstr "Load"
+
+#: src/animation/pages/Bos2LuaPage.tsx
+msgid "Load .bos…"
+msgstr "Load .bos…"
 
 #: src/downloads/pages/components/RapidBrowser.tsx
 msgid "Load a rapid master to list its repositories."
@@ -15492,6 +16098,10 @@ msgstr "Loading game data…"
 #: src/play/pages/components/GameSelectCard.tsx
 msgid "Loading games…"
 msgstr "Loading games…"
+
+#: src/mapconv/pages/components/MapPreview3D.tsx
+msgid "Loading map preview…"
+msgstr "Loading map preview…"
 
 #: src/play/pages/components/MapCard.tsx
 msgid "Loading maps…"
@@ -15802,6 +16412,10 @@ msgstr "Made with coilbox"
 msgid "Made with coilbox {0}"
 msgstr "Made with coilbox {0}"
 
+#: src/mapconv/pages/CompilePage.tsx
+msgid "Main texture (-t)"
+msgstr "Main texture (-t)"
+
 #: src/multiplayer/admin/MaintenanceSection.tsx
 #: src/multiplayer/admin/tools.tsx
 msgid "Maintenance"
@@ -15855,6 +16469,7 @@ msgstr "Making the track"
 msgid "Making the track from the recording."
 msgstr "Making the track from the recording."
 
+#: src/placement/BlueprintOnMap.tsx
 #: src/scenario/pages/components/ScenarioMapScene.tsx
 msgid "Manage maps"
 msgstr "Manage maps"
@@ -15893,6 +16508,10 @@ msgstr "Map"
 msgid "Map · {infoMapName}"
 msgstr "Map · {infoMapName}"
 
+#: src/mapconv/pages/DecompilePage.tsx
+msgid "Map (.smf / .sdz / .sd7 / .sdd)"
+msgstr "Map (.smf / .sdz / .sd7 / .sdd)"
+
 #: src/multiplayer/battles/SaveSearchPopover.tsx
 msgid "Map (optional)"
 msgstr "Map (optional)"
@@ -15916,6 +16535,14 @@ msgstr "Map keys. Full stop and comma step through what is on the map, including
 #: src/content/pages/components/ReplayMap.tsx
 msgid "Map layers"
 msgstr "Map layers"
+
+#: src/placement/MapLoadIndicator.tsx
+msgid "Map loading"
+msgstr "Map loading"
+
+#: src/mapconv/pages/DecompilePage.tsx
+msgid "Map minimap"
+msgstr "Map minimap"
 
 #: src/multiplayer/battle/contentBlock.ts
 msgid "Map missing"
@@ -15945,9 +16572,17 @@ msgstr "Map overlay"
 msgid "Map packs"
 msgstr "Map packs"
 
+#: src/placement/mapLoad.ts
+msgid "Map picture"
+msgstr "Map picture"
+
 #: src/play/pages/components/MapCard.tsx
 msgid "Map size"
 msgstr "Map size"
+
+#: src/mapconv/pages/CompilePage.tsx
+msgid "Map sizes"
+msgstr "Map sizes"
 
 #: src/runlite/pages/components/RunSetupForm.tsx
 msgid "Map style"
@@ -15986,6 +16621,10 @@ msgstr "mapinfo.lua keys the engine warns on"
 msgid "Mapping Tools"
 msgstr "Mapping Tools"
 
+#: src/mapconv/pages/CompilePage.tsx
+msgid "Mapping wiki"
+msgstr "Mapping wiki"
+
 #: src/mapconv/index.ts
 msgid "Mapping Wiki"
 msgstr "Mapping Wiki"
@@ -16013,6 +16652,10 @@ msgstr "Maps by {author} on the Coilbox hub"
 msgid "Maps could not be read"
 msgstr "Maps could not be read"
 
+#: src/mapconv/pages/ProjectsPage.tsx
+msgid "Maps you've decompiled or compiled. Open one to recompile with its remembered options, or reveal its folder. Decompiling extracts to a <0>.sdd</0> directory the engine can load directly."
+msgstr "Maps you've decompiled or compiled. Open one to recompile with its remembered options, or reveal its folder. Decompiling extracts to a <0>.sdd</0> directory the engine can load directly."
+
 #: src/content/pages/PlayerDossierPage.tsx
 msgid "Maps you've shared"
 msgstr "Maps you've shared"
@@ -16033,6 +16676,10 @@ msgstr "Marks an objective as done."
 #: src/scenario/triggerTypes.ts
 msgid "Marks an objective as failed."
 msgstr "Marks an objective as failed."
+
+#: src/mapconv/pages/components/AdvancedOptions.tsx
+msgid "Marks where reclaimable/extractable metal is. The <0>red channel</0> sets metal density (brighter red = more); paint small red spots where you want metal spots in game."
+msgstr "Marks where reclaimable/extractable metal is. The <0>red channel</0> sets metal density (brighter red = more); paint small red spots where you want metal spots in game."
 
 #: src/content/unitFieldNotes.ts
 msgid "Mass"
@@ -16137,6 +16784,10 @@ msgstr "Matchmaking pairs you up and starts the accept countdown."
 #: src/multiplayer/index.tsx
 msgid "Matchup"
 msgstr "Matchup"
+
+#: src/mapconv/pages/components/AdvancedOptions.tsx
+msgid "Max height (-maxh)"
+msgstr "Max height (-maxh)"
 
 #: src/direct/HostRoomForm.tsx
 #: src/multiplayer/battles/HostBattleForm.tsx
@@ -16281,6 +16932,10 @@ msgstr "Metal made"
 msgid "Metal made when on"
 msgstr "Metal made when on"
 
+#: src/mapconv/pages/components/AdvancedOptions.tsx
+msgid "Metal map (-m)"
+msgstr "Metal map (-m)"
+
 #: src/content/pages/components/PlayerUnitUsage.tsx
 msgid "Metal ordered by kind of unit"
 msgstr "Metal ordered by kind of unit"
@@ -16313,9 +16968,21 @@ msgstr "Milestones"
 msgid "Military"
 msgstr "Military"
 
+#: src/mapconv/pages/components/AdvancedOptions.tsx
+msgid "Min height (-minh)"
+msgstr "Min height (-minh)"
+
+#: src/mapconv/pages/CompilePage.tsx
+msgid "Min height ({minHeight}) is at or above max height ({maxHeight}) — the terrain will be flat or inverted. Set min below max."
+msgstr "Min height ({minHeight}) is at or above max height ({maxHeight}) — the terrain will be flat or inverted. Set min below max."
+
 #: src/scenario/pages/components/scenarioList.ts
 msgid "Mine"
 msgstr "Mine"
+
+#: src/mapconv/pages/components/AdvancedOptions.tsx
+msgid "Minimap (-minimap)"
+msgstr "Minimap (-minimap)"
 
 #. placeholder {0}: r.mapName
 #: src/content/pages/ReplaysPage.tsx
@@ -16988,6 +17655,10 @@ msgstr "Needs at least two allies with a box"
 msgid "Needs attention"
 msgstr "Needs attention"
 
+#: src/animation/pages/Bos2LuaPage.tsx
+msgid "Needs cob_vars.lua"
+msgstr "Needs cob_vars.lua"
+
 #: src/scenario/capabilities.ts
 msgid "Needs runtime {version}"
 msgstr "Needs runtime {version}"
@@ -17200,6 +17871,7 @@ msgstr "Newest first"
 msgid "Next"
 msgstr "Next"
 
+#: src/animation/pages/Bos2LuaPage.tsx
 #: src/scenario/pages/components/MissionLuaView.tsx
 msgid "Next match"
 msgstr "Next match"
@@ -17721,6 +18393,10 @@ msgstr "no map"
 msgid "No map"
 msgstr "No map"
 
+#: src/placement/BlueprintEditor.tsx
+msgid "no map · a build grid, {GRID_EXTENT} elmos square · drag or middle-drag to pan · right-drag to turn the view · scroll to zoom"
+msgstr "no map · a build grid, {GRID_EXTENT} elmos square · drag or middle-drag to pan · right-drag to turn the view · scroll to zoom"
+
 #: src/workshop/pages/components/PlayLocallyButton.tsx
 msgid "No map installed"
 msgstr "No map installed"
@@ -17933,6 +18609,10 @@ msgstr "No presets yet. Save your current setup above, or import a shared one."
 msgid "no preview"
 msgstr "no preview"
 
+#: src/mapconv/pages/components/AssetPreview.tsx
+msgid "No preview available."
+msgstr "No preview available."
+
 #: src/workshop/pages/components/AssetPicker.tsx
 msgid "No preview for this file ({fileSize})."
 msgstr "No preview for this file ({fileSize})."
@@ -17974,6 +18654,10 @@ msgstr "No projects for {gameName} yet"
 #: src/workshop/pages/ProjectsPage.tsx
 msgid "No projects match \"{0}\"."
 msgstr "No projects match \"{0}\"."
+
+#: src/mapconv/pages/ProjectsPage.tsx
+msgid "No projects yet."
+msgstr "No projects yet."
 
 #: src/downloads/pages/components/RapidBrowser.tsx
 msgid "No rapid repositories configured. Add one in <0>Sources settings</0>."
@@ -18416,6 +19100,7 @@ msgstr "Nobody won"
 msgid "none"
 msgstr "none"
 
+#: src/animation/pages/Bos2LuaPage.tsx
 #: src/multiplayer/battle/BattleEngineCard.tsx
 #: src/profile/SettingsSection.tsx
 msgid "None"
@@ -18499,6 +19184,7 @@ msgstr "None. Channels you join are added here; add one to auto-join it on conne
 msgid "Normal"
 msgstr "Normal"
 
+#: src/placement/preview.ts
 #: src/scenario/pages/components/mapKeyboard.ts
 msgid "north"
 msgstr "north"
@@ -18583,6 +19269,10 @@ msgstr "Not decoded"
 #: src/workshop/pages/components/WeaponLibraryPanel.tsx
 msgid "Not equipped anywhere."
 msgstr "Not equipped anywhere."
+
+#: src/mapconv/pages/SettingsSection.tsx
+msgid "not found"
+msgstr "not found"
 
 #: src/multiplayer/battle/BattleEngineCard.tsx
 msgid "Not given by the lobby"
@@ -18676,6 +19366,10 @@ msgstr "Not reachable"
 #: src/multiplayer/battle/MemberRow.tsx
 msgid "Not ready"
 msgstr "Not ready"
+
+#: src/mapconv/pages/components/AdvancedOptions.tsx
+msgid "Not recommended; you lose precision. Prefer min/max height instead."
+msgstr "Not recommended; you lose precision. Prefer min/max height instead."
 
 #: src/content/pages/components/ReplayAnalysisSection.tsx
 msgid "Not recorded for rewind."
@@ -18842,6 +19536,10 @@ msgstr "Nothing has scanned the content folders yet. Let the scan finish, then r
 msgid "Nothing here decoded to a shape coilbox can carry into a project."
 msgstr "Nothing here decoded to a shape coilbox can carry into a project."
 
+#: src/placement/LayoutControls.tsx
+msgid "Nothing here has been checked against the ground either, for want of a height to check it against."
+msgstr "Nothing here has been checked against the ground either, for want of a height to check it against."
+
 #: src/runlite/pages/components/NodeOverlays.tsx
 msgid "Nothing here is within budget yet — patch up and press on."
 msgstr "Nothing here is within budget yet — patch up and press on."
@@ -18998,6 +19696,10 @@ msgstr "Nothing to point at"
 msgid "Nothing to reclaim - the pool is tidy."
 msgstr "Nothing to reclaim - the pool is tidy."
 
+#: src/placement/SurfaceBars.tsx
+msgid "Nothing to redo"
+msgstr "Nothing to redo"
+
 #: src/content/pages/components/RemixPanel.tsx
 msgid "Nothing to remix onto. This game isn't installed."
 msgstr "Nothing to remix onto. This game isn't installed."
@@ -19013,6 +19715,10 @@ msgstr "Nothing to send: this battle already holds every slot."
 #: src/workshop/pages/components/PlayLocallyButton.tsx
 msgid "Nothing to test yet"
 msgstr "Nothing to test yet"
+
+#: src/placement/SurfaceBars.tsx
+msgid "Nothing to undo yet"
+msgstr "Nothing to undo yet"
 
 #: src/scenario/pages/components/useMapKeyboard.ts
 msgid "Nothing turned."
@@ -19260,6 +19966,10 @@ msgstr "On a narrow window, the sidebar becomes a menu button and opens fullscre
 msgid "On a roll"
 msgstr "On a roll"
 
+#: src/placement/SurfaceBars.tsx
+msgid "On a step, building the next one"
+msgstr "On a step, building the next one"
+
 #: src/content/mapAggregate.ts
 msgid "on average {amount} a minute in {when} within {reach} of one spot, {over}"
 msgstr "on average {amount} a minute in {when} within {reach} of one spot, {over}"
@@ -19469,6 +20179,10 @@ msgstr "Only when players cannot reach you directly."
 msgid "Opal"
 msgstr "Opal"
 
+#: src/animation/pages/CobPage.tsx
+msgid "Opcodes"
+msgstr "Opcodes"
+
 #: src/content/pages/components/EngineRow.tsx
 #: src/content/pages/components/RootCard.tsx
 #: src/deeplink/DeepLinkHandler.tsx
@@ -19478,6 +20192,10 @@ msgstr "Opal"
 #: src/multiplayer/battles/BattleList.tsx
 msgid "Open"
 msgstr "Open"
+
+#: src/animation/pages/CobPage.tsx
+msgid "Open .cob…"
+msgstr "Open .cob…"
 
 #: src/scenario/pages/components/BlueprintPanel.tsx
 msgid "Open {gameLabel}'s {gameFileName}"
@@ -19569,6 +20287,10 @@ msgstr "Open it"
 #: src/multiplayer/LobbyStatusButton.tsx
 msgid "Open last time"
 msgstr "Open last time"
+
+#: src/animation/pages/CobPage.tsx
+msgid "Open or drop a .bos to compile, or a .cob to read back."
+msgstr "Open or drop a .bos to compile, or a .cob to read back."
 
 #: src/direct/ReachablePorts.tsx
 msgid "Open ports on my router"
@@ -19880,8 +20602,13 @@ msgid "Outcome unknown — the winner couldn't be determined."
 msgstr "Outcome unknown — the winner couldn't be determined."
 
 #: src/content/pages/components/Convert3doDrawer.tsx
+#: src/mapconv/pages/CompilePage.tsx
 msgid "Output folder"
 msgstr "Output folder"
+
+#: src/mapconv/pages/CompilePage.tsx
+msgid "Output name (-o)"
+msgstr "Output name (-o)"
 
 #: src/content/replayMatchFigures.ts
 msgid "Over {length}"
@@ -19918,6 +20645,10 @@ msgstr "Overview"
 #: src/content/pages/components/ConfigProfilesPanel.tsx
 msgid "Overwrite"
 msgstr "Overwrite"
+
+#: src/animation/pages/CobPage.tsx
+msgid "Overwrite .cob?"
+msgstr "Overwrite .cob?"
 
 #: src/content/pages/components/ConfigProfilesPanel.tsx
 msgid "Overwrite the current settings with this profile?"
@@ -19979,6 +20710,11 @@ msgstr "parameter {name} has no kind coilbox knows: {shownKind}"
 #: src/scenario/extensions.ts
 msgid "parameter {name} is an enum with no values"
 msgstr "parameter {name} is an enum with no values"
+
+#: src/animation/pages/Bos2LuaPage.tsx
+#: src/animation/pages/CobPage.tsx
+msgid "Parse error"
+msgstr "Parse error"
 
 #: src/multiplayer/battles/SaveSearchPopover.tsx
 msgid "Part of the game's name."
@@ -20117,6 +20853,7 @@ msgid "Patrol"
 msgstr "Patrol"
 
 #: src/content/pages/components/ReplayPlaybackBar.tsx
+#: src/placement/SurfaceBars.tsx
 msgid "Pause"
 msgstr "Pause"
 
@@ -20189,6 +20926,10 @@ msgstr "Permission granted."
 msgid "Permission not granted."
 msgstr "Permission not granted."
 
+#: src/mapconv/pages/DecompilePage.tsx
+msgid "Pick a .sdd folder…"
+msgstr "Pick a .sdd folder…"
+
 #: src/scenario/pages/components/TriggerSteps.tsx
 msgid "Pick a {friendly}"
 msgstr "Pick a {friendly}"
@@ -20208,6 +20949,10 @@ msgstr "Pick a blueprint…"
 #: src/scenario/pages/components/modes.tsx
 msgid "Pick a building and click the map. Clicks add to the base you have selected. Stop placing with the button beside the picker, or Escape. A base is the building half: mobile units belong in a group."
 msgstr "Pick a building and click the map. Clicks add to the base you have selected. Stop placing with the button beside the picker, or Escape. A base is the building half: mobile units belong in a group."
+
+#: src/placement/BlueprintEditor.tsx
+msgid "Pick a building to start placing. Drag one to move it, click bare ground to deselect."
+msgstr "Pick a building to start placing. Drag one to move it, click bare ground to deselect."
 
 #: src/workshop/pages/components/RandomModDrawer.tsx
 msgid "Pick a collection"
@@ -20235,6 +20980,10 @@ msgstr "Pick a game, a seed and a scope. Two people who type the same seed and r
 #: src/content/pages/KeybindsSection.tsx
 msgid "Pick a key above to see what it does, or find it in the list below."
 msgstr "Pick a key above to see what it does, or find it in the list below."
+
+#: src/placement/BlueprintOnMap.tsx
+msgid "Pick a map to see which of this layout's buildings the ground would take. The layout is not changed by anything you do here."
+msgstr "Pick a map to see which of this layout's buildings the ground would take. The layout is not changed by anything you do here."
 
 #: src/play/pages/components/NewPresetFromReplayButton.tsx
 msgid "Pick a replay"
@@ -20368,6 +21117,10 @@ msgstr "Places a group on the map if it isn't there yet, and sends it off on its
 msgid "Places a group's units on the map, holding position until wake group or give orders sets them moving."
 msgstr "Places a group's units on the map, holding position until wake group or give orders sets them moving."
 
+#: src/mapconv/pages/components/AdvancedOptions.tsx
+msgid "Places map features (trees, rocks, wreckage). A text file with one feature per line: <0>[tdfname] [x] [y] [z] [rotation]</0>, where tdfname is the feature's definition name."
+msgstr "Places map features (trees, rocks, wreckage). A text file with one feature per line: <0>[tdfname] [x] [y] [z] [rotation]</0>, where tdfname is the feature's definition name."
+
 #: src/workshop/pages/components/PlayLocallyButton.tsx
 msgid "Places the edited {unitLabel} and the game's own beside it when the game starts, so there is nothing to build first. Coilbox writes {WORKSHOP_MUTATOR_FOLDER} to do it, and it is never packaged."
 msgstr "Places the edited {unitLabel} and the game's own beside it when the game starts, so there is nothing to build first. Coilbox writes {WORKSHOP_MUTATOR_FOLDER} to do it, and it is never packaged."
@@ -20406,6 +21159,7 @@ msgstr "Planet Wars"
 #: src/content/pages/components/GameHeader.tsx
 #: src/content/pages/components/LibraryMapCard.tsx
 #: src/content/pages/components/ReplayPlaybackBar.tsx
+#: src/placement/SurfaceBars.tsx
 #: src/play/index.ts
 #: src/runlite/index.ts
 #: src/scenario/index.ts
@@ -20722,6 +21476,10 @@ msgstr "Power"
 msgid "pr-downloader sidecar unavailable"
 msgstr "pr-downloader sidecar unavailable"
 
+#: src/mapconv/pages/SettingsSection.tsx
+msgid "Pre-fill the file pickers with the folders you used last time."
+msgstr "Pre-fill the file pickers with the folders you used last time."
+
 #: src/content/pages/components/ReplayChat.tsx
 #: src/content/pages/components/ReplayTimeline.tsx
 msgid "Pre-game"
@@ -20782,6 +21540,10 @@ msgstr "Press a key"
 msgid "Press it again later to carry on."
 msgstr "Press it again later to carry on."
 
+#: src/placement/preview.ts
+msgid "Press N to put it down {words} instead, outlined, where it fits."
+msgstr "Press N to put it down {words} instead, outlined, where it fits."
+
 #: src/runlite/generate.ts
 msgid "Press on"
 msgstr "Press on"
@@ -20803,6 +21565,7 @@ msgstr "Preview {eventLabel}"
 msgid "Previous"
 msgstr "Previous"
 
+#: src/animation/pages/Bos2LuaPage.tsx
 #: src/scenario/pages/components/MissionLuaView.tsx
 msgid "Previous match"
 msgstr "Previous match"
@@ -20844,6 +21607,14 @@ msgstr "Probe Zero-K / Steam"
 #: src/scenario/pages/ScenarioEditPage.tsx
 msgid "Problems in {scenarioName}"
 msgstr "Problems in {scenarioName}"
+
+#: src/animation/pages/LintProblems.tsx
+msgid "Problems in the BOS"
+msgstr "Problems in the BOS"
+
+#: src/animation/pages/Bos2LuaPage.tsx
+msgid "Problems the lint pass found in the BOS, and where the Lua may do something different from it."
+msgstr "Problems the lint pass found in the BOS, and where the Lua may do something different from it."
 
 #: src/workshop/pages/components/WeaponSlotsPanel.tsx
 msgid "Problems with this unit's weapons"
@@ -20935,6 +21706,7 @@ msgid "Projectiles per shot"
 msgstr "Projectiles per shot"
 
 #: src/mapconv/index.ts
+#: src/mapconv/pages/ProjectsPage.tsx
 #: src/workshop/pages/UnitPage.tsx
 msgid "Projects"
 msgstr "Projects"
@@ -20986,6 +21758,10 @@ msgstr "Put {unitName} back on this menu"
 #: src/workshop/pages/components/BuildMenuPanel.tsx
 msgid "Put {unitName} back on this menu. It is switched off as well, so it would come back marked disabled."
 msgstr "Put {unitName} back on this menu. It is switched off as well, so it would come back marked disabled."
+
+#: src/animation/pages/Bos2LuaPage.tsx
+msgid "Put <0>VFS.Include(\"lualibs/cob_vars.lua\")</0> on the first line of <1>LuaRules/main.lua</1>, <2>LuaRules/draw.lua</2> and <3>luaui.lua</3> (or <4>LuaUI/main.lua</4>)."
+msgstr "Put <0>VFS.Include(\"lualibs/cob_vars.lua\")</0> on the first line of <1>LuaRules/main.lua</1>, <2>LuaRules/draw.lua</2> and <3>luaui.lua</3> (or <4>LuaUI/main.lua</4>)."
 
 #: src/workshop/pages/components/WeaponSlotsPanel.tsx
 msgid "Put back {explosionName}"
@@ -21233,6 +22009,10 @@ msgstr "Rare"
 msgid "Rating"
 msgstr "Rating"
 
+#: src/animation/pages/CobPage.tsx
+msgid "Re-run"
+msgstr "Re-run"
+
 #: src/profile/SettingsSection.tsx
 msgid "Re-run validation"
 msgstr "Re-run validation"
@@ -21359,6 +22139,7 @@ msgstr "Reading {gameCount}."
 msgid "Reading {gameName}'s units…"
 msgstr "Reading {gameName}'s units…"
 
+#: src/placement/BlueprintOnMap.tsx
 #: src/scenario/pages/components/ScenarioMapScene.tsx
 msgid "Reading {mapName}…"
 msgstr "Reading {mapName}…"
@@ -21621,6 +22402,10 @@ msgstr "Reclaim speed"
 msgid "Recoil (GitHub releases)"
 msgstr "Recoil (GitHub releases)"
 
+#: src/mapconv/pages/DecompilePage.tsx
+msgid "Recompile"
+msgstr "Recompile"
+
 #: src/runlite/meta.ts
 msgid "Recon doctrine"
 msgstr "Recon doctrine"
@@ -21720,15 +22505,24 @@ msgstr "Recruit"
 msgid "Red"
 msgstr "Red"
 
+#: src/mapconv/pages/components/AdvancedOptions.tsx
+msgid "red channel marks metal deposits"
+msgstr "red channel marks metal deposits"
+
 #: src/content/unitFieldNotes.ts
 msgid "Red, green and blue from 0 to 1."
 msgstr "Red, green and blue from 0 to 1."
 
+#: src/placement/SurfaceBars.tsx
 #: src/scenario/pages/components/shortcuts.ts
 #: src/workshop/pages/ReferencePage.tsx
 #: src/workshop/pages/UnitPage.tsx
 msgid "Redo"
 msgstr "Redo"
+
+#: src/placement/SurfaceBars.tsx
+msgid "Redo ({mod} Shift Z)"
+msgstr "Redo ({mod} Shift Z)"
 
 #: src/workshop/pages/ReferencePage.tsx
 #: src/workshop/pages/UnitPage.tsx
@@ -21878,6 +22672,10 @@ msgstr "Released games only. A game you are working on in a loose folder stays o
 msgid "Relevant"
 msgstr "Relevant"
 
+#: src/placement/mapLoad.ts
+msgid "Relief"
+msgstr "Relief"
+
 #: src/content/pages/components/UnitStatsTable.tsx
 #: src/general/ErrorBoundary.tsx
 #: src/multiplayer/admin/MaintenanceSection.tsx
@@ -21921,6 +22719,10 @@ msgstr "Rematch with tweak"
 #: src/play/pages/SkirmishPage.tsx
 msgid "Rematch: {rematchMapName}"
 msgstr "Rematch: {rematchMapName}"
+
+#: src/mapconv/pages/SettingsSection.tsx
+msgid "Remember last-used folders"
+msgstr "Remember last-used folders"
 
 #: src/content/pages/components/RemixPanel.tsx
 #: src/content/pages/PlayerDossierPage.tsx
@@ -21991,6 +22793,10 @@ msgstr "Remove {label} from this build menu"
 #: src/multiplayer/chat/ConversationSidebar.tsx
 msgid "Remove {name} from friends"
 msgstr "Remove {name} from friends"
+
+#: src/mapconv/pages/ProjectsPage.tsx
+msgid "Remove {name} from projects"
+msgstr "Remove {name} from projects"
 
 #: src/workshop/pages/components/UnitCompareDrawer.tsx
 msgid "Remove {name} from the comparison"
@@ -22319,6 +23125,10 @@ msgstr "repository"
 msgid "Request refused."
 msgstr "Request refused."
 
+#: src/mapconv/pages/CompilePage.tsx
+msgid "required · the map's diffuse colour image · sets the map size · siblings auto-fill below"
+msgstr "required · the map's diffuse colour image · sets the map size · siblings auto-fill below"
+
 #: src/content/unitFieldNotes.ts
 msgid "Requires stockpiling"
 msgstr "Requires stockpiling"
@@ -22448,6 +23258,10 @@ msgstr "Resize the member list"
 #: src/multiplayer/battle/RoomSplit.tsx
 msgid "Resize the player table and chat"
 msgstr "Resize the player table and chat"
+
+#: src/placement/PlacementSurface.tsx
+msgid "Resize the working area"
+msgstr "Resize the working area"
 
 #: src/content/unitFieldNotes.ts
 msgid "Resolved under scripts/, defaulting to the unit name with a .cob suffix."
@@ -22608,6 +23422,10 @@ msgstr "Reveal {firstPath}"
 #: src/content/pages/StorageSection.tsx
 msgid "Reveal in file manager"
 msgstr "Reveal in file manager"
+
+#: src/animation/pages/CobPage.tsx
+msgid "Reveal in folder"
+msgstr "Reveal in folder"
 
 #: src/i18n/frameStrings.ts
 msgid "Reveal sidebar"
@@ -22813,6 +23631,10 @@ msgstr "Save"
 msgid "Save a password first. Coilbox cannot log in at startup without one."
 msgstr "Save a password first. Coilbox cannot log in at startup without one."
 
+#: src/animation/pages/CobPage.tsx
+msgid "Save as .bos…"
+msgstr "Save as .bos…"
+
 #: src/workshop/pages/components/PackagePanel.tsx
 msgid "Save as .sdd…"
 msgstr "Save as .sdd…"
@@ -22858,6 +23680,10 @@ msgstr "Save preset"
 msgid "Save search"
 msgstr "Save search"
 
+#: src/animation/pages/CobPage.tsx
+msgid "Save the rebuilt .bos"
+msgstr "Save the rebuilt .bos"
+
 #: src/startbox/StartBoxPresetsPopover.tsx
 msgid "Save these boxes for {mapName}"
 msgstr "Save these boxes for {mapName}"
@@ -22892,6 +23718,10 @@ msgstr "Saved \"{trimmed}\"."
 #: src/startbox/StartBoxPresetsPopover.tsx
 msgid "Saved {0}"
 msgstr "Saved {0}"
+
+#: src/animation/pages/CobPage.tsx
+msgid "Saved {dest}."
+msgstr "Saved {dest}."
 
 #: src/components/SaveStatus.tsx
 msgid "Saved {savedAt}"
@@ -23345,6 +24175,10 @@ msgstr "See the matchup by map, faction and game length"
 msgid "Seed"
 msgstr "Seed"
 
+#: src/mapconv/pages/SettingsSection.tsx
+msgid "seeds the Compile page"
+msgstr "seeds the Compile page"
+
 #: src/multiplayer/admin/PlayerLookupSection.tsx
 msgid "seen before"
 msgstr "seen before"
@@ -23361,9 +24195,29 @@ msgstr "Seismic signature"
 msgid "Select"
 msgstr "Select"
 
+#: src/mapconv/pages/components/PathField.tsx
+msgid "Select {label}"
+msgstr "Select {label}"
+
 #: src/workshop/pages/components/UnitReferenceTable.tsx
 msgid "Select {name} to compare"
 msgstr "Select {name} to compare"
+
+#: src/animation/pages/CobPage.tsx
+msgid "Select a .bos unit script to compile"
+msgstr "Select a .bos unit script to compile"
+
+#: src/animation/pages/Bos2LuaPage.tsx
+msgid "Select a .bos unit script to convert"
+msgstr "Select a .bos unit script to convert"
+
+#: src/animation/pages/CobPage.tsx
+msgid "Select a .cob unit script"
+msgstr "Select a .cob unit script"
+
+#: src/mapconv/pages/DecompilePage.tsx
+msgid "Select a .sdd map folder"
+msgstr "Select a .sdd map folder"
 
 #: src/content/pages/components/DownloadFolders.tsx
 msgid "Select a content folder…"
@@ -23454,6 +24308,10 @@ msgstr "Select player"
 #: src/scenario/pages/components/ContentsList.tsx
 msgid "selected"
 msgstr "selected"
+
+#: src/mapconv/pages/components/AssetPreview.tsx
+msgid "Selected asset preview"
+msgstr "Selected asset preview"
 
 #: src/content/unitFieldNotes.ts
 msgid "Selected sound"
@@ -24297,6 +25155,8 @@ msgstr "Show every replay again"
 msgid "Show frame rate"
 msgstr "Show frame rate"
 
+#: src/mapconv/pages/CompilePage.tsx
+#: src/mapconv/pages/DecompilePage.tsx
 #: src/play/pages/components/EngineLogFile.tsx
 msgid "Show in folder"
 msgstr "Show in folder"
@@ -24360,6 +25220,10 @@ msgstr "Show the back and forward navigation buttons in the top bar."
 #: src/general/pages/SettingsSection.tsx
 msgid "Show the brand splash when Coilbox launches. Click it or press Escape to dismiss it early."
 msgstr "Show the brand splash when Coilbox launches. Click it or press Escape to dismiss it early."
+
+#: src/placement/PlacementSurface.tsx
+msgid "Show the build grid the blueprint stands on"
+msgstr "Show the build grid the blueprint stands on"
 
 #: src/general/pages/SettingsSection.tsx
 msgid "Show the developer and modding tools — uberstress, mapconv, animation, and the archive explorer — in the sidebar and welcome screen. Off by default for a player-focused layout."
@@ -24590,6 +25454,7 @@ msgstr "Singleplayer saves in your content folder. Resume one to launch the engi
 #: src/content/pages/components/UnitModelPanel.tsx
 #: src/content/pages/GameUnitPage.tsx
 #: src/content/pages/StorageSection.tsx
+#: src/mapconv/pages/DecompilePage.tsx
 #: src/workshop/explosionGenerators.ts
 msgid "Size"
 msgstr "Size"
@@ -24636,6 +25501,7 @@ msgid "Skirmish setup"
 msgstr "Skirmish setup"
 
 #: src/i18n/frameStrings.ts
+#: src/placement/mapLoad.ts
 msgid "Sky"
 msgstr "Sky"
 
@@ -24715,6 +25581,10 @@ msgstr "Smoke trail size"
 #: src/content/unitFieldNotes.ts
 msgid "Smoke trail update rate"
 msgstr "Smoke trail update rate"
+
+#: src/mapconv/pages/components/AdvancedOptions.tsx
+msgid "Smooth texture (-smooth)"
+msgstr "Smooth texture (-smooth)"
 
 #: src/content/pages/components/GameVersionsTab.tsx
 msgid "snapshot"
@@ -24819,11 +25689,20 @@ msgstr "Sounds that want your attention, like a ring or a mention."
 msgid "Source"
 msgstr "Source"
 
+#: src/mapconv/pages/components/AdvancedOptions.tsx
+msgid "Source maps"
+msgstr "Source maps"
+
+#: src/animation/pages/CobPage.tsx
+msgid "Source rebuilt from the file. Compiling it gives back this .cob."
+msgstr "Source rebuilt from the file. Compiling it gives back this .cob."
+
 #: src/content/pages/GameDetailPage.tsx
 #: src/downloads/index.ts
 msgid "Sources"
 msgstr "Sources"
 
+#: src/placement/preview.ts
 #: src/scenario/pages/components/mapKeyboard.ts
 msgid "south"
 msgstr "south"
@@ -24916,6 +25795,10 @@ msgstr "Splash falloff shape"
 msgid "Spread of individual projectiles within one burst, using the same angle transform as accuracy."
 msgstr "Spread of individual projectiles within one burst, using the same angle transform as accuracy."
 
+#: src/mapconv/pages/DecompilePage.tsx
+msgid "Spring map or archive"
+msgstr "Spring map or archive"
+
 #: src/downloads/index.ts
 msgid "Springfiles"
 msgstr "Springfiles"
@@ -24927,6 +25810,10 @@ msgstr "springfiles has no engines for this kind of machine. Recoil does, so swi
 #: src/downloads/emptyEngineList.ts
 msgid "springfiles has no engines to offer right now. Try again in a moment, or switch the source above to Recoil."
 msgstr "springfiles has no engines to offer right now. Try again in a moment, or switch the source above to Recoil."
+
+#: src/mapconv/pages/SettingsSection.tsx
+msgid "SpringMapConvNG sidecars"
+msgstr "SpringMapConvNG sidecars"
 
 #: src/content/unitFieldNotes.ts
 msgid "Sprite colour"
@@ -24989,6 +25876,10 @@ msgstr "Standard"
 #: src/runlite/meta.ts
 msgid "Standard deployment"
 msgstr "Standard deployment"
+
+#: src/placement/mapCheck.ts
+msgid "Standing at {x}, {z}."
+msgstr "Standing at {x}, {z}."
 
 #: src/general/pages/AboutCoilbox.tsx
 msgid "Star on GitHub"
@@ -25653,6 +26544,10 @@ msgstr "Tells one of the mission's units to build something, at a point or into 
 msgid "Terraform speed"
 msgstr "Terraform speed"
 
+#: src/mapconv/pages/components/AdvancedOptions.tsx
+msgid "terrain-type index per pixel"
+msgstr "terrain-type index per pixel"
+
 #: src/content/unitFieldNotes.ts
 msgid "Tertiary texture"
 msgstr "Tertiary texture"
@@ -25688,9 +26583,17 @@ msgstr "Test notification"
 msgid "Testing a scenario here leaves its compiled mission in the game folder. Removing one takes the folder and its dialogue clips, and nothing else. The mission runtime stays, and testing that scenario again writes it back."
 msgstr "Testing a scenario here leaves its compiled mission in the game folder. Removing one takes the folder and its dialogue clips, and nothing else. The mission runtime stays, and testing that scenario again writes it back."
 
+#: src/mapconv/pages/components/AdvancedOptions.tsx
+msgid "text file; one feature per line: [tdfname] [x] [y] [z] [rotation]"
+msgstr "text file; one feature per line: [tdfname] [x] [y] [z] [rotation]"
+
 #: src/workshop/explosionGenerators.ts
 msgid "Texture"
 msgstr "Texture"
+
+#: src/mapconv/pages/CompilePage.tsx
+msgid "Texture is {textureWidth} × {textureHeight}px — each side must be a multiple of 1024. mapcompile will likely reject it."
+msgstr "Texture is {textureWidth} × {textureHeight}px — each side must be a multiple of 1024. mapcompile will likely reject it."
 
 #: src/content/pages/components/ArchiveModelPreview.tsx
 #: src/content/pages/components/UnitModelPanel.tsx
@@ -25859,6 +26762,14 @@ msgstr "the \"{kind}\" zone"
 msgid "The {resourceName} cost of each line's finished, living units every {periodSec} seconds, stacked by what each unit is for. A unit counts from the moment it is finished until it is destroyed, and moves with it when it is given away or captured. A unit still being built counts nothing. Costs and kinds come from the installed game's unit definitions, and every panel has the same scale. Metal and energy are never added together."
 msgstr "The {resourceName} cost of each line's finished, living units every {periodSec} seconds, stacked by what each unit is for. A unit counts from the moment it is finished until it is destroyed, and moves with it when it is given away or captured. A unit still being built counts nothing. Costs and kinds come from the installed game's unit definitions, and every panel has the same scale. Metal and energy are never added together."
 
+#: src/mapconv/pages/CompilePage.tsx
+msgid "The <0>mapcompile</0> sidecar was not found. Bundle SpringMapConvNG or set <1>MAPCONV_MAPCOMPILE_SIDECAR</1>."
+msgstr "The <0>mapcompile</0> sidecar was not found. Bundle SpringMapConvNG or set <1>MAPCONV_MAPCOMPILE_SIDECAR</1>."
+
+#: src/mapconv/pages/DecompilePage.tsx
+msgid "The <0>mapdecompile</0> sidecar was not found. Bundle SpringMapConvNG or set <1>MAPCONV_MAPDECOMPILE_SIDECAR</1>."
+msgstr "The <0>mapdecompile</0> sidecar was not found. Bundle SpringMapConvNG or set <1>MAPCONV_MAPDECOMPILE_SIDECAR</1>."
+
 #: src/multiplayer/admin/ServerAddressSection.tsx
 msgid "The addresses the server gives players for the battles they host."
 msgstr "The addresses the server gives players for the battles they host."
@@ -25924,6 +26835,14 @@ msgstr "The build orders could not be read from this replay."
 msgid "The bundled engines are all for other platforms, so a player on {platform} downloads one on first run. Add engine/{folder}/<version>/ to bundle it."
 msgstr "The bundled engines are all for other platforms, so a player on {platform} downloads one on first run. Add engine/{folder}/<version>/ to bundle it."
 
+#: src/animation/pages/CobPage.tsx
+msgid "The bytes of the file, sixteen to a line."
+msgstr "The bytes of the file, sixteen to a line."
+
+#: src/animation/pages/CobPage.tsx
+msgid "The bytes that were written, sixteen to a line."
+msgstr "The bytes that were written, sixteen to a line."
+
 #: src/content/unitFieldNotes.ts
 msgid "The chance, from 0 to 1, that each incoming missile is fooled into chasing the flare instead."
 msgstr "The chance, from 0 to 1, that each incoming missile is fooled into chasing the flare instead."
@@ -25951,6 +26870,10 @@ msgstr "The colour the shield fades to as its charge drops to 0."
 #: src/content/unitFieldNotes.ts
 msgid "The colour the shield fades to as its charge regenerates to full."
 msgstr "The colour the shield fades to as its charge regenerates to full."
+
+#: src/mapconv/pages/SettingsSection.tsx
+msgid "The compile/decompile features shell out to the bundled SpringMapConvNG binaries."
+msgstr "The compile/decompile features shell out to the bundled SpringMapConvNG binaries."
 
 #: src/scenario/validate.ts
 msgid "the compiled mission returned no table"
@@ -26032,6 +26955,10 @@ msgstr "The death explosion is <0>{fires}</0> from the project's weapon library,
 #: src/workshop/pages/components/WeaponSlotsPanel.tsx
 msgid "the death explosion is the copy"
 msgstr "the death explosion is the copy"
+
+#: src/mapconv/pages/CompilePage.tsx
+msgid "The diffuse colour image painted across the whole map. Its width and height set the map's size and <0>must each be a multiple of 1024</0> (e.g. 1024, 2048, 8192). Name companion images <1>heightmap.png</1>, <2>metalmap.png</2>, etc. in the same folder and they auto-fill below."
+msgstr "The diffuse colour image painted across the whole map. Its width and height set the map's size and <0>must each be a multiple of 1024</0> (e.g. 1024, 2048, 8192). Name companion images <1>heightmap.png</1>, <2>metalmap.png</2>, etc. in the same folder and they auto-fill below."
 
 #: src/content/unitFieldNotes.ts
 msgid "The direction the arc is measured from, in the unit's own coordinates. The default points forward."
@@ -26226,6 +27153,10 @@ msgstr "The file is permanently removed from your demos folder — this can't be
 #: src/scenario/pages/components/BlueprintPanel.tsx
 msgid "The file it was is kept at {backup}."
 msgstr "The file it was is kept at {backup}."
+
+#: src/animation/pages/Bos2LuaPage.tsx
+msgid "The file lets the game's synced gadgets set those values, and its gadgets and widgets read them, through <0>Spring.SetUnitCOBValue</0>, <1>Spring.GetCOBTeamVar</1> and their siblings."
+msgstr "The file lets the game's synced gadgets set those values, and its gadgets and widgets read them, through <0>Spring.SetUnitCOBValue</0>, <1>Spring.GetCOBTeamVar</1> and their siblings."
 
 #: src/downloads/installArchive.ts
 msgid "The files you opened stay where they are."
@@ -26648,9 +27579,25 @@ msgstr "The hub would not take any more {anyNoun} just now."
 msgid "The hub's answer {index} is not a result."
 msgstr "The hub's answer {index} is not a result."
 
+#: src/mapconv/pages/components/AdvancedOptions.tsx
+msgid "The in-world height (in map units) that pure black in the heightmap maps to — the map's lowest point. Below 0 is underwater."
+msgstr "The in-world height (in map units) that pure black in the heightmap maps to — the map's lowest point. Below 0 is underwater."
+
+#: src/mapconv/pages/components/AdvancedOptions.tsx
+msgid "The in-world height (in map units) that pure white maps to — the map's highest point. The gap between min and max sets how steep the terrain is."
+msgstr "The in-world height (in map units) that pure white maps to — the map's highest point. The gap between min and max sets how steep the terrain is."
+
 #: src/content/pages/components/UnitListNotes.tsx
 msgid "The installed game is read with the match's own mod options, teams and AIs, because a game's unit list can change with them. With the right list, a placed order names a building and a factory order names a unit that moves. A list can still be the wrong one, for a build that is not the match's or a unit that a map adds, and then some orders do not fit."
 msgstr "The installed game is read with the match's own mod options, teams and AIs, because a game's unit list can change with them. With the right list, a placed order names a building and a factory order names a unit that moves. A list can still be the wrong one, for a build that is not the match's or a unit that a map adds, and then some orders do not fit."
+
+#: src/animation/pages/CobPage.tsx
+msgid "The instructions in the file, as they are stored."
+msgstr "The instructions in the file, as they are stored."
+
+#: src/animation/pages/CobPage.tsx
+msgid "The instructions those bytes hold."
+msgstr "The instructions those bytes hold."
 
 #: src/deeplink/DeepLinkHandler.tsx
 msgid "The join form opens filled in. Nothing connects until you press Join in it."
@@ -26724,6 +27671,10 @@ msgstr "the login did not finish within {seconds}s"
 #: src/workshop/derivedStats.ts
 msgid "The longest range among the unit's weapons, divided by metal cost. Counts every weapon, including a manual-fire or slaved one: a threat range does not need a sustained rate of fire."
 msgstr "The longest range among the unit's weapons, divided by metal cost. Counts every weapon, including a manual-fire or slaved one: a threat range does not need a sustained rate of fire."
+
+#: src/mapconv/pages/components/AdvancedOptions.tsx
+msgid "The low-resolution overview image players see in the lobby and the in-game minimap. If omitted, the engine can derive one from the texture."
+msgstr "The low-resolution overview image players see in the lobby and the in-game minimap. If omitted, the engine can derive one from the texture."
 
 #: src/content/pages/components/ReplayMap.tsx
 #: src/multiplayer/battle/contentBlock.ts
@@ -27133,6 +28084,10 @@ msgstr "The sector warlord. Break it to win the run."
 msgid "The seed and rules this project was made from. Change one, preview the result and apply it as a single change you can undo."
 msgstr "The seed and rules this project was made from. Change one, preview the result and apply it as a single change you can undo."
 
+#: src/placement/LayoutControls.tsx
+msgid "The selected building is the one in green. The order is the blueprint itself, so a base placed from it anywhere is built the same way."
+msgstr "The selected building is the one in green. The order is the blueprint itself, so a base placed from it anywhere is built the same way."
+
 #: src/content/unitFieldNotes.ts
 msgid "The selection volume is taken from the footprint rather than from the numbers above."
 msgstr "The selection volume is taken from the footprint rather than from the numbers above."
@@ -27222,9 +28177,17 @@ msgstr "The servers you can log in to, and your accounts on them."
 msgid "The servers you play on, and who you hear from there."
 msgstr "The servers you play on, and who you hear from there."
 
+#: src/mapconv/pages/components/AdvancedOptions.tsx
+msgid "the small overview image shown in-lobby and in-game"
+msgstr "the small overview image shown in-lobby and in-game"
+
 #: src/sound/events.ts
 msgid "The soundtrack, whichever one you pick above."
 msgstr "The soundtrack, whichever one you pick above."
+
+#: src/animation/pages/CobPage.tsx
+msgid "The source that was compiled, as it is on disk."
+msgstr "The source that was compiled, as it is on disk."
 
 #: src/content/unitFieldNotes.ts
 msgid "The speed of takeoff and landing, at least for a gunship."
@@ -27398,6 +28361,10 @@ msgstr "the whole match"
 msgid "The whole match, {matchStart} to {matchEnd}."
 msgstr "The whole match, {matchStart} to {matchEnd}."
 
+#: src/placement/SurfaceBars.tsx
+msgid "The whole selection swung a quarter turn about its own middle, so it keeps its shape. Press R to turn each thing where it stands instead."
+msgstr "The whole selection swung a quarter turn about its own middle, so it keeps its shape. Press R to turn each thing where it stands instead."
+
 #: src/content/pages/components/MapAggregate.tsx
 msgid "The window is {when} of each match by its own clock, in whole minutes."
 msgstr "The window is {when} of each match by its own clock, in whole minutes."
@@ -27493,6 +28460,10 @@ msgstr "These boxes are already saved for {mapName}"
 #: src/play/PresetPartsView.tsx
 msgid "These boxes were drawn for {presetMap}, not the map you are on."
 msgstr "These boxes were drawn for {presetMap}, not the map you are on."
+
+#: src/placement/LayoutControls.tsx
+msgid "These buildings are in the order they were clicked, which is not an opening. Turn this on to say what gets built first, and the blueprint becomes a build order that can be followed, watched and shared."
+msgstr "These buildings are in the order they were clicked, which is not an opening. Turn this on to say what gets built first, and the blueprint becomes a build order that can be followed, watched and shared."
 
 #: src/content/pages/components/MissionRuntimeSection.tsx
 msgid "These come with the game and play as the game itself. They are listed under Play, and coilbox neither wrote them nor removes them."
@@ -27613,6 +28584,10 @@ msgstr "This battle's password cannot be sent"
 #: src/deeplink/build.ts
 msgid "This battle's password cannot go in a link."
 msgstr "This battle's password cannot go in a link."
+
+#: src/placement/BlueprintEditor.tsx
+msgid "This blueprint's game is not installed, so nothing can be drawn with its models."
+msgstr "This blueprint's game is not installed, so nothing can be drawn with its models."
 
 #: src/game-updates/pages/GameUpdatesSection.tsx
 msgid "This build has no game-update source configured."
@@ -27953,6 +28928,22 @@ msgstr "This map"
 #: src/startbox/StartBoxPresetsPopover.tsx
 msgid "This map ({0})"
 msgstr "This map ({0})"
+
+#: src/placement/LayoutControls.tsx
+msgid "This map has no water on it: nothing on it is below the waterline, and its lowest ground is {lowest} elmos. Every building here that needs water is refused wherever it stands, marked in cyan. This blueprint wants a map with a coast rather than a different spot on this one."
+msgstr "This map has no water on it: nothing on it is below the waterline, and its lowest ground is {lowest} elmos. Every building here that needs water is refused wherever it stands, marked in cyan. This blueprint wants a map with a coast rather than a different spot on this one."
+
+#: src/placement/LayoutControls.tsx
+msgid "This map's heights could not be read, so every unit here is drawn on flat ground rather than at the height the engine will stand it at."
+msgstr "This map's heights could not be read, so every unit here is drawn on flat ground rather than at the height the engine will stand it at."
+
+#: src/placement/LayoutControls.tsx
+msgid "This map's heights could not be read. Nothing here has been checked against the ground, so every square is dashed rather than clean."
+msgstr "This map's heights could not be read. Nothing here has been checked against the ground, so every square is dashed rather than clean."
+
+#: src/mapconv/skyboxNote.ts
+msgid "This map's skybox is a DDS, but not a cube map, so the preview draws the map's sky colour instead."
+msgstr "This map's skybox is a DDS, but not a cube map, so the preview draws the map's sky colour instead."
 
 #: src/content/replayAnalysis.ts
 msgid "This match never recorded a game over, usually because it was quit before it ended. There is nothing to check a playback against, so it cannot be analysed."
@@ -28360,6 +29351,14 @@ msgstr "This scenario was made for a newer version of coilbox. Update coilbox to
 msgid "This scenario's {mine} hand over to the preset's {theirs} in list order, and every position stays where it is on the new map."
 msgstr "This scenario's {mine} hand over to the preset's {theirs} in list order, and every position stays where it is on the new map."
 
+#: src/animation/pages/Bos2LuaPage.tsx
+msgid "This script includes {includes}. A script pasted here cannot load its includes, so it cannot be converted. Load the .bos from its folder instead, or open the unit out of its game."
+msgstr "This script includes {includes}. A script pasted here cannot load its includes, so it cannot be converted. Load the .bos from its folder instead, or open the unit out of its game."
+
+#: src/animation/pages/Bos2LuaPage.tsx
+msgid "This script shares values with other units, which it keeps as rules params."
+msgstr "This script shares values with other units, which it keeps as rules params."
+
 #: src/lobby-servers/PasswordRecoveryForm.tsx
 msgid "This server does not offer password recovery in Coilbox. Reset it on the server's own page instead:"
 msgstr "This server does not offer password recovery in Coilbox. Reset it on the server's own page instead:"
@@ -28467,6 +29466,10 @@ msgstr "This warpath needs the game <0>{name}</0>, which is not installed."
 msgid "This was made by a newer version of coilbox. Update coilbox to open it."
 msgstr "This was made by a newer version of coilbox. Update coilbox to open it."
 
+#: src/mapconv/pages/components/AdvancedOptions.tsx
+msgid "Threshold (-th)"
+msgstr "Threshold (-th)"
+
 #: src/content/unitFieldNotes.ts
 msgid "Tidal generation"
 msgstr "Tidal generation"
@@ -28490,6 +29493,14 @@ msgstr "Tier weights"
 #: src/workshop/randomMod.ts
 msgid "Tier weights: {tierText}."
 msgstr "Tier weights: {tierText}."
+
+#: src/mapconv/pages/components/AdvancedOptions.tsx
+msgid "tile match tolerance; default 0.8"
+msgstr "tile match tolerance; default 0.8"
+
+#: src/mapconv/pages/components/AdvancedOptions.tsx
+msgid "tiles to compare in modes 2 & 4; default 64"
+msgstr "tiles to compare in modes 2 & 4; default 64"
 
 #: src/content/unitFieldNotes.ts
 msgid "Tilt smoothing"
@@ -28813,6 +29824,10 @@ msgstr "Try with {chosenLabel}"
 msgid "ttl, in frames."
 msgstr "ttl, in frames."
 
+#: src/placement/SurfaceBars.tsx
+msgid "Turn"
+msgstr "Turn"
+
 #: src/content/pages/ArchiveDetailPage.tsx
 msgid "Turn {archiveName}''s {legacyModels} legacy models into .s3o, one shared texture per folder."
 msgstr "Turn {archiveName}''s {legacyModels} legacy models into .s3o, one shared texture per folder."
@@ -28825,6 +29840,18 @@ msgstr "Turn {archiveName}'s {legacyModels} into .s3o, one shared texture per fo
 msgid "Turn {turn}"
 msgstr "Turn {turn}"
 
+#: src/placement/SurfaceBars.tsx
+msgid "Turn a quarter turn"
+msgstr "Turn a quarter turn"
+
+#: src/placement/SurfaceBars.tsx
+msgid "Turn all"
+msgstr "Turn all"
+
+#: src/placement/SurfaceBars.tsx
+msgid "Turn all {count}"
+msgstr "Turn all {count}"
+
 #: src/multiplayer/MatchFoundPanel.tsx
 msgid "Turn down"
 msgstr "Turn down"
@@ -28832,6 +29859,10 @@ msgstr "Turn down"
 #: src/multiplayer/chat/PartySection.tsx
 msgid "Turn down the invitation from {who}"
 msgstr "Turn down the invitation from {who}"
+
+#: src/placement/SurfaceBars.tsx
+msgid "Turn everything selected that turns a quarter turn. A group and a zone do not."
+msgstr "Turn everything selected that turns a quarter turn. A group and a zone do not."
 
 #: src/content/unitFieldNotes.ts
 msgid "Turn radius"
@@ -28864,6 +29895,14 @@ msgstr "turned half way round, the way the game places it"
 #: src/scenario/pages/components/BlueprintPanel.tsx
 msgid "turned three quarters of a turn, the way the game places it"
 msgstr "turned three quarters of a turn, the way the game places it"
+
+#: src/placement/SurfaceBars.tsx
+msgid "Turning it leaves it on the same squares. Its footprint is square, so there is nowhere for it to move."
+msgstr "Turning it leaves it on the same squares. Its footprint is square, so there is nowhere for it to move."
+
+#: src/placement/SurfaceBars.tsx
+msgid "Turning it stands it on the outlined squares. Its sides swap, so it moves half a build square."
+msgstr "Turning it stands it on the outlined squares. Its sides swap, so it moves half a build square."
 
 #: src/content/unitFieldNotes.ts
 msgid "Turns into its wreck"
@@ -28902,6 +29941,10 @@ msgstr "Type {username} to confirm"
 #: src/scenario/pages/components/TriggerSteps.tsx
 msgid "Type and press Enter"
 msgstr "Type and press Enter"
+
+#: src/mapconv/pages/components/AdvancedOptions.tsx
+msgid "Type map (-z)"
+msgstr "Type map (-z)"
 
 #: src/multiplayer/chat/ChatPane.tsx
 msgid "Type your message..."
@@ -29023,6 +30066,7 @@ msgid "Underwater"
 msgstr "Underwater"
 
 #: src/content/pages/components/Convert3doDrawer.tsx
+#: src/placement/SurfaceBars.tsx
 #: src/scenario/pages/components/deleteNotice.ts
 #: src/scenario/pages/components/shortcuts.ts
 #: src/workshop/pages/components/CloneInPlaceNotice.tsx
@@ -29033,6 +30077,10 @@ msgstr "Underwater"
 #: src/workshop/pages/UnitPage.tsx
 msgid "Undo"
 msgstr "Undo"
+
+#: src/placement/SurfaceBars.tsx
+msgid "Undo ({mod} Z)"
+msgstr "Undo ({mod} Z)"
 
 #: src/workshop/pages/ReferencePage.tsx
 #: src/workshop/pages/UnitPage.tsx
@@ -29099,6 +30147,10 @@ msgstr "unit builder module"
 msgid "unit builder modules"
 msgstr "unit builder modules"
 
+#: src/placement/mapLoad.ts
+msgid "Unit definitions"
+msgstr "Unit definitions"
+
 #: src/content/useCompatReport.ts
 msgid "Unit defs: {defsError}"
 msgstr "Unit defs: {defsError}"
@@ -29106,6 +30158,10 @@ msgstr "Unit defs: {defsError}"
 #: src/content/pages/components/ReplayPlaybackBar.tsx
 msgid "Unit destroyed, {at}"
 msgstr "Unit destroyed, {at}"
+
+#: src/placement/mapLoad.ts
+msgid "Unit models"
+msgstr "Unit models"
 
 #: src/content/replayUnitDefs.ts
 msgid "Unit names"
@@ -29133,6 +30189,11 @@ msgstr "Unit restrictions"
 #: src/content/unitFieldNotes.ts
 msgid "Unit script"
 msgstr "Unit script"
+
+#: src/animation/pages/Bos2LuaPage.tsx
+#: src/animation/pages/CobPage.tsx
+msgid "Unit script source"
+msgstr "Unit script source"
 
 #: src/scenario/triggerTypes.ts
 msgid "unit to build"
@@ -29633,6 +30694,10 @@ msgstr "Variables"
 msgid "Variety"
 msgstr "Variety"
 
+#: src/mapconv/pages/components/AdvancedOptions.tsx
+msgid "Vegetation map (-v)"
+msgstr "Vegetation map (-v)"
+
 #: src/account/pages/SettingsSection.tsx
 #: src/multiplayer/VerificationCodeDialog.tsx
 msgid "Verification code"
@@ -29897,6 +30962,10 @@ msgstr "Watch"
 msgid "Watch anyway"
 msgstr "Watch anyway"
 
+#: src/placement/LayoutControls.tsx
+msgid "Watch it go up"
+msgstr "Watch it go up"
+
 #: src/play/PresetList.tsx
 msgid "Watch the best replay for {presetName}"
 msgstr "Watch the best replay for {presetName}"
@@ -29919,6 +30988,7 @@ msgid "Watching…"
 msgstr "Watching…"
 
 #: src/content/libraryMaps.ts
+#: src/mapconv/pages/components/MapPreview3D.tsx
 #: src/workshop/pages/components/ExplosionGeneratorEditor.tsx
 msgid "Water"
 msgstr "Water"
@@ -30021,6 +31091,7 @@ msgstr "Welcome screen"
 msgid "Well travelled"
 msgstr "Well travelled"
 
+#: src/placement/preview.ts
 #: src/scenario/pages/components/mapKeyboard.ts
 msgid "west"
 msgstr "west"
@@ -30133,6 +31204,10 @@ msgstr "What the engine said"
 msgid "What the game and every tool joins on. Lowercase, no spaces."
 msgstr "What the game and every tool joins on. Lowercase, no spaces."
 
+#: src/animation/pages/CobPage.tsx
+msgid "What the lint pass found in this .bos."
+msgstr "What the lint pass found in this .bos."
+
 #: src/scenario/pages/components/MissionLuaView.tsx
 msgid "What the mission runtime reads, compiled from this document. It is written into the game as <0>{path}</0> when the mission is played."
 msgstr "What the mission runtime reads, compiled from this document. It is written into the game as <0>{path}</0> when the mission is played."
@@ -30164,6 +31239,10 @@ msgstr "What the weapon does. {unitName} carries its own copy of this definition
 #: src/multiplayer/battle/BattleTweakDecodeSection.tsx
 msgid "What this battle already has set, decoded back to Lua. Read only, nothing here changes what the host set."
 msgstr "What this battle already has set, decoded back to Lua. Read only, nothing here changes what the host set."
+
+#: src/placement/LayoutControls.tsx
+msgid "What this blueprint is called"
+msgstr "What this blueprint is called"
 
 #: src/workshop/pages/components/ProjectDetailsDrawer.tsx
 msgid "What this changes, and why."
@@ -30266,6 +31345,10 @@ msgstr "Where metal was lost"
 #: src/content/pages/components/ReplayMap.tsx
 msgid "Where orders were aimed"
 msgstr "Where orders were aimed"
+
+#: src/mapconv/pages/CompilePage.tsx
+msgid "where the .smf/.smt are written"
+msgstr "where the .smf/.smt are written"
 
 #: src/play/index.ts
 msgid "Where the engine last wrote its log, and the system it ran on."
@@ -30567,6 +31650,10 @@ msgstr "Winner"
 msgid "Wins"
 msgstr "Wins"
 
+#: src/mapconv/pages/components/MapPreview3D.tsx
+msgid "Wireframe"
+msgstr "Wireframe"
+
 #: src/hub/maps/pictureSweep.ts
 msgid "with a minimap that is one flat colour"
 msgstr "with a minimap that is one flat colour"
@@ -30672,6 +31759,18 @@ msgstr "Works for every game. Coilbox writes {WORKSHOP_MUTATOR_FOLDER} and rewri
 #: src/workshop/index.ts
 msgid "workshop"
 msgstr "workshop"
+
+#: src/mapconv/pages/DecompilePage.tsx
+msgid "World"
+msgstr "World"
+
+#: src/mapconv/pages/components/AdvancedOptions.tsx
+msgid "world height at black; default 0"
+msgstr "world height at black; default 0"
+
+#: src/mapconv/pages/components/AdvancedOptions.tsx
+msgid "world height at white; default 1"
+msgstr "world height at white; default 1"
 
 #: src/workshop/pages/components/ProjectChecks.tsx
 #: src/workshop/pages/components/UnitFieldRow.tsx

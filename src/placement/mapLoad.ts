@@ -7,6 +7,9 @@
  * still being read and the indicator says which is which.
  */
 
+import { i18n, type MessageDescriptor } from "@lingui/core";
+import { msg } from "@lingui/core/macro";
+
 export type StageState = "idle" | "loading" | "done" | "failed";
 
 export interface ModelsStage {
@@ -43,13 +46,13 @@ export interface MapLoadRow {
   detail?: string;
 }
 
-const LABELS: Record<keyof MapLoad, string> = {
-  minimap: "Map picture",
-  heightPicture: "Relief",
-  exactHeights: "Exact heights",
-  skybox: "Sky",
-  unitDefs: "Unit definitions",
-  models: "Unit models",
+const LABELS: Record<keyof MapLoad, MessageDescriptor> = {
+  minimap: msg`Map picture`,
+  heightPicture: msg`Relief`,
+  exactHeights: msg`Exact heights`,
+  skybox: msg`Sky`,
+  unitDefs: msg`Unit definitions`,
+  models: msg`Unit models`,
 };
 
 const ORDER: (keyof MapLoad)[] = [
@@ -71,7 +74,7 @@ export function mapLoadRows(load: MapLoad): MapLoadRow[] {
   for (const key of ORDER) {
     const state = stateOf(load, key);
     if (state === "idle") continue;
-    const row: MapLoadRow = { key, label: LABELS[key], state };
+    const row: MapLoadRow = { key, label: i18n._(LABELS[key]), state };
     if (key === "models" && load.models.total > 0) {
       row.detail = `${load.models.done} / ${load.models.total}`;
     }
