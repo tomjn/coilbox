@@ -457,6 +457,14 @@ msgstr "Back/forward buttons"
 msgid "Base color"
 msgstr "Base color"
 
+#: src/multiplayer/index.tsx
+msgid "Battle Room"
+msgstr "Battle Room"
+
+#: src/multiplayer/index.tsx
+msgid "Battles"
+msgstr "Battles"
+
 #: src/i18n/frameStrings.ts
 msgid "Blue"
 msgstr "Blue"
@@ -518,6 +526,18 @@ msgstr "Career"
 #: src/home/groupDescription.ts
 msgid "Change what a game's units cost, carry and can do."
 msgstr "Change what a game's units cost, carry and can do."
+
+#: src/multiplayer/index.tsx
+msgid "Chat"
+msgstr "Chat"
+
+#: src/multiplayer/index.tsx
+msgid "Chat highlights"
+msgstr "Chat highlights"
+
+#: src/multiplayer/index.tsx
+msgid "Chat logs"
+msgstr "Chat logs"
 
 #: src/updater/pages/UpdatesSettingsSection.tsx
 msgid "Check for updates"
@@ -600,6 +620,10 @@ msgstr "Coilbox file"
 msgid "Coilbox has not contacted it yet. Only continue if you trust this link."
 msgstr "Coilbox has not contacted it yet. Only continue if you trust this link."
 
+#: src/hub/index.tsx
+msgid "Coilbox hub"
+msgstr "Coilbox hub"
+
 #: src/downloads/index.ts
 msgid "Coilbox Hub"
 msgstr "Coilbox Hub"
@@ -648,6 +672,10 @@ msgstr "Command palette"
 #: src/components/ui/command.tsx
 msgid "Command Palette"
 msgstr "Command Palette"
+
+#: src/hub/index.tsx
+msgid "Community"
+msgstr "Community"
 
 #: src/mapconv/index.ts
 msgid "Compile"
@@ -1140,6 +1168,10 @@ msgstr "Ignored a coilbox link"
 msgid "Ignored a file"
 msgstr "Ignored a file"
 
+#: src/multiplayer/index.tsx
+msgid "Ignored users"
+msgstr "Ignored users"
+
 #: src/deeplink/index.ts
 #: src/deeplink/pages/ImportSection.tsx
 msgid "Import"
@@ -1255,6 +1287,10 @@ msgstr "It opens in the importer, which resolves any missing content before savi
 msgid "It opens in the keybinds editor, unsaved."
 msgstr "It opens in the keybinds editor, unsaved."
 
+#: src/hub/index.tsx
+msgid "Item"
+msgstr "Item"
+
 #: src/deeplink/DeepLinkHandler.tsx
 msgid "Join a room"
 msgstr "Join a room"
@@ -1309,6 +1345,7 @@ msgstr "Let the banner make your system's notification sound. Your operating sys
 
 #: src/content/index.ts
 #: src/downloads/index.ts
+#: src/hub/index.tsx
 msgid "Library"
 msgstr "Library"
 
@@ -1343,6 +1380,10 @@ msgstr "Log in"
 #: src/home/groupDescription.ts
 msgid "Log in to a lobby server, chat, and join battles."
 msgstr "Log in to a lobby server, chat, and join battles."
+
+#: src/multiplayer/index.tsx
+msgid "Login"
+msgstr "Login"
 
 #: src/animation/index.ts
 msgid "Lua Animations"
@@ -1380,9 +1421,17 @@ msgstr "Master volume"
 msgid "Match in progress · hosted by {host}"
 msgstr "Match in progress · hosted by {host}"
 
+#: src/multiplayer/index.tsx
+msgid "Matchmaking"
+msgstr "Matchmaking"
+
 #: src/sound/events.ts
 msgid "Matchmaking pairs you up and starts the accept countdown."
 msgstr "Matchmaking pairs you up and starts the accept countdown."
+
+#: src/multiplayer/index.tsx
+msgid "Matchup"
+msgstr "Matchup"
 
 #: src/sound/events.ts
 msgid "Mentioned in chat"
@@ -1421,6 +1470,7 @@ msgid "Motion & effects"
 msgstr "Motion & effects"
 
 #: src/home/zones/ResumeRail.tsx
+#: src/multiplayer/index.tsx
 msgid "Multiplayer"
 msgstr "Multiplayer"
 
@@ -1699,6 +1749,10 @@ msgstr "Paste it into chat or Discord."
 msgid "Pause music"
 msgstr "Pause music"
 
+#: src/multiplayer/index.tsx
+msgid "People whose messages coilbox hides from you."
+msgstr "People whose messages coilbox hides from you."
+
 #: src/general/pages/SettingsSection.tsx
 msgid "Performance mode"
 msgstr "Performance mode"
@@ -1742,6 +1796,14 @@ msgstr "Play"
 #: src/sound/SoundSettings.tsx
 msgid "Play music"
 msgstr "Play music"
+
+#: src/multiplayer/index.tsx
+msgid "Player"
+msgstr "Player"
+
+#: src/multiplayer/index.tsx
+msgid "Player stats"
+msgstr "Player stats"
 
 #: src/profile/health.ts
 msgid "Portable mode active — {portableRoot}"
@@ -1814,6 +1876,10 @@ msgstr "Ready to install"
 #: src/home/zones/ResumeRail.tsx
 msgid "Reconnect all"
 msgstr "Reconnect all"
+
+#: src/recordsGroup.ts
+msgid "Records"
+msgstr "Records"
 
 #: src/i18n/frameStrings.ts
 msgid "Red"
@@ -2005,6 +2071,10 @@ msgstr "Search for a command to run..."
 #: src/notify/NotificationsSettings.tsx
 msgid "Send test notification"
 msgstr "Send test notification"
+
+#: src/multiplayer/index.tsx
+msgid "Server admin"
+msgstr "Server admin"
 
 #: src/home/zones/SuggestedMap.tsx
 msgid "Set a download folder in <0>Content folders settings</0> to install it."
@@ -2374,6 +2444,10 @@ msgstr "the server refused the login"
 msgid "The servers you can log in to, and your accounts on them."
 msgstr "The servers you can log in to, and your accounts on them."
 
+#: src/multiplayer/index.tsx
+msgid "The servers you play on, and who you hear from there."
+msgstr "The servers you play on, and who you hear from there."
+
 #: src/sound/events.ts
 msgid "The soundtrack, whichever one you pick above."
 msgstr "The soundtrack, whichever one you pick above."
@@ -2722,6 +2796,10 @@ msgstr "Where the engine last wrote its log, and the system it ran on."
 #: src/content/index.ts
 msgid "Where your games, maps and engines live, and where new ones come from."
 msgstr "Where your games, maps and engines live, and where new ones come from."
+
+#: src/multiplayer/index.tsx
+msgid "Words that light up a chat tab when somebody says them."
+msgstr "Words that light up a chat tab when somebody says them."
 
 #: src/i18n/frameStrings.ts
 msgid "Working: {op}"
