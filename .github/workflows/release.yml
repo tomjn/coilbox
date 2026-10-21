@@ -382,7 +382,7 @@ jobs:
           ZIP="Coilbox_${VER}_x64-portable.zip"
           rm -f "$ZIP" "$ZIP.sig"
           (cd "$STAGING" && 7z a -tzip -mx=9 "$(cygpath -w "$GITHUB_WORKSPACE/$ZIP")" . > /dev/null)
-          bunx tauri signer sign -k "$TAURI_SIGNING_PRIVATE_KEY" -p "$TAURI_SIGNING_PRIVATE_KEY_PASSWORD" "$ZIP"
+          bunx --bun tauri signer sign -k "$TAURI_SIGNING_PRIVATE_KEY" -p "$TAURI_SIGNING_PRIVATE_KEY_PASSWORD" "$ZIP"
 
           # `gh release upload` looks the release up by tag, which is the lookup
           # that sent 1.15.5's zip to a duplicate release. Checking the id it
