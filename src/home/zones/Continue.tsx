@@ -1,3 +1,5 @@
+import { i18n } from "@lingui/core";
+import { t } from "@lingui/core/macro";
 import { buttonVariants, cn } from "@picoframe/frame";
 import { Play } from "lucide-react";
 import type { ReactNode } from "react";
@@ -135,11 +137,11 @@ export default function Continue({ className }: { className?: string }) {
       />
     );
 
-  const { label, action } = RESUME_KIND_COPY[top.kind];
+  const copy = RESUME_KIND_COPY[top.kind];
   return heroCard({
     top,
-    label,
-    action,
+    label: i18n._(copy.label),
+    action: i18n._(copy.action),
     detail: top.detail,
     art: <KindIcon kind={top.kind} />,
     className,
@@ -194,7 +196,7 @@ function StartHero({
   const still = src && mediaKind(src) !== "video" ? src : undefined;
   return heroCard({
     top,
-    label: RESUME_KIND_COPY.start.label,
+    label: i18n._(RESUME_KIND_COPY.start.label),
     action: copy.action,
     detail: copy.detail ?? top.detail,
     art: still ? (
@@ -257,7 +259,7 @@ function StartScenarioHero({
   const copy = startCopy(needs);
   return heroCard({
     top: needs.length > 0 ? { ...top, to: "/scenarios" } : top,
-    label: RESUME_KIND_COPY.start.label,
+    label: i18n._(RESUME_KIND_COPY.start.label),
     action: copy.action,
     detail: copy.detail ?? top.detail,
     art: <KindIcon kind="start" />,
@@ -281,6 +283,8 @@ function heroCard({
   art: ReactNode;
   className?: string;
 }) {
+  const runTitle = top.title;
+  const ariaLabel = t`${action}: ${runTitle}`;
   return (
     // The accent border and the filled action mark this as the card to look at.
     // A tinted fill would say the same thing three times. The tint was also
@@ -302,7 +306,7 @@ function heroCard({
           it by the icon's tooltip and by what the card says. */}
       <Link
         to={top.to}
-        aria-label={`${action}: ${top.title}`}
+        aria-label={ariaLabel}
         className={cn(
           "flex flex-wrap items-center gap-4 rounded-lg p-4 transition-colors hover:bg-accent/50",
           CARD_FOCUS_CLASS,

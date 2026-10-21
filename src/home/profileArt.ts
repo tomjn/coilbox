@@ -41,6 +41,7 @@
  * module does not have to inspect a single pixel of it.
  */
 
+import { t } from "@lingui/core/macro";
 import { assetUrl } from "../lib/assetUrl";
 import { parseRef } from "../profile/refs";
 import { canonicalProfileId } from "../profile/renamedIds";
@@ -78,9 +79,10 @@ export function resolveCardArtOverrides(
 export function readArtMap(value: unknown, issues?: string[]): ArtOverrides {
   if (value === undefined || value === null) return NONE;
   if (typeof value !== "object" || Array.isArray(value)) {
+    const got = showHomeValue(value);
     noteHomeIssue(
       issues,
-      `home: ignoring \`art\`, expected an object, got ${showHomeValue(value)}`,
+      t`home: ignoring \`art\`, expected an object, got ${got}`,
     );
     return NONE;
   }
@@ -112,9 +114,11 @@ function toolArt(
     const ref = parseRef(value);
     if (ref?.kind === "file") return assetUrl(ref.path);
   }
+  const tool = showHomeValue(toolId);
+  const got = showHomeValue(value);
   noteHomeIssue(
     issues,
-    `home: ignoring art for ${showHomeValue(toolId)}, expected an @.coilbox file reference or false, got ${showHomeValue(value)}`,
+    t`home: ignoring art for ${tool}, expected an @.coilbox file reference or false, got ${got}`,
   );
   return undefined;
 }

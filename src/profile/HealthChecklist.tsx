@@ -1,3 +1,4 @@
+import { Trans } from "@lingui/react/macro";
 import {
   AlertTriangle,
   CheckCircle2,
@@ -28,10 +29,12 @@ export default function HealthChecklist() {
   return (
     <section className="space-y-3">
       <h3 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
-        Health
+        <Trans>Health</Trans>
       </h3>
       {loading && checks.length === 0 ? (
-        <p className="text-sm text-muted-foreground">Running checks…</p>
+        <p className="text-sm text-muted-foreground">
+          <Trans>Running checks…</Trans>
+        </p>
       ) : (
         <ul className="divide-y divide-border rounded-md border border-border text-sm">
           {checks.map((c) => (

@@ -26,6 +26,7 @@
  * the same way this module does.
  */
 
+import { t } from "@lingui/core/macro";
 import {
   DEFAULT_LAYOUT,
   isLayoutName,
@@ -322,9 +323,10 @@ export function resolveHome(raw: unknown): ResolvedHome {
   if (raw === undefined || raw === null) return stock();
   const home = asObject(raw);
   if (!home) {
+    const got = showHomeValue(raw);
     noteHomeIssue(
       issues,
-      `home: ignoring \`home\`, expected an object, got ${showHomeValue(raw)}`,
+      t`home: ignoring \`home\`, expected an object, got ${got}`,
     );
     return stock();
   }
@@ -352,9 +354,11 @@ export function resolveHome(raw: unknown): ResolvedHome {
  * in {@link ResolvedHome.issues}, which is the pairing the health panel shows.
  */
 export function describeHome(home: ResolvedHome): string {
-  const layout = home.layout ? `Layout "${home.layout}"` : "Default layout";
-  const tracking = home.pinned ? "pinned" : "tracking the default";
-  return `${layout}, ${home.entries.length} zone(s), ${tracking}`;
+  const layoutName = home.layout;
+  const layout = layoutName ? t`Layout "${layoutName}"` : t`Default layout`;
+  const tracking = home.pinned ? t`pinned` : t`tracking the default`;
+  const zoneCount = home.entries.length;
+  return t`${layout}, ${zoneCount} zone(s), ${tracking}`;
 }
 
 /**
@@ -392,16 +396,20 @@ export function zonesOnPage(
 function layoutName(value: unknown, issues: string[]): LayoutName | undefined {
   if (value === undefined || value === null) return undefined;
   if (typeof value !== "string") {
+    const got = showHomeValue(value);
     noteHomeIssue(
       issues,
-      `home: ignoring \`layout\`, expected a string, got ${showHomeValue(value)}`,
+      t`home: ignoring \`layout\`, expected a string, got ${got}`,
     );
     return undefined;
   }
   if (isLayoutName(value)) return value;
+  const shown = showHomeValue(value);
+  const defaultLayout = DEFAULT_LAYOUT;
+  const shipped = LAYOUT_NAMES.join(", ");
   noteHomeIssue(
     issues,
-    `home: ignoring unknown layout ${showHomeValue(value)}, using "${DEFAULT_LAYOUT}". This build ships: ${LAYOUT_NAMES.join(", ")}`,
+    t`home: ignoring unknown layout ${shown}, using "${defaultLayout}". This build ships: ${shipped}`,
   );
   return undefined;
 }
@@ -426,9 +434,10 @@ function resolveEntries(
   const stock = () => ({ entries: defaultEntries(), pinned: false });
   if (zones === undefined || zones === null) return stock();
   if (!Array.isArray(zones)) {
+    const got = showHomeValue(zones);
     noteHomeIssue(
       issues,
-      `home: ignoring \`zones\`, expected an array, got ${showHomeValue(zones)}`,
+      t`home: ignoring \`zones\`, expected an array, got ${got}`,
     );
     return stock();
   }
@@ -437,21 +446,24 @@ function resolveEntries(
   for (const raw of zones) {
     const entry = asObject(raw);
     if (!entry) {
+      const got = showHomeValue(raw);
       noteHomeIssue(
         issues,
-        `home: ignoring a zone entry that is not an object: ${showHomeValue(raw)}`,
+        t`home: ignoring a zone entry that is not an object: ${got}`,
       );
       continue;
     }
     const kind = entryKind(entry);
     if (kind === null) {
+      const zoneName = showHomeValue(entry.zone);
+      const got = showHomeValue(raw);
       noteHomeIssue(
         issues,
         typeof entry.zone === "string"
           ? // Quoted through the shared formatter, so a name long enough to fill
             // the health panel is cut to length like any other bad value.
-            `home: ignoring unknown zone ${showHomeValue(entry.zone)}`
-          : `home: ignoring a zone entry with no \`zone\` name or \`html\`: ${showHomeValue(raw)}`,
+            t`home: ignoring unknown zone ${zoneName}`
+          : t`home: ignoring a zone entry with no \`zone\` name or \`html\`: ${got}`,
       );
       continue;
     }
@@ -469,7 +481,7 @@ function resolveEntries(
       // Two greetings or two tool grids reads as a bug to whoever sees the
       // page, and a repeated zone is nearly always a copy-paste slip. Keeping
       // the first leaves the author a page plus a warning naming the zone.
-      noteHomeIssue(issues, `home: ignoring a repeated "${kind}" zone`);
+      noteHomeIssue(issues, t`home: ignoring a repeated "${kind}" zone`);
       continue;
     }
     seen.add(kind);
@@ -483,7 +495,7 @@ function resolveEntries(
   if (entries.length === 0) {
     noteHomeIssue(
       issues,
-      "home: `zones` left nothing to render, using the default page",
+      t`home: \`zones\` left nothing to render, using the default page`,
     );
     return stock();
   }
@@ -513,22 +525,23 @@ function entryStrings(
 ): EntryStrings {
   const reads = ENTRY_STRING_KEYS[kind];
   const where =
-    kind === "html" ? "a custom `html` entry" : `the "${kind}" zone`;
+    kind === "html" ? t`a custom \`html\` entry` : t`the "${kind}" zone`;
   let strings: Partial<Record<EntryStringKey, string>> | undefined;
   for (const key of ENTRY_KEYS) {
     const value = entry[key];
     if (value === undefined || value === null) continue;
     if (!reads.includes(key)) {
-      noteHomeIssue(issues, `home: \`${key}\` does nothing on ${where}`);
+      noteHomeIssue(issues, t`home: \`${key}\` does nothing on ${where}`);
       continue;
     }
     // The custom entry's own markup, already lifted onto the entry by the walk
     // that had to read it to know this was a custom entry at all.
     if (key === "html") continue;
     if (typeof value !== "string") {
+      const got = showHomeValue(value);
       noteHomeIssue(
         issues,
-        `home: ignoring \`${key}\` on ${where}, expected a string, got ${showHomeValue(value)}`,
+        t`home: ignoring \`${key}\` on ${where}, expected a string, got ${got}`,
       );
       continue;
     }

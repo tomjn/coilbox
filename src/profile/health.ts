@@ -1,3 +1,4 @@
+import { plural, t } from "@lingui/core/macro";
 import type { BundleReport } from "../content/bindings";
 import { bundleProblemText } from "../content/bundle";
 import type { OnlyOwnMapsResolution } from "./onlyOwnMaps";
@@ -182,17 +183,25 @@ export function checkHideIds(
     return {
       id: "hide",
       status: "ok",
-      label: `Hide list: ${hide.length} id(s), all match a hideable feature`,
+      label: plural(hide.length, {
+        one: "Hide list: # id, which matches a hideable feature",
+        other: "Hide list: # ids, all match a hideable feature",
+      }),
       hint: renamedHint(hide),
     };
   }
+  const unmatched = unknown
+    .map((id) => t`hide id ''${id}'' matches nothing`)
+    .join("; ");
+  const hideableIds = hideable.join(", ");
   return {
     id: "hide",
     status: "warn",
-    label: `${unknown.length} hide id(s) match nothing`,
-    hint: `${unknown
-      .map((id) => `hide id '${id}' matches nothing`)
-      .join("; ")}. Hideable ids: ${hideable.join(", ")}.`,
+    label: plural(unknown.length, {
+      one: "# hide id matches nothing",
+      other: "# hide ids match nothing",
+    }),
+    hint: t`${unmatched}. Hideable ids: ${hideableIds}.`,
   };
 }
 
@@ -207,9 +216,13 @@ export function checkHideIds(
 function renamedHint(ids: string[]): string | undefined {
   const renamed = ids.filter((id) => canonicalProfileId(id) !== id);
   if (renamed.length === 0) return undefined;
-  return `${renamed
-    .map((id) => `'${id}' is now '${canonicalProfileId(id)}'`)
-    .join("; ")}. The old names still work.`;
+  const renames = renamed
+    .map((id) => {
+      const current = canonicalProfileId(id);
+      return t`''${id}'' is now ''${current}''`;
+    })
+    .join("; ");
+  return t`${renames}. The old names still work.`;
 }
 
 /**
@@ -228,17 +241,25 @@ export function checkHideSettingsIds(
     return {
       id: "hideSettings",
       status: "ok",
-      label: `Hide settings: ${hideSettings.length} id(s), all match a section`,
+      label: plural(hideSettings.length, {
+        one: "Hide settings: # id, which matches a section",
+        other: "Hide settings: # ids, all match a section",
+      }),
       hint: renamedHint(hideSettings),
     };
   }
+  const unmatched = unknown
+    .map((id) => t`hideSettings id ''${id}'' matches nothing`)
+    .join("; ");
+  const sectionIds = settingsIds.join(", ");
   return {
     id: "hideSettings",
     status: "warn",
-    label: `${unknown.length} hideSettings id(s) match nothing`,
-    hint: `${unknown
-      .map((id) => `hideSettings id '${id}' matches nothing`)
-      .join("; ")}. Section ids: ${settingsIds.join(", ")}.`,
+    label: plural(unknown.length, {
+      one: "# hideSettings id matches nothing",
+      other: "# hideSettings ids match nothing",
+    }),
+    hint: t`${unmatched}. Section ids: ${sectionIds}.`,
   };
 }
 
@@ -251,18 +272,20 @@ export function checkAppIcon(
   appIcon: HealthInputs["appIcon"],
 ): HealthCheck | null {
   if (!appIcon) return null;
+  const iconPath = appIcon.path;
+  const iconError = appIcon.error;
   if (appIcon.error === "") {
     return {
       id: "appIcon",
       status: "ok",
-      label: `App icon: ${appIcon.path}`,
+      label: t`App icon: ${iconPath}`,
     };
   }
   return {
     id: "appIcon",
     status: "warn",
-    label: "The profile's `icon` was not applied",
-    hint: `${appIcon.error}. \`icon\` is a PNG file, by its path relative to the .coilbox folder.`,
+    label: t`The profile's \`icon\` was not applied`,
+    hint: t`${iconError}. \`icon\` is a PNG file, by its path relative to the .coilbox folder.`,
   };
 }
 
@@ -282,16 +305,23 @@ export function checkLinkIcons(
     return {
       id: "linkIcons",
       status: "ok",
-      label: `Link icons: ${icons.length} set, all recognised`,
+      label: plural(icons.length, {
+        one: "Link icons: # set, and it is recognised",
+        other: "Link icons: # set, all recognised",
+      }),
     };
   }
+  const unrecognised = unknown
+    .map((n) => t`link icon ''${n}'' is unknown — falls back to a generic icon`)
+    .join("; ");
   return {
     id: "linkIcons",
     status: "warn",
-    label: `${unknown.length} link icon(s) unknown`,
-    hint: `${unknown
-      .map((n) => `link icon '${n}' is unknown — falls back to a generic icon`)
-      .join("; ")}.`,
+    label: plural(unknown.length, {
+      one: "# link icon unknown",
+      other: "# link icons unknown",
+    }),
+    hint: t`${unrecognised}.`,
   };
 }
 
@@ -313,14 +343,18 @@ export function checkLinkIcons(
  */
 export function checkHome(home: HomeHealth | null): HealthCheck | null {
   if (!home) return null;
+  const homeSummary = home.summary;
   if (home.issues.length === 0) {
-    return { id: "home", status: "ok", label: `Home page — ${home.summary}` };
+    return { id: "home", status: "ok", label: t`Home page — ${homeSummary}` };
   }
   return {
     id: "home",
     status: "warn",
-    label: `${home.issues.length} problem(s) in \`home\``,
-    hint: `Coilbox drew the page anyway: ${home.summary}. Each line below is one thing it ignored or could not read.`,
+    label: plural(home.issues.length, {
+      one: "# problem in `home`",
+      other: "# problems in `home`",
+    }),
+    hint: t`Coilbox drew the page anyway: ${homeSummary}. Each line below is one thing it ignored or could not read.`,
     detail: home.issues.join("\n"),
   };
 }
@@ -337,24 +371,28 @@ export function checkHome(home: HomeHealth | null): HealthCheck | null {
 export function checkStart(start: StartResolution): HealthCheck | null {
   if (start.status === "none") return null;
   if (start.status === "ok") {
+    const missionTitle = start.mission.title;
+    const campaignTitle = start.campaign.title;
     return {
       id: "start",
       status: "ok",
-      label: `Start: '${start.mission.title}' in campaign '${start.campaign.title}'`,
+      label: t`Start: ''${missionTitle}'' in campaign ''${campaignTitle}''`,
     };
   }
   if (start.status === "scenario") {
+    const scenarioName = start.scenario.name;
     return {
       id: "start",
       status: "ok",
-      label: `Start: scenario '${start.scenario.name}'`,
+      label: t`Start: scenario ''${scenarioName}''`,
     };
   }
+  const startIssue = start.issue;
   return {
     id: "start",
     status: "warn",
-    label: "`start` names nothing playable",
-    hint: `The home page shows no start card: ${start.issue}.`,
+    label: t`\`start\` names nothing playable`,
+    hint: t`The home page shows no start card: ${startIssue}.`,
   };
 }
 
@@ -376,15 +414,16 @@ export function checkOnlyOwnMaps(
     return {
       id: "onlyOwnMaps",
       status: "ok",
-      label: "Only own maps: generated map styles are hidden",
-      hint: "A game with no hand-made map to offer keeps them, so there is always something to pick.",
+      label: t`Only own maps: generated map styles are hidden`,
+      hint: t`A game with no hand-made map to offer keeps them, so there is always something to pick.`,
     };
   }
+  const mapsIssue = onlyOwnMaps.issue;
   return {
     id: "onlyOwnMaps",
     status: "warn",
-    label: "`onlyOwnMaps` is not true or false",
-    hint: `The generated map styles stay on: ${onlyOwnMaps.issue}.`,
+    label: t`\`onlyOwnMaps\` is not true or false`,
+    hint: t`The generated map styles stay on: ${mapsIssue}.`,
   };
 }
 
@@ -400,33 +439,38 @@ export function checkOnlyOwnMaps(
 export function checkBundle(bundle: BundleReport | null): HealthCheck | null {
   if (!bundle) return null;
   const forHere = bundle.engines.filter((e) => e.forThisPlatform);
+  const engineVersions = forHere.map((e) => e.version).join(", ");
   const engineText =
     forHere.length > 0
-      ? `engine ${forHere.map((e) => e.version).join(", ")}`
-      : "no engine for this platform";
-  const summary = `${bundle.games} game(s), ${bundle.maps} map(s), ${engineText}`;
+      ? t`engine ${engineVersions}`
+      : t`no engine for this platform`;
+  const gameCount = bundle.games;
+  const mapCount = bundle.maps;
+  const summary = t`${gameCount} game(s), ${mapCount} map(s), ${engineText}`;
+  const bundlePath = bundle.path;
   const lines = bundle.problems.map(bundleProblemText);
   // No engine at all is not a mistake the Rust side reports, because a bundle
   // may carry only games and maps on purpose. It still costs the player a
   // download, so the author is told.
   if (bundle.engines.length === 0 && bundle.problems.length === 0) {
     lines.push(
-      "There is no engine in engine/, so players download one on first run. Copy engine/<platform>/<version>/ from a working install to bundle it.",
+      t`There is no engine in engine/, so players download one on first run. Copy engine/<platform>/<version>/ from a working install to bundle it.`,
     );
   }
   if (lines.length === 0) {
     return {
       id: "bundle",
       status: "ok",
-      label: `Bundled content: ${summary}`,
-      hint: `Read in place from ${bundle.path}. Only the engine is copied, once, into the download folder.`,
+      label: t`Bundled content: ${summary}`,
+      hint: t`Read in place from ${bundlePath}. Only the engine is copied, once, into the download folder.`,
     };
   }
+  const problemCount = lines.length;
   return {
     id: "bundle",
     status: "warn",
-    label: `${lines.length} problem(s) in the bundled content`,
-    hint: `${bundle.path} has ${summary}. Each line below is one thing to fix.`,
+    label: t`${problemCount} problem(s) in the bundled content`,
+    hint: t`${bundlePath} has ${summary}. Each line below is one thing to fix.`,
     detail: lines.join("\n"),
   };
 }
@@ -452,22 +496,23 @@ export function checkBundleStart(
     return {
       id: "bundleStart",
       status: "unknown",
-      label: "Start game and map not checked against the bundle",
-      hint: "Nothing has scanned the content folders yet. Let the scan finish, then re-run this.",
+      label: t`Start game and map not checked against the bundle`,
+      hint: t`Nothing has scanned the content folders yet. Let the scan finish, then re-run this.`,
     };
   }
   if (missing.length === 0) {
     return {
       id: "bundleStart",
       status: "ok",
-      label: "The start's game and map are installed",
+      label: t`The start's game and map are installed`,
     };
   }
+  const missingNames = missing.join(" and ");
   return {
     id: "bundleStart",
     status: "warn",
-    label: "`start` needs content the bundle does not carry",
-    hint: `A new player is asked to download ${missing.join(" and ")} before the first lesson. Copy it into .coilbox/content/games/ or .coilbox/content/maps/.`,
+    label: t`\`start\` needs content the bundle does not carry`,
+    hint: t`A new player is asked to download ${missingNames} before the first lesson. Copy it into .coilbox/content/games/ or .coilbox/content/maps/.`,
   };
 }
 
@@ -481,18 +526,17 @@ export function checkBundleStart(
  */
 function loadFailureCheck(
   id: string,
-  noun: string,
-  where: string,
+  labels: { allLoaded: string; failed: string; hint: string },
   failures: LoadFailure[],
 ): HealthCheck {
   if (failures.length === 0) {
-    return { id, status: "ok", label: `All ${noun}s loaded` };
+    return { id, status: "ok", label: labels.allLoaded };
   }
   return {
     id,
     status: "warn",
-    label: `${failures.length} ${noun}(s) failed to load`,
-    hint: `Fix the JSON in ${where}:`,
+    label: labels.failed,
+    hint: labels.hint,
     detail: failures
       .map((f) => `${f.name} [${f.source}]: ${f.error}`)
       .join("\n"),
@@ -501,6 +545,8 @@ function loadFailureCheck(
 
 export function deriveHealthChecks(i: HealthInputs): HealthCheck[] {
   const portable = i.portableRoot !== "";
+  const portableRoot = i.portableRoot;
+  const scanError = i.scanError ?? "";
   const checks: HealthCheck[] = [];
 
   // 1. Portable mode
@@ -509,21 +555,22 @@ export function deriveHealthChecks(i: HealthInputs): HealthCheck[] {
       ? {
           id: "portable",
           status: "ok",
-          label: `Portable mode active — ${i.portableRoot}`,
+          label: t`Portable mode active — ${portableRoot}`,
         }
       : {
           id: "portable",
           status: "unknown",
-          label: "Not portable (standard per-user install)",
+          label: t`Not portable (standard per-user install)`,
         },
   );
 
   // 2. Profile source / parse error
+  const profileSource = i.profileSource;
   if (i.profileError && i.profileSource === "file") {
     checks.push({
       id: "profile",
       status: "error",
-      label: "profile.json failed to parse",
+      label: t`profile.json failed to parse`,
       hint: i.profileError,
       detail: i.profileErrorSnippet ?? undefined,
     });
@@ -531,7 +578,7 @@ export function deriveHealthChecks(i: HealthInputs): HealthCheck[] {
     checks.push({
       id: "profile",
       status: "error",
-      label: "Profile failed to load",
+      label: t`Profile failed to load`,
       hint: i.profileError,
     });
   } else {
@@ -540,8 +587,8 @@ export function deriveHealthChecks(i: HealthInputs): HealthCheck[] {
       status: i.profileSource === "default" ? "unknown" : "ok",
       label:
         i.profileSource === "default"
-          ? "No distribution profile loaded"
-          : `Profile loaded from ${i.profileSource}`,
+          ? t`No distribution profile loaded`
+          : t`Profile loaded from ${profileSource}`,
     });
   }
 
@@ -550,19 +597,20 @@ export function deriveHealthChecks(i: HealthInputs): HealthCheck[] {
     checks.push({
       id: "roots",
       status: "warn",
-      label: "No content folders configured",
-      hint: "Add a Content Folder so Coilbox can find the game.",
+      label: t`No content folders configured`,
+      hint: t`Add a Content Folder so Coilbox can find the game.`,
     });
   } else {
     const portableRoots = i.roots.filter((r) => r.portable).length;
-    const label = `${i.roots.length} content folder(s), ${portableRoots} portable`;
+    const rootCount = i.roots.length;
+    const label = t`${rootCount} content folder(s), ${portableRoots} portable`;
     checks.push(
       portable && portableRoots === 0
         ? {
             id: "roots",
             status: "warn",
             label,
-            hint: "No content folder is portable — nothing would ship with the package. Tick Portable on the bundled folder.",
+            hint: t`No content folder is portable — nothing would ship with the package. Tick Portable on the bundled folder.`,
           }
         : { id: "roots", status: "ok", label },
     );
@@ -573,16 +621,16 @@ export function deriveHealthChecks(i: HealthInputs): HealthCheck[] {
     checks.push({
       id: "gameFilter",
       status: "unknown",
-      label: "No game filter set",
+      label: t`No game filter set`,
     });
   } else if (i.installedGames === null) {
     checks.push({
       id: "gameFilter",
       status: "unknown",
-      label: "Game filter not checked against anything",
+      label: t`Game filter not checked against anything`,
       hint: i.scanError
-        ? `The games scan failed, so there is nothing to match the filter against. unitsync said: ${i.scanError}`
-        : "Nothing has scanned the content folders for games yet, so there is nothing to match the filter against. Install an engine, or open Content > Games and let the scan finish, then re-run this.",
+        ? t`The games scan failed, so there is nothing to match the filter against. unitsync said: ${scanError}`
+        : t`Nothing has scanned the content folders for games yet, so there is nothing to match the filter against. Install an engine, or open Content > Games and let the scan finish, then re-run this.`,
     });
   } else {
     const { count, regexError } = countFilterMatches(
@@ -593,25 +641,34 @@ export function deriveHealthChecks(i: HealthInputs): HealthCheck[] {
       checks.push({
         id: "gameFilter",
         status: "error",
-        label: "Game filter regex is invalid",
-        hint: `Invalid regex: ${regexError}`,
+        label: t`Game filter regex is invalid`,
+        hint: t`Invalid regex: ${regexError}`,
       });
     } else {
       const installed = i.installedGames;
-      const filterDesc = i.gameFilter.regex
-        ? `regex /${i.gameFilter.regex}/i`
-        : `names [${i.gameFilter.names?.join(", ")}]`;
+      const filterRegex = i.gameFilter.regex;
+      const filterNames = i.gameFilter.names?.join(", ") ?? "";
+      const filterDesc = filterRegex
+        ? t`regex /${filterRegex}/i`
+        : t`names [${filterNames}]`;
       const sample = installed.slice(0, 8).join(", ");
       const more = installed.length > 8 ? ", …" : "";
+      const installedCount = installed.length;
       checks.push({
         id: "gameFilter",
         status: count === 0 ? "warn" : "ok",
-        label: `Game filter matches ${count} installed game(s)`,
+        label: plural(count, {
+          one: "Game filter matches # installed game",
+          other: "Game filter matches # installed games",
+        }),
         hint:
           count === 0
             ? installed.length
-              ? `Filter (${filterDesc}) matched none of the ${installed.length} installed game(s): ${sample}${more}. Adjust it to match one of these.`
-              : `Filter (${filterDesc}) has nothing to match yet — no games are installed. Install the game, or check the filter.`
+              ? plural(installedCount, {
+                  one: `Filter (${filterDesc}) matched none of the # installed game: ${sample}${more}. Adjust it to match one of these.`,
+                  other: `Filter (${filterDesc}) matched none of the # installed games: ${sample}${more}. Adjust it to match one of these.`,
+                })
+              : t`Filter (${filterDesc}) has nothing to match yet — no games are installed. Install the game, or check the filter.`
             : undefined,
       });
     }
@@ -622,16 +679,17 @@ export function deriveHealthChecks(i: HealthInputs): HealthCheck[] {
     checks.push({
       id: "writeRoot",
       status: "unknown",
-      label: "Write root portability n/a (not portable)",
+      label: t`Write root portability n/a (not portable)`,
     });
   } else if (i.writeRootPath === undefined) {
     checks.push({
       id: "writeRoot",
       status: "unknown",
-      label: "No download write root set",
+      label: t`No download write root set`,
     });
   } else {
     const appDir = appDirOf(i.portableRoot);
+    const writeRootPath = i.writeRootPath;
     const inside =
       i.writeRootPath === appDir ||
       i.writeRootPath.startsWith(`${appDir}/`) ||
@@ -641,29 +699,37 @@ export function deriveHealthChecks(i: HealthInputs): HealthCheck[] {
         ? {
             id: "writeRoot",
             status: "ok",
-            label: "Download write root is inside the package",
+            label: t`Download write root is inside the package`,
           }
         : {
             id: "writeRoot",
             status: "warn",
-            label: "Download write root is outside the package",
-            hint: `Write root "${i.writeRootPath}" is outside the package ("${appDir}"). Downloads and release updates would land there, not with the package. Point the write root at a folder under the package.`,
+            label: t`Download write root is outside the package`,
+            hint: t`Write root "${writeRootPath}" is outside the package ("${appDir}"). Downloads and release updates would land there, not with the package. Point the write root at a folder under the package.`,
           },
     );
   }
 
   // 6. Bundled campaign and scenario load errors
+  const campaignFailureCount = i.campaignFailures.length;
+  const scenarioFailureCount = i.scenarioFailures.length;
   checks.push(
     loadFailureCheck(
       "campaigns",
-      "campaign",
-      ".coilbox/campaigns/ (bundled) or the app data campaigns folder (local)",
+      {
+        allLoaded: t`All campaigns loaded`,
+        failed: t`${campaignFailureCount} campaign(s) failed to load`,
+        hint: t`Fix the JSON in .coilbox/campaigns/ (bundled) or the app data campaigns folder (local):`,
+      },
       i.campaignFailures,
     ),
     loadFailureCheck(
       "scenarios",
-      "scenario",
-      ".coilbox/scenarios/ (bundled) or the app data scenarios folder (local)",
+      {
+        allLoaded: t`All scenarios loaded`,
+        failed: t`${scenarioFailureCount} scenario(s) failed to load`,
+        hint: t`Fix the JSON in .coilbox/scenarios/ (bundled) or the app data scenarios folder (local):`,
+      },
       i.scenarioFailures,
     ),
   );
@@ -672,15 +738,17 @@ export function deriveHealthChecks(i: HealthInputs): HealthCheck[] {
   {
     const engines = i.roots.reduce((n, r) => n + r.engineCount, 0);
     const games = i.installedGames?.length ?? 0;
+    const scanRootCount = i.roots.length;
+    const scanRootPaths = i.roots.map((r) => r.path).join(", ");
     const scanned = i.roots.length
-      ? `Scanned ${i.roots.length} content folder(s): ${i.roots.map((r) => r.path).join(", ")}.`
-      : "No content folders are configured to scan.";
+      ? t`Scanned ${scanRootCount} content folder(s): ${scanRootPaths}.`
+      : t`No content folders are configured to scan.`;
     if (engines === 0) {
       checks.push({
         id: "content",
         status: "warn",
-        label: "No engine found",
-        hint: `Install or bundle an engine — the game can't launch without one. ${scanned}`,
+        label: t`No engine found`,
+        hint: t`Install or bundle an engine — the game can't launch without one. ${scanned}`,
       });
     } else if (i.installedGames === null) {
       // An engine is there but no scan has answered. Counting the files in
@@ -690,24 +758,24 @@ export function deriveHealthChecks(i: HealthInputs): HealthCheck[] {
         id: "content",
         status: "unknown",
         label: i.scanError
-          ? `${engines} engine(s) found, games scan failed`
-          : `${engines} engine(s) found, games not scanned yet`,
+          ? t`${engines} engine(s) found, games scan failed`
+          : t`${engines} engine(s) found, games not scanned yet`,
         hint: i.scanError
-          ? `The games scan failed, so it is not known what is installed. unitsync said: ${i.scanError} ${scanned}`
-          : `Nothing has scanned for games yet. Open Content > Games and let the scan finish, then re-run this. ${scanned}`,
+          ? t`The games scan failed, so it is not known what is installed. unitsync said: ${scanError} ${scanned}`
+          : t`Nothing has scanned for games yet. Open Content > Games and let the scan finish, then re-run this. ${scanned}`,
       });
     } else if (games === 0) {
       checks.push({
         id: "content",
         status: "warn",
-        label: "No games found",
-        hint: `Bundle or download the game archive (.sdz/.sd7). ${scanned}`,
+        label: t`No games found`,
+        hint: t`Bundle or download the game archive (.sdz/.sd7). ${scanned}`,
       });
     } else {
       checks.push({
         id: "content",
         status: "ok",
-        label: `${engines} engine(s), ${games} game(s) found`,
+        label: t`${engines} engine(s), ${games} game(s) found`,
       });
     }
   }
@@ -724,22 +792,23 @@ export function deriveHealthChecks(i: HealthInputs): HealthCheck[] {
       checks.push({
         id: "writable",
         status: "unknown",
-        label: "Folder writability not checked",
+        label: t`Folder writability not checked`,
       });
     } else {
       const bad = probes.find((p) => !p.writable);
+      const badReason = bad?.error ?? t`not writable`;
       checks.push(
         bad
           ? {
               id: "writable",
               status: "error",
-              label: "A folder is read-only",
-              hint: `Downloads and updates will fail — the folder is read-only (${bad.error ?? "not writable"}). Move the package somewhere writable — not a mounted disk image or a protected system folder.`,
+              label: t`A folder is read-only`,
+              hint: t`Downloads and updates will fail — the folder is read-only (${badReason}). Move the package somewhere writable — not a mounted disk image or a protected system folder.`,
             }
           : {
               id: "writable",
               status: "ok",
-              label: "Download + data folders are writable",
+              label: t`Download + data folders are writable`,
             },
       );
     }

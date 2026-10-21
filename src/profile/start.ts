@@ -1,3 +1,4 @@
+import { t } from "@lingui/core/macro";
 import type { Campaign, CampaignMission } from "../campaign/model";
 import { isSetUp } from "../scenario/listing";
 import type { Scenario } from "../scenario/model";
@@ -76,42 +77,47 @@ export function resolveStart(
   ) {
     return {
       status: "problem",
-      issue:
-        "`start` must be an object with a `campaign` id or a `scenario` id",
+      issue: t`\`start\` must be an object with a \`campaign\` id or a \`scenario\` id`,
     };
   }
   if (start.mission !== undefined && typeof start.mission !== "string") {
-    return { status: "problem", issue: "`start.mission` must be a mission id" };
+    return {
+      status: "problem",
+      issue: t`\`start.mission\` must be a mission id`,
+    };
   }
-  const found = campaigns.find((c) => c.campaign.id === start.campaign);
+  const campaignId = start.campaign;
+  const found = campaigns.find((c) => c.campaign.id === campaignId);
   if (!found) {
     return {
       status: "problem",
-      issue: `start campaign '${start.campaign}' is not bundled. Put its export in .coilbox/campaigns/ and use the \`id\` from that file`,
+      issue: t`start campaign ''${campaignId}'' is not bundled. Put its export in .coilbox/campaigns/ and use the \`id\` from that file`,
     };
   }
   if (found.source !== "bundled") {
     return {
       status: "problem",
-      issue: `start campaign '${start.campaign}' is a local campaign, not a bundled one. Players will not have it until its export is in .coilbox/campaigns/`,
+      issue: t`start campaign ''${campaignId}'' is a local campaign, not a bundled one. Players will not have it until its export is in .coilbox/campaigns/`,
     };
   }
   const { campaign } = found;
+  const campaignTitle = campaign.title;
   if (start.mission === undefined) {
     const first = campaign.missions[0];
     if (!first) {
       return {
         status: "problem",
-        issue: `start campaign '${campaign.title}' has no missions`,
+        issue: t`start campaign ''${campaignTitle}'' has no missions`,
       };
     }
     return { status: "ok", campaign, mission: first };
   }
-  const mission = campaign.missions.find((m) => m.id === start.mission);
+  const missionId = start.mission;
+  const mission = campaign.missions.find((m) => m.id === missionId);
   if (!mission) {
     return {
       status: "problem",
-      issue: `start mission '${start.mission}' is not in campaign '${campaign.title}'`,
+      issue: t`start mission ''${missionId}'' is not in campaign ''${campaignTitle}''`,
     };
   }
   return { status: "ok", campaign, mission };
@@ -125,21 +131,20 @@ function resolveStartScenario(
   if (start.campaign !== undefined) {
     return {
       status: "problem",
-      issue:
-        "`start` names both a `campaign` and a `scenario`. Keep one of them",
+      issue: t`\`start\` names both a \`campaign\` and a \`scenario\`. Keep one of them`,
     };
   }
   if (start.mission !== undefined) {
     return {
       status: "problem",
-      issue: "`start.mission` goes with `campaign`, not with `scenario`",
+      issue: t`\`start.mission\` goes with \`campaign\`, not with \`scenario\``,
     };
   }
   const id = start.scenario;
   if (typeof id !== "string" || id === "") {
     return {
       status: "problem",
-      issue: "`start.scenario` must be a scenario id",
+      issue: t`\`start.scenario\` must be a scenario id`,
     };
   }
   const named = scenarios.filter((s) => s.scenario.id === id);
@@ -149,14 +154,15 @@ function resolveStartScenario(
       status: "problem",
       issue:
         named.length > 0
-          ? `start scenario '${id}' is not a bundled one. Players will not have it until its export is in .coilbox/scenarios/`
-          : `start scenario '${id}' is not bundled. Put its export in .coilbox/scenarios/ and use the \`id\` from that file`,
+          ? t`start scenario ''${id}'' is not a bundled one. Players will not have it until its export is in .coilbox/scenarios/`
+          : t`start scenario ''${id}'' is not bundled. Put its export in .coilbox/scenarios/ and use the \`id\` from that file`,
     };
   }
   if (!isSetUp(found.scenario)) {
+    const scenarioName = found.scenario.name;
     return {
       status: "problem",
-      issue: `start scenario '${found.scenario.name}' names no game and map, so there is nothing to play`,
+      issue: t`start scenario ''${scenarioName}'' names no game and map, so there is nothing to play`,
     };
   }
   return { status: "scenario", scenario: found.scenario };

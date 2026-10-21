@@ -1,3 +1,4 @@
+import { Trans } from "@lingui/react/macro";
 import { Button } from "@picoframe/frame";
 import { type ComponentProps, type ReactNode, useState } from "react";
 import {
@@ -77,7 +78,7 @@ export function ConfirmPopover({
             disabled={busy}
             onClick={() => setOpen(false)}
           >
-            Cancel
+            <Trans>Cancel</Trans>
           </Button>
           <Button
             type="button"

@@ -1,3 +1,5 @@
+import { plural } from "@lingui/core/macro";
+import { Trans, useLingui } from "@lingui/react/macro";
 import { Button, useTheme } from "@picoframe/frame";
 import { relaunch } from "@tauri-apps/plugin-process";
 import {
@@ -34,6 +36,7 @@ import {
  * Reflects the profile loaded once at startup; nothing here is editable.
  */
 export default function ProfileSettings() {
+  const { t } = useLingui();
   const profile = getProfile();
   const source = getProfileSource();
   const loaded = source !== "default";
@@ -43,7 +46,7 @@ export default function ProfileSettings() {
       <div className="space-y-8">
         <Header />
         <p className="text-sm text-muted-foreground">
-          No distribution profile loaded — standard Coilbox.
+          <Trans>No distribution profile loaded — standard Coilbox.</Trans>
         </p>
         <ProfileValidation />
         <ProfileAuthoring />
@@ -63,49 +66,56 @@ export default function ProfileSettings() {
   // profile with no `home` key says so in one word, like the welcome row above.
   const homeSummary = profile.home
     ? describeHome(resolveHome(profile.home))
-    : "Default";
+    : t`Default`;
+  const userChoice = t`User choice`;
+  const none = t`None`;
+  const themeSummary = themeCount
+    ? plural(themeCount, { one: "# variable", other: "# variables" })
+    : none;
 
   return (
     <div className="space-y-8">
       <Header />
       <section className="space-y-3">
         <p className="text-sm text-muted-foreground">
-          A distribution profile is active (loaded from{" "}
-          <span className="font-medium text-foreground">{source}</span>). It
-          reskins and narrows this build:
+          <Trans>
+            A distribution profile is active (loaded from{" "}
+            <span className="font-medium text-foreground">{source}</span>). It
+            reskins and narrows this build:
+          </Trans>
         </p>
         <dl className="divide-y divide-border rounded-md border border-border text-sm">
-          <Row label="Title" value={profile.title ?? "Coilbox"} />
-          <Row label="Colour scheme" value={profile.mode ?? "User choice"} />
-          <Row label="Accent" value={profile.accent ?? "User choice"} />
+          <Row label={t`Title`} value={profile.title ?? "Coilbox"} />
+          <Row label={t`Colour scheme`} value={profile.mode ?? userChoice} />
+          <Row label={t`Accent`} value={profile.accent ?? userChoice} />
           <Row
-            label="Hidden features"
-            value={hidden.length ? hidden.join(", ") : "None"}
+            label={t`Hidden features`}
+            value={hidden.length ? hidden.join(", ") : none}
           />
           <Row
-            label="Hidden settings"
-            value={hiddenSettings.length ? hiddenSettings.join(", ") : "None"}
+            label={t`Hidden settings`}
+            value={hiddenSettings.length ? hiddenSettings.join(", ") : none}
           />
-          <Row label="Game filter" value={filterText ?? "None"} />
-          <Row label="Update repo" value={profile.release?.repo ?? "None"} />
+          <Row label={t`Game filter`} value={filterText ?? none} />
+          <Row label={t`Update repo`} value={profile.release?.repo ?? none} />
           <Row
-            label="Coilbox updates"
-            value={profile.updater === false ? "Off" : "On"}
+            label={t`Coilbox updates`}
+            value={profile.updater === false ? t`Off` : t`On`}
           />
           <Row
-            label="Authoring tools"
-            value={profile.authoring === false ? "Off" : "On"}
+            label={t`Authoring tools`}
+            value={profile.authoring === false ? t`Off` : t`On`}
           />
-          <Row label="Quit button" value={profile.quit ? "Shown" : "Hidden"} />
           <Row
-            label="Welcome screen"
-            value={profile.welcome ? "Custom" : "Default"}
+            label={t`Quit button`}
+            value={profile.quit ? t`Shown` : t`Hidden`}
           />
-          <Row label="Home page" value={homeSummary} />
           <Row
-            label="Theme overrides"
-            value={themeCount ? `${themeCount} variable(s)` : "None"}
+            label={t`Welcome screen`}
+            value={profile.welcome ? t`Custom` : t`Default`}
           />
+          <Row label={t`Home page`} value={homeSummary} />
+          <Row label={t`Theme overrides`} value={themeSummary} />
         </dl>
       </section>
       <ProfileValidation />
@@ -124,6 +134,7 @@ export default function ProfileSettings() {
  * each click (via the `run` key) re-runs it, so it doubles as a manual refresh.
  */
 function ProfileValidation() {
+  const { t } = useLingui();
   const [run, setRun] = useState(0);
   return (
     <section className="space-y-3">
@@ -135,7 +146,7 @@ function ProfileValidation() {
         onClick={() => setRun((n) => n + 1)}
       >
         <ClipboardCheck size={15} aria-hidden />
-        {run === 0 ? "Validate profile" : "Re-run validation"}
+        {run === 0 ? t`Validate profile` : t`Re-run validation`}
       </Button>
       {run > 0 && <HealthChecklist key={run} />}
     </section>
@@ -152,6 +163,7 @@ function ProfileValidation() {
  * shipped distribution doesn't hand players a way to reload or replace its branding.
  */
 function ProfileAuthoring() {
+  const { t } = useLingui();
   const { mode, accent } = useTheme();
   const [advanced] = useAdvancedModeSetting();
   const [fullscreen] = useFullscreenSetting();
@@ -175,8 +187,9 @@ function ProfileAuthoring() {
       // A failed scan has no games to seed the filter from, and an empty list
       // would write a profile that says none are installed.
       if (scan.error) {
+        const scanError = scan.error;
         throw new Error(
-          `The content scan failed, so the profile could not be seeded with the installed games. unitsync said: ${scan.error}`,
+          t`The content scan failed, so the profile could not be seeded with the installed games. unitsync said: ${scanError}`,
         );
       }
       const installedGames = installedGameNames(scan.data?.games ?? []);
@@ -199,12 +212,12 @@ function ProfileAuthoring() {
   return (
     <section className="space-y-3">
       <h3 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
-        Authoring
+        <Trans>Authoring</Trans>
       </h3>
       <p className="text-sm text-muted-foreground">
         {loaded
-          ? "Reload re-reads .coilbox/profile.json and applies it to this window, so editing a profile does not need an app restart. You stay on this page, but anything in progress elsewhere resets."
-          : "Start a distribution profile from how Coilbox is set up right now. It is written to .coilbox/profile.json beside the app, and never overwrites a profile that is already there."}
+          ? t`Reload re-reads .coilbox/profile.json and applies it to this window, so editing a profile does not need an app restart. You stay on this page, but anything in progress elsewhere resets.`
+          : t`Start a distribution profile from how Coilbox is set up right now. It is written to .coilbox/profile.json beside the app, and never overwrites a profile that is already there.`}
       </p>
       <div className="flex flex-wrap gap-2">
         {loaded ? (
@@ -216,7 +229,7 @@ function ProfileAuthoring() {
             onClick={reloadProfile}
           >
             <RefreshCw size={15} aria-hidden />
-            Reload profile
+            <Trans>Reload profile</Trans>
           </Button>
         ) : (
           <Button
@@ -232,7 +245,7 @@ function ProfileAuthoring() {
             ) : (
               <FilePlus2 size={15} aria-hidden />
             )}
-            Create profile.json
+            <Trans>Create profile.json</Trans>
           </Button>
         )}
       </div>
@@ -241,16 +254,20 @@ function ProfileAuthoring() {
         (result.written ? (
           <div className="space-y-2">
             <p className="text-sm">
-              Wrote <Path value={result.path} />. Restart Coilbox to load it.
+              <Trans>
+                Wrote <Path value={result.path} />. Restart Coilbox to load it.
+              </Trans>
             </p>
             <Button type="button" size="sm" onClick={() => relaunch()}>
-              Restart Coilbox
+              <Trans>Restart Coilbox</Trans>
             </Button>
           </div>
         ) : (
           <p className="text-sm">
-            A profile is already there: <Path value={result.path} />. Edit that
-            file, then restart Coilbox to pick it up.
+            <Trans>
+              A profile is already there: <Path value={result.path} />. Edit
+              that file, then restart Coilbox to pick it up.
+            </Trans>
           </p>
         ))}
     </section>
@@ -264,7 +281,7 @@ function Path({ value }: { value: string }) {
 function Header() {
   return (
     <h2 className="flex items-center gap-2 text-sm font-semibold uppercase tracking-wide text-muted-foreground">
-      <Package size={15} /> Distribution profile
+      <Package size={15} /> <Trans>Distribution profile</Trans>
     </h2>
   );
 }

@@ -1,3 +1,4 @@
+import { useLingui } from "@lingui/react/macro";
 import { cn } from "@/lib/utils";
 
 /**
@@ -15,11 +16,16 @@ export const CONTINUE_BADGE_CLASS =
 /** The inert form: a badge sitting inside a row that's already clickable
  * (e.g. a card whose own link already opens the right thing to resume). */
 export function ContinueBadge({
-  label = "Continue",
+  label,
   className,
 }: {
   label?: string;
   className?: string;
 }) {
-  return <span className={cn(CONTINUE_BADGE_CLASS, className)}>{label}</span>;
+  const { t } = useLingui();
+  return (
+    <span className={cn(CONTINUE_BADGE_CLASS, className)}>
+      {label ?? t`Continue`}
+    </span>
+  );
 }

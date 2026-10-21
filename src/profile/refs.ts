@@ -1,3 +1,4 @@
+import { t } from "@lingui/core/macro";
 import { defineCommand } from "@picoframe/plugin-sdk";
 
 /**
@@ -113,10 +114,11 @@ export async function resolveFileRef(
 ): Promise<{ text: string; error?: string }> {
   if (!value.trim().startsWith("@")) return { text: value };
   const ref = parseRef(value);
+  const reference = value.trim();
   if (ref?.kind !== "file") {
-    return { text: "", error: `Invalid file reference: ${value.trim()}` };
+    return { text: "", error: t`Invalid file reference: ${reference}` };
   }
   const { text, ok } = await read(ref.path);
-  if (!ok) return { text: "", error: `Could not read ${value.trim()}` };
+  if (!ok) return { text: "", error: t`Could not read ${reference}` };
   return { text };
 }
