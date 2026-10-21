@@ -1429,6 +1429,10 @@ msgstr "{missingCount} of this model's textures are not in {archive}, so those f
 msgid "{missingTextureFaces} faces are flat because their tile is missing."
 msgstr "{missingTextureFaces} faces are flat because their tile is missing."
 
+#: src/hub/api.ts
+msgid "{mode, select, conquest {Conquest challenge} warpath {Warpath challenge} other {{label} challenge}}"
+msgstr "{mode, select, conquest {Conquest challenge} warpath {Warpath challenge} other {{label} challenge}}"
+
 #: src/content/pages/GameDetailPage.tsx
 msgid "{models, plural, one {# legacy model} other {# legacy models}}"
 msgstr "{models, plural, one {# legacy model} other {# legacy models}}"
@@ -2670,6 +2674,10 @@ msgstr "A bit mask matched against the mask the game's Lua has painted on each m
 #: src/hub/removePlan.ts
 msgid "A campaign mission plays this scenario. The mission keeps playing, because it carries its own copy."
 msgstr "A campaign mission plays this scenario. The mission keeps playing, because it carries its own copy."
+
+#: src/container/names.ts
+msgid "a campaign, a singleplayer preset, a challenge, a setup pack, a scenario, a keymap, a base blueprint, a unit tweak project or a unit builder module"
+msgstr "a campaign, a singleplayer preset, a challenge, a setup pack, a scenario, a keymap, a base blueprint, a unit tweak project or a unit builder module"
 
 #: src/content/unitFieldNotes.ts
 msgid "A character: b box, e ellipsoid, c cylinder, s sphere."
@@ -3940,6 +3948,22 @@ msgstr "Ballistic height range bonus"
 msgid "Banks into turns"
 msgstr "Banks into turns"
 
+#: src/container/names.ts
+msgid "base blueprint"
+msgstr "base blueprint"
+
+#: src/hub/api.ts
+msgid "Base blueprint"
+msgstr "Base blueprint"
+
+#: src/container/names.ts
+msgid "base blueprints"
+msgstr "base blueprints"
+
+#: src/hub/api.ts
+msgid "Base blueprints"
+msgstr "Base blueprints"
+
 #: src/i18n/frameStrings.ts
 msgid "Base color"
 msgstr "Base color"
@@ -4434,6 +4458,10 @@ msgstr "Camera mode, edge scrolling and the mouse."
 msgid "Camera shake strength"
 msgstr "Camera shake strength"
 
+#: src/container/names.ts
+msgid "campaign"
+msgstr "campaign"
+
 #: src/content/pages/ReplaysPage.tsx
 #: src/home/continue.ts
 msgid "Campaign"
@@ -4447,6 +4475,10 @@ msgstr "Campaign Builder"
 #: src/play/PlayProvider.tsx
 msgid "Campaign mission"
 msgstr "Campaign mission"
+
+#: src/container/names.ts
+msgid "campaigns"
+msgstr "campaigns"
 
 #: src/campaign/index.ts
 msgid "Campaigns"
@@ -4661,6 +4693,22 @@ msgstr "Categories"
 #: src/content/achievements.ts
 msgid "Centurion"
 msgstr "Centurion"
+
+#: src/container/names.ts
+msgid "challenge"
+msgstr "challenge"
+
+#: src/hub/api.ts
+msgid "Challenge"
+msgstr "Challenge"
+
+#: src/container/names.ts
+msgid "challenges"
+msgstr "challenges"
+
+#: src/hub/api.ts
+msgid "Challenges"
+msgstr "Challenges"
 
 #: src/content/unitFieldNotes.ts
 msgid "Chance of setting static map features alight on impact."
@@ -9276,6 +9324,14 @@ msgstr "keybinds"
 #: src/content/index.ts
 msgid "Keybinds"
 msgstr "Keybinds"
+
+#: src/container/names.ts
+msgid "keymap"
+msgstr "keymap"
+
+#: src/container/names.ts
+msgid "keymaps"
+msgstr "keymaps"
 
 #: src/content/pages/components/ReplayPlaybackBar.tsx
 msgid "Kills"
@@ -14553,6 +14609,11 @@ msgstr "Scar starting opacity"
 msgid "Scar surface-angle cutoff"
 msgstr "Scar surface-angle cutoff"
 
+#: src/container/names.ts
+msgid "scenario"
+msgstr "scenario"
+
+#: src/hub/api.ts
 #: src/runlite/pages/components/EncounterOverlay.tsx
 #: src/scenario/index.ts
 msgid "Scenario"
@@ -14562,6 +14623,11 @@ msgstr "Scenario"
 msgid "Scenario Builder"
 msgstr "Scenario Builder"
 
+#: src/container/names.ts
+msgid "scenarios"
+msgstr "scenarios"
+
+#: src/hub/api.ts
 #: src/scenario/index.ts
 msgid "Scenarios"
 msgstr "Scenarios"
@@ -15047,9 +15113,25 @@ msgstr "Settings"
 msgid "Settings profiles"
 msgstr "Settings profiles"
 
+#: src/container/names.ts
+msgid "setup pack"
+msgstr "setup pack"
+
+#: src/hub/api.ts
+msgid "Setup pack"
+msgstr "Setup pack"
+
 #: src/packs/pages/components/ImportPackForm.tsx
 msgid "Setup pack imported"
 msgstr "Setup pack imported"
+
+#: src/container/names.ts
+msgid "setup packs"
+msgstr "setup packs"
+
+#: src/hub/api.ts
+msgid "Setup packs"
+msgstr "Setup packs"
 
 #: src/content/pages/components/ReplayTimeWindowControl.tsx
 msgid "Shaded: {activityLabel}"
@@ -15554,6 +15636,26 @@ msgstr "Single HTML"
 #: src/play/pages/SkirmishPage.tsx
 msgid "Singleplayer"
 msgstr "Singleplayer"
+
+#: src/container/names.ts
+msgid "singleplayer preset"
+msgstr "singleplayer preset"
+
+#: src/hub/api.ts
+msgid "Singleplayer preset"
+msgstr "Singleplayer preset"
+
+#: src/container/names.ts
+msgid "singleplayer presets"
+msgstr "singleplayer presets"
+
+#: src/hub/api.ts
+msgid "Singleplayer presets"
+msgstr "Singleplayer presets"
+
+#: src/hub/api.ts
+msgid "Singleplayer presets, challenges, setup packs, scenarios, base blueprints and unit tweak projects"
+msgstr "Singleplayer presets, challenges, setup packs, scenarios, base blueprints and unit tweak projects"
 
 #: src/play/pages/SavegamesPage.tsx
 msgid "Singleplayer saves in your content folder. Resume one to launch the engine into it."
@@ -18629,6 +18731,14 @@ msgstr "unit builder"
 msgid "Unit builder guide"
 msgstr "Unit builder guide"
 
+#: src/container/names.ts
+msgid "unit builder module"
+msgstr "unit builder module"
+
+#: src/container/names.ts
+msgid "unit builder modules"
+msgstr "unit builder modules"
+
 #: src/content/useCompatReport.ts
 msgid "Unit defs: {defsError}"
 msgstr "Unit defs: {defsError}"
@@ -18656,6 +18766,22 @@ msgstr "Unit restrictions"
 #: src/content/unitFieldNotes.ts
 msgid "Unit script"
 msgstr "Unit script"
+
+#: src/container/names.ts
+msgid "unit tweak project"
+msgstr "unit tweak project"
+
+#: src/hub/api.ts
+msgid "Unit tweak project"
+msgstr "Unit tweak project"
+
+#: src/container/names.ts
+msgid "unit tweak projects"
+msgstr "unit tweak projects"
+
+#: src/hub/api.ts
+msgid "Unit tweak projects"
+msgstr "Unit tweak projects"
 
 #: src/play/pages/components/PresetsDrawer.tsx
 #: src/play/presetParts.ts

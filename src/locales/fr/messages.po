@@ -1429,6 +1429,10 @@ msgstr ""
 msgid "{missingTextureFaces} faces are flat because their tile is missing."
 msgstr ""
 
+#: src/hub/api.ts
+msgid "{mode, select, conquest {Conquest challenge} warpath {Warpath challenge} other {{label} challenge}}"
+msgstr ""
+
 #: src/content/pages/GameDetailPage.tsx
 msgid "{models, plural, one {# legacy model} other {# legacy models}}"
 msgstr ""
@@ -2669,6 +2673,10 @@ msgstr ""
 
 #: src/hub/removePlan.ts
 msgid "A campaign mission plays this scenario. The mission keeps playing, because it carries its own copy."
+msgstr ""
+
+#: src/container/names.ts
+msgid "a campaign, a singleplayer preset, a challenge, a setup pack, a scenario, a keymap, a base blueprint, a unit tweak project or a unit builder module"
 msgstr ""
 
 #: src/content/unitFieldNotes.ts
@@ -3940,6 +3948,22 @@ msgstr ""
 msgid "Banks into turns"
 msgstr ""
 
+#: src/container/names.ts
+msgid "base blueprint"
+msgstr ""
+
+#: src/hub/api.ts
+msgid "Base blueprint"
+msgstr ""
+
+#: src/container/names.ts
+msgid "base blueprints"
+msgstr ""
+
+#: src/hub/api.ts
+msgid "Base blueprints"
+msgstr ""
+
 #: src/i18n/frameStrings.ts
 msgid "Base color"
 msgstr ""
@@ -4434,6 +4458,10 @@ msgstr ""
 msgid "Camera shake strength"
 msgstr ""
 
+#: src/container/names.ts
+msgid "campaign"
+msgstr ""
+
 #: src/content/pages/ReplaysPage.tsx
 #: src/home/continue.ts
 msgid "Campaign"
@@ -4446,6 +4474,10 @@ msgstr ""
 
 #: src/play/PlayProvider.tsx
 msgid "Campaign mission"
+msgstr ""
+
+#: src/container/names.ts
+msgid "campaigns"
 msgstr ""
 
 #: src/campaign/index.ts
@@ -4660,6 +4692,22 @@ msgstr ""
 
 #: src/content/achievements.ts
 msgid "Centurion"
+msgstr ""
+
+#: src/container/names.ts
+msgid "challenge"
+msgstr ""
+
+#: src/hub/api.ts
+msgid "Challenge"
+msgstr ""
+
+#: src/container/names.ts
+msgid "challenges"
+msgstr ""
+
+#: src/hub/api.ts
+msgid "Challenges"
 msgstr ""
 
 #: src/content/unitFieldNotes.ts
@@ -9275,6 +9323,14 @@ msgstr ""
 
 #: src/content/index.ts
 msgid "Keybinds"
+msgstr ""
+
+#: src/container/names.ts
+msgid "keymap"
+msgstr ""
+
+#: src/container/names.ts
+msgid "keymaps"
 msgstr ""
 
 #: src/content/pages/components/ReplayPlaybackBar.tsx
@@ -14553,6 +14609,11 @@ msgstr ""
 msgid "Scar surface-angle cutoff"
 msgstr ""
 
+#: src/container/names.ts
+msgid "scenario"
+msgstr ""
+
+#: src/hub/api.ts
 #: src/runlite/pages/components/EncounterOverlay.tsx
 #: src/scenario/index.ts
 msgid "Scenario"
@@ -14562,6 +14623,11 @@ msgstr ""
 msgid "Scenario Builder"
 msgstr ""
 
+#: src/container/names.ts
+msgid "scenarios"
+msgstr ""
+
+#: src/hub/api.ts
 #: src/scenario/index.ts
 msgid "Scenarios"
 msgstr ""
@@ -15047,8 +15113,24 @@ msgstr ""
 msgid "Settings profiles"
 msgstr ""
 
+#: src/container/names.ts
+msgid "setup pack"
+msgstr ""
+
+#: src/hub/api.ts
+msgid "Setup pack"
+msgstr ""
+
 #: src/packs/pages/components/ImportPackForm.tsx
 msgid "Setup pack imported"
+msgstr ""
+
+#: src/container/names.ts
+msgid "setup packs"
+msgstr ""
+
+#: src/hub/api.ts
+msgid "Setup packs"
 msgstr ""
 
 #: src/content/pages/components/ReplayTimeWindowControl.tsx
@@ -15553,6 +15635,26 @@ msgstr ""
 #: src/play/index.ts
 #: src/play/pages/SkirmishPage.tsx
 msgid "Singleplayer"
+msgstr ""
+
+#: src/container/names.ts
+msgid "singleplayer preset"
+msgstr ""
+
+#: src/hub/api.ts
+msgid "Singleplayer preset"
+msgstr ""
+
+#: src/container/names.ts
+msgid "singleplayer presets"
+msgstr ""
+
+#: src/hub/api.ts
+msgid "Singleplayer presets"
+msgstr ""
+
+#: src/hub/api.ts
+msgid "Singleplayer presets, challenges, setup packs, scenarios, base blueprints and unit tweak projects"
 msgstr ""
 
 #: src/play/pages/SavegamesPage.tsx
@@ -18629,6 +18731,14 @@ msgstr ""
 msgid "Unit builder guide"
 msgstr ""
 
+#: src/container/names.ts
+msgid "unit builder module"
+msgstr ""
+
+#: src/container/names.ts
+msgid "unit builder modules"
+msgstr ""
+
 #: src/content/useCompatReport.ts
 msgid "Unit defs: {defsError}"
 msgstr ""
@@ -18655,6 +18765,22 @@ msgstr ""
 
 #: src/content/unitFieldNotes.ts
 msgid "Unit script"
+msgstr ""
+
+#: src/container/names.ts
+msgid "unit tweak project"
+msgstr ""
+
+#: src/hub/api.ts
+msgid "Unit tweak project"
+msgstr ""
+
+#: src/container/names.ts
+msgid "unit tweak projects"
+msgstr ""
+
+#: src/hub/api.ts
+msgid "Unit tweak projects"
 msgstr ""
 
 #: src/play/pages/components/PresetsDrawer.tsx

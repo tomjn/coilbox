@@ -23,8 +23,8 @@
  * handler and its two confirmations.
  */
 
-import { t } from "@lingui/core/macro";
-import { containerKindName, containerKindPlural } from "@/container/names";
+import { i18n, type MessageDescriptor } from "@lingui/core";
+import { msg, select, t } from "@lingui/core/macro";
 import type { SuggestedMap } from "@/content/branding";
 
 /** Response envelopes, from `lib/api/items.ts` in tomjn/coilbox-hub. */
@@ -494,37 +494,46 @@ export function fetchHubMapPacks(
 /**
  * What a filter chip calls a kind, in the plural.
  *
- * The words come from {@link containerKindPlural} (issue #1795), so a chip
- * offers a thing under the name the rest of coilbox gives it. The hub used to
- * keep its own shorter set here, saying Presets and Blueprints where a card's
- * badge beside it said Singleplayer preset and Base blueprint. That was not a
- * choice about wording: the chips shared a row with the search box and the two
- * comboboxes, and the row could not afford the longer words at any width it was
- * given. The chips have a row of their own now, so it can.
+ * The same words the rest of coilbox uses (issue #1795), so a chip offers a
+ * thing under the name the rest of coilbox gives it, with a capital because a
+ * chip is not part of a sentence. Messages of their own rather than the
+ * lowercase name raised, because not every language capitalises the same way.
  */
+const KIND_LABELS_PLURAL: Record<HubKind, MessageDescriptor> = {
+  preset: msg`Singleplayer presets`,
+  challenge: msg`Challenges`,
+  "setup-pack": msg`Setup packs`,
+  scenario: msg`Scenarios`,
+  blueprint: msg`Base blueprints`,
+  "mod-project": msg`Unit tweak projects`,
+};
+
+/** What a card's badge calls one item of a kind, with a capital. */
+const KIND_LABELS: Record<HubKind, MessageDescriptor> = {
+  preset: msg`Singleplayer preset`,
+  challenge: msg`Challenge`,
+  "setup-pack": msg`Setup pack`,
+  scenario: msg`Scenario`,
+  blueprint: msg`Base blueprint`,
+  "mod-project": msg`Unit tweak project`,
+};
+
 export function kindLabelPlural(kind: HubKind): string {
-  return opened(containerKindPlural(kind));
+  const label: MessageDescriptor | undefined = KIND_LABELS_PLURAL[kind];
+  return label ? i18n._(label) : opened(kind);
 }
 
 /**
  * What the hub carries, to open a sentence with: "Singleplayer presets,
- * challenges, setup packs, scenarios and base blueprints".
+ * challenges, setup packs, scenarios, base blueprints and unit tweak projects".
  *
- * Built from {@link HUB_KINDS} rather than written out (issue #1502). The hand
- * written version of this sentence sat directly above a row of filter chips
- * that had grown a fifth kind, saying the hub carried four, for as long as it
- * took somebody to notice.
- *
- * The labels are written to start a sentence, so every one after the first is
- * lowered.
+ * One message, so a translator sees the whole list. The test beside this file
+ * checks every kind in {@link HUB_KINDS} is in it (issue #1502): the hand written
+ * version once sat above a row of filter chips that had grown a fifth kind,
+ * saying the hub carried four.
  */
 export function kindsPlural(): string {
-  const [first, ...rest] = HUB_KINDS.map(kindLabelPlural);
-  const said = rest.map((l) => l.charAt(0).toLowerCase() + l.slice(1));
-  const last = said.pop();
-  return last === undefined
-    ? first
-    : `${[first, ...said].join(", ")} and ${last}`;
+  return t`Singleplayer presets, challenges, setup packs, scenarios, base blueprints and unit tweak projects`;
 }
 
 /** A label to start with a capital, since a badge is not part of a sentence. */
@@ -537,10 +546,8 @@ function opened(label: string): string {
  * which is the difference between a galactic conquest and a warpath run and
  * worth more to a reader than the word "challenge" on its own.
  *
- * The words come from {@link containerKindName} (issue #1520), so a badge calls
- * a thing what the rest of coilbox calls it: a Singleplayer preset rather than a
- * Preset, a Base blueprint rather than a Blueprint. The hub's own copy of these
- * names said neither, and was the only place in the app that did.
+ * The words match the rest of coilbox (issue #1520): a Singleplayer preset
+ * rather than a Preset, a Base blueprint rather than a Blueprint.
  *
  * A listing is read without checking each row's kind, so a hub carrying a kind
  * this build has never heard of reaches here as a string with no name. Fall back
@@ -548,8 +555,13 @@ function opened(label: string): string {
  */
 export function describeItem(kind: HubKind, mode: string | null): string {
   if (kind === "challenge" && mode) {
-    return `${opened(mode)} challenge`;
+    const label = opened(mode);
+    return select(mode, {
+      conquest: "Conquest challenge",
+      warpath: "Warpath challenge",
+      other: `${label} challenge`,
+    });
   }
-  const name: string | undefined = containerKindName(kind);
-  return opened(name ?? kind);
+  const name: MessageDescriptor | undefined = KIND_LABELS[kind];
+  return name ? i18n._(name) : opened(kind);
 }
