@@ -6,8 +6,8 @@ import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { useLanguageSetting } from "../../i18n/language";
 import {
-  LOCALES,
   localeDisplayName,
+  pickerLocales,
   SYSTEM_LANGUAGE,
 } from "../../i18n/locales";
 import { clampUiZoom, UI_ZOOM_LEVELS } from "../../lib/uiZoom";
@@ -84,7 +84,7 @@ export default function GeneralSettings() {
             size="sm"
             options={[
               { value: SYSTEM_LANGUAGE, label: t`System` },
-              ...LOCALES.map((code) => ({
+              ...pickerLocales().map((code) => ({
                 value: code,
                 label: localeDisplayName(code),
               })),

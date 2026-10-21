@@ -1,7 +1,7 @@
 import { useSetting } from "@picoframe/frame";
 import { useEffect } from "react";
 import { loadLocale } from ".";
-import { type LocaleCode, resolveLanguage, SYSTEM_LANGUAGE } from "./locales";
+import { type AppLocale, resolveLanguage, SYSTEM_LANGUAGE } from "./locales";
 
 export const LANGUAGE_KEY = "general.language";
 
@@ -15,7 +15,7 @@ export function useLanguageSetting() {
  * when that is "system". Formatting helpers read this rather than
  * `navigator.language`, so a date or number follows the picker.
  */
-export function useResolvedLocale(): LocaleCode {
+export function useResolvedLocale(): AppLocale {
   const [language] = useLanguageSetting();
   return resolveLanguage(language, navigator.language);
 }
@@ -24,7 +24,7 @@ export function useResolvedLocale(): LocaleCode {
  * The locale to load before first render, from the raw stored value (settings
  * are kept as JSON, so a stored choice reads back as `"fr"` with its quotes).
  */
-export function bootLocale(raw: string | null): LocaleCode {
+export function bootLocale(raw: string | null): AppLocale {
   let stored: unknown = SYSTEM_LANGUAGE;
   try {
     if (raw !== null) stored = JSON.parse(raw);

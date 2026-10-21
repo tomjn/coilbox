@@ -1,5 +1,5 @@
-import { i18n } from "@lingui/core";
-import { SOURCE_LOCALE } from "./locales";
+import { i18n, type Messages } from "@lingui/core";
+import { PSEUDO_LOCALE, SOURCE_LOCALE } from "./locales";
 
 /**
  * The one translation runtime. It is Lingui's global instance, so the `t`
@@ -17,6 +17,25 @@ export function getLocale(): string {
   return i18n.locale || SOURCE_LOCALE;
 }
 
+/**
+ * The shipped catalogs, one lazy chunk each. The pseudo-locale is left out here
+ * and imported behind `import.meta.env.DEV` in `importCatalog`, so a release
+ * build drops it.
+ */
+const catalogs = import.meta.glob<{ messages: Messages }>([
+  "../locales/*/messages.po",
+  "!../locales/en-XA/messages.po",
+]);
+
+function importCatalog(code: string): Promise<{ messages: Messages }> {
+  if (import.meta.env.DEV && code === PSEUDO_LOCALE) {
+    return import("../locales/en-XA/messages.po");
+  }
+  const load = catalogs[`../locales/${code}/messages.po`];
+  if (!load) return Promise.reject(new Error(`no catalog for ${code}`));
+  return load();
+}
+
 /** The locale most recently asked for, so a slow load cannot overwrite a later pick. */
 let requested: string | undefined;
 
@@ -29,7 +48,7 @@ let requested: string | undefined;
  */
 export async function loadLocale(code: string): Promise<void> {
   requested = code;
-  const { messages } = await import(`../locales/${code}/messages.po`);
+  const { messages } = await importCatalog(code);
   if (requested !== code) return;
   i18n.loadAndActivate({ locale: code, messages });
   document.documentElement.lang = code;

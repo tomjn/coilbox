@@ -12,6 +12,24 @@ export type LocaleCode = (typeof LOCALES)[number];
 
 export const SOURCE_LOCALE: LocaleCode = "en";
 
+/**
+ * The dev-only pseudo-locale (#4593): every English message with its letters
+ * accented, padded and wrapped in brackets, so plain English on screen is a
+ * string that never went through `t`, and a clipped bracket is a layout that
+ * cannot take a longer language. Lingui generates it from the source catalog.
+ * `en-XA` is the conventional pseudo-locale tag, and `Intl` treats it as `en`.
+ */
+export const PSEUDO_LOCALE = "en-XA";
+
+/**
+ * Whether the pseudo-locale can be chosen. `import.meta.env` is undefined when
+ * the Lingui CLI loads this file, which reads as a release build.
+ */
+const PSEUDO_ENABLED = import.meta.env?.DEV === true;
+
+/** A locale coilbox can run in: one with a catalog, or the pseudo-locale. */
+export type AppLocale = LocaleCode | typeof PSEUDO_LOCALE;
+
 /** The settings value that means "follow the system language". */
 export const SYSTEM_LANGUAGE = "system";
 
@@ -44,12 +62,19 @@ export function resolveLocaleTag(tag: string): LocaleCode {
  * anything unrecognised, such as a code from a newer build) follows
  * `systemTag`.
  */
-export function resolveLanguage(stored: string, systemTag: string): LocaleCode {
+export function resolveLanguage(stored: string, systemTag: string): AppLocale {
+  if (PSEUDO_ENABLED && stored === PSEUDO_LOCALE) return PSEUDO_LOCALE;
   return isLocale(stored) ? stored : resolveLocaleTag(systemTag);
+}
+
+/** The locales the Language picker offers, with the pseudo-locale in dev. */
+export function pickerLocales(): string[] {
+  return PSEUDO_ENABLED ? [...LOCALES, PSEUDO_LOCALE] : [...LOCALES];
 }
 
 /** A locale's name in its own language, which is how the picker lists it. */
 export function localeDisplayName(code: string): string {
+  if (code === PSEUDO_LOCALE) return "Pseudo";
   try {
     const name = new Intl.DisplayNames([code], { type: "language" }).of(code);
     return name ? name.charAt(0).toLocaleUpperCase(code) + name.slice(1) : code;
