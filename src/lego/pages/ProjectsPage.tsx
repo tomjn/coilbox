@@ -1,3 +1,5 @@
+import { plural } from "@lingui/core/macro";
+import { Trans, useLingui } from "@lingui/react/macro";
 import { Button, Input } from "@picoframe/frame";
 import { ask } from "@tauri-apps/plugin-dialog";
 import {
@@ -131,6 +133,7 @@ interface Renaming {
  * so somebody who has never opened a model sees the page exactly as it was.
  */
 export default function ProjectsPage() {
+  const { t } = useLingui();
   const { projects, loading, error } = useLegoProjects();
   const [busy, setBusy] = useState(false);
   const [problem, setProblem] = useState<string | null>(null);
@@ -152,7 +155,8 @@ export default function ProjectsPage() {
   );
   const [query, setQuery] = useState("");
   const shown = useMemo(() => filterGrouped(grouped, query), [grouped, query]);
-  const searching = query.trim() !== "";
+  const searchTerm = query.trim();
+  const searching = searchTerm !== "";
   const [collapsedGames, toggleGame] = useCollapsedGames(grouped.games);
   /** Whether anything here came from somebody else's model, which is the only
    *  reason to split the page up at all. */
@@ -179,7 +183,7 @@ export default function ProjectsPage() {
           value: newGame,
           onChange: setNewGame,
           options: [
-            { value: NO_GAME, label: "No game" },
+            { value: NO_GAME, label: t`No game` },
             ...games.map((g) => ({
               value: g.primaryArchive.name,
               label: g.name,
@@ -195,11 +199,12 @@ export default function ProjectsPage() {
     setProblem(null);
     try {
       const pack = await loadPack();
+      const modelNumber = projects.length + 1;
       const picked = games.find((g) => g.primaryArchive.name === newGame);
       const options = {
         id: crypto.randomUUID(),
         rootPieceId: crypto.randomUUID(),
-        name: `Model ${projects.length + 1}`,
+        name: t`Model ${modelNumber}`,
         packId: pack.manifest.id,
         packVersion: pack.manifest.version,
         // Left off for the base pack's atlas, so a unit built with one atlas
@@ -222,9 +227,8 @@ export default function ProjectsPage() {
       await saveProject(project);
       navigate(`/lego/${project.id}`);
     } catch (e) {
-      setProblem(
-        `Could not start a model: ${e instanceof Error ? e.message : String(e)}`,
-      );
+      const reason = e instanceof Error ? e.message : String(e);
+      setProblem(t`Could not start a model: ${reason}`);
     } finally {
       setBusy(false);
     }
@@ -245,15 +249,14 @@ export default function ProjectsPage() {
       await saveProject(project);
       navigate(`/lego/${project.id}`);
     } catch (e) {
-      setProblem(
-        `Could not save the model: ${e instanceof Error ? e.message : String(e)}`,
-      );
+      const reason = e instanceof Error ? e.message : String(e);
+      setProblem(t`Could not save the model: ${reason}`);
     }
   }
 
   async function remove(id: string, name: string) {
-    const yes = await ask(`Delete "${name}"? This cannot be undone.`, {
-      title: "Delete model?",
+    const yes = await ask(t`Delete "${name}"? This cannot be undone.`, {
+      title: t`Delete model?`,
       kind: "warning",
     });
     if (!yes) return;
@@ -296,6 +299,9 @@ export default function ProjectsPage() {
    */
   function card(project: LegoProject) {
     const isRenaming = renaming?.id === project.id;
+    const projectName = project.name;
+    const pieceCount = project.pieces.length;
+    const unitName = project.unitName;
     return (
       <li
         key={project.id}
@@ -309,7 +315,7 @@ export default function ProjectsPage() {
             <div className="flex aspect-square w-full flex-col items-center justify-center gap-2 rounded-t bg-muted px-3 text-center">
               <ImageOff className="text-muted-foreground" size={20} />
               <span className="text-xs text-muted-foreground">
-                No picture yet. Open it to make one.
+                <Trans>No picture yet. Open it to make one.</Trans>
               </span>
             </div>
           ) : (
@@ -329,9 +335,10 @@ export default function ProjectsPage() {
             <p className="mt-0.5 truncate text-xs text-muted-foreground">
               {isRenaming
                 ? ""
-                : `${project.pieces.length} ${
-                    project.pieces.length === 1 ? "piece" : "pieces"
-                  } · ${project.unitName}`}
+                : plural(pieceCount, {
+                    one: `# piece · ${unitName}`,
+                    other: `# pieces · ${unitName}`,
+                  })}
             </p>
           </div>
         </Link>
@@ -360,7 +367,7 @@ export default function ProjectsPage() {
                   cancelRename();
                 }
               }}
-              aria-label={`Rename ${project.name}`}
+              aria-label={t`Rename ${projectName}`}
               aria-invalid={renaming.error ? true : undefined}
               className="h-6 text-sm"
             />
@@ -375,7 +382,7 @@ export default function ProjectsPage() {
           size="sm"
           variant="ghost"
           className="absolute left-1 top-1 opacity-0 transition-opacity focus-visible:opacity-100 group-hover:opacity-100"
-          aria-label={`Rename ${project.name}`}
+          aria-label={t`Rename ${projectName}`}
           onClick={() => startRename(project.id, project.name)}
         >
           <Pencil size={14} />
@@ -384,7 +391,7 @@ export default function ProjectsPage() {
           size="sm"
           variant="ghost"
           className="absolute right-1 top-1 opacity-0 transition-opacity focus-visible:opacity-100 group-hover:opacity-100"
-          aria-label={`Delete ${project.name}`}
+          aria-label={t`Delete ${projectName}`}
           onClick={() => remove(project.id, project.name)}
         >
           <Trash2 size={14} />
@@ -407,7 +414,7 @@ export default function ProjectsPage() {
         className="border-b border-border px-6 py-4"
         title={
           <>
-            <Boxes size={18} /> Models
+            <Boxes size={18} /> <Trans>Models</Trans>
           </>
         }
         actions={
@@ -421,7 +428,7 @@ export default function ProjectsPage() {
                   setAtlas(value === atlases[0].tex1 ? null : value)
                 }
               >
-                <SelectTrigger size="sm" className="w-52" aria-label="Atlas">
+                <SelectTrigger size="sm" className="w-52" aria-label={t`Atlas`}>
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -434,14 +441,14 @@ export default function ProjectsPage() {
               </Select>
             ) : null}
             <Button variant="outline" onClick={() => setPicking(true)}>
-              <Package size={16} /> Open from a game
+              <Package size={16} /> <Trans>Open from a game</Trans>
             </Button>
             <Button variant="outline" onClick={() => setOpening(true)}>
-              <FileUp size={16} /> Open a model
+              <FileUp size={16} /> <Trans>Open a model</Trans>
             </Button>
             <NewUnitPopover
               plans={BODY_PLANS}
-              label="New model"
+              label={t`New model`}
               busy={busy}
               game={gameChoice}
               onChoose={(plan, target) => void create(plan, target)}
@@ -473,25 +480,29 @@ export default function ProjectsPage() {
       ) : null}
       {error ? (
         <p className="border-b border-border px-6 py-3 text-sm text-muted-foreground">
-          Could not read your saved models: {error}
+          <Trans>Could not read your saved models: {error}</Trans>
         </p>
       ) : null}
 
       {loading ? (
         <p className="px-6 py-10 text-center text-sm text-muted-foreground">
-          Reading your saved models.
+          <Trans>Reading your saved models.</Trans>
         </p>
       ) : projects.length === 0 ? (
         <div className="flex flex-1 flex-col items-center justify-center gap-3 px-6 text-center">
           <Blocks className="text-muted-foreground" size={28} />
-          <h2 className="text-base font-medium">No models yet</h2>
+          <h2 className="text-base font-medium">
+            <Trans>No models yet</Trans>
+          </h2>
           <p className="max-w-prose text-sm text-muted-foreground">
-            Start one, then drop parts into it. Browse what is available under
-            Lego Parts.
+            <Trans>
+              Start one, then drop parts into it. Browse what is available under
+              Lego Parts.
+            </Trans>
           </p>
           <NewUnitPopover
             plans={BODY_PLANS}
-            label="New unit"
+            label={t`New unit`}
             busy={busy}
             game={gameChoice}
             onChoose={(plan, target) => void create(plan, target)}
@@ -508,8 +519,8 @@ export default function ProjectsPage() {
               type="search"
               value={query}
               onChange={(event) => setQuery(event.target.value)}
-              placeholder="Search models and games"
-              aria-label="Search models and games"
+              placeholder={t`Search models and games`}
+              aria-label={t`Search models and games`}
               className="pl-8"
             />
           </div>
@@ -517,13 +528,15 @@ export default function ProjectsPage() {
           {searching &&
           shown.own.length + shown.games.length + shown.files.length === 0 ? (
             <p className="text-sm text-muted-foreground">
-              No models match "{query.trim()}".
+              <Trans>No models match "{searchTerm}".</Trans>
             </p>
           ) : null}
 
           {shown.games.length > 0 ? (
             <section className="space-y-4">
-              <h2 className={SECTION}>Games</h2>
+              <h2 className={SECTION}>
+                <Trans>Games</Trans>
+              </h2>
               {shown.games.map((game) => {
                 // A search opens every game it found something in, since a
                 // match hidden in a folded section reads as no match at all.
@@ -560,14 +573,20 @@ export default function ProjectsPage() {
               is something else on the page to tell it apart from. */}
           {shown.own.length > 0 ? (
             <section className="space-y-3">
-              {sectioned ? <h2 className={SECTION}>No game</h2> : null}
+              {sectioned ? (
+                <h2 className={SECTION}>
+                  <Trans>No game</Trans>
+                </h2>
+              ) : null}
               {grid(shown.own)}
             </section>
           ) : null}
 
           {shown.files.length > 0 ? (
             <section className="space-y-3">
-              <h2 className={SECTION}>Opened from a file</h2>
+              <h2 className={SECTION}>
+                <Trans>Opened from a file</Trans>
+              </h2>
               {grid(shown.files)}
             </section>
           ) : null}

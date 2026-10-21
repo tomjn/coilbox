@@ -18,6 +18,7 @@
  * never pointed at.
  */
 
+import { Trans, useLingui } from "@lingui/react/macro";
 import { Button } from "@picoframe/frame";
 import { Blocks } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -48,6 +49,7 @@ import {
 } from "./components/ImportResult";
 
 export default function OpenFromArchivePage() {
+  const { t } = useLingui();
   const [params] = useSearchParams();
   const request = useMemo(() => openRequest(params), [params]);
   const navigate = useNavigate();
@@ -185,13 +187,13 @@ export default function OpenFromArchivePage() {
       await saveProject(project);
       navigate(`/lego/${project.id}`, { replace: true });
     } catch (error) {
-      setProblem(
-        `Could not save the unit: ${
-          error instanceof Error ? error.message : String(error)
-        }`,
-      );
+      const reason = error instanceof Error ? error.message : String(error);
+      setProblem(t`Could not save the unit: ${reason}`);
     }
   }
+
+  const describeRequest = (member: string, source: string) =>
+    t`${member} in ${source}`;
 
   return (
     <div className="flex h-full flex-col">
@@ -200,17 +202,17 @@ export default function OpenFromArchivePage() {
         title={
           <>
             <Blocks size={18} />{" "}
-            {request ? modelName(request.member) : "Open a model"}
+            {request ? modelName(request.member) : t`Open a model`}
           </>
         }
         description={
           request
-            ? `${request.member} in ${request.name ?? request.archive}`
-            : "Nothing was named to open."
+            ? describeRequest(request.member, request.name ?? request.archive)
+            : t`Nothing was named to open.`
         }
         actions={
           <Button variant="outline" onClick={() => navigate(-1)}>
-            Back to the archive
+            <Trans>Back to the archive</Trans>
           </Button>
         }
       />
@@ -258,40 +260,51 @@ function Body({
   if (!request) {
     return (
       <p className="text-sm text-muted-foreground">
-        This page opens one model out of an archive, and it was not told which.
-        Browse an archive under Library &gt; Archives and open a model from its
-        preview.
+        <Trans>
+          This page opens one model out of an archive, and it was not told
+          which. Browse an archive under Library &gt; Archives and open a model
+          from its preview.
+        </Trans>
       </p>
     );
   }
-  if (!openableInBuilder(request.member)) {
+  const { member, archive } = request;
+  if (!openableInBuilder(member)) {
     return (
       <p className="text-sm text-muted-foreground">
-        {request.member} is not a <code>.s3o</code> or a <code>.3do</code>. The
-        builder reads those formats alone, so there is nothing here it could
-        open.
+        <Trans>
+          {member} is not a <code>.s3o</code> or a <code>.3do</code>. The
+          builder reads those formats alone, so there is nothing here it could
+          open.
+        </Trans>
       </p>
     );
   }
   if (noTarget) {
     return (
       <p className="text-sm text-muted-foreground">
-        No engine is selected, so there is nothing to read this archive with.
+        <Trans>
+          No engine is selected, so there is nothing to read this archive with.
+        </Trans>
       </p>
     );
   }
   if (missing) {
     return (
       <p className="text-sm text-muted-foreground">
-        Could not read {request.archive}. It may have been moved or removed
-        since it was browsed.
+        <Trans>
+          Could not read {archive}. It may have been moved or removed since it
+          was browsed.
+        </Trans>
       </p>
     );
   }
   if (reading || stage.state === "idle") {
     return (
       <p className="text-sm text-muted-foreground">
-        Reading {request.member} out of {request.archive}.
+        <Trans>
+          Reading {member} out of {archive}.
+        </Trans>
       </p>
     );
   }
