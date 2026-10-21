@@ -154,6 +154,21 @@ local spots = { { x = 100, z = 100 }, { x = 400, z = 400 }, { x = 160, z = 100 }
 check("the nearest spot within reach is found", PLACE.nearestSpot(spots, 150, 110, PLACE.SPOT_SNAP) == spots[3])
 check("a spot out of reach is not", PLACE.nearestSpot(spots, 700, 700, PLACE.SPOT_SNAP) == nil and PLACE.nearestSpot(nil, 0, 0, 90) == nil)
 
+-- a 10 by 8 metal map: a two square spot, a lone square, and a strip too
+-- wide for one extractor
+local metal = {}
+metal[2 * 10 + 1], metal[2 * 10 + 2] = 1, 3
+metal[6 * 10 + 8] = 2
+for x = 0, 9 do
+	metal[4 * 10 + x] = 1
+end
+local found = PLACE.metalSpots(10, 8, function(x, z)
+	return metal[z * 10 + x] or 0
+end, 16, 48)
+check("each patch of metal no wider than an extractor reaches is a spot", #found == 2, show(found))
+check("a spot sits at its patch's middle, weighted by metal", found[1].x == (1.75 + 0.5) * 16 and found[1].z == 2.5 * 16, show(found[1]))
+check("a lone square is a spot at its own middle", found[2].x == 8.5 * 16 and found[2].z == 6.5 * 16, show(found[2]))
+
 local px, pz = PLACE.pivotAt(pivotLayout, 2, 0, nil, 500, 500)
 check("the pivot lands on the grid the engine snaps it to", px == 504 and pz == 504, px .. "," .. pz)
 local pivotOrigin = pivotLayout.buildings[2].offset

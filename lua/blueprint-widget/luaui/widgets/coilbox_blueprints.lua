@@ -488,8 +488,10 @@ end
 -- map's geothermal features, which every game has. Metal spots are whichever
 -- list the game's own widgets publish: BAR and Zero-K style games keep
 -- WG.metalSpots or WG.resource_spot_finder.metalSpotsList, Splinter Faction
--- WG.metalMakerSpots and WG.mapmetalspots. A game with none gets no snapping.
-local function spotsFor(kind)
+-- WG.metalMakerSpots and WG.mapmetalspots. For any other game they are
+-- worked out from the map's metal once, for the extractor's reach.
+local mapMetal = {}
+local function spotsFor(kind, def)
 	if kind == "geo" then
 		local out = {}
 		for _, featureID in ipairs(Spring.GetAllFeatures() or {}) do
@@ -507,7 +509,16 @@ local function spotsFor(kind)
 			return list
 		end
 	end
-	return {}
+	-- what one extractor covers: twice its reach, or its own footprint
+	local span = 2 * (def.extractRange or 0)
+	if span <= 0 then
+		span = math.max(def.xsize, def.zsize) * 8
+	end
+	if not mapMetal[span] then
+		local sizeX, sizeZ = Spring.GetMetalMapSize()
+		mapMetal[span] = PLACE.metalSpots(sizeX, sizeZ, Spring.GetMetalAmount, Game.metalMapSquareSize, span)
+	end
+	return mapMetal[span]
 end
 
 local function stopPlacing()
@@ -540,8 +551,9 @@ local function startPlacing(key)
 	bindDefaults()
 	readKeys()
 	placing = { item = item, rotation = 0, flip = { x = false, z = false }, pivot = PLACE.pivot(item.resolved), foot = nil }
-	local kind = PLACE.spotKind(item.resolved.buildings[placing.pivot].def)
-	placing.spots = kind and spotsFor(kind) or nil
+	local held = item.resolved.buildings[placing.pivot].def
+	local kind = PLACE.spotKind(held)
+	placing.spots = kind and spotsFor(kind, held) or nil
 	panel.placing = { key = key, name = item.name, rotation = 0, flip = placing.flip }
 	readCost()
 end

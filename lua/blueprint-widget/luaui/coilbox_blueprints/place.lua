@@ -194,6 +194,55 @@ function M.nearestSpot(spots, x, z, reach)
 	return best
 end
 
+--- Metal spots worked out from the map's metal, for a game that publishes
+-- no list of its own: each patch of touching squares holding metal, as long
+-- as it is no wider than one extractor reaches. A wider patch is open ground
+-- with metal everywhere, not a spot.
+-- @param sizeX integer the metal map's width in squares
+-- @param sizeZ integer and its depth
+-- @param amountAt function(x, z) -> metal on a square
+-- @param square number elmos per square
+-- @param span number elmos one extractor covers, edge to edge
+-- @return table[] { x, z } at each patch's middle, weighted by its metal
+function M.metalSpots(sizeX, sizeZ, amountAt, square, span)
+	local seen, out = {}, {}
+	local function key(x, z)
+		return z * sizeX + x
+	end
+	for z0 = 0, sizeZ - 1 do
+		for x0 = 0, sizeX - 1 do
+			if not seen[key(x0, z0)] and amountAt(x0, z0) > 0 then
+				seen[key(x0, z0)] = true
+				local queue, i = { { x0, z0 } }, 1
+				local sum, sx, sz = 0, 0, 0
+				local minX, maxX, minZ, maxZ = x0, x0, z0, z0
+				while queue[i] do
+					local x, z = queue[i][1], queue[i][2]
+					local metal = amountAt(x, z)
+					sum, sx, sz = sum + metal, sx + metal * x, sz + metal * z
+					minX, maxX = math.min(minX, x), math.max(maxX, x)
+					minZ, maxZ = math.min(minZ, z), math.max(maxZ, z)
+					for dz = -1, 1 do
+						for dx = -1, 1 do
+							local nx, nz = x + dx, z + dz
+							if nx >= 0 and nz >= 0 and nx < sizeX and nz < sizeZ and not seen[key(nx, nz)] and amountAt(nx, nz) > 0 then
+								seen[key(nx, nz)] = true
+								queue[#queue + 1] = { nx, nz }
+							end
+						end
+					end
+					i = i + 1
+				end
+				local wide = math.max(maxX - minX + 1, maxZ - minZ + 1) * square
+				if wide <= span then
+					out[#out + 1] = { x = (sx / sum + 0.5) * square, z = (sz / sum + 0.5) * square }
+				end
+			end
+		end
+	end
+	return out
+end
+
 --- The building a layout is held by while it is placed. The first that only
 -- builds on a spot, so the layout can snap to one, otherwise the one nearest
 -- the middle of the layout, the first in layout order on a tie. The cursor
