@@ -1,3 +1,4 @@
+import { Trans, useLingui } from "@lingui/react/macro";
 import { Button } from "@picoframe/frame";
 import { autohostHearsChat } from "../../direct/room";
 import type { MemberRow } from "./config";
@@ -10,13 +11,7 @@ import {
   layoutToForceCommand,
 } from "./gameTypePresets";
 
-const PRESETS: { label: string; preset: GameTypePreset }[] = [
-  { label: "Team", preset: "team" },
-  { label: "FFA", preset: "ffa" },
-  { label: "Coop", preset: "coop" },
-  { label: "Duel", preset: "duel" },
-  { label: "Tourney", preset: "tourney" },
-];
+const PRESETS: GameTypePreset[] = ["team", "ffa", "coop", "duel", "tourney"];
 
 /**
  * One-click game-type presets (Team/FFA/Coop/Duel/Tourney) plus a Balance
@@ -69,7 +64,16 @@ export function GameTypePresetsControls({
   onSetBattleStatusBatch: (patch: { ally?: number; teamId?: number }) => void;
   onAutohostSend: (command: string) => void;
 }) {
+  const { t } = useLingui();
   if (serverAssignsSeat) return null;
+
+  const presetLabels: Record<GameTypePreset, string> = {
+    team: t`Team`,
+    ffa: t`FFA`,
+    coop: t`Coop`,
+    duel: t`Duel`,
+    tourney: t`Tourney`,
+  };
 
   const active = rows.filter((r) => r.kind === "human" && !r.spectator);
   const activeNames = active.map((r) => r.name);
@@ -104,19 +108,21 @@ export function GameTypePresetsControls({
 
   return (
     <div className="flex flex-col gap-3 rounded-lg border border-border/50 bg-card p-4">
-      <span className="text-sm font-semibold">Team setup</span>
+      <span className="text-sm font-semibold">
+        <Trans>Team setup</Trans>
+      </span>
       <div className="flex flex-wrap gap-2">
         <Button variant="outline" size="sm" onClick={onBalance}>
-          {suggestOnly ? "Suggest balance" : "Balance"}
+          {suggestOnly ? t`Suggest balance` : t`Balance`}
         </Button>
-        {PRESETS.map((p) => (
+        {PRESETS.map((preset) => (
           <Button
-            key={p.preset}
+            key={preset}
             variant="outline"
             size="sm"
-            onClick={() => applyLayout(gameTypeLayout(p.preset, activeNames))}
+            onClick={() => applyLayout(gameTypeLayout(preset, activeNames))}
           >
-            {p.label}
+            {presetLabels[preset]}
           </Button>
         ))}
       </div>

@@ -1,3 +1,4 @@
+import { Trans, useLingui } from "@lingui/react/macro";
 import { Button, Input, useSetting } from "@picoframe/frame";
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router";
@@ -65,6 +66,7 @@ export function CreateLobbyPopover({
    *  null. Said above the button, which then confirms leaving. */
   leaves?: string | null;
 }) {
+  const { t } = useLingui();
   const [open, setOpen] = useState(!!autoOpen);
   const { target } = usePreferredTarget();
   const scan = useUnitsyncScan(target?.enginePath, target?.dataDir);
@@ -119,50 +121,62 @@ export function CreateLobbyPopover({
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
         <Button variant="secondary" className="h-8 px-3" disabled={disabled}>
-          Create a lobby
+          <Trans>Create a lobby</Trans>
         </Button>
       </PopoverTrigger>
       <PopoverContent align="end" className="w-80">
         <form className="flex flex-col gap-3" onSubmit={submit}>
-          <span className="text-sm font-semibold">Create a lobby</span>
+          <span className="text-sm font-semibold">
+            <Trans>Create a lobby</Trans>
+          </span>
           <p className="text-xs text-muted-foreground">
-            A lobby is a room players gather in. When anyone in it starts the
-            match, the server picks a machine to run the game and sends everyone
-            its address. Your machine does not run it, so there is nothing to
-            forward and no password to set.
+            <Trans>
+              A lobby is a room players gather in. When anyone in it starts the
+              match, the server picks a machine to run the game and sends
+              everyone its address. Your machine does not run it, so there is
+              nothing to forward and no password to set.
+            </Trans>
           </p>
 
           {noEngine ? (
             <p className="text-sm text-muted-foreground">
-              No engine found. Add a content folder with an engine in{" "}
-              <Link
-                className="font-medium underline underline-offset-4"
-                to="/settings/content-folders"
-              >
-                Settings → Content Folders
-              </Link>{" "}
-              first.
+              <Trans>
+                No engine found. Add a content folder with an engine in{" "}
+                <Link
+                  className="font-medium underline underline-offset-4"
+                  to="/settings/content-folders"
+                >
+                  Settings → Content Folders
+                </Link>{" "}
+                first.
+              </Trans>
             </p>
           ) : (
             <>
               {/* biome-ignore lint/a11y/noLabelWithoutControl: wraps the control (implicit label association) */}
               <label className="flex flex-col gap-1 text-sm">
-                <span className="font-medium">Name</span>
+                <span className="font-medium">
+                  <Trans>Name</Trans>
+                </span>
                 <Input
                   value={name}
                   onChange={(e) => setName(e.target.value)}
-                  placeholder={`${shape} on ${mapName || "any map"}`}
+                  placeholder={
+                    mapName ? t`${shape} on ${mapName}` : t`${shape} on any map`
+                  }
                 />
               </label>
 
               {/* biome-ignore lint/a11y/noLabelWithoutControl: wraps the control (implicit label association) */}
               <label className="flex flex-col gap-1 text-sm">
-                <span className="font-medium">Map</span>
+                <span className="font-medium">
+                  <Trans>Map</Trans>
+                </span>
                 <OptionSelect
                   value={mapName}
                   onValueChange={setMapName}
                   options={maps.map((m) => ({ value: m.name, label: m.name }))}
-                  placeholder={scan.loading ? "Scanning…" : "Select a map"}
+                  placeholder={scan.loading ? t`Scanning…` : t`Select a map`}
                   size="sm"
                 />
               </label>
@@ -170,7 +184,9 @@ export function CreateLobbyPopover({
               <div className="flex gap-2">
                 {/* biome-ignore lint/a11y/noLabelWithoutControl: wraps the control (implicit label association) */}
                 <label className="flex flex-1 flex-col gap-1 text-sm">
-                  <span className="font-medium">Sides</span>
+                  <span className="font-medium">
+                    <Trans>Sides</Trans>
+                  </span>
                   <Input
                     type="number"
                     min={ALLY_TEAM_RANGE.min}
@@ -183,7 +199,9 @@ export function CreateLobbyPopover({
                 </label>
                 {/* biome-ignore lint/a11y/noLabelWithoutControl: wraps the control (implicit label association) */}
                 <label className="flex flex-1 flex-col gap-1 text-sm">
-                  <span className="font-medium">Players each</span>
+                  <span className="font-medium">
+                    <Trans>Players each</Trans>
+                  </span>
                   <Input
                     type="number"
                     min={PLAYERS_PER_TEAM_RANGE.min}
@@ -198,7 +216,7 @@ export function CreateLobbyPopover({
                 </label>
               </div>
               <p className="text-xs text-muted-foreground">
-                A {shape} lobby, with a start box for each side.
+                <Trans>A {shape} lobby, with a start box for each side.</Trans>
               </p>
 
               {/* biome-ignore lint/a11y/noLabelWithoutControl: wraps the Checkbox control (implicit label association) */}
@@ -209,10 +227,14 @@ export function CreateLobbyPopover({
                   className="mt-0.5"
                 />
                 <span className="flex flex-col gap-0.5">
-                  <span className="font-medium">Allow bosses</span>
+                  <span className="font-medium">
+                    <Trans>Allow bosses</Trans>
+                  </span>
                   <span className="text-xs text-muted-foreground">
-                    A lobby has no owner. A boss is the member who may change
-                    the map and the settings once it is running.
+                    <Trans>
+                      A lobby has no owner. A boss is the member who may change
+                      the map and the settings once it is running.
+                    </Trans>
                   </span>
                 </span>
               </label>
@@ -224,7 +246,7 @@ export function CreateLobbyPopover({
               {leaves && <p className="text-sm">{leaves}</p>}
 
               <Button type="submit" className="h-8" disabled={!!problem}>
-                {leaves ? leaveAndLabel("create") : "Create lobby"}
+                {leaves ? leaveAndLabel("create") : t`Create lobby`}
               </Button>
             </>
           )}

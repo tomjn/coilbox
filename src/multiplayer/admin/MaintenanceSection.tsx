@@ -1,3 +1,4 @@
+import { Trans, useLingui } from "@lingui/react/macro";
 import { Button, Input } from "@picoframe/frame";
 import { TriangleAlert } from "lucide-react";
 import { useState } from "react";
@@ -18,14 +19,15 @@ import { ToolGroup, ToolHeader } from "./ToolHeader";
  * engine at once, after posting a notice in each one's chat.
  */
 function SetMinSpringVersionAction({ serverKey }: { serverKey: string }) {
+  const { t } = useLingui();
   const [version, setVersion] = useState("");
   const request = useAdminRequest(serverKey);
   const canSubmit = version.trim() !== "";
 
   return (
     <ToolGroup
-      title="Minimum engine version"
-      description="The oldest Spring engine version a bot-flagged account may host a battle on."
+      title={t`Minimum engine version`}
+      description={t`The oldest Spring engine version a bot-flagged account may host a battle on.`}
     >
       <Popover>
         <PopoverTrigger asChild>
@@ -35,25 +37,27 @@ function SetMinSpringVersionAction({ serverKey }: { serverKey: string }) {
             size="sm"
             className="h-8 self-start"
           >
-            Set minimum engine version…
+            <Trans>Set minimum engine version…</Trans>
           </Button>
         </PopoverTrigger>
         <PopoverContent align="start" className="flex w-80 flex-col gap-3">
           <div className="flex flex-col gap-1">
             <h3 className="text-sm font-medium">
-              Set the minimum engine version?
+              <Trans>Set the minimum engine version?</Trans>
             </h3>
             <p className="text-xs text-muted-foreground">
-              Every open battle a bot-flagged account hosts on an older engine
-              closes immediately, after uberserver posts a notice in its chat.
+              <Trans>
+                Every open battle a bot-flagged account hosts on an older engine
+                closes immediately, after uberserver posts a notice in its chat.
+              </Trans>
             </p>
           </div>
           <span className="flex flex-col gap-1 text-xs text-muted-foreground">
-            Version
+            <Trans>Version</Trans>
             <Input
               value={version}
               onChange={(event) => setVersion(event.target.value)}
-              aria-label="Minimum engine version"
+              aria-label={t`Minimum engine version`}
               className="h-8"
             />
           </span>
@@ -72,18 +76,19 @@ function SetMinSpringVersionAction({ serverKey }: { serverKey: string }) {
                 )
               }
             >
-              Set version
+              <Trans>Set version</Trans>
             </Button>
           </div>
-          <AdminRequestStatus
-            state={request.state}
-            unanswered="The server did not answer."
-          >
-            {(reply) =>
-              reply.shape === "setMinSpringVersion" ? (
-                <span>Set to {reply.version}.</span>
-              ) : null
-            }
+          <AdminRequestStatus state={request.state}>
+            {(reply) => {
+              if (reply.shape !== "setMinSpringVersion") return null;
+              const version = reply.version;
+              return (
+                <span>
+                  <Trans>Set to {version}.</Trans>
+                </span>
+              );
+            }}
           </AdminRequestStatus>
         </PopoverContent>
       </Popover>
@@ -98,11 +103,12 @@ function SetMinSpringVersionAction({ serverKey }: { serverKey: string }) {
  * clicking it.
  */
 function StatsAction({ serverKey }: { serverKey: string }) {
+  const { t } = useLingui();
   const request = useAdminRequest(serverKey);
   return (
     <ToolGroup
-      title="Server statistics"
-      description="Writes the server's command counts, login counts and agent stats to its own log file. Nothing is shown here."
+      title={t`Server statistics`}
+      description={t`Writes the server's command counts, login counts and agent stats to its own log file. Nothing is shown here.`}
     >
       <Button
         type="button"
@@ -111,12 +117,9 @@ function StatsAction({ serverKey }: { serverKey: string }) {
         disabled={request.state.status === "sending"}
         onClick={() => void request.send("STATS", [], "stats")}
       >
-        Write stats to the server log
+        <Trans>Write stats to the server log</Trans>
       </Button>
-      <AdminRequestStatus
-        state={request.state}
-        unanswered="The server did not answer."
-      />
+      <AdminRequestStatus state={request.state} />
     </ToolGroup>
   );
 }
@@ -128,11 +131,12 @@ function StatsAction({ serverKey }: { serverKey: string }) {
  * as a channel message rather than the direct reply this waits for.
  */
 function ReloadAction({ serverKey }: { serverKey: string }) {
+  const { t } = useLingui();
   const request = useAdminRequest(serverKey);
   return (
     <ToolGroup
-      title="Reload"
-      description="Reloads the server's code without restarting it. Announces the attempt in #moderator, then the result there and here."
+      title={t`Reload`}
+      description={t`Reloads the server's code without restarting it. Announces the attempt in #moderator, then the result there and here.`}
     >
       <Popover>
         <PopoverTrigger asChild>
@@ -142,15 +146,19 @@ function ReloadAction({ serverKey }: { serverKey: string }) {
             size="sm"
             className="h-8 self-start"
           >
-            Reload…
+            <Trans>Reload…</Trans>
           </Button>
         </PopoverTrigger>
         <PopoverContent align="start" className="flex w-80 flex-col gap-3">
           <div className="flex flex-col gap-1">
-            <h3 className="text-sm font-medium">Reload the server's code?</h3>
+            <h3 className="text-sm font-medium">
+              <Trans>Reload the server's code?</Trans>
+            </h3>
             <p className="text-xs text-muted-foreground">
-              Posts a notice in #moderator, reloads, then posts and replies with
-              whether it worked.
+              <Trans>
+                Posts a notice in #moderator, reloads, then posts and replies
+                with whether it worked.
+              </Trans>
             </p>
           </div>
           <div className="flex justify-end">
@@ -162,13 +170,10 @@ function ReloadAction({ serverKey }: { serverKey: string }) {
               disabled={request.state.status === "sending"}
               onClick={() => void request.send("RELOAD", [], "reload")}
             >
-              Reload
+              <Trans>Reload</Trans>
             </Button>
           </div>
-          <AdminRequestStatus
-            state={request.state}
-            unanswered="The server did not answer."
-          >
+          <AdminRequestStatus state={request.state}>
             {(reply) =>
               reply.shape === "reload" ? (
                 reply.success ? (
@@ -176,7 +181,9 @@ function ReloadAction({ serverKey }: { serverKey: string }) {
                 ) : (
                   <Alert variant="destructive">
                     <TriangleAlert />
-                    <AlertTitle>The reload failed</AlertTitle>
+                    <AlertTitle>
+                      <Trans>The reload failed</Trans>
+                    </AlertTitle>
                     <AlertDescription>{reply.message}</AlertDescription>
                   </Alert>
                 )
@@ -196,11 +203,12 @@ function ReloadAction({ serverKey }: { serverKey: string }) {
  * with silence rather than a refusal, so the unanswered wording says so.
  */
 function CleanupAction({ serverKey }: { serverKey: string }) {
+  const { t } = useLingui();
   const request = useAdminRequest(serverKey);
   return (
     <ToolGroup
-      title="Cleanup"
-      description="Clears out inconsistent server state left over from a crash or a bug. Announces the attempt in #moderator, then the result there and here."
+      title={t`Cleanup`}
+      description={t`Clears out inconsistent server state left over from a crash or a bug. Announces the attempt in #moderator, then the result there and here.`}
     >
       <Popover>
         <PopoverTrigger asChild>
@@ -210,15 +218,19 @@ function CleanupAction({ serverKey }: { serverKey: string }) {
             size="sm"
             className="h-8 self-start"
           >
-            Cleanup…
+            <Trans>Cleanup…</Trans>
           </Button>
         </PopoverTrigger>
         <PopoverContent align="start" className="flex w-80 flex-col gap-3">
           <div className="flex flex-col gap-1">
-            <h3 className="text-sm font-medium">Clean up server state?</h3>
+            <h3 className="text-sm font-medium">
+              <Trans>Clean up server state?</Trans>
+            </h3>
             <p className="text-xs text-muted-foreground">
-              Posts a notice in #moderator, then deletes anything it finds
-              inconsistent and posts and replies with what it removed.
+              <Trans>
+                Posts a notice in #moderator, then deletes anything it finds
+                inconsistent and posts and replies with what it removed.
+              </Trans>
             </p>
           </div>
           <div className="flex justify-end">
@@ -230,12 +242,12 @@ function CleanupAction({ serverKey }: { serverKey: string }) {
               disabled={request.state.status === "sending"}
               onClick={() => void request.send("CLEANUP", [], "cleanup")}
             >
-              Clean up
+              <Trans>Clean up</Trans>
             </Button>
           </div>
           <AdminRequestStatus
             state={request.state}
-            unanswered="The server did not answer. A cleanup that raised an error on the server sends no reply at all."
+            unanswered={t`The server did not answer. A cleanup that raised an error on the server sends no reply at all.`}
           >
             {(reply) =>
               reply.shape === "cleanup" ? <span>{reply.message}</span> : null
@@ -256,11 +268,12 @@ function CleanupAction({ serverKey }: { serverKey: string }) {
  * the registry, so none of its actions needs its own `<AdminOnly>` guard.
  */
 export function MaintenanceSection({ serverKey }: { serverKey: string }) {
+  const { t } = useLingui();
   return (
     <section className="flex flex-col gap-6">
       <ToolHeader
-        title="Maintenance"
-        description="uberserver's own maintenance jobs, for admins only."
+        title={t`Maintenance`}
+        description={t`uberserver's own maintenance jobs, for admins only.`}
       />
       <SetMinSpringVersionAction serverKey={serverKey} />
       <StatsAction serverKey={serverKey} />

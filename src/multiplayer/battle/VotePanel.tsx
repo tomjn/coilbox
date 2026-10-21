@@ -1,3 +1,4 @@
+import { Trans, useLingui } from "@lingui/react/macro";
 import { Button } from "@picoframe/frame";
 import { Check, Minus, Vote as VoteIcon, X } from "lucide-react";
 import { useEffect, useState } from "react";
@@ -35,7 +36,10 @@ export function VotePanel({
   vote: Vote;
   onVote: (choice: VoteChoice) => void;
 }) {
+  const { t } = useLingui();
   const secondsLeft = useCountdown(vote.endsAt);
+  const caller = vote.caller;
+  const subject = vote.subject;
 
   // Proportional yes/no bar. Falls back to a neutral empty bar before any vote is
   // counted so we never divide by zero.
@@ -44,28 +48,31 @@ export function VotePanel({
 
   return (
     <section
-      aria-label="Autohost vote"
+      aria-label={t`Autohost vote`}
       className="border-b border-primary/30 bg-primary/5 px-4 py-3"
     >
       <div className="flex items-center gap-4">
         <div className="flex min-w-0 flex-1 basis-0 items-center gap-2">
           <VoteIcon className="size-4 shrink-0 text-primary" />
-          <span className="shrink-0 text-sm font-semibold">Vote</span>
+          <span className="shrink-0 text-sm font-semibold">
+            <Trans>Vote</Trans>
+          </span>
           <span
             className="truncate text-sm text-muted-foreground"
-            title={
-              vote.caller ? `${vote.subject} · by ${vote.caller}` : vote.subject
-            }
+            title={vote.caller ? t`${subject} · by ${caller}` : vote.subject}
           >
             {vote.subject}
             {vote.caller && (
-              <span className="text-muted-foreground"> · by {vote.caller}</span>
+              <span className="text-muted-foreground">
+                {" "}
+                <Trans>· by {caller}</Trans>
+              </span>
             )}
           </span>
         </div>
         {secondsLeft !== null && (
           <span className="shrink-0 text-xs tabular-nums text-muted-foreground">
-            {secondsLeft}s left
+            <Trans>{secondsLeft}s left</Trans>
           </span>
         )}
 
@@ -98,11 +105,11 @@ export function VotePanel({
         <div className="flex shrink-0 gap-2">
           <Button size="sm" onClick={() => onVote("yes")}>
             <Check className="size-4" />
-            Yes
+            <Trans>Yes</Trans>
           </Button>
           <Button size="sm" variant="destructive" onClick={() => onVote("no")}>
             <X className="size-4" />
-            No
+            <Trans>No</Trans>
           </Button>
           {vote.allowAbstain && (
             <Button
@@ -111,7 +118,7 @@ export function VotePanel({
               onClick={() => onVote("abstain")}
             >
               <Minus className="size-4" />
-              Abstain
+              <Trans>Abstain</Trans>
             </Button>
           )}
         </div>

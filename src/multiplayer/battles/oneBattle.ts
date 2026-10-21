@@ -1,3 +1,4 @@
+import { t } from "@lingui/core/macro";
 import { useCallback, useRef } from "react";
 import { inBattleKey } from "../battle/battleRoomKey";
 import { leaveBattle } from "../battle/leaveBattle";
@@ -38,22 +39,20 @@ export function leavesBattleNotice(
   serverName: string,
   entry: BattleEntry,
 ): string {
-  const doing =
-    entry === "join"
-      ? "Joining this one"
-      : entry === "host"
-        ? "Hosting a battle here"
-        : "Creating a lobby here";
-  return `You are in a battle on ${serverName}. ${doing} leaves it.`;
+  if (entry === "join")
+    return t`You are in a battle on ${serverName}. Joining this one leaves it.`;
+  if (entry === "host")
+    return t`You are in a battle on ${serverName}. Hosting a battle here leaves it.`;
+  return t`You are in a battle on ${serverName}. Creating a lobby here leaves it.`;
 }
 
 /** The label of the button that confirms leaving. Pure. */
 export function leaveAndLabel(entry: BattleEntry): string {
   return entry === "join"
-    ? "Leave and join"
+    ? t`Leave and join`
     : entry === "host"
-      ? "Leave and host"
-      : "Leave and create";
+      ? t`Leave and host`
+      : t`Leave and create`;
 }
 
 /**
@@ -121,8 +120,9 @@ export function useRoomBattleRule(): {
       const now = latest.current;
       if (now == null) return;
       if (roomLeaveIsStale(shown, now)) {
+        const notice = noticeFor(now, entry);
         throw new Error(
-          `${noticeFor(now, entry)} Close this form and open it again to go ahead.`,
+          t`${notice} Close this form and open it again to go ahead.`,
         );
       }
       await leaveBattle(now);

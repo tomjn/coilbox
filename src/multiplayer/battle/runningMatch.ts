@@ -1,3 +1,4 @@
+import { t } from "@lingui/core/macro";
 import { useEffect, useState } from "react";
 import { relativeTime } from "@/lib/relativeTime";
 
@@ -14,7 +15,7 @@ import { relativeTime } from "@/lib/relativeTime";
  */
 export function startedAgo(since: number | null, now: number): string {
   const ago = since === null ? null : agoFrom(since, now);
-  return ago ? `Started ${ago}` : "In progress";
+  return ago ? t`Started ${ago}` : t`In progress`;
 }
 
 function agoFrom(since: number, now: number): string | null {

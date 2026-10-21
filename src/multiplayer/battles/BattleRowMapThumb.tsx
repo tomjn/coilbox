@@ -1,3 +1,4 @@
+import { useLingui } from "@lingui/react/macro";
 import { Download, Loader2 } from "lucide-react";
 import { useState } from "react";
 import {
@@ -69,6 +70,9 @@ function Minimap({
   writePath?: string;
   onDownloaded: () => void;
 }) {
+  const { t } = useLingui();
+  const battleMap = battle.map;
+  const battleTitle = battle.title;
   const { url, loading } = useUnitsyncMinimap(
     enginePath,
     dataDir,
@@ -81,12 +85,13 @@ function Minimap({
     missing
       ? {
           kind: "mapAnySource",
-          label: `Map: ${battle.map}`,
+          label: t`Map: ${battleMap}`,
           args: { mapName: battle.map, writePath },
         }
       : null,
   );
   const downloading = mapDl.busy;
+  const downloadError = mapDl.error;
 
   async function download() {
     const settled = await mapDl.start();
@@ -104,7 +109,7 @@ function Minimap({
         <MapThumb
           url={url ?? undefined}
           loading={loading}
-          alt={`Minimap of ${battle.map}`}
+          alt={t`Minimap of ${battleMap}`}
         />
       </div>
     );
@@ -117,17 +122,17 @@ function Minimap({
       disabled={downloading}
       aria-label={
         downloading
-          ? `Downloading map for ${battle.title}`
+          ? t`Downloading map for ${battleTitle}`
           : mapDl.error
-            ? `Retry downloading the map for ${battle.title}`
-            : `Download the map for ${battle.title}`
+            ? t`Retry downloading the map for ${battleTitle}`
+            : t`Download the map for ${battleTitle}`
       }
       title={
         downloading
-          ? "Downloading…"
+          ? t`Downloading…`
           : mapDl.error
-            ? `Download failed: ${mapDl.error}`
-            : "Map not installed. Click to download."
+            ? t`Download failed: ${downloadError}`
+            : t`Map not installed. Click to download.`
       }
       className="flex aspect-square w-14 shrink-0 items-center justify-center overflow-hidden rounded-md border border-border bg-muted text-muted-foreground transition-colors hover:bg-muted/80 hover:text-foreground disabled:cursor-wait disabled:hover:bg-muted disabled:hover:text-muted-foreground"
     >
