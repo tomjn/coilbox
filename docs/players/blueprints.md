@@ -91,8 +91,17 @@ The widget panel opens by itself the first time you start a match. If it never a
 2. Open the panel. Select the Blueprints button on the right of the screen, or type /coilbox_blueprints in the game's chat.
 3. Select one or more builders.
 4. Select a blueprint in the list. Its buildings follow the cursor. A building the ground will not take is marked with dark stripes and a dashed red outline.
-5. Press [ or ] to turn it. Shift+[ and Shift+] switch to the previous or next blueprint.
+5. Press [ or ] to turn it, F to flip it side to side or G to flip it top to bottom. Shift+[ and Shift+] switch to the previous or next blueprint.
 6. Left click to place it.
+
+While you place a blueprint, a second panel opens beside the first. It shows what the blueprint costs and how long your selected builders take to build it. Its buttons do the same as the keys, and each is labelled with the key that does it.
+
+The Builders buttons in that panel choose how the work is shared:
+
+- Together gives every builder every building, so they help each other with each one in turn. In most games this finishes soonest.
+- Split up gives each building to one builder, the nearest one, until each has its share. Use this in games such as Splinter Faction, where only one builder can work on a building at a time.
+
+The game remembers your choice for each game.
 
 Each builder you selected is ordered to build the buildings it can. Right click or Escape puts the blueprint away without placing it. Hold Shift when you click to add the orders after what the builders are already doing, and to keep the blueprint on the cursor for another copy.
 
@@ -118,10 +127,11 @@ You can bind other keys. Type /bind followed by a key and an action in the game'
 
 - coilbox_blueprints opens and closes the panel
 - coilbox_blueprints_rotate_left and coilbox_blueprints_rotate_right turn the blueprint
+- coilbox_blueprints_flip_x and coilbox_blueprints_flip_z flip it side to side and top to bottom
 - coilbox_blueprints_prev and coilbox_blueprints_next switch blueprint
 - coilbox_blueprints_save saves the selection
 
-Some games use [ and ] for their own keys, so those keys may not reach the widget. Bind other keys to the actions in that case.
+The widget only takes these keys while you place a blueprint, so the rest of the time F still means fight and G still means guard. Some games use [ and ] for their own keys, so those keys may not reach the widget. Bind other keys to the actions in that case.
 
 ### Save a base from a game
 

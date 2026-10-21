@@ -243,13 +243,85 @@ check("the opener lifts under the cursor", (function()
 end)())
 
 -- placing and the remainder are reported
-state.placing = { key = "library:eco", name = "Eco", rotation = 1 }
-state.keys = { left = { "[" }, right = { "]" } }
+state.placing = { key = "library:eco", name = "Eco", rotation = 1, flip = { x = true }, cost = { metal = 450.4, energy = 1200, seconds = 75 } }
+state.keys = { left = { "[" }, right = { "]" }, flipX = { "f" }, flipZ = {} }
 state.remainder = { count = 3 }
 state.message = "Saved Base on Map 2"
 local LP = MODEL.layout(state, measure, VIEW)
-check("the placing line says how to turn and drop it, not the name again", #textsWith(LP, "[ ] turn") == 1 and #textsWith(LP, "Placing") == 0 and #textsWith(LP, "Eco") == 1, show(LP.texts))
-check("the placing row offers cancel", #hitsOf(LP, "cancel") == 1)
+local function trayHits(L, kind)
+	local out = {}
+	for _, h in ipairs(hitsOf(L, kind)) do
+		if h.x >= L.tray.x and h.x < L.tray.x + L.tray.w then
+			out[#out + 1] = h
+		end
+	end
+	return out
+end
+local function trayTexts(L, needle)
+	local out = {}
+	for _, t in ipairs(L.texts) do
+		if t.text == needle and t.x >= L.tray.x and t.x < L.tray.x + L.tray.w then
+			out[#out + 1] = t
+		end
+	end
+	return out
+end
+local function trayTextsWith(L, needle)
+	local out = {}
+	for _, t in ipairs(textsWith(L, needle)) do
+		if t.x >= L.tray.x and t.x < L.tray.x + L.tray.w then
+			out[#out + 1] = t
+		end
+	end
+	return out
+end
+check("placing opens a panel beside the main one", LP.tray ~= nil and (LP.tray.x + LP.tray.w <= LP.box.x or LP.tray.x >= LP.box.x + LP.box.w), show(LP.tray))
+check("the placing panel opens toward the middle of the screen", LP.tray.x < LP.box.x)
+check("the placing panel's top lines up with the main panel's", LP.tray.y + LP.tray.h == LP.box.y + LP.box.h)
+check("the placing panel names the layout and offers Cancel", #trayTexts(LP, "Eco") == 1 and #trayHits(LP, "cancel") == 1, show(LP.texts))
+check("the main panel no longer has a placing line", #hitsOf(LP, "cancel") == 1 and #textsWith(LP, "turn,") == 0)
+check("the cost line gives metal, energy and the build time", #trayTextsWith(LP, "450 metal, 1200 energy, 1:15 to build") == 1, show(LP.texts))
+check("each key is a button labelled with the key bound to it", #trayTexts(LP, "[") == 1 and #trayTexts(LP, "]") == 1 and #trayTexts(LP, "F") == 1)
+check("a key with nothing bound gets a word instead", #trayTexts(LP, "Down") == 1)
+check("the turn buttons turn each way", #trayHits(LP, "turn") == 2 and trayHits(LP, "turn")[1].action.delta == -1)
+check("the flip buttons flip each axis", #trayHits(LP, "flip") == 2 and trayHits(LP, "flip")[1].action.axis == "x" and trayHits(LP, "flip")[2].action.axis == "z")
+check("the builders choice has both modes", #trayHits(LP, "assist") == 2)
+check("the tray's background counts as the panel, so a click there is not a placement", (function()
+	local a = MODEL.hit(LP, LP.tray.x + 2, LP.tray.y + 2)
+	return a ~= nil and a.kind == "panel"
+end)())
+check("every control in the placing panel sits inside it", (function()
+	for _, h in ipairs(LP.hits) do
+		if h.x >= LP.tray.x and h.x < LP.tray.x + LP.tray.w then
+			if h.x + h.w > LP.tray.x + LP.tray.w or h.y < LP.tray.y or h.y + h.h > LP.tray.y + LP.tray.h then
+				return false
+			end
+		end
+	end
+	return true
+end)())
+check("controls in a row of the placing panel do not overlap its label", (function()
+	for _, t in ipairs(LP.texts) do
+		if t.text == "Builders" then
+			for _, h in ipairs(trayHits(LP, "assist")) do
+				if h.x < t.x + measure(t.text, t.size) then
+					return false
+				end
+			end
+			return true
+		end
+	end
+end)())
+local lifted = (function()
+	local active
+	for _, r in ipairs(LP.rects) do
+		if r.kind == "button" and same(r.color, MODEL.COLORS.pillActive) and r.x >= LP.tray.x and r.x < LP.tray.x + LP.tray.w then
+			active = (active or 0) + 1
+		end
+	end
+	return active
+end)()
+check("the flip that is on and the builders mode in use are lit", lifted == 2, tostring(lifted))
 check("the remainder row has a count and two buttons", #textsWith(LP, "3 left") == 1 and #hitsOf(LP, "remainder") == 1 and #hitsOf(LP, "dismiss") == 1, show(LP.texts))
 check("the message is shown", #textsWith(LP, "Saved Base on Map 2") == 1)
 check("the active row is highlighted", (function()
@@ -269,9 +341,26 @@ check("the active row has a gold outline", (function()
 	return false
 end)())
 state.placing, state.remainder, state.message, state.keys = nil, nil, nil, {}
+check("nothing placing, no placing panel", MODEL.layout(state, measure, VIEW).tray == nil)
 
-check("the hint names the keys bound to turning", MODEL.placingHint({ left = { "q", "[" }, right = { "e" } }) == "q e turn, right click cancels", MODEL.placingHint({ left = { "q" }, right = { "e" } }))
-check("with nothing bound to turning the hint leaves it out", MODEL.placingHint({}) == "right click cancels" and MODEL.placingHint({ left = {}, right = {} }) == "right click cancels")
+local leftSide = MODEL.new()
+leftSide.open = true
+leftSide.pos = { x = 0, y = 0.9, right = false }
+leftSide.placing = { key = "x", name = "X", rotation = 0 }
+local LL = MODEL.layout(leftSide, measure, VIEW)
+check("with the panel on the left the placing panel opens to its right", LL.tray.x >= LL.box.x + LL.box.w, show(LL.tray))
+leftSide.open = false
+local LC = MODEL.layout(leftSide, measure, VIEW)
+check("with the panel closed the placing panel sits beside its tab", LC.tray ~= nil and LC.tray.x >= LC.box.x + LC.box.w)
+
+check("a key label puts a letter in capitals", MODEL.keyLabel({ "g" }, "Down") == "G" and MODEL.keyLabel({ "Shift+[" }, "x") == "Shift+[" and MODEL.keyLabel({}, "Down") == "Down")
+check("the cost line leaves out the time with no builder", MODEL.costLine({ metal = 10, energy = 0 }) == "10 metal, 0 energy")
+check("times read as minutes and seconds", MODEL.clockTime(5) == "0:05" and MODEL.clockTime(3599.6) == "60:00")
+local assisting = MODEL.new()
+check("builders help each other unless told otherwise", assisting.assist == "help")
+MODEL.setAssist(assisting, "split")
+MODEL.setAssist(assisting, "sideways")
+check("the builders mode switches, and an unknown one is ignored", assisting.assist == "split")
 
 -- stepping through the blueprints with a key
 local stepping = MODEL.new()
@@ -622,7 +711,15 @@ check("hovering a tile shows it in the strip as a list row", #rectsOf(LGH, "row"
 tiles.hover = nil
 tiles.placing = { key = "library:3", name = "Entry 3", rotation = 0 }
 local LGP = MODEL.layout(tiles, measure, VIEW)
-check("with nothing hovered the strip shows the one being placed, outlined only in the grid", #textsWith(LGP, "Entry 3") == 1 and #rectsOf(LGP, "outline") == 1)
+check("with nothing hovered the strip shows the one being placed, outlined only in the grid", (function()
+	local inPanel = 0
+	for _, t in ipairs(textsWith(LGP, "Entry 3")) do
+		if t.x >= LGP.box.x and t.x < LGP.box.x + LGP.box.w then
+			inPanel = inPanel + 1
+		end
+	end
+	return inPanel == 1 and #rectsOf(LGP, "outline") == 1
+end)())
 tiles.placing = nil
 MODEL.turnPage(tiles, 1)
 check("a grid page is whole rows of tiles", hitsOf(MODEL.layout(tiles, measure, VIEW), "place")[1].action.key == "library:" .. (#shownTiles + 1) and #shownTiles % MODEL.GRID_COLUMNS == 0)

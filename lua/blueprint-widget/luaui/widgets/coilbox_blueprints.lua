@@ -6,8 +6,8 @@
 --
 -- The panel lists the blueprints coilbox holds for this game, plus whatever
 -- BAR's own blueprints.json has. Pick one and it follows the cursor as ghosts,
--- turned with [ and ], placed with a click as build orders to the selected
--- builders. Save selection writes the selected buildings to a spool file that
+-- turned with [ and ], flipped with F and G, placed with a click as build
+-- orders to the selected builders. Save selection writes the selected buildings to a spool file that
 -- coilbox collects into the library.
 --
 -- Everything that can be decided without the engine lives under
@@ -29,15 +29,21 @@ local ACTION_LEFT = "coilbox_blueprints_rotate_left"
 local ACTION_RIGHT = "coilbox_blueprints_rotate_right"
 local ACTION_NEXT = "coilbox_blueprints_next"
 local ACTION_PREV = "coilbox_blueprints_prev"
+local ACTION_FLIP_X = "coilbox_blueprints_flip_x"
+local ACTION_FLIP_Z = "coilbox_blueprints_flip_z"
 
 -- Keys bound when the widget loads, each only if the player has bound
--- nothing to its action. The engine binds [ and ] to buildfacing too, and an
--- action that takes the key stops the ones after it.
+-- nothing to its action. The engine binds [ and ] to buildfacing and F and G
+-- to fight and guard. LuaUI is offered a key's actions before the engine
+-- runs them, and these only take the key while a layout is being placed, so
+-- the rest of the time it does its usual job. F and G flip, as in Factorio.
 local DEFAULT_KEYS = {
 	{ ACTION_LEFT, "[" },
 	{ ACTION_RIGHT, "]" },
 	{ ACTION_PREV, "Shift+[" },
 	{ ACTION_NEXT, "Shift+]" },
+	{ ACTION_FLIP_X, "f" },
+	{ ACTION_FLIP_Z, "g" },
 }
 -- The defaults this widget bound, to unbind on shutdown.
 local boundKeys = {}
@@ -329,9 +335,12 @@ local function readSelection()
 	return true
 end
 
+local readCost
+
 local function refreshPanel()
 	MODEL.refresh(panel, store:entries(), PLACE, Game, can)
 	panel.remainder = remainder and { count = #remainder } or nil
+	readCost()
 	MODEL.touch(panel)
 end
 
@@ -344,7 +353,19 @@ local function readKeys()
 	panel.keys = {
 		left = Spring.GetActionHotKeys(ACTION_LEFT) or {},
 		right = Spring.GetActionHotKeys(ACTION_RIGHT) or {},
+		flipX = Spring.GetActionHotKeys(ACTION_FLIP_X) or {},
+		flipZ = Spring.GetActionHotKeys(ACTION_FLIP_Z) or {},
 	}
+	MODEL.touch(panel)
+end
+
+--- What the layout being placed costs, and how long the selection takes.
+function readCost()
+	if not placing then
+		return
+	end
+	local metal, energy, seconds = PLACE.cost(placing.item.resolved, can)
+	panel.placing.cost = { metal = metal, energy = energy, seconds = seconds }
 	MODEL.touch(panel)
 end
 
@@ -372,9 +393,9 @@ local function startPlacing(key)
 		return
 	end
 	readKeys()
-	placing = { item = item, rotation = 0, foot = nil }
-	panel.placing = { key = key, name = item.name, rotation = 0 }
-	MODEL.touch(panel)
+	placing = { item = item, rotation = 0, flip = { x = false, z = false }, foot = nil }
+	panel.placing = { key = key, name = item.name, rotation = 0, flip = placing.flip }
+	readCost()
 end
 
 --- Turn the layout being placed. Returns whether it did, so a key bound to
@@ -383,9 +404,26 @@ local function rotate(turns)
 	if not placing then
 		return false
 	end
+	-- One flip mirrors the turn too, so turn the other way to keep a key
+	-- turning the same way on screen.
+	if placing.flip.x ~= placing.flip.z then
+		turns = -turns
+	end
 	placing.rotation = (placing.rotation + turns) % 4
 	placing.foot = nil
 	panel.placing.rotation = placing.rotation
+	MODEL.touch(panel)
+	return true
+end
+
+--- Flip the layout being placed side to side ("x") or top to bottom ("z").
+-- Returns whether it did, as rotate does.
+local function flip(axis)
+	if not placing or (axis ~= "x" and axis ~= "z") then
+		return false
+	end
+	placing.flip[axis] = not placing.flip[axis]
+	placing.foot = nil
 	MODEL.touch(panel)
 	return true
 end
@@ -418,7 +456,7 @@ local function trackCursor()
 		return
 	end
 	placing.ax, placing.az = ax, az
-	placing.foot = PLACE.footprint(placing.item.resolved, placing.rotation, ax, az)
+	placing.foot = PLACE.footprint(placing.item.resolved, placing.rotation, ax, az, placing.flip)
 end
 
 local function setRemainder(positions)
@@ -455,7 +493,7 @@ local function placeNow()
 		return
 	end
 	readSelection()
-	local plan = PLACE.plan(placing.foot, can, shiftHeld())
+	local plan = PLACE.plan(placing.foot, can, shiftHeld(), panel.assist)
 	local sent = PLACE.issue(plan)
 	say(placing.item.name .. ": " .. describe(plan, sent))
 	setRemainder(plan.remainder)
@@ -478,7 +516,7 @@ local function placeRemainder()
 		local status = Spring.TestBuildOrder(p.defID, p.x, p.y, p.z, p.facing)
 		foot[i] = { defID = p.defID, def = p.def, x = p.x, y = p.y, z = p.z, facing = p.facing, blocked = status == 0 }
 	end
-	local plan = PLACE.plan(foot, can, shiftHeld())
+	local plan = PLACE.plan(foot, can, shiftHeld(), panel.assist)
 	local sent = PLACE.issue(plan)
 	say("Remainder: " .. describe(plan, sent))
 	setRemainder(plan.remainder)
@@ -548,6 +586,12 @@ local function act(action)
 		MODEL.setView(panel, action.view)
 	elseif kind == "page" then
 		MODEL.turnPage(panel, action.delta)
+	elseif kind == "turn" then
+		rotate(action.delta)
+	elseif kind == "flip" then
+		flip(action.axis)
+	elseif kind == "assist" then
+		MODEL.setAssist(panel, action.mode)
 	elseif kind == "place" then
 		if placing and placing.item.entry.key == action.key then
 			stopPlacing()
@@ -573,8 +617,21 @@ function widget:SetConfigData(data)
 	saved = data
 end
 
+-- Whether builders help each other or split the work, by game, since that
+-- depends on the game's rules.
+local function gameKey()
+	return Game.gameShortName or Game.gameName or ""
+end
+
 function widget:GetConfigData()
-	return { seen = true, pos = panel and panel.pos, view = panel and panel.view }
+	local assist = {}
+	for k, v in pairs(type(saved and saved.assist) == "table" and saved.assist or {}) do
+		assist[k] = v
+	end
+	if panel then
+		assist[gameKey()] = panel.assist
+	end
+	return { seen = true, pos = panel and panel.pos, view = panel and panel.view, assist = assist }
 end
 
 function widget:Initialize()
@@ -615,6 +672,9 @@ function widget:Initialize()
 	end
 	if saved then
 		MODEL.setView(panel, saved.view)
+		if type(saved.assist) == "table" then
+			MODEL.setAssist(panel, saved.assist[gameKey()])
+		end
 	end
 	can = PLACE.capabilities({})
 
@@ -642,6 +702,12 @@ function widget:Initialize()
 	widgetHandler:AddAction(ACTION_NEXT, function()
 		return step(1)
 	end, nil, "tp")
+	widgetHandler:AddAction(ACTION_FLIP_X, function()
+		return flip("x")
+	end, nil, "tp")
+	widgetHandler:AddAction(ACTION_FLIP_Z, function()
+		return flip("z")
+	end, nil, "tp")
 	for _, default in ipairs(DEFAULT_KEYS) do
 		local action, key = default[1], default[2]
 		local current = Spring.GetActionHotKeys(action)
@@ -665,13 +731,14 @@ function widget:Initialize()
 		end,
 		save = saveSelection,
 		rotate = rotate,
+		flip = flip,
 		step = step,
 	}
 
 	-- A widget that loads and then draws nothing looks like one that did not
 	-- load. Say how to reach it, and the very first time it ever runs, open
 	-- the panel so there is something to see.
-	Spring.Echo("Coilbox blueprints: /coilbox_blueprints toggles the panel. Bind keys to " .. ACTION_LEFT .. ", " .. ACTION_RIGHT .. ", " .. ACTION_PREV .. " and " .. ACTION_NEXT .. " to turn and pick layouts.")
+	Spring.Echo("Coilbox blueprints: /coilbox_blueprints toggles the panel. Bind keys to " .. ACTION_LEFT .. ", " .. ACTION_RIGHT .. ", " .. ACTION_FLIP_X .. ", " .. ACTION_FLIP_Z .. ", " .. ACTION_PREV .. " and " .. ACTION_NEXT .. " to turn, flip and pick layouts.")
 	if not (saved and saved.seen) then
 		open()
 	end
@@ -684,6 +751,8 @@ function widget:Shutdown()
 	widgetHandler:RemoveAction(ACTION_RIGHT)
 	widgetHandler:RemoveAction(ACTION_NEXT)
 	widgetHandler:RemoveAction(ACTION_PREV)
+	widgetHandler:RemoveAction(ACTION_FLIP_X)
+	widgetHandler:RemoveAction(ACTION_FLIP_Z)
 	for _, default in ipairs(boundKeys) do
 		Spring.SendCommands("unbind " .. default[2] .. " " .. default[1])
 	end
@@ -924,7 +993,7 @@ function widget:DrawWorld()
 	local marks, key
 	if foot then
 		marks = foot
-		key = "cursor:" .. placing.ax .. ":" .. placing.az .. ":" .. placing.rotation .. ":" .. placing.item.entry.key
+		key = "cursor:" .. placing.ax .. ":" .. placing.az .. ":" .. placing.rotation .. ":" .. tostring(placing.flip.x) .. tostring(placing.flip.z) .. ":" .. placing.item.entry.key
 	else
 		marks = remainder
 		key = "remainder:" .. remainderSerial

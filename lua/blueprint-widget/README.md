@@ -9,9 +9,11 @@ Coilbox installs `luaui/` into the content root as `LuaUI/` when you press the b
 - a panel, opened from a small Blueprints button or with the `coilbox_blueprints` action (bind a key, or type `/coilbox_blueprints` in the console), listing the blueprints for the game being played
 - the button and the panel's title drag the panel anywhere on screen, snapping to an edge near one, and the widget's config keeps where it was left and whether it shows a list or a grid
 - each blueprint's layout drawn from above, with energy yellow, builders green and weapons red
-- three tabs: what the selected builders can build now, what they can build in part, and everything
+- three tabs: what the selected builders can build now, what they can build in part, and everything, a page at a time, turned with the arrows in the footer or the mouse wheel
 - pick a row or a tile and the layout follows the cursor as ghosts over marks in the same colours, striped with a dashed red rim where the ground refuses a building
-- `[` and `]` turn it, Shift+`[` and Shift+`]` step to the previous or next blueprint, left click places it, right click or escape puts it down
+- while it is placed, a second panel beside the first shows its cost and build time with the selected builders, and buttons for each key
+- `[` and `]` turn it, F and G flip it side to side and top to bottom as in Factorio, Shift+`[` and Shift+`]` step to the previous or next blueprint, left click places it, right click or escape puts it down
+- builders either help each other, each taking every building it can build, or split up, each building going to the nearest builder until it has its share of the build time. Splitting is for games such as Splinter Faction that stop a second builder joining a nanoframe, where the stopped builder loses its whole queue. The choice is kept per game
 - a partial placement leaves what nobody selected could build as a remainder, and the panel offers to place that with whatever is selected later
 - Save selection writes the selected buildings to a spool file that coilbox collects into the library next time it runs
 
@@ -53,11 +55,11 @@ The shader is `#version 130` with `GL_ARB_explicit_attrib_location`, the lowest 
 
 ## Other widgets and games
 
-`WG.CoilboxBlueprints` offers `open`, `close`, `toggle`, `list`, `place(key)`, `save`, `rotate(turns)` and `step(direction)` to a game's own interface.
+`WG.CoilboxBlueprints` offers `open`, `close`, `toggle`, `list`, `place(key)`, `save`, `rotate(turns)`, `flip(axis)` with `"x"` or `"z"`, and `step(direction)` to a game's own interface.
 
-Widget actions: `coilbox_blueprints`, `coilbox_blueprints_save`, `coilbox_blueprints_rotate_left`, `coilbox_blueprints_rotate_right`, `coilbox_blueprints_prev`, `coilbox_blueprints_next`.
+Widget actions: `coilbox_blueprints`, `coilbox_blueprints_save`, `coilbox_blueprints_rotate_left`, `coilbox_blueprints_rotate_right`, `coilbox_blueprints_prev`, `coilbox_blueprints_next`, `coilbox_blueprints_flip_x`, `coilbox_blueprints_flip_z`.
 
-When the widget loads it binds `[`, `]`, `Shift+[` and `Shift+]` to the turn and step actions, each only if nothing is bound to that action yet, and unbinds them when it shuts down. A key in `uikeys.txt`, or a `bind` typed in the console, replaces the default. The engine binds the same keys to `buildfacing`, so the turn and step actions take the key only while there is something to turn or the panel is open. The hint while placing names whichever keys are bound to turning. A game whose own widget handler takes `[` and `]` first, as BAR may, leaves the actions to be bound to other keys.
+When the widget loads it binds `[`, `]`, `Shift+[`, `Shift+]`, `f` and `g` to the turn, step and flip actions, each only if nothing is bound to that action yet, and unbinds them when it shuts down. A key in `uikeys.txt`, or a `bind` typed in the console, replaces the default. The engine binds the same keys to `buildfacing`, `fight` and `guard`. LuaUI is offered a key's actions before the engine runs them, and the turn and flip actions take the key only while there is something to turn, the step actions only while the panel is open, so the rest of the time the key does its usual job. The placing panel labels its buttons with whichever keys are bound. A game whose own widget handler takes `[` and `]` first, as BAR may, leaves the actions to be bound to other keys.
 
 ## Tests
 

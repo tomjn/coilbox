@@ -30,6 +30,8 @@ M.PIC_RADIUS = 4
 M.BUTTON_RADIUS = 4
 --- Tiles across the grid view.
 M.GRID_COLUMNS = 4
+-- The panel that opens beside the main one while a blueprint is placed.
+M.TRAY_WIDTH = 210
 --- A dragged box closer than this to an edge of the view snaps flush to it.
 M.SNAP = 24
 --- The sizes above are for a view this many pixels tall. The panel scales
@@ -88,6 +90,10 @@ function M.new()
 		items = {},
 		counts = { now = 0, partly = 0, all = 0 },
 		hasBuilders = false,
+		-- "help": every builder takes every building and they help each other.
+		-- "split": each building goes to one builder, for games that stop
+		-- builders helping
+		assist = "help",
 		placing = nil,
 		remainder = nil,
 		message = nil,
@@ -98,7 +104,7 @@ end
 
 --- One name per clickable thing, for remembering what the cursor is over.
 function M.actionId(action)
-	return action.kind .. ":" .. (action.key or action.tab or action.view or action.delta or "")
+	return action.kind .. ":" .. (action.key or action.tab or action.view or action.delta or action.axis or action.mode or "")
 end
 
 --- Bump the version so the widget knows to lay out again.
@@ -213,18 +219,44 @@ function M.step(state, step)
 	return keys[(at + step - 1) % #keys + 1]
 end
 
---- The hint while placing, naming whichever keys turn a layout.
-function M.placingHint(keys)
-	local turn = {}
-	for _, list in ipairs({ keys.left or {}, keys.right or {} }) do
-		if list[1] then
-			turn[#turn + 1] = list[1]
-		end
+--- How a key reads on a button: a single letter in capitals, anything else
+-- as the engine names it, or the fallback when nothing is bound.
+function M.keyLabel(list, fallback)
+	local key = list and list[1]
+	if not key then
+		return fallback
 	end
-	if #turn == 0 then
-		return "right click cancels"
+	if #key == 1 then
+		return key:upper()
 	end
-	return table.concat(turn, " ") .. " turn, right click cancels"
+	return key
+end
+
+--- A time in seconds as minutes and seconds.
+function M.clockTime(seconds)
+	local whole = math.floor(seconds + 0.5)
+	return string.format("%d:%02d", math.floor(whole / 60), whole % 60)
+end
+
+--- What placing a layout costs, as the placing panel says it.
+-- @param cost table? { metal, energy, seconds }, seconds nil with no builder
+function M.costLine(cost)
+	if not cost then
+		return ""
+	end
+	local parts = { string.format("%d metal", math.floor(cost.metal + 0.5)), string.format("%d energy", math.floor(cost.energy + 0.5)) }
+	if cost.seconds then
+		parts[#parts + 1] = M.clockTime(cost.seconds) .. " to build"
+	end
+	return table.concat(parts, ", ")
+end
+
+--- Switch between builders helping each other and splitting the work.
+function M.setAssist(state, mode)
+	if (mode == "help" or mode == "split") and mode ~= state.assist then
+		state.assist = mode
+		M.touch(state)
+	end
 end
 
 --- Switch tab and go back to the first page.
@@ -554,6 +586,7 @@ function M.layout(state, measure, view)
 		}
 		hit(x, y, w, h, toggle)
 		L.box = { x = x, y = y, w = w, h = h }
+		M.layoutTray(state, L, measure, view)
 		return L
 	end
 
@@ -568,9 +601,6 @@ function M.layout(state, measure, view)
 	-- The panel's fixed parts, and however many lines fit under them in the
 	-- view. Without the clamp a tall library would push the panel off screen.
 	local chrome = HEADER + FOOTER
-	if state.placing then
-		chrome = chrome + LINE
-	end
 	if state.remainder then
 		chrome = chrome + LINE
 	end
@@ -629,15 +659,6 @@ function M.layout(state, measure, view)
 	local handleW = tx - px
 	text(px + PAD, y + HEADER / 2, FONT, M.truncate(TITLE, handleW - 2 * PAD, measure, FONT), hovered(toggle) and C.text or C.title)
 	hit(px, y, handleW, HEADER, toggle)
-
-	-- placing: the card being placed has the gold outline, so this line says
-	-- how to turn and drop it
-	if state.placing then
-		y = y - LINE
-		local cancelW = buttonW("Cancel")
-		text(px + PAD, y + LINE / 2, SMALL, M.truncate(M.placingHint(state.keys), W - 3 * PAD - cancelW, measure, SMALL), C.warn)
-		button(px + W - PAD - cancelW, y + (LINE - PILL) / 2, "Cancel", { kind = "cancel" })
-	end
 
 	-- remainder
 	if state.remainder then
@@ -795,7 +816,94 @@ function M.layout(state, measure, view)
 	end
 
 	panel.h = top - py
+	M.layoutTray(state, L, measure, view)
 	return L
+end
+
+--- The placing panel, beside the main panel or its tab on the side with more
+-- room: the name and Cancel, the cost, the keys that turn, flip and switch
+-- the layout, and whether builders help each other or split the work. Every
+-- key is a button too, so it works with nothing bound.
+function M.layoutTray(state, L, measure, view)
+	local placing = state.placing
+	if not placing then
+		return
+	end
+	local rects, texts, hits = L.rects, L.texts, L.hits
+	local S = M.scaleFor(state, view)
+	local PAD, GAP, LINE, HEADER = M.PAD * S, M.GAP * S, M.LINE * S, M.HEADER * S
+	local FONT, SMALL = M.FONT * S, M.SMALL * S
+	local PILL = SMALL + 8 * S
+	local BR = M.BUTTON_RADIUS * S
+	local TW = M.TRAY_WIDTH * S
+	local TH = HEADER + 4 * LINE + PAD
+
+	local function hovered(action)
+		return state.hover ~= nil and state.hover == M.actionId(action)
+	end
+	local function lift(color)
+		return { math.min(1, color[1] + 0.1), math.min(1, color[2] + 0.1), math.min(1, color[3] + 0.1), color[4] }
+	end
+	local function text(x, y, size, str, color)
+		texts[#texts + 1] = { x = x, y = y, size = size, text = str, color = color or C.text }
+	end
+	local function buttonW(label)
+		return math.max(PILL, measure(label, SMALL) + 2 * 6 * S)
+	end
+	local function button(x, y, label, action, active)
+		local w = buttonW(label)
+		local base = active and C.pillActive or C.button
+		rects[#rects + 1] = { x = x, y = y, w = w, h = PILL, color = hovered(action) and lift(base) or base, kind = "button", radius = BR }
+		text(x + 6 * S, y + PILL / 2, SMALL, label, active and C.text or nil)
+		hits[#hits + 1] = { x = x, y = y, w = w, h = PILL, action = action }
+	end
+
+	local box = L.box
+	local right = box.x + box.w / 2 > view.w / 2
+	local x = right and box.x - GAP - TW or box.x + box.w + GAP
+	x = math.floor(math.max(0, math.min(view.w - TW, x)))
+	local y = math.floor(math.max(0, math.min(view.h - TH, box.y + box.h - TH)))
+	rects[#rects + 1] = { x = x, y = y, w = TW, h = TH, color = C.panel, kind = "tray", radius = M.RADIUS * S }
+	L.tray = { x = x, y = y, w = TW, h = TH }
+	local edge = x + TW - PAD
+
+	-- name and Cancel
+	local row = y + TH - HEADER
+	local cancelX = edge - buttonW("Cancel")
+	button(cancelX, row + (HEADER - PILL) / 2, "Cancel", { kind = "cancel" })
+	text(x + PAD, row + HEADER / 2, FONT, M.truncate(placing.name or "", cancelX - GAP - x - PAD, measure, FONT))
+
+	-- cost
+	row = row - LINE
+	text(x + PAD, row + LINE / 2, SMALL, M.truncate(M.costLine(placing.cost), TW - 2 * PAD, measure, SMALL), C.dim)
+
+	-- one labelled row of buttons, lined up on the right
+	local keys = state.keys or {}
+	local function controls(label, buttons)
+		row = row - LINE
+		text(x + PAD, row + LINE / 2, SMALL, label, C.dim)
+		local bx = edge + GAP
+		for _, b in ipairs(buttons) do
+			bx = bx - buttonW(b[1]) - GAP
+		end
+		for _, b in ipairs(buttons) do
+			button(bx, row + (LINE - PILL) / 2, b[1], b[2], b[3])
+			bx = bx + buttonW(b[1]) + GAP
+		end
+	end
+	local flip = placing.flip or {}
+	controls("Turn", {
+		{ M.keyLabel(keys.left, "Left"), { kind = "turn", delta = -1 } },
+		{ M.keyLabel(keys.right, "Right"), { kind = "turn", delta = 1 } },
+	})
+	controls("Flip", {
+		{ M.keyLabel(keys.flipX, "Across"), { kind = "flip", axis = "x" }, flip.x },
+		{ M.keyLabel(keys.flipZ, "Down"), { kind = "flip", axis = "z" }, flip.z },
+	})
+	controls("Builders", {
+		{ "Together", { kind = "assist", mode = "help" }, state.assist ~= "split" },
+		{ "Split up", { kind = "assist", mode = "split" }, state.assist == "split" },
+	})
 end
 
 --- What a point is over: the topmost hit, or the panel itself, or nil when
@@ -807,9 +915,10 @@ function M.hit(L, x, y)
 			return h.action
 		end
 	end
-	local p = L.rects[1]
-	if p and p.kind == "panel" and x >= p.x and x < p.x + p.w and y >= p.y and y < p.y + p.h then
-		return { kind = "panel" }
+	for _, p in ipairs({ L.rects[1], L.tray }) do
+		if p and (p == L.tray or p.kind == "panel") and x >= p.x and x < p.x + p.w and y >= p.y and y < p.y + p.h then
+			return { kind = "panel" }
+		end
 	end
 	return nil
 end
