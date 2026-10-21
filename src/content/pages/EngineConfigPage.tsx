@@ -1,3 +1,4 @@
+import { Trans, useLingui } from "@lingui/react/macro";
 import { Link } from "react-router";
 import { useEngineEditTarget, useUnitsyncEngineConfig } from "../config";
 import { BrowserToolbar } from "./components/BrowserToolbar";
@@ -28,6 +29,7 @@ import {
  * immediately. The frame renders the section title, so this is the body only.
  */
 export function EngineConfigPage({ category }: { category: string }) {
+  const { t } = useLingui();
   const { targets, selected, selectedKey, setSelectedKey } =
     useEngineEditTarget();
   const { data, loading, error, run, write } = useUnitsyncEngineConfig(
@@ -41,14 +43,17 @@ export function EngineConfigPage({ category }: { category: string }) {
   const busy = loading || (!!selected && !data && !error);
   // A build that lacks SetSpringConfig* can be read but not written. Fall back
   // to disabled controls in that case.
+  const configPath = data?.configPath;
   const writable = data?.writable !== false;
 
   return (
     <div className="space-y-4">
       {data && !data.writable ? (
         <p className="rounded-md border border-border/50 bg-muted/30 p-2 text-xs text-muted-foreground">
-          This engine's unitsync build can't write settings, so they're shown
-          read-only. Update the engine to edit them here.
+          <Trans>
+            This engine's unitsync build can't write settings, so they're shown
+            read-only. Update the engine to edit them here.
+          </Trans>
         </p>
       ) : null}
 
@@ -68,7 +73,7 @@ export function EngineConfigPage({ category }: { category: string }) {
       ) : targets.length === 0 ? (
         <EmptyState
           label={
-            <>
+            <Trans>
               No engines found in your content folders. Add a folder in{" "}
               <Link
                 to="/settings/content-folders"
@@ -84,15 +89,15 @@ export function EngineConfigPage({ category }: { category: string }) {
                 Engines
               </Link>
               .
-            </>
+            </Trans>
           }
         />
       ) : settings.length === 0 ? (
         <EmptyState
           label={
             data
-              ? "No settings could be read for this engine. See the details above."
-              : "No settings to display yet."
+              ? t`No settings could be read for this engine. See the details above.`
+              : t`No settings to display yet.`
           }
         />
       ) : (
@@ -116,7 +121,7 @@ export function EngineConfigPage({ category }: { category: string }) {
           className="break-all font-mono text-xs text-muted-foreground"
           title={data.configPath}
         >
-          Config file: {data.configPath}
+          <Trans>Config file: {configPath}</Trans>
         </p>
       ) : null}
     </div>

@@ -1,3 +1,4 @@
+import { Trans, useLingui } from "@lingui/react/macro";
 import { Button, useSetting } from "@picoframe/frame";
 import { Download, FolderPlus, Loader2, RotateCcw } from "lucide-react";
 import { useEffect, useState } from "react";
@@ -22,6 +23,7 @@ import {
 import { GetStartedCard } from "./GetStartedCard";
 
 export function SetupCard({ dismissible = false }: { dismissible?: boolean }) {
+  const { t } = useLingui();
   const {
     needsFolder,
     needsEngine,
@@ -71,6 +73,9 @@ export function SetupCard({ dismissible = false }: { dismissible?: boolean }) {
   if (complete) return null;
   if (dismissible && dismissed) return null;
 
+  const newestVersion = newest?.version ?? "";
+  const newestPlatform = newest?.platform ?? "";
+
   async function createFolder() {
     setBusy("folder");
     setError(null);
@@ -104,7 +109,7 @@ export function SetupCard({ dismissible = false }: { dismissible?: boolean }) {
 
   async function downloadEngine() {
     if (!writePath) {
-      setError("No download destination set.");
+      setError(t`No download destination set.`);
       return;
     }
     setBusy("engine");
@@ -112,14 +117,14 @@ export function SetupCard({ dismissible = false }: { dismissible?: boolean }) {
     try {
       const { release } = await fetchNewestRecoil();
       if (!release) {
-        setError("No engine is available to download for this platform.");
+        setError(t`No engine is available to download for this platform.`);
         return;
       }
       // The queue's engineRecoil kind rescans content after the install, which
       // is what installRecoil used to do here.
       const settled = await engineDl.start({
         kind: "engineRecoil",
-        label: `Engine ${release.version}`,
+        label: t`Engine ${release.version}`,
         args: {
           version: release.version,
           assetUrl: release.assetUrl,
@@ -143,9 +148,13 @@ export function SetupCard({ dismissible = false }: { dismissible?: boolean }) {
   return (
     <Card className="gap-3 rounded-lg border-border p-4 shadow-none">
       <div className="space-y-1">
-        <h2 className="text-sm font-semibold">Set up Coilbox</h2>
+        <h2 className="text-sm font-semibold">
+          <Trans>Set up Coilbox</Trans>
+        </h2>
         <p className="text-xs text-muted-foreground">
-          To play, Coilbox needs a content folder and a game engine.
+          <Trans>
+            To play, Coilbox needs a content folder and a game engine.
+          </Trans>
         </p>
       </div>
 
@@ -153,16 +162,18 @@ export function SetupCard({ dismissible = false }: { dismissible?: boolean }) {
         (missingRoot ? (
           <div className="space-y-2">
             <p className="text-xs text-muted-foreground">
-              Your content folder{" "}
-              <code className="break-all rounded bg-muted px-1 py-0.5 text-foreground">
-                {missingRoot.path}
-              </code>{" "}
-              is missing. Recreate it to continue, or add a different folder
-              from the{" "}
-              <Link className="underline" to="/settings/content-folders">
-                Content folders
-              </Link>{" "}
-              page.
+              <Trans>
+                Your content folder{" "}
+                <code className="break-all rounded bg-muted px-1 py-0.5 text-foreground">
+                  {missingRoot.path}
+                </code>{" "}
+                is missing. Recreate it to continue, or add a different folder
+                from the{" "}
+                <Link className="underline" to="/settings/content-folders">
+                  Content folders
+                </Link>{" "}
+                page.
+              </Trans>
             </p>
             <Button onClick={recreateFolder} disabled={busy !== null}>
               {busy === "recreate" ? (
@@ -170,7 +181,7 @@ export function SetupCard({ dismissible = false }: { dismissible?: boolean }) {
               ) : (
                 <FolderPlus />
               )}
-              Recreate folder
+              <Trans>Recreate folder</Trans>
             </Button>
           </div>
         ) : (
@@ -181,8 +192,8 @@ export function SetupCard({ dismissible = false }: { dismissible?: boolean }) {
               <FolderPlus />
             )}
             {standardPath
-              ? `Create folder at ${standardPath}`
-              : "Create content folder"}
+              ? t`Create folder at ${standardPath}`
+              : t`Create content folder`}
           </Button>
         ))}
 
@@ -202,22 +213,37 @@ export function SetupCard({ dismissible = false }: { dismissible?: boolean }) {
                 <Download />
               )}
               {engineDl.status === "queued"
-                ? "Waiting for a slot…"
+                ? t`Waiting for a slot…`
                 : busy === "engine"
-                  ? "Installing…"
-                  : `Download newest engine${newest.version ? ` (${newest.version})` : ""}`}
+                  ? t`Installing…`
+                  : newestVersion
+                    ? t`Download newest engine (${newestVersion})`
+                    : t`Download newest engine`}
             </Button>
             <QueueProgress item={engineDl} />
           </div>
         ) : (
           <p className="text-xs text-muted-foreground">
-            An engine is required to play. No automatic download is available
-            for your platform{newest?.platform ? ` (${newest.platform})` : ""} —
-            install one from the{" "}
-            <Link className="underline" to="/settings/engines">
-              Engines page
-            </Link>
-            .
+            {newestPlatform ? (
+              <Trans>
+                An engine is required to play. No automatic download is
+                available for your platform ({newestPlatform}) — install one
+                from the{" "}
+                <Link className="underline" to="/settings/engines">
+                  Engines page
+                </Link>
+                .
+              </Trans>
+            ) : (
+              <Trans>
+                An engine is required to play. No automatic download is
+                available for your platform — install one from the{" "}
+                <Link className="underline" to="/settings/engines">
+                  Engines page
+                </Link>
+                .
+              </Trans>
+            )}
           </p>
         ))}
 
@@ -229,7 +255,7 @@ export function SetupCard({ dismissible = false }: { dismissible?: boolean }) {
           className="-mx-1 px-1 py-1.5 text-xs text-muted-foreground underline"
           onClick={() => setDismissed(true)}
         >
-          Dismiss
+          <Trans>Dismiss</Trans>
         </button>
       )}
     </Card>
@@ -243,8 +269,14 @@ export function SetupCard({ dismissible = false }: { dismissible?: boolean }) {
  * read or when there is none, so a plain coilbox sees the card it always did.
  */
 function BundledEngineRow() {
+  const { t } = useLingui();
   const { state, retry } = useBundledEngine();
   const { items } = useDownloadQueue();
+  const engineVersion =
+    state.status === "checking" || state.status === "none"
+      ? ""
+      : state.engine.version;
+  const failureReason = state.status === "failed" ? state.error : "";
   switch (state.status) {
     case "checking":
     case "none":
@@ -255,7 +287,7 @@ function BundledEngineRow() {
         <div className="space-y-2" role="status">
           <p className="flex items-center gap-2 text-xs">
             <Loader2 className="size-3.5 motion-safe:animate-spin" />
-            Setting up engine {state.engine.version}
+            <Trans>Setting up engine {engineVersion}</Trans>
           </p>
           <QueueProgress item={item} />
         </div>
@@ -265,7 +297,7 @@ function BundledEngineRow() {
       return (
         <p className="flex items-center gap-2 text-xs" role="status">
           <Loader2 className="size-3.5 motion-safe:animate-spin" />
-          Engine {state.engine.version} is set up. Finding your games…
+          <Trans>Engine {engineVersion} is set up. Finding your games…</Trans>
         </p>
       );
     case "failed":
@@ -280,13 +312,13 @@ function BundledEngineRow() {
             }
           >
             {state.status === "failed"
-              ? `Could not set up engine ${state.engine.version} from this package. ${state.error}`
-              : `Setting up engine ${state.engine.version} was cancelled.`}{" "}
-            Try again, or download an engine instead.
+              ? t`Could not set up engine ${engineVersion} from this package. ${failureReason}`
+              : t`Setting up engine ${engineVersion} was cancelled.`}{" "}
+            <Trans>Try again, or download an engine instead.</Trans>
           </p>
           <Button variant="outline" onClick={retry}>
             <RotateCcw />
-            Try again
+            <Trans>Try again</Trans>
           </Button>
         </div>
       );

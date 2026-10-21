@@ -1,3 +1,4 @@
+import { useLingui } from "@lingui/react/macro";
 import { useMemo } from "react";
 import { Skeleton } from "@/components/ui/skeleton";
 import type { GameItem } from "../../bindings";
@@ -32,6 +33,7 @@ export function BuildTreeEmbed({
   arg?: string;
   mode: "graph" | "buttons";
 }) {
+  const { t } = useLingui();
   const { selected } = useScanTargetSelection();
   const {
     data,
@@ -69,21 +71,20 @@ export function BuildTreeEmbed({
     game?.primaryArchive.name,
   );
 
+  const embedToken = "@widget/build-tree/<game>";
   if (!selected)
-    return <Notice>No engine selected to read the build tree.</Notice>;
+    return <Notice>{t`No engine selected to read the build tree.`}</Notice>;
   if (scanError)
     return (
       <div className="my-3">
-        <ScanFailed noun="games" reason={scanError} />
+        <ScanFailed noun={t`games`} reason={scanError} />
       </div>
     );
   if (!data || scanLoading) return <EmbedSkeleton />;
   if (!game) {
     return (
       <Notice>
-        {arg
-          ? `Game not installed: ${arg}`
-          : "Name a game: @widget/build-tree/<game>"}
+        {arg ? t`Game not installed: ${arg}` : t`Name a game: ${embedToken}`}
       </Notice>
     );
   }

@@ -1,12 +1,15 @@
+import type { MessageDescriptor } from "@lingui/core";
+import { msg } from "@lingui/core/macro";
+import { Trans, useLingui } from "@lingui/react/macro";
 import { Button, Input } from "@picoframe/frame";
 import { type KeyboardEvent, useState } from "react";
 import { type BindingSource, bindingsFor, type Keymap } from "../../keymap";
 
 /** What a source badge says, in the player's terms rather than ours. */
-const SOURCE_LABEL: Record<BindingSource, string> = {
-  engine: "engine default",
-  game: "from the game",
-  user: "you changed this",
+const SOURCE_LABEL: Record<BindingSource, MessageDescriptor> = {
+  engine: msg`engine default`,
+  game: msg`from the game`,
+  user: msg`you changed this`,
 };
 
 /**
@@ -69,6 +72,7 @@ export function KeyBindingEditor({
   /** Move every action on this keyset to another one. */
   onRebind: (nextKeys: string) => void;
 }) {
+  const { t, i18n } = useLingui();
   const [action, setAction] = useState("");
   const [capturing, setCapturing] = useState(false);
 
@@ -97,7 +101,7 @@ export function KeyBindingEditor({
               variant="ghost"
               onClick={() => setCapturing(false)}
             >
-              Cancel
+              <Trans>Cancel</Trans>
             </Button>
           ) : (
             <Button
@@ -105,12 +109,12 @@ export function KeyBindingEditor({
               variant="outline"
               onClick={() => setCapturing(true)}
             >
-              Press a key
+              <Trans>Press a key</Trans>
             </Button>
           )}
           {changed ? (
             <Button size="sm" variant="ghost" onClick={onReset}>
-              Reset
+              <Trans>Reset</Trans>
             </Button>
           ) : null}
         </div>
@@ -122,14 +126,14 @@ export function KeyBindingEditor({
           autoFocus
           value=""
           onKeyDown={onCapture}
-          placeholder="Press the keys you want. Escape binds Escape, so use Cancel to back out."
+          placeholder={t`Press the keys you want. Escape binds Escape, so use Cancel to back out.`}
           className="text-xs"
         />
       ) : null}
 
       {bindings.length === 0 ? (
         <p className="text-sm text-muted-foreground">
-          Nothing is bound to this key.
+          <Trans>Nothing is bound to this key.</Trans>
         </p>
       ) : (
         <ul className="space-y-1">
@@ -143,14 +147,14 @@ export function KeyBindingEditor({
               </span>
               <span className="flex shrink-0 items-center gap-2">
                 <span className="text-[11px] text-muted-foreground">
-                  {SOURCE_LABEL[b.source]}
+                  {i18n._(SOURCE_LABEL[b.source])}
                 </span>
                 <Button
                   size="sm"
                   variant="ghost"
                   onClick={() => onRemove(b.action)}
                 >
-                  Remove
+                  <Trans>Remove</Trans>
                 </Button>
               </span>
             </li>
@@ -160,8 +164,10 @@ export function KeyBindingEditor({
 
       {bindings.length > 1 ? (
         <p className="text-xs text-muted-foreground">
-          The engine tries these in order and runs the first one that applies,
-          which is how one key can mean two things.
+          <Trans>
+            The engine tries these in order and runs the first one that applies,
+            which is how one key can mean two things.
+          </Trans>
         </p>
       ) : null}
 
@@ -177,11 +183,11 @@ export function KeyBindingEditor({
         <Input
           value={action}
           onChange={(e) => setAction(e.target.value)}
-          placeholder="Another action for this key, e.g. areaattack"
+          placeholder={t`Another action for this key, e.g. areaattack`}
           className="font-mono text-xs"
         />
         <Button type="submit" size="sm" disabled={!action.trim()}>
-          Add
+          <Trans>Add</Trans>
         </Button>
       </form>
     </div>

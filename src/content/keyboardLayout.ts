@@ -1,3 +1,5 @@
+import { t } from "@lingui/core/macro";
+
 /**
  * An ANSI keyboard as data, in the engine's key names.
  *
@@ -116,9 +118,19 @@ export const KEYBOARD_ROWS: KeyCap[][] = [
 export type ModifierLayer = "" | "Shift+" | "Ctrl+" | "Alt+" | "Any+";
 
 export const MODIFIER_LAYERS: { id: ModifierLayer; label: string }[] = [
-  { id: "", label: "Plain" },
+  {
+    id: "",
+    get label() {
+      return t`Plain`;
+    },
+  },
   { id: "Shift+", label: "Shift" },
   { id: "Ctrl+", label: "Ctrl" },
   { id: "Alt+", label: "Alt" },
-  { id: "Any+", label: "Any" },
+  {
+    id: "Any+",
+    get label() {
+      return t`Any`;
+    },
+  },
 ];

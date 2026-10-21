@@ -1,3 +1,4 @@
+import { Trans } from "@lingui/react/macro";
 import { Button } from "@picoframe/frame";
 import { CheckCircle2, FolderOpen, Loader2, Star } from "lucide-react";
 import type { Engine } from "../../bindings";
@@ -36,7 +37,7 @@ export function EngineRow({
           {isPreferred && (
             <StatusBadge tone="good">
               <Star className="mr-1 size-3 fill-current" />
-              Preferred
+              <Trans>Preferred</Trans>
             </StatusBadge>
           )}
         </div>
@@ -56,7 +57,7 @@ export function EngineRow({
             onClick={() => onSetPreferred(engine)}
           >
             <Star className="size-4" />
-            Set preferred
+            <Trans>Set preferred</Trans>
           </Button>
         )}
         <Button
@@ -71,7 +72,11 @@ export function EngineRow({
           ) : (
             <CheckCircle2 className="size-4" />
           )}
-          {engine.syncVersion ? "Re-verify" : "Verify"}
+          {engine.syncVersion ? (
+            <Trans>Re-verify</Trans>
+          ) : (
+            <Trans>Verify</Trans>
+          )}
         </Button>
         <Button
           type="button"
@@ -80,7 +85,7 @@ export function EngineRow({
           onClick={() => onOpen(engine.path)}
         >
           <FolderOpen className="size-4" />
-          Open
+          <Trans>Open</Trans>
         </Button>
       </div>
     </li>

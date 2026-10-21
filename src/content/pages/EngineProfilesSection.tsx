@@ -1,3 +1,4 @@
+import { useLingui } from "@lingui/react/macro";
 import { useEngineEditTarget } from "../config";
 import { BrowserToolbar } from "./components/BrowserToolbar";
 import { ConfigProfilesPanel } from "./components/ConfigProfilesPanel";
@@ -17,6 +18,7 @@ import { EmptyState } from "./components/states";
  * chose an engine within.
  */
 export default function EngineProfilesSection() {
+  const { t } = useLingui();
   const { targets, selected, selectedKey, setSelectedKey, loading, refresh } =
     useEngineEditTarget();
 
@@ -35,7 +37,9 @@ export default function EngineProfilesSection() {
       {selected?.rootPath ? (
         <ConfigProfilesPanel rootPath={selected.rootPath} />
       ) : (
-        <EmptyState label="No content folder selected, so there is nothing to save a copy of yet." />
+        <EmptyState
+          label={t`No content folder selected, so there is nothing to save a copy of yet.`}
+        />
       )}
     </div>
   );

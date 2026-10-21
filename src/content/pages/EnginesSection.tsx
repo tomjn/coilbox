@@ -1,3 +1,4 @@
+import { Trans } from "@lingui/react/macro";
 import { AlertCircle } from "lucide-react";
 import { useState } from "react";
 import { Link } from "react-router";
@@ -73,7 +74,7 @@ export default function EnginesSection() {
       {/* What this page is for is the section's description, under the title.
           This says only the part that description cannot: what Verify does. */}
       <p className="text-sm text-muted-foreground">
-        Verify reads the real version from the binary.
+        <Trans>Verify reads the real version from the binary.</Trans>
       </p>
 
       {actionError && (
@@ -93,17 +94,19 @@ export default function EnginesSection() {
       ) : total === 0 ? (
         <div className="flex flex-col items-center gap-2 rounded-lg border border-dashed p-10 text-center">
           <p className="text-sm text-muted-foreground">
-            No engines found in your content folders.
+            <Trans>No engines found in your content folders.</Trans>
           </p>
           <p className="text-sm text-muted-foreground">
-            Add a folder in{" "}
-            <Link
-              to="/settings/content-folders"
-              className="underline underline-offset-4"
-            >
-              Content folders
-            </Link>{" "}
-            or download an engine.
+            <Trans>
+              Add a folder in{" "}
+              <Link
+                to="/settings/content-folders"
+                className="underline underline-offset-4"
+              >
+                Content folders
+              </Link>{" "}
+              or download an engine.
+            </Trans>
           </p>
         </div>
       ) : (
@@ -136,7 +139,7 @@ export default function EnginesSection() {
 
       {newerEngine && (
         <p className="text-sm font-medium">
-          Newer engine available: {newerEngine}
+          <Trans>Newer engine available: {newerEngine}</Trans>
         </p>
       )}
 

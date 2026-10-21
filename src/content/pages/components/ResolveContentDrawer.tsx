@@ -1,3 +1,4 @@
+import { Trans, useLingui } from "@lingui/react/macro";
 import { Button } from "@picoframe/frame";
 import {
   AlertTriangle,
@@ -24,6 +25,7 @@ function RequirementRow({
   req: ContentRequirement;
   resolve: ReturnType<typeof useResolveContent>;
 }) {
+  const { t } = useLingui();
   const status = resolve.statusFor(req);
   const item = resolve.itemFor(req);
   const error = resolve.errorFor(req);
@@ -31,12 +33,21 @@ function RequirementRow({
   const active = status === "active" || status === "queued";
   const kindLabel =
     req.kind === "game"
-      ? "Game"
+      ? t`Game`
       : req.kind === "map"
-        ? "Map"
+        ? t`Map`
         : req.kind === "dependency"
-          ? "Archive"
-          : "Engine";
+          ? t`Archive`
+          : t`Engine`;
+  const kindNoun =
+    req.kind === "game"
+      ? t`game`
+      : req.kind === "map"
+        ? t`map`
+        : req.kind === "dependency"
+          ? t`archive`
+          : t`engine`;
+  const gameName = req.kind === "dependency" ? req.gameName : "";
 
   return (
     <li className="flex flex-col gap-1.5 rounded-lg border border-border/50 bg-card p-3">
@@ -49,7 +60,7 @@ function RequirementRow({
         </div>
         {done ? (
           <span className="flex shrink-0 items-center gap-1.5 text-xs text-emerald-600 dark:text-emerald-400">
-            <CheckCircle2 className="size-4" /> Installed
+            <CheckCircle2 className="size-4" /> <Trans>Installed</Trans>
           </span>
         ) : req.noDownload ? null : (
           <Button
@@ -65,30 +76,34 @@ function RequirementRow({
               <Download className="size-4" />
             )}
             {status === "queued"
-              ? "Queued"
+              ? t`Queued`
               : status === "active"
-                ? "Downloading…"
-                : "Download"}
+                ? t`Downloading…`
+                : t`Download`}
           </Button>
         )}
       </div>
       {req.kind === "dependency" && !done && (
         <p className="text-xs text-muted-foreground">
-          {req.gameName} depends on it, and coilbox cannot download an archive
-          by this name. Find it in{" "}
-          <Link className="underline underline-offset-4" to="/library/games">
-            game downloads
-          </Link>
-          , then try again.
+          <Trans>
+            {gameName} depends on it, and coilbox cannot download an archive by
+            this name. Find it in{" "}
+            <Link className="underline underline-offset-4" to="/library/games">
+              game downloads
+            </Link>
+            , then try again.
+          </Trans>
         </p>
       )}
       {req.kind !== "dependency" && req.noDownload && !done && (
         <p className="text-xs text-muted-foreground">
-          Coilbox has no download for this {kindLabel.toLowerCase()}. Add it in{" "}
-          <Link className="underline underline-offset-4" to="/library/games">
-            Content &gt; Games
-          </Link>
-          , then try again.
+          <Trans>
+            Coilbox has no download for this {kindNoun}. Add it in{" "}
+            <Link className="underline underline-offset-4" to="/library/games">
+              Content &gt; Games
+            </Link>
+            , then try again.
+          </Trans>
         </p>
       )}
       {active && <QueueProgress item={item} />}
@@ -101,8 +116,8 @@ function RequirementRow({
         (resolve.noWriteRoot || req.kind === "engine") && (
           <p className="text-xs text-muted-foreground">
             {req.kind === "engine" && !resolve.noWriteRoot
-              ? "No matching engine build found automatically — install one from Settings → Engines."
-              : "Set a download folder in Content folders settings to enable this."}
+              ? t`No matching engine build found automatically — install one from Settings → Engines.`
+              : t`Set a download folder in Content folders settings to enable this.`}
           </p>
         )}
       {error && <p className="text-xs text-destructive">{error}</p>}
@@ -163,6 +178,7 @@ export function ResolveContentGate({
   onContinue: () => void | Promise<void>;
   onCancel: () => void;
 }) {
+  const { t } = useLingui();
   const resolve = useResolveContent(
     requirements,
     target,
@@ -223,7 +239,7 @@ export function ResolveContentGate({
             </DialogPrimitive.Title>
             <Loader2 className="size-5 animate-spin text-muted-foreground" />
             <p className="text-sm text-muted-foreground">
-              {continuing ? "Setting up…" : "Checking installed content…"}
+              {continuing ? t`Setting up…` : t`Checking installed content…`}
             </p>
           </DialogPrimitive.Content>
         </DialogPrimitive.Portal>
@@ -244,7 +260,7 @@ export function ResolveContentGate({
               <Button
                 variant="ghost"
                 size="icon"
-                aria-label="Close"
+                aria-label={t`Close`}
                 onClick={onCancel}
               >
                 <X className="size-4" />
@@ -258,13 +274,15 @@ export function ResolveContentGate({
                 <AlertTriangle className="mt-0.5 size-4 shrink-0 text-amber-600 dark:text-amber-400" />
                 <div className="flex min-w-0 flex-col gap-1.5">
                   <p className="text-xs text-muted-foreground">
-                    Coilbox could not read what is installed, so it has not
-                    checked whether you already have what this needs.
+                    <Trans>
+                      Coilbox could not read what is installed, so it has not
+                      checked whether you already have what this needs.
+                    </Trans>
                   </p>
                   <p className="text-xs text-muted-foreground">
                     {engineReading?.unconfirmed
-                      ? "An engine that may be the one this needs would not report its version. Check it in Settings → Engines and try this again, or continue without the check and find out when you play."
-                      : "The engine set as preferred could not be read. Pick another in Settings → Engines and try this again, or continue without the check and find out when you play."}
+                      ? t`An engine that may be the one this needs would not report its version. Check it in Settings → Engines and try this again, or continue without the check and find out when you play.`
+                      : t`The engine set as preferred could not be read. Pick another in Settings → Engines and try this again, or continue without the check and find out when you play.`}
                   </p>
                   {resolve.unreadableReason && (
                     <p className="break-words font-mono text-xs text-muted-foreground">
@@ -282,8 +300,8 @@ export function ResolveContentGate({
                   <p className="text-xs text-muted-foreground">
                     {description ??
                       (nothingToDownload
-                        ? "Some content this needs isn't installed, and coilbox cannot download it. Nothing is imported until it is installed."
-                        : "Some content this needs isn't installed. Download it below, or cancel — nothing is imported until everything's ready.")}
+                        ? t`Some content this needs isn't installed, and coilbox cannot download it. Nothing is imported until it is installed.`
+                        : t`Some content this needs isn't installed. Download it below, or cancel — nothing is imported until everything's ready.`)}
                   </p>
                 </div>
 
@@ -299,15 +317,17 @@ export function ResolveContentGate({
 
                 {!nothingToDownload && (
                   <p className="text-xs text-muted-foreground">
-                    Best-effort by name — a download may not be an exact match.
-                    See{" "}
-                    <Link
-                      className="underline underline-offset-4"
-                      to="/settings/content-folders"
-                    >
-                      Content folders settings
-                    </Link>{" "}
-                    for the destination folder.
+                    <Trans>
+                      Best-effort by name — a download may not be an exact
+                      match. See{" "}
+                      <Link
+                        className="underline underline-offset-4"
+                        to="/settings/content-folders"
+                      >
+                        Content folders settings
+                      </Link>{" "}
+                      for the destination folder.
+                    </Trans>
                   </p>
                 )}
               </>
@@ -318,15 +338,17 @@ export function ResolveContentGate({
 
           <div className="flex justify-end gap-2 border-t border-border/60 px-5 py-4">
             <Button variant="outline" onClick={onCancel}>
-              Cancel
+              <Trans>Cancel</Trans>
             </Button>
             {resolve.unreadable && !error && (
               <Button onClick={runContinue} disabled={continuing}>
-                {continuing ? "Setting up…" : "Continue anyway"}
+                {continuing ? t`Setting up…` : t`Continue anyway`}
               </Button>
             )}
             {error && resolve.missing.length === 0 && (
-              <Button onClick={runContinue}>Try again</Button>
+              <Button onClick={runContinue}>
+                <Trans>Try again</Trans>
+              </Button>
             )}
           </div>
         </DialogPrimitive.Content>

@@ -1,3 +1,4 @@
+import { Trans } from "@lingui/react/macro";
 import { cn } from "@picoframe/frame";
 import { ChevronRight, File, Folder, FolderOpen } from "lucide-react";
 import { useMemo, useState } from "react";
@@ -166,7 +167,7 @@ export function ArchiveTree({
   if (files.length === 0) {
     return (
       <p className="p-3 text-sm text-muted-foreground">
-        No files listed for this archive.
+        <Trans>No files listed for this archive.</Trans>
       </p>
     );
   }

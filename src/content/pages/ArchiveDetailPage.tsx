@@ -1,3 +1,4 @@
+import { Trans, useLingui } from "@lingui/react/macro";
 import { Button, buttonVariants, cn, useDrawer } from "@picoframe/frame";
 import { save } from "@tauri-apps/plugin-dialog";
 import { ArrowLeft, Boxes, FolderOpen, Terminal } from "lucide-react";
@@ -36,6 +37,7 @@ import { DetailLoading, NotFound } from "./components/states";
  * folder tree of its contents with a preview pane for the selected file.
  */
 export default function ArchiveDetailPage() {
+  const { t } = useLingui();
   const { name } = useParams();
   const decoded = name ?? "";
   const navigate = useNavigate();
@@ -74,7 +76,8 @@ export default function ArchiveDetailPage() {
   const selectedSize = tree?.files.find((f) => f.path === selectedFile)?.size;
 
   if (!data || loading) return <DetailLoading backTo="/library/archives" />;
-  if (!archive) return <NotFound backTo="/library/archives" label="archive" />;
+  if (!archive)
+    return <NotFound backTo="/library/archives" label={t`archive`} />;
 
   // Dependencies: a game's own deps, or a map's other archives.
   const game = data.games.find((g) => g.primaryArchive.name === decoded);
@@ -85,6 +88,9 @@ export default function ArchiveDetailPage() {
       ? map.archives.slice(1)
       : [];
 
+  const checksum = tree?.checksum;
+  const depCount = deps.length;
+  const fileCount = tree?.files.length ?? 0;
   const onDiskPath = tree?.archivePath ?? archive.path;
   // The batch conversion is only worth offering for an archive that has
   // something to convert, so the listing decides rather than the archive kind:
@@ -94,21 +100,22 @@ export default function ArchiveDetailPage() {
   const linked =
     archive.kind === "game" && archive.gameName
       ? {
-          label: "View game",
+          label: t`View game`,
           to: `/library/games/${encodeURIComponent(archive.gameName)}`,
         }
       : archive.kind === "map" && archive.mapName
         ? {
-            label: "View map",
+            label: t`View map`,
             to: `/library/maps/${encodeURIComponent(archive.mapName)}`,
           }
         : null;
 
+  const archiveName = archive.name;
   const openConvert = () => {
     if (!selected?.enginePath || !selected?.rootPath) return;
     drawer.open({
-      title: "Convert .3do models",
-      description: `Turn ${archive.name}'s ${legacyModels} legacy models into .s3o, one shared texture per folder.`,
+      title: t`Convert .3do models`,
+      description: t`Turn ${archiveName}''s ${legacyModels} legacy models into .s3o, one shared texture per folder.`,
       width: "44rem",
       content: (
         <Convert3doDrawer
@@ -146,7 +153,7 @@ export default function ArchiveDetailPage() {
       return false;
     const base = selectedFile.split("/").pop() ?? "file";
     const dest = await save({
-      title: "Save file from archive",
+      title: t`Save file from archive`,
       defaultPath: base,
     });
     if (!dest) return false;
@@ -168,7 +175,7 @@ export default function ArchiveDetailPage() {
           to="/library/archives"
           className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:underline"
         >
-          <ArrowLeft className="size-3.5" /> Archives
+          <ArrowLeft className="size-3.5" /> <Trans>Archives</Trans>
         </Link>
         <div className="flex flex-wrap items-center gap-2">
           <h1 className="break-all font-mono text-lg font-semibold">
@@ -189,7 +196,7 @@ export default function ArchiveDetailPage() {
                   "gap-1.5",
                 )}
               >
-                <Boxes className="size-4" /> Convert models
+                <Boxes className="size-4" /> <Trans>Convert models</Trans>
               </Link>
             ) : (
               selected?.enginePath &&
@@ -201,7 +208,7 @@ export default function ArchiveDetailPage() {
                   className="gap-1.5"
                   onClick={openConvert}
                 >
-                  <Boxes className="size-4" /> Convert models
+                  <Boxes className="size-4" /> <Trans>Convert models</Trans>
                 </Button>
               )
             )}
@@ -212,8 +219,8 @@ export default function ArchiveDetailPage() {
                 className="gap-1.5"
                 onClick={() =>
                   drawer.open({
-                    title: "Lua Console",
-                    description: `Run Lua through ${archive.name} via unitsync.`,
+                    title: t`Lua Console`,
+                    description: t`Run Lua through ${archiveName} via unitsync.`,
                     width: "40rem",
                     content: (
                       <LuaConsoleDrawer
@@ -225,7 +232,7 @@ export default function ArchiveDetailPage() {
                   })
                 }
               >
-                <Terminal className="size-4" /> Lua Console
+                <Terminal className="size-4" /> <Trans>Lua Console</Trans>
               </Button>
             )}
             {linked && (
@@ -244,7 +251,7 @@ export default function ArchiveDetailPage() {
                 className="gap-1.5"
                 onClick={openFolder}
               >
-                <FolderOpen className="size-4" /> Open folder
+                <FolderOpen className="size-4" /> <Trans>Open folder</Trans>
               </Button>
             )}
             {onDiskPath && isDeletableArchive(onDiskPath) && (
@@ -259,7 +266,9 @@ export default function ArchiveDetailPage() {
         <div className="flex flex-wrap gap-x-3 gap-y-1 text-xs text-muted-foreground">
           {archive.size != null && <span>{formatBytes(archive.size)}</span>}
           {tree?.checksum && (
-            <span className="font-mono">checksum {tree.checksum}</span>
+            <span className="font-mono">
+              <Trans>checksum {checksum}</Trans>
+            </span>
           )}
           {onDiskPath && (
             <span className="break-all font-mono" title={onDiskPath}>
@@ -283,10 +292,12 @@ export default function ArchiveDetailPage() {
       </header>
 
       <section className="flex shrink-0 flex-col gap-2">
-        <h2 className="text-sm font-medium">Dependencies ({deps.length})</h2>
+        <h2 className="text-sm font-medium">
+          <Trans>Dependencies ({depCount})</Trans>
+        </h2>
         {deps.length === 0 ? (
           <p className="text-sm text-muted-foreground">
-            This archive lists no dependencies.
+            <Trans>This archive lists no dependencies.</Trans>
           </p>
         ) : (
           <ul className="flex flex-col gap-2">
@@ -303,7 +314,7 @@ export default function ArchiveDetailPage() {
 
       <section className="flex min-h-0 flex-1 flex-col gap-2">
         <h2 className="shrink-0 text-sm font-medium">
-          Contents{tree ? ` (${tree.files.length} files)` : ""}
+          {tree ? t`Contents (${fileCount} files)` : t`Contents`}
         </h2>
         <div className="grid min-h-0 flex-1 grid-cols-[minmax(14rem,20rem)_1fr] gap-3">
           <div
@@ -324,7 +335,7 @@ export default function ArchiveDetailPage() {
               />
             ) : (
               <p className="p-3 text-sm text-muted-foreground">
-                Could not list this archive's contents.
+                <Trans>Could not list this archive's contents.</Trans>
               </p>
             )}
           </div>

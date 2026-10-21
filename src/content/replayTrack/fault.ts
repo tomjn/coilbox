@@ -1,3 +1,4 @@
+import { t } from "@lingui/core/macro";
 import type { ReplayTrackFault } from "../bindings";
 
 /**
@@ -22,20 +23,37 @@ export class ReplayTrackError extends Error {
 export function describeFault(fault: ReplayTrackFault): string {
   switch (fault.kind) {
     case "missing":
-      return "this replay has no recorded track";
-    case "stale":
-      return `the track was made by recorder version ${fault.recorderVersion} and this is ${fault.current}`;
+      return t`this replay has no recorded track`;
+    case "stale": {
+      const recorderVersion = fault.recorderVersion;
+      const current = fault.current;
+      return t`the track was made by recorder version ${recorderVersion} and this is ${current}`;
+    }
     case "otherGame":
-      return "the track in this replay's place is for another game";
-    case "unknownFormat":
-      return `the track's ${fault.field} is ${fault.found}, and this build reads ${fault.expected}`;
-    case "unreadable":
-      return `the track cannot be read: ${fault.message}`;
-    case "corruptWindow":
-      return `window ${fault.window} cannot be read: ${fault.message}`;
-    case "noSuchWindow":
-      return `there is no window ${fault.window}, the track has ${fault.windowCount}`;
-    case "io":
-      return `the track file failed: ${fault.message}`;
+      return t`the track in this replay's place is for another game`;
+    case "unknownFormat": {
+      const field = fault.field;
+      const found = fault.found;
+      const expected = fault.expected;
+      return t`the track's ${field} is ${found}, and this build reads ${expected}`;
+    }
+    case "unreadable": {
+      const message = fault.message;
+      return t`the track cannot be read: ${message}`;
+    }
+    case "corruptWindow": {
+      const window = fault.window;
+      const message = fault.message;
+      return t`window ${window} cannot be read: ${message}`;
+    }
+    case "noSuchWindow": {
+      const window = fault.window;
+      const windowCount = fault.windowCount;
+      return t`there is no window ${window}, the track has ${windowCount}`;
+    }
+    case "io": {
+      const message = fault.message;
+      return t`the track file failed: ${message}`;
+    }
   }
 }

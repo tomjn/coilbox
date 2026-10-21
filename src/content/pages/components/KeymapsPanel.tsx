@@ -1,3 +1,5 @@
+import { t } from "@lingui/core/macro";
+import { Trans, useLingui } from "@lingui/react/macro";
 import { Button, Input } from "@picoframe/frame";
 import { open, save } from "@tauri-apps/plugin-dialog";
 import { Download, Link2, Trash2, Upload } from "lucide-react";
@@ -44,11 +46,11 @@ export function applyContainerText(
 ): string | null {
   const container = asContainer(decodeContainerText(text));
   if (container?.kind !== "keymap") {
-    return "That is not a coilbox keymap.";
+    return t`That is not a coilbox keymap.`;
   }
   const payload = container.payload as SavedKeymap;
   if (!Array.isArray(payload.bindings)) {
-    return "That keymap has no bindings in it.";
+    return t`That keymap has no bindings in it.`;
   }
   onApply(payload);
   return null;
@@ -77,6 +79,7 @@ export function KeymapsPanel({
   gameName?: string;
   onApply: (saved: SavedKeymap) => void;
 }) {
+  const { t } = useLingui();
   const [saved, setSaved] = useState<StoredKeymap[]>([]);
   const [name, setName] = useState("");
   const [busy, setBusy] = useState(false);
@@ -110,7 +113,7 @@ export function KeymapsPanel({
         json: JSON.stringify(toSaved(keymap, gameName)),
       });
       setName("");
-      setStatus(`Saved "${trimmed}".`);
+      setStatus(t`Saved "${trimmed}".`);
       await refresh();
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
@@ -134,23 +137,24 @@ export function KeymapsPanel({
 
   async function onExport(stored: StoredKeymap) {
     const payload = payloadOf(stored);
+    const keymapName = stored.name;
     if (!payload) {
-      setError(`"${stored.name}" could not be read.`);
+      setError(t`"${keymapName}" could not be read.`);
       return;
     }
     setError(null);
     try {
       const dest = await save({
-        title: "Export keymap",
+        title: t`Export keymap`,
         defaultPath: `${stored.slug}.json`,
-        filters: [{ name: "Coilbox keymap", extensions: ["json"] }],
+        filters: [{ name: t`Coilbox keymap`, extensions: ["json"] }],
       });
       if (!dest) return;
       await contentWriteFile({
         dest,
         text: encodeContainerJson("keymap", KEYMAP_KIND_VERSION, payload),
       });
-      setStatus(`Exported "${stored.name}".`);
+      setStatus(t`Exported "${keymapName}".`);
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
     }
@@ -158,27 +162,28 @@ export function KeymapsPanel({
 
   function onCopyLink(stored: StoredKeymap) {
     const payload = payloadOf(stored);
+    const keymapName = stored.name;
     if (!payload) {
-      setError(`"${stored.name}" could not be read.`);
+      setError(t`"${keymapName}" could not be read.`);
       return;
     }
     const code = encodeContainerCode("keymap", KEYMAP_KIND_VERSION, payload);
     void copyDeepLink(buildImportCodeLink(code));
-    setStatus(`Copied a link to "${stored.name}".`);
+    setStatus(t`Copied a link to "${keymapName}".`);
   }
 
   async function onImport() {
     setError(null);
     try {
       const src = await open({
-        title: "Import keymap",
+        title: t`Import keymap`,
         multiple: false,
-        filters: [{ name: "Coilbox keymap", extensions: ["json"] }],
+        filters: [{ name: t`Coilbox keymap`, extensions: ["json"] }],
       });
       if (typeof src !== "string") return;
       const { text } = await importContainerFile({ src });
       const problem = applyContainerText(text, onApply);
-      setStatus(problem ? null : "Imported. Save to write it to uikeys.txt.");
+      setStatus(problem ? null : t`Imported. Save to write it to uikeys.txt.`);
       setError(problem);
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
@@ -189,14 +194,18 @@ export function KeymapsPanel({
     <section className="flex flex-col gap-3 rounded-lg border border-border/50 bg-card p-3">
       <div className="flex items-start justify-between gap-2">
         <div>
-          <h2 className="font-semibold text-sm">Saved keymaps</h2>
+          <h2 className="font-semibold text-sm">
+            <Trans>Saved keymaps</Trans>
+          </h2>
           <p className="mt-0.5 text-muted-foreground text-xs">
-            Keep this keymap under a name, switch between them, and share one.
+            <Trans>
+              Keep this keymap under a name, switch between them, and share one.
+            </Trans>
           </p>
         </div>
         <Button size="sm" variant="outline" onClick={onImport}>
           <Upload className="mr-1 size-3.5" />
-          Import
+          <Trans>Import</Trans>
         </Button>
       </div>
 
@@ -207,10 +216,10 @@ export function KeymapsPanel({
           onKeyDown={(e) => {
             if (e.key === "Enter") void onSave();
           }}
-          placeholder="Name this keymap"
+          placeholder={t`Name this keymap`}
         />
         <Button size="sm" disabled={busy || !name.trim()} onClick={onSave}>
-          Save
+          <Trans>Save</Trans>
         </Button>
       </div>
 
@@ -221,12 +230,14 @@ export function KeymapsPanel({
 
       {saved.length === 0 ? (
         <p className="text-muted-foreground text-sm">
-          No saved keymaps for this content folder yet.
+          <Trans>No saved keymaps for this content folder yet.</Trans>
         </p>
       ) : (
         <ul className="space-y-1">
           {saved.map((s) => {
             const payload = payloadOf(s);
+            const itemName = s.name;
+            const builtFor = payload?.gameName;
             const otherGame =
               payload?.gameName && gameName && payload.gameName !== gameName;
             return (
@@ -243,13 +254,13 @@ export function KeymapsPanel({
                       disabled={busy || !payload}
                       onClick={() => payload && onApply(payload)}
                     >
-                      Apply
+                      <Trans>Apply</Trans>
                     </Button>
                     <Button
                       size="sm"
                       variant="ghost"
                       onClick={() => onExport(s)}
-                      aria-label={`Export ${s.name}`}
+                      aria-label={t`Export ${itemName}`}
                     >
                       <Download className="size-3.5" />
                     </Button>
@@ -257,7 +268,7 @@ export function KeymapsPanel({
                       size="sm"
                       variant="ghost"
                       onClick={() => onCopyLink(s)}
-                      aria-label={`Copy a link to ${s.name}`}
+                      aria-label={t`Copy a link to ${itemName}`}
                     >
                       <Link2 className="size-3.5" />
                     </Button>
@@ -266,7 +277,7 @@ export function KeymapsPanel({
                       variant="ghost"
                       disabled={busy}
                       onClick={() => onRemove(s)}
-                      aria-label={`Delete ${s.name}`}
+                      aria-label={t`Delete ${itemName}`}
                     >
                       <Trash2 className="size-3.5" />
                     </Button>
@@ -274,8 +285,10 @@ export function KeymapsPanel({
                 </div>
                 {otherGame ? (
                   <p className="mt-0.5 text-muted-foreground text-xs">
-                    Built for {payload?.gameName}. Applying it here keeps its
-                    bindings, including any this game does not have.
+                    <Trans>
+                      Built for {builtFor}. Applying it here keeps its bindings,
+                      including any this game does not have.
+                    </Trans>
                   </p>
                 ) : null}
               </li>

@@ -1,3 +1,4 @@
+import { Plural, Trans, useLingui } from "@lingui/react/macro";
 import { Button } from "@picoframe/frame";
 import { AlertCircle, FolderOpen, Loader2, RefreshCw } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
@@ -13,7 +14,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { formatBytes, formatNumber } from "@/lib/format";
+import { formatBytes } from "@/lib/format";
 import { useDownloadQueue } from "../../downloads/DownloadQueueProvider";
 import {
   type ContentRoot,
@@ -150,7 +151,9 @@ export default function StorageSection() {
       <div className="space-y-8">
         <div className="flex flex-col items-center gap-2 rounded-lg border border-dashed p-10 text-center">
           <p className="text-sm text-muted-foreground">
-            No content folders to measure yet. Add one in Content folders.
+            <Trans>
+              No content folders to measure yet. Add one in Content folders.
+            </Trans>
           </p>
         </div>
         <ReplayTracksStorage />
@@ -175,7 +178,7 @@ export default function StorageSection() {
             ) : (
               <RefreshCw className="size-4" />
             )}
-            Refresh
+            <Trans>Refresh</Trans>
           </Button>
         </div>
 
@@ -198,11 +201,13 @@ export default function StorageSection() {
         <div className="flex flex-wrap items-center justify-between gap-2">
           <div className="flex flex-col gap-0.5">
             <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
-              Caches
+              <Trans>Caches</Trans>
             </h2>
             <p className="text-xs text-muted-foreground">
-              Generated thumbnails, headers, icons and branding art. All
-              regenerate on demand, so clearing them only frees disk space.
+              <Trans>
+                Generated thumbnails, headers, icons and branding art. All
+                regenerate on demand, so clearing them only frees disk space.
+              </Trans>
             </p>
           </div>
           <ReclaimCachesButton />
@@ -243,15 +248,33 @@ function ReplayUnitLists() {
   }, []);
 
   if (!usage) return null;
+  const { sets, replays } = usage;
+  const size = formatBytes(usage.bytes);
   return (
     <section className="space-y-1">
       <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
-        Replay unit lists
+        <Trans>Replay unit lists</Trans>
       </h2>
       <p className="text-xs text-muted-foreground">
-        {usage.sets === 0
-          ? "No unit lists are kept yet. One is kept the first time a replay's build orders are read against its installed game, or when a replay is analysed."
-          : `${formatNumber(usage.sets)} unit ${usage.sets === 1 ? "list is" : "lists are"} kept for ${formatNumber(usage.replays)} ${usage.replays === 1 ? "replay" : "replays"}, using ${formatBytes(usage.bytes)}. They let a replay name its units after its game is updated or removed, and each goes when the last replay that uses it is deleted.`}
+        {usage.sets === 0 ? (
+          <Trans>
+            No unit lists are kept yet. One is kept the first time a replay's
+            build orders are read against its installed game, or when a replay
+            is analysed.
+          </Trans>
+        ) : (
+          <Trans>
+            <Plural
+              value={sets}
+              one="# unit list is"
+              other="# unit lists are"
+            />{" "}
+            kept for <Plural value={replays} one="# replay" other="# replays" />
+            , using {size}. They let a replay name its units after its game is
+            updated or removed, and each goes when the last replay that uses it
+            is deleted.
+          </Trans>
+        )}
       </p>
     </section>
   );
@@ -276,6 +299,7 @@ function RootStorageCard({
   /** Re-size this root after something was deleted from it. */
   onChanged: () => void;
 }) {
+  const { t } = useLingui();
   return (
     <Card className="gap-4 rounded-lg border-border/50 p-4 shadow-none">
       <div className="flex flex-wrap items-start justify-between gap-2">
@@ -288,7 +312,7 @@ function RootStorageCard({
         <ReclaimSpaceButton
           rootPath={root.path}
           canPrune={canPrune}
-          blockReason="Finish or cancel downloads before reclaiming space"
+          blockReason={t`Finish or cancel downloads before reclaiming space`}
         />
       </div>
 
@@ -306,44 +330,60 @@ function RootStorageCard({
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Content</TableHead>
-                <TableHead className="text-right">Files</TableHead>
-                <TableHead className="text-right">Size</TableHead>
+                <TableHead>
+                  <Trans>Content</Trans>
+                </TableHead>
+                <TableHead className="text-right">
+                  <Trans>Files</Trans>
+                </TableHead>
+                <TableHead className="text-right">
+                  <Trans>Size</Trans>
+                </TableHead>
                 <TableHead className="w-24">
-                  <span className="sr-only">Reveal in file manager</span>
+                  <span className="sr-only">
+                    <Trans>Reveal in file manager</Trans>
+                  </span>
                 </TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              {state.overview.categories.map((c) => (
-                <TableRow key={c.id}>
-                  <TableCell>{c.label}</TableCell>
-                  <TableCell className="text-right tabular-nums text-muted-foreground">
-                    {c.files}
-                  </TableCell>
-                  <TableCell className="text-right tabular-nums">
-                    {formatBytes(c.bytes)}
-                  </TableCell>
-                  <TableCell className="text-right">
-                    {c.paths.length > 0 && (
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => onOpen(c.paths[0])}
-                        title={`Reveal ${c.paths[0]}`}
-                      >
-                        <FolderOpen className="size-4" />
-                        <span className="sr-only">Reveal {c.label} folder</span>
-                      </Button>
-                    )}
-                  </TableCell>
-                </TableRow>
-              ))}
+              {state.overview.categories.map((c) => {
+                const firstPath = c.paths[0];
+                const categoryLabel = c.label;
+                return (
+                  <TableRow key={c.id}>
+                    <TableCell>{c.label}</TableCell>
+                    <TableCell className="text-right tabular-nums text-muted-foreground">
+                      {c.files}
+                    </TableCell>
+                    <TableCell className="text-right tabular-nums">
+                      {formatBytes(c.bytes)}
+                    </TableCell>
+                    <TableCell className="text-right">
+                      {c.paths.length > 0 && (
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => onOpen(c.paths[0])}
+                          title={t`Reveal ${firstPath}`}
+                        >
+                          <FolderOpen className="size-4" />
+                          <span className="sr-only">
+                            <Trans>Reveal {categoryLabel} folder</Trans>
+                          </span>
+                        </Button>
+                      )}
+                    </TableCell>
+                  </TableRow>
+                );
+              })}
             </TableBody>
             <TableFooter>
               <TableRow>
-                <TableCell className="font-medium">Total</TableCell>
+                <TableCell className="font-medium">
+                  <Trans>Total</Trans>
+                </TableCell>
                 <TableCell />
                 <TableCell className="text-right font-medium tabular-nums">
                   {formatBytes(state.overview.totalBytes)}
@@ -355,7 +395,7 @@ function RootStorageCard({
 
           <div className="flex flex-col gap-2">
             <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-              Replay cleanup
+              <Trans>Replay cleanup</Trans>
             </h3>
             <BulkDeleteReplaysPanel
               rootPath={root.path}
@@ -366,49 +406,53 @@ function RootStorageCard({
           {state.overview.engines.length > 0 && (
             <div className="flex flex-col gap-2">
               <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                Engines
+                <Trans>Engines</Trans>
               </h3>
               <ul className="flex flex-col gap-2">
-                {state.overview.engines.map((engine) => (
-                  <li
-                    key={engine.path}
-                    className="relative flex flex-wrap items-center gap-x-4 gap-y-2 rounded-lg border border-border/50 p-3"
-                  >
-                    <div className="flex min-w-0 flex-1 flex-col gap-0.5">
-                      <span className="font-medium">{engine.version}</span>
-                      <span
-                        className="break-all font-mono text-xs text-muted-foreground"
-                        title={engine.path}
-                      >
-                        {engine.path}
-                      </span>
-                    </div>
-                    <span className="tabular-nums">
-                      {formatBytes(engine.bytes)}
-                    </span>
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => onOpen(engine.path)}
-                      title={`Reveal ${engine.path}`}
+                {state.overview.engines.map((engine) => {
+                  const enginePath = engine.path;
+                  const engineVersion = engine.version;
+                  return (
+                    <li
+                      key={engine.path}
+                      className="relative flex flex-wrap items-center gap-x-4 gap-y-2 rounded-lg border border-border/50 p-3"
                     >
-                      <FolderOpen className="size-4" />
-                      <span className="sr-only">
-                        Reveal the {engine.version} folder
+                      <div className="flex min-w-0 flex-1 flex-col gap-0.5">
+                        <span className="font-medium">{engine.version}</span>
+                        <span
+                          className="break-all font-mono text-xs text-muted-foreground"
+                          title={engine.path}
+                        >
+                          {engine.path}
+                        </span>
+                      </div>
+                      <span className="tabular-nums">
+                        {formatBytes(engine.bytes)}
                       </span>
-                    </Button>
-                    <DeleteEngineButton
-                      engine={engine}
-                      blockReason={
-                        engine.path === preferredEnginePath
-                          ? "This is your preferred engine, the one every launch uses. Set another as preferred first."
-                          : undefined
-                      }
-                      onDeleted={onChanged}
-                    />
-                  </li>
-                ))}
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => onOpen(engine.path)}
+                        title={t`Reveal ${enginePath}`}
+                      >
+                        <FolderOpen className="size-4" />
+                        <span className="sr-only">
+                          <Trans>Reveal the {engineVersion} folder</Trans>
+                        </span>
+                      </Button>
+                      <DeleteEngineButton
+                        engine={engine}
+                        blockReason={
+                          engine.path === preferredEnginePath
+                            ? t`This is your preferred engine, the one every launch uses. Set another as preferred first.`
+                            : undefined
+                        }
+                        onDeleted={onChanged}
+                      />
+                    </li>
+                  );
+                })}
               </ul>
             </div>
           )}

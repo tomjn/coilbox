@@ -1,3 +1,4 @@
+import { Trans, useLingui } from "@lingui/react/macro";
 import { Card } from "@/components/ui/card";
 import { useWriteRoot } from "../../../downloads/config";
 import { MapPacksBanner } from "../../../downloads/pages/components/MapPacksBanner";
@@ -16,6 +17,7 @@ import { SuggestionsList } from "./SuggestionsList";
  * This file is the card.
  */
 export function GetStartedCard() {
+  const { t } = useLingui();
   const gamesRoot = useWriteRoot("games");
   const mapsRoot = useWriteRoot("maps");
   const { offer, installed, refresh } = useGetStartedOffer();
@@ -26,16 +28,18 @@ export function GetStartedCard() {
   return (
     <Card className="gap-4 rounded-lg border-border p-4 shadow-none">
       <div className="space-y-1">
-        <h2 className="text-sm font-semibold">Get started</h2>
+        <h2 className="text-sm font-semibold">
+          <Trans>Get started</Trans>
+        </h2>
         <p className="text-xs text-muted-foreground">
-          Download a game or map to start playing.
+          <Trans>Download a game or map to start playing.</Trans>
         </p>
       </div>
 
       {offer.games.length > 0 && (
         <SuggestionsList
           kind="game"
-          heading="Games"
+          heading={t`Games`}
           items={offer.games}
           writeRoot={gamesRoot}
           onComplete={refresh}
@@ -45,7 +49,7 @@ export function GetStartedCard() {
         <>
           <SuggestionsList
             kind="map"
-            heading="Maps"
+            heading={t`Maps`}
             items={offer.maps}
             writeRoot={mapsRoot}
             onComplete={refresh}
