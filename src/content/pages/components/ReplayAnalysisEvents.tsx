@@ -1,3 +1,5 @@
+import { plural } from "@lingui/core/macro";
+import { Trans, useLingui } from "@lingui/react/macro";
 import { Button } from "@picoframe/frame";
 import { save } from "@tauri-apps/plugin-dialog";
 import { ChevronRight, Download, Loader2 } from "lucide-react";
@@ -68,29 +70,38 @@ function UnitNote({
   source: UnitSource | null;
   unitsFailed: boolean;
 }) {
+  const { t } = useLingui();
   if (!source) return null;
+  const game = recorded || t`This replay's game`;
   if (source.kind === "notInstalled") {
     return (
       <p className="text-xs text-muted-foreground">
-        {recorded || "This replay's game"} is not installed, so the units cannot
-        be named. Each event shows its unit definition id.
+        <Trans>
+          {game} is not installed, so the units cannot be named. Each event
+          shows its unit definition id.
+        </Trans>
       </p>
     );
   }
   if (source.kind === "stored") return <StoredListNote source={source} />;
+  const gameName = source.game.name;
   if (unitsFailed) {
     return (
       <p className="text-xs text-muted-foreground">
-        The units of {source.game.name} could not be read, so each event shows
-        its unit definition id.
+        <Trans>
+          The units of {gameName} could not be read, so each event shows its
+          unit definition id.
+        </Trans>
       </p>
     );
   }
   if (source.kind === "differentBuild") {
     return (
       <p className="text-xs text-amber-600 dark:text-amber-400">
-        This replay was played on {recorded}, which is not installed. Unit names
-        come from {source.game.name}, a different build, and may be wrong.
+        <Trans>
+          This replay was played on {recorded}, which is not installed. Unit
+          names come from {gameName}, a different build, and may be wrong.
+        </Trans>
       </p>
     );
   }
@@ -106,25 +117,27 @@ function DownloadButton({
   events: LogEvent[];
   info: DemoInfo;
 }) {
+  const { t } = useLingui();
   const [busy, setBusy] = useState(false);
 
   async function download() {
     setBusy(true);
     try {
       const dest = await save({
-        title: "Download the event log",
+        title: t`Download the event log`,
         defaultPath: eventsFileName(info, analysis.gameId),
-        filters: [{ name: "JSON lines", extensions: ["jsonl"] }],
+        filters: [{ name: t`JSON lines`, extensions: ["jsonl"] }],
       });
       if (!dest) return;
       await contentWriteFile({
         dest,
         text: eventsDownloadText(analysis, events),
       });
-      void notify({ title: "Event log downloaded.", level: "success" });
+      void notify({ title: t`Event log downloaded.`, level: "success" });
     } catch (e) {
+      const reason = e instanceof Error ? e.message : String(e);
       void notify({
-        title: `Download failed: ${e instanceof Error ? e.message : e}`,
+        title: t`Download failed: ${reason}`,
         level: "error",
       });
     } finally {
@@ -139,7 +152,7 @@ function DownloadButton({
       size="sm"
       className="gap-1.5"
       disabled={busy}
-      title="Writes every event, whatever the filters show."
+      title={t`Writes every event, whatever the filters show.`}
       onClick={download}
     >
       {busy ? (
@@ -147,17 +160,17 @@ function DownloadButton({
       ) : (
         <Download className="size-4" aria-hidden />
       )}
-      Download log
+      <Trans>Download log</Trans>
     </Button>
   );
 }
 
 function unitName(
   unit: UnitDatasetEntry | undefined,
-  def: number | undefined,
+  fallback: string,
 ): string {
   if (unit) return unit.fullName || unit.name;
-  return def === undefined ? "" : `Unit ${def}`;
+  return fallback;
 }
 
 /** The filters and the table, for one analysis whose events have arrived. */
@@ -170,6 +183,7 @@ function EventsTable({
   events: LogEvent[];
   info: DemoInfo;
 }) {
+  const { t } = useLingui();
   const [kind, setKind] = useState(ALL_KINDS);
   const [player, setPlayer] = useState(ALL_PLAYERS);
   const [shown, setShown] = useState(PAGE);
@@ -188,6 +202,9 @@ function EventsTable({
     [events, kind, player, labels],
   );
   const { rows, left } = pageOf(matching, shown);
+  const totalCount = formatNumber(events.length);
+  const matchingCount = formatNumber(matching.length);
+  const moreCount = Math.min(PAGE, left);
 
   // Nothing is asked of unitsync until there are events to name.
   // An event's ids are those of the game the analysis ran on, which the
@@ -222,7 +239,7 @@ function EventsTable({
     <div className="flex flex-col gap-2">
       <div className="flex flex-wrap items-center gap-2">
         <OptionSelect
-          ariaLabel="Kind of event"
+          ariaLabel={t`Kind of event`}
           size="sm"
           value={kind}
           onValueChange={(v) => {
@@ -230,24 +247,26 @@ function EventsTable({
             setShown(PAGE);
           }}
           options={[
-            { value: ALL_KINDS, label: "All kinds" },
+            { value: ALL_KINDS, label: t`All kinds` },
             ...kinds.map((k) => ({ value: k, label: kindLabel(k) })),
           ]}
         />
         <OptionSelect
-          ariaLabel="Player"
+          ariaLabel={t`Player`}
           size="sm"
           value={player}
           onValueChange={(v) => {
             setPlayer(v);
             setShown(PAGE);
           }}
-          options={[{ value: ALL_PLAYERS, label: "All players" }, ...players]}
+          options={[{ value: ALL_PLAYERS, label: t`All players` }, ...players]}
         />
         <DownloadButton analysis={analysis} events={events} info={info} />
       </div>
       {archive && status === "loading" ? (
-        <p className="text-xs text-muted-foreground">Reading unit names…</p>
+        <p className="text-xs text-muted-foreground">
+          <Trans>Reading unit names…</Trans>
+        </p>
       ) : (
         <UnitNote
           recorded={recorded}
@@ -257,22 +276,32 @@ function EventsTable({
       )}
       <p className="text-xs text-muted-foreground">
         {matching.length === events.length
-          ? `${formatNumber(events.length)} events.`
-          : `${formatNumber(matching.length)} of ${formatNumber(events.length)} events match.`}
+          ? t`${totalCount} events.`
+          : t`${matchingCount} of ${totalCount} events match.`}
       </p>
       {matching.length === 0 ? (
         <p className="text-sm text-muted-foreground">
-          No event matches these filters.
+          <Trans>No event matches these filters.</Trans>
         </p>
       ) : (
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead>Time</TableHead>
-              <TableHead>Kind</TableHead>
-              <TableHead>Player</TableHead>
-              <TableHead>Unit</TableHead>
-              <TableHead>Details</TableHead>
+              <TableHead>
+                <Trans>Time</Trans>
+              </TableHead>
+              <TableHead>
+                <Trans>Kind</Trans>
+              </TableHead>
+              <TableHead>
+                <Trans>Player</Trans>
+              </TableHead>
+              <TableHead>
+                <Trans>Unit</Trans>
+              </TableHead>
+              <TableHead>
+                <Trans>Details</Trans>
+              </TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -305,7 +334,7 @@ function EventsTable({
                             size="sm"
                           />
                         )}
-                        {unitName(unit, def)}
+                        {unitName(unit, t`Unit ${def}`)}
                       </span>
                     )}
                   </TableCell>
@@ -327,7 +356,9 @@ function EventsTable({
             size="sm"
             onClick={() => setShown((n) => n + PAGE)}
           >
-            Show {Math.min(PAGE, left)} more of {formatNumber(matching.length)}
+            <Trans>
+              Show {moreCount} more of {matchingCount}
+            </Trans>
           </Button>
         </div>
       )}
@@ -349,6 +380,7 @@ export function ReplayAnalysisEvents({
   replayPath: string;
   info: DemoInfo;
 }) {
+  const { t } = useLingui();
   const analyses = useStoredAnalyses();
   const gameId = info.remixed ? undefined : info.gameId;
   const stored = gameId ? analyses.get(gameId) : undefined;
@@ -399,9 +431,11 @@ export function ReplayAnalysisEvents({
               className="group justify-start gap-1.5"
             >
               <ChevronRight className="size-4 transition-transform group-data-[state=open]:rotate-90" />
-              <span className="font-medium">Recorded events</span>
+              <span className="font-medium">
+                <Trans>Recorded events</Trans>
+              </span>
               <span className="text-xs text-muted-foreground">
-                {formatNumber(total)} {total === 1 ? "event" : "events"}
+                {plural(total, { one: "# event", other: "# events" })}
               </span>
             </Button>
           </CollapsibleTrigger>
@@ -410,14 +444,18 @@ export function ReplayAnalysisEvents({
         <CollapsibleContent className="flex flex-col gap-2 pt-2">
           {readable.state === "outdated" && (
             <p className="text-xs text-amber-600 dark:text-amber-400">
-              This analysis was recorded by an older logger and may lack newer
-              kinds of event.
+              <Trans>
+                This analysis was recorded by an older logger and may lack newer
+                kinds of event.
+              </Trans>
             </p>
           )}
           {current === null ? (
-            <p className="text-sm text-muted-foreground">Reading events…</p>
+            <p className="text-sm text-muted-foreground">
+              <Trans>Reading events…</Trans>
+            </p>
           ) : current.status === "failed" ? (
-            <ErrorBanner message="The events could not be read." />
+            <ErrorBanner message={t`The events could not be read.`} />
           ) : (
             <EventsTable
               // Filters and paging start again for another replay or run.

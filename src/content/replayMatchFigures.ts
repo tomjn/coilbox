@@ -1,3 +1,4 @@
+import { plural, t } from "@lingui/core/macro";
 import type { Metric, StatRecord } from "./bindings";
 import { GAME_LENGTH_BOUNDARIES_SEC } from "./gameLength";
 import { formatTotal } from "./matchStats";
@@ -51,7 +52,10 @@ export function libraryMetrics(metrics: Metric[]): Metric[] {
   return metrics.filter((m) => m.roster && m.surfaced);
 }
 
-const BEST_ARMY = "best single army";
+/** Energy and metal are summed across armies by the best one, not added up. */
+function isBestArmyMetric(metric: Metric): boolean {
+  return metric.unit === "metal" || metric.unit === "energy";
+}
 
 /**
  * Whether a metric's row figure is the best single army or the sum of all of
@@ -59,10 +63,8 @@ const BEST_ARMY = "best single army";
  * one engine team controls, which is not a side.
  */
 export function figureBasis(metric: Metric, player?: string): string {
-  if (player) return `${player}'s own total`;
-  return metric.unit === "metal" || metric.unit === "energy"
-    ? BEST_ARMY
-    : "match total";
+  if (player) return t`${player}'s own total`;
+  return isBestArmyMetric(metric) ? t`best single army` : t`match total`;
 }
 
 /**
@@ -106,7 +108,7 @@ export function matchFigure(
     if (typeof v === "number") perTeam.push(v);
   }
   if (perTeam.length === 0) return undefined;
-  return figureBasis(metric) === BEST_ARMY
+  return isBestArmyMetric(metric)
     ? Math.max(...perTeam)
     : perTeam.reduce((a, b) => a + b, 0);
 }
@@ -148,8 +150,9 @@ export function columnMetrics(
 function lengthLabel(sec: number): string {
   const hours = sec / 3600;
   if (Number.isInteger(hours))
-    return `${hours} ${hours === 1 ? "hour" : "hours"}`;
-  return `${sec / 60} minutes`;
+    return plural(hours, { one: "# hour", other: "# hours" });
+  const minutes = sec / 60;
+  return t`${minutes} minutes`;
 }
 
 /**
@@ -157,10 +160,18 @@ function lengthLabel(sec: number): string {
  * the bands the matchup view groups by, read from the one list they share.
  */
 export const MIN_LENGTH_OPTIONS = [
-  { value: "0", label: "Any length" },
+  {
+    value: "0",
+    get label() {
+      return t`Any length`;
+    },
+  },
   ...GAME_LENGTH_BOUNDARIES_SEC.map((sec) => ({
     value: String(sec),
-    label: `Over ${lengthLabel(sec)}`,
+    get label() {
+      const length = lengthLabel(sec);
+      return t`Over ${length}`;
+    },
   })),
 ];
 

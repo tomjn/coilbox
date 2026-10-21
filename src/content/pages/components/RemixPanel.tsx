@@ -1,3 +1,4 @@
+import { Trans, useLingui } from "@lingui/react/macro";
 import { Button } from "@picoframe/frame";
 import { Code2, FilePlus2, Loader2 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
@@ -57,7 +58,7 @@ export function RemixPanel({
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
         <Button variant="outline" className="gap-1.5">
-          <Code2 className="size-4" /> Remix
+          <Code2 className="size-4" /> <Trans>Remix</Trans>
         </Button>
       </PopoverTrigger>
       <PopoverContent align="end" className="flex w-80 flex-col gap-3">
@@ -95,6 +96,7 @@ function RemixForm({
   dataDir: string;
   onRemixed: (newPath: string) => void;
 }) {
+  const { t } = useLingui();
   const scan = useUnitsyncScan(enginePath, dataDir);
   const games = scan.data?.games ?? [];
   const { resolved } = useReplayTarget(recordedEngineVersion);
@@ -160,31 +162,45 @@ function RemixForm({
   return (
     <>
       <div className="flex flex-col gap-1">
-        <h3 className="text-sm font-medium">Remix this replay</h3>
+        <h3 className="text-sm font-medium">
+          <Trans>Remix this replay</Trans>
+        </h3>
         <p className="text-xs text-muted-foreground">
-          Writes a copy that loads a locally installed game in place of the one
-          it was recorded on. A desync during playback usually means your build
-          differs from the recording. The original replay is left untouched.
+          <Trans>
+            Writes a copy that loads a locally installed game in place of the
+            one it was recorded on. A desync during playback usually means your
+            build differs from the recording. The original replay is left
+            untouched.
+          </Trans>
         </p>
       </div>
 
       <div className="flex flex-col gap-1.5">
-        <span className="text-xs font-medium">New target game</span>
+        <span className="text-xs font-medium">
+          <Trans>New target game</Trans>
+        </span>
         {scan.loading ? (
           <p className="text-xs text-muted-foreground">
-            Scanning installed games…
+            <Trans>Scanning installed games…</Trans>
           </p>
         ) : scan.error ? (
-          <ScanFailed noun="games" reason={scan.error} />
+          <ScanFailed noun={t`games`} reason={scan.error} />
         ) : games.length === 0 ? (
           <p className="text-xs text-muted-foreground">
-            No installed games found to target.
+            <Trans>No installed games found to target.</Trans>
           </p>
         ) : candidates.length === 0 ? (
           <p className="text-xs text-destructive">
-            Nothing to remix onto. This game isn't installed.
-            {!shortGameId.exact &&
-              " Its exact game couldn't be confirmed from the replay, so this is a name-only check."}
+            <Trans>Nothing to remix onto. This game isn't installed.</Trans>
+            {!shortGameId.exact && (
+              <>
+                {" "}
+                <Trans>
+                  Its exact game couldn't be confirmed from the replay, so this
+                  is a name-only check.
+                </Trans>
+              </>
+            )}
           </p>
         ) : (
           <OptionSelect
@@ -195,7 +211,7 @@ function RemixForm({
               label: g.name,
               description: g.info?.version,
             }))}
-            placeholder="Pick a game build"
+            placeholder={t`Pick a game build`}
             size="sm"
           />
         )}
@@ -214,10 +230,10 @@ function RemixForm({
               htmlFor="remix-stamp-version"
               className="text-xs font-normal"
             >
-              Also stamp the engine version
+              <Trans>Also stamp the engine version</Trans>
             </Label>
             <span className="text-xs text-muted-foreground">
-              Only needed to watch on a release engine.
+              <Trans>Only needed to watch on a release engine.</Trans>
             </span>
           </div>
         </div>
@@ -233,7 +249,7 @@ function RemixForm({
         ) : (
           <FilePlus2 className="size-4" />
         )}
-        {pending ? "Rewriting…" : "Rewrite"}
+        {pending ? t`Rewriting…` : t`Rewrite`}
       </Button>
 
       {error && <p className="text-xs text-destructive">{error}</p>}

@@ -1,3 +1,5 @@
+import { t } from "@lingui/core/macro";
+import { getLocale } from "../i18n";
 import type { ChatLine, TimelineEvent } from "./bindings";
 import { FRAMES_PER_SECOND, PREGAME_FRAME } from "./chatClock";
 
@@ -178,17 +180,22 @@ export function toEventMarks(events: TimelineEvent[]): EventMark[] {
   }));
 }
 
-/** "A", "A and B", "A, B and C". */
+/** "A", "A and B", "A, B and C" in the app language. */
 function nameList(names: string[]): string {
   if (names.length <= 1) return names[0] ?? "";
-  return `${names.slice(0, -1).join(", ")} and ${names[names.length - 1]}`;
+  return new Intl.ListFormat(getLocale(), {
+    style: "long",
+    type: "conjunction",
+  }).format(names);
 }
 
 const SERVER = 255;
 
 function eventName(e: TimelineEvent): string {
   if (e.playerName) return e.playerName;
-  return e.player === SERVER ? "The server" : `Player ${e.player}`;
+  if (e.player === SERVER) return t`The server`;
+  const slot = e.player;
+  return t`Player ${slot}`;
 }
 
 /** What happened, in plain words, from the typed event and nothing the engine said. */
@@ -196,29 +203,36 @@ export function describeEvent(e: TimelineEvent): string {
   const who = eventName(e);
   switch (e.type) {
     case "resigned":
-      return `${who} resigned`;
-    case "teamDied":
-      return e.players.length > 0
-        ? `${nameList(e.players)}'s army was eliminated`
-        : "An army was eliminated";
+      return t`${who} resigned`;
+    case "teamDied": {
+      if (e.players.length === 0) return t`An army was eliminated`;
+      const names = nameList(e.players);
+      return t`${names}'s army was eliminated`;
+    }
     case "playerLeft":
       switch (e.reason.kind) {
         case "lostConnection":
-          return `${who} lost connection`;
+          return t`${who} lost connection`;
         case "left":
-          return `${who} left the game`;
+          return t`${who} left the game`;
         case "kicked":
-          return `${who} was kicked`;
-        default:
-          return `${who} left the game (reason code ${e.reason.code})`;
+          return t`${who} was kicked`;
+        default: {
+          const code = e.reason.code;
+          return t`${who} left the game (reason code ${code})`;
+        }
       }
     case "paused":
-      return `${who} ${e.paused ? "paused" : "unpaused"} the game`;
+      return e.paused ? t`${who} paused the game` : t`${who} unpaused the game`;
     case "joined":
-      return `${who} joined ${e.spectator ? "as a spectator" : "the game"}`;
+      return e.spectator
+        ? t`${who} joined as a spectator`
+        : t`${who} joined the game`;
     case "giveAway":
-      return `${who} gave away all the units of an army`;
-    case "other":
-      return `${who} sent an army action this app does not name (code ${e.action})`;
+      return t`${who} gave away all the units of an army`;
+    case "other": {
+      const action = e.action;
+      return t`${who} sent an army action this app does not name (code ${action})`;
+    }
   }
 }

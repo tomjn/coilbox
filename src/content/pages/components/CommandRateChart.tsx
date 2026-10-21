@@ -1,3 +1,4 @@
+import { Trans, useLingui } from "@lingui/react/macro";
 import { Button } from "@picoframe/frame";
 import { useMemo, useState } from "react";
 import {
@@ -59,6 +60,7 @@ export function CommandRateChart({
   /** Where the match chart's time axis ends, in seconds. */
   endSec: number;
 }) {
+  const { t, i18n } = useLingui();
   const [open, setOpen] = useState(false);
   const [chosen, setChosen] = useState<OrderSource>("selection");
   const read = useReplayCommandRates(replayPath);
@@ -91,7 +93,7 @@ export function CommandRateChart({
             read.load();
           }}
         >
-          Show commands per minute
+          <Trans>Show commands per minute</Trans>
         </Button>
       </div>
     );
@@ -99,24 +101,30 @@ export function CommandRateChart({
 
   const body = () => {
     if (read.loading || read.status === "idle")
-      return <p className="text-xs text-muted-foreground">Reading orders…</p>;
+      return (
+        <p className="text-xs text-muted-foreground">
+          <Trans>Reading orders…</Trans>
+        </p>
+      );
     if (read.failed || !rates)
       return (
         <p className="text-xs text-destructive">
-          The orders could not be read from this replay.
+          <Trans>The orders could not be read from this replay.</Trans>
         </p>
       );
     if (present.length === 0)
       return (
         <p className="text-xs text-muted-foreground">
-          This replay's order stream holds no orders to count.
+          <Trans>This replay's order stream holds no orders to count.</Trans>
         </p>
       );
     if (rates.buckets === 0)
       return (
         <p className="text-xs text-muted-foreground">
-          This replay is shorter than one {rates.periodSec} second period, so
-          there is no rate to draw.
+          <Trans>
+            This replay is shorter than one {rates.periodSec} second period, so
+            there is no rate to draw.
+          </Trans>
         </p>
       );
     return (
@@ -127,18 +135,20 @@ export function CommandRateChart({
           size="sm"
           value={source}
           onValueChange={(v) => v && setChosen(v as OrderSource)}
-          aria-label="Orders sent by"
+          aria-label={t`Orders sent by`}
           className="self-start"
         >
           {present.map((s) => (
             <ToggleGroupItem key={s} value={s} className="px-3 text-xs">
-              {SENDER_LABEL[s]}
+              {i18n._(SENDER_LABEL[s])}
             </ToggleGroupItem>
           ))}
         </ToggleGroup>
         {shown.length === 0 ? (
           <p className="text-xs text-muted-foreground">
-            None of the lines on the chart above gave orders of this kind.
+            <Trans>
+              None of the lines on the chart above gave orders of this kind.
+            </Trans>
           </p>
         ) : (
           <ResponsiveContainer width="100%" height={180}>
@@ -171,7 +181,10 @@ export function CommandRateChart({
                 width={52}
               />
               <Tooltip
-                formatter={(v) => `${formatRate(Number(v))} a minute`}
+                formatter={(v) => {
+                  const rate = formatRate(Number(v));
+                  return t`${rate} a minute`;
+                }}
                 labelFormatter={(t) => axisTime(Number(t))}
                 isAnimationActive={false}
               />
@@ -196,8 +209,10 @@ export function CommandRateChart({
         )}
         {rates.incomplete && (
           <p className="text-xs text-muted-foreground">
-            This replay could not be read to the end, so later orders may be
-            missing.
+            <Trans>
+              This replay could not be read to the end, so later orders may be
+              missing.
+            </Trans>
           </p>
         )}
       </>
@@ -205,26 +220,60 @@ export function CommandRateChart({
   };
 
   const explained = !!rates && present.length > 0 && rates.buckets > 0;
+  const trailingCount = formatNumber(rates?.trailing ?? 0);
+  const pregameCount = formatNumber(rates?.pregame ?? 0);
+  const unattributedCount = formatNumber(rates?.unattributed ?? 0);
   return (
     <div className="flex flex-col gap-2 border-t border-border/50 pt-3">
       <div className="flex items-center gap-1">
-        <h3 className="text-sm font-medium">Commands per minute</h3>
+        <h3 className="text-sm font-medium">
+          <Trans>Commands per minute</Trans>
+        </h3>
         {explained && (
           <SectionHelp section="commands per minute" source="stream">
-            <p>{SENDER_NOTE[source]}</p>
+            <p>{i18n._(SENDER_NOTE[source])}</p>
             <p>
-              Orders given in each {rates.periodSec} second stretch, shown as a
-              rate per minute.
-              {rates.periodIsDefault &&
-                " The replay named no period, so the engine's default is used."}{" "}
-              One order is one command. This is not the same count as the
-              trailer's, so neither checks the other.
-              {rates.trailing > 0 &&
-                ` ${formatNumber(rates.trailing)} orders in the last part-period are left out.`}
-              {rates.pregame > 0 &&
-                ` ${formatNumber(rates.pregame)} orders before the game started are left out.`}
-              {rates.unattributed > 0 &&
-                ` ${formatNumber(rates.unattributed)} orders from players with no team are left out.`}
+              <Trans>
+                Orders given in each {rates.periodSec} second stretch, shown as
+                a rate per minute.
+              </Trans>
+              {rates.periodIsDefault && (
+                <>
+                  {" "}
+                  <Trans>
+                    The replay named no period, so the engine's default is used.
+                  </Trans>
+                </>
+              )}{" "}
+              <Trans>
+                One order is one command. This is not the same count as the
+                trailer's, so neither checks the other.
+              </Trans>
+              {rates.trailing > 0 && (
+                <>
+                  {" "}
+                  <Trans>
+                    {trailingCount} orders in the last part-period are left out.
+                  </Trans>
+                </>
+              )}
+              {rates.pregame > 0 && (
+                <>
+                  {" "}
+                  <Trans>
+                    {pregameCount} orders before the game started are left out.
+                  </Trans>
+                </>
+              )}
+              {rates.unattributed > 0 && (
+                <>
+                  {" "}
+                  <Trans>
+                    {unattributedCount} orders from players with no team are
+                    left out.
+                  </Trans>
+                </>
+              )}
             </p>
           </SectionHelp>
         )}

@@ -1,3 +1,4 @@
+import { Trans, useLingui } from "@lingui/react/macro";
 import { Link } from "react-router";
 
 /**
@@ -19,25 +20,29 @@ export function StaleRemixNotice({
   originFilename?: string;
   originInLibrary: boolean;
 }) {
+  const { t } = useLingui();
+  const playsOn = sourceGametype || t`the game it was recorded with`;
   return (
     <p className="max-w-xl text-xs text-amber-600 dark:text-amber-400">
-      An older coilbox made this remix, and it will play on{" "}
-      {sourceGametype || "the game it was recorded with"}, not on {gameType}.{" "}
+      <Trans>
+        An older coilbox made this remix, and it will play on {playsOn}, not on{" "}
+        {gameType}.
+      </Trans>{" "}
       {originInLibrary && originFilename ? (
         <>
           <Link
             to={`/play/replays/${encodeURIComponent(originFilename)}`}
             className="underline underline-offset-4"
           >
-            Open the original replay
+            <Trans>Open the original replay</Trans>
           </Link>{" "}
-          and remix it again to get one that plays on {gameType}.
+          <Trans>and remix it again to get one that plays on {gameType}.</Trans>
         </>
       ) : (
-        <>
+        <Trans>
           The original replay is not in your library, so it cannot be made
           again.
-        </>
+        </Trans>
       )}
     </p>
   );

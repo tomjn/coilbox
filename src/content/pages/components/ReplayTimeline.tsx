@@ -1,3 +1,6 @@
+import { plural, t } from "@lingui/core/macro";
+import { useLingui as useLocale } from "@lingui/react";
+import { Trans } from "@lingui/react/macro";
 import { useState } from "react";
 import { formatDuration } from "@/lib/format";
 import type { ChatLine } from "../../bindings";
@@ -28,23 +31,40 @@ const MARK_MAX = 20;
 const EVENT_MIN = 8;
 const EVENT_MAX = 14;
 
-const KIND_LABEL: Record<MarkKind, string> = {
-  everyone: "Everyone",
-  allies: "Allies",
-  spectators: "Spectators",
-  whisper: "Whispers",
-  system: "System",
-};
+/** Read when the timeline draws, so they follow the app language. */
+function kindLabel(kind: MarkKind): string {
+  switch (kind) {
+    case "everyone":
+      return t`Everyone`;
+    case "allies":
+      return t`Allies`;
+    case "spectators":
+      return t`Spectators`;
+    case "whisper":
+      return t`Whispers`;
+    case "system":
+      return t`System`;
+  }
+}
 
-const EVENT_LABEL: Record<EventKind, string> = {
-  joined: "Joined late",
-  paused: "Pauses",
-  resigned: "Resigned",
-  giveAway: "Gave away",
-  left: "Left",
-  teamDied: "Eliminated",
-  other: "Other events",
-};
+function eventLabel(kind: EventKind): string {
+  switch (kind) {
+    case "joined":
+      return t`Joined late`;
+    case "paused":
+      return t`Pauses`;
+    case "resigned":
+      return t`Resigned`;
+    case "giveAway":
+      return t`Gave away`;
+    case "left":
+      return t`Left`;
+    case "teamDied":
+      return t`Eliminated`;
+    case "other":
+      return t`Other events`;
+  }
+}
 
 /** What the strip is pointing at: a column of chat or a column of events. */
 type Active =
@@ -57,20 +77,40 @@ function binTime(
   bin: TimelineBin<TimelineMark | EventMark>,
   totalSec: number,
 ): string {
-  if (bin.slot === "pregame") return "Before the game";
+  if (bin.slot === "pregame") return t`Before the game`;
   const from = Math.floor((bin.slot / BIN_COUNT) * totalSec);
   const to = Math.floor(((bin.slot + 1) / BIN_COUNT) * totalSec);
-  return from === to ? axisTime(from) : `${axisTime(from)} to ${axisTime(to)}`;
+  const start = axisTime(from);
+  if (from === to) return start;
+  const end = axisTime(to);
+  return t`${start} to ${end}`;
 }
 
 function binLabel(bin: TimelineBin, totalSec: number): string {
   const n = bin.marks.length;
-  return `${KIND_LABEL[bin.kind]}, ${binTime(bin, totalSec)}, ${n} ${n === 1 ? "line" : "lines"}`;
+  const kind = kindLabel(bin.kind);
+  const time = binTime(bin, totalSec);
+  const lines = plural(n, { one: "# line", other: "# lines" });
+  return t`${kind}, ${time}, ${lines}`;
 }
 
 function eventBinLabel(bin: TimelineBin<EventMark>, totalSec: number): string {
   const n = bin.marks.length;
-  return `Event, ${EVENT_LABEL[bin.kind]}, ${binTime(bin, totalSec)}, ${n} ${n === 1 ? "event" : "events"}`;
+  const kind = eventLabel(bin.kind);
+  const time = binTime(bin, totalSec);
+  const count = plural(n, { one: "# event", other: "# events" });
+  return t`Event, ${kind}, ${time}, ${count}`;
+}
+
+/** The line above the readout: the row the strip points at, and when. */
+function readoutHeading(active: Active, totalSec: number): string {
+  const time = binTime(active.bin, totalSec);
+  if (active.of === "chat") {
+    const kind = kindLabel(active.bin.kind);
+    return t`${kind}, ${time}`;
+  }
+  const kind = eventLabel(active.bin.kind);
+  return t`Event, ${kind}, ${time}`;
 }
 
 /**
@@ -94,6 +134,7 @@ export function ReplayTimeline({
   describe: (line: ChatLine) => string;
   onOpenLine: (index: number) => void;
 }) {
+  useLocale();
   const [active, setActive] = useState<Active | null>(null);
   const bins = binMarks(marks, totalSec, BIN_COUNT);
   const eventBins = binMarks(events, totalSec, BIN_COUNT);
@@ -105,6 +146,7 @@ export function ReplayTimeline({
     events.some((m) => m.kind === k),
   );
   const ticks = axisTicks(totalSec);
+  const hiddenCount = active ? active.bin.marks.length - READOUT_LINES : 0;
   const columns = hasPregame
     ? "grid-cols-[5.5rem_3.5rem_minmax(0,1fr)]"
     : "grid-cols-[5.5rem_minmax(0,1fr)]";
@@ -175,7 +217,7 @@ export function ReplayTimeline({
           return (
             <div key={kind} className="contents">
               <span className="self-center pr-2 text-muted-foreground">
-                {KIND_LABEL[kind]}
+                {kindLabel(kind)}
               </span>
               {hasPregame && (
                 <div className="relative h-6 border-r border-border/60">
@@ -202,7 +244,7 @@ export function ReplayTimeline({
           return (
             <div key={kind} className="contents">
               <span className="self-center pr-2 text-muted-foreground">
-                {EVENT_LABEL[kind]}
+                {eventLabel(kind)}
               </span>
               {hasPregame && (
                 <div className="relative h-6 border-r border-border/60">
@@ -225,16 +267,18 @@ export function ReplayTimeline({
         })}
         <span />
         {hasPregame && (
-          <span className="pt-1 text-center text-muted-foreground">Before</span>
+          <span className="pt-1 text-center text-muted-foreground">
+            <Trans>Before</Trans>
+          </span>
         )}
         <div className="relative h-5 border-t border-border/60 text-muted-foreground">
-          {ticks.map((t) => (
+          {ticks.map((tick) => (
             <span
-              key={t}
+              key={tick}
               className="absolute top-1 -translate-x-1/2 tabular-nums first:translate-x-0"
-              style={{ left: `${totalSec > 0 ? (t / totalSec) * 100 : 0}%` }}
+              style={{ left: `${totalSec > 0 ? (tick / totalSec) * 100 : 0}%` }}
             >
-              {axisTime(t)}
+              {axisTime(tick)}
             </span>
           ))}
         </div>
@@ -242,12 +286,7 @@ export function ReplayTimeline({
       <div aria-live="polite" className="min-h-16 text-xs">
         {active ? (
           <>
-            <p className="font-medium">
-              {active.of === "chat"
-                ? KIND_LABEL[active.bin.kind]
-                : `Event, ${EVENT_LABEL[active.bin.kind]}`}
-              , {binTime(active.bin, totalSec)}
-            </p>
+            <p className="font-medium">{readoutHeading(active, totalSec)}</p>
             <ul className="text-muted-foreground">
               {active.of === "chat"
                 ? active.bin.marks.slice(0, READOUT_LINES).map((m) => (
@@ -260,12 +299,14 @@ export function ReplayTimeline({
                       key={`${m.event.frame}/${m.event.time}/${m.event.player}/${m.event.type}`}
                       className="break-words"
                     >
-                      {m.second === null ? "Pre-game" : axisTime(m.second)}{" "}
+                      {m.second === null ? t`Pre-game` : axisTime(m.second)}{" "}
                       {describeEvent(m.event)}
                     </li>
                   ))}
               {active.bin.marks.length > READOUT_LINES && (
-                <li>and {active.bin.marks.length - READOUT_LINES} more</li>
+                <li>
+                  <Trans>and {hiddenCount} more</Trans>
+                </li>
               )}
             </ul>
           </>

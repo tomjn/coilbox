@@ -1,3 +1,7 @@
+import type { MessageDescriptor } from "@lingui/core";
+import { msg, plural, t } from "@lingui/core/macro";
+import { useLingui as useLocale } from "@lingui/react";
+import { useLingui } from "@lingui/react/macro";
 import { Button } from "@picoframe/frame";
 import { Loader2, Pause, Play } from "lucide-react";
 import { Slider as SliderPrimitive } from "radix-ui";
@@ -41,11 +45,11 @@ import {
  */
 const COLUMN_PX = 8;
 
-const LANES: { lane: MarkLane; name: string }[] = [
-  { lane: "kills", name: "Kills" },
-  { lane: "chat", name: "Chat" },
-  { lane: "left", name: "Players leaving" },
-];
+const LANES = [
+  { lane: "kills", name: msg`Kills` },
+  { lane: "chat", name: msg`Chat` },
+  { lane: "left", name: msg`Players leaving` },
+] as const satisfies readonly { lane: MarkLane; name: MessageDescriptor }[];
 
 const matchTime = (header: ReplayTrackHeader, frame: number) =>
   formatDuration(
@@ -163,19 +167,26 @@ function ClockText({
 function groupWords(header: ReplayTrackHeader, group: MarkGroup): string {
   const at = matchTime(header, group.frame);
   const n = group.count;
+  const text = group.text;
   switch (group.lane) {
     case "kills":
       return n === 1
-        ? `Unit destroyed, ${at}`
-        : `${n} units destroyed from ${at}`;
+        ? t`Unit destroyed, ${at}`
+        : t`${n} units destroyed from ${at}`;
     case "chat":
-      return n === 1 && group.text
-        ? `Chat, ${at}: ${group.text}`
-        : `${n} chat lines from ${at}`;
+      return n === 1 && text
+        ? t`Chat, ${at}: ${text}`
+        : plural(n, {
+            one: `# chat line from ${at}`,
+            other: `# chat lines from ${at}`,
+          });
     case "left":
-      return n === 1 && group.text
-        ? `${group.text}, ${at}`
-        : `${n} players left from ${at}`;
+      return n === 1 && text
+        ? t`${text}, ${at}`
+        : plural(n, {
+            one: `# player left from ${at}`,
+            other: `# players left from ${at}`,
+          });
   }
 }
 
@@ -236,6 +247,7 @@ export function ReplayPlaybackBar({
    *  also the slider's own step. */
   onKeyDown: (event: KeyboardEvent) => void;
 }) {
+  const { t: tr, i18n } = useLingui();
   const state = useSyncExternalStore(playback.subscribe, playback.getSnapshot);
   const barRef = useRef<HTMLDivElement | null>(null);
   const [columns, setColumns] = useState(0);
@@ -269,13 +281,13 @@ export function ReplayPlaybackBar({
     <TooltipProvider delayDuration={300}>
       <div className="flex flex-col gap-1.5">
         <div className="flex items-center gap-1">
-          <Tip label={playingBack ? "Pause" : "Play in reverse"}>
+          <Tip label={playingBack ? tr`Pause` : tr`Play in reverse`}>
             <Button
               type="button"
               variant="ghost"
               size="icon"
               className="size-7"
-              aria-label={playingBack ? "Pause" : "Play in reverse"}
+              aria-label={playingBack ? tr`Pause` : tr`Play in reverse`}
               onClick={() =>
                 playingBack ? playback.pause() : playback.play(-1)
               }
@@ -287,13 +299,13 @@ export function ReplayPlaybackBar({
               )}
             </Button>
           </Tip>
-          <Tip label={playingForward ? "Pause" : "Play"}>
+          <Tip label={playingForward ? tr`Pause` : tr`Play`}>
             <Button
               type="button"
               variant="ghost"
               size="icon"
               className="size-7"
-              aria-label={playingForward ? "Pause" : "Play"}
+              aria-label={playingForward ? tr`Pause` : tr`Play`}
               onClick={() =>
                 playingForward ? playback.pause() : playback.play(1)
               }
@@ -315,7 +327,7 @@ export function ReplayPlaybackBar({
           <div className="ml-auto w-20">
             <OptionSelect
               size="sm"
-              ariaLabel="Playback speed"
+              ariaLabel={tr`Playback speed`}
               value={String(state.speed)}
               onValueChange={(next) => playback.setSpeed(Number(next))}
               options={SPEEDS.map((s) => ({
@@ -334,7 +346,7 @@ export function ReplayPlaybackBar({
               <div
                 key={lane}
                 role="group"
-                aria-label={name}
+                aria-label={i18n._(name)}
                 className="relative h-4"
               >
                 {row.map((group) => (
@@ -389,6 +401,7 @@ function Knob({
   playback: Playback;
   onKeyDown: (event: KeyboardEvent) => void;
 }) {
+  useLocale();
   const frame = useSyncExternalStore(clock.subscribe, () => clock.frame);
   return (
     <SliderPrimitive.Root
@@ -410,7 +423,7 @@ function Knob({
         <SliderPrimitive.Range className="absolute h-full bg-primary" />
       </SliderPrimitive.Track>
       <SliderPrimitive.Thumb
-        aria-label="Time in the match"
+        aria-label={t`Time in the match`}
         aria-valuetext={matchTime(header, frame)}
         className="block size-4 shrink-0 rounded-full border border-primary bg-background shadow-sm ring-ring/50 transition-[color,box-shadow] hover:ring-4 focus-visible:ring-4 focus-visible:outline-hidden"
       />

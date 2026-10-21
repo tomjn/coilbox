@@ -6,6 +6,8 @@
  * player. That milestone should match this table, which issue #3794 carries.
  */
 
+import { plural, t } from "@lingui/core/macro";
+
 /** What one arrow press moves, and what one with Shift held moves. Product
  *  choices, not measurements. */
 export const STEP_SECONDS = 1;
@@ -30,8 +32,9 @@ interface KeyRow {
   action: TimelineAction;
   /** The key as the help names it. */
   show: string;
-  /** What it does, for the help. */
-  does: string;
+  /** What it does, for the help. A getter, so it reads the language at the
+   *  moment the help draws. */
+  readonly does: string;
 }
 
 export const TIMELINE_KEYS: readonly KeyRow[] = [
@@ -39,89 +42,129 @@ export const TIMELINE_KEYS: readonly KeyRow[] = [
     keys: [" "],
     action: { type: "toggle" },
     show: "Space",
-    does: "Play or pause",
+    get does() {
+      return t`Play or pause`;
+    },
   },
   {
     keys: ["r"],
     action: { type: "reverse" },
     show: "R",
-    does: "Play the other way",
+    get does() {
+      return t`Play the other way`;
+    },
   },
   {
     keys: ["ArrowLeft"],
     shift: false,
     action: { type: "step", seconds: -STEP_SECONDS },
     show: "Left",
-    does: `Back ${STEP_SECONDS} second`,
+    get does() {
+      return plural(STEP_SECONDS, {
+        one: "Back # second",
+        other: "Back # seconds",
+      });
+    },
   },
   {
     keys: ["ArrowRight"],
     shift: false,
     action: { type: "step", seconds: STEP_SECONDS },
     show: "Right",
-    does: `Forward ${STEP_SECONDS} second`,
+    get does() {
+      return plural(STEP_SECONDS, {
+        one: "Forward # second",
+        other: "Forward # seconds",
+      });
+    },
   },
   {
     keys: ["ArrowLeft"],
     shift: true,
     action: { type: "step", seconds: -LARGE_STEP_SECONDS },
     show: "Shift and Left",
-    does: `Back ${LARGE_STEP_SECONDS} seconds`,
+    get does() {
+      return plural(LARGE_STEP_SECONDS, {
+        one: "Back # second",
+        other: "Back # seconds",
+      });
+    },
   },
   {
     keys: ["ArrowRight"],
     shift: true,
     action: { type: "step", seconds: LARGE_STEP_SECONDS },
     show: "Shift and Right",
-    does: `Forward ${LARGE_STEP_SECONDS} seconds`,
+    get does() {
+      return plural(LARGE_STEP_SECONDS, {
+        one: "Forward # second",
+        other: "Forward # seconds",
+      });
+    },
   },
   {
     keys: [","],
     action: { type: "frame", frames: -1 },
     show: ",",
-    does: "Back one frame",
+    get does() {
+      return t`Back one frame`;
+    },
   },
   {
     keys: ["."],
     action: { type: "frame", frames: 1 },
     show: ".",
-    does: "Forward one frame",
+    get does() {
+      return t`Forward one frame`;
+    },
   },
   {
     keys: ["Home"],
     action: { type: "start" },
     show: "Home",
-    does: "Go to the start",
+    get does() {
+      return t`Go to the start`;
+    },
   },
   {
     keys: ["End"],
     action: { type: "end" },
     show: "End",
-    does: "Go to the end",
+    get does() {
+      return t`Go to the end`;
+    },
   },
   {
     keys: ["["],
     action: { type: "mark", direction: -1 },
     show: "[",
-    does: "Go to the previous mark",
+    get does() {
+      return t`Go to the previous mark`;
+    },
   },
   {
     keys: ["]"],
     action: { type: "mark", direction: 1 },
     show: "]",
-    does: "Go to the next mark",
+    get does() {
+      return t`Go to the next mark`;
+    },
   },
   {
     keys: ["-"],
     action: { type: "slower" },
     show: "-",
-    does: "Slower",
+    get does() {
+      return t`Slower`;
+    },
   },
   {
     keys: ["=", "+"],
     action: { type: "faster" },
     show: "+",
-    does: "Faster",
+    get does() {
+      return t`Faster`;
+    },
   },
 ];
 

@@ -1,3 +1,5 @@
+import { t as coreT } from "@lingui/core/macro";
+import { Trans, useLingui } from "@lingui/react/macro";
 import { Button } from "@picoframe/frame";
 import {
   ArrowDown,
@@ -19,6 +21,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Toggle } from "@/components/ui/toggle";
+import { formatNumber } from "@/lib/format";
 import { RatingBadge } from "@/multiplayer/UserBadges";
 import { isProfileHidden } from "../../../profile/hidden";
 import type { DemoInfo, ReplayAi, ReplayPlayer } from "../../bindings";
@@ -75,10 +78,9 @@ export function swatch(rgb?: [number, number, number]): string | undefined {
  * figure the start script holds, shown as written and used for nothing else.
  */
 export function ratingDetail(skill: string, uncertainty?: number): string {
-  const base = `This is the rating the lobby recorded for its declared game mode, which may not be the one this match was played in. The start script says: ${skill}`;
-  return uncertainty === undefined
-    ? base
-    : `${base}. The lobby recorded an uncertainty of ${uncertainty} with the rating.`;
+  if (uncertainty === undefined)
+    return coreT`This is the rating the lobby recorded for its declared game mode, which may not be the one this match was played in. The start script says: ${skill}`;
+  return coreT`This is the rating the lobby recorded for its declared game mode, which may not be the one this match was played in. The start script says: ${skill}. The lobby recorded an uncertainty of ${uncertainty} with the rating.`;
 }
 
 /** How a seat's side finished, or undefined where the file doesn't say. */
@@ -99,25 +101,31 @@ function SeatResult({ result }: { result: SeatOutcome }) {
   return result === "won" ? (
     <span className="flex items-center gap-1 text-xs font-medium text-amber-600 dark:text-amber-400">
       <Trophy className="size-3.5" aria-hidden />
-      Won
+      <Trans>Won</Trans>
     </span>
   ) : (
-    <span className="text-xs text-muted-foreground">Lost</span>
+    <span className="text-xs text-muted-foreground">
+      <Trans>Lost</Trans>
+    </span>
   );
 }
 
 /** A seat's counters on hover: the figures APM is made from. */
 function apmDetail(p: ReplayPlayer): string | undefined {
   const s = p.stats;
-  return s
-    ? [
-        `${s.numCommands} orders given`,
-        `${s.unitCommands} reached a unit`,
-        `${s.mouseClicks} mouse clicks`,
-        `${s.keyPresses} key presses`,
-        `${s.mousePixels} pixels of mouse travel`,
-      ].join(", ")
-    : undefined;
+  if (!s) return undefined;
+  const orders = formatNumber(s.numCommands);
+  const reached = formatNumber(s.unitCommands);
+  const clicks = formatNumber(s.mouseClicks);
+  const presses = formatNumber(s.keyPresses);
+  const pixels = formatNumber(s.mousePixels);
+  return [
+    coreT`${orders} orders given`,
+    coreT`${reached} reached a unit`,
+    coreT`${clicks} mouse clicks`,
+    coreT`${presses} key presses`,
+    coreT`${pixels} pixels of mouse travel`,
+  ].join(", ");
 }
 
 /** One line per seat in every cell of a row, so a shared team's cells line up. */
@@ -194,7 +202,7 @@ function AiName({ a }: { a: ReplayAi }) {
         variant="ghost"
         className="shrink-0 rounded bg-muted px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground"
       >
-        Bot
+        <Trans>Bot</Trans>
       </Badge>
       {a.side && (
         <span className="shrink-0 text-xs text-muted-foreground">{a.side}</span>
@@ -259,6 +267,7 @@ export function ReplayRoster({
   info: DemoInfo;
   replayPath?: string;
 }) {
+  const { t } = useLingui();
   const statsOn = !isProfileHidden("analytics.matchStats");
   const { data } = useMatchStats(statsOn && replayPath ? replayPath : null);
   const e = useSeriesEmphasis();
@@ -279,8 +288,8 @@ export function ReplayRoster({
   if (statsOn && roster.rows.some((r) => rowApm(r) !== undefined))
     figures.push({
       column: { kind: "apm" },
-      label: "APM",
-      hint: "Actions per minute",
+      label: t`APM`,
+      hint: t`Actions per minute`,
     });
   if (measured)
     for (const m of rosterMetrics(measured.metrics))
@@ -294,6 +303,7 @@ export function ReplayRoster({
   const hasResult = roster.sides.some((id) => outcomeOf(info, id));
   const hasChecks = roster.rows.some((r) => e.isCharted(r.team));
   const sorted = sort !== null;
+  const spectatorNames = roster.spectators.map((s) => s.name).join(", ");
   const rows = sortRows(roster.rows, sort, finals);
 
   /** The charted teams on a side, which a side's checkbox stands for. */
@@ -335,7 +345,7 @@ export function ReplayRoster({
         {hasChecks && (
           <TableCell className="w-8">
             {charted && teams && (
-              <ChartCheck teams={teams} label={`Show ${label} on the chart`} />
+              <ChartCheck teams={teams} label={t`Show ${label} on the chart`} />
             )}
           </TableCell>
         )}
@@ -350,7 +360,7 @@ export function ReplayRoster({
         </TableCell>
         {sorted && (
           <TableCell className="text-xs text-muted-foreground">
-            {row.allyTeam === -1 ? "Unassigned" : teamLabel(row.allyTeam)}
+            {row.allyTeam === -1 ? t`Unassigned` : teamLabel(row.allyTeam)}
           </TableCell>
         )}
         {hasRating && (
@@ -405,8 +415,8 @@ export function ReplayRoster({
             {shown && teams && (
               <Toggle
                 size="sm"
-                aria-label={`Highlight ${label} on the chart`}
-                title={`Highlight ${label} on the chart`}
+                aria-label={t`Highlight ${label} on the chart`}
+                title={t`Highlight ${label} on the chart`}
                 pressed={isEmphasised(
                   { ...e.state, hovered: null, resting: null },
                   teams,
@@ -426,21 +436,23 @@ export function ReplayRoster({
   return (
     <section className="flex flex-col gap-2">
       <div className="flex items-center gap-1">
-        <h2 className="text-sm font-medium">Players</h2>
+        <h2 className="text-sm font-medium">
+          <Trans>Players</Trans>
+        </h2>
         <SectionHelp
-          section="the players"
+          section={t`the players`}
           source={statsOn ? "players" : "setup"}
         />
       </div>
       {sorted && hasChecks && checkableSides.length > 0 && (
         // Sorting drops the side header rows, which is where side boxes live.
         <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted-foreground">
-          Sides on the chart
+          <Trans>Sides on the chart</Trans>
           {checkableSides.map((id) => (
             <ChartCheck
               key={id}
               teams={sideTeams(id)}
-              label={id === -1 ? "Unassigned" : teamLabel(id)}
+              label={id === -1 ? t`Unassigned` : teamLabel(id)}
               withLabel
             />
           ))}
@@ -452,20 +464,22 @@ export function ReplayRoster({
             <TableRow className="hover:bg-transparent">
               {hasChecks && (
                 <TableHead className="w-8">
-                  <span className="sr-only">Show on the chart</span>
+                  <span className="sr-only">
+                    <Trans>Show on the chart</Trans>
+                  </span>
                 </TableHead>
               )}
               <TableHead scope="col" className="text-xs">
-                Player
+                <Trans>Player</Trans>
               </TableHead>
               {sorted && (
                 <TableHead scope="col" className="text-xs">
-                  Side
+                  <Trans>Side</Trans>
                 </TableHead>
               )}
               {hasRating && (
                 <TableHead scope="col" className="text-xs">
-                  Rating
+                  <Trans>Rating</Trans>
                 </TableHead>
               )}
               {figures.map(({ column, label, hint }) => {
@@ -493,12 +507,14 @@ export function ReplayRoster({
               })}
               {hasResult && (
                 <TableHead scope="col" className="text-xs">
-                  Result
+                  <Trans>Result</Trans>
                 </TableHead>
               )}
               {hasChecks && (
                 <TableHead className="w-10">
-                  <span className="sr-only">Highlight on the chart</span>
+                  <span className="sr-only">
+                    <Trans>Highlight on the chart</Trans>
+                  </span>
                 </TableHead>
               )}
             </TableRow>
@@ -510,6 +526,7 @@ export function ReplayRoster({
               const result = outcomeOf(info, id);
               const won = result === "won";
               const teams = sideTeams(id);
+              const sideName = id === -1 ? t`Unassigned` : teamLabel(id);
               return (
                 <TableBody key={id}>
                   <TableRow
@@ -528,16 +545,16 @@ export function ReplayRoster({
                         {hasChecks && teams.length > 1 && (
                           <ChartCheck
                             teams={teams}
-                            label={`Show all of ${id === -1 ? "Unassigned" : teamLabel(id)} on the chart`}
+                            label={t`Show all of ${sideName} on the chart`}
                           />
                         )}
-                        {id === -1 ? "Unassigned" : teamLabel(id)}
+                        {sideName}
                         {won && (
                           <Badge
                             variant="ghost"
                             className="rounded bg-amber-500/15 px-1.5 py-0.5 text-[10px] font-medium text-amber-600 dark:text-amber-400"
                           >
-                            <Trophy className="size-3" /> Winner
+                            <Trophy className="size-3" /> <Trans>Winner</Trans>
                           </Badge>
                         )}
                       </span>
@@ -552,7 +569,7 @@ export function ReplayRoster({
       </div>
       {roster.spectators.length > 0 && (
         <p className="text-xs text-muted-foreground">
-          Spectators: {roster.spectators.map((s) => s.name).join(", ")}
+          <Trans>Spectators: {spectatorNames}</Trans>
         </p>
       )}
     </section>

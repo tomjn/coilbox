@@ -1,3 +1,4 @@
+import { useLingui } from "@lingui/react/macro";
 import { Badge } from "@/components/ui/badge";
 import { useStoredTracks } from "../../replayTracks";
 
@@ -16,6 +17,7 @@ export function ReplayTrackBadge({
   gameId: string | undefined;
   remixed?: boolean;
 }) {
+  const { t } = useLingui();
   const tracks = useStoredTracks();
   const track = gameId && !remixed ? tracks.get(gameId) : undefined;
   if (!track) return null;
@@ -24,9 +26,9 @@ export function ReplayTrackBadge({
       <Badge
         variant="ghost"
         className="shrink-0 rounded bg-amber-500/15 px-1.5 py-0.5 text-[10px] font-medium text-amber-600 dark:text-amber-400"
-        title="This track was made by another version of the recorder, or cannot be read. It is not played, and recording the replay again replaces it."
+        title={t`This track was made by another version of the recorder, or cannot be read. It is not played, and recording the replay again replaces it.`}
       >
-        Track out of date
+        {t`Track out of date`}
       </Badge>
     );
   }
@@ -34,9 +36,9 @@ export function ReplayTrackBadge({
     <Badge
       variant="ghost"
       className="shrink-0 rounded bg-muted px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground"
-      title="This replay has a recorded track."
+      title={t`This replay has a recorded track.`}
     >
-      Track recorded
+      {t`Track recorded`}
     </Badge>
   );
 }

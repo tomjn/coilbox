@@ -1,3 +1,4 @@
+import { Trans, useLingui } from "@lingui/react/macro";
 import {
   Clock,
   Coins,
@@ -48,7 +49,9 @@ const groupIcon: Record<MetricGroup, React.ReactNode> = {
 function NoStatistics({ detail }: { detail: string }) {
   return (
     <div className="flex flex-col gap-1 rounded-lg border border-dashed p-4">
-      <p className="text-sm">This replay has no statistics.</p>
+      <p className="text-sm">
+        <Trans>This replay has no statistics.</Trans>
+      </p>
       <p className="text-xs text-muted-foreground">{detail}</p>
     </div>
   );
@@ -64,25 +67,26 @@ function Headlines({
   trailer: DemoTrailer;
   metrics: Metric[];
 }) {
+  const { t } = useLingui();
   const bots = info.ais?.length ?? 0;
   const measured = trailer.teams.filter((t) => t.samples.length > 0).length;
   return (
     <div className="grid grid-cols-[repeat(auto-fit,minmax(11rem,1fr))] gap-3">
       <StatCard
         icon={<Clock className="size-3.5" />}
-        label="Duration"
+        label={t`Duration`}
         value={formatDuration(info.durationSec)}
       />
       <StatCard
         icon={<Trophy className="size-3.5" />}
-        label="Result"
+        label={t`Result`}
         value={teamResultLabel(info)}
       />
       <StatCard
         icon={<Users className="size-3.5" />}
-        label="Players"
+        label={t`Players`}
         value={String(seatCount(info))}
-        sub={bots > 0 ? `${bots} of them bots` : undefined}
+        sub={bots > 0 ? t`${bots} of them bots` : undefined}
       />
       {headlineTotals(trailer, metrics).map((h) => (
         <StatCard
@@ -90,7 +94,7 @@ function Headlines({
           icon={groupIcon[h.metric.group]}
           label={h.metric.label}
           value={h.text}
-          sub={measured === 1 ? "one team" : `across ${measured} teams`}
+          sub={measured === 1 ? t`one team` : t`across ${measured} teams`}
         />
       ))}
     </div>
@@ -104,6 +108,7 @@ export function MatchStatsSection({
   info: DemoInfo;
   replayPath: string;
 }) {
+  const { t } = useLingui();
   const { data, loading, error } = useMatchStats(replayPath);
 
   function body() {
@@ -111,12 +116,14 @@ export function MatchStatsSection({
       return (
         <div className="flex items-center gap-2 rounded-lg border border-border/50 bg-card p-4 text-sm text-muted-foreground">
           <Loader2 className="size-4 animate-spin" />
-          Reading this replay's statistics…
+          <Trans>Reading this replay's statistics…</Trans>
         </div>
       );
     }
     if (error) {
-      return <NoStatistics detail={`Its trailer couldn't be read: ${error}`} />;
+      return (
+        <NoStatistics detail={t`Its trailer couldn't be read: ${error}`} />
+      );
     }
     if (!data) return null;
     if (!hasStatistics(data.trailer)) {
@@ -124,7 +131,9 @@ export function MatchStatsSection({
       // against name a winner and still carry no samples at all (#1190). So this
       // says what the file shows and doesn't pick a reason for it.
       return (
-        <NoStatistics detail="The engine wrote none for it. Either the recording was abandoned, or the match ended without its statistics ever being written." />
+        <NoStatistics
+          detail={t`The engine wrote none for it. Either the recording was abandoned, or the match ended without its statistics ever being written.`}
+        />
       );
     }
     return (
@@ -147,14 +156,16 @@ export function MatchStatsSection({
   return (
     <section className="flex flex-col gap-2">
       <div className="flex items-center gap-1">
-        <h2 className="text-sm font-medium">Match statistics</h2>
+        <h2 className="text-sm font-medium">
+          <Trans>Match statistics</Trans>
+        </h2>
         {data && hasStatistics(data.trailer) && (
           <SectionHelp
             section="match statistics"
             source="trailer"
             detail={
               period > 0
-                ? `Figures are sampled every ${period} seconds.`
+                ? t`Figures are sampled every ${period} seconds.`
                 : undefined
             }
           />

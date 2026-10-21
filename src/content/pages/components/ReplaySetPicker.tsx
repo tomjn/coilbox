@@ -1,3 +1,4 @@
+import { Trans, useLingui } from "@lingui/react/macro";
 import { Button, Input } from "@picoframe/frame";
 import { Layers } from "lucide-react";
 import { useState } from "react";
@@ -16,13 +17,15 @@ import type { ReplaySetMember, ReplaySetsApi } from "../../replaySets";
 export function ReplaySetPicker({
   api,
   member,
-  label = "Sets",
+  label,
 }: {
   api: ReplaySetsApi;
   member: ReplaySetMember;
   /** Visible text beside the icon. Leave empty for an icon button. */
   label?: string;
 }) {
+  const { t } = useLingui();
+  const shownLabel = label ?? t`Sets`;
   const [name, setName] = useState("");
   const [error, setError] = useState<string | null>(null);
 
@@ -50,24 +53,28 @@ export function ReplaySetPicker({
       <PopoverTrigger asChild>
         <Button
           variant={inCount > 0 ? "secondary" : "ghost"}
-          size={label ? "sm" : "icon"}
-          aria-label="Sets for this replay"
-          title="Add to or remove from a set"
+          size={shownLabel ? "sm" : "icon"}
+          aria-label={t`Sets for this replay`}
+          title={t`Add to or remove from a set`}
           className="gap-1.5"
         >
           <Layers
             className={`size-4 ${inCount > 0 ? "text-primary" : "text-muted-foreground"}`}
           />
-          {label}
+          {shownLabel}
         </Button>
       </PopoverTrigger>
       <PopoverContent align="end" className="flex w-72 flex-col gap-3">
         <p className="text-xs text-muted-foreground">
-          A set groups replays. Adding or removing here never changes the replay
-          file.
+          <Trans>
+            A set groups replays. Adding or removing here never changes the
+            replay file.
+          </Trans>
         </p>
         {api.sets.length === 0 ? (
-          <p className="text-sm text-muted-foreground">No sets yet.</p>
+          <p className="text-sm text-muted-foreground">
+            <Trans>No sets yet.</Trans>
+          </p>
         ) : (
           <ul className="flex max-h-48 flex-col gap-2 overflow-y-auto">
             {api.sets.map((s) => (
@@ -97,13 +104,13 @@ export function ReplaySetPicker({
                 setName(e.target.value);
                 setError(null);
               }}
-              placeholder="New set name"
-              aria-label="New set name"
+              placeholder={t`New set name`}
+              aria-label={t`New set name`}
               aria-invalid={error ? true : undefined}
               className="h-8"
             />
             <Button type="submit" size="sm" variant="outline">
-              Create
+              <Trans>Create</Trans>
             </Button>
           </div>
           {error && (

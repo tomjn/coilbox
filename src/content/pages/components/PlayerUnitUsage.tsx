@@ -1,3 +1,6 @@
+import type { MessageDescriptor } from "@lingui/core";
+import { msg, plural } from "@lingui/core/macro";
+import { Trans, useLingui } from "@lingui/react/macro";
 import { Button, useTheme } from "@picoframe/frame";
 import { ArrowDown, ArrowUp, ArrowUpDown } from "lucide-react";
 import { useMemo, useState } from "react";
@@ -36,33 +39,33 @@ import { SectionHelp } from "./SectionHelp";
  * sample is big enough. Method and caveats are in the help entry.
  */
 
-const KIND: Record<UnitCategory, string> = {
-  economy: "Economy",
-  defence: "Defence",
-  offence: "Offence",
-  factory: "Factory",
-  builder: "Builder",
-  intelligence: "Sensor",
-  transport: "Transport",
-  unclassified: "Unclassified",
+const KIND: Record<UnitCategory, MessageDescriptor> = {
+  economy: msg`Economy`,
+  defence: msg`Defence`,
+  offence: msg`Offence`,
+  factory: msg`Factory`,
+  builder: msg`Builder`,
+  intelligence: msg`Sensor`,
+  transport: msg`Transport`,
+  unclassified: msg`Unclassified`,
 };
 
-const BUCKET: Record<SplitBucket, string> = {
-  economy: "Economy",
-  defence: "Defence",
-  offence: "Offence",
-  other: "Other",
-  unclassified: "Unclassified",
+const BUCKET: Record<SplitBucket, MessageDescriptor> = {
+  economy: msg`Economy`,
+  defence: msg`Defence`,
+  offence: msg`Offence`,
+  other: msg`Other`,
+  unclassified: msg`Unclassified`,
 };
 
 const whole = (n: number) => formatNumber(Math.round(n));
 
 function games(n: number): string {
-  return `${formatNumber(n)} ${n === 1 ? "game" : "games"}`;
+  return plural(n, { one: "# game", other: "# games" });
 }
 
 function orders(n: number): string {
-  return `${formatNumber(n)} ${n === 1 ? "order" : "orders"}`;
+  return plural(n, { one: "# order", other: "# orders" });
 }
 
 /** How many of the player's games are in no row, for any reason. */
@@ -89,6 +92,7 @@ function SortIcon({ dir }: { dir: "ascending" | "descending" | "none" }) {
 
 /** The metal ordered by kind of unit, as one bar and its key. */
 function KindSplit({ usage }: { usage: UnitUsage }) {
+  const { t, i18n } = useLingui();
   const { resolved: theme } = useTheme();
   const colours = SPLIT_COLOURS[theme === "light" ? "light" : "dark"];
   const total = SPLIT_BUCKETS.reduce((n, b) => n + usage.split[b], 0);
@@ -97,7 +101,7 @@ function KindSplit({ usage }: { usage: UnitUsage }) {
   return (
     <div className="flex flex-col gap-1.5" data-testid="unit-usage-split">
       <h3 className="text-xs font-medium text-muted-foreground">
-        Metal ordered by kind of unit
+        <Trans>Metal ordered by kind of unit</Trans>
       </h3>
       <div className="flex h-3 w-full overflow-hidden rounded-sm" aria-hidden>
         {shown.map((b) => (
@@ -111,114 +115,133 @@ function KindSplit({ usage }: { usage: UnitUsage }) {
         ))}
       </div>
       <ul className="flex flex-wrap gap-x-4 gap-y-1 text-xs">
-        {shown.map((b) => (
-          <li key={b} className="flex items-center gap-1.5">
-            <span
-              className="size-2.5 shrink-0 rounded-sm"
-              style={{ backgroundColor: colours[b] }}
-              aria-hidden
-            />
-            <span>{BUCKET[b]}</span>
-            <span className="tabular-nums text-muted-foreground">
-              {whole(usage.split[b])} metal
-            </span>
-          </li>
-        ))}
+        {shown.map((b) => {
+          const metal = whole(usage.split[b]);
+          return (
+            <li key={b} className="flex items-center gap-1.5">
+              <span
+                className="size-2.5 shrink-0 rounded-sm"
+                style={{ backgroundColor: colours[b] }}
+                aria-hidden
+              />
+              <span>{i18n._(BUCKET[b])}</span>
+              <span className="tabular-nums text-muted-foreground">
+                {t`${metal} metal`}
+              </span>
+            </li>
+          );
+        })}
       </ul>
     </div>
   );
 }
 
 function Help({ usage, name }: { usage: UnitUsage; name: string }) {
+  const { t } = useLingui();
+  const noListGames = games(usage.noList.games);
+  const noListOrders = orders(usage.noList.orders);
+  const misfitGames = games(usage.misfit.games);
+  const misfitOrders = orders(usage.misfit.orders);
+  const failedGames = games(usage.failed);
+  const unnamedOrders = orders(usage.unnamedOrders);
+  const incompleteGames = games(usage.incomplete);
+  const unpricedUnits = formatNumber(usage.unpriced);
+  const analysedUnnamedGames = games(usage.analysedUnnamed);
+  const analysedNoTeamGames = games(usage.analysedNoTeam);
   return (
     <SectionHelp section="units ordered" source="stream">
       <p>
-        These are orders {name} gave, not units built. A replay does not say
-        whether an order was carried out, and a unit taken off a factory queue
-        is not taken off these counts. A skirmish AI's orders are not counted.
+        <Trans>
+          These are orders {name} gave, not units built. A replay does not say
+          whether an order was carried out, and a unit taken off a factory queue
+          is not taken off these counts. A skirmish AI's orders are not counted.
+        </Trans>
       </p>
       <p>
-        Metal is the units ordered times the unit's metal cost, from the unit
-        list of the build each game was played on. Other is builders, factories,
-        sensors and transports. Unclassified is a unit whose definition does not
-        say what it is for.
+        <Trans>
+          Metal is the units ordered times the unit's metal cost, from the unit
+          list of the build each game was played on. Other is builders,
+          factories, sensors and transports. Unclassified is a unit whose
+          definition does not say what it is for.
+        </Trans>
       </p>
       <p>
-        Won is the games {name} won out of the games with a recorded result in
-        which they ordered the unit. It is what happened in those games, not a
-        sign that the unit caused it.
+        <Trans>
+          Won is the games {name} won out of the games with a recorded result in
+          which they ordered the unit. It is what happened in those games, not a
+          sign that the unit caused it.
+        </Trans>
       </p>
       <p>
-        A replay's unit numbers only mean something against the unit list of the
-        build it was played on. A game with no such list is left out whole, and
-        so is a game whose own orders do not fit its list.
+        <Trans>
+          A replay's unit numbers only mean something against the unit list of
+          the build it was played on. A game with no such list is left out
+          whole, and so is a game whose own orders do not fit its list.
+        </Trans>
       </p>
       {usage.noList.games > 0 && (
         <p>
-          {games(usage.noList.games)} left out with{" "}
-          {orders(usage.noList.orders)}: no unit list is kept and that build is
-          not installed.
+          {t`${noListGames} left out with ${noListOrders}: no unit list is kept and that build is not installed.`}
         </p>
       )}
       {usage.misfit.games > 0 && (
         <p>
-          {games(usage.misfit.games)} left out with{" "}
-          {orders(usage.misfit.orders)}: the orders do not fit the unit list.
+          {t`${misfitGames} left out with ${misfitOrders}: the orders do not fit the unit list.`}
         </p>
       )}
       {usage.failed > 0 && (
-        <p>{games(usage.failed)} left out: the replay could not be read.</p>
+        <p>{t`${failedGames} left out: the replay could not be read.`}</p>
       )}
       {usage.unnamedOrders > 0 && (
         <p>
-          {orders(usage.unnamedOrders)} left out: the unit list does not reach
-          the unit's number.
+          {t`${unnamedOrders} left out: the unit list does not reach the unit's number.`}
         </p>
       )}
       {usage.incomplete > 0 && (
         <p>
-          In {games(usage.incomplete)} the recording stops early, so later
-          orders are missing.
+          {t`In ${incompleteGames} the recording stops early, so later orders are missing.`}
         </p>
       )}
       {usage.unpriced > 0 && (
         <p>
-          {formatNumber(usage.unpriced)} units ordered have no metal cost in
-          their list and add nothing to the metal.
+          {t`${unpricedUnits} units ordered have no metal cost in their list and add nothing to the metal.`}
         </p>
       )}
       <p>
-        Finished and died come from playing a game back with coilbox's own
-        recorder, so only analysed games have them. They are the units of {name}
-        's team, counted for a unit only in games where {name} ordered it. Died
-        counts finished units only.
+        <Trans>
+          Finished and died come from playing a game back with coilbox's own
+          recorder, so only analysed games have them. They are the units of{" "}
+          {name}'s team, counted for a unit only in games where {name} ordered
+          it. Died counts finished units only.
+        </Trans>
       </p>
       {usage.analysedUnnamed > 0 && (
         <p>
-          {games(usage.analysedUnnamed)} analysed before the recorder kept the
-          engine's unit list, so their events cannot be named and are not
-          counted. Analysing them again adds them.
+          {t`${analysedUnnamedGames} analysed before the recorder kept the engine's unit list, so their events cannot be named and are not counted. Analysing them again adds them.`}
         </p>
       )}
       {usage.analysedNoTeam > 0 && (
         <p>
-          {games(usage.analysedNoTeam)} analysed with no team recorded for{" "}
-          {name} in the library, so their events are not counted.
+          {t`${analysedNoTeamGames} analysed with no team recorded for ${name} in the library, so their events are not counted.`}
         </p>
       )}
     </SectionHelp>
   );
 }
 
-const COLUMNS: { column: UsageColumn; label: string; numeric: boolean }[] = [
-  { column: "name", label: "Unit", numeric: false },
-  { column: "category", label: "Kind", numeric: false },
-  { column: "matches", label: "Games", numeric: true },
-  { column: "units", label: "Units", numeric: true },
-  { column: "metal", label: "Metal", numeric: true },
-  { column: "won", label: "Won", numeric: true },
-  { column: "finished", label: "Finished", numeric: true },
-  { column: "died", label: "Died", numeric: true },
+const COLUMNS: {
+  column: UsageColumn;
+  label: MessageDescriptor;
+  numeric: boolean;
+}[] = [
+  { column: "name", label: msg`Unit`, numeric: false },
+  { column: "category", label: msg`Kind`, numeric: false },
+  { column: "matches", label: msg`Games`, numeric: true },
+  { column: "units", label: msg`Units`, numeric: true },
+  { column: "metal", label: msg`Metal`, numeric: true },
+  { column: "won", label: msg`Won`, numeric: true },
+  { column: "finished", label: msg`Finished`, numeric: true },
+  { column: "died", label: msg`Died`, numeric: true },
 ];
 
 export function PlayerUnitUsage({
@@ -230,6 +253,7 @@ export function PlayerUnitUsage({
   playerName: string;
   refightFilenames: ReadonlySet<string>;
 }) {
+  const { t, i18n } = useLingui();
   const played = useMemo(
     () =>
       gamesFor(
@@ -246,38 +270,49 @@ export function PlayerUnitUsage({
     () => new Set(usage.rows.map((r) => r.game)).size > 1,
     [usage],
   );
+  const wonOf = (won: number, decided: number) => t`${won} of ${decided}`;
+  const orderedIn = (ordered: string, replays: string) =>
+    t`${ordered} ordered in ${replays}`;
   const pending = usage.unread + usage.waiting;
   const out = leftOut(usage);
+  const counted = usage.counted;
+  const gameCount = games(usage.games);
+  const analysedGames = games(usage.analysed);
 
   return (
     <section className="flex flex-col gap-3 rounded-lg border border-border/60 bg-card p-4">
       <div className="flex items-center gap-1">
-        <h2 className="text-sm font-medium">Units ordered</h2>
+        <h2 className="text-sm font-medium">
+          <Trans>Units ordered</Trans>
+        </h2>
         <Help usage={usage} name={playerName} />
       </div>
 
       {error ? (
         <p className="text-sm text-destructive">
-          The replays could not be read: {error}
+          <Trans>The replays could not be read: {error}</Trans>
         </p>
       ) : reading ? (
         <p className="text-sm text-muted-foreground">
-          Reading {games(usage.games)}.
+          <Trans>Reading {gameCount}.</Trans>
         </p>
       ) : (
         <>
           <p className="text-xs text-muted-foreground">
-            From {usage.counted} of {games(usage.games)}.
-            {out > 0 ? ` ${out} left out.` : ""}
-            {pending > 0 ? ` ${pending} still being read.` : ""}
-            {usage.analysed > 0
-              ? ` Finished and died from ${games(usage.analysed)} analysed.`
-              : ""}
+            {[
+              t`From ${counted} of ${gameCount}.`,
+              out > 0 && t`${out} left out.`,
+              pending > 0 && t`${pending} still being read.`,
+              usage.analysed > 0 &&
+                t`Finished and died from ${analysedGames} analysed.`,
+            ]
+              .filter(Boolean)
+              .join(" ")}
           </p>
           {rows.length === 0 ? (
             pending === 0 && (
               <p className="text-sm text-muted-foreground">
-                No build orders to show.
+                <Trans>No build orders to show.</Trans>
               </p>
             )
           ) : (
@@ -302,7 +337,7 @@ export function PlayerUnitUsage({
                             className={`h-7 gap-1 px-2 text-xs font-medium ${numeric ? "-mr-2" : "-ml-2"}`}
                             onClick={() => setSort(nextUsageSort(sort, column))}
                           >
-                            {label}
+                            {i18n._(label)}
                             <SortIcon dir={dir} />
                           </Button>
                         </TableHead>
@@ -321,7 +356,7 @@ export function PlayerUnitUsage({
                           </div>
                         )}
                       </TableHead>
-                      <TableCell>{KIND[row.category]}</TableCell>
+                      <TableCell>{i18n._(KIND[row.category])}</TableCell>
                       <TableCell className="text-right tabular-nums">
                         {formatNumber(row.matches)}
                       </TableCell>
@@ -332,15 +367,17 @@ export function PlayerUnitUsage({
                         {row.unpriced < row.units ? whole(row.metal) : ""}
                       </TableCell>
                       <TableCell className="text-right tabular-nums">
-                        {row.decided > 0 ? `${row.won} of ${row.decided}` : ""}
+                        {row.decided > 0 ? wonOf(row.won, row.decided) : ""}
                       </TableCell>
                       <TableCell className="text-right tabular-nums">
                         {row.analysed && (
                           <>
                             <div>{formatNumber(row.analysed.finished)}</div>
                             <div className="text-[11px] text-muted-foreground">
-                              {formatNumber(row.analysed.ordered)} ordered in{" "}
-                              {games(row.analysed.replays)}
+                              {orderedIn(
+                                formatNumber(row.analysed.ordered),
+                                games(row.analysed.replays),
+                              )}
                             </div>
                           </>
                         )}

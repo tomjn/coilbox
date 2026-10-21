@@ -1,3 +1,4 @@
+import { Trans, useLingui } from "@lingui/react/macro";
 import { cn } from "@picoframe/frame";
 import { useMemo } from "react";
 import { formatDuration, formatNumber } from "@/lib/format";
@@ -44,12 +45,17 @@ function CropCard({
   minimapUrl: string;
   windowed: boolean;
 }) {
+  const { t } = useLingui();
   const { isLit, dimming, pointTo, focusOn, toggleSelected } =
     useSeriesEmphasis();
   const teams = [crop.team];
   const lit = isLit(teams);
   const image = cropImageBox(crop.window, world);
-  const name = crop.names.length > 0 ? crop.names.join(", ") : "Unnamed player";
+  const name =
+    crop.names.length > 0 ? crop.names.join(", ") : t`Unnamed player`;
+  const opening = crop.opening;
+  const ordered = formatNumber(crop.ordered);
+  const outside = formatNumber(crop.outside);
   const faded = dimming && !lit;
   return (
     <button
@@ -134,22 +140,23 @@ function CropCard({
       <span className="flex flex-col text-xs leading-tight">
         <span className="font-medium">
           {name}
-          {crop.isMe ? " (you)" : ""}
+          {crop.isMe ? ` ${t`(you)`}` : ""}
         </span>
         {crop.opening && (
           <span className="text-muted-foreground">
-            Opened with {crop.opening}
+            <Trans>Opened with {opening}</Trans>
           </span>
         )}
         <span className="text-muted-foreground">
           {crop.ordered === 0
             ? windowed
-              ? "None ordered in this window"
-              : "None ordered"
-            : `${formatNumber(crop.ordered)} ordered`}
+              ? t`None ordered in this window`
+              : t`None ordered`
+            : t`${ordered} ordered`}
           {crop.outside > 0 && (
             <span data-crop-outside>
-              , {formatNumber(crop.outside)} outside this view
+              {", "}
+              <Trans>{outside} outside this view</Trans>
             </span>
           )}
         </span>
@@ -199,21 +206,34 @@ export function BaseCropsHelp({
   timeWindow: TimeWindow | null;
   domainSec: number;
 }) {
+  const { t } = useLingui();
+  const from = timeWindow ? formatDuration(timeWindow.startSec) : "";
+  const to = timeWindow
+    ? formatDuration(Math.min(timeWindow.endSec, domainSec))
+    : "";
   const windowText = timeWindow
-    ? `Showing orders given from ${formatDuration(timeWindow.startSec)} to ${formatDuration(Math.min(timeWindow.endSec, domainSec))}.`
-    : "Showing orders given across the whole match.";
+    ? t`Showing orders given from ${from} to ${to}.`
+    : t`Showing orders given across the whole match.`;
   const side = Math.round(cropSide(world));
+  const sideText = formatNumber(side);
+  const barText = formatNumber(Math.round(side / 4));
   return (
     <p>
-      Each base view shows the buildings a player ordered, not the buildings
-      that were built. {windowText} Every view is {formatNumber(side)} elmos
-      across, the same for every player, and is centred on that player's start
-      unless the start is near the edge of the map. The bar at the bottom left
-      of a view is {formatNumber(Math.round(side / 4))} elmos. A mark is one
-      order to place a building, in its player's colour, and the dot with a
-      white edge is the player's start. An order that was cancelled or never
-      carried out is drawn like any other. Under each view is how many buildings
-      that player ordered, and how many of those fall outside the view.
+      <Trans>
+        Each base view shows the buildings a player ordered, not the buildings
+        that were built.
+      </Trans>{" "}
+      {windowText}{" "}
+      <Trans>
+        Every view is {sideText} elmos across, the same for every player, and is
+        centred on that player's start unless the start is near the edge of the
+        map. The bar at the bottom left of a view is {barText} elmos. A mark is
+        one order to place a building, in its player's colour, and the dot with
+        a white edge is the player's start. An order that was cancelled or never
+        carried out is drawn like any other. Under each view is how many
+        buildings that player ordered, and how many of those fall outside the
+        view.
+      </Trans>
     </p>
   );
 }
@@ -251,6 +271,7 @@ export function ReplayBaseCrops({
   minimapUrl: string;
   timeWindow: TimeWindow | null;
 }) {
+  const { t } = useLingui();
   const crops = useMemo(
     () => (orders ? baseCrops(dots, orders, world, units, info) : []),
     [dots, orders, world, units, info],
@@ -268,21 +289,26 @@ export function ReplayBaseCrops({
   if (dots.length === 0)
     return (
       <p className="text-xs text-muted-foreground">
-        There are no base views, because this replay holds no start position to
-        centre one on.
+        <Trans>
+          There are no base views, because this replay holds no start position
+          to centre one on.
+        </Trans>
       </p>
     );
   if (!orders) return null;
 
   return (
     <section
-      aria-label="Bases"
+      aria-label={t`Bases`}
       data-testid="base-crops"
       className="flex flex-col gap-2"
     >
       {units === null && (
         <p className="text-xs text-muted-foreground">
-          This replay's game is not installed, so every mark is the same shape.
+          <Trans>
+            This replay's game is not installed, so every mark is the same
+            shape.
+          </Trans>
         </p>
       )}
       <ShapeKey crops={crops} />
@@ -291,7 +317,7 @@ export function ReplayBaseCrops({
           {groups.length > 1 && (
             <h4 className="text-xs font-medium text-muted-foreground">
               {group.ally === undefined
-                ? "Side not described"
+                ? t`Side not described`
                 : teamLabel(group.ally)}
             </h4>
           )}

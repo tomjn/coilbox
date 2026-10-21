@@ -1,3 +1,6 @@
+import type { MessageDescriptor } from "@lingui/core";
+import { msg } from "@lingui/core/macro";
+import { Trans, useLingui } from "@lingui/react/macro";
 import { Button, useTheme } from "@picoframe/frame";
 import { useEffect, useMemo, useState } from "react";
 import {
@@ -117,13 +120,14 @@ function MetricSelect({
   value: string;
   onChange: (key: string) => void;
 }) {
+  const { t } = useLingui();
   const groups = useMemo(() => metricGroups(metrics), [metrics]);
   return (
     <Select value={value} onValueChange={onChange}>
       <SelectTrigger
         size="sm"
         className="w-56 lg:hidden"
-        aria-label="Charted metric"
+        aria-label={t`Charted metric`}
       >
         <SelectValue />
       </SelectTrigger>
@@ -162,10 +166,11 @@ function Choice<T extends string>({
   onChange,
 }: {
   value: T;
-  options: { value: T; label: string }[];
+  options: { value: T; label: MessageDescriptor }[];
   label: string;
   onChange: (value: T) => void;
 }) {
+  const { i18n } = useLingui();
   return (
     <ToggleGroup
       type="single"
@@ -188,26 +193,26 @@ function Choice<T extends string>({
           // the component's own more specific rule, and would widen the item.
           className="px-3 text-xs data-[state=on]:border-primary data-[state=on]:bg-primary/10 data-[state=on]:not-first:shadow-[inset_1px_0_0_var(--color-primary)]"
         >
-          {o.label}
+          {i18n._(o.label)}
         </ToggleGroupItem>
       ))}
     </ToggleGroup>
   );
 }
 
-const MODES: { value: ChartMode; label: string }[] = [
-  { value: "cumulative", label: "Cumulative" },
-  { value: "perMinute", label: "Per minute" },
+const MODES: { value: ChartMode; label: MessageDescriptor }[] = [
+  { value: "cumulative", label: msg`Cumulative` },
+  { value: "perMinute", label: msg`Per minute` },
 ];
 
-const VIEWS: { value: ChartView; label: string }[] = [
-  { value: "players", label: "Players" },
-  { value: "teams", label: "Teams" },
+const VIEWS: { value: ChartView; label: MessageDescriptor }[] = [
+  { value: "players", label: msg`Players` },
+  { value: "teams", label: msg`Teams` },
 ];
 
-const DISPLAYS: { value: ChartDisplay; label: string }[] = [
-  { value: "chart", label: "Chart" },
-  { value: "table", label: "Table" },
+const DISPLAYS: { value: ChartDisplay; label: MessageDescriptor }[] = [
+  { value: "chart", label: msg`Chart` },
+  { value: "table", label: msg`Table` },
 ];
 
 /**
@@ -248,7 +253,9 @@ function SeriesTooltip({
         ))}
       </ul>
       {hidden > 0 && (
-        <p className="mt-1 text-muted-foreground">and {hidden} more</p>
+        <p className="mt-1 text-muted-foreground">
+          <Trans>and {hidden} more</Trans>
+        </p>
       )}
     </div>
   );
@@ -365,6 +372,7 @@ export function MatchStatsChart({
   /** Where to read commands per minute from. Left out, the chart has none. */
   replayPath?: string;
 }) {
+  const { t } = useLingui();
   const opening = defaultMetric(metrics);
   const [key, setKey] = useState(opening?.key ?? "");
   const [mode, setMode] = useState<ChartMode>("cumulative");
@@ -482,6 +490,7 @@ export function MatchStatsChart({
   // With every line unchecked the controls stay, so there is a way back.
   if (!noneDrawn && (!table || rows.length === 0)) return null;
 
+  const partialLabels = partial.map((s) => s.label).join(", ");
   const litLine = (id: string) => emphasis.isLit(teamsOf.get(id));
   const legendEntries: LegendEntry[] = drawn.map((s) => ({
     id: s.id,
@@ -504,29 +513,29 @@ export function MatchStatsChart({
         <Choice
           value={mode}
           options={MODES}
-          label="Charted values"
+          label={t`Charted values`}
           onChange={setMode}
         />
         <Choice
           value={view}
           options={VIEWS}
-          label="Charted lines"
+          label={t`Charted lines`}
           onChange={setChosen}
         />
         <Choice
           value={display}
           options={DISPLAYS}
-          label="Shown as"
+          label={t`Shown as`}
           onChange={setDisplay}
         />
         <CheckField
-          label="In-game colours"
+          label={t`In-game colours`}
           checked={colorMode === "game"}
           onChange={(on) => setColorMode(on ? "game" : "palette")}
         />
         {canHighlightMe && (
           <CheckField
-            label="Highlight me"
+            label={t`Highlight me`}
             checked={highlightMe}
             onChange={setHighlightMe}
           />
@@ -551,21 +560,22 @@ export function MatchStatsChart({
         // A side's line is every member added up. Unchecking one member of a
         // side leaves the side's line as it was, and this says so.
         <p className="text-xs text-muted-foreground">
-          Unchecked players still count in the total for{" "}
-          {partial.map((s) => s.label).join(", ")}.
+          <Trans>
+            Unchecked players still count in the total for {partialLabels}.
+          </Trans>
         </p>
       )}
 
       {noneDrawn || !table ? (
         <div className="flex flex-wrap items-center gap-2 rounded-md border border-dashed p-4 text-sm">
-          Every line is unchecked in the roster.
+          <Trans>Every line is unchecked in the roster.</Trans>
           <Button
             type="button"
             variant="outline"
             size="sm"
             onClick={() => emphasis.setShown(chartedTeams, true)}
           >
-            Show all
+            <Trans>Show all</Trans>
           </Button>
         </div>
       ) : (

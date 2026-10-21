@@ -1,3 +1,4 @@
+import { t } from "@lingui/core/macro";
 import type { StatAi, StatRecord } from "./bindings";
 import { isGenuineMatch } from "./stats";
 
@@ -63,7 +64,7 @@ export function bonusLabel(ai: StatAi): string | null {
   const advantage = Math.round((ai.advantage ?? 0) * 100);
   if (advantage !== 0) parts.push(`${advantage > 0 ? "+" : ""}${advantage}%`);
   const income = Math.round((ai.incomeMultiplier ?? 1) * 100) / 100;
-  if (income !== 1) parts.push(`x${income} income`);
+  if (income !== 1) parts.push(t`x${income} income`);
   return parts.length ? parts.join(", ") : null;
 }
 

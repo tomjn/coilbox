@@ -1,3 +1,5 @@
+import { t as coreT, plural } from "@lingui/core/macro";
+import { Plural, Trans, useLingui } from "@lingui/react/macro";
 import { cn, useTheme } from "@picoframe/frame";
 import { type ReactNode, useEffect, useMemo, useRef, useState } from "react";
 import { HeatLegend } from "@/components/HeatLegend";
@@ -92,6 +94,42 @@ const MARK_SIZE = 0.0075;
 /** How much of a mark shows when another player is the emphasised one. */
 const DIMMED = 0.18;
 
+/** What the peak of an order heat field holds, in words. */
+function orderPeak(
+  field: { peakWithinRadius?: number; radius: number },
+  inWindow: boolean,
+): string {
+  const count = Math.round(field.peakWithinRadius ?? 0);
+  const radius = formatNumber(Math.round(field.radius));
+  return inWindow
+    ? plural(count, {
+        one: `# order within ${radius} elmos of one spot in this window`,
+        other: `# orders within ${radius} elmos of one spot in this window`,
+      })
+    : plural(count, {
+        one: `# order within ${radius} elmos of one spot`,
+        other: `# orders within ${radius} elmos of one spot`,
+      });
+}
+
+/** How many orders the density layer holds, and how many widgets sent. */
+function orderDensitySentence(
+  counted: number,
+  byWidgets: number,
+  inWindow: boolean,
+): string {
+  const orders = formatNumber(counted);
+  const widgets = formatNumber(byWidgets);
+  if (inWindow) {
+    return byWidgets > 0
+      ? coreT`${orders} orders in this window are on it, from the player's own selection, widgets acting for them and AIs alike, and ${widgets} of them were sent by widgets.`
+      : coreT`${orders} orders in this window are on it, from the player's own selection, widgets acting for them and AIs alike.`;
+  }
+  return byWidgets > 0
+    ? coreT`${orders} orders are on it, from the player's own selection, widgets acting for them and AIs alike, and ${widgets} of them were sent by widgets.`
+    : coreT`${orders} orders are on it, from the player's own selection, widgets acting for them and AIs alike.`;
+}
+
 function drawMarks(
   canvas: HTMLCanvasElement,
   marks: readonly BuildMark[],
@@ -141,11 +179,13 @@ function StartDotButton({ dot }: { dot: StartDot }) {
     useSeriesEmphasis();
   const teams = [dot.team];
   const lit = isLit(teams);
+  const { t } = useLingui();
   const name = startDotName(dot);
+  const opening = dot.opening;
   const says = [
     name,
-    dot.isMe ? "you" : null,
-    dot.opening ? `opened with ${dot.opening}` : null,
+    dot.isMe ? t`you` : null,
+    opening ? t`opened with ${opening}` : null,
   ]
     .filter(Boolean)
     .join(", ");
@@ -155,7 +195,7 @@ function StartDotButton({ dot }: { dot: StartDot }) {
       data-team={dot.team}
       data-x={dot.x}
       data-z={dot.z}
-      aria-label={`Start position of ${says}`}
+      aria-label={t`Start position of ${says}`}
       aria-pressed={lit}
       onClick={() => toggleSelected(teams)}
       {...pointTo(teams)}
@@ -179,11 +219,12 @@ function StartDotButton({ dot }: { dot: StartDot }) {
       {lit && (
         <span className="pointer-events-none absolute bottom-full left-1/2 mb-0.5 w-max max-w-40 -translate-x-1/2 rounded bg-black/80 px-1.5 py-0.5 text-left text-[10px] leading-tight text-white">
           <span className="block font-medium">
-            {name}
-            {dot.isMe ? " (you)" : ""}
+            {dot.isMe ? t`${name} (you)` : name}
           </span>
           {dot.opening && (
-            <span className="block">Opened with {dot.opening}</span>
+            <span className="block">
+              <Trans>Opened with {opening}</Trans>
+            </span>
           )}
         </span>
       )}
@@ -267,6 +308,7 @@ export function ReplayMap({
   /** The section's heading, which the help entry sits beside. */
   heading?: ReactNode;
 }) {
+  const { t } = useLingui();
   const layersShown = !isProfileHidden("analytics.spatialLayers");
   const [stored, setLayers] = useStoredMapLayers();
   const on = {
@@ -497,15 +539,23 @@ export function ReplayMap({
     (ev.field?.peak ?? 0) > 0 ||
     (ev.damageField?.peak ?? 0) > 0;
   const basesShown = on.bases && dots.length > 0 && !!inWindow;
+  const recordedGame = units.recorded;
+  const differentBuildName =
+    units.source?.kind === "differentBuild" ? units.source.game.name : "";
+  const orderDensityCount = orderDensitySentence(
+    orderField?.counted ?? 0,
+    bySender?.lua ?? 0,
+    Boolean(timeWindow),
+  );
 
   return (
     <div className="flex flex-col gap-3">
       <div className="flex items-center gap-1">
         {heading}
         <SectionHelp
-          section="the map"
+          section={t`the map`}
           source="stream"
-          detail="Start boxes come from the match setup."
+          detail={t`Start boxes come from the match setup.`}
         >
           {layersShown && (windowed || ev.active) && (
             <TimeWindowHelp
@@ -514,59 +564,111 @@ export function ReplayMap({
             />
           )}
           {on.startBoxes && hasBoxes && (
-            <p>A start box is where a team was allowed to start.</p>
+            <p>
+              <Trans>A start box is where a team was allowed to start.</Trans>
+            </p>
           )}
           {on.starts && !noStarts && (
             <p>
-              A dot is where a player's start was set before the game. The
-              engine can move a start into its start box, so the commander may
-              have appeared a short way off. Point at a dot to see whose it is.
+              <Trans>
+                A dot is where a player's start was set before the game. The
+                engine can move a start into its start box, so the commander may
+                have appeared a short way off. Point at a dot to see whose it
+                is.
+              </Trans>
             </p>
           )}
           {wantOrders && built && placed > 0 && (
             <p>
-              Buildings ordered shows the orders each player gave, not what was
-              built. An order that was cancelled or never carried out is drawn
-              like any other.
-              {built.unplaced > 0 &&
-                ` ${formatNumber(built.unplaced)} factory queue ${built.unplaced === 1 ? "order has" : "orders have"} no position and ${built.unplaced === 1 ? "is" : "are"} not drawn.`}
-              {built.offMap > 0 &&
-                ` ${formatNumber(built.offMap)} ${built.offMap === 1 ? "order was" : "orders were"} placed off the map and ${built.offMap === 1 ? "is" : "are"} not drawn.`}
-              {on.buildings && " A mark is one order, in its player's colour."}
+              <Trans>
+                Buildings ordered shows the orders each player gave, not what
+                was built. An order that was cancelled or never carried out is
+                drawn like any other.
+              </Trans>
+              {built.unplaced > 0 && (
+                <>
+                  {" "}
+                  <Plural
+                    value={built.unplaced}
+                    one="# factory queue order has no position and is not drawn."
+                    other="# factory queue orders have no position and are not drawn."
+                  />
+                </>
+              )}
+              {built.offMap > 0 && (
+                <>
+                  {" "}
+                  <Plural
+                    value={built.offMap}
+                    one="# order was placed off the map and is not drawn."
+                    other="# orders were placed off the map and are not drawn."
+                  />
+                </>
+              )}
+              {on.buildings && (
+                <>
+                  {" "}
+                  <Trans>A mark is one order, in its player's colour.</Trans>
+                </>
+              )}
             </p>
           )}
           {wantPoints && allOrders && allOrders.count > 0 && bySender && (
             <>
               <p>
-                Order density shows where orders were aimed, which is roughly
-                where attention went. {formatNumber(orderField?.counted ?? 0)}{" "}
-                orders
-                {timeWindow ? " in this window" : ""} are on it, from the
-                player's own selection, widgets acting for them and AIs alike
-                {bySender.lua > 0 &&
-                  `, and ${formatNumber(bySender.lua)} of them were sent by widgets`}
-                .
+                <Trans>
+                  Order density shows where orders were aimed, which is roughly
+                  where attention went.
+                </Trans>{" "}
+                {orderDensityCount}
               </p>
               <p>
-                Orders aimed at a unit are not on it, as the replay holds the
-                unit and not its position. {formatNumber(allOrders.unitAimed)}{" "}
-                {allOrders.unitAimed === 1 ? "order was" : "orders were"} aimed
-                at a unit
-                {timeWindow
-                  ? " in the whole match, which the window cannot narrow"
-                  : ""}
-                .
-                {allOrders.custom > 0 &&
-                  ` ${formatNumber(allOrders.custom)} ${allOrders.custom === 1 ? "order was" : "orders were"} a command the engine does not define, which a game or a widget made up and which says nothing about where it points, and ${allOrders.custom === 1 ? "is" : "are"} left out.`}
-                {(orderField?.dropped ?? 0) > 0 &&
-                  ` ${formatNumber(orderField?.dropped ?? 0)} ${orderField?.dropped === 1 ? "order was" : "orders were"} aimed off the map and ${orderField?.dropped === 1 ? "is" : "are"} not drawn.`}
+                <Trans>
+                  Orders aimed at a unit are not on it, as the replay holds the
+                  unit and not its position.
+                </Trans>{" "}
+                {timeWindow ? (
+                  <Plural
+                    value={allOrders.unitAimed}
+                    one="# order was aimed at a unit in the whole match, which the window cannot narrow."
+                    other="# orders were aimed at a unit in the whole match, which the window cannot narrow."
+                  />
+                ) : (
+                  <Plural
+                    value={allOrders.unitAimed}
+                    one="# order was aimed at a unit."
+                    other="# orders were aimed at a unit."
+                  />
+                )}
+                {allOrders.custom > 0 && (
+                  <>
+                    {" "}
+                    <Plural
+                      value={allOrders.custom}
+                      one="# order was a command the engine does not define, which a game or a widget made up and which says nothing about where it points, and is left out."
+                      other="# orders were a command the engine does not define, which a game or a widget made up and which says nothing about where it points, and are left out."
+                    />
+                  </>
+                )}
+                {(orderField?.dropped ?? 0) > 0 && (
+                  <>
+                    {" "}
+                    <Plural
+                      value={orderField?.dropped ?? 0}
+                      one="# order was aimed off the map and is not drawn."
+                      other="# orders were aimed off the map and are not drawn."
+                    />
+                  </>
+                )}
               </p>
             </>
           )}
           {showColourNote && (
             <p>
-              Colours compare places on this map with each other, not with
-              another picture.
+              <Trans>
+                Colours compare places on this map with each other, not with
+                another picture.
+              </Trans>
             </p>
           )}
           {layersShown && <EventLayerHelp ev={ev} />}
@@ -588,7 +690,7 @@ export function ReplayMap({
           <div className="relative inline-flex max-h-full max-w-full">
             <img
               src={minimapUrl}
-              alt={`Minimap of ${mapName}`}
+              alt={t`Minimap of ${mapName}`}
               style={{ aspectRatio: aspect }}
               className="block max-h-full max-w-full object-fill"
             />
@@ -611,6 +713,7 @@ export function ReplayMap({
             {boxes.map((a) => {
               const b = a.startBox as StartBox;
               const c = swatch(a.color) ?? NEUTRAL_TEAM_COLOUR;
+              const boxTeam = teamLabel(a.id);
               return (
                 <span
                   key={a.id}
@@ -626,7 +729,7 @@ export function ReplayMap({
                       .replace("rgb", "rgba")
                       .replace(")", ", 0.22)"),
                   }}
-                  title={`${teamLabel(a.id)} start box`}
+                  title={t`${boxTeam} start box`}
                 >
                   <span
                     className="m-0.5 rounded px-1 text-[10px] font-medium leading-tight text-white"
@@ -678,7 +781,9 @@ export function ReplayMap({
       </div>
 
       {!layersShown && boxes.length > 0 && (
-        <p className="text-xs text-muted-foreground">Start boxes per team.</p>
+        <p className="text-xs text-muted-foreground">
+          <Trans>Start boxes per team.</Trans>
+        </p>
       )}
 
       {layersShown && (
@@ -688,7 +793,7 @@ export function ReplayMap({
             variant="outline"
             size="sm"
             spacing={1}
-            aria-label="Map layers"
+            aria-label={t`Map layers`}
             className="w-full flex-wrap"
             value={layersOn(stored).filter(
               (l) => !ev.block || !EVENT_MAP_LAYERS.includes(l),
@@ -698,30 +803,38 @@ export function ReplayMap({
               setLayers(ev.block ? holdEventLayers(next, stored) : next);
             }}
           >
-            <ToggleGroupItem value="startBoxes">Start boxes</ToggleGroupItem>
-            <ToggleGroupItem value="starts">Start positions</ToggleGroupItem>
+            <ToggleGroupItem value="startBoxes">
+              <Trans>Start boxes</Trans>
+            </ToggleGroupItem>
+            <ToggleGroupItem value="starts">
+              <Trans>Start positions</Trans>
+            </ToggleGroupItem>
             <ToggleGroupItem value="buildings">
-              Buildings ordered
+              <Trans>Buildings ordered</Trans>
             </ToggleGroupItem>
-            <ToggleGroupItem value="density">Building density</ToggleGroupItem>
+            <ToggleGroupItem value="density">
+              <Trans>Building density</Trans>
+            </ToggleGroupItem>
             <ToggleGroupItem value="orderDensity">
-              Order density
+              <Trans>Order density</Trans>
             </ToggleGroupItem>
-            <ToggleGroupItem value="bases">Bases</ToggleGroupItem>
+            <ToggleGroupItem value="bases">
+              <Trans>Bases</Trans>
+            </ToggleGroupItem>
             <EventToggle value="deaths" reason={ev.block}>
-              Deaths
+              <Trans>Deaths</Trans>
             </EventToggle>
             <EventToggle value="damage" reason={ev.block}>
-              Damage dealt
+              <Trans>Damage dealt</Trans>
             </EventToggle>
             <EventToggle value="finished" reason={ev.block}>
-              Buildings finished
+              <Trans>Buildings finished</Trans>
             </EventToggle>
             <EventToggle value="startUnitDeaths" reason={ev.block}>
-              Starting unit deaths
+              <Trans>Starting unit deaths</Trans>
             </EventToggle>
             <EventToggle value="startUnitPaths" reason={ev.block}>
-              Starting unit paths
+              <Trans>Starting unit paths</Trans>
             </EventToggle>
           </ToggleGroup>
 
@@ -747,15 +860,15 @@ export function ReplayMap({
                 noun={
                   on.orderDensity
                     ? buildLayer
-                      ? "building orders"
-                      : "orders on the map"
+                      ? t`building orders`
+                      : t`orders on the map`
                     : undefined
                 }
                 also={
                   on.orderDensity && buildLayer
                     ? {
                         count: orderCount,
-                        noun: "orders on the map",
+                        noun: t`orders on the map`,
                       }
                     : undefined
                 }
@@ -771,54 +884,64 @@ export function ReplayMap({
 
             {on.startBoxes && !hasBoxes && (
               <p className="text-xs text-muted-foreground">
-                This match set no start boxes.
+                <Trans>This match set no start boxes.</Trans>
               </p>
             )}
 
             {noStarts && (
               <p className="text-xs text-muted-foreground">
-                This replay recorded no start positions.
+                <Trans>This replay recorded no start positions.</Trans>
               </p>
             )}
             {wantOrders && orders.loading && (
               <p className="text-xs text-muted-foreground">
-                Reading build orders…
+                <Trans>Reading build orders…</Trans>
               </p>
             )}
             {wantOrders && orders.failed && (
               <p className="text-xs text-destructive">
-                The build orders could not be read from this replay.
+                <Trans>
+                  The build orders could not be read from this replay.
+                </Trans>
               </p>
             )}
             {wantOrders && built && placedCount.total === 0 && (
               <p className="text-xs text-muted-foreground">
-                No buildings were ordered in this replay.
+                <Trans>No buildings were ordered in this replay.</Trans>
               </p>
             )}
             {wantOrders && result?.incomplete && (
               <p className="text-xs text-muted-foreground">
-                This replay could not be read to the end, so later build orders
-                may be missing.
+                <Trans>
+                  This replay could not be read to the end, so later build
+                  orders may be missing.
+                </Trans>
               </p>
             )}
 
             {wantPoints && orderPoints.loading && (
-              <p className="text-xs text-muted-foreground">Reading orders…</p>
+              <p className="text-xs text-muted-foreground">
+                <Trans>Reading orders…</Trans>
+              </p>
             )}
             {wantPoints && orderPoints.failed && (
               <p className="text-xs text-destructive">
-                The orders could not be read from this replay.
+                <Trans>The orders could not be read from this replay.</Trans>
               </p>
             )}
             {wantPoints && allOrders && allOrders.count === 0 && (
               <p className="text-xs text-muted-foreground">
-                No orders with a place on the map were given in this replay.
+                <Trans>
+                  No orders with a place on the map were given in this replay.
+                </Trans>
               </p>
             )}
             {wantPoints && allOrders?.incomplete && (
               <p className="text-xs text-muted-foreground">
-                This replay could not be read to the end, so later orders may be
-                missing.
+                <Trans>
+                  This replay could not be read to the end, so later orders may
+                  be missing.
+                </Trans>
               </p>
             )}
 
@@ -833,13 +956,15 @@ export function ReplayMap({
                   />
                 ) : units.status === "loading" ? (
                   <p className="text-xs text-muted-foreground">
-                    Reading unit names…
+                    <Trans>Reading unit names…</Trans>
                   </p>
                 ) : (
                   <p className="text-xs text-muted-foreground">
                     {units.source?.kind === "notInstalled"
-                      ? `${units.recorded || "This replay's game"} is not installed, so nothing says what each building is for and every mark is the same shape.`
-                      : "The units of this replay's game could not be read, so every mark is the same shape."}
+                      ? units.recorded
+                        ? t`${recordedGame} is not installed, so nothing says what each building is for and every mark is the same shape.`
+                        : t`This replay's game is not installed, so nothing says what each building is for and every mark is the same shape.`
+                      : t`The units of this replay's game could not be read, so every mark is the same shape.`}
                   </p>
                 )}
                 {categorised && (
@@ -847,9 +972,11 @@ export function ReplayMap({
                 )}
                 {categorised && units.source?.kind === "differentBuild" && (
                   <p className="text-xs text-amber-600 dark:text-amber-400">
-                    This replay was played on {units.recorded}, which is not
-                    installed. Shapes come from {units.source.game.name}, a
-                    different build, and may be wrong.
+                    <Trans>
+                      This replay was played on {recordedGame}, which is not
+                      installed. Shapes come from {differentBuildName}, a
+                      different build, and may be wrong.
+                    </Trans>
                   </p>
                 )}
               </>
@@ -857,15 +984,15 @@ export function ReplayMap({
 
             {orderField && orderField.peak > 0 && (
               <HeatLegend
-                label="Where orders were aimed"
-                peak={`${formatNumber(Math.round(orderField.peakWithinRadius ?? 0))} ${Math.round(orderField.peakWithinRadius ?? 0) === 1 ? "order" : "orders"} within ${formatNumber(Math.round(orderField.radius))} elmos of one spot${timeWindow ? " in this window" : ""}`}
+                label={t`Where orders were aimed`}
+                peak={orderPeak(orderField, Boolean(timeWindow))}
                 kind={HEAT_KIND_OF_LAYER.orderDensity}
               />
             )}
             {field && field.peak > 0 && (
               <HeatLegend
-                label="Where buildings were ordered"
-                peak={`${formatNumber(Math.round(field.peakWithinRadius ?? 0))} ${Math.round(field.peakWithinRadius ?? 0) === 1 ? "order" : "orders"} within ${formatNumber(Math.round(field.radius))} elmos of one spot${timeWindow ? " in this window" : ""}`}
+                label={t`Where buildings were ordered`}
+                peak={orderPeak(field, Boolean(timeWindow))}
                 kind={HEAT_KIND_OF_LAYER.density}
               />
             )}

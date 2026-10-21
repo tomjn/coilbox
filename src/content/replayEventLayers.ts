@@ -11,6 +11,7 @@
  * order layers are.
  */
 
+import { plural, t } from "@lingui/core/macro";
 import { formatNumber } from "@/lib/format";
 import type { HeatPoints } from "@/lib/heatField";
 import type { StoredReplayAnalysis, UnitDatasetEntry } from "./bindings";
@@ -208,8 +209,9 @@ export function eventState(
 }
 
 /** The layers' names, which the map's help uses. */
-export const EVENT_LAYER_NAMES =
-  "Deaths, Damage dealt, Buildings finished and the two starting unit layers";
+export function eventLayerNames(): string {
+  return t`Deaths, Damage dealt, Buildings finished and the two starting unit layers`;
+}
 
 /**
  * Why the event layers cannot be switched on, or null when they can. It is the
@@ -221,17 +223,25 @@ export function eventBlock(state: EventState): string | null {
     case "ready":
       return null;
     case "remix":
-      return "A remix has no analysis of its own. Analyse the original match.";
+      return t`A remix has no analysis of its own. Analyse the original match.`;
     case "diverged":
-      return "The playback did not reproduce the recorded match, so what it recorded was thrown away and there is nothing to draw.";
+      return t`The playback did not reproduce the recorded match, so what it recorded was thrown away and there is nothing to draw.`;
     case "notAnalysed":
       return state.canAnalyse
-        ? "This replay has not been analysed."
-        : "This replay has not been analysed. This copy of coilbox cannot analyse replays.";
+        ? t`This replay has not been analysed.`
+        : t`This replay has not been analysed. This copy of coilbox cannot analyse replays.`;
   }
 }
 
 /** The one line the events table uses about an older logger. */
+export function outdatedNote(): string {
+  return t`This analysis was recorded by an older logger and may lack newer kinds of event.`;
+}
+
+/**
+ * The English source of {@link outdatedNote}, for a caller that reads it as a
+ * constant. Use `outdatedNote()` to show it.
+ */
 export const OUTDATED_NOTE =
   "This analysis was recorded by an older logger and may lack newer kinds of event.";
 
@@ -243,9 +253,6 @@ export function windowSubject(
   return ordersOn && eventsOn ? "both" : eventsOn ? "events" : "orders";
 }
 
-const plural = (n: number, one: string, many: string) =>
-  `${formatNumber(n)} ${n === 1 ? one : many}`;
-
 /** The legend of a deaths field: what is counted and what the peak holds. */
 export function deathLegend(
   field: { peakWithinRadius?: number; radius: number },
@@ -253,14 +260,26 @@ export function deathLegend(
   inWindow: boolean,
 ): { label: string; peak: string } {
   const peak = Math.round(field.peakWithinRadius ?? 0);
-  const where = `within ${formatNumber(Math.round(field.radius))} elmos of one spot${inWindow ? " in this window" : ""}`;
-  return weighted
-    ? {
-        label: "Where metal was lost",
-        peak: `${formatNumber(peak)} metal of units lost ${where}`,
-      }
-    : {
-        label: "Where units died",
-        peak: `${plural(peak, "death", "deaths")} ${where}`,
-      };
+  const radius = formatNumber(Math.round(field.radius));
+  if (weighted) {
+    const metal = formatNumber(peak);
+    return {
+      label: t`Where metal was lost`,
+      peak: inWindow
+        ? t`${metal} metal of units lost within ${radius} elmos of one spot in this window`
+        : t`${metal} metal of units lost within ${radius} elmos of one spot`,
+    };
+  }
+  return {
+    label: t`Where units died`,
+    peak: inWindow
+      ? plural(peak, {
+          one: `# death within ${radius} elmos of one spot in this window`,
+          other: `# deaths within ${radius} elmos of one spot in this window`,
+        })
+      : plural(peak, {
+          one: `# death within ${radius} elmos of one spot`,
+          other: `# deaths within ${radius} elmos of one spot`,
+        }),
+  };
 }

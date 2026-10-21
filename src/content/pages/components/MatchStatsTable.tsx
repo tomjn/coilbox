@@ -1,3 +1,4 @@
+import { Trans } from "@lingui/react/macro";
 import { useId } from "react";
 import {
   TableBody,
@@ -37,7 +38,9 @@ function NoReading() {
       <span className="text-muted-foreground" aria-hidden>
         &ndash;
       </span>
-      <span className="sr-only">no reading</span>
+      <span className="sr-only">
+        <Trans>no reading</Trans>
+      </span>
     </>
   );
 }
@@ -74,7 +77,7 @@ export function MatchStatsTable({ table }: { table: ValueTable }) {
               scope="col"
               className="sticky top-0 left-0 z-20 bg-card px-2 shadow-[inset_-1px_0_0_var(--color-border),inset_0_-1px_0_var(--color-border)]"
             >
-              Time
+              <Trans>Time</Trans>
             </TableHead>
             {table.columns.map((c) => (
               <TableHead

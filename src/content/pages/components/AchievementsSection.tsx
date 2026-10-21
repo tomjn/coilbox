@@ -1,3 +1,6 @@
+import type { MessageDescriptor } from "@lingui/core";
+import { msg } from "@lingui/core/macro";
+import { Trans, useLingui } from "@lingui/react/macro";
 import { CheckCircle2, Lock, Trophy } from "lucide-react";
 import { useMemo } from "react";
 import { formatDate } from "@/lib/format";
@@ -10,6 +13,15 @@ import { aiWinFacts } from "../../aiRecord";
 import type { StatRecord } from "../../bindings";
 import { playerGameFacts } from "../../stats";
 import { TallyBar } from "./StatWidgets";
+
+/** What each category is called as a heading. The key itself is not shown. */
+const CATEGORY_LABEL: Record<AchievementCategory, MessageDescriptor> = {
+  Milestones: msg`Milestones`,
+  Victories: msg`Victories`,
+  Streaks: msg`Streaks`,
+  Variety: msg`Variety`,
+  Activity: msg`Activity`,
+};
 
 /** Category display order for the grouped achievements list. */
 const CATEGORY_ORDER: AchievementCategory[] = [
@@ -30,6 +42,7 @@ function earnedAt(ms: number | undefined): string | null {
  * Shared with the Career page, so both draw an achievement the same way.
  */
 export function AchievementRow({ a }: { a: AchievementResult }) {
+  const { t } = useLingui();
   const date = earnedAt(a.earnedAtMs);
   return (
     <li className="flex items-start gap-3 py-2">
@@ -39,9 +52,9 @@ export function AchievementRow({ a }: { a: AchievementResult }) {
         }
       >
         {a.earned ? (
-          <CheckCircle2 className="size-5" aria-label="Earned" />
+          <CheckCircle2 className="size-5" aria-label={t`Earned`} />
         ) : (
-          <Lock className="size-5" aria-label="Not yet earned" />
+          <Lock className="size-5" aria-label={t`Not yet earned`} />
         )}
       </span>
       <div className="min-w-0 flex-1">
@@ -88,16 +101,22 @@ export function AchievementsSection({
   /** Replays from campaign, Conquest and Warpath, which AI wins leave out. */
   scripted: ReadonlySet<string>;
 }) {
+  const { i18n } = useLingui();
+  const locale = i18n.locale;
+  // `locale` is a dependency because the names and descriptions are resolved in
+  // the active language when the catalog is evaluated.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: see above
   const results = useMemo(
     () =>
       evaluateAchievements(
         playerGameFacts(records, playerName, refights),
         aiWinFacts(records, playerName, refights, scripted),
       ),
-    [records, playerName, refights, scripted],
+    [records, playerName, refights, scripted, locale],
   );
 
   const earnedCount = results.filter((r) => r.earned).length;
+  const resultCount = results.length;
 
   const groups = useMemo(
     () =>
@@ -118,16 +137,18 @@ export function AchievementsSection({
     <section className="rounded-lg border border-border/60 bg-card p-4">
       <h2 className="mb-3 flex items-center gap-2 text-sm font-medium">
         <Trophy className="size-4 text-muted-foreground" />
-        Achievements
+        <Trans>Achievements</Trans>
         <span className="ml-auto text-xs font-normal tabular-nums text-muted-foreground">
-          {earnedCount} of {results.length} earned
+          <Trans>
+            {earnedCount} of {resultCount} earned
+          </Trans>
         </span>
       </h2>
       <div className="grid gap-x-6 gap-y-4 sm:grid-cols-2">
         {groups.map((g) => (
           <div key={g.category}>
             <h3 className="mb-1 text-xs font-medium uppercase tracking-wide text-muted-foreground">
-              {g.category}
+              {i18n._(CATEGORY_LABEL[g.category])}
             </h3>
             <ul className="divide-y divide-border/40">
               {g.items.map((a) => (

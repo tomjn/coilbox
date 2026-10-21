@@ -1,3 +1,4 @@
+import { Trans, useLingui } from "@lingui/react/macro";
 import { Button, Input } from "@picoframe/frame";
 import {
   ArrowLeft,
@@ -52,7 +53,7 @@ import { gameNamesMatch } from "../resolveContent";
 import { type ReplayEngine, useReplayEngine } from "../useReplayEngine";
 import { useReplaysRoot } from "../useReplaysRoot";
 import { SeriesEmphasisProvider } from "../useSeriesEmphasis";
-import { UNFINISHED_WARNING } from "./components/ClearUnfinishedButton";
+import { unfinishedWarning } from "./components/ClearUnfinishedButton";
 import { MatchStatsSection } from "./components/MatchStatsSection";
 import { RefightPanel } from "./components/RefightPanel";
 import { RemixPanel } from "./components/RemixPanel";
@@ -159,8 +160,10 @@ function ReplayMapPreview({
       <div className="flex flex-col items-center gap-3 rounded-lg border border-dashed p-8 text-center">
         <ImageOff className="size-6 text-muted-foreground" />
         <p className="text-sm text-muted-foreground">
-          <span className="font-medium text-foreground">{mapName}</span> isn't
-          installed, so its preview can't be rendered.
+          <Trans>
+            <span className="font-medium text-foreground">{mapName}</span> isn't
+            installed, so its preview can't be rendered.
+          </Trans>
         </p>
       </div>
     </>
@@ -170,10 +173,11 @@ function ReplayMapPreview({
 /** Best-effort game download (rapid). The demo's `gameType` is a display string,
  * not a rapid tag, so an exact-version match isn't guaranteed — surfaced honestly. */
 function GameDownload({ gameType }: { gameType: string }) {
+  const { t } = useLingui();
   const writePath = useWriteRootPath("games");
   const gameDl = useQueuedDownload({
     kind: "rapid",
-    label: `Game: ${gameType}`,
+    label: t`Game: ${gameType}`,
     args: { tag: gameType, writePath },
   });
 
@@ -190,15 +194,17 @@ function GameDownload({ gameType }: { gameType: string }) {
           ) : (
             <Download className="size-4" />
           )}
-          Download game
+          <Trans>Download game</Trans>
         </Button>
         <span className="text-xs text-muted-foreground">
-          Best effort — an exact version match isn't guaranteed.
+          <Trans>Best effort — an exact version match isn't guaranteed.</Trans>
         </span>
       </div>
       <QueueProgress item={gameDl} className="max-w-xs" />
       {gameDl.status === "done" && (
-        <p className="text-xs text-muted-foreground">Downloaded {gameType}.</p>
+        <p className="text-xs text-muted-foreground">
+          <Trans>Downloaded {gameType}.</Trans>
+        </p>
       )}
       {gameDl.error && (
         <p className="text-xs text-destructive">{gameDl.error}</p>
@@ -219,6 +225,7 @@ function MapDownload({
   mapName: string;
   onDownloaded: () => void;
 }) {
+  const { t } = useLingui();
   const { path: writePath, loading: writeRootLoading } = useWriteRoot("maps");
   // Only once the read has landed and said there is none. Before that `writePath`
   // is undefined whatever the user has configured (issue #1104).
@@ -229,7 +236,7 @@ function MapDownload({
   // BAR pay to host it. The source order does not.
   const mapDl = useQueuedDownload({
     kind: "mapAnySource",
-    label: `Map: ${mapName}`,
+    label: t`Map: ${mapName}`,
     args: { mapName, writePath },
   });
   const downloading = mapDl.busy;
@@ -252,20 +259,22 @@ function MapDownload({
           ) : (
             <Download className="size-4" />
           )}
-          Download map
+          <Trans>Download map</Trans>
         </Button>
       </div>
       <QueueProgress item={mapDl} className="max-w-xs" />
       {noWriteRoot && !downloading && (
         <p className="text-xs text-muted-foreground">
-          Set a download folder in{" "}
-          <Link
-            className="underline underline-offset-4"
-            to="/settings/content-folders"
-          >
-            Content folders settings
-          </Link>{" "}
-          first.
+          <Trans>
+            Set a download folder in{" "}
+            <Link
+              className="underline underline-offset-4"
+              to="/settings/content-folders"
+            >
+              Content folders settings
+            </Link>{" "}
+            first.
+          </Trans>
         </p>
       )}
       {mapDl.error && <p className="text-xs text-destructive">{mapDl.error}</p>}
@@ -285,7 +294,9 @@ function EngineDownload({
   notice: Extract<ReplayEngineNotice, { kind: "download" | "unavailable" }>;
   engine: ReplayEngine;
 }) {
+  const { t } = useLingui();
   const { requirement, resolve } = engine;
+  const engineVersion = notice.version;
   const status = resolve.statusFor(requirement);
   const item = resolve.itemFor(requirement);
   const error = resolve.errorFor(requirement);
@@ -295,8 +306,8 @@ function EngineDownload({
     return (
       <p className="text-xs text-muted-foreground">
         {notice.reason === "no-write-root" ? (
-          <>
-            Engine {notice.version} is not installed. Set a download folder in{" "}
+          <Trans>
+            Engine {engineVersion} is not installed. Set a download folder in{" "}
             <Link
               className="underline underline-offset-4"
               to="/settings/content-folders"
@@ -304,12 +315,12 @@ function EngineDownload({
               Content folders settings
             </Link>{" "}
             to download it.
-          </>
+          </Trans>
         ) : (
-          <>
-            Engine {notice.version} is not installed, and no download was found
+          <Trans>
+            Engine {engineVersion} is not installed, and no download was found
             for it on this platform. Install it yourself in Settings, Engines.
-          </>
+          </Trans>
         )}
       </p>
     );
@@ -328,10 +339,12 @@ function EngineDownload({
           ) : (
             <Download className="size-4" />
           )}
-          {status === "queued" ? "Queued…" : "Download engine"}
+          {status === "queued" ? t`Queued…` : t`Download engine`}
         </Button>
         <span className="text-xs text-muted-foreground">
-          Recorded on {notice.version}. A replay only plays on that version.
+          <Trans>
+            Recorded on {engineVersion}. A replay only plays on that version.
+          </Trans>
         </span>
       </div>
       <QueueProgress item={item} className="max-w-xs" />
@@ -362,20 +375,26 @@ function MissingContentNotice({
   engine: ReplayEngine;
   onMapDownloaded: () => void;
 }) {
+  const { t } = useLingui();
   const engineNotice =
     engine.notice.kind === "download" || engine.notice.kind === "unavailable"
       ? engine.notice
       : null;
   if (!missingGame && !missingMap && !engineNotice) return null;
-  const missing = [
-    missingGame && "Game",
-    missingMap && "Map",
-    engineNotice && "Engine",
-  ].filter((m): m is string => !!m);
-  const label = `${missing
-    .map((m, i) => (i === 0 ? m : m.toLowerCase()))
-    .join(", ")
-    .replace(/, ([^,]*)$/, " and $1")} not installed`;
+  const label =
+    missingGame && missingMap && engineNotice
+      ? t`Game, map and engine not installed`
+      : missingGame && missingMap
+        ? t`Game and map not installed`
+        : missingGame && engineNotice
+          ? t`Game and engine not installed`
+          : missingMap && engineNotice
+            ? t`Map and engine not installed`
+            : missingGame
+              ? t`Game not installed`
+              : missingMap
+                ? t`Map not installed`
+                : t`Engine not installed`;
   return (
     <section className="flex flex-col gap-2 rounded-lg border border-dashed border-amber-500/40 bg-amber-500/5 p-3">
       <div className="flex items-center gap-1.5 text-sm font-medium text-amber-700 dark:text-amber-400">
@@ -398,6 +417,7 @@ function ReplayNotes({
   filename: string;
   gameId?: string;
 }) {
+  const { t } = useLingui();
   const userState = useReplayUserState();
   const replaySets = useReplaySets();
   const us = userState.get(filename);
@@ -405,23 +425,23 @@ function ReplayNotes({
   const [draft, setDraft] = useState("");
 
   const addTag = () => {
-    const t = draft.trim();
-    if (!t || tags.includes(t)) {
+    const tag = draft.trim();
+    if (!tag || tags.includes(tag)) {
       setDraft("");
       return;
     }
-    userState.setTags(filename, [...tags, t]);
+    userState.setTags(filename, [...tags, tag]);
     setDraft("");
   };
-  const removeTag = (t: string) =>
+  const removeTag = (tag: string) =>
     userState.setTags(
       filename,
-      tags.filter((x) => x !== t),
+      tags.filter((x) => x !== tag),
     );
 
   return (
     <section className="flex flex-col gap-2">
-      <h2 className="text-sm font-medium">Your notes</h2>
+      <h2 className="text-sm font-medium">{t`Your notes`}</h2>
       <div className="flex flex-col gap-3 rounded-lg border border-border/50 bg-card p-3">
         <Button
           variant={us.watched ? "default" : "outline"}
@@ -430,19 +450,19 @@ function ReplayNotes({
           aria-pressed={!!us.watched}
           className="w-fit gap-1.5"
         >
-          <Eye className="size-4" /> {us.watched ? "Watched" : "Mark watched"}
+          <Eye className="size-4" /> {us.watched ? t`Watched` : t`Mark watched`}
         </Button>
         <div className="flex flex-wrap items-center gap-1.5">
-          {tags.map((t) => (
+          {tags.map((tag) => (
             <span
-              key={t}
+              key={tag}
               className="flex items-center gap-1 rounded bg-muted px-1.5 py-0.5 text-xs text-muted-foreground"
             >
-              {t}
+              {tag}
               <button
                 type="button"
-                onClick={() => removeTag(t)}
-                aria-label={`Remove tag ${t}`}
+                onClick={() => removeTag(tag)}
+                aria-label={t`Remove tag ${tag}`}
                 className="hover:text-foreground"
               >
                 <X className="size-3" />
@@ -456,7 +476,7 @@ function ReplayNotes({
               if (e.key === "Enter") addTag();
             }}
             onBlur={addTag}
-            placeholder="Add tag…"
+            placeholder={t`Add tag…`}
             className="h-7 w-28"
           />
         </div>
@@ -474,7 +494,7 @@ function ReplayNotes({
           <ReplaySetPicker
             api={replaySets}
             member={{ filename, gameId }}
-            label="Sets"
+            label={t`Sets`}
           />
         </div>
       </div>
@@ -494,6 +514,7 @@ export function DeleteReplayButton({
    * backend leaves the file alone if it has filled in since the page opened. */
   unfinished?: boolean;
 }) {
+  const { t } = useLingui();
   const [open, setOpen] = useState(false);
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -536,26 +557,30 @@ export function DeleteReplayButton({
     <Popover open={open} onOpenChange={onOpenChange}>
       <PopoverTrigger asChild>
         <Button variant="outline" className="gap-1.5">
-          <Trash2 className="size-4" /> Delete
+          <Trash2 className="size-4" /> {t`Delete`}
         </Button>
       </PopoverTrigger>
       <PopoverContent align="end" className="flex w-72 flex-col gap-3">
         <div className="flex flex-col gap-1">
-          <h3 className="text-sm font-medium">Delete this replay?</h3>
+          <h3 className="text-sm font-medium">{t`Delete this replay?`}</h3>
           <p className="text-xs text-muted-foreground">
-            The file is permanently removed from your demos folder — this can't
-            be undone. If this replay has been analysed, its stored analysis is
-            deleted with it.
+            <Trans>
+              The file is permanently removed from your demos folder — this
+              can't be undone. If this replay has been analysed, its stored
+              analysis is deleted with it.
+            </Trans>
           </p>
           {track && (
             <p className="text-xs text-muted-foreground">
-              Its recorded track is deleted too, freeing{" "}
-              {formatBytes(track.bytes) ?? "0 B"}.
+              <Trans>
+                Its recorded track is deleted too, freeing{" "}
+                {formatBytes(track.bytes) ?? "0 B"}.
+              </Trans>
             </p>
           )}
           {unfinished && (
             <p className="text-xs text-muted-foreground">
-              {UNFINISHED_WARNING}
+              {unfinishedWarning()}
             </p>
           )}
         </div>
@@ -566,7 +591,7 @@ export function DeleteReplayButton({
             onClick={() => setOpen(false)}
             disabled={pending}
           >
-            Cancel
+            <Trans>Cancel</Trans>
           </Button>
           <Button
             variant="destructive"
@@ -580,7 +605,7 @@ export function DeleteReplayButton({
             ) : (
               <Trash2 className="size-4" />
             )}
-            Delete
+            <Trans>Delete</Trans>
           </Button>
         </div>
         {error && <p className="text-xs text-destructive">{error}</p>}
@@ -591,6 +616,7 @@ export function DeleteReplayButton({
 
 /** One replay: decoded metadata, players, and a preview of the map it was on. */
 export default function ReplayDetailPage() {
+  const { t } = useLingui();
   const { name } = useParams();
   const filename = name ?? "";
   const navigate = useNavigate();
@@ -666,35 +692,41 @@ export default function ReplayDetailPage() {
     navigate(`/play/replays/${encodeURIComponent(newName)}`);
     // Flag the navigation so the jump to a different file isn't a surprise.
     void notify({
-      title: "Remix created",
-      body: "Opened the remixed replay — use Watch to run it.",
+      title: t`Remix created`,
+      body: t`Opened the remixed replay — use Watch to run it.`,
       level: "success",
     });
   };
 
   const onDeleted = () => {
     navigate("/play/replays");
-    void notify({ title: "Replay deleted", level: "success" });
+    void notify({ title: t`Replay deleted`, level: "success" });
   };
 
   if (listLoading && !replay) return <DetailLoading backTo="/play/replays" />;
   if (!listLoading && !replay)
     return <NotFound backTo="/play/replays" label="replay" />;
 
+  const infoMapName = info?.mapName ?? "";
+  const recordedOn = info?.engineVersion || t`an unknown engine`;
+  const folderEngineVersion = resolved?.target.engineVersion ?? "";
+  const watchingWith =
+    resolved?.target.syncVersion ||
+    t`the engine in a folder named ${folderEngineVersion}, which has not had its version checked yet`;
   const metaRows: [string, string][] = info
     ? [
-        ["Game", info.gameType || "—"],
+        [t`Game`, info.gameType || "—"],
         ...(info.remixed && info.sourceGametype
-          ? ([["Remixed from", info.sourceGametype]] as [string, string][])
+          ? ([[t`Remixed from`, info.sourceGametype]] as [string, string][])
           : []),
-        ["Engine", info.engineVersion || "—"],
+        [t`Engine`, info.engineVersion || "—"],
         [
-          "Played",
+          t`Played`,
           playedAt(info.startTimeMs) || playedAt(replay?.modifiedMs ?? 0),
         ],
-        ["Duration", formatDuration(info.durationSec)],
-        ["Result", teamResultLabel(info)],
-        ["File size", replay ? formatBytes(replay.sizeBytes) : "—"],
+        [t`Duration`, formatDuration(info.durationSec)],
+        [t`Result`, teamResultLabel(info)],
+        [t`File size`, replay ? formatBytes(replay.sizeBytes) : "—"],
       ]
     : [];
 
@@ -712,7 +744,7 @@ export default function ReplayDetailPage() {
             to="/play/replays"
             className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:underline"
           >
-            <ArrowLeft className="size-3.5" /> Replays
+            <ArrowLeft className="size-3.5" /> {t`Replays`}
           </Link>
           <div className="flex flex-wrap items-center gap-2">
             <h1 className="break-words text-lg font-semibold">
@@ -723,7 +755,7 @@ export default function ReplayDetailPage() {
                 variant="ghost"
                 className="shrink-0 gap-1 rounded bg-primary/15 px-1.5 py-0.5 text-[11px] font-medium text-primary"
               >
-                <Code2 className="size-3" /> Remix
+                <Code2 className="size-3" /> {t`Remix`}
               </Badge>
             )}
             <OriginBadge origin={origin} />
@@ -736,7 +768,7 @@ export default function ReplayDetailPage() {
               to={`/play/replays/${encodeURIComponent(info.originFilename)}`}
               className="inline-flex w-fit items-center gap-1 text-xs text-primary hover:underline"
             >
-              <ArrowLeft className="size-3.5" /> Back to original replay
+              <ArrowLeft className="size-3.5" /> {t`Back to original replay`}
             </Link>
           )}
           {link && (
@@ -752,11 +784,10 @@ export default function ReplayDetailPage() {
             !resolved.matched &&
             engine.watch.kind === "fallback" && (
               <p className="max-w-md text-xs text-amber-600 dark:text-amber-400">
-                Recorded on {info.engineVersion || "an unknown engine"}.
-                Watching with{" "}
-                {resolved.target.syncVersion ||
-                  `the engine in a folder named ${resolved.target.engineVersion}, which has not had its version checked yet`}{" "}
-                — may not sync.
+                <Trans>
+                  Recorded on {recordedOn}. Watching with {watchingWith} — may
+                  not sync.
+                </Trans>
               </p>
             )}
         </div>
@@ -810,12 +841,15 @@ export default function ReplayDetailPage() {
 
       {unfinished && (
         <section className="flex max-w-xl flex-col gap-1 rounded-lg border border-border/50 bg-card p-3">
-          <h2 className="text-sm font-medium">Recording did not finish</h2>
+          <h2 className="text-sm font-medium">{t`Recording did not finish`}</h2>
           <p className="text-xs text-muted-foreground">
-            This file is empty and nothing in it can be played. A game that was
-            closed, killed or crashed before it ended leaves a file like this.
+            <Trans>
+              This file is empty and nothing in it can be played. A game that
+              was closed, killed or crashed before it ended leaves a file like
+              this.
+            </Trans>
           </p>
-          <p className="text-xs text-muted-foreground">{UNFINISHED_WARNING}</p>
+          <p className="text-xs text-muted-foreground">{unfinishedWarning()}</p>
         </section>
       )}
 
@@ -849,7 +883,7 @@ export default function ReplayDetailPage() {
           />
 
           <section className="flex flex-col gap-2">
-            <h2 className="text-sm font-medium">Details</h2>
+            <h2 className="text-sm font-medium">{t`Details`}</h2>
             <dl className="grid grid-cols-[minmax(7rem,auto)_1fr] gap-x-4 gap-y-1 rounded-lg border border-border/50 bg-card p-3 text-sm">
               {metaRows.map(([k, v]) => (
                 <div key={k} className="contents">
@@ -934,7 +968,7 @@ export default function ReplayDetailPage() {
                 <ReplayMapPreview
                   heading={
                     <h2 className="text-sm font-medium">
-                      Map · {info.mapName}
+                      <Trans>Map · {infoMapName}</Trans>
                     </h2>
                   }
                   key={previewNonce}
@@ -946,11 +980,13 @@ export default function ReplayDetailPage() {
                 />
               ) : (
                 <>
-                  <h2 className="text-sm font-medium">Map · {info.mapName}</h2>
+                  <h2 className="text-sm font-medium">
+                    <Trans>Map · {infoMapName}</Trans>
+                  </h2>
                   <p className="text-sm text-muted-foreground">
                     {info.mapName
-                      ? "Install an engine to preview this map."
-                      : "No map recorded for this replay."}
+                      ? t`Install an engine to preview this map.`
+                      : t`No map recorded for this replay.`}
                   </p>
                 </>
               )}

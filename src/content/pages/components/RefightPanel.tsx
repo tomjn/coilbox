@@ -1,3 +1,4 @@
+import { Trans, useLingui } from "@lingui/react/macro";
 import { Button } from "@picoframe/frame";
 import { Loader2, Play, Swords } from "lucide-react";
 import { useMemo, useState } from "react";
@@ -53,7 +54,7 @@ export function RefightPanel({
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
         <Button variant="outline" className="gap-1.5">
-          <Swords className="size-4" /> Refight this setup
+          <Swords className="size-4" /> <Trans>Refight this setup</Trans>
         </Button>
       </PopoverTrigger>
       <PopoverContent align="end" className="flex w-80 flex-col gap-3">
@@ -95,6 +96,7 @@ function RefightForm({
     mapOptions,
     ais,
   } = useRefightSetup(info);
+  const { t } = useLingui();
   const { running, launch } = usePlay();
   const { setProvenance } = useReplayUserState();
   const [aiKey, setAiKey] = useState("");
@@ -127,7 +129,8 @@ function RefightForm({
   if (scanLoading) {
     return (
       <div className="flex items-center gap-2 text-sm text-muted-foreground">
-        <Loader2 className="size-4 animate-spin" /> Checking installed content…
+        <Loader2 className="size-4 animate-spin" />{" "}
+        <Trans>Checking installed content…</Trans>
       </div>
     );
   }
@@ -135,8 +138,10 @@ function RefightForm({
   if (scanFailure) {
     return (
       <div className="flex flex-col gap-1">
-        <h3 className="text-sm font-medium">Refight this setup</h3>
-        <ScanFailed noun="games or maps" reason={scanFailure} />
+        <h3 className="text-sm font-medium">
+          <Trans>Refight this setup</Trans>
+        </h3>
+        <ScanFailed noun={t`games or maps`} reason={scanFailure} />
       </div>
     );
   }
@@ -144,18 +149,24 @@ function RefightForm({
   if (missingGame || missingMap) {
     return (
       <div className="flex flex-col gap-1">
-        <h3 className="text-sm font-medium">Refight this setup</h3>
+        <h3 className="text-sm font-medium">
+          <Trans>Refight this setup</Trans>
+        </h3>
         <p className="text-xs text-muted-foreground">
           {missingGame && missingMap
-            ? "This replay's game and map aren't installed."
+            ? t`This replay's game and map aren't installed. Download them below first.`
             : missingGame
-              ? "This replay's game isn't installed."
-              : "This replay's map isn't installed."}{" "}
-          Download {missingGame && missingMap ? "them" : "it"} below first.
-          {missingGame &&
-            shortGameId &&
-            !shortGameId.exact &&
-            " Its exact game couldn't be confirmed from the replay, so this is a name-only check."}
+              ? t`This replay's game isn't installed. Download it below first.`
+              : t`This replay's map isn't installed. Download it below first.`}
+          {missingGame && shortGameId && !shortGameId.exact && (
+            <>
+              {" "}
+              <Trans>
+                Its exact game couldn't be confirmed from the replay, so this is
+                a name-only check.
+              </Trans>
+            </>
+          )}
         </p>
       </div>
     );
@@ -175,11 +186,13 @@ function RefightForm({
     description: aiByline(a),
   }));
 
+  const mapName = info.mapName;
+
   async function refightNow() {
     if (!target) return;
     const draft = getDraft();
     if (!draft) {
-      setError("This replay has no seated players to refight.");
+      setError(t`This replay has no seated players to refight.`);
       return;
     }
     setPending(true);
@@ -214,7 +227,8 @@ function RefightForm({
         dataDir: target.dataDir,
       });
       if (res.exitCode && res.exitCode !== 0) {
-        setError(`Engine exited with code ${res.exitCode}.`);
+        const exitCode = res.exitCode;
+        setError(t`Engine exited with code ${exitCode}.`);
       }
       if (beforePaths && res.exitCode !== null) {
         tagAndIngestFreshReplay(
@@ -235,17 +249,23 @@ function RefightForm({
   return (
     <>
       <div className="flex flex-col gap-1">
-        <h3 className="text-sm font-medium">Refight this setup</h3>
+        <h3 className="text-sm font-medium">
+          <Trans>Refight this setup</Trans>
+        </h3>
         <p className="text-xs text-muted-foreground">
-          Every seated player from this replay becomes an AI opponent, keeping
-          the map, factions, colours and options. "You" starts as a spectator —
-          take a seat from the Skirmish page if you want to play.
+          <Trans>
+            Every seated player from this replay becomes an AI opponent, keeping
+            the map, factions, colours and options. "You" starts as a spectator
+            — take a seat from the Skirmish page if you want to play.
+          </Trans>
         </p>
       </div>
 
       {gameCandidates.length > 1 && (
         <div className="flex flex-col gap-1.5">
-          <span className="text-xs font-medium">Game version</span>
+          <span className="text-xs font-medium">
+            <Trans>Game version</Trans>
+          </span>
           <OptionSelect
             value={selectedGameName}
             onValueChange={setSelectedGameName}
@@ -256,17 +276,19 @@ function RefightForm({
       )}
 
       <div className="flex flex-col gap-1.5">
-        <span className="text-xs font-medium">AI to fill every player</span>
+        <span className="text-xs font-medium">
+          <Trans>AI to fill every player</Trans>
+        </span>
         {ais.length === 0 ? (
           <p className="text-xs text-muted-foreground">
-            No AIs found for this game.
+            <Trans>No AIs found for this game.</Trans>
           </p>
         ) : (
           <OptionSelect
             value={aiKey}
             onValueChange={setAiKey}
             options={aiOptions}
-            placeholder="Default AI"
+            placeholder={t`Default AI`}
             size="sm"
           />
         )}
@@ -283,11 +305,11 @@ function RefightForm({
           ) : (
             <Play className="size-4 fill-current" />
           )}
-          {pending ? "Launching…" : "Refight now"}
+          {pending ? t`Launching…` : t`Refight now`}
         </Button>
         <SaveAsPresetButton
           getDraft={getDraft}
-          defaultName={`Refight: ${info.mapName}`}
+          defaultName={t`Refight: ${mapName}`}
           // A preset stores only what the match changed, which needs the game's
           // option list to compare against. Refighting now does not, because it
           // sends the match's values whatever they are.

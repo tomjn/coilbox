@@ -1,3 +1,5 @@
+import { t } from "@lingui/core/macro";
+import { Trans, useLingui } from "@lingui/react/macro";
 import { useSetting } from "@picoframe/frame";
 import {
   ArrowLeft,
@@ -27,14 +29,14 @@ import { SectionHelp } from "./components/SectionHelp";
 import { EmptyState, ErrorBanner, SkeletonList } from "./components/states";
 
 function playedAt(ms: number): string {
-  if (!ms) return "never";
+  if (!ms) return t`never`;
   return formatDate(new Date(ms), { dateStyle: "medium" });
 }
 
 function outcomeLabel(won: boolean | undefined): string {
-  if (won === true) return "Win";
-  if (won === false) return "Loss";
-  return "Unknown";
+  if (won === true) return t`Win`;
+  if (won === false) return t`Loss`;
+  return t`Unknown`;
 }
 
 /** One square per game, oldest first: a win, a loss, or no recorded result. */
@@ -79,7 +81,9 @@ function GroupSection({
         {title}
       </h2>
       {groups.length === 0 ? (
-        <p className="text-sm text-muted-foreground">Nothing recorded.</p>
+        <p className="text-sm text-muted-foreground">
+          <Trans>Nothing recorded.</Trans>
+        </p>
       ) : (
         <ul className="divide-y divide-border/40">
           {groups.map((g) => (
@@ -103,6 +107,8 @@ function GroupSection({
 
 function MatchRow({ game }: { game: MatchupGame }) {
   const r = game.record;
+  const myFaction = game.myFaction;
+  const theirFaction = game.theirFaction;
   return (
     <li>
       <Link
@@ -113,7 +119,10 @@ function MatchRow({ game }: { game: MatchupGame }) {
           {r.mapName}
           <span className="text-muted-foreground">
             {" "}
-            · {game.myFaction} vs {game.theirFaction}
+            ·{" "}
+            <Trans>
+              {myFaction} vs {theirFaction}
+            </Trans>
           </span>
         </span>
         <span className="shrink-0 text-xs tabular-nums text-muted-foreground">
@@ -139,6 +148,7 @@ function MatchRow({ game }: { game: MatchupGame }) {
  * dossier does.
  */
 export default function MatchupPage() {
+  const { t } = useLingui();
   const { name } = useParams();
   const other = name ?? "";
   const [searchParams] = useSearchParams();
@@ -171,6 +181,13 @@ export default function MatchupPage() {
   );
 
   const left = matchup ? matchup.gamesTogether + matchup.gamesSideUnknown : 0;
+  const leftLabel = gamesLabel(left);
+  const togetherLabel = gamesLabel(matchup?.gamesTogether ?? 0);
+  const unknownLabel = gamesLabel(matchup?.gamesSideUnknown ?? 0);
+  const sameTeamNote = t`${togetherLabel} on the same team not counted.`;
+  const unknownTeamNote = t`${unknownLabel} with an unknown team not counted.`;
+  const overallGames = gamesLabel(matchup?.overall.games ?? 0);
+  const overallRecord = matchup ? recordCounts(matchup.overall) : "";
 
   return (
     <div className="flex flex-col gap-4 p-4">
@@ -179,28 +196,30 @@ export default function MatchupPage() {
           to={`/stats/${encodeURIComponent(other)}`}
           className="inline-flex w-fit items-center gap-1 text-xs text-muted-foreground hover:underline"
         >
-          <ArrowLeft className="size-3.5" /> {other || "Player"}
+          <ArrowLeft className="size-3.5" /> {other || t`Player`}
         </Link>
         <div className="flex items-center gap-1">
           <h1 className="text-lg font-semibold">
-            {me && other ? `${me} vs ${other}` : "Matchup"}
+            {me && other ? t`${me} vs ${other}` : t`Matchup`}
           </h1>
-          <SectionHelp section="the matchup">
+          <SectionHelp section={t`the matchup`}>
             <p>
-              A matchup is the games where you were on opposing teams, from the
-              replays in your content folders.
+              <Trans>
+                A matchup is the games where you were on opposing teams, from
+                the replays in your content folders.
+              </Trans>
             </p>
             {matchup && left > 0 && (
               <p>
-                {matchup.gamesTogether > 0 &&
-                  `${gamesLabel(matchup.gamesTogether)} on the same team not counted. `}
-                {matchup.gamesSideUnknown > 0 &&
-                  `${gamesLabel(matchup.gamesSideUnknown)} with an unknown team not counted.`}
+                {matchup.gamesTogether > 0 && `${sameTeamNote} `}
+                {matchup.gamesSideUnknown > 0 && unknownTeamNote}
               </p>
             )}
             <p>
-              Each square is one game, oldest first. Filled is a win, red is a
-              loss, an outline is no recorded result.
+              <Trans>
+                Each square is one game, oldest first. Filled is a win, red is a
+                loss, an outline is no recorded result.
+              </Trans>
             </p>
           </SectionHelp>
         </div>
@@ -211,15 +230,15 @@ export default function MatchupPage() {
       {ingesting && records.length === 0 ? (
         <SkeletonList />
       ) : !me ? (
-        <EmptyState label="No player to compare against yet." />
+        <EmptyState label={t`No player to compare against yet.`} />
       ) : me === other ? (
-        <EmptyState label="Pick another player to see a matchup." />
+        <EmptyState label={t`Pick another player to see a matchup.`} />
       ) : !matchup || matchup.overall.games === 0 ? (
         <EmptyState
           label={
             left > 0
-              ? `You and ${other} have not played on opposing teams. ${gamesLabel(left)} on the same team or with an unknown team are not counted.`
-              : `You have not shared a replay with ${other}.`
+              ? t`You and ${other} have not played on opposing teams. ${leftLabel} on the same team or with an unknown team are not counted.`
+              : t`You have not shared a replay with ${other}.`
           }
         />
       ) : (
@@ -227,34 +246,35 @@ export default function MatchupPage() {
           <section className="rounded-lg border border-border/60 bg-card p-4">
             <h2 className="mb-1 flex items-center gap-2 text-sm font-medium">
               <Swords className="size-4 text-muted-foreground" />
-              Overall
+              {t`Overall`}
             </h2>
             <p className="text-sm">
-              {gamesLabel(matchup.overall.games)} against {other}:{" "}
-              {recordCounts(matchup.overall)}.
+              <Trans>
+                {overallGames} against {other}: {overallRecord}.
+              </Trans>
             </p>
           </section>
 
           <GroupSection
             icon={<MapIcon className="size-4 text-muted-foreground" />}
-            title="By map"
+            title={t`By map`}
             groups={matchup.byMap}
           />
           <GroupSection
             icon={<Swords className="size-4 text-muted-foreground" />}
-            title="By faction pairing (yours vs theirs)"
+            title={t`By faction pairing (yours vs theirs)`}
             groups={matchup.byFactions}
           />
           <GroupSection
             icon={<Clock className="size-4 text-muted-foreground" />}
-            title="By game length"
+            title={t`By game length`}
             groups={matchup.byLength}
           />
 
           <section className="rounded-lg border border-border/60 bg-card p-4">
             <h2 className="mb-1 flex items-center gap-2 text-sm font-medium">
               <History className="size-4 text-muted-foreground" />
-              Games
+              {t`Games`}
             </h2>
             <ul className="divide-y divide-border/40">
               {matchup.matches.map((g) => (

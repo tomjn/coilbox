@@ -1,3 +1,4 @@
+import { useLingui } from "@lingui/react/macro";
 import { Button } from "@picoframe/frame";
 import { Play } from "lucide-react";
 import { usePlay } from "../../../play/PlayProvider";
@@ -30,6 +31,7 @@ export function WatchButton({
   /** `replayDependencyBlock`: why the replay's game cannot run, or null. */
   dependencyBlock?: string | null;
 }) {
+  const { t } = useLingui();
   const { running } = usePlay();
   const {
     watchReplay: onWatch,
@@ -39,7 +41,7 @@ export function WatchButton({
 
   const title =
     launchBlockedReason(watch, dependencyBlock) ??
-    (running && !pending ? "A game is already running." : undefined);
+    (running && !pending ? t`A game is already running.` : undefined);
 
   return (
     <div className="flex flex-col items-end gap-1">
@@ -50,7 +52,7 @@ export function WatchButton({
         className="gap-1.5"
       >
         <Play className="size-4 fill-current" />
-        {pending ? "Watching…" : "Watch"}
+        {pending ? t`Watching…` : t`Watch`}
       </Button>
       {error && (
         <p className="max-w-xs text-right text-xs text-destructive">{error}</p>

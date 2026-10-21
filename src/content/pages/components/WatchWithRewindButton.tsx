@@ -1,3 +1,5 @@
+import { msg } from "@lingui/core/macro";
+import { useLingui } from "@lingui/react/macro";
 import { Button } from "@picoframe/frame";
 import { Loader2, Rewind } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
@@ -38,10 +40,9 @@ import {
 type Check = Awaited<ReturnType<typeof contentAnalysisCheck>>;
 
 const HEADINGS = {
-  none: "Record this replay, then watch it with rewind?",
-  stale:
-    "The recorded track is out of date. Record it again, then watch it with rewind?",
-  failed: "The last recording failed. Try again, then watch it with rewind?",
+  none: msg`Record this replay, then watch it with rewind?`,
+  stale: msg`The recorded track is out of date. Record it again, then watch it with rewind?`,
+  failed: msg`The last recording failed. Try again, then watch it with rewind?`,
 } as const;
 
 /**
@@ -84,6 +85,7 @@ export function WatchWithRewindButton({
   /** Another installed version of the replay's game, when its own is missing. */
   game?: string;
 }) {
+  const { t, i18n } = useLingui();
   const hidden = analysisRunHidden();
   const resolveTarget = useWatchTarget(info.engineVersion, watch);
   const { resolved } = useReplayTarget(info.engineVersion);
@@ -154,9 +156,9 @@ export function WatchWithRewindButton({
 
   let recordBlocker: string | null = null;
   if (hidden) {
-    recordBlocker = "Recording is turned off in this distribution.";
+    recordBlocker = t`Recording is turned off in this distribution.`;
   } else if (check === undefined) {
-    recordBlocker = "Checking this replay.";
+    recordBlocker = t`Checking this replay.`;
   } else {
     const blockers = analysisBlockers({
       cannot: check.cannot,
@@ -174,7 +176,7 @@ export function WatchWithRewindButton({
     recordBlocker = check.cannot
       ? blockers[0]
       : target === null
-        ? "Record this replay in the analysis and recording section, which can use another engine."
+        ? t`Record this replay in the analysis and recording section, which can use another engine.`
         : (blockers[0] ?? null);
   }
 
@@ -191,16 +193,17 @@ export function WatchWithRewindButton({
     setError(null);
     setNotice(null);
     try {
-      const t = await resolveTarget();
-      if (!t) return;
+      const launchTarget = await resolveTarget();
+      if (!launchTarget) return;
       const res = await launchReplayPlayback({
         replayPath,
-        executable: t.executable,
-        dataDir: t.dataDir,
+        executable: launchTarget.executable,
+        dataDir: launchTarget.dataDir,
         game,
       });
       if (res.exitCode && res.exitCode !== 0) {
-        setError(`Engine exited with code ${res.exitCode}.`);
+        const exitCode = res.exitCode;
+        setError(t`Engine exited with code ${exitCode}.`);
       }
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
@@ -250,7 +253,7 @@ export function WatchWithRewindButton({
     }
     if (runningNow.current) {
       setNotice(
-        "Recording finished. A game is running, so the engine did not open.",
+        t`Recording finished. A game is running, so the engine did not open.`,
       );
       return;
     }
@@ -269,11 +272,11 @@ export function WatchWithRewindButton({
   const unavailable = isBlocked(watch) || !!playbackBlock || running;
   const title =
     launchBlock ??
-    (running && !pending ? "A game is already running." : undefined) ??
+    (running && !pending ? t`A game is already running.` : undefined) ??
     (offer.kind === "recording"
       ? awaiting
-        ? "Recording this replay. The engine opens when it finishes."
-        : "This replay is being recorded."
+        ? t`Recording this replay. The engine opens when it finishes.`
+        : t`This replay is being recorded.`
       : offer.kind === "unavailable"
         ? offer.reason
         : undefined);
@@ -302,7 +305,7 @@ export function WatchWithRewindButton({
       ) : (
         <Rewind className="size-4 fill-current" />
       )}
-      Watch with rewind
+      {t`Watch with rewind`}
     </Button>
   );
 
@@ -321,7 +324,7 @@ export function WatchWithRewindButton({
           <PopoverContent align="end" className="flex w-80 flex-col gap-3">
             {offer.kind === "record" ? (
               <Confirmation
-                heading={HEADINGS[offer.why]}
+                heading={i18n._(HEADINGS[offer.why])}
                 estimate={estimate}
                 ownBytes={track?.sizeBytes ?? 0}
                 onCancel={() => setConfirming(false)}
@@ -330,8 +333,7 @@ export function WatchWithRewindButton({
             ) : (
               <>
                 <p className="text-sm">
-                  The playback did not reproduce this match when it was
-                  recorded, so there is no track to rewind.
+                  {t`The playback did not reproduce this match when it was recorded, so there is no track to rewind.`}
                 </p>
                 <div className="flex justify-end gap-2">
                   <Button
@@ -342,7 +344,7 @@ export function WatchWithRewindButton({
                       void plain.watchReplay();
                     }}
                   >
-                    Watch
+                    {t`Watch`}
                   </Button>
                 </div>
               </>

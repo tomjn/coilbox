@@ -1,3 +1,5 @@
+import { plural } from "@lingui/core/macro";
+import { Plural, Trans, useLingui } from "@lingui/react/macro";
 import { Button, Input } from "@picoframe/frame";
 import { ChevronRight, Hammer, Loader2 } from "lucide-react";
 import { useMemo, useState } from "react";
@@ -53,35 +55,46 @@ function SourceNote({
   source: UnitSource | null;
   unitsFailed: boolean;
 }) {
+  const { t } = useLingui();
   if (!source) return null;
   if (source.kind === "notInstalled") {
+    const game = recorded || t`This replay's game`;
     return (
       <p className="text-xs text-muted-foreground">
-        {recorded || "This replay's game"} is not installed, so the units cannot
-        be named. Each order shows the unit definition id the replay recorded.
+        <Trans>
+          {game} is not installed, so the units cannot be named. Each order
+          shows the unit definition id the replay recorded.
+        </Trans>
       </p>
     );
   }
   if (source.kind === "stored") return <StoredListNote source={source} />;
+  const gameName = source.game.name;
   if (unitsFailed) {
     return (
       <p className="text-xs text-muted-foreground">
-        The units of {source.game.name} could not be read, so each order shows
-        the unit definition id the replay recorded.
+        <Trans>
+          The units of {gameName} could not be read, so each order shows the
+          unit definition id the replay recorded.
+        </Trans>
       </p>
     );
   }
   if (source.kind === "differentBuild") {
     return (
       <p className="text-xs text-amber-600 dark:text-amber-400">
-        This replay was played on {recorded}, which is not installed. Unit names
-        come from {source.game.name}, a different build, and may be wrong.
+        <Trans>
+          This replay was played on {recorded}, which is not installed. Unit
+          names come from {gameName}, a different build, and may be wrong.
+        </Trans>
       </p>
     );
   }
   return (
     <p className="text-xs text-muted-foreground">
-      Unit names come from {source.game.name}, matched by name and version.
+      <Trans>
+        Unit names come from {gameName}, matched by name and version.
+      </Trans>
     </p>
   );
 }
@@ -90,9 +103,9 @@ function SourceNote({
  *  the id the replay recorded. */
 function unitLabel(
   unit: UnitDatasetEntry | undefined,
-  unitDefId: number,
+  fallback: string,
 ): string {
-  return unit ? unit.fullName || unit.name : `Unit ${unitDefId}`;
+  return unit ? unit.fullName || unit.name : fallback;
 }
 
 /**
@@ -115,20 +128,25 @@ function SeatOpening({
   cutMinutes: number | null;
   differentBuild: boolean;
 }) {
+  const { t } = useLingui();
   const [shown, setShown] = useState(PAGE);
   const inStretch = ordersUpTo(seat.orders, cutMinutes);
   const entries = collapseOrders(inStretch);
   const left = entries.length - shown;
   // Costs need the game's definitions. Without them there is nothing to add.
   const cost = units ? orderedCost(inStretch, units) : null;
+  const moreCount = Math.min(PAGE, left);
+  const entryCount = entries.length;
+  const metal = cost ? formatNumber(cost.metal) : "";
+  const energy = cost ? formatNumber(cost.energy) : "";
   return (
     <div className="flex flex-col gap-1 border-t border-border/50 p-3 text-sm">
       <h3 className="text-xs font-medium">
-        {cutMinutes === null ? "Opening" : `Opening, first ${cutMinutes} min`}
+        {cutMinutes === null ? t`Opening` : t`Opening, first ${cutMinutes} min`}
       </h3>
       {entries.length === 0 ? (
         <p className="text-xs text-muted-foreground">
-          No orders were given in this stretch.
+          <Trans>No orders were given in this stretch.</Trans>
         </p>
       ) : (
         <div className="flex max-h-72 flex-col gap-1 overflow-y-auto">
@@ -150,7 +168,7 @@ function SeatOpening({
                   />
                 )}
                 <span className="min-w-0 truncate">
-                  {unitLabel(unit, entry.unitDefId)}
+                  {unitLabel(unit, t`Unit ${entry.unitDefId}`)}
                 </span>
                 {entry.count > 1 && (
                   <span className="shrink-0 tabular-nums text-xs text-muted-foreground">
@@ -159,7 +177,7 @@ function SeatOpening({
                 )}
                 {entry.first.origin.kind === "lua" && (
                   <span className="shrink-0 text-xs text-muted-foreground">
-                    from a widget
+                    <Trans>from a widget</Trans>
                   </span>
                 )}
                 {note && (
@@ -179,20 +197,33 @@ function SeatOpening({
             size="sm"
             onClick={() => setShown((n) => n + PAGE)}
           >
-            Show {Math.min(PAGE, left)} more of {entries.length} entries
+            <Trans>
+              Show {moreCount} more of {entryCount} entries
+            </Trans>
           </Button>
         </div>
       )}
       {cost && (
         <p className="text-xs text-muted-foreground">
-          Ordered cost: {formatNumber(cost.metal)} metal and{" "}
-          {formatNumber(cost.energy)} energy.
-          {cost.unpriced > 0 &&
-            ` ${cost.unpriced} ${cost.unpriced === 1 ? "unit" : "units"} could not be priced and ${cost.unpriced === 1 ? "is" : "are"} left out.`}
+          <Trans>
+            Ordered cost: {metal} metal and {energy} energy.
+          </Trans>
+          {cost.unpriced > 0 && (
+            <>
+              {" "}
+              <Plural
+                value={cost.unpriced}
+                one="# unit could not be priced and is left out."
+                other="# units could not be priced and are left out."
+              />
+            </>
+          )}
           {differentBuild && (
             <span className="text-amber-600 dark:text-amber-400">
               {" "}
-              These costs come from a different build and may be wrong.
+              <Trans>
+                These costs come from a different build and may be wrong.
+              </Trans>
             </span>
           )}
         </p>
@@ -218,9 +249,12 @@ function SeatOrders({
   cutMinutes: number | null;
   differentBuild: boolean;
 }) {
+  const { t } = useLingui();
   const [shown, setShown] = useState(PAGE);
   const { pointTo } = useSeriesEmphasis();
   const left = seat.orders.length - shown;
+  const moreCount = Math.min(PAGE, left);
+  const orderCount = seat.orders.length;
   return (
     <Collapsible
       defaultOpen={defaultOpen}
@@ -236,7 +270,7 @@ function SeatOrders({
           <ChevronRight className="size-4 transition-transform group-data-[state=open]:rotate-90" />
           <span className="font-medium">{seat.name}</span>
           <span className="text-xs text-muted-foreground">
-            {seat.orders.length} {seat.orders.length === 1 ? "order" : "orders"}
+            {plural(orderCount, { one: "# order", other: "# orders" })}
           </span>
         </Button>
       </CollapsibleTrigger>
@@ -250,7 +284,7 @@ function SeatOrders({
           differentBuild={differentBuild}
         />
         <h3 className="border-t border-border/50 px-3 pt-3 text-xs font-medium">
-          All orders
+          <Trans>All orders</Trans>
         </h3>
         <ol className="flex max-h-96 flex-col gap-1 overflow-y-auto p-3 text-sm">
           {seat.orders.slice(0, shown).map((order, i) => {
@@ -271,9 +305,7 @@ function SeatOrders({
                   />
                 )}
                 <span className="min-w-0 truncate">
-                  {unit
-                    ? unit.fullName || unit.name
-                    : `Unit ${order.unitDefId}`}
+                  {unitLabel(unit, t`Unit ${order.unitDefId}`)}
                 </span>
                 {order.count > 1 && (
                   <span className="shrink-0 tabular-nums text-xs text-muted-foreground">
@@ -302,7 +334,9 @@ function SeatOrders({
               size="sm"
               onClick={() => setShown((n) => n + PAGE)}
             >
-              Show {Math.min(PAGE, left)} more of {seat.orders.length}
+              <Trans>
+                Show {moreCount} more of {orderCount}
+              </Trans>
             </Button>
           </div>
         )}
@@ -324,6 +358,7 @@ export function ReplayBuildOrders({
   replayPath: string;
   info: DemoInfo;
 }) {
+  const { t } = useLingui();
   const { result, loading, failed, load } = useReplayBuildOrders(replayPath);
   const [cut, setCut] = useState("");
 
@@ -368,29 +403,34 @@ export function ReplayBuildOrders({
   return (
     <section className="flex flex-col gap-2">
       <div className="flex items-center gap-1">
-        <h2 className="text-sm font-medium">Build orders</h2>
-        <SectionHelp section="build orders" source="stream">
+        <h2 className="text-sm font-medium">
+          <Trans>Build orders</Trans>
+        </h2>
+        <SectionHelp section={t`build orders`} source="stream">
           {seats.length > 0 && (
             <>
               <p>
-                These are the orders each player gave, not what was built. An
-                order that was cancelled or never carried out is listed like any
-                other.
+                <Trans>
+                  These are the orders each player gave, not what was built. An
+                  order that was cancelled or never carried out is listed like
+                  any other.
+                </Trans>
               </p>
               <p>
-                Each player's opening is their orders folded into a sequence,
-                with repeats shown as a count.
+                <Trans>
+                  Each player's opening is their orders folded into a sequence,
+                  with repeats shown as a count.
+                </Trans>
               </p>
               {units && <OpeningSplitHelp />}
               <UnitListHelp fit={fit} />
               {result && result.removals > 0 && (
                 <p>
-                  {result.removals}{" "}
-                  {result.removals === 1
-                    ? "order that took"
-                    : "orders that took"}{" "}
-                  units off a factory queue{" "}
-                  {result.removals === 1 ? "is" : "are"} not listed.
+                  <Plural
+                    value={result.removals}
+                    one="# order that took units off a factory queue is not listed."
+                    other="# orders that took units off a factory queue are not listed."
+                  />
                 </p>
               )}
             </>
@@ -411,20 +451,24 @@ export function ReplayBuildOrders({
             ) : (
               <Hammer className="size-4" />
             )}
-            {loading ? "Reading build orders…" : "Show build orders"}
+            {loading ? t`Reading build orders…` : t`Show build orders`}
           </Button>
           {failed && (
-            <ErrorBanner message="The build orders could not be read from this replay." />
+            <ErrorBanner
+              message={t`The build orders could not be read from this replay.`}
+            />
           )}
         </div>
       ) : seats.length === 0 ? (
         <p className="text-sm text-muted-foreground">
-          No build orders were recorded in this replay.
+          <Trans>No build orders were recorded in this replay.</Trans>
         </p>
       ) : (
         <>
           {archive && status === "loading" ? (
-            <p className="text-xs text-muted-foreground">Reading unit names…</p>
+            <p className="text-xs text-muted-foreground">
+              <Trans>Reading unit names…</Trans>
+            </p>
           ) : (
             <SourceNote
               recorded={recorded}
@@ -433,12 +477,12 @@ export function ReplayBuildOrders({
             />
           )}
           {fit && <OrderFitNote fit={fit} />}
-          <Field label="Opening length in minutes" className="max-w-sm">
+          <Field label={t`Opening length in minutes`} className="max-w-sm">
             <Input
               inputMode="decimal"
               value={cut}
               onChange={(e) => setCut(e.target.value)}
-              placeholder="Whole match"
+              placeholder={t`Whole match`}
               className="h-8 w-24"
               autoComplete="off"
             />
@@ -473,8 +517,10 @@ export function ReplayBuildOrders({
       )}
       {result?.incomplete && (
         <p className="text-xs text-muted-foreground">
-          This replay could not be read to the end, so later build orders may be
-          missing.
+          <Trans>
+            This replay could not be read to the end, so later build orders may
+            be missing.
+          </Trans>
         </p>
       )}
     </section>

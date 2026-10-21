@@ -1,3 +1,6 @@
+import { t } from "@lingui/core/macro";
+import { useLingui as useLocale } from "@lingui/react";
+import { Trans } from "@lingui/react/macro";
 import { Button } from "@picoframe/frame";
 import { Loader2, MessageSquare } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -16,7 +19,7 @@ const SERVER = 255;
 /** A line's match time, or a label for one sent before the game started. */
 export function chatTime(frame: number): string {
   return frame <= PREGAME_FRAME
-    ? "Pre-game"
+    ? t`Pre-game`
     : formatDuration(Math.floor(frame / FRAMES_PER_SECOND));
 }
 
@@ -27,7 +30,8 @@ function senderName(
 ): string {
   if (system) return "*";
   if (playerName) return playerName;
-  return player === SERVER ? "Server" : `Player ${player}`;
+  if (player === SERVER) return t`Server`;
+  return t`Player ${player}`;
 }
 
 /** "to everyone" is the default and left off. Anything narrower is labelled. */
@@ -36,9 +40,10 @@ function destLabel(
   names: Map<number, string>,
 ): string | null {
   if (!dest || dest.kind === "everyone") return null;
-  if (dest.kind === "allies") return "to allies";
-  if (dest.kind === "spectators") return "to spectators";
-  return `to ${names.get(dest.player) ?? `Player ${dest.player}`}`;
+  if (dest.kind === "allies") return t`to allies`;
+  if (dest.kind === "spectators") return t`to spectators`;
+  const target = names.get(dest.player) ?? t`Player ${dest.player}`;
+  return t`to ${target}`;
 }
 
 /** The chat lines, one row each with match time, sender and destination. */
@@ -50,6 +55,7 @@ export function ChatLines({
   /** The line to scroll to and mark, from the timeline. */
   highlight?: number | null;
 }) {
+  useLocale();
   const list = useRef<HTMLUListElement>(null);
   useEffect(() => {
     if (highlight === null) return;
@@ -117,6 +123,7 @@ export function ReplayChat({
   replayPath: string;
   durationSec?: number;
 }) {
+  useLocale();
   const { loading, failed, messages, incomplete, events } =
     useReplayChat(replayPath);
   // The replay the log was opened for, so another replay starts closed.
@@ -145,27 +152,33 @@ export function ReplayChat({
     <>
       <section className="flex flex-col gap-2">
         <div className="flex items-center gap-1">
-          <h2 className="text-sm font-medium">Timeline</h2>
-          <SectionHelp section="the timeline" source="stream">
+          <h2 className="text-sm font-medium">
+            <Trans>Timeline</Trans>
+          </h2>
+          <SectionHelp section={t`the timeline`} source="stream">
             <p>
-              Point at or focus a mark to read it. Select a chat mark to open
-              the chat log at that line.
+              <Trans>
+                Point at or focus a mark to read it. Select a chat mark to open
+                the chat log at that line.
+              </Trans>
             </p>
           </SectionHelp>
         </div>
         {loading && (
           <p className="flex items-center gap-2 text-sm text-muted-foreground">
             <Loader2 className="size-4 animate-spin" />
-            Reading chat…
+            <Trans>Reading chat…</Trans>
           </p>
         )}
         {failed && (
-          <ErrorBanner message="The chat could not be read from this replay." />
+          <ErrorBanner
+            message={t`The chat could not be read from this replay.`}
+          />
         )}
         {messages !== null &&
           (messages.length === 0 && eventMarks.length === 0 ? (
             <p className="text-sm text-muted-foreground">
-              No chat was recorded in this replay.
+              <Trans>No chat was recorded in this replay.</Trans>
             </p>
           ) : (
             <ReplayTimeline
@@ -178,8 +191,10 @@ export function ReplayChat({
           ))}
         {incomplete && (
           <p className="text-xs text-muted-foreground">
-            This replay could not be read to the end, so the timeline stops at
-            the last line read and may be incomplete.
+            <Trans>
+              This replay could not be read to the end, so the timeline stops at
+              the last line read and may be incomplete.
+            </Trans>
           </p>
         )}
       </section>
@@ -187,8 +202,10 @@ export function ReplayChat({
       {(messages === null || messages.length > 0) && (
         <section className="flex flex-col gap-2">
           <div className="flex items-center gap-1">
-            <h2 className="text-sm font-medium">Chat log</h2>
-            <SectionHelp section="the chat log" source="stream" />
+            <h2 className="text-sm font-medium">
+              <Trans>Chat log</Trans>
+            </h2>
+            <SectionHelp section={t`the chat log`} source="stream" />
           </div>
           {messages === null || !open ? (
             <div>
@@ -204,7 +221,7 @@ export function ReplayChat({
                 ) : (
                   <MessageSquare className="size-4" />
                 )}
-                {loading ? "Reading chat…" : "Show chat log"}
+                {loading ? t`Reading chat…` : t`Show chat log`}
               </Button>
             </div>
           ) : (
@@ -212,8 +229,10 @@ export function ReplayChat({
               <ChatLines messages={messages} highlight={open.line} />
               {incomplete && (
                 <p className="text-xs text-muted-foreground">
-                  This replay could not be read to the end, so the chat log may
-                  be incomplete.
+                  <Trans>
+                    This replay could not be read to the end, so the chat log
+                    may be incomplete.
+                  </Trans>
                 </p>
               )}
             </>

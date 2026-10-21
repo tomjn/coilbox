@@ -1,3 +1,4 @@
+import { t } from "@lingui/core/macro";
 import { useState } from "react";
 import { usePlay } from "../../../play/PlayProvider";
 import type { ReplayWatch } from "../../replayEngine";
@@ -37,7 +38,8 @@ export function useWatchReplay(
         dataDir: target.dataDir,
       });
       if (res.exitCode && res.exitCode !== 0) {
-        setError(`Engine exited with code ${res.exitCode}.`);
+        const exitCode = res.exitCode;
+        setError(t`Engine exited with code ${exitCode}.`);
       }
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));

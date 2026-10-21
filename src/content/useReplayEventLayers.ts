@@ -1,3 +1,4 @@
+import { t } from "@lingui/core/macro";
 import { useEffect, useMemo, useState } from "react";
 import {
   buildHeatField,
@@ -257,20 +258,20 @@ export function useReplayEventLayers({
   const counts: EventLayerCount[] = [];
   if (deathsOn && deathRead.status === "done")
     counts.push({
-      noun: "deaths",
+      noun: t`deaths`,
       inside: deathsInWindow,
       total: deaths.length,
     });
   if (finishedAll && finishedMarks)
     counts.push({
-      noun: "finished buildings",
+      noun: t`finished buildings`,
       inside: finishedMarks.length,
       total: finishedAll.marks.length,
     });
 
   if (startDeathsOn && startRead.status === "done" && startUnitsRecorded)
     counts.push({
-      noun: "starting units lost",
+      noun: t`starting units lost`,
       inside: startEnds.length,
       total: startEndsAll.length,
     });
