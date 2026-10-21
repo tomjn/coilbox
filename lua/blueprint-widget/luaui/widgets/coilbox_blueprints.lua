@@ -1053,29 +1053,63 @@ function widget:ViewResize(x, y)
 	layoutVersion = -1
 end
 
--- Seconds until the panel next checks whether it covers another panel.
-local untilAvoid = 0
+-- Whether the panel has looked for other panels in its way yet. It looks
+-- once, when the game's own panels are up: the first time a unit is
+-- selected, since Splinter Faction only shows its build menu then, or a few
+-- seconds after the team's first unit appears.
+local avoided = false
+local spawnedAt = nil
+local AVOID_AFTER = 5
 
---- Move the panel up or down its edge out of the way of other widgets'
--- panels, found by asking each widget's IsAbove at points over the panel.
--- Panels the engine draws itself answer to nothing and are not avoided.
+-- Elements RmlUi reports where a document draws nothing: the root of a
+-- context and a document's own body, which often spans the screen.
+local RML_BACKGROUND = { ["#root"] = true, body = true, html = true }
+
+--- Whether an RmlUi document draws something at a point. LuaUI measures y
+-- up from the bottom of the screen and RmlUi down from the top.
+local function rmlAt(x, y)
+	if not (RmlUi and RmlUi.contexts and RmlUi.Vector2f) then
+		return false
+	end
+	local ok, hit = pcall(function()
+		local point = RmlUi.Vector2f.new(x, vsy - y)
+		-- a function in Recoil 2026.09.01 that returns the list
+		local contexts = RmlUi.contexts
+		if type(contexts) == "function" then
+			contexts = contexts()
+		end
+		for _, context in ipairs(contexts) do
+			local element = context:GetElementAtPoint(point)
+			if element and not RML_BACKGROUND[element.tag_name] then
+				return true
+			end
+		end
+		return false
+	end)
+	return ok and hit
+end
+
+--- Move the panel up or down its edge out of the way of the game's other
+-- panels: RmlUi documents, and widgets that answer IsAbove at points over
+-- the panel. Panels the engine draws itself answer to neither and are not
+-- avoided.
 local function avoidOthers()
-	local list = widgetHandler.IsAboveList
-	if drag or not layout or type(list) ~= "table" then
+	local list = type(widgetHandler.IsAboveList) == "table" and widgetHandler.IsAboveList or {}
+	if drag or not layout then
 		return
 	end
 	local seen = {}
 	local function covered(x, y)
 		local k = math.floor(x) .. ":" .. math.floor(y)
 		if seen[k] == nil then
-			seen[k] = false
+			seen[k] = rmlAt(x, y)
 			for _, w in ipairs(list) do
+				if seen[k] then
+					break
+				end
 				if w ~= me and w.IsAbove then
 					local ok, above = pcall(w.IsAbove, w, x, y)
-					if ok and above then
-						seen[k] = true
-						break
-					end
+					seen[k] = ok and above == true
 				end
 			end
 		end
@@ -1093,10 +1127,14 @@ end
 
 function widget:Update(dt)
 	clock = clock + dt
-	untilAvoid = untilAvoid - dt
-	if untilAvoid <= 0 then
-		untilAvoid = 1
-		avoidOthers()
+	if not avoided and layout then
+		if not spawnedAt and #(Spring.GetTeamUnits(Spring.GetMyTeamID()) or {}) > 0 then
+			spawnedAt = clock
+		end
+		if spawnedAt and (#Spring.GetSelectedUnits() > 0 or clock - spawnedAt > AVOID_AFTER) then
+			avoided = true
+			avoidOthers()
+		end
 	end
 	if panel.message and clock > messageUntil then
 		panel.message = nil
