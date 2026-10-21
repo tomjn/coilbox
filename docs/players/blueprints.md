@@ -109,7 +109,7 @@ Each builder you selected is ordered to build the buildings it can. Right click 
 
 ### Plan a base ahead
 
-You can place a blueprint with no builders selected. It stays on the map as a plan, drawn the way it looked while you placed it, and only you can see it. Place as many as you like. When you have the builders, select them and right click a plan to build it. Right click a plan with nothing selected to remove it.
+You can place a blueprint with no builders selected. It stays on the map as a plan, drawn the way it looked while you placed it, and only you can see it. Place as many as you like. When you have the builders, select them and right click a building in a plan to build that building. Hold Shift as you right click to build the whole plan, after whatever the builders are already doing. Right click a plan with nothing selected to remove it.
 
 If the panel is in the way, drag the Blueprints button, or the panel's title, somewhere else. Close to the edge of the screen, it snaps to the edge. The button at the top right of the panel, or selecting the title, closes it. The game remembers where you put it.
 

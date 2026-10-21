@@ -543,19 +543,31 @@ local function placeNow()
 	end
 end
 
---- Hand a plan to the selected builders. What they cannot build stays
--- planned.
-local function buildPlan(index)
+--- Hand a plan, or one building of it, to the selected builders. What
+-- they cannot build stays planned.
+-- @param index integer the plan
+-- @param only integer? one position in the plan, the whole plan if nil
+local function buildPlan(index, only)
 	local positions = plans[index].positions
 	-- Re-test the ground, since things have been built since.
 	local foot = {}
 	for i, p in ipairs(positions) do
-		local status = Spring.TestBuildOrder(p.defID, p.x, p.y, p.z, p.facing)
-		foot[i] = { defID = p.defID, def = p.def, x = p.x, y = p.y, z = p.z, facing = p.facing, blocked = status == 0 }
+		if not only or i == only then
+			local status = Spring.TestBuildOrder(p.defID, p.x, p.y, p.z, p.facing)
+			foot[#foot + 1] = { defID = p.defID, def = p.def, x = p.x, y = p.y, z = p.z, facing = p.facing, blocked = status == 0 }
+		end
 	end
 	local plan = PLACE.plan(foot, can, shiftHeld(), panel.assist)
 	local sent = PLACE.issue(plan)
-	plans[index].positions = plan.remainder
+	if only then
+		-- the one building leaves the plan once it is ordered or the ground
+		-- refuses it, and stays when nobody selected can build it
+		if #plan.remainder == 0 then
+			table.remove(positions, only)
+		end
+	else
+		plans[index].positions = plan.remainder
+	end
 	return plan, sent
 end
 
@@ -586,21 +598,23 @@ local function placeRemainder()
 end
 
 --- The plan with a building under a point on the ground, if any.
+-- @return integer? the plan, integer? the building's position in it
 local function planAt(x, z)
 	for i = #plans, 1, -1 do
-		for _, p in ipairs(plans[i].positions) do
+		for j, p in ipairs(plans[i].positions) do
 			local hw, hd = PLACE.halfSpan(p.def, p.facing)
 			if math.abs(x - p.x) <= hw and math.abs(z - p.z) <= hd then
-				return i
+				return i, j
 			end
 		end
 	end
 	return nil
 end
 
---- A right click on a plan builds it with the selected builders. With
--- nothing selected it removes the plan. With other units selected the click
--- is theirs.
+--- A right click on a building in a plan has the selected builders build
+-- that building. With shift held they build the whole plan, after what they
+-- are already doing. With nothing selected the click removes the plan, and
+-- with other units selected the click is theirs.
 local function clickPlan(mx, my)
 	if #plans == 0 then
 		return false
@@ -609,14 +623,20 @@ local function clickPlan(mx, my)
 	if kind ~= "ground" or not pos then
 		return false
 	end
-	local index = planAt(pos[1], pos[3])
+	local index, position = planAt(pos[1], pos[3])
 	if not index then
 		return false
 	end
 	readSelection()
 	if #can.builders > 0 then
-		local plan, sent = buildPlan(index)
-		say("Planned: " .. describe(plan, sent))
+		local whole = shiftHeld()
+		local name = plans[index].positions[position].def
+		local plan, sent = buildPlan(index, not whole and position or nil)
+		if not whole and sent == 0 and plan.blocked == 0 then
+			say("The selected builders cannot build " .. (name.translatedHumanName or name.humanName or name.name))
+		else
+			say("Planned: " .. describe(plan, sent))
+		end
 		dropEmptyPlans()
 		return true
 	end
