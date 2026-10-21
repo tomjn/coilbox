@@ -1,3 +1,5 @@
+import { i18n, type MessageDescriptor } from "@lingui/core";
+import { msg, plural, t } from "@lingui/core/macro";
 import { scenarioEvalMission, scenarioReadMission } from "./bindings";
 import { missionPath } from "./compile";
 import {
@@ -68,19 +70,25 @@ export interface MapExtent {
   height: number;
 }
 
-/** The parameter kinds that hold a cross-reference, and what to call each one. */
+/**
+ * The parameter kinds that hold a cross-reference, and what to call each one.
+ * Descriptors, resolved by {@link noun} when a message is written, so a table
+ * built at module load still follows the Language picker.
+ */
 const NOUN = {
-  zoneId: "zone",
-  actorId: "actor or building",
-  groupId: "group",
-  triggerId: "trigger",
-  objectiveId: "objective",
-  dialogueId: "dialogue line",
-  teamId: "team",
-  varName: "variable",
+  zoneId: msg`zone`,
+  actorId: msg`actor or building`,
+  groupId: msg`group`,
+  triggerId: msg`trigger`,
+  objectiveId: msg`objective`,
+  dialogueId: msg`dialogue line`,
+  teamId: msg`team`,
+  varName: msg`variable`,
 } as const;
 
 type IdKind = keyof typeof NOUN;
+
+const noun = (kind: IdKind): string => i18n._(NOUN[kind]);
 
 const isIdKind = (kind: ParamKind): kind is IdKind => kind in NOUN;
 
@@ -154,11 +162,13 @@ function resolve(
   issues: MissionIssue[],
 ): void {
   if (typeof value !== "string" || value === "") {
-    issues.push({ path, message: `no ${NOUN[kind]} given` });
+    const what = noun(kind);
+    issues.push({ path, message: t`no ${what} given` });
     return;
   }
   if (!known[kind].has(value)) {
-    issues.push({ path, message: `no ${NOUN[kind]} called "${value}"` });
+    const what = noun(kind);
+    issues.push({ path, message: t`no ${what} called "${value}"` });
   }
 }
 
@@ -179,13 +189,13 @@ function checkOrders(
     const where = `${path}[${index}].target`;
     const target = order.target;
     if (typeof target !== "string" || target === "") {
-      issues.push({ path: where, message: "no target given" });
+      issues.push({ path: where, message: t`no target given` });
       return;
     }
     if (!known.actorId.has(target) && !known.groupId.has(target)) {
       issues.push({
         path: where,
-        message: `nothing called "${target}" for an order to aim at`,
+        message: t`nothing called "${target}" for an order to aim at`,
       });
     }
   });
@@ -208,7 +218,7 @@ function checkAmount(
     return;
   }
   if (typeof value !== "number") {
-    issues.push({ path, message: "no number or variable given" });
+    issues.push({ path, message: t`no number or variable given` });
   }
 }
 
@@ -312,11 +322,12 @@ function pointsIn(value: unknown, path = ""): FoundPoint[] {
 /** Why a position is not on the map, or null when it is. */
 function offMap(x: number, z: number, map?: MapExtent): string | null {
   if (x < 0 || z < 0) {
-    return `${x},${z} is off the map. Spring measures a map from its north-west corner, so x and z start at 0.`;
+    return t`${x},${z} is off the map. Spring measures a map from its north-west corner, so x and z start at 0.`;
   }
   if (!map || map.width <= 0 || map.height <= 0) return null;
   if (x > map.width || z > map.height) {
-    return `${x},${z} is off the map, which is ${map.width} by ${map.height} elmos.`;
+    const { width, height } = map;
+    return t`${x},${z} is off the map, which is ${width} by ${height} elmos.`;
   }
   return null;
 }
@@ -374,7 +385,7 @@ function checkUnitNames(
       if (taken.has(id)) {
         issues.push({
           path: `${where}.buildings[${i}].id`,
-          message: `"${id}" already names an actor or another building, and a trigger naming it would reach only one of them.`,
+          message: t`"${id}" already names an actor or another building, and a trigger naming it would reach only one of them.`,
         });
       }
       taken.add(id);
@@ -550,12 +561,16 @@ function checkUnitDefs(
   if (found.length === 0) return;
 
   const named = typeof mission.game === "string" ? mission.game : "";
-  const game = named === "" ? "the game" : named;
+  const game = named === "" ? t`the game` : named;
 
   if (units.length === 0) {
+    const count = found.length;
     issues.push({
       path: "mission",
-      message: `coilbox could not read ${game}'s units, so the ${found.length} unit type${found.length === 1 ? "" : "s"} this mission names ${found.length === 1 ? "was" : "were"} not checked against it.`,
+      message: plural(count, {
+        one: `coilbox could not read ${game}'s units, so the # unit type this mission names was not checked against it.`,
+        other: `coilbox could not read ${game}'s units, so the # unit types this mission names were not checked against it.`,
+      }),
       severity: "warning",
     });
     return;
@@ -569,9 +584,10 @@ function checkUnitDefs(
   );
   for (const entry of found) {
     if (!missing.has(entry.def.toLowerCase())) continue;
+    const def = entry.def;
     issues.push({
       path: entry.path,
-      message: `no unit type called "${entry.def}" in ${game}`,
+      message: t`no unit type called "${def}" in ${game}`,
     });
   }
 }
@@ -611,8 +627,8 @@ function checkText(
     });
   };
 
-  say("objectives", "no text, so the objectives panel shows a blank line");
-  say("dialogue", "no text, so the radio panel opens on an empty message");
+  say("objectives", t`no text, so the objectives panel shows a blank line`);
+  say("dialogue", t`no text, so the radio panel opens on an empty message`);
 }
 
 /**
@@ -652,9 +668,11 @@ function checkDifficulty(
       const least = rank(range.atLeast);
       const most = rank(range.atMost);
       if (least === null || most === null || least <= most) return;
+      const atLeast = String(range.atLeast);
+      const atMost = String(range.atMost);
       issues.push({
         path: `${at(list, entry, index)}.difficulty`,
-        message: `it is only there from ${range.atLeast} up and only up to ${range.atMost}, which is no difficulty at all, so it never appears`,
+        message: t`it is only there from ${atLeast} up and only up to ${atMost}, which is no difficulty at all, so it never appears`,
         severity: "warning",
       });
     });
@@ -668,7 +686,10 @@ export function validateMission(
 ): MissionIssue[] {
   if (!isRecord(mission)) {
     return [
-      { path: "mission", message: "the compiled mission returned no table" },
+      {
+        path: "mission",
+        message: t`the compiled mission returned no table`,
+      },
     ];
   }
   const issues: MissionIssue[] = [];
@@ -680,7 +701,7 @@ export function validateMission(
     if (typeof asRecord(raw).team !== "number") {
       issues.push({
         path: `teams[${JSON.stringify(id)}]`,
-        message: `"${id}" has no engine team, so nothing can spawn for it. It names a spectator, or a participant the setup does not have.`,
+        message: t`"${id}" has no engine team, so nothing can spawn for it. It names a spectator, or a participant the setup does not have.`,
       });
     }
   }
@@ -740,28 +761,28 @@ export function validateMission(
  * -------------------------------------------------------------------------- */
 
 /** What each part of a compiled path is called in the editor. */
-const PART: Record<string, string> = {
-  mission: "Mission",
-  actors: "Actor",
-  groups: "Group",
+const PART: Record<string, MessageDescriptor> = {
+  mission: msg`Mission`,
+  actors: msg`Actor`,
+  groups: msg`Group`,
   // The compiled mission still spells a base "prefabs", because the runtime a
   // game vendored reads that key. The editor calls it a base.
-  prefabs: "Base",
-  bases: "Base",
-  blueprints: "Blueprint",
-  zones: "Zone",
-  triggers: "Trigger",
-  objectives: "Objective",
-  dialogue: "Dialogue line",
-  teams: "Team",
-  conditions: "Condition",
-  actions: "Action",
-  orders: "Order",
-  waypoints: "Waypoint",
-  buildings: "Building",
-  startUnits: "Start unit",
-  units: "Unit",
-  queue: "Queue item",
+  prefabs: msg`Base`,
+  bases: msg`Base`,
+  blueprints: msg`Blueprint`,
+  zones: msg`Zone`,
+  triggers: msg`Trigger`,
+  objectives: msg`Objective`,
+  dialogue: msg`Dialogue line`,
+  teams: msg`Team`,
+  conditions: msg`Condition`,
+  actions: msg`Action`,
+  orders: msg`Order`,
+  waypoints: msg`Waypoint`,
+  buildings: msg`Building`,
+  startUnits: msg`Start unit`,
+  units: msg`Unit`,
+  queue: msg`Queue item`,
 };
 
 /** A name, optionally subscripted by an id or a position. */
@@ -898,7 +919,8 @@ export function issueLocation(
     if (name === "params") continue;
     // A name with no entry here is a parameter or a field, which is already
     // what the form calls it.
-    const label = PART[name] ?? name;
+    const part = PART[name];
+    const label = part ? i18n._(part) : name;
     if (ref === null) said.push(label);
     else if (ref.startsWith('"'))
       said.push(`${label} ${named(ref, labels[name])}`);
@@ -943,7 +965,9 @@ export function describeIssue(
   issue: MissionIssue,
   labels: IssueLabels = {},
 ): string {
-  return `${issueLocation(issue.path, labels) ?? issue.path}: ${issue.message}`;
+  const where = issueLocation(issue.path, labels) ?? issue.path;
+  const { message } = issue;
+  return t`${where}: ${message}`;
 }
 
 /**

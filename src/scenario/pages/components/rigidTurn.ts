@@ -64,6 +64,7 @@
  * Arithmetic on plain values, so all of it is tested without a GPU.
  */
 
+import { plural, t } from "@lingui/core/macro";
 import type { FootprintMark } from "@/blueprint/footprint";
 import { turnedAbout } from "@/lib/scenarioEditing/editing";
 import type { Point, Scenario } from "../../model";
@@ -175,14 +176,18 @@ export function turnedAroundWords(
   marks: readonly FootprintMark[],
 ): string {
   const count = countSelection(selection);
-  if (count.total === 0) return "Nothing selected.";
+  if (count.total === 0) return t`Nothing selected.`;
   const turns = count.actors + count.buildings + count.zones;
   const rest = count.groups + count.points;
   const trouble = manyBuildTrouble(selection, marks);
+  const total = count.total;
   if (turns === 0) {
-    return `Swung ${count.total} round together. Neither a group nor a path point has a facing to turn.${trouble}`;
+    return `${t`Swung ${total} round together. Neither a group nor a path point has a facing to turn.`}${trouble}`;
   }
-  if (rest === 0) return `Turned ${count.total} round together.${trouble}`;
-  const with_ = turns === 1 ? "it" : "them";
-  return `Turned ${turns} of ${count.total} round together. The other ${rest} moved with ${with_} without turning.${trouble}`;
+  if (rest === 0) return `${t`Turned ${total} round together.`}${trouble}`;
+  const moved = plural(turns, {
+    one: `Turned # of ${total} round together. The other ${rest} moved with it without turning.`,
+    other: `Turned # of ${total} round together. The other ${rest} moved with them without turning.`,
+  });
+  return `${moved}${trouble}`;
 }

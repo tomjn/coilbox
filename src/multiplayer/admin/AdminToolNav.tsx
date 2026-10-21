@@ -1,3 +1,4 @@
+import { useLingui } from "@lingui/react/macro";
 import { cn } from "@picoframe/frame";
 import { useId } from "react";
 import { Link, useSearchParams } from "react-router";
@@ -13,6 +14,7 @@ function ToolGroupList({
   tools: AdminTool[];
   current: string;
 }) {
+  const { i18n } = useLingui();
   const [params] = useSearchParams();
   const headingId = useId();
   if (tools.length === 0) return null;
@@ -43,7 +45,7 @@ function ToolGroupList({
                   aria-hidden
                   className="size-4 shrink-0 text-muted-foreground"
                 />
-                <span className="truncate">{label}</span>
+                <span className="truncate">{i18n._(label)}</span>
               </Link>
             </li>
           );
@@ -66,14 +68,19 @@ export function AdminToolNav({
   tools: AdminTool[];
   current: string;
 }) {
+  const { t } = useLingui();
   const { moderation, admin } = groupTools(tools);
   return (
     <nav
-      aria-label="Server admin tools"
+      aria-label={t`Server admin tools`}
       className="flex flex-col gap-4 border-border p-3 md:border-r"
     >
-      <ToolGroupList title="Moderation" tools={moderation} current={current} />
-      <ToolGroupList title="Admin only" tools={admin} current={current} />
+      <ToolGroupList
+        title={t`Moderation`}
+        tools={moderation}
+        current={current}
+      />
+      <ToolGroupList title={t`Admin only`} tools={admin} current={current} />
     </nav>
   );
 }

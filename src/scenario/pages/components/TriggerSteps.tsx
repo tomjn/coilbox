@@ -17,6 +17,9 @@
  * picker below offers and which it greys out, and needs nothing from the fields.
  */
 
+import type { MessageDescriptor } from "@lingui/core";
+import { t as coreT, msg } from "@lingui/core/macro";
+import { Trans, useLingui } from "@lingui/react/macro";
 import { Button, Input } from "@picoframe/frame";
 import {
   ArrowDown,
@@ -44,6 +47,7 @@ import {
   ACTION_GROUP_ORDER,
   CONDITION_GROUP_ORDER,
   GAME_TYPE_GROUP,
+  groupLabel,
   isUnitDefParam,
   type ParamSpec,
   TYPE_DESCRIPTIONS,
@@ -102,8 +106,8 @@ function paramAccessibleName(
   friendly: string,
 ): string {
   return friendly === name
-    ? `${typeLabel} ${friendly}`
-    : `${typeLabel} ${friendly}, ${name}`;
+    ? coreT`${typeLabel} ${friendly}`
+    : coreT`${typeLabel} ${friendly}, ${name}`;
 }
 
 /** The number a `default` in a parameter's spec substitutes when the box is
@@ -113,7 +117,9 @@ function paramAccessibleName(
  *  there is nothing to leave out. */
 function numberPlaceholder(optional: boolean, defaultValue?: number): string {
   if (!optional) return "";
-  return defaultValue === undefined ? "optional" : `default ${defaultValue}`;
+  return defaultValue === undefined
+    ? coreT`optional`
+    : coreT`default ${defaultValue}`;
 }
 
 /** Whether the map is waiting for the point this field asked for. */
@@ -175,7 +181,9 @@ export function StepRow({
   onMove: ((delta: number) => void) | null;
   onRemove: () => void;
 }) {
+  const { t } = useLingui();
   const spec = stepTypes(at.list, extensions)[step.type];
+  const typeLabel = stepLabel(step.type, extensions);
 
   return (
     <li className="rounded-md border border-border/60 bg-muted/20 p-2">
@@ -192,29 +200,29 @@ export function StepRow({
             aria-pressed={step.negate === true}
             title={
               step.negate
-                ? "Holds while this condition does not. Press to read it the right way up again."
-                : "Read this condition the other way round, so it holds while the condition does not."
+                ? t`Holds while this condition does not. Press to read it the right way up again.`
+                : t`Read this condition the other way round, so it holds while the condition does not.`
             }
             onClick={() => onNegate(step.negate !== true)}
           >
-            not
+            <Trans>not</Trans>
           </Button>
         )}
         <span className="min-w-0 flex-1 truncate text-xs font-medium">
-          {stepLabel(step.type, extensions)}
+          {typeLabel}
         </span>
         {!spec && (
           <span
             className="flex items-center gap-1 text-[11px] text-amber-300"
-            title="Coilbox has no form for this type, so its parameters are shown and kept as they are."
+            title={t`Coilbox has no form for this type, so its parameters are shown and kept as they are.`}
           >
-            <TriangleAlert className="size-3.5" /> unknown type
+            <TriangleAlert className="size-3.5" /> <Trans>unknown type</Trans>
           </span>
         )}
         {unsupported && (
           <span
             className="flex items-center gap-1 text-[11px] text-amber-300"
-            title="The runtime that would play this scenario does not implement this type, so the mission is refused at launch until the game's runtime catches up or the step goes."
+            title={t`The runtime that would play this scenario does not implement this type, so the mission is refused at launch until the game's runtime catches up or the step goes.`}
           >
             <TriangleAlert className="size-3.5" /> {unsupported.toLowerCase()}
           </span>
@@ -225,7 +233,7 @@ export function StepRow({
               size="sm"
               variant="ghost"
               className="size-7 p-0"
-              aria-label="Move up"
+              aria-label={t`Move up`}
               onClick={() => onMove(-1)}
             >
               <ArrowUp className="size-3.5" />
@@ -234,7 +242,7 @@ export function StepRow({
               size="sm"
               variant="ghost"
               className="size-7 p-0"
-              aria-label="Move down"
+              aria-label={t`Move down`}
               onClick={() => onMove(1)}
             >
               <ArrowDown className="size-3.5" />
@@ -245,7 +253,7 @@ export function StepRow({
           size="sm"
           variant="ghost"
           className="size-7 p-0 text-destructive hover:text-destructive"
-          aria-label={`Remove ${stepLabel(step.type, extensions)}`}
+          aria-label={t`Remove ${typeLabel}`}
           onClick={onRemove}
         >
           <X className="size-3.5" />
@@ -262,7 +270,7 @@ export function StepRow({
               name={name}
               spec={param}
               value={step.params[name]}
-              typeLabel={stepLabel(step.type, extensions)}
+              typeLabel={typeLabel}
               at={at}
               scenario={scenario}
               units={units}
@@ -326,6 +334,7 @@ export function AddStep({
   gate: Record<string, string>;
   onAdd: (step: TriggerStep) => void;
 }) {
+  const { t } = useLingui();
   const table = stepTypes(list, extensions);
   const declared =
     list === "conditions" ? extensions.conditions : extensions.actions;
@@ -344,7 +353,7 @@ export function AddStep({
         description:
           declared[type]?.description ??
           TYPE_DESCRIPTIONS[type] ??
-          "No description.",
+          t`No description.`,
         trailing: reason,
         disabled: reason !== undefined,
         group: TYPE_GROUPS[type] ?? GAME_TYPE_GROUP,
@@ -354,13 +363,16 @@ export function AddStep({
       (a, b) =>
         (groupRank.get(a.group) ?? groupOrder.length) -
         (groupRank.get(b.group) ?? groupOrder.length),
-    );
+    )
+    .map((option) => ({ ...option, group: groupLabel(option.group) }));
 
   return (
     <OptionSelect
       size="sm"
       value=""
-      placeholder={list === "conditions" ? "Add a condition" : "Add an action"}
+      placeholder={
+        list === "conditions" ? t`Add a condition` : t`Add an action`
+      }
       options={options}
       onValueChange={(type) => {
         if (gate[type] || !table[type]) return;
@@ -408,6 +420,7 @@ function ParamField({
   onPick: (target: PointTarget | null) => void;
   onChange: (value: ScenarioParam | undefined) => void;
 }) {
+  const { t } = useLingui();
   const friendly = spec.label ?? name;
   const label = paramAccessibleName(typeLabel, name, friendly);
   // An optional parameter that is set can be put back to whatever the runtime
@@ -444,7 +457,7 @@ function ParamField({
           size="sm"
           variant="ghost"
           className={`size-7 shrink-0 p-0 ${clearable ? "" : "invisible"}`}
-          aria-label={`Clear ${label}`}
+          aria-label={t`Clear ${label}`}
           disabled={!clearable}
           onClick={() => onChange(undefined)}
         >
@@ -488,6 +501,7 @@ function ParamControl({
   onPick: (target: PointTarget | null) => void;
   onChange: (value: ScenarioParam | undefined) => void;
 }) {
+  const { t } = useLingui();
   const friendly = spec.label ?? name;
   const options = registryOptions(scenario, spec.kind);
   if (options) {
@@ -512,7 +526,7 @@ function ParamControl({
         options={options}
         disabled={options.length === 0}
         placeholder={
-          options.length === 0 ? "Nothing to pick yet" : `Pick a ${friendly}`
+          options.length === 0 ? t`Nothing to pick yet` : t`Pick a ${friendly}`
         }
         ariaLabel={label}
         ariaInvalid={ariaInvalid}
@@ -557,7 +571,7 @@ function ParamControl({
           value={asString(value)}
           onValueChange={onChange}
           options={(spec.values ?? []).map((v) => ({ value: v, label: v }))}
-          placeholder={`Pick a ${friendly}`}
+          placeholder={t`Pick a ${friendly}`}
           ariaLabel={label}
         />
       );
@@ -668,9 +682,9 @@ function NumberField({
 
 /** What an amount is picked as. The stored value says which without a flag,
  *  but the control needs a name for each side of the choice. */
-const AMOUNT_SIDES = [
-  { value: "number", label: "a number" },
-  { value: "var", label: "a variable" },
+const AMOUNT_SIDES: { value: string; label: MessageDescriptor }[] = [
+  { value: "number", label: msg`a number` },
+  { value: "var", label: msg`a variable` },
 ];
 
 /**
@@ -696,6 +710,7 @@ function AmountField({
   vars: string[];
   onChange: (value: ScenarioParam | undefined) => void;
 }) {
+  const { t, i18n } = useLingui();
   const named = amountVar(value);
 
   return (
@@ -706,10 +721,11 @@ function AmountField({
         value={named === null ? "number" : "var"}
         options={AMOUNT_SIDES.map((side) => ({
           ...side,
+          label: i18n._(side.label),
           disabled: side.value === "var" && vars.length === 0,
           trailing:
             side.value === "var" && vars.length === 0
-              ? "Needs a variable"
+              ? t`Needs a variable`
               : undefined,
         }))}
         onValueChange={(side) => {
@@ -734,7 +750,7 @@ function AmountField({
           value={named}
           options={vars.map((name) => ({ value: name, label: name }))}
           onValueChange={(name) => onChange({ var: name })}
-          placeholder={`Pick a variable for ${label}`}
+          placeholder={t`Pick a variable for ${label}`}
         />
       )}
     </>
@@ -755,6 +771,7 @@ function TextField({
   optional: boolean;
   onChange: (value: ScenarioParam | undefined) => void;
 }) {
+  const { t } = useLingui();
   const [text, setText] = useFieldText(value);
 
   const commit = () => {
@@ -771,7 +788,7 @@ function TextField({
     <Input
       aria-label={label}
       value={text}
-      placeholder={optional ? "optional" : ""}
+      placeholder={optional ? t`optional` : ""}
       onChange={(e) => setText(e.target.value)}
       onBlur={commit}
       onKeyDown={(e) => {
@@ -798,6 +815,7 @@ function StringsField({
   unitsLoading: boolean;
   onChange: (value: ScenarioParam) => void;
 }) {
+  const { t } = useLingui();
   const [typed, setTyped] = useState("");
 
   const add = (item: string) => {
@@ -817,7 +835,7 @@ function StringsField({
               {item}
               <button
                 type="button"
-                aria-label={`Remove ${item}`}
+                aria-label={t`Remove ${item}`}
                 className="text-muted-foreground hover:text-destructive"
                 onClick={() => onChange(values.filter((v) => v !== item))}
               >
@@ -832,7 +850,7 @@ function StringsField({
           units={units}
           value=""
           loading={unitsLoading}
-          placeholder="Add a unit type"
+          placeholder={t`Add a unit type`}
           size="sm"
           onValueChange={add}
         />
@@ -840,7 +858,7 @@ function StringsField({
         <Input
           aria-label={label}
           value={typed}
-          placeholder="Type and press Enter"
+          placeholder={t`Type and press Enter`}
           onChange={(e) => setTyped(e.target.value)}
           onKeyDown={(e) => {
             if (e.key !== "Enter") return;
@@ -882,6 +900,7 @@ function PointField({
   describedBy?: string;
   onAsk: (on: boolean) => void;
 }) {
+  const { t } = useLingui();
   return (
     // biome-ignore lint/a11y/useSemanticElements: a button and its readout are a role=group cluster, not a form <fieldset>
     <div
@@ -898,10 +917,10 @@ function PointField({
         onClick={() => onAsk(!asking)}
       >
         <MapPin className="size-3.5" />
-        {asking ? "Click the map" : "Pick on the map"}
+        {asking ? t`Click the map` : t`Pick on the map`}
       </Button>
       <span className="font-mono text-[11px] text-muted-foreground">
-        {point ? `${point.x}, ${point.z}` : "nowhere yet"}
+        {point ? `${point.x}, ${point.z}` : t`nowhere yet`}
       </span>
     </div>
   );
@@ -944,7 +963,9 @@ function OrdersField({
     >
       {orders.length === 0 && (
         <p className="text-[11px] text-muted-foreground">
-          With no orders the group carries on with what it was already doing.
+          <Trans>
+            With no orders the group carries on with what it was already doing.
+          </Trans>
         </p>
       )}
       {orders.map((order, index) => (
@@ -974,7 +995,7 @@ function OrdersField({
         className="h-7 w-full gap-1.5 px-2 text-xs"
         onClick={() => onChange(ordersParam([...orders, orderOfKind("move")]))}
       >
-        <Plus className="size-3.5" /> Add an order
+        <Plus className="size-3.5" /> <Trans>Add an order</Trans>
       </Button>
     </div>
   );

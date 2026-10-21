@@ -1,3 +1,4 @@
+import { plural } from "@lingui/core/macro";
 import {
   type AiSubstitution,
   reconcileAi,
@@ -221,11 +222,12 @@ export function hostSeedAiNotice(
   const parts: string[] = [];
   const subs = summarizeSubstitutions(seed.substitutions);
   if (subs) parts.push(subs);
-  if (seed.unresolvedAiCount === 1) {
-    parts.push("One bot had no AI available in this game and was skipped.");
-  } else if (seed.unresolvedAiCount > 1) {
+  if (seed.unresolvedAiCount > 0) {
     parts.push(
-      `${seed.unresolvedAiCount} bots had no AI available in this game and were skipped.`,
+      plural(seed.unresolvedAiCount, {
+        one: "One bot had no AI available in this game and was skipped.",
+        other: "# bots had no AI available in this game and were skipped.",
+      }),
     );
   }
   return parts.length > 0 ? parts.join(" ") : undefined;

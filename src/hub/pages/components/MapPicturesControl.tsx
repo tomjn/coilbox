@@ -1,3 +1,6 @@
+import type { MessageDescriptor } from "@lingui/core";
+import { msg } from "@lingui/core/macro";
+import { Trans, useLingui } from "@lingui/react/macro";
 import { Button } from "@picoframe/frame";
 import { useState } from "react";
 import { describeError } from "@/i18n/uiError";
@@ -40,6 +43,7 @@ export function MapPicturesControl({
    *  than one that is not offered yet. */
   agreed: boolean;
 }) {
+  const { t, i18n } = useLingui();
   const { target } = usePreferredTarget();
   const [running, setRunning] = useState(false);
   const [progress, setProgress] = useState<MapPictureSweepProgress | null>(
@@ -78,22 +82,29 @@ export function MapPicturesControl({
 
   if (!agreed) return null;
 
+  const lastRun = swept === null ? null : formatDateTime(new Date(swept));
+
   return (
     <section className="space-y-2">
       <h3 className="text-sm font-medium leading-none">
-        Sending pictures of your maps
+        <Trans>Sending pictures of your maps</Trans>
       </h3>
       <p className="text-sm text-muted-foreground">
-        Coilbox can read the minimap out of every map on this computer and send
-        it to the hub, so a map somebody is looking at there has a picture of it
-        rather than a drawing of its name. It asks the hub what it already has
-        first, so a map somebody else has covered costs one question.
+        <Trans>
+          Coilbox can read the minimap out of every map on this computer and
+          send it to the hub, so a map somebody is looking at there has a
+          picture of it rather than a drawing of its name. It asks the hub what
+          it already has first, so a map somebody else has covered costs one
+          question.
+        </Trans>
       </p>
       <p className="text-sm text-muted-foreground">
-        A big collection takes several goes. Every picture spends part of an
-        hourly allowance the whole community shares, so one press covers what is
-        left of this hour and picks up where it stopped the next time you press
-        it.
+        <Trans>
+          A big collection takes several goes. Every picture spends part of an
+          hourly allowance the whole community shares, so one press covers what
+          is left of this hour and picks up where it stopped the next time you
+          press it.
+        </Trans>
       </p>
       <div className="flex items-center gap-3 pt-1">
         <Button
@@ -102,22 +113,24 @@ export function MapPicturesControl({
           onClick={run}
           disabled={running || !target?.enginePath}
         >
-          {running ? "Reading your maps…" : "Send pictures of your maps"}
+          {running ? t`Reading your maps…` : t`Send pictures of your maps`}
         </Button>
         {progress && (
           <span className="text-sm text-muted-foreground">
-            {phaseWords(progress)}
+            {i18n._(phaseWords(progress))}
           </span>
         )}
       </div>
       {!target?.enginePath && (
         <p className="text-sm text-muted-foreground">
-          Coilbox needs an engine installed before it can read your maps.
+          <Trans>
+            Coilbox needs an engine installed before it can read your maps.
+          </Trans>
         </p>
       )}
       {swept !== null && !running && (
         <p className="text-sm text-muted-foreground">
-          Last run {formatDateTime(new Date(swept))}.
+          <Trans>Last run {lastRun}.</Trans>
         </p>
       )}
       {report && (
@@ -142,10 +155,19 @@ export function phaseWords({
   phase,
   done,
   total,
-}: MapPictureSweepProgress): string {
-  const of = total > 0 ? ` ${done} of ${total}` : "";
-  if (phase === "asking") return `Asking the hub about${of || " your maps"}`;
-  if (phase === "encoding") return `Making the pictures${of}`;
-  if (phase === "sending") return `Sending${of}`;
-  return total > 0 ? `Read${of}` : "Reading your maps";
+}: MapPictureSweepProgress): MessageDescriptor {
+  if (phase === "asking") {
+    return total > 0
+      ? msg`Asking the hub about ${done} of ${total}`
+      : msg`Asking the hub about your maps`;
+  }
+  if (phase === "encoding") {
+    return total > 0
+      ? msg`Making the pictures ${done} of ${total}`
+      : msg`Making the pictures`;
+  }
+  if (phase === "sending") {
+    return total > 0 ? msg`Sending ${done} of ${total}` : msg`Sending`;
+  }
+  return total > 0 ? msg`Read ${done} of ${total}` : msg`Reading your maps`;
 }

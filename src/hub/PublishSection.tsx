@@ -1,3 +1,4 @@
+import { Trans, useLingui } from "@lingui/react/macro";
 import { Button, Input } from "@picoframe/frame";
 import { Check, Copy, ExternalLink, Globe } from "lucide-react";
 import { useCallback, useState } from "react";
@@ -36,6 +37,7 @@ import {
  * See `./publish`.
  */
 export function PublishSection({ code }: { code: string }) {
+  const { t, i18n } = useLingui();
   const hubUrl = useHubUrl();
   const account = useHubAccount(hubUrl);
   const { loading: checking, signedIn } = account;
@@ -102,7 +104,9 @@ export function PublishSection({ code }: { code: string }) {
     const page = hubItemPageUrl(hubUrl, published.id);
     return (
       <div className="flex flex-col gap-1.5 border-t pt-3">
-        <p className="text-sm">Published to the Coilbox hub.</p>
+        <p className="text-sm">
+          <Trans>Published to the Coilbox hub.</Trans>
+        </p>
         <p className="break-all text-xs text-muted-foreground">{page}</p>
         <div className="flex gap-2">
           <Button
@@ -112,11 +116,13 @@ export function PublishSection({ code }: { code: string }) {
           >
             {copied ? (
               <>
-                <Check className="mr-1.5 size-4" aria-hidden /> Copied
+                <Check className="mr-1.5 size-4" aria-hidden />{" "}
+                <Trans>Copied</Trans>
               </>
             ) : (
               <>
-                <Copy className="mr-1.5 size-4" aria-hidden /> Copy link
+                <Copy className="mr-1.5 size-4" aria-hidden />{" "}
+                <Trans>Copy link</Trans>
               </>
             )}
           </Button>
@@ -125,8 +131,8 @@ export function PublishSection({ code }: { code: string }) {
             className="flex-1"
             onClick={() => openExternal(page)}
           >
-            <ExternalLink className="mr-1.5 size-4" aria-hidden /> View on the
-            hub
+            <ExternalLink className="mr-1.5 size-4" aria-hidden />{" "}
+            <Trans>View on the hub</Trans>
           </Button>
         </div>
       </div>
@@ -136,7 +142,9 @@ export function PublishSection({ code }: { code: string }) {
   if (unpublishable) {
     return (
       <div className="flex flex-col gap-1.5 border-t pt-3">
-        <h3 className="text-sm font-medium leading-none">Coilbox hub</h3>
+        <h3 className="text-sm font-medium leading-none">
+          <Trans>Coilbox hub</Trans>
+        </h3>
         <p className="text-xs text-muted-foreground">{unpublishable}</p>
       </div>
     );
@@ -145,9 +153,11 @@ export function PublishSection({ code }: { code: string }) {
   if (checking) {
     return (
       <div className="flex flex-col gap-1.5 border-t pt-3">
-        <h3 className="text-sm font-medium leading-none">Coilbox hub</h3>
+        <h3 className="text-sm font-medium leading-none">
+          <Trans>Coilbox hub</Trans>
+        </h3>
         <p className="text-xs text-muted-foreground">
-          Checking whether you are signed in.
+          <Trans>Checking whether you are signed in.</Trans>
         </p>
       </div>
     );
@@ -160,9 +170,11 @@ export function PublishSection({ code }: { code: string }) {
   if (account.unknown) {
     return (
       <div className="flex flex-col gap-1.5 border-t pt-3">
-        <h3 className="text-sm font-medium leading-none">Coilbox hub</h3>
+        <h3 className="text-sm font-medium leading-none">
+          <Trans>Coilbox hub</Trans>
+        </h3>
         <p className="text-xs text-muted-foreground">
-          {account.problem ?? COULD_NOT_CHECK}
+          {account.problem ?? i18n._(COULD_NOT_CHECK)}
         </p>
         <div className="flex gap-2">
           <TryAgainButton
@@ -178,8 +190,8 @@ export function PublishSection({ code }: { code: string }) {
           />
         </div>
         <Button variant="ghost" onClick={copyAndOpen}>
-          <Globe className="mr-1.5 size-4" aria-hidden /> Copy code &amp; open
-          hub
+          <Globe className="mr-1.5 size-4" aria-hidden />{" "}
+          <Trans>Copy code &amp; open hub</Trans>
         </Button>
       </div>
     );
@@ -188,10 +200,14 @@ export function PublishSection({ code }: { code: string }) {
   if (!signedIn) {
     return (
       <div className="flex flex-col gap-1.5 border-t pt-3">
-        <h3 className="text-sm font-medium leading-none">Coilbox hub</h3>
+        <h3 className="text-sm font-medium leading-none">
+          <Trans>Coilbox hub</Trans>
+        </h3>
         <p className="text-xs text-muted-foreground">
-          Sign in to publish from here. Or copy the code and finish on the hub's
-          own page.
+          <Trans>
+            Sign in to publish from here. Or copy the code and finish on the
+            hub's own page.
+          </Trans>
         </p>
         <SignInButton
           busy={account.busy}
@@ -202,8 +218,8 @@ export function PublishSection({ code }: { code: string }) {
           <p className="text-xs text-destructive">{account.problem}</p>
         )}
         <Button variant="ghost" onClick={copyAndOpen}>
-          <Globe className="mr-1.5 size-4" aria-hidden /> Copy code &amp; open
-          hub
+          <Globe className="mr-1.5 size-4" aria-hidden />{" "}
+          <Trans>Copy code &amp; open hub</Trans>
         </Button>
       </div>
     );
@@ -212,7 +228,7 @@ export function PublishSection({ code }: { code: string }) {
   return (
     <div className="flex flex-col gap-2 border-t pt-3">
       <h3 className="text-sm font-medium leading-none">
-        Publish to the Coilbox hub
+        <Trans>Publish to the Coilbox hub</Trans>
       </h3>
       {/* A sign-in that worked and was not kept says so here, since this is
           where most people sign in from (issue #1469). Publishing still works,
@@ -220,25 +236,25 @@ export function PublishSection({ code }: { code: string }) {
       {account.problem && (
         <p className="text-xs text-destructive">{account.problem}</p>
       )}
-      <Field label="Title">
+      <Field label={t`Title`}>
         <Input
           value={title}
           onChange={(e) => setTitle(e.target.value)}
-          placeholder="What people will see first"
+          placeholder={t`What people will see first`}
         />
       </Field>
-      <Field label="Description" hint="Optional.">
+      <Field label={t`Description`} hint={t`Optional.`}>
         <Textarea
           value={description}
           onChange={(e) => setDescription(e.target.value)}
           rows={3}
         />
       </Field>
-      <Field label="Tags" hint="Optional, separated by commas.">
+      <Field label={t`Tags`} hint={t`Optional, separated by commas.`}>
         <Input
           value={tags}
           onChange={(e) => setTags(e.target.value)}
-          placeholder="1v1, cheese, teaching"
+          placeholder={t`1v1, cheese, teaching`}
         />
       </Field>
       {error && <ErrorBanner message={error} />}
@@ -248,10 +264,12 @@ export function PublishSection({ code }: { code: string }) {
         aria-busy={busy}
       >
         <Globe className="mr-1.5 size-4" aria-hidden />
-        {busy ? "Publishing…" : "Publish"}
+        {busy ? t`Publishing…` : t`Publish`}
       </Button>
       <p className="text-xs leading-snug text-muted-foreground">
-        Anyone browsing the hub will be able to find and import this.
+        <Trans>
+          Anyone browsing the hub will be able to find and import this.
+        </Trans>
       </p>
     </div>
   );

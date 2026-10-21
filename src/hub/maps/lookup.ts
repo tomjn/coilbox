@@ -27,6 +27,7 @@
  * rather than being thrown so a caller that wants to say something can.
  */
 
+import { t } from "@lingui/core/macro";
 import { serverError } from "../api";
 import { MAX_LOOKUP_NAMES } from "./vocabulary";
 
@@ -207,28 +208,29 @@ export function readLookupBody(body: unknown, asked: string[]): LookupResult {
   if (typeof body !== "object" || body === null) {
     return {
       ok: false,
-      reason: "The hub sent something coilbox could not read.",
+      reason: t`The hub sent something coilbox could not read.`,
     };
   }
   const shape = body as Record<string, unknown>;
   if (shape.format !== LOOKUP_FORMAT) {
     return {
       ok: false,
-      reason: "That address answered, but it is not a coilbox hub.",
+      reason: t`That address answered, but it is not a coilbox hub.`,
     };
   }
   if (typeof shape.version !== "number" || shape.version > MAP_LOOKUP_VERSION) {
     return {
       ok: false,
-      reason:
-        "This hub answers with a newer map lookup than this copy of coilbox understands. Update coilbox.",
+      reason: t`This hub answers with a newer map lookup than this copy of coilbox understands. Update coilbox.`,
     };
   }
   const results = shape.results;
   if (!Array.isArray(results) || results.length !== asked.length) {
+    const answered = Array.isArray(results) ? results.length : 0;
+    const requested = asked.length;
     return {
       ok: false,
-      reason: `The hub answered ${Array.isArray(results) ? results.length : 0} of ${asked.length} maps.`,
+      reason: t`The hub answered ${answered} of ${requested} maps.`,
     };
   }
 
@@ -237,14 +239,14 @@ export function readLookupBody(body: unknown, asked: string[]): LookupResult {
     if (typeof result !== "object" || result === null) {
       return {
         ok: false,
-        reason: `The hub's answer ${index} is not a result.`,
+        reason: t`The hub's answer ${index} is not a result.`,
       };
     }
     const record = result as Record<string, unknown>;
     if (record.map_name !== asked[index]) {
       return {
         ok: false,
-        reason: `The hub answered name ${index} with a different name.`,
+        reason: t`The hub answered name ${index} with a different name.`,
       };
     }
     maps.push(readMapFacts(record.map));
@@ -270,7 +272,8 @@ async function ask(
       signal,
     });
   } catch {
-    return { ok: false, reason: `Could not reach the hub at ${hostOf(url)}.` };
+    const host = hostOf(url);
+    return { ok: false, reason: t`Could not reach the hub at ${host}.` };
   }
 
   let body: unknown = null;
@@ -280,17 +283,17 @@ async function ask(
     if (response.ok) {
       return {
         ok: false,
-        reason: "The hub sent something coilbox could not read.",
+        reason: t`The hub sent something coilbox could not read.`,
       };
     }
   }
 
   if (!response.ok) {
     const said = serverError(body);
+    const status = response.status;
     return {
       ok: false,
-      reason:
-        said ?? `The hub refused the map lookup (HTTP ${response.status}).`,
+      reason: said ?? t`The hub refused the map lookup (HTTP ${status}).`,
     };
   }
   return readLookupBody(body, names);

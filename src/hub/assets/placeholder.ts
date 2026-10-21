@@ -23,6 +23,8 @@
  * needs to know about units.
  */
 
+import { t } from "@lingui/core/macro";
+
 /**
  * A map's size the way BAR names one: 512 elmo units, so a 6144 elmo map is 12.
  * Not elmos, and not the hub's `map_width`, which is in elmos. "12 by 12" is how
@@ -117,7 +119,8 @@ export function placeholderMeasure(picture: MissingMapPicture): string | null {
  */
 export function placeholderLabel(picture: MissingMapPicture): string {
   const measure = placeholderMeasure(picture);
+  const name = picture.name;
   return measure
-    ? `No picture of ${picture.name}, a ${measure} map`
-    : `No picture of ${picture.name}`;
+    ? t`No picture of ${name}, a ${measure} map`
+    : t`No picture of ${name}`;
 }

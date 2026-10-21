@@ -20,6 +20,9 @@
  * plumbing are left out for a player (issue #862). See `wording.ts`.
  */
 
+import type { MessageDescriptor } from "@lingui/core";
+import { msg } from "@lingui/core/macro";
+import { Trans, useLingui } from "@lingui/react/macro";
 import { Button } from "@picoframe/frame";
 import { Rocket } from "lucide-react";
 import { useMemo, useState } from "react";
@@ -87,10 +90,10 @@ type Phase =
   | { state: "done"; result: Launched }
   | { state: "failed"; message: string; issues: MissionIssue[] };
 
-const BUSY_LABEL: Record<string, string> = {
-  writing: "Compiling the mission",
-  scanning: "Letting the engine find it",
-  playing: "Game running",
+const BUSY_LABEL: Record<string, MessageDescriptor> = {
+  writing: msg`Compiling the mission`,
+  scanning: msg`Letting the engine find it`,
+  playing: msg`Game running`,
 };
 
 /**
@@ -141,10 +144,10 @@ function LogLines({ lines }: { lines: string[] }) {
 }
 
 /** How each difficulty is written on its button. */
-const DIFFICULTY_LABEL: Record<Difficulty, string> = {
-  easy: "Easy",
-  normal: "Normal",
-  hard: "Hard",
+const DIFFICULTY_LABEL: Record<Difficulty, MessageDescriptor> = {
+  easy: msg`Easy`,
+  normal: msg`Normal`,
+  hard: msg`Hard`,
 };
 
 export function ScenarioTestDrawer({
@@ -169,6 +172,7 @@ export function ScenarioTestDrawer({
   origin?: GameOrigin;
   mode?: "test" | "play";
 }) {
+  const { t, i18n } = useLingui();
   const testing = mode === "test";
   const { target, loading: targetLoading } = usePreferredTarget();
   const scan = useUnitsyncScan(target?.enginePath, target?.dataDir);
@@ -225,8 +229,9 @@ export function ScenarioTestDrawer({
   // a game that is. So the read is waited for rather than blocked on.
   const waiting = targetLoading || (!!target && !scan.data && !scan.error);
 
-  const blocker = scan.error
-    ? `The content scan failed: ${scan.error}`
+  const scanError = scan.error;
+  const blocker = scanError
+    ? t`The content scan failed: ${scanError}`
     : scenarioLaunchBlocker({
         scenario,
         hasEngine: targetLoading || !!target,
@@ -375,6 +380,12 @@ export function ScenarioTestDrawer({
     }
   }
 
+  // Named locals so the catalog carries {exitCode} and not {0}.
+  const done = phase.state === "done" ? phase.result : null;
+  const exitCode = done?.exitCode;
+  const gameType = done?.gameType;
+  const mission = done?.mission;
+
   return (
     <div className="flex flex-col gap-5">
       {/* Why a launch can stop before it starts. Author wording, and only an
@@ -382,9 +393,11 @@ export function ScenarioTestDrawer({
           in their own words if it actually happens. */}
       {testing ? (
         <p className="text-xs text-muted-foreground">
-          The scenario is compiled and read back before the engine is started,
-          so a reference that does not resolve stops here rather than playing as
-          a trigger that never fires.
+          <Trans>
+            The scenario is compiled and read back before the engine is started,
+            so a reference that does not resolve stops here rather than playing
+            as a trigger that never fires.
+          </Trans>
         </p>
       ) : null}
 
@@ -403,7 +416,7 @@ export function ScenarioTestDrawer({
       {varies ? (
         <div className="flex flex-col gap-2">
           <p className="text-sm" id="scenario-difficulty-label">
-            How hard should it be?
+            <Trans>How hard should it be?</Trans>
           </p>
           <ToggleGroup
             type="single"
@@ -419,7 +432,7 @@ export function ScenarioTestDrawer({
                 value={level}
                 className="rounded-md border border-border/60 px-4 data-[state=on]:border-primary data-[state=on]:bg-primary/10"
               >
-                {DIFFICULTY_LABEL[level]}
+                {i18n._(DIFFICULTY_LABEL[level])}
               </ToggleGroupItem>
             ))}
           </ToggleGroup>
@@ -433,12 +446,12 @@ export function ScenarioTestDrawer({
         >
           <Rocket className="size-4" />
           {busy
-            ? BUSY_LABEL[phase.state]
+            ? i18n._(BUSY_LABEL[phase.state])
             : waiting
-              ? "Reading your installed games"
+              ? t`Reading your installed games`
               : testing
-                ? "Test in game"
-                : "Play"}
+                ? t`Test in game`
+                : t`Play`}
         </Button>
       </div>
 
@@ -486,19 +499,21 @@ export function ScenarioTestDrawer({
         <div className="flex flex-col gap-2 text-xs text-muted-foreground">
           <p>
             {phase.result.exitCode !== null && phase.result.exitCode !== 0
-              ? `The engine exited with code ${phase.result.exitCode}. Its infolog says why.`
+              ? t`The engine exited with code ${exitCode}. Its infolog says why.`
               : testing
-                ? "The game has closed. Test again to play a change."
+                ? t`The game has closed. Test again to play a change.`
                 : outcome === "victory"
-                  ? "You won. Play it again from here."
-                  : "The game has closed. Play it again from here."}
+                  ? t`You won. Play it again from here.`
+                  : t`The game has closed. Play it again from here.`}
           </p>
           {/* The replay did not say who won, so the player is asked, as a
               campaign mission asks. Only after a clean exit: an engine that
               died has no result to report. */}
           {outcome === "ambiguous" && phase.result.exitCode === 0 ? (
             <div className="flex items-center gap-3">
-              <p>Coilbox could not tell how that ended.</p>
+              <p>
+                <Trans>Coilbox could not tell how that ended.</Trans>
+              </p>
               <Button
                 variant="outline"
                 size="sm"
@@ -507,7 +522,7 @@ export function ScenarioTestDrawer({
                   setOutcome("victory");
                 }}
               >
-                I won
+                <Trans>I won</Trans>
               </Button>
             </div>
           ) : null}
@@ -516,16 +531,20 @@ export function ScenarioTestDrawer({
           {testing ? (
             <>
               <p>
-                Played as <code>{phase.result.gameType}</code>, from{" "}
-                <code className="break-all">{phase.result.mission}</code>.
+                <Trans>
+                  Played as <code>{gameType}</code>, from{" "}
+                  <code className="break-all">{mission}</code>.
+                </Trans>
               </p>
               <p className="break-all">
                 <code>{phase.result.dir}</code>
               </p>
               {phase.result.route === "mutator" ? (
                 <p>
-                  Deleting <code>{MUTATOR_FOLDER}</code> undoes everything this
-                  wrote.
+                  <Trans>
+                    Deleting <code>{MUTATOR_FOLDER}</code> undoes everything
+                    this wrote.
+                  </Trans>
                 </p>
               ) : null}
             </>

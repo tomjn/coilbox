@@ -1,3 +1,4 @@
+import { Trans, useLingui } from "@lingui/react/macro";
 import { Button } from "@picoframe/frame";
 import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router";
@@ -32,6 +33,7 @@ export function RejoinOfferPanel() {
 }
 
 function Offer({ serverKey }: { serverKey: string }) {
+  const { t } = useLingui();
   const { connections } = useMultiplayer();
   const servers = useProtocolServers();
   const navigate = useNavigate();
@@ -45,10 +47,10 @@ function Offer({ serverKey }: { serverKey: string }) {
     if (!offer || told.current === offer) return;
     told.current = offer;
     void notify({
-      title: "You are still in a match",
-      body: "Rejoin it or leave the other players without you.",
+      title: t`You are still in a match`,
+      body: t`Rejoin it or leave the other players without you.`,
     });
-  }, [offer]);
+  }, [offer, t]);
 
   if (!offer || answered === offer) return null;
   const name = serverNameFor(serverKey, servers);
@@ -56,13 +58,17 @@ function Offer({ serverKey }: { serverKey: string }) {
   return (
     <div
       role="alertdialog"
-      aria-label="You are still in a running match"
+      aria-label={t`You are still in a running match`}
       className="w-80 rounded-lg border border-border bg-card p-4 shadow-lg"
     >
-      <p className="text-sm font-semibold">You are still in a match</p>
+      <p className="text-sm font-semibold">
+        <Trans>You are still in a match</Trans>
+      </p>
       <p className="mt-1 text-sm text-muted-foreground">
-        You left a match on {name} that is still running. Rejoin it, or leave
-        your team a player short.
+        <Trans>
+          You left a match on {name} that is still running. Rejoin it, or leave
+          your team a player short.
+        </Trans>
       </p>
       <div className="mt-3 flex gap-2">
         <Button
@@ -73,10 +79,10 @@ function Offer({ serverKey }: { serverKey: string }) {
             });
           }}
         >
-          Rejoin
+          <Trans>Rejoin</Trans>
         </Button>
         <Button variant="secondary" onClick={() => setAnswered(offer)}>
-          Dismiss
+          <Trans>Dismiss</Trans>
         </Button>
       </div>
     </div>

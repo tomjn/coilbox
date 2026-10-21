@@ -19,6 +19,8 @@
  * arrives in the panel with no change to this file.
  */
 
+import { i18n, type MessageDescriptor } from "@lingui/core";
+import { msg, plural, t } from "@lingui/core/macro";
 import {
   type ExtensionTypes,
   extensionSpecs,
@@ -507,16 +509,24 @@ export function applyPoint(
 
 /** What each reference kind is picked out of, in the words the picker greys a
  *  type out with. */
-const NEEDS: Record<string, string> = {
-  zoneId: "Needs a zone",
-  actorId: "Needs an actor or a base",
-  groupId: "Needs a group",
-  triggerId: "Needs a trigger",
-  objectiveId: "Needs an objective",
-  dialogueId: "Needs a dialogue line",
-  teamId: "Needs a team",
-  varName: "Needs a variable",
+const NEEDS: Record<string, MessageDescriptor> = {
+  zoneId: msg`Needs a zone`,
+  actorId: msg`Needs an actor or a base`,
+  groupId: msg`Needs a group`,
+  triggerId: msg`Needs a trigger`,
+  objectiveId: msg`Needs an objective`,
+  dialogueId: msg`Needs a dialogue line`,
+  teamId: msg`Needs a team`,
+  varName: msg`Needs a variable`,
 };
+
+function allyTeamLabel(allyTeam: number): string {
+  return t`ally team ${allyTeam}`;
+}
+
+function startsAtLabel(value: number): string {
+  return t`starts at ${value}`;
+}
 
 /**
  * Everything a parameter of this kind can name, by name rather than by id, or
@@ -535,7 +545,7 @@ export function registryOptions(
       return scenario.zones.map((zone, i) => ({
         value: zone.id,
         label: labels[i],
-        description: zone.shape,
+        description: zone.shape === "circle" ? t`circle` : t`box`,
       }));
     }
     // Actors and named base buildings both, because the runtime holds them in
@@ -558,11 +568,18 @@ export function registryOptions(
       ];
     }
     case "groupId":
-      return scenario.groups.map((group, i) => ({
-        value: group.id,
-        label: `Group ${i + 1}`,
-        description: `${groupSize(group)} units`,
-      }));
+      return scenario.groups.map((group, i) => {
+        const number = i + 1;
+        const size = groupSize(group);
+        return {
+          value: group.id,
+          label: t`Group ${number}`,
+          description: plural(size, {
+            one: "# unit",
+            other: "# units",
+          }),
+        };
+      });
     // By name, with the id underneath as the value, the way a zone is picked.
     // Two triggers may share a name, so the labels are made to differ first,
     // otherwise the list offers the same word twice and neither is the one the
@@ -579,7 +596,7 @@ export function registryOptions(
       return scenario.objectives.map((objective) => ({
         value: objective.id,
         label: objective.text.trim() || objective.id,
-        description: objective.kind,
+        description: objective.kind === "primary" ? t`primary` : t`secondary`,
       }));
     case "dialogueId":
       return scenario.dialogue.map((line) => ({
@@ -591,7 +608,7 @@ export function registryOptions(
       return scenario.setup.participants.map((p) => ({
         value: p.id,
         label: p.name,
-        description: p.spectator ? "spectator" : `ally team ${p.allyTeam}`,
+        description: p.spectator ? t`spectator` : allyTeamLabel(p.allyTeam),
       }));
     case "varName":
       return Object.keys(scenario.vars)
@@ -599,7 +616,7 @@ export function registryOptions(
         .map((name) => ({
           value: name,
           label: name,
-          description: `starts at ${scenario.vars[name]}`,
+          description: startsAtLabel(scenario.vars[name]),
         }));
     default:
       return null;
@@ -676,9 +693,11 @@ export function stepDefaults(spec: TypeSpec, ctx: StepContext): StepDefaults {
     const value = defaultParam(name, param, ctx);
     if (value === null) {
       return {
-        needs:
-          NEEDS[param.kind] ??
-          (isUnitDefParam(name) ? "Needs the game's units" : `Needs ${name}`),
+        needs: NEEDS[param.kind]
+          ? i18n._(NEEDS[param.kind])
+          : isUnitDefParam(name)
+            ? t`Needs the game's units`
+            : t`Needs ${name}`,
       };
     }
     params[name] = value;
@@ -693,9 +712,16 @@ export function triggerSummary(trigger: ScenarioTrigger): string {
   const actions = trigger.actions.length;
   const when =
     conditions === 0
-      ? "always"
-      : conditions === 1
-        ? "1 condition"
-        : `${trigger.conditions.op} of ${conditions} conditions`;
-  return `${when} · ${actions} action${actions === 1 ? "" : "s"}`;
+      ? t`always`
+      : trigger.conditions.op === "any"
+        ? plural(conditions, {
+            one: "# condition",
+            other: "any of # conditions",
+          })
+        : plural(conditions, {
+            one: "# condition",
+            other: "all of # conditions",
+          });
+  const doing = plural(actions, { one: "# action", other: "# actions" });
+  return t`${when} · ${doing}`;
 }

@@ -12,6 +12,9 @@
  * rules.
  */
 
+import { plural } from "@lingui/core/macro";
+import { useLingui as useLocale } from "@lingui/react";
+import { Trans, useLingui } from "@lingui/react/macro";
 import { Button, cn, Input } from "@picoframe/frame";
 import {
   ArrowDown,
@@ -57,16 +60,17 @@ export function LayoutNameField({
   name: string;
   onRename: (name: string) => void;
 }) {
+  const { t } = useLingui();
   const [text, setText] = useFieldText(name);
   return (
     <div className="space-y-1.5">
       <Label htmlFor={id} className="text-xs font-medium">
-        Blueprint name
+        <Trans>Blueprint name</Trans>
       </Label>
       <Input
         id={id}
         value={text}
-        placeholder="What this blueprint is called"
+        placeholder={t`What this blueprint is called`}
         onChange={(e) => setText(e.target.value)}
         onBlur={() => (text.trim() ? onRename(text) : setText(name))}
         onKeyDown={(e) => {
@@ -94,7 +98,7 @@ export function LayoutNameField({
 export function layoutTriggerLabel(name: string, buildings: number): string {
   const called = name.trim();
   if (called) return called;
-  return `${buildings} building${buildings === 1 ? "" : "s"}`;
+  return plural(buildings, { one: "# building", other: "# buildings" });
 }
 
 /** Buildings named by their place in the layout, the way an author counts
@@ -184,31 +188,45 @@ export function LayoutNotes({
    *  worse thing than the silence it replaces. */
   onSnapToGrid?: () => void;
 }) {
+  useLocale();
   const elsewhere =
     designedFor !== undefined &&
     designedFor !== "" &&
     onMap !== undefined &&
     onMap !== "" &&
     designedFor !== onMap;
+  const overlapList = listed(overlaps);
+  const overlapCount = overlaps.length;
+  const unstableCount = unstable?.length ?? 0;
+  const tooDeepCount = tooDeep?.length ?? 0;
+  const tooShallowCount = tooShallow?.length ?? 0;
+  const absentCount = absent?.length ?? 0;
+  const noSlopeCount = noSlope?.length ?? 0;
+  const strayCount = strays.length;
+  const unstableList = unstable ? listed(unstable) : "";
+  const tooDeepList = tooDeep ? listed(tooDeep) : "";
+  const tooShallowList = tooShallow ? listed(tooShallow) : "";
+  const absentList = absent ? listed(absent.map((one) => one.index)) : "";
+  const noSlopeList = noSlope ? listed(noSlope) : "";
+  const strayList = strays.join(", ");
 
   return (
     <>
       {overlaps.length > 0 && (
         <p className="rounded bg-red-950/60 px-2 py-1.5 text-[11px] text-red-200">
-          Building{overlaps.length === 1 ? " " : "s "}
-          {listed(overlaps)} stand
-          {overlaps.length === 1 ? "s" : ""} on ground another building wants,
-          marked in red. The engine builds one of them and refuses the rest.
+          {plural(overlapCount, {
+            one: `Building ${overlapList} stands on ground another building wants, marked in red. The engine builds one of them and refuses the rest.`,
+            other: `Buildings ${overlapList} stand on ground another building wants, marked in red. The engine builds one of them and refuses the rest.`,
+          })}
         </p>
       )}
 
       {unstable !== undefined && unstable.length > 0 && (
         <p className="rounded bg-amber-950/60 px-2 py-1.5 text-[11px] text-amber-200">
-          Building{unstable.length === 1 ? " " : "s "}
-          {listed(unstable)} stand
-          {unstable.length === 1 ? "s" : ""} on ground too steep for
-          {unstable.length === 1 ? " it" : " them"}, marked in amber. The engine
-          refuses to build on a slope past what the unit allows.
+          {plural(unstableCount, {
+            one: `Building ${unstableList} stands on ground too steep for it, marked in amber. The engine refuses to build on a slope past what the unit allows.`,
+            other: `Buildings ${unstableList} stand on ground too steep for them, marked in amber. The engine refuses to build on a slope past what the unit allows.`,
+          })}
         </p>
       )}
 
@@ -217,23 +235,19 @@ export function LayoutNotes({
           #1552). */}
       {tooDeep !== undefined && tooDeep.length > 0 && (
         <p className="rounded bg-cyan-950/60 px-2 py-1.5 text-[11px] text-cyan-200">
-          Building{tooDeep.length === 1 ? " " : "s "}
-          {listed(tooDeep)} stand
-          {tooDeep.length === 1 ? "s" : ""} in water too deep for
-          {tooDeep.length === 1 ? " it" : " them"}, marked in cyan. The engine
-          refuses a building with more water over it than its def allows, so
-          {tooDeep.length === 1 ? " it wants" : " they want"} shallower water,
-          or dry land.
+          {plural(tooDeepCount, {
+            one: `Building ${tooDeepList} stands in water too deep for it, marked in cyan. The engine refuses a building with more water over it than its def allows, so it wants shallower water, or dry land.`,
+            other: `Buildings ${tooDeepList} stand in water too deep for them, marked in cyan. The engine refuses a building with more water over it than its def allows, so they want shallower water, or dry land.`,
+          })}
         </p>
       )}
 
       {tooShallow !== undefined && tooShallow.length > 0 && (
         <p className="rounded bg-cyan-950/60 px-2 py-1.5 text-[11px] text-cyan-200">
-          Building{tooShallow.length === 1 ? " " : "s "}
-          {listed(tooShallow)} {tooShallow.length === 1 ? "is" : "are"} not in
-          deep enough water, marked in cyan. The engine refuses a naval building
-          out of the sea, so{" "}
-          {tooShallow.length === 1 ? "it wants" : "they want"} deeper water.
+          {plural(tooShallowCount, {
+            one: `Building ${tooShallowList} is not in deep enough water, marked in cyan. The engine refuses a naval building out of the sea, so it wants deeper water.`,
+            other: `Buildings ${tooShallowList} are not in deep enough water, marked in cyan. The engine refuses a naval building out of the sea, so they want deeper water.`,
+          })}
         </p>
       )}
 
@@ -241,40 +255,46 @@ export function LayoutNotes({
         <p className="rounded bg-violet-950/60 px-2 py-1.5 text-[11px] text-violet-200">
           {absent.length < buildings && (
             <>
-              Building{absent.length === 1 ? " " : "s "}
-              {listed(absent.map((one) => one.index))}{" "}
-              {absent.length === 1 ? "is" : "are"} marked in violet.{" "}
+              {plural(absentCount, {
+                one: `Building ${absentList} is marked in violet.`,
+                other: `Buildings ${absentList} are marked in violet.`,
+              })}{" "}
             </>
           )}
           {unknownUnitsWarning(absent, buildings)}
-          {absent.length >= buildings &&
-            " Every one of them is marked in violet."}
+          {absent.length >= buildings && (
+            <>
+              {" "}
+              <Trans>Every one of them is marked in violet.</Trans>
+            </>
+          )}
         </p>
       )}
 
       {noSlope !== undefined && noSlope.length > 0 && (
         <p className="rounded bg-slate-800/70 px-2 py-1.5 text-[11px] text-slate-300">
-          Building{noSlope.length === 1 ? " " : "s "}
-          {listed(noSlope)} {noSlope.length === 1 ? "is" : "are"} dashed because
-          this game gives {noSlope.length === 1 ? "it" : "them"} no slope to
-          check against, so nothing can say whether the ground will take{" "}
-          {noSlope.length === 1 ? "it" : "them"}.
+          {plural(noSlopeCount, {
+            one: `Building ${noSlopeList} is dashed because this game gives it no slope to check against, so nothing can say whether the ground will take it.`,
+            other: `Buildings ${noSlopeList} are dashed because this game gives them no slope to check against, so nothing can say whether the ground will take them.`,
+          })}
         </p>
       )}
 
       {elsewhere && (
         <p className="rounded bg-slate-800/70 px-2 py-1.5 text-[11px] text-slate-300">
-          Drawn for {designedFor}. A blueprint shaped around one map's terrain
-          does not always fit another's.
+          <Trans>
+            Drawn for {designedFor}. A blueprint shaped around one map's terrain
+            does not always fit another's.
+          </Trans>
         </p>
       )}
 
       {strays.length > 0 && (
         <p className="rounded bg-amber-950/60 px-2 py-1.5 text-[11px] text-amber-200">
-          {strays.join(", ")} {strays.length === 1 ? "is" : "are"} not a
-          building in this game, so {strays.length === 1 ? "it" : "they"} will
-          spawn off the build grid. Mobile units belong in a group or as an
-          actor.
+          {plural(strayCount, {
+            one: `${strayList} is not a building in this game, so it will spawn off the build grid. Mobile units belong in a group or as an actor.`,
+            other: `${strayList} are not a building in this game, so they will spawn off the build grid. Mobile units belong in a group or as an actor.`,
+          })}
         </p>
       )}
 
@@ -318,16 +338,30 @@ export function UncheckedNote({
     <p className="w-fit rounded bg-slate-800/80 px-2 py-1 text-[11px] text-slate-300 backdrop-blur">
       {flattened === true && (
         <>
-          This map's heights could not be read, so every unit here is drawn on
-          flat ground rather than at the height the engine will stand it at.{" "}
+          <Trans>
+            This map's heights could not be read, so every unit here is drawn on
+            flat ground rather than at the height the engine will stand it at.
+          </Trans>{" "}
         </>
       )}
-      {unchecked === "no-units" &&
-        "Coilbox has not read this game's units. Nothing here has been checked against the ground, so every square is dashed rather than clean."}
+      {unchecked === "no-units" && (
+        <Trans>
+          Coilbox has not read this game's units. Nothing here has been checked
+          against the ground, so every square is dashed rather than clean.
+        </Trans>
+      )}
       {unchecked === "no-ground" &&
-        (flattened === true
-          ? "Nothing here has been checked against the ground either, for want of a height to check it against."
-          : "This map's heights could not be read. Nothing here has been checked against the ground, so every square is dashed rather than clean.")}
+        (flattened === true ? (
+          <Trans>
+            Nothing here has been checked against the ground either, for want of
+            a height to check it against.
+          </Trans>
+        ) : (
+          <Trans>
+            This map's heights could not be read. Nothing here has been checked
+            against the ground, so every square is dashed rather than clean.
+          </Trans>
+        ))}
     </p>
   );
 }
@@ -354,13 +388,16 @@ export function WaterlessNote({
   floor: number | null;
 }) {
   if (floor === null) return null;
+  const lowest = Math.round(floor);
 
   return (
     <p className="w-fit rounded bg-cyan-950/80 px-2 py-1 text-[11px] text-cyan-200 backdrop-blur">
-      This map has no water on it: nothing on it is below the waterline, and its
-      lowest ground is {Math.round(floor)} elmos. Every building here that needs
-      water is refused wherever it stands, marked in cyan. This blueprint wants
-      a map with a coast rather than a different spot on this one.
+      <Trans>
+        This map has no water on it: nothing on it is below the waterline, and
+        its lowest ground is {lowest} elmos. Every building here that needs
+        water is refused wherever it stands, marked in cyan. This blueprint
+        wants a map with a coast rather than a different spot on this one.
+      </Trans>
     </p>
   );
 }
@@ -393,6 +430,8 @@ export function BuildOrderPopover({
   onMoveBuilding: (index: number, delta: number) => void;
   onPlay: () => void;
 }) {
+  const { t } = useLingui();
+  const stepCount = buildings.length;
   const [copied, setCopied] = useState(false);
 
   const copy = async () => {
@@ -413,13 +452,18 @@ export function BuildOrderPopover({
       <PopoverTrigger asChild>
         <Button size="sm" variant="ghost" className="h-7 gap-1.5 px-2 text-xs">
           <ListOrdered className="size-3.5" />
-          {ordered ? `Build order · ${buildings.length} steps` : "Build order"}
+          {ordered
+            ? plural(stepCount, {
+                one: "Build order · # step",
+                other: "Build order · # steps",
+              })
+            : t`Build order`}
         </Button>
       </PopoverTrigger>
       <PopoverContent align="start" className="w-80 space-y-3">
         <div className="flex items-center justify-between gap-3">
           <Label htmlFor="layout-ordered" className="text-xs font-medium">
-            Build these in this order
+            <Trans>Build these in this order</Trans>
           </Label>
           <Switch
             id="layout-ordered"
@@ -452,7 +496,7 @@ export function BuildOrderPopover({
                     size="sm"
                     variant="ghost"
                     className="size-7 p-0"
-                    aria-label={`Build ${building.def} sooner`}
+                    aria-label={t`Build ${{ def: building.def }} sooner`}
                     disabled={at === 0}
                     onClick={() => onMoveBuilding(at, -1)}
                   >
@@ -462,7 +506,7 @@ export function BuildOrderPopover({
                     size="sm"
                     variant="ghost"
                     className="size-7 p-0"
-                    aria-label={`Build ${building.def} later`}
+                    aria-label={t`Build ${{ def: building.def }} later`}
                     disabled={at === buildings.length - 1}
                     onClick={() => onMoveBuilding(at, 1)}
                   >
@@ -473,9 +517,11 @@ export function BuildOrderPopover({
             </ol>
 
             <p className="text-[11px] text-muted-foreground">
-              The selected building is the one in green. The order is the
-              blueprint itself, so a base placed from it anywhere is built the
-              same way.
+              <Trans>
+                The selected building is the one in green. The order is the
+                blueprint itself, so a base placed from it anywhere is built the
+                same way.
+              </Trans>
             </p>
 
             <div className="flex items-center gap-1.5 border-t border-border/60 pt-3">
@@ -486,7 +532,7 @@ export function BuildOrderPopover({
                 onClick={onPlay}
                 disabled={buildings.length < 2}
               >
-                <Play className="size-3.5" /> Watch it go up
+                <Play className="size-3.5" /> <Trans>Watch it go up</Trans>
               </Button>
               <Button
                 size="sm"
@@ -495,16 +541,18 @@ export function BuildOrderPopover({
                 onClick={copy}
               >
                 <ClipboardCopy className="size-3.5" />
-                {copied ? "Copied" : "Copy as a build order"}
+                {copied ? t`Copied` : t`Copy as a build order`}
               </Button>
             </div>
           </>
         ) : (
           <p className="text-xs text-muted-foreground">
-            These buildings are in the order they were clicked, which is not an
-            opening. Turn this on to say what gets built first, and the
-            blueprint becomes a build order that can be followed, watched and
-            shared.
+            <Trans>
+              These buildings are in the order they were clicked, which is not
+              an opening. Turn this on to say what gets built first, and the
+              blueprint becomes a build order that can be followed, watched and
+              shared.
+            </Trans>
           </p>
         )}
       </PopoverContent>

@@ -24,6 +24,7 @@
  * answer to a bad id is silence, so the refusal has to come first.
  */
 
+import { t } from "@lingui/core/macro";
 import type { ConfigOption, GameItem } from "../content/bindings";
 import { isSdd } from "../content/format";
 import { dependencyBlockReason } from "../content/gameDependencies";
@@ -181,7 +182,9 @@ export function missionIssueMessage(
   const [first] = issues;
   if (!first) return "";
   const more = issues.length - 1;
-  return `${missionIssueSummary(reader, issues)} ${describeIssue(first)}${more > 0 ? ` (and ${more} more)` : ""}`;
+  const lead = `${missionIssueSummary(reader, issues)} ${describeIssue(first)}`;
+  if (more <= 0) return lead;
+  return t`${lead} (and ${more} more)`;
 }
 
 /**
@@ -242,20 +245,20 @@ export function scenarioLaunchBlock(opts: {
     kind: "text",
     reason,
   });
-  if (scanError) return text(`The content scan failed: ${scanError}`);
+  if (scanError) return text(t`The content scan failed: ${scanError}`);
   if (!hasEngine) {
     return {
       kind: "download",
       reason:
         reader === "player"
-          ? "No engine is installed. Add one from Content before playing a scenario."
-          : "No engine is installed. Add one from Content before testing a scenario.",
+          ? t`No engine is installed. Add one from Content before playing a scenario.`
+          : t`No engine is installed. Add one from Content before testing a scenario.`,
       needs: { engine: true },
     };
   }
   if (!gameName || !mapName) {
     return text(
-      "This scenario has no game and map yet. Set it up from a preset first.",
+      t`This scenario has no game and map yet. Set it up from a preset first.`,
     );
   }
   // A scan that has not answered is not a reason to stop, and it names nothing
@@ -278,7 +281,7 @@ export function scenarioLaunchBlock(opts: {
   if (dependency?.gameName) {
     return text(dependencyBlockReason(dependency.label, dependency.gameName));
   }
-  if (running) return text("A game is already running.");
+  if (running) return text(t`A game is already running.`);
   return null;
 }
 

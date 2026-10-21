@@ -1,3 +1,4 @@
+import { t } from "@lingui/core/macro";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   useUnitsyncGameInfo,
@@ -153,11 +154,12 @@ export function hashFailureMessage(
   status: string,
   firstError?: string,
 ): string {
+  const kindName = kind === "game" ? t`game` : t`map`;
   if (status === "unsyncable")
     return firstError
-      ? `Couldn't hash the ${kind}: ${firstError}`
-      : `Couldn't hash the ${kind}, so it may be missing a dependency or be unreadable.`;
+      ? t`Couldn't hash the ${kindName}: ${firstError}`
+      : t`Couldn't hash the ${kindName}, so it may be missing a dependency or be unreadable.`;
   return firstError
-    ? `Failed to read the ${kind}: ${firstError}`
-    : `Failed to read the ${kind}.`;
+    ? t`Failed to read the ${kindName}: ${firstError}`
+    : t`Failed to read the ${kindName}.`;
 }

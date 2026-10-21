@@ -15,6 +15,7 @@
  * Pure, so the decision is tested without a scan or a plugin.
  */
 
+import { t } from "@lingui/core/macro";
 import { isCompatArchive } from "@/lib/generatedGames";
 
 /** The name `modinfo.lua` gives a mutator built from manifest `n`. */
@@ -117,20 +118,26 @@ export function compatLaunchBlock(
   switch (state.status) {
     case "idle":
       return null;
-    case "building":
+    case "building": {
+      const { baseName, version } = state;
       return {
-        short: "Building",
-        reason: `Coilbox is building the compatibility mode copy of ${state.baseName} (compat ${state.version}) that this battle uses. It can start for you once that finishes.`,
+        short: t`Building`,
+        reason: t`Coilbox is building the compatibility mode copy of ${baseName} (compat ${version}) that this battle uses. It can start for you once that finishes.`,
       };
-    case "update":
+    }
+    case "update": {
+      const { baseName, version, latest } = state;
       return {
-        short: "Update coilbox",
-        reason: `The host is on a newer coilbox. This battle uses ${state.baseName} compatibility mode version ${state.version} and this coilbox builds up to version ${state.latest}. Update coilbox to play.`,
+        short: t`Update coilbox`,
+        reason: t`The host is on a newer coilbox. This battle uses ${baseName} compatibility mode version ${version} and this coilbox builds up to version ${latest}. Update coilbox to play.`,
       };
-    case "failed":
+    }
+    case "failed": {
+      const { baseName, version, error } = state;
       return {
-        short: "Build failed",
-        reason: `Coilbox could not build ${state.baseName} (compat ${state.version}) for this battle: ${state.error}`,
+        short: t`Build failed`,
+        reason: t`Coilbox could not build ${baseName} (compat ${version}) for this battle: ${error}`,
       };
+    }
   }
 }

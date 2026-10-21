@@ -1,3 +1,4 @@
+import { t } from "@lingui/core/macro";
 import { useEffect, useRef } from "react";
 import {
   type LobbyServer,
@@ -320,9 +321,9 @@ export function ConnectionSession({
       if (name === st.myUsername) continue;
       const online = roster.has(name);
       if (online && !prev.has(name))
-        void notify({ title: `${name} is online` });
+        void notify({ title: t`${name} is online` });
       else if (!online && prev.has(name))
-        void notify({ title: `${name} went offline` });
+        void notify({ title: t`${name} went offline` });
     }
   }, [activeKey, mirror.phase, mirror.state, favourites]);
 
@@ -348,9 +349,14 @@ export function ConnectionSession({
     );
     toldBattlesRef.current = told;
     for (const { search, battle } of matches) {
+      const searchName = describeSearch(search);
+      const battleTitle = battle.title;
+      const map = battle.map;
+      const taken = occupancy(battle);
+      const maxPlayers = battle.maxPlayers;
       void notify({
-        title: `A battle matches "${describeSearch(search)}"`,
-        body: `${battle.title} on ${serverName}: ${battle.map}, ${occupancy(battle)}/${battle.maxPlayers} players`,
+        title: t`A battle matches "${searchName}"`,
+        body: t`${battleTitle} on ${serverName}: ${map}, ${taken}/${maxPlayers} players`,
         to: battleRowHref(activeKey, battle.id),
       });
     }
@@ -401,7 +407,7 @@ export function ConnectionSession({
     if (!target) return;
     const stillOpen = mirror.state?.battles[String(target.id)] != null;
     if (!stillOpen) {
-      void notify({ title: "Your battle is no longer open" });
+      void notify({ title: t`Your battle is no longer open` });
       return;
     }
     mpJoinBattle({

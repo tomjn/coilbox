@@ -16,6 +16,8 @@
  * view, and this component owns the find box and the keyboard around it.
  */
 
+import { t } from "@lingui/core/macro";
+import { Trans, useLingui } from "@lingui/react/macro";
 import { Button, Input } from "@picoframe/frame";
 import { Check, ChevronDown, ChevronUp, Copy, Search } from "lucide-react";
 import {
@@ -75,16 +77,19 @@ export function compiledMissionText(scenario: Scenario): {
  *  not announce "no matches" the moment the drawer opens. */
 function matchCountLabel(query: string, count: number, at: number | null) {
   if (!query.trim()) return "";
-  if (count === 0) return "No matches";
-  return `${(at ?? 0) + 1} of ${count}`;
+  if (count === 0) return t`No matches`;
+  const position = (at ?? 0) + 1;
+  return t`${position} of ${count}`;
 }
 
 export function MissionLuaView({ scenario }: { scenario: Scenario }) {
+  const { t } = useLingui();
   const { lua, error } = useMemo(
     () => compiledMissionText(scenario),
     [scenario],
   );
   const lines = useMemo(() => lua.split("\n"), [lua]);
+  const path = missionPath(scenario.id);
   const tokens = useLuaTokens(lua, lines);
 
   const [copied, setCopied] = useState(false);
@@ -177,10 +182,11 @@ export function MissionLuaView({ scenario }: { scenario: Scenario }) {
     <div className="flex h-full min-h-0 flex-col gap-3">
       <div className="flex items-start justify-between gap-3">
         <p className="text-xs text-muted-foreground">
-          What the mission runtime reads, compiled from this document. It is
-          written into the game as{" "}
-          <code className="font-mono">{missionPath(scenario.id)}</code> when the
-          mission is played.
+          <Trans>
+            What the mission runtime reads, compiled from this document. It is
+            written into the game as <code className="font-mono">{path}</code>{" "}
+            when the mission is played.
+          </Trans>
         </p>
         <Button
           size="sm"
@@ -190,13 +196,13 @@ export function MissionLuaView({ scenario }: { scenario: Scenario }) {
           onClick={() => void copy()}
         >
           {copied ? <Check className="size-4" /> : <Copy className="size-4" />}
-          {copied ? "Copied" : "Copy"}
+          {copied ? t`Copied` : t`Copy`}
         </Button>
       </div>
 
       {error ? (
         <p className="text-xs text-destructive">
-          This document does not compile: {error}
+          <Trans>This document does not compile: {error}</Trans>
         </p>
       ) : (
         <>
@@ -216,8 +222,8 @@ export function MissionLuaView({ scenario }: { scenario: Scenario }) {
                   e.preventDefault();
                   goToMatch(e.shiftKey ? -1 : 1);
                 }}
-                placeholder="Find (Cmd+F)"
-                aria-label="Find in mission.lua"
+                placeholder={t`Find (Cmd+F)`}
+                aria-label={t`Find in mission.lua`}
                 className="h-8 pl-7 text-xs"
               />
             </div>
@@ -225,7 +231,7 @@ export function MissionLuaView({ scenario }: { scenario: Scenario }) {
               size="icon"
               variant="ghost"
               className="size-8"
-              aria-label="Previous match"
+              aria-label={t`Previous match`}
               disabled={matches.length === 0}
               onClick={() => goToMatch(-1)}
             >
@@ -235,7 +241,7 @@ export function MissionLuaView({ scenario }: { scenario: Scenario }) {
               size="icon"
               variant="ghost"
               className="size-8"
-              aria-label="Next match"
+              aria-label={t`Next match`}
               disabled={matches.length === 0}
               onClick={() => goToMatch(1)}
             >

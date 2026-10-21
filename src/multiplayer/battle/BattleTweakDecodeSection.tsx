@@ -27,6 +27,7 @@
  * decode command only fires when those values actually change, not on every
  * unrelated snapshot the room otherwise receives.
  */
+import { Trans } from "@lingui/react/macro";
 import { Button } from "@picoframe/frame";
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router";
@@ -124,15 +125,19 @@ export function BattleTweakDecodeSection({
   return (
     <section>
       <div className="mb-2 text-[11px] uppercase tracking-wide text-muted-foreground">
-        Tweak slots
+        <Trans>Tweak slots</Trans>
       </div>
       <p className="mb-2 text-xs text-muted-foreground">
-        What this battle already has set, decoded back to Lua. Read only,
-        nothing here changes what the host set.
+        <Trans>
+          What this battle already has set, decoded back to Lua. Read only,
+          nothing here changes what the host set.
+        </Trans>
       </p>
 
       {phase.state === "decoding" && (
-        <p className="text-xs text-muted-foreground">Decoding…</p>
+        <p className="text-xs text-muted-foreground">
+          <Trans>Decoding…</Trans>
+        </p>
       )}
       {phase.state === "failed" && (
         <p className="text-xs text-destructive">{phase.message}</p>
@@ -149,7 +154,7 @@ export function BattleTweakDecodeSection({
           </ul>
           {!nothingToStart && (
             <Button size="sm" variant="secondary" onClick={startProject}>
-              Start a project from this
+              <Trans>Start a project from this</Trans>
             </Button>
           )}
         </div>

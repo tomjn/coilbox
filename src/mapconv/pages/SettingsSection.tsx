@@ -1,3 +1,6 @@
+import { i18n } from "@lingui/core";
+import { msg } from "@lingui/core/macro";
+import { Trans, useLingui } from "@lingui/react/macro";
 import { CheckCircle2, XCircle } from "lucide-react";
 import { useEffect, useState } from "react";
 import { CheckField, Field } from "@/components/Field";
@@ -6,10 +9,10 @@ import { type CompressionType, mcProbe } from "../bindings";
 import { useMapconvConfig } from "../config";
 
 const CT_OPTIONS = [
-  { value: "1", label: "1 — No compression" },
-  { value: "2", label: "2 — Fast" },
-  { value: "3", label: "3 — Insane (slow)" },
-  { value: "4", label: "4 — High quality fast" },
+  { value: "1", label: msg`1 — No compression` },
+  { value: "2", label: msg`2 — Fast` },
+  { value: "3", label: msg`3 — Insane (slow)` },
+  { value: "4", label: msg`4 — High quality fast` },
 ];
 
 /**
@@ -19,6 +22,7 @@ const CT_OPTIONS = [
  * title + padding, so this is just the form body.
  */
 export default function MapconvSettings() {
+  const { t } = useLingui();
   const [cfg, setCfg] = useMapconvConfig();
   const [probe, setProbe] = useState<{
     available: boolean;
@@ -36,10 +40,13 @@ export default function MapconvSettings() {
     <div className="space-y-8">
       <section className="space-y-3">
         <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
-          Defaults
+          <Trans>Defaults</Trans>
         </h2>
         <div className="grid grid-cols-2 gap-4">
-          <Field label="Default compression type" hint="seeds the Compile page">
+          <Field
+            label={t`Default compression type`}
+            hint={t`seeds the Compile page`}
+          >
             <OptionSelect
               value={String(cfg.defaultCompressionType)}
               onValueChange={(v) =>
@@ -48,13 +55,16 @@ export default function MapconvSettings() {
                   defaultCompressionType: Number(v) as CompressionType,
                 })
               }
-              options={CT_OPTIONS}
+              options={CT_OPTIONS.map((o) => ({
+                ...o,
+                label: i18n._(o.label),
+              }))}
             />
           </Field>
         </div>
         <CheckField
-          label="Remember last-used folders"
-          hint="Pre-fill the file pickers with the folders you used last time."
+          label={t`Remember last-used folders`}
+          hint={t`Pre-fill the file pickers with the folders you used last time.`}
           checked={cfg.rememberDirs}
           onChange={(v) => setCfg({ ...cfg, rememberDirs: v })}
         />
@@ -62,11 +72,13 @@ export default function MapconvSettings() {
 
       <section className="space-y-3">
         <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
-          SpringMapConvNG sidecars
+          <Trans>SpringMapConvNG sidecars</Trans>
         </h2>
         <p className="text-xs text-muted-foreground">
-          The compile/decompile features shell out to the bundled
-          SpringMapConvNG binaries.
+          <Trans>
+            The compile/decompile features shell out to the bundled
+            SpringMapConvNG binaries.
+          </Trans>
         </p>
         <ul className="space-y-1.5 text-sm">
           <SidecarRow label="mapcompile" ok={probe?.compile} />
@@ -78,6 +90,7 @@ export default function MapconvSettings() {
 }
 
 function SidecarRow({ label, ok }: { label: string; ok?: boolean }) {
+  const { t } = useLingui();
   return (
     <li className="flex items-center gap-2">
       {ok ? (
@@ -90,7 +103,7 @@ function SidecarRow({ label, ok }: { label: string; ok?: boolean }) {
       )}
       <code className="text-xs">{label}</code>
       <span className="text-xs text-muted-foreground">
-        {ok === undefined ? "checking…" : ok ? "available" : "not found"}
+        {ok === undefined ? t`checking…` : ok ? t`available` : t`not found`}
       </span>
     </li>
   );

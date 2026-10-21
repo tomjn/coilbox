@@ -18,6 +18,7 @@
  * half is `pathsLayer.ts`.
  */
 
+import { t } from "@lingui/core/macro";
 import { type ExtensionTypes, NO_EXTENSIONS } from "../../extensions";
 import type {
   Point,
@@ -138,12 +139,15 @@ export function scenarioPaths(
   extensions: ExtensionTypes = NO_EXTENSIONS,
 ): PathSource[] {
   const groups = scenario.groups
-    .map<PathSource>((group, i) => ({
-      id: group.id,
-      label: `Group ${i + 1}`,
-      from: group.pos,
-      orders: group.orders,
-    }))
+    .map<PathSource>((group, i) => {
+      const number = i + 1;
+      return {
+        id: group.id,
+        label: t`Group ${number}`,
+        from: group.pos,
+        orders: group.orders,
+      };
+    })
     .filter((source) => source.orders.length > 0);
 
   const held: PathSource[] = [];
@@ -176,7 +180,7 @@ export function scenarioPaths(
  *  point. A path that has gone says so rather than showing an id. */
 export function pathLabel(sources: PathSource[], id: string): string {
   return (
-    sources.find((source) => source.id === id)?.label ?? "a path that is gone"
+    sources.find((source) => source.id === id)?.label ?? t`a path that is gone`
   );
 }
 

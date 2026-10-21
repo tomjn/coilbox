@@ -1,3 +1,4 @@
+import { t } from "@lingui/core/macro";
 import { useEffect, useState } from "react";
 import { mpRelayPing } from "./bindings";
 
@@ -68,7 +69,8 @@ export function useRelayPing(
 
 /** The figure or its absence, in one sentence. Pure. */
 export function relayPingLabel(ping: RelayPing): string {
-  if (ping === undefined) return "Measuring the ping to the relay…";
-  if (ping === null) return "The relay's ping could not be measured.";
-  return `About ${Math.round(ping)} ms to the relay.`;
+  if (ping === undefined) return t`Measuring the ping to the relay…`;
+  if (ping === null) return t`The relay's ping could not be measured.`;
+  const ms = Math.round(ping);
+  return t`About ${ms} ms to the relay.`;
 }

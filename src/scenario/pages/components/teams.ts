@@ -28,6 +28,7 @@
  * that shows it is the start conditions section of `SetupPanel.tsx`.
  */
 
+import { plural, t } from "@lingui/core/macro";
 import { effectiveTeams, type Participant } from "@/play/participants";
 import type { Scenario, ScenarioTeam } from "../../model";
 
@@ -317,21 +318,23 @@ export function startsWarning(scenario: Scenario): string | null {
   const marked = starts.filter((s) => s.suppressed).length;
   if (marked === 0 || marked === starts.length) return null;
   const left = starts.length - marked;
-  return `${left} of ${starts.length} teams still take the game's own start. A game whose start is a sequence of pre-game phases, a faction picker or a start spot picker, runs the whole sequence unless the mission owns every team's start, so those phases will play over this mission. Mark every team, or none.`;
+  const total = starts.length;
+  return t`${left} of ${total} teams still take the game's own start. A game whose start is a sequence of pre-game phases, a faction picker or a start spot picker, runs the whole sequence unless the mission owns every team's start, so those phases will play over this mission. Mark every team, or none.`;
 }
 
 /** What the start conditions come to, for a shut panel's one line. */
 export function startsSummary(scenario: Scenario): string {
   const entries = Object.values(scenario.teams);
-  if (entries.length === 0) return "The game's own start";
+  if (entries.length === 0) return t`The game's own start`;
   const units = entries.reduce((sum, team) => sum + startUnitTotal(team), 0);
   const parts: string[] = [];
-  if (units > 0) parts.push(`${units} start unit${units === 1 ? "" : "s"}`);
-  const banked = entries.filter((t) => t.resources).length;
-  if (banked > 0) parts.push(`${banked} banked`);
-  const paid = entries.filter((t) => t.income).length;
-  if (paid > 0) parts.push(`${paid} on income`);
-  const suppressed = entries.filter((t) => t.noCommander).length;
-  if (suppressed > 0) parts.push(`${suppressed} without a commander`);
-  return parts.length === 0 ? "The game's own start" : parts.join(" · ");
+  if (units > 0)
+    parts.push(plural(units, { one: "# start unit", other: "# start units" }));
+  const banked = entries.filter((team) => team.resources).length;
+  if (banked > 0) parts.push(t`${banked} banked`);
+  const paid = entries.filter((team) => team.income).length;
+  if (paid > 0) parts.push(t`${paid} on income`);
+  const suppressed = entries.filter((team) => team.noCommander).length;
+  if (suppressed > 0) parts.push(t`${suppressed} without a commander`);
+  return parts.length === 0 ? t`The game's own start` : parts.join(" · ");
 }

@@ -1,3 +1,4 @@
+import { useLingui } from "@lingui/react/macro";
 import { Button } from "@picoframe/frame";
 import { ArrowLeft, X } from "lucide-react";
 import { Dialog as DialogPrimitive } from "radix-ui";
@@ -109,6 +110,7 @@ export function ApplySkirmishPresetDrawer({
   onSaveFromReplay: (name: string, draft: SkirmishDraft) => void;
   onBrowseHub: () => void;
 }) {
+  const { t } = useLingui();
   const [viewing, setViewing] = useState<SkirmishPreset | null>(null);
   const [tweaksOpen, setTweaksOpen] = useState(false);
   // Read here as well as in the panel, so the row says up front when there is
@@ -151,16 +153,16 @@ export function ApplySkirmishPresetDrawer({
                   setViewing(null);
                   setTweaksOpen(false);
                 }}
-                aria-label="Back to presets"
+                aria-label={t`Back to presets`}
               >
                 <ArrowLeft className="size-4" />
               </Button>
             )}
             <DialogPrimitive.Title className="min-w-0 flex-1 truncate text-base font-semibold">
-              {tweaksOpen ? "Unit tweaks" : (viewing?.name ?? "Presets")}
+              {tweaksOpen ? t`Unit tweaks` : (viewing?.name ?? t`Presets`)}
             </DialogPrimitive.Title>
             <DialogPrimitive.Close asChild>
-              <Button variant="ghost" size="icon" aria-label="Close">
+              <Button variant="ghost" size="icon" aria-label={t`Close`}>
                 <X className="size-4" />
               </Button>
             </DialogPrimitive.Close>
@@ -185,7 +187,7 @@ export function ApplySkirmishPresetDrawer({
                 !selfHost && delivery?.progress ? (
                   <DeliveryProgressPanel
                     progress={delivery.progress}
-                    retryHint="Applying again sends only the slots that did not land."
+                    retryHint={t`Applying again sends only the slots that did not land.`}
                   />
                 ) : null
               }
@@ -195,21 +197,22 @@ export function ApplySkirmishPresetDrawer({
               key={viewing.id}
               preset={viewing}
               currentGameName={gameName}
-              verb="Apply"
+              verb={t`Apply`}
               // The room is already on a game and cannot be moved off it.
               omit={["game"]}
               extraDisabledReasons={
                 canEditRestrictions === false
                   ? {
-                      restrictions:
-                        "The host owns these. There is no autohost command.",
+                      restrictions: t`The host owns these. There is no autohost command.`,
                     }
                   : {}
               }
               // Only the map needs unitsync to read a checksum, so the wait is
               // announced rather than the button just sitting dead.
               blockedLabel={
-                selfHost && mapInfo.status === "loading" ? "Reading map…" : null
+                selfHost && mapInfo.status === "loading"
+                  ? t`Reading map…`
+                  : null
               }
               disabled={disabled}
               onConfirm={(selection) => {
@@ -222,7 +225,7 @@ export function ApplySkirmishPresetDrawer({
                 !selfHost && delivery?.progress ? (
                   <DeliveryProgressPanel
                     progress={delivery.progress}
-                    retryHint="Applying again sends only the options that did not land."
+                    retryHint={t`Applying again sends only the options that did not land.`}
                   />
                 ) : null
               }
@@ -248,7 +251,7 @@ export function ApplySkirmishPresetDrawer({
                   thumbs={thumbs}
                   disabled={disabled}
                   onOpen={setViewing}
-                  empty="No skirmish presets saved yet. Save one from Singleplayer."
+                  empty={t`No skirmish presets saved yet. Save one from Singleplayer.`}
                 />
               </div>
             </>

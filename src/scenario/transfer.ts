@@ -1,3 +1,4 @@
+import { plural, t } from "@lingui/core/macro";
 import {
   decodeContainerText,
   encodeContainerJson,
@@ -232,11 +233,17 @@ export function encodeScenarioCode(
   const clips = Object.keys(exported.media).length;
   const because =
     clips > 0
-      ? ` Its ${clips} dialogue ${clips === 1 ? "clip travels" : "clips travel"} inside the export, which is most of that.`
+      ? ` ${plural(clips, {
+          one: "Its # dialogue clip travels inside the export, which is most of that.",
+          other:
+            "Its # dialogue clips travel inside the export, which is most of that.",
+        })}`
       : "";
+  const size = formatBytes(result.bytes);
+  const limit = formatBytes(result.limit);
   return {
     ok: false,
-    message: `This scenario is ${formatBytes(result.bytes)}, past the ${formatBytes(result.limit)} a share code can carry.${because} Export it as a file and send that instead.`,
+    message: t`This scenario is ${size}, past the ${limit} a share code can carry.${because} Export it as a file and send that instead.`,
   };
 }
 
@@ -258,12 +265,12 @@ export function readScenarioExport(text: string): OpenResult<ScenarioExport> {
 export function scenarioImportErrorMessage(error: OpenError): string {
   switch (error) {
     case "unknown-format":
-      return "That file isn't a coilbox scenario.";
+      return t`That file isn't a coilbox scenario.`;
     case "unsupported-version":
-      return "That scenario was made by a newer version of coilbox. Update coilbox to open it.";
+      return t`That scenario was made by a newer version of coilbox. Update coilbox to open it.`;
     case "wrong-kind":
-      return "That's a coilbox file, but not a scenario.";
+      return t`That's a coilbox file, but not a scenario.`;
     default:
-      return "That scenario file is damaged or incomplete.";
+      return t`That scenario file is damaged or incomplete.`;
   }
 }

@@ -7,6 +7,7 @@
  * all.
  */
 
+import { plural, t } from "@lingui/core/macro";
 import type { Campaign } from "../campaign/model";
 import type { Scenario } from "./model";
 
@@ -40,17 +41,33 @@ export function scenarioCounts(scenario: Scenario): ScenarioCount[] {
     {
       key: "placements",
       count: scenario.actors.length + scenario.groups.length,
-      noun: "unit placement",
+      noun: t`unit placement`,
     },
-    { key: "zones", count: scenario.zones.length, noun: "zone" },
-    { key: "triggers", count: scenario.triggers.length, noun: "trigger" },
-    { key: "objectives", count: scenario.objectives.length, noun: "objective" },
+    { key: "zones", count: scenario.zones.length, noun: t`zone` },
+    { key: "triggers", count: scenario.triggers.length, noun: t`trigger` },
+    {
+      key: "objectives",
+      count: scenario.objectives.length,
+      noun: t`objective`,
+    },
   ];
 }
 
 /** One count named, pluralised against itself: "1 zone", "0 zones". */
-export function countPhrase({ count, noun }: ScenarioCount): string {
-  return `${count} ${noun}${count === 1 ? "" : "s"}`;
+export function countPhrase({ key, count }: ScenarioCount): string {
+  switch (key) {
+    case "placements":
+      return plural(count, {
+        one: "# unit placement",
+        other: "# unit placements",
+      });
+    case "zones":
+      return plural(count, { one: "# zone", other: "# zones" });
+    case "triggers":
+      return plural(count, { one: "# trigger", other: "# triggers" });
+    case "objectives":
+      return plural(count, { one: "# objective", other: "# objectives" });
+  }
 }
 
 /** What a scenario holds, as a sentence, for a list row's second line. */

@@ -1,3 +1,5 @@
+import { t as coreT } from "@lingui/core/macro";
+import { Trans, useLingui } from "@lingui/react/macro";
 import { Button, cn } from "@picoframe/frame";
 import { Footprints, TriangleAlert } from "lucide-react";
 import { useEffect, useRef } from "react";
@@ -32,15 +34,20 @@ import {
 } from "./followStep";
 import { type Follow, setFollow, useFollow } from "./followStore";
 
-const STOPPED: Record<FollowStop, string> = {
-  disconnected: "You are no longer connected to their server.",
-  unfriended: "They are no longer one of your friends.",
-  leftByHand: "You left their battle.",
-};
+function stoppedText(reason: FollowStop): string {
+  switch (reason) {
+    case "disconnected":
+      return coreT`You are no longer connected to their server.`;
+    case "unfriended":
+      return coreT`They are no longer one of your friends.`;
+    case "leftByHand":
+      return coreT`You left their battle.`;
+  }
+}
 
-const BLOCKED: Record<Exclude<FollowBlock, "passworded">, string> = {
-  locked: "Their battle is locked.",
-};
+function blockedText(_reason: Exclude<FollowBlock, "passworded">): string {
+  return coreT`Their battle is locked.`;
+}
 
 /**
  * Follows the friend in the follow store: joins the battle they join and leaves
@@ -101,13 +108,13 @@ function useFollowDriver(follow: Follow | null): FollowBlock | null {
     if (action.kind === "stop") {
       setFollow(null);
       void notify({
-        title: `Stopped following ${name}`,
-        body: STOPPED[action.reason],
+        title: coreT`Stopped following ${name}`,
+        body: stoppedText(action.reason),
       });
     } else if (action.kind === "leave") {
       leaveBattle(serverKey).catch((e) => {
         void notify({
-          title: `Could not leave the battle ${name} left`,
+          title: coreT`Could not leave the battle ${name} left`,
           body: e instanceof Error ? e.message : String(e),
           level: "error",
         });
@@ -116,12 +123,12 @@ function useFollowDriver(follow: Follow | null): FollowBlock | null {
       void notify(
         action.reason === "passworded"
           ? {
-              title: `${name} is in a battle with a password`,
-              body: "Enter it from the follow button in the top bar.",
+              title: coreT`${name} is in a battle with a password`,
+              body: coreT`Enter it from the follow button in the top bar.`,
             }
           : {
-              title: `Could not follow ${name} into their battle`,
-              body: BLOCKED[action.reason],
+              title: coreT`Could not follow ${name} into their battle`,
+              body: blockedText(action.reason),
               level: "warning",
             },
       );
@@ -148,14 +155,14 @@ function useFollowDriver(follow: Follow | null): FollowBlock | null {
     if (mine === waiting.current) {
       waiting.current = null;
       void notify({
-        title: `Followed ${name} into their battle`,
+        title: coreT`Followed ${name} into their battle`,
         to: battleRoomHref(serverKey),
       });
       navigate(battleRoomHref(serverKey));
     } else if (joinError) {
       waiting.current = null;
       void notify({
-        title: `Could not follow ${name} into their battle`,
+        title: coreT`Could not follow ${name} into their battle`,
         body: joinError,
         level: "error",
       });
@@ -166,11 +173,11 @@ function useFollowDriver(follow: Follow | null): FollowBlock | null {
 }
 
 /** What the panel says about a battle the player could not be moved into. */
-const WHY_NOT: Record<FollowBlock, string> = {
-  passworded:
-    "It has a password, so you were not moved. Enter the password to join them.",
-  locked: "It is locked, so you were not moved. You join if it is unlocked.",
-};
+function whyNot(block: FollowBlock): string {
+  return block === "passworded"
+    ? coreT`It has a password, so you were not moved. Enter the password to join them.`
+    : coreT`It is locked, so you were not moved. You join if it is unlocked.`;
+}
 
 /**
  * The top bar's sign that a friend is being followed, and the way to stop.
@@ -179,6 +186,7 @@ const WHY_NOT: Record<FollowBlock, string> = {
  * player still moves with their friend.
  */
 export default function FollowIndicator() {
+  const { t } = useLingui();
   const follow = useFollow();
   const blocked = useFollowDriver(follow);
   const connection = useConnection(follow?.serverKey);
@@ -188,6 +196,10 @@ export default function FollowIndicator() {
   const { serverKey, name } = follow;
   const state = connection?.mirror.state ?? null;
   const battle = state ? battleOf(state, name) : null;
+  const account = usernameFromKey(serverKey);
+  const serverName = serverNameFor(serverKey, servers);
+  const battleId = battle?.id;
+  const battleName = battle ? battle.title || t`battle ${battleId}` : "";
   return (
     <Popover>
       <PopoverTrigger asChild>
@@ -205,29 +217,30 @@ export default function FollowIndicator() {
           ) : (
             <Footprints aria-hidden className="size-3.5" />
           )}
-          {blocked ? `Cannot follow ${name}` : `Following ${name}`}
+          {blocked ? t`Cannot follow ${name}` : t`Following ${name}`}
         </button>
       </PopoverTrigger>
       <PopoverContent align="end" className="w-72 space-y-3">
         <div className="space-y-1">
-          <p className="text-sm font-medium">Following {name}</p>
+          <p className="text-sm font-medium">
+            <Trans>Following {name}</Trans>
+          </p>
           <p className="text-xs text-muted-foreground">
-            As {usernameFromKey(serverKey)} on{" "}
-            {serverNameFor(serverKey, servers)}. You join the battles they join
-            and leave when they leave.
+            <Trans>
+              As {account} on {serverName}. You join the battles they join and
+              leave when they leave.
+            </Trans>
           </p>
         </div>
         <p className="text-sm">
-          {battle
-            ? `In ${battle.title || `battle ${battle.id}`}`
-            : "Not in a battle"}
+          {battle ? t`In ${battleName}` : t`Not in a battle`}
         </p>
         {blocked && (
           <p
             role="status"
             className="text-sm text-amber-700 dark:text-amber-400"
           >
-            {WHY_NOT[blocked]}
+            {whyNot(blocked)}
           </p>
         )}
         <div className="flex items-center justify-end gap-2">
@@ -239,7 +252,7 @@ export default function FollowIndicator() {
             />
           )}
           <Button variant="secondary" size="sm" onClick={() => setFollow(null)}>
-            Unfollow
+            <Trans>Unfollow</Trans>
           </Button>
         </div>
       </PopoverContent>

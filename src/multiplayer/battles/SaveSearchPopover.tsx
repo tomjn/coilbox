@@ -1,3 +1,4 @@
+import { Trans, useLingui } from "@lingui/react/macro";
 import { Button, Input } from "@picoframe/frame";
 import { BellPlus } from "lucide-react";
 import { useState } from "react";
@@ -28,6 +29,7 @@ const EMPTY = {
  * switched off and removed in Settings, Notifications.
  */
 export function SaveSearchPopover() {
+  const { t } = useLingui();
   const { update } = useSavedBattleSearches();
   const [open, setOpen] = useState(false);
   const [form, setForm] = useState(EMPTY);
@@ -49,9 +51,10 @@ export function SaveSearchPopover() {
       enabled: true,
     };
     update((cur) => [...cur, search]);
+    const description = describeSearch(search);
     void notify({
-      title: "Search saved",
-      body: `Coilbox will tell you when a battle matches ${describeSearch(search)}.`,
+      title: t`Search saved`,
+      body: t`Coilbox will tell you when a battle matches ${description}.`,
       level: "success",
     });
     setForm(EMPTY);
@@ -64,31 +67,33 @@ export function SaveSearchPopover() {
         <Button
           variant="secondary"
           className="h-9 shrink-0 gap-2 px-3"
-          aria-label="Tell me when a battle matches"
+          aria-label={t`Tell me when a battle matches`}
         >
           <BellPlus className="size-4" />
-          Alert me
+          <Trans>Alert me</Trans>
         </Button>
       </PopoverTrigger>
       <PopoverContent align="end" className="w-80 space-y-3">
         <p className="text-xs text-muted-foreground">
-          Coilbox tells you once when a battle matching this appears on any
-          server you are connected to.
+          <Trans>
+            Coilbox tells you once when a battle matching this appears on any
+            server you are connected to.
+          </Trans>
         </p>
-        <Field label="Game" hint="Part of the game's name.">
+        <Field label={t`Game`} hint={t`Part of the game's name.`}>
           <Input
             value={form.game}
             onChange={(e) => setForm((f) => ({ ...f, game: e.target.value }))}
             placeholder="Beyond All Reason"
           />
         </Field>
-        <Field label="Map (optional)" hint="Part of the map's name.">
+        <Field label={t`Map (optional)`} hint={t`Part of the map's name.`}>
           <Input
             value={form.map}
             onChange={(e) => setForm((f) => ({ ...f, map: e.target.value }))}
           />
         </Field>
-        <Field label="Players at least (optional)">
+        <Field label={t`Players at least (optional)`}>
           <Input
             type="number"
             min={0}
@@ -99,17 +104,17 @@ export function SaveSearchPopover() {
           />
         </Field>
         <CheckField
-          label="Has a free slot"
+          label={t`Has a free slot`}
           checked={form.freeSlot}
           onChange={(v) => setForm((f) => ({ ...f, freeSlot: v }))}
         />
         <CheckField
-          label="No password"
+          label={t`No password`}
           checked={form.noPassword}
           onChange={(v) => setForm((f) => ({ ...f, noPassword: v }))}
         />
         <Button className="w-full" disabled={!game || !minValid} onClick={save}>
-          Save search
+          <Trans>Save search</Trans>
         </Button>
       </PopoverContent>
     </Popover>

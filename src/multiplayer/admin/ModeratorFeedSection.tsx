@@ -1,3 +1,4 @@
+import { Trans, useLingui } from "@lingui/react/macro";
 import type { ReactNode } from "react";
 import { Link } from "react-router";
 import { formatTime } from "@/lib/format";
@@ -170,6 +171,7 @@ function AnnouncementRow({
  * badge for a conversation nobody actually opened.
  */
 export function ModeratorFeedSection({ serverKey }: { serverKey: string }) {
+  const { t } = useLingui();
   const connection = useConnection(serverKey);
   const state = connection?.mirror.state ?? null;
   const announcements = moderatorAnnouncements(state);
@@ -181,22 +183,25 @@ export function ModeratorFeedSection({ serverKey }: { serverKey: string }) {
   return (
     <section className="flex flex-col gap-4">
       <ToolHeader
-        title="Staff activity"
-        description="ChanServ's announcements of what moderators and admins did, from #moderator."
+        title={t`Staff activity`}
+        description={t`ChanServ's announcements of what moderators and admins did, from #moderator.`}
         actions={
           <Link
             to={channelHref}
             className="text-sm text-muted-foreground underline decoration-dotted underline-offset-2 hover:text-foreground"
           >
-            Open #moderator in Chat
+            <Trans>Open #moderator in Chat</Trans>
           </Link>
         }
       />
       {announcements.length === 0 ? (
         <p className="max-w-prose text-sm text-muted-foreground">
-          No staff actions yet this session. #moderator does not keep history on
-          this server by default, so this feed only shows announcements that
-          arrive while coilbox stays connected, not anything from before now.
+          <Trans>
+            No staff actions yet this session. #moderator does not keep history
+            on this server by default, so this feed only shows announcements
+            that arrive while coilbox stays connected, not anything from before
+            now.
+          </Trans>
         </p>
       ) : (
         <ul className="flex flex-col">

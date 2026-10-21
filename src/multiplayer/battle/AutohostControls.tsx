@@ -1,3 +1,4 @@
+import { useLingui } from "@lingui/react/macro";
 import { Button } from "@picoframe/frame";
 import { Lock, Unlock } from "lucide-react";
 
@@ -39,21 +40,22 @@ export function AutohostControls({
   onCommand: (command: string) => void;
   onRing: () => void;
 }) {
-  const ring = { label: "Ring unready", cmd: "!ring" };
+  const { t } = useLingui();
+  const ring = { label: t`Ring unready`, cmd: "!ring" };
   const quick: { label: string; cmd: string }[] = selfHost
     ? [ring]
     : directRoom
-      ? [{ label: "Suggest balance", cmd: "!balance" }, ring]
+      ? [{ label: t`Suggest balance`, cmd: "!balance" }, ring]
       : [
-          { label: "Balance", cmd: "!balance" },
-          { label: "Fix colours", cmd: "!fixcolors" },
+          { label: t`Balance`, cmd: "!balance" },
+          { label: t`Fix colours`, cmd: "!fixcolors" },
           ring,
         ];
 
   return (
     <div className="flex flex-col gap-3 rounded-lg border border-border/50 bg-card p-4">
       <span className="text-sm font-semibold">
-        {directRoom && !selfHost ? "Ask the host" : "Host commands"}
+        {directRoom && !selfHost ? t`Ask the host` : t`Host commands`}
       </span>
       <div className="flex flex-wrap gap-2">
         {quick.map((q) => (
@@ -79,11 +81,11 @@ export function AutohostControls({
             )}
             {directRoom
               ? locked
-                ? "Suggest unlock"
-                : "Suggest lock"
+                ? t`Suggest unlock`
+                : t`Suggest lock`
               : locked
-                ? "Unlock"
-                : "Lock"}
+                ? t`Unlock`
+                : t`Lock`}
           </Button>
         )}
       </div>

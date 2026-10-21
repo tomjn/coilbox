@@ -1,3 +1,4 @@
+import { useLingui } from "@lingui/react/macro";
 import { Button, cn, Input } from "@picoframe/frame";
 import { Plus } from "lucide-react";
 import { useMemo, useState } from "react";
@@ -26,7 +27,7 @@ import { PRESENCE_META, userPresence } from "./presence";
 export function UserPicker({
   serverKey,
   onPick,
-  label = "New direct message",
+  label,
   exclude = [],
 }: {
   serverKey: string | null;
@@ -36,6 +37,7 @@ export function UserPicker({
   /** Names to leave out, such as the people already in your party. */
   exclude?: string[];
 }) {
+  const { t } = useLingui();
   const mirror = useConnection(serverKey)?.mirror;
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
@@ -67,7 +69,11 @@ export function UserPicker({
       }}
     >
       <PopoverTrigger asChild>
-        <Button variant="secondary" aria-label={label} className="h-7 px-2">
+        <Button
+          variant="secondary"
+          aria-label={label ?? t`New direct message`}
+          className="h-7 px-2"
+        >
           <Plus className="size-4" />
         </Button>
       </PopoverTrigger>
@@ -75,7 +81,7 @@ export function UserPicker({
         <Input
           value={query}
           onChange={(e) => setQuery(e.target.value)}
-          placeholder="Search online users…"
+          placeholder={t`Search online users…`}
           autoFocus
           {...identifierFieldProps}
         />
@@ -109,7 +115,7 @@ export function UserPicker({
           })}
           {matches.length === 0 && (
             <li className="px-2 py-1.5 text-sm text-muted-foreground">
-              {query.trim() ? "No matching users." : "No other users online."}
+              {query.trim() ? t`No matching users.` : t`No other users online.`}
             </li>
           )}
         </ul>

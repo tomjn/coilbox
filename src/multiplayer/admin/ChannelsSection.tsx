@@ -1,3 +1,5 @@
+import { t } from "@lingui/core/macro";
+import { Trans, useLingui } from "@lingui/react/macro";
 import { Button, Input } from "@picoframe/frame";
 import { useState } from "react";
 import {
@@ -48,14 +50,26 @@ export function knownChannels(
 
 function settingText(reply: AdminReply) {
   switch (reply.shape) {
-    case "registerChannel":
-      return `#${reply.channel} is registered to ${reply.founder}.`;
-    case "unregisterChannel":
-      return `#${reply.channel} is no longer registered.`;
-    case "channelHistory":
-      return `History is ${reply.on ? "on" : "off"} for #${reply.channel}.`;
-    case "channelAntispam":
-      return `Antispam is ${reply.on ? "on" : "off"} for #${reply.channel}.`;
+    case "registerChannel": {
+      const { channel, founder } = reply;
+      return t`#${channel} is registered to ${founder}.`;
+    }
+    case "unregisterChannel": {
+      const { channel } = reply;
+      return t`#${channel} is no longer registered.`;
+    }
+    case "channelHistory": {
+      const { channel } = reply;
+      return reply.on
+        ? t`History is on for #${channel}.`
+        : t`History is off for #${channel}.`;
+    }
+    case "channelAntispam": {
+      const { channel } = reply;
+      return reply.on
+        ? t`Antispam is on for #${channel}.`
+        : t`Antispam is off for #${channel}.`;
+    }
     default:
       return null;
   }
@@ -64,9 +78,15 @@ function settingText(reply: AdminReply) {
 /** The channel's real history and antispam state, from ChanServ's `:info`. */
 function infoText(reply: AdminReply) {
   if (reply.shape !== "channelInfo") return null;
-  return `Currently, history is ${reply.historyOn ? "on" : "off"} and antispam is ${
-    reply.antispamOn ? "on" : "off"
-  } for #${reply.channel}.`;
+  const { channel } = reply;
+  if (reply.historyOn) {
+    return reply.antispamOn
+      ? t`Currently, history is on and antispam is on for #${channel}.`
+      : t`Currently, history is on and antispam is off for #${channel}.`;
+  }
+  return reply.antispamOn
+    ? t`Currently, history is off and antispam is on for #${channel}.`
+    : t`Currently, history is off and antispam is off for #${channel}.`;
 }
 
 function BansTable({
@@ -78,43 +98,61 @@ function BansTable({
   onLift: (username: string) => void;
   disabled: boolean;
 }) {
+  const { t } = useLingui();
   return (
     <Table>
       <TableHeader>
         <TableRow>
-          <TableHead>Username</TableHead>
-          <TableHead>IP</TableHead>
-          <TableHead>Reason</TableHead>
-          <TableHead>Ends</TableHead>
-          <TableHead>Issuer</TableHead>
           <TableHead>
-            <span className="sr-only">Actions</span>
+            <Trans>Username</Trans>
+          </TableHead>
+          <TableHead>
+            <Trans>IP</Trans>
+          </TableHead>
+          <TableHead>
+            <Trans>Reason</Trans>
+          </TableHead>
+          <TableHead>
+            <Trans>Ends</Trans>
+          </TableHead>
+          <TableHead>
+            <Trans>Issuer</Trans>
+          </TableHead>
+          <TableHead>
+            <span className="sr-only">
+              <Trans>Actions</Trans>
+            </span>
           </TableHead>
         </TableRow>
       </TableHeader>
       <TableBody>
-        {entries.map((entry) => (
-          <TableRow key={`${entry.username}-${entry.ends}`}>
-            <TableCell>{entry.username}</TableCell>
-            <TableCell>{entry.ip ?? "-"}</TableCell>
-            <TableCell className="whitespace-normal">{entry.reason}</TableCell>
-            <TableCell className="whitespace-normal">{entry.ends}</TableCell>
-            <TableCell>{entry.issuer}</TableCell>
-            <TableCell className="text-right">
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                className="h-7"
-                disabled={disabled}
-                aria-label={`Unban ${entry.username}`}
-                onClick={() => onLift(entry.username)}
-              >
-                Unban
-              </Button>
-            </TableCell>
-          </TableRow>
-        ))}
+        {entries.map((entry) => {
+          const username = entry.username;
+          return (
+            <TableRow key={`${entry.username}-${entry.ends}`}>
+              <TableCell>{entry.username}</TableCell>
+              <TableCell>{entry.ip ?? "-"}</TableCell>
+              <TableCell className="whitespace-normal">
+                {entry.reason}
+              </TableCell>
+              <TableCell className="whitespace-normal">{entry.ends}</TableCell>
+              <TableCell>{entry.issuer}</TableCell>
+              <TableCell className="text-right">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="h-7"
+                  disabled={disabled}
+                  aria-label={t`Unban ${username}`}
+                  onClick={() => onLift(entry.username)}
+                >
+                  <Trans>Unban</Trans>
+                </Button>
+              </TableCell>
+            </TableRow>
+          );
+        })}
       </TableBody>
     </Table>
   );
@@ -129,41 +167,57 @@ function MutesTable({
   onLift: (username: string) => void;
   disabled: boolean;
 }) {
+  const { t } = useLingui();
   return (
     <Table>
       <TableHeader>
         <TableRow>
-          <TableHead>Username</TableHead>
-          <TableHead>Reason</TableHead>
-          <TableHead>Ends</TableHead>
-          <TableHead>Issuer</TableHead>
           <TableHead>
-            <span className="sr-only">Actions</span>
+            <Trans>Username</Trans>
+          </TableHead>
+          <TableHead>
+            <Trans>Reason</Trans>
+          </TableHead>
+          <TableHead>
+            <Trans>Ends</Trans>
+          </TableHead>
+          <TableHead>
+            <Trans>Issuer</Trans>
+          </TableHead>
+          <TableHead>
+            <span className="sr-only">
+              <Trans>Actions</Trans>
+            </span>
           </TableHead>
         </TableRow>
       </TableHeader>
       <TableBody>
-        {entries.map((entry) => (
-          <TableRow key={`${entry.username}-${entry.ends}`}>
-            <TableCell>{entry.username}</TableCell>
-            <TableCell className="whitespace-normal">{entry.reason}</TableCell>
-            <TableCell className="whitespace-normal">{entry.ends}</TableCell>
-            <TableCell>{entry.issuer}</TableCell>
-            <TableCell className="text-right">
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                className="h-7"
-                disabled={disabled}
-                aria-label={`Unmute ${entry.username}`}
-                onClick={() => onLift(entry.username)}
-              >
-                Unmute
-              </Button>
-            </TableCell>
-          </TableRow>
-        ))}
+        {entries.map((entry) => {
+          const username = entry.username;
+          return (
+            <TableRow key={`${entry.username}-${entry.ends}`}>
+              <TableCell>{entry.username}</TableCell>
+              <TableCell className="whitespace-normal">
+                {entry.reason}
+              </TableCell>
+              <TableCell className="whitespace-normal">{entry.ends}</TableCell>
+              <TableCell>{entry.issuer}</TableCell>
+              <TableCell className="text-right">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="h-7"
+                  disabled={disabled}
+                  aria-label={t`Unmute ${username}`}
+                  onClick={() => onLift(entry.username)}
+                >
+                  <Trans>Unmute</Trans>
+                </Button>
+              </TableCell>
+            </TableRow>
+          );
+        })}
       </TableBody>
     </Table>
   );
@@ -178,7 +232,9 @@ function listView(
 ) {
   if (reply.shape === "channelBanList") {
     return reply.entries.length === 0 ? (
-      <span>No one is banned from #{channel}.</span>
+      <span>
+        <Trans>No one is banned from #{channel}.</Trans>
+      </span>
     ) : (
       <BansTable
         entries={reply.entries}
@@ -189,7 +245,9 @@ function listView(
   }
   if (reply.shape === "channelMuteList") {
     return reply.entries.length === 0 ? (
-      <span>No one is muted in #{channel}.</span>
+      <span>
+        <Trans>No one is muted in #{channel}.</Trans>
+      </span>
     ) : (
       <MutesTable
         entries={reply.entries}
@@ -219,6 +277,7 @@ function listView(
  * just did.
  */
 export function ChannelsSection({ serverKey }: { serverKey: string }) {
+  const { t } = useLingui();
   const [typed, setTyped] = useState("");
   const [founder, setFounder] = useState("");
   const [listed, setListed] = useState("");
@@ -282,7 +341,13 @@ export function ChannelsSection({ serverKey }: { serverKey: string }) {
   const lifting =
     unban.state.status === "sending" || unmute.state.status === "sending";
 
-  const onOff = (label: string, command: string, shape: AdminShape) => (
+  const onOff = (
+    label: string,
+    onLabel: string,
+    offLabel: string,
+    command: string,
+    shape: AdminShape,
+  ) => (
     <div className="flex flex-wrap items-center gap-2">
       <span className="w-20 text-sm">{label}</span>
       <Button
@@ -292,7 +357,7 @@ export function ChannelsSection({ serverKey }: { serverKey: string }) {
         disabled={none}
         onClick={() => change(command, ["on"], shape)}
       >
-        {label} on
+        {onLabel}
       </Button>
       <Button
         size="sm"
@@ -301,7 +366,7 @@ export function ChannelsSection({ serverKey }: { serverKey: string }) {
         disabled={none}
         onClick={() => change(command, ["off"], shape)}
       >
-        {label} off
+        {offLabel}
       </Button>
     </div>
   );
@@ -309,19 +374,19 @@ export function ChannelsSection({ serverKey }: { serverKey: string }) {
   return (
     <section className="flex flex-col gap-6">
       <ToolHeader
-        title="Channels"
-        description="ChanServ's tools for one channel. Timed channel bans and mutes are in the chat member menu."
+        title={t`Channels`}
+        description={t`ChanServ's tools for one channel. Timed channel bans and mutes are in the chat member menu.`}
       />
 
       <div className="flex max-w-md flex-col gap-2">
         <span className="flex flex-col gap-1 text-sm font-medium">
-          Channel
+          <Trans>Channel</Trans>
           <Input
             value={typed}
             onChange={(event) => setTyped(event.target.value)}
             onBlur={() => loadInfo(channel)}
             placeholder="main"
-            aria-label="Channel"
+            aria-label={t`Channel`}
             {...identifierFieldProps}
           />
         </span>
@@ -345,7 +410,7 @@ export function ChannelsSection({ serverKey }: { serverKey: string }) {
         )}
       </div>
 
-      <ToolGroup title="Bans and mutes">
+      <ToolGroup title={t`Bans and mutes`}>
         <div className="flex flex-wrap gap-2">
           <Button
             size="sm"
@@ -353,7 +418,7 @@ export function ChannelsSection({ serverKey }: { serverKey: string }) {
             disabled={none}
             onClick={() => show("listbans", "channelBanList")}
           >
-            Show bans
+            <Trans>Show bans</Trans>
           </Button>
           <Button
             size="sm"
@@ -362,45 +427,39 @@ export function ChannelsSection({ serverKey }: { serverKey: string }) {
             disabled={none}
             onClick={() => show("listmutes", "channelMuteList")}
           >
-            Show mutes
+            <Trans>Show mutes</Trans>
           </Button>
         </div>
         <AdminRequestStatus state={list.state}>
           {(reply) => listView(reply, listed, liftBan, liftMute, lifting)}
         </AdminRequestStatus>
-        <AdminRequestStatus
-          state={unban.state}
-          unanswered="The server did not answer."
-        >
-          {(reply) =>
-            reply.shape === "channelUnban"
-              ? `${reply.username} was unbanned from #${reply.channel}.`
-              : null
-          }
+        <AdminRequestStatus state={unban.state}>
+          {(reply) => {
+            if (reply.shape !== "channelUnban") return null;
+            const { username, channel } = reply;
+            return t`${username} was unbanned from #${channel}.`;
+          }}
         </AdminRequestStatus>
-        <AdminRequestStatus
-          state={unmute.state}
-          unanswered="The server did not answer."
-        >
-          {(reply) =>
-            reply.shape === "channelUnmute"
-              ? `${reply.username} was unmuted in #${reply.channel}.`
-              : null
-          }
+        <AdminRequestStatus state={unmute.state}>
+          {(reply) => {
+            if (reply.shape !== "channelUnmute") return null;
+            const { username, channel } = reply;
+            return t`${username} was unmuted in #${channel}.`;
+          }}
         </AdminRequestStatus>
       </ToolGroup>
 
       <ToolGroup
-        title="Registration and settings"
-        description="A registered channel has a founder, and ChanServ keeps its operators, bans, mutes and settings. Someone has to be in the channel to register it. With history on, the server stores the channel's messages and deletes them after 14 days."
+        title={t`Registration and settings`}
+        description={t`A registered channel has a founder, and ChanServ keeps its operators, bans, mutes and settings. Someone has to be in the channel to register it. With history on, the server stores the channel's messages and deletes them after 14 days.`}
       >
         <div className="flex max-w-md flex-wrap items-end gap-2">
           <span className="flex min-w-40 flex-1 flex-col gap-1 text-xs text-muted-foreground">
-            Founder (optional, defaults to you)
+            <Trans>Founder (optional, defaults to you)</Trans>
             <Input
               value={founder}
               onChange={(event) => setFounder(event.target.value)}
-              aria-label="Founder"
+              aria-label={t`Founder`}
               className="h-8"
               {...identifierFieldProps}
             />
@@ -415,7 +474,7 @@ export function ChannelsSection({ serverKey }: { serverKey: string }) {
               change("register", name ? [name] : [], "registerChannel");
             }}
           >
-            Register
+            <Trans>Register</Trans>
           </Button>
           <Button
             size="sm"
@@ -424,14 +483,26 @@ export function ChannelsSection({ serverKey }: { serverKey: string }) {
             disabled={none}
             onClick={() => change("unregister", [], "unregisterChannel")}
           >
-            Unregister
+            <Trans>Unregister</Trans>
           </Button>
         </div>
         <AdminRequestStatus state={info.state}>
           {(reply) => infoText(reply)}
         </AdminRequestStatus>
-        {onOff("History", "history", "channelHistory")}
-        {onOff("Antispam", "antispam", "channelAntispam")}
+        {onOff(
+          t`History`,
+          t`History on`,
+          t`History off`,
+          "history",
+          "channelHistory",
+        )}
+        {onOff(
+          t`Antispam`,
+          t`Antispam on`,
+          t`Antispam off`,
+          "antispam",
+          "channelAntispam",
+        )}
         <AdminRequestStatus state={setting.state}>
           {(reply) => settingText(reply)}
         </AdminRequestStatus>

@@ -1,3 +1,4 @@
+import { t } from "@lingui/core/macro";
 import { contentVerifyEngine } from "../../content/bindings";
 import { refreshContentState } from "../../content/contentState";
 import type { PlayTarget } from "../../play/config";
@@ -24,10 +25,10 @@ export async function hostEngineVersion(
     refreshContentState().catch(() => {});
   } catch (err) {
     const reason = err instanceof Error ? err.message : String(err);
-    throw new Error(`Could not read the engine's version: ${reason}`);
+    throw new Error(t`Could not read the engine's version: ${reason}`);
   }
   if (!reported) {
-    throw new Error("Could not read the engine's version.");
+    throw new Error(t`Could not read the engine's version.`);
   }
   return reported;
 }

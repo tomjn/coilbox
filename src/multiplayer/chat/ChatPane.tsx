@@ -1,3 +1,6 @@
+import type { MessageDescriptor } from "@lingui/core";
+import { t as coreT, msg, plural } from "@lingui/core/macro";
+import { Trans, useLingui } from "@lingui/react/macro";
 import { Button, cn, useTheme } from "@picoframe/frame";
 import {
   ArrowUp,
@@ -69,8 +72,8 @@ function formatDay(at: number): string {
   const today = new Date();
   const yesterday = new Date(today);
   yesterday.setDate(today.getDate() - 1);
-  if (sameDay(d, today)) return "Today";
-  if (sameDay(d, yesterday)) return "Yesterday";
+  if (sameDay(d, today)) return coreT`Today`;
+  if (sameDay(d, yesterday)) return coreT`Yesterday`;
   return formatDate(d, {
     weekday: "short",
     year: "numeric",
@@ -91,13 +94,17 @@ function dayChanged(prev: ChatMsg | undefined, m: ChatMsg): boolean {
 /** The composer's formatting buttons, in toolbar order. Only the formats
  * `parseMessage` tokenizes: a button for markup we don't render would be a
  * button that appears to do nothing. */
-const FORMAT_BUTTONS: { format: Format; label: string; Icon: typeof Bold }[] = [
-  { format: "bold", label: "Bold", Icon: Bold },
-  { format: "italic", label: "Italic", Icon: Italic },
-  { format: "strike", label: "Strikethrough", Icon: Strikethrough },
-  { format: "code", label: "Code", Icon: Code },
-  { format: "quote", label: "Quote", Icon: TextQuote },
-  { format: "bullet", label: "Bullet list", Icon: List },
+const FORMAT_BUTTONS: {
+  format: Format;
+  label: MessageDescriptor;
+  Icon: typeof Bold;
+}[] = [
+  { format: "bold", label: msg`Bold`, Icon: Bold },
+  { format: "italic", label: msg`Italic`, Icon: Italic },
+  { format: "strike", label: msg`Strikethrough`, Icon: Strikethrough },
+  { format: "code", label: msg`Code`, Icon: Code },
+  { format: "quote", label: msg`Quote`, Icon: TextQuote },
+  { format: "bullet", label: msg`Bullet list`, Icon: List },
 ];
 
 /** A row of the composer's autocomplete menu. The two triggers share the menu
@@ -237,6 +244,7 @@ export function ChatPane({
   messageAction,
   battleMemberNames,
 }: ChatPaneProps) {
+  const { t, i18n } = useLingui();
   const { resolved: theme } = useTheme();
   /** A sender's team colour as readable text, or undefined outside a battle. */
   const teamColour = (from: string) => {
@@ -262,7 +270,7 @@ export function ChatPane({
   // below are rows, not messages.
   const rows = useMemo(() => foldNotices(messages), [messages]);
   /** One part of a folded run: "alice, bob and 3 others joined". */
-  const noticePart = (names: string[], verb: string): ReactNode => {
+  const noticePart = (names: string[], id: string, verb: string): ReactNode => {
     if (names.length === 0) return null;
     // One more than the cap is spelled out too, since "and 1 other" is no
     // shorter than the name it hides.
@@ -272,14 +280,14 @@ export function ChatPane({
         : names;
     const hidden = names.length - shown.length;
     return (
-      <span key={verb} title={hidden > 0 ? names.join(", ") : undefined}>
+      <span key={id} title={hidden > 0 ? names.join(", ") : undefined}>
         {shown.map((name, i) => {
           const mark = markFor?.(name) ?? null;
           const color = teamColour(name);
           return (
             <span key={name}>
               {i > 0 &&
-                (i === shown.length - 1 && hidden === 0 ? " and " : ", ")}
+                (i === shown.length - 1 && hidden === 0 ? ` ${t`and`} ` : ", ")}
               <span
                 className={cn(
                   "font-medium",
@@ -298,7 +306,9 @@ export function ChatPane({
             </span>
           );
         })}
-        {hidden > 0 && ` and ${hidden} others`} {verb}.{" "}
+        {hidden > 0 &&
+          ` ${plural(hidden, { one: "and # other", other: "and # others" })}`}{" "}
+        {verb}.{" "}
       </span>
     );
   };
@@ -519,7 +529,9 @@ export function ChatPane({
       <header className="flex items-center justify-between gap-3 border-b border-border px-4 py-3">
         <div className="min-w-0">
           <h2 className="flex items-center gap-1.5 text-sm font-semibold">
-            {titleIsBot && <Bot className="size-4 shrink-0" aria-label="Bot" />}
+            {titleIsBot && (
+              <Bot className="size-4 shrink-0" aria-label={t`Bot`} />
+            )}
             <span className="truncate">{title}</span>
           </h2>
           {(subtitle || titlePresence) && (
@@ -560,7 +572,7 @@ export function ChatPane({
               {messages.length === 0
                 ? (emptyState ?? (
                     <p className="text-sm text-muted-foreground">
-                      No messages yet.
+                      <Trans>No messages yet.</Trans>
                     </p>
                   ))
                 : rows.map(({ m, run }, i) => {
@@ -581,15 +593,24 @@ export function ChatPane({
                       const summary = summariseNotices(run);
                       body = (
                         <div className="px-1 py-0.5 text-left text-xs text-muted-foreground">
-                          {noticePart(summary.joined, "joined")}
-                          {noticePart(summary.rejoined, "rejoined")}
-                          {noticePart(summary.left, "left")}
-                          {noticePart(summary.passedThrough, "joined and left")}
+                          {noticePart(summary.joined, "joined", t`joined`)}
+                          {noticePart(
+                            summary.rejoined,
+                            "rejoined",
+                            t`rejoined`,
+                          )}
+                          {noticePart(summary.left, "left", t`left`)}
+                          {noticePart(
+                            summary.passedThrough,
+                            "passedThrough",
+                            t`joined and left`,
+                          )}
                         </div>
                       );
                     } else if (isNotice(m.kind)) {
                       const mark = markFor?.(m.from) ?? null;
                       const color = teamColour(m.from);
+                      const leaveReason = m.text;
                       // Left-aligned like every other line (issue #3188) rather
                       // than centred, which put a join/leave notice a long way
                       // from the messages around it in a wide chat.
@@ -613,10 +634,12 @@ export function ChatPane({
                                   mark={mark}
                                   className="ml-1 inline size-3 align-text-bottom"
                                 />
-                              )}
+                              )}{" "}
                               {m.kind === "join"
-                                ? " joined"
-                                : ` left${m.text ? `: ${m.text}` : ""}`}
+                                ? t`joined`
+                                : m.text
+                                  ? t`left: ${leaveReason}`
+                                  : t`left`}
                             </>
                           )}
                         </div>
@@ -648,7 +671,7 @@ export function ChatPane({
                             {bot && (
                               <Bot
                                 className="mr-1 inline size-4 shrink-0 align-text-bottom"
-                                aria-label="Bot"
+                                aria-label={t`Bot`}
                               />
                             )}
                             {m.from}
@@ -693,7 +716,7 @@ export function ChatPane({
                               {bot && (
                                 <Bot
                                   className="size-4 shrink-0"
-                                  aria-label="Bot"
+                                  aria-label={t`Bot`}
                                 />
                               )}
                               {m.from}
@@ -785,7 +808,7 @@ export function ChatPane({
       <div className="px-4 py-3">
         {sendError && (
           <p className="pb-1 text-xs text-destructive">
-            Failed to send: {sendError}
+            <Trans>Failed to send: {sendError}</Trans>
           </p>
         )}
         {/* The draft sits on its own row above the toolbar, so the buttons stay
@@ -796,7 +819,7 @@ export function ChatPane({
             <div
               id={listId}
               role="listbox"
-              aria-label={mention ? "Mention a user" : "Insert an emoji"}
+              aria-label={mention ? t`Mention a user` : t`Insert an emoji`}
               className="absolute bottom-full left-0 z-10 mb-2 max-h-48 w-64 overflow-y-auto rounded-md border border-border bg-popover py-1 shadow-md"
             >
               {options.map((option, i) => (
@@ -910,9 +933,9 @@ export function ChatPane({
                 if (onTab(e.currentTarget)) e.preventDefault();
               }
             }}
-            placeholder="Type your message..."
+            placeholder={t`Type your message...`}
             disabled={disabled}
-            aria-label="Message"
+            aria-label={t`Message`}
             // Height is driven by the auto-grow effect; the cap here is what it
             // grows to before the box scrolls instead. `resize-none` because a
             // drag handle would fight that effect.
@@ -938,8 +961,8 @@ export function ChatPane({
                 disabled={disabled}
                 variant="ghost"
                 size="icon"
-                aria-label={label}
-                title={label}
+                aria-label={i18n._(label)}
+                title={i18n._(label)}
                 className="size-7 shrink-0 rounded-md text-muted-foreground"
               >
                 <Icon className="size-4" />
@@ -950,8 +973,8 @@ export function ChatPane({
               onClick={submit}
               disabled={disabled || draft.trim() === ""}
               size="icon"
-              aria-label="Send"
-              title="Send"
+              aria-label={t`Send`}
+              title={t`Send`}
               className="size-8 shrink-0 rounded-full"
             >
               <ArrowUp className="size-4" />

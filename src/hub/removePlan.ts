@@ -12,6 +12,7 @@
  * removing a pack whose presets were half deleted by hand still finishes.
  */
 
+import { plural, t } from "@lingui/core/macro";
 import type { HubItem } from "./api";
 import type { HubImportRecord } from "./importRecord";
 
@@ -73,8 +74,8 @@ export function planRemoval(
     return plan(
       "run",
       stores.runs.filter((r) => refs.has(r.id)),
-      "warpath run",
-      "However far you have got in it goes too.",
+      (n) => plural(n, { one: "# warpath run", other: "# warpath runs" }),
+      t`However far you have got in it goes too.`,
     );
   }
 
@@ -83,9 +84,9 @@ export function planRemoval(
     return plan(
       "galaxy",
       found.map((g) => ({ id: g.id, name: g.title })),
-      "galaxy",
+      (n) => plural(n, { one: "# galaxy", other: "# galaxies" }),
       found.some((g) => stores.playing.has(g.id))
-        ? "You have a game in progress on it, which goes too."
+        ? t`You have a game in progress on it, which goes too.`
         : null,
     );
   }
@@ -97,9 +98,9 @@ export function planRemoval(
     return plan(
       "scenario",
       targets,
-      "scenario",
+      (n) => plural(n, { one: "# scenario", other: "# scenarios" }),
       targets.some((s) => s.keepMedia)
-        ? "A campaign mission plays this scenario. The mission keeps playing, because it carries its own copy."
+        ? t`A campaign mission plays this scenario. The mission keeps playing, because it carries its own copy.`
         : null,
     );
   }
@@ -108,7 +109,7 @@ export function planRemoval(
   return plan(
     "preset",
     stores.presets.filter((p) => refs.has(p.id)),
-    "preset",
+    (n) => plural(n, { one: "# preset", other: "# presets" }),
     null,
   );
 }
@@ -123,14 +124,14 @@ export function planRemoval(
 function plan(
   store: RemovalStore,
   targets: RemovalTarget[],
-  noun: string,
+  count: (n: number) => string,
   warning: string | null,
 ): RemovalPlan | null {
   if (targets.length === 0) return null;
-  const names = targets.map((t) => t.name);
+  const names = targets.map((target) => target.name);
+  const quoted = names.map((n) => `“${n}”`).join(", ");
+  const total = count(names.length);
   const summary =
-    names.length <= 3
-      ? `Delete ${names.map((n) => `“${n}”`).join(", ")}?`
-      : `Delete ${names.length} ${noun}s?`;
+    names.length <= 3 ? t`Delete ${quoted}?` : t`Delete ${total}?`;
   return { store, targets, summary, warning };
 }

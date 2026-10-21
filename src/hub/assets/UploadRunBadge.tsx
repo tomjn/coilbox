@@ -1,3 +1,4 @@
+import { Plural, useLingui } from "@lingui/react/macro";
 import { Button } from "@picoframe/frame";
 import { Images } from "lucide-react";
 import {
@@ -36,11 +37,12 @@ import {
  * than afterwards.
  */
 export default function UploadRunBadge() {
+  const { t } = useLingui();
   const runs = useRunningUploads();
   if (runs.length === 0) return null;
 
   const drawing = runs.some((run) => run.phase === "drawing");
-  const label = drawing ? "Making pictures" : "Sending pictures";
+  const label = drawing ? t`Making pictures` : t`Sending pictures`;
 
   return (
     <Popover>
@@ -48,7 +50,11 @@ export default function UploadRunBadge() {
         <button
           type="button"
           className="flex items-center gap-1.5 rounded-full bg-primary/10 px-3 py-1 text-xs font-medium text-primary hover:bg-primary/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-          aria-label={`${label} for the hub. Open to stop.`}
+          aria-label={
+            drawing
+              ? t`Making pictures for the hub. Open to stop.`
+              : t`Sending pictures for the hub. Open to stop.`
+          }
         >
           <Images
             size={14}
@@ -68,16 +74,18 @@ export default function UploadRunBadge() {
 
 /** One run: what it is doing, how far it has got, and the button that ends it. */
 function UploadRunRow({ run }: { run: RunningUpload }) {
+  const { t } = useLingui();
   const percent =
     run.total > 0 ? Math.min(100, Math.round((run.done / run.total) * 100)) : 0;
+  const { game, done, total, sent } = run;
   const doing =
     run.phase === "drawing"
-      ? `Coilbox is making pictures of ${run.game}'s units. Nothing has been sent yet.`
-      : `Coilbox is sending ${run.game}'s pictures to the hub.`;
+      ? t`Coilbox is making pictures of ${game}'s units. Nothing has been sent yet.`
+      : t`Coilbox is sending ${game}'s pictures to the hub.`;
   const counted =
     run.phase === "drawing"
-      ? `${run.done} of ${run.total} made`
-      : `${run.done} of ${run.total} sent`;
+      ? t`${done} of ${total} made`
+      : t`${done} of ${total} sent`;
 
   return (
     <div className="space-y-2">
@@ -85,7 +93,7 @@ function UploadRunRow({ run }: { run: RunningUpload }) {
       <Progress
         value={percent}
         className="h-1.5 bg-muted"
-        aria-label={`${run.game} pictures`}
+        aria-label={t`${game} pictures`}
       />
       <p className="text-xs tabular-nums text-muted-foreground">{counted}</p>
       {run.sent > 0 && (
@@ -93,9 +101,11 @@ function UploadRunRow({ run }: { run: RunningUpload }) {
         // person who needs that is the one deciding whether to press, not the
         // one who already has.
         <p className="text-xs text-muted-foreground">
-          {run.sent === 1
-            ? "One picture has already gone, and it stays on the hub."
-            : `${run.sent} pictures have already gone, and they stay on the hub.`}
+          <Plural
+            value={sent}
+            one="One picture has already gone, and it stays on the hub."
+            other="# pictures have already gone, and they stay on the hub."
+          />
         </p>
       )}
       <Button
@@ -105,7 +115,7 @@ function UploadRunRow({ run }: { run: RunningUpload }) {
         disabled={run.stopping}
         onClick={() => void stopUploadRun(run.opId)}
       >
-        {run.stopping ? "Stopping…" : "Stop sending pictures"}
+        {run.stopping ? t`Stopping…` : t`Stop sending pictures`}
       </Button>
     </div>
   );

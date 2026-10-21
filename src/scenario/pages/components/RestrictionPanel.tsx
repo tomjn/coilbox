@@ -18,6 +18,8 @@
  * panel says it in place rather than in a manual.
  */
 
+import { t as coreT, plural } from "@lingui/core/macro";
+import { Trans, useLingui } from "@lingui/react/macro";
 import { Button, Input } from "@picoframe/frame";
 import { Ban, Lock, Plus, X } from "lucide-react";
 import { useState } from "react";
@@ -57,9 +59,11 @@ const COMMON_COMMANDS = [
 function Reach() {
   return (
     <p className="text-xs text-muted-foreground">
-      A restriction binds every team the scenario declares, not the player
-      alone: the rule names no team. Teams the scenario says nothing about, Gaia
-      included, are untouched.
+      <Trans>
+        A restriction binds every team the scenario declares, not the player
+        alone: the rule names no team. Teams the scenario says nothing about,
+        Gaia included, are untouched.
+      </Trans>
     </p>
   );
 }
@@ -83,28 +87,33 @@ export function UnitRestrictionPanel({
    *  issue #2306). */
   onUndo: () => void;
 }) {
+  const { t } = useLingui();
   const mode = buildableMode(scenario);
   const listed = scenario.restrictions.buildable?.units ?? [];
   const warning = buildableWarning(scenario);
 
   return (
     <EditorPanel
-      title="Unit restrictions"
+      title={t`Unit restrictions`}
       icon={Lock}
       summary={buildSummary(mode, listed.length)}
     >
       <div className="flex max-w-2xl flex-col gap-4">
         <Reach />
         <p className="text-xs text-muted-foreground">
-          An author who wants a rule for the player only writes it here and
-          gives the def back to the others with <code>unlock_unit</code>. The
-          mission's own spawns are exempt, so a scenario can place a unit its
-          teams may not build.
+          <Trans>
+            An author who wants a rule for the player only writes it here and
+            gives the def back to the others with <code>unlock_unit</code>. The
+            mission's own spawns are exempt, so a scenario can place a unit its
+            teams may not build.
+          </Trans>
         </p>
 
         <section className="flex flex-col gap-2">
           <div className="flex flex-wrap items-center gap-2">
-            <h3 className="text-xs font-medium">Building</h3>
+            <h3 className="text-xs font-medium">
+              <Trans>Building</Trans>
+            </h3>
             <OptionSelect
               size="sm"
               className="w-52"
@@ -113,9 +122,9 @@ export function UnitRestrictionPanel({
                 onChange(setBuildableMode(scenario, next as BuildableMode))
               }
               options={[
-                { value: "none", label: "Anything the game allows" },
-                { value: "allow", label: "Only these units" },
-                { value: "deny", label: "Everything but these" },
+                { value: "none", label: t`Anything the game allows` },
+                { value: "allow", label: t`Only these units` },
+                { value: "deny", label: t`Everything but these` },
               ]}
             />
           </div>
@@ -128,11 +137,11 @@ export function UnitRestrictionPanel({
                     <li key={def}>
                       <Chip
                         label={def}
-                        remove={`Take ${def} off the list`}
+                        remove={t`Take ${def} off the list`}
                         onRemove={() => {
                           onChange(removeBuildableUnit(scenario, def));
                           notifyDeleted(
-                            `Took "${def}" off the buildable list.`,
+                            t`Took "${def}" off the buildable list.`,
                             onUndo,
                           );
                         }}
@@ -146,7 +155,7 @@ export function UnitRestrictionPanel({
                 units={units}
                 value=""
                 loading={unitsLoading}
-                placeholder="Add a unit to the list"
+                placeholder={t`Add a unit to the list`}
                 size="sm"
                 className="w-72"
                 onValueChange={(def) =>
@@ -178,11 +187,12 @@ export function CommandRestrictionPanel({
   /** The page's own step back, as {@link UnitRestrictionPanel} takes it. */
   onUndo: () => void;
 }) {
+  const { t } = useLingui();
   const commands = scenario.restrictions.commands ?? [];
 
   return (
     <EditorPanel
-      title="Command restrictions"
+      title={t`Command restrictions`}
       icon={Ban}
       summary={commandSummary(commands.length)}
     >
@@ -190,18 +200,20 @@ export function CommandRestrictionPanel({
         <Reach />
 
         <section className="flex flex-col gap-2">
-          <h3 className="text-xs font-medium">Commands withheld</h3>
+          <h3 className="text-xs font-medium">
+            <Trans>Commands withheld</Trans>
+          </h3>
           {commands.length > 0 && (
             <ul className="flex flex-wrap gap-1.5">
               {commands.map((name) => (
                 <li key={name}>
                   <Chip
                     label={name}
-                    remove={`Allow ${name} again`}
+                    remove={t`Allow ${name} again`}
                     onRemove={() => {
                       onChange(removeCommand(scenario, name));
                       notifyDeleted(
-                        `Took "${name}" off the withheld list.`,
+                        t`Took "${name}" off the withheld list.`,
                         onUndo,
                       );
                     }}
@@ -215,9 +227,12 @@ export function CommandRestrictionPanel({
             onAdd={(name) => onChange(addCommand(scenario, name))}
           />
           <p className="text-[11px] text-muted-foreground">
-            An engine command name, as the engine spells it: <code>selfd</code>{" "}
-            is self destruct. An order the mission's own Lua gives is exempt, so
-            withholding one never stops the scenario driving its own units.
+            <Trans>
+              An engine command name, as the engine spells it:{" "}
+              <code>selfd</code> is self destruct. An order the mission's own
+              Lua gives is exempt, so withholding one never stops the scenario
+              driving its own units.
+            </Trans>
           </p>
         </section>
       </div>
@@ -226,16 +241,19 @@ export function CommandRestrictionPanel({
 }
 
 function buildSummary(mode: BuildableMode, units: number): string {
-  if (mode === "none") return "Builds anything";
+  if (mode === "none") return coreT`Builds anything`;
   return mode === "allow"
-    ? `Only ${units} unit${units === 1 ? "" : "s"}`
-    : `${units} unit${units === 1 ? "" : "s"} withheld`;
+    ? plural(units, { one: "Only # unit", other: "Only # units" })
+    : plural(units, { one: "# unit withheld", other: "# units withheld" });
 }
 
 function commandSummary(commands: number): string {
   return commands === 0
-    ? "Every command allowed"
-    : `${commands} command${commands === 1 ? "" : "s"} withheld`;
+    ? coreT`Every command allowed`
+    : plural(commands, {
+        one: "# command withheld",
+        other: "# commands withheld",
+      });
 }
 
 /** One entry of a list of names, with the button that takes it back off. */
@@ -274,6 +292,7 @@ function CommandField({
   taken: string[];
   onAdd: (name: string) => void;
 }) {
+  const { t } = useLingui();
   const [text, setText] = useState("");
   const suggestions = COMMON_COMMANDS.filter((name) => !taken.includes(name));
 
@@ -286,7 +305,7 @@ function CommandField({
   return (
     <div className="flex flex-wrap items-center gap-2">
       <Input
-        aria-label="Command to withhold"
+        aria-label={t`Command to withhold`}
         value={text}
         placeholder="selfd"
         onChange={(e) => setText(e.target.value)}
@@ -305,14 +324,14 @@ function CommandField({
         disabled={!text.trim()}
         onClick={() => add(text)}
       >
-        <Plus className="size-3.5" /> Withhold
+        <Plus className="size-3.5" /> <Trans>Withhold</Trans>
       </Button>
       {suggestions.length > 0 && (
         <OptionSelect
           size="sm"
           className="w-52"
           value=""
-          placeholder="Or one of the common ones"
+          placeholder={t`Or one of the common ones`}
           onValueChange={add}
           options={suggestions.map((name) => ({ value: name, label: name }))}
         />

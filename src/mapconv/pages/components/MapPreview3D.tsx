@@ -1,3 +1,4 @@
+import { Trans, useLingui } from "@lingui/react/macro";
 import { cn } from "@picoframe/frame";
 import {
   Box,
@@ -387,6 +388,7 @@ export function MapPreview3D({
   // Setting-aware reduce-motion (General settings -> Motion & effects), which
   // itself follows the OS preference in its default "system" mode.
   const reduceMotion = useReduceMotion();
+  const { t } = useLingui();
   const [srcs, setSrcs] = useState<Srcs | null>(null);
   // The heightmap file read as words, for the mapconv flow, which hands over a
   // path rather than a grid. `heightWords` from the caller wins over it.
@@ -1269,7 +1271,7 @@ uniform vec2 wPlane;`,
   if (failed) {
     return (
       <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
-        <ImageOff size={13} /> 3D preview unavailable.
+        <ImageOff size={13} /> <Trans>3D preview unavailable.</Trans>
       </p>
     );
   }
@@ -1295,7 +1297,7 @@ uniform vec2 wPlane;`,
         <button
           type="button"
           onClick={() => setExpanded((e) => !e)}
-          aria-label={expanded ? "Exit fullscreen" : "Fullscreen preview"}
+          aria-label={expanded ? t`Exit fullscreen` : t`Fullscreen preview`}
           className="absolute left-2 top-2 flex items-center justify-center rounded-md border border-border bg-card/80 p-2 text-muted-foreground backdrop-blur transition-colors hover:text-foreground"
         >
           {expanded ? <Minimize2 size={15} /> : <Maximize2 size={15} />}
@@ -1305,7 +1307,7 @@ uniform vec2 wPlane;`,
       {!built && (
         <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 text-sm text-muted-foreground">
           <Loader2 size={22} className="animate-spin opacity-40" />
-          {srcs ? "Building 3D preview…" : "Loading map preview…"}
+          {srcs ? t`Building 3D preview…` : t`Loading map preview…`}
         </div>
       )}
 
@@ -1318,7 +1320,7 @@ uniform vec2 wPlane;`,
                 checked={water}
                 onCheckedChange={(v) => setWater(v === true)}
               />
-              Water
+              <Trans>Water</Trans>
             </label>
             {/* biome-ignore lint/a11y/noLabelWithoutControl: wraps the <Checkbox> control (implicit label association) */}
             <label className="flex items-center gap-2">
@@ -1326,11 +1328,14 @@ uniform vec2 wPlane;`,
                 checked={wireframe}
                 onCheckedChange={(v) => setWireframe(v === true)}
               />
-              Wireframe
+              <Trans>Wireframe</Trans>
             </label>
           </div>
           <p className="pointer-events-none absolute bottom-2 left-2 flex items-center gap-1.5 rounded bg-card/70 px-2 py-1 font-mono text-[11px] text-muted-foreground backdrop-blur">
-            <Box size={12} /> height {minHeight} → {maxHeight} · drag to orbit
+            <Box size={12} />{" "}
+            <Trans>
+              height {minHeight} → {maxHeight} · drag to orbit
+            </Trans>
           </p>
           {sky && (
             <p

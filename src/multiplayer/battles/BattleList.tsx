@@ -1,3 +1,4 @@
+import { Trans, useLingui } from "@lingui/react/macro";
 import { ChevronRight } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import type { LobbyProtocol } from "../../lobby-servers/config";
@@ -78,6 +79,7 @@ export function BattleList({
   /** The protocol of this connection's saved server entry (issue #3524). */
   protocol?: LobbyProtocol;
 }) {
+  const { t } = useLingui();
   // Running matches can be watched, so they start expanded. Passworded battles
   // are ones you cannot simply drop into, and locked ones nobody can enter, so
   // both start collapsed and keep the joinable list short.
@@ -142,14 +144,14 @@ export function BattleList({
   if (totalCount === 0) {
     return (
       <p className="p-6 text-center text-sm text-muted-foreground">
-        No open battles right now.
+        <Trans>No open battles right now.</Trans>
       </p>
     );
   }
   if (!joinedBattle && rest.length === 0) {
     return (
       <p className="p-6 text-center text-sm text-muted-foreground">
-        No battles match your filters.
+        <Trans>No battles match your filters.</Trans>
       </p>
     );
   }
@@ -167,7 +169,7 @@ export function BattleList({
         </ul>
       )}
       <BattleGroup
-        label="Open"
+        label={t`Open`}
         battles={open}
         collapsed={collapsed.open}
         onToggle={() => setCollapsed((c) => ({ ...c, open: !c.open }))}
@@ -177,7 +179,7 @@ export function BattleList({
         inProgressIds={inProgressIds}
       />
       <BattleGroup
-        label="Passworded"
+        label={t`Passworded`}
         battles={passworded}
         collapsed={collapsed.passworded}
         onToggle={() =>
@@ -189,7 +191,7 @@ export function BattleList({
         inProgressIds={inProgressIds}
       />
       <BattleGroup
-        label="In progress"
+        label={t`In progress`}
         battles={running}
         collapsed={collapsed.running}
         onToggle={() => setCollapsed((c) => ({ ...c, running: !c.running }))}
@@ -199,7 +201,7 @@ export function BattleList({
         inProgressIds={inProgressIds}
       />
       <BattleGroup
-        label="Locked"
+        label={t`Locked`}
         battles={locked}
         collapsed={collapsed.locked}
         onToggle={() => setCollapsed((c) => ({ ...c, locked: !c.locked }))}

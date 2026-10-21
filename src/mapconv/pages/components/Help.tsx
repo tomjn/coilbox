@@ -1,3 +1,4 @@
+import { useLingui } from "@lingui/react/macro";
 import { ExternalLink, HelpCircle } from "lucide-react";
 import type { ReactNode } from "react";
 import {
@@ -33,6 +34,7 @@ export function openExternal(url: string) {
 
 /** A small "?" icon that reveals explanatory help on hover/focus. */
 export function HelpTip({ children }: { children: ReactNode }) {
+  const { t } = useLingui();
   return (
     <TooltipProvider delayDuration={150}>
       <Tooltip>
@@ -41,7 +43,7 @@ export function HelpTip({ children }: { children: ReactNode }) {
             type="button"
             // Stop the wrapping <label> from forwarding the click to its control.
             onClick={(e) => e.preventDefault()}
-            aria-label="Help"
+            aria-label={t`Help`}
             className="cursor-help text-muted-foreground transition-colors hover:text-foreground"
           >
             <HelpCircle size={13} />
@@ -56,13 +58,8 @@ export function HelpTip({ children }: { children: ReactNode }) {
 }
 
 /** A "Learn more" link that opens a wiki page in the OS browser. */
-export function LearnMore({
-  href,
-  label = "Learn more",
-}: {
-  href: string;
-  label?: string;
-}) {
+export function LearnMore({ href, label }: { href: string; label?: string }) {
+  const { t } = useLingui();
   return (
     <button
       type="button"
@@ -72,7 +69,7 @@ export function LearnMore({
       }}
       className="inline-flex cursor-pointer items-center gap-0.5 text-xs text-primary hover:underline"
     >
-      {label} <ExternalLink size={11} />
+      {label ?? t`Learn more`} <ExternalLink size={11} />
     </button>
   );
 }

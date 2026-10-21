@@ -1,3 +1,4 @@
+import { Trans, useLingui } from "@lingui/react/macro";
 import { Button, useSetting } from "@picoframe/frame";
 import { Download, Loader2 } from "lucide-react";
 import { useMemo } from "react";
@@ -28,6 +29,7 @@ function MissingEngine({
   target: PlayTarget | null;
   onInstalled: () => void;
 }) {
+  const { t } = useLingui();
   const req = useMemo(() => engineVersionRequirement(version), [version]);
   const requirements = useMemo(() => [req], [req]);
   const resolve = useResolveContent(requirements, target ?? undefined);
@@ -60,8 +62,10 @@ function MissingEngine({
   return (
     <div className="flex flex-col gap-2 rounded-md border border-amber-500/40 bg-amber-500/10 px-3 py-2">
       <p className="text-amber-700 dark:text-amber-400">
-        You do not have the host's engine, so the host will refuse your
-        connection.
+        <Trans>
+          You do not have the host's engine, so the host will refuse your
+          connection.
+        </Trans>
       </p>
       {item && status === "active" ? (
         <QueueProgress item={item} />
@@ -77,17 +81,21 @@ function MissingEngine({
           ) : (
             <Download className="size-4" />
           )}
-          {status === "queued" ? "Queued…" : `Download ${version}`}
+          {status === "queued" ? t`Queued…` : t`Download ${version}`}
         </Button>
       ) : resolve.noWriteRoot ? (
         <p className="text-xs text-muted-foreground">
-          Set a download folder in Content folders settings to download it.
+          <Trans>
+            Set a download folder in Content folders settings to download it.
+          </Trans>
         </p>
       ) : (
         !resolve.loading && (
           <p className="text-xs text-muted-foreground">
-            No download was found for this version on this platform. Install it
-            yourself in Settings, Engines.
+            <Trans>
+              No download was found for this version on this platform. Install
+              it yourself in Settings, Engines.
+            </Trans>
           </p>
         )
       )}
@@ -119,22 +127,31 @@ export function BattleEngineCard({
   /** The engine was asked for its version and would not say. */
   unreadable: boolean;
 }) {
+  const { t } = useLingui();
   const { verdict, hostLabel, mineLabel } = match;
 
   return (
     <div className="flex flex-col gap-2 rounded-lg border border-border/50 bg-card p-4 text-sm">
-      <span className="font-semibold">Engine</span>
+      <span className="font-semibold">
+        <Trans>Engine</Trans>
+      </span>
       <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1">
-        <dt className="text-muted-foreground">Host</dt>
-        <dd className="break-words">{hostLabel ?? "Not given by the lobby"}</dd>
-        <dt className="text-muted-foreground">Yours</dt>
+        <dt className="text-muted-foreground">
+          <Trans>Host</Trans>
+        </dt>
+        <dd className="break-words">
+          {hostLabel ?? t`Not given by the lobby`}
+        </dd>
+        <dt className="text-muted-foreground">
+          <Trans>Yours</Trans>
+        </dt>
         <dd className="break-words">
           {mineLabel ??
             (verdict !== "unverified"
-              ? "None"
+              ? t`None`
               : unreadable
-                ? "Unknown"
-                : "Checking…")}
+                ? t`Unknown`
+                : t`Checking…`)}
         </dd>
       </dl>
       {verdict === "mismatch" && (
@@ -147,8 +164,10 @@ export function BattleEngineCard({
       )}
       {verdict === "unverified" && unreadable && (
         <p className="rounded-md border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-amber-700 dark:text-amber-400">
-          Your engine would not report its version, so it cannot be checked
-          against the host's. Pick another in Settings, Engines.
+          <Trans>
+            Your engine would not report its version, so it cannot be checked
+            against the host's. Pick another in Settings, Engines.
+          </Trans>
         </p>
       )}
     </div>

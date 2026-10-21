@@ -1,3 +1,4 @@
+import { Trans, useLingui } from "@lingui/react/macro";
 import type { Dispatch, ReactNode, SetStateAction } from "react";
 import { buildingFootprints, type FootprintMark } from "@/blueprint/footprint";
 import type { BlueprintBuilding } from "@/blueprint/model";
@@ -349,18 +350,24 @@ export function ClickAnswerBars({
   worldWidth: number;
   worldHeight: number;
 }) {
+  const { t } = useLingui();
+  const pathGroup =
+    drawingPath && pickedGroup ? groupLabel(groups, pickedGroup.id) : "";
+  const pathOrder =
+    drawingPath && pickedGroup
+      ? pickedGroup.orders[drawingPath.order].kind
+      : "";
   return (
     <>
       {drawingPath && pickedGroup && (
         <ClickMapBar
           message={
-            <>
+            <Trans>
               Click the map to add points to{" "}
               <span className="font-mono">
-                {groupLabel(groups, pickedGroup.id)} ·{" "}
-                {pickedGroup.orders[drawingPath.order].kind}
+                {pathGroup} · {pathOrder}
               </span>
-            </>
+            </Trans>
           }
           onDone={onDrawingDone}
           onAt={onPlace}
@@ -370,7 +377,7 @@ export function ClickAnswerBars({
       )}
       {moving && (
         <ClickMapBar
-          message="Click the map to put this base's origin there, buildings and all"
+          message={t`Click the map to put this base's origin there, buildings and all`}
           onDone={onMovingDone}
           onAt={onPlace}
           worldWidth={worldWidth}

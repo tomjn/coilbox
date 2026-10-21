@@ -14,6 +14,7 @@
  * player pressing Play (issue #862).
  */
 
+import { t } from "@lingui/core/macro";
 import { MUTATOR_FOLDER } from "../lib/generatedGames";
 import type { RuntimeMarker } from "./bindings";
 import { packagedGameRoute } from "./wording";
@@ -41,15 +42,16 @@ export function mutatorOffer(
 ): MutatorOffer {
   if (!available) {
     return {
-      reason: `${gameName} is a packaged archive, which cannot be written into, so coilbox cannot install the mission runtime into it.`,
-      offer:
-        "This build of coilbox ships no mission runtime, so it has no test mutator to offer either.",
+      reason: t`${gameName} is a packaged archive, which cannot be written into, so coilbox cannot install the mission runtime into it.`,
+      offer: t`This build of coilbox ships no mission runtime, so it has no test mutator to offer either.`,
       limit: null,
     };
   }
+  const folder = MUTATOR_FOLDER;
+  const version = available.version;
   return {
     reason: packagedGameRoute("author", gameName),
-    offer: `Coilbox writes a game of its own, ${MUTATOR_FOLDER}, beside this one. It depends on ${gameName} for units, sides and everything else, and carries mission runtime version ${available.version} plus the one scenario under test. Testing a scenario writes it, and deleting that folder undoes it.`,
-    limit: `It is a test route and never a distribution one. For ${gameName} to play scenarios itself its archive has to bundle the runtime, and coilbox can only install that into a loose .sdd copy of the game.`,
+    offer: t`Coilbox writes a game of its own, ${folder}, beside this one. It depends on ${gameName} for units, sides and everything else, and carries mission runtime version ${version} plus the one scenario under test. Testing a scenario writes it, and deleting that folder undoes it.`,
+    limit: t`It is a test route and never a distribution one. For ${gameName} to play scenarios itself its archive has to bundle the runtime, and coilbox can only install that into a loose .sdd copy of the game.`,
   };
 }
