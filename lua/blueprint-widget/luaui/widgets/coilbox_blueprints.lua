@@ -27,6 +27,20 @@ local ACTION_TOGGLE = "coilbox_blueprints"
 local ACTION_SAVE = "coilbox_blueprints_save"
 local ACTION_LEFT = "coilbox_blueprints_rotate_left"
 local ACTION_RIGHT = "coilbox_blueprints_rotate_right"
+local ACTION_NEXT = "coilbox_blueprints_next"
+local ACTION_PREV = "coilbox_blueprints_prev"
+
+-- Keys bound when the widget loads, each only if the player has bound
+-- nothing to its action. The engine binds [ and ] to buildfacing too, and an
+-- action that takes the key stops the ones after it.
+local DEFAULT_KEYS = {
+	{ ACTION_LEFT, "[" },
+	{ ACTION_RIGHT, "]" },
+	{ ACTION_PREV, "Shift+[" },
+	{ ACTION_NEXT, "Shift+]" },
+}
+-- The defaults this widget bound, to unbind on shutdown.
+local boundKeys = {}
 
 function widget:GetInfo()
 	return {
@@ -325,6 +339,15 @@ end
 -- Placing
 --------------------------------------------------------------------------------
 
+--- Read which keys are bound to the actions the hints name.
+local function readKeys()
+	panel.keys = {
+		left = Spring.GetActionHotKeys(ACTION_LEFT) or {},
+		right = Spring.GetActionHotKeys(ACTION_RIGHT) or {},
+	}
+	MODEL.touch(panel)
+end
+
 local function stopPlacing()
 	if placing then
 		placing = nil
@@ -348,19 +371,38 @@ local function startPlacing(key)
 		say("Nothing in " .. item.name .. " exists in this game")
 		return
 	end
+	readKeys()
 	placing = { item = item, rotation = 0, foot = nil }
 	panel.placing = { key = key, name = item.name, rotation = 0 }
 	MODEL.touch(panel)
 end
 
+--- Turn the layout being placed. Returns whether it did, so a key bound to
+-- this and to something else only turns when there is something to turn.
 local function rotate(turns)
 	if not placing then
-		return
+		return false
 	end
 	placing.rotation = (placing.rotation + turns) % 4
 	placing.foot = nil
 	panel.placing.rotation = placing.rotation
 	MODEL.touch(panel)
+	return true
+end
+
+--- Pick up the next or the previous blueprint under the current tab. Only
+-- while the panel is open or something is being placed, so the key does its
+-- usual job the rest of the time.
+local function step(direction)
+	if not (panel.open or placing) then
+		return false
+	end
+	local key = MODEL.step(panel, direction)
+	if key then
+		startPlacing(key)
+		MODEL.reveal(panel, key)
+	end
+	return true
 end
 
 --- Where the layout would land under the cursor now, or nil off the map.
@@ -587,11 +629,25 @@ function widget:Initialize()
 	widgetHandler:AddAction(ACTION_TOGGLE, toggle, nil, "tp")
 	widgetHandler:AddAction(ACTION_SAVE, saveSelection, nil, "tp")
 	widgetHandler:AddAction(ACTION_LEFT, function()
-		rotate(-1)
+		return rotate(-1)
 	end, nil, "tp")
 	widgetHandler:AddAction(ACTION_RIGHT, function()
-		rotate(1)
+		return rotate(1)
 	end, nil, "tp")
+	widgetHandler:AddAction(ACTION_PREV, function()
+		return step(-1)
+	end, nil, "tp")
+	widgetHandler:AddAction(ACTION_NEXT, function()
+		return step(1)
+	end, nil, "tp")
+	for _, default in ipairs(DEFAULT_KEYS) do
+		local action, key = default[1], default[2]
+		local current = Spring.GetActionHotKeys(action)
+		if not current or #current == 0 then
+			Spring.SendCommands("bind " .. key .. " " .. action)
+			boundKeys[#boundKeys + 1] = default
+		end
+	end
 
 	WG.CoilboxBlueprints = {
 		open = open,
@@ -607,12 +663,13 @@ function widget:Initialize()
 		end,
 		save = saveSelection,
 		rotate = rotate,
+		step = step,
 	}
 
 	-- A widget that loads and then draws nothing looks like one that did not
 	-- load. Say how to reach it, and the very first time it ever runs, open
 	-- the panel so there is something to see.
-	Spring.Echo("Coilbox blueprints: /coilbox_blueprints toggles the panel, [ and ] turn a layout while placing.")
+	Spring.Echo("Coilbox blueprints: /coilbox_blueprints toggles the panel. Bind keys to " .. ACTION_LEFT .. ", " .. ACTION_RIGHT .. ", " .. ACTION_PREV .. " and " .. ACTION_NEXT .. " to turn and pick layouts.")
 	if not (saved and saved.seen) then
 		open()
 	end
@@ -623,6 +680,12 @@ function widget:Shutdown()
 	widgetHandler:RemoveAction(ACTION_SAVE)
 	widgetHandler:RemoveAction(ACTION_LEFT)
 	widgetHandler:RemoveAction(ACTION_RIGHT)
+	widgetHandler:RemoveAction(ACTION_NEXT)
+	widgetHandler:RemoveAction(ACTION_PREV)
+	for _, default in ipairs(boundKeys) do
+		Spring.SendCommands("unbind " .. default[2] .. " " .. default[1])
+	end
+	boundKeys = {}
 	WG.CoilboxBlueprints = nil
 	dropGL()
 end
@@ -741,8 +804,6 @@ function widget:MouseWheel(up, value)
 end
 
 local KEY_ESCAPE = 27
-local KEY_LEFT_BRACKET = 91
-local KEY_RIGHT_BRACKET = 93
 
 function widget:KeyPress(key)
 	if not placing then
@@ -750,12 +811,6 @@ function widget:KeyPress(key)
 	end
 	if key == KEY_ESCAPE then
 		stopPlacing()
-		return true
-	elseif key == KEY_LEFT_BRACKET then
-		rotate(-1)
-		return true
-	elseif key == KEY_RIGHT_BRACKET then
-		rotate(1)
 		return true
 	end
 	return false

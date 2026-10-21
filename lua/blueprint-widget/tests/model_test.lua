@@ -244,6 +244,7 @@ end)())
 
 -- placing and the remainder are reported
 state.placing = { key = "library:eco", name = "Eco", rotation = 1 }
+state.keys = { left = { "[" }, right = { "]" } }
 state.remainder = { count = 3 }
 state.message = "Saved Base on Map 2"
 local LP = MODEL.layout(state, measure, VIEW)
@@ -267,7 +268,30 @@ check("the active row has a gold outline", (function()
 	end
 	return false
 end)())
-state.placing, state.remainder, state.message = nil, nil, nil
+state.placing, state.remainder, state.message, state.keys = nil, nil, nil, {}
+
+check("the hint names the keys bound to turning", MODEL.placingHint({ left = { "q", "[" }, right = { "e" } }) == "q e turn, right click cancels", MODEL.placingHint({ left = { "q" }, right = { "e" } }))
+check("with nothing bound to turning the hint leaves it out", MODEL.placingHint({}) == "right click cancels" and MODEL.placingHint({ left = {}, right = {} }) == "right click cancels")
+
+-- stepping through the blueprints with a key
+local stepping = MODEL.new()
+MODEL.refresh(stepping, ENTRIES, PLACE, game, CAN)
+check("a step forward with nothing placed picks the first", MODEL.step(stepping, 1) == "library:eco", MODEL.step(stepping, 1))
+check("a step back with nothing placed picks the last", MODEL.step(stepping, -1) == "bar:1", MODEL.step(stepping, -1))
+stepping.placing = { key = "library:eco" }
+check("a step forward goes to the next", MODEL.step(stepping, 1) == "spool:1", MODEL.step(stepping, 1))
+check("a step back from the first wraps to the last", MODEL.step(stepping, -1) == "bar:1", MODEL.step(stepping, -1))
+stepping.placing = { key = "bar:1" }
+check("a step forward from the last wraps to the first", MODEL.step(stepping, 1) == "library:eco")
+MODEL.setTab(stepping, "all")
+stepping.placing = { key = "library:mixed" }
+check("a step skips entries with nothing in this game", MODEL.step(MODEL.new(), 1) == nil and (function()
+	local only = MODEL.new()
+	MODEL.refresh(only, { { key = "library:gone", name = "Gone", source = "library", ordered = false, buildings = { b("corgant") } } }, PLACE, game, CAN)
+	only.tab = "all"
+	return MODEL.step(only, 1) == nil
+end)())
+check("a step follows the current tab", MODEL.step(stepping, 1) == "library:lab", MODEL.step(stepping, 1))
 
 -- empty tabs explain themselves
 local emptyState = MODEL.new()
@@ -395,6 +419,15 @@ MODEL.scroll(tall, -100)
 check("scroll clamps at the top", tall.scroll == 0)
 MODEL.scroll(tall, 1000)
 check("scroll clamps so the last row stays visible", hitsOf(MODEL.layout(tall, measure, VIEW), "place")[shown].action.key == "library:30", tall.scroll)
+MODEL.scroll(tall, -100)
+MODEL.reveal(tall, "library:20")
+local revealed = hitsOf(MODEL.layout(tall, measure, VIEW), "place")
+check("revealing an entry below the window scrolls it to the bottom line", revealed[#revealed].action.key == "library:20", tall.scroll)
+MODEL.reveal(tall, "library:2")
+check("revealing an entry above the window scrolls it to the top line", hitsOf(MODEL.layout(tall, measure, VIEW), "place")[1].action.key == "library:2", tall.scroll)
+local before = tall.scroll
+MODEL.reveal(tall, "library:3")
+check("revealing an entry already shown does not scroll", tall.scroll == before)
 check("a panel with few rows does not scroll", (function()
 	MODEL.scroll(state, 5)
 	return state.scroll == 0

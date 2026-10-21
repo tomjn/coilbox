@@ -11,7 +11,7 @@ Coilbox installs `luaui/` into the content root as `LuaUI/` when you press the b
 - each blueprint's layout drawn from above, with energy yellow, builders green and weapons red
 - three tabs: what the selected builders can build now, what they can build in part, and everything
 - pick a row or a tile and the layout follows the cursor as ghosts over marks in the same colours, striped with a dashed red rim where the ground refuses a building
-- `[` and `]` turn it, left click places it, right click or escape puts it down
+- `[` and `]` turn it, Shift+`[` and Shift+`]` step to the previous or next blueprint, left click places it, right click or escape puts it down
 - a partial placement leaves what nobody selected could build as a remainder, and the panel offers to place that with whatever is selected later
 - Save selection writes the selected buildings to a spool file that coilbox collects into the library next time it runs
 
@@ -53,11 +53,11 @@ The shader is `#version 130` with `GL_ARB_explicit_attrib_location`, the lowest 
 
 ## Other widgets and games
 
-`WG.CoilboxBlueprints` offers `open`, `close`, `toggle`, `list`, `place(key)`, `save` and `rotate(turns)` to a game's own interface.
+`WG.CoilboxBlueprints` offers `open`, `close`, `toggle`, `list`, `place(key)`, `save`, `rotate(turns)` and `step(direction)` to a game's own interface.
 
-Widget actions: `coilbox_blueprints`, `coilbox_blueprints_save`, `coilbox_blueprints_rotate_left`, `coilbox_blueprints_rotate_right`.
+Widget actions: `coilbox_blueprints`, `coilbox_blueprints_save`, `coilbox_blueprints_rotate_left`, `coilbox_blueprints_rotate_right`, `coilbox_blueprints_prev`, `coilbox_blueprints_next`.
 
-A game that binds `[` and `]` to its own actions, as BAR does for build facing, takes those keys before the widget sees them. The rotate actions are there for that case.
+When the widget loads it binds `[`, `]`, `Shift+[` and `Shift+]` to the turn and step actions, each only if nothing is bound to that action yet, and unbinds them when it shuts down. A key in `uikeys.txt`, or a `bind` typed in the console, replaces the default. The engine binds the same keys to `buildfacing`, so the turn and step actions take the key only while there is something to turn or the panel is open. The hint while placing names whichever keys are bound to turning. A game whose own widget handler takes `[` and `]` first, as BAR may, leaves the actions to be bound to other keys.
 
 ## Tests
 

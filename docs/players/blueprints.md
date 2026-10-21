@@ -91,7 +91,7 @@ The widget panel opens by itself the first time you start a match. If it never a
 2. Open the panel. Select the Blueprints button on the right of the screen, or type /coilbox_blueprints in the game's chat.
 3. Select one or more builders.
 4. Select a blueprint in the list. Its buildings follow the cursor. A building the ground will not take is marked with dark stripes and a dashed red outline.
-5. Press [ or ] to turn it.
+5. Press [ or ] to turn it. Shift+[ and Shift+] switch to the previous or next blueprint.
 6. Left click to place it.
 
 Each builder you selected is ordered to build the buildings it can. Right click or Escape puts the blueprint away without placing it. Hold Shift when you click to add the orders after what the builders are already doing, and to keep the blueprint on the cursor for another copy.
@@ -112,7 +112,14 @@ Under each name is where it came from, how many buildings it has and any buildin
 
 If your builders cannot build every building, the panel says how many are left to build. Select other builders, then select Place to build the rest, or Dismiss to drop them.
 
-Some games use [ and ] for their own keys, so those keys may not reach the widget. Bind keys to coilbox_blueprints_rotate_left and coilbox_blueprints_rotate_right instead.
+You can bind other keys. Type /bind followed by a key and an action in the game's chat, for example /bind q coilbox_blueprints_rotate_left, or add the same line without the slash to uikeys.txt. The actions are:
+
+- coilbox_blueprints opens and closes the panel
+- coilbox_blueprints_rotate_left and coilbox_blueprints_rotate_right turn the blueprint
+- coilbox_blueprints_prev and coilbox_blueprints_next switch blueprint
+- coilbox_blueprints_save saves the selection
+
+Some games use [ and ] for their own keys, so those keys may not reach the widget. Bind other keys to the actions in that case.
 
 ### Save a base from a game
 

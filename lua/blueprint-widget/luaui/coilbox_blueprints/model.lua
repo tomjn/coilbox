@@ -77,6 +77,8 @@ function M.new()
 		open = false,
 		tab = "now",
 		view = "list",
+		-- the keys bound to the widget's actions, by action, for the hints
+		keys = {},
 		scale = nil,
 		pos = nil,
 		scroll = 0,
@@ -170,6 +172,60 @@ function M.scroll(state, delta)
 		state.scroll = next
 		M.touch(state)
 	end
+end
+
+--- Scroll just far enough that an entry's line is in the window.
+function M.reveal(state, key)
+	for i, item in ipairs(M.visible(state)) do
+		if item.entry.key == key then
+			local line = math.ceil(i / (state.perLine or 1)) - 1
+			local shown = state.rowsShown or M.MAX_ROWS
+			if line < state.scroll then
+				M.scroll(state, line - state.scroll)
+			elseif line >= state.scroll + shown then
+				M.scroll(state, line - shown + 1 - state.scroll)
+			end
+			return
+		end
+	end
+end
+
+--- The entry a step away from the one being placed, among those under the
+-- current tab that have something to place, wrapping at either end. With
+-- nothing being placed, a step forward is the first and back the last.
+-- @param step integer 1 or -1
+-- @return string? the entry's key, nil when there is nothing to step to
+function M.step(state, step)
+	local keys = {}
+	for _, item in ipairs(M.visible(state)) do
+		if #item.resolved.buildings > 0 then
+			keys[#keys + 1] = item.entry.key
+		end
+	end
+	if #keys == 0 then
+		return nil
+	end
+	local at = step > 0 and 0 or #keys + 1
+	for i, key in ipairs(keys) do
+		if state.placing and state.placing.key == key then
+			at = i
+		end
+	end
+	return keys[(at + step - 1) % #keys + 1]
+end
+
+--- The hint while placing, naming whichever keys turn a layout.
+function M.placingHint(keys)
+	local turn = {}
+	for _, list in ipairs({ keys.left or {}, keys.right or {} }) do
+		if list[1] then
+			turn[#turn + 1] = list[1]
+		end
+	end
+	if #turn == 0 then
+		return "right click cancels"
+	end
+	return table.concat(turn, " ") .. " turn, right click cancels"
 end
 
 --- Switch tab and reset the scroll.
@@ -572,7 +628,7 @@ function M.layout(state, measure, view)
 	if state.placing then
 		y = y - LINE
 		local cancelW = buttonW("Cancel")
-		text(px + PAD, y + LINE / 2, SMALL, M.truncate("[ ] turn, right click cancels", W - 3 * PAD - cancelW, measure, SMALL), C.warn)
+		text(px + PAD, y + LINE / 2, SMALL, M.truncate(M.placingHint(state.keys), W - 3 * PAD - cancelW, measure, SMALL), C.warn)
 		button(px + W - PAD - cancelW, y + (LINE - PILL) / 2, "Cancel", { kind = "cancel" })
 	end
 
