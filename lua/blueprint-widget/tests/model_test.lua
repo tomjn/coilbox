@@ -365,12 +365,17 @@ check("the builders mode switches, and an unknown one is ignored", assisting.ass
 -- a layout with another side's buildings
 local sided = MODEL.new()
 local reachNone = {}
-MODEL.refresh(sided, ENTRIES, PLACE, game, CAN, reachNone)
+MODEL.refresh(sided, ENTRIES, PLACE, game, CAN, { reach = reachNone })
 check("with a reach given, a layout outside it goes under no tab but All", sided.counts.now == 0 and sided.counts.partly == 0 and sided.counts.all > 0, show(sided.counts))
 sided.tab = "all"
 sided.open = true
 check("a row says how many buildings are from another side", #textsWith(MODEL.layout(sided, measure, VIEW), "from another side") > 0)
 check("stepping skips layouts from another side", MODEL.step(sided, 1) == nil)
+
+local upgrading = MODEL.new()
+MODEL.refresh(upgrading, ENTRIES, PLACE, game, CAN, { standIns = { [1] = 2 } })
+upgrading.tab, upgrading.open = "all", true
+check("a row says how many buildings start a tier lower, to upgrade", #textsWith(MODEL.layout(upgrading, measure, VIEW), "to upgrade") > 0)
 
 -- stepping through the blueprints with a key
 local stepping = MODEL.new()

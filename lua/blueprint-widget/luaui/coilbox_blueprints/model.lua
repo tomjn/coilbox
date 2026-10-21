@@ -136,18 +136,22 @@ end
 -- @param place table the place module, for resolve and classify
 -- @param game table Game
 -- @param can table from place.capabilities
--- @param reach table? from place.reach, what the team can ever build. A
---   layout with anything outside it is for another side and goes under no
---   tab but All.
-function M.refresh(state, entries, place, game, can, reach)
+-- @param side table? { reach, standIns }: what the team can ever build,
+--   from place.reach, and what to build in place of what it only gets by
+--   morphing, from place.standIns. A layout with anything outside reach is
+--   for another side and goes under no tab but All.
+function M.refresh(state, entries, place, game, can, side)
+	local reach, standIns = side and side.reach, side and side.standIns
 	local items = {}
 	local counts = { now = 0, partly = 0, all = 0 }
 	for _, entry in ipairs(entries) do
 		if M.forGame(entry, game) then
 			local resolved = place.resolve(entry)
 			local foreign = place.foreign(resolved, reach)
+			local upgrades
+			resolved, upgrades = place.substitute(resolved, standIns)
 			local tab = foreign > 0 and "never" or place.classify(resolved, can)
-			local item = { entry = entry, resolved = resolved, tab = tab, foreign = foreign }
+			local item = { entry = entry, resolved = resolved, tab = tab, foreign = foreign, upgrades = upgrades }
 			item.name = M.displayName(item)
 			items[#items + 1] = item
 			counts.all = counts.all + 1
@@ -372,9 +376,13 @@ end
 --- The one line that says what a row is.
 local function rowDetail(item)
 	local parts = {}
-	-- first, so a narrow row never cuts it off
+	-- what stops or changes placing goes first, so a narrow row never cuts
+	-- it off
 	if (item.foreign or 0) > 0 then
 		parts[1] = item.foreign .. " from another side"
+	end
+	if (item.upgrades or 0) > 0 then
+		parts[#parts + 1] = item.upgrades .. " to upgrade"
 	end
 	parts[#parts + 1] = SOURCE_TAGS[item.entry.source] or item.entry.source
 	local n = #item.entry.buildings

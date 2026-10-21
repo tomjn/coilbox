@@ -279,6 +279,23 @@ local mixed = { buildings = { { defID = 33 }, { defID = 36 }, { defID = 37 } } }
 check("foreign counts the buildings the team can never build", PLACE.foreign(mixed, reach) == 2)
 check("with no reach known nothing is foreign", PLACE.foreign(mixed, nil) == 0)
 
+local F1 = support.def(40, "f1landfac", { isBuilding = true, xsize = 12, zsize = 12 })
+local F2 = support.def(41, "f2landfac", { isBuilding = true, xsize = 12, zsize = 12 })
+local F3 = support.def(42, "f3landfac", { isBuilding = true, xsize = 12, zsize = 12 })
+local BUILDER = support.def(43, "builder", { buildOptions = { 40 } })
+local tiers = support.engine({ F1, F2, F3, BUILDER })
+PLACE.use(tiers)
+local tierMorphs = PLACE.morphTargets({ { f1landfac = { into = "f2landfac" }, f2landfac = { { into = "f3landfac" } } } })
+local tierReach = PLACE.reach({ 43 }, tierMorphs)
+local stand = PLACE.standIns(tierReach, tierMorphs)
+check("a def reached only by morphing stands in as the first buildable def back along the chain", stand[41] == 40 and stand[42] == 40, show(stand))
+check("a buildable def has no stand-in", stand[40] == nil and stand[43] == nil)
+local tierLayout = PLACE.resolve({ buildings = { { def = "f2landfac", offset = { x = 0, z = 0 }, facing = 1 }, { def = "f1landfac", offset = { x = 200, z = 0 }, facing = 0 } } })
+local swapped, n = PLACE.substitute(tierLayout, stand)
+check("substitute swaps in the stand-in and keeps the place and facing", n == 1 and swapped.buildings[1].defID == 40 and swapped.buildings[1].facing == 1 and swapped.buildings[1].offset.x == 0, show(swapped.buildings[1]))
+check("a swapped building remembers what it becomes", swapped.buildings[1].upgradesTo == F2 and swapped.buildings[2].upgradesTo == nil)
+check("with no stand-ins nothing is swapped", select(2, PLACE.substitute(tierLayout, nil)) == 0)
+
 -- the map's edge
 local edged = support.engine({ SOLAR })
 edged.Game.mapSizeX, edged.Game.mapSizeZ = 512, 512

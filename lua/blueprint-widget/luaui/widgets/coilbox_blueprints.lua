@@ -365,11 +365,11 @@ local readCost
 -- What morphs into what, read once, and what the team can ever build, read
 -- again when the kinds of unit it has change.
 local morphs = nil
-local reach, reachKey = nil, nil
+local side, reachKey = nil, nil
 
 local function readReach()
 	if Spring.GetSpectatingState() then
-		reach, reachKey = nil, nil
+		side, reachKey = nil, nil
 		return
 	end
 	if not morphs then
@@ -395,13 +395,17 @@ local function readReach()
 	if key ~= reachKey then
 		reachKey = key
 		-- before the team has a unit there is nothing to tell sides apart by
-		reach = #ids > 0 and PLACE.reach(ids, morphs) or nil
+		side = nil
+		if #ids > 0 then
+			local reach = PLACE.reach(ids, morphs)
+			side = { reach = reach, standIns = PLACE.standIns(reach, morphs) }
+		end
 	end
 end
 
 local function refreshPanel()
 	readReach()
-	MODEL.refresh(panel, store:entries(), PLACE, Game, can, reach)
+	MODEL.refresh(panel, store:entries(), PLACE, Game, can, side)
 	readCost()
 	MODEL.touch(panel)
 end

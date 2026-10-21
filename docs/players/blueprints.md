@@ -111,6 +111,8 @@ A building that would sit partly off the map is marked like one the ground will 
 
 You can only pick up a blueprint your side can build. A blueprint with another side's buildings, such as one recorded by a player on the other faction, shows how many in its row and stays under the All tab.
 
+A building your side only gets by upgrading another, such as a Tech 2 factory that starts as a Tech 1 factory, is placed as the building it starts from. The row says how many buildings you then need to upgrade.
+
 ### Plan a base ahead
 
 You can place a blueprint with no builders selected. It stays on the map as a plan, drawn the way it looked while you placed it, and only you can see it. Place as many as you like. When you have the builders, select them and point at a plan. The building under the cursor gets a white outline, and the cursor shows whether they can build it. A building they cannot build is crossed out. Right click to build that building. Hold Shift to outline the whole plan, and right click to build all of it after whatever the builders are already doing. Right click a plan with nothing selected to remove it.

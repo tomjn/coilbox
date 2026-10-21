@@ -315,6 +315,69 @@ function M.capabilities(unitIDs)
 	return out
 end
 
+--- What to build in place of a def the team only gets by morphing, such as
+-- a tech 2 factory that is a tech 1 factory upgraded: the first def back
+-- along the morph chain that something the team has, or can build, builds.
+-- @param reach table from M.reach
+-- @param morphs table from M.morphTargets
+-- @return table defID -> the defID to build instead
+function M.standIns(reach, morphs)
+	local buildable = {}
+	for id in pairs(reach) do
+		local def = UnitDefs[id]
+		for _, option in ipairs(def and def.buildOptions or {}) do
+			buildable[option] = true
+		end
+	end
+	local from = {}
+	for source, targets in pairs(morphs) do
+		for _, target in ipairs(targets) do
+			from[target] = from[target] or {}
+			table.insert(from[target], source)
+		end
+	end
+	local out = {}
+	for id in pairs(reach) do
+		if not buildable[id] and from[id] then
+			local seen, queue, i = { [id] = true }, { id }, 1
+			while queue[i] and not out[id] do
+				for _, source in ipairs(from[queue[i]] or {}) do
+					if buildable[source] then
+						out[id] = source
+						break
+					elseif not seen[source] then
+						seen[source] = true
+						queue[#queue + 1] = source
+					end
+				end
+				i = i + 1
+			end
+		end
+	end
+	return out
+end
+
+--- A resolved layout with each building the team only gets by morphing
+-- swapped for its stand-in, which keeps the place and facing. Each swapped
+-- building keeps the def it becomes as upgradesTo.
+-- @return table resolved, integer how many were swapped
+function M.substitute(resolved, standIns)
+	if not standIns then
+		return resolved, 0
+	end
+	local out, n = { buildings = {}, missing = resolved.missing }, 0
+	for i, b in ipairs(resolved.buildings) do
+		local source = standIns[b.defID]
+		if source then
+			n = n + 1
+			out.buildings[i] = { defID = source, def = UnitDefs[source], offset = b.offset, facing = b.facing, upgradesTo = b.def }
+		else
+			out.buildings[i] = b
+		end
+	end
+	return out, n
+end
+
 --- How many of a layout's buildings the team can never build, from
 -- M.reach. Nil reach, as for a spectator or before the team has units,
 -- counts none.
