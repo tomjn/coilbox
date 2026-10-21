@@ -6,6 +6,7 @@
  */
 
 import { t } from "@lingui/core/macro";
+import { Trans } from "@lingui/react/macro";
 import {
   Dialog,
   DialogContent,
@@ -21,6 +22,13 @@ import {
 
 const GROUP_ORDER: ShortcutGroup[] = ["Transform", "View", "Edit", "Help"];
 
+function groupLabel(group: ShortcutGroup): string {
+  if (group === "Transform") return t`Transform`;
+  if (group === "View") return t`View`;
+  if (group === "Edit") return t`Edit`;
+  return t`Help`;
+}
+
 export function ShortcutSheet({
   open,
   onOpenChange,
@@ -34,13 +42,15 @@ export function ShortcutSheet({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-md" closeLabel={t`Close`}>
         <DialogHeader>
-          <DialogTitle>Keyboard shortcuts</DialogTitle>
+          <DialogTitle>
+            <Trans>Keyboard shortcuts</Trans>
+          </DialogTitle>
         </DialogHeader>
         <div className="flex flex-col gap-4">
           {GROUP_ORDER.map((group) => (
             <div key={group}>
               <h3 className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                {group}
+                {groupLabel(group)}
               </h3>
               <ul className="mt-1 flex flex-col gap-1">
                 {SHORTCUTS.filter((shortcut) => shortcut.group === group).map(

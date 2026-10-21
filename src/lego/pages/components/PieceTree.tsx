@@ -10,6 +10,7 @@
  * in the panel below the tree does the same move from the keyboard.
  */
 
+import { useLingui } from "@lingui/react/macro";
 import { Button } from "@picoframe/frame";
 import {
   Box,
@@ -85,6 +86,7 @@ export function PieceTree({
   onToggleCollapsed,
   joins,
 }: Props) {
+  const { t } = useLingui();
   const [drag, setDrag] = useState<Drag | null>(null);
   const pressed = useRef<{ pieceId: string; x: number; y: number } | null>(
     null,
@@ -135,6 +137,8 @@ export function PieceTree({
 
   const carried = drag ? pieceById(project, drag.pieceId) : undefined;
   const onto = drag?.over ? pieceById(project, drag.over) : undefined;
+  const carriedName = carried?.name ?? "";
+  const ontoName = onto?.name ?? "";
 
   return (
     <div
@@ -165,7 +169,7 @@ export function PieceTree({
           className="pointer-events-none fixed z-50 rounded border border-border bg-popover px-2 py-1 text-xs shadow-md"
           style={{ left: drag.x + 12, top: drag.y + 12 }}
         >
-          {onto ? `${carried.name} onto ${onto.name}` : carried.name}
+          {onto ? t`${carriedName} onto ${ontoName}` : carried.name}
         </span>
       ) : null}
     </div>
@@ -209,6 +213,7 @@ function Rows({
   joins?: ReadonlyMap<string, JoinSummary>;
   depth?: number;
 }) {
+  const { t } = useLingui();
   const siblings = childrenOf(project, parentId);
 
   return (
@@ -223,6 +228,10 @@ function Rows({
         const hasChildren = childrenOf(project, piece.id).length > 0;
         const collapsed = hasChildren && collapsedIds.has(piece.id);
         const join = joins?.get(piece.id);
+        const pieceName = piece.name;
+        const parentName = join?.parentName ?? "";
+        const connectorName = join?.connectorName ?? "";
+        const toName = join?.toName ?? "";
         return (
           <li
             key={piece.id}
@@ -260,8 +269,8 @@ function Rows({
                   aria-expanded={!collapsed}
                   aria-label={
                     collapsed
-                      ? `Expand ${piece.name}`
-                      : `Collapse ${piece.name}`
+                      ? t`Expand ${pieceName}`
+                      : t`Collapse ${pieceName}`
                   }
                   className="ml-2 flex h-6 w-4 shrink-0 items-center justify-center text-muted-foreground hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                 >
@@ -295,13 +304,13 @@ function Rows({
                   role="img"
                   aria-label={
                     pieceKind(piece, raw) === "geometry"
-                      ? "Geometry piece"
-                      : "Empty piece"
+                      ? t`Geometry piece`
+                      : t`Empty piece`
                   }
                   title={
                     pieceKind(piece, raw) === "geometry"
-                      ? "Has geometry"
-                      : "Empty piece: a hierarchy node, flare, aim point or emitter"
+                      ? t`Has geometry`
+                      : t`Empty piece: a hierarchy node, flare, aim point or emitter`
                   }
                 >
                   {pieceKind(piece, raw) === "geometry" ? (
@@ -313,14 +322,16 @@ function Rows({
                 <span className="truncate">{piece.name}</span>
                 {piece.mountPoints?.length ? (
                   <span
-                    title="Mount points"
+                    title={t`Mount points`}
                     className="min-w-0 truncate text-[10px] text-orange-500"
                   >
                     {mountContents(project, piece)
-                      .map(
-                        ({ mount, onIt }) =>
-                          `${mount.name}: ${onIt ?? "empty"}`,
-                      )
+                      .map(({ mount, onIt }) => {
+                        const mountName = mount.name;
+                        return onIt === null
+                          ? t`${mountName}: empty`
+                          : t`${mountName}: ${onIt}`;
+                      })
                       .join(", ")}
                   </span>
                 ) : null}
@@ -329,13 +340,13 @@ function Rows({
                     role="img"
                     aria-label={
                       join.broken
-                        ? `Broken join to ${join.parentName}`
-                        : `Joined to ${join.parentName}`
+                        ? t`Broken join to ${parentName}`
+                        : t`Joined to ${parentName}`
                     }
                     title={
                       join.broken
-                        ? `Broken join to ${join.parentName}`
-                        : `Joined to ${join.parentName}: its ${join.connectorName} to the ${join.toName}`
+                        ? t`Broken join to ${parentName}`
+                        : t`Joined to ${parentName}: its ${connectorName} to the ${toName}`
                     }
                     className={`shrink-0 ${
                       join.broken ? "text-destructive" : "text-muted-foreground"
@@ -358,10 +369,12 @@ function Rows({
                 }`}
                 onClick={() => onToggleHidden(piece.id)}
                 aria-label={
-                  piece.hidden ? `Show ${piece.name}` : `Hide ${piece.name}`
+                  piece.hidden ? t`Show ${pieceName}` : t`Hide ${pieceName}`
                 }
                 title={
-                  piece.hidden ? "Show in the viewport" : "Hide in the viewport"
+                  piece.hidden
+                    ? t`Show in the viewport`
+                    : t`Hide in the viewport`
                 }
               >
                 {piece.hidden ? <EyeOff size={14} /> : <Eye size={14} />}
