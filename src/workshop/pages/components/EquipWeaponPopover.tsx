@@ -8,6 +8,8 @@
  * shared: the copy goes into the library under a name of its own and this
  * slot fires it, and nothing else in the game changes.
  */
+import { plural } from "@lingui/core/macro";
+import { Trans, useLingui } from "@lingui/react/macro";
 import { Button, Input } from "@picoframe/frame";
 import { Copy, Crosshair } from "lucide-react";
 import { useState } from "react";
@@ -71,6 +73,7 @@ export function EquipWeaponPopover({
   onCopy: (key: string) => void;
   onEquip: (key: string) => void;
 }) {
+  const { t } = useLingui();
   const [open, setOpen] = useState(false);
   const [name, setName] = useState("");
 
@@ -81,6 +84,7 @@ export function EquipWeaponPopover({
   };
 
   const check = checkWeaponName(name, library);
+  const takenName = check.key;
   const blocked = check.ok ? refusal(check.key) : undefined;
   const choices = Object.values(library)
     .filter((weapon) => weapon.key !== equippedHere)
@@ -112,18 +116,20 @@ export function EquipWeaponPopover({
             <div className="flex flex-col gap-1">
               <h3 className="text-sm font-medium">
                 {shared
-                  ? `Give ${unitName} its own copy`
-                  : "Copy this weapon into the library"}
+                  ? t`Give ${unitName} its own copy`
+                  : t`Copy this weapon into the library`}
               </h3>
               <p className="text-xs text-muted-foreground">
-                Copies <span className="font-mono">{copySource}</span> as it
-                stands into the project's weapon library, and {usesCopy}.
-                Changing the copy changes no other unit.
+                <Trans>
+                  Copies <span className="font-mono">{copySource}</span> as it
+                  stands into the project's weapon library, and {usesCopy}.
+                  Changing the copy changes no other unit.
+                </Trans>
               </p>
             </div>
             <Field
-              label="Weapon name"
-              hint="Lowercase letters, numbers and underscores."
+              label={t`Weapon name`}
+              hint={t`Lowercase letters, numbers and underscores.`}
             >
               <Input
                 value={name}
@@ -136,16 +142,16 @@ export function EquipWeaponPopover({
             {!check.ok && (
               <p className="text-xs text-muted-foreground">
                 {check.verdict === "empty"
-                  ? "Give the copy a name."
+                  ? t`Give the copy a name.`
                   : check.verdict === "invalid"
-                    ? "A weapon name can only use lowercase letters, numbers and underscores."
-                    : `The library already has a weapon called ${check.key}. Equip that one below, or pick another name.`}
+                    ? t`A weapon name can only use lowercase letters, numbers and underscores.`
+                    : t`The library already has a weapon called ${takenName}. Equip that one below, or pick another name.`}
               </p>
             )}
             {blocked && <p className="text-xs text-destructive">{blocked}</p>}
             <div className="flex justify-end">
               <Button type="submit" size="sm" disabled={!check.ok || !!blocked}>
-                Copy and equip
+                <Trans>Copy and equip</Trans>
               </Button>
             </div>
           </form>
@@ -154,20 +160,25 @@ export function EquipWeaponPopover({
         <section className="flex flex-col gap-2">
           <h3 className="text-sm font-medium">
             {copySource
-              ? "Or equip one from the library"
-              : "Equip one from the library"}
+              ? t`Or equip one from the library`
+              : t`Equip one from the library`}
           </h3>
           {choices.length === 0 ? (
             <p className="text-xs text-muted-foreground">
               {Object.keys(library).length === 0
-                ? "The project's weapon library is empty. Add weapons from the Weapons button at the top of the page."
-                : "The library holds no other weapon."}
+                ? t`The project's weapon library is empty. Add weapons from the Weapons button at the top of the page.`
+                : t`The library holds no other weapon.`}
             </p>
           ) : (
             <ul className="flex max-h-60 flex-col gap-1 overflow-y-auto">
               {choices.map((weapon) => {
                 const why = refusal(weapon.key);
                 const fired = mounts(weapon.key);
+                const source = weapon.source;
+                const places = plural(fired, {
+                  one: "# place",
+                  other: "# places",
+                });
                 return (
                   <li key={weapon.key}>
                     <Button
@@ -185,7 +196,9 @@ export function EquipWeaponPopover({
                       <span className="font-mono text-xs">{weapon.key}</span>
                       <span className="text-xs font-normal text-muted-foreground">
                         {why ??
-                          `Copied from ${weapon.source}${fired > 0 ? `, equipped in ${fired} place${fired === 1 ? "" : "s"}` : ""}`}
+                          (fired > 0
+                            ? t`Copied from ${source}, equipped in ${places}`
+                            : t`Copied from ${source}`)}
                       </span>
                     </Button>
                   </li>

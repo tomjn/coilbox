@@ -39,6 +39,8 @@
  * `weapons/`, which is what puts it in the game's weapon table for a game
  * whose own post files never add a unit's weapons there (issue #3068).
  */
+import { plural } from "@lingui/core/macro";
+import { Trans, useLingui } from "@lingui/react/macro";
 import { Button } from "@picoframe/frame";
 import { useCallback, useEffect, useState } from "react";
 import {
@@ -79,10 +81,6 @@ function message(e: unknown): string {
   return describeError(e);
 }
 
-function plural(n: number, word: string): string {
-  return `${n} ${word}${n === 1 ? "" : "s"}`;
-}
-
 export function InPlaceWrite({
   gameDir,
   project,
@@ -100,6 +98,7 @@ export function InPlaceWrite({
   /** Called after write, undo or accept went through, with what it did. */
   onDone: (done: InPlaceDone) => void;
 }) {
+  const { t } = useLingui();
   const [status, setStatus] = useState<InPlaceStatus | null>(null);
   const [busy, setBusy] = useState<Busy>(null);
   const [outcome, setOutcome] = useState<InPlaceWriteOutcome | null>(null);
@@ -119,9 +118,9 @@ export function InPlaceWrite({
     try {
       setStatus(await workshopInPlaceStatus({ gameDir }));
     } catch (e) {
-      setError(`Could not count the backups: ${message(e)}`);
+      setError(t`Could not count the backups: ${message(e)}`);
     }
-  }, [gameDir]);
+  }, [gameDir, t]);
 
   useEffect(() => {
     void refresh();
@@ -176,13 +175,19 @@ export function InPlaceWrite({
         const undone = await workshopUndoInPlace({ gameDir });
         const count = undone.restored.length + undone.deleted.length;
         setDone(
-          `Put ${plural(count, "file")} back as ${count === 1 ? "it was" : "they were"}.`,
+          plural(count, {
+            one: "Put # file back as it was.",
+            other: "Put # files back as they were.",
+          }),
         );
         onDone({ kind: "undo", changed: count > 0 });
       } else if (kind === "accept") {
         const accepted = await workshopAcceptInPlace({ gameDir });
         setDone(
-          `Kept the changes to ${plural(accepted.kept.length, "file")} and deleted the backups.`,
+          plural(accepted.kept.length, {
+            one: "Kept the changes to # file and deleted the backups.",
+            other: "Kept the changes to # files and deleted the backups.",
+          }),
         );
         onDone({ kind: "accept", changed: accepted.kept.length > 0 });
       }
@@ -233,10 +238,10 @@ export function InPlaceWrite({
           onClick={() => void run("write")}
         >
           {busy === "settling"
-            ? "Checking typed values against the game"
+            ? t`Checking typed values against the game`
             : busy === "write"
-              ? "Writing…"
-              : "Write changes into the game"}
+              ? t`Writing…`
+              : t`Write changes into the game`}
         </Button>
         {pending > 0 && (
           <>
@@ -246,7 +251,7 @@ export function InPlaceWrite({
               disabled={busy !== null || reading}
               onClick={() => setReviewing(true)}
             >
-              Review the disk diff
+              <Trans>Review the disk diff</Trans>
             </Button>
             <Button
               size="sm"
@@ -254,7 +259,7 @@ export function InPlaceWrite({
               disabled={busy !== null || reading}
               onClick={() => void run("undo")}
             >
-              {busy === "undo" ? "Undoing…" : "Undo"}
+              {busy === "undo" ? t`Undoing…` : t`Undo`}
             </Button>
             <Popover open={confirmAccept} onOpenChange={setConfirmAccept}>
               <PopoverTrigger asChild>
@@ -263,7 +268,7 @@ export function InPlaceWrite({
                   variant="outline"
                   disabled={busy !== null || reading}
                 >
-                  {busy === "accept" ? "Accepting…" : "Accept"}
+                  {busy === "accept" ? t`Accepting…` : t`Accept`}
                 </Button>
               </PopoverTrigger>
               <PopoverContent
@@ -271,11 +276,15 @@ export function InPlaceWrite({
                 className="flex w-80 flex-col gap-3"
               >
                 <div className="flex flex-col gap-1">
-                  <h3 className="text-sm font-medium">Keep the changes?</h3>
+                  <h3 className="text-sm font-medium">
+                    <Trans>Keep the changes?</Trans>
+                  </h3>
                   <p className="text-xs text-muted-foreground">
-                    This deletes the originals coilbox kept of{" "}
-                    {plural(pending, "file")}. After that, undo is not possible
-                    here, only through your own copy or version control.
+                    {plural(pending, {
+                      one: "This deletes the original coilbox kept of # file. After that, undo is not possible here, only through your own copy or version control.",
+                      other:
+                        "This deletes the originals coilbox kept of # files. After that, undo is not possible here, only through your own copy or version control.",
+                    })}
                   </p>
                 </div>
                 <div className="flex justify-end gap-2">
@@ -285,7 +294,7 @@ export function InPlaceWrite({
                     size="sm"
                     onClick={() => setConfirmAccept(false)}
                   >
-                    Cancel
+                    <Trans>Cancel</Trans>
                   </Button>
                   <Button
                     type="button"
@@ -295,7 +304,7 @@ export function InPlaceWrite({
                       void run("accept");
                     }}
                   >
-                    Accept
+                    <Trans>Accept</Trans>
                   </Button>
                 </div>
               </PopoverContent>
@@ -305,25 +314,25 @@ export function InPlaceWrite({
       </div>
       <p className="text-muted-foreground text-xs">
         {!project
-          ? "Open a project to write its changes into the game."
+          ? t`Open a project to write its changes into the game.`
           : !hasWork
             ? routed.length > 0 || routedClones.length > 0
-              ? "Every field change and copy in this project goes through the mutator route, so there is nothing to write in place."
-              : "This project has no field changes, copies or equipped weapons to write."
+              ? t`Every field change and copy in this project goes through the mutator route, so there is nothing to write in place.`
+              : t`This project has no field changes, copies or equipped weapons to write.`
             : copies.length > 0
-              ? "Each field change and equipped weapon is written into its unit's own file, and each copy into a new file beside the unit it was copied from. Each equipped weapon also gets a file of its own under weapons/. Coilbox keeps the original of every file it changes, and marks every file it adds, until you undo or accept."
+              ? t`Each field change and equipped weapon is written into its unit's own file, and each copy into a new file beside the unit it was copied from. Each equipped weapon also gets a file of its own under weapons/. Coilbox keeps the original of every file it changes, and marks every file it adds, until you undo or accept.`
               : equips
-                ? "Each field change and equipped weapon is written into its unit's own file, and each equipped weapon also gets a file of its own under weapons/. Coilbox keeps the original of every file it changes, and marks every file it adds, until you undo or accept."
-                : "Each field change is written into its unit's own file. Coilbox keeps the original of every file it changes until you undo or accept."}
+                ? t`Each field change and equipped weapon is written into its unit's own file, and each equipped weapon also gets a file of its own under weapons/. Coilbox keeps the original of every file it changes, and marks every file it adds, until you undo or accept.`
+                : t`Each field change is written into its unit's own file. Coilbox keeps the original of every file it changes until you undo or accept.`}
       </p>
       {routed.length > 0 && (
         <div className="flex flex-col gap-1 rounded-md border border-amber-500/40 bg-amber-500/10 p-2 text-xs">
           <span>
-            {plural(routed.length, "change")} cannot be written into the game's
-            files, so you sent {routed.length === 1 ? "it" : "them"} to the
-            mutator route. Writing in place skips{" "}
-            {routed.length === 1 ? "it" : "them"}, and you still need a mutator
-            for {routed.length === 1 ? "it" : "them"}:
+            {plural(routed.length, {
+              one: "# change cannot be written into the game's files, so you sent it to the mutator route. Writing in place skips it, and you still need a mutator for it:",
+              other:
+                "# changes cannot be written into the game's files, so you sent them to the mutator route. Writing in place skips them, and you still need a mutator for them:",
+            })}
           </span>
           <ul className="flex list-disc flex-col gap-0.5 pl-4 font-mono text-[11px]">
             {routed.map((c) => (
@@ -337,12 +346,11 @@ export function InPlaceWrite({
       {routedClones.length > 0 && (
         <div className="flex flex-col gap-1 rounded-md border border-amber-500/40 bg-amber-500/10 p-2 text-xs">
           <span>
-            {routedClones.length} cop{routedClones.length === 1 ? "y" : "ies"}{" "}
-            cannot be written into the game's files, so you sent{" "}
-            {routedClones.length === 1 ? "it" : "them"} to the mutator route
-            whole. Writing in place skips{" "}
-            {routedClones.length === 1 ? "it" : "them"}, and you still need a
-            mutator for {routedClones.length === 1 ? "it" : "them"}:
+            {plural(routedClones.length, {
+              one: "# copy cannot be written into the game's files, so you sent it to the mutator route whole. Writing in place skips it, and you still need a mutator for it:",
+              other:
+                "# copies cannot be written into the game's files, so you sent them to the mutator route whole. Writing in place skips them, and you still need a mutator for them:",
+            })}
           </span>
           <ul className="flex list-disc flex-col gap-0.5 pl-4 font-mono text-[11px]">
             {routedClones.map((c) => (
@@ -353,9 +361,11 @@ export function InPlaceWrite({
       )}
       {pending > 0 && (
         <p className="text-xs">
-          {plural(pending, "file")} in this game{" "}
-          {pending === 1 ? "has" : "have"} a change from coilbox that can still
-          be undone.
+          {plural(pending, {
+            one: "# file in this game has a change from coilbox that can still be undone.",
+            other:
+              "# files in this game have a change from coilbox that can still be undone.",
+          })}
         </p>
       )}
       {error && <p className="text-destructive text-xs">{error}</p>}
@@ -379,15 +389,20 @@ export function InPlaceWrite({
 }
 
 function WriteResult({ outcome }: { outcome: InPlaceWriteOutcome }) {
+  const { t } = useLingui();
   const copyFiles = new Set(outcome.copies.map((c) => c.file));
   const patched = outcome.written.filter((file) => !copyFiles.has(file));
+  const files = patched.join(", ");
   return (
     <div className="flex flex-col gap-1.5 text-xs">
       {outcome.refused.length > 0 ? (
         <div className="flex flex-col gap-1 rounded-md border border-destructive/40 bg-destructive/10 p-2 text-destructive">
           <span>
-            Nothing was written. {plural(outcome.refused.length, "change")}{" "}
-            cannot be written into the game's files:
+            {plural(outcome.refused.length, {
+              one: "Nothing was written. # change cannot be written into the game's files:",
+              other:
+                "Nothing was written. # changes cannot be written into the game's files:",
+            })}
           </span>
           <ul className="flex list-disc flex-col gap-1 pl-4">
             {outcome.refused.map((r) => (
@@ -399,32 +414,32 @@ function WriteResult({ outcome }: { outcome: InPlaceWriteOutcome }) {
         <>
           {outcome.changed > 0 && (
             <span>
-              Wrote {plural(outcome.changed, "change")} into{" "}
-              {patched.join(", ")}.
+              {plural(outcome.changed, {
+                one: `Wrote # change into ${files}.`,
+                other: `Wrote # changes into ${files}.`,
+              })}
             </span>
           )}
           {outcome.copies.map((copy) => (
             <span key={copy.unit}>
-              Added {copy.unit} as {copy.file}
               {copy.builders.length > 0
-                ? `, and to the build menu of ${copy.builders.join(", ")}`
-                : ""}
-              .
+                ? t`Added ${{ unit: copy.unit }} as ${{ file: copy.file }}, and to the build menu of ${{ builders: copy.builders.join(", ") }}.`
+                : t`Added ${{ unit: copy.unit }} as ${{ file: copy.file }}.`}
             </span>
           ))}
           {outcome.equipped.map((e) => (
             <span key={`${e.unit}:${e.at}`}>
-              Equipped {e.weapon}{" "}
               {isDeathMount(e.at)
-                ? `as ${e.unit}'s ${e.at}`
-                : `in ${e.unit}'s weapon slot ${e.at}`}
-              , in {e.file}.
+                ? t`Equipped ${{ weapon: e.weapon }} as ${{ unit: e.unit }}'s ${{ slot: e.at }}, in ${{ file: e.file }}.`
+                : t`Equipped ${{ weapon: e.weapon }} in ${{ unit: e.unit }}'s weapon slot ${{ slot: e.at }}, in ${{ file: e.file }}.`}
             </span>
           ))}
         </>
       ) : (
         <span>
-          The game's files already hold every change, so nothing was written.
+          <Trans>
+            The game's files already hold every change, so nothing was written.
+          </Trans>
         </span>
       )}
       {outcome.notCarried.map((line) => (

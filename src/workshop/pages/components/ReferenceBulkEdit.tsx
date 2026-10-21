@@ -16,6 +16,8 @@
  * `applyFollowBatchRows`. "Set to" always writes a fixed number, and so does
  * Range, which has no rule of its own yet (see `rangeEdit.ts`).
  */
+import { msg, plural } from "@lingui/core/macro";
+import { Trans, useLingui } from "@lingui/react/macro";
 import { Button, Input } from "@picoframe/frame";
 import { Sigma } from "lucide-react";
 import { useState } from "react";
@@ -46,17 +48,17 @@ const SHOWN_ROWS = 300;
 
 type OperationKind = "percent" | "offset" | "set";
 
-const OPERATION_KINDS: { value: OperationKind; label: string }[] = [
-  { value: "percent", label: "Change by %" },
-  { value: "offset", label: "Add" },
-  { value: "set", label: "Set to" },
-];
+const OPERATION_KINDS = [
+  { value: "percent", label: msg`Change by %` },
+  { value: "offset", label: msg`Add` },
+  { value: "set", label: msg`Set to` },
+] as const;
 
 const ROUNDING_KINDS = [
-  { value: "none", label: "No rounding" },
-  { value: "integer", label: "Nearest whole number" },
-  { value: "nearest", label: "Nearest multiple of…" },
-];
+  { value: "none", label: msg`No rounding` },
+  { value: "integer", label: msg`Nearest whole number` },
+  { value: "nearest", label: msg`Nearest multiple of…` },
+] as const;
 
 const PLACEHOLDERS: Record<OperationKind, string> = {
   percent: "10",
@@ -64,9 +66,8 @@ const PLACEHOLDERS: Record<OperationKind, string> = {
   set: "500",
 };
 
-function skipLabel(row: BatchRow): string {
-  return row.skipped === "missing" ? "No such field" : "Not a number";
-}
+const skipLabel = (row: BatchRow) =>
+  row.skipped === "missing" ? msg`No such field` : msg`Not a number`;
 
 /** What the editable page hands the table (issue #3113): the project's units
  *  and overrides to read, and the one way to write them. */
@@ -129,6 +130,9 @@ export function ReferenceBulkEdit({
   /** Close the panel, after applying or cancelling. */
   onDone: () => void;
 }) {
+  const { t } = useLingui();
+  const copiedTitle = (copiedAs: string) =>
+    t`Shared with other units, so it is copied into the project's weapon library first, as ${copiedAs}.`;
   const [columnId, setColumnId] = useState("health");
   const [opKind, setOpKind] = useState<OperationKind>("percent");
   const [opValue, setOpValue] = useState("");
@@ -217,57 +221,63 @@ export function ReferenceBulkEdit({
 
   return (
     <section
-      aria-label="Change the selected units"
+      aria-label={t`Change the selected units`}
       className="flex flex-col gap-3 rounded-lg border border-border/50 bg-card p-3"
     >
       <div className="flex flex-wrap items-end gap-2">
-        <Field label="Column" className="w-40">
+        <Field label={t`Column`} className="w-40">
           <OptionSelect
             value={columnId}
             onValueChange={setColumnId}
             options={columns}
             size="sm"
-            ariaLabel="Column"
+            ariaLabel={t`Column`}
           />
         </Field>
-        <Field label="Operation" className="w-36">
+        <Field label={t`Operation`} className="w-36">
           <OptionSelect
             value={opKind}
             onValueChange={(v) => setOpKind(v as OperationKind)}
-            options={OPERATION_KINDS}
+            options={OPERATION_KINDS.map((o) => ({
+              value: o.value,
+              label: t(o.label),
+            }))}
             size="sm"
-            ariaLabel="Operation"
+            ariaLabel={t`Operation`}
           />
         </Field>
-        <Field label="Value" className="w-28">
+        <Field label={t`Value`} className="w-28">
           <Input
             inputMode="decimal"
             value={opValue}
             onChange={(e) => setOpValue(e.target.value)}
             placeholder={PLACEHOLDERS[opKind]}
-            aria-label="Value"
+            aria-label={t`Value`}
             className="h-8"
           />
         </Field>
-        <Field label="Rounding" className="w-48">
+        <Field label={t`Rounding`} className="w-48">
           <OptionSelect
             value={roundingKind}
             onValueChange={(v) =>
               setRoundingKind(v as "none" | "integer" | "nearest")
             }
-            options={ROUNDING_KINDS}
+            options={ROUNDING_KINDS.map((o) => ({
+              value: o.value,
+              label: t(o.label),
+            }))}
             size="sm"
-            ariaLabel="Rounding"
+            ariaLabel={t`Rounding`}
           />
         </Field>
         {roundingKind === "nearest" && (
-          <Field label="Step" className="w-24">
+          <Field label={t`Step`} className="w-24">
             <Input
               inputMode="decimal"
               value={roundingStep}
               onChange={(e) => setRoundingStep(e.target.value)}
               placeholder="5"
-              aria-label="Step"
+              aria-label={t`Step`}
               className="h-8"
             />
           </Field>
@@ -276,8 +286,8 @@ export function ReferenceBulkEdit({
 
       {followOffered && (
         <CheckField
-          label="Follow game updates"
-          hint="A row already at a fixed number stays fixed, since that number does not move with the game."
+          label={t`Follow game updates`}
+          hint={t`A row already at a fixed number stays fixed, since that number does not move with the game.`}
           checked={follow}
           onChange={setFollow}
         />
@@ -287,19 +297,23 @@ export function ReferenceBulkEdit({
         <div className="flex flex-col gap-1">
           <p className="text-xs text-muted-foreground">
             {opKind === "set"
-              ? "Changes only the weapon or weapons already at each unit's longest range."
-              : "Changes every one of a unit's weapons, each from its own current range."}
+              ? t`Changes only the weapon or weapons already at each unit's longest range.`
+              : t`Changes every one of a unit's weapons, each from its own current range.`}
           </p>
           <p className="text-xs text-muted-foreground">
-            Range does not offer Follow game updates yet: every change here is a
-            fixed number.
+            <Trans>
+              Range does not offer Follow game updates yet: every change here is
+              a fixed number.
+            </Trans>
           </p>
           <p className="text-xs text-muted-foreground">
-            {changeCount} of {rangeRows.length} unit
-            {rangeRows.length === 1 ? "" : "s"} change
+            {plural(rangeRows.length, {
+              one: `${changeCount} of # unit change`,
+              other: `${changeCount} of # units change`,
+            })}
           </p>
           <ul
-            aria-label="Preview"
+            aria-label={t`Preview`}
             className="flex max-h-60 flex-col gap-1 overflow-y-auto rounded-md border border-border/60 p-1 text-sm"
           >
             {rangeRows.slice(0, SHOWN_ROWS).map((row) => (
@@ -312,7 +326,7 @@ export function ReferenceBulkEdit({
                 </span>
                 {row.skipped ? (
                   <span className="text-xs text-muted-foreground">
-                    No weapons to change
+                    <Trans>No weapons to change</Trans>
                   </span>
                 ) : (
                   row.weapons.map((weapon) => (
@@ -324,14 +338,16 @@ export function ReferenceBulkEdit({
                       <span className="shrink-0 font-mono">
                         {weapon.before} {"→"} {weapon.after}
                         {!weapon.changed && (
-                          <span className="ml-1">(unchanged)</span>
+                          <span className="ml-1">
+                            <Trans>(unchanged)</Trans>
+                          </span>
                         )}
                         {weapon.copiedAs && (
                           <span
                             className="ml-1"
-                            title={`Shared with other units, so it is copied into the project's weapon library first, as ${weapon.copiedAs}.`}
+                            title={copiedTitle(weapon.copiedAs)}
                           >
-                            (copies into the library)
+                            <Trans>(copies into the library)</Trans>
                           </span>
                         )}
                       </span>
@@ -343,8 +359,10 @@ export function ReferenceBulkEdit({
           </ul>
           {rangeRows.length > SHOWN_ROWS && (
             <p className="text-xs text-muted-foreground">
-              Showing the first {SHOWN_ROWS} of {rangeRows.length} units. All of
-              them still apply.
+              {plural(rangeRows.length, {
+                one: `Showing the first ${SHOWN_ROWS} of # unit. All of them still apply.`,
+                other: `Showing the first ${SHOWN_ROWS} of # units. All of them still apply.`,
+              })}
             </p>
           )}
         </div>
@@ -353,11 +371,13 @@ export function ReferenceBulkEdit({
       {!isRange && preview.length > 0 && (
         <div className="flex flex-col gap-1">
           <p className="text-xs text-muted-foreground">
-            {changeCount} of {preview.length} unit
-            {preview.length === 1 ? "" : "s"} change
+            {plural(preview.length, {
+              one: `${changeCount} of # unit change`,
+              other: `${changeCount} of # units change`,
+            })}
           </p>
           <ul
-            aria-label="Preview"
+            aria-label={t`Preview`}
             className="flex max-h-60 flex-col gap-0.5 overflow-y-auto rounded-md border border-border/60 p-1 text-sm"
           >
             {preview.slice(0, SHOWN_ROWS).map((row) => {
@@ -379,32 +399,32 @@ export function ReferenceBulkEdit({
                   </span>
                   {row.skipped ? (
                     <span className="shrink-0 text-xs text-muted-foreground">
-                      {skipLabel(row)}
+                      {t(skipLabel(row))}
                     </span>
                   ) : (
                     <span className="shrink-0 font-mono text-xs">
                       {row.before} {"→"} {row.after}
                       {!row.changed && (
                         <span className="ml-1 text-muted-foreground">
-                          (unchanged)
+                          <Trans>(unchanged)</Trans>
                         </span>
                       )}
                       {followOffered && follow && row.changed && row.path && (
                         <span
                           className="ml-1 text-muted-foreground"
-                          title="Whether this row would record a rule that follows the game, or a fixed number, once follow game updates is ticked."
+                          title={t`Whether this row would record a rule that follows the game, or a fixed number, once follow game updates is ticked.`}
                         >
                           (
                           {wouldFollow(editing, row.unit, row.path)
-                            ? "follows"
-                            : "fixed"}
+                            ? t`follows`
+                            : t`fixed`}
                           )
                         </span>
                       )}
                       {note && (
                         <span
                           className="ml-1 text-muted-foreground"
-                          title="The game's post files may change this field again as it loads."
+                          title={t`The game's post files may change this field again as it loads.`}
                         >
                           *
                         </span>
@@ -417,8 +437,10 @@ export function ReferenceBulkEdit({
           </ul>
           {preview.length > SHOWN_ROWS && (
             <p className="text-xs text-muted-foreground">
-              Showing the first {SHOWN_ROWS} of {preview.length} units. All of
-              them still apply.
+              {plural(preview.length, {
+                one: `Showing the first ${SHOWN_ROWS} of # unit. All of them still apply.`,
+                other: `Showing the first ${SHOWN_ROWS} of # units. All of them still apply.`,
+              })}
             </p>
           )}
         </div>
@@ -432,10 +454,13 @@ export function ReferenceBulkEdit({
           disabled={changeCount === 0}
         >
           <Sigma className="mr-1 size-3.5" />
-          Apply to {changeCount} unit{changeCount === 1 ? "" : "s"}
+          {plural(changeCount, {
+            one: "Apply to # unit",
+            other: "Apply to # units",
+          })}
         </Button>
         <Button type="button" size="sm" variant="outline" onClick={onDone}>
-          Cancel
+          <Trans>Cancel</Trans>
         </Button>
       </div>
     </section>

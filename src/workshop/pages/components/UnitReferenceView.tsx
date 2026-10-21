@@ -16,6 +16,8 @@
  * `editing` is what turns both on, so the game's own reference page, with no
  * project to write to, stays read only.
  */
+import { plural } from "@lingui/core/macro";
+import { Trans, useLingui } from "@lingui/react/macro";
 import { Button, Input } from "@picoframe/frame";
 import { type ReactNode, useMemo, useState } from "react";
 import { OptionSelect } from "@/components/OptionSelect";
@@ -74,6 +76,7 @@ export function UnitReferenceView({
    *  leaves the table read only. */
   editing?: ReferenceEditing;
 }) {
+  const { t } = useLingui();
   const [selected, setSelected] = useState<string[]>([]);
   const [compareOpen, setCompareOpen] = useState(false);
   const [bulkOpen, setBulkOpen] = useState(false);
@@ -147,12 +150,12 @@ export function UnitReferenceView({
   );
 
   const emptyMessage = needle
-    ? `No unit matches "${needle}".`
+    ? t`No unit matches "${needle}".`
     : factionFilter !== ALL_FACTIONS
-      ? "No unit in this faction."
+      ? t`No unit in this faction.`
       : inCollection
-        ? "No unit in this collection."
-        : "No units.";
+        ? t`No unit in this collection.`
+        : t`No units.`;
   const narrowed = !!needle || factionFilter !== ALL_FACTIONS || !!inCollection;
 
   const toggle = (key: string) =>
@@ -187,12 +190,16 @@ export function UnitReferenceView({
     return row ? [row] : [];
   });
 
+  const shownCount = filtered.length;
   return (
     <div className="flex flex-col gap-3">
       {selected.length > 0 && (
         <div className="flex items-center justify-between gap-3 rounded-lg border border-border/50 bg-card p-2">
           <span className="text-xs text-muted-foreground">
-            {selected.length} unit{selected.length === 1 ? "" : "s"} selected
+            {plural(selected.length, {
+              one: "# unit selected",
+              other: "# units selected",
+            })}
           </span>
           <div className="flex items-center gap-2">
             <Button
@@ -204,7 +211,7 @@ export function UnitReferenceView({
                 setBulkOpen(false);
               }}
             >
-              Clear
+              <Trans>Clear</Trans>
             </Button>
             <Button
               type="button"
@@ -212,7 +219,7 @@ export function UnitReferenceView({
               disabled={selected.length < 2}
               onClick={() => setCompareOpen(true)}
             >
-              Compare
+              <Trans>Compare</Trans>
             </Button>
             {editing && (
               <Button
@@ -222,7 +229,7 @@ export function UnitReferenceView({
                 aria-expanded={bulkOpen}
                 onClick={() => setBulkOpen((open) => !open)}
               >
-                Change values
+                <Trans>Change values</Trans>
               </Button>
             )}
           </div>
@@ -240,18 +247,18 @@ export function UnitReferenceView({
           type="search"
           value={query}
           onChange={(e) => setQuery(e.target.value)}
-          placeholder="Search units… (e.g. hp > 3000)"
-          aria-label="Search units"
+          placeholder={t`Search units… (e.g. hp > 3000)`}
+          aria-label={t`Search units`}
           className="h-9 max-w-sm"
         />
         {factions.length > 0 && (
           <OptionSelect
             value={factionFilter}
             onValueChange={setFactionFilter}
-            ariaLabel="Filter by faction"
+            ariaLabel={t`Filter by faction`}
             className="h-9 w-auto"
             options={[
-              { value: ALL_FACTIONS, label: "All factions" },
+              { value: ALL_FACTIONS, label: t`All factions` },
               ...factions.map((faction) => ({
                 value: faction,
                 label: faction,
@@ -263,10 +270,10 @@ export function UnitReferenceView({
           <OptionSelect
             value={collectionFilter}
             onValueChange={setCollectionFilter}
-            ariaLabel="Filter by collection"
+            ariaLabel={t`Filter by collection`}
             className="h-9 w-auto"
             options={[
-              { value: ALL_COLLECTIONS, label: "All collections" },
+              { value: ALL_COLLECTIONS, label: t`All collections` },
               ...collectionOptions,
             ]}
           />
@@ -280,8 +287,11 @@ export function UnitReferenceView({
           {!filterResult.ok
             ? filterResult.error
             : narrowed
-              ? `${filtered.length} of ${rows.length} units`
-              : `${rows.length} unit${rows.length === 1 ? "" : "s"}`}
+              ? plural(rows.length, {
+                  one: `${shownCount} of # unit`,
+                  other: `${shownCount} of # units`,
+                })
+              : plural(rows.length, { one: "# unit", other: "# units" })}
         </p>
       </div>
       <UnitScatterPlot

@@ -18,6 +18,7 @@
  * nothing to aim at on a touch screen, which is the regression #2203 records.
  */
 
+import { Trans, useLingui } from "@lingui/react/macro";
 import { Button, Drawer } from "@picoframe/frame";
 import { CopyPlus, MoreVertical, Pencil, Share2, Trash2 } from "lucide-react";
 import { useState } from "react";
@@ -47,6 +48,9 @@ export function ProjectCardMenu({
   onShare: () => void;
   onDelete: () => void;
 }) {
+  const { t } = useLingui();
+  const projectName = project.name;
+  const editsSummary = describeEdits(project.edits);
   /**
    * Deleting throws away every edit in the project and undo does not reach past
    * it, so it asks first. In a drawer rather than a box hanging off the menu
@@ -66,7 +70,7 @@ export function ProjectCardMenu({
                 size="icon"
                 variant="ghost"
                 className="size-8 shrink-0 text-muted-foreground opacity-60 transition-opacity hover:opacity-100 group-focus-within:opacity-100 group-hover:opacity-100 data-[state=open]:opacity-100"
-                aria-label={`Actions for ${project.name}`}
+                aria-label={t`Actions for ${projectName}`}
               >
                 <MoreVertical className="size-4" aria-hidden="true" />
               </Button>
@@ -75,27 +79,31 @@ export function ProjectCardMenu({
           {/* Above the card rather than beside the trigger, which on a card this
               narrow put the tip over the project's own name. */}
           <TooltipContent side="top">
-            Rename, duplicate, share or delete
+            <Trans>Rename, duplicate, share or delete</Trans>
           </TooltipContent>
         </Tooltip>
         <DropdownMenuContent align="end" className="w-52">
           <DropdownMenuItem onSelect={onRename}>
-            <Pencil className="size-4" aria-hidden="true" /> Rename
+            <Pencil className="size-4" aria-hidden="true" />{" "}
+            <Trans>Rename</Trans>
           </DropdownMenuItem>
           {/* Not the two-rectangles clipboard glyph, which means copy to
               clipboard everywhere else in the app and would read as the same
               job as Share two rows down (issue #2706). */}
           <DropdownMenuItem onSelect={onDuplicate}>
-            <CopyPlus className="size-4" aria-hidden="true" /> Duplicate
+            <CopyPlus className="size-4" aria-hidden="true" />{" "}
+            <Trans>Duplicate</Trans>
           </DropdownMenuItem>
           <DropdownMenuItem onSelect={onShare}>
-            <Share2 className="size-4" aria-hidden="true" /> Share
+            <Share2 className="size-4" aria-hidden="true" />{" "}
+            <Trans>Share</Trans>
           </DropdownMenuItem>
           <DropdownMenuItem
             variant="destructive"
             onSelect={() => setConfirming(true)}
           >
-            <Trash2 className="size-4" aria-hidden="true" /> Delete
+            <Trash2 className="size-4" aria-hidden="true" />{" "}
+            <Trans>Delete</Trans>
           </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>
@@ -103,14 +111,13 @@ export function ProjectCardMenu({
       <Drawer
         open={confirming}
         onOpenChange={setConfirming}
-        title={`Delete ${project.name}`}
-        description="Nothing puts a deleted project back."
+        title={t`Delete ${projectName}`}
+        description={t`Nothing puts a deleted project back.`}
         width="24rem"
       >
         <div className="flex flex-col gap-3">
           <p className="text-sm">
-            {describeEdits(project.edits)}. Export it first if you might want
-            it.
+            <Trans>{editsSummary}. Export it first if you might want it.</Trans>
           </p>
           <Button
             className="gap-1.5"
@@ -120,7 +127,8 @@ export function ProjectCardMenu({
               onDelete();
             }}
           >
-            <Trash2 className="size-4" aria-hidden="true" /> Delete
+            <Trash2 className="size-4" aria-hidden="true" />{" "}
+            <Trans>Delete</Trans>
           </Button>
         </div>
       </Drawer>
