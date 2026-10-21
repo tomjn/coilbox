@@ -22,11 +22,6 @@ export function LocalisedAppFrame(
     [props.plugins, i18n, locale],
   );
   return (
-    <AppFrame
-      {...props}
-      plugins={plugins}
-      strings={strings}
-      locale={locale}
-    />
+    <AppFrame {...props} plugins={plugins} strings={strings} locale={locale} />
   );
 }

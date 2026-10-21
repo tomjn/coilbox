@@ -71,9 +71,9 @@ describe("plugin nav labels and settings titles", () => {
     renderFrame();
     expect(await screen.findByRole("link", { name: "Cartes" })).toBeTruthy();
     expect(screen.queryByRole("link", { name: "Maps" })).toBeNull();
-    expect(
-      await screen.findAllByText("Sources des cartes"),
-    ).not.toHaveLength(0);
+    expect(await screen.findAllByText("Sources des cartes")).not.toHaveLength(
+      0,
+    );
   });
 
   it("follow a language change without remounting a plugin's provider", async () => {

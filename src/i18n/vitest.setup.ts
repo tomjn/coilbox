@@ -15,8 +15,7 @@ vi.mock("@lingui/react", async (importOriginal) => {
   const fallback = () => ({ i18n, _: i18n.t.bind(i18n) });
   return {
     ...real,
-    useLingui: () =>
-      useContext(real.LinguiContext) ? real.useLingui() : fallback(),
+    useLingui: () => useContext(real.LinguiContext) ?? fallback(),
     Trans: (props: Parameters<typeof real.Trans>[0]) => {
       const trans = createElement(real.Trans, props);
       return useContext(real.LinguiContext)
