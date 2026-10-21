@@ -30,6 +30,7 @@ import { Link } from "react-router";
 
 import { buildGridSnap, type FootprintMark } from "@/blueprint/footprint";
 import type { BaseBlueprint } from "@/blueprint/model";
+import { buildingColors } from "@/blueprint/role";
 import { useMissionMapAssets } from "@/campaign/pages/components/useMissionMapAssets";
 import { useUnitsyncScan, useUnitsyncThumbnails } from "@/content/config";
 import { useGameUnits } from "@/content/useGameUnits";
@@ -122,6 +123,9 @@ export function BlueprintOnMap({
     [units],
   );
 
+  // What each building does, coloured the way the in-game widget colours it.
+  const colorOf = useMemo(() => buildingColors(units), [units]);
+
   const [spot, setSpot] = useState<Point | null>(null);
   // Held rather than worked out per render, because everything downstream of the
   // document is rebuilt when it changes, and that means every model on the map
@@ -189,6 +193,9 @@ export function BlueprintOnMap({
     preview.dragging ? NOTHING : footprints,
     assets,
     drawn.groundAt,
+    "standing",
+    null,
+    colorOf,
   );
 
   // Where the whole layout would stand, when the spot it is on will not do
