@@ -1,7 +1,9 @@
+import { msg } from "@lingui/core/macro";
 import { NavGate } from "@picoframe/frame";
 import type { FramePlugin } from "@picoframe/plugin-sdk";
 import type { ComponentType } from "react";
 import { CoilboxGlyph } from "../components/CoilboxGlyph";
+import { lazyText } from "../i18n/pluginText";
 import { isHubEnabled } from "../profile/profile";
 import UploadRunBadge from "./assets/UploadRunBadge";
 import { isHubItemPageReachable } from "./config";
@@ -64,7 +66,7 @@ const hubPlugin: FramePlugin = {
   settings: [
     {
       id: "hub",
-      title: "Coilbox hub",
+      title: lazyText(msg`Coilbox hub`),
       order: 40,
       icon: CoilboxGlyph,
       Component: HubSettings,
@@ -75,12 +77,12 @@ const hubPlugin: FramePlugin = {
     {
       // Groups merge by id across plugins.
       id: "library",
-      label: "Library",
+      label: lazyText(msg`Library`),
       order: 15,
       items: [
         {
           id: "hub.browse",
-          label: "Community",
+          label: lazyText(msg`Community`),
           to: "/hub",
           order: 1.25,
           icon: CoilboxGlyph,
@@ -93,7 +95,7 @@ const hubPlugin: FramePlugin = {
     {
       path: "hub",
       lazy: gated(() => import("./pages/BrowsePage")),
-      crumb: "Coilbox hub",
+      crumb: lazyText(msg`Coilbox hub`),
     },
     {
       // One item in full, and where a `<hub>/i/<id>` link lands (issue #1366).
@@ -101,7 +103,7 @@ const hubPlugin: FramePlugin = {
       // fetched it, so the crumb is the generic word.
       path: "hub/:id",
       lazy: gated(() => import("./pages/ItemPage")),
-      crumb: "Item",
+      crumb: lazyText(msg`Item`),
     },
   ],
 };

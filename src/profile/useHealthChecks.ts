@@ -1,3 +1,4 @@
+import { t } from "@lingui/core/macro";
 import { useEffect, useMemo, useState } from "react";
 import { plugins } from "../app.plugins";
 import { campaignList } from "../campaign/bindings";
@@ -57,7 +58,7 @@ function campaignName(json: string): string {
   } catch {
     // Unparseable — the syntax error (below) is the useful part.
   }
-  return "(unnamed)";
+  return t`(unnamed)`;
 }
 
 /** Why a campaign was rejected: a located JSON syntax error, or a schema mismatch. */
@@ -67,7 +68,7 @@ function campaignError(json: string): string {
   } catch (e) {
     return describeJsonError(json, e).message;
   }
-  return "valid JSON but does not match the campaign schema";
+  return t`valid JSON but does not match the campaign schema`;
 }
 
 /**

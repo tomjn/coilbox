@@ -1,3 +1,6 @@
+import { i18n } from "@lingui/core";
+import { plural, t } from "@lingui/core/macro";
+import { useLingui } from "@lingui/react/macro";
 import type { LucideIcon } from "lucide-react";
 import { ArrowRight, LogIn } from "lucide-react";
 import { Link } from "react-router";
@@ -146,10 +149,10 @@ function candidateCard(c: ResumeCandidate): RailCard {
   return {
     key: c.id,
     icon: RESUME_KIND_ICON[c.kind],
-    label,
+    label: i18n._(label),
     title: c.title,
     detail: c.detail,
-    action,
+    action: i18n._(action),
     to: c.to,
   };
 }
@@ -164,7 +167,10 @@ function candidateCard(c: ResumeCandidate): RailCard {
  * above one, not a second exception at two.
  */
 function nameAndOthers(name: string, othersCount: number): string {
-  return `${name} and ${othersCount} other${othersCount === 1 ? "" : "s"}`;
+  return plural(othersCount, {
+    one: `${name} and # other`,
+    other: `${name} and # others`,
+  });
 }
 
 /**
@@ -200,20 +206,20 @@ function loginCard(
     return {
       key: `login:${account.id}`,
       icon: LogIn,
-      label: "Multiplayer",
+      label: t`Multiplayer`,
       title: account.username,
       detail: server.name,
-      action: "Log in",
+      action: t`Log in`,
       to: "/lobby",
     };
   }
   return {
     key: "login:all",
     icon: LogIn,
-    label: "Multiplayer",
+    label: t`Multiplayer`,
     title: nameAndOthers(account.username, logins.length - 1),
     detail: server.name,
-    action: "Reconnect all",
+    action: t`Reconnect all`,
     onClick: () => void reconnectAll([...logins]),
   };
 }
@@ -334,6 +340,7 @@ export const RAIL_CARD_CLASS =
  * it.
  */
 export default function ResumeRail() {
+  const { t } = useLingui();
   const { candidates, loading } = useResume();
   const { connections, busyKeys, reconnectAll } = useMultiplayer();
   const [accountsCfg] = useLobbyAccounts();
@@ -359,7 +366,7 @@ export default function ResumeRail() {
     // half. The label gives assistive tech the grouping a sighted reader gets
     // from the layout.
     <section
-      aria-label="More to pick up"
+      aria-label={t`More to pick up`}
       className="flex min-w-0 flex-1 flex-wrap gap-3"
     >
       {cards.map((card) => {

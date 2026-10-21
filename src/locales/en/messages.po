@@ -7,6 +7,80 @@ msgstr ""
 "X-Generator: @lingui/cli\n"
 "Language: en\n"
 
+#: src/profile/health.ts
+msgid "''{id}'' is now ''{current}''"
+msgstr "''{id}'' is now ''{current}''"
+
+#: src/general/ErrorBoundary.tsx
+msgid "(unknown route)"
+msgstr "(unknown route)"
+
+#: src/profile/scenarioFailure.ts
+#: src/profile/useHealthChecks.ts
+msgid "(unnamed)"
+msgstr "(unnamed)"
+
+#. placeholder {0}: rest.length
+#: src/home/zones/Greeting.tsx
+msgid "{0, plural, one {{first} and # other} other {{first} and # others}}"
+msgstr "{0, plural, one {{first} and # other} other {{first} and # others}}"
+
+#. placeholder {0}: unknown.length
+#: src/profile/health.ts
+msgid "{0, plural, one {# hide id matches nothing} other {# hide ids match nothing}}"
+msgstr "{0, plural, one {# hide id matches nothing} other {# hide ids match nothing}}"
+
+#. placeholder {0}: unknown.length
+#: src/profile/health.ts
+msgid "{0, plural, one {# hideSettings id matches nothing} other {# hideSettings ids match nothing}}"
+msgstr "{0, plural, one {# hideSettings id matches nothing} other {# hideSettings ids match nothing}}"
+
+#. placeholder {0}: unknown.length
+#: src/profile/health.ts
+msgid "{0, plural, one {# link icon unknown} other {# link icons unknown}}"
+msgstr "{0, plural, one {# link icon unknown} other {# link icons unknown}}"
+
+#. placeholder {0}: home.issues.length
+#: src/profile/health.ts
+msgid "{0, plural, one {# problem in `home`} other {# problems in `home`}}"
+msgstr "{0, plural, one {# problem in `home`} other {# problems in `home`}}"
+
+#. placeholder {0}: hide.length
+#: src/profile/health.ts
+msgid "{0, plural, one {Hide list: # id, which matches a hideable feature} other {Hide list: # ids, all match a hideable feature}}"
+msgstr "{0, plural, one {Hide list: # id, which matches a hideable feature} other {Hide list: # ids, all match a hideable feature}}"
+
+#. placeholder {0}: hideSettings.length
+#: src/profile/health.ts
+msgid "{0, plural, one {Hide settings: # id, which matches a section} other {Hide settings: # ids, all match a section}}"
+msgstr "{0, plural, one {Hide settings: # id, which matches a section} other {Hide settings: # ids, all match a section}}"
+
+#. placeholder {0}: icons.length
+#: src/profile/health.ts
+msgid "{0, plural, one {Link icons: # set, and it is recognised} other {Link icons: # set, all recognised}}"
+msgstr "{0, plural, one {Link icons: # set, and it is recognised} other {Link icons: # set, all recognised}}"
+
+#. placeholder {0}: offers.length
+#: src/deeplink/DeepLinkHandler.tsx
+msgid "{0, plural, other {# archives}}"
+msgstr "{0, plural, other {# archives}}"
+
+#: src/home/zones/Continue.tsx
+msgid "{action}: {runTitle}"
+msgstr "{action}: {runTitle}"
+
+#: src/content/index.ts
+msgid "{archiveName} · Lua REPL"
+msgstr "{archiveName} · Lua REPL"
+
+#: src/profile/health.ts
+msgid "{bundlePath} has {summary}. Each line below is one thing to fix."
+msgstr "{bundlePath} has {summary}. Each line below is one thing to fix."
+
+#: src/profile/health.ts
+msgid "{campaignFailureCount} campaign(s) failed to load"
+msgstr "{campaignFailureCount} campaign(s) failed to load"
+
 #: src/i18n/uiError.ts
 msgid "{count, plural, one {# blocker would reach the lobby broken, so it was not packed: {blockers}} other {# blockers would reach the lobby broken, so it was not packed: {blockers}}}"
 msgstr "{count, plural, one {# blocker would reach the lobby broken, so it was not packed: {blockers}} other {# blockers would reach the lobby broken, so it was not packed: {blockers}}}"
@@ -15,7 +89,44 @@ msgstr "{count, plural, one {# blocker would reach the lobby broken, so it was n
 msgid "{count, plural, one {# blocker would reach whoever plays this broken, so it was not packaged: {blockers}} other {# blockers would reach whoever plays this broken, so it was not packaged: {blockers}}}"
 msgstr "{count, plural, one {# blocker would reach whoever plays this broken, so it was not packaged: {blockers}} other {# blockers would reach whoever plays this broken, so it was not packaged: {blockers}}}"
 
+#: src/sound/MusicSource.tsx
+msgid "{count, plural, one {# track found.} other {# tracks found.}}"
+msgstr "{count, plural, one {# track found.} other {# tracks found.}}"
+
+#: src/profile/health.ts
+msgid "{count, plural, one {Game filter matches # installed game} other {Game filter matches # installed games}}"
+msgstr "{count, plural, one {Game filter matches # installed game} other {Game filter matches # installed games}}"
+
+#: src/notify/NotificationsBell.tsx
+msgid "{days}d"
+msgstr "{days}d"
+
+#: src/home/continue.ts
+msgid "{earlier} and {last}"
+msgstr "{earlier} and {last}"
+
+#: src/profile/health.ts
+msgid "{engines} engine(s) found, games not scanned yet"
+msgstr "{engines} engine(s) found, games not scanned yet"
+
+#: src/profile/health.ts
+msgid "{engines} engine(s) found, games scan failed"
+msgstr "{engines} engine(s) found, games scan failed"
+
+#: src/profile/health.ts
+msgid "{engines} engine(s), {games} game(s) found"
+msgstr "{engines} engine(s), {games} game(s) found"
+
+#: src/home/zones/Greeting.tsx
+msgid "{first} and {second}"
+msgstr "{first} and {second}"
+
+#: src/profile/health.ts
+msgid "{gameCount} game(s), {mapCount} map(s), {engineText}"
+msgstr "{gameCount} game(s), {mapCount} map(s), {engineText}"
+
 #: src/downloads/downloadRate.ts
+#: src/notify/NotificationsBell.tsx
 msgid "{hours}h"
 msgstr "{hours}h"
 
@@ -23,7 +134,28 @@ msgstr "{hours}h"
 msgid "{hours}h {mins}m"
 msgstr "{hours}h {mins}m"
 
+#: src/profile/health.ts
+msgid "{iconError}. `icon` is a PNG file, by its path relative to the .coilbox folder."
+msgstr "{iconError}. `icon` is a PNG file, by its path relative to the .coilbox folder."
+
+#: src/profile/health.ts
+msgid "{installedCount, plural, one {Filter ({filterDesc}) matched none of the # installed game: {sample}{more}. Adjust it to match one of these.} other {Filter ({filterDesc}) matched none of the # installed games: {sample}{more}. Adjust it to match one of these.}}"
+msgstr "{installedCount, plural, one {Filter ({filterDesc}) matched none of the # installed game: {sample}{more}. Adjust it to match one of these.} other {Filter ({filterDesc}) matched none of the # installed games: {sample}{more}. Adjust it to match one of these.}}"
+
+#: src/deeplink/DeepLinkHandler.tsx
+msgid "{installedCount, plural, other {Installed # archives}}"
+msgstr "{installedCount, plural, other {Installed # archives}}"
+
+#: src/sound/LevelRow.tsx
+msgid "{label} volume"
+msgstr "{label} volume"
+
+#: src/home/config.ts
+msgid "{layout}, {zoneCount} zone(s), {tracking}"
+msgstr "{layout}, {zoneCount} zone(s), {tracking}"
+
 #: src/downloads/downloadRate.ts
+#: src/notify/NotificationsBell.tsx
 msgid "{mins}m"
 msgstr "{mins}m"
 
@@ -43,25 +175,275 @@ msgstr "{next}m"
 msgid "{op} failed"
 msgstr "{op} failed"
 
+#: src/home/zones/ResumeRail.tsx
+msgid "{othersCount, plural, one {{name} and # other} other {{name} and # others}}"
+msgstr "{othersCount, plural, one {{name} and # other} other {{name} and # others}}"
+
 #: src/i18n/uiError.ts
 msgid "{path} already exists; confirm a replace before packaging over it"
 msgstr "{path} already exists; confirm a replace before packaging over it"
+
+#: src/home/continue.ts
+msgid "{presetGame} on {presetMap}"
+msgstr "{presetGame} on {presetMap}"
+
+#: src/profile/health.ts
+msgid "{problemCount} problem(s) in the bundled content"
+msgstr "{problemCount} problem(s) in the bundled content"
+
+#: src/profile/health.ts
+msgid "{renames}. The old names still work."
+msgstr "{renames}. The old names still work."
+
+#: src/profile/health.ts
+msgid "{rootCount} content folder(s), {portableRoots} portable"
+msgstr "{rootCount} content folder(s), {portableRoots} portable"
+
+#: src/profile/health.ts
+msgid "{scenarioFailureCount} scenario(s) failed to load"
+msgstr "{scenarioFailureCount} scenario(s) failed to load"
+
+#: src/home/continue.ts
+msgid "{shortname} · health {hull}/{maxHull}"
+msgstr "{shortname} · health {hull}/{maxHull}"
+
+#: src/profile/SettingsSection.tsx
+msgid "{themeCount, plural, one {# variable} other {# variables}}"
+msgstr "{themeCount, plural, one {# variable} other {# variables}}"
 
 #: src/downloads/downloadRate.ts
 msgid "{total}s"
 msgstr "{total}s"
 
+#: src/profile/health.ts
+msgid "{unmatched}. Hideable ids: {hideableIds}."
+msgstr "{unmatched}. Hideable ids: {hideableIds}."
+
+#: src/profile/health.ts
+msgid "{unmatched}. Section ids: {sectionIds}."
+msgstr "{unmatched}. Section ids: {sectionIds}."
+
+#: src/profile/health.ts
+msgid "{unrecognised}."
+msgstr "{unrecognised}."
+
+#: src/profile/onlyOwnMaps.ts
+msgid "`onlyOwnMaps` is a {kind}, and it must be true or false"
+msgstr "`onlyOwnMaps` is a {kind}, and it must be true or false"
+
+#: src/profile/onlyOwnMaps.ts
+msgid "`onlyOwnMaps` is a list, and it must be true or false"
+msgstr "`onlyOwnMaps` is a list, and it must be true or false"
+
+#: src/profile/onlyOwnMaps.ts
+msgid "`onlyOwnMaps` is an object, and it must be true or false"
+msgstr "`onlyOwnMaps` is an object, and it must be true or false"
+
+#: src/profile/health.ts
+msgid "`onlyOwnMaps` is not true or false"
+msgstr "`onlyOwnMaps` is not true or false"
+
+#: src/profile/start.ts
+msgid "`start.mission` goes with `campaign`, not with `scenario`"
+msgstr "`start.mission` goes with `campaign`, not with `scenario`"
+
+#: src/profile/start.ts
+msgid "`start.mission` must be a mission id"
+msgstr "`start.mission` must be a mission id"
+
+#: src/profile/start.ts
+msgid "`start.scenario` must be a scenario id"
+msgstr "`start.scenario` must be a scenario id"
+
+#: src/profile/start.ts
+msgid "`start` must be an object with a `campaign` id or a `scenario` id"
+msgstr "`start` must be an object with a `campaign` id or a `scenario` id"
+
+#: src/profile/start.ts
+msgid "`start` names both a `campaign` and a `scenario`. Keep one of them"
+msgstr "`start` names both a `campaign` and a `scenario`. Keep one of them"
+
+#: src/profile/health.ts
+msgid "`start` names nothing playable"
+msgstr "`start` names nothing playable"
+
+#: src/profile/health.ts
+msgid "`start` needs content the bundle does not carry"
+msgstr "`start` needs content the bundle does not carry"
+
+#: src/profile/pages.ts
+msgid "> **Include error:** could not read `{include}`"
+msgstr "> **Include error:** could not read `{include}`"
+
+#: src/profile/pages.ts
+msgid "> **Include error:** cycle detected at `{include}`"
+msgstr "> **Include error:** cycle detected at `{include}`"
+
+#: src/profile/pages.ts
+msgid "> **Include error:** include nesting too deep at `{include}`"
+msgstr "> **Include error:** include nesting too deep at `{include}`"
+
+#: src/deeplink/readImport.ts
+msgid "a {label}"
+msgstr "a {label}"
+
+#: src/deeplink/readImport.ts
+msgid "a {label} for {name}"
+msgstr "a {label} for {name}"
+
+#: src/home/config.ts
+msgid "a custom `html` entry"
+msgstr "a custom `html` entry"
+
+#: src/profile/SettingsSection.tsx
+msgid "A distribution profile is active (loaded from <0>{source}</0>). It reskins and narrows this build:"
+msgstr "A distribution profile is active (loaded from <0>{source}</0>). It reskins and narrows this build:"
+
+#: src/sound/events.ts
+msgid "A download completes, or anything else Coilbox tells you went well."
+msgstr "A download completes, or anything else Coilbox tells you went well."
+
+#: src/profile/health.ts
+msgid "A folder is read-only"
+msgstr "A folder is read-only"
+
+#: src/profile/health.ts
+msgid "A game with no hand-made map to offer keeps them, so there is always something to pick."
+msgstr "A game with no hand-made map to offer keeps them, so there is always something to pick."
+
+#: src/uberstress/index.ts
+msgid "A load tester for uberserver lobby servers."
+msgstr "A load tester for uberserver lobby servers."
+
+#: src/sound/events.ts
+msgid "A match is found"
+msgstr "A match is found"
+
+#: src/profile/health.ts
+msgid "A new player is asked to download {missingNames} before the first lesson. Copy it into .coilbox/content/games/ or .coilbox/content/maps/."
+msgstr "A new player is asked to download {missingNames} before the first lesson. Copy it into .coilbox/content/games/ or .coilbox/content/maps/."
+
+#: src/profile/SettingsSection.tsx
+msgid "A profile is already there: <0/>. Edit that file, then restart Coilbox to pick it up."
+msgstr "A profile is already there: <0/>. Edit that file, then restart Coilbox to pick it up."
+
+#: src/general/pages/AboutCoilbox.tsx
+msgid "About Coilbox"
+msgstr "About Coilbox"
+
+#: src/profile/SettingsSection.tsx
+msgid "Accent"
+msgstr "Accent"
+
 #: src/i18n/frameStrings.ts
 msgid "Accent color"
 msgstr "Accent color"
+
+#: src/account/index.ts
+msgid "Account"
+msgstr "Account"
+
+#: src/general/index.ts
+msgid "Accounts"
+msgstr "Accounts"
+
+#: src/profile/health.ts
+msgid "Add a Content Folder so Coilbox can find the game."
+msgstr "Add a Content Folder so Coilbox can find the game."
+
+#: src/general/index.ts
+msgid "Advanced"
+msgstr "Advanced"
+
+#: src/general/pages/SettingsSection.tsx
+msgid "Advanced mode"
+msgstr "Advanced mode"
+
+#: src/general/pages/SettingsSection.tsx
+msgid "Advanced tools"
+msgstr "Advanced tools"
+
+#: src/sound/events.ts
+msgid "Alerts"
+msgstr "Alerts"
+
+#: src/profile/health.ts
+msgid "All campaigns loaded"
+msgstr "All campaigns loaded"
+
+#: src/profile/health.ts
+msgid "All scenarios loaded"
+msgstr "All scenarios loaded"
+
+#: src/general/index.ts
+msgid "All settings"
+msgstr "All settings"
 
 #: src/i18n/frameStrings.ts
 msgid "Amber"
 msgstr "Amber"
 
+#: src/general/pages/SettingsSection.tsx
+msgid "Ambient effects"
+msgstr "Ambient effects"
+
+#: src/animation/index.ts
+msgid "animation"
+msgstr "animation"
+
+#: src/animation/index.ts
+msgid "Animation"
+msgstr "Animation"
+
+#: src/deeplink/DeepLinkHandler.tsx
+msgid "Another invite is still open. Answer or close it, then open this link again."
+msgstr "Another invite is still open. Answer or close it, then open this link again."
+
+#: src/deeplink/DeepLinkHandler.tsx
+msgid "Another link is still open. Answer or close it, then open this link again."
+msgstr "Another link is still open. Answer or close it, then open this link again."
+
+#: src/deeplink/DeepLinkHandler.tsx
+msgid "Another prompt is still open. Answer or close it, then open this file again."
+msgstr "Another prompt is still open. Answer or close it, then open this file again."
+
+#: src/sound/events.ts
+msgid "Any launch of your own: a skirmish, a battle, a campaign mission, a saved game or a replay."
+msgstr "Any launch of your own: a skirmish, a battle, a campaign mission, a saved game or a replay."
+
+#: src/deeplink/pages/ImportSection.tsx
+msgid "Anything coilbox shares goes here: {kindsSentence}."
+msgstr "Anything coilbox shares goes here: {kindsSentence}."
+
+#: src/profile/health.ts
+msgid "App icon: {iconPath}"
+msgstr "App icon: {iconPath}"
+
+#: src/general/index.ts
 #: src/i18n/frameStrings.ts
+#: src/profile/index.ts
 msgid "Appearance"
 msgstr "Appearance"
+
+#: src/content/index.ts
+msgid "Archive"
+msgstr "Archive"
+
+#: src/content/index.ts
+msgid "Archives"
+msgstr "Archives"
+
+#: src/home/groupDescription.ts
+msgid "Assemble units from parts and inspect s3o models."
+msgstr "Assemble units from parts and inspect s3o models."
+
+#: src/profile/SettingsSection.tsx
+msgid "Authoring"
+msgstr "Authoring"
+
+#: src/profile/SettingsSection.tsx
+msgid "Authoring tools"
+msgstr "Authoring tools"
 
 #: src/i18n/frameStrings.ts
 msgid "Back"
@@ -75,22 +457,112 @@ msgstr "Back/forward buttons"
 msgid "Base color"
 msgstr "Base color"
 
+#: src/multiplayer/index.tsx
+msgid "Battle Room"
+msgstr "Battle Room"
+
+#: src/multiplayer/index.tsx
+msgid "Battles"
+msgstr "Battles"
+
 #: src/i18n/frameStrings.ts
 msgid "Blue"
 msgstr "Blue"
+
+#: src/content/index.ts
+msgid "Blueprints"
+msgstr "Blueprints"
+
+#: src/animation/index.ts
+msgid "BOS → Lua"
+msgstr "BOS → Lua"
+
+#: src/home/groupDescription.ts
+msgid "Build your own campaigns and scenarios."
+msgstr "Build your own campaigns and scenarios."
+
+#: src/profile/health.ts
+msgid "Bundle or download the game archive (.sdz/.sd7). {scanned}"
+msgstr "Bundle or download the game archive (.sdz/.sd7). {scanned}"
+
+#: src/sound/MusicSource.tsx
+msgid "Bundled"
+msgstr "Bundled"
+
+#: src/profile/health.ts
+msgid "Bundled content: {summary}"
+msgstr "Bundled content: {summary}"
+
+#: src/content/index.ts
+msgid "Camera mode, edge scrolling and the mouse."
+msgstr "Camera mode, edge scrolling and the mouse."
+
+#: src/home/continue.ts
+msgid "Campaign"
+msgstr "Campaign"
+
+#: src/campaign/index.ts
+#: src/scenario/index.ts
+msgid "Campaign Builder"
+msgstr "Campaign Builder"
+
+#: src/campaign/index.ts
+msgid "Campaigns"
+msgstr "Campaigns"
+
+#: src/campaign/index.ts
+msgid "Campaigns guide"
+msgstr "Campaigns guide"
+
+#: src/components/ConfirmPopover.tsx
+#: src/deeplink/ConfirmDialog.tsx
+msgid "Cancel"
+msgstr "Cancel"
+
+#: src/career/index.ts
+msgid "Career"
+msgstr "Career"
+
+#: src/home/groupDescription.ts
+msgid "Change what a game's units cost, carry and can do."
+msgstr "Change what a game's units cost, carry and can do."
+
+#: src/multiplayer/index.tsx
+msgid "Chat"
+msgstr "Chat"
+
+#: src/multiplayer/index.tsx
+msgid "Chat highlights"
+msgstr "Chat highlights"
+
+#: src/multiplayer/index.tsx
+msgid "Chat logs"
+msgstr "Chat logs"
 
 #: src/updater/pages/UpdatesSettingsSection.tsx
 msgid "Check for updates"
 msgstr "Check for updates"
 
+#: src/notify/NotificationsSettings.tsx
+msgid "Checking permission…"
+msgstr "Checking permission…"
+
+#: src/deeplink/pages/ImportSection.tsx
 #: src/updater/pages/UpdatesSettingsSection.tsx
 msgid "Checking…"
 msgstr "Checking…"
 
+#: src/home/zones/Greeting.tsx
 #: src/i18n/frameStrings.ts
 msgid "Choose a tool to get started."
 msgstr "Choose a tool to get started."
 
+#: src/notify/NotificationsBell.tsx
+msgid "Clear all"
+msgstr "Clear all"
+
+#: src/components/SlideDrawer.tsx
+#: src/components/ui/dialog.tsx
 #: src/deeplink/ConfirmDialog.tsx
 #: src/lego/pages/components/ShortcutSheet.tsx
 #: src/multiplayer/ServerMessageBoxDialog.tsx
@@ -99,9 +571,83 @@ msgstr "Choose a tool to get started."
 msgid "Close"
 msgstr "Close"
 
+#: src/components/SlideDrawer.tsx
+msgid "Close {title}"
+msgstr "Close {title}"
+
 #: src/i18n/frameStrings.ts
 msgid "Close menu"
 msgstr "Close menu"
+
+#: src/animation/index.ts
+msgid "COB tools"
+msgstr "COB tools"
+
+#: src/main.tsx
+#: src/sound/library.ts
+msgid "Coilbox"
+msgstr "Coilbox"
+
+#: src/updater/updater.ts
+msgid "Coilbox {newVersion} has no portable download, so it cannot be installed over this copy. Update the package instead."
+msgstr "Coilbox {newVersion} has no portable download, so it cannot be installed over this copy. Update the package instead."
+
+#: src/updater/UpdaterProvider.tsx
+msgid "Coilbox {newVersion} is ready to install."
+msgstr "Coilbox {newVersion} is ready to install."
+
+#: src/deeplink/readImport.ts
+msgid "coilbox campaign"
+msgstr "coilbox campaign"
+
+#: src/settings-storage.ts
+msgid "Coilbox could not save your settings"
+msgstr "Coilbox could not save your settings"
+
+#: src/deeplink/readImport.ts
+msgid "Coilbox does not recognise that. Paste a coilbox link, a share code, or the contents of a coilbox .json file."
+msgstr "Coilbox does not recognise that. Paste a coilbox link, a share code, or the contents of a coilbox .json file."
+
+#: src/profile/health.ts
+msgid "Coilbox drew the page anyway: {homeSummary}. Each line below is one thing it ignored or could not read."
+msgstr "Coilbox drew the page anyway: {homeSummary}. Each line below is one thing it ignored or could not read."
+
+#: src/deeplink/pages/ImportSection.tsx
+msgid "Coilbox file"
+msgstr "Coilbox file"
+
+#: src/deeplink/DeepLinkHandler.tsx
+msgid "Coilbox has not contacted it yet. Only continue if you trust this link."
+msgstr "Coilbox has not contacted it yet. Only continue if you trust this link."
+
+#: src/hub/index.tsx
+msgid "Coilbox hub"
+msgstr "Coilbox hub"
+
+#: src/downloads/index.ts
+msgid "Coilbox Hub"
+msgstr "Coilbox Hub"
+
+#: src/general/pages/AboutCoilbox.tsx
+msgid "Coilbox is open source. Browse the code, report a bug, or star the project on GitHub."
+msgstr "Coilbox is open source. Browse the code, report a bug, or star the project on GitHub."
+
+#: src/general/pages/AboutCoilbox.tsx
+msgid "Coilbox on GitHub"
+msgstr "Coilbox on GitHub"
+
+#: src/sound/events.ts
+msgid "Coilbox reports that something went wrong."
+msgstr "Coilbox reports that something went wrong."
+
+#: src/home/continue.ts
+msgid "Coilbox update"
+msgstr "Coilbox update"
+
+#: src/profile/SettingsSection.tsx
+#: src/updater/index.ts
+msgid "Coilbox updates"
+msgstr "Coilbox updates"
 
 #: src/i18n/frameStrings.ts
 msgid "Collapse breadcrumb"
@@ -115,25 +661,116 @@ msgstr "Collapse sidebar on narrow windows"
 msgid "Collapsing the sidebar hides it fully instead of showing an icon rail."
 msgstr "Collapsing the sidebar hides it fully instead of showing an icon rail."
 
+#: src/profile/SettingsSection.tsx
+msgid "Colour scheme"
+msgstr "Colour scheme"
+
 #: src/workshop/pages/components/CommandPalette.tsx
 msgid "Command palette"
 msgstr "Command palette"
+
+#: src/components/ui/command.tsx
+msgid "Command Palette"
+msgstr "Command Palette"
+
+#: src/hub/index.tsx
+msgid "Community"
+msgstr "Community"
+
+#: src/mapconv/index.ts
+msgid "Compile"
+msgstr "Compile"
+
+#: src/home/groupDescription.ts
+msgid "Compile and decompile maps."
+msgstr "Compile and decompile maps."
 
 #: src/deeplink/ConfirmDialog.tsx
 msgid "Confirm this before it runs."
 msgstr "Confirm this before it runs."
 
+#: src/conquest/index.ts
+#: src/home/continue.ts
+msgid "Conquest"
+msgstr "Conquest"
+
+#: src/deeplink/DeepLinkHandler.tsx
+msgid "Contacting {fetching} and checking what it sends back."
+msgstr "Contacting {fetching} and checking what it sends back."
+
+#: src/content/index.ts
+msgid "Content folders"
+msgstr "Content folders"
+
+#: src/components/ContinueBadge.tsx
+#: src/deeplink/DeepLinkHandler.tsx
+#: src/deeplink/pages/ImportSection.tsx
+msgid "Continue"
+msgstr "Continue"
+
+#: src/home/groupDescription.ts
+msgid "Convert BOS to Lua, and work with COB scripts."
+msgstr "Convert BOS to Lua, and work with COB scripts."
+
+#: src/general/ErrorBoundary.tsx
+msgid "Copied"
+msgstr "Copied"
+
+#: src/deeplink/DeepLinkHandler.tsx
+msgid "Copied to {destDir}."
+msgstr "Copied to {destDir}."
+
+#: src/general/ErrorBoundary.tsx
+msgid "Copy details"
+msgstr "Copy details"
+
+#: src/deeplink/DeepLinkHandler.tsx
+msgid "Copying {installing}."
+msgstr "Copying {installing}."
+
+#: src/deeplink/DeepLinkHandler.tsx
+msgid "Could not install an archive"
+msgstr "Could not install an archive"
+
+#: src/profile/openBundledFile.ts
+msgid "Could not open that file"
+msgstr "Could not open that file"
+
 #: src/i18n/uiError.ts
 msgid "Could not reach the host."
 msgstr "Could not reach the host."
+
+#: src/home/markup.ts
+msgid "Could not read {ref}"
+msgstr "Could not read {ref}"
+
+#: src/profile/refs.ts
+msgid "Could not read {reference}"
+msgstr "Could not read {reference}"
+
+#: src/deeplink/copyLink.ts
+msgid "Couldn't copy the link"
+msgstr "Couldn't copy the link"
+
+#: src/profile/SettingsSection.tsx
+msgid "Create profile.json"
+msgstr "Create profile.json"
 
 #: src/i18n/frameStrings.ts
 msgid "Crimson"
 msgstr "Crimson"
 
+#: src/home/zones/SuggestedMap.tsx
+msgid "Curated map"
+msgstr "Curated map"
+
 #: src/updater/pages/UpdatesSettingsSection.tsx
 msgid "Current version"
 msgstr "Current version"
+
+#: src/profile/SettingsSection.tsx
+msgid "Custom"
+msgstr "Custom"
 
 #: src/i18n/frameStrings.ts
 msgid "Cyan"
@@ -143,37 +780,253 @@ msgstr "Cyan"
 msgid "Dark"
 msgstr "Dark"
 
+#: src/mapconv/index.ts
+msgid "Decompile"
+msgstr "Decompile"
+
 #: src/i18n/frameStrings.ts
+#: src/profile/SettingsSection.tsx
+#: src/sound/SoundSettings.tsx
 msgid "Default"
 msgstr "Default"
+
+#: src/home/config.ts
+msgid "Default layout"
+msgstr "Default layout"
+
+#: src/notify/NotificationsSettings.tsx
+msgid "Desktop notifications"
+msgstr "Desktop notifications"
+
+#: src/components/ResultCard.tsx
+msgid "Details"
+msgstr "Details"
+
+#: src/profile/Splash.tsx
+msgid "Dismiss splash"
+msgstr "Dismiss splash"
+
+#: src/deeplink/pages/ImportSection.tsx
+msgid "Dismiss the clipboard offer"
+msgstr "Dismiss the clipboard offer"
+
+#: src/content/index.ts
+#: src/general/pages/SettingsSection.tsx
+msgid "Display"
+msgstr "Display"
+
+#: src/profile/index.ts
+#: src/profile/SettingsSection.tsx
+msgid "Distribution profile"
+msgstr "Distribution profile"
 
 #: src/i18n/frameStrings.ts
 msgid "Done"
 msgstr "Done"
 
+#: src/home/continue.ts
+msgid "Download {list} first"
+msgstr "Download {list} first"
+
 #: src/updater/pages/UpdatesSettingsSection.tsx
 msgid "Download & install"
 msgstr "Download & install"
+
+#: src/profile/health.ts
+msgid "Download + data folders are writable"
+msgstr "Download + data folders are writable"
+
+#: src/deeplink/DeepLinkHandler.tsx
+msgid "Download an import"
+msgstr "Download an import"
+
+#: src/home/continue.ts
+msgid "Download and start"
+msgstr "Download and start"
+
+#: src/profile/health.ts
+msgid "Download write root is inside the package"
+msgstr "Download write root is inside the package"
+
+#: src/profile/health.ts
+msgid "Download write root is outside the package"
+msgstr "Download write root is outside the package"
+
+#: src/deeplink/DeepLinkHandler.tsx
+msgid "Downloading an import"
+msgstr "Downloading an import"
+
+#: src/home/zones/SuggestedMap.tsx
+msgid "Downloading…"
+msgstr "Downloading…"
+
+#: src/downloads/index.ts
+msgid "Downloads"
+msgstr "Downloads"
+
+#: src/profile/health.ts
+msgid "Downloads and updates will fail — the folder is read-only ({badReason}). Move the package somewhere writable — not a mounted disk image or a protected system folder."
+msgstr "Downloads and updates will fail — the folder is read-only ({badReason}). Move the package somewhere writable — not a mounted disk image or a protected system folder."
 
 #: src/i18n/frameStrings.ts
 msgid "Drawer"
 msgstr "Drawer"
 
+#: src/deeplink/DeepLinkHandler.tsx
+msgid "Drop to install"
+msgstr "Drop to install"
+
+#: src/sound/SoundSettings.tsx
+msgid "Each of these plays a sound you can change. A sound's final volume is the master, times the group it sits under, times its own. Play lets you hear one whether or not it is muted."
+msgstr "Each of these plays a sound you can change. A sound's final volume is the master, times the group it sits under, times its own. Play lets you hear one whether or not it is muted."
+
+#: src/campaign/index.ts
+msgid "Edit"
+msgstr "Edit"
+
 #: src/i18n/frameStrings.ts
 msgid "Emerald"
 msgstr "Emerald"
+
+#: src/deeplink/parse.ts
+msgid "Empty link."
+msgstr "Empty link."
+
+#: src/profile/health.ts
+msgid "engine {engineVersions}"
+msgstr "engine {engineVersions}"
+
+#: src/play/index.ts
+msgid "Engine log"
+msgstr "Engine log"
+
+#: src/home/groupDescription.ts
+msgid "Engine options, appearance, accounts, and everything else."
+msgstr "Engine options, appearance, accounts, and everything else."
+
+#: src/general/index.ts
+msgid "Engine settings"
+msgstr "Engine settings"
+
+#: src/content/index.ts
+msgid "Engine Settings"
+msgstr "Engine Settings"
+
+#: src/content/index.ts
+msgid "Engines"
+msgstr "Engines"
+
+#: src/general/fullscreen.tsx
+msgid "Enter fullscreen"
+msgstr "Enter fullscreen"
+
+#: src/general/ErrorBoundary.tsx
+msgid "Error details"
+msgstr "Error details"
+
+#: src/general/fullscreen.tsx
+msgid "Exit fullscreen"
+msgstr "Exit fullscreen"
+
+#: src/deeplink/DeepLinkHandler.tsx
+msgid "Fetch and check"
+msgstr "Fetch and check"
+
+#: src/profile/health.ts
+msgid "Filter ({filterDesc}) has nothing to match yet — no games are installed. Install the game, or check the filter."
+msgstr "Filter ({filterDesc}) has nothing to match yet — no games are installed. Install the game, or check the filter."
+
+#: src/profile/health.ts
+msgid "Fix the JSON in .coilbox/campaigns/ (bundled) or the app data campaigns folder (local):"
+msgstr "Fix the JSON in .coilbox/campaigns/ (bundled) or the app data campaigns folder (local):"
+
+#: src/profile/health.ts
+msgid "Fix the JSON in .coilbox/scenarios/ (bundled) or the app data scenarios folder (local):"
+msgstr "Fix the JSON in .coilbox/scenarios/ (bundled) or the app data scenarios folder (local):"
 
 #: src/i18n/frameStrings.ts
 msgid "Floating top bar"
 msgstr "Floating top bar"
 
+#: src/profile/health.ts
+msgid "Folder writability not checked"
+msgstr "Folder writability not checked"
+
+#: src/general/pages/SettingsSection.tsx
+msgid "Follow system"
+msgstr "Follow system"
+
 #: src/i18n/frameStrings.ts
 msgid "Forward"
 msgstr "Forward"
 
+#: src/sound/MusicSource.tsx
+msgid "From a game"
+msgstr "From a game"
+
 #: src/i18n/frameStrings.ts
 msgid "Fuchsia"
 msgstr "Fuchsia"
+
+#: src/general/pages/SettingsSection.tsx
+msgid "Full motion"
+msgstr "Full motion"
+
+#: src/general/pages/SettingsSection.tsx
+msgid "Fullscreen"
+msgstr "Fullscreen"
+
+#: src/content/index.ts
+msgid "Fullscreen, resolution and vsync."
+msgstr "Fullscreen, resolution and vsync."
+
+#: src/conquest/index.ts
+msgid "Galaxy"
+msgstr "Galaxy"
+
+#: src/content/index.ts
+msgid "Game"
+msgstr "Game"
+
+#: src/profile/SettingsSection.tsx
+msgid "Game filter"
+msgstr "Game filter"
+
+#: src/profile/health.ts
+msgid "Game filter not checked against anything"
+msgstr "Game filter not checked against anything"
+
+#: src/profile/health.ts
+msgid "Game filter regex is invalid"
+msgstr "Game filter regex is invalid"
+
+#: src/sound/MusicSource.tsx
+msgid "Game to take music from"
+msgstr "Game to take music from"
+
+#: src/game-updates/index.ts
+msgid "Game updates"
+msgstr "Game updates"
+
+#: src/content/index.ts
+msgid "Games"
+msgstr "Games"
+
+#: src/sound/MusicSource.tsx
+msgid "Games often ship their own soundtrack. Coilbox can play it in the lobby, though it was written to score a battle rather than a menu."
+msgstr "Games often ship their own soundtrack. Coilbox can play it in the lobby, though it was written to score a battle rather than a menu."
+
+#: src/general/index.ts
+msgid "General"
+msgstr "General"
+
+#: src/notify/NotificationsSettings.tsx
+msgid "Grant permission"
+msgstr "Grant permission"
+
+#: src/content/index.ts
+msgid "Graphics"
+msgstr "Graphics"
 
 #: src/i18n/frameStrings.ts
 msgid "Gray"
@@ -183,37 +1036,268 @@ msgstr "Gray"
 msgid "Green"
 msgstr "Green"
 
+#: src/sound/SoundSettings.tsx
+msgid "Groups"
+msgstr "Groups"
+
+#: src/profile/HealthChecklist.tsx
+msgid "Health"
+msgstr "Health"
+
+#: src/profile/SettingsSection.tsx
+msgid "Hidden"
+msgstr "Hidden"
+
+#: src/profile/SettingsSection.tsx
+msgid "Hidden features"
+msgstr "Hidden features"
+
+#: src/profile/SettingsSection.tsx
+msgid "Hidden settings"
+msgstr "Hidden settings"
+
+#: src/profile/health.ts
+msgid "hide id ''{id}'' matches nothing"
+msgstr "hide id ''{id}'' matches nothing"
+
 #: src/i18n/frameStrings.ts
 msgid "Hide sidebar when collapsed"
 msgstr "Hide sidebar when collapsed"
+
+#: src/components/ViewControls.tsx
+msgid "Hide the ground grid"
+msgstr "Hide the ground grid"
 
 #: src/i18n/frameStrings.ts
 msgid "Hide the sidebar and open it from a menu button instead."
 msgstr "Hide the sidebar and open it from a menu button instead."
 
+#: src/profile/health.ts
+msgid "hideSettings id ''{id}'' matches nothing"
+msgstr "hideSettings id ''{id}'' matches nothing"
+
+#: src/uberstress/index.ts
+msgid "History"
+msgstr "History"
+
 #: src/i18n/frameStrings.ts
 msgid "Home"
 msgstr "Home"
+
+#: src/profile/SettingsSection.tsx
+msgid "Home page"
+msgstr "Home page"
+
+#: src/profile/health.ts
+msgid "Home page — {homeSummary}"
+msgstr "Home page — {homeSummary}"
+
+#: src/home/config.ts
+msgid "home: `{key}` does nothing on {where}"
+msgstr "home: `{key}` does nothing on {where}"
+
+#: src/home/config.ts
+msgid "home: `zones` left nothing to render, using the default page"
+msgstr "home: `zones` left nothing to render, using the default page"
+
+#: src/home/background.ts
+msgid "home: could not read background {token}, painting the default backdrop"
+msgstr "home: could not read background {token}, painting the default backdrop"
+
+#: src/home/config.ts
+msgid "home: ignoring `{key}` on {where}, expected a string, got {got}"
+msgstr "home: ignoring `{key}` on {where}, expected a string, got {got}"
+
+#: src/home/profileArt.ts
+msgid "home: ignoring `art`, expected an object, got {got}"
+msgstr "home: ignoring `art`, expected an object, got {got}"
+
+#: src/home/background.ts
+msgid "home: ignoring `background`, expected an @.coilbox file reference or false, got {got}"
+msgstr "home: ignoring `background`, expected an @.coilbox file reference or false, got {got}"
+
+#: src/home/config.ts
+msgid "home: ignoring `home`, expected an object, got {got}"
+msgstr "home: ignoring `home`, expected an object, got {got}"
+
+#: src/home/config.ts
+msgid "home: ignoring `layout`, expected a string, got {got}"
+msgstr "home: ignoring `layout`, expected a string, got {got}"
+
+#: src/home/config.ts
+msgid "home: ignoring `zones`, expected an array, got {got}"
+msgstr "home: ignoring `zones`, expected an array, got {got}"
+
+#: src/home/config.ts
+msgid "home: ignoring a repeated \"{kind}\" zone"
+msgstr "home: ignoring a repeated \"{kind}\" zone"
+
+#: src/home/config.ts
+msgid "home: ignoring a zone entry that is not an object: {got}"
+msgstr "home: ignoring a zone entry that is not an object: {got}"
+
+#: src/home/config.ts
+msgid "home: ignoring a zone entry with no `zone` name or `html`: {got}"
+msgstr "home: ignoring a zone entry with no `zone` name or `html`: {got}"
+
+#: src/home/profileArt.ts
+msgid "home: ignoring art for {tool}, expected an @.coilbox file reference or false, got {got}"
+msgstr "home: ignoring art for {tool}, expected an @.coilbox file reference or false, got {got}"
+
+#: src/home/config.ts
+msgid "home: ignoring unknown layout {shown}, using \"{defaultLayout}\". This build ships: {shipped}"
+msgstr "home: ignoring unknown layout {shown}, using \"{defaultLayout}\". This build ships: {shipped}"
+
+#: src/home/config.ts
+msgid "home: ignoring unknown zone {zoneName}"
+msgstr "home: ignoring unknown zone {zoneName}"
 
 #: src/i18n/frameStrings.ts
 msgid "Hover-reveal sidebar"
 msgstr "Hover-reveal sidebar"
 
+#: src/content/index.ts
+msgid "How the game itself looks, sounds and handles."
+msgstr "How the game itself looks, sounds and handles."
+
+#: src/deeplink/DeepLinkHandler.tsx
+msgid "Ignored a coilbox link"
+msgstr "Ignored a coilbox link"
+
+#: src/deeplink/DeepLinkHandler.tsx
+msgid "Ignored a file"
+msgstr "Ignored a file"
+
+#: src/multiplayer/index.tsx
+msgid "Ignored users"
+msgstr "Ignored users"
+
+#: src/deeplink/index.ts
+#: src/deeplink/pages/ImportSection.tsx
+msgid "Import"
+msgstr "Import"
+
+#: src/deeplink/pages/ImportSection.tsx
+msgid "Import {phrase}"
+msgstr "Import {phrase}"
+
+#: src/deeplink/DeepLinkHandler.tsx
+msgid "Import a {planLabel} downloaded from {host}?"
+msgstr "Import a {planLabel} downloaded from {host}?"
+
+#: src/deeplink/DeepLinkHandler.tsx
+msgid "Import a {planLabel} shared with you?"
+msgstr "Import a {planLabel} shared with you?"
+
+#: src/deeplink/DeepLinkHandler.tsx
+msgid "Import from a link"
+msgstr "Import from a link"
+
+#: src/deeplink/build.ts
+#: src/deeplink/fetchImport.ts
+#: src/deeplink/parse.ts
 #: src/i18n/uiError.ts
 msgid "Import URLs must be https."
 msgstr "Import URLs must be https."
+
+#: src/content/index.ts
+msgid "In game"
+msgstr "In game"
 
 #: src/i18n/frameStrings.ts
 msgid "Indigo"
 msgstr "Indigo"
 
+#: src/content/index.ts
+msgid "Input and camera"
+msgstr "Input and camera"
+
+#: src/deeplink/DeepLinkHandler.tsx
+#: src/home/zones/SuggestedMap.tsx
+msgid "Install"
+msgstr "Install"
+
+#: src/home/zones/SuggestedMap.tsx
+msgid "Install {mapTitle}"
+msgstr "Install {mapTitle}"
+
+#: src/profile/health.ts
+msgid "Install or bundle an engine — the game can't launch without one. {scanned}"
+msgstr "Install or bundle an engine — the game can't launch without one. {scanned}"
+
+#: src/home/zones/SuggestedMap.tsx
+msgid "Installed"
+msgstr "Installed"
+
 #: src/updater/pages/UpdatesSettingsSection.tsx
 msgid "Installed — restart to apply."
 msgstr "Installed — restart to apply."
 
+#: src/deeplink/DeepLinkHandler.tsx
+msgid "Installed {fileName}"
+msgstr "Installed {fileName}"
+
+#: src/deeplink/DeepLinkHandler.tsx
+msgid "Installing"
+msgstr "Installing"
+
+#: src/updater/UpdateBadge.tsx
+msgid "Installing update"
+msgstr "Installing update"
+
 #: src/updater/pages/UpdatesSettingsSection.tsx
 msgid "Installing…"
 msgstr "Installing…"
+
+#: src/sound/events.ts
+#: src/sound/library.ts
+msgid "Interface"
+msgstr "Interface"
+
+#: src/general/pages/SettingsSection.tsx
+msgid "Interface size"
+msgstr "Interface size"
+
+#: src/profile/refs.ts
+msgid "Invalid file reference: {reference}"
+msgstr "Invalid file reference: {reference}"
+
+#: src/profile/health.ts
+msgid "Invalid regex: {regexError}"
+msgstr "Invalid regex: {regexError}"
+
+#: src/deeplink/actions.ts
+msgid "It is added to your modules, which needs Advanced mode turned on in Settings."
+msgstr "It is added to your modules, which needs Advanced mode turned on in Settings."
+
+#: src/deeplink/actions.ts
+msgid "It is saved to Unit tweaks and opened, which needs Advanced mode turned on in Settings."
+msgstr "It is saved to Unit tweaks and opened, which needs Advanced mode turned on in Settings."
+
+#: src/deeplink/actions.ts
+msgid "It opens in the import box, which says where a campaign goes."
+msgstr "It opens in the import box, which says where a campaign goes."
+
+#: src/deeplink/DeepLinkHandler.tsx
+#: src/deeplink/pages/ImportSection.tsx
+msgid "It opens in the importer, which resolves any missing content before saving."
+msgstr "It opens in the importer, which resolves any missing content before saving."
+
+#: src/deeplink/actions.ts
+msgid "It opens in the keybinds editor, unsaved."
+msgstr "It opens in the keybinds editor, unsaved."
+
+#: src/hub/index.tsx
+msgid "Item"
+msgstr "Item"
+
+#: src/deeplink/DeepLinkHandler.tsx
+msgid "Join a room"
+msgstr "Join a room"
+
+#: src/deeplink/DeepLinkHandler.tsx
+msgid "Join the room at {roomAddress}:{roomPort}?"
+msgstr "Join the room at {roomAddress}:{roomPort}?"
 
 #: src/workshop/pages/components/CommandPalette.tsx
 msgid "Jump to a unit, a field, a section or an action"
@@ -222,6 +1306,14 @@ msgstr "Jump to a unit, a field, a section or an action"
 #: src/lib/relativeTime.ts
 msgid "just now"
 msgstr "just now"
+
+#: src/content/index.ts
+msgid "Keep a copy of your whole engine config, and put it back."
+msgstr "Keep a copy of your whole engine config, and put it back."
+
+#: src/content/index.ts
+msgid "Keybinds"
+msgstr "Keybinds"
 
 #: src/general/pages/SettingsSection.tsx
 msgid "Language"
@@ -235,6 +1327,28 @@ msgstr "Last checked {lastCheckedTime}"
 msgid "Layout"
 msgstr "Layout"
 
+#: src/home/config.ts
+msgid "Layout \"{layoutName}\""
+msgstr "Layout \"{layoutName}\""
+
+#: src/components/HeatLegend.tsx
+msgid "Least"
+msgstr "Least"
+
+#: src/lego/index.ts
+msgid "Lego Parts"
+msgstr "Lego Parts"
+
+#: src/notify/NotificationsSettings.tsx
+msgid "Let the banner make your system's notification sound. Your operating system owns that sound and its volume, so Coilbox's own volume does not apply, though muting all sound does."
+msgstr "Let the banner make your system's notification sound. Your operating system owns that sound and its volume, so Coilbox's own volume does not apply, though muting all sound does."
+
+#: src/content/index.ts
+#: src/downloads/index.ts
+#: src/hub/index.tsx
+msgid "Library"
+msgstr "Library"
+
 #: src/i18n/frameStrings.ts
 msgid "Light"
 msgstr "Light"
@@ -243,9 +1357,151 @@ msgstr "Light"
 msgid "Lime"
 msgstr "Lime"
 
+#: src/profile/jsonError.ts
+msgid "Line {line}, column {column}: {raw}"
+msgstr "Line {line}, column {column}: {raw}"
+
+#: src/deeplink/copyLink.ts
+msgid "Link copied"
+msgstr "Link copied"
+
+#: src/profile/health.ts
+msgid "link icon ''{n}'' is unknown — falls back to a generic icon"
+msgstr "link icon ''{n}'' is unknown — falls back to a generic icon"
+
+#: src/lobby-servers/index.ts
+msgid "Lobby servers"
+msgstr "Lobby servers"
+
+#: src/home/zones/ResumeRail.tsx
+msgid "Log in"
+msgstr "Log in"
+
+#: src/home/groupDescription.ts
+msgid "Log in to a lobby server, chat, and join battles."
+msgstr "Log in to a lobby server, chat, and join battles."
+
+#: src/multiplayer/index.tsx
+msgid "Login"
+msgstr "Login"
+
+#: src/animation/index.ts
+msgid "Lua Animations"
+msgstr "Lua Animations"
+
+#: src/content/index.ts
+msgid "Lua REPL"
+msgstr "Lua REPL"
+
+#: src/content/index.ts
+msgid "Map"
+msgstr "Map"
+
+#: src/mapconv/index.ts
+msgid "mapconv"
+msgstr "mapconv"
+
+#: src/mapconv/index.ts
+msgid "Mapping Tools"
+msgstr "Mapping Tools"
+
+#: src/mapconv/index.ts
+msgid "Mapping Wiki"
+msgstr "Mapping Wiki"
+
+#: src/content/index.ts
+msgid "Maps"
+msgstr "Maps"
+
+#: src/sound/SoundSettings.tsx
+msgid "Master volume"
+msgstr "Master volume"
+
+#: src/home/continue.ts
+msgid "Match in progress · hosted by {host}"
+msgstr "Match in progress · hosted by {host}"
+
+#: src/multiplayer/index.tsx
+msgid "Matchmaking"
+msgstr "Matchmaking"
+
+#: src/sound/events.ts
+msgid "Matchmaking pairs you up and starts the accept countdown."
+msgstr "Matchmaking pairs you up and starts the accept countdown."
+
+#: src/multiplayer/index.tsx
+msgid "Matchup"
+msgstr "Matchup"
+
+#: src/sound/events.ts
+msgid "Mentioned in chat"
+msgstr "Mentioned in chat"
+
 #: src/i18n/frameStrings.ts
 msgid "Menu"
 msgstr "Menu"
+
+#: src/campaign/index.ts
+msgid "Mission"
+msgstr "Mission"
+
+#: src/lego/index.ts
+msgid "Model"
+msgstr "Model"
+
+#: src/lego/index.ts
+msgid "Models"
+msgstr "Models"
+
+#: src/home/zones/ResumeRail.tsx
+msgid "More to pick up"
+msgstr "More to pick up"
+
+#: src/components/HeatLegend.tsx
+msgid "Most"
+msgstr "Most"
+
+#: src/components/HeatLegend.tsx
+msgid "Most is {peak}."
+msgstr "Most is {peak}."
+
+#: src/general/pages/SettingsSection.tsx
+msgid "Motion & effects"
+msgstr "Motion & effects"
+
+#: src/home/zones/ResumeRail.tsx
+#: src/multiplayer/index.tsx
+msgid "Multiplayer"
+msgstr "Multiplayer"
+
+#: src/home/continue.ts
+msgid "Multiplayer battle"
+msgstr "Multiplayer battle"
+
+#: src/sound/events.ts
+#: src/sound/SoundSettings.tsx
+msgid "Music"
+msgstr "Music"
+
+#: src/sound/MusicSource.tsx
+msgid "Music source"
+msgstr "Music source"
+
+#: src/sound/SoundSettings.tsx
+msgid "Music was turned off because the last attempt to play it stopped Coilbox responding."
+msgstr "Music was turned off because the last attempt to play it stopped Coilbox responding."
+
+#: src/sound/LevelRow.tsx
+msgid "Mute {label}"
+msgstr "Mute {label}"
+
+#: src/sound/SoundSettings.tsx
+msgid "Mute all sound"
+msgstr "Mute all sound"
+
+#: src/profile/health.ts
+msgid "names [{filterNames}]"
+msgstr "names [{filterNames}]"
 
 #: src/i18n/frameStrings.ts
 msgid "Navy"
@@ -255,53 +1511,474 @@ msgstr "Navy"
 msgid "Neutral"
 msgstr "Neutral"
 
+#: src/workshop/index.ts
+msgid "New project"
+msgstr "New project"
+
+#: src/profile/health.ts
+msgid "No content folder is portable — nothing would ship with the package. Tick Portable on the bundled folder."
+msgstr "No content folder is portable — nothing would ship with the package. Tick Portable on the bundled folder."
+
+#: src/profile/health.ts
+msgid "No content folders are configured to scan."
+msgstr "No content folders are configured to scan."
+
+#: src/profile/health.ts
+msgid "No content folders configured"
+msgstr "No content folders configured"
+
+#: src/profile/health.ts
+msgid "No distribution profile loaded"
+msgstr "No distribution profile loaded"
+
+#: src/profile/SettingsSection.tsx
+msgid "No distribution profile loaded — standard Coilbox."
+msgstr "No distribution profile loaded — standard Coilbox."
+
+#: src/profile/health.ts
+msgid "No download write root set"
+msgstr "No download write root set"
+
+#: src/profile/health.ts
+msgid "no engine for this platform"
+msgstr "no engine for this platform"
+
+#: src/profile/health.ts
+msgid "No engine found"
+msgstr "No engine found"
+
+#: src/profile/health.ts
+msgid "No game filter set"
+msgstr "No game filter set"
+
+#: src/profile/health.ts
+msgid "No games found"
+msgstr "No games found"
+
+#: src/sound/MusicSource.tsx
+msgid "No music"
+msgstr "No music"
+
+#: src/sound/MusicSource.tsx
+msgid "No music found in this game. Most ship sound effects only."
+msgstr "No music found in this game. Most ship sound effects only."
+
+#: src/notify/NotificationsBell.tsx
+msgid "No notifications yet."
+msgstr "No notifications yet."
+
 #: src/i18n/frameStrings.ts
 msgid "No settings available."
 msgstr "No settings available."
 
+#: src/home/zones/Greeting.tsx
 #: src/i18n/frameStrings.ts
 msgid "No tools available yet."
 msgstr "No tools available yet."
+
+#: src/profile/SettingsSection.tsx
+msgid "None"
+msgstr "None"
+
+#: src/sound/MusicSource.tsx
+msgid "Nostalgia"
+msgstr "Nostalgia"
+
+#: src/profile/health.ts
+msgid "Not portable (standard per-user install)"
+msgstr "Not portable (standard per-user install)"
+
+#: src/components/SaveStatus.tsx
+msgid "Not saved. Leaving this page loses the change."
+msgstr "Not saved. Leaving this page loses the change."
+
+#: src/profile/health.ts
+msgid "not writable"
+msgstr "not writable"
+
+#: src/profile/health.ts
+msgid "Nothing has scanned for games yet. Open Content > Games and let the scan finish, then re-run this. {scanned}"
+msgstr "Nothing has scanned for games yet. Open Content > Games and let the scan finish, then re-run this. {scanned}"
+
+#: src/profile/health.ts
+msgid "Nothing has scanned the content folders for games yet, so there is nothing to match the filter against. Install an engine, or open Content > Games and let the scan finish, then re-run this."
+msgstr "Nothing has scanned the content folders for games yet, so there is nothing to match the filter against. Install an engine, or open Content > Games and let the scan finish, then re-run this."
+
+#: src/profile/health.ts
+msgid "Nothing has scanned the content folders yet. Let the scan finish, then re-run this."
+msgstr "Nothing has scanned the content folders yet. Let the scan finish, then re-run this."
+
+#: src/deeplink/DeepLinkHandler.tsx
+msgid "Nothing was installed"
+msgstr "Nothing was installed"
+
+#: src/notify/NotificationsSettings.tsx
+msgid "Notification sound"
+msgstr "Notification sound"
+
+#: src/notify/index.ts
+#: src/notify/NotificationsBell.tsx
+msgid "Notifications"
+msgstr "Notifications"
+
+#: src/notify/NotificationsBell.tsx
+msgid "Notifications: {unread} unread"
+msgstr "Notifications: {unread} unread"
+
+#: src/notify/NotificationsBell.tsx
+msgid "now"
+msgstr "now"
+
+#: src/profile/SettingsSection.tsx
+msgid "Off"
+msgstr "Off"
+
+#: src/profile/SettingsSection.tsx
+msgid "On"
+msgstr "On"
 
 #: src/i18n/frameStrings.ts
 msgid "On a narrow window, the sidebar becomes a menu button and opens fullscreen."
 msgstr "On a narrow window, the sidebar becomes a menu button and opens fullscreen."
 
+#: src/profile/health.ts
+msgid "Only own maps: generated map styles are hidden"
+msgstr "Only own maps: generated map styles are hidden"
+
 #: src/i18n/frameStrings.ts
 msgid "Opal"
 msgstr "Opal"
+
+#: src/deeplink/DeepLinkHandler.tsx
+msgid "Open"
+msgstr "Open"
+
+#: src/deeplink/actions.ts
+msgid "Open {route}."
+msgstr "Open {route}."
+
+#: src/deeplink/pages/ImportSection.tsx
+msgid "Open a coilbox file"
+msgstr "Open a coilbox file"
+
+#: src/deeplink/pages/ImportSection.tsx
+msgid "Open a file instead…"
+msgstr "Open a file instead…"
+
+#: src/lego/index.ts
+msgid "Open a model"
+msgstr "Open a model"
+
+#: src/deeplink/DeepLinkHandler.tsx
+msgid "Open a screen"
+msgstr "Open a screen"
+
+#: src/deeplink/actions.ts
+msgid "Open chat."
+msgstr "Open chat."
+
+#: src/deeplink/actions.ts
+msgid "Open Conquest."
+msgstr "Open Conquest."
+
+#: src/home/continue.ts
+msgid "Open setup"
+msgstr "Open setup"
+
+#: src/deeplink/actions.ts
+msgid "Open the battle list."
+msgstr "Open the battle list."
+
+#: src/deeplink/actions.ts
+msgid "Open the game \"{id}\"."
+msgstr "Open the game \"{id}\"."
+
+#: src/deeplink/DeepLinkHandler.tsx
+msgid "Open the join form"
+msgstr "Open the join form"
+
+#: src/deeplink/actions.ts
+msgid "Open the map \"{id}\"."
+msgstr "Open the map \"{id}\"."
+
+#: src/deeplink/actions.ts
+msgid "Open the replay \"{id}\"."
+msgstr "Open the replay \"{id}\"."
+
+#: src/deeplink/actions.ts
+msgid "Open Warpath."
+msgstr "Open Warpath."
+
+#: src/deeplink/parse.ts
+msgid "Opening \"{screen}\" needs an id."
+msgstr "Opening \"{screen}\" needs an id."
+
+#: src/deeplink/build.ts
+msgid "Opening \"{screenName}\" needs an id."
+msgstr "Opening \"{screenName}\" needs an id."
 
 #: src/i18n/frameStrings.ts
 msgid "Orange"
 msgstr "Orange"
 
+#: src/lego/index.ts
+msgid "Parts pack format"
+msgstr "Parts pack format"
+
+#: src/deeplink/pages/ImportSection.tsx
+msgid "Paste a coilbox link, a code, or an exported file's contents…"
+msgstr "Paste a coilbox link, a code, or an exported file's contents…"
+
+#: src/deeplink/readImport.ts
+msgid "Paste a coilbox link, a share code, or the contents of a coilbox .json file."
+msgstr "Paste a coilbox link, a share code, or the contents of a coilbox .json file."
+
+#: src/deeplink/index.ts
+msgid "Paste a share code or link somebody sent you."
+msgstr "Paste a share code or link somebody sent you."
+
+#: src/deeplink/pages/ImportSection.tsx
+msgid "Paste anything coilbox made and it will work out what it is. A coilbox link, a share code, the address of a share on the web, the contents of an exported file, or the file itself. Nothing is imported until you have seen what it is and said yes."
+msgstr "Paste anything coilbox made and it will work out what it is. A coilbox link, a share code, the address of a share on the web, the contents of an exported file, or the file itself. Nothing is imported until you have seen what it is and said yes."
+
+#: src/deeplink/copyLink.ts
+msgid "Paste it into chat or Discord."
+msgstr "Paste it into chat or Discord."
+
+#: src/sound/SoundSettings.tsx
+msgid "Pause music"
+msgstr "Pause music"
+
+#: src/multiplayer/index.tsx
+msgid "People whose messages coilbox hides from you."
+msgstr "People whose messages coilbox hides from you."
+
+#: src/general/pages/SettingsSection.tsx
+msgid "Performance mode"
+msgstr "Performance mode"
+
+#: src/notify/NotificationsSettings.tsx
+msgid "Permission granted."
+msgstr "Permission granted."
+
+#: src/notify/NotificationsSettings.tsx
+msgid "Permission not granted."
+msgstr "Permission not granted."
+
+#: src/sound/MusicSource.tsx
+msgid "Pick a game"
+msgstr "Pick a game"
+
+#: src/sound/MusicSource.tsx
+msgid "Pick a game to see what it ships."
+msgstr "Pick a game to see what it ships."
+
+#: src/home/zones/Greeting.tsx
+msgid "Pick up where you left off."
+msgstr "Pick up where you left off."
+
 #: src/i18n/frameStrings.ts
 msgid "Pink"
 msgstr "Pink"
+
+#: src/home/config.ts
+msgid "pinned"
+msgstr "pinned"
+
+#: src/campaign/index.ts
+#: src/conquest/index.ts
+#: src/play/index.ts
+#: src/runlite/index.ts
+#: src/scenario/index.ts
+msgid "Play"
+msgstr "Play"
+
+#: src/sound/SoundSettings.tsx
+msgid "Play music"
+msgstr "Play music"
+
+#: src/multiplayer/index.tsx
+msgid "Player"
+msgstr "Player"
+
+#: src/multiplayer/index.tsx
+msgid "Player stats"
+msgstr "Player stats"
+
+#: src/profile/health.ts
+msgid "Portable mode active — {portableRoot}"
+msgstr "Portable mode active — {portableRoot}"
+
+#: src/sound/SoundSettings.tsx
+msgid "Preview {eventLabel}"
+msgstr "Preview {eventLabel}"
+
+#: src/profile/health.ts
+msgid "Profile failed to load"
+msgstr "Profile failed to load"
+
+#: src/profile/health.ts
+msgid "Profile loaded from {profileSource}"
+msgstr "Profile loaded from {profileSource}"
+
+#: src/profile/health.ts
+msgid "profile.json failed to parse"
+msgstr "profile.json failed to parse"
+
+#: src/workshop/index.ts
+msgid "Project"
+msgstr "Project"
+
+#: src/mapconv/index.ts
+msgid "Projects"
+msgstr "Projects"
 
 #: src/i18n/frameStrings.ts
 msgid "Purple"
 msgstr "Purple"
 
+#: src/home/zones/SuggestedMap.tsx
+msgid "Queued"
+msgstr "Queued"
+
+#: src/general/quit.tsx
+msgid "Quit"
+msgstr "Quit"
+
+#: src/profile/SettingsSection.tsx
+msgid "Quit button"
+msgstr "Quit button"
+
 #: src/i18n/frameStrings.ts
 msgid "Rainbow"
 msgstr "Rainbow"
+
+#: src/downloads/index.ts
+msgid "Rapid repositories"
+msgstr "Rapid repositories"
+
+#: src/profile/SettingsSection.tsx
+msgid "Re-run validation"
+msgstr "Re-run validation"
+
+#: src/profile/health.ts
+msgid "Read in place from {bundlePath}. Only the engine is copied, once, into the download folder."
+msgstr "Read in place from {bundlePath}. Only the engine is copied, once, into the download folder."
+
+#: src/sound/MusicSource.tsx
+msgid "Reading the archive…"
+msgstr "Reading the archive…"
+
+#: src/home/continue.ts
+msgid "Ready to install"
+msgstr "Ready to install"
+
+#: src/home/zones/ResumeRail.tsx
+msgid "Reconnect all"
+msgstr "Reconnect all"
+
+#: src/recordsGroup.ts
+msgid "Records"
+msgstr "Records"
 
 #: src/i18n/frameStrings.ts
 msgid "Red"
 msgstr "Red"
 
+#: src/general/pages/SettingsSection.tsx
+msgid "Reduce motion"
+msgstr "Reduce motion"
+
+#: src/content/index.ts
+#: src/workshop/index.ts
+msgid "Reference"
+msgstr "Reference"
+
 #: src/lib/relativeTime.ts
 msgid "refreshed {ago}"
 msgstr "refreshed {ago}"
+
+#: src/profile/health.ts
+msgid "regex /{filterRegex}/i"
+msgstr "regex /{filterRegex}/i"
+
+#: src/home/continue.ts
+msgid "Rejoin battle"
+msgstr "Rejoin battle"
+
+#: src/general/ErrorBoundary.tsx
+msgid "Reload"
+msgstr "Reload"
+
+#: src/profile/SettingsSection.tsx
+msgid "Reload profile"
+msgstr "Reload profile"
+
+#: src/profile/SettingsSection.tsx
+msgid "Reload re-reads .coilbox/profile.json and applies it to this window, so editing a profile does not need an app restart. You stay on this page, but anything in progress elsewhere resets."
+msgstr "Reload re-reads .coilbox/profile.json and applies it to this window, so editing a profile does not need an app restart. You stay on this page, but anything in progress elsewhere resets."
+
+#: src/general/pages/SettingsSection.tsx
+msgid "Renders 3D views at a lower resolution with fewer particles — for laptops and older GPUs."
+msgstr "Renders 3D views at a lower resolution with fewer particles — for laptops and older GPUs."
+
+#: src/play/index.ts
+msgid "Replay"
+msgstr "Replay"
+
+#: src/play/index.ts
+msgid "Replays"
+msgstr "Replays"
+
+#: src/general/ErrorBoundary.tsx
+#: src/general/pages/AboutCoilbox.tsx
+msgid "Report an issue"
+msgstr "Report an issue"
+
+#: src/sound/SoundSettings.tsx
+msgid "Reset {eventLabel} to {defaultSoundLabel}"
+msgstr "Reset {eventLabel} to {defaultSoundLabel}"
+
+#: src/components/ViewControls.tsx
+msgid "Reset the view"
+msgstr "Reset the view"
 
 #: src/i18n/frameStrings.ts
 msgid "Resize sidebar"
 msgstr "Resize sidebar"
 
+#: src/profile/SettingsSection.tsx
+msgid "Restart Coilbox"
+msgstr "Restart Coilbox"
+
 #: src/updater/pages/UpdatesSettingsSection.tsx
 msgid "Restart now"
 msgstr "Restart now"
+
+#: src/updater/UpdateBadge.tsx
+msgid "Restart to update"
+msgstr "Restart to update"
+
+#: src/home/continue.ts
+msgid "Resume conquest"
+msgstr "Resume conquest"
+
+#: src/home/continue.ts
+msgid "Resume mission"
+msgstr "Resume mission"
+
+#: src/home/continue.ts
+msgid "Resume run"
+msgstr "Resume run"
+
+#: src/components/SaveStatus.tsx
+#: src/home/zones/SuggestedMap.tsx
+msgid "Retry"
+msgstr "Retry"
+
+#: src/home/zones/SuggestedMap.tsx
+msgid "Retry installing {mapTitle}"
+msgstr "Retry installing {mapTitle}"
 
 #: src/i18n/frameStrings.ts
 msgid "Reveal sidebar"
@@ -311,6 +1988,74 @@ msgstr "Reveal sidebar"
 msgid "Rose"
 msgstr "Rose"
 
+#: src/uberstress/index.ts
+msgid "Run"
+msgstr "Run"
+
+#: src/general/pages/SettingsSection.tsx
+msgid "Run Coilbox in fullscreen. Also toggleable with F11 or the top-bar button; the choice is remembered across restarts."
+msgstr "Run Coilbox in fullscreen. Also toggleable with F11 or the top-bar button; the choice is remembered across restarts."
+
+#: src/home/groupDescription.ts
+msgid "Run engine stress tests and compare the results."
+msgstr "Run engine stress tests and compare the results."
+
+#: src/sound/events.ts
+msgid "Rung by the host"
+msgstr "Rung by the host"
+
+#: src/profile/HealthChecklist.tsx
+msgid "Running checks…"
+msgstr "Running checks…"
+
+#: src/lego/index.ts
+msgid "S3O Blender Tools"
+msgstr "S3O Blender Tools"
+
+#: src/play/index.ts
+msgid "Save Games"
+msgstr "Save Games"
+
+#: src/components/SaveStatus.tsx
+msgid "Saved {savedAt}"
+msgstr "Saved {savedAt}"
+
+#: src/content/index.ts
+msgid "Saved configs"
+msgstr "Saved configs"
+
+#: src/components/SaveStatus.tsx
+msgid "Saving…"
+msgstr "Saving…"
+
+#: src/sound/SoundSettings.tsx
+msgid "Scales every sound Coilbox makes. Audio played by a campaign briefing or a profile page has its own controls and is not affected."
+msgstr "Scales every sound Coilbox makes. Audio played by a campaign briefing or a profile page has its own controls and is not affected."
+
+#: src/general/pages/SettingsSection.tsx
+msgid "Scales the whole of Coilbox: text, spacing and the 3D views. Fit more on a small screen, or make everything easier to read on a large one. Cmd or Ctrl with plus and minus does the same, and with zero puts it back to 100%."
+msgstr "Scales the whole of Coilbox: text, spacing and the 3D views. Fit more on a small screen, or make everything easier to read on a large one. Cmd or Ctrl with plus and minus does the same, and with zero puts it back to 100%."
+
+#: src/profile/health.ts
+msgid "Scanned {scanRootCount} content folder(s): {scanRootPaths}."
+msgstr "Scanned {scanRootCount} content folder(s): {scanRootPaths}."
+
+#: src/scenario/index.ts
+msgid "Scenario"
+msgstr "Scenario"
+
+#: src/scenario/index.ts
+msgid "Scenario Builder"
+msgstr "Scenario Builder"
+
+#: src/scenario/index.ts
+msgid "Scenarios"
+msgstr "Scenarios"
+
+#: src/scenario/index.ts
+msgid "Scenarios guide"
+msgstr "Scenarios guide"
+
 #: src/components/ui/message-scroller.tsx
 msgid "Scroll to end"
 msgstr "Scroll to end"
@@ -319,9 +2064,38 @@ msgstr "Scroll to end"
 msgid "Scroll to start"
 msgstr "Scroll to start"
 
+#: src/components/ui/command.tsx
+msgid "Search for a command to run..."
+msgstr "Search for a command to run..."
+
+#: src/notify/NotificationsSettings.tsx
+msgid "Send test notification"
+msgstr "Send test notification"
+
+#: src/multiplayer/index.tsx
+msgid "Server admin"
+msgstr "Server admin"
+
+#: src/home/zones/SuggestedMap.tsx
+msgid "Set a download folder in <0>Content folders settings</0> to install it."
+msgstr "Set a download folder in <0>Content folders settings</0> to install it."
+
+#: src/general/index.ts
 #: src/i18n/frameStrings.ts
 msgid "Settings"
 msgstr "Settings"
+
+#: src/content/index.ts
+msgid "Shadows, water, particles and anti-aliasing."
+msgstr "Shadows, water, particles and anti-aliasing."
+
+#: src/notify/NotificationsSettings.tsx
+msgid "Show a native notification when the app is in the background."
+msgstr "Show a native notification when the app is in the background."
+
+#: src/general/pages/SettingsSection.tsx
+msgid "Show frame rate"
+msgstr "Show frame rate"
 
 #: src/i18n/frameStrings.ts
 msgid "Show only the current page; reveal the full path on hover."
@@ -331,9 +2105,45 @@ msgstr "Show only the current page; reveal the full path on hover."
 msgid "Show the back and forward navigation buttons in the top bar."
 msgstr "Show the back and forward navigation buttons in the top bar."
 
+#: src/general/pages/SettingsSection.tsx
+msgid "Show the brand splash when Coilbox launches. Click it or press Escape to dismiss it early."
+msgstr "Show the brand splash when Coilbox launches. Click it or press Escape to dismiss it early."
+
+#: src/general/pages/SettingsSection.tsx
+msgid "Show the developer and modding tools — uberstress, mapconv, animation, and the archive explorer — in the sidebar and welcome screen. Off by default for a player-focused layout."
+msgstr "Show the developer and modding tools — uberstress, mapconv, animation, and the archive explorer — in the sidebar and welcome screen. Off by default for a player-focused layout."
+
+#: src/profile/SettingsSection.tsx
+msgid "Shown"
+msgstr "Shown"
+
+#: src/general/pages/SettingsSection.tsx
+msgid "Shows how many frames a second each 3D view draws, in its bottom right corner."
+msgstr "Shows how many frames a second each 3D view draws, in its bottom right corner."
+
 #: src/i18n/frameStrings.ts
 msgid "Sidebar as popover menu"
 msgstr "Sidebar as popover menu"
+
+#: src/sound/SoundSettings.tsx
+msgid "Silence everything without losing your volume setting."
+msgstr "Silence everything without losing your volume setting."
+
+#: src/play/index.ts
+msgid "Singleplayer"
+msgstr "Singleplayer"
+
+#: src/animation/index.ts
+msgid "Skeletor IK Animation Guide"
+msgstr "Skeletor IK Animation Guide"
+
+#: src/animation/index.ts
+msgid "Skeletor S3O"
+msgstr "Skeletor S3O"
+
+#: src/home/continue.ts
+msgid "Skirmish setup"
+msgstr "Skirmish setup"
 
 #: src/i18n/frameStrings.ts
 msgid "Sky"
@@ -343,9 +2153,139 @@ msgstr "Sky"
 msgid "Slate"
 msgstr "Slate"
 
+#: src/sound/events.ts
+msgid "Small sounds as Coilbox gets on with things."
+msgstr "Small sounds as Coilbox gets on with things."
+
+#: src/sound/events.ts
+msgid "Someone says your name, or one of your highlight words, in chat or a private message."
+msgstr "Someone says your name, or one of your highlight words, in chat or a private message."
+
+#: src/sound/events.ts
+msgid "Something failed"
+msgstr "Something failed"
+
+#: src/sound/events.ts
+msgid "Something finished"
+msgstr "Something finished"
+
+#: src/general/ErrorBoundary.tsx
+msgid "Something went wrong"
+msgstr "Something went wrong"
+
+#: src/content/index.ts
+#: src/sound/index.ts
+#: src/sound/SoundSettings.tsx
+msgid "Sound"
+msgstr "Sound"
+
+#: src/sound/SoundSettings.tsx
+msgid "Sound for {eventLabel}"
+msgstr "Sound for {eventLabel}"
+
+#: src/sound/SoundSettings.tsx
+msgid "Sounds"
+msgstr "Sounds"
+
+#: src/sound/events.ts
+msgid "Sounds that want your attention, like a ring or a mention."
+msgstr "Sounds that want your attention, like a ring or a mention."
+
+#: src/downloads/index.ts
+msgid "Sources"
+msgstr "Sources"
+
+#: src/downloads/index.ts
+msgid "Springfiles"
+msgstr "Springfiles"
+
+#: src/general/pages/AboutCoilbox.tsx
+msgid "Star on GitHub"
+msgstr "Star on GitHub"
+
+#: src/general/pages/SettingsSection.tsx
+msgid "Star twinkle, nebulae and other decorative touches. Turn off for a plainer interface. Sound is controlled separately, in Sound settings."
+msgstr "Star twinkle, nebulae and other decorative touches. Turn off for a plainer interface. Sound is controlled separately, in Sound settings."
+
+#: src/profile/SettingsSection.tsx
+msgid "Start a distribution profile from how Coilbox is set up right now. It is written to .coilbox/profile.json beside the app, and never overwrites a profile that is already there."
+msgstr "Start a distribution profile from how Coilbox is set up right now. It is written to .coilbox/profile.json beside the app, and never overwrites a profile that is already there."
+
+#: src/home/groupDescription.ts
+msgid "Start a skirmish, run a campaign, or pick up a Warpath run."
+msgstr "Start a skirmish, run a campaign, or pick up a Warpath run."
+
+#: src/profile/start.ts
+msgid "start campaign ''{campaignId}'' is a local campaign, not a bundled one. Players will not have it until its export is in .coilbox/campaigns/"
+msgstr "start campaign ''{campaignId}'' is a local campaign, not a bundled one. Players will not have it until its export is in .coilbox/campaigns/"
+
+#: src/profile/start.ts
+msgid "start campaign ''{campaignId}'' is not bundled. Put its export in .coilbox/campaigns/ and use the `id` from that file"
+msgstr "start campaign ''{campaignId}'' is not bundled. Put its export in .coilbox/campaigns/ and use the `id` from that file"
+
+#: src/profile/start.ts
+msgid "start campaign ''{campaignTitle}'' has no missions"
+msgstr "start campaign ''{campaignTitle}'' has no missions"
+
+#: src/profile/health.ts
+msgid "Start game and map not checked against the bundle"
+msgstr "Start game and map not checked against the bundle"
+
+#: src/home/continue.ts
+msgid "Start here"
+msgstr "Start here"
+
+#: src/home/continue.ts
+msgid "Start mission"
+msgstr "Start mission"
+
+#: src/profile/start.ts
+msgid "start mission ''{missionId}'' is not in campaign ''{campaignTitle}''"
+msgstr "start mission ''{missionId}'' is not in campaign ''{campaignTitle}''"
+
+#: src/profile/start.ts
+msgid "start scenario ''{id}'' is not a bundled one. Players will not have it until its export is in .coilbox/scenarios/"
+msgstr "start scenario ''{id}'' is not a bundled one. Players will not have it until its export is in .coilbox/scenarios/"
+
+#: src/profile/start.ts
+msgid "start scenario ''{id}'' is not bundled. Put its export in .coilbox/scenarios/ and use the `id` from that file"
+msgstr "start scenario ''{id}'' is not bundled. Put its export in .coilbox/scenarios/ and use the `id` from that file"
+
+#: src/profile/start.ts
+msgid "start scenario ''{scenarioName}'' names no game and map, so there is nothing to play"
+msgstr "start scenario ''{scenarioName}'' names no game and map, so there is nothing to play"
+
+#: src/profile/health.ts
+msgid "Start: ''{missionTitle}'' in campaign ''{campaignTitle}''"
+msgstr "Start: ''{missionTitle}'' in campaign ''{campaignTitle}''"
+
+#: src/profile/health.ts
+msgid "Start: scenario ''{scenarioName}''"
+msgstr "Start: scenario ''{scenarioName}''"
+
+#: src/general/pages/SettingsSection.tsx
+msgid "Startup splash"
+msgstr "Startup splash"
+
 #: src/i18n/frameStrings.ts
 msgid "Stone"
 msgstr "Stone"
+
+#: src/sound/SoundSettings.tsx
+msgid "Stop {eventLabel}"
+msgstr "Stop {eventLabel}"
+
+#: src/general/pages/SettingsSection.tsx
+msgid "Stops ambient animation — the galaxy twinkle, scrolling panoramas, spinning map previews and result flourishes. \"Follow system\" respects your OS accessibility preference."
+msgstr "Stops ambient animation — the galaxy twinkle, scrolling panoramas, spinning map previews and result flourishes. \"Follow system\" respects your OS accessibility preference."
+
+#: src/content/index.ts
+msgid "Storage"
+msgstr "Storage"
+
+#: src/home/zones/SuggestedMap.tsx
+msgid "Suggested map"
+msgstr "Suggested map"
 
 #: src/general/pages/SettingsSection.tsx
 #: src/i18n/frameStrings.ts
@@ -355,6 +2295,10 @@ msgstr "System"
 #: src/i18n/frameStrings.ts
 msgid "Teal"
 msgstr "Teal"
+
+#: src/notify/NotificationsSettings.tsx
+msgid "Test notification"
+msgstr "Test notification"
 
 #: src/i18n/uiError.ts
 msgid "That address answered, but it is not a coilbox hub."
@@ -368,13 +2312,57 @@ msgstr "That import is not a coilbox import."
 msgid "That import is too large to be a coilbox import."
 msgstr "That import is too large to be a coilbox import."
 
+#: src/deeplink/readImport.ts
+msgid "That is a JSON file, but not one coilbox made. A coilbox export starts with a \"format\": \"coilbox\" line."
+msgstr "That is a JSON file, but not one coilbox made. A coilbox export starts with a \"format\": \"coilbox\" line."
+
+#: src/deeplink/parse.ts
+msgid "That is not a coilbox link."
+msgstr "That is not a coilbox link."
+
+#: src/deeplink/parse.ts
+msgid "That is not a valid link."
+msgstr "That is not a valid link."
+
+#: src/deeplink/readImport.ts
+msgid "That starts like a coilbox code, but the rest is damaged or cut short. Copy the whole code and paste it again."
+msgstr "That starts like a coilbox code, but the rest is damaged or cut short. Copy the whole code and paste it again."
+
+#: src/deeplink/build.ts
+msgid "That URL is invalid."
+msgstr "That URL is invalid."
+
+#: src/home/config.ts
+msgid "the \"{kind}\" zone"
+msgstr "the \"{kind}\" zone"
+
 #: src/i18n/uiError.ts
 msgid "the connection ended before the login finished"
 msgstr "the connection ended before the login finished"
 
+#: src/profile/SettingsSection.tsx
+msgid "The content scan failed, so the profile could not be seeded with the installed games. unitsync said: {scanError}"
+msgstr "The content scan failed, so the profile could not be seeded with the installed games. unitsync said: {scanError}"
+
 #: src/i18n/uiError.ts
 msgid "The download failed part way through."
 msgstr "The download failed part way through."
+
+#: src/home/continue.ts
+msgid "the engine"
+msgstr "the engine"
+
+#: src/content/index.ts
+msgid "The engine versions you have, and getting more."
+msgstr "The engine versions you have, and getting more."
+
+#: src/content/index.ts
+msgid "The folders coilbox reads games and maps from, and which one new content goes to."
+msgstr "The folders coilbox reads games and maps from, and which one new content goes to."
+
+#: src/sound/events.ts
+msgid "The founder of the battle you are in goes in game."
+msgstr "The founder of the battle you are in goes in game."
 
 #: src/i18n/uiError.ts
 msgid "The game did not answer within {seconds} seconds. Its infolog says why."
@@ -388,9 +2376,33 @@ msgstr "The game has not connected to coilbox."
 msgid "The game has not started yet."
 msgstr "The game has not started yet."
 
+#: src/profile/health.ts
+msgid "The games scan failed, so it is not known what is installed. unitsync said: {scanError} {scanned}"
+msgstr "The games scan failed, so it is not known what is installed. unitsync said: {scanError} {scanned}"
+
+#: src/profile/health.ts
+msgid "The games scan failed, so there is nothing to match the filter against. unitsync said: {scanError}"
+msgstr "The games scan failed, so there is nothing to match the filter against. unitsync said: {scanError}"
+
+#: src/profile/health.ts
+msgid "The generated map styles stay on: {mapsIssue}."
+msgstr "The generated map styles stay on: {mapsIssue}."
+
+#: src/profile/health.ts
+msgid "The home page shows no start card: {startIssue}."
+msgstr "The home page shows no start card: {startIssue}."
+
 #: src/i18n/uiError.ts
 msgid "The host returned an error ({status})."
 msgstr "The host returned an error ({status})."
+
+#: src/sound/events.ts
+msgid "The host rings the battle room to round up idle players."
+msgstr "The host rings the battle room to round up idle players."
+
+#: src/sound/events.ts
+msgid "The host starts the game"
+msgstr "The host starts the game"
 
 #: src/i18n/uiError.ts
 msgid "The host took too long to respond."
@@ -400,13 +2412,49 @@ msgstr "The host took too long to respond."
 msgid "The hub stopped answering part way through."
 msgstr "The hub stopped answering part way through."
 
+#: src/deeplink/DeepLinkHandler.tsx
+msgid "The join form opens filled in. Nothing connects until you press Join in it."
+msgstr "The join form opens filled in. Nothing connects until you press Join in it."
+
+#: src/account/index.ts
+msgid "The lobby account you are signed in to."
+msgstr "The lobby account you are signed in to."
+
 #: src/i18n/uiError.ts
 msgid "the login did not finish within {seconds}s"
 msgstr "the login did not finish within {seconds}s"
 
+#: src/mapconv/index.ts
+msgid "The map compiler coilbox builds and takes apart maps with."
+msgstr "The map compiler coilbox builds and takes apart maps with."
+
+#: src/profile/health.ts
+msgid "The profile's `icon` was not applied"
+msgstr "The profile's `icon` was not applied"
+
+#: src/general/ErrorBoundary.tsx
+msgid "The screen you were on hit an unexpected error. Reloading usually clears it. If this keeps happening, copy the details below and report it so it can be fixed."
+msgstr "The screen you were on hit an unexpected error. Reloading usually clears it. If this keeps happening, copy the details below and report it so it can be fixed."
+
 #: src/i18n/uiError.ts
 msgid "the server refused the login"
 msgstr "the server refused the login"
+
+#: src/lobby-servers/index.ts
+msgid "The servers you can log in to, and your accounts on them."
+msgstr "The servers you can log in to, and your accounts on them."
+
+#: src/multiplayer/index.tsx
+msgid "The servers you play on, and who you hear from there."
+msgstr "The servers you play on, and who you hear from there."
+
+#: src/sound/events.ts
+msgid "The soundtrack, whichever one you pick above."
+msgstr "The soundtrack, whichever one you pick above."
+
+#: src/profile/health.ts
+msgid "The start's game and map are installed"
+msgstr "The start's game and map are installed"
 
 #: src/i18n/frameStrings.ts
 msgid "The top bar loses its background and sits over the content as it scrolls."
@@ -419,6 +2467,122 @@ msgstr "Theme"
 #: src/i18n/frameStrings.ts
 msgid "Theme and visual preferences."
 msgstr "Theme and visual preferences."
+
+#: src/profile/SettingsSection.tsx
+msgid "Theme overrides"
+msgstr "Theme overrides"
+
+#: src/profile/health.ts
+msgid "There is no engine in engine/, so players download one on first run. Copy engine/<platform>/<version>/ from a working install to bundle it."
+msgstr "There is no engine in engine/, so players download one on first run. Copy engine/<platform>/<version>/ from a working install to bundle it."
+
+#: src/deeplink/build.ts
+msgid "There is no URL to share."
+msgstr "There is no URL to share."
+
+#: src/deeplink/build.ts
+msgid "There is nothing to share yet."
+msgstr "There is nothing to share yet."
+
+#: src/deeplink/copyLink.ts
+msgid "There's nothing to share yet."
+msgstr "There's nothing to share yet."
+
+#: src/deeplink/build.ts
+msgid "This battle has no id to join."
+msgstr "This battle has no id to join."
+
+#: src/deeplink/build.ts
+msgid "This battle has no server to join."
+msgstr "This battle has no server to join."
+
+#: src/deeplink/build.ts
+msgid "This battle's password cannot go in a link."
+msgstr "This battle's password cannot go in a link."
+
+#: src/sound/MusicSource.tsx
+msgid "This build ships no music."
+msgstr "This build ships no music."
+
+#: src/deeplink/actions.ts
+msgid "This challenge link is for an unknown game mode."
+msgstr "This challenge link is for an unknown game mode."
+
+#: src/deeplink/build.ts
+msgid "This id is invalid for a link."
+msgstr "This id is invalid for a link."
+
+#: src/deeplink/parse.ts
+msgid "This import link has an invalid URL."
+msgstr "This import link has an invalid URL."
+
+#: src/deeplink/parse.ts
+msgid "This import link has both a code and a URL."
+msgstr "This import link has both a code and a URL."
+
+#: src/deeplink/parse.ts
+msgid "This import link has no payload."
+msgstr "This import link has no payload."
+
+#: src/deeplink/parse.ts
+msgid "This import link is too large."
+msgstr "This import link is too large."
+
+#: src/deeplink/fetchImport.ts
+msgid "This import URL is not valid."
+msgstr "This import URL is not valid."
+
+#: src/deeplink/readImport.ts
+msgid "This is {campaignPhrase}. Campaigns import from a file: turn on Advanced mode in Settings, then use Campaign Builder and its Import button."
+msgstr "This is {campaignPhrase}. Campaigns import from a file: turn on Advanced mode in Settings, then use Campaign Builder and its Import button."
+
+#: src/deeplink/pages/ImportSection.tsx
+msgid "This is {phrase}. Import it?"
+msgstr "This is {phrase}. Import it?"
+
+#: src/deeplink/build.ts
+msgid "This is too large to share as a link."
+msgstr "This is too large to share as a link."
+
+#: src/deeplink/parse.ts
+msgid "This join link has no battle."
+msgstr "This join link has no battle."
+
+#: src/deeplink/parse.ts
+msgid "This join link has no server."
+msgstr "This join link has no server."
+
+#: src/deeplink/DeepLinkHandler.tsx
+msgid "This join link is not one coilbox can read."
+msgstr "This join link is not one coilbox can read."
+
+#: src/deeplink/parse.ts
+msgid "This join link's battle is not a battle number."
+msgstr "This join link's battle is not a battle number."
+
+#: src/deeplink/parse.ts
+msgid "This join link's password is not a battle password."
+msgstr "This join link's password is not a battle password."
+
+#: src/deeplink/parse.ts
+msgid "This join link's server is not an address and a port."
+msgstr "This join link's server is not an address and a port."
+
+#: src/deeplink/DeepLinkHandler.tsx
+msgid "This link downloads an import from {host}."
+msgstr "This link downloads an import from {host}."
+
+#: src/deeplink/actions.ts
+msgid "This link is not a coilbox import."
+msgstr "This link is not a coilbox import."
+
+#: src/deeplink/parse.ts
+msgid "This open link has no screen."
+msgstr "This open link has no screen."
+
+#: src/deeplink/parse.ts
+msgid "This open link's id is not a name."
+msgstr "This open link's id is not a name."
 
 #: src/i18n/uiError.ts
 msgid "This project has a custom explosion effect. A tweak slot cannot carry the effects file it needs, so packing it into a lobby chat line would silently break it. Use the mutator or edit-in-place route instead."
@@ -436,9 +2600,110 @@ msgstr "This project has no edits a mutator archive can carry, so there is nothi
 msgid "This project has no edits, so there is nothing to pack for a lobby."
 msgstr "This project has no edits, so there is nothing to pack for a lobby."
 
+#: src/deeplink/build.ts
+msgid "This room has no address to join at."
+msgstr "This room has no address to join at."
+
+#: src/deeplink/build.ts
+msgid "This room has no port to join on."
+msgstr "This room has no port to join on."
+
+#: src/deeplink/parse.ts
+msgid "This room link has no address."
+msgstr "This room link has no address."
+
+#: src/deeplink/parse.ts
+msgid "This room link has no port."
+msgstr "This room link has no port."
+
+#: src/deeplink/parse.ts
+msgid "This room link's address is not an address."
+msgstr "This room link's address is not an address."
+
+#: src/deeplink/parse.ts
+msgid "This room link's port is not a port."
+msgstr "This room link's port is not a port."
+
+#: src/deeplink/build.ts
+msgid "This URL is too long for a link."
+msgstr "This URL is too long for a link."
+
+#: src/deeplink/readImport.ts
+msgid "This was made by a newer version of coilbox. Update coilbox to open it."
+msgstr "This was made by a newer version of coilbox. Update coilbox to open it."
+
+#: src/profile/SettingsSection.tsx
+msgid "Title"
+msgstr "Title"
+
 #: src/i18n/frameStrings.ts
 msgid "Toggle sidebar"
 msgstr "Toggle sidebar"
+
+#: src/general/index.ts
+msgid "Tools for making things, and for the people who ship coilbox."
+msgstr "Tools for making things, and for the people who ship coilbox."
+
+#: src/home/config.ts
+msgid "tracking the default"
+msgstr "tracking the default"
+
+#: src/home/continue.ts
+msgid "Turn {turn}"
+msgstr "Turn {turn}"
+
+#: src/uberstress/index.ts
+msgid "uberstress"
+msgstr "uberstress"
+
+#: src/content/index.ts
+msgid "Unit"
+msgstr "Unit"
+
+#: src/lego/index.ts
+msgid "unit builder"
+msgstr "unit builder"
+
+#: src/lego/index.ts
+msgid "Unit builder guide"
+msgstr "Unit builder guide"
+
+#: src/workshop/index.ts
+msgid "Unit tweaks"
+msgstr "Unit tweaks"
+
+#: src/content/index.ts
+msgid "Units"
+msgstr "Units"
+
+#: src/deeplink/parse.ts
+msgid "Unknown action \"{shownAction}\"."
+msgstr "Unknown action \"{shownAction}\"."
+
+#: src/deeplink/parse.ts
+msgid "Unknown screen \"{screen}\"."
+msgstr "Unknown screen \"{screen}\"."
+
+#: src/profile/widgets.tsx
+msgid "Unknown widget: <0>@widget/{name}</0>"
+msgstr "Unknown widget: <0>@widget/{name}</0>"
+
+#: src/components/SaveStatus.tsx
+msgid "Unsaved changes"
+msgstr "Unsaved changes"
+
+#: src/updater/UpdateBadge.tsx
+#: src/updater/UpdaterProvider.tsx
+msgid "Update available"
+msgstr "Update available"
+
+#: src/home/continue.ts
+msgid "Update Coilbox"
+msgstr "Update Coilbox"
+
+#: src/profile/SettingsSection.tsx
+msgid "Update repo"
+msgstr "Update repo"
 
 #: src/updater/pages/UpdatesSettingsSection.tsx
 msgid "Updates are disabled in development builds."
@@ -448,6 +2713,26 @@ msgstr "Updates are disabled in development builds."
 msgid "Updates for this build are managed by its distributor."
 msgstr "Updates for this build are managed by its distributor."
 
+#: src/deeplink/pages/ImportSection.tsx
+msgid "Use it"
+msgstr "Use it"
+
+#: src/profile/SettingsSection.tsx
+msgid "User choice"
+msgstr "User choice"
+
+#: src/profile/useHealthChecks.ts
+msgid "valid JSON but does not match the campaign schema"
+msgstr "valid JSON but does not match the campaign schema"
+
+#: src/profile/scenarioFailure.ts
+msgid "valid JSON but does not match the scenario schema"
+msgstr "valid JSON but does not match the scenario schema"
+
+#: src/profile/SettingsSection.tsx
+msgid "Validate profile"
+msgstr "Validate profile"
+
 #: src/updater/pages/UpdatesSettingsSection.tsx
 msgid "Version {newVersion} available"
 msgstr "Version {newVersion} available"
@@ -456,21 +2741,125 @@ msgstr "Version {newVersion} available"
 msgid "Violet"
 msgstr "Violet"
 
+#: src/sound/SoundSettings.tsx
+msgid "Volume"
+msgstr "Volume"
+
+#: src/content/index.ts
+msgid "Volume, channel by channel."
+msgstr "Volume, channel by channel."
+
+#: src/runlite/index.ts
+msgid "Warpath"
+msgstr "Warpath"
+
+#: src/home/continue.ts
+msgid "Warpath run"
+msgstr "Warpath run"
+
+#: src/home/zones/Greeting.tsx
+msgid "Welcome back {username}"
+msgstr "Welcome back {username}"
+
+#: src/profile/SettingsSection.tsx
+msgid "Welcome screen"
+msgstr "Welcome screen"
+
+#: src/profile/index.ts
+msgid "What a game's own build of coilbox has renamed, hidden or fixed."
+msgstr "What a game's own build of coilbox has renamed, hidden or fixed."
+
+#: src/content/index.ts
+msgid "What every key does, on a keyboard you can click."
+msgstr "What every key does, on a keyboard you can click."
+
+#: src/content/index.ts
+msgid "What is taking up space, and clearing it out."
+msgstr "What is taking up space, and clearing it out."
+
+#: src/sound/SoundSettings.tsx
+msgid "When"
+msgstr "When"
+
 #: src/i18n/frameStrings.ts
 msgid "When collapsed, hide the sidebar and slide it out on hovering the left edge."
 msgstr "When collapsed, hide the sidebar and slide it out on hovering the left edge."
+
+#: src/downloads/index.ts
+msgid "Where games and maps come from."
+msgstr "Where games and maps come from."
+
+#: src/play/index.ts
+msgid "Where the engine last wrote its log, and the system it ran on."
+msgstr "Where the engine last wrote its log, and the system it ran on."
+
+#: src/content/index.ts
+msgid "Where your games, maps and engines live, and where new ones come from."
+msgstr "Where your games, maps and engines live, and where new ones come from."
+
+#: src/multiplayer/index.tsx
+msgid "Words that light up a chat tab when somebody says them."
+msgstr "Words that light up a chat tab when somebody says them."
 
 #: src/i18n/frameStrings.ts
 msgid "Working: {op}"
 msgstr "Working: {op}"
 
+#: src/workshop/index.ts
+msgid "workshop"
+msgstr "workshop"
+
+#: src/profile/health.ts
+msgid "Write root \"{writeRootPath}\" is outside the package (\"{appDir}\"). Downloads and release updates would land there, not with the package. Point the write root at a folder under the package."
+msgstr "Write root \"{writeRootPath}\" is outside the package (\"{appDir}\"). Downloads and release updates would land there, not with the package. Point the write root at a folder under the package."
+
+#: src/profile/health.ts
+msgid "Write root portability n/a (not portable)"
+msgstr "Write root portability n/a (not portable)"
+
+#: src/profile/SettingsSection.tsx
+msgid "Wrote <0/>. Restart Coilbox to load it."
+msgstr "Wrote <0/>. Restart Coilbox to load it."
+
 #: src/i18n/frameStrings.ts
 msgid "Yellow"
 msgstr "Yellow"
 
+#: src/home/continue.ts
+msgid "You have {installedVersion}"
+msgstr "You have {installedVersion}"
+
+#: src/sound/events.ts
+msgid "You launch a game"
+msgstr "You launch a game"
+
 #: src/updater/pages/UpdatesSettingsSection.tsx
 msgid "You're up to date."
 msgstr "You're up to date."
+
+#: src/home/groupDescription.ts
+msgid "Your career, player stats and replays of games already played."
+msgstr "Your career, player stats and replays of games already played."
+
+#: src/settings-storage.ts
+msgid "Your change will be lost when Coilbox closes, and anything that reads the settings file still has the old answer. Check the disk is not full, then change the setting again to try saving it."
+msgstr "Your change will be lost when Coilbox closes, and anything that reads the settings file still has the old answer. Check the disk is not full, then change the setting again to try saving it."
+
+#: src/deeplink/readImport.ts
+msgid "Your clipboard holds {phrase}."
+msgstr "Your clipboard holds {phrase}."
+
+#: src/deeplink/readImport.ts
+msgid "Your clipboard holds a coilbox link."
+msgstr "Your clipboard holds a coilbox link."
+
+#: src/home/groupDescription.ts
+msgid "Your maps, games and blueprints, what other players have shared, and what is downloading."
+msgstr "Your maps, games and blueprints, what other players have shared, and what is downloading."
+
+#: src/content/index.ts
+msgid "Your player name and team highlighting."
+msgstr "Your player name and team highlighting."
 
 #: src/i18n/frameStrings.ts
 msgid "Zinc"

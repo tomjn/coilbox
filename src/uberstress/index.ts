@@ -1,6 +1,8 @@
+import { msg } from "@lingui/core/macro";
 import type { FramePlugin } from "@picoframe/plugin-sdk";
 import { History, Server, Zap } from "lucide-react";
 import { gateAdvanced, useAdvancedMode } from "../general/advanced";
+import { lazyText } from "../i18n/pluginText";
 import UberstressSettings from "./pages/SettingsSection";
 
 /**
@@ -20,12 +22,12 @@ const uberstressPlugin: FramePlugin = {
   nav: [
     {
       id: "uberstress",
-      label: "uberstress",
+      label: lazyText(msg`uberstress`),
       order: 30,
       items: [
         {
           id: "uberstress.run",
-          label: "Run",
+          label: lazyText(msg`Run`),
           to: "/uberstress",
           end: true,
           order: 0,
@@ -34,7 +36,7 @@ const uberstressPlugin: FramePlugin = {
         },
         {
           id: "uberstress.history",
-          label: "History",
+          label: lazyText(msg`History`),
           to: "/uberstress/history",
           order: 1,
           icon: History,
@@ -47,19 +49,19 @@ const uberstressPlugin: FramePlugin = {
     {
       path: "uberstress",
       lazy: gateAdvanced(() => import("./pages/RunPage")),
-      crumb: "uberstress",
+      crumb: lazyText(msg`uberstress`),
     },
     {
       path: "uberstress/history",
       lazy: gateAdvanced(() => import("./pages/HistoryPage")),
-      crumb: "History",
+      crumb: lazyText(msg`History`),
     },
   ],
   settings: [
     {
       id: "uberstress",
-      title: "uberstress",
-      description: "A load tester for uberserver lobby servers.",
+      title: lazyText(msg`uberstress`),
+      description: lazyText(msg`A load tester for uberserver lobby servers.`),
       parent: "advanced",
       order: 20,
       icon: Server,

@@ -1,3 +1,4 @@
+import { useLingui } from "@lingui/react/macro";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { getProfile, type SplashConfig } from "./profile";
 
@@ -24,6 +25,7 @@ export default function Splash({
   config: SplashConfig;
   src: string;
 }) {
+  const { t } = useLingui();
   const duration = config.duration ?? DEFAULT_DURATION_MS;
   const fadeInMs = Math.round(duration * FADE_IN_FRACTION);
   const fadeOutMs = Math.round(duration * FADE_OUT_FRACTION);
@@ -84,7 +86,7 @@ export default function Splash({
   return (
     <button
       type="button"
-      aria-label="Dismiss splash"
+      aria-label={t`Dismiss splash`}
       onClick={dismiss}
       style={{
         position: "fixed",

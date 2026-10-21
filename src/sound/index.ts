@@ -1,5 +1,7 @@
+import { msg } from "@lingui/core/macro";
 import type { FramePlugin } from "@picoframe/plugin-sdk";
 import { Volume2 } from "lucide-react";
+import { lazyText } from "../i18n/pluginText";
 import { SoundProvider } from "./SoundProvider";
 import SoundSettings from "./SoundSettings";
 
@@ -17,7 +19,7 @@ const soundPlugin: FramePlugin = {
   settings: [
     {
       id: "sound",
-      title: "Sound",
+      title: lazyText(msg`Sound`),
       // Between Notifications (30) and the Coilbox hub (40). Both are about
       // how the app gets your attention, so they sit together.
       order: 35,

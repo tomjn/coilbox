@@ -1,3 +1,4 @@
+import { t } from "@lingui/core/macro";
 import type { NavGroup, NavItem } from "@picoframe/plugin-sdk";
 import { defineCommand } from "@picoframe/plugin-sdk";
 import { resolveLinkIcon } from "./links";
@@ -114,19 +115,20 @@ export async function expandIncludes(
       out.push(line);
       continue;
     }
+    const include = line.trim();
     if (seen.has(ref.path)) {
-      out.push(`> **Include error:** cycle detected at \`${line.trim()}\``);
+      out.push(t`> **Include error:** cycle detected at \`${include}\``);
       continue;
     }
     if (depth >= MAX_INCLUDE_DEPTH) {
       out.push(
-        `> **Include error:** include nesting too deep at \`${line.trim()}\``,
+        t`> **Include error:** include nesting too deep at \`${include}\``,
       );
       continue;
     }
     const { text, ok } = await read(ref.path);
     if (!ok) {
-      out.push(`> **Include error:** could not read \`${line.trim()}\``);
+      out.push(t`> **Include error:** could not read \`${include}\``);
       continue;
     }
     const nextSeen = new Set(seen).add(ref.path);

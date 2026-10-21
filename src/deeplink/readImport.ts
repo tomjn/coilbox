@@ -32,6 +32,7 @@
  * has and gains nothing new.
  */
 
+import { t } from "@lingui/core/macro";
 import { COMPRESSED_CODE_PREFIX, identify } from "../container/container";
 import type { GameIdentity } from "../container/gameIdentity";
 import { type ImportPlan, prepareImport } from "./actions";
@@ -55,7 +56,7 @@ function phraseFor(label: string, game?: GameIdentity): string {
   // The archive name pins a build and is the more useful of the two. The
   // shortname is all a challenge ever carries.
   const name = game?.name ?? game?.shortname;
-  return name ? `a ${label} for ${name}` : `a ${label}`;
+  return name ? t`a ${label} for ${name}` : t`a ${label}`;
 }
 
 /** True when the text parses as JSON, which separates "not a coilbox file" from
@@ -74,12 +75,12 @@ function isJson(text: string): boolean {
  * they can act on. */
 function unrecognised(text: string): string {
   if (text.startsWith(COMPRESSED_CODE_PREFIX)) {
-    return "That starts like a coilbox code, but the rest is damaged or cut short. Copy the whole code and paste it again.";
+    return t`That starts like a coilbox code, but the rest is damaged or cut short. Copy the whole code and paste it again.`;
   }
   if (isJson(text)) {
-    return 'That is a JSON file, but not one coilbox made. A coilbox export starts with a "format": "coilbox" line.';
+    return t`That is a JSON file, but not one coilbox made. A coilbox export starts with a "format": "coilbox" line.`;
   }
-  return "Coilbox does not recognise that. Paste a coilbox link, a share code, or the contents of a coilbox .json file.";
+  return t`Coilbox does not recognise that. Paste a coilbox link, a share code, or the contents of a coilbox .json file.`;
 }
 
 /** Classify a code or an export's text: everything except a link. */
@@ -94,7 +95,7 @@ function readContainerText(text: string): ReadImportResult {
       outcome: "rejected",
       reason:
         id.warnings[0] ??
-        "This was made by a newer version of coilbox. Update coilbox to open it.",
+        t`This was made by a newer version of coilbox. Update coilbox to open it.`,
     };
   }
 
@@ -106,9 +107,10 @@ function readContainerText(text: string): ReadImportResult {
   // behind Advanced mode. Say so, rather than routing to a screen that will not
   // take a code (issue #1333 keeps campaign code import out of scope).
   if (id.kind === "campaign") {
+    const campaignPhrase = phraseFor(t`coilbox campaign`, id.game);
     return {
       outcome: "rejected",
-      reason: `This is ${phraseFor("coilbox campaign", id.game)}. Campaigns import from a file: turn on Advanced mode in Settings, then use Campaign Builder and its Import button.`,
+      reason: t`This is ${campaignPhrase}. Campaigns import from a file: turn on Advanced mode in Settings, then use Campaign Builder and its Import button.`,
     };
   }
 
@@ -130,8 +132,7 @@ export function readImport(input: string): ReadImportResult {
   if (text === "") {
     return {
       outcome: "rejected",
-      reason:
-        "Paste a coilbox link, a share code, or the contents of a coilbox .json file.",
+      reason: t`Paste a coilbox link, a share code, or the contents of a coilbox .json file.`,
     };
   }
 
@@ -179,8 +180,9 @@ export function clipboardOffer(text: string): string | null {
   if (!COILBOX_LINK.test(trimmed) && WEB_URL.test(trimmed)) return null;
   const result = readImport(trimmed);
   if (result.outcome === "confirm") {
-    return `Your clipboard holds ${result.phrase}.`;
+    const phrase = result.phrase;
+    return t`Your clipboard holds ${phrase}.`;
   }
-  if (result.outcome === "link") return "Your clipboard holds a coilbox link.";
+  if (result.outcome === "link") return t`Your clipboard holds a coilbox link.`;
   return null;
 }

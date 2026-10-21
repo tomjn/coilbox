@@ -1,9 +1,11 @@
+import { msg } from "@lingui/core/macro";
 import type { FramePlugin } from "@picoframe/plugin-sdk";
 import { Download, Globe, History, Package } from "lucide-react";
 import { makeLegacyRedirect } from "../content/pages/LegacyRedirect";
 import { gateAdvanced, useAdvancedMode } from "../general/advanced";
 import CoilMark from "../general/CoilMark";
 import { DEFAULT_HUB_URL, useHubUrl } from "../hub/config";
+import { lazyText } from "../i18n/pluginText";
 import { gateProfileHidden, isProfileHidden } from "../profile/hidden";
 import DownloadQueueBadge from "./DownloadQueueBadge";
 import { DownloadsProvider } from "./DownloadsProvider";
@@ -48,13 +50,13 @@ const downloadsPlugin: FramePlugin = {
     {
       // Groups merge by id across plugins.
       id: "library",
-      label: "Library",
+      label: lazyText(msg`Library`),
       order: 15,
       items: [
         {
           // The queue and its history (issue #4583).
           id: "library.downloads",
-          label: "Downloads",
+          label: lazyText(msg`Downloads`),
           to: "/library/downloads",
           order: 1.75,
           icon: History,
@@ -63,7 +65,7 @@ const downloadsPlugin: FramePlugin = {
           // Beside Archives: a tool for people who run their own rapid master,
           // so it is behind advanced mode like the archive explorer.
           id: "library.rapid",
-          label: "Rapid repositories",
+          label: lazyText(msg`Rapid repositories`),
           to: "/library/rapid",
           order: 2.5,
           icon: Package,
@@ -76,7 +78,7 @@ const downloadsPlugin: FramePlugin = {
         // `href` is only what a surface that cannot run a hook would use.
         {
           id: "library.hubSite",
-          label: "Coilbox Hub",
+          label: lazyText(msg`Coilbox Hub`),
           href: DEFAULT_HUB_URL,
           useHref: useHubUrl,
           icon: CoilMark,
@@ -85,7 +87,7 @@ const downloadsPlugin: FramePlugin = {
         },
         {
           id: "library.springfiles",
-          label: "Springfiles",
+          label: lazyText(msg`Springfiles`),
           href: "https://springfiles.springrts.com/",
           icon: Globe,
           sidebar: false,
@@ -98,7 +100,7 @@ const downloadsPlugin: FramePlugin = {
     {
       path: "library/downloads",
       lazy: () => import("./pages/ActivityPage"),
-      crumb: "Downloads",
+      crumb: lazyText(msg`Downloads`),
     },
     {
       path: "library/rapid",
@@ -108,7 +110,7 @@ const downloadsPlugin: FramePlugin = {
           () => import("./pages/ExplorerPage"),
         ),
       ),
-      crumb: "Rapid repositories",
+      crumb: lazyText(msg`Rapid repositories`),
     },
     ...Object.entries(RETIRED_DOWNLOADS_PATHS).map(([path, target]) => ({
       path,
@@ -118,8 +120,8 @@ const downloadsPlugin: FramePlugin = {
   settings: [
     {
       id: "sources",
-      title: "Sources",
-      description: "Where games and maps come from.",
+      title: lazyText(msg`Sources`),
+      description: lazyText(msg`Where games and maps come from.`),
       parent: "library",
       order: 30,
       icon: Download,

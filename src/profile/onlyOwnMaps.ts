@@ -1,3 +1,5 @@
+import { t } from "@lingui/core/macro";
+
 /**
  * What a profile's `onlyOwnMaps` key resolved to (issue #3604).
  *
@@ -20,13 +22,11 @@ export function resolveOnlyOwnMaps(raw: unknown): OnlyOwnMapsResolution {
   if (raw === undefined || raw === null) return { status: "none" };
   if (raw === true) return { status: "on" };
   if (raw === false) return { status: "off" };
-  const kind = Array.isArray(raw)
-    ? "a list"
-    : typeof raw === "object"
-      ? "an object"
-      : `a ${typeof raw}`;
-  return {
-    status: "problem",
-    issue: `\`onlyOwnMaps\` is ${kind}, and it must be true or false`,
-  };
+  const kind = typeof raw;
+  const issue = Array.isArray(raw)
+    ? t`\`onlyOwnMaps\` is a list, and it must be true or false`
+    : kind === "object"
+      ? t`\`onlyOwnMaps\` is an object, and it must be true or false`
+      : t`\`onlyOwnMaps\` is a ${kind}, and it must be true or false`;
+  return { status: "problem", issue };
 }

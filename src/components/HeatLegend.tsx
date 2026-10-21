@@ -1,3 +1,4 @@
+import { Trans } from "@lingui/react/macro";
 import { type HeatKind, heatGradientCss } from "@/lib/heatRamp";
 
 /**
@@ -27,7 +28,9 @@ export function HeatLegend({
     <div className="flex flex-col gap-1 text-xs text-muted-foreground">
       <span className="font-medium text-foreground">{label}</span>
       <div className="flex items-center gap-2">
-        <span>Least</span>
+        <span>
+          <Trans>Least</Trans>
+        </span>
         {/* Over a mid grey and not the card, because the ramp is drawn over a
          * map and its faint end would vanish against a card of either theme. */}
         <span
@@ -39,9 +42,13 @@ export function HeatLegend({
             style={{ backgroundImage: heatGradientCss(kind) }}
           />
         </span>
-        <span>Most</span>
+        <span>
+          <Trans>Most</Trans>
+        </span>
       </div>
-      <span>Most is {peak}.</span>
+      <span>
+        <Trans>Most is {peak}.</Trans>
+      </span>
     </div>
   );
 }

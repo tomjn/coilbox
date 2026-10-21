@@ -1,8 +1,10 @@
+import { msg, t } from "@lingui/core/macro";
 import type { FramePlugin } from "@picoframe/plugin-sdk";
 import { Boxes, Code2, ToyBrick } from "lucide-react";
 import { gateAdvanced, useAdvancedMode } from "../general/advanced";
 import CoilMark from "../general/CoilMark";
 import { insideSection } from "../general/nav";
+import { lazyText } from "../i18n/pluginText";
 import { getCachedProject } from "./projects";
 
 /**
@@ -18,12 +20,12 @@ const legoPlugin: FramePlugin = {
   nav: [
     {
       id: "lego",
-      label: "unit builder",
+      label: lazyText(msg`unit builder`),
       order: 45,
       items: [
         {
           id: "lego.units",
-          label: "Models",
+          label: lazyText(msg`Models`),
           to: "/lego",
           // Lit on the list and on a model you have open, but not on Lego
           // Parts, which is the item below's (issue #2719).
@@ -35,7 +37,7 @@ const legoPlugin: FramePlugin = {
         },
         {
           id: "lego.parts",
-          label: "Lego Parts",
+          label: lazyText(msg`Lego Parts`),
           to: "/lego/parts",
           order: 1,
           icon: ToyBrick,
@@ -45,7 +47,7 @@ const legoPlugin: FramePlugin = {
         // the system browser via the Tauri opener.
         {
           id: "lego.builder-guide",
-          label: "Unit builder guide",
+          label: lazyText(msg`Unit builder guide`),
           href: "https://tomjn.github.io/coilbox/developers/lego-builder",
           icon: CoilMark,
           sidebar: false,
@@ -54,7 +56,7 @@ const legoPlugin: FramePlugin = {
         },
         {
           id: "lego.parts-pack-guide",
-          label: "Parts pack format",
+          label: lazyText(msg`Parts pack format`),
           href: "https://tomjn.github.io/coilbox/reference/lego-parts-pack",
           icon: CoilMark,
           sidebar: false,
@@ -63,7 +65,7 @@ const legoPlugin: FramePlugin = {
         },
         {
           id: "lego.s3o-blender-tools",
-          label: "S3O Blender Tools",
+          label: lazyText(msg`S3O Blender Tools`),
           href: "https://github.com/ChrisFloofyKitsune/s3o-blender-tools/",
           icon: Code2,
           sidebar: false,
@@ -77,19 +79,19 @@ const legoPlugin: FramePlugin = {
     {
       path: "lego",
       lazy: gateAdvanced(() => import("./pages/ProjectsPage")),
-      crumb: "Models",
+      crumb: lazyText(msg`Models`),
     },
     {
       path: "lego/parts",
       lazy: gateAdvanced(() => import("./pages/PartsPage")),
-      crumb: "Lego Parts",
+      crumb: lazyText(msg`Lego Parts`),
     },
     {
       // Before the model route so the two are read in the order they are
       // written, though a static segment outranks a dynamic one either way.
       path: "lego/open",
       lazy: gateAdvanced(() => import("./pages/OpenFromArchivePage")),
-      crumb: "Open a model",
+      crumb: lazyText(msg`Open a model`),
     },
     {
       // The route param is an opaque uuid, so the crumb resolves the model's
@@ -97,7 +99,7 @@ const legoPlugin: FramePlugin = {
       path: "lego/:id",
       lazy: gateAdvanced(() => import("./pages/BuilderPage")),
       crumb: (c) =>
-        (c.params.id && getCachedProject(c.params.id)?.name) || "Model",
+        (c.params.id && getCachedProject(c.params.id)?.name) || t`Model`,
     },
   ],
   settings: [],

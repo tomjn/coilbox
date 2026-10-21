@@ -1,3 +1,4 @@
+import { Plural, Trans, useLingui } from "@lingui/react/macro";
 import { useSetting } from "@picoframe/frame";
 import { OptionSelect } from "@/components/OptionSelect";
 import { useUnitsyncGameHeaders } from "@/content/config";
@@ -19,6 +20,7 @@ import { useGameMusic } from "./useGameMusic";
  * runtime, and borrowing it for a lobby is a player's call to make.
  */
 export function MusicSource() {
+  const { t } = useLingui();
   const hasProfileTracks = getProfileSound() !== null;
   const [source, setSource] = useSetting<string>(
     MUSIC_SOURCE_KEY,
@@ -40,29 +42,33 @@ export function MusicSource() {
             value={source}
             onValueChange={setSource}
             size="sm"
-            ariaLabel="Music source"
+            ariaLabel={t`Music source`}
             options={[
-              { value: "off", label: "No music" },
-              { value: "nostalgia", label: "Nostalgia" },
+              { value: "off", label: t`No music` },
+              { value: "nostalgia", label: t`Nostalgia` },
               // Only offered by a build that ships tracks, but always listed,
               // so it is clear the option exists and why it is unavailable.
               {
                 value: "profile",
-                label: "Bundled",
+                label: t`Bundled`,
                 description: hasProfileTracks
                   ? undefined
-                  : "This build ships no music.",
+                  : t`This build ships no music.`,
                 disabled: !hasProfileTracks,
               },
-              { value: "game", label: "From a game" },
+              { value: "game", label: t`From a game` },
             ]}
           />
         </div>
         <span className="space-y-1">
-          <span className="block text-sm font-medium">Music source</span>
+          <span className="block text-sm font-medium">
+            <Trans>Music source</Trans>
+          </span>
           <span className="block text-xs text-muted-foreground">
-            Games often ship their own soundtrack. Coilbox can play it in the
-            lobby, though it was written to score a battle rather than a menu.
+            <Trans>
+              Games often ship their own soundtrack. Coilbox can play it in the
+              lobby, though it was written to score a battle rather than a menu.
+            </Trans>
           </span>
         </span>
       </div>
@@ -75,8 +81,8 @@ export function MusicSource() {
               onValueChange={setGame}
               games={content.games}
               headers={gameHeaders}
-              placeholder="Pick a game"
-              ariaLabel="Game to take music from"
+              placeholder={t`Pick a game`}
+              ariaLabel={t`Game to take music from`}
               gamesLoading={content.scanning}
               scanError={content.scanError}
             />
@@ -104,13 +110,11 @@ function TrackCount({
   loading: boolean;
   count: number;
 }) {
-  if (game === "") return <>Pick a game to see what it ships.</>;
-  if (loading) return <>Reading the archive…</>;
+  if (game === "") return <Trans>Pick a game to see what it ships.</Trans>;
+  if (loading) return <Trans>Reading the archive…</Trans>;
   if (count === 0)
-    return <>No music found in this game. Most ship sound effects only.</>;
-  return (
-    <>
-      {count} track{count === 1 ? "" : "s"} found.
-    </>
-  );
+    return (
+      <Trans>No music found in this game. Most ship sound effects only.</Trans>
+    );
+  return <Plural value={count} one="# track found." other="# tracks found." />;
 }

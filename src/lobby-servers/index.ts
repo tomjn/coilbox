@@ -1,5 +1,7 @@
+import { msg } from "@lingui/core/macro";
 import type { FramePlugin } from "@picoframe/plugin-sdk";
 import { ServerCog } from "lucide-react";
+import { lazyText } from "../i18n/pluginText";
 import { LobbyServersProvider } from "./LobbyServersProvider";
 import LobbyServersSettings from "./pages/SettingsSection";
 
@@ -17,8 +19,10 @@ const lobbyServersPlugin: FramePlugin = {
   settings: [
     {
       id: "lobby-servers",
-      title: "Lobby servers",
-      description: "The servers you can log in to, and your accounts on them.",
+      title: lazyText(msg`Lobby servers`),
+      description: lazyText(
+        msg`The servers you can log in to, and your accounts on them.`,
+      ),
       parent: "multiplayer",
       order: 10,
       icon: ServerCog,

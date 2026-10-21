@@ -1,3 +1,5 @@
+import { i18n, type MessageDescriptor } from "@lingui/core";
+import { msg, t } from "@lingui/core/macro";
 import type { LucideIcon } from "lucide-react";
 import {
   CircleArrowUp,
@@ -98,9 +100,9 @@ export interface ResumeCandidate {
 /** What a card calls a kind of thing, and what its action offers to do. */
 export interface ResumeKindCopy {
   /** The line above the title, saying what sort of thing this is. */
-  label: string;
+  label: MessageDescriptor;
   /** The action's own words. Says where it takes you, not just "go". */
-  action: string;
+  action: MessageDescriptor;
 }
 
 /**
@@ -117,19 +119,19 @@ export interface ResumeKindCopy {
  * does not load the preset for you.
  */
 export const RESUME_KIND_COPY: Record<ResumeKind, ResumeKindCopy> = {
-  battle: { label: "Multiplayer battle", action: "Rejoin battle" },
-  warpath: { label: "Warpath run", action: "Resume run" },
-  conquest: { label: "Conquest", action: "Resume conquest" },
-  campaign: { label: "Campaign", action: "Resume mission" },
-  skirmish: { label: "Skirmish setup", action: "Open setup" },
+  battle: { label: msg`Multiplayer battle`, action: msg`Rejoin battle` },
+  warpath: { label: msg`Warpath run`, action: msg`Resume run` },
+  conquest: { label: msg`Conquest`, action: msg`Resume conquest` },
+  campaign: { label: msg`Campaign`, action: msg`Resume mission` },
+  skirmish: { label: msg`Skirmish setup`, action: msg`Open setup` },
   // Not a thing you left, unlike everything above it, but it competes for the
   // same slots on the same rule. The action goes to the updates page rather
   // than installing from the card: an update is a restart, so it is not
   // something to set off with one click from the welcome screen.
-  update: { label: "Coilbox update", action: "Update Coilbox" },
+  update: { label: msg`Coilbox update`, action: msg`Update Coilbox` },
   // The one card here that is not a thing you left. A distribution's profile
   // names it as where a new player begins (issue #3378).
-  start: { label: "Start here", action: "Start mission" },
+  start: { label: msg`Start here`, action: msg`Start mission` },
 };
 
 /**
@@ -227,13 +229,14 @@ export function warpathCandidate(
   if (!best) return undefined;
   const [id, run] = best;
   const { hull, maxHull } = run.progress;
+  const shortname = run.settings.game.shortname;
   return {
     id: `warpath:${id}`,
     kind: "warpath",
     title: run.name,
     // Matches the run card's own subtitle, so the same run reads the same on
     // both screens.
-    detail: `${run.settings.game.shortname} · health ${hull}/${maxHull}`,
+    detail: t`${shortname} · health ${hull}/${maxHull}`,
     to: `/warpath/${encodeURIComponent(id)}`,
     touchedAt: Date.parse(run.updatedAt),
   };
@@ -289,11 +292,12 @@ export function conquestCandidate(
   if (!best) return undefined;
   const state = file.conquests[best.galaxy.id];
   if (!state) return undefined;
+  const turn = state.turn;
   return {
     id: `conquest:${best.galaxy.id}`,
     kind: "conquest",
     title: best.galaxy.title,
-    detail: `Turn ${state.turn}`,
+    detail: t`Turn ${turn}`,
     to: `/conquest/${encodeURIComponent(best.galaxy.id)}`,
     touchedAt: Date.parse(state.updatedAt),
   };
@@ -331,11 +335,12 @@ export function battleCandidate(
   // Hosting it ourselves means we start the match rather than rejoin it.
   if (battle.host === state.myUsername) return undefined;
   if (!state.users[battle.host]?.status.ingame) return undefined;
+  const host = battle.host;
   return {
     id: `battle:${state.currentBattle}`,
     kind: "battle",
     title: battle.title,
-    detail: `Match in progress · hosted by ${battle.host}`,
+    detail: t`Match in progress · hosted by ${host}`,
     to: "/battle",
     // The match is running as we look at it, so "now" is when it was touched.
     // Only ever compared against another closing window, of which there is one.
@@ -392,11 +397,12 @@ export function skirmishCandidate(
     (p) => Date.parse(p.lastUsedAt),
   );
   if (!best) return undefined;
+  const { gameName: presetGame, mapName: presetMap } = best;
   return {
     id: `skirmish:${best.id}`,
     kind: "skirmish",
     title: best.name,
-    detail: `${best.gameName} on ${best.mapName}`,
+    detail: t`${presetGame} on ${presetMap}`,
     to: "/play/skirmish",
     touchedAt: Date.parse(best.lastUsedAt),
   };
@@ -442,8 +448,8 @@ export function updateCandidate(
     kind: "update",
     title: `Coilbox ${update.version}`,
     detail: installedVersion
-      ? `You have ${installedVersion}`
-      : "Ready to install",
+      ? t`You have ${installedVersion}`
+      : t`Ready to install`,
     to: "/settings/updates",
     touchedAt,
   };
@@ -510,13 +516,16 @@ export function startCopy(needs: readonly MissionNeed[]): {
   detail: string | null;
 } {
   if (needs.length === 0)
-    return { action: RESUME_KIND_COPY.start.action, detail: null };
-  const names = needs.map((n) => (n.kind === "engine" ? "the engine" : n.name));
-  const last = names.pop();
-  const list = names.length ? `${names.join(", ")} and ${last}` : last;
+    return { action: i18n._(RESUME_KIND_COPY.start.action), detail: null };
+  const names = needs.map((n) =>
+    n.kind === "engine" ? t`the engine` : n.name,
+  );
+  const last = names.pop() ?? "";
+  const earlier = names.join(", ");
+  const list = names.length ? t`${earlier} and ${last}` : last;
   return {
-    action: "Download and start",
-    detail: `Download ${list} first`,
+    action: t`Download and start`,
+    detail: t`Download ${list} first`,
   };
 }
 

@@ -1,3 +1,4 @@
+import { t } from "@lingui/core/macro";
 import { readProfileFile, resolveFileRef } from "../profile/refs";
 import { entryMarkupKeys } from "./config";
 
@@ -102,7 +103,7 @@ export async function loadHomeMarkup(
 export function homeMarkup(value: string): HomeMarkup {
   if (!isRef(value)) return { html: value };
   const ref = value.trim();
-  return files.get(ref) ?? { error: `Could not read ${ref}` };
+  return files.get(ref) ?? { error: t`Could not read ${ref}` };
 }
 
 /**

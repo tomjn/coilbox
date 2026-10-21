@@ -1,3 +1,4 @@
+import { msg } from "@lingui/core/macro";
 import { FRAME_APPEARANCE_SETTINGS_ID } from "@picoframe/frame";
 import type { FramePlugin } from "@picoframe/plugin-sdk";
 import {
@@ -8,6 +9,7 @@ import {
   SlidersHorizontal,
   Wrench,
 } from "lucide-react";
+import { lazyText } from "../i18n/pluginText";
 import { isSettingsHidden } from "../profile/hidden";
 import { FullscreenControls } from "./fullscreen";
 import GeneralSettings from "./pages/SettingsSection";
@@ -51,7 +53,7 @@ const generalPlugin: FramePlugin = {
   nav: [
     {
       id: "settings",
-      label: "Settings",
+      label: lazyText(msg`Settings`),
       // Last. Everything above it is somewhere you go to do something, and this
       // is where you go to change how those behave.
       order: 60,
@@ -61,7 +63,7 @@ const generalPlugin: FramePlugin = {
           // player reaches for least often, whatever its weight in the
           // settings tree.
           id: "settings.engine",
-          label: "Engine settings",
+          label: lazyText(msg`Engine settings`),
           to: "/settings/engine-settings",
           order: 1,
           sidebar: false,
@@ -75,7 +77,7 @@ const generalPlugin: FramePlugin = {
           // First. The one people come here to change on day one, and the one
           // that needs no knowledge of Spring to want.
           id: "settings.appearance",
-          label: "Appearance",
+          label: lazyText(msg`Appearance`),
           to: `/settings/${FRAME_APPEARANCE_SETTINGS_ID}`,
           order: 0,
           sidebar: false,
@@ -86,7 +88,7 @@ const generalPlugin: FramePlugin = {
           // The lobby server logins, not the Coilbox hub sign-in. A player with
           // more than one account manages them here.
           id: "settings.accounts",
-          label: "Accounts",
+          label: lazyText(msg`Accounts`),
           to: "/settings/lobby-servers",
           order: 2,
           sidebar: false,
@@ -96,7 +98,7 @@ const generalPlugin: FramePlugin = {
         {
           // Everything else, including the sections this group does not name.
           id: "settings.all",
-          label: "All settings",
+          label: lazyText(msg`All settings`),
           to: "/settings",
           order: 3,
           sidebar: false,
@@ -113,7 +115,7 @@ const generalPlugin: FramePlugin = {
   settings: [
     {
       id: "general",
-      title: "General",
+      title: lazyText(msg`General`),
       order: 0,
       icon: Settings2,
       Component: GeneralSettings,
@@ -123,9 +125,10 @@ const generalPlugin: FramePlugin = {
     // plugin already owns the Advanced-mode toggle that gates their nav.
     {
       id: "advanced",
-      title: "Advanced",
-      description:
-        "Tools for making things, and for the people who ship coilbox.",
+      title: lazyText(msg`Advanced`),
+      description: lazyText(
+        msg`Tools for making things, and for the people who ship coilbox.`,
+      ),
       order: 90,
       icon: Wrench,
     },

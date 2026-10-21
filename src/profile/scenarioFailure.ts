@@ -1,3 +1,4 @@
+import { t } from "@lingui/core/macro";
 /**
  * What to say about a bundled scenario coilbox would not load (issue #962).
  *
@@ -41,7 +42,7 @@ function scenarioName(json: string): string {
   } catch {
     // Unparseable, so the syntax error is the useful part, not the name.
   }
-  return "(unnamed)";
+  return t`(unnamed)`;
 }
 
 /**
@@ -60,7 +61,7 @@ function scenarioError(json: string): string {
   if (!read.ok && read.error !== "unknown-format") {
     return scenarioImportErrorMessage(read.error);
   }
-  return "valid JSON but does not match the scenario schema";
+  return t`valid JSON but does not match the scenario schema`;
 }
 
 /** One rejected scenario document, named and explained. */

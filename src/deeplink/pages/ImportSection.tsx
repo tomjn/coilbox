@@ -1,3 +1,4 @@
+import { Trans, useLingui } from "@lingui/react/macro";
 import { Button } from "@picoframe/frame";
 import { open } from "@tauri-apps/plugin-dialog";
 import { ClipboardPaste, X } from "lucide-react";
@@ -32,6 +33,7 @@ import { useImportParam } from "../useImportParam";
  * exactly as it would have.
  */
 export default function ImportSection() {
+  const { t } = useLingui();
   const navigate = useNavigate();
   const [pending, setPending] = useState<Pending | null>(null);
   const [offer, setOffer] = useState<{ text: string; line: string } | null>(
@@ -92,36 +94,40 @@ export default function ImportSection() {
     }
     const { plan, phrase } = result;
     setPending({
-      title: `Import ${phrase}`,
+      title: t`Import ${phrase}`,
       lines: [
-        `This is ${phrase}. Import it?`,
+        t`This is ${phrase}. Import it?`,
         plan.detail ??
-          "It opens in the importer, which resolves any missing content before saving.",
+          t`It opens in the importer, which resolves any missing content before saving.`,
       ],
       warnings: plan.warnings,
-      confirmLabel: "Continue",
+      confirmLabel: t`Continue`,
       run: () => navigate(plan.route),
     });
   };
 
   const pickFile = async () => {
     const src = await open({
-      title: "Open a coilbox file",
+      title: t`Open a coilbox file`,
       multiple: false,
-      filters: [{ name: "Coilbox file", extensions: ["json"] }],
+      filters: [{ name: t`Coilbox file`, extensions: ["json"] }],
     });
     if (typeof src !== "string") return null;
     const { text } = await importContainerFile({ src });
     return text;
   };
 
+  const kindsSentence = containerKindsSentence();
+
   return (
     <div className="flex flex-col gap-4">
       <p className="text-sm text-muted-foreground">
-        Paste anything coilbox made and it will work out what it is. A coilbox
-        link, a share code, the address of a share on the web, the contents of
-        an exported file, or the file itself. Nothing is imported until you have
-        seen what it is and said yes.
+        <Trans>
+          Paste anything coilbox made and it will work out what it is. A coilbox
+          link, a share code, the address of a share on the web, the contents of
+          an exported file, or the file itself. Nothing is imported until you
+          have seen what it is and said yes.
+        </Trans>
       </p>
 
       {offer && (
@@ -139,12 +145,12 @@ export default function ImportSection() {
               setOffer(null);
             }}
           >
-            Use it
+            <Trans>Use it</Trans>
           </Button>
           <Button
             size="sm"
             variant="ghost"
-            aria-label="Dismiss the clipboard offer"
+            aria-label={t`Dismiss the clipboard offer`}
             onClick={() => setOffer(null)}
           >
             <X className="size-4" aria-hidden />
@@ -161,11 +167,11 @@ export default function ImportSection() {
           // A campaign is on it: pasting one here is answered with where a
           // campaign goes, which is this box doing its job rather than
           // refusing.
-          helpText={`Anything coilbox shares goes here: ${containerKindsSentence()}.`}
-          placeholder="Paste a coilbox link, a code, or an exported file's contents…"
-          submitLabel="Import"
-          busyLabel="Checking…"
-          fileButtonLabel="Open a file instead…"
+          helpText={t`Anything coilbox shares goes here: ${kindsSentence}.`}
+          placeholder={t`Paste a coilbox link, a code, or an exported file's contents…`}
+          submitLabel={t`Import`}
+          busyLabel={t`Checking…`}
+          fileButtonLabel={t`Open a file instead…`}
           initialCode={seed}
           onImport={check}
           onPickFile={pickFile}

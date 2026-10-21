@@ -27,6 +27,7 @@
  * joiner would otherwise be reading out over voice chat.
  */
 
+import { t } from "@lingui/core/macro";
 import {
   normaliseHostPort,
   normaliseServerAddress,
@@ -84,18 +85,18 @@ const invalid = (reason: string): DeepLinkParseError => ({
  */
 export function parseDeepLink(raw: string): DeepLinkParseResult {
   if (typeof raw !== "string" || raw.trim() === "") {
-    return invalid("Empty link.");
+    return invalid(t`Empty link.`);
   }
 
   let url: URL;
   try {
     url = new URL(raw.trim());
   } catch {
-    return invalid("That is not a valid link.");
+    return invalid(t`That is not a valid link.`);
   }
 
   if (url.protocol !== `${DEEP_LINK_SCHEME}:`) {
-    return invalid("That is not a coilbox link.");
+    return invalid(t`That is not a coilbox link.`);
   }
 
   // The action is the URL's authority (host). `new URL` lowercases it, which
@@ -112,8 +113,10 @@ export function parseDeepLink(raw: string): DeepLinkParseResult {
       return parseImport(params);
     case "open":
       return parseOpen(params);
-    default:
-      return invalid(`Unknown action "${action || "(none)"}".`);
+    default: {
+      const shownAction = action || "(none)";
+      return invalid(t`Unknown action "${shownAction}".`);
+    }
   }
 }
 
@@ -207,19 +210,19 @@ export function battleKeyFor(
 function parseJoin(params: URLSearchParams): DeepLinkParseResult {
   const server = field(params, "server");
   const battle = field(params, "battle");
-  if (!server) return invalid("This join link has no server.");
-  if (!battle) return invalid("This join link has no battle.");
+  if (!server) return invalid(t`This join link has no server.`);
+  if (!battle) return invalid(t`This join link has no battle.`);
   const address = normaliseServerAddress(server);
   if (!address) {
-    return invalid("This join link's server is not an address and a port.");
+    return invalid(t`This join link's server is not an address and a port.`);
   }
   const id = battleIdFrom(battle);
-  if (!id) return invalid("This join link's battle is not a battle number.");
+  if (!id) return invalid(t`This join link's battle is not a battle number.`);
   // Not trimmed, unlike the others. Whether a space is allowed depends on the
   // protocol of the server it is sent to, which is judged when the join is made.
   const password = params.get("password") ?? "";
   if (password !== "" && !validLinkBattlePassword(password)) {
-    return invalid("This join link's password is not a battle password.");
+    return invalid(t`This join link's password is not a battle password.`);
   }
   return {
     kind: "join",
@@ -242,13 +245,13 @@ function parseJoin(params: URLSearchParams): DeepLinkParseResult {
 function parseRoom(params: URLSearchParams): DeepLinkParseResult {
   const address = field(params, "address");
   const port = field(params, "port");
-  if (!address) return invalid("This room link has no address.");
-  if (!port) return invalid("This room link has no port.");
+  if (!address) return invalid(t`This room link has no address.`);
+  if (!port) return invalid(t`This room link has no port.`);
   if (!/^[0-9]{1,5}$/.test(port) || Number(port) < 1 || Number(port) > 65535) {
-    return invalid("This room link's port is not a port.");
+    return invalid(t`This room link's port is not a port.`);
   }
   const normal = normaliseHostPort(address, Number(port));
-  if (!normal) return invalid("This room link's address is not an address.");
+  if (!normal) return invalid(t`This room link's address is not an address.`);
   return { kind: "room", address: normal.host, port: normal.port };
 }
 
@@ -257,30 +260,30 @@ function parseImport(params: URLSearchParams): DeepLinkParseResult {
   const rawUrl = params.get("url")?.trim() || null;
 
   if (code && rawUrl) {
-    return invalid("This import link has both a code and a URL.");
+    return invalid(t`This import link has both a code and a URL.`);
   }
   if (code) {
     if (code.length > MAX_CODE_LENGTH) {
-      return invalid("This import link is too large.");
+      return invalid(t`This import link is too large.`);
     }
     return { kind: "import", source: { type: "code", code } };
   }
   if (rawUrl) {
     if (rawUrl.length > MAX_URL_LENGTH) {
-      return invalid("This import link is too large.");
+      return invalid(t`This import link is too large.`);
     }
     let parsed: URL;
     try {
       parsed = new URL(rawUrl);
     } catch {
-      return invalid("This import link has an invalid URL.");
+      return invalid(t`This import link has an invalid URL.`);
     }
     if (parsed.protocol !== "https:") {
-      return invalid("Import URLs must be https.");
+      return invalid(t`Import URLs must be https.`);
     }
     return { kind: "import", source: { type: "url", url: parsed.toString() } };
   }
-  return invalid("This import link has no payload.");
+  return invalid(t`This import link has no payload.`);
 }
 
 /**
@@ -295,16 +298,16 @@ export function validOpenId(id: string): boolean {
 
 function parseOpen(params: URLSearchParams): DeepLinkParseResult {
   const screen = field(params, "screen");
-  if (!screen) return invalid("This open link has no screen.");
+  if (!screen) return invalid(t`This open link has no screen.`);
   // An own name only: `in` also finds `constructor` and `toString`.
   if (!Object.hasOwn(OPEN_SCREENS, screen)) {
-    return invalid(`Unknown screen "${screen}".`);
+    return invalid(t`Unknown screen "${screen}".`);
   }
   const key = screen as OpenScreen;
   if (!OPEN_SCREENS[key].needsId) return { kind: "open", screen: key };
   const id = field(params, "id");
-  if (!id) return invalid(`Opening "${screen}" needs an id.`);
-  if (!validOpenId(id)) return invalid(`This open link's id is not a name.`);
+  if (!id) return invalid(t`Opening "${screen}" needs an id.`);
+  if (!validOpenId(id)) return invalid(t`This open link's id is not a name.`);
   return { kind: "open", screen: key, id };
 }
 

@@ -1,3 +1,4 @@
+import { Trans } from "@lingui/react/macro";
 import { ChevronRight } from "lucide-react";
 import type { ReactNode } from "react";
 import {
@@ -85,7 +86,7 @@ export function Details({ lines }: { lines: string[] }) {
           aria-hidden
           className="size-3 motion-safe:transition-transform group-data-[state=open]:rotate-90"
         />
-        Details
+        <Trans>Details</Trans>
       </CollapsibleTrigger>
       <CollapsibleContent className="mt-1 flex flex-col gap-1 font-mono text-[11px] opacity-80">
         {lines.map((line) => (

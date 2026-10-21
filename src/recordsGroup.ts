@@ -1,3 +1,6 @@
+import { msg } from "@lingui/core/macro";
+import { lazyText } from "./i18n/pluginText";
+
 /**
  * The sidebar group for records of games already played: Career, Player stats
  * and Replays. Three plugins put an item in it (`career`, `multiplayer`,
@@ -11,6 +14,6 @@
  */
 export const RECORDS_GROUP = {
   id: "records",
-  label: "Records",
+  label: lazyText(msg`Records`),
   order: 12,
 } as const;

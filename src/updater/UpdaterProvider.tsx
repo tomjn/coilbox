@@ -1,3 +1,4 @@
+import { t } from "@lingui/core/macro";
 import {
   createContext,
   type ReactNode,
@@ -113,9 +114,10 @@ export function UpdaterProvider({ children }: { children: ReactNode }) {
       const found = await checkForUpdate();
       setUpdate(found);
       if (found) {
+        const newVersion = found.version;
         void notify({
-          title: "Update available",
-          body: `Coilbox ${found.version} is ready to install.`,
+          title: t`Update available`,
+          body: t`Coilbox ${newVersion} is ready to install.`,
           level: "info",
           to: "/settings/updates",
         });

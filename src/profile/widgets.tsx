@@ -1,3 +1,4 @@
+import { Trans } from "@lingui/react/macro";
 import { lazy, type ReactNode, Suspense } from "react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { HomeSetupCard } from "../content/pages/components/SetupCard";
@@ -72,7 +73,9 @@ export function PageWidget({ name, arg }: { name: string; arg?: string }) {
   if (!make) {
     return (
       <div className="my-3 rounded-md border border-dashed border-muted-foreground/40 px-4 py-3 text-sm text-muted-foreground">
-        Unknown widget: <code>@widget/{name}</code>
+        <Trans>
+          Unknown widget: <code>@widget/{name}</code>
+        </Trans>
       </div>
     );
   }

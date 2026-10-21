@@ -1,3 +1,5 @@
+import type { MessageDescriptor } from "@lingui/core";
+import { msg } from "@lingui/core/macro";
 import { type SoundName as CuelumeName, sounds as cuelumeNames } from "cuelume";
 import { getAudioContext } from "./context";
 
@@ -172,7 +174,7 @@ function playPing(out: AudioNode) {
 type SoundDef =
   | {
       label: string;
-      group: string;
+      group: MessageDescriptor;
       kind: "synth";
       /** How long it sounds for. Only the preview button's icon reads this. */
       seconds: number;
@@ -180,7 +182,7 @@ type SoundDef =
     }
   | {
       label: string;
-      group: string;
+      group: MessageDescriptor;
       kind: "cuelume";
       seconds: number;
       name: CuelumeName;
@@ -216,8 +218,8 @@ const CUELUME_SECONDS: Record<string, number> = {
 };
 
 /** The bands the sound picker splits its list into. */
-const COILBOX = "Coilbox";
-const INTERFACE = "Interface";
+const COILBOX = msg`Coilbox`;
+const INTERFACE = msg`Interface`;
 
 /**
  * Cuelume's catalogue, offered for any event. Ids carry a `cue-` prefix because
@@ -238,7 +240,7 @@ const CUELUME_SOUNDS = Object.fromEntries(
 ) as {
   [K in CuelumeName as `cue-${K}`]: {
     label: string;
-    group: string;
+    group: MessageDescriptor;
     kind: "cuelume";
     seconds: number;
     name: K;

@@ -1,3 +1,5 @@
+import { plural, t } from "@lingui/core/macro";
+import { Trans } from "@lingui/react/macro";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { getCurrentWebview } from "@tauri-apps/api/webview";
@@ -95,15 +97,6 @@ import { openScreenRoute, parseDeepLink } from "./parse";
  * content folder chosen for its kind.
  */
 
-/** What a link that arrives while another is open is told. Written the way the
- * invite store's refusal of a second join link is. */
-const BUSY =
-  "Another link is still open. Answer or close it, then open this link again.";
-
-/** The same refusal for a file. */
-const BUSY_FILE =
-  "Another prompt is still open. Answer or close it, then open this file again.";
-
 export function DeepLinkHandler({ children }: { children: React.ReactNode }) {
   const navigate = useNavigate();
   const trustedHubUrl = useTrustedHubUrl();
@@ -153,7 +146,12 @@ export function DeepLinkHandler({ children }: { children: React.ReactNode }) {
       open.current.archives ||
       invitePromptOpen()
     ) {
-      notify({ title: "Ignored a file", body: BUSY_FILE, level: "error" });
+      notify({
+        title: t`Ignored a file`,
+        // The refusal for a file, worded like the one for a link below.
+        body: t`Another prompt is still open. Answer or close it, then open this file again.`,
+        level: "error",
+      });
       return;
     }
     open.current.archives = true;
@@ -166,7 +164,9 @@ export function DeepLinkHandler({ children }: { children: React.ReactNode }) {
       // asked over the top of it.
       open.current.archives = true;
       setInstalling(
-        offers.length === 1 ? offers[0].fileName : `${offers.length} archives`,
+        offers.length === 1
+          ? offers[0].fileName
+          : plural(offers.length, { other: "# archives" }),
       );
       const { installed, failed } = await installArchives(
         offers,
@@ -179,15 +179,20 @@ export function DeepLinkHandler({ children }: { children: React.ReactNode }) {
         // The game and map lists read the disk again, so the new one shows
         // without a restart.
         invalidateScans();
+        const installedCount = installed.length;
+        const fileName = installed[0].fileName;
+        const destDir = installed[0].destDir;
         notify(
-          installed.length === 1
+          installedCount === 1
             ? {
-                title: `Installed ${installed[0].fileName}`,
-                body: `Copied to ${installed[0].destDir}.`,
+                title: t`Installed ${fileName}`,
+                body: t`Copied to ${destDir}.`,
                 level: "success",
               }
             : {
-                title: `Installed ${installed.length} archives`,
+                title: plural(installedCount, {
+                  other: "Installed # archives",
+                }),
                 body: installed.map((o) => o.fileName).join(", "),
                 level: "success",
               },
@@ -195,7 +200,7 @@ export function DeepLinkHandler({ children }: { children: React.ReactNode }) {
       }
       if (failed.length > 0) {
         notify({
-          title: "Could not install an archive",
+          title: t`Could not install an archive`,
           body: failed.join(" "),
           level: "error",
         });
@@ -213,7 +218,7 @@ export function DeepLinkHandler({ children }: { children: React.ReactNode }) {
         open.current.archives = false;
         if (offers.length === 0) {
           notify({
-            title: "Nothing was installed",
+            title: t`Nothing was installed`,
             body: refused.join(" "),
             level: "error",
           });
@@ -222,7 +227,7 @@ export function DeepLinkHandler({ children }: { children: React.ReactNode }) {
         setPending({
           ...describeOffers(offers),
           warnings: refused,
-          confirmLabel: "Install",
+          confirmLabel: t`Install`,
           icon: PackagePlus,
           run: () => void runInstall(offers, roots),
         });
@@ -233,19 +238,22 @@ export function DeepLinkHandler({ children }: { children: React.ReactNode }) {
   // Build the second (apply) confirmation for a resolved import plan. `host` is
   // set for a fetch-URL import so the dialog says where the content came from.
   const buildImportPending = useCallback(
-    (plan: ImportPlan, host?: string, hubItemId?: string): Pending => ({
-      title: "Import from a link",
-      lines: [
-        host
-          ? `Import a ${plan.label} downloaded from ${host}?`
-          : `Import a ${plan.label} shared with you?`,
-        plan.detail ??
-          "It opens in the importer, which resolves any missing content before saving.",
-      ],
-      warnings: plan.warnings,
-      confirmLabel: "Continue",
-      run: () => navigate(withHubItem(plan.route, hubItemId)),
-    }),
+    (plan: ImportPlan, host?: string, hubItemId?: string): Pending => {
+      const planLabel = plan.label;
+      return {
+        title: t`Import from a link`,
+        lines: [
+          host
+            ? t`Import a ${planLabel} downloaded from ${host}?`
+            : t`Import a ${planLabel} shared with you?`,
+          plan.detail ??
+            t`It opens in the importer, which resolves any missing content before saving.`,
+        ],
+        warnings: plan.warnings,
+        confirmLabel: t`Continue`,
+        run: () => navigate(withHubItem(plan.route, hubItemId)),
+      };
+    },
     [navigate],
   );
 
@@ -258,7 +266,7 @@ export function DeepLinkHandler({ children }: { children: React.ReactNode }) {
       setFetching(null);
       if (!result.ok) {
         notify({
-          title: "Ignored a coilbox link",
+          title: t`Ignored a coilbox link`,
           body: result.reason,
           level: "error",
         });
@@ -292,7 +300,7 @@ export function DeepLinkHandler({ children }: { children: React.ReactNode }) {
       const result = parseDeepLink(raw);
       if (result.kind === "invalid") {
         notify({
-          title: "Ignored a coilbox link",
+          title: t`Ignored a coilbox link`,
           body: result.reason,
           level: "error",
         });
@@ -310,8 +318,9 @@ export function DeepLinkHandler({ children }: { children: React.ReactNode }) {
         invitePromptOpen()
       ) {
         notify({
-          title: "Ignored a coilbox link",
-          body: BUSY,
+          title: t`Ignored a coilbox link`,
+          // Written the way the invite store's refusal of a second join link is.
+          body: t`Another link is still open. Answer or close it, then open this link again.`,
           level: "error",
         });
         return;
@@ -319,10 +328,10 @@ export function DeepLinkHandler({ children }: { children: React.ReactNode }) {
 
       if (result.kind === "open") {
         setPending({
-          title: "Open a screen",
+          title: t`Open a screen`,
           lines: [describeOpen(result)],
           warnings: [],
-          confirmLabel: "Open",
+          confirmLabel: t`Open`,
           run: () => navigate(openScreenRoute(result)),
         });
         return;
@@ -337,14 +346,14 @@ export function DeepLinkHandler({ children }: { children: React.ReactNode }) {
         const link = inviteLinkFrom(result);
         if (!link) {
           notify({
-            title: "Ignored a coilbox link",
-            body: "This join link is not one coilbox can read.",
+            title: t`Ignored a coilbox link`,
+            body: t`This join link is not one coilbox can read.`,
             level: "error",
           });
         } else if (!offerInvite(link)) {
           notify({
-            title: "Ignored a coilbox link",
-            body: "Another invite is still open. Answer or close it, then open this link again.",
+            title: t`Ignored a coilbox link`,
+            body: t`Another invite is still open. Answer or close it, then open this link again.`,
             level: "error",
           });
         }
@@ -358,14 +367,16 @@ export function DeepLinkHandler({ children }: { children: React.ReactNode }) {
       // the room being gone is answered where the join is made, in the words
       // `joinRoomFailure` already had for it.
       if (result.kind === "room") {
+        const roomAddress = result.address;
+        const roomPort = result.port;
         setPending({
-          title: "Join a room",
+          title: t`Join a room`,
           lines: [
-            `Join the room at ${result.address}:${result.port}?`,
-            "The join form opens filled in. Nothing connects until you press Join in it.",
+            t`Join the room at ${roomAddress}:${roomPort}?`,
+            t`The join form opens filled in. Nothing connects until you press Join in it.`,
           ],
           warnings: [],
-          confirmLabel: "Open the join form",
+          confirmLabel: t`Open the join form`,
           run: () =>
             navigate("/battles", {
               state: {
@@ -401,13 +412,13 @@ export function DeepLinkHandler({ children }: { children: React.ReactNode }) {
           return;
         }
         setPending({
-          title: "Download an import",
+          title: t`Download an import`,
           lines: [
-            `This link downloads an import from ${host}.`,
-            "Coilbox has not contacted it yet. Only continue if you trust this link.",
+            t`This link downloads an import from ${host}.`,
+            t`Coilbox has not contacted it yet. Only continue if you trust this link.`,
           ],
           warnings: [],
-          confirmLabel: "Fetch and check",
+          confirmLabel: t`Fetch and check`,
           run: () => void runFetch(url, host),
         });
         return;
@@ -417,7 +428,7 @@ export function DeepLinkHandler({ children }: { children: React.ReactNode }) {
       const plan = prepareImport(result.source.code);
       if (!plan.ok) {
         notify({
-          title: "Ignored a coilbox link",
+          title: t`Ignored a coilbox link`,
           body: plan.reason,
           level: "error",
         });
@@ -543,10 +554,12 @@ export function DeepLinkHandler({ children }: { children: React.ReactNode }) {
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <Loader2 className="size-4 animate-spin text-muted-foreground" />
-              Downloading an import
+              <Trans>Downloading an import</Trans>
             </DialogTitle>
             <DialogDescription>
-              Contacting {fetching} and checking what it sends back.
+              <Trans>
+                Contacting {fetching} and checking what it sends back.
+              </Trans>
             </DialogDescription>
           </DialogHeader>
         </DialogContent>
@@ -556,9 +569,11 @@ export function DeepLinkHandler({ children }: { children: React.ReactNode }) {
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <Loader2 className="size-4 animate-spin text-muted-foreground" />
-              Installing
+              <Trans>Installing</Trans>
             </DialogTitle>
-            <DialogDescription>Copying {installing}.</DialogDescription>
+            <DialogDescription>
+              <Trans>Copying {installing}.</Trans>
+            </DialogDescription>
           </DialogHeader>
         </DialogContent>
       </Dialog>
@@ -567,7 +582,7 @@ export function DeepLinkHandler({ children }: { children: React.ReactNode }) {
         <div className="pointer-events-none fixed inset-0 z-50 flex items-center justify-center bg-background/80">
           <p className="flex items-center gap-2 rounded-md border bg-card px-4 py-3 text-sm font-medium">
             <PackagePlus className="size-4 text-muted-foreground" />
-            Drop to install
+            <Trans>Drop to install</Trans>
           </p>
         </div>
       )}

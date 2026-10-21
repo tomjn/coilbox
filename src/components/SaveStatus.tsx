@@ -1,3 +1,4 @@
+import { Trans, useLingui } from "@lingui/react/macro";
 import { Button } from "@picoframe/frame";
 import { Check, Loader2, TriangleAlert } from "lucide-react";
 import { formatTime } from "@/lib/format";
@@ -55,6 +56,8 @@ export function SaveStatus({
   /** Ask for the failed write again, with the document as it stands. */
   onRetry: () => void;
 }) {
+  const { t } = useLingui();
+  const savedAt = state.kind === "saved" ? savedTime(state.at) : "";
   if (state.kind === "failed") {
     return (
       <div
@@ -62,9 +65,11 @@ export function SaveStatus({
         className="flex items-center gap-2 text-xs text-destructive"
       >
         <TriangleAlert className="size-3.5 shrink-0" />
-        <span>Not saved. Leaving this page loses the change.</span>
+        <span>
+          <Trans>Not saved. Leaving this page loses the change.</Trans>
+        </span>
         <Button type="button" size="sm" variant="outline" onClick={onRetry}>
-          Retry
+          <Trans>Retry</Trans>
         </Button>
       </div>
     );
@@ -84,9 +89,9 @@ export function SaveStatus({
       )}
       {state.kind === "saved" && <Check className="size-3.5 shrink-0" />}
       <span>
-        {state.kind === "unsaved" && "Unsaved changes"}
-        {state.kind === "saving" && "Saving…"}
-        {state.kind === "saved" && `Saved ${savedTime(state.at)}`}
+        {state.kind === "unsaved" && t`Unsaved changes`}
+        {state.kind === "saving" && t`Saving…`}
+        {state.kind === "saved" && t`Saved ${savedAt}`}
       </span>
     </div>
   );

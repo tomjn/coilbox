@@ -35,6 +35,7 @@
  * than no toggle at all.
  */
 
+import { useLingui } from "@lingui/react/macro";
 import { Button } from "@picoframe/frame";
 import { Frame, Grid3x3, type LucideIcon } from "lucide-react";
 import type { ReactNode } from "react";
@@ -148,12 +149,13 @@ export function GridToggle({
   onChange: (on: boolean) => void;
   showTitle: string;
 }) {
+  const { t } = useLingui();
   return (
     <ViewToggle
       icon={Grid3x3}
       on={on}
       onChange={onChange}
-      hideTitle="Hide the ground grid"
+      hideTitle={t`Hide the ground grid`}
       showTitle={showTitle}
     />
   );
@@ -170,15 +172,16 @@ export function GridToggle({
  */
 export function ResetViewButton({
   onClick,
-  title = "Reset the view",
+  title,
 }: {
   onClick: () => void;
   /** Overridden where the surface can say what is being framed, such as "Frame
    *  the map". */
   title?: string;
 }) {
+  const { t } = useLingui();
   return (
-    <ViewButton title={title} onClick={onClick}>
+    <ViewButton title={title ?? t`Reset the view`} onClick={onClick}>
       <Frame className="size-4" />
     </ViewButton>
   );

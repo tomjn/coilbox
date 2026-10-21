@@ -1,5 +1,7 @@
+import { msg } from "@lingui/core/macro";
 import type { FramePlugin } from "@picoframe/plugin-sdk";
 import { Award } from "lucide-react";
+import { lazyText } from "../i18n/pluginText";
 import { gateProfileHidden, isProfileHidden } from "../profile/hidden";
 import { RECORDS_GROUP } from "../recordsGroup";
 
@@ -21,7 +23,7 @@ const careerPlugin: FramePlugin = {
       items: [
         {
           id: "career.overview",
-          label: "Career",
+          label: lazyText(msg`Career`),
           to: "/career",
           // First in Records: the summary, above Player stats and Replays.
           order: 0,
@@ -38,7 +40,7 @@ const careerPlugin: FramePlugin = {
         "career.overview",
         () => import("./pages/CareerPage"),
       ),
-      crumb: "Career",
+      crumb: lazyText(msg`Career`),
     },
   ],
 };

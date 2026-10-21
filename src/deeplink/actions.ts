@@ -1,3 +1,5 @@
+import { t } from "@lingui/core/macro";
+
 /**
  * Turn a validated deep-link action into a concrete plan the handler can confirm
  * and then carry out (issue #388). Pure and app-state-free, so the trust-boundary
@@ -76,7 +78,7 @@ export function prepareImport(code: string): PrepareImportResult {
   if (id.kind === "unknown") {
     // A newer-version container of an unknown kind still carries a hint.
     if (id.warnings.length > 0) return { ok: false, reason: id.warnings[0] };
-    return { ok: false, reason: "This link is not a coilbox import." };
+    return { ok: false, reason: t`This link is not a coilbox import.` };
   }
 
   const base: Partial<ImportPlan> = {
@@ -116,7 +118,7 @@ export function prepareImport(code: string): PrepareImportResult {
       }
       return {
         ok: false,
-        reason: "This challenge link is for an unknown game mode.",
+        reason: t`This challenge link is for an unknown game mode.`,
       };
     }
     case "setup-pack":
@@ -139,8 +141,7 @@ export function prepareImport(code: string): PrepareImportResult {
           ...(base as ImportPlan),
           route: importRoute("/settings/import", code),
           label: containerKindName("campaign"),
-          detail:
-            "It opens in the import box, which says where a campaign goes.",
+          detail: t`It opens in the import box, which says where a campaign goes.`,
         },
       };
     case "scenario":
@@ -176,7 +177,7 @@ export function prepareImport(code: string): PrepareImportResult {
           ...(base as ImportPlan),
           route: importRoute("/settings/engine-keybinds", code),
           label: containerKindName("keymap"),
-          detail: "It opens in the keybinds editor, unsaved.",
+          detail: t`It opens in the keybinds editor, unsaved.`,
         },
       };
     case "mod-project":
@@ -190,8 +191,7 @@ export function prepareImport(code: string): PrepareImportResult {
           ...(base as ImportPlan),
           route: importRoute("/workshop", code),
           label: containerKindName("mod-project"),
-          detail:
-            "It is saved to Unit tweaks and opened, which needs Advanced mode turned on in Settings.",
+          detail: t`It is saved to Unit tweaks and opened, which needs Advanced mode turned on in Settings.`,
         },
       };
     case "module":
@@ -203,8 +203,7 @@ export function prepareImport(code: string): PrepareImportResult {
           ...(base as ImportPlan),
           route: importRoute("/lego/parts", code),
           label: containerKindName("module"),
-          detail:
-            "It is added to your modules, which needs Advanced mode turned on in Settings.",
+          detail: t`It is added to your modules, which needs Advanced mode turned on in Settings.`,
         },
       };
   }
@@ -217,22 +216,23 @@ export function describeOpen(action: {
   id?: string;
 }): string {
   const route = openScreenRoute(action);
+  const id = action.id ?? "";
   switch (action.screen) {
     case "map":
-      return `Open the map "${action.id}".`;
+      return t`Open the map "${id}".`;
     case "game":
-      return `Open the game "${action.id}".`;
+      return t`Open the game "${id}".`;
     case "replay":
-      return `Open the replay "${action.id}".`;
+      return t`Open the replay "${id}".`;
     case "conquest":
-      return "Open Conquest.";
+      return t`Open Conquest.`;
     case "warpath":
-      return "Open Warpath.";
+      return t`Open Warpath.`;
     case "battles":
-      return "Open the battle list.";
+      return t`Open the battle list.`;
     case "chat":
-      return "Open chat.";
+      return t`Open chat.`;
     default:
-      return `Open ${route}.`;
+      return t`Open ${route}.`;
   }
 }

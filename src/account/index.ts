@@ -1,5 +1,7 @@
+import { msg } from "@lingui/core/macro";
 import type { FramePlugin } from "@picoframe/plugin-sdk";
 import { UserCog } from "lucide-react";
+import { lazyText } from "../i18n/pluginText";
 import AccountSettings from "./pages/SettingsSection";
 
 /**
@@ -15,8 +17,8 @@ const accountPlugin: FramePlugin = {
   settings: [
     {
       id: "account",
-      title: "Account",
-      description: "The lobby account you are signed in to.",
+      title: lazyText(msg`Account`),
+      description: lazyText(msg`The lobby account you are signed in to.`),
       parent: "multiplayer",
       order: 40,
       icon: UserCog,

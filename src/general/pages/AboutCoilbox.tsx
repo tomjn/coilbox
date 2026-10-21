@@ -1,3 +1,4 @@
+import { Trans } from "@lingui/react/macro";
 import { Button } from "@picoframe/frame";
 import { openUrl } from "@tauri-apps/plugin-opener";
 import { Bug, ExternalLink, Info, Star } from "lucide-react";
@@ -43,11 +44,13 @@ export function AboutCoilbox() {
   return (
     <section className="space-y-3">
       <h2 className="flex items-center gap-2 text-sm font-semibold uppercase tracking-wide text-muted-foreground">
-        <Info size={15} /> About Coilbox
+        <Info size={15} /> <Trans>About Coilbox</Trans>
       </h2>
       <p className="text-xs text-muted-foreground">
-        Coilbox is open source. Browse the code, report a bug, or star the
-        project on GitHub.
+        <Trans>
+          Coilbox is open source. Browse the code, report a bug, or star the
+          project on GitHub.
+        </Trans>
       </p>
       <div className="flex flex-wrap gap-2">
         <Button
@@ -56,7 +59,7 @@ export function AboutCoilbox() {
           className="gap-1.5"
           onClick={() => openUrl(REPO_URL).catch(() => {})}
         >
-          <ExternalLink className="size-4" /> Coilbox on GitHub
+          <ExternalLink className="size-4" /> <Trans>Coilbox on GitHub</Trans>
         </Button>
         <Button
           size="sm"
@@ -64,7 +67,7 @@ export function AboutCoilbox() {
           className="gap-1.5"
           onClick={() => openUrl(ISSUE_URL).catch(() => {})}
         >
-          <Bug className="size-4" /> Report an issue
+          <Bug className="size-4" /> <Trans>Report an issue</Trans>
         </Button>
         <Button
           size="sm"
@@ -72,7 +75,7 @@ export function AboutCoilbox() {
           className="gap-1.5"
           onClick={() => openUrl(REPO_URL).catch(() => {})}
         >
-          <Star className="size-4" /> Star on GitHub
+          <Star className="size-4" /> <Trans>Star on GitHub</Trans>
           {stars !== null && (
             <span className="text-muted-foreground">
               · {formatStars(stars)}

@@ -1,3 +1,4 @@
+import { useLingui } from "@lingui/react/macro";
 import { XIcon } from "lucide-react";
 import { Dialog as DialogPrimitive, Direction } from "radix-ui";
 import type * as React from "react";
@@ -48,13 +49,14 @@ function DialogContent({
   className,
   children,
   showCloseButton = true,
-  closeLabel = "Close",
+  closeLabel,
   ...props
 }: React.ComponentProps<typeof DialogPrimitive.Content> & {
   showCloseButton?: boolean;
   closeLabel?: string;
 }) {
   const dir = Direction.useDirection();
+  const { t } = useLingui();
   return (
     <DialogPortal>
       <DialogOverlay />
@@ -74,7 +76,7 @@ function DialogContent({
             className="absolute end-4 top-4 rounded-xs opacity-70 ring-offset-background transition-opacity hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:pointer-events-none"
           >
             <XIcon className="size-4" />
-            <span className="sr-only">{closeLabel}</span>
+            <span className="sr-only">{closeLabel ?? t`Close`}</span>
           </DialogPrimitive.Close>
         )}
       </DialogPrimitive.Content>

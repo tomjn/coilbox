@@ -1,3 +1,4 @@
+import { t } from "@lingui/core/macro";
 import { notify } from "../notify/notify";
 import { openProfileFile } from "./refs";
 
@@ -22,7 +23,7 @@ export function openBundledFile(path: string): void {
   openProfileFile(path).catch((err: unknown) => {
     console.warn(`profile: could not open the file "${path}"`, err);
     notify({
-      title: "Could not open that file",
+      title: t`Could not open that file`,
       body: err instanceof Error ? err.message : String(err),
       level: "error",
     });

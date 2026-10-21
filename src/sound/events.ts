@@ -1,3 +1,5 @@
+import type { MessageDescriptor } from "@lingui/core";
+import { msg } from "@lingui/core/macro";
 import type { SoundId } from "./library";
 
 /**
@@ -12,23 +14,27 @@ import type { SoundId } from "./library";
 /** The volume and mute groups a player gets, above the individual events. */
 export const GROUPS = {
   alerts: {
-    label: "Alerts",
-    description: "Sounds that want your attention, like a ring or a mention.",
+    label: msg`Alerts`,
+    description: msg`Sounds that want your attention, like a ring or a mention.`,
   },
   ui: {
-    label: "Interface",
-    description: "Small sounds as Coilbox gets on with things.",
+    label: msg`Interface`,
+    description: msg`Small sounds as Coilbox gets on with things.`,
     // Off until asked for. Interface sounds divide people, and a desktop app
     // that starts chirping after an update irritates before it delights.
     mutedByDefault: true,
   },
   music: {
-    label: "Music",
-    description: "The soundtrack, whichever one you pick above.",
+    label: msg`Music`,
+    description: msg`The soundtrack, whichever one you pick above.`,
   },
 } as const satisfies Record<
   string,
-  { label: string; description: string; mutedByDefault?: true }
+  {
+    label: MessageDescriptor;
+    description: MessageDescriptor;
+    mutedByDefault?: true;
+  }
 >;
 
 /** Whether a group is silent for a player who has never opened Sound settings. */
@@ -41,9 +47,9 @@ export type GroupId = keyof typeof GROUPS;
 export const GROUP_IDS = Object.keys(GROUPS) as GroupId[];
 
 type EventDef = {
-  label: string;
+  label: MessageDescriptor;
   /** When it fires, shown under the name in the events table. */
-  description: string;
+  description: MessageDescriptor;
   group: GroupId;
   sound: SoundId;
   /**
@@ -56,48 +62,45 @@ type EventDef = {
 
 export const EVENTS = {
   ring: {
-    label: "Rung by the host",
-    description: "The host rings the battle room to round up idle players.",
+    label: msg`Rung by the host`,
+    description: msg`The host rings the battle room to round up idle players.`,
     group: "alerts",
     sound: "gong",
   },
   mention: {
-    label: "Mentioned in chat",
-    description:
-      "Someone says your name, or one of your highlight words, in chat or a private message.",
+    label: msg`Mentioned in chat`,
+    description: msg`Someone says your name, or one of your highlight words, in chat or a private message.`,
     group: "alerts",
     sound: "ping",
   },
   hostIngame: {
-    label: "The host starts the game",
-    description: "The founder of the battle you are in goes in game.",
+    label: msg`The host starts the game`,
+    description: msg`The founder of the battle you are in goes in game.`,
     group: "alerts",
     sound: "chime",
   },
   launch: {
-    label: "You launch a game",
-    description:
-      "Any launch of your own: a skirmish, a battle, a campaign mission, a saved game or a replay.",
+    label: msg`You launch a game`,
+    description: msg`Any launch of your own: a skirmish, a battle, a campaign mission, a saved game or a replay.`,
     group: "alerts",
     sound: "cue-ready",
   },
   matchFound: {
-    label: "A match is found",
-    description: "Matchmaking pairs you up and starts the accept countdown.",
+    label: msg`A match is found`,
+    description: msg`Matchmaking pairs you up and starts the accept countdown.`,
     group: "alerts",
     sound: "gong",
     hidden: true,
   },
   uiSuccess: {
-    label: "Something finished",
-    description:
-      "A download completes, or anything else Coilbox tells you went well.",
+    label: msg`Something finished`,
+    description: msg`A download completes, or anything else Coilbox tells you went well.`,
     group: "ui",
     sound: "cue-success",
   },
   uiError: {
-    label: "Something failed",
-    description: "Coilbox reports that something went wrong.",
+    label: msg`Something failed`,
+    description: msg`Coilbox reports that something went wrong.`,
     group: "ui",
     sound: "cue-error",
   },

@@ -1,6 +1,8 @@
+import { msg } from "@lingui/core/macro";
 import { FRAME_APPEARANCE_SETTINGS_ID } from "@picoframe/frame";
 import type { FramePlugin } from "@picoframe/plugin-sdk";
 import { Package } from "lucide-react";
+import { lazyText } from "../i18n/pluginText";
 import { isSettingsHidden } from "./hidden";
 import ProfileSettings from "./SettingsSection";
 
@@ -23,9 +25,10 @@ const profilePlugin: FramePlugin = {
   settings: [
     {
       id: "profile",
-      title: "Distribution profile",
-      description:
-        "What a game's own build of coilbox has renamed, hidden or fixed.",
+      title: lazyText(msg`Distribution profile`),
+      description: lazyText(
+        msg`What a game's own build of coilbox has renamed, hidden or fixed.`,
+      ),
       parent: "advanced",
       order: 30,
       icon: Package,
@@ -38,7 +41,7 @@ const profilePlugin: FramePlugin = {
       // forces a fixed mode/accent. `applyProfileSettingsHiding` doesn't reach this
       // frame-owned section, so the gate is declared here directly.
       id: FRAME_APPEARANCE_SETTINGS_ID,
-      title: "Appearance",
+      title: lazyText(msg`Appearance`),
       useVisible: () => !isSettingsHidden(FRAME_APPEARANCE_SETTINGS_ID),
     },
   ],

@@ -1,3 +1,4 @@
+import { useLingui } from "@lingui/react/macro";
 import { Button, useSetting } from "@picoframe/frame";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { Maximize2, Minimize2 } from "lucide-react";
@@ -55,6 +56,7 @@ export function applyFullscreen(enabled: boolean): void {
  * keydown listener. Renders a toggle button whose icon reflects current state.
  */
 export function FullscreenControls() {
+  const { t } = useLingui();
   const locked = isFullscreenLocked();
   const [fs, setFs] = useFullscreenSetting();
   // A kiosk lock or a profile that hides the fullscreen button both remove the
@@ -90,7 +92,7 @@ export function FullscreenControls() {
     <Button
       variant="ghost"
       size="icon"
-      aria-label={fs ? "Exit fullscreen" : "Enter fullscreen"}
+      aria-label={fs ? t`Exit fullscreen` : t`Enter fullscreen`}
       onClick={() => setFs(!fs)}
     >
       {fs ? <Minimize2 size={16} /> : <Maximize2 size={16} />}

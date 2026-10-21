@@ -1,3 +1,4 @@
+import { msg, t } from "@lingui/core/macro";
 import type { FramePlugin } from "@picoframe/plugin-sdk";
 import {
   Archive as ArchiveIcon,
@@ -18,6 +19,7 @@ import {
 } from "lucide-react";
 import { cachedBlueprint } from "../blueprint/store";
 import { gateAdvanced, useAdvancedMode } from "../general/advanced";
+import { lazyText } from "../i18n/pluginText";
 import { gateProfileHidden, isProfileHidden } from "../profile/hidden";
 import AnalysisQueueBadge from "./AnalysisQueueBadge";
 import ContentStartupProvider from "./ContentStartupProvider";
@@ -94,19 +96,19 @@ const contentPlugin: FramePlugin = {
   nav: [
     {
       id: "library",
-      label: "Library",
+      label: lazyText(msg`Library`),
       order: 15,
       items: [
         {
           id: "library.maps",
-          label: "Maps",
+          label: lazyText(msg`Maps`),
           to: "/library/maps",
           order: 0,
           icon: MapIcon,
         },
         {
           id: "library.games",
-          label: "Games",
+          label: lazyText(msg`Games`),
           to: "/library/games",
           order: 1,
           icon: Gamepad2,
@@ -117,7 +119,7 @@ const contentPlugin: FramePlugin = {
           // Layouts you keep, beside the maps and games they are drawn for and
           // above the modding tool below (issue #1415).
           id: "library.blueprints",
-          label: "Blueprints",
+          label: lazyText(msg`Blueprints`),
           to: "/library/blueprints",
           order: 1.5,
           icon: Blocks,
@@ -126,7 +128,7 @@ const contentPlugin: FramePlugin = {
           // Archive explorer is a modding tool — gated behind advanced mode,
           // unlike the player-facing Maps/Games in this same group.
           id: "library.archives",
-          label: "Archives",
+          label: lazyText(msg`Archives`),
           to: "/library/archives",
           order: 2,
           icon: ArchiveIcon,
@@ -139,12 +141,12 @@ const contentPlugin: FramePlugin = {
     {
       path: "library/maps",
       lazy: () => import("./pages/MapsPage"),
-      crumb: "Maps",
+      crumb: lazyText(msg`Maps`),
     },
     {
       path: "library/maps/:name",
       lazy: () => import("./pages/MapDetailPage"),
-      crumb: (c) => c.params.name ?? "Map",
+      crumb: (c) => c.params.name ?? t`Map`,
     },
     {
       path: "library/games",
@@ -152,7 +154,7 @@ const contentPlugin: FramePlugin = {
         "library.games",
         () => import("./pages/GamesPage"),
       ),
-      crumb: "Games",
+      crumb: lazyText(msg`Games`),
     },
     {
       path: "library/games/:name",
@@ -160,7 +162,7 @@ const contentPlugin: FramePlugin = {
         "library.games",
         () => import("./pages/GameDetailPage"),
       ),
-      crumb: (c) => c.params.name ?? "Game",
+      crumb: (c) => c.params.name ?? t`Game`,
     },
     {
       path: "library/games/:name/units",
@@ -168,7 +170,7 @@ const contentPlugin: FramePlugin = {
         "library.games",
         () => import("./pages/GameUnitsPage"),
       ),
-      crumb: "Units",
+      crumb: lazyText(msg`Units`),
     },
     {
       // The reference table and comparison view for the game's own units
@@ -180,7 +182,7 @@ const contentPlugin: FramePlugin = {
         "library.games",
         () => import("./pages/UnitReferencePage"),
       ),
-      crumb: "Reference",
+      crumb: lazyText(msg`Reference`),
     },
     {
       // The crumb is the def key rather than the display name, because it
@@ -192,7 +194,7 @@ const contentPlugin: FramePlugin = {
         "library.games",
         () => import("./pages/GameUnitPage"),
       ),
-      crumb: (c) => c.params.unit ?? "Unit",
+      crumb: (c) => c.params.unit ?? t`Unit`,
     },
     {
       // The blueprint library (issue #1415). Its pages live under
@@ -200,7 +202,7 @@ const contentPlugin: FramePlugin = {
       // layout is its own thing rather than part of the content browser.
       path: "library/blueprints",
       lazy: () => import("../blueprint/pages/BlueprintsPage"),
-      crumb: "Blueprints",
+      crumb: lazyText(msg`Blueprints`),
     },
     {
       // The route param is an opaque uuid, so the crumb resolves the layout's
@@ -214,18 +216,20 @@ const contentPlugin: FramePlugin = {
     {
       path: "library/archives",
       lazy: gateAdvanced(() => import("./pages/ArchivesPage")),
-      crumb: "Archives",
+      crumb: lazyText(msg`Archives`),
     },
     {
       path: "library/archives/:name",
       lazy: gateAdvanced(() => import("./pages/ArchiveDetailPage")),
-      crumb: (c) => c.params.name ?? "Archive",
+      crumb: (c) => c.params.name ?? t`Archive`,
     },
     {
       path: "library/archives/:name/repl",
       lazy: gateAdvanced(() => import("./pages/ArchiveReplPage")),
-      crumb: (c) =>
-        c.params.name ? `${c.params.name} · Lua REPL` : "Lua REPL",
+      crumb: (c) => {
+        const archiveName = c.params.name;
+        return archiveName ? t`${archiveName} · Lua REPL` : t`Lua REPL`;
+      },
     },
     {
       path: "content/setup-packs",
@@ -282,15 +286,17 @@ const contentPlugin: FramePlugin = {
     // added to its catalog lands on the right page with no change here.
     {
       id: "engine-settings",
-      title: "Engine Settings",
-      description: "How the game itself looks, sounds and handles.",
+      title: lazyText(msg`Engine Settings`),
+      description: lazyText(
+        msg`How the game itself looks, sounds and handles.`,
+      ),
       order: 20,
       icon: SlidersHorizontal,
     },
     {
       id: "engine-display",
-      title: "Display",
-      description: "Fullscreen, resolution and vsync.",
+      title: lazyText(msg`Display`),
+      description: lazyText(msg`Fullscreen, resolution and vsync.`),
       parent: "engine-settings",
       order: 10,
       icon: Monitor,
@@ -298,8 +304,8 @@ const contentPlugin: FramePlugin = {
     },
     {
       id: "engine-graphics",
-      title: "Graphics",
-      description: "Shadows, water, particles and anti-aliasing.",
+      title: lazyText(msg`Graphics`),
+      description: lazyText(msg`Shadows, water, particles and anti-aliasing.`),
       parent: "engine-settings",
       order: 20,
       icon: Sparkles,
@@ -307,8 +313,8 @@ const contentPlugin: FramePlugin = {
     },
     {
       id: "engine-sound",
-      title: "Sound",
-      description: "Volume, channel by channel.",
+      title: lazyText(msg`Sound`),
+      description: lazyText(msg`Volume, channel by channel.`),
       parent: "engine-settings",
       order: 30,
       icon: Volume2,
@@ -316,8 +322,8 @@ const contentPlugin: FramePlugin = {
     },
     {
       id: "engine-input",
-      title: "Input and camera",
-      description: "Camera mode, edge scrolling and the mouse.",
+      title: lazyText(msg`Input and camera`),
+      description: lazyText(msg`Camera mode, edge scrolling and the mouse.`),
       parent: "engine-settings",
       order: 40,
       icon: MousePointer2,
@@ -325,8 +331,8 @@ const contentPlugin: FramePlugin = {
     },
     {
       id: "engine-game",
-      title: "In game",
-      description: "Your player name and team highlighting.",
+      title: lazyText(msg`In game`),
+      description: lazyText(msg`Your player name and team highlighting.`),
       parent: "engine-settings",
       order: 50,
       icon: Gamepad2,
@@ -337,8 +343,10 @@ const contentPlugin: FramePlugin = {
     // setting that is not a springsettings.cfg value at all.
     {
       id: "engine-keybinds",
-      title: "Keybinds",
-      description: "What every key does, on a keyboard you can click.",
+      title: lazyText(msg`Keybinds`),
+      description: lazyText(
+        msg`What every key does, on a keyboard you can click.`,
+      ),
       parent: "engine-settings",
       order: 55,
       icon: Keyboard,
@@ -347,8 +355,10 @@ const contentPlugin: FramePlugin = {
     },
     {
       id: "engine-profiles",
-      title: "Saved configs",
-      description: "Keep a copy of your whole engine config, and put it back.",
+      title: lazyText(msg`Saved configs`),
+      description: lazyText(
+        msg`Keep a copy of your whole engine config, and put it back.`,
+      ),
       parent: "engine-settings",
       order: 60,
       icon: Save,
@@ -358,17 +368,19 @@ const contentPlugin: FramePlugin = {
     // than play, so it sits below everything a player touches while playing.
     {
       id: "library",
-      title: "Library",
-      description:
-        "Where your games, maps and engines live, and where new ones come from.",
+      title: lazyText(msg`Library`),
+      description: lazyText(
+        msg`Where your games, maps and engines live, and where new ones come from.`,
+      ),
       order: 80,
       icon: Library,
     },
     {
       id: "content-folders",
-      title: "Content folders",
-      description:
-        "The folders coilbox reads games and maps from, and which one new content goes to.",
+      title: lazyText(msg`Content folders`),
+      description: lazyText(
+        msg`The folders coilbox reads games and maps from, and which one new content goes to.`,
+      ),
       parent: "library",
       order: 10,
       icon: FolderTree,
@@ -376,8 +388,10 @@ const contentPlugin: FramePlugin = {
     },
     {
       id: "engines",
-      title: "Engines",
-      description: "The engine versions you have, and getting more.",
+      title: lazyText(msg`Engines`),
+      description: lazyText(
+        msg`The engine versions you have, and getting more.`,
+      ),
       parent: "library",
       order: 20,
       icon: Boxes,
@@ -385,8 +399,8 @@ const contentPlugin: FramePlugin = {
     },
     {
       id: "storage",
-      title: "Storage",
-      description: "What is taking up space, and clearing it out.",
+      title: lazyText(msg`Storage`),
+      description: lazyText(msg`What is taking up space, and clearing it out.`),
       parent: "library",
       order: 40,
       icon: HardDrive,

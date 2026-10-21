@@ -1,3 +1,4 @@
+import { t } from "@lingui/core/macro";
 import type { CSSProperties } from "react";
 import { assetUrl } from "../lib/assetUrl";
 import { parseRef } from "../profile/refs";
@@ -211,15 +212,17 @@ export function resolveHomeBackground(
   if (ref) {
     if (!unreadable.has(ref.token))
       return { kind: "image", url: assetUrl(ref.path) };
+    const token = ref.token;
     noteHomeIssue(
       issues,
-      `home: could not read background ${ref.token}, painting the default backdrop`,
+      t`home: could not read background ${token}, painting the default backdrop`,
     );
     return { kind: "default" };
   }
+  const got = showHomeValue(value);
   noteHomeIssue(
     issues,
-    `home: ignoring \`background\`, expected an @.coilbox file reference or false, got ${showHomeValue(value)}`,
+    t`home: ignoring \`background\`, expected an @.coilbox file reference or false, got ${got}`,
   );
   return { kind: "default" };
 }

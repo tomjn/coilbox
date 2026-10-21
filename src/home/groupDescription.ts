@@ -1,3 +1,6 @@
+import { i18n, type MessageDescriptor } from "@lingui/core";
+import { msg } from "@lingui/core/macro";
+
 /**
  * One line under each group heading on the welcome page, saying what the group
  * is for.
@@ -22,19 +25,18 @@
  */
 
 /** Keyed by nav group id. See {@link groupDescription}. */
-const GROUP_DESCRIPTIONS: Readonly<Record<string, string>> = {
-  play: "Start a skirmish, run a campaign, or pick up a Warpath run.",
-  multiplayer: "Log in to a lobby server, chat, and join battles.",
-  records: "Your career, player stats and replays of games already played.",
-  library:
-    "Your maps, games and blueprints, what other players have shared, and what is downloading.",
-  builder: "Build your own campaigns and scenarios.",
-  uberstress: "Run engine stress tests and compare the results.",
-  mapconv: "Compile and decompile maps.",
-  lego: "Assemble units from parts and inspect s3o models.",
-  workshop: "Change what a game's units cost, carry and can do.",
-  animation: "Convert BOS to Lua, and work with COB scripts.",
-  settings: "Engine options, appearance, accounts, and everything else.",
+const GROUP_DESCRIPTIONS: Readonly<Record<string, MessageDescriptor>> = {
+  play: msg`Start a skirmish, run a campaign, or pick up a Warpath run.`,
+  multiplayer: msg`Log in to a lobby server, chat, and join battles.`,
+  records: msg`Your career, player stats and replays of games already played.`,
+  library: msg`Your maps, games and blueprints, what other players have shared, and what is downloading.`,
+  builder: msg`Build your own campaigns and scenarios.`,
+  uberstress: msg`Run engine stress tests and compare the results.`,
+  mapconv: msg`Compile and decompile maps.`,
+  lego: msg`Assemble units from parts and inspect s3o models.`,
+  workshop: msg`Change what a game's units cost, carry and can do.`,
+  animation: msg`Convert BOS to Lua, and work with COB scripts.`,
+  settings: msg`Engine options, appearance, accounts, and everything else.`,
 };
 
 /**
@@ -47,7 +49,7 @@ const GROUP_DESCRIPTIONS: Readonly<Record<string, string>> = {
  */
 export function groupDescription(id: string): string | undefined {
   return Object.hasOwn(GROUP_DESCRIPTIONS, id)
-    ? GROUP_DESCRIPTIONS[id]
+    ? i18n._(GROUP_DESCRIPTIONS[id])
     : undefined;
 }
 

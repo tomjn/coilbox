@@ -1,3 +1,4 @@
+import { t } from "@lingui/core/macro";
 /**
  * Turn a `JSON.parse` failure into a human-locatable pointer: a line/column and a
  * short source excerpt with a caret under the offending character.
@@ -104,8 +105,9 @@ export function describeJsonError(
   const raw = error instanceof Error ? error.message : String(error);
   const loc = locateJsonError(text, raw);
   if (!loc) return { message: raw };
+  const { line, column } = loc;
   return {
-    message: `Line ${loc.line}, column ${loc.column}: ${raw}`,
+    message: t`Line ${line}, column ${column}: ${raw}`,
     snippet: jsonErrorSnippet(text, loc),
   };
 }

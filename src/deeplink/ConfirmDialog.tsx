@@ -1,4 +1,5 @@
 import { t } from "@lingui/core/macro";
+import { Trans } from "@lingui/react/macro";
 import { Button } from "@picoframe/frame";
 import { AlertTriangle, ExternalLink } from "lucide-react";
 import type { ComponentType } from "react";
@@ -83,7 +84,7 @@ export function ConfirmDialog({
 
           <DialogFooter>
             <Button variant="outline" onClick={() => setPending(null)}>
-              Cancel
+              <Trans>Cancel</Trans>
             </Button>
             <Button onClick={confirm}>{pending.confirmLabel}</Button>
           </DialogFooter>

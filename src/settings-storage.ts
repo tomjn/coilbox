@@ -1,3 +1,4 @@
+import { t } from "@lingui/core/macro";
 import { invoke } from "@tauri-apps/api/core";
 import {
   type FlushableSettingsStorage,
@@ -53,8 +54,8 @@ export async function createTauriSettingsStorage(): Promise<FlushableSettingsSto
           failing = true;
           void notify({
             level: "error",
-            title: "Coilbox could not save your settings",
-            body: "Your change will be lost when Coilbox closes, and anything that reads the settings file still has the old answer. Check the disk is not full, then change the setting again to try saving it.",
+            title: t`Coilbox could not save your settings`,
+            body: t`Your change will be lost when Coilbox closes, and anything that reads the settings file still has the old answer. Check the disk is not full, then change the setting again to try saving it.`,
           });
         },
       ),

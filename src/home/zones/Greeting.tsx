@@ -1,3 +1,4 @@
+import { plural, t } from "@lingui/core/macro";
 import { useFrame } from "@picoframe/frame";
 import {
   type Connections,
@@ -94,7 +95,7 @@ export function greetingCopy(
   overrides: GreetingOverrides = {},
 ): GreetingCopy {
   const heading =
-    overrides.title ?? (username ? `Welcome back ${username}` : title);
+    overrides.title ?? (username ? t`Welcome back ${username}` : title);
   const settled = (tagline: string | null): GreetingCopy => ({
     heading,
     tagline,
@@ -104,19 +105,17 @@ export function greetingCopy(
   // on it, including an empty string meaning a deliberate blank.
   if (overrides.tagline !== undefined) return settled(overrides.tagline);
   if (hasResume && (zones.has("continue") || zones.has("resume")))
-    return settled(RESUME_LINE);
+    // There is something waiting, so point at it rather than at the grid.
+    return settled(t`Pick up where you left off.`);
   if (!zones.has("cards")) return settled(null);
-  return { heading, tagline: TOOLS_LINE, taglineWithoutTools: NO_TOOLS_LINE };
+  return {
+    heading,
+    // The grid drew at least one tool card.
+    tagline: t`Choose a tool to get started.`,
+    // It drew none, so the page is a heading and whatever links came with it.
+    taglineWithoutTools: t`No tools available yet.`,
+  };
 }
-
-/** There is something waiting, so point at it rather than at the grid. */
-const RESUME_LINE = "Pick up where you left off.";
-
-/** The grid drew at least one tool card. */
-const TOOLS_LINE = "Choose a tool to get started.";
-
-/** It drew none, so the page is a heading and whatever links came with it. */
-const NO_TOOLS_LINE = "No tools available yet.";
 
 /**
  * Every live, logged-in connection's lobby name, the focused one first
@@ -156,9 +155,15 @@ export function connectedNames(
 export function greetingSubject(names: readonly string[]): string | null {
   if (names.length === 0) return null;
   if (names.length === 1) return names[0];
-  if (names.length === 2) return `${names[0]} and ${names[1]}`;
+  if (names.length === 2) {
+    const [first, second] = names;
+    return t`${first} and ${second}`;
+  }
   const [first, ...rest] = names;
-  return `${first} and ${rest.length} others`;
+  return plural(rest.length, {
+    one: `${first} and # other`,
+    other: `${first} and # others`,
+  });
 }
 
 /**

@@ -1,3 +1,4 @@
+import { Trans, useLingui } from "@lingui/react/macro";
 import { buttonVariants, cn } from "@picoframe/frame";
 import { Check, Download, Loader2, Map as MapIcon } from "lucide-react";
 import { type ReactNode, useState } from "react";
@@ -78,6 +79,7 @@ export function SuggestedMapCard({
   // The page's answer, not this card's. `CoilboxHome` resolves it once, above the
   // layout, because the same map is claimed against the tool cards and two
   // resolutions could drift apart (issue #1077).
+  const { t } = useLingui();
   const { map, loading, inventory } = useSuggestedMapAnswer();
   const { state, error, canDownload, noWriteRoot, download } =
     useSuggestedMapInstall(map, inventory);
@@ -99,6 +101,7 @@ export function SuggestedMapCard({
   if (loading) return labelled(<Placeholder />);
   if (!map) return null;
 
+  const mapTitle = map.title;
   const row = variant === "row";
   // In the resume row the card is the same card, at the height of the cards it is
   // standing among and the width that height allows. See {@link ROW_CARD_CLASS}.
@@ -136,7 +139,7 @@ export function SuggestedMapCard({
           <span
             className={`block truncate text-xs ${art ? ART_DIM_CLASS : "text-muted-foreground"}`}
           >
-            {error ?? map.blurb ?? "Curated map"}
+            {error ?? map.blurb ?? t`Curated map`}
           </span>
         </span>
         <Action state={state} compact={row} />
@@ -157,7 +160,7 @@ export function SuggestedMapCard({
   return labelled(
     <Column
       className={cn(COLUMN_CLASS, row && ROW_COLUMN_CLASS)}
-      aria-label={row ? "Suggested map" : undefined}
+      aria-label={row ? t`Suggested map` : undefined}
     >
       {installedName ? (
         // Installed: the card is the way to the map, so the whole surface is the
@@ -180,8 +183,8 @@ export function SuggestedMapCard({
           disabled={!canDownload}
           aria-label={
             state === "failed"
-              ? `Retry installing ${map.title}`
-              : `Install ${map.title}`
+              ? t`Retry installing ${mapTitle}`
+              : t`Install ${mapTitle}`
           }
           className={cn(
             surface,
@@ -201,14 +204,16 @@ export function SuggestedMapCard({
           row to 239px until the read landed (issue #1099). */}
       {noWriteRoot && state !== "installed" && (
         <p className="text-xs text-muted-foreground">
-          Set a download folder in{" "}
-          <Link
-            className="underline underline-offset-4"
-            to="/settings/content-folders"
-          >
-            Content folders settings
-          </Link>{" "}
-          to install it.
+          <Trans>
+            Set a download folder in{" "}
+            <Link
+              className="underline underline-offset-4"
+              to="/settings/content-folders"
+            >
+              Content folders settings
+            </Link>{" "}
+            to install it.
+          </Trans>
         </p>
       )}
     </Column>,
@@ -222,7 +227,7 @@ function Heading() {
       id="suggested-map-heading"
       className="mb-3 text-xs font-medium uppercase tracking-wide text-muted-foreground"
     >
-      Suggested map
+      <Trans>Suggested map</Trans>
     </h2>
   );
 }
@@ -289,11 +294,12 @@ function Action({
    */
   compact?: boolean;
 }) {
+  const { t } = useLingui();
   if (state === "installed") {
     return (
       <span className={STATUS_CLASS}>
         <Check className="size-4" />
-        {!compact && "Installed"}
+        {!compact && t`Installed`}
       </span>
     );
   }
@@ -301,7 +307,7 @@ function Action({
     return (
       <span className={STATUS_CLASS}>
         <Loader2 className="size-3.5 motion-safe:animate-spin" />
-        {!compact && (state === "active" ? "Downloading…" : "Queued")}
+        {!compact && (state === "active" ? t`Downloading…` : t`Queued`)}
       </span>
     );
   }
@@ -318,7 +324,7 @@ function Action({
       )}
     >
       <Download className="size-4" />
-      {!compact && (state === "failed" ? "Retry" : "Install")}
+      {!compact && (state === "failed" ? t`Retry` : t`Install`)}
     </span>
   );
 }

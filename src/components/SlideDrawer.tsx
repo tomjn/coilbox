@@ -1,3 +1,4 @@
+import { useLingui } from "@lingui/react/macro";
 import { Button } from "@picoframe/frame";
 import { X } from "lucide-react";
 import { createPortal } from "react-dom";
@@ -21,12 +22,13 @@ export function SlideDrawer({
   onClose: () => void;
   children: React.ReactNode;
 }) {
+  const { t } = useLingui();
   return createPortal(
     <>
       {open && (
         <button
           type="button"
-          aria-label={`Close ${title}`}
+          aria-label={t`Close ${title}`}
           className="fixed inset-0 z-40 bg-black/20"
           onClick={onClose}
         />
@@ -39,7 +41,7 @@ export function SlideDrawer({
       >
         <header className="flex items-center justify-between border-b border-border px-4 py-3">
           <h2 className="text-sm font-semibold">{title}</h2>
-          <Button className="h-7 px-2" onClick={onClose} aria-label="Close">
+          <Button className="h-7 px-2" onClick={onClose} aria-label={t`Close`}>
             <X className="size-4" />
           </Button>
         </header>

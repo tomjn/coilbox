@@ -1,3 +1,4 @@
+import { useLingui } from "@lingui/react/macro";
 import { useSetting } from "@picoframe/frame";
 import { Slider } from "@/components/ui/slider";
 import { Switch } from "@/components/ui/switch";
@@ -29,6 +30,7 @@ export function LevelRow({
   /** Tighter layout for a table cell, rather than a settings row. */
   compact?: boolean;
 }) {
+  const { t } = useLingui();
   const [volume, setVolume] = useSetting<number>(volumeKey, defaultVolume);
   const [muted, setMuted] = useSetting<boolean>(mutedKey, defaultMuted);
 
@@ -43,7 +45,7 @@ export function LevelRow({
         value={[volume]}
         onValueChange={([v]) => setVolume(v)}
         disabled={muted}
-        aria-label={`${label} volume`}
+        aria-label={t`${label} volume`}
       />
       <span className="w-10 shrink-0 text-xs tabular-nums text-muted-foreground">
         {volume}%
@@ -52,7 +54,7 @@ export function LevelRow({
         id={`${id}-muted`}
         checked={muted}
         onCheckedChange={setMuted}
-        aria-label={`Mute ${label}`}
+        aria-label={t`Mute ${label}`}
       />
     </div>
   );

@@ -1,6 +1,7 @@
 "use client";
 
 // From the picoframe shadcn registry (`bunx shadcn@latest add @picoframe/command`).
+import { useLingui } from "@lingui/react/macro";
 import { Command as CommandPrimitive } from "cmdk";
 import { SearchIcon } from "lucide-react";
 import type * as React from "react";
@@ -30,8 +31,8 @@ function Command({
 }
 
 function CommandDialog({
-  title = "Command Palette",
-  description = "Search for a command to run...",
+  title,
+  description,
   children,
   className,
   showCloseButton = true,
@@ -48,11 +49,14 @@ function CommandDialog({
    *  a caller that ranks and filters its own results. */
   commandProps?: React.ComponentProps<typeof Command>;
 }) {
+  const { t } = useLingui();
   return (
     <Dialog {...props}>
       <DialogHeader className="sr-only">
-        <DialogTitle>{title}</DialogTitle>
-        <DialogDescription>{description}</DialogDescription>
+        <DialogTitle>{title ?? t`Command Palette`}</DialogTitle>
+        <DialogDescription>
+          {description ?? t`Search for a command to run...`}
+        </DialogDescription>
       </DialogHeader>
       <DialogContent
         className={cn("overflow-hidden p-0", className)}
