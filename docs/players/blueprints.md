@@ -93,7 +93,7 @@ The widget panel opens by itself the first time you start a match. If it never a
 2. Open the panel. Select the Blueprints button on the right of the screen, or type /coilbox_blueprints in the game's chat.
 3. Select one or more builders.
 4. Select a blueprint in the list. Its buildings follow the cursor. A building the ground will not take is marked with dark stripes and a dashed red outline.
-5. Press [ or ] to turn it, F to flip it side to side or G to flip it top to bottom. Shift+[ and Shift+] switch to the previous or next blueprint.
+5. Press [ or ] to turn it, H to flip it side to side or V to flip it top to bottom. Shift+[ and Shift+] switch to the previous or next blueprint.
 6. Left click to place it.
 
 While you place a blueprint, a second panel opens beside the first. It shows what the blueprint costs and how long your selected builders take to build it. Its buttons do the same as the keys, and each is labelled with the key that does it.
@@ -105,7 +105,11 @@ The Builders buttons in that panel choose how the work is shared:
 
 The game remembers your choice for each game.
 
-Each builder you selected is ordered to build the buildings it can. Right click or Escape puts the blueprint away without placing it. Hold Shift when you click to add the orders after what the builders are already doing, and to keep the blueprint on the cursor for another copy.
+Each builder you selected is ordered to build the buildings it can. Right click or Escape puts the blueprint away without placing it. Hold Shift when you click to add the orders after what the builders are already doing, and to keep the blueprint on the cursor for another copy. Hold Shift and drag to lay copies in a line, each touching the last.
+
+### Plan a base ahead
+
+You can place a blueprint with no builders selected. It stays on the map as a plan, drawn the way it looked while you placed it, and only you can see it. Place as many as you like. When you have the builders, select them and right click a plan to build it. Right click a plan with nothing selected to remove it.
 
 If the panel is in the way, drag the Blueprints button, or the panel's title, somewhere else. Close to the edge of the screen, it snaps to the edge. The button at the top right of the panel, or selecting the title, closes it. The game remembers where you put it.
 
@@ -123,7 +127,7 @@ The panel only lists blueprints for the game you are playing. It has three tabs:
 
 Under each name is where it came from, how many buildings it has and any buildings this game does not have.
 
-If your builders cannot build every building, the panel says how many are left to build. Select other builders, then select Place to build the rest, or Dismiss to drop them.
+If your builders cannot build every building, the rest stay on the map as a plan too. The panel says how many buildings your plans hold. Select builders, then select Place to build them all, or Dismiss to remove every plan.
 
 You can bind other keys. Type /bind followed by a key and an action in the game's chat, for example /bind q coilbox_blueprints_rotate_left, or add the same line without the slash to uikeys.txt. The actions are:
 
@@ -133,7 +137,7 @@ You can bind other keys. Type /bind followed by a key and an action in the game'
 - coilbox_blueprints_prev and coilbox_blueprints_next switch blueprint
 - coilbox_blueprints_save saves the selection
 
-The widget only takes these keys while you place a blueprint, so the rest of the time F still means fight and G still means guard. Some games use [ and ] for their own keys, so those keys may not reach the widget. Bind other keys to the actions in that case.
+Some games use [ and ] for their own keys, so those keys may not reach the widget. Bind other keys to the actions in that case.
 
 ### Save a base from a game
 

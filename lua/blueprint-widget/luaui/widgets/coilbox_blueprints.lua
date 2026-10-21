@@ -6,7 +6,7 @@
 --
 -- The panel lists the blueprints coilbox holds for this game, plus whatever
 -- BAR's own blueprints.json has. Pick one and it follows the cursor as ghosts,
--- turned with [ and ], flipped with F and G, placed with a click as build
+-- turned with [ and ], flipped with H and V, placed with a click as build
 -- orders to the selected builders. Save selection writes the selected buildings to a spool file that
 -- coilbox collects into the library.
 --
@@ -33,20 +33,22 @@ local ACTION_FLIP_X = "coilbox_blueprints_flip_x"
 local ACTION_FLIP_Z = "coilbox_blueprints_flip_z"
 
 -- Keys bound when the widget loads, each only if the player has bound
--- nothing to its action. The engine binds [ and ] to buildfacing and F and G
--- to fight and guard. LuaUI is offered a key's actions before the engine
--- runs them, and these only take the key while a layout is being placed, so
--- the rest of the time it does its usual job. F and G flip, as in Factorio.
+-- nothing to its action. The engine binds [ and ] to buildfacing. LuaUI is
+-- offered a key's actions before the engine runs them, and these only take
+-- the key while a layout is being placed, so the rest of the time it does
+-- its usual job. H and V flip, as in Factorio.
 local DEFAULT_KEYS = {
 	{ ACTION_LEFT, "[" },
 	{ ACTION_RIGHT, "]" },
 	{ ACTION_PREV, "Shift+[" },
 	{ ACTION_NEXT, "Shift+]" },
-	{ ACTION_FLIP_X, "f" },
-	{ ACTION_FLIP_Z, "g" },
+	{ ACTION_FLIP_X, "h" },
+	{ ACTION_FLIP_Z, "v" },
 }
 -- The defaults this widget bound, to unbind on shutdown.
 local boundKeys = {}
+-- Each of the widget's actions by name, filled in by Initialize. See KeyPress.
+local keyActions = {}
 
 function widget:GetInfo()
 	return {
@@ -55,7 +57,11 @@ function widget:GetInfo()
 		author = "coilbox",
 		date = "2026",
 		license = "MIT or GNU GPL, v2 or later",
-		layer = 0,
+		-- Ahead of game widgets that answer a key outright: Splinter
+		-- Faction's share menu takes H at layer -500. The widget only takes a
+		-- key while a layout is being placed. Behind -1000, the Chili
+		-- framework's, so a text box still gets its keys first.
+		layer = -600,
 		enabled = true,
 	}
 end
@@ -104,10 +110,13 @@ local layoutW, layoutH = 0, 0
 -- What is being placed: the item, the rotation, and where it would land now.
 local placing = nil
 -- Ghosts left after a partial placement, already in world space.
-local remainder = nil
--- Counts every new remainder, so its ground marks are rebuilt even when it
--- holds as many positions as the last one.
-local remainderSerial = 0
+-- Planned layouts nobody has built yet: placed with no builder that could
+-- build them, or left over when the builders could build only part. Each is
+-- { positions } in world space, kept until it is built or dismissed.
+local plans = {}
+-- Counts every change to the plans, so their ground marks are rebuilt even
+-- when they hold as many positions as before.
+local plansSerial = 0
 local messageUntil = 0
 -- A press on the pill or the panel's title, which is a click if the mouse
 -- comes up where it went down and a drag once it moves further than the
@@ -339,7 +348,6 @@ local readCost
 
 local function refreshPanel()
 	MODEL.refresh(panel, store:entries(), PLACE, Game, can)
-	panel.remainder = remainder and { count = #remainder } or nil
 	readCost()
 	MODEL.touch(panel)
 end
@@ -410,7 +418,7 @@ local function rotate(turns)
 		turns = -turns
 	end
 	placing.rotation = (placing.rotation + turns) % 4
-	placing.foot = nil
+	placing.foot, placing.extent = nil, nil
 	panel.placing.rotation = placing.rotation
 	MODEL.touch(panel)
 	return true
@@ -423,7 +431,7 @@ local function flip(axis)
 		return false
 	end
 	placing.flip[axis] = not placing.flip[axis]
-	placing.foot = nil
+	placing.foot, placing.extent = nil, nil
 	MODEL.touch(panel)
 	return true
 end
@@ -444,6 +452,8 @@ local function step(direction)
 end
 
 --- Where the layout would land under the cursor now, or nil off the map.
+-- The cursor holds the middle of the layout. During a shift drag it is
+-- copies in a line from where the drag began.
 local function trackCursor()
 	local mx, my = Spring.GetMouseState()
 	local kind, pos = Spring.TraceScreenRay(mx, my, true)
@@ -451,19 +461,44 @@ local function trackCursor()
 		placing.foot = nil
 		return
 	end
-	local ax, az = PLACE.snapAnchor(pos[1], pos[3])
+	local resolved = placing.item.resolved
+	if not placing.extent then
+		placing.extent = { PLACE.extent(resolved, placing.rotation, placing.flip) }
+	end
+	local ax, az = PLACE.centredAnchor(pos[1], pos[3], unpack(placing.extent))
 	if placing.foot and placing.ax == ax and placing.az == az then
 		return
 	end
 	placing.ax, placing.az = ax, az
-	placing.foot = PLACE.footprint(placing.item.resolved, placing.rotation, ax, az, placing.flip)
+	local anchors = { { x = ax, z = az } }
+	if placing.line then
+		anchors = PLACE.line(placing.line.x, placing.line.z, ax, az, unpack(placing.extent))
+	end
+	local foot = {}
+	for _, at in ipairs(anchors) do
+		for _, p in ipairs(PLACE.footprint(resolved, placing.rotation, at.x, at.z, placing.flip)) do
+			foot[#foot + 1] = p
+		end
+	end
+	placing.foot = foot
+	placing.serial = (placing.serial or 0) + 1
 end
 
-local function setRemainder(positions)
-	remainder = (#positions > 0) and positions or nil
-	remainderSerial = remainderSerial + 1
-	panel.remainder = remainder and { count = #remainder } or nil
+local function plansChanged()
+	plansSerial = plansSerial + 1
+	local count = 0
+	for _, plan in ipairs(plans) do
+		count = count + #plan.positions
+	end
+	panel.remainder = count > 0 and { count = count } or nil
 	MODEL.touch(panel)
+end
+
+local function addPlan(positions)
+	if #positions > 0 then
+		plans[#plans + 1] = { positions = positions }
+		plansChanged()
+	end
 end
 
 local function describe(plan, sent)
@@ -475,7 +510,8 @@ local function describe(plan, sent)
 		parts[#parts + 1] = plan.blocked .. " blocked"
 	end
 	if #plan.remainder > 0 then
-		parts[#parts + 1] = #plan.remainder .. " left for another builder"
+		local what = sent > 0 and " left for another builder" or " planned, right click it with builders to build"
+		parts[#parts + 1] = #plan.remainder .. what
 	end
 	if #parts == 0 then
 		return "nothing could be placed"
@@ -496,7 +532,8 @@ local function placeNow()
 	local plan = PLACE.plan(placing.foot, can, shiftHeld(), panel.assist)
 	local sent = PLACE.issue(plan)
 	say(placing.item.name .. ": " .. describe(plan, sent))
-	setRemainder(plan.remainder)
+	addPlan(plan.remainder)
+	placing.line = nil
 	-- Holding shift keeps the blueprint on the cursor for another copy.
 	if not shiftHeld() then
 		stopPlacing()
@@ -505,21 +542,90 @@ local function placeNow()
 	end
 end
 
-local function placeRemainder()
-	if not remainder then
-		return
-	end
-	readSelection()
+--- Hand a plan to the selected builders. What they cannot build stays
+-- planned.
+local function buildPlan(index)
+	local positions = plans[index].positions
 	-- Re-test the ground, since things have been built since.
 	local foot = {}
-	for i, p in ipairs(remainder) do
+	for i, p in ipairs(positions) do
 		local status = Spring.TestBuildOrder(p.defID, p.x, p.y, p.z, p.facing)
 		foot[i] = { defID = p.defID, def = p.def, x = p.x, y = p.y, z = p.z, facing = p.facing, blocked = status == 0 }
 	end
 	local plan = PLACE.plan(foot, can, shiftHeld(), panel.assist)
 	local sent = PLACE.issue(plan)
-	say("Remainder: " .. describe(plan, sent))
-	setRemainder(plan.remainder)
+	plans[index].positions = plan.remainder
+	return plan, sent
+end
+
+local function dropEmptyPlans()
+	for i = #plans, 1, -1 do
+		if #plans[i].positions == 0 then
+			table.remove(plans, i)
+		end
+	end
+	plansChanged()
+end
+
+--- Build every plan with the selection, from the panel's Place button.
+local function placeRemainder()
+	readSelection()
+	local total = { blocked = 0, remainder = {} }
+	local sent = 0
+	for i = 1, #plans do
+		local plan, n = buildPlan(i)
+		total.blocked = total.blocked + plan.blocked
+		for _, p in ipairs(plan.remainder) do
+			total.remainder[#total.remainder + 1] = p
+		end
+		sent = math.max(sent, n)
+	end
+	dropEmptyPlans()
+	say("Planned: " .. describe(total, sent))
+end
+
+--- The plan with a building under a point on the ground, if any.
+local function planAt(x, z)
+	for i = #plans, 1, -1 do
+		for _, p in ipairs(plans[i].positions) do
+			local hw, hd = PLACE.halfSpan(p.def, p.facing)
+			if math.abs(x - p.x) <= hw and math.abs(z - p.z) <= hd then
+				return i
+			end
+		end
+	end
+	return nil
+end
+
+--- A right click on a plan builds it with the selected builders. With
+-- nothing selected it removes the plan. With other units selected the click
+-- is theirs.
+local function clickPlan(mx, my)
+	if #plans == 0 then
+		return false
+	end
+	local kind, pos = Spring.TraceScreenRay(mx, my, true)
+	if kind ~= "ground" or not pos then
+		return false
+	end
+	local index = planAt(pos[1], pos[3])
+	if not index then
+		return false
+	end
+	readSelection()
+	if #can.builders > 0 then
+		local plan, sent = buildPlan(index)
+		say("Planned: " .. describe(plan, sent))
+		dropEmptyPlans()
+		return true
+	end
+	if #Spring.GetSelectedUnits() == 0 then
+		table.remove(plans, index)
+		plansChanged()
+		say("Plan removed")
+		return true
+	end
+	return false
 end
 
 --------------------------------------------------------------------------------
@@ -603,7 +709,8 @@ local function act(action)
 	elseif kind == "remainder" then
 		placeRemainder()
 	elseif kind == "dismiss" then
-		setRemainder({})
+		plans = {}
+		plansChanged()
 	elseif kind == "save" then
 		saveSelection()
 	end
@@ -688,26 +795,37 @@ function widget:Initialize()
 
 	-- "t" reaches the console and "p" a key bound in uikeys.txt. Without the
 	-- second, bind x coilbox_blueprints would do nothing.
-	widgetHandler:AddAction(ACTION_TOGGLE, toggle, nil, "tp")
-	widgetHandler:AddAction(ACTION_SAVE, saveSelection, nil, "tp")
-	widgetHandler:AddAction(ACTION_LEFT, function()
-		return rotate(-1)
-	end, nil, "tp")
-	widgetHandler:AddAction(ACTION_RIGHT, function()
-		return rotate(1)
-	end, nil, "tp")
-	widgetHandler:AddAction(ACTION_PREV, function()
-		return step(-1)
-	end, nil, "tp")
-	widgetHandler:AddAction(ACTION_NEXT, function()
-		return step(1)
-	end, nil, "tp")
-	widgetHandler:AddAction(ACTION_FLIP_X, function()
-		return flip("x")
-	end, nil, "tp")
-	widgetHandler:AddAction(ACTION_FLIP_Z, function()
-		return flip("z")
-	end, nil, "tp")
+	keyActions = {
+		[ACTION_TOGGLE] = function()
+			toggle()
+			return true
+		end,
+		[ACTION_SAVE] = function()
+			saveSelection()
+			return true
+		end,
+		[ACTION_LEFT] = function()
+			return rotate(-1)
+		end,
+		[ACTION_RIGHT] = function()
+			return rotate(1)
+		end,
+		[ACTION_PREV] = function()
+			return step(-1)
+		end,
+		[ACTION_NEXT] = function()
+			return step(1)
+		end,
+		[ACTION_FLIP_X] = function()
+			return flip("x")
+		end,
+		[ACTION_FLIP_Z] = function()
+			return flip("z")
+		end,
+	}
+	for action, run in pairs(keyActions) do
+		widgetHandler:AddAction(action, run, nil, "tp")
+	end
 	for _, default in ipairs(DEFAULT_KEYS) do
 		local action, key = default[1], default[2]
 		local current = Spring.GetActionHotKeys(action)
@@ -733,6 +851,9 @@ function widget:Initialize()
 		rotate = rotate,
 		flip = flip,
 		step = step,
+		assist = function(mode)
+			MODEL.setAssist(panel, mode)
+		end,
 	}
 
 	-- A widget that loads and then draws nothing looks like one that did not
@@ -821,12 +942,23 @@ function widget:MousePress(x, y, button)
 	end
 	if placing then
 		if button == 1 then
-			placeNow()
+			-- Holding shift, a press starts a line of copies that the drag
+			-- lengthens and the release places.
+			if shiftHeld() and placing.foot then
+				placing.line = { x = placing.ax, z = placing.az }
+				placing.foot = nil
+			else
+				placeNow()
+			end
 			return true
 		elseif button == 3 then
 			stopPlacing()
 			return true
 		end
+		return false
+	end
+	if button == 3 then
+		return clickPlan(x, y)
 	end
 	return false
 end
@@ -848,6 +980,11 @@ function widget:MouseMove(x, y)
 end
 
 function widget:MouseRelease()
+	if placing and placing.line then
+		trackCursor()
+		placeNow()
+		return true
+	end
 	if not drag then
 		return false
 	end
@@ -876,13 +1013,38 @@ end
 
 local KEY_ESCAPE = 27
 
-function widget:KeyPress(key)
-	if not placing then
-		return false
+-- The widget's own actions run from KeyPress when the widget handler has
+-- not run them. Splinter Faction's handler calls actionHandler:KeyAction without the
+-- key's bound actions, so no key bound to a widget action reaches it, and
+-- the engine runs the key's first engine action instead. A handler that does
+-- route a key has run the action already and stopped the key there.
+--- The engine's name for a key press with its modifiers, as a bind uses it.
+local function keySet(key, mods)
+	local name = Spring.GetKeySymbol(key)
+	if not name then
+		return nil
 	end
-	if key == KEY_ESCAPE then
+	local prefix = ""
+	if mods then
+		prefix = (mods.alt and "Alt+" or "") .. (mods.ctrl and "Ctrl+" or "") .. (mods.meta and "Meta+" or "") .. (mods.shift and "Shift+" or "")
+	end
+	return prefix .. name
+end
+
+function widget:KeyPress(key, mods, isRepeat)
+	if placing and key == KEY_ESCAPE then
 		stopPlacing()
 		return true
+	end
+	local set = keySet(key, mods)
+	if not set then
+		return false
+	end
+	for _, action in ipairs(Spring.GetKeyBindings(set) or {}) do
+		local run = keyActions[action.command]
+		if run and (not isRepeat or action.command == ACTION_LEFT or action.command == ACTION_RIGHT) and run() then
+			return true
+		end
 	end
 	return false
 end
@@ -984,21 +1146,27 @@ end
 
 function widget:DrawWorld()
 	local foot = placing and placing.foot
-	if not foot and not remainder then
+	if not foot and #plans == 0 then
 		return
 	end
 	local teamID = Spring.GetMyTeamID()
 	gl.Blending(GL.SRC_ALPHA, GL.ONE_MINUS_SRC_ALPHA)
 
-	local marks, key
-	if foot then
-		marks = foot
-		key = "cursor:" .. placing.ax .. ":" .. placing.az .. ":" .. placing.rotation .. ":" .. tostring(placing.flip.x) .. tostring(placing.flip.z) .. ":" .. placing.item.entry.key
-	else
-		marks = remainder
-		key = "remainder:" .. remainderSerial
+	-- the plans' marks and the cursor's in one buffer, rebuilt when either
+	-- changes
+	local key = "plans:" .. plansSerial .. (foot and (":cursor:" .. placing.serial) or "")
+	if groundKey ~= key then
+		local marks = {}
+		for _, plan in ipairs(plans) do
+			for _, p in ipairs(plan.positions) do
+				marks[#marks + 1] = p
+			end
+		end
+		for _, p in ipairs(foot or {}) do
+			marks[#marks + 1] = p
+		end
+		groundMarks(marks, key)
 	end
-	groundMarks(marks, key)
 	-- The marks follow the heightmap, but the terrain the engine draws is
 	-- simplified with distance, so a depth test would still let it cut them.
 	gl.DepthTest(false)
@@ -1022,8 +1190,8 @@ function widget:DrawWorld()
 			ghost(p, teamID)
 		end
 	end
-	if remainder then
-		for _, p in ipairs(remainder) do
+	for _, plan in ipairs(plans) do
+		for _, p in ipairs(plan.positions) do
 			ghost(p, teamID)
 		end
 	end
