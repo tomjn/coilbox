@@ -33,6 +33,8 @@
  * `weaponLibrary.ts`). Until then those fields are shown and not offered.
  */
 
+import { i18n, type MessageDescriptor } from "@lingui/core";
+import { msg, plural, t } from "@lingui/core/macro";
 import { WEAPON_FIELD_NOTES } from "@/content/unitFieldNotes";
 import {
   describeField,
@@ -40,6 +42,7 @@ import {
   normaliseFieldPath,
   type ResolvedField,
 } from "@/content/unitFields";
+import { getLocale } from "@/i18n";
 import { fieldState, readPath, type UnitOverrides } from "./overrides";
 import type {
   FieldRow,
@@ -351,25 +354,34 @@ export function describeLeaf(
   const field = describeField("weapon", canonical(leaf));
   if (field.known || parts.length !== 2 || parts[0].toLowerCase() !== "damage")
     return field;
+  const armourClass = parts[1];
   return {
     ...field,
     known: true,
     described: true,
-    label: `Damage against ${parts[1]}`,
+    label: t`Damage against ${armourClass}`,
     type: "number",
-    help: `Damage dealt to a unit whose armour class is ${parts[1]}. The default entry covers every class the weapon does not name.`,
+    help: t`Damage dealt to a unit whose armour class is ${armourClass}. The default entry covers every class the weapon does not name.`,
   };
 }
 
 /** Where a definition field is drawn on the page. */
-const DEFINITION_SECTIONS: { id: string; label: string }[] = [
-  { id: "damage", label: "Damage" },
-  { id: "weapon", label: "Weapon" },
-  { id: "shield", label: "Shield" },
-  { id: "textures", label: "Textures" },
-  { id: "customParams", label: "Custom parameters" },
-  { id: "game", label: "Fields only this game declares" },
+const DEFINITION_SECTIONS: { id: string; label: MessageDescriptor }[] = [
+  { id: "damage", label: msg`Damage` },
+  { id: "weapon", label: msg`Weapon` },
+  { id: "shield", label: msg`Shield` },
+  { id: "textures", label: msg`Textures` },
+  { id: "customParams", label: msg`Custom parameters` },
+  { id: "game", label: msg`Fields only this game declares` },
 ];
+
+/** "A", "A and B", "A, B and C" in the app language. */
+function nameList(names: string[]): string {
+  return new Intl.ListFormat(getLocale(), {
+    style: "long",
+    type: "conjunction",
+  }).format(names);
+}
 
 function definitionSection(leaf: string, field: ResolvedField): string {
   const head = leaf.split(".")[0].toLowerCase();
@@ -484,14 +496,20 @@ function slotGroup(
   };
   sortRows(rows, order);
 
+  const number = slot.number;
+  let note: string;
+  if (!slot.table)
+    note = t`This slot names its weapon and nothing else, so it has no mount fields to change.`;
+  else if (rows.length === 0)
+    note = t`Where weapon ${number} sits on this unit and what it aims at. These fields belong to the unit's own weapon list, not to the weapon. This slot sets none of them, and All lists every one.`;
+  else
+    note = t`Where weapon ${number} sits on this unit and what it aims at. These fields belong to the unit's own weapon list, not to the weapon.`;
   return {
     group: {
       id: "slot",
-      label: `Weapon ${slot.number} mount`,
-      note: slot.table
-        ? `Where weapon ${slot.number} sits on this unit and what it aims at. These fields belong to the unit's own weapon list, not to the weapon.${rows.length === 0 ? " This slot sets none of them, and All lists every one." : ""}`
-        : `This slot names its weapon and nothing else, so it has no mount fields to change.`,
-      sections: rows.length > 0 ? [{ id: "slot", label: "Mount", rows }] : [],
+      label: t`Weapon ${number} mount`,
+      note,
+      sections: rows.length > 0 ? [{ id: "slot", label: t`Mount`, rows }] : [],
     },
     relevant: relevantLeaves.length,
     all: allLeaves.length,
@@ -598,7 +616,7 @@ export function definitionSections(
     const rows = bySection.get(spec.id);
     if (!rows?.length) continue;
     sortRows(rows, rank);
-    sections.push({ ...spec, rows });
+    sections.push({ id: spec.id, label: i18n._(spec.label), rows });
   }
   return {
     sections,
@@ -657,15 +675,27 @@ function definitionGroup(
     leafUnder(linkedField, prefix),
   );
 
+  const weaponKey = definition.key;
+  const slotName = slot.name;
+  let note: string;
+  if (own)
+    note = t`What the weapon does. ${unitName} carries its own copy of this definition, so a change here reaches no other unit, even one whose weapon has the same name.`;
+  else if (mountedBy > 1) {
+    const mounts = plural(mountedBy, {
+      one: "# unit mounts it",
+      other: "# units mount it",
+    });
+    note = t`${unitName} does not carry this definition itself. ${slotName} is in the game's shared weapon table, and ${mounts}, so a change to it would reach every one of them. Give ${unitName} its own copy to change it here.`;
+  } else
+    note = t`${unitName} does not carry this definition itself. ${slotName} is in the game's shared weapon table, so a change to it would reach every one of them. Give ${unitName} its own copy to change it here.`;
+
   return {
     group: {
       id: "definition",
       label: own
-        ? `Weapon definition ${definition.key}`
-        : `Weapon definition ${definition.key}, shared`,
-      note: own
-        ? `What the weapon does. ${unitName} carries its own copy of this definition, so a change here reaches no other unit, even one whose weapon has the same name.`
-        : `${unitName} does not carry this definition itself. ${slot.name} is in the game's shared weapon table${mountedBy > 1 ? `, and ${mountedBy} units mount it` : ""}, so a change to it would reach every one of them. Give ${unitName} its own copy to change it here.`,
+        ? t`Weapon definition ${weaponKey}`
+        : t`Weapon definition ${weaponKey}, shared`,
+      note,
       readOnly: !own,
       sections,
     },
@@ -694,10 +724,11 @@ export function libraryWeaponGroup(
     undefined,
     leafUnder(linkedField, ""),
   );
+  const weaponKey = weapon.key;
   return {
     group: {
       id: "library",
-      label: `Library weapon ${weapon.key}`,
+      label: t`Library weapon ${weaponKey}`,
       note,
       sections,
     },
@@ -734,10 +765,19 @@ export function weaponSlotView(
   const mount = slotGroup(slot, overrides, unitKey, view, linkedField);
   if (equipped) {
     const others = equipped.mounts - 1;
+    let note: string;
+    if (others > 0) {
+      const reach = plural(others, {
+        one: "so it reaches the # other slot that fires it too",
+        other: "so it reaches the # other slots that fire it too",
+      });
+      note = t`What the weapon does. ${unitName} carries it as its own, out of the project's weapon library. A change here is a change to the library weapon, ${reach}.`;
+    } else
+      note = t`What the weapon does. ${unitName} carries it as its own, out of the project's weapon library. A change here is a change to the library weapon.`;
     const library = libraryWeaponGroup(
       equipped.weapon,
       view,
-      `What the weapon does. ${unitName} carries it as its own, out of the project's weapon library. A change here is a change to the library weapon${others > 0 ? `, so it reaches the ${others} other slot${others === 1 ? "" : "s"} that fire${others === 1 ? "s" : ""} it too` : ""}.`,
+      note,
       linkedField,
     );
     const relevant = mount.relevant + library.relevant;
@@ -790,17 +830,25 @@ export function supportingView(
     undefined,
     leafUnder(linkedField, support.path),
   );
-  const users = support.usedBy.map((u) => `${u.from}'s ${u.field}`);
+  const users = support.usedBy.map((u) => {
+    const { from, field } = u;
+    return t`${from}'s ${field}`;
+  });
+  const userList = nameList(users);
   const named =
     users.length > 0
-      ? `${unitName} carries it for ${users.join(" and ")}, which name${users.length === 1 ? "s" : ""} it.`
-      : `No field coilbox knows names it, so the game's own Lua may use it by name, or nothing does.`;
+      ? plural(users.length, {
+          one: `${unitName} carries it for ${userList}, which names it.`,
+          other: `${unitName} carries it for ${userList}, which name it.`,
+        })
+      : t`No field coilbox knows names it, so the game's own Lua may use it by name, or nothing does.`;
+  const supportKey = support.key;
   return {
     groups: [
       {
         id: "definition",
-        label: `Supporting definition ${support.key}`,
-        note: `A weapon definition ${unitName} carries and no slot mounts. ${named} A change here reaches no other unit.`,
+        label: t`Supporting definition ${supportKey}`,
+        note: t`A weapon definition ${unitName} carries and no slot mounts. ${named} A change here reaches no other unit.`,
         sections,
       },
     ],

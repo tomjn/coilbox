@@ -1,3 +1,5 @@
+import { t as coreT } from "@lingui/core/macro";
+import { useLingui } from "@lingui/react/macro";
 import { cn } from "@picoframe/frame";
 import { UserCheck } from "lucide-react";
 import { Children, type ReactNode } from "react";
@@ -5,7 +7,9 @@ import type { FriendStatus } from "../friendsAcrossServers";
 import { PRESENCE_META } from "./presence";
 
 const UNKNOWN_META = {
-  label: "Unknown, not connected",
+  get label() {
+    return coreT`Unknown, not connected`;
+  },
   dotClass: "border border-muted-foreground/60",
 };
 
@@ -52,11 +56,12 @@ export function FriendRow({
   onOpen: () => void;
   children?: ReactNode;
 }) {
+  const { t } = useLingui();
   const meta = status === "unknown" ? UNKNOWN_META : PRESENCE_META[status];
   const dim = status === "offline" || status === "unknown";
-  const battleLabel = battle
-    ? `In ${battle.title || `battle ${battle.id}`}`
-    : null;
+  const battleId = battle?.id;
+  const battleName = battle ? battle.title || t`battle ${battleId}` : "";
+  const battleLabel = battle ? t`In ${battleName}` : null;
   const subline = [serverLabel, battleLabel].filter(Boolean).join(" · ");
   // The menu is 32px wide and Follow 24px, side by side from the right.
   const actions = Children.toArray(children).length;
@@ -96,7 +101,7 @@ export function FriendRow({
         {serverFriend && (
           <UserCheck
             className="size-3.5 shrink-0 text-sky-500"
-            aria-label="Server friend"
+            aria-label={t`Server friend`}
           />
         )}
         {trailing}

@@ -11,6 +11,7 @@
  * you can grab, and the line only shows once the pointer is on it.
  */
 
+import { useLingui } from "@lingui/react/macro";
 import { useRef } from "react";
 import {
   clampWidth,
@@ -41,6 +42,7 @@ export function MemberListResizer({
   onChange,
   controls,
 }: Props) {
+  const { t } = useLingui();
   // Where the pointer went down and how wide the list was then, so a drag
   // tracks the pointer instead of accumulating rounding from each move.
   const start = useRef<{ x: number; width: number } | null>(null);
@@ -51,7 +53,7 @@ export function MemberListResizer({
     <div
       role="separator"
       aria-orientation="vertical"
-      aria-label="Resize the member list"
+      aria-label={t`Resize the member list`}
       aria-controls={controls}
       aria-valuenow={width}
       aria-valuemin={MIN_WIDTH}

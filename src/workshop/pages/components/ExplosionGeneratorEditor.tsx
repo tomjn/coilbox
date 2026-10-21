@@ -14,6 +14,7 @@
  * controls, then a ground flash toggle and a `useDefaultExplosions` toggle
  * below them.
  */
+import { Trans, useLingui } from "@lingui/react/macro";
 import { Button, Input } from "@picoframe/frame";
 import { ArrowDown, ArrowUp, Plus, Sparkles, Trash2 } from "lucide-react";
 import { useState } from "react";
@@ -138,11 +139,13 @@ function SpawnForm({
   onRemove: () => void;
   onMove: (direction: "up" | "down") => void;
 }) {
+  const { t } = useLingui();
+  const spawnNumber = index + 1;
   return (
     <div className="flex flex-col gap-3 rounded border border-border p-3">
       <div className="flex items-center justify-between gap-2">
         <span className="text-xs font-medium text-muted-foreground">
-          Spawn {index + 1}
+          <Trans>Spawn {spawnNumber}</Trans>
         </span>
         <div className="flex gap-1">
           <Button
@@ -151,7 +154,7 @@ function SpawnForm({
             size="icon"
             disabled={index === 0}
             onClick={() => onMove("up")}
-            aria-label="Move spawn up"
+            aria-label={t`Move spawn up`}
           >
             <ArrowUp className="size-3.5" />
           </Button>
@@ -161,7 +164,7 @@ function SpawnForm({
             size="icon"
             disabled={index === spawnCount - 1}
             onClick={() => onMove("down")}
-            aria-label="Move spawn down"
+            aria-label={t`Move spawn down`}
           >
             <ArrowDown className="size-3.5" />
           </Button>
@@ -170,13 +173,13 @@ function SpawnForm({
             variant="outline"
             size="icon"
             onClick={onRemove}
-            aria-label="Remove spawn"
+            aria-label={t`Remove spawn`}
           >
             <Trash2 className="size-3.5" />
           </Button>
         </div>
       </div>
-      <Field label="Class">
+      <Field label={t`Class`}>
         <OptionSelect
           value={spawn.class}
           onValueChange={(value) => onPatch({ class: value as SpawnClass })}
@@ -195,7 +198,10 @@ function SpawnForm({
           onPatch={onPatch}
         />
       ))}
-      <Field label="Count" hint="How many times this fires per explosion.">
+      <Field
+        label={t`Count`}
+        hint={t`How many times this fires per explosion.`}
+      >
         <Input
           type="number"
           min={1}
@@ -207,25 +213,27 @@ function SpawnForm({
         />
       </Field>
       <div className="flex flex-col gap-1.5">
-        <span className="text-sm font-medium">Fires on</span>
+        <span className="text-sm font-medium">
+          <Trans>Fires on</Trans>
+        </span>
         <div className="grid grid-cols-2 gap-1.5">
           <CheckField
-            label="Ground"
+            label={t`Ground`}
             checked={spawn.ground}
             onChange={(v) => onPatch({ ground: v })}
           />
           <CheckField
-            label="Water"
+            label={t`Water`}
             checked={spawn.water}
             onChange={(v) => onPatch({ water: v })}
           />
           <CheckField
-            label="Air"
+            label={t`Air`}
             checked={spawn.air}
             onChange={(v) => onPatch({ air: v })}
           />
           <CheckField
-            label="Underwater"
+            label={t`Underwater`}
             checked={spawn.underwater}
             onChange={(v) => onPatch({ underwater: v })}
           />
@@ -252,6 +260,7 @@ function GeneratorForm({
   onSetGroundFlash: (groundFlash: GroundFlash | undefined) => void;
   onPatch: (patch: Partial<ExplosionGenerator>) => void;
 }) {
+  const { t } = useLingui();
   return (
     <div className="flex flex-col gap-3">
       {generator.spawns.map((spawn, index) => (
@@ -275,11 +284,11 @@ function GeneratorForm({
         onClick={() => onAddSpawn(SPAWN_CLASSES[0].value)}
       >
         <Plus className="size-3.5" />
-        Add spawn
+        <Trans>Add spawn</Trans>
       </Button>
       <div className="flex flex-col gap-3 rounded border border-border p-3">
         <CheckField
-          label="Ground flash"
+          label={t`Ground flash`}
           checked={!!generator.groundFlash}
           onChange={(v) => onSetGroundFlash(v ? {} : undefined)}
         />
@@ -296,7 +305,7 @@ function GeneratorForm({
           ))}
       </div>
       <CheckField
-        label="Also play the engine's own explosion"
+        label={t`Also play the engine's own explosion`}
         checked={generator.useDefaultExplosions}
         onChange={(v) => onPatch({ useDefaultExplosions: v })}
       />
@@ -322,6 +331,7 @@ export function ExplosionGeneratorEditor({
   onSetGenerators: (next: ExplosionGenerators) => void;
   onSetField: (value: string) => void;
 }) {
+  const { t } = useLingui();
   const [open, setOpen] = useState(false);
   const [draftName, setDraftName] = useState("");
 
@@ -334,6 +344,11 @@ export function ExplosionGeneratorEditor({
   };
 
   const check = checkExplosionGeneratorName(draftName, generators);
+
+  const article = articleFor(label);
+  const lowerLabel = label.toLowerCase();
+  const ownedKey = owned?.key;
+  const createLabel = t`Create ${article} ${lowerLabel}`;
 
   const create = () => {
     if (!check.ok) return;
@@ -355,9 +370,7 @@ export function ExplosionGeneratorEditor({
       <PopoverTrigger asChild>
         <Button variant={owned ? "default" : "outline"} size="sm">
           <Sparkles className="size-3.5" />
-          {owned
-            ? `Edit ${owned.key}`
-            : `Create ${articleFor(label)} ${label.toLowerCase()}`}
+          {owned ? t`Edit ${ownedKey}` : createLabel}
         </Button>
       </PopoverTrigger>
       <PopoverContent align="start" className="flex w-96 flex-col gap-4">
@@ -368,9 +381,11 @@ export function ExplosionGeneratorEditor({
                 {label}: <span className="font-mono">{owned.key}</span>
               </h3>
               <p className="text-xs text-muted-foreground">
-                Written as effects/{owned.key}.lua. Coilbox cannot render what
-                this looks like in game; use Test to launch a real skirmish and
-                see it.
+                <Trans>
+                  Written as effects/{ownedKey}.lua. Coilbox cannot render what
+                  this looks like in game; use Test to launch a real skirmish
+                  and see it.
+                </Trans>
               </p>
             </div>
             <GeneratorForm
@@ -420,10 +435,10 @@ export function ExplosionGeneratorEditor({
                 size="sm"
                 onClick={remove}
               >
-                Remove
+                <Trans>Remove</Trans>
               </Button>
               <Button type="button" size="sm" onClick={() => setOpen(false)}>
-                Done
+                <Trans>Done</Trans>
               </Button>
             </div>
           </div>
@@ -436,18 +451,16 @@ export function ExplosionGeneratorEditor({
             }}
           >
             <div className="flex flex-col gap-1">
-              <h3 className="text-sm font-medium">
-                Create {articleFor(label)} {label.toLowerCase()}
-              </h3>
+              <h3 className="text-sm font-medium">{createLabel}</h3>
               <p className="text-xs text-muted-foreground">
                 {currentKey
-                  ? `${label} already names ${currentKey}, which this project does not manage. Creating one here replaces it.`
-                  : "A custom explosion generator, written into the game as its own file and bound to this field."}
+                  ? t`${label} already names ${currentKey}, which this project does not manage. Creating one here replaces it.`
+                  : t`A custom explosion generator, written into the game as its own file and bound to this field.`}
               </p>
             </div>
             <Field
-              label="Effect name"
-              hint="Lowercase letters, numbers and underscores."
+              label={t`Effect name`}
+              hint={t`Lowercase letters, numbers and underscores.`}
             >
               <Input
                 value={draftName}
@@ -460,15 +473,15 @@ export function ExplosionGeneratorEditor({
             {!check.ok && (
               <p className="text-xs text-muted-foreground">
                 {check.verdict === "empty"
-                  ? "Give the effect a name."
+                  ? t`Give the effect a name.`
                   : check.verdict === "invalid"
-                    ? "A name can only use lowercase letters, numbers and underscores."
-                    : `The project already has an effect called ${check.key}.`}
+                    ? t`A name can only use lowercase letters, numbers and underscores.`
+                    : t`The project already has an effect called ${check.key}.`}
               </p>
             )}
             <div className="flex justify-end">
               <Button type="submit" size="sm" disabled={!check.ok}>
-                Create
+                <Trans>Create</Trans>
               </Button>
             </div>
           </form>

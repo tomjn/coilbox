@@ -26,6 +26,7 @@
  * game wrote, and folding its case here would offer a name the engine may not
  * accept.
  */
+import { t } from "@lingui/core/macro";
 
 /** One class, and how much of the game is already using it. */
 export interface MoveClass {
@@ -103,9 +104,9 @@ export function moveClassProblem(
   const moves = flag(field(def, "canmove"));
   const named = moveClassOf(def) !== "";
   if (moves && !named)
-    return "This unit moves but names no movement class, so the engine drops it at load. Pick one.";
+    return t`This unit moves but names no movement class, so the engine drops it at load. Pick one.`;
   if (named && !moves)
-    return "This unit does not move, so the class has no effect until Can move is on.";
+    return t`This unit does not move, so the class has no effect until Can move is on.`;
   return undefined;
 }
 

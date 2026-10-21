@@ -1,3 +1,4 @@
+import { Trans, useLingui } from "@lingui/react/macro";
 import { Button } from "@picoframe/frame";
 import { openUrl } from "@tauri-apps/plugin-opener";
 import { Eye, Link as LinkIcon, Lock, LogIn, LogOut, Play } from "lucide-react";
@@ -119,6 +120,8 @@ export function BattleRoomHeader({
    * track of which one they are in. */
   connectionLabel?: string | null;
 }) {
+  const { t } = useLingui();
+  const battleId = battle.id;
   const ready = myStatus?.battleStatus.ready ?? false;
   // The route the battle hosted on this room's connection took. Read here
   // rather than handed down from the page, because the check that it belongs to
@@ -173,6 +176,7 @@ export function BattleRoomHeader({
     : joinedBattleRouteLabel(battle.relayed);
   // A match is running. Zero-K says so on the battle, where there is no host
   // whose in-game bit could.
+  const routeWord = routeLabel?.word;
   const matchRunning = action !== "start" || battle.inProgress;
   const now = useNow(matchRunning);
   // The one thing worth asking before the click goes ahead: leaving somebody
@@ -183,15 +187,15 @@ export function BattleRoomHeader({
     action === "ingame" || !!blockReason || (action === "start" && !allReady);
   const mainTitle = (() => {
     if (blockReason) return blockReason;
-    if (action === "ingame") return "The match is already running";
-    if (action === "rejoin") return "Return to the running match";
-    if (action === "watch") return "Join the running match to watch";
-    if (!allReady) return "All players must be ready first";
+    if (action === "ingame") return t`The match is already running`;
+    if (action === "rejoin") return t`Return to the running match`;
+    if (action === "watch") return t`Join the running match to watch`;
+    if (!allReady) return t`All players must be ready first`;
     return (
       warning ??
       (canStartDirectly
-        ? "Ask the autohost to start the match"
-        : "Ask the room to vote on starting the match")
+        ? t`Ask the autohost to start the match`
+        : t`Ask the room to vote on starting the match`)
     );
   })();
   const mainButton = (
@@ -210,10 +214,10 @@ export function BattleRoomHeader({
       {action === "start"
         ? startButtonLabel(canStartDirectly)
         : action === "rejoin"
-          ? "Rejoin"
+          ? t`Rejoin`
           : action === "watch"
-            ? "Watch"
-            : "In game"}
+            ? t`Watch`
+            : t`In game`}
     </Button>
   );
 
@@ -247,7 +251,7 @@ export function BattleRoomHeader({
                     <span key={i}>{part.text}</span>
                   ),
                 )
-              : `Battle ${battle.id}`}
+              : t`Battle ${battleId}`}
           </h1>
         </div>
         {/* "Out of sync" on its own leaves the player hunting. Name the thing,
@@ -262,8 +266,8 @@ export function BattleRoomHeader({
             variant="ghost"
             size="icon"
             className="size-8 shrink-0 text-muted-foreground"
-            aria-label="Copy an invite link for this battle"
-            title="Copy invite link"
+            aria-label={t`Copy an invite link for this battle`}
+            title={t`Copy invite link`}
             onClick={() => copyDeepLink(invite)}
           >
             <LinkIcon className="size-4" />
@@ -276,7 +280,7 @@ export function BattleRoomHeader({
               variant="ghost"
               size="icon"
               className="size-8 text-muted-foreground"
-              aria-label={`No invite link for this battle. ${inviteProblem}`}
+              aria-label={t`No invite link for this battle. ${inviteProblem}`}
               disabled
             >
               <LinkIcon className="size-4" />
@@ -299,7 +303,7 @@ export function BattleRoomHeader({
                   <button
                     type="button"
                     className="cursor-help"
-                    aria-label={`How this battle is connected: ${routeLabel.word}`}
+                    aria-label={t`How this battle is connected: ${routeWord}`}
                   >
                     {routeLabel.word}
                   </button>
@@ -326,7 +330,7 @@ export function BattleRoomHeader({
             disabled={!myStatus}
             onCheckedChange={(v) => onToggleSpectate(v === true)}
           />
-          Spectate
+          <Trans>Spectate</Trans>
         </label>
         {!spectator && (
           <label
@@ -339,7 +343,7 @@ export function BattleRoomHeader({
               disabled={!myStatus}
               onCheckedChange={(v) => onToggleReady(v === true)}
             />
-            Ready
+            <Trans>Ready</Trans>
           </label>
         )}
         {selfHost && (
@@ -353,7 +357,7 @@ export function BattleRoomHeader({
               onCheckedChange={(v) => onToggleLock(v === true)}
             />
             <Lock className="size-3.5" />
-            Locked
+            <Trans>Locked</Trans>
           </label>
         )}
         {matchRunning && (
@@ -368,14 +372,14 @@ export function BattleRoomHeader({
               <PopoverTrigger asChild>
                 <Button variant="outline">
                   <LogOut className="size-4" />
-                  Close
+                  <Trans>Close</Trans>
                 </Button>
               </PopoverTrigger>
               <PopoverContent align="end" className="w-64 space-y-3">
                 <p className="text-sm">
                   {closesRoom
-                    ? "Close this battle? Everyone will be removed, and the room it is in will stop hosting and give its port back."
-                    : "Close this battle? Everyone will be removed and it will disappear from the battle list."}
+                    ? t`Close this battle? Everyone will be removed, and the room it is in will stop hosting and give its port back.`
+                    : t`Close this battle? Everyone will be removed and it will disappear from the battle list.`}
                 </p>
                 <div className="flex justify-end gap-2">
                   <Button
@@ -383,7 +387,7 @@ export function BattleRoomHeader({
                     size="sm"
                     onClick={() => setConfirmClose(false)}
                   >
-                    Cancel
+                    <Trans>Cancel</Trans>
                   </Button>
                   <Button
                     variant="destructive"
@@ -393,7 +397,7 @@ export function BattleRoomHeader({
                       onLeave();
                     }}
                   >
-                    Close battle
+                    <Trans>Close battle</Trans>
                   </Button>
                 </div>
               </PopoverContent>
@@ -401,7 +405,7 @@ export function BattleRoomHeader({
           ) : (
             <Button variant="outline" onClick={onLeave}>
               <LogOut className="size-4" />
-              Leave
+              <Trans>Leave</Trans>
             </Button>
           )}
           {warning && !mainDisabled ? (
@@ -415,7 +419,7 @@ export function BattleRoomHeader({
                     size="sm"
                     onClick={() => setConfirmStart(false)}
                   >
-                    {action === "start" ? "Wait for them" : "Not now"}
+                    {action === "start" ? t`Wait for them` : t`Not now`}
                   </Button>
                   <Button
                     size="sm"
@@ -424,7 +428,7 @@ export function BattleRoomHeader({
                       go();
                     }}
                   >
-                    {action === "start" ? "Start anyway" : "Watch anyway"}
+                    {action === "start" ? t`Start anyway` : t`Watch anyway`}
                   </Button>
                 </div>
               </PopoverContent>

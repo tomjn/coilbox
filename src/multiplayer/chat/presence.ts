@@ -1,3 +1,4 @@
+import { t } from "@lingui/core/macro";
 import type { LobbyState } from "../bindings";
 
 /**
@@ -8,16 +9,42 @@ import type { LobbyState } from "../bindings";
  */
 export type Presence = "offline" | "online" | "away" | "inBattle" | "ingame";
 
-/** Per-presence display metadata: a Tailwind dot colour and a human label. */
+/** Per-presence display metadata: a Tailwind dot colour and a human label.
+ * The label is a getter so it is translated when read, not at module load. */
 export const PRESENCE_META: Record<
   Presence,
   { label: string; dotClass: string }
 > = {
-  ingame: { label: "In-game", dotClass: "bg-red-500" },
-  inBattle: { label: "In battle", dotClass: "bg-blue-500" },
-  away: { label: "Away", dotClass: "bg-amber-500" },
-  online: { label: "Online", dotClass: "bg-green-500" },
-  offline: { label: "Offline", dotClass: "bg-muted-foreground/50" },
+  ingame: {
+    get label() {
+      return t`In-game`;
+    },
+    dotClass: "bg-red-500",
+  },
+  inBattle: {
+    get label() {
+      return t`In battle`;
+    },
+    dotClass: "bg-blue-500",
+  },
+  away: {
+    get label() {
+      return t`Away`;
+    },
+    dotClass: "bg-amber-500",
+  },
+  online: {
+    get label() {
+      return t`Online`;
+    },
+    dotClass: "bg-green-500",
+  },
+  offline: {
+    get label() {
+      return t`Offline`;
+    },
+    dotClass: "bg-muted-foreground/50",
+  },
 };
 
 /** True when `name` sits in any battle (as host or member) in the roster. */

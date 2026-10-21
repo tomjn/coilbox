@@ -1,3 +1,5 @@
+import { plural } from "@lingui/core/macro";
+import { Trans, useLingui } from "@lingui/react/macro";
 import { Button, cn, NavGate } from "@picoframe/frame";
 import { Bookmark, Gamepad2 } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -62,6 +64,14 @@ import {
 } from "../store";
 import { useNameMark } from "../useNameMark";
 
+/** The sentence for bots a host seed or preset could not add. */
+function botFailure(failed: number, total: number, names: string): string {
+  return plural(total, {
+    one: `${failed} of # bot couldn't be added. ${names}`,
+    other: `${failed} of # bots couldn't be added. ${names}`,
+  });
+}
+
 /**
  * The battle room for a joined multiplayer battle. Reads the live battle from the
  * mirror of the connection its `?server=` names (issue #2844) via
@@ -73,6 +83,7 @@ import { useNameMark } from "../useNameMark";
  * match our engine dropped out of, or in to watch one we walked in on.
  */
 function BattleRoomPage() {
+  const { t } = useLingui();
   const room = useBattleRoom(useBattleRoomKey());
   const split = useRoomSplit();
   const { disconnect, connections } = useMultiplayer();
@@ -199,7 +210,11 @@ function BattleRoomPage() {
     // its bots were remapped to valid defaults rather than added blind.
     const hostNotice = hostSeedAiNotice(seed);
     if (hostNotice) {
-      notify({ title: "Preset AI adjusted", body: hostNotice, level: "info" });
+      notify({
+        title: t`Preset AI adjusted`,
+        body: hostNotice,
+        level: "info",
+      });
     }
     room.setBattleStatusBatch({
       side: seed.self.side,
@@ -223,12 +238,12 @@ function BattleRoomPage() {
       (failures) => {
         if (failures.length > 0) {
           setHostSeedError(
-            `${failures.length} of ${seed.bots.length} bot(s) couldn't be added. ${failures.join(", ")}`,
+            botFailure(failures.length, seed.bots.length, failures.join(", ")),
           );
         }
       },
     );
-  }, [hostDraft, room]);
+  }, [hostDraft, room, t]);
 
   // Apply a saved skirmish preset to the current room in place (issue #373).
   // Reachable on any room whose options we may write: one we host ourselves,
@@ -246,7 +261,7 @@ function BattleRoomPage() {
     // engine-natives fallback. Only the roster needs that list, so taking the
     // options alone is not made to wait on it.
     if (take("teams") && !room.addableAisReady) {
-      setHostSeedError("Still loading this game's AI list. Try again.");
+      setHostSeedError(t`Still loading this game's AI list. Try again.`);
       return;
     }
     setHostSeedError(null);
@@ -266,7 +281,7 @@ function BattleRoomPage() {
       const applyNotice = hostSeedAiNotice(seed);
       if (applyNotice) {
         notify({
-          title: "Preset AI adjusted",
+          title: t`Preset AI adjusted`,
           body: applyNotice,
           level: "info",
         });
@@ -304,7 +319,7 @@ function BattleRoomPage() {
       (failures) => {
         if (failures.length > 0) {
           setHostSeedError(
-            `${failures.length} of ${seed.bots.length} bot(s) couldn't be added. ${failures.join(", ")}`,
+            botFailure(failures.length, seed.bots.length, failures.join(", ")),
           );
         }
       },
@@ -390,8 +405,8 @@ function BattleRoomPage() {
       if (blockReason && startNoticeRef.current !== battleStartSeq) {
         startNoticeRef.current = battleStartSeq;
         void notify({
-          title: "The match has started",
-          body: `${blockReason} Coilbox will join as soon as it is there.`,
+          title: t`The match has started`,
+          body: t`${blockReason} Coilbox will join as soon as it is there.`,
           level: "error",
         });
       }
@@ -399,7 +414,7 @@ function BattleRoomPage() {
     }
     startedRef.current = battleStartSeq;
     void runLaunch();
-  }, [battleStartSeq, blockReason, canRun, runLaunch]);
+  }, [battleStartSeq, blockReason, canRun, runLaunch, t]);
 
   // What the header's main button does. Getting into a running match is never
   // automatic past the first launch: an engine that exited may have exited on
@@ -432,11 +447,17 @@ function BattleRoomPage() {
     return (
       <main className="flex flex-col items-center justify-center gap-4 p-10 text-center">
         <Gamepad2 className="size-8 text-muted-foreground" />
-        <h1 className="text-lg font-semibold">Not in a battle</h1>
+        <h1 className="text-lg font-semibold">
+          <Trans>Not in a battle</Trans>
+        </h1>
         <p className="max-w-sm text-sm text-muted-foreground">
-          You're not currently in a battle. Browse open battles to join one.
+          <Trans>
+            You're not currently in a battle. Browse open battles to join one.
+          </Trans>
         </p>
-        <Button onClick={() => navigate("/battles")}>Browse battles</Button>
+        <Button onClick={() => navigate("/battles")}>
+          <Trans>Browse battles</Trans>
+        </Button>
       </main>
     );
   }
@@ -462,9 +483,10 @@ function BattleRoomPage() {
         // Said out here rather than in the room's own line, which is on the page
         // this is about to leave for and describes a room that is still up. The
         // "Stop room" button beside it is the way out.
+        const reason = e instanceof Error ? e.message : String(e);
         void notify({
-          title: "The room is still running",
-          body: `Coilbox could not close it: ${e instanceof Error ? e.message : String(e)}. Stop it from the Battles page.`,
+          title: t`The room is still running`,
+          body: t`Coilbox could not close it: ${reason}. Stop it from the Battles page.`,
           level: "error",
         });
       } finally {
@@ -666,7 +688,7 @@ function BattleRoomPage() {
                 className="w-full"
                 onClick={() => setApplyPresetOpen(true)}
               >
-                <Bookmark className="size-4" /> Presets
+                <Bookmark className="size-4" /> <Trans>Presets</Trans>
               </Button>
               <ApplySkirmishPresetDrawer
                 open={applyPresetOpen}
@@ -694,7 +716,7 @@ function BattleRoomPage() {
                 selfHost={room.selfHost}
                 delivery={room.presetDelivery}
                 onApply={applySkirmishPresetInPlace}
-                saveLabel="Save this battle"
+                saveLabel={t`Save this battle`}
                 onSave={(name) => {
                   const draft = battleToSkirmishDraft({
                     battle,
@@ -704,16 +726,16 @@ function BattleRoomPage() {
                   });
                   if (!draft) {
                     notify({
-                      title: "Couldn't save preset",
-                      body: "This battle can't be captured yet.",
+                      title: t`Couldn't save preset`,
+                      body: t`This battle can't be captured yet.`,
                       level: "error",
                     });
                     return;
                   }
                   skirmishPresets.savePreset(name, draft);
                   notify({
-                    title: "Saved to Singleplayer presets",
-                    body: `"${name}" — replay it from Singleplayer → Presets.`,
+                    title: t`Saved to Singleplayer presets`,
+                    body: t`"${name}" — replay it from Singleplayer → Presets.`,
                     level: "success",
                   });
                 }}
@@ -721,8 +743,8 @@ function BattleRoomPage() {
                 onSaveFromReplay={(name, draft) => {
                   skirmishPresets.savePreset(name, draft);
                   notify({
-                    title: "Saved to Singleplayer presets",
-                    body: `"${name}" — replay it from Singleplayer → Presets.`,
+                    title: t`Saved to Singleplayer presets`,
+                    body: t`"${name}" — replay it from Singleplayer → Presets.`,
                     level: "success",
                   });
                 }}
@@ -741,7 +763,7 @@ function BattleRoomPage() {
                 onCancel={() => presetImport.setPending(null)}
                 onContinue={(p) => {
                   skirmishPresets.savePreset(
-                    p.name?.trim() || "Imported preset",
+                    p.name?.trim() || t`Imported preset`,
                     p,
                   );
                   presetImport.setPending(null);

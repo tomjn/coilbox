@@ -1,3 +1,4 @@
+import { t } from "@lingui/core/macro";
 import { useSyncExternalStore } from "react";
 
 /**
@@ -93,5 +94,6 @@ export function useBattleMoved(): number | null {
  * hands that number to people. A joiner never types it, and coilbox has already
  * used it by the time this is read.
  */
-export const BATTLE_MOVED_NOTICE =
-  "This battle has moved onto a different address, because the connection the host runs it on moved. Coilbox has followed it, so starting the game from here uses the new one. Anybody already in the game was connected to the address it has left.";
+export function battleMovedNotice(): string {
+  return t`This battle has moved onto a different address, because the connection the host runs it on moved. Coilbox has followed it, so starting the game from here uses the new one. Anybody already in the game was connected to the address it has left.`;
+}

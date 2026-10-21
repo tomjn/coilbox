@@ -1,3 +1,4 @@
+import { t } from "@lingui/core/macro";
 import { getLocale } from "@/i18n";
 import type { ChatMsg, LobbyState, User } from "../bindings";
 
@@ -164,7 +165,7 @@ export function resolveConversationRequest(
   if (!state.channels[requested.name]) {
     return {
       ok: false,
-      reason: `You have not joined ${requested.name}.`,
+      reason: t`You have not joined ${requested.name}.`,
     };
   }
   return { ok: true, descriptor: requested };

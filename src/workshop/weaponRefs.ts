@@ -26,6 +26,7 @@
  * units (`carried_unit`, `spawns_name`), not weapons, and its shields are
  * mounted in slots, so neither is a reference between weapons.
  */
+import { t } from "@lingui/core/macro";
 import { type PostChange, withoutEdited } from "./beforePost";
 import { resolvedDef } from "./overrides";
 import type { LibraryWeapon, WeaponLibrary } from "./weaponLibrary";
@@ -256,12 +257,15 @@ export function refProblems(
   const own = ownWeaponDefs(resolved).defs;
   const out: RefProblem[] = [];
   const say = (ref: WeaponRef, holder: string, inLibrary: boolean) => {
-    const where = inLibrary
-      ? `neither the project's weapon library nor ${unitName}`
-      : unitName;
-    return ref.field.resolution === "own"
-      ? `${holder}'s ${ref.field.key} names ${ref.value}, which ${where} carries. The game looks for it among ${unitName}'s own weapon definitions, so the effect that needs it does not happen.`
-      : `${holder}'s ${ref.field.key} names ${ref.value}, which is not a weapon ${inLibrary ? `in the project's weapon library or ` : ""}in the game. It takes the full name the game gives a weapon, <unit>_<name> for one a unit carries, so the effect that needs it does not happen.`;
+    const field = ref.field.key;
+    const value = ref.value;
+    if (ref.field.resolution === "own")
+      return inLibrary
+        ? t`${holder}'s ${field} names ${value}, which neither the project's weapon library nor ${unitName} carries. The game looks for it among ${unitName}'s own weapon definitions, so the effect that needs it does not happen.`
+        : t`${holder}'s ${field} names ${value}, which ${unitName} carries. The game looks for it among ${unitName}'s own weapon definitions, so the effect that needs it does not happen.`;
+    return inLibrary
+      ? t`${holder}'s ${field} names ${value}, which is not a weapon in the project's weapon library or in the game. It takes the full name the game gives a weapon, <unit>_<name> for one a unit carries, so the effect that needs it does not happen.`
+      : t`${holder}'s ${field} names ${value}, which is not a weapon in the game. It takes the full name the game gives a weapon, <unit>_<name> for one a unit carries, so the effect that needs it does not happen.`;
   };
   for (const [key, weapon] of Object.entries(own)) {
     if (!isPlainObject(weapon)) continue;

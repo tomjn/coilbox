@@ -7,6 +7,7 @@
  * tweak slots and a whole option preset, because a run looks the same either
  * way: a list of slots, each one queued, sent, confirmed or given up on.
  */
+import { Trans, useLingui } from "@lingui/react/macro";
 import { cn } from "@/lib/utils";
 import {
   type DeliveryProgress,
@@ -14,17 +15,17 @@ import {
   type SlotProgress,
 } from "./tweakDelivery";
 
-const STATE_LABEL: Record<SlotProgress["state"], string> = {
-  waiting: "queued",
-  "already-set": "already set",
-  sending: "sending",
-  confirming: "waiting for the battle",
-  confirmed: "set",
-  failed: "did not land",
-  skipped: "not sent",
-};
-
 function SlotRow({ entry }: { entry: SlotProgress }) {
+  const { t } = useLingui();
+  const stateLabel: Record<SlotProgress["state"], string> = {
+    waiting: t`queued`,
+    "already-set": t`already set`,
+    sending: t`sending`,
+    confirming: t`waiting for the battle`,
+    confirmed: t`set`,
+    failed: t`did not land`,
+    skipped: t`not sent`,
+  };
   const bad = entry.state === "failed";
   const grey = entry.state === "skipped" || entry.state === "waiting";
   return (
@@ -37,7 +38,7 @@ function SlotRow({ entry }: { entry: SlotProgress }) {
           grey && "text-muted-foreground",
         )}
       >
-        {STATE_LABEL[entry.state]}
+        {stateLabel[entry.state]}
       </span>
     </li>
   );
@@ -78,19 +79,21 @@ export function DeliveryProgressPanel({
           <p>{failed.reason}</p>
           {failed.hostSaid?.map((said) => (
             <p key={said} className="break-all">
-              The host said: {said}
+              <Trans>The host said: {said}</Trans>
             </p>
           ))}
           {failed.serverSaid?.map((said) => (
             <p key={said} className="break-all">
-              The server said: {said}
+              <Trans>The server said: {said}</Trans>
             </p>
           ))}
           {!failed.hostSaid && !failed.serverSaid && (
             <p>
-              Nothing said why. The usual causes are not being the room's boss,
-              the autohost ignoring you for sending too much too fast, and a
-              lobby server that drops a line this long.
+              <Trans>
+                Nothing said why. The usual causes are not being the room's
+                boss, the autohost ignoring you for sending too much too fast,
+                and a lobby server that drops a line this long.
+              </Trans>
             </p>
           )}
           <p>{retryHint}</p>

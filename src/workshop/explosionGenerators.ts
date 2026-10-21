@@ -44,6 +44,8 @@
  * its own fields.
  */
 
+import { t } from "@lingui/core/macro";
+
 /** The four emitter classes the form covers, in engine spelling
  *  (`rts/Rendering/Env/Particles/Classes/*.cpp`, `rts/Rendering/GroundFlash.cpp`). */
 export type CegClass =
@@ -52,12 +54,33 @@ export type CegClass =
   | "CHeatCloudProjectile"
   | "CStandardGroundFlash";
 
-/** The classes, in the order the form offers them. */
+/** The classes, in the order the form offers them. `label` is a getter so it
+ *  is translated each time it is read, not once when the module loads. */
 export const CEG_CLASSES: { value: CegClass; label: string }[] = [
-  { value: "CBitmapMuzzleFlame", label: "Muzzle flame" },
-  { value: "CSimpleParticleSystem", label: "Particle system" },
-  { value: "CHeatCloudProjectile", label: "Heat cloud" },
-  { value: "CStandardGroundFlash", label: "Ground flash" },
+  {
+    value: "CBitmapMuzzleFlame",
+    get label() {
+      return t`Muzzle flame`;
+    },
+  },
+  {
+    value: "CSimpleParticleSystem",
+    get label() {
+      return t`Particle system`;
+    },
+  },
+  {
+    value: "CHeatCloudProjectile",
+    get label() {
+      return t`Heat cloud`;
+    },
+  },
+  {
+    value: "CStandardGroundFlash",
+    get label() {
+      return t`Ground flash`;
+    },
+  },
 ];
 
 /** The three classes a spawn can be. `CStandardGroundFlash` is not one of
@@ -363,6 +386,24 @@ export interface CegFieldSpec {
   help: string;
 }
 
+/** A field spec whose label and help are translated each time they are read,
+ *  not once when the module loads. */
+function fieldSpec(
+  key: CegFieldSpec["key"],
+  label: () => string,
+  help: () => string,
+): CegFieldSpec {
+  return {
+    key,
+    get label() {
+      return label();
+    },
+    get help() {
+      return help();
+    },
+  };
+}
+
 /** Which of {@link ExplosionSpawn}'s (or, for ground flash, {@link GroundFlash}'s)
  *  optional fields each class uses, and what to call them: the issue's own
  *  list (colour, texture, size, count and lifetime), read against each
@@ -371,43 +412,89 @@ export interface CegFieldSpec {
  *  class takes them the same way and ground flash takes neither. */
 export const CEG_CLASS_FIELDS: Record<CegClass, CegFieldSpec[]> = {
   CBitmapMuzzleFlame: [
-    {
-      key: "texture",
-      label: "Texture",
-      help: "sidetexture and fronttexture: the same bitmap used for both faces of the flame.",
-    },
-    {
-      key: "color",
-      label: "Colour",
-      help: "colormap, held as one constant colour.",
-    },
-    { key: "size", label: "Size", help: "size" },
-    { key: "lifetime", label: "Lifetime", help: "ttl, in frames." },
+    fieldSpec(
+      "texture",
+      () => t`Texture`,
+      () =>
+        t`sidetexture and fronttexture: the same bitmap used for both faces of the flame.`,
+    ),
+    fieldSpec(
+      "color",
+      () => t`Colour`,
+      () => t`colormap, held as one constant colour.`,
+    ),
+    fieldSpec(
+      "size",
+      () => t`Size`,
+      () => "size",
+    ),
+    fieldSpec(
+      "lifetime",
+      () => t`Lifetime`,
+      () => t`ttl, in frames.`,
+    ),
   ],
   CSimpleParticleSystem: [
-    { key: "texture", label: "Texture", help: "texture" },
-    {
-      key: "color",
-      label: "Colour",
-      help: "colormap, held as one constant colour.",
-    },
-    { key: "size", label: "Size", help: "particlesize" },
-    { key: "lifetime", label: "Lifetime", help: "particlelife, in frames." },
-    { key: "particles", label: "Particles", help: "numparticles, per spawn." },
+    fieldSpec(
+      "texture",
+      () => t`Texture`,
+      () => "texture",
+    ),
+    fieldSpec(
+      "color",
+      () => t`Colour`,
+      () => t`colormap, held as one constant colour.`,
+    ),
+    fieldSpec(
+      "size",
+      () => t`Size`,
+      () => "particlesize",
+    ),
+    fieldSpec(
+      "lifetime",
+      () => t`Lifetime`,
+      () => t`particlelife, in frames.`,
+    ),
+    fieldSpec(
+      "particles",
+      () => t`Particles`,
+      () => t`numparticles, per spawn.`,
+    ),
   ],
   CHeatCloudProjectile: [
-    { key: "texture", label: "Texture", help: "texture" },
-    { key: "size", label: "Size", help: "size" },
-    {
-      key: "lifetime",
-      label: "Fades over",
-      help: "heatfalloff: how fast the cloud's heat drains, not a fixed frame count. This class has no colour of its own.",
-    },
+    fieldSpec(
+      "texture",
+      () => t`Texture`,
+      () => "texture",
+    ),
+    fieldSpec(
+      "size",
+      () => t`Size`,
+      () => "size",
+    ),
+    fieldSpec(
+      "lifetime",
+      () => t`Fades over`,
+      () =>
+        t`heatfalloff: how fast the cloud's heat drains, not a fixed frame count. This class has no colour of its own.`,
+    ),
   ],
   CStandardGroundFlash: [
-    { key: "color", label: "Colour", help: "color" },
-    { key: "size", label: "Size", help: "flashSize" },
-    { key: "lifetime", label: "Lifetime", help: "ttl, in frames." },
+    fieldSpec(
+      "color",
+      () => t`Colour`,
+      () => "color",
+    ),
+    fieldSpec(
+      "size",
+      () => t`Size`,
+      () => "flashSize",
+    ),
+    fieldSpec(
+      "lifetime",
+      () => t`Lifetime`,
+      () => t`ttl, in frames.`,
+    ),
   ],
 };
 

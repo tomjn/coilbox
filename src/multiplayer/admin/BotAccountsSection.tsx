@@ -1,3 +1,4 @@
+import { Trans, useLingui } from "@lingui/react/macro";
 import { Button, Input } from "@picoframe/frame";
 import { Info } from "lucide-react";
 import { useState } from "react";
@@ -31,6 +32,7 @@ import { DrawerBody, ToolHeader } from "./ToolHeader";
  * opens in a drawer.
  */
 export function BotAccountsSection({ serverKey }: { serverKey: string }) {
+  const { t } = useLingui();
   const [newName, setNewName] = useState("");
   const [fromUser, setFromUser] = useState("");
   const [founder, setFounder] = useState("");
@@ -42,8 +44,8 @@ export function BotAccountsSection({ serverKey }: { serverKey: string }) {
   return (
     <section className="flex flex-col gap-4">
       <ToolHeader
-        title="Bot accounts"
-        description="Create an account for a bot. uberserver has no command to list bot accounts. To set or clear the bot flag on an account that exists, look it up in Players."
+        title={t`Bot accounts`}
+        description={t`Create an account for a bot. uberserver has no command to list bot accounts. To set or clear the bot flag on an account that exists, look it up in Players.`}
         actions={
           <Button
             type="button"
@@ -51,25 +53,27 @@ export function BotAccountsSection({ serverKey }: { serverKey: string }) {
             className="h-8"
             onClick={() => setOpen(true)}
           >
-            Create bot account…
+            <Trans>Create bot account…</Trans>
           </Button>
         }
       />
       <SlideDrawer
         open={open}
-        title="Create a bot account"
+        title={t`Create a bot account`}
         onClose={() => setOpen(false)}
       >
         <DrawerBody>
           <Alert>
             <Info />
             <AlertTitle className="line-clamp-none">
-              The new account's password is copied, not set
+              <Trans>The new account's password is copied, not set</Trans>
             </AlertTitle>
             <AlertDescription>
-              uberserver gives the new account the same password as the account
-              named below. Coilbox never sees that password, and there is
-              nothing to type for it here.
+              <Trans>
+                uberserver gives the new account the same password as the
+                account named below. Coilbox never sees that password, and there
+                is nothing to type for it here.
+              </Trans>
             </AlertDescription>
           </Alert>
           <form
@@ -85,31 +89,31 @@ export function BotAccountsSection({ serverKey }: { serverKey: string }) {
             }}
           >
             <span className="flex flex-col gap-1 text-xs text-muted-foreground">
-              New bot account name
+              <Trans>New bot account name</Trans>
               <Input
                 value={newName}
                 onChange={(event) => setNewName(event.target.value)}
-                aria-label="New bot account name"
+                aria-label={t`New bot account name`}
                 className="h-8"
                 {...identifierFieldProps}
               />
             </span>
             <span className="flex flex-col gap-1 text-xs text-muted-foreground">
-              Copy the password from
+              <Trans>Copy the password from</Trans>
               <Input
                 value={fromUser}
                 onChange={(event) => setFromUser(event.target.value)}
-                aria-label="Copy the password from"
+                aria-label={t`Copy the password from`}
                 className="h-8"
                 {...identifierFieldProps}
               />
             </span>
             <span className="flex flex-col gap-1 text-xs text-muted-foreground">
-              Battle founder (optional)
+              <Trans>Battle founder (optional)</Trans>
               <Input
                 value={founder}
                 onChange={(event) => setFounder(event.target.value)}
-                aria-label="Battle founder"
+                aria-label={t`Battle founder`}
                 className="h-8"
                 {...identifierFieldProps}
               />
@@ -120,20 +124,17 @@ export function BotAccountsSection({ serverKey }: { serverKey: string }) {
               className="h-8 self-start"
               disabled={!canSubmit}
             >
-              Create bot account
+              <Trans>Create bot account</Trans>
             </Button>
           </form>
-          <AdminRequestStatus
-            state={create.state}
-            unanswered="The server did not answer."
-          >
-            {(reply) =>
-              reply.shape === "createBotAccount"
-                ? `Created bot account ${reply.username}, with the same password as ${reply.fromUsername}${
-                    reply.founder ? `, and battle founder ${reply.founder}` : ""
-                  }.`
-                : null
-            }
+          <AdminRequestStatus state={create.state}>
+            {(reply) => {
+              if (reply.shape !== "createBotAccount") return null;
+              const { username, fromUsername, founder } = reply;
+              return founder
+                ? t`Created bot account ${username}, with the same password as ${fromUsername}, and battle founder ${founder}.`
+                : t`Created bot account ${username}, with the same password as ${fromUsername}.`;
+            }}
           </AdminRequestStatus>
         </DrawerBody>
       </SlideDrawer>

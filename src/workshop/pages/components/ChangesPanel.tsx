@@ -23,6 +23,7 @@
  * does (`overrides.ts`'s `clearOverride`), through the page's normal edit path,
  * so undo puts it back like any other change.
  */
+import { Trans, useLingui } from "@lingui/react/macro";
 import { Button, Input } from "@picoframe/frame";
 import { RotateCcw } from "lucide-react";
 import { useMemo, useState } from "react";
@@ -85,6 +86,7 @@ export function ChangesPanel({
    *  puts it back (issue #3112). */
   onRevertField: (unit: string, fieldPath: string) => void;
 }) {
+  const { t } = useLingui();
   const [query, setQuery] = useState("");
   const [faction, setFaction] = useState("");
 
@@ -144,25 +146,25 @@ export function ChangesPanel({
   if (!projectId)
     return (
       <p className="text-muted-foreground text-sm">
-        No project is open yet, so there is nothing to show.
+        <Trans>No project is open yet, so there is nothing to show.</Trans>
       </p>
     );
   if (error)
     return (
       <p className="text-destructive text-sm">
-        This project's changes could not be traced: {error}
+        <Trans>This project's changes could not be traced: {error}</Trans>
       </p>
     );
   if (!ledger)
     return (
       <p className="text-muted-foreground text-sm">
-        {loading ? "Tracing…" : "Not traced yet."}
+        {loading ? t`Tracing…` : t`Not traced yet.`}
       </p>
     );
   if (totalChanges === 0)
     return (
       <p className="text-muted-foreground text-sm">
-        This project changes nothing yet.
+        <Trans>This project changes nothing yet.</Trans>
       </p>
     );
 
@@ -172,19 +174,19 @@ export function ChangesPanel({
         <Input
           value={query}
           onChange={(e) => setQuery(e.target.value)}
-          placeholder='Search changed units, or "hp > 3000"'
-          aria-label="Search changed units"
+          placeholder={t`Search changed units, or "hp > 3000"`}
+          aria-label={t`Search changed units`}
           className="h-8 max-w-xs text-xs"
         />
         {factions.length > 1 && (
           <OptionSelect
             size="sm"
-            ariaLabel="Filter changes by faction"
+            ariaLabel={t`Filter changes by faction`}
             className="w-auto"
             value={faction}
             onValueChange={setFaction}
             options={[
-              { value: "", label: "Every faction" },
+              { value: "", label: t`Every faction` },
               ...factions.map((f) => ({ value: f, label: f })),
             ]}
           />
@@ -194,7 +196,7 @@ export function ChangesPanel({
         <p className="text-destructive text-sm">{parsedQuery.error}</p>
       ) : visible.length === 0 ? (
         <p className="text-muted-foreground text-sm">
-          No changed unit matches this search.
+          <Trans>No changed unit matches this search.</Trans>
         </p>
       ) : (
         <ul className="flex flex-col gap-2">
@@ -257,6 +259,11 @@ export function ChangesPanel({
                   {fieldChanges.map((change) => {
                     const path = change.fieldPath as string;
                     const rule = relativeRuleOf(relative, unit, path);
+                    const gameValue = display(readPath(gameUnits[unit], path));
+                    const projectValue = display(
+                      overrideValue(overrides, unit, path),
+                    );
+                    const follows = rule ? describeRelative(rule) : "";
                     return (
                       <li
                         key={path}
@@ -272,22 +279,23 @@ export function ChangesPanel({
                           </Link>
                           <span
                             className="shrink-0 rounded-full bg-primary/15 px-1.5 text-[10px] font-medium text-primary"
-                            title="This value has been changed from the game's default."
+                            title={t`This value has been changed from the game's default.`}
                           >
-                            edited
+                            <Trans>edited</Trans>
                           </span>
                         </span>
                         <span className="flex flex-wrap items-center gap-x-3 gap-y-0.5 text-[11px] text-muted-foreground">
                           <span>
-                            Game: {display(readPath(gameUnits[unit], path))}
+                            <Trans>Game: {gameValue}</Trans>
                           </span>
                           <span>
-                            Project:{" "}
-                            {display(overrideValue(overrides, unit, path))}
+                            <Trans>Project: {projectValue}</Trans>
                           </span>
                           {rule && (
-                            <span title="Worked out again from the game's value whenever the game changes.">
-                              Follows the game: {describeRelative(rule)}
+                            <span
+                              title={t`Worked out again from the game's value whenever the game changes.`}
+                            >
+                              <Trans>Follows the game: {follows}</Trans>
                             </span>
                           )}
                           <Button
@@ -295,8 +303,8 @@ export function ChangesPanel({
                             size="icon"
                             className="size-6"
                             onClick={() => onRevertField(unit, path)}
-                            title={`Revert ${path} to the game's value`}
-                            aria-label={`Revert ${path} to the game's value`}
+                            title={t`Revert ${path} to the game's value`}
+                            aria-label={t`Revert ${path} to the game's value`}
                           >
                             <RotateCcw className="size-3" />
                           </Button>
@@ -308,6 +316,8 @@ export function ChangesPanel({
                     const rule = relativeRuleOf(relative, unit, path);
                     if (!rule) return null;
                     const result = relativeResult(rule);
+                    const resultText = display(result);
+                    const follows = describeRelative(rule);
                     return (
                       <li
                         key={path}
@@ -323,24 +333,30 @@ export function ChangesPanel({
                           </Link>
                           <span
                             className="shrink-0 rounded-full bg-primary/15 px-1.5 text-[10px] font-medium text-primary"
-                            title="This value has been changed from the game's default."
+                            title={t`This value has been changed from the game's default.`}
                           >
-                            edited
+                            <Trans>edited</Trans>
                           </span>
                         </span>
                         <span className="flex flex-wrap items-center gap-x-3 gap-y-0.5 text-[11px] text-muted-foreground">
-                          <span>Game: {display(result)}</span>
-                          <span>Project: {display(result)}</span>
-                          <span title="Worked out again from the game's value whenever the game changes.">
-                            Follows the game: {describeRelative(rule)}
+                          <span>
+                            <Trans>Game: {resultText}</Trans>
+                          </span>
+                          <span>
+                            <Trans>Project: {resultText}</Trans>
+                          </span>
+                          <span
+                            title={t`Worked out again from the game's value whenever the game changes.`}
+                          >
+                            <Trans>Follows the game: {follows}</Trans>
                           </span>
                           <Button
                             variant="ghost"
                             size="icon"
                             className="size-6"
                             onClick={() => onRevertField(unit, path)}
-                            title={`Revert ${path} to the game's value`}
-                            aria-label={`Revert ${path} to the game's value`}
+                            title={t`Revert ${path} to the game's value`}
+                            aria-label={t`Revert ${path} to the game's value`}
                           >
                             <RotateCcw className="size-3" />
                           </Button>

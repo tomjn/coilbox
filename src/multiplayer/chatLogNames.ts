@@ -1,3 +1,4 @@
+import { t } from "@lingui/core/macro";
 import type { LobbyServer } from "../lobby-servers/config";
 import type { ChatLogThread, LobbyState } from "./bindings";
 import { isBattleChannel } from "./chat/conversation";
@@ -44,5 +45,5 @@ export function threadLabel(
   const id = thread.name.slice("__battle__".length);
   const key = Object.keys(liveStates).find((k) => sanitizeKey(k) === stem);
   const title = key ? liveStates[key]?.battles[id]?.title : undefined;
-  return title ? `${title} (battle chat)` : `Battle chat ${id}`;
+  return title ? t`${title} (battle chat)` : t`Battle chat ${id}`;
 }

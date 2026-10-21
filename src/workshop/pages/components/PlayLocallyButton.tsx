@@ -17,6 +17,8 @@
  * only when the open game declares that slot, and preferred by default when
  * it does, since it is the cheaper path.
  */
+import { t as coreT, msg, plural } from "@lingui/core/macro";
+import { Trans, useLingui } from "@lingui/react/macro";
 import { Button, Drawer, useSetting } from "@picoframe/frame";
 import { Rocket } from "lucide-react";
 import { useEffect, useState } from "react";
@@ -80,12 +82,12 @@ type Phase =
   | { state: "done"; route: Route; dir: string | null }
   | { state: "failed"; message: string };
 
-const BUSY_LABEL: Record<string, string> = {
-  settling: "Checking typed values against the game",
-  writing: "Writing the test game",
-  scanning: "Letting the engine find it",
-  playing: "Game running",
-};
+const BUSY_LABEL = {
+  settling: msg`Checking typed values against the game`,
+  writing: msg`Writing the test game`,
+  scanning: msg`Letting the engine find it`,
+  playing: msg`Game running`,
+} as const;
 
 /**
  * Two installed archives can carry the same map name. A start script names
@@ -110,7 +112,8 @@ async function findGeneratedGame(target: {
     target.dataDir,
     true,
   ).catch((error) => {
-    throw new Error(`The content scan failed: ${describeError(error)}`);
+    const reason = describeError(error);
+    throw new Error(coreT`The content scan failed: ${reason}`);
   });
   return rescanned.games.find((g) =>
     isWorkshopMutatorArchive(g.primaryArchive.name),
@@ -132,6 +135,7 @@ export function PlayLocallyButton({
    *  drawer's first open before it bumps this. */
   requestOpen?: number;
 }) {
+  const { t } = useLingui();
   const [open, setOpen] = useState(false);
   useEffect(() => {
     if (requestOpen !== undefined) setOpen(true);
@@ -144,6 +148,13 @@ export function PlayLocallyButton({
 
   const games = scan.data?.games ?? [];
   const game = games.find((g) => g.name === project.gameName);
+  const gameName = project.gameName;
+  const projectName = project.name;
+  const gameDisplayName = game?.name;
+  const scanError = scan.error;
+  const unitLabel = unit?.label;
+  const unitKey = unit?.key;
+  const installedName = game?.name;
   const maps = uniqueByName(scan.data?.maps ?? []);
   const [mapName, setMapName] = useSetting<string>("workshop.testMap", "");
   const map = maps.find((m) => m.name === mapName) ?? maps[0];
@@ -180,19 +191,19 @@ export function PlayLocallyButton({
   }[] = [
     {
       route: "tweak-slot",
-      label: "Local tweak-slot mod option",
+      label: t`Local tweak-slot mod option`,
       available: tweakAvailable,
       detail: tweakAvailable
         ? startWithUnit
-          ? `The launch carries the edits itself. Placing the unit adds a generated game, ${WORKSHOP_MUTATOR_FOLDER}, and a rescan.`
-          : "No generated game and no rescan: the launch carries the edits itself."
-        : `${project.gameName} does not declare a tweakdefs mod option, so this route is not on offer.`,
+          ? t`The launch carries the edits itself. Placing the unit adds a generated game, ${WORKSHOP_MUTATOR_FOLDER}, and a rescan.`
+          : t`No generated game and no rescan: the launch carries the edits itself.`
+        : t`${gameName} does not declare a tweakdefs mod option, so this route is not on offer.`,
     },
     {
       route: "mutator",
-      label: "Generated test game",
+      label: t`Generated test game`,
       available: mutatorAvailable,
-      detail: `Works for every game. Coilbox writes ${WORKSHOP_MUTATOR_FOLDER} and rewrites it on every test.`,
+      detail: t`Works for every game. Coilbox writes ${WORKSHOP_MUTATOR_FOLDER} and rewrites it on every test.`,
     },
   ];
   const [routeChoice, setRouteChoice] = useState<Route | null>(null);
@@ -216,15 +227,15 @@ export function PlayLocallyButton({
 
   const blocker =
     !targetLoading && !target
-      ? "No engine is installed. Add one from Content before playing locally."
+      ? t`No engine is installed. Add one from Content before playing locally.`
       : scan.error
-        ? `The content scan failed: ${scan.error}`
+        ? t`The content scan failed: ${scanError}`
         : scan.data && !game
-          ? `${project.gameName} is not installed here.`
+          ? t`${gameName} is not installed here.`
           : scan.data && maps.length === 0
-            ? "No map is installed. Download one from Content first."
+            ? t`No map is installed. Download one from Content first.`
             : running && !busy
-              ? "A game is already running."
+              ? t`A game is already running.`
               : null;
 
   const nothingToTest =
@@ -243,9 +254,17 @@ export function PlayLocallyButton({
       const preflight = await workshopPreflight({ project });
       if (preflight.blockers.length > 0) {
         const [first, ...rest] = preflight.blockers;
+        const blockerCount = preflight.blockers.length;
+        const summary = plural(blockerCount, {
+          one: `# blocker would reach the game broken: ${first}`,
+          other: `# blockers would reach the game broken: ${first}`,
+        });
         setPhase({
           state: "failed",
-          message: `${preflight.blockers.length} blocker${preflight.blockers.length === 1 ? "" : "s"} would reach the game broken: ${first}${rest.length > 0 ? ` (and ${rest.length} more)` : ""}`,
+          message:
+            rest.length > 0
+              ? `${summary} ${plural(rest.length, { one: "(and # more)", other: "(and # more)" })}`
+              : summary,
         });
         return;
       }
@@ -321,7 +340,7 @@ export function PlayLocallyButton({
           if (!found) {
             setPhase({
               state: "failed",
-              message: `The engine did not pick up ${WORKSHOP_MUTATOR_FOLDER}. Check that ${game.name} is still installed.`,
+              message: t`The engine did not pick up ${WORKSHOP_MUTATOR_FOLDER}. Check that ${installedName} is still installed.`,
             });
             return;
           }
@@ -367,7 +386,7 @@ export function PlayLocallyButton({
         if (!found) {
           setPhase({
             state: "failed",
-            message: `The engine did not pick up ${WORKSHOP_MUTATOR_FOLDER}. Check that ${game.name} is still installed.`,
+            message: t`The engine did not pick up ${WORKSHOP_MUTATOR_FOLDER}. Check that ${installedName} is still installed.`,
           });
           return;
         }
@@ -392,10 +411,11 @@ export function PlayLocallyButton({
         executable: target.executable,
         dataDir: target.dataDir,
       });
-      if (result.exitCode !== null && result.exitCode !== 0) {
+      const exitCode = result.exitCode;
+      if (exitCode !== null && exitCode !== 0) {
         setPhase({
           state: "failed",
-          message: `The engine exited with code ${result.exitCode}. Its infolog says why.`,
+          message: t`The engine exited with code ${exitCode}. Its infolog says why.`,
         });
         return;
       }
@@ -414,22 +434,24 @@ export function PlayLocallyButton({
         variant="outline"
         size="sm"
         onClick={() => setOpen(true)}
-        title="Play this project on your own machine"
+        title={t`Play this project on your own machine`}
       >
         <Rocket className="mr-1 size-3.5" />
-        Test
+        <Trans>Test</Trans>
       </Button>
       <Drawer
         open={open}
         onOpenChange={setOpen}
-        title="Play locally"
-        description={`Test ${project.name} in ${project.gameName} on this machine. Nothing is uploaded and nothing is shared.`}
+        title={t`Play locally`}
+        description={t`Test ${projectName} in ${gameName} on this machine. Nothing is uploaded and nothing is shared.`}
         width="28rem"
       >
         <div className="flex flex-col gap-5">
           {routes.some((r) => r.route === "tweak-slot" && r.available) && (
             <div className="flex flex-col gap-2">
-              <span className="text-sm font-medium">Route</span>
+              <span className="text-sm font-medium">
+                <Trans>Route</Trans>
+              </span>
               <div className="flex flex-col gap-2">
                 {routes.map((r) => (
                   <label
@@ -458,13 +480,15 @@ export function PlayLocallyButton({
 
           {unit ? (
             <CheckField
-              label={`Start with ${unit.label} on the map`}
+              label={t`Start with ${unitLabel} on the map`}
               hint={
                 unit.inGame && !canPlaceBaseCopy(unit)
-                  ? `Places the edited ${unit.label} when the game starts, so there is nothing to build first. The game's own version is not placed beside it, because a unit's internal name can only hold lowercase letters, digits and underscores and ${unit.key} does not. Coilbox writes ${WORKSHOP_MUTATOR_FOLDER} to do it, and it is never packaged.`
+                  ? t`Places the edited ${unitLabel} when the game starts, so there is nothing to build first. The game's own version is not placed beside it, because a unit's internal name can only hold lowercase letters, digits and underscores and ${unitKey} does not. Coilbox writes ${WORKSHOP_MUTATOR_FOLDER} to do it, and it is never packaged.`
                   : unit.inGame
-                    ? `Places the edited ${unit.label} and the game's own beside it when the game starts, so there is nothing to build first. Coilbox writes ${WORKSHOP_MUTATOR_FOLDER} to do it, and it is never packaged.`
-                    : `Places the edited ${unit.label} when the game starts, so there is nothing to build first. ${game?.name ?? "The game"} has no version of its own to put beside it. Coilbox writes ${WORKSHOP_MUTATOR_FOLDER} to do it, and it is never packaged.`
+                    ? t`Places the edited ${unitLabel} and the game's own beside it when the game starts, so there is nothing to build first. Coilbox writes ${WORKSHOP_MUTATOR_FOLDER} to do it, and it is never packaged.`
+                    : gameDisplayName
+                      ? t`Places the edited ${unitLabel} when the game starts, so there is nothing to build first. ${gameDisplayName} has no version of its own to put beside it. Coilbox writes ${WORKSHOP_MUTATOR_FOLDER} to do it, and it is never packaged.`
+                      : t`Places the edited ${unitLabel} when the game starts, so there is nothing to build first. The game has no version of its own to put beside it. Coilbox writes ${WORKSHOP_MUTATOR_FOLDER} to do it, and it is never packaged.`
               }
               checked={startWithUnit}
               onChange={setStartWithUnit}
@@ -472,7 +496,9 @@ export function PlayLocallyButton({
           ) : null}
 
           <div className="flex flex-col gap-2">
-            <span className="text-sm font-medium">Map</span>
+            <span className="text-sm font-medium">
+              <Trans>Map</Trans>
+            </span>
             <Button
               variant="outline"
               className="justify-start font-normal"
@@ -481,10 +507,10 @@ export function PlayLocallyButton({
             >
               {map?.name ??
                 (waiting
-                  ? "Reading maps"
+                  ? t`Reading maps`
                   : scan.error
-                    ? "Maps could not be read"
-                    : "No map installed")}
+                    ? t`Maps could not be read`
+                    : t`No map installed`)}
             </Button>
           </div>
           <MapPickerDrawer
@@ -504,10 +530,10 @@ export function PlayLocallyButton({
             >
               <Rocket className="size-4" />
               {busy
-                ? BUSY_LABEL[phase.state]
+                ? t(BUSY_LABEL[phase.state])
                 : nothingToTest
-                  ? "Nothing to test yet"
-                  : "Play"}
+                  ? t`Nothing to test yet`
+                  : t`Play`}
             </Button>
           </div>
 
@@ -516,7 +542,9 @@ export function PlayLocallyButton({
           ) : null}
           {!blocker && nothingToTest ? (
             <p className="text-xs text-muted-foreground">
-              This project has no edits yet, so there is nothing to launch.
+              <Trans>
+                This project has no edits yet, so there is nothing to launch.
+              </Trans>
             </p>
           ) : null}
 
@@ -530,15 +558,21 @@ export function PlayLocallyButton({
 
           {phase.state === "done" ? (
             <div className="flex flex-col gap-2 text-xs text-muted-foreground">
-              <p>The game has closed. Play it again to test another change.</p>
+              <p>
+                <Trans>
+                  The game has closed. Play it again to test another change.
+                </Trans>
+              </p>
               {phase.dir ? (
                 <>
                   <p className="break-all">
                     <code>{phase.dir}</code>
                   </p>
                   <p>
-                    Deleting <code>{WORKSHOP_MUTATOR_FOLDER}</code> undoes
-                    everything this wrote.
+                    <Trans>
+                      Deleting <code>{WORKSHOP_MUTATOR_FOLDER}</code> undoes
+                      everything this wrote.
+                    </Trans>
                   </p>
                 </>
               ) : null}

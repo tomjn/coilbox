@@ -1,3 +1,5 @@
+import type { MessageDescriptor } from "@lingui/core";
+import { msg } from "@lingui/core/macro";
 import {
   Activity,
   Ban,
@@ -37,7 +39,7 @@ import type { AdminToolEntry } from "./toolNav";
  */
 export interface AdminTool extends AdminToolEntry {
   id: string;
-  label: string;
+  label: MessageDescriptor;
   icon: LucideIcon;
   Component: ComponentType<{ serverKey: string }>;
 }
@@ -46,48 +48,53 @@ export interface AdminTool extends AdminToolEntry {
 export const ADMIN_TOOLS: AdminTool[] = [
   {
     id: "players",
-    label: "Players",
+    label: msg`Players`,
     icon: Users,
     Component: PlayerLookupSection,
   },
-  { id: "bans", label: "Bans", icon: Ban, Component: BansSection },
+  { id: "bans", label: msg`Bans`, icon: Ban, Component: BansSection },
   {
     id: "emailDomains",
-    label: "Email domains",
+    label: msg`Email domains`,
     icon: Mail,
     Component: EmailDomainsSection,
   },
-  { id: "channels", label: "Channels", icon: Hash, Component: ChannelsSection },
-  { id: "bots", label: "Bots", icon: Bot, Component: BotAccountsSection },
+  {
+    id: "channels",
+    label: msg`Channels`,
+    icon: Hash,
+    Component: ChannelsSection,
+  },
+  { id: "bots", label: msg`Bots`, icon: Bot, Component: BotAccountsSection },
   {
     id: "activity",
-    label: "Staff activity",
+    label: msg`Staff activity`,
     icon: Activity,
     Component: ModeratorFeedSection,
   },
   {
     id: "server",
-    label: "Server",
+    label: msg`Server`,
     icon: Server,
     Component: ServerAddressSection,
   },
   {
     id: "maintenance",
-    label: "Maintenance",
+    label: msg`Maintenance`,
     icon: Wrench,
     adminOnly: true,
     Component: MaintenanceSection,
   },
   {
     id: "staff",
-    label: "Staff",
+    label: msg`Staff`,
     icon: Shield,
     adminOnly: true,
     Component: StaffSection,
   },
   {
     id: "announcements",
-    label: "Announcements",
+    label: msg`Announcements`,
     icon: Megaphone,
     adminOnly: true,
     Component: AnnouncementsSection,

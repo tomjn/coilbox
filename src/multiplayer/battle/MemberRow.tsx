@@ -1,3 +1,4 @@
+import { Trans, useLingui } from "@lingui/react/macro";
 import {
   AlertTriangle,
   BellRing,
@@ -71,15 +72,19 @@ export const SELECT_SIZE = "py-0 data-[size=sm]:h-6";
 
 /** Ready state as a round check/cross; spectators show an eye (always "ready"). */
 function ReadyIcon({ row }: { row: Row }) {
+  const { t } = useLingui();
   if (row.spectator) {
     return (
-      <Eye className="size-4 text-muted-foreground" aria-label="Spectating" />
+      <Eye
+        className="size-4 text-muted-foreground"
+        aria-label={t`Spectating`}
+      />
     );
   }
   return row.ready ? (
-    <CheckCircle2 className="size-4 text-green-500" aria-label="Ready" />
+    <CheckCircle2 className="size-4 text-green-500" aria-label={t`Ready`} />
   ) : (
-    <XCircle className="size-4 text-destructive" aria-label="Not ready" />
+    <XCircle className="size-4 text-destructive" aria-label={t`Not ready`} />
   );
 }
 
@@ -191,16 +196,20 @@ export function MemberRow({
   onAlly: (ally: number) => void;
   onColor: (hex: string) => void;
 }) {
+  const { t } = useLingui();
   // Ordinary players get no subtitle at all (#3196): "Player" told nobody
   // anything and made every common row taller than it needed to be.
+  const botAi = row.aiDll ?? "AI";
+  const aiDll = row.aiDll;
+  const rowName = row.name;
   const subtitle = row.host
-    ? "Host"
+    ? t`Host`
     : row.boss
-      ? "Boss"
+      ? t`Boss`
       : row.kind === "bot"
-        ? `Bot · ${row.aiDll ?? "AI"}`
+        ? t`Bot · ${botAi}`
         : row.self
-          ? "You"
+          ? t`You`
           : undefined;
 
   // Colour is settable by us on our own row (MYBATTLESTATUS) or by the host on
@@ -234,8 +243,9 @@ export function MemberRow({
     editable ? onAlly(v) : control?.onForceAlly?.(v);
   const setColor = (hex: string) =>
     editable ? onColor(hex) : control?.onForceColor?.(hex);
+  const sharedName = sharedWith?.name;
   const sharedTitle = sharedWith
-    ? `Shares a team with ${sharedWith.name} — team settings come from the first member`
+    ? t`Shares a team with ${sharedName} — team settings come from the first member`
     : undefined;
 
   return (
@@ -257,7 +267,7 @@ export function MemberRow({
           {row.kind === "human" && !row.spectator && row.sync === 2 && (
             <span className="inline-flex items-center gap-1 text-[11px] font-medium text-amber-600 dark:text-amber-400">
               <AlertTriangle className="size-3.5" />
-              Unsynced
+              <Trans>Unsynced</Trans>
             </span>
           )}
         </div>
@@ -281,7 +291,7 @@ export function MemberRow({
           ) : serverAssignsSeat ? null : canEditColor ? (
             <input
               type="color"
-              aria-label={`${row.name} colour`}
+              aria-label={t`${rowName} colour`}
               value={row.colorHex}
               onChange={(e) => setColor(e.target.value)}
               className="color-swatch size-6 shrink-0 cursor-pointer rounded border border-white/25 bg-transparent p-0"
@@ -340,14 +350,14 @@ export function MemberRow({
                   options={aiOptions ?? []}
                   size="sm"
                   className={cn(SELECT_SIZE, "min-w-0 flex-1")}
-                  placeholder={row.aiDll ?? "Select an AI"}
+                  placeholder={row.aiDll ?? t`Select an AI`}
                 />
               )}
             </div>
             {aiInvalid && (
               <span className="flex items-center gap-1 text-[11px] font-medium text-amber-600 dark:text-amber-400">
                 <AlertTriangle className="size-3 shrink-0" />
-                {row.aiDll} isn't available in this game
+                <Trans>{aiDll} isn't available in this game</Trans>
               </span>
             )}
           </div>
@@ -397,7 +407,7 @@ export function MemberRow({
                 borderColor: sharedWith.colorHex,
               }}
             >
-              Co-player
+              <Trans>Co-player</Trans>
             </Badge>
           ) : canEditSide ? (
             <OptionSelect
@@ -465,7 +475,7 @@ export function MemberRow({
             value={String(row.ally)}
             size="sm"
             className={cn(SELECT_SIZE, "w-16")}
-            ariaLabel={`${row.name} ally`}
+            ariaLabel={t`${rowName} ally`}
             options={allyOptions}
             onValueChange={(v) => setAlly(Number(v))}
           />
@@ -508,6 +518,7 @@ export function MemberActionsMenu({
   /** Classes for the menu's trigger button. */
   triggerClassName?: string;
 }) {
+  const { t } = useLingui();
   if (!control && !personal) return null;
   const canSpectate =
     row.kind === "human" && !row.spectator && !!control?.onForceSpectator;
@@ -523,7 +534,7 @@ export function MemberActionsMenu({
                 {canSpectate && (
                   <MenuItem
                     icon={<Eye className="size-4" />}
-                    label="Force spectate"
+                    label={t`Force spectate`}
                     onClick={() => {
                       close();
                       control.onForceSpectator?.();
@@ -533,7 +544,7 @@ export function MemberActionsMenu({
                 {control.onRing && (
                   <MenuItem
                     icon={<BellRing className="size-4" />}
-                    label="Ring"
+                    label={t`Ring`}
                     onClick={() => {
                       close();
                       control.onRing?.();
@@ -543,7 +554,7 @@ export function MemberActionsMenu({
                 {control.onAppointBoss && (
                   <MenuItem
                     icon={<Crown className="size-4" />}
-                    label="Make boss"
+                    label={t`Make boss`}
                     onClick={() => {
                       close();
                       control.onAppointBoss?.();
@@ -553,7 +564,7 @@ export function MemberActionsMenu({
                 {control.onUnboss && (
                   <MenuItem
                     icon={<Crown className="size-4" />}
-                    label="Stand boss down"
+                    label={t`Stand boss down`}
                     onClick={() => {
                       close();
                       control.onUnboss?.();
@@ -562,7 +573,7 @@ export function MemberActionsMenu({
                 )}
                 <MenuItem
                   icon={<UserX className="size-4" />}
-                  label={row.kind === "bot" ? "Remove" : "Kick"}
+                  label={row.kind === "bot" ? t`Remove` : t`Kick`}
                   onClick={() => {
                     close();
                     control.onKick();

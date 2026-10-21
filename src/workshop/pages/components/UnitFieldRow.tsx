@@ -36,6 +36,8 @@
  * value typed here too, so the number typed is not always the number the game
  * loads. `PostProcessedNote` below draws that.
  */
+import { t as coreT } from "@lingui/core/macro";
+import { Trans, useLingui } from "@lingui/react/macro";
 import { Button, cn, Input } from "@picoframe/frame";
 import {
   FileCog,
@@ -64,6 +66,7 @@ import {
 // The "?" tooltip mapconv already built for its own labelled fields. Shared
 // rather than copied: it is a generic control that happens to live in that
 // plugin's folder.
+import { getLocale } from "@/i18n";
 import type { BuilderFieldMark } from "@/lego/builderFields";
 import { luaLiteral } from "@/lib/lua";
 import { HelpTip } from "@/mapconv/pages/components/Help";
@@ -91,19 +94,25 @@ export interface BuilderMark {
 
 /** The short label for a field the builder writes, linked to the unit there. */
 function BuilderFieldNote({ mark }: { mark: BuilderMark }) {
+  const { t } = useLingui();
+  const projectName = mark.projectName;
   const label =
-    mark.kind === "set" ? "Set by the unit builder" : "Kept by hand";
+    mark.kind === "set" ? t`Set by the unit builder` : t`Kept by hand`;
+  const ariaLabel =
+    mark.kind === "set"
+      ? t`Set by the unit builder. Open ${projectName} in the unit builder.`
+      : t`Kept by hand. Open ${projectName} in the unit builder.`;
   const detail =
     mark.kind === "set"
-      ? `${mark.projectName} writes this field on each export. Writing a change to it into the game stops the builder updating it.`
-      : `The file differs from what the last export wrote, so the builder will not change this field again.`;
+      ? t`${projectName} writes this field on each export. Writing a change to it into the game stops the builder updating it.`
+      : t`The file differs from what the last export wrote, so the builder will not change this field again.`;
   return (
     <TooltipProvider delayDuration={150}>
       <Tooltip>
         <TooltipTrigger asChild>
           <Link
             to={`/lego/${mark.projectId}`}
-            aria-label={`${label}. Open ${mark.projectName} in the unit builder.`}
+            aria-label={ariaLabel}
             className="shrink-0 rounded-full bg-muted px-1.5 text-[10px] font-medium text-muted-foreground hover:text-foreground"
           >
             {label}
@@ -161,7 +170,7 @@ const isTable = (
  * line breaks would push the rows below it off the screen.
  */
 export function display(value: unknown): string {
-  if (value === undefined) return "not set";
+  if (value === undefined) return coreT`not set`;
   if (typeof value === "string") return value;
   return luaLiteral(value).replace(/\s*\n\s*/g, " ");
 }
@@ -316,19 +325,24 @@ function InPlaceNote({
   field: InPlaceField;
   overridden: boolean;
 }) {
+  const { t } = useLingui();
   const refusal = field.check.refusal;
-  const where = refusal?.file
-    ? `${refusal.file}${refusal.location ? `, line ${refusal.location.start.line}` : ""}`
+  const refusalFile = refusal?.file;
+  const refusalLine = refusal?.location?.start.line;
+  const where = refusalFile
+    ? refusalLine !== undefined
+      ? t`${refusalFile}, line ${refusalLine}`
+      : refusalFile
     : null;
   return (
     <span className="flex flex-wrap items-center gap-x-2 gap-y-1 text-[10px] text-muted-foreground">
       <FileLock2 className="size-3 shrink-0" />
       <span>
         {field.routed
-          ? "Goes through the mutator route. Writing in place skips this field."
+          ? t`Goes through the mutator route. Writing in place skips this field.`
           : overridden
-            ? "Read only for edit in place. This change stops an in-place write."
-            : "Read only for edit in place."}
+            ? t`Read only for edit in place. This change stops an in-place write.`
+            : t`Read only for edit in place.`}
       </span>
       {refusal && (
         <Popover>
@@ -336,9 +350,9 @@ function InPlaceNote({
             <button
               type="button"
               className="underline underline-offset-2 hover:text-foreground focus-visible:text-foreground"
-              aria-label={`Why ${label} cannot be written in place`}
+              aria-label={t`Why ${label} cannot be written in place`}
             >
-              Why?
+              <Trans>Why?</Trans>
             </button>
           </PopoverTrigger>
           <PopoverContent
@@ -346,7 +360,9 @@ function InPlaceNote({
             className="flex w-[32rem] flex-col gap-2"
           >
             <h3 className="text-sm font-medium">
-              Coilbox cannot write {label} into the game's own file
+              <Trans>
+                Coilbox cannot write {label} into the game's own file
+              </Trans>
             </h3>
             <p className="text-xs">{refusal.message}</p>
             {where && (
@@ -362,9 +378,11 @@ function InPlaceNote({
               />
             )}
             <p className="text-xs text-muted-foreground">
-              A mutator overrides the value however the file works it out, so
-              this one change can go that way while the rest of the project is
-              written in place.
+              <Trans>
+                A mutator overrides the value however the file works it out, so
+                this one change can go that way while the rest of the project is
+                written in place.
+              </Trans>
             </p>
           </PopoverContent>
         </Popover>
@@ -376,15 +394,15 @@ function InPlaceNote({
         onClick={() => field.onRoute(!field.routed)}
         aria-label={
           field.routed
-            ? `Stop sending ${label} through the mutator route`
-            : `Send ${label} through the mutator route`
+            ? t`Stop sending ${label} through the mutator route`
+            : t`Send ${label} through the mutator route`
         }
       >
         {field.routed
-          ? "Undo"
+          ? t`Undo`
           : overridden
-            ? "Send this change to the mutator"
-            : "Change it through the mutator"}
+            ? t`Send this change to the mutator`
+            : t`Change it through the mutator`}
       </Button>
     </span>
   );
@@ -403,19 +421,25 @@ function InPlaceNote({
  * load can prove is written as typed, so the note still says "may".
  */
 function PostProcessedNote({ post }: { post: PostNote }) {
+  const { t } = useLingui();
+  const fileValue = post.kind === "changed" ? display(post.file) : "";
+  const loadedValue = display(post.loaded);
   const what =
     post.kind === "changed"
-      ? `The game changes this field as it loads. Its files say ${display(post.file)} and it loads as ${display(post.loaded)}.`
+      ? t`The game changes this field as it loads. Its files say ${fileValue} and it loads as ${loadedValue}.`
       : post.loaded === undefined
-        ? "The game sets this field as it loads. Its own files leave it unset."
-        : `The game sets this field as it loads, to ${display(post.loaded)}. Its own files leave it unset.`;
+        ? t`The game sets this field as it loads. Its own files leave it unset.`
+        : t`The game sets this field as it loads, to ${loadedValue}. Its own files leave it unset.`;
   return (
     <span className="flex items-start gap-1 text-[10px] text-muted-foreground">
       <FileCog className="mt-px size-3 shrink-0" />
       <span>
-        {what} It may change a value typed here too. A mutator archive, an
-        edit-in-place write and the tweak slots each get a value the game turns
-        into the typed one, where loading the game proves it.
+        {what}{" "}
+        <Trans>
+          It may change a value typed here too. A mutator archive, an
+          edit-in-place write and the tweak slots each get a value the game
+          turns into the typed one, where loading the game proves it.
+        </Trans>
       </span>
     </span>
   );
@@ -434,7 +458,7 @@ export function UnitFieldRow({
   warning,
   checkMarker,
   builderMark,
-  inheritedLabel = "Game value",
+  inheritedLabel: inheritedLabelProp,
   inPlace,
   post,
   relative,
@@ -489,6 +513,9 @@ export function UnitFieldRow({
    *  that is not a number, or one nothing has changed yet. */
   onToggleRelative?: () => void;
 }) {
+  const { t } = useLingui();
+  const inheritedLabel = inheritedLabelProp ?? t`Game value`;
+  const rowLabel = row.label;
   const kind = controlKind(row);
   const overridden = row.state === "overridden";
   const muted = !overridden;
@@ -510,9 +537,11 @@ export function UnitFieldRow({
   // The typo this picker exists to catch, said where it was made rather than at
   // the point the game refuses to load the unit. A field with nothing written in
   // it has no path to be wrong about, so it says nothing.
+  const archiveLabel = assets?.archiveLabel;
+  const noun = asset?.kind.noun;
   const missing =
     asset && assets && pointsAt && pointsAt.member === undefined
-      ? `${assets.archiveLabel} has no ${asset.kind.noun} at this path.`
+      ? t`${archiveLabel} has no ${noun} at this path.`
       : undefined;
 
   const input = (
@@ -548,6 +577,13 @@ export function UnitFieldRow({
    */
   const tall = Boolean(preview) || isTable(row.value);
 
+  const engineDefaults =
+    row.field.engine && row.field.engine.defaults.length > 0
+      ? new Intl.ListFormat(getLocale(), {
+          style: "long",
+          type: "disjunction",
+        }).format(row.field.engine.defaults.map(String))
+      : t`a value it works out itself`;
   const current = typeof row.value === "string" ? row.value.trim() : "";
   const options =
     choices && current && !choices.options.some((o) => o.value === current)
@@ -584,9 +620,9 @@ export function UnitFieldRow({
           {overridden && (
             <span
               className="shrink-0 rounded-full bg-primary/15 px-1.5 text-[10px] font-medium text-primary"
-              title="This value has been changed from the game's default."
+              title={t`This value has been changed from the game's default.`}
             >
-              edited
+              <Trans>edited</Trans>
             </span>
           )}
           {builderMark && <BuilderFieldNote mark={builderMark} />}
@@ -605,8 +641,8 @@ export function UnitFieldRow({
                     )}
                     aria-label={
                       checkMarker.severity === "blocker"
-                        ? "Blocker"
-                        : "Worth a look"
+                        ? t`Blocker`
+                        : t`Worth a look`
                     }
                   >
                     <TriangleAlert className="size-3.5" />
@@ -621,9 +657,9 @@ export function UnitFieldRow({
           {!row.field.known && (
             <span
               className="shrink-0 text-[10px] uppercase tracking-wide text-muted-foreground"
-              title="The engine does not declare this key. Only this game's own Lua reads it."
+              title={t`The engine does not declare this key. Only this game's own Lua reads it.`}
             >
-              game
+              <Trans>game</Trans>
             </span>
           )}
           {/* A label nobody wrote is the engine's key wearing a label's clothes,
@@ -633,9 +669,9 @@ export function UnitFieldRow({
           {row.field.known && !row.field.described && (
             <span
               className="shrink-0 text-[10px] uppercase tracking-wide text-muted-foreground"
-              title="Coilbox has no description for this field yet, so this is the engine's own key rather than a label."
+              title={t`Coilbox has no description for this field yet, so this is the engine's own key rather than a label.`}
             >
-              engine key
+              <Trans>engine key</Trans>
             </span>
           )}
         </span>
@@ -682,11 +718,11 @@ export function UnitFieldRow({
               className="h-8 shrink-0 gap-1.5"
               disabled={readOnly}
               onClick={() => setPicking(true)}
-              title={`Choose a ${asset.kind.noun} from ${assets.archiveLabel}`}
-              aria-label={`Browse for ${row.label}`}
+              title={t`Choose a ${noun} from ${archiveLabel}`}
+              aria-label={t`Browse for ${rowLabel}`}
             >
               <FolderOpen className="size-3.5" />
-              Browse
+              <Trans>Browse</Trans>
             </Button>
             {picking && (
               <AssetPicker
@@ -747,24 +783,24 @@ export function UnitFieldRow({
         )}
         {overridden && (
           <span className="truncate text-[10px] text-muted-foreground">
-            {row.present ? inheritedLabel : "Engine default"}:{" "}
+            {row.present ? inheritedLabel : t`Engine default`}:{" "}
             {display(row.inherited)}
           </span>
         )}
         {relative && (
           <span
             className="truncate text-[10px] text-muted-foreground"
-            title="Worked out again from the game's value whenever the game changes. Typing a number here makes it fixed."
+            title={t`Worked out again from the game's value whenever the game changes. Typing a number here makes it fixed.`}
           >
-            Follows the game: {relative}
+            <Trans>Follows the game: {relative}</Trans>
           </span>
         )}
         {!overridden && !row.present && (
           <span className="truncate text-[10px] text-muted-foreground">
-            Not set by this game.{" "}
+            <Trans>Not set by this game.</Trans>{" "}
             {row.field.engine && row.field.default === undefined
-              ? `The engine uses ${row.field.engine.defaults.join(" or ") || "a value it works out itself"}.`
-              : "Showing the engine's default."}
+              ? t`The engine uses ${engineDefaults}.`
+              : t`Showing the engine's default.`}
           </span>
         )}
       </div>
@@ -778,8 +814,8 @@ export function UnitFieldRow({
                 size="icon"
                 className="size-7"
                 onClick={onToggleRelative}
-                title={`Make ${row.label} a fixed number`}
-                aria-label={`Make ${row.label} a fixed number`}
+                title={t`Make ${rowLabel} a fixed number`}
+                aria-label={t`Make ${rowLabel} a fixed number`}
               >
                 <Link2Off className="size-3.5" />
               </Button>
@@ -791,8 +827,8 @@ export function UnitFieldRow({
                   size="icon"
                   className="size-7"
                   onClick={onToggleRelative}
-                  title={`Make ${row.label} follow the game`}
-                  aria-label={`Make ${row.label} follow the game`}
+                  title={t`Make ${rowLabel} follow the game`}
+                  aria-label={t`Make ${rowLabel} follow the game`}
                 >
                   <Link2 className="size-3.5" />
                 </Button>
@@ -803,8 +839,8 @@ export function UnitFieldRow({
             size="icon"
             className="size-7"
             onClick={onReset}
-            title={`Reset ${row.label} to the inherited value`}
-            aria-label={`Reset ${row.label} to the inherited value`}
+            title={t`Reset ${rowLabel} to the inherited value`}
+            aria-label={t`Reset ${rowLabel} to the inherited value`}
           >
             <RotateCcw className="size-3.5" />
           </Button>

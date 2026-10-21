@@ -14,6 +14,8 @@
  * a lower cost per hit point is the good direction, everything else here is
  * the opposite, per {@link Direction}.
  */
+import { plural } from "@lingui/core/macro";
+import { useLingui } from "@lingui/react/macro";
 import {
   Tooltip,
   TooltipContent,
@@ -22,12 +24,12 @@ import {
 } from "@/components/ui/tooltip";
 import { formatNumber as formatLocaleNumber } from "@/lib/format";
 import {
-  ALPHA_DAMAGE_HELP,
-  COST_PER_HIT_POINT_HELP,
-  DPS_HELP,
-  DPS_PER_100_METAL_HELP,
-  HIT_POINTS_PER_BUILD_SECOND_HELP,
-  RANGE_PER_COST_HELP,
+  alphaDamageHelp,
+  costPerHitPointHelp,
+  dpsHelp,
+  dpsPer100MetalHelp,
+  hitPointsPerBuildSecondHelp,
+  rangePerCostHelp,
   type UnitDerivedStats,
 } from "../../derivedStats";
 
@@ -121,20 +123,29 @@ export function DerivedStatsStrip({
    *  unit this project added with no game unit behind it. */
   gameStats?: UnitDerivedStats;
 }) {
+  const { t } = useLingui();
   const excludedManual = stats.weapons.filter(
     (w) => w.excludedFromSum === "manual",
   ).length;
   const excludedSlaved = stats.weapons.filter(
     (w) => w.excludedFromSum === "slaved",
   ).length;
-  const excludedNote = [
-    excludedManual > 0 &&
-      `${excludedManual} manual-fire weapon${excludedManual === 1 ? "" : "s"}`,
-    excludedSlaved > 0 &&
-      `${excludedSlaved} slaved weapon${excludedSlaved === 1 ? "" : "s"}`,
-  ]
-    .filter(Boolean)
-    .join(" and ");
+  const manualText = plural(excludedManual, {
+    one: "# manual-fire weapon",
+    other: "# manual-fire weapons",
+  });
+  const slavedText = plural(excludedSlaved, {
+    one: "# slaved weapon",
+    other: "# slaved weapons",
+  });
+  const excludedNote =
+    excludedManual > 0 && excludedSlaved > 0
+      ? t`${manualText} and ${slavedText}`
+      : excludedManual > 0
+        ? manualText
+        : excludedSlaved > 0
+          ? slavedText
+          : "";
 
   const nothingToShow =
     stats.dps === null &&
@@ -145,51 +156,55 @@ export function DerivedStatsStrip({
     stats.rangePerCost === null;
   if (nothingToShow) return null;
 
-  const dpsHelp = `${DPS_HELP}${excludedNote ? ` Leaves out ${excludedNote}, which do not fire on a reload cycle of their own.` : ""}`;
-  const alphaDamageHelp = `${ALPHA_DAMAGE_HELP}${excludedNote ? ` Leaves out ${excludedNote}.` : ""}`;
+  const dpsText = excludedNote
+    ? `${dpsHelp()} ${t`Leaves out ${excludedNote}, which do not fire on a reload cycle of their own.`}`
+    : dpsHelp();
+  const alphaDamageText = excludedNote
+    ? `${alphaDamageHelp()} ${t`Leaves out ${excludedNote}.`}`
+    : alphaDamageHelp();
 
   return (
     <div className="flex flex-wrap items-stretch gap-2">
       <Stat
-        label="DPS"
+        label={t`DPS`}
         value={stats.dps}
         gameValue={gameStats?.dps ?? null}
-        help={dpsHelp}
+        help={dpsText}
         direction="higher"
       />
       <Stat
-        label="Volley damage"
+        label={t`Volley damage`}
         value={stats.alphaDamage}
         gameValue={gameStats?.alphaDamage ?? null}
-        help={alphaDamageHelp}
+        help={alphaDamageText}
         direction="higher"
       />
       <Stat
-        label="Cost per HP"
+        label={t`Cost per HP`}
         value={stats.costPerHitPoint}
         gameValue={gameStats?.costPerHitPoint ?? null}
-        help={COST_PER_HIT_POINT_HELP}
+        help={costPerHitPointHelp()}
         direction="lower"
       />
       <Stat
-        label="DPS per 100 metal"
+        label={t`DPS per 100 metal`}
         value={stats.dpsPer100Metal}
         gameValue={gameStats?.dpsPer100Metal ?? null}
-        help={DPS_PER_100_METAL_HELP}
+        help={dpsPer100MetalHelp()}
         direction="higher"
       />
       <Stat
-        label="HP per build second"
+        label={t`HP per build second`}
         value={stats.hitPointsPerBuildSecond}
         gameValue={gameStats?.hitPointsPerBuildSecond ?? null}
-        help={HIT_POINTS_PER_BUILD_SECOND_HELP}
+        help={hitPointsPerBuildSecondHelp()}
         direction="higher"
       />
       <Stat
-        label="Range per cost"
+        label={t`Range per cost`}
         value={stats.rangePerCost}
         gameValue={gameStats?.rangePerCost ?? null}
-        help={RANGE_PER_COST_HELP}
+        help={rangePerCostHelp()}
         direction="higher"
       />
     </div>

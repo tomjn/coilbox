@@ -1,3 +1,4 @@
+import { t } from "@lingui/core/macro";
 import type { MapSize, MissingMapPicture } from "./placeholder";
 import { type AssetTier, assetTierUrl } from "./tier";
 
@@ -168,5 +169,5 @@ export function shownMapPicture(
  *  of an archive or out of the hub, so there is one caption. The drawing carries
  *  its own label and takes none. */
 export function mapPictureAlt(picture: MapPicture, mapName: string): string {
-  return picture.from === "placeholder" ? "" : `Minimap of ${mapName}`;
+  return picture.from === "placeholder" ? "" : t`Minimap of ${mapName}`;
 }

@@ -1,3 +1,5 @@
+import { t } from "@lingui/core/macro";
+import { Trans, useLingui } from "@lingui/react/macro";
 import { Button, cn, Input, useSetting } from "@picoframe/frame";
 import { openUrl } from "@tauri-apps/plugin-opener";
 import {
@@ -52,6 +54,7 @@ import {
   type LobbyAccount,
   type LobbyServer,
   resolveRecoveredAccount,
+  serverNotice,
   serverProtocol,
   type TlsStyle,
   useCustomServers,
@@ -91,7 +94,6 @@ type SaveStatus =
   | { kind: "error"; text: string };
 
 const IDLE: SaveStatus = { kind: "idle" };
-const SAVED: SaveStatus = { kind: "saved", text: "Saved" };
 
 /** The two halves of a keychain key. */
 type LoginIdentity = Pick<LobbyAccount, "serverId" | "username">;
@@ -141,6 +143,7 @@ const validPort = (port: number) =>
  * (`ls_*_credential`).
  */
 export default function LobbyServersSettings() {
+  const { t } = useLingui();
   const [accountsCfg, setAccountsCfg] = useLobbyAccounts();
   const [customCfg, setCustomCfg] = useCustomServers();
   const [consoleOpen, setConsoleOpen] = useState(false);
@@ -334,34 +337,34 @@ export default function LobbyServersSettings() {
     <div className="space-y-8 pb-8">
       <section className="space-y-3">
         <h2 className={H2_CLASS}>
-          <RefreshCw size={15} /> Connection
+          <RefreshCw size={15} /> <Trans>Connection</Trans>
         </h2>
         <div className="space-y-3 rounded-md border border-border p-3">
           <CheckField
-            label="Connect automatically on startup"
-            hint="When Coilbox starts, log back in to every account that was connected when it last closed. To connect one account every time, tick Connect on startup on that login."
+            label={t`Connect automatically on startup`}
+            hint={t`When Coilbox starts, log back in to every account that was connected when it last closed. To connect one account every time, tick Connect on startup on that login.`}
             checked={autoConnect}
             onChange={setAutoConnect}
           />
           <CheckField
-            label="Reconnect automatically"
-            hint="If the server drops the connection, rejoin your channels and last battle automatically."
+            label={t`Reconnect automatically`}
+            hint={t`If the server drops the connection, rejoin your channels and last battle automatically.`}
             checked={autoRejoin}
             onChange={setAutoRejoin}
           />
           <CheckField
-            label="Set me away when idle"
-            hint="Show as away to everyone else after a spell without input. Using Coilbox again clears it. Away you set by hand stays until you clear it."
+            label={t`Set me away when idle`}
+            hint={t`Show as away to everyone else after a spell without input. Using Coilbox again clears it. Away you set by hand stays until you clear it.`}
             checked={autoAway}
             onChange={setAutoAway}
           />
           {autoAway && (
             <Field
-              label="Minutes before away"
+              label={t`Minutes before away`}
               // The cap belongs on the input, not the field: on the field it also
               // caps the label and hint, which wraps them at 10rem.
               className="pl-6"
-              hint={`${MIN_AUTO_AWAY_MINUTES} to ${MAX_AUTO_AWAY_MINUTES}.`}
+              hint={t`${MIN_AUTO_AWAY_MINUTES} to ${MAX_AUTO_AWAY_MINUTES}.`}
             >
               <Input
                 className="max-w-40"
@@ -381,11 +384,11 @@ export default function LobbyServersSettings() {
 
       <section className="space-y-3">
         <h2 className={H2_CLASS}>
-          <Users size={15} /> Accounts
+          <Users size={15} /> <Trans>Accounts</Trans>
         </h2>
         {accountsCfg.accounts.length === 0 ? (
           <p className={EMPTY_CLASS}>
-            No logins yet. Add one to connect to a lobby.
+            <Trans>No logins yet. Add one to connect to a lobby.</Trans>
           </p>
         ) : (
           <ul className="space-y-2">
@@ -406,7 +409,7 @@ export default function LobbyServersSettings() {
             onClick={() => setRegisterOpen((o) => !o)}
             disabled={servers.length === 0}
           >
-            <UserPlus /> Register
+            <UserPlus /> <Trans>Register</Trans>
           </Button>
           <Button
             variant="outline"
@@ -414,7 +417,7 @@ export default function LobbyServersSettings() {
             onClick={addAccount}
             disabled={servers.length === 0}
           >
-            <Plus /> Add login
+            <Plus /> <Trans>Add login</Trans>
           </Button>
           <Button
             variant="outline"
@@ -422,7 +425,7 @@ export default function LobbyServersSettings() {
             onClick={() => setRecoveryOpen((o) => !o)}
             disabled={servers.length === 0}
           >
-            <KeyRound /> Forgot password
+            <KeyRound /> <Trans>Forgot password</Trans>
           </Button>
         </div>
       </section>
@@ -430,10 +433,10 @@ export default function LobbyServersSettings() {
       <section className="space-y-3">
         <div className="flex items-center justify-between">
           <h2 className={H2_CLASS}>
-            <Server size={15} /> Servers
+            <Server size={15} /> <Trans>Servers</Trans>
           </h2>
           <Button variant="outline" size="sm" onClick={addCustomServer}>
-            <Plus /> Add custom server
+            <Plus /> <Trans>Add custom server</Trans>
           </Button>
         </div>
         {/* One list: `allServers` already returns the built-ins first, then the
@@ -456,21 +459,23 @@ export default function LobbyServersSettings() {
 
       <section className="space-y-3">
         <h2 className={H2_CLASS}>
-          <ServerCog size={15} /> Host your own server
+          <ServerCog size={15} /> <Trans>Host your own server</Trans>
         </h2>
         <div className="space-y-3 rounded-md border border-dashed border-border p-3">
           <p className="text-xs leading-snug text-muted-foreground">
-            Coilbox connects to any TASServer-compatible lobby, including one
-            you run yourself. lobby.recoilengine.org runs uberserver, which
-            ships a start-to-finish deployment guide using Docker and MariaDB.
-            Add yours as a custom server above once it is running.
+            <Trans>
+              Coilbox connects to any TASServer-compatible lobby, including one
+              you run yourself. lobby.recoilengine.org runs uberserver, which
+              ships a start-to-finish deployment guide using Docker and MariaDB.
+              Add yours as a custom server above once it is running.
+            </Trans>
           </p>
           <Button
             variant="outline"
             size="sm"
             onClick={() => openUrl(UBERSERVER_URL).catch(() => {})}
           >
-            <ExternalLink /> Uberserver
+            <ExternalLink /> <Trans>Uberserver</Trans>
           </Button>
         </div>
       </section>
@@ -551,6 +556,7 @@ function AccountListRow({
   servers: LobbyServer[];
   onOpen: () => void;
 }) {
+  const { t } = useLingui();
   const server = servers.find((s) => s.id === a.serverId);
   const { connected, onlineCount } = useAccountConnection(a, server);
 
@@ -563,16 +569,16 @@ function AccountListRow({
       >
         <span className="flex min-w-0 flex-col">
           <span className="truncate text-sm font-semibold leading-tight">
-            {a.username || "(no username)"}
+            {a.username || t`(no username)`}
           </span>
           <span className="truncate text-xs text-muted-foreground">
-            {server?.name ?? "Unknown server"}
+            {server?.name ?? t`Unknown server`}
           </span>
         </span>
         {connected && (
           <span className="ml-auto flex items-center gap-2 text-xs font-medium text-muted-foreground">
             <span className="size-2 rounded-full bg-emerald-500" aria-hidden />
-            Connected · {onlineCount} online
+            <Trans>Connected · {onlineCount} online</Trans>
           </span>
         )}
       </button>
@@ -605,13 +611,14 @@ function AccountDrawer({
   onOpenConsole: (serverKey: string) => void;
   onClose: () => void;
 }) {
+  const { t } = useLingui();
   const account =
     state?.mode === "edit"
       ? (accounts.find((a) => a.id === state.id) ?? null)
       : null;
   const adding = state?.mode === "add";
-  let title = "New login";
-  if (account) title = account.username.trim() || "Unnamed login";
+  let title = t`New login`;
+  if (account) title = account.username.trim() || t`Unnamed login`;
   return (
     <SlideDrawer
       open={adding || account != null}
@@ -647,12 +654,11 @@ function AccountDrawer({
 
 /** The labels a server picker shows, built-ins by name and the player's own marked. */
 function serverOptions(servers: LobbyServer[]) {
-  return servers.map((s) => ({
-    value: s.id,
-    label: `${s.builtin ? s.name : `${s.name || s.host} (custom)`}${
-      s.alpha ? " (alpha)" : ""
-    }`,
-  }));
+  return servers.map((s) => {
+    const name = s.name || s.host;
+    const base = s.builtin ? s.name : t`${name} (custom)`;
+    return { value: s.id, label: s.alpha ? t`${base} (alpha)` : base };
+  });
 }
 
 /** The foot of an add drawer: Cancel, and the button that saves the draft. */
@@ -668,7 +674,7 @@ function AddFooter({
   return (
     <footer className="flex items-center justify-end gap-2 border-t border-border px-4 py-3">
       <Button type="button" variant="outline" size="sm" onClick={onCancel}>
-        Cancel
+        <Trans>Cancel</Trans>
       </Button>
       <Button type="submit" size="sm" disabled={disabled}>
         <Plus /> {label}
@@ -691,7 +697,9 @@ function EditFooter({
   return (
     <footer className="flex items-center gap-3 border-t border-border px-4 py-3">
       <div className="min-w-0 flex-1 space-y-0.5 text-xs leading-snug">
-        <p className="text-muted-foreground">Changes save automatically.</p>
+        <p className="text-muted-foreground">
+          <Trans>Changes save automatically.</Trans>
+        </p>
         <p
           role="status"
           className={cn(
@@ -704,14 +712,14 @@ function EditFooter({
           {status.kind === "saved" && (
             <Check className="mt-px size-3.5 shrink-0" aria-hidden />
           )}
-          {status.kind === "saving" && "Saving…"}
+          {status.kind === "saving" && <Trans>Saving…</Trans>}
           {(status.kind === "saved" || status.kind === "error") && (
             <span>{status.text}</span>
           )}
         </p>
       </div>
       <Button type="button" size="sm" onClick={onDone}>
-        Done
+        <Trans>Done</Trans>
       </Button>
     </footer>
   );
@@ -860,8 +868,9 @@ function RegisterDrawer({
   servers: LobbyServer[];
   onClose: () => void;
 }) {
+  const { t } = useLingui();
   return (
-    <SlideDrawer open={open} title="Create a new account" onClose={onClose}>
+    <SlideDrawer open={open} title={t`Create a new account`} onClose={onClose}>
       <div className="flex-1 overflow-y-auto p-4">
         <RegisterForm
           servers={servers}
@@ -890,8 +899,9 @@ function RecoveryDrawer({
   onClose: () => void;
   onSignIn: (serverId: string, username: string) => void;
 }) {
+  const { t } = useLingui();
   return (
-    <SlideDrawer open={open} title="Recover your password" onClose={onClose}>
+    <SlideDrawer open={open} title={t`Recover your password`} onClose={onClose}>
       <div className="flex-1 overflow-y-auto p-4">
         <PasswordRecoveryForm
           servers={servers}
@@ -933,10 +943,12 @@ function AccountForm({
   onOpenConsole: (serverKey: string) => void;
   onDone: () => void;
 }) {
+  const { t } = useLingui();
+  const savedStatus: SaveStatus = { kind: "saved", text: t`Saved` };
   const [password, setPassword] = useState("");
   const [usernameInput, setUsernameInput] = useState(a.username);
   const [status, setStatus] = useState<SaveStatus>(
-    added ? { kind: "saved", text: "Login added" } : IDLE,
+    added ? { kind: "saved", text: t`Login added` } : IDLE,
   );
   // Set while a rename's keychain move is under way, so a second rename
   // cannot start from the name the first is moving away from.
@@ -984,12 +996,12 @@ function AccountForm({
     }
     if (next.username === "") {
       setUsernameInput(a.username);
-      setStatus({ kind: "error", text: "A login needs a username." });
+      setStatus({ kind: "error", text: t`A login needs a username.` });
       return;
     }
     if (loginTaken(accounts, next, a.id)) {
       setUsernameInput(a.username);
-      setStatus({ kind: "error", text: "You already have this login." });
+      setStatus({ kind: "error", text: t`You already have this login.` });
       return;
     }
     renaming.current = true;
@@ -1021,9 +1033,9 @@ function AccountForm({
       lost
         ? {
             kind: "error",
-            text: "Coilbox could not move the saved password to the new name. Enter the password again.",
+            text: t`Coilbox could not move the saved password to the new name. Enter the password again.`,
           }
-        : SAVED,
+        : savedStatus,
     );
   };
 
@@ -1038,17 +1050,20 @@ function AccountForm({
       .then(() => {
         setSaved(true);
         onChange({ hasSecret: true });
-        setStatus({ kind: "saved", text: "Password saved" });
+        setStatus({ kind: "saved", text: t`Password saved` });
       })
       .catch(() => {
         setSaved(false);
         onChange({ hasSecret: false });
         setStatus({
           kind: "error",
-          text: "Coilbox could not save the password to your keychain.",
+          text: t`Coilbox could not save the password to your keychain.`,
         });
       });
   };
+
+  const accountName = a.username || t`login`;
+  const removeLabel = t`Remove ${accountName}`;
 
   const blurOnEnter = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === "Enter") e.currentTarget.blur();
@@ -1067,14 +1082,18 @@ function AccountForm({
                 )}
                 aria-hidden
               />
-              {connected ? `Connected · ${onlineCount} online` : "Disconnected"}
+              {connected ? (
+                <Trans>Connected · {onlineCount} online</Trans>
+              ) : (
+                <Trans>Disconnected</Trans>
+              )}
             </span>
             <Button
               variant="outline"
               size="sm"
               className="ml-auto"
               onClick={() => accountKey && onOpenConsole(accountKey)}
-              aria-label="Open protocol console"
+              aria-label={t`Open protocol console`}
             >
               <Terminal />
             </Button>
@@ -1115,7 +1134,7 @@ function AccountForm({
               onChange({ hasSecret: exists });
               setStatus({
                 kind: "saved",
-                text: exists ? "Signed in" : "Signed out",
+                text: exists ? t`Signed in` : t`Signed out`,
               });
             }}
           />
@@ -1145,16 +1164,16 @@ function AccountForm({
             cannot be ticked. One already ticked stays editable, so losing the
             password never leaves a tick that cannot be cleared. */}
         <CheckField
-          label="Connect on startup"
+          label={t`Connect on startup`}
           hint={
             saved === false
-              ? "Save a password first. Coilbox cannot log in at startup without one."
-              : "Log in with this account every time Coilbox starts."
+              ? t`Save a password first. Coilbox cannot log in at startup without one.`
+              : t`Log in with this account every time Coilbox starts.`
           }
           checked={a.connectOnStartup === true}
           onChange={(v) => {
             onChange({ connectOnStartup: v });
-            setStatus(SAVED);
+            setStatus(savedStatus);
           }}
           disabled={saved === false && !a.connectOnStartup}
         />
@@ -1170,9 +1189,9 @@ function AccountForm({
             variant="outline"
             size="sm"
             onClick={onRemove}
-            aria-label={`Remove ${a.username || "login"}`}
+            aria-label={removeLabel}
           >
-            <Trash2 /> Remove login
+            <Trash2 /> <Trans>Remove login</Trans>
           </Button>
         </div>
       </div>
@@ -1204,6 +1223,7 @@ function TachyonSignIn({
   signedIn: boolean | undefined;
   onChanged: (signedIn: boolean) => void;
 }) {
+  const { t } = useLingui();
   const { signIn, busyKeys } = useMultiplayer();
   const [error, setError] = useState<string | null>(null);
   const named = a.username.trim() !== "";
@@ -1223,7 +1243,9 @@ function TachyonSignIn({
 
   return (
     <div className="flex flex-col gap-1.5 text-sm">
-      <span className="font-medium leading-none">Sign-in</span>
+      <span className="font-medium leading-none">
+        <Trans>Sign-in</Trans>
+      </span>
       <div className="flex flex-wrap gap-2">
         <Button
           variant="outline"
@@ -1234,7 +1256,7 @@ function TachyonSignIn({
           }}
         >
           <ExternalLink />
-          {signedIn ? "Sign in again" : "Sign in with your browser"}
+          {signedIn ? t`Sign in again` : t`Sign in with your browser`}
         </Button>
         {signedIn && (
           <Button
@@ -1251,18 +1273,18 @@ function TachyonSignIn({
               )
             }
           >
-            Sign out
+            <Trans>Sign out</Trans>
           </Button>
         )}
       </div>
       <span className="text-xs leading-snug text-muted-foreground">
         {!named
-          ? "Give this login a username first, so the sign-in has something to belong to."
+          ? t`Give this login a username first, so the sign-in has something to belong to.`
           : signedIn == null
-            ? "Checking whether you are signed in."
+            ? t`Checking whether you are signed in.`
             : signedIn
-              ? "Signed in. Coilbox holds a token for this login, not a password."
-              : "This server has no password. Signing in opens its own page in your browser."}
+              ? t`Signed in. Coilbox holds a token for this login, not a password.`
+              : t`This server has no password. Signing in opens its own page in your browser.`}
       </span>
       {error && <span className="text-xs text-destructive">{error}</span>}
     </div>
@@ -1282,6 +1304,8 @@ function ServerListRow({
   server: LobbyServer;
   onOpen?: () => void;
 }) {
+  const { t, i18n } = useLingui();
+  const notice = serverNotice(i18n, s.notice);
   // `shrink-0` matters: without it a long server name squeezes the badges until
   // their own text wraps mid-word.
   const tag =
@@ -1290,7 +1314,7 @@ function ServerListRow({
     <>
       <div className="flex items-center gap-2">
         <span className="min-w-0 truncate font-medium">
-          {s.name || s.host || "New server"}
+          {s.name || s.host || t`New server`}
         </span>
         {s.tls && <span className={tag}>TLS</span>}
         {s.alpha && (
@@ -1302,7 +1326,7 @@ function ServerListRow({
               "border border-destructive/40 bg-destructive/15 text-destructive",
             )}
           >
-            Alpha
+            <Trans>Alpha</Trans>
           </span>
         )}
         {s.official ? (
@@ -1312,21 +1336,21 @@ function ServerListRow({
               "ml-auto bg-primary/15 font-medium text-primary",
             )}
           >
-            Official
+            <Trans>Official</Trans>
           </span>
         ) : (
           <span className={cn(tag, "ml-auto")}>
-            {s.builtin ? "Built-in" : "Custom"}
+            {s.builtin ? t`Built-in` : t`Custom`}
           </span>
         )}
       </div>
       <div className="truncate font-mono text-xs text-muted-foreground">
-        {s.host ? `${s.host}:${s.port}` : "No address yet"}
+        {s.host ? `${s.host}:${s.port}` : t`No address yet`}
       </div>
-      {s.notice && (
+      {notice && (
         <p className="mt-1 flex items-start gap-1.5 text-xs text-amber-600 dark:text-amber-400">
           <TriangleAlert className="mt-0.5 size-3.5 shrink-0" aria-hidden />
-          {s.notice}
+          {notice}
         </p>
       )}
     </>
@@ -1370,13 +1394,14 @@ function ServerDrawer({
   onRemove: (s: LobbyServer) => void;
   onClose: () => void;
 }) {
+  const { t } = useLingui();
   const server =
     state?.mode === "edit"
       ? (servers.find((s) => s.id === state.id) ?? null)
       : null;
   const adding = state?.mode === "add";
-  let title = "New server";
-  if (server) title = server.name.trim() || server.host || "Unnamed server";
+  let title = t`New server`;
+  if (server) title = server.name.trim() || server.host || t`Unnamed server`;
   return (
     <SlideDrawer
       open={adding || server != null}
@@ -1415,6 +1440,7 @@ function AddServerForm({
   onAdd: (s: LobbyServer) => void;
   onCancel: () => void;
 }) {
+  const { t } = useLingui();
   const [draft, setDraft] = useState(initial);
   const ready = draft.host.trim() !== "" && validPort(draft.port);
 
@@ -1428,14 +1454,14 @@ function AddServerForm({
     <form className="flex min-h-0 flex-1 flex-col" onSubmit={submit}>
       <div className="flex-1 space-y-3 overflow-y-auto p-4">
         <p className="text-xs leading-snug text-muted-foreground">
-          Nothing is saved until you add the server.
+          <Trans>Nothing is saved until you add the server.</Trans>
         </p>
         <ServerFields
           server={draft}
           onChange={(patch) => setDraft((d) => ({ ...d, ...patch }))}
         />
       </div>
-      <AddFooter label="Add server" disabled={!ready} onCancel={onCancel} />
+      <AddFooter label={t`Add server`} disabled={!ready} onCancel={onCancel} />
     </form>
   );
 }
@@ -1454,9 +1480,13 @@ function CustomServerForm({
   onRemove: () => void;
   onDone: () => void;
 }) {
+  const { t } = useLingui();
+  const savedStatus: SaveStatus = { kind: "saved", text: t`Saved` };
   const [status, setStatus] = useState<SaveStatus>(
-    added ? { kind: "saved", text: "Server added" } : IDLE,
+    added ? { kind: "saved", text: t`Server added` } : IDLE,
   );
+  const serverName = s.name || s.host || t`server`;
+  const removeLabel = t`Remove ${serverName}`;
   return (
     <>
       <div className="flex-1 space-y-3 overflow-y-auto p-4">
@@ -1464,7 +1494,7 @@ function CustomServerForm({
           server={s}
           onChange={(patch) => {
             onChange(patch);
-            setStatus(SAVED);
+            setStatus(savedStatus);
           }}
         />
         <div className="border-t border-border pt-3">
@@ -1472,9 +1502,9 @@ function CustomServerForm({
             variant="outline"
             size="sm"
             onClick={onRemove}
-            aria-label={`Remove ${s.name || s.host || "server"}`}
+            aria-label={removeLabel}
           >
-            <Trash2 /> Remove server
+            <Trash2 /> <Trans>Remove server</Trans>
           </Button>
         </div>
       </div>
@@ -1491,17 +1521,18 @@ function ServerFields({
   server: LobbyServer;
   onChange: (patch: Partial<LobbyServer>) => void;
 }) {
+  const { t } = useLingui();
   return (
     <>
-      <Field label="Name">
+      <Field label={t`Name`}>
         <Input
           value={s.name}
           onChange={(e) => onChange({ name: e.target.value })}
-          placeholder="My server"
+          placeholder={t`My server`}
         />
       </Field>
       <div className="grid grid-cols-3 gap-2">
-        <Field label="Host" className="col-span-2">
+        <Field label={t`Host`} className="col-span-2">
           <Input
             value={s.host}
             onChange={(e) => onChange({ host: e.target.value })}
@@ -1510,7 +1541,7 @@ function ServerFields({
             {...identifierFieldProps}
           />
         </Field>
-        <Field label="Port">
+        <Field label={t`Port`}>
           <Input
             type="number"
             min={1}
@@ -1522,28 +1553,28 @@ function ServerFields({
       </div>
       <div className="flex flex-col gap-2">
         <CheckField
-          label="Use TLS"
+          label={t`Use TLS`}
           checked={s.tls}
           onChange={(v) => onChange({ tls: v })}
         />
         {s.tls && (
           <Field
-            label="TLS mode"
-            hint="uberserver upgrades in-band on its plain port. teiserver's 8201 is encrypted from the first byte."
+            label={t`TLS mode`}
+            hint={t`uberserver upgrades in-band on its plain port. teiserver's 8201 is encrypted from the first byte.`}
           >
             <OptionSelect
               value={s.tlsStyle ?? "stls"}
               onValueChange={(v) => onChange({ tlsStyle: v as TlsStyle })}
               options={[
-                { value: "stls", label: "Upgrade with STLS" },
-                { value: "direct", label: "Direct (TLS from the first byte)" },
+                { value: "stls", label: t`Upgrade with STLS` },
+                { value: "direct", label: t`Direct (TLS from the first byte)` },
               ]}
             />
           </Field>
         )}
         <CheckField
-          label="Allow self-signed certificate"
-          hint="uberserver ships one; teiserver does not."
+          label={t`Allow self-signed certificate`}
+          hint={t`uberserver ships one; teiserver does not.`}
           checked={s.allowSelfSigned}
           onChange={(v) => onChange({ allowSelfSigned: v })}
         />

@@ -1,3 +1,4 @@
+import { plural, t } from "@lingui/core/macro";
 import type { GameItem, UnitDatasetEntry } from "@/content/bindings";
 import {
   unitsyncFactionLogos,
@@ -475,7 +476,7 @@ async function sweepOneGame(
   if (affordable <= 0) {
     return {
       ...surveyed,
-      stopped: `Coilbox has already sent this hour's pictures for ${shortname}.`,
+      stopped: t`Coilbox has already sent this hour's pictures for ${shortname}.`,
     };
   }
 
@@ -720,9 +721,9 @@ export const rememberSweptAt = sweptAt.rememberSweptAt;
  * that is the one that says whether pressing the button again is worth anything.
  */
 export function pictureSweepSummary(report: PictureSweepReport): string {
-  if (report.found === 0) return "Coilbox found no games to draw.";
+  if (report.found === 0) return t`Coilbox found no games to draw.`;
   if (report.games.length === 0) {
-    return "Coilbox found no released games to draw. Only released games are sent, not the ones you are working on.";
+    return t`Coilbox found no released games to draw. Only released games are sent, not the ones you are working on.`;
   }
 
   const written = report.games.reduce((sum, one) => sum + one.written, 0);
@@ -734,18 +735,24 @@ export function pictureSweepSummary(report: PictureSweepReport): string {
   const logoNote =
     logos === 0
       ? ""
-      : logos === 1
-        ? " Sent one faction logo."
-        : ` Sent ${logos} faction logos.`;
+      : ` ${plural(logos, {
+          one: "Sent one faction logo.",
+          other: "Sent # faction logos.",
+        })}`;
 
   if (written === 0 && left === 0) {
-    return `The hub already has a picture of every unit in your games.${logoNote}`;
+    return `${t`The hub already has a picture of every unit in your games.`}${logoNote}`;
   }
-  const sent =
-    written === 1 ? "Sent one picture." : `Sent ${written} pictures.`;
+  const sent = plural(written, {
+    one: "Sent one picture.",
+    other: "Sent # pictures.",
+  });
   if (left === 0) {
-    return `${sent}${logoNote} The hub now has every unit in your games.`;
+    return `${sent}${logoNote} ${t`The hub now has every unit in your games.`}`;
   }
-  const units = left === 1 ? "unit is" : "units are";
-  return `${sent}${logoNote} ${left} more ${units} still waiting. Press it again later to carry on.`;
+  const waiting = plural(left, {
+    one: "# more unit is still waiting.",
+    other: "# more units are still waiting.",
+  });
+  return `${sent}${logoNote} ${waiting} ${t`Press it again later to carry on.`}`;
 }

@@ -1,3 +1,4 @@
+import { Trans, useLingui } from "@lingui/react/macro";
 import { Button, Input } from "@picoframe/frame";
 import { Check, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
@@ -26,6 +27,7 @@ export function ChannelBrowser({
   onClose: () => void;
   onJoined: (name: string) => void;
 }) {
+  const { t } = useLingui();
   const { requestJoinChannel } = useMultiplayer();
   const mirror = useConnection(serverKey)?.mirror;
   const [loading, setLoading] = useState(false);
@@ -53,8 +55,8 @@ export function ChannelBrowser({
     // Failsafe: if the server never sends ENDOFCHANNELS, resolve to the empty
     // state rather than spinning forever. The completion counter clears it first
     // in the normal case.
-    const t = setTimeout(() => setLoading(false), 4000);
-    return () => clearTimeout(t);
+    const timer = setTimeout(() => setLoading(false), 4000);
+    return () => clearTimeout(timer);
   }, [open, serverKey]);
 
   // Completion (channelListReceived advances the counter) ends loading, so an
@@ -92,7 +94,7 @@ export function ChannelBrowser({
       {open && (
         <button
           type="button"
-          aria-label="Close channel browser"
+          aria-label={t`Close channel browser`}
           className="absolute inset-0 z-10 bg-black/20"
           onClick={onClose}
         />
@@ -104,16 +106,18 @@ export function ChannelBrowser({
         inert={!open}
       >
         <header className="flex items-center justify-between border-b border-border px-4 py-3">
-          <h2 className="text-sm font-semibold">Browse channels</h2>
+          <h2 className="text-sm font-semibold">
+            <Trans>Browse channels</Trans>
+          </h2>
           <div className="flex items-center gap-1">
             <Button variant="secondary" className="h-7 px-2" onClick={refresh}>
-              Refresh
+              <Trans>Refresh</Trans>
             </Button>
             <Button
               variant="secondary"
               className="h-7 px-2"
               onClick={onClose}
-              aria-label="Close"
+              aria-label={t`Close`}
             >
               <X className="size-4" />
             </Button>
@@ -129,8 +133,8 @@ export function ChannelBrowser({
           <Input
             value={newName}
             onChange={(e) => setNewName(e.target.value)}
-            placeholder="Join or create a channel…"
-            aria-label="Channel name to join or create"
+            placeholder={t`Join or create a channel…`}
+            aria-label={t`Channel name to join or create`}
             className="h-7"
             {...identifierFieldProps}
           />
@@ -139,16 +143,18 @@ export function ChannelBrowser({
             className="h-7 px-2"
             disabled={newName.trim() === ""}
           >
-            Join
+            <Trans>Join</Trans>
           </Button>
         </form>
         <ul className="flex flex-col gap-1 overflow-auto p-3">
           {loading && directory.length === 0 && (
-            <li className="text-sm text-muted-foreground">Loading channels…</li>
+            <li className="text-sm text-muted-foreground">
+              <Trans>Loading channels…</Trans>
+            </li>
           )}
           {!loading && directory.length === 0 && (
             <li className="text-sm text-muted-foreground">
-              No channels found.
+              <Trans>No channels found.</Trans>
             </li>
           )}
           {directory.map((c) => {
@@ -174,11 +180,11 @@ export function ChannelBrowser({
                 {isJoined ? (
                   <span className="flex shrink-0 items-center gap-1 px-2 text-xs text-muted-foreground">
                     <Check className="size-3.5" />
-                    Joined
+                    <Trans>Joined</Trans>
                   </span>
                 ) : (
                   <Button className="h-7 px-2" onClick={() => join(c.name)}>
-                    Join
+                    <Trans>Join</Trans>
                   </Button>
                 )}
               </li>

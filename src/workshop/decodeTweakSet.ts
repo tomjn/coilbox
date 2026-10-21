@@ -11,6 +11,7 @@
  * decode drawer can offer: new units for the ones with a shape, and
  * read-only Lua for the ones without.
  */
+import { t } from "@lingui/core/macro";
 import { defineCommand } from "@picoframe/plugin-sdk";
 import { checkCloneName, type UnitClone } from "./clones";
 import type { ReadOnlyLuaBlock } from "./readOnlyLua";
@@ -154,10 +155,10 @@ export function planProjectFromDecoded(set: DecodedTweakSet): {
     if (!slot.lua) continue; // `slot.error` already says why nothing decoded.
     const note =
       slot.form === "block"
-        ? "Decoded as a program (loops or conditionals), not a data table, so it is carried as Lua rather than turned into edits. It is compiled into the output as it stands, ahead of this project's own changes."
+        ? t`Decoded as a program (loops or conditionals), not a data table, so it is carried as Lua rather than turned into edits. It is compiled into the output as it stands, ahead of this project's own changes.`
         : slot.error
           ? slot.error
-          : "This slot did not decode to a shape coilbox could read into a project, and it did not parse as Lua either, so it is kept for reference and left out of the compiled output.";
+          : t`This slot did not decode to a shape coilbox could read into a project, and it did not parse as Lua either, so it is kept for reference and left out of the compiled output.`;
     readOnlyLua.push({
       title: slotTitle(slot),
       lua: slot.lua,

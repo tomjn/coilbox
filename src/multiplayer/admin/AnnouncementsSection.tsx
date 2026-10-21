@@ -1,3 +1,6 @@
+import type { MessageDescriptor } from "@lingui/core";
+import { msg } from "@lingui/core/macro";
+import { Trans, useLingui } from "@lingui/react/macro";
 import { Button, Input } from "@picoframe/frame";
 import { useState } from "react";
 import { OptionSelect } from "@/components/OptionSelect";
@@ -13,19 +16,18 @@ import { ToolGroup, ToolHeader } from "./ToolHeader";
 
 type Kind = "broadcast" | "broadcastex" | "adminBroadcast";
 
-const KIND_OPTIONS: { value: Kind; label: string }[] = [
-  { value: "broadcast", label: "Broadcast" },
-  { value: "broadcastex", label: "Broadcast (dialog)" },
-  { value: "adminBroadcast", label: "Admin broadcast" },
+const KIND_OPTIONS: { value: Kind; label: MessageDescriptor }[] = [
+  { value: "broadcast", label: msg`Broadcast` },
+  { value: "broadcastex", label: msg`Broadcast (dialog)` },
+  { value: "adminBroadcast", label: msg`Admin broadcast` },
 ];
 
 /** How each kind looks to the player it reaches, read out beside the picker
  * (issue #2788). */
-const KIND_DESCRIPTION: Record<Kind, string> = {
-  broadcast: "Every player sees it as a Staff announcement toast.",
-  broadcastex: "Every player sees it as a dialog box they must dismiss.",
-  adminBroadcast:
-    "Only online admins, including you, see it as a server message.",
+const KIND_DESCRIPTION: Record<Kind, MessageDescriptor> = {
+  broadcast: msg`Every player sees it as a Staff announcement toast.`,
+  broadcastex: msg`Every player sees it as a dialog box they must dismiss.`,
+  adminBroadcast: msg`Only online admins, including you, see it as a server message.`,
 };
 
 const KIND_COMMAND: Record<Kind, string> = {
@@ -59,22 +61,31 @@ function AnnouncementStatus({
   kind: Kind;
   request: ReturnType<typeof useAdminRequest>;
 }) {
+  const { t } = useLingui();
   return (
     <AdminRequestStatus
       state={request.state}
       unanswered={
         kind === "adminBroadcast"
-          ? "The server did not answer."
-          : "Sent. Nothing replies to confirm a player saw it."
+          ? t`The server did not answer.`
+          : t`Sent. Nothing replies to confirm a player saw it.`
       }
     >
-      {(reply) =>
-        reply.shape === "adminBroadcast" ? (
-          <span>Sent. The server echoed back: {reply.message}</span>
-        ) : (
-          <span>Sent.</span>
-        )
-      }
+      {(reply) => {
+        if (reply.shape !== "adminBroadcast") {
+          return (
+            <span>
+              <Trans>Sent.</Trans>
+            </span>
+          );
+        }
+        const echo = reply.message;
+        return (
+          <span>
+            <Trans>Sent. The server echoed back: {echo}</Trans>
+          </span>
+        );
+      }}
     </AdminRequestStatus>
   );
 }
@@ -98,6 +109,7 @@ function AnnouncementStatus({
  * as its own answer.
  */
 export function AnnouncementsSection({ serverKey }: { serverKey: string }) {
+  const { t, i18n } = useLingui();
   const [kind, setKind] = useState<Kind>("broadcast");
   const [sentKind, setSentKind] = useState<Kind>("broadcast");
   const [message, setMessage] = useState("");
@@ -113,29 +125,32 @@ export function AnnouncementsSection({ serverKey }: { serverKey: string }) {
   return (
     <section className="flex flex-col gap-6">
       <ToolHeader
-        title="Announcements"
-        description="Message every player, or every online admin, at once."
+        title={t`Announcements`}
+        description={t`Message every player, or every online admin, at once.`}
       />
-      <ToolGroup title="Announcement">
+      <ToolGroup title={t`Announcement`}>
         <span className="flex max-w-xs flex-col gap-1 text-xs text-muted-foreground">
-          Kind
+          <Trans>Kind</Trans>
           <OptionSelect
             value={kind}
             onValueChange={(value) => setKind(value as Kind)}
-            options={KIND_OPTIONS}
-            ariaLabel="Announcement kind"
+            options={KIND_OPTIONS.map((o) => ({
+              value: o.value,
+              label: i18n._(o.label),
+            }))}
+            ariaLabel={t`Announcement kind`}
             size="sm"
           />
         </span>
         <p className="text-xs text-muted-foreground">
-          {KIND_DESCRIPTION[kind]}
+          {i18n._(KIND_DESCRIPTION[kind])}
         </p>
         <span className="flex flex-col gap-1 text-xs text-muted-foreground">
-          Message
+          <Trans>Message</Trans>
           <Input
             value={message}
             onChange={(event) => setMessage(event.target.value)}
-            aria-label="Announcement message"
+            aria-label={t`Announcement message`}
             className="h-8"
           />
         </span>
@@ -149,14 +164,18 @@ export function AnnouncementsSection({ serverKey }: { serverKey: string }) {
                 className="h-8 self-start"
                 disabled={!canSubmit}
               >
-                Send…
+                <Trans>Send…</Trans>
               </Button>
             </PopoverTrigger>
             <PopoverContent align="start" className="flex w-80 flex-col gap-3">
               <div className="flex flex-col gap-1">
-                <h3 className="text-sm font-medium">Send to every player?</h3>
+                <h3 className="text-sm font-medium">
+                  <Trans>Send to every player?</Trans>
+                </h3>
                 <p className="text-xs text-muted-foreground">
-                  uberserver relays it immediately, with no way to unsend it.
+                  <Trans>
+                    uberserver relays it immediately, with no way to unsend it.
+                  </Trans>
                 </p>
               </div>
               <div className="flex justify-end">
@@ -168,7 +187,7 @@ export function AnnouncementsSection({ serverKey }: { serverKey: string }) {
                   disabled={!canSubmit || request.state.status === "sending"}
                   onClick={send}
                 >
-                  Send
+                  <Trans>Send</Trans>
                 </Button>
               </div>
               <AnnouncementStatus kind={sentKind} request={request} />
@@ -183,7 +202,7 @@ export function AnnouncementsSection({ serverKey }: { serverKey: string }) {
               disabled={!canSubmit || request.state.status === "sending"}
               onClick={send}
             >
-              Send
+              <Trans>Send</Trans>
             </Button>
             <AnnouncementStatus kind={sentKind} request={request} />
           </>

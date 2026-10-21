@@ -1,3 +1,6 @@
+import type { MessageDescriptor } from "@lingui/core";
+import { msg } from "@lingui/core/macro";
+import { Trans, useLingui } from "@lingui/react/macro";
 import { Button, Input } from "@picoframe/frame";
 import { TriangleAlert } from "lucide-react";
 import { useEffect, useState } from "react";
@@ -38,49 +41,73 @@ function BansTable({
   entries: BanEntry[];
   onLift: (target: string) => void;
 }) {
+  const { t } = useLingui();
   if (entries.length === 0) {
-    return <p className="text-sm text-muted-foreground">No one is banned.</p>;
+    return (
+      <p className="text-sm text-muted-foreground">
+        <Trans>No one is banned.</Trans>
+      </p>
+    );
   }
   return (
     <Table className="text-foreground">
       <TableHeader>
         <TableRow>
-          <TableHead>Username</TableHead>
-          <TableHead>IP</TableHead>
-          <TableHead>Email</TableHead>
-          <TableHead>Reason</TableHead>
-          <TableHead>Ends</TableHead>
-          <TableHead>Issuer</TableHead>
           <TableHead>
-            <span className="sr-only">Actions</span>
+            <Trans>Username</Trans>
+          </TableHead>
+          <TableHead>
+            <Trans>IP</Trans>
+          </TableHead>
+          <TableHead>
+            <Trans>Email</Trans>
+          </TableHead>
+          <TableHead>
+            <Trans>Reason</Trans>
+          </TableHead>
+          <TableHead>
+            <Trans>Ends</Trans>
+          </TableHead>
+          <TableHead>
+            <Trans>Issuer</Trans>
+          </TableHead>
+          <TableHead>
+            <span className="sr-only">
+              <Trans>Actions</Trans>
+            </span>
           </TableHead>
         </TableRow>
       </TableHeader>
       <TableBody>
-        {entries.map((entry) => (
-          <TableRow
-            key={`${entry.username}-${entry.ip}-${entry.email}-${entry.ends}-${entry.issuer}`}
-          >
-            <TableCell>{dash(entry.username)}</TableCell>
-            <TableCell>{dash(entry.ip)}</TableCell>
-            <TableCell>{dash(entry.email)}</TableCell>
-            <TableCell className="whitespace-normal">{entry.reason}</TableCell>
-            <TableCell className="whitespace-normal">{entry.ends}</TableCell>
-            <TableCell>{entry.issuer}</TableCell>
-            <TableCell className="text-right">
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                className="h-7"
-                aria-label={`Lift ban on ${unbanTarget(entry)}…`}
-                onClick={() => onLift(unbanTarget(entry))}
-              >
-                Lift…
-              </Button>
-            </TableCell>
-          </TableRow>
-        ))}
+        {entries.map((entry) => {
+          const target = unbanTarget(entry);
+          return (
+            <TableRow
+              key={`${entry.username}-${entry.ip}-${entry.email}-${entry.ends}-${entry.issuer}`}
+            >
+              <TableCell>{dash(entry.username)}</TableCell>
+              <TableCell>{dash(entry.ip)}</TableCell>
+              <TableCell>{dash(entry.email)}</TableCell>
+              <TableCell className="whitespace-normal">
+                {entry.reason}
+              </TableCell>
+              <TableCell className="whitespace-normal">{entry.ends}</TableCell>
+              <TableCell>{entry.issuer}</TableCell>
+              <TableCell className="text-right">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="h-7"
+                  aria-label={t`Lift ban on ${target}…`}
+                  onClick={() => onLift(unbanTarget(entry))}
+                >
+                  <Trans>Lift…</Trans>
+                </Button>
+              </TableCell>
+            </TableRow>
+          );
+        })}
       </TableBody>
     </Table>
   );
@@ -103,6 +130,7 @@ function BanForm({
   username: string;
   onChanged: () => void;
 }) {
+  const { t } = useLingui();
   const [name, setName] = useState(username);
   const [days, setDays] = useState("1");
   const [reason, setReason] = useState("");
@@ -117,7 +145,9 @@ function BanForm({
 
   return (
     <fieldset className="flex flex-col gap-3">
-      <legend className="sr-only">Ban an account</legend>
+      <legend className="sr-only">
+        <Trans>Ban an account</Trans>
+      </legend>
       <form
         className="flex flex-col gap-3"
         onSubmit={(event) => {
@@ -131,22 +161,22 @@ function BanForm({
         }}
       >
         <span className="flex flex-col gap-1 text-xs text-muted-foreground">
-          Username
+          <Trans>Username</Trans>
           <Input
             value={name}
             onChange={(event) => setName(event.target.value)}
-            aria-label="Username"
+            aria-label={t`Username`}
             className="h-8"
             {...identifierFieldProps}
           />
         </span>
         <DaysField value={days} onChange={setDays} />
         <span className="flex flex-col gap-1 text-xs text-muted-foreground">
-          Reason
+          <Trans>Reason</Trans>
           <Input
             value={reason}
             onChange={(event) => setReason(event.target.value)}
-            aria-label="Reason"
+            aria-label={t`Reason`}
             className="h-8"
           />
         </span>
@@ -157,13 +187,10 @@ function BanForm({
           className="h-8 self-start"
           disabled={!canSubmit}
         >
-          Ban account
+          <Trans>Ban account</Trans>
         </Button>
       </form>
-      <AdminRequestStatus
-        state={ban.state}
-        unanswered="The server did not answer."
-      >
+      <AdminRequestStatus state={ban.state}>
         {(reply) => (reply.shape === "ban" ? reply.message : null)}
       </AdminRequestStatus>
     </fieldset>
@@ -181,6 +208,7 @@ function BanSpecificForm({
   serverKey: string;
   onChanged: () => void;
 }) {
+  const { t } = useLingui();
   const [target, setTarget] = useState("");
   const [days, setDays] = useState("1");
   const [reason, setReason] = useState("");
@@ -191,7 +219,9 @@ function BanSpecificForm({
 
   return (
     <fieldset className="flex flex-col gap-3">
-      <legend className="sr-only">Ban a specific username, IP or email</legend>
+      <legend className="sr-only">
+        <Trans>Ban a specific username, IP or email</Trans>
+      </legend>
       <form
         className="flex flex-col gap-3"
         onSubmit={(event) => {
@@ -209,22 +239,22 @@ function BanSpecificForm({
         }}
       >
         <span className="flex flex-col gap-1 text-xs text-muted-foreground">
-          Username, IP or email
+          <Trans>Username, IP or email</Trans>
           <Input
             value={target}
             onChange={(event) => setTarget(event.target.value)}
-            aria-label="Username, IP or email to ban"
+            aria-label={t`Username, IP or email to ban`}
             className="h-8"
             {...identifierFieldProps}
           />
         </span>
         <DaysField value={days} onChange={setDays} />
         <span className="flex flex-col gap-1 text-xs text-muted-foreground">
-          Reason
+          <Trans>Reason</Trans>
           <Input
             value={reason}
             onChange={(event) => setReason(event.target.value)}
-            aria-label="Reason"
+            aria-label={t`Reason`}
             className="h-8"
           />
         </span>
@@ -235,13 +265,10 @@ function BanSpecificForm({
           className="h-8 self-start"
           disabled={!canSubmit}
         >
-          Ban target
+          <Trans>Ban target</Trans>
         </Button>
       </form>
-      <AdminRequestStatus
-        state={banSpecific.state}
-        unanswered="The server did not answer."
-      >
+      <AdminRequestStatus state={banSpecific.state}>
         {(reply) => (reply.shape === "banSpecific" ? reply.message : null)}
       </AdminRequestStatus>
     </fieldset>
@@ -262,20 +289,25 @@ function UnbanForm({
   initialTarget: string;
   onChanged: () => void;
 }) {
+  const { t } = useLingui();
   const [target, setTarget] = useState(initialTarget);
   const unban = useAdminRequest(serverKey);
 
   return (
     <fieldset className="flex flex-col gap-3">
-      <legend className="sr-only">Lift a ban</legend>
+      <legend className="sr-only">
+        <Trans>Lift a ban</Trans>
+      </legend>
       <Alert>
         <TriangleAlert />
         <AlertTitle className="line-clamp-none">
-          Lifting by IP or email lifts every ban on it
+          <Trans>Lifting by IP or email lifts every ban on it</Trans>
         </AlertTitle>
         <AlertDescription>
-          Not only the row you had in mind. uberserver removes every ban
-          matching the username, IP or email you give it.
+          <Trans>
+            Not only the row you had in mind. uberserver removes every ban
+            matching the username, IP or email you give it.
+          </Trans>
         </AlertDescription>
       </Alert>
       <form
@@ -289,11 +321,11 @@ function UnbanForm({
         }}
       >
         <span className="flex flex-1 flex-col gap-1 text-xs text-muted-foreground">
-          Username, IP or email
+          <Trans>Username, IP or email</Trans>
           <Input
             value={target}
             onChange={(event) => setTarget(event.target.value)}
-            aria-label="Username, IP or email to unban"
+            aria-label={t`Username, IP or email to unban`}
             className="h-8"
             {...identifierFieldProps}
           />
@@ -304,13 +336,10 @@ function UnbanForm({
           className="h-8"
           disabled={target.trim() === ""}
         >
-          Lift ban
+          <Trans>Lift ban</Trans>
         </Button>
       </form>
-      <AdminRequestStatus
-        state={unban.state}
-        unanswered="The server did not answer."
-      >
+      <AdminRequestStatus state={unban.state}>
         {(reply) => (reply.shape === "unban" ? reply.message : null)}
       </AdminRequestStatus>
     </fieldset>
@@ -323,10 +352,10 @@ type BansDrawer =
   | { kind: "banSpecific" }
   | { kind: "unban"; target: string };
 
-const DRAWER_TITLES: Record<BansDrawer["kind"], string> = {
-  ban: "Ban an account",
-  banSpecific: "Ban a specific username, IP or email",
-  unban: "Lift a ban",
+const DRAWER_TITLES: Record<BansDrawer["kind"], MessageDescriptor> = {
+  ban: msg`Ban an account`,
+  banSpecific: msg`Ban a specific username, IP or email`,
+  unban: msg`Lift a ban`,
 };
 
 /**
@@ -343,6 +372,7 @@ const DRAWER_TITLES: Record<BansDrawer["kind"], string> = {
  * pinned to this tool so the page stays here once `?ban=` is gone.
  */
 export function BansSection({ serverKey }: { serverKey: string }) {
+  const { t, i18n } = useLingui();
   const [params, setParams] = useSearchParams();
   const banParam = params.get("ban");
   const [banTarget, setBanTarget] = useState(banParam ?? "");
@@ -381,8 +411,8 @@ export function BansSection({ serverKey }: { serverKey: string }) {
   return (
     <section className="flex flex-col gap-4">
       <ToolHeader
-        title="Bans"
-        description="There is no command to change a ban's reason or length. Lift it and ban again instead."
+        title={t`Bans`}
+        description={t`There is no command to change a ban's reason or length. Lift it and ban again instead.`}
         actions={
           <>
             <Button
@@ -392,7 +422,7 @@ export function BansSection({ serverKey }: { serverKey: string }) {
               className="h-8"
               onClick={() => setDrawer({ kind: "banSpecific" })}
             >
-              Ban IP or email…
+              <Trans>Ban IP or email…</Trans>
             </Button>
             <Button
               type="button"
@@ -401,7 +431,7 @@ export function BansSection({ serverKey }: { serverKey: string }) {
               className="h-8"
               onClick={() => setDrawer({ kind: "unban", target: "" })}
             >
-              Lift a ban…
+              <Trans>Lift a ban…</Trans>
             </Button>
             <Button
               type="button"
@@ -412,15 +442,12 @@ export function BansSection({ serverKey }: { serverKey: string }) {
                 setDrawer({ kind: "ban" });
               }}
             >
-              Ban an account…
+              <Trans>Ban an account…</Trans>
             </Button>
           </>
         }
       />
-      <AdminRequestStatus
-        state={list.state}
-        unanswered="The server did not answer."
-      >
+      <AdminRequestStatus state={list.state}>
         {(reply) =>
           reply.shape === "banList" ? (
             <BansTable
@@ -432,7 +459,7 @@ export function BansSection({ serverKey }: { serverKey: string }) {
       </AdminRequestStatus>
       <SlideDrawer
         open={drawer !== null}
-        title={drawer ? DRAWER_TITLES[drawer.kind] : ""}
+        title={drawer ? i18n._(DRAWER_TITLES[drawer.kind]) : ""}
         onClose={() => setDrawer(null)}
       >
         <DrawerBody>

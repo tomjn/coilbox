@@ -1,3 +1,4 @@
+import { Trans, useLingui } from "@lingui/react/macro";
 import { Button, Input } from "@picoframe/frame";
 import { useEffect, useState } from "react";
 import {
@@ -33,6 +34,7 @@ export function VerificationCodeDialog() {
     cancelAgreement,
     connections,
   } = useMultiplayer();
+  const { t } = useLingui();
   const servers = useProtocolServers();
   const [code, setCode] = useState("");
   const [busy, setBusy] = useState(false);
@@ -85,17 +87,27 @@ export function VerificationCodeDialog() {
       >
         <DialogHeader>
           <DialogTitle>
-            {wantsCode
-              ? "Enter verification code"
-              : "Accept the server's terms"}
+            {wantsCode ? (
+              <Trans>Enter verification code</Trans>
+            ) : (
+              <Trans>Accept the server's terms</Trans>
+            )}
           </DialogTitle>
           {serverName ? (
             <p className="text-xs text-muted-foreground">{serverName}</p>
           ) : null}
           <DialogDescription>
-            {wantsCode
-              ? "The server sent a verification code to finish signing in. Enter it below to continue."
-              : "The server asks you to accept its terms before you sign in for the first time."}
+            {wantsCode ? (
+              <Trans>
+                The server sent a verification code to finish signing in. Enter
+                it below to continue.
+              </Trans>
+            ) : (
+              <Trans>
+                The server asks you to accept its terms before you sign in for
+                the first time.
+              </Trans>
+            )}
           </DialogDescription>
         </DialogHeader>
         {pendingAgreement?.text ? (
@@ -117,8 +129,8 @@ export function VerificationCodeDialog() {
             onChange={(e) => setCode(e.target.value)}
             placeholder={
               wantsCode
-                ? "Verification code"
-                : "Verification code, if you were sent one"
+                ? t`Verification code`
+                : t`Verification code, if you were sent one`
             }
             autoFocus
             disabled={busy}
@@ -132,13 +144,13 @@ export function VerificationCodeDialog() {
               onClick={disconnect}
               disabled={busy}
             >
-              Disconnect
+              <Trans>Disconnect</Trans>
             </Button>
             <Button
               type="submit"
               disabled={busy || (wantsCode && code.trim() === "")}
             >
-              {wantsCode ? "Confirm" : "Accept"}
+              {wantsCode ? <Trans>Confirm</Trans> : <Trans>Accept</Trans>}
             </Button>
           </DialogFooter>
         </form>

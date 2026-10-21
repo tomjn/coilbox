@@ -1,3 +1,4 @@
+import { useLingui } from "@lingui/react/macro";
 import { Button } from "@picoframe/frame";
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router";
@@ -33,6 +34,7 @@ export function FriendBattleButton({
   status: FriendStatus;
   battleId: number;
 }) {
+  const { t } = useLingui();
   const connection = useConnection(serverKey);
   const { busy, clearJoinError } = useMultiplayer();
   const rule = useOneBattleRule(serverKey);
@@ -56,12 +58,12 @@ export function FriendBattleButton({
     } else if (joinError) {
       setWaiting(false);
       void notify({
-        title: "Could not join the battle",
+        title: t`Could not join the battle`,
         body: joinError,
         level: "error",
       });
     }
-  }, [waiting, joinedId, joinError, navigate, serverKey]);
+  }, [waiting, joinedId, joinError, navigate, serverKey, t]);
 
   const battle = state?.battles[String(battleId)];
   if (!battle) return null;
@@ -89,8 +91,10 @@ export function FriendBattleButton({
   const title =
     action.reason ??
     (action.kind === "watch"
-      ? "Joins the battle, where you can watch the running game"
+      ? t`Joins the battle, where you can watch the running game`
       : undefined);
+  const actionLabel = action.label;
+  const battleTitle = battle.title;
   const asks = !action.disabled && (action.asksPassword || !!leaves);
 
   if (asks) {
@@ -113,7 +117,7 @@ export function FriendBattleButton({
       className="h-6 px-2 text-xs"
       disabled={action.disabled || waiting}
       title={title}
-      aria-label={`${action.label} ${battle.title}`}
+      aria-label={t`${actionLabel} ${battleTitle}`}
       onClick={() => join()}
     >
       {action.label}

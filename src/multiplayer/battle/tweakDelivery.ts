@@ -29,6 +29,7 @@
  * sent it anyway would sit and wait for a confirmation that is never coming.
  */
 
+import { plural, t } from "@lingui/core/macro";
 import type { TweakSlotPack } from "@/workshop/tweakPack";
 import { MODOPT_PREFIX } from "./battleOptions";
 
@@ -320,9 +321,11 @@ export async function runDelivery(
     }
 
     if (!landed) {
+      const slotName = slot.name;
+      const seconds = Math.round(timeout / 1000);
       stop(
         i,
-        `The battle never came back with ${slot.name}, after ${Math.round(timeout / 1000)}s of waiting.`,
+        t`The battle never came back with ${slotName}, after ${seconds}s of waiting.`,
         said(),
       );
       break;
@@ -357,9 +360,15 @@ export function deliverySummary(progress: DeliveryProgress): string {
   const skipped = progress.slots.filter((s) => s.state === "skipped").length;
   if (!failed && skipped === 0) {
     return landed === 0
-      ? "Nothing to send: this battle already holds every slot."
-      : `All ${landed} slot${landed === 1 ? "" : "s"} are set on this battle.`;
+      ? t`Nothing to send: this battle already holds every slot.`
+      : plural(landed, {
+          one: "All # slot is set on this battle.",
+          other: "All # slots are set on this battle.",
+        });
   }
   const unsent = skipped + (failed ? 1 : 0);
-  return `${landed} slot${landed === 1 ? "" : "s"} landed and ${unsent} did not. This battle is holding part of a set, which the match will start on as it stands.`;
+  return plural(landed, {
+    one: `# slot landed and ${unsent} did not. This battle is holding part of a set, which the match will start on as it stands.`,
+    other: `# slots landed and ${unsent} did not. This battle is holding part of a set, which the match will start on as it stands.`,
+  });
 }

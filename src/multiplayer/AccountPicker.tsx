@@ -1,3 +1,4 @@
+import { useLingui } from "@lingui/react/macro";
 import { OptionSelect } from "@/components/OptionSelect";
 import { serverNameFor, useProtocolServers, usernameFromKey } from "./store";
 
@@ -16,13 +17,14 @@ export function AccountPicker({
   value: string;
   onChange: (serverKey: string) => void;
 }) {
+  const { t } = useLingui();
   const servers = useProtocolServers();
 
   return (
     <OptionSelect
       value={value}
       onValueChange={onChange}
-      ariaLabel="Account"
+      ariaLabel={t`Account`}
       options={keys.map((key) => ({
         value: key,
         label: `${usernameFromKey(key)} · ${serverNameFor(key, servers)}`,

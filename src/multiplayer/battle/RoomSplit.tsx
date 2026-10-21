@@ -11,6 +11,7 @@
  * out as it did before the handle existed.
  */
 
+import { useLingui } from "@lingui/react/macro";
 import { useSetting } from "@picoframe/frame";
 import {
   type CSSProperties,
@@ -194,6 +195,7 @@ export function RoomSplitHandle({
   controls,
   onChange,
 }: HandleProps) {
+  const { t } = useLingui();
   // Where the pointer went down and how tall the table was then, so a drag
   // tracks the pointer instead of accumulating rounding from each move.
   const start = useRef<{ y: number; height: number } | null>(null);
@@ -207,7 +209,7 @@ export function RoomSplitHandle({
       <div
         role="separator"
         aria-orientation="horizontal"
-        aria-label="Resize the player table and chat"
+        aria-label={t`Resize the player table and chat`}
         aria-controls={controls}
         aria-valuenow={height}
         aria-valuemin={TABLE_MIN}

@@ -7,11 +7,14 @@
  * the connection is fine. So this is the only thing the host has to read, and
  * dropping it left them pressing a button that did nothing (issue #1591).
  */
+
+import { t } from "@lingui/core/macro";
+
 export function hostBattleFailure(error: unknown): string {
   const raw = (
     error instanceof Error ? error.message : String(error ?? "")
   ).trim();
   return raw
-    ? `Could not host the battle: ${raw}`
-    : "Could not host the battle.";
+    ? t`Could not host the battle: ${raw}`
+    : t`Could not host the battle.`;
 }

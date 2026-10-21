@@ -26,6 +26,9 @@
  * fills it in the first time it opens the project against a game it can read.
  */
 
+import type { MessageDescriptor } from "@lingui/core";
+import { msg } from "@lingui/core/macro";
+import { Trans, useLingui } from "@lingui/react/macro";
 import { Button, Input, useDrawer, useSetting } from "@picoframe/frame";
 import { open } from "@tauri-apps/plugin-dialog";
 import { Plus, Search, SlidersHorizontal, Upload } from "lucide-react";
@@ -81,10 +84,10 @@ const SORT_KEY = "workshop.projectsSort";
 
 type ProjectSort = "updated-desc" | "name-asc" | "created-desc";
 
-const SORT_OPTIONS: { value: ProjectSort; label: string }[] = [
-  { value: "updated-desc", label: "Last changed" },
-  { value: "name-asc", label: "Name A–Z" },
-  { value: "created-desc", label: "Date created" },
+const SORT_OPTIONS: { value: ProjectSort; label: MessageDescriptor }[] = [
+  { value: "updated-desc", label: msg`Last changed` },
+  { value: "name-asc", label: msg`Name A–Z` },
+  { value: "created-desc", label: msg`Date created` },
 ];
 
 function sortProjects(list: ModProject[], sort: ProjectSort): ModProject[] {
@@ -141,6 +144,7 @@ function groupProjects(
 }
 
 export default function ProjectsPage() {
+  const { t } = useLingui();
   const [params] = useSearchParams();
   const navigate = useNavigate();
   const { selected } = useScanTargetSelection();
@@ -274,7 +278,7 @@ export default function ProjectsPage() {
   importRef.current = (code: string, hubItemId?: string) => {
     const imported = parseModProjectJson(code);
     if (!imported) {
-      setError("That link is not a coilbox tweak project.");
+      setError(t`That link is not a coilbox tweak project.`);
       return;
     }
     setError(null);
@@ -298,7 +302,7 @@ export default function ProjectsPage() {
   const openShare = async (project: ModProject) => {
     const { ShareProjectForm } = await import("./components/ShareProjectForm");
     drawer.open({
-      title: `Share ${project.name}`,
+      title: t`Share ${project.name}`,
       width: "28rem",
       content: (
         <ShareProjectForm
@@ -314,15 +318,15 @@ export default function ProjectsPage() {
     setError(null);
     try {
       const src = await open({
-        title: "Import tweak project",
+        title: t`Import tweak project`,
         multiple: false,
-        filters: [{ name: "Coilbox tweak project", extensions: ["json"] }],
+        filters: [{ name: t`Coilbox tweak project`, extensions: ["json"] }],
       });
       if (typeof src !== "string") return;
       const { text } = await importContainerFile({ src });
       const imported = parseModProjectJson(text);
       if (!imported) {
-        setError("That is not a coilbox tweak project.");
+        setError(t`That is not a coilbox tweak project.`);
         return;
       }
       navigate(projectPath(createProject(imported).id));
@@ -350,10 +354,10 @@ export default function ProjectsPage() {
         <PageHeader
           title={
             <>
-              <SlidersHorizontal size={18} /> Unit tweaks
+              <SlidersHorizontal size={18} /> <Trans>Unit tweaks</Trans>
             </>
           }
-          description="A project is one game's edits under a name, saved as you work and exportable as a file somebody else can open. Open one to change what its game's units cost, carry and can do."
+          description={t`A project is one game's edits under a name, saved as you work and exportable as a file somebody else can open. Open one to change what its game's units cost, carry and can do.`}
           actions={
             <>
               <DecodeTweakSetDrawer
@@ -373,11 +377,11 @@ export default function ProjectsPage() {
               />
               <Button size="sm" variant="secondary" onClick={onImport}>
                 <Upload className="mr-1 size-3.5" />
-                Import
+                <Trans>Import</Trans>
               </Button>
               <Button size="sm" onClick={() => setStarting(true)}>
                 <Plus className="mr-1 size-3.5" />
-                New project
+                <Trans>New project</Trans>
               </Button>
             </>
           }
@@ -403,7 +407,9 @@ export default function ProjectsPage() {
         ) : null}
 
         {projects.length === 0 ? (
-          <EmptyState label="No tweak projects yet. Start one against a game, or import one somebody sent you." />
+          <EmptyState
+            label={t`No tweak projects yet. Start one against a game, or import one somebody sent you.`}
+          />
         ) : (
           <>
             <div className="flex flex-wrap items-center gap-2">
@@ -416,22 +422,25 @@ export default function ProjectsPage() {
                   type="text"
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
-                  placeholder="Search projects…"
-                  aria-label="Search projects"
+                  placeholder={t`Search projects…`}
+                  aria-label={t`Search projects`}
                   className="h-9 pl-7"
                 />
               </div>
               <OptionSelect
                 value={sort}
                 onValueChange={(v) => setSort(v as ProjectSort)}
-                options={SORT_OPTIONS}
-                ariaLabel="Sort projects"
+                options={SORT_OPTIONS.map((o) => ({
+                  value: o.value,
+                  label: t(o.label),
+                }))}
+                ariaLabel={t`Sort projects`}
                 className="w-40"
               />
             </div>
 
             {visibleGroups.length === 0 ? (
-              <EmptyState label={`No projects match "${search.trim()}".`} />
+              <EmptyState label={t`No projects match "${search.trim()}".`} />
             ) : (
               visibleGroups.map((group) => (
                 <section key={group.key} className="flex flex-col gap-2">
@@ -476,7 +485,7 @@ export default function ProjectsPage() {
                           <span className="text-muted-foreground text-xs">
                             {describeEdits(project.edits)}
                             {when(project.updatedAt)
-                              ? ` · changed ${when(project.updatedAt)}`
+                              ? ` · ${t`changed ${when(project.updatedAt)}`}`
                               : ""}
                           </span>
                         </Link>
@@ -486,7 +495,7 @@ export default function ProjectsPage() {
                             onRename={() => setRenamingId(project.id)}
                             onDuplicate={() => {
                               const copy = duplicateProject(project.id);
-                              if (copy) setStatus(`Copied to "${copy.name}".`);
+                              if (copy) setStatus(t`Copied to "${copy.name}".`);
                             }}
                             onShare={() => void openShare(project)}
                             onDelete={() => {

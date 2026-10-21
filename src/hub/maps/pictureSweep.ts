@@ -1,3 +1,5 @@
+import type { MessageDescriptor } from "@lingui/core";
+import { msg, plural, t } from "@lingui/core/macro";
 import type {
   MapMinimapRow,
   MapMinimapSkip,
@@ -259,8 +261,7 @@ async function sweep(
   if (room <= 0) {
     return {
       ...surveyedReport,
-      stopped:
-        "Coilbox has already sent this hour's map pictures. Press it again later to carry on.",
+      stopped: t`Coilbox has already sent this hour's map pictures. Press it again later to carry on.`,
     };
   }
   const sending = wanted.slice(0, room);
@@ -347,17 +348,17 @@ const MINIMAP_SKIP_ORDER: readonly MapMinimapSkip[] = [
   "not-written",
 ];
 
-const MINIMAP_SKIP_CLAUSES: Record<MapMinimapSkip, string> = {
-  "no-source": "with no minimap to draw",
-  "duplicate-map": "listed twice in the library",
-  "working-folder": "in a loose working folder",
-  blank: "with a minimap that is one flat colour",
-  "no-extent": "whose size coilbox could not work out",
-  "no-bounds": "whose bounds coilbox could not read",
-  "read-failed": "coilbox could not read",
-  "encode-failed": "whose picture coilbox could not encode",
-  "too-large": "whose picture would be too large to send",
-  "not-written": "whose picture could not be saved",
+const MINIMAP_SKIP_CLAUSES: Record<MapMinimapSkip, MessageDescriptor> = {
+  "no-source": msg`with no minimap to draw`,
+  "duplicate-map": msg`listed twice in the library`,
+  "working-folder": msg`in a loose working folder`,
+  blank: msg`with a minimap that is one flat colour`,
+  "no-extent": msg`whose size coilbox could not work out`,
+  "no-bounds": msg`whose bounds coilbox could not read`,
+  "read-failed": msg`coilbox could not read`,
+  "encode-failed": msg`whose picture coilbox could not encode`,
+  "too-large": msg`whose picture would be too large to send`,
+  "not-written": msg`whose picture could not be saved`,
 };
 
 /** What to tell somebody about the maps a sweep skipped, in one sentence, or
@@ -381,30 +382,32 @@ export function mapPictureSweepSummary(report: MapPictureSweepReport): string {
   const say = (sentence: string): string =>
     skipNote ? `${sentence} ${skipNote}` : sentence;
 
-  if (report.read === 0) return say("Coilbox found no maps to draw.");
+  if (report.read === 0) return say(t`Coilbox found no maps to draw.`);
   const whole = report.skipped.length === 0;
   if (report.wanted === 0) {
     return say(
       whole
-        ? "The hub already has a picture of every map on this computer."
-        : "The hub already has a picture of every map coilbox could draw one for.",
+        ? t`The hub already has a picture of every map on this computer.`
+        : t`The hub already has a picture of every map coilbox could draw one for.`,
     );
   }
-  const sent =
-    report.sent === 0
-      ? "Sent no pictures."
-      : report.sent === 1
-        ? "Sent one map's picture."
-        : `Sent ${report.sent} maps' pictures.`;
+  const sentCount = report.sent;
+  const sent = plural(sentCount, {
+    0: "Sent no pictures.",
+    one: "Sent one map's picture.",
+    other: "Sent # maps' pictures.",
+  });
   if (report.left === 0) {
     return say(
       whole
-        ? `${sent} The hub now has a picture of every map on this computer.`
-        : `${sent} The hub now has a picture of every map coilbox could draw one for.`,
+        ? `${sent} ${t`The hub now has a picture of every map on this computer.`}`
+        : `${sent} ${t`The hub now has a picture of every map coilbox could draw one for.`}`,
     );
   }
-  const maps = report.left === 1 ? "map is" : "maps are";
-  return say(
-    `${sent} ${report.left} more ${maps} still waiting. Press it again later to carry on.`,
-  );
+  const leftCount = report.left;
+  const waiting = plural(leftCount, {
+    one: "# more map is still waiting.",
+    other: "# more maps are still waiting.",
+  });
+  return say(`${sent} ${waiting} ${t`Press it again later to carry on.`}`);
 }

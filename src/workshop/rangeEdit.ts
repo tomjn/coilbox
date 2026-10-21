@@ -30,6 +30,7 @@
  * what keeps a bulk change to one undo step.
  */
 
+import { t } from "@lingui/core/macro";
 import {
   applyBatchOperation,
   applyBatchRounding,
@@ -118,14 +119,15 @@ export interface RangeEditContext {
  *  anything (the same fallback `WeaponSlotsPanel.tsx`'s `slotTitle` draws the
  *  slot button with). */
 function weaponLabel(slot: WeaponSlot, fires: string | undefined): string {
-  if (fires) return `Weapon ${slot.number} (${fires})`;
+  const number = slot.number;
+  if (fires) return t`Weapon ${number} (${fires})`;
   const def =
     slot.definition.kind !== "missing" ? slot.definition.def : undefined;
   const nameKey = def ? findKeyCI(def, "name") : undefined;
   const named = nameKey ? def?.[nameKey] : undefined;
   const name =
     typeof named === "string" && named.trim() ? named.trim() : slot.name;
-  return `Weapon ${slot.number} (${name})`;
+  return t`Weapon ${number} (${name})`;
 }
 
 /** `unitKey`'s non-shield weapons, in slot order, with where each one's

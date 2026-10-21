@@ -13,6 +13,7 @@
  * off again. Disabling a game unit to ship your own copy in its place is a
  * normal thing to do, and it needs both halves to be possible at once.
  */
+import { Trans, useLingui } from "@lingui/react/macro";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 
@@ -28,6 +29,7 @@ export function DisableUnitSwitch({
   disabled: boolean;
   onChange: (disabled: boolean) => void;
 }) {
+  const { t } = useLingui();
   const id = `workshop-disable-${unitKey}`;
   return (
     <span className="flex items-center gap-2">
@@ -35,10 +37,10 @@ export function DisableUnitSwitch({
         id={id}
         checked={disabled}
         onCheckedChange={onChange}
-        aria-label={`Disable ${unitName}`}
+        aria-label={t`Disable ${unitName}`}
       />
       <Label htmlFor={id} className="text-xs font-medium">
-        Disabled
+        <Trans>Disabled</Trans>
       </Label>
     </span>
   );

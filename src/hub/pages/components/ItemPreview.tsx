@@ -1,3 +1,6 @@
+import type { MessageDescriptor } from "@lingui/core";
+import { msg } from "@lingui/core/macro";
+import { Plural, useLingui } from "@lingui/react/macro";
 import { useMemo } from "react";
 import { LayoutPlan } from "@/blueprint/LayoutPlan";
 import { useBuildingRoles } from "@/blueprint/useBuildingRoles";
@@ -28,6 +31,8 @@ import { SetupPackContents } from "./SetupPackContents";
  * kept in its own file for the same reason.
  */
 export function ItemPreview({ preview }: { preview: HubPreview }) {
+  const playing = preview.kind === "preset" ? preview.playing : 0;
+  const teamCount = preview.kind === "preset" ? preview.teams.length : 0;
   if (preview.kind === "preset") {
     return (
       <div className="flex flex-col gap-3">
@@ -62,8 +67,11 @@ export function ItemPreview({ preview }: { preview: HubPreview }) {
           ))}
         </div>
         <p className="text-xs text-muted-foreground">
-          {preview.playing} playing across {preview.teams.length}{" "}
-          {preview.teams.length === 1 ? "team" : "teams"}
+          <Plural
+            value={teamCount}
+            one={`${playing} playing across # team`}
+            other={`${playing} playing across # teams`}
+          />
         </p>
       </div>
     );
@@ -148,8 +156,15 @@ function BlueprintLayout({
         className="mx-auto aspect-[4/3] w-full max-w-md"
       />
       <p className="text-xs text-muted-foreground">
-        {buildings} {buildings === 1 ? "building" : "buildings"}
-        {shape.ordered ? ", in build order" : ""}
+        {shape.ordered ? (
+          <Plural
+            value={buildings}
+            one="# building, in build order"
+            other="# buildings, in build order"
+          />
+        ) : (
+          <Plural value={buildings} one="# building" other="# buildings" />
+        )}
       </p>
     </div>
   );
@@ -213,6 +228,10 @@ export function Galaxy({
   const { land } = shape;
   const noun = locationNoun(shape.skin).many;
   const routeIds = new Set(route?.steps.map((step) => step.id));
+  const { t } = useLingui();
+  const systemCount = shape.systems.length;
+  const laneCount = shape.lanes.length;
+  const routeCount = route?.steps.length ?? 0;
 
   if (land) {
     // The land fills the box edge to edge, so nothing is inset.
@@ -225,8 +244,8 @@ export function Galaxy({
         role="img"
         aria-label={
           route
-            ? `A route of ${route.steps.length} ${noun} across a map of ${shape.systems.length}, on land and sea, from the start to the boss`
-            : `${shape.systems.length} ${noun} on a map of land and sea, ${held} of them held at the start`
+            ? t`A route of ${routeCount} ${noun} across a map of ${systemCount}, on land and sea, from the start to the boss`
+            : t`${systemCount} ${noun} on a map of land and sea, ${held} of them held at the start`
         }
       >
         <rect width={100} height={100} rx={2} fill={SEA} />
@@ -333,7 +352,7 @@ export function Galaxy({
       viewBox="0 0 100 100"
       className={className}
       role="img"
-      aria-label={`${shape.systems.length} ${noun} joined by ${shape.lanes.length} jump lanes, ${held} of them held at the start`}
+      aria-label={t`${systemCount} ${noun} joined by ${laneCount} jump lanes, ${held} of them held at the start`}
     >
       <defs>
         {/* Each node is a star, so it glows. The blurred copies go under the
@@ -381,14 +400,18 @@ export function Galaxy({
  * Colours match the hub website's drawing of the same run
  * (`lib/gallery/warpathRun.ts` in tomjn/coilbox-hub), so a challenge looks the
  * same wherever it is opened. */
-const RUN_NODE_KINDS: { type: RunNodeType; label: string; color: string }[] = [
-  { type: "start", label: "Start", color: "#e5e5e5" },
-  { type: "battle", label: "Battle", color: "#2f7dff" },
-  { type: "elite", label: "Elite", color: "#ffb300" },
-  { type: "event", label: "Event", color: "#a855f7" },
-  { type: "reward", label: "Reward", color: "#00c853" },
-  { type: "shop", label: "Depot", color: "#14b8a6" },
-  { type: "boss", label: "Boss", color: "#ff3524" },
+const RUN_NODE_KINDS: {
+  type: RunNodeType;
+  label: MessageDescriptor;
+  color: string;
+}[] = [
+  { type: "start", label: msg`Start`, color: "#e5e5e5" },
+  { type: "battle", label: msg`Battle`, color: "#2f7dff" },
+  { type: "elite", label: msg`Elite`, color: "#ffb300" },
+  { type: "event", label: msg`Event`, color: "#a855f7" },
+  { type: "reward", label: msg`Reward`, color: "#00c853" },
+  { type: "shop", label: msg`Depot`, color: "#14b8a6" },
+  { type: "boss", label: msg`Boss`, color: "#ff3524" },
 ];
 
 const RUN_COLORS = new Map(RUN_NODE_KINDS.map((k) => [k.type, k.color]));
@@ -426,6 +449,7 @@ export function RunMap({
   className?: string;
   legend?: boolean;
 }) {
+  const { t, i18n } = useLingui();
   const kinds = RUN_NODE_KINDS.filter((k) =>
     shape.steps.some((s) => s.type === k.type),
   );
@@ -441,7 +465,7 @@ export function RunMap({
             className="size-2 shrink-0 rounded-full"
             style={{ background: kind.color }}
           />
-          {kind.label}
+          {i18n._(kind.label)}
         </li>
       ))}
     </ul>
@@ -460,6 +484,8 @@ export function RunMap({
   const fights = shape.steps.filter(
     (s) => s.type === "battle" || s.type === "elite" || s.type === "boss",
   ).length;
+  const columns = shape.columns;
+  const nodeCount = shape.steps.length;
 
   return (
     <div className="flex flex-col gap-3">
@@ -467,7 +493,7 @@ export function RunMap({
         viewBox="0 0 100 40"
         className={className}
         role="img"
-        aria-label={`${shape.columns} stops from the start to the boss, ${shape.steps.length} nodes in all, ${fights} of them fights`}
+        aria-label={t`${columns} stops from the start to the boss, ${nodeCount} nodes in all, ${fights} of them fights`}
       >
         <defs>
           <filter id={RUN_GLOW} x="-50%" y="-50%" width="200%" height="200%">

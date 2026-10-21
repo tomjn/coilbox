@@ -1,3 +1,4 @@
+import { useLingui } from "@lingui/react/macro";
 import type { GameItem } from "@/content/bindings";
 import { useBrandingEntry, useBrandingImage } from "@/content/branding";
 import { useUnitsyncGameHeaders } from "@/content/config";
@@ -20,7 +21,9 @@ export function BattleGameCard({
   game: GameItem | undefined;
   gameName: string;
 }) {
+  const { t } = useLingui();
   const { headers } = useUnitsyncGameHeaders(enginePath, dataDir);
+  const loadingScreenName = game?.name ?? gameName;
   const brand = useBrandingEntry(game ?? undefined);
   const brandBanner = useBrandingImage(brand?.banner, true);
 
@@ -29,7 +32,7 @@ export function BattleGameCard({
       name={game?.name ?? gameName}
       title={game?.name ?? gameName}
       artUrl={game ? (brandBanner ?? headers.get(game.name)) : undefined}
-      alt={`${game?.name ?? gameName} loading screen`}
+      alt={t`${loadingScreenName} loading screen`}
       version={game?.info.version}
       sdd={game ? isSdd(game.primaryArchive) : false}
       warnings={game?.warnings}
