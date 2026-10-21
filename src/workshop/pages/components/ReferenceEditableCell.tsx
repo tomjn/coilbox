@@ -12,6 +12,7 @@
  * An edited cell is marked, and hovering it shows the value before this
  * project's edits.
  */
+import { useLingui } from "@lingui/react/macro";
 import { Input } from "@picoframe/frame";
 import { useState } from "react";
 import {
@@ -54,6 +55,7 @@ export function ReferenceEditableCell({
   onDraft: (value: number | undefined) => void;
   onCommit: (value: number) => void;
 }) {
+  const { t } = useLingui();
   const [draft, setDraft] = useState<string | undefined>();
 
   const close = () => {
@@ -73,7 +75,7 @@ export function ReferenceEditableCell({
         autoFocus
         inputMode="decimal"
         value={draft}
-        aria-label={`${label} for ${unitName}`}
+        aria-label={t`${label} for ${unitName}`}
         aria-invalid={parsed(draft) === undefined}
         onChange={(e) => {
           setDraft(e.target.value);
@@ -92,20 +94,25 @@ export function ReferenceEditableCell({
     cell.edited && shown !== undefined && cell.gameValue !== undefined
       ? shown - cell.gameValue
       : undefined;
-  const before = [
-    cell.edited &&
-      `Before this project's edits: ${formatReferenceValue(cell.gameValue)}${diff !== undefined ? ` (${formatDiff(diff)})` : ""}`,
-    rule && `Follows the game: ${rule}`,
-  ]
+  const gameValue = formatReferenceValue(cell.gameValue);
+  const change = diff !== undefined ? formatDiff(diff) : undefined;
+  const beforeEdits = cell.edited
+    ? change !== undefined
+      ? t`Before this project's edits: ${gameValue} (${change})`
+      : t`Before this project's edits: ${gameValue}`
+    : undefined;
+  const before = [beforeEdits, rule && t`Follows the game: ${rule}`]
     .filter(Boolean)
     .join(". ");
+  const nowShown = formatReferenceValue(shown);
+  const editLabel = t`Edit ${label} for ${unitName}, now ${nowShown}`;
   const button = (
     <button
       type="button"
       onClick={() =>
         setDraft(cell.value === undefined ? "" : String(cell.value))
       }
-      aria-label={`Edit ${label} for ${unitName}, now ${formatReferenceValue(shown)}${before ? `. ${before}` : ""}`}
+      aria-label={before ? `${editLabel}. ${before}` : editLabel}
       className={cn(
         "w-full rounded px-1 text-right tabular-nums hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
         cell.edited &&

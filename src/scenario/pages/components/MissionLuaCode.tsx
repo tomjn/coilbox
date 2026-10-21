@@ -12,6 +12,7 @@
  * for the windowing math this reads from a real, measured container height.
  */
 
+import { useLingui } from "@lingui/react/macro";
 import {
   forwardRef,
   useEffect,
@@ -50,10 +51,8 @@ export const MissionLuaCode = forwardRef<
      *  Lua through this too. */
     label?: string;
   }
->(function MissionLuaCode(
-  { lines, tokens, matches, activeMatch, label = "Compiled mission.lua" },
-  ref,
-) {
+>(function MissionLuaCode({ lines, tokens, matches, activeMatch, label }, ref) {
+  const { t } = useLingui();
   const containerRef = useRef<HTMLElement | null>(null);
   const [viewportHeight, setViewportHeight] = useState(0);
   const [scrollTop, setScrollTop] = useState(0);
@@ -114,7 +113,7 @@ export const MissionLuaCode = forwardRef<
     <section
       ref={containerRef}
       onScroll={(e) => setScrollTop(e.currentTarget.scrollTop)}
-      aria-label={label}
+      aria-label={label ?? t`Compiled mission.lua`}
       className="h-full overflow-auto rounded-md border border-border/50 bg-muted/20 font-mono text-xs"
     >
       <div style={{ height: lines.length * LINE_HEIGHT, position: "relative" }}>

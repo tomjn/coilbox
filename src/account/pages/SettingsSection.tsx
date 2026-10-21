@@ -1,3 +1,4 @@
+import { Trans, useLingui } from "@lingui/react/macro";
 import { Button, Input } from "@picoframe/frame";
 import { type FormEvent, useEffect, useState } from "react";
 import { Field } from "@/components/Field";
@@ -86,15 +87,24 @@ export default function AccountSettings() {
 function DisconnectedPanel() {
   const { openLoginPopover } = useMultiplayer();
   const [lastLogin] = useLastLogin();
+  const lastUsername = lastLogin?.username ?? "";
 
   return (
     <div className="space-y-3 rounded-md border border-dashed border-border p-4 text-sm">
       <p className="text-muted-foreground">
-        {lastLogin
-          ? `Not signed in. Connect as ${lastLogin.username} to manage that account.`
-          : "Not signed in. Connect to a lobby account to manage it here."}
+        {lastLogin ? (
+          <Trans>
+            Not signed in. Connect as {lastUsername} to manage that account.
+          </Trans>
+        ) : (
+          <Trans>
+            Not signed in. Connect to a lobby account to manage it here.
+          </Trans>
+        )}
       </p>
-      <Button onClick={openLoginPopover}>Connect</Button>
+      <Button onClick={openLoginPopover}>
+        <Trans>Connect</Trans>
+      </Button>
     </div>
   );
 }
@@ -103,7 +113,9 @@ function DisconnectedPanel() {
 function OtherProtocolPanel() {
   return (
     <p className="rounded-md border border-dashed border-border p-4 text-sm text-muted-foreground">
-      Account management for this server happens on the server's own site.
+      <Trans>
+        Account management for this server happens on the server's own site.
+      </Trans>
     </p>
   );
 }
@@ -119,18 +131,29 @@ function AccountDetails({
   email: string | null;
   ingameHours: string | null;
 }) {
-  const NOT_KNOWN = "Not known yet";
+  const { t } = useLingui();
+  const NOT_KNOWN = t`Not known yet`;
   return (
     <section className="space-y-3">
-      <h2 className={H2_CLASS}>Account</h2>
+      <h2 className={H2_CLASS}>
+        <Trans>Account</Trans>
+      </h2>
       <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1.5 rounded-md border border-border p-3 text-sm">
-        <dt className="text-muted-foreground">Username</dt>
+        <dt className="text-muted-foreground">
+          <Trans>Username</Trans>
+        </dt>
         <dd className="font-medium">{username ?? NOT_KNOWN}</dd>
-        <dt className="text-muted-foreground">Member since</dt>
+        <dt className="text-muted-foreground">
+          <Trans>Member since</Trans>
+        </dt>
         <dd>{registrationDate ?? NOT_KNOWN}</dd>
-        <dt className="text-muted-foreground">Email address</dt>
+        <dt className="text-muted-foreground">
+          <Trans>Email address</Trans>
+        </dt>
         <dd>{email ?? NOT_KNOWN}</dd>
-        <dt className="text-muted-foreground">Playtime</dt>
+        <dt className="text-muted-foreground">
+          <Trans>Playtime</Trans>
+        </dt>
         <dd>{ingameHours ?? NOT_KNOWN}</dd>
       </dl>
     </section>
@@ -144,6 +167,7 @@ function AccountActions({
   email: string | null;
   serverKey: string;
 }) {
+  const { t } = useLingui();
   const { resendVerification } = useMultiplayer();
   const [drawer, setDrawer] = useState<"password" | "email" | null>(null);
   const [resendStatus, setResendStatus] = useState<string | null>(null);
@@ -155,7 +179,7 @@ function AccountActions({
     setResendStatus(null);
     try {
       await resendVerification(email, serverKey);
-      setResendStatus("Verification email sent.");
+      setResendStatus(t`Verification email sent.`);
     } catch (err) {
       setResendStatus(String(err));
     } finally {
@@ -165,17 +189,19 @@ function AccountActions({
 
   return (
     <section className="space-y-3">
-      <h2 className={H2_CLASS}>Change your account</h2>
+      <h2 className={H2_CLASS}>
+        <Trans>Change your account</Trans>
+      </h2>
       <div className="flex flex-wrap items-center gap-2">
         <Button
           variant="outline"
           size="sm"
           onClick={() => setDrawer("password")}
         >
-          Change password
+          <Trans>Change password</Trans>
         </Button>
         <Button variant="outline" size="sm" onClick={() => setDrawer("email")}>
-          Change email
+          <Trans>Change email</Trans>
         </Button>
         <Button
           variant="outline"
@@ -183,7 +209,7 @@ function AccountActions({
           disabled={email == null || resending}
           onClick={() => void doResend()}
         >
-          Resend verification email
+          <Trans>Resend verification email</Trans>
         </Button>
       </div>
       {resendStatus && (
@@ -246,8 +272,9 @@ function ChangePasswordDrawer({
   serverKey: string;
   onClose: () => void;
 }) {
+  const { t } = useLingui();
   return (
-    <SlideDrawer open={open} title="Change password" onClose={onClose}>
+    <SlideDrawer open={open} title={t`Change password`} onClose={onClose}>
       <ChangePasswordForm serverKey={serverKey} onClose={onClose} />
     </SlideDrawer>
   );
@@ -267,6 +294,7 @@ function ChangePasswordForm({
   serverKey: string;
   onClose: () => void;
 }) {
+  const { t } = useLingui();
   const { changePassword } = useMultiplayer();
   const servers = useProtocolServers();
   const [accountsCfg] = useLobbyAccounts();
@@ -304,7 +332,7 @@ function ChangePasswordForm({
           // the saved copy is now wrong rather than merely stale, and the
           // next reconnect will fail with it until the user retypes it.
           setKeychainWarning(
-            "Your password changed on the server, but coilbox could not save it. Enter the new one under Settings, Lobby servers.",
+            t`Your password changed on the server, but coilbox could not save it. Enter the new one under Settings, Lobby servers.`,
           );
         }
       }
@@ -320,7 +348,7 @@ function ChangePasswordForm({
       onSubmit={submit}
       className="flex flex-1 flex-col gap-3 overflow-y-auto p-4"
     >
-      <Field label="Current password">
+      <Field label={t`Current password`}>
         <Input
           type="password"
           value={current}
@@ -329,7 +357,7 @@ function ChangePasswordForm({
           {...identifierFieldProps}
         />
       </Field>
-      <Field label="New password">
+      <Field label={t`New password`}>
         <Input
           type="password"
           value={next}
@@ -341,8 +369,12 @@ function ChangePasswordForm({
       {message && (
         <p className="text-xs text-muted-foreground">
           {message}
-          {succeeded === false &&
-            " Your saved password has been left as it was."}
+          {succeeded === false && (
+            <>
+              {" "}
+              <Trans>Your saved password has been left as it was.</Trans>
+            </>
+          )}
         </p>
       )}
       {keychainWarning && (
@@ -351,14 +383,14 @@ function ChangePasswordForm({
       {error && <p className="text-xs text-destructive">{error}</p>}
       <div className="mt-auto flex justify-end gap-2 border-t border-border pt-3">
         <Button type="button" variant="outline" size="sm" onClick={onClose}>
-          Close
+          <Trans>Close</Trans>
         </Button>
         <Button
           type="submit"
           size="sm"
           disabled={submitting || current === "" || next === ""}
         >
-          {submitting ? "Saving…" : "Save"}
+          {submitting ? t`Saving…` : t`Save`}
         </Button>
       </div>
     </form>
@@ -380,8 +412,9 @@ function ChangeEmailDrawer({
   serverKey: string;
   onClose: () => void;
 }) {
+  const { t } = useLingui();
   return (
-    <SlideDrawer open={open} title="Change email" onClose={onClose}>
+    <SlideDrawer open={open} title={t`Change email`} onClose={onClose}>
       <ChangeEmailForm email={email} serverKey={serverKey} onClose={onClose} />
     </SlideDrawer>
   );
@@ -402,12 +435,15 @@ function ChangeEmailForm({
   serverKey: string;
   onClose: () => void;
 }) {
+  const { t } = useLingui();
   const { changeEmailRequest, changeEmail } = useMultiplayer();
   const [stage, setStage] = useState<"address" | "code" | "done">("address");
   const [address, setAddress] = useState("");
   const [code, setCode] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+
+  const currentEmail = email ?? t`Not known yet`;
 
   const submitAddress = async (e: FormEvent) => {
     e.preventDefault();
@@ -440,10 +476,12 @@ function ChangeEmailForm({
   if (stage === "done") {
     return (
       <div className="flex flex-1 flex-col gap-3 overflow-y-auto p-4">
-        <p className="text-sm">Email address changed.</p>
+        <p className="text-sm">
+          <Trans>Email address changed.</Trans>
+        </p>
         <div className="mt-auto flex justify-end border-t border-border pt-3">
           <Button size="sm" onClick={onClose}>
-            Close
+            <Trans>Close</Trans>
           </Button>
         </div>
       </div>
@@ -457,9 +495,9 @@ function ChangeEmailForm({
         className="flex flex-1 flex-col gap-3 overflow-y-auto p-4"
       >
         <p className="text-xs text-muted-foreground">
-          Check {address} for the verification code.
+          <Trans>Check {address} for the verification code.</Trans>
         </p>
-        <Field label="Verification code">
+        <Field label={t`Verification code`}>
           <Input
             value={code}
             onChange={(e) => setCode(e.target.value)}
@@ -470,14 +508,14 @@ function ChangeEmailForm({
         {error && <p className="text-xs text-destructive">{error}</p>}
         <div className="mt-auto flex justify-end gap-2 border-t border-border pt-3">
           <Button type="button" variant="outline" size="sm" onClick={onClose}>
-            Close
+            <Trans>Close</Trans>
           </Button>
           <Button
             type="submit"
             size="sm"
             disabled={submitting || code.trim() === ""}
           >
-            {submitting ? "Saving…" : "Save"}
+            {submitting ? t`Saving…` : t`Save`}
           </Button>
         </div>
       </form>
@@ -490,9 +528,9 @@ function ChangeEmailForm({
       className="flex flex-1 flex-col gap-3 overflow-y-auto p-4"
     >
       <p className="text-xs text-muted-foreground">
-        Currently: {email ?? "Not known yet"}
+        <Trans>Currently: {currentEmail}</Trans>
       </p>
-      <Field label="New email address">
+      <Field label={t`New email address`}>
         <Input
           type="email"
           value={address}
@@ -504,14 +542,14 @@ function ChangeEmailForm({
       {error && <p className="text-xs text-destructive">{error}</p>}
       <div className="mt-auto flex justify-end gap-2 border-t border-border pt-3">
         <Button type="button" variant="outline" size="sm" onClick={onClose}>
-          Close
+          <Trans>Close</Trans>
         </Button>
         <Button
           type="submit"
           size="sm"
           disabled={submitting || address.trim() === ""}
         >
-          {submitting ? "Sending…" : "Send code"}
+          {submitting ? t`Sending…` : t`Send code`}
         </Button>
       </div>
     </form>

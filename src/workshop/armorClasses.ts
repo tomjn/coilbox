@@ -33,6 +33,7 @@
  * asking the compiler to fetch it again. Every move after the first reads
  * against that snapshot.
  */
+import { plural } from "@lingui/core/macro";
 import type { UnitClones } from "./clones";
 import type { UnitOverrides } from "./overrides";
 import { resolvedDef } from "./overrides";
@@ -348,12 +349,14 @@ export function unknownDamageClasses(
     (key) => !known.has(key.toLowerCase()),
   );
   if (unknown.length === 0) return [];
-  const noun = unknown.length === 1 ? "class" : "classes";
-  const rows = unknown.length === 1 ? "row" : "rows";
+  const list = unknown.join(", ");
   return [
     {
       id: `${holder}:damage`,
-      message: `${holder}'s damage table names ${unknown.length} armour ${noun} this game does not have: ${unknown.join(", ")}. The engine uses the default damage for them instead, so ${unknown.length === 1 ? "this" : "these"} ${rows} ${unknown.length === 1 ? "has" : "have"} no effect.`,
+      message: plural(unknown.length, {
+        one: `${holder}'s damage table names # armour class this game does not have: ${list}. The engine uses the default damage for it instead, so this row has no effect.`,
+        other: `${holder}'s damage table names # armour classes this game does not have: ${list}. The engine uses the default damage for them instead, so these rows have no effect.`,
+      }),
       severity: "warning",
     },
   ];

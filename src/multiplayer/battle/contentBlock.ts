@@ -12,6 +12,7 @@
  * sync pill, and the launch itself.
  */
 
+import { t } from "@lingui/core/macro";
 import type { ContentRequirement } from "@/content/resolveContent";
 import { launchRequirements } from "@/play/launchContent";
 import {
@@ -112,57 +113,60 @@ export function launchBlock(c: LaunchContent): LaunchBlock | null {
   if (!c.hasTarget) {
     if (c.targetLoading) return null;
     return {
-      short: "No engine",
-      reason:
-        "No engine is selected, so this battle cannot start. Add a content folder with an engine in Settings, Content folders.",
+      short: t`No engine`,
+      reason: t`No engine is selected, so this battle cannot start. Add a content folder with an engine in Settings, Content folders.`,
     };
   }
   if (c.engineMissing) {
+    const engineMissing = c.engineMissing;
     return {
-      short: "Engine missing",
-      reason: `You do not have the engine this battle uses (${c.engineMissing}), so the host will refuse your connection. Install it in Settings, Engines to play.`,
+      short: t`Engine missing`,
+      reason: t`You do not have the engine this battle uses (${engineMissing}), so the host will refuse your connection. Install it in Settings, Engines to play.`,
     };
   }
   if (c.engineUnreadable) {
     return {
-      short: "Engine unknown",
-      reason:
-        "Your engine would not report its version, so it cannot be checked against the host's. Pick another engine in Settings, Engines to play.",
+      short: t`Engine unknown`,
+      reason: t`Your engine would not report its version, so it cannot be checked against the host's. Pick another engine in Settings, Engines to play.`,
     };
   }
   if (c.unreadable) {
+    const reason = c.unreadableReason;
     return {
-      short: "Can't check content",
-      reason: `Coilbox could not read what is installed${c.unreadableReason ? ` (${c.unreadableReason})` : ""}, so it cannot tell whether you have this battle's game or map. Pick another engine in Settings, Engines to fix this.`,
+      short: t`Can't check content`,
+      reason: reason
+        ? t`Coilbox could not read what is installed (${reason}), so it cannot tell whether you have this battle's game or map. Pick another engine in Settings, Engines to fix this.`
+        : t`Coilbox could not read what is installed, so it cannot tell whether you have this battle's game or map. Pick another engine in Settings, Engines to fix this.`,
     };
   }
   if (!c.contentKnown) return null;
-  const map = c.mapName || "the map";
-  const game = c.gameName || "the game";
+  const map = c.mapName || t`the map`;
+  const game = c.gameName || t`the game`;
   if (c.mapMissing && c.gameMissing) {
     return {
-      short: "Map and game missing",
-      reason: `You do not have the game (${game}) or the map (${map}) this battle uses, so it cannot start for you. Install both to play.`,
+      short: t`Map and game missing`,
+      reason: t`You do not have the game (${game}) or the map (${map}) this battle uses, so it cannot start for you. Install both to play.`,
     };
   }
   if (c.gameMissing) {
     return {
-      short: "Game missing",
-      reason: `You do not have the game this battle uses (${game}), so it cannot start for you. Install it to play.`,
+      short: t`Game missing`,
+      reason: t`You do not have the game this battle uses (${game}), so it cannot start for you. Install it to play.`,
     };
   }
   if (c.mapMissing) {
     return {
-      short: "Map missing",
-      reason: `You do not have the map this battle uses (${map}), so it cannot start for you. Install it to play.`,
+      short: t`Map missing`,
+      reason: t`You do not have the map this battle uses (${map}), so it cannot start for you. Install it to play.`,
     };
   }
   const compat = c.compat ? compatLaunchBlock(c.compat) : null;
   if (compat) return compat;
   if (c.dependencyBlock) {
+    const dependencyBlock = c.dependencyBlock;
     return {
-      short: "Archive missing",
-      reason: `${c.dependencyBlock} The battle cannot start for you until it is installed.`,
+      short: t`Archive missing`,
+      reason: t`${dependencyBlock} The battle cannot start for you until it is installed.`,
     };
   }
   return null;
@@ -174,5 +178,6 @@ export function launchBlock(c: LaunchContent): LaunchBlock | null {
  * moved on and sitting still needs explaining.
  */
 export function startedWithoutYou(block: LaunchBlock): string {
-  return `The match has started without you. ${block.reason}`;
+  const reason = block.reason;
+  return t`The match has started without you. ${reason}`;
 }

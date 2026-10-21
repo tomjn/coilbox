@@ -1,3 +1,4 @@
+import { Trans, useLingui } from "@lingui/react/macro";
 import { Button } from "@picoframe/frame";
 import { Check, ChevronsUpDown } from "lucide-react";
 import { useState } from "react";
@@ -51,6 +52,8 @@ export function FilterCombobox({
   onCommit,
   options,
   placeholder,
+  searchPlaceholder,
+  anyLabel,
   ariaLabel,
   className,
 }: {
@@ -58,9 +61,14 @@ export function FilterCombobox({
   onCommit: (value: string) => void;
   options: ComboOption[];
   placeholder: string;
+  /** The search box inside the list, e.g. "Search games…". */
+  searchPlaceholder: string;
+  /** The row that clears the filter, e.g. "Any game". */
+  anyLabel: string;
   ariaLabel: string;
   className?: string;
 }) {
+  const { t } = useLingui();
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState("");
 
@@ -100,22 +108,21 @@ export function FilterCombobox({
       <PopoverContent align="start" className="w-64 p-0">
         <Command>
           <CommandInput
-            placeholder={`Search ${placeholder.toLowerCase()}s…`}
+            placeholder={searchPlaceholder}
             value={search}
             onValueChange={setSearch}
           />
           <CommandList>
-            <CommandEmpty>Nothing installed matches that.</CommandEmpty>
+            <CommandEmpty>
+              <Trans>Nothing installed matches that.</Trans>
+            </CommandEmpty>
             {value && (
               <CommandGroup>
                 {/* Its own words are its `value`, so cmdk filters it the way it
                     filters everything else. An empty value would be a row the
                     filter cannot match at all. */}
-                <CommandItem
-                  value={`Any ${placeholder}`}
-                  onSelect={() => commit("")}
-                >
-                  Any {placeholder.toLowerCase()}
+                <CommandItem value={anyLabel} onSelect={() => commit("")}>
+                  {anyLabel}
                 </CommandItem>
               </CommandGroup>
             )}
@@ -125,11 +132,11 @@ export function FilterCombobox({
                     keeps this row: it is the one thing the list must never
                     hide. */}
                 <CommandItem value={typed} onSelect={() => commit(typed)}>
-                  Filter by “{typed}”
+                  <Trans>Filter by “{typed}”</Trans>
                 </CommandItem>
               </CommandGroup>
             )}
-            <CommandGroup heading="Installed">
+            <CommandGroup heading={t`Installed`}>
               {options.map((option) => (
                 <CommandItem
                   key={option.value}

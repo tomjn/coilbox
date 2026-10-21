@@ -255,8 +255,9 @@ function buildResults(
         { kind: "section", id: section.id, label: section.label },
         `s:${section.id}`,
       );
-  if ("reference".includes(lower)) push({ kind: "reference" }, "reference");
-  if ("test".includes(lower)) push({ kind: "test" }, "test");
+  if (t`Reference`.toLowerCase().includes(lower))
+    push({ kind: "reference" }, "reference");
+  if (t`Test`.toLowerCase().includes(lower)) push({ kind: "test" }, "test");
 
   return results;
 }
@@ -352,14 +353,14 @@ export function CommandPalette({
       commandProps={{ shouldFilter: false }}
     >
       <CommandInput
-        placeholder="Jump to a unit, a field ('zeus range'), a section or an action..."
+        placeholder={t`Jump to a unit, a field ('zeus range'), a section or an action...`}
         value={query}
         onValueChange={setQuery}
       />
       <CommandList>
-        <CommandEmpty>Nothing found.</CommandEmpty>
+        <CommandEmpty>{t`Nothing found.`}</CommandEmpty>
         {fields.length > 0 && (
-          <CommandGroup heading="Fields">
+          <CommandGroup heading={t`Fields`}>
             {fields.map((r) => (
               <CommandItem
                 key={`f:${r.unitKey}:${r.hit.path}`}
@@ -376,7 +377,7 @@ export function CommandPalette({
           </CommandGroup>
         )}
         {unitResults.length > 0 && (
-          <CommandGroup heading="Units">
+          <CommandGroup heading={t`Units`}>
             {unitResults.map((r) => (
               <CommandItem
                 key={`u:${r.key}`}
@@ -389,7 +390,7 @@ export function CommandPalette({
           </CommandGroup>
         )}
         {sections.length > 0 && (
-          <CommandGroup heading="Sections">
+          <CommandGroup heading={t`Sections`}>
             {sections.map((r) => (
               <CommandItem
                 key={`s:${r.id}`}
@@ -402,14 +403,14 @@ export function CommandPalette({
           </CommandGroup>
         )}
         {actions.length > 0 && (
-          <CommandGroup heading="Actions">
+          <CommandGroup heading={t`Actions`}>
             {actions.map((r) => (
               <CommandItem
                 key={r.kind}
                 value={r.kind}
                 onSelect={() => runResult(r)}
               >
-                {r.kind === "reference" ? "Reference" : "Test"}
+                {r.kind === "reference" ? t`Reference` : t`Test`}
               </CommandItem>
             ))}
           </CommandGroup>

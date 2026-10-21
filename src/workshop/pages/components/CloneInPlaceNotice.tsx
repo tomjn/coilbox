@@ -8,6 +8,8 @@
  * unwritable change is still named, the way a field's own refusal is, so the
  * user can see what about the copy is the problem before pressing anything.
  */
+import { plural } from "@lingui/core/macro";
+import { Trans, useLingui } from "@lingui/react/macro";
 import { Button } from "@picoframe/frame";
 import { FileLock2 } from "lucide-react";
 import type { CloneUnwritable } from "../../inPlace";
@@ -30,11 +32,14 @@ export function CloneInPlaceNotice({
   routed: boolean;
   onRoute: (on: boolean) => void;
 }) {
+  const { t } = useLingui();
   if (error) {
     return (
       <p className="text-xs text-destructive">
-        Coilbox could not check whether {unitName} can be written into the
-        game's own files: {error}
+        <Trans>
+          Coilbox could not check whether {unitName} can be written into the
+          game's own files: {error}
+        </Trans>
       </p>
     );
   }
@@ -47,8 +52,11 @@ export function CloneInPlaceNotice({
         <FileLock2 className="size-3.5 shrink-0" />
         <span>
           {routed
-            ? "Goes through the mutator route. Writing in place skips this whole copy."
-            : `${unwritable?.length ?? 0} change${unwritable?.length === 1 ? "" : "s"} to ${unitName} cannot be written into a file.`}
+            ? t`Goes through the mutator route. Writing in place skips this whole copy.`
+            : plural(unwritable?.length ?? 0, {
+                one: `# change to ${unitName} cannot be written into a file.`,
+                other: `# changes to ${unitName} cannot be written into a file.`,
+              })}
         </span>
         <Button
           variant="outline"
@@ -57,11 +65,11 @@ export function CloneInPlaceNotice({
           onClick={() => onRoute(!routed)}
           aria-label={
             routed
-              ? `Stop sending ${unitName} through the mutator route`
-              : `Send ${unitName} through the mutator route`
+              ? t`Stop sending ${unitName} through the mutator route`
+              : t`Send ${unitName} through the mutator route`
           }
         >
-          {routed ? "Undo" : "Send this copy to the mutator"}
+          {routed ? t`Undo` : t`Send this copy to the mutator`}
         </Button>
       </div>
       {!routed && unwritable && unwritable.length > 0 && (
@@ -74,9 +82,11 @@ export function CloneInPlaceNotice({
         </ul>
       )}
       <p className="text-muted-foreground">
-        A copy is written as a file or not at all, so this sends the whole copy
-        through the mutator route rather than only the change above. The
-        in-place write then skips it and lists it as still needing a mutator.
+        <Trans>
+          A copy is written as a file or not at all, so this sends the whole
+          copy through the mutator route rather than only the change above. The
+          in-place write then skips it and lists it as still needing a mutator.
+        </Trans>
       </p>
     </div>
   );

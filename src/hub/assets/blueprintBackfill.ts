@@ -98,6 +98,7 @@
  * 4.6.1 of the asset pipeline design carries both halves.
  */
 
+import { plural, t } from "@lingui/core/macro";
 import {
   type LocalRender,
   type UnitBuildpicsResult,
@@ -317,16 +318,21 @@ export async function backfillBlueprintUnits(
     written: 0,
   };
   if (units.length === 0) return nothing;
+  const game = target.game;
+  const total = units.length;
   if (affordableUnits <= 0) {
     return {
       ...nothing,
-      stopped: `Coilbox has already sent this hour's pictures for ${target.game}.`,
+      stopped: t`Coilbox has already sent this hour's pictures for ${game}.`,
     };
   }
 
   const stopped =
     units.length > affordableUnits
-      ? `Only ${affordableUnits} of this layout's ${units.length} units fit in this hour's allowance for ${target.game}.`
+      ? plural(total, {
+          one: `Only ${affordableUnits} of this layout's # unit fits in this hour's allowance for ${game}.`,
+          other: `Only ${affordableUnits} of this layout's # units fit in this hour's allowance for ${game}.`,
+        })
       : undefined;
   const working = units.slice(0, affordableUnits);
 

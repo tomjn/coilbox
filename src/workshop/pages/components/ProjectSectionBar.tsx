@@ -14,6 +14,7 @@
  * across many units without being a section: the reference table, which is a
  * page of its own and where many units are changed at once (issue #3113).
  */
+import { useLingui } from "@lingui/react/macro";
 import { cn } from "@picoframe/frame";
 import {
   Crosshair,
@@ -62,14 +63,16 @@ export function ProjectSectionBar({
   checks: ProjectChecksState | undefined;
   tools?: ReactNode;
 }) {
+  const { t } = useLingui();
   return (
     <div className="flex flex-wrap items-end justify-between gap-2 border-b border-border">
-      <nav aria-label="Project sections" className="-mb-px">
+      <nav aria-label={t`Project sections`} className="-mb-px">
         <ul className="flex flex-wrap items-end gap-1">
           {PROJECT_SECTIONS.filter((s) => shown(s.id)).map(({ id, label }) => {
             const Icon = ICONS[id];
             const active = id === current;
             const count = counts[id];
+            const summary = checks?.summary;
             return (
               <li key={id}>
                 <Link
@@ -79,7 +82,7 @@ export function ProjectSectionBar({
                   // "Checks, 1 blocker found" rather than a bare icon.
                   aria-label={
                     id === "checks" && checks
-                      ? `${label}, ${checks.summary}`
+                      ? t`${label}, ${summary}`
                       : undefined
                   }
                   title={id === "checks" ? checks?.summary : undefined}

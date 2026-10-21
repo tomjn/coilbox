@@ -9,6 +9,7 @@
  * `runtimeVersion` check are `launchScenario`'s own.
  */
 
+import { t } from "@lingui/core/macro";
 import type { GameItem } from "../content/bindings";
 import { primeScan } from "../content/config";
 import { sameGameFamily } from "../content/resolveContent";
@@ -76,9 +77,8 @@ export async function launchScenarioForPlayer(
       try {
         return (await primeScan(target.enginePath, target.dataDir, true)).games;
       } catch (e) {
-        throw new Error(
-          `The content scan failed: ${e instanceof Error ? e.message : String(e)}`,
-        );
+        const reason = e instanceof Error ? e.message : String(e);
+        throw new Error(t`The content scan failed: ${reason}`);
       }
     },
     launch,

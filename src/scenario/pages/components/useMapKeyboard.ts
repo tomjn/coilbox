@@ -23,6 +23,7 @@
  * what actually happened.
  */
 
+import { t } from "@lingui/core/macro";
 import type { KeyboardEvent as ReactKeyboardEvent } from "react";
 import { useCallback, useEffect, useRef, useState } from "react";
 
@@ -38,10 +39,11 @@ import { addWaypoint } from "./groups";
 import {
   addedPointWords,
   cursorWords,
+  headingWords,
   type LayoutEditFor,
-  MAP_KEY_HELP,
   type MapStep,
   type MapThings,
+  mapKeyHelp,
   mapProblemsWords,
   mapSteps,
   movedWords,
@@ -235,7 +237,7 @@ export function useMapKeyboard(deps: MapKeyboardDeps): MapKeyboard {
           const step = nextStep(steps, things.entries, selected, action.by);
           if (!step) {
             say(
-              "Nothing on the map yet. Pick a mode and press Enter to place.",
+              t`Nothing on the map yet. Pick a mode and press Enter to place.`,
             );
             return;
           }
@@ -262,7 +264,7 @@ export function useMapKeyboard(deps: MapKeyboardDeps): MapKeyboard {
           const step = nextStep(steps, things.entries, selected, action.by);
           if (!step) {
             say(
-              "Nothing on the map yet. Pick a mode and press Enter to place.",
+              t`Nothing on the map yet. Pick a mode and press Enter to place.`,
             );
             return;
           }
@@ -294,7 +296,7 @@ export function useMapKeyboard(deps: MapKeyboardDeps): MapKeyboard {
               )
             : moveOnMap(things.scenario, key, action.delta, snap, layoutEdit);
           if (after === things.scenario) {
-            say("Nothing moved.");
+            say(t`Nothing moved.`);
             return;
           }
           onChange((doc) =>
@@ -394,7 +396,7 @@ export function useMapKeyboard(deps: MapKeyboardDeps): MapKeyboard {
             layoutEdit,
           );
           if (after === things.scenario) {
-            say("This does not turn. A group's units all face south.");
+            say(t`This does not turn. A group's units all face south.`);
             return;
           }
           onChange((doc) => turnOnMap(doc, key, action.steps, layoutEdit));
@@ -418,7 +420,7 @@ export function useMapKeyboard(deps: MapKeyboardDeps): MapKeyboard {
             layoutEdit,
           );
           if (after === things.scenario) {
-            say("Nothing turned.");
+            say(t`Nothing turned.`);
             return;
           }
           onChange((doc) =>
@@ -446,30 +448,33 @@ export function useMapKeyboard(deps: MapKeyboardDeps): MapKeyboard {
           const what = thingWords(things, key);
           onChange((doc) => removeOnMap(doc, key, layoutEdit));
           onSelect(null);
-          say(`Deleted ${what}. Nothing selected.`);
+          say(t`Deleted ${what}. Nothing selected.`);
           return;
         }
 
         case "pan": {
           panBy(action.delta);
           const at = readCursor();
-          say(
-            at
-              ? `${action.heading} ${action.step}. ${cursorWords(at.pos, at.height)}`
-              : "The map is not drawn yet.",
-          );
+          if (!at) {
+            say(t`The map is not drawn yet.`);
+            return;
+          }
+          const way = headingWords(action.heading);
+          const step = action.step;
+          const cursor = cursorWords(at.pos, at.height);
+          say(t`${way} ${step}. ${cursor}`);
           return;
         }
 
         case "act": {
           const at = readCursor();
           if (!at) {
-            say("The map is not drawn yet.");
+            say(t`The map is not drawn yet.`);
             return;
           }
           if (!onPlace) {
             say(
-              "This mode places nothing here. Pick a mode above the map, or press full stop to step through what is already placed.",
+              t`This mode places nothing here. Pick a mode above the map, or press full stop to step through what is already placed.`,
             );
             return;
           }
@@ -506,10 +511,16 @@ export function useMapKeyboard(deps: MapKeyboardDeps): MapKeyboard {
               );
               return;
             case "picking":
-              say(`Answered the question at ${spotWords(at.pos)}.`);
+              {
+                const spot = spotWords(at.pos);
+                say(t`Answered the question at ${spot}.`);
+              }
               return;
             case "arm":
-              say(`Placed at ${spotWords(at.pos)}.`);
+              {
+                const spot = spotWords(at.pos);
+                say(t`Placed at ${spot}.`);
+              }
               return;
           }
           return;
@@ -522,11 +533,11 @@ export function useMapKeyboard(deps: MapKeyboardDeps): MapKeyboard {
           // selected, is not ours and reaches it.
           event.stopPropagation();
           onSelect(null);
-          say("Nothing selected.");
+          say(t`Nothing selected.`);
           return;
 
         case "help":
-          say(MAP_KEY_HELP);
+          say(mapKeyHelp());
           return;
 
         case "problems":
@@ -543,5 +554,5 @@ export function useMapKeyboard(deps: MapKeyboardDeps): MapKeyboard {
     readCursor();
   }, [readCursor]);
 
-  return { help: MAP_KEY_HELP, said, cursor, onKeyDown, onFocus, say };
+  return { help: mapKeyHelp(), said, cursor, onKeyDown, onFocus, say };
 }

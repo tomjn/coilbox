@@ -1,3 +1,4 @@
+import { useLingui } from "@lingui/react/macro";
 import { useSetting } from "@picoframe/frame";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { ConfigOption, GameItem, MapItem, Side } from "@/content/bindings";
@@ -399,8 +400,6 @@ export interface BattleRoomView {
   rescan: () => Promise<ContentPresence>;
 }
 
-const RESCAN_FAILURE = "The rescan could not read what is installed.";
-
 /** Whether the battle's game and map are installed, as one scan saw it. */
 export interface ContentPresence {
   game: boolean;
@@ -419,6 +418,7 @@ export interface ContentPresence {
  * to that connection.
  */
 export function useBattleRoom(serverKey: string | null): BattleRoomView {
+  const { t } = useLingui();
   const { setIngame: setIngameOn } = useMultiplayer();
   const connection = useConnection(serverKey);
   const mirror = connection?.mirror ?? initialMirror;
@@ -515,7 +515,7 @@ export function useBattleRoom(serverKey: string | null): BattleRoomView {
   const canAddBot = !!battle && !!myStatus && takesBots;
   const botsRefused =
     battle && !takesBots
-      ? "This room type takes no AIs. Only a custom or cooperative room does."
+      ? t`This room type takes no AIs. Only a custom or cooperative room does.`
       : null;
   // Two settings this connection may have nowhere to put (issue #1979). Both are
   // real gaps in Zero-K's protocol rather than work coilbox has not done, so the
@@ -700,13 +700,13 @@ export function useBattleRoom(serverKey: string | null): BattleRoomView {
   useEffect(() => {
     if (shouldNotifyVoteOpened(prevVoteRef.current, currentVote)) {
       void notify({
-        title: "Vote called",
-        body: currentVote?.subject || "A vote is open in your battle.",
+        title: t`Vote called`,
+        body: currentVote?.subject || t`A vote is open in your battle.`,
         to: battleRoomHref(activeKey),
       });
     }
     prevVoteRef.current = currentVote;
-  }, [currentVote, activeKey]);
+  }, [currentVote, activeKey, t]);
 
   // The colour we last intended (as the `0xBBGGRR` int), so a status push that
   // omits `color` never reverts to 0 while our colour echo is still in flight —
@@ -1397,8 +1397,8 @@ export function useBattleRoom(serverKey: string | null): BattleRoomView {
         game: false,
         map: false,
         failure: error
-          ? `The rescan could not read what is installed (${error}).`
-          : RESCAN_FAILURE,
+          ? t`The rescan could not read what is installed (${error}).`
+          : t`The rescan could not read what is installed.`,
       };
     }
     // The same exact-name match `contentVerdict` makes above.
@@ -1415,6 +1415,7 @@ export function useBattleRoom(serverKey: string | null): BattleRoomView {
     battle?.modname,
     scan.runWithReason,
     clearErr,
+    t,
   ]);
 
   return {

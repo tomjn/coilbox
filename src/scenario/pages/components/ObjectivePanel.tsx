@@ -19,6 +19,7 @@
  * comes back as a new `scenario`, the way the trigger panel works.
  */
 
+import { Trans, useLingui } from "@lingui/react/macro";
 import { Button } from "@picoframe/frame";
 import { Copy, ListChecks, Plus, Trash2 } from "lucide-react";
 import { useEffect, useId, useRef, useState } from "react";
@@ -67,6 +68,7 @@ export function ObjectivePanel({
    *  placement or a def rather than a field on this panel. */
   issues: MissionIssue[];
 }) {
+  const { t } = useLingui();
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const selected =
     scenario.objectives.find((o) => o.id === selectedId) ??
@@ -91,6 +93,7 @@ export function ObjectivePanel({
   const primary = scenario.objectives.filter(
     (o) => o.kind === "primary",
   ).length;
+  const secondary = count - primary;
   const create = () => {
     const id = nextObjectiveId(scenario);
     onChange(addObjective(scenario, id));
@@ -100,20 +103,23 @@ export function ObjectivePanel({
   return (
     <EditorPanel
       ref={panelRef}
-      title="Objectives"
+      title={t`Objectives`}
       icon={ListChecks}
       summary={
         count === 0
-          ? "Nothing to do yet"
-          : `${primary} primary · ${count - primary} secondary`
+          ? t`Nothing to do yet`
+          : t`${primary} primary · ${secondary} secondary`
       }
     >
       <div className="flex flex-col gap-4 lg:flex-row">
         <div className="flex shrink-0 flex-col gap-2 lg:w-72">
           {count === 0 ? (
             <p className="text-xs text-muted-foreground">
-              An objective is what the player is told to do. A trigger completes
-              or fails it, and the panel in game shows it until then.
+              <Trans>
+                An objective is what the player is told to do. A trigger
+                completes or fails it, and the panel in game shows it until
+                then.
+              </Trans>
             </p>
           ) : (
             <ul className="flex flex-col gap-1">
@@ -138,7 +144,7 @@ export function ObjectivePanel({
             className="h-7 gap-1.5 px-2 text-xs"
             onClick={create}
           >
-            <Plus className="size-3.5" /> New objective
+            <Plus className="size-3.5" /> <Trans>New objective</Trans>
           </Button>
         </div>
 
@@ -174,6 +180,7 @@ function ObjectiveRow({
    *  and focus it (issue #2271). */
   rowRef?: (el: HTMLButtonElement | null) => void;
 }) {
+  const { t } = useLingui();
   return (
     <button
       ref={rowRef}
@@ -188,15 +195,20 @@ function ObjectiveRow({
       <span className="flex items-center gap-1.5">
         <span className="min-w-0 flex-1 truncate text-xs">
           {objective.text.trim() || (
-            <span className="text-muted-foreground">No text yet</span>
+            <span className="text-muted-foreground">
+              <Trans>No text yet</Trans>
+            </span>
           )}
         </span>
         {objective.hidden && (
-          <span className="shrink-0 text-[10px] text-amber-300">hidden</span>
+          <span className="shrink-0 text-[10px] text-amber-300">
+            <Trans>hidden</Trans>
+          </span>
         )}
       </span>
       <span className="truncate font-mono text-[11px] text-muted-foreground">
-        {objective.id} · {objective.kind}
+        {objective.id} ·{" "}
+        {objective.kind === "primary" ? t`primary` : t`secondary`}
       </span>
     </button>
   );
@@ -227,6 +239,7 @@ function ObjectiveForm({
   onUndo: () => void;
   issues: MissionIssue[];
 }) {
+  const { t } = useLingui();
   const edit = (patch: Partial<Omit<ScenarioObjective, "id">>) =>
     onChange(editObjective(scenario, objective.id, patch));
   const duplicate = () => {
@@ -263,8 +276,8 @@ function ObjectiveForm({
             edit({ kind: kind === "secondary" ? "secondary" : "primary" })
           }
           options={[
-            { value: "primary", label: "Primary" },
-            { value: "secondary", label: "Secondary" },
+            { value: "primary", label: t`Primary` },
+            { value: "secondary", label: t`Secondary` },
           ]}
         />
         <Button
@@ -273,7 +286,7 @@ function ObjectiveForm({
           className="ml-auto h-7 gap-1.5 px-2 text-xs"
           onClick={duplicate}
         >
-          <Copy className="size-3.5" /> Duplicate
+          <Copy className="size-3.5" /> <Trans>Duplicate</Trans>
         </Button>
         <Button
           size="sm"
@@ -282,21 +295,19 @@ function ObjectiveForm({
           onClick={() => {
             onChange(removeObjective(scenario, objective.id));
             onSelect(null);
-            notifyDeleted(
-              `Deleted objective "${objectiveLabel(objective)}".`,
-              onUndo,
-            );
+            const label = objectiveLabel(objective);
+            notifyDeleted(t`Deleted objective "${label}".`, onUndo);
           }}
         >
-          <Trash2 className="size-3.5" /> Delete
+          <Trash2 className="size-3.5" /> <Trans>Delete</Trans>
         </Button>
       </div>
 
       <div className="flex flex-col gap-0.5">
         <TextField
           value={objective.text}
-          label="Objective text"
-          placeholder="Hold the landing pad for two minutes"
+          label={t`Objective text`}
+          placeholder={t`Hold the landing pad for two minutes`}
           onCommit={(text) => edit({ text })}
           className="h-8 text-xs"
           describedBy={textDescribedBy}
@@ -314,16 +325,18 @@ function ObjectiveForm({
           htmlFor={`objective-hidden-${objective.id}`}
           className="text-xs font-medium"
         >
-          Hidden until it is settled
+          <Trans>Hidden until it is settled</Trans>
         </Label>
       </div>
 
       <p className="text-[11px] text-muted-foreground">
-        Triggers move an objective with <code>complete_objective</code> and{" "}
-        <code>fail_objective</code>, and the first of the two to run is the one
-        that sticks. A hidden objective stays off the player's panel until one
-        of them does, so it is how a mission springs a surprise job rather than
-        a secret the player never sees.
+        <Trans>
+          Triggers move an objective with <code>complete_objective</code> and{" "}
+          <code>fail_objective</code>, and the first of the two to run is the
+          one that sticks. A hidden objective stays off the player's panel until
+          one of them does, so it is how a mission springs a surprise job rather
+          than a secret the player never sees.
+        </Trans>
       </p>
     </div>
   );

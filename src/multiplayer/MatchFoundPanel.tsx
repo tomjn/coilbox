@@ -1,3 +1,4 @@
+import { Trans, useLingui } from "@lingui/react/macro";
 import { Button } from "@picoframe/frame";
 import { useEffect, useRef, useState } from "react";
 import { usePreferredTarget } from "@/play/config";
@@ -57,6 +58,7 @@ export function MatchFoundPanel() {
 }
 
 function Panel({ serverKey }: { serverKey: string }) {
+  const { t } = useLingui();
   const mirror = useConnection(serverKey)?.mirror ?? initialMirror;
   const state = mirror.state;
   const found = state?.matchmaking.found ?? null;
@@ -87,13 +89,13 @@ function Panel({ serverKey }: { serverKey: string }) {
     rungFor.current = id;
     triggerAttention(
       "matchFound",
-      "A match has been found. Accept it to play.",
+      t`A match has been found. Accept it to play.`,
     );
     void notify({
-      title: "Match found",
-      body: "Accept it before the countdown runs out.",
+      title: t`Match found`,
+      body: t`Accept it before the countdown runs out.`,
     });
-  }, [found]);
+  }, [found, t]);
 
   // The server has told us where the match is. `launch` itself refuses and
   // records why when `blocked` names a reason, which is what the error text
@@ -109,6 +111,7 @@ function Panel({ serverKey }: { serverKey: string }) {
 
   if (!found) return null;
   const key = serverKey;
+  const readyCount = found.readyCount;
   const queue =
     state?.matchmaking.queues.find((q) => q.id === found.queueId)?.name ??
     found.queueId;
@@ -116,15 +119,20 @@ function Panel({ serverKey }: { serverKey: string }) {
   return (
     <div
       role="alertdialog"
-      aria-label="A match has been found"
+      aria-label={t`A match has been found`}
       className="w-80 rounded-lg border border-border bg-card p-4 shadow-lg"
     >
-      <p className="text-sm font-semibold">Match found: {queue}</p>
+      <p className="text-sm font-semibold">
+        <Trans>Match found: {queue}</Trans>
+      </p>
       <Remaining readyBy={found.readyBy} />
       {found.readied ? (
         <p className="mt-2 text-sm text-muted-foreground">
-          Waiting for the other players
-          {found.readyCount > 0 ? `, ${found.readyCount} so far` : ""}.
+          {readyCount > 0 ? (
+            <Trans>Waiting for the other players, {readyCount} so far.</Trans>
+          ) : (
+            <Trans>Waiting for the other players.</Trans>
+          )}
         </p>
       ) : (
         <div className="mt-3 flex gap-2">
@@ -133,7 +141,7 @@ function Panel({ serverKey }: { serverKey: string }) {
               mpMatchmakingReady({ serverKey: key }).catch(() => {})
             }
           >
-            Accept
+            <Trans>Accept</Trans>
           </Button>
           <Button
             variant="secondary"
@@ -141,7 +149,7 @@ function Panel({ serverKey }: { serverKey: string }) {
               mpMatchmakingCancel({ serverKey: key }).catch(() => {})
             }
           >
-            Turn down
+            <Trans>Turn down</Trans>
           </Button>
         </div>
       )}
@@ -162,9 +170,10 @@ function Remaining({ readyBy }: { readyBy: number }) {
     const timer = window.setInterval(() => setNow(Date.now()), 1000);
     return () => window.clearInterval(timer);
   }, []);
+  const remaining = countdown(secondsLeft(readyBy, now));
   return (
     <p className="mt-1 text-sm text-muted-foreground" aria-live="polite">
-      {countdown(secondsLeft(readyBy, now))} left to accept
+      <Trans>{remaining} left to accept</Trans>
     </p>
   );
 }
@@ -183,9 +192,10 @@ function StillSearching({ serverKey }: { serverKey: string }) {
     ),
   });
   if (others.length === 0) return null;
+  const queues = others.join(", ");
   return (
     <p className="mt-2 text-xs text-muted-foreground">
-      Still searching in {others.join(", ")}.
+      <Trans>Still searching in {queues}.</Trans>
     </p>
   );
 }

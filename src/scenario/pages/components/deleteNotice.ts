@@ -25,6 +25,7 @@
  * action button before it would otherwise close.
  */
 
+import { t } from "@lingui/core/macro";
 import { toast } from "sonner";
 
 const DELETE_NOTICE_ID = "scenario-panel-delete";
@@ -35,7 +36,7 @@ export function notifyDeleted(message: string, undo: () => void): void {
     id: DELETE_NOTICE_ID,
     duration: DELETE_NOTICE_DURATION_MS,
     action: {
-      label: "Undo",
+      label: t`Undo`,
       onClick: undo,
     },
   });

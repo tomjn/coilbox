@@ -1,3 +1,4 @@
+import { Trans, useLingui } from "@lingui/react/macro";
 import { Button } from "@picoframe/frame";
 import { AlertTriangle, Download, Loader2, RefreshCw } from "lucide-react";
 import { useNavigate } from "react-router";
@@ -16,17 +17,23 @@ export function CompatBattleCard({
   state: CompatBattleState;
   onRetry: () => void;
 }) {
+  const { t } = useLingui();
   const navigate = useNavigate();
+  const baseName = state.status === "building" ? state.baseName : "";
+  const version = state.status === "building" ? state.version : 0;
   const block = compatLaunchBlock(state);
   if (!block) return null;
 
   if (state.status === "building") {
     return (
       <div className="flex items-center gap-1.5 rounded-lg border p-4 text-sm text-muted-foreground">
-        <Loader2 className="size-3.5 animate-spin" /> Building
-        <span className="font-medium text-foreground">
-          {state.baseName} (compat {state.version})
-        </span>
+        <Loader2 className="size-3.5 animate-spin" />{" "}
+        <Trans>
+          Building{" "}
+          <span className="font-medium text-foreground">
+            {baseName} (compat {version})
+          </span>
+        </Trans>
       </div>
     );
   }
@@ -35,19 +42,21 @@ export function CompatBattleCard({
     <div className="flex flex-col gap-3 rounded-lg border border-amber-500/40 bg-amber-500/10 p-4">
       <div className="flex items-center gap-2 text-sm font-medium text-amber-700 dark:text-amber-400">
         <AlertTriangle className="size-4" />
-        {state.status === "update" ? "Host is on a newer coilbox" : block.short}
+        {state.status === "update"
+          ? t`Host is on a newer coilbox`
+          : block.short}
       </div>
       <p className="text-sm">{block.reason}</p>
       <div className="flex flex-wrap items-center gap-2">
         {state.status === "update" ? (
           <Button size="sm" onClick={() => navigate("/settings/updates")}>
             <Download className="size-4" />
-            Update coilbox
+            <Trans>Update coilbox</Trans>
           </Button>
         ) : (
           <Button size="sm" variant="secondary" onClick={onRetry}>
             <RefreshCw className="size-4" />
-            Try again
+            <Trans>Try again</Trans>
           </Button>
         )}
       </div>

@@ -1,3 +1,4 @@
+import { useLingui } from "@lingui/react/macro";
 import { cn } from "@picoframe/frame";
 import type { MapPicture } from "./picture";
 import { mapPictureAlt } from "./picture";
@@ -121,6 +122,7 @@ export function MapDrawing({
   picture: MissingMapPicture;
   className?: string;
 }) {
+  const { t } = useLingui();
   const measure = placeholderMeasure(picture);
 
   return (
@@ -136,7 +138,7 @@ export function MapDrawing({
       <p className="flex flex-col items-center gap-0.5 text-center text-xs">
         <span className="break-all">{picture.name}</span>
         <span className="text-muted-foreground">
-          {measure ?? "No picture of this map yet"}
+          {measure ?? t`No picture of this map yet`}
         </span>
       </p>
     </div>

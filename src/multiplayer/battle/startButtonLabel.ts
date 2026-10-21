@@ -8,6 +8,9 @@
  * founder (a battle coilbox hosts itself, or one hosted directly on Zero-K),
  * and a Tachyon lobby's boss. Everyone else sees "Vote to start".
  */
+
+import { t } from "@lingui/core/macro";
+
 export function startButtonLabel(canStartDirectly: boolean): string {
-  return canStartDirectly ? "Start" : "Vote to start";
+  return canStartDirectly ? t`Start` : t`Vote to start`;
 }

@@ -29,6 +29,7 @@
  * reader, the same two the picker uses, so a file looks the same in all three
  * places.
  */
+import { Trans, useLingui } from "@lingui/react/macro";
 import { Button, buttonVariants, cn } from "@picoframe/frame";
 import { Blocks, ChevronDown, ChevronRight } from "lucide-react";
 import { useState } from "react";
@@ -67,6 +68,7 @@ function PicturePreview({
   member: string;
   assets: AssetBrowsing;
 }) {
+  const { t } = useLingui();
   const { data, loading } = useUnitsyncArchiveFile(
     assets.enginePath,
     assets.dataDir,
@@ -97,10 +99,10 @@ function PicturePreview({
   // draws for a broken path would be the wrong thing to say.
   return (
     <span
-      title="Coilbox cannot draw this picture. The game can still read it."
+      title={t`Coilbox cannot draw this picture. The game can still read it.`}
       className="flex size-12 shrink-0 items-center justify-center rounded border border-border/50 bg-muted text-center text-[9px] leading-tight text-muted-foreground"
     >
-      no preview
+      <Trans>no preview</Trans>
     </span>
   );
 }
@@ -115,6 +117,7 @@ function ModelPreview({
   assets: AssetBrowsing;
   label: string;
 }) {
+  const { t } = useLingui();
   const [open, setOpen] = useState(false);
   const size = sizeOf(assets, member);
   const tooLarge = modelTooLargeToPreview(size);
@@ -125,6 +128,9 @@ function ModelPreview({
     open && !tooLarge ? member : undefined,
   );
   const openable = openableInBuilder(member);
+  const archiveLabel = assets.archiveLabel;
+  const modelSize = formatBytes(size);
+  const previewCap = formatBytes(MODEL_PREVIEW_CAP);
 
   return (
     <div className="flex min-w-0 flex-col gap-1.5">
@@ -138,14 +144,16 @@ function ModelPreview({
           // A section can hold more than one model field, so the button says
           // which one it opens rather than leaving several identical "Show
           // model" buttons for a screen reader to tell apart.
-          aria-label={`${open ? "Hide" : "Show"} the ${label} model`}
+          aria-label={
+            open ? t`Hide the ${label} model` : t`Show the ${label} model`
+          }
         >
           {open ? (
             <ChevronDown className="size-3" />
           ) : (
             <ChevronRight className="size-3" />
           )}
-          {open ? "Hide model" : "Show model"}
+          {open ? t`Hide model` : t`Show model`}
         </Button>
         {/* Not behind the preview. Somebody who wants the model in the builder
             has no reason to draw it here first, and the read they would be
@@ -161,10 +169,10 @@ function ModelPreview({
               buttonVariants({ variant: "ghost", size: "sm" }),
               "h-6 shrink-0 gap-1 px-1.5 text-[11px]",
             )}
-            title={`Open ${member} in the unit builder`}
+            title={t`Open ${member} in the unit builder`}
           >
             <Blocks className="size-3" />
-            Open in the builder
+            <Trans>Open in the builder</Trans>
           </Link>
         )}
       </div>
@@ -179,24 +187,27 @@ function ModelPreview({
           since that list has grown once already. */}
       {!openable && (
         <span className="text-[10px] text-muted-foreground">
-          The engine draws this one, and the builder cannot open it.
+          <Trans>
+            The engine draws this one, and the builder cannot open it.
+          </Trans>
         </span>
       )}
       {open &&
         (tooLarge ? (
           <span className="text-[10px] text-muted-foreground">
-            This model is {formatBytes(size)}, past the{" "}
-            {formatBytes(MODEL_PREVIEW_CAP)} a preview reads.
+            <Trans>
+              This model is {modelSize}, past the {previewCap} a preview reads.
+            </Trans>
           </span>
         ) : loading ? (
           <span className="text-[10px] text-muted-foreground">
-            Reading this model out of {assets.archiveLabel}.
+            <Trans>Reading this model out of {archiveLabel}.</Trans>
           </span>
         ) : failed ? (
           <span className="text-[10px] text-muted-foreground">
             <ModelReadFailed
               error={error}
-              fallback="Could not reach unitsync to read this model."
+              fallback={t`Could not reach unitsync to read this model.`}
               onRetry={retry}
             />
           </span>
@@ -207,7 +218,7 @@ function ModelPreview({
           />
         ) : (
           <span className="text-[10px] text-muted-foreground">
-            Nothing drawable came out of this file.
+            <Trans>Nothing drawable came out of this file.</Trans>
           </span>
         ))}
     </div>

@@ -1,3 +1,4 @@
+import { Trans, useLingui } from "@lingui/react/macro";
 import { useCallback, useEffect } from "react";
 import type { MapItem } from "@/content/bindings";
 import { autohostHearsChat } from "../../direct/room";
@@ -10,14 +11,18 @@ import { initialMirror, useConnection, useMultiplayer } from "../store";
 import { colorIntToHex, type MemberRow } from "./config";
 import { applyLayoutDirectly, balanceLayoutForRows } from "./gameTypePresets";
 import { HostSuggestionAction } from "./HostSuggestionAction";
-import {
-  type HostSuggestionKind,
-  hostSuggestionActionLabel,
-  matchHostSuggestion,
-} from "./hostSuggestion";
+import { type HostSuggestionKind, matchHostSuggestion } from "./hostSuggestion";
 import { MapSuggestionAction } from "./MapSuggestionAction";
 import { matchMapSuggestion } from "./mapSuggestion";
 import { useMapChangeQueue } from "./useMapChangeQueue";
+
+// The line posted back when a founder rejects a suggestion is read by the
+// whole room, so it stays English.
+const SENT_ACTION: Record<HostSuggestionKind, string> = {
+  balance: "balance the teams",
+  lock: "lock the room",
+  unlock: "unlock the room",
+};
 
 /**
  * The battle's chat, embedded in the room. Reuses the same `ChatPane` +
@@ -88,6 +93,7 @@ export function BattleChatCard({
    * `useNameMark` on this battle's connection (issue #336). */
   markFor?: (name: string) => NameMark | null;
 }) {
+  const { t } = useLingui();
   const { markSeen } = useMultiplayer();
   const mirror = useConnection(serverKey)?.mirror ?? initialMirror;
   const me = mirror.state?.myUsername ?? null;
@@ -152,7 +158,7 @@ export function BattleChatCard({
   );
   const rejectHostSuggestion = useCallback(
     (kind: HostSuggestionKind) => {
-      conv.send(`Declined: ${hostSuggestionActionLabel(kind)}`);
+      conv.send(`Declined: ${SENT_ACTION[kind]}`);
     },
     [conv],
   );
@@ -199,7 +205,7 @@ export function BattleChatCard({
   if (!channel) {
     return (
       <div className="rounded-md border border-border p-4 text-sm text-muted-foreground">
-        Battle chat isn't available yet.
+        <Trans>Battle chat isn't available yet.</Trans>
       </div>
     );
   }
@@ -213,7 +219,7 @@ export function BattleChatCard({
     <div className="grid min-h-[22rem] flex-1">
       <ChatPane
         variant="embedded"
-        title="Battle chat"
+        title={t`Battle chat`}
         messages={conv.messages}
         currentUser={me}
         senderColor={senderColor}

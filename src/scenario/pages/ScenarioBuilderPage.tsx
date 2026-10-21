@@ -1,3 +1,5 @@
+import { plural } from "@lingui/core/macro";
+import { Trans, useLingui } from "@lingui/react/macro";
 import { Button, Input, useDrawer } from "@picoframe/frame";
 import {
   ChevronDown,
@@ -78,6 +80,7 @@ import {
  * also the row's longest and least predictable line gone.
  */
 export default function ScenarioBuilderPage() {
+  const { t } = useLingui();
   const { scenarios, loading, error, refresh } = useScenarios();
   const { campaigns } = useCampaigns();
   // The engine and content root every row's map is looked up against, and that
@@ -116,6 +119,7 @@ export default function ScenarioBuilderPage() {
     () => groupScenariosByGame(filterScenarios(scenarios, query, source)),
     [scenarios, query, source],
   );
+  const scenarioCount = scenarios.length;
   const showAll = () => {
     setQuery("");
     setSource("all");
@@ -126,7 +130,7 @@ export default function ScenarioBuilderPage() {
   // scenario before it exists.
   const openNew = (starter = false) =>
     drawer.open({
-      title: starter ? "New scenario from the starter" : "New scenario",
+      title: starter ? t`New scenario from the starter` : t`New scenario`,
       width: "28rem",
       content: (
         <NewScenarioForm
@@ -150,7 +154,7 @@ export default function ScenarioBuilderPage() {
     try {
       await refresh();
       void notify({
-        title: "Rescanned. The scenario list is up to date.",
+        title: t`Rescanned. The scenario list is up to date.`,
         level: "success",
       });
     } finally {
@@ -164,7 +168,7 @@ export default function ScenarioBuilderPage() {
   // time before (issue #1395).
   const openReclaim = () =>
     drawer.open({
-      title: "Reclaim dialogue clips",
+      title: t`Reclaim dialogue clips`,
       width: "24rem",
       content: (
         <ReclaimClipsForm key={nextDrawerKey()} onDone={() => drawer.close()} />
@@ -179,8 +183,9 @@ export default function ScenarioBuilderPage() {
     const { ShareScenarioForm } = await import(
       "./components/ShareScenarioForm"
     );
+    const name = scenario.name;
     drawer.open({
-      title: `Share ${scenario.name}`,
+      title: t`Share ${name}`,
       width: "28rem",
       content: (
         <ShareScenarioForm
@@ -220,8 +225,10 @@ export default function ScenarioBuilderPage() {
       await refreshScenarios();
       navigate(`/scenario-builder/${copy.id}`);
     } catch (e) {
+      const name = scenario.name;
+      const reason = e instanceof Error ? e.message : String(e);
       void notify({
-        title: `Could not duplicate ${scenario.name}: ${e instanceof Error ? e.message : String(e)}`,
+        title: t`Could not duplicate ${name}: ${reason}`,
         level: "error",
       });
     }
@@ -259,6 +266,9 @@ export default function ScenarioBuilderPage() {
     // Null for a document written by an older build, or hand-edited, which can
     // carry no stamp at all. Dropping the segment beats "edited Invalid Date".
     const edited = relativeTime(scenario.updatedAt);
+    const campaignCount = inCampaigns.length;
+    const campaignNames = inCampaigns.join(", ");
+    const originGame = origin?.gameName;
     return (
       <li
         key={scenario.id}
@@ -285,17 +295,17 @@ export default function ScenarioBuilderPage() {
               </span>
               {draft && (
                 <Badge variant="outline" className="shrink-0 text-[10px]">
-                  Draft
+                  <Trans>Draft</Trans>
                 </Badge>
               )}
               {bundled && (
                 <span className="shrink-0 rounded bg-muted px-1.5 py-0.5 text-xs text-muted-foreground">
-                  Bundled
+                  <Trans>Bundled</Trans>
                 </span>
               )}
               {fromGame && origin && (
                 <Badge variant="secondary" className="shrink-0 text-[10px]">
-                  From {origin.gameName}
+                  <Trans>From {originGame}</Trans>
                 </Badge>
               )}
               {/* Not a link. The whole row is already one, and an anchor inside
@@ -306,11 +316,12 @@ export default function ScenarioBuilderPage() {
                 <Badge
                   variant="secondary"
                   className="shrink-0 text-[10px]"
-                  title={`Used by ${inCampaigns.join(", ")}`}
+                  title={t`Used by ${campaignNames}`}
                 >
-                  {inCampaigns.length === 1
-                    ? "In campaign"
-                    : `In ${inCampaigns.length} campaigns`}
+                  {plural(campaignCount, {
+                    one: "In campaign",
+                    other: "In # campaigns",
+                  })}
                 </Badge>
               )}
             </div>
@@ -318,7 +329,7 @@ export default function ScenarioBuilderPage() {
                 repeating it here would be the one piece of text the grouping
                 was meant to stop repeating (issue #2181). */}
             <span className="truncate text-xs text-muted-foreground">
-              {scenario.setup.mapName || "No map"}
+              {scenario.setup.mapName || t`No map`}
             </span>
             {/* The chips and the edit time share one line, and the chips are
                 what makes room for it. The edit time is a fact about the
@@ -326,7 +337,11 @@ export default function ScenarioBuilderPage() {
                 engine setup. */}
             <span className="flex items-center gap-2 text-xs text-muted-foreground">
               <ScenarioContentChips scenario={scenario} />
-              {edited && <span className="truncate">edited {edited}</span>}
+              {edited && (
+                <span className="truncate">
+                  <Trans>edited {edited}</Trans>
+                </span>
+              )}
             </span>
             {/* Only when the author wrote one. An empty line here would be a row
                 that is taller for having said nothing. */}
@@ -355,8 +370,8 @@ export default function ScenarioBuilderPage() {
   return (
     <div className="flex flex-col gap-5 p-4">
       <PageHeader
-        title="Scenario Builder"
-        description="Author a mission's in-engine content: what spawns, what the triggers watch for, and what wins it. A scenario stands alone, so you can play one on its own or attach it to a campaign mission later."
+        title={t`Scenario Builder`}
+        description={t`Author a mission's in-engine content: what spawns, what the triggers watch for, and what wins it. A scenario stands alone, so you can play one on its own or attach it to a campaign mission later.`}
         actions={
           <>
             {/* The two the page exists for. Getting hold of a scenario and
@@ -368,7 +383,7 @@ export default function ScenarioBuilderPage() {
               }
             />
             <Button className="gap-1.5" onClick={() => openNew()}>
-              <Plus className="size-4" /> New scenario
+              <Plus className="size-4" /> <Trans>New scenario</Trans>
             </Button>
             {/* Rescan and Reclaim clips are housekeeping on the store behind the
                 list rather than authoring, and they were sitting at the same
@@ -389,9 +404,10 @@ export default function ScenarioBuilderPage() {
                   type="button"
                   variant="ghost"
                   className="gap-1.5 text-muted-foreground data-[state=open]:text-foreground"
-                  aria-label="More scenario actions"
+                  aria-label={t`More scenario actions`}
                 >
-                  More <ChevronDown className="size-4" aria-hidden="true" />
+                  <Trans>More</Trans>{" "}
+                  <ChevronDown className="size-4" aria-hidden="true" />
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="w-52">
@@ -407,13 +423,14 @@ export default function ScenarioBuilderPage() {
                   ) : (
                     <RefreshCw className="size-4" aria-hidden="true" />
                   )}
-                  Rescan
+                  <Trans>Rescan</Trans>
                 </DropdownMenuItem>
                 {/* Not marked destructive, because this item deletes nothing.
                     It opens a dry run that names the count and the size, and
                     the confirm inside it is the destructive control. */}
                 <DropdownMenuItem onSelect={openReclaim}>
-                  <Trash2 className="size-4" aria-hidden="true" /> Reclaim clips
+                  <Trash2 className="size-4" aria-hidden="true" />{" "}
+                  <Trans>Reclaim clips</Trans>
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
@@ -428,8 +445,8 @@ export default function ScenarioBuilderPage() {
             <Input
               value={query}
               onChange={(e) => setQuery(e.target.value)}
-              placeholder="Search scenarios…"
-              aria-label="Search scenarios by name"
+              placeholder={t`Search scenarios…`}
+              aria-label={t`Search scenarios by name`}
               className="h-8 w-56"
             />
             {/* Only when this machine has more than one kind. Most authors have
@@ -443,7 +460,7 @@ export default function ScenarioBuilderPage() {
                   aria-pressed={source === "all"}
                   onClick={() => setSource("all")}
                 >
-                  All
+                  <Trans>All</Trans>
                 </Button>
                 {sources.map((s) => (
                   <Button
@@ -476,8 +493,10 @@ export default function ScenarioBuilderPage() {
           label={
             <span className="flex flex-col items-center gap-3">
               <span>
-                No scenarios yet. Start from the starter to get a mission that
-                already plays, start an empty one, or import a shared one.
+                <Trans>
+                  No scenarios yet. Start from the starter to get a mission that
+                  already plays, start an empty one, or import a shared one.
+                </Trans>
               </span>
               <Button
                 variant="outline"
@@ -485,7 +504,8 @@ export default function ScenarioBuilderPage() {
                 className="gap-1.5"
                 onClick={() => openNew(true)}
               >
-                <Wand2 className="size-4" /> Start from the starter
+                <Wand2 className="size-4" />{" "}
+                <Trans>Start from the starter</Trans>
               </Button>
             </span>
           }
@@ -498,10 +518,13 @@ export default function ScenarioBuilderPage() {
           label={
             <span className="flex flex-col items-center gap-2">
               <span>
-                No scenarios match. All {scenarios.length} are still here.
+                {plural(scenarioCount, {
+                  one: "No scenarios match. The only scenario is still here.",
+                  other: "No scenarios match. All # are still here.",
+                })}
               </span>
               <Button variant="outline" size="sm" onClick={showAll}>
-                Show all scenarios
+                <Trans>Show all scenarios</Trans>
               </Button>
             </span>
           }
@@ -514,7 +537,7 @@ export default function ScenarioBuilderPage() {
                   names, often with a version in them, and they should read the
                   way they are written everywhere else in the app. */}
               <h2 className="px-1 text-xs font-semibold text-muted-foreground">
-                {group.gameName || "No game yet"}
+                {group.gameName || t`No game yet`}
               </h2>
               <ul className="flex flex-col gap-2">
                 {group.scenarios.map(row)}
@@ -543,6 +566,7 @@ function NewScenarioForm({
   starter?: boolean;
   onCreated: (id: string) => void;
 }) {
+  const { t } = useLingui();
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
   const [busy, setBusy] = useState(false);
@@ -572,19 +596,21 @@ function NewScenarioForm({
           cannot know them. */}
       {starter && (
         <p className="text-xs text-muted-foreground">
-          The starter comes with a mission in it: an opening radio message, an
-          objective, and the triggers that play the one and complete the other
-          five minutes in. Pick a game and a map in the editor and it plays.
+          <Trans>
+            The starter comes with a mission in it: an opening radio message, an
+            objective, and the triggers that play the one and complete the other
+            five minutes in. Pick a game and a map in the editor and it plays.
+          </Trans>
         </p>
       )}
       <Input
         value={name}
-        placeholder="Name"
+        placeholder={t`Name`}
         onChange={(e) => setName(e.target.value)}
       />
       <Textarea
         value={description}
-        placeholder="Description (optional)"
+        placeholder={t`Description (optional)`}
         className="min-h-16"
         onChange={(e) => setDescription(e.target.value)}
       />
@@ -594,7 +620,7 @@ function NewScenarioForm({
         onClick={create}
         disabled={!name.trim() || busy}
       >
-        <Plus className="size-4" /> {busy ? "Creating…" : "Create"}
+        <Plus className="size-4" /> {busy ? t`Creating…` : t`Create`}
       </Button>
     </div>
   );

@@ -1,3 +1,4 @@
+import { Trans, useLingui } from "@lingui/react/macro";
 import { Button, Input } from "@picoframe/frame";
 import { ChevronRight, X } from "lucide-react";
 import { useEffect, useState } from "react";
@@ -61,6 +62,7 @@ export function ConsoleDrawer({
    * switch once more than one connection is live. */
   serverKey?: string | null;
 }) {
+  const { t } = useLingui();
   const { connections, activeKey } = useMultiplayer();
   const servers = useProtocolServers();
   const liveKeys = liveConnectionKeys(connections, activeKey);
@@ -104,7 +106,7 @@ export function ConsoleDrawer({
       {open && (
         <button
           type="button"
-          aria-label="Close protocol console"
+          aria-label={t`Close protocol console`}
           className="fixed inset-0 z-40 bg-black/20"
           onClick={onClose}
         />
@@ -116,7 +118,9 @@ export function ConsoleDrawer({
         inert={!open}
       >
         <header className="flex items-center justify-between gap-2 border-b border-border px-4 py-3">
-          <h2 className="shrink-0 text-sm font-semibold">Protocol console</h2>
+          <h2 className="shrink-0 text-sm font-semibold">
+            <Trans>Protocol console</Trans>
+          </h2>
           {pickable.length > 1 && (
             <div className="min-w-0 flex-1">
               <AccountPicker
@@ -126,7 +130,7 @@ export function ConsoleDrawer({
               />
             </div>
           )}
-          <Button className="h-7 px-2" onClick={onClose} aria-label="Close">
+          <Button className="h-7 px-2" onClick={onClose} aria-label={t`Close`}>
             <X className="size-4" />
           </Button>
         </header>
@@ -142,14 +146,14 @@ export function ConsoleDrawer({
               value={command}
               onChange={(e) => setCommand(e.target.value)}
               placeholder={
-                sendKey ? "Send a raw command…" : "Connect to send commands"
+                sendKey ? t`Send a raw command…` : t`Connect to send commands`
               }
               disabled={!sendKey}
               className="font-mono text-xs"
               {...identifierFieldProps}
             />
             <Button type="submit" disabled={!sendKey || !command.trim()}>
-              Send
+              <Trans>Send</Trans>
             </Button>
           </form>
         ) : (
@@ -176,6 +180,7 @@ export function ConsoleDrawer({
  * request reached nobody, so sending it again is safe.
  */
 function TachyonSendBox({ serverKey }: { serverKey: string | null }) {
+  const { t } = useLingui();
   const [commandId, setCommandId] = useState("");
   const [dataText, setDataText] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -202,7 +207,7 @@ function TachyonSendBox({ serverKey }: { serverKey: string | null }) {
     <form onSubmit={send} className="space-y-2 border-t border-border p-3">
       <div className="space-y-1">
         <Label htmlFor="tachyon-command-id" className="text-xs">
-          Command id
+          <Trans>Command id</Trans>
         </Label>
         <Input
           id="tachyon-command-id"
@@ -216,13 +221,13 @@ function TachyonSendBox({ serverKey }: { serverKey: string | null }) {
       </div>
       <div className="space-y-1">
         <Label htmlFor="tachyon-data" className="text-xs">
-          Data
+          <Trans>Data</Trans>
         </Label>
         <Textarea
           id="tachyon-data"
           value={dataText}
           onChange={(e) => setDataText(e.target.value)}
-          placeholder={'{ "id": "…" }, or leave empty'}
+          placeholder={t`{ "id": "…" }, or leave empty`}
           disabled={!serverKey}
           rows={3}
           className="font-mono text-xs"
@@ -235,11 +240,11 @@ function TachyonSendBox({ serverKey }: { serverKey: string | null }) {
       ) : null}
       <div className="flex items-center gap-2">
         <Button type="submit" disabled={!serverKey || sending}>
-          {sending ? "Sending…" : "Send"}
+          {sending ? t`Sending…` : t`Send`}
         </Button>
         {!serverKey ? (
           <span className="text-xs text-muted-foreground">
-            Connect to send a request.
+            <Trans>Connect to send a request.</Trans>
           </span>
         ) : null}
       </div>
@@ -258,7 +263,7 @@ function ConsoleLog({
   if (lines.length === 0) {
     return (
       <p className="p-4 text-sm text-muted-foreground">
-        No console output yet.
+        <Trans>No console output yet.</Trans>
       </p>
     );
   }
@@ -294,8 +299,10 @@ function TachyonLog({ lines }: { lines: string[] }) {
  * itself scrolls in its own box, so one enormous frame cannot stretch the drawer.
  */
 function TachyonFrame({ entry }: { entry: TachyonConsoleEntry }) {
+  const { t } = useLingui();
   const arrow = entry.direction === "out" ? ">>" : "<<";
-  const direction = entry.direction === "out" ? "sent" : "received";
+  const maxFrameChars = MAX_FRAME_CHARS;
+  const direction = entry.direction === "out" ? t`sent` : t`received`;
 
   // Not a frame at all: a note the connection task wrote, or something the server
   // sent that is not JSON. Shown as it stands, wrapped rather than truncated,
@@ -328,7 +335,7 @@ function TachyonFrame({ entry }: { entry: TachyonConsoleEntry }) {
           </Badge>
         ) : null}
         <span className="min-w-0 truncate">
-          {entry.commandId ?? "no command id"}
+          {entry.commandId ?? t`no command id`}
         </span>
         {entry.status ? (
           <Badge
@@ -355,7 +362,7 @@ function TachyonFrame({ entry }: { entry: TachyonConsoleEntry }) {
         </pre>
         {entry.truncated ? (
           <p className="px-3 pb-2 text-xs text-muted-foreground">
-            Cut short at {MAX_FRAME_CHARS} characters.
+            <Trans>Cut short at {maxFrameChars} characters.</Trans>
           </p>
         ) : null}
       </CollapsibleContent>

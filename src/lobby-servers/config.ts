@@ -1,4 +1,7 @@
+import type { I18n, MessageDescriptor } from "@lingui/core";
+import { msg } from "@lingui/core/macro";
 import { useSetting } from "@picoframe/frame";
+import { lazyText } from "../i18n/pluginText";
 import type { ProfileLobby } from "../profile/profile";
 import { getProfile } from "../profile/profile";
 import { bracketedHost } from "./hostForms";
@@ -125,6 +128,23 @@ export function canonicalServerId(id: string): string {
   return RENAMED_BUILTIN_IDS[id] ?? id;
 }
 
+const TACHYON_NOTICE = msg`Our Tachyon support is incomplete. Use the Beyond All Reason entry instead.`;
+const SPRING_OFFICIAL_NOTICE = msg`You cannot register a new account here. This server's verification emails are not being delivered.`;
+
+/**
+ * A built-in server's `notice` in the active language. The field holds the
+ * `lazyText` key, which is the English source outside a release build, so it is
+ * matched back to its message here.
+ */
+export function serverNotice(
+  i18n: I18n,
+  notice: string | undefined,
+): string | undefined {
+  const known: MessageDescriptor[] = [TACHYON_NOTICE, SPRING_OFFICIAL_NOTICE];
+  const found = known.find((d) => (d.message ?? d.id) === notice);
+  return found ? i18n._(found) : notice;
+}
+
 /**
  * The well-known public lobby servers, taken from SkyLobby's `default-servers`
  * (graal/clj/skylobby/util.clj). Read-only, and users add logins against these. BAR
@@ -183,8 +203,7 @@ export const BUILTIN_SERVERS: LobbyServer[] = [
     allowSelfSigned: false,
     protocol: "tachyon",
     alpha: true,
-    notice:
-      "Our Tachyon support is incomplete. Use the Beyond All Reason entry instead.",
+    notice: lazyText(TACHYON_NOTICE),
   },
   {
     id: "zero-k",
@@ -208,8 +227,7 @@ export const BUILTIN_SERVERS: LobbyServer[] = [
     port: 8200,
     tls: false,
     allowSelfSigned: false,
-    notice:
-      "You cannot register a new account here. This server's verification emails are not being delivered.",
+    notice: lazyText(SPRING_OFFICIAL_NOTICE),
   },
 ];
 

@@ -1,3 +1,6 @@
+import type { MessageDescriptor } from "@lingui/core";
+import { msg } from "@lingui/core/macro";
+import { Trans, useLingui } from "@lingui/react/macro";
 import { Button } from "@picoframe/frame";
 import {
   ArrowLeft,
@@ -55,12 +58,12 @@ const DOT_CLASS: Record<DotStatus, string> = {
   error: "bg-destructive",
 };
 
-const LABEL: Record<DotStatus, string> = {
-  off: "Multiplayer: log in",
-  connecting: "Multiplayer: connecting",
-  on: "Multiplayer: connected",
-  away: "Multiplayer: away",
-  error: "Multiplayer: connection error",
+const LABEL: Record<DotStatus, MessageDescriptor> = {
+  off: msg`Multiplayer: log in`,
+  connecting: msg`Multiplayer: connecting`,
+  on: msg`Multiplayer: connected`,
+  away: msg`Multiplayer: away`,
+  error: msg`Multiplayer: connection error`,
 };
 
 /**
@@ -73,6 +76,7 @@ const LABEL: Record<DotStatus, string> = {
  * same popover.
  */
 export default function LobbyStatusButton() {
+  const { t } = useLingui();
   const [accountsCfg] = useLobbyAccounts();
   const {
     connections,
@@ -96,7 +100,7 @@ export default function LobbyStatusButton() {
       <PopoverTrigger asChild>
         <button
           type="button"
-          aria-label={LABEL[status]}
+          aria-label={t(LABEL[status])}
           className="relative flex size-8 items-center justify-center rounded-md hover:bg-accent focus-visible:outline-2 focus-visible:outline-ring"
         >
           <Users className="size-4" />
@@ -120,12 +124,13 @@ export default function LobbyStatusButton() {
  * phases are not listed: that connect is one step from the user's side, and its
  * ten phases pass too fast to read.
  */
-const PHASE_LABEL: Partial<Record<LoginPhase, string>> = {
-  tachyonAuthorizing: "Checking your sign-in",
-  tachyonOpening: "Opening the connection",
+const PHASE_LABEL: Partial<Record<LoginPhase, MessageDescriptor>> = {
+  tachyonAuthorizing: msg`Checking your sign-in`,
+  tachyonOpening: msg`Opening the connection`,
 };
 
 export function LoginPanel({ onNavigate }: { onNavigate: () => void }) {
+  const { t } = useLingui();
   const [accountsCfg] = useLobbyAccounts();
   const [customCfg] = useCustomServers();
   const accounts = accountsCfg.accounts;
@@ -245,7 +250,7 @@ export function LoginPanel({ onNavigate }: { onNavigate: () => void }) {
     try {
       if (!server) {
         throw new Error(
-          "This login's server no longer exists (check Settings).",
+          t`This login's server no longer exists (check Settings).`,
         );
       }
       if (tachyon && (signInFirst || account.hasSecret !== true)) {
@@ -307,6 +312,14 @@ export function LoginPanel({ onNavigate }: { onNavigate: () => void }) {
     await connectTo(account);
   }
 
+  const recoveredUser = recovered?.username;
+  const recoveredServer = recovered
+    ? (resolveServer(recovered.serverId, customCfg.servers)?.name ??
+      t`that server`)
+    : null;
+  const loginError = mirror.loginError;
+  const disconnectError = mirror.error;
+
   if (liveKeys.length > 0 && !adding) {
     const several = listed.length > 1;
     const anyReady = liveKeys.some(
@@ -343,7 +356,13 @@ export function LoginPanel({ onNavigate }: { onNavigate: () => void }) {
                   >
                     {/* A login that dropped or never opened has nothing to
                         log out of. Dismissing it also stops its reconnect. */}
-                    {opening ? "Cancel" : entry.live ? "Log out" : "Dismiss"}
+                    {opening ? (
+                      <Trans>Cancel</Trans>
+                    ) : entry.live ? (
+                      <Trans>Log out</Trans>
+                    ) : (
+                      <Trans>Dismiss</Trans>
+                    )}
                   </Button>
                 )}
               </li>
@@ -355,15 +374,19 @@ export function LoginPanel({ onNavigate }: { onNavigate: () => void }) {
           className="flex items-center justify-between gap-3"
         >
           <span className="flex flex-col">
-            <span className="text-sm font-medium">Away</span>
+            <span className="text-sm font-medium">
+              <Trans>Away</Trans>
+            </span>
             <span className="text-xs text-muted-foreground">
               {/* The idle watcher owns the away bit unless the user takes it,
                   so say which of the two is showing right now. */}
-              {manualAway
-                ? "Others see you as away until you turn this off."
-                : idleAway
-                  ? "You've been set away automatically while idle."
-                  : "Tell others you're not at the keyboard."}
+              {manualAway ? (
+                <Trans>Others see you as away until you turn this off.</Trans>
+              ) : idleAway ? (
+                <Trans>You've been set away automatically while idle.</Trans>
+              ) : (
+                <Trans>Tell others you're not at the keyboard.</Trans>
+              )}
             </span>
           </span>
           <Switch
@@ -378,7 +401,7 @@ export function LoginPanel({ onNavigate }: { onNavigate: () => void }) {
           onClick={onNavigate}
           className="inline-flex h-8 items-center justify-center rounded-md border border-border text-sm font-medium hover:bg-accent"
         >
-          Chat
+          <Trans>Chat</Trans>
         </Link>
         <Button
           variant="outline"
@@ -390,14 +413,14 @@ export function LoginPanel({ onNavigate }: { onNavigate: () => void }) {
           className="h-8 gap-2"
         >
           <Plus className="size-4" />
-          Add another login
+          <Trans>Add another login</Trans>
         </Button>
         <Button
           onClick={() => void (several ? logOutAll() : logOut(listed[0]))}
           disabled={busy}
           className="h-8"
         >
-          {several ? "Log out of all" : "Log out"}
+          {several ? <Trans>Log out of all</Trans> : <Trans>Log out</Trans>}
         </Button>
         {error && <p className="text-xs text-destructive">{error}</p>}
       </div>
@@ -410,7 +433,9 @@ export function LoginPanel({ onNavigate }: { onNavigate: () => void }) {
   if (registering) {
     return (
       <div className="flex flex-col gap-2">
-        <p className="px-1 text-sm font-medium">Create an account</p>
+        <p className="px-1 text-sm font-medium">
+          <Trans>Create an account</Trans>
+        </p>
         <RegisterForm
           servers={allServers(customCfg.servers)}
           onSuccess={() => setRegistering(false)}
@@ -425,7 +450,9 @@ export function LoginPanel({ onNavigate }: { onNavigate: () => void }) {
   if (recovering) {
     return (
       <div className="flex flex-col gap-2">
-        <p className="px-1 text-sm font-medium">Recover your password</p>
+        <p className="px-1 text-sm font-medium">
+          <Trans>Recover your password</Trans>
+        </p>
         <PasswordRecoveryForm
           servers={allServers(customCfg.servers)}
           onSignIn={(serverId, username) => {
@@ -440,6 +467,7 @@ export function LoginPanel({ onNavigate }: { onNavigate: () => void }) {
 
   if ((busy && liveKeys.length === 0) || pending != null) {
     const phase = mirror.phase ? PHASE_LABEL[mirror.phase] : undefined;
+    const phaseText = phase ? t(phase) : undefined;
     const pendingServer = pending
       ? resolveServer(pending.serverId, customCfg.servers)
       : null;
@@ -452,12 +480,12 @@ export function LoginPanel({ onNavigate }: { onNavigate: () => void }) {
         <Loader2 className="size-5 animate-spin text-muted-foreground" />
         <div className="text-center">
           <p className="text-sm font-medium">
-            {signingIn ? "Waiting for your browser" : "Connecting…"}
+            {signingIn ? t`Waiting for your browser` : t`Connecting…`}
           </p>
           <p className="text-xs text-muted-foreground">
             {signingIn
-              ? "Sign in on the page Coilbox opened, then come back."
-              : (phase ?? pending?.username ?? "server")}
+              ? t`Sign in on the page Coilbox opened, then come back.`
+              : (phaseText ?? pending?.username ?? t`server`)}
           </p>
         </div>
         {/* Nothing can call off a sign-in that is happening in someone else's
@@ -467,7 +495,7 @@ export function LoginPanel({ onNavigate }: { onNavigate: () => void }) {
             onClick={() => void cancelConnect(pendingKey)}
             className="h-8 w-full"
           >
-            Cancel
+            <Trans>Cancel</Trans>
           </Button>
         )}
         {error && <p className="text-xs text-destructive">{error}</p>}
@@ -488,13 +516,19 @@ export function LoginPanel({ onNavigate }: { onNavigate: () => void }) {
             className="h-8 gap-1.5 px-2"
           >
             <ArrowLeft className="size-4" />
-            Back
+            <Trans>Back</Trans>
           </Button>
-          <p className="text-sm font-medium">Add another login</p>
+          <p className="text-sm font-medium">
+            <Trans>Add another login</Trans>
+          </p>
         </div>
       ) : (
         <p className="px-2 pb-1 text-sm font-medium">
-          {revealed ? "Reconnect to multiplayer" : "Connect to multiplayer"}
+          {revealed ? (
+            <Trans>Reconnect to multiplayer</Trans>
+          ) : (
+            <Trans>Connect to multiplayer</Trans>
+          )}
         </p>
       )}
       {pendingRemembered.length > 1 && (
@@ -505,7 +539,7 @@ export function LoginPanel({ onNavigate }: { onNavigate: () => void }) {
           className="mb-1 h-9 justify-start gap-2"
         >
           <RefreshCw className="size-4" />
-          Reconnect all
+          <Trans>Reconnect all</Trans>
         </Button>
       )}
       <div className="min-h-0 flex-1 overflow-y-auto">
@@ -526,7 +560,7 @@ export function LoginPanel({ onNavigate }: { onNavigate: () => void }) {
         className="flex items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm text-muted-foreground hover:bg-accent hover:text-accent-foreground"
       >
         <UserPlus className="size-4" />
-        Register a new account
+        <Trans>Register a new account</Trans>
       </button>
       <button
         type="button"
@@ -537,23 +571,23 @@ export function LoginPanel({ onNavigate }: { onNavigate: () => void }) {
         className="flex items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm text-muted-foreground hover:bg-accent hover:text-accent-foreground"
       >
         <KeyRound className="size-4" />
-        Forgot password?
+        <Trans>Forgot password?</Trans>
       </button>
       {recovered && (
         <p className="px-2 pt-1 text-xs text-muted-foreground">
-          A new password has been emailed for{" "}
-          <span className="font-medium">{recovered.username}</span> on{" "}
-          {resolveServer(recovered.serverId, customCfg.servers)?.name ??
-            "that server"}
-          .{" "}
-          <Link
-            to="/settings/lobby-servers"
-            onClick={onNavigate}
-            className="font-medium text-foreground underline underline-offset-2 hover:no-underline"
-          >
-            Go to Settings, Lobby servers
-          </Link>{" "}
-          and add or update that login with the password from the email.
+          <Trans>
+            A new password has been emailed for{" "}
+            <span className="font-medium">{recoveredUser}</span> on{" "}
+            {recoveredServer}.{" "}
+            <Link
+              to="/settings/lobby-servers"
+              onClick={onNavigate}
+              className="font-medium text-foreground underline underline-offset-2 hover:no-underline"
+            >
+              Go to Settings, Lobby servers
+            </Link>{" "}
+            and add or update that login with the password from the email.
+          </Trans>
         </p>
       )}
       {error && <p className="px-2 pt-1 text-xs text-destructive">{error}</p>}
@@ -563,19 +597,19 @@ export function LoginPanel({ onNavigate }: { onNavigate: () => void }) {
           className="mt-1 h-9 justify-start gap-2"
         >
           <ExternalLink className="size-4" />
-          Sign in with your browser
+          <Trans>Sign in with your browser</Trans>
         </Button>
       )}
       {adding ? null : mirror.loginError ? (
         <p className="px-2 pt-1 text-xs text-destructive">
-          Login failed: {mirror.loginError}
+          <Trans>Login failed: {loginError}</Trans>
         </p>
       ) : (
         mirror.error &&
         // A connect that just failed is already reported above, in `error`.
         !error && (
           <p className="px-2 pt-1 text-xs text-destructive">
-            Disconnected: {mirror.error}
+            <Trans>Disconnected: {disconnectError}</Trans>
           </p>
         )
       )}
@@ -610,6 +644,7 @@ function AccountList({
   onPick: (account: LobbyAccount) => void;
   onNavigate: () => void;
 }) {
+  const { t } = useLingui();
   return (
     <>
       {accounts.map((a) => {
@@ -617,6 +652,7 @@ function AccountList({
         const current =
           server != null && liveKeys.includes(serverKeyFor(server, a.username));
         const replaced = current ? null : replacedBy(a);
+        const replacedName = replaced ? usernameFromKey(replaced) : null;
         // A Tachyon login with no sign-in stored takes the user to their browser
         // when they press it, so say so before they press it.
         const opensBrowser =
@@ -632,15 +668,15 @@ function AccountList({
             className="flex w-full flex-col items-start rounded-md px-2 py-1.5 text-left hover:bg-accent disabled:pointer-events-none disabled:opacity-50"
           >
             <span className="flex w-full items-center gap-2 text-base font-semibold leading-tight">
-              {a.username || "(no username)"}
+              {a.username || t`(no username)`}
               {current ? (
                 <span className="ml-auto rounded bg-green-500/15 px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide text-green-600 dark:text-green-400">
-                  Connected
+                  <Trans>Connected</Trans>
                 </span>
               ) : (
                 remembered.has(a.id) && (
                   <span className="ml-auto rounded bg-primary/15 px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide text-primary">
-                    Open last time
+                    <Trans>Open last time</Trans>
                   </span>
                 )
               )}
@@ -649,21 +685,21 @@ function AccountList({
                 through the badge rather than pushing it into a column. The
                 sign-in note takes its own line under both. */}
             <span className="text-xs text-muted-foreground">
-              {server?.name ?? "Unknown server"}
+              {server?.name ?? t`Unknown server`}
               {server?.alpha && (
                 <span className="ml-1.5 rounded border border-destructive/40 bg-destructive/15 px-1 py-0.5 text-[10px] font-medium uppercase tracking-wide text-destructive">
-                  Alpha
+                  <Trans>Alpha</Trans>
                 </span>
               )}
             </span>
             {opensBrowser && (
               <span className="text-xs text-muted-foreground">
-                Signs in with your browser
+                <Trans>Signs in with your browser</Trans>
               </span>
             )}
             {replaced && (
               <span className="text-xs text-muted-foreground">
-                Logs out {usernameFromKey(replaced)}
+                <Trans>Logs out {replacedName}</Trans>
               </span>
             )}
           </button>
@@ -675,7 +711,7 @@ function AccountList({
         className="mt-1 flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-sm text-muted-foreground hover:bg-accent hover:text-accent-foreground"
       >
         <Plus className="size-4" />
-        Add a login
+        <Trans>Add a login</Trans>
       </Link>
     </>
   );
@@ -689,25 +725,33 @@ function ConnectionLine({
   entry: ConnectionState;
   opening: boolean;
 }) {
+  const { t } = useLingui();
   const m = entry.mirror;
   if (entry.live) {
+    const phaseName = m.phase ?? "…";
     return (
       <p className="text-xs text-muted-foreground">
         {m.phase !== "ready"
-          ? `Connecting… (${m.phase ?? "…"})`
+          ? t`Connecting… (${phaseName})`
           : entry.status.away
-            ? "Away"
-            : "Online"}
+            ? t`Away`
+            : t`Online`}
       </p>
     );
   }
   if (opening) {
-    return <p className="text-xs text-muted-foreground">Connecting…</p>;
+    return (
+      <p className="text-xs text-muted-foreground">
+        <Trans>Connecting…</Trans>
+      </p>
+    );
   }
-  const reason = m.loginError
-    ? `Login failed: ${m.loginError}`
-    : m.error
-      ? `Disconnected: ${m.error}`
-      : "Disconnected";
+  const loginError = m.loginError;
+  const error = m.error;
+  const reason = loginError
+    ? t`Login failed: ${loginError}`
+    : error
+      ? t`Disconnected: ${error}`
+      : t`Disconnected`;
   return <p className="text-xs text-destructive">{reason}</p>;
 }

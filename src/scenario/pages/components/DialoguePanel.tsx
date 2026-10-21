@@ -24,6 +24,8 @@
  * see {@link useClipSrc}.
  */
 
+import { plural } from "@lingui/core/macro";
+import { Trans, useLingui } from "@lingui/react/macro";
 import { Button } from "@picoframe/frame";
 import { open } from "@tauri-apps/plugin-dialog";
 import {
@@ -61,9 +63,9 @@ import { entryFieldProblem } from "./triggerProblems";
  *  image formats than these, but these are the ones a portrait is drawn in.
  *  `dds` stays on the list because it is what a game's own art is shipped as,
  *  even though the preview cannot show one: see {@link portraitDrawable}. */
-const FILTERS = {
-  portrait: { name: "Image", extensions: ["png", "jpg", "jpeg", "dds", "bmp"] },
-  audio: { name: "Audio", extensions: ["ogg", "wav", "mp3"] },
+const FILTER_EXTENSIONS = {
+  portrait: ["png", "jpg", "jpeg", "dds", "bmp"],
+  audio: ["ogg", "wav", "mp3"],
 };
 
 /**
@@ -106,6 +108,7 @@ export function DialoguePanel({
    *  or a def rather than a field on this panel. */
   issues: MissionIssue[];
 }) {
+  const { t } = useLingui();
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const selected =
     scenario.dialogue.find((d) => d.id === selectedId) ??
@@ -121,21 +124,23 @@ export function DialoguePanel({
 
   return (
     <EditorPanel
-      title="Dialogue"
+      title={t`Dialogue`}
       icon={MessageSquare}
       summary={
         count === 0
-          ? "Nobody says anything yet"
-          : `${count} line${count === 1 ? "" : "s"}`
+          ? t`Nobody says anything yet`
+          : plural(count, { one: "# line", other: "# lines" })
       }
     >
       <div className="flex flex-col gap-4 lg:flex-row">
         <div className="flex shrink-0 flex-col gap-2 lg:w-72">
           {count === 0 ? (
             <p className="text-xs text-muted-foreground">
-              A line is a radio message: who is speaking, what they say, and the
-              portrait and voice clip that go with it. A trigger's{" "}
-              <code>dialogue</code> action plays one.
+              <Trans>
+                A line is a radio message: who is speaking, what they say, and
+                the portrait and voice clip that go with it. A trigger's{" "}
+                <code>dialogue</code> action plays one.
+              </Trans>
             </p>
           ) : (
             <ul className="flex flex-col gap-1">
@@ -156,7 +161,7 @@ export function DialoguePanel({
             className="h-7 gap-1.5 px-2 text-xs"
             onClick={create}
           >
-            <Plus className="size-3.5" /> New line
+            <Plus className="size-3.5" /> <Trans>New line</Trans>
           </Button>
         </div>
 
@@ -202,7 +207,7 @@ function DialogueRow({
         <span className="min-w-0 flex-1 truncate text-xs font-medium">
           {line.speaker.trim() || (
             <span className="font-normal text-muted-foreground">
-              No speaker yet
+              <Trans>No speaker yet</Trans>
             </span>
           )}
         </span>
@@ -244,6 +249,7 @@ function DialogueForm({
   onUndo: () => void;
   issues: MissionIssue[];
 }) {
+  const { t } = useLingui();
   // The words are held here while they are typed and written when the box is
   // left, because every change is saved. That copy follows the line when the
   // line changes on its own, which is what an undo does (issue #2185): the form
@@ -274,7 +280,15 @@ function DialogueForm({
   const importMedia = async (field: "portrait" | "audio") => {
     setError(null);
     try {
-      const src = await open({ multiple: false, filters: [FILTERS[field]] });
+      const src = await open({
+        multiple: false,
+        filters: [
+          {
+            name: field === "portrait" ? t`Image` : t`Audio`,
+            extensions: FILTER_EXTENSIONS[field],
+          },
+        ],
+      });
       if (typeof src !== "string") return;
       const file = await importScenarioMedia(scenario.id, src);
       const previous = line[field];
@@ -308,8 +322,8 @@ function DialogueForm({
         </span>
         <TextField
           value={line.speaker}
-          label="Speaker"
-          placeholder="Speaker"
+          label={t`Speaker`}
+          placeholder={t`Speaker`}
           onCommit={(speaker) => edit({ speaker })}
           className="h-7 w-44 text-xs"
         />
@@ -319,7 +333,7 @@ function DialogueForm({
           className="ml-auto h-7 gap-1.5 px-2 text-xs"
           onClick={duplicate}
         >
-          <Copy className="size-3.5" /> Duplicate
+          <Copy className="size-3.5" /> <Trans>Duplicate</Trans>
         </Button>
         <Button
           size="sm"
@@ -340,23 +354,24 @@ function DialogueForm({
             // no undo of its own, so the notice says so rather than
             // implying Undo is as complete here as it is everywhere else
             // (issue #2306).
+            const label = dialogueLabel(line);
             const message =
               clips.length > 0
-                ? `Deleted dialogue line "${dialogueLabel(line)}". Undo brings back the line; its clip may already be gone.`
-                : `Deleted dialogue line "${dialogueLabel(line)}".`;
+                ? t`Deleted dialogue line "${label}". Undo brings back the line; its clip may already be gone.`
+                : t`Deleted dialogue line "${label}".`;
             notifyDeleted(message, onUndo);
           }}
         >
-          <Trash2 className="size-3.5" /> Delete
+          <Trash2 className="size-3.5" /> <Trans>Delete</Trans>
         </Button>
       </div>
 
       <div className="flex flex-col gap-0.5">
         <Textarea
-          aria-label="What is said"
+          aria-label={t`What is said`}
           aria-describedby={textDescribedBy}
           value={text}
-          placeholder="Contact! Raiders inbound from the north pass."
+          placeholder={t`Contact! Raiders inbound from the north pass.`}
           className="min-h-16 text-xs"
           onChange={(e) => setText(e.target.value)}
           onBlur={() => {
@@ -394,9 +409,11 @@ function DialogueForm({
       </div>
 
       <p className="text-[11px] text-muted-foreground">
-        A clip is copied into this scenario, so the author's own file can move
-        afterwards. Both travel with an export, and both are written beside the
-        compiled mission at launch, where the engine loads them by name.
+        <Trans>
+          A clip is copied into this scenario, so the author's own file can move
+          afterwards. Both travel with an export, and both are written beside
+          the compiled mission at launch, where the engine loads them by name.
+        </Trans>
       </p>
     </div>
   );
@@ -453,6 +470,7 @@ function MediaField({
   onImport: () => void;
   onDrop: () => void;
 }) {
+  const { t } = useLingui();
   const [undrawable, setUndrawable] = useState(false);
   const { src, unreadable } = useClipSrc(scenarioId, file);
   const failed = undrawable || unreadable;
@@ -463,14 +481,18 @@ function MediaField({
       <header className="flex items-center gap-1.5">
         <Icon className="size-3.5 shrink-0 text-muted-foreground" />
         <h3 className="text-xs font-medium">
-          {field === "portrait" ? "Portrait" : "Voice clip"}
+          {field === "portrait" ? t`Portrait` : t`Voice clip`}
         </h3>
         {file && (
           <Button
             size="sm"
             variant="ghost"
             className="ml-auto size-6 p-0 text-destructive hover:text-destructive"
-            aria-label={`Remove the ${field}`}
+            aria-label={
+              field === "portrait"
+                ? t`Remove the portrait`
+                : t`Remove the audio`
+            }
             onClick={onDrop}
           >
             <X className="size-3.5" />
@@ -482,22 +504,26 @@ function MediaField({
         <>
           {failed ? (
             <p className="text-[11px] text-amber-300">
-              The file is in the document but could not be read back, so it will
-              be missing from the mission too.
+              <Trans>
+                The file is in the document but could not be read back, so it
+                will be missing from the mission too.
+              </Trans>
             </p>
           ) : field === "portrait" && !portraitDrawable(file) ? (
             <p className="text-[11px] text-muted-foreground">
-              DDS is a format the engine reads and no browser engine does, so
-              coilbox cannot show it here. The mission still gets it.
+              <Trans>
+                DDS is a format the engine reads and no browser engine does, so
+                coilbox cannot show it here. The mission still gets it.
+              </Trans>
             </p>
           ) : !src ? (
             <p className="text-[11px] text-muted-foreground">
-              Reading the file…
+              <Trans>Reading the file…</Trans>
             </p>
           ) : field === "portrait" ? (
             <img
               src={src}
-              alt="The portrait this line shows"
+              alt={t`The portrait this line shows`}
               className="size-24 rounded border border-border/50 object-cover"
               onError={() => setUndrawable(true)}
             />
@@ -522,7 +548,7 @@ function MediaField({
           onClick={onImport}
         >
           <Plus className="size-3.5" />
-          {field === "portrait" ? "Import an image" : "Import a clip"}
+          {field === "portrait" ? t`Import an image` : t`Import a clip`}
         </Button>
       )}
     </section>

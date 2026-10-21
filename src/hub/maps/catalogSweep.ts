@@ -1,3 +1,5 @@
+import type { MessageDescriptor } from "@lingui/core";
+import { msg, plural, t } from "@lingui/core/macro";
 import { Channel } from "@tauri-apps/api/core";
 import type {
   MapCatalogEntry,
@@ -247,12 +249,12 @@ const CATALOG_SKIP_ORDER: readonly MapCatalogSkip[] = [
   "no-height-range",
 ];
 
-const CATALOG_SKIP_CLAUSES: Record<MapCatalogSkip, string> = {
-  "no-archive-file": "whose archive file is missing",
-  "unreadable-archive": "whose archive coilbox could not read",
-  "duplicate-map": "listed twice in the library",
-  "no-extent": "whose size coilbox could not work out",
-  "no-height-range": "whose height range coilbox could not read",
+const CATALOG_SKIP_CLAUSES: Record<MapCatalogSkip, MessageDescriptor> = {
+  "no-archive-file": msg`whose archive file is missing`,
+  "unreadable-archive": msg`whose archive coilbox could not read`,
+  "duplicate-map": msg`listed twice in the library`,
+  "no-extent": msg`whose size coilbox could not work out`,
+  "no-height-range": msg`whose height range coilbox could not read`,
 };
 
 /** What to tell somebody about the maps a sweep skipped, in one sentence, or
@@ -277,19 +279,28 @@ export function sweepSummary(report: SweepReport): string | null {
   const say = (sentence: string): string =>
     skipNote ? `${sentence} ${skipNote}` : sentence;
 
-  if (report.read === 0) return say("Coilbox found no maps to read.");
+  if (report.read === 0) return say(t`Coilbox found no maps to read.`);
+  const sentCount = report.sent;
   const sent =
     report.sent === 0
-      ? "The hub already had every map on this machine."
-      : `Sent facts for ${report.sent} ${report.sent === 1 ? "map" : "maps"}.`;
+      ? t`The hub already had every map on this machine.`
+      : plural(sentCount, {
+          one: "Sent facts for # map.",
+          other: "Sent facts for # maps.",
+        });
   if (report.refused === 0) return say(sent);
   const conflicts = report.problems.filter(
     (problem) => problem.outcome === "conflict",
   ).length;
   if (conflicts === report.refused) {
     return say(
-      `${sent} ${conflicts} ${conflicts === 1 ? "map differs" : "maps differ"} from the version everyone else has under the same name, so ${conflicts === 1 ? "it" : "they"} would not match in a game.`,
+      `${sent} ${plural(conflicts, {
+        one: "# map differs from the version everyone else has under the same name, so it would not match in a game.",
+        other:
+          "# maps differ from the version everyone else has under the same name, so they would not match in a game.",
+      })}`,
     );
   }
-  return say(`${sent} The hub would not take ${report.refused} of them.`);
+  const refusedCount = report.refused;
+  return say(`${sent} ${t`The hub would not take ${refusedCount} of them.`}`);
 }

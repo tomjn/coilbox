@@ -13,6 +13,7 @@
  * can follow.
  */
 
+import { plural } from "@lingui/core/macro";
 import { mapSizeLabel as sizeLabel } from "@/content/pages/components/MapThumb";
 import { ELMOS_PER_METAL_SAMPLE } from "../assets/vocabulary";
 import type { MapFacts } from "./lookup";
@@ -64,7 +65,7 @@ export function mapPlayersLabel(
 ): string | null {
   const starts = facts?.points?.start?.length ?? 0;
   if (starts < 1) return null;
-  return `${starts} player${starts === 1 ? "" : "s"}`;
+  return plural(starts, { one: "# player", other: "# players" });
 }
 
 /** Size and player count as one line, or null when the hub can say neither. */

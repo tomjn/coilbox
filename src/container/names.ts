@@ -17,46 +17,58 @@
  * is, since the mode is in the payload rather than in the kind.
  */
 
-import { CONTAINER_KINDS, type ContainerKind } from "./container";
+import { i18n, type MessageDescriptor } from "@lingui/core";
+import { msg, t } from "@lingui/core/macro";
+import type { ContainerKind } from "./container";
 
-const KIND_NAMES: Record<ContainerKind, string> = {
-  campaign: "campaign",
-  preset: "singleplayer preset",
-  challenge: "challenge",
-  "setup-pack": "setup pack",
-  scenario: "scenario",
-  keymap: "keymap",
-  blueprint: "base blueprint",
-  "mod-project": "unit tweak project",
-  module: "unit builder module",
+const KIND_NAMES: Record<ContainerKind, MessageDescriptor> = {
+  campaign: msg`campaign`,
+  preset: msg`singleplayer preset`,
+  challenge: msg`challenge`,
+  "setup-pack": msg`setup pack`,
+  scenario: msg`scenario`,
+  keymap: msg`keymap`,
+  blueprint: msg`base blueprint`,
+  "mod-project": msg`unit tweak project`,
+  module: msg`unit builder module`,
+};
+
+/** Plurals are their own messages, because not every language adds an "s". */
+const KIND_PLURALS: Record<ContainerKind, MessageDescriptor> = {
+  campaign: msg`campaigns`,
+  preset: msg`singleplayer presets`,
+  challenge: msg`challenges`,
+  "setup-pack": msg`setup packs`,
+  scenario: msg`scenarios`,
+  keymap: msg`keymaps`,
+  blueprint: msg`base blueprints`,
+  "mod-project": msg`unit tweak projects`,
+  module: msg`unit builder modules`,
 };
 
 /** What to call one kind, for a sentence a person reads. */
 export function containerKindName(kind: ContainerKind): string {
-  return KIND_NAMES[kind];
+  return i18n._(KIND_NAMES[kind]);
 }
 
 /**
  * What to call more than one of a kind: "singleplayer presets".
  *
- * Every name above is a regular noun, so a plain "s" is right for all of them.
- * Lowercase like the singular, for a caller that wants it mid-sentence. A
- * caller that wants it to open one raises the first letter itself.
+ * Lowercase like the singular, for a caller that wants it mid-sentence.
  */
 export function containerKindPlural(kind: ContainerKind): string {
-  return `${containerKindName(kind)}s`;
+  return i18n._(KIND_PLURALS[kind]);
 }
 
 /**
  * Every kind, as the middle of a sentence: "a campaign, a singleplayer preset,
  * … or a base blueprint".
  *
- * Built from {@link CONTAINER_KINDS} so a box saying what it takes cannot fall
- * behind what it takes. "Or" rather than "and", because a paste is one of them
- * rather than all of them.
+ * One message, so a translator can give each kind its own article. The test
+ * beside this file checks every kind in `CONTAINER_KINDS` is in it, so it
+ * cannot fall behind what a box takes. "Or" rather than "and", because a paste
+ * is one of them rather than all of them.
  */
 export function containerKindsSentence(): string {
-  const said = CONTAINER_KINDS.map((kind) => `a ${containerKindName(kind)}`);
-  const last = said.pop();
-  return last === undefined ? "" : `${said.join(", ")} or ${last}`;
+  return t`a campaign, a singleplayer preset, a challenge, a setup pack, a scenario, a keymap, a base blueprint, a unit tweak project or a unit builder module`;
 }

@@ -5,6 +5,7 @@
  * turned out to be. Split out of `DecodeTweakSetDrawer.tsx` so the battle
  * room's own read-only view does not have to redraw the same card.
  */
+import { Trans, useLingui } from "@lingui/react/macro";
 import { Button } from "@picoframe/frame";
 import { Check, Copy } from "lucide-react";
 import { useState } from "react";
@@ -13,6 +14,7 @@ import { slotTitle } from "../../decodeTweakSet";
 
 /** One press to put a slot's Lua on the clipboard. */
 function CopyLuaButton({ lua }: { lua: string }) {
+  const { t } = useLingui();
   const [copied, setCopied] = useState(false);
   return (
     <Button
@@ -20,7 +22,7 @@ function CopyLuaButton({ lua }: { lua: string }) {
       size="sm"
       variant="outline"
       className="h-6 shrink-0 gap-1 px-2"
-      aria-label="Copy this Lua"
+      aria-label={t`Copy this Lua`}
       onClick={() => {
         navigator.clipboard
           .writeText(lua)
@@ -29,7 +31,7 @@ function CopyLuaButton({ lua }: { lua: string }) {
       }}
     >
       {copied ? <Check className="size-3" /> : <Copy className="size-3" />}
-      {copied ? "Copied" : "Copy"}
+      {copied ? <Trans>Copied</Trans> : <Trans>Copy</Trans>}
     </Button>
   );
 }
@@ -39,25 +41,29 @@ function CopyLuaButton({ lua }: { lua: string }) {
 function FormBadge({ slot }: { slot: DecodedSlot }) {
   if (slot.error) {
     return (
-      <span className="shrink-0 text-xs text-destructive">Not decoded</span>
+      <span className="shrink-0 text-xs text-destructive">
+        <Trans>Not decoded</Trans>
+      </span>
     );
   }
   if (slot.form === "table") {
     return (
       <span className="shrink-0 text-xs text-emerald-600 dark:text-emerald-400">
-        Data table
+        <Trans>Data table</Trans>
       </span>
     );
   }
   if (slot.form === "block") {
     return (
       <span className="shrink-0 text-xs text-amber-600 dark:text-amber-400">
-        Program, read only
+        <Trans>Program, read only</Trans>
       </span>
     );
   }
   return (
-    <span className="shrink-0 text-xs text-muted-foreground">Unrecognised</span>
+    <span className="shrink-0 text-xs text-muted-foreground">
+      <Trans>Unrecognised</Trans>
+    </span>
   );
 }
 

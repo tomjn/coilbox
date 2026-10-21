@@ -1,3 +1,4 @@
+import { t } from "@lingui/core/macro";
 import type { ZerokBattleMode } from "../bindings";
 
 /**
@@ -20,7 +21,11 @@ export interface NewZerokBattleForm {
  * itself. */
 export const MAX_PLAYERS_RANGE = { min: 2, max: 32 } as const;
 
-/** The modes a room can be opened in, labelled as the game labels them. */
+/**
+ * The modes a room can be opened in, labelled as the game labels them. The
+ * text is read through getters so it follows the language at render time rather
+ * than at module load.
+ */
 export const ZEROK_BATTLE_MODES: {
   value: ZerokBattleMode;
   label: string;
@@ -28,20 +33,46 @@ export const ZEROK_BATTLE_MODES: {
 }[] = [
   {
     value: "custom",
-    label: "Custom",
-    blurb: "Players pick their own sides and the room is yours to set up.",
+    get label() {
+      return t`Custom`;
+    },
+    get blurb() {
+      return t`Players pick their own sides and the room is yours to set up.`;
+    },
   },
   {
     value: "teams",
-    label: "Teams",
-    blurb: "The server balances two sides when the match starts.",
+    get label() {
+      return t`Teams`;
+    },
+    get blurb() {
+      return t`The server balances two sides when the match starts.`;
+    },
   },
-  { value: "1v1", label: "1v1", blurb: "Two players, one each side." },
-  { value: "ffa", label: "FFA", blurb: "Everyone for themselves." },
+  {
+    value: "1v1",
+    label: "1v1",
+    get blurb() {
+      return t`Two players, one each side.`;
+    },
+  },
+  {
+    value: "ffa",
+    get label() {
+      return t`FFA`;
+    },
+    get blurb() {
+      return t`Everyone for themselves.`;
+    },
+  },
   {
     value: "coop",
-    label: "Cooperative",
-    blurb: "Players together against the chickens.",
+    get label() {
+      return t`Cooperative`;
+    },
+    get blurb() {
+      return t`Players together against the chickens.`;
+    },
   },
 ];
 
@@ -50,13 +81,14 @@ export const ZEROK_BATTLE_MODES: {
  * can. Pure.
  */
 export function newZerokBattleProblem(form: NewZerokBattleForm): string | null {
-  if (!form.title.trim()) return "Give the battle a title.";
+  if (!form.title.trim()) return t`Give the battle a title.`;
   if (
     !Number.isInteger(form.maxPlayers) ||
     form.maxPlayers < MAX_PLAYERS_RANGE.min ||
     form.maxPlayers > MAX_PLAYERS_RANGE.max
   ) {
-    return `A battle seats between ${MAX_PLAYERS_RANGE.min} and ${MAX_PLAYERS_RANGE.max} players.`;
+    const { min, max } = MAX_PLAYERS_RANGE;
+    return t`A battle seats between ${min} and ${max} players.`;
   }
   return null;
 }

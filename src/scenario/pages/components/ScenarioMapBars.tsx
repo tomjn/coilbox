@@ -1,3 +1,5 @@
+import { plural } from "@lingui/core/macro";
+import { Trans, useLingui } from "@lingui/react/macro";
 import { Button, Input } from "@picoframe/frame";
 import { Loader2, MapPin } from "lucide-react";
 import { type ReactNode, useState } from "react";
@@ -34,15 +36,17 @@ export function ScenarioSelectionBar({
    *  overrides, and whatever a group or a base grows later. */
   children?: ReactNode;
 }) {
+  const { t } = useLingui();
+  const number = placement.kind === "actor" ? 0 : placement.index + 1;
   return (
     <SelectionBar
       def={placement.def}
       what={
         placement.kind === "actor"
-          ? "actor"
+          ? t`actor`
           : placement.kind === "group"
-            ? `group unit ${placement.index + 1}`
-            : `base building ${placement.index + 1}`
+            ? t`group unit ${number}`
+            : t`base building ${number}`
       }
     >
       {children}
@@ -77,17 +81,20 @@ export function SelectionCountBar({
   what: string;
   onClear: () => void;
 }) {
+  const { t } = useLingui();
   return (
     <div className="flex w-fit items-center gap-1.5 rounded-md border border-primary/60 bg-card p-1 pl-2">
-      <span className="text-[11px]">{what} selected</span>
+      <span className="text-[11px]">
+        <Trans>{what} selected</Trans>
+      </span>
       <Button
         size="sm"
         variant="ghost"
         className="h-7 px-2 text-xs"
         onClick={onClear}
-        title="Let go of all of it (Esc)"
+        title={t`Let go of all of it (Esc)`}
       >
-        Clear
+        <Trans>Clear</Trans>
       </Button>
     </div>
   );
@@ -119,12 +126,16 @@ export function ZoneBar({
   zone: ScenarioZone;
   onRename: (name: string) => void;
 }) {
+  const { t } = useLingui();
   const [name, setName] = useFieldText(zone.name);
   const { halfX, halfZ } = zoneExtent(zone);
+  const radius = zone.shape === "circle" ? zone.radius : 0;
+  const width = Math.round(halfX * 2);
+  const depth = Math.round(halfZ * 2);
   const size =
     zone.shape === "circle"
-      ? `circle · radius ${zone.radius}`
-      : `box · ${Math.round(halfX * 2)} × ${Math.round(halfZ * 2)}`;
+      ? t`circle · radius ${radius}`
+      : t`box · ${width} × ${depth}`;
 
   const commit = () => {
     const trimmed = name.trim();
@@ -135,7 +146,7 @@ export function ZoneBar({
   return (
     <div className="flex w-fit items-center gap-1.5 rounded-md border border-border/60 bg-card/85 p-1 pl-2 backdrop-blur">
       <Input
-        aria-label="Zone name"
+        aria-label={t`Zone name`}
         value={name}
         onChange={(e) => setName(e.target.value)}
         onBlur={commit}
@@ -198,7 +209,7 @@ export function ClickMapBar({
         className="h-7 px-2 text-xs"
         onClick={onDone}
       >
-        Done
+        <Trans>Done</Trans>
       </Button>
     </div>
   );
@@ -220,6 +231,7 @@ function PointFields({
   worldWidth: number;
   worldHeight: number;
 }) {
+  const { t } = useLingui();
   const [x, setX] = useState("");
   const [z, setZ] = useState("");
   const at = pointFrom(x, z, worldWidth, worldHeight);
@@ -236,17 +248,17 @@ function PointFields({
       }}
     >
       <Input
-        aria-label="X in elmos"
+        aria-label={t`X in elmos`}
         inputMode="numeric"
-        placeholder="x"
+        placeholder={t`x`}
         value={x}
         onChange={(event) => setX(event.target.value)}
         className="h-7 w-16 text-xs"
       />
       <Input
-        aria-label="Z in elmos"
+        aria-label={t`Z in elmos`}
         inputMode="numeric"
-        placeholder="z"
+        placeholder={t`z`}
         value={z}
         onChange={(event) => setZ(event.target.value)}
         className="h-7 w-16 text-xs"
@@ -258,7 +270,7 @@ function PointFields({
         disabled={!at}
         className="h-7 px-2 text-xs"
       >
-        Use
+        <Trans>Use</Trans>
       </Button>
     </form>
   );
@@ -309,6 +321,7 @@ export function UnitsNote({
   gameName: string;
   drawing: boolean;
 }) {
+  const { t } = useLingui();
   if (units.placed === 0) return null;
   // Said while the game's units or their models are still being read, in
   // place of a verdict on what could not be drawn: nothing is missing until
@@ -316,10 +329,18 @@ export function UnitsNote({
   const reading =
     units.load.unitDefs === "loading" || units.load.models.state === "loading";
 
+  const shownGame = gameName || t`The scenario's game`;
+  const missingCount = units.missing.length;
+  const missingList = units.missing.join(", ");
+  const placed = units.placed;
+
   const problem = units.gameMissing
-    ? `${gameName || "The scenario's game"} is not installed, so nothing can be drawn with its models.`
-    : units.missing.length > 0
-      ? `${units.missing.length} unit type${units.missing.length === 1 ? "" : "s"} not in ${gameName}, drawn as boxes: ${units.missing.join(", ")}`
+    ? t`${shownGame} is not installed, so nothing can be drawn with its models.`
+    : missingCount > 0
+      ? plural(missingCount, {
+          one: `# unit type not in ${gameName}, drawn as boxes: ${missingList}`,
+          other: `# unit types not in ${gameName}, drawn as boxes: ${missingList}`,
+        })
       : null;
 
   return (
@@ -334,10 +355,10 @@ export function UnitsNote({
         {reading || drawing ? (
           <>
             <Loader2 className="size-3 animate-spin" />
-            Reading units
+            <Trans>Reading units</Trans>
           </>
         ) : (
-          `${units.placed} unit${units.placed === 1 ? "" : "s"}`
+          plural(placed, { one: "# unit", other: "# units" })
         )}
       </p>
     </>

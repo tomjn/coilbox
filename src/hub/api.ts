@@ -23,7 +23,8 @@
  * handler and its two confirmations.
  */
 
-import { containerKindName, containerKindPlural } from "@/container/names";
+import { i18n, type MessageDescriptor } from "@lingui/core";
+import { msg, select, t } from "@lingui/core/macro";
 import type { SuggestedMap } from "@/content/branding";
 
 /** Response envelopes, from `lib/api/items.ts` in tomjn/coilbox-hub. */
@@ -186,12 +187,14 @@ export function serverError(body: unknown): string | null {
  * that pauses after a week without traffic, and waking it is the most likely
  * reason a read fails, so say so rather than leaving a bare 503 to be guessed at.
  */
-export const COLD_START =
-  "The hub may be waking up after a quiet spell, which takes a few seconds. Try again in a moment.";
+export function coldStart(): string {
+  return t`The hub may be waking up after a quiet spell, which takes a few seconds. Try again in a moment.`;
+}
 
 /** What to say instead, once a refusal is known to be permanent. */
-export const WILL_NOT_ACCEPT =
-  "The hub will not accept it as it stands, so trying again will not help.";
+export function willNotAccept(): string {
+  return t`The hub will not accept it as it stands, so trying again will not help.`;
+}
 
 /**
  * Whether the hub's own words describe a database refusing the row rather
@@ -217,12 +220,12 @@ export function isPermanentRefusal(said: string | null): boolean {
 function statusMessage(status: number, body: unknown): string {
   const said = serverError(body);
   if (status >= 500) {
-    if (isPermanentRefusal(said)) return `${said} ${WILL_NOT_ACCEPT}`;
-    return `${said ?? "The hub could not answer."} ${COLD_START}`;
+    if (isPermanentRefusal(said)) return `${said} ${willNotAccept()}`;
+    return `${said ?? t`The hub could not answer.`} ${coldStart()}`;
   }
   if (status === 404)
-    return "The hub has no such item. It may have been taken down.";
-  return said ?? `The hub refused that request (HTTP ${status}).`;
+    return t`The hub has no such item. It may have been taken down.`;
+  return said ?? t`The hub refused that request (HTTP ${status}).`;
 }
 
 /** Check the envelope both routes share, before any field is read. */
@@ -233,22 +236,20 @@ function readEnvelope(
   if (typeof body !== "object" || body === null) {
     return {
       ok: false,
-      reason: "The hub sent something coilbox could not read.",
+      reason: t`The hub sent something coilbox could not read.`,
     };
   }
   const shape = body as Record<string, unknown>;
   if (shape.format !== format) {
     return {
       ok: false,
-      reason:
-        "That address answered, but it is not a coilbox hub. Check the hub address in Settings.",
+      reason: t`That address answered, but it is not a coilbox hub. Check the hub address in Settings.`,
     };
   }
   if (typeof shape.version !== "number" || shape.version > HUB_API_VERSION) {
     return {
       ok: false,
-      reason:
-        "This hub is newer than this copy of coilbox understands. Update coilbox to browse it.",
+      reason: t`This hub is newer than this copy of coilbox understands. Update coilbox to browse it.`,
     };
   }
   return { ok: true, body: shape };
@@ -260,7 +261,10 @@ export function readItemsBody(body: unknown): HubResult<HubItemsPage> {
   if (!envelope.ok) return { ok: false, reason: envelope.reason };
   const { items, page, page_size, total } = envelope.body;
   if (!Array.isArray(items)) {
-    return { ok: false, reason: "The hub sent a listing with no items in it." };
+    return {
+      ok: false,
+      reason: t`The hub sent a listing with no items in it.`,
+    };
   }
   return {
     ok: true,
@@ -281,7 +285,7 @@ export function readItemBody(body: unknown): HubResult<HubItemDetail> {
   if (!item || typeof item.container_url !== "string") {
     return {
       ok: false,
-      reason: "The hub gave no address for that item's contents.",
+      reason: t`The hub gave no address for that item's contents.`,
     };
   }
   return { ok: true, value: item };
@@ -302,9 +306,10 @@ async function getJson<T>(
   } catch {
     // A DNS failure, no route, or a refused connection. The host is worth naming
     // because it can be overridden, and it is often not the default one.
+    const host = hostOf(url);
     return {
       ok: false,
-      reason: `Could not reach the hub at ${hostOf(url)}. Check your connection. ${COLD_START}`,
+      reason: `${t`Could not reach the hub at ${host}. Check your connection.`} ${coldStart()}`,
     };
   }
 
@@ -315,7 +320,7 @@ async function getJson<T>(
     if (response.ok) {
       return {
         ok: false,
-        reason: "The hub sent something coilbox could not read.",
+        reason: t`The hub sent something coilbox could not read.`,
       };
     }
   }
@@ -406,7 +411,7 @@ export function readGamesBody(body: unknown): HubResult<HubGame[]> {
   if (!Array.isArray(games)) {
     return {
       ok: false,
-      reason: "The hub sent a games list with no games in it.",
+      reason: t`The hub sent a games list with no games in it.`,
     };
   }
   return { ok: true, value: games as HubGame[] };
@@ -464,7 +469,7 @@ export function readMapPacksBody(body: unknown): HubResult<HubMapPack[]> {
   if (!Array.isArray(packs)) {
     return {
       ok: false,
-      reason: "The hub sent a map pack list with no packs in it.",
+      reason: t`The hub sent a map pack list with no packs in it.`,
     };
   }
   return { ok: true, value: packs as HubMapPack[] };
@@ -489,37 +494,46 @@ export function fetchHubMapPacks(
 /**
  * What a filter chip calls a kind, in the plural.
  *
- * The words come from {@link containerKindPlural} (issue #1795), so a chip
- * offers a thing under the name the rest of coilbox gives it. The hub used to
- * keep its own shorter set here, saying Presets and Blueprints where a card's
- * badge beside it said Singleplayer preset and Base blueprint. That was not a
- * choice about wording: the chips shared a row with the search box and the two
- * comboboxes, and the row could not afford the longer words at any width it was
- * given. The chips have a row of their own now, so it can.
+ * The same words the rest of coilbox uses (issue #1795), so a chip offers a
+ * thing under the name the rest of coilbox gives it, with a capital because a
+ * chip is not part of a sentence. Messages of their own rather than the
+ * lowercase name raised, because not every language capitalises the same way.
  */
+const KIND_LABELS_PLURAL: Record<HubKind, MessageDescriptor> = {
+  preset: msg`Singleplayer presets`,
+  challenge: msg`Challenges`,
+  "setup-pack": msg`Setup packs`,
+  scenario: msg`Scenarios`,
+  blueprint: msg`Base blueprints`,
+  "mod-project": msg`Unit tweak projects`,
+};
+
+/** What a card's badge calls one item of a kind, with a capital. */
+const KIND_LABELS: Record<HubKind, MessageDescriptor> = {
+  preset: msg`Singleplayer preset`,
+  challenge: msg`Challenge`,
+  "setup-pack": msg`Setup pack`,
+  scenario: msg`Scenario`,
+  blueprint: msg`Base blueprint`,
+  "mod-project": msg`Unit tweak project`,
+};
+
 export function kindLabelPlural(kind: HubKind): string {
-  return opened(containerKindPlural(kind));
+  const label: MessageDescriptor | undefined = KIND_LABELS_PLURAL[kind];
+  return label ? i18n._(label) : opened(kind);
 }
 
 /**
  * What the hub carries, to open a sentence with: "Singleplayer presets,
- * challenges, setup packs, scenarios and base blueprints".
+ * challenges, setup packs, scenarios, base blueprints and unit tweak projects".
  *
- * Built from {@link HUB_KINDS} rather than written out (issue #1502). The hand
- * written version of this sentence sat directly above a row of filter chips
- * that had grown a fifth kind, saying the hub carried four, for as long as it
- * took somebody to notice.
- *
- * The labels are written to start a sentence, so every one after the first is
- * lowered.
+ * One message, so a translator sees the whole list. The test beside this file
+ * checks every kind in {@link HUB_KINDS} is in it (issue #1502): the hand written
+ * version once sat above a row of filter chips that had grown a fifth kind,
+ * saying the hub carried four.
  */
 export function kindsPlural(): string {
-  const [first, ...rest] = HUB_KINDS.map(kindLabelPlural);
-  const said = rest.map((l) => l.charAt(0).toLowerCase() + l.slice(1));
-  const last = said.pop();
-  return last === undefined
-    ? first
-    : `${[first, ...said].join(", ")} and ${last}`;
+  return t`Singleplayer presets, challenges, setup packs, scenarios, base blueprints and unit tweak projects`;
 }
 
 /** A label to start with a capital, since a badge is not part of a sentence. */
@@ -532,10 +546,8 @@ function opened(label: string): string {
  * which is the difference between a galactic conquest and a warpath run and
  * worth more to a reader than the word "challenge" on its own.
  *
- * The words come from {@link containerKindName} (issue #1520), so a badge calls
- * a thing what the rest of coilbox calls it: a Singleplayer preset rather than a
- * Preset, a Base blueprint rather than a Blueprint. The hub's own copy of these
- * names said neither, and was the only place in the app that did.
+ * The words match the rest of coilbox (issue #1520): a Singleplayer preset
+ * rather than a Preset, a Base blueprint rather than a Blueprint.
  *
  * A listing is read without checking each row's kind, so a hub carrying a kind
  * this build has never heard of reaches here as a string with no name. Fall back
@@ -543,8 +555,13 @@ function opened(label: string): string {
  */
 export function describeItem(kind: HubKind, mode: string | null): string {
   if (kind === "challenge" && mode) {
-    return `${opened(mode)} challenge`;
+    const label = opened(mode);
+    return select(mode, {
+      conquest: "Conquest challenge",
+      warpath: "Warpath challenge",
+      other: `${label} challenge`,
+    });
   }
-  const name: string | undefined = containerKindName(kind);
-  return opened(name ?? kind);
+  const name: MessageDescriptor | undefined = KIND_LABELS[kind];
+  return name ? i18n._(name) : opened(kind);
 }

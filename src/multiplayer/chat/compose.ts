@@ -1,3 +1,5 @@
+import { plural, t } from "@lingui/core/macro";
+
 /**
  * Turn a composer draft into the wire lines to send. Pure and React-free so it
  * can be unit-tested directly.
@@ -44,7 +46,7 @@ export function composeDraft(
     // nonsense, and there is no second command to send the rest as. Refuse
     // rather than silently flatten or drop what the user typed.
     if (text.includes("\n")) {
-      return { kind: "error", reason: "an emote can't span multiple lines" };
+      return { kind: "error", reason: t`an emote can''t span multiple lines` };
     }
     return tooLong([text], maxChars) ?? { kind: "send", lines: [text] };
   }
@@ -57,10 +59,14 @@ export function composeDraft(
     .map((l) => l.trim())
     .filter((l) => l !== "");
 
-  if (lines.length > MAX_COMPOSE_LINES) {
+  const lineCount = lines.length;
+  if (lineCount > MAX_COMPOSE_LINES) {
     return {
       kind: "error",
-      reason: `a message can be at most ${MAX_COMPOSE_LINES} lines (this one is ${lines.length})`,
+      reason: plural(MAX_COMPOSE_LINES, {
+        one: `a message can be at most # line (this one is ${lineCount})`,
+        other: `a message can be at most # lines (this one is ${lineCount})`,
+      }),
     };
   }
   return tooLong(lines, maxChars) ?? { kind: "send", lines };
@@ -74,8 +80,12 @@ function tooLong(lines: string[], maxChars: number | null): Compose | null {
   if (maxChars == null) return null;
   const over = lines.find((line) => [...line].length > maxChars);
   if (over == null) return null;
+  const overLength = [...over].length;
   return {
     kind: "error",
-    reason: `a message can be at most ${maxChars} characters (this one is ${[...over].length})`,
+    reason: plural(maxChars, {
+      one: `a message can be at most # character (this one is ${overLength})`,
+      other: `a message can be at most # characters (this one is ${overLength})`,
+    }),
   };
 }

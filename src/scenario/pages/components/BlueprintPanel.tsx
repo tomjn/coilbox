@@ -36,6 +36,8 @@
  *   so it holds whether or not this panel remembered to ask.
  */
 
+import { plural, t } from "@lingui/core/macro";
+import { Trans, useLingui } from "@lingui/react/macro";
 import { Button } from "@picoframe/frame";
 import { open, save } from "@tauri-apps/plugin-dialog";
 import { Blocks, Download, Library, Pencil, Upload } from "lucide-react";
@@ -82,6 +84,7 @@ export function BlueprintPanel({
    *  known. Empty until the dataset has been read. */
   units: UnitDatasetEntry[];
 }) {
+  const { t } = useLingui();
   const { running } = usePlay();
   const [read, setRead] = useState<{
     from: string;
@@ -117,24 +120,27 @@ export function BlueprintPanel({
   // Nothing here needs a participant any more, because nothing here places a
   // base. The Layouts mode asks whose the base is at the click that places it.
   const anyone = scenario.setup.participants.length > 0;
+  // The game's own name and its file's name, which are not ours to translate.
+  const gameLabel = barFormat.label;
+  const gameFileName = barFormat.file;
 
   async function onImport() {
     setError(null);
     setStatus(null);
     try {
       const src = await open({
-        title: `Open ${barFormat.label}'s ${barFormat.file}`,
+        title: t`Open ${gameLabel}'s ${gameFileName}`,
         multiple: false,
         // The file itself, which the dialog reads as its directory plus its
         // name, so a game that has never saved a blueprint still opens in the
         // right place with the right name filled in.
         defaultPath: gameFile,
-        filters: [{ name: "Blueprints", extensions: ["json"] }],
+        filters: [{ name: t`Blueprints`, extensions: ["json"] }],
       });
       if (typeof src !== "string") return;
       const text = await appFileIO.read(src);
       if (text === null) {
-        setError("There is no file there.");
+        setError(t`There is no file there.`);
         return;
       }
       // Without a unit dataset every building looks like one square, and
@@ -174,8 +180,9 @@ export function BlueprintPanel({
     onChange((current) =>
       carryBlueprint(current, imported.layout, crypto.randomUUID()),
     );
+    const importedName = imported.layout.name;
     setStatus(
-      `"${imported.layout.name}" is in this scenario and is not placed yet. Put it on the map with Blueprints on the mode rail, or with the pin beside it under Contents.`,
+      t`"${importedName}" is in this scenario and is not placed yet. Put it on the map with Blueprints on the mode rail, or with the pin beside it under Contents.`,
     );
   }
 
@@ -236,17 +243,23 @@ export function BlueprintPanel({
           )
         : [];
       setKept({ id: saved.id, name });
+      const layoutName = layout.name;
+      const unstatedNames = unstated.join(", ");
+      const unstatedCount = unstated.length;
       setStatus(
         [
-          `"${name}" is in your library.`,
+          t`"${name}" is in your library.`,
           name === layout.name
             ? null
-            : `A blueprint there was already called "${layout.name}".`,
+            : t`A blueprint there was already called "${layoutName}".`,
           units.length === 0
-            ? "This game's units have not been read, so nothing is recorded about how much ground its buildings stand on, and its picture draws each of them as one build square until it is saved again."
+            ? t`This game's units have not been read, so nothing is recorded about how much ground its buildings stand on, and its picture draws each of them as one build square until it is saved again.`
             : null,
           unstated.length > 0
-            ? `This game has no ${unstated.join(", ")}, so nothing is recorded about how much ground ${unstated.length === 1 ? "it stands" : "they stand"} on and the picture draws ${unstated.length === 1 ? "it" : "them"} as one build square.`
+            ? plural(unstatedCount, {
+                one: `This game has no ${unstatedNames}, so nothing is recorded about how much ground it stands on and the picture draws it as one build square.`,
+                other: `This game has no ${unstatedNames}, so nothing is recorded about how much ground they stand on and the picture draws them as one build square.`,
+              })
             : null,
         ]
           .filter(Boolean)
@@ -266,9 +279,9 @@ export function BlueprintPanel({
     if (!layout) return;
     try {
       const dest = await save({
-        title: `Write into ${barFormat.label}'s ${barFormat.file}`,
+        title: t`Write into ${gameLabel}'s ${gameFileName}`,
         defaultPath: gameFile ?? "blueprints.json",
-        filters: [{ name: "Blueprints", extensions: ["json"] }],
+        filters: [{ name: t`Blueprints`, extensions: ["json"] }],
       });
       if (!dest) return;
       setBusy(true);
@@ -279,13 +292,20 @@ export function BlueprintPanel({
         layouts: [layout],
         gameRunning: running,
       });
-      const what = done.replaced.length > 0 ? "Replaced" : "Added";
+      const backup = done.backup;
+      const keptCount = done.kept;
       setStatus(
         [
-          `${what} "${layoutName}" in ${dest}.`,
-          done.backup ? `The file it was is kept at ${done.backup}.` : null,
+          done.replaced.length > 0
+            ? t`Replaced "${layoutName}" in ${dest}.`
+            : t`Added "${layoutName}" in ${dest}.`,
+          backup ? t`The file it was is kept at ${backup}.` : null,
           done.kept > 0
-            ? `${done.kept} entr${done.kept === 1 ? "y" : "ies"} coilbox cannot read ${done.kept === 1 ? "was" : "were"} left exactly as ${done.kept === 1 ? "it" : "they"} ${done.kept === 1 ? "was" : "were"}.`
+            ? plural(keptCount, {
+                one: "# entry coilbox cannot read was left exactly as it was.",
+                other:
+                  "# entries coilbox cannot read were left exactly as they were.",
+              })
             : null,
         ]
           .filter(Boolean)
@@ -299,15 +319,20 @@ export function BlueprintPanel({
   }
 
   const layouts = scenario.blueprints;
+  const blueprintCount = layouts.length;
+  const engine = target?.engineVersion ?? t`your engine`;
 
   return (
     <EditorPanel
-      title="Blueprints in this scenario"
+      title={t`Blueprints in this scenario`}
       icon={Blocks}
       summary={
         layouts.length === 0
-          ? "Take a base out of a game, or send one back"
-          : `${layouts.length} blueprint${layouts.length === 1 ? "" : "s"}`
+          ? t`Take a base out of a game, or send one back`
+          : plural(blueprintCount, {
+              one: "# blueprint",
+              other: "# blueprints",
+            })
       }
     >
       <div className="space-y-4">
@@ -319,12 +344,13 @@ export function BlueprintPanel({
           <div className="space-y-1">
             {gameFile && (
               <p className="break-all text-[11px] text-muted-foreground">
-                Both buttons open on{" "}
-                <span className="font-mono">{gameFile}</span>, where{" "}
-                {target?.engineVersion ?? "your engine"} writes. Pick another
-                file if you keep your games somewhere else. A player who has
-                never saved a base in game has no file there yet, and sending
-                one writes it.
+                <Trans>
+                  Both buttons open on{" "}
+                  <span className="font-mono">{gameFile}</span>, where {engine}{" "}
+                  writes. Pick another file if you keep your games somewhere
+                  else. A player who has never saved a base in game has no file
+                  there yet, and sending one writes it.
+                </Trans>
               </p>
             )}
           </div>
@@ -334,15 +360,18 @@ export function BlueprintPanel({
             className="shrink-0"
             onClick={onImport}
           >
-            <Upload className="mr-1 size-3.5" /> Open a game's file
+            <Upload className="mr-1 size-3.5" />{" "}
+            <Trans>Open a game's file</Trans>
           </Button>
         </div>
 
         {running && (
           <p className="rounded bg-amber-950/60 px-2 py-1.5 text-[11px] text-amber-200">
-            A game is running. {barFormat.label} writes its whole blueprints
-            file back when it saves or exits, so coilbox will not write into it
-            until the game is closed.
+            <Trans>
+              A game is running. {gameLabel} writes its whole blueprints file
+              back when it saves or exits, so coilbox will not write into it
+              until the game is closed.
+            </Trans>
           </p>
         )}
 
@@ -361,7 +390,7 @@ export function BlueprintPanel({
                   to={blueprintRoute(kept.id)}
                   className="underline underline-offset-2 hover:text-foreground"
                 >
-                  Open it
+                  <Trans>Open it</Trans>
                 </Link>
                 .
               </>
@@ -383,7 +412,9 @@ export function BlueprintPanel({
         <section className="space-y-2">
           {layouts.length === 0 ? (
             <p className="text-xs text-muted-foreground">
-              None yet. Draw a base on the map, or open a game's file above.
+              <Trans>
+                None yet. Draw a base on the map, or open a game's file above.
+              </Trans>
             </p>
           ) : (
             <ul className="space-y-1.5">
@@ -394,6 +425,21 @@ export function BlueprintPanel({
                 const stripped = barFormat.stripped(
                   places.flatMap((base) => base.buildings),
                 );
+                const strippedList = stripped.join(", ");
+                const buildingCount = layout.buildings.length;
+                const detail = [
+                  plural(buildingCount, {
+                    one: "# building",
+                    other: "# buildings",
+                  }),
+                  layout.ordered ? t`build order` : null,
+                  // A layout stays in the scenario after the last base placed
+                  // from it goes (#1424), so this list holds layouts nothing on
+                  // the map is drawn from.
+                  places.length === 0 ? t`not placed` : null,
+                ]
+                  .filter(Boolean)
+                  .join(" · ");
                 return (
                   <li
                     key={layout.id}
@@ -404,13 +450,7 @@ export function BlueprintPanel({
                         {layout.name}
                       </span>
                       <span className="shrink-0 text-[11px] text-muted-foreground">
-                        {layout.buildings.length} building
-                        {layout.buildings.length === 1 ? "" : "s"}
-                        {layout.ordered ? " · build order" : ""}
-                        {/* A layout stays in the scenario after the last base
-                            placed from it goes (#1424), so this list holds
-                            layouts nothing on the map is drawn from. */}
-                        {places.length === 0 ? " · not placed" : ""}
+                        {detail}
                       </span>
                       <Button
                         size="sm"
@@ -421,7 +461,9 @@ export function BlueprintPanel({
                         }
                       >
                         <Pencil className="mr-1 size-3.5" />
-                        {editing === layout.id ? "Close" : "Edit the blueprint"}
+                        {editing === layout.id
+                          ? t`Close`
+                          : t`Edit the blueprint`}
                       </Button>
                       <Button
                         size="sm"
@@ -430,8 +472,8 @@ export function BlueprintPanel({
                         disabled={busy || layout.buildings.length === 0}
                         onClick={() => void onKeep(layout.id)}
                       >
-                        <Library className="mr-1 size-3.5" /> Save to your
-                        library
+                        <Library className="mr-1 size-3.5" />{" "}
+                        <Trans>Save to your library</Trans>
                       </Button>
                       <Button
                         size="sm"
@@ -440,18 +482,21 @@ export function BlueprintPanel({
                         disabled={busy || running}
                         onClick={() => onSend(layout.id, layout.name)}
                       >
-                        <Download className="mr-1 size-3.5" /> Send to a game
+                        <Download className="mr-1 size-3.5" />{" "}
+                        <Trans>Send to a game</Trans>
                       </Button>
                     </div>
 
                     {openLayout?.id === layout.id && (
                       <div className="space-y-2 pt-1">
                         <p className="text-[11px] text-muted-foreground">
-                          A blueprint is a shape rather than a place, so this
-                          draws on a build grid and loads no map. Editing it
-                          here edits the blueprint itself, so every base placed
-                          from it changes. To change one base only, drag its
-                          buildings on the map above.
+                          <Trans>
+                            A blueprint is a shape rather than a place, so this
+                            draws on a build grid and loads no map. Editing it
+                            here edits the blueprint itself, so every base
+                            placed from it changes. To change one base only,
+                            drag its buildings on the map above.
+                          </Trans>
                         </p>
                         <BlueprintEditor
                           blueprint={openLayout}
@@ -474,9 +519,11 @@ export function BlueprintPanel({
                       // in coilbox's own library as much as in a game's file,
                       // so what a game cannot hold the library cannot either.
                       <p className="text-[11px] text-amber-200/80">
-                        Sending or saving this strips {stripped.join(", ")}. A
-                        blueprint is geometry, so there is nowhere for them to
-                        go. They stay in this scenario.
+                        <Trans>
+                          Sending or saving this strips {strippedList}. A
+                          blueprint is geometry, so there is nowhere for them to
+                          go. They stay in this scenario.
+                        </Trans>
                       </p>
                     )}
                   </li>
@@ -512,6 +559,8 @@ function FileContents({
   onTake: (imported: ImportedBlueprint) => void;
   onClose: () => void;
 }) {
+  const { t } = useLingui();
+  const unreadableCount = report.unreadable;
   return (
     <section className="space-y-2 rounded border border-border/60 bg-muted/20 p-2">
       <div className="flex items-center justify-between gap-2">
@@ -524,13 +573,13 @@ function FileContents({
           className="shrink-0"
           onClick={onClose}
         >
-          Close
+          <Trans>Close</Trans>
         </Button>
       </div>
 
       {report.blueprints.length === 0 ? (
         <p className="text-xs text-muted-foreground">
-          There are no blueprints in this file coilbox can read.
+          <Trans>There are no blueprints in this file coilbox can read.</Trans>
         </p>
       ) : (
         <ul className="space-y-1.5">
@@ -543,6 +592,10 @@ function FileContents({
               imported.unknown.length > 0 &&
               imported.unknown.length >= buildings;
             const missing = unknownUnitsWarning(imported.unknown, buildings);
+            const buildingsText = plural(buildings, {
+              one: "# building",
+              other: "# buildings",
+            });
             return (
               <li
                 // A file is free to hold two layouts of the same name, and
@@ -557,9 +610,9 @@ function FileContents({
                     {imported.layout.name}
                   </span>
                   <span className="shrink-0 text-[11px] text-muted-foreground">
-                    {buildings} building
-                    {buildings === 1 ? "" : "s"}
-                    {imported.layout.ordered ? " · build order" : ""}
+                    {imported.layout.ordered
+                      ? t`${buildingsText} · build order`
+                      : buildingsText}
                   </span>
                   <Button
                     size="sm"
@@ -567,7 +620,7 @@ function FileContents({
                     className="shrink-0"
                     onClick={() => onTake(imported)}
                   >
-                    {foreign ? "Add it anyway" : "Add to this scenario"}
+                    {foreign ? t`Add it anyway` : t`Add to this scenario`}
                   </Button>
                 </div>
                 {missing && (
@@ -590,28 +643,33 @@ function FileContents({
 
       {!report.checked && report.blueprints.length > 0 && (
         <p className="text-[11px] text-amber-200/80">
-          Coilbox has not read this game's units yet, so nothing here has been
-          checked against them. This file holds every blueprint every game
-          sharing a data directory has saved, and another game's looks exactly
-          like this one's until the names are checked.
+          <Trans>
+            Coilbox has not read this game's units yet, so nothing here has been
+            checked against them. This file holds every blueprint every game
+            sharing a data directory has saved, and another game's looks exactly
+            like this one's until the names are checked.
+          </Trans>
         </p>
       )}
 
       {report.unreadable > 0 && (
         <p className="text-[11px] text-muted-foreground">
-          {report.unreadable} other entr
-          {report.unreadable === 1 ? "y is" : "ies are"} in this file that
-          coilbox cannot read. Writing back to it leaves{" "}
-          {report.unreadable === 1 ? "it" : "them"} exactly as{" "}
-          {report.unreadable === 1 ? "it is" : "they are"}.
+          {plural(unreadableCount, {
+            one: "# other entry is in this file that coilbox cannot read. Writing back to it leaves it exactly as it is.",
+            other:
+              "# other entries are in this file that coilbox cannot read. Writing back to it leaves them exactly as they are.",
+          })}
         </p>
       )}
 
       {!anyone && report.blueprints.length > 0 && (
         <p className="text-[11px] text-amber-200/80">
-          This scenario has no participants yet. A blueprint can still be added,
-          and putting one on the map cannot be done until there is somebody for
-          the base to belong to. Add a participant in the setup above.
+          <Trans>
+            This scenario has no participants yet. A blueprint can still be
+            added, and putting one on the map cannot be done until there is
+            somebody for the base to belong to. Add a participant in the setup
+            above.
+          </Trans>
         </p>
       )}
     </section>
@@ -619,29 +677,37 @@ function FileContents({
 }
 
 /** How far the file's own facing turned a layout, in words. */
-const TURNS = [
-  "",
-  "a quarter turn",
-  "half way round",
-  "three quarters of a turn",
-];
+function turned(turns: number): string {
+  switch (turns) {
+    case 1:
+      return t`turned a quarter turn, the way the game places it`;
+    case 2:
+      return t`turned half way round, the way the game places it`;
+    default:
+      return t`turned three quarters of a turn, the way the game places it`;
+  }
+}
 
 /** What reading one layout out of the file changed about it, in a line. */
 function Changes({ imported }: { imported: ImportedBlueprint }) {
+  const { t } = useLingui();
   const said: string[] = [];
-  if (imported.turned > 0) {
-    said.push(`turned ${TURNS[imported.turned]}, the way the game places it`);
-  }
+  const snappedCount = imported.snapped.length;
+  if (imported.turned > 0) said.push(turned(imported.turned));
   if (imported.snapped.length > 0) {
     said.push(
-      `${imported.snapped.length} building${imported.snapped.length === 1 ? "" : "s"} moved onto the build grid`,
+      plural(snappedCount, {
+        one: "# building moved onto the build grid",
+        other: "# buildings moved onto the build grid",
+      }),
     );
   }
-  for (const dropped of imported.dropped) said.push(`${dropped} is not kept`);
+  for (const dropped of imported.dropped) said.push(t`${dropped} is not kept`);
   if (said.length === 0) return null;
+  const changes = said.join(", ");
   return (
     <p className="text-[11px] text-muted-foreground">
-      Reading it {said.join(", ")}.
+      <Trans>Reading it {changes}.</Trans>
     </p>
   );
 }

@@ -1,3 +1,4 @@
+import { plural, t } from "@lingui/core/macro";
 import type { GameItem, Side, UnitDatasetEntry } from "@/content/bindings";
 import {
   unitsyncGameInfo,
@@ -470,28 +471,43 @@ export async function sweepGameFacts(
  * about facts it already holds, which nobody can do anything with.
  */
 export function gameSweepSummary(report: GameSweepReport): string {
-  if (report.found === 0) return "Coilbox found no games to read.";
+  if (report.found === 0) return t`Coilbox found no games to read.`;
   if (report.sent === 0 && report.failed.length === 0) {
-    return "Coilbox found no games worth sending. Only released games are sent, not the ones you are working on.";
+    return t`Coilbox found no games worth sending. Only released games are sent, not the ones you are working on.`;
   }
-  const games = report.sent === 1 ? "game" : "games";
-  const sent = `Sent what ${report.sent} ${games} say about their units.`;
+  const sentCount = report.sent;
+  const sent = plural(sentCount, {
+    one: "Sent what # game says about its units.",
+    other: "Sent what # games say about their units.",
+  });
   if (report.failed.length > 0) {
-    const would =
-      report.failed.length === 1 ? "one game" : `${report.failed.length} games`;
-    return `${sent} The hub would not take ${would}.`;
+    const failedCount = report.failed.length;
+    const would = plural(failedCount, {
+      one: "The hub would not take one game.",
+      other: "The hub would not take # games.",
+    });
+    return `${sent} ${would}`;
   }
   if (report.refused.length > 0) {
     // A result names the list it came from, so a refused faction is not reported
     // as a refused unit. They are fixed in different places.
-    const counted = ([one, many]: [string, string]) => {
-      const how = report.refused.filter((r) => r.kind === one).length;
-      return how === 0 ? "" : `${how} ${how === 1 ? one : many}`;
-    };
-    const said = [counted(["unit", "units"]), counted(["faction", "factions"])]
-      .filter(Boolean)
-      .join(" and ");
-    return `${sent} It would not take ${said}.`;
+    const units = report.refused.filter((r) => r.kind === "unit").length;
+    const factions = report.refused.filter((r) => r.kind === "faction").length;
+    const unitsSaid = plural(units, {
+      one: "# unit",
+      other: "# units",
+    });
+    const factionsSaid = plural(factions, {
+      one: "# faction",
+      other: "# factions",
+    });
+    const refusedSentence =
+      units > 0 && factions > 0
+        ? t`It would not take ${unitsSaid} and ${factionsSaid}.`
+        : units > 0
+          ? t`It would not take ${unitsSaid}.`
+          : t`It would not take ${factionsSaid}.`;
+    return `${sent} ${refusedSentence}`;
   }
   return sent;
 }

@@ -1,3 +1,4 @@
+import { Trans, useLingui } from "@lingui/react/macro";
 import { Button, cn, NavGate, useSetting } from "@picoframe/frame";
 import { Gamepad2, LogOut, Star, UserCheck, Users, UserX } from "lucide-react";
 import {
@@ -82,6 +83,7 @@ function IconTip({ label, children }: { label: string; children: ReactNode }) {
  * `?server=`, and to seed the sidebar's initial selection.
  */
 function ChatPage() {
+  const { t } = useLingui();
   const {
     connections,
     activeKey: focusKey,
@@ -384,11 +386,15 @@ function ChatPage() {
   if (liveKeys.length === 0) {
     return (
       <main className="flex flex-col items-center justify-center gap-4 p-10 text-center">
-        <h1 className="text-lg font-semibold">Chat</h1>
+        <h1 className="text-lg font-semibold">
+          <Trans>Chat</Trans>
+        </h1>
         <p className="text-sm text-muted-foreground">
-          You are not connected to a lobby server.
+          <Trans>You are not connected to a lobby server.</Trans>
         </p>
-        <Button onClick={openLoginPopover}>Connect…</Button>
+        <Button onClick={openLoginPopover}>
+          <Trans>Connect…</Trans>
+        </Button>
       </main>
     );
   }
@@ -426,8 +432,8 @@ function ChatPage() {
                   <IconTip
                     label={
                       dmIsFavourite
-                        ? `Remove ${desc.peer} from friends`
-                        : `Add ${desc.peer} to friends`
+                        ? t`Remove ${dmPeer} from friends`
+                        : t`Add ${dmPeer} to friends`
                     }
                   >
                     <Button
@@ -436,8 +442,8 @@ function ChatPage() {
                       onClick={dmFriend.onToggle}
                       aria-label={
                         dmIsFavourite
-                          ? `Remove ${desc.peer} from friends`
-                          : `Add ${desc.peer} to friends`
+                          ? t`Remove ${dmPeer} from friends`
+                          : t`Add ${dmPeer} to friends`
                       }
                       aria-pressed={dmIsFavourite}
                     >
@@ -453,8 +459,8 @@ function ChatPage() {
                 <IconTip
                   label={
                     ignoredNow(desc.peer)
-                      ? `Unignore ${desc.peer}`
-                      : `Ignore ${desc.peer}`
+                      ? t`Unignore ${dmPeer}`
+                      : t`Ignore ${dmPeer}`
                   }
                 >
                   <Button
@@ -463,8 +469,8 @@ function ChatPage() {
                     onClick={() => toggleIgnore(desc.peer)}
                     aria-label={
                       ignoredNow(desc.peer)
-                        ? `Unignore ${desc.peer}`
-                        : `Ignore ${desc.peer}`
+                        ? t`Unignore ${dmPeer}`
+                        : t`Ignore ${dmPeer}`
                     }
                     aria-pressed={ignoredNow(desc.peer)}
                   >
@@ -478,12 +484,12 @@ function ChatPage() {
               </TooltipProvider>
             ) : desc.kind === "channel" || desc.kind === "battle" ? (
               <TooltipProvider delayDuration={150}>
-                <IconTip label="Toggle members">
+                <IconTip label={t`Toggle members`}>
                   <Button
                     variant="secondary"
                     className="h-7 px-2"
                     onClick={() => setShowMembers((v) => !v)}
-                    aria-label="Toggle members"
+                    aria-label={t`Toggle members`}
                     aria-pressed={showMembers}
                   >
                     <Users className="size-4" />
@@ -504,11 +510,11 @@ function ChatPage() {
                         }}
                       />
                     )}
-                    <IconTip label="Leave channel">
+                    <IconTip label={t`Leave channel`}>
                       <Button
                         className="h-7 px-2"
                         onClick={() => leaveChannel(desc.name)}
-                        aria-label="Leave channel"
+                        aria-label={t`Leave channel`}
                       >
                         <LogOut className="size-4" />
                       </Button>
@@ -522,14 +528,14 @@ function ChatPage() {
                       onClick={() => navigate(battleRoomHref(activeServerKey))}
                     >
                       <Gamepad2 className="size-4" />
-                      Go to battle
+                      <Trans>Go to battle</Trans>
                     </Button>
                     <Button
                       className="h-7 gap-1.5 px-2"
                       onClick={leaveCurrentBattle}
                     >
                       <LogOut className="size-4" />
-                      Leave
+                      <Trans>Leave</Trans>
                     </Button>
                   </>
                 )}
@@ -540,8 +546,8 @@ function ChatPage() {
       ) : (
         <div className="flex flex-1 items-center justify-center text-sm text-muted-foreground">
           {hasChannels
-            ? "Select a conversation, or browse channels to join one."
-            : "Select a conversation."}
+            ? t`Select a conversation, or browse channels to join one.`
+            : t`Select a conversation.`}
         </div>
       )}
 

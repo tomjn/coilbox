@@ -19,6 +19,8 @@
  * `InPlaceWrite` already uses, so the caller refreshes the same way either
  * control was pressed from.
  */
+import { plural } from "@lingui/core/macro";
+import { Trans, useLingui } from "@lingui/react/macro";
 import { Button, Drawer } from "@picoframe/frame";
 import { useCallback, useEffect, useState } from "react";
 import {
@@ -43,10 +45,6 @@ function message(e: unknown): string {
   return describeError(e);
 }
 
-function plural(n: number, word: string): string {
-  return `${n} ${word}${n === 1 ? "" : "s"}`;
-}
-
 function lineClass(kind: LineChange): string {
   if (kind === "added") return "bg-emerald-500/10";
   if (kind === "removed") return "bg-destructive/10";
@@ -61,7 +59,7 @@ function FileDiffView({ file }: { file: FileDiff }) {
         {file.file}
         {file.created && (
           <span className="rounded border border-border/60 px-1.5 py-0.5 font-sans text-[0.65rem]">
-            New file
+            <Trans>New file</Trans>
           </span>
         )}
       </h3>
@@ -72,7 +70,11 @@ function FileDiffView({ file }: { file: FileDiff }) {
               key={item.id}
               className="bg-muted/40 px-3 py-1 text-muted-foreground"
             >
-              … {plural(item.count, "unchanged line")}
+              …{" "}
+              {plural(item.count, {
+                one: "# unchanged line",
+                other: "# unchanged lines",
+              })}
             </div>
           ) : (
             <div
@@ -109,6 +111,7 @@ export function DiskDiffDrawer({
   /** Called after undo or accept went through, with what it did. */
   onDone: (done: InPlaceDone) => void;
 }) {
+  const { t } = useLingui();
   const [diffs, setDiffs] = useState<FileDiff[] | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -122,11 +125,11 @@ export function DiskDiffDrawer({
       setDiffs(await workshopInPlaceDiffs({ gameDir }));
       setError(null);
     } catch (e) {
-      setError(`Could not read the disk diff: ${message(e)}`);
+      setError(t`Could not read the disk diff: ${message(e)}`);
     } finally {
       setLoading(false);
     }
-  }, [gameDir]);
+  }, [gameDir, t]);
 
   useEffect(() => {
     if (open) void refresh();
@@ -141,13 +144,19 @@ export function DiskDiffDrawer({
         const undone = await workshopUndoInPlace({ gameDir });
         const count = undone.restored.length + undone.deleted.length;
         setDone(
-          `Put ${plural(count, "file")} back as ${count === 1 ? "it was" : "they were"}.`,
+          plural(count, {
+            one: "Put # file back as it was.",
+            other: "Put # files back as they were.",
+          }),
         );
         onDone({ kind: "undo", changed: count > 0 });
       } else {
         const accepted = await workshopAcceptInPlace({ gameDir });
         setDone(
-          `Kept the changes to ${plural(accepted.kept.length, "file")} and deleted the backups.`,
+          plural(accepted.kept.length, {
+            one: "Kept the changes to # file and deleted the backups.",
+            other: "Kept the changes to # files and deleted the backups.",
+          }),
         );
         onDone({ kind: "accept", changed: accepted.kept.length > 0 });
       }
@@ -165,8 +174,8 @@ export function DiskDiffDrawer({
     <Drawer
       open={open}
       onOpenChange={onOpenChange}
-      title="Disk diff"
-      description="Every file coilbox has changed or created in this game's own folder, backup against what is there now."
+      title={t`Disk diff`}
+      description={t`Every file coilbox has changed or created in this game's own folder, backup against what is there now.`}
       width="42rem"
     >
       <div className="flex flex-col gap-4">
@@ -177,7 +186,7 @@ export function DiskDiffDrawer({
             disabled={busy !== null || reading || pending === 0}
             onClick={() => void run("undo")}
           >
-            {busy === "undo" ? "Undoing…" : "Undo"}
+            {busy === "undo" ? t`Undoing…` : t`Undo`}
           </Button>
           <Popover open={confirmAccept} onOpenChange={setConfirmAccept}>
             <PopoverTrigger asChild>
@@ -186,16 +195,20 @@ export function DiskDiffDrawer({
                 variant="outline"
                 disabled={busy !== null || reading || pending === 0}
               >
-                {busy === "accept" ? "Accepting…" : "Accept"}
+                {busy === "accept" ? t`Accepting…` : t`Accept`}
               </Button>
             </PopoverTrigger>
             <PopoverContent align="start" className="flex w-80 flex-col gap-3">
               <div className="flex flex-col gap-1">
-                <h3 className="text-sm font-medium">Keep the changes?</h3>
+                <h3 className="text-sm font-medium">
+                  <Trans>Keep the changes?</Trans>
+                </h3>
                 <p className="text-xs text-muted-foreground">
-                  This deletes the originals coilbox kept of{" "}
-                  {plural(pending, "file")}. After that, undo is not possible
-                  here, only through your own copy or version control.
+                  {plural(pending, {
+                    one: "This deletes the original coilbox kept of # file. After that, undo is not possible here, only through your own copy or version control.",
+                    other:
+                      "This deletes the originals coilbox kept of # files. After that, undo is not possible here, only through your own copy or version control.",
+                  })}
                 </p>
               </div>
               <div className="flex justify-end gap-2">
@@ -205,7 +218,7 @@ export function DiskDiffDrawer({
                   size="sm"
                   onClick={() => setConfirmAccept(false)}
                 >
-                  Cancel
+                  <Trans>Cancel</Trans>
                 </Button>
                 <Button
                   type="button"
@@ -215,7 +228,7 @@ export function DiskDiffDrawer({
                     void run("accept");
                   }}
                 >
-                  Accept
+                  <Trans>Accept</Trans>
                 </Button>
               </div>
             </PopoverContent>
@@ -225,12 +238,14 @@ export function DiskDiffDrawer({
         {done && <p className="text-xs">{done}</p>}
         {loading && diffs === null && (
           <p className="text-muted-foreground text-sm">
-            Reading the game's files…
+            <Trans>Reading the game's files…</Trans>
           </p>
         )}
         {diffs !== null && diffs.length === 0 && !loading && (
           <p className="text-muted-foreground text-sm">
-            Nothing to review: no file here holds a change from coilbox.
+            <Trans>
+              Nothing to review: no file here holds a change from coilbox.
+            </Trans>
           </p>
         )}
         {diffs?.map((file) => (

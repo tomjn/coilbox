@@ -1,3 +1,4 @@
+import { Trans } from "@lingui/react/macro";
 import { Button } from "@picoframe/frame";
 import { Check, X } from "lucide-react";
 import {
@@ -29,11 +30,10 @@ export function HostSuggestionAction({
   onReject: () => void;
 }) {
   const label = hostSuggestionActionLabel(suggestion.kind);
+  const text = hostSuggestionText(suggestion.kind);
   return (
     <div className="flex flex-col gap-1 px-1">
-      <p className="text-xs text-muted-foreground">
-        {hostSuggestionText(suggestion.kind)}
-      </p>
+      <p className="text-xs text-muted-foreground">{text}</p>
       <div className="flex gap-1">
         <Button
           size="sm"
@@ -42,7 +42,7 @@ export function HostSuggestionAction({
           onClick={onAccept}
         >
           <Check className="size-3" />
-          {`Accept: ${label}`}
+          <Trans>Accept: {label}</Trans>
         </Button>
         <Button
           size="sm"
@@ -51,7 +51,7 @@ export function HostSuggestionAction({
           onClick={onReject}
         >
           <X className="size-3" />
-          Reject
+          <Trans>Reject</Trans>
         </Button>
       </div>
     </div>

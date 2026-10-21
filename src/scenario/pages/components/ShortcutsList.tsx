@@ -4,6 +4,7 @@
  * than a dialog, matching every other surface this editor opens on demand.
  */
 
+import { Trans } from "@lingui/react/macro";
 import { editorShortcuts } from "./shortcuts";
 
 export function ShortcutsList() {
@@ -23,12 +24,14 @@ export function ShortcutsList() {
         ))}
       </ul>
       <p className="text-xs text-muted-foreground">
-        The map has its own keys for stepping through what is placed, moving it,
-        turning it and deleting it. Focus the map and press{" "}
-        <kbd className="rounded border border-border bg-muted px-1 py-0.5 font-mono text-xs">
-          ?
-        </kbd>{" "}
-        to hear them.
+        <Trans>
+          The map has its own keys for stepping through what is placed, moving
+          it, turning it and deleting it. Focus the map and press{" "}
+          <kbd className="rounded border border-border bg-muted px-1 py-0.5 font-mono text-xs">
+            ?
+          </kbd>{" "}
+          to hear them.
+        </Trans>
       </p>
     </div>
   );

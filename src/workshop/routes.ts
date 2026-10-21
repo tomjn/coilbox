@@ -16,6 +16,7 @@
  * which is exactly what the page did before this issue. Looking at a unit still
  * leaves nothing behind.
  */
+import { t } from "@lingui/core/macro";
 import type { ModProject } from "./project";
 
 /**
@@ -86,14 +87,46 @@ export function unitEditPath(
  * existed still lands on the unit editor.
  *
  * Adding a section is one entry here and one case in `UnitPage.tsx`'s body.
+ * Each label is a getter so it is translated when read, not when the module
+ * loads.
  */
 export const PROJECT_SECTIONS = [
-  { id: "units", label: "Units" },
-  { id: "changes", label: "Changes" },
-  { id: "weapons", label: "Weapons" },
-  { id: "collections", label: "Collections" },
-  { id: "checks", label: "Checks" },
-  { id: "package", label: "Package" },
+  {
+    id: "units",
+    get label() {
+      return t`Units`;
+    },
+  },
+  {
+    id: "changes",
+    get label() {
+      return t`Changes`;
+    },
+  },
+  {
+    id: "weapons",
+    get label() {
+      return t`Weapons`;
+    },
+  },
+  {
+    id: "collections",
+    get label() {
+      return t`Collections`;
+    },
+  },
+  {
+    id: "checks",
+    get label() {
+      return t`Checks`;
+    },
+  },
+  {
+    id: "package",
+    get label() {
+      return t`Package`;
+    },
+  },
 ] as const;
 
 export type ProjectSection = (typeof PROJECT_SECTIONS)[number]["id"];

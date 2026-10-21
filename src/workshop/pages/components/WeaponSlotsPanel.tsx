@@ -26,11 +26,15 @@
  * shared one gives the unit its own copy out of the library the same way a
  * shared slot weapon does.
  */
+import type { MessageDescriptor } from "@lingui/core";
+import { msg, plural } from "@lingui/core/macro";
+import { Plural, Trans, useLingui } from "@lingui/react/macro";
 import { Button, cn, Input } from "@picoframe/frame";
 import { Plus, TriangleAlert, Undo2 } from "lucide-react";
 import { useState } from "react";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import type { CustomParamsResult } from "@/content/bindings";
+import { getLocale } from "@/i18n";
 import type { AssetBrowsing } from "../../assetFields";
 import type { PostNote } from "../../beforePost";
 import type { DeathExplosion } from "../../deathExplosions";
@@ -62,6 +66,7 @@ import type { InPlaceField } from "./UnitFieldRow";
  * other damage row already draws.
  */
 function AddDamageClass({ onAdd }: { onAdd: (className: string) => void }) {
+  const { t } = useLingui();
   const [adding, setAdding] = useState(false);
   const [name, setName] = useState("");
   if (!adding) {
@@ -74,7 +79,7 @@ function AddDamageClass({ onAdd }: { onAdd: (className: string) => void }) {
         onClick={() => setAdding(true)}
       >
         <Plus className="size-3.5" />
-        Add a class to the damage table
+        <Trans>Add a class to the damage table</Trans>
       </Button>
     );
   }
@@ -89,8 +94,8 @@ function AddDamageClass({ onAdd }: { onAdd: (className: string) => void }) {
     <div className="flex w-fit items-center gap-1.5">
       <Input
         className="h-8 w-40 font-mono text-xs"
-        aria-label="Armour class to add to the damage table"
-        placeholder="Armour class"
+        aria-label={t`Armour class to add to the damage table`}
+        placeholder={t`Armour class`}
         value={name}
         onChange={(e) => setName(e.target.value)}
         onKeyDown={(e) => {
@@ -111,7 +116,7 @@ function AddDamageClass({ onAdd }: { onAdd: (className: string) => void }) {
         className="h-8 text-[10px]"
         onClick={submit}
       >
-        Add
+        <Trans>Add</Trans>
       </Button>
     </div>
   );
@@ -177,11 +182,12 @@ function SlotMarker({ problems }: { problems: WeaponProblem[] }) {
 }
 
 function WeaponProblems({ problems }: { problems: WeaponProblem[] }) {
+  const { t } = useLingui();
   if (problems.length === 0) return null;
   return (
     <ul
       className="flex max-w-prose flex-col gap-1 text-xs"
-      aria-label="Problems with this unit's weapons"
+      aria-label={t`Problems with this unit's weapons`}
     >
       {problems.map((problem) => (
         <li
@@ -270,11 +276,15 @@ export function WeaponSlotsPanel({
    *  up yet, in which case no control is offered. */
   cegLibrary?: CegLibrary;
 }) {
+  const { t } = useLingui();
   if (slots.length === 0 && supporting.length === 0)
     return (
-      <p className="text-sm text-muted-foreground">This unit has no weapons.</p>
+      <p className="text-sm text-muted-foreground">
+        <Trans>This unit has no weapons.</Trans>
+      </p>
     );
   const onSlot = selectedSupport === undefined ? selected : undefined;
+  const onSlotName = onSlot?.name;
 
   // Where "add a class" writes, when there is anywhere it can (issue #2645):
   // the supporting definition on screen, the library weapon the slot fires,
@@ -334,10 +344,12 @@ export function WeaponSlotsPanel({
         className="flex-wrap"
         value={onSlot?.step ?? ""}
         onValueChange={(step) => step && onSelect(step)}
-        aria-label="Weapon slot"
+        aria-label={t`Weapon slot`}
       >
         {slots.map((slot) => {
           const fires = library.equippedIn(slot.step);
+          const slotNumber = slot.number;
+          const slotName = slot.name;
           const changed =
             slotEditCount(slot, overrides, unitKey) + (fires ? 1 : 0);
           const slotProblems = fires
@@ -353,7 +365,7 @@ export function WeaponSlotsPanel({
             <ToggleGroupItem
               key={slot.step}
               value={slot.step}
-              aria-label={`Weapon ${slot.number}, ${slot.name}`}
+              aria-label={t`Weapon ${slotNumber}, ${slotName}`}
               title={slot.name}
               className="gap-1.5"
             >
@@ -366,7 +378,10 @@ export function WeaponSlotsPanel({
               {changed > 0 && (
                 <span
                   className="rounded-full bg-primary px-1.5 text-[10px] text-primary-foreground"
-                  title={`${changed} field${changed === 1 ? "" : "s"} changed`}
+                  title={plural(changed, {
+                    one: "# field changed",
+                    other: "# fields changed",
+                  })}
                 >
                   {changed}
                 </span>
@@ -380,7 +395,9 @@ export function WeaponSlotsPanel({
       {supporting.length > 0 && (
         <div className="flex flex-col gap-1.5">
           <p className="text-xs text-muted-foreground" id="supporting-defs">
-            Supporting definitions: carried by this unit, mounted in no slot
+            <Trans>
+              Supporting definitions: carried by this unit, mounted in no slot
+            </Trans>
           </p>
           <ToggleGroup
             type="single"
@@ -394,14 +411,25 @@ export function WeaponSlotsPanel({
           >
             {supporting.map((support) => {
               const changed = supportingEditCount(support, overrides, unitKey);
+              const supportKey = support.key;
+              const namedBy = new Intl.ListFormat(getLocale(), {
+                style: "long",
+                type: "conjunction",
+              }).format(
+                support.usedBy.map((u) => {
+                  const from = u.from;
+                  const field = u.field;
+                  return t`${from}'s ${field}`;
+                }),
+              );
               return (
                 <ToggleGroupItem
                   key={support.key}
                   value={support.key}
-                  aria-label={`Supporting definition ${support.key}`}
+                  aria-label={t`Supporting definition ${supportKey}`}
                   title={
                     support.usedBy.length > 0
-                      ? `Named by ${support.usedBy.map((u) => `${u.from}'s ${u.field}`).join(" and ")}`
+                      ? t`Named by ${namedBy}`
                       : support.key
                   }
                   className="gap-1.5"
@@ -412,7 +440,10 @@ export function WeaponSlotsPanel({
                   {changed > 0 && (
                     <span
                       className="rounded-full bg-primary px-1.5 text-[10px] text-primary-foreground"
-                      title={`${changed} field${changed === 1 ? "" : "s"} changed`}
+                      title={plural(changed, {
+                        one: "# field changed",
+                        other: "# fields changed",
+                      })}
                     >
                       {changed}
                     </span>
@@ -435,8 +466,10 @@ export function WeaponSlotsPanel({
       {onSlot?.definition.kind === "missing" &&
         !library.equippedIn(onSlot.step) && (
           <p className="max-w-prose text-xs text-destructive">
-            No weapon definition in this game is called {onSlot.name}, so the
-            engine leaves this slot empty.
+            <Trans>
+              No weapon definition in this game is called {onSlotName}, so the
+              engine leaves this slot empty.
+            </Trans>
           </p>
         )}
 
@@ -475,7 +508,7 @@ export function WeaponSlotsPanel({
               }}
               consumers={consumers}
               assets={assets}
-              inheritedLabel="Copied value"
+              inheritedLabel={t`Copied value`}
               post={(row) =>
                 library.postOf(library.equippedIn(onSlot.step), row)
               }
@@ -535,10 +568,11 @@ export function DeathExplosionsPanel({
    *  up yet, in which case no control is offered. */
   cegLibrary?: CegLibrary;
 }) {
+  const { t } = useLingui();
   if (explosions.entries.length === 0)
     return (
       <p className="text-sm text-muted-foreground">
-        This unit has no death explosions.
+        <Trans>This unit has no death explosions.</Trans>
       </p>
     );
   // The page always names one once this tab is open (`UnitPage.tsx`), and
@@ -598,7 +632,7 @@ export function DeathExplosionsPanel({
         onValueChange={(mount) =>
           mount && explosions.onSelect(mount as DeathMount)
         }
-        aria-label="Death explosion"
+        aria-label={t`Death explosion`}
       >
         {explosions.entries.map((explosion) => {
           const changed = explosions.editCount(explosion);
@@ -621,18 +655,21 @@ export function DeathExplosionsPanel({
               className="gap-1.5"
             >
               <span>
-                {explosion.mount === "explodeas" ? "Dies" : "Self-destructs"}
+                {explosion.mount === "explodeas" ? t`Dies` : t`Self-destructs`}
               </span>
               <span className="max-w-48 truncate font-mono text-xs text-muted-foreground">
                 {equippedHere ??
                   (explosion.follows
-                    ? "as it dies"
-                    : explosion.name || "nothing")}
+                    ? t`as it dies`
+                    : explosion.name || t`nothing`)}
               </span>
               {changed > 0 && (
                 <span
                   className="rounded-full bg-primary px-1.5 text-[10px] text-primary-foreground"
-                  title={`${changed} field${changed === 1 ? "" : "s"} changed`}
+                  title={plural(changed, {
+                    one: "# field changed",
+                    other: "# fields changed",
+                  })}
                 >
                   {changed}
                 </span>
@@ -670,7 +707,7 @@ export function DeathExplosionsPanel({
           assets={assets}
           inheritedLabel={
             explosionFires
-              ? "Copied value"
+              ? t`Copied value`
               : activeExplosion.definition.kind === "own"
                 ? inheritedLabel
                 : undefined
@@ -737,10 +774,10 @@ export interface CegLibrary {
 /** The label a weapon field's own row already carries, for the three fields
  *  that can name a custom explosion generator, so the control reads "Create
  *  an impact effect" rather than the field's raw key. */
-const CEG_FIELD_LABEL: Record<string, string> = {
-  explosionGenerator: "Impact effect",
-  bounceExplosionGenerator: "Bounce effect",
-  cegTag: "Trail effect",
+const CEG_FIELD_LABEL: Record<string, MessageDescriptor> = {
+  explosionGenerator: msg`Impact effect`,
+  bounceExplosionGenerator: msg`Bounce effect`,
+  cegTag: msg`Trail effect`,
 };
 
 /**
@@ -760,6 +797,7 @@ function CegFieldControls({
   cegLibrary: CegLibrary;
   writeField: (row: FieldRow, value: unknown) => void;
 }) {
+  const { t } = useLingui();
   const rows = view.groups.flatMap((group) =>
     group.sections.flatMap((section) => section.rows),
   );
@@ -784,15 +822,17 @@ function CegFieldControls({
   return (
     <div className="flex flex-col gap-1.5">
       <p className="text-xs text-muted-foreground">
-        Custom explosion effects: coilbox cannot render one, but Test can launch
-        a real skirmish to show it
+        <Trans>
+          Custom explosion effects: coilbox cannot render one, but Test can
+          launch a real skirmish to show it
+        </Trans>
       </p>
       <div className="flex flex-wrap gap-2">
         {controls.map(({ row, field }) => (
           <ExplosionGeneratorEditor
             key={row.path}
             field={field}
-            label={CEG_FIELD_LABEL[field]}
+            label={t(CEG_FIELD_LABEL[field])}
             value={row.value}
             generators={cegLibrary.generators}
             onSetGenerators={cegLibrary.onChange}
@@ -814,20 +854,25 @@ function ExplosionActions({
   explosions: ExplosionPanel;
   library: SlotLibrary;
 }) {
+  const { t } = useLingui();
   const fires = explosions.equippedIn(explosion.mount);
-  const noun =
-    explosion.mount === "explodeas"
-      ? "death explosion"
-      : "self-destruct explosion";
+  const isDeath = explosion.mount === "explodeas";
+  const unitName = library.unitName;
+  const explosionField = explosion.field;
+  const explosionName = explosion.name;
   if (!fires && explosion.follows) {
     const death = explosions.equippedIn("explodeas") ?? explosion.name;
     return (
       <p className="max-w-prose text-xs text-muted-foreground">
-        {library.unitName} sets no {explosion.field}, so the engine uses its
-        death explosion,{" "}
-        <span className="font-mono text-foreground">{death || "nothing"}</span>,
-        when it self-destructs. Change the death explosion to change both, or
-        set {explosion.field} on the fields tab to give it one of its own.
+        <Trans>
+          {unitName} sets no {explosionField}, so the engine uses its death
+          explosion,{" "}
+          <span className="font-mono text-foreground">
+            {death || t`nothing`}
+          </span>
+          , when it self-destructs. Change the death explosion to change both,
+          or set {explosionField} on the fields tab to give it one of its own.
+        </Trans>
       </p>
     );
   }
@@ -842,17 +887,28 @@ function ExplosionActions({
     <div className="flex flex-col gap-2">
       {fires ? (
         <p className="max-w-prose text-xs text-muted-foreground">
-          The {noun} is{" "}
-          <span className="font-mono text-foreground">{fires}</span> from the
-          project's weapon library, in place of{" "}
-          <span className="font-mono">{explosion.name || "nothing"}</span>.
+          {isDeath ? (
+            <Trans>
+              The death explosion is{" "}
+              <span className="font-mono text-foreground">{fires}</span> from
+              the project's weapon library, in place of{" "}
+              <span className="font-mono">{explosionName || t`nothing`}</span>.
+            </Trans>
+          ) : (
+            <Trans>
+              The self-destruct explosion is{" "}
+              <span className="font-mono text-foreground">{fires}</span> from
+              the project's weapon library, in place of{" "}
+              <span className="font-mono">{explosionName || t`nothing`}</span>.
+            </Trans>
+          )}
         </p>
       ) : (
         explosion.definition.kind === "missing" && (
           <p className="max-w-prose text-xs text-destructive">
             {explosion.name
-              ? `No weapon definition in this game is called ${explosion.name}, so the engine uses its empty NOWEAPON definition and the unit explodes as nothing.`
-              : `${library.unitName} sets no ${explosion.field}, so the engine uses its empty NOWEAPON definition and the unit explodes as nothing.`}
+              ? t`No weapon definition in this game is called ${explosionName}, so the engine uses its empty NOWEAPON definition and the unit explodes as nothing.`
+              : t`${unitName} sets no ${explosionField}, so the engine uses its empty NOWEAPON definition and the unit explodes as nothing.`}
           </p>
         )
       )}
@@ -860,10 +916,10 @@ function ExplosionActions({
         <EquipWeaponPopover
           label={
             fires
-              ? "Change explosion"
+              ? t`Change explosion`
               : shared
-                ? `Give ${library.unitName} its own copy`
-                : "Use a library weapon"
+                ? t`Give ${unitName} its own copy`
+                : t`Use a library weapon`
           }
           shared={shared}
           // A death explosion's fields are already editable and copy
@@ -872,7 +928,11 @@ function ExplosionActions({
           // than the only way in, unlike a shared slot's weapon below.
           primary={false}
           unitName={library.unitName}
-          usesCopy={`the ${noun} is the copy`}
+          usesCopy={
+            isDeath
+              ? t`the death explosion is the copy`
+              : t`the self-destruct explosion is the copy`
+          }
           copySource={copySource}
           suggestedKey={copySource ? explosions.copyKey(explosion) : undefined}
           library={library.weapons}
@@ -890,7 +950,9 @@ function ExplosionActions({
             onClick={() => explosions.onPutBack(explosion)}
           >
             <Undo2 className="size-3.5" />
-            Put back {explosion.name || "the game's"}
+            {explosionName
+              ? t`Put back ${explosionName}`
+              : t`Put back the game's`}
           </Button>
         )}
       </div>
@@ -908,27 +970,38 @@ function SlotWeaponActions({
   library: SlotLibrary;
   fires: string | undefined;
 }) {
+  const { t } = useLingui();
   const shared = !fires && slot.definition.kind === "shared";
   const copySource = fires ? undefined : library.copySourceOf(slot);
   const brings = fires ? librarySupport(library.weapons, fires) : [];
+  const unitName = library.unitName;
+  const slotNumber = slot.number;
+  const slotName = slot.name;
   return (
     <div className="flex flex-wrap items-center gap-2">
       {fires && (
         <p className="text-xs text-muted-foreground">
-          Weapon {slot.number} fires{" "}
-          <span className="font-mono text-foreground">{fires}</span> from the
-          project's weapon library, in place of{" "}
-          <span className="font-mono">{slot.name}</span>.
+          <Trans>
+            Weapon {slotNumber} fires{" "}
+            <span className="font-mono text-foreground">{fires}</span> from the
+            project's weapon library, in place of{" "}
+            <span className="font-mono">{slotName}</span>.
+          </Trans>
           {brings.length > 0 && (
             <>
               {" "}
-              It names{" "}
-              <span className="font-mono text-foreground">
-                {brings.join(", ")}
-              </span>
-              , which {brings.length === 1 ? "goes" : "go"} into{" "}
-              {library.unitName} beside it. Change{" "}
-              {brings.length === 1 ? "it" : "them"} in the weapon library.
+              <Trans>
+                It names{" "}
+                <span className="font-mono text-foreground">
+                  {brings.join(", ")}
+                </span>
+                ,{" "}
+                <Plural
+                  value={brings.length}
+                  one={`which goes into ${unitName} beside it. Change it in the weapon library.`}
+                  other={`which go into ${unitName} beside it. Change them in the weapon library.`}
+                />
+              </Trans>
             </>
           )}
         </p>
@@ -936,14 +1009,14 @@ function SlotWeaponActions({
       <EquipWeaponPopover
         label={
           fires
-            ? "Change weapon"
+            ? t`Change weapon`
             : shared
-              ? `Give ${library.unitName} its own copy`
-              : "Equip a library weapon"
+              ? t`Give ${unitName} its own copy`
+              : t`Equip a library weapon`
         }
         shared={shared}
         unitName={library.unitName}
-        usesCopy={`weapon ${slot.number} fires the copy`}
+        usesCopy={t`weapon ${slotNumber} fires the copy`}
         copySource={copySource}
         library={library.weapons}
         equippedHere={fires}
@@ -960,7 +1033,7 @@ function SlotWeaponActions({
           onClick={() => library.onUnequip(slot)}
         >
           <Undo2 className="size-3.5" />
-          Put back {slot.name}
+          <Trans>Put back {slotName}</Trans>
         </Button>
       )}
     </div>

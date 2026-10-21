@@ -1,3 +1,4 @@
+import { t } from "@lingui/core/macro";
 import { occupancy } from "../battles/battleFilters";
 import type { Battle } from "../bindings";
 import type { FriendStatus } from "../friendsAcrossServers";
@@ -50,7 +51,7 @@ export function friendBattleAction(input: {
   const kind = running ? "watch" : "join";
   // A full room still takes spectators, which is what a joiner lands as.
   const full = !running && occupancy(battle) >= battle.maxPlayers;
-  const verb = running ? "Watch" : full ? "Spectate" : "Join";
+  const verb = running ? t`Watch` : full ? t`Spectate` : t`Join`;
   const asksPassword = battle.passworded;
   const refuse = (label: string, reason: string): FriendBattleAction => ({
     kind,
@@ -60,11 +61,11 @@ export function friendBattleAction(input: {
     asksPassword,
   });
 
-  if (battle.locked) return refuse("Locked", "This battle is locked");
-  if (!session.ready) return refuse(verb, "Not connected yet");
-  if (session.busy) return refuse(verb, "Another action is in progress");
+  if (battle.locked) return refuse(t`Locked`, t`This battle is locked`);
+  if (!session.ready) return refuse(verb, t`Not connected yet`);
+  if (session.busy) return refuse(verb, t`Another action is in progress`);
   if (session.joinedId != null) {
-    return refuse(verb, "Leave your current battle first");
+    return refuse(verb, t`Leave your current battle first`);
   }
   return { kind, label: verb, disabled: false, reason: null, asksPassword };
 }

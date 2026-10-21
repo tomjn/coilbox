@@ -27,6 +27,9 @@
  * once and adds a row, it does not edit one (issue #2346).
  */
 
+import type { MessageDescriptor } from "@lingui/core";
+import { msg, plural } from "@lingui/core/macro";
+import { Trans, useLingui } from "@lingui/react/macro";
 import { Button, Input } from "@picoframe/frame";
 import { Boxes, Pencil, Plus, Route, Trash2, X } from "lucide-react";
 import { useId, useState } from "react";
@@ -63,12 +66,12 @@ import { TeamSelect } from "./TeamSelect";
 import { entryFieldProblem } from "./triggerProblems";
 
 /** What each order kind does, in the words an author would use. */
-const ORDER_LABELS: Record<OrderKind, string> = {
-  move: "Move along",
-  patrol: "Patrol",
-  fight: "Fight along",
-  guard: "Guard",
-  attack: "Attack",
+const ORDER_LABELS: Record<OrderKind, MessageDescriptor> = {
+  move: msg`Move along`,
+  patrol: msg`Patrol`,
+  fight: msg`Fight along`,
+  guard: msg`Guard`,
+  attack: msg`Attack`,
 };
 
 export function GroupControls({
@@ -100,7 +103,9 @@ export function GroupControls({
   drawing: number | null;
   onDraw: (order: number | null) => void;
 }) {
+  const { t } = useLingui();
   const size = groupSize(group);
+  const orderCount = group.orders.length;
   const teamDescribedBy = useId();
   const teamProblem = entryFieldProblem(issues, "groups", group.id, "team");
   const posProblem = entryFieldProblem(issues, "groups", group.id, "pos");
@@ -113,7 +118,7 @@ export function GroupControls({
           value={group.team}
           onValueChange={(team) => onEdit({ team })}
           className="w-32"
-          ariaLabel="Team"
+          ariaLabel={t`Team`}
           ariaInvalid={teamProblem !== null}
           describedBy={teamDescribedBy}
         />
@@ -127,7 +132,8 @@ export function GroupControls({
             variant="ghost"
             className="h-7 gap-1.5 px-2 text-xs"
           >
-            <Boxes className="size-3.5" /> {size} unit{size === 1 ? "" : "s"}
+            <Boxes className="size-3.5" />{" "}
+            {plural(size, { one: "# unit", other: "# units" })}
           </Button>
         </PopoverTrigger>
         <PopoverContent align="start" className="w-80 space-y-3">
@@ -161,7 +167,7 @@ export function GroupControls({
 
           <div className="flex items-center justify-between gap-3 border-t border-border/60 pt-3">
             <Label htmlFor="group-dormant" className="text-xs font-medium">
-              Waits for a trigger to spawn it
+              <Trans>Waits for a trigger to spawn it</Trans>
             </Label>
             <Switch
               id="group-dormant"
@@ -193,7 +199,8 @@ export function GroupControls({
             className="h-7 w-full gap-1.5 px-2 text-xs text-destructive hover:text-destructive"
             onClick={onDelete}
           >
-            <Trash2 className="size-3.5" /> Delete the whole group
+            <Trash2 className="size-3.5" />{" "}
+            <Trans>Delete the whole group</Trans>
           </Button>
         </PopoverContent>
       </Popover>
@@ -206,15 +213,17 @@ export function GroupControls({
             className="h-7 gap-1.5 px-2 text-xs"
           >
             <Route className="size-3.5" />
-            {group.orders.length === 0
-              ? "No orders"
-              : `${group.orders.length} order${group.orders.length === 1 ? "" : "s"}`}
+            {orderCount === 0
+              ? t`No orders`
+              : plural(orderCount, { one: "# order", other: "# orders" })}
           </Button>
         </PopoverTrigger>
         <PopoverContent align="start" className="w-96 space-y-2">
           {group.orders.length === 0 && (
             <p className="text-xs text-muted-foreground">
-              With no orders a group holds its ground where it spawns.
+              <Trans>
+                With no orders a group holds its ground where it spawns.
+              </Trans>
             </p>
           )}
           {group.orders.map((order, index) => (
@@ -248,7 +257,7 @@ export function GroupControls({
               onEdit({ orders: [...group.orders, orderOfKind("move")] })
             }
           >
-            <Plus className="size-3.5" /> Add an order
+            <Plus className="size-3.5" /> <Trans>Add an order</Trans>
           </Button>
         </PopoverContent>
       </Popover>
@@ -279,6 +288,8 @@ export function UnitRow({
   onCount: (count: number) => void;
   onRemove: () => void;
 }) {
+  const { t } = useLingui();
+  const def = entry.def;
   const [count, setCount] = useFieldText(String(entry.count));
 
   const commit = () => {
@@ -294,7 +305,7 @@ export function UnitRow({
           {entry.def}
         </span>
         <Input
-          aria-label={`How many ${entry.def}`}
+          aria-label={t`How many ${def}`}
           type="number"
           min={1}
           value={count}
@@ -309,7 +320,7 @@ export function UnitRow({
           size="sm"
           variant="ghost"
           className="size-7 p-0 text-destructive hover:text-destructive"
-          aria-label={`Remove ${entry.def}`}
+          aria-label={t`Remove ${def}`}
           onClick={onRemove}
         >
           <X className="size-3.5" />
@@ -331,6 +342,7 @@ function AddUnit({
   loading: boolean;
   onAdd: (def: string) => void;
 }) {
+  const { t } = useLingui();
   const [def, setDef] = useState("");
 
   return (
@@ -338,7 +350,7 @@ function AddUnit({
       units={units}
       value={def}
       loading={loading}
-      placeholder="Add a unit type"
+      placeholder={t`Add a unit type`}
       size="sm"
       onValueChange={(next) => {
         setDef("");
@@ -384,6 +396,8 @@ export function OrderRow({
   const path = "waypoints" in order ? order : null;
   const aimed = "waypoints" in order ? null : order;
   const describedBy = useId();
+  const { t, i18n } = useLingui();
+  const pointCount = path?.waypoints.length ?? 0;
 
   return (
     <div className="flex flex-col gap-0.5">
@@ -400,7 +414,7 @@ export function OrderRow({
           }}
           options={ORDER_KINDS.map((kind) => ({
             value: kind,
-            label: ORDER_LABELS[kind],
+            label: i18n._(ORDER_LABELS[kind]),
           }))}
         />
 
@@ -413,12 +427,12 @@ export function OrderRow({
               onClick={() => onDraw(!drawing)}
             >
               <Pencil className="size-3.5" />
-              {drawing ? "Click the map" : "Draw"}
+              {drawing ? t`Click the map` : t`Draw`}
             </Button>
             <span className="min-w-0 flex-1 truncate text-xs text-muted-foreground">
-              {path.waypoints.length === 0
-                ? "no points yet"
-                : `${path.waypoints.length} point${path.waypoints.length === 1 ? "" : "s"}`}
+              {pointCount === 0
+                ? t`no points yet`
+                : plural(pointCount, { one: "# point", other: "# points" })}
             </span>
             {path.waypoints.length > 0 && (
               <Button
@@ -427,7 +441,7 @@ export function OrderRow({
                 className="h-7 shrink-0 px-2 text-xs"
                 onClick={() => onChange({ ...path, waypoints: [] })}
               >
-                Clear
+                <Trans>Clear</Trans>
               </Button>
             )}
           </>
@@ -439,11 +453,11 @@ export function OrderRow({
               value={aimed.target}
               onValueChange={(target) => onChange({ ...aimed, target })}
               placeholder={
-                targets.length ? "Pick a target" : "Nothing to point at"
+                targets.length ? t`Pick a target` : t`Nothing to point at`
               }
               disabled={targets.length === 0}
               options={targets}
-              ariaLabel="Order target"
+              ariaLabel={t`Order target`}
               ariaInvalid={problem !== null}
               describedBy={describedBy}
             />
@@ -454,7 +468,7 @@ export function OrderRow({
           size="sm"
           variant="ghost"
           className="size-7 shrink-0 p-0 text-destructive hover:text-destructive"
-          aria-label="Remove this order"
+          aria-label={t`Remove this order`}
           onClick={onRemove}
         >
           <X className="size-3.5" />

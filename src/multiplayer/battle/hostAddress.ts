@@ -10,6 +10,8 @@
  * engine stuck forever on "Connecting to".
  */
 
+import { t } from "@lingui/core/macro";
+
 export type HostAddressVerdict =
   | { kind: "ok" }
   | { kind: "blocked"; reason: string }
@@ -51,16 +53,16 @@ export function checkHostAddress(
   port: number | null | undefined,
 ): HostAddressVerdict {
   const ip = (addr ?? "").trim();
-  if (!ip) return blocked("The lobby gave no address for the host.");
-  if (!port) return blocked("The lobby gave no port for the host.");
+  if (!ip) return blocked(t`The lobby gave no address for the host.`);
+  if (!port) return blocked(t`The lobby gave no port for the host.`);
   if (PLACEHOLDERS.has(ip)) {
     return blocked(
-      `The lobby gave a placeholder address (${ip}) instead of the host's own.`,
+      t`The lobby gave a placeholder address (${ip}) instead of the host's own.`,
     );
   }
   if (ip === "::1") {
     return blocked(
-      `The lobby says the host is at ${ip}, which points back at your own machine.`,
+      t`The lobby says the host is at ${ip}, which points back at your own machine.`,
     );
   }
 
@@ -70,19 +72,19 @@ export function checkHostAddress(
 
   if (a === 0) {
     return blocked(
-      `The lobby gave a placeholder address (${ip}) instead of the host's own.`,
+      t`The lobby gave a placeholder address (${ip}) instead of the host's own.`,
     );
   }
   if (a === 127) {
     return blocked(
-      `The lobby says the host is at ${ip}, which points back at your own machine.`,
+      t`The lobby says the host is at ${ip}, which points back at your own machine.`,
     );
   }
   // 224.0.0.0/4 multicast, 240.0.0.0/4 reserved, and the broadcast address: none
   // of them name one machine, so the engine has nothing to connect to.
   if (a >= 224) {
     return blocked(
-      `${ip} is not a single machine's address, so the engine cannot connect to it.`,
+      t`${ip} is not a single machine's address, so the engine cannot connect to it.`,
     );
   }
   if (
@@ -91,17 +93,17 @@ export function checkHostAddress(
     (a === 192 && b === 168)
   ) {
     return warning(
-      `The host's address (${ip}) is a private one, so this only works if you are on the same network as them.`,
+      t`The host's address (${ip}) is a private one, so this only works if you are on the same network as them.`,
     );
   }
   if (a === 100 && b >= 64 && b <= 127) {
     return warning(
-      `The host's address (${ip}) is shared with other customers by their internet provider, so they are unlikely to be able to accept incoming connections.`,
+      t`The host's address (${ip}) is shared with other customers by their internet provider, so they are unlikely to be able to accept incoming connections.`,
     );
   }
   if (a === 169 && b === 254) {
     return warning(
-      `The host's address (${ip}) is a link-local one, so this only works if you are on the same network segment as them.`,
+      t`The host's address (${ip}) is a link-local one, so this only works if you are on the same network segment as them.`,
     );
   }
   return { kind: "ok" };

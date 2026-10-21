@@ -1,3 +1,4 @@
+import { Trans } from "@lingui/react/macro";
 import { Link } from "react-router";
 import {
   Popover,
@@ -61,7 +62,7 @@ export function HeaderAccount({ hubUrl }: { hubUrl: string }) {
       )}
       {busy && (
         <p className="max-w-xs text-right text-xs text-muted-foreground">
-          Finish signing in the browser window that opened.
+          <Trans>Finish signing in the browser window that opened.</Trans>
         </p>
       )}
       {problem && (
@@ -99,7 +100,7 @@ function AccountPill({
             aria-hidden="true"
             className="size-1.5 shrink-0 rounded-full bg-emerald-500"
           />
-          {name ?? "Signed in"}
+          {name ?? <Trans>Signed in</Trans>}
         </button>
       </PopoverTrigger>
       <PopoverContent align="end" className="w-56 p-1">
@@ -108,7 +109,7 @@ function AccountPill({
             to="/settings/hub"
             className="rounded px-2 py-1.5 text-left text-sm hover:bg-accent"
           >
-            Account and sharing settings
+            <Trans>Account and sharing settings</Trans>
           </Link>
           <button
             type="button"
@@ -117,7 +118,7 @@ function AccountPill({
             aria-busy={busy}
             className="rounded px-2 py-1.5 text-left text-sm hover:bg-accent disabled:opacity-60"
           >
-            Sign out
+            <Trans>Sign out</Trans>
           </button>
         </div>
       </PopoverContent>

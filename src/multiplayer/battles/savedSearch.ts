@@ -1,3 +1,4 @@
+import { t } from "@lingui/core/macro";
 import { useSetting } from "@picoframe/frame";
 import { updateStoredSetting } from "../../lib/storedSetting";
 import type { Battle } from "../bindings";
@@ -122,10 +123,12 @@ export function useSavedBattleSearches() {
 /** A search in words, for the settings list and the notification. */
 export function describeSearch(s: SavedBattleSearch): string {
   const parts = [s.game.trim()];
-  if (s.map.trim()) parts.push(`on ${s.map.trim()}`);
-  if (s.minPlayers > 0) parts.push(`${s.minPlayers}+ players`);
-  if (s.freeSlot) parts.push("free slot");
-  if (s.noPassword) parts.push("no password");
+  const map = s.map.trim();
+  const minPlayers = s.minPlayers;
+  if (map) parts.push(t`on ${map}`);
+  if (minPlayers > 0) parts.push(t`${minPlayers}+ players`);
+  if (s.freeSlot) parts.push(t`free slot`);
+  if (s.noPassword) parts.push(t`no password`);
   return parts.join(", ");
 }
 

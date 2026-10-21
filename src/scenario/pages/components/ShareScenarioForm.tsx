@@ -13,6 +13,8 @@
  * `encodeScenarioCode`.
  */
 
+import { plural } from "@lingui/core/macro";
+import { Trans, useLingui } from "@lingui/react/macro";
 import { Button } from "@picoframe/frame";
 import { save } from "@tauri-apps/plugin-dialog";
 import { Download, Loader2 } from "lucide-react";
@@ -38,6 +40,7 @@ export function ShareScenarioForm({
    * built from the same payload, so both carry it or neither does. */
   installed: readonly InstalledGameInfo[];
 }) {
+  const { t } = useLingui();
   const [gathered, setGathered] = useState<GatheredScenario | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -58,9 +61,9 @@ export function ShareScenarioForm({
   const saveFile = async () => {
     if (!gathered) return;
     const dest = await save({
-      title: "Export scenario",
+      title: t`Export scenario`,
       defaultPath: `${scenario.name || "scenario"}.json`,
-      filters: [{ name: "Coilbox scenario", extensions: ["json"] }],
+      filters: [{ name: t`Coilbox scenario`, extensions: ["json"] }],
     });
     if (!dest) return;
     await scenarioExport({
@@ -80,8 +83,8 @@ export function ShareScenarioForm({
   if (!gathered) {
     return (
       <p className="flex items-center gap-2 p-4 text-sm text-muted-foreground">
-        <Loader2 className="size-4 animate-spin" aria-hidden /> Gathering the
-        scenario and its dialogue clips…
+        <Loader2 className="size-4 animate-spin" aria-hidden />{" "}
+        <Trans>Gathering the scenario and its dialogue clips…</Trans>
       </p>
     );
   }
@@ -93,7 +96,7 @@ export function ShareScenarioForm({
       {result.ok ? (
         <ChallengeCodeView
           code={result.code}
-          helpText="Anyone who pastes this into Scenarios → Import gets this mission, its dialogue clips and an offer to download the game and map it is played on."
+          helpText={t`Anyone who pastes this into Scenarios → Import gets this mission, its dialogue clips and an offer to download the game and map it is played on.`}
           onExportFile={saveFile}
         />
       ) : (
@@ -114,12 +117,15 @@ export function ShareScenarioForm({
  */
 function MissingClips({ files }: { files: readonly string[] }) {
   if (files.length === 0) return null;
+  const count = files.length;
   return (
     <div className="border-amber-500/40 border-b bg-amber-500/10 p-4 text-amber-200 text-sm">
       <p>
-        {files.length === 1
-          ? "One dialogue clip could not be read, so it is not in this share:"
-          : `${files.length} dialogue clips could not be read, so they are not in this share:`}
+        {plural(count, {
+          one: "# dialogue clip could not be read, so it is not in this share:",
+          other:
+            "# dialogue clips could not be read, so they are not in this share:",
+        })}
       </p>
       <ul className="mt-1 font-mono text-[11px]">
         {files.map((file) => (
@@ -127,7 +133,9 @@ function MissingClips({ files }: { files: readonly string[] }) {
         ))}
       </ul>
       <p className="mt-2">
-        Whoever imports it gets those lines with no portrait and no voice.
+        <Trans>
+          Whoever imports it gets those lines with no portrait and no voice.
+        </Trans>
       </p>
     </div>
   );
@@ -145,6 +153,7 @@ function TooLargeToShare({
   message: string;
   onExportFile: () => Promise<void>;
 }) {
+  const { t } = useLingui();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -166,7 +175,7 @@ function TooLargeToShare({
       {error && <ErrorBanner message={error} />}
       <Button onClick={run} disabled={busy}>
         <Download className="mr-1.5 size-4" aria-hidden />
-        {busy ? "Exporting…" : "Export as file"}
+        {busy ? t`Exporting…` : t`Export as file`}
       </Button>
     </div>
   );

@@ -1,3 +1,4 @@
+import { Trans, useLingui } from "@lingui/react/macro";
 import { useSetting } from "@picoframe/frame";
 import { ChevronRight } from "lucide-react";
 import { useCallback, useMemo } from "react";
@@ -82,7 +83,7 @@ export function FriendBattles({
             collapsed ? "" : "rotate-90"
           }`}
         />
-        Friends
+        <Trans>Friends</Trans>
         <span className="text-muted-foreground">{found.length}</span>
       </button>
       {!collapsed && (
@@ -111,6 +112,7 @@ function FriendBattleRow({
   awaitLanding: (serverKey: string) => void;
   giveUp: (serverKey: string) => void;
 }) {
+  const { t } = useLingui();
   const { busy } = useMultiplayer();
   const connection = useConnection(serverKey);
   const mirror = connection?.mirror ?? initialMirror;
@@ -118,6 +120,8 @@ function FriendBattleRow({
   const { selected } = useScanTargetSelection();
   const { leaveOther, notice } = useOneBattleRule(serverKey);
   const ready = mirror.phase === "ready";
+  const username = usernameFromKey(serverKey);
+  const serverName = serverNameFor(serverKey, servers);
   const joinedId = mirror.state?.currentBattle ?? null;
 
   const onJoin = useCallback(
@@ -144,7 +148,7 @@ function FriendBattleRow({
       linkable={ready}
       inProgress={group === "running"}
       friendsHere={names}
-      connectionLabel={`${usernameFromKey(serverKey)} on ${serverNameFor(serverKey, servers)}`}
+      connectionLabel={t`${username} on ${serverName}`}
       onJoin={onJoin}
       onLeave={onLeave}
       enginePath={selected?.enginePath}

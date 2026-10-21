@@ -26,6 +26,8 @@
  * row per key, so each key keeps the note naming the gadget that reads it
  * (issue #2661), and each of those values is a scalar with its own control.
  */
+import { plural, t as tc } from "@lingui/core/macro";
+import { useLingui } from "@lingui/react/macro";
 import { Button, cn } from "@picoframe/frame";
 import { Check, Copy, PanelRightOpen, X } from "lucide-react";
 import { Dialog as DialogPrimitive } from "radix-ui";
@@ -44,17 +46,15 @@ function summarise(
   lines: number,
 ): string {
   const n = Array.isArray(value) ? value.length : Object.keys(value).length;
-  const noun = Array.isArray(value)
-    ? n === 1
-      ? "entry"
-      : "entries"
-    : n === 1
-      ? "key"
-      : "keys";
-  return `${n} ${noun}, ${lines} lines of Lua`;
+  const count = Array.isArray(value)
+    ? plural(n, { one: "# entry", other: "# entries" })
+    : plural(n, { one: "# key", other: "# keys" });
+  const lineCount = plural(lines, { one: "# line", other: "# lines" });
+  return tc`${count}, ${lineCount} of Lua`;
 }
 
 function CopyButton({ code }: { code: string }) {
+  const { t } = useLingui();
   const [copied, setCopied] = useState(false);
   const copy = async () => {
     try {
@@ -68,7 +68,7 @@ function CopyButton({ code }: { code: string }) {
   return (
     <Button size="sm" variant="outline" className="gap-1.5" onClick={copy}>
       {copied ? <Check className="size-3.5" /> : <Copy className="size-3.5" />}
-      {copied ? "Copied" : "Copy"}
+      {copied ? t`Copied` : t`Copy`}
     </Button>
   );
 }
@@ -86,6 +86,7 @@ function LuaTableDrawer({
   open: boolean;
   onOpenChange: (open: boolean) => void;
 }) {
+  const { t } = useLingui();
   return (
     <DialogPrimitive.Root open={open} onOpenChange={onOpenChange}>
       <DialogPrimitive.Portal>
@@ -102,7 +103,7 @@ function LuaTableDrawer({
             </div>
             <CopyButton code={code} />
             <DialogPrimitive.Close asChild>
-              <Button variant="ghost" size="icon" aria-label="Close">
+              <Button variant="ghost" size="icon" aria-label={t`Close`}>
                 <X className="size-4" />
               </Button>
             </DialogPrimitive.Close>
@@ -111,7 +112,7 @@ function LuaTableDrawer({
             <CodeBlock
               code={code}
               lang="lua"
-              label={`${label} as Lua`}
+              label={t`${label} as Lua`}
               className="h-full rounded-lg border border-border/50 [&_pre]:min-h-full"
             />
           </div>
@@ -137,13 +138,14 @@ export function LuaTableValue({
   const code = useMemo(() => luaLiteral(value), [value]);
   const lines = code.split("\n").length;
   const [open, setOpen] = useState(false);
+  const { t } = useLingui();
 
   if (lines <= INLINE_MAX_LINES) {
     return (
       <CodeBlock
         code={code}
         lang="lua"
-        label={`${label} as Lua`}
+        label={t`${label} as Lua`}
         className={cn(
           "rounded border border-border/50",
           // Wide values wrap rather than reaching off the row, since there is
@@ -161,7 +163,7 @@ export function LuaTableValue({
         size="sm"
         className="h-8 w-full justify-start gap-2 font-normal text-muted-foreground"
         onClick={() => setOpen(true)}
-        aria-label={`Read ${label} as Lua`}
+        aria-label={t`Read ${label} as Lua`}
       >
         {/* A panel opening, not braces. Braces beside "3 keys" reads as an
             empty table at a glance, and the words already say it is one. */}

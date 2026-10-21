@@ -1,3 +1,4 @@
+import { Trans, useLingui } from "@lingui/react/macro";
 import { Button, Input } from "@picoframe/frame";
 import { Pencil } from "lucide-react";
 import { useState } from "react";
@@ -23,6 +24,7 @@ export function ChannelTopicMenu({
   currentTopic?: string;
   send: (line: string) => void;
 }) {
+  const { t } = useLingui();
   const [open, setOpen] = useState(false);
   const [topic, setTopic] = useState("");
 
@@ -39,7 +41,7 @@ export function ChannelTopicMenu({
         <Button
           variant="secondary"
           className="h-7 px-2"
-          aria-label="Set channel topic"
+          aria-label={t`Set channel topic`}
         >
           <Pencil className="size-4" />
         </Button>
@@ -54,12 +56,12 @@ export function ChannelTopicMenu({
           }}
         >
           <span className="flex flex-col gap-1 text-xs text-muted-foreground">
-            Channel topic
+            <Trans>Channel topic</Trans>
             <Input
               value={topic}
               onChange={(e) => setTopic(e.target.value)}
-              placeholder="Topic text"
-              aria-label="Channel topic"
+              placeholder={t`Topic text`}
+              aria-label={t`Channel topic`}
               autoFocus
             />
           </span>
@@ -71,10 +73,10 @@ export function ChannelTopicMenu({
               className="h-8"
               onClick={() => setOpen(false)}
             >
-              Cancel
+              <Trans>Cancel</Trans>
             </Button>
             <Button type="submit" size="sm" className="h-8">
-              Set topic
+              <Trans>Set topic</Trans>
             </Button>
           </div>
         </form>

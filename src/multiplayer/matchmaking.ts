@@ -1,3 +1,4 @@
+import { t } from "@lingui/core/macro";
 import type { LobbyServer } from "../lobby-servers/config";
 import type { Matchmaking, MatchQueue } from "./bindings";
 import type { Connections } from "./connections";
@@ -26,8 +27,11 @@ export function countdown(seconds: number): string {
 
 /** What a queue plays, in one line: "2 teams of 1, ranked". */
 export function describeQueue(queue: MatchQueue): string {
-  const shape = `${queue.teams} teams of ${queue.teamSize}`;
-  return queue.ranked ? `${shape}, ranked` : shape;
+  const teams = queue.teams;
+  const size = queue.teamSize;
+  return queue.ranked
+    ? t`${teams} teams of ${size}, ranked`
+    : t`${teams} teams of ${size}`;
 }
 
 /**
@@ -73,10 +77,12 @@ export function matchLaunchBlockReason(
   serverName: (key: string) => string,
 ): string | null {
   if (gameRunning) {
-    return "A game is already running, so accepting this match would start a second one.";
+    return t`A game is already running, so accepting this match would start a second one.`;
   }
   if (inBattleKey == null) return null;
-  return inBattleKey === serverKey
-    ? "You are already in a battle here, so accepting this match would start a second game."
-    : `${serverName(inBattleKey)} owns the current battle room, so accepting this match would start a second game.`;
+  if (inBattleKey === serverKey) {
+    return t`You are already in a battle here, so accepting this match would start a second game.`;
+  }
+  const server = serverName(inBattleKey);
+  return t`${server} owns the current battle room, so accepting this match would start a second game.`;
 }

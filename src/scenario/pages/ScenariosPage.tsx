@@ -1,3 +1,5 @@
+import { t as coreT } from "@lingui/core/macro";
+import { Trans, useLingui } from "@lingui/react/macro";
 import { Button, useDrawer } from "@picoframe/frame";
 import { Download, Loader2, Play } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -46,6 +48,7 @@ import { ScenarioTestDrawer } from "./components/ScenarioTestDrawer";
  * advanced-only, which is also why a scenario deep link routes here.
  */
 export default function ScenariosPage() {
+  const { t } = useLingui();
   const { scenarios, loading, error } = useScenarios();
   const {
     target,
@@ -108,14 +111,15 @@ export default function ScenariosPage() {
   // player looking for a row that never arrives.
   const imported = (scenario: Scenario) => {
     recordHubImport(hubItemId, [scenario.id], scenarioRoute(scenario.id));
+    const name = scenario.name;
     if (isSetUp(scenario)) {
       void notify({
-        title: `${scenario.name} is ready to play.`,
+        title: t`${name} is ready to play.`,
         level: "success",
       });
     } else {
       void notify({
-        title: `${scenario.name} was imported, but it names no game and map, so there is nothing to play yet.`,
+        title: t`${name} was imported, but it names no game and map, so there is nothing to play yet.`,
         level: "warning",
       });
     }
@@ -141,6 +145,7 @@ export default function ScenariosPage() {
   // playable without a reload.
   const download = async (scenario: Scenario, block: ScenarioLaunchBlock) => {
     if (block.kind !== "download") return;
+    const name = scenario.name;
     setDownloading(scenario.id);
     try {
       const check = await ensureContent({
@@ -154,7 +159,7 @@ export default function ScenariosPage() {
           map: block.needs.map,
         }),
         target,
-        title: `Download what ${scenario.name} needs`,
+        title: t`Download what ${name} needs`,
       });
       if (!check.ready) return;
       await refreshTarget();
@@ -164,9 +169,10 @@ export default function ScenariosPage() {
     }
   };
 
-  const openPlay = (loaded: LoadedScenario) =>
-    drawer.open({
-      title: `Play ${loaded.scenario.name}`,
+  const openPlay = (loaded: LoadedScenario) => {
+    const name = loaded.scenario.name;
+    return drawer.open({
+      title: t`Play ${name}`,
       width: "32rem",
       content: (
         <ScenarioTestDrawer
@@ -176,6 +182,7 @@ export default function ScenariosPage() {
         />
       ),
     });
+  };
 
   // Opening one scenario by address (issue #1372, `scenarioRoute`): the same
   // drawer its row's Play button opens, so a link and the row end in the same
@@ -193,8 +200,8 @@ export default function ScenariosPage() {
     if (found) return void openPlay(found);
     void notify({
       title: scenarios.some((l) => l.scenario.id === openScenarioId)
-        ? "That scenario names no game and map, so there is nothing to play yet."
-        : "That scenario isn't here any more. It may have been deleted.",
+        ? t`That scenario names no game and map, so there is nothing to play yet.`
+        : t`That scenario isn't here any more. It may have been deleted.`,
       level: "warning",
     });
   }, [openScenarioId, loading, playable, scenarios]);
@@ -202,8 +209,8 @@ export default function ScenariosPage() {
   return (
     <div className="flex flex-col gap-4 p-4">
       <PageHeader
-        title="Scenarios"
-        description="Standalone missions: a map, a starting force and something to do. Play one on its own, without a campaign around it."
+        title={t`Scenarios`}
+        description={t`Standalone missions: a map, a starting force and something to do. Play one on its own, without a campaign around it.`}
         actions={
           <ScenarioImportButton
             initialCode={importCode}
@@ -217,7 +224,9 @@ export default function ScenariosPage() {
       {loading ? (
         <SkeletonList />
       ) : playable.length === 0 ? (
-        <EmptyState label="No scenarios are ready to play yet. Import one someone shared with you." />
+        <EmptyState
+          label={t`No scenarios are ready to play yet. Import one someone shared with you.`}
+        />
       ) : (
         <ul className="flex flex-col gap-2">
           {playable.map((loaded) => {
@@ -285,7 +294,7 @@ function ScenarioCard({
           <span className="truncate text-sm font-medium">{scenario.name}</span>
           {fromGame && (
             <Badge variant="secondary" className="shrink-0 text-[10px]">
-              From {fromGame}
+              <Trans>From {fromGame}</Trans>
             </Badge>
           )}
         </div>
@@ -319,7 +328,7 @@ function ScenarioCard({
           </Button>
         )}
         <Button className="gap-1.5" onClick={onPlay} disabled={!!blocker}>
-          <Play className="size-4" /> Play
+          <Play className="size-4" /> <Trans>Play</Trans>
         </Button>
       </div>
     </div>
@@ -330,7 +339,7 @@ function ScenarioCard({
 function downloadLabel(block: ScenarioLaunchBlock): string {
   if (block.kind !== "download") return "";
   const { engine, game, map } = block.needs;
-  if (engine) return "Download engine";
-  if (game && map) return "Download game and map";
-  return game ? "Download game" : "Download map";
+  if (engine) return coreT`Download engine`;
+  if (game && map) return coreT`Download game and map`;
+  return game ? coreT`Download game` : coreT`Download map`;
 }

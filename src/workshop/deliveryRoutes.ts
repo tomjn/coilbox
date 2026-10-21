@@ -35,6 +35,7 @@
  * offers and explains the route. The write, its backups and undo are
  * `inPlace.ts` (issue #2635), reached from the checks drawer.
  */
+import { plural, t } from "@lingui/core/macro";
 import type { ConfigOption } from "@/content/bindings";
 import { isEditInPlaceEligible } from "@/content/format";
 
@@ -115,7 +116,7 @@ export function tweakSlotsChecked(gameName: string): boolean {
 export function tweakSlotsUncheckedNote(gameName: string): string | null {
   return tweakSlotsChecked(gameName)
     ? null
-    : `Coilbox has checked this route against Beyond All Reason's and Zero-K's own code only. How ${gameName} reads a tweakdefs slot is unverified, so check the changes in game.`;
+    : t`Coilbox has checked this route against Beyond All Reason's and Zero-K's own code only. How ${gameName} reads a tweakdefs slot is unverified, so check the changes in game.`;
 }
 
 /** One route, whether the selected game supports it, and why when it does not. */
@@ -156,31 +157,34 @@ export function deliveryRoutes(
   const available = defs > 0 && !hasExplosionGenerators;
   const unchecked = tweakSlotsUncheckedNote(gameName);
   const inPlace = isEditInPlaceEligible(gamePath);
+  const slots = plural(defs, {
+    one: "# tweakdefs slot",
+    other: "# tweakdefs slots",
+  });
   return [
     {
       route: "mutator",
-      label: "Mutator archive",
+      label: t`Mutator archive`,
       available: true,
-      detail:
-        "Works for every game: a generated game that depends on this one and supplies only what the project changes.",
+      detail: t`Works for every game: a generated game that depends on this one and supplies only what the project changes.`,
     },
     {
       route: "tweak-slots",
-      label: "Tweak slots",
+      label: t`Tweak slots`,
       available,
       detail: hasExplosionGenerators
-        ? "This project has a custom explosion effect, and the engine only reads one from a real file, which a tweak slot cannot carry. The mutator and edit-in-place routes below still work."
+        ? t`This project has a custom explosion effect, and the engine only reads one from a real file, which a tweak slot cannot carry. The mutator and edit-in-place routes below still work.`
         : available
-          ? `${gameName} declares ${defs} tweakdefs slot${defs === 1 ? "" : "s"} for base64 Lua.${unchecked ? ` ${unchecked}` : ""}`
-          : `${gameName} does not declare any tweakdefs mod options, so there is no slot to carry base64 Lua. The mutator route above still works.`,
+          ? `${t`${gameName} declares ${slots} for base64 Lua.`}${unchecked ? ` ${unchecked}` : ""}`
+          : t`${gameName} does not declare any tweakdefs mod options, so there is no slot to carry base64 Lua. The mutator route above still works.`,
     },
     {
       route: "edit-in-place",
-      label: "Edit in place",
+      label: t`Edit in place`,
       available: inPlace,
       detail: inPlace
-        ? `${gameName} is a loose .sdd game under a content root's games folder, so field changes can be written straight into its own unit files. Coilbox keeps the original of each file it changes until you undo or accept.`
-        : `${gameName} is not a loose .sdd game directly under a content root's games folder, so its files cannot be rewritten in place. The mutator route above still works.`,
+        ? t`${gameName} is a loose .sdd game under a content root's games folder, so field changes can be written straight into its own unit files. Coilbox keeps the original of each file it changes until you undo or accept.`
+        : t`${gameName} is not a loose .sdd game directly under a content root's games folder, so its files cannot be rewritten in place. The mutator route above still works.`,
     },
   ];
 }
