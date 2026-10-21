@@ -89,18 +89,21 @@ end
 
 --- Where every building of a resolved entry lands, for a given anchor,
 -- rotation and flip, snapped and tested against the ground. The flip comes
--- after the turn, so it is always along the map's own x or z.
+-- after the turn, so it is always along the map's own x or z. Both turn and
+-- flip about the origin, a point in the layout that lands on the anchor.
 -- @param resolved table from M.resolve
 -- @param rotation integer quarter turns
 -- @param ax number anchor x, elmos
 -- @param az number anchor z, elmos
 -- @param flip table? { x = boolean, z = boolean }
+-- @param origin table? { x, z } in the layout's own offsets, 0, 0 if nil
 -- @return table[] { defID, def, x, y, z, facing, blocked }
-function M.footprint(resolved, rotation, ax, az, flip)
+function M.footprint(resolved, rotation, ax, az, flip, origin)
 	local flipX, flipZ = flip and flip.x, flip and flip.z
+	local cx, cz = origin and origin.x or 0, origin and origin.z or 0
 	local out = {}
 	for i, b in ipairs(resolved.buildings) do
-		local ox, oz = M.turned(b.offset.x, b.offset.z, rotation)
+		local ox, oz = M.turned(b.offset.x - cx, b.offset.z - cz, rotation)
 		if flipX then
 			ox = -ox
 		end
@@ -149,9 +152,32 @@ function M.extent(resolved, rotation, flip)
 	return minX, maxX, minZ, maxZ
 end
 
---- The anchor that puts a layout's middle under a point, on the build grid.
-function M.centredAnchor(x, z, minX, maxX, minZ, maxZ)
-	return M.snapAnchor(x - (minX + maxX) / 2 + M.BUILD_SQUARE / 2, z - (minZ + maxZ) / 2 + M.BUILD_SQUARE / 2)
+--- The building a layout is held by while it is placed: the one nearest
+-- the middle of the layout, the first in layout order on a tie. The cursor
+-- holds it, and the layout turns and flips about it.
+-- @return integer? its index in resolved.buildings, nil for an empty layout
+function M.pivot(resolved)
+	local minX, maxX, minZ, maxZ = M.extent(resolved, 0)
+	local mx, mz = (minX + maxX) / 2, (minZ + maxZ) / 2
+	local best, bestD
+	for i, b in ipairs(resolved.buildings) do
+		local d = (b.offset.x - mx) ^ 2 + (b.offset.z - mz) ^ 2
+		if not best or d < bestD then
+			best, bestD = i, d
+		end
+	end
+	return best
+end
+
+--- Where the pivot lands for a point on the ground: snapped to the build
+-- grid the way the engine snaps that building, at its facing once turned and
+-- flipped. The layout's other buildings keep their place around it.
+-- @return number x, number z
+function M.pivotAt(resolved, pivot, rotation, flip, x, z)
+	local b = resolved.buildings[pivot]
+	local facing = M.flippedFacing((b.facing + rotation) % 4, flip and flip.x, flip and flip.z)
+	local px, _, pz = Spring.Pos2BuildPos(b.defID, x, 0, z, facing)
+	return px, pz
 end
 
 --- Anchors for copies of a layout laid in a line from one anchor toward

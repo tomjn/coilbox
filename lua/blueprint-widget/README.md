@@ -12,7 +12,7 @@ Coilbox installs `luaui/` into the content root as `LuaUI/` when you press the b
 - three tabs: what the selected builders can build now, what they can build in part, and everything, a page at a time, turned with the arrows in the footer or the mouse wheel
 - pick a row or a tile and the layout follows the cursor as ghosts over marks in the same colours, striped with a dashed red rim where the ground refuses a building
 - while it is placed, a second panel beside the first shows its cost and build time with the selected builders, and buttons for each key
-- the cursor holds the middle of the layout. `[` and `]` turn it, H and V flip it side to side and top to bottom as in Factorio, Shift+`[` and Shift+`]` step to the previous or next blueprint, left click places it, right click or escape puts it down
+- the cursor holds the building nearest the middle of the layout, and turns and flips go round it. `[` and `]` turn it, H and V flip it side to side and top to bottom as in Factorio, Shift+`[` and Shift+`]` step to the previous or next blueprint, left click places it, right click or escape puts it down
 - a shift drag lays copies in a line, each touching the last, along whichever of x and z the drag covers more
 - what nobody selected can build stays on the map as a plan, drawn as ghosts. A right click on a plan with builders selected builds it, and with nothing selected removes it
 - builders either help each other, each taking every building it can build, or split up, each building going to the nearest builder until it has its share of the build time. Splitting is for games such as Splinter Faction that stop a second builder joining a nanoframe, where the stopped builder loses its whole queue. The choice is kept per game

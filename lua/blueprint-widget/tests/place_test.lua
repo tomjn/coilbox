@@ -130,9 +130,24 @@ local tminX, tmaxX, tminZ, tmaxZ = PLACE.extent(square, 1)
 check("extent follows the turn", tminX == -32 and tmaxX == 32 and tminZ == -96 and tmaxZ == 32, tminX .. " " .. tmaxX .. " " .. tminZ .. " " .. tmaxZ)
 local fminX, fmaxX = PLACE.extent(square, 0, { x = true })
 check("extent follows the flip", fminX == -96 and fmaxX == 32)
-local cax, caz = PLACE.centredAnchor(500, 500, minX, maxX, minZ, maxZ)
-check("a centred anchor puts the middle of the layout under the point, on the grid", cax == 464 and caz == 496, cax .. "," .. caz)
-check("a centred anchor is on the build grid", cax % 16 == 0 and caz % 16 == 0)
+local pivotLayout = PLACE.resolve({
+	buildings = {
+		{ def = "armsolar", offset = { x = 0, z = 0 }, facing = 0 },
+		{ def = "armllt", offset = { x = 72, z = 8 }, facing = 1 },
+		{ def = "armsolar", offset = { x = 160, z = 0 }, facing = 0 },
+	},
+})
+check("the pivot is the building nearest the middle of the layout", PLACE.pivot(pivotLayout) == 2, tostring(PLACE.pivot(pivotLayout)))
+check("an empty layout has no pivot", PLACE.pivot({ buildings = {} }) == nil)
+local px, pz = PLACE.pivotAt(pivotLayout, 2, 0, nil, 500, 500)
+check("the pivot lands on the grid the engine snaps it to", px == 504 and pz == 504, px .. "," .. pz)
+local pivotOrigin = pivotLayout.buildings[2].offset
+for _, case in ipairs({ { 0 }, { 1 }, { 2 }, { 3 }, { 1, { x = true } }, { 0, { z = true } } }) do
+	local foot = PLACE.footprint(pivotLayout, case[1], px, pz, case[2], pivotOrigin)
+	check("turned " .. case[1] .. (case[2] and " and flipped" or "") .. ", the pivot stays under the cursor", foot[2].x == px and foot[2].z == pz, show(foot[2]))
+end
+local spun = PLACE.footprint(pivotLayout, 2, px, pz, nil, pivotOrigin)
+check("the rest of the layout turns about the pivot", spun[1].x == px + 72 and spun[3].x == px - 88, spun[1].x .. " " .. spun[3].x)
 
 local line = PLACE.line(0, 0, 400, 30, minX, maxX, minZ, maxZ)
 check("a line runs along the axis it covers most, each copy touching the last", #line == 4 and line[2].x == 128 and line[2].z == 0 and line[4].x == 384, show(line))

@@ -92,8 +92,8 @@ The widget panel opens by itself the first time you start a match. If it never a
 1. Start a match in the blueprint's game.
 2. Open the panel. Select the Blueprints button on the right of the screen, or type /coilbox_blueprints in the game's chat.
 3. Select one or more builders.
-4. Select a blueprint in the list. Its buildings follow the cursor. A building the ground will not take is marked with dark stripes and a dashed red outline.
-5. Press [ or ] to turn it, H to flip it side to side or V to flip it top to bottom. Shift+[ and Shift+] switch to the previous or next blueprint.
+4. Select a blueprint in the list. Its buildings follow the cursor, which holds the building nearest the middle. A building the ground will not take is marked with dark stripes and a dashed red outline.
+5. Press [ or ] to turn it, H to flip it side to side or V to flip it top to bottom. It turns and flips around the building under the cursor. Shift+[ and Shift+] switch to the previous or next blueprint.
 6. Left click to place it.
 
 While you place a blueprint, a second panel opens beside the first. It shows what the blueprint costs and how long your selected builders take to build it. Its buttons do the same as the keys, and each is labelled with the key that does it.

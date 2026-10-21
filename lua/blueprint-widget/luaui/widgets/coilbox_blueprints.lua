@@ -401,7 +401,7 @@ local function startPlacing(key)
 		return
 	end
 	readKeys()
-	placing = { item = item, rotation = 0, flip = { x = false, z = false }, foot = nil }
+	placing = { item = item, rotation = 0, flip = { x = false, z = false }, pivot = PLACE.pivot(item.resolved), foot = nil }
 	panel.placing = { key = key, name = item.name, rotation = 0, flip = placing.flip }
 	readCost()
 end
@@ -452,8 +452,9 @@ local function step(direction)
 end
 
 --- Where the layout would land under the cursor now, or nil off the map.
--- The cursor holds the middle of the layout. During a shift drag it is
--- copies in a line from where the drag began.
+-- The cursor holds the pivot, the building nearest the layout's middle, and
+-- the layout turns and flips about it. During a shift drag it is copies in a
+-- line from where the drag began.
 local function trackCursor()
 	local mx, my = Spring.GetMouseState()
 	local kind, pos = Spring.TraceScreenRay(mx, my, true)
@@ -465,7 +466,7 @@ local function trackCursor()
 	if not placing.extent then
 		placing.extent = { PLACE.extent(resolved, placing.rotation, placing.flip) }
 	end
-	local ax, az = PLACE.centredAnchor(pos[1], pos[3], unpack(placing.extent))
+	local ax, az = PLACE.pivotAt(resolved, placing.pivot, placing.rotation, placing.flip, pos[1], pos[3])
 	if placing.foot and placing.ax == ax and placing.az == az then
 		return
 	end
@@ -476,7 +477,7 @@ local function trackCursor()
 	end
 	local foot = {}
 	for _, at in ipairs(anchors) do
-		for _, p in ipairs(PLACE.footprint(resolved, placing.rotation, at.x, at.z, placing.flip)) do
+		for _, p in ipairs(PLACE.footprint(resolved, placing.rotation, at.x, at.z, placing.flip, resolved.buildings[placing.pivot].offset)) do
 			foot[#foot + 1] = p
 		end
 	end
