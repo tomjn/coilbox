@@ -1,3 +1,4 @@
+import { Trans, useLingui } from "@lingui/react/macro";
 import { Button } from "@picoframe/frame";
 import { openUrl } from "@tauri-apps/plugin-opener";
 import { Trophy, X } from "lucide-react";
@@ -62,6 +63,7 @@ export function DebriefingDrawer({
   serverName?: string | null;
   onClose: () => void;
 }) {
+  const { t } = useLingui();
   const me = report?.players.find((player) => player.name === myUsername);
   const navigate = useNavigate();
   function openChatChannel(channel: string) {
@@ -79,13 +81,13 @@ export function DebriefingDrawer({
       {open && report ? (
         <button
           type="button"
-          aria-label="Close the match result"
+          aria-label={t`Close the match result`}
           className="fixed inset-0 z-40 bg-black/20"
           onClick={onClose}
         />
       ) : null}
       <aside
-        aria-label="Match result"
+        aria-label={t`Match result`}
         className={`fixed inset-y-0 right-0 z-50 flex w-[28rem] max-w-full flex-col border-l border-border bg-background shadow-lg transition-transform motion-reduce:transition-none ${
           open && report ? "translate-x-0" : "translate-x-full"
         }`}
@@ -93,12 +95,14 @@ export function DebriefingDrawer({
       >
         <header className="flex items-center justify-between border-b border-border px-4 py-3">
           <div>
-            <h2 className="text-sm font-semibold">Match result</h2>
+            <h2 className="text-sm font-semibold">
+              <Trans>Match result</Trans>
+            </h2>
             {serverName ? (
               <p className="text-xs text-muted-foreground">{serverName}</p>
             ) : null}
           </div>
-          <Button className="h-7 px-2" onClick={onClose} aria-label="Close">
+          <Button className="h-7 px-2" onClick={onClose} aria-label={t`Close`}>
             <X className="size-4" />
           </Button>
         </header>
@@ -117,8 +121,10 @@ export function DebriefingDrawer({
             {report.chatChannel ? (
               <div className="flex items-center justify-between gap-2">
                 <p className="text-xs text-muted-foreground">
-                  Talk it over in {report.chatChannel}, which is in your chat
-                  list.
+                  <Trans>
+                    Talk it over in {report.chatChannel}, which is in your chat
+                    list.
+                  </Trans>
                 </p>
                 <Button
                   variant="secondary"
@@ -128,7 +134,7 @@ export function DebriefingDrawer({
                     if (channel) openChatChannel(channel);
                   }}
                 >
-                  Open chat
+                  <Trans>Open chat</Trans>
                 </Button>
               </div>
             ) : null}
@@ -142,7 +148,7 @@ export function DebriefingDrawer({
                 if (url) openUrl(url).catch(() => {});
               }}
             >
-              Open the battle page
+              <Trans>Open the battle page</Trans>
             </Button>
           </footer>
         ) : null}
@@ -166,37 +172,44 @@ function YourStanding({
   player: DebriefingPlayer;
   report: Debriefing;
 }) {
+  const { t } = useLingui();
   const moved = rankMove(player);
   const rank = rankName(player.rank);
+  const category = categoryLabel(report.ratingCategory);
+  const nextRankRating = player.nextRankRating;
+  const xp = player.xp;
   return (
     <dl className="space-y-1 text-sm">
       {player.rating != null ? (
-        <Row label={`${categoryLabel(report.ratingCategory)} rating`}>
+        <Row label={t`${category} rating`}>
           {player.rating}
           {player.nextRankRating != null ? (
             <span className="text-muted-foreground">
               {" "}
-              (next rank at {player.nextRankRating})
+              <Trans>(next rank at {nextRankRating})</Trans>
             </span>
           ) : null}
         </Row>
       ) : null}
-      {rank ? <Row label="Rank">{rank}</Row> : null}
+      {rank ? <Row label={t`Rank`}>{rank}</Row> : null}
       {moved ? (
-        <Row label="Rank change">
+        <Row label={t`Rank change`}>
           <Badge variant={player.rankedUp ? "default" : "destructive"}>
             {moved}
           </Badge>
         </Row>
       ) : null}
       {player.xpChange !== 0 ? (
-        <Row label="Experience">
+        <Row label={t`Experience`}>
           {player.xpChange > 0 ? `+${player.xpChange}` : player.xpChange}
-          <span className="text-muted-foreground"> (now {player.xp})</span>
+          <span className="text-muted-foreground">
+            {" "}
+            <Trans>(now {xp})</Trans>
+          </span>
         </Row>
       ) : null}
       {player.awards.length > 0 ? (
-        <Row label="Awards">
+        <Row label={t`Awards`}>
           <ul className="inline-flex flex-wrap gap-1">
             {player.awards.map((award) => (
               <li key={award.key}>
@@ -248,7 +261,11 @@ function Scoreboard({
         <section key={team.ally}>
           <h3 className="mb-1 flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
             {teamLabel(team.ally)}
-            {team.won ? <Badge variant="secondary">Won</Badge> : null}
+            {team.won ? (
+              <Badge variant="secondary">
+                <Trans>Won</Trans>
+              </Badge>
+            ) : null}
           </h3>
           <ul className="divide-y divide-border rounded-md border border-border">
             {team.players.map((player) => {

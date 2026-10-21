@@ -1,3 +1,4 @@
+import { plural, t } from "@lingui/core/macro";
 import type { PlayerRelation } from "@/content/stats";
 
 /**
@@ -11,18 +12,22 @@ export function relationSummary(
   relation: PlayerRelation | null,
 ): string | null {
   if (!relation || relation.gamesShared === 0) return null;
+  const shared = relation.gamesShared;
   const parts: string[] = [
-    `${relation.gamesShared} game${relation.gamesShared === 1 ? "" : "s"} with this player`,
+    plural(shared, {
+      one: "# game with this player",
+      other: "# games with this player",
+    }),
   ];
   if (relation.gamesTogether > 0) {
-    parts.push(
-      `${relation.winsTogether}W/${relation.gamesTogether - relation.winsTogether}L as teammates`,
-    );
+    const wins = relation.winsTogether;
+    const losses = relation.gamesTogether - relation.winsTogether;
+    parts.push(t`${wins}W/${losses}L as teammates`);
   }
   if (relation.gamesAgainst > 0) {
-    parts.push(
-      `${relation.winsAgainst}W/${relation.gamesAgainst - relation.winsAgainst}L as opponents`,
-    );
+    const wins = relation.winsAgainst;
+    const losses = relation.gamesAgainst - relation.winsAgainst;
+    parts.push(t`${wins}W/${losses}L as opponents`);
   }
   return parts.join(" · ");
 }

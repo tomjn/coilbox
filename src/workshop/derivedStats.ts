@@ -1,3 +1,5 @@
+import { t } from "@lingui/core/macro";
+
 /**
  * Derived combat and economy numbers for a unit (issue #2644): DPS, alpha
  * damage, cost per hit point, DPS per 100 metal, hit points per build second
@@ -292,23 +294,23 @@ export interface UnitDerivedStats {
  * per-unit exclusion note of their own (which weapons a unit's own tiles left
  * out), added by the strip on top of the base text here.
  */
-export const DPS_HELP =
-  "Damage per second against the default armour class, summed across every weapon that fires on its own. A weapon that deals different damage to some armour classes may hit harder or softer against them than this.";
+export const dpsHelp = (): string =>
+  t`Damage per second against the default armour class, summed across every weapon that fires on its own. A weapon that deals different damage to some armour classes may hit harder or softer against them than this.`;
 
-export const ALPHA_DAMAGE_HELP =
-  "Total damage in one burst from every weapon counted in DPS above. Sometimes called alpha damage.";
+export const alphaDamageHelp = (): string =>
+  t`Total damage in one burst from every weapon counted in DPS above. Sometimes called alpha damage.`;
 
-export const COST_PER_HIT_POINT_HELP =
-  "Metal cost divided by hit points. Lower is a tankier unit for its cost.";
+export const costPerHitPointHelp = (): string =>
+  t`Metal cost divided by hit points. Lower is a tankier unit for its cost.`;
 
-export const DPS_PER_100_METAL_HELP =
-  "DPS scaled to a metal cost of 100, so units of different cost can be compared directly.";
+export const dpsPer100MetalHelp = (): string =>
+  t`DPS scaled to a metal cost of 100, so units of different cost can be compared directly.`;
 
-export const HIT_POINTS_PER_BUILD_SECOND_HELP =
-  "Hit points divided by build time. Build time is already stated in seconds at a build power of 1, so this holds for a builder of any speed.";
+export const hitPointsPerBuildSecondHelp = (): string =>
+  t`Hit points divided by build time. Build time is already stated in seconds at a build power of 1, so this holds for a builder of any speed.`;
 
-export const RANGE_PER_COST_HELP =
-  "The longest range among the unit's weapons, divided by metal cost. Counts every weapon, including a manual-fire or slaved one: a threat range does not need a sustained rate of fire.";
+export const rangePerCostHelp = (): string =>
+  t`The longest range among the unit's weapons, divided by metal cost. Counts every weapon, including a manual-fire or slaved one: a threat range does not need a sustained rate of fire.`;
 
 /**
  * A unit's derived combat and economy numbers, from its resolved fields and

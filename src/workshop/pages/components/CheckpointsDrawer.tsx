@@ -11,6 +11,7 @@
  * autosave into looking hand made: only a manual checkpoint's name and
  * description can be edited, the same distinction `Checkpoint.kind` draws.
  */
+import { Trans, useLingui } from "@lingui/react/macro";
 import { Button, Drawer, Input } from "@picoframe/frame";
 import { History, RotateCcw, Trash2 } from "lucide-react";
 import { useState } from "react";
@@ -37,6 +38,7 @@ export function CheckpointsDrawer({
   onRename: (id: string, name: string, description: string | undefined) => void;
   onDelete: (id: string) => void;
 }) {
+  const { t } = useLingui();
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
 
@@ -50,13 +52,15 @@ export function CheckpointsDrawer({
     <Drawer
       open={open}
       onOpenChange={onOpenChange}
-      title="Checkpoints"
-      description="Named states of the whole project, to go back to in one action. Autosaved on a timer too, so a crash costs minutes rather than a session."
+      title={t`Checkpoints`}
+      description={t`Named states of the whole project, to go back to in one action. Autosaved on a timer too, so a crash costs minutes rather than a session.`}
       width="28rem"
     >
       <div className="flex flex-col gap-6">
         <section className="flex flex-col gap-3">
-          <h3 className="text-sm font-medium">New checkpoint</h3>
+          <h3 className="text-sm font-medium">
+            <Trans>New checkpoint</Trans>
+          </h3>
           <form
             className="flex flex-col gap-2"
             onSubmit={(e) => {
@@ -64,15 +68,15 @@ export function CheckpointsDrawer({
               save();
             }}
           >
-            <Field label="Name">
+            <Field label={t`Name`}>
               <Input
                 value={name}
                 onChange={(e) => setName(e.target.value)}
-                placeholder="Before the health rebalance"
+                placeholder={t`Before the health rebalance`}
                 className="h-8"
               />
             </Field>
-            <Field label="Description (optional)">
+            <Field label={t`Description (optional)`}>
               <Textarea
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
@@ -81,21 +85,23 @@ export function CheckpointsDrawer({
             </Field>
             <Button type="submit" size="sm" disabled={!name.trim()}>
               <History className="size-3.5" />
-              Save checkpoint
+              <Trans>Save checkpoint</Trans>
             </Button>
           </form>
         </section>
 
         <section className="flex flex-col gap-3">
           <h3 className="text-sm font-medium">
-            Saved{" "}
+            <Trans>Saved</Trans>{" "}
             <span className="text-xs font-normal text-muted-foreground">
               {checkpoints.length}
             </span>
           </h3>
           {checkpoints.length === 0 ? (
             <p className="text-sm text-muted-foreground">
-              Nothing yet. Save one above, or wait for the next autosave.
+              <Trans>
+                Nothing yet. Save one above, or wait for the next autosave.
+              </Trans>
             </p>
           ) : (
             <ul className="flex flex-col gap-2">
@@ -132,6 +138,7 @@ function CheckpointRow({
   onRename: (name: string, description: string | undefined) => void;
   onDelete: () => void;
 }) {
+  const { t } = useLingui();
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(checkpoint.name);
   const [draftDescription, setDraftDescription] = useState(
@@ -143,6 +150,7 @@ function CheckpointRow({
     setEditing(false);
   };
 
+  const checkpointName = checkpoint.name;
   return (
     <li className="flex flex-col gap-1.5 rounded-md border border-border/60 p-2">
       {editing ? (
@@ -181,7 +189,7 @@ function CheckpointRow({
             }}
             title={
               checkpoint.kind === "manual"
-                ? "Click to rename or describe this checkpoint"
+                ? t`Click to rename or describe this checkpoint`
                 : undefined
             }
           >
@@ -189,7 +197,7 @@ function CheckpointRow({
               <span className="truncate">{checkpoint.name}</span>
               {checkpoint.kind === "autosave" && (
                 <span className="shrink-0 rounded bg-muted px-1.5 py-0.5 text-[10px] uppercase text-muted-foreground">
-                  Auto
+                  <Trans>Auto</Trans>
                 </span>
               )}
             </span>
@@ -210,8 +218,8 @@ function CheckpointRow({
               size="sm"
               className="h-7 px-2"
               onClick={onRestore}
-              aria-label={`Restore ${checkpoint.name}`}
-              title="Put the project back to how it was at this checkpoint, as one undo step"
+              aria-label={t`Restore ${checkpointName}`}
+              title={t`Put the project back to how it was at this checkpoint, as one undo step`}
             >
               <RotateCcw className="size-3.5" />
             </Button>
@@ -221,8 +229,8 @@ function CheckpointRow({
               size="sm"
               className="h-7 px-2"
               onClick={onDelete}
-              aria-label={`Delete ${checkpoint.name}`}
-              title="Delete this checkpoint"
+              aria-label={t`Delete ${checkpointName}`}
+              title={t`Delete this checkpoint`}
             >
               <Trash2 className="size-3.5" />
             </Button>

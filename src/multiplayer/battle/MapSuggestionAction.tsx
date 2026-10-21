@@ -1,3 +1,4 @@
+import { Trans, useLingui } from "@lingui/react/macro";
 import { Button } from "@picoframe/frame";
 import { Check } from "lucide-react";
 import type { MapSuggestion } from "./mapSuggestion";
@@ -17,17 +18,20 @@ export function MapSuggestionAction({
   pending: boolean;
   onAccept: (name: string) => void;
 }) {
+  const { t } = useLingui();
+  const query = suggestion.query;
+  const matches = suggestion.matches.join(", ");
   if (suggestion.matches.length === 0) {
     return (
       <p className="px-1 text-xs text-muted-foreground">
-        No installed map matches “{suggestion.query}”.
+        <Trans>No installed map matches “{query}”.</Trans>
       </p>
     );
   }
   if (suggestion.matches.length > 1) {
     return (
       <p className="px-1 text-xs text-muted-foreground">
-        Matches: {suggestion.matches.join(", ")}
+        <Trans>Matches: {matches}</Trans>
       </p>
     );
   }
@@ -41,7 +45,7 @@ export function MapSuggestionAction({
       onClick={() => onAccept(name)}
     >
       <Check className="size-3" />
-      {pending ? "Changing map…" : `Accept: ${name}`}
+      {pending ? t`Changing map…` : t`Accept: ${name}`}
     </Button>
   );
 }

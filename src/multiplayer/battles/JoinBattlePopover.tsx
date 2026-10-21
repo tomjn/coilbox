@@ -1,3 +1,4 @@
+import { Trans, useLingui } from "@lingui/react/macro";
 import { Button, Input } from "@picoframe/frame";
 import { useState } from "react";
 import {
@@ -26,7 +27,7 @@ export function JoinBattlePopover({
   onOpenChange,
   needsPassword = true,
   notice = null,
-  triggerLabel = "Join",
+  triggerLabel,
   protocol = "tasserver",
 }: {
   title: string;
@@ -43,6 +44,7 @@ export function JoinBattlePopover({
    * decides what a password may hold (issue #3524). */
   protocol?: LobbyProtocol;
 }) {
+  const { t } = useLingui();
   const [key, setKey] = useState("");
   const [refusal, setRefusal] = useState<string | null>(null);
   return (
@@ -58,7 +60,7 @@ export function JoinBattlePopover({
     >
       <PopoverTrigger asChild>
         <Button className="h-8 shrink-0 px-3" disabled={disabled}>
-          {triggerLabel}
+          {triggerLabel ?? t`Join`}
         </Button>
       </PopoverTrigger>
       <PopoverContent className="w-64">
@@ -82,7 +84,9 @@ export function JoinBattlePopover({
           {needsPassword && (
             // biome-ignore lint/a11y/noLabelWithoutControl: wraps the <Input> control (implicit label association)
             <label className="flex flex-col gap-1 text-sm">
-              <span className="font-medium">Join {title}</span>
+              <span className="font-medium">
+                <Trans>Join {title}</Trans>
+              </span>
               <Input
                 autoFocus
                 type="password"
@@ -91,7 +95,7 @@ export function JoinBattlePopover({
                   setKey(e.target.value);
                   setRefusal(null);
                 }}
-                placeholder="Battle password"
+                placeholder={t`Battle password`}
               />
             </label>
           )}
@@ -101,7 +105,7 @@ export function JoinBattlePopover({
             </p>
           )}
           <Button type="submit" className="h-8">
-            {notice ? leaveAndLabel("join") : "Join"}
+            {notice ? leaveAndLabel("join") : t`Join`}
           </Button>
         </form>
       </PopoverContent>

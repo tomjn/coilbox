@@ -31,6 +31,7 @@
  * to call. The unit list's own search box matches both, so a rule and a typed
  * search can disagree about a plain word.
  */
+import { t } from "@lingui/core/macro";
 import type { UnitClones } from "./clones";
 import type { UnitDerivedStats } from "./derivedStats";
 import { resolvedDef, type UnitOverrides } from "./overrides";
@@ -89,7 +90,7 @@ export function createCollection(
     parentId && Object.hasOwn(collections, parentId) ? parentId : undefined;
   const collection: Collection = {
     id,
-    name: trimmed || "Unnamed collection",
+    name: trimmed || t`Unnamed collection`,
     ...(parent ? { parentId: parent } : {}),
     units: [],
   };

@@ -1,3 +1,6 @@
+import type { MessageDescriptor } from "@lingui/core";
+import { msg } from "@lingui/core/macro";
+import { Trans, useLingui } from "@lingui/react/macro";
 import { Button, Input } from "@picoframe/frame";
 import { TriangleAlert } from "lucide-react";
 import { useEffect, useState } from "react";
@@ -15,10 +18,10 @@ import { AdminRequestStatus } from "./AdminRequestStatus";
 import { useAdminRequest } from "./adminRequest";
 import { ToolGroup, ToolHeader } from "./ToolHeader";
 
-const ACCESS_OPTIONS = [
-  { value: "user", label: "User" },
-  { value: "mod", label: "Mod" },
-  { value: "admin", label: "Admin" },
+const ACCESS_OPTIONS: { value: string; label: MessageDescriptor }[] = [
+  { value: "user", label: msg`User` },
+  { value: "mod", label: msg`Mod` },
+  { value: "admin", label: msg`Admin` },
 ];
 
 function StaffGroup({ title, names }: { title: string; names: string[] }) {
@@ -26,7 +29,9 @@ function StaffGroup({ title, names }: { title: string; names: string[] }) {
     <div className="flex flex-col gap-1">
       <h3 className="text-sm font-medium">{title}</h3>
       {names.length === 0 ? (
-        <p className="text-sm text-muted-foreground">None.</p>
+        <p className="text-sm text-muted-foreground">
+          <Trans>None.</Trans>
+        </p>
       ) : (
         <ul className="flex flex-col gap-0.5 text-sm text-foreground">
           {names.map((name) => (
@@ -45,15 +50,18 @@ function StaffList({
 }: {
   reply: Extract<AdminReply, { shape: "listMods" }>;
 }) {
+  const { t } = useLingui();
   return (
     <div className="flex flex-col gap-3">
       <p className="text-xs text-muted-foreground">
-        The server removes moderator and admin access from an account after 365
-        days without a login.
+        <Trans>
+          The server removes moderator and admin access from an account after
+          365 days without a login.
+        </Trans>
       </p>
       <div className="grid gap-6 sm:grid-cols-2">
-        <StaffGroup title="Admins" names={reply.admins} />
-        <StaffGroup title="Mods" names={reply.mods} />
+        <StaffGroup title={t`Admins`} names={reply.admins} />
+        <StaffGroup title={t`Mods`} names={reply.mods} />
       </div>
     </div>
   );
@@ -88,6 +96,7 @@ export function SetAccessAction({
   onChanged: () => void;
   disabled?: boolean;
 }) {
+  const { t, i18n } = useLingui();
   const [level, setLevel] = useState<"user" | "mod" | "admin">("user");
   const request = useAdminRequest(serverKey);
   const isSelf =
@@ -120,31 +129,42 @@ export function SetAccessAction({
           className="h-8"
           disabled={!canSubmit}
         >
-          Change access…
+          <Trans>Change access…</Trans>
         </Button>
       </PopoverTrigger>
       <PopoverContent align="end" className="flex w-80 flex-col gap-3">
-        <h3 className="text-sm font-medium">Change {username}'s access?</h3>
+        <h3 className="text-sm font-medium">
+          <Trans>Change {username}'s access?</Trans>
+        </h3>
         <OptionSelect
           value={level}
           onValueChange={(value) => setLevel(value as "user" | "mod" | "admin")}
-          options={ACCESS_OPTIONS}
-          ariaLabel="New access level"
+          options={ACCESS_OPTIONS.map((o) => ({
+            value: o.value,
+            label: i18n._(o.label),
+          }))}
+          ariaLabel={t`New access level`}
           size="sm"
         />
         {level !== "user" && (
           <p className="text-xs text-muted-foreground">
-            Setting {username} to {level} also takes them off every player's
-            ignore list.
+            <Trans>
+              Setting {username} to {level} also takes them off every player's
+              ignore list.
+            </Trans>
           </p>
         )}
         {selfDemote && (
           <Alert variant="destructive">
             <TriangleAlert />
-            <AlertTitle>This is your own account</AlertTitle>
+            <AlertTitle>
+              <Trans>This is your own account</Trans>
+            </AlertTitle>
             <AlertDescription>
-              Only another admin, or a direct change to the database, can give
-              it back.
+              <Trans>
+                Only another admin, or a direct change to the database, can give
+                it back.
+              </Trans>
             </AlertDescription>
           </Alert>
         )}
@@ -156,21 +176,22 @@ export function SetAccessAction({
             onClick={confirm}
             disabled={!canSubmit || request.state.status === "sending"}
           >
-            Change access
+            <Trans>Change access</Trans>
           </Button>
         </div>
-        <AdminRequestStatus
-          state={request.state}
-          unanswered="The server did not answer."
-        >
+        <AdminRequestStatus state={request.state}>
           {(reply) =>
             reply.shape === "setAccess" ? (
               reply.success ? (
-                <span>Done.</span>
+                <span>
+                  <Trans>Done.</Trans>
+                </span>
               ) : (
                 <Alert variant="destructive">
                   <TriangleAlert />
-                  <AlertTitle>The server refused</AlertTitle>
+                  <AlertTitle>
+                    <Trans>The server refused</Trans>
+                  </AlertTitle>
                   <AlertDescription>{reply.message}</AlertDescription>
                 </Alert>
               )
@@ -191,19 +212,20 @@ function ChangeAccessForm({
   serverKey: string;
   onChanged: () => void;
 }) {
+  const { t } = useLingui();
   const [username, setUsername] = useState("");
 
   return (
     <ToolGroup
-      title="Change an account's access"
-      description="Set an account to user, mod or admin."
+      title={t`Change an account's access`}
+      description={t`Set an account to user, mod or admin.`}
     >
       <span className="flex max-w-xs flex-col gap-1 text-xs text-muted-foreground">
-        Username
+        <Trans>Username</Trans>
         <Input
           value={username}
           onChange={(event) => setUsername(event.target.value)}
-          aria-label="Username"
+          aria-label={t`Username`}
           className="h-8"
           {...identifierFieldProps}
         />
@@ -226,6 +248,7 @@ function ChangeAccessForm({
  * uberserver's `restricted['admin']` set.
  */
 export function StaffSection({ serverKey }: { serverKey: string }) {
+  const { t } = useLingui();
   const list = useAdminRequest(serverKey);
 
   // Only the connection changing should trigger a fresh load here, not
@@ -243,13 +266,10 @@ export function StaffSection({ serverKey }: { serverKey: string }) {
   return (
     <section className="flex flex-col gap-6">
       <ToolHeader
-        title="Staff"
-        description="Everyone with moderator or admin access on this server."
+        title={t`Staff`}
+        description={t`Everyone with moderator or admin access on this server.`}
       />
-      <AdminRequestStatus
-        state={list.state}
-        unanswered="The server did not answer."
-      >
+      <AdminRequestStatus state={list.state}>
         {(reply) =>
           reply.shape === "listMods" ? <StaffList reply={reply} /> : null
         }

@@ -51,6 +51,7 @@
  * #2661 can say whether one is still named anywhere, and every other such
  * table has no such oracle and is never judged at all.
  */
+import { plural, t } from "@lingui/core/macro";
 import type { CustomParamsResult } from "@/content/bindings";
 import {
   type DefKind,
@@ -153,9 +154,6 @@ export interface CompatInput {
    */
   customParams?: CustomParamsResult | null;
 }
-
-const plural = (n: number, one: string, many = `${one}s`) =>
-  `${n} ${n === 1 ? one : many}`;
 
 /** Drop one key from a record, returning the record itself when it had none. */
 function without<T>(table: Record<string, T>, key: string): Record<string, T> {
@@ -352,13 +350,13 @@ function deadKeyDetail(
     if (!scan || scan.truncated || scan.wholeTableFiles > 0) return null;
     const consumers = scan.params[param];
     if (consumers && consumers.files > 0) return null;
-    return `No Lua file in ${gameName} names the custom parameter ${param} any more, so the value set for ${path} is dead weight.`;
+    return t`No Lua file in ${gameName} names the custom parameter ${param} any more, so the value set for ${path} is dead weight.`;
   }
   if (insideUnjudgeableTable(path)) return null;
   if (isEngineField(path)) return null;
   if (readPath(def, path) !== undefined) return null;
   const key = path.split(".").at(-1) ?? path;
-  return `${gameName}'s engine has never read ${key}, and its own current definition no longer carries it either, so the value set for ${path} is dead weight.`;
+  return t`${gameName}'s engine has never read ${key}, and its own current definition no longer carries it either, so the value set for ${path} is dead weight.`;
 }
 
 /** Findings for units the project patches that the game no longer has. */
@@ -368,19 +366,27 @@ function overrideFindings(
   defOf: (key: string) => Record<string, unknown> | undefined,
 ): CompatFinding[] {
   const out: CompatFinding[] = [];
+  const { gameName } = input;
   for (const [unit, paths] of Object.entries(input.edits.overrides)) {
     const fields = Object.keys(paths);
-    if (fields.length === 0) continue;
+    const fieldCount = fields.length;
+    if (fieldCount === 0) continue;
     if (!known(unit)) {
       out.push({
         id: `overrides:${unit}`,
         store: "overrides",
         severity: "broken",
         subject: unit,
-        detail: `${input.gameName} has no unit called ${unit} any more, so ${plural(fields.length, "change")} here changes nothing.`,
+        detail: plural(fieldCount, {
+          one: `${gameName} has no unit called ${unit} any more, so # change here changes nothing.`,
+          other: `${gameName} has no unit called ${unit} any more, so # changes here change nothing.`,
+        }),
         fix: {
-          label: "Remove these changes",
-          cost: `${plural(fields.length, "field")} you set on ${unit}`,
+          label: t`Remove these changes`,
+          cost: plural(fieldCount, {
+            one: `# field you set on ${unit}`,
+            other: `# fields you set on ${unit}`,
+          }),
           // The unit's rules go with its numbers (issue #3174).
           apply: (edits) => resetUnit(edits, unit),
         },
@@ -392,8 +398,8 @@ function overrideFindings(
     // reasons below fires, so the offer is built once and only the detail
     // sentence and the id tell the two apart.
     const removeFix = (path: string): CompatFix => ({
-      label: "Remove this change",
-      cost: `the value you set for ${path}`,
+      label: t`Remove this change`,
+      cost: t`the value you set for ${path}`,
       apply: (edits) => resetField(edits, unit, path),
     });
     for (const path of fields) {
@@ -404,7 +410,7 @@ function overrideFindings(
           store: "overrides",
           severity: "review",
           subject: `${unit}.${path}`,
-          detail: `${unit} no longer has ${parent}, so the value set for ${path} is written into a table nothing reads.`,
+          detail: t`${unit} no longer has ${parent}, so the value set for ${path} is written into a table nothing reads.`,
           fix: removeFix(path),
         });
         continue;
@@ -442,15 +448,17 @@ function cloneFindings(
   shared: Set<string>,
 ): CompatFinding[] {
   const out: CompatFinding[] = [];
+  const { gameName } = input;
   for (const clone of Object.values(input.edits.clones) as UnitClone[]) {
+    const { key, source } = clone;
     const inGame = Object.hasOwn(input.units, clone.key);
-    if (clone.source !== undefined && !Object.hasOwn(input.units, clone.source))
+    if (source !== undefined && !Object.hasOwn(input.units, source))
       out.push({
         id: `clones:${clone.key}:source`,
         store: "clones",
         severity: "review",
         subject: clone.key,
-        detail: `${clone.key} was copied from ${clone.source}, which ${input.gameName} no longer has. The copy still works, but it is now the only version of a unit the game has dropped.`,
+        detail: t`${key} was copied from ${source}, which ${gameName} no longer has. The copy still works, but it is now the only version of a unit the game has dropped.`,
       });
     if (!clone.replacesGameUnit && inGame)
       out.push({
@@ -458,7 +466,7 @@ function cloneFindings(
         store: "clones",
         severity: "broken",
         subject: clone.key,
-        detail: `${input.gameName} now has a unit of its own called ${clone.key}, so this copy replaces it rather than adding a unit. Rename the copy if that is not what you want.`,
+        detail: t`${gameName} now has a unit of its own called ${key}, so this copy replaces it rather than adding a unit. Rename the copy if that is not what you want.`,
       });
     if (clone.replacesGameUnit && !inGame)
       out.push({
@@ -466,20 +474,22 @@ function cloneFindings(
         store: "clones",
         severity: "review",
         subject: clone.key,
-        detail: `${clone.key} was made to stand in for ${input.gameName}'s own unit of that name, which the game no longer has. It now adds a unit instead of replacing one.`,
+        detail: t`${key} was made to stand in for ${gameName}'s own unit of that name, which the game no longer has. It now adds a unit instead of replacing one.`,
       });
     const own = ownWeaponDefs(clone.def);
     const lost = mountNames(clone.def).filter(
       (name) => !mountResolves(name, own, shared),
     );
-    if (lost.length > 0)
+    if (lost.length > 0) {
+      const lostNames = lost.join(", ");
       out.push({
         id: `clones:${clone.key}:weapons`,
         store: "clones",
         severity: "broken",
         subject: clone.key,
-        detail: `${clone.key} mounts ${lost.join(", ")}, which ${input.gameName} no longer defines and the copy does not carry itself. Those weapons will not fire.`,
+        detail: t`${key} mounts ${lostNames}, which ${gameName} no longer defines and the copy does not carry itself. Those weapons will not fire.`,
       });
+    }
   }
   return out;
 }
@@ -490,6 +500,7 @@ function menuFindings(
   known: (key: string) => boolean,
 ): CompatFinding[] {
   const out: CompatFinding[] = [];
+  const { gameName } = input;
   for (const [builder, ops] of Object.entries(
     input.edits.menus as BuildMenus,
   )) {
@@ -500,10 +511,16 @@ function menuFindings(
         store: "menus",
         severity: "broken",
         subject: builder,
-        detail: `${input.gameName} has no unit called ${builder} any more, so ${plural(ops.length, "build menu change")} here changes nothing.`,
+        detail: plural(ops.length, {
+          one: `${gameName} has no unit called ${builder} any more, so # build menu change here changes nothing.`,
+          other: `${gameName} has no unit called ${builder} any more, so # build menu changes here change nothing.`,
+        }),
         fix: {
-          label: "Remove this menu",
-          cost: plural(ops.length, "build menu change"),
+          label: t`Remove this menu`,
+          cost: plural(ops.length, {
+            one: "# build menu change",
+            other: "# build menu changes",
+          }),
           apply: (edits) => ({
             ...edits,
             menus: without(edits.menus, builder),
@@ -514,16 +531,19 @@ function menuFindings(
     }
     const dead = ops.filter((op) => !known(op.unit));
     if (dead.length > 0) {
-      const names = [...new Set(dead.map((op) => op.unit))];
+      const names = [...new Set(dead.map((op) => op.unit))].join(", ");
       out.push({
         id: `menus:${builder}:units`,
         store: "menus",
         severity: "broken",
         subject: builder,
-        detail: `${builder}'s build menu names ${names.join(", ")}, which ${input.gameName} no longer has.`,
+        detail: t`${builder}'s build menu names ${names}, which ${gameName} no longer has.`,
         fix: {
-          label: "Remove these operations",
-          cost: plural(dead.length, "build menu change"),
+          label: t`Remove these operations`,
+          cost: plural(dead.length, {
+            one: "# build menu change",
+            other: "# build menu changes",
+          }),
           apply: (edits) => keepOps(edits, builder, (op) => known(op.unit)),
         },
       });
@@ -546,7 +566,10 @@ function menuFindings(
         store: "menus",
         severity: "review",
         subject: builder,
-        detail: `${plural(stranded.length, "unit")} in ${builder}'s build menu ${stranded.length === 1 ? "was" : "were"} placed before a unit ${input.gameName} no longer has, so ${stranded.length === 1 ? "it goes" : "they go"} on the end of the menu instead.`,
+        detail: plural(stranded.length, {
+          one: `# unit in ${builder}'s build menu was placed before a unit ${gameName} no longer has, so it goes on the end of the menu instead.`,
+          other: `# units in ${builder}'s build menu were placed before a unit ${gameName} no longer has, so they go on the end of the menu instead.`,
+        }),
       });
   }
   return out;
@@ -570,6 +593,7 @@ function textFindings(
   known: (key: string) => boolean,
 ): CompatFinding[] {
   const out: CompatFinding[] = [];
+  const { gameName } = input;
   for (const [unit, languages] of Object.entries(input.edits.text)) {
     if (known(unit)) continue;
     const written = Object.values(languages).reduce(
@@ -582,10 +606,13 @@ function textFindings(
       store: "text",
       severity: "broken",
       subject: unit,
-      detail: `${input.gameName} has no unit called ${unit} any more, so the words written for it are never shown.`,
+      detail: t`${gameName} has no unit called ${unit} any more, so the words written for it are never shown.`,
       fix: {
-        label: "Remove this text",
-        cost: `${plural(written, "name or description", "names and descriptions")} you wrote for ${unit}`,
+        label: t`Remove this text`,
+        cost: plural(written, {
+          one: `# name or description you wrote for ${unit}`,
+          other: `# names and descriptions you wrote for ${unit}`,
+        }),
         apply: (edits) => ({ ...edits, text: without(edits.text, unit) }),
       },
     });
@@ -605,6 +632,7 @@ function disabledFindings(
   input: CompatInput,
   known: (key: string) => boolean,
 ): CompatFinding[] {
+  const { gameName } = input;
   return input.edits.disabled
     .filter((unit) => !known(unit))
     .map((unit) => ({
@@ -612,10 +640,10 @@ function disabledFindings(
       store: "disabled" as const,
       severity: "broken" as const,
       subject: unit,
-      detail: `${input.gameName} has no unit called ${unit} any more, so switching it off does nothing.`,
+      detail: t`${gameName} has no unit called ${unit} any more, so switching it off does nothing.`,
       fix: {
-        label: "Remove this mark",
-        cost: "nothing, a mark is not an edit",
+        label: t`Remove this mark`,
+        cost: t`nothing, a mark is not an edit`,
         apply: (edits: GameEdits) => ({
           ...edits,
           disabled: edits.disabled.filter((other) => other !== unit),
@@ -641,33 +669,38 @@ function libraryFindings(
   defOf: (key: string) => Record<string, unknown> | undefined,
 ): CompatFinding[] {
   const out: CompatFinding[] = [];
+  const { gameName } = input;
   for (const weapon of Object.values(input.edits.weapons ?? {})) {
     const source = input.weaponDefs[weapon.source];
+    const weaponKey = weapon.key;
+    const weaponSource = weapon.source;
     if (!source)
       out.push({
         id: `weapons:${weapon.key}:source`,
         store: "weapons",
         severity: "review",
         subject: weapon.key,
-        detail: `${weapon.key} was copied from ${weapon.source}, which ${input.gameName} no longer has. The copy still works, but it is now the only version of that weapon.`,
+        detail: t`${weaponKey} was copied from ${weaponSource}, which ${gameName} no longer has. The copy still works, but it is now the only version of that weapon.`,
       });
     else {
       const moved = Object.keys({ ...weapon.def, ...source }).filter(
         (key) => !sameValue(weapon.def[key], source[key]),
       );
-      if (moved.length > 0)
+      if (moved.length > 0) {
+        const movedKeys = moved.sort().join(", ");
         out.push({
           id: `weapons:${weapon.key}:moved`,
           store: "weapons",
           severity: "review",
           subject: weapon.key,
-          detail: `${input.gameName} has changed ${weapon.source} since ${weapon.key} was copied from it: ${moved.sort().join(", ")}. The copy keeps the values it was copied with.`,
+          detail: t`${gameName} has changed ${weaponSource} since ${weaponKey} was copied from it: ${movedKeys}. The copy keeps the values it was copied with.`,
         });
+      }
     }
   }
   const unequip = (unit: string, step?: string) => ({
-    label: "Put back the game's weapon",
-    cost: "nothing, the weapon stays in the library",
+    label: t`Put back the game's weapon`,
+    cost: t`nothing, the weapon stays in the library`,
     apply: (edits: GameEdits) => ({
       ...edits,
       equipped:
@@ -684,7 +717,7 @@ function libraryFindings(
         store: "equipped",
         severity: "broken",
         subject: unit,
-        detail: `${input.gameName} has no unit called ${unit} any more, so the library weapons equipped into it go nowhere.`,
+        detail: t`${gameName} has no unit called ${unit} any more, so the library weapons equipped into it go nowhere.`,
         fix: unequip(unit),
       });
       continue;
@@ -697,6 +730,7 @@ function libraryFindings(
       // Every unit can die, so a death explosion always has a field to go
       // into (issue #2642).
       const death = isDeathMount(step);
+      const explodes = step === "explodeas";
       if (!lost && (death || steps.has(step))) continue;
       out.push({
         id: `equipped:${unit}:${step}`,
@@ -705,9 +739,11 @@ function libraryFindings(
         subject: unit,
         detail: lost
           ? death
-            ? `${unit} explodes as ${key}, which is not in the weapon library any more, so it explodes as the game's own when it ${step === "explodeas" ? "dies" : "self-destructs"}.`
-            : `${unit} is equipped with ${key}, which is not in the weapon library any more, so that slot fires the game's weapon.`
-          : `${unit} no longer has the weapon slot ${key} was equipped into, so it is equipped into nothing.`,
+            ? explodes
+              ? t`${unit} explodes as ${key}, which is not in the weapon library any more, so it explodes as the game's own when it dies.`
+              : t`${unit} explodes as ${key}, which is not in the weapon library any more, so it explodes as the game's own when it self-destructs.`
+            : t`${unit} is equipped with ${key}, which is not in the weapon library any more, so that slot fires the game's weapon.`
+          : t`${unit} no longer has the weapon slot ${key} was equipped into, so it is equipped into nothing.`,
         fix: unequip(unit, step),
       });
     }
@@ -828,6 +864,7 @@ function armorClassFindings(input: CompatInput): CompatFinding[] {
     ),
   );
   const out: CompatFinding[] = [];
+  const { gameName } = input;
   for (const [unit, className] of Object.entries(moves)) {
     const lower = className.toLowerCase();
     if (lower === "default") continue;
@@ -838,10 +875,10 @@ function armorClassFindings(input: CompatInput): CompatFinding[] {
       store: "armorClasses",
       severity: "broken",
       subject: unit,
-      detail: `${unit} was moved to the armour class ${className}, which ${input.gameName} no longer has. It still compiles, as a class of its own that no weapon's damage table names, so ${unit} takes default damage exactly as it would if it had never been moved.`,
+      detail: t`${unit} was moved to the armour class ${className}, which ${gameName} no longer has. It still compiles, as a class of its own that no weapon's damage table names, so ${unit} takes default damage exactly as it would if it had never been moved.`,
       fix: {
-        label: "Put back the game's class",
-        cost: `the move of ${unit} to ${className}`,
+        label: t`Put back the game's class`,
+        cost: t`the move of ${unit} to ${className}`,
         apply: (edits) => ({
           ...edits,
           armorClasses: removeArmorMove(edits.armorClasses, unit),

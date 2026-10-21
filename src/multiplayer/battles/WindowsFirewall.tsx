@@ -1,3 +1,5 @@
+import { plural, t } from "@lingui/core/macro";
+import { Trans } from "@lingui/react/macro";
 import { Button } from "@picoframe/frame";
 import {
   ChevronRight,
@@ -68,7 +70,7 @@ export function WindowsFirewall({ engine }: { engine: string | null }) {
         supported: true,
         programs: was?.programs ?? [],
         problem: {
-          title: "Coilbox could not reach Windows Firewall",
+          title: t`Coilbox could not reach Windows Firewall`,
           details: [e instanceof Error ? e.message : String(e)],
           fault: true,
         },
@@ -88,7 +90,9 @@ export function WindowsFirewall({ engine }: { engine: string | null }) {
         <Verdict
           icon={<CircleCheck className="size-3.5 shrink-0 text-emerald-500" />}
         >
-          Windows Firewall already allows every program hosting needs
+          <Trans>
+            Windows Firewall already allows every program hosting needs
+          </Trans>
         </Verdict>
       </ResultCard>
     );
@@ -96,11 +100,15 @@ export function WindowsFirewall({ engine }: { engine: string | null }) {
 
   return (
     <div className="flex flex-col gap-1.5 text-sm">
-      <span className="font-medium">Windows Firewall</span>
+      <span className="font-medium">
+        <Trans>Windows Firewall</Trans>
+      </span>
       <p className="text-xs text-muted-foreground">
-        Windows asks whether to allow a program the first time it opens a port.
-        The engine asks while your game is starting, which is the worst moment
-        to be answering questions. Answer for all of them now instead.
+        <Trans>
+          Windows asks whether to allow a program the first time it opens a
+          port. The engine asks while your game is starting, which is the worst
+          moment to be answering questions. Answer for all of them now instead.
+        </Trans>
       </p>
 
       <ResultCard
@@ -120,7 +128,7 @@ export function WindowsFirewall({ engine }: { engine: string | null }) {
           strong={!problem?.fault}
         >
           {asking
-            ? "Waiting for Windows"
+            ? t`Waiting for Windows`
             : (problem?.title ?? verdict(state.programs))}
         </Verdict>
 
@@ -131,10 +139,10 @@ export function WindowsFirewall({ engine }: { engine: string | null }) {
                 {program.name}
               </span>{" "}
               {program.allowed === true
-                ? "is allowed in"
+                ? t`is allowed in`
                 : program.allowed === false
-                  ? "is not allowed in"
-                  : "could not be checked"}
+                  ? t`is not allowed in`
+                  : t`could not be checked`}
             </li>
           ))}
         </ul>
@@ -144,8 +152,10 @@ export function WindowsFirewall({ engine }: { engine: string | null }) {
             Windows refused, and adding them asks for administrator rights. */}
         {state.programs.some((p) => p.allowed === null) && !asking && (
           <span className="pl-5">
-            You can still add the rules. Windows keeps one per program, so doing
-            it twice changes nothing.
+            <Trans>
+              You can still add the rules. Windows keeps one per program, so
+              doing it twice changes nothing.
+            </Trans>
           </span>
         )}
 
@@ -159,7 +169,7 @@ export function WindowsFirewall({ engine }: { engine: string | null }) {
           disabled={asking}
           className="ml-5 self-start"
         >
-          Allow them through the firewall
+          <Trans>Allow them through the firewall</Trans>
         </Button>
       </ResultCard>
 
@@ -169,18 +179,22 @@ export function WindowsFirewall({ engine }: { engine: string | null }) {
             aria-hidden
             className="size-3 motion-safe:transition-transform group-data-[state=open]:rotate-90"
           />
-          What does this change?
+          <Trans>What does this change?</Trans>
         </CollapsibleTrigger>
         <CollapsibleContent className="mt-1.5 flex flex-col gap-1.5 pl-4 text-xs text-muted-foreground">
           <p>
-            It adds one Windows Defender Firewall rule per program, allowing
-            incoming connections to that program and nothing else. Windows asks
-            you to confirm as an administrator once, and coilbox changes nothing
-            if you say no.
+            <Trans>
+              It adds one Windows Defender Firewall rule per program, allowing
+              incoming connections to that program and nothing else. Windows
+              asks you to confirm as an administrator once, and coilbox changes
+              nothing if you say no.
+            </Trans>
           </p>
           <p>
-            The rules are grouped under Coilbox, so you can find and remove them
-            in Windows Defender Firewall whenever you like.
+            <Trans>
+              The rules are grouped under Coilbox, so you can find and remove
+              them in Windows Defender Firewall whenever you like.
+            </Trans>
           </p>
         </CollapsibleContent>
       </Collapsible>
@@ -191,6 +205,8 @@ export function WindowsFirewall({ engine }: { engine: string | null }) {
 /** The line above the list, when there is nothing wrong to say instead. */
 function verdict(programs: Firewall["programs"]): string {
   const blocked = programs.filter((p) => p.allowed === false).length;
-  if (blocked === 1) return "One program is not allowed in yet";
-  return `${blocked} programs are not allowed in yet`;
+  return plural(blocked, {
+    one: "One program is not allowed in yet",
+    other: "# programs are not allowed in yet",
+  });
 }

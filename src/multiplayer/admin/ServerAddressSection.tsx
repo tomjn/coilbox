@@ -1,3 +1,5 @@
+import { t } from "@lingui/core/macro";
+import { Trans, useLingui } from "@lingui/react/macro";
 import { Button } from "@picoframe/frame";
 import { TriangleAlert } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
@@ -8,19 +10,23 @@ import { useAdminRequest } from "./adminRequest";
 import { ToolGroup, ToolHeader } from "./ToolHeader";
 
 function overrideText(pinned: string | null) {
-  return pinned === null ? "Looked up by the server" : `Pinned to ${pinned}`;
+  return pinned === null ? t`Looked up by the server` : t`Pinned to ${pinned}`;
 }
 
 function AddressView({ reply }: { reply: AdminReply }) {
   if (reply.shape !== "showIp") return null;
   return (
     <dl className="grid grid-cols-[auto_auto_1fr] gap-x-4 gap-y-1 text-foreground">
-      <dt className="text-muted-foreground">Online IP</dt>
+      <dt className="text-muted-foreground">
+        <Trans>Online IP</Trans>
+      </dt>
       <dd>{reply.onlineIp}</dd>
       <dd className="text-muted-foreground">
         {overrideText(reply.onlineOverride)}
       </dd>
-      <dt className="text-muted-foreground">Local IP</dt>
+      <dt className="text-muted-foreground">
+        <Trans>Local IP</Trans>
+      </dt>
       <dd>{reply.localIp}</dd>
       <dd className="text-muted-foreground">
         {overrideText(reply.localOverride)}
@@ -36,13 +42,17 @@ function RefreshView({ reply }: { reply: AdminReply }) {
       <span>{reply.started}</span>
       {reply.result === null ? (
         <span>
-          The server did not report the result in time. Show the server IP to
-          check whether it changed.
+          <Trans>
+            The server did not report the result in time. Show the server IP to
+            check whether it changed.
+          </Trans>
         </span>
       ) : reply.failed ? (
         <Alert variant="destructive">
           <TriangleAlert />
-          <AlertTitle>The refresh failed</AlertTitle>
+          <AlertTitle>
+            <Trans>The refresh failed</Trans>
+          </AlertTitle>
           <AlertDescription>{reply.result}</AlertDescription>
         </Alert>
       ) : (
@@ -57,11 +67,12 @@ function RefreshView({ reply }: { reply: AdminReply }) {
  * again when the lookup ends, and the request stays open for both.
  */
 function RefreshIpAction({ serverKey }: { serverKey: string }) {
+  const { t } = useLingui();
   const refresh = useAdminRequest(serverKey);
   return (
     <ToolGroup
-      title="Refresh the address (admins only)"
-      description="Makes the server look up its public IP address again. Battles opened afterwards advertise the new address. Battles already open must be rehosted."
+      title={t`Refresh the address (admins only)`}
+      description={t`Makes the server look up its public IP address again. Battles opened afterwards advertise the new address. Battles already open must be rehosted.`}
     >
       <Button
         size="sm"
@@ -70,11 +81,11 @@ function RefreshIpAction({ serverKey }: { serverKey: string }) {
         disabled={refresh.state.status === "sending"}
         onClick={() => void refresh.send("refreship", [], "refreshIp")}
       >
-        Refresh server IP
+        <Trans>Refresh server IP</Trans>
       </Button>
       <AdminRequestStatus
         state={refresh.state}
-        sending="Waiting for the server to look up its address. This can take up to a minute."
+        sending={t`Waiting for the server to look up its address. This can take up to a minute.`}
       >
         {(reply) => <RefreshView reply={reply} />}
       </AdminRequestStatus>
@@ -89,19 +100,20 @@ function RefreshIpAction({ serverKey }: { serverKey: string }) {
  * On the Server admin page it is the Server tool (issue #2918).
  */
 export function ServerAddressSection({ serverKey }: { serverKey: string }) {
+  const { t } = useLingui();
   const show = useAdminRequest(serverKey);
   return (
     <section className="flex flex-col gap-6">
       <ToolHeader
-        title="Server address"
-        description="The addresses the server gives players for the battles they host."
+        title={t`Server address`}
+        description={t`The addresses the server gives players for the battles they host.`}
         actions={
           <Button
             size="sm"
             className="h-8"
             onClick={() => void show.send("showip", [], "showIp")}
           >
-            Show server IP
+            <Trans>Show server IP</Trans>
           </Button>
         }
       />

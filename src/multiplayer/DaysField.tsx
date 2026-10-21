@@ -1,3 +1,4 @@
+import { Trans, useLingui } from "@lingui/react/macro";
 import { cn, Input } from "@picoframe/frame";
 
 /**
@@ -19,6 +20,7 @@ export function DaysField({
   className?: string;
   autoFocus?: boolean;
 }) {
+  const { t } = useLingui();
   return (
     <span
       className={cn(
@@ -26,14 +28,14 @@ export function DaysField({
         className,
       )}
     >
-      Days
+      <Trans>Days</Trans>
       <Input
         type="number"
         step="any"
         value={value}
         onChange={(event) => onChange(event.target.value)}
-        placeholder="e.g. 0.5, 1, 7"
-        aria-label="Days"
+        placeholder={t`e.g. 0.5, 1, 7`}
+        aria-label={t`Days`}
         className="h-8"
         autoFocus={autoFocus}
       />

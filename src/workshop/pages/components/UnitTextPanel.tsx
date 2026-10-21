@@ -27,6 +27,7 @@
  * where a shut panel would still say it, and the sentence explaining why keeps
  * its place above the boxes.
  */
+import { Trans, useLingui } from "@lingui/react/macro";
 import { Button, cn, Input } from "@picoframe/frame";
 import { RotateCcw, Type } from "lucide-react";
 import { useEffect, useState } from "react";
@@ -135,7 +136,10 @@ function TextRow({
   onChange: (value: string) => void;
   onReset: () => void;
 }) {
+  const { t } = useLingui();
   const overridden = row.state === "overridden";
+  const redirect = row.redirect;
+  const inherited = row.inherited;
   // A def that redirects its lookup at another unit reads that unit's entries,
   // so this unit's own keys are ones the game never asks for. Shown rather than
   // hidden, because "where does this name come from" is the question, but not
@@ -157,8 +161,10 @@ function TextRow({
             className="h-8 text-sm text-muted-foreground"
           />
           <span className="text-[10px] text-muted-foreground">
-            Taken from {row.redirect}, which this unit's definition names as its
-            i18nfromunit. Rename {row.redirect} to change it.
+            <Trans>
+              Taken from {redirect}, which this unit's definition names as its
+              i18nfromunit. Rename {redirect} to change it.
+            </Trans>
           </span>
         </div>
         <span className="size-7" />
@@ -177,9 +183,9 @@ function TextRow({
           {overridden && (
             <span
               className="shrink-0 rounded-full bg-primary/15 px-1.5 text-[10px] font-medium text-primary"
-              title="This value has been changed from the game's default."
+              title={t`This value has been changed from the game's default.`}
             >
-              edited
+              <Trans>edited</Trans>
             </span>
           )}
         </span>
@@ -198,19 +204,21 @@ function TextRow({
         {overridden && (
           <span className="text-[10px] text-muted-foreground">
             {row.present
-              ? `Game value: ${row.inherited}`
-              : "The game says nothing here."}
+              ? t`Game value: ${inherited}`
+              : t`The game says nothing here.`}
           </span>
         )}
         {!overridden && !row.present && (
           <span className="text-[10px] text-muted-foreground">
-            The game says nothing here. Anything you type is new.
+            <Trans>The game says nothing here. Anything you type is new.</Trans>
           </span>
         )}
         {!overridden && row.present && row.inheritedFrom && (
           <span className="text-[10px] text-muted-foreground">
-            Untranslated, so the game falls back to{" "}
-            {languageLabel(row.inheritedFrom)}.
+            <Trans>
+              Untranslated, so the game falls back to{" "}
+              {languageLabel(row.inheritedFrom)}.
+            </Trans>
           </span>
         )}
       </div>
@@ -221,8 +229,8 @@ function TextRow({
           size="icon"
           className="size-7"
           onClick={onReset}
-          title={`Reset ${label} to the inherited value`}
-          aria-label={`Reset ${label} to the inherited value`}
+          title={t`Reset ${label} to the inherited value`}
+          aria-label={t`Reset ${label} to the inherited value`}
         >
           <RotateCcw className="size-3.5" />
         </Button>
@@ -256,6 +264,7 @@ export function UnitTextPanel({
   onChange: (field: TextField, value: string) => void;
   onReset: (field: TextField) => void;
 }) {
+  const { t } = useLingui();
   // Tabs only where there is somewhere to go. Beyond All Reason ships six
   // translations and every other game measured here ships none, so this is the
   // difference between six tabs and no control at all.
@@ -265,30 +274,33 @@ export function UnitTextPanel({
   // copy in a game like Beyond All Reason is named in the localisation file
   // alongside everything else, because that is the only place the game looks
   // (issue #2673).
+  const unitsFile = languageUnitsFile(language);
+  const namePath = rows.name.path;
+  const descriptionPath = rows.description.path;
   const destination =
     home === "language"
-      ? `Kept in this game's ${languageUnitsFile(language)}, not in the unit definition. This game names its units there, so that is where a rename has to go.`
+      ? t`Kept in this game's ${unitsFile}, not in the unit definition. This game names its units there, so that is where a rename has to go.`
       : isClone
-        ? "Kept in the unit's own definition, since this is a unit you added."
-        : `Kept in the unit definition, as ${rows.name.path} and ${rows.description.path}.`;
+        ? t`Kept in the unit's own definition, since this is a unit you added.`
+        : t`Kept in the unit definition, as ${namePath} and ${descriptionPath}.`;
 
   const fields = (
     <div className="flex flex-col gap-0.5">
       <TextRow
         row={rows.name}
-        label="Name"
-        hint="What a player sees"
+        label={t`Name`}
+        hint={t`What a player sees`}
         multiline={false}
-        placeholder="Unnamed"
+        placeholder={t`Unnamed`}
         onChange={(value) => onChange("name", value)}
         onReset={() => onReset("name")}
       />
       <TextRow
         row={rows.description}
-        label="Description"
-        hint="The tooltip under it"
+        label={t`Description`}
+        hint={t`The tooltip under it`}
         multiline
-        placeholder="No description"
+        placeholder={t`No description`}
         onChange={(value) => onChange("description", value)}
         onReset={() => onReset("description")}
       />
@@ -304,7 +316,7 @@ export function UnitTextPanel({
 
   return (
     <SectionPanel
-      title="Name and description"
+      title={t`Name and description`}
       icon={Type}
       headingLevel={3}
       defaultOpen
@@ -318,11 +330,13 @@ export function UnitTextPanel({
               {languageUnitsFile(language)}
             </span>
           ) : (
-            <span className="truncate">In the unit definition</span>
+            <span className="truncate">
+              <Trans>In the unit definition</Trans>
+            </span>
           )}
           {changed > 0 && (
             <span className="shrink-0 rounded-full bg-primary/15 px-1.5 text-primary">
-              {changed} changed
+              {t`${changed} changed`}
             </span>
           )}
         </>
@@ -331,7 +345,7 @@ export function UnitTextPanel({
       <p className="text-xs text-muted-foreground">{destination}</p>
       {translated ? (
         <Tabs value={language} onValueChange={onLanguage}>
-          <TabsList aria-label="Language">
+          <TabsList aria-label={t`Language`}>
             {languages.map((code) => (
               <TabsTrigger key={code} value={code} title={languageLabel(code)}>
                 {code}

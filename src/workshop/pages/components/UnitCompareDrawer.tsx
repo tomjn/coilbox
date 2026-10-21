@@ -5,6 +5,7 @@
  * decides which rows to show. A field the selection agrees on says nothing a
  * comparison needs to, so it is left out rather than padding the table.
  */
+import { Trans, useLingui } from "@lingui/react/macro";
 import { Button, Drawer } from "@picoframe/frame";
 import { X } from "lucide-react";
 import {
@@ -33,18 +34,20 @@ export function UnitCompareDrawer({
   rows: UnitReferenceRow[];
   onRemove: (key: string) => void;
 }) {
+  const { t } = useLingui();
   const columns = differingColumns(rows);
+  const removeLabel = (name: string) => t`Remove ${name} from the comparison`;
   return (
     <Drawer
       open={open}
       onOpenChange={onOpenChange}
-      title="Compare units"
+      title={t`Compare units`}
       description={
         rows.length < 2
-          ? "Select at least two units to compare."
+          ? t`Select at least two units to compare.`
           : columns.length === 0
-            ? "Every field below is the same across the selected units."
-            : "Only the fields where the selected units differ."
+            ? t`Every field below is the same across the selected units.`
+            : t`Only the fields where the selected units differ.`
       }
       width="48rem"
     >
@@ -52,7 +55,9 @@ export function UnitCompareDrawer({
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead>Field</TableHead>
+              <TableHead>
+                <Trans>Field</Trans>
+              </TableHead>
               {rows.map((row) => (
                 <TableHead key={row.key}>
                   <div className="flex items-center gap-1">
@@ -63,7 +68,7 @@ export function UnitCompareDrawer({
                       size="icon"
                       className="size-5 shrink-0"
                       onClick={() => onRemove(row.key)}
-                      aria-label={`Remove ${row.name} from the comparison`}
+                      aria-label={removeLabel(row.name)}
                     >
                       <X className="size-3" aria-hidden="true" />
                     </Button>

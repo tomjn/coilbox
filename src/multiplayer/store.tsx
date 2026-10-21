@@ -1,3 +1,4 @@
+import { t } from "@lingui/core/macro";
 import { useSetting } from "@picoframe/frame";
 import { Channel } from "@tauri-apps/api/core";
 import {
@@ -170,7 +171,9 @@ export function connectionLabelIfSeveral(
   if (!serverKey || liveConnectionKeys(connections, null).length < 2) {
     return null;
   }
-  return `${usernameFromKey(serverKey)} on ${serverNameFor(serverKey, servers)}`;
+  const user = usernameFromKey(serverKey);
+  const server = serverNameFor(serverKey, servers);
+  return t`${user} on ${server}`;
 }
 
 /**
@@ -238,14 +241,14 @@ export function connectBlockedReason(
   if (direct) {
     const address = serverAddressFromKey(other.serverKey);
     return other.opening
-      ? `A room at ${address} is already opening. Wait for that one to finish: coilbox can be in one room at a time.`
-      : `You are in a room already, at ${address}. Leave it first: coilbox can be in one room at a time.`;
+      ? t`A room at ${address} is already opening. Wait for that one to finish: coilbox can be in one room at a time.`
+      : t`You are in a room already, at ${address}. Leave it first: coilbox can be in one room at a time.`;
   }
   const who = usernameFromKey(other.serverKey);
   const where = serverHostFromKey(other.serverKey);
   return other.opening
-    ? `A login to ${where} as ${who} is already opening. Wait for that one to finish.`
-    : `You are already logged in to ${where} as ${who}. Log out of that account first.`;
+    ? t`A login to ${where} as ${who} is already opening. Wait for that one to finish.`
+    : t`You are already logged in to ${where} as ${who}. Log out of that account first.`;
 }
 
 /**
@@ -321,13 +324,13 @@ function waitForAccountDelta(
   const promise = new Promise<void>((resolve, reject) => {
     timer = setTimeout(() => {
       cleanup();
-      reject(new Error("The server did not answer."));
+      reject(new Error(t`The server did not answer.`));
     }, SERVER_REPLY_TIMEOUT_MS);
     waiter = (d) => {
       if (d.kind !== acceptKind && d.kind !== denyKind) return;
       cleanup();
       if (d.kind === denyKind) {
-        reject(new Error("reason" in d ? d.reason : "Request refused."));
+        reject(new Error("reason" in d ? d.reason : t`Request refused.`));
       } else {
         resolve();
       }
@@ -1201,8 +1204,9 @@ export function MultiplayerProvider({ children }: { children: ReactNode }) {
             );
             if (!rt.notifiedJoinFailures.has(d.channel)) {
               rt.notifiedJoinFailures.add(d.channel);
+              const channel = d.channel;
               void notify({
-                title: `Couldn't join ${d.channel}`,
+                title: t`Couldn't join ${channel}`,
                 body: d.reason || undefined,
                 level: "error",
               });
@@ -1213,8 +1217,9 @@ export function MultiplayerProvider({ children }: { children: ReactNode }) {
           // host is told, because only the host has anything to tell: the joiner
           // sees a battle they are in and a game that never starts for them.
           else if (d.kind === "joinerNotLetThrough") {
+            const username = d.username;
             void notify({
-              title: `${d.username} cannot reach your relayed battle`,
+              title: t`${username} cannot reach your relayed battle`,
               body: d.reason || undefined,
               level: "error",
             });
@@ -1227,7 +1232,7 @@ export function MultiplayerProvider({ children }: { children: ReactNode }) {
           // from players saying they cannot connect.
           else if (d.kind === "relayedHostRefused") {
             void notify({
-              title: "Your battle is not going through the relay",
+              title: t`Your battle is not going through the relay`,
               body: d.reason || undefined,
               level: "error",
             });
@@ -1258,10 +1263,10 @@ export function MultiplayerProvider({ children }: { children: ReactNode }) {
           ) {
             const reason = d.kind === "relayedHostMoveRefused" ? d.reason : "";
             void notify({
-              title: "Nobody can reach your battle any more",
+              title: t`Nobody can reach your battle any more`,
               body: reason
-                ? `Its relay moved and the lobby would not update the address: ${reason}`
-                : "Its relay moved and the lobby would not update the address.",
+                ? t`Its relay moved and the lobby would not update the address: ${reason}`
+                : t`Its relay moved and the lobby would not update the address.`,
               level: "error",
             });
           }
@@ -1272,15 +1277,16 @@ export function MultiplayerProvider({ children }: { children: ReactNode }) {
           // Hosting again is the only thing that gets a live credential.
           else if (d.kind === "relayCredentialExpired") {
             void notify({
-              title: "Your battle is running on an expired relay pass",
-              body: "The lobby would not issue another one. The game carries on, but if the relay has to reconnect everybody will be dropped. Host again when you can.",
+              title: t`Your battle is running on an expired relay pass`,
+              body: t`The lobby would not issue another one. The game carries on, but if the relay has to reconnect everybody will be dropped. Host again when you can.`,
               level: "error",
             });
           } else if (d.kind === "commandFailed") {
             // Ignore-sync commands are best-effort: a server without IGNORE support
             // may reject them, but local hiding still applies, so degrade silently
             // rather than nag the user (the raw FAILED line is still in the console).
-            const cmd = d.command.toUpperCase();
+            const command = d.command;
+            const cmd = command.toUpperCase();
             if (
               cmd !== "IGNORE" &&
               cmd !== "UNIGNORE" &&
@@ -1288,8 +1294,8 @@ export function MultiplayerProvider({ children }: { children: ReactNode }) {
             ) {
               void notify({
                 title: d.command
-                  ? `Command failed: ${d.command}`
-                  : "Command failed",
+                  ? t`Command failed: ${command}`
+                  : t`Command failed`,
                 body: d.reason || undefined,
                 level: "error",
               });
@@ -1310,7 +1316,7 @@ export function MultiplayerProvider({ children }: { children: ReactNode }) {
             if (text) {
               if (d.boxed)
                 setServerMsgBoxes((q) => [...q, { serverKey, text: d.text }]);
-              else void notify({ title: "Server message", body: d.text });
+              else void notify({ title: t`Server message`, body: d.text });
             }
           }
           // A staff `BROADCAST` (issue #2775). It never answers a command the way
@@ -1320,7 +1326,7 @@ export function MultiplayerProvider({ children }: { children: ReactNode }) {
           else if (d.kind === "broadcast") {
             const text = d.text.trim();
             if (text)
-              void notify({ title: "Staff announcement", body: d.text });
+              void notify({ title: t`Staff announcement`, body: d.text });
           }
           // A game we played has finished and the server has said what it did to
           // everybody's rating. Only the id is recorded: the result itself is in
@@ -1452,7 +1458,7 @@ export function MultiplayerProvider({ children }: { children: ReactNode }) {
           });
           if (!cred.secret) {
             throw new Error(
-              "No stored password for this login (set one in Settings).",
+              t`No stored password for this login (set one in Settings).`,
             );
           }
           beginConnecting(serverKey, direct, focus);
@@ -1491,7 +1497,7 @@ export function MultiplayerProvider({ children }: { children: ReactNode }) {
             });
             if (!cred.secret) {
               throw new Error(
-                "No stored password for this login (set one in Settings).",
+                t`No stored password for this login (set one in Settings).`,
               );
             }
             secret = cred.secret;
@@ -1614,9 +1620,11 @@ export function MultiplayerProvider({ children }: { children: ReactNode }) {
           serverProtocol(server) === "tachyon" &&
           (await needsSignIn(server, account.username))
         ) {
+          const username = account.username;
+          const serverName = server.name;
           void notify({
-            title: "Signed out of multiplayer",
-            body: `${account.username} on ${server.name} needs a new sign-in. Log in again from the topbar to sign in with your browser.`,
+            title: t`Signed out of multiplayer`,
+            body: t`${username} on ${serverName} needs a new sign-in. Log in again from the topbar to sign in with your browser.`,
             level: "error",
           });
           continue;
@@ -1624,9 +1632,11 @@ export function MultiplayerProvider({ children }: { children: ReactNode }) {
         try {
           await doConnect(server, account.username, false, false);
         } catch {
+          const username = account.username;
+          const serverName = server.name;
           void notify({
-            title: "Couldn't connect to multiplayer",
-            body: `Log in as ${account.username} on ${server.name} from the topbar when you're ready.`,
+            title: t`Couldn't connect to multiplayer`,
+            body: t`Log in as ${username} on ${serverName} from the topbar when you're ready.`,
             level: "error",
           });
         }
@@ -1696,7 +1706,7 @@ export function MultiplayerProvider({ children }: { children: ReactNode }) {
           await doConnect(ctx.server, ctx.username, ctx.direct, false);
           if (superseded()) return;
           void notify({
-            title: "Reconnected to multiplayer",
+            title: t`Reconnected to multiplayer`,
             level: "success",
           });
         } catch {
@@ -1707,8 +1717,8 @@ export function MultiplayerProvider({ children }: { children: ReactNode }) {
           // address rather than the account. Stop and let the person fix it.
           if (rt.denied) {
             void notify({
-              title: "Multiplayer login refused",
-              body: "Check the password in Settings, then log in again from the topbar.",
+              title: t`Multiplayer login refused`,
+              body: t`Check the password in Settings, then log in again from the topbar.`,
               level: "error",
             });
             return;
@@ -1719,8 +1729,8 @@ export function MultiplayerProvider({ children }: { children: ReactNode }) {
           if (await needsSignIn(ctx.server, ctx.username)) {
             if (superseded()) return;
             void notify({
-              title: "Signed out of multiplayer",
-              body: "The server no longer accepts your sign-in. Log in again from the topbar to sign in with your browser.",
+              title: t`Signed out of multiplayer`,
+              body: t`The server no longer accepts your sign-in. Log in again from the topbar to sign in with your browser.`,
               level: "error",
             });
             return;
@@ -1728,8 +1738,8 @@ export function MultiplayerProvider({ children }: { children: ReactNode }) {
           const attempt = ++rt.reconnectAttempt;
           if (attempt >= RECONNECT_DELAYS_MS.length) {
             void notify({
-              title: "Couldn't reconnect to multiplayer",
-              body: "Log in again from the topbar when you're ready.",
+              title: t`Couldn't reconnect to multiplayer`,
+              body: t`Log in again from the topbar when you're ready.`,
               level: "error",
             });
             return;
@@ -1765,7 +1775,7 @@ export function MultiplayerProvider({ children }: { children: ReactNode }) {
       // the reconnect below, since that is the shape a network blip takes and
       // the same room is what is still there to reclaim a seat in.
       if (rt.reconnectCtx?.direct && reason) {
-        void notify({ title: "Disconnected from the room", body: reason });
+        void notify({ title: t`Disconnected from the room`, body: reason });
         return;
       }
       if (!autoRejoinRef.current) return;
@@ -1782,7 +1792,7 @@ export function MultiplayerProvider({ children }: { children: ReactNode }) {
       } else {
         rt.rejoinBattle = null;
       }
-      void notify({ title: "Connection lost — reconnecting…" });
+      void notify({ title: t`Connection lost — reconnecting…` });
       runReconnect(serverKey);
     },
     [markGone, runReconnect],
@@ -1833,7 +1843,7 @@ export function MultiplayerProvider({ children }: { children: ReactNode }) {
               settled = true;
               reject(
                 new Error(
-                  "Server asked for verification during registration. Try logging in to enter your code.",
+                  t`Server asked for verification during registration. Try logging in to enter your code.`,
                 ),
               );
             } else if (
@@ -1847,7 +1857,7 @@ export function MultiplayerProvider({ children }: { children: ReactNode }) {
               reject(new Error(ev.delta.reason));
             } else if (ev.kind === "disconnected") {
               settled = true;
-              reject(new Error(ev.reason ?? "Registration failed"));
+              reject(new Error(ev.reason ?? t`Registration failed`));
             }
           };
           // Zero-K creates an account over its own protocol. Everything above
@@ -1935,7 +1945,7 @@ export function MultiplayerProvider({ children }: { children: ReactNode }) {
               reject(new Error(ev.delta.reason));
             } else if (ev.kind === "disconnected") {
               settled = true;
-              reject(new Error(ev.reason ?? "Account recovery failed"));
+              reject(new Error(ev.reason ?? t`Account recovery failed`));
             }
           };
           mpRecoverPassword({
@@ -1989,7 +1999,7 @@ export function MultiplayerProvider({ children }: { children: ReactNode }) {
   const submitRecoveryCode = useCallback(
     async (serverKey: string, code: string) => {
       const onEvent = recoveryChannelsRef.current.get(serverKey);
-      if (!onEvent) throw new Error("Not awaiting a recovery code.");
+      if (!onEvent) throw new Error(t`Not awaiting a recovery code.`);
       beginBusy(serverKey);
       let disconnect = true;
       try {
@@ -2069,10 +2079,10 @@ export function MultiplayerProvider({ children }: { children: ReactNode }) {
     async (current: string, next: string, serverKey?: string) => {
       const key = serverKey ?? activeKeyRef.current;
       const rt = key ? runtimesRef.current.get(key) : undefined;
-      if (!key || !rt) throw new Error("Not connected.");
+      if (!key || !rt) throw new Error(t`Not connected.`);
       const waiters = rt.serverMessageWaiters;
       if (waiters.size > 0) {
-        throw new Error("A password change is already in progress.");
+        throw new Error(t`A password change is already in progress.`);
       }
       let waiter: (text: string) => void = () => {};
       let timer: ReturnType<typeof setTimeout>;
@@ -2084,7 +2094,7 @@ export function MultiplayerProvider({ children }: { children: ReactNode }) {
         (resolve, reject) => {
           timer = setTimeout(() => {
             cleanup();
-            reject(new Error("The server did not answer."));
+            reject(new Error(t`The server did not answer.`));
           }, SERVER_REPLY_TIMEOUT_MS);
           waiter = (text: string) => {
             cleanup();
@@ -2120,7 +2130,7 @@ export function MultiplayerProvider({ children }: { children: ReactNode }) {
   const accountTarget = useCallback((serverKey?: string) => {
     const key = serverKey ?? activeKeyRef.current;
     const rt = key ? runtimesRef.current.get(key) : undefined;
-    if (!key || !rt) throw new Error("Not connected.");
+    if (!key || !rt) throw new Error(t`Not connected.`);
     return { key, rt };
   }, []);
 
@@ -2183,7 +2193,7 @@ export function MultiplayerProvider({ children }: { children: ReactNode }) {
 
   const getUserInfo = useCallback((serverKey?: string) => {
     const key = serverKey ?? activeKeyRef.current;
-    if (!key) throw new Error("Not connected.");
+    if (!key) throw new Error(t`Not connected.`);
     mpGetUserInfo({ serverKey: key }).catch(() => {});
   }, []);
 

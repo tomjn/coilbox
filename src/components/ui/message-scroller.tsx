@@ -167,6 +167,7 @@ function MessageScrollerViewport({
     <MessageScrollerPrimitive.Viewport
       ref={setRef}
       data-slot="message-scroller-viewport"
+      aria-label={t`Messages`}
       className={cn(
         "size-full min-h-0 min-w-0 overflow-y-auto overscroll-contain data-pending-scroll:invisible",
         className,

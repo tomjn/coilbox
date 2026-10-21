@@ -1,3 +1,4 @@
+import { Trans, useLingui } from "@lingui/react/macro";
 import { Button, useDrawer } from "@picoframe/frame";
 import { useEffect, useRef } from "react";
 import { nextDrawerKey } from "@/general/drawerKey";
@@ -49,6 +50,7 @@ export function HostBattleButton({
    *  null. */
   leaves?: string | null;
 }) {
+  const { t } = useLingui();
   const drawer = useDrawer();
   const latest = useRef(onHost);
   latest.current = onHost;
@@ -62,7 +64,7 @@ export function HostBattleButton({
     const now = latestLeaves.current;
     if (now && now !== shown) {
       return Promise.reject(
-        new Error(`${now} Close this form and open it again to host.`),
+        new Error(t`${now} Close this form and open it again to host.`),
       );
     }
     return latest.current(args);
@@ -70,7 +72,7 @@ export function HostBattleButton({
 
   const open = () =>
     drawer.open({
-      title: "Host a battle",
+      title: t`Host a battle`,
       // The width the LAN form has, for the same reason: the router's answer
       // and the relay choice are sentences, and a narrow drawer stacks them
       // into a column taller than a laptop window.
@@ -104,7 +106,7 @@ export function HostBattleButton({
       disabled={disabled}
       onClick={open}
     >
-      Host a battle
+      <Trans>Host a battle</Trans>
     </Button>
   );
 }

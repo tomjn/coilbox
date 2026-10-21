@@ -74,6 +74,8 @@
  * is opening its game, so the two cannot meet.
  */
 
+import { plural } from "@lingui/core/macro";
+import { Trans, useLingui } from "@lingui/react/macro";
 import { Button, buttonVariants, cn } from "@picoframe/frame";
 import {
   ArrowLeft,
@@ -371,21 +373,24 @@ type UnitTab = "fields" | "weapons" | "explosions";
  * icon rather than spelled out on every visit (issue #3102). A returning
  * user already knows it, and a first-time one can still find it here. */
 function RecordingExplainer() {
+  const { t } = useLingui();
   return (
     <TooltipProvider delayDuration={150}>
       <Tooltip>
         <TooltipTrigger asChild>
           <button
             type="button"
-            aria-label="How edits are recorded"
+            aria-label={t`How edits are recorded`}
             className="cursor-help text-muted-foreground transition-colors hover:text-foreground"
           >
             <HelpCircle size={13} />
           </button>
         </TooltipTrigger>
         <TooltipContent className="max-w-xs text-left leading-snug">
-          Only the fields you change are recorded, so the rest still follow the
-          game when it updates.
+          <Trans>
+            Only the fields you change are recorded, so the rest still follow
+            the game when it updates.
+          </Trans>
         </TooltipContent>
       </Tooltip>
     </TooltipProvider>
@@ -409,6 +414,8 @@ function FieldViewBar({
   onViewChange: (view: FieldView) => void;
   counted: { shown: number; hidden: number };
 }) {
+  const { t } = useLingui();
+  const { shown, hidden } = counted;
   return (
     <div className="flex flex-wrap items-center justify-between gap-2">
       <ToggleGroup
@@ -417,21 +424,26 @@ function FieldViewBar({
         size="sm"
         value={view}
         onValueChange={(v) => v && onViewChange(v as FieldView)}
-        aria-label="Which fields to show"
+        aria-label={t`Which fields to show`}
       >
-        <ToggleGroupItem value="relevant">Relevant</ToggleGroupItem>
-        <ToggleGroupItem value="all">All</ToggleGroupItem>
+        <ToggleGroupItem value="relevant">
+          <Trans>Relevant</Trans>
+        </ToggleGroupItem>
+        <ToggleGroupItem value="all">
+          <Trans>All</Trans>
+        </ToggleGroupItem>
       </ToggleGroup>
       <span className="text-xs text-muted-foreground">
         {view === "relevant"
-          ? `${counted.shown} shown, ${counted.hidden} hidden`
-          : `${counted.shown} shown`}
+          ? t`${shown} shown, ${hidden} hidden`
+          : t`${shown} shown`}
       </span>
     </div>
   );
 }
 
 export default function UnitPage() {
+  const { t } = useLingui();
   const [params] = useSearchParams();
   const navigate = useNavigate();
   const { selected } = useScanTargetSelection();
@@ -1385,16 +1397,16 @@ export default function UnitPage() {
     if (moveClasses.length === 0) return undefined;
     return {
       movementclass: {
-        placeholder: "Does not move",
-        unknownLabel: () => `No unit in ${gameName} moves on this`,
+        placeholder: t`Does not move`,
+        unknownLabel: () => t`No unit in ${gameName} moves on this`,
         options: moveClasses.map((c) => ({
           value: c.name,
           label: c.name,
-          description: `${c.units} unit${c.units === 1 ? "" : "s"}`,
+          description: plural(c.units, { one: "# unit", other: "# units" }),
         })),
       },
     };
-  }, [moveClasses, gameName]);
+  }, [moveClasses, gameName, t]);
   const warnings = useMemo(() => {
     const problem = moveClassProblem(edited);
     return problem ? { movementclass: problem } : undefined;
@@ -2260,8 +2272,11 @@ export default function UnitPage() {
   /** A slot that fires a library weapon, as the drawer lists it. */
   const describeMount = (mount: WeaponMount) => {
     const def = units[mount.unit];
+    const mountUnit = nameOf(mount.unit, def);
     if (isDeathMount(mount.step))
-      return `${nameOf(mount.unit, def)}, ${mount.step === "explodeas" ? "death explosion" : "self-destruct explosion"}`;
+      return mount.step === "explodeas"
+        ? t`${mountUnit}, death explosion`
+        : t`${mountUnit}, self-destruct explosion`;
     const owners = [
       mount.unit,
       ...(clones[mount.unit]?.source
@@ -2271,23 +2286,32 @@ export default function UnitPage() {
     const number =
       weaponSlots(def, weaponDefs, owners).find((s) => s.step === mount.step)
         ?.number ?? Number(mount.step) + 1;
-    return `${nameOf(mount.unit, def)}, weapon ${number}`;
+    return t`${mountUnit}, weapon ${number}`;
   };
 
   /** What the value under an edit is, for a unit whose definition is not the
    *  game's. */
   const inheritedLabel = clone
     ? clone.origin
-      ? "Exported value"
-      : "Copied value"
+      ? t`Exported value`
+      : t`Copied value`
     : builtBy
-      ? "Value in the game"
+      ? t`Value in the game`
       : undefined;
   /** What the count at the top of the open tab's list is counting. */
   const counted =
     tab === "weapons" || tab === "explosions"
       ? (weaponView ?? { shown: 0, hidden: 0 })
       : fields;
+
+  const gameLabel = game?.name ?? "";
+  const builtByName = builtBy?.projectName ?? "";
+  const copySource = clone?.source ?? "";
+  const inPlaceError = inPlaceChecks.error;
+  const conflictNames = built.conflicts.join(", ");
+  const conflictCount = built.conflicts.length;
+  const movedCount = moved?.findings.length ?? 0;
+  const checkpointCount = checkpoints.length;
 
   // `h-full` against the frame's own scroll container, so from `lg` up the two
   // panes each take the height that is left and scroll themselves rather than
@@ -2305,7 +2329,7 @@ export default function UnitPage() {
             to="/workshop"
             className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:underline"
           >
-            <ArrowLeft className="size-3.5" /> Projects
+            <ArrowLeft className="size-3.5" /> <Trans>Projects</Trans>
           </Link>
         }
         // A node rather than a string once a project is open, so rename sits
@@ -2322,14 +2346,14 @@ export default function UnitPage() {
                 variant="ghost"
                 className="size-7 shrink-0 text-muted-foreground"
                 onClick={() => setRenaming(true)}
-                aria-label="Rename this project"
-                title="Rename this project, or change what it says it is for"
+                aria-label={t`Rename this project`}
+                title={t`Rename this project, or change what it says it is for`}
               >
                 <Pencil className="size-3.5" aria-hidden="true" />
               </Button>
             </span>
           ) : (
-            "Unit tweaks"
+            t`Unit tweaks`
           )
         }
         // One short line naming which game is open, not the paragraph this
@@ -2346,11 +2370,11 @@ export default function UnitPage() {
             </span>
           ) : gameName ? (
             <span className="inline-flex items-center gap-1.5">
-              {gameName}. The first change starts a project.
+              <Trans>{gameName}. The first change starts a project.</Trans>
               <RecordingExplainer />
             </span>
           ) : (
-            "Change a unit's numbers. No project is open."
+            t`Change a unit's numbers. No project is open.`
           )
         }
         actions={
@@ -2364,8 +2388,11 @@ export default function UnitPage() {
                 {[
                   anythingChanged && describeEdits(edits),
                   builtCount > 0 &&
-                    `${builtCount} built unit${builtCount === 1 ? "" : "s"}`,
-                  staleCount > 0 && `${staleCount} left behind by a rename`,
+                    plural(builtCount, {
+                      one: "# built unit",
+                      other: "# built units",
+                    }),
+                  staleCount > 0 && t`${staleCount} left behind by a rename`,
                 ]
                   .filter(Boolean)
                   .join(", ")}
@@ -2379,8 +2406,8 @@ export default function UnitPage() {
                 size="sm"
                 disabled={!history.canUndo(projectId)}
                 onClick={undo}
-                aria-label="Undo"
-                title="Undo the last change"
+                aria-label={t`Undo`}
+                title={t`Undo the last change`}
               >
                 <Undo2 className="size-3.5" />
               </Button>
@@ -2389,8 +2416,8 @@ export default function UnitPage() {
                 size="sm"
                 disabled={!history.canRedo(projectId)}
                 onClick={redo}
-                aria-label="Redo"
-                title="Redo the change you undid"
+                aria-label={t`Redo`}
+                title={t`Redo the change you undid`}
               >
                 <Redo2 className="size-3.5" />
               </Button>
@@ -2409,9 +2436,9 @@ export default function UnitPage() {
                         size="sm"
                         onClick={() => setCheckpointsOpen(true)}
                         aria-label={
-                          checkpoints.length > 0
-                            ? `Checkpoints, ${checkpoints.length} saved`
-                            : "Checkpoints"
+                          checkpointCount > 0
+                            ? t`Checkpoints, ${checkpointCount} saved`
+                            : t`Checkpoints`
                         }
                         className="relative"
                       >
@@ -2428,7 +2455,9 @@ export default function UnitPage() {
                       </Button>
                     </TooltipTrigger>
                     <TooltipContent>
-                      Named states of the project, to go back to in one action
+                      <Trans>
+                        Named states of the project, to go back to in one action
+                      </Trans>
                     </TooltipContent>
                   </Tooltip>
                 </TooltipProvider>
@@ -2443,10 +2472,10 @@ export default function UnitPage() {
                 variant="outline"
                 size="sm"
                 onClick={() => setRegenerateOpen(true)}
-                title="Reopen the seed and rules this project was made from, to change one and replay it"
+                title={t`Reopen the seed and rules this project was made from, to change one and replay it`}
               >
                 <Dice5 className="mr-1 size-3.5" />
-                Regenerate
+                <Trans>Regenerate</Trans>
               </Button>
             )}
             {/* One button that plays the project on your own machine (issue
@@ -2503,10 +2532,10 @@ export default function UnitPage() {
                         variant: "ghost",
                         size: "sm",
                       })}
-                      title="Every unit in this project, to compare side by side and change many at once"
+                      title={t`Every unit in this project, to compare side by side and change many at once`}
                     >
                       <Table2 className="mr-1 size-3.5" />
-                      Reference
+                      <Trans>Reference</Trans>
                     </Link>
                   )}
                 </>
@@ -2603,18 +2632,20 @@ export default function UnitPage() {
       {moved && moved.findings.length > 0 && (
         <Alert variant={moved.broken > 0 ? "destructive" : "default"}>
           <AlertTitle>
-            {moved.findings.length === 1
-              ? "One edit no longer fits"
-              : `${moved.findings.length} edits no longer fit`}{" "}
-            {game?.name}
+            {plural(movedCount, {
+              one: `One edit no longer fits ${gameLabel}`,
+              other: `# edits no longer fit ${gameLabel}`,
+            })}
           </AlertTitle>
           <AlertDescription>
-            {game?.name} has been updated since this project was written. Open{" "}
-            <Link to={sectionHref("checks")} className="underline">
-              Checks
-            </Link>{" "}
-            to read what changed underneath it and what can be done about each
-            one.
+            <Trans>
+              {gameLabel} has been updated since this project was written. Open{" "}
+              <Link to={sectionHref("checks")} className="underline">
+                Checks
+              </Link>{" "}
+              to read what changed underneath it and what can be done about each
+              one.
+            </Trans>
           </AlertDescription>
         </Alert>
       )}
@@ -2622,13 +2653,17 @@ export default function UnitPage() {
       {built.conflicts.length > 0 && (
         <Alert variant="destructive">
           <AlertTitle>
-            {built.conflicts.length} built unit
-            {built.conflicts.length === 1 ? " is" : "s are"} not shown
+            {plural(conflictCount, {
+              one: "# built unit is not shown",
+              other: "# built units are not shown",
+            })}
           </AlertTitle>
           <AlertDescription>
-            {built.conflicts.join(", ")} exported into {game?.name} under a name
-            another unit here already uses. Rename the unit in the builder and
-            export again, or take the other one out.
+            <Trans>
+              {conflictNames} exported into {gameLabel} under a name another
+              unit here already uses. Rename the unit in the builder and export
+              again, or take the other one out.
+            </Trans>
           </AlertDescription>
         </Alert>
       )}
@@ -2645,7 +2680,9 @@ export default function UnitPage() {
         // A link to a project that has been deleted, or one from a machine that
         // never had it. Nothing is started in its place: the edits it named are
         // gone, and an empty project under the same link would say they were not.
-        <EmptyState label="That project is not on this machine. Pick one under Unit tweaks." />
+        <EmptyState
+          label={t`That project is not on this machine. Pick one under Unit tweaks.`}
+        />
       ) : section === "package" && project ? (
         // Ahead of the game's own read, the way the Package button used to
         // be: a project whose game is not installed here can still be
@@ -2667,15 +2704,15 @@ export default function UnitPage() {
           initFailure={scan.error}
           label={
             scan.loading
-              ? "Scanning for installed games…"
+              ? t`Scanning for installed games…`
               : games.length === 0
-                ? "No games are installed. Add one from the Library."
+                ? t`No games are installed. Add one from the Library.`
                 : gameName
                   ? // An imported project naming a game this machine has not
                     // got. Its edits are safe, there is just nothing to apply
                     // them against until the game is installed.
-                    `${gameName} is not installed here, so there are no units to show. The project's edits are kept.`
-                  : "Start a project under Unit tweaks to edit a game's units."
+                    t`${gameName} is not installed here, so there are no units to show. The project's edits are kept.`
+                  : t`Start a project under Unit tweaks to edit a game's units.`
           }
         />
       ) : status === "error" ? (
@@ -2684,17 +2721,19 @@ export default function UnitPage() {
           className="flex items-center justify-between gap-3"
         >
           <span className="break-words">
-            {error ?? "This game's unit definitions could not be read."}
+            {error ?? t`This game's unit definitions could not be read.`}
           </span>
           <Button variant="outline" size="sm" onClick={reload}>
-            Retry
+            <Trans>Retry</Trans>
           </Button>
         </Alert>
       ) : status !== "ready" || !defs ? (
         <div className="flex flex-col gap-2">
           <p className="text-sm text-muted-foreground">
-            Reading every unit definition in {game.name}. This mounts the game's
-            archives and can take a while the first time.
+            <Trans>
+              Reading every unit definition in {gameLabel}. This mounts the
+              game's archives and can take a while the first time.
+            </Trans>
           </p>
           <SkeletonList />
         </div>
@@ -2830,14 +2869,14 @@ export default function UnitPage() {
                 }
                 onValueChange={(v) => setActiveCollectionId(v || undefined)}
                 options={[
-                  { value: "", label: "All units" },
+                  { value: "", label: t`All units` },
                   ...collectionTree(collections).map((n) => ({
                     value: n.collection.id,
                     label: `${"— ".repeat(n.depth)}${n.collection.name}`,
                   })),
                 ]}
                 size="sm"
-                ariaLabel="Filter the unit list to a collection"
+                ariaLabel={t`Filter the unit list to a collection`}
               />
             )}
             <UnitList
@@ -2871,7 +2910,7 @@ export default function UnitPage() {
           </div>
 
           {!unit ? (
-            <EmptyState label="Pick a unit to see its fields." />
+            <EmptyState label={t`Pick a unit to see its fields.`} />
           ) : (
             <Tabs
               value={tab}
@@ -2941,7 +2980,7 @@ export default function UnitPage() {
                           buttonVariants({ variant: "outline", size: "sm" }),
                         )}
                       >
-                        View unit details
+                        <Trans>View unit details</Trans>
                       </Link>
                     )}
                     {/* Only a unit copied here. Taking a built one out would
@@ -2975,7 +3014,10 @@ export default function UnitPage() {
                         }
                       >
                         <RotateCcw className="size-3.5" />
-                        Reset {unitEdits} change{unitEdits === 1 ? "" : "s"}
+                        {plural(unitEdits, {
+                          one: "Reset # change",
+                          other: "Reset # changes",
+                        })}
                       </Button>
                     )}
                     <DisableUnitSwitch
@@ -3003,16 +3045,18 @@ export default function UnitPage() {
                   describes only the list under the tab that is open, so it
                   now sits at the top of each tab's own list instead (issue
                   #3103). */}
-                <TabsList aria-label="Which part of the unit to edit">
-                  <TabsTrigger value="fields">Fields</TabsTrigger>
+                <TabsList aria-label={t`Which part of the unit to edit`}>
+                  <TabsTrigger value="fields">
+                    <Trans>Fields</Trans>
+                  </TabsTrigger>
                   <TabsTrigger value="weapons">
-                    Weapons
+                    <Trans>Weapons</Trans>
                     <span className="text-xs text-muted-foreground">
                       {slots.length}
                     </span>
                   </TabsTrigger>
                   <TabsTrigger value="explosions">
-                    Explosions
+                    <Trans>Explosions</Trans>
                     <span className="text-xs text-muted-foreground">
                       {explosions.length}
                     </span>
@@ -3025,34 +3069,36 @@ export default function UnitPage() {
                 {builtBy ? (
                   builtBy.stale ? (
                     <p className="max-w-prose text-xs text-destructive">
-                      Left behind when {builtBy.projectName} was renamed. Its
-                      files are still in {game.name}, so the game has this unit
-                      and the renamed one. The unit builder's export drawer
-                      clears them.
+                      <Trans>
+                        Left behind when {builtByName} was renamed. Its files
+                        are still in {gameLabel}, so the game has this unit and
+                        the renamed one. The unit builder's export drawer clears
+                        them.
+                      </Trans>
                     </p>
                   ) : (
                     <p className="max-w-prose text-xs text-muted-foreground">
-                      Built in the unit builder as {builtBy.projectName} and
-                      exported into {game.name}
                       {clone
-                        ? ". Not in this game's definitions yet, so this is what the export wrote."
-                        : ""}
+                        ? t`Built in the unit builder as ${builtByName} and exported into ${gameLabel}. Not in this game's definitions yet, so this is what the export wrote.`
+                        : t`Built in the unit builder as ${builtByName} and exported into ${gameLabel}`}
                     </p>
                   )
                 ) : (
                   clone && (
                     <p className="max-w-prose text-xs text-muted-foreground">
                       {clone.replacesGameUnit
-                        ? `Yours, copied from ${clone.source}, in place of the game's own`
-                        : `Yours, copied from ${clone.source}`}
+                        ? t`Yours, copied from ${copySource}, in place of the game's own`
+                        : t`Yours, copied from ${copySource}`}
                     </p>
                   )
                 )}
                 {unitDisabled && (
                   <p className="max-w-prose text-xs text-muted-foreground">
-                    Disabled: it comes off every build menu when this is
-                    compiled. The definition is kept, so switching it back on
-                    restores it.
+                    <Trans>
+                      Disabled: it comes off every build menu when this is
+                      compiled. The definition is kept, so switching it back on
+                      restores it.
+                    </Trans>
                   </p>
                 )}
               </div>
@@ -3067,8 +3113,10 @@ export default function UnitPage() {
                 <DerivedStatsStrip stats={derived} gameStats={gameDerived} />
                 {inPlaceChecks.error && (
                   <p className="text-xs text-destructive">
-                    Coilbox could not check which fields can be written into the
-                    game's own files: {inPlaceChecks.error}
+                    <Trans>
+                      Coilbox could not check which fields can be written into
+                      the game's own files: {inPlaceError}
+                    </Trans>
                   </p>
                 )}
                 {cloneInPlaceDir && (

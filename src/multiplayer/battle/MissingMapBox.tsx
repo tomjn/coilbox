@@ -1,3 +1,4 @@
+import { Trans, useLingui } from "@lingui/react/macro";
 import { Button, useSetting } from "@picoframe/frame";
 import { Download, RefreshCw } from "lucide-react";
 import { useState } from "react";
@@ -40,6 +41,7 @@ export function MissingMapBox({
    */
   picture: MapPicture[];
 }) {
+  const { t } = useLingui();
   const { picture: rung, onError } = useMapPictureRung(picture);
   const previewUrl = rung.from === "placeholder" ? undefined : rung.url;
   const writePath = useWriteRootPath("maps");
@@ -47,7 +49,7 @@ export function MissingMapBox({
   const [autoEnabled] = useSetting<boolean>(AUTO_DOWNLOAD_ON_JOIN_KEY, true);
   const mapDl = useQueuedDownload({
     kind: "mapAnySource",
-    label: `Map: ${mapName}`,
+    label: t`Map: ${mapName}`,
     args: { mapName, writePath },
   });
   const [rescanning, setRescanning] = useState(false);
@@ -124,13 +126,15 @@ export function MissingMapBox({
         }
       >
         <span className="text-xs font-medium text-muted-foreground">
-          Map not installed
+          <Trans>Map not installed</Trans>
         </span>
         {downloadedButMissing && (
           <span className="text-xs">
-            Downloaded to {writePath}, but the engine still does not list this
-            map. The file may be a different version, or one the engine cannot
-            read.
+            <Trans>
+              Downloaded to {writePath}, but the engine still does not list this
+              map. The file may be a different version, or one the engine cannot
+              read.
+            </Trans>
           </span>
         )}
         {mapDl.status === "active" ? (
@@ -149,10 +153,10 @@ export function MissingMapBox({
             >
               <Download className="size-4" />
               {mapDl.status === "queued"
-                ? "Queued…"
+                ? t`Queued…`
                 : downloadedButMissing
-                  ? "Download again"
-                  : "Download"}
+                  ? t`Download again`
+                  : t`Download`}
             </Button>
             <Button
               variant="secondary"
@@ -163,7 +167,7 @@ export function MissingMapBox({
               <RefreshCw
                 className={rescanning ? "size-4 animate-spin" : "size-4"}
               />
-              Rescan
+              <Trans>Rescan</Trans>
             </Button>
           </div>
         )}

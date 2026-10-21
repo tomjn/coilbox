@@ -1,3 +1,4 @@
+import { Plural, Trans, useLingui } from "@lingui/react/macro";
 import { Button } from "@picoframe/frame";
 import { Link as LinkIcon, Lock, LogOut, UserCheck, Users } from "lucide-react";
 import { memo, useEffect, useRef, useState } from "react";
@@ -99,11 +100,15 @@ function BattleRowInner({
    * a battle password may hold (issue #3524). */
   protocol?: LobbyProtocol;
 }) {
+  const { t } = useLingui();
+  const battleTitle = battle.title;
+  const spectatorCount = battle.spectatorCount;
   const players = occupancy(battle);
   const restricted = battle.passworded || battle.locked;
   // Join an open battle, or watch a running one live as a spectator. The joined
   // row shows Leave instead and ignores this action.
   const action = battleRowAction(battle, { canJoin, inProgress });
+  const actionLabel = action.label;
   const disabled = joined || action.disabled;
   const [pwOpen, setPwOpen] = useState(false);
   const rowRef = useRef<HTMLLIElement>(null);
@@ -129,8 +134,9 @@ function BattleRowInner({
   };
 
   // Tachyon's lobby list names no founder, so there is no host to name.
+  const host = battle.host;
   const subtitle = `${battle.map} · ${battle.modname}${
-    battle.host ? ` · host ${battle.host}` : ""
+    host ? ` · ${t`host ${host}`}` : ""
   }${connectionLabel ? ` · ${connectionLabel}` : ""}`;
 
   // Both lines cut off with an ellipsis on a narrow card and carry the full
@@ -141,7 +147,7 @@ function BattleRowInner({
         {restricted && (
           <Lock
             className="size-3.5 shrink-0 text-muted-foreground"
-            aria-label={battle.passworded ? "Passworded" : "Locked"}
+            aria-label={battle.passworded ? t`Passworded` : t`Locked`}
           />
         )}
         <span
@@ -177,7 +183,7 @@ function BattleRowInner({
           <button
             type="button"
             onClick={activate}
-            aria-label={`${action.label} ${battle.title}`}
+            aria-label={t`${actionLabel} ${battleTitle}`}
             className="group/row flex min-w-0 flex-1 cursor-pointer items-center rounded-md text-left transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
           >
             {details}
@@ -195,7 +201,9 @@ function BattleRowInner({
             {players}/{battle.maxPlayers}
           </span>
           {battle.spectatorCount > 0 && (
-            <span className="ml-1">+{battle.spectatorCount} spec</span>
+            <span className="ml-1">
+              <Trans>+{spectatorCount} spec</Trans>
+            </span>
           )}
         </div>
         {invite && (
@@ -204,8 +212,8 @@ function BattleRowInner({
             size="icon"
             className="size-8 shrink-0"
             disabled={!linkable}
-            aria-label={`Copy an invite link for ${battle.title}`}
-            title="Copy invite link"
+            aria-label={t`Copy an invite link for ${battleTitle}`}
+            title={t`Copy invite link`}
             onClick={() => copyDeepLink(invite)}
           >
             <LinkIcon className="size-4" />
@@ -215,10 +223,10 @@ function BattleRowInner({
           <Button
             className="h-8 shrink-0 gap-1 px-3"
             onClick={onLeave}
-            aria-label="Leave battle"
+            aria-label={t`Leave battle`}
           >
             <LogOut className="size-4" />
-            Leave
+            <Trans>Leave</Trans>
           </Button>
         ) : asks ? (
           <JoinBattlePopover
@@ -231,7 +239,7 @@ function BattleRowInner({
             onOpenChange={setPwOpen}
             needsPassword={battle.passworded}
             notice={leaves}
-            triggerLabel={battle.passworded ? "Join" : action.label}
+            triggerLabel={battle.passworded ? t`Join` : action.label}
             protocol={protocol}
           />
         ) : (
@@ -264,7 +272,11 @@ function FriendsBadge({ names }: { names: string }) {
             className="flex shrink-0 cursor-default items-center gap-1 rounded-full bg-sky-500/10 px-2 py-1 text-xs font-medium text-sky-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring dark:text-sky-400"
           >
             <UserCheck className="size-3.5 shrink-0" aria-hidden />
-            {count === 1 ? "Friend in battle" : `${count} friends in battle`}
+            <Plural
+              value={count}
+              one="Friend in battle"
+              other="# friends in battle"
+            />
           </button>
         </TooltipTrigger>
         <TooltipContent>{names}</TooltipContent>

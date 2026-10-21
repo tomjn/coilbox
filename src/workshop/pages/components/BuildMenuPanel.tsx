@@ -82,6 +82,8 @@
  * down a list of factories comparing rosters opens it once, which is worth more
  * than making every unit obey the default again.
  */
+import { plural } from "@lingui/core/macro";
+import { Trans, useLingui } from "@lingui/react/macro";
 import { Button, cn } from "@picoframe/frame";
 import {
   GripVertical,
@@ -185,6 +187,7 @@ export function BuildMenuPanel({
   onEnableBuilder: () => void;
   onReset: () => void;
 }) {
+  const { t } = useLingui();
   // Which faction reaches each unit is the game's answer rather than ours, out
   // of the build graph the picker groups by. Only used here to say when a row
   // crosses a faction line, so a row on the builder's own side says nothing.
@@ -208,6 +211,7 @@ export function BuildMenuPanel({
   );
   const removed = inherited.filter((unit) => !menu.includes(unit));
   const off = menu.filter((unit) => isUnitDisabled(disabled, unit));
+  const removedCount = removed.length;
 
   /**
    * The drag in progress: which unit is held, and where it would land.
@@ -322,7 +326,7 @@ export function BuildMenuPanel({
 
   return (
     <SectionPanel
-      title="Build menu"
+      title={t`Build menu`}
       icon={Hammer}
       headingLevel={3}
       defaultOpen={edited}
@@ -331,14 +335,20 @@ export function BuildMenuPanel({
         <>
           <span className="truncate">
             {menu.length === 0
-              ? "Builds nothing"
-              : `${menu.length} unit${menu.length === 1 ? "" : "s"}, in order${
-                  off.length > 0 ? `, ${off.length} disabled` : ""
-                }`}
+              ? t`Builds nothing`
+              : off.length > 0
+                ? plural(menu.length, {
+                    one: `# unit, in order, ${off.length} disabled`,
+                    other: `# units, in order, ${off.length} disabled`,
+                  })
+                : plural(menu.length, {
+                    one: "# unit, in order",
+                    other: "# units, in order",
+                  })}
           </span>
           {edited && (
             <span className="shrink-0 rounded-full bg-primary/15 px-1.5 text-primary">
-              changed
+              <Trans>changed</Trans>
             </span>
           )}
         </>
@@ -348,26 +358,32 @@ export function BuildMenuPanel({
         <Alert variant="warning">
           <TriangleAlert />
           <AlertTitle className="line-clamp-none">
-            {builderName} cannot build, so none of this menu reaches the game
+            <Trans>
+              {builderName} cannot build, so none of this menu reaches the game
+            </Trans>
           </AlertTitle>
           <AlertDescription>
             <p>
-              Its own <code>builder</code> field is off, so the engine gives it
-              none of these buttons. Four more abilities go with it:{" "}
-              <code>canAssist</code>, <code>canReclaim</code>,{" "}
-              <code>canRepair</code> and <code>canRestore</code> all default to
-              whatever <code>builder</code> says, so as things stand this unit
-              cannot help build, reclaim, repair or restore either.
+              <Trans>
+                Its own <code>builder</code> field is off, so the engine gives
+                it none of these buttons. Four more abilities go with it:{" "}
+                <code>canAssist</code>, <code>canReclaim</code>,{" "}
+                <code>canRepair</code> and <code>canRestore</code> all default
+                to whatever <code>builder</code> says, so as things stand this
+                unit cannot help build, reclaim, repair or restore either.
+              </Trans>
             </p>
             <Button variant="outline" size="sm" onClick={onEnableBuilder}>
               <Wrench className="size-3.5" />
-              Switch builder on
+              <Trans>Switch builder on</Trans>
             </Button>
             <p>
-              That one is a change to the unit's own definition rather than to
-              this menu, so it lands in the field list and counts as a field
-              change. Leave it off if that is what you meant, for a unit whose
-              menu is there for something else to turn on.
+              <Trans>
+                That one is a change to the unit's own definition rather than to
+                this menu, so it lands in the field list and counts as a field
+                change. Leave it off if that is what you meant, for a unit whose
+                menu is there for something else to turn on.
+              </Trans>
             </p>
           </AlertDescription>
         </Alert>
@@ -375,7 +391,9 @@ export function BuildMenuPanel({
 
       {menu.length === 0 ? (
         <p className="text-sm text-muted-foreground">
-          This builder has nothing on its menu. Add a unit to give it one.
+          <Trans>
+            This builder has nothing on its menu. Add a unit to give it one.
+          </Trans>
         </p>
       ) : (
         <ol
@@ -389,6 +407,8 @@ export function BuildMenuPanel({
             const faction = crossFaction(unit);
             const label = nameOf(unit);
             const switchedOff = isUnitDisabled(disabled, unit);
+            const position = index + 1;
+            const total = menu.length;
             const held = drag?.unit === unit;
             return (
               <li
@@ -406,8 +426,8 @@ export function BuildMenuPanel({
                   className="size-6 cursor-grab touch-none active:cursor-grabbing"
                   onPointerDown={startDrag(unit)}
                   onKeyDown={onHandleKeyDown(unit)}
-                  aria-label={`Reorder ${label}, ${index + 1} of ${menu.length}`}
-                  title={`Drag ${label} to move it along the menu, or use the arrow keys. Home sends it to the top and End to the bottom.`}
+                  aria-label={t`Reorder ${label}, ${position} of ${total}`}
+                  title={t`Drag ${label} to move it along the menu, or use the arrow keys. Home sends it to the top and End to the bottom.`}
                 >
                   <GripVertical className="size-3.5" />
                 </Button>
@@ -430,9 +450,9 @@ export function BuildMenuPanel({
                       <Badge
                         variant="outline"
                         className="shrink-0 text-[10px]"
-                        title="This unit is switched off, so it comes off every build menu in the game when this is compiled. Its place here is kept, and switching it back on restores it."
+                        title={t`This unit is switched off, so it comes off every build menu in the game when this is compiled. Its place here is kept, and switching it back on restores it.`}
                       >
-                        disabled
+                        <Trans>disabled</Trans>
                       </Badge>
                     )}
                     {faction && (
@@ -445,20 +465,22 @@ export function BuildMenuPanel({
                     )}
                     {clones[unit] && (
                       <Badge variant="outline" className="shrink-0 text-[10px]">
-                        yours
+                        <Trans>yours</Trans>
                       </Badge>
                     )}
                     {!known.has(unit) && (
                       <Badge
                         variant="destructive"
                         className="shrink-0 text-[10px]"
-                        title="This game has no unit of that name, so the button would do nothing."
+                        title={t`This game has no unit of that name, so the button would do nothing.`}
                       >
-                        not in this game
+                        <Trans>not in this game</Trans>
                       </Badge>
                     )}
                     {!inherited.includes(unit) && (
-                      <Badge className="shrink-0 text-[10px]">added</Badge>
+                      <Badge className="shrink-0 text-[10px]">
+                        <Trans>added</Trans>
+                      </Badge>
                     )}
                   </span>
                   <span className="truncate font-mono text-[10px] text-muted-foreground">
@@ -471,8 +493,8 @@ export function BuildMenuPanel({
                     size="icon"
                     className="size-7"
                     onClick={() => onRemove(unit)}
-                    aria-label={`Remove ${label} from this build menu`}
-                    title={`Remove ${label} from this build menu`}
+                    aria-label={t`Remove ${label} from this build menu`}
+                    title={t`Remove ${label} from this build menu`}
                   >
                     <X className="size-3.5" />
                   </Button>
@@ -506,7 +528,7 @@ export function BuildMenuPanel({
           size="sm"
           className="w-full"
           value=""
-          placeholder="Add a unit to this menu"
+          placeholder={t`Add a unit to this menu`}
           onValueChange={onAdd}
         />
       </div>
@@ -514,34 +536,39 @@ export function BuildMenuPanel({
       {removed.length > 0 && (
         <div className="flex flex-col gap-1 border-t border-border/50 pt-2">
           <span className="text-xs text-muted-foreground">
-            Taken off this menu ({removed.length}). Still in the game, and still
-            built by anything else that builds it.
+            <Trans>
+              Taken off this menu ({removedCount}). Still in the game, and still
+              built by anything else that builds it.
+            </Trans>
           </span>
           <ul className="flex flex-wrap gap-1.5">
-            {removed.map((unit) => (
-              <li key={unit}>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="h-7 gap-1 text-xs"
-                  onClick={() => onAdd(unit)}
-                  title={
-                    isUnitDisabled(disabled, unit)
-                      ? `Put ${nameOf(unit)} back on this menu. It is switched off as well, so it would come back marked disabled.`
-                      : `Put ${nameOf(unit)} back on this menu`
-                  }
-                >
-                  <Undo2 className="size-3" />
-                  <span
-                    className={cn(
-                      isUnitDisabled(disabled, unit) && "line-through",
-                    )}
+            {removed.map((unit) => {
+              const unitName = nameOf(unit);
+              return (
+                <li key={unit}>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="h-7 gap-1 text-xs"
+                    onClick={() => onAdd(unit)}
+                    title={
+                      isUnitDisabled(disabled, unit)
+                        ? t`Put ${unitName} back on this menu. It is switched off as well, so it would come back marked disabled.`
+                        : t`Put ${unitName} back on this menu`
+                    }
                   >
-                    {nameOf(unit)}
-                  </span>
-                </Button>
-              </li>
-            ))}
+                    <Undo2 className="size-3" />
+                    <span
+                      className={cn(
+                        isUnitDisabled(disabled, unit) && "line-through",
+                      )}
+                    >
+                      {nameOf(unit)}
+                    </span>
+                  </Button>
+                </li>
+              );
+            })}
           </ul>
         </div>
       )}
@@ -551,17 +578,20 @@ export function BuildMenuPanel({
         panel whose height is somebody's roster. */}
       <div className="flex flex-col items-start gap-2 border-t border-border/50 pt-2">
         <p className="text-xs text-muted-foreground">
-          What {builderName} offers, in the order the buttons appear. Drag a row
-          by its handle to move it, or focus the handle and use the arrow keys.
-          The picker covers the whole game, so another side's units go in here
-          the same way this side's do. Taking a unit out of this menu does not
-          remove it from the game. A unit switched off on its own page keeps its
-          place here and is marked disabled instead of disappearing.
+          <Trans>
+            What {builderName} offers, in the order the buttons appear. Drag a
+            row by its handle to move it, or focus the handle and use the arrow
+            keys. The picker covers the whole game, so another side's units go
+            in here the same way this side's do. Taking a unit out of this menu
+            does not remove it from the game. A unit switched off on its own
+            page keeps its place here and is marked disabled instead of
+            disappearing.
+          </Trans>
         </p>
         {edited && (
           <Button variant="outline" size="sm" onClick={onReset}>
             <RotateCcw className="size-3.5" />
-            Reset menu
+            <Trans>Reset menu</Trans>
           </Button>
         )}
       </div>

@@ -18,6 +18,8 @@
  * crate), the way SPADS does.
  */
 
+import { t } from "@lingui/core/macro";
+
 export type HostSuggestionKind = "balance" | "lock" | "unlock";
 
 export interface HostSuggestion {
@@ -50,11 +52,11 @@ export function matchHostSuggestion(text: string): HostSuggestion | null {
 export function hostSuggestionText(kind: HostSuggestionKind): string {
   switch (kind) {
     case "balance":
-      return "Asked to balance the teams.";
+      return t`Asked to balance the teams.`;
     case "lock":
-      return "Asked to lock the room.";
+      return t`Asked to lock the room.`;
     case "unlock":
-      return "Asked to unlock the room.";
+      return t`Asked to unlock the room.`;
   }
 }
 
@@ -63,10 +65,10 @@ export function hostSuggestionText(kind: HostSuggestionKind): string {
 export function hostSuggestionActionLabel(kind: HostSuggestionKind): string {
   switch (kind) {
     case "balance":
-      return "balance the teams";
+      return t`balance the teams`;
     case "lock":
-      return "lock the room";
+      return t`lock the room`;
     case "unlock":
-      return "unlock the room";
+      return t`unlock the room`;
   }
 }

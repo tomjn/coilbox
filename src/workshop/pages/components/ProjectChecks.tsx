@@ -53,6 +53,8 @@
  * project's section bar. The verdict still reads live whichever section is
  * open, and the change ledger still waits until the Checks page is.
  */
+import { t as coreT, plural } from "@lingui/core/macro";
+import { Trans, useLingui } from "@lingui/react/macro";
 import { Button } from "@picoframe/frame";
 import {
   Check,
@@ -183,13 +185,20 @@ function PreflightGroup({
  *  themselves are listed under Needs attention, and the same clean sentence
  *  as before when it did not. */
 function UnitsyncSection({ errorCount }: { errorCount: number }) {
+  const { t } = useLingui();
   return (
     <section className="flex flex-col gap-2">
-      <h3 className="font-medium text-sm">Game definitions</h3>
+      <h3 className="font-medium text-sm">
+        <Trans>Game definitions</Trans>
+      </h3>
       <p className="text-muted-foreground text-sm">
         {errorCount > 0
-          ? `unitsync had ${errorCount} complaint${errorCount === 1 ? "" : "s"} reading the game, listed under Needs attention above.`
-          : "unitsync read everything it was asked for without complaining."}
+          ? plural(errorCount, {
+              one: "unitsync had # complaint reading the game, listed under Needs attention above.",
+              other:
+                "unitsync had # complaints reading the game, listed under Needs attention above.",
+            })
+          : t`unitsync read everything it was asked for without complaining.`}
       </p>
     </section>
   );
@@ -218,6 +227,7 @@ function AttentionRow({
   item: AttentionItem;
   severity: "blocker" | "review";
 }) {
+  const cost = item.fix?.cost;
   return (
     <li className="flex flex-col gap-1.5 rounded-md border border-border/60 p-2.5">
       <div className="flex items-start gap-2">
@@ -237,7 +247,7 @@ function AttentionRow({
       {item.fix && (
         <div className="flex items-center gap-2 self-end">
           <span className="text-muted-foreground text-xs">
-            Loses {item.fix.cost}
+            <Trans>Loses {cost}</Trans>
           </span>
           <Button size="sm" variant="outline" onClick={item.fix.onFix}>
             {item.fix.label}
@@ -287,22 +297,25 @@ function AttentionSection({
   blockers: AttentionItem[];
   review: AttentionItem[];
 }) {
+  const { t } = useLingui();
   return (
     <section className="flex flex-col gap-3">
-      <h3 className="font-medium text-sm">Needs attention</h3>
+      <h3 className="font-medium text-sm">
+        <Trans>Needs attention</Trans>
+      </h3>
       {blockers.length === 0 && review.length === 0 ? (
         <p className="text-muted-foreground text-sm">
-          Nothing here needs attention.
+          <Trans>Nothing here needs attention.</Trans>
         </p>
       ) : (
         <>
           <AttentionGroup
-            heading="Blockers"
+            heading={t`Blockers`}
             items={blockers}
             severity="blocker"
           />
           <AttentionGroup
-            heading="Worth a look"
+            heading={t`Worth a look`}
             items={review}
             severity="review"
           />
@@ -329,31 +342,39 @@ function CompatibilitySection({
   const findings = state?.kind === "moved" ? state.report.findings : [];
   return (
     <section className="flex flex-col gap-2">
-      <h3 className="font-medium text-sm">Still fits {gameName}</h3>
+      <h3 className="font-medium text-sm">
+        <Trans>Still fits {gameName}</Trans>
+      </h3>
       {!state ? (
         <p className="text-muted-foreground text-sm">
-          No project is open yet, so there is nothing to compare.
+          <Trans>No project is open yet, so there is nothing to compare.</Trans>
         </p>
       ) : state.kind === "unknown" ? (
         <p className="text-muted-foreground text-sm">
-          {gameName} could not be checksummed, so whether it has changed since
-          this project was written is not known.
+          <Trans>
+            {gameName} could not be checksummed, so whether it has changed since
+            this project was written is not known.
+          </Trans>
         </p>
       ) : state.kind === "unmoved" ? (
         <p className="text-muted-foreground text-sm">
-          {gameName} is the same build this project was written against.
+          <Trans>
+            {gameName} is the same build this project was written against.
+          </Trans>
         </p>
       ) : findings.length === 0 ? (
         <p className="text-muted-foreground text-sm">
-          {gameName} has been updated since this project was written, and
-          everything the project names is still there.
+          <Trans>
+            {gameName} has been updated since this project was written, and
+            everything the project names is still there.
+          </Trans>
         </p>
       ) : (
         <p className="text-muted-foreground text-sm">
-          {gameName} has been updated since this project was written. These
-          edits name things it no longer has: {findings.length} finding
-          {findings.length === 1 ? "" : "s"}, listed under Needs attention
-          above.
+          {plural(findings.length, {
+            one: `${gameName} has been updated since this project was written. These edits name things it no longer has: # finding, listed under Needs attention above.`,
+            other: `${gameName} has been updated since this project was written. These edits name things it no longer has: # findings, listed under Needs attention above.`,
+          })}
         </p>
       )}
     </section>
@@ -401,6 +422,7 @@ function RoutesSection({
    *  of the game (issue #2637). */
   onInPlaceWrite: (done: InPlaceDone) => void;
 }) {
+  const { t } = useLingui();
   const routes = options
     ? deliveryRoutes(
         options,
@@ -411,7 +433,7 @@ function RoutesSection({
     : undefined;
   return (
     <CollapsibleSection
-      heading="Delivery routes"
+      heading={t`Delivery routes`}
       count={routes?.filter((r) => r.available).length}
       // Always has something to report: even a route that is not available
       // is itself the answer to "how does an edit reach this game", so this
@@ -421,12 +443,14 @@ function RoutesSection({
     >
       {checking && !options ? (
         <p className="text-muted-foreground text-sm">
-          Reading which routes {gameName} supports…
+          <Trans>Reading which routes {gameName} supports…</Trans>
         </p>
       ) : !routes ? (
         <p className="text-muted-foreground text-sm">
-          {gameName}'s mod options could not be read, so which routes it
-          supports is not known.
+          <Trans>
+            {gameName}'s mod options could not be read, so which routes it
+            supports is not known.
+          </Trans>
         </p>
       ) : (
         <ul className="flex flex-col gap-3">
@@ -485,9 +509,11 @@ function PostHookSection({
   state: PostHookState | null;
   loading: boolean;
 }) {
+  const { t } = useLingui();
+  const detail = state?.kind === "unknown" ? state.detail : undefined;
   return (
     <CollapsibleSection
-      heading="Post-processing"
+      heading={t`Post-processing`}
       // A covered post file is a blocker, listed above already: this section
       // only has something of its own to say for the other two answers
       // (issue #3106).
@@ -497,28 +523,36 @@ function PostHookSection({
       {loading || !state ? (
         <p className="text-muted-foreground text-sm">
           {loading
-            ? `Reading whether ${gameName} post-processes its own units…`
-            : "No game is picked yet, so there is nothing to read."}
+            ? t`Reading whether ${gameName} post-processes its own units…`
+            : t`No game is picked yet, so there is nothing to read.`}
         </p>
       ) : state.kind === "unwritten" ? (
         <p className="text-muted-foreground text-sm">
-          Nothing in this project needs {POST_FILE}, so the mutator covers
-          nothing of {gameName}'s.
+          <Trans>
+            Nothing in this project needs {POST_FILE}, so the mutator covers
+            nothing of {gameName}'s.
+          </Trans>
         </p>
       ) : state.kind === "unknown" ? (
         <p className="text-muted-foreground text-sm">
-          {gameName}'s archives could not be read, so whether the mutator would
-          cover its own post-processing is not known: {state.detail}
+          <Trans>
+            {gameName}'s archives could not be read, so whether the mutator
+            would cover its own post-processing is not known: {detail}
+          </Trans>
         </p>
       ) : state.kind === "clear" ? (
         <p className="text-muted-foreground text-sm">
-          This project's mutator writes {POST_FILE}, and {gameName} has no file
-          of its own there for it to cover.
+          <Trans>
+            This project's mutator writes {POST_FILE}, and {gameName} has no
+            file of its own there for it to cover.
+          </Trans>
         </p>
       ) : (
         <p className="text-muted-foreground text-sm">
-          This mutator would overwrite {gameName}'s own post-processing, listed
-          under Needs attention above.
+          <Trans>
+            This mutator would overwrite {gameName}'s own post-processing,
+            listed under Needs attention above.
+          </Trans>
         </p>
       )}
     </CollapsibleSection>
@@ -539,25 +573,28 @@ function PreflightSection({
   loading: boolean;
   error: string | null;
 }) {
+  const { t } = useLingui();
   return (
     <CollapsibleSection
-      heading="Preflight"
+      heading={t`Preflight`}
       count={report?.passes.length}
       hasContent={!!report && report.passes.length > 0}
       forceOpen={loading || !!error || !report}
     >
       {!project ? (
         <p className="text-muted-foreground text-sm">
-          No project is open yet, so there is nothing compiled to check.
+          <Trans>
+            No project is open yet, so there is nothing compiled to check.
+          </Trans>
         </p>
       ) : error ? (
         <p className="text-destructive text-sm">
-          The preflight check could not run: {error}
+          <Trans>The preflight check could not run: {error}</Trans>
         </p>
       ) : report ? (
         <div className="flex flex-col gap-3">
           <PreflightGroup
-            heading="Passed"
+            heading={t`Passed`}
             lines={report.passes}
             className="border-border/60 bg-muted/40 text-muted-foreground"
           />
@@ -565,13 +602,16 @@ function PreflightSection({
             report.review.length === 0 &&
             report.passes.length === 0 && (
               <p className="text-muted-foreground text-sm">
-                This project changes nothing yet, so there is nothing to check.
+                <Trans>
+                  This project changes nothing yet, so there is nothing to
+                  check.
+                </Trans>
               </p>
             )}
         </div>
       ) : (
         <p className="text-muted-foreground text-sm">
-          {loading ? "Checking…" : "Nothing has been checked yet."}
+          {loading ? t`Checking…` : t`Nothing has been checked yet.`}
         </p>
       )}
     </CollapsibleSection>
@@ -582,16 +622,17 @@ function PreflightSection({
  *  description: the file(s) it reached, the tweak slot when the trace could
  *  place it, and the reason when it could not reach anything at all. */
 function ChangeDestination({ change }: { change: LedgerChange }) {
+  const { t } = useLingui();
   const parts: string[] = [...change.files];
   if (change.tweakSlot) parts.push(`!bset ${change.tweakSlot.label}`);
   else if (change.tweakMiss === "oversized")
-    parts.push("too big for any tweak slot");
+    parts.push(t`too big for any tweak slot`);
   else if (change.tweakMiss === "unplaced")
-    parts.push("no tweak slot left to hold it");
+    parts.push(t`no tweak slot left to hold it`);
   else if (change.tweakMiss === "unresolved")
-    parts.push("tweak slot not traced for this project");
+    parts.push(t`tweak slot not traced for this project`);
   else if (change.tweakMiss === "noSlotForWords")
-    parts.push("no tweak slot can carry words");
+    parts.push(t`no tweak slot can carry words`);
   if (change.uncompiledReason) parts.push(change.uncompiledReason);
   if (parts.length === 0) return null;
   return (
@@ -651,13 +692,14 @@ function ChangeLedgerSection({
   loading: boolean;
   error: string | null;
 }) {
+  const { t } = useLingui();
   const [view, setView] = useState<"unit" | "output">("unit");
   const units = ledger?.units.filter((u) => u.changes.length > 0) ?? [];
   const totalChanges = units.reduce((n, u) => n + u.changes.length, 0);
 
   return (
     <CollapsibleSection
-      heading="Change ledger"
+      heading={t`Change ledger`}
       count={totalChanges}
       hasContent={totalChanges > 0}
       forceOpen={loading || !!error || !ledger}
@@ -670,28 +712,30 @@ function ChangeLedgerSection({
             size="sm"
             value={view}
             onValueChange={(v) => v && setView(v as "unit" | "output")}
-            aria-label="Group the change ledger by"
+            aria-label={t`Group the change ledger by`}
           >
-            <ToggleGroupItem value="unit">By unit</ToggleGroupItem>
-            <ToggleGroupItem value="output">By output</ToggleGroupItem>
+            <ToggleGroupItem value="unit">{t`By unit`}</ToggleGroupItem>
+            <ToggleGroupItem value="output">{t`By output`}</ToggleGroupItem>
           </ToggleGroup>
         </div>
       )}
       {!projectId ? (
         <p className="text-muted-foreground text-sm">
-          No project is open yet, so there is nothing to trace.
+          <Trans>No project is open yet, so there is nothing to trace.</Trans>
         </p>
       ) : error ? (
         <p className="text-destructive text-sm">
-          The change ledger could not be built: {error}
+          <Trans>The change ledger could not be built: {error}</Trans>
         </p>
       ) : !ledger ? (
         <p className="text-muted-foreground text-sm">
-          {loading ? "Tracing…" : "Not traced yet."}
+          {loading ? t`Tracing…` : t`Not traced yet.`}
         </p>
       ) : totalChanges === 0 ? (
         <p className="text-muted-foreground text-sm">
-          This project changes nothing yet, so there is nothing to trace.
+          <Trans>
+            This project changes nothing yet, so there is nothing to trace.
+          </Trans>
         </p>
       ) : view === "unit" ? (
         <ul className="flex flex-col gap-2">
@@ -778,9 +822,9 @@ function verdict(
   if (blockers === 0 && review === 0 && diagnostics === 0) return null;
   const parts: string[] = [];
   if (blockers > 0)
-    parts.push(`${blockers} blocker${blockers === 1 ? "" : "s"}`);
+    parts.push(plural(blockers, { one: "# blocker", other: "# blockers" }));
   const rest = review + diagnostics;
-  if (rest > 0) parts.push(`${rest} to review`);
+  if (rest > 0) parts.push(coreT`${rest} to review`);
   return parts.join(", ");
 }
 
@@ -852,6 +896,7 @@ export function useProjectChecks(input: ChecksInput, reading: boolean) {
   } = input;
   // Read whenever a project is open, not only while the page is up: see the
   // module doc comment for why the verdict needs a live answer.
+  const { t } = useLingui();
   const preflight = usePreflightReport(project, true);
   const changeLedger = useChangeLedger(project, reading);
   // Also live, for the same reason preflight is: the post-processing check
@@ -901,13 +946,14 @@ export function useProjectChecks(input: ChecksInput, reading: boolean) {
   const clean = !checking && !attention;
 
   const found = verdict(blockers, review, diagnostics);
+  const preflightError = preflight.error;
   const summary = checking
-    ? "Checking the project"
+    ? t`Checking the project`
     : preflightFailed
-      ? `Preflight could not run: ${preflight.error}`
+      ? t`Preflight could not run: ${preflightError}`
       : found
-        ? `${found} found`
-        : "No problems found";
+        ? t`${found} found`
+        : t`No problems found`;
 
   return {
     preflight,
@@ -1066,14 +1112,13 @@ function buildAttention({
   }
 
   if (postHook.state?.kind === "covered") {
-    const state = postHook.state;
+    const archive = postHook.state.archive;
     blockers.push({
       key: "post-hook-covered",
-      text: `${
-        state.archive === primaryArchive
-          ? `${gameName} post-processes its own units in ${POST_FILE}.`
-          : `${gameName} inherits a ${POST_FILE} from ${state.archive}.`
-      } This project's mutator writes a file at that path, which takes its place. The engine's definition parser gives a mutator no way to run the file it covered, so playing this mutator skips whatever ${gameName} does there, from a few missing values to a game that does not start. Deliver it through the tweak slots instead, if this game has them.`,
+      text:
+        archive === primaryArchive
+          ? coreT`${gameName} post-processes its own units in ${POST_FILE}. This project's mutator writes a file at that path, which takes its place. The engine's definition parser gives a mutator no way to run the file it covered, so playing this mutator skips whatever ${gameName} does there, from a few missing values to a game that does not start. Deliver it through the tweak slots instead, if this game has them.`
+          : coreT`${gameName} inherits a ${POST_FILE} from ${archive}. This project's mutator writes a file at that path, which takes its place. The engine's definition parser gives a mutator no way to run the file it covered, so playing this mutator skips whatever ${gameName} does there, from a few missing values to a game that does not start. Deliver it through the tweak slots instead, if this game has them.`,
     });
   }
 
@@ -1147,10 +1192,13 @@ export function ChecksPanel({
   return (
     <div className="flex max-w-3xl flex-col gap-5">
       <p className="max-w-prose text-sm text-muted-foreground">
-        Whether {gameName} is in a fit state to use: the game's own definitions,
-        whether the project still fits them, how an edit reaches it, what a
-        mutator would cover of the game's own post-processing, what is wrong
-        with what you have written, and which output each edit ended up in.
+        <Trans>
+          Whether {gameName} is in a fit state to use: the game's own
+          definitions, whether the project still fits them, how an edit reaches
+          it, what a mutator would cover of the game's own post-processing, what
+          is wrong with what you have written, and which output each edit ended
+          up in.
+        </Trans>
       </p>
       <AttentionSection blockers={attention.blockers} review={review} />
       <UnitsyncSection errorCount={diagnosticErrors.length} />

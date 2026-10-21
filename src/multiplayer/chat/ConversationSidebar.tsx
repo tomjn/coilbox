@@ -1,3 +1,4 @@
+import { Trans, useLingui } from "@lingui/react/macro";
 import { Button, cn } from "@picoframe/frame";
 import {
   Bot,
@@ -74,12 +75,13 @@ function FavStar({
   active: boolean;
   onToggle: () => void;
 }) {
+  const { t } = useLingui();
   return (
     <button
       type="button"
       onClick={onToggle}
       aria-label={
-        active ? `Remove ${name} from friends` : `Add ${name} to friends`
+        active ? t`Remove ${name} from friends` : t`Add ${name} to friends`
       }
       aria-pressed={active}
       className={cn(
@@ -106,8 +108,9 @@ function FollowAction({
   name: string;
   className: string;
 }) {
+  const { t } = useLingui();
   const following = isFollowing(useFollow(), serverKey, name);
-  const label = following ? `Unfollow ${name}` : `Follow ${name}`;
+  const label = following ? t`Unfollow ${name}` : t`Follow ${name}`;
   return (
     <button
       type="button"
@@ -117,7 +120,7 @@ function FollowAction({
       title={
         following
           ? label
-          : `${label}: join the battles they join and leave when they leave`
+          : t`${label}: join the battles they join and leave when they leave`
       }
       className={cn(
         "absolute top-1/2 flex size-6 -translate-y-1/2 items-center justify-center rounded hover:bg-muted-foreground/10 hover:text-foreground focus-visible:opacity-100 group-hover:opacity-100",
@@ -181,6 +184,7 @@ function ConnectionGroup({
   onSelect: (serverKey: string, d: ConversationDescriptor) => void;
   onBrowse: (serverKey: string) => void;
 }) {
+  const { t } = useLingui();
   const { unreadFor } = useMultiplayer();
   const connection = useConnection(serverKey);
   const servers = useProtocolServers();
@@ -198,6 +202,8 @@ function ConnectionGroup({
   const { get: getNote, set: setNote } = useNoteActions(serverKey);
   const state = connection?.mirror.state;
   const me = state?.myUsername ?? null;
+  const headingUser = usernameFromKey(serverKey);
+  const headingServer = serverNameFor(serverKey, servers);
 
   // Friends starred on this client for this connection. Offline ones still
   // show so you can jump to a past conversation.
@@ -266,12 +272,14 @@ function ConnectionGroup({
             divided && "mt-2 border-t border-border",
           )}
         >
-          {usernameFromKey(serverKey)} on {serverNameFor(serverKey, servers)}
+          <Trans>
+            {headingUser} on {headingServer}
+          </Trans>
         </div>
       )}
 
       {currentBattle && battleChannel && (
-        <Section title="Battle">
+        <Section title={t`Battle`}>
           <ul className="flex flex-col gap-0.5 px-2">
             {(() => {
               const desc: ConversationDescriptor = {
@@ -290,7 +298,7 @@ function ConnectionGroup({
                   >
                     <Swords className="size-4 shrink-0 text-muted-foreground" />
                     <span className="truncate">
-                      {currentBattle.title || `Battle ${currentBattle.id}`}
+                      {currentBattle.title || t`Battle ${currentBattle.id}`}
                     </span>
                     <Badge n={unreadBadge(id, msgs)} />
                   </button>
@@ -303,18 +311,20 @@ function ConnectionGroup({
 
       {!hasChannels && (
         <p className="px-3 py-2 text-xs text-muted-foreground">
-          This server has direct messages and battle chat, but no channels.
+          <Trans>
+            This server has direct messages and battle chat, but no channels.
+          </Trans>
         </p>
       )}
 
       {hasChannels && (
         <Section
-          title="Channels"
+          title={t`Channels`}
           action={
             <Button
               variant="secondary"
               onClick={() => onBrowse(serverKey)}
-              aria-label="Browse channels"
+              aria-label={t`Browse channels`}
               className="h-7 px-2"
             >
               <Plus className="size-4" />
@@ -351,7 +361,7 @@ function ConnectionGroup({
             })}
             {channels.length === 0 && (
               <li className="px-2 py-1.5 text-xs text-muted-foreground">
-                No channels joined. Browse to join one.
+                <Trans>No channels joined. Browse to join one.</Trans>
               </li>
             )}
           </ul>
@@ -361,7 +371,7 @@ function ConnectionGroup({
       {hasParties && <PartySection serverKey={serverKey} />}
 
       {(friendNames.length > 0 || friendRequests.length > 0) && (
-        <Section title="Friends">
+        <Section title={t`Friends`}>
           {friendRequests.length > 0 && (
             <ul className="flex flex-col gap-1 px-2 pb-1">
               {friendRequests.map((name) => (
@@ -372,7 +382,7 @@ function ConnectionGroup({
                   <UserPlus className="size-4 shrink-0 text-muted-foreground" />
                   <span
                     className="truncate"
-                    title={`${name} wants to be friends`}
+                    title={t`${name} wants to be friends`}
                   >
                     {name}
                   </span>
@@ -380,7 +390,7 @@ function ConnectionGroup({
                     <Button
                       variant="secondary"
                       onClick={() => acceptRequest(name)}
-                      aria-label={`Accept friend request from ${name}`}
+                      aria-label={t`Accept friend request from ${name}`}
                       className="h-6 px-2"
                     >
                       <Check className="size-4" />
@@ -388,7 +398,7 @@ function ConnectionGroup({
                     <Button
                       variant="secondary"
                       onClick={() => declineRequest(name)}
-                      aria-label={`Decline friend request from ${name}`}
+                      aria-label={t`Decline friend request from ${name}`}
                       className="h-6 px-2"
                     >
                       <X className="size-4" />
@@ -439,7 +449,7 @@ function ConnectionGroup({
       )}
 
       <Section
-        title="Direct messages"
+        title={t`Direct messages`}
         action={
           <UserPicker
             serverKey={serverKey}
@@ -470,7 +480,7 @@ function ConnectionGroup({
                     {bot ? (
                       <Bot
                         className="size-4 shrink-0 text-muted-foreground"
-                        aria-label="Bot"
+                        aria-label={t`Bot`}
                       />
                     ) : (
                       <MessageSquare className="size-4 shrink-0 text-muted-foreground" />
@@ -499,7 +509,9 @@ function ConnectionGroup({
           })}
           {peers.length === 0 && (
             <li className="px-2 py-1.5 text-xs text-muted-foreground">
-              No direct messages. Use + to message an online user.
+              <Trans>
+                No direct messages. Use + to message an online user.
+              </Trans>
             </li>
           )}
         </ul>
@@ -522,6 +534,7 @@ function AllFriendsSection({
   onSelect: (serverKey: string, d: ConversationDescriptor) => void;
 }) {
   const { connections } = useMultiplayer();
+  const { t } = useLingui();
   const servers = useProtocolServers();
   const [favourites] = useFavourites();
   const states: Record<string, LobbyState | null> = {};
@@ -531,50 +544,54 @@ function AllFriendsSection({
   const entries = mergeFriends(favourites, states);
   if (new Set(entries.map((e) => e.serverKey)).size < 2) return null;
   return (
-    <Section title="All friends">
+    <Section title={t`All friends`}>
       <ul className="flex flex-col gap-0.5 px-2">
-        {entries.map((e) => (
-          <FriendRow
-            key={`${e.serverKey}:${e.name}`}
-            name={e.name}
-            status={e.status}
-            battle={e.battle}
-            serverLabel={serverNameFor(e.serverKey, servers)}
-            serverTitle={
-              e.status === "unknown"
-                ? `Not connected as ${usernameFromKey(e.serverKey)} on ${serverNameFor(e.serverKey, servers)}`
-                : `${usernameFromKey(e.serverKey)} on ${serverNameFor(e.serverKey, servers)}`
-            }
-            serverFriend={e.serverFriend}
-            disabled={e.status === "unknown"}
-            battleAction={
-              e.battle && (
-                <FriendBattleButton
+        {entries.map((e) => {
+          const user = usernameFromKey(e.serverKey);
+          const server = serverNameFor(e.serverKey, servers);
+          return (
+            <FriendRow
+              key={`${e.serverKey}:${e.name}`}
+              name={e.name}
+              status={e.status}
+              battle={e.battle}
+              serverLabel={server}
+              serverTitle={
+                e.status === "unknown"
+                  ? t`Not connected as ${user} on ${server}`
+                  : t`${user} on ${server}`
+              }
+              serverFriend={e.serverFriend}
+              disabled={e.status === "unknown"}
+              battleAction={
+                e.battle && (
+                  <FriendBattleButton
+                    serverKey={e.serverKey}
+                    status={e.status}
+                    battleId={e.battle.id}
+                  />
+                )
+              }
+              active={
+                active?.serverKey === e.serverKey &&
+                convId(active.desc) === `dm:${e.name}`
+              }
+              onOpen={() => onSelect(e.serverKey, { kind: "dm", peer: e.name })}
+            >
+              {/* Nothing can be done on a server that is not connected. */}
+              {e.status !== "unknown" && (
+                <FriendMenu serverKey={e.serverKey} name={e.name} />
+              )}
+              {e.status !== "unknown" && (
+                <FollowAction
                   serverKey={e.serverKey}
-                  status={e.status}
-                  battleId={e.battle.id}
+                  name={e.name}
+                  className="right-9"
                 />
-              )
-            }
-            active={
-              active?.serverKey === e.serverKey &&
-              convId(active.desc) === `dm:${e.name}`
-            }
-            onOpen={() => onSelect(e.serverKey, { kind: "dm", peer: e.name })}
-          >
-            {/* Nothing can be done on a server that is not connected. */}
-            {e.status !== "unknown" && (
-              <FriendMenu serverKey={e.serverKey} name={e.name} />
-            )}
-            {e.status !== "unknown" && (
-              <FollowAction
-                serverKey={e.serverKey}
-                name={e.name}
-                className="right-9"
-              />
-            )}
-          </FriendRow>
-        ))}
+              )}
+            </FriendRow>
+          );
+        })}
       </ul>
     </Section>
   );
@@ -628,7 +645,7 @@ export function ConversationSidebar({
           onClick={() => navigate("/chatlogs")}
         >
           <History className="size-4" />
-          Chat logs
+          <Trans>Chat logs</Trans>
         </Button>
       </div>
     </nav>

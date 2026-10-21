@@ -17,6 +17,7 @@
  * Pure, so the words and the rule can be tested without a room.
  */
 
+import { plural, t } from "@lingui/core/macro";
 import type { MemberRow } from "./config";
 
 /**
@@ -52,12 +53,16 @@ export function unsyncedPlayers(rows: MemberRow[]): string[] {
 export function startAnywayWarning(names: string[]): string | null {
   if (names.length === 0) return null;
   const who = nameList(names);
-  const have = names.length === 1 ? "does not have" : "do not have";
-  return `${who} ${have} this battle's map or game. Start now and the match runs without them.`;
+  return plural(names.length, {
+    one: `${who} does not have this battle's map or game. Start now and the match runs without them.`,
+    other: `${who} do not have this battle's map or game. Start now and the match runs without them.`,
+  });
 }
 
 /** "Bob", "Bob and Carol", "Bob, Carol and Dave". */
 function nameList(names: string[]): string {
   if (names.length === 1) return names[0];
-  return `${names.slice(0, -1).join(", ")} and ${names[names.length - 1]}`;
+  const rest = names.slice(0, -1).join(", ");
+  const last = names[names.length - 1];
+  return t`${rest} and ${last}`;
 }

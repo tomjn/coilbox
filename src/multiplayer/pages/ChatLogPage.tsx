@@ -1,3 +1,4 @@
+import { Trans, useLingui } from "@lingui/react/macro";
 import { Input } from "@picoframe/frame";
 import { Hash, MessageSquare, Search, Swords, User } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
@@ -33,6 +34,7 @@ function fmtTime(ms: number): string {
  * chat so they read identically.
  */
 export default function ChatLogPage() {
+  const { t } = useLingui();
   const [accounts, setAccounts] = useState<ChatLogAccount[]>([]);
   const [selection, setSelection] = useState<Selection | null>(null);
   const [messages, setMessages] = useState<ChatMsg[]>([]);
@@ -50,11 +52,11 @@ export default function ChatLogPage() {
       ),
     [connections],
   );
-  const labelFor = (account: string, t: ChatLogThread) =>
-    threadLabel(t, account, liveStates);
-  const iconFor = (t: ChatLogThread) =>
-    t.kind === "channel" ? (
-      isBattleChannel(t.name) ? (
+  const labelFor = (account: string, th: ChatLogThread) =>
+    threadLabel(th, account, liveStates);
+  const iconFor = (th: ChatLogThread) =>
+    th.kind === "channel" ? (
+      isBattleChannel(th.name) ? (
         <Swords className="size-4 shrink-0 text-muted-foreground" />
       ) : (
         <Hash className="size-4 shrink-0 text-muted-foreground" />
@@ -111,9 +113,13 @@ export default function ChatLogPage() {
   return (
     <main className="flex h-full min-h-0 flex-col">
       <div className="border-b border-border px-4 py-3">
-        <h1 className="text-base font-semibold">Chat logs</h1>
+        <h1 className="text-base font-semibold">
+          <Trans>Chat logs</Trans>
+        </h1>
         <p className="text-xs text-muted-foreground">
-          Past direct messages and channel conversations saved on this device.
+          <Trans>
+            Past direct messages and channel conversations saved on this device.
+          </Trans>
         </p>
       </div>
 
@@ -128,8 +134,10 @@ export default function ChatLogPage() {
         <nav className="min-h-0 space-y-4 overflow-y-auto border-r border-border p-3">
           {!hasLogs ? (
             <p className="px-1 py-8 text-center text-sm text-muted-foreground">
-              No chat logs yet. Conversations you have while connected are saved
-              here.
+              <Trans>
+                No chat logs yet. Conversations you have while connected are
+                saved here.
+              </Trans>
             </p>
           ) : (
             accounts.map((acc) => (
@@ -138,26 +146,26 @@ export default function ChatLogPage() {
                   {accountLabel(acc.account, servers)}
                 </h2>
                 <ul className="flex flex-col gap-0.5">
-                  {acc.threads.map((t) => {
+                  {acc.threads.map((th) => {
                     const active =
                       selection?.account === acc.account &&
-                      selection.thread.kind === t.kind &&
-                      selection.thread.name === t.name;
+                      selection.thread.kind === th.kind &&
+                      selection.thread.name === th.name;
                     return (
-                      <li key={`${t.kind}:${t.name}`}>
+                      <li key={`${th.kind}:${th.name}`}>
                         <button
                           type="button"
                           onClick={() =>
-                            setSelection({ account: acc.account, thread: t })
+                            setSelection({ account: acc.account, thread: th })
                           }
                           className={`flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${active ? "bg-accent text-accent-foreground" : "hover:bg-accent/50"}`}
                         >
-                          {iconFor(t)}
+                          {iconFor(th)}
                           <span className="min-w-0 flex-1 truncate">
-                            {labelFor(acc.account, t)}
+                            {labelFor(acc.account, th)}
                           </span>
                           <span className="shrink-0 text-xs text-muted-foreground">
-                            {t.messageCount}
+                            {th.messageCount}
                           </span>
                         </button>
                       </li>
@@ -185,7 +193,7 @@ export default function ChatLogPage() {
                   <Input
                     value={query}
                     onChange={(e) => setQuery(e.target.value)}
-                    placeholder="Search this log"
+                    placeholder={t`Search this log`}
                     className="h-8 pl-8"
                   />
                 </div>
@@ -193,13 +201,13 @@ export default function ChatLogPage() {
               <div className="min-h-0 flex-1 overflow-y-auto px-4 py-3">
                 {loading ? (
                   <p className="py-8 text-center text-sm text-muted-foreground">
-                    Loading…
+                    <Trans>Loading…</Trans>
                   </p>
                 ) : filtered.length === 0 ? (
                   <p className="py-8 text-center text-sm text-muted-foreground">
                     {messages.length === 0
-                      ? "This log is empty."
-                      : "No lines match your search."}
+                      ? t`This log is empty.`
+                      : t`No lines match your search.`}
                   </p>
                 ) : (
                   <ul className="flex flex-col gap-1.5">
@@ -232,7 +240,9 @@ export default function ChatLogPage() {
           ) : (
             <div className="flex flex-1 flex-col items-center justify-center gap-2 text-muted-foreground">
               <MessageSquare className="size-8" />
-              <p className="text-sm">Select a conversation to read it.</p>
+              <p className="text-sm">
+                <Trans>Select a conversation to read it.</Trans>
+              </p>
             </div>
           )}
         </section>

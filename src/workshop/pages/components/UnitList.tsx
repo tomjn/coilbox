@@ -46,6 +46,8 @@
  * carries the grammar and the alias table. A query that does not parse shows
  * its own error here rather than matching nothing silently.
  */
+import { plural } from "@lingui/core/macro";
+import { Trans, useLingui } from "@lingui/react/macro";
 import { cn, Input } from "@picoframe/frame";
 import { TriangleAlert } from "lucide-react";
 import {
@@ -182,6 +184,7 @@ export function UnitList({
   markerOf?: (key: string) => CheckMarker | undefined;
   onSelect: (key: string) => void;
 }) {
+  const { t } = useLingui();
   const [query, setQuery] = useState("");
   const [factionFilter, setFactionFilter] = useState(ALL_FACTIONS);
   const [changedOnly, setChangedOnly] = useState(false);
@@ -421,26 +424,27 @@ export function UnitList({
   // and only the rows scroll, so the count still answers "of how many" after
   // you have scrolled a long way down. Below `lg` the two panes stack and the
   // page scrolls as one, so the column is capped rather than stretched.
+  const shown = rows.length;
   return (
     <div className="flex min-h-0 flex-col gap-2 lg:h-full">
       <Input
         type="search"
         value={query}
         onChange={(e) => setQuery(e.target.value)}
-        placeholder="Search units…"
-        aria-label="Search units"
+        placeholder={t`Search units…`}
+        aria-label={t`Search units`}
         className="h-9 shrink-0"
       />
       <div className="flex shrink-0 flex-wrap items-center gap-2">
         {factions.length > 0 && (
           <OptionSelect
             size="sm"
-            ariaLabel="Filter units by faction"
+            ariaLabel={t`Filter units by faction`}
             className="w-auto flex-1"
             value={factionFilter}
             onValueChange={setFactionFilter}
             options={[
-              { value: ALL_FACTIONS, label: "All factions" },
+              { value: ALL_FACTIONS, label: t`All factions` },
               ...factions.map((faction) => ({
                 value: faction,
                 label: faction,
@@ -450,13 +454,13 @@ export function UnitList({
         )}
         <OptionSelect
           size="sm"
-          ariaLabel="Filter units by changes"
+          ariaLabel={t`Filter units by changes`}
           className="w-auto flex-1"
           value={changedOnly ? "changed" : "all"}
           onValueChange={(v) => setChangedOnly(v === "changed")}
           options={[
-            { value: "all", label: "All units" },
-            { value: "changed", label: "Changed only" },
+            { value: "all", label: t`All units` },
+            { value: "changed", label: t`Changed only` },
           ]}
         />
       </div>
@@ -470,12 +474,12 @@ export function UnitList({
           {!parsedQuery.ok
             ? parsedQuery.error
             : needle
-              ? `No unit matches "${needle}".`
+              ? t`No unit matches "${needle}".`
               : factionFilter !== ALL_FACTIONS || changedOnly
-                ? "No unit matches this filter."
+                ? t`No unit matches this filter.`
                 : restrictTo
-                  ? "This collection has no units in it yet."
-                  : 'No unit matches "".'}
+                  ? t`This collection has no units in it yet.`
+                  : t`No unit matches "".`}
         </p>
       ) : (
         <div
@@ -501,6 +505,8 @@ export function UnitList({
                 const off = isUnitDisabled(disabled, u.key);
                 const faction = factionOf(u.key);
                 const marker = markerOf?.(u.key);
+                const projectName = builtBy?.[u.key]?.projectName;
+                const cloneSource = clone?.source;
                 return (
                   // The position and the total are said out loud, because a
                   // list that only has 30 of its rows in the DOM would
@@ -554,9 +560,9 @@ export function UnitList({
                         {off && (
                           <span
                             className="rounded-full bg-muted px-1.5 text-[10px] font-medium text-muted-foreground"
-                            title="Disabled: taken off every build menu in the game when this is compiled"
+                            title={t`Disabled: taken off every build menu in the game when this is compiled`}
                           >
-                            off
+                            <Trans>off</Trans>
                           </span>
                         )}
                         {/* A unit out of the lego builder is marked as built
@@ -574,11 +580,15 @@ export function UnitList({
                             }
                             title={
                               builtBy[u.key].stale
-                                ? `Left behind when ${builtBy[u.key].projectName} was renamed. Its files are still in this game, so the game has two units. Clear them in the unit builder's export drawer.`
-                                : `Built in the unit builder as ${builtBy[u.key].projectName} and exported into this game`
+                                ? t`Left behind when ${projectName} was renamed. Its files are still in this game, so the game has two units. Clear them in the unit builder's export drawer.`
+                                : t`Built in the unit builder as ${projectName} and exported into this game`
                             }
                           >
-                            {builtBy[u.key].stale ? "stale" : "built"}
+                            {builtBy[u.key].stale ? (
+                              <Trans>stale</Trans>
+                            ) : (
+                              <Trans>built</Trans>
+                            )}
                           </span>
                         ) : (
                           clone && (
@@ -586,26 +596,36 @@ export function UnitList({
                               className="rounded-full border border-border px-1.5 text-[10px] font-medium text-muted-foreground"
                               title={
                                 clone.replacesGameUnit
-                                  ? `Your copy of ${clone.source}, standing in for the game's own`
-                                  : `A unit you added, copied from ${clone.source}`
+                                  ? t`Your copy of ${cloneSource}, standing in for the game's own`
+                                  : t`A unit you added, copied from ${cloneSource}`
                               }
                             >
-                              {clone.replacesGameUnit ? "replaced" : "added"}
+                              {clone.replacesGameUnit ? (
+                                <Trans>replaced</Trans>
+                              ) : (
+                                <Trans>added</Trans>
+                              )}
                             </span>
                           )
                         )}
                         {menuEdits > 0 && (
                           <span
                             className="rounded-full bg-primary/15 px-1.5 text-[10px] font-medium text-primary"
-                            title={`Build menu changed, ${menuEdits} edit${menuEdits === 1 ? "" : "s"}`}
+                            title={plural(menuEdits, {
+                              one: "Build menu changed, # edit",
+                              other: "Build menu changed, # edits",
+                            })}
                           >
-                            menu
+                            <Trans>menu</Trans>
                           </span>
                         )}
                         {edits > 0 && (
                           <span
                             className="rounded-full bg-primary/15 px-1.5 text-[10px] font-medium text-primary"
-                            title={`${edits} field${edits === 1 ? "" : "s"} changed`}
+                            title={plural(edits, {
+                              one: "# field changed",
+                              other: "# fields changed",
+                            })}
                           >
                             {edits}
                           </span>
@@ -636,8 +656,11 @@ export function UnitList({
         say whether the game has 12 or 564. */}
       <p className="shrink-0 text-xs text-muted-foreground">
         {needle
-          ? `${rows.length} of ${all.length} units`
-          : `${all.length} unit${all.length === 1 ? "" : "s"}`}
+          ? plural(all.length, {
+              one: `${shown} of # unit`,
+              other: `${shown} of # units`,
+            })
+          : plural(all.length, { one: "# unit", other: "# units" })}
       </p>
     </div>
   );

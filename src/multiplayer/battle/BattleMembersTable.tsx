@@ -1,3 +1,4 @@
+import { Trans, useLingui } from "@lingui/react/macro";
 import { Button } from "@picoframe/frame";
 import { ChevronUp, Percent, StickyNote } from "lucide-react";
 import { useEffect, useState } from "react";
@@ -158,6 +159,7 @@ export function BattleMembersTable({
    * `useNameMark` on this battle's connection (issue #336). */
   markFor?: (name: string) => NameMark | null;
 }) {
+  const { t } = useLingui();
   const justWentIngame = useConnection(serverKey)?.justWentIngame ?? NO_NAMES;
   // The AI the host will add next; defaults to the first available.
   const [chosenAi, setChosenAi] = useState("");
@@ -296,13 +298,14 @@ export function BattleMembersTable({
   );
   const teamOptions = range(teamSlots).map((i) => {
     const leader = leaderByTeamId.get(i);
+    const position = i + 1;
     return {
       value: String(i),
       label: String(i + 1),
       // Under fixed start positions the team number *is* the spawn choice — say
       // so in the picker, since nothing else in the room links the two (#456).
       description:
-        startPosType === 0 ? `Spawns at map position ${i + 1}` : undefined,
+        startPosType === 0 ? t`Spawns at map position ${position}` : undefined,
       // Taken teams show their leader's colour in the open dropdown; an unused
       // slot keeps a blank spacer so the numbers stay aligned.
       icon: (
@@ -347,13 +350,13 @@ export function BattleMembersTable({
         size="sm"
         className="w-auto min-w-40"
         placeholder={
-          addableAis.length > 0 ? "Select an AI" : "No AIs installed"
+          addableAis.length > 0 ? t`Select an AI` : t`No AIs installed`
         }
       />
       {showFaction && !serverAssignsSeat && (
         <OptionSelect
           value={chosenSide}
-          ariaLabel="Faction for the new AI"
+          ariaLabel={t`Faction for the new AI`}
           disabled={!canAddBot}
           onValueChange={setChosenSide}
           options={sideOptions}
@@ -369,7 +372,7 @@ export function BattleMembersTable({
           onAddBot(chosenAi, showFaction ? Number(chosenSide) : undefined)
         }
       >
-        Add
+        <Trans>Add</Trans>
       </Button>
     </>
   );
@@ -387,54 +390,68 @@ export function BattleMembersTable({
           <TooltipProvider>
             <TableRow className="text-[11px] uppercase tracking-wide text-muted-foreground border-border/40 hover:bg-transparent">
               <TableHead className="px-3 pb-2 pt-3 text-center font-medium text-muted-foreground">
-                Ready
+                <Trans>Ready</Trans>
               </TableHead>
               <TableHead className="w-full px-3 pb-2 pt-3 text-left font-medium text-muted-foreground">
-                Player
+                <Trans>Player</Trans>
               </TableHead>
               <TableHead className="px-2 pb-2 pt-3 text-center font-medium text-muted-foreground">
                 <Tooltip>
                   <TooltipTrigger className="inline-flex items-center rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
                     <ChevronUp className="size-3.5" aria-hidden />
-                    <span className="sr-only">Rank</span>
+                    <span className="sr-only">
+                      <Trans>Rank</Trans>
+                    </span>
                   </TooltipTrigger>
-                  <TooltipContent>Rank</TooltipContent>
+                  <TooltipContent>
+                    <Trans>Rank</Trans>
+                  </TooltipContent>
                 </Tooltip>
               </TableHead>
               <TableHead className="px-2 pb-2 pt-3 text-center font-medium text-muted-foreground">
                 <Tooltip>
                   <TooltipTrigger className="inline-flex items-center rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
                     <StickyNote className="size-3.5" aria-hidden />
-                    <span className="sr-only">Note</span>
+                    <span className="sr-only">
+                      <Trans>Note</Trans>
+                    </span>
                   </TooltipTrigger>
-                  <TooltipContent>Private note</TooltipContent>
+                  <TooltipContent>
+                    <Trans>Private note</Trans>
+                  </TooltipContent>
                 </Tooltip>
               </TableHead>
               <TableHead className="px-2 pb-2 pt-3 text-center font-medium text-muted-foreground">
                 <Tooltip>
                   <TooltipTrigger className="inline-flex items-center rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
                     <Percent className="size-3.5" aria-hidden />
-                    <span className="sr-only">Bonus</span>
+                    <span className="sr-only">
+                      <Trans>Bonus</Trans>
+                    </span>
                   </TooltipTrigger>
-                  <TooltipContent>Resource bonus</TooltipContent>
+                  <TooltipContent>
+                    <Trans>Resource bonus</Trans>
+                  </TooltipContent>
                 </Tooltip>
               </TableHead>
               {showFaction && (
                 <TableHead className="px-2 pb-2 pt-3 text-left font-medium text-muted-foreground">
-                  Faction
+                  <Trans>Faction</Trans>
                 </TableHead>
               )}
               {showTeam && (
                 <TableHead className="px-2 pb-2 pt-3 text-left font-medium text-muted-foreground">
-                  Team
+                  <Trans>Team</Trans>
                 </TableHead>
               )}
               <TableHead className="px-2 pb-2 pt-3 text-left font-medium text-muted-foreground">
-                Ally
+                <Trans>Ally</Trans>
               </TableHead>
               {showActions && (
                 <TableHead className="px-2 pb-2 pt-3">
-                  <span className="sr-only">Actions</span>
+                  <span className="sr-only">
+                    <Trans>Actions</Trans>
+                  </span>
                 </TableHead>
               )}
             </TableRow>
@@ -516,7 +533,7 @@ export function BattleMembersTable({
                 colSpan={showActions ? 9 : 8}
                 className="px-3 py-6 text-center text-sm text-muted-foreground"
               >
-                Waiting for players…
+                <Trans>Waiting for players…</Trans>
               </TableCell>
             </TableRow>
           )}
@@ -526,7 +543,7 @@ export function BattleMembersTable({
       {spectators.length > 0 && (
         <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5 border-t border-border/40 px-3 py-2">
           <span className="text-xs font-medium text-muted-foreground">
-            Spectating
+            <Trans>Spectating</Trans>
           </span>
           {spectators.map((row) => {
             const control = controlFor(row);
@@ -567,7 +584,7 @@ export function BattleMembersTable({
       {(canAddBot || botsRefused) && (
         <div className="sticky bottom-0 flex items-center gap-2 border-t border-border/40 bg-card p-2">
           <span className="text-xs font-medium text-muted-foreground">
-            Add AI
+            <Trans>Add AI</Trans>
           </span>
           {canAddBot ? (
             addAiControls

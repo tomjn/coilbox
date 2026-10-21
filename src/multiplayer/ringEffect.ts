@@ -1,3 +1,4 @@
+import { t } from "@lingui/core/macro";
 import { announce, flashTaskbar } from "@/sound/context";
 import type { EventId } from "@/sound/events";
 import { playEvent } from "@/sound/play";
@@ -52,7 +53,7 @@ export function triggerAttention(event: EventId, announcement: string) {
  * `from` is the ringing user (usually the autohost).
  */
 export function triggerRing(from?: string) {
-  triggerAttention("ring", from ? `Rung by ${from}` : "Rung by the host");
+  triggerAttention("ring", from ? t`Rung by ${from}` : t`Rung by the host`);
 }
 
 // Dev-only hook so the effect can be exercised from devtools / tauri-mcp `execute_js`

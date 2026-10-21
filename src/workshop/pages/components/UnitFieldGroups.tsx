@@ -18,6 +18,8 @@
  * content padding from the caller: a unit shows a few dozen of them at once and
  * 260 or so in the all view.
  */
+import { plural } from "@lingui/core/macro";
+import { Trans, useLingui } from "@lingui/react/macro";
 import {
   Box,
   Braces,
@@ -142,10 +144,11 @@ export function UnitFieldGroups({
   /** The field row's toggle between a rule and a fixed number (issue #3175). */
   onToggleRelative?: (row: FieldRow) => void;
 }) {
+  const { t } = useLingui();
   if (view.groups.length === 0)
     return (
       <p className="text-sm text-muted-foreground">
-        This unit's definition is empty.
+        <Trans>This unit's definition is empty.</Trans>
       </p>
     );
 
@@ -174,7 +177,7 @@ export function UnitFieldGroups({
                     <TooltipTrigger asChild>
                       <button
                         type="button"
-                        aria-label="More about this"
+                        aria-label={t`More about this`}
                         className="shrink-0 cursor-help text-muted-foreground hover:text-foreground"
                       >
                         <HelpCircle size={13} />
@@ -203,12 +206,14 @@ export function UnitFieldGroups({
                 summary={
                   <>
                     <span>
-                      {section.rows.length}{" "}
-                      {section.rows.length === 1 ? "field" : "fields"}
+                      {plural(section.rows.length, {
+                        one: "# field",
+                        other: "# fields",
+                      })}
                     </span>
                     {changed > 0 && (
                       <span className="rounded-full bg-primary/15 px-1.5 text-primary">
-                        {changed} changed
+                        <Trans>{changed} changed</Trans>
                       </span>
                     )}
                   </>

@@ -37,6 +37,8 @@
  * named-collection pattern this follows, down to writing `gameName` beside the
  * shared `game` identity.
  */
+import { i18n } from "@lingui/core";
+import { plural, t } from "@lingui/core/macro";
 import { useSetting } from "@picoframe/frame";
 import {
   asContainer,
@@ -310,23 +312,55 @@ export function describeEdits(edits: GameEdits): string {
   } = editCounts(edits);
   const slots = equipped - deaths;
   const uses = [
-    slots > 0 && `${slots} slot${slots === 1 ? "" : "s"}`,
-    deaths > 0 && `${deaths} death explosion${deaths === 1 ? "" : "s"}`,
+    slots > 0 && plural(slots, { one: "# slot", other: "# slots" }),
+    deaths > 0 &&
+      plural(deaths, {
+        one: "# death explosion",
+        other: "# death explosions",
+      }),
   ].filter((part): part is string => typeof part === "string");
+  const usedIn = new Intl.ListFormat(i18n.locale, {
+    type: "conjunction",
+  }).format(uses);
+  const libraryWeapons =
+    uses.length === 0
+      ? plural(weapons, {
+          one: "# library weapon",
+          other: "# library weapons",
+        })
+      : plural(weapons, {
+          one: `# library weapon in ${usedIn}`,
+          other: `# library weapons in ${usedIn}`,
+        });
   const parts = [
-    fields > 0 && `${fields} change${fields === 1 ? "" : "s"}`,
-    added > 0 && `${added} unit${added === 1 ? "" : "s"} added`,
-    menuOps > 0 && `${menuOps} build menu edit${menuOps === 1 ? "" : "s"}`,
-    off > 0 && `${off} unit${off === 1 ? "" : "s"} disabled`,
-    weapons > 0 &&
-      `${weapons} library weapon${weapons === 1 ? "" : "s"}${uses.length > 0 ? ` in ${uses.join(" and ")}` : ""}`,
+    fields > 0 && plural(fields, { one: "# change", other: "# changes" }),
+    added > 0 && plural(added, { one: "# unit added", other: "# units added" }),
+    menuOps > 0 &&
+      plural(menuOps, {
+        one: "# build menu edit",
+        other: "# build menu edits",
+      }),
+    off > 0 &&
+      plural(off, { one: "# unit disabled", other: "# units disabled" }),
+    weapons > 0 && libraryWeapons,
     armorMoves > 0 &&
-      `${armorMoves} unit${armorMoves === 1 ? "" : "s"} moved to a different armour class`,
-    effects > 0 && `${effects} explosion effect${effects === 1 ? "" : "s"}`,
+      plural(armorMoves, {
+        one: "# unit moved to a different armour class",
+        other: "# units moved to a different armour class",
+      }),
+    effects > 0 &&
+      plural(effects, {
+        one: "# explosion effect",
+        other: "# explosion effects",
+      }),
     collections > 0 &&
-      `${collections} collection${collections === 1 ? "" : "s"}`,
+      plural(collections, { one: "# collection", other: "# collections" }),
   ].filter((part): part is string => typeof part === "string");
-  return parts.length === 0 ? "Nothing changed yet" : parts.join(", ");
+  return parts.length === 0
+    ? t`Nothing changed yet`
+    : new Intl.ListFormat(i18n.locale, { type: "unit", style: "long" }).format(
+        parts,
+      );
 }
 
 /** A named set of edits against one game, as it is stored and as it is shared. */
