@@ -18,6 +18,7 @@
  * pointer is on it.
  */
 
+import { t } from "@lingui/core/macro";
 import { type RefObject, useEffect, useRef, useState } from "react";
 import {
   clampPanelHeight,
@@ -81,7 +82,7 @@ export function StripResizer({ height, onHeight, columnRef, controls }: Props) {
     <div
       role="separator"
       aria-orientation="horizontal"
-      aria-label="Resize this panel"
+      aria-label={t`Resize this panel`}
       aria-controls={controls}
       aria-valuenow={height}
       aria-valuemin={MIN_PANEL_HEIGHT}

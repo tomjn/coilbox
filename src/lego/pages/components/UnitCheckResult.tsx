@@ -4,6 +4,7 @@
  * did not load, then every error and warning about the unit.
  */
 
+import { Plural, Trans, useLingui } from "@lingui/react/macro";
 import { FileText } from "lucide-react";
 
 import type { UnitCheckEntry, UnitCheckReport } from "@/content/bindings";
@@ -34,31 +35,35 @@ function Entries({
     <section className="flex flex-col gap-1">
       <h3 className="text-xs font-medium">{title}</h3>
       <ul className="flex flex-col gap-1">
-        {entries.map((entry) => (
-          <li
-            key={entry.text}
-            className={`rounded border px-2 py-1 ${
-              tone === "error"
-                ? "border-destructive/50 text-destructive"
-                : "border-amber-500/50 text-amber-600 dark:text-amber-400"
-            }`}
-          >
-            <pre className="whitespace-pre-wrap break-all font-mono text-[11px]">
-              {entry.text}
-            </pre>
-            {entry.count > 1 ? (
-              <span className="text-[11px] text-muted-foreground">
-                {entry.count} times
-              </span>
-            ) : null}
-          </li>
-        ))}
+        {entries.map((entry) => {
+          const times = entry.count;
+          return (
+            <li
+              key={entry.text}
+              className={`rounded border px-2 py-1 ${
+                tone === "error"
+                  ? "border-destructive/50 text-destructive"
+                  : "border-amber-500/50 text-amber-600 dark:text-amber-400"
+              }`}
+            >
+              <pre className="whitespace-pre-wrap break-all font-mono text-[11px]">
+                {entry.text}
+              </pre>
+              {entry.count > 1 ? (
+                <span className="text-[11px] text-muted-foreground">
+                  <Plural value={times} one="# time" other="# times" />
+                </span>
+              ) : null}
+            </li>
+          );
+        })}
       </ul>
     </section>
   );
 }
 
 export function UnitCheckResult({ report, unitName }: Props) {
+  const { t } = useLingui();
   const others = describeOtherErrors(report);
   const moved = describeMove(report);
   return (
@@ -73,12 +78,12 @@ export function UnitCheckResult({ report, unitName }: Props) {
         {describeCheck(report, unitName)}
       </p>
       {moved ? <p>{moved}</p> : null}
-      <Entries title="Why" entries={report.fatal} tone="error" />
-      <Entries title="Errors" entries={report.problems} tone="error" />
-      <Entries title="Warnings" entries={report.warnings} tone="warning" />
+      <Entries title={t`Why`} entries={report.fatal} tone="error" />
+      <Entries title={t`Errors`} entries={report.problems} tone="error" />
+      <Entries title={t`Warnings`} entries={report.warnings} tone="warning" />
       {others ? <p className="text-muted-foreground">{others}</p> : null}
       <ShowMe path={report.logPath}>
-        <FileText className="size-4" /> Show me the engine log
+        <FileText className="size-4" /> <Trans>Show me the engine log</Trans>
       </ShowMe>
     </div>
   );
