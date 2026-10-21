@@ -29,8 +29,8 @@ M.CARD_RADIUS = 5
 M.PIC_RADIUS = 4
 M.BUTTON_RADIUS = 4
 --- Tiles across the grid view.
-M.GRID_COLUMNS = 5
---- A dragged box closer than this to an edge's margin snaps to it.
+M.GRID_COLUMNS = 4
+--- A dragged box closer than this to an edge of the view snaps flush to it.
 M.SNAP = 24
 --- The sizes above are for a view this many pixels tall. The panel scales
 -- with the view's height, so it covers the same share of any screen.
@@ -55,6 +55,8 @@ local C = {
 	energy = { 0.95, 0.80, 0.25, 1 },
 	builder = { 0.40, 0.80, 0.40, 1 },
 	weapon = { 0.90, 0.33, 0.28, 1 },
+	-- a purer red than weapon's, for the dashed rim of a mark the ground refuses
+	blocked = { 1.0, 0.05, 0.10, 1 },
 	text = { 1, 1, 1, 1 },
 	title = { 0.66, 0.68, 0.72, 1 },
 	dim = { 0.72, 0.74, 0.78, 1 },
@@ -384,15 +386,14 @@ end
 
 --- Move the box by a drag. box is where it was when the drag began, and the
 -- corner it hangs from stays the one it had then, so it does not jump. Near
--- an edge, or past it, the box snaps to the edge's margin.
+-- an edge, or past it, the box snaps flush to the edge.
 function M.drag(state, box, right, dx, dy, view)
-	local S = M.scaleFor(state, view)
-	local margin, snap = M.PAD * S, M.SNAP * S
+	local snap = M.SNAP * M.scaleFor(state, view)
 	local function snapped(lo, size, span)
-		if lo < margin + snap then
-			return margin
-		elseif lo + size > span - margin - snap then
-			return span - margin - size
+		if lo < snap then
+			return 0
+		elseif lo + size > span - snap then
+			return span - size
 		end
 		return lo
 	end

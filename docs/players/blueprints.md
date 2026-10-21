@@ -90,7 +90,7 @@ The widget panel opens by itself the first time you start a match. If it never a
 1. Start a match in the blueprint's game.
 2. Open the panel. Select the Blueprints button on the right of the screen, or type /coilbox_blueprints in the game's chat.
 3. Select one or more builders.
-4. Select a blueprint in the list. Its buildings follow the cursor. A building the ground will not take is marked with dark stripes.
+4. Select a blueprint in the list. Its buildings follow the cursor. A building the ground will not take is marked with dark stripes and a dashed red outline.
 5. Press [ or ] to turn it.
 6. Left click to place it.
 

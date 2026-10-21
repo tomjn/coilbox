@@ -341,15 +341,15 @@ check("a drag moves the pill by the mouse's travel", after.x == before.x - 300 a
 
 MODEL.drag(moved, before, true, -5000, 5000, VIEW)
 local clamped = MODEL.layout(moved, measure, VIEW).box
-check("a drag past the edges stops at their margin", clamped.x == MODEL.PAD and clamped.y + clamped.h == VIEW.h - MODEL.PAD, show(clamped))
+check("a drag past the edges stops flush with them", clamped.x == 0 and clamped.y + clamped.h == VIEW.h, show(clamped))
 
 MODEL.settle(moved, MODEL.layout(moved, measure, VIEW), VIEW)
-check("dropped on the left half, the pill hangs from its left corner", moved.pos.right == false and moved.pos.x == MODEL.PAD / VIEW.w and moved.pos.y == (VIEW.h - MODEL.PAD) / VIEW.h, show(moved.pos))
+check("dropped on the left half, the pill hangs from its left corner", moved.pos.right == false and moved.pos.x == 0 and moved.pos.y == 1, show(moved.pos))
 local settled = MODEL.layout(moved, measure, VIEW).box
 check("settling does not move the pill", same(settled, clamped), show({ settled, clamped }))
 moved.open = true
 local openLeft = MODEL.layout(moved, measure, VIEW)
-check("opened there, the panel hangs from the same corner", openLeft.box.x == MODEL.PAD and openLeft.box.y + openLeft.box.h == VIEW.h - MODEL.PAD, show(openLeft.box))
+check("opened there, the panel hangs from the same corner", openLeft.box.x == 0 and openLeft.box.y + openLeft.box.h == VIEW.h, show(openLeft.box))
 
 MODEL.drag(moved, openLeft.box, false, 1500, -200, VIEW)
 MODEL.settle(moved, MODEL.layout(moved, measure, VIEW), VIEW)
@@ -362,12 +362,12 @@ check("closing it there leaves the pill under the panel's right corner", pillRig
 local snapping = MODEL.new()
 local start = MODEL.layout(snapping, measure, VIEW).box
 MODEL.drag(snapping, start, true, -(start.x - 20), 0, VIEW)
-check("dropped near the left edge, the box snaps to its margin", MODEL.layout(snapping, measure, VIEW).box.x == MODEL.PAD, show(MODEL.layout(snapping, measure, VIEW).box))
-MODEL.drag(snapping, start, true, -(start.x - 20 - MODEL.SNAP - MODEL.PAD), 0, VIEW)
-check("further out than the snap distance, it stays where it was dropped", MODEL.layout(snapping, measure, VIEW).box.x == 20 + MODEL.SNAP + MODEL.PAD, show(MODEL.layout(snapping, measure, VIEW).box))
+check("dropped near the left edge, the box snaps flush to it", MODEL.layout(snapping, measure, VIEW).box.x == 0, show(MODEL.layout(snapping, measure, VIEW).box))
+MODEL.drag(snapping, start, true, -(start.x - 20 - MODEL.SNAP), 0, VIEW)
+check("further out than the snap distance, it stays where it was dropped", MODEL.layout(snapping, measure, VIEW).box.x == 20 + MODEL.SNAP, show(MODEL.layout(snapping, measure, VIEW).box))
 MODEL.drag(snapping, start, true, 0, VIEW.h - start.y - start.h - 10, VIEW)
 local nearTop = MODEL.layout(snapping, measure, VIEW).box
-check("dropped near the top, the box snaps to its margin", nearTop.y + nearTop.h == VIEW.h - MODEL.PAD, show(nearTop))
+check("dropped near the top, the box snaps flush to it", nearTop.y + nearTop.h == VIEW.h, show(nearTop))
 
 --------------------------------------------------------------------------------
 -- scrolling

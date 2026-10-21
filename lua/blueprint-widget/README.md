@@ -10,7 +10,7 @@ Coilbox installs `luaui/` into the content root as `LuaUI/` when you press the b
 - the button and the panel's title drag the panel anywhere on screen, snapping to an edge near one, and the widget's config keeps where it was left and whether it shows a list or a grid
 - each blueprint's layout drawn from above, with energy yellow, builders green and weapons red
 - three tabs: what the selected builders can build now, what they can build in part, and everything
-- pick a row or a tile and the layout follows the cursor as ghosts over marks in the same colours, striped where the ground refuses a building
+- pick a row or a tile and the layout follows the cursor as ghosts over marks in the same colours, striped with a dashed red rim where the ground refuses a building
 - `[` and `]` turn it, left click places it, right click or escape puts it down
 - a partial placement leaves what nobody selected could build as a remainder, and the panel offers to place that with whatever is selected later
 - Save selection writes the selected buildings to a spool file that coilbox collects into the library next time it runs

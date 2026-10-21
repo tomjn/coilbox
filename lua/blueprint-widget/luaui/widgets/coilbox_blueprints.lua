@@ -102,7 +102,7 @@ local saved = nil
 --------------------------------------------------------------------------------
 
 local shader
-local locProj, locView, locRect, locUseTex, locPicRadius, locGround
+local locProj, locView, locRect, locUseTex, locPicRadius, locGround, locBlocked
 local quadVAO, quadVBO, quadIBO
 -- The panel's and the ground marks' buffers, grown as needed by upload().
 local panelSet = { capacity = 0 }
@@ -149,6 +149,7 @@ local FRAGMENT_SHADER = [[
 uniform sampler2D tex;
 uniform int useTex;
 uniform int ground;
+uniform vec4 blocked;
 in vec2 vUv;
 in vec4 vColor;
 in vec4 vShape;
@@ -166,13 +167,16 @@ void main() {
 	float d = length(max(q, 0.0)) + min(max(q.x, q.y), 0.0) - r;
 	float a = clamp(0.5 - d, 0.0, 1.0);
 	if (ground == 1) {
-		// On the ground the units are elmos. A striped mark is one the ground
-		// refuses, and every mark has a firmer rim two elmos wide.
+		// On the ground the units are elmos. Every mark has a firmer rim. A
+		// striped mark is one the ground refuses, and its rim is a red dash.
 		vec2 p = vUv * vShape.xy;
-		if (vShape.w > 0.0 && fract((p.x + p.y) / 8.0) < 0.5) {
-			c = vec4(0.05, 0.05, 0.05, 0.6);
+		bool refused = vShape.w > 0.0;
+		if (refused && fract((p.x + p.y) / 16.0) < 0.5) {
+			c = vec4(0.05, 0.05, 0.05, 0.7);
 		}
-		if (d > -2.0) {
+		if (refused && d > -3.0) {
+			c = fract((p.x + p.y) / 12.0) < 0.6 ? blocked : vec4(0.0);
+		} else if (d > -2.0) {
 			c = vec4(vColor.rgb, min(1.0, vColor.a * 2.5));
 		}
 	} else if (vShape.w > 0.0) {
@@ -232,6 +236,7 @@ local function makeGL()
 	locUseTex = gl.GetUniformLocation(shader, "useTex")
 	locPicRadius = gl.GetUniformLocation(shader, "picRadius")
 	locGround = gl.GetUniformLocation(shader, "ground")
+	locBlocked = gl.GetUniformLocation(shader, "blocked")
 
 	quadVBO, quadIBO, quadVAO = makeBuffers(1)
 	if not quadVAO then
@@ -878,6 +883,7 @@ function widget:DrawWorld()
 		gl.Uniform(locRect, unpack(UNIT_RECT))
 		gl.UniformInt(locUseTex, 0)
 		gl.UniformInt(locGround, 1)
+		gl.Uniform(locBlocked, unpack(MODEL.COLORS.blocked))
 		groundSet.vao:DrawElements(GL.TRIANGLES, groundIndices, 0)
 		gl.UniformInt(locGround, 0)
 		gl.UseShader(0)
