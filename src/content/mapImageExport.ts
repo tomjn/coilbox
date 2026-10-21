@@ -1,3 +1,4 @@
+import { t } from "@lingui/core/macro";
 import { drawHeatField } from "@/lib/heatCanvas";
 import type { HeatField } from "@/lib/heatField";
 import type { HeatKind } from "@/lib/heatRamp";
@@ -48,7 +49,7 @@ export async function renderMapImage(
     );
     const canvas = document.createElement("canvas");
     const first = canvas.getContext("2d");
-    if (!first) throw new Error("A 2D canvas is not available.");
+    if (!first) throw new Error(t`A 2D canvas is not available.`);
     const layout = layoutImage(size, imageBlocks(input.words), (text, font) => {
       first.font = font;
       return first.measureText(text).width;
@@ -57,7 +58,7 @@ export async function renderMapImage(
     canvas.width = layout.width;
     canvas.height = layout.height;
     const ctx = canvas.getContext("2d");
-    if (!ctx) throw new Error("A 2D canvas is not available.");
+    if (!ctx) throw new Error(t`A 2D canvas is not available.`);
 
     const fieldCanvas = document.createElement("canvas");
     drawHeatField(fieldCanvas, input.field, input.kind);

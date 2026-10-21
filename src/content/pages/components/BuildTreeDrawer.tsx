@@ -1,3 +1,5 @@
+import { plural } from "@lingui/core/macro";
+import { Trans, useLingui } from "@lingui/react/macro";
 import { cn } from "@picoframe/frame";
 import {
   Background,
@@ -58,9 +60,12 @@ interface UnitNodeData extends Record<string, unknown> {
  * the base, matching the unit picker's "Commander, 2 upgrades" wording, so the
  * two halves of the picture agree on what the number means. */
 function nodeLabel(name: string, stageCount?: number): string {
-  return stageCount && stageCount > 0
-    ? `${name} (${stageCount} upgrade${stageCount === 1 ? "" : "s"})`
-    : name;
+  if (!stageCount || stageCount <= 0) return name;
+  const upgrades = plural(stageCount, {
+    one: "# upgrade",
+    other: "# upgrades",
+  });
+  return `${name} (${upgrades})`;
 }
 
 /** A build-tree node: build-pic (square, fills the node) above the unit name.
@@ -204,6 +209,7 @@ export function BuildTreeDrawer({
   /** Resolved catalog entry, for the export's branded wrapper (null = neutral). */
   branding?: BrandingEntry | null;
 }) {
+  const { t } = useLingui();
   const [activeName, setActiveName] = useState(initialSide);
   const [hoveredId, setHoveredId] = useState<string | null>(null);
   // Click-to-focus: a single unit whose neighbours (builds + built-by) replace
@@ -403,6 +409,7 @@ export function BuildTreeDrawer({
   // animate: focus-set nodes move to the clean focus layout, the rest fade out
   // (opacity 0, click-through disabled). Also dim nodes not connected to the
   // hovered one. On unfocus every node animates back to its full-tree position.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: `t` changes with the language, so the node labels are rebuilt when it does
   const nodes = useMemo(
     () =>
       laidOut.nodes.map((n) => {
@@ -447,6 +454,7 @@ export function BuildTreeDrawer({
       focusLayout,
       adjacency,
       reduceMotion,
+      t,
     ],
   );
 
@@ -565,9 +573,11 @@ export function BuildTreeDrawer({
 
       {reachableCount === 0 ? (
         <p className="rounded-lg border border-border/50 bg-card p-4 text-sm text-muted-foreground">
-          No build options found for this faction. This game may not expose unit
-          <span className="font-mono"> buildoptions</span> (e.g. legacy TDF
-          games), or its commander builds nothing.
+          <Trans>
+            No build options found for this faction. This game may not expose
+            unit <span className="font-mono">buildoptions</span> (e.g. legacy
+            TDF games), or its commander builds nothing.
+          </Trans>
         </p>
       ) : (
         <>
@@ -697,31 +707,31 @@ function BuildTreeLegend() {
     <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted-foreground">
       <span className="flex items-center gap-1.5">
         <span className="inline-block size-3 rounded-sm border-2 border-blue-400/80" />
-        Commander
+        <Trans>Commander</Trans>
       </span>
       <span className="flex items-center gap-1.5">
         <span className="inline-block size-3 rounded-sm border-2 border-yellow-400/70" />
-        Builder
+        <Trans>Builder</Trans>
       </span>
       <span className="flex items-center gap-1.5">
         <span className="inline-block size-3 rounded-sm border-2 border-rose-400/60" />
-        Unit
+        <Trans>Unit</Trans>
       </span>
       <span className="flex items-center gap-1.5">
         <span className="inline-block size-3 rounded-sm border-2 border-slate-400/50" />
-        Building
+        <Trans>Building</Trans>
       </span>
       <span className="flex items-center gap-1.5">
         <span className="inline-block h-0.5 w-4 rounded bg-green-400" />
-        Builds (hover)
+        <Trans>Builds (hover)</Trans>
       </span>
       <span className="flex items-center gap-1.5">
         <span className="inline-block h-0.5 w-4 rounded bg-yellow-400" />
-        Built by (hover)
+        <Trans>Built by (hover)</Trans>
       </span>
       <span className="flex items-center gap-1.5">
         <span className="inline-block h-0 w-4 border-t-2 border-dashed border-muted-foreground/70" />
-        Also buildable by
+        <Trans>Also buildable by</Trans>
       </span>
     </div>
   );

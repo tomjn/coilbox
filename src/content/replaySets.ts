@@ -1,3 +1,4 @@
+import { t } from "@lingui/core/macro";
 import { useSetting } from "@picoframe/frame";
 import { useMemo } from "react";
 
@@ -79,10 +80,10 @@ export function validateSetName(
   exceptId?: string,
 ): string | null {
   const trimmed = name.trim();
-  if (!trimmed) return "Give the set a name.";
+  if (!trimmed) return t`Give the set a name.`;
   const lower = trimmed.toLowerCase();
   if (sets.some((s) => s.id !== exceptId && s.name.toLowerCase() === lower)) {
-    return `A set called “${trimmed}” already exists.`;
+    return t`A set called “${trimmed}” already exists.`;
   }
   return null;
 }

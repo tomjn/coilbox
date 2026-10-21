@@ -1,3 +1,4 @@
+import { Trans } from "@lingui/react/macro";
 import { Badge } from "@/components/ui/badge";
 
 /**
@@ -16,7 +17,7 @@ export function GeneratedBadge({ note }: { note: string }) {
       className="shrink-0 rounded bg-sky-500/15 px-1.5 py-0.5 text-[0.625rem] font-medium tracking-wide text-sky-700 dark:text-sky-400"
       title={note}
     >
-      Coilbox&apos;s own
+      <Trans>Coilbox's own</Trans>
     </Badge>
   );
 }

@@ -1,3 +1,4 @@
+import { Trans, useLingui } from "@lingui/react/macro";
 import { useCallback, useMemo } from "react";
 import { Link, useParams } from "react-router";
 import { useUnitDefs } from "@/workshop/config";
@@ -31,6 +32,7 @@ import { DetailError, DetailLoading, NotFound } from "./components/states";
  */
 export default function UnitReferencePage() {
   const { name } = useParams();
+  const { t } = useLingui();
   const decoded = name ?? "";
   const { selected } = useScanTargetSelection();
   const { data, loading, error, run } = useUnitsyncScan(
@@ -138,12 +140,13 @@ export default function UnitReferencePage() {
   if (!game) return <NotFound backTo="/library/games" label="game" />;
 
   const backTo = `/library/games/${encodeURIComponent(game.name)}/units`;
+  const gameName = game.name;
 
   if (defsStatus === "error")
     return (
       <DetailError
         backTo={backTo}
-        message={defsError ?? "Could not read this game's units."}
+        message={defsError ?? t`Could not read this game's units.`}
         onRetry={reloadDefs}
       />
     );
@@ -165,10 +168,14 @@ export default function UnitReferencePage() {
         >
           {game.name}
         </Link>
-        <h1 className="text-lg font-semibold">Unit reference</h1>
+        <h1 className="text-lg font-semibold">
+          <Trans>Unit reference</Trans>
+        </h1>
         <p className="text-sm text-muted-foreground">
-          Every unit in {game.name}, with the numbers players argue about.
-          Select two or more to compare them.
+          <Trans>
+            Every unit in {gameName}, with the numbers players argue about.
+            Select two or more to compare them.
+          </Trans>
         </p>
       </div>
       <UnitReferenceView

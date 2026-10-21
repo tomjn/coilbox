@@ -1,3 +1,5 @@
+import { t } from "@lingui/core/macro";
+import { Trans, useLingui } from "@lingui/react/macro";
 import { Button, cn } from "@picoframe/frame";
 import { Download, Loader2, Play, RefreshCw, X } from "lucide-react";
 import type { ReactNode } from "react";
@@ -33,20 +35,22 @@ const BADGE_TONES = {
 } as const;
 
 function StateBadge({ game }: { game: LibraryGame }) {
+  const { t } = useLingui();
   const { state } = game;
   if (state === "available" || state === "noSource") return null;
+  const updateVersion = game.update?.version;
   const label =
     state === "installed"
-      ? "Installed"
+      ? t`Installed`
       : state === "update"
-        ? game.update?.version
-          ? `Update ${game.update.version}`
-          : "Update"
+        ? updateVersion
+          ? t`Update ${updateVersion}`
+          : t`Update`
         : state === "downloading"
-          ? "Downloading"
+          ? t`Downloading`
           : state === "queued"
-            ? "Queued"
-            : "Local";
+            ? t`Queued`
+            : t`Local`;
   return (
     <Badge className={cn("rounded-sm shadow-sm", BADGE_TONES[state])}>
       {label}
@@ -57,15 +61,17 @@ function StateBadge({ game }: { game: LibraryGame }) {
 /** The caption's second line: the version on disk, or where it comes from. */
 function subtitleOf(game: LibraryGame, hubRead: boolean): ReactNode {
   if (game.state === "noSource") {
-    return <span className="text-xs text-destructive">no download source</span>;
+    return (
+      <span className="text-xs text-destructive">{t`no download source`}</span>
+    );
   }
   const version = game.installed[0]?.info.version;
   const shown = version ? versionLabel(version) : null;
   const parts =
     game.state === "update"
-      ? [shown ? `${shown} installed` : "installed"]
+      ? [shown ? t`${shown} installed` : t`installed`]
       : game.state === "local"
-        ? [shown, hubRead && "not on the hub"]
+        ? [shown, hubRead && t`not on the hub`]
         : game.state === "installed"
           ? [shown, ...sourceKinds(game)]
           : sourceKinds(game);
@@ -127,6 +133,7 @@ export function GameCard({
   onUpdate: () => void;
   onCancel: () => void;
 }) {
+  const { t } = useLingui();
   const installed = game.installed[0];
   const brand = useBrandingEntry(installed);
   const brandBanner = useBrandingImage(brand?.banner, true);
@@ -156,7 +163,7 @@ export function GameCard({
         onClick={onCancel}
       >
         <X className="size-4" />
-        Cancel
+        <Trans>Cancel</Trans>
       </Button>,
     );
   }
@@ -175,7 +182,7 @@ export function GameCard({
         ) : (
           <RefreshCw className="size-4" />
         )}
-        Update
+        <Trans>Update</Trans>
       </Button>,
     );
   }
@@ -194,7 +201,7 @@ export function GameCard({
         ) : (
           <Download className="size-4" />
         )}
-        Install
+        <Trans>Install</Trans>
       </Button>,
     );
   }
@@ -208,7 +215,7 @@ export function GameCard({
         disabled={playDisabled}
       >
         <Play className="size-4 fill-current" />
-        Play
+        <Trans>Play</Trans>
       </Button>,
     );
   }
@@ -218,7 +225,7 @@ export function GameCard({
       name={installed?.name ?? game.title}
       title={title}
       artUrl={art}
-      alt={`${title} art`}
+      alt={t`${title} art`}
       sdd={installed ? isSdd(installed.primaryArchive) : false}
       generated={
         installed ? generatedGameNote(installed.primaryArchive.name) : null

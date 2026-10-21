@@ -9,10 +9,10 @@
  * of reading a model or of resolving its textures.
  */
 
+import { Plural, Trans } from "@lingui/react/macro";
 import { useRef } from "react";
 import * as THREE from "three";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
-import { formatNumber } from "@/lib/format";
 import { useCanvas3D } from "@/lib/useCanvas3D";
 import type { UnitModelResult } from "../../bindings";
 import { buildModel, missingTextures } from "../../unitModel";
@@ -44,33 +44,38 @@ export function ModelNotes({
 }) {
   const missing = missingTextures(model);
   const teamColour = model.textures.filter((t) => t.teamColour);
+  const teamColourCount = teamColour.length;
+  const missingCount = missing.length;
+  const missingNames = missing.map((t) => t.name).join(", ");
 
   return (
     <>
       {teamColour.length > 0 && (
         <Note>
-          {teamColour.length} of this model&apos;s textures are team-colour
-          regions, which the engine paints in the owning player&apos;s colour.
-          There is no player here, so they are drawn in one blue.
+          <Trans>
+            {teamColourCount} of this model's textures are team-colour regions,
+            which the engine paints in the owning player's colour. There is no
+            player here, so they are drawn in one blue.
+          </Trans>
         </Note>
       )}
 
       {missing.length > 0 && (
         <Note>
-          {missing.length} of this model&apos;s textures are not in {archive},
-          so those faces are drawn plain:{" "}
-          <span className="font-mono">
-            {missing.map((t) => t.name).join(", ")}
-          </span>
-          .
+          <Trans>
+            {missingCount} of this model's textures are not in {archive}, so
+            those faces are drawn plain:{" "}
+            <span className="font-mono">{missingNames}</span>.
+          </Trans>
         </Note>
       )}
       {model.paletteFaces > 0 && (
         <Note>
-          {formatNumber(model.paletteFaces)}{" "}
-          {model.paletteFaces === 1 ? "face names" : "faces name"} a Total
-          Annihilation palette entry this could not resolve to a colour, so{" "}
-          {model.paletteFaces === 1 ? "it is" : "they are"} drawn plain grey.
+          <Plural
+            value={model.paletteFaces}
+            one="# face names a Total Annihilation palette entry this could not resolve to a colour, so it is drawn plain grey."
+            other="# faces name a Total Annihilation palette entry this could not resolve to a colour, so they are drawn plain grey."
+          />
         </Note>
       )}
       {model.errors.length > 0 && <Note>{model.errors.join(". ")}</Note>}

@@ -1,3 +1,4 @@
+import { t } from "@lingui/core/macro";
 import type { UnitDisplay } from "./bindings";
 
 /**
@@ -19,16 +20,15 @@ export function buildPicMissing(display?: UnitDisplay): {
     case "undecodable":
     case "encode-failed":
       return {
-        label: "bad pic",
-        title:
-          "Coilbox cannot read this unit's build pic. The game ships one, in a format the decoder does not handle.",
+        label: t`bad pic`,
+        title: t`Coilbox cannot read this unit's build pic. The game ships one, in a format the decoder does not handle.`,
       };
     case "no-source":
       return {
-        label: "no pic",
-        title: "This game ships no build pic for this unit.",
+        label: t`no pic`,
+        title: t`This game ships no build pic for this unit.`,
       };
     default:
-      return { label: "no pic" };
+      return { label: t`no pic` };
   }
 }

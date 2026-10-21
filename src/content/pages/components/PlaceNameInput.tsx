@@ -1,3 +1,4 @@
+import { useLingui } from "@lingui/react/macro";
 import { Input } from "@picoframe/frame";
 import { useEffect, useRef, useState } from "react";
 import { tidyName } from "../../startNames";
@@ -18,6 +19,7 @@ export function PlaceNameInput({
   label: string;
   onCommit: (name: string) => void;
 }) {
+  const { t } = useLingui();
   const [draft, setDraft] = useState(value ?? "");
   const cancelled = useRef(false);
   useEffect(() => setDraft(value ?? ""), [value]);
@@ -31,7 +33,7 @@ export function PlaceNameInput({
   return (
     <Input
       aria-label={label}
-      placeholder="Name this place"
+      placeholder={t`Name this place`}
       className="h-7 min-w-28 text-xs"
       value={draft}
       onChange={(e) => setDraft(e.target.value)}

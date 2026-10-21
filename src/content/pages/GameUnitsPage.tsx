@@ -1,3 +1,4 @@
+import { Plural, Trans, useLingui } from "@lingui/react/macro";
 import { buttonVariants, Input } from "@picoframe/frame";
 import { useMemo, useState } from "react";
 import { Link, useParams, useSearchParams } from "react-router";
@@ -33,6 +34,7 @@ import { UnitIcon } from "./components/UnitIcon";
  */
 export default function GameUnitsPage() {
   const { name } = useParams();
+  const { t } = useLingui();
   const decoded = name ?? "";
   const [searchParams] = useSearchParams();
   const factionParam = searchParams.get("faction");
@@ -131,6 +133,8 @@ export default function GameUnitsPage() {
   if (!game) return <NotFound backTo="/library/games" label="game" />;
 
   const backTo = `/library/games/${encodeURIComponent(game.name)}`;
+  const trimmedQuery = query.trim();
+  const cellCount = allCellIds.length;
 
   if (datasetStatus === "error")
     return (
@@ -142,7 +146,9 @@ export default function GameUnitsPage() {
           {game.name}
         </Link>
         <Alert variant="destructive">
-          <AlertTitle>Could not read this game&apos;s units</AlertTitle>
+          <AlertTitle>
+            <Trans>Could not read this game's units</Trans>
+          </AlertTitle>
           <AlertDescription>
             <ul className="flex flex-col gap-1 font-mono text-xs">
               {(dataset?.errors ?? []).map((e) => (
@@ -193,7 +199,7 @@ export default function GameUnitsPage() {
           to={`/library/games/${encodeURIComponent(game.name)}/units/reference`}
           className={buttonVariants({ variant: "outline", size: "sm" })}
         >
-          Compare units
+          <Trans>Compare units</Trans>
         </Link>
       </div>
 
@@ -202,25 +208,31 @@ export default function GameUnitsPage() {
           type="search"
           value={query}
           onChange={(e) => setQuery(e.target.value)}
-          placeholder="Search units…"
-          aria-label="Search units"
+          placeholder={t`Search units…`}
+          aria-label={t`Search units`}
           className="h-9 max-w-sm"
         />
         {/* Both numbers while a search is on, because "12 units" alone does not
           say whether the game has 12 or 564. Up here beside the box rather than
           under the grid, which on a game this size is 500 cells away. */}
         <p className="text-xs text-muted-foreground">
-          {query.trim()
-            ? `${total} of ${allCellIds.length} units`
-            : `${total} unit${total === 1 ? "" : "s"}`}
+          {query.trim() ? (
+            <Trans>
+              {total} of {cellCount} units
+            </Trans>
+          ) : (
+            <Plural value={total} one="# unit" other="# units" />
+          )}
         </p>
       </div>
 
       {total === 0 ? (
         <p className="text-sm text-muted-foreground">
-          {query.trim()
-            ? `No units match "${query.trim()}".`
-            : "No units found for this game."}
+          {trimmedQuery ? (
+            <Trans>No units match "{trimmedQuery}".</Trans>
+          ) : (
+            <Trans>No units found for this game.</Trans>
+          )}
         </p>
       ) : (
         rows.map((section) => (
@@ -288,7 +300,7 @@ function UnitCellItem({
         </span>
         {cell.upgrades > 0 && (
           <span className="text-[11px] text-muted-foreground">
-            {cell.upgrades} upgrade{cell.upgrades === 1 ? "" : "s"}
+            <Plural value={cell.upgrades} one="# upgrade" other="# upgrades" />
           </span>
         )}
       </Link>

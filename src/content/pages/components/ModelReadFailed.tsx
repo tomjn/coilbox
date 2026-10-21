@@ -1,3 +1,4 @@
+import { Trans, useLingui } from "@lingui/react/macro";
 import { Button } from "@picoframe/frame";
 import { RotateCw } from "lucide-react";
 
@@ -18,11 +19,12 @@ export function ModelReadFailed({
   fallback: string;
   onRetry: () => void;
 }) {
+  const { t } = useLingui();
   return (
     <span className="inline-flex flex-wrap items-center justify-center gap-2">
-      <span>{error ? `Could not read this model: ${error}.` : fallback}</span>
+      <span>{error ? t`Could not read this model: ${error}.` : fallback}</span>
       <Button size="sm" variant="outline" className="gap-1.5" onClick={onRetry}>
-        <RotateCw className="size-3.5" /> Try again
+        <RotateCw className="size-3.5" /> <Trans>Try again</Trans>
       </Button>
     </span>
   );

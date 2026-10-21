@@ -13,6 +13,7 @@
  * `GameUnitPage` shows further down the page as a quiet block instead.
  */
 
+import { Trans, useLingui } from "@lingui/react/macro";
 import type { UnitModelResult } from "@/content/bindings";
 import { countTriangles } from "../../unitModel";
 import { ModelReadFailed } from "./ModelReadFailed";
@@ -35,19 +36,24 @@ export function UnitHero({
   onRetry: () => void;
   gameArchive: string;
 }) {
+  const { t } = useLingui();
   if (!object) {
     return (
       <Note>
-        This unit&apos;s definition names no model, so the engine draws nothing
-        for it either.
+        <Trans>
+          This unit's definition names no model, so the engine draws nothing for
+          it either.
+        </Trans>
       </Note>
     );
   }
   if (loading) {
     return (
       <Note>
-        Reading <span className="font-mono">{object}</span> out of {gameArchive}
-        .
+        <Trans>
+          Reading <span className="font-mono">{object}</span> out of{" "}
+          {gameArchive}.
+        </Trans>
       </Note>
     );
   }
@@ -56,7 +62,7 @@ export function UnitHero({
       <Note>
         <ModelReadFailed
           error={error}
-          fallback="Could not reach unitsync to read this unit's model."
+          fallback={t`Could not reach unitsync to read this unit's model.`}
           onRetry={onRetry}
         />
       </Note>
@@ -69,7 +75,7 @@ export function UnitHero({
     return (
       <Note>
         {model.errors[0] ??
-          `Nothing drawable came out of ${object}: it has pieces but no faces.`}
+          t`Nothing drawable came out of ${object}: it has pieces but no faces.`}
       </Note>
     );
   }

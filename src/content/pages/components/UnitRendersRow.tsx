@@ -9,6 +9,7 @@
  * not draw, are each their own sentence rather than a blank or broken image.
  */
 
+import { Trans, useLingui } from "@lingui/react/macro";
 import { type AngleRender, angleLabel } from "./useUnitRenders";
 
 /** Checkerboard behind a render, so a transparent picture reads as
@@ -31,7 +32,9 @@ export function UnitRendersRow({
 
   return (
     <section className="flex flex-col gap-2">
-      <h2 className="text-sm font-medium">Renders</h2>
+      <h2 className="text-sm font-medium">
+        <Trans>Renders</Trans>
+      </h2>
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
         {angles.map((angle) => (
           <RenderCard key={angle} render={renders[angle]} />
@@ -42,6 +45,8 @@ export function UnitRendersRow({
 }
 
 function RenderCard({ render }: { render: AngleRender }) {
+  const { t } = useLingui();
+  const angle = angleLabel(render.angle);
   return (
     <div className="flex flex-col gap-1.5 rounded-lg border border-border/50 bg-card p-2">
       <div
@@ -51,22 +56,20 @@ function RenderCard({ render }: { render: AngleRender }) {
         {render.status === "ready" && render.url ? (
           <img
             src={render.url}
-            alt={`${angleLabel(render.angle)} render of this unit`}
+            alt={t`${angle} render of this unit`}
             className="max-h-full max-w-full object-contain"
           />
         ) : render.status === "unavailable" ? (
           <p className="px-2 text-center text-xs text-muted-foreground">
-            {render.message ?? "Not available."}
+            {render.message ?? t`Not available.`}
           </p>
         ) : (
           <p className="text-xs text-muted-foreground">
-            {render.status === "drawing" ? "Drawing…" : "Checking…"}
+            {render.status === "drawing" ? t`Drawing…` : t`Checking…`}
           </p>
         )}
       </div>
-      <p className="text-center text-xs text-muted-foreground">
-        {angleLabel(render.angle)}
-      </p>
+      <p className="text-center text-xs text-muted-foreground">{angle}</p>
     </div>
   );
 }

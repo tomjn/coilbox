@@ -1,3 +1,4 @@
+import { t } from "@lingui/core/macro";
 import type { DemoInfo } from "./bindings";
 
 /**
@@ -15,7 +16,8 @@ import type { DemoInfo } from "./bindings";
  * `replaySideLabel.test.ts` fails if a second one appears anywhere in `src`.
  */
 export function teamLabel(ally: number): string {
-  return `Team ${ally + 1}`;
+  const number = ally + 1;
+  return t`Team ${number}`;
 }
 
 /**
@@ -26,8 +28,8 @@ export function teamResultLabel(info: DemoInfo): string {
   // False either because the recording never reached a game over, or because
   // its trailer is in a format coilbox doesn't read and there was no demotool
   // fallback to ask, so this doesn't name a specific reason.
-  if (!info.winnersKnown) return "Unknown";
-  if (info.winningAllyTeams.length === 0) return "Nobody won";
+  if (!info.winnersKnown) return t`Unknown`;
+  if (info.winningAllyTeams.length === 0) return t`Nobody won`;
   const ids = info.winningAllyTeams.map((a) => teamLabel(a)).join(", ");
-  return `${ids} won`;
+  return t`${ids} won`;
 }

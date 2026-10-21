@@ -1,3 +1,4 @@
+import { Trans } from "@lingui/react/macro";
 import { CheckCircle2 } from "lucide-react";
 import { Link } from "react-router";
 import { StatusBadge } from "./StatusBadge";
@@ -63,7 +64,7 @@ export function UnitPictureCard({
       )}
       {current && (
         <StatusBadge tone="info">
-          <CheckCircle2 /> Current
+          <CheckCircle2 /> <Trans>Current</Trans>
         </StatusBadge>
       )}
     </>

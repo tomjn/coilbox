@@ -1,3 +1,4 @@
+import { Trans, useLingui } from "@lingui/react/macro";
 import { Button } from "@picoframe/frame";
 import { save } from "@tauri-apps/plugin-dialog";
 import { Download, Loader2 } from "lucide-react";
@@ -57,6 +58,7 @@ export function BuildTreeExportButton({
   /** Resolved catalog entry for the branded wrapper (null = neutral only). */
   branding?: BrandingEntry | null;
 }) {
+  const { t } = useLingui();
   const [open, setOpen] = useState(false);
   const locale = useResolvedLocale();
   const [busy, setBusy] = useState(false);
@@ -75,7 +77,7 @@ export function BuildTreeExportButton({
       scope === "all" ? sides : sides.filter((s) => s.name === activeSide);
     if (scopeSides.length === 0) {
       void notify({
-        title: "Nothing to export for this faction.",
+        title: t`Nothing to export for this faction.`,
         level: "error",
       });
       return;
@@ -87,11 +89,11 @@ export function BuildTreeExportButton({
       "build-tree";
     const ext = format === "zip" ? "zip" : "html";
     const dest = await save({
-      title: "Export build tree",
+      title: t`Export build tree`,
       defaultPath: `${slug}-build-tree.${ext}`,
       filters: [
         {
-          name: format === "zip" ? "Zip archive" : "HTML page",
+          name: format === "zip" ? t`Zip archive` : t`HTML page`,
           extensions: [ext],
         },
       ],
@@ -144,11 +146,12 @@ export function BuildTreeExportButton({
       } else {
         await contentExportBuildTreeZip({ dest, files: artifact.files });
       }
-      void notify({ title: "Build tree exported.", level: "success" });
+      void notify({ title: t`Build tree exported.`, level: "success" });
       setOpen(false);
     } catch (e) {
+      const reason = e instanceof Error ? e.message : String(e);
       void notify({
-        title: `Export failed: ${e instanceof Error ? e.message : e}`,
+        title: t`Export failed: ${reason}`,
         level: "error",
       });
     } finally {
@@ -161,13 +164,15 @@ export function BuildTreeExportButton({
       <PopoverTrigger asChild>
         <Button type="button" variant="outline" size="sm" className="gap-1.5">
           <Download className="size-4" aria-hidden />
-          Export HTML
+          <Trans>Export HTML</Trans>
         </Button>
       </PopoverTrigger>
       <PopoverContent align="end" className="w-72 space-y-3">
-        <p className="text-sm font-medium">Export build tree</p>
+        <p className="text-sm font-medium">
+          <Trans>Export build tree</Trans>
+        </p>
 
-        <Field label="Factions">
+        <Field label={t`Factions`}>
           <ToggleGroup
             type="single"
             value={scope}
@@ -175,15 +180,15 @@ export function BuildTreeExportButton({
             className="justify-start gap-2"
           >
             <ToggleGroupItem value="all" className={toggleItem}>
-              All
+              <Trans>All</Trans>
             </ToggleGroupItem>
             <ToggleGroupItem value="current" className={toggleItem}>
-              Current
+              <Trans>Current</Trans>
             </ToggleGroupItem>
           </ToggleGroup>
         </Field>
 
-        <Field label="Wrapper">
+        <Field label={t`Wrapper`}>
           <ToggleGroup
             type="single"
             value={wrapper}
@@ -197,15 +202,15 @@ export function BuildTreeExportButton({
               className={toggleItem}
               disabled={!branding}
             >
-              Branded
+              <Trans>Branded</Trans>
             </ToggleGroupItem>
             <ToggleGroupItem value="neutral" className={toggleItem}>
-              Neutral
+              <Trans>Neutral</Trans>
             </ToggleGroupItem>
           </ToggleGroup>
         </Field>
 
-        <Field label="Format">
+        <Field label={t`Format`}>
           <ToggleGroup
             type="single"
             value={format}
@@ -213,18 +218,18 @@ export function BuildTreeExportButton({
             className="justify-start gap-2"
           >
             <ToggleGroupItem value="html" className={toggleItem}>
-              Single HTML
+              <Trans>Single HTML</Trans>
             </ToggleGroupItem>
             <ToggleGroupItem value="zip" className={toggleItem}>
-              Zip
+              <Trans>Zip</Trans>
             </ToggleGroupItem>
           </ToggleGroup>
         </Field>
 
         <p className="text-xs text-muted-foreground">
           {format === "html"
-            ? "One self-contained file with pics inlined — larger, but drop-in."
-            : "index.html plus cacheable images/ and assets/ — smaller page."}
+            ? t`One self-contained file with pics inlined — larger, but drop-in.`
+            : t`index.html plus cacheable images/ and assets/ — smaller page.`}
         </p>
 
         <Button
@@ -238,7 +243,7 @@ export function BuildTreeExportButton({
           ) : (
             <Download className="size-4" aria-hidden />
           )}
-          Export
+          <Trans>Export</Trans>
         </Button>
       </PopoverContent>
     </Popover>

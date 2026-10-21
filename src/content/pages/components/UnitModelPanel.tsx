@@ -8,6 +8,8 @@
  * editable. The shape copied here is the parts picker's detail viewport.
  */
 
+import { plural, t } from "@lingui/core/macro";
+import { Trans, useLingui } from "@lingui/react/macro";
 import { Button } from "@picoframe/frame";
 import { X } from "lucide-react";
 import { useState } from "react";
@@ -15,7 +17,7 @@ import { useState } from "react";
 import { RENDER_VERSION, renderUnit } from "@/hub/assets/renderTop";
 import { RENDER_ANGLES, renderFrame } from "@/hub/assets/vocabulary";
 import { toBase64 } from "@/lib/base64";
-import { formatFixed, formatNumber } from "@/lib/format";
+import { formatFixed } from "@/lib/format";
 import type {
   RenderSkip,
   UnitDatasetEntry,
@@ -57,6 +59,7 @@ export function UnitModelPanel({
   onClose,
   hideTitle,
 }: Props) {
+  const { t } = useLingui();
   const object = unit?.objectName?.trim();
   const { model, loading, failed, error, retry } = useUnitsyncUnitModel(
     enginePath,
@@ -86,7 +89,9 @@ export function UnitModelPanel({
           size="sm"
           variant="ghost"
           onClick={onClose}
-          aria-label={hideTitle ? "Back to the units grid" : "Close model view"}
+          aria-label={
+            hideTitle ? t`Back to the units grid` : t`Close model view`
+          }
         >
           <X size={16} />
         </Button>
@@ -139,19 +144,24 @@ function Body({
   onRetry: () => void;
   gameArchive: string;
 }) {
+  const { t } = useLingui();
   if (!object) {
     return (
       <Note>
-        This unit's definition names no model, so the engine draws nothing for
-        it either.
+        <Trans>
+          This unit's definition names no model, so the engine draws nothing for
+          it either.
+        </Trans>
       </Note>
     );
   }
   if (loading) {
     return (
       <Note>
-        Reading <span className="font-mono">{object}</span> out of {gameArchive}
-        .
+        <Trans>
+          Reading <span className="font-mono">{object}</span> out of{" "}
+          {gameArchive}.
+        </Trans>
       </Note>
     );
   }
@@ -160,7 +170,7 @@ function Body({
       <Note>
         <ModelReadFailed
           error={error}
-          fallback="Could not reach unitsync to read this unit's model."
+          fallback={t`Could not reach unitsync to read this unit's model.`}
           onRetry={onRetry}
         />
       </Note>
@@ -173,10 +183,19 @@ function Body({
     return (
       <Note>
         {model.errors[0] ??
-          `Nothing drawable came out of ${object}: it has pieces but no faces.`}
+          t`Nothing drawable came out of ${object}: it has pieces but no faces.`}
       </Note>
     );
   }
+
+  const triangleCount = plural(triangles, {
+    one: "# triangle",
+    other: "# triangles",
+  });
+  const pieceCount = plural(countPieces(model.root), {
+    one: "# piece",
+    other: "# pieces",
+  });
 
   return (
     <>
@@ -185,26 +204,35 @@ function Body({
         className="aspect-square w-full border-b border-border/50"
       />
       <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1.5 px-3 py-2 text-xs">
-        <dt className="text-muted-foreground">Model</dt>
+        <dt className="text-muted-foreground">
+          <Trans>Model</Trans>
+        </dt>
         <dd className="break-all font-mono">{model.path}</dd>
 
-        <dt className="text-muted-foreground">Format</dt>
+        <dt className="text-muted-foreground">
+          <Trans>Format</Trans>
+        </dt>
         <dd>{modelFormatLabel(model.format)}</dd>
 
-        <dt className="text-muted-foreground">Size</dt>
+        <dt className="text-muted-foreground">
+          <Trans>Size</Trans>
+        </dt>
         <dd>
-          {formatNumber(triangles)} triangles in{" "}
-          {formatNumber(countPieces(model.root))} pieces
+          <Trans>
+            {triangleCount} in {pieceCount}
+          </Trans>
         </dd>
 
-        <dt className="text-muted-foreground">Textures</dt>
+        <dt className="text-muted-foreground">
+          <Trans>Textures</Trans>
+        </dt>
         <dd className="break-all font-mono">
           {model.textures.length === 0
-            ? "none"
+            ? t`none`
             : model.textures
-                .filter((t) => !t.teamColour)
-                .map((t) => t.name)
-                .join(", ") || "none"}
+                .filter((tex) => !tex.teamColour)
+                .map((tex) => tex.name)
+                .join(", ") || t`none`}
         </dd>
       </dl>
 
@@ -242,12 +270,20 @@ function HubRender({
   footprintX: number;
   footprintZ: number;
 }) {
+  const { t } = useLingui();
   const [result, setResult] = useState<UnitRenderResult | null>(null);
   const [busy, setBusy] = useState(false);
   // The narrowest frame this footprint can have, which is what it gets unless
   // the model reaches further. Replaced by the frame actually drawn, since only
   // a render knows how far this model reaches.
   const [frame, setFrame] = useState(renderFrame(footprintX, footprintZ));
+
+  const widthPx = frame.widthPx;
+  const heightPx = frame.heightPx;
+  const framing = plural(frame.bleedSquares, {
+    one: `${footprintX} by ${footprintZ} squares, framed with a square of bleed on each side, so ${widthPx} by ${heightPx} pixels.`,
+    other: `${footprintX} by ${footprintZ} squares, framed with # squares of bleed on each side, so ${widthPx} by ${heightPx} pixels.`,
+  });
 
   const run = async () => {
     setBusy(true);
@@ -282,21 +318,27 @@ function HubRender({
     }
   };
 
+  const assetWidth = result?.asset?.width;
+  const assetHeight = result?.asset?.height;
+  const assetKb = result?.asset
+    ? formatFixed(result.asset.bytes / 1024, 1)
+    : undefined;
+  const encodeProfile = result?.asset?.encodeProfile;
+  const skipReason = result?.assetSkipped
+    ? renderSkipReason(result.assetSkipped)
+    : undefined;
+
   return (
     <section className="border-t border-border/50 px-3 py-2">
       <div className="flex items-center justify-between gap-2">
-        <h4 className="text-xs font-medium">Top down render</h4>
+        <h4 className="text-xs font-medium">
+          <Trans>Top down render</Trans>
+        </h4>
         <Button size="sm" variant="secondary" onClick={run} disabled={busy}>
-          {busy ? "Rendering…" : "Render"}
+          {busy ? t`Rendering…` : t`Render`}
         </Button>
       </div>
-      <p className="mt-1 text-xs text-muted-foreground">
-        {footprintX} by {footprintZ} squares, framed with{" "}
-        {frame.bleedSquares === 1
-          ? "a square"
-          : `${frame.bleedSquares} squares`}{" "}
-        of bleed on each side, so {frame.widthPx} by {frame.heightPx} pixels.
-      </p>
+      <p className="mt-1 text-xs text-muted-foreground">{framing}</p>
 
       {result?.dataUrl && (
         // Checkerboard behind it, because the whole point is that the background
@@ -313,7 +355,7 @@ function HubRender({
         >
           <img
             src={result.dataUrl}
-            alt={`Top down render of ${object}`}
+            alt={t`Top down render of ${object}`}
             className="max-w-full"
           />
         </div>
@@ -321,24 +363,30 @@ function HubRender({
 
       {result?.asset && (
         <dl className="mt-2 grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 text-xs">
-          <dt className="text-muted-foreground">Size</dt>
+          <dt className="text-muted-foreground">
+            <Trans>Size</Trans>
+          </dt>
           <dd>
-            {result.asset.width} by {result.asset.height},{" "}
-            {formatFixed(result.asset.bytes / 1024, 1)} KB,{" "}
-            {result.asset.encodeProfile}
+            <Trans>
+              {assetWidth} by {assetHeight}, {assetKb} KB, {encodeProfile}
+            </Trans>
           </dd>
 
-          <dt className="text-muted-foreground">Identity</dt>
+          <dt className="text-muted-foreground">
+            <Trans>Identity</Trans>
+          </dt>
           <dd className="break-all font-mono">{result.asset.sourceHash}</dd>
 
-          <dt className="text-muted-foreground">File</dt>
+          <dt className="text-muted-foreground">
+            <Trans>File</Trans>
+          </dt>
           <dd className="break-all font-mono">{result.asset.path}</dd>
         </dl>
       )}
 
       {result?.assetSkipped && (
         <Note>
-          No render was stored: {renderSkipReason(result.assetSkipped)}
+          <Trans>No render was stored: {skipReason}</Trans>
         </Note>
       )}
       {result && result.errors.length > 0 && (
@@ -355,18 +403,18 @@ function HubRender({
 export function renderSkipReason(skip: RenderSkip): string {
   switch (skip) {
     case "mis-framed":
-      return "the picture is not the shape this unit's footprint frames to, which is a bug in coilbox rather than in the game.";
+      return t`the picture is not the shape this unit's footprint frames to, which is a bug in coilbox rather than in the game.`;
     case "no-pixels":
-      return "the pixels did not reach the worker intact.";
+      return t`the pixels did not reach the worker intact.`;
     case "unknown-angle":
-      return "coilbox asked for an angle the hub does not store.";
+      return t`coilbox asked for an angle the hub does not store.`;
     case "no-model":
-      return "the game's archive has no model for this unit.";
+      return t`the game's archive has no model for this unit.`;
     case "encode-failed":
-      return "libwebp refused the picture.";
+      return t`libwebp refused the picture.`;
     case "too-large":
-      return "it encoded past the size the hub accepts.";
+      return t`it encoded past the size the hub accepts.`;
     case "not-written":
-      return "it encoded, and the file could not be written.";
+      return t`it encoded, and the file could not be written.`;
   }
 }

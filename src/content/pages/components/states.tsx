@@ -1,3 +1,6 @@
+import { plural } from "@lingui/core/macro";
+import { useLingui as useLocale } from "@lingui/react";
+import { Plural, Trans, useLingui } from "@lingui/react/macro";
 import { Button, Drawer } from "@picoframe/frame";
 import {
   AlertCircle,
@@ -39,9 +42,13 @@ export function ScanFailed({ noun, reason }: { noun: string; reason: string }) {
   return (
     <Alert variant="destructive">
       <AlertCircle />
-      <AlertTitle>The scan failed, so no {noun} are listed</AlertTitle>
+      <AlertTitle>
+        <Trans>The scan failed, so no {noun} are listed</Trans>
+      </AlertTitle>
       <AlertDescription className="break-words">
-        Anything already installed is still on disk. unitsync said: {reason}
+        <Trans>
+          Anything already installed is still on disk. unitsync said: {reason}
+        </Trans>
       </AlertDescription>
     </Alert>
   );
@@ -66,18 +73,22 @@ export function SavedListStatus({
         className="flex items-center gap-1.5 text-xs text-muted-foreground"
       >
         <Loader2 className="size-3.5 motion-safe:animate-spin" />
-        Checking
+        <Trans>Checking</Trans>
       </p>
     );
   }
   return (
     <Alert variant="warning">
       <TriangleAlert />
-      <AlertTitle>This list could not be checked</AlertTitle>
+      <AlertTitle>
+        <Trans>This list could not be checked</Trans>
+      </AlertTitle>
       <AlertDescription className="break-words">
-        It shows the last saved scan, which may be out of date. Playing is off
-        until a scan succeeds.
-        {reason ? ` ${reason}` : " The scan was cancelled."}
+        <Trans>
+          It shows the last saved scan, which may be out of date. Playing is off
+          until a scan succeeds.
+        </Trans>{" "}
+        {reason || <Trans>The scan was cancelled.</Trans>}
       </AlertDescription>
     </Alert>
   );
@@ -93,11 +104,13 @@ export function DependencyBlocked({ reason }: { reason: string }) {
   return (
     <Alert variant="destructive">
       <AlertCircle />
-      <AlertTitle>This game is missing something it depends on</AlertTitle>
+      <AlertTitle>
+        <Trans>This game is missing something it depends on</Trans>
+      </AlertTitle>
       <AlertDescription className="break-words">
         {reason}{" "}
         <Link className="underline underline-offset-4" to="/library/games">
-          Open game downloads
+          <Trans>Open game downloads</Trans>
         </Link>
       </AlertDescription>
     </Alert>
@@ -123,8 +136,11 @@ export function Diagnostics({ errors }: { errors: string[] }) {
     <Collapsible className="rounded-lg border border-amber-500/40 bg-amber-500/10 p-3 text-sm">
       <CollapsibleTrigger className="group flex w-full cursor-pointer items-center gap-1 text-left text-amber-700 dark:text-amber-400">
         <ChevronRight className="size-4 shrink-0 transition-transform group-data-[state=open]:rotate-90" />
-        unitsync reported {errors.length} diagnostic
-        {errors.length === 1 ? "" : "s"}
+        <Plural
+          value={errors.length}
+          one="unitsync reported # diagnostic"
+          other="unitsync reported # diagnostics"
+        />
       </CollapsibleTrigger>
       <CollapsibleContent className="mt-2">
         <DiagnosticsLines errors={errors} />
@@ -162,6 +178,7 @@ export function DiagnosticsButton({
   title: string;
   description: string;
 }) {
+  const { t } = useLingui();
   const [open, setOpen] = useState(false);
   const count = errors.length;
   return (
@@ -185,10 +202,10 @@ export function DiagnosticsButton({
           <Check className="size-4" />
         )}
         {checking
-          ? "Checking…"
+          ? t`Checking…`
           : count > 0
-            ? `${count} diagnostic${count === 1 ? "" : "s"}`
-            : "No problems"}
+            ? plural(count, { one: "# diagnostic", other: "# diagnostics" })
+            : t`No problems`}
       </Button>
       {/* Controlled, for the reason the scenario editor's is: the frame's own
         drawer snapshots its content when it opens. These lines are fixed once
@@ -205,7 +222,9 @@ export function DiagnosticsButton({
           <DiagnosticsLines errors={errors} />
         ) : (
           <p className="text-sm text-muted-foreground">
-            unitsync read everything it was asked for without complaining.
+            <Trans>
+              unitsync read everything it was asked for without complaining.
+            </Trans>
           </p>
         )}
       </Drawer>
@@ -218,6 +237,8 @@ export function DiagnosticsButton({
  * text is surfaced on hover; the detail page shows the full banner.
  */
 export function WarningIcon({ warnings }: { warnings: string[] }) {
+  // Subscribes to language changes, so the core `plural` below re-renders.
+  useLocale();
   return (
     <span
       title={warnings.join("\n")}
@@ -225,9 +246,10 @@ export function WarningIcon({ warnings }: { warnings: string[] }) {
     >
       <TriangleAlert
         className="size-3.5"
-        aria-label={`${warnings.length} warning${
-          warnings.length === 1 ? "" : "s"
-        }`}
+        aria-label={plural(warnings.length, {
+          one: "# warning",
+          other: "# warnings",
+        })}
       />
     </span>
   );
@@ -245,8 +267,11 @@ export function WarningBanner({
     <Alert variant="warning">
       <TriangleAlert />
       <AlertTitle>
-        unitsync reported {warnings.length} warning
-        {warnings.length === 1 ? "" : "s"} for this {noun}
+        <Trans>
+          unitsync reported{" "}
+          <Plural value={warnings.length} one="# warning" other="# warnings" />{" "}
+          for this {noun}
+        </Trans>
       </AlertTitle>
       <AlertDescription>
         <ul className="flex flex-col gap-1 font-mono text-xs text-muted-foreground">
@@ -266,7 +291,9 @@ export function MissingDependencyBanner({ notes }: { notes: string[] }) {
   return (
     <Alert variant="warning">
       <TriangleAlert />
-      <AlertTitle>A dependency of this game is missing</AlertTitle>
+      <AlertTitle>
+        <Trans>A dependency of this game is missing</Trans>
+      </AlertTitle>
       <AlertDescription>
         <ul className="flex flex-col gap-1 font-mono text-xs text-muted-foreground">
           {notes.map((n) => (
@@ -276,7 +303,9 @@ export function MissingDependencyBanner({ notes }: { notes: string[] }) {
           ))}
         </ul>
         <p className="mt-2 text-xs text-muted-foreground">
-          A battle on this game stops in the engine until it is installed.
+          <Trans>
+            A battle on this game stops in the engine until it is installed.
+          </Trans>
         </p>
       </AlertDescription>
     </Alert>
@@ -364,7 +393,7 @@ export function DetailLoading({ backTo }: { backTo: string }) {
         to={backTo}
         className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:underline"
       >
-        <ArrowLeft className="size-3.5" /> Back
+        <ArrowLeft className="size-3.5" /> <Trans>Back</Trans>
       </Link>
       <SkeletonList />
     </div>
@@ -387,7 +416,7 @@ export function DetailError({
         to={backTo}
         className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:underline"
       >
-        <ArrowLeft className="size-3.5" /> Back
+        <ArrowLeft className="size-3.5" /> <Trans>Back</Trans>
       </Link>
       <Alert
         variant="destructive"
@@ -395,7 +424,7 @@ export function DetailError({
       >
         <span className="break-words text-destructive">{message}</span>
         <Button variant="outline" size="sm" onClick={onRetry}>
-          Retry
+          <Trans>Retry</Trans>
         </Button>
       </Alert>
     </div>
@@ -410,11 +439,13 @@ export function NotFound({ backTo, label }: { backTo: string; label: string }) {
         to={backTo}
         className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:underline"
       >
-        <ArrowLeft className="size-3.5" /> Back
+        <ArrowLeft className="size-3.5" /> <Trans>Back</Trans>
       </Link>
       <div className="flex flex-col items-center gap-2 rounded-lg border border-dashed p-10 text-center">
         <p className="text-sm text-muted-foreground">
-          This {label} isn't in the current scan. Go back and Scan the engine.
+          <Trans>
+            This {label} isn't in the current scan. Go back and Scan the engine.
+          </Trans>
         </p>
       </div>
     </div>

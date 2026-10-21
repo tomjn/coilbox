@@ -1,3 +1,6 @@
+import type { MessageDescriptor } from "@lingui/core";
+import { msg, plural } from "@lingui/core/macro";
+import { Plural, Trans, useLingui } from "@lingui/react/macro";
 import { Button, Input, useSetting } from "@picoframe/frame";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Field } from "@/components/Field";
@@ -6,6 +9,7 @@ import { OptionSelect } from "@/components/OptionSelect";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Toggle } from "@/components/ui/toggle";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
+import { getLocale } from "@/i18n";
 import { formatNumber } from "@/lib/format";
 import { drawHeatField } from "@/lib/heatCanvas";
 import { HEAT_KIND_OF_LAYER } from "@/lib/heatRamp";
@@ -76,55 +80,61 @@ const NO_REFIGHTS: ReadonlySet<string> = new Set();
 const NO_SIZES: Readonly<Record<string, MapSize>> = {};
 
 /** The windows offered by name. Each is a stretch of every match's own clock. */
-const WINDOWS: { value: string; label: string; window: MatchWindow | null }[] =
-  [
-    { value: "whole", label: "Whole match", window: WHOLE },
-    {
-      value: "first5",
-      label: "First 5 minutes",
-      window: { kind: "first", minutes: 5 },
-    },
-    {
-      value: "first10",
-      label: "First 10 minutes",
-      window: { kind: "first", minutes: 10 },
-    },
-    {
-      value: "5to10",
-      label: "Minutes 5 to 10",
-      window: { kind: "range", from: 5, to: 10 },
-    },
-    {
-      value: "10to20",
-      label: "Minutes 10 to 20",
-      window: { kind: "range", from: 10, to: 20 },
-    },
-    {
-      value: "last5",
-      label: "Last 5 minutes",
-      window: { kind: "last", minutes: 5 },
-    },
-    { value: "custom", label: "Between two minutes", window: null },
-  ];
+const WINDOWS: {
+  value: string;
+  label: MessageDescriptor;
+  window: MatchWindow | null;
+}[] = [
+  { value: "whole", label: msg`Whole match`, window: WHOLE },
+  {
+    value: "first5",
+    label: msg`First 5 minutes`,
+    window: { kind: "first", minutes: 5 },
+  },
+  {
+    value: "first10",
+    label: msg`First 10 minutes`,
+    window: { kind: "first", minutes: 10 },
+  },
+  {
+    value: "5to10",
+    label: msg`Minutes 5 to 10`,
+    window: { kind: "range", from: 5, to: 10 },
+  },
+  {
+    value: "10to20",
+    label: msg`Minutes 10 to 20`,
+    window: { kind: "range", from: 10, to: 20 },
+  },
+  {
+    value: "last5",
+    label: msg`Last 5 minutes`,
+    window: { kind: "last", minutes: 5 },
+  },
+  { value: "custom", label: msg`Between two minutes`, window: null },
+];
 
-const LEGEND_LABEL: Record<HeatLayerId, string> = {
-  buildings: "Where buildings were ordered",
-  defence: "Where defences were ordered",
-  economy: "Where economy buildings were ordered",
-  orders: "Where orders were aimed",
-  deaths: "Where units died",
+const LEGEND_LABEL: Record<HeatLayerId, MessageDescriptor> = {
+  buildings: msg`Where buildings were ordered`,
+  defence: msg`Where defences were ordered`,
+  economy: msg`Where economy buildings were ordered`,
+  orders: msg`Where orders were aimed`,
+  deaths: msg`Where units died`,
 };
 
 /** What a scaling does, for the help. */
-const NORMALISE_NOTE: Record<Normalise, string> = {
-  share:
-    "Each match counts the same: its events are scaled to add up to one before the matches are averaged. A long busy match weighs no more than a short quiet one.",
-  peak: "Each match is scaled so its own busiest spot is one, then the matches are averaged. A spot is bright when it was the busiest place in many matches.",
-  rate: "Each match is divided by its length in the window, then the matches are averaged. A busy match weighs more than a quiet one, and a long one no more than a short one.",
+const NORMALISE_NOTE: Record<Normalise, MessageDescriptor> = {
+  share: msg`Each match counts the same: its events are scaled to add up to one before the matches are averaged. A long busy match weighs no more than a short quiet one.`,
+  peak: msg`Each match is scaled so its own busiest spot is one, then the matches are averaged. A spot is bright when it was the busiest place in many matches.`,
+  rate: msg`Each match is divided by its length in the window, then the matches are averaged. A busy match weighs more than a quiet one, and a long one no more than a short one.`,
 };
 
-const plural = (n: number, one: string, many: string) =>
-  `${formatNumber(n)} ${n === 1 ? one : many}`;
+/** "A", "A and B", "A, B and C" in the app language. */
+const joinList = (parts: string[]) =>
+  new Intl.ListFormat(getLocale(), {
+    style: "long",
+    type: "conjunction",
+  }).format(parts);
 
 /**
  * Every match of one map in the library, drawn as one picture (#1161).
@@ -165,6 +175,7 @@ export function MapAggregate({
    *  because a replay does not record the size of the map it was played on. */
   mapSizes?: Readonly<Record<string, MapSize>>;
 }) {
+  const { t } = useLingui();
   const analyses = useStoredAnalyses();
   const { sets } = useReplaySets();
   // Every version of the map. Which of them are in is chosen below.
@@ -391,6 +402,12 @@ export function MapAggregate({
     JSON.stringify(filters) !== JSON.stringify(NO_FILTERS) ||
     !!activeSet ||
     versionChoice.size > 0;
+  const startCount = formatNumber(startMatches);
+  const layerToggle = (id: HeatLayerId) => {
+    const layerName = LAYER_LABEL[id];
+    const layerMatches = formatNumber(perLayer[id].contributing);
+    return t`${layerName} · ${layerMatches}`;
+  };
   const toggleVersion = (name: string, on: boolean) =>
     setVersionChoice((before) => new Map(before).set(name, on));
   const toggleGame = (name: string, on: boolean) =>
@@ -403,7 +420,9 @@ export function MapAggregate({
   if (ingesting && records.length === 0)
     return (
       <section className="flex flex-col gap-2">
-        <h2 className="text-sm font-medium">How this map is played</h2>
+        <h2 className="text-sm font-medium">
+          <Trans>How this map is played</Trans>
+        </h2>
         <Skeleton className="h-24 rounded bg-muted" />
       </section>
     );
@@ -411,43 +430,92 @@ export function MapAggregate({
   if (family.matches.length === 0)
     return (
       <section className="flex flex-col gap-2" data-testid="map-aggregate">
-        <h2 className="text-sm font-medium">How this map is played</h2>
+        <h2 className="text-sm font-medium">
+          <Trans>How this map is played</Trans>
+        </h2>
         <p className="text-sm text-muted-foreground">
-          No match on this map is in your library yet.
-          {family.remixes > 0 &&
-            ` ${plural(family.remixes, "remix is", "remixes are")} here, and a remix is a copy of another match and not a match of its own.`}
+          <Trans>No match on this map is in your library yet.</Trans>
+          {family.remixes > 0 && (
+            <>
+              {" "}
+              <Plural
+                value={family.remixes}
+                one="# remix is here, and a remix is a copy of another match and not a match of its own."
+                other="# remixes are here, and a remix is a copy of another match and not a match of its own."
+              />
+            </>
+          )}
         </p>
       </section>
     );
 
   const leftOut = [
-    family.remixes > 0 ? plural(family.remixes, "remix", "remixes") : null,
-    family.refights > 0 ? plural(family.refights, "refight", "refights") : null,
-    family.duplicates > 0
-      ? plural(
-          family.duplicates,
-          "second file of a match already counted",
-          "second files of matches already counted",
-        )
+    family.remixes > 0
+      ? plural(family.remixes, { one: "# remix", other: "# remixes" })
       : null,
-  ].filter(Boolean);
+    family.refights > 0
+      ? plural(family.refights, { one: "# refight", other: "# refights" })
+      : null,
+    family.duplicates > 0
+      ? plural(family.duplicates, {
+          one: "# second file of a match already counted",
+          other: "# second files of matches already counted",
+        })
+      : null,
+  ].filter((part): part is string => part !== null);
+  const inPicture = matchCount(shown.length);
+  const libraryTotal = formatNumber(family.matches.length);
+  const picturePart = filtered
+    ? plural(shown.length, {
+        one: `${inPicture} of the ${libraryTotal} on this map in your library is in this picture.`,
+        other: `${inPicture} of the ${libraryTotal} on this map in your library are in this picture.`,
+      })
+    : plural(shown.length, {
+        one: "The # match on this map in your library is in this picture.",
+        other: "All # matches on this map in your library are in this picture.",
+      });
   const mentioned = family.remixes + family.duplicates + family.refights;
   const spanned = versionsSpanned(shown);
+  const readDone = formatNumber(read.done);
+  const readTotal = formatNumber(read.total);
+  const ordersPart = plural(withOrders, {
+    one: "# has orders recorded",
+    other: "# have orders recorded",
+  });
+  const eventsPart = plural(withEvents, {
+    one: "# has been analysed and has event data",
+    other: "# have been analysed and have event data",
+  });
+  const countsPart = read.reading
+    ? t`Reading replays: ${readDone} of ${readTotal}.`
+    : t`${ordersPart}, and ${eventsPart}.`;
+  const divergedPart = plural(diverged, {
+    one: "# was analysed and the playback did not reproduce the match, so it has no events.",
+    other:
+      "# were analysed and the playback did not reproduce the match, so they have no events.",
+  });
+  const matchesWithStart = matchCount(startMatches);
+  const startsPart = plural(dots.length, {
+    one: `# start from ${matchesWithStart}.`,
+    other: `# starts from ${matchesWithStart}.`,
+  });
 
   return (
     <section className="flex flex-col gap-3" data-testid="map-aggregate">
       <div className="flex flex-col gap-1">
         <div className="flex items-center gap-1">
-          <h2 className="text-sm font-medium">How this map is played</h2>
+          <h2 className="text-sm font-medium">
+            <Trans>How this map is played</Trans>
+          </h2>
           <SectionHelp
-            section="how this map is played"
+            section={t`how this map is played`}
             source={
               layer === "deaths" ? "log" : layer === "" ? undefined : "stream"
             }
             detail={
               layer === "deaths" || layer === ""
                 ? undefined
-                : "These are orders given, which is what players meant to do and not what happened. An order that was cancelled or never carried out counts like any other."
+                : t`These are orders given, which is what players meant to do and not what happened. An order that was cancelled or never carried out counts like any other.`
             }
           >
             <AggregateHelp
@@ -457,7 +525,7 @@ export function MapAggregate({
               timeWindow={timeWindow}
               picture={shown.length > 0}
               versions={versions.length}
-              leftOut={leftOut.join(" and ")}
+              leftOut={joinList(leftOut)}
               leftOutCount={mentioned}
               short={!filters.includeShort ? choices.short : 0}
               showStarts={showStarts}
@@ -485,19 +553,16 @@ export function MapAggregate({
           className="text-sm text-muted-foreground"
           data-testid="aggregate-summary"
         >
-          {filtered
-            ? `${matchCount(shown.length)} of the ${formatNumber(family.matches.length)} on this map in your library ${shown.length === 1 ? "is" : "are"} in this picture.`
-            : `${shown.length === 1 ? "The 1 match" : `All ${formatNumber(shown.length)} matches`} on this map in your library ${shown.length === 1 ? "is" : "are"} in this picture.`}{" "}
-          {read.reading
-            ? `Reading replays: ${formatNumber(read.done)} of ${formatNumber(read.total)}.`
-            : `${formatNumber(withOrders)} ${withOrders === 1 ? "has" : "have"} orders recorded, and ${formatNumber(withEvents)} ${withEvents === 1 ? "has" : "have"} been analysed and ${withEvents === 1 ? "has" : "have"} event data.`}
-          {diverged > 0 &&
-            ` ${plural(diverged, "was", "were")} analysed and the playback did not reproduce the match, so ${diverged === 1 ? "it has" : "they have"} no events.`}
+          {picturePart} {countsPart}
+          {diverged > 0 && ` ${divergedPart}`}
         </p>
         {read.failed.length > 0 && (
           <p className="text-xs text-destructive">
-            {plural(read.failed.length, "replay", "replays")} could not be read
-            and {read.failed.length === 1 ? "is" : "are"} not in the picture.
+            <Plural
+              value={read.failed.length}
+              one="# replay could not be read and is not in the picture."
+              other="# replays could not be read and are not in the picture."
+            />
           </p>
         )}
       </div>
@@ -505,7 +570,7 @@ export function MapAggregate({
       {versions.length > 1 && (
         <>
           <VersionList
-            label="Versions of this map"
+            label={t`Versions of this map`}
             testId="map-versions"
             onToggle={toggleVersion}
             items={versions.map((v) => ({
@@ -514,11 +579,11 @@ export function MapAggregate({
               included: included.has(v.name),
               note:
                 v.name === mapName
-                  ? "this page's map"
+                  ? t`this page's map`
                   : v.verdict === "different"
                     ? included.has(v.name)
-                      ? "a different size from this page's map"
-                      : "a different size from this page's map, so it is left out"
+                      ? t`a different size from this page's map`
+                      : t`a different size from this page's map, so it is left out`
                     : undefined,
             }))}
           />
@@ -526,14 +591,16 @@ export function MapAggregate({
             className="text-xs text-muted-foreground"
             data-testid="version-layout-warning"
           >
-            A version can differ in layout, so its starts and counts may be in
-            the wrong place on this page's map.
+            <Trans>
+              A version can differ in layout, so its starts and counts may be in
+              the wrong place on this page's map.
+            </Trans>
           </p>
         </>
       )}
       {games.length > 1 && (
         <VersionList
-          label="Games and versions"
+          label={t`Games and versions`}
           testId="game-versions"
           onToggle={toggleGame}
           items={games.map((g) => ({
@@ -552,7 +619,7 @@ export function MapAggregate({
           <OptionSelect
             size="sm"
             className="w-44"
-            ariaLabel="Players in the match"
+            ariaLabel={t`Players in the match`}
             value={
               filters.playerCount === null ? ANY : String(filters.playerCount)
             }
@@ -560,10 +627,10 @@ export function MapAggregate({
               set({ playerCount: v === ANY ? null : Number(v) })
             }
             options={[
-              { value: ANY, label: "Any number of players" },
+              { value: ANY, label: t`Any number of players` },
               ...choices.playerCounts.map((n) => ({
                 value: String(n),
-                label: `${n} players`,
+                label: plural(n, { one: "# player", other: "# players" }),
               })),
             ]}
           />
@@ -572,16 +639,16 @@ export function MapAggregate({
           <OptionSelect
             size="sm"
             className="w-40"
-            ariaLabel="How the sides were arranged"
+            ariaLabel={t`How the sides were arranged`}
             value={filters.format ?? ANY}
             onValueChange={(v) =>
               set({ format: v === ANY ? null : (v as MatchFormat) })
             }
             options={[
-              { value: ANY, label: "Any sides" },
+              { value: ANY, label: t`Any sides` },
               ...choices.formats.map((f) => ({
                 value: f,
-                label: FORMAT_LABEL[f],
+                label: t(FORMAT_LABEL[f]),
               })),
             ]}
           />
@@ -589,37 +656,40 @@ export function MapAggregate({
         <OptionSelect
           size="sm"
           className="w-44"
-          ariaLabel="Analysed or not"
+          ariaLabel={t`Analysed or not`}
           value={filters.analysed}
           onValueChange={(v) =>
             set({ analysed: v as AggregateFilters["analysed"] })
           }
           options={[
-            { value: "any", label: "Analysed or not" },
-            { value: "yes", label: "Analysed" },
-            { value: "no", label: "Not analysed" },
+            { value: "any", label: t`Analysed or not` },
+            { value: "yes", label: t`Analysed` },
+            { value: "no", label: t`Not analysed` },
           ]}
         />
         {sets.length > 0 && (
           <OptionSelect
             size="sm"
             className="w-48"
-            ariaLabel="Scope to a set"
+            ariaLabel={t`Scope to a set`}
             value={activeSet?.id ?? "all"}
             onValueChange={(v) => setSetId(v === "all" ? "" : v)}
             options={[
-              { value: "all", label: "All replays" },
-              ...sets.map((s) => ({ value: s.id, label: `Set: ${s.name}` })),
+              { value: "all", label: t`All replays` },
+              ...sets.map((s) => {
+                const setName = s.name;
+                return { value: s.id, label: t`Set: ${setName}` };
+              }),
             ]}
           />
         )}
         <DateFilter
-          label="Played from"
+          label={t`Played from`}
           value={filters.from}
           onChange={(from) => set({ from })}
         />
         <DateFilter
-          label="Played until"
+          label={t`Played until`}
           value={filters.to}
           onChange={(to) => set({ to })}
         />
@@ -630,7 +700,7 @@ export function MapAggregate({
             pressed={filters.includeShort}
             onPressedChange={(on) => set({ includeShort: on })}
           >
-            Matches under a minute
+            <Trans>Matches under a minute</Trans>
           </Toggle>
         )}
         {anyFilter && (
@@ -643,14 +713,14 @@ export function MapAggregate({
               setVersionChoice(new Map());
             }}
           >
-            Clear filters
+            <Trans>Clear filters</Trans>
           </Button>
         )}
       </div>
 
       {shown.length === 0 ? (
         <p className="text-sm text-muted-foreground">
-          No match on this map passes these filters.
+          <Trans>No match on this map passes these filters.</Trans>
         </p>
       ) : (
         <>
@@ -668,7 +738,7 @@ export function MapAggregate({
                 {minimapUrl && (
                   <img
                     src={minimapUrl}
-                    alt={`Minimap of ${mapName}`}
+                    alt={t`Minimap of ${mapName}`}
                     className="absolute inset-0 size-full object-fill brightness-[0.7]"
                   />
                 )}
@@ -725,14 +795,14 @@ export function MapAggregate({
                   onPressedChange={setShowStarts}
                   data-testid="layer-starts"
                 >
-                  Start positions · {formatNumber(startMatches)}
+                  <Trans>Start positions · {startCount}</Trans>
                 </Toggle>
                 <ToggleGroup
                   type="single"
                   variant="outline"
                   size="sm"
                   spacing={1}
-                  aria-label="Density layer"
+                  aria-label={t`Density layer`}
                   className="flex-wrap"
                   value={layer}
                   onValueChange={(v) => setLayer(v as HeatLayerId | "")}
@@ -743,8 +813,7 @@ export function MapAggregate({
                       value={id}
                       data-testid={`layer-${id}`}
                     >
-                      {LAYER_LABEL[id]} ·{" "}
-                      {formatNumber(perLayer[id].contributing)}
+                      {layerToggle(id)}
                     </ToggleGroupItem>
                   ))}
                 </ToggleGroup>
@@ -754,7 +823,7 @@ export function MapAggregate({
                 <OptionSelect
                   size="sm"
                   className="w-56"
-                  ariaLabel="How each match is scaled"
+                  ariaLabel={t`How each match is scaled`}
                   value={normalise}
                   onValueChange={(v) => setNormalise(v as Normalise)}
                   options={(Object.keys(NORMALISE_LABEL) as Normalise[]).map(
@@ -764,17 +833,17 @@ export function MapAggregate({
                 <OptionSelect
                   size="sm"
                   className="w-52"
-                  ariaLabel="Window of match time"
+                  ariaLabel={t`Window of match time`}
                   value={windowChoice}
                   onValueChange={setWindowChoice}
                   options={WINDOWS.map(({ value, label }) => ({
                     value,
-                    label,
+                    label: t(label),
                   }))}
                 />
                 {windowChoice === "custom" && (
                   <>
-                    <Field label="From minute" className="w-24 text-xs">
+                    <Field label={t`From minute`} className="w-24 text-xs">
                       <Input
                         type="number"
                         min={0}
@@ -782,7 +851,7 @@ export function MapAggregate({
                         onChange={(e) => setCustomFrom(e.target.value)}
                       />
                     </Field>
-                    <Field label="To minute" className="w-24 text-xs">
+                    <Field label={t`To minute`} className="w-24 text-xs">
                       <Input
                         type="number"
                         min={1}
@@ -795,8 +864,10 @@ export function MapAggregate({
               </div>
               {customInvalid && (
                 <p className="text-xs text-destructive">
-                  The second minute must be after the first. The whole match is
-                  shown until it is.
+                  <Trans>
+                    The second minute must be after the first. The whole match
+                    is shown until it is.
+                  </Trans>
                 </p>
               )}
               {showStarts && (
@@ -806,9 +877,9 @@ export function MapAggregate({
                 >
                   {dots.length === 0
                     ? read.reading
-                      ? "Reading start positions…"
-                      : "None of these replays recorded a start position."
-                    : `${plural(dots.length, "start", "starts")} from ${matchCount(startMatches)}.`}
+                      ? t`Reading start positions…`
+                      : t`None of these replays recorded a start position.`
+                    : startsPart}
                 </p>
               )}
 
@@ -829,7 +900,7 @@ export function MapAggregate({
               <MapExportButtons
                 info={exportBasis}
                 layer={layer}
-                layerSentence={layer ? LEGEND_LABEL[layer] : ""}
+                layerSentence={layer ? t(LEGEND_LABEL[layer]) : ""}
                 drawn={drawn}
                 normalise={normalise}
                 window={timeWindow}
@@ -891,14 +962,23 @@ function LayerNotes({
   /** Replays whose stream could not be read to the end. */
   incomplete: number;
 }) {
+  const { t } = useLingui();
   const category = layer === "defence" || layer === "economy";
   const windowed = timeWindow.kind !== "whole";
+  const when = windowLabel(timeWindow);
+  const unclassified = drawn.unclassified - misfit;
+  const contributing = formatNumber(drawn.contributing);
+  const available = matchCount(drawn.available);
+  const events = layerEvents(layer, drawn.events);
+  const fromMatches = matchCount(drawn.contributing);
   return (
     <div className="flex flex-col gap-2" data-testid="layer-notes">
       {layer === "deaths" && analysedShown === 0 && (
         <p className="text-xs text-muted-foreground" data-testid="no-analysis">
-          No match on this map in the picture has been analysed, so there are no
-          deaths to draw.
+          <Trans>
+            No match on this map in the picture has been analysed, so there are
+            no deaths to draw.
+          </Trans>
         </p>
       )}
 
@@ -907,9 +987,15 @@ function LayerNotes({
           className="text-xs text-muted-foreground"
           data-testid="category-note"
         >
-          {categoriesLoading
-            ? "Reading unit definitions…"
-            : `${plural(drawn.unclassified - misfit, "match was", "matches were")} played on a game or version that is not installed, so nothing says what ${drawn.unclassified - misfit === 1 ? "its" : "their"} buildings are for and ${drawn.unclassified - misfit === 1 ? "it is" : "they are"} left out of this layer.`}
+          {categoriesLoading ? (
+            t`Reading unit definitions…`
+          ) : (
+            <Plural
+              value={unclassified}
+              one="# match was played on a game or version that is not installed, so nothing says what its buildings are for and it is left out of this layer."
+              other="# matches were played on a game or version that is not installed, so nothing says what their buildings are for and they are left out of this layer."
+            />
+          )}
         </p>
       )}
       {category && !categoriesLoading && misfit > 0 && (
@@ -917,8 +1003,11 @@ function LayerNotes({
           className="text-xs text-muted-foreground"
           data-testid="category-misfit"
         >
-          {plural(misfit, "match", "matches")} left out: orders do not fit the
-          unit list.
+          <Plural
+            value={misfit}
+            one="# match left out: orders do not fit the unit list."
+            other="# matches left out: orders do not fit the unit list."
+          />
         </p>
       )}
 
@@ -930,34 +1019,39 @@ function LayerNotes({
             data-testid="layer-empty"
           >
             {windowed
-              ? `None of these matches has anything on this layer in ${windowLabel(timeWindow)}.`
-              : "None of these matches has anything on this layer."}
+              ? t`None of these matches has anything on this layer in ${when}.`
+              : t`None of these matches has anything on this layer.`}
           </p>
         )}
       {drawn.contributing > 0 && windowed && (
         <p className="text-xs text-muted-foreground" data-testid="window-count">
-          {formatNumber(drawn.contributing)} of {matchCount(drawn.available)}{" "}
-          {drawn.contributing === 1 ? "has" : "have"} anything on this layer in{" "}
-          {windowLabel(timeWindow)}.
+          <Plural
+            value={drawn.contributing}
+            one={`${contributing} of ${available} has anything on this layer in ${when}.`}
+            other={`${contributing} of ${available} have anything on this layer in ${when}.`}
+          />
         </p>
       )}
       {drawn.contributing > 0 && (
         <p className="text-xs text-muted-foreground" data-testid="layer-events">
-          {layerEvents(layer, drawn.events)}
-          {windowed ? ` in ${windowLabel(timeWindow)}` : ""}, from{" "}
-          {matchCount(drawn.contributing)}.
+          {windowed
+            ? t`${events} in ${when}, from ${fromMatches}.`
+            : t`${events}, from ${fromMatches}.`}
         </p>
       )}
       {incomplete > 0 && layer !== "deaths" && (
         <p className="text-xs text-muted-foreground">
-          {plural(incomplete, "replay", "replays")} could not be read to the end
-          and may be missing later orders.
+          <Plural
+            value={incomplete}
+            one="# replay could not be read to the end and may be missing later orders."
+            other="# replays could not be read to the end and may be missing later orders."
+          />
         </p>
       )}
 
       {drawn.field && drawn.field.peak > 0 && (
         <HeatLegend
-          label={LEGEND_LABEL[layer]}
+          label={t(LEGEND_LABEL[layer])}
           peak={layerLegend(layer, drawn, normalise, timeWindow)}
           kind={HEAT_KIND_OF_LAYER[layer]}
         />
@@ -1007,90 +1101,124 @@ function AggregateHelp({
   /** Whether the layer has anything in the picture. */
   windowCount: boolean;
 }) {
+  const { t } = useLingui();
   const windowed = timeWindow.kind !== "whole";
   const category = layer === "defence" || layer === "economy";
+  const when = windowLabel(timeWindow);
+  const leftOutNote = plural(leftOutCount, {
+    one: `${leftOut} is left out, so each match counts once.`,
+    other: `${leftOut} are left out, so each match counts once.`,
+  });
+  const shortNote = leftOut
+    ? plural(short, {
+        one: "# match under a minute is left out too.",
+        other: "# matches under a minute are left out too.",
+      })
+    : plural(short, {
+        one: "# match under a minute is left out.",
+        other: "# matches under a minute are left out.",
+      });
+  const windowNote = t`The window is ${when} of each match by its own clock, in whole minutes.`;
+  const emptyWindowNote = t`Matches with nothing on this layer in the window are not in the average.`;
+  const destroyedNote = t`Every unit that was destroyed counts, whatever destroyed it.`;
+  const unattackedNote = plural(unattacked, {
+    one: "# death names no attacker, which is how a cancelled build and a self destruct are recorded.",
+    other:
+      "# deaths name no attacker, which is how a cancelled build and a self destruct are recorded.",
+  });
+  const noPositionNote = plural(noPosition, {
+    one: "# death was recorded at exactly the map's corner, which is what the recorder writes when it has no position, and is left out.",
+    other:
+      "# deaths were recorded at exactly the map's corner, which is what the recorder writes when it has no position, and are left out.",
+  });
   return (
     <>
       <p data-testid="grouping-note">
-        Matches are grouped by the map's name with a trailing version taken off,
-        and not by the map's archive. A replay records the map's name and
-        nothing that says which archive it was played on, so two archives with
-        one name cannot be told apart.
+        <Trans>
+          Matches are grouped by the map's name with a trailing version taken
+          off, and not by the map's archive. A replay records the map's name and
+          nothing that says which archive it was played on, so two archives with
+          one name cannot be told apart.
+        </Trans>
       </p>
       {(leftOut || short > 0) && (
         <p data-testid="left-out-note">
-          {leftOut &&
-            `${leftOut} ${leftOutCount === 1 ? "is" : "are"} left out, so each match counts once.`}
-          {short > 0 &&
-            `${leftOut ? " " : ""}${plural(short, "match", "matches")} under a minute ${short === 1 ? "is" : "are"} left out${leftOut ? " too" : ""}.`}
+          {leftOut && leftOutNote}
+          {short > 0 && `${leftOut ? " " : ""}${shortNote}`}
         </p>
       )}
       {versions > 1 && (
         <>
           <p>
-            A version can differ in layout. Its starts and counts are drawn on
-            this page's map as the replay recorded them, so a version that moved
-            things puts them in the wrong place.
+            <Trans>
+              A version can differ in layout. Its starts and counts are drawn on
+              this page's map as the replay recorded them, so a version that
+              moved things puts them in the wrong place.
+            </Trans>
           </p>
           <p data-testid="version-sizes-note">
-            A version is left out only when it is installed and its size differs
-            from this page's map. A version that is not installed has no size to
-            compare, because a replay does not record the size of the map it was
-            played on.
+            <Trans>
+              A version is left out only when it is installed and its size
+              differs from this page's map. A version that is not installed has
+              no size to compare, because a replay does not record the size of
+              the map it was played on.
+            </Trans>
           </p>
         </>
       )}
       {picture && (
         <p>
-          The number beside a layer is how many matches it is drawn from. One
-          density layer shows at a time.
+          <Trans>
+            The number beside a layer is how many matches it is drawn from. One
+            density layer shows at a time.
+          </Trans>
         </p>
       )}
       {picture && showStarts && hasDots && (
         <p>
-          A dot is where one team's start was set before one match. The engine
-          can move a start into its start box, so a commander may have appeared
-          a short way off.
+          <Trans>
+            A dot is where one team's start was set before one match. The engine
+            can move a start into its start box, so a commander may have
+            appeared a short way off.
+          </Trans>
         </p>
       )}
       {picture && layer && (
         <p data-testid="scaling-note">
-          {NORMALISE_NOTE[normalise]}
-          {windowed &&
-            ` The window is ${windowLabel(timeWindow)} of each match by its own clock, in whole minutes.`}
-          {windowed &&
-            windowCount &&
-            " Matches with nothing on this layer in the window are not in the average."}
+          {t(NORMALISE_NOTE[normalise])}
+          {windowed && ` ${windowNote}`}
+          {windowed && windowCount && ` ${emptyWindowNote}`}
         </p>
       )}
       {picture && layer === "deaths" && (
         <p>
-          Deaths come from playing a match back, which is run from a replay's
-          own page.
-          {analysedShown > 0 &&
-            " Every unit that was destroyed counts, whatever destroyed it."}
-          {analysedShown > 0 &&
-            unattacked > 0 &&
-            ` ${plural(unattacked, "death names", "deaths name")} no attacker, which is how a cancelled build and a self destruct are recorded.`}
-          {analysedShown > 0 &&
-            noPosition > 0 &&
-            ` ${plural(noPosition, "death was", "deaths were")} recorded at exactly the map's corner, which is what the recorder writes when it has no position, and ${noPosition === 1 ? "is" : "are"} left out.`}
+          <Trans>
+            Deaths come from playing a match back, which is run from a replay's
+            own page.
+          </Trans>
+          {analysedShown > 0 && ` ${destroyedNote}`}
+          {analysedShown > 0 && unattacked > 0 && ` ${unattackedNote}`}
+          {analysedShown > 0 && noPosition > 0 && ` ${noPositionNote}`}
         </p>
       )}
       {picture && category && (
         <p>
-          What a building is for is read from the unit list that replay's own
-          page names its orders from: the engine's own list when the match was
-          analysed, then the installed game with exactly the name and version
-          the replay records, read with the match's own mod options and AIs. A
-          match whose build orders do not fit that list, or whose orders could
-          not be checked against it, is left out of Defences and Economy.
+          <Trans>
+            What a building is for is read from the unit list that replay's own
+            page names its orders from: the engine's own list when the match was
+            analysed, then the installed game with exactly the name and version
+            the replay records, read with the match's own mod options and AIs. A
+            match whose build orders do not fit that list, or whose orders could
+            not be checked against it, is left out of Defences and Economy.
+          </Trans>
         </p>
       )}
       {picture && drawn?.field && drawn.field.peak > 0 && (
         <p>
-          Colours compare places on this map with each other, not with another
-          picture.
+          <Trans>
+            Colours compare places on this map with each other, not with another
+            picture.
+          </Trans>
         </p>
       )}
     </>

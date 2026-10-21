@@ -12,6 +12,8 @@
  * matches.
  */
 
+import { i18n, type MessageDescriptor } from "@lingui/core";
+import { msg, plural, t } from "@lingui/core/macro";
 import { formatFixed, formatNumber } from "@/lib/format";
 import {
   buildHeatFieldFromCounts,
@@ -121,12 +123,29 @@ export function decodeReplayGrids(raw: ReplayMapGrids): ReplayCounts {
 /** How the sides of a match were arranged. */
 export type MatchFormat = "duel" | "teams" | "ffa" | "other";
 
-export const FORMAT_LABEL: Record<MatchFormat, string> = {
-  duel: "1v1",
-  teams: "Two sides",
-  ffa: "Free for all",
-  other: "Other",
+/** Resolve each with `i18n._` at render, so a language change shows. */
+export const FORMAT_LABEL: Record<MatchFormat, MessageDescriptor> = {
+  duel: msg`1v1`,
+  teams: msg`Two sides`,
+  ffa: msg`Free for all`,
+  other: msg`Other`,
 };
+
+/**
+ * A record of labels that reads the active language each time one is looked
+ * up. Callers outside this folder index the record as plain strings.
+ */
+function lazyLabels<K extends string>(
+  messages: Record<K, MessageDescriptor>,
+): Record<K, string> {
+  const out = {} as Record<K, string>;
+  for (const key of Object.keys(messages) as K[])
+    Object.defineProperty(out, key, {
+      enumerable: true,
+      get: () => i18n._(messages[key]),
+    });
+  return out;
+}
 
 /** Whether a match has events from an analysis. */
 export type MatchAnalysis = "events" | "diverged" | "none";
@@ -388,13 +407,21 @@ export function windowSlices(
 export function windowLabel(window: MatchWindow): string {
   switch (window.kind) {
     case "whole":
-      return "the whole match";
+      return t`the whole match`;
     case "first":
-      return `the first ${window.minutes} minutes`;
+      return plural(window.minutes, {
+        one: "the first # minute",
+        other: "the first # minutes",
+      });
     case "last":
-      return `the last ${window.minutes} minutes`;
-    case "range":
-      return `minutes ${window.from} to ${window.to}`;
+      return plural(window.minutes, {
+        one: "the last # minute",
+        other: "the last # minutes",
+      });
+    case "range": {
+      const { from, to } = window;
+      return t`minutes ${from} to ${to}`;
+    }
   }
 }
 
@@ -449,11 +476,11 @@ const LAYER_CATEGORY: Partial<Record<HeatLayerId, UnitCategory>> = {
  */
 export type Normalise = "share" | "peak" | "rate";
 
-export const NORMALISE_LABEL: Record<Normalise, string> = {
-  share: "Share of each match",
-  peak: "Each match's busiest spot",
-  rate: "Per minute of match",
-};
+export const NORMALISE_LABEL = lazyLabels<Normalise>({
+  share: msg`Share of each match`,
+  peak: msg`Each match's busiest spot`,
+  rate: msg`Per minute of match`,
+});
 
 export interface LayerAggregate {
   /** The mean of the scaled matches, smoothed. Null when no match has
@@ -656,34 +683,46 @@ export function aggregateLayer(
   return out;
 }
 
-const NOUN: Record<HeatLayerId, [one: string, many: string]> = {
-  buildings: ["order to place a building", "orders to place a building"],
-  defence: ["order to place a defence", "orders to place a defence"],
-  economy: [
-    "order to place an economy building",
-    "orders to place an economy building",
-  ],
-  orders: ["order", "orders"],
-  deaths: ["death", "deaths"],
+const NOUN_ONE: Record<HeatLayerId, MessageDescriptor> = {
+  buildings: msg`order to place a building`,
+  defence: msg`order to place a defence`,
+  economy: msg`order to place an economy building`,
+  orders: msg`order`,
+  deaths: msg`death`,
 };
 
-export const LAYER_LABEL: Record<HeatLayerId, string> = {
-  buildings: "Building density",
-  defence: "Defences",
-  economy: "Economy",
-  orders: "Order density",
-  deaths: "Deaths",
+const NOUN_MANY: Record<HeatLayerId, MessageDescriptor> = {
+  buildings: msg`orders to place a building`,
+  defence: msg`orders to place a defence`,
+  economy: msg`orders to place an economy building`,
+  orders: msg`orders`,
+  deaths: msg`deaths`,
 };
+
+export const LAYER_LABEL = lazyLabels<HeatLayerId>({
+  buildings: msg`Building density`,
+  defence: msg`Defences`,
+  economy: msg`Economy`,
+  orders: msg`Order density`,
+  deaths: msg`Deaths`,
+});
 
 /** A count of matches in words. */
-export const matchCount = (n: number) =>
-  `${formatNumber(n)} ${n === 1 ? "match" : "matches"}`;
+export const matchCount = (n: number) => {
+  const count = formatNumber(n);
+  return plural(n, { one: `${count} match`, other: `${count} matches` });
+};
 
 /** How many events a layer holds, in its own noun: "172 orders to place a
  *  building". */
 export function layerEvents(layer: HeatLayerId, events: number): string {
-  const [one, many] = NOUN[layer];
-  return `${formatNumber(events)} ${events === 1 ? one : many}`;
+  const count = formatNumber(events);
+  const one = i18n._(NOUN_ONE[layer]);
+  const many = i18n._(NOUN_MANY[layer]);
+  return plural(events, {
+    one: `${count} ${one}`,
+    other: `${count} ${many}`,
+  });
 }
 
 /** A fraction as a percentage a person can read: one decimal under ten. */
@@ -704,19 +743,35 @@ export function layerLegend(
 ): string {
   const { field, contributing } = aggregate;
   if (!field) return "";
-  const [one, many] = NOUN[layer];
-  const reach = `${formatNumber(Math.round(field.radius))} elmos`;
-  const during = window.kind === "whole" ? "" : ` in ${windowLabel(window)}`;
-  const over = `across ${matchCount(contributing)}`;
-  if (normalise === "share")
-    return `on average ${percent(aggregate.atPeak ?? 0)} of a match's ${many}${during} within ${reach} of one spot, ${over}`;
+  const one = i18n._(NOUN_ONE[layer]);
+  const many = i18n._(NOUN_MANY[layer]);
+  const radius = formatNumber(Math.round(field.radius));
+  const reach = t`${radius} elmos`;
+  const windowed = window.kind !== "whole";
+  const when = windowLabel(window);
+  const matches = matchCount(contributing);
+  const over = t`across ${matches}`;
+  if (normalise === "share") {
+    const share = percent(aggregate.atPeak ?? 0);
+    return windowed
+      ? t`on average ${share} of a match's ${many} in ${when} within ${reach} of one spot, ${over}`
+      : t`on average ${share} of a match's ${many} within ${reach} of one spot, ${over}`;
+  }
   if (normalise === "rate") {
     const rate = aggregate.atPeak ?? 0;
     const shown =
       rate < 10 ? formatFixed(rate, 1) : formatNumber(Math.round(rate));
-    return `on average ${shown} ${rate === 1 ? one : many} a minute${during} within ${reach} of one spot, ${over}`;
+    const amount = plural(rate, {
+      one: `${shown} ${one}`,
+      other: `${shown} ${many}`,
+    });
+    return windowed
+      ? t`on average ${amount} a minute in ${when} within ${reach} of one spot, ${over}`
+      : t`on average ${amount} a minute within ${reach} of one spot, ${over}`;
   }
-  return `where the most matches were at their own busiest${during}, ${over}. Each match is scaled to its busiest spot, so this is not a count`;
+  return windowed
+    ? t`where the most matches were at their own busiest in ${when}, ${over}. Each match is scaled to its busiest spot, so this is not a count`
+    : t`where the most matches were at their own busiest, ${over}. Each match is scaled to its busiest spot, so this is not a count`;
 }
 
 // ---- start positions --------------------------------------------------------

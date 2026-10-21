@@ -1,3 +1,4 @@
+import { t } from "@lingui/core/macro";
 import type { StatRecord } from "./bindings";
 import { GAME_LENGTH_BOUNDARIES_SEC } from "./gameLength";
 
@@ -503,17 +504,18 @@ export interface Matchup {
 /** The label for the band a game of `durationSec` falls in. */
 export function lengthBandLabel(durationSec: number): string {
   const [thirty, hour, twoHours] = GAME_LENGTH_BOUNDARIES_SEC;
-  if (durationSec > twoHours) return "Over 2 hours";
-  if (durationSec > hour) return "1 to 2 hours";
-  if (durationSec > thirty) return "30 minutes to 1 hour";
-  return "Up to 30 minutes";
+  if (durationSec > twoHours) return t`Over 2 hours`;
+  if (durationSec > hour) return t`1 to 2 hours`;
+  if (durationSec > thirty) return t`30 minutes to 1 hour`;
+  return t`Up to 30 minutes`;
 }
 
-const LENGTH_BAND_ORDER = [
-  "Up to 30 minutes",
-  "30 minutes to 1 hour",
-  "1 to 2 hours",
-  "Over 2 hours",
+/** The band labels, shortest first, in the active language. */
+const lengthBandOrder = () => [
+  t`Up to 30 minutes`,
+  t`30 minutes to 1 hour`,
+  t`1 to 2 hours`,
+  t`Over 2 hours`,
 ];
 
 function matchupGroups(
@@ -555,6 +557,7 @@ export function matchupAgainst(
   other: string,
   refightFilenames: ReadonlySet<string> = new Set(),
 ): Matchup {
+  const unknownFaction = t`Unknown`;
   const opposed: MatchupGame[] = [];
   let gamesTogether = 0;
   let gamesSideUnknown = 0;
@@ -570,13 +573,14 @@ export function matchupAgainst(
     } else {
       opposed.push({
         record,
-        myFaction: mine.side || "Unknown",
-        theirFaction: theirs.side || "Unknown",
+        myFaction: mine.side || unknownFaction,
+        theirFaction: theirs.side || unknownFaction,
         won: record.winnersKnown ? (mine.won ?? undefined) : undefined,
       });
     }
   }
   opposed.sort((a, b) => a.record.startTimeMs - b.record.startTimeMs);
+  const bandOrder = lengthBandOrder();
 
   return {
     me,
@@ -587,14 +591,17 @@ export function matchupAgainst(
     byMap: matchupGroups(opposed, (g) => g.record.mapName, mostPlayed),
     byFactions: matchupGroups(
       opposed,
-      (g) => `${g.myFaction} vs ${g.theirFaction}`,
+      (g) => {
+        const mine = g.myFaction;
+        const theirs = g.theirFaction;
+        return t`${mine} vs ${theirs}`;
+      },
       mostPlayed,
     ),
     byLength: matchupGroups(
       opposed,
       (g) => lengthBandLabel(g.record.durationSec),
-      (a, b) =>
-        LENGTH_BAND_ORDER.indexOf(a.key) - LENGTH_BAND_ORDER.indexOf(b.key),
+      (a, b) => bandOrder.indexOf(a.key) - bandOrder.indexOf(b.key),
     ),
     matches: [...opposed].reverse(),
   };

@@ -18,6 +18,7 @@
  * `orderFit` in `replayUnitDefs.ts` is the check for what is left.
  */
 
+import { t } from "@lingui/core/macro";
 import { formatDuration } from "@/lib/format";
 import type {
   BuildOrder,
@@ -161,6 +162,8 @@ export function buildOrderSeats(
   const seats = new Map<string, BuildOrderSeat>();
   for (const order of result.orders) {
     const ai = order.origin.kind === "ai" ? order.origin : null;
+    const aiTeam = ai?.team ?? 0;
+    const playerNumber = order.player;
     const key = ai ? `ai-${ai.team}-${ai.ai}` : `player-${order.player}`;
     let seat = seats.get(key);
     if (!seat) {
@@ -168,8 +171,8 @@ export function buildOrderSeats(
         key,
         name: ai
           ? (info.ais.find((a) => a.team === ai.team)?.name ??
-            `AI on team ${ai.team}`)
-          : (names.get(order.player) ?? `Player ${order.player}`),
+            t`AI on team ${aiTeam}`)
+          : (names.get(order.player) ?? t`Player ${playerNumber}`),
         team: order.team,
         orders: [],
       };
@@ -184,12 +187,13 @@ export function buildOrderSeats(
  *  added to the end, or one that replaced the queue, gets none. */
 export function slotNote(order: BuildOrder): string | null {
   const slot = order.slot;
-  if (slot.kind === "front") return "front of queue";
+  if (slot.kind === "front") return t`front of queue`;
   if (slot.kind === "insertAt") {
-    if (slot.position === 0) return "inserted first";
-    if (slot.position === -1) return "inserted last";
-    return `inserted at ${slot.position}`;
+    if (slot.position === 0) return t`inserted first`;
+    if (slot.position === -1) return t`inserted last`;
+    const position = slot.position;
+    return t`inserted at ${position}`;
   }
-  if (slot.kind === "insertAtTag") return "inserted mid-queue";
+  if (slot.kind === "insertAtTag") return t`inserted mid-queue`;
   return null;
 }

@@ -1,3 +1,4 @@
+import { t } from "@lingui/core/macro";
 import keysFile from "@/data/engineMapInfoKeys.json";
 import { type Finding, readErrorsFinding } from "./compatReport";
 
@@ -112,9 +113,9 @@ export function buildMapReport(inputs: MapReportInputs): Finding[] {
   if (sm3.length > 0)
     out.push({
       kind: "sm3",
-      label: "SM3 map, not supported since Spring 95.0",
+      label: t`SM3 map, not supported since Spring 95.0`,
       severity: "problem",
-      details: [{ heading: "Files", lines: sm3 }],
+      details: [{ heading: t`Files`, lines: sm3 }],
     });
 
   const hasMapinfo = files.includes("mapinfo.lua");
@@ -122,7 +123,7 @@ export function buildMapReport(inputs: MapReportInputs): Finding[] {
   if (!hasMapinfo && smd.length === 0 && sm3.length === 0)
     out.push({
       kind: "no-map-settings",
-      label: "No mapinfo.lua or .smd file",
+      label: t`No mapinfo.lua or .smd file`,
       severity: "problem",
     });
 
@@ -130,10 +131,10 @@ export function buildMapReport(inputs: MapReportInputs): Finding[] {
   if (models.length > 0)
     out.push({
       kind: "features-3do",
-      label: ".3do feature models",
+      label: t`.3do feature models`,
       severity: "problem",
       count: models.length,
-      details: [{ heading: "Models", lines: models }],
+      details: [{ heading: t`Models`, lines: models }],
     });
 
   const entries = inputs.mapinfo ?? [];
@@ -146,7 +147,7 @@ export function buildMapReport(inputs: MapReportInputs): Finding[] {
   if (pcx.length > 0)
     out.push({
       kind: "textures-pcx",
-      label: ".pcx textures in mapinfo.lua",
+      label: t`.pcx textures in mapinfo.lua`,
       severity: "problem",
       count: pcx.length,
       details: [{ heading: "mapinfo.lua", lines: pcx }],
@@ -157,7 +158,7 @@ export function buildMapReport(inputs: MapReportInputs): Finding[] {
   if (warned.length > 0)
     out.push({
       kind: "mapinfo-keys",
-      label: "mapinfo.lua keys the engine warns on",
+      label: t`mapinfo.lua keys the engine warns on`,
       severity: "problem",
       count: warned.length,
       details: warned.map((k) => ({ heading: k.key, lines: [k.message] })),
@@ -167,7 +168,7 @@ export function buildMapReport(inputs: MapReportInputs): Finding[] {
   if (bmp.length > 0)
     out.push({
       kind: "textures-bmp",
-      label: ".bmp textures in mapinfo.lua",
+      label: t`.bmp textures in mapinfo.lua`,
       severity: "info",
       count: bmp.length,
       details: [{ heading: "mapinfo.lua", lines: bmp }],
@@ -176,9 +177,9 @@ export function buildMapReport(inputs: MapReportInputs): Finding[] {
   if (!hasMapinfo && smd.length > 0)
     out.push({
       kind: "smd-only",
-      label: "No mapinfo.lua, settings from the .smd file",
+      label: t`No mapinfo.lua, settings from the .smd file`,
       severity: "info",
-      details: [{ heading: "Files", lines: smd }],
+      details: [{ heading: t`Files`, lines: smd }],
     });
 
   const errors = readErrorsFinding(inputs.errors ?? []);

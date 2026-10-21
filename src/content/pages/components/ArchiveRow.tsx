@@ -1,3 +1,4 @@
+import { useLingui } from "@lingui/react/macro";
 import { Button } from "@picoframe/frame";
 import { Boxes } from "lucide-react";
 import { Link, useNavigate } from "react-router";
@@ -18,18 +19,19 @@ export function ArchiveRow({
   archive: Archive;
   classification?: ArchiveClassification;
 }) {
+  const { t } = useLingui();
   const navigate = useNavigate();
   const size = formatBytes(archive.size);
   const detailTo = `/library/archives/${encodeURIComponent(archive.name)}`;
   const linked =
     classification?.kind === "game" && classification.gameName
       ? {
-          label: "View game",
+          label: t`View game`,
           to: `/library/games/${encodeURIComponent(classification.gameName)}`,
         }
       : classification?.kind === "map" && classification.mapName
         ? {
-            label: "View map",
+            label: t`View map`,
             to: `/library/maps/${encodeURIComponent(classification.mapName)}`,
           }
         : null;

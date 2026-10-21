@@ -1,3 +1,5 @@
+import { i18n, type MessageDescriptor } from "@lingui/core";
+import { msg, t } from "@lingui/core/macro";
 import { listen } from "@tauri-apps/api/event";
 import { useEffect, useSyncExternalStore } from "react";
 import { formatNumber } from "@/lib/format";
@@ -153,7 +155,7 @@ export async function requestAnalysis(args: {
   force?: boolean;
 }): Promise<"queued" | "alreadyQueued" | "alreadyDone"> {
   if (analysisRunHidden()) {
-    throw new Error("Replay analysis is turned off in this distribution.");
+    throw new Error(t`Replay analysis is turned off in this distribution.`);
   }
   const { outcome, queue: next } = await contentAnalysisEnqueue(args);
   setQueue(next);
@@ -250,42 +252,45 @@ export function analysisBlockers(facts: {
   switch (facts.cannot) {
     case "remix":
       return [
-        "This is a remix. The result it recorded belongs to the original match, so there is nothing to check a playback of it against. Analyse the original.",
+        t`This is a remix. The result it recorded belongs to the original match, so there is nothing to check a playback of it against. Analyse the original.`,
       ];
     case "noGameOver":
       return [
-        "This match never recorded a game over, usually because it was quit before it ended. There is nothing to check a playback against, so it cannot be analysed.",
+        t`This match never recorded a game over, usually because it was quit before it ended. There is nothing to check a playback against, so it cannot be analysed.`,
       ];
     case "noGameId":
       return [
-        "This replay has no game id, so there is nothing to file an analysis under.",
+        t`This replay has no game id, so there is nothing to file an analysis under.`,
       ];
     case "playbackGame":
       return [
-        "This replay was recorded on the replay playback game. It has no match of its own to record.",
+        t`This replay was recorded on the replay playback game. It has no match of its own to record.`,
       ];
     case "unreadable":
-      return ["This file does not read as a replay."];
+      return [t`This file does not read as a replay.`];
   }
   const blockers: string[] = [];
   if (!facts.engineInstalled && !facts.otherEngines) {
-    const which = facts.engineVersion
-      ? `Engine ${facts.engineVersion} is not installed`
-      : "This replay does not say which engine recorded it";
+    const engineVersion = facts.engineVersion;
     blockers.push(
       facts.installedEngines
-        ? `${which}, and none of the engines that are installed can run an analysis, which needs one with a headless build.`
-        : `${which}, and no other engine is installed.`,
+        ? engineVersion
+          ? t`Engine ${engineVersion} is not installed, and none of the engines that are installed can run an analysis, which needs one with a headless build.`
+          : t`This replay does not say which engine recorded it, and none of the engines that are installed can run an analysis, which needs one with a headless build.`
+        : engineVersion
+          ? t`Engine ${engineVersion} is not installed, and no other engine is installed.`
+          : t`This replay does not say which engine recorded it, and no other engine is installed.`,
     );
   } else if (facts.engineInstalled && facts.engineHeadless === false) {
+    const engineVersion = facts.engineVersion;
     blockers.push(
-      `Engine ${facts.engineVersion} has no headless build, which the playback needs.`,
+      t`Engine ${engineVersion} has no headless build, which the playback needs.`,
     );
   }
   if (facts.missingGame && !facts.otherGame) {
-    blockers.push("The game is not installed.");
+    blockers.push(t`The game is not installed.`);
   }
-  if (facts.missingMap) blockers.push("The map is not installed.");
+  if (facts.missingMap) blockers.push(t`The map is not installed.`);
   if (facts.dependencyBlock) blockers.push(facts.dependencyBlock);
   return blockers;
 }
@@ -302,26 +307,32 @@ export function differenceNote(a: StoredReplayAnalysis): string | null {
   if (!engine && !game) return null;
   const said: string[] = [];
   if (engine) {
+    const usedEngine = a.engine || t`unknown`;
+    const recordedEngine = a.recordedEngine || t`unknown`;
     said.push(
-      `It used engine ${a.engine || "unknown"}, and the replay was recorded on engine ${a.recordedEngine || "unknown"}.`,
+      t`It used engine ${usedEngine}, and the replay was recorded on engine ${recordedEngine}.`,
     );
   }
   if (game) {
+    const usedGame = a.game || t`an unnamed game`;
+    const recordedGame = a.recordedGame || t`an unnamed game`;
     said.push(
-      `It used ${a.game || "an unnamed game"}, and the replay was recorded on ${a.recordedGame || "an unnamed game"}.`,
+      t`It used ${usedGame}, and the replay was recorded on ${recordedGame}.`,
     );
   }
-  const what =
-    engine && game
-      ? "engine or game version"
-      : engine
-        ? "engine"
-        : "game version";
-  said.push(
-    a.outcome === "diverged"
-      ? `A different ${what} is the likely reason.`
-      : "The playback still matched the recorded match exactly, so the events are kept.",
-  );
+  if (a.outcome === "diverged") {
+    said.push(
+      engine && game
+        ? t`A different engine or game version is the likely reason.`
+        : engine
+          ? t`A different engine is the likely reason.`
+          : t`A different game version is the likely reason.`,
+    );
+  } else {
+    said.push(
+      t`The playback still matched the recorded match exactly, so the events are kept.`,
+    );
+  }
   return said.join(" ");
 }
 
@@ -336,29 +347,30 @@ export function analysisPercent(job: ReplayAnalysisRunningJob): number {
 
 /** What a running analysis is doing, in a few words. */
 export function analysisProgressLabel(job: ReplayAnalysisRunningJob): string {
-  if (job.cancelling) return "Stopping";
-  if (job.phase === "thinning") return "Making the track";
-  if (job.phase === "starting") return "Starting the engine";
-  if (job.phase === "loading") return "Loading the match";
+  if (job.cancelling) return t`Stopping`;
+  if (job.phase === "thinning") return t`Making the track`;
+  if (job.phase === "starting") return t`Starting the engine`;
+  if (job.phase === "loading") return t`Loading the match`;
   // The header holds whole seconds, so the last event can land past it.
   const frame = Math.min(job.frame, job.lastFrame);
-  return `Frame ${formatNumber(frame)} of ${formatNumber(job.lastFrame)}`;
+  const current = formatNumber(frame);
+  const last = formatNumber(job.lastFrame);
+  return t`Frame ${current} of ${last}`;
 }
 
-const FIGURE_WORDS: Record<string, string> = {
-  winners: "Who won",
-  gameSeconds: "The length of the match in seconds",
-  teams: "The number of teams",
-  samples: "The number of statistics samples",
-  desyncWarnings: "Desync warnings from the engine",
-  gameOver: "The game over",
-  unitCreatedLines: "Units made",
-  unitDestroyedLines: "Units lost",
-  unitsReceivedLines: "Units given to the team, as the log counted them",
-  unitsSentLines: "Units the team gave away, as the log counted them",
-  unitsCapturedLines: "Units the team captured, as the log counted them",
-  unitsOutCapturedLines:
-    "Units captured from the team, as the log counted them",
+const FIGURE_WORDS: Record<string, MessageDescriptor> = {
+  winners: msg`Who won`,
+  gameSeconds: msg`The length of the match in seconds`,
+  teams: msg`The number of teams`,
+  samples: msg`The number of statistics samples`,
+  desyncWarnings: msg`Desync warnings from the engine`,
+  gameOver: msg`The game over`,
+  unitCreatedLines: msg`Units made`,
+  unitDestroyedLines: msg`Units lost`,
+  unitsReceivedLines: msg`Units given to the team, as the log counted them`,
+  unitsSentLines: msg`Units the team gave away, as the log counted them`,
+  unitsCapturedLines: msg`Units the team captured, as the log counted them`,
+  unitsOutCapturedLines: msg`Units captured from the team, as the log counted them`,
 };
 
 /** A camel case name as words, for a figure nothing has a label for. */
@@ -378,12 +390,15 @@ export function disagreementInWords(
   d: ReplayDisagreement,
   labels?: ReadonlyMap<string, string>,
 ): string {
+  const known = FIGURE_WORDS[d.figure];
   const figure =
-    FIGURE_WORDS[d.figure] ??
+    (known ? i18n._(known) : undefined) ??
     labels?.get(d.figure) ??
     wordsFromCamelCase(d.figure);
-  const whose = d.team === undefined ? "" : ` for team ${d.team}`;
-  const recorded = d.recorded === "" ? "nobody" : d.recorded;
-  const observed = d.observed === "" ? "nobody" : d.observed;
-  return `${figure}${whose}: the replay recorded ${recorded}, the playback gave ${observed}.`;
+  const recorded = d.recorded === "" ? t`nobody` : d.recorded;
+  const observed = d.observed === "" ? t`nobody` : d.observed;
+  if (d.team === undefined)
+    return t`${figure}: the replay recorded ${recorded}, the playback gave ${observed}.`;
+  const team = d.team;
+  return t`${figure} for team ${team}: the replay recorded ${recorded}, the playback gave ${observed}.`;
 }

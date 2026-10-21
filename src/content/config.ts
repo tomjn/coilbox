@@ -1,3 +1,4 @@
+import { t } from "@lingui/core/macro";
 import { useSetting } from "@picoframe/frame";
 import { listen } from "@tauri-apps/api/event";
 import {
@@ -1757,7 +1758,7 @@ export function useKeybinds(configDir?: string) {
   /** Write the file. Resolves to an error message, or `null` when it worked. */
   const write = useCallback(
     async (text: string): Promise<string | null> => {
-      if (!configDir) return "No engine config directory to write to.";
+      if (!configDir) return t`No engine config directory to write to.`;
       try {
         const res = await contentKeybindsWrite({ configDir, text });
         setData({ path: res.path, exists: true, text, ours: true });

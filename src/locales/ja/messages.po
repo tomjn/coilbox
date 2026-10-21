@@ -7,12 +7,36 @@ msgstr ""
 "X-Generator: @lingui/cli\n"
 "Language: ja\n"
 
+#: src/content/mapImage.ts
+msgid " in {window}"
+msgstr ""
+
 #: src/play/debrief.ts
 msgid "-10% AI handicap (easier)"
 msgstr ""
 
 #: src/direct/ShareRoomButton.tsx
 msgid ", has a warning"
+msgstr ""
+
+#: src/content/mapCompatReport.ts
+msgid ".3do feature models"
+msgstr ""
+
+#: src/content/compatReport.ts
+msgid ".3do models"
+msgstr ""
+
+#: src/content/mapCompatReport.ts
+msgid ".bmp textures in mapinfo.lua"
+msgstr ""
+
+#: src/content/compatReport.ts
+msgid ".fbi or .tdf unit definitions"
+msgstr ""
+
+#: src/content/mapCompatReport.ts
+msgid ".pcx textures in mapinfo.lua"
 msgstr ""
 
 #: src/profile/health.ts
@@ -36,9 +60,24 @@ msgstr ""
 msgid "(unnamed)"
 msgstr ""
 
+#. placeholder {0}: drawn.contributing
+#: src/content/pages/components/MapAggregate.tsx
+msgid "{0, plural, one {{contributing} of {available} has anything on this layer in {when}.} other {{contributing} of {available} have anything on this layer in {when}.}}"
+msgstr ""
+
 #. placeholder {0}: rest.length
 #: src/home/zones/Greeting.tsx
 msgid "{0, plural, one {{first} and # other} other {{first} and # others}}"
+msgstr ""
+
+#. placeholder {0}: frame.bleedSquares
+#: src/content/pages/components/UnitModelPanel.tsx
+msgid "{0, plural, one {{footprintX} by {footprintZ} squares, framed with a square of bleed on each side, so {widthPx} by {heightPx} pixels.} other {{footprintX} by {footprintZ} squares, framed with # squares of bleed on each side, so {widthPx} by {heightPx} pixels.}}"
+msgstr ""
+
+#. placeholder {0}: shown.length
+#: src/content/pages/components/MapAggregate.tsx
+msgid "{0, plural, one {{inPicture} of the {libraryTotal} on this map in your library is in this picture.} other {{inPicture} of the {libraryTotal} on this map in your library are in this picture.}}"
 msgstr ""
 
 #. placeholder {0}: record.attempts
@@ -51,6 +90,31 @@ msgstr ""
 msgid "{0, plural, one {# blueprint added to your library.} other {# blueprints added to your library.}}"
 msgstr ""
 
+#. placeholder {0}: outcome.missingOriginal.length
+#: src/content/pages/components/Convert3doDrawer.tsx
+msgid "{0, plural, one {# converted model has no original .3do to replace: {missingNames}.} other {# converted models have no original .3do to replace: {missingNames}.}}"
+msgstr ""
+
+#. placeholder {0}: built.defOverrides
+#: src/content/pages/components/CompatMode.tsx
+msgid "{0, plural, one {# def override} other {# def overrides}}"
+msgstr ""
+
+#. placeholder {0}: model.paletteFaces
+#: src/content/pages/components/ModelViewport.tsx
+msgid "{0, plural, one {# face names a Total Annihilation palette entry this could not resolve to a colour, so it is drawn plain grey.} other {# faces name a Total Annihilation palette entry this could not resolve to a colour, so they are drawn plain grey.}}"
+msgstr ""
+
+#. placeholder {0}: hub.faction_count
+#: src/content/pages/components/GameLibrarySummary.tsx
+msgid "{0, plural, one {# faction} other {# factions}}"
+msgstr ""
+
+#. placeholder {0}: f.games
+#: src/content/pages/GameDetailPage.tsx
+msgid "{0, plural, one {# game · outcome unknown} other {# games · outcome unknown}}"
+msgstr ""
+
 #. placeholder {0}: unknown.length
 #: src/profile/health.ts
 msgid "{0, plural, one {# hide id matches nothing} other {# hide ids match nothing}}"
@@ -61,9 +125,19 @@ msgstr ""
 msgid "{0, plural, one {# hideSettings id matches nothing} other {# hideSettings ids match nothing}}"
 msgstr ""
 
+#. placeholder {0}: group.droppedPieces
+#: src/content/pages/components/Convert3doDrawer.tsx
+msgid "{0, plural, one {# inert same-named piece was dropped.} other {# inert same-named pieces were dropped.}}"
+msgstr ""
+
 #. placeholder {0}: unknown.length
 #: src/profile/health.ts
 msgid "{0, plural, one {# link icon unknown} other {# link icons unknown}}"
+msgstr ""
+
+#. placeholder {0}: outcome.alreadyInstalled.length
+#: src/content/pages/components/Convert3doDrawer.tsx
+msgid "{0, plural, one {# model was already installed.} other {# models were already installed.}}"
 msgstr ""
 
 #. placeholder {0}: counts.plain
@@ -71,9 +145,19 @@ msgstr ""
 msgid "{0, plural, one {# option} other {# options}}"
 msgstr ""
 
+#. placeholder {0}: countPieces(model.root)
+#: src/content/pages/components/UnitModelPanel.tsx
+msgid "{0, plural, one {# piece} other {# pieces}}"
+msgstr ""
+
 #. placeholder {0}: draft.participants.length
 #: src/play/presetParts.ts
 msgid "{0, plural, one {# player} other {# players}}"
+msgstr ""
+
+#. placeholder {0}: built.preludeFixes.length
+#: src/content/pages/components/CompatMode.tsx
+msgid "{0, plural, one {# prelude function} other {# prelude functions}}"
 msgstr ""
 
 #. placeholder {0}: bundled.length
@@ -86,6 +170,41 @@ msgstr ""
 msgid "{0, plural, one {# problem in `home`} other {# problems in `home`}}"
 msgstr ""
 
+#. placeholder {0}: family.refights
+#: src/content/pages/components/MapAggregate.tsx
+msgid "{0, plural, one {# refight} other {# refights}}"
+msgstr ""
+
+#. placeholder {0}: family.remixes
+#: src/content/pages/components/MapAggregate.tsx
+msgid "{0, plural, one {# remix is here, and a remix is a copy of another match and not a match of its own.} other {# remixes are here, and a remix is a copy of another match and not a match of its own.}}"
+msgstr ""
+
+#. placeholder {0}: family.remixes
+#: src/content/pages/components/MapAggregate.tsx
+msgid "{0, plural, one {# remix} other {# remixes}}"
+msgstr ""
+
+#. placeholder {0}: read.failed.length
+#: src/content/pages/components/MapAggregate.tsx
+msgid "{0, plural, one {# replay could not be read and is not in the picture.} other {# replays could not be read and are not in the picture.}}"
+msgstr ""
+
+#. placeholder {0}: family.duplicates
+#: src/content/pages/components/MapAggregate.tsx
+msgid "{0, plural, one {# second file of a match already counted} other {# second files of matches already counted}}"
+msgstr ""
+
+#. placeholder {0}: kinds.length
+#: src/content/libraryMaps.ts
+msgid "{0, plural, one {# source} other {# sources}}"
+msgstr ""
+
+#. placeholder {0}: dots.length
+#: src/content/pages/components/MapAggregate.tsx
+msgid "{0, plural, one {# start from {matchesWithStart}.} other {# starts from {matchesWithStart}.}}"
+msgstr ""
+
 #. placeholder {0}: counts.tweak
 #: src/play/presetParts.ts
 msgid "{0, plural, one {# tweak slot} other {# tweak slots}}"
@@ -96,9 +215,39 @@ msgstr ""
 msgid "{0, plural, one {# unit disabled} other {# units disabled}}"
 msgstr ""
 
+#. placeholder {0}: hub.unit_count
+#: src/content/pages/components/GameLibrarySummary.tsx
+msgid "{0, plural, one {# unit} other {# units}}"
+msgstr ""
+
+#. placeholder {0}: cell.upgrades
+#: src/content/pages/GameUnitsPage.tsx
+msgid "{0, plural, one {# upgrade} other {# upgrades}}"
+msgstr ""
+
+#. placeholder {0}: warnings.length
+#: src/content/pages/components/states.tsx
+msgid "{0, plural, one {# warning} other {# warnings}}"
+msgstr ""
+
 #. placeholder {0}: record.wins
 #: src/play/presetRecord.ts
 msgid "{0, plural, one {# win} other {# wins}}"
+msgstr ""
+
+#. placeholder {0}: group.paletteModels.length
+#: src/content/pages/components/Convert3doDrawer.tsx
+msgid "{0, plural, one {across # model} other {across # models}}"
+msgstr ""
+
+#. placeholder {0}: missions.length
+#: src/content/pages/components/MissionRuntimeSection.tsx
+msgid "{0, plural, one {Coilbox has written # mission into this game} other {Coilbox has written # missions into this game}}"
+msgstr ""
+
+#. placeholder {0}: info.gameVersions.length
+#: src/content/mapImage.ts
+msgid "{0, plural, one {Game and version: {gameVersions}.} other {Game and versions: {gameVersions}.}}"
 msgstr ""
 
 #. placeholder {0}: hide.length
@@ -121,14 +270,64 @@ msgstr ""
 msgid "{0, plural, one {Link icons: # set, and it is recognised} other {Link icons: # set, all recognised}}"
 msgstr ""
 
+#. placeholder {0}: info.mapVersions.length
+#: src/content/mapImage.ts
+msgid "{0, plural, one {Map version: {mapVersions}.} other {Map versions: {mapVersions}.}}"
+msgstr ""
+
+#. placeholder {0}: preview.length
+#: src/content/pages/components/MissionRuntimeSection.tsx
+msgid "{0, plural, one {Removes # runtime file from the folder coilbox no longer writes to, then installs again into the game's own.} other {Removes # runtime files from the folder coilbox no longer writes to, then installs again into the game's own.}}"
+msgstr ""
+
+#. placeholder {0}: w.contributing
+#: src/content/mapImage.ts
+msgid "{0, plural, one {Replays: {matches} of this map. # has something on this layer, {events}{inWindow}.} other {Replays: {matches} of this map. # have something on this layer, {events}{inWindow}.}}"
+msgstr ""
+
+#. placeholder {0}: teams.decided
+#: src/content/pages/components/MapRecords.tsx
+msgid "{0, plural, one {Team 1 {team1Record}, team 2 {team2Record}, in # match of two teams with a result.} other {Team 1 {team1Record}, team 2 {team2Record}, in # matches of two teams with a result.}}"
+msgstr ""
+
+#. placeholder {0}: shown.length
+#: src/content/pages/components/MapAggregate.tsx
+msgid "{0, plural, one {The # match on this map in your library is in this picture.} other {All # matches on this map in your library are in this picture.}}"
+msgstr ""
+
+#. placeholder {0}: window.minutes
+#: src/content/mapAggregate.ts
+msgid "{0, plural, one {the first # minute} other {the first # minutes}}"
+msgstr ""
+
+#. placeholder {0}: window.minutes
+#: src/content/mapAggregate.ts
+msgid "{0, plural, one {the last # minute} other {the last # minutes}}"
+msgstr ""
+
 #. placeholder {0}: rest.length
 #: src/runlite/handmadeMap.ts
 msgid "{0, plural, one {There is # more problem with it.} other {There are # more problems with it.}}"
 msgstr ""
 
+#. placeholder {0}: duplicates.length
+#: src/content/pages/components/MissionRuntimeSection.tsx
+msgid "{0, plural, one {This game has # runtime file under a second spelling of a runtime folder. The engine reads both folders as one, so it may load the older copy of a file rather than the one coilbox wrote.} other {This game has # runtime files under a second spelling of a runtime folder. The engine reads both folders as one, so it may load the older copy of a file rather than the one coilbox wrote.}}"
+msgstr ""
+
 #. placeholder {0}: seed.skippedBots.length
 #: src/direct/roomSeed.ts
 msgid "{0, plural, one {This game offers no AI for {skipped}, so it is left out.} other {This game offers no AI for {skipped}, so they are left out.}}"
+msgstr ""
+
+#. placeholder {0}: shipped.length
+#: src/content/pages/components/MissionRuntimeSection.tsx
+msgid "{0, plural, one {This game ships # mission} other {This game ships # missions}}"
+msgstr ""
+
+#. placeholder {0}: errors.length
+#: src/content/pages/components/states.tsx
+msgid "{0, plural, one {unitsync reported # diagnostic} other {unitsync reported # diagnostics}}"
 msgstr ""
 
 #. placeholder {0}: offers.length
@@ -141,9 +340,19 @@ msgstr ""
 msgid "{0, select, win {You won your last game against {aiName} {at}. Try {suggested}?} other {You lost your last game against {aiName} {at}. Try {suggested}?}}"
 msgstr ""
 
+#. placeholder {0}: d.asset
+#: src/content/gameSourceRows.ts
+msgid "{0} from the newest release"
+msgstr ""
+
 #. placeholder {0}: gamesText || mapsText
 #: src/packs/pages/components/ImportPackForm.tsx
 msgid "{0} ready."
+msgstr ""
+
+#. placeholder {0}: game.name
+#: src/content/pages/GameUnitPage.tsx
+msgid "{0} units"
 msgstr ""
 
 #: src/home/zones/Continue.tsx
@@ -162,8 +371,24 @@ msgstr ""
 msgid "{aiShortName} isn't available in this game"
 msgstr ""
 
+#: src/content/pages/components/MapRecords.tsx
+msgid "{amount} elmos"
+msgstr ""
+
+#: src/content/pages/components/UnitRendersRow.tsx
+msgid "{angle} render of this unit"
+msgstr ""
+
+#: src/content/pages/components/Convert3doDrawer.tsx
+msgid "{archive} is a packed archive, so coilbox cannot install into it directly. Copy the output folder over the game yourself, remove the original <0>.3do</0> files, and fix any unit definition that spells <1>.3do</1> in its <2>objectname</2>. Or extract the game to a <3>.sdd</3> copy first and run this again from there."
+msgstr ""
+
 #: src/content/index.ts
 msgid "{archiveName} · Lua REPL"
+msgstr ""
+
+#: src/content/pages/components/UnitModelPanel.tsx
+msgid "{assetWidth} by {assetHeight}, {assetKb} KB, {encodeProfile}"
 msgstr ""
 
 #: src/play/PresetList.tsx
@@ -192,6 +417,10 @@ msgstr ""
 
 #: src/profile/health.ts
 msgid "{bundlePath} has {summary}. Each line below is one thing to fix."
+msgstr ""
+
+#: src/content/pages/components/MapRecords.tsx
+msgid "{byAi, plural, one {# start was taken by an AI and is counted.} other {# starts were taken by an AI and are counted.}}"
 msgstr ""
 
 #: src/profile/health.ts
@@ -226,8 +455,20 @@ msgstr ""
 msgid "{count, plural, one {# blocker would reach whoever plays this broken, so it was not packaged: {blockers}} other {# blockers would reach whoever plays this broken, so it was not packaged: {blockers}}}"
 msgstr ""
 
+#: src/content/pages/components/states.tsx
+msgid "{count, plural, one {# diagnostic} other {# diagnostics}}"
+msgstr ""
+
+#: src/content/pages/components/MapRecords.tsx
+msgid "{count, plural, one {# place with this name} other {# places with this name}}"
+msgstr ""
+
 #: src/sound/MusicSource.tsx
 msgid "{count, plural, one {# track found.} other {# tracks found.}}"
+msgstr ""
+
+#: src/content/pages/components/FactionBuildList.tsx
+msgid "{count, plural, one {# unit} other {# units}}"
 msgstr ""
 
 #: src/game-updates/GameUpdateBadge.tsx
@@ -258,8 +499,20 @@ msgstr ""
 msgid "{days}d"
 msgstr ""
 
+#: src/content/pages/components/MapAggregate.tsx
+msgid "{diverged, plural, one {# was analysed and the playback did not reproduce the match, so it has no events.} other {# were analysed and the playback did not reproduce the match, so they have no events.}}"
+msgstr ""
+
 #: src/downloads/pages/components/MapPacksDrawer.tsx
 msgid "{done} / {total} downloaded"
+msgstr ""
+
+#: src/content/pages/components/Convert3doDrawer.tsx
+msgid "{done} of {total}"
+msgstr ""
+
+#: src/content/pages/components/Convert3doDrawer.tsx
+msgid "{done} of {total}: {member}"
 msgstr ""
 
 #: src/downloads/pages/components/ProgressBar.tsx
@@ -286,6 +539,38 @@ msgstr ""
 msgid "{engines} engine(s), {games} game(s) found"
 msgstr ""
 
+#: src/content/mapAggregate.ts
+msgid "{events, plural, one {{count} {one}} other {{count} {many}}}"
+msgstr ""
+
+#: src/content/pages/components/MapAggregate.tsx
+msgid "{events} in {when}, from {fromMatches}."
+msgstr ""
+
+#: src/content/pages/components/MapAggregate.tsx
+msgid "{events}, from {fromMatches}."
+msgstr ""
+
+#: src/content/pages/components/GameLibrarySummary.tsx
+msgid "{factions} · {units}"
+msgstr ""
+
+#: src/content/pages/MapDetailPage.tsx
+msgid "{factionWins}W of {factionGames}"
+msgstr ""
+
+#: src/content/replayAnalysis.ts
+msgid "{figure} for team {team}: the replay recorded {recorded}, the playback gave {observed}."
+msgstr ""
+
+#: src/content/replayAnalysis.ts
+msgid "{figure}: the replay recorded {recorded}, the playback gave {observed}."
+msgstr ""
+
+#: src/content/gameSourceRows.ts
+msgid "{filename} · {mirrorCount}"
+msgstr ""
+
 #: src/downloads/installArchive.ts
 msgid "{fileName} is not a .sdz or .sd7 archive."
 msgstr ""
@@ -300,6 +585,10 @@ msgstr ""
 
 #: src/home/zones/Greeting.tsx
 msgid "{first} and {second}"
+msgstr ""
+
+#: src/content/pages/GameUnitPage.tsx
+msgid "{footprintX} by {footprintZ} squares"
 msgstr ""
 
 #: src/play/pages/components/ParticipantsTable.tsx
@@ -322,6 +611,10 @@ msgstr ""
 msgid "{gameCount} game(s), {mapCount} map(s), {engineText}"
 msgstr ""
 
+#: src/content/pages/components/FactionBuildList.tsx
+msgid "{gameName} — Build tree"
+msgstr ""
+
 #: src/runlite/pages/components/EncounterOverlay.tsx
 msgid "{gameName} does not have these units from your run: {shown} and {extra} more. They will not be available if you move."
 msgstr ""
@@ -342,6 +635,7 @@ msgstr ""
 msgid "{gameName} is not installed here, so typed values are written as typed and the game may load some of them as something else."
 msgstr ""
 
+#: src/content/pages/components/GameHeader.tsx
 #: src/play/pages/components/GamePickerGrid.tsx
 #: src/play/pages/components/GameSelectCard.tsx
 msgid "{gameName} loading screen"
@@ -349,6 +643,10 @@ msgstr ""
 
 #: src/packs/pages/components/ImportPackForm.tsx
 msgid "{gamesText} and {mapsText} ready."
+msgstr ""
+
+#: src/content/pages/GameDetailPage.tsx
+msgid "{generated} It is not offered anywhere a game is picked, which is why you will not find it in Singleplayer or in a scenario's setup."
 msgstr ""
 
 #: src/runlite/pages/components/EncounterOverlay.tsx
@@ -359,6 +657,14 @@ msgstr ""
 #: src/runlite/pages/components/EncounterOverlay.tsx
 #: src/runlite/pages/RunPage.tsx
 msgid "{hostileCount} × hostile (+{hostileHandicap}%)"
+msgstr ""
+
+#: src/content/pages/components/GameSourcesTab.tsx
+msgid "{hours} h"
+msgstr ""
+
+#: src/content/pages/components/GameSourcesTab.tsx
+msgid "{hours} h {m} min"
 msgstr ""
 
 #: src/downloads/downloadRate.ts
@@ -374,8 +680,16 @@ msgstr ""
 msgid "{iconError}. `icon` is a PNG file, by its path relative to the .coilbox folder."
 msgstr ""
 
+#: src/content/replaySideLabel.ts
+msgid "{ids} won"
+msgstr ""
+
 #: src/play/presetParts.ts
 msgid "{incomeMultiplier}x income"
+msgstr ""
+
+#: src/content/pages/components/MapAggregate.tsx
+msgid "{incomplete, plural, one {# replay could not be read to the end and may be missing later orders.} other {# replays could not be read to the end and may be missing later orders.}}"
 msgstr ""
 
 #: src/profile/health.ts
@@ -386,12 +700,28 @@ msgstr ""
 msgid "{installedCount, plural, other {Installed # archives}}"
 msgstr ""
 
+#: src/content/pages/components/GameLibrarySummary.tsx
+msgid "{installedName} from {installedSource} <0>{fetched}</0> on {installedOn}"
+msgstr ""
+
+#: src/content/pages/components/GameLibrarySummary.tsx
+msgid "{installedName} from {installedSource} on {installedOn}"
+msgstr ""
+
 #: src/direct/room.ts
 msgid "{joined, plural, one {# player joined} other {# players joined}}"
 msgstr ""
 
 #: src/sound/LevelRow.tsx
 msgid "{label} volume"
+msgstr ""
+
+#: src/content/mapImage.ts
+msgid "{layerLabel}. {layerSentence}."
+msgstr ""
+
+#: src/content/pages/components/MapAggregate.tsx
+msgid "{layerName} · {layerMatches}"
 msgstr ""
 
 #: src/home/config.ts
@@ -401,6 +731,10 @@ msgstr ""
 #: src/downloads/DownloadQueueBadge.tsx
 #: src/downloads/pages/components/ProgressBar.tsx
 msgid "{left} left"
+msgstr ""
+
+#: src/content/pages/components/MapAggregate.tsx
+msgid "{leftOutCount, plural, one {{leftOut} is left out, so each match counts once.} other {{leftOut} are left out, so each match counts once.}}"
 msgstr ""
 
 #: src/packs/pages/components/ImportPackForm.tsx
@@ -419,8 +753,56 @@ msgstr ""
 msgid "{mapTitle} (hand-made map)"
 msgstr ""
 
+#: src/content/pages/components/VersionList.tsx
+msgid "{matches}, {note}"
+msgstr ""
+
+#: src/content/pages/GameUnitPage.tsx
+msgid "{maxDepth} deep"
+msgstr ""
+
 #: src/direct/ReachablePorts.tsx
 msgid "{method} opened <0/>."
+msgstr ""
+
+#: src/content/matchStats.ts
+msgid "{metricLabel} in total, by player, over match time"
+msgstr ""
+
+#: src/content/matchStats.ts
+msgid "{metricLabel} in total, by team, over match time"
+msgstr ""
+
+#: src/content/replayTimeWindow.ts
+msgid "{metricLabel} per minute"
+msgstr ""
+
+#: src/content/matchStats.ts
+msgid "{metricLabel} per minute, by player, over match time"
+msgstr ""
+
+#: src/content/matchStats.ts
+msgid "{metricLabel} per minute, by team, over match time"
+msgstr ""
+
+#: src/content/pages/GameUnitPage.tsx
+msgid "{minDepth} deep"
+msgstr ""
+
+#: src/content/pages/GameUnitPage.tsx
+msgid "{minDepth} to {maxDepth} deep"
+msgstr ""
+
+#: src/content/stats.ts
+msgid "{mine} vs {theirs}"
+msgstr ""
+
+#: src/content/pages/components/GameSourcesTab.tsx
+msgid "{mins} min"
+msgstr ""
+
+#: src/content/pages/components/GameSourcesTab.tsx
+msgid "{mins} min {rest} s"
 msgstr ""
 
 #: src/downloads/downloadRate.ts
@@ -432,16 +814,60 @@ msgstr ""
 msgid "{mins}m {rest}s"
 msgstr ""
 
+#: src/content/gameSourceRows.ts
+msgid "{mirrors, plural, one {# mirror} other {# mirrors}}"
+msgstr ""
+
+#: src/content/pages/components/MapAggregate.tsx
+msgid "{misfit, plural, one {# match left out: orders do not fit the unit list.} other {# matches left out: orders do not fit the unit list.}}"
+msgstr ""
+
+#: src/content/pages/components/ModelViewport.tsx
+msgid "{missingCount} of this model's textures are not in {archive}, so those faces are drawn plain: <0>{missingNames}</0>."
+msgstr ""
+
+#: src/content/pages/components/Convert3doDrawer.tsx
+msgid "{missingTextureFaces} faces are flat because their tile is missing."
+msgstr ""
+
+#: src/content/pages/GameDetailPage.tsx
+msgid "{models, plural, one {# legacy model} other {# legacy models}}"
+msgstr ""
+
+#: src/content/pages/components/CompatMode.tsx
+msgid "{modelsWritten, plural, one {# model} other {# models}} converted"
+msgstr ""
+
+#: src/content/pages/components/CompatMode.tsx
+msgid "{modelsWritten, plural, one {# model} other {# models}} converted of {modelsFound}"
+msgstr ""
+
+#: src/content/pages/components/Convert3doDrawer.tsx
+msgid "{modelsWritten} models on a {atlasSide} pixel sheet of {tilesPacked} tiles ({atlas})"
+msgstr ""
+
 #: src/direct/roomSeed.ts
 msgid "{n, plural, =0 {no bots} one {# bot} other {# bots}}"
+msgstr ""
+
+#: src/content/mapAggregate.ts
+msgid "{n, plural, one {{count} match} other {{count} matches}}"
 msgstr ""
 
 #: src/play/presetParts.ts
 msgid "{n, plural, one {# map option} other {# map options}}"
 msgstr ""
 
+#: src/content/pages/components/MapAggregate.tsx
+msgid "{n, plural, one {# player} other {# players}}"
+msgstr ""
+
 #: src/direct/PendingJoins.tsx
 msgid "{name} cannot ask again while this battle is open."
+msgstr ""
+
+#: src/content/pages/components/DeleteArchiveButton.tsx
+msgid "{name} is deleted from disk and you would have to download it again. Replays and saves that need it stop working."
 msgstr ""
 
 #: src/downloads/downloadRate.ts
@@ -452,6 +878,30 @@ msgstr ""
 msgid "{next}m"
 msgstr ""
 
+#: src/content/pages/components/MapRecords.tsx
+msgid "{noLength, plural, one {# match has no length in the replay's header and is left out of it.} other {# matches have no length in the replay's header and are left out of it.}}"
+msgstr ""
+
+#: src/content/pages/components/MapAggregate.tsx
+msgid "{noPosition, plural, one {# death was recorded at exactly the map's corner, which is what the recorder writes when it has no position, and is left out.} other {# deaths were recorded at exactly the map's corner, which is what the recorder writes when it has no position, and are left out.}}"
+msgstr ""
+
+#: src/content/pages/components/MapRecords.tsx
+msgid "{noResultTeams, plural, one {# more match of two teams has no result.} other {# more matches of two teams have no result.}}"
+msgstr ""
+
+#: src/content/pages/components/MapRecords.tsx
+msgid "{noSeat, plural, one {# start for a team that no player or AI held.} other {# starts for a team that no player or AI held.}}"
+msgstr ""
+
+#: src/content/pages/components/MapRecords.tsx
+msgid "{noStarts, plural, one {# match with no start recorded.} other {# matches with no start recorded.}}"
+msgstr ""
+
+#: src/content/pages/components/MapRecords.tsx
+msgid "{noTeamIds, plural, one {# match saved before team numbers were kept, which a start cannot be matched to a result through until the library is read again.} other {# matches saved before team numbers were kept, which a start cannot be matched to a result through until the library is read again.}}"
+msgstr ""
+
 #: src/runlite/pages/components/NodeOverlays.tsx
 msgid "{offerCost} salvage"
 msgstr ""
@@ -460,12 +910,36 @@ msgstr ""
 msgid "{op} failed"
 msgstr ""
 
+#: src/content/pages/components/MapAggregate.tsx
+msgid "{ordersPart}, and {eventsPart}."
+msgstr ""
+
+#: src/content/pages/components/MapRecords.tsx
+msgid "{otherArrangement, plural, one {# match of another arrangement is not in it.} other {# matches of another arrangement are not in it.}}"
+msgstr ""
+
 #: src/home/zones/ResumeRail.tsx
 msgid "{othersCount, plural, one {{name} and # other} other {{name} and # others}}"
 msgstr ""
 
+#: src/content/pages/components/Convert3doDrawer.tsx
+msgid "{paletteFaces} faces took a palette colour nothing could resolve"
+msgstr ""
+
 #: src/i18n/uiError.ts
 msgid "{path} already exists; confirm a replace before packaging over it"
+msgstr ""
+
+#: src/content/pages/GameUnitPage.tsx
+msgid "{pieceCount, plural, one {# piece} other {# pieces}}"
+msgstr ""
+
+#: src/content/pages/components/MapRecords.tsx
+msgid "{played} played, {decidedCount} with a recorded result."
+msgstr ""
+
+#: src/content/mapAggregateExport.ts
+msgid "{playerCount, plural, one {# player} other {# players}}"
 msgstr ""
 
 #: src/play/pages/components/ParticipantsTable.tsx
@@ -490,6 +964,14 @@ msgstr ""
 
 #: src/profile/health.ts
 msgid "{problemCount} problem(s) in the bundled content"
+msgstr ""
+
+#: src/content/mapAggregate.ts
+msgid "{radius} elmos"
+msgstr ""
+
+#: src/content/mapAggregate.ts
+msgid "{rate, plural, one {{shown} {one}} other {{shown} {many}}}"
 msgstr ""
 
 #: src/game-updates/pages/GameUpdatesSection.tsx
@@ -528,16 +1010,52 @@ msgstr ""
 msgid "{seats} for people."
 msgstr ""
 
+#: src/content/pages/components/GameSourcesTab.tsx
+msgid "{secs} s"
+msgstr ""
+
+#: src/content/pages/components/MapAggregate.tsx
+msgid "{short, plural, one {# match under a minute is left out too.} other {# matches under a minute are left out too.}}"
+msgstr ""
+
+#: src/content/pages/components/MapAggregate.tsx
+msgid "{short, plural, one {# match under a minute is left out.} other {# matches under a minute are left out.}}"
+msgstr ""
+
 #: src/home/continue.ts
 msgid "{shortname} · health {hull}/{maxHull}"
+msgstr ""
+
+#: src/content/pages/components/GameCard.tsx
+msgid "{shown} installed"
 msgstr ""
 
 #: src/downloads/pages/components/RapidBrowser.tsx
 msgid "{shownVersions} / {totalVersions} versions"
 msgstr ""
 
+#: src/content/matchStats.ts
+msgid "{side} (won)"
+msgstr ""
+
 #: src/runlite/unitLimit.ts
 msgid "{sideName} has no start unit in {gameName}, so coilbox cannot limit your units. Rewards will offer perks only and every unit will be available from the first battle."
+msgstr ""
+
+#: src/content/pages/components/GameVersionsTab.tsx
+msgid "{snapshotCount, plural, one {Hide # commit snapshot} other {Hide # commit snapshots}}"
+msgstr ""
+
+#: src/content/pages/components/GameVersionsTab.tsx
+msgid "{snapshotCount, plural, one {Show # commit snapshot} other {Show # commit snapshots}}"
+msgstr ""
+
+#: src/content/pages/components/BuildTreeDrawer.tsx
+msgid "{stageCount, plural, one {# upgrade} other {# upgrades}}"
+msgstr ""
+
+#: src/content/pages/MapDetailPage.tsx
+msgid "{startCount, plural, one {Preview · # start position} other {Preview · # start positions}}"
 msgstr ""
 
 #: src/play/pages/components/ParticipantsTable.tsx
@@ -548,12 +1066,60 @@ msgstr ""
 msgid "{startPositionCount, plural, one {# start position} other {# start positions}}"
 msgstr ""
 
+#: src/content/libraryMaps.ts
+msgid "{starts, plural, one {# start} other {# starts}}"
+msgstr ""
+
 #: src/runlite/unitLimit.ts
 msgid "{startUnitName}, this run's start unit, is not one of the units in {gameName}, so coilbox cannot limit your units. Every unit is available."
 msgstr ""
 
+#: src/content/replayUnitDefs.ts
+msgid "{subject} come from the unit list recorded when this replay was read on {date}, from {game}, a loose game folder that can change under that name."
+msgstr ""
+
+#: src/content/replayUnitDefs.ts
+msgid "{subject} come from the unit list recorded when this replay was read on {date}, from {game}."
+msgstr ""
+
+#: src/content/replayUnitDefs.ts
+msgid "{subject} come from the unit list the engine wrote when this replay was analysed on {date}, on {game}."
+msgstr ""
+
+#: src/content/compatReport.ts
+msgid "{tag}, {change} ({userCount})"
+msgstr ""
+
+#: src/content/pages/components/MapRecords.tsx
+msgid "{taken} taken, {record}"
+msgstr ""
+
+#: src/content/pages/components/ModelViewport.tsx
+msgid "{teamColourCount} of this model's textures are team-colour regions, which the engine paints in the owning player's colour. There is no player here, so they are drawn in one blue."
+msgstr ""
+
 #: src/profile/SettingsSection.tsx
 msgid "{themeCount, plural, one {# variable} other {# variables}}"
+msgstr ""
+
+#: src/content/pages/components/GameCard.tsx
+msgid "{title} art"
+msgstr ""
+
+#: src/content/pages/components/SuggestionsList.tsx
+msgid "{title} downloaded"
+msgstr ""
+
+#: src/content/pages/components/SuggestionsList.tsx
+msgid "{title} downloaded."
+msgstr ""
+
+#: src/content/pages/GameUnitsPage.tsx
+msgid "{total, plural, one {# unit} other {# units}}"
+msgstr ""
+
+#: src/content/pages/GameUnitsPage.tsx
+msgid "{total} of {cellCount} units"
 msgstr ""
 
 #: src/downloads/downloadRate.ts
@@ -564,8 +1130,44 @@ msgstr ""
 msgid "{totalVersions, plural, one {# version} other {# versions}}"
 msgstr ""
 
+#: src/content/pages/GameUnitPage.tsx
+msgid "{triangleCount, plural, one {# triangle} other {# triangles}}"
+msgstr ""
+
+#: src/content/pages/components/UnitModelPanel.tsx
+msgid "{triangleCount} in {pieceCount}"
+msgstr ""
+
+#: src/content/pages/components/Convert3doDrawer.tsx
+msgid "{triangleCount} triangles, {vertexCount} vertices."
+msgstr ""
+
+#: src/content/pages/components/UnitModelPanel.tsx
+msgid "{triangles, plural, one {# triangle} other {# triangles}}"
+msgstr ""
+
+#: src/content/pages/GameUnitPage.tsx
+msgid "{trianglesText} in {piecesText}"
+msgstr ""
+
 #: src/direct/HostRoomForm.tsx
 msgid "{trimmedName}'s room"
+msgstr ""
+
+#: src/content/pages/components/MapAggregate.tsx
+msgid "{unattacked, plural, one {# death names no attacker, which is how a cancelled build and a self destruct are recorded.} other {# deaths name no attacker, which is how a cancelled build and a self destruct are recorded.}}"
+msgstr ""
+
+#: src/content/pages/components/MapAggregate.tsx
+msgid "{unclassified, plural, one {# match was played on a game or version that is not installed, so nothing says what its buildings are for and it is left out of this layer.} other {# matches were played on a game or version that is not installed, so nothing says what their buildings are for and they are left out of this layer.}}"
+msgstr ""
+
+#: src/content/pages/components/MapRecords.tsx
+msgid "{ungrouped, plural, one {# start that could not be grouped because the map has no size.} other {# starts that could not be grouped because the map has no size.}}"
+msgstr ""
+
+#: src/content/pages/GameDetailPage.tsx
+msgid "{unitCount, plural, one {Sides · # unit} other {Sides · # units}}"
 msgstr ""
 
 #: src/runlite/pages/components/NodeOverlays.tsx
@@ -588,12 +1190,24 @@ msgstr ""
 msgid "{unmatched}. Section ids: {sectionIds}."
 msgstr ""
 
+#: src/content/pages/components/MapRecords.tsx
+msgid "{unread, plural, one {# match not read yet.} other {# matches not read yet.}}"
+msgstr ""
+
+#: src/content/pages/components/MapRecords.tsx
+msgid "{unread, plural, one {# match whose replay could not be read.} other {# matches whose replay could not be read.}}"
+msgstr ""
+
 #: src/runlite/pages/RunListPage.tsx
 msgid "{unreadableCount, plural, one {# warpath run could not be read. It is kept in the file and has not been changed.} other {# warpath runs could not be read. They are kept in the file and have not been changed.}}"
 msgstr ""
 
 #: src/profile/health.ts
 msgid "{unrecognised}."
+msgstr ""
+
+#: src/content/pages/components/GameLibrarySummary.tsx
+msgid "{updateName} via {updateVia}"
 msgstr ""
 
 #: src/downloads/failureReason.ts
@@ -622,6 +1236,18 @@ msgstr ""
 
 #: src/play/presetRecord.ts
 msgid "{wins} in {attempts}"
+msgstr ""
+
+#: src/content/pages/MapDetailPage.tsx
+msgid "{wins}W · {losses}L"
+msgstr ""
+
+#: src/content/pages/components/MapAggregate.tsx
+msgid "{withEvents, plural, one {# has been analysed and has event data} other {# have been analysed and have event data}}"
+msgstr ""
+
+#: src/content/pages/components/MapAggregate.tsx
+msgid "{withOrders, plural, one {# has orders recorded} other {# have orders recorded}}"
 msgstr ""
 
 #: src/profile/onlyOwnMaps.ts
@@ -737,6 +1363,16 @@ msgstr ""
 msgid "<0/> isn't open"
 msgstr ""
 
+#. placeholder {0}: at.member
+#. placeholder {1}: at.wantedBy
+#: src/content/pages/components/Convert3doDrawer.tsx
+msgid "<0>{name}</0> is <1>{0}</1>, wanted by {1, plural, one {# model} other {# models}}"
+msgstr ""
+
+#: src/content/pages/components/Convert3doDrawer.tsx
+msgid "<0>{name}</0>, wanted by {models, plural, one {# model} other {# models}}"
+msgstr ""
+
 #: src/profile/pages.ts
 msgid "> **Include error:** could not read `{include}`"
 msgstr ""
@@ -747,6 +1383,19 @@ msgstr ""
 
 #: src/profile/pages.ts
 msgid "> **Include error:** include nesting too deep at `{include}`"
+msgstr ""
+
+#: src/content/stats.ts
+msgid "1 to 2 hours"
+msgstr ""
+
+#: src/content/libraryMaps.ts
+#: src/content/mapAggregate.ts
+msgid "1v1"
+msgstr ""
+
+#: src/content/stats.ts
+msgid "30 minutes to 1 hour"
 msgstr ""
 
 #: src/startbox/presets.ts
@@ -765,6 +1414,14 @@ msgstr ""
 msgid "a {label} for {name}"
 msgstr ""
 
+#: src/content/mapImageExport.ts
+msgid "A 2D canvas is not available."
+msgstr ""
+
+#: src/content/pages/components/states.tsx
+msgid "A battle on this game stops in the engine until it is installed."
+msgstr ""
+
 #: src/runlite/pages/RunPage.tsx
 msgid "A choice awaits"
 msgstr ""
@@ -781,8 +1438,36 @@ msgstr ""
 msgid "A dead warship drifts in the debris field. Boarding it is a risk — the reactor may still be live."
 msgstr ""
 
+#: src/content/pages/components/states.tsx
+msgid "A dependency of this game is missing"
+msgstr ""
+
+#: src/content/replayAnalysis.ts
+msgid "A different engine is the likely reason."
+msgstr ""
+
+#: src/content/replayAnalysis.ts
+msgid "A different engine or game version is the likely reason."
+msgstr ""
+
+#: src/content/replayAnalysis.ts
+msgid "A different game version is the likely reason."
+msgstr ""
+
+#: src/content/pages/components/MapAggregate.tsx
+msgid "a different size from this page's map"
+msgstr ""
+
+#: src/content/pages/components/MapAggregate.tsx
+msgid "a different size from this page's map, so it is left out"
+msgstr ""
+
 #: src/profile/SettingsSection.tsx
 msgid "A distribution profile is active (loaded from <0>{source}</0>). It reskins and narrows this build:"
+msgstr ""
+
+#: src/content/pages/components/MapAggregate.tsx
+msgid "A dot is where one team's start was set before one match. The engine can move a start into its start box, so a commander may have appeared a short way off."
 msgstr ""
 
 #: src/sound/events.ts
@@ -817,6 +1502,10 @@ msgstr ""
 msgid "A match is found"
 msgstr ""
 
+#: src/content/pages/components/MapRecords.tsx
+msgid "A match with no recorded result is in no win or loss. Every figure about wins is a count of the matches that have one, with the number it is out of beside it."
+msgstr ""
+
 #: src/profile/health.ts
 msgid "A new player is asked to download {missingNames} before the first lesson. Copy it into .coilbox/content/games/ or .coilbox/content/maps/."
 msgstr ""
@@ -837,12 +1526,32 @@ msgstr ""
 msgid "A room on this computer"
 msgstr ""
 
+#: src/content/replaySets.ts
+msgid "A set called “{trimmed}” already exists."
+msgstr ""
+
 #: src/play/pages/components/NoEngineNotice.tsx
 msgid "a skirmish"
 msgstr ""
 
+#: src/content/pages/components/MapRecords.tsx
+msgid "A start within {tolerance} of a position the map declares is counted at it. That is half the distance between the two closest declared positions, so a start is never near two."
+msgstr ""
+
 #: src/runlite/generate.ts
 msgid "A stranded engineering crew hails you. They offer expertise in exchange for passage."
+msgstr ""
+
+#: src/content/pages/components/MapAggregate.tsx
+msgid "A version can differ in layout, so its starts and counts may be in the wrong place on this page's map."
+msgstr ""
+
+#: src/content/pages/components/MapAggregate.tsx
+msgid "A version can differ in layout. Its starts and counts are drawn on this page's map as the replay recorded them, so a version that moved things puts them in the wrong place."
+msgstr ""
+
+#: src/content/pages/components/MapAggregate.tsx
+msgid "A version is left out only when it is installed and its size differs from this page's map. A version that is not installed has no size to compare, because a replay does not record the size of the map it was played on."
 msgstr ""
 
 #: src/runlite/pages/RunPage.tsx
@@ -865,6 +1574,10 @@ msgstr ""
 msgid "Abandoning…"
 msgstr ""
 
+#: src/content/pages/components/SectionHelp.tsx
+msgid "About {section}"
+msgstr ""
+
 #: src/general/pages/AboutCoilbox.tsx
 msgid "About Coilbox"
 msgstr ""
@@ -885,6 +1598,19 @@ msgstr ""
 msgid "Accounts"
 msgstr ""
 
+#: src/content/pages/components/VersionList.tsx
+msgid "Across {count} versions of this map"
+msgstr ""
+
+#: src/content/mapAggregate.ts
+msgid "across {matches}"
+msgstr ""
+
+#: src/content/pages/components/GameVersionsTab.tsx
+msgid "Action"
+msgstr ""
+
+#: src/content/pages/components/MissionRuntimeSection.tsx
 #: src/downloads/pages/ActivityPage.tsx
 msgid "Actions"
 msgstr ""
@@ -902,6 +1628,7 @@ msgstr ""
 msgid "Add to queue"
 msgstr ""
 
+#: src/content/pages/GameDetailPage.tsx
 #: src/general/index.ts
 msgid "Advanced"
 msgstr ""
@@ -918,6 +1645,10 @@ msgstr ""
 msgid "Advertise on the local network"
 msgstr ""
 
+#: src/content/replayBuildOrders.ts
+msgid "AI on team {aiTeam}"
+msgstr ""
+
 #: src/play/pages/components/NewPresetFromReplayButton.tsx
 msgid "AI to fill every player"
 msgstr ""
@@ -930,6 +1661,7 @@ msgstr ""
 msgid "Alerts"
 msgstr ""
 
+#: src/content/pages/components/BuildTreeExportButton.tsx
 #: src/downloads/pages/ActivityPage.tsx
 msgid "All"
 msgstr ""
@@ -950,12 +1682,20 @@ msgstr ""
 msgid "All packs downloaded"
 msgstr ""
 
+#: src/content/pages/components/MapAggregate.tsx
+msgid "All replays"
+msgstr ""
+
 #: src/profile/health.ts
 msgid "All scenarios loaded"
 msgstr ""
 
 #: src/general/index.ts
 msgid "All settings"
+msgstr ""
+
+#: src/content/pages/GameDetailPage.tsx
+msgid "All units"
 msgstr ""
 
 #: src/play/pages/components/ParticipantsTable.tsx
@@ -968,6 +1708,10 @@ msgstr ""
 
 #: src/startbox/StartBoxPresetsPopover.tsx
 msgid "Already saved"
+msgstr ""
+
+#: src/content/pages/components/BuildTreeDrawer.tsx
+msgid "Also buildable by"
 msgstr ""
 
 #: src/i18n/frameStrings.ts
@@ -986,8 +1730,32 @@ msgstr ""
 msgid "An automated depot offers to patch your hull — for a price in salvage."
 msgstr ""
 
+#: src/content/replayAnalysis.ts
+msgid "an unnamed game"
+msgstr ""
+
+#: src/content/mapAggregateExport.ts
+msgid "analysed"
+msgstr ""
+
+#: src/content/pages/components/MapAggregate.tsx
+msgid "Analysed"
+msgstr ""
+
+#: src/content/mapAggregateExport.ts
+msgid "analysed or not"
+msgstr ""
+
+#: src/content/pages/components/MapAggregate.tsx
+msgid "Analysed or not"
+msgstr ""
+
 #: src/direct/ReachablePorts.tsx
 msgid "and"
+msgstr ""
+
+#: src/content/pages/components/useUnitRenders.ts
+msgid "Angled"
 msgstr ""
 
 #: src/animation/index.ts
@@ -1014,8 +1782,28 @@ msgstr ""
 msgid "Another prompt is still open. Answer or close it, then open this file again."
 msgstr ""
 
+#: src/content/pages/components/DateFilter.tsx
+msgid "Any date"
+msgstr ""
+
 #: src/sound/events.ts
 msgid "Any launch of your own: a skirmish, a battle, a campaign mission, a saved game or a replay."
+msgstr ""
+
+#: src/content/mapAggregateExport.ts
+msgid "any number of players"
+msgstr ""
+
+#: src/content/pages/components/MapAggregate.tsx
+msgid "Any number of players"
+msgstr ""
+
+#: src/content/mapAggregateExport.ts
+msgid "any sides"
+msgstr ""
+
+#: src/content/pages/components/MapAggregate.tsx
+msgid "Any sides"
 msgstr ""
 
 #: src/runlite/pages/RunListPage.tsx
@@ -1024,6 +1812,10 @@ msgstr ""
 
 #: src/packs/pages/components/ExportPackForm.tsx
 msgid "Anyone who pastes this into Import setup pack gets its games and maps offered as downloads (or confirmed already installed), plus any presets and blueprints you included."
+msgstr ""
+
+#: src/content/pages/components/states.tsx
+msgid "Anything already installed is still on disk. unitsync said: {reason}"
 msgstr ""
 
 #: src/deeplink/pages/ImportSection.tsx
@@ -1068,17 +1860,49 @@ msgstr ""
 msgid "Archive"
 msgstr ""
 
+#: src/content/gameDependencies.ts
+msgid "Archive not installed: {archive}. {gameName} depends on it."
+msgstr ""
+
 #: src/content/index.ts
 msgid "Archives"
+msgstr ""
+
+#: src/content/pages/MapDetailPage.tsx
+msgid "Archives ({archiveCount})"
+msgstr ""
+
+#: src/content/compatReport.ts
+msgid "arguments changed"
+msgstr ""
+
+#: src/content/compatReport.ts
+msgid "arguments changed in {version}"
 msgstr ""
 
 #: src/runlite/meta.ts
 msgid "Armoured vanguard"
 msgstr ""
 
+#: src/content/pages/components/MapRecords.tsx
+msgid "Around {x}, {z}"
+msgstr ""
+
+#: src/content/pages/components/MapRecords.tsx
+msgid "Around {x}, {z}, within {radius}"
+msgstr ""
+
 #: src/runlite/pages/components/RunHud.tsx
 #: src/runlite/pages/RunPage.tsx
 msgid "Arsenal"
+msgstr ""
+
+#: src/content/pages/components/MapRecords.tsx
+msgid "As team 1"
+msgstr ""
+
+#: src/content/pages/components/MapRecords.tsx
+msgid "As team 2"
 msgstr ""
 
 #: src/runlite/pages/components/RunSetupForm.tsx
@@ -1121,6 +1945,8 @@ msgstr ""
 msgid "Authoring tools"
 msgstr ""
 
+#: src/content/pages/components/states.tsx
+#: src/content/pages/GameUnitPage.tsx
 #: src/i18n/frameStrings.ts
 msgid "Back"
 msgstr ""
@@ -1143,6 +1969,10 @@ msgstr ""
 msgid "Back to the room form"
 msgstr ""
 
+#: src/content/pages/components/UnitModelPanel.tsx
+msgid "Back to the units grid"
+msgstr ""
+
 #: src/runlite/pages/RunPage.tsx
 msgid "Back to warpath"
 msgstr ""
@@ -1154,6 +1984,10 @@ msgstr ""
 
 #: src/i18n/frameStrings.ts
 msgid "Back/forward buttons"
+msgstr ""
+
+#: src/content/buildPicMissing.ts
+msgid "bad pic"
 msgstr ""
 
 #: src/i18n/frameStrings.ts
@@ -1206,6 +2040,10 @@ msgstr ""
 msgid "Best win {bestTime} · {wins} in {attempts}"
 msgstr ""
 
+#: src/content/pages/components/MapAggregate.tsx
+msgid "Between two minutes"
+msgstr ""
+
 #: src/i18n/frameStrings.ts
 msgid "Blue"
 msgstr ""
@@ -1238,6 +2076,18 @@ msgstr ""
 msgid "Box size"
 msgstr ""
 
+#: src/content/pages/components/GameVersionsTab.tsx
+msgid "branch"
+msgstr ""
+
+#: src/content/pages/components/BuildTreeExportButton.tsx
+msgid "Branded"
+msgstr ""
+
+#: src/content/mapImage.ts
+msgid "Brightest spot: {legend}."
+msgstr ""
+
 #: src/downloads/pages/ExplorerPage.tsx
 msgid "Browse Spring/Recoil rapid content and download a tag through the bundled sidecar."
 msgstr ""
@@ -1246,12 +2096,53 @@ msgstr ""
 msgid "Browse the hub"
 msgstr ""
 
+#: src/content/pages/components/FactionBuildList.tsx
+msgid "Browse units"
+msgstr ""
+
+#: src/content/pages/components/UnitStatsTable.tsx
+msgid "Build time"
+msgstr ""
+
+#: src/content/pages/components/FactionBuildList.tsx
+msgid "Build tree"
+msgstr ""
+
+#: src/content/pages/components/BuildTreeExportButton.tsx
+msgid "Build tree exported."
+msgstr ""
+
 #: src/home/groupDescription.ts
 msgid "Build your own campaigns and scenarios."
 msgstr ""
 
+#: src/content/pages/components/BuildTreeDrawer.tsx
+msgid "Builder"
+msgstr ""
+
+#: src/content/pages/components/BuildTreeDrawer.tsx
+#: src/content/pages/components/CompatMode.tsx
+msgid "Building"
+msgstr ""
+
+#: src/content/mapAggregate.ts
+msgid "Building density"
+msgstr ""
+
 #: src/runlite/RunMapView.tsx
 msgid "Building the land…"
+msgstr ""
+
+#: src/content/pages/components/Convert3doDrawer.tsx
+msgid "Building the sheet for {folder}"
+msgstr ""
+
+#: src/content/pages/components/BuildTreeDrawer.tsx
+msgid "Builds (hover)"
+msgstr ""
+
+#: src/content/pages/components/BuildTreeDrawer.tsx
+msgid "Built by (hover)"
 msgstr ""
 
 #: src/profile/health.ts
@@ -1292,7 +2183,16 @@ msgstr ""
 msgid "Campaigns guide"
 msgstr ""
 
+#: src/content/pages/GameUnitPage.tsx
+msgid "Can be upgraded from"
+msgstr ""
+
 #: src/components/ConfirmPopover.tsx
+#: src/content/pages/components/Convert3doDrawer.tsx
+#: src/content/pages/components/DeleteArchiveButton.tsx
+#: src/content/pages/components/GameCard.tsx
+#: src/content/pages/components/LibraryMapCard.tsx
+#: src/content/pages/components/MissionRuntimeSection.tsx
 #: src/deeplink/ConfirmDialog.tsx
 #: src/direct/HostRoomForm.tsx
 #: src/direct/JoinRoomForm.tsx
@@ -1305,6 +2205,10 @@ msgstr ""
 
 #: src/downloads/DownloadQueueBadge.tsx
 msgid "Cancel downloading {label}"
+msgstr ""
+
+#: src/content/pages/components/BrowserToolbar.tsx
+msgid "Cancel scan"
 msgstr ""
 
 #: src/downloads/pages/ActivityPage.tsx
@@ -1323,8 +2227,13 @@ msgstr ""
 msgid "Change what a game's units cost, carry and can do."
 msgstr ""
 
+#: src/content/compatReport.ts
 #: src/play/pages/components/GameOptionsPanel.tsx
 msgid "changed"
+msgstr ""
+
+#: src/content/compatReport.ts
+msgid "changed in {version}"
 msgstr ""
 
 #: src/runlite/pages/RunPage.tsx
@@ -1352,6 +2261,10 @@ msgstr ""
 msgid "Check for updates"
 msgstr ""
 
+#: src/content/pages/components/states.tsx
+msgid "Checking"
+msgstr ""
+
 #: src/play/pages/SkirmishPage.tsx
 msgid "Checking match result…"
 msgstr ""
@@ -1364,15 +2277,34 @@ msgstr ""
 msgid "Checking that your units exist in {offeredName}…"
 msgstr ""
 
+#: src/content/pages/GameDetailPage.tsx
+msgid "Checking this game…"
+msgstr ""
+
 #: src/runlite/pages/components/RunSetupForm.tsx
 msgid "Checking which maps this game carries…"
 msgstr ""
 
+#: src/content/pages/components/states.tsx
+#: src/content/pages/components/UnitRendersRow.tsx
 #: src/deeplink/pages/ImportSection.tsx
 #: src/game-updates/pages/GameUpdatesSection.tsx
 #: src/packs/pages/components/ImportPackForm.tsx
 #: src/updater/pages/UpdatesSettingsSection.tsx
 msgid "Checking…"
+msgstr ""
+
+#: src/content/pages/GameDetailPage.tsx
+#: src/content/pages/MapDetailPage.tsx
+msgid "checksum {checksum}"
+msgstr ""
+
+#: src/content/pages/components/MapExportButtons.tsx
+msgid "Choose a density layer first."
+msgstr ""
+
+#: src/content/pages/components/Convert3doDrawer.tsx
+msgid "Choose a folder for the converted models"
 msgstr ""
 
 #: src/play/pages/components/GamePickerDrawer.tsx
@@ -1392,6 +2324,10 @@ msgstr ""
 
 #: src/startbox/mode.ts
 msgid "Choose before game"
+msgstr ""
+
+#: src/content/pages/components/Convert3doDrawer.tsx
+msgid "Choose folder"
 msgstr ""
 
 #: src/play/pages/components/GameSelectCard.tsx
@@ -1418,8 +2354,13 @@ msgstr ""
 msgid "Choose one of"
 msgstr ""
 
+#: src/content/pages/components/DateFilter.tsx
 #: src/play/pages/SkirmishPage.tsx
 msgid "Clear"
+msgstr ""
+
+#: src/content/pages/components/DateFilter.tsx
+msgid "Clear {lowerLabel}"
 msgstr ""
 
 #: src/play/pages/components/ParticipantsTable.tsx
@@ -1433,6 +2374,10 @@ msgstr ""
 
 #: src/startbox/StartBoxEditor.tsx
 msgid "Clear ally {letter}'s start box"
+msgstr ""
+
+#: src/content/pages/components/MapAggregate.tsx
+msgid "Clear filters"
 msgstr ""
 
 #: src/play/PresetList.tsx
@@ -1449,6 +2394,8 @@ msgstr ""
 
 #: src/components/SlideDrawer.tsx
 #: src/components/ui/dialog.tsx
+#: src/content/pages/components/BrandingScreenshots.tsx
+#: src/content/pages/components/MissionRuntimeSection.tsx
 #: src/deeplink/ConfirmDialog.tsx
 #: src/downloads/pages/components/MapPacksDrawer.tsx
 #: src/lego/pages/components/ShortcutSheet.tsx
@@ -1469,6 +2416,10 @@ msgstr ""
 
 #: src/i18n/frameStrings.ts
 msgid "Close menu"
+msgstr ""
+
+#: src/content/pages/components/UnitModelPanel.tsx
+msgid "Close model view"
 msgstr ""
 
 #: src/play/pages/components/ParticipantsTable.tsx
@@ -1492,8 +2443,16 @@ msgstr ""
 msgid "Coilbox {newVersion} is ready to install."
 msgstr ""
 
+#: src/content/pages/components/UnitModelPanel.tsx
+msgid "coilbox asked for an angle the hub does not store."
+msgstr ""
+
 #: src/deeplink/readImport.ts
 msgid "coilbox campaign"
+msgstr ""
+
+#: src/content/buildPicMissing.ts
+msgid "Coilbox cannot read this unit's build pic. The game ships one, in a format the decoder does not handle."
 msgstr ""
 
 #: src/runlite/pages/RunListPage.tsx
@@ -1522,6 +2481,10 @@ msgstr ""
 
 #: src/deeplink/pages/ImportSection.tsx
 msgid "Coilbox file"
+msgstr ""
+
+#: src/content/pages/components/MissionRuntimeSection.tsx
+msgid "Coilbox found no runtime marker in this game, so it cannot play scenarios yet. Installing writes coilbox's luarules, luaui and missions folders into the game folder."
 msgstr ""
 
 #: src/deeplink/DeepLinkHandler.tsx
@@ -1563,6 +2526,10 @@ msgstr ""
 msgid "Coilbox updates"
 msgstr ""
 
+#: src/content/pages/components/GeneratedBadge.tsx
+msgid "Coilbox's own"
+msgstr ""
+
 #: src/i18n/frameStrings.ts
 msgid "Collapse breadcrumb"
 msgstr ""
@@ -1579,6 +2546,14 @@ msgstr ""
 msgid "Colour scheme"
 msgstr ""
 
+#: src/content/pages/components/MapAggregate.tsx
+msgid "Colours compare places on this map with each other, not with another picture."
+msgstr ""
+
+#: src/content/mapImage.ts
+msgid "Colours compare places on this map with each other, not with another picture. {made} on {exported}."
+msgstr ""
+
 #: src/runlite/galaxyAdapter.ts
 #: src/runlite/pages/RunPage.tsx
 msgid "Command"
@@ -1592,8 +2567,29 @@ msgstr ""
 msgid "Command Palette"
 msgstr ""
 
+#: src/content/pages/components/BuildTreeDrawer.tsx
+msgid "Commander"
+msgstr ""
+
 #: src/hub/index.tsx
 msgid "Community"
+msgstr ""
+
+#: src/content/pages/GameUnitsPage.tsx
+msgid "Compare units"
+msgstr ""
+
+#: src/content/pages/GameDetailPage.tsx
+#: src/content/pages/MapDetailPage.tsx
+msgid "Compatibility"
+msgstr ""
+
+#: src/content/compatReport.ts
+msgid "Compatibility gadgets a build turns on"
+msgstr ""
+
+#: src/content/pages/components/CompatMode.tsx
+msgid "Compatibility mode"
 msgstr ""
 
 #: src/play/compatTarget.ts
@@ -1626,6 +2622,10 @@ msgstr ""
 
 #: src/downloads/pages/components/MapPacksDrawer.tsx
 msgid "Complete"
+msgstr ""
+
+#: src/content/pages/components/MissionRuntimeSection.tsx
+msgid "Conditions"
 msgstr ""
 
 #: src/deeplink/ConfirmDialog.tsx
@@ -1664,8 +2664,21 @@ msgstr ""
 msgid "Continue on {newerName}"
 msgstr ""
 
+#: src/content/pages/GameDetailPage.tsx
+msgid "Convert .3do models"
+msgstr ""
+
 #: src/home/groupDescription.ts
 msgid "Convert BOS to Lua, and work with COB scripts."
+msgstr ""
+
+#: src/content/pages/components/Convert3doDrawer.tsx
+#: src/content/pages/GameDetailPage.tsx
+msgid "Convert models"
+msgstr ""
+
+#: src/content/pages/components/Convert3doDrawer.tsx
+msgid "Converting..."
 msgstr ""
 
 #: src/direct/CopyButton.tsx
@@ -1717,6 +2730,18 @@ msgstr ""
 msgid "Copying {installing}."
 msgstr ""
 
+#: src/content/pages/components/Convert3doDrawer.tsx
+msgid "Copying the output over the game is not enough on its own: the engine tries <0>.3do</0> before <1>.s3o</1> for a unit whose <2>objectname</2> has no extension, so it keeps loading the old models while both are there. The original <3>.3do</3> files have to go, and any unit definition that spells <4>.3do</4> in its <5>objectname</5> has to lose it too."
+msgstr ""
+
+#: src/content/pages/components/Convert3doDrawer.tsx
+msgid "Could not be read at all ({unreadableCount})"
+msgstr ""
+
+#: src/content/compatReport.ts
+msgid "Could not check everything"
+msgstr ""
+
 #: src/direct/ReachablePorts.tsx
 msgid "Could not check your router"
 msgstr ""
@@ -1753,12 +2778,43 @@ msgstr ""
 msgid "Could not reach the host."
 msgstr ""
 
+#: src/content/pages/components/UnitHero.tsx
+#: src/content/pages/components/UnitModelPanel.tsx
+msgid "Could not reach unitsync to read this unit's model."
+msgstr ""
+
 #: src/home/markup.ts
 msgid "Could not read {ref}"
 msgstr ""
 
 #: src/profile/refs.ts
 msgid "Could not read {reference}"
+msgstr ""
+
+#: src/content/modelFile.ts
+msgid "could not read model {file}: {status}"
+msgstr ""
+
+#: src/content/pages/GameDetailPage.tsx
+msgid "Could not read this game's files."
+msgstr ""
+
+#: src/content/pages/GameDetailPage.tsx
+msgid "Could not read this game's options."
+msgstr ""
+
+#: src/content/pages/GameDetailPage.tsx
+#: src/content/pages/GameUnitPage.tsx
+#: src/content/pages/GameUnitsPage.tsx
+msgid "Could not read this game's units"
+msgstr ""
+
+#: src/content/pages/UnitReferencePage.tsx
+msgid "Could not read this game's units."
+msgstr ""
+
+#: src/content/pages/components/ModelReadFailed.tsx
+msgid "Could not read this model: {error}."
 msgstr ""
 
 #: src/direct/room.ts
@@ -1773,8 +2829,20 @@ msgstr ""
 msgid "Couldn't copy the link"
 msgstr ""
 
+#: src/content/pages/MapDetailPage.tsx
+msgid "Couldn't locate this map's archive on disk."
+msgstr ""
+
+#: src/content/pages/MapDetailPage.tsx
+msgid "Couldn't open this map in mapconv."
+msgstr ""
+
 #: src/play/pages/components/SaveAsPresetButton.tsx
 msgid "Couldn't save preset"
+msgstr ""
+
+#: src/content/pages/components/MapRecords.tsx
+msgid "Counted"
 msgstr ""
 
 #: src/play/pages/components/NewPresetFromReplayButton.tsx
@@ -1817,6 +2885,12 @@ msgstr ""
 msgid "Currency dropped by winning battles (more for elites and bosses). Spend it at depots on unit unlocks, perks, and repairs."
 msgstr ""
 
+#: src/content/pages/components/BuildTreeExportButton.tsx
+#: src/content/pages/components/UnitPictureCard.tsx
+#: src/content/pages/GameUnitPage.tsx
+msgid "Current"
+msgstr ""
+
 #: src/updater/pages/UpdatesSettingsSection.tsx
 msgid "Current version"
 msgstr ""
@@ -1829,8 +2903,32 @@ msgstr ""
 msgid "Cyan"
 msgstr ""
 
+#: src/content/pages/components/UnitStatsTable.tsx
+msgid "Damage"
+msgstr ""
+
 #: src/i18n/frameStrings.ts
 msgid "Dark"
+msgstr ""
+
+#: src/content/mapAggregate.ts
+msgid "death"
+msgstr ""
+
+#: src/content/mapAggregate.ts
+msgid "deaths"
+msgstr ""
+
+#: src/content/mapAggregate.ts
+msgid "Deaths"
+msgstr ""
+
+#: src/content/pages/components/MapAggregate.tsx
+msgid "Deaths come from playing a match back, which is run from a replay's own page."
+msgstr ""
+
+#: src/content/pages/components/MapRecords.tsx
+msgid "Declared by the map"
 msgstr ""
 
 #: src/mapconv/index.ts
@@ -1871,6 +2969,12 @@ msgstr ""
 msgid "Defeat."
 msgstr ""
 
+#: src/content/mapAggregate.ts
+msgid "Defences"
+msgstr ""
+
+#: src/content/pages/components/DeleteArchiveButton.tsx
+#: src/content/pages/components/MapRecords.tsx
 #: src/play/pages/SavegamesPage.tsx
 msgid "Delete"
 msgstr ""
@@ -1887,8 +2991,40 @@ msgstr ""
 msgid "Delete savegame {saveFilename}"
 msgstr ""
 
+#: src/content/pages/components/MapRecords.tsx
+msgid "Delete the name {name}"
+msgstr ""
+
+#: src/content/pages/components/DeleteArchiveButton.tsx
+msgid "Delete this archive?"
+msgstr ""
+
 #: src/play/pages/SavegamesPage.tsx
 msgid "Delete this savegame? This can't be undone."
+msgstr ""
+
+#: src/content/pages/components/DeleteArchiveButton.tsx
+msgid "Deleted {name}, freeing {freed}."
+msgstr ""
+
+#: src/content/pages/components/DeleteArchiveButton.tsx
+msgid "Deleted {name}."
+msgstr ""
+
+#: src/content/pages/components/MapAggregate.tsx
+msgid "Density layer"
+msgstr ""
+
+#: src/content/pages/GameDetailPage.tsx
+msgid "Dependencies ({dependencyCount})"
+msgstr ""
+
+#: src/content/compatReport.ts
+msgid "Dependencies not scanned for Lua"
+msgstr ""
+
+#: src/content/gameDependencies.ts
+msgid "Depends on \"{name}\", which is not installed."
 msgstr ""
 
 #: src/downloads/pages/components/RapidBrowser.tsx
@@ -1916,8 +3052,16 @@ msgstr ""
 msgid "Desktop notifications"
 msgstr ""
 
+#: src/content/replayAnalysis.ts
+msgid "Desync warnings from the engine"
+msgstr ""
+
 #: src/components/ResultCard.tsx
 msgid "Details"
+msgstr ""
+
+#: src/content/pages/components/Convert3doDrawer.tsx
+msgid "Did not fit on the sheet ({didNotFitCount})"
 msgstr ""
 
 #: src/runlite/pages/components/EncounterOverlay.tsx
@@ -1932,6 +3076,7 @@ msgstr ""
 msgid "Difficulty {filled} of {scale}"
 msgstr ""
 
+#: src/content/pages/components/GameSourcesTab.tsx
 #: src/direct/hostingRoute.ts
 #: src/downloads/activityRows.ts
 msgid "Direct"
@@ -1978,6 +3123,7 @@ msgstr ""
 msgid "Done · {finished}"
 msgstr ""
 
+#: src/content/pages/components/SuggestionsList.tsx
 #: src/downloads/DownloadQueueBadge.tsx
 #: src/downloads/pages/components/MapPacksDrawer.tsx
 #: src/downloads/pages/components/RapidBrowser.tsx
@@ -1994,6 +3140,10 @@ msgstr ""
 
 #: src/downloads/pages/components/RapidBrowser.tsx
 msgid "Download {tag}"
+msgstr ""
+
+#: src/content/pages/components/SuggestionsList.tsx
+msgid "Download {title}"
 msgstr ""
 
 #: src/game-updates/pages/GameUpdatesSection.tsx
@@ -2073,6 +3223,13 @@ msgstr ""
 msgid "Download write root is outside the package"
 msgstr ""
 
+#: src/content/pages/components/SuggestionsList.tsx
+msgid "Downloaded"
+msgstr ""
+
+#: src/content/pages/components/GameCard.tsx
+#: src/content/pages/components/GameVersionsTab.tsx
+#: src/content/pages/components/LibraryMapCard.tsx
 #: src/downloads/pages/ActivityPage.tsx
 msgid "Downloading"
 msgstr ""
@@ -2085,6 +3242,7 @@ msgstr ""
 msgid "Downloading an import"
 msgstr ""
 
+#: src/content/pages/components/SuggestionsList.tsx
 #: src/downloads/pages/components/MapPacksDrawer.tsx
 #: src/downloads/pages/components/RapidBrowser.tsx
 #: src/home/zones/SuggestedMap.tsx
@@ -2132,6 +3290,10 @@ msgstr ""
 msgid "Drawer"
 msgstr ""
 
+#: src/content/pages/components/UnitRendersRow.tsx
+msgid "Drawing…"
+msgstr ""
+
 #: src/deeplink/DeepLinkHandler.tsx
 msgid "Drop to install"
 msgstr ""
@@ -2142,6 +3304,22 @@ msgstr ""
 
 #: src/packs/pages/components/ExportPackForm.tsx
 msgid "e.g. Popular water maps"
+msgstr ""
+
+#: src/content/pages/components/MapAggregate.tsx
+msgid "Each match counts the same: its events are scaled to add up to one before the matches are averaged. A long busy match weighs no more than a short quiet one."
+msgstr ""
+
+#: src/content/pages/components/MapAggregate.tsx
+msgid "Each match is divided by its length in the window, then the matches are averaged. A busy match weighs more than a quiet one, and a long one no more than a short one."
+msgstr ""
+
+#: src/content/pages/components/MapAggregate.tsx
+msgid "Each match is scaled so its own busiest spot is one, then the matches are averaged. A spot is bright when it was the busiest place in many matches."
+msgstr ""
+
+#: src/content/mapAggregate.ts
+msgid "Each match's busiest spot"
 msgstr ""
 
 #: src/sound/SoundSettings.tsx
@@ -2156,8 +3334,17 @@ msgstr ""
 msgid "Easy"
 msgstr ""
 
+#: src/content/mapAggregate.ts
+#: src/content/matchStats.ts
+msgid "Economy"
+msgstr ""
+
 #: src/campaign/index.ts
 msgid "Edit"
+msgstr ""
+
+#: src/content/pages/GameUnitPage.tsx
+msgid "Edit in Unit tweaks"
 msgstr ""
 
 #: src/runlite/generate.ts
@@ -2207,10 +3394,15 @@ msgstr ""
 msgid "End it for everybody"
 msgstr ""
 
+#: src/content/pages/components/UnitStatsTable.tsx
+msgid "Energy cost"
+msgstr ""
+
 #: src/downloads/pages/ActivityPage.tsx
 msgid "engine"
 msgstr ""
 
+#: src/content/pages/components/GameLibrarySummary.tsx
 #: src/downloads/DownloadQueueBadge.tsx
 #: src/play/pages/components/CrashDrawer.tsx
 #: src/play/pages/EngineLogSection.tsx
@@ -2223,6 +3415,18 @@ msgstr ""
 
 #: src/game-updates/GameUpdatesProvider.tsx
 msgid "Engine {engineUpdate}"
+msgstr ""
+
+#: src/content/replayAnalysis.ts
+msgid "Engine {engineVersion} has no headless build, which the playback needs."
+msgstr ""
+
+#: src/content/replayAnalysis.ts
+msgid "Engine {engineVersion} is not installed, and no other engine is installed."
+msgstr ""
+
+#: src/content/replayAnalysis.ts
+msgid "Engine {engineVersion} is not installed, and none of the engines that are installed can run an analysis, which needs one with a headless build."
 msgstr ""
 
 #: src/profile/health.ts
@@ -2283,8 +3487,16 @@ msgstr ""
 msgid "Error details"
 msgstr ""
 
+#: src/content/compatReport.ts
+msgid "Errors"
+msgstr ""
+
 #: src/runlite/galaxyAdapter.ts
 msgid "Event"
+msgstr ""
+
+#: src/content/pages/components/Convert3doDrawer.tsx
+msgid "Every <0>.3do</0> under <1>objects3d/</1> becomes an <2>.s3o</2>. Each folder's models share one texture, so the engine binds one sheet for a faction rather than one per unit. This archive has {models} of them."
 msgstr ""
 
 #: src/play/pages/components/ParticipantsTable.tsx
@@ -2295,24 +3507,112 @@ msgstr ""
 msgid "Every battle, for when players cannot join even though the check says they can."
 msgstr ""
 
+#: src/content/pages/GamesPage.tsx
+msgid "Every game is installed."
+msgstr ""
+
+#: src/content/pages/GamesPage.tsx
+msgid "Every installed game is up to date."
+msgstr ""
+
+#: src/content/pages/MapsPage.tsx
+msgid "Every map is installed."
+msgstr ""
+
+#: src/content/pages/MapsPage.tsx
+msgid "Every map you have, and every map the mirrors carry."
+msgstr ""
+
+#: src/content/pages/components/MapRecords.tsx
+msgid "Every other map"
+msgstr ""
+
+#: src/content/pages/components/MapRecords.tsx
+msgid "Every player counts in the faction record, so two players of one faction on one team count twice. In a team game a faction's record is not separated from the team it was on or the factions beside it. Skirmish AIs are not counted."
+msgstr ""
+
 #: src/play/pages/components/NewPresetFromReplayButton.tsx
 msgid "Every seated player becomes an AI opponent, keeping the map, factions, colours and options."
+msgstr ""
+
+#: src/content/pages/UnitReferencePage.tsx
+msgid "Every unit in {gameName}, with the numbers players argue about. Select two or more to compare them."
+msgstr ""
+
+#: src/content/pages/components/MapAggregate.tsx
+msgid "Every unit that was destroyed counts, whatever destroyed it."
+msgstr ""
+
+#: src/content/pages/GamesPage.tsx
+msgid "Everything you can play, and everything the hub knows how to fetch."
 msgstr ""
 
 #: src/general/fullscreen.tsx
 msgid "Exit fullscreen"
 msgstr ""
 
+#: src/content/pages/components/BuildTreeExportButton.tsx
 #: src/play/pages/components/PresetsDrawer.tsx
 msgid "Export"
+msgstr ""
+
+#: src/content/pages/components/CompatMode.tsx
+msgid "Export .sdz"
+msgstr ""
+
+#: src/content/pages/components/BuildTreeExportButton.tsx
+msgid "Export build tree"
 msgstr ""
 
 #: src/runlite/pages/RunListPage.tsx
 msgid "Export challenge"
 msgstr ""
 
+#: src/content/pages/components/CompatMode.tsx
+msgid "Export compatibility mutator"
+msgstr ""
+
+#: src/content/pages/components/BuildTreeExportButton.tsx
+#: src/content/pages/components/MapExportButtons.tsx
+msgid "Export failed: {reason}"
+msgstr ""
+
+#: src/content/pages/components/BuildTreeExportButton.tsx
+msgid "Export HTML"
+msgstr ""
+
+#: src/content/pages/components/MapExportButtons.tsx
+msgid "Export layer CSV"
+msgstr ""
+
+#: src/content/pages/components/MapExportButtons.tsx
+msgid "Export picture"
+msgstr ""
+
 #: src/play/pages/SkirmishPage.tsx
 msgid "Export preset"
+msgstr ""
+
+#: src/content/pages/components/MapExportButtons.tsx
+msgid "Export start positions CSV"
+msgstr ""
+
+#: src/content/pages/components/MapExportButtons.tsx
+msgid "Export the layer as CSV"
+msgstr ""
+
+#: src/content/pages/components/MapExportButtons.tsx
+msgid "Export the picture"
+msgstr ""
+
+#: src/content/pages/components/MapExportButtons.tsx
+msgid "Export the start positions as CSV"
+msgstr ""
+
+#. placeholder {0}: exported.files.length
+#. placeholder {1}: exported.path
+#: src/content/pages/components/CompatMode.tsx
+msgid "Exported {0, plural, one {# file} other {# files}} to <0>{1}</0>"
 msgstr ""
 
 #: src/play/pages/components/ParticipantsTable.tsx
@@ -2323,12 +3623,17 @@ msgstr ""
 msgid "Extracting…"
 msgstr ""
 
+#: src/content/pages/components/MapRecords.tsx
 #: src/play/pages/components/ParticipantsTable.tsx
 msgid "Faction"
 msgstr ""
 
 #: src/runlite/pages/components/RunSetupForm.tsx
 msgid "Faction / side"
+msgstr ""
+
+#: src/content/pages/components/BuildTreeExportButton.tsx
+msgid "Factions"
 msgstr ""
 
 #: src/downloads/pages/ActivityPage.tsx
@@ -2339,6 +3644,10 @@ msgstr ""
 msgid "Failed"
 msgstr ""
 
+#: src/content/pages/components/GameSourcesTab.tsx
+msgid "failed {when} · {reason}"
+msgstr ""
+
 #: src/downloads/pages/ActivityPage.tsx
 msgid "Failed: {reason}"
 msgstr ""
@@ -2347,8 +3656,20 @@ msgstr ""
 msgid "Failing"
 msgstr ""
 
+#: src/content/libraryGames.ts
+msgid "Featured"
+msgstr ""
+
+#: src/content/libraryGames.ts
+msgid "Featured first"
+msgstr ""
+
 #: src/deeplink/DeepLinkHandler.tsx
 msgid "Fetch and check"
+msgstr ""
+
+#: src/content/pages/components/GameSourcesTab.tsx
+msgid "Fetches"
 msgstr ""
 
 #: src/runlite/pages/components/NodeOverlays.tsx
@@ -2359,10 +3680,15 @@ msgstr ""
 msgid "file"
 msgstr ""
 
+#: src/content/pages/components/UnitModelPanel.tsx
 #: src/downloads/activityRows.ts
 #: src/downloads/DownloadQueueBadge.tsx
 #: src/play/pages/components/CrashDrawer.tsx
 msgid "File"
+msgstr ""
+
+#: src/content/mapCompatReport.ts
+msgid "Files"
 msgstr ""
 
 #: src/profile/health.ts
@@ -2393,12 +3719,28 @@ msgstr ""
 msgid "Filter versions…"
 msgstr ""
 
+#: src/content/mapImage.ts
+msgid "Filters: {filters}"
+msgstr ""
+
 #: src/direct/ReachablePorts.tsx
 msgid "Find it another way to share it."
 msgstr ""
 
 #: src/direct/ReachablePorts.tsx
 msgid "Find it another way, or on this network use <0>{lan}</0>."
+msgstr ""
+
+#: src/content/replayTimeWindow.ts
+msgid "First {minutes} minutes"
+msgstr ""
+
+#: src/content/pages/components/MapAggregate.tsx
+msgid "First 10 minutes"
+msgstr ""
+
+#: src/content/pages/components/MapAggregate.tsx
+msgid "First 5 minutes"
 msgstr ""
 
 #: src/play/presetRecord.ts
@@ -2441,12 +3783,20 @@ msgstr ""
 msgid "Floating top bar"
 msgstr ""
 
+#: src/content/pages/GameUnitPage.tsx
+msgid "Floats"
+msgstr ""
+
 #: src/profile/health.ts
 msgid "Folder writability not checked"
 msgstr ""
 
 #: src/general/pages/SettingsSection.tsx
 msgid "Follow system"
+msgstr ""
+
+#: src/content/pages/GameUnitPage.tsx
+msgid "Footprint"
 msgstr ""
 
 #: src/direct/share.ts
@@ -2465,8 +3815,22 @@ msgstr ""
 msgid "for somebody who is not on your network, who can join this room and chat but cannot start the game"
 msgstr ""
 
+#: src/content/pages/components/BuildTreeExportButton.tsx
+#: src/content/pages/components/UnitModelPanel.tsx
+#: src/content/pages/GameUnitPage.tsx
+msgid "Format"
+msgstr ""
+
 #: src/i18n/frameStrings.ts
 msgid "Forward"
+msgstr ""
+
+#: src/content/replayAnalysis.ts
+msgid "Frame {current} of {last}"
+msgstr ""
+
+#: src/content/mapAggregate.ts
+msgid "Free for all"
 msgstr ""
 
 #: src/sound/MusicSource.tsx
@@ -2477,8 +3841,32 @@ msgstr ""
 msgid "From a link, to a room at {linkAddress}:{linkPort}. Nothing connects until you press Join, and if the host has stopped hosting you will be told so."
 msgstr ""
 
+#: src/content/pages/components/MapAggregate.tsx
+msgid "From minute"
+msgstr ""
+
 #: src/direct/share.ts
 msgid "From outside"
+msgstr ""
+
+#: src/content/replaySources.ts
+msgid "From playing the match back with coilbox's own recorder, which is kept only when the playback reproduced the recorded match exactly. These are events, not orders."
+msgstr ""
+
+#: src/content/replaySources.ts
+msgid "From the engine's own record at the end of the match."
+msgstr ""
+
+#: src/content/replaySources.ts
+msgid "From the orders and messages recorded during the match."
+msgstr ""
+
+#: src/content/pages/components/useUnitRenders.ts
+msgid "Front"
+msgstr ""
+
+#: src/content/replayBuildOrders.ts
+msgid "front of queue"
 msgstr ""
 
 #: src/i18n/frameStrings.ts
@@ -2497,6 +3885,14 @@ msgstr ""
 msgid "Fullscreen, resolution and vsync."
 msgstr ""
 
+#: src/content/pages/components/CompatMode.tsx
+msgid "Gadgets enabled: {gadgets}"
+msgstr ""
+
+#: src/content/pages/components/CompatMode.tsx
+msgid "Gadgets enabled: none"
+msgstr ""
+
 #: src/runlite/generate.ts
 msgid "Gain a field upgrade"
 msgstr ""
@@ -2505,11 +3901,13 @@ msgstr ""
 msgid "Galaxy"
 msgstr ""
 
+#: src/content/pages/GameDetailPage.tsx
 #: src/downloads/pages/ActivityPage.tsx
 msgid "game"
 msgstr ""
 
 #: src/content/index.ts
+#: src/content/pages/components/ArchiveTypeBadge.tsx
 #: src/direct/HostRoomForm.tsx
 #: src/downloads/DownloadQueueBadge.tsx
 #: src/play/pages/components/CrashDrawer.tsx
@@ -2571,17 +3969,29 @@ msgstr ""
 msgid "Game version"
 msgstr ""
 
+#: src/content/pages/components/SuggestionsList.tsx
+msgid "Game: {title}"
+msgstr ""
+
+#: src/content/pages/GamesPage.tsx
 #: src/play/pages/components/GamePickerGrid.tsx
 msgid "games"
 msgstr ""
 
 #: src/content/index.ts
+#: src/content/pages/components/GameHeader.tsx
+#: src/content/pages/GamesPage.tsx
+#: src/content/pages/MapDetailPage.tsx
 #: src/packs/pages/components/ExportPackForm.tsx
 msgid "Games"
 msgstr ""
 
 #: src/play/pages/SkirmishPage.tsx
 msgid "games and maps"
+msgstr ""
+
+#: src/content/pages/components/MapAggregate.tsx
+msgid "Games and versions"
 msgstr ""
 
 #: src/sound/MusicSource.tsx
@@ -2596,12 +4006,24 @@ msgstr ""
 msgid "General"
 msgstr ""
 
+#: src/content/pages/components/SuggestionsList.tsx
+msgid "Get started — download a game"
+msgstr ""
+
+#: src/content/pages/components/SuggestionsList.tsx
+msgid "Get started — download a map"
+msgstr ""
+
 #: src/direct/share.ts
 msgid "Give joiners the address for the network they are on."
 msgstr ""
 
 #: src/direct/share.ts
 msgid "Give joiners this address."
+msgstr ""
+
+#: src/content/replaySets.ts
+msgid "Give the set a name."
 msgstr ""
 
 #: src/notify/NotificationsSettings.tsx
@@ -2628,6 +4050,7 @@ msgstr ""
 msgid "Hard"
 msgstr ""
 
+#: src/content/pages/components/UnitStatsTable.tsx
 #: src/profile/HealthChecklist.tsx
 msgid "Health"
 msgstr ""
@@ -2646,6 +4069,22 @@ msgstr ""
 
 #: src/profile/SettingsSection.tsx
 msgid "Hidden"
+msgstr ""
+
+#: src/content/pages/MapDetailPage.tsx
+msgid "Hidden by the branding catalog: {reason}"
+msgstr ""
+
+#: src/content/pages/MapDetailPage.tsx
+msgid "Hidden by the branding catalog."
+msgstr ""
+
+#: src/content/pages/MapDetailPage.tsx
+msgid "Hidden by the distribution profile: {reason}"
+msgstr ""
+
+#: src/content/pages/MapDetailPage.tsx
+msgid "Hidden by the distribution profile."
 msgstr ""
 
 #: src/profile/SettingsSection.tsx
@@ -2670,6 +4109,10 @@ msgstr ""
 
 #: src/i18n/frameStrings.ts
 msgid "Hide the sidebar and open it from a menu button instead."
+msgstr ""
+
+#: src/content/pages/MapDetailPage.tsx
+msgid "Hide this map"
 msgstr ""
 
 #: src/profile/health.ts
@@ -2764,6 +4207,10 @@ msgstr ""
 msgid "host {hostName}"
 msgstr ""
 
+#: src/content/pages/MapDetailPage.tsx
+msgid "Host a battle here"
+msgstr ""
+
 #: src/direct/JoinRoomForm.tsx
 msgid "Host address"
 msgstr ""
@@ -2796,12 +4243,40 @@ msgstr ""
 msgid "Hover-reveal sidebar"
 msgstr ""
 
+#: src/content/pages/components/MapAggregate.tsx
+msgid "How each match is scaled"
+msgstr ""
+
 #: src/runlite/pages/components/RunHud.tsx
 msgid "How far you've crossed the map. Reach and beat the warlord at the far end to win the warpath."
 msgstr ""
 
+#: src/content/pages/components/MapRecords.tsx
+msgid "How long a match runs"
+msgstr ""
+
 #: src/content/index.ts
 msgid "How the game itself looks, sounds and handles."
+msgstr ""
+
+#: src/content/pages/components/MapAggregate.tsx
+msgid "How the sides were arranged"
+msgstr ""
+
+#: src/content/pages/components/MapAggregate.tsx
+msgid "how this map is played"
+msgstr ""
+
+#: src/content/pages/components/MapAggregate.tsx
+msgid "How this map is played"
+msgstr ""
+
+#: src/content/pages/components/BuildTreeExportButton.tsx
+msgid "HTML page"
+msgstr ""
+
+#: src/content/pages/components/GameLibrarySummary.tsx
+msgid "Hub"
 msgstr ""
 
 #: src/runlite/pages/components/RunHud.tsx
@@ -2814,6 +4289,10 @@ msgstr ""
 
 #: src/play/pages/components/ParticipantsTable.tsx
 msgid "Human · host"
+msgstr ""
+
+#: src/content/pages/components/UnitModelPanel.tsx
+msgid "Identity"
 msgstr ""
 
 #: src/deeplink/DeepLinkHandler.tsx
@@ -2844,6 +4323,10 @@ msgstr ""
 
 #: src/deeplink/DeepLinkHandler.tsx
 msgid "Import a {planLabel} shared with you?"
+msgstr ""
+
+#: src/content/pages/MapsPage.tsx
+msgid "Import a setup pack"
 msgstr ""
 
 #: src/runlite/pages/RunListPage.tsx
@@ -2879,9 +4362,25 @@ msgstr ""
 msgid "Imported preset"
 msgstr ""
 
+#: src/content/pages/components/MapRecords.tsx
+msgid "In a 1v1 each start is a team of one, so a position's record is the record of whoever held it against one opponent."
+msgstr ""
+
+#: src/content/pages/components/MapRecords.tsx
+msgid "In a free for all every player is a team of one, so there is no team to split by. A position's record is not controlled for how many players there were or who they were."
+msgstr ""
+
+#: src/content/pages/components/MapRecords.tsx
+msgid "In a team game a position's record depends on the team it was on and on who else was on it. It is split by team here, and it is not controlled for anything else."
+msgstr ""
+
 #: src/content/index.ts
 #: src/play/InGameBadge.tsx
 msgid "In game"
+msgstr ""
+
+#: src/content/pages/components/BuildTreeExportButton.tsx
+msgid "index.html plus cacheable images/ and assets/ — smaller page."
 msgstr ""
 
 #: src/i18n/frameStrings.ts
@@ -2892,6 +4391,26 @@ msgstr ""
 msgid "Input and camera"
 msgstr ""
 
+#: src/content/replayBuildOrders.ts
+msgid "inserted at {position}"
+msgstr ""
+
+#: src/content/replayBuildOrders.ts
+msgid "inserted first"
+msgstr ""
+
+#: src/content/replayBuildOrders.ts
+msgid "inserted last"
+msgstr ""
+
+#: src/content/replayBuildOrders.ts
+msgid "inserted mid-queue"
+msgstr ""
+
+#: src/content/pages/components/Convert3doDrawer.tsx
+#: src/content/pages/components/GameCard.tsx
+#: src/content/pages/components/GameVersionsTab.tsx
+#: src/content/pages/components/LibraryMapCard.tsx
 #: src/deeplink/DeepLinkHandler.tsx
 #: src/downloads/pages/components/EngineInstaller.tsx
 #: src/home/zones/SuggestedMap.tsx
@@ -2918,6 +4437,10 @@ msgstr ""
 msgid "Install an engine to resume savegames."
 msgstr ""
 
+#: src/content/pages/components/Convert3doDrawer.tsx
+msgid "Install into game"
+msgstr ""
+
 #: src/play/pages/components/NewPresetFromReplayButton.tsx
 msgid "Install it first from the Replays screen."
 msgstr ""
@@ -2934,6 +4457,27 @@ msgstr ""
 msgid "Install the map {fileName}?"
 msgstr ""
 
+#: src/content/pages/components/MissionRuntimeSection.tsx
+msgid "Install the mission runtime"
+msgstr ""
+
+#: src/content/pages/components/Convert3doDrawer.tsx
+msgid "Install this conversion?"
+msgstr ""
+
+#: src/content/pages/components/Convert3doDrawer.tsx
+msgid "Install writes the converted files into {archive}, moves each original <0>.3do</0> aside rather than deleting it, and fixes any unit definition that names one. Reversible with Undo, for as long as the moved-aside originals are still there."
+msgstr ""
+
+#: src/content/pages/components/GameCard.tsx
+#: src/content/pages/components/GameVersionsTab.tsx
+msgid "installed"
+msgstr ""
+
+#: src/content/pages/components/GameCard.tsx
+#: src/content/pages/components/GameLibrarySummary.tsx
+#: src/content/pages/components/GameVersionsTab.tsx
+#: src/content/pages/components/LibraryMapCard.tsx
 #: src/downloads/pages/components/MapPacksDrawer.tsx
 #: src/downloads/pages/components/RapidBrowser.tsx
 #: src/home/zones/SuggestedMap.tsx
@@ -2956,8 +4500,16 @@ msgstr ""
 msgid "Installed and ready."
 msgstr ""
 
+#: src/content/pages/components/Convert3doDrawer.tsx
+msgid "Installed the conversion into {archive}."
+msgstr ""
+
 #: src/deeplink/DeepLinkHandler.tsx
 msgid "Installing"
+msgstr ""
+
+#: src/content/pages/components/MissionRuntimeSection.tsx
+msgid "Installing adds {conditionCount} conditions and {actionCount} actions"
 msgstr ""
 
 #: src/updater/UpdateBadge.tsx
@@ -2994,8 +4546,20 @@ msgstr ""
 msgid "Invite people to this room"
 msgstr ""
 
+#: src/content/pages/components/CompatMode.tsx
+msgid "is out of date: {staleReasons}."
+msgstr ""
+
 #: src/play/engineConfirmation.ts
 msgid "it did not report a version"
+msgstr ""
+
+#: src/content/pages/components/UnitModelPanel.tsx
+msgid "it encoded past the size the hub accepts."
+msgstr ""
+
+#: src/content/pages/components/UnitModelPanel.tsx
+msgid "it encoded, and the file could not be written."
 msgstr ""
 
 #: src/deeplink/actions.ts
@@ -3021,6 +4585,26 @@ msgstr ""
 
 #: src/deeplink/actions.ts
 msgid "It opens in the keybinds editor, unsaved."
+msgstr ""
+
+#: src/content/pages/components/MissionRuntimeSection.tsx
+msgid "It reads mission format {installedFormat}, and coilbox compiles format {availableFormat}. A scenario compiled here may not load until those match."
+msgstr ""
+
+#: src/content/pages/components/MissionRuntimeSection.tsx
+msgid "It reads mission format {installedFormat}."
+msgstr ""
+
+#: src/content/pages/components/states.tsx
+msgid "It shows the last saved scan, which may be out of date. Playing is off until a scan succeeds."
+msgstr ""
+
+#: src/content/replayAnalysis.ts
+msgid "It used {usedGame}, and the replay was recorded on {recordedGame}."
+msgstr ""
+
+#: src/content/replayAnalysis.ts
+msgid "It used engine {usedEngine}, and the replay was recorded on engine {recordedEngine}."
 msgstr ""
 
 #: src/direct/room.ts
@@ -3109,24 +4693,60 @@ msgstr ""
 msgid "Keep playing"
 msgstr ""
 
+#: src/content/pages/MapDetailPage.tsx
+msgid "Keep this map out of generated warpaths and conquests. It stays playable in skirmish and multiplayer."
+msgstr ""
+
 #: src/play/PresetPartsPicker.tsx
 msgid "Keep tweak slots this preset does not set"
+msgstr ""
+
+#: src/content/pages/components/Convert3doDrawer.tsx
+msgid "kept from an earlier run so the models it already wrote stay correct"
 msgstr ""
 
 #: src/content/index.ts
 msgid "Keybinds"
 msgstr ""
 
+#: src/content/pages/components/GameVersionsTab.tsx
+msgid "Kind"
+msgstr ""
+
 #: src/general/pages/SettingsSection.tsx
 msgid "Language"
+msgstr ""
+
+#: src/content/libraryMaps.ts
+msgid "Largest"
+msgstr ""
+
+#: src/content/replayTimeWindow.ts
+msgid "Last {minutes} minutes"
+msgstr ""
+
+#: src/content/pages/components/MapAggregate.tsx
+msgid "Last 5 minutes"
 msgstr ""
 
 #: src/updater/pages/UpdatesSettingsSection.tsx
 msgid "Last checked {lastCheckedTime}"
 msgstr ""
 
+#: src/content/pages/MapDetailPage.tsx
+msgid "Last played"
+msgstr ""
+
+#: src/content/pages/components/GameSourcesTab.tsx
+msgid "Last result"
+msgstr ""
+
 #: src/game-updates/pages/GameUpdatesSection.tsx
 msgid "Latest: {releaseName}"
+msgstr ""
+
+#: src/content/pages/components/MapExportButtons.tsx
+msgid "Layer exported."
 msgstr ""
 
 #: src/i18n/frameStrings.ts
@@ -3158,6 +4778,10 @@ msgstr ""
 msgid "Leave the depot"
 msgstr ""
 
+#: src/content/pages/components/MapRecords.tsx
+msgid "Left out of the start positions:"
+msgstr ""
+
 #: src/lego/index.ts
 msgid "Lego Parts"
 msgstr ""
@@ -3171,9 +4795,14 @@ msgid "Let the banner make your system's notification sound. Your operating syst
 msgstr ""
 
 #: src/content/index.ts
+#: src/content/pages/components/GameLibrarySummary.tsx
 #: src/downloads/index.ts
 #: src/hub/index.tsx
 msgid "Library"
+msgstr ""
+
+#: src/content/pages/components/UnitModelPanel.tsx
+msgid "libwebp refused the picture."
 msgstr ""
 
 #: src/i18n/frameStrings.ts
@@ -3194,6 +4823,10 @@ msgstr ""
 
 #: src/profile/health.ts
 msgid "link icon ''{n}'' is unknown — falls back to a generic icon"
+msgstr ""
+
+#: src/content/pages/components/BrandingLinks.tsx
+msgid "Links"
 msgstr ""
 
 #: src/play/pages/components/PresetsDrawer.tsx
@@ -3228,6 +4861,7 @@ msgstr ""
 msgid "Loading maps…"
 msgstr ""
 
+#: src/content/pages/components/MapThumb.tsx
 #: src/play/pages/components/MinimapPreview.tsx
 msgid "Loading minimap"
 msgstr ""
@@ -3236,8 +4870,16 @@ msgstr ""
 msgid "Loading replays…"
 msgstr ""
 
+#: src/content/pages/GameDetailPage.tsx
+msgid "Loading sides…"
+msgstr ""
+
 #: src/runlite/pages/components/RunSetupForm.tsx
 msgid "Loading the game's factions…"
+msgstr ""
+
+#: src/content/replayAnalysis.ts
+msgid "Loading the match"
 msgstr ""
 
 #: src/runlite/unitLimit.ts
@@ -3258,6 +4900,11 @@ msgstr ""
 
 #: src/lobby-servers/index.ts
 msgid "Lobby servers"
+msgstr ""
+
+#: src/content/pages/components/GameCard.tsx
+#: src/content/pages/components/LibraryMapCard.tsx
+msgid "Local"
 msgstr ""
 
 #: src/direct/LanRooms.tsx
@@ -3288,8 +4935,16 @@ msgstr ""
 msgid "long"
 msgstr ""
 
+#: src/content/pages/components/MapRecords.tsx
+msgid "Longest"
+msgstr ""
+
 #: src/runlite/pages/RunListPage.tsx
 msgid "Looking for an engine…"
+msgstr ""
+
+#: src/content/pages/components/MissionRuntimeSection.tsx
+msgid "Looking for duplicate runtime files..."
 msgstr ""
 
 #: src/play/pages/EngineLogSection.tsx
@@ -3300,19 +4955,51 @@ msgstr ""
 msgid "Looking up this machine's addresses…"
 msgstr ""
 
+#: src/content/pages/components/SddBadge.tsx
+msgid "Loose .sdd directory (uncompressed)"
+msgstr ""
+
 #: src/animation/index.ts
 msgid "Lua Animations"
+msgstr ""
+
+#: src/content/compatReport.ts
+msgid "Lua calls to functions whose behaviour changed"
+msgstr ""
+
+#: src/content/compatReport.ts
+msgid "Lua calls to removed or changed APIs"
 msgstr ""
 
 #: src/content/index.ts
 msgid "Lua REPL"
 msgstr ""
 
+#. placeholder {0}: lua.error
+#: src/content/useCompatReport.ts
+msgid "Lua scan: {0}"
+msgstr ""
+
+#: src/content/mapImage.ts
+msgid "Made with coilbox"
+msgstr ""
+
+#. placeholder {0}: w.appVersion
+#: src/content/mapImage.ts
+msgid "Made with coilbox {0}"
+msgstr ""
+
+#: src/content/replayAnalysis.ts
+msgid "Making the track"
+msgstr ""
+
+#: src/content/pages/MapDetailPage.tsx
 #: src/downloads/pages/ActivityPage.tsx
 msgid "map"
 msgstr ""
 
 #: src/content/index.ts
+#: src/content/pages/components/ArchiveTypeBadge.tsx
 #: src/direct/HostRoomForm.tsx
 #: src/downloads/DownloadQueueBadge.tsx
 #: src/play/pages/components/CrashDrawer.tsx
@@ -3321,6 +5008,7 @@ msgstr ""
 msgid "Map"
 msgstr ""
 
+#: src/content/pages/MapDetailPage.tsx
 #: src/play/presetParts.ts
 msgid "Map options"
 msgstr ""
@@ -3342,8 +5030,16 @@ msgstr ""
 msgid "Map style"
 msgstr ""
 
+#: src/content/pages/components/SuggestionsList.tsx
+msgid "Map: {title}"
+msgstr ""
+
 #: src/mapconv/index.ts
 msgid "mapconv"
+msgstr ""
+
+#: src/content/mapCompatReport.ts
+msgid "mapinfo.lua keys the engine warns on"
 msgstr ""
 
 #: src/mapconv/index.ts
@@ -3354,11 +5050,14 @@ msgstr ""
 msgid "Mapping Wiki"
 msgstr ""
 
+#: src/content/pages/MapsPage.tsx
 #: src/play/pages/components/MapPickerGrid.tsx
 msgid "maps"
 msgstr ""
 
 #: src/content/index.ts
+#: src/content/pages/MapDetailPage.tsx
+#: src/content/pages/MapsPage.tsx
 #: src/packs/pages/components/ExportPackForm.tsx
 msgid "Maps"
 msgstr ""
@@ -3383,6 +5082,30 @@ msgstr ""
 msgid "Match in progress · hosted by {host}"
 msgstr ""
 
+#: src/content/pages/components/MapRecords.tsx
+msgid "Matches"
+msgstr ""
+
+#: src/content/pages/components/MapAggregate.tsx
+msgid "Matches are grouped by the map's name with a trailing version taken off, and not by the map's archive. A replay records the map's name and nothing that says which archive it was played on, so two archives with one name cannot be told apart."
+msgstr ""
+
+#: src/content/pages/components/MapAggregate.tsx
+msgid "Matches under a minute"
+msgstr ""
+
+#: src/content/mapImage.ts
+msgid "matches under a minute included"
+msgstr ""
+
+#: src/content/mapImage.ts
+msgid "matches under a minute left out"
+msgstr ""
+
+#: src/content/pages/components/MapAggregate.tsx
+msgid "Matches with nothing on this layer in the window are not in the average."
+msgstr ""
+
 #: src/play/presetRecord.ts
 msgid "Matches your best on {name}, {best}."
 msgstr ""
@@ -3403,6 +5126,14 @@ msgstr ""
 msgid "Max players"
 msgstr ""
 
+#: src/content/pages/GameUnitPage.tsx
+msgid "Maximum slope"
+msgstr ""
+
+#: src/content/pages/components/MapRecords.tsx
+msgid "Median"
+msgstr ""
+
 #: src/sound/events.ts
 msgid "Mentioned in chat"
 msgstr ""
@@ -3411,10 +5142,37 @@ msgstr ""
 msgid "Menu"
 msgstr ""
 
+#: src/content/pages/components/MissionRuntimeSection.tsx
+msgid "Merge"
+msgstr ""
+
+#: src/content/pages/components/MissionRuntimeSection.tsx
+msgid "Merge the runtime folders"
+msgstr ""
+
+#: src/content/pages/components/MissionRuntimeSection.tsx
+msgid "Merged the runtime folders, {removedCount} duplicate files removed."
+msgstr ""
+
+#: src/content/pages/GameDetailPage.tsx
+#: src/content/pages/MapDetailPage.tsx
+msgid "Metadata"
+msgstr ""
+
 #: src/play/pages/components/MapOverlay.tsx
 msgid "Metal"
 msgstr ""
 
+#: src/content/pages/components/UnitStatsTable.tsx
+msgid "Metal cost"
+msgstr ""
+
+#: src/content/matchStats.ts
+msgid "Military"
+msgstr ""
+
+#: src/content/pages/components/LibraryMapCard.tsx
+#: src/content/pages/components/MapAggregate.tsx
 #: src/direct/LanRooms.tsx
 #: src/play/pages/components/MapCard.tsx
 #: src/play/pages/components/MapPickerGrid.tsx
@@ -3422,12 +5180,37 @@ msgstr ""
 msgid "Minimap of {mapName}"
 msgstr ""
 
+#: src/content/pages/MapDetailPage.tsx
 #: src/downloads/pages/components/MapPacksDrawer.tsx
 msgid "Minimap of {mapTitle}"
 msgstr ""
 
+#: src/content/mapAggregate.ts
+msgid "minutes {from} to {to}"
+msgstr ""
+
+#: src/content/pages/components/MapAggregate.tsx
+msgid "Minutes 10 to 20"
+msgstr ""
+
+#: src/content/pages/components/MapAggregate.tsx
+msgid "Minutes 5 to 10"
+msgstr ""
+
 #: src/campaign/index.ts
 msgid "Mission"
+msgstr ""
+
+#: src/content/pages/components/MissionRuntimeSection.tsx
+msgid "Mission runtime"
+msgstr ""
+
+#: src/content/pages/components/MissionRuntimeSection.tsx
+msgid "Mission runtime unavailable"
+msgstr ""
+
+#: src/content/pages/components/MissionRuntimeSection.tsx
+msgid "Mission runtime version {installedVersion} installed, {fileCount} files."
 msgstr ""
 
 #: src/play/pages/components/GameOptionsPanel.tsx
@@ -3435,12 +5218,23 @@ msgstr ""
 msgid "Mod options"
 msgstr ""
 
+#: src/content/pages/components/UnitModelPanel.tsx
+#: src/content/pages/GameUnitPage.tsx
 #: src/lego/index.ts
 msgid "Model"
 msgstr ""
 
+#: src/content/pages/GameUnitPage.tsx
+msgid "Model file"
+msgstr ""
+
+#: src/content/mapCompatReport.ts
 #: src/lego/index.ts
 msgid "Models"
+msgstr ""
+
+#: src/content/compatReport.ts
+msgid "modinfo.tdf instead of modinfo.lua"
 msgstr ""
 
 #: src/home/zones/ResumeRail.tsx
@@ -3467,6 +5261,17 @@ msgstr ""
 msgid "Move to {newerName}"
 msgstr ""
 
+#. placeholder {0}: outcome.originalsMovedAside.length
+#. placeholder {1}: outcome.unitDefsPatched.length
+#: src/content/pages/components/Convert3doDrawer.tsx
+msgid "Moved {0, plural, one {# original model} other {# original models}} aside and fixed {1, plural, one {# unit definition} other {# unit definitions}} that named a .3do extension."
+msgstr ""
+
+#. placeholder {0}: outcome.originalsMovedAside.length
+#: src/content/pages/components/Convert3doDrawer.tsx
+msgid "Moved {0, plural, one {# original model} other {# original models}} aside."
+msgstr ""
+
 #: src/home/zones/ResumeRail.tsx
 #: src/multiplayer/index.tsx
 msgid "Multiplayer"
@@ -3490,6 +5295,10 @@ msgstr ""
 msgid "Music was turned off because the last attempt to play it stopped Coilbox responding."
 msgstr ""
 
+#: src/content/pages/components/CompatMode.tsx
+msgid "Mutator archive"
+msgstr ""
+
 #: src/sound/LevelRow.tsx
 msgid "Mute {label}"
 msgstr ""
@@ -3498,22 +5307,55 @@ msgstr ""
 msgid "Mute all sound"
 msgstr ""
 
+#: src/content/libraryGames.ts
+msgid "My Games"
+msgstr ""
+
+#: src/content/libraryMaps.ts
+msgid "My Maps"
+msgstr ""
+
+#: src/content/pages/components/MapRecords.tsx
 #: src/downloads/pages/ActivityPage.tsx
 #: src/downloads/pages/SettingsSection.tsx
 #: src/packs/pages/components/ExportPackForm.tsx
 msgid "Name"
 msgstr ""
 
+#: src/content/libraryGames.ts
+#: src/content/libraryMaps.ts
 #: src/play/pages/SavegamesPage.tsx
 msgid "Name A–Z"
 msgstr ""
 
+#: src/content/pages/components/MapRecords.tsx
+msgid "Name for place {placeNumber}"
+msgstr ""
+
+#: src/content/pages/components/PlaceNameInput.tsx
+msgid "Name this place"
+msgstr ""
+
+#: src/content/libraryGames.ts
+#: src/content/libraryMaps.ts
 #: src/play/pages/SavegamesPage.tsx
 msgid "Name Z–A"
 msgstr ""
 
 #: src/profile/health.ts
 msgid "names [{filterNames}]"
+msgstr ""
+
+#: src/content/pages/components/MapRecords.tsx
+msgid "Names are yours, kept on this computer for {mapName} by its exact name. A saved name that matches no place is kept until you delete it, and it is used again if a place turns up where it was."
+msgstr ""
+
+#: src/content/replaySources.ts
+msgid "Names, sides and ratings come from the match setup."
+msgstr ""
+
+#: src/content/replaySources.ts
+msgid "Names, sides and ratings come from the match setup. Totals and APM come from the engine's own record at the end of the match."
 msgstr ""
 
 #: src/i18n/frameStrings.ts
@@ -3524,6 +5366,10 @@ msgstr ""
 msgid "NE-SW"
 msgstr ""
 
+#: src/content/pages/components/GameVersionsTab.tsx
+msgid "Needs"
+msgstr ""
+
 #: src/play/navBadges.tsx
 msgid "Needs a game"
 msgstr ""
@@ -3532,12 +5378,29 @@ msgstr ""
 msgid "Needs at least two allies with a box"
 msgstr ""
 
+#: src/content/pages/components/BuildTreeExportButton.tsx
 #: src/i18n/frameStrings.ts
 msgid "Neutral"
 msgstr ""
 
+#: src/content/pages/MapDetailPage.tsx
+msgid "never"
+msgstr ""
+
 #: src/play/presetRecord.ts
 msgid "New best on {name}: {faster} faster than before."
+msgstr ""
+
+#: src/content/pages/components/StartModeActions.tsx
+msgid "New campaign"
+msgstr ""
+
+#: src/content/libraryGames.ts
+msgid "New Games"
+msgstr ""
+
+#: src/content/libraryMaps.ts
+msgid "New Maps"
 msgstr ""
 
 #: src/play/pages/components/NewPresetFromReplayButton.tsx
@@ -3564,6 +5427,18 @@ msgstr ""
 msgid "Nightmare"
 msgstr ""
 
+#: src/content/pages/GameUnitPage.tsx
+msgid "No"
+msgstr ""
+
+#: src/content/pages/MapsPage.tsx
+msgid "No 1v1 maps in the first {checked}."
+msgstr ""
+
+#: src/content/pages/MapsPage.tsx
+msgid "No 1v1 maps."
+msgstr ""
+
 #: src/runlite/pages/RunPage.tsx
 msgid "No active warpath."
 msgstr ""
@@ -3576,6 +5451,10 @@ msgstr ""
 msgid "No AIs found for this game."
 msgstr ""
 
+#: src/content/pages/MapDetailPage.tsx
+msgid "No archives reported for this map."
+msgstr ""
+
 #: src/runlite/pages/RunPage.tsx
 msgid "no battle"
 msgstr ""
@@ -3586,6 +5465,10 @@ msgstr ""
 
 #: src/play/pages/components/ParticipantsTable.tsx
 msgid "no bonus"
+msgstr ""
+
+#: src/content/pages/components/BuildTreeDrawer.tsx
+msgid "No build options found for this faction. This game may not expose unit <0>buildoptions</0> (e.g. legacy TDF games), or its commander builds nothing."
 msgstr ""
 
 #: src/runlite/generate.ts
@@ -3616,12 +5499,24 @@ msgstr ""
 msgid "No download destination set — choose a content folder in <0>Content folders settings</0> to enable engine downloads."
 msgstr ""
 
+#: src/content/pages/components/GameCard.tsx
+msgid "no download source"
+msgstr ""
+
+#: src/content/libraryGames.ts
+msgid "No download source for {title}."
+msgstr ""
+
 #: src/profile/health.ts
 msgid "No download write root set"
 msgstr ""
 
 #: src/downloads/pages/ActivityPage.tsx
 msgid "No downloads match \"{query}\"."
+msgstr ""
+
+#: src/content/config.ts
+msgid "No engine config directory to write to."
 msgstr ""
 
 #: src/profile/health.ts
@@ -3654,6 +5549,14 @@ msgstr ""
 msgid "No engine selected."
 msgstr ""
 
+#: src/content/pages/components/BrowserToolbar.tsx
+msgid "No engines found in your content folders. Add a folder in <0>Content folders</0> or install one from <1>Engines</1>."
+msgstr ""
+
+#: src/content/pages/components/MapRecords.tsx
+msgid "No faction is recorded for these matches."
+msgstr ""
+
 #: src/downloads/pages/ActivityPage.tsx
 msgid "No failed downloads."
 msgstr ""
@@ -3682,8 +5585,16 @@ msgstr ""
 msgid "No games found"
 msgstr ""
 
+#: src/content/pages/GamesPage.tsx
+msgid "No games found for this engine."
+msgstr ""
+
 #: src/packs/pages/components/ExportPackForm.tsx
 msgid "No games installed for this engine."
+msgstr ""
+
+#: src/content/pages/GamesPage.tsx
+msgid "No games installed."
 msgstr ""
 
 #: src/runlite/pages/RunListPage.tsx
@@ -3694,8 +5605,28 @@ msgstr ""
 msgid "No games match “{query}”."
 msgstr ""
 
+#: src/content/pages/GamesPage.tsx
+msgid "No games match “{searchTerm}”."
+msgstr ""
+
+#: src/content/pages/GameDetailPage.tsx
+msgid "No games recorded"
+msgstr ""
+
+#: src/content/pages/GamesPage.tsx
+msgid "No games yet — try one of these"
+msgstr ""
+
 #: src/downloads/gameRepos.ts
 msgid "No GitHub repo declared for source \"{sourceKey}\"."
+msgstr ""
+
+#: src/content/compatReport.ts
+msgid "No luaui folder"
+msgstr ""
+
+#: src/content/compatReport.ts
+msgid "No luaui/widgets folder"
 msgstr ""
 
 #: src/direct/lan.ts
@@ -3706,10 +5637,23 @@ msgstr ""
 msgid "No map selected"
 msgstr ""
 
+#: src/content/mapCompatReport.ts
+msgid "No mapinfo.lua or .smd file"
+msgstr ""
+
+#: src/content/mapCompatReport.ts
+msgid "No mapinfo.lua, settings from the .smd file"
+msgstr ""
+
+#: src/content/pages/MapsPage.tsx
+msgid "No maps found for this engine."
+msgstr ""
+
 #: src/packs/pages/components/ExportPackForm.tsx
 msgid "No maps installed for this engine."
 msgstr ""
 
+#: src/content/pages/MapsPage.tsx
 #: src/play/pages/components/MapPickerGrid.tsx
 msgid "No maps installed."
 msgstr ""
@@ -3718,8 +5662,33 @@ msgstr ""
 msgid "No maps match \"{query}\"."
 msgstr ""
 
+#: src/content/pages/MapsPage.tsx
+msgid "No maps match “{query}”."
+msgstr ""
+
+#: src/content/pages/MapsPage.tsx
+msgid "No maps yet — try one of these"
+msgstr ""
+
+#: src/content/pages/components/MapAggregate.tsx
+msgid "No match on this map in the picture has been analysed, so there are no deaths to draw."
+msgstr ""
+
+#: src/content/pages/components/MapAggregate.tsx
+msgid "No match on this map is in your library yet."
+msgstr ""
+
+#: src/content/pages/components/MapAggregate.tsx
+msgid "No match on this map passes these filters."
+msgstr ""
+
+#: src/content/pages/MapDetailPage.tsx
 #: src/play/pages/components/MinimapPreview.tsx
 msgid "No minimap"
+msgstr ""
+
+#: src/content/pages/components/Convert3doDrawer.tsx
+msgid "No model has a second texture. A <0>.3do</0> carries no glow, no shine and no cut-out mask, so there is nothing to put there and coilbox leaves it empty rather than writing a stand-in that would fix all three at one value for every unit."
 msgstr ""
 
 #: src/sound/MusicSource.tsx
@@ -3738,8 +5707,16 @@ msgstr ""
 msgid "no password"
 msgstr ""
 
+#: src/content/buildPicMissing.ts
+msgid "no pic"
+msgstr ""
+
 #: src/play/pages/components/PresetsDrawer.tsx
 msgid "No presets yet. Save your current setup above, or import a shared one."
+msgstr ""
+
+#: src/content/pages/components/states.tsx
+msgid "No problems"
 msgstr ""
 
 #: src/play/PresetTweaksView.tsx
@@ -3754,12 +5731,21 @@ msgstr ""
 msgid "No rapid repositories. Add one to browse and download games from it."
 msgstr ""
 
+#: src/content/pages/components/GameSourcesTab.tsx
 #: src/downloads/pages/ActivityPage.tsx
 msgid "no reason given"
 msgstr ""
 
 #: src/downloads/emptyEngineList.ts
 msgid "No Recoil builds for this platform ({platform}). On macOS, add an engine manually."
+msgstr ""
+
+#: src/content/pages/components/SuggestionsList.tsx
+msgid "No release archive found for {repo}."
+msgstr ""
+
+#: src/content/pages/components/UnitModelPanel.tsx
+msgid "No render was stored: {skipReason}"
 msgstr ""
 
 #: src/play/pages/components/DebriefDrawer.tsx
@@ -3770,8 +5756,16 @@ msgstr ""
 msgid "No replays found."
 msgstr ""
 
+#: src/content/pages/MapDetailPage.tsx
+msgid "No replays recorded on this map yet."
+msgstr ""
+
 #: src/downloads/pages/components/RapidBrowser.tsx
 msgid "No repositories match “{repoQuery}”."
+msgstr ""
+
+#: src/content/pages/components/MapRecords.tsx
+msgid "no result"
 msgstr ""
 
 #: src/direct/LanRooms.tsx
@@ -3798,6 +5792,10 @@ msgstr ""
 msgid "No savegames match “{trimmedFilter}”."
 msgstr ""
 
+#: src/content/pages/components/MissionRuntimeSection.tsx
+msgid "no scenario here any more"
+msgstr ""
+
 #: src/direct/ReachablePorts.tsx
 msgid "No server would say what your public address is."
 msgstr ""
@@ -3806,12 +5804,20 @@ msgstr ""
 msgid "No settings available."
 msgstr ""
 
+#: src/content/pages/components/GameSourcesTab.tsx
+msgid "No source can fetch this game."
+msgstr ""
+
 #: src/downloads/downloadGame.ts
 msgid "No source could provide \"{gameName}\". {errors}"
 msgstr ""
 
 #: src/downloads/downloadMap.ts
 msgid "No source could provide \"{mapName}\". {errors}"
+msgstr ""
+
+#: src/content/pages/components/GameVersionsTab.tsx
+msgid "No source lists a version."
 msgstr ""
 
 #: src/direct/room.ts
@@ -3826,9 +5832,30 @@ msgstr ""
 msgid "No start boxes yet, so every team may start anywhere on the map."
 msgstr ""
 
+#: src/content/pages/components/MapExportButtons.tsx
+#: src/content/pages/components/MapRecords.tsx
+msgid "No start position is counted for these matches."
+msgstr ""
+
+#: src/content/pages/MapsPage.tsx
+msgid "No team maps in the first {checked}."
+msgstr ""
+
+#: src/content/pages/MapsPage.tsx
+msgid "No team maps."
+msgstr ""
+
 #: src/home/zones/Greeting.tsx
 #: src/i18n/frameStrings.ts
 msgid "No tools available yet."
+msgstr ""
+
+#: src/content/pages/GameUnitsPage.tsx
+msgid "No units found for this game."
+msgstr ""
+
+#: src/content/pages/GameUnitsPage.tsx
+msgid "No units match \"{trimmedQuery}\"."
 msgstr ""
 
 #: src/downloads/pages/components/RapidBrowser.tsx
@@ -3843,6 +5870,22 @@ msgstr ""
 msgid "No warpath in progress. Start a new warpath to begin."
 msgstr ""
 
+#: src/content/pages/MapsPage.tsx
+msgid "No water maps in the first {checked}."
+msgstr ""
+
+#: src/content/pages/MapsPage.tsx
+msgid "No water maps."
+msgstr ""
+
+#: src/content/pages/components/MapRecords.tsx
+msgid "No."
+msgstr ""
+
+#: src/content/replayAnalysis.ts
+msgid "nobody"
+msgstr ""
+
 #: src/direct/HostRoomForm.tsx
 msgid "Nobody gets in until you say so. You are asked in the battle room, and whoever is asking waits until you answer."
 msgstr ""
@@ -3855,12 +5898,46 @@ msgstr ""
 msgid "Nobody outside this network can reach this room, so it is for the people on this network."
 msgstr ""
 
+#: src/content/replaySideLabel.ts
+msgid "Nobody won"
+msgstr ""
+
+#: src/content/pages/components/MapRecords.tsx
+#: src/content/pages/components/UnitModelPanel.tsx
+#: src/content/pages/GameUnitPage.tsx
+msgid "none"
+msgstr ""
+
 #: src/profile/SettingsSection.tsx
 msgid "None"
 msgstr ""
 
 #: src/play/pages/EngineLogSection.tsx
 msgid "none found"
+msgstr ""
+
+#: src/content/pages/components/MapRecords.tsx
+msgid "None of the {twoSides} matches of two teams has a recorded result, so neither team has a record."
+msgstr ""
+
+#: src/content/pages/components/MapAggregate.tsx
+msgid "None of these matches has anything on this layer in {when}."
+msgstr ""
+
+#: src/content/pages/components/MapAggregate.tsx
+msgid "None of these matches has anything on this layer."
+msgstr ""
+
+#: src/content/pages/components/MapRecords.tsx
+msgid "None of these matches is two teams, so there is no team 1 and team 2 to compare."
+msgstr ""
+
+#: src/content/pages/components/MapAggregate.tsx
+msgid "None of these replays recorded a start position."
+msgstr ""
+
+#: src/content/pages/GameDetailPage.tsx
+msgid "None of this game's sides resolve to a start unit in its roster, so every build tree below is empty. All units still lists the full roster."
 msgstr ""
 
 #: src/play/scenarioDifficulty.ts
@@ -3875,8 +5952,20 @@ msgstr ""
 msgid "Not a new best on {name}. This win was {slower} slower than {best}."
 msgstr ""
 
+#: src/content/mapAggregateExport.ts
+msgid "not analysed"
+msgstr ""
+
+#: src/content/pages/components/MapAggregate.tsx
+msgid "Not analysed"
+msgstr ""
+
 #: src/direct/room.ts
 msgid "Not announced on this network, so give joiners your address."
+msgstr ""
+
+#: src/content/pages/components/UnitRendersRow.tsx
+msgid "Not available."
 msgstr ""
 
 #: src/direct/room.ts
@@ -3885,6 +5974,18 @@ msgstr ""
 
 #: src/play/PresetPartsPicker.tsx
 msgid "Not in this preset"
+msgstr ""
+
+#: src/content/compatReport.ts
+msgid "Not installed"
+msgstr ""
+
+#: src/content/libraryMaps.ts
+msgid "not on any mirror"
+msgstr ""
+
+#: src/content/pages/components/GameCard.tsx
+msgid "not on the hub"
 msgstr ""
 
 #: src/profile/health.ts
@@ -3897,6 +5998,14 @@ msgstr ""
 
 #: src/components/SaveStatus.tsx
 msgid "Not saved. Leaving this page loses the change."
+msgstr ""
+
+#: src/content/pages/components/MapRecords.tsx
+msgid "not taken"
+msgstr ""
+
+#: src/content/pages/components/GameSourcesTab.tsx
+msgid "not tried"
 msgstr ""
 
 #: src/profile/health.ts
@@ -3913,6 +6022,15 @@ msgstr ""
 
 #: src/downloads/pages/ActivityPage.tsx
 msgid "Nothing downloaded yet."
+msgstr ""
+
+#: src/content/pages/components/UnitHero.tsx
+#: src/content/pages/components/UnitModelPanel.tsx
+msgid "Nothing drawable came out of {object}: it has pieces but no faces."
+msgstr ""
+
+#: src/content/pages/GameDetailPage.tsx
+msgid "Nothing found that would stop this game running on this engine."
 msgstr ""
 
 #: src/direct/hostingRoute.ts
@@ -3939,6 +6057,10 @@ msgstr ""
 msgid "Nothing here is within budget yet — press on and win more salvage."
 msgstr ""
 
+#: src/content/pages/components/MapExportButtons.tsx
+msgid "Nothing in the picture has anything on this layer, so there is nothing to write."
+msgstr ""
+
 #: src/downloads/pages/ActivityPage.tsx
 msgid "Nothing is downloading."
 msgstr ""
@@ -3947,12 +6069,24 @@ msgstr ""
 msgid "Nothing is hosting on {where}. Check the port with the host, and that their room is still up."
 msgstr ""
 
+#: src/content/pages/components/Convert3doDrawer.tsx
+msgid "nothing picked yet"
+msgstr ""
+
 #: src/startbox/StartBoxPresetsPopover.tsx
 msgid "Nothing saved for this map yet. Draw a layout and keep it here."
 msgstr ""
 
 #: src/play/PresetPartsView.tsx
 msgid "Nothing selected"
+msgstr ""
+
+#: src/content/pages/components/BuildTreeExportButton.tsx
+msgid "Nothing to export for this faction."
+msgstr ""
+
+#: src/content/pages/components/MissionRuntimeSection.tsx
+msgid "Nothing to merge - this game has one of each runtime folder."
 msgstr ""
 
 #: src/deeplink/DeepLinkHandler.tsx
@@ -4013,6 +6147,10 @@ msgstr ""
 msgid "ok"
 msgstr ""
 
+#: src/content/pages/components/GameSourcesTab.tsx
+msgid "ok · {when} · {took}"
+msgstr ""
+
 #: src/play/pages/SavegamesPage.tsx
 msgid "Oldest"
 msgstr ""
@@ -4030,8 +6168,32 @@ msgstr ""
 msgid "On a narrow window, the sidebar becomes a menu button and opens fullscreen."
 msgstr ""
 
+#: src/content/mapAggregate.ts
+msgid "on average {amount} a minute in {when} within {reach} of one spot, {over}"
+msgstr ""
+
+#: src/content/mapAggregate.ts
+msgid "on average {amount} a minute within {reach} of one spot, {over}"
+msgstr ""
+
+#: src/content/mapAggregate.ts
+msgid "on average {share} of a match's {many} in {when} within {reach} of one spot, {over}"
+msgstr ""
+
+#: src/content/mapAggregate.ts
+msgid "on average {share} of a match's {many} within {reach} of one spot, {over}"
+msgstr ""
+
 #: src/direct/share.ts
 msgid "On this network"
+msgstr ""
+
+#: src/content/pages/components/BuildTreeExportButton.tsx
+msgid "One self-contained file with pics inlined — larger, but drop-in."
+msgstr ""
+
+#: src/content/pages/components/MissionRuntimeSection.tsx
+msgid "Only coilbox's own files. The game's gadgets, widgets and missions stay where they are. This can't be undone."
 msgstr ""
 
 #: src/profile/health.ts
@@ -4078,6 +6240,19 @@ msgstr ""
 msgid "Open Conquest."
 msgstr ""
 
+#: src/content/pages/components/Convert3doDrawer.tsx
+#: src/content/pages/GameDetailPage.tsx
+msgid "Open folder"
+msgstr ""
+
+#: src/content/pages/components/states.tsx
+msgid "Open game downloads"
+msgstr ""
+
+#: src/content/pages/MapDetailPage.tsx
+msgid "Open in mapconv decompile"
+msgstr ""
+
 #: src/direct/ReachablePorts.tsx
 msgid "Open ports on my router"
 msgstr ""
@@ -4122,6 +6297,10 @@ msgstr ""
 msgid "Opening \"{screenName}\" needs an id."
 msgstr ""
 
+#: src/content/pages/MapDetailPage.tsx
+msgid "Opening…"
+msgstr ""
+
 #: src/direct/roomSeed.ts
 msgid "Opens with {bots}."
 msgstr ""
@@ -4131,8 +6310,65 @@ msgstr ""
 msgid "Opposition"
 msgstr ""
 
+#: src/content/pages/GameDetailPage.tsx
+msgid "Options"
+msgstr ""
+
 #: src/i18n/frameStrings.ts
 msgid "Orange"
+msgstr ""
+
+#: src/content/mapAggregate.ts
+msgid "order"
+msgstr ""
+
+#: src/content/mapAggregate.ts
+msgid "Order density"
+msgstr ""
+
+#: src/content/mapAggregate.ts
+msgid "order to place a building"
+msgstr ""
+
+#: src/content/mapAggregate.ts
+msgid "order to place a defence"
+msgstr ""
+
+#: src/content/mapAggregate.ts
+msgid "order to place an economy building"
+msgstr ""
+
+#: src/content/mapAggregate.ts
+msgid "orders"
+msgstr ""
+
+#: src/content/mapAggregate.ts
+msgid "orders to place a building"
+msgstr ""
+
+#: src/content/mapAggregate.ts
+msgid "orders to place a defence"
+msgstr ""
+
+#: src/content/mapAggregate.ts
+msgid "orders to place an economy building"
+msgstr ""
+
+#: src/content/mapAggregate.ts
+#: src/content/pages/components/ArchiveTypeBadge.tsx
+msgid "Other"
+msgstr ""
+
+#: src/content/pages/components/MapRecords.tsx
+msgid "Other starts are grouped when they are within {scale} of one another, directly or through others, which is 1/32 of the map's shorter side and the grain of the density layers. Nothing measured says that suits every map, and a group with a wide radius may be more than one position."
+msgstr ""
+
+#: src/content/techForest.ts
+msgid "Other units"
+msgstr ""
+
+#: src/content/pages/MapDetailPage.tsx
+msgid "outcome unknown"
 msgstr ""
 
 #: src/play/debrief.ts
@@ -4147,8 +6383,28 @@ msgstr ""
 msgid "Outcome unknown — the winner couldn't be determined."
 msgstr ""
 
+#: src/content/pages/components/Convert3doDrawer.tsx
+msgid "Output folder"
+msgstr ""
+
+#: src/content/stats.ts
+msgid "Over 2 hours"
+msgstr ""
+
 #: src/runlite/generate.ts
 msgid "Overclocked Reactor"
+msgstr ""
+
+#: src/content/pages/GameDetailPage.tsx
+msgid "Overview"
+msgstr ""
+
+#: src/content/pages/components/GameVersionsTab.tsx
+msgid "Package"
+msgstr ""
+
+#: src/content/pages/components/GameLibrarySummary.tsx
+msgid "package {rapidPackage} via {rapidTag}"
 msgstr ""
 
 #: src/lego/index.ts
@@ -4219,6 +6475,10 @@ msgstr ""
 msgid "People whose messages coilbox hides from you."
 msgstr ""
 
+#: src/content/mapAggregate.ts
+msgid "Per minute of match"
+msgstr ""
+
 #: src/general/pages/SettingsSection.tsx
 msgid "Performance mode"
 msgstr ""
@@ -4264,6 +6524,14 @@ msgstr ""
 msgid "Pick up where you left off."
 msgstr ""
 
+#: src/content/pages/components/MapExportButtons.tsx
+msgid "Picture exported."
+msgstr ""
+
+#: src/content/pages/components/GameSourcesTab.tsx
+msgid "Pin"
+msgstr ""
+
 #: src/i18n/frameStrings.ts
 msgid "Pink"
 msgstr ""
@@ -4272,12 +6540,23 @@ msgstr ""
 msgid "pinned"
 msgstr ""
 
+#: src/content/pages/components/GameSourcesTab.tsx
+msgid "Pinned"
+msgstr ""
+
+#: src/content/pages/components/MapRecords.tsx
+msgid "Place"
+msgstr ""
+
 #: src/runlite/pages/components/RunSetupForm.tsx
 msgid "Planet"
 msgstr ""
 
 #: src/campaign/index.ts
 #: src/conquest/index.ts
+#: src/content/pages/components/GameCard.tsx
+#: src/content/pages/components/GameHeader.tsx
+#: src/content/pages/components/LibraryMapCard.tsx
 #: src/play/index.ts
 #: src/runlite/index.ts
 #: src/scenario/index.ts
@@ -4288,9 +6567,37 @@ msgstr ""
 msgid "Play music"
 msgstr ""
 
+#: src/content/pages/MapDetailPage.tsx
+msgid "Play this map"
+msgstr ""
+
+#: src/content/pages/components/MapRecords.tsx
+msgid "Played"
+msgstr ""
+
+#: src/content/pages/components/MapAggregate.tsx
+msgid "Played from"
+msgstr ""
+
+#: src/content/mapImage.ts
+msgid "played from {playedFrom}"
+msgstr ""
+
+#: src/content/pages/components/MapAggregate.tsx
+msgid "Played until"
+msgstr ""
+
+#: src/content/mapImage.ts
+msgid "played until {playedUntil}"
+msgstr ""
+
 #: src/multiplayer/index.tsx
 #: src/play/pages/components/ParticipantsTable.tsx
 msgid "Player"
+msgstr ""
+
+#: src/content/replayBuildOrders.ts
+msgid "Player {playerNumber}"
 msgstr ""
 
 #: src/multiplayer/index.tsx
@@ -4305,12 +6612,20 @@ msgstr ""
 msgid "Players connect straight to you or not at all."
 msgstr ""
 
+#: src/content/pages/components/MapAggregate.tsx
+msgid "Players in the match"
+msgstr ""
+
 #: src/play/pages/components/CrashDrawer.tsx
 msgid "Playing"
 msgstr ""
 
 #: src/play/pages/SkirmishPage.tsx
 msgid "Playing with \"{projectName}\""
+msgstr ""
+
+#: src/content/pages/components/MapExportButtons.tsx
+msgid "PNG image"
 msgstr ""
 
 #: src/direct/JoinRoomForm.tsx
@@ -4365,8 +6680,20 @@ msgstr ""
 msgid "Press on"
 msgstr ""
 
+#: src/content/pages/MapDetailPage.tsx
+msgid "Preview"
+msgstr ""
+
 #: src/sound/SoundSettings.tsx
 msgid "Preview {eventLabel}"
+msgstr ""
+
+#: src/content/pages/components/ArchiveTypeBadge.tsx
+msgid "Primary"
+msgstr ""
+
+#: src/content/pages/GameDetailPage.tsx
+msgid "Primary archive"
 msgstr ""
 
 #: src/profile/health.ts
@@ -4389,6 +6716,10 @@ msgstr ""
 msgid "Project"
 msgstr ""
 
+#: src/content/pages/components/UnitStatsTable.tsx
+msgid "Projectile"
+msgstr ""
+
 #: src/mapconv/index.ts
 msgid "Projects"
 msgstr ""
@@ -4397,6 +6728,9 @@ msgstr ""
 msgid "Purple"
 msgstr ""
 
+#: src/content/pages/components/GameCard.tsx
+#: src/content/pages/components/GameVersionsTab.tsx
+#: src/content/pages/components/LibraryMapCard.tsx
 #: src/downloads/pages/ActivityPage.tsx
 #: src/downloads/pages/components/EngineInstaller.tsx
 #: src/downloads/pages/components/MapPacksDrawer.tsx
@@ -4419,6 +6753,10 @@ msgstr ""
 
 #: src/downloads/DownloadQueueBadge.tsx
 msgid "Queued ({count}) · {total} + {unknown} of unknown size"
+msgstr ""
+
+#: src/content/pages/components/SuggestionsList.tsx
+msgid "Queued…"
 msgstr ""
 
 #: src/runlite/pages/components/RunSetupForm.tsx
@@ -4450,8 +6788,16 @@ msgstr ""
 msgid "Random positions"
 msgstr ""
 
+#: src/content/pages/components/UnitStatsTable.tsx
+msgid "Range"
+msgstr ""
+
 #: src/downloads/DownloadQueueBadge.tsx
 msgid "Rapid"
+msgstr ""
+
+#: src/content/useGameLibrary.ts
+msgid "Rapid index {refreshed} from {hosts}"
 msgstr ""
 
 #: src/downloads/index.ts
@@ -4472,12 +6818,30 @@ msgstr ""
 msgid "Reading"
 msgstr ""
 
+#: src/content/pages/components/UnitHero.tsx
+#: src/content/pages/components/UnitModelPanel.tsx
+msgid "Reading <0>{object}</0> out of {gameArchive}."
+msgstr ""
+
 #: src/direct/room.ts
 msgid "Reading content…"
 msgstr ""
 
 #: src/play/pages/components/NewPresetFromReplayButton.tsx
 msgid "Reading replay…"
+msgstr ""
+
+#: src/content/pages/components/MapAggregate.tsx
+msgid "Reading replays: {readDone} of {readTotal}."
+msgstr ""
+
+#: src/content/pages/components/MapAggregate.tsx
+#: src/content/pages/components/MapRecords.tsx
+msgid "Reading start positions…"
+msgstr ""
+
+#: src/content/pages/components/Convert3doDrawer.tsx
+msgid "Reading the archive"
 msgstr ""
 
 #: src/sound/MusicSource.tsx
@@ -4488,12 +6852,32 @@ msgstr ""
 msgid "Reading the game and the map."
 msgstr ""
 
+#: src/content/pages/MapsPage.tsx
+msgid "Reading the mirror indexes…"
+msgstr ""
+
+#: src/content/pages/components/GameVersionsTab.tsx
+msgid "Reading the rapid index…"
+msgstr ""
+
+#: src/content/pages/GameDetailPage.tsx
+msgid "Reading this game's options…"
+msgstr ""
+
+#: src/content/pages/components/MapAggregate.tsx
+msgid "Reading unit definitions…"
+msgstr ""
+
 #: src/play/pages/components/GamePickerGrid.tsx
 msgid "Reading your games…"
 msgstr ""
 
 #: src/home/continue.ts
 msgid "Ready to install"
+msgstr ""
+
+#: src/content/pages/components/CompatMode.tsx
+msgid "Rebuild"
 msgstr ""
 
 #: src/downloads/pages/components/EngineInstaller.tsx
@@ -4550,6 +6934,10 @@ msgstr ""
 msgid "regex /{filterRegex}/i"
 msgstr ""
 
+#: src/content/pages/components/MissionRuntimeSection.tsx
+msgid "Reinstall the mission runtime"
+msgstr ""
+
 #: src/direct/PendingJoins.tsx
 msgid "Reject {name}"
 msgstr ""
@@ -4574,10 +6962,15 @@ msgstr ""
 msgid "Relaying {speed}"
 msgstr ""
 
+#: src/content/pages/components/GameVersionsTab.tsx
+msgid "release"
+msgstr ""
+
 #: src/downloads/pages/components/RapidBrowser.tsx
 msgid "Release"
 msgstr ""
 
+#: src/content/pages/components/UnitStatsTable.tsx
 #: src/general/ErrorBoundary.tsx
 #: src/play/pages/EngineLogSection.tsx
 msgid "Reload"
@@ -4604,6 +6997,11 @@ msgstr ""
 msgid "Rematch: {rematchMapName}"
 msgstr ""
 
+#: src/content/pages/components/CompatMode.tsx
+#: src/content/pages/components/MissionRuntimeSection.tsx
+msgid "Remove"
+msgstr ""
+
 #: src/downloads/DownloadQueueBadge.tsx
 msgid "Remove {itemLabel} from queue"
 msgstr ""
@@ -4620,6 +7018,50 @@ msgstr ""
 msgid "Remove from queue"
 msgstr ""
 
+#: src/content/compatReport.ts
+msgid "removed"
+msgstr ""
+
+#: src/content/pages/components/MissionRuntimeSection.tsx
+msgid "Removed {missionName} from the game."
+msgstr ""
+
+#: src/content/compatReport.ts
+msgid "Removed def tags in use"
+msgstr ""
+
+#: src/content/compatReport.ts
+msgid "removed in {version}"
+msgstr ""
+
+#: src/content/compatReport.ts
+msgid "renamed"
+msgstr ""
+
+#: src/content/compatReport.ts
+msgid "renamed in {version}"
+msgstr ""
+
+#: src/content/compatReport.ts
+msgid "renamed to {replacement}"
+msgstr ""
+
+#: src/content/compatReport.ts
+msgid "renamed to {replacement} in {version}"
+msgstr ""
+
+#: src/content/pages/components/UnitModelPanel.tsx
+msgid "Render"
+msgstr ""
+
+#: src/content/pages/components/UnitModelPanel.tsx
+msgid "Rendering…"
+msgstr ""
+
+#: src/content/pages/components/UnitRendersRow.tsx
+msgid "Renders"
+msgstr ""
+
 #: src/general/pages/SettingsSection.tsx
 msgid "Renders 3D views at a lower resolution with fewer particles — for laptops and older GPUs."
 msgstr ""
@@ -4628,14 +7070,42 @@ msgstr ""
 msgid "Repair Bay"
 msgstr ""
 
+#: src/content/pages/components/MissionRuntimeSection.tsx
+msgid "Repair the mission runtime"
+msgstr ""
+
+#: src/content/pages/components/MissionRuntimeSection.tsx
+msgid "Replace with coilbox's mission runtime"
+msgstr ""
+
+#: src/content/compatReport.ts
+msgid "replaced by {replacement}"
+msgstr ""
+
+#: src/content/compatReport.ts
+msgid "replaced by {replacement} in {version}"
+msgstr ""
+
 #: src/play/index.ts
 #: src/play/pages/components/NewPresetFromReplayButton.tsx
 #: src/play/PlayProvider.tsx
 msgid "Replay"
 msgstr ""
 
+#: src/content/replayAnalysis.ts
+msgid "Replay analysis is turned off in this distribution."
+msgstr ""
+
+#: src/content/mapImage.ts
+msgid "replay set {replaySet}"
+msgstr ""
+
 #: src/play/index.ts
 msgid "Replays"
+msgstr ""
+
+#: src/content/pages/MapDetailPage.tsx
+msgid "Replays on this map"
 msgstr ""
 
 #: src/general/ErrorBoundary.tsx
@@ -4653,6 +7123,10 @@ msgstr ""
 
 #: src/runlite/generate.ts
 msgid "Requisition their cache"
+msgstr ""
+
+#: src/content/pages/components/BrowserToolbar.tsx
+msgid "Rescan"
 msgstr ""
 
 #: src/play/pages/components/GameOptionsPanel.tsx
@@ -4701,12 +7175,24 @@ msgstr ""
 msgid "Restart to update"
 msgstr ""
 
+#: src/content/pages/components/Convert3doDrawer.tsx
+msgid "Restored {archive}'s original models and unit definitions."
+msgstr ""
+
+#: src/content/pages/components/Convert3doDrawer.tsx
+msgid "Restored {restored, plural, one {# file} other {# files}} to how they were before the install."
+msgstr ""
+
 #: src/play/pages/SkirmishPage.tsx
 msgid "Restricted battle"
 msgstr ""
 
 #: src/play/pages/SkirmishPage.tsx
 msgid "Restricted battle — {summary}"
+msgstr ""
+
+#: src/content/pages/components/MapRecords.tsx
+msgid "Result"
 msgstr ""
 
 #: src/runlite/pages/components/EncounterOverlay.tsx
@@ -4735,6 +7221,7 @@ msgid "Resuming…"
 msgstr ""
 
 #: src/components/SaveStatus.tsx
+#: src/content/pages/components/states.tsx
 #: src/direct/HostRoomForm.tsx
 #: src/downloads/pages/components/RapidBrowser.tsx
 #: src/home/zones/SuggestedMap.tsx
@@ -4895,6 +7382,10 @@ msgstr ""
 msgid "Saved configs"
 msgstr ""
 
+#: src/content/pages/components/MapRecords.tsx
+msgid "Saved names that match no place in the matches above."
+msgstr ""
+
 #: src/play/pages/components/SaveAsPresetButton.tsx
 #: src/play/pages/SkirmishPage.tsx
 msgid "Saved to Singleplayer presets"
@@ -4912,6 +7403,10 @@ msgstr ""
 msgid "savegames"
 msgstr ""
 
+#: src/content/pages/components/MapExportButtons.tsx
+msgid "Saves the map with this layer on it, the legend, and the map, replays, versions, window and filters written under it."
+msgstr ""
+
 #: src/components/SaveStatus.tsx
 msgid "Saving…"
 msgstr ""
@@ -4922,6 +7417,18 @@ msgstr ""
 
 #: src/general/pages/SettingsSection.tsx
 msgid "Scales the whole of Coilbox: text, spacing and the 3D views. Fit more on a small screen, or make everything easier to read on a large one. Cmd or Ctrl with plus and minus does the same, and with zero puts it back to 100%."
+msgstr ""
+
+#: src/content/mapImage.ts
+msgid "Scaling: {scaling}."
+msgstr ""
+
+#: src/content/pages/GamesPage.tsx
+msgid "Scan cancelled. Press Rescan to load games."
+msgstr ""
+
+#: src/content/pages/MapsPage.tsx
+msgid "Scan cancelled. Press Rescan to load maps."
 msgstr ""
 
 #: src/profile/health.ts
@@ -4961,6 +7468,18 @@ msgstr ""
 msgid "Schematic"
 msgstr ""
 
+#: src/content/pages/components/MapAggregate.tsx
+msgid "Scope to a set"
+msgstr ""
+
+#: src/content/pages/components/BrandingScreenshots.tsx
+msgid "Screenshot"
+msgstr ""
+
+#: src/content/pages/components/BrandingScreenshots.tsx
+msgid "Screenshots"
+msgstr ""
+
 #: src/components/ui/message-scroller.tsx
 msgid "Scroll to end"
 msgstr ""
@@ -4981,8 +7500,29 @@ msgstr ""
 msgid "Search for a command to run..."
 msgstr ""
 
+#: src/content/pages/GamesPage.tsx
 #: src/play/pages/components/GamePickerGrid.tsx
 msgid "Search games"
+msgstr ""
+
+#: src/content/pages/GamesPage.tsx
+msgid "Search games…"
+msgstr ""
+
+#: src/content/pages/MapsPage.tsx
+msgid "Search maps"
+msgstr ""
+
+#: src/content/pages/MapsPage.tsx
+msgid "Search maps…"
+msgstr ""
+
+#: src/content/pages/GameUnitsPage.tsx
+msgid "Search units"
+msgstr ""
+
+#: src/content/pages/GameUnitsPage.tsx
+msgid "Search units…"
 msgstr ""
 
 #: src/play/pages/components/GameOptionsPanel.tsx
@@ -5021,6 +7561,10 @@ msgstr ""
 msgid "Select all"
 msgstr ""
 
+#: src/content/pages/components/TargetPicker.tsx
+msgid "Select an engine"
+msgstr ""
+
 #: src/notify/NotificationsSettings.tsx
 msgid "Send test notification"
 msgstr ""
@@ -5033,12 +7577,24 @@ msgstr ""
 msgid "Set"
 msgstr ""
 
+#: src/content/pages/components/SuggestionsList.tsx
+msgid "Set a download folder in <0>Content folders settings</0> to enable downloads."
+msgstr ""
+
 #: src/game-updates/pages/GameUpdatesSection.tsx
 msgid "Set a download folder in <0>Content folders settings</0> to enable updates."
 msgstr ""
 
 #: src/home/zones/SuggestedMap.tsx
 msgid "Set a download folder in <0>Content folders settings</0> to install it."
+msgstr ""
+
+#: src/content/pages/GamesPage.tsx
+msgid "Set a download folder in <0>Content folders</0> to install games."
+msgstr ""
+
+#: src/content/pages/MapsPage.tsx
+msgid "Set a download folder in <0>Content folders</0> to install maps."
 msgstr ""
 
 #: src/play/pages/components/ParticipantsTable.tsx
@@ -5056,6 +7612,10 @@ msgstr ""
 #: src/play/pages/SkirmishPage.tsx
 #: src/play/presetImport.tsx
 msgid "Set up this preset"
+msgstr ""
+
+#: src/content/pages/components/MapAggregate.tsx
+msgid "Set: {setName}"
 msgstr ""
 
 #: src/general/index.ts
@@ -5083,6 +7643,10 @@ msgstr ""
 msgid "Share challenge"
 msgstr ""
 
+#: src/content/mapAggregate.ts
+msgid "Share of each match"
+msgstr ""
+
 #: src/runlite/pages/components/RunHud.tsx
 msgid "Shared ceiling"
 msgstr ""
@@ -5091,6 +7655,12 @@ msgstr ""
 msgid "Shares a team with {leaderName} — team settings come from the first member"
 msgstr ""
 
+#: src/content/pages/components/MapRecords.tsx
+msgid "Shortest"
+msgstr ""
+
+#: src/content/pages/GamesPage.tsx
+#: src/content/pages/MapsPage.tsx
 #: src/downloads/pages/ActivityPage.tsx
 msgid "Show"
 msgstr ""
@@ -5115,6 +7685,10 @@ msgstr ""
 msgid "Show in Maps"
 msgstr ""
 
+#: src/content/pages/MapsPage.tsx
+msgid "Show more ({remaining} remaining)"
+msgstr ""
+
 #: src/i18n/frameStrings.ts
 msgid "Show only the current page; reveal the full path on hover."
 msgstr ""
@@ -5131,6 +7705,10 @@ msgstr ""
 msgid "Show the developer and modding tools — uberstress, mapconv, animation, and the archive explorer — in the sidebar and welcome screen. Off by default for a player-focused layout."
 msgstr ""
 
+#: src/content/pages/components/GameLibrarySummary.tsx
+msgid "Show updates"
+msgstr ""
+
 #: src/profile/SettingsSection.tsx
 msgid "Shown"
 msgstr ""
@@ -5139,8 +7717,20 @@ msgstr ""
 msgid "Shows how many frames a second each 3D view draws, in its bottom right corner."
 msgstr ""
 
+#: src/content/pages/components/useUnitRenders.ts
+msgid "Side"
+msgstr ""
+
 #: src/i18n/frameStrings.ts
 msgid "Sidebar as popover menu"
+msgstr ""
+
+#: src/content/pages/GameDetailPage.tsx
+msgid "Sides"
+msgstr ""
+
+#: src/content/pages/components/UnitStatsTable.tsx
+msgid "Sight distance"
 msgstr ""
 
 #: src/runlite/model.ts
@@ -5153,6 +7743,10 @@ msgstr ""
 msgid "Silence everything without losing your volume setting."
 msgstr ""
 
+#: src/content/pages/components/BuildTreeExportButton.tsx
+msgid "Single HTML"
+msgstr ""
+
 #: src/play/index.ts
 #: src/play/pages/SkirmishPage.tsx
 msgid "Singleplayer"
@@ -5160,6 +7754,11 @@ msgstr ""
 
 #: src/play/pages/SavegamesPage.tsx
 msgid "Singleplayer saves in your content folder. Resume one to launch the engine into it."
+msgstr ""
+
+#: src/content/pages/components/UnitModelPanel.tsx
+#: src/content/pages/GameUnitPage.tsx
+msgid "Size"
 msgstr ""
 
 #: src/downloads/pages/components/ProgressBar.tsx
@@ -5190,8 +7789,20 @@ msgstr ""
 msgid "Slate"
 msgstr ""
 
+#: src/content/mapCompatReport.ts
+msgid "SM3 map, not supported since Spring 95.0"
+msgstr ""
+
 #: src/sound/events.ts
 msgid "Small sounds as Coilbox gets on with things."
+msgstr ""
+
+#: src/content/libraryMaps.ts
+msgid "Smallest"
+msgstr ""
+
+#: src/content/pages/components/GameVersionsTab.tsx
+msgid "snapshot"
 msgstr ""
 
 #: src/downloads/pages/components/RapidBrowser.tsx
@@ -5232,10 +7843,12 @@ msgstr ""
 msgid "Sounds that want your attention, like a ring or a mention."
 msgstr ""
 
+#: src/content/pages/components/GameSourcesTab.tsx
 #: src/downloads/pages/ActivityPage.tsx
 msgid "Source"
 msgstr ""
 
+#: src/content/pages/GameDetailPage.tsx
 #: src/downloads/index.ts
 msgid "Sources"
 msgstr ""
@@ -5247,6 +7860,10 @@ msgstr ""
 
 #: src/play/pages/SkirmishPage.tsx
 msgid "Spectate"
+msgstr ""
+
+#: src/content/pages/components/UnitStatsTable.tsx
+msgid "Speed"
 msgstr ""
 
 #: src/runlite/pages/components/RunHud.tsx
@@ -5297,6 +7914,10 @@ msgstr ""
 msgid "Star twinkle, nebulae and other decorative touches. Turn off for a plainer interface. Sound is controlled separately, in Sound settings."
 msgstr ""
 
+#: src/content/pages/components/StartModeActions.tsx
+msgid "Start a conquest"
+msgstr ""
+
 #: src/profile/SettingsSection.tsx
 msgid "Start a distribution profile from how Coilbox is set up right now. It is written to .coilbox/profile.json beside the app, and never overwrites a profile that is already there."
 msgstr ""
@@ -5307,6 +7928,10 @@ msgstr ""
 
 #: src/runlite/pages/RunPage.tsx
 msgid "Start a warpath"
+msgstr ""
+
+#: src/content/pages/components/StartModeActions.tsx
+msgid "Start a warpath run"
 msgstr ""
 
 #: src/startbox/StartBoxControls.tsx
@@ -5345,6 +7970,11 @@ msgstr ""
 msgid "start mission ''{missionId}'' is not in campaign ''{campaignTitle}''"
 msgstr ""
 
+#. placeholder {0}: i + 1
+#: src/content/pages/MapDetailPage.tsx
+msgid "Start position {0}"
+msgstr ""
+
 #: src/play/pages/components/MinimapPreview.tsx
 msgid "Start position {position}"
 msgstr ""
@@ -5353,9 +7983,18 @@ msgstr ""
 msgid "Start position {position} (unclaimed)"
 msgstr ""
 
+#: src/content/pages/components/MapRecords.tsx
 #: src/play/presetParts.ts
 #: src/startbox/StartPosCard.tsx
 msgid "Start positions"
+msgstr ""
+
+#: src/content/pages/components/MapAggregate.tsx
+msgid "Start positions · {startCount}"
+msgstr ""
+
+#: src/content/pages/components/MapExportButtons.tsx
+msgid "Start positions exported."
 msgstr ""
 
 #: src/direct/room.ts
@@ -5386,6 +8025,10 @@ msgstr ""
 msgid "Starting a room for you and the computer on {mapName}."
 msgstr ""
 
+#: src/content/replayAnalysis.ts
+msgid "Starting the engine"
+msgstr ""
+
 #: src/direct/room.ts
 #: src/downloads/DownloadQueueBadge.tsx
 #: src/downloads/pages/components/ProgressBar.tsx
@@ -5404,6 +8047,10 @@ msgstr ""
 msgid "Stay on {currentName}"
 msgstr ""
 
+#: src/content/pages/GameDetailPage.tsx
+msgid "Still checking…"
+msgstr ""
+
 #: src/i18n/frameStrings.ts
 msgid "Stone"
 msgstr ""
@@ -5418,6 +8065,10 @@ msgstr ""
 
 #: src/direct/lan.ts
 msgid "Stop your own room first. Coilbox can be in one room at a time."
+msgstr ""
+
+#: src/content/replayAnalysis.ts
+msgid "Stopping"
 msgstr ""
 
 #: src/general/pages/SettingsSection.tsx
@@ -5438,6 +8089,10 @@ msgstr ""
 
 #: src/home/zones/SuggestedMap.tsx
 msgid "Suggested map"
+msgstr ""
+
+#: src/content/pages/components/MissionRuntimeSection.tsx
+msgid "Supports {supportedConditions} of {conditionCount} conditions and {supportedActions} of {actionCount} actions"
 msgstr ""
 
 #: src/startbox/StartBoxControls.tsx
@@ -5466,16 +8121,34 @@ msgstr ""
 msgid "Take them aboard"
 msgstr ""
 
+#: src/content/pages/components/MapRecords.tsx
 #: src/runlite/galaxyAdapter.ts
 msgid "Taken"
+msgstr ""
+
+#: src/content/pages/components/MapRecords.tsx
+msgid "Taken is the number of starts at the place. The result column counts only those in a match with a recorded result. Positions you give one name are one row, counted together."
 msgstr ""
 
 #: src/i18n/frameStrings.ts
 msgid "Teal"
 msgstr ""
 
+#: src/content/libraryMaps.ts
 #: src/play/pages/components/ParticipantsTable.tsx
 msgid "Team"
+msgstr ""
+
+#: src/content/replaySideLabel.ts
+msgid "Team {number}"
+msgstr ""
+
+#: src/content/matchStats.ts
+msgid "Team {team}"
+msgstr ""
+
+#: src/content/pages/components/MapRecords.tsx
+msgid "Team 1 is the team with the lower number in the match, so the team record does not say which slot or which side of the map is stronger."
 msgstr ""
 
 #: src/play/presetParts.ts
@@ -5493,6 +8166,23 @@ msgstr ""
 
 #: src/notify/NotificationsSettings.tsx
 msgid "Test notification"
+msgstr ""
+
+#: src/content/pages/components/MissionRuntimeSection.tsx
+msgid "Testing a scenario here leaves its compiled mission in the game folder. Removing one takes the folder and its dialogue clips, and nothing else. The mission runtime stays, and testing that scenario again writes it back."
+msgstr ""
+
+#: src/content/pages/components/UnitModelPanel.tsx
+#: src/content/pages/GameUnitPage.tsx
+msgid "Textures"
+msgstr ""
+
+#: src/content/pages/components/Convert3doDrawer.tsx
+msgid "Textures coilbox could not decode ({undecodableCount})"
+msgstr ""
+
+#: src/content/pages/components/Convert3doDrawer.tsx
+msgid "Textures the game does not ship ({missingCount})"
 msgstr ""
 
 #: src/i18n/uiError.ts
@@ -5560,6 +8250,10 @@ msgstr ""
 msgid "That starts like a coilbox code, but the rest is damaged or cut short. Copy the whole code and paste it again."
 msgstr ""
 
+#: src/content/pages/GameUnitPage.tsx
+msgid "That unit is not in this game."
+msgstr ""
+
 #: src/deeplink/build.ts
 msgid "That URL is invalid."
 msgstr ""
@@ -5586,6 +8280,10 @@ msgstr ""
 
 #: src/play/applyTweakMutatorRoute.ts
 msgid "The content scan failed: {reason}"
+msgstr ""
+
+#: src/content/useMapAggregate.ts
+msgid "the counts are not on this map's grid"
 msgstr ""
 
 #: src/i18n/uiError.ts
@@ -5652,12 +8350,24 @@ msgstr ""
 msgid "The game has not started yet."
 msgstr ""
 
+#: src/content/replayAnalysis.ts
+msgid "The game is not installed."
+msgstr ""
+
+#: src/content/replayAnalysis.ts
+msgid "The game over"
+msgstr ""
+
 #: src/play/pages/components/CrashDrawer.tsx
 msgid "The game stopped unexpectedly"
 msgstr ""
 
 #: src/play/crash.ts
 msgid "The game was cancelled."
+msgstr ""
+
+#: src/content/pages/components/UnitModelPanel.tsx
+msgid "the game's archive has no model for this unit."
 msgstr ""
 
 #: src/profile/health.ts
@@ -5724,6 +8434,10 @@ msgstr ""
 msgid "The host took too long to respond."
 msgstr ""
 
+#: src/content/pages/GamesPage.tsx
+msgid "The hub features no games."
+msgstr ""
+
 #: src/i18n/uiError.ts
 msgid "The hub stopped answering part way through."
 msgstr ""
@@ -5734,6 +8448,10 @@ msgstr ""
 
 #: src/runlite/RunMapView.tsx
 msgid "The land of this map could not be built. {landError}"
+msgstr ""
+
+#: src/content/replayAnalysis.ts
+msgid "The length of the match in seconds"
 msgstr ""
 
 #: src/account/index.ts
@@ -5764,6 +8482,14 @@ msgstr ""
 msgid "The map has no two locations joined by a link."
 msgstr ""
 
+#: src/content/replayAnalysis.ts
+msgid "The map is not installed."
+msgstr ""
+
+#: src/content/mapImage.ts
+msgid "The minimap could not be read: {failure}"
+msgstr ""
+
 #: src/downloads/failureReason.ts
 msgid "the mirror"
 msgstr ""
@@ -5773,8 +8499,52 @@ msgstr ""
 msgid "The name others see"
 msgstr ""
 
+#: src/content/gameSourceRows.ts
+msgid "the newest release archive"
+msgstr ""
+
+#: src/content/pages/components/MapAggregate.tsx
+msgid "The number beside a layer is how many matches it is drawn from. One density layer shows at a time."
+msgstr ""
+
+#: src/content/replayAnalysis.ts
+msgid "The number of statistics samples"
+msgstr ""
+
+#: src/content/replayAnalysis.ts
+msgid "The number of teams"
+msgstr ""
+
+#: src/content/pages/components/MapRecords.tsx
+msgid "The one match of two teams has no recorded result, so neither team has a record."
+msgstr ""
+
+#: src/content/pages/components/MapRecords.tsx
+msgid "The other maps are counted under the same filters. Nothing here tests whether a difference in length is more than chance, and with few matches on either row it may be."
+msgstr ""
+
+#: src/content/mapImage.ts
+msgid "The picture could not be encoded as a PNG."
+msgstr ""
+
+#: src/content/pages/components/UnitModelPanel.tsx
+msgid "the picture is not the shape this unit's footprint frames to, which is a bug in coilbox rather than in the game."
+msgstr ""
+
+#: src/content/pages/components/UnitModelPanel.tsx
+msgid "the pixels did not reach the worker intact."
+msgstr ""
+
+#: src/content/replayAnalysis.ts
+msgid "The playback still matched the recorded match exactly, so the events are kept."
+msgstr ""
+
 #: src/profile/health.ts
 msgid "The profile's `icon` was not applied"
+msgstr ""
+
+#: src/content/gameSourceRows.ts
+msgid "the release archive for the version asked for"
 msgstr ""
 
 #: src/play/pages/SkirmishPage.tsx
@@ -5793,6 +8563,10 @@ msgstr ""
 msgid "The room started but its battle never opened, so the room has been stopped. Try again, and if it keeps happening, host on another port."
 msgstr ""
 
+#: src/content/pages/components/states.tsx
+msgid "The scan failed, so no {noun} are listed"
+msgstr ""
+
 #: src/packs/pages/components/ExportPackForm.tsx
 msgid "The scan failed, so no games are listed. unitsync said: {scanError}"
 msgstr ""
@@ -5801,12 +8575,20 @@ msgstr ""
 msgid "The scan failed, so no maps are listed. unitsync said: {scanError}"
 msgstr ""
 
+#: src/content/pages/components/states.tsx
+msgid "The scan was cancelled."
+msgstr ""
+
 #: src/play/useBattleRun.ts
 msgid "The scenario \"{scenarioName}\" was made for {scenarioGame}, which is a different game from {installedName}. It cannot be played here."
 msgstr ""
 
 #: src/general/ErrorBoundary.tsx
 msgid "The screen you were on hit an unexpected error. Reloading usually clears it. If this keeps happening, copy the details below and report it so it can be fixed."
+msgstr ""
+
+#: src/content/pages/components/MapAggregate.tsx
+msgid "The second minute must be after the first. The whole match is shown until it is."
 msgstr ""
 
 #: src/runlite/pages/components/RunEndScreen.tsx
@@ -5845,6 +8627,10 @@ msgstr ""
 msgid "The start's game and map are installed"
 msgstr ""
 
+#: src/content/pages/components/MissionRuntimeSection.tsx
+msgid "The test mutator brings {conditionCount} conditions and {actionCount} actions"
+msgstr ""
+
 #: src/i18n/frameStrings.ts
 msgid "The top bar loses its background and sits over the content as it scrolls."
 msgstr ""
@@ -5859,6 +8645,14 @@ msgstr ""
 
 #: src/runlite/pages/components/RunSetupForm.tsx
 msgid "The warpath was not started. {reason}"
+msgstr ""
+
+#: src/content/mapAggregate.ts
+msgid "the whole match"
+msgstr ""
+
+#: src/content/pages/components/MapAggregate.tsx
+msgid "The window is {when} of each match by its own clock, in whole minutes."
 msgstr ""
 
 #: src/i18n/frameStrings.ts
@@ -5889,6 +8683,10 @@ msgstr ""
 msgid "There's nothing to share yet."
 msgstr ""
 
+#: src/content/pages/components/MapAggregate.tsx
+msgid "These are orders given, which is what players meant to do and not what happened. An order that was cancelled or never carried out counts like any other."
+msgstr ""
+
 #: src/startbox/StartBoxPresetsPopover.tsx
 msgid "These boxes are already saved for {mapName}"
 msgstr ""
@@ -5897,8 +8695,20 @@ msgstr ""
 msgid "These boxes were drawn for {presetMap}, not the map you are on."
 msgstr ""
 
+#: src/content/pages/components/MissionRuntimeSection.tsx
+msgid "These come with the game and play as the game itself. They are listed under Play, and coilbox neither wrote them nor removes them."
+msgstr ""
+
+#: src/content/pages/components/MapRecords.tsx
+msgid "These matches are not all one arrangement, so positions are not split by team here, and a position's record is not controlled for the team it was on. Choose an arrangement above to split them."
+msgstr ""
+
 #: src/direct/share.ts
 msgid "They can join this room and chat. They cannot start the game, because the room gives everybody in it {announced}, which nothing outside your network can dial."
+msgstr ""
+
+#: src/content/pages/components/states.tsx
+msgid "This {label} isn't in the current scan. Go back and Scan the engine."
 msgstr ""
 
 #. placeholder {0}: offer.candidates.length
@@ -5912,6 +8722,10 @@ msgstr ""
 
 #: src/play/pages/components/GameChoiceOffer.tsx
 msgid "This {nounText} was started on <0>{pinnedName}</0>, which is not installed. Another version of that game is installed. Continue on <1>{newerName}</1>?"
+msgstr ""
+
+#: src/content/pages/components/useUnitRenders.ts
+msgid "This angle could not be drawn."
 msgstr ""
 
 #: src/play/pages/components/SaveAsPresetButton.tsx
@@ -5936,6 +8750,10 @@ msgstr ""
 
 #: src/game-updates/pages/GameUpdatesSection.tsx
 msgid "This build has no game-update source configured."
+msgstr ""
+
+#: src/content/pages/components/MissionRuntimeSection.tsx
+msgid "This build of coilbox has no mission runtime to install."
 msgstr ""
 
 #: src/sound/MusicSource.tsx
@@ -5974,6 +8792,10 @@ msgstr ""
 msgid "This challenge was made on a different version of its hand-made map than the one installed here."
 msgstr ""
 
+#: src/content/pages/components/Convert3doDrawer.tsx
+msgid "This copies the converted models and textures into {archive}, and moves every original <0>.3do</0> they replace aside so the conversion actually takes effect. It does not delete anything, and Undo puts it all back."
+msgstr ""
+
 #: src/runlite/pages/RunListPage.tsx
 msgid "This deletes the warpath for good, including its progress ({progressText}). It cannot be undone."
 msgstr ""
@@ -5982,21 +8804,57 @@ msgstr ""
 msgid "This engine could not read your games. Try another from <0>Settings → Engines</0>, or see what it found in <1>Content → Games</1>."
 msgstr ""
 
+#: src/content/replayAnalysis.ts
+msgid "This file does not read as a replay."
+msgstr ""
+
 #: src/runlite/pages/components/ImportChallengeForm.tsx
 #: src/runlite/pages/components/RunSetupForm.tsx
 msgid "this game"
+msgstr ""
+
+#: src/content/pages/components/MissionRuntimeSection.tsx
+msgid "This game bundles runtime version {installedVersion}, newer than the version {availableVersion} coilbox ships. Installing would take it backwards."
+msgstr ""
+
+#: src/content/pages/components/MissionRuntimeSection.tsx
+msgid "This game bundles runtime version {installedVersion}. Coilbox ships version {availableVersion}."
+msgstr ""
+
+#: src/content/pages/components/MissionRuntimeSection.tsx
+msgid "This game bundles runtime version {installedVersion}. This build of coilbox has no runtime of its own to measure it against."
 msgstr ""
 
 #: src/play/pages/components/GameOptionsPanel.tsx
 msgid "This game declares no options."
 msgstr ""
 
+#: src/content/pages/GameDetailPage.tsx
+msgid "This game depends on no other archives."
+msgstr ""
+
 #: src/play/relayCarrying.ts
 msgid "This game goes through your machine's relay, so every other player's traffic passes through here. This is how much went through in the last second."
 msgstr ""
 
+#: src/content/pages/components/MissionRuntimeSection.tsx
+msgid "This game has a runtime marker, but it would not load: {loadError}. Until that is fixed the engine will not read it either, so coilbox cannot tell what this runtime supports. Repairing overwrites it with the version {availableVersion} coilbox ships."
+msgstr ""
+
+#: src/content/pages/GameDetailPage.tsx
+msgid "This game has no options."
+msgstr ""
+
+#: src/content/pages/components/states.tsx
+msgid "This game is missing something it depends on"
+msgstr ""
+
 #: src/play/InGameBadge.tsx
 msgid "This game runs through your machine's relay. Ending it here ends it for everybody playing in it, not just for you."
+msgstr ""
+
+#: src/content/buildPicMissing.ts
+msgid "This game ships no build pic for this unit."
 msgstr ""
 
 #: src/deeplink/build.ts
@@ -6029,6 +8887,14 @@ msgstr ""
 
 #: src/deeplink/pages/ImportSection.tsx
 msgid "This is {phrase}. Import it?"
+msgstr ""
+
+#: src/content/pages/components/ArchiveTypeBadge.tsx
+msgid "This is a game's primary archive"
+msgstr ""
+
+#: src/content/replayAnalysis.ts
+msgid "This is a remix. The result it recorded belongs to the original match, so there is nothing to check a playback of it against. Analyse the original."
 msgstr ""
 
 #: src/deeplink/build.ts
@@ -6067,6 +8933,10 @@ msgstr ""
 msgid "This link is not a coilbox import."
 msgstr ""
 
+#: src/content/pages/components/states.tsx
+msgid "This list could not be checked"
+msgstr ""
+
 #: src/runlite/pages/components/EncounterOverlay.tsx
 msgid "This location is a scenario, not a skirmish."
 msgstr ""
@@ -6083,6 +8953,7 @@ msgstr ""
 msgid "This machine is on the internet under its own address."
 msgstr ""
 
+#: src/content/pages/components/MapRecords.tsx
 #: src/startbox/StartBoxPresetsPopover.tsx
 msgid "This map"
 msgstr ""
@@ -6090,6 +8961,10 @@ msgstr ""
 #. placeholder {0}: savedForMap.length
 #: src/startbox/StartBoxPresetsPopover.tsx
 msgid "This map ({0})"
+msgstr ""
+
+#: src/content/replayAnalysis.ts
+msgid "This match never recorded a game over, usually because it was quit before it ended. There is nothing to check a playback against, so it cannot be analysed."
 msgstr ""
 
 #: src/deeplink/parse.ts
@@ -6102,6 +8977,10 @@ msgstr ""
 
 #: src/packs/manifest.ts
 msgid "This pack is {packSize}, past the {limit} a share code can carry. Take some blueprints out."
+msgstr ""
+
+#: src/content/pages/components/MapAggregate.tsx
+msgid "this page's map"
 msgstr ""
 
 #: src/play/PresetTweaksView.tsx
@@ -6124,8 +9003,24 @@ msgstr ""
 msgid "This project has no edits, so there is nothing to pack for a lobby."
 msgstr ""
 
+#: src/content/replayAnalysis.ts
+msgid "This replay does not say which engine recorded it, and no other engine is installed."
+msgstr ""
+
+#: src/content/replayAnalysis.ts
+msgid "This replay does not say which engine recorded it, and none of the engines that are installed can run an analysis, which needs one with a headless build."
+msgstr ""
+
+#: src/content/replayAnalysis.ts
+msgid "This replay has no game id, so there is nothing to file an analysis under."
+msgstr ""
+
 #: src/play/pages/components/NewPresetFromReplayButton.tsx
 msgid "This replay has no seated players to refight."
+msgstr ""
+
+#: src/content/replayAnalysis.ts
+msgid "This replay was recorded on the replay playback game. It has no match of its own to record."
 msgstr ""
 
 #: src/play/pages/components/NewPresetFromReplayButton.tsx
@@ -6176,6 +9071,15 @@ msgstr ""
 msgid "This setup pack was made by a newer version of coilbox."
 msgstr ""
 
+#: src/content/pages/components/UnitHero.tsx
+#: src/content/pages/components/UnitModelPanel.tsx
+msgid "This unit's definition names no model, so the engine draws nothing for it either."
+msgstr ""
+
+#: src/content/pages/components/useUnitRenders.ts
+msgid "This unit's definition names no model, so there is nothing to render."
+msgstr ""
+
 #: src/deeplink/build.ts
 msgid "This URL is too long for a link."
 msgstr ""
@@ -6208,8 +9112,20 @@ msgstr ""
 msgid "Tier {i}"
 msgstr ""
 
+#: src/content/mapImage.ts
+msgid "Time window: {window} of each match, by its own clock."
+msgstr ""
+
+#: src/content/mapImage.ts
+msgid "Time window: the whole match."
+msgstr ""
+
 #: src/profile/SettingsSection.tsx
 msgid "Title"
+msgstr ""
+
+#: src/content/pages/components/MapAggregate.tsx
+msgid "To minute"
 msgstr ""
 
 #: src/i18n/frameStrings.ts
@@ -6220,6 +9136,22 @@ msgstr ""
 msgid "Tools for making things, and for the people who ship coilbox."
 msgstr ""
 
+#: src/content/pages/components/useUnitRenders.ts
+msgid "Top down"
+msgstr ""
+
+#: src/content/pages/components/UnitModelPanel.tsx
+msgid "Top down render"
+msgstr ""
+
+#: src/content/pages/components/UnitModelPanel.tsx
+msgid "Top down render of {object}"
+msgstr ""
+
+#: src/content/pages/MapDetailPage.tsx
+msgid "Top faction"
+msgstr ""
+
 #: src/home/config.ts
 msgid "tracking the default"
 msgstr ""
@@ -6228,6 +9160,7 @@ msgstr ""
 msgid "Try {label}"
 msgstr ""
 
+#: src/content/pages/components/ModelReadFailed.tsx
 #: src/direct/QuickRoom.tsx
 msgid "Try again"
 msgstr ""
@@ -6244,8 +9177,16 @@ msgstr ""
 msgid "Try reading the unit data again"
 msgstr ""
 
+#: src/content/pages/GameDetailPage.tsx
+msgid "Turn {archiveName}'s {legacyModels} into .s3o, one shared texture per folder."
+msgstr ""
+
 #: src/home/continue.ts
 msgid "Turn {turn}"
+msgstr ""
+
+#: src/content/mapAggregate.ts
+msgid "Two sides"
 msgstr ""
 
 #: src/uberstress/index.ts
@@ -6256,7 +9197,12 @@ msgstr ""
 msgid "Unavailable"
 msgstr ""
 
+#: src/content/pages/components/Convert3doDrawer.tsx
+msgid "Undo"
+msgstr ""
+
 #: src/content/index.ts
+#: src/content/pages/components/BuildTreeDrawer.tsx
 msgid "Unit"
 msgstr ""
 
@@ -6266,6 +9212,18 @@ msgstr ""
 
 #: src/lego/index.ts
 msgid "Unit builder guide"
+msgstr ""
+
+#: src/content/useCompatReport.ts
+msgid "Unit defs: {defsError}"
+msgstr ""
+
+#: src/content/replayUnitDefs.ts
+msgid "Unit names"
+msgstr ""
+
+#: src/content/pages/UnitReferencePage.tsx
+msgid "Unit reference"
 msgstr ""
 
 #: src/play/presetParts.ts
@@ -6280,11 +9238,45 @@ msgid "Unit tweaks"
 msgstr ""
 
 #: src/content/index.ts
+#: src/content/matchStats.ts
+#: src/content/pages/GameDetailPage.tsx
 msgid "Units"
+msgstr ""
+
+#: src/content/pages/GameDetailPage.tsx
+msgid "Units · {unitCount}"
+msgstr ""
+
+#: src/content/replayAnalysis.ts
+msgid "Units captured from the team, as the log counted them"
+msgstr ""
+
+#: src/content/pages/components/FactionBuildList.tsx
+msgid "Units each faction's commander can build, directly or indirectly."
 msgstr ""
 
 #: src/runlite/pages/components/RunSetupForm.tsx
 msgid "Units from the builder"
+msgstr ""
+
+#: src/content/replayAnalysis.ts
+msgid "Units given to the team, as the log counted them"
+msgstr ""
+
+#: src/content/replayAnalysis.ts
+msgid "Units lost"
+msgstr ""
+
+#: src/content/replayAnalysis.ts
+msgid "Units made"
+msgstr ""
+
+#: src/content/replayAnalysis.ts
+msgid "Units the team captured, as the log counted them"
+msgstr ""
+
+#: src/content/replayAnalysis.ts
+msgid "Units the team gave away, as the log counted them"
 msgstr ""
 
 #: src/runlite/pages/components/RunEndScreen.tsx
@@ -6295,12 +9287,27 @@ msgstr ""
 msgid "Units unlocked into your shared arsenal, lit up against the faction's full build tree."
 msgstr ""
 
+#: src/content/pages/components/states.tsx
+msgid "unitsync read everything it was asked for without complaining."
+msgstr ""
+
+#. placeholder {0}: warnings.length
+#: src/content/pages/components/states.tsx
+msgid "unitsync reported {0, plural, one {# warning} other {# warnings}} for this {noun}"
+msgstr ""
+
 #: src/runlite/pages/components/RunContentNotice.tsx
 msgid "unitsync said: {reason}"
 msgstr ""
 
+#: src/content/replayAnalysis.ts
 #: src/play/pages/components/DebriefDrawer.tsx
 msgid "unknown"
+msgstr ""
+
+#: src/content/replaySideLabel.ts
+#: src/content/stats.ts
+msgid "Unknown"
 msgstr ""
 
 #: src/deeplink/parse.ts
@@ -6324,8 +9331,25 @@ msgstr ""
 msgid "Unlocked {0}"
 msgstr ""
 
+#: src/content/replayMapLayers.ts
+msgid "Unnamed player"
+msgstr ""
+
+#: src/content/pages/components/GameSourcesTab.tsx
+msgid "Unpin"
+msgstr ""
+
 #: src/components/SaveStatus.tsx
 msgid "Unsaved changes"
+msgstr ""
+
+#: src/content/stats.ts
+msgid "Up to 30 minutes"
+msgstr ""
+
+#: src/content/pages/components/GameCard.tsx
+#: src/content/pages/components/GameLibrarySummary.tsx
+msgid "Update"
 msgstr ""
 
 #: src/game-updates/GameUpdateBadge.tsx
@@ -6334,6 +9358,10 @@ msgstr ""
 
 #: src/game-updates/GameUpdateBadge.tsx
 msgid "Update {first} +{others}"
+msgstr ""
+
+#: src/content/pages/components/GameCard.tsx
+msgid "Update {updateVersion}"
 msgstr ""
 
 #: src/updater/UpdateBadge.tsx
@@ -6353,12 +9381,28 @@ msgstr ""
 msgid "Update source"
 msgstr ""
 
+#: src/content/pages/components/MissionRuntimeSection.tsx
+msgid "Update the mission runtime"
+msgstr ""
+
+#: src/content/libraryGames.ts
+msgid "Updates"
+msgstr ""
+
 #: src/updater/pages/UpdatesSettingsSection.tsx
 msgid "Updates are disabled in development builds."
 msgstr ""
 
 #: src/updater/pages/UpdatesSettingsSection.tsx
 msgid "Updates for this build are managed by its distributor."
+msgstr ""
+
+#: src/content/pages/GameUnitPage.tsx
+msgid "Upgrade path"
+msgstr ""
+
+#: src/content/pages/GameUnitPage.tsx
+msgid "Upgrades into"
 msgstr ""
 
 #: src/play/pages/components/ParticipantsTable.tsx
@@ -6371,6 +9415,10 @@ msgstr ""
 
 #: src/deeplink/pages/ImportSection.tsx
 msgid "Use it"
+msgstr ""
+
+#: src/content/pages/components/GameSourcesTab.tsx
+msgid "Use this"
 msgstr ""
 
 #: src/profile/SettingsSection.tsx
@@ -6389,8 +9437,20 @@ msgstr ""
 msgid "Validate profile"
 msgstr ""
 
+#: src/content/pages/components/GameVersionsTab.tsx
+msgid "Version"
+msgstr ""
+
 #: src/updater/pages/UpdatesSettingsSection.tsx
 msgid "Version {newVersion} available"
+msgstr ""
+
+#: src/content/pages/GameDetailPage.tsx
+msgid "Versions"
+msgstr ""
+
+#: src/content/pages/components/MapAggregate.tsx
+msgid "Versions of this map"
 msgstr ""
 
 #: src/startbox/presets.ts
@@ -6405,6 +9465,10 @@ msgstr ""
 msgid "Veteran Cadre"
 msgstr ""
 
+#: src/content/pages/components/BrowserToolbar.tsx
+msgid "via {currentLabel}"
+msgstr ""
+
 #: src/runlite/pages/components/EncounterOverlay.tsx
 msgid "Victory"
 msgstr ""
@@ -6413,12 +9477,24 @@ msgstr ""
 msgid "Victory!"
 msgstr ""
 
+#: src/content/pages/components/BrandingLinks.tsx
+msgid "Video"
+msgstr ""
+
 #: src/runlite/pages/RunListPage.tsx
 msgid "View"
 msgstr ""
 
 #: src/runlite/pages/components/RunHud.tsx
 msgid "View arsenal tree"
+msgstr ""
+
+#: src/content/pages/components/ArchiveRow.tsx
+msgid "View game"
+msgstr ""
+
+#: src/content/pages/components/ArchiveRow.tsx
+msgid "View map"
 msgstr ""
 
 #: src/play/pages/components/DebriefDrawer.tsx
@@ -6456,6 +9532,10 @@ msgstr ""
 msgid "Warpath"
 msgstr ""
 
+#: src/content/pages/MapDetailPage.tsx
+msgid "Warpath and Galactic Conquest"
+msgstr ""
+
 #: src/play/PlayProvider.tsx
 msgid "Warpath battle"
 msgstr ""
@@ -6482,8 +9562,20 @@ msgstr ""
 msgid "Warpath run"
 msgstr ""
 
+#: src/content/pages/components/MapRecords.tsx
+msgid "was around {x}, {z}"
+msgstr ""
+
 #: src/play/PresetList.tsx
 msgid "Watch the best replay for {presetName}"
+msgstr ""
+
+#: src/content/libraryMaps.ts
+msgid "Water"
+msgstr ""
+
+#: src/content/pages/GameUnitPage.tsx
+msgid "Water depth"
 msgstr ""
 
 #: src/home/zones/Greeting.tsx
@@ -6494,8 +9586,16 @@ msgstr ""
 msgid "Welcome screen"
 msgstr ""
 
+#: src/content/pages/components/MapAggregate.tsx
+msgid "What a building is for is read from the unit list that replay's own page names its orders from: the engine's own list when the match was analysed, then the installed game with exactly the name and version the replay records, read with the match's own mod options and AIs. A match whose build orders do not fit that list, or whose orders could not be checked against it, is left out of Defences and Economy."
+msgstr ""
+
 #: src/profile/index.ts
 msgid "What a game's own build of coilbox has renamed, hidden or fixed."
+msgstr ""
+
+#: src/content/pages/GameUnitPage.tsx
+msgid "What builds it"
 msgstr ""
 
 #: src/content/index.ts
@@ -6510,6 +9610,18 @@ msgstr ""
 msgid "What is taking up space, and clearing it out."
 msgstr ""
 
+#: src/content/pages/GameUnitPage.tsx
+msgid "What it builds"
+msgstr ""
+
+#: src/content/pages/components/MapRecords.tsx
+msgid "What your library knows about it"
+msgstr ""
+
+#: src/content/pages/components/Convert3doDrawer.tsx
+msgid "Whatever had already been written is still in the output folder."
+msgstr ""
+
 #: src/sound/SoundSettings.tsx
 msgid "When"
 msgstr ""
@@ -6522,24 +9634,88 @@ msgstr ""
 msgid "When you join a battle whose game or map you don't have, start the download straight away instead of waiting for a click. The Download button stays available to pause or retry."
 msgstr ""
 
+#: src/content/pages/components/MapAggregate.tsx
+msgid "Where buildings were ordered"
+msgstr ""
+
+#: src/content/pages/components/MapAggregate.tsx
+msgid "Where defences were ordered"
+msgstr ""
+
 #: src/play/pages/SkirmishPage.tsx
 msgid "Where do you want to host this?"
+msgstr ""
+
+#: src/content/pages/components/MapAggregate.tsx
+msgid "Where economy buildings were ordered"
+msgstr ""
+
+#: src/content/pages/components/GameVersionsTab.tsx
+msgid "Where from"
 msgstr ""
 
 #: src/downloads/index.ts
 msgid "Where games and maps come from."
 msgstr ""
 
+#: src/content/pages/GameUnitPage.tsx
+msgid "Where it can be built"
+msgstr ""
+
+#: src/content/pages/components/MapAggregate.tsx
+msgid "Where orders were aimed"
+msgstr ""
+
 #: src/play/index.ts
 msgid "Where the engine last wrote its log, and the system it ran on."
+msgstr ""
+
+#: src/content/mapAggregate.ts
+msgid "where the most matches were at their own busiest in {when}, {over}. Each match is scaled to its busiest spot, so this is not a count"
+msgstr ""
+
+#: src/content/mapAggregate.ts
+msgid "where the most matches were at their own busiest, {over}. Each match is scaled to its busiest spot, so this is not a count"
+msgstr ""
+
+#: src/content/pages/components/SectionHelp.tsx
+msgid "Where these numbers come from"
+msgstr ""
+
+#: src/content/pages/components/MapAggregate.tsx
+msgid "Where units died"
 msgstr ""
 
 #: src/content/index.ts
 msgid "Where your games, maps and engines live, and where new ones come from."
 msgstr ""
 
+#: src/content/pages/components/MapRecords.tsx
+msgid "Which factions won here"
+msgstr ""
+
+#: src/content/pages/components/MapRecords.tsx
+msgid "Which team won"
+msgstr ""
+
+#: src/content/mapImage.ts
+msgid "White dots are where one team's start was set before one match. Numbered circles are start positions the matches share."
+msgstr ""
+
+#: src/content/replayAnalysis.ts
+msgid "Who won"
+msgstr ""
+
+#: src/content/pages/components/MapAggregate.tsx
+msgid "Whole match"
+msgstr ""
+
 #: src/runlite/pages/components/EncounterOverlay.tsx
 msgid "Win it to clear the location."
+msgstr ""
+
+#: src/content/pages/MapDetailPage.tsx
+msgid "Win rate"
 msgstr ""
 
 #: src/play/presetRecord.ts
@@ -6550,8 +9726,20 @@ msgstr ""
 msgid "Wind"
 msgstr ""
 
+#: src/content/pages/components/MapAggregate.tsx
+msgid "Window of match time"
+msgstr ""
+
+#: src/content/pages/components/MapRecords.tsx
+msgid "With more than one version in, every start is placed on {mapName}, this page's map. Another version may declare other positions, and a start of its that is near none of this map's is grouped with the others by distance."
+msgstr ""
+
 #: src/play/pages/components/ParticipantsTable.tsx
 msgid "with no bonus"
+msgstr ""
+
+#: src/content/pages/components/MapRecords.tsx
+msgid "won {won} of {known}"
 msgstr ""
 
 #: src/multiplayer/index.tsx
@@ -6566,6 +9754,10 @@ msgstr ""
 msgid "workshop"
 msgstr ""
 
+#: src/content/pages/components/BuildTreeExportButton.tsx
+msgid "Wrapper"
+msgstr ""
+
 #: src/profile/health.ts
 msgid "Write root \"{writeRootPath}\" is outside the package (\"{appDir}\"). Downloads and release updates would land there, not with the package. Point the write root at a folder under the package."
 msgstr ""
@@ -6574,8 +9766,21 @@ msgstr ""
 msgid "Write root portability n/a (not portable)"
 msgstr ""
 
+#: src/content/pages/components/MapExportButtons.tsx
+msgid "Writes each start position with how many times it was taken and how many of those won."
+msgstr ""
+
+#: src/content/pages/components/MapExportButtons.tsx
+msgid "Writes this layer's cells before smoothing, one row each, with the numbers behind them. A cell that is not in the file holds nothing."
+msgstr ""
+
 #: src/play/pages/components/EngineLogFile.tsx
 msgid "Written {writtenAt}"
+msgstr ""
+
+#. placeholder {0}: result.groups.length
+#: src/content/pages/components/Convert3doDrawer.tsx
+msgid "Wrote {modelsWritten} of {modelsFound} models into {0, plural, one {# sheet} other {# sheets}}."
 msgstr ""
 
 #: src/profile/SettingsSection.tsx
@@ -6588,6 +9793,10 @@ msgstr ""
 
 #: src/i18n/frameStrings.ts
 msgid "Yellow"
+msgstr ""
+
+#: src/content/pages/GameUnitPage.tsx
+msgid "Yes"
 msgstr ""
 
 #: src/play/pages/components/ParticipantsTable.tsx
@@ -6673,6 +9882,14 @@ msgstr ""
 msgid "Your player name and team highlighting."
 msgstr ""
 
+#: src/content/pages/GameDetailPage.tsx
+msgid "Your record by faction"
+msgstr ""
+
+#: src/content/pages/MapDetailPage.tsx
+msgid "Your record on this map"
+msgstr ""
+
 #: src/direct/HostRoomForm.tsx
 msgid "Your room"
 msgstr ""
@@ -6724,4 +9941,12 @@ msgstr ""
 
 #: src/i18n/frameStrings.ts
 msgid "Zinc"
+msgstr ""
+
+#: src/content/pages/components/BuildTreeExportButton.tsx
+msgid "Zip"
+msgstr ""
+
+#: src/content/pages/components/BuildTreeExportButton.tsx
+msgid "Zip archive"
 msgstr ""

@@ -1,3 +1,4 @@
+import { Trans, useLingui } from "@lingui/react/macro";
 import { Button, Input } from "@picoframe/frame";
 import { X } from "lucide-react";
 import { useEffect, useId, useRef, useState } from "react";
@@ -17,6 +18,7 @@ export function DateFilter({
   value: string;
   onChange: (value: string) => void;
 }) {
+  const { t } = useLingui();
   const labelId = useId();
   const buttonId = useId();
   const [choosing, setChoosing] = useState(false);
@@ -29,6 +31,7 @@ export function DateFilter({
     if (value) setChoosing(false);
   }, [value]);
 
+  const lowerLabel = label.toLowerCase();
   const showInput = value !== "" || choosing;
   // biome-ignore lint/correctness/useExhaustiveDependencies: runs after each swap between the two controls
   useEffect(() => {
@@ -62,8 +65,8 @@ export function DateFilter({
             type="button"
             size="sm"
             variant="ghost"
-            aria-label={`Clear ${label.toLowerCase()}`}
-            title="Clear"
+            aria-label={t`Clear ${lowerLabel}`}
+            title={t`Clear`}
             onMouseDown={(e) => e.preventDefault()}
             onClick={() => {
               focusNext.current = "any";
@@ -86,7 +89,7 @@ export function DateFilter({
             setChoosing(true);
           }}
         >
-          Any date
+          <Trans>Any date</Trans>
         </Button>
       )}
     </div>

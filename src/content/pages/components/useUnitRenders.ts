@@ -27,6 +27,7 @@
  * redraw-of-a-cached-picture this hook exists to avoid.
  */
 
+import { t } from "@lingui/core/macro";
 import { useEffect, useRef, useState } from "react";
 import type { UnitModelResult, UnitRenderKeysResult } from "@/content/bindings";
 import { unitsyncUnitRender, unitsyncUnitRenderKeys } from "@/content/bindings";
@@ -37,19 +38,22 @@ import { hubAssetUrl } from "@/lib/assetUrl";
 import { toBase64 } from "@/lib/base64";
 import { renderSkipReason } from "./UnitModelPanel";
 
-/** The label each angle is shown under, matching the hub encyclopedia's own
- *  wording. */
-const ANGLE_LABELS: Record<string, string> = {
-  top: "Top down",
-  front: "Front",
-  side: "Side",
-  angled: "Angled",
-};
-
-/** An angle's label, or the raw angle for one the vocabulary added after this
- *  was written rather than a blank card. */
+/** An angle's label, matching the hub encyclopedia's own wording, or the raw
+ *  angle for one the vocabulary added after this was written rather than a
+ *  blank card. Called at render, so it reads the active language. */
 export function angleLabel(angle: string): string {
-  return ANGLE_LABELS[angle] ?? angle;
+  switch (angle) {
+    case "top":
+      return t`Top down`;
+    case "front":
+      return t`Front`;
+    case "side":
+      return t`Side`;
+    case "angled":
+      return t`Angled`;
+    default:
+      return angle;
+  }
 }
 
 export interface AngleRender {
@@ -142,7 +146,7 @@ export function useUnitRenders(
     if (!object) {
       setRenders(
         unavailableRenders(
-          "This unit's definition names no model, so there is nothing to render.",
+          t`This unit's definition names no model, so there is nothing to render.`,
         ),
       );
       setCacheChecked(true);
@@ -295,7 +299,7 @@ export function useUnitRenders(
               status: "unavailable",
               message: encoded.assetSkipped
                 ? renderSkipReason(encoded.assetSkipped)
-                : (encoded.errors[0] ?? "This angle could not be drawn."),
+                : (encoded.errors[0] ?? t`This angle could not be drawn.`),
             },
           }));
         }

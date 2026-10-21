@@ -1,3 +1,4 @@
+import { plural, t } from "@lingui/core/macro";
 import {
   type DownloadHistory,
   type DownloadRecord,
@@ -80,8 +81,8 @@ export function gameSourceRows(input: GameSourceInput): GameSourceRow[] {
         label: "GitHub",
         where: d.value,
         fetches: d.asset
-          ? `${d.asset} from the newest release`
-          : "the newest release archive",
+          ? t`${d.asset} from the newest release`
+          : t`the newest release archive`,
         last: newest(fromRepo(d.value)),
       });
     } else {
@@ -101,7 +102,7 @@ export function gameSourceRows(input: GameSourceInput): GameSourceRow[] {
       step: { source: "github", mirror: null },
       label: "GitHub",
       where: repo,
-      fetches: "the release archive for the version asked for",
+      fetches: t`the release archive for the version asked for`,
       last: newest(fromRepo(repo)),
     });
   }
@@ -110,11 +111,16 @@ export function gameSourceRows(input: GameSourceInput): GameSourceRow[] {
   if (springfiles.length > 0) {
     const best = springfiles.find((s) => !s.installed) ?? springfiles[0];
     const mirrors = best.mirrors?.length ?? 0;
+    const filename = best.filename;
+    const mirrorCount = plural(mirrors, {
+      one: "# mirror",
+      other: "# mirrors",
+    });
     rows.push({
       step: { source: "springfiles", mirror: null },
       label: "Springfiles",
       where: best.url ? hostOf(best.url) : null,
-      fetches: `${best.filename} · ${mirrors} mirror${mirrors === 1 ? "" : "s"}`,
+      fetches: t`${filename} · ${mirrorCount}`,
       last: newest((r) => r.source === "springfiles"),
     });
   }

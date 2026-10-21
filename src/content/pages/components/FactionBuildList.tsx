@@ -1,3 +1,4 @@
+import { Plural, Trans, useLingui } from "@lingui/react/macro";
 import { Button, buttonVariants, cn, useDrawer } from "@picoframe/frame";
 import { useMemo } from "react";
 import { Link } from "react-router";
@@ -55,12 +56,13 @@ function FactionBuildButton({
   unitLabel?: string;
   count: number;
 }) {
+  const { t } = useLingui();
   const drawer = useDrawer();
+  const gameName = ctx.gameName;
   const open = () =>
     drawer.open({
-      title: `${ctx.gameName} — Build tree`,
-      description:
-        "Units each faction's commander can build, directly or indirectly.",
+      title: t`${gameName} — Build tree`,
+      description: t`Units each faction's commander can build, directly or indirectly.`,
       width: "72rem",
       content: (
         <BuildTreeDrawer
@@ -101,7 +103,11 @@ function FactionBuildButton({
           </span>
         </span>
         <span className="flex flex-col items-end gap-0.5 text-xs text-muted-foreground">
-          {count > 0 && <span>{count} units</span>}
+          {count > 0 && (
+            <span>
+              <Plural value={count} one="# unit" other="# units" />
+            </span>
+          )}
           {unitLabel && <span>{unitLabel}</span>}
         </span>
       </div>
@@ -117,18 +123,18 @@ function FactionBuildButton({
           disabled={count === 0}
           onClick={open}
         >
-          Build tree
+          <Trans>Build tree</Trans>
         </Button>
         {browseHref && count > 0 ? (
           <Link
             to={browseHref}
             className={cn(buttonVariants({ variant: "outline" }))}
           >
-            Browse units
+            <Trans>Browse units</Trans>
           </Link>
         ) : (
           <Button type="button" variant="outline" disabled>
-            Browse units
+            <Trans>Browse units</Trans>
           </Button>
         )}
       </div>

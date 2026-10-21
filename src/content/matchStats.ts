@@ -1,3 +1,5 @@
+import { i18n, type MessageDescriptor } from "@lingui/core";
+import { msg, t } from "@lingui/core/macro";
 import { CHART_PALETTE, pairsStayApart } from "@/lib/chartPalette";
 import { formatCompact, formatDuration, formatNumber } from "@/lib/format";
 import {
@@ -139,10 +141,10 @@ export function headlineTotals(
  * ------------------------------------------------------------------------- */
 
 /** What to call a group of metrics. The registry decides which groups exist. */
-const GROUP_LABEL: Record<MetricGroup, string> = {
-  economy: "Economy",
-  military: "Military",
-  units: "Units",
+const GROUP_LABEL: Record<MetricGroup, MessageDescriptor> = {
+  economy: msg`Economy`,
+  military: msg`Military`,
+  units: msg`Units`,
 };
 
 /** One heading in the metric chooser, and the metrics under it. */
@@ -163,7 +165,11 @@ export function metricGroups(metrics: Metric[]): MetricGroupOptions[] {
     if (!m.surfaced) continue;
     let group = groups.find((g) => g.group === m.group);
     if (!group) {
-      group = { group: m.group, label: GROUP_LABEL[m.group], metrics: [] };
+      group = {
+        group: m.group,
+        label: i18n._(GROUP_LABEL[m.group]),
+        metrics: [],
+      };
       groups.push(group);
     }
     group.metrics.push(m);
@@ -247,18 +253,19 @@ export function teamSeries(
 ): ChartSeries[] {
   const seats = seatsByTeam(info);
   return trailer.teams
-    .filter((t) => t.samples.length > 0)
-    .map((t) => {
-      const held = seats.get(t.team) ?? [];
+    .filter((stat) => stat.samples.length > 0)
+    .map((stat) => {
+      const held = seats.get(stat.team) ?? [];
       const first = held[0];
       // Shared control puts several seats on one team, and one line covers them
       // all, so the label says whose line it also is rather than dropping them.
       const extra = held.length > 1 ? ` +${held.length - 1}` : "";
+      const team = stat.team;
       return {
-        id: teamId(t.team),
-        label: first ? `${first.name}${extra}` : `Team ${t.team}`,
-        color: seriesColor(first?.rgbColor, t.team),
-        samples: t.samples,
+        id: teamId(team),
+        label: first ? `${first.name}${extra}` : t`Team ${team}`,
+        color: seriesColor(first?.rgbColor, team),
+        samples: stat.samples,
       };
     });
 }
@@ -320,7 +327,8 @@ function mergeSamples(parts: TeamStatSample[][]): TeamStatSample[] {
  */
 function sideLabel(ally: number, info: DemoInfo): string {
   const won = info.winnersKnown && info.winningAllyTeams.includes(ally);
-  return `${teamLabel(ally)}${won ? " (won)" : ""}`;
+  const side = teamLabel(ally);
+  return won ? t`${side} (won)` : side;
 }
 
 /**
@@ -1026,10 +1034,18 @@ export function valueTable(
   shown: { metric: Metric; mode: ChartMode; view: ChartView },
 ): ValueTable {
   const { metric, mode, view } = shown;
-  const question = mode === "perMinute" ? "per minute" : "in total";
-  const lines = view === "teams" ? "by team" : "by player";
+  const metricLabel = metric.label;
+  const byTeam = view === "teams";
+  const caption =
+    mode === "perMinute"
+      ? byTeam
+        ? t`${metricLabel} per minute, by team, over match time`
+        : t`${metricLabel} per minute, by player, over match time`
+      : byTeam
+        ? t`${metricLabel} in total, by team, over match time`
+        : t`${metricLabel} in total, by player, over match time`;
   return {
-    caption: `${metric.label} ${question}, ${lines}, over match time`,
+    caption,
     columns: series.map((s) => ({ id: s.id, label: s.label, color: s.color })),
     rows: rows.map((row) => ({
       timeSec: row.timeSec,

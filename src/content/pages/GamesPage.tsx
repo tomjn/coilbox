@@ -1,3 +1,5 @@
+import { msg } from "@lingui/core/macro";
+import { Trans, useLingui } from "@lingui/react/macro";
 import { CloudOff } from "lucide-react";
 import { useMemo, useState } from "react";
 import { Link, useSearchParams } from "react-router";
@@ -48,12 +50,12 @@ import {
 } from "./components/states";
 
 /** What a chip with nothing in it says. */
-const EMPTY_CHIP: Record<GameChip, string> = {
-  installed: "No games installed.",
-  updates: "Every installed game is up to date.",
-  featured: "The hub features no games.",
-  notInstalled: "Every game is installed.",
-};
+const EMPTY_CHIP = {
+  installed: msg`No games installed.`,
+  updates: msg`Every installed game is up to date.`,
+  featured: msg`The hub features no games.`,
+  notInstalled: msg`Every game is installed.`,
+} as const satisfies Record<GameChip, unknown>;
 
 /**
  * Every game the player has and every game the hub knows how to fetch, in one
@@ -64,6 +66,7 @@ const EMPTY_CHIP: Record<GameChip, string> = {
  * session.
  */
 export default function GamesPage() {
+  const { t } = useLingui();
   const { targets, selected } = useScanTargetSelection();
   const {
     data,
@@ -175,13 +178,19 @@ export default function GamesPage() {
   // an update or it is the chip already chosen.
   const chips = GAME_CHIPS.filter(
     (c) => c.value !== "updates" || counts.updates > 0 || chip === "updates",
-  ).map((c) => ({ ...c, count: counts[c.value] }));
+  ).map((c) => ({ ...c, label: t(c.label), count: counts[c.value] }));
+  const sortOptions = GAME_SORT_OPTIONS.map((o) => ({
+    ...o,
+    label: t(o.label),
+  }));
+  const gamesNoun = t`games`;
+  const searchTerm = search.trim();
 
   return (
     <div className="flex flex-col gap-4 p-4">
       <PageHeader
-        title="Games"
-        description="Everything you can play, and everything the hub knows how to fetch."
+        title={t`Games`}
+        description={t`Everything you can play, and everything the hub knows how to fetch.`}
         actions={
           targets.length > 0 && (
             <RescanButton
@@ -210,14 +219,16 @@ export default function GamesPage() {
 
       {writeRoot && !writeRoot.loading && !writePath && records.length > 0 && (
         <p className="text-xs text-muted-foreground">
-          Set a download folder in{" "}
-          <Link
-            className="underline underline-offset-4"
-            to="/settings/content-folders"
-          >
-            Content folders
-          </Link>{" "}
-          to install games.
+          <Trans>
+            Set a download folder in{" "}
+            <Link
+              className="underline underline-offset-4"
+              to="/settings/content-folders"
+            >
+              Content folders
+            </Link>{" "}
+            to install games.
+          </Trans>
         </p>
       )}
 
@@ -226,51 +237,51 @@ export default function GamesPage() {
           chips={chips}
           chip={chip}
           onChip={(v) => setChip(v as GameChip)}
-          chipsLabel="Show"
+          chipsLabel={t`Show`}
           search={search}
           onSearch={setSearch}
-          searchPlaceholder="Search games…"
-          searchLabel="Search games"
+          searchPlaceholder={t`Search games…`}
+          searchLabel={t`Search games`}
           sort={sort}
           onSort={(v) => setSort(v as GameSort)}
-          sortOptions={GAME_SORT_OPTIONS}
+          sortOptions={sortOptions}
           sortClassName="w-40"
           total={counts[chip]}
           shown={shown.length}
-          noun="games"
+          noun={gamesNoun}
         />
       )}
 
       {error && !scanFailure && !unchecked && <ErrorBanner message={error} />}
       {result?.errors?.length ? <Diagnostics errors={result.errors} /> : null}
       {scanFailure && records.length > 0 && scanned.length === 0 && (
-        <ScanFailed noun="games" reason={scanFailure} />
+        <ScanFailed noun={gamesNoun} reason={scanFailure} />
       )}
 
       {targets.length === 0 ? null : busy && !unchecked ? (
         <SkeletonList grid />
       ) : cancelled && records.length === 0 ? (
-        <EmptyState label="Scan cancelled. Press Rescan to load games." />
+        <EmptyState label={t`Scan cancelled. Press Rescan to load games.`} />
       ) : records.length === 0 && scanFailure ? (
-        <ScanFailed noun="games" reason={scanFailure} />
+        <ScanFailed noun={gamesNoun} reason={scanFailure} />
       ) : records.length === 0 ? (
         suggestions.length > 0 ? (
           <SuggestionsList
             kind="game"
-            heading="No games yet — try one of these"
+            heading={t`No games yet — try one of these`}
             items={suggestions}
             writeRoot={writeRoot}
             onComplete={() => run(true)}
           />
         ) : (
-          <EmptyState label="No games found for this engine." />
+          <EmptyState label={t`No games found for this engine.`} />
         )
       ) : shown.length === 0 ? (
         <EmptyState
           label={
-            search.trim()
-              ? `No games match “${search.trim()}”.`
-              : EMPTY_CHIP[chip]
+            searchTerm
+              ? t`No games match “${searchTerm}”.`
+              : t(EMPTY_CHIP[chip])
           }
         />
       ) : (

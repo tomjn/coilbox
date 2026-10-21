@@ -1,3 +1,4 @@
+import { Plural, Trans, useLingui } from "@lingui/react/macro";
 import { Button } from "@picoframe/frame";
 import { save } from "@tauri-apps/plugin-dialog";
 import { FileArchive, Loader2, Trash2, Wrench } from "lucide-react";
@@ -22,9 +23,6 @@ import {
 const msg = (e: unknown): string =>
   e instanceof Error ? e.message : String(e);
 
-const plural = (n: number, one: string, many: string) =>
-  `${n} ${n === 1 ? one : many}`;
-
 /**
  * Compatibility mode for one game (issue #4561). The switch is the only thing
  * that builds the game's mutator: turning it on builds from the latest manifest,
@@ -45,6 +43,7 @@ export function CompatMode({
   /** The archive's checksum from unitsync, or undefined while it is read. */
   checksum?: string;
 }) {
+  const { t } = useLingui();
   const [settings, setSettings] = useCompatSettings();
   const settingsRef = useRef(settings);
   settingsRef.current = settings;
@@ -152,9 +151,9 @@ export function CompatMode({
     setError(null);
     try {
       const dest = await save({
-        title: "Export compatibility mutator",
+        title: t`Export compatibility mutator`,
         defaultPath: status.folder.replace(/\.sdd$/i, ".sdz"),
-        filters: [{ name: "Mutator archive", extensions: ["sdz"] }],
+        filters: [{ name: t`Mutator archive`, extensions: ["sdz"] }],
       });
       if (!dest) return;
       setBusy("export");
@@ -174,7 +173,8 @@ export function CompatMode({
     }
   };
 
-  const label = "Compatibility mode";
+  const staleReasons = stale.map(staleReason).join("; ");
+  const label = t`Compatibility mode`;
   return (
     <div className="flex flex-col gap-2">
       <div className="flex flex-wrap items-center gap-3">
@@ -191,7 +191,8 @@ export function CompatMode({
           </label>
           {busy === "build" && (
             <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
-              <Loader2 className="size-3.5 animate-spin" /> Building
+              <Loader2 className="size-3.5 animate-spin" />{" "}
+              <Trans>Building</Trans>
             </span>
           )}
         </div>
@@ -204,7 +205,7 @@ export function CompatMode({
             disabled={busy !== null}
             onClick={() => void build(enabled)}
           >
-            <Wrench className="size-4" /> Rebuild
+            <Wrench className="size-4" /> <Trans>Rebuild</Trans>
           </Button>
         )}
         {current && (
@@ -221,7 +222,7 @@ export function CompatMode({
             ) : (
               <FileArchive className="size-4" />
             )}
-            Export .sdz
+            <Trans>Export .sdz</Trans>
           </Button>
         )}
         {status?.folder && (
@@ -238,7 +239,7 @@ export function CompatMode({
             ) : (
               <Trash2 className="size-4" />
             )}
-            Remove
+            <Trans>Remove</Trans>
           </Button>
         )}
       </div>
@@ -247,15 +248,25 @@ export function CompatMode({
         <p className="text-xs text-muted-foreground">
           <span className="font-mono">{status.folder}</span>
           {stale.length > 0 && (
-            <> is out of date: {stale.map(staleReason).join("; ")}.</>
+            <>
+              {" "}
+              <Trans>is out of date: {staleReasons}.</Trans>
+            </>
           )}
         </p>
       )}
 
       {exported && (
         <p className="text-xs text-muted-foreground">
-          Exported {plural(exported.files.length, "file", "files")} to{" "}
-          <span className="font-mono">{exported.path}</span>
+          <Trans>
+            Exported{" "}
+            <Plural
+              value={exported.files.length}
+              one="# file"
+              other="# files"
+            />{" "}
+            to <span className="font-mono">{exported.path}</span>
+          </Trans>
         </p>
       )}
 
@@ -268,27 +279,47 @@ export function CompatMode({
 
 /** What a build wrote, and why its models are not used when they are not. */
 export function BuildResult({ built }: { built: CompatBuilt }) {
+  const { t } = useLingui();
+  const modelsWritten = built.models.modelsWritten;
+  const modelsFound = built.models.modelsFound;
+  const gadgets = built.gadgets.join(", ");
   return (
     <div className="flex flex-col gap-1 text-xs text-muted-foreground">
       <ul className="flex flex-col gap-0.5">
         <li>
-          {plural(built.models.modelsWritten, "model", "models")} converted
-          {built.models.modelsFound > built.models.modelsWritten
-            ? ` of ${built.models.modelsFound}`
-            : ""}
-        </li>
-        <li>
-          {plural(
-            built.preludeFixes.length,
-            "prelude function",
-            "prelude functions",
+          {modelsFound > modelsWritten ? (
+            <Trans>
+              <Plural value={modelsWritten} one="# model" other="# models" />{" "}
+              converted of {modelsFound}
+            </Trans>
+          ) : (
+            <Trans>
+              <Plural value={modelsWritten} one="# model" other="# models" />{" "}
+              converted
+            </Trans>
           )}
         </li>
         <li>
-          Gadgets enabled:{" "}
-          {built.gadgets.length > 0 ? built.gadgets.join(", ") : "none"}
+          <Plural
+            value={built.preludeFixes.length}
+            one="# prelude function"
+            other="# prelude functions"
+          />
         </li>
-        <li>{plural(built.defOverrides, "def override", "def overrides")}</li>
+        <li>
+          {built.gadgets.length > 0 ? (
+            <Trans>Gadgets enabled: {gadgets}</Trans>
+          ) : (
+            t`Gadgets enabled: none`
+          )}
+        </li>
+        <li>
+          <Plural
+            value={built.defOverrides}
+            one="# def override"
+            other="# def overrides"
+          />
+        </li>
       </ul>
       {built.notes.map((note) => (
         <p key={note}>{note}</p>
