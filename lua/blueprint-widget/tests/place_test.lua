@@ -123,6 +123,23 @@ check("flipping both ways is a half turn", (function()
 	return true
 end)())
 
+local square = PLACE.resolve({ buildings = { { def = "armsolar", offset = { x = 0, z = 0 }, facing = 0 }, { def = "armsolar", offset = { x = 64, z = 0 }, facing = 0 } } })
+local minX, maxX, minZ, maxZ = PLACE.extent(square, 0)
+check("extent runs edge to edge", minX == -32 and maxX == 96 and minZ == -32 and maxZ == 32, minX .. " " .. maxX .. " " .. minZ .. " " .. maxZ)
+local tminX, tmaxX, tminZ, tmaxZ = PLACE.extent(square, 1)
+check("extent follows the turn", tminX == -32 and tmaxX == 32 and tminZ == -96 and tmaxZ == 32, tminX .. " " .. tmaxX .. " " .. tminZ .. " " .. tmaxZ)
+local fminX, fmaxX = PLACE.extent(square, 0, { x = true })
+check("extent follows the flip", fminX == -96 and fmaxX == 32)
+local cax, caz = PLACE.centredAnchor(500, 500, minX, maxX, minZ, maxZ)
+check("a centred anchor puts the middle of the layout under the point, on the grid", cax == 464 and caz == 496, cax .. "," .. caz)
+check("a centred anchor is on the build grid", cax % 16 == 0 and caz % 16 == 0)
+
+local line = PLACE.line(0, 0, 400, 30, minX, maxX, minZ, maxZ)
+check("a line runs along the axis it covers most, each copy touching the last", #line == 4 and line[2].x == 128 and line[2].z == 0 and line[4].x == 384, show(line))
+local back = PLACE.line(0, 0, 10, -300, minX, maxX, minZ, maxZ)
+check("a line runs backward too, along z", #back == 6 and back[2].z == -64 and back[2].x == 0, show(back))
+check("a line with no length is one copy", #PLACE.line(16, 16, 16, 16, minX, maxX, minZ, maxZ) == 1)
+
 local blockedFoot = PLACE.footprint(resolved, 0, 1024, 0)
 check("a blocked square is marked", blockedFoot[1].blocked == true and blockedFoot[4].blocked == false, show(blockedFoot))
 

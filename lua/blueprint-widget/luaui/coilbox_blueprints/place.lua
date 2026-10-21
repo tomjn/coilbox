@@ -115,6 +115,67 @@ function M.footprint(resolved, rotation, ax, az, flip)
 	return out
 end
 
+--- Half a footprint's width and depth in elmos, for a facing. xsize and
+-- zsize are in the engine's 8 elmo half squares.
+function M.halfSpan(def, facing)
+	local xs, zs = def.xsize, def.zsize
+	if facing % 2 == 1 then
+		xs, zs = zs, xs
+	end
+	return xs * 4, zs * 4
+end
+
+--- How far a layout reaches from its anchor once turned and flipped, edge to
+-- edge.
+-- @return number minX, maxX, minZ, maxZ in elmos, all 0 for an empty layout
+function M.extent(resolved, rotation, flip)
+	local flipX, flipZ = flip and flip.x, flip and flip.z
+	local minX, maxX, minZ, maxZ = math.huge, -math.huge, math.huge, -math.huge
+	for _, b in ipairs(resolved.buildings) do
+		local ox, oz = M.turned(b.offset.x, b.offset.z, rotation)
+		if flipX then
+			ox = -ox
+		end
+		if flipZ then
+			oz = -oz
+		end
+		local hw, hd = M.halfSpan(b.def, (b.facing + rotation) % 4)
+		minX, maxX = math.min(minX, ox - hw), math.max(maxX, ox + hw)
+		minZ, maxZ = math.min(minZ, oz - hd), math.max(maxZ, oz + hd)
+	end
+	if minX == math.huge then
+		return 0, 0, 0, 0
+	end
+	return minX, maxX, minZ, maxZ
+end
+
+--- The anchor that puts a layout's middle under a point, on the build grid.
+function M.centredAnchor(x, z, minX, maxX, minZ, maxZ)
+	return M.snapAnchor(x - (minX + maxX) / 2 + M.BUILD_SQUARE / 2, z - (minZ + maxZ) / 2 + M.BUILD_SQUARE / 2)
+end
+
+--- Anchors for copies of a layout laid in a line from one anchor toward
+-- another, along whichever of x and z the line runs further, each copy
+-- touching the last.
+-- @return table[] { x, z }, the first always the start
+function M.line(sx, sz, ex, ez, minX, maxX, minZ, maxZ)
+	local dx, dz = ex - sx, ez - sz
+	local alongX = math.abs(dx) >= math.abs(dz)
+	local span = alongX and (maxX - minX) or (maxZ - minZ)
+	local step = math.max(M.BUILD_SQUARE, math.ceil(span / M.BUILD_SQUARE) * M.BUILD_SQUARE)
+	local reach = alongX and dx or dz
+	local sign = reach < 0 and -1 or 1
+	local out = {}
+	for i = 0, math.floor(math.abs(reach) / step + 0.5) do
+		if alongX then
+			out[#out + 1] = { x = sx + sign * i * step, z = sz }
+		else
+			out[#out + 1] = { x = sx, z = sz + sign * i * step }
+		end
+	end
+	return out
+end
+
 --- What the selected units can build, and how fast.
 -- @param unitIDs integer[]
 -- @return table { union = { defID = true }, byUnit = { unitID = { defID = true } },
