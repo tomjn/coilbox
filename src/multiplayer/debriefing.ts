@@ -1,3 +1,4 @@
+import { t } from "@lingui/core/macro";
 import type { Debriefing, DebriefingPlayer } from "./bindings";
 
 /**
@@ -44,9 +45,9 @@ export function rankName(rank: number): string | null {
  * upstream is better shown in the server's words than dropped.
  */
 export function categoryLabel(category: string | null): string {
-  if (!category) return "Unrated";
-  if (category.toLowerCase() === "matchmaking") return "Matchmaking";
-  if (category.toLowerCase() === "planetwars") return "Planet Wars";
+  if (!category) return t`Unrated`;
+  if (category.toLowerCase() === "matchmaking") return t`Matchmaking`;
+  if (category.toLowerCase() === "planetwars") return t`Planet Wars`;
   return category;
 }
 
@@ -73,13 +74,17 @@ export function headline(
   report: Debriefing,
   me: DebriefingPlayer | undefined,
 ): string {
-  if (!me) return report.message ?? "The game has finished";
+  if (!me) return report.message ?? t`The game has finished`;
   const change = formatRatingChange(me.ratingChange);
-  const result = me.won ? "Won" : "Lost";
   if (change == null) {
-    return `${result}, and it counted toward no rating`;
+    return me.won
+      ? t`Won, and it counted toward no rating`
+      : t`Lost, and it counted toward no rating`;
   }
-  return `${result}, ${change} ${categoryLabel(report.ratingCategory).toLowerCase()}`;
+  const category = categoryLabel(report.ratingCategory).toLowerCase();
+  return me.won
+    ? t`Won, ${change} ${category}`
+    : t`Lost, ${change} ${category}`;
 }
 
 /**
@@ -91,8 +96,9 @@ export function headline(
  */
 export function rankMove(player: DebriefingPlayer): string | null {
   const name = rankName(player.rank);
-  if (player.rankedUp) return name ? `Promoted to ${name}` : "Promoted";
-  if (player.rankedDown) return name ? `Dropped to ${name}` : "Dropped a rank";
+  if (player.rankedUp) return name ? t`Promoted to ${name}` : t`Promoted`;
+  if (player.rankedDown)
+    return name ? t`Dropped to ${name}` : t`Dropped a rank`;
   return null;
 }
 

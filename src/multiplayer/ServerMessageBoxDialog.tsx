@@ -1,4 +1,4 @@
-import { t } from "@lingui/core/macro";
+import { Trans, useLingui } from "@lingui/react/macro";
 import { Button } from "@picoframe/frame";
 import { openUrl } from "@tauri-apps/plugin-opener";
 import type { ReactNode } from "react";
@@ -34,6 +34,7 @@ export function ServerMessageBoxDialog({
   serverName: string | null;
   onDismiss: () => void;
 }) {
+  const { t } = useLingui();
   return (
     <Dialog
       open={text != null}
@@ -48,16 +49,20 @@ export function ServerMessageBoxDialog({
       >
         <DialogHeader>
           <DialogTitle>
-            {serverName
-              ? `Server message from ${serverName}`
-              : "Server message"}
+            {serverName ? (
+              <Trans>Server message from {serverName}</Trans>
+            ) : (
+              <Trans>Server message</Trans>
+            )}
           </DialogTitle>
         </DialogHeader>
         <div className="max-h-72 overflow-y-auto whitespace-pre-wrap break-words rounded-md border border-border bg-muted/40 p-3 text-sm">
           {text != null ? linkify(text) : null}
         </div>
         <DialogFooter>
-          <Button onClick={onDismiss}>OK</Button>
+          <Button onClick={onDismiss}>
+            <Trans>OK</Trans>
+          </Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>
