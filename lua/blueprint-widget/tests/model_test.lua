@@ -9,9 +9,9 @@ local check, same, show = support.check, support.same, support.show
 local MODEL = support.module("model.lua")
 local PLACE = support.module("place.lua")
 
-local SOLAR = support.def(1, "armsolar", { isBuilding = true, xsize = 8, zsize = 8, humanName = "Solar Collector" })
-local LLT = support.def(2, "armllt", { isBuilding = true, xsize = 6, zsize = 6 })
-local LAB = support.def(4, "armlab", { isBuilding = true, xsize = 12, zsize = 12 })
+local SOLAR = support.def(1, "armsolar", { isBuilding = true, xsize = 8, zsize = 8, humanName = "Solar Collector", energyUpkeep = -20 })
+local LLT = support.def(2, "armllt", { isBuilding = true, xsize = 6, zsize = 6, humanName = "Light Laser Tower", weapons = { { weaponDef = 1 } } })
+local LAB = support.def(4, "armlab", { isBuilding = true, xsize = 12, zsize = 12, buildOptions = { 10 } })
 local CON = support.def(10, "armck", { buildOptions = { 1, 2 } })
 local E = support.engine({ SOLAR, LLT, LAB, CON }, {
 	selected = { 100 },
@@ -137,7 +137,21 @@ local function hitsOf(layout, kind)
 end
 check("each row is clickable to place", #hitsOf(L, "place") == 3 and hitsOf(L, "place")[1].action.key == "library:eco", show(hitsOf(L, "place")))
 check("tabs are clickable", #hitsOf(L, "tab") == 3 and hitsOf(L, "tab")[2].action.tab == "partly")
-check("there is a save button and no separate close button", #hitsOf(L, "save") == 1 and #hitsOf(L, "close") == 0)
+check("there is a save button and a collapse button", #hitsOf(L, "save") == 1 and #hitsOf(L, "close") == 1)
+check("the collapse button is the last thing in the header, right of the tabs", (function()
+	local c, tabs, p = hitsOf(L, "close")[1], hitsOf(L, "tab"), L.rects[1]
+	return c.x > tabs[3].x + tabs[3].w and c.x + c.w == p.x + p.w - MODEL.PAD and c.y == tabs[3].y
+end)(), show(hitsOf(L, "close")))
+check("labels sit on the middle of their buttons", (function()
+	local saveHit = hitsOf(L, "save")[1]
+	for _, t in ipairs(L.texts) do
+		if t.text == "Save selection" then
+			return t.y == saveHit.y + saveHit.h / 2
+		end
+	end
+	return false
+end)())
+check("the footer switches between the list and the grid", #hitsOf(L, "view") == 2 and hitsOf(L, "view")[1].action.view == "grid" and hitsOf(L, "view")[2].action.view == "list")
 check("the title is the toggle, across the header left of the tabs", (function()
 	local t = hitsOf(L, "toggle")[1]
 	local firstTab = hitsOf(L, "tab")[1]
@@ -233,7 +247,7 @@ state.placing = { key = "library:eco", name = "Eco", rotation = 1 }
 state.remainder = { count = 3 }
 state.message = "Saved Base on Map 2"
 local LP = MODEL.layout(state, measure, VIEW)
-check("the placing row names the blueprint and the rotation", #textsWith(LP, "Placing Eco") == 1 and #textsWith(LP, "90") == 1, show(LP.texts))
+check("the placing line says how to turn and drop it, not the name again", #textsWith(LP, "[ ] turn") == 1 and #textsWith(LP, "Placing") == 0 and #textsWith(LP, "Eco") == 1, show(LP.texts))
 check("the placing row offers cancel", #hitsOf(LP, "cancel") == 1)
 check("the remainder row has a count and two buttons", #textsWith(LP, "3 left") == 1 and #hitsOf(LP, "remainder") == 1 and #hitsOf(LP, "dismiss") == 1, show(LP.texts))
 check("the message is shown", #textsWith(LP, "Saved Base on Map 2") == 1)
@@ -327,15 +341,15 @@ check("a drag moves the pill by the mouse's travel", after.x == before.x - 300 a
 
 MODEL.drag(moved, before, true, -5000, 5000, VIEW)
 local clamped = MODEL.layout(moved, measure, VIEW).box
-check("a drag cannot take the pill off screen", clamped.x == 0 and clamped.y + clamped.h == VIEW.h, show(clamped))
+check("a drag past the edges stops at their margin", clamped.x == MODEL.PAD and clamped.y + clamped.h == VIEW.h - MODEL.PAD, show(clamped))
 
 MODEL.settle(moved, MODEL.layout(moved, measure, VIEW), VIEW)
-check("dropped on the left half, the pill hangs from its left corner", moved.pos.right == false and moved.pos.x == 0 and moved.pos.y == 1, show(moved.pos))
+check("dropped on the left half, the pill hangs from its left corner", moved.pos.right == false and moved.pos.x == MODEL.PAD / VIEW.w and moved.pos.y == (VIEW.h - MODEL.PAD) / VIEW.h, show(moved.pos))
 local settled = MODEL.layout(moved, measure, VIEW).box
 check("settling does not move the pill", same(settled, clamped), show({ settled, clamped }))
 moved.open = true
 local openLeft = MODEL.layout(moved, measure, VIEW)
-check("opened there, the panel hangs from the same corner", openLeft.box.x == 0 and openLeft.box.y + openLeft.box.h == VIEW.h, show(openLeft.box))
+check("opened there, the panel hangs from the same corner", openLeft.box.x == MODEL.PAD and openLeft.box.y + openLeft.box.h == VIEW.h - MODEL.PAD, show(openLeft.box))
 
 MODEL.drag(moved, openLeft.box, false, 1500, -200, VIEW)
 MODEL.settle(moved, MODEL.layout(moved, measure, VIEW), VIEW)
@@ -344,6 +358,16 @@ check("dropped on the right half, the panel hangs from its right corner", moved.
 moved.open = false
 local pillRight = MODEL.layout(moved, measure, VIEW).box
 check("closing it there leaves the pill under the panel's right corner", pillRight.x + pillRight.w == openRight.x + openRight.w and pillRight.y + pillRight.h == openRight.y + openRight.h, show({ pillRight, openRight }))
+
+local snapping = MODEL.new()
+local start = MODEL.layout(snapping, measure, VIEW).box
+MODEL.drag(snapping, start, true, -(start.x - 20), 0, VIEW)
+check("dropped near the left edge, the box snaps to its margin", MODEL.layout(snapping, measure, VIEW).box.x == MODEL.PAD, show(MODEL.layout(snapping, measure, VIEW).box))
+MODEL.drag(snapping, start, true, -(start.x - 20 - MODEL.SNAP - MODEL.PAD), 0, VIEW)
+check("further out than the snap distance, it stays where it was dropped", MODEL.layout(snapping, measure, VIEW).box.x == 20 + MODEL.SNAP + MODEL.PAD, show(MODEL.layout(snapping, measure, VIEW).box))
+MODEL.drag(snapping, start, true, 0, VIEW.h - start.y - start.h - 10, VIEW)
+local nearTop = MODEL.layout(snapping, measure, VIEW).box
+check("dropped near the top, the box snaps to its margin", nearTop.y + nearTop.h == VIEW.h - MODEL.PAD, show(nearTop))
 
 --------------------------------------------------------------------------------
 -- scrolling
@@ -401,14 +425,20 @@ check("packing nothing is empty", #none == 0 and #noneIdx == 0)
 local function slope(x, z)
 	return x * 0.5 + z * 0.25
 end
+local function style(p)
+	if p.blocked then
+		return { 1, 0, 0, 0.4 }, true
+	end
+	return { 0, 1, 0, 0.4 }, false
+end
 local gv, gi = MODEL.packGround({
 	{ x = 320, y = 10, z = 320, defID = 1, facing = 0, blocked = true, def = { xsize = 4, zsize = 2 } },
 	{ x = 96, y = 0, z = 96, defID = 1, facing = 1, blocked = false, def = { xsize = 4, zsize = 2 } },
-}, { 1, 0, 0, 0.4 }, { 0, 1, 0, 0.4 }, slope)
+}, style, slope)
 local K = MODEL.STRIDE
 local function vert(i)
 	local o = (i - 1) * K
-	return { x = gv[o + 1], y = gv[o + 2], z = gv[o + 3], u = gv[o + 4], v = gv[o + 5], r = gv[o + 6], g = gv[o + 7], w = gv[o + 10], h = gv[o + 11] }
+	return { x = gv[o + 1], y = gv[o + 2], z = gv[o + 3], u = gv[o + 4], v = gv[o + 5], r = gv[o + 6], g = gv[o + 7], w = gv[o + 10], h = gv[o + 11], radius = gv[o + 12], stripe = gv[o + 13] }
 end
 -- the first mark is 32 by 16 elmos: 5 by 3 grid points, 4 by 2 squares
 check("a mark has a vertex on every heightmap point inside it", #gv == (5 * 3 + 3 * 5) * K, #gv / K)
@@ -428,8 +458,10 @@ check("uvs span each whole mark", vert(1).u == 0 and vert(1).v == 0 and vert(15)
 check("each vertex carries the mark's size", vert(1).w == 32 and vert(1).h == 16)
 check("the second mark's indices start after the first's vertices", gi[8 * 6 + 1] == 15, gi[8 * 6 + 1])
 check("an odd facing swaps the span", vert(16).x == 96 - 8 and vert(16).z == 96 - 16, show(vert(16)))
-check("a blocked mark takes the first colour and an open one the second", vert(1).r == 1 and vert(16).g == 1)
-local _, offGrid = MODEL.packGround({ { x = 4, y = 0, z = 4, defID = 1, facing = 0, def = { xsize = 2, zsize = 2 } } }, { 1, 0, 0, 1 }, { 0, 1, 0, 1 }, slope)
+check("each mark takes the colour its style gives", vert(1).r == 1 and vert(16).g == 1)
+check("a mark's corners are rounded as the layout map's buildings are", vert(1).radius == 4 and vert(16).radius == 4, show(vert(1)))
+check("a mark the style stripes says so, and an open one does not", vert(1).stripe == 1 and vert(16).stripe == 0)
+local _, offGrid = MODEL.packGround({ { x = 4, y = 0, z = 4, defID = 1, facing = 0, def = { xsize = 2, zsize = 2 } } }, style, slope)
 -- 16 elmos about x = 4 runs from -4 to 12, so it crosses the lines at 0 and 8
 check("a mark off the heightmap grid still meets every line inside it", #offGrid == 3 * 3 * 6, #offGrid)
 
@@ -470,6 +502,90 @@ check("each row draws its layout map", (function()
 		end
 	end
 	return maps == #hitsOf(L, "place") and buildings > 0
+end)())
+
+--------------------------------------------------------------------------------
+-- what a building does, and naming a layout by what it holds
+--------------------------------------------------------------------------------
+
+check("a building that builds is a builder", MODEL.category(LAB) == "builder" and MODEL.category({ isBuilder = true }) == "builder")
+check("an armed building is a weapon", MODEL.category(LLT) == "weapon")
+check("a building that makes energy is energy", MODEL.category(SOLAR) == "energy" and MODEL.category({ windGenerator = 25 }) == "energy" and MODEL.category({ tidalGenerator = 20 }) == "energy" and MODEL.category({ energyMake = 1 }) == "energy")
+check("anything else is other", MODEL.category({ name = "armmstor" }) == "other")
+check("energy is yellow, builders green and weapons red", same(MODEL.categoryColor(SOLAR), MODEL.COLORS.energy) and same(MODEL.categoryColor(LAB), MODEL.COLORS.builder) and same(MODEL.categoryColor(LLT), MODEL.COLORS.weapon) and same(MODEL.categoryColor({}), MODEL.COLORS.building))
+check("each building in a layout map takes its category's colour", (function()
+	for _, r in ipairs(L.rects) do
+		if r.kind == "building" and same(r.color, MODEL.COLORS.energy) then
+			return true
+		end
+	end
+	return false
+end)())
+
+check("a content name counts each kind, most common first", MODEL.contentName({ LLT, SOLAR, SOLAR, { name = "corgant" } }) == "2 Solar Collector, Light Laser Tower, corgant", MODEL.contentName({ LLT, SOLAR, SOLAR, { name = "corgant" } }))
+check("a translated name wins over the def's own", MODEL.contentName({ { humanName = "Solar", translatedHumanName = "Solaire" } }) == "Solaire")
+local function itemNamed(name)
+	for _, item in ipairs(state.items) do
+		if item.entry.name == name then
+			return item
+		end
+	end
+end
+check("a made up map name shows what the layout holds", itemNamed("Base on Map 1").name == "Light Laser Tower", itemNamed("Base on Map 1").name)
+check("a name somebody chose is kept", itemNamed("Eco").name == "Eco")
+check("an unnamed BAR layout shows what it holds", MODEL.displayName({ entry = { name = "#3" }, resolved = { buildings = { { def = SOLAR } }, missing = {} } }) == "Solar Collector")
+
+--------------------------------------------------------------------------------
+-- the grid view
+--------------------------------------------------------------------------------
+
+local plenty = {}
+for i = 1, 80 do
+	plenty[i] = { key = "library:" .. i, name = "Entry " .. i, source = "library", ordered = false, buildings = { b("armsolar") } }
+end
+local tiles = MODEL.new()
+MODEL.refresh(tiles, plenty, PLACE, game, CAN)
+tiles.open = true
+MODEL.setView(tiles, "grid")
+local LG = MODEL.layout(tiles, measure, VIEW)
+local function rectsOf(layout, kind)
+	local found = {}
+	for _, r in ipairs(layout.rects) do
+		if r.kind == kind then
+			found[#found + 1] = r
+		end
+	end
+	return found
+end
+local shownTiles = rectsOf(LG, "tile")
+check("the grid lays tiles out in rows of GRID_COLUMNS", #shownTiles % MODEL.GRID_COLUMNS == 0 and #shownTiles > MODEL.GRID_COLUMNS and shownTiles[1].y == shownTiles[MODEL.GRID_COLUMNS].y and shownTiles[MODEL.GRID_COLUMNS + 1].y < shownTiles[1].y, #shownTiles)
+check("tiles are square and fill the width between the margins", (function()
+	local p, first, last = LG.rects[1], shownTiles[1], shownTiles[MODEL.GRID_COLUMNS]
+	return first.w == first.h and first.x == p.x + MODEL.PAD and math.abs(last.x + last.w - (p.x + p.w - MODEL.PAD)) < 1e-9
+end)(), show(shownTiles[1]))
+check("each tile is clickable to place and draws its layout map", #hitsOf(LG, "place") == #shownTiles and #rectsOf(LG, "map") == #shownTiles)
+check("with nothing hovered the strip under the tiles is empty", #rectsOf(LG, "info") == 1 and #rectsOf(LG, "row") == 0)
+tiles.hover = MODEL.actionId({ kind = "place", key = "library:2" })
+local LGH = MODEL.layout(tiles, measure, VIEW)
+check("hovering a tile shows it in the strip as a list row", #rectsOf(LGH, "row") == 1 and rectsOf(LGH, "row")[1].key == "library:2" and #textsWith(LGH, "Entry 2") == 1, show(rectsOf(LGH, "row")))
+tiles.hover = nil
+tiles.placing = { key = "library:3", name = "Entry 3", rotation = 0 }
+local LGP = MODEL.layout(tiles, measure, VIEW)
+check("with nothing hovered the strip shows the one being placed, outlined only in the grid", #textsWith(LGP, "Entry 3") == 1 and #rectsOf(LGP, "outline") == 1)
+tiles.placing = nil
+MODEL.scroll(tiles, 1)
+check("the grid scrolls a row of tiles at a time", hitsOf(MODEL.layout(tiles, measure, VIEW), "place")[1].action.key == "library:" .. (MODEL.GRID_COLUMNS + 1))
+MODEL.setView(tiles, "list")
+check("switching view goes back to the top", tiles.scroll == 0 and tiles.view == "list")
+MODEL.setView(tiles, "sideways")
+check("an unknown view is ignored", tiles.view == "list")
+check("the active view's button is lit", (function()
+	for _, r in ipairs(LG.rects) do
+		if r.kind == "button" and r.x == hitsOf(LG, "view")[1].x and r.y == hitsOf(LG, "view")[1].y then
+			return same(r.color, MODEL.COLORS.pillActive)
+		end
+	end
+	return false
 end)())
 
 --------------------------------------------------------------------------------

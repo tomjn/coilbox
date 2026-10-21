@@ -85,10 +85,11 @@ end
 -- fields the widget reads.
 -- @param id integer
 -- @param name string internal name
--- @param opts table? isBuilding, xsize, zsize, buildOptions (def ids), humanName
+-- @param opts table? isBuilding, xsize, zsize, buildOptions (def ids), humanName,
+--   and any other UnitDefs field, such as weapons or energyMake, as given
 function M.def(id, name, opts)
 	opts = opts or {}
-	return {
+	local def = {
 		id = id,
 		name = name,
 		humanName = opts.humanName or name,
@@ -97,6 +98,12 @@ function M.def(id, name, opts)
 		zsize = opts.zsize or 2,
 		buildOptions = opts.buildOptions or {},
 	}
+	for k, v in pairs(opts) do
+		if def[k] == nil then
+			def[k] = v
+		end
+	end
+	return def
 end
 
 --- The engine stub. Holds UnitDefs and UnitDefNames built from the defs given,

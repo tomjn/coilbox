@@ -85,6 +85,9 @@ local layoutW, layoutH = 0, 0
 local placing = nil
 -- Ghosts left after a partial placement, already in world space.
 local remainder = nil
+-- Counts every new remainder, so its ground marks are rebuilt even when it
+-- holds as many positions as the last one.
+local remainderSerial = 0
 local messageUntil = 0
 -- A press on the pill or the panel's title, which is a click if the mouse
 -- comes up where it went down and a drag once it moves further than the
@@ -99,7 +102,7 @@ local saved = nil
 --------------------------------------------------------------------------------
 
 local shader
-local locProj, locView, locRect, locUseTex, locPicRadius
+local locProj, locView, locRect, locUseTex, locPicRadius, locGround
 local quadVAO, quadVBO, quadIBO
 -- The panel's and the ground marks' buffers, grown as needed by upload().
 local panelSet = { capacity = 0 }
@@ -145,6 +148,7 @@ local FRAGMENT_SHADER = [[
 #version 130
 uniform sampler2D tex;
 uniform int useTex;
+uniform int ground;
 in vec2 vUv;
 in vec4 vColor;
 in vec4 vShape;
@@ -161,7 +165,17 @@ void main() {
 	vec2 q = abs((vUv - 0.5) * vShape.xy) - halfSize + r;
 	float d = length(max(q, 0.0)) + min(max(q.x, q.y), 0.0) - r;
 	float a = clamp(0.5 - d, 0.0, 1.0);
-	if (vShape.w > 0.0) {
+	if (ground == 1) {
+		// On the ground the units are elmos. A striped mark is one the ground
+		// refuses, and every mark has a firmer rim two elmos wide.
+		vec2 p = vUv * vShape.xy;
+		if (vShape.w > 0.0 && fract((p.x + p.y) / 8.0) < 0.5) {
+			c = vec4(0.05, 0.05, 0.05, 0.6);
+		}
+		if (d > -2.0) {
+			c = vec4(vColor.rgb, min(1.0, vColor.a * 2.5));
+		}
+	} else if (vShape.w > 0.0) {
 		a *= clamp(0.5 + d + vShape.w, 0.0, 1.0);
 	}
 	c.a *= a;
@@ -205,7 +219,7 @@ local function makeGL()
 	shader = gl.CreateShader({
 		vertex = VERTEX_SHADER,
 		fragment = FRAGMENT_SHADER,
-		uniformInt = { tex = 0, useTex = 0 },
+		uniformInt = { tex = 0, useTex = 0, ground = 0 },
 		uniformFloat = { picRadius = 0 },
 	})
 	if not shader then
@@ -217,6 +231,7 @@ local function makeGL()
 	locRect = gl.GetUniformLocation(shader, "rect")
 	locUseTex = gl.GetUniformLocation(shader, "useTex")
 	locPicRadius = gl.GetUniformLocation(shader, "picRadius")
+	locGround = gl.GetUniformLocation(shader, "ground")
 
 	quadVBO, quadIBO, quadVAO = makeBuffers(1)
 	if not quadVAO then
@@ -279,6 +294,11 @@ local function measure(text, size)
 	return gl.GetTextWidth(text) * size
 end
 
+-- The height of a capital at size 1. The model puts a text's y at the middle
+-- of its capitals, and drawing from the baseline half this below keeps every
+-- label in a button centred whatever letters it has.
+local capHeight = nil
+
 local function readSelection()
 	local selected = Spring.GetSelectedUnits()
 	local key = #selected .. ":" .. table.concat(selected, ",")
@@ -294,16 +314,6 @@ local function refreshPanel()
 	MODEL.refresh(panel, store:entries(), PLACE, Game, can)
 	panel.remainder = remainder and { count = #remainder } or nil
 	MODEL.touch(panel)
-end
-
-local function spoolCount()
-	local n = 0
-	for _, entry in ipairs(store:entries()) do
-		if entry.source == "spool" then
-			n = n + 1
-		end
-	end
-	return n
 end
 
 --------------------------------------------------------------------------------
@@ -330,11 +340,11 @@ local function startPlacing(key)
 		return
 	end
 	if #item.resolved.buildings == 0 then
-		say("Nothing in " .. item.entry.name .. " exists in this game")
+		say("Nothing in " .. item.name .. " exists in this game")
 		return
 	end
 	placing = { item = item, rotation = 0, foot = nil }
-	panel.placing = { key = key, name = item.entry.name, rotation = 0 }
+	panel.placing = { key = key, name = item.name, rotation = 0 }
 	MODEL.touch(panel)
 end
 
@@ -366,6 +376,7 @@ end
 
 local function setRemainder(positions)
 	remainder = (#positions > 0) and positions or nil
+	remainderSerial = remainderSerial + 1
 	panel.remainder = remainder and { count = #remainder } or nil
 	MODEL.touch(panel)
 end
@@ -399,7 +410,7 @@ local function placeNow()
 	readSelection()
 	local plan = PLACE.plan(placing.foot, can, shiftHeld())
 	local sent = PLACE.issue(plan)
-	say(placing.item.entry.name .. ": " .. describe(plan, sent))
+	say(placing.item.name .. ": " .. describe(plan, sent))
 	setRemainder(plan.remainder)
 	-- Holding shift keeps the blueprint on the cursor for another copy.
 	if not shiftHeld() then
@@ -431,7 +442,7 @@ end
 --------------------------------------------------------------------------------
 
 local function saveSelection()
-	local entry, err = RECORD.selection({ spoolCount = spoolCount(), now = os.time() })
+	local entry, err = RECORD.selection({ nameFor = MODEL.contentName, now = os.time() })
 	if not entry then
 		say(err)
 		return false
@@ -486,6 +497,8 @@ local function act(action)
 		close()
 	elseif kind == "tab" then
 		MODEL.setTab(panel, action.tab)
+	elseif kind == "view" then
+		MODEL.setView(panel, action.view)
 	elseif kind == "place" then
 		if placing and placing.item.entry.key == action.key then
 			stopPlacing()
@@ -512,7 +525,7 @@ function widget:SetConfigData(data)
 end
 
 function widget:GetConfigData()
-	return { seen = true, pos = panel and panel.pos }
+	return { seen = true, pos = panel and panel.pos, view = panel and panel.view }
 end
 
 function widget:Initialize()
@@ -551,6 +564,9 @@ function widget:Initialize()
 	if saved and MODEL.validPos(saved.pos) then
 		panel.pos = saved.pos
 	end
+	if saved then
+		MODEL.setView(panel, saved.view)
+	end
 	can = PLACE.capabilities({})
 
 	if not makeGL() then
@@ -559,6 +575,7 @@ function widget:Initialize()
 	end
 
 	vsx, vsy = Spring.GetViewGeometry()
+	capHeight = gl.GetTextHeight("H")
 
 	-- "t" reaches the console and "p" a key bound in uikeys.txt. Without the
 	-- second, bind x coilbox_blueprints would do nothing.
@@ -785,25 +802,35 @@ function widget:DrawScreen()
 	end
 	gl.UseShader(0)
 	for _, t in ipairs(layout.texts) do
+		local drop = capHeight * t.size / 2
 		if t.rotate then
 			gl.PushMatrix()
 			gl.Translate(t.x, t.y, 0)
 			gl.Rotate(t.rotate, 0, 0, 1)
-			gl.Text(colourCode(t.color) .. t.text, 0, 0, t.size, "")
+			gl.Text(colourCode(t.color) .. t.text, 0, -drop, t.size, "x")
 			gl.PopMatrix()
 		else
-			gl.Text(colourCode(t.color) .. t.text, t.x, t.y, t.size, "")
+			gl.Text(colourCode(t.color) .. t.text, t.x, t.y - drop, t.size, "x")
 		end
 	end
 end
 
-local BLOCKED = { 0.9, 0.2, 0.15, 0.45 }
-local OPEN = { 0.3, 0.9, 0.4, 0.3 }
-local LEFT = { 0.95, 0.7, 0.2, 0.3 }
+--- How a mark on the ground looks: the colour of what the building does, as
+-- in the panel's layout maps, striped when the ground refuses it.
+local markColors = {}
+local function markStyle(p)
+	local c = markColors[p.defID]
+	if not c then
+		local base = MODEL.categoryColor(p.def)
+		c = { base[1], base[2], base[3], 0.3 }
+		markColors[p.defID] = c
+	end
+	return c, p.blocked
+end
 
 --- One translucent model. It comes out in the team's colour whatever gl.Color
 -- says, because the model shader takes its tint from the team handler, so the
--- square on the ground under it is what says blocked, open or left over.
+-- mark on the ground under it is what says what it is and whether it fits.
 local function ghost(p, teamID)
 	gl.PushMatrix()
 	-- The stack holds the camera here, and UnitShape wants a pure model
@@ -816,10 +843,10 @@ local function ghost(p, teamID)
 end
 
 --- Refill the ground buffer when the marked positions change.
-local function groundMarks(foot, key, blocked, open)
+local function groundMarks(foot, key)
 	if groundKey ~= key then
 		groundKey = key
-		local verts, idx = MODEL.packGround(foot, blocked, open, Spring.GetGroundHeight)
+		local verts, idx = MODEL.packGround(foot, markStyle, Spring.GetGroundHeight)
 		groundIndices = upload(groundSet, verts, idx)
 	end
 end
@@ -832,17 +859,15 @@ function widget:DrawWorld()
 	local teamID = Spring.GetMyTeamID()
 	gl.Blending(GL.SRC_ALPHA, GL.ONE_MINUS_SRC_ALPHA)
 
-	local marks, key, blockedColor, openColor
+	local marks, key
 	if foot then
 		marks = foot
 		key = "cursor:" .. placing.ax .. ":" .. placing.az .. ":" .. placing.rotation .. ":" .. placing.item.entry.key
-		blockedColor, openColor = BLOCKED, OPEN
 	else
 		marks = remainder
-		key = "remainder:" .. #remainder
-		blockedColor, openColor = LEFT, LEFT
+		key = "remainder:" .. remainderSerial
 	end
-	groundMarks(marks, key, blockedColor, openColor)
+	groundMarks(marks, key)
 	-- The marks follow the heightmap, but the terrain the engine draws is
 	-- simplified with distance, so a depth test would still let it cut them.
 	gl.DepthTest(false)
@@ -852,7 +877,9 @@ function widget:DrawWorld()
 		gl.UniformMatrix(locView, "view")
 		gl.Uniform(locRect, unpack(UNIT_RECT))
 		gl.UniformInt(locUseTex, 0)
+		gl.UniformInt(locGround, 1)
 		groundSet.vao:DrawElements(GL.TRIANGLES, groundIndices, 0)
+		gl.UniformInt(locGround, 0)
 		gl.UseShader(0)
 	end
 

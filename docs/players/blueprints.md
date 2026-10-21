@@ -90,13 +90,17 @@ The widget panel opens by itself the first time you start a match. If it never a
 1. Start a match in the blueprint's game.
 2. Open the panel. Select the Blueprints button on the right of the screen, or type /coilbox_blueprints in the game's chat.
 3. Select one or more builders.
-4. Select a blueprint in the list. Its buildings follow the cursor. Squares the ground will not take are marked red.
+4. Select a blueprint in the list. Its buildings follow the cursor. A building the ground will not take is marked with dark stripes.
 5. Press [ or ] to turn it.
 6. Left click to place it.
 
 Each builder you selected is ordered to build the buildings it can. Right click or Escape puts the blueprint away without placing it. Hold Shift when you click to add the orders after what the builders are already doing, and to keep the blueprint on the cursor for another copy.
 
-If the panel is in the way, drag the Blueprints button, or the panel's title, somewhere else. Selecting the title closes the panel. The game remembers where you put it.
+If the panel is in the way, drag the Blueprints button, or the panel's title, somewhere else. Close to the edge of the screen, it snaps to the edge. The button at the top right of the panel, or selecting the title, closes it. The game remembers where you put it.
+
+Each blueprint shows a small drawing of its layout. Buildings that make energy are yellow, buildings that build are green, and buildings with weapons are red. The marks on the ground use the same colours while you place it.
+
+The two buttons at the bottom right switch between a list and a grid of drawings. In the grid, point at a drawing to see its name and buildings under the grid.
 
 The panel only lists blueprints for the game you are playing. It has three tabs:
 
@@ -115,7 +119,7 @@ Some games use [ and ] for their own keys, so those keys may not reach the widge
 1. Select the buildings you want to keep.
 2. Select Save selection at the bottom of the panel.
 
-The blueprint is named after the map, for example "Base on Comet Catcher Redux 1". It shows up on the Blueprints page the next time you open it with no game running. It is marked Saved in game.
+The blueprint is named after what is in it, for example "2 Solar Collector, Light Laser Tower". It shows up on the Blueprints page the next time you open it with no game running. It is marked Saved in game.
 
 ### Which games it works with
 
