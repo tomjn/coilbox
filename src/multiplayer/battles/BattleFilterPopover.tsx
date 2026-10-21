@@ -1,3 +1,4 @@
+import { Trans, useLingui } from "@lingui/react/macro";
 import { Button, Input } from "@picoframe/frame";
 import { SlidersHorizontal } from "lucide-react";
 import type { Dispatch, SetStateAction } from "react";
@@ -15,11 +16,7 @@ const GROUP_CLASS =
 const ITEM_CLASS =
   "h-auto flex-1 px-2 py-1.5 text-xs text-muted-foreground hover:bg-muted/50 hover:text-foreground data-[state=on]:bg-muted data-[state=on]:text-foreground";
 
-const SORTS: { key: BattleSortKey; label: string }[] = [
-  { key: "players", label: "Players" },
-  { key: "map", label: "Map" },
-  { key: "game", label: "Game" },
-];
+const SORT_KEYS: BattleSortKey[] = ["players", "map", "game"];
 
 const DEFAULTS = {
   hideEmpty: false,
@@ -43,6 +40,12 @@ export function BattleFilterPopover({
   filters: BattleFilters;
   setFilters: Dispatch<SetStateAction<BattleFilters>>;
 }) {
+  const { t } = useLingui();
+  const sortLabels: Partial<Record<BattleSortKey, string>> = {
+    players: t`Players`,
+    map: t`Map`,
+    game: t`Game`,
+  };
   const hasSearch = filters.search.trim().length > 0;
   const badgeCount =
     Number(hasSearch) +
@@ -60,10 +63,10 @@ export function BattleFilterPopover({
         <Button
           variant={badgeCount > 0 ? "default" : "secondary"}
           className="h-9 shrink-0 gap-2 px-3"
-          aria-label="Filters and sorting"
+          aria-label={t`Filters and sorting`}
         >
           <SlidersHorizontal className="size-4" />
-          Filters
+          <Trans>Filters</Trans>
           {badgeCount > 0 && (
             <span className="inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-primary px-1.5 text-xs font-medium text-primary-foreground">
               {badgeCount}
@@ -73,18 +76,20 @@ export function BattleFilterPopover({
       </PopoverTrigger>
       <PopoverContent align="end" className="w-72 space-y-4">
         <div className="space-y-1">
-          <p className="text-xs font-medium text-muted-foreground">Search</p>
+          <p className="text-xs font-medium text-muted-foreground">
+            <Trans>Search</Trans>
+          </p>
           <Input
             value={filters.search}
             onChange={(e) =>
               setFilters((f) => ({ ...f, search: e.target.value }))
             }
-            placeholder="Title, map, host, or game"
+            placeholder={t`Title, map, host, or game`}
           />
         </div>
         <fieldset className="space-y-2">
           <legend className="mb-1 text-xs font-medium text-muted-foreground">
-            Sort by
+            <Trans>Sort by</Trans>
           </legend>
           <ToggleGroup
             type="single"
@@ -98,15 +103,11 @@ export function BattleFilterPopover({
             }
             className={GROUP_CLASS}
           >
-            {SORTS.map((s) => {
-              const active = s.key === filters.sortKey;
+            {SORT_KEYS.map((key) => {
+              const active = key === filters.sortKey;
               return (
-                <ToggleGroupItem
-                  key={s.key}
-                  value={s.key}
-                  className={ITEM_CLASS}
-                >
-                  {s.label}
+                <ToggleGroupItem key={key} value={key} className={ITEM_CLASS}>
+                  {sortLabels[key]}
                   {active && (filters.sortDir === "desc" ? " ↓" : " ↑")}
                 </ToggleGroupItem>
               );
@@ -116,7 +117,7 @@ export function BattleFilterPopover({
 
         <fieldset className="space-y-2">
           <legend className="mb-1 text-xs font-medium text-muted-foreground">
-            Hide
+            <Trans>Hide</Trans>
           </legend>
           <ToggleGroup
             type="multiple"
@@ -136,13 +137,13 @@ export function BattleFilterPopover({
             className={GROUP_CLASS}
           >
             <ToggleGroupItem value="empty" className={ITEM_CLASS}>
-              Empty
+              <Trans>Empty</Trans>
             </ToggleGroupItem>
             <ToggleGroupItem value="locked" className={ITEM_CLASS}>
-              Locked
+              <Trans>Locked</Trans>
             </ToggleGroupItem>
             <ToggleGroupItem value="full" className={ITEM_CLASS}>
-              Full
+              <Trans>Full</Trans>
             </ToggleGroupItem>
           </ToggleGroup>
         </fieldset>
@@ -155,7 +156,7 @@ export function BattleFilterPopover({
               setFilters((f) => ({ ...f, ...DEFAULTS, search: "" }))
             }
           >
-            Reset filters
+            <Trans>Reset filters</Trans>
           </button>
         )}
       </PopoverContent>

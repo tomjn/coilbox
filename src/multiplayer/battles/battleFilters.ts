@@ -1,3 +1,4 @@
+import { t } from "@lingui/core/macro";
 import type { Battle } from "../bindings";
 
 export type BattleSortKey = "players" | "map" | "game" | "title";
@@ -62,12 +63,12 @@ export function battleRowAction(
   opts: { canJoin: boolean; inProgress: boolean },
 ): BattleRowAction {
   if (opts.inProgress) {
-    return { kind: "watch", label: "Join", disabled: !opts.canJoin };
+    return { kind: "watch", label: t`Join`, disabled: !opts.canJoin };
   }
   const full = occupancy(b) >= b.maxPlayers;
   return {
     kind: "join",
-    label: full ? "Spectate" : "Join",
+    label: full ? t`Spectate` : t`Join`,
     disabled: !opts.canJoin,
   };
 }

@@ -1,3 +1,4 @@
+import { Trans, useLingui } from "@lingui/react/macro";
 import { Button, useSetting } from "@picoframe/frame";
 import { AlertTriangle, Download, RefreshCw } from "lucide-react";
 import { useEffect, useState } from "react";
@@ -34,6 +35,7 @@ export function MissingContentCard({
   gameName: string;
   onRescan: () => Promise<ContentPresence>;
 }) {
+  const { t } = useLingui();
   const writePath = useWriteRootPath("games");
   const {
     active,
@@ -136,17 +138,21 @@ export function MissingContentCard({
     <div className="flex flex-col gap-3 rounded-lg border border-amber-500/40 bg-amber-500/10 p-4">
       <div className="flex items-center gap-2 text-sm font-medium text-amber-700 dark:text-amber-400">
         <AlertTriangle className="size-4" />
-        Game not installed
+        <Trans>Game not installed</Trans>
       </div>
       <p className="text-sm">
-        <span className="font-medium">{gameName}</span> isn't installed —
-        download it to join, or rescan if it's already on disk.
+        <Trans>
+          <span className="font-medium">{gameName}</span> isn't installed —
+          download it to join, or rescan if it's already on disk.
+        </Trans>
       </p>
       {downloadedButMissing && (
         <p className="text-sm">
-          Downloaded to {writePath}, but the engine still does not list this
-          game. The archive may be a different version, or one the engine cannot
-          read.
+          <Trans>
+            Downloaded to {writePath}, but the engine still does not list this
+            game. The archive may be a different version, or one the engine
+            cannot read.
+          </Trans>
         </p>
       )}
       {item?.status === "active" ? (
@@ -167,10 +173,10 @@ export function MissingContentCard({
             {/* Queued is worth saying: the queue runs one download at a time, so
                 waiting behind another is not the same as making no progress. */}
             {item?.status === "queued"
-              ? "Queued…"
+              ? t`Queued…`
               : downloadedButMissing
-                ? "Download again"
-                : "Download"}
+                ? t`Download again`
+                : t`Download`}
           </Button>
           <Button
             variant="secondary"
@@ -181,7 +187,7 @@ export function MissingContentCard({
             <RefreshCw
               className={rescanning ? "size-4 animate-spin" : "size-4"}
             />
-            {rescanning ? "Rescanning…" : "Rescan"}
+            {rescanning ? t`Rescanning…` : t`Rescan`}
           </Button>
         </div>
       )}

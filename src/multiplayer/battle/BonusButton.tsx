@@ -1,3 +1,4 @@
+import { Trans, useLingui } from "@lingui/react/macro";
 import { Button } from "@picoframe/frame";
 import { Percent } from "lucide-react";
 import { useState } from "react";
@@ -32,8 +33,8 @@ export function BonusButton({
   name,
   confirmed,
   onSend,
-  help = "The autohost applies this and rejects the request if you aren't its boss or host.",
-  actionLabel = "Send",
+  help,
+  actionLabel,
   disabled,
 }: {
   name: string;
@@ -46,6 +47,7 @@ export function BonusButton({
   actionLabel?: string;
   disabled?: boolean;
 }) {
+  const { t } = useLingui();
   const [open, setOpen] = useState(false);
   const [draft, setDraft] = useState(confirmed);
   const hasBonus = confirmed > 0;
@@ -64,11 +66,11 @@ export function BonusButton({
           disabled={disabled}
           aria-label={
             hasBonus
-              ? `Edit resource bonus for ${name}, currently ${confirmed}%`
-              : `Set a resource bonus for ${name}`
+              ? t`Edit resource bonus for ${name}, currently ${confirmed}%`
+              : t`Set a resource bonus for ${name}`
           }
           title={
-            hasBonus ? `${confirmed}% resource bonus` : "Set a resource bonus"
+            hasBonus ? t`${confirmed}% resource bonus` : t`Set a resource bonus`
           }
           className={cn(
             "inline-flex h-6 min-w-6 shrink-0 items-center justify-center gap-0.5 rounded px-1 text-muted-foreground hover:bg-accent hover:text-foreground disabled:pointer-events-none disabled:opacity-50",
@@ -83,13 +85,17 @@ export function BonusButton({
       </PopoverTrigger>
       <PopoverContent align="end" className="w-64 p-3">
         <div className="flex flex-col gap-3">
-          <p className="text-sm font-medium">Resource bonus: {name}</p>
+          <p className="text-sm font-medium">
+            <Trans>Resource bonus: {name}</Trans>
+          </p>
           <p className="text-xs text-muted-foreground">
-            Current: {confirmed}%. {help}
+            <Trans>Current: {confirmed}%.</Trans>{" "}
+            {help ??
+              t`The autohost applies this and rejects the request if you aren't its boss or host.`}
           </p>
           <div className="flex items-center gap-3">
             <Slider
-              aria-label={`Resource bonus for ${name}`}
+              aria-label={t`Resource bonus for ${name}`}
               min={0}
               max={100}
               step={1}
@@ -112,7 +118,7 @@ export function BonusButton({
                 setOpen(false);
               }}
             >
-              {actionLabel}
+              {actionLabel ?? t`Send`}
             </Button>
           </div>
         </div>

@@ -1,3 +1,5 @@
+import { t } from "@lingui/core/macro";
+import { Trans } from "@lingui/react/macro";
 import { Button } from "@picoframe/frame";
 import { useState } from "react";
 import { mpAskLeftoverRelayToStop } from "../bindings";
@@ -29,15 +31,15 @@ export type StopOutcome = Awaited<
 export function stopOutcomeMessage(outcome: StopOutcome): string {
   switch (outcome) {
     case "stopped":
-      return "It has stopped. Nothing was ever played through it, so nobody was cut off. Host the battle again.";
+      return t`It has stopped. Nothing was ever played through it, so nobody was cut off. Host the battle again.`;
     case "carrying":
-      return "It kept running, because a game is still being played through it. Nobody was cut off. It stops on its own once that game ends, and hosting will work again then.";
+      return t`It kept running, because a game is still being played through it. Nobody was cut off. It stops on its own once that game ends, and hosting will work again then.`;
     case "noAnswer":
-      return "Nothing read the note. coilbox cannot rule out that the process really is the relay agent, so it has changed nothing and hosting is still refused. Restarting this machine clears the record.";
+      return t`Nothing read the note. coilbox cannot rule out that the process really is the relay agent, so it has changed nothing and hosting is still refused. Restarting this machine clears the record.`;
     case "ours":
-      return "It is carrying a battle this coilbox is hosting right now. Leave that battle before opening another one.";
+      return t`It is carrying a battle this coilbox is hosting right now. Leave that battle before opening another one.`;
     case "gone":
-      return "It has already gone. Host the battle again.";
+      return t`It has already gone. Host the battle again.`;
   }
 }
 
@@ -81,7 +83,7 @@ export function LeftoverRelayAgent({
       setOutcome(outcome);
     } catch (err) {
       setFailed(
-        err instanceof Error ? err.message : String(err ?? "it could not be"),
+        err instanceof Error ? err.message : String(err ?? t`it could not be`),
       );
     } finally {
       setAsking(false);
@@ -94,8 +96,10 @@ export function LeftoverRelayAgent({
     return (
       <div className="flex flex-col gap-2 rounded-md border p-2 text-xs">
         <p>
-          The relay agent running as process {pid} is carrying a battle this
-          coilbox is hosting. Leave that battle before opening another one.
+          <Trans>
+            The relay agent running as process {pid} is carrying a battle this
+            coilbox is hosting. Leave that battle before opening another one.
+          </Trans>
         </p>
       </div>
     );
@@ -104,10 +108,12 @@ export function LeftoverRelayAgent({
   return (
     <div className="flex flex-col gap-2 rounded-md border p-2 text-xs">
       <p>
-        A relay agent from an earlier session is still running as process {pid}.
-        It may be carrying a game other people are still playing, so coilbox
-        will not end it. Asking it to stop is safe: it stops only if no player
-        has ever been heard through it.
+        <Trans>
+          A relay agent from an earlier session is still running as process{" "}
+          {pid}. It may be carrying a game other people are still playing, so
+          coilbox will not end it. Asking it to stop is safe: it stops only if
+          no player has ever been heard through it.
+        </Trans>
       </p>
       {outcome ? (
         <p role="status">{stopOutcomeMessage(outcome)}</p>
@@ -119,11 +125,13 @@ export function LeftoverRelayAgent({
           disabled={asking}
           onClick={ask}
         >
-          {asking ? "Asking it to stop…" : "Ask it to stop"}
+          {asking ? t`Asking it to stop…` : t`Ask it to stop`}
         </Button>
       )}
       {failed && (
-        <p role="alert">The relay agent could not be asked: {failed}</p>
+        <p role="alert">
+          <Trans>The relay agent could not be asked: {failed}</Trans>
+        </p>
       )}
     </div>
   );

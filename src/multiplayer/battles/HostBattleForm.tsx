@@ -1,3 +1,4 @@
+import { Trans, useLingui } from "@lingui/react/macro";
 import { Button, Input, useDrawer, useSetting } from "@picoframe/frame";
 import { ChevronLeft, ChevronRight, ImageOff, Loader2 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
@@ -132,7 +133,9 @@ export function HostBattleForm({
    *  null. Said above the button, which then confirms leaving. */
   leaves?: string | null;
 }) {
+  const { t } = useLingui();
   const drawer = useDrawer();
+  const hostedTitle = (name: string) => t`${name} — hosted`;
   // What the host picked last time (issue #2794), read once at mount. A jump
   // that opened this drawer with a map or game already chosen (`initialMap`/
   // `initialGame`) wins over it, per the jumps at `BattlesPage.tsx`.
@@ -256,14 +259,14 @@ export function HostBattleForm({
   );
 
   function hostButtonLabel(): string {
-    if (hosting) return "Hosting…";
-    if (checking) return "Checking your router…";
+    if (hosting) return t`Hosting…`;
+    if (checking) return t`Checking your router…`;
     if (!gameName || !mapName || checksumsReady)
-      return leaves ? leaveAndLabel("host") : "Host battle";
-    if (gameInfo.status === "loading") return "Hashing game…";
-    if (mapInfo.status === "loading") return "Hashing map…";
+      return leaves ? leaveAndLabel("host") : t`Host battle`;
+    if (gameInfo.status === "loading") return t`Hashing game…`;
+    if (mapInfo.status === "loading") return t`Hashing map…`;
     // Both failed/idle: the button is disabled and the error row explains why.
-    return "Host battle";
+    return t`Host battle`;
   }
 
   const noEngine = content.noEngine;
@@ -278,12 +281,12 @@ export function HostBattleForm({
   // still running is in the button's label.
   const whyNotHost = !target
     ? checkingEngines
-      ? "Reading engine versions…"
-      : "Choose an engine to host with."
+      ? t`Reading engine versions…`
+      : t`Choose an engine to host with.`
     : !gameName
-      ? "Choose a game."
+      ? t`Choose a game.`
       : !mapName
-        ? "Choose a map."
+        ? t`Choose a map.`
         : null;
   const route = hostingRoute(reachability, relayAvailable, relayMode);
   // Only when there was a relay to refuse. On a server with none the host's
@@ -322,7 +325,7 @@ export function HostBattleForm({
         engine: "spring",
         version,
         map: mapName,
-        title: title.trim() || `${gameName} — hosted`,
+        title: title.trim() || hostedTitle(gameName),
         modname: gameName,
       });
       // Only once the battle is actually open, so nothing downstream describes a
@@ -371,7 +374,7 @@ export function HostBattleForm({
         selectedName={gameName}
         onSelect={setGameName}
         onBack={() => setPickingGame(false)}
-        backLabel="Back to the battle form"
+        backLabel={t`Back to the battle form`}
         gamesLoading={content.scanning}
         scanError={content.scanError}
       />
@@ -386,12 +389,14 @@ export function HostBattleForm({
             type="button"
             variant="ghost"
             size="icon"
-            aria-label="Back to the battle form"
+            aria-label={t`Back to the battle form`}
             onClick={() => setPickingMap(false)}
           >
             <ChevronLeft className="size-4" />
           </Button>
-          <h2 className="text-sm font-semibold">Choose a map</h2>
+          <h2 className="text-sm font-semibold">
+            <Trans>Choose a map</Trans>
+          </h2>
         </div>
         <MapPickerGrid
           maps={maps}
@@ -412,63 +417,75 @@ export function HostBattleForm({
     <form className="flex flex-col gap-3" onSubmit={submit}>
       {noEngine ? (
         <p className="text-sm text-muted-foreground">
-          No engine found. Add a content folder with an engine in{" "}
-          <Link
-            className="font-medium underline underline-offset-4"
-            to="/settings/content-folders"
-          >
-            Settings → Content folders
-          </Link>{" "}
-          first.
+          <Trans>
+            No engine found. Add a content folder with an engine in{" "}
+            <Link
+              className="font-medium underline underline-offset-4"
+              to="/settings/content-folders"
+            >
+              Settings → Content folders
+            </Link>{" "}
+            first.
+          </Trans>
         </p>
       ) : (
         <>
           {content.scanError && (
-            <ScanFailed noun="games or maps" reason={content.scanError} />
+            <ScanFailed noun={t`games or maps`} reason={content.scanError} />
           )}
 
           {/* biome-ignore lint/a11y/noLabelWithoutControl: wraps the control (implicit label association) */}
           <label className="flex flex-col gap-1 text-sm">
-            <span className="font-medium">Title</span>
+            <span className="font-medium">
+              <Trans>Title</Trans>
+            </span>
             <Input
               value={title}
               onChange={(e) => setTitle(e.target.value)}
-              placeholder={`${gameName || "Game"} — hosted`}
+              placeholder={hostedTitle(gameName || t`Game`)}
             />
           </label>
 
           {/* biome-ignore lint/a11y/noLabelWithoutControl: wraps the control (implicit label association) */}
           <label className="flex flex-col gap-1 text-sm">
-            <span className="font-medium">Engine</span>
+            <span className="font-medium">
+              <Trans>Engine</Trans>
+            </span>
             <OptionSelect
               value={target?.syncVersion ?? ""}
               onValueChange={setEngineVersion}
               options={engineOptions(targets)}
               placeholder={
                 checkingEngines
-                  ? "Reading engine versions…"
-                  : "Select an engine"
+                  ? t`Reading engine versions…`
+                  : t`Select an engine`
               }
               size="sm"
             />
             <span className="text-xs text-muted-foreground">
-              Everybody who joins has to have exactly this version.
+              <Trans>
+                Everybody who joins has to have exactly this version.
+              </Trans>
             </span>
           </label>
 
           <div className="flex flex-col gap-1 text-sm">
-            <span className="font-medium">Game</span>
+            <span className="font-medium">
+              <Trans>Game</Trans>
+            </span>
             <GamePickerButton
               value={gameName}
               games={games}
               headers={gameHeaders}
-              placeholder={content.scanning ? "Scanning…" : "Select a game"}
+              placeholder={content.scanning ? t`Scanning…` : t`Select a game`}
               onClick={() => setPickingGame(true)}
             />
           </div>
 
           <div className="flex flex-col gap-1 text-sm">
-            <span className="font-medium">Map</span>
+            <span className="font-medium">
+              <Trans>Map</Trans>
+            </span>
             <button
               type="button"
               onClick={() => setPickingMap(true)}
@@ -486,7 +503,7 @@ export function HostBattleForm({
                 )}
               </span>
               <span className="min-w-0 flex-1 truncate">
-                {mapName || (content.scanning ? "Scanning…" : "Select a map")}
+                {mapName || (content.scanning ? t`Scanning…` : t`Select a map`)}
               </span>
             </button>
           </div>
@@ -494,7 +511,9 @@ export function HostBattleForm({
           <div className="flex gap-2">
             {/* biome-ignore lint/a11y/noLabelWithoutControl: wraps the control (implicit label association) */}
             <label className="flex flex-1 flex-col gap-1 text-sm">
-              <span className="font-medium">Max players</span>
+              <span className="font-medium">
+                <Trans>Max players</Trans>
+              </span>
               <Input
                 type="number"
                 min={2}
@@ -509,7 +528,9 @@ export function HostBattleForm({
             </label>
             {/* biome-ignore lint/a11y/noLabelWithoutControl: wraps the control (implicit label association) */}
             <label className="flex flex-1 flex-col gap-1 text-sm">
-              <span className="font-medium">Port</span>
+              <span className="font-medium">
+                <Trans>Port</Trans>
+              </span>
               <Input
                 type="number"
                 value={port}
@@ -522,12 +543,14 @@ export function HostBattleForm({
 
           {/* biome-ignore lint/a11y/noLabelWithoutControl: wraps the control (implicit label association) */}
           <label className="flex flex-col gap-1 text-sm">
-            <span className="font-medium">Password (optional)</span>
+            <span className="font-medium">
+              <Trans>Password (optional)</Trans>
+            </span>
             <Input
               type="password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              placeholder="Leave blank for an open battle"
+              placeholder={t`Leave blank for an open battle`}
             />
             {passwordProblem && (
               <span className="text-xs text-destructive">
@@ -540,7 +563,7 @@ export function HostBattleForm({
             ports={relayAlways ? null : battlePorts(port)}
             help={
               relayAlways
-                ? "Not checked, because every battle you host goes through the server's relay."
+                ? t`Not checked, because every battle you host goes through the server's relay.`
                 : undefined
             }
             onReport={setReachability}
@@ -557,19 +580,27 @@ export function HostBattleForm({
               has already paid it (issue #2023). */}
           {relayAvailable && (
             <div className="flex flex-col gap-1.5 text-sm">
-              <span className="font-medium">Server relay</span>
+              <span className="font-medium">
+                <Trans>Server relay</Trans>
+              </span>
               <ToggleGroup
                 type="single"
                 variant="outline"
                 size="sm"
                 value={relayMode}
                 onValueChange={(v) => v && setRelayMode(v as RelayMode)}
-                aria-label="Server relay"
+                aria-label={t`Server relay`}
                 className="self-start"
               >
-                <ToggleGroupItem value="auto">Automatic</ToggleGroupItem>
-                <ToggleGroupItem value="always">Always</ToggleGroupItem>
-                <ToggleGroupItem value="never">Never</ToggleGroupItem>
+                <ToggleGroupItem value="auto">
+                  <Trans>Automatic</Trans>
+                </ToggleGroupItem>
+                <ToggleGroupItem value="always">
+                  <Trans>Always</Trans>
+                </ToggleGroupItem>
+                <ToggleGroupItem value="never">
+                  <Trans>Never</Trans>
+                </ToggleGroupItem>
               </ToggleGroup>
               <p className="text-xs text-muted-foreground">
                 {relayPingLabel(relayPing)}
@@ -580,16 +611,16 @@ export function HostBattleForm({
                     aria-hidden
                     className="size-3 motion-safe:transition-transform group-data-[state=open]:rotate-90"
                   />
-                  What are server relays?
+                  <Trans>What are server relays?</Trans>
                 </CollapsibleTrigger>
                 <CollapsibleContent className="mt-1.5 flex flex-col gap-1.5 pl-4 text-xs text-muted-foreground">
                   <p>{RELAY_EXPLAINED}</p>
                   <ul className="flex flex-col gap-0.5">
                     {(
                       [
-                        ["auto", "Automatic"],
-                        ["always", "Always"],
-                        ["never", "Never"],
+                        ["auto", t`Automatic`],
+                        ["always", t`Always`],
+                        ["never", t`Never`],
                       ] as const
                     ).map(([mode, name]) => (
                       <li key={mode}>
@@ -652,7 +683,7 @@ export function HostBattleForm({
                     className="h-6 shrink-0 px-2"
                     onClick={gameInfo.reload}
                   >
-                    Retry
+                    <Trans>Retry</Trans>
                   </Button>
                 </div>
               )}
@@ -671,7 +702,7 @@ export function HostBattleForm({
                     className="h-6 shrink-0 px-2"
                     onClick={mapInfo.reload}
                   >
-                    Retry
+                    <Trans>Retry</Trans>
                   </Button>
                 </div>
               )}
@@ -704,7 +735,7 @@ export function HostBattleForm({
               className="h-9"
               onClick={() => drawer.close()}
             >
-              Cancel
+              <Trans>Cancel</Trans>
             </Button>
             <Button
               type="submit"

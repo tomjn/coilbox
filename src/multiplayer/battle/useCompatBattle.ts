@@ -1,3 +1,4 @@
+import { t } from "@lingui/core/macro";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { compatBuild, compatStatus } from "../../compat/bindings";
 import { primeGameInfo } from "../../content/config";
@@ -78,7 +79,7 @@ export function useCompatBattle(opts: {
       try {
         const info = await primeGameInfo(enginePath, dataDir, p.archiveName);
         if (!info.checksum) {
-          return failed("the base game could not be read");
+          return failed(t`the base game could not be read`);
         }
         const { latest } = await compatStatus({
           dataDir,
@@ -104,7 +105,7 @@ export function useCompatBattle(opts: {
         });
         const found = await rescanRef.current();
         if (found?.some((g) => g.name === gameName)) return null;
-        return failed("the engine did not find it once built");
+        return failed(t`the engine did not find it once built`);
       } catch (e) {
         return failed(e);
       }

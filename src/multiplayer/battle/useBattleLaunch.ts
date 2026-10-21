@@ -1,3 +1,4 @@
+import { t } from "@lingui/core/macro";
 import { useCallback, useState } from "react";
 import { loadReplays } from "@/content/replayList";
 import { useReplayUserState } from "@/content/replayUserState";
@@ -58,7 +59,7 @@ async function vetHostAddress(
   if (verdict.kind === "blocked") return verdict.reason;
   if (verdict.kind === "warning") {
     await notify({
-      title: "Check the host's address",
+      title: t`Check the host's address`,
       body: verdict.reason,
       level: "error",
     });
@@ -69,8 +70,8 @@ async function vetHostAddress(
   // reachable on its own.
   if (natType !== "" && natType !== "0") {
     await notify({
-      title: "This battle expects NAT traversal",
-      body: "The host says players need help getting through their router, which coilbox does not do yet. Joining still works if their port is open.",
+      title: t`This battle expects NAT traversal`,
+      body: t`The host says players need help getting through their router, which coilbox does not do yet. Joining still works if their port is open.`,
       level: "error",
     });
   }
@@ -84,12 +85,12 @@ async function vetHostAddress(
     return null; // A probe we could not run tells us nothing.
   }
   if (outcome === "unresolved") {
-    return `The host's address (${ip}) does not resolve, so the engine cannot connect to it.`;
+    return t`The host's address (${ip}) does not resolve, so the engine cannot connect to it.`;
   }
   if (outcome === "refused") {
     await notify({
-      title: "The host is not listening",
-      body: `Nothing is bound to ${ip}:${port}. The host may not have started the game yet, or their port may not be forwarded.`,
+      title: t`The host is not listening`,
+      body: t`Nothing is bound to ${ip}:${port}. The host may not have started the game yet, or their port may not be forwarded.`,
       level: "error",
     });
   }
@@ -184,7 +185,8 @@ export function useBattleLaunch(
         onEngineStarted: tellTheRelayAboutTheEngine(relayed, serverKey),
       });
       if (res.exitCode && res.exitCode !== 0) {
-        setError(`Engine exited with code ${res.exitCode}.`);
+        const code = res.exitCode;
+        setError(t`Engine exited with code ${code}.`);
       }
       if (beforePaths && res.exitCode !== null) {
         tagAndIngestFreshReplay(
