@@ -1,3 +1,4 @@
+import { Trans, useLingui } from "@lingui/react/macro";
 import { Button } from "@picoframe/frame";
 import {
   type MutableRefObject,
@@ -147,6 +148,7 @@ function ServerBattles({
   /** The battle a notification sent the player to, on this connection. */
   focusId?: number;
 }) {
+  const { t } = useLingui();
   const { busy, clearJoinError } = useMultiplayer();
   const connection = useConnection(serverKey);
   const mirror = connection?.mirror ?? initialMirror;
@@ -357,9 +359,17 @@ function ServerBattles({
       role="alert"
       className="border-b border-border bg-destructive/10 px-4 py-2 text-sm text-destructive"
     >
-      Join failed: {lastJoinError}
+      <Trans>Join failed: {lastJoinError}</Trans>
     </div>
   );
+
+  const shownCount = shown.length;
+  const username = usernameFromKey(serverKey);
+  const serverName = serverNameFor(serverKey, servers);
+  const countLabel =
+    shownCount === totalCount
+      ? t`(${totalCount})`
+      : t`(${shownCount} of ${totalCount})`;
 
   const list = (
     <BattleList
@@ -394,12 +404,10 @@ function ServerBattles({
       <section className="border-b border-border">
         <div className="flex items-center justify-between gap-2 px-4 pt-3 pb-1">
           <h2 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-            {usernameFromKey(serverKey)} on {serverNameFor(serverKey, servers)}
-            <span className="ml-2 font-normal normal-case">
-              {shown.length === totalCount
-                ? `(${totalCount})`
-                : `(${shown.length} of ${totalCount})`}
-            </span>
+            <Trans>
+              {username} on {serverName}
+            </Trans>
+            <span className="ml-2 font-normal normal-case">{countLabel}</span>
           </h2>
           {openControl}
         </div>
@@ -413,12 +421,10 @@ function ServerBattles({
     <main className="flex h-full min-h-0 flex-col">
       <header className="flex items-center justify-between gap-2 border-b border-border p-4">
         <div className="flex items-center gap-2">
-          <h1 className="text-lg font-semibold">Battles</h1>
-          <span className="text-sm text-muted-foreground">
-            {shown.length === totalCount
-              ? `(${totalCount})`
-              : `(${shown.length} of ${totalCount})`}
-          </span>
+          <h1 className="text-lg font-semibold">
+            <Trans>Battles</Trans>
+          </h1>
+          <span className="text-sm text-muted-foreground">{countLabel}</span>
         </div>
         <div className="flex items-center gap-2">
           {openControl}
@@ -455,6 +461,7 @@ function ServerBattles({
  * also where a room is hosted with no server at all.
  */
 function BattlesPage() {
+  const { t } = useLingui();
   const {
     connections,
     activeKey,
@@ -799,23 +806,31 @@ function BattlesPage() {
     return (
       <main className="flex h-full min-h-0 flex-col">
         <header className="flex items-center justify-between gap-2 border-b border-border p-4">
-          <h1 className="text-lg font-semibold">Battles</h1>
+          <h1 className="text-lg font-semibold">
+            <Trans>Battles</Trans>
+          </h1>
         </header>
         {/* Scrolls rather than centres once the rooms on the network push it
             past the window, which a LAN party will. */}
         <div className="flex flex-1 flex-col items-center overflow-y-auto p-10">
           <div className="my-auto flex w-full max-w-xl flex-col items-center gap-3 text-center">
             <h2 className="text-base font-semibold">
-              Not connected to a server
+              <Trans>Not connected to a server</Trans>
             </h2>
             <p className="text-sm text-muted-foreground">
-              Server battles are listed here once you log in. This list is empty
-              because coilbox has no lobby connection, not because nobody is
-              playing.
+              <Trans>
+                Server battles are listed here once you log in. This list is
+                empty because coilbox has no lobby connection, not because
+                nobody is playing.
+              </Trans>
             </p>
-            <Button onClick={openLoginPopover}>Log in</Button>
+            <Button onClick={openLoginPopover}>
+              <Trans>Log in</Trans>
+            </Button>
             <p className="text-sm text-muted-foreground">
-              Or host a room of your own. It needs no server and no account.
+              <Trans>
+                Or host a room of your own. It needs no server and no account.
+              </Trans>
             </p>
             {hostControl}
             <div className="mt-4 w-full border-t border-border pt-4 text-left">
@@ -872,16 +887,18 @@ function BattlesPage() {
     (n, k) => n + (lists[k]?.scoped.length ?? 0),
     0,
   );
+  const countLabel =
+    shownCount === totalCount
+      ? t`(${totalCount})`
+      : t`(${shownCount} of ${totalCount})`;
   return (
     <main className="flex h-full min-h-0 flex-col">
       <header className="flex items-center justify-between gap-2 border-b border-border p-4">
         <div className="flex items-center gap-2">
-          <h1 className="text-lg font-semibold">Battles</h1>
-          <span className="text-sm text-muted-foreground">
-            {shownCount === totalCount
-              ? `(${totalCount})`
-              : `(${shownCount} of ${totalCount})`}
-          </span>
+          <h1 className="text-lg font-semibold">
+            <Trans>Battles</Trans>
+          </h1>
+          <span className="text-sm text-muted-foreground">{countLabel}</span>
         </div>
         <div className="flex items-center gap-2">
           {hostControl}

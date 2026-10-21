@@ -1,3 +1,4 @@
+import { Trans, useLingui } from "@lingui/react/macro";
 import { Button, NavGate } from "@picoframe/frame";
 import { useSearchParams } from "react-router";
 import { PageHeader } from "@/components/PageHeader";
@@ -35,6 +36,7 @@ import { useServerAdminKey } from "../useServerAdminKey";
  * chooses which one. With one, the page acts on it without asking.
  */
 function ServerAdminPage() {
+  const { t } = useLingui();
   const { connections, activeKey, openLoginPopover } = useMultiplayer();
   const servers = useProtocolServers();
   const keys = serverAdminKeys(connections, servers, activeKey);
@@ -47,23 +49,31 @@ function ServerAdminPage() {
   if (keys.length === 0 || !serverKey) {
     return (
       <main className="flex flex-col items-center justify-center gap-4 p-10 text-center">
-        <h1 className="text-lg font-semibold">Server admin</h1>
+        <h1 className="text-lg font-semibold">
+          <Trans>Server admin</Trans>
+        </h1>
         <p className="text-sm text-muted-foreground">
-          You are not a moderator or admin on any connected uberserver.
+          <Trans>
+            You are not a moderator or admin on any connected uberserver.
+          </Trans>
         </p>
-        <Button onClick={openLoginPopover}>Connect…</Button>
+        <Button onClick={openLoginPopover}>
+          <Trans>Connect…</Trans>
+        </Button>
       </main>
     );
   }
 
   const Tool = current.Component;
+  const username = usernameFromKey(serverKey);
+  const serverName = serverNameFor(serverKey, servers);
 
   return (
     <main className="flex h-full min-h-0 flex-col">
       <PageHeader
         className="border-b border-border px-4 py-3"
-        title="Server admin"
-        description={`Acting as ${usernameFromKey(serverKey)} on ${serverNameFor(serverKey, servers)}.`}
+        title={t`Server admin`}
+        description={t`Acting as ${username} on ${serverName}.`}
         actions={
           keys.length > 1 && (
             <AccountPicker
