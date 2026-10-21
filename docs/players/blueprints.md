@@ -93,7 +93,7 @@ The widget panel opens by itself the first time you start a match. If it never a
 2. Open the panel. Select the Blueprints button on the right of the screen, or type /coilbox_blueprints in the game's chat.
 3. Select one or more builders.
 4. Select a blueprint in the list. Its buildings follow the cursor, which holds the building nearest the middle. A building the ground will not take is marked with dark stripes and a dashed red outline.
-5. Press [ or ] to turn it, H to flip it side to side or V to flip it top to bottom. It turns and flips around the building under the cursor. Shift+[ and Shift+] switch to the previous or next blueprint.
+5. Press [ or ] to turn it, F to flip it side to side or G to flip it top to bottom. It turns and flips around the building under the cursor. Shift+[ and Shift+] switch to the previous or next blueprint.
 6. Left click to place it.
 
 While you place a blueprint, a second panel opens beside the first. It shows what the blueprint costs and how long your selected builders take to build it. Its buttons do the same as the keys, and each is labelled with the key that does it.
@@ -117,7 +117,7 @@ A building your side only gets by upgrading another, such as a Tech 2 factory th
 
 You can place a blueprint with no builders selected. It stays on the map as a plan, drawn the way it looked while you placed it, and only you can see it. Place as many as you like. When you have the builders, select them and point at a plan. The building under the cursor gets a white outline, and the cursor shows whether they can build it. A building they cannot build is crossed out. Right click to build that building. Hold Shift to outline the whole plan, and right click to build all of it after whatever the builders are already doing. Right click a plan with nothing selected to remove it.
 
-If the panel is in the way, drag the Blueprints button, or the panel's title, somewhere else. Close to the edge of the screen, it snaps to the edge. The button at the top right of the panel, or selecting the title, closes it. The game remembers where you put it.
+If the panel is in the way, drag the Blueprints button, or the panel's title, somewhere else. Close to the edge of the screen, it snaps to the edge. If another panel of the game is in the way, it slides up or down the edge to a clear spot. The button at the top right of the panel, or selecting the title, closes it. The game remembers where you put it.
 
 Each blueprint shows a small drawing of its layout. Buildings that make energy are yellow, buildings that build are green, and buildings with weapons are red. The marks on the ground use the same colours while you place it.
 
@@ -143,7 +143,7 @@ You can bind other keys. Type /bind followed by a key and an action in the game'
 - coilbox_blueprints_prev and coilbox_blueprints_next switch blueprint
 - coilbox_blueprints_save saves the selection
 
-Some games use [ and ] for their own keys, so those keys may not reach the widget. Bind other keys to the actions in that case.
+The widget only takes these keys while you place a blueprint, so the rest of the time F still means fight and G still means guard. Some games use [ and ] for their own keys, so those keys may not reach the widget. Bind other keys to the actions in that case.
 
 ### Save a base from a game
 

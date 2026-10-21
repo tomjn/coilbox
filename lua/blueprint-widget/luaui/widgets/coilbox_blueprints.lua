@@ -6,7 +6,7 @@
 --
 -- The panel lists the blueprints coilbox holds for this game, plus whatever
 -- BAR's own blueprints.json has. Pick one and it follows the cursor as ghosts,
--- turned with [ and ], flipped with H and V, placed with a click as build
+-- turned with [ and ], flipped with F and G, placed with a click as build
 -- orders to the selected builders. Save selection writes the selected buildings to a spool file that
 -- coilbox collects into the library.
 --
@@ -33,22 +33,68 @@ local ACTION_FLIP_X = "coilbox_blueprints_flip_x"
 local ACTION_FLIP_Z = "coilbox_blueprints_flip_z"
 
 -- Keys bound when the widget loads, each only if the player has bound
--- nothing to its action. The engine binds [ and ] to buildfacing. LuaUI is
--- offered a key's actions before the engine runs them, and these only take
--- the key while a layout is being placed, so the rest of the time it does
--- its usual job. H and V flip, as in Factorio.
+-- nothing to its action. The engine binds [ and ] to buildfacing and F and G
+-- to fight and guard. LuaUI is offered a key before the engine runs its
+-- actions, and these only take the key while a layout is being placed, so
+-- the rest of the time it does its usual job. F and G flip, as in Factorio
+-- before 2.0. Not H and V as in 2.0: Splinter Faction's share menu unbinds
+-- everything on H when it loads and answers H itself.
 local DEFAULT_KEYS = {
 	{ ACTION_LEFT, "[" },
 	{ ACTION_RIGHT, "]" },
 	{ ACTION_PREV, "Shift+[" },
 	{ ACTION_NEXT, "Shift+]" },
-	{ ACTION_FLIP_X, "h" },
-	{ ACTION_FLIP_Z, "v" },
+	{ ACTION_FLIP_X, "f" },
+	{ ACTION_FLIP_Z, "g" },
 }
 -- The defaults this widget bound, to unbind on shutdown.
 local boundKeys = {}
+
+--- Bind each default key whose action has no key at all. Run when the
+-- widget loads and again whenever placing starts, because a game widget that
+-- loads later can clear a key: Splinter Faction's game_resetHotkeys.lua runs
+-- unbindkeyset g. Binding adds to a key, so the game's own action on it
+-- stays.
+local function bindDefaults()
+	for _, default in ipairs(DEFAULT_KEYS) do
+		local action, key = default[1], default[2]
+		local current = Spring.GetActionHotKeys(action)
+		if not current or #current == 0 then
+			Spring.SendCommands("bind " .. key .. " " .. action)
+			local known = false
+			for _, bound in ipairs(boundKeys) do
+				known = known or bound == default
+			end
+			if not known then
+				boundKeys[#boundKeys + 1] = default
+			end
+		end
+	end
+end
 -- Each of the widget's actions by name, filled in by Initialize. See KeyPress.
 local keyActions = {}
+-- This widget, for the handler calls that name it.
+local me = nil
+
+-- Asking for the handler itself (handler = true in GetInfo) means the
+-- usual stand-in's AddAction is not there. Every LuaUI handler keeps its
+-- actions in widgetHandler.actionHandler, so go through that, and through
+-- the stand-in for a handler that gave one anyway.
+local function addAction(action, run)
+	if widgetHandler.actionHandler then
+		widgetHandler.actionHandler:AddAction(me, action, run, nil, "tp")
+	else
+		widgetHandler:AddAction(action, run, nil, "tp")
+	end
+end
+
+local function removeAction(action)
+	if widgetHandler.actionHandler then
+		widgetHandler.actionHandler:RemoveAction(me, action)
+	else
+		widgetHandler:RemoveAction(action)
+	end
+end
 
 function widget:GetInfo()
 	return {
@@ -63,6 +109,9 @@ function widget:GetInfo()
 		-- framework's, so a text box still gets its keys first.
 		layer = -600,
 		enabled = true,
+		-- the handler itself rather than the usual stand-in, to ask other
+		-- widgets whether they are drawn where the panel is
+		handler = true,
 	}
 end
 
@@ -462,6 +511,7 @@ local function startPlacing(key)
 		say(item.name .. " has buildings your side cannot build")
 		return
 	end
+	bindDefaults()
 	readKeys()
 	placing = { item = item, rotation = 0, flip = { x = false, z = false }, pivot = PLACE.pivot(item.resolved), foot = nil }
 	panel.placing = { key = key, name = item.name, rotation = 0, flip = placing.flip }
@@ -950,17 +1000,11 @@ function widget:Initialize()
 			return flip("z")
 		end,
 	}
+	me = self
 	for action, run in pairs(keyActions) do
-		widgetHandler:AddAction(action, run, nil, "tp")
+		addAction(action, run)
 	end
-	for _, default in ipairs(DEFAULT_KEYS) do
-		local action, key = default[1], default[2]
-		local current = Spring.GetActionHotKeys(action)
-		if not current or #current == 0 then
-			Spring.SendCommands("bind " .. key .. " " .. action)
-			boundKeys[#boundKeys + 1] = default
-		end
-	end
+	bindDefaults()
 
 	WG.CoilboxBlueprints = {
 		open = open,
@@ -993,14 +1037,9 @@ function widget:Initialize()
 end
 
 function widget:Shutdown()
-	widgetHandler:RemoveAction(ACTION_TOGGLE)
-	widgetHandler:RemoveAction(ACTION_SAVE)
-	widgetHandler:RemoveAction(ACTION_LEFT)
-	widgetHandler:RemoveAction(ACTION_RIGHT)
-	widgetHandler:RemoveAction(ACTION_NEXT)
-	widgetHandler:RemoveAction(ACTION_PREV)
-	widgetHandler:RemoveAction(ACTION_FLIP_X)
-	widgetHandler:RemoveAction(ACTION_FLIP_Z)
+	for action in pairs(keyActions) do
+		removeAction(action)
+	end
 	for _, default in ipairs(boundKeys) do
 		Spring.SendCommands("unbind " .. default[2] .. " " .. default[1])
 	end
@@ -1014,8 +1053,51 @@ function widget:ViewResize(x, y)
 	layoutVersion = -1
 end
 
+-- Seconds until the panel next checks whether it covers another panel.
+local untilAvoid = 0
+
+--- Move the panel up or down its edge out of the way of other widgets'
+-- panels, found by asking each widget's IsAbove at points over the panel.
+-- Panels the engine draws itself answer to nothing and are not avoided.
+local function avoidOthers()
+	local list = widgetHandler.IsAboveList
+	if drag or not layout or type(list) ~= "table" then
+		return
+	end
+	local seen = {}
+	local function covered(x, y)
+		local k = math.floor(x) .. ":" .. math.floor(y)
+		if seen[k] == nil then
+			seen[k] = false
+			for _, w in ipairs(list) do
+				if w ~= me and w.IsAbove then
+					local ok, above = pcall(w.IsAbove, w, x, y)
+					if ok and above then
+						seen[k] = true
+						break
+					end
+				end
+			end
+		end
+		return seen[k]
+	end
+	local b = layout.box
+	local base = { x = b.x, y = b.y - panel.nudge, w = b.w, h = b.h }
+	local step = math.max(8, math.floor(24 * MODEL.scaleFor(panel, { w = vsx, h = vsy })))
+	local dy = MODEL.clearOffset(base, vsy, covered, step)
+	if dy ~= panel.nudge then
+		panel.nudge = dy
+		MODEL.touch(panel)
+	end
+end
+
 function widget:Update(dt)
 	clock = clock + dt
+	untilAvoid = untilAvoid - dt
+	if untilAvoid <= 0 then
+		untilAvoid = 1
+		avoidOthers()
+	end
 	if panel.message and clock > messageUntil then
 		panel.message = nil
 		MODEL.touch(panel)
@@ -1101,6 +1183,9 @@ function widget:MouseMove(x, y)
 			return
 		end
 		drag.moved = true
+		-- the drag starts from where the panel is drawn, which takes the
+		-- place of the offset that moved it there
+		panel.nudge = 0
 	end
 	MODEL.drag(panel, drag.box, drag.right, dx, dy, { w = vsx, h = vsy })
 end

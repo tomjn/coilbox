@@ -99,6 +99,8 @@ function M.new()
 		message = nil,
 		hover = nil,
 		version = 0,
+		-- pixels up or down the panel has moved out of another panel's way
+		nudge = 0,
 	}
 end
 
@@ -484,9 +486,65 @@ local function placeBox(state, view, w, h, margin)
 		x = view.w - margin - w
 		y = (view.h - h) / 2
 	end
+	-- moved up or down out of another panel's way, see M.clearOffset
+	y = y + (state.nudge or 0)
 	x = math.max(0, math.min(view.w - w, x))
 	y = math.max(0, math.min(view.h - h, y))
 	return math.floor(x), math.floor(y)
+end
+
+--- How far to move a box up or down so that no other panel covers it. Each
+-- offset is tried nearest first, a step at a time, as far as the box stays
+-- in the view. The box is sampled a step apart, inset from its edges, and
+-- covered(x, y) says whether something else is drawn at a point. With no
+-- clear place it keeps the offset that leaves least of it covered,
+-- preferring to stay put.
+-- @param box table x, y, w, h where the box is with no offset
+-- @param viewH number the view's height
+-- @param covered function(x, y) -> boolean
+-- @param step number pixels between samples and between offsets
+-- @return number the offset, 0 when it is clear where it is
+function M.clearOffset(box, viewH, covered, step)
+	local function hidden(dy)
+		local n = 0
+		local y0 = box.y + dy
+		local cols = math.max(1, math.floor((box.w - 4) / step))
+		local rows = math.max(1, math.floor((box.h - 4) / step))
+		for i = 0, cols do
+			for j = 0, rows do
+				if covered(box.x + 2 + i * (box.w - 4) / cols, y0 + 2 + j * (box.h - 4) / rows) then
+					n = n + 1
+				end
+			end
+		end
+		return n
+	end
+	local best, bestHidden = 0, hidden(0)
+	if bestHidden == 0 then
+		return 0
+	end
+	-- as far as the box can go each way, so the last try sits flush on
+	-- the edge rather than a part step short of it
+	local up, down = viewH - box.h - box.y, -box.y
+	local k = 1
+	while true do
+		local tried = false
+		for _, dy in ipairs({ math.min(k * step, up), math.max(-k * step, down) }) do
+			if dy ~= 0 and (k == 1 or math.abs(dy) > (k - 1) * step) then
+				tried = true
+				local n = hidden(dy)
+				if n == 0 then
+					return dy
+				elseif n < bestHidden then
+					best, bestHidden = dy, n
+				end
+			end
+		end
+		if not tried then
+			return best
+		end
+		k = k + 1
+	end
 end
 
 --- Move the box by a drag. box is where it was when the drag began, and the

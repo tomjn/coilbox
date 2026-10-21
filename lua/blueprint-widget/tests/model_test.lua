@@ -555,6 +555,31 @@ check("a panel with one page has no pager and does not turn", (function()
 	return state.page == 0 and next(pagerOf(L)) == nil
 end)())
 
+-- moving out of another panel's way
+local other = { x = 1500, y = 300, w = 420, h = 200 }
+local function coveredBy(rects)
+	return function(x, y)
+		for _, r in ipairs(rects) do
+			if x >= r.x and x < r.x + r.w and y >= r.y and y < r.y + r.h then
+				return true
+			end
+		end
+		return false
+	end
+end
+local base = { x = 1600, y = 400, w = 300, h = 300 }
+local dy = MODEL.clearOffset(base, VIEW.h, coveredBy({ other }), 24)
+check("a covered box moves just clear of the other panel", base.y + dy >= other.y + other.h and base.y + dy - 24 < other.y + other.h, tostring(dy))
+check("a clear box stays put", MODEL.clearOffset(base, VIEW.h, coveredBy({}), 24) == 0)
+local down = MODEL.clearOffset({ x = 1600, y = 150, w = 300, h = 300 }, VIEW.h, coveredBy({ { x = 1500, y = 300, w = 420, h = 700 } }), 24)
+check("it moves down, flush to the screen's edge when that is what clears it", down == -150, tostring(down))
+check("with nowhere clear it stays put", MODEL.clearOffset(base, VIEW.h, coveredBy({ { x = 0, y = 0, w = VIEW.w, h = VIEW.h } }), 24) == 0)
+local nudged = MODEL.new()
+nudged.open = true
+local before = MODEL.layout(nudged, measure, VIEW).box.y
+nudged.nudge = 50
+check("the layout applies the nudge", MODEL.layout(nudged, measure, VIEW).box.y == before + 50)
+
 --------------------------------------------------------------------------------
 -- packing
 --------------------------------------------------------------------------------
