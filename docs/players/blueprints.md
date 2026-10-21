@@ -105,11 +105,15 @@ The Builders buttons in that panel choose how the work is shared:
 
 The game remembers your choice for each game.
 
-Each builder you selected is ordered to build the buildings it can. Right click or Escape puts the blueprint away without placing it. Hold Shift when you click to add the orders after what the builders are already doing, and to keep the blueprint on the cursor for another copy. Hold Shift and drag to lay copies in a line, each touching the last.
+Each builder you selected is ordered to build the buildings it can. Right click or Escape puts the blueprint away without placing it. Hold Shift when you click to add the orders after what the builders are already doing, and to keep the blueprint on the cursor for another copy. Drag to lay copies in a line, each touching the last, and let go to place them.
+
+A building that would sit partly off the map is marked like one the ground will not take, and is not ordered.
+
+You can only pick up a blueprint your side can build. A blueprint with another side's buildings, such as one recorded by a player on the other faction, shows how many in its row and stays under the All tab.
 
 ### Plan a base ahead
 
-You can place a blueprint with no builders selected. It stays on the map as a plan, drawn the way it looked while you placed it, and only you can see it. Place as many as you like. When you have the builders, select them and right click a building in a plan to build that building. Hold Shift as you right click to build the whole plan, after whatever the builders are already doing. Right click a plan with nothing selected to remove it.
+You can place a blueprint with no builders selected. It stays on the map as a plan, drawn the way it looked while you placed it, and only you can see it. Place as many as you like. When you have the builders, select them and point at a plan. The building under the cursor gets a white outline, and the cursor shows whether they can build it. A building they cannot build is crossed out. Right click to build that building. Hold Shift to outline the whole plan, and right click to build all of it after whatever the builders are already doing. Right click a plan with nothing selected to remove it.
 
 If the panel is in the way, drag the Blueprints button, or the panel's title, somewhere else. Close to the edge of the screen, it snaps to the edge. The button at the top right of the panel, or selecting the title, closes it. The game remembers where you put it.
 

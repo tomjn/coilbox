@@ -362,6 +362,16 @@ MODEL.setAssist(assisting, "split")
 MODEL.setAssist(assisting, "sideways")
 check("the builders mode switches, and an unknown one is ignored", assisting.assist == "split")
 
+-- a layout with another side's buildings
+local sided = MODEL.new()
+local reachNone = {}
+MODEL.refresh(sided, ENTRIES, PLACE, game, CAN, reachNone)
+check("with a reach given, a layout outside it goes under no tab but All", sided.counts.now == 0 and sided.counts.partly == 0 and sided.counts.all > 0, show(sided.counts))
+sided.tab = "all"
+sided.open = true
+check("a row says how many buildings are from another side", #textsWith(MODEL.layout(sided, measure, VIEW), "from another side") > 0)
+check("stepping skips layouts from another side", MODEL.step(sided, 1) == nil)
+
 -- stepping through the blueprints with a key
 local stepping = MODEL.new()
 MODEL.refresh(stepping, ENTRIES, PLACE, game, CAN)
@@ -567,9 +577,9 @@ local function slope(x, z)
 end
 local function style(p)
 	if p.blocked then
-		return { 1, 0, 0, 0.4 }, true
+		return { 1, 0, 0, 0.4 }, MODEL.MARK_REFUSED + MODEL.MARK_HOVERED
 	end
-	return { 0, 1, 0, 0.4 }, false
+	return { 0, 1, 0, 0.4 }, 0
 end
 local gv, gi = MODEL.packGround({
 	{ x = 320, y = 10, z = 320, defID = 1, facing = 0, blocked = true, def = { xsize = 4, zsize = 2 } },
@@ -600,7 +610,8 @@ check("the second mark's indices start after the first's vertices", gi[8 * 6 + 1
 check("an odd facing swaps the span", vert(16).x == 96 - 8 and vert(16).z == 96 - 16, show(vert(16)))
 check("each mark takes the colour its style gives", vert(1).r == 1 and vert(16).g == 1)
 check("a mark's corners are rounded as the layout map's buildings are", vert(1).radius == 4 and vert(16).radius == 4, show(vert(1)))
-check("a mark the style stripes says so, and an open one does not", vert(1).stripe == 1 and vert(16).stripe == 0)
+check("a mark carries the flags its style gives", vert(1).stripe == MODEL.MARK_REFUSED + MODEL.MARK_HOVERED and vert(16).stripe == 0)
+check("the mark flags are separate bits", MODEL.MARK_REFUSED == 1 and MODEL.MARK_HOVERED == 2 and MODEL.MARK_CANNOT == 4)
 local _, offGrid = MODEL.packGround({ { x = 4, y = 0, z = 4, defID = 1, facing = 0, def = { xsize = 2, zsize = 2 } } }, style, slope)
 -- 16 elmos about x = 4 runs from -4 to 12, so it crosses the lines at 0 and 8
 check("a mark off the heightmap grid still meets every line inside it", #offGrid == 3 * 3 * 6, #offGrid)

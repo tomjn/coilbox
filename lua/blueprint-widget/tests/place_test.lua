@@ -259,6 +259,36 @@ local _, _, noTime = PLACE.cost({ buildings = { { defID = 20, def = SPLIT_SOLAR 
 check("with no builder there is no build time", noTime == nil)
 PLACE.use(E)
 
+-- sides and morphs
+local FED_COM = support.def(30, "fedcom", { buildOptions = { 31 } })
+local FED_LAB = support.def(31, "fedlab", { isBuilding = true, buildOptions = { 32 } })
+local FED_CON = support.def(32, "fedcon", { buildOptions = { 33 } })
+local FED_SOLAR = support.def(33, "fedsolar", { isBuilding = true })
+local FED_COM2 = support.def(34, "fedcom_up1", { buildOptions = { 35 } })
+local FED_FUSION = support.def(35, "fedfusion", { isBuilding = true })
+local LOZ_LAB = support.def(36, "lozlab", { isBuilding = true, customParams = { morphto = "lozlab2" } })
+local LOZ_LAB2 = support.def(37, "lozlab2", { isBuilding = true })
+local sides = support.engine({ FED_COM, FED_LAB, FED_CON, FED_SOLAR, FED_COM2, FED_FUSION, LOZ_LAB, LOZ_LAB2 })
+PLACE.use(sides)
+local morphs = PLACE.morphTargets({ { fedcom = { { into = "fedcom_up1" } } }, { notaunit = { into = "fedcom" } }, "not a table" })
+check("morph targets come from config tables and custom params", same(morphs[30], { 34 }) and same(morphs[36], { 37 }) and morphs[99] == nil, show(morphs))
+local reach = PLACE.reach({ 30 }, morphs)
+check("a team reaches what it builds, what that builds, and what it morphs into", reach[31] and reach[32] and reach[33] and reach[34] and reach[35], show(reach))
+check("a team does not reach another side's buildings", not reach[36] and not reach[37])
+local mixed = { buildings = { { defID = 33 }, { defID = 36 }, { defID = 37 } } }
+check("foreign counts the buildings the team can never build", PLACE.foreign(mixed, reach) == 2)
+check("with no reach known nothing is foreign", PLACE.foreign(mixed, nil) == 0)
+
+-- the map's edge
+local edged = support.engine({ SOLAR })
+edged.Game.mapSizeX, edged.Game.mapSizeZ = 512, 512
+PLACE.use(edged)
+local edgeLayout = PLACE.resolve({ buildings = { { def = "armsolar", offset = { x = 0, z = 0 }, facing = 0 }, { def = "armsolar", offset = { x = 64, z = 0 }, facing = 0 } } })
+local edgeFoot = PLACE.footprint(edgeLayout, 0, 480, 256)
+check("a building reaching past the map's edge is refused", edgeFoot[1].blocked == false and edgeFoot[2].blocked == true, show(edgeFoot))
+check("a building past the low edge is refused too", PLACE.footprint(edgeLayout, 0, 16, 16)[1].blocked == true)
+PLACE.use(E)
+
 E.orders = {}
 local issued = PLACE.issue(plan)
 check("issue sends one array per builder", issued == 2 and #E.orders == 2, show(E.orders))

@@ -136,14 +136,18 @@ end
 -- @param place table the place module, for resolve and classify
 -- @param game table Game
 -- @param can table from place.capabilities
-function M.refresh(state, entries, place, game, can)
+-- @param reach table? from place.reach, what the team can ever build. A
+--   layout with anything outside it is for another side and goes under no
+--   tab but All.
+function M.refresh(state, entries, place, game, can, reach)
 	local items = {}
 	local counts = { now = 0, partly = 0, all = 0 }
 	for _, entry in ipairs(entries) do
 		if M.forGame(entry, game) then
 			local resolved = place.resolve(entry)
-			local tab = place.classify(resolved, can)
-			local item = { entry = entry, resolved = resolved, tab = tab }
+			local foreign = place.foreign(resolved, reach)
+			local tab = foreign > 0 and "never" or place.classify(resolved, can)
+			local item = { entry = entry, resolved = resolved, tab = tab, foreign = foreign }
 			item.name = M.displayName(item)
 			items[#items + 1] = item
 			counts.all = counts.all + 1
@@ -203,7 +207,7 @@ end
 function M.step(state, step)
 	local keys = {}
 	for _, item in ipairs(M.visible(state)) do
-		if #item.resolved.buildings > 0 then
+		if #item.resolved.buildings > 0 and (item.foreign or 0) == 0 then
 			keys[#keys + 1] = item.entry.key
 		end
 	end
@@ -367,7 +371,12 @@ end
 
 --- The one line that says what a row is.
 local function rowDetail(item)
-	local parts = { SOURCE_TAGS[item.entry.source] or item.entry.source }
+	local parts = {}
+	-- first, so a narrow row never cuts it off
+	if (item.foreign or 0) > 0 then
+		parts[1] = item.foreign .. " from another side"
+	end
+	parts[#parts + 1] = SOURCE_TAGS[item.entry.source] or item.entry.source
 	local n = #item.entry.buildings
 	parts[#parts + 1] = n .. (n == 1 and " building" or " buildings")
 	if item.entry.ordered then
@@ -980,15 +989,22 @@ local function gridLines(lo, hi)
 	return out
 end
 
+-- Flags a ground mark carries, added together. Refused is striped with a
+-- dashed red rim, hovered has a white rim, and a cross says nobody selected
+-- can build it.
+M.MARK_REFUSED = 1
+M.MARK_HOVERED = 2
+M.MARK_CANNOT = 4
+
 --- Flatten footprint marks on the ground for the vertex buffer, in world
 -- space. Each mark is a grid with a vertex on every heightmap point inside
 -- it, at the ground's height there, and each square is split along the
 -- diagonal the engine uses (Map/Ground.cpp), so the mark lies on the ground
 -- rather than cutting through a slope. The corners are rounded as the
 -- buildings in a row's layout map are, and the widget's ground shader reads
--- the shape's last field as whether to stripe the mark.
+-- the shape's last field as the mark's flags, M.MARK_REFUSED and the rest.
 -- @param positions table[] from place.footprint
--- @param style function(p) -> rgba, and true to stripe the mark
+-- @param style function(p) -> rgba, and the mark's flags added together
 -- @param heightAt function(x, z) -> the ground's height
 -- @return number[] vertices, number[] indices, as M.pack, with uv spanning
 --   each whole mark
@@ -999,8 +1015,8 @@ function M.packGround(positions, style, heightAt)
 		local hw, hd = M.halfSpan(p.def, p.facing)
 		local x0, z0 = p.x - hw, p.z - hd
 		local xs, zs = gridLines(x0, p.x + hw), gridLines(z0, p.z + hd)
-		local c, striped = style(p)
-		local radius, stripe = math.min(hw, hd) / 2, striped and 1 or 0
+		local c, flags = style(p)
+		local radius, stripe = math.min(hw, hd) / 2, flags or 0
 		for _, z in ipairs(zs) do
 			for _, x in ipairs(xs) do
 				verts[v + 1], verts[v + 2], verts[v + 3] = x, heightAt(x, z), z

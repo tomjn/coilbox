@@ -117,6 +117,9 @@ local plans = {}
 -- Counts every change to the plans, so their ground marks are rebuilt even
 -- when they hold as many positions as before.
 local plansSerial = 0
+-- The plan under the cursor: which marks to outline or cross out, by
+-- position, and a key that changes when they do.
+local hover = { marks = {}, key = "" }
 local messageUntil = 0
 -- A press on the pill or the panel's title, which is a click if the mouse
 -- comes up where it went down and a drag once it moves further than the
@@ -196,10 +199,13 @@ void main() {
 	float d = length(max(q, 0.0)) + min(max(q.x, q.y), 0.0) - r;
 	float a = clamp(0.5 - d, 0.0, 1.0);
 	if (ground == 1) {
-		// On the ground the units are elmos. Every mark has a firmer rim. A
-		// striped mark is one the ground refuses, and its rim is a red dash.
+		// On the ground the units are elmos, and the shape's last field holds
+		// flags: 1 refused, striped with a red dashed rim, 2 hovered, with a
+		// white rim, 4 nobody selected can build it, crossed out. Every mark
+		// has a firmer rim.
 		vec2 p = vUv * vShape.xy;
-		bool refused = vShape.w > 0.0;
+		int flags = int(vShape.w + 0.5);
+		bool refused = (flags & 1) != 0;
 		if (refused && fract((p.x + p.y) / 16.0) < 0.5) {
 			c = vec4(0.05, 0.05, 0.05, 0.7);
 		}
@@ -207,6 +213,16 @@ void main() {
 			c = fract((p.x + p.y) / 12.0) < 0.6 ? blocked : vec4(0.0);
 		} else if (d > -2.0) {
 			c = vec4(vColor.rgb, min(1.0, vColor.a * 2.5));
+		}
+		if ((flags & 4) != 0 && d < -4.0) {
+			float side = min(vShape.x, vShape.y);
+			float cross = min(abs(vUv.x - vUv.y), abs(vUv.x + vUv.y - 1.0)) * side;
+			if (cross < 3.0) {
+				c = vec4(blocked.rgb, 0.9);
+			}
+		}
+		if ((flags & 2) != 0 && d > -3.0) {
+			c = vec4(1.0, 1.0, 1.0, 1.0);
 		}
 	} else if (vShape.w > 0.0) {
 		a *= clamp(0.5 + d + vShape.w, 0.0, 1.0);
@@ -346,8 +362,46 @@ end
 
 local readCost
 
+-- What morphs into what, read once, and what the team can ever build, read
+-- again when the kinds of unit it has change.
+local morphs = nil
+local reach, reachKey = nil, nil
+
+local function readReach()
+	if Spring.GetSpectatingState() then
+		reach, reachKey = nil, nil
+		return
+	end
+	if not morphs then
+		local configs = {}
+		for _, path in ipairs({ "gamedata/morph_defs.lua", "LuaRules/Configs/morph_defs.lua" }) do
+			if VFS.FileExists(path) then
+				local ok, value = pcall(VFS.Include, path)
+				if ok then
+					configs[#configs + 1] = value
+				end
+			end
+		end
+		morphs = PLACE.morphTargets(configs)
+	end
+	local ids = {}
+	for defID in pairs(Spring.GetTeamUnitsCounts(Spring.GetMyTeamID()) or {}) do
+		if type(defID) == "number" then
+			ids[#ids + 1] = defID
+		end
+	end
+	table.sort(ids)
+	local key = table.concat(ids, ",")
+	if key ~= reachKey then
+		reachKey = key
+		-- before the team has a unit there is nothing to tell sides apart by
+		reach = #ids > 0 and PLACE.reach(ids, morphs) or nil
+	end
+end
+
 local function refreshPanel()
-	MODEL.refresh(panel, store:entries(), PLACE, Game, can)
+	readReach()
+	MODEL.refresh(panel, store:entries(), PLACE, Game, can, reach)
 	readCost()
 	MODEL.touch(panel)
 end
@@ -398,6 +452,10 @@ local function startPlacing(key)
 	end
 	if #item.resolved.buildings == 0 then
 		say("Nothing in " .. item.name .. " exists in this game")
+		return
+	end
+	if item.foreign > 0 then
+		say(item.name .. " has buildings your side cannot build")
 		return
 	end
 	readKeys()
@@ -649,6 +707,50 @@ local function clickPlan(mx, my)
 	return false
 end
 
+--- What a right click would do where the cursor is: outline the building
+-- under it, or the whole plan with shift held or nothing selected, cross out
+-- what the selection cannot build, and show the build cursor for it.
+local function trackHover()
+	local marks, key, cursor = {}, "", nil
+	if not placing and #plans > 0 then
+		local mx, my = Spring.GetMouseState()
+		local kind, pos = Spring.TraceScreenRay(mx, my, true)
+		local index, position
+		if kind == "ground" and pos then
+			index, position = planAt(pos[1], pos[3])
+		end
+		local selected = #Spring.GetSelectedUnits()
+		if index and (#can.builders > 0 or selected == 0) then
+			local whole = shiftHeld() or selected == 0
+			local any = false
+			for j, p in ipairs(plans[index].positions) do
+				if whole or j == position then
+					local flags = MODEL.MARK_HOVERED
+					if selected > 0 then
+						if can.union[p.defID] then
+							any = true
+						else
+							flags = flags + MODEL.MARK_CANNOT
+						end
+					end
+					marks[p] = flags
+					key = key .. j .. ":" .. flags .. ","
+				end
+			end
+			key = index .. "|" .. key
+			if selected > 0 then
+				cursor = any and "BuildGood" or "BuildBad"
+			end
+		end
+	end
+	if key ~= hover.key then
+		hover.marks, hover.key = marks, key
+	end
+	if cursor then
+		Spring.SetMouseCursor(cursor)
+	end
+end
+
 --------------------------------------------------------------------------------
 -- Saving
 --------------------------------------------------------------------------------
@@ -784,7 +886,7 @@ function widget:Initialize()
 	end
 
 	STORE.use(JSON)
-	PLACE.use({ Spring = Spring, UnitDefs = UnitDefs, UnitDefNames = UnitDefNames })
+	PLACE.use({ Spring = Spring, UnitDefs = UnitDefs, UnitDefNames = UnitDefNames, Game = Game })
 	RECORD.use({ Spring = Spring, UnitDefs = UnitDefs, Game = Game })
 
 	store = STORE.new({
@@ -924,7 +1026,7 @@ function widget:Update(dt)
 			MODEL.touch(panel)
 		end
 	end
-	if not panel.open and not placing then
+	if not panel.open and not placing and #plans == 0 then
 		return
 	end
 	sinceSelection = sinceSelection + dt
@@ -940,6 +1042,7 @@ function widget:Update(dt)
 	if placing then
 		trackCursor()
 	end
+	trackHover()
 end
 
 function widget:IsAbove(x, y)
@@ -963,13 +1066,11 @@ function widget:MousePress(x, y, button)
 	end
 	if placing then
 		if button == 1 then
-			-- Holding shift, a press starts a line of copies that the drag
-			-- lengthens and the release places.
-			if shiftHeld() and placing.foot then
+			-- A press starts a line of copies that a drag lengthens, and the
+			-- release places it. A click without a drag places one.
+			if placing.foot then
 				placing.line = { x = placing.ax, z = placing.az }
 				placing.foot = nil
-			else
-				placeNow()
 			end
 			return true
 		elseif button == 3 then
@@ -1130,7 +1231,8 @@ function widget:DrawScreen()
 end
 
 --- How a mark on the ground looks: the colour of what the building does, as
--- in the panel's layout maps, striped when the ground refuses it.
+-- in the panel's layout maps, striped when the ground refuses it, and
+-- outlined or crossed out while the cursor is over its plan.
 local markColors = {}
 local function markStyle(p)
 	local c = markColors[p.defID]
@@ -1139,7 +1241,7 @@ local function markStyle(p)
 		c = { base[1], base[2], base[3], 0.3 }
 		markColors[p.defID] = c
 	end
-	return c, p.blocked
+	return c, (p.blocked and MODEL.MARK_REFUSED or 0) + (hover.marks[p] or 0)
 end
 
 --- One translucent model. It comes out in the team's colour whatever gl.Color
@@ -1175,7 +1277,7 @@ function widget:DrawWorld()
 
 	-- the plans' marks and the cursor's in one buffer, rebuilt when either
 	-- changes
-	local key = "plans:" .. plansSerial .. (foot and (":cursor:" .. placing.serial) or "")
+	local key = "plans:" .. plansSerial .. ":hover:" .. hover.key .. (foot and (":cursor:" .. placing.serial) or "")
 	if groundKey ~= key then
 		local marks = {}
 		for _, plan in ipairs(plans) do

@@ -13,14 +13,24 @@ local M = {}
 --- One build square in elmos.
 M.BUILD_SQUARE = 16
 
-local Spring, UnitDefs, UnitDefNames
+local Spring, UnitDefs, UnitDefNames, Game
 
 --- Hand over the engine tables. A test passes a stub.
--- @param engine table Spring, UnitDefs, UnitDefNames
+-- @param engine table Spring, UnitDefs, UnitDefNames, and Game for the map's
+--   size
 function M.use(engine)
 	Spring = engine.Spring
 	UnitDefs = engine.UnitDefs
 	UnitDefNames = engine.UnitDefNames
+	Game = engine.Game
+end
+
+--- Whether a footprint reaches past the edge of the map.
+local function offMap(x, z, hw, hd)
+	if not (Game and Game.mapSizeX) then
+		return false
+	end
+	return x - hw < 0 or z - hd < 0 or x + hw > Game.mapSizeX or z + hd > Game.mapSizeZ
 end
 
 --- A point turned n quarter turns about the origin, facing 1 sending (x, z)
@@ -113,7 +123,8 @@ function M.footprint(resolved, rotation, ax, az, flip, origin)
 		local facing = M.flippedFacing((b.facing + rotation) % 4, flipX, flipZ)
 		local x, y, z = Spring.Pos2BuildPos(b.defID, ax + ox, 0, az + oz, facing)
 		local status = Spring.TestBuildOrder(b.defID, x, y, z, facing)
-		out[i] = { defID = b.defID, def = b.def, x = x, y = y, z = z, facing = facing, blocked = status == 0 }
+		local hw, hd = M.halfSpan(b.def, facing)
+		out[i] = { defID = b.defID, def = b.def, x = x, y = y, z = z, facing = facing, blocked = status == 0 or offMap(x, z, hw, hd) }
 	end
 	return out
 end
@@ -202,6 +213,84 @@ function M.line(sx, sz, ex, ez, minX, maxX, minZ, maxZ)
 	return out
 end
 
+--- What each unit def can turn into besides by building: morph and
+-- evolution targets. Games keep these in different places, so this reads the
+-- unit defs' custom params (Zero-K's morphto, BAR's evolution_target) and any
+-- morph config tables the widget could load, keyed by unit name with a value
+-- of { into = name } or a list of those (Splinter Faction, Metal Factions,
+-- Spring 1944).
+-- @param configs table[] loaded morph config tables
+-- @return table defID -> defID[]
+function M.morphTargets(configs)
+	local out = {}
+	local function add(fromName, intoName)
+		local from, into = defByName(fromName), type(intoName) == "string" and defByName(intoName)
+		if from and into then
+			out[from.id] = out[from.id] or {}
+			table.insert(out[from.id], into.id)
+		end
+	end
+	for _, def in pairs(UnitDefs) do
+		local params = def.customParams or {}
+		for key, value in pairs(params) do
+			if key == "morphto" or key:match("^morphto_%d+$") or key == "evolution_target" then
+				add(def.name, value)
+			end
+		end
+	end
+	for _, config in ipairs(configs) do
+		if type(config) == "table" then
+			for fromName, value in pairs(config) do
+				if type(fromName) == "string" and type(value) == "table" then
+					if value.into then
+						add(fromName, value.into)
+					end
+					for _, each in ipairs(value) do
+						if type(each) == "table" then
+							add(fromName, each.into)
+						end
+					end
+				end
+			end
+		end
+	end
+	return out
+end
+
+--- Every def a team can reach from the units it has: what they build, what
+-- that builds in turn, and what any of them morph into.
+-- @param defIDs integer[] the def ids of the team's units
+-- @param morphs table from M.morphTargets
+-- @return table defID -> true
+function M.reach(defIDs, morphs)
+	local seen, queue = {}, {}
+	for _, id in ipairs(defIDs) do
+		if not seen[id] then
+			seen[id] = true
+			queue[#queue + 1] = id
+		end
+	end
+	local i = 1
+	while queue[i] do
+		local def = UnitDefs[queue[i]]
+		local next = {}
+		for _, id in ipairs(def and def.buildOptions or {}) do
+			next[#next + 1] = id
+		end
+		for _, id in ipairs(morphs[queue[i]] or {}) do
+			next[#next + 1] = id
+		end
+		for _, id in ipairs(next) do
+			if not seen[id] then
+				seen[id] = true
+				queue[#queue + 1] = id
+			end
+		end
+		i = i + 1
+	end
+	return seen
+end
+
 --- What the selected units can build, and how fast.
 -- @param unitIDs integer[]
 -- @return table { union = { defID = true }, byUnit = { unitID = { defID = true } },
@@ -224,6 +313,22 @@ function M.capabilities(unitIDs)
 		end
 	end
 	return out
+end
+
+--- How many of a layout's buildings the team can never build, from
+-- M.reach. Nil reach, as for a spectator or before the team has units,
+-- counts none.
+function M.foreign(resolved, reach)
+	if not reach then
+		return 0
+	end
+	local n = 0
+	for _, b in ipairs(resolved.buildings) do
+		if not reach[b.defID] then
+			n = n + 1
+		end
+	end
+	return n
 end
 
 --- Which tab a resolved entry belongs under for these capabilities.
