@@ -1,3 +1,4 @@
+import { Trans, useLingui } from "@lingui/react/macro";
 import { Button, Input } from "@picoframe/frame";
 import { openUrl } from "@tauri-apps/plugin-opener";
 import { type FormEvent, useEffect, useRef, useState } from "react";
@@ -28,6 +29,7 @@ export function PasswordRecoveryForm({
   onSignIn: (serverId: string, username: string) => void;
   onCancel: () => void;
 }) {
+  const { t } = useLingui();
   const { recoverPassword, submitRecoveryCode, cancelRecovery, busyKeys } =
     useMultiplayer();
   const recoverable = servers.filter((s) => serverProtocol(s) === "tasserver");
@@ -44,6 +46,7 @@ export function PasswordRecoveryForm({
   const [submitting, setSubmitting] = useState(false);
 
   const selected = recoverable.find((s) => s.id === serverId);
+  const serverName = selected?.name ?? "";
   // Scoped to the account each stage targets, not the store-wide `busy`, so
   // recovering one account does not grey out another's controls (issue
   // #2846). The email stage doesn't have a `serverKey` yet (that's what
@@ -69,11 +72,13 @@ export function PasswordRecoveryForm({
     };
   }, [cancelRecovery]);
 
+  const customLabel = (name: string) => t`${name} (custom)`;
+
   const submitEmail = async (e: FormEvent) => {
     e.preventDefault();
     const server = selected;
     if (!server) {
-      setError("Select a server.");
+      setError(t`Select a server.`);
       return;
     }
     setSubmitting(true);
@@ -125,16 +130,18 @@ export function PasswordRecoveryForm({
     return (
       <div className="flex flex-col gap-3">
         <p className="text-sm">
-          Check your email. The server usually closes the connection like this
-          once it has reset your password, and it emails you the new password
-          with your username.
+          <Trans>
+            Check your email. The server usually closes the connection like this
+            once it has reset your password, and it emails you the new password
+            with your username.
+          </Trans>
         </p>
         <p className="text-xs text-muted-foreground">
-          If nothing arrives, start again and ask for a new code.
+          <Trans>If nothing arrives, start again and ask for a new code.</Trans>
         </p>
         <div className="flex justify-end gap-2">
           <Button type="button" size="sm" onClick={onCancel}>
-            Close
+            <Trans>Close</Trans>
           </Button>
         </div>
       </div>
@@ -145,15 +152,19 @@ export function PasswordRecoveryForm({
     return (
       <div className="flex flex-col gap-3">
         <div>
-          <p className="text-xs font-medium text-muted-foreground">Username</p>
+          <p className="text-xs font-medium text-muted-foreground">
+            <Trans>Username</Trans>
+          </p>
           <p className="text-lg font-semibold">{username}</p>
         </div>
         <p className="text-sm text-muted-foreground">
-          A new password has been emailed to you.
+          <Trans>A new password has been emailed to you.</Trans>
         </p>
         <p className="text-xs text-muted-foreground">
-          Save it in Coilbox, then replace it with one of your own in Settings,
-          Account.
+          <Trans>
+            Save it in Coilbox, then replace it with one of your own in
+            Settings, Account.
+          </Trans>
         </p>
         <div className="flex justify-end gap-2">
           <Button
@@ -161,7 +172,7 @@ export function PasswordRecoveryForm({
             size="sm"
             onClick={() => onSignIn(serverId, username)}
           >
-            Save your new password
+            <Trans>Save your new password</Trans>
           </Button>
         </div>
       </div>
@@ -172,20 +183,29 @@ export function PasswordRecoveryForm({
     return (
       <div className="flex flex-col gap-3">
         <p className="text-sm text-muted-foreground">
-          {selected?.name ?? "This server"} does not offer password recovery in
-          Coilbox. Reset it on the server's own page instead:
+          {selected ? (
+            <Trans>
+              {serverName} does not offer password recovery in Coilbox. Reset it
+              on the server's own page instead:
+            </Trans>
+          ) : (
+            <Trans>
+              This server does not offer password recovery in Coilbox. Reset it
+              on the server's own page instead:
+            </Trans>
+          )}
         </p>
         <p className="break-all text-sm font-medium">{redirectUrl}</p>
         <div className="flex justify-end gap-2">
           <Button type="button" variant="outline" size="sm" onClick={onCancel}>
-            Close
+            <Trans>Close</Trans>
           </Button>
           <Button
             type="button"
             size="sm"
             onClick={() => void openUrl(redirectUrl)}
           >
-            Open
+            <Trans>Open</Trans>
           </Button>
         </div>
       </div>
@@ -199,10 +219,12 @@ export function PasswordRecoveryForm({
             slot renders inside the same <label> as the input, and a getByLabelText
             lookup for "Code" would then have to match the hint text too. */}
         <p className="text-xs text-muted-foreground">
-          Check your email for the 8 digit code. Three wrong tries locks this
-          request.
+          <Trans>
+            Check your email for the 8 digit code. Three wrong tries locks this
+            request.
+          </Trans>
         </p>
-        <Field label="Code">
+        <Field label={t`Code`}>
           <Input
             value={code}
             onChange={(e) => setCode(e.target.value)}
@@ -219,14 +241,14 @@ export function PasswordRecoveryForm({
             onClick={cancelCode}
             disabled={submitting}
           >
-            Cancel
+            <Trans>Cancel</Trans>
           </Button>
           <Button
             type="submit"
             size="sm"
             disabled={submitting || codeStageBusy || code.trim() === ""}
           >
-            {submitting ? "Resetting…" : "Reset password"}
+            {submitting ? t`Resetting…` : t`Reset password`}
           </Button>
         </div>
       </form>
@@ -236,21 +258,23 @@ export function PasswordRecoveryForm({
   return (
     <form onSubmit={submitEmail} className="flex flex-col gap-3">
       <p className="text-xs text-muted-foreground">
-        Enter the email address on your account and we will send you a recovery
-        code.
+        <Trans>
+          Enter the email address on your account and we will send you a
+          recovery code.
+        </Trans>
       </p>
-      <Field label="Server">
+      <Field label={t`Server`}>
         <OptionSelect
           value={serverId}
           onValueChange={setServerId}
           options={recoverable.map((s) => ({
             value: s.id,
-            label: s.builtin ? s.name : `${s.name || s.host} (custom)`,
+            label: s.builtin ? s.name : customLabel(s.name || s.host),
           }))}
-          placeholder="Select a server"
+          placeholder={t`Select a server`}
         />
       </Field>
-      <Field label="Email">
+      <Field label={t`Email`}>
         <Input
           type="email"
           value={email}
@@ -268,7 +292,7 @@ export function PasswordRecoveryForm({
           onClick={onCancel}
           disabled={submitting}
         >
-          Cancel
+          <Trans>Cancel</Trans>
         </Button>
         <Button
           type="submit"
@@ -280,7 +304,7 @@ export function PasswordRecoveryForm({
             emailStageBusy
           }
         >
-          {submitting ? "Sending…" : "Send code"}
+          {submitting ? t`Sending…` : t`Send code`}
         </Button>
       </div>
     </form>
