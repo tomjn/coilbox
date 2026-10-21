@@ -29,6 +29,7 @@
  * `../../maps/knownMaps.ts`.
  */
 
+import { Plural, Trans } from "@lingui/react/macro";
 import type { ReactNode } from "react";
 import { LayoutPlan } from "@/blueprint/LayoutPlan";
 import { useBuildingRoles } from "@/blueprint/useBuildingRoles";
@@ -56,11 +57,14 @@ export function SetupPackContents({ pack }: { pack: PackContents }) {
   // One target for the whole grid rather than one per card: every card renders
   // the same session's engine and data directory, and it is a settings read.
   const { selected } = useScanTargetSelection();
+  const gameCount = pack.games.length;
+  const mapCount = pack.maps.length;
+  const blueprintCount = pack.blueprints.length;
 
   return (
     <div className="flex flex-col gap-8">
       {pack.games.length > 0 && (
-        <Section title={pack.games.length === 1 ? "Game" : "Games"}>
+        <Section title={<Plural value={gameCount} one="Game" other="Games" />}>
           <ul className="flex flex-col gap-1 text-sm">
             {pack.games.map((game) => (
               <li key={game}>{game}</li>
@@ -70,13 +74,13 @@ export function SetupPackContents({ pack }: { pack: PackContents }) {
       )}
 
       {pack.engine && (
-        <Section title="Engine">
+        <Section title={<Trans>Engine</Trans>}>
           <p className="text-sm">{pack.engine}</p>
         </Section>
       )}
 
       {pack.maps.length > 0 && (
-        <Section title={pack.maps.length === 1 ? "Map" : "Maps"}>
+        <Section title={<Plural value={mapCount} one="Map" other="Maps" />}>
           <ul className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
             {pack.maps.map((name) => (
               // A row of maps is a row of different shapes, so each card is the
@@ -96,7 +100,9 @@ export function SetupPackContents({ pack }: { pack: PackContents }) {
 
       {pack.blueprints.length > 0 && (
         <Section
-          title={pack.blueprints.length === 1 ? "Blueprint" : "Blueprints"}
+          title={
+            <Plural value={blueprintCount} one="Blueprint" other="Blueprints" />
+          }
         >
           <ul className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
             {pack.blueprints.map((blueprint, index) => (
@@ -128,14 +134,20 @@ function PackLayout({ blueprint }: { blueprint: PackBlueprint }) {
       <div className="flex flex-col">
         <span className="text-sm">{blueprint.name}</span>
         <span className="text-xs text-muted-foreground">
-          {buildings} {buildings === 1 ? "building" : "buildings"}
+          <Plural value={buildings} one="# building" other="# buildings" />
         </span>
       </div>
     </div>
   );
 }
 
-function Section({ title, children }: { title: string; children: ReactNode }) {
+function Section({
+  title,
+  children,
+}: {
+  title: ReactNode;
+  children: ReactNode;
+}) {
   return (
     <section className="flex flex-col gap-3">
       <h2 className="text-xs uppercase tracking-wide text-muted-foreground">
