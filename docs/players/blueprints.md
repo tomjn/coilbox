@@ -102,6 +102,8 @@ Each blueprint shows a small drawing of its layout. Buildings that make energy a
 
 The two buttons at the bottom right switch between a list and a grid of drawings. In the grid, point at a drawing to see its name and buildings under the grid.
 
+When a tab holds more blueprints than fit, the arrows next to those buttons turn the page. The mouse wheel turns it too.
+
 The panel only lists blueprints for the game you are playing. It has three tabs:
 
 - Now shows blueprints your selected builders can build all of.

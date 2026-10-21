@@ -394,7 +394,7 @@ local nearTop = MODEL.layout(snapping, measure, VIEW).box
 check("dropped near the top, the box snaps flush to it", nearTop.y + nearTop.h == VIEW.h, show(nearTop))
 
 --------------------------------------------------------------------------------
--- scrolling
+-- pages
 --------------------------------------------------------------------------------
 
 local many = {}
@@ -411,26 +411,44 @@ check("the shown rows fit the view", (function()
 	local p = LT.rects[1]
 	return p.y >= 0 and p.y + p.h <= VIEW.h
 end)(), show(LT.rects[1]))
-check("the first row is Entry 1 before scrolling", hitsOf(LT, "place")[1].action.key == "library:1")
-MODEL.scroll(tall, 3)
-check("scroll moves the window down", hitsOf(MODEL.layout(tall, measure, VIEW), "place")[1].action.key == "library:4")
-MODEL.scroll(tall, -3)
-MODEL.scroll(tall, -100)
-check("scroll clamps at the top", tall.scroll == 0)
-MODEL.scroll(tall, 1000)
-check("scroll clamps so the last row stays visible", hitsOf(MODEL.layout(tall, measure, VIEW), "place")[shown].action.key == "library:30", tall.scroll)
-MODEL.scroll(tall, -100)
-MODEL.reveal(tall, "library:20")
-local revealed = hitsOf(MODEL.layout(tall, measure, VIEW), "place")
-check("revealing an entry below the window scrolls it to the bottom line", revealed[#revealed].action.key == "library:20", tall.scroll)
+check("the first row is Entry 1 on the first page", hitsOf(LT, "place")[1].action.key == "library:1")
+local pagerOf = function(L)
+	local out = {}
+	for _, h in ipairs(L.hits) do
+		if h.action.kind == "page" then
+			out[h.action.delta] = h
+		end
+	end
+	return out
+end
+check("on the first page only the next page button can be clicked", pagerOf(LT)[1] ~= nil and pagerOf(LT)[-1] == nil)
+check("the pager says which page of how many", #textsWith(LT, "1 / " .. math.ceil(30 / shown)) == 1)
+MODEL.turnPage(tall, 1)
+local page2 = MODEL.layout(tall, measure, VIEW)
+check("the next page starts after the last row of the first", hitsOf(page2, "place")[1].action.key == "library:" .. (shown + 1))
+check("the pager sits right of Save selection", (function()
+	for _, h in ipairs(page2.hits) do
+		if h.action.kind == "save" then
+			return pagerOf(page2)[-1].x > h.x + h.w
+		end
+	end
+end)())
+check("every page is as tall as a full one", page2.box.h == LT.box.h, page2.box.h .. " vs " .. LT.box.h)
+MODEL.turnPage(tall, -100)
+check("turning back stops at the first page", tall.page == 0)
+MODEL.turnPage(tall, 1000)
+local last = MODEL.layout(tall, measure, VIEW)
+local lastHits = hitsOf(last, "place")
+check("turning on stops at the last page, which ends with the last entry", lastHits[#lastHits].action.key == "library:30" and pagerOf(last)[1] == nil and pagerOf(last)[-1] ~= nil, tall.page)
+check("a short last page keeps the panel's height", last.box.h == LT.box.h)
 MODEL.reveal(tall, "library:2")
-check("revealing an entry above the window scrolls it to the top line", hitsOf(MODEL.layout(tall, measure, VIEW), "place")[1].action.key == "library:2", tall.scroll)
-local before = tall.scroll
-MODEL.reveal(tall, "library:3")
-check("revealing an entry already shown does not scroll", tall.scroll == before)
-check("a panel with few rows does not scroll", (function()
-	MODEL.scroll(state, 5)
-	return state.scroll == 0
+check("revealing an entry turns to its page", tall.page == 0)
+MODEL.reveal(tall, "library:" .. (shown + 2))
+check("revealing an entry on another page turns to that page", tall.page == 1)
+check("a panel with one page has no pager and does not turn", (function()
+	MODEL.turnPage(state, 5)
+	local L = MODEL.layout(state, measure, VIEW)
+	return state.page == 0 and next(pagerOf(L)) == nil
 end)())
 
 --------------------------------------------------------------------------------
@@ -606,10 +624,10 @@ tiles.placing = { key = "library:3", name = "Entry 3", rotation = 0 }
 local LGP = MODEL.layout(tiles, measure, VIEW)
 check("with nothing hovered the strip shows the one being placed, outlined only in the grid", #textsWith(LGP, "Entry 3") == 1 and #rectsOf(LGP, "outline") == 1)
 tiles.placing = nil
-MODEL.scroll(tiles, 1)
-check("the grid scrolls a row of tiles at a time", hitsOf(MODEL.layout(tiles, measure, VIEW), "place")[1].action.key == "library:" .. (MODEL.GRID_COLUMNS + 1))
+MODEL.turnPage(tiles, 1)
+check("a grid page is whole rows of tiles", hitsOf(MODEL.layout(tiles, measure, VIEW), "place")[1].action.key == "library:" .. (#shownTiles + 1) and #shownTiles % MODEL.GRID_COLUMNS == 0)
 MODEL.setView(tiles, "list")
-check("switching view goes back to the top", tiles.scroll == 0 and tiles.view == "list")
+check("switching view goes back to the first page", tiles.page == 0 and tiles.view == "list")
 MODEL.setView(tiles, "sideways")
 check("an unknown view is ignored", tiles.view == "list")
 check("the active view's button is lit", (function()

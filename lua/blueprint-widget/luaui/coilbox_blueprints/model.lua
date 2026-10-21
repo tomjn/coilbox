@@ -48,7 +48,6 @@ local C = {
 	pill = { 0.16, 0.18, 0.22, 1 },
 	pillActive = { 0.22, 0.52, 0.60, 1 },
 	button = { 0.16, 0.18, 0.22, 1 },
-	scroll = { 0.35, 0.38, 0.45, 1 },
 	gold = { 0.93, 0.76, 0.25, 1 },
 	map = { 0.05, 0.06, 0.07, 1 },
 	building = { 0.45, 0.66, 0.74, 1 },
@@ -69,6 +68,10 @@ local TITLE = "BLUEPRINTS"
 local TABS_LIST = { "now", "partly", "all" }
 local TAB_LABELS = { now = "Now", partly = "Partly", all = "All" }
 local SOURCE_TAGS = { library = "coilbox", spool = "saved", bar = "BAR" }
+-- Arrows for the pager, as steps of bars in a unit square, pointing right and
+-- left.
+local ARROW_NEXT = { { 0.36, 0.28, 0.1, 0.44 }, { 0.46, 0.36, 0.1, 0.28 }, { 0.56, 0.44, 0.1, 0.12 } }
+local ARROW_PREV = { { 0.54, 0.28, 0.1, 0.44 }, { 0.44, 0.36, 0.1, 0.28 }, { 0.34, 0.44, 0.1, 0.12 } }
 
 --- A fresh, closed panel. scale nil follows the view's height, and pos nil
 -- puts it at the right edge, vertically centred.
@@ -81,7 +84,7 @@ function M.new()
 		keys = {},
 		scale = nil,
 		pos = nil,
-		scroll = 0,
+		page = 0,
 		items = {},
 		counts = { now = 0, partly = 0, all = 0 },
 		hasBuilders = false,
@@ -95,7 +98,7 @@ end
 
 --- One name per clickable thing, for remembering what the cursor is over.
 function M.actionId(action)
-	return action.kind .. ":" .. (action.key or action.tab or action.view or "")
+	return action.kind .. ":" .. (action.key or action.tab or action.view or action.delta or "")
 end
 
 --- Bump the version so the widget knows to lay out again.
@@ -146,7 +149,7 @@ function M.refresh(state, entries, place, game, can)
 	state.items = items
 	state.counts = counts
 	state.hasBuilders = #can.builders > 0
-	M.scroll(state, 0)
+	M.turnPage(state, 0)
 	M.touch(state)
 end
 
@@ -161,30 +164,26 @@ function M.visible(state)
 	return out
 end
 
---- Move the window, a line at a time, clamped so the last line stays
--- reachable. A line is a list row or a row of grid tiles. The window is
--- however many lines the last layout could fit, which the layout records.
-function M.scroll(state, delta)
-	local total = math.ceil(#M.visible(state) / (state.perLine or 1))
-	local most = math.max(0, total - (state.rowsShown or M.MAX_ROWS))
-	local next = math.max(0, math.min(most, state.scroll + delta))
-	if next ~= state.scroll then
-		state.scroll = next
+--- How many pages the current tab fills. A page is however many entries
+-- the last layout could fit, which the layout records.
+function M.pages(state)
+	return math.max(1, math.ceil(#M.visible(state) / (state.perPage or M.MAX_ROWS)))
+end
+
+--- Turn the page, clamped to the first and last.
+function M.turnPage(state, delta)
+	local next = math.max(0, math.min(M.pages(state) - 1, state.page + delta))
+	if next ~= state.page then
+		state.page = next
 		M.touch(state)
 	end
 end
 
---- Scroll just far enough that an entry's line is in the window.
+--- Turn to the page holding an entry.
 function M.reveal(state, key)
 	for i, item in ipairs(M.visible(state)) do
 		if item.entry.key == key then
-			local line = math.ceil(i / (state.perLine or 1)) - 1
-			local shown = state.rowsShown or M.MAX_ROWS
-			if line < state.scroll then
-				M.scroll(state, line - state.scroll)
-			elseif line >= state.scroll + shown then
-				M.scroll(state, line - shown + 1 - state.scroll)
-			end
+			M.turnPage(state, math.floor((i - 1) / (state.perPage or M.MAX_ROWS)) - state.page)
 			return
 		end
 	end
@@ -228,20 +227,21 @@ function M.placingHint(keys)
 	return table.concat(turn, " ") .. " turn, right click cancels"
 end
 
---- Switch tab and reset the scroll.
+--- Switch tab and go back to the first page.
 function M.setTab(state, tab)
 	if TAB_LABELS[tab] and tab ~= state.tab then
 		state.tab = tab
-		state.scroll = 0
+		state.page = 0
 		M.touch(state)
 	end
 end
 
---- Switch between the list and the grid of tiles, and reset the scroll.
+--- Switch between the list and the grid of tiles, and go back to the first
+-- page.
 function M.setView(state, view)
 	if (view == "list" or view == "grid") and view ~= state.view then
 		state.view = view
-		state.scroll = 0
+		state.page = 0
 		M.touch(state)
 	end
 end
@@ -521,14 +521,18 @@ function M.layout(state, measure, view)
 		text(x + PAD, y + PILL / 2, SMALL, label)
 		hit(x, y, w, PILL, action)
 	end
-	-- a square button holding a small drawing, given as rects inside a unit square
+	-- a square button holding a small drawing, given as rects inside a unit
+	-- square. With no action it is drawn faint and cannot be clicked.
 	local function iconButton(x, y, marks, action, active)
 		local base = active and C.pillActive or C.button
-		rect(x, y, PILL, PILL, hovered(action) and lift(base) or base, "button", { radius = BR })
+		rect(x, y, PILL, PILL, action and hovered(action) and lift(base) or base, "button", { radius = BR })
+		local ink = active and C.text or action and C.dim or C.faint
 		for _, m in ipairs(marks) do
-			rect(x + m[1] * PILL, y + m[2] * PILL, m[3] * PILL, m[4] * PILL, active and C.text or C.dim, "icon", { radius = S })
+			rect(x + m[1] * PILL, y + m[2] * PILL, m[3] * PILL, m[4] * PILL, ink, "icon", { radius = S })
 		end
-		hit(x, y, PILL, PILL, action)
+		if action then
+			hit(x, y, PILL, PILL, action)
+		end
 	end
 
 	local toggle = { kind = "toggle" }
@@ -579,17 +583,20 @@ function M.layout(state, measure, view)
 	end
 	local fit = math.max(1, math.floor((view.h - 2 * PAD - chrome) / lineH))
 	local maxLines = math.min(math.floor(M.MAX_ROWS * ROW / lineH), fit)
-	state.rowsShown = maxLines
-	state.perLine = perLine
+	state.perPage = maxLines * perLine
 
 	local lines = math.ceil(#visible / perLine)
-	local firstLine = state.scroll + 1
-	local lastLine = math.min(lines, state.scroll + maxLines)
+	local paged = lines > maxLines
+	-- a smaller view or a shorter list can leave the page past the end
+	state.page = math.min(state.page, M.pages(state) - 1)
+	local firstLine = state.page * maxLines + 1
+	local lastLine = math.min(lines, firstLine + maxLines - 1)
 	local linesShown = math.max(0, lastLine - firstLine + 1)
 	-- The body is at least MIN_ROWS list rows tall whatever it holds, so the
-	-- panel keeps its shape as entries come and go.
+	-- panel keeps its shape as entries come and go, and every page of a long
+	-- list is as tall as a full one, so the pager does not move.
 	local minLines = math.ceil(M.MIN_ROWS * ROW / lineH)
-	local bodyLines = math.min(fit, math.max(minLines, linesShown))
+	local bodyLines = math.min(fit, math.max(minLines, paged and maxLines or linesShown))
 	local height = chrome + bodyLines * lineH
 
 	local px, py = placeBox(state, view, W, height, PAD)
@@ -735,14 +742,6 @@ function M.layout(state, measure, view)
 	end
 	y = bodyTop - bodyLines * lineH
 
-	-- scrollbar, in the margin right of the cards
-	if lines > linesShown and linesShown > 0 then
-		local trackH = linesShown * lineH
-		local thumbH = math.max(12 * S, trackH * linesShown / lines)
-		local thumbTop = bodyTop - (trackH - thumbH) * (state.scroll / (lines - linesShown))
-		rect(px + W - PAD / 2 - 1.5 * S, thumbTop - thumbH, 3 * S, thumbH, C.scroll, "scroll", { radius = 1.5 * S })
-	end
-
 	-- in the grid, what the hovered or placing tile holds, as a list row
 	if grid then
 		y = y - ROW
@@ -782,6 +781,18 @@ function M.layout(state, measure, view)
 		{ 0.25, 0.45, 0.5, 0.1 },
 		{ 0.25, 0.64, 0.5, 0.1 },
 	}, { kind = "view", view = "list" }, not grid)
+
+	-- pager, left of the view switch, when the tab holds more than a page
+	if paged then
+		local pages = M.pages(state)
+		local label = (state.page + 1) .. " / " .. pages
+		local nx = gx - GAP - PILL - 2 * GAP - PILL
+		local lw = measure(label, SMALL)
+		local lx = nx - GAP - lw
+		iconButton(nx, by, ARROW_NEXT, state.page < pages - 1 and { kind = "page", delta = 1 } or nil)
+		text(lx, by + PILL / 2, SMALL, label, C.dim)
+		iconButton(lx - GAP - PILL, by, ARROW_PREV, state.page > 0 and { kind = "page", delta = -1 } or nil)
+	end
 
 	panel.h = top - py
 	return L

@@ -546,6 +546,8 @@ local function act(action)
 		MODEL.setTab(panel, action.tab)
 	elseif kind == "view" then
 		MODEL.setView(panel, action.view)
+	elseif kind == "page" then
+		MODEL.turnPage(panel, action.delta)
 	elseif kind == "place" then
 		if placing and placing.item.entry.key == action.key then
 			stopPlacing()
@@ -799,7 +801,7 @@ function widget:MouseWheel(up, value)
 	if not MODEL.hit(layout, mx, my) then
 		return false
 	end
-	MODEL.scroll(panel, up and -1 or 1)
+	MODEL.turnPage(panel, up and -1 or 1)
 	return true
 end
 
