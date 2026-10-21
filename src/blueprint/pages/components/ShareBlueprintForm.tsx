@@ -16,6 +16,7 @@
  * building, which is exactly the picture the hub would then draw of it.
  */
 
+import { useLingui } from "@lingui/react/macro";
 import { Button } from "@picoframe/frame";
 import { save } from "@tauri-apps/plugin-dialog";
 import { Download } from "lucide-react";
@@ -28,14 +29,15 @@ import type { StoredBlueprint } from "../../library";
 import { encodePayloadCode, encodePayloadJson } from "../../transfer";
 
 export function ShareBlueprintForm({ record }: { record: StoredBlueprint }) {
+  const { t } = useLingui();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const saveFile = async () => {
     const dest = await save({
-      title: "Export blueprint",
+      title: t`Export blueprint`,
       defaultPath: `${record.layout.name || "blueprint"}.json`,
-      filters: [{ name: "Coilbox blueprint", extensions: ["json"] }],
+      filters: [{ name: t`Coilbox blueprint`, extensions: ["json"] }],
     });
     if (!dest) return;
     await appFileIO.write(dest, encodePayloadJson(record.layout));
@@ -58,7 +60,7 @@ export function ShareBlueprintForm({ record }: { record: StoredBlueprint }) {
     return (
       <ChallengeCodeView
         code={code.code}
-        helpText="Anyone who pastes this into Blueprints → Import gets this blueprint, and coilbox tells them there whether their game has the units it names."
+        helpText={t`Anyone who pastes this into Blueprints → Import gets this blueprint, and coilbox tells them there whether their game has the units it names.`}
         onExportFile={saveFile}
       />
     );
@@ -74,7 +76,7 @@ export function ShareBlueprintForm({ record }: { record: StoredBlueprint }) {
       {error && <ErrorBanner message={error} />}
       <Button onClick={exportFile} disabled={busy}>
         <Download className="mr-1.5 size-4" aria-hidden />
-        {busy ? "Exporting…" : "Export as file"}
+        {busy ? t`Exporting…` : t`Export as file`}
       </Button>
     </div>
   );

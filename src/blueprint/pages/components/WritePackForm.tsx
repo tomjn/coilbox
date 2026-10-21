@@ -24,6 +24,7 @@
  * than against the button that opened it (issue #1488).
  */
 
+import { useLingui } from "@lingui/react/macro";
 import { save } from "@tauri-apps/plugin-dialog";
 import { useMemo, useState } from "react";
 import { useUnitsyncEngineConfig } from "@/content/config";
@@ -47,6 +48,7 @@ export function WritePackForm({
   /** What the write did, once the file is on disk. */
   onWritten: (said: string) => void;
 }) {
+  const { t } = useLingui();
   const [taking, setTaking] = useState<ReadonlySet<string>>(new Set());
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -95,7 +97,7 @@ export function WritePackForm({
       const dest = await save({
         title: to.title,
         defaultPath: to.defaultPath,
-        filters: [{ name: "Blueprints", extensions: ["json"] }],
+        filters: [{ name: t`Blueprints`, extensions: ["json"] }],
       });
       if (!dest) return;
       setBusy(true);
@@ -119,11 +121,14 @@ export function WritePackForm({
     }
   };
 
+  const gameLabel = barFormat.label;
+  const gameFileName = barFormat.file;
+
   return (
     <div className="flex flex-col">
       {error && (
         <div className="px-4 pt-4">
-          <ErrorBanner message={`Not written: ${error}`} />
+          <ErrorBanner message={t`Not written: ${error}`} />
         </div>
       )}
 
@@ -140,13 +145,13 @@ export function WritePackForm({
         onClear={() => setTaking(new Set())}
         onWriteToGame={() =>
           void write({
-            title: `Write into ${barFormat.label}'s ${barFormat.file}`,
+            title: t`Write into ${gameLabel}'s ${gameFileName}`,
             defaultPath: gameFile ?? "blueprints.json",
           })
         }
         onWriteToFile={() =>
           void write({
-            title: "Save a file of blueprints",
+            title: t`Save a file of blueprints`,
             defaultPath: "blueprints.json",
           })
         }

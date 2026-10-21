@@ -54,6 +54,8 @@
  * Pure and rendered in a test. The hooks are `./GameEquivalents.tsx`.
  */
 
+import { plural } from "@lingui/core/macro";
+import { Trans, useLingui } from "@lingui/react/macro";
 import { Button, Input } from "@picoframe/frame";
 import { Shuffle, X } from "lucide-react";
 import {
@@ -90,6 +92,7 @@ export function EquivalentsPanel({
   onForget: (at: number) => void;
   onForgetAll: () => void;
 }) {
+  const { t } = useLingui();
   // A game nobody has answered anything about has nothing to look at and
   // nothing to correct, so the page says nothing rather than saying "none".
   if (table.groups.length === 0) return null;
@@ -124,44 +127,54 @@ export function EquivalentsPanel({
   );
   const mine = table.groups.filter(answeredByYou).length;
   const mixed = mine > 0 && mine < table.groups.length;
+  const groupCount = table.groups.length;
+  const shownCount = order.length;
 
   return (
     <section className="flex flex-col gap-2">
       <div className="flex items-center justify-between gap-2">
         <h2 className="flex items-center gap-2 text-sm font-medium">
           <Shuffle className="size-4 text-muted-foreground" aria-hidden />
-          Equivalent buildings
+          <Trans>Equivalent buildings</Trans>
         </h2>
         <Button size="sm" variant="outline" onClick={onForgetAll}>
-          Forget all {table.groups.length}
+          <Trans>Forget all {groupCount}</Trans>
         </Button>
       </div>
       <p className="max-w-prose text-xs text-muted-foreground">
-        Which of this game's buildings coilbox treats as each side's version of
-        the same thing. It uses these first when a blueprint of this game is
-        said in another side, ahead of anything it can read off a unit's name.
-        Each answer says where it came from: you picked it while converting, or
-        this game's own published table brought it when you asked coilbox to
-        read one.
+        <Trans>
+          Which of this game's buildings coilbox treats as each side's version
+          of the same thing. It uses these first when a blueprint of this game
+          is said in another side, ahead of anything it can read off a unit's
+          name. Each answer says where it came from: you picked it while
+          converting, or this game's own published table brought it when you
+          asked coilbox to read one.
+        </Trans>
         {mixed &&
-          ` The ${mine} holding an answer you gave ${mine === 1 ? "is" : "are"} first, because reading a game's table brings enough at once to lose them in.`}
+          ` ${plural(mine, {
+            one: "The # holding an answer you gave is first, because reading a game's table brings enough at once to lose them in.",
+            other:
+              "The # holding an answer you gave are first, because reading a game's table brings enough at once to lose them in.",
+          })}`}
       </p>
       {searchable && (
         <div className="flex flex-wrap items-center gap-2">
           <Input
             value={query}
             onChange={(event) => onQuery(event.target.value)}
-            placeholder="Find a building"
-            aria-label="Find a building"
+            placeholder={t`Find a building`}
+            aria-label={t`Find a building`}
             className="w-56"
           />
           {hunt !== "" && (
             <>
               <span className="text-xs text-muted-foreground">
-                Showing {order.length} of {table.groups.length}
+                <Trans>
+                  Showing {shownCount} of {groupCount}
+                </Trans>
               </span>
               <Button size="sm" variant="ghost" onClick={() => onQuery("")}>
-                Clear
+                <Trans>Clear</Trans>
               </Button>
             </>
           )}
@@ -169,8 +182,11 @@ export function EquivalentsPanel({
       )}
       {order.length === 0 ? (
         <p className="rounded-lg border border-border/50 bg-card px-3 py-2 text-xs text-muted-foreground">
-          Nothing in this table names {hunt}, so coilbox has no answer recorded
-          for it and would fall back on reading the name when converting.
+          <Trans>
+            Nothing in this table names {hunt}, so coilbox has no answer
+            recorded for it and would fall back on reading the name when
+            converting.
+          </Trans>
         </p>
       ) : (
         <ul className="divide-y divide-border/40 rounded-lg border border-border/50 bg-card">
@@ -182,6 +198,9 @@ export function EquivalentsPanel({
             const said = sides.filter(
               (side) => defIn(group, side) !== undefined,
             );
+            const forgetting = said
+              .map((side) => String(defIn(group, side)))
+              .reduce((joined, next) => t`${joined} and ${next}`);
             return (
               <li
                 // A table holds no ids and two groups can honestly name the same
@@ -201,7 +220,7 @@ export function EquivalentsPanel({
                           {defIn(group, side)}
                           {from && (
                             <span className="ml-1.5 font-sans text-[0.65rem] text-muted-foreground">
-                              {from === "you" ? "you" : "the game"}
+                              {from === "you" ? t`you` : t`the game`}
                             </span>
                           )}
                         </dd>
@@ -213,7 +232,7 @@ export function EquivalentsPanel({
                   size="sm"
                   variant="ghost"
                   className="size-7 shrink-0 p-0"
-                  aria-label={`Forget ${said.map((side) => defIn(group, side)).join(" and ")}`}
+                  aria-label={t`Forget ${forgetting}`}
                   onClick={() => onForget(at)}
                 >
                   <X className="size-3.5" />
@@ -224,11 +243,21 @@ export function EquivalentsPanel({
         </ul>
       )}
       <p className="max-w-prose text-xs text-muted-foreground">
-        Forgetting one is how a wrong answer is corrected. The next blueprint of
-        this game you convert asks about it again, and keeps whatever you say
-        then.
-        {anyUnsourced &&
-          " An answer with nothing after it is one coilbox held before it started recording where they came from, so there is no longer anybody to ask."}
+        <Trans>
+          Forgetting one is how a wrong answer is corrected. The next blueprint
+          of this game you convert asks about it again, and keeps whatever you
+          say then.
+        </Trans>
+        {anyUnsourced && (
+          <>
+            {" "}
+            <Trans>
+              An answer with nothing after it is one coilbox held before it
+              started recording where they came from, so there is no longer
+              anybody to ask.
+            </Trans>
+          </>
+        )}
       </p>
     </section>
   );

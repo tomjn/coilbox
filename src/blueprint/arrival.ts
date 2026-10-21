@@ -24,6 +24,8 @@
  * https://github.com/tomjn/coilbox/issues/1314. Nothing here changes a name.
  */
 
+import { t } from "@lingui/core/macro";
+
 import type {
   GameIdentity,
   InstalledGameInfo,
@@ -182,35 +184,46 @@ export function blueprintArrival(input: ArrivalInput): BlueprintArrival {
     case "unnamed":
       notes.push({
         tone: "note",
-        text: "This blueprint does not say which game it is for, so its unit names have not been checked against anything.",
+        text: t`This blueprint does not say which game it is for, so its unit names have not been checked against anything.`,
       });
       break;
-    case "unread":
+    case "unread": {
+      const wanted = game.wanted;
       notes.push({
         tone: "note",
-        text: `This blueprint is for ${game.wanted}. Coilbox is still reading your games, so it does not know yet whether you have it.`,
+        text: t`This blueprint is for ${wanted}. Coilbox is still reading your games, so it does not know yet whether you have it.`,
       });
       break;
-    case "unreadable":
+    }
+    case "unreadable": {
+      const wanted = game.wanted;
       notes.push({
         tone: "note",
-        text: `This blueprint is for ${game.wanted}. Your games could not be read, so it has not been checked against them.`,
+        text: t`This blueprint is for ${wanted}. Your games could not be read, so it has not been checked against them.`,
       });
       break;
-    case "missing":
+    }
+    case "missing": {
+      const wanted = game.wanted;
       notes.push({
         tone: "warn",
         text: into
-          ? `This blueprint is for ${game.wanted}, and this mission is for ${into}.`
-          : `This blueprint is for ${game.wanted}, which is not installed here. It will be kept exactly as it is, and its buildings can be checked once you have that game.`,
+          ? t`This blueprint is for ${wanted}, and this mission is for ${into}.`
+          : t`This blueprint is for ${wanted}, which is not installed here. It will be kept exactly as it is, and its buildings can be checked once you have that game.`,
       });
       break;
-    case "other-version":
+    }
+    case "other-version": {
+      const wanted = game.wanted;
+      const here = game.here;
       notes.push({
         tone: "note",
-        text: `This blueprint is for ${game.wanted}. ${into ? `This mission is for ${game.here}` : `You have ${game.here}`}, which is the same game at another version, so a unit it names may have moved since.`,
+        text: into
+          ? t`This blueprint is for ${wanted}. This mission is for ${here}, which is the same game at another version, so a unit it names may have moved since.`
+          : t`This blueprint is for ${wanted}. You have ${here}, which is the same game at another version, so a unit it names may have moved since.`,
       });
       break;
+    }
     case "installed":
       break;
   }
@@ -231,7 +244,7 @@ export function blueprintArrival(input: ArrivalInput): BlueprintArrival {
     } else if (!known) {
       notes.push({
         tone: "note",
-        text: "Coilbox has not read that game's units yet, so this blueprint has not been checked against them.",
+        text: t`Coilbox has not read that game's units yet, so this blueprint has not been checked against them.`,
       });
     }
   }
@@ -241,7 +254,9 @@ export function blueprintArrival(input: ArrivalInput): BlueprintArrival {
   if (wasCalled) {
     notes.push({
       tone: "note",
-      text: `A blueprint ${into ? "in this scenario" : "in your library"} is already called "${wasCalled}", so this one is kept as "${name}".`,
+      text: into
+        ? t`A blueprint in this scenario is already called "${wasCalled}", so this one is kept as "${name}".`
+        : t`A blueprint in your library is already called "${wasCalled}", so this one is kept as "${name}".`,
     });
   }
 

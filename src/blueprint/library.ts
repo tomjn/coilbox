@@ -20,6 +20,8 @@
  * `./pages/`.
  */
 
+import { t } from "@lingui/core/macro";
+
 import { declaredFootprints, type Footprint } from "./footprint";
 import type { BaseBlueprint } from "./model";
 import {
@@ -234,62 +236,75 @@ export function sourceFileName(path: string): string {
 export function sourceLabel(source: BlueprintSource): string {
   switch (source.kind) {
     case "pack":
-    case "file":
-      return `From ${sourceFileName(source.file)}`;
-    case "setup-pack":
-      return source.title
-        ? `From the setup pack ${source.title}`
-        : "From a setup pack";
+    case "file": {
+      const fileName = sourceFileName(source.file);
+      return t`From ${fileName}`;
+    }
+    case "setup-pack": {
+      const title = source.title;
+      return title ? t`From the setup pack ${title}` : t`From a setup pack`;
+    }
     case "code":
-      return "From a shared code";
-    case "hub":
-      return source.author
-        ? `From ${source.author} on the hub`
-        : "From the hub";
+      return t`From a shared code`;
+    case "hub": {
+      const author = source.author;
+      return author ? t`From ${author} on the hub` : t`From the hub`;
+    }
     case "widget":
-      return "Saved in game";
-    default:
-      return source.scenarioName
-        ? `From ${source.scenarioName}`
-        : "From a scenario";
+      return t`Saved in game`;
+    default: {
+      const scenarioName = source.scenarioName;
+      return scenarioName ? t`From ${scenarioName}` : t`From a scenario`;
+    }
   }
 }
 
 /** Where a layout came from, in a line under its name. */
 export function sourceSummary(source: BlueprintSource): string {
   const from = summaryOf(source);
-  return source.wasCalled
-    ? `${from} It was called "${source.wasCalled}" in there.`
-    : from;
+  const wasCalled = source.wasCalled;
+  return wasCalled ? t`${from} It was called "${wasCalled}" in there.` : from;
 }
 
 function summaryOf(source: BlueprintSource): string {
   switch (source.kind) {
-    case "pack":
-      return `Imported from a file of blueprints, ${source.file}.`;
-    case "setup-pack":
-      return source.title
-        ? `Imported with the setup pack "${source.title}".`
-        : "Imported with a setup pack.";
-    case "file":
-      return `Imported from the file ${source.file}.`;
+    case "pack": {
+      const file = source.file;
+      return t`Imported from a file of blueprints, ${file}.`;
+    }
+    case "setup-pack": {
+      const title = source.title;
+      return title
+        ? t`Imported with the setup pack "${title}".`
+        : t`Imported with a setup pack.`;
+    }
+    case "file": {
+      const file = source.file;
+      return t`Imported from the file ${file}.`;
+    }
     case "code":
       // The honest answer rather than a shrug. A code is the layout and
       // nothing else, so there is no file, no author and no site to name, and
       // saying so beats a card that looks like it forgot.
-      return "Imported from a code somebody shared. A code carries the blueprint and nothing about where it came from, so that is the whole of what is known about it.";
-    case "hub":
-      return source.author
-        ? `Imported from the community hub, published by ${source.author}.`
-        : "Imported from the community hub.";
-    case "widget":
-      return source.engine
-        ? `Saved in game with the coilbox widget, on engine ${source.engine}.`
-        : "Saved in game with the coilbox widget.";
-    default:
-      return source.scenarioName
-        ? `Saved out of the scenario "${source.scenarioName}".`
-        : "Saved out of a scenario.";
+      return t`Imported from a code somebody shared. A code carries the blueprint and nothing about where it came from, so that is the whole of what is known about it.`;
+    case "hub": {
+      const author = source.author;
+      return author
+        ? t`Imported from the community hub, published by ${author}.`
+        : t`Imported from the community hub.`;
+    }
+    case "widget": {
+      const engine = source.engine;
+      return engine
+        ? t`Saved in game with the coilbox widget, on engine ${engine}.`
+        : t`Saved in game with the coilbox widget.`;
+    }
+    default: {
+      const scenarioName = source.scenarioName;
+      return scenarioName
+        ? t`Saved out of the scenario "${scenarioName}".`
+        : t`Saved out of a scenario.`;
+    }
   }
 }
 
@@ -348,8 +363,11 @@ function parseBlueprintSource(value: unknown): BlueprintSource | undefined {
   }
 }
 
-/** What a layout is called when its author has not said. */
-export const UNTITLED = "Untitled blueprint";
+/** What a layout is called when its author has not said. A function so the
+ *  language is read when the name is needed rather than at module load. */
+export function untitled(): string {
+  return t`Untitled blueprint`;
+}
 
 /** The archive name of the game a layout's unit names belong to, or empty when
  *  it names none. */
@@ -510,8 +528,8 @@ export function uniqueLayoutName(
   name: string,
   taken: Iterable<string>,
 ): string {
-  const wanted = name.trim() || UNTITLED;
-  const used = new Set([...taken].map((t) => t.trim().toLowerCase()));
+  const wanted = name.trim() || untitled();
+  const used = new Set([...taken].map((one) => one.trim().toLowerCase()));
   if (!used.has(wanted.toLowerCase())) return wanted;
   for (let at = 2; ; at++) {
     const candidate = `${wanted} ${at}`;
