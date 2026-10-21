@@ -1,3 +1,5 @@
+import { plural } from "@lingui/core/macro";
+import { Trans, useLingui } from "@lingui/react/macro";
 import { Button } from "@picoframe/frame";
 import { ScanSearch, X } from "lucide-react";
 import {
@@ -30,6 +32,7 @@ import {
  * fails.
  */
 export default function AnalysisQueueBadge() {
+  const { t } = useLingui();
   const queue = useAnalysisQueue();
   if (analysisRunHidden()) return null;
   const { running, queued, failures, waitingForGame } = queue;
@@ -38,16 +41,19 @@ export default function AnalysisQueueBadge() {
 
   // Every job analyses the match and records it, and the badge has room for
   // the one word.
+  const failureCount = failures.length;
   const label =
     jobs === 0
-      ? failures.length === 1
-        ? "1 analysis failed"
-        : `${failures.length} analyses failed`
+      ? plural(failureCount, {
+          one: "# analysis failed",
+          other: "# analyses failed",
+        })
       : waitingForGame
-        ? "Analysis paused"
-        : jobs === 1
-          ? "Analysing 1 replay"
-          : `Analysing ${jobs} replays`;
+        ? t`Analysis paused`
+        : plural(jobs, {
+            one: "Analysing # replay",
+            other: "Analysing # replays",
+          });
 
   return (
     <Popover>
@@ -55,7 +61,7 @@ export default function AnalysisQueueBadge() {
         <button
           type="button"
           className="flex items-center gap-1.5 rounded-full bg-primary/10 px-3 py-1 text-xs font-medium text-primary hover:bg-primary/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-          aria-label={`${label}. Open to see or cancel.`}
+          aria-label={t`${label}. Open to see or cancel.`}
         >
           <ScanSearch
             size={14}
@@ -69,7 +75,9 @@ export default function AnalysisQueueBadge() {
       <PopoverContent align="end" className="flex w-80 flex-col gap-3">
         {waitingForGame && (
           <p className="text-sm">
-            Paused while a game is running. It carries on when the game ends.
+            <Trans>
+              Paused while a game is running. It carries on when the game ends.
+            </Trans>
           </p>
         )}
         {running && (
@@ -77,7 +85,7 @@ export default function AnalysisQueueBadge() {
             <Row
               name={running.name}
               note={analysisProgressLabel(running)}
-              cancelLabel={`Cancel the analysis of ${running.name}`}
+              cancelLabel={t`Cancel the analysis of ${running.name}`}
               disabled={running.cancelling}
               onCancel={() => void cancelAnalysis(running.id).catch(() => {})}
             />
@@ -85,7 +93,7 @@ export default function AnalysisQueueBadge() {
               <Progress
                 value={analysisPercent(running)}
                 className="h-1.5 bg-muted"
-                aria-label={`Playback of ${running.name}`}
+                aria-label={t`Playback of ${running.name}`}
               />
             )}
           </div>
@@ -94,8 +102,8 @@ export default function AnalysisQueueBadge() {
           <Row
             key={job.id}
             name={job.name}
-            note="Queued"
-            cancelLabel={`Cancel the analysis of ${job.name}`}
+            note={t`Queued`}
+            cancelLabel={t`Cancel the analysis of ${job.name}`}
             onCancel={() => void cancelAnalysis(job.id).catch(() => {})}
           />
         ))}
@@ -103,8 +111,8 @@ export default function AnalysisQueueBadge() {
           <Row
             key={failure.gameId}
             name={failure.name}
-            note="Failed. Open the replay to see why."
-            cancelLabel={`Dismiss the failed analysis of ${failure.name}`}
+            note={t`Failed. Open the replay to see why.`}
+            cancelLabel={t`Dismiss the failed analysis of ${failure.name}`}
             onCancel={() =>
               void dismissAnalysisFailure(failure.gameId).catch(() => {})
             }
@@ -118,7 +126,7 @@ export default function AnalysisQueueBadge() {
             className="w-fit self-end"
             onClick={() => void cancelAnalysis().catch(() => {})}
           >
-            Cancel all
+            <Trans>Cancel all</Trans>
           </Button>
         )}
       </PopoverContent>

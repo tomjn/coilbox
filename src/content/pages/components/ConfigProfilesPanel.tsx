@@ -1,3 +1,6 @@
+import type { MessageDescriptor } from "@lingui/core";
+import { msg, plural } from "@lingui/core/macro";
+import { Trans, useLingui } from "@lingui/react/macro";
 import { Button, Input } from "@picoframe/frame";
 import { RotateCcw, Save, Trash2, TriangleAlert } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
@@ -13,11 +16,11 @@ import {
 } from "../../bindings";
 import { useContentPrefs } from "../../config";
 
-/** Friendly label for each captured artifact id. */
-const ARTIFACT_LABEL: Record<string, string> = {
-  "springsettings.cfg": "settings",
-  "uikeys.txt": "keybinds",
-  "LuaUI/Config": "widget config",
+/** Friendly label for each captured artifact id, read when a row draws. */
+const ARTIFACT_LABEL: Record<string, MessageDescriptor> = {
+  "springsettings.cfg": msg`settings`,
+  "uikeys.txt": msg`keybinds`,
+  "LuaUI/Config": msg`widget config`,
 };
 
 const AUTO_BACKUP_NAME = "Auto-backup";
@@ -30,6 +33,7 @@ const AUTO_BACKUP_NAME = "Auto-backup";
  * the current config to a reserved profile just before a restore.
  */
 export function ConfigProfilesPanel({ rootPath }: { rootPath: string }) {
+  const { t, i18n } = useLingui();
   const [prefs, setPrefs] = useContentPrefs();
   const [profiles, setProfiles] = useState<ConfigProfile[]>([]);
   const [name, setName] = useState("");
@@ -63,7 +67,7 @@ export function ConfigProfilesPanel({ rootPath }: { rootPath: string }) {
     try {
       await contentConfigBackup({ rootPath, name: trimmed });
       setName("");
-      setStatus(`Saved profile "${trimmed}".`);
+      setStatus(t`Saved profile "${trimmed}".`);
       await refresh();
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
@@ -90,7 +94,13 @@ export function ConfigProfilesPanel({ rootPath }: { rootPath: string }) {
         setStatus(null);
       } else {
         setConfirmSlug(null);
-        setStatus(`Restored "${p.name}" (${res.restored} item(s)).`);
+        const profileName = p.name;
+        setStatus(
+          plural(res.restored, {
+            one: `Restored "${profileName}" (# item).`,
+            other: `Restored "${profileName}" (# items).`,
+          }),
+        );
         await refresh();
       }
     } catch (e) {
@@ -117,12 +127,16 @@ export function ConfigProfilesPanel({ rootPath }: { rootPath: string }) {
   return (
     <section className="flex flex-col gap-3 rounded-lg border border-border/50 bg-card p-3">
       <div>
-        <h2 className="text-sm font-semibold">Settings profiles</h2>
+        <h2 className="text-sm font-semibold">
+          <Trans>Settings profiles</Trans>
+        </h2>
         <p className="mt-0.5 text-xs text-muted-foreground">
-          Snapshot and swap this content folder's{" "}
-          <span className="font-mono">springsettings.cfg</span>,{" "}
-          <span className="font-mono">LuaUI/Config</span> and{" "}
-          <span className="font-mono">uikeys.txt</span>.
+          <Trans>
+            Snapshot and swap this content folder's{" "}
+            <span className="font-mono">springsettings.cfg</span>,{" "}
+            <span className="font-mono">LuaUI/Config</span> and{" "}
+            <span className="font-mono">uikeys.txt</span>.
+          </Trans>
         </p>
       </div>
 
@@ -134,7 +148,7 @@ export function ConfigProfilesPanel({ rootPath }: { rootPath: string }) {
           onKeyDown={(e) => {
             if (e.key === "Enter") void save();
           }}
-          placeholder="New profile name"
+          placeholder={t`New profile name`}
           className="h-8 flex-1"
           disabled={busy}
         />
@@ -144,7 +158,7 @@ export function ConfigProfilesPanel({ rootPath }: { rootPath: string }) {
           onClick={save}
           disabled={busy || !name.trim()}
         >
-          <Save className="size-4" /> Back up
+          <Save className="size-4" /> <Trans>Back up</Trans>
         </Button>
       </div>
 
@@ -159,14 +173,15 @@ export function ConfigProfilesPanel({ rootPath }: { rootPath: string }) {
 
       {profiles.length === 0 ? (
         <p className="py-2 text-center text-xs text-muted-foreground">
-          No saved profiles yet.
+          <Trans>No saved profiles yet.</Trans>
         </p>
       ) : (
         <ul className="flex flex-col gap-2">
           {profiles.map((p) => {
             const confirming = confirmSlug === p.slug;
+            const profileName = p.name;
             const parts = p.artifacts
-              .map((a) => ARTIFACT_LABEL[a] ?? a)
+              .map((a) => (ARTIFACT_LABEL[a] ? i18n._(ARTIFACT_LABEL[a]) : a))
               .join(", ");
             return (
               <li
@@ -180,7 +195,7 @@ export function ConfigProfilesPanel({ rootPath }: { rootPath: string }) {
                     </span>
                     <span className="block truncate text-xs text-muted-foreground">
                       {formatDateTime(new Date(p.createdAtMs))}
-                      {parts ? ` · ${parts}` : " · empty"}
+                      {parts ? ` · ${parts}` : ` · ${t`empty`}`}
                     </span>
                   </div>
                   <div className="flex shrink-0 items-center gap-1">
@@ -190,14 +205,14 @@ export function ConfigProfilesPanel({ rootPath }: { rootPath: string }) {
                       onClick={() => restore(p, false)}
                       disabled={busy}
                     >
-                      <RotateCcw className="size-4" /> Restore
+                      <RotateCcw className="size-4" /> <Trans>Restore</Trans>
                     </Button>
                     <Button
                       variant="ghost"
                       size="icon"
                       onClick={() => remove(p)}
                       disabled={busy}
-                      aria-label={`Delete profile ${p.name}`}
+                      aria-label={t`Delete profile ${profileName}`}
                     >
                       <Trash2 className="size-4" />
                     </Button>
@@ -207,7 +222,9 @@ export function ConfigProfilesPanel({ rootPath }: { rootPath: string }) {
                   <div className="mt-2 flex items-center justify-between gap-2 rounded border border-amber-500/40 bg-amber-500/10 p-2 text-xs">
                     <span className="flex items-center gap-1.5 text-amber-700 dark:text-amber-400">
                       <TriangleAlert className="size-4 shrink-0" />
-                      Overwrite the current settings with this profile?
+                      <Trans>
+                        Overwrite the current settings with this profile?
+                      </Trans>
                     </span>
                     <div className="flex shrink-0 gap-1">
                       <Button
@@ -216,7 +233,7 @@ export function ConfigProfilesPanel({ rootPath }: { rootPath: string }) {
                         onClick={() => setConfirmSlug(null)}
                         disabled={busy}
                       >
-                        Cancel
+                        <Trans>Cancel</Trans>
                       </Button>
                       <Button
                         variant="destructive"
@@ -224,7 +241,7 @@ export function ConfigProfilesPanel({ rootPath }: { rootPath: string }) {
                         onClick={() => restore(p, true)}
                         disabled={busy}
                       >
-                        Overwrite
+                        <Trans>Overwrite</Trans>
                       </Button>
                     </div>
                   </div>
@@ -247,7 +264,7 @@ export function ConfigProfilesPanel({ rootPath }: { rootPath: string }) {
           htmlFor="auto-backup-engine-config"
           className="font-normal text-muted-foreground"
         >
-          Auto-backup current settings before restoring
+          <Trans>Auto-backup current settings before restoring</Trans>
         </Label>
       </div>
     </section>

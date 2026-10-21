@@ -28,6 +28,7 @@
  * Nothing here is a list of field names. Which fields hold a path is a separate
  * question, answered in `src/workshop/assetFields.ts`.
  */
+import { t } from "@lingui/core/macro";
 import type { ArchiveFileEntry } from "./bindings";
 
 /** The kinds of asset a definition names by path. */
@@ -69,8 +70,13 @@ export interface AssetKind {
 export const ASSET_KINDS: Record<AssetKindId, AssetKind> = {
   model: {
     id: "model",
-    label: "Model",
-    noun: "model",
+    // Read when a picker draws, so a getter keeps callers reading a string.
+    get label() {
+      return t`Model`;
+    },
+    get noun() {
+      return t`model`;
+    },
     root: "objects3d",
     extensions: [
       ".3do",
@@ -88,8 +94,13 @@ export const ASSET_KINDS: Record<AssetKindId, AssetKind> = {
   },
   script: {
     id: "script",
-    label: "Script",
-    noun: "script",
+    // Read when a picker draws, so a getter keeps callers reading a string.
+    get label() {
+      return t`Script`;
+    },
+    get noun() {
+      return t`script`;
+    },
     root: "scripts",
     extensions: [".lua", ".cob"],
     searchesBelowRoot: true,
@@ -97,8 +108,13 @@ export const ASSET_KINDS: Record<AssetKindId, AssetKind> = {
   },
   picture: {
     id: "picture",
-    label: "Picture",
-    noun: "picture",
+    // Read when a picker draws, so a getter keeps callers reading a string.
+    get label() {
+      return t`Picture`;
+    },
+    get noun() {
+      return t`picture`;
+    },
     root: "unitpics",
     extensions: [".dds", ".png", ".pcx", ".bmp", ".tga", ".jpg", ".jpeg"],
     searchesBelowRoot: false,

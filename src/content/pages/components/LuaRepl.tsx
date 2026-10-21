@@ -1,3 +1,4 @@
+import { Trans, useLingui } from "@lingui/react/macro";
 import { Button } from "@picoframe/frame";
 import { ChevronRight, ExternalLink, Play, RotateCcw } from "lucide-react";
 import { useCallback, useLayoutEffect, useRef, useState } from "react";
@@ -39,6 +40,7 @@ export function LuaRepl({
   popOutTo?: string;
   onPopOut?: () => void;
 }) {
+  const { t } = useLingui();
   const key = sessionKey(dataDir, enginePath, archive);
   const session = useReplSession(key);
   const [input, setInput] = useState("");
@@ -114,11 +116,13 @@ export function LuaRepl({
       >
         {session.cells.length === 0 ? (
           <p className="text-zinc-500">
-            Globals persist across runs via replay — each Run re-executes the
-            whole session against{" "}
-            <span className="text-zinc-300">{archive}</span>. End with{" "}
-            <span className="text-zinc-300">return …</span> to see a value.
-            Enter runs; Shift+Enter for a newline.
+            <Trans>
+              Globals persist across runs via replay — each Run re-executes the
+              whole session against{" "}
+              <span className="text-zinc-300">{archive}</span>. End with{" "}
+              <span className="text-zinc-300">return …</span> to see a value.
+              Enter runs; Shift+Enter for a newline.
+            </Trans>
           </p>
         ) : (
           <ol className="flex flex-col gap-3">
@@ -134,7 +138,7 @@ export function LuaRepl({
         <textarea
           value={input}
           spellCheck={false}
-          aria-label="Lua input"
+          aria-label={t`Lua input`}
           placeholder="lua…"
           rows={3}
           disabled={session.running}
@@ -150,7 +154,7 @@ export function LuaRepl({
             onClick={() => void submit()}
           >
             <Play className="size-4 fill-current" />{" "}
-            {session.running ? "Running…" : "Run"}
+            {session.running ? t`Running…` : t`Run`}
           </Button>
           <Button
             size="sm"
@@ -159,7 +163,7 @@ export function LuaRepl({
             disabled={session.running || session.cells.length === 0}
             onClick={reset}
           >
-            <RotateCcw className="size-4" /> Reset session
+            <RotateCcw className="size-4" /> <Trans>Reset session</Trans>
           </Button>
           {popOutTo && (
             <Link
@@ -167,7 +171,8 @@ export function LuaRepl({
               onClick={onPopOut}
               className="ml-auto inline-flex items-center gap-1 text-xs text-zinc-400 hover:text-zinc-200 hover:underline"
             >
-              <ExternalLink className="size-3.5" /> Open full page
+              <ExternalLink className="size-3.5" />{" "}
+              <Trans>Open full page</Trans>
             </Link>
           )}
         </div>
@@ -178,6 +183,7 @@ export function LuaRepl({
 
 /** One transcript cell: echoed input, then prints, then result or error. */
 function ReplCellView({ cell }: { cell: ReplCell }) {
+  const diagnosticCount = cell.diagnostics.length;
   return (
     <li className="flex flex-col gap-1">
       <div className="flex gap-2">
@@ -208,7 +214,7 @@ function ReplCellView({ cell }: { cell: ReplCell }) {
         <Collapsible className="text-zinc-500">
           <CollapsibleTrigger className="group flex cursor-pointer items-center gap-1 text-left">
             <ChevronRight className="size-3.5 shrink-0 transition-transform group-data-[state=open]:rotate-90" />
-            Diagnostics ({cell.diagnostics.length})
+            <Trans>Diagnostics ({diagnosticCount})</Trans>
           </CollapsibleTrigger>
           <CollapsibleContent>
             <ul className="mt-1 flex flex-col gap-1">

@@ -1,3 +1,4 @@
+import { Trans, useLingui } from "@lingui/react/macro";
 import { Button } from "@picoframe/frame";
 import { Check, Copy, Download, FileQuestion } from "lucide-react";
 import { useState } from "react";
@@ -58,6 +59,7 @@ function PreviewBody({
   dataDir?: string;
   size?: number;
 }) {
+  const { t } = useLingui();
   // Models are classified here rather than by the preview command, which
   // decodes bytes and has nothing to make of a `.3do`. The read they need is a
   // different one anyway: it mounts the archive set to resolve the model's
@@ -82,7 +84,11 @@ function PreviewBody({
     );
   }
   if (!result) {
-    return <Centered>Could not read this file.</Centered>;
+    return (
+      <Centered>
+        <Trans>Could not read this file.</Trans>
+      </Centered>
+    );
   }
   if (result.kind === "text" && result.text != null) {
     return (
@@ -104,12 +110,13 @@ function PreviewBody({
       </div>
     );
   }
+  const fileSize = formatBytes(result.size);
   return (
     <Centered>
       <FileQuestion className="size-6" />
       {result.truncated
-        ? `Too large to preview (${formatBytes(result.size)}).`
-        : `No preview for this file type (${formatBytes(result.size)}).`}
+        ? t`Too large to preview (${fileSize}).`
+        : t`No preview for this file type (${fileSize}).`}
     </Centered>
   );
 }
@@ -124,6 +131,7 @@ function PreviewToolbar({
   result: ArchiveFileResult | null;
   onDownload: () => Promise<boolean>;
 }) {
+  const { t } = useLingui();
   const base = path.split("/").pop() ?? path;
   const text = result?.kind === "text" ? result.text : undefined;
   const [copied, setCopied] = useState(false);
@@ -155,12 +163,12 @@ function PreviewToolbar({
 
   const dlLabel =
     dl === "saving"
-      ? "Saving"
+      ? t`Saving`
       : dl === "saved"
-        ? "Saved"
+        ? t`Saved`
         : dl === "error"
-          ? "Failed"
-          : "Download";
+          ? t`Failed`
+          : t`Download`;
 
   return (
     <div className="flex shrink-0 items-center gap-2">
@@ -177,7 +185,7 @@ function PreviewToolbar({
           ) : (
             <Copy className="size-3.5" />
           )}
-          {copied ? "Copied" : "Copy"}
+          {copied ? t`Copied` : t`Copy`}
         </Button>
       )}
       <Button
@@ -227,7 +235,7 @@ export function FilePreview({
     return (
       <Centered>
         <FileQuestion className="size-6" />
-        Select a file to preview it.
+        <Trans>Select a file to preview it.</Trans>
       </Centered>
     );
   }

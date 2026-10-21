@@ -1,3 +1,4 @@
+import { t } from "@lingui/core/macro";
 import type { EnqueueInput } from "../downloads/DownloadQueueProvider";
 import type { BundledEngine, BundleProblem, BundleReport } from "./bindings";
 
@@ -34,7 +35,8 @@ export function enginesToInstall(report: BundleReport | null): BundledEngine[] {
 
 /** What the player reads while the copy runs, in the setup card and the queue. */
 export function bundledEngineLabel(engine: BundledEngine): string {
-  return `Setting up engine ${engine.version}`;
+  const version = engine.version;
+  return t`Setting up engine ${version}`;
 }
 
 /** The queue request that copies `engine` into `writePath`. */
@@ -61,22 +63,39 @@ export function bundledEngineInput(
 export function bundleProblemText(p: BundleProblem): string {
   switch (p.kind) {
     case "empty":
-      return "The folder is empty. Copy engine/, games/ and maps/ into it from a working install.";
-    case "looseArchive":
-      return `${p.path} sits at the top of the folder. Move it into games/ or maps/, or nothing will find it.`;
-    case "stray":
-      return `${p.path} is not part of a Spring data directory, so nothing reads it. The folder holds engine/, games/, maps/, packages/ and pool/.`;
+      return t`The folder is empty. Copy engine/, games/ and maps/ into it from a working install.`;
+    case "looseArchive": {
+      const path = p.path;
+      return t`${path} sits at the top of the folder. Move it into games/ or maps/, or nothing will find it.`;
+    }
+    case "stray": {
+      const path = p.path;
+      return t`${path} is not part of a Spring data directory, so nothing reads it. The folder holds engine/, games/, maps/, packages/ and pool/.`;
+    }
     case "packagesWithoutPool":
-      return "packages/ has rapid packages but there is no pool/ beside it. Copy pool/ too, or the packages cannot be read.";
-    case "looseGame":
-      return `${p.path} is a loose .sdd game. It is read in place, but coilbox does not write into this folder, so scenario missions cannot be installed into it. Ship the game as .sdz or .sd7, or keep the .sdd in the app folder's games/ instead.`;
-    case "unknownPlatform":
-      return `${p.path} is not a platform folder, so its engine is never used. Use one of ${BUNDLE_PLATFORMS.join(", ")}.`;
+      return t`packages/ has rapid packages but there is no pool/ beside it. Copy pool/ too, or the packages cannot be read.`;
+    case "looseGame": {
+      const path = p.path;
+      return t`${path} is a loose .sdd game. It is read in place, but coilbox does not write into this folder, so scenario missions cannot be installed into it. Ship the game as .sdz or .sd7, or keep the .sdd in the app folder's games/ instead.`;
+    }
+    case "unknownPlatform": {
+      const path = p.path;
+      const platforms = BUNDLE_PLATFORMS.join(", ");
+      return t`${path} is not a platform folder, so its engine is never used. Use one of ${platforms}.`;
+    }
     case "engineAtTop":
-      return "An engine sits at the top of the folder. Move it into engine/<platform>/<version>/.";
-    case "unreadableEngine":
-      return `${p.path} cannot be copied${p.detail ? `: ${p.detail}` : "."}`;
-    case "noEngineForThisPlatform":
-      return `The bundled engines are all for other platforms, so a player on ${p.detail ?? "this machine"} downloads one on first run. Add engine/${p.detail ?? "<platform>"}/<version>/ to bundle it.`;
+      return t`An engine sits at the top of the folder. Move it into engine/<platform>/<version>/.`;
+    case "unreadableEngine": {
+      const path = p.path;
+      const detail = p.detail;
+      return detail
+        ? t`${path} cannot be copied: ${detail}`
+        : t`${path} cannot be copied.`;
+    }
+    case "noEngineForThisPlatform": {
+      const platform = p.detail ?? t`this machine`;
+      const folder = p.detail ?? "<platform>";
+      return t`The bundled engines are all for other platforms, so a player on ${platform} downloads one on first run. Add engine/${folder}/<version>/ to bundle it.`;
+    }
   }
 }

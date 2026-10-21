@@ -1,3 +1,4 @@
+import { useLingui } from "@lingui/react/macro";
 import { cn } from "@picoframe/frame";
 import {
   KEYBOARD_ROWS,
@@ -69,6 +70,7 @@ function Cap({
   selected: string | null;
   onSelect: (keys: string) => void;
 }) {
+  const { t } = useLingui();
   const bindings = bindingsFor(keymap, keys);
   const bound = bindings.length > 0;
   const yours = bindings.some((b) => b.source === "user");
@@ -82,7 +84,7 @@ function Cap({
       title={
         bound
           ? `${keys}: ${bindings.map((b) => b.action).join(", ")}`
-          : `${keys}: nothing bound`
+          : t`${keys}: nothing bound`
       }
       // The flex basis is the cap's width in key units, so a row always fills
       // the panel however wide it is and Space stays six keys long.

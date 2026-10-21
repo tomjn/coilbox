@@ -1,3 +1,5 @@
+import { plural } from "@lingui/core/macro";
+import { Trans, useLingui } from "@lingui/react/macro";
 import { Button, cn, Input } from "@picoframe/frame";
 import { Check, ChevronsUpDown, X } from "lucide-react";
 import {
@@ -149,7 +151,7 @@ export function UnitPicker({
   gameName,
   selected,
   onChange,
-  selectedLabel = "selected",
+  selectedLabel,
   enginePath,
   dataDir,
   gameArchive,
@@ -185,7 +187,10 @@ export function UnitPicker({
   /** Pre-resolved build icons, if the caller already has them. */
   buildpics?: UnitBuildpicsResult | null;
 }) {
+  const { t } = useLingui();
   const readOnly = !onChange;
+  const selectedWord = selectedLabel ?? t`selected`;
+  const selectedCount = selected.length;
   const { forest, labels, blocks, allIds, known, icons, iconsPending } =
     useUnitCatalogue({
       units,
@@ -196,6 +201,7 @@ export function UnitPicker({
       gameArchive,
       buildpics,
     });
+  const totalCount = allIds.length;
   const unknown = useMemo(
     () => unknownSelected(selected, known),
     [selected, known],
@@ -217,7 +223,7 @@ export function UnitPicker({
   if (known.size === 0) {
     return (
       <div className="rounded-md border border-dashed border-muted-foreground/40 px-3 py-2 text-xs text-muted-foreground">
-        No unit data available for this game.
+        <Trans>No unit data available for this game.</Trans>
         {selected.length > 0 && (
           <UnknownList
             ids={unknown}
@@ -243,7 +249,7 @@ export function UnitPicker({
         factions={blocks}
         // Both numbers, because "379 allowed" alone does not say whether that is
         // all of them or most of them.
-        count={`${selected.length} of ${allIds.length} ${selectedLabel}`}
+        count={t`${selectedCount} of ${totalCount} ${selectedWord}`}
         isOn={(id) => isSelected(selected, id)}
         mode={readOnly ? "read-only" : "multi"}
         onPick={pick}
@@ -274,7 +280,7 @@ export function UnitPickerButton({
   value,
   onValueChange,
   loading,
-  placeholder = "Pick a unit",
+  placeholder,
   disabled,
   className,
   size = "default",
@@ -313,6 +319,7 @@ export function UnitPickerButton({
   gameArchive?: string;
   buildpics?: UnitBuildpicsResult | null;
 }) {
+  const { t } = useLingui();
   const [open, setOpen] = useState(false);
   const { forest, labels, blocks, allIds, known, icons, iconsPending } =
     useUnitCatalogue({
@@ -351,7 +358,11 @@ export function UnitPickerButton({
               <span
                 className={cn("truncate", !value && "text-muted-foreground")}
               >
-                {value ? pickedLabel : loading ? "Reading units" : placeholder}
+                {value
+                  ? pickedLabel
+                  : loading
+                    ? t`Reading units`
+                    : (placeholder ?? t`Pick a unit`)}
               </span>
             </span>
             <ChevronsUpDown
@@ -405,6 +416,7 @@ function PickedUnit({
   what: string;
   children: ReactNode;
 }) {
+  const { t } = useLingui();
   if (!onClear) return children;
   return (
     <span className="inline-flex items-center gap-1">
@@ -415,11 +427,13 @@ function PickedUnit({
         // A cross on its own, beside a picker showing what is picked: the words
         // would only repeat what the thing next to it already says.
         className="h-8 w-8 p-0"
-        title={`Stop placing ${what}`}
+        title={t`Stop placing ${what}`}
         onClick={onClear}
       >
         <X className="size-3.5 shrink-0" aria-hidden />
-        <span className="sr-only">Stop placing {what}</span>
+        <span className="sr-only">
+          <Trans>Stop placing {what}</Trans>
+        </span>
       </Button>
     </span>
   );
@@ -547,6 +561,7 @@ function UnitList({
   onPick: (id: string, on: boolean) => void;
   autoFocusSearch?: boolean;
 }) {
+  const { t } = useLingui();
   const [query, setQuery] = useState("");
 
   // A commander's tech levels are one row here, not five (issue #2063): only
@@ -582,7 +597,10 @@ function UnitList({
     const name = labels.get(id) ?? id;
     const extra = upgradeCount.get(id) ?? 0;
     return extra > 0
-      ? `${name}, ${extra} upgrade${extra === 1 ? "" : "s"}`
+      ? plural(extra, {
+          one: `${name}, # upgrade`,
+          other: `${name}, # upgrades`,
+        })
       : name;
   };
 
@@ -601,6 +619,7 @@ function UnitList({
     return factionGroups(forest, rowIds, name, heading, match);
   }, [forest, rowIds, stagesOf, labels, factions, query]);
 
+  const matchableCount = rowIds.length;
   const showHeadings = groups.length > 1;
   const rows = useMemo(() => {
     const out: PickerRow[] = [];
@@ -742,9 +761,9 @@ function UnitList({
         <Input
           value={query}
           onChange={(e) => setQuery(e.target.value)}
-          placeholder="Search units…"
+          placeholder={t`Search units…`}
           className="h-8"
-          aria-label="Search units"
+          aria-label={t`Search units`}
           // The popover opened for this box, and the list is long enough that
           // reaching it by tab is a step nobody asked for.
           autoFocus={autoFocusSearch}
@@ -758,7 +777,7 @@ function UnitList({
 
       {total === 0 ? (
         <p className="rounded-md border border-border/50 px-2 py-1 text-xs text-muted-foreground">
-          No units match.
+          <Trans>No units match.</Trans>
         </p>
       ) : (
         <div
@@ -815,8 +834,8 @@ function UnitList({
       {(needle || !count) && (
         <p className="text-xs text-muted-foreground">
           {needle
-            ? `${total} of ${rowIds.length} units`
-            : `${total} unit${total === 1 ? "" : "s"}`}
+            ? t`${total} of ${matchableCount} units`
+            : plural(total, { one: "# unit", other: "# units" })}
         </p>
       )}
     </div>
@@ -949,10 +968,12 @@ function UnknownList({
   readOnly: boolean;
   onRemove: (id: string) => void;
 }) {
+  const { t } = useLingui();
+  const idCount = ids.length;
   return (
     <div className="flex flex-col gap-1">
       <span className="text-xs text-muted-foreground">
-        Not in this game ({ids.length}), kept from the saved set.
+        <Trans>Not in this game ({idCount}), kept from the saved set.</Trans>
       </span>
       <ul className="flex flex-wrap gap-1.5">
         {ids.map((id) => (
@@ -964,7 +985,7 @@ function UnknownList({
             {!readOnly && (
               <button
                 type="button"
-                aria-label={`Remove ${id}`}
+                aria-label={t`Remove ${id}`}
                 onClick={() => onRemove(id)}
                 className="text-muted-foreground hover:text-foreground"
               >

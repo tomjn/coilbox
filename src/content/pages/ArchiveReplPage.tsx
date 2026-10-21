@@ -1,3 +1,4 @@
+import { useLingui } from "@lingui/react/macro";
 import { ArrowLeft } from "lucide-react";
 import { Link, useParams } from "react-router";
 import { useArchives, useScanTargetSelection } from "../config";
@@ -10,6 +11,7 @@ import { DetailLoading, NotFound } from "./components/states";
  * the page height so long sessions get room to breathe.
  */
 export default function ArchiveReplPage() {
+  const { t } = useLingui();
   const { name } = useParams();
   const decoded = name ?? "";
   const { selected } = useScanTargetSelection();
@@ -22,7 +24,7 @@ export default function ArchiveReplPage() {
 
   if (!data || loading) return <DetailLoading backTo={backTo} />;
   if (!archive || !selected?.enginePath || !selected?.rootPath)
-    return <NotFound backTo={backTo} label="archive" />;
+    return <NotFound backTo={backTo} label={t`archive`} />;
 
   return (
     <div className="flex h-full min-h-0 flex-col gap-3 p-4">
@@ -33,7 +35,7 @@ export default function ArchiveReplPage() {
         >
           <ArrowLeft className="size-3.5" /> {archive.name}
         </Link>
-        <h1 className="font-mono text-lg font-semibold">Lua REPL</h1>
+        <h1 className="font-mono text-lg font-semibold">{t`Lua REPL`}</h1>
       </header>
       <LuaRepl
         fill

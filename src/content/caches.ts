@@ -4,6 +4,7 @@
  * (free of binding imports) makes them unit-testable.
  */
 
+import { plural, t } from "@lingui/core/macro";
 import { formatBytes } from "@/lib/format";
 import type { CacheReclaimSummary } from "./bindings";
 
@@ -14,10 +15,18 @@ export function isEmpty(s: CacheReclaimSummary): boolean {
 
 /** One-line description of what a reclaim (dry-run or applied) covers. */
 export function summarizeCaches(s: CacheReclaimSummary): string {
-  if (isEmpty(s)) return "Caches are already empty - nothing to reclaim.";
-  const files = `${s.totalFiles} ${s.totalFiles === 1 ? "file" : "files"}`;
-  const verb = s.applied ? "Cleared" : "Can reclaim";
-  return `${verb} ${files} (${formatBytes(s.totalBytes)}).`;
+  if (isEmpty(s)) return t`Caches are already empty - nothing to reclaim.`;
+  const fileCount = s.totalFiles;
+  const size = formatBytes(s.totalBytes);
+  return s.applied
+    ? plural(fileCount, {
+        one: `Cleared # file (${size}).`,
+        other: `Cleared # files (${size}).`,
+      })
+    : plural(fileCount, {
+        one: `Can reclaim # file (${size}).`,
+        other: `Can reclaim # files (${size}).`,
+      });
 }
 
 /** Non-empty caches, largest first, for the per-cache breakdown. */

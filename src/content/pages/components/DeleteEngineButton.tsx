@@ -1,3 +1,5 @@
+import { t } from "@lingui/core/macro";
+import { Trans, useLingui } from "@lingui/react/macro";
 import { Button } from "@picoframe/frame";
 import { Loader2, Trash2 } from "lucide-react";
 import { useState } from "react";
@@ -38,6 +40,8 @@ export function DeleteEngineButton({
   /** Re-read the breakdown, which is now short one engine. */
   onDeleted: () => void;
 }) {
+  const { t: tr } = useLingui();
+  const version = engine.version;
   const [open, setOpen] = useState(false);
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -50,8 +54,8 @@ export function DeleteEngineButton({
       const freed = formatBytes(bytes);
       void notify({
         title: freed
-          ? `Deleted engine ${engine.version}, freeing ${freed}.`
-          : `Deleted engine ${engine.version}.`,
+          ? t`Deleted engine ${version}, freeing ${freed}.`
+          : t`Deleted engine ${version}.`,
         level: "success",
       });
       setOpen(false);
@@ -63,6 +67,9 @@ export function DeleteEngineButton({
     }
   }
 
+  const freedBytes = formatBytes(engine.bytes) ?? "0 B";
+  const replayBytes = formatBytes(engine.replayBytes);
+
   return (
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
@@ -72,31 +79,37 @@ export function DeleteEngineButton({
           size="sm"
           className="gap-1.5"
           disabled={!!blockReason}
-          title={blockReason ?? `Delete engine ${engine.version}`}
+          title={blockReason ?? tr`Delete engine ${version}`}
         >
           <Trash2 className="size-4" />
-          Delete
+          <Trans>Delete</Trans>
         </Button>
       </PopoverTrigger>
       <PopoverContent align="end" className="flex w-80 flex-col gap-3">
         <div className="flex flex-col gap-1">
           <h3 className="text-sm font-medium">
-            Delete engine {engine.version}?
+            <Trans>Delete engine {version}?</Trans>
           </h3>
           <p className="text-xs text-muted-foreground">
-            The whole folder goes, freeing {formatBytes(engine.bytes) ?? "0 B"}.
-            You would have to download this version again to replay a game
-            recorded on it.
+            <Trans>
+              The whole folder goes, freeing {freedBytes}. You would have to
+              download this version again to replay a game recorded on it.
+            </Trans>
           </p>
           {engine.replayBytes > 0 && (
             <p className="text-xs text-amber-700 dark:text-amber-400">
-              This engine recorded {formatBytes(engine.replayBytes)} of replays
-              into its own folder, which go with it. Move them out first with
-              Gather replays on the{" "}
-              <Link to="/play/replays" className="underline underline-offset-4">
-                Replays screen
-              </Link>
-              .
+              <Trans>
+                This engine recorded {replayBytes} of replays into its own
+                folder, which go with it. Move them out first with Gather
+                replays on the{" "}
+                <Link
+                  to="/play/replays"
+                  className="underline underline-offset-4"
+                >
+                  Replays screen
+                </Link>
+                .
+              </Trans>
             </p>
           )}
         </div>
@@ -108,7 +121,7 @@ export function DeleteEngineButton({
             onClick={() => setOpen(false)}
             disabled={pending}
           >
-            Cancel
+            <Trans>Cancel</Trans>
           </Button>
           <Button
             type="button"
@@ -123,7 +136,7 @@ export function DeleteEngineButton({
             ) : (
               <Trash2 className="size-4" />
             )}
-            Delete
+            <Trans>Delete</Trans>
           </Button>
         </div>
         {error && (

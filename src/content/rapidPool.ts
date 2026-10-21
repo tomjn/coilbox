@@ -5,6 +5,7 @@
  * module stays free of binding imports (and thus unit-testable).
  */
 
+import { plural, t } from "@lingui/core/macro";
 import { formatBytes } from "@/lib/format";
 import type { PruneSummary } from "./bindings";
 
@@ -29,15 +30,25 @@ export function isClean(s: PruneSummary): boolean {
 
 /** One-line description of what a prune (dry-run or applied) covers. */
 export function summarize(s: PruneSummary): string {
-  if (isClean(s)) return "Nothing to reclaim - the pool is tidy.";
+  if (isClean(s)) return t`Nothing to reclaim - the pool is tidy.`;
   const parts: string[] = [];
-  if (s.blobs > 0) parts.push(`${s.blobs} orphaned ${plural(s.blobs, "blob")}`);
+  if (s.blobs > 0)
+    parts.push(
+      plural(s.blobs, {
+        one: "# orphaned blob",
+        other: "# orphaned blobs",
+      }),
+    );
   if (s.incompletes > 0)
-    parts.push(`${s.incompletes} partial ${plural(s.incompletes, "file")}`);
-  const verb = s.applied ? "Removed" : "Can reclaim";
-  return `${verb} ${parts.join(" + ")} (${formatBytes(reclaimedBytes(s))}).`;
-}
-
-function plural(n: number, word: string): string {
-  return n === 1 ? word : `${word}s`;
+    parts.push(
+      plural(s.incompletes, {
+        one: "# partial file",
+        other: "# partial files",
+      }),
+    );
+  const what = parts.join(" + ");
+  const size = formatBytes(reclaimedBytes(s));
+  return s.applied
+    ? t`Removed ${what} (${size}).`
+    : t`Can reclaim ${what} (${size}).`;
 }

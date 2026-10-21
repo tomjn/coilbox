@@ -1,3 +1,4 @@
+import { Trans, useLingui } from "@lingui/react/macro";
 import { Button } from "@picoframe/frame";
 import { open } from "@tauri-apps/plugin-dialog";
 import { AlertCircle, FolderPlus, Loader2, RefreshCw } from "lucide-react";
@@ -31,6 +32,7 @@ const msg = (e: unknown): string =>
  * title, so this is the body only.
  */
 export default function FoldersSection() {
+  const { t } = useLingui();
   const { state, setState, loading, error } = useContentState();
   const [prefs, setPrefs] = useContentPrefs();
   const [rescanning, setRescanning] = useState(false);
@@ -75,7 +77,7 @@ export default function FoldersSection() {
     const picked = await open({
       directory: true,
       multiple: false,
-      title: "Select a Spring/Recoil data folder",
+      title: t`Select a Spring/Recoil data folder`,
     });
     if (typeof picked !== "string") return;
     setActionError(null);
@@ -169,11 +171,11 @@ export default function FoldersSection() {
   const gamesPath = useWriteRootPath("games");
   const mapsPath = useWriteRootPath("maps");
   const receives = (path: string): string[] => [
-    ...(path === defaultPath ? ["new content goes here"] : []),
+    ...(path === defaultPath ? [t`new content goes here`] : []),
     ...(path === gamesPath && path !== defaultPath
-      ? ["new games go here"]
+      ? [t`new games go here`]
       : []),
-    ...(path === mapsPath && path !== defaultPath ? ["new maps go here"] : []),
+    ...(path === mapsPath && path !== defaultPath ? [t`new maps go here`] : []),
   ];
 
   return (
@@ -188,13 +190,13 @@ export default function FoldersSection() {
             {/* biome-ignore lint/a11y/noLabelWithoutControl: wraps the <Checkbox> control */}
             <label
               className="flex items-center gap-1.5 text-xs text-muted-foreground"
-              title="Store the added folder as a path relative to the app dir, so it follows the executable in a portable install. The folder must be inside the app folder."
+              title={t`Store the added folder as a path relative to the app dir, so it follows the executable in a portable install. The folder must be inside the app folder.`}
             >
               <Checkbox
                 checked={addPortable}
                 onCheckedChange={(v) => setAddPortable(v === true)}
               />
-              Portable
+              <Trans>Portable</Trans>
             </label>
             <Button
               type="button"
@@ -203,7 +205,7 @@ export default function FoldersSection() {
               onClick={pickAndAdd}
             >
               <FolderPlus className="size-4" />
-              Add folder
+              <Trans>Add folder</Trans>
             </Button>
             <Button
               type="button"
@@ -216,7 +218,7 @@ export default function FoldersSection() {
               ) : (
                 <RefreshCw className="size-4" />
               )}
-              Rescan
+              <Trans>Rescan</Trans>
             </Button>
           </div>
         </div>
@@ -243,7 +245,7 @@ export default function FoldersSection() {
                 size="sm"
                 onClick={addAnyway}
               >
-                Add anyway
+                <Trans>Add anyway</Trans>
               </Button>
               <Button
                 type="button"
@@ -251,7 +253,7 @@ export default function FoldersSection() {
                 size="sm"
                 onClick={() => setAddError(null)}
               >
-                Cancel
+                <Trans>Cancel</Trans>
               </Button>
             </div>
           </Alert>
@@ -265,14 +267,16 @@ export default function FoldersSection() {
         ) : roots.length === 0 ? (
           <div className="flex flex-col items-center gap-3 rounded-lg border border-dashed p-10 text-center">
             <p className="text-sm text-muted-foreground">
-              No content folders found yet. Rescan to detect standard locations,
-              or add one manually.
+              <Trans>
+                No content folders found yet. Rescan to detect standard
+                locations, or add one manually.
+              </Trans>
             </p>
             <div className="flex items-center gap-2">
               {standardPath && (
                 <Button type="button" size="sm" onClick={createStandard}>
                   <FolderPlus className="size-4" />
-                  Create folder at {standardPath}
+                  <Trans>Create folder at {standardPath}</Trans>
                 </Button>
               )}
               <Button
@@ -282,7 +286,7 @@ export default function FoldersSection() {
                 onClick={pickAndAdd}
               >
                 <FolderPlus className="size-4" />
-                Add folder
+                <Trans>Add folder</Trans>
               </Button>
             </div>
           </div>
@@ -306,7 +310,7 @@ export default function FoldersSection() {
 
       <section className="space-y-3">
         <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
-          Detection
+          <Trans>Detection</Trans>
         </h2>
         {/* biome-ignore lint/a11y/noLabelWithoutControl: wraps the <Checkbox> control */}
         <label className="flex items-start gap-2.5 text-sm">
@@ -318,9 +322,13 @@ export default function FoldersSection() {
             className="mt-0.5"
           />
           <span className="flex flex-col gap-0.5">
-            <span className="font-medium leading-none">Scan on startup</span>
+            <span className="font-medium leading-none">
+              <Trans>Scan on startup</Trans>
+            </span>
             <span className="text-xs leading-snug text-muted-foreground">
-              Detect standard data roots the first time this section opens.
+              <Trans>
+                Detect standard data roots the first time this section opens.
+              </Trans>
             </span>
           </span>
         </label>
@@ -335,16 +343,18 @@ export default function FoldersSection() {
           />
           <span className="flex flex-col gap-0.5">
             <span className="font-medium leading-none">
-              Probe Zero-K / Steam
+              <Trans>Probe Zero-K / Steam</Trans>
             </span>
             <span className="text-xs leading-snug text-muted-foreground">
-              Also check Steam install locations for Zero-K during a rescan.
+              <Trans>
+                Also check Steam install locations for Zero-K during a rescan.
+              </Trans>
             </span>
           </span>
         </label>
         <CheckField
-          label="Fetch download lists in the background"
-          hint="Load map, game and engine lists after launch. Turn this off on a metered connection."
+          label={t`Fetch download lists in the background`}
+          hint={t`Load map, game and engine lists after launch. Turn this off on a metered connection.`}
           checked={prefs.fetchListsInBackground !== false}
           onChange={(v) => setPrefs({ ...prefs, fetchListsInBackground: v })}
         />

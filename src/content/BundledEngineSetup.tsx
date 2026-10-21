@@ -1,3 +1,4 @@
+import { t } from "@lingui/core/macro";
 import {
   createContext,
   type ReactNode,
@@ -102,7 +103,7 @@ export function BundledEngineSetup({ children }: { children: ReactNode }) {
           setState({
             status: "failed",
             engine,
-            error: settled.error ?? "The copy stopped.",
+            error: settled.error ?? t`The copy stopped.`,
           });
           return;
         }

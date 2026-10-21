@@ -1,3 +1,4 @@
+import { Trans, useLingui } from "@lingui/react/macro";
 import { Button, Input } from "@picoframe/frame";
 import { Loader2, RotateCcw } from "lucide-react";
 import { useEffect, useState } from "react";
@@ -42,6 +43,7 @@ export function EngineSettingField({
   writable: boolean;
   onWrite: (key: string, value: string) => Promise<EngineConfigWriteResult>;
 }) {
+  const { t } = useLingui();
   const id = `engineopt-${s.key}`;
   const [draft, setDraft] = useState(s.value);
   const [saving, setSaving] = useState(false);
@@ -60,23 +62,24 @@ export function EngineSettingField({
     const res = await onWrite(s.key, value);
     setSaving(false);
     if (!res.ok) {
-      setErr(res.errors[0] ?? "write failed");
+      setErr(res.errors[0] ?? t`write failed`);
       setDraft(s.value); // revert to the last committed value
     }
   }
 
+  const defaultValue = s.default || t`empty`;
   const reset = writable && changed && (
     <Button
       type="button"
       variant="ghost"
       size="sm"
       className="h-7 gap-1 px-2 text-xs text-muted-foreground"
-      title={`Reset to engine default (${s.default || "empty"})`}
+      title={t`Reset to engine default (${defaultValue})`}
       disabled={saving}
       onClick={() => commit(s.default)}
     >
       <RotateCcw className="size-3" />
-      Reset
+      <Trans>Reset</Trans>
     </Button>
   );
 

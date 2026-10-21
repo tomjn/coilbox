@@ -1,3 +1,5 @@
+import { t } from "@lingui/core/macro";
+import { Trans, useLingui } from "@lingui/react/macro";
 import { Button } from "@picoframe/frame";
 import { FolderOpen, Loader2, RefreshCw, Trash2 } from "lucide-react";
 import { CheckField } from "@/components/Field";
@@ -7,7 +9,7 @@ import type { ContentRoot } from "../../bindings";
 import { StatusBadge } from "./StatusBadge";
 
 function fmtTime(ms?: number): string {
-  return ms ? formatDateTime(new Date(ms)) : "never";
+  return ms ? formatDateTime(new Date(ms)) : t`never`;
 }
 
 function Stat({ label, value }: { label: string; value: number }) {
@@ -41,6 +43,9 @@ export function RootCard({
   onSetReadOnly: (path: string, readOnly: boolean) => void;
   onOpen: (path: string) => void;
 }) {
+  const { t } = useLingui();
+  const origins = root.origins.join(", ");
+  const scannedAt = fmtTime(root.lastScannedAt);
   const isManual = root.source === "manual";
   return (
     <Card className="gap-4 rounded-lg border-border/50 p-4 shadow-none">
@@ -59,49 +64,61 @@ export function RootCard({
               </StatusBadge>
             ))}
             <StatusBadge tone={isManual ? "info" : "neutral"}>
-              {isManual ? "manual" : "auto"}
+              {isManual ? t`manual` : t`auto`}
             </StatusBadge>
             <StatusBadge tone="neutral">{root.kind}</StatusBadge>
             {root.portable ? (
-              <StatusBadge tone="info">portable</StatusBadge>
+              <StatusBadge tone="info">
+                <Trans>portable</Trans>
+              </StatusBadge>
             ) : null}
             {root.bundled ? (
-              <StatusBadge tone="info">bundled, read only</StatusBadge>
+              <StatusBadge tone="info">
+                <Trans>bundled, read only</Trans>
+              </StatusBadge>
             ) : root.readOnly ? (
-              <StatusBadge tone="info">read only</StatusBadge>
+              <StatusBadge tone="info">
+                <Trans>read only</Trans>
+              </StatusBadge>
             ) : null}
             {root.valid ? (
-              <StatusBadge tone="good">valid</StatusBadge>
+              <StatusBadge tone="good">
+                <Trans>valid</Trans>
+              </StatusBadge>
             ) : (
               <StatusBadge tone="warn">
-                {root.exists ? "not a Spring root" : "missing"}
+                {root.exists ? t`not a Spring root` : t`missing`}
               </StatusBadge>
             )}
-            {root.forced ? <StatusBadge tone="warn">forced</StatusBadge> : null}
+            {root.forced ? (
+              <StatusBadge tone="warn">
+                <Trans>forced</Trans>
+              </StatusBadge>
+            ) : null}
           </div>
           {root.origins.length > 0 && (
             <p className="text-xs text-muted-foreground">
-              detected via {root.origins.join(", ")}
+              <Trans>detected via {origins}</Trans>
             </p>
           )}
         </div>
       </div>
 
       <div className="grid grid-cols-4 gap-2">
-        <Stat label="engines" value={root.counts.engines} />
-        <Stat label="maps" value={root.counts.maps} />
-        <Stat label="games" value={root.counts.games} />
-        <Stat label="packages" value={root.counts.packages} />
+        <Stat label={t`engines`} value={root.counts.engines} />
+        <Stat label={t`maps`} value={root.counts.maps} />
+        <Stat label={t`games`} value={root.counts.games} />
+        <Stat label={t`packages`} value={root.counts.packages} />
       </div>
 
       <div className="flex flex-wrap items-center justify-between gap-2">
         <span className="text-xs text-muted-foreground">
-          scanned {fmtTime(root.lastScannedAt)}
+          <Trans>scanned {scannedAt}</Trans>
         </span>
         <div className="flex items-center gap-2">
           {!root.bundled && (
             <CheckField
-              label="Read only"
+              label={t`Read only`}
               checked={root.readOnly === true}
               onChange={(v) => onSetReadOnly(root.path, v)}
             />
@@ -114,7 +131,7 @@ export function RootCard({
             onClick={() => onOpen(root.path)}
           >
             <FolderOpen className="size-4" />
-            Open
+            <Trans>Open</Trans>
           </Button>
           <Button
             type="button"
@@ -128,7 +145,7 @@ export function RootCard({
             ) : (
               <RefreshCw className="size-4" />
             )}
-            Re-scan
+            <Trans>Re-scan</Trans>
           </Button>
           {isManual && !root.bundled && (
             <Button
@@ -138,7 +155,7 @@ export function RootCard({
               onClick={() => onRemove(root.path)}
             >
               <Trash2 className="size-4" />
-              Remove
+              <Trans>Remove</Trans>
             </Button>
           )}
         </div>

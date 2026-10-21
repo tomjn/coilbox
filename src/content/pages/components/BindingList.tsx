@@ -1,3 +1,4 @@
+import { Trans, useLingui } from "@lingui/react/macro";
 import { Button, Input } from "@picoframe/frame";
 import { useMemo, useState } from "react";
 import { Badge } from "@/components/ui/badge";
@@ -26,6 +27,7 @@ export function BindingList({
   onSelect: (keys: string) => void;
   onRemove: (keys: string, action: string) => void;
 }) {
+  const { t } = useLingui();
   const [filter, setFilter] = useState("");
 
   const conflicts = useMemo(
@@ -33,6 +35,7 @@ export function BindingList({
     [keymap.bindings],
   );
 
+  const total = keymap.bindings.length;
   const rows = useMemo(() => {
     const q = filter.trim().toLowerCase();
     // Sort by keyset so a multi-bound key's actions sit together, and keep the
@@ -50,16 +53,19 @@ export function BindingList({
       .map(({ b }) => b);
   }, [keymap.bindings, filter]);
 
+  const shown = rows.length;
   return (
     <div className="space-y-2">
       <div className="flex items-center gap-2">
         <Input
           value={filter}
           onChange={(e) => setFilter(e.target.value)}
-          placeholder="Search by key or action"
+          placeholder={t`Search by key or action`}
         />
         <span className="shrink-0 text-xs text-muted-foreground">
-          {rows.length} of {keymap.bindings.length}
+          <Trans>
+            {shown} of {total}
+          </Trans>
         </span>
       </div>
 
@@ -84,12 +90,12 @@ export function BindingList({
                 <td className="w-40 px-2 py-1 text-right">
                   {b.source === "user" ? (
                     <Badge variant="outline" className="text-[10px]">
-                      yours
+                      <Trans>yours</Trans>
                     </Badge>
                   ) : null}
                   {conflicts.has(b.keys) ? (
                     <Badge variant="outline" className="ml-1 text-[10px]">
-                      shared key
+                      <Trans>shared key</Trans>
                     </Badge>
                   ) : null}
                 </td>
@@ -99,7 +105,7 @@ export function BindingList({
                     variant="ghost"
                     onClick={() => onRemove(b.keys, b.action)}
                   >
-                    Remove
+                    <Trans>Remove</Trans>
                   </Button>
                 </td>
               </tr>
@@ -110,7 +116,7 @@ export function BindingList({
                   colSpan={4}
                   className="px-2 py-4 text-center text-muted-foreground text-sm"
                 >
-                  No binding matches that.
+                  <Trans>No binding matches that.</Trans>
                 </td>
               </tr>
             ) : null}
@@ -120,7 +126,7 @@ export function BindingList({
 
       <Collapsible>
         <CollapsibleTrigger className="text-muted-foreground text-xs underline-offset-4 hover:underline">
-          Show the file this would write
+          <Trans>Show the file this would write</Trans>
         </CollapsibleTrigger>
         <CollapsibleContent>
           <pre className="mt-2 max-h-80 overflow-auto rounded-lg border border-border/50 bg-muted/20 p-2 font-mono text-xs">

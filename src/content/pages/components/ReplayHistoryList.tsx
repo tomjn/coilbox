@@ -1,3 +1,4 @@
+import { useLingui } from "@lingui/react/macro";
 import { History } from "lucide-react";
 import { Link } from "react-router";
 import { formatDateTime } from "@/lib/format";
@@ -26,12 +27,13 @@ function playedAt(ms: number): string {
 export function ReplayHistoryList({
   dataDir,
   match,
-  emptyLabel = "No replays recorded here yet.",
+  emptyLabel,
 }: {
   dataDir?: string;
   match: (p: ReplayProvenance) => boolean;
   emptyLabel?: string;
 }) {
+  const { t } = useLingui();
   const { replays } = useReplays(dataDir);
   const userState = useReplayUserState();
 
@@ -46,7 +48,11 @@ export function ReplayHistoryList({
     );
 
   if (matched.length === 0) {
-    return <p className="text-xs text-muted-foreground">{emptyLabel}</p>;
+    return (
+      <p className="text-xs text-muted-foreground">
+        {emptyLabel ?? t`No replays recorded here yet.`}
+      </p>
+    );
   }
 
   return (

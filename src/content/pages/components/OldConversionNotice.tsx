@@ -1,3 +1,5 @@
+import { t } from "@lingui/core/macro";
+import { Trans } from "@lingui/react/macro";
 import { Button } from "@picoframe/frame";
 import { Loader2 } from "lucide-react";
 import { useEffect, useState } from "react";
@@ -49,7 +51,7 @@ export function OldConversionNotice({
       await contentUndo3doInstall({ gameDir });
       onRestored();
       void notify({
-        title: "Restored the original models. Convert them again.",
+        title: t`Restored the original models. Convert them again.`,
         level: "success",
       });
     } catch (e) {
@@ -62,8 +64,10 @@ export function OldConversionNotice({
   return (
     <div className="flex flex-wrap items-center gap-2 rounded-md border border-border/50 p-2 text-xs">
       <span>
-        The converted models were made by an older coilbox and draw the wrong
-        colours.
+        <Trans>
+          The converted models were made by an older coilbox and draw the wrong
+          colours.
+        </Trans>
       </span>
       <Button
         type="button"
@@ -74,7 +78,11 @@ export function OldConversionNotice({
         onClick={hasOriginals ? onConvert : restore}
       >
         {busy ? <Loader2 className="size-4 animate-spin" /> : null}
-        {hasOriginals ? "Convert again" : "Restore originals"}
+        {hasOriginals ? (
+          <Trans>Convert again</Trans>
+        ) : (
+          <Trans>Restore originals</Trans>
+        )}
       </Button>
       {error && <span className="w-full text-destructive">{error}</span>}
     </div>

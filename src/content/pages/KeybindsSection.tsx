@@ -1,3 +1,4 @@
+import { Trans, useLingui } from "@lingui/react/macro";
 import { Button } from "@picoframe/frame";
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router";
@@ -47,6 +48,7 @@ import { EmptyState, ErrorBanner, ScanFailed } from "./components/states";
  * player's changes alone.
  */
 export default function KeybindsSection() {
+  const { t } = useLingui();
   const { targets, selected, selectedKey, loading, refresh } =
     useScanTargetSelection();
   const enginePath = selected?.enginePath;
@@ -114,6 +116,7 @@ export default function KeybindsSection() {
   // What is dirty is what would be written, so compare the files rather than
   // the objects: a keymap rebuilt by an edit that changed nothing is not dirty.
   const text = keymapText(keymap);
+  const includedFiles = keymap.includes.join(", ");
   const dirty = text !== keymapText(resolved);
 
   async function onSave() {
@@ -126,7 +129,7 @@ export default function KeybindsSection() {
     return (
       <EmptyState
         label={
-          <>
+          <Trans>
             No engines found in your content folders. Add a folder in{" "}
             <Link
               to="/settings/content-folders"
@@ -142,7 +145,7 @@ export default function KeybindsSection() {
               Engines
             </Link>
             .
-          </>
+          </Trans>
         }
       />
     );
@@ -159,7 +162,7 @@ export default function KeybindsSection() {
 
       <div className="flex flex-wrap items-center gap-2">
         <span className="text-sm text-muted-foreground">
-          Bindings a game brings with it:
+          <Trans>Bindings a game brings with it:</Trans>
         </span>
         <div className="w-72">
           <GamePickerField
@@ -167,30 +170,36 @@ export default function KeybindsSection() {
             onValueChange={setGameName}
             games={games}
             headers={gameHeaders}
-            placeholder={scan.loading ? "Reading games..." : "No game selected"}
-            ariaLabel="Game whose bindings to show"
+            placeholder={
+              scan.loading ? t`Reading games...` : t`No game selected`
+            }
+            ariaLabel={t`Game whose bindings to show`}
             disabled={games.length === 0}
             gamesLoading={scan.loading}
           />
         </div>
       </div>
 
-      {scan.error ? <ScanFailed noun="games" reason={scan.error} /> : null}
+      {scan.error ? <ScanFailed noun={t`games`} reason={scan.error} /> : null}
       {file.error ? <ErrorBanner message={file.error} /> : null}
       {saveError ? <ErrorBanner message={saveError} /> : null}
 
       {keymap.includes.length > 0 ? (
         <p className="rounded-md border border-border/50 bg-muted/30 p-2 text-xs text-muted-foreground">
-          This file loads {keymap.includes.join(", ")} with keyload, which
-          coilbox does not follow, so bindings from there are not shown. Saving
-          keeps the keyload line.
+          <Trans>
+            This file loads {includedFiles} with keyload, which coilbox does not
+            follow, so bindings from there are not shown. Saving keeps the
+            keyload line.
+          </Trans>
         </p>
       ) : null}
 
       {file.data?.exists && !file.data.ours ? (
         <p className="rounded-md border border-border/50 bg-muted/30 p-2 text-xs text-muted-foreground">
-          This uikeys.txt was written by hand or by another tool. The first save
-          keeps a copy of it as uikeys.txt.bak.
+          <Trans>
+            This uikeys.txt was written by hand or by another tool. The first
+            save keeps a copy of it as uikeys.txt.bak.
+          </Trans>
         </p>
       ) : null}
 
@@ -243,7 +252,9 @@ export default function KeybindsSection() {
         />
       ) : (
         <p className="text-sm text-muted-foreground">
-          Pick a key above to see what it does, or find it in the list below.
+          <Trans>
+            Pick a key above to see what it does, or find it in the list below.
+          </Trans>
         </p>
       )}
 
@@ -269,7 +280,7 @@ export default function KeybindsSection() {
           className="break-all font-mono text-xs text-muted-foreground"
           title={file.data?.path}
         >
-          {file.data?.path ?? "No config file yet"}
+          {file.data?.path ?? t`No config file yet`}
         </p>
         <div className="flex gap-2">
           <Button
@@ -278,10 +289,10 @@ export default function KeybindsSection() {
             disabled={!dirty || saving}
             onClick={() => setKeymap(resolved)}
           >
-            Revert
+            <Trans>Revert</Trans>
           </Button>
           <Button size="sm" disabled={!dirty || saving} onClick={onSave}>
-            {saving ? "Saving..." : "Save to uikeys.txt"}
+            {saving ? t`Saving...` : t`Save to uikeys.txt`}
           </Button>
         </div>
       </div>

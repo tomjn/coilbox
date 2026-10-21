@@ -1,3 +1,4 @@
+import { Trans, useLingui } from "@lingui/react/macro";
 import { Button } from "@picoframe/frame";
 import { Loader2, Trash2 } from "lucide-react";
 import { useState } from "react";
@@ -20,6 +21,7 @@ const msg = (e: unknown): string =>
  * explicit confirm. Every cache regenerates on demand, so clearing is always safe.
  */
 export function ReclaimCachesButton() {
+  const { t } = useLingui();
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const [applying, setApplying] = useState(false);
@@ -66,17 +68,17 @@ export function ReclaimCachesButton() {
           type="button"
           variant="outline"
           size="sm"
-          title="Size and clear the generated-image and info caches"
+          title={t`Size and clear the generated-image and info caches`}
         >
           <Trash2 className="size-4" />
-          Reclaim caches
+          <Trans>Reclaim caches</Trans>
         </Button>
       </PopoverTrigger>
       <PopoverContent align="end" className="w-80">
         {loading ? (
           <p className="flex items-center gap-2 text-sm text-muted-foreground">
             <Loader2 className="size-4 animate-spin" />
-            Sizing the caches...
+            <Trans>Sizing the caches...</Trans>
           </p>
         ) : error ? (
           <p className="break-words text-sm text-destructive">{error}</p>
@@ -100,7 +102,11 @@ export function ReclaimCachesButton() {
                 size="sm"
                 onClick={() => setOpen(false)}
               >
-                {isEmpty(preview) ? "Close" : "Cancel"}
+                {isEmpty(preview) ? (
+                  <Trans>Close</Trans>
+                ) : (
+                  <Trans>Cancel</Trans>
+                )}
               </Button>
               {!isEmpty(preview) && (
                 <Button
@@ -114,7 +120,7 @@ export function ReclaimCachesButton() {
                   ) : (
                     <Trash2 className="size-4" />
                   )}
-                  Reclaim
+                  <Trans>Reclaim</Trans>
                 </Button>
               )}
             </div>

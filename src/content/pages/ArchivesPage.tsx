@@ -1,3 +1,4 @@
+import { Trans, useLingui } from "@lingui/react/macro";
 import { Boxes } from "lucide-react";
 import { Link } from "react-router";
 import { formatBytes } from "@/lib/format";
@@ -19,6 +20,7 @@ import {
  * to the archive's detail page (metadata, dependencies, contents).
  */
 export default function ArchivesPage() {
+  const { t } = useLingui();
   const { targets, selected, selectedKey } = useScanTargetSelection();
   const { archives, data, loading, error, cancelled, run, cancel } =
     useArchives(selected?.enginePath, selected?.rootPath);
@@ -27,10 +29,14 @@ export default function ArchivesPage() {
   return (
     <div className="flex flex-col gap-4 p-4">
       <header className="flex flex-col gap-1">
-        <h1 className="text-lg font-semibold">Archives</h1>
+        <h1 className="text-lg font-semibold">
+          <Trans>Archives</Trans>
+        </h1>
         <p className="text-sm text-muted-foreground">
-          Every archive your content references, read via unitsync. Click one to
-          browse its contents.
+          <Trans>
+            Every archive your content references, read via unitsync. Click one
+            to browse its contents.
+          </Trans>
         </p>
       </header>
 
@@ -48,9 +54,9 @@ export default function ArchivesPage() {
       {targets.length === 0 ? null : busy ? (
         <SkeletonList />
       ) : cancelled && archives.length === 0 ? (
-        <EmptyState label="Scan cancelled. Press Rescan to load archives." />
+        <EmptyState label={t`Scan cancelled. Press Rescan to load archives.`} />
       ) : archives.length === 0 ? (
-        <EmptyState label="No archives found for this engine." />
+        <EmptyState label={t`No archives found for this engine.`} />
       ) : (
         <ul className="flex flex-col gap-2">
           {archives.map((a) => {

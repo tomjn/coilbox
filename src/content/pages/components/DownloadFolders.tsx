@@ -1,3 +1,4 @@
+import { Trans, useLingui } from "@lingui/react/macro";
 import { Field } from "@/components/Field";
 import { OptionSelect } from "@/components/OptionSelect";
 import { useDownloadsConfig } from "../../../downloads/config";
@@ -16,6 +17,7 @@ const SAME_AS_DEFAULT = "same-as-default";
  * below already says so and offers to add one.
  */
 export function DownloadFolders({ roots }: { roots: ContentRoot[] }) {
+  const { t } = useLingui();
   const [cfg, setCfg] = useDownloadsConfig();
   // The bundled content folder and any folder set to read only are never
   // written into, so they are never offered as somewhere to download to.
@@ -28,7 +30,7 @@ export function DownloadFolders({ roots }: { roots: ContentRoot[] }) {
     description: root.label ? root.path : undefined,
   }));
   const withDefault = [
-    { value: SAME_AS_DEFAULT, label: "Same as default" },
+    { value: SAME_AS_DEFAULT, label: t`Same as default` },
     ...folders,
   ];
   // A folder that has been removed reads as following the default, which is
@@ -41,25 +43,25 @@ export function DownloadFolders({ roots }: { roots: ContentRoot[] }) {
   return (
     <section className="space-y-3">
       <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
-        New content goes to
+        <Trans>New content goes to</Trans>
       </h2>
       <div className="grid gap-3 sm:grid-cols-3">
-        <Field label="Default">
+        <Field label={t`Default`}>
           <OptionSelect
             value={cfg.writeRootId ?? ""}
             onValueChange={(v) => setCfg({ ...cfg, writeRootId: v })}
-            placeholder="Select a content folder…"
+            placeholder={t`Select a content folder…`}
             options={folders}
           />
         </Field>
-        <Field label="Games">
+        <Field label={t`Games`}>
           <OptionSelect
             value={own(cfg.gamesRootId)}
             onValueChange={(v) => setCfg({ ...cfg, gamesRootId: chosen(v) })}
             options={withDefault}
           />
         </Field>
-        <Field label="Maps">
+        <Field label={t`Maps`}>
           <OptionSelect
             value={own(cfg.mapsRootId)}
             onValueChange={(v) => setCfg({ ...cfg, mapsRootId: chosen(v) })}
