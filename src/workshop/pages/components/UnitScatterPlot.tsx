@@ -24,6 +24,7 @@
  * recharts wiring around it, the same split `MatchStatsChart.tsx` makes
  * against `matchStats.ts`.
  */
+import { Trans, useLingui } from "@lingui/react/macro";
 import { useMemo, useState } from "react";
 import { useNavigate } from "react-router";
 import {
@@ -154,6 +155,7 @@ export function UnitScatterPlot({
   picOf?: (key: string) => UnitDisplay | undefined;
   picsPending?: boolean;
 }) {
+  const { t } = useLingui();
   const navigate = useNavigate();
   const [xId, setXId] = useState(DEFAULT_X_COLUMN);
   const [yId, setYId] = useState(DEFAULT_Y_COLUMN);
@@ -188,35 +190,43 @@ export function UnitScatterPlot({
       <div className="flex flex-wrap items-end gap-4">
         <div className="flex flex-col gap-1">
           <span className="text-xs font-medium text-muted-foreground">
-            X axis
+            <Trans>X axis</Trans>
           </span>
           <div className="flex items-center gap-2">
             <OptionSelect
               value={xId}
               onValueChange={setXId}
-              ariaLabel="X axis"
+              ariaLabel={t`X axis`}
               className="h-9 w-48"
               options={columnOptions}
             />
             {canLogColumn(xId) && (
-              <CheckField label="Log scale" checked={logX} onChange={setLogX} />
+              <CheckField
+                label={t`Log scale`}
+                checked={logX}
+                onChange={setLogX}
+              />
             )}
           </div>
         </div>
         <div className="flex flex-col gap-1">
           <span className="text-xs font-medium text-muted-foreground">
-            Y axis
+            <Trans>Y axis</Trans>
           </span>
           <div className="flex items-center gap-2">
             <OptionSelect
               value={yId}
               onValueChange={setYId}
-              ariaLabel="Y axis"
+              ariaLabel={t`Y axis`}
               className="h-9 w-48"
               options={columnOptions}
             />
             {canLogColumn(yId) && (
-              <CheckField label="Log scale" checked={logY} onChange={setLogY} />
+              <CheckField
+                label={t`Log scale`}
+                checked={logY}
+                onChange={setLogY}
+              />
             )}
           </div>
         </div>

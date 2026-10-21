@@ -18,6 +18,7 @@
  * weapon shows that weapon's numbers rather than its own unequipped
  * definition's.
  */
+import { useLingui } from "@lingui/react/macro";
 import { Button } from "@picoframe/frame";
 import { ArrowLeft, Redo2, Undo2 } from "lucide-react";
 import { useCallback, useMemo } from "react";
@@ -69,6 +70,7 @@ const NO_LIBRARY: WeaponLibrary = {};
 const NO_EQUIPPED: EquippedWeapons = {};
 
 export default function ReferencePage() {
+  const { t } = useLingui();
   const { id } = useParams();
   const { projects, applyEdits, setEdits } = useModProjects();
   const history = useEditHistory();
@@ -455,7 +457,9 @@ export default function ReferencePage() {
   // table (`UnitReferencePage.tsx`) does not already show.
   if (!project)
     return (
-      <EmptyState label="That project is not on this machine. Pick one under Unit tweaks." />
+      <EmptyState
+        label={t`That project is not on this machine. Pick one under Unit tweaks.`}
+      />
     );
   if (error && !data)
     return (
@@ -470,14 +474,14 @@ export default function ReferencePage() {
     return (
       <GameMissingState
         initFailure={null}
-        label={`${gameName} is not installed here, so there are no units to show.`}
+        label={t`${gameName} is not installed here, so there are no units to show.`}
       />
     );
   if (defsStatus === "error")
     return (
       <DetailError
         backTo={backTo}
-        message={defsError ?? "Could not read this game's units."}
+        message={defsError ?? t`Could not read this game's units.`}
         onRetry={reloadDefs}
       />
     );
@@ -492,11 +496,11 @@ export default function ReferencePage() {
             to={backTo}
             className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:underline"
           >
-            <ArrowLeft className="size-3.5" /> {project?.name ?? "Unit tweaks"}
+            <ArrowLeft className="size-3.5" /> {project?.name ?? t`Unit tweaks`}
           </Link>
         }
-        title="Unit reference"
-        description={`Every unit in ${gameName}, with this project's own edits applied. Click a number to change it, or select units to compare them or change them together.`}
+        title={t`Unit reference`}
+        description={t`Every unit in ${gameName}, with this project's own edits applied. Click a number to change it, or select units to compare them or change them together.`}
         actions={
           <>
             <Button
@@ -504,8 +508,8 @@ export default function ReferencePage() {
               size="sm"
               disabled={!history.canUndo(project.id)}
               onClick={undo}
-              aria-label="Undo"
-              title="Undo the last change"
+              aria-label={t`Undo`}
+              title={t`Undo the last change`}
             >
               <Undo2 className="size-3.5" />
             </Button>
@@ -514,8 +518,8 @@ export default function ReferencePage() {
               size="sm"
               disabled={!history.canRedo(project.id)}
               onClick={redo}
-              aria-label="Redo"
-              title="Redo the change you undid"
+              aria-label={t`Redo`}
+              title={t`Redo the change you undid`}
             >
               <Redo2 className="size-3.5" />
             </Button>

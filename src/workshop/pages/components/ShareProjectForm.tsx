@@ -12,6 +12,7 @@
  * filter that named it.
  */
 
+import { Trans, useLingui } from "@lingui/react/macro";
 import { Button } from "@picoframe/frame";
 import { save } from "@tauri-apps/plugin-dialog";
 import { Download } from "lucide-react";
@@ -35,14 +36,15 @@ export function ShareProjectForm({
   project: ModProject;
   installed: readonly InstalledGameInfo[];
 }) {
+  const { t } = useLingui();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const saveFile = async () => {
     const dest = await save({
-      title: "Export tweak project",
+      title: t`Export tweak project`,
       defaultPath: modProjectFileName(project),
-      filters: [{ name: "Coilbox tweak project", extensions: ["json"] }],
+      filters: [{ name: t`Coilbox tweak project`, extensions: ["json"] }],
     });
     if (!dest) return;
     await contentWriteFile({
@@ -68,7 +70,7 @@ export function ShareProjectForm({
     return (
       <ChallengeCodeView
         code={code.code}
-        helpText="Anyone who pastes this into Unit tweaks → Import gets this project, opened against the game it names."
+        helpText={t`Anyone who pastes this into Unit tweaks → Import gets this project, opened against the game it names.`}
         onExportFile={saveFile}
       />
     );
@@ -79,15 +81,21 @@ export function ShareProjectForm({
   // somewhere nobody can take it back from. A project holds whole unit
   // definitions once it has copies in it, so this is the file route on its
   // own rather than a dead end.
+  const projectName = project.name;
+  const sizeKb = Math.round(code.length / 1024);
+  const limitKb = Math.round(code.limit / 1024);
   return (
     <div className="flex flex-col gap-3 p-4">
       <p className="text-sm text-muted-foreground">
-        {`"${project.name}" is ${Math.round(code.length / 1024)} KB, over the ${Math.round(code.limit / 1024)} KB a code can carry. Export it as a file instead.`}
+        <Trans>
+          "{projectName}" is {sizeKb} KB, over the {limitKb} KB a code can
+          carry. Export it as a file instead.
+        </Trans>
       </p>
       {error && <ErrorBanner message={error} />}
       <Button onClick={exportFile} disabled={busy}>
         <Download className="mr-1.5 size-4" aria-hidden />
-        {busy ? "Exporting…" : "Export as file"}
+        {busy ? t`Exporting…` : t`Export as file`}
       </Button>
     </div>
   );

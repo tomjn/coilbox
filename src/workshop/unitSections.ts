@@ -17,6 +17,8 @@
  * `src/content/unitFields.ts`, which generates them from the engine's own
  * parsers. This module only says where a field belongs.
  */
+import { i18n, type MessageDescriptor } from "@lingui/core";
+import { msg, t } from "@lingui/core/macro";
 import {
   describeField,
   engineFields,
@@ -34,7 +36,9 @@ import {
 /** A collapsible run of fields inside a group. */
 export interface SectionSpec {
   id: string;
-  label: string;
+  /** A descriptor, resolved when the page is built so it follows the
+   *  language. */
+  label: MessageDescriptor;
   /** Registry paths, as the registry writes them, so `weapons.*.name`. */
   paths: string[];
 }
@@ -42,7 +46,7 @@ export interface SectionSpec {
 /** A top-level heading on the unit page. */
 export interface GroupSpec {
   id: string;
-  label: string;
+  label: MessageDescriptor;
   sections: SectionSpec[];
 }
 
@@ -62,11 +66,11 @@ export interface GroupSpec {
 export const UNIT_FIELD_GROUPS: GroupSpec[] = [
   {
     id: "economy",
-    label: "Economy and durability",
+    label: msg`Economy and durability`,
     sections: [
       {
         id: "economy",
-        label: "Cost and production",
+        label: msg`Cost and production`,
         paths: [
           "metalCost",
           "energyCost",
@@ -119,7 +123,7 @@ export const UNIT_FIELD_GROUPS: GroupSpec[] = [
       },
       {
         id: "durability",
-        label: "Durability",
+        label: msg`Durability`,
         paths: [
           "health",
           "maxDamage",
@@ -139,7 +143,7 @@ export const UNIT_FIELD_GROUPS: GroupSpec[] = [
       },
       {
         id: "classification",
-        label: "Classification",
+        label: msg`Classification`,
         // `name`, `humanName` and `description` used to head this list. They
         // now have a panel of their own at the top of the page, for the reason
         // {@link OWN_EDITOR} gives, and placing a path this module never draws
@@ -160,7 +164,7 @@ export const UNIT_FIELD_GROUPS: GroupSpec[] = [
       },
       {
         id: "death",
-        label: "Death and self destruct",
+        label: msg`Death and self destruct`,
         paths: [
           "corpse",
           "explodeAs",
@@ -181,11 +185,11 @@ export const UNIT_FIELD_GROUPS: GroupSpec[] = [
   },
   {
     id: "movement",
-    label: "Movement and sensors",
+    label: msg`Movement and sensors`,
     sections: [
       {
         id: "movement",
-        label: "Movement",
+        label: msg`Movement`,
         paths: [
           "canMove",
           "speed",
@@ -255,7 +259,7 @@ export const UNIT_FIELD_GROUPS: GroupSpec[] = [
       },
       {
         id: "sensors",
-        label: "Sensors and stealth",
+        label: msg`Sensors and stealth`,
         paths: [
           "sightDistance",
           "airSightDistance",
@@ -282,7 +286,7 @@ export const UNIT_FIELD_GROUPS: GroupSpec[] = [
       },
       {
         id: "collision",
-        label: "Collision and physics",
+        label: msg`Collision and physics`,
         paths: [
           "mass",
           "collide",
@@ -314,7 +318,7 @@ export const UNIT_FIELD_GROUPS: GroupSpec[] = [
       },
       {
         id: "footprint",
-        label: "Footprint and placement",
+        label: msg`Footprint and placement`,
         paths: [
           "footprintX",
           "footprintZ",
@@ -341,11 +345,11 @@ export const UNIT_FIELD_GROUPS: GroupSpec[] = [
     // {@link isWeaponPath} keeps out of this list. What is left is how the
     // unit as a whole fights.
     id: "combat",
-    label: "Combat",
+    label: msg`Combat`,
     sections: [
       {
         id: "combat",
-        label: "Combat behaviour",
+        label: msg`Combat behaviour`,
         paths: [
           "canAttack",
           "canDGun",
@@ -370,11 +374,11 @@ export const UNIT_FIELD_GROUPS: GroupSpec[] = [
   },
   {
     id: "presentation",
-    label: "Everything else",
+    label: msg`Everything else`,
     sections: [
       {
         id: "assets",
-        label: "Assets",
+        label: msg`Assets`,
         paths: [
           "objectName",
           "script",
@@ -404,7 +408,7 @@ export const UNIT_FIELD_GROUPS: GroupSpec[] = [
         // in it means whatever this game's own Lua decides. One row per key,
         // each carrying the file that reads it (issue #2661).
         id: "customParams",
-        label: "Custom parameters",
+        label: msg`Custom parameters`,
         paths: ["customParams"],
       },
     ],
@@ -414,13 +418,13 @@ export const UNIT_FIELD_GROUPS: GroupSpec[] = [
 /** Where an engine key nobody placed above ends up. */
 const UNPLACED_SECTION = {
   id: "unplaced",
-  label: "Other engine fields",
+  label: msg`Other engine fields`,
 } as const;
 
 /** Where a key only this game declares ends up, as a raw key and value row. */
 const GAME_SECTION = {
   id: "game",
-  label: "Fields only this game declares",
+  label: msg`Fields only this game declares`,
 } as const;
 
 /** The group both fallback sections are appended to. */
@@ -687,7 +691,8 @@ function qualifiedLabel(
   const keyed =
     list !== null && typeof list === "object" && !Array.isArray(list);
   const number = Number(parts[at]) + (keyed ? 0 : 1);
-  return `${field.label} (${container} ${number})`;
+  const label = field.label;
+  return t`${label} (${container} ${number})`;
 }
 
 /**
@@ -842,10 +847,10 @@ export function unitFieldView(
     for (const section of specs) {
       const rows = bySection.get(section.id);
       if (rows?.length)
-        sections.push({ id: section.id, label: section.label, rows });
+        sections.push({ id: section.id, label: i18n._(section.label), rows });
     }
     if (sections.length > 0)
-      groups.push({ id: group.id, label: group.label, sections });
+      groups.push({ id: group.id, label: i18n._(group.label), sections });
   }
 
   const shown = [...bySection.values()].reduce((n, rows) => n + rows.length, 0);

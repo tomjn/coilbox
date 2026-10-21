@@ -46,6 +46,7 @@
  * Parsing never throws. A malformed query comes back as `{ ok: false, error
  * }` with a message meant to be shown next to the search box.
  */
+import { t } from "@lingui/core/macro";
 import { engineFields } from "@/content/unitFields";
 import type { UnitDerivedStats } from "./derivedStats";
 
@@ -162,7 +163,7 @@ export function resolveField(
   if (engineKey) return { ok: true, keys: [engineKey] };
   return {
     ok: false,
-    error: `Unknown field "${identifier}". Try hp, speed, cost, metal, energy, buildtime, los, or a unit field's own name.`,
+    error: t`Unknown field "${identifier}". Try hp, speed, cost, metal, energy, buildtime, los, or a unit field's own name.`,
   };
 }
 
@@ -244,7 +245,7 @@ export function parseUnitQuery(input: string): ParseResult {
     if (token.type === "or") {
       flushPhrase();
       if (current.length === 0) {
-        return { ok: false, error: 'Expected something before "or".' };
+        return { ok: false, error: t`Expected something before "or".` };
       }
       groups.push(current);
       current = [];
@@ -257,9 +258,10 @@ export function parseUnitQuery(input: string): ParseResult {
       continue;
     }
     if (token.type === "op") {
+      const op = token.value;
       return {
         ok: false,
-        error: `"${token.value}" needs a field name before it.`,
+        error: t`"${op}" needs a field name before it.`,
       };
     }
     const next = tokens[i + 1];
@@ -272,9 +274,11 @@ export function parseUnitQuery(input: string): ParseResult {
         valueToken.type === "and" ||
         valueToken.type === "or"
       ) {
+        const name = token.value;
+        const op = next.value;
         return {
           ok: false,
-          error: `"${token.value} ${next.value}" needs a value after it.`,
+          error: t`"${name} ${op}" needs a value after it.`,
         };
       }
       const resolved = resolveQueryField(token.value);
@@ -288,9 +292,12 @@ export function parseUnitQuery(input: string): ParseResult {
           next.value === "<=") &&
         !isNumber
       ) {
+        const name = token.value;
+        const op = next.value;
+        const given = valueToken.value;
         return {
           ok: false,
-          error: `"${token.value} ${next.value}" needs a number, not "${valueToken.value}".`,
+          error: t`"${name} ${op}" needs a number, not "${given}".`,
         };
       }
       current.push({
@@ -313,7 +320,7 @@ export function parseUnitQuery(input: string): ParseResult {
 
   if (current.length === 0) {
     if (groups.length > 0) {
-      return { ok: false, error: 'Expected something after "or".' };
+      return { ok: false, error: t`Expected something after "or".` };
     }
     return { ok: true, query: [] };
   }
