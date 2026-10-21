@@ -11616,6 +11616,10 @@ msgstr ""
 msgid "Message every player, or every online admin, at once."
 msgstr ""
 
+#: src/components/ui/message-scroller.tsx
+msgid "Messages"
+msgstr ""
+
 #: src/content/pages/GameDetailPage.tsx
 #: src/content/pages/MapDetailPage.tsx
 msgid "Metadata"
