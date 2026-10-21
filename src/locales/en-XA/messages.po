@@ -75,6 +75,10 @@ msgstr ""
 msgid "\"{trimmed}\" — replay it from Singleplayer → Presets."
 msgstr ""
 
+#: src/lobby-servers/pages/SettingsSection.tsx
+msgid "(no username)"
+msgstr ""
+
 #: src/general/ErrorBoundary.tsx
 msgid "(unknown route)"
 msgstr ""
@@ -671,6 +675,10 @@ msgstr ""
 msgid "{archiveName} · Lua REPL"
 msgstr ""
 
+#: src/hub/uploadOutcomes.ts
+msgid "{assets, plural, one {One {assetNoun} was not sent.} other {# {assetNoun} were not sent.}}"
+msgstr ""
+
 #: src/content/pages/components/UnitModelPanel.tsx
 msgid "{assetWidth} by {assetHeight}, {assetKb} KB, {encodeProfile}"
 msgstr ""
@@ -691,6 +699,14 @@ msgstr ""
 msgid "{available, plural, one {# pack available · curated map sets} other {# packs available · curated map sets}}"
 msgstr ""
 
+#: src/lobby-servers/pages/SettingsSection.tsx
+msgid "{base} (alpha)"
+msgstr ""
+
+#: src/hub/pages/components/SetupPackContents.tsx
+msgid "{blueprintCount, plural, one {Blueprint} other {Blueprints}}"
+msgstr ""
+
 #: src/play/presetParts.ts
 msgid "{bots, plural, one {# bot} other {# bots}}"
 msgstr ""
@@ -705,6 +721,19 @@ msgstr ""
 
 #: src/content/pages/components/ReplayMap.tsx
 msgid "{boxTeam} start box"
+msgstr ""
+
+#: src/hub/pages/components/ItemPreview.tsx
+msgid "{buildings, plural, one {# building, in build order} other {# buildings, in build order}}"
+msgstr ""
+
+#: src/hub/pages/components/ItemPreview.tsx
+#: src/hub/pages/components/SetupPackContents.tsx
+msgid "{buildings, plural, one {# building} other {# buildings}}"
+msgstr ""
+
+#: src/hub/preview.ts
+msgid "{buildings, plural, one {# building} other {# buildings}} over {width} by {height} build squares"
 msgstr ""
 
 #: src/profile/health.ts
@@ -739,6 +768,14 @@ msgstr ""
 msgid "{clicks} mouse clicks"
 msgstr ""
 
+#: src/hub/pages/components/ItemPreview.tsx
+msgid "{columns} stops from the start to the boss, {nodeCount} nodes in all, {fights} of them fights"
+msgstr ""
+
+#: src/hub/maps/catalogSweep.ts
+msgid "{conflicts, plural, one {# map differs from the version everyone else has under the same name, so it would not match in a game.} other {# maps differ from the version everyone else has under the same name, so they would not match in a game.}}"
+msgstr ""
+
 #: src/play/PresetPartsView.tsx
 msgid "{count, plural, one {{verb} # part} other {{verb} # parts}}"
 msgstr ""
@@ -757,6 +794,10 @@ msgstr ""
 
 #: src/content/pages/components/states.tsx
 msgid "{count, plural, one {# diagnostic} other {# diagnostics}}"
+msgstr ""
+
+#: src/hub/sweepFrame.ts
+msgid "{count, plural, one {# map was skipped: {list}.} other {# maps were skipped: {list}.}}"
 msgstr ""
 
 #: src/content/pages/components/ReplayAnalysisSection.tsx
@@ -793,6 +834,14 @@ msgstr ""
 
 #: src/profile/health.ts
 msgid "{count, plural, one {Game filter matches # installed game} other {Game filter matches # installed games}}"
+msgstr ""
+
+#: src/hub/uploadOutcomes.ts
+msgid "{count, plural, one {picture for {game}} other {pictures for {game}}}"
+msgstr ""
+
+#: src/hub/uploadOutcomes.ts
+msgid "{count, plural, one {picture} other {pictures}}"
 msgstr ""
 
 #: src/content/pages/components/ReplayTracksStorage.tsx
@@ -848,6 +897,14 @@ msgstr ""
 msgid "{done} of {total}"
 msgstr ""
 
+#: src/hub/assets/UploadRunBadge.tsx
+msgid "{done} of {total} made"
+msgstr ""
+
+#: src/hub/assets/UploadRunBadge.tsx
+msgid "{done} of {total} sent"
+msgstr ""
+
 #: src/content/pages/components/Convert3doDrawer.tsx
 msgid "{done} of {total}: {member}"
 msgstr ""
@@ -900,12 +957,20 @@ msgstr ""
 msgid "{extra, plural, one {{name}, # upgrade} other {{name}, # upgrades}}"
 msgstr ""
 
+#: src/hub/games/factsSweep.ts
+msgid "{factions, plural, one {# faction} other {# factions}}"
+msgstr ""
+
 #: src/content/pages/components/GameLibrarySummary.tsx
 msgid "{factions} · {units}"
 msgstr ""
 
 #: src/content/pages/MapDetailPage.tsx
 msgid "{factionWins}W of {factionGames}"
+msgstr ""
+
+#: src/hub/games/factsSweep.ts
+msgid "{failedCount, plural, one {The hub would not take one game.} other {The hub would not take # games.}}"
 msgstr ""
 
 #: src/content/pages/StatsPage.tsx
@@ -984,8 +1049,32 @@ msgstr ""
 msgid "{game} is not installed, so the units cannot be named. Each order shows the unit definition id the replay recorded."
 msgstr ""
 
+#: src/hub/assets/UploadRunBadge.tsx
+msgid "{game} pictures"
+msgstr ""
+
+#: src/hub/pages/components/GamePicturesControl.tsx
+msgid "{game}: {left, plural, one {# unit} other {# units}} still waiting out of {units}."
+msgstr ""
+
+#: src/hub/pages/components/GamePicturesControl.tsx
+msgid "{game}: {units, plural, one {the hub has the # unit.} other {the hub has all # units.}}"
+msgstr ""
+
+#: src/hub/pages/components/GamePicturesControl.tsx
+msgid "{game}: coilbox could not read its units."
+msgstr ""
+
+#: src/hub/pages/components/GamePicturesControl.tsx
+msgid "{game}: sent {covered} of them, {left, plural, one {# unit} other {# units}} still waiting out of {units}."
+msgstr ""
+
 #: src/packs/pages/components/ImportPackForm.tsx
 msgid "{gameCount, plural, one {# game} other {# games}}"
+msgstr ""
+
+#: src/hub/pages/components/SetupPackContents.tsx
+msgid "{gameCount, plural, one {Game} other {Games}}"
 msgstr ""
 
 #: src/play/pages/components/GamePickerGrid.tsx
@@ -1129,6 +1218,10 @@ msgstr ""
 msgid "{kind}, {time}, {lines}"
 msgstr ""
 
+#: src/hub/pages/BrowsePage.tsx
+msgid "{kinds} shared by other players."
+msgstr ""
+
 #: src/sound/LevelRow.tsx
 msgid "{label} volume"
 msgstr ""
@@ -1169,13 +1262,25 @@ msgstr ""
 msgid "{layout}, {zoneCount} zone(s), {tracking}"
 msgstr ""
 
+#: src/hub/assets/pictureSweep.ts
+msgid "{left, plural, one {# more unit is still waiting.} other {# more units are still waiting.}}"
+msgstr ""
+
 #: src/downloads/DownloadQueueBadge.tsx
 #: src/downloads/pages/components/ProgressBar.tsx
 msgid "{left} left"
 msgstr ""
 
+#: src/hub/maps/pictureSweep.ts
+msgid "{leftCount, plural, one {# more map is still waiting.} other {# more maps are still waiting.}}"
+msgstr ""
+
 #: src/content/pages/components/MapAggregate.tsx
 msgid "{leftOutCount, plural, one {{leftOut} is left out, so each match counts once.} other {{leftOut} are left out, so each match counts once.}}"
+msgstr ""
+
+#: src/hub/assets/pictureSweep.ts
+msgid "{logos, plural, one {Sent one faction logo.} other {Sent # faction logos.}}"
 msgstr ""
 
 #: src/content/pages/components/AiRecordSection.tsx
@@ -1184,6 +1289,10 @@ msgstr ""
 
 #: src/packs/pages/components/ImportPackForm.tsx
 msgid "{mapCount, plural, one {# map} other {# maps}}"
+msgstr ""
+
+#: src/hub/pages/components/SetupPackContents.tsx
+msgid "{mapCount, plural, one {Map} other {Maps}}"
 msgstr ""
 
 #: src/play/pages/components/MapPickerGrid.tsx
@@ -1249,6 +1358,10 @@ msgstr ""
 
 #: src/content/matchStats.ts
 msgid "{metricLabel} per minute, by team, over match time"
+msgstr ""
+
+#: src/lobby-servers/pages/SettingsSection.tsx
+msgid "{MIN_AUTO_AWAY_MINUTES} to {MAX_AUTO_AWAY_MINUTES}."
 msgstr ""
 
 #: src/content/pages/GameUnitPage.tsx
@@ -1348,6 +1461,10 @@ msgstr ""
 msgid "{n, plural, one {# event} other {# events}}"
 msgstr ""
 
+#: src/hub/removePlan.ts
+msgid "{n, plural, one {# galaxy} other {# galaxies}}"
+msgstr ""
+
 #: src/content/matchupFormat.ts
 #: src/content/pages/components/PlayerMatchFigures.tsx
 #: src/content/pages/components/PlayerUnitUsage.tsx
@@ -1374,6 +1491,18 @@ msgstr ""
 msgid "{n, plural, one {# player} other {# players}}"
 msgstr ""
 
+#: src/hub/removePlan.ts
+msgid "{n, plural, one {# preset} other {# presets}}"
+msgstr ""
+
+#: src/hub/removePlan.ts
+msgid "{n, plural, one {# scenario} other {# scenarios}}"
+msgstr ""
+
+#: src/hub/removePlan.ts
+msgid "{n, plural, one {# warpath run} other {# warpath runs}}"
+msgstr ""
+
 #: src/content/pages/components/GatherReplaysButton.tsx
 msgid "{n, plural, one {Can move # replay ({size}).} other {Can move # replays ({size}).}}"
 msgstr ""
@@ -1384,6 +1513,11 @@ msgstr ""
 
 #: src/content/pages/components/ReplayPlaybackBar.tsx
 msgid "{n} units destroyed from {at}"
+msgstr ""
+
+#: src/lobby-servers/pages/SettingsSection.tsx
+#: src/lobby-servers/PasswordRecoveryForm.tsx
+msgid "{name} (custom)"
 msgstr ""
 
 #: src/content/pages/components/ReplayMap.tsx
@@ -1686,6 +1820,22 @@ msgstr ""
 msgid "{recordings, plural, one {The estimate goes by the # recording of this game this computer has finished.} other {The estimate goes by the # recordings of this game this computer has finished.}}"
 msgstr ""
 
+#: src/hub/uploadOutcomes.ts
+msgid "{refused} because this copy of coilbox makes them the way an older hub took them. Update coilbox and they will go."
+msgstr ""
+
+#: src/hub/uploadOutcomes.ts
+msgid "{refusedCount, plural, one {Coilbox will not send it again: the same bytes get the same answer.} other {Coilbox will not send them again: the same bytes get the same answer.}}"
+msgstr ""
+
+#: src/hub/uploadOutcomes.ts
+msgid "{refusedCount, plural, one {The hub refused a {refusedNoun}} other {The hub refused all # {refusedNoun}}}"
+msgstr ""
+
+#: src/hub/uploadOutcomes.ts
+msgid "{refusedCount, plural, one {The hub would not take a picture} other {The hub would not take # pictures}}"
+msgstr ""
+
 #: src/game-updates/pages/GameUpdatesSection.tsx
 msgid "{releaseName} available"
 msgstr ""
@@ -1732,6 +1882,30 @@ msgstr ""
 
 #: src/content/pages/components/UnitPicker.tsx
 msgid "{selectedCount} of {totalCount} {selectedWord}"
+msgstr ""
+
+#: src/hub/uploadOutcomes.ts
+msgid "{sent, plural, =0 {Nothing had been sent, so nothing was added to the hub.} one {One picture had already gone, and it stays on the hub.} other {# pictures had already gone, and they stay on the hub.}}"
+msgstr ""
+
+#: src/hub/assets/UploadRunBadge.tsx
+msgid "{sent, plural, one {One picture has already gone, and it stays on the hub.} other {# pictures have already gone, and they stay on the hub.}}"
+msgstr ""
+
+#: src/hub/maps/pictureSweep.ts
+msgid "{sentCount, plural, =0 {Sent no pictures.} one {Sent one map's picture.} other {Sent # maps' pictures.}}"
+msgstr ""
+
+#: src/hub/maps/catalogSweep.ts
+msgid "{sentCount, plural, one {Sent facts for # map.} other {Sent facts for # maps.}}"
+msgstr ""
+
+#: src/hub/games/factsSweep.ts
+msgid "{sentCount, plural, one {Sent what # game says about its units.} other {Sent what # games say about their units.}}"
+msgstr ""
+
+#: src/lobby-servers/PasswordRecoveryForm.tsx
+msgid "{serverName} does not offer password recovery in Coilbox. Reset it on the server's own page instead:"
 msgstr ""
 
 #: src/content/pages/StorageSection.tsx
@@ -1806,6 +1980,10 @@ msgstr ""
 msgid "{startPositionCount, plural, one {# start position} other {# start positions}}"
 msgstr ""
 
+#: src/hub/maps/facts.ts
+msgid "{starts, plural, one {# player} other {# players}}"
+msgstr ""
+
 #: src/content/libraryMaps.ts
 msgid "{starts, plural, one {# start} other {# starts}}"
 msgstr ""
@@ -1850,6 +2028,14 @@ msgstr ""
 msgid "{subjectLabel} from {rangeStart} to {rangeEnd}."
 msgstr ""
 
+#: src/hub/pages/components/ItemPreview.tsx
+msgid "{systemCount} {noun} joined by {laneCount} jump lanes, {held} of them held at the start"
+msgstr ""
+
+#: src/hub/pages/components/ItemPreview.tsx
+msgid "{systemCount} {noun} on a map of land and sea, {held} of them held at the start"
+msgstr ""
+
 #: src/content/compatReport.ts
 msgid "{tag}, {change} ({userCount})"
 msgstr ""
@@ -1860,6 +2046,10 @@ msgstr ""
 
 #: src/content/pages/components/ModelViewport.tsx
 msgid "{teamColourCount} of this model's textures are team-colour regions, which the engine paints in the owning player's colour. There is no player here, so they are drawn in one blue."
+msgstr ""
+
+#: src/hub/pages/components/ItemPreview.tsx
+msgid "{teamCount, plural, one {{playing} playing across # team} other {{playing} playing across # teams}}"
 msgstr ""
 
 #: src/content/pages/components/ReplayPlaybackBar.tsx
@@ -1890,9 +2080,17 @@ msgstr ""
 msgid "{total, plural, one {# event} other {# events}}"
 msgstr ""
 
+#: src/hub/pages/BrowsePage.tsx
+msgid "{total, plural, one {# item} other {# items}}"
+msgstr ""
+
 #: src/content/pages/components/UnitPicker.tsx
 #: src/content/pages/GameUnitsPage.tsx
 msgid "{total, plural, one {# unit} other {# units}}"
+msgstr ""
+
+#: src/hub/assets/blueprintBackfill.ts
+msgid "{total, plural, one {Only {affordableUnits} of this layout's # unit fits in this hour's allowance for {game}.} other {Only {affordableUnits} of this layout's # units fit in this hour's allowance for {game}.}}"
 msgstr ""
 
 #: src/content/pages/GameUnitsPage.tsx
@@ -1987,6 +2185,10 @@ msgstr ""
 msgid "{units, plural, one {# unit disabled} other {# units disabled}}"
 msgstr ""
 
+#: src/hub/games/factsSweep.ts
+msgid "{units, plural, one {# unit} other {# units}}"
+msgstr ""
+
 #: src/content/pages/MatchupPage.tsx
 msgid "{unknownLabel} with an unknown team not counted."
 msgstr ""
@@ -2029,6 +2231,10 @@ msgstr ""
 
 #: src/profile/health.ts
 msgid "{unrecognised}."
+msgstr ""
+
+#: src/hub/uploadOutcomes.ts
+msgid "{untried, plural, one {One more {untriedNoun} was not tried.} other {# more {untriedNoun} were not tried.}}"
 msgstr ""
 
 #: src/content/pages/components/GameLibrarySummary.tsx
@@ -2171,6 +2377,10 @@ msgstr ""
 
 #: src/content/pages/components/PlayerUnitUsage.tsx
 msgid "{won} of {decided}"
+msgstr ""
+
+#: src/hub/assets/pictureSweep.ts
+msgid "{written, plural, one {Sent one picture.} other {Sent # pictures.}}"
 msgstr ""
 
 #: src/content/pages/components/UnitListNotes.tsx
@@ -2385,6 +2595,10 @@ msgstr ""
 msgid "1v1"
 msgstr ""
 
+#: src/hub/PublishSection.tsx
+msgid "1v1, cheese, teaching"
+msgstr ""
+
 #: src/content/stats.ts
 msgid "30 minutes to 1 hour"
 msgstr ""
@@ -2437,8 +2651,20 @@ msgstr ""
 msgid "A BeamLaser plays it once per sim frame."
 msgstr ""
 
+#: src/hub/pages/components/MapPicturesControl.tsx
+msgid "A big collection takes several goes. Every picture spends part of an hourly allowance the whole community shares, so one press covers what is left of this hour and picks up where it stopped the next time you press it."
+msgstr ""
+
+#: src/hub/pages/components/GamePicturesControl.tsx
+msgid "A big game takes several goes. Every upload spends part of an hourly allowance the whole community shares, so one press covers what is left of this hour and picks up where it stopped the next time you press it."
+msgstr ""
+
 #: src/content/unitFieldNotes.ts
 msgid "A bit mask matched against the mask the game's Lua has painted on each map square. A building only goes down where the two share a bit. Bit 1 is the ordinary case."
+msgstr ""
+
+#: src/hub/removePlan.ts
+msgid "A campaign mission plays this scenario. The mission keeps playing, because it carries its own copy."
 msgstr ""
 
 #: src/content/unitFieldNotes.ts
@@ -2588,6 +2814,10 @@ msgstr ""
 msgid "A load tester for uberserver lobby servers."
 msgstr ""
 
+#: src/lobby-servers/pages/SettingsSection.tsx
+msgid "A login needs a username."
+msgstr ""
+
 #: src/runlite/mapRun.ts
 msgid "A map needs both a start and a goal, or neither of them."
 msgstr ""
@@ -2610,6 +2840,10 @@ msgstr ""
 
 #: src/content/unitFieldNotes.ts
 msgid "A multiplier on how much target picking favours whatever the weapon is already aimed at."
+msgstr ""
+
+#: src/lobby-servers/PasswordRecoveryForm.tsx
+msgid "A new password has been emailed to you."
 msgstr ""
 
 #: src/profile/health.ts
@@ -2670,6 +2904,10 @@ msgstr ""
 
 #: src/play/pages/SkirmishPage.tsx
 msgid "A room on this computer"
+msgstr ""
+
+#: src/hub/pages/components/ItemPreview.tsx
+msgid "A route of {routeCount} {noun} across a map of {systemCount}, on land and sea, from the start to the boss"
 msgstr ""
 
 #: src/content/unitFieldNotes.ts
@@ -2805,10 +3043,20 @@ msgid "Accent color"
 msgstr ""
 
 #: src/account/index.ts
+#: src/account/pages/SettingsSection.tsx
 msgid "Account"
 msgstr ""
 
+#: src/hub/pages/components/HeaderAccount.tsx
+msgid "Account and sharing settings"
+msgstr ""
+
+#: src/account/pages/SettingsSection.tsx
+msgid "Account management for this server happens on the server's own site."
+msgstr ""
+
 #: src/general/index.ts
+#: src/lobby-servers/pages/SettingsSection.tsx
 msgid "Accounts"
 msgstr ""
 
@@ -2849,6 +3097,10 @@ msgstr ""
 msgid "Activity"
 msgstr ""
 
+#: src/hub/preview.ts
+msgid "Actors"
+msgstr ""
+
 #: src/content/pages/components/KeyBindingEditor.tsx
 msgid "Add"
 msgstr ""
@@ -2865,6 +3117,14 @@ msgstr ""
 msgid "Add anyway"
 msgstr ""
 
+#: src/lobby-servers/pages/components/AutojoinChannels.tsx
+msgid "Add channel"
+msgstr ""
+
+#: src/lobby-servers/pages/SettingsSection.tsx
+msgid "Add custom server"
+msgstr ""
+
 #: src/content/pages/components/ReplaySetsManager.tsx
 msgid "Add every replay in the list as filtered now"
 msgstr ""
@@ -2873,8 +3133,16 @@ msgstr ""
 msgid "Add folder"
 msgstr ""
 
+#: src/lobby-servers/pages/SettingsSection.tsx
+msgid "Add login"
+msgstr ""
+
 #: src/downloads/pages/SettingsSection.tsx
 msgid "Add repository"
+msgstr ""
+
+#: src/lobby-servers/pages/SettingsSection.tsx
+msgid "Add server"
 msgstr ""
 
 #: src/content/pages/ReplayDetailPage.tsx
@@ -2976,6 +3244,7 @@ msgstr ""
 #: src/content/pages/components/BuildTreeExportButton.tsx
 #: src/content/pages/components/PlayerMatchFigures.tsx
 #: src/downloads/pages/ActivityPage.tsx
+#: src/hub/pages/BrowsePage.tsx
 msgid "All"
 msgstr ""
 
@@ -2991,7 +3260,12 @@ msgstr ""
 msgid "All downloads"
 msgstr ""
 
+#: src/hub/pages/components/GamePicturesControl.tsx
+msgid "All games"
+msgstr ""
+
 #: src/content/pages/components/ReplayAnalysisEvents.tsx
+#: src/hub/pages/BrowsePage.tsx
 msgid "All kinds"
 msgstr ""
 
@@ -3040,12 +3314,20 @@ msgstr ""
 msgid "Allies on one side each have their own figures. Only players who share control of one army have the same figures."
 msgstr ""
 
+#: src/lobby-servers/pages/SettingsSection.tsx
+msgid "Allow self-signed certificate"
+msgstr ""
+
 #: src/play/pages/components/ParticipantsTable.tsx
 msgid "Ally"
 msgstr ""
 
 #: src/startbox/StartBoxPresetsPopover.tsx
 msgid "ally {letter}"
+msgstr ""
+
+#: src/lobby-servers/pages/SettingsSection.tsx
+msgid "Alpha"
 msgstr ""
 
 #: src/startbox/StartBoxPresetsPopover.tsx
@@ -3289,12 +3571,20 @@ msgstr ""
 msgid "Any date"
 msgstr ""
 
+#: src/hub/pages/BrowsePage.tsx
+msgid "Any game"
+msgstr ""
+
 #: src/sound/events.ts
 msgid "Any launch of your own: a skirmish, a battle, a campaign mission, a saved game or a replay."
 msgstr ""
 
 #: src/content/replayMatchFigures.ts
 msgid "Any length"
+msgstr ""
+
+#: src/hub/pages/BrowsePage.tsx
+msgid "Any map"
 msgstr ""
 
 #: src/content/mapAggregateExport.ts
@@ -3311,6 +3601,10 @@ msgstr ""
 
 #: src/content/pages/components/MapAggregate.tsx
 msgid "Any sides"
+msgstr ""
+
+#: src/hub/PublishSection.tsx
+msgid "Anyone browsing the hub will be able to find and import this."
 msgstr ""
 
 #: src/runlite/pages/RunListPage.tsx
@@ -3457,12 +3751,23 @@ msgstr ""
 msgid "As team 2"
 msgstr ""
 
+#: src/hub/preview.ts
 #: src/runlite/pages/components/RunSetupForm.tsx
 msgid "Ascension"
 msgstr ""
 
 #: src/content/unitFieldNotes.ts
 msgid "Ascent time"
+msgstr ""
+
+#: src/hub/pages/components/MapCatalogControl.tsx
+#: src/hub/pages/components/MapPicturesControl.tsx
+msgid "Asking the hub about {done} of {total}"
+msgstr ""
+
+#: src/hub/pages/components/MapCatalogControl.tsx
+#: src/hub/pages/components/MapPicturesControl.tsx
+msgid "Asking the hub about your maps"
 msgstr ""
 
 #: src/direct/ReachablePorts.tsx
@@ -3523,6 +3828,10 @@ msgstr ""
 
 #: src/content/pages/components/ConfigProfilesPanel.tsx
 msgid "Auto-backup current settings before restoring"
+msgstr ""
+
+#: src/lobby-servers/pages/components/AutojoinChannels.tsx
+msgid "Auto-join channels"
 msgstr ""
 
 #: src/content/pages/ReplaysPage.tsx
@@ -3640,6 +3949,7 @@ msgstr ""
 msgid "battle"
 msgstr ""
 
+#: src/hub/pages/components/ItemPreview.tsx
 #: src/runlite/galaxyAdapter.ts
 #: src/runlite/pages/components/EncounterOverlay.tsx
 #: src/runlite/pages/RunPage.tsx
@@ -3855,6 +4165,10 @@ msgstr ""
 msgid "BOS → Lua"
 msgstr ""
 
+#: src/hub/pages/components/ItemPreview.tsx
+msgid "Boss"
+msgstr ""
+
 #: src/content/pages/components/ReplayRoster.tsx
 msgid "Bot"
 msgstr ""
@@ -4039,6 +4353,10 @@ msgstr ""
 msgid "Built from the replays in your content folders. Fully offline — no server, no account."
 msgstr ""
 
+#: src/lobby-servers/pages/SettingsSection.tsx
+msgid "Built-in"
+msgstr ""
+
 #: src/profile/health.ts
 msgid "Bundle or download the game archive (.sdz/.sd7). {scanned}"
 msgstr ""
@@ -4074,6 +4392,14 @@ msgstr ""
 
 #: src/content/achievements.ts
 msgid "Busy week"
+msgstr ""
+
+#: src/hub/pages/BrowsePage.tsx
+msgid "By"
+msgstr ""
+
+#: src/hub/pages/BrowsePage.tsx
+msgid "by {authorName}"
 msgstr ""
 
 #: src/content/pages/MatchupPage.tsx
@@ -4234,6 +4560,8 @@ msgstr ""
 #: src/direct/HostRoomForm.tsx
 #: src/direct/JoinRoomForm.tsx
 #: src/downloads/pages/ActivityPage.tsx
+#: src/lobby-servers/pages/SettingsSection.tsx
+#: src/lobby-servers/PasswordRecoveryForm.tsx
 #: src/play/pages/components/GameOptionsPanel.tsx
 #: src/play/pages/SavegamesPage.tsx
 #: src/play/PresetLibraryToolbar.tsx
@@ -4334,8 +4662,20 @@ msgstr ""
 msgid "Chance of setting static map features alight on impact."
 msgstr ""
 
+#: src/account/pages/SettingsSection.tsx
+msgid "Change email"
+msgstr ""
+
+#: src/account/pages/SettingsSection.tsx
+msgid "Change password"
+msgstr ""
+
 #: src/home/groupDescription.ts
 msgid "Change what a game's units cost, carry and can do."
+msgstr ""
+
+#: src/account/pages/SettingsSection.tsx
+msgid "Change your account"
 msgstr ""
 
 #: src/content/compatReport.ts
@@ -4345,6 +4685,22 @@ msgstr ""
 
 #: src/content/compatReport.ts
 msgid "changed in {version}"
+msgstr ""
+
+#: src/lobby-servers/pages/SettingsSection.tsx
+msgid "Changes save automatically."
+msgstr ""
+
+#: src/lobby-servers/pages/components/AutojoinChannels.tsx
+msgid "channel"
+msgstr ""
+
+#: src/lobby-servers/pages/components/AutojoinChannels.tsx
+msgid "Channel key"
+msgstr ""
+
+#: src/lobby-servers/pages/components/AutojoinChannels.tsx
+msgid "Channel name"
 msgstr ""
 
 #: src/content/pages/components/MatchStatsChart.tsx
@@ -4396,9 +4752,21 @@ msgstr ""
 msgid "Cheapest"
 msgstr ""
 
+#: src/account/pages/SettingsSection.tsx
+msgid "Check {address} for the verification code."
+msgstr ""
+
 #: src/game-updates/pages/GameUpdatesSection.tsx
 #: src/updater/pages/UpdatesSettingsSection.tsx
 msgid "Check for updates"
+msgstr ""
+
+#: src/lobby-servers/PasswordRecoveryForm.tsx
+msgid "Check your email for the 8 digit code. Three wrong tries locks this request."
+msgstr ""
+
+#: src/lobby-servers/PasswordRecoveryForm.tsx
+msgid "Check your email. The server usually closes the connection like this once it has reset your password, and it emails you the new password with your username."
 msgstr ""
 
 #: src/content/pages/components/states.tsx
@@ -4436,6 +4804,12 @@ msgstr ""
 
 #: src/content/pages/components/ClearUnfinishedButton.tsx
 msgid "Checking what can be deleted..."
+msgstr ""
+
+#: src/hub/pages/components/AccountControl.tsx
+#: src/hub/PublishSection.tsx
+#: src/lobby-servers/pages/SettingsSection.tsx
+msgid "Checking whether you are signed in."
 msgstr ""
 
 #: src/runlite/pages/components/RunSetupForm.tsx
@@ -4529,6 +4903,7 @@ msgstr ""
 msgid "Clear AIs"
 msgstr ""
 
+#: src/hub/pages/BrowsePage.tsx
 #: src/notify/NotificationsBell.tsx
 #: src/startbox/StartBoxControls.tsx
 msgid "Clear all"
@@ -4543,7 +4918,12 @@ msgid "Clear ally {letter}'s start box"
 msgstr ""
 
 #: src/content/pages/components/MapAggregate.tsx
+#: src/hub/pages/BrowsePage.tsx
 msgid "Clear filters"
+msgstr ""
+
+#: src/hub/pages/components/HubAddressField.tsx
+msgid "Clear override"
 msgstr ""
 
 #: src/play/PresetList.tsx
@@ -4556,6 +4936,10 @@ msgstr ""
 
 #: src/play/PresetList.tsx
 msgid "Clear the record for {presetName}"
+msgstr ""
+
+#: src/hub/pages/BrowsePage.tsx
+msgid "Clear this filter"
 msgstr ""
 
 #: src/content/pages/components/ReplayTracksStorage.tsx
@@ -4582,6 +4966,7 @@ msgstr ""
 msgid "Cloak cost moving"
 msgstr ""
 
+#: src/account/pages/SettingsSection.tsx
 #: src/components/SlideDrawer.tsx
 #: src/components/ui/dialog.tsx
 #: src/content/pages/components/BrandingScreenshots.tsx
@@ -4593,6 +4978,7 @@ msgstr ""
 #: src/deeplink/ConfirmDialog.tsx
 #: src/downloads/pages/components/MapPacksDrawer.tsx
 #: src/lego/pages/components/ShortcutSheet.tsx
+#: src/lobby-servers/PasswordRecoveryForm.tsx
 #: src/multiplayer/ServerMessageBoxDialog.tsx
 #: src/play/pages/components/CrashDrawer.tsx
 #: src/play/pages/components/DebriefDrawer.tsx
@@ -4632,6 +5018,10 @@ msgstr ""
 msgid "COB tools"
 msgstr ""
 
+#: src/lobby-servers/PasswordRecoveryForm.tsx
+msgid "Code"
+msgstr ""
+
 #: src/main.tsx
 #: src/sound/library.ts
 msgid "Coilbox"
@@ -4653,12 +5043,44 @@ msgstr ""
 msgid "coilbox campaign"
 msgstr ""
 
+#: src/hub/pages/components/GamePicturesControl.tsx
+msgid "Coilbox can draw every unit in the games on this computer and send the pictures to the hub: the icon the game ships, and {angleCount} views of the model drawn here. It asks the hub what it already has first, so a game somebody else has covered costs one question."
+msgstr ""
+
+#: src/hub/pages/components/GameFactsControl.tsx
+msgid "Coilbox can read the games on this computer and tell the hub what units each one has: their names, what each one builds, and which faction they belong to. It sends no pictures and no files, only those names."
+msgstr ""
+
+#: src/hub/pages/components/MapCatalogControl.tsx
+msgid "Coilbox can read the maps on this computer and tell the hub what is in them: how big each one is, how high its ground goes, how much of it is under water, how much wind and tidal power it has, and where players start. It sends no pictures and no files, only those measurements."
+msgstr ""
+
+#: src/hub/pages/components/MapPicturesControl.tsx
+msgid "Coilbox can read the minimap out of every map on this computer and send it to the hub, so a map somebody is looking at there has a picture of it rather than a drawing of its name. It asks the hub what it already has first, so a map somebody else has covered costs one question."
+msgstr ""
+
 #: src/content/buildPicMissing.ts
 msgid "Coilbox cannot read this unit's build pic. The game ships one, in a format the decoder does not handle."
 msgstr ""
 
 #: src/runlite/pages/RunListPage.tsx
 msgid "Coilbox challenge"
+msgstr ""
+
+#: src/lobby-servers/pages/SettingsSection.tsx
+msgid "Coilbox connects to any TASServer-compatible lobby, including one you run yourself. lobby.recoilengine.org runs uberserver, which ships a start-to-finish deployment guide using Docker and MariaDB. Add yours as a custom server above once it is running."
+msgstr ""
+
+#: src/lobby-servers/pages/SettingsSection.tsx
+msgid "Coilbox could not move the saved password to the new name. Enter the password again."
+msgstr ""
+
+#: src/hub/maps/pictureSweep.ts
+msgid "coilbox could not read"
+msgstr ""
+
+#: src/hub/pages/components/GamePicturesControl.tsx
+msgid "Coilbox could not read {game}: {said}"
 msgstr ""
 
 #: src/runlite/unitLimit.ts
@@ -4673,12 +5095,28 @@ msgstr ""
 msgid "Coilbox could not read what is installed, so it has not checked whether you already have what this needs."
 msgstr ""
 
+#: src/lobby-servers/pages/SettingsSection.tsx
+msgid "Coilbox could not save the password to your keychain."
+msgstr ""
+
 #: src/settings-storage.ts
 msgid "Coilbox could not save your settings"
 msgstr ""
 
+#: src/hub/pages/components/AccountControl.tsx
+msgid "Coilbox could not tell whether you are signed in."
+msgstr ""
+
+#: src/hub/pages/ItemPage.tsx
+msgid "Coilbox deletes it from this computer. It stays on the hub, so you can import it again."
+msgstr ""
+
 #: src/deeplink/readImport.ts
 msgid "Coilbox does not recognise that. Paste a coilbox link, a share code, or the contents of a coilbox .json file."
+msgstr ""
+
+#: src/hub/pages/ItemPage.tsx
+msgid "Coilbox downloads it from {hubHost} and opens it in the importer, which resolves any missing content before saving."
 msgstr ""
 
 #: src/profile/health.ts
@@ -4693,8 +5131,44 @@ msgstr ""
 msgid "Coilbox forgets that the playback did not match. The replay is not touched."
 msgstr ""
 
+#: src/hub/assets/pictureSweep.ts
+msgid "Coilbox found no games to draw."
+msgstr ""
+
+#: src/hub/games/factsSweep.ts
+msgid "Coilbox found no games to read."
+msgstr ""
+
+#: src/hub/games/factsSweep.ts
+msgid "Coilbox found no games worth sending. Only released games are sent, not the ones you are working on."
+msgstr ""
+
+#: src/hub/maps/pictureSweep.ts
+msgid "Coilbox found no maps to draw."
+msgstr ""
+
+#: src/hub/maps/catalogSweep.ts
+msgid "Coilbox found no maps to read."
+msgstr ""
+
+#: src/hub/assets/pictureSweep.ts
+msgid "Coilbox found no released games to draw. Only released games are sent, not the ones you are working on."
+msgstr ""
+
 #: src/content/pages/components/MissionRuntimeSection.tsx
 msgid "Coilbox found no runtime marker in this game, so it cannot play scenarios yet. Installing writes coilbox's luarules, luaui and missions folders into the game folder."
+msgstr ""
+
+#: src/hub/maps/pictureSweep.ts
+msgid "Coilbox has already sent this hour's map pictures. Press it again later to carry on."
+msgstr ""
+
+#: src/hub/assets/blueprintBackfill.ts
+msgid "Coilbox has already sent this hour's pictures for {game}."
+msgstr ""
+
+#: src/hub/assets/pictureSweep.ts
+msgid "Coilbox has already sent this hour's pictures for {shortname}."
 msgstr ""
 
 #: src/content/pages/components/ResolveContentDrawer.tsx
@@ -4705,8 +5179,15 @@ msgstr ""
 msgid "Coilbox has not contacted it yet. Only continue if you trust this link."
 msgstr ""
 
+#: src/hub/uploadOutcomes.ts
+msgid "Coilbox has stopped sending {sendingNoun}. {already}"
+msgstr ""
+
 #: src/downloads/pages/SettingsSection.tsx
 #: src/hub/index.tsx
+#: src/hub/pages/BrowsePage.tsx
+#: src/hub/pages/ItemPage.tsx
+#: src/hub/PublishSection.tsx
 msgid "Coilbox hub"
 msgstr ""
 
@@ -4714,12 +5195,49 @@ msgstr ""
 msgid "Coilbox Hub"
 msgstr ""
 
+#: src/hub/assets/UploadRunBadge.tsx
+msgid "Coilbox is making pictures of {game}'s units. Nothing has been sent yet."
+msgstr ""
+
 #: src/general/pages/AboutCoilbox.tsx
 msgid "Coilbox is open source. Browse the code, report a bug, or star the project on GitHub."
 msgstr ""
 
+#: src/hub/uploadOutcomes.ts
+msgid "Coilbox is out of date"
+msgstr ""
+
+#: src/hub/assets/UploadRunBadge.tsx
+msgid "Coilbox is sending {game}'s pictures to the hub."
+msgstr ""
+
+#: src/hub/pages/components/HubAddressField.tsx
+msgid "Coilbox is using <0>{effective}</0>, the address your distribution set."
+msgstr ""
+
+#: src/hub/pages/components/HubAddressField.tsx
+msgid "Coilbox is using <0>{effective}</0>, the built-in default."
+msgstr ""
+
+#: src/hub/pages/components/HubAddressField.tsx
+msgid "Coilbox is using <0>{effective}</0>, your own address, set below."
+msgstr ""
+
 #: src/content/pages/components/KeymapsPanel.tsx
 msgid "Coilbox keymap"
+msgstr ""
+
+#: src/hub/pages/components/GamePicturesControl.tsx
+msgid "Coilbox needs an engine installed before it can draw your units."
+msgstr ""
+
+#: src/hub/pages/components/GameFactsControl.tsx
+msgid "Coilbox needs an engine installed before it can read your games."
+msgstr ""
+
+#: src/hub/pages/components/MapCatalogControl.tsx
+#: src/hub/pages/components/MapPicturesControl.tsx
+msgid "Coilbox needs an engine installed before it can read your maps."
 msgstr ""
 
 #: src/general/pages/AboutCoilbox.tsx
@@ -4935,6 +5453,26 @@ msgstr ""
 msgid "Confirm this before it runs."
 msgstr ""
 
+#: src/account/pages/SettingsSection.tsx
+msgid "Connect"
+msgstr ""
+
+#: src/lobby-servers/pages/SettingsSection.tsx
+msgid "Connect automatically on startup"
+msgstr ""
+
+#: src/lobby-servers/pages/SettingsSection.tsx
+msgid "Connect on startup"
+msgstr ""
+
+#: src/lobby-servers/pages/SettingsSection.tsx
+msgid "Connected · {onlineCount} online"
+msgstr ""
+
+#: src/lobby-servers/pages/SettingsSection.tsx
+msgid "Connection"
+msgstr ""
+
 #: src/content/achievements.ts
 msgid "Conqueror"
 msgstr ""
@@ -5022,6 +5560,7 @@ msgstr ""
 #: src/content/pages/components/FilePreview.tsx
 #: src/direct/CopyButton.tsx
 #: src/general/ErrorBoundary.tsx
+#: src/hub/PublishSection.tsx
 #: src/play/pages/components/CrashDrawer.tsx
 #: src/play/pages/EngineLogSection.tsx
 msgid "Copied"
@@ -5060,12 +5599,18 @@ msgstr ""
 msgid "Copy address"
 msgstr ""
 
+#: src/hub/PublishSection.tsx
+msgid "Copy code & open hub"
+msgstr ""
+
 #: src/general/ErrorBoundary.tsx
 #: src/play/pages/components/CrashDrawer.tsx
 msgid "Copy details"
 msgstr ""
 
 #: src/direct/ShareRoomButton.tsx
+#: src/hub/pages/ItemPage.tsx
+#: src/hub/PublishSection.tsx
 #: src/play/pages/components/PresetsDrawer.tsx
 msgid "Copy link"
 msgstr ""
@@ -5148,6 +5693,15 @@ msgstr ""
 
 #: src/i18n/uiError.ts
 msgid "Could not reach the host."
+msgstr ""
+
+#: src/hub/assets/pictures.ts
+#: src/hub/maps/lookup.ts
+msgid "Could not reach the hub at {host}."
+msgstr ""
+
+#: src/hub/api.ts
+msgid "Could not reach the hub at {host}. Check your connection."
 msgstr ""
 
 #: src/content/pages/components/ArchiveModelPreview.tsx
@@ -5258,6 +5812,10 @@ msgstr ""
 msgid "Create"
 msgstr ""
 
+#: src/lobby-servers/pages/SettingsSection.tsx
+msgid "Create a new account"
+msgstr ""
+
 #: src/content/pages/components/SetupCard.tsx
 msgid "Create content folder"
 msgstr ""
@@ -5337,10 +5895,19 @@ msgstr ""
 msgid "Current"
 msgstr ""
 
+#: src/account/pages/SettingsSection.tsx
+msgid "Current password"
+msgstr ""
+
 #: src/updater/pages/UpdatesSettingsSection.tsx
 msgid "Current version"
 msgstr ""
 
+#: src/account/pages/SettingsSection.tsx
+msgid "Currently: {currentEmail}"
+msgstr ""
+
+#: src/lobby-servers/pages/SettingsSection.tsx
 #: src/profile/SettingsSection.tsx
 msgid "Custom"
 msgstr ""
@@ -5512,12 +6079,21 @@ msgstr ""
 #: src/content/pages/components/DeleteEngineButton.tsx
 #: src/content/pages/components/MapRecords.tsx
 #: src/content/pages/ReplayDetailPage.tsx
+#: src/hub/pages/ItemPage.tsx
 #: src/play/pages/SavegamesPage.tsx
 msgid "Delete"
 msgstr ""
 
 #: src/content/pages/components/KeymapsPanel.tsx
 msgid "Delete {itemName}"
+msgstr ""
+
+#: src/hub/removePlan.ts
+msgid "Delete {quoted}?"
+msgstr ""
+
+#: src/hub/removePlan.ts
+msgid "Delete {total}?"
 msgstr ""
 
 #: src/content/pages/components/ReplayAnalysisSection.tsx
@@ -5636,6 +6212,7 @@ msgstr ""
 msgid "Depends on {dependencies}"
 msgstr ""
 
+#: src/hub/pages/components/ItemPreview.tsx
 #: src/runlite/galaxyAdapter.ts
 #: src/runlite/pages/RunPage.tsx
 msgid "Depot"
@@ -5651,6 +6228,10 @@ msgstr ""
 
 #: src/runlite/generate.ts
 msgid "Derelict Hulk"
+msgstr ""
+
+#: src/hub/PublishSection.tsx
+msgid "Description"
 msgstr ""
 
 #: src/content/pages/components/ReplaySetsManager.tsx
@@ -5695,6 +6276,10 @@ msgstr ""
 msgid "Diagnostics ({diagnosticCount})"
 msgstr ""
 
+#: src/hub/preview.ts
+msgid "Dialogue"
+msgstr ""
+
 #: src/content/pages/components/Convert3doDrawer.tsx
 msgid "Did not fit on the sheet ({didNotFitCount})"
 msgstr ""
@@ -5703,6 +6288,7 @@ msgstr ""
 msgid "Died"
 msgstr ""
 
+#: src/hub/preview.ts
 #: src/runlite/pages/components/EncounterOverlay.tsx
 msgid "Difficulty"
 msgstr ""
@@ -5719,6 +6305,14 @@ msgstr ""
 #: src/direct/hostingRoute.ts
 #: src/downloads/activityRows.ts
 msgid "Direct"
+msgstr ""
+
+#: src/lobby-servers/pages/SettingsSection.tsx
+msgid "Direct (TLS from the first byte)"
+msgstr ""
+
+#: src/lobby-servers/pages/SettingsSection.tsx
+msgid "Disconnected"
 msgstr ""
 
 #: src/content/unitFieldNotes.ts
@@ -5786,6 +6380,7 @@ msgstr ""
 #: src/downloads/pages/components/EngineInstaller.tsx
 #: src/downloads/pages/components/RapidBrowser.tsx
 #: src/i18n/frameStrings.ts
+#: src/lobby-servers/pages/SettingsSection.tsx
 msgid "Done"
 msgstr ""
 
@@ -6005,6 +6600,26 @@ msgstr ""
 msgid "Drawer"
 msgstr ""
 
+#: src/hub/pages/components/GamePicturesControl.tsx
+msgid "Drawing"
+msgstr ""
+
+#: src/hub/pages/components/GamePicturesControl.tsx
+msgid "Drawing {at} of {total}"
+msgstr ""
+
+#: src/hub/pages/components/GamePicturesControl.tsx
+msgid "Drawing {at} of {total}: {game}"
+msgstr ""
+
+#: src/hub/pages/components/GamePicturesControl.tsx
+msgid "Drawing your units…"
+msgstr ""
+
+#: src/hub/pages/components/GamePicturesControl.tsx
+msgid "Drawing: {game}"
+msgstr ""
+
 #: src/content/pages/components/UnitRendersRow.tsx
 msgid "Drawing…"
 msgstr ""
@@ -6156,6 +6771,7 @@ msgstr ""
 msgid "Eliminated"
 msgstr ""
 
+#: src/hub/pages/components/ItemPreview.tsx
 #: src/runlite/galaxyAdapter.ts
 #: src/runlite/pages/components/EncounterOverlay.tsx
 #: src/runlite/pages/components/RunHud.tsx
@@ -6164,6 +6780,18 @@ msgstr ""
 
 #: src/runlite/pages/RunPage.tsx
 msgid "Elite garrison"
+msgstr ""
+
+#: src/lobby-servers/PasswordRecoveryForm.tsx
+msgid "Email"
+msgstr ""
+
+#: src/account/pages/SettingsSection.tsx
+msgid "Email address"
+msgstr ""
+
+#: src/account/pages/SettingsSection.tsx
+msgid "Email address changed."
 msgstr ""
 
 #: src/i18n/frameStrings.ts
@@ -6199,6 +6827,10 @@ msgstr ""
 
 #: src/play/InGameBadge.tsx
 msgid "End it for everybody"
+msgstr ""
+
+#: src/hub/preview.ts
+msgid "Enemies"
 msgstr ""
 
 #: src/content/unitFieldNotes.ts
@@ -6260,6 +6892,7 @@ msgstr ""
 #: src/content/pages/components/ResolveContentDrawer.tsx
 #: src/content/pages/ReplayDetailPage.tsx
 #: src/downloads/DownloadQueueBadge.tsx
+#: src/hub/pages/components/SetupPackContents.tsx
 #: src/play/pages/components/CrashDrawer.tsx
 #: src/play/pages/EngineLogSection.tsx
 msgid "Engine"
@@ -6377,8 +7010,16 @@ msgstr ""
 msgid "Enter a port."
 msgstr ""
 
+#: src/hub/pages/components/HubAddressField.tsx
+msgid "Enter a web address starting with http:// or https://, or clear the field."
+msgstr ""
+
 #: src/general/fullscreen.tsx
 msgid "Enter fullscreen"
+msgstr ""
+
+#: src/lobby-servers/PasswordRecoveryForm.tsx
+msgid "Enter the email address on your account and we will send you a recovery code."
 msgstr ""
 
 #: src/direct/lan.ts
@@ -6397,6 +7038,7 @@ msgstr ""
 msgid "Errors"
 msgstr ""
 
+#: src/hub/pages/components/ItemPreview.tsx
 #: src/runlite/galaxyAdapter.ts
 msgid "Event"
 msgstr ""
@@ -6711,6 +7353,10 @@ msgstr ""
 msgid "Fetches"
 msgstr ""
 
+#: src/hub/pages/ItemPage.tsx
+msgid "Fetching…"
+msgstr ""
+
 #: src/runlite/pages/components/NodeOverlays.tsx
 msgid "Field upgrade"
 msgstr ""
@@ -6741,6 +7387,18 @@ msgstr ""
 
 #: src/profile/health.ts
 msgid "Filter ({filterDesc}) has nothing to match yet — no games are installed. Install the game, or check the filter."
+msgstr ""
+
+#: src/hub/pages/components/FilterCombobox.tsx
+msgid "Filter by “{typed}”"
+msgstr ""
+
+#: src/hub/pages/BrowsePage.tsx
+msgid "Filter by game"
+msgstr ""
+
+#: src/hub/pages/BrowsePage.tsx
+msgid "Filter by map"
 msgstr ""
 
 #: src/content/pages/ReplaysPage.tsx
@@ -6789,6 +7447,14 @@ msgstr ""
 
 #: src/content/pages/StorageSection.tsx
 msgid "Finish or cancel downloads before reclaiming space"
+msgstr ""
+
+#: src/hub/pages/components/HeaderAccount.tsx
+msgid "Finish signing in the browser window that opened."
+msgstr ""
+
+#: src/hub/pages/components/AccountControl.tsx
+msgid "Finish signing in the browser window that opened. Coilbox stops waiting after a minute."
 msgstr ""
 
 #: src/content/pages/components/PlayerUnitUsage.tsx
@@ -7079,6 +7745,10 @@ msgstr ""
 msgid "Forget this attempt?"
 msgstr ""
 
+#: src/lobby-servers/pages/SettingsSection.tsx
+msgid "Forgot password"
+msgstr ""
+
 #: src/content/pages/components/ArchiveModelPreview.tsx
 #: src/content/pages/components/BuildTreeExportButton.tsx
 #: src/content/pages/components/UnitModelPanel.tsx
@@ -7226,6 +7896,8 @@ msgstr ""
 #: src/content/pages/ReplayDetailPage.tsx
 #: src/direct/HostRoomForm.tsx
 #: src/downloads/DownloadQueueBadge.tsx
+#: src/hub/pages/BrowsePage.tsx
+#: src/hub/pages/ItemPage.tsx
 #: src/play/pages/components/CrashDrawer.tsx
 #: src/play/presetParts.ts
 #: src/runlite/pages/components/EncounterOverlay.tsx
@@ -7394,6 +8066,10 @@ msgstr ""
 msgid "Getting started"
 msgstr ""
 
+#: src/hub/publish.ts
+msgid "Give it a title so people know what it is."
+msgstr ""
+
 #: src/direct/share.ts
 msgid "Give joiners the address for the network they are on."
 msgstr ""
@@ -7404,6 +8080,10 @@ msgstr ""
 
 #: src/content/replaySets.ts
 msgid "Give the set a name."
+msgstr ""
+
+#: src/lobby-servers/pages/SettingsSection.tsx
+msgid "Give this login a username first, so the sign-in has something to belong to."
 msgstr ""
 
 #: src/content/unitFieldNotes.ts
@@ -7773,6 +8453,7 @@ msgstr ""
 msgid "Horizontal"
 msgstr ""
 
+#: src/lobby-servers/pages/SettingsSection.tsx
 #: src/play/pages/SkirmishPage.tsx
 msgid "Host"
 msgstr ""
@@ -7807,6 +8488,10 @@ msgstr ""
 
 #: src/direct/HostRoomControl.tsx
 msgid "Host vs computer"
+msgstr ""
+
+#: src/lobby-servers/pages/SettingsSection.tsx
+msgid "Host your own server"
 msgstr ""
 
 #: src/direct/room.ts
@@ -7949,12 +8634,24 @@ msgstr ""
 msgid "How transparent the shield is while visible."
 msgstr ""
 
+#: src/hub/removePlan.ts
+msgid "However far you have got in it goes too."
+msgstr ""
+
 #: src/content/pages/components/BuildTreeExportButton.tsx
 msgid "HTML page"
 msgstr ""
 
 #: src/content/pages/components/GameLibrarySummary.tsx
 msgid "Hub"
+msgstr ""
+
+#: src/hub/pages/BrowsePage.tsx
+msgid "Hub results"
+msgstr ""
+
+#: src/hub/pages/BrowsePage.tsx
+msgid "Hub website"
 msgstr ""
 
 #: src/runlite/pages/components/RunHud.tsx
@@ -7979,6 +8676,14 @@ msgstr ""
 
 #: src/content/unitFieldNotes.ts
 msgid "Idle self repair"
+msgstr ""
+
+#: src/lobby-servers/PasswordRecoveryForm.tsx
+msgid "If nothing arrives, start again and ask for a new code."
+msgstr ""
+
+#: src/lobby-servers/pages/SettingsSection.tsx
+msgid "If the server drops the connection, rejoin your channels and last battle automatically."
 msgstr ""
 
 #: src/deeplink/DeepLinkHandler.tsx
@@ -8024,6 +8729,7 @@ msgstr ""
 #: src/content/pages/components/KeymapsPanel.tsx
 #: src/deeplink/index.ts
 #: src/deeplink/pages/ImportSection.tsx
+#: src/hub/pages/ItemPage.tsx
 #: src/play/PresetLibraryToolbar.tsx
 msgid "Import"
 msgstr ""
@@ -8042,6 +8748,10 @@ msgstr ""
 
 #: src/content/pages/MapsPage.tsx
 msgid "Import a setup pack"
+msgstr ""
+
+#: src/hub/pages/ItemPage.tsx
+msgid "Import anyway"
 msgstr ""
 
 #: src/runlite/pages/RunListPage.tsx
@@ -8072,6 +8782,11 @@ msgstr ""
 msgid "Import URLs must be https."
 msgstr ""
 
+#: src/hub/pages/BrowsePage.tsx
+#: src/hub/pages/ItemPage.tsx
+msgid "Imported"
+msgstr ""
+
 #: src/runlite/pages/RunListPage.tsx
 #: src/runlite/pages/RunPage.tsx
 msgid "Imported challenge"
@@ -8099,6 +8814,10 @@ msgstr ""
 
 #: src/content/pages/components/MapRecords.tsx
 msgid "In a free for all every player is a team of one, so there is no team to split by. A position's record is not controlled for how many players there were or who they were."
+msgstr ""
+
+#: src/hub/maps/pictureSweep.ts
+msgid "in a loose working folder"
 msgstr ""
 
 #: src/content/pages/components/MapRecords.tsx
@@ -8229,6 +8948,7 @@ msgstr ""
 #: src/downloads/pages/components/MapPacksDrawer.tsx
 #: src/downloads/pages/components/RapidBrowser.tsx
 #: src/home/zones/SuggestedMap.tsx
+#: src/hub/pages/components/FilterCombobox.tsx
 msgid "Installed"
 msgstr ""
 
@@ -8323,6 +9043,10 @@ msgstr ""
 msgid "is where a game swapped a starting unit for another unit, which is how some games upgrade one. The line carries on as the new unit, and the swap is not a loss. Two units are joined only when the game's own script destroyed the old one with no attacker and made the new one for the same player, with no builder, on exactly the same spot, on the same frame or the one before. A game that destroys a starting unit and spawns an unrelated unit on that spot at that moment would be drawn as an upgrade."
 msgstr ""
 
+#: src/hub/pages/components/MapCatalogControl.tsx
+msgid "It asks the hub what it already knows first, so most of a library costs nothing to check. Reading the rest takes a while on a large collection."
+msgstr ""
+
 #: src/content/pages/components/LivingValueChart.tsx
 msgid "It did not record a unit changing hands, so a unit that was given away or captured is counted for its first owner throughout."
 msgstr ""
@@ -8390,6 +9114,18 @@ msgstr ""
 
 #: src/direct/room.ts
 msgid "It was handing out {previous} earlier."
+msgstr ""
+
+#: src/hub/games/factsSweep.ts
+msgid "It would not take {factionsSaid}."
+msgstr ""
+
+#: src/hub/games/factsSweep.ts
+msgid "It would not take {unitsSaid} and {factionsSaid}."
+msgstr ""
+
+#: src/hub/games/factsSweep.ts
+msgid "It would not take {unitsSaid}."
 msgstr ""
 
 #: src/downloads/pages/ActivityPage.tsx
@@ -8525,6 +9261,10 @@ msgstr ""
 msgid "kept from an earlier run so the models it already wrote stay correct"
 msgstr ""
 
+#: src/lobby-servers/pages/components/AutojoinChannels.tsx
+msgid "key (optional)"
+msgstr ""
+
 #: src/content/pages/components/ConfigProfilesPanel.tsx
 msgid "keybinds"
 msgstr ""
@@ -8540,11 +9280,16 @@ msgstr ""
 #: src/content/pages/components/GameVersionsTab.tsx
 #: src/content/pages/components/PlayerUnitUsage.tsx
 #: src/content/pages/components/ReplayAnalysisEvents.tsx
+#: src/hub/pages/BrowsePage.tsx
 msgid "Kind"
 msgstr ""
 
 #: src/content/pages/components/ReplayAnalysisEvents.tsx
 msgid "Kind of event"
+msgstr ""
+
+#: src/hub/pages/BrowsePage.tsx
+msgid "Kind: {kindLabel}"
 msgstr ""
 
 #: src/content/pages/components/LivingValueChart.tsx
@@ -8612,12 +9357,25 @@ msgstr ""
 msgid "Last checked {lastCheckedTime}"
 msgstr ""
 
+#: src/lobby-servers/pages/components/AutojoinChannels.tsx
+msgid "Last join failed: {failureReason}. Remove it if you no longer have access."
+msgstr ""
+
+#: src/lobby-servers/pages/components/AutojoinChannels.tsx
+msgid "Last join failed. Remove it if you no longer have access."
+msgstr ""
+
 #: src/content/pages/MapDetailPage.tsx
 msgid "Last played"
 msgstr ""
 
 #: src/content/pages/components/GameSourcesTab.tsx
 msgid "Last result"
+msgstr ""
+
+#: src/hub/pages/components/GamePicturesControl.tsx
+#: src/hub/pages/components/MapPicturesControl.tsx
+msgid "Last run {lastRun}."
 msgstr ""
 
 #: src/content/pages/PlayerDossierPage.tsx
@@ -8640,6 +9398,7 @@ msgstr ""
 msgid "Layer exported."
 msgstr ""
 
+#: src/hub/preview.ts
 #: src/i18n/frameStrings.ts
 msgid "Layout"
 msgstr ""
@@ -8665,6 +9424,10 @@ msgstr ""
 msgid "Leave blank for an open room"
 msgstr ""
 
+#: src/hub/pages/components/HubAddressField.tsx
+msgid "Leave blank to use the default, or your distribution's address if it sets one."
+msgstr ""
+
 #: src/runlite/pages/components/NodeOverlays.tsx
 msgid "Leave it — press on"
 msgstr ""
@@ -8675,6 +9438,10 @@ msgstr ""
 
 #: src/runlite/pages/components/NodeOverlays.tsx
 msgid "Leave the depot"
+msgstr ""
+
+#: src/hub/pages/components/AssetUploadControl.tsx
+msgid "Leave this off unless you are happy to publish pictures made from the games and maps you have installed."
 msgstr ""
 
 #: src/content/unitFieldNotes.ts
@@ -8729,6 +9496,7 @@ msgstr ""
 msgid "Lego Parts"
 msgstr ""
 
+#: src/hub/preview.ts
 #: src/runlite/pages/components/RunSetupForm.tsx
 msgid "Length"
 msgstr ""
@@ -8769,6 +9537,7 @@ msgid "Line of sight"
 msgstr ""
 
 #: src/deeplink/copyLink.ts
+#: src/hub/pages/ItemPage.tsx
 msgid "Link copied"
 msgstr ""
 
@@ -8778,6 +9547,11 @@ msgstr ""
 
 #: src/content/pages/components/BrandingLinks.tsx
 msgid "Links"
+msgstr ""
+
+#: src/hub/maps/catalogSweep.ts
+#: src/hub/maps/pictureSweep.ts
+msgid "listed twice in the library"
 msgstr ""
 
 #: src/play/pages/components/PresetsDrawer.tsx
@@ -8837,6 +9611,14 @@ msgstr ""
 msgid "Loading the game's factions…"
 msgstr ""
 
+#: src/hub/pages/ItemPage.tsx
+msgid "loading the hub…"
+msgstr ""
+
+#: src/hub/pages/BrowsePage.tsx
+msgid "Loading the hub…"
+msgstr ""
+
 #: src/content/replayAnalysis.ts
 msgid "Loading the match"
 msgstr ""
@@ -8886,12 +9668,24 @@ msgstr ""
 msgid "Log in to a lobby server, chat, and join battles."
 msgstr ""
 
+#: src/lobby-servers/pages/SettingsSection.tsx
+msgid "Log in with this account every time Coilbox starts."
+msgstr ""
+
 #: src/play/pages/EngineLogSection.tsx
 msgid "Log: {logPath}"
 msgstr ""
 
+#: src/lobby-servers/pages/SettingsSection.tsx
+msgid "login"
+msgstr ""
+
 #: src/multiplayer/index.tsx
 msgid "Login"
+msgstr ""
+
+#: src/lobby-servers/pages/SettingsSection.tsx
+msgid "Login added"
 msgstr ""
 
 #: src/runlite/pages/components/RunSetupForm.tsx
@@ -8917,6 +9711,11 @@ msgstr ""
 
 #: src/play/pages/EngineLogSection.tsx
 msgid "Looking for the engine log."
+msgstr ""
+
+#: src/hub/pages/components/GameFactsControl.tsx
+#: src/hub/pages/components/GamePicturesControl.tsx
+msgid "Looking for your games"
 msgstr ""
 
 #: src/direct/ShareRoomButton.tsx
@@ -8996,6 +9795,22 @@ msgstr ""
 msgid "Makes a BeamLaser keep firing while retargeting, sweeping across the terrain instead of cutting off."
 msgstr ""
 
+#: src/hub/assets/UploadRunBadge.tsx
+msgid "Making pictures"
+msgstr ""
+
+#: src/hub/assets/UploadRunBadge.tsx
+msgid "Making pictures for the hub. Open to stop."
+msgstr ""
+
+#: src/hub/pages/components/MapPicturesControl.tsx
+msgid "Making the pictures"
+msgstr ""
+
+#: src/hub/pages/components/MapPicturesControl.tsx
+msgid "Making the pictures {done} of {total}"
+msgstr ""
+
 #: src/content/replayAnalysis.ts
 msgid "Making the track"
 msgstr ""
@@ -9019,6 +9834,8 @@ msgstr ""
 #: src/content/pages/components/ResolveContentDrawer.tsx
 #: src/direct/HostRoomForm.tsx
 #: src/downloads/DownloadQueueBadge.tsx
+#: src/hub/pages/BrowsePage.tsx
+#: src/hub/pages/ItemPage.tsx
 #: src/play/pages/components/CrashDrawer.tsx
 #: src/play/pages/components/MapOverlay.tsx
 #: src/play/presetParts.ts
@@ -9253,6 +10070,10 @@ msgstr ""
 msgid "median {median}"
 msgstr ""
 
+#: src/account/pages/SettingsSection.tsx
+msgid "Member since"
+msgstr ""
+
 #: src/sound/events.ts
 msgid "Mentioned in chat"
 msgstr ""
@@ -9351,6 +10172,7 @@ msgstr ""
 #: src/content/pages/components/ReplayMap.tsx
 #: src/content/pages/components/ReplayMapView.tsx
 #: src/direct/LanRooms.tsx
+#: src/hub/assets/picture.ts
 #: src/play/pages/components/MapCard.tsx
 #: src/play/pages/components/MapPickerGrid.tsx
 #: src/play/PresetList.tsx
@@ -9384,6 +10206,10 @@ msgstr ""
 
 #: src/content/pages/components/MapAggregate.tsx
 msgid "Minutes 5 to 10"
+msgstr ""
+
+#: src/lobby-servers/pages/SettingsSection.tsx
+msgid "Minutes before away"
 msgstr ""
 
 #: src/content/unitFieldNotes.ts
@@ -9615,9 +10441,14 @@ msgstr ""
 msgid "My Maps"
 msgstr ""
 
+#: src/lobby-servers/pages/SettingsSection.tsx
+msgid "My server"
+msgstr ""
+
 #: src/content/pages/components/MapRecords.tsx
 #: src/downloads/pages/ActivityPage.tsx
 #: src/downloads/pages/SettingsSection.tsx
+#: src/lobby-servers/pages/SettingsSection.tsx
 #: src/packs/pages/components/ExportPackForm.tsx
 msgid "Name"
 msgstr ""
@@ -9769,6 +10600,10 @@ msgstr ""
 msgid "New content goes to"
 msgstr ""
 
+#: src/account/pages/SettingsSection.tsx
+msgid "New email address"
+msgstr ""
+
 #: src/content/libraryGames.ts
 msgid "New Games"
 msgstr ""
@@ -9777,12 +10612,20 @@ msgstr ""
 msgid "new games go here"
 msgstr ""
 
+#: src/lobby-servers/pages/SettingsSection.tsx
+msgid "New login"
+msgstr ""
+
 #: src/content/libraryMaps.ts
 msgid "New Maps"
 msgstr ""
 
 #: src/content/pages/FoldersSection.tsx
 msgid "new maps go here"
+msgstr ""
+
+#: src/account/pages/SettingsSection.tsx
+msgid "New password"
 msgstr ""
 
 #: src/play/pages/components/NewPresetFromReplayButton.tsx
@@ -9795,6 +10638,10 @@ msgstr ""
 
 #: src/workshop/index.ts
 msgid "New project"
+msgstr ""
+
+#: src/lobby-servers/pages/SettingsSection.tsx
+msgid "New server"
 msgstr ""
 
 #: src/content/pages/components/ReplaySetsManager.tsx
@@ -9823,7 +10670,12 @@ msgid "Newest"
 msgstr ""
 
 #: src/downloads/pages/ActivityPage.tsx
+#: src/hub/pages/BrowsePage.tsx
 msgid "Newest first"
+msgstr ""
+
+#: src/hub/pages/BrowsePage.tsx
+msgid "Next"
 msgstr ""
 
 #: src/runlite/pages/components/RunHud.tsx
@@ -9846,8 +10698,16 @@ msgstr ""
 msgid "No 1v1 maps."
 msgstr ""
 
+#: src/hub/pages/ItemPage.tsx
+msgid "No account needed. What this page shows above is what you get, fetched before you press the button."
+msgstr ""
+
 #: src/runlite/pages/RunPage.tsx
 msgid "No active warpath."
+msgstr ""
+
+#: src/lobby-servers/pages/SettingsSection.tsx
+msgid "No address yet"
 msgstr ""
 
 #: src/play/pages/components/ParticipantsTable.tsx
@@ -10146,6 +11006,10 @@ msgstr ""
 msgid "No line is on the chart above."
 msgstr ""
 
+#: src/lobby-servers/pages/SettingsSection.tsx
+msgid "No logins yet. Add one to connect to a lobby."
+msgstr ""
+
 #: src/content/compatReport.ts
 msgid "No luaui folder"
 msgstr ""
@@ -10259,6 +11123,18 @@ msgstr ""
 
 #: src/content/buildPicMissing.ts
 msgid "no pic"
+msgstr ""
+
+#: src/hub/assets/placeholder.ts
+msgid "No picture of {name}"
+msgstr ""
+
+#: src/hub/assets/placeholder.ts
+msgid "No picture of {name}, a {measure} map"
+msgstr ""
+
+#: src/hub/assets/MapPicture.tsx
+msgid "No picture of this map yet"
 msgstr ""
 
 #: src/content/pages/MatchupPage.tsx
@@ -10533,6 +11409,10 @@ msgstr ""
 msgid "No units match."
 msgstr ""
 
+#: src/hub/games/download.ts
+msgid "No usable download source for {label}."
+msgstr ""
+
 #: src/downloads/pages/components/RapidBrowser.tsx
 msgid "No versions in this repository."
 msgstr ""
@@ -10636,6 +11516,10 @@ msgstr ""
 msgid "None ordered in this window"
 msgstr ""
 
+#: src/lobby-servers/pages/components/AutojoinChannels.tsx
+msgid "None. Channels you join are added here; add one to auto-join it on connect."
+msgstr ""
+
 #: src/play/scenarioDifficulty.ts
 msgid "Normal"
 msgstr ""
@@ -10692,6 +11576,10 @@ msgstr ""
 msgid "Not installed"
 msgstr ""
 
+#: src/account/pages/SettingsSection.tsx
+msgid "Not known yet"
+msgstr ""
+
 #: src/content/libraryMaps.ts
 msgid "not on any mirror"
 msgstr ""
@@ -10720,8 +11608,24 @@ msgstr ""
 msgid "Not saved. Leaving this page loses the change."
 msgstr ""
 
+#: src/account/pages/SettingsSection.tsx
+msgid "Not signed in. Connect as {lastUsername} to manage that account."
+msgstr ""
+
+#: src/account/pages/SettingsSection.tsx
+msgid "Not signed in. Connect to a lobby account to manage it here."
+msgstr ""
+
 #: src/content/pages/components/MapRecords.tsx
 msgid "not taken"
+msgstr ""
+
+#: src/hub/pages/ItemPage.tsx
+msgid "Not tied to one game"
+msgstr ""
+
+#: src/hub/pages/ItemPage.tsx
+msgid "Not tied to one map"
 msgstr ""
 
 #: src/content/pages/components/GameSourcesTab.tsx
@@ -10793,6 +11697,10 @@ msgstr ""
 msgid "Nothing in the picture has anything on this layer, so there is nothing to write."
 msgstr ""
 
+#: src/hub/pages/components/FilterCombobox.tsx
+msgid "Nothing installed matches that."
+msgstr ""
+
 #: src/content/pages/components/KeyBindingEditor.tsx
 msgid "Nothing is bound to this key."
 msgstr ""
@@ -10805,8 +11713,16 @@ msgstr ""
 msgid "Nothing is hosting on {where}. Check the port with the host, and that their room is still up."
 msgstr ""
 
+#: src/lobby-servers/pages/SettingsSection.tsx
+msgid "Nothing is saved until you add the server."
+msgstr ""
+
 #: src/content/pages/components/ReplayAnalysisSection.tsx
 msgid "Nothing of this game has been recorded on this computer yet."
+msgstr ""
+
+#: src/hub/pages/BrowsePage.tsx
+msgid "Nothing on the hub matches those filters yet."
 msgstr ""
 
 #: src/content/pages/components/Convert3doDrawer.tsx
@@ -10886,9 +11802,17 @@ msgstr ""
 msgid "NW-SE"
 msgstr ""
 
+#: src/hub/preview.ts
+msgid "Objectives"
+msgstr ""
+
 #: src/play/modOptions.ts
 #: src/profile/SettingsSection.tsx
 msgid "Off"
+msgstr ""
+
+#: src/hub/pages/components/AssetUploadControl.tsx
+msgid "Off unless you turn it on. When it is on, Coilbox reads the game and map files on this computer, makes pictures of the units and maps inside them, and sends those pictures to the hub under your account, with your name on them. It can also send what it measured about a map, such as its size, its height range and where players start."
 msgstr ""
 
 #: src/content/unitFieldNotes.ts
@@ -10947,6 +11871,10 @@ msgstr ""
 
 #: src/content/unitFieldNotes.ts
 msgid "Offers the build orders. The engine only counts the unit as a builder if it also has build power and build range."
+msgstr ""
+
+#: src/lobby-servers/pages/SettingsSection.tsx
+msgid "Official"
 msgstr ""
 
 #: src/downloads/pages/ActivityPage.tsx
@@ -11139,6 +12067,10 @@ msgstr ""
 msgid "Only shoots at"
 msgstr ""
 
+#: src/hub/pages/BrowsePage.tsx
+msgid "Only the first {scanned} items on the hub were read, so there may be more for this game than are listed here. Search to narrow it down."
+msgstr ""
+
 #: src/content/unitFieldNotes.ts
 msgid "Only used when the weapon has no model."
 msgstr ""
@@ -11154,11 +12086,18 @@ msgstr ""
 #: src/content/pages/components/EngineRow.tsx
 #: src/content/pages/components/RootCard.tsx
 #: src/deeplink/DeepLinkHandler.tsx
+#: src/hub/pages/BrowsePage.tsx
+#: src/hub/pages/ItemPage.tsx
+#: src/lobby-servers/PasswordRecoveryForm.tsx
 msgid "Open"
 msgstr ""
 
 #: src/deeplink/actions.ts
 msgid "Open {route}."
+msgstr ""
+
+#: src/hub/pages/BrowsePage.tsx
+msgid "Open {title}"
 msgstr ""
 
 #: src/deeplink/pages/ImportSection.tsx
@@ -11215,8 +12154,16 @@ msgstr ""
 msgid "Open ports on my router"
 msgstr ""
 
+#: src/lobby-servers/pages/SettingsSection.tsx
+msgid "Open protocol console"
+msgstr ""
+
 #: src/home/continue.ts
 msgid "Open setup"
+msgstr ""
+
+#: src/hub/preview.ts
+msgid "Open slot"
 msgstr ""
 
 #: src/deeplink/actions.ts
@@ -11300,6 +12247,14 @@ msgstr ""
 #: src/runlite/pages/components/EncounterOverlay.tsx
 #: src/runlite/pages/RunPage.tsx
 msgid "Opposition"
+msgstr ""
+
+#: src/hub/PublishSection.tsx
+msgid "Optional, separated by commas."
+msgstr ""
+
+#: src/hub/PublishSection.tsx
+msgid "Optional."
 msgstr ""
 
 #: src/content/pages/GameDetailPage.tsx
@@ -11424,6 +12379,10 @@ msgstr ""
 msgid "Other units cannot shove this one out of the way while it is holding its ground."
 msgstr ""
 
+#: src/lobby-servers/config.ts
+msgid "Our Tachyon support is incomplete. Use the Beyond All Reason entry instead."
+msgstr ""
+
 #: src/content/pages/MapDetailPage.tsx
 msgid "outcome unknown"
 msgstr ""
@@ -11500,6 +12459,10 @@ msgstr ""
 msgid "packages/ has rapid packages but there is no pool/ beside it. Copy pool/ too, or the packages cannot be read."
 msgstr ""
 
+#: src/hub/pages/BrowsePage.tsx
+msgid "Page {current} of {lastPage}"
+msgstr ""
+
 #: src/lego/index.ts
 msgid "Parts pack format"
 msgstr ""
@@ -11542,6 +12505,10 @@ msgstr ""
 
 #: src/direct/room.ts
 msgid "password needed"
+msgstr ""
+
+#: src/lobby-servers/pages/SettingsSection.tsx
+msgid "Password saved"
 msgstr ""
 
 #: src/direct/LanRooms.tsx
@@ -11695,6 +12662,10 @@ msgstr ""
 
 #: src/content/pages/components/MapExportButtons.tsx
 msgid "Picture exported."
+msgstr ""
+
+#: src/hub/uploadOutcomes.ts
+msgid "Picture uploads stopped early"
 msgstr ""
 
 #: src/content/unitFieldNotes.ts
@@ -11914,6 +12885,10 @@ msgstr ""
 msgid "Plays original game"
 msgstr ""
 
+#: src/account/pages/SettingsSection.tsx
+msgid "Playtime"
+msgstr ""
+
 #: src/content/pages/components/MapExportButtons.tsx
 msgid "PNG image"
 msgstr ""
@@ -11931,6 +12906,7 @@ msgid "Poor targets"
 msgstr ""
 
 #: src/direct/JoinRoomForm.tsx
+#: src/lobby-servers/pages/SettingsSection.tsx
 msgid "Port"
 msgstr ""
 
@@ -12007,6 +12983,11 @@ msgstr ""
 msgid "Press a key"
 msgstr ""
 
+#: src/hub/assets/pictureSweep.ts
+#: src/hub/maps/pictureSweep.ts
+msgid "Press it again later to carry on."
+msgstr ""
+
 #: src/runlite/generate.ts
 msgid "Press on"
 msgstr ""
@@ -12021,6 +13002,10 @@ msgstr ""
 
 #: src/sound/SoundSettings.tsx
 msgid "Preview {eventLabel}"
+msgstr ""
+
+#: src/hub/pages/BrowsePage.tsx
+msgid "Previous"
 msgstr ""
 
 #: src/content/pages/components/ArchiveTypeBadge.tsx
@@ -12105,6 +13090,22 @@ msgstr ""
 
 #: src/mapconv/index.ts
 msgid "Projects"
+msgstr ""
+
+#: src/hub/PublishSection.tsx
+msgid "Publish"
+msgstr ""
+
+#: src/hub/PublishSection.tsx
+msgid "Publish to the Coilbox hub"
+msgstr ""
+
+#: src/hub/PublishSection.tsx
+msgid "Published to the Coilbox hub."
+msgstr ""
+
+#: src/hub/PublishSection.tsx
+msgid "Publishing…"
 msgstr ""
 
 #: src/i18n/frameStrings.ts
@@ -12209,6 +13210,7 @@ msgstr ""
 msgid "raises tech ceiling · both sides"
 msgstr ""
 
+#: src/hub/preview.ts
 #: src/play/pages/components/ParticipantsTable.tsx
 #: src/startbox/mode.ts
 msgid "Random"
@@ -12259,6 +13261,11 @@ msgstr ""
 
 #: src/content/pages/components/EngineRow.tsx
 msgid "Re-verify"
+msgstr ""
+
+#: src/hub/pages/components/MapCatalogControl.tsx
+#: src/hub/pages/components/MapPicturesControl.tsx
+msgid "Read {done} of {total}"
 msgstr ""
 
 #: src/content/unitFieldNotes.ts
@@ -12321,8 +13328,20 @@ msgstr ""
 msgid "Read with a capital M as an alternate spelling of heightmod. Its default depends on whether the weapon is ballistic (0.8) or guided (1.0)."
 msgstr ""
 
+#: src/hub/pages/components/GameFactsControl.tsx
+#: src/hub/pages/components/GamePicturesControl.tsx
 #: src/play/pages/EngineLogSection.tsx
 msgid "Reading"
+msgstr ""
+
+#: src/hub/pages/components/GameFactsControl.tsx
+#: src/hub/pages/components/GamePicturesControl.tsx
+msgid "Reading {at} of {total}"
+msgstr ""
+
+#: src/hub/pages/components/GameFactsControl.tsx
+#: src/hub/pages/components/GamePicturesControl.tsx
+msgid "Reading {at} of {total}: {game}"
 msgstr ""
 
 #: src/content/pages/components/PlayerUnitUsage.tsx
@@ -12332,6 +13351,10 @@ msgstr ""
 #: src/content/pages/components/UnitHero.tsx
 #: src/content/pages/components/UnitModelPanel.tsx
 msgid "Reading <0>{object}</0> out of {gameArchive}."
+msgstr ""
+
+#: src/hub/pages/components/MapCatalogControl.tsx
+msgid "Reading and sending your maps"
 msgstr ""
 
 #: src/content/pages/components/ReplayBuildOrders.tsx
@@ -12433,8 +13456,28 @@ msgstr ""
 msgid "Reading units"
 msgstr ""
 
+#: src/hub/pages/ItemPage.tsx
+msgid "reading what is in it…"
+msgstr ""
+
+#: src/hub/pages/components/GameFactsControl.tsx
 #: src/play/pages/components/GamePickerGrid.tsx
 msgid "Reading your games…"
+msgstr ""
+
+#: src/hub/pages/components/MapCatalogControl.tsx
+#: src/hub/pages/components/MapPicturesControl.tsx
+msgid "Reading your maps"
+msgstr ""
+
+#: src/hub/pages/components/MapCatalogControl.tsx
+#: src/hub/pages/components/MapPicturesControl.tsx
+msgid "Reading your maps…"
+msgstr ""
+
+#: src/hub/pages/components/GameFactsControl.tsx
+#: src/hub/pages/components/GamePicturesControl.tsx
+msgid "Reading: {game}"
 msgstr ""
 
 #: src/home/continue.ts
@@ -12480,6 +13523,10 @@ msgstr ""
 
 #: src/home/zones/ResumeRail.tsx
 msgid "Reconnect all"
+msgstr ""
+
+#: src/lobby-servers/pages/SettingsSection.tsx
+msgid "Reconnect automatically"
 msgstr ""
 
 #: src/content/pages/components/ReplayAnalysisSection.tsx
@@ -12537,6 +13584,10 @@ msgstr ""
 
 #: src/runlite/pages/RunPage.tsx
 msgid "Recover a schematic to widen the arsenal, or a field upgrade for yourself."
+msgstr ""
+
+#: src/lobby-servers/pages/SettingsSection.tsx
+msgid "Recover your password"
 msgstr ""
 
 #: src/content/pages/components/SetupCard.tsx
@@ -12599,6 +13650,10 @@ msgstr ""
 msgid "regex /{filterRegex}/i"
 msgstr ""
 
+#: src/lobby-servers/pages/SettingsSection.tsx
+msgid "Register"
+msgstr ""
+
 #: src/content/pages/components/MissionRuntimeSection.tsx
 msgid "Reinstall the mission runtime"
 msgstr ""
@@ -12633,6 +13688,10 @@ msgstr ""
 
 #: src/downloads/pages/components/RapidBrowser.tsx
 msgid "Release"
+msgstr ""
+
+#: src/hub/pages/components/GameFactsControl.tsx
+msgid "Released games only. A game you are working on in a loose folder stays on this machine, and so do the games coilbox writes for itself."
 msgstr ""
 
 #: src/content/pages/components/UnitStatsTable.tsx
@@ -12694,7 +13753,16 @@ msgstr ""
 #: src/content/pages/components/KeyBindingEditor.tsx
 #: src/content/pages/components/MissionRuntimeSection.tsx
 #: src/content/pages/components/RootCard.tsx
+#: src/hub/pages/ItemPage.tsx
 msgid "Remove"
+msgstr ""
+
+#: src/lobby-servers/pages/SettingsSection.tsx
+msgid "Remove {accountName}"
+msgstr ""
+
+#: src/lobby-servers/pages/components/AutojoinChannels.tsx
+msgid "Remove {channel}"
 msgstr ""
 
 #: src/content/pages/components/UnitPicker.tsx
@@ -12713,8 +13781,20 @@ msgstr ""
 msgid "Remove {repoName}"
 msgstr ""
 
+#: src/lobby-servers/pages/SettingsSection.tsx
+msgid "Remove {serverName}"
+msgstr ""
+
 #: src/downloads/pages/ActivityPage.tsx
 msgid "Remove from queue"
+msgstr ""
+
+#: src/lobby-servers/pages/SettingsSection.tsx
+msgid "Remove login"
+msgstr ""
+
+#: src/lobby-servers/pages/SettingsSection.tsx
+msgid "Remove server"
 msgstr ""
 
 #: src/content/pages/ReplayDetailPage.tsx
@@ -12905,6 +13985,10 @@ msgstr ""
 msgid "Rescan"
 msgstr ""
 
+#: src/account/pages/SettingsSection.tsx
+msgid "Resend verification email"
+msgstr ""
+
 #: src/content/pages/components/EngineSettingField.tsx
 #: src/content/pages/components/KeyBindingEditor.tsx
 #: src/play/pages/components/GameOptionsPanel.tsx
@@ -12923,6 +14007,10 @@ msgstr ""
 msgid "Reset {optionName} to its default"
 msgstr ""
 
+#: src/lobby-servers/PasswordRecoveryForm.tsx
+msgid "Reset password"
+msgstr ""
+
 #: src/content/pages/components/LuaRepl.tsx
 msgid "Reset session"
 msgstr ""
@@ -12937,6 +14025,10 @@ msgstr ""
 
 #: src/content/pages/components/EngineSettingField.tsx
 msgid "Reset to engine default ({defaultValue})"
+msgstr ""
+
+#: src/lobby-servers/PasswordRecoveryForm.tsx
+msgid "Resetting…"
 msgstr ""
 
 #: src/content/pages/components/ReplayTimeline.tsx
@@ -13101,6 +14193,7 @@ msgstr ""
 msgid "Revert"
 msgstr ""
 
+#: src/hub/pages/components/ItemPreview.tsx
 #: src/runlite/pages/RunPage.tsx
 msgid "Reward"
 msgstr ""
@@ -13237,11 +14330,16 @@ msgstr ""
 msgid "Same as default"
 msgstr ""
 
+#: src/account/pages/SettingsSection.tsx
 #: src/content/pages/components/KeymapsPanel.tsx
 #: src/content/pages/components/ReplaySetsManager.tsx
 #: src/play/pages/components/NewPresetFromReplayButton.tsx
 #: src/play/pages/components/SaveAsPresetButton.tsx
 msgid "Save"
+msgstr ""
+
+#: src/lobby-servers/pages/SettingsSection.tsx
+msgid "Save a password first. Coilbox cannot log in at startup without one."
 msgstr ""
 
 #: src/play/pages/components/SaveAsPresetButton.tsx
@@ -13265,6 +14363,10 @@ msgstr ""
 msgid "Save Games"
 msgstr ""
 
+#: src/lobby-servers/PasswordRecoveryForm.tsx
+msgid "Save it in Coilbox, then replace it with one of your own in Settings, Account."
+msgstr ""
+
 #: src/play/PresetLibraryToolbar.tsx
 msgid "Save preset"
 msgstr ""
@@ -13277,7 +14379,12 @@ msgstr ""
 msgid "Save to uikeys.txt"
 msgstr ""
 
+#: src/lobby-servers/PasswordRecoveryForm.tsx
+msgid "Save your new password"
+msgstr ""
+
 #: src/content/pages/components/FilePreview.tsx
+#: src/lobby-servers/pages/SettingsSection.tsx
 msgid "Saved"
 msgstr ""
 
@@ -13343,7 +14450,9 @@ msgstr ""
 msgid "Saving..."
 msgstr ""
 
+#: src/account/pages/SettingsSection.tsx
 #: src/components/SaveStatus.tsx
+#: src/lobby-servers/pages/SettingsSection.tsx
 msgid "Saving…"
 msgstr ""
 
@@ -13512,6 +14621,7 @@ msgid "Search games"
 msgstr ""
 
 #: src/content/pages/GamesPage.tsx
+#: src/hub/pages/BrowsePage.tsx
 msgid "Search games…"
 msgstr ""
 
@@ -13520,7 +14630,16 @@ msgid "Search maps"
 msgstr ""
 
 #: src/content/pages/MapsPage.tsx
+#: src/hub/pages/BrowsePage.tsx
 msgid "Search maps…"
+msgstr ""
+
+#: src/hub/pages/BrowsePage.tsx
+msgid "Search the hub"
+msgstr ""
+
+#: src/hub/pages/BrowsePage.tsx
+msgid "Search titles and descriptions…"
 msgstr ""
 
 #: src/content/pages/components/UnitPicker.tsx
@@ -13531,6 +14650,10 @@ msgstr ""
 #: src/content/pages/components/UnitPicker.tsx
 #: src/content/pages/GameUnitsPage.tsx
 msgid "Search units…"
+msgstr ""
+
+#: src/hub/pages/BrowsePage.tsx
+msgid "Search: {searchText}"
 msgstr ""
 
 #: src/content/achievements.ts
@@ -13605,6 +14728,14 @@ msgstr ""
 msgid "Select a repository to see its downloadable versions."
 msgstr ""
 
+#: src/lobby-servers/PasswordRecoveryForm.tsx
+msgid "Select a server"
+msgstr ""
+
+#: src/lobby-servers/PasswordRecoveryForm.tsx
+msgid "Select a server."
+msgstr ""
+
 #: src/content/pages/FoldersSection.tsx
 msgid "Select a Spring/Recoil data folder"
 msgstr ""
@@ -13677,8 +14808,89 @@ msgstr ""
 msgid "Self repair"
 msgstr ""
 
+#: src/account/pages/SettingsSection.tsx
+#: src/lobby-servers/PasswordRecoveryForm.tsx
+msgid "Send code"
+msgstr ""
+
+#: src/hub/pages/components/GamePicturesControl.tsx
+msgid "Send pictures of your games"
+msgstr ""
+
+#: src/hub/pages/components/AssetUploadControl.tsx
+msgid "Send pictures of your games and maps to the hub"
+msgstr ""
+
+#: src/hub/pages/components/MapPicturesControl.tsx
+msgid "Send pictures of your maps"
+msgstr ""
+
 #: src/notify/NotificationsSettings.tsx
 msgid "Send test notification"
+msgstr ""
+
+#: src/hub/pages/components/GameFactsControl.tsx
+msgid "Send what your games say"
+msgstr ""
+
+#: src/hub/pages/components/MapCatalogControl.tsx
+msgid "Send what your maps say"
+msgstr ""
+
+#: src/hub/pages/components/GameFactsControl.tsx
+#: src/hub/pages/components/MapCatalogControl.tsx
+#: src/hub/pages/components/MapPicturesControl.tsx
+msgid "Sending"
+msgstr ""
+
+#: src/hub/pages/components/GameFactsControl.tsx
+msgid "Sending {at} of {total}"
+msgstr ""
+
+#: src/hub/pages/components/GameFactsControl.tsx
+msgid "Sending {at} of {total}: {game}"
+msgstr ""
+
+#: src/hub/pages/components/MapCatalogControl.tsx
+#: src/hub/pages/components/MapPicturesControl.tsx
+msgid "Sending {done} of {total}"
+msgstr ""
+
+#: src/hub/assets/UploadRunBadge.tsx
+msgid "Sending pictures"
+msgstr ""
+
+#: src/hub/assets/UploadRunBadge.tsx
+msgid "Sending pictures for the hub. Open to stop."
+msgstr ""
+
+#: src/hub/pages/components/GamePicturesControl.tsx
+msgid "Sending pictures of your games"
+msgstr ""
+
+#: src/hub/pages/components/MapPicturesControl.tsx
+msgid "Sending pictures of your maps"
+msgstr ""
+
+#: src/hub/pages/components/AssetUploadControl.tsx
+msgid "Sending pictures to the hub"
+msgstr ""
+
+#: src/hub/pages/components/GameFactsControl.tsx
+msgid "Sending what your games say"
+msgstr ""
+
+#: src/hub/pages/components/MapCatalogControl.tsx
+msgid "Sending what your maps say"
+msgstr ""
+
+#: src/hub/pages/components/GameFactsControl.tsx
+msgid "Sending: {game}"
+msgstr ""
+
+#: src/account/pages/SettingsSection.tsx
+#: src/lobby-servers/PasswordRecoveryForm.tsx
+msgid "Sending…"
 msgstr ""
 
 #: src/content/pages/components/PlayerUnitUsage.tsx
@@ -13689,12 +14901,25 @@ msgstr ""
 msgid "Separation distance"
 msgstr ""
 
+#: src/lobby-servers/pages/SettingsSection.tsx
+msgid "server"
+msgstr ""
+
 #: src/content/pages/components/ReplayChat.tsx
+#: src/lobby-servers/PasswordRecoveryForm.tsx
 msgid "Server"
+msgstr ""
+
+#: src/lobby-servers/pages/SettingsSection.tsx
+msgid "Server added"
 msgstr ""
 
 #: src/multiplayer/index.tsx
 msgid "Server admin"
+msgstr ""
+
+#: src/lobby-servers/pages/SettingsSection.tsx
+msgid "Servers"
 msgstr ""
 
 #: src/play/pages/components/ParticipantsTable.tsx
@@ -13731,6 +14956,10 @@ msgstr ""
 
 #: src/play/pages/components/ParticipantsTable.tsx
 msgid "Set all"
+msgstr ""
+
+#: src/lobby-servers/pages/SettingsSection.tsx
+msgid "Set me away when idle"
 msgstr ""
 
 #: src/content/pages/components/ReplaySetsManager.tsx
@@ -13831,11 +15060,20 @@ msgid "Shapes and the choice of buildings"
 msgstr ""
 
 #: src/direct/ShareRoomButton.tsx
+#: src/hub/pages/components/ShareMenu.tsx
 msgid "Share"
 msgstr ""
 
 #: src/runlite/pages/RunListPage.tsx
 msgid "Share {runName} as a challenge code"
+msgstr ""
+
+#: src/hub/pages/components/ShareMenu.tsx
+msgid "Share a pack"
+msgstr ""
+
+#: src/hub/pages/components/ShareMenu.tsx
+msgid "Share a setup pack"
 msgstr ""
 
 #: src/runlite/pages/RunListPage.tsx
@@ -13844,6 +15082,18 @@ msgstr ""
 
 #: src/content/mapAggregate.ts
 msgid "Share of each match"
+msgstr ""
+
+#: src/hub/pages/components/ShareMenu.tsx
+msgid "Share your maps and games"
+msgstr ""
+
+#: src/hub/pages/ItemPage.tsx
+msgid "Shared by {authorName}"
+msgstr ""
+
+#: src/hub/pages/ItemPage.tsx
+msgid "Shared by {authorName} on {createdAt}"
 msgstr ""
 
 #: src/runlite/pages/components/RunHud.tsx
@@ -14066,6 +15316,10 @@ msgstr ""
 msgid "Show and sort the figures for {primary} alone instead of the whole match"
 msgstr ""
 
+#: src/lobby-servers/pages/SettingsSection.tsx
+msgid "Show as away to everyone else after a spell without input. Using Coilbox again clears it. Away you set by hand stays until you clear it."
+msgstr ""
+
 #: src/content/pages/components/ReplayBuildOrders.tsx
 msgid "Show build orders"
 msgstr ""
@@ -14108,6 +15362,10 @@ msgstr ""
 
 #: src/content/pages/components/ReplayRoster.tsx
 msgid "Show on the chart"
+msgstr ""
+
+#: src/hub/pages/BrowsePage.tsx
+msgid "Show only {filterValue}"
 msgstr ""
 
 #: src/i18n/frameStrings.ts
@@ -14219,10 +15477,61 @@ msgstr ""
 msgid "Sight height (old name)"
 msgstr ""
 
+#: src/lobby-servers/pages/SettingsSection.tsx
+msgid "Sign in again"
+msgstr ""
+
+#: src/hub/PublishSection.tsx
+msgid "Sign in to publish from here. Or copy the code and finish on the hub's own page."
+msgstr ""
+
+#: src/hub/pages/components/AccountControl.tsx
+msgid "Sign in with Discord"
+msgstr ""
+
+#: src/lobby-servers/pages/SettingsSection.tsx
+msgid "Sign in with your browser"
+msgstr ""
+
+#: src/hub/pages/components/AccountControl.tsx
+#: src/hub/pages/components/HeaderAccount.tsx
+#: src/lobby-servers/pages/SettingsSection.tsx
+msgid "Sign out"
+msgstr ""
+
+#: src/lobby-servers/pages/SettingsSection.tsx
+msgid "Sign-in"
+msgstr ""
+
 #: src/runlite/model.ts
 #: src/runlite/pages/components/NodeOverlays.tsx
 #: src/runlite/pages/RunPage.tsx
 msgid "Signal"
+msgstr ""
+
+#: src/hub/pages/components/HeaderAccount.tsx
+#: src/lobby-servers/pages/SettingsSection.tsx
+msgid "Signed in"
+msgstr ""
+
+#: src/hub/pages/components/AccountControl.tsx
+msgid "Signed in as {accountName}."
+msgstr ""
+
+#: src/hub/pages/components/AccountControl.tsx
+msgid "Signed in. Coilbox could not check the name this time."
+msgstr ""
+
+#: src/lobby-servers/pages/SettingsSection.tsx
+msgid "Signed in. Coilbox holds a token for this login, not a password."
+msgstr ""
+
+#: src/lobby-servers/pages/SettingsSection.tsx
+msgid "Signed out"
+msgstr ""
+
+#: src/hub/pages/components/AccountControl.tsx
+msgid "Signing out only affects this computer. It does not remove anything you have already shared."
 msgstr ""
 
 #: src/sound/SoundSettings.tsx
@@ -14423,6 +15732,10 @@ msgstr ""
 msgid "Sonar stealth"
 msgstr ""
 
+#: src/hub/pages/BrowsePage.tsx
+msgid "Sort"
+msgstr ""
+
 #: src/content/index.ts
 #: src/sound/index.ts
 #: src/sound/SoundSettings.tsx
@@ -14578,6 +15891,7 @@ msgid "Star twinkle, nebulae and other decorative touches. Turn off for a plaine
 msgstr ""
 
 #: src/content/pages/components/ReplayAnalysisSection.tsx
+#: src/hub/pages/components/ItemPreview.tsx
 msgid "Start"
 msgstr ""
 
@@ -14800,12 +16114,20 @@ msgstr ""
 msgid "Stop room"
 msgstr ""
 
+#: src/hub/assets/UploadRunBadge.tsx
+msgid "Stop sending pictures"
+msgstr ""
+
 #: src/direct/lan.ts
 msgid "Stop your own room first. Coilbox can be in one room at a time."
 msgstr ""
 
 #: src/content/replayAnalysis.ts
 msgid "Stopping"
+msgstr ""
+
+#: src/hub/assets/UploadRunBadge.tsx
+msgid "Stopping…"
 msgstr ""
 
 #: src/general/pages/SettingsSection.tsx
@@ -14881,6 +16203,15 @@ msgstr ""
 
 #: src/content/pages/components/MatchStatsChart.tsx
 msgid "Table"
+msgstr ""
+
+#: src/hub/pages/BrowsePage.tsx
+msgid "Tag"
+msgstr ""
+
+#: src/hub/pages/ItemPage.tsx
+#: src/hub/PublishSection.tsx
+msgid "Tags"
 msgstr ""
 
 #: src/runlite/pages/components/NodeOverlays.tsx
@@ -14966,6 +16297,7 @@ msgid "Team 1 is the team with the lower number in the match, so the team record
 msgstr ""
 
 #: src/content/pages/components/MatchStatsChart.tsx
+#: src/hub/preview.ts
 msgid "Teams"
 msgstr ""
 
@@ -15016,8 +16348,14 @@ msgstr ""
 msgid "Textures the game does not ship ({missingCount})"
 msgstr ""
 
+#: src/hub/assets/pictures.ts
+#: src/hub/maps/lookup.ts
 #: src/i18n/uiError.ts
 msgid "That address answered, but it is not a coilbox hub."
+msgstr ""
+
+#: src/hub/api.ts
+msgid "That address answered, but it is not a coilbox hub. Check the hub address in Settings."
 msgstr ""
 
 #: src/packs/pages/components/ImportPackForm.tsx
@@ -15061,6 +16399,10 @@ msgstr ""
 msgid "That is not a valid link."
 msgstr ""
 
+#: src/hub/publish.ts
+msgid "That is not something coilbox made, so the hub will not take it."
+msgstr ""
+
 #: src/content/pages/components/KeymapsPanel.tsx
 msgid "That keymap has no bindings in it."
 msgstr ""
@@ -15083,6 +16425,10 @@ msgstr ""
 
 #: src/packs/envelope.ts
 msgid "That setup pack is corrupted or incomplete."
+msgstr ""
+
+#: src/hub/publish.ts
+msgid "That share code could not be read."
 msgstr ""
 
 #: src/deeplink/readImport.ts
@@ -15519,12 +16865,156 @@ msgstr ""
 msgid "The host took too long to respond."
 msgstr ""
 
+#: src/hub/maps/catalogSweep.ts
+msgid "The hub already had every map on this machine."
+msgstr ""
+
+#: src/hub/maps/pictureSweep.ts
+msgid "The hub already has a picture of every map coilbox could draw one for."
+msgstr ""
+
+#: src/hub/maps/pictureSweep.ts
+msgid "The hub already has a picture of every map on this computer."
+msgstr ""
+
+#: src/hub/assets/pictureSweep.ts
+msgid "The hub already has a picture of every unit in your games."
+msgstr ""
+
+#: src/hub/assets/pictures.ts
+msgid "The hub answered {answered} of {requested} keys."
+msgstr ""
+
+#: src/hub/maps/lookup.ts
+msgid "The hub answered {answered} of {requested} maps."
+msgstr ""
+
+#: src/hub/assets/pictures.ts
+msgid "The hub answered key {index} with a different key."
+msgstr ""
+
+#: src/hub/maps/lookup.ts
+msgid "The hub answered name {index} with a different name."
+msgstr ""
+
+#: src/hub/api.ts
+msgid "The hub could not answer."
+msgstr ""
+
+#: src/hub/publish.ts
+msgid "The hub could not publish it."
+msgstr ""
+
+#: src/hub/publish.ts
+msgid "The hub does not carry {kind}s yet."
+msgstr ""
+
 #: src/content/pages/GamesPage.tsx
 msgid "The hub features no games."
 msgstr ""
 
+#: src/hub/api.ts
+msgid "The hub gave no address for that item's contents."
+msgstr ""
+
+#: src/hub/api.ts
+msgid "The hub has no such item. It may have been taken down."
+msgstr ""
+
+#: src/hub/pages/BrowsePage.tsx
+msgid "The hub has nothing for {pinnedGame} yet. This copy of Coilbox lists only that game's things, so there may be other games' things on the hub."
+msgstr ""
+
+#: src/hub/pages/BrowsePage.tsx
+msgid "The hub has nothing for this game yet. This copy of Coilbox lists only that game's things, so there may be other games' things on the hub."
+msgstr ""
+
+#: src/hub/pages/BrowsePage.tsx
+msgid "The hub has nothing on it yet. Anything you share will show up here."
+msgstr ""
+
+#: src/hub/pages/ItemPage.tsx
+msgid "The hub lists this as a {listed}, but what it sent is a {sent}."
+msgstr ""
+
+#: src/hub/api.ts
+msgid "The hub may be waking up after a quiet spell, which takes a few seconds. Try again in a moment."
+msgstr ""
+
+#: src/hub/games/download.ts
+msgid "The hub named no download source for {label}."
+msgstr ""
+
+#: src/hub/maps/pictureSweep.ts
+msgid "The hub now has a picture of every map coilbox could draw one for."
+msgstr ""
+
+#: src/hub/maps/pictureSweep.ts
+msgid "The hub now has a picture of every map on this computer."
+msgstr ""
+
+#: src/hub/assets/pictureSweep.ts
+msgid "The hub now has every unit in your games."
+msgstr ""
+
+#: src/hub/api.ts
+#: src/hub/publish.ts
+msgid "The hub refused that request (HTTP {status})."
+msgstr ""
+
+#: src/hub/maps/lookup.ts
+msgid "The hub refused the map lookup (HTTP {status})."
+msgstr ""
+
+#: src/hub/assets/pictures.ts
+msgid "The hub refused the picture lookup (HTTP {status})."
+msgstr ""
+
+#: src/hub/api.ts
+msgid "The hub sent a games list with no games in it."
+msgstr ""
+
+#: src/hub/api.ts
+msgid "The hub sent a listing with no items in it."
+msgstr ""
+
+#: src/hub/api.ts
+msgid "The hub sent a map pack list with no packs in it."
+msgstr ""
+
+#: src/hub/api.ts
+#: src/hub/assets/pictures.ts
+#: src/hub/maps/lookup.ts
+msgid "The hub sent something coilbox could not read."
+msgstr ""
+
 #: src/i18n/uiError.ts
 msgid "The hub stopped answering part way through."
+msgstr ""
+
+#: src/hub/api.ts
+msgid "The hub will not accept it as it stands, so trying again will not help."
+msgstr ""
+
+#: src/hub/publish.ts
+msgid "The hub would not accept your sign-in. Sign out and back in under Settings > Coilbox hub, then try again."
+msgstr ""
+
+#: src/hub/maps/catalogSweep.ts
+msgid "The hub would not take {refusedCount} of them."
+msgstr ""
+
+#: src/hub/uploadOutcomes.ts
+msgid "The hub would not take any just now."
+msgstr ""
+
+#: src/hub/uploadOutcomes.ts
+msgid "The hub would not take any more {anyNoun} just now."
+msgstr ""
+
+#: src/hub/assets/pictures.ts
+#: src/hub/maps/lookup.ts
+msgid "The hub's answer {index} is not a result."
 msgstr ""
 
 #: src/content/pages/components/UnitListNotes.tsx
@@ -16053,6 +17543,10 @@ msgstr ""
 msgid "there is no window {window}, the track has {windowCount}"
 msgstr ""
 
+#: src/hub/publish.ts
+msgid "There is nothing to publish yet."
+msgstr ""
+
 #: src/deeplink/build.ts
 msgid "There is nothing to share yet."
 msgstr ""
@@ -16117,6 +17611,10 @@ msgstr ""
 
 #: src/play/pages/components/GameChoiceOffer.tsx
 msgid "This {nounText} was started on <0>{pinnedName}</0>, which is not installed. Another version of that game is installed. Continue on <1>{newerName}</1>?"
+msgstr ""
+
+#: src/hub/publish.ts
+msgid "This account has published 20 things in the last hour, which is the hub's limit. Try again later."
 msgstr ""
 
 #: src/content/pages/components/ReplayStartUnitLayer.tsx
@@ -16220,6 +17718,22 @@ msgstr ""
 msgid "This copies the converted models and textures into {archive}, and moves every original <0>.3do</0> they replace aside so the conversion actually takes effect. It does not delete anything, and Undo puts it all back."
 msgstr ""
 
+#: src/hub/pages/BrowsePage.tsx
+msgid "This copy of Coilbox is set up for {pinnedGame}, so the hub shows its things, plus anything not tied to a game."
+msgstr ""
+
+#: src/hub/pages/ItemPage.tsx
+msgid "This copy of Coilbox is set up for {pinnedGame}, so this is not in its hub list. You can still import it."
+msgstr ""
+
+#: src/hub/pages/ItemPage.tsx
+msgid "This copy of Coilbox is set up for another game, so this is not in its hub list. You can still import it."
+msgstr ""
+
+#: src/hub/pages/BrowsePage.tsx
+msgid "This copy of Coilbox is set up for one game, so the hub shows its things, plus anything not tied to a game."
+msgstr ""
+
 #: src/runlite/pages/RunListPage.tsx
 msgid "This deletes the warpath for good, including its progress ({progressText}). It cannot be undone."
 msgstr ""
@@ -16297,6 +17811,18 @@ msgstr ""
 msgid "This game ships no build pic for this unit."
 msgstr ""
 
+#: src/hub/maps/lookup.ts
+msgid "This hub answers with a newer map lookup than this copy of coilbox understands. Update coilbox."
+msgstr ""
+
+#: src/hub/assets/pictures.ts
+msgid "This hub answers with a newer picture lookup than this copy of coilbox understands. Update coilbox."
+msgstr ""
+
+#: src/hub/api.ts
+msgid "This hub is newer than this copy of coilbox understands. Update coilbox to browse it."
+msgstr ""
+
 #: src/deeplink/build.ts
 msgid "This id is invalid for a link."
 msgstr ""
@@ -16347,6 +17873,10 @@ msgstr ""
 
 #: src/deeplink/build.ts
 msgid "This is too large to share as a link."
+msgstr ""
+
+#: src/hub/publish.ts
+msgid "This is too large to share. Coilbox would refuse to import it."
 msgstr ""
 
 #: src/content/pages/StorageSection.tsx
@@ -16685,6 +18215,18 @@ msgstr ""
 msgid "This runs the game once, without a window."
 msgstr ""
 
+#: src/hub/publish.ts
+msgid "This scenario names no game and map, so there is nothing to play yet. Set both before sharing it."
+msgstr ""
+
+#: src/lobby-servers/PasswordRecoveryForm.tsx
+msgid "This server does not offer password recovery in Coilbox. Reset it on the server's own page instead:"
+msgstr ""
+
+#: src/lobby-servers/pages/SettingsSection.tsx
+msgid "This server has no password. Signing in opens its own page in your browser."
+msgstr ""
+
 #: src/direct/invite.ts
 msgid "This server's address names a network card on this computer, so it would mean nothing to a friend. Save the server under its full IPv6 address, without the % part, to get a link."
 msgstr ""
@@ -16783,8 +18325,14 @@ msgstr ""
 msgid "Timeline"
 msgstr ""
 
+#: src/hub/pages/BrowsePage.tsx
+#: src/hub/PublishSection.tsx
 #: src/profile/SettingsSection.tsx
 msgid "Title"
+msgstr ""
+
+#: src/lobby-servers/pages/SettingsSection.tsx
+msgid "TLS mode"
 msgstr ""
 
 #: src/content/pages/components/ReplayChat.tsx
@@ -16931,6 +18479,10 @@ msgstr ""
 msgid "Tried so far, and none reproduced the match: {triedList}."
 msgstr ""
 
+#: src/hub/preview.ts
+msgid "Triggers"
+msgstr ""
+
 #: src/downloads/activityRows.ts
 msgid "Try {label}"
 msgstr ""
@@ -16940,6 +18492,9 @@ msgstr ""
 #: src/content/pages/components/ResolveContentDrawer.tsx
 #: src/content/pages/components/SetupCard.tsx
 #: src/direct/QuickRoom.tsx
+#: src/hub/pages/BrowsePage.tsx
+#: src/hub/pages/components/AccountControl.tsx
+#: src/hub/pages/ItemPage.tsx
 msgid "Try again"
 msgstr ""
 
@@ -16997,6 +18552,18 @@ msgstr ""
 
 #: src/content/mapAggregate.ts
 msgid "Two sides"
+msgstr ""
+
+#: src/lobby-servers/pages/SettingsSection.tsx
+msgid "Uberserver"
+msgstr ""
+
+#: src/lobby-servers/pages/SettingsSection.tsx
+msgid "uberserver ships one; teiserver does not."
+msgstr ""
+
+#: src/lobby-servers/pages/SettingsSection.tsx
+msgid "uberserver upgrades in-band on its plain port. teiserver's 8201 is encrypted from the first byte."
 msgstr ""
 
 #: src/uberstress/index.ts
@@ -17199,6 +18766,10 @@ msgstr ""
 msgid "Unknown screen \"{screen}\"."
 msgstr ""
 
+#: src/lobby-servers/pages/SettingsSection.tsx
+msgid "Unknown server"
+msgstr ""
+
 #: src/content/pages/components/ReplayMapView.tsx
 msgid "unknown unit"
 msgstr ""
@@ -17224,9 +18795,17 @@ msgstr ""
 msgid "Unlocked {0}"
 msgstr ""
 
+#: src/lobby-servers/pages/SettingsSection.tsx
+msgid "Unnamed login"
+msgstr ""
+
 #: src/content/pages/components/ReplayBaseCrops.tsx
 #: src/content/replayMapLayers.ts
 msgid "Unnamed player"
+msgstr ""
+
+#: src/lobby-servers/pages/SettingsSection.tsx
+msgid "Unnamed server"
 msgstr ""
 
 #: src/content/pages/components/GameSourcesTab.tsx
@@ -17307,6 +18886,10 @@ msgstr ""
 msgid "Upgrade path"
 msgstr ""
 
+#: src/lobby-servers/pages/SettingsSection.tsx
+msgid "Upgrade with STLS"
+msgstr ""
+
 #: src/content/pages/GameUnitPage.tsx
 msgid "Upgrades into"
 msgstr ""
@@ -17331,6 +18914,10 @@ msgstr ""
 msgid "Use this"
 msgstr ""
 
+#: src/lobby-servers/pages/SettingsSection.tsx
+msgid "Use TLS"
+msgstr ""
+
 #: src/content/unitFieldNotes.ts
 msgid "Used for any armour class that doesn't have its own entry in damage."
 msgstr ""
@@ -17345,6 +18932,11 @@ msgstr ""
 
 #: src/profile/SettingsSection.tsx
 msgid "User choice"
+msgstr ""
+
+#: src/account/pages/SettingsSection.tsx
+#: src/lobby-servers/PasswordRecoveryForm.tsx
+msgid "Username"
 msgstr ""
 
 #: src/content/pages/components/RootCard.tsx
@@ -17369,6 +18961,14 @@ msgstr ""
 
 #: src/content/pages/components/AchievementsSection.tsx
 msgid "Variety"
+msgstr ""
+
+#: src/account/pages/SettingsSection.tsx
+msgid "Verification code"
+msgstr ""
+
+#: src/account/pages/SettingsSection.tsx
+msgid "Verification email sent."
 msgstr ""
 
 #: src/content/pages/components/EngineRow.tsx
@@ -17453,6 +19053,11 @@ msgstr ""
 msgid "View map"
 msgstr ""
 
+#: src/hub/pages/ItemPage.tsx
+#: src/hub/PublishSection.tsx
+msgid "View on the hub"
+msgstr ""
+
 #: src/play/pages/components/DebriefDrawer.tsx
 msgid "View replay"
 msgstr ""
@@ -17475,6 +19080,10 @@ msgstr ""
 
 #: src/content/pages/components/SetupCard.tsx
 msgid "Waiting for a slot…"
+msgstr ""
+
+#: src/hub/pages/components/AccountControl.tsx
+msgid "Waiting for your browser"
 msgstr ""
 
 #: src/runlite/galaxyAdapter.ts
@@ -17625,6 +19234,10 @@ msgstr ""
 msgid "What it builds"
 msgstr ""
 
+#: src/hub/PublishSection.tsx
+msgid "What people will see first"
+msgstr ""
+
 #: src/content/pages/components/ReplayEventLayers.tsx
 msgid "What the deaths are counted as"
 msgstr ""
@@ -17641,6 +19254,10 @@ msgstr ""
 msgid "What the unit is worth when experience is shared out after a kill. Defaults to the metal cost plus a sixtieth of the energy cost, and the engine floors it just above zero."
 msgstr ""
 
+#: src/hub/pages/components/AssetUploadControl.tsx
+msgid "What you send is public and hard to take back. It goes into a public repository and stays in its history, so it is not like deleting a file you uploaded by mistake. The pictures are made from other people's game and map archives, and not every archive is clear about what you may do with what is inside it. Every upload also spends storage the whole community shares."
+msgstr ""
+
 #: src/content/pages/components/MapRecords.tsx
 msgid "What your library knows about it"
 msgstr ""
@@ -17655,6 +19272,10 @@ msgstr ""
 
 #: src/content/pages/components/ReplayTracksStorage.tsx
 msgid "When a new track is stored and the tracks take more than the limit, the least recently watched are removed until they fit. Tracks that are out of date go first. The new track is never removed, so a track larger than the limit is kept and every other one goes."
+msgstr ""
+
+#: src/lobby-servers/pages/SettingsSection.tsx
+msgid "When Coilbox starts, log back in to every account that was connected when it last closed. To connect one account every time, tick Connect on startup on that login."
 msgstr ""
 
 #: src/i18n/frameStrings.ts
@@ -17784,6 +19405,10 @@ msgstr ""
 msgid "Which factions won here"
 msgstr ""
 
+#: src/hub/pages/components/GamePicturesControl.tsx
+msgid "Which game to send pictures of"
+msgstr ""
+
 #: src/content/pages/components/MapRecords.tsx
 msgid "Which team won"
 msgstr ""
@@ -17804,10 +19429,47 @@ msgstr ""
 msgid "Who won"
 msgstr ""
 
+#: src/hub/pages/ItemPage.tsx
+msgid "Whoever shared this wrote no description."
+msgstr ""
+
 #: src/content/pages/components/MapAggregate.tsx
 #: src/content/pages/components/ReplayBuildOrders.tsx
 #: src/content/pages/components/ReplayTimeWindowControl.tsx
 msgid "Whole match"
+msgstr ""
+
+#: src/hub/maps/catalogSweep.ts
+msgid "whose archive coilbox could not read"
+msgstr ""
+
+#: src/hub/maps/catalogSweep.ts
+msgid "whose archive file is missing"
+msgstr ""
+
+#: src/hub/maps/pictureSweep.ts
+msgid "whose bounds coilbox could not read"
+msgstr ""
+
+#: src/hub/maps/catalogSweep.ts
+msgid "whose height range coilbox could not read"
+msgstr ""
+
+#: src/hub/maps/pictureSweep.ts
+msgid "whose picture coilbox could not encode"
+msgstr ""
+
+#: src/hub/maps/pictureSweep.ts
+msgid "whose picture could not be saved"
+msgstr ""
+
+#: src/hub/maps/pictureSweep.ts
+msgid "whose picture would be too large to send"
+msgstr ""
+
+#: src/hub/maps/catalogSweep.ts
+#: src/hub/maps/pictureSweep.ts
+msgid "whose size coilbox could not work out"
 msgstr ""
 
 #: src/content/pages/components/ConfigProfilesPanel.tsx
@@ -17906,12 +19568,20 @@ msgstr ""
 msgid "Wins"
 msgstr ""
 
+#: src/hub/maps/pictureSweep.ts
+msgid "with a minimap that is one flat colour"
+msgstr ""
+
 #: src/content/pages/components/MapRecords.tsx
 msgid "With more than one version in, every start is placed on {mapName}, this page's map. Another version may declare other positions, and a start of its that is near none of this map's is grouped with the others by distance."
 msgstr ""
 
 #: src/play/pages/components/ParticipantsTable.tsx
 msgid "with no bonus"
+msgstr ""
+
+#: src/hub/maps/pictureSweep.ts
+msgid "with no minimap to draw"
 msgstr ""
 
 #: src/content/pages/PlayerDossierPage.tsx
@@ -18024,9 +19694,14 @@ msgstr ""
 msgid "you"
 msgstr ""
 
+#: src/hub/preview.ts
 #: src/play/pages/components/ParticipantsTable.tsx
 #: src/runlite/galaxyAdapter.ts
 msgid "You"
+msgstr ""
+
+#: src/lobby-servers/pages/SettingsSection.tsx
+msgid "You already have this login."
 msgstr ""
 
 #: src/content/pages/MatchupPage.tsx
@@ -18036,6 +19711,10 @@ msgstr ""
 #: src/direct/lan.ts
 #: src/direct/room.ts
 msgid "You are in a room already, at {address}. Leave it first: coilbox can be in one room at a time."
+msgstr ""
+
+#: src/lobby-servers/config.ts
+msgid "You cannot register a new account here. This server's verification emails are not being delivered."
 msgstr ""
 
 #: src/content/pages/components/KeyBindingEditor.tsx
@@ -18050,6 +19729,10 @@ msgstr ""
 msgid "You have {installedVersion}"
 msgstr ""
 
+#: src/hub/removePlan.ts
+msgid "You have a game in progress on it, which goes too."
+msgstr ""
+
 #: src/content/pages/MatchupPage.tsx
 msgid "You have not shared a replay with {other}."
 msgstr ""
@@ -18062,8 +19745,16 @@ msgstr ""
 msgid "You haven't shared a replay with {playerName} yet."
 msgstr ""
 
+#: src/hub/pages/ItemPage.tsx
+msgid "You imported this before. Nothing of it is here now."
+msgstr ""
+
 #: src/sound/events.ts
 msgid "You launch a game"
+msgstr ""
+
+#: src/hub/pages/components/AccountControl.tsx
+msgid "You need an account to share things on the hub. Browsing and importing need no account."
 msgstr ""
 
 #: src/runlite/pages/components/NodeOverlays.tsx
@@ -18072,6 +19763,10 @@ msgstr ""
 
 #: src/runlite/pages/components/EncounterOverlay.tsx
 msgid "You retreat, hull scarred."
+msgstr ""
+
+#: src/hub/uploadOutcomes.ts
+msgid "You stopped the picture uploads"
 msgstr ""
 
 #: src/updater/pages/UpdatesSettingsSection.tsx
@@ -18103,6 +19798,18 @@ msgstr ""
 msgid "Your content folder <0>{0}</0> is missing. Recreate it to continue, or add a different folder from the <1>Content folders</1> page."
 msgstr ""
 
+#: src/hub/pages/components/AssetUploadControl.tsx
+msgid "Your distribution has switched off sending pictures to the hub, so Coilbox will not upload any."
+msgstr ""
+
+#: src/hub/pages/components/AccountControl.tsx
+msgid "Your hub account"
+msgstr ""
+
+#: src/hub/pages/components/HubAddressField.tsx
+msgid "Your hub address"
+msgstr ""
+
 #: src/direct/ReachablePorts.tsx
 msgid "Your internet provider blocks the way in"
 msgstr ""
@@ -18126,6 +19833,10 @@ msgstr ""
 
 #: src/content/pages/ReplayDetailPage.tsx
 msgid "Your notes"
+msgstr ""
+
+#: src/account/pages/SettingsSection.tsx
+msgid "Your password changed on the server, but coilbox could not save it. Enter the new one under Settings, Lobby servers."
 msgstr ""
 
 #: src/content/index.ts
@@ -18173,6 +19884,10 @@ msgstr ""
 msgid "Your router's own address is {0}, which the internet does not route to."
 msgstr ""
 
+#: src/account/pages/SettingsSection.tsx
+msgid "Your saved password has been left as it was."
+msgstr ""
+
 #: src/runlite/pages/components/RunEndScreen.tsx
 msgid "Your ship gave out. The warpath is over."
 msgstr ""
@@ -18207,4 +19922,8 @@ msgstr ""
 
 #: src/content/pages/components/BuildTreeExportButton.tsx
 msgid "Zip archive"
+msgstr ""
+
+#: src/hub/preview.ts
+msgid "Zones"
 msgstr ""
