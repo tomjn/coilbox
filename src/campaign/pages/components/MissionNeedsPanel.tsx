@@ -1,3 +1,5 @@
+import { t } from "@lingui/core/macro";
+import { Trans, useLingui } from "@lingui/react/macro";
 import { Button } from "@picoframe/frame";
 import { ChevronRight, Download, Loader2 } from "lucide-react";
 import { useEffect, useState } from "react";
@@ -12,12 +14,31 @@ import { type MissionNeed, needNotice } from "../../missionNeeds";
 import type { CampaignMission } from "../../model";
 import { PhaseCard } from "./PhaseCard";
 
-const KIND_LABEL = {
-  engine: "Engine",
-  game: "Game",
-  map: "Map",
-  atlas: "Atlas pack",
-} as const;
+function kindLabel(kind: MissionNeed["kind"]): string {
+  switch (kind) {
+    case "engine":
+      return t`Engine`;
+    case "game":
+      return t`Game`;
+    case "map":
+      return t`Map`;
+    case "atlas":
+      return t`Atlas pack`;
+  }
+}
+
+function kindRequired(kind: MissionNeed["kind"]): string {
+  switch (kind) {
+    case "engine":
+      return t`Engine required`;
+    case "game":
+      return t`Game required`;
+    case "map":
+      return t`Map required`;
+    case "atlas":
+      return t`Atlas pack required`;
+  }
+}
 
 /** The newest Recoil release, which is what a campaign gets when it names no
  *  engine, or why there is none to offer. */
@@ -50,16 +71,19 @@ function NeedRow({
   need: MissionNeed;
   onInstalled: (need: MissionNeed) => Promise<void>;
 }) {
+  const { t } = useLingui();
+  const needName = need.name;
   const writeRoot = useWriteRoot(
     need.kind === "map" ? "maps" : need.kind === "game" ? "games" : undefined,
   );
   const writePath = writeRoot.path;
   const newest = useNewestEngine(need.kind === "engine");
+  const engineVersion = newest.release?.version;
   const input =
     need.kind === "map"
       ? ({
           kind: "map",
-          label: `Map: ${need.name}`,
+          label: t`Map: ${needName}`,
           args: {
             springName: mission.mapDownload?.springName ?? need.name,
             searchUrl: mission.mapDownload?.searchUrl,
@@ -69,13 +93,13 @@ function NeedRow({
       : need.kind === "game"
         ? ({
             kind: "game",
-            label: `Game: ${need.name}`,
+            label: t`Game: ${needName}`,
             args: { gameName: need.name, writePath },
           } as const)
         : writePath && newest.release
           ? ({
               kind: "engineRecoil",
-              label: `Engine ${newest.release.version}`,
+              label: t`Engine ${engineVersion}`,
               args: {
                 version: newest.release.version,
                 assetUrl: newest.release.assetUrl,
@@ -84,6 +108,7 @@ function NeedRow({
             } as const)
           : null;
   const dl = useQueuedDownload(input);
+  const kind = kindLabel(need.kind);
 
   const notice = needNotice({
     need,
@@ -108,17 +133,20 @@ function NeedRow({
   return (
     <li className="flex flex-col gap-2">
       <p className="text-sm text-muted-foreground">
-        {KIND_LABEL[need.kind]}
-        {need.name && (
-          <>
-            {": "}
-            <span className="font-medium text-foreground">{need.name}</span>
-          </>
+        {need.name ? (
+          <Trans>
+            {kind}:{" "}
+            <span className="font-medium text-foreground">{needName}</span>
+          </Trans>
+        ) : (
+          kind
         )}
       </p>
       {need.kind === "engine" && (
         <p className="text-xs text-muted-foreground">
-          This mission does not name an engine, so the newest one is offered.
+          <Trans>
+            This mission does not name an engine, so the newest one is offered.
+          </Trans>
         </p>
       )}
       {notice.message && (
@@ -140,10 +168,10 @@ function NeedRow({
             <Download className="size-4" />
           )}
           {dl.status === "queued"
-            ? "Waiting for a slot…"
+            ? t`Waiting for a slot…`
             : dl.busy
-              ? "Downloading…"
-              : "Download & Install"}
+              ? t`Downloading…`
+              : t`Download & Install`}
         </Button>
       )}
       {dl.busy && <QueueProgress item={dl} />}
@@ -155,7 +183,8 @@ function NeedRow({
           to={need.kind === "map" ? "/library/maps" : "/library/games"}
           className="inline-flex w-fit items-center gap-1 text-xs text-muted-foreground hover:underline"
         >
-          Find it in Downloads <ChevronRight className="size-3.5" />
+          <Trans>Find it in Downloads</Trans>{" "}
+          <ChevronRight className="size-3.5" />
         </Link>
       )}
     </li>
@@ -180,18 +209,21 @@ export function MissionNeedsPanel({
   needs: MissionNeed[];
   onInstalled: (need: MissionNeed) => Promise<void>;
 }) {
+  const { t } = useLingui();
   return (
     <PhaseCard>
       <div className="flex items-center gap-2">
         <Download className="size-5 text-muted-foreground" />
         <h2 className="text-lg font-semibold">
           {needs.length === 1
-            ? `${KIND_LABEL[needs[0].kind]} required`
-            : "Content required"}
+            ? kindRequired(needs[0].kind)
+            : t`Content required`}
         </h2>
       </div>
       <p className="text-sm text-muted-foreground">
-        This mission needs the following installed before you can play it.
+        <Trans>
+          This mission needs the following installed before you can play it.
+        </Trans>
       </p>
       <ul className="flex flex-col gap-4">
         {needs.map((need) => (

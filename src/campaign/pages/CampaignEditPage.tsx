@@ -1,3 +1,4 @@
+import { Trans, useLingui } from "@lingui/react/macro";
 import { Button, Input, useDrawer } from "@picoframe/frame";
 import {
   ArrowDown,
@@ -140,6 +141,7 @@ function DropLine({ atEnd = false }: { atEnd?: boolean }) {
 
 /** Editor for one local campaign: its fields, ordered mission list, and export. */
 export default function CampaignEditPage() {
+  const { t } = useLingui();
   const { id } = useParams();
   const { campaigns, loading } = useCampaigns();
   const { presets } = useSkirmishPresets();
@@ -322,12 +324,13 @@ export default function CampaignEditPage() {
       const [carried] = missions.splice(from, 1);
       if (!carried) return;
       missions.splice(to, 0, carried);
-      say(
-        `Moved ${carried.title} to position ${to + 1} of ${missions.length}.`,
-      );
+      const movedTitle = carried.title;
+      const position = to + 1;
+      const total = missions.length;
+      say(t`Moved ${movedTitle} to position ${position} of ${total}.`);
       void persist({ ...campaign, missions });
     },
-    [campaign, persist],
+    [campaign, persist, t],
   );
   const { drag, listProps } = useMissionDrag(moveTo);
 
@@ -339,16 +342,20 @@ export default function CampaignEditPage() {
           to={BACK}
           className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:underline"
         >
-          <ArrowLeft className="size-3.5" /> Back
+          <ArrowLeft className="size-3.5" /> <Trans>Back</Trans>
         </Link>
         <div className="rounded-lg border border-dashed p-10 text-center text-sm text-muted-foreground">
-          This campaign is bundled and read-only. Import it or create a new one
-          to edit.
+          <Trans>
+            This campaign is bundled and read-only. Import it or create a new
+            one to edit.
+          </Trans>
         </div>
       </div>
     );
   }
-  if (!campaign) return <NotFound backTo={BACK} label="campaign" />;
+  if (!campaign) return <NotFound backTo={BACK} label={t`campaign`} />;
+
+  const missionCount = campaign.missions.length;
 
   /** Change the document without writing it. The text boxes edit as they are
    *  typed in and only persist on blur, so until then what is on screen is
@@ -495,9 +502,10 @@ export default function CampaignEditPage() {
   // content scan that shutting the group avoids paying for (issue #2265). This
   // page has already read them, for the row's own "Out of date" badge, so the
   // answer costs the drawer nothing on the way in.
-  const openMission = (m: CampaignMission) =>
-    drawer.open({
-      title: `Edit mission: ${m.title}`,
+  const openMission = (m: CampaignMission) => {
+    const missionTitle = m.title;
+    return drawer.open({
+      title: t`Edit mission: ${missionTitle}`,
       width: "46rem",
       content: (
         <MissionEditorDrawer
@@ -509,10 +517,11 @@ export default function CampaignEditPage() {
         />
       ),
     });
+  };
 
   const openPresetPicker = () =>
     drawer.open({
-      title: "Add mission from preset",
+      title: t`Add mission from preset`,
       width: "32rem",
       content: (
         <PresetPickerDrawer
@@ -532,7 +541,7 @@ export default function CampaignEditPage() {
 
   const openScenarioPicker = () =>
     drawer.open({
-      title: "Add mission from scenario",
+      title: t`Add mission from scenario`,
       width: "32rem",
       content: (
         <ScenarioPickerDrawer
@@ -557,7 +566,7 @@ export default function CampaignEditPage() {
           to={BACK}
           className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:underline"
         >
-          <ArrowLeft className="size-3.5" /> Back to campaigns
+          <ArrowLeft className="size-3.5" /> <Trans>Back to campaigns</Trans>
         </Link>
         <div className="flex flex-wrap items-center gap-3">
           <SaveStatus state={save} onRetry={() => void persist(campaign)} />
@@ -578,7 +587,7 @@ export default function CampaignEditPage() {
             disabled={campaign.missions.length === 0}
             onClick={() => void openPreview()}
           >
-            <Eye className="size-4" /> Preview
+            <Eye className="size-4" /> <Trans>Preview</Trans>
           </Button>
         </div>
       </div>
@@ -610,9 +619,9 @@ export default function CampaignEditPage() {
       <header className="flex flex-col gap-3">
         <h1>
           <Input
-            aria-label="Campaign title"
+            aria-label={t`Campaign title`}
             value={campaign.title}
-            placeholder="Untitled campaign"
+            placeholder={t`Untitled campaign`}
             onChange={(e) => edit((c) => ({ ...c, title: e.target.value }))}
             onBlur={() => void persist(campaign)}
             onKeyDown={(e) => {
@@ -623,12 +632,12 @@ export default function CampaignEditPage() {
         </h1>
         <div className="flex flex-col gap-1.5">
           <Label htmlFor="campaign-description" className="text-sm font-medium">
-            Description
+            <Trans>Description</Trans>
           </Label>
           <Textarea
             id="campaign-description"
             value={campaign.description}
-            placeholder="What this campaign is about. Players read it on the campaign's own page."
+            placeholder={t`What this campaign is about. Players read it on the campaign's own page.`}
             className="min-h-16"
             onChange={(e) =>
               edit((c) => ({ ...c, description: e.target.value }))
@@ -650,7 +659,7 @@ export default function CampaignEditPage() {
         <h2 className="text-base font-semibold">
           <CollapsibleTrigger className="group flex w-full items-center gap-2 rounded-md py-1 text-left hover:text-foreground/80">
             <ChevronRight className="size-4 shrink-0 transition-transform group-data-[state=open]:rotate-90" />
-            Presentation
+            <Trans>Presentation</Trans>
             <span className="truncate text-xs font-normal text-muted-foreground">
               {presentationSummary(!!campaign.icon, !!campaign.background)}
             </span>
@@ -663,8 +672,8 @@ export default function CampaignEditPage() {
             kind="icon"
             value={campaign.icon}
             onChange={(icon) => void persistMedia({ ...campaign, icon })}
-            label="Icon"
-            help="Small emblem shown on this campaign in lists. Transparency is kept."
+            label={t`Icon`}
+            help={t`Small emblem shown on this campaign in lists. Transparency is kept.`}
             gameName={campaign.missions[0]?.snapshot.gameName}
             preview={
               <div className="flex size-20 items-center justify-center overflow-hidden rounded-md border border-border/50 bg-muted">
@@ -684,8 +693,8 @@ export default function CampaignEditPage() {
             onChange={(background) =>
               void persistMedia({ ...campaign, background })
             }
-            label="Background"
-            help="Backdrop behind the campaign's mission list — an image or a looping video. A video imported here only plays back on this machine (it isn't bundled into a single-file export)."
+            label={t`Background`}
+            help={t`Backdrop behind the campaign's mission list — an image or a looping video. A video imported here only plays back on this machine (it isn't bundled into a single-file export).`}
             gameName={campaign.missions[0]?.snapshot.gameName}
             allowVideo
             preview={
@@ -720,7 +729,7 @@ export default function CampaignEditPage() {
       <section className="flex flex-col gap-2">
         <div className="flex items-center justify-between gap-2">
           <h2 className="text-base font-semibold">
-            Missions ({campaign.missions.length})
+            <Trans>Missions ({missionCount})</Trans>
           </h2>
           <div className="flex flex-wrap items-center gap-2">
             <Button
@@ -729,7 +738,7 @@ export default function CampaignEditPage() {
               className="gap-1.5"
               onClick={openPresetPicker}
             >
-              <Plus className="size-4" /> From preset
+              <Plus className="size-4" /> <Trans>From preset</Trans>
             </Button>
             <Button
               size="sm"
@@ -737,7 +746,7 @@ export default function CampaignEditPage() {
               className="gap-1.5"
               onClick={openScenarioPicker}
             >
-              <Plus className="size-4" /> From scenario
+              <Plus className="size-4" /> <Trans>From scenario</Trans>
             </Button>
           </div>
         </div>
@@ -767,8 +776,10 @@ export default function CampaignEditPage() {
 
         {campaign.missions.length === 0 ? (
           <div className="rounded-lg border border-dashed p-8 text-center text-sm text-muted-foreground">
-            No missions yet. Add one from a saved skirmish preset, or from a
-            scenario.
+            <Trans>
+              No missions yet. Add one from a saved skirmish preset, or from a
+              scenario.
+            </Trans>
           </div>
         ) : (
           <ul
@@ -793,6 +804,7 @@ export default function CampaignEditPage() {
                 m.panoramaUnit
               );
               const attachment = scenarioAttachment(m, scenarios);
+              const missionTitle = m.title;
               return (
                 <li
                   key={m.id}
@@ -872,7 +884,7 @@ export default function CampaignEditPage() {
                     <span
                       data-drag-handle
                       aria-hidden="true"
-                      title="Drag to reorder"
+                      title={t`Drag to reorder`}
                       className="flex size-8 shrink-0 cursor-grab touch-none items-center justify-center rounded-md text-muted-foreground hover:bg-accent hover:text-accent-foreground active:cursor-grabbing"
                     >
                       <GripVertical className="size-4" />
@@ -881,7 +893,7 @@ export default function CampaignEditPage() {
                       <Button
                         size="icon"
                         variant="ghost"
-                        aria-label={`Move ${m.title} up`}
+                        aria-label={t`Move ${missionTitle} up`}
                         disabled={i === 0}
                         onClick={(e) => moveArrow(e, i, -1)}
                       >
@@ -890,7 +902,7 @@ export default function CampaignEditPage() {
                       <Button
                         size="icon"
                         variant="ghost"
-                        aria-label={`Move ${m.title} down`}
+                        aria-label={t`Move ${missionTitle} down`}
                         disabled={i === campaign.missions.length - 1}
                         onClick={(e) => moveArrow(e, i, 1)}
                       >
@@ -960,7 +972,7 @@ export default function CampaignEditPage() {
                         className="gap-1.5"
                         onClick={() => openMission(m)}
                       >
-                        <Pencil className="size-4" /> Edit
+                        <Pencil className="size-4" /> <Trans>Edit</Trans>
                       </Button>
                       {/* Straight to this mission's briefing, because the
                           detail page will not take the author there: it locks
@@ -968,7 +980,7 @@ export default function CampaignEditPage() {
                       <Button
                         size="icon"
                         variant="ghost"
-                        aria-label={`Preview ${m.title}`}
+                        aria-label={t`Preview ${missionTitle}`}
                         onClick={() => void openPreview(m.id)}
                       >
                         <Eye className="size-4" />
@@ -979,7 +991,7 @@ export default function CampaignEditPage() {
                       <Button
                         size="icon"
                         variant="ghost"
-                        aria-label={`Duplicate ${m.title}`}
+                        aria-label={t`Duplicate ${missionTitle}`}
                         onClick={() => duplicateMissionAt(i)}
                       >
                         <Copy className="size-4" />
@@ -1006,7 +1018,7 @@ export default function CampaignEditPage() {
                 className="gap-1.5"
                 onClick={openPresetPicker}
               >
-                <Plus className="size-4" /> From preset
+                <Plus className="size-4" /> <Trans>From preset</Trans>
               </Button>
               <Button
                 size="sm"
@@ -1014,7 +1026,7 @@ export default function CampaignEditPage() {
                 className="gap-1.5"
                 onClick={openScenarioPicker}
               >
-                <Plus className="size-4" /> From scenario
+                <Plus className="size-4" /> <Trans>From scenario</Trans>
               </Button>
             </li>
           </ul>

@@ -1,3 +1,4 @@
+import { Trans, useLingui } from "@lingui/react/macro";
 import { Button, cn } from "@picoframe/frame";
 import { open } from "@tauri-apps/plugin-dialog";
 import { ImageIcon, Milestone, Trash2 } from "lucide-react";
@@ -163,17 +164,20 @@ export function CampaignImageField({
    */
   gameName?: string;
 }) {
+  const { t } = useLingui();
   const [error, setError] = useState<string | null>(null);
+
+  const labelLower = label.toLowerCase();
 
   const pick = async () => {
     setError(null);
     try {
       const src = await open({
-        title: `Choose ${label.toLowerCase()}`,
+        title: t`Choose ${labelLower}`,
         multiple: false,
         filters: [
           {
-            name: allowVideo ? "Image or video" : "Image",
+            name: allowVideo ? t`Image or video` : t`Image`,
             extensions: allowVideo
               ? [...IMAGE_EXTS, ...VIDEO_EXTS]
               : [...IMAGE_EXTS],
@@ -206,7 +210,8 @@ export function CampaignImageField({
       {value && preview}
       <div className="flex flex-wrap gap-2">
         <Button size="sm" variant="outline" className="gap-1.5" onClick={pick}>
-          <ImageIcon className="size-4" /> {value ? "Replace" : "Choose image"}
+          <ImageIcon className="size-4" />{" "}
+          {value ? t`Replace` : t`Choose image`}
         </Button>
         {gameName !== undefined && (
           <ArchiveMediaImportButton
@@ -214,7 +219,7 @@ export function CampaignImageField({
             gameName={gameName}
             mediaType="image"
             imageKind={kind}
-            triggerLabel={allowVideo ? "Image from game files" : undefined}
+            triggerLabel={allowVideo ? t`Image from game files` : undefined}
             onImported={(file) => onChange({ kind: "file", file })}
           />
         )}
@@ -223,7 +228,7 @@ export function CampaignImageField({
             campaignId={campaignId}
             gameName={gameName}
             mediaType="video"
-            triggerLabel="Video from game files"
+            triggerLabel={t`Video from game files`}
             onImported={(file) => onChange({ kind: "file", file })}
           />
         )}
@@ -234,7 +239,7 @@ export function CampaignImageField({
             className="gap-1.5"
             onClick={() => onChange(undefined)}
           >
-            <Trash2 className="size-4" /> Remove
+            <Trash2 className="size-4" /> <Trans>Remove</Trans>
           </Button>
         )}
       </div>

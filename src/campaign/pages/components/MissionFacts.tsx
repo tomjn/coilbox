@@ -28,6 +28,8 @@
  * reader nothing.
  */
 
+import { plural } from "@lingui/core/macro";
+import { Trans, useLingui } from "@lingui/react/macro";
 import { cn } from "@picoframe/frame";
 import { Ban, FileText, ListChecks, type LucideIcon } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
@@ -51,6 +53,7 @@ import type { CampaignMission } from "../../model";
  * the list.
  */
 export function MissionSetup({ snapshot }: { snapshot: SkirmishDraft }) {
+  const { t } = useLingui();
   const part = (value: string | undefined, missing: string) =>
     value ? (
       <span>{value}</span>
@@ -59,7 +62,8 @@ export function MissionSetup({ snapshot }: { snapshot: SkirmishDraft }) {
     );
   return (
     <span className="truncate text-xs text-muted-foreground">
-      {part(snapshot.gameName, "No game")} · {part(snapshot.mapName, "No map")}
+      {part(snapshot.gameName, t`No game`)} ·{" "}
+      {part(snapshot.mapName, t`No map`)}
     </span>
   );
 }
@@ -71,8 +75,6 @@ export type MissionCountKey = "objectives" | "restrictions";
 export type MissionCount = {
   key: MissionCountKey;
   count: number;
-  /** Singular, so a caller can phrase it either way. */
-  noun: string;
 };
 
 const ICONS: Record<MissionCountKey, LucideIcon> = {
@@ -91,18 +93,19 @@ const ICONS: Record<MissionCountKey, LucideIcon> = {
  */
 export function missionCounts(mission: CampaignMission): MissionCount[] {
   return [
-    { key: "objectives", count: mission.objectives.length, noun: "objective" },
-    {
-      key: "restrictions",
-      count: mission.disabledUnits.length,
-      noun: "unit restriction",
-    },
+    { key: "objectives", count: mission.objectives.length },
+    { key: "restrictions", count: mission.disabledUnits.length },
   ];
 }
 
 /** One count named, pluralised against itself: "1 objective", "0 objectives". */
-export function missionCountPhrase({ count, noun }: MissionCount): string {
-  return `${count} ${noun}${count === 1 ? "" : "s"}`;
+export function missionCountPhrase({ key, count }: MissionCount): string {
+  return key === "objectives"
+    ? plural(count, { one: "# objective", other: "# objectives" })
+    : plural(count, {
+        one: "# unit restriction",
+        other: "# unit restrictions",
+      });
 }
 
 /** The shared chip shape: a small icon, an optional digit, and the phrase. */
@@ -133,7 +136,9 @@ function Chip({
 }
 
 export function MissionFacts({ mission }: { mission: CampaignMission }) {
+  const { t } = useLingui();
   const briefed = mission.briefing.trim() !== "";
+  const scenarioName = mission.scenario?.name;
   return (
     <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
       {/* No digit: a briefing is written or it is not, and "1 briefing" would
@@ -142,7 +147,7 @@ export function MissionFacts({ mission }: { mission: CampaignMission }) {
           same slot on every row. */}
       <Chip
         icon={FileText}
-        phrase={briefed ? "Briefing written" : "No briefing"}
+        phrase={briefed ? t`Briefing written` : t`No briefing`}
         dim={!briefed}
       />
       {missionCounts(mission).map((entry) => (
@@ -161,12 +166,14 @@ export function MissionFacts({ mission }: { mission: CampaignMission }) {
           says only that there is one. */}
       {mission.scenario && (
         <Badge variant="secondary" className="max-w-56 text-[10px]">
-          <span className="truncate">Scenario: {mission.scenario.name}</span>
+          <span className="truncate">
+            <Trans>Scenario: {scenarioName}</Trans>
+          </span>
         </Badge>
       )}
       {mission.skippable && (
         <Badge variant="secondary" className="text-[10px]">
-          Skippable
+          <Trans>Skippable</Trans>
         </Badge>
       )}
     </div>

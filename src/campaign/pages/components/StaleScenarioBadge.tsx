@@ -1,10 +1,13 @@
+import { t } from "@lingui/core/macro";
+import { Trans } from "@lingui/react/macro";
 import { TriangleAlert } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 
 /** The full text behind the stale-scenario badge, said once for a screen
  * reader and again as the badge's hover title. */
-export const STALE_SCENARIO_WARNING =
-  "The scenario has been edited since this copy was attached.";
+export function staleScenarioWarning(): string {
+  return t`The scenario has been edited since this copy was attached.`;
+}
 
 /**
  * A mission is playing a copy the stored scenario has moved on from.
@@ -22,12 +25,12 @@ export function StaleScenarioBadge() {
   return (
     <Badge
       variant="outline"
-      title={STALE_SCENARIO_WARNING}
+      title={staleScenarioWarning()}
       className="gap-1 border-amber-600/40 text-amber-600 dark:border-amber-500/40 dark:text-amber-500"
     >
       <TriangleAlert className="size-3" aria-hidden="true" />
-      Out of date
-      <span className="sr-only"> {STALE_SCENARIO_WARNING}</span>
+      <Trans>Out of date</Trans>
+      <span className="sr-only"> {staleScenarioWarning()}</span>
     </Badge>
   );
 }

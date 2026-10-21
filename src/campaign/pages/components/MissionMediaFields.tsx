@@ -1,3 +1,4 @@
+import { Trans, useLingui } from "@lingui/react/macro";
 import { Button } from "@picoframe/frame";
 import { open } from "@tauri-apps/plugin-dialog";
 import { Music, Trash2, Video } from "lucide-react";
@@ -32,6 +33,7 @@ export function MissionMediaPlayer({
   cutscene?: MediaRef;
   cutscenePlayback?: MediaPlayback;
 }) {
+  const { t } = useLingui();
   const audio = useCampaignImage(campaignId, voiceover);
   const video = useCampaignImage(campaignId, cutscene);
   if (!audio && !video) return null;
@@ -41,7 +43,7 @@ export function MissionMediaPlayer({
         <CampaignAudio
           src={audio}
           playback={voiceoverPlayback}
-          label="Briefing voiceover"
+          label={t`Briefing voiceover`}
         />
       )}
       {video && (
@@ -50,7 +52,7 @@ export function MissionMediaPlayer({
           playback={cutscenePlayback}
           defaults={CUE_DEFAULTS}
           variant="inline"
-          label="Intro cutscene"
+          label={t`Intro cutscene`}
           className="max-h-64 w-full rounded-md bg-black"
         />
       )}
@@ -86,18 +88,20 @@ export function MissionAvField({
    */
   gameName?: string;
 }) {
+  const { t } = useLingui();
   const [error, setError] = useState<string | null>(null);
   const src = useCampaignImage(campaignId, value);
+  const labelLower = label.toLowerCase();
 
   const pick = async () => {
     setError(null);
     try {
       const picked = await open({
-        title: `Choose ${label.toLowerCase()}`,
+        title: t`Choose ${labelLower}`,
         multiple: false,
         filters: [
           {
-            name: kind === "audio" ? "Audio" : "Video",
+            name: kind === "audio" ? t`Audio` : t`Video`,
             extensions: kind === "audio" ? AUDIO_EXTS : VIDEO_EXTS,
           },
         ],
@@ -139,7 +143,12 @@ export function MissionAvField({
         ))}
       <div className="flex flex-wrap gap-2">
         <Button size="sm" variant="outline" className="gap-1.5" onClick={pick}>
-          <Icon className="size-4" /> {value ? "Replace" : `Choose ${kind}`}
+          <Icon className="size-4" />{" "}
+          {value
+            ? t`Replace`
+            : kind === "audio"
+              ? t`Choose audio`
+              : t`Choose video`}
         </Button>
         {gameName !== undefined && (
           <ArchiveMediaImportButton
@@ -156,7 +165,7 @@ export function MissionAvField({
             className="gap-1.5"
             onClick={() => onChange(undefined)}
           >
-            <Trash2 className="size-4" /> Remove
+            <Trash2 className="size-4" /> <Trans>Remove</Trans>
           </Button>
         )}
       </div>

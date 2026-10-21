@@ -1,3 +1,4 @@
+import { Trans, useLingui } from "@lingui/react/macro";
 import { Button } from "@picoframe/frame";
 import { X } from "lucide-react";
 import { useMemo } from "react";
@@ -12,12 +13,8 @@ import { UnitPicker } from "@/content/pages/components/UnitPicker";
 import { unknownSelected } from "@/content/techForest";
 import { withBuiltUnits } from "@/lego/buildList";
 import { usePreferredTarget } from "@/play/config";
+import { formatNumber } from "../../../lib/format";
 import { allowedFromBans, bansFromAllowed } from "../../unitBans";
-
-// Neutral about what is being edited: the same editor is a campaign mission's
-// restrictions and a hosted battle's.
-const HELPER =
-  "Ticked units are allowed. Untick a unit to ban it, which the engine applies to ALL teams including enemy AI. Unknown unit names are silently ignored by the engine.";
 
 /**
  * Editor for a mission's engine-level unit restrictions, over the shared
@@ -61,6 +58,10 @@ export function UnitRestrictions({
     builtBy: readonly string[];
   }[];
 }) {
+  const { t } = useLingui();
+  // Neutral about what is being edited: the same editor is a campaign mission's
+  // restrictions and a hosted battle's.
+  const helper = t`Ticked units are allowed. Untick a unit to ban it, which the engine applies to ALL teams including enemy AI. Unknown unit names are silently ignored by the engine.`;
   const { target } = usePreferredTarget();
   const scan = useUnitsyncScan(target?.enginePath, target?.dataDir);
   const game = scan.data?.games.find((g) => g.name === gameName) ?? null;
@@ -124,22 +125,25 @@ export function UnitRestrictions({
   // the retry that actually addresses it.
   const unavailable = !resolving && (!game || (gameUnits ?? []).length === 0);
   const infoError = gameInfo.info?.errors?.[0];
+  const shownGame = gameName || t`(unset)`;
+  const unknownCount = formatNumber(bannedUnknown.length);
 
   if (unavailable) {
     let reason: string;
     let action: { label: string; onClick: () => void };
-    if (scan.error) {
-      reason = `The content scan failed: ${scan.error}`;
-      action = { label: "Retry scan", onClick: () => scan.run(true) };
+    const scanError = scan.error;
+    if (scanError) {
+      reason = t`The content scan failed: ${scanError}`;
+      action = { label: t`Retry scan`, onClick: () => scan.run(true) };
     } else if (!game) {
-      reason = `The game wasn't found in the scanned content of the current play target — it may live in a different content folder or still need installing.`;
-      action = { label: "Rescan content", onClick: () => scan.run(true) };
+      reason = t`The game wasn't found in the scanned content of the current play target — it may live in a different content folder or still need installing.`;
+      action = { label: t`Rescan content`, onClick: () => scan.run(true) };
     } else {
       reason = infoError
-        ? `unitsync couldn't enumerate its units — the game's own def files errored while loading: ${infoError}`
-        : "unitsync reported no units for this game.";
+        ? t`unitsync couldn't enumerate its units — the game's own def files errored while loading: ${infoError}`
+        : t`unitsync reported no units for this game.`;
       action = {
-        label: "Reload units",
+        label: t`Reload units`,
         onClick: () => {
           invalidateGameInfo(
             target?.enginePath,
@@ -153,10 +157,12 @@ export function UnitRestrictions({
     }
     return (
       <div className="flex flex-col gap-2">
-        <p className="text-xs text-muted-foreground">{HELPER}</p>
+        <p className="text-xs text-muted-foreground">{helper}</p>
         <p className="text-xs text-muted-foreground">
-          <span className="font-medium">{gameName || "(unset)"}</span>: {reason}{" "}
-          Existing restrictions are still editable below.
+          <Trans>
+            <span className="font-medium">{shownGame}</span>: {reason} Existing
+            restrictions are still editable below.
+          </Trans>
         </p>
         <div>
           <Button
@@ -169,7 +175,9 @@ export function UnitRestrictions({
           </Button>
         </div>
         {disabledUnits.length === 0 ? (
-          <p className="text-xs text-muted-foreground">No restrictions.</p>
+          <p className="text-xs text-muted-foreground">
+            <Trans>No restrictions.</Trans>
+          </p>
         ) : (
           <ul className="flex flex-wrap gap-1.5">
             {disabledUnits.map((name) => (
@@ -183,7 +191,7 @@ export function UnitRestrictions({
                   <span className="font-mono">{name}</span>
                   <button
                     type="button"
-                    aria-label={`Remove ${name}`}
+                    aria-label={t`Remove ${name}`}
                     onClick={() => removeUnit(name)}
                     className="text-muted-foreground hover:text-foreground"
                   >
@@ -200,9 +208,11 @@ export function UnitRestrictions({
 
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-2">
-      <p className="text-xs text-muted-foreground">{HELPER}</p>
+      <p className="text-xs text-muted-foreground">{helper}</p>
       {resolving ? (
-        <p className="text-xs text-muted-foreground">Loading units…</p>
+        <p className="text-xs text-muted-foreground">
+          <Trans>Loading units…</Trans>
+        </p>
       ) : (
         <UnitPicker
           listClassName={listClassName}
@@ -210,7 +220,7 @@ export function UnitRestrictions({
           factions={factions}
           selected={allowed}
           onChange={setAllowed}
-          selectedLabel="allowed"
+          selectedLabel={t`allowed`}
           enginePath={target?.enginePath}
           dataDir={target?.dataDir}
           gameArchive={game?.primaryArchive.name}
@@ -219,8 +229,10 @@ export function UnitRestrictions({
       {!resolving && bannedUnknown.length > 0 && (
         <div className="flex flex-col gap-1">
           <span className="text-xs text-muted-foreground">
-            Banned but not in this game ({bannedUnknown.length}), kept from the
-            saved mission.
+            <Trans>
+              Banned but not in this game ({unknownCount}), kept from the saved
+              mission.
+            </Trans>
           </span>
           <ul className="flex flex-wrap gap-1.5">
             {bannedUnknown.map((name) => (
@@ -234,7 +246,7 @@ export function UnitRestrictions({
                   <span className="font-mono">{name}</span>
                   <button
                     type="button"
-                    aria-label={`Remove ${name}`}
+                    aria-label={t`Remove ${name}`}
                     onClick={() => removeUnit(name)}
                     className="text-muted-foreground hover:text-foreground"
                   >
