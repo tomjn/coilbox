@@ -1,3 +1,6 @@
+import type { MessageDescriptor } from "@lingui/core";
+import { msg } from "@lingui/core/macro";
+import { Trans, useLingui } from "@lingui/react/macro";
 import { Button, Input } from "@picoframe/frame";
 import { useEffect, useState } from "react";
 import { SlideDrawer } from "@/components/SlideDrawer";
@@ -22,20 +25,31 @@ function DomainsTable({
   entries: BlacklistEntry[];
   onUnblock: (domain: string) => void;
 }) {
+  const { t } = useLingui();
   if (entries.length === 0) {
     return (
-      <p className="text-sm text-muted-foreground">No domains are blocked.</p>
+      <p className="text-sm text-muted-foreground">
+        <Trans>No domains are blocked.</Trans>
+      </p>
     );
   }
   return (
     <Table className="text-foreground">
       <TableHeader>
         <TableRow>
-          <TableHead>Domain</TableHead>
-          <TableHead>Reason</TableHead>
-          <TableHead>Issuer</TableHead>
           <TableHead>
-            <span className="sr-only">Actions</span>
+            <Trans>Domain</Trans>
+          </TableHead>
+          <TableHead>
+            <Trans>Reason</Trans>
+          </TableHead>
+          <TableHead>
+            <Trans>Issuer</Trans>
+          </TableHead>
+          <TableHead>
+            <span className="sr-only">
+              <Trans>Actions</Trans>
+            </span>
           </TableHead>
         </TableRow>
       </TableHeader>
@@ -51,10 +65,10 @@ function DomainsTable({
                 variant="outline"
                 size="sm"
                 className="h-7"
-                aria-label={`Unblock ${entry.domain}…`}
+                aria-label={t`Unblock ${entry.domain}…`}
                 onClick={() => onUnblock(entry.domain)}
               >
-                Unblock…
+                <Trans>Unblock…</Trans>
               </Button>
             </TableCell>
           </TableRow>
@@ -75,6 +89,7 @@ function BlockDomainForm({
   serverKey: string;
   onChanged: () => void;
 }) {
+  const { t } = useLingui();
   const [domain, setDomain] = useState("");
   const [reason, setReason] = useState("");
   const block = useAdminRequest(serverKey);
@@ -83,7 +98,9 @@ function BlockDomainForm({
 
   return (
     <fieldset className="flex flex-col gap-3">
-      <legend className="sr-only">Block a domain</legend>
+      <legend className="sr-only">
+        <Trans>Block a domain</Trans>
+      </legend>
       <form
         className="flex flex-col gap-3"
         onSubmit={(event) => {
@@ -101,21 +118,21 @@ function BlockDomainForm({
         }}
       >
         <span className="flex flex-col gap-1 text-xs text-muted-foreground">
-          Domain
+          <Trans>Domain</Trans>
           <Input
             value={domain}
             onChange={(event) => setDomain(event.target.value)}
-            aria-label="Domain"
+            aria-label={t`Domain`}
             className="h-8"
             {...identifierFieldProps}
           />
         </span>
         <span className="flex flex-col gap-1 text-xs text-muted-foreground">
-          Reason (optional)
+          <Trans>Reason (optional)</Trans>
           <Input
             value={reason}
             onChange={(event) => setReason(event.target.value)}
-            aria-label="Reason"
+            aria-label={t`Reason`}
             className="h-8"
           />
         </span>
@@ -126,13 +143,10 @@ function BlockDomainForm({
           className="h-8 self-start"
           disabled={!canSubmit}
         >
-          Block domain
+          <Trans>Block domain</Trans>
         </Button>
       </form>
-      <AdminRequestStatus
-        state={block.state}
-        unanswered="The server did not answer."
-      >
+      <AdminRequestStatus state={block.state}>
         {(reply) => (reply.shape === "blacklistDomain" ? reply.message : null)}
       </AdminRequestStatus>
     </fieldset>
@@ -152,12 +166,15 @@ function UnblockDomainForm({
   initialDomain: string;
   onChanged: () => void;
 }) {
+  const { t } = useLingui();
   const [domain, setDomain] = useState(initialDomain);
   const unblock = useAdminRequest(serverKey);
 
   return (
     <fieldset className="flex flex-col gap-3">
-      <legend className="sr-only">Unblock a domain</legend>
+      <legend className="sr-only">
+        <Trans>Unblock a domain</Trans>
+      </legend>
       <form
         className="flex items-end gap-2"
         onSubmit={(event) => {
@@ -171,11 +188,11 @@ function UnblockDomainForm({
         }}
       >
         <span className="flex flex-1 flex-col gap-1 text-xs text-muted-foreground">
-          Domain
+          <Trans>Domain</Trans>
           <Input
             value={domain}
             onChange={(event) => setDomain(event.target.value)}
-            aria-label="Domain to unblock"
+            aria-label={t`Domain to unblock`}
             className="h-8"
             {...identifierFieldProps}
           />
@@ -186,13 +203,10 @@ function UnblockDomainForm({
           className="h-8"
           disabled={domain.trim() === ""}
         >
-          Unblock domain
+          <Trans>Unblock domain</Trans>
         </Button>
       </form>
-      <AdminRequestStatus
-        state={unblock.state}
-        unanswered="The server did not answer."
-      >
+      <AdminRequestStatus state={unblock.state}>
         {(reply) =>
           reply.shape === "unblacklistDomain" ? reply.message : null
         }
@@ -204,9 +218,9 @@ function UnblockDomainForm({
 /** Which form the drawer holds, if any. */
 type DomainsDrawer = { kind: "block" } | { kind: "unblock"; domain: string };
 
-const DRAWER_TITLES: Record<DomainsDrawer["kind"], string> = {
-  block: "Block a domain",
-  unblock: "Unblock a domain",
+const DRAWER_TITLES: Record<DomainsDrawer["kind"], MessageDescriptor> = {
+  block: msg`Block a domain`,
+  unblock: msg`Unblock a domain`,
 };
 
 /**
@@ -217,6 +231,7 @@ const DRAWER_TITLES: Record<DomainsDrawer["kind"], string> = {
  * Unblock action, which opens `UNBLACKLIST` filled with that row's domain.
  */
 export function EmailDomainsSection({ serverKey }: { serverKey: string }) {
+  const { t, i18n } = useLingui();
   const [drawer, setDrawer] = useState<DomainsDrawer | null>(null);
   const list = useAdminRequest(serverKey);
 
@@ -235,8 +250,8 @@ export function EmailDomainsSection({ serverKey }: { serverKey: string }) {
   return (
     <section className="flex flex-col gap-4">
       <ToolHeader
-        title="Email domains"
-        description="Blocks a domain from being used to register a new account."
+        title={t`Email domains`}
+        description={t`Blocks a domain from being used to register a new account.`}
         actions={
           <Button
             type="button"
@@ -244,14 +259,11 @@ export function EmailDomainsSection({ serverKey }: { serverKey: string }) {
             className="h-8"
             onClick={() => setDrawer({ kind: "block" })}
           >
-            Block a domain…
+            <Trans>Block a domain…</Trans>
           </Button>
         }
       />
-      <AdminRequestStatus
-        state={list.state}
-        unanswered="The server did not answer."
-      >
+      <AdminRequestStatus state={list.state}>
         {(reply) =>
           reply.shape === "blacklist" ? (
             <DomainsTable
@@ -263,7 +275,7 @@ export function EmailDomainsSection({ serverKey }: { serverKey: string }) {
       </AdminRequestStatus>
       <SlideDrawer
         open={drawer !== null}
-        title={drawer ? DRAWER_TITLES[drawer.kind] : ""}
+        title={drawer ? i18n._(DRAWER_TITLES[drawer.kind]) : ""}
         onClose={() => setDrawer(null)}
       >
         <DrawerBody>
