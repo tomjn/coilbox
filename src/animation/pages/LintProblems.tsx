@@ -8,6 +8,7 @@
  * their line, the same way `MissionProblemsList`'s rows jump to what they
  * are about).
  */
+import { useLingui } from "@lingui/react/macro";
 import { CheckItem, CheckSection } from "@/components/CheckItem";
 import type { LintDiagnostic } from "../bindings";
 
@@ -21,6 +22,7 @@ export function LintProblems({
   error?: string | null;
   onSelect?: (line: number) => void;
 }) {
+  const { t } = useLingui();
   if (error) {
     return (
       <p role="alert" className="text-sm text-destructive">
@@ -30,12 +32,12 @@ export function LintProblems({
   }
   if (diagnostics.length === 0) return null;
   return (
-    <CheckSection title="Problems in the BOS" count={diagnostics.length}>
+    <CheckSection title={t`Problems in the BOS`} count={diagnostics.length}>
       {diagnostics.map((d) => (
         <CheckItem
           key={`${d.rule}:${d.line}:${d.message}`}
           severity={d.severity}
-          location={`line ${d.line}`}
+          location={t`line ${{ line: d.line }}`}
           message={d.message}
           tag={d.rule}
           onSelect={onSelect ? () => onSelect(d.line) : undefined}
