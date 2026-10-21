@@ -1,3 +1,6 @@
+import { i18n } from "@lingui/core";
+import { msg, plural } from "@lingui/core/macro";
+import { Trans, useLingui } from "@lingui/react/macro";
 import { Button, Drawer } from "@picoframe/frame";
 import { getCurrentWebview } from "@tauri-apps/api/webview";
 import { ask, open, save } from "@tauri-apps/plugin-dialog";
@@ -56,16 +59,16 @@ function ScriptText({ value }: { value: string }) {
  *  brings its own source, and a `.cob` has one rebuilt from its instructions. */
 const VIEW_NOTES = {
   bos: {
-    bos: "The source that was compiled, as it is on disk.",
-    cob: "Source rebuilt from the file. Compiling it gives back this .cob.",
+    bos: msg`The source that was compiled, as it is on disk.`,
+    cob: msg`Source rebuilt from the file. Compiling it gives back this .cob.`,
   },
   cob: {
-    bos: "The bytes that were written, sixteen to a line.",
-    cob: "The bytes of the file, sixteen to a line.",
+    bos: msg`The bytes that were written, sixteen to a line.`,
+    cob: msg`The bytes of the file, sixteen to a line.`,
   },
   opcodes: {
-    bos: "The instructions those bytes hold.",
-    cob: "The instructions in the file, as they are stored.",
+    bos: msg`The instructions those bytes hold.`,
+    cob: msg`The instructions in the file, as they are stored.`,
   },
 } as const;
 /** Which reading of the script is on screen. The same file is all three: the
@@ -89,6 +92,7 @@ const BANNER_ICONS = { success: CheckCircle2, info: Info, error: AlertCircle };
  * opens it in the OS file manager.
  */
 export default function CobPage() {
+  const { t } = useLingui();
   // The file and everything derived from it live in a session store, so
   // leaving the page and coming back finds it as it was rather than empty.
   const {
@@ -151,16 +155,16 @@ export default function CobPage() {
   async function saveBos() {
     const suggested = path.replace(COB, ".bos");
     const dest = await save({
-      title: "Save the rebuilt .bos",
+      title: t`Save the rebuilt .bos`,
       defaultPath: suggested,
-      filters: [{ name: "Unit script source", extensions: ["bos"] }],
+      filters: [{ name: t`Unit script source`, extensions: ["bos"] }],
     });
     if (!dest) return;
     setBusy(true);
     try {
       await animCobDecompile({ path, output: dest });
       set({ revealTarget: dest });
-      setBanner({ kind: "success", text: `Saved ${dest}.` });
+      setBanner({ kind: "success", text: t`Saved ${dest}.` });
     } catch (e) {
       setBanner({ kind: "error", text: errorText(e) });
     } finally {
@@ -181,21 +185,27 @@ export default function CobPage() {
     try {
       const res = await animBos2cob({ path: p, overwrite });
       if (res.needsOverwrite) {
-        const yes = await ask(`${res.output} already exists.\nOverwrite it?`, {
-          title: "Overwrite .cob?",
+        const existing = res.output;
+        const yes = await ask(t`${existing} already exists.\nOverwrite it?`, {
+          title: t`Overwrite .cob?`,
           kind: "warning",
         });
         if (yes) await compile(p, true);
         else
           setBanner({
             kind: "info",
-            text: "Kept the existing .cob — not overwritten.",
+            text: t`Kept the existing .cob, not overwritten.`,
           });
         return;
       }
+      const output = res.output;
+      const bytes = res.bytes;
       setBanner({
         kind: "success",
-        text: `Compiled to ${res.output} (${res.bytes} bytes).`,
+        text: plural(bytes, {
+          one: `Compiled to ${output} (# byte).`,
+          other: `Compiled to ${output} (# bytes).`,
+        }),
       });
       set({ revealTarget: res.output, warnings: res.warnings });
       await readCob(res.output);
@@ -247,18 +257,18 @@ export default function CobPage() {
 
   async function browseCob() {
     const picked = await open({
-      title: "Select a .cob unit script",
+      title: t`Select a .cob unit script`,
       multiple: false,
-      filters: [{ name: "Compiled unit script", extensions: ["cob"] }],
+      filters: [{ name: t`Compiled unit script`, extensions: ["cob"] }],
     });
     if (typeof picked === "string") await loadCob(picked);
   }
 
   async function browseBos() {
     const picked = await open({
-      title: "Select a .bos unit script to compile",
+      title: t`Select a .bos unit script to compile`,
       multiple: false,
-      filters: [{ name: "Unit script source", extensions: ["bos"] }],
+      filters: [{ name: t`Unit script source`, extensions: ["bos"] }],
     });
     if (typeof picked === "string") await compile(picked);
   }
@@ -282,7 +292,7 @@ export default function CobPage() {
           if (bos) void compile(bos);
           else if (cob) void loadCob(cob);
           else if (p.paths.length)
-            setBanner({ kind: "error", text: "Drop a .bos or .cob file." });
+            setBanner({ kind: "error", text: t`Drop a .bos or .cob file.` });
         }
       })
       .then((fn) => {
@@ -313,15 +323,15 @@ export default function CobPage() {
         className="border-b border-border px-6 py-4"
         title={
           <>
-            <Binary size={18} /> COB tools
+            <Binary size={18} /> <Trans>COB tools</Trans>
           </>
         }
         description={
-          <>
+          <Trans>
             Compile a <code>.bos</code> unit script to <code>.cob</code>, or
             open a <code>.cob</code> and read it back as source, as bytes, and
             as the instructions it holds.
-          </>
+          </Trans>
         }
         actions={
           <>
@@ -331,7 +341,7 @@ export default function CobPage() {
               onClick={rerun}
               disabled={!path || busy}
             >
-              <RefreshCw /> Re-run
+              <RefreshCw /> <Trans>Re-run</Trans>
             </Button>
             <Button
               variant="outline"
@@ -339,7 +349,7 @@ export default function CobPage() {
               onClick={reveal}
               disabled={!revealTarget || busy}
             >
-              <FolderSearch /> Reveal in folder
+              <FolderSearch /> <Trans>Reveal in folder</Trans>
             </Button>
             {kind === "cob" && bos && (
               <Button
@@ -348,7 +358,7 @@ export default function CobPage() {
                 onClick={saveBos}
                 disabled={busy}
               >
-                <FileCode /> Save as .bos…
+                <FileCode /> <Trans>Save as .bos…</Trans>
               </Button>
             )}
             <Button
@@ -357,7 +367,7 @@ export default function CobPage() {
               onClick={browseBos}
               disabled={busy}
             >
-              <Hammer /> Compile .bos…
+              <Hammer /> <Trans>Compile .bos…</Trans>
             </Button>
             <Button
               variant="outline"
@@ -365,7 +375,7 @@ export default function CobPage() {
               onClick={browseCob}
               disabled={busy}
             >
-              <FolderOpen /> Open .cob…
+              <FolderOpen /> <Trans>Open .cob…</Trans>
             </Button>
             {showChecks && (
               <Button
@@ -384,10 +394,10 @@ export default function CobPage() {
                   <Info className="size-4" />
                 )}
                 {lintError
-                  ? "Parse error"
+                  ? t`Parse error`
                   : severeCount > 0
-                    ? `${severeCount} ${severeCount === 1 ? "check" : "checks"}`
-                    : `${infoCount} ${infoCount === 1 ? "note" : "notes"}`}
+                    ? plural(severeCount, { one: "# check", other: "# checks" })
+                    : plural(infoCount, { one: "# note", other: "# notes" })}
               </Button>
             )}
           </>
@@ -428,10 +438,12 @@ export default function CobPage() {
               <TabsList>
                 <TabsTrigger value="bos">BOS</TabsTrigger>
                 <TabsTrigger value="cob">COB</TabsTrigger>
-                <TabsTrigger value="opcodes">Opcodes</TabsTrigger>
+                <TabsTrigger value="opcodes">
+                  <Trans>Opcodes</Trans>
+                </TabsTrigger>
               </TabsList>
               <span className="text-xs text-muted-foreground">
-                {VIEW_NOTES[view][kind === "cob" ? "cob" : "bos"]}
+                {i18n._(VIEW_NOTES[view][kind === "cob" ? "cob" : "bos"])}
               </span>
             </div>
             <TabsContent value="bos" className="min-h-0 flex-1">
@@ -447,7 +459,11 @@ export default function CobPage() {
         ) : (
           <div className="flex min-h-0 flex-1 flex-col items-center justify-center gap-2 text-center text-sm text-muted-foreground">
             <Binary size={26} className="opacity-30" />
-            <p>Open or drop a .bos to compile, or a .cob to read back.</p>
+            <p>
+              <Trans>
+                Open or drop a .bos to compile, or a .cob to read back.
+              </Trans>
+            </p>
             {path && <p className="font-mono text-xs">{path}</p>}
           </div>
         )}
@@ -455,8 +471,8 @@ export default function CobPage() {
       <Drawer
         open={checksOpen && showChecks}
         onOpenChange={setChecksOpen}
-        title="Checks"
-        description="What the lint pass found in this .bos."
+        title={t`Checks`}
+        description={t`What the lint pass found in this .bos.`}
         width="34rem"
       >
         <LintProblems diagnostics={diagnostics} error={lintError} />

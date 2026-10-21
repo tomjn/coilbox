@@ -16,6 +16,9 @@
  * pair of buttons means one answer to what they say when there is nowhere to go.
  */
 
+import { t as coreT } from "@lingui/core/macro";
+import { useLingui as useLocale } from "@lingui/react";
+import { Trans, useLingui } from "@lingui/react/macro";
 import { Button } from "@picoframe/frame";
 import {
   ChevronLeft,
@@ -67,6 +70,7 @@ export function HistoryControls({
    *  down the left edge instead of in the top corner. */
   vertical?: boolean;
 }) {
+  const { t } = useLingui();
   const mod = modKeyLabel();
   return (
     <ButtonGroup orientation={vertical ? "vertical" : "horizontal"}>
@@ -76,8 +80,8 @@ export function HistoryControls({
         className={vertical ? "bg-card" : "bg-card px-2"}
         onClick={undo}
         disabled={!canUndo}
-        aria-label="Undo"
-        title={canUndo ? `Undo (${mod} Z)` : "Nothing to undo yet"}
+        aria-label={t`Undo`}
+        title={canUndo ? t`Undo (${mod} Z)` : t`Nothing to undo yet`}
       >
         <Undo2 className="size-3.5" />
       </Button>
@@ -87,8 +91,8 @@ export function HistoryControls({
         className={vertical ? "bg-card" : "bg-card px-2"}
         onClick={redo}
         disabled={!canRedo}
-        aria-label="Redo"
-        title={canRedo ? `Redo (${mod} Shift Z)` : "Nothing to redo"}
+        aria-label={t`Redo`}
+        title={canRedo ? t`Redo (${mod} Shift Z)` : t`Nothing to redo`}
       >
         <Redo2 className="size-3.5" />
       </Button>
@@ -116,7 +120,7 @@ export function HistoryControls({
  */
 export function SelectionTools({
   count,
-  deleteLabel = "Delete",
+  deleteLabel,
   turnNote,
   onTurn,
   onTurnPreview,
@@ -151,7 +155,11 @@ export function SelectionTools({
   onTurnPreview?: (on: boolean) => void;
   onDelete: () => void;
 }) {
-  const all = count === undefined ? "" : ` all ${count}`;
+  const { t } = useLingui();
+  const delLabel = deleteLabel ?? t`Delete`;
+  const turnLabel = count === undefined ? t`Turn` : t`Turn all ${count}`;
+  const deleteTitle =
+    count === undefined ? delLabel : t`${delLabel} all ${count}`;
 
   // Its own provider, so the component carries its tooltips wherever it is put
   // rather than only working inside a surface that happens to have one.
@@ -166,7 +174,9 @@ export function SelectionTools({
                 variant="outline"
                 className="bg-card"
                 onClick={onTurn}
-                aria-label={`Turn${all || " a quarter turn"}`}
+                aria-label={
+                  count === undefined ? t`Turn a quarter turn` : turnLabel
+                }
                 onPointerEnter={() => onTurnPreview?.(true)}
                 onPointerLeave={() => onTurnPreview?.(false)}
                 onFocus={() => onTurnPreview?.(true)}
@@ -176,11 +186,11 @@ export function SelectionTools({
               </Button>
             </TooltipTrigger>
             <TooltipContent side="right" className="max-w-64">
-              <p className="font-medium">Turn{all}</p>
+              <p className="font-medium">{turnLabel}</p>
               <p className="opacity-80">
                 {count === undefined
-                  ? "A quarter turn. A unit faces one of four ways and nothing in between."
-                  : "The whole selection swung a quarter turn about its own middle, so it keeps its shape. Press R to turn each thing where it stands instead."}
+                  ? t`A quarter turn. A unit faces one of four ways and nothing in between.`
+                  : t`The whole selection swung a quarter turn about its own middle, so it keeps its shape. Press R to turn each thing where it stands instead.`}
               </p>
               {turnNote && <p className="opacity-80">{turnNote}</p>}
             </TooltipContent>
@@ -193,19 +203,18 @@ export function SelectionTools({
               variant="outline"
               className="bg-card text-destructive hover:text-destructive"
               onClick={onDelete}
-              aria-label={`${deleteLabel}${all}`}
+              aria-label={deleteTitle}
             >
               <Trash2 className="size-3.5" />
             </Button>
           </TooltipTrigger>
           <TooltipContent side="right" className="max-w-64">
-            <p className="font-medium">
-              {deleteLabel}
-              {all}
-            </p>
+            <p className="font-medium">{deleteTitle}</p>
             {count !== undefined && (
               <p className="opacity-80">
-                Everything selected goes, not just the one the bar names.
+                <Trans>
+                  Everything selected goes, not just the one the bar names.
+                </Trans>
               </p>
             )}
           </TooltipContent>
@@ -270,6 +279,7 @@ export function SelectionBar({
    *  overrides, a base's queue, a layout's build order. */
   children?: ReactNode;
 }) {
+  const { t } = useLingui();
   return (
     <div className="flex w-fit items-center gap-1.5 rounded-md border border-border/60 bg-card p-1 pl-2">
       <span className="font-mono text-[11px]">
@@ -288,16 +298,16 @@ export function SelectionBar({
             !turnable
               ? turnHint
               : count === undefined
-                ? "Turn a quarter turn"
-                : "Turn everything selected that turns a quarter turn. A group and a zone do not."
+                ? t`Turn a quarter turn`
+                : t`Turn everything selected that turns a quarter turn. A group and a zone do not.`
           }
           onPointerEnter={() => onTurnPreview?.(true)}
           onPointerLeave={() => onTurnPreview?.(false)}
           onFocus={() => onTurnPreview?.(true)}
           onBlur={() => onTurnPreview?.(false)}
         >
-          <RotateCw className="size-3.5" /> Turn
-          {count === undefined ? "" : " all"}
+          <RotateCw className="size-3.5" />{" "}
+          {count === undefined ? t`Turn` : t`Turn all`}
         </Button>
       )}
       {onDelete && (
@@ -307,11 +317,11 @@ export function SelectionBar({
           className="h-7 gap-1.5 px-2 text-xs text-destructive hover:text-destructive"
           onClick={onDelete}
           title={
-            count === undefined ? undefined : `Delete all ${count} of them`
+            count === undefined ? undefined : t`Delete all ${count} of them`
           }
         >
-          <Trash2 className="size-3.5" /> Delete
-          {count === undefined ? "" : ` ${count}`}
+          <Trash2 className="size-3.5" />{" "}
+          {count === undefined ? t`Delete` : t`Delete ${count}`}
         </Button>
       )}
     </div>
@@ -335,8 +345,8 @@ export function SelectionBar({
 export function turnNoteText(moves: boolean | null): string | null {
   if (moves === null) return null;
   return moves
-    ? "Turning it stands it on the outlined squares. Its sides swap, so it moves half a build square."
-    : "Turning it leaves it on the same squares. Its footprint is square, so there is nowhere for it to move.";
+    ? coreT`Turning it stands it on the outlined squares. Its sides swap, so it moves half a build square.`
+    : coreT`Turning it leaves it on the same squares. Its footprint is square, so there is nowhere for it to move.`;
 }
 
 /**
@@ -351,6 +361,7 @@ export function TurnNote({
    *  considering a turn, and then nothing is said. */
   moves: boolean | null;
 }) {
+  useLocale();
   const said = turnNoteText(moves);
   if (!said) return null;
   return (
@@ -388,23 +399,28 @@ export function PlaybackBar({
   onPlaying: (on: boolean) => void;
   onDone: () => void;
 }) {
+  const { t } = useLingui();
   return (
     <div className="flex w-fit items-center gap-1.5 rounded-md border border-lime-400/60 bg-card/85 p-1 pl-2 backdrop-blur">
       <span className="text-[11px]">
         {step === 0 ? (
-          <span className="text-muted-foreground">bare ground</span>
+          <span className="text-muted-foreground">
+            <Trans>bare ground</Trans>
+          </span>
         ) : (
           <span className="font-mono">{def}</span>
         )}
         <span className="ml-1.5 text-muted-foreground">
-          {step} of {total}
+          <Trans>
+            {step} of {total}
+          </Trans>
         </span>
       </span>
       <Button
         size="sm"
         variant="ghost"
         className="size-7 p-0"
-        aria-label="Back a step"
+        aria-label={t`Back a step`}
         disabled={step === 0}
         onClick={() => onStep(step - 1)}
       >
@@ -414,7 +430,7 @@ export function PlaybackBar({
         size="sm"
         variant="ghost"
         className="size-7 p-0"
-        aria-label={playing ? "Pause" : "Play"}
+        aria-label={playing ? t`Pause` : t`Play`}
         onClick={() => onPlaying(!playing)}
       >
         {playing ? (
@@ -427,7 +443,7 @@ export function PlaybackBar({
         size="sm"
         variant="ghost"
         className="size-7 p-0"
-        aria-label="On a step, building the next one"
+        aria-label={t`On a step, building the next one`}
         disabled={step >= total}
         onClick={() => onStep(step + 1)}
       >
@@ -439,7 +455,7 @@ export function PlaybackBar({
         className="h-7 px-2 text-xs"
         onClick={onDone}
       >
-        Done
+        <Trans>Done</Trans>
       </Button>
     </div>
   );

@@ -22,6 +22,7 @@
  * every pointer move would be the expensive part of an otherwise cheap check.
  */
 
+import { plural, t } from "@lingui/core/macro";
 import { type Ground, standsOn, unitLimits } from "@/blueprint/buildable";
 import {
   BUILD_SQUARE,
@@ -430,6 +431,14 @@ export function nudgedPreview(
   );
 }
 
+/** One direction of a nudge, said as a count of build squares. */
+function squaresWay(far: number, way: string): string {
+  return plural(far, {
+    one: `# square ${way}`,
+    other: `# squares ${way}`,
+  });
+}
+
 /** Which way a nudge goes, in the map's own directions: `+x` is east and `+z`
  *  is south, the way the engine's facings run. */
 export function nudgeWords(squares: Point): string {
@@ -437,31 +446,37 @@ export function nudgeWords(squares: Point): string {
   if (squares.z !== 0) {
     ways.push({
       far: Math.abs(squares.z),
-      way: squares.z < 0 ? "north" : "south",
+      way: squares.z < 0 ? t`north` : t`south`,
     });
   }
   if (squares.x !== 0) {
     ways.push({
       far: Math.abs(squares.x),
-      way: squares.x < 0 ? "west" : "east",
+      way: squares.x < 0 ? t`west` : t`east`,
     });
   }
-  return ways
-    .map(({ far, way }, at) =>
-      at === 0
-        ? `${far} ${far === 1 ? "square" : "squares"} ${way}`
-        : `${far} ${way}`,
-    )
-    .join(" and ");
+  const [first, second] = ways;
+  if (!first) return "";
+  const firstWords = squaresWay(first.far, first.way);
+  if (!second) return firstWords;
+  // The second direction is a bare count, as it always was, so only the first
+  // carries the word for squares.
+  const secondFar = second.far;
+  const secondWay = second.way;
+  return t`${firstWords} and ${secondFar} ${secondWay}`;
 }
 
 /** The offer in words, said next to the warning rather than instead of it. */
 export function nudgeSentence(offer: NudgeOffer, limit = NUDGE_LIMIT): string {
   if (offer === null) return "";
   if (offer === "nowhere") {
-    return `Nothing within ${limit} squares of here fits.`;
+    return plural(limit, {
+      one: "Nothing within # square of here fits.",
+      other: "Nothing within # squares of here fits.",
+    });
   }
-  return `Press N to put it down ${nudgeWords(offer.squares)} instead, outlined, where it fits.`;
+  const words = nudgeWords(offer.squares);
+  return t`Press N to put it down ${words} instead, outlined, where it fits.`;
 }
 
 /** Whether two offers say the same thing, so a surface can leave its state
@@ -547,18 +562,31 @@ export function previewMovable(count: PreviewCount): boolean {
   );
 }
 
-/** What is left unsaid about this spot, when anything is. Appended rather than
- *  colouring the sentence, because an unknown is not a refusal (issue #1491).
- *  Exported for {@link mapProblemsWords} in `mapKeyboard.ts`, which says the
- *  same thing about the whole map rather than about one spot (issue #2315). */
-export function unjudgedClause(count: PreviewCount): string {
-  if (count.unjudged === 0) return "";
-  if (count.unjudged === count.total) {
-    return count.total === 1
-      ? " It has not been checked against the ground."
-      : " None of them has been checked against the ground.";
+/** What is left unsaid about this spot, when anything is, as a sentence of its
+ *  own and empty when nothing is. Not coloured, because an unknown is not a
+ *  refusal (issue #1491). Exported for {@link mapProblemsWords} in
+ *  `mapKeyboard.ts`, which says the same thing about the whole map rather than
+ *  about one spot (issue #2315). */
+export function unjudgedSentence(count: PreviewCount): string {
+  const { unjudged, total } = count;
+  if (unjudged === 0) return "";
+  if (unjudged === total) {
+    return plural(total, {
+      one: "It has not been checked against the ground.",
+      other: "None of them has been checked against the ground.",
+    });
   }
-  return ` ${count.unjudged} of them ${count.unjudged === 1 ? "has" : "have"} not been checked against the ground.`;
+  return plural(unjudged, {
+    one: "# of them has not been checked against the ground.",
+    other: "# of them have not been checked against the ground.",
+  });
+}
+
+/** {@link unjudgedSentence} with the space that joins it on to the sentence
+ *  before it, or nothing when there is nothing to add. */
+export function unjudgedClause(count: PreviewCount): string {
+  const sentence = unjudgedSentence(count);
+  return sentence === "" ? "" : ` ${sentence}`;
 }
 
 /**
@@ -567,57 +595,87 @@ export function unjudgedClause(count: PreviewCount): string {
  * Only overlaps and slopes are named, and a spot with neither is only said to
  * have room rather than to fit: room is about the other buildings, and the
  * ground is a separate question this may not have an answer to.
+ *
+ * Each sentence is a whole message. The first trouble found says how many of
+ * the total it is, and the later ones leave that out.
  */
 export function previewSentence(count: PreviewCount): string {
-  const { total, clashes, unstable } = count;
+  const { total, clashes, unstable, tooDeep, tooShallow, absent } = count;
   if (!previewTrouble(count)) {
-    const room =
-      total === 1
-        ? "1 building, and it has room here."
-        : `${total} buildings, and they all have room here.`;
-    return room + unjudgedClause(count);
+    const room = plural(total, {
+      one: "# building, and it has room here.",
+      other: "# buildings, and they all have room here.",
+    });
+    return [room, unjudgedSentence(count)].filter(Boolean).join(" ");
   }
   const parts: string[] = [];
   if (clashes > 0) {
     parts.push(
-      `${clashes} of ${total} want${clashes === 1 ? "s" : ""} ground another building has, in red.`,
+      plural(clashes, {
+        one: `# of ${total} wants ground another building has, in red.`,
+        other: `# of ${total} want ground another building has, in red.`,
+      }),
     );
   }
   if (unstable > 0) {
-    const of = parts.length > 0 ? "" : ` of ${total}`;
+    const first = parts.length === 0;
     parts.push(
-      unstable === 1
-        ? `1${of} is on ground too steep for it, in amber.`
-        : `${unstable}${of} are on ground too steep for them, in amber.`,
+      first
+        ? plural(unstable, {
+            one: `# of ${total} is on ground too steep for it, in amber.`,
+            other: `# of ${total} are on ground too steep for them, in amber.`,
+          })
+        : plural(unstable, {
+            one: "# is on ground too steep for it, in amber.",
+            other: "# are on ground too steep for them, in amber.",
+          }),
     );
   }
   // Both ends of the engine's band are cyan, so these two sentences are the
   // only thing saying which way a building has to move (issue #1552).
-  if (count.tooDeep > 0) {
-    const of = parts.length > 0 ? "" : ` of ${total}`;
+  if (tooDeep > 0) {
+    const first = parts.length === 0;
     parts.push(
-      count.tooDeep === 1
-        ? `1${of} is in water too deep for it, in cyan.`
-        : `${count.tooDeep}${of} are in water too deep for them, in cyan.`,
+      first
+        ? plural(tooDeep, {
+            one: `# of ${total} is in water too deep for it, in cyan.`,
+            other: `# of ${total} are in water too deep for them, in cyan.`,
+          })
+        : plural(tooDeep, {
+            one: "# is in water too deep for it, in cyan.",
+            other: "# are in water too deep for them, in cyan.",
+          }),
     );
   }
-  if (count.tooShallow > 0) {
-    const of = parts.length > 0 ? "" : ` of ${total}`;
+  if (tooShallow > 0) {
+    const first = parts.length === 0;
     parts.push(
-      count.tooShallow === 1
-        ? `1${of} is not in deep enough water, in cyan.`
-        : `${count.tooShallow}${of} are not in deep enough water, in cyan.`,
+      first
+        ? plural(tooShallow, {
+            one: `# of ${total} is not in deep enough water, in cyan.`,
+            other: `# of ${total} are not in deep enough water, in cyan.`,
+          })
+        : plural(tooShallow, {
+            one: "# is not in deep enough water, in cyan.",
+            other: "# are not in deep enough water, in cyan.",
+          }),
     );
   }
-  if (count.absent > 0) {
-    const of = parts.length > 0 ? "" : ` of ${total}`;
+  if (absent > 0) {
+    const first = parts.length === 0;
     parts.push(
-      count.absent === 1
-        ? `1${of} is a unit this game has not got, in violet.`
-        : `${count.absent}${of} are units this game has not got, in violet.`,
+      first
+        ? plural(absent, {
+            one: `# of ${total} is a unit this game has not got, in violet.`,
+            other: `# of ${total} are units this game has not got, in violet.`,
+          })
+        : plural(absent, {
+            one: "# is a unit this game has not got, in violet.",
+            other: "# are units this game has not got, in violet.",
+          }),
     );
   }
-  return parts.join(" ") + unjudgedClause(count);
+  return [...parts, unjudgedSentence(count)].filter(Boolean).join(" ");
 }
 
 /**

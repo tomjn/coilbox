@@ -1,3 +1,5 @@
+import { t } from "@lingui/core/macro";
+import { Trans } from "@lingui/react/macro";
 import { Button } from "@picoframe/frame";
 import { Download, Loader2, Swords } from "lucide-react";
 import type { ReactNode } from "react";
@@ -82,7 +84,7 @@ export function BattleCheckingNotice() {
   return (
     <div className="flex items-center gap-2 text-sm text-muted-foreground">
       <Loader2 className="size-4 animate-spin" aria-hidden />
-      Reading the battle report…
+      <Trans>Reading the battle report…</Trans>
     </div>
   );
 }
@@ -103,14 +105,16 @@ export function BattleResultPrompt({
     <div className="flex flex-col gap-3">
       {error && <ErrorBanner message={error} />}
       <p className="text-sm text-muted-foreground">
-        The outcome could not be read from the replay. How did the battle end?
+        <Trans>
+          The outcome could not be read from the replay. How did the battle end?
+        </Trans>
       </p>
       <div className="flex gap-2">
         <Button disabled={saving} onClick={onVictory}>
-          Victory
+          <Trans>Victory</Trans>
         </Button>
         <Button variant="outline" disabled={saving} onClick={onDefeat}>
-          Defeat
+          <Trans>Defeat</Trans>
         </Button>
       </div>
     </div>
@@ -138,13 +142,15 @@ function MissingContentGate({
   const gameDownload = game ? resolveGameDownload(game, gameCatalog) : null;
   const mapDl = useQueuedDownload({
     kind: "map",
-    label: `Map: ${mapName}`,
+    label: t`Map: ${mapName}`,
     args: {
       springName: mapDownload?.springName ?? mapName,
       searchUrl: mapDownload?.searchUrl,
     },
   });
   const downloading = mapDl.busy;
+  const missingName = missing.name;
+  const gameName = missing.kind === "dependency" ? missing.gameName : undefined;
 
   const download = async () => {
     const settled = await mapDl.start();
@@ -159,17 +165,28 @@ function MissingContentGate({
   return (
     <div className="flex flex-col gap-2">
       <p className="text-sm text-muted-foreground">
-        {missing.kind === "map"
-          ? "Map"
-          : missing.kind === "dependency"
-            ? "Archive"
-            : "Game"}{" "}
-        not installed: <span className="text-foreground">{missing.name}</span>
+        {missing.kind === "map" ? (
+          <Trans>
+            Map not installed:{" "}
+            <span className="text-foreground">{missingName}</span>
+          </Trans>
+        ) : missing.kind === "dependency" ? (
+          <Trans>
+            Archive not installed:{" "}
+            <span className="text-foreground">{missingName}</span>
+          </Trans>
+        ) : (
+          <Trans>
+            Game not installed:{" "}
+            <span className="text-foreground">{missingName}</span>
+          </Trans>
+        )}
       </p>
       {missing.kind === "dependency" && missing.gameName && (
         <p className="text-sm text-muted-foreground">
-          <span className="text-foreground">{missing.gameName}</span> depends on
-          it.
+          <Trans>
+            <span className="text-foreground">{gameName}</span> depends on it.
+          </Trans>
         </p>
       )}
       {mapDl.error && <ErrorBanner message={mapDl.error} />}
@@ -178,10 +195,10 @@ function MissingContentGate({
           <Button onClick={download} disabled={downloading} className="w-full">
             <Download className="mr-1.5 size-4" aria-hidden />
             {mapDl.status === "queued"
-              ? "Waiting for a slot…"
+              ? t`Waiting for a slot…`
               : downloading
-                ? "Downloading…"
-                : "Download map"}
+                ? t`Downloading…`
+                : t`Download map`}
           </Button>
           <QueueProgress item={mapDl} />
         </>
@@ -195,8 +212,8 @@ function MissingContentGate({
       ) : (
         <Link to="/library/games">
           <Button variant="outline" className="w-full">
-            <Download className="mr-1.5 size-4" aria-hidden /> Open game
-            downloads
+            <Download className="mr-1.5 size-4" aria-hidden />{" "}
+            <Trans>Open game downloads</Trans>
           </Button>
         </Link>
       )}
@@ -268,19 +285,24 @@ export function BattleLaunchGate({
       {error && <ErrorBanner message={error} />}
       {leftOut.map((line) => (
         <p key={line} className="text-xs text-muted-foreground">
-          Left out: {line}
+          <Trans>Left out: {line}</Trans>
         </p>
       ))}
       {noEngine ? (
         <p className="text-sm text-muted-foreground">
-          Install an engine first (
-          <Link className="underline underline-offset-4" to="/settings/engines">
-            Settings → Engines
-          </Link>
-          ).
+          <Trans>
+            Install an engine first (
+            <Link
+              className="underline underline-offset-4"
+              to="/settings/engines"
+            >
+              Settings → Engines
+            </Link>
+            ).
+          </Trans>
         </p>
       ) : scanFailure ? (
-        <ScanFailed noun="games or maps" reason={scanFailure} />
+        <ScanFailed noun={t`games or maps`} reason={scanFailure} />
       ) : missing ? (
         <MissingContentGate
           missing={missing}
@@ -300,7 +322,8 @@ export function BattleLaunchGate({
         />
       ) : canStart ? (
         <Button onClick={onStart} className="w-full">
-          <Swords className="mr-1.5 size-4" aria-hidden /> Launch battle
+          <Swords className="mr-1.5 size-4" aria-hidden />{" "}
+          <Trans>Launch battle</Trans>
         </Button>
       ) : (
         <Button disabled className="w-full">
@@ -308,12 +331,12 @@ export function BattleLaunchGate({
             <Loader2 className="mr-1.5 size-4 animate-spin" aria-hidden />
           )}
           {running
-            ? "A game is already running"
+            ? t`A game is already running`
             : scanLoading
-              ? "Scanning content…"
+              ? t`Scanning content…`
               : !aisAvailable
-                ? "No skirmish AI available"
-                : (hold?.label ?? "Preparing…")}
+                ? t`No skirmish AI available`
+                : (hold?.label ?? t`Preparing…`)}
         </Button>
       )}
     </>

@@ -1,3 +1,4 @@
+import { useLingui } from "@lingui/react/macro";
 import { Check, Loader2, X } from "lucide-react";
 import { useEffect, useState } from "react";
 import {
@@ -32,6 +33,7 @@ function StageIcon({ state }: { state: StageState }) {
  * anything has failed, because a failed read is something to act on.
  */
 export function MapLoadIndicator({ load }: { load: MapLoad }) {
+  const { t } = useLingui();
   const rows = mapLoadRows(load);
   const busy = mapLoading(load);
   const failed = mapLoadFailed(load);
@@ -51,7 +53,7 @@ export function MapLoadIndicator({ load }: { load: MapLoad }) {
   return (
     <ul
       aria-live="polite"
-      aria-label="Map loading"
+      aria-label={t`Map loading`}
       className="w-fit rounded bg-card/80 px-2 py-1.5 text-left text-[11px] text-foreground backdrop-blur"
     >
       {rows.map((row) => (
