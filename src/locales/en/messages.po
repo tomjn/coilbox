@@ -75,6 +75,30 @@ msgstr "'Large' BeamLaser only. How fast the beam fades to nothing and back."
 msgid "'Large' BeamLaser only. Regular BeamLaser stretches a single tile instead of repeating it."
 msgstr "'Large' BeamLaser only. Regular BeamLaser stretches a single tile instead of repeating it."
 
+#: src/conquest/handmade/library.ts
+msgid "\"{file}\" could not be opened as an image. Save it again as a PNG."
+msgstr "\"{file}\" could not be opened as an image. Save it again as a PNG."
+
+#: src/conquest/handmade/archive.ts
+msgid "\"{file}\" is in the game archive, but it could not be read. {detail}"
+msgstr "\"{file}\" is in the game archive, but it could not be read. {detail}"
+
+#: src/conquest/handmade/archive.ts
+msgid "\"{file}\" is in the game archive, but it could not be read. {details}"
+msgstr "\"{file}\" is in the game archive, but it could not be read. {details}"
+
+#: src/conquest/handmade/archive.ts
+msgid "\"{file}\" is in the game archive, but it is larger than 256 MB, the most coilbox reads from a game archive for one file."
+msgstr "\"{file}\" is in the game archive, but it is larger than 256 MB, the most coilbox reads from a game archive for one file."
+
+#: src/conquest/handmade/manifest.ts
+msgid "\"{first}\" and \"{second}\" have a blocked border and a crossing. Remove one of the two."
+msgstr "\"{first}\" and \"{second}\" have a blocked border and a crossing. Remove one of the two."
+
+#: src/conquest/handmade/manifest.ts
+msgid "\"{first}\" and \"{second}\" have a blocked border and a road. Remove one of the two."
+msgstr "\"{first}\" and \"{second}\" have a blocked border and a road. Remove one of the two."
+
 #: src/scenario/validate.ts
 msgid "\"{id}\" already names an actor or another building, and a trigger naming it would reach only one of them."
 msgstr "\"{id}\" already names an actor or another building, and a trigger naming it would reach only one of them."
@@ -87,9 +111,17 @@ msgstr "\"{id}\" has no engine team, so nothing can spawn for it. It names a spe
 msgid "\"{importedName}\" is in this scenario and is not placed yet. Put it on the map with Blueprints on the mode rail, or with the pin beside it under Contents."
 msgstr "\"{importedName}\" is in this scenario and is not placed yet. Put it on the map with Blueprints on the mode rail, or with the pin beside it under Contents."
 
+#: src/conquest/pages/ConquestListPage.tsx
+msgid "\"{importedTitle}\" is imported and listed on the Conquest page."
+msgstr "\"{importedTitle}\" is imported and listed on the Conquest page."
+
 #: src/content/pages/components/KeymapsPanel.tsx
 msgid "\"{keymapName}\" could not be read."
 msgstr "\"{keymapName}\" could not be read."
+
+#: src/conquest/pages/ConquestListPage.tsx
+msgid "\"{mapsDir}/{folder}\" in {game}"
+msgstr "\"{mapsDir}/{folder}\" in {game}"
 
 #: src/workshop/searchQuery.ts
 msgid "\"{name} {op}\" needs a number, not \"{given}\"."
@@ -119,6 +151,10 @@ msgstr "\"{presetName}\" replaces the game, the map, the participants and the ga
 #: src/workshop/pages/components/ShareProjectForm.tsx
 msgid "\"{projectName}\" is {sizeKb} KB, over the {limitKb} KB a code can carry. Export it as a file instead."
 msgstr "\"{projectName}\" is {sizeKb} KB, over the {limitKb} KB a code can carry. Export it as a file instead."
+
+#: src/conquest/pages/ConquestListPage.tsx
+msgid "\"{title}\" was not removed. {reason}"
+msgstr "\"{title}\" was not removed. {reason}"
 
 #: src/play/pages/components/SaveAsPresetButton.tsx
 msgid "\"{trimmed}\" — replay it from Singleplayer → Presets."
@@ -1037,6 +1073,10 @@ msgstr "{baseName}'s {def}"
 msgid "{bases, plural, one {# base} other {# bases}}"
 msgstr "{bases, plural, one {# base} other {# bases}}"
 
+#: src/conquest/pages/GalaxyPage.tsx
+msgid "{battles, plural, one {{turns, plural, one {{battles} battle fought over {turns} turn, {victories} won.} other {{battles} battle fought over {turns} turns, {victories} won.}}} other {{turns, plural, one {{battles} battles fought over {turns} turn, {victories} won.} other {{battles} battles fought over {turns} turns, {victories} won.}}}}"
+msgstr "{battles, plural, one {{turns, plural, one {{battles} battle fought over {turns} turn, {victories} won.} other {{battles} battle fought over {turns} turns, {victories} won.}}} other {{turns, plural, one {{battles} battles fought over {turns} turn, {victories} won.} other {{battles} battles fought over {turns} turns, {victories} won.}}}}"
+
 #: src/multiplayer/ConnectionSession.tsx
 msgid "{battleTitle} on {serverName}: {map}, {taken}/{maxPlayers} players"
 msgstr "{battleTitle} on {serverName}: {map}, {taken}/{maxPlayers} players"
@@ -1568,6 +1608,18 @@ msgstr "{existing} already exists.\n"
 #: src/content/pages/components/UnitPicker.tsx
 msgid "{extra, plural, one {{name}, # upgrade} other {{name}, # upgrades}}"
 msgstr "{extra, plural, one {{name}, # upgrade} other {{name}, # upgrades}}"
+
+#: src/conquest/pages/GalaxyPage.tsx
+msgid "{faction} took {node}"
+msgstr "{faction} took {node}"
+
+#: src/conquest/pages/GalaxyPage.tsx
+msgid "{faction} took {node} from {previous}"
+msgstr "{faction} took {node} from {previous}"
+
+#: src/conquest/pages/ConquestListPage.tsx
+msgid "{factionCount, plural, one {# faction} other {# factions}}"
+msgstr "{factionCount, plural, one {# faction} other {# factions}}"
 
 #: src/hub/games/factsSweep.ts
 msgid "{factions, plural, one {# faction} other {# factions}}"
@@ -2231,6 +2283,10 @@ msgstr "{left, plural, one {# does not turn.} other {# do not turn.}}"
 msgid "{left, plural, one {# more unit is still waiting.} other {# more units are still waiting.}}"
 msgstr "{left, plural, one {# more unit is still waiting.} other {# more units are still waiting.}}"
 
+#: src/conquest/pages/GalaxyPage.tsx
+msgid "{left, plural, one {Incursion at {incursionName} — falls in # turn} other {Incursion at {incursionName} — falls in # turns}}"
+msgstr "{left, plural, one {Incursion at {incursionName} — falls in # turn} other {Incursion at {incursionName} — falls in # turns}}"
+
 #: src/downloads/DownloadQueueBadge.tsx
 #: src/downloads/pages/components/ProgressBar.tsx
 msgid "{left} left"
@@ -2268,9 +2324,341 @@ msgstr "{logos, plural, one {Sent one faction logo.} other {Sent # faction logos
 msgid "{losses}L"
 msgstr "{losses}L"
 
+#: src/conquest/pages/ConquestListPage.tsx
+msgid "{ly} light years ({count, plural, one {# system} other {# systems}})"
+msgstr "{ly} light years ({count, plural, one {# system} other {# systems}})"
+
+#: src/conquest/handmade/read.ts
+msgid "{MANIFEST_FILE} blocks the border between {first} and {second}, but they do not touch on the province image."
+msgstr "{MANIFEST_FILE} blocks the border between {first} and {second}, but they do not touch on the province image."
+
+#: src/conquest/handmade/manifest.ts
+msgid "{MANIFEST_FILE} is not valid JSON: {detail}"
+msgstr "{MANIFEST_FILE} is not valid JSON: {detail}"
+
+#: src/conquest/handmade/manifest.ts
+msgid "{MANIFEST_FILE} must hold one JSON object."
+msgstr "{MANIFEST_FILE} must hold one JSON object."
+
+#: src/conquest/handmade/read.ts
+msgid "{MANIFEST_FILE} names the heightmap \"{file}\", but the folder has no file with that name."
+msgstr "{MANIFEST_FILE} names the heightmap \"{file}\", but the folder has no file with that name."
+
+#: src/conquest/handmade/read.ts
+msgid "{MANIFEST_FILE} names the picture \"{file}\", but the folder has no file with that name."
+msgstr "{MANIFEST_FILE} names the picture \"{file}\", but the folder has no file with that name."
+
+#: src/conquest/handmade/read.ts
+msgid "{MANIFEST_FILE} names the province image \"{file}\", but the folder has no file with that name."
+msgstr "{MANIFEST_FILE} names the province image \"{file}\", but the folder has no file with that name."
+
+#: src/conquest/handmade/manifest.ts
+msgid "{MANIFEST_FILE}: \"{firstName}\" and \"{secondName}\" are both listed with the colour {color}. Each province needs its own colour."
+msgstr "{MANIFEST_FILE}: \"{firstName}\" and \"{secondName}\" are both listed with the colour {color}. Each province needs its own colour."
+
+#: src/conquest/handmade/manifest.ts
+msgid "{MANIFEST_FILE}: \"{locationName}\" is the Warpath goal, so it cannot also have the kind \"{kind}\". Remove the kind, or move the goal."
+msgstr "{MANIFEST_FILE}: \"{locationName}\" is the Warpath goal, so it cannot also have the kind \"{kind}\". Remove the kind, or move the goal."
+
+#: src/conquest/handmade/manifest.ts
+msgid "{MANIFEST_FILE}: \"{locationName}\" is the Warpath start, so it cannot also have the kind \"{kind}\". Remove the kind, or move the start."
+msgstr "{MANIFEST_FILE}: \"{locationName}\" is the Warpath start, so it cannot also have the kind \"{kind}\". Remove the kind, or move the start."
+
+#: src/conquest/handmade/manifest.ts
+msgid "{MANIFEST_FILE}: \"{name}\" has a scenario and a battle. A location plays one or the other, so remove one of them."
+msgstr "{MANIFEST_FILE}: \"{name}\" has a scenario and a battle. A location plays one or the other, so remove one of them."
+
+#: src/conquest/handmade/manifest.ts
+msgid "{MANIFEST_FILE}: \"{name}\" has the Warpath kind \"{kind}\", which Warpath does not know. Use one of: {kinds}."
+msgstr "{MANIFEST_FILE}: \"{name}\" has the Warpath kind \"{kind}\", which Warpath does not know. Use one of: {kinds}."
+
+#: src/conquest/handmade/read.ts
+msgid "{MANIFEST_FILE}: \"{name}\" names the scenario file \"{file}\", but the folder has no file with that name."
+msgstr "{MANIFEST_FILE}: \"{name}\" names the scenario file \"{file}\", but the folder has no file with that name."
+
+#: src/conquest/handmade/manifest.ts
+msgid "{MANIFEST_FILE}: \"{other}\" and \"{name}\" both have the id \"{locId}\". Give one of them its own \"id\"."
+msgstr "{MANIFEST_FILE}: \"{other}\" and \"{name}\" both have the id \"{locId}\". Give one of them its own \"id\"."
+
+#: src/conquest/handmade/manifest.ts
+msgid "{MANIFEST_FILE}: {key}[{i}] names \"{end}\", which is not the id of any location."
+msgstr "{MANIFEST_FILE}: {key}[{i}] names \"{end}\", which is not the id of any location."
+
+#: src/conquest/handmade/manifest.ts
+msgid "{MANIFEST_FILE}: {where} \"{fid}\" is used by two factions."
+msgstr "{MANIFEST_FILE}: {where} \"{fid}\" is used by two factions."
+
+#: src/conquest/handmade/manifest.ts
+msgid "{MANIFEST_FILE}: {where} \"{playerFaction}\" is not the id of a faction the player can pick."
+msgstr "{MANIFEST_FILE}: {where} \"{playerFaction}\" is not the id of a faction the player can pick."
+
+#: src/conquest/handmade/manifest.ts
+msgid "{MANIFEST_FILE}: {where} \"{unknownOwner}\" is not a faction id. Use one of: {owners}."
+msgstr "{MANIFEST_FILE}: {where} \"{unknownOwner}\" is not a faction id. Use one of: {owners}."
+
+#: src/conquest/handmade/manifest.ts
+msgid "{MANIFEST_FILE}: {where} cannot be \"{NEUTRAL}\", which means no owner."
+msgstr "{MANIFEST_FILE}: {where} cannot be \"{NEUTRAL}\", which means no owner."
+
+#: src/conquest/handmade/manifest.ts
+msgid "{MANIFEST_FILE}: {where} is \"{file}\", which is not a glTF model. The name must end in {extensions}."
+msgstr "{MANIFEST_FILE}: {where} is \"{file}\", which is not a glTF model. The name must end in {extensions}."
+
+#: src/conquest/handmade/manifest.ts
+msgid "{MANIFEST_FILE}: {where} is [{x}, {y}], which is outside the map ({mapWidth} by {mapHeight})."
+msgstr "{MANIFEST_FILE}: {where} is [{x}, {y}], which is outside the map ({mapWidth} by {mapHeight})."
+
+#: src/conquest/handmade/manifest.ts
+msgid "{MANIFEST_FILE}: {where} is {color}, the same as the background."
+msgstr "{MANIFEST_FILE}: {where} is {color}, the same as the background."
+
+#: src/conquest/handmade/manifest.ts
+msgid "{MANIFEST_FILE}: {where} is {found}, which is newer than this coilbox reads ({MANIFEST_FORMAT_VERSION}). Update coilbox to use this map."
+msgstr "{MANIFEST_FILE}: {where} is {found}, which is newer than this coilbox reads ({MANIFEST_FORMAT_VERSION}). Update coilbox to use this map."
+
+#: src/conquest/handmade/manifest.ts
+msgid "{MANIFEST_FILE}: {where} is empty, and the map needs at least one location."
+msgstr "{MANIFEST_FILE}: {where} is empty, and the map needs at least one location."
+
+#: src/conquest/handmade/manifest.ts
+msgid "{MANIFEST_FILE}: {where} is needed, because the name has no letters or digits to make one from."
+msgstr "{MANIFEST_FILE}: {where} is needed, because the name has no letters or digits to make one from."
+
+#: src/conquest/handmade/manifest.ts
+msgid "{MANIFEST_FILE}: {where} is not a model the map can place."
+msgstr "{MANIFEST_FILE}: {where} is not a model the map can place."
+
+#: src/conquest/handmade/manifest.ts
+msgid "{MANIFEST_FILE}: {where} is true, so the location needs an owner."
+msgstr "{MANIFEST_FILE}: {where} is true, so the location needs an owner."
+
+#: src/conquest/handmade/manifest.ts
+msgid "{MANIFEST_FILE}: {where} joins \"{name}\" to itself."
+msgstr "{MANIFEST_FILE}: {where} joins \"{name}\" to itself."
+
+#: src/conquest/handmade/manifest.ts
+msgid "{MANIFEST_FILE}: {where} may only use letters, digits and -."
+msgstr "{MANIFEST_FILE}: {where} may only use letters, digits and -."
+
+#: src/conquest/handmade/manifest.ts
+msgid "{MANIFEST_FILE}: {where} may only use letters, digits, - and _."
+msgstr "{MANIFEST_FILE}: {where} may only use letters, digits, - and _."
+
+#: src/conquest/handmade/manifest.ts
+msgid "{MANIFEST_FILE}: {where} must be {MANIFEST_FORMAT_VERSION}."
+msgstr "{MANIFEST_FILE}: {where} must be {MANIFEST_FORMAT_VERSION}."
+
+#: src/conquest/handmade/manifest.ts
+msgid "{MANIFEST_FILE}: {where} must be a colour such as #cc3333."
+msgstr "{MANIFEST_FILE}: {where} must be a colour such as #cc3333."
+
+#: src/conquest/handmade/manifest.ts
+msgid "{MANIFEST_FILE}: {where} must be a colour such as #ffffff."
+msgstr "{MANIFEST_FILE}: {where} must be a colour such as #ffffff."
+
+#: src/conquest/handmade/manifest.ts
+msgid "{MANIFEST_FILE}: {where} must be a list of models."
+msgstr "{MANIFEST_FILE}: {where} must be a list of models."
+
+#: src/conquest/handmade/manifest.ts
+msgid "{MANIFEST_FILE}: {where} must be a list of pairs of location ids."
+msgstr "{MANIFEST_FILE}: {where} must be a list of pairs of location ids."
+
+#: src/conquest/handmade/manifest.ts
+msgid "{MANIFEST_FILE}: {where} must be a list of point locations."
+msgstr "{MANIFEST_FILE}: {where} must be a list of point locations."
+
+#: src/conquest/handmade/manifest.ts
+msgid "{MANIFEST_FILE}: {where} must be a list of provinces."
+msgstr "{MANIFEST_FILE}: {where} must be a list of provinces."
+
+#: src/conquest/handmade/manifest.ts
+msgid "{MANIFEST_FILE}: {where} must be a list of unit names."
+msgstr "{MANIFEST_FILE}: {where} must be a list of unit names."
+
+#: src/conquest/handmade/manifest.ts
+msgid "{MANIFEST_FILE}: {where} must be a number above 0."
+msgstr "{MANIFEST_FILE}: {where} must be a number above 0."
+
+#: src/conquest/handmade/manifest.ts
+msgid "{MANIFEST_FILE}: {where} must be a number from 0 to 1."
+msgstr "{MANIFEST_FILE}: {where} must be a number from 0 to 1."
+
+#: src/conquest/handmade/manifest.ts
+msgid "{MANIFEST_FILE}: {where} must be a number."
+msgstr "{MANIFEST_FILE}: {where} must be a number."
+
+#: src/conquest/handmade/manifest.ts
+msgid "{MANIFEST_FILE}: {where} must be a pair of location ids such as [\"kent\", \"calais\"]."
+msgstr "{MANIFEST_FILE}: {where} must be a pair of location ids such as [\"kent\", \"calais\"]."
+
+#: src/conquest/handmade/manifest.ts
+msgid "{MANIFEST_FILE}: {where} must be a position such as [120, 340]."
+msgstr "{MANIFEST_FILE}: {where} must be a position such as [120, 340]."
+
+#: src/conquest/handmade/manifest.ts
+msgid "{MANIFEST_FILE}: {where} must be a whole number from {MIN_DIFFICULTY} to {MAX_DIFFICULTY}."
+msgstr "{MANIFEST_FILE}: {where} must be a whole number from {MIN_DIFFICULTY} to {MAX_DIFFICULTY}."
+
+#: src/conquest/handmade/manifest.ts
+msgid "{MANIFEST_FILE}: {where} must be a whole number from 0 to 300."
+msgstr "{MANIFEST_FILE}: {where} must be a whole number from 0 to 300."
+
+#: src/conquest/handmade/manifest.ts
+msgid "{MANIFEST_FILE}: {where} must be a whole number from 1 to 8."
+msgstr "{MANIFEST_FILE}: {where} must be a whole number from 1 to 8."
+
+#: src/conquest/handmade/manifest.ts
+msgid "{MANIFEST_FILE}: {where} must be a whole number, 0 or above."
+msgstr "{MANIFEST_FILE}: {where} must be a whole number, 0 or above."
+
+#: src/conquest/handmade/manifest.ts
+msgid "{MANIFEST_FILE}: {where} must be an object naming the picture and provinces files."
+msgstr "{MANIFEST_FILE}: {where} must be an object naming the picture and provinces files."
+
+#: src/conquest/handmade/manifest.ts
+msgid "{MANIFEST_FILE}: {where} must be an object such as {exampleBattle}."
+msgstr "{MANIFEST_FILE}: {where} must be an object such as {exampleBattle}."
+
+#: src/conquest/handmade/manifest.ts
+msgid "{MANIFEST_FILE}: {where} must be an object such as {exampleGame}."
+msgstr "{MANIFEST_FILE}: {where} must be an object such as {exampleGame}."
+
+#: src/conquest/handmade/manifest.ts
+msgid "{MANIFEST_FILE}: {where} must be an object such as {exampleKind}."
+msgstr "{MANIFEST_FILE}: {where} must be an object such as {exampleKind}."
+
+#: src/conquest/handmade/manifest.ts
+msgid "{MANIFEST_FILE}: {where} must be an object such as {exampleModel}."
+msgstr "{MANIFEST_FILE}: {where} must be an object such as {exampleModel}."
+
+#: src/conquest/handmade/manifest.ts
+msgid "{MANIFEST_FILE}: {where} must be an object such as {exampleSize}."
+msgstr "{MANIFEST_FILE}: {where} must be an object such as {exampleSize}."
+
+#: src/conquest/handmade/manifest.ts
+msgid "{MANIFEST_FILE}: {where} must be an object such as {exampleWarpath}."
+msgstr "{MANIFEST_FILE}: {where} must be an object such as {exampleWarpath}."
+
+#: src/conquest/handmade/manifest.ts
+msgid "{MANIFEST_FILE}: {where} must be an object."
+msgstr "{MANIFEST_FILE}: {where} must be an object."
+
+#: src/conquest/handmade/manifest.ts
+msgid "{MANIFEST_FILE}: {where} must be text and cannot be empty."
+msgstr "{MANIFEST_FILE}: {where} must be text and cannot be empty."
+
+#: src/conquest/handmade/manifest.ts
+msgid "{MANIFEST_FILE}: {where} must be text."
+msgstr "{MANIFEST_FILE}: {where} must be text."
+
+#: src/conquest/handmade/manifest.ts
+msgid "{MANIFEST_FILE}: {where} must be the name of a .json scenario file inside the map folder."
+msgstr "{MANIFEST_FILE}: {where} must be the name of a .json scenario file inside the map folder."
+
+#: src/conquest/handmade/manifest.ts
+msgid "{MANIFEST_FILE}: {where} must be the name of a file inside the map folder."
+msgstr "{MANIFEST_FILE}: {where} must be the name of a file inside the map folder."
+
+#: src/conquest/handmade/manifest.ts
+msgid "{MANIFEST_FILE}: {where} must be the name of a map. Leave the whole battle out to have one picked."
+msgstr "{MANIFEST_FILE}: {where} must be the name of a map. Leave the whole battle out to have one picked."
+
+#: src/conquest/handmade/manifest.ts
+msgid "{MANIFEST_FILE}: {where} must be true or false."
+msgstr "{MANIFEST_FILE}: {where} must be true or false."
+
+#: src/conquest/handmade/manifest.ts
+msgid "{MANIFEST_FILE}: {where} must have a springName or a searchUrl."
+msgstr "{MANIFEST_FILE}: {where} must have a springName or a searchUrl."
+
+#: src/conquest/handmade/manifest.ts
+msgid "{MANIFEST_FILE}: {where} must have at least one faction the player can pick."
+msgstr "{MANIFEST_FILE}: {where} must have at least one faction the player can pick."
+
+#: src/conquest/handmade/manifest.ts
+msgid "{MANIFEST_FILE}: {where} must list at least one faction."
+msgstr "{MANIFEST_FILE}: {where} must list at least one faction."
+
+#: src/conquest/handmade/manifest.ts
+msgid "{MANIFEST_FILE}: {where} must map option names to text values."
+msgstr "{MANIFEST_FILE}: {where} must map option names to text values."
+
+#: src/conquest/handmade/manifest.ts
+msgid "{MANIFEST_FILE}: {where} must name one model: {exampleFile} for a file in the map folder, or {exampleGameModel} for a model the game has."
+msgstr "{MANIFEST_FILE}: {where} must name one model: {exampleFile} for a file in the map folder, or {exampleGameModel} for a model the game has."
+
+#: src/conquest/handmade/library.ts
+msgid "{MANIFEST_FILE}: models[{i}] names the model \"{file}\", which needs the file \"{path}\", but the folder has no file with that name."
+msgstr "{MANIFEST_FILE}: models[{i}] names the model \"{file}\", which needs the file \"{path}\", but the folder has no file with that name."
+
+#: src/conquest/handmade/library.ts
+msgid "{MANIFEST_FILE}: models[{i}] names the model \"{file}\", which points at \"{path}\" outside the map folder. Put the file in the folder and point at it there."
+msgstr "{MANIFEST_FILE}: models[{i}] names the model \"{file}\", which points at \"{path}\" outside the map folder. Put the file in the folder and point at it there."
+
+#: src/conquest/handmade/read.ts
+msgid "{MANIFEST_FILE}: models[{i}] names the model file \"{file}\", but the folder has no file with that name."
+msgstr "{MANIFEST_FILE}: models[{i}] names the model file \"{file}\", but the folder has no file with that name."
+
+#: src/conquest/handmade/library.ts
+msgid "{MANIFEST_FILE}: the game shortname \"{mapShortname}\" is not \"{gameShortname}\", the shortname of the game that carries the map."
+msgstr "{MANIFEST_FILE}: the game shortname \"{mapShortname}\" is not \"{gameShortname}\", the shortname of the game that carries the map."
+
+#: src/conquest/handmade/library.ts
+msgid "{MANIFEST_FILE}: the id \"{mapId}\" does not match the folder \"{folder}\" the map is stored in."
+msgstr "{MANIFEST_FILE}: the id \"{mapId}\" does not match the folder \"{folder}\" the map is stored in."
+
+#: src/conquest/handmade/manifest.ts
+msgid "{MANIFEST_FILE}: the Warpath start and goal are both \"{sameName}\". They must be different locations."
+msgstr "{MANIFEST_FILE}: the Warpath start and goal are both \"{sameName}\". They must be different locations."
+
+#: src/conquest/handmade/manifest.ts
+msgid "{MANIFEST_FILE}: warpath has a goal and no start. Warpath needs both. Add warpath.start, or remove warpath.goal to offer the map in Conquest only."
+msgstr "{MANIFEST_FILE}: warpath has a goal and no start. Warpath needs both. Add warpath.start, or remove warpath.goal to offer the map in Conquest only."
+
+#: src/conquest/handmade/manifest.ts
+msgid "{MANIFEST_FILE}: warpath has a start and no goal. Warpath needs both. Add warpath.goal, or remove warpath.start to offer the map in Conquest only."
+msgstr "{MANIFEST_FILE}: warpath has a start and no goal. Warpath needs both. Add warpath.goal, or remove warpath.start to offer the map in Conquest only."
+
+#: src/conquest/handmade/manifest.ts
+msgid "{MANIFEST_FILE}: warpath.{end} names \"{endId}\", which is not the id of any location."
+msgstr "{MANIFEST_FILE}: warpath.{end} names \"{endId}\", which is not the id of any location."
+
 #: src/workshop/pages/components/DerivedStatsStrip.tsx
 msgid "{manualText} and {slavedText}"
 msgstr "{manualText} and {slavedText}"
+
+#: src/conquest/unlocks.ts
+msgid "{many, select, systems {Colossal (120 systems)} locations {Colossal (120 locations)} cities {Colossal (120 cities)} provinces {Colossal (120 provinces)} other {Colossal (120 {many})}}"
+msgstr "{many, select, systems {Colossal (120 systems)} locations {Colossal (120 locations)} cities {Colossal (120 cities)} provinces {Colossal (120 provinces)} other {Colossal (120 {many})}}"
+
+#: src/conquest/unlocks.ts
+msgid "{many, select, systems {Immense (80 systems)} locations {Immense (80 locations)} cities {Immense (80 cities)} provinces {Immense (80 provinces)} other {Immense (80 {many})}}"
+msgstr "{many, select, systems {Immense (80 systems)} locations {Immense (80 locations)} cities {Immense (80 cities)} provinces {Immense (80 provinces)} other {Immense (80 {many})}}"
+
+#: src/conquest/unlocks.ts
+msgid "{many, select, systems {Large (28 systems)} locations {Large (28 locations)} cities {Large (28 cities)} provinces {Large (28 provinces)} other {Large (28 {many})}}"
+msgstr "{many, select, systems {Large (28 systems)} locations {Large (28 locations)} cities {Large (28 cities)} provinces {Large (28 provinces)} other {Large (28 {many})}}"
+
+#: src/conquest/unlocks.ts
+msgid "{many, select, systems {Medium (18 systems)} locations {Medium (18 locations)} cities {Medium (18 cities)} provinces {Medium (18 provinces)} other {Medium (18 {many})}}"
+msgstr "{many, select, systems {Medium (18 systems)} locations {Medium (18 locations)} cities {Medium (18 cities)} provinces {Medium (18 provinces)} other {Medium (18 {many})}}"
+
+#: src/conquest/unlocks.ts
+msgid "{many, select, systems {Small (12 systems)} locations {Small (12 locations)} cities {Small (12 cities)} provinces {Small (12 provinces)} other {Small (12 {many})}}"
+msgstr "{many, select, systems {Small (12 systems)} locations {Small (12 locations)} cities {Small (12 cities)} provinces {Small (12 provinces)} other {Small (12 {many})}}"
+
+#: src/conquest/unlocks.ts
+msgid "{many, select, systems {Sprawling (40 systems)} locations {Sprawling (40 locations)} cities {Sprawling (40 cities)} provinces {Sprawling (40 provinces)} other {Sprawling (40 {many})}}"
+msgstr "{many, select, systems {Sprawling (40 systems)} locations {Sprawling (40 locations)} cities {Sprawling (40 cities)} provinces {Sprawling (40 provinces)} other {Sprawling (40 {many})}}"
+
+#: src/conquest/unlocks.ts
+msgid "{many, select, systems {Titanic (160 systems)} locations {Titanic (160 locations)} cities {Titanic (160 cities)} provinces {Titanic (160 provinces)} other {Titanic (160 {many})}}"
+msgstr "{many, select, systems {Titanic (160 systems)} locations {Titanic (160 locations)} cities {Titanic (160 cities)} provinces {Titanic (160 provinces)} other {Titanic (160 {many})}}"
+
+#: src/conquest/unlocks.ts
+msgid "{many, select, systems {Vast (56 systems)} locations {Vast (56 locations)} cities {Vast (56 cities)} provinces {Vast (56 provinces)} other {Vast (56 {many})}}"
+msgstr "{many, select, systems {Vast (56 systems)} locations {Vast (56 locations)} cities {Vast (56 cities)} provinces {Vast (56 provinces)} other {Vast (56 {many})}}"
 
 #: src/multiplayer/pages/MatchmakingPage.tsx
 #: src/packs/pages/components/ImportPackForm.tsx
@@ -2703,6 +3091,18 @@ msgstr "{next}m"
 #: src/content/pages/components/ReplayEventLayers.tsx
 msgid "{noAttacker, plural, one {# death has no attacker recorded, such as a cancelled build, and is counted like the rest.} other {# deaths have no attacker recorded, such as a cancelled build, and are counted like the rest.}}"
 msgstr "{noAttacker, plural, one {# death has no attacker recorded, such as a cancelled build, and is counted like the rest.} other {# deaths have no attacker recorded, such as a cancelled build, and are counted like the rest.}}"
+
+#: src/conquest/pages/components/BattleOverlay.tsx
+msgid "{nodeName} has fallen."
+msgstr "{nodeName} has fallen."
+
+#: src/conquest/pages/components/BattleOverlay.tsx
+msgid "{nodeName} is yours."
+msgstr "{nodeName} is yours."
+
+#: src/conquest/pages/components/BattleOverlay.tsx
+msgid "{nodeName} vs {opponentName}"
+msgstr "{nodeName} vs {opponentName}"
 
 #: src/content/pages/components/MapRecords.tsx
 msgid "{noLength, plural, one {# match has no length in the replay's header and is left out of it.} other {# matches have no length in the replay's header and are left out of it.}}"
@@ -3219,6 +3619,10 @@ msgstr "{secs} s"
 msgid "{selectedCount} of {totalCount} {selectedWord}"
 msgstr "{selectedCount} of {totalCount} {selectedWord}"
 
+#: src/conquest/pages/ConquestListPage.tsx
+msgid "{selectedName} plays Conquest only on the maps the game carries. Pick one from the Conquest list."
+msgstr "{selectedName} plays Conquest only on the maps the game carries. Pick one from the Conquest list."
+
 #: src/hub/uploadOutcomes.ts
 msgid "{sent, plural, =0 {Nothing had been sent, so nothing was added to the hub.} one {One picture had already gone, and it stays on the hub.} other {# pictures had already gone, and they stay on the hub.}}"
 msgstr "{sent, plural, =0 {Nothing had been sent, so nothing was added to the hub.} one {One picture had already gone, and it stays on the hub.} other {# pictures had already gone, and they stay on the hub.}}"
@@ -3280,6 +3684,10 @@ msgstr "{short, plural, one {# match under a minute is left out too.} other {# m
 msgid "{short, plural, one {# match under a minute is left out.} other {# matches under a minute are left out.}}"
 msgstr "{short, plural, one {# match under a minute is left out.} other {# matches under a minute are left out.}}"
 
+#: src/conquest/pages/ConquestListPage.tsx
+msgid "{shortname} · Hand-made map"
+msgstr "{shortname} · Hand-made map"
+
 #: src/home/continue.ts
 msgid "{shortname} · health {hull}/{maxHull}"
 msgstr "{shortname} · health {hull}/{maxHull}"
@@ -3325,6 +3733,22 @@ msgstr "{sideName} has no start unit in {gameName}, so coilbox cannot limit your
 #: src/scenario/pages/components/triggers.ts
 msgid "{size, plural, one {# unit} other {# units}}"
 msgstr "{size, plural, one {# unit} other {# units}}"
+
+#: src/conquest/pages/components/BattleOverlay.tsx
+msgid "{skin, select, galaxy {Lose this defence and the system falls — it is your capital.} theatre {Lose this defence and the location falls — it is your capital.} cities {Lose this defence and the city falls — it is your capital.} territories {Lose this defence and the province falls — it is your capital.} other {Lose this defence and the location falls — it is your capital.}}"
+msgstr "{skin, select, galaxy {Lose this defence and the system falls — it is your capital.} theatre {Lose this defence and the location falls — it is your capital.} cities {Lose this defence and the city falls — it is your capital.} territories {Lose this defence and the province falls — it is your capital.} other {Lose this defence and the location falls — it is your capital.}}"
+
+#: src/conquest/pages/components/BattleOverlay.tsx
+msgid "{skin, select, galaxy {Lose this defence and the system falls.} theatre {Lose this defence and the location falls.} cities {Lose this defence and the city falls.} territories {Lose this defence and the province falls.} other {Lose this defence and the location falls.}}"
+msgstr "{skin, select, galaxy {Lose this defence and the system falls.} theatre {Lose this defence and the location falls.} cities {Lose this defence and the city falls.} territories {Lose this defence and the province falls.} other {Lose this defence and the location falls.}}"
+
+#: src/conquest/pages/GalaxyPage.tsx
+msgid "{skin, select, galaxy {Out of reach — capture an adjacent system first.} theatre {Out of reach — capture an adjacent location first.} cities {Out of reach — capture an adjacent city first.} territories {Out of reach — capture an adjacent province first.} other {Out of reach — capture an adjacent location first.}}"
+msgstr "{skin, select, galaxy {Out of reach — capture an adjacent system first.} theatre {Out of reach — capture an adjacent location first.} cities {Out of reach — capture an adjacent city first.} territories {Out of reach — capture an adjacent province first.} other {Out of reach — capture an adjacent location first.}}"
+
+#: src/conquest/pages/ConquestListPage.tsx
+msgid "{skipped, plural, one {# file in the zip was left out, because a map does not use it.} other {# files in the zip were left out, because a map does not use them.}}"
+msgstr "{skipped, plural, one {# file in the zip was left out, because a map does not use it.} other {# files in the zip were left out, because a map does not use them.}}"
 
 #: src/content/pages/components/BulkDeleteReplaysPanel.tsx
 msgid "{skippedCount} could not be deleted: {firstSkipped}"
@@ -3429,6 +3853,38 @@ msgstr "{strayCount, plural, one {{strayList} is not a building in this game, so
 #: src/content/pages/StatsPage.tsx
 msgid "{streak, plural, one {# win} other {# wins}}"
 msgstr "{streak, plural, one {# win} other {# wins}}"
+
+#: src/conquest/pages/ConquestListPage.tsx
+msgid "{style, select, galaxy {{count, plural, one {# system} other {# systems}}} theatre {{count, plural, one {# location} other {# locations}}} cities {{count, plural, one {# city} other {# cities}}} territories {{count, plural, one {# province} other {# provinces}}} other {{count, plural, one {# location} other {# locations}}}}"
+msgstr "{style, select, galaxy {{count, plural, one {# system} other {# systems}}} theatre {{count, plural, one {# location} other {# locations}}} cities {{count, plural, one {# city} other {# cities}}} territories {{count, plural, one {# province} other {# provinces}}} other {{count, plural, one {# location} other {# locations}}}}"
+
+#: src/conquest/pages/ConquestListPage.tsx
+msgid "{style, select, galaxy {{count, plural, one {Capped at # named system.} other {Capped at # named systems.}}} theatre {{count, plural, one {Capped at # named location.} other {Capped at # named locations.}}} cities {{count, plural, one {Capped at # named city.} other {Capped at # named cities.}}} territories {{count, plural, one {Capped at # named province.} other {Capped at # named provinces.}}} other {{count, plural, one {Capped at # named location.} other {Capped at # named locations.}}}}"
+msgstr "{style, select, galaxy {{count, plural, one {Capped at # named system.} other {Capped at # named systems.}}} theatre {{count, plural, one {Capped at # named location.} other {Capped at # named locations.}}} cities {{count, plural, one {Capped at # named city.} other {Capped at # named cities.}}} territories {{count, plural, one {Capped at # named province.} other {Capped at # named provinces.}}} other {{count, plural, one {Capped at # named location.} other {Capped at # named locations.}}}}"
+
+#: src/conquest/pages/ConquestListPage.tsx
+msgid "{style, select, galaxy {Capital + 1 system} theatre {Capital + 1 location} cities {Capital + 1 city} territories {Capital + 1 province} other {Capital + 1 location}}"
+msgstr "{style, select, galaxy {Capital + 1 system} theatre {Capital + 1 location} cities {Capital + 1 city} territories {Capital + 1 province} other {Capital + 1 location}}"
+
+#: src/conquest/pages/ConquestListPage.tsx
+msgid "{style, select, galaxy {Capital + 2 systems} theatre {Capital + 2 locations} cities {Capital + 2 cities} territories {Capital + 2 provinces} other {Capital + 2 locations}}"
+msgstr "{style, select, galaxy {Capital + 2 systems} theatre {Capital + 2 locations} cities {Capital + 2 cities} territories {Capital + 2 provinces} other {Capital + 2 locations}}"
+
+#: src/conquest/pages/ConquestListPage.tsx
+msgid "{style, select, galaxy {Capital + 3 systems} theatre {Capital + 3 locations} cities {Capital + 3 cities} territories {Capital + 3 provinces} other {Capital + 3 locations}}"
+msgstr "{style, select, galaxy {Capital + 3 systems} theatre {Capital + 3 locations} cities {Capital + 3 cities} territories {Capital + 3 provinces} other {Capital + 3 locations}}"
+
+#: src/conquest/pages/ConquestListPage.tsx
+msgid "{style, select, galaxy {Hide systems more than two jumps from your territory.} theatre {Hide locations more than two moves from your territory.} cities {Hide cities more than two moves from your territory.} territories {Hide provinces more than two moves from your territory.} other {Hide locations more than two moves from your territory.}}"
+msgstr "{style, select, galaxy {Hide systems more than two jumps from your territory.} theatre {Hide locations more than two moves from your territory.} cities {Hide cities more than two moves from your territory.} territories {Hide provinces more than two moves from your territory.} other {Hide locations more than two moves from your territory.}}"
+
+#: src/conquest/mapStyle.ts
+msgid "{style, select, galaxy {system} theatre {location} cities {city} territories {province} other {location}}"
+msgstr "{style, select, galaxy {system} theatre {location} cities {city} territories {province} other {location}}"
+
+#: src/conquest/mapStyle.ts
+msgid "{style, select, galaxy {systems} theatre {locations} cities {cities} territories {provinces} other {locations}}"
+msgstr "{style, select, galaxy {systems} theatre {locations} cities {cities} territories {provinces} other {locations}}"
 
 #: src/multiplayer/battle/VotePanel.tsx
 msgid "{subject} · by {caller}"
@@ -4015,6 +4471,14 @@ msgstr "{what} selected"
 msgid "{when} · {doing}"
 msgstr "{when} · {doing}"
 
+#: src/conquest/handmade/archive.ts
+msgid "{where} is not valid JSON, so its settings are not used."
+msgstr "{where} is not valid JSON, so its settings are not used."
+
+#: src/conquest/handmade/archive.ts
+msgid "{where} must hold an object such as {exampleSettings}."
+msgstr "{where} must hold an object such as {exampleSettings}."
+
 #: src/scenario/pages/components/mapKeyboard.ts
 msgid "{where}, {def}"
 msgstr "{where}, {def}"
@@ -4022,6 +4486,10 @@ msgstr "{where}, {def}"
 #: src/scenario/validate.ts
 msgid "{where}: {message}"
 msgstr "{where}: {message}"
+
+#: src/conquest/handmade/archive.ts
+msgid "{where}: onlyOwnMaps must be true or false."
+msgstr "{where}: onlyOwnMaps must be true or false."
 
 #: src/downloads/failureReason.ts
 msgid "{who} answered {code} for {file}"
@@ -4273,6 +4741,10 @@ msgstr "+{cacheSalvage} salvage"
 msgid "+{incomePercent}% income"
 msgstr "+{incomePercent}% income"
 
+#: src/conquest/pages/GalaxyPage.tsx
+msgid "+{more} more"
+msgstr "+{more} more"
+
 #: src/play/pages/components/ParticipantsTable.tsx
 msgid "+{n}%"
 msgstr "+{n}%"
@@ -4337,6 +4809,10 @@ msgstr "<0>{buildingDef}</0> builds nothing in this game, so nothing queued on i
 #: src/workshop/pages/components/CloneActions.tsx
 msgid "<0>{cloneKey}</0> is already the game's {replacedName}. Your copy takes its place, and the game's own version is not in the tweak at all."
 msgstr "<0>{cloneKey}</0> is already the game's {replacedName}. Your copy takes its place, and the game's own version is not in the tweak at all."
+
+#: src/conquest/pages/components/BattleOverlayParts.tsx
+msgid "<0>{gameName}</0> depends on it."
+msgstr "<0>{gameName}</0> depends on it."
 
 #: src/multiplayer/battle/MissingContentCard.tsx
 msgid "<0>{gameName}</0> isn't installed — download it to join, or rescan if it's already on disk."
@@ -4615,6 +5091,10 @@ msgstr "A coilbox remix — rewritten to run on a local build. Doesn't count tow
 msgid "A collection"
 msgstr "A collection"
 
+#: src/conquest/pages/ConquestListPage.tsx
+msgid "A conquest in progress on it is kept and carries on with the new map."
+msgstr "A conquest in progress on it is kept and carries on with the new map."
+
 #: src/workshop/pages/components/CloneInPlaceNotice.tsx
 msgid "A copy is written as a file or not at all, so this sends the whole copy through the mutator route rather than only the change above. The in-place write then skips it and lists it as still needing a mutator."
 msgstr "A copy is written as a file or not at all, so this sends the whole copy through the mutator route rather than only the change above. The in-place write then skips it and lists it as still needing a mutator."
@@ -4703,6 +5183,10 @@ msgstr "A folder is read-only"
 msgid "A game against several different AIs shows on each one's row. Games from campaign, Conquest and Warpath are not counted."
 msgstr "A game against several different AIs shows on each one's row. Games from campaign, Conquest and Warpath are not counted."
 
+#: src/conquest/pages/components/BattleOverlayParts.tsx
+msgid "A game is already running"
+msgstr "A game is already running"
+
 #: src/multiplayer/matchmaking.ts
 msgid "A game is already running, so accepting this match would start a second one."
 msgstr "A game is already running, so accepting this match would start a second one."
@@ -4783,6 +5267,10 @@ msgstr "A login needs a username."
 #: src/multiplayer/store.tsx
 msgid "A login to {where} as {who} is already opening. Wait for that one to finish."
 msgstr "A login to {where} as {who} is already opening. Wait for that one to finish."
+
+#: src/conquest/pages/ConquestListPage.tsx
+msgid "A map called \"{existingTitle}\" is already installed. Replace it with the one in this zip?"
+msgstr "A map called \"{existingTitle}\" is already installed. Replace it with the one in this zip?"
 
 #: src/runlite/mapRun.ts
 msgid "A map needs both a start and a goal, or neither of them."
@@ -5100,6 +5588,10 @@ msgstr "A veteran garrison — tougher, but the salvage is richer."
 msgid "A vote is open in your battle."
 msgstr "A vote is open in your battle."
 
+#: src/conquest/handmade/read.ts
+msgid "A Warpath run cannot get from the start {start} to the goal {goal}. Join them with a crossing or a road in {MANIFEST_FILE}, or paint the land between them so it touches."
+msgstr "A Warpath run cannot get from the start {start} to the goal {goal}. Join them with a crossing or a road in {MANIFEST_FILE}, or paint the land between them so it touches."
+
 #: src/workshop/weaponSlots.ts
 msgid "A weapon definition {unitName} carries and no slot mounts. {named} A change here reaches no other unit."
 msgstr "A weapon definition {unitName} carries and no slot mounts. {named} A change here reaches no other unit."
@@ -5125,14 +5617,47 @@ msgstr "a zone that is gone"
 msgid "Abandon"
 msgstr "Abandon"
 
+#: src/conquest/pages/ConquestListPage.tsx
+msgid "Abandon {galaxyTitle}"
+msgstr "Abandon {galaxyTitle}"
+
+#: src/conquest/pages/ConquestListPage.tsx
+msgid "Abandon {mapTitle}"
+msgstr "Abandon {mapTitle}"
+
 #: src/runlite/pages/RunListPage.tsx
 msgid "Abandon {runName}?"
 msgstr "Abandon {runName}?"
+
+#: src/conquest/pages/ConquestListPage.tsx
+msgid "Abandon {title}"
+msgstr "Abandon {title}"
+
+#: src/conquest/pages/ConquestListPage.tsx
+msgid "Abandon conquest"
+msgstr "Abandon conquest"
+
+#: src/conquest/pages/ConquestListPage.tsx
+msgid "Abandon the conquest on {galaxyTitle}?"
+msgstr "Abandon the conquest on {galaxyTitle}?"
+
+#: src/conquest/pages/ConquestListPage.tsx
+msgid "Abandon the conquest on {mapTitle}?"
+msgstr "Abandon the conquest on {mapTitle}?"
+
+#: src/conquest/pages/ConquestListPage.tsx
+msgid "Abandon the conquest on {title}?"
+msgstr "Abandon the conquest on {title}?"
+
+#: src/conquest/pages/ConquestListPage.tsx
+msgid "Abandon this campaign"
+msgstr "Abandon this campaign"
 
 #: src/runlite/pages/RunListPage.tsx
 msgid "Abandon warpath"
 msgstr "Abandon warpath"
 
+#: src/conquest/pages/ConquestListPage.tsx
 #: src/runlite/pages/RunListPage.tsx
 msgid "Abandoning…"
 msgstr "Abandoning…"
@@ -5252,6 +5777,10 @@ msgstr "Accuracy gain from XP"
 #: src/content/pages/components/AchievementsSection.tsx
 msgid "Achievements"
 msgstr "Achievements"
+
+#: src/conquest/planets.ts
+msgid "Acid"
+msgstr "Acid"
 
 #: src/content/pages/components/VersionList.tsx
 msgid "Across {count} versions of this map"
@@ -6234,9 +6763,17 @@ msgstr "Any sides"
 msgid "Anyone browsing the hub will be able to find and import this."
 msgstr "Anyone browsing the hub will be able to find and import this."
 
+#: src/conquest/pages/ConquestListPage.tsx
+msgid "Anyone who pastes this code into Import challenge (needs the same game installed) plays the identical map, so results are directly comparable."
+msgstr "Anyone who pastes this code into Import challenge (needs the same game installed) plays the identical map, so results are directly comparable."
+
 #: src/runlite/pages/RunListPage.tsx
 msgid "Anyone who pastes this code into Import challenge (needs the same game installed) plays the identical warpath, so results are directly comparable."
 msgstr "Anyone who pastes this code into Import challenge (needs the same game installed) plays the identical warpath, so results are directly comparable."
+
+#: src/conquest/pages/ConquestListPage.tsx
+msgid "Anyone who pastes this code into Import challenge plays this map with the same settings, so results are directly comparable. They need the same game and the same version of this map installed. The code does not carry the map."
+msgstr "Anyone who pastes this code into Import challenge plays this map with the same settings, so results are directly comparable. They need the same game and the same version of this map installed. The code does not carry the map."
 
 #: src/packs/pages/components/ExportPackForm.tsx
 msgid "Anyone who pastes this into Import setup pack gets its games and maps offered as downloads (or confirmed already installed), plus any presets and blueprints you included."
@@ -6333,6 +6870,10 @@ msgstr "Arbitrary key and value pairs the engine ignores. Only the game's own Lu
 msgid "Arc of fire"
 msgstr "Arc of fire"
 
+#: src/conquest/pages/ConquestListPage.tsx
+msgid "Archipelago"
+msgstr "Archipelago"
+
 #: src/content/pages/ArchiveDetailPage.tsx
 #: src/content/pages/ArchiveReplPage.tsx
 #: src/content/pages/components/ResolveContentDrawer.tsx
@@ -6355,6 +6896,10 @@ msgstr "Archive missing"
 #: src/content/gameDependencies.ts
 msgid "Archive not installed: {archive}. {gameName} depends on it."
 msgstr "Archive not installed: {archive}. {gameName} depends on it."
+
+#: src/conquest/pages/components/BattleOverlayParts.tsx
+msgid "Archive not installed: <0>{missingName}</0>"
+msgstr "Archive not installed: <0>{missingName}</0>"
 
 #: src/content/index.ts
 #: src/content/pages/ArchiveDetailPage.tsx
@@ -6511,6 +7056,10 @@ msgstr "Assets"
 msgid "Assigns a terrain type per pixel (each pixel value is an index into the map's terrain types, which set speed/hardness for units)."
 msgstr "Assigns a terrain type per pixel (each pixel value is an index into the map's terrain types, which set speed/hardness for units)."
 
+#: src/conquest/galaxy3d/bodies.ts
+msgid "asteroid field"
+msgstr "asteroid field"
+
 #: src/content/replayAnalysisEvents.ts
 msgid "at"
 msgstr "at"
@@ -6527,9 +7076,14 @@ msgstr "at least"
 msgid "at most"
 msgstr "at most"
 
+#: src/conquest/pages/GalaxyPage.tsx
 #: src/scenario/pages/components/GroupControls.tsx
 msgid "Attack"
 msgstr "Attack"
+
+#: src/conquest/pages/components/BattleOverlay.tsx
+msgid "Attack {nodeName}"
+msgstr "Attack {nodeName}"
 
 #: src/content/replayAnalysisEvents.ts
 msgid "attacker"
@@ -6591,9 +7145,14 @@ msgstr "Automatic"
 msgid "Autosave {when}"
 msgstr "Autosave {when}"
 
+#: src/conquest/pages/components/BattleOverlay.tsx
 #: src/mapconv/pages/SettingsSection.tsx
 msgid "available"
 msgstr "available"
+
+#: src/conquest/pages/components/BattleOverlay.tsx
+msgid "Available units"
+msgstr "Available units"
 
 #: src/content/pages/ReplaysPage.tsx
 msgid "Average non-spectator player skill, with the min-max range below"
@@ -6648,10 +7207,16 @@ msgstr "Back one frame"
 msgid "Back to all packs"
 msgstr "Back to all packs"
 
+#: src/conquest/pages/GalaxyPage.tsx
+msgid "Back to Conquest"
+msgstr "Back to Conquest"
+
 #: src/content/replayProvenanceLink.ts
 msgid "Back to conquest map"
 msgstr "Back to conquest map"
 
+#: src/conquest/pages/components/BackToMapButton.tsx
+#: src/conquest/pages/components/BattleOverlay.tsx
 #: src/runlite/pages/components/EncounterOverlay.tsx
 #: src/runlite/pages/components/NodeOverlays.tsx
 #: src/runlite/pages/RunPage.tsx
@@ -6683,6 +7248,10 @@ msgstr "Back to the battle form"
 #: src/workshop/pages/components/DecodeTweakSetDrawer.tsx
 msgid "Back to the decoded payload"
 msgstr "Back to the decoded payload"
+
+#: src/conquest/pages/ConquestListPage.tsx
+msgid "Back to the map form"
+msgstr "Back to the map form"
 
 #: src/placement/PlacementSurface.tsx
 msgid "Back to the page (Esc)"
@@ -6913,6 +7482,7 @@ msgstr "Battle founder"
 msgid "Battle founder (optional)"
 msgstr "Battle founder (optional)"
 
+#: src/conquest/pages/GalaxyPage.tsx
 #: src/runlite/pages/RunPage.tsx
 msgid "Battle history"
 msgstr "Battle history"
@@ -6930,6 +7500,8 @@ msgstr "Battle password"
 msgid "Battle Room"
 msgstr "Battle Room"
 
+#: src/conquest/pages/components/BattleOverlay.tsx
+#: src/conquest/pages/GalaxyPage.tsx
 #: src/runlite/pages/components/EncounterOverlay.tsx
 msgid "Battlefield"
 msgstr "Battlefield"
@@ -7067,6 +7639,10 @@ msgstr "Before this project's edits: {gameValue}"
 msgid "Before this project's edits: {gameValue} ({change})"
 msgstr "Before this project's edits: {gameValue} ({change})"
 
+#: src/conquest/pages/GalaxyPage.tsx
+msgid "Begin conquest"
+msgstr "Begin conquest"
+
 #: src/runlite/pages/components/RunSetupForm.tsx
 msgid "Begin warpath"
 msgstr "Begin warpath"
@@ -7124,6 +7700,10 @@ msgstr "Best-effort by name — a download may not be an exact match. See <0>Con
 msgid "Between two minutes"
 msgstr "Between two minutes"
 
+#: src/conquest/galaxy3d/GalaxyView.tsx
+msgid "binary pair — {primary} + {companion}"
+msgstr "binary pair — {primary} + {companion}"
+
 #: src/content/pages/KeybindsSection.tsx
 msgid "Bindings a game brings with it:"
 msgstr "Bindings a game brings with it:"
@@ -7159,6 +7739,10 @@ msgstr "Blocks the ground"
 #: src/i18n/frameStrings.ts
 msgid "Blue"
 msgstr "Blue"
+
+#: src/conquest/galaxy3d/GalaxyView.tsx
+msgid "blue giant"
+msgstr "blue giant"
 
 #: src/scenario/validate.ts
 msgid "Blueprint"
@@ -7341,6 +7925,10 @@ msgstr "Broadcast"
 msgid "Broadcast (dialog)"
 msgstr "Broadcast (dialog)"
 
+#: src/conquest/galaxy3d/GalaxyView.tsx
+msgid "brown dwarf"
+msgstr "brown dwarf"
+
 #: src/mapconv/pages/components/PathField.tsx
 #: src/workshop/pages/components/UnitFieldRow.tsx
 msgid "Browse"
@@ -7366,6 +7954,10 @@ msgstr "Browse for {label}"
 #: src/workshop/pages/components/UnitFieldRow.tsx
 msgid "Browse for {rowLabel}"
 msgstr "Browse for {rowLabel}"
+
+#: src/conquest/pages/ConquestListPage.tsx
+msgid "Browse games to download"
+msgstr "Browse games to download"
 
 #: src/downloads/pages/ExplorerPage.tsx
 msgid "Browse Spring/Recoil rapid content and download a tag through the bundled sidecar."
@@ -7524,9 +8116,14 @@ msgstr "building orders"
 msgid "Building sound"
 msgstr "Building sound"
 
+#: src/conquest/pages/GalaxyPage.tsx
 #: src/runlite/RunMapView.tsx
 msgid "Building the land…"
 msgstr "Building the land…"
+
+#: src/conquest/pages/ConquestListPage.tsx
+msgid "Building the preview…"
+msgstr "Building the preview…"
 
 #: src/content/pages/components/Convert3doDrawer.tsx
 msgid "Building the sheet for {folder}"
@@ -7604,6 +8201,7 @@ msgstr "Bumped from {bumpedFrom} automatically. Two players on different builds 
 msgid "Bundle or download the game archive (.sdz/.sd7). {scanned}"
 msgstr "Bundle or download the game archive (.sdz/.sd7). {scanned}"
 
+#: src/conquest/pages/ConquestListPage.tsx
 #: src/downloads/activityRows.ts
 #: src/scenario/pages/components/scenarioList.ts
 #: src/scenario/pages/ScenarioBuilderPage.tsx
@@ -7614,6 +8212,10 @@ msgstr "Bundled"
 #: src/profile/health.ts
 msgid "Bundled content: {summary}"
 msgstr "Bundled content: {summary}"
+
+#: src/conquest/pages/ConquestListPage.tsx
+msgid "Bundled map folder \"{folder}\""
+msgstr "Bundled map folder \"{folder}\""
 
 #: src/content/pages/components/RootCard.tsx
 msgid "bundled, read only"
@@ -7938,6 +8540,18 @@ msgstr "Cannot follow {name}"
 msgid "Cannot launch without unit data"
 msgstr "Cannot launch without unit data"
 
+#: src/conquest/pages/GalaxyPage.tsx
+msgid "Capital"
+msgstr "Capital"
+
+#: src/conquest/pages/ConquestListPage.tsx
+msgid "Capital only"
+msgstr "Capital only"
+
+#: src/conquest/pages/ConquestListPage.tsx
+msgid "Capital only (default)"
+msgstr "Capital only (default)"
+
 #: src/content/unitFieldNotes.ts
 msgid "Capture speed"
 msgstr "Capture speed"
@@ -7945,6 +8559,10 @@ msgstr "Capture speed"
 #: src/scenario/triggerTypes.ts
 msgid "capturing team"
 msgstr "capturing team"
+
+#: src/conquest/galaxy3d/GalaxyView.tsx
+msgid "carbon star"
+msgstr "carbon star"
 
 #: src/career/index.ts
 msgid "Career"
@@ -7965,6 +8583,14 @@ msgstr "Casual"
 #: src/content/unitFieldNotes.ts
 msgid "Categories"
 msgstr "Categories"
+
+#: src/conquest/pages/components/StartPositionSelect.tsx
+msgid "Centre"
+msgstr "Centre"
+
+#: src/conquest/pages/components/StartPositionSelect.tsx
+msgid "Centre is locked."
+msgstr "Centre is locked."
 
 #: src/content/achievements.ts
 msgid "Centurion"
@@ -8281,6 +8907,7 @@ msgstr "Checking what can be deleted..."
 msgid "Checking whether you are signed in."
 msgstr "Checking whether you are signed in."
 
+#: src/conquest/pages/ConquestListPage.tsx
 #: src/runlite/pages/components/RunSetupForm.tsx
 msgid "Checking which maps this game carries…"
 msgstr "Checking which maps this game carries…"
@@ -8421,6 +9048,10 @@ msgstr "Choose in-game, {boxCount}"
 msgid "Choose map"
 msgstr "Choose map"
 
+#: src/conquest/pages/GalaxyPage.tsx
+msgid "Choose my own settings"
+msgstr "Choose my own settings"
+
 #: src/runlite/pages/RunPage.tsx
 msgid "Choose one of"
 msgstr "Choose one of"
@@ -8441,6 +9072,10 @@ msgstr "Circle"
 #: src/scenario/pages/components/ScenarioMapBars.tsx
 msgid "circle · radius {radius}"
 msgstr "circle · radius {radius}"
+
+#: src/conquest/mapStyle.ts
+msgid "Cities (roads across generated land)"
+msgstr "Cities (roads across generated land)"
 
 #: src/workshop/pages/components/ExplosionGeneratorEditor.tsx
 msgid "Class"
@@ -8600,6 +9235,7 @@ msgstr "Cloak cost moving"
 #: src/account/pages/SettingsSection.tsx
 #: src/components/SlideDrawer.tsx
 #: src/components/ui/dialog.tsx
+#: src/conquest/pages/GalaxyPage.tsx
 #: src/content/pages/components/BrandingScreenshots.tsx
 #: src/content/pages/components/GatherReplaysButton.tsx
 #: src/content/pages/components/MissionRuntimeSection.tsx
@@ -8678,10 +9314,18 @@ msgstr "Close this battle? Everyone will be removed, and the room it is in will 
 msgid "Closeness targeting weight"
 msgstr "Closeness targeting weight"
 
+#: src/conquest/pages/ConquestListPage.tsx
+msgid "Clusters"
+msgstr "Clusters"
+
 #: src/multiplayer/battle/MemberRow.tsx
 #: src/play/pages/components/ParticipantsTable.tsx
 msgid "Co-player"
 msgstr "Co-player"
+
+#: src/conquest/pages/ConquestListPage.tsx
+msgid "Coast"
+msgstr "Coast"
 
 #: src/content/unitFieldNotes.ts
 msgid "COB identifier"
@@ -8750,6 +9394,7 @@ msgstr "Coilbox cannot read this unit's build pic. The game ships one, in a form
 msgid "Coilbox cannot write {label} into the game's own file"
 msgstr "Coilbox cannot write {label} into the game's own file"
 
+#: src/conquest/pages/ConquestListPage.tsx
 #: src/runlite/pages/RunListPage.tsx
 msgid "Coilbox challenge"
 msgstr "Coilbox challenge"
@@ -9218,6 +9863,10 @@ msgstr "Combat"
 msgid "Combat behaviour"
 msgstr "Combat behaviour"
 
+#: src/conquest/galaxy3d/bodies.ts
+msgid "comet"
+msgstr "comet"
+
 #: src/runlite/galaxyAdapter.ts
 #: src/runlite/pages/RunPage.tsx
 msgid "Command"
@@ -9487,6 +10136,8 @@ msgid "conquest"
 msgstr "conquest"
 
 #: src/conquest/index.ts
+#: src/conquest/pages/ConquestListPage.tsx
+#: src/conquest/pages/GalaxyPage.tsx
 #: src/content/pages/ReplaysPage.tsx
 #: src/home/continue.ts
 msgid "Conquest"
@@ -9495,6 +10146,30 @@ msgstr "Conquest"
 #: src/play/PlayProvider.tsx
 msgid "Conquest battle"
 msgstr "Conquest battle"
+
+#: src/conquest/pages/ConquestListPage.tsx
+msgid "Conquest generates a map for any installed game with skirmish AIs. Download a game to get started, and it will appear here automatically."
+msgstr "Conquest generates a map for any installed game with skirmish AIs. Download a game to get started, and it will appear here automatically."
+
+#: src/conquest/pages/GalaxyPage.tsx
+msgid "Conquest lost"
+msgstr "Conquest lost"
+
+#: src/conquest/pages/ConquestListPage.tsx
+msgid "Conquest needs a game installed"
+msgstr "Conquest needs a game installed"
+
+#: src/conquest/pages/ConquestListPage.tsx
+msgid "Conquest needs an engine and a game"
+msgstr "Conquest needs an engine and a game"
+
+#: src/conquest/pages/GalaxyPage.tsx
+msgid "Conquest seed"
+msgstr "Conquest seed"
+
+#: src/conquest/pages/GalaxyPage.tsx
+msgid "Conquest won"
+msgstr "Conquest won"
 
 #: src/multiplayer/admin/PlayerLookupSection.tsx
 msgid "Contact and network"
@@ -10112,6 +10787,10 @@ msgstr "Create from replay"
 msgid "Create lobby"
 msgstr "Create lobby"
 
+#: src/conquest/pages/ConquestListPage.tsx
+msgid "Create map"
+msgstr "Create map"
+
 #: src/packs/pages/components/ExportPackForm.tsx
 msgid "Create pack code"
 msgstr "Create pack code"
@@ -10506,6 +11185,9 @@ msgstr "Defaults to one and a half times the ground sight distance."
 msgid "Defaults to the unit's build power."
 msgstr "Defaults to the unit's build power."
 
+#: src/conquest/pages/components/BattleOverlay.tsx
+#: src/conquest/pages/components/BattleOverlayParts.tsx
+#: src/conquest/pages/ConquestListPage.tsx
 #: src/runlite/pages/components/EncounterOverlay.tsx
 msgid "Defeat"
 msgstr "Defeat"
@@ -10513,6 +11195,10 @@ msgstr "Defeat"
 #: src/runlite/pages/components/EncounterOverlay.tsx
 msgid "Defeat costs health, not the warpath — you retreat and press on."
 msgstr "Defeat costs health, not the warpath — you retreat and press on."
+
+#: src/conquest/pages/components/BattleOverlay.tsx
+msgid "Defeat costs nothing but the turn — the enemy may move."
+msgstr "Defeat costs nothing but the turn — the enemy may move."
 
 #: src/play/debrief.ts
 msgid "Defeat."
@@ -10527,6 +11213,14 @@ msgstr "Defence"
 #: src/content/mapAggregate.ts
 msgid "Defences"
 msgstr "Defences"
+
+#: src/conquest/pages/GalaxyPage.tsx
+msgid "Defend"
+msgstr "Defend"
+
+#: src/conquest/pages/components/BattleOverlay.tsx
+msgid "Defend {nodeName}"
+msgstr "Defend {nodeName}"
 
 #: src/mapconv/pages/components/AdvancedOptions.tsx
 msgid "Defines the terrain elevation. A grayscale image where <0>white is the highest point and black the lowest</0>. Greys are heights in between. It should be <1>(texture ÷ 8) + 1</1> pixels on each side (e.g. an 8192px texture needs a 1025px heightmap)."
@@ -10567,6 +11261,14 @@ msgstr "Delete {collectionName}"
 #: src/placement/SurfaceBars.tsx
 msgid "Delete {count}"
 msgstr "Delete {count}"
+
+#: src/conquest/pages/ConquestListPage.tsx
+msgid "Delete {galaxyTitle}"
+msgstr "Delete {galaxyTitle}"
+
+#: src/conquest/pages/ConquestListPage.tsx
+msgid "Delete {galaxyTitle}?"
+msgstr "Delete {galaxyTitle}?"
 
 #: src/content/pages/components/KeymapsPanel.tsx
 msgid "Delete {itemName}"
@@ -10633,6 +11335,10 @@ msgstr "Delete engine {version}"
 #: src/content/pages/components/DeleteEngineButton.tsx
 msgid "Delete engine {version}?"
 msgstr "Delete engine {version}?"
+
+#: src/conquest/pages/ConquestListPage.tsx
+msgid "Delete map"
+msgstr "Delete map"
 
 #: src/content/pages/components/BulkDeleteReplaysPanel.tsx
 msgid "Delete matching"
@@ -10774,6 +11480,7 @@ msgstr "Deleting <0>{WORKSHOP_MUTATOR_FOLDER}</0> undoes everything this wrote."
 msgid "Deleting a scenario cannot be undone."
 msgstr "Deleting a scenario cannot be undone."
 
+#: src/conquest/pages/ConquestListPage.tsx
 #: src/scenario/pages/components/ScenarioRowMenu.tsx
 msgid "Deleting…"
 msgstr "Deleting…"
@@ -10840,6 +11547,10 @@ msgstr "Description"
 #: src/workshop/pages/components/CheckpointsDrawer.tsx
 msgid "Description (optional)"
 msgstr "Description (optional)"
+
+#: src/conquest/planets.ts
+msgid "Desert"
+msgstr "Desert"
 
 #: src/notify/NotificationsSettings.tsx
 msgid "Desktop notifications"
@@ -10910,6 +11621,8 @@ msgstr "Died"
 msgid "Dies"
 msgstr "Dies"
 
+#: src/conquest/pages/components/BattleOverlay.tsx
+#: src/conquest/pages/GalaxyPage.tsx
 #: src/hub/preview.ts
 #: src/runlite/pages/components/EncounterOverlay.tsx
 msgid "Difficulty"
@@ -10922,6 +11635,10 @@ msgstr "Difficulty — level {difficulty}"
 #: src/play/pages/components/DifficultyPips.tsx
 msgid "Difficulty {filled} of {scale}"
 msgstr "Difficulty {filled} of {scale}"
+
+#: src/conquest/pages/GalaxyPage.tsx
+msgid "Difficulty {value} of 5"
+msgstr "Difficulty {value} of 5"
 
 #: src/content/pages/components/GameSourcesTab.tsx
 #: src/direct/hostingRoute.ts
@@ -11074,6 +11791,7 @@ msgstr "Domain to unblock"
 msgid "Dominant"
 msgstr "Dominant"
 
+#: src/conquest/pages/ConquestListPage.tsx
 #: src/downloads/pages/ActivityPage.tsx
 #: src/downloads/pages/components/EngineInstaller.tsx
 #: src/downloads/pages/components/RapidBrowser.tsx
@@ -11214,6 +11932,7 @@ msgstr "Download game and map"
 msgid "Download log"
 msgstr "Download log"
 
+#: src/conquest/pages/components/BattleOverlayParts.tsx
 #: src/content/pages/ReplayDetailPage.tsx
 #: src/downloads/pages/components/MapPacksDrawer.tsx
 #: src/scenario/pages/ScenariosPage.tsx
@@ -11299,6 +12018,7 @@ msgstr "Downloading an import"
 msgid "Downloading map for {battleTitle}"
 msgstr "Downloading map for {battleTitle}"
 
+#: src/conquest/pages/components/BattleOverlayParts.tsx
 #: src/content/pages/components/ResolveContentDrawer.tsx
 #: src/content/pages/components/SuggestionsList.tsx
 #: src/downloads/pages/components/MapPacksDrawer.tsx
@@ -11378,6 +12098,10 @@ msgstr "drag one of its points to move it"
 #: src/scenario/pages/components/modes.tsx
 msgid "Drag the map to move the view. Click something to select it, and drag it to move it. Right-drag turns the camera."
 msgstr "Drag the map to move the view. Click something to select it, and drag it to move it. Right-drag turns the camera."
+
+#: src/conquest/pages/GalaxyPage.tsx
+msgid "drag to pan · scroll to zoom · right-drag to tilt"
+msgstr "drag to pan · scroll to zoom · right-drag to tilt"
 
 #: src/scenario/pages/components/GroupControls.tsx
 msgid "Draw"
@@ -11515,6 +12239,10 @@ msgstr "Duration"
 msgid "Duration: {duration}"
 msgstr "Duration: {duration}"
 
+#: src/conquest/galaxy3d/GalaxyView.tsx
+msgid "dyson swarm"
+msgstr "dyson swarm"
+
 #: src/multiplayer/chat/MemberActionsMenu.tsx
 #: src/multiplayer/DaysField.tsx
 msgid "e.g. 0.5, 1, 7"
@@ -11639,6 +12367,10 @@ msgstr "Economy"
 #: src/workshop/unitSections.ts
 msgid "Economy and durability"
 msgstr "Economy and durability"
+
+#: src/conquest/pages/components/StartPositionSelect.tsx
+msgid "Edge"
+msgstr "Edge"
 
 #: src/campaign/index.ts
 #: src/content/pages/components/ReplaySetsManager.tsx
@@ -11813,6 +12545,14 @@ msgstr "Enemies"
 #: src/content/unitFieldNotes.ts
 msgid "Enemies can carry it"
 msgstr "Enemies can carry it"
+
+#: src/conquest/pages/components/BattleOverlay.tsx
+msgid "Enemy incursion detected — check the galaxy map."
+msgstr "Enemy incursion detected — check the galaxy map."
+
+#: src/conquest/pages/components/BattleOverlay.tsx
+msgid "Enemy incursion detected — check the map."
+msgstr "Enemy incursion detected — check the map."
 
 #: src/content/pages/components/LivingValueChart.tsx
 msgid "energy"
@@ -12134,6 +12874,22 @@ msgstr "Every command allowed"
 msgid "Every edit in the project is a patch against this game's own units."
 msgstr "Every edit in the project is a patch against this game's own units."
 
+#: src/conquest/pages/components/BattleOverlay.tsx
+msgid "Every enemy capital has fallen — the galaxy is yours."
+msgstr "Every enemy capital has fallen — the galaxy is yours."
+
+#: src/conquest/pages/components/BattleOverlay.tsx
+msgid "Every enemy capital has fallen — the map is yours."
+msgstr "Every enemy capital has fallen — the map is yours."
+
+#: src/conquest/pages/GalaxyPage.tsx
+msgid "Every enemy capital has fallen. The galaxy is yours."
+msgstr "Every enemy capital has fallen. The galaxy is yours."
+
+#: src/conquest/pages/GalaxyPage.tsx
+msgid "Every enemy capital has fallen. The map is yours."
+msgstr "Every enemy capital has fallen. The map is yours."
+
 #: src/workshop/pages/components/ChangesPanel.tsx
 msgid "Every faction"
 msgstr "Every faction"
@@ -12201,6 +12957,10 @@ msgstr "Every player sees it as a Staff announcement toast."
 #: src/content/pages/components/ReplayEventLayers.tsx
 msgid "Every player's deaths are counted, whoever is highlighted."
 msgstr "Every player's deaths are counted, whoever is highlighted."
+
+#: src/conquest/pages/ConquestListPage.tsx
+msgid "Every real system within the radius, at its true position. You start at Sol, in the middle."
+msgstr "Every real system within the radius, at its true position. You start at Sol, in the middle."
 
 #: src/scenario/pages/components/MissionProblemsList.tsx
 msgid "Every reference in this mission resolves, and there is nothing in it a player would read as a bug."
@@ -12353,6 +13113,7 @@ msgstr "Export as file"
 msgid "Export build tree"
 msgstr "Export build tree"
 
+#: src/conquest/pages/ConquestListPage.tsx
 #: src/runlite/pages/RunListPage.tsx
 msgid "Export challenge"
 msgstr "Export challenge"
@@ -12644,6 +13405,10 @@ msgstr "Fields: {fieldText}."
 #: src/scenario/pages/components/GroupControls.tsx
 msgid "Fight along"
 msgstr "Fight along"
+
+#: src/conquest/pages/components/BattleOverlay.tsx
+msgid "Fighting for"
+msgstr "Fighting for"
 
 #: src/content/pages/components/MatchStatsSection.tsx
 msgid "Figures are sampled every {period} seconds."
@@ -13046,6 +13811,11 @@ msgstr "Floats on water"
 msgid "Fly over the smoothed map"
 msgstr "Fly over the smoothed map"
 
+#: src/conquest/pages/ConquestListPage.tsx
+#: src/conquest/pages/GalaxyPage.tsx
+msgid "Fog of war"
+msgstr "Fog of war"
+
 #: src/mapconv/pages/ProjectsPage.tsx
 msgid "Folder"
 msgstr "Folder"
@@ -13339,6 +14109,10 @@ msgstr "From the engine's own record at the end of the match."
 msgid "from the game"
 msgstr "from the game"
 
+#: src/conquest/pages/ConquestListPage.tsx
+msgid "From the game"
+msgstr "From the game"
+
 #: src/content/unitFieldNotes.ts
 msgid "From the model's centre."
 msgstr "From the model's centre."
@@ -13362,6 +14136,10 @@ msgstr "Fuchsia"
 #: src/multiplayer/battles/BattleFilterPopover.tsx
 msgid "Full"
 msgstr "Full"
+
+#: src/conquest/pages/ConquestListPage.tsx
+msgid "Full frontier (default)"
+msgstr "Full frontier (default)"
 
 #: src/general/pages/SettingsSection.tsx
 msgid "Full motion"
@@ -13399,6 +14177,18 @@ msgstr "Gain a field upgrade"
 msgid "Galaxy"
 msgstr "Galaxy"
 
+#: src/conquest/mapStyle.ts
+msgid "Galaxy (starfield)"
+msgstr "Galaxy (starfield)"
+
+#: src/conquest/pages/GalaxyPage.tsx
+msgid "Galaxy conquered"
+msgstr "Galaxy conquered"
+
+#: src/conquest/pages/components/GalaxyPreview2D.tsx
+msgid "Galaxy layout preview"
+msgstr "Galaxy layout preview"
+
 #: src/content/pages/components/ResolveContentDrawer.tsx
 #: src/content/pages/GameDetailPage.tsx
 #: src/downloads/pages/ActivityPage.tsx
@@ -13407,6 +14197,8 @@ msgstr "Galaxy"
 msgid "game"
 msgstr "game"
 
+#: src/conquest/pages/components/BattleOverlay.tsx
+#: src/conquest/pages/ConquestListPage.tsx
 #: src/content/index.ts
 #: src/content/pages/components/ArchiveTypeBadge.tsx
 #: src/content/pages/components/ResolveContentDrawer.tsx
@@ -13489,6 +14281,10 @@ msgstr "Game not installed"
 #: src/content/pages/components/BuildTreeEmbed.tsx
 msgid "Game not installed: {arg}"
 msgstr "Game not installed: {arg}"
+
+#: src/conquest/pages/components/BattleOverlayParts.tsx
+msgid "Game not installed: <0>{missingName}</0>"
+msgstr "Game not installed: <0>{missingName}</0>"
 
 #: src/play/pages/components/GameOptionsPanel.tsx
 msgid "Game options"
@@ -13576,6 +14372,11 @@ msgstr "Game: {resultText}"
 msgid "Game: {title}"
 msgstr "Game: {title}"
 
+#: src/conquest/pages/ConquestListPage.tsx
+msgid "Game: <0>{onlyGameName}</0>"
+msgstr "Game: <0>{onlyGameName}</0>"
+
+#: src/conquest/pages/ConquestListPage.tsx
 #: src/content/pages/components/BuildTreeEmbed.tsx
 #: src/content/pages/components/RemixPanel.tsx
 #: src/content/pages/components/RootCard.tsx
@@ -13611,12 +14412,17 @@ msgstr "Games and versions"
 msgid "Games often ship their own soundtrack. Coilbox can play it in the lobby, though it was written to score a battle rather than a menu."
 msgstr "Games often ship their own soundtrack. Coilbox can play it in the lobby, though it was written to score a battle rather than a menu."
 
+#: src/conquest/pages/components/BattleOverlayParts.tsx
 #: src/content/pages/components/RefightPanel.tsx
 #: src/multiplayer/battles/HostBattleForm.tsx
 #: src/play/pages/components/NewPresetFromReplayButton.tsx
 #: src/scenario/pages/components/SetupPanel.tsx
 msgid "games or maps"
 msgstr "games or maps"
+
+#: src/conquest/pages/components/BattleOverlay.tsx
+msgid "garrison"
+msgstr "garrison"
 
 #: src/content/pages/components/GatherReplaysButton.tsx
 msgid "Gather replays"
@@ -13634,6 +14440,10 @@ msgstr "Gave away"
 msgid "General"
 msgstr "General"
 
+#: src/conquest/pages/ConquestListPage.tsx
+msgid "Generate a map"
+msgstr "Generate a map"
+
 #: src/workshop/pages/components/CompiledLuaPanel.tsx
 msgid "Generated Lua"
 msgstr "Generated Lua"
@@ -13649,6 +14459,10 @@ msgstr "Generated thumbnails, headers, icons and branding art. All regenerate on
 #: src/mapconv/pages/components/AssetPreview.tsx
 msgid "generating preview…"
 msgstr "generating preview…"
+
+#: src/conquest/pages/ConquestListPage.tsx
+msgid "Generating…"
+msgstr "Generating…"
 
 #: src/multiplayer/chat/MemberActionsMenu.tsx
 msgid "Get IP"
@@ -13901,6 +14715,10 @@ msgstr "Guard"
 msgid "Hand them over"
 msgstr "Hand them over"
 
+#: src/conquest/pages/ConquestListPage.tsx
+msgid "Hand-made map"
+msgstr "Hand-made map"
+
 #: src/scenario/triggerTypes.ts
 msgid "Hands a group's units to another team, though the mission keeps ordering them."
 msgstr "Hands a group's units to another team, though the mission keeps ordering them."
@@ -14092,6 +14910,10 @@ msgstr "Hide health from enemies"
 msgid "hide id ''{id}'' matches nothing"
 msgstr "hide id ''{id}'' matches nothing"
 
+#: src/conquest/pages/GalaxyPage.tsx
+msgid "Hide locations more than two jumps from your territory."
+msgstr "Hide locations more than two jumps from your territory."
+
 #: src/workshop/pages/components/AssetPreview.tsx
 msgid "Hide model"
 msgstr "Hide model"
@@ -14188,6 +15010,10 @@ msgstr "Hit points divided by build time. Build time is already stated in second
 #: src/content/unitFieldNotes.ts
 msgid "Hit the model's pieces"
 msgstr "Hit the model's pieces"
+
+#: src/conquest/pages/GalaxyPage.tsx
+msgid "Hold"
+msgstr "Hold"
 
 #: src/scenario/pages/components/ObjectivePanel.tsx
 msgid "Hold the landing pad for two minutes"
@@ -14592,6 +15418,10 @@ msgstr "Human · host"
 msgid "I won"
 msgstr "I won"
 
+#: src/conquest/planets.ts
+msgid "Ice"
+msgstr "Ice"
+
 #: src/content/pages/components/UnitModelPanel.tsx
 msgid "Identity"
 msgstr "Identity"
@@ -14725,6 +15555,7 @@ msgstr "Import an image"
 msgid "Import anyway"
 msgstr "Import anyway"
 
+#: src/conquest/pages/ConquestListPage.tsx
 #: src/runlite/pages/RunListPage.tsx
 msgid "Import challenge"
 msgstr "Import challenge"
@@ -14741,6 +15572,10 @@ msgstr "Import from file…"
 msgid "Import keymap"
 msgstr "Import keymap"
 
+#: src/conquest/pages/ConquestListPage.tsx
+msgid "Import map"
+msgstr "Import map"
+
 #: src/play/pages/SkirmishPage.tsx
 #: src/play/presetImport.tsx
 msgid "Import preset"
@@ -14753,6 +15588,10 @@ msgstr "Import scenario"
 #: src/packs/pages/components/ImportPackForm.tsx
 msgid "Import setup pack"
 msgstr "Import setup pack"
+
+#: src/conquest/pages/GalaxyPage.tsx
+msgid "Import the map again from the Conquest page to carry on."
+msgstr "Import the map again from the Conquest page to carry on."
 
 #: src/workshop/pages/ProjectsPage.tsx
 msgid "Import tweak project"
@@ -14770,6 +15609,8 @@ msgstr "Import URLs must be https."
 msgid "Imported"
 msgstr "Imported"
 
+#: src/conquest/pages/ConquestListPage.tsx
+#: src/conquest/pages/GalaxyPage.tsx
 #: src/runlite/pages/RunListPage.tsx
 #: src/runlite/pages/RunPage.tsx
 msgid "Imported challenge"
@@ -14783,6 +15624,10 @@ msgstr "Imported preset"
 #: src/content/pages/components/KeymapsPanel.tsx
 msgid "Imported. Save to write it to uikeys.txt."
 msgstr "Imported. Save to write it to uikeys.txt."
+
+#: src/conquest/pages/ConquestListPage.tsx
+msgid "Importing the map…"
+msgstr "Importing the map…"
 
 #: src/content/unitFieldNotes.ts
 msgid "Impulse multiplier"
@@ -14823,6 +15668,7 @@ msgstr "In battle"
 msgid "In game"
 msgstr "In game"
 
+#: src/conquest/pages/ConquestListPage.tsx
 #: src/multiplayer/battle/runningMatch.ts
 #: src/multiplayer/battles/BattleList.tsx
 msgid "In progress"
@@ -14881,6 +15727,10 @@ msgstr "Indices into the scar table in resources.lua."
 msgid "Indigo"
 msgstr "Indigo"
 
+#: src/conquest/pages/ConquestListPage.tsx
+msgid "Inland sea"
+msgstr "Inland sea"
+
 #: src/content/index.ts
 msgid "Input and camera"
 msgstr "Input and camera"
@@ -14923,15 +15773,26 @@ msgstr "Install {mapTitle}"
 msgid "Install a game"
 msgstr "Install a game"
 
+#: src/conquest/pages/ConquestListPage.tsx
+msgid "Install a game first (<0>Content → Games</0>)."
+msgstr "Install a game first (<0>Content → Games</0>)."
+
 #: src/downloads/installArchive.ts
 msgid "Install a map"
 msgstr "Install a map"
 
+#: src/conquest/pages/ConquestListPage.tsx
 #: src/placement/BlueprintOnMap.tsx
 #: src/scenario/pages/components/ScenarioMapScene.tsx
 msgid "Install an engine"
 msgstr "Install an engine"
 
+#: src/conquest/pages/ConquestListPage.tsx
+msgid "Install an engine and at least one game, then return here to generate a map for it."
+msgstr "Install an engine and at least one game, then return here to generate a map for it."
+
+#: src/conquest/pages/components/BattleOverlayParts.tsx
+#: src/conquest/pages/ConquestListPage.tsx
 #: src/runlite/pages/RunListPage.tsx
 msgid "Install an engine first (<0>Settings → Engines</0>)."
 msgstr "Install an engine first (<0>Settings → Engines</0>)."
@@ -14947,6 +15808,10 @@ msgstr "Install an engine to resume savegames."
 #: src/content/pages/components/useWatchTarget.ts
 msgid "Install an engine to watch replays."
 msgstr "Install an engine to watch replays."
+
+#: src/conquest/pages/ConquestListPage.tsx
+msgid "Install at least one map first (<0>Content → Maps</0>)."
+msgstr "Install at least one map first (<0>Content → Maps</0>)."
 
 #: src/content/pages/components/Convert3doDrawer.tsx
 msgid "Install into game"
@@ -15150,6 +16015,14 @@ msgstr "It asks the hub what it already knows first, so most of a library costs 
 #: src/scenario/pages/ScenarioEditPage.tsx
 msgid "It came with this copy of coilbox, so it is read-only. Play it from Scenarios, or Export it and import that file back to get a copy you can edit."
 msgstr "It came with this copy of coilbox, so it is read-only. Play it from Scenarios, or Export it and import that file back to get a copy you can edit."
+
+#: src/conquest/pages/GalaxyPage.tsx
+msgid "It carries on if a game carries the map again."
+msgstr "It carries on if a game carries the map again."
+
+#: src/conquest/pages/GalaxyPage.tsx
+msgid "It carries on once the map can be read again."
+msgstr "It carries on once the map can be read again."
 
 #: src/multiplayer/battles/LeftoverRelayAgent.tsx
 msgid "it could not be"
@@ -15485,6 +16358,10 @@ msgstr "Keep playing"
 msgid "Keep the changes?"
 msgstr "Keep the changes?"
 
+#: src/conquest/pages/ConquestListPage.tsx
+msgid "Keep the installed map"
+msgstr "Keep the installed map"
+
 #: src/scenario/pages/components/SetupPanel.tsx
 msgid "Keep the positions"
 msgstr "Keep the positions"
@@ -15630,6 +16507,10 @@ msgstr "Kind: {kindLabel}"
 msgid "Kinds of unit"
 msgstr "Kinds of unit"
 
+#: src/conquest/pages/ConquestListPage.tsx
+msgid "Landlocked"
+msgstr "Landlocked"
+
 #: src/general/pages/SettingsSection.tsx
 #: src/workshop/pages/components/UnitTextPanel.tsx
 msgid "Language"
@@ -15745,9 +16626,17 @@ msgstr "last seen {lastSeen}"
 msgid "Last system ID"
 msgstr "Last system ID"
 
+#: src/conquest/pages/GalaxyPage.tsx
+msgid "Last turn"
+msgstr "Last turn"
+
 #: src/game-updates/pages/GameUpdatesSection.tsx
 msgid "Latest: {releaseName}"
 msgstr "Latest: {releaseName}"
+
+#: src/conquest/pages/components/BattleOverlayParts.tsx
+msgid "Launch battle"
+msgstr "Launch battle"
 
 #: src/content/unitFieldNotes.ts
 msgid "Launches along a fixed heading"
@@ -15911,6 +16800,10 @@ msgstr "Left behind when {projectName} was renamed. Its files are still in this 
 msgid "Left out of the start positions:"
 msgstr "Left out of the start positions:"
 
+#: src/conquest/pages/components/BattleOverlayParts.tsx
+msgid "Left out: {line}"
+msgstr "Left out: {line}"
+
 #: src/content/playerMatchFigures.ts
 msgid "Left out: {noLength} with no usable length."
 msgstr "Left out: {noLength} with no usable length."
@@ -15964,6 +16857,18 @@ msgstr "Lets go of a group: its units stay put and keep their owner, and the mis
 #: src/workshop/pages/components/PlayLocallyButton.tsx
 msgid "Letting the engine find it"
 msgstr "Letting the engine find it"
+
+#: src/conquest/pages/components/ThreatLevelSelect.tsx
+msgid "Level {lockedLevel}"
+msgstr "Level {lockedLevel}"
+
+#: src/conquest/pages/components/ThreatLevelSelect.tsx
+msgid "Level {lockedLevel} is locked."
+msgstr "Level {lockedLevel} is locked."
+
+#: src/conquest/pages/components/ThreatLevelSelect.tsx
+msgid "Level {n}"
+msgstr "Level {n}"
 
 #: src/content/index.ts
 #: src/content/pages/components/GameLibrarySummary.tsx
@@ -16140,6 +17045,10 @@ msgstr "Loading the hub…"
 msgid "Loading the match"
 msgstr "Loading the match"
 
+#: src/conquest/pages/ConquestListPage.tsx
+msgid "Loading this game's skirmish AIs."
+msgstr "Loading this game's skirmish AIs."
+
 #: src/content/pages/components/ReplayMapView.tsx
 msgid "Loading this part of the match"
 msgstr "Loading this part of the match"
@@ -16151,6 +17060,10 @@ msgstr "Loading unit data…"
 #: src/downloads/pages/components/RapidBrowser.tsx
 msgid "loading versions…"
 msgstr "loading versions…"
+
+#: src/conquest/pages/GalaxyPage.tsx
+msgid "Loading your campaign…"
+msgstr "Loading your campaign…"
 
 #: src/downloads/pages/components/RapidBrowser.tsx
 #: src/multiplayer/pages/ChatLogPage.tsx
@@ -16186,6 +17099,10 @@ msgstr "Local tweak-slot mod option"
 msgid "Location"
 msgstr "Location"
 
+#: src/conquest/pages/ConquestListPage.tsx
+msgid "locations"
+msgstr "locations"
+
 #: src/multiplayer/battle/AutohostControls.tsx
 msgid "Lock"
 msgstr "Lock"
@@ -16201,6 +17118,14 @@ msgstr "lock the room"
 #: src/multiplayer/chat/friendBattleAction.ts
 msgid "Locked"
 msgstr "Locked"
+
+#: src/conquest/unlocks.ts
+msgid "Locked. Win a conquest at level {top}."
+msgstr "Locked. Win a conquest at level {top}."
+
+#: src/conquest/unlocks.ts
+msgid "Locked. Win a conquest."
+msgstr "Locked. Win a conquest."
 
 #: src/downloads/pages/ActivityPage.tsx
 msgid "Log"
@@ -16288,6 +17213,7 @@ msgstr "Look up in Server admin"
 msgid "Looked up by the server"
 msgstr "Looked up by the server"
 
+#: src/conquest/pages/ConquestListPage.tsx
 #: src/runlite/pages/RunListPage.tsx
 msgid "Looking for an engine…"
 msgstr "Looking for an engine…"
@@ -16332,6 +17258,10 @@ msgstr "Loops back to attack"
 #: src/content/pages/components/SddBadge.tsx
 msgid "Loose .sdd directory (uncompressed)"
 msgstr "Loose .sdd directory (uncompressed)"
+
+#: src/conquest/pages/components/BattleOverlay.tsx
+msgid "Lose this defence and the system falls — it is your homeworld."
+msgstr "Lose this defence and the system falls — it is your homeworld."
 
 #: src/workshop/pages/components/ProjectChecks.tsx
 msgid "Loses {cost}"
@@ -16524,6 +17454,10 @@ msgstr "Map and engine not installed"
 msgid "Map and game missing"
 msgstr "Map and game missing"
 
+#: src/conquest/pages/ConquestListPage.tsx
+msgid "Map folder \"{folder}\""
+msgstr "Map folder \"{folder}\""
+
 #: src/content/unitFieldNotes.ts
 msgid "Map icon"
 msgstr "Map icon"
@@ -16548,10 +17482,18 @@ msgstr "Map minimap"
 msgid "Map missing"
 msgstr "Map missing"
 
+#: src/conquest/pages/GalaxyPage.tsx
+msgid "Map not found."
+msgstr "Map not found."
+
 #: src/content/pages/ReplayDetailPage.tsx
 #: src/multiplayer/battle/MissingMapBox.tsx
 msgid "Map not installed"
 msgstr "Map not installed"
+
+#: src/conquest/pages/components/BattleOverlayParts.tsx
+msgid "Map not installed: <0>{missingName}</0>"
+msgstr "Map not installed: <0>{missingName}</0>"
 
 #: src/multiplayer/battles/BattleRowMapThumb.tsx
 msgid "Map not installed. Click to download."
@@ -16576,6 +17518,15 @@ msgstr "Map packs"
 msgid "Map picture"
 msgstr "Map picture"
 
+#: src/conquest/pages/components/GalaxyPreview2D.tsx
+msgid "Map preview"
+msgstr "Map preview"
+
+#: src/conquest/pages/ConquestListPage.tsx
+msgid "Map seed"
+msgstr "Map seed"
+
+#: src/conquest/pages/ConquestListPage.tsx
 #: src/play/pages/components/MapCard.tsx
 msgid "Map size"
 msgstr "Map size"
@@ -16584,6 +17535,7 @@ msgstr "Map size"
 msgid "Map sizes"
 msgstr "Map sizes"
 
+#: src/conquest/pages/ConquestListPage.tsx
 #: src/runlite/pages/components/RunSetupForm.tsx
 msgid "Map style"
 msgstr "Map style"
@@ -16596,6 +17548,7 @@ msgstr "Map: {battleMap}"
 msgid "Map: {mapFilter}"
 msgstr "Map: {mapFilter}"
 
+#: src/conquest/pages/components/BattleOverlayParts.tsx
 #: src/content/pages/ReplayDetailPage.tsx
 #: src/multiplayer/battle/MissingMapBox.tsx
 msgid "Map: {mapName}"
@@ -16629,6 +17582,7 @@ msgstr "Mapping wiki"
 msgid "Mapping Wiki"
 msgstr "Mapping Wiki"
 
+#: src/conquest/pages/GalaxyPage.tsx
 #: src/content/pages/components/RootCard.tsx
 #: src/content/pages/MapsPage.tsx
 #: src/play/pages/components/MapPickerGrid.tsx
@@ -16651,6 +17605,10 @@ msgstr "Maps by {author} on the Coilbox hub"
 #: src/workshop/pages/components/PlayLocallyButton.tsx
 msgid "Maps could not be read"
 msgstr "Maps could not be read"
+
+#: src/conquest/pages/ConquestListPage.tsx
+msgid "Maps that could not be listed"
+msgstr "Maps that could not be listed"
 
 #: src/mapconv/pages/ProjectsPage.tsx
 msgid "Maps you've decompiled or compiled. Open one to recompile with its remembered options, or reveal its folder. Decompiling extracts to a <0>.sdd</0> directory the engine can load directly."
@@ -17155,6 +18113,10 @@ msgstr "modinfo.tdf instead of modinfo.lua"
 msgid "Mods"
 msgstr "Mods"
 
+#: src/conquest/planets.ts
+msgid "Moon"
+msgstr "Moon"
+
 #: src/scenario/pages/ScenarioBuilderPage.tsx
 msgid "More"
 msgstr "More"
@@ -17336,6 +18298,10 @@ msgstr "Multiplayer: connection error"
 #: src/multiplayer/LobbyStatusButton.tsx
 msgid "Multiplayer: log in"
 msgstr "Multiplayer: log in"
+
+#: src/conquest/galaxy3d/GalaxyView.tsx
+msgid "multiple system, {names}"
+msgstr "multiple system, {names}"
 
 #: src/content/unitFieldNotes.ts
 msgid "Multiplied by 8 elmos to give the distance from the centre to each edge, so 4 draws a mark 64 elmos across."
@@ -17683,11 +18649,16 @@ msgstr "Nest the new collection under"
 msgid "Nest under"
 msgstr "Nest under"
 
+#: src/conquest/pages/GalaxyPage.tsx
 #: src/content/pages/components/BuildTreeExportButton.tsx
 #: src/content/replayAnalysisEvents.ts
 #: src/i18n/frameStrings.ts
 msgid "Neutral"
 msgstr "Neutral"
+
+#: src/conquest/pages/GalaxyPage.tsx
+msgid "neutral space"
+msgstr "neutral space"
 
 #: src/content/pages/components/RootCard.tsx
 #: src/content/pages/MapDetailPage.tsx
@@ -17732,6 +18703,7 @@ msgstr "New best on {name}: {faster} faster than before."
 msgid "New bot account name"
 msgstr "New bot account name"
 
+#: src/conquest/pages/GalaxyPage.tsx
 #: src/content/pages/components/StartModeActions.tsx
 msgid "New campaign"
 msgstr "New campaign"
@@ -17950,6 +18922,7 @@ msgstr "No archives reported for this map."
 msgid "no battle"
 msgstr "no battle"
 
+#: src/conquest/pages/GalaxyPage.tsx
 #: src/runlite/pages/RunPage.tsx
 msgid "No battles fought here yet."
 msgstr "No battles fought here yet."
@@ -17994,6 +18967,10 @@ msgstr "No build orders were recorded in this replay."
 msgid "No buildings were ordered in this replay."
 msgstr "No buildings were ordered in this replay."
 
+#: src/conquest/pages/ConquestListPage.tsx
+msgid "No challenge code can be made, because the map \"{mapTitle}\" could not be read."
+msgstr "No challenge code can be made, because the map \"{mapTitle}\" could not be read."
+
 #: src/runlite/generate.ts
 msgid "No change"
 msgstr "No change"
@@ -18029,6 +19006,10 @@ msgstr "no command id"
 #: src/content/pages/KeybindsSection.tsx
 msgid "No config file yet"
 msgstr "No config file yet"
+
+#: src/conquest/pages/ConquestListPage.tsx
+msgid "No conquest maps yet. Generate one for any installed game, or import a map or a challenge."
+msgstr "No conquest maps yet. Generate one for any installed game, or import a map or a challenge."
 
 #: src/multiplayer/ConsoleDrawer.tsx
 msgid "No console output yet."
@@ -18335,6 +19316,10 @@ msgstr "No generated game and no rescan: the launch carries the edits itself."
 #: src/downloads/gameRepos.ts
 msgid "No GitHub repo declared for source \"{sourceKey}\"."
 msgstr "No GitHub repo declared for source \"{sourceKey}\"."
+
+#: src/conquest/handmade/library.ts
+msgid "No hand-made map with the id \"{id}\" is installed, and no installed game carries one. A game update may have removed it."
+msgstr "No hand-made map with the id \"{id}\" is installed, and no installed game carries one. A game update may have removed it."
 
 #: src/multiplayer/pages/IgnoreSettings.tsx
 msgid "No ignored users. Add one above, or use the ignore action next to a user in chat."
@@ -18828,6 +19813,10 @@ msgstr "No settings could be read for this engine. See the details above."
 #: src/content/pages/EngineConfigPage.tsx
 msgid "No settings to display yet."
 msgstr "No settings to display yet."
+
+#: src/conquest/pages/components/BattleOverlayParts.tsx
+msgid "No skirmish AI available"
+msgstr "No skirmish AI available"
 
 #: src/multiplayer/battle/ApplySkirmishPresetDrawer.tsx
 msgid "No skirmish presets saved yet. Save one from Singleplayer."
@@ -19403,6 +20392,10 @@ msgstr "Not signed in. Connect as {lastUsername} to manage that account."
 msgid "Not signed in. Connect to a lobby account to manage it here."
 msgstr "Not signed in. Connect to a lobby account to manage it here."
 
+#: src/conquest/pages/ConquestListPage.tsx
+msgid "Not started"
+msgstr "Not started"
+
 #: src/content/pages/components/MapRecords.tsx
 msgid "not taken"
 msgstr "not taken"
@@ -19724,6 +20717,10 @@ msgstr "Nothing to undo yet"
 msgid "Nothing turned."
 msgstr "Nothing turned."
 
+#: src/conquest/pages/GalaxyPage.tsx
+msgid "Nothing was changed. {reason}"
+msgstr "Nothing was changed. {reason}"
+
 #: src/deeplink/DeepLinkHandler.tsx
 msgid "Nothing was installed"
 msgstr "Nothing was installed"
@@ -20042,6 +21039,14 @@ msgstr "One build square is 16 elmos."
 msgid "One character per footprint square saying what may pass or be built there. Prefix with h for a half-square grid."
 msgstr "One character per footprint square saying what may pass or be built there. Prefix with h for a half-square grid."
 
+#: src/conquest/pages/ConquestListPage.tsx
+msgid "One continent"
+msgstr "One continent"
+
+#: src/conquest/pages/ConquestListPage.tsx
+msgid "One enemy faction"
+msgstr "One enemy faction"
+
 #: src/content/unitFieldNotes.ts
 msgid "One entry per armour class. The default entry covers the rest."
 msgstr "One entry per armour class. The default entry covers the rest."
@@ -20253,6 +21258,10 @@ msgstr "Open chat."
 msgid "Open Conquest."
 msgstr "Open Conquest."
 
+#: src/conquest/pages/ConquestListPage.tsx
+msgid "Open Content > Games"
+msgstr "Open Content > Games"
+
 #: src/content/pages/ArchiveDetailPage.tsx
 #: src/content/pages/components/Convert3doDrawer.tsx
 #: src/content/pages/GameDetailPage.tsx
@@ -20263,6 +21272,7 @@ msgstr "Open folder"
 msgid "Open full page"
 msgstr "Open full page"
 
+#: src/conquest/pages/components/BattleOverlayParts.tsx
 #: src/content/pages/components/states.tsx
 msgid "Open game downloads"
 msgstr "Open game downloads"
@@ -20331,6 +21341,10 @@ msgstr "Open the log file"
 #: src/multiplayer/invite/InviteLinkHost.tsx
 msgid "Open the login screen"
 msgstr "Open the login screen"
+
+#: src/conquest/pages/ConquestListPage.tsx
+msgid "Open the map"
+msgstr "Open the map"
 
 #: src/deeplink/actions.ts
 msgid "Open the map \"{id}\"."
@@ -20402,6 +21416,24 @@ msgstr "Opens with {bots}."
 msgid "Operation"
 msgstr "Operation"
 
+#: src/conquest/pages/components/ThreatLevelSelect.tsx
+msgid "Opponents attack as they always have."
+msgstr "Opponents attack as they always have."
+
+#: src/conquest/pages/components/ThreatLevelSelect.tsx
+msgid "Opponents pick your territory over neutral ground more often."
+msgstr "Opponents pick your territory over neutral ground more often."
+
+#: src/conquest/pages/components/ThreatLevelSelect.tsx
+msgid "Opponents pick your territory over neutral ground much more often."
+msgstr "Opponents pick your territory over neutral ground much more often."
+
+#: src/conquest/pages/components/ThreatLevelSelect.tsx
+msgid "Opponents treat your territory like any other target, so incursions come far more often."
+msgstr "Opponents treat your territory like any other target, so incursions come far more often."
+
+#: src/conquest/pages/components/BattleOverlay.tsx
+#: src/conquest/pages/ConquestListPage.tsx
 #: src/runlite/pages/components/EncounterOverlay.tsx
 #: src/runlite/pages/RunPage.tsx
 msgid "Opposition"
@@ -20446,6 +21478,10 @@ msgstr "Or one of the common ones"
 #: src/i18n/frameStrings.ts
 msgid "Orange"
 msgstr "Orange"
+
+#: src/conquest/galaxy3d/GalaxyView.tsx
+msgid "orange dwarf"
+msgstr "orange dwarf"
 
 #: src/content/mapAggregate.ts
 msgid "order"
@@ -20804,6 +21840,10 @@ msgstr "Passworded"
 msgid "Past direct messages and channel conversations saved on this device."
 msgstr "Past direct messages and channel conversations saved on this device."
 
+#: src/conquest/pages/ConquestListPage.tsx
+msgid "Paste a challenge code shared by another player to generate the identical map on your own install. A challenge made on a hand-made map needs that map installed here."
+msgstr "Paste a challenge code shared by another player to generate the identical map on your own install. A challenge made on a hand-made map needs that map installed here."
+
 #: src/runlite/pages/components/ImportChallengeForm.tsx
 msgid "Paste a challenge code shared by another player to generate the identical warpath on your own install."
 msgstr "Paste a challenge code shared by another player to generate the identical warpath on your own install."
@@ -21025,6 +22065,10 @@ msgstr "Pick an AI"
 msgid "Pick an engine"
 msgstr "Pick an engine"
 
+#: src/conquest/pages/ConquestListPage.tsx
+msgid "Pick another engine"
+msgstr "Pick another engine"
+
 #: src/content/pages/MatchupPage.tsx
 msgid "Pick another player to see a matchup."
 msgstr "Pick another player to see a matchup."
@@ -21145,6 +22189,7 @@ msgstr "Placing this copies it into the scenario, so what you share carries the 
 msgid "Plain"
 msgstr "Plain"
 
+#: src/conquest/pages/ConquestListPage.tsx
 #: src/runlite/pages/components/RunSetupForm.tsx
 msgid "Planet"
 msgstr "Planet"
@@ -21192,6 +22237,10 @@ msgstr "Play 3 different factions."
 #: src/content/achievements.ts
 msgid "Play 50 games."
 msgstr "Play 50 games."
+
+#: src/conquest/pages/GalaxyPage.tsx
+msgid "Play as"
+msgstr "Play as"
 
 #: src/content/pages/components/ReplayPlaybackBar.tsx
 msgid "Play in reverse"
@@ -21505,6 +22554,10 @@ msgstr "Preflight"
 msgid "Preflight could not run: {preflightError}"
 msgstr "Preflight could not run: {preflightError}"
 
+#: src/conquest/pages/components/BattleOverlayParts.tsx
+msgid "Preparing…"
+msgstr "Preparing…"
+
 #: src/scenario/triggerTypes.ts
 msgid "Presentation"
 msgstr "Presentation"
@@ -21552,6 +22605,7 @@ msgstr "Press on"
 msgid "Press the keys you want. Escape binds Escape, so use Cancel to back out."
 msgstr "Press the keys you want. Escape binds Escape, so use Cancel to back out."
 
+#: src/conquest/pages/ConquestListPage.tsx
 #: src/content/pages/MapDetailPage.tsx
 #: src/workshop/pages/components/ReferenceBulkEdit.tsx
 msgid "Preview"
@@ -21739,6 +22793,10 @@ msgstr "Published to the Coilbox hub."
 msgid "Publishing…"
 msgstr "Publishing…"
 
+#: src/conquest/galaxy3d/GalaxyView.tsx
+msgid "pulsar"
+msgstr "pulsar"
+
 #: src/i18n/frameStrings.ts
 msgid "Purple"
 msgstr "Purple"
@@ -21794,6 +22852,10 @@ msgstr "Put the project back to how it was at this checkpoint, as one undo step"
 #: src/scenario/pages/components/MissionHomeActions.tsx
 msgid "Put this mission in the game"
 msgstr "Put this mission in the game"
+
+#: src/conquest/galaxy3d/GalaxyView.tsx
+msgid "quadruple system, {names}"
+msgstr "quadruple system, {names}"
 
 #: src/content/unitFieldNotes.ts
 msgid "Quaternary texture"
@@ -21868,6 +22930,10 @@ msgstr "Queued…"
 msgid "quick"
 msgstr "quick"
 
+#: src/conquest/galaxy3d/GalaxyView.tsx
+msgid "quintuple system, {names}"
+msgstr "quintuple system, {names}"
+
 #: src/general/quit.tsx
 msgid "Quit"
 msgstr "Quit"
@@ -21903,6 +22969,10 @@ msgstr "Radar stealth"
 #: src/scenario/pages/components/mapKeyboard.ts
 msgid "radius {radius} elmos"
 msgstr "radius {radius} elmos"
+
+#: src/conquest/pages/ConquestListPage.tsx
+msgid "Radius from Sol"
+msgstr "Radius from Sol"
 
 #: src/content/unitFieldNotes.ts
 msgid "Radius when being built"
@@ -22225,6 +23295,10 @@ msgstr "Reading the archive"
 msgid "Reading the archive…"
 msgstr "Reading the archive…"
 
+#: src/conquest/pages/components/BattleOverlayParts.tsx
+msgid "Reading the battle report…"
+msgstr "Reading the battle report…"
+
 #: src/scenario/pages/components/DialoguePanel.tsx
 msgid "Reading the file…"
 msgstr "Reading the file…"
@@ -22236,6 +23310,10 @@ msgstr "Reading the game and the map."
 #: src/workshop/pages/components/DiskDiffDrawer.tsx
 msgid "Reading the game's files…"
 msgstr "Reading the game's files…"
+
+#: src/conquest/pages/ConquestListPage.tsx
+msgid "Reading the map…"
+msgstr "Reading the map…"
 
 #: src/content/pages/MapsPage.tsx
 msgid "Reading the mirror indexes…"
@@ -22339,9 +23417,17 @@ msgstr "Ready"
 msgid "Ready to install"
 msgstr "Ready to install"
 
+#: src/conquest/pages/ConquestListPage.tsx
+msgid "Ready to start"
+msgstr "Ready to start"
+
 #: src/content/unitFieldNotes.ts
 msgid "Reaim threshold"
 msgstr "Reaim threshold"
+
+#: src/conquest/pages/ConquestListPage.tsx
+msgid "Real stars (the solar neighbourhood)"
+msgstr "Real stars (the solar neighbourhood)"
 
 #: src/multiplayer/admin/PlayerLookupSection.tsx
 #: src/multiplayer/chat/MemberActionsMenu.tsx
@@ -22501,6 +23587,7 @@ msgstr "Recreate folder"
 msgid "Recruit"
 msgstr "Recruit"
 
+#: src/conquest/planets.ts
 #: src/i18n/frameStrings.ts
 msgid "Red"
 msgstr "Red"
@@ -22508,6 +23595,14 @@ msgstr "Red"
 #: src/mapconv/pages/components/AdvancedOptions.tsx
 msgid "red channel marks metal deposits"
 msgstr "red channel marks metal deposits"
+
+#: src/conquest/galaxy3d/GalaxyView.tsx
+msgid "red dwarf"
+msgstr "red dwarf"
+
+#: src/conquest/galaxy3d/GalaxyView.tsx
+msgid "red giant"
+msgstr "red giant"
 
 #: src/content/unitFieldNotes.ts
 msgid "Red, green and blue from 0 to 1."
@@ -22584,6 +23679,14 @@ msgstr "refreshed {ago}"
 #: src/workshop/pages/UnitPage.tsx
 msgid "Regenerate"
 msgstr "Regenerate"
+
+#: src/conquest/pages/GalaxyPage.tsx
+msgid "Regenerate map"
+msgstr "Regenerate map"
+
+#: src/conquest/pages/GalaxyPage.tsx
+msgid "Regenerating…"
+msgstr "Regenerating…"
 
 #: src/profile/health.ts
 msgid "regex /{filterRegex}/i"
@@ -22790,6 +23893,14 @@ msgstr "Remove {itemLabel} from queue"
 msgid "Remove {label} from this build menu"
 msgstr "Remove {label} from this build menu"
 
+#: src/conquest/pages/ConquestListPage.tsx
+msgid "Remove {mapTitle}"
+msgstr "Remove {mapTitle}"
+
+#: src/conquest/pages/ConquestListPage.tsx
+msgid "Remove {mapTitle}?"
+msgstr "Remove {mapTitle}?"
+
 #: src/multiplayer/chat/ConversationSidebar.tsx
 msgid "Remove {name} from friends"
 msgstr "Remove {name} from friends"
@@ -22834,6 +23945,10 @@ msgstr "Remove from queue"
 msgid "Remove login"
 msgstr "Remove login"
 
+#: src/conquest/pages/ConquestListPage.tsx
+msgid "Remove map"
+msgstr "Remove map"
+
 #: src/multiplayer/chat/MemberActionsMenu.tsx
 msgid "Remove operator"
 msgstr "Remove operator"
@@ -22869,6 +23984,10 @@ msgstr "Remove these operations"
 #: src/workshop/compatibility.ts
 msgid "Remove this change"
 msgstr "Remove this change"
+
+#: src/conquest/pages/ConquestListPage.tsx
+msgid "Remove this map"
+msgstr "Remove this map"
 
 #: src/workshop/compatibility.ts
 msgid "Remove this mark"
@@ -22925,6 +24044,10 @@ msgstr "Removed, use rgbColor"
 #: src/content/unitFieldNotes.ts
 msgid "Removed, use weaponType Shield"
 msgstr "Removed, use weaponType Shield"
+
+#: src/conquest/pages/ConquestListPage.tsx
+msgid "Removing…"
+msgstr "Removing…"
 
 #: src/workshop/pages/components/ProjectCardMenu.tsx
 msgid "Rename"
@@ -23025,6 +24148,10 @@ msgstr "Replace {replacedKey}"
 #: src/workshop/pages/components/PackagePanel.tsx
 msgid "Replace existing folder?"
 msgstr "Replace existing folder?"
+
+#: src/conquest/pages/ConquestListPage.tsx
+msgid "Replace the map"
+msgstr "Replace the map"
 
 #: src/content/pages/components/MissionRuntimeSection.tsx
 msgid "Replace with coilbox's mission runtime"
@@ -23140,6 +24267,11 @@ msgstr "Requires waterweapon to also be on."
 #: src/runlite/generate.ts
 msgid "Requisition their cache"
 msgstr "Requisition their cache"
+
+#: src/conquest/pages/ConquestListPage.tsx
+#: src/conquest/pages/GalaxyPage.tsx
+msgid "Reroll seed"
+msgstr "Reroll seed"
 
 #: src/scenario/pages/components/SetupPanel.tsx
 msgid "Rescale onto {mapName}"
@@ -23344,6 +24476,7 @@ msgstr "Restricted battle — {summary}"
 msgid "Result"
 msgstr "Result"
 
+#: src/conquest/pages/components/BattleOverlay.tsx
 #: src/runlite/pages/components/EncounterOverlay.tsx
 msgid "Result detected from the replay."
 msgstr "Result detected from the replay."
@@ -23395,10 +24528,15 @@ msgstr "Retry downloading the map for {battleTitle}"
 msgid "Retry installing {mapTitle}"
 msgstr "Retry installing {mapTitle}"
 
+#: src/conquest/pages/components/BattleOverlay.tsx
+msgid "Return to the galaxy"
+msgstr "Return to the galaxy"
+
 #: src/play/InGameBadge.tsx
 msgid "Return to the game"
 msgstr "Return to the game"
 
+#: src/conquest/pages/components/BattleOverlay.tsx
 #: src/runlite/pages/components/EncounterOverlay.tsx
 msgid "Return to the map"
 msgstr "Return to the map"
@@ -23468,6 +24606,7 @@ msgstr "Rewrite"
 msgid "Rewriting…"
 msgstr "Rewriting…"
 
+#: src/conquest/pages/ConquestListPage.tsx
 #: src/multiplayer/battle/MemberRow.tsx
 msgid "Ring"
 msgstr "Ring"
@@ -23475,6 +24614,10 @@ msgstr "Ring"
 #: src/multiplayer/battle/AutohostControls.tsx
 msgid "Ring unready"
 msgstr "Ring unready"
+
+#: src/conquest/galaxy3d/GalaxyView.tsx
+msgid "ringed gas giant"
+msgstr "ringed gas giant"
 
 #: src/content/unitFieldNotes.ts
 msgid "Roll speed"
@@ -23823,6 +24966,10 @@ msgstr "scanned {scannedAt}"
 msgid "Scanned {scanRootCount} content folder(s): {scanRootPaths}."
 msgstr "Scanned {scanRootCount} content folder(s): {scanRootPaths}."
 
+#: src/conquest/pages/components/BattleOverlayParts.tsx
+msgid "Scanning content…"
+msgstr "Scanning content…"
+
 #: src/workshop/pages/UnitPage.tsx
 msgid "Scanning for installed games…"
 msgstr "Scanning for installed games…"
@@ -23840,6 +24987,7 @@ msgstr "Scanning maps…"
 msgid "Scanning the pool for orphaned data..."
 msgstr "Scanning the pool for orphaned data..."
 
+#: src/conquest/pages/ConquestListPage.tsx
 #: src/direct/HostRoomForm.tsx
 #: src/multiplayer/battles/CreateLobbyPopover.tsx
 #: src/multiplayer/battles/HostBattleForm.tsx
@@ -23890,11 +25038,20 @@ msgstr "Scar starting opacity"
 msgid "Scar surface-angle cutoff"
 msgstr "Scar surface-angle cutoff"
 
+#: src/conquest/pages/ConquestListPage.tsx
+msgid "Scattered"
+msgstr "Scattered"
+
+#: src/conquest/pages/ConquestListPage.tsx
+msgid "Scattered disc"
+msgstr "Scattered disc"
+
 #: src/container/names.ts
 #: src/scenario/pages/ScenarioEditPage.tsx
 msgid "scenario"
 msgstr "scenario"
 
+#: src/conquest/pages/components/BattleOverlay.tsx
 #: src/hub/api.ts
 #: src/runlite/pages/components/EncounterOverlay.tsx
 #: src/scenario/index.ts
@@ -24110,6 +25267,10 @@ msgstr "Searching in {searchingNames}"
 msgid "Searching with {partyNames}"
 msgstr "Searching with {partyNames}"
 
+#: src/conquest/pages/ConquestListPage.tsx
+msgid "Searching your installed games for maps they carry."
+msgstr "Searching your installed games for maps they carry."
+
 #: src/content/achievements.ts
 msgid "Seasoned"
 msgstr "Seasoned"
@@ -24171,6 +25332,8 @@ msgstr "See the matchup"
 msgid "See the matchup by map, faction and game length"
 msgstr "See the matchup by map, faction and game length"
 
+#: src/conquest/pages/ConquestListPage.tsx
+#: src/conquest/pages/GalaxyPage.tsx
 #: src/workshop/pages/components/RandomModDrawer.tsx
 msgid "Seed"
 msgstr "Seed"
@@ -24239,6 +25402,7 @@ msgstr "Select a conversation."
 msgid "Select a file to preview it."
 msgstr "Select a file to preview it."
 
+#: src/conquest/pages/ConquestListPage.tsx
 #: src/direct/HostRoomForm.tsx
 #: src/multiplayer/battles/HostBattleForm.tsx
 msgid "Select a game"
@@ -24833,6 +25997,10 @@ msgstr "Shaded: {activityLabel}"
 msgid "Shadows, water, particles and anti-aliasing."
 msgstr "Shadows, water, particles and anti-aliasing."
 
+#: src/conquest/pages/ConquestListPage.tsx
+msgid "Shape"
+msgstr "Shape"
+
 #: src/content/pages/components/ReplayEventLayers.tsx
 msgid "Shapes and the choice of buildings"
 msgstr "Shapes and the choice of buildings"
@@ -24849,6 +26017,14 @@ msgstr "Share"
 #: src/workshop/pages/ProjectsPage.tsx
 msgid "Share {0}"
 msgstr "Share {0}"
+
+#: src/conquest/pages/ConquestListPage.tsx
+msgid "Share {galaxyTitle} as a challenge code"
+msgstr "Share {galaxyTitle} as a challenge code"
+
+#: src/conquest/pages/ConquestListPage.tsx
+msgid "Share {mapTitle} as a challenge code"
+msgstr "Share {mapTitle} as a challenge code"
 
 #: src/scenario/pages/ScenarioBuilderPage.tsx
 #: src/scenario/pages/ScenarioEditPage.tsx
@@ -24867,6 +26043,7 @@ msgstr "Share a pack"
 msgid "Share a setup pack"
 msgstr "Share a setup pack"
 
+#: src/conquest/pages/ConquestListPage.tsx
 #: src/runlite/pages/RunListPage.tsx
 msgid "Share challenge"
 msgstr "Share challenge"
@@ -25293,6 +26470,8 @@ msgstr "Shows the repulse effect (old name)"
 msgid "Shrank {step}, now {size}."
 msgstr "Shrank {step}, now {size}."
 
+#: src/conquest/pages/components/RunSetup.tsx
+#: src/conquest/pages/GalaxyPage.tsx
 #: src/content/pages/components/ReplayRoster.tsx
 #: src/content/pages/components/useUnitRenders.ts
 msgid "Side"
@@ -25783,6 +26962,14 @@ msgstr "Spend at depots"
 msgid "Spend salvage on unlocks, perks, and repairs."
 msgstr "Spend salvage on unlocks, perks, and repairs."
 
+#: src/conquest/pages/ConquestListPage.tsx
+msgid "Spiral"
+msgstr "Spiral"
+
+#: src/conquest/pages/ConquestListPage.tsx
+msgid "Spiral arms"
+msgstr "Spiral arms"
+
 #: src/content/unitFieldNotes.ts
 msgid "Splash diameter"
 msgstr "Splash diameter"
@@ -25928,6 +27115,10 @@ msgstr "Start a warpath"
 msgid "Start a warpath run"
 msgstr "Start a warpath run"
 
+#: src/conquest/pages/GalaxyPage.tsx
+msgid "Start again"
+msgstr "Start again"
+
 #: src/multiplayer/battle/BattleRoomHeader.tsx
 msgid "Start anyway"
 msgstr "Start anyway"
@@ -25961,6 +27152,10 @@ msgstr "start campaign ''{campaignTitle}'' has no missions"
 msgid "Start conditions"
 msgstr "Start conditions"
 
+#: src/conquest/pages/GalaxyPage.tsx
+msgid "Start conquest"
+msgstr "Start conquest"
+
 #: src/workshop/pages/components/ProjectDetailsDrawer.tsx
 msgid "Start editing"
 msgstr "Start editing"
@@ -25988,6 +27183,10 @@ msgstr "Start mission"
 #: src/profile/start.ts
 msgid "start mission ''{missionId}'' is not in campaign ''{campaignTitle}''"
 msgstr "start mission ''{missionId}'' is not in campaign ''{campaignTitle}''"
+
+#: src/conquest/pages/components/StartPositionSelect.tsx
+msgid "Start position"
+msgstr "Start position"
 
 #. placeholder {0}: i + 1
 #: src/content/pages/MapDetailPage.tsx
@@ -26066,6 +27265,10 @@ msgstr "Started {ago}"
 msgid "Starting a room for you and the computer on {mapName}."
 msgstr "Starting a room for you and the computer on {mapName}."
 
+#: src/conquest/pages/GalaxyPage.tsx
+msgid "Starting again resets {galaxyTitle} with a new seed."
+msgstr "Starting again resets {galaxyTitle} with a new seed."
+
 #: src/content/unitFieldNotes.ts
 msgid "Starting fire state"
 msgstr "Starting fire state"
@@ -26085,6 +27288,10 @@ msgstr "Starting move state"
 #: src/content/unitFieldNotes.ts
 msgid "Starting speed"
 msgstr "Starting speed"
+
+#: src/conquest/pages/ConquestListPage.tsx
+msgid "Starting territory"
+msgstr "Starting territory"
 
 #: src/content/replayAnalysis.ts
 msgid "Starting the engine"
@@ -26106,6 +27313,7 @@ msgstr "starting units lost"
 msgid "Starting value of {name}"
 msgstr "Starting value of {name}"
 
+#: src/conquest/pages/GalaxyPage.tsx
 #: src/direct/room.ts
 #: src/downloads/DownloadQueueBadge.tsx
 #: src/downloads/pages/components/ProgressBar.tsx
@@ -26135,6 +27343,22 @@ msgstr "Startup splash"
 #: src/downloads/pages/ActivityPage.tsx
 msgid "State"
 msgstr "State"
+
+#: src/conquest/model.ts
+msgid "state.json has no conquests object"
+msgstr "state.json has no conquests object"
+
+#: src/conquest/model.ts
+msgid "state.json is not a JSON object"
+msgstr "state.json is not a JSON object"
+
+#: src/conquest/model.ts
+msgid "state.json is not valid JSON"
+msgstr "state.json is not valid JSON"
+
+#: src/conquest/model.ts
+msgid "state.json was made by a newer version of coilbox (file version {fileVersion}, this version reads {supportedVersion})"
+msgstr "state.json was made by a newer version of coilbox (file version {fileVersion}, this version reads {supportedVersion})"
 
 #: src/content/pages/StatsPage.tsx
 msgid "Stats"
@@ -26313,6 +27537,11 @@ msgstr "Supporting definitions: carried by this unit, mounted in no slot"
 #: src/content/pages/components/MissionRuntimeSection.tsx
 msgid "Supports {supportedConditions} of {conditionCount} conditions and {supportedActions} of {actionCount} actions"
 msgstr "Supports {supportedConditions} of {conditionCount} conditions and {supportedActions} of {actionCount} actions"
+
+#: src/conquest/pages/components/planetOptions.tsx
+#: src/conquest/pages/ConquestListPage.tsx
+msgid "Surprise me"
+msgstr "Surprise me"
 
 #: src/startbox/StartBoxControls.tsx
 msgid "Swap"
@@ -26540,6 +27769,10 @@ msgstr "Tell others you're not at the keyboard."
 msgid "Tells one of the mission's units to build something, at a point or into a factory queue."
 msgstr "Tells one of the mission's units to build something, at a point or into a factory queue."
 
+#: src/conquest/planets.ts
+msgid "Temperate"
+msgstr "Temperate"
+
 #: src/content/unitFieldNotes.ts
 msgid "Terraform speed"
 msgstr "Terraform speed"
@@ -26547,6 +27780,10 @@ msgstr "Terraform speed"
 #: src/mapconv/pages/components/AdvancedOptions.tsx
 msgid "terrain-type index per pixel"
 msgstr "terrain-type index per pixel"
+
+#: src/conquest/mapStyle.ts
+msgid "Territories (provinces on generated land)"
+msgstr "Territories (provinces on generated land)"
 
 #: src/content/unitFieldNotes.ts
 msgid "Tertiary texture"
@@ -26794,6 +28031,10 @@ msgstr "The analysis will use engine {chosenLabel} instead."
 msgid "The angle between the plane's nose and the flat of its wings. It sets the direction lift pulls in and it is squared into the wing drag."
 msgstr "The angle between the plane's nose and the flat of its wings. It sets the direction lift pulls in and it is squared into the wing drag."
 
+#: src/conquest/pages/components/BattleOverlay.tsx
+msgid "The assault on {nodeName} failed. Your territory holds."
+msgstr "The assault on {nodeName} failed. Your territory holds."
+
 #: src/multiplayer/battle/BonusButton.tsx
 msgid "The autohost applies this and rejects the request if you aren't its boss or host."
 msgstr "The autohost applies this and rejects the request if you aren't its boss or host."
@@ -26843,6 +28084,18 @@ msgstr "The bytes of the file, sixteen to a line."
 msgid "The bytes that were written, sixteen to a line."
 msgstr "The bytes that were written, sixteen to a line."
 
+#: src/conquest/pages/GalaxyPage.tsx
+msgid "The challenge code sets this conquest up: fog of war is off and the threat level is {level}. Pick a faction and start."
+msgstr "The challenge code sets this conquest up: fog of war is off and the threat level is {level}. Pick a faction and start."
+
+#: src/conquest/pages/GalaxyPage.tsx
+msgid "The challenge code sets this conquest up: fog of war is on and the threat level is {level}. Pick a faction and start."
+msgstr "The challenge code sets this conquest up: fog of war is on and the threat level is {level}. Pick a faction and start."
+
+#: src/conquest/pages/GalaxyPage.tsx
+msgid "The challenge you imported was made on a different version of this map, so its settings are not used here."
+msgstr "The challenge you imported was made on a different version of this map, so its settings are not used here."
+
 #: src/content/unitFieldNotes.ts
 msgid "The chance, from 0 to 1, that each incoming missile is fooled into chasing the flare instead."
 msgstr "The chance, from 0 to 1, that each incoming missile is fooled into chasing the flare instead."
@@ -26891,9 +28144,25 @@ msgstr "The compiler could not run: {error}"
 msgid "the connection ended before the login finished"
 msgstr "the connection ended before the login finished"
 
+#: src/conquest/pages/ConquestListPage.tsx
+msgid "The conquest was not abandoned. {reason}"
+msgstr "The conquest was not abandoned. {reason}"
+
+#: src/conquest/pages/GalaxyPage.tsx
+msgid "The conquest was not started. {reason}"
+msgstr "The conquest was not started. {reason}"
+
 #: src/workshop/loadsAs.ts
 msgid "The content scan failed, so {gameName} could not be found to check typed values ({initFailure}). They are written as typed and the game may load some of them as something else."
 msgstr "The content scan failed, so {gameName} could not be found to check typed values ({initFailure}). They are written as typed and the game may load some of them as something else."
+
+#: src/conquest/pages/ConquestListPage.tsx
+msgid "The content scan failed, so installed games are not listed: {reason}"
+msgstr "The content scan failed, so installed games are not listed: {reason}"
+
+#: src/conquest/pages/GalaxyPage.tsx
+msgid "The content scan failed, so installed maps are not listed: {reason}"
+msgstr "The content scan failed, so installed maps are not listed: {reason}"
 
 #: src/profile/SettingsSection.tsx
 msgid "The content scan failed, so the profile could not be seeded with the installed games. unitsync said: {scanError}"
@@ -27122,6 +28391,14 @@ msgstr "The events could not be read from this replay's analysis."
 msgid "The events could not be read."
 msgstr "The events could not be read."
 
+#: src/conquest/handmade/manifest.ts
+msgid "The faction \"{factionName}\" has {count, plural, one {# capital} other {# capitals}}: {capitalList}. Keep \"capital\": true on one of them."
+msgstr "The faction \"{factionName}\" has {count, plural, one {# capital} other {# capitals}}: {capitalList}. Keep \"capital\": true on one of them."
+
+#: src/conquest/handmade/manifest.ts
+msgid "The faction \"{factionName}\" has no capital. Set \"capital\": true on one location it owns."
+msgstr "The faction \"{factionName}\" has no capital. Set \"capital\": true on one location it owns."
+
 #: src/content/unitFieldNotes.ts
 msgid "The fastest speed the repulsor can impart to a deflected projectile."
 msgstr "The fastest speed the repulsor can impart to a deflected projectile."
@@ -27133,6 +28410,10 @@ msgstr "The feature left behind on death."
 #: src/downloads/failureReason.ts
 msgid "the file"
 msgstr "the file"
+
+#: src/conquest/handmade/archive.ts
+msgid "The file could not be read from the game archive."
+msgstr "The file could not be read from the game archive."
 
 #: src/workshop/pages/components/UnitFieldRow.tsx
 msgid "The file differs from what the last export wrote, so the builder will not change this field again."
@@ -27206,6 +28487,22 @@ msgstr "The full width of the arc around the arc centre, so 360 is no restrictio
 #: src/scenario/validate.ts
 msgid "the game"
 msgstr "the game"
+
+#: src/conquest/handmade/library.ts
+msgid "The game \"{carriedBy}\" carries a map with the id \"{mapId}\", and a map a game carries cannot be replaced. Change the id in {MANIFEST_FILE} and import it again."
+msgstr "The game \"{carriedBy}\" carries a map with the id \"{mapId}\", and a map a game carries cannot be replaced. Change the id in {MANIFEST_FILE} and import it again."
+
+#: src/conquest/pages/ConquestListPage.tsx
+msgid "The game {carriedBy} carries this map"
+msgstr "The game {carriedBy} carries this map"
+
+#: src/conquest/pages/GalaxyPage.tsx
+msgid "The game {carriedBy} no longer carries the map \"{savedTitle}\". A game update may have removed it."
+msgstr "The game {carriedBy} no longer carries the map \"{savedTitle}\". A game update may have removed it."
+
+#: src/conquest/pages/ConquestListPage.tsx
+msgid "The game {game} no longer carries the map this conquest is played on. A game update may have removed it. Your progress is saved (turn {turn}), and it carries on if a game carries the map again."
+msgstr "The game {game} no longer carries the map this conquest is played on. A game update may have removed it. Your progress is saved (turn {turn}), and it carries on if a game carries the map again."
 
 #: src/workshop/pages/components/UnitFieldRow.tsx
 msgid "The game changes this field as it loads. Its files say {fileValue} and it loads as {loadedValue}."
@@ -27355,9 +28652,17 @@ msgstr "The hand-made map \"{mapTitle}\" has changed since this warpath began, a
 msgid "The hand-made map \"{mapTitle}\" has no Warpath start and goal, so it can only be played in Conquest."
 msgstr "The hand-made map \"{mapTitle}\" has no Warpath start and goal, so it can only be played in Conquest."
 
+#: src/conquest/pages/ConquestListPage.tsx
+msgid "The hand-made map \"{mapTitle}\" has the id \"{mapId}\", which another map in your list already uses, so it cannot be opened. Delete that map on the Conquest page, then import this code again."
+msgstr "The hand-made map \"{mapTitle}\" has the id \"{mapId}\", which another map in your list already uses, so it cannot be opened. Delete that map on the Conquest page, then import this code again."
+
 #: src/runlite/pages/components/RunSetupForm.tsx
 msgid "The hand-made maps could not be listed, so none is offered here. {handmadeError}"
 msgstr "The hand-made maps could not be listed, so none is offered here. {handmadeError}"
+
+#: src/conquest/pages/ConquestListPage.tsx
+msgid "The hand-made maps could not be listed. {handmadeError}"
+msgstr "The hand-made maps could not be listed. {handmadeError}"
 
 #: src/runlite/handmadeMap.ts
 msgid "The hand-made maps could not be listed. {reason}"
@@ -27587,9 +28892,17 @@ msgstr "The in-world height (in map units) that pure black in the heightmap maps
 msgid "The in-world height (in map units) that pure white maps to — the map's highest point. The gap between min and max sets how steep the terrain is."
 msgstr "The in-world height (in map units) that pure white maps to — the map's highest point. The gap between min and max sets how steep the terrain is."
 
+#: src/conquest/pages/components/BattleOverlay.tsx
+msgid "The incursion at {nodeName} is repelled."
+msgstr "The incursion at {nodeName} is repelled."
+
 #: src/content/pages/components/UnitListNotes.tsx
 msgid "The installed game is read with the match's own mod options, teams and AIs, because a game's unit list can change with them. With the right list, a placed order names a building and a factory order names a unit that moves. A list can still be the wrong one, for a build that is not the match's or a unit that a map adds, and then some orders do not fit."
 msgstr "The installed game is read with the match's own mod options, teams and AIs, because a game's unit list can change with them. With the right list, a placed order names a building and a factory order names a unit that moves. A list can still be the wrong one, for a build that is not the match's or a unit that a map adds, and then some orders do not fit."
+
+#: src/conquest/pages/ConquestListPage.tsx
+msgid "The installed games could not be searched for maps they carry, so none is listed. {archiveError}"
+msgstr "The installed games could not be searched for maps they carry, so none is listed. {archiveError}"
 
 #: src/animation/pages/CobPage.tsx
 msgid "The instructions in the file, as they are stored."
@@ -27610,6 +28923,10 @@ msgstr "The keys work while focus is in the map or the timeline."
 #: src/runlite/RunMapView.tsx
 msgid "The land of this map could not be built. {landError}"
 msgstr "The land of this map could not be built. {landError}"
+
+#: src/conquest/pages/GalaxyPage.tsx
+msgid "The land of this map could not be built. {terrainError}"
+msgstr "The land of this map could not be built. {terrainError}"
 
 #: src/content/pages/components/WatchWithRewindButton.tsx
 msgid "The last recording failed. Try again, then watch it with rewind?"
@@ -27664,6 +28981,14 @@ msgstr "The lobby says the host is at {ip}, which points back at your own machin
 msgid "The lobby would not issue another one. The game carries on, but if the relay has to reconnect everybody will be dropped. Host again when you can."
 msgstr "The lobby would not issue another one. The game carries on, but if the relay has to reconnect everybody will be dropped. Host again when you can."
 
+#: src/conquest/handmade/read.ts
+msgid "The location {who} cannot be reached from the rest of the map. It is joined only to {joined}. Add a road or a crossing to it in {MANIFEST_FILE}."
+msgstr "The location {who} cannot be reached from the rest of the map. It is joined only to {joined}. Add a road or a crossing to it in {MANIFEST_FILE}."
+
+#: src/conquest/handmade/read.ts
+msgid "The location {who} cannot be reached from the rest of the map. No road or crossing joins it. Add a road or a crossing to it in {MANIFEST_FILE}."
+msgstr "The location {who} cannot be reached from the rest of the map. No road or crossing joins it. Add a road or a crossing to it in {MANIFEST_FILE}."
+
 #: src/i18n/uiError.ts
 msgid "the login did not finish within {seconds}s"
 msgstr "the login did not finish within {seconds}s"
@@ -27681,6 +29006,10 @@ msgstr "The low-resolution overview image players see in the lobby and the in-ga
 msgid "the map"
 msgstr "the map"
 
+#: src/conquest/pages/GalaxyPage.tsx
+msgid "The map \"{savedTitle}\" is no longer installed."
+msgstr "The map \"{savedTitle}\" is no longer installed."
+
 #: src/mapconv/index.ts
 msgid "The map compiler coilbox builds and takes apart maps with."
 msgstr "The map compiler coilbox builds and takes apart maps with."
@@ -27692,6 +29021,10 @@ msgstr "The map could not be drawn."
 #: src/runlite/pages/components/RunSetupForm.tsx
 msgid "The map decides how long this warpath is. This length crosses a map of {landLocationCount} {landLocationNoun}."
 msgstr "The map decides how long this warpath is. This length crosses a map of {landLocationCount} {landLocationNoun}."
+
+#: src/conquest/pages/GalaxyPage.tsx
+msgid "The map folders could not be read. {failure}"
+msgstr "The map folders could not be read. {failure}"
 
 #: src/runlite/mapRun.ts
 msgid "The map for this warpath could not be generated."
@@ -27716,6 +29049,26 @@ msgstr "The map is not drawn yet."
 #: src/content/replayAnalysis.ts
 msgid "The map is not installed."
 msgstr "The map is not installed."
+
+#: src/conquest/pages/GalaxyPage.tsx
+msgid "The map never changes. The seed sets how your enemies move and which battlefield each location the map leaves open is fought on."
+msgstr "The map never changes. The seed sets how your enemies move and which battlefield each location the map leaves open is fought on."
+
+#: src/conquest/pages/ConquestListPage.tsx
+msgid "The map this conquest is played on is no longer installed. Your progress is saved (turn {turn}). Import the map again to carry on."
+msgstr "The map this conquest is played on is no longer installed. Your progress is saved (turn {turn}). Import the map again to carry on."
+
+#: src/conquest/handmade/library.ts
+msgid "The map was installed as \"{id}\" but could not be read back, and taking it out again failed. Remove it from the Conquest page. {detail}"
+msgstr "The map was installed as \"{id}\" but could not be read back, and taking it out again failed. Remove it from the Conquest page. {detail}"
+
+#: src/conquest/pages/ConquestListPage.tsx
+msgid "The map was not imported. {refusal}"
+msgstr "The map was not imported. {refusal}"
+
+#: src/conquest/pages/ConquestListPage.tsx
+msgid "The map was not imported. Fix the following in the map folder, zip it again and import the new zip."
+msgstr "The map was not imported. Fix the following in the map folder, zip it again and import the new zip."
 
 #: src/multiplayer/pages/BattleRoomPage.tsx
 msgid "The match has started"
@@ -27839,6 +29192,10 @@ msgstr "The original replay is not in your library, so it cannot be made again."
 msgid "The other maps are counted under the same filters. Nothing here tests whether a difference in length is more than chance, and with few matches on either row it may be."
 msgstr "The other maps are counted under the same filters. Nothing here tests whether a difference in length is more than chance, and with few matches on either row it may be."
 
+#: src/conquest/pages/components/BattleOverlayParts.tsx
+msgid "The outcome could not be read from the replay. How did the battle end?"
+msgstr "The outcome could not be read from the replay. How did the battle end?"
+
 #: src/content/mapImage.ts
 msgid "The picture could not be encoded as a PNG."
 msgstr "The picture could not be encoded as a PNG."
@@ -27907,6 +29264,26 @@ msgstr "The project's weapon library is empty. Add weapons from the Weapons butt
 #: src/content/unitFieldNotes.ts
 msgid "The projectile survives its own explosion and keeps going, exploding again on every sim frame it spends inside a collision volume. Multiplies damage enormously."
 msgstr "The projectile survives its own explosion and keeps going, exploding again on every sim frame it spends inside a collision volume. Multiplies damage enormously."
+
+#: src/conquest/handmade/read.ts
+msgid "The province {province} is listed in {MANIFEST_FILE}, but its colour is not painted anywhere on the province image. Check the colour matches exactly."
+msgstr "The province {province} is listed in {MANIFEST_FILE}, but its colour is not painted anywhere on the province image. Check the colour matches exactly."
+
+#: src/conquest/handmade/read.ts
+msgid "The province {who} cannot be reached from the rest of the map. It is joined only to {joined}. Add a crossing or a road in {MANIFEST_FILE}, or paint it so it touches a neighbour."
+msgstr "The province {who} cannot be reached from the rest of the map. It is joined only to {joined}. Add a crossing or a road in {MANIFEST_FILE}, or paint it so it touches a neighbour."
+
+#: src/conquest/handmade/read.ts
+msgid "The province {who} cannot be reached from the rest of the map. Nothing touches it. Add a crossing or a road in {MANIFEST_FILE}, or paint it so it touches a neighbour."
+msgstr "The province {who} cannot be reached from the rest of the map. Nothing touches it. Add a crossing or a road in {MANIFEST_FILE}, or paint it so it touches a neighbour."
+
+#: src/conquest/handmade/read.ts
+msgid "The province image \"{provincesFile}\" is {provincesWidth} by {provincesHeight} pixels and the map picture \"{pictureFile}\" is {pictureWidth} by {pictureHeight}. They must be the same size."
+msgstr "The province image \"{provincesFile}\" is {provincesWidth} by {provincesHeight} pixels and the map picture \"{pictureFile}\" is {pictureWidth} by {pictureHeight}. They must be the same size."
+
+#: src/conquest/handmade/read.ts
+msgid "The province image has the colour {color} at pixel {x}, {y} (counted from the top left), but {MANIFEST_FILE} lists no province with that colour. Add a province for it, or repaint the area."
+msgstr "The province image has the colour {color} at pixel {x}, {y} (counted from the top left), but {MANIFEST_FILE} lists no province with that colour. Add a province for it, or repaint the area."
 
 #: src/content/pages/components/ReplayAnalysisSection.tsx
 msgid "The recorded events are deleted. The replay is not touched, and it can be analysed again."
@@ -28028,6 +29405,10 @@ msgstr "The same idea for radar. Defaults to the sight height."
 msgid "The same predicate language the unit search box takes, e.g. \"cost < 500\"."
 msgstr "The same predicate language the unit search box takes, e.g. \"cost < 500\"."
 
+#: src/conquest/pages/ConquestListPage.tsx
+msgid "The same seed always builds the same map."
+msgstr "The same seed always builds the same map."
+
 #: src/workshop/pages/components/RandomModDrawer.tsx
 msgid "The same seed and rules against this game always produce the same mod."
 msgstr "The same seed and rules against this game always produce the same mod."
@@ -28044,6 +29425,10 @@ msgstr "The scan failed, so no games are listed. unitsync said: {scanError}"
 msgid "The scan failed, so no maps are listed. unitsync said: {scanError}"
 msgstr "The scan failed, so no maps are listed. unitsync said: {scanError}"
 
+#: src/conquest/pages/ConquestListPage.tsx
+msgid "The scan finished but the engine reported problems and listed no games, so this is not a sign that you own none. Try another engine, or open Content > Games to see what it did find."
+msgstr "The scan finished but the engine reported problems and listed no games, so this is not a sign that you own none. Try another engine, or open Content > Games to see what it did find."
+
 #: src/workshop/customParamConsumers.ts
 msgid "The scan stopped before it had read the whole archive."
 msgstr "The scan stopped before it had read the whole archive."
@@ -28055,6 +29440,22 @@ msgstr "The scan was cancelled."
 #: src/play/useBattleRun.ts
 msgid "The scenario \"{scenarioName}\" was made for {scenarioGame}, which is a different game from {installedName}. It cannot be played here."
 msgstr "The scenario \"{scenarioName}\" was made for {scenarioGame}, which is a different game from {installedName}. It cannot be played here."
+
+#: src/conquest/handmade/read.ts
+msgid "The scenario file \"{file}\" for \"{name}\" cannot be used. {why}"
+msgstr "The scenario file \"{file}\" for \"{name}\" cannot be used. {why}"
+
+#: src/conquest/handmade/read.ts
+msgid "The scenario file \"{file}\" for \"{name}\" cannot be used. It has no game and map yet. Set it up in the scenario builder and export it again."
+msgstr "The scenario file \"{file}\" for \"{name}\" cannot be used. It has no game and map yet. Set it up in the scenario builder and export it again."
+
+#: src/conquest/handmade/read.ts
+msgid "The scenario file \"{file}\" for \"{name}\" cannot be used. The file could not be read."
+msgstr "The scenario file \"{file}\" for \"{name}\" cannot be used. The file could not be read."
+
+#: src/conquest/handmade/read.ts
+msgid "The scenario file \"{file}\" for \"{name}\" is for the game \"{scenarioGame}\", and this map is for \"{mapGame}\". A location can only play a scenario made for the map's game."
+msgstr "The scenario file \"{file}\" for \"{name}\" is for the game \"{scenarioGame}\", and this map is for \"{mapGame}\". A location can only play a scenario made for the map's game."
 
 #: src/scenario/pages/components/ScenarioTestDrawer.tsx
 msgid "The scenario is compiled and read back before the engine is started, so a reference that does not resolve stops here rather than playing as a trigger that never fires."
@@ -28177,6 +29578,10 @@ msgstr "The servers you can log in to, and your accounts on them."
 msgid "The servers you play on, and who you hear from there."
 msgstr "The servers you play on, and who you hear from there."
 
+#: src/conquest/pages/ConquestListPage.tsx
+msgid "The skirmish AIs for this game could not be listed."
+msgstr "The skirmish AIs for this game could not be listed."
+
 #: src/mapconv/pages/components/AdvancedOptions.tsx
 msgid "the small overview image shown in-lobby and in-game"
 msgstr "the small overview image shown in-lobby and in-game"
@@ -28192,6 +29597,10 @@ msgstr "The source that was compiled, as it is on disk."
 #: src/content/unitFieldNotes.ts
 msgid "The speed of takeoff and landing, at least for a gunship."
 msgstr "The speed of takeoff and landing, at least for a gunship."
+
+#: src/conquest/pages/ConquestListPage.tsx
+msgid "The stars never change. The seed sets the factions, where your enemies start, and which maps each system is fought on."
+msgstr "The stars never change. The seed sets the factions, where your enemies start, and which maps each system is fought on."
 
 #: src/runlite/mapRun.ts
 msgid "The start and the goal are both \"{place}\". They must be different locations."
@@ -28377,6 +29786,10 @@ msgstr "The window is when an order was given, not when anything was built."
 msgid "The window is when each event happened in the playback."
 msgstr "The window is when each event happened in the playback."
 
+#: src/conquest/mapStyle.ts
+msgid "Theatre (flat chart)"
+msgstr "Theatre (flat chart)"
+
 #: src/multiplayer/follow/FollowIndicator.tsx
 msgid "Their battle is locked."
 msgstr "Their battle is locked."
@@ -28464,6 +29877,10 @@ msgstr "These boxes were drawn for {presetMap}, not the map you are on."
 #: src/placement/LayoutControls.tsx
 msgid "These buildings are in the order they were clicked, which is not an opening. Turn this on to say what gets built first, and the blueprint becomes a build order that can be followed, watched and shared."
 msgstr "These buildings are in the order they were clicked, which is not an opening. Turn this on to say what gets built first, and the blueprint becomes a build order that can be followed, watched and shared."
+
+#: src/conquest/pages/ConquestListPage.tsx
+msgid "These choices could not be built into a map. Try another seed."
+msgstr "These choices could not be built into a map. Try another seed."
 
 #: src/content/pages/components/MissionRuntimeSection.tsx
 msgid "These come with the game and play as the game itself. They are listed under Play, and coilbox neither wrote them nor removes them."
@@ -28641,6 +30058,10 @@ msgstr "This challenge link is for an unknown game mode."
 msgid "This challenge needs \"{gameShortname}\", which isn't installed. Install it from Content → Games, then try again."
 msgstr "This challenge needs \"{gameShortname}\", which isn't installed. Install it from Content → Games, then try again."
 
+#: src/conquest/pages/ConquestListPage.tsx
+msgid "This challenge needs \"{shortname}\", which isn't installed. Install it from Content → Games, then try again."
+msgstr "This challenge needs \"{shortname}\", which isn't installed. Install it from Content → Games, then try again."
+
 #: src/runlite/challenge.ts
 msgid "This challenge was made on a different version of its hand-made map than the one installed here."
 msgstr "This challenge was made on a different version of its hand-made map than the one installed here."
@@ -28669,6 +30090,30 @@ msgstr "This copy of Coilbox is set up for another game, so this is not in its h
 msgid "This copy of Coilbox is set up for one game, so the hub shows its things, plus anything not tied to a game."
 msgstr "This copy of Coilbox is set up for one game, so the hub shows its things, plus anything not tied to a game."
 
+#: src/conquest/pages/ConquestListPage.tsx
+msgid "This deletes the conquest for good, including its progress (Defeat). The map stays in your list. It cannot be undone."
+msgstr "This deletes the conquest for good, including its progress (Defeat). The map stays in your list. It cannot be undone."
+
+#: src/conquest/pages/ConquestListPage.tsx
+msgid "This deletes the conquest for good, including its progress (Turn {turn} · {percent}% held). The map stays in your list. It cannot be undone."
+msgstr "This deletes the conquest for good, including its progress (Turn {turn} · {percent}% held). The map stays in your list. It cannot be undone."
+
+#: src/conquest/pages/ConquestListPage.tsx
+msgid "This deletes the conquest for good, including its progress (turn {turn}). It cannot be undone, and it cannot carry on if the map comes back."
+msgstr "This deletes the conquest for good, including its progress (turn {turn}). It cannot be undone, and it cannot carry on if the map comes back."
+
+#: src/conquest/pages/ConquestListPage.tsx
+msgid "This deletes the conquest for good, including its progress (Victory). The map stays in your list. It cannot be undone."
+msgstr "This deletes the conquest for good, including its progress (Victory). The map stays in your list. It cannot be undone."
+
+#: src/conquest/pages/ConquestListPage.tsx
+msgid "This deletes the imported map from your computer. To play it again you would have to import it again. It cannot be undone."
+msgstr "This deletes the imported map from your computer. To play it again you would have to import it again. It cannot be undone."
+
+#: src/conquest/pages/ConquestListPage.tsx
+msgid "This deletes the map from your computer. It cannot be undone."
+msgstr "This deletes the map from your computer. It cannot be undone."
+
 #: src/runlite/pages/RunListPage.tsx
 msgid "This deletes the warpath for good, including its progress ({progressText}). It cannot be undone."
 msgstr "This deletes the warpath for good, including its progress ({progressText}). It cannot be undone."
@@ -28684,6 +30129,10 @@ msgstr "This does not turn."
 #: src/scenario/pages/components/useMapKeyboard.ts
 msgid "This does not turn. A group's units all face south."
 msgstr "This does not turn. A group's units all face south."
+
+#: src/conquest/pages/ConquestListPage.tsx
+msgid "This engine could not read your games"
+msgstr "This engine could not read your games"
 
 #: src/runlite/pages/RunListPage.tsx
 msgid "This engine could not read your games. Try another from <0>Settings → Engines</0>, or see what it found in <1>Content → Games</1>."
@@ -28746,6 +30195,10 @@ msgstr "This game has a runtime marker, but it would not load: {loadError}. Unti
 #: src/content/pages/GameDetailPage.tsx
 msgid "This game has no options."
 msgstr "This game has no options."
+
+#: src/conquest/pages/ConquestListPage.tsx
+msgid "This game has no skirmish AIs to fight against."
+msgstr "This game has no skirmish AIs to fight against."
 
 #: src/workshop/pages/components/BuildMenuPanel.tsx
 msgid "This game has no unit of that name, so the button would do nothing."
@@ -28891,6 +30344,7 @@ msgstr "This link is not a coilbox import."
 msgid "This list could not be checked"
 msgstr "This list could not be checked"
 
+#: src/conquest/pages/components/BattleOverlay.tsx
 #: src/runlite/pages/components/EncounterOverlay.tsx
 msgid "This location is a scenario, not a skirmish."
 msgstr "This location is a scenario, not a skirmish."
@@ -28929,9 +30383,25 @@ msgstr "This map"
 msgid "This map ({0})"
 msgstr "This map ({0})"
 
+#: src/conquest/pages/GalaxyPage.tsx
+msgid "This map could not be opened."
+msgstr "This map could not be opened."
+
+#: src/conquest/pages/GalaxyPage.tsx
+msgid "This map could not be read."
+msgstr "This map could not be read."
+
 #: src/placement/LayoutControls.tsx
 msgid "This map has no water on it: nothing on it is below the waterline, and its lowest ground is {lowest} elmos. Every building here that needs water is refused wherever it stands, marked in cyan. This blueprint wants a map with a coast rather than a different spot on this one."
 msgstr "This map has no water on it: nothing on it is below the waterline, and its lowest ground is {lowest} elmos. Every building here that needs water is refused wherever it stands, marked in cyan. This blueprint wants a map with a coast rather than a different spot on this one."
+
+#: src/conquest/pages/ConquestListPage.tsx
+msgid "This map has the id \"{mapId}\", which a map in the list above already uses, so the map is not listed. Change the id in its map.json and import it again."
+msgstr "This map has the id \"{mapId}\", which a map in the list above already uses, so the map is not listed. Change the id in its map.json and import it again."
+
+#: src/conquest/pages/GalaxyPage.tsx
+msgid "This map leaves {blankCount} of its battles for coilbox to choose, and there are no maps installed to choose from. Install at least one map in Content > Maps, then open it again."
+msgstr "This map leaves {blankCount} of its battles for coilbox to choose, and there are no maps installed to choose from. Install at least one map in Content > Maps, then open it again."
 
 #: src/placement/LayoutControls.tsx
 msgid "This map's heights could not be read, so every unit here is drawn on flat ground rather than at the height the engine will stand it at."
@@ -29466,6 +30936,14 @@ msgstr "This warpath needs the game <0>{name}</0>, which is not installed."
 msgid "This was made by a newer version of coilbox. Update coilbox to open it."
 msgstr "This was made by a newer version of coilbox. Update coilbox to open it."
 
+#: src/conquest/pages/components/ThreatLevelSelect.tsx
+msgid "Threat level"
+msgstr "Threat level"
+
+#: src/conquest/pages/ConquestListPage.tsx
+msgid "Three enemy factions"
+msgstr "Three enemy factions"
+
 #: src/mapconv/pages/components/AdvancedOptions.tsx
 msgid "Threshold (-th)"
 msgstr "Threshold (-th)"
@@ -29772,6 +31250,10 @@ msgstr "Triggers are evaluated in this order, and other triggers point at this o
 msgid "Triggers move an objective with <0>complete_objective</0> and <1>fail_objective</1>, and the first of the two to run is the one that sticks. A hidden objective stays off the player's panel until one of them does, so it is how a mission springs a surprise job rather than a secret the player never sees."
 msgstr "Triggers move an objective with <0>complete_objective</0> and <1>fail_objective</1>, and the first of the two to run is the one that sticks. A hidden objective stays off the player's panel until one of them does, so it is how a mission springs a surprise job rather than a secret the player never sees."
 
+#: src/conquest/galaxy3d/GalaxyView.tsx
+msgid "triple system, {names}"
+msgstr "triple system, {names}"
+
 #: src/scenario/triggerTypes.ts
 msgid "Trips once an actor's health drops below the fraction you set."
 msgstr "Trips once an actor's health drops below the fraction you set."
@@ -29824,6 +31306,7 @@ msgstr "Try with {chosenLabel}"
 msgid "ttl, in frames."
 msgstr "ttl, in frames."
 
+#: src/conquest/pages/GalaxyPage.tsx
 #: src/placement/SurfaceBars.tsx
 msgid "Turn"
 msgstr "Turn"
@@ -29839,6 +31322,10 @@ msgstr "Turn {archiveName}'s {legacyModels} into .s3o, one shared texture per fo
 #: src/home/continue.ts
 msgid "Turn {turn}"
 msgstr "Turn {turn}"
+
+#: src/conquest/pages/ConquestListPage.tsx
+msgid "Turn {turn} · {percent}% held"
+msgstr "Turn {turn} · {percent}% held"
 
 #: src/placement/SurfaceBars.tsx
 msgid "Turn a quarter turn"
@@ -29925,6 +31412,14 @@ msgstr "tweak slot not traced for this project"
 #: src/workshop/pages/components/PackagePanel.tsx
 msgid "Tweak slots"
 msgstr "Tweak slots"
+
+#: src/conquest/pages/ConquestListPage.tsx
+msgid "Two continents"
+msgstr "Two continents"
+
+#: src/conquest/pages/ConquestListPage.tsx
+msgid "Two enemy factions"
+msgstr "Two enemy factions"
 
 #: src/multiplayer/battles/zerokBattle.ts
 msgid "Two players, one each side."
@@ -30027,6 +31522,10 @@ msgstr "Unblock…"
 msgid "Unchecked players still count in the total for {partialLabels}."
 msgstr "Unchecked players still count in the total for {partialLabels}."
 
+#: src/conquest/pages/GalaxyPage.tsx
+msgid "Unclaimed"
+msgstr "Unclaimed"
+
 #: src/content/pages/components/LivingValueChart.tsx
 #: src/content/pages/components/PlayerUnitUsage.tsx
 #: src/content/pages/components/ReplayOpeningSplit.tsx
@@ -30060,6 +31559,18 @@ msgstr "Under attack sound"
 #: src/content/pages/components/ReplayMapView.tsx
 msgid "Under the map, the knob sets the time and the buttons play the match forward or in reverse, at the speed beside them. A tall bar is a unit destroyed, a dot is chat and a diamond is a player leaving, taken from the replay and its analysis. Marks that would touch are drawn as one, larger, and clicking it goes to the earliest event in it. A replay that has not been analysed has no kills. The address holds the time, so a link opens at that moment."
 msgstr "Under the map, the knob sets the time and the buttons play the match forward or in reverse, at the speed beside them. A tall bar is a unit destroyed, a dot is chat and a diamond is a player leaving, taken from the replay and its analysis. Marks that would touch are drawn as one, larger, and clicking it goes to the earliest event in it. A replay that has not been analysed has no kills. The address holds the time, so a link opens at that moment."
+
+#: src/conquest/pages/GalaxyPage.tsx
+msgid "Under your control — your capital."
+msgstr "Under your control — your capital."
+
+#: src/conquest/pages/GalaxyPage.tsx
+msgid "Under your control — your homeworld."
+msgstr "Under your control — your homeworld."
+
+#: src/conquest/pages/GalaxyPage.tsx
+msgid "Under your control."
+msgstr "Under your control."
 
 #: src/workshop/pages/components/ExplosionGeneratorEditor.tsx
 msgid "Underwater"
@@ -30261,6 +31772,7 @@ msgstr "Units captured from the team, as the log counted them"
 msgid "Units each faction's commander can build, directly or indirectly."
 msgstr "Units each faction's commander can build, directly or indirectly."
 
+#: src/conquest/pages/GalaxyPage.tsx
 #: src/runlite/pages/components/RunSetupForm.tsx
 msgid "Units from the builder"
 msgstr "Units from the builder"
@@ -30313,6 +31825,10 @@ msgstr "Units unlocked"
 #: src/runlite/pages/RunPage.tsx
 msgid "Units unlocked into your shared arsenal, lit up against the faction's full build tree."
 msgstr "Units unlocked into your shared arsenal, lit up against the faction's full build tree."
+
+#: src/conquest/pages/components/BattleOverlay.tsx
+msgid "Units usable in this fight, lit up against your faction's build tree. Restricted units stay unlit."
+msgstr "Units usable in this fight, lit up against your faction's build tree. Restricted units stay unlit."
 
 #: src/content/pages/components/states.tsx
 #: src/workshop/pages/components/ProjectChecks.tsx
@@ -30685,6 +32201,10 @@ msgstr "Value of living units by kind"
 msgid "variable"
 msgstr "variable"
 
+#: src/conquest/galaxy3d/GalaxyView.tsx
+msgid "variable star"
+msgstr "variable star"
+
 #: src/scenario/pages/components/VarPanel.tsx
 #: src/scenario/triggerTypes.ts
 msgid "Variables"
@@ -30768,6 +32288,9 @@ msgstr "Victor"
 msgid "Victories"
 msgstr "Victories"
 
+#: src/conquest/pages/components/BattleOverlay.tsx
+#: src/conquest/pages/components/BattleOverlayParts.tsx
+#: src/conquest/pages/ConquestListPage.tsx
 #: src/runlite/pages/components/EncounterOverlay.tsx
 msgid "Victory"
 msgstr "Victory"
@@ -30788,6 +32311,10 @@ msgstr "View"
 msgid "View arsenal tree"
 msgstr "View arsenal tree"
 
+#: src/conquest/pages/components/BattleOverlay.tsx
+msgid "View available units"
+msgstr "View available units"
+
 #: src/content/pages/ArchiveDetailPage.tsx
 #: src/content/pages/components/ArchiveRow.tsx
 msgid "View game"
@@ -30807,6 +32334,10 @@ msgstr "View on the hub"
 msgid "View replay"
 msgstr "View replay"
 
+#: src/conquest/pages/components/BattleOverlay.tsx
+msgid "View tech tree"
+msgstr "View tech tree"
+
 #: src/runlite/pages/components/RunHud.tsx
 msgid "View the arsenal tech tree"
 msgstr "View the arsenal tech tree"
@@ -30822,6 +32353,10 @@ msgstr "Violet"
 #: src/scenario/pages/components/DialoguePanel.tsx
 msgid "Voice clip"
 msgstr "Voice clip"
+
+#: src/conquest/planets.ts
+msgid "Volcanic"
+msgstr "Volcanic"
 
 #: src/workshop/pages/components/DerivedStatsStrip.tsx
 #: src/workshop/unitReference.ts
@@ -30848,6 +32383,10 @@ msgstr "Vote called"
 msgid "Vote to start"
 msgstr "Vote to start"
 
+#: src/conquest/pages/ConquestListPage.tsx
+msgid "Wage a campaign across a map of territory you take one battle at a time. Win skirmishes to capture territory, defend against counterattacks, and take every enemy capital."
+msgstr "Wage a campaign across a map of territory you take one battle at a time. Win skirmishes to capture territory, defend against counterattacks, and take every enemy capital."
+
 #: src/scenario/triggerTypes.ts
 msgid "wait for the player"
 msgstr "wait for the player"
@@ -30856,6 +32395,7 @@ msgstr "wait for the player"
 msgid "Wait for them"
 msgstr "Wait for them"
 
+#: src/conquest/pages/components/BattleOverlayParts.tsx
 #: src/content/pages/components/SetupCard.tsx
 msgid "Waiting for a slot…"
 msgstr "Waiting for a slot…"
@@ -31475,6 +33015,14 @@ msgstr "Whispers"
 msgid "White dots are where one team's start was set before one match. Numbered circles are start positions the matches share."
 msgstr "White dots are where one team's start was set before one match. Numbered circles are start positions the matches share."
 
+#: src/conquest/galaxy3d/GalaxyView.tsx
+msgid "white dwarf"
+msgstr "white dwarf"
+
+#: src/conquest/galaxy3d/GalaxyView.tsx
+msgid "white star"
+msgstr "white star"
+
 #: src/content/replayAnalysis.ts
 msgid "Who won"
 msgstr "Who won"
@@ -31584,9 +33132,29 @@ msgstr "Win 5 games in a row."
 msgid "Win 50 games."
 msgstr "Win 50 games."
 
+#: src/conquest/unlocks.ts
+msgid "Win a conquest"
+msgstr "Win a conquest"
+
+#: src/conquest/unlocks.ts
+msgid "Win a conquest at level {top}"
+msgstr "Win a conquest at level {top}"
+
+#: src/conquest/unlocks.ts
+msgid "Win a conquest at level {top}."
+msgstr "Win a conquest at level {top}."
+
+#: src/conquest/unlocks.ts
+msgid "Win a conquest."
+msgstr "Win a conquest."
+
 #: src/runlite/pages/components/EncounterOverlay.tsx
 msgid "Win it to clear the location."
 msgstr "Win it to clear the location."
+
+#: src/conquest/pages/components/BattleOverlay.tsx
+msgid "Win it to take {nodeName}."
+msgstr "Win it to take {nodeName}."
 
 #: src/content/pages/MapDetailPage.tsx
 #: src/content/pages/PlayerDossierPage.tsx
@@ -31922,6 +33490,10 @@ msgstr "Yaw speed"
 msgid "Yellow"
 msgstr "Yellow"
 
+#: src/conquest/galaxy3d/GalaxyView.tsx
+msgid "yellow star"
+msgstr "yellow star"
+
 #: src/content/pages/GameUnitPage.tsx
 #: src/multiplayer/battle/VotePanel.tsx
 msgid "Yes"
@@ -31936,6 +33508,7 @@ msgstr "Yesterday"
 msgid "you"
 msgstr "you"
 
+#: src/conquest/pages/GalaxyPage.tsx
 #: src/hub/preview.ts
 #: src/multiplayer/battle/MemberRow.tsx
 #: src/multiplayer/NameMarkIcon.tsx
@@ -31943,6 +33516,10 @@ msgstr "you"
 #: src/runlite/galaxyAdapter.ts
 msgid "You"
 msgstr "You"
+
+#: src/conquest/pages/ConquestListPage.tsx
+msgid "You already have a conquest on the hand-made map \"{mapTitle}\", and a map holds one conquest at a time. Abandon that conquest on the Conquest page, then import this code again."
+msgstr "You already have a conquest on the hand-made map \"{mapTitle}\", and a map holds one conquest at a time. Abandon that conquest on the Conquest page, then import this code again."
 
 #: src/lobby-servers/pages/SettingsSection.tsx
 msgid "You already have this login."
@@ -32112,6 +33689,14 @@ msgstr "you only · per-team"
 msgid "You retreat, hull scarred."
 msgstr "You retreat, hull scarred."
 
+#: src/conquest/pages/components/StartPositionSelect.tsx
+msgid "You start in the middle, and your rivals start out on the rim all around you."
+msgstr "You start in the middle, and your rivals start out on the rim all around you."
+
+#: src/conquest/pages/components/StartPositionSelect.tsx
+msgid "You start on the western edge, with your rivals far across the map."
+msgstr "You start on the western edge, with your rivals far across the map."
+
 #: src/hub/uploadOutcomes.ts
 msgid "You stopped the picture uploads"
 msgstr "You stopped the picture uploads"
@@ -32148,6 +33733,14 @@ msgstr "Your battle is not going through the relay"
 msgid "Your battle is running on an expired relay pass"
 msgstr "Your battle is running on an expired relay pass"
 
+#: src/conquest/pages/GalaxyPage.tsx
+msgid "Your capital has fallen."
+msgstr "Your capital has fallen."
+
+#: src/conquest/pages/components/BattleOverlay.tsx
+msgid "Your capital is lost."
+msgstr "Your capital is lost."
+
 #: src/home/groupDescription.ts
 msgid "Your career, player stats and replays of games already played."
 msgstr "Your career, player stats and replays of games already played."
@@ -32167,6 +33760,15 @@ msgstr "Your clipboard holds a coilbox link."
 #: src/runlite/pages/RunPage.tsx
 msgid "Your commander deploys here. Chart a course onward toward the warlord."
 msgstr "Your commander deploys here. Chart a course onward toward the warlord."
+
+#: src/conquest/pages/GalaxyPage.tsx
+msgid "Your conquest on it is saved and nothing has been changed."
+msgstr "Your conquest on it is saved and nothing has been changed."
+
+#: src/conquest/pages/ConquestListPage.tsx
+#: src/conquest/pages/GalaxyPage.tsx
+msgid "Your conquest progress could not be read. Nothing has been changed. {stateError}"
+msgstr "Your conquest progress could not be read. Nothing has been changed. {stateError}"
 
 #. placeholder {0}: missingRoot.path
 #: src/content/pages/components/SetupCard.tsx

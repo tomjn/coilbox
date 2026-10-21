@@ -1,3 +1,4 @@
+import { t } from "@lingui/core/macro";
 import {
   assetUrl,
   conquestMapStagingUrl,
@@ -30,7 +31,11 @@ import {
   parseManifest,
   type ResolvedManifest,
 } from "./manifest";
-import { type HandmadeMapResult, readHandmadeMap } from "./read";
+import {
+  type HandmadeMapResult,
+  missingFileMessage,
+  readHandmadeMap,
+} from "./read";
 
 /**
  * The hand-made maps coilbox holds: the ones bundled with a distribution in
@@ -245,11 +250,13 @@ async function listFolders({
     if (
       manifest.game.shortname.toLowerCase() !== game.shortname.toLowerCase()
     ) {
+      const mapShortname = manifest.game.shortname;
+      const gameShortname = game.shortname;
       fail([
         {
           code: "manifest-field",
           path: "game.shortname",
-          message: `${MANIFEST_FILE}: the game shortname "${manifest.game.shortname}" is not "${game.shortname}", the shortname of the game that carries the map.`,
+          message: t`${MANIFEST_FILE}: the game shortname "${mapShortname}" is not "${gameShortname}", the shortname of the game that carries the map.`,
         },
       ]);
       continue;
@@ -283,6 +290,7 @@ async function listFolders({
     // An imported map is stored under its id. One that is not was put there
     // by hand, and removing it by id would miss the folder.
     if (source === "imported" && manifest.id !== folder) {
+      const mapId = manifest.id;
       unreadable.push({
         folder,
         source,
@@ -290,7 +298,7 @@ async function listFolders({
           {
             code: "manifest-field",
             path: "id",
-            message: `${MANIFEST_FILE}: the id "${manifest.id}" does not match the folder "${folder}" the map is stored in.`,
+            message: t`${MANIFEST_FILE}: the id "${mapId}" does not match the folder "${folder}" the map is stored in.`,
           },
         ],
       });
@@ -395,8 +403,8 @@ async function missingModelFiles(
         code: "file-missing",
         file: path,
         message: outside
-          ? `${MANIFEST_FILE}: models[${i}] names the model "${file}", which points at "${path}" outside the map folder. Put the file in the folder and point at it there.`
-          : `${MANIFEST_FILE}: models[${i}] names the model "${file}", which needs the file "${path}", but the folder has no file with that name.`,
+          ? t`${MANIFEST_FILE}: models[${i}] names the model "${file}", which points at "${path}" outside the map folder. Put the file in the folder and point at it there.`
+          : t`${MANIFEST_FILE}: models[${i}] names the model "${file}", which needs the file "${path}", but the folder has no file with that name.`,
       });
     }
   }
@@ -412,13 +420,16 @@ async function readFolder(
   if (!manifest) return { ok: false, errors };
 
   const missing: HandmadeMapError[] = [];
-  const need = (what: string, file: string): string | undefined => {
+  const need = (
+    what: "province image" | "picture",
+    file: string,
+  ): string | undefined => {
     const url = urlFor(file);
     if (url === undefined) {
       missing.push({
         code: "file-missing",
         file,
-        message: `${MANIFEST_FILE} names the ${what} "${file}", but the folder has no file with that name.`,
+        message: missingFileMessage(what, file),
       });
     }
     return url;
@@ -440,7 +451,7 @@ async function readFolder(
       unreadable.push({
         code: "image-unreadable",
         file,
-        message: `"${file}" could not be opened as an image. Save it again as a PNG.`,
+        message: t`"${file}" could not be opened as an image. Save it again as a PNG.`,
       });
       return undefined;
     }
@@ -521,7 +532,7 @@ export async function loadHandmadeMap(id: string): Promise<HandmadeMapResult> {
         {
           code: "file-missing",
           file: MANIFEST_FILE,
-          message: `No hand-made map with the id "${id}" is installed, and no installed game carries one. A game update may have removed it.`,
+          message: t`No hand-made map with the id "${id}" is installed, and no installed game carries one. A game update may have removed it.`,
         },
       ],
     };
@@ -619,9 +630,11 @@ export async function importHandmadeMap(
       (l) => l.summary.id === read.doc.id && l.summary.source === "game",
     );
     if (carried) {
+      const carriedBy = carried.summary.carriedBy ?? "";
+      const mapId = read.doc.id;
       return {
         status: "refused",
-        message: `The game "${carried.summary.carriedBy}" carries a map with the id "${read.doc.id}", and a map a game carries cannot be replaced. Change the id in ${MANIFEST_FILE} and import it again.`,
+        message: t`The game "${carriedBy}" carries a map with the id "${mapId}", and a map a game carries cannot be replaced. Change the id in ${MANIFEST_FILE} and import it again.`,
       };
     }
 
@@ -642,9 +655,10 @@ export async function importHandmadeMap(
       try {
         await conquestMapRemove({ id });
       } catch (e) {
+        const detail = messageOf(e);
         return {
           status: "refused",
-          message: `The map was installed as "${id}" but could not be read back, and taking it out again failed. Remove it from the Conquest page. ${messageOf(e)}`,
+          message: t`The map was installed as "${id}" but could not be read back, and taking it out again failed. Remove it from the Conquest page. ${detail}`,
         };
       }
       return { status: "invalid", errors: installed.errors };
