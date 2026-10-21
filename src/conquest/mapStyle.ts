@@ -1,3 +1,4 @@
+import { select, t } from "@lingui/core/macro";
 import { generateCities } from "./cities";
 import { terrainMarginPixels } from "./galaxy3d/terrain";
 import type { TerrainPixels } from "./galaxy3d/terrainLoad";
@@ -16,10 +17,31 @@ import { generatedTerrainWithMargin, generateTerritories } from "./territories";
 
 /** The style choices, in the order both setup forms offer them. */
 export const MAP_STYLE_OPTIONS: { value: MapSkin; label: string }[] = [
-  { value: "galaxy", label: "Galaxy (starfield)" },
-  { value: "theatre", label: "Theatre (flat chart)" },
-  { value: "cities", label: "Cities (roads across generated land)" },
-  { value: "territories", label: "Territories (provinces on generated land)" },
+  {
+    value: "galaxy",
+    // Read when the picker draws, so it follows the language.
+    get label() {
+      return t`Galaxy (starfield)`;
+    },
+  },
+  {
+    value: "theatre",
+    get label() {
+      return t`Theatre (flat chart)`;
+    },
+  },
+  {
+    value: "cities",
+    get label() {
+      return t`Cities (roads across generated land)`;
+    },
+  },
+  {
+    value: "territories",
+    get label() {
+      return t`Territories (provinces on generated land)`;
+    },
+  },
 ];
 
 /** What a style calls one of its locations, for player-facing text. */
@@ -28,15 +50,45 @@ export interface LocationNoun {
   many: string;
 }
 
-const LOCATION_NOUNS: Record<MapSkin, LocationNoun> = {
-  galaxy: { one: "system", many: "systems" },
-  theatre: { one: "location", many: "locations" },
-  cities: { one: "city", many: "cities" },
-  territories: { one: "province", many: "provinces" },
+/** The English plural for each style, which `sizeOptions` selects its wording by. */
+const LOCATION_KEYS: Record<MapSkin, string> = {
+  galaxy: "systems",
+  theatre: "locations",
+  cities: "cities",
+  territories: "provinces",
 };
 
+export function locationNounKey(skin: MapSkin | undefined): string {
+  return LOCATION_KEYS[skin ?? "galaxy"];
+}
+
+/**
+ * The words are for text that stands alone, such as a heading or a table label.
+ * A sentence that holds one selects on the style instead, so each language words
+ * the whole sentence around the noun.
+ */
 export function locationNoun(skin: MapSkin | undefined): LocationNoun {
-  return LOCATION_NOUNS[skin ?? "galaxy"];
+  const style = skin ?? "galaxy";
+  return {
+    get one() {
+      return select(style, {
+        galaxy: "system",
+        theatre: "location",
+        cities: "city",
+        territories: "province",
+        other: "location",
+      });
+    },
+    get many() {
+      return select(style, {
+        galaxy: "systems",
+        theatre: "locations",
+        cities: "cities",
+        territories: "provinces",
+        other: "locations",
+      });
+    },
+  };
 }
 
 /**

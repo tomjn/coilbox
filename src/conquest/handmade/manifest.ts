@@ -1,3 +1,4 @@
+import { plural, t } from "@lingui/core/macro";
 import { parseMapDownload } from "../../campaign/model";
 import { MAP_RUN_KINDS, type MapRunKind } from "../../runlite/mapRun";
 import type { NodeBattleSpec } from "../model";
@@ -25,6 +26,17 @@ import type { HandmadeMapError } from "./errors";
 
 /** The file name of the manifest inside a map folder. */
 export const MANIFEST_FILE = "map.json";
+
+// Example JSON shown in messages. It is not translated, and held in variables
+// because a literal brace is not allowed in a message.
+const exampleGame = '{ "shortname": "BYAR" }';
+const exampleSize = '{ "width": 2000, "height": 1500 }';
+const exampleKind = '{ "kind": "shop" }';
+const exampleModel = '{ "model": { "file": "tower.glb" }, "pos": [120, 340] }';
+const exampleFile = '{ "file": "tower.glb" }';
+const exampleGameModel = '{ "game": "armcom" }';
+const exampleWarpath = '{ "start": "kent", "goal": "calais" }';
+const exampleBattle = '{ "mapName": "Comet Catcher Redux" }';
 
 /** The manifest version this build reads. */
 export const MANIFEST_FORMAT_VERSION = 1;
@@ -253,7 +265,7 @@ export function parseManifest(text: string): {
       errors: [
         {
           code: "manifest-json",
-          message: `${MANIFEST_FILE} is not valid JSON: ${detail}`,
+          message: t`${MANIFEST_FILE} is not valid JSON: ${detail}`,
         },
       ],
     };
@@ -264,17 +276,17 @@ export function parseManifest(text: string): {
       errors: [
         {
           code: "manifest-json",
-          message: `${MANIFEST_FILE} must hold one JSON object.`,
+          message: t`${MANIFEST_FILE} must hold one JSON object.`,
         },
       ],
     };
   }
 
-  const field = (path: string, problem: string) => {
+  const field = (path: string, message: (where: string) => string) => {
     errors.push({
       code: "manifest-field",
       path,
-      message: `${MANIFEST_FILE}: ${path} ${problem}`,
+      message: message(path),
     });
   };
 
@@ -282,7 +294,11 @@ export function parseManifest(text: string): {
   const text1 = (o: Obj, key: string, path: string): string => {
     const v = o[key];
     if (typeof v === "string" && v !== "") return v;
-    field(path, "must be text and cannot be empty.");
+    field(
+      path,
+      (where) =>
+        t`${MANIFEST_FILE}: ${where} must be text and cannot be empty.`,
+    );
     return "";
   };
   /** An optional string. Absent is fine, any other type is not. */
@@ -290,7 +306,7 @@ export function parseManifest(text: string): {
     const v = o[key];
     if (v === undefined) return undefined;
     if (typeof v === "string") return v === "" ? undefined : v;
-    field(path, "must be text.");
+    field(path, (where) => t`${MANIFEST_FILE}: ${where} must be text.`);
     return undefined;
   };
   const optNumber = (
@@ -298,19 +314,22 @@ export function parseManifest(text: string): {
     key: string,
     path: string,
     ok: (n: number) => boolean,
-    rule: string,
+    message: (where: string) => string,
   ): number | undefined => {
     const v = o[key];
     if (v === undefined) return undefined;
     if (typeof v === "number" && Number.isFinite(v) && ok(v)) return v;
-    field(path, `must be ${rule}.`);
+    field(path, message);
     return undefined;
   };
   const optBool = (o: Obj, key: string, path: string): boolean | undefined => {
     const v = o[key];
     if (v === undefined) return undefined;
     if (typeof v === "boolean") return v;
-    field(path, "must be true or false.");
+    field(
+      path,
+      (where) => t`${MANIFEST_FILE}: ${where} must be true or false.`,
+    );
     return undefined;
   };
 
@@ -321,18 +340,28 @@ export function parseManifest(text: string): {
       typeof d.formatVersion === "number" &&
       d.formatVersion > MANIFEST_FORMAT_VERSION
     ) {
+      const found = d.formatVersion;
       field(
         "formatVersion",
-        `is ${d.formatVersion}, which is newer than this coilbox reads (${MANIFEST_FORMAT_VERSION}). Update coilbox to use this map.`,
+        (where) =>
+          t`${MANIFEST_FILE}: ${where} is ${found}, which is newer than this coilbox reads (${MANIFEST_FORMAT_VERSION}). Update coilbox to use this map.`,
       );
     } else {
-      field("formatVersion", `must be ${MANIFEST_FORMAT_VERSION}.`);
+      field(
+        "formatVersion",
+        (where) =>
+          t`${MANIFEST_FILE}: ${where} must be ${MANIFEST_FORMAT_VERSION}.`,
+      );
     }
   }
 
   const id = text1(d, "id", "id");
   if (id !== "" && !/^[A-Za-z0-9-]+$/.test(id)) {
-    field("id", "may only use letters, digits and -.");
+    field(
+      "id",
+      (where) =>
+        t`${MANIFEST_FILE}: ${where} may only use letters, digits and -.`,
+    );
   }
   const title = text1(d, "title", "title");
   const description = optText(d, "description", "description");
@@ -344,7 +373,11 @@ export function parseManifest(text: string): {
       pinnedName: optText(d.game, "pinnedName", "game.pinnedName"),
     };
   } else {
-    field("game", 'must be an object such as { "shortname": "BYAR" }.');
+    field(
+      "game",
+      (where) =>
+        t`${MANIFEST_FILE}: ${where} must be an object such as ${exampleGame}.`,
+    );
   }
 
   const size = { width: 0, height: 0 };
@@ -352,12 +385,17 @@ export function parseManifest(text: string): {
     for (const key of ["width", "height"] as const) {
       const v = d.size[key];
       if (typeof v === "number" && Number.isFinite(v) && v > 0) size[key] = v;
-      else field(`size.${key}`, "must be a number above 0.");
+      else
+        field(
+          `size.${key}`,
+          (where) => t`${MANIFEST_FILE}: ${where} must be a number above 0.`,
+        );
     }
   } else {
     field(
       "size",
-      'must be an object such as { "width": 2000, "height": 1500 }.',
+      (where) =>
+        t`${MANIFEST_FILE}: ${where} must be an object such as ${exampleSize}.`,
     );
   }
   const sized = size.width > 0 && size.height > 0;
@@ -366,7 +404,11 @@ export function parseManifest(text: string): {
     const v = o[key];
     if (v === undefined && !required) return undefined;
     if (typeof v === "string" && isFolderFile(v)) return v;
-    field(`files.${key}`, "must be the name of a file inside the map folder.");
+    field(
+      `files.${key}`,
+      (where) =>
+        t`${MANIFEST_FILE}: ${where} must be the name of a file inside the map folder.`,
+    );
     return undefined;
   };
   const files: MapManifest["files"] = { picture: "", provinces: "" };
@@ -375,7 +417,11 @@ export function parseManifest(text: string): {
     files.provinces = fileName(d.files, "provinces", true) ?? "";
     files.heightmap = fileName(d.files, "heightmap", false);
   } else {
-    field("files", "must be an object naming the picture and provinces files.");
+    field(
+      "files",
+      (where) =>
+        t`${MANIFEST_FILE}: ${where} must be an object naming the picture and provinces files.`,
+    );
   }
 
   const heightScale = optNumber(
@@ -383,13 +429,18 @@ export function parseManifest(text: string): {
     "heightScale",
     "heightScale",
     (n) => n > 0,
-    "a number above 0",
+    (where) => t`${MANIFEST_FILE}: ${where} must be a number above 0.`,
   );
 
   let background: string | undefined;
   if (d.background !== undefined) {
     background = normaliseHex(d.background) ?? undefined;
-    if (!background) field("background", "must be a colour such as #ffffff.");
+    if (!background)
+      field(
+        "background",
+        (where) =>
+          t`${MANIFEST_FILE}: ${where} must be a colour such as #ffffff.`,
+      );
   }
 
   const towns = optBool(d, "towns", "towns");
@@ -401,17 +452,33 @@ export function parseManifest(text: string): {
     d.factions.forEach((raw, i) => {
       const path = `factions[${i}]`;
       if (!isObj(raw)) {
-        field(path, "must be an object.");
+        field(
+          path,
+          (where) => t`${MANIFEST_FILE}: ${where} must be an object.`,
+        );
         return;
       }
       const fid = text1(raw, "id", `${path}.id`);
       const name = text1(raw, "name", `${path}.name`);
       const color = normaliseHex(raw.color);
-      if (!color) field(`${path}.color`, "must be a colour such as #cc3333.");
+      if (!color)
+        field(
+          `${path}.color`,
+          (where) =>
+            t`${MANIFEST_FILE}: ${where} must be a colour such as #cc3333.`,
+        );
       if (fid === NEUTRAL) {
-        field(`${path}.id`, `cannot be "${NEUTRAL}", which means no owner.`);
+        field(
+          `${path}.id`,
+          (where) =>
+            t`${MANIFEST_FILE}: ${where} cannot be "${NEUTRAL}", which means no owner.`,
+        );
       } else if (factionIds.has(fid)) {
-        field(`${path}.id`, `"${fid}" is used by two factions.`);
+        field(
+          `${path}.id`,
+          (where) =>
+            t`${MANIFEST_FILE}: ${where} "${fid}" is used by two factions.`,
+        );
       }
       factionIds.add(fid);
       factions.push({
@@ -423,7 +490,8 @@ export function parseManifest(text: string): {
           "aggression",
           `${path}.aggression`,
           (n) => n >= 0 && n <= 1,
-          "a number from 0 to 1",
+          (where) =>
+            t`${MANIFEST_FILE}: ${where} must be a number from 0 to 1.`,
         ),
         aiKey: optText(raw, "aiKey", `${path}.aiKey`),
         side: optText(raw, "side", `${path}.side`),
@@ -431,12 +499,19 @@ export function parseManifest(text: string): {
       });
     });
   } else {
-    field("factions", "must list at least one faction.");
+    field(
+      "factions",
+      (where) => t`${MANIFEST_FILE}: ${where} must list at least one faction.`,
+    );
   }
 
   const playable = factions.filter((f) => f.playable !== false);
   if (factions.length > 0 && playable.length === 0) {
-    field("factions", "must have at least one faction the player can pick.");
+    field(
+      "factions",
+      (where) =>
+        t`${MANIFEST_FILE}: ${where} must have at least one faction the player can pick.`,
+    );
   }
   const playerFaction = optText(d, "playerFaction", "playerFaction");
   if (
@@ -445,7 +520,8 @@ export function parseManifest(text: string): {
   ) {
     field(
       "playerFaction",
-      `"${playerFaction}" is not the id of a faction the player can pick.`,
+      (where) =>
+        t`${MANIFEST_FILE}: ${where} "${playerFaction}" is not the id of a faction the player can pick.`,
     );
   }
 
@@ -456,14 +532,19 @@ export function parseManifest(text: string): {
     const label = name === "" ? path : `${path} ("${name}")`;
     let locId = optText(raw, "id", `${label}.id`);
     if (locId !== undefined && !/^[A-Za-z0-9_-]+$/.test(locId)) {
-      field(`${label}.id`, "may only use letters, digits, - and _.");
+      field(
+        `${label}.id`,
+        (where) =>
+          t`${MANIFEST_FILE}: ${where} may only use letters, digits, - and _.`,
+      );
     }
     if (locId === undefined) {
       locId = slugifyName(name);
       if (locId === "" && name !== "") {
         field(
           `${label}.id`,
-          "is needed, because the name has no letters or digits to make one from.",
+          (where) =>
+            t`${MANIFEST_FILE}: ${where} is needed, because the name has no letters or digits to make one from.`,
         );
       }
     }
@@ -473,7 +554,7 @@ export function parseManifest(text: string): {
         errors.push({
           code: "duplicate-id",
           id: locId,
-          message: `${MANIFEST_FILE}: "${other}" and "${name}" both have the id "${locId}". Give one of them its own "id".`,
+          message: t`${MANIFEST_FILE}: "${other}" and "${name}" both have the id "${locId}". Give one of them its own "id".`,
         });
       } else {
         locationIds.set(locId, name);
@@ -481,9 +562,12 @@ export function parseManifest(text: string): {
     }
     let owner = optText(raw, "owner", `${label}.owner`) ?? NEUTRAL;
     if (owner !== NEUTRAL && !factionIds.has(owner)) {
+      const unknownOwner = owner;
+      const owners = [...factionIds, NEUTRAL].join(", ");
       field(
         `${label}.owner`,
-        `"${owner}" is not a faction id. Use one of: ${[...factionIds, NEUTRAL].join(", ")}.`,
+        (where) =>
+          t`${MANIFEST_FILE}: ${where} "${unknownOwner}" is not a faction id. Use one of: ${owners}.`,
       );
       owner = NEUTRAL;
     }
@@ -497,14 +581,15 @@ export function parseManifest(text: string): {
       ) {
         field(
           `${label}.scenario`,
-          "must be the name of a .json scenario file inside the map folder.",
+          (where) =>
+            t`${MANIFEST_FILE}: ${where} must be the name of a .json scenario file inside the map folder.`,
         );
       } else if (raw.battle !== undefined) {
         errors.push({
           code: "scenario-and-battle",
           id: locId,
           name,
-          message: `${MANIFEST_FILE}: "${name}" has a scenario and a battle. A location plays one or the other, so remove one of them.`,
+          message: t`${MANIFEST_FILE}: "${name}" has a scenario and a battle. A location plays one or the other, so remove one of them.`,
         });
       } else {
         scenario = file;
@@ -512,7 +597,11 @@ export function parseManifest(text: string): {
     }
     const capital = optBool(raw, "capital", `${label}.capital`);
     if (capital && owner === NEUTRAL) {
-      field(`${label}.capital`, "is true, so the location needs an owner.");
+      field(
+        `${label}.capital`,
+        (where) =>
+          t`${MANIFEST_FILE}: ${where} is true, so the location needs an owner.`,
+      );
     }
     let warpath: { kind: MapRunKind } | undefined;
     if (isObj(raw.warpath)) {
@@ -520,17 +609,19 @@ export function parseManifest(text: string): {
       if (MAP_RUN_KINDS.includes(kind as MapRunKind)) {
         warpath = { kind: kind as MapRunKind };
       } else if (kind !== undefined) {
+        const kinds = MAP_RUN_KINDS.join(", ");
         errors.push({
           code: "warpath-kind",
           name,
           kind,
-          message: `${MANIFEST_FILE}: "${name}" has the Warpath kind "${kind}", which Warpath does not know. Use one of: ${MAP_RUN_KINDS.join(", ")}.`,
+          message: t`${MANIFEST_FILE}: "${name}" has the Warpath kind "${kind}", which Warpath does not know. Use one of: ${kinds}.`,
         });
       }
     } else if (raw.warpath !== undefined) {
       field(
         `${label}.warpath`,
-        'must be an object such as { "kind": "shop" }.',
+        (where) =>
+          t`${MANIFEST_FILE}: ${where} must be an object such as ${exampleKind}.`,
       );
     }
     return {
@@ -545,7 +636,8 @@ export function parseManifest(text: string): {
         `${label}.difficulty`,
         (n) =>
           Number.isInteger(n) && n >= MIN_DIFFICULTY && n <= MAX_DIFFICULTY,
-        `a whole number from ${MIN_DIFFICULTY} to ${MAX_DIFFICULTY}`,
+        (where) =>
+          t`${MANIFEST_FILE}: ${where} must be a whole number from ${MIN_DIFFICULTY} to ${MAX_DIFFICULTY}.`,
       ),
       battle: readBattle(raw.battle, `${label}.battle`, field),
       blurb: optText(raw, "blurb", `${label}.blurb`),
@@ -562,13 +654,20 @@ export function parseManifest(text: string): {
       if (!sized || (x >= 0 && x <= size.width && y >= 0 && y <= size.height)) {
         return [x, y] as [number, number];
       }
+      const mapWidth = size.width;
+      const mapHeight = size.height;
       field(
         path,
-        `is [${x}, ${y}], which is outside the map (${size.width} by ${size.height}).`,
+        (where) =>
+          t`${MANIFEST_FILE}: ${where} is [${x}, ${y}], which is outside the map (${mapWidth} by ${mapHeight}).`,
       );
       return undefined;
     }
-    field(path, "must be a position such as [120, 340].");
+    field(
+      path,
+      (where) =>
+        t`${MANIFEST_FILE}: ${where} must be a position such as [120, 340].`,
+    );
     return undefined;
   };
 
@@ -578,21 +677,34 @@ export function parseManifest(text: string): {
     d.provinces.forEach((raw, i) => {
       const path = `provinces[${i}]`;
       if (!isObj(raw)) {
-        field(path, "must be an object.");
+        field(
+          path,
+          (where) => t`${MANIFEST_FILE}: ${where} must be an object.`,
+        );
         return;
       }
       const base = readLocation(raw, path);
       const label = base.name === "" ? path : `${path} ("${base.name}")`;
       const color = normaliseHex(raw.color);
       if (!color) {
-        field(`${label}.color`, "must be a colour such as #cc3333.");
+        field(
+          `${label}.color`,
+          (where) =>
+            t`${MANIFEST_FILE}: ${where} must be a colour such as #cc3333.`,
+        );
       } else if (color === background) {
-        field(`${label}.color`, `is ${color}, the same as the background.`);
+        field(
+          `${label}.color`,
+          (where) =>
+            t`${MANIFEST_FILE}: ${where} is ${color}, the same as the background.`,
+        );
       } else if (colors.has(color)) {
+        const firstName = colors.get(color) ?? "";
+        const secondName = base.name;
         errors.push({
           code: "duplicate-color",
           color,
-          message: `${MANIFEST_FILE}: "${colors.get(color)}" and "${base.name}" are both listed with the colour ${color}. Each province needs its own colour.`,
+          message: t`${MANIFEST_FILE}: "${firstName}" and "${secondName}" are both listed with the colour ${color}. Each province needs its own colour.`,
         });
       } else {
         colors.set(color, base.name);
@@ -607,7 +719,10 @@ export function parseManifest(text: string): {
       });
     });
   } else {
-    field("provinces", "must be a list of provinces.");
+    field(
+      "provinces",
+      (where) => t`${MANIFEST_FILE}: ${where} must be a list of provinces.`,
+    );
   }
 
   const locations: ResolvedManifest["locations"] = [];
@@ -615,7 +730,10 @@ export function parseManifest(text: string): {
     d.locations.forEach((raw, i) => {
       const path = `locations[${i}]`;
       if (!isObj(raw)) {
-        field(path, "must be an object.");
+        field(
+          path,
+          (where) => t`${MANIFEST_FILE}: ${where} must be an object.`,
+        );
         return;
       }
       const base = readLocation(raw, path);
@@ -624,7 +742,11 @@ export function parseManifest(text: string): {
       locations.push({ ...base, pos: pos ?? [0, 0] });
     });
   } else if (d.locations !== undefined) {
-    field("locations", "must be a list of point locations.");
+    field(
+      "locations",
+      (where) =>
+        t`${MANIFEST_FILE}: ${where} must be a list of point locations.`,
+    );
   }
   // Placed models. An entry has the shape the map document keeps, so the
   // checks here only say what `parsePlacedModels` would drop without a word.
@@ -635,7 +757,8 @@ export function parseManifest(text: string): {
       if (!isObj(raw)) {
         field(
           path,
-          'must be an object such as { "model": { "file": "tower.glb" }, "pos": [120, 340] }.',
+          (where) =>
+            t`${MANIFEST_FILE}: ${where} must be an object such as ${exampleModel}.`,
         );
         return;
       }
@@ -649,42 +772,70 @@ export function parseManifest(text: string): {
       if ((file === undefined) === (gameModel === undefined)) {
         field(
           `${label}.model`,
-          'must name one model: { "file": "tower.glb" } for a file in the map folder, or { "game": "armcom" } for a model the game has.',
+          (where) =>
+            t`${MANIFEST_FILE}: ${where} must name one model: ${exampleFile} for a file in the map folder, or ${exampleGameModel} for a model the game has.`,
         );
       } else if (gameModel !== undefined) {
         if (typeof gameModel !== "string" || gameModel.trim() === "") {
-          field(`${label}.model.game`, "must be text and cannot be empty.");
+          field(
+            `${label}.model.game`,
+            (where) =>
+              t`${MANIFEST_FILE}: ${where} must be text and cannot be empty.`,
+          );
         }
       } else if (typeof file !== "string" || !isFolderFile(file)) {
         field(
           `${label}.model.file`,
-          "must be the name of a file inside the map folder.",
+          (where) =>
+            t`${MANIFEST_FILE}: ${where} must be the name of a file inside the map folder.`,
         );
       } else if (
         !MODEL_FILE_EXTS.some((ext) => file.toLowerCase().endsWith(ext))
       ) {
+        const extensions = MODEL_FILE_EXTS.join(" or ");
         field(
           `${label}.model.file`,
-          `is "${file}", which is not a glTF model. The name must end in ${MODEL_FILE_EXTS.join(" or ")}.`,
+          (where) =>
+            t`${MANIFEST_FILE}: ${where} is "${file}", which is not a glTF model. The name must end in ${extensions}.`,
         );
       }
       readPoint(raw.pos, `${label}.pos`);
-      optNumber(raw, "height", `${label}.height`, () => true, "a number");
-      optNumber(raw, "rotation", `${label}.rotation`, () => true, "a number");
+      optNumber(
+        raw,
+        "height",
+        `${label}.height`,
+        () => true,
+        (where) => t`${MANIFEST_FILE}: ${where} must be a number.`,
+      );
+      optNumber(
+        raw,
+        "rotation",
+        `${label}.rotation`,
+        () => true,
+        (where) => t`${MANIFEST_FILE}: ${where} must be a number.`,
+      );
       optNumber(
         raw,
         "scale",
         `${label}.scale`,
         (n) => n > 0,
-        "a number above 0",
+        (where) => t`${MANIFEST_FILE}: ${where} must be a number above 0.`,
       );
       if (errors.length > before) return;
       const [entry] = parsePlacedModels([raw]) ?? [];
       if (entry) models.push(entry);
-      else field(label, "is not a model the map can place.");
+      else
+        field(
+          label,
+          (where) =>
+            t`${MANIFEST_FILE}: ${where} is not a model the map can place.`,
+        );
     });
   } else if (d.models !== undefined) {
-    field("models", "must be a list of models.");
+    field(
+      "models",
+      (where) => t`${MANIFEST_FILE}: ${where} must be a list of models.`,
+    );
   }
 
   let warpathStart: string | undefined;
@@ -695,12 +846,17 @@ export function parseManifest(text: string): {
   } else if (d.warpath !== undefined) {
     field(
       "warpath",
-      'must be an object such as { "start": "kent", "goal": "calais" }.',
+      (where) =>
+        t`${MANIFEST_FILE}: ${where} must be an object such as ${exampleWarpath}.`,
     );
   }
 
   if (provinces.length + locations.length === 0 && Array.isArray(d.provinces)) {
-    field("provinces", "is empty, and the map needs at least one location.");
+    field(
+      "provinces",
+      (where) =>
+        t`${MANIFEST_FILE}: ${where} is empty, and the map needs at least one location.`,
+    );
   }
 
   // Everything above is the shape of the file. A problem there stops here,
@@ -715,15 +871,18 @@ export function parseManifest(text: string): {
       .filter((l) => l.capital && l.owner === f.id)
       .map((l) => l.name);
     if (capitals.length === 1) continue;
+    const count = capitals.length;
+    const factionName = f.name;
+    const capitalList = capitals.join(", ");
     errors.push({
       code: "capital-count",
       factionId: f.id,
       factionName: f.name,
       capitals,
       message:
-        capitals.length === 0
-          ? `The faction "${f.name}" has no capital. Set "capital": true on one location it owns.`
-          : `The faction "${f.name}" has ${capitals.length} capitals: ${capitals.join(", ")}. Keep "capital": true on one of them.`,
+        count === 0
+          ? t`The faction "${factionName}" has no capital. Set "capital": true on one location it owns.`
+          : t`The faction "${factionName}" has ${plural(count, { one: "# capital", other: "# capitals" })}: ${capitalList}. Keep "capital": true on one of them.`,
     });
   }
 
@@ -732,7 +891,11 @@ export function parseManifest(text: string): {
     const raw = d[key];
     if (raw === undefined) return out;
     if (!Array.isArray(raw)) {
-      field(key, "must be a list of pairs of location ids.");
+      field(
+        key,
+        (where) =>
+          t`${MANIFEST_FILE}: ${where} must be a list of pairs of location ids.`,
+      );
       return out;
     }
     raw.forEach((pair, i) => {
@@ -744,7 +907,8 @@ export function parseManifest(text: string): {
       ) {
         field(
           `${key}[${i}]`,
-          'must be a pair of location ids such as ["kent", "calais"].',
+          (where) =>
+            t`${MANIFEST_FILE}: ${where} must be a pair of location ids such as ["kent", "calais"].`,
         );
         return;
       }
@@ -757,12 +921,16 @@ export function parseManifest(text: string): {
           code: "unknown-location",
           list: key,
           id: end,
-          message: `${MANIFEST_FILE}: ${key}[${i}] names "${end}", which is not the id of any location.`,
+          message: t`${MANIFEST_FILE}: ${key}[${i}] names "${end}", which is not the id of any location.`,
         });
       }
       if (!known) return;
       if (a === b) {
-        field(`${key}[${i}]`, `joins "${nameOf.get(a)}" to itself.`);
+        const name = nameOf.get(a) ?? a;
+        field(
+          `${key}[${i}]`,
+          (where) => t`${MANIFEST_FILE}: ${where} joins "${name}" to itself.`,
+        );
         return;
       }
       out.push([a, b]);
@@ -782,11 +950,16 @@ export function parseManifest(text: string): {
   ] as const) {
     for (const [a, b] of list) {
       if (!blocked.has(pairKey(a, b))) continue;
+      const first = nameOf.get(a) ?? a;
+      const second = nameOf.get(b) ?? b;
       errors.push({
         code: "link-conflict",
         a,
         b,
-        message: `"${nameOf.get(a)}" and "${nameOf.get(b)}" have a blocked border and a ${word}. Remove one of the two.`,
+        message:
+          word === "crossing"
+            ? t`"${first}" and "${second}" have a blocked border and a crossing. Remove one of the two.`
+            : t`"${first}" and "${second}" have a blocked border and a road. Remove one of the two.`,
       });
     }
   }
@@ -803,7 +976,7 @@ export function parseManifest(text: string): {
       code: "warpath-unknown-location",
       end,
       id: endId,
-      message: `${MANIFEST_FILE}: warpath.${end} names "${endId}", which is not the id of any location.`,
+      message: t`${MANIFEST_FILE}: warpath.${end} names "${endId}", which is not the id of any location.`,
     });
   }
   if ((warpathStart === undefined) !== (warpathGoal === undefined)) {
@@ -814,16 +987,20 @@ export function parseManifest(text: string): {
     errors.push({
       code: "warpath-one-end",
       missing,
-      message: `${MANIFEST_FILE}: warpath has a ${has} and no ${missing}. Warpath needs both. Add warpath.${missing}, or remove warpath.${has} to offer the map in Conquest only.`,
+      message:
+        has === "start"
+          ? t`${MANIFEST_FILE}: warpath has a start and no goal. Warpath needs both. Add warpath.goal, or remove warpath.start to offer the map in Conquest only.`
+          : t`${MANIFEST_FILE}: warpath has a goal and no start. Warpath needs both. Add warpath.start, or remove warpath.goal to offer the map in Conquest only.`,
     });
   } else if (warpathStart !== undefined && warpathGoal !== undefined) {
     if (warpathStart === warpathGoal) {
       if (nameOf.has(warpathStart)) {
+        const sameName = nameOf.get(warpathStart) ?? warpathStart;
         errors.push({
           code: "warpath-same-location",
           id: warpathStart,
           name: nameOf.get(warpathStart) ?? warpathStart,
-          message: `${MANIFEST_FILE}: the Warpath start and goal are both "${nameOf.get(warpathStart)}". They must be different locations.`,
+          message: t`${MANIFEST_FILE}: the Warpath start and goal are both "${sameName}". They must be different locations.`,
         });
       }
     } else if (nameOf.has(warpathStart) && nameOf.has(warpathGoal)) {
@@ -834,13 +1011,17 @@ export function parseManifest(text: string): {
       const at = all.find((l) => l.id === endId);
       const kind = at?.warpath?.kind;
       if (!at || !kind) continue;
+      const locationName = at.name;
       errors.push({
         code: "warpath-kind-on-end",
         end,
         id: at.id,
         name: at.name,
         kind,
-        message: `${MANIFEST_FILE}: "${at.name}" is the Warpath ${end}, so it cannot also have the kind "${kind}". Remove the kind, or move the ${end}.`,
+        message:
+          end === "start"
+            ? t`${MANIFEST_FILE}: "${locationName}" is the Warpath start, so it cannot also have the kind "${kind}". Remove the kind, or move the start.`
+            : t`${MANIFEST_FILE}: "${locationName}" is the Warpath goal, so it cannot also have the kind "${kind}". Remove the kind, or move the goal.`,
       });
     }
   }
@@ -880,13 +1061,14 @@ export function parseManifest(text: string): {
 function readBattle(
   value: unknown,
   path: string,
-  field: (path: string, problem: string) => void,
+  field: (path: string, message: (where: string) => string) => void,
 ): ManifestBattle | undefined {
   if (value === undefined) return undefined;
   if (!isObj(value)) {
     field(
       path,
-      'must be an object such as { "mapName": "Comet Catcher Redux" }.',
+      (where) =>
+        t`${MANIFEST_FILE}: ${where} must be an object such as ${exampleBattle}.`,
     );
     return undefined;
   }
@@ -894,7 +1076,8 @@ function readBattle(
   if (typeof b.mapName !== "string" || b.mapName === "") {
     field(
       `${path}.mapName`,
-      "must be the name of a map. Leave the whole battle out to have one picked.",
+      (where) =>
+        t`${MANIFEST_FILE}: ${where} must be the name of a map. Leave the whole battle out to have one picked.`,
     );
     return undefined;
   }
@@ -902,28 +1085,51 @@ function readBattle(
   const num = (
     key: "enemyAiCount" | "startPosType" | "handicap",
     ok: (n: number) => boolean,
-    rule: string,
+    message: (where: string) => string,
   ) => {
     const v = b[key];
     if (v === undefined) return;
     if (typeof v === "number" && Number.isInteger(v) && ok(v)) out[key] = v;
-    else field(`${path}.${key}`, `must be ${rule}.`);
+    else field(`${path}.${key}`, message);
   };
   // The ranges are the ones `parseGalaxyJson` clamps a stored battle to.
-  num("enemyAiCount", (n) => n >= 1 && n <= 8, "a whole number from 1 to 8");
-  num("startPosType", (n) => n >= 0, "a whole number, 0 or above");
-  num("handicap", (n) => n >= 0 && n <= 300, "a whole number from 0 to 300");
+  num(
+    "enemyAiCount",
+    (n) => n >= 1 && n <= 8,
+    (where) =>
+      t`${MANIFEST_FILE}: ${where} must be a whole number from 1 to 8.`,
+  );
+  num(
+    "startPosType",
+    (n) => n >= 0,
+    (where) =>
+      t`${MANIFEST_FILE}: ${where} must be a whole number, 0 or above.`,
+  );
+  num(
+    "handicap",
+    (n) => n >= 0 && n <= 300,
+    (where) =>
+      t`${MANIFEST_FILE}: ${where} must be a whole number from 0 to 300.`,
+  );
   if (b.enemyAiKey !== undefined) {
     if (typeof b.enemyAiKey === "string" && b.enemyAiKey !== "") {
       out.enemyAiKey = b.enemyAiKey;
     } else {
-      field(`${path}.enemyAiKey`, "must be text.");
+      field(
+        `${path}.enemyAiKey`,
+        (where) => t`${MANIFEST_FILE}: ${where} must be text.`,
+      );
     }
   }
   if (b.mapDownload !== undefined) {
     const hint = parseMapDownload(b.mapDownload);
     if (hint) out.mapDownload = hint;
-    else field(`${path}.mapDownload`, "must have a springName or a searchUrl.");
+    else
+      field(
+        `${path}.mapDownload`,
+        (where) =>
+          t`${MANIFEST_FILE}: ${where} must have a springName or a searchUrl.`,
+      );
   }
   if (b.modOptionValues !== undefined) {
     if (
@@ -932,7 +1138,11 @@ function readBattle(
     ) {
       out.modOptionValues = b.modOptionValues as Record<string, string>;
     } else {
-      field(`${path}.modOptionValues`, "must map option names to text values.");
+      field(
+        `${path}.modOptionValues`,
+        (where) =>
+          t`${MANIFEST_FILE}: ${where} must map option names to text values.`,
+      );
     }
   }
   if (b.disabledUnits !== undefined) {
@@ -942,7 +1152,10 @@ function readBattle(
     ) {
       out.disabledUnits = b.disabledUnits as string[];
     } else {
-      field(`${path}.disabledUnits`, "must be a list of unit names.");
+      field(
+        `${path}.disabledUnits`,
+        (where) => t`${MANIFEST_FILE}: ${where} must be a list of unit names.`,
+      );
     }
   }
   return out;

@@ -1,3 +1,4 @@
+import { t } from "@lingui/core/macro";
 import type { GalaxyNode } from "../model";
 import { hashString } from "./layout";
 
@@ -55,5 +56,5 @@ export function voidBodiesFor(nodeIds: string[]): Map<string, VoidBody> {
 
 /** Selection-panel label for a void body. */
 export function bodyLabel(body: VoidBody): string {
-  return body === "comet" ? "comet" : "asteroid field";
+  return body === "comet" ? t`comet` : t`asteroid field`;
 }

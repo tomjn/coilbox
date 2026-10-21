@@ -13,6 +13,7 @@
  * looking at.
  */
 
+import { t } from "@lingui/core/macro";
 import { scenarioWriteGameMission } from "./bindings";
 import { compileScenario } from "./compile";
 import { requiredRuntimeVersion } from "./gating";
@@ -39,8 +40,12 @@ export async function saveMissionIntoGame(
 ): Promise<Scenario> {
   const origin = loaded.origin;
   if (!origin || !isEditable(loaded)) {
+    const name = loaded.scenario.name;
+    const gameName = origin?.gameName;
     throw new Error(
-      `${loaded.scenario.name} ships inside ${origin?.gameName ?? "a game"}, which is packaged, so it cannot be saved there.`,
+      gameName
+        ? t`${name} ships inside ${gameName}, which is packaged, so it cannot be saved there.`
+        : t`${name} ships inside a game, which is packaged, so it cannot be saved there.`,
     );
   }
   const now = new Date().toISOString();

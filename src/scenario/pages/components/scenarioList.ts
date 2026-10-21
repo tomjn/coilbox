@@ -10,6 +10,7 @@
  * the part worth pinning in a test on their own.
  */
 
+import { t } from "@lingui/core/macro";
 import type { LoadedScenario } from "../../storage";
 
 /** One of the three sources, or "all" for the filter being off. */
@@ -23,9 +24,15 @@ export type SourceFilter = "all" | LoadedScenario["source"];
  * kind they can freely edit and delete.
  */
 export const SOURCE_LABELS: Record<LoadedScenario["source"], string> = {
-  local: "Mine",
-  bundled: "Bundled",
-  game: "From games",
+  get local() {
+    return t`Mine`;
+  },
+  get bundled() {
+    return t`Bundled`;
+  },
+  get game() {
+    return t`From games`;
+  },
 };
 
 /** The chips, in the order they are offered. */

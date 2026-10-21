@@ -1,3 +1,4 @@
+import { Trans, useLingui } from "@lingui/react/macro";
 import { Button } from "@picoframe/frame";
 import { List } from "lucide-react";
 import type { ComponentProps, ReactNode } from "react";
@@ -66,39 +67,43 @@ export function ScenarioModeRail({
   onModeChange: (id: string) => void;
   tools: ComponentProps<typeof SelectionTools> | null;
 }) {
+  const { t } = useLingui();
   return (
     <TooltipProvider>
       <div className="flex flex-col gap-2">
         {history && <HistoryControls {...history} vertical />}
         <ButtonGroup orientation="vertical">
-          {EDITOR_MODES.map((m, i) => (
-            <Tooltip key={m.id}>
-              <TooltipTrigger asChild>
-                <Button
-                  size="icon"
-                  // The pair the unit builder's viewport uses for the handle
-                  // it is on. `bg-card` only on the ones that are off: an
-                  // outline button has no fill of its own, and a see-through
-                  // control on terrain takes whatever is under it.
-                  variant={modeId === m.id ? "default" : "outline"}
-                  className={modeId === m.id ? undefined : "bg-card"}
-                  onClick={() => onModeChange(m.id)}
-                  // The name is in the tooltip, which a pointer reaches and a
-                  // screen reader does not, so the button carries it as its
-                  // accessible name as well.
-                  aria-label={m.label}
-                  aria-pressed={modeId === m.id}
-                >
-                  <m.icon className="size-4" />
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent side="right" className="max-w-56">
-                <p className="font-medium">{m.label}</p>
-                <p className="opacity-80">{m.what}</p>
-                <p className="opacity-60">Key {i + 1}</p>
-              </TooltipContent>
-            </Tooltip>
-          ))}
+          {EDITOR_MODES.map((m, i) => {
+            const key = i + 1;
+            return (
+              <Tooltip key={m.id}>
+                <TooltipTrigger asChild>
+                  <Button
+                    size="icon"
+                    // The pair the unit builder's viewport uses for the handle
+                    // it is on. `bg-card` only on the ones that are off: an
+                    // outline button has no fill of its own, and a see-through
+                    // control on terrain takes whatever is under it.
+                    variant={modeId === m.id ? "default" : "outline"}
+                    className={modeId === m.id ? undefined : "bg-card"}
+                    onClick={() => onModeChange(m.id)}
+                    // The name is in the tooltip, which a pointer reaches and a
+                    // screen reader does not, so the button carries it as its
+                    // accessible name as well.
+                    aria-label={m.label}
+                    aria-pressed={modeId === m.id}
+                  >
+                    <m.icon className="size-4" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent side="right" className="max-w-56">
+                  <p className="font-medium">{m.label}</p>
+                  <p className="opacity-80">{m.what}</p>
+                  <p className="opacity-60">{t`Key ${key}`}</p>
+                </TooltipContent>
+              </Tooltip>
+            );
+          })}
         </ButtonGroup>
         {tools && <SelectionTools {...tools} />}
       </div>
@@ -133,6 +138,7 @@ export function ScenarioContentsPopover({
   setLayoutChoice: (choice: LayoutChoice | null) => void;
   setModeId: (id: string) => void;
 }) {
+  const { t } = useLingui();
   return (
     <Popover open={open} onOpenChange={onOpenChange}>
       <PopoverTrigger asChild>
@@ -140,9 +146,9 @@ export function ScenarioContentsPopover({
           size="sm"
           variant="outline"
           className="gap-1.5 bg-card"
-          title="Everything this scenario holds, placed or not"
+          title={t`Everything this scenario holds, placed or not`}
         >
-          <List className="size-3.5" /> Contents
+          <List className="size-3.5" /> <Trans>Contents</Trans>
         </Button>
       </PopoverTrigger>
       <PopoverContent align="end" className="w-80 p-1">

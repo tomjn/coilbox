@@ -1,3 +1,4 @@
+import { t } from "@lingui/core/macro";
 import { hashString, mulberry32, pick } from "./rng";
 
 /** Colour in sRGB, each channel 0 to 255. */
@@ -176,7 +177,10 @@ const biome = (
 
 const TEMPERATE: Planet = {
   id: "temperate",
-  label: "Temperate",
+  // Read when a picker draws, so it follows the language.
+  get label() {
+    return t`Temperate`;
+  },
   biomes: [
     biome("grass", [122, 154, 84], "grass", true),
     biome("dry", [182, 168, 116], "dunes"),
@@ -235,7 +239,9 @@ const TEMPERATE: Planet = {
 
 const DESERT: Planet = {
   id: "desert",
-  label: "Desert",
+  get label() {
+    return t`Desert`;
+  },
   biomes: [
     biome("dunes", [214, 186, 128], "dunes"),
     biome("rock flats", [168, 138, 104], "scree"),
@@ -293,7 +299,9 @@ const DESERT: Planet = {
 
 const ICE: Planet = {
   id: "ice",
-  label: "Ice",
+  get label() {
+    return t`Ice`;
+  },
   biomes: [
     biome("snowfield", [238, 242, 246], "snow"),
     biome("bare ice", [176, 208, 224], "ice"),
@@ -341,7 +349,9 @@ const ICE: Planet = {
 
 const RED: Planet = {
   id: "red",
-  label: "Red",
+  get label() {
+    return t`Red`;
+  },
   biomes: [
     biome("red dust", [170, 92, 62], "dust"),
     biome("dark basalt", [84, 60, 54], "basalt"),
@@ -387,7 +397,9 @@ const RED: Planet = {
 
 const MOON: Planet = {
   id: "moon",
-  label: "Moon",
+  get label() {
+    return t`Moon`;
+  },
   biomes: [
     biome("regolith", [142, 142, 146], "regolith"),
     biome("bright highland", [196, 196, 200], "regolith"),
@@ -430,7 +442,9 @@ const MOON: Planet = {
 
 const VOLCANIC: Planet = {
   id: "volcanic",
-  label: "Volcanic",
+  get label() {
+    return t`Volcanic`;
+  },
   biomes: [
     biome("dark basalt", [46, 40, 40], "basalt"),
     biome("brown rock", [88, 58, 42], "rock"),
@@ -479,7 +493,9 @@ const VOLCANIC: Planet = {
 
 const ACID: Planet = {
   id: "acid",
-  label: "Acid",
+  get label() {
+    return t`Acid`;
+  },
   biomes: [
     biome("dull yellow ground", [156, 148, 96], "cracked"),
     biome("brown ground", [118, 98, 70], "earth"),

@@ -14,7 +14,6 @@ export const BASE_MAX_NODE_COUNT = 80;
 /** A size above the base, and the threat level that opens it. */
 export interface LargeSize {
   count: number;
-  label: string;
   /** The highest threat level the player must have unlocked. */
   level: number;
 }
@@ -27,8 +26,8 @@ export interface LargeSize {
  * `MAX_NODE_MAPS` (256) bounds what a code may name, so no size here loses maps.
  */
 export const LARGE_SIZES: readonly LargeSize[] = [
-  { count: 120, label: "Colossal", level: 2 },
-  { count: 160, label: "Titanic", level: 3 },
+  { count: 120, level: 2 },
+  { count: 160, level: 3 },
 ];
 
 /** The most systems a galaxy may have, in the generator, a saved galaxy and a
@@ -37,12 +36,12 @@ export const MAX_NODE_COUNT = LARGE_SIZES[LARGE_SIZES.length - 1].count;
 
 /** The sizes that were always on offer, as the setup lists them. */
 export const BASE_SIZES = [
-  { value: "12", label: "Small (12 systems)" },
-  { value: "18", label: "Medium (18 systems)" },
-  { value: "28", label: "Large (28 systems)" },
-  { value: "40", label: "Sprawling (40 systems)" },
-  { value: "56", label: "Vast (56 systems)" },
-  { value: String(BASE_MAX_NODE_COUNT), label: "Immense (80 systems)" },
+  { value: "12" },
+  { value: "18" },
+  { value: "28" },
+  { value: "40" },
+  { value: "56" },
+  { value: String(BASE_MAX_NODE_COUNT) },
 ];
 
 /** The largest galaxy a game whose highest unlocked threat level is `ceiling`

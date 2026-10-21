@@ -1,3 +1,5 @@
+import { plural, select, t } from "@lingui/core/macro";
+import { Trans, useLingui } from "@lingui/react/macro";
 import {
   Button,
   buttonVariants,
@@ -126,7 +128,7 @@ import {
 } from "../handmade/useHandmadeMaps";
 import type { LandPicture } from "../landJob";
 import { generateMapOffThread, landPreviewOffThread } from "../landJobs";
-import { generateMap, locationNoun, MAP_STYLE_OPTIONS } from "../mapStyle";
+import { generateMap, locationNounKey, MAP_STYLE_OPTIONS } from "../mapStyle";
 import {
   type ConquestState,
   type GalaxyDoc,
@@ -160,15 +162,15 @@ import { ThreatLevelSelect } from "./components/ThreatLevelSelect";
 export default function ConquestListPage() {
   const { galaxies, loading, error } = useGalaxies();
   const { file, error: stateError, saveFor } = useConquestState();
+  const { t } = useLingui();
   const [abandonError, setAbandonError] = useState<string | null>(null);
   const abandon = async (galaxyId: string) => {
     setAbandonError(null);
     try {
       await saveFor(galaxyId, undefined);
     } catch (e) {
-      setAbandonError(
-        `The conquest was not abandoned. ${e instanceof Error ? e.message : String(e)}`,
-      );
+      const reason = e instanceof Error ? e.message : String(e);
+      setAbandonError(t`The conquest was not abandoned. ${reason}`);
     }
   };
   const drawer = useDrawer();
@@ -227,6 +229,8 @@ export default function ConquestListPage() {
             ? [{ id, title: run.title, carriedBy: run.carriedBy, state }]
             : [];
         });
+  const handmadeError = handmade.error;
+  const archiveError = handmade.archiveError;
   const [mapError, setMapError] = useState<string | null>(null);
   const removeMap = async (map: HandmadeMapSummary) => {
     setMapError(null);
@@ -234,9 +238,9 @@ export default function ConquestListPage() {
       await removeHandmadeMap(map.id);
       await refreshHandmadeMaps();
     } catch (e) {
-      setMapError(
-        `"${map.title}" was not removed. ${e instanceof Error ? e.message : String(e)}`,
-      );
+      const title = map.title;
+      const reason = e instanceof Error ? e.message : String(e);
+      setMapError(t`"${title}" was not removed. ${reason}`);
     }
   };
   const nothingListed =
@@ -263,7 +267,7 @@ export default function ConquestListPage() {
 
   const openGenerate = (initialGameName?: string) =>
     drawer.open({
-      title: "Generate a map",
+      title: t`Generate a map`,
       width: "30rem",
       content: (
         <GenerateGalaxyForm
@@ -278,7 +282,7 @@ export default function ConquestListPage() {
 
   const openImportChallenge = (initialCode?: string) =>
     drawer.open({
-      title: "Import challenge",
+      title: t`Import challenge`,
       width: "26rem",
       content: (
         // A fresh form every time, because the last one may still be mounted
@@ -299,13 +303,13 @@ export default function ConquestListPage() {
   // Pick a zip, then run the import in a drawer that shows how it went.
   const importMap = async () => {
     const zipPath = await open({
-      title: "Import map",
+      title: t`Import map`,
       multiple: false,
-      filters: [{ name: "Hand-made map", extensions: ["zip"] }],
+      filters: [{ name: t`Hand-made map`, extensions: ["zip"] }],
     });
     if (typeof zipPath !== "string") return;
     drawer.open({
-      title: "Import map",
+      title: t`Import map`,
       width: "26rem",
       content: (
         <ImportMapForm
@@ -340,20 +344,22 @@ export default function ConquestListPage() {
   return (
     <div className="flex flex-col gap-4 p-4">
       <PageHeader
-        title="Conquest"
-        description="Wage a campaign across a map of territory you take one battle at a time. Win skirmishes to capture territory, defend against counterattacks, and take every enemy capital."
+        title={t`Conquest`}
+        description={t`Wage a campaign across a map of territory you take one battle at a time. Win skirmishes to capture territory, defend against counterattacks, and take every enemy capital.`}
         actions={
           !needsGame && (
             <>
               <Button variant="outline" onClick={importMap}>
-                <MapPlus className="mr-1.5 size-4" aria-hidden /> Import map
+                <MapPlus className="mr-1.5 size-4" aria-hidden />{" "}
+                <Trans>Import map</Trans>
               </Button>
               <Button variant="outline" onClick={() => openImportChallenge()}>
-                <Download className="mr-1.5 size-4" aria-hidden /> Import
-                challenge
+                <Download className="mr-1.5 size-4" aria-hidden />{" "}
+                <Trans>Import challenge</Trans>
               </Button>
               <Button onClick={() => openGenerate()}>
-                <Dices className="mr-1.5 size-4" aria-hidden /> Generate a map
+                <Dices className="mr-1.5 size-4" aria-hidden />{" "}
+                <Trans>Generate a map</Trans>
               </Button>
             </>
           )
@@ -363,18 +369,18 @@ export default function ConquestListPage() {
       {error && <ErrorBanner message={error} />}
       {stateError && (
         <ErrorBanner
-          message={`Your conquest progress could not be read. Nothing has been changed. ${stateError}`}
+          message={t`Your conquest progress could not be read. Nothing has been changed. ${stateError}`}
         />
       )}
       {abandonError && <ErrorBanner message={abandonError} />}
       {handmade.error && (
         <ErrorBanner
-          message={`The hand-made maps could not be listed. ${handmade.error}`}
+          message={t`The hand-made maps could not be listed. ${handmadeError}`}
         />
       )}
       {handmade.archiveError && (
         <ErrorBanner
-          message={`The installed games could not be searched for maps they carry, so none is listed. ${handmade.archiveError}`}
+          message={t`The installed games could not be searched for maps they carry, so none is listed. ${archiveError}`}
         />
       )}
       {mapError && <ErrorBanner message={mapError} />}
@@ -386,17 +392,17 @@ export default function ConquestListPage() {
             <div className="space-y-1">
               <p className="text-sm font-medium">
                 {state === "unreadable"
-                  ? "This engine could not read your games"
+                  ? t`This engine could not read your games`
                   : target
-                    ? "Conquest needs a game installed"
-                    : "Conquest needs an engine and a game"}
+                    ? t`Conquest needs a game installed`
+                    : t`Conquest needs an engine and a game`}
               </p>
               <p className="max-w-md text-sm text-muted-foreground">
                 {state === "unreadable"
-                  ? "The scan finished but the engine reported problems and listed no games, so this is not a sign that you own none. Try another engine, or open Content > Games to see what it did find."
+                  ? t`The scan finished but the engine reported problems and listed no games, so this is not a sign that you own none. Try another engine, or open Content > Games to see what it did find.`
                   : target
-                    ? "Conquest generates a map for any installed game with skirmish AIs. Download a game to get started, and it will appear here automatically."
-                    : "Install an engine and at least one game, then return here to generate a map for it."}
+                    ? t`Conquest generates a map for any installed game with skirmish AIs. Download a game to get started, and it will appear here automatically.`
+                    : t`Install an engine and at least one game, then return here to generate a map for it.`}
               </p>
             </div>
             <div className="flex flex-wrap justify-center gap-2">
@@ -415,8 +421,8 @@ export default function ConquestListPage() {
                   className={cn(buttonVariants({ variant: "outline" }))}
                 >
                   {state === "unreadable"
-                    ? "Pick another engine"
-                    : "Install an engine"}
+                    ? t`Pick another engine`
+                    : t`Install an engine`}
                 </Link>
               )}
               {state === "unreadable" ? (
@@ -424,20 +430,20 @@ export default function ConquestListPage() {
                   to="/library/games"
                   className={cn(buttonVariants({ variant: "outline" }))}
                 >
-                  Open Content &gt; Games
+                  <Trans>Open Content &gt; Games</Trans>
                 </Link>
               ) : (
                 <Button
                   variant="outline"
                   onClick={() => navigate("/library/games")}
                 >
-                  Browse games to download
+                  <Trans>Browse games to download</Trans>
                 </Button>
               )}
             </div>
           </div>
           {state === "unreadable" && scanFailure && (
-            <ScanFailed noun="games" reason={scanFailure} />
+            <ScanFailed noun={t`games`} reason={scanFailure} />
           )}
           {state === "unreadable" && <Diagnostics errors={scanErrors} />}
         </div>
@@ -446,13 +452,15 @@ export default function ConquestListPage() {
       ) : nothingListed && handmade.loading ? (
         <SearchingGames />
       ) : nothingListed ? (
-        <EmptyState label="No conquest maps yet. Generate one for any installed game, or import a map or a challenge." />
+        <EmptyState
+          label={t`No conquest maps yet. Generate one for any installed game, or import a map or a challenge.`}
+        />
       ) : (
         <>
           {runIds.length + lostRuns.length > 0 && (
             <section className="flex flex-col gap-2">
               <h2 className="text-sm font-medium text-muted-foreground">
-                In progress
+                <Trans>In progress</Trans>
               </h2>
               <ul className="flex flex-col gap-2">
                 {runs.map(({ galaxy, source }) => (
@@ -492,7 +500,7 @@ export default function ConquestListPage() {
           {unstarted.length + mapsUnstarted.length > 0 && (
             <section className="flex flex-col gap-2">
               <h2 className="text-sm font-medium text-muted-foreground">
-                Ready to start
+                <Trans>Ready to start</Trans>
               </h2>
               <ul className="flex flex-col gap-2">
                 {unstarted.map(({ galaxy, source }) => (
@@ -523,33 +531,36 @@ export default function ConquestListPage() {
           {handmade.unreadable.length + hiddenMaps.length > 0 && (
             <section className="flex flex-col gap-2">
               <h2 className="text-sm font-medium text-muted-foreground">
-                Maps that could not be listed
+                <Trans>Maps that could not be listed</Trans>
               </h2>
               <ul className="flex flex-col gap-2">
                 {handmade.unreadable.map((u) => (
                   <li key={`${u.source}/${u.carriedBy ?? ""}/${u.folder}`}>
                     <Card className="gap-2 rounded-lg border-border/50 p-3 shadow-none">
                       <span className="text-sm font-medium">
-                        {u.source === "game"
-                          ? `"${ARCHIVE_MAPS_DIR}/${u.folder}" in ${u.carriedBy}`
-                          : `${u.source === "bundled" ? "Bundled map" : "Map"} folder "${u.folder}"`}
+                        {unreadableMapTitle(u)}
                       </span>
                       <MapErrorList errors={u.errors} />
                     </Card>
                   </li>
                 ))}
-                {hiddenMaps.map((m) => (
-                  <li key={m.id}>
-                    <Card className="gap-2 rounded-lg border-border/50 p-3 shadow-none">
-                      <span className="text-sm font-medium">{m.title}</span>
-                      <p className="text-sm text-muted-foreground">
-                        This map has the id "{m.id}", which a map in the list
-                        above already uses, so the map is not listed. Change the
-                        id in its map.json and import it again.
-                      </p>
-                    </Card>
-                  </li>
-                ))}
+                {hiddenMaps.map((m) => {
+                  const mapId = m.id;
+                  return (
+                    <li key={m.id}>
+                      <Card className="gap-2 rounded-lg border-border/50 p-3 shadow-none">
+                        <span className="text-sm font-medium">{m.title}</span>
+                        <p className="text-sm text-muted-foreground">
+                          <Trans>
+                            This map has the id "{mapId}", which a map in the
+                            list above already uses, so the map is not listed.
+                            Change the id in its map.json and import it again.
+                          </Trans>
+                        </p>
+                      </Card>
+                    </li>
+                  );
+                })}
               </ul>
             </section>
           )}
@@ -558,6 +569,23 @@ export default function ConquestListPage() {
       )}
     </div>
   );
+}
+
+/** How an unreadable map folder is named above the reasons it was refused. */
+function unreadableMapTitle(u: {
+  source: string;
+  folder: string;
+  carriedBy?: string;
+}): string {
+  const folder = u.folder;
+  if (u.source === "game") {
+    const mapsDir = ARCHIVE_MAPS_DIR;
+    const game = u.carriedBy ?? "";
+    return t`"${mapsDir}/${folder}" in ${game}`;
+  }
+  return u.source === "bundled"
+    ? t`Bundled map folder "${folder}"`
+    : t`Map folder "${folder}"`;
 }
 
 /**
@@ -571,7 +599,7 @@ function SearchingGames() {
       className="flex items-center gap-2 text-sm text-muted-foreground"
     >
       <Loader2 className="size-4 animate-spin" aria-hidden />
-      Searching your installed games for maps they carry.
+      <Trans>Searching your installed games for maps they carry.</Trans>
     </p>
   );
 }
@@ -602,6 +630,67 @@ function statusClass(state: ConquestState | undefined): string {
       : "text-muted-foreground";
 }
 
+/** How many locations a map has, in the words its style uses for them. */
+function locationCount(style: string, count: number): string {
+  return select(style, {
+    galaxy: plural(count, { one: "# system", other: "# systems" }),
+    theatre: plural(count, { one: "# location", other: "# locations" }),
+    cities: plural(count, { one: "# city", other: "# cities" }),
+    territories: plural(count, { one: "# province", other: "# provinces" }),
+    other: plural(count, { one: "# location", other: "# locations" }),
+  });
+}
+
+/** Said under the preview when the map has fewer locations than were asked for. */
+function cappedMessage(style: string, count: number): string {
+  return select(style, {
+    galaxy: plural(count, {
+      one: "Capped at # named system.",
+      other: "Capped at # named systems.",
+    }),
+    theatre: plural(count, {
+      one: "Capped at # named location.",
+      other: "Capped at # named locations.",
+    }),
+    cities: plural(count, {
+      one: "Capped at # named city.",
+      other: "Capped at # named cities.",
+    }),
+    territories: plural(count, {
+      one: "Capped at # named province.",
+      other: "Capped at # named provinces.",
+    }),
+    other: plural(count, {
+      one: "Capped at # named location.",
+      other: "Capped at # named locations.",
+    }),
+  });
+}
+
+/** What a conquest's card says about how it stands. */
+function statusLabelFor(
+  state: ConquestState | undefined,
+  percent: number,
+): string {
+  if (state?.status === "won") return t`Victory`;
+  if (state?.status === "lost") return t`Defeat`;
+  if (!state) return t`Not started`;
+  const turn = state.turn;
+  return t`Turn ${turn} · ${percent}% held`;
+}
+
+/** The warning on abandoning a conquest, with how far it got in the sentence. */
+function abandonDescription(state: ConquestState, percent: number): string {
+  if (state.status === "won") {
+    return t`This deletes the conquest for good, including its progress (Victory). The map stays in your list. It cannot be undone.`;
+  }
+  if (state.status === "lost") {
+    return t`This deletes the conquest for good, including its progress (Defeat). The map stays in your list. It cannot be undone.`;
+  }
+  const turn = state.turn;
+  return t`This deletes the conquest for good, including its progress (Turn ${turn} · ${percent}% held). The map stays in your list. It cannot be undone.`;
+}
+
 /**
  * A hand-made map in the list: its picture, title and description, and the
  * conquest on it when there is one. The list is drawn from each map's
@@ -622,21 +711,19 @@ function HandmadeMapCard({
   /** Present for an imported map with no conquest on it. */
   onRemove?: () => void | Promise<void>;
 }) {
+  const { t } = useLingui();
   const drawer = useDrawer();
   const openShareChallenge = (conquest: ConquestState) =>
     drawer.open({
-      title: "Share challenge",
+      title: t`Share challenge`,
       width: "26rem",
       content: <HandmadeChallengeShare map={map} state={conquest} />,
     });
-  const statusLabel =
-    state?.status === "won"
-      ? "Victory"
-      : state?.status === "lost"
-        ? "Defeat"
-        : state
-          ? `Turn ${state.turn} · ${heldPercent(state)}% held`
-          : "Not started";
+  const percent = state ? heldPercent(state) : 0;
+  const statusLabel = statusLabelFor(state, percent);
+  const mapTitle = map.title;
+  const carriedBy = map.carriedBy;
+  const shortname = map.game.shortname;
   return (
     <Card className="flex-row items-center gap-3 rounded-lg border-border/50 p-3 shadow-none transition-colors hover:border-border hover:bg-accent/50">
       <Link
@@ -659,21 +746,21 @@ function HandmadeMapCard({
             <span className="truncate text-sm font-medium">{map.title}</span>
             {map.source === "bundled" && (
               <span className="shrink-0 rounded bg-muted px-1.5 py-0.5 text-xs text-muted-foreground">
-                Bundled
+                <Trans>Bundled</Trans>
               </span>
             )}
             {map.source === "game" && (
               <span
                 className="shrink-0 rounded bg-muted px-1.5 py-0.5 text-xs text-muted-foreground"
-                title={`The game ${map.carriedBy} carries this map`}
+                title={t`The game ${carriedBy} carries this map`}
               >
-                From the game
+                <Trans>From the game</Trans>
               </span>
             )}
             {resume && <ContinueBadge />}
           </div>
           <p className="line-clamp-1 text-xs text-muted-foreground">
-            {map.game.shortname} · Hand-made map
+            {t`${shortname} · Hand-made map`}
             {map.description ? ` · ${map.description}` : ""}
           </p>
           <span className={`text-xs ${statusClass(state)}`}>{statusLabel}</span>
@@ -687,8 +774,8 @@ function HandmadeMapCard({
         <Button
           variant="ghost"
           size="icon"
-          aria-label={`Share ${map.title} as a challenge code`}
-          title="Share challenge"
+          aria-label={t`Share ${mapTitle} as a challenge code`}
+          title={t`Share challenge`}
           onClick={() => openShareChallenge(state)}
         >
           <Share2 className="size-4 text-muted-foreground" aria-hidden />
@@ -699,13 +786,13 @@ function HandmadeMapCard({
           triggerProps={{
             variant: "ghost",
             size: "icon",
-            "aria-label": `Abandon ${map.title}`,
-            title: "Abandon this campaign",
+            "aria-label": t`Abandon ${mapTitle}`,
+            title: t`Abandon this campaign`,
           }}
-          heading={`Abandon the conquest on ${map.title}?`}
-          description={`This deletes the conquest for good, including its progress (${statusLabel}). The map stays in your list. It cannot be undone.`}
-          confirmLabel="Abandon conquest"
-          busyLabel="Abandoning…"
+          heading={t`Abandon the conquest on ${mapTitle}?`}
+          description={abandonDescription(state, percent)}
+          confirmLabel={t`Abandon conquest`}
+          busyLabel={t`Abandoning…`}
           onConfirm={onAbandon}
         >
           <Trash2 className="size-4 text-muted-foreground" aria-hidden />
@@ -716,13 +803,13 @@ function HandmadeMapCard({
             triggerProps={{
               variant: "ghost",
               size: "icon",
-              "aria-label": `Remove ${map.title}`,
-              title: "Remove this map",
+              "aria-label": t`Remove ${mapTitle}`,
+              title: t`Remove this map`,
             }}
-            heading={`Remove ${map.title}?`}
-            description="This deletes the imported map from your computer. To play it again you would have to import it again. It cannot be undone."
-            confirmLabel="Remove map"
-            busyLabel="Removing…"
+            heading={t`Remove ${mapTitle}?`}
+            description={t`This deletes the imported map from your computer. To play it again you would have to import it again. It cannot be undone.`}
+            confirmLabel={t`Remove map`}
+            busyLabel={t`Removing…`}
             onConfirm={onRemove}
           >
             <Trash2 className="size-4 text-muted-foreground" aria-hidden />
@@ -745,18 +832,22 @@ function HandmadeChallengeShare({
   map: HandmadeMapSummary;
   state: ConquestState;
 }) {
+  const { t } = useLingui();
   const { loading, result, failure } = useHandmadeMap(map.id);
   if (loading) {
     return (
-      <p className="p-4 text-sm text-muted-foreground">Reading the map…</p>
+      <p className="p-4 text-sm text-muted-foreground">
+        <Trans>Reading the map…</Trans>
+      </p>
     );
   }
   const run = readHandmadeRun(state);
+  const mapTitle = map.title;
   if (!result?.ok || !run) {
     return (
       <div className="flex flex-col gap-2 p-4">
         <ErrorBanner
-          message={`No challenge code can be made, because the map "${map.title}" could not be read.${failure ? ` ${failure}` : ""}`}
+          message={`${t`No challenge code can be made, because the map "${mapTitle}" could not be read.`}${failure ? ` ${failure}` : ""}`}
         />
         {result && !result.ok && <MapErrorList errors={result.errors} />}
       </div>
@@ -767,9 +858,9 @@ function HandmadeChallengeShare({
     const fileText = encodeHandmadeChallengeFile(galaxy);
     if (!fileText) return;
     const dest = await save({
-      title: "Export challenge",
+      title: t`Export challenge`,
       defaultPath: `${galaxy.title || "challenge"}.json`,
-      filters: [{ name: "Coilbox challenge", extensions: ["json"] }],
+      filters: [{ name: t`Coilbox challenge`, extensions: ["json"] }],
     });
     if (!dest) return;
     await challengeExport({ text: fileText, dest });
@@ -778,7 +869,7 @@ function HandmadeChallengeShare({
     <ChallengeShare
       identity={galaxyIdentity(galaxy)}
       code={encodeHandmadeChallenge(galaxy) ?? ""}
-      helpText="Anyone who pastes this code into Import challenge plays this map with the same settings, so results are directly comparable. They need the same game and the same version of this map installed. The code does not carry the map."
+      helpText={t`Anyone who pastes this code into Import challenge plays this map with the same settings, so results are directly comparable. They need the same game and the same version of this map installed. The code does not carry the map.`}
       onExportFile={exportChallengeFile}
     />
   );
@@ -797,6 +888,9 @@ function LostMapCard({
   state: ConquestState;
   onAbandon: () => void | Promise<void>;
 }) {
+  const { t } = useLingui();
+  const turn = state.turn;
+  const game = carriedBy;
   return (
     <Card className="flex-row items-center gap-3 rounded-lg border-border/50 p-3 shadow-none">
       <div className="flex size-10 shrink-0 items-center justify-center rounded-md bg-muted">
@@ -806,21 +900,21 @@ function LostMapCard({
         <span className="truncate text-sm font-medium">{title}</span>
         <p className="text-xs text-muted-foreground">
           {carriedBy
-            ? `The game ${carriedBy} no longer carries the map this conquest is played on. A game update may have removed it. Your progress is saved (turn ${state.turn}), and it carries on if a game carries the map again.`
-            : `The map this conquest is played on is no longer installed. Your progress is saved (turn ${state.turn}). Import the map again to carry on.`}
+            ? t`The game ${game} no longer carries the map this conquest is played on. A game update may have removed it. Your progress is saved (turn ${turn}), and it carries on if a game carries the map again.`
+            : t`The map this conquest is played on is no longer installed. Your progress is saved (turn ${turn}). Import the map again to carry on.`}
         </p>
       </div>
       <ConfirmPopover
         triggerProps={{
           variant: "ghost",
           size: "icon",
-          "aria-label": `Abandon ${title}`,
-          title: "Abandon this campaign",
+          "aria-label": t`Abandon ${title}`,
+          title: t`Abandon this campaign`,
         }}
-        heading={`Abandon the conquest on ${title}?`}
-        description={`This deletes the conquest for good, including its progress (turn ${state.turn}). It cannot be undone, and it cannot carry on if the map comes back.`}
-        confirmLabel="Abandon conquest"
-        busyLabel="Abandoning…"
+        heading={t`Abandon the conquest on ${title}?`}
+        description={t`This deletes the conquest for good, including its progress (turn ${turn}). It cannot be undone, and it cannot carry on if the map comes back.`}
+        confirmLabel={t`Abandon conquest`}
+        busyLabel={t`Abandoning…`}
         onConfirm={onAbandon}
       >
         <Trash2 className="size-4 text-muted-foreground" aria-hidden />
@@ -843,6 +937,7 @@ function ImportMapForm({
   onClose: () => void;
   onOpenMap: (id: string) => void;
 }) {
+  const { t } = useLingui();
   /** Null while an import is running. */
   const [result, setResult] = useState<HandmadeImportResult | null>(null);
   const run = useCallback(
@@ -859,6 +954,10 @@ function ImportMapForm({
   );
   // Once per drawer, so a second effect run cannot import the zip twice.
   const started = useRef(false);
+  const importedTitle = result?.status === "imported" ? result.doc.title : "";
+  const skipped = result?.status === "imported" ? result.skipped : 0;
+  const existingTitle = result?.status === "exists" ? result.title : "";
+  const refusal = result?.status === "refused" ? result.message : "";
   useEffect(() => {
     if (started.current) return;
     started.current = true;
@@ -868,24 +967,32 @@ function ImportMapForm({
   return (
     <div className="flex flex-col gap-4 p-4">
       {result === null && (
-        <p className="text-sm text-muted-foreground">Importing the map…</p>
+        <p className="text-sm text-muted-foreground">
+          <Trans>Importing the map…</Trans>
+        </p>
       )}
       {result?.status === "imported" && (
         <>
           <p className="text-sm">
-            "{result.doc.title}" is imported and listed on the Conquest page.
+            <Trans>
+              "{importedTitle}" is imported and listed on the Conquest page.
+            </Trans>
           </p>
           {result.skipped > 0 && (
             <p className="text-sm text-muted-foreground">
-              {result.skipped} file{result.skipped === 1 ? "" : "s"} in the zip{" "}
-              {result.skipped === 1 ? "was" : "were"} left out, because a map
-              does not use {result.skipped === 1 ? "it" : "them"}.
+              {plural(skipped, {
+                one: "# file in the zip was left out, because a map does not use it.",
+                other:
+                  "# files in the zip were left out, because a map does not use them.",
+              })}
             </p>
           )}
           <div className="flex gap-2">
-            <Button onClick={() => onOpenMap(result.id)}>Open the map</Button>
+            <Button onClick={() => onOpenMap(result.id)}>
+              <Trans>Open the map</Trans>
+            </Button>
             <Button variant="outline" onClick={onClose}>
-              Done
+              <Trans>Done</Trans>
             </Button>
           </div>
         </>
@@ -893,17 +1000,23 @@ function ImportMapForm({
       {result?.status === "exists" && (
         <>
           <p className="text-sm">
-            A map called "{result.title}" is already installed. Replace it with
-            the one in this zip?
+            <Trans>
+              A map called "{existingTitle}" is already installed. Replace it
+              with the one in this zip?
+            </Trans>
           </p>
           <p className="text-sm text-muted-foreground">
-            A conquest in progress on it is kept and carries on with the new
-            map.
+            <Trans>
+              A conquest in progress on it is kept and carries on with the new
+              map.
+            </Trans>
           </p>
           <div className="flex gap-2">
-            <Button onClick={() => run(true)}>Replace the map</Button>
+            <Button onClick={() => run(true)}>
+              <Trans>Replace the map</Trans>
+            </Button>
             <Button variant="outline" onClick={onClose}>
-              Keep the installed map
+              <Trans>Keep the installed map</Trans>
             </Button>
           </div>
         </>
@@ -911,14 +1024,16 @@ function ImportMapForm({
       {result?.status === "invalid" && (
         <>
           <p className="text-sm">
-            The map was not imported. Fix the following in the map folder, zip
-            it again and import the new zip.
+            <Trans>
+              The map was not imported. Fix the following in the map folder, zip
+              it again and import the new zip.
+            </Trans>
           </p>
           <MapErrorList errors={result.errors} />
         </>
       )}
       {result?.status === "refused" && (
-        <ErrorBanner message={`The map was not imported. ${result.message}`} />
+        <ErrorBanner message={t`The map was not imported. ${refusal}`} />
       )}
     </div>
   );
@@ -940,6 +1055,7 @@ function GalaxyCard({
   /** Present for in-progress cards: clears the run state, keeping the galaxy. */
   onAbandon?: () => void | Promise<void>;
 }) {
+  const { t } = useLingui();
   const { refresh } = useGalaxies();
   const drawer = useDrawer();
   // Only a procedurally generated galaxy carries the seed a challenge code
@@ -949,22 +1065,22 @@ function GalaxyCard({
     const fileText = encodeConquestChallengeFile(galaxy);
     if (!fileText) return;
     const dest = await save({
-      title: "Export challenge",
+      title: t`Export challenge`,
       defaultPath: `${galaxy.title || "challenge"}.json`,
-      filters: [{ name: "Coilbox challenge", extensions: ["json"] }],
+      filters: [{ name: t`Coilbox challenge`, extensions: ["json"] }],
     });
     if (!dest) return;
     await challengeExport({ text: fileText, dest });
   };
   const openShareChallenge = () =>
     drawer.open({
-      title: "Share challenge",
+      title: t`Share challenge`,
       width: "26rem",
       content: (
         <ChallengeShare
           identity={galaxyIdentity(galaxy)}
           code={challengeCode ?? ""}
-          helpText="Anyone who pastes this code into Import challenge (needs the same game installed) plays the identical map, so results are directly comparable."
+          helpText={t`Anyone who pastes this code into Import challenge (needs the same game installed) plays the identical map, so results are directly comparable.`}
           onExportFile={exportChallengeFile}
         />
       ),
@@ -976,17 +1092,19 @@ function GalaxyCard({
     galaxy.game,
     scan.data?.games ?? [],
   );
-  const statusLabel =
-    state?.status === "won"
-      ? "Victory"
-      : state?.status === "lost"
-        ? "Defeat"
-        : state
-          ? `Turn ${state.turn} · ${territoryPercent(galaxy, state)}% held`
-          : "Not started";
+  const percent = state ? territoryPercent(galaxy, state) : 0;
+  const statusLabel = statusLabelFor(state, percent);
+  const galaxyTitle = galaxy.title;
   // Set for a generated Cities or Territories map, which is the only kind
   // built on a planet.
   const planet = generatedPlanet(galaxy);
+  const factionCount = galaxy.factions.length;
+  const galaxyCounts = [
+    galaxy.game.shortname,
+    locationCount(galaxy.theme?.skin ?? "galaxy", galaxy.nodes.length),
+    plural(factionCount, { one: "# faction", other: "# factions" }),
+    ...(planet ? [planetOf(planet).label] : []),
+  ].join(" · ");
 
   return (
     <Card className="flex-row items-center gap-3 rounded-lg border-border/50 p-3 shadow-none transition-colors hover:border-border hover:bg-accent/50">
@@ -1007,23 +1125,18 @@ function GalaxyCard({
             <span className="truncate text-sm font-medium">{galaxy.title}</span>
             {bundled && (
               <span className="shrink-0 rounded bg-muted px-1.5 py-0.5 text-xs text-muted-foreground">
-                Bundled
+                <Trans>Bundled</Trans>
               </span>
             )}
             {galaxy.importedChallenge && (
               <span className="shrink-0 rounded bg-muted px-1.5 py-0.5 text-xs text-muted-foreground">
-                Imported challenge
+                <Trans>Imported challenge</Trans>
               </span>
             )}
             {resume && <ContinueBadge />}
           </div>
           <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
-            <span className="truncate">
-              {galaxy.game.shortname} · {galaxy.nodes.length}{" "}
-              {locationNoun(galaxy.theme?.skin).many} · {galaxy.factions.length}{" "}
-              factions
-              {planet && ` · ${planetOf(planet).label}`}
-            </span>
+            <span className="truncate">{galaxyCounts}</span>
             {planet ? (
               <PlanetSwatch planet={planet} />
             ) : (
@@ -1055,8 +1168,8 @@ function GalaxyCard({
         <Button
           variant="ghost"
           size="icon"
-          aria-label={`Share ${galaxy.title} as a challenge code`}
-          title="Share challenge"
+          aria-label={t`Share ${galaxyTitle} as a challenge code`}
+          title={t`Share challenge`}
           onClick={openShareChallenge}
         >
           <Share2 className="size-4 text-muted-foreground" aria-hidden />
@@ -1067,13 +1180,13 @@ function GalaxyCard({
           triggerProps={{
             variant: "ghost",
             size: "icon",
-            "aria-label": `Abandon ${galaxy.title}`,
-            title: "Abandon this campaign",
+            "aria-label": t`Abandon ${galaxyTitle}`,
+            title: t`Abandon this campaign`,
           }}
-          heading={`Abandon the conquest on ${galaxy.title}?`}
-          description={`This deletes the conquest for good, including its progress (${statusLabel}). The map stays in your list. It cannot be undone.`}
-          confirmLabel="Abandon conquest"
-          busyLabel="Abandoning…"
+          heading={t`Abandon the conquest on ${galaxyTitle}?`}
+          description={abandonDescription(state, percent)}
+          confirmLabel={t`Abandon conquest`}
+          busyLabel={t`Abandoning…`}
           onConfirm={onAbandon}
         >
           <Trash2 className="size-4 text-muted-foreground" aria-hidden />
@@ -1085,12 +1198,12 @@ function GalaxyCard({
             triggerProps={{
               variant: "ghost",
               size: "icon",
-              "aria-label": `Delete ${galaxy.title}`,
+              "aria-label": t`Delete ${galaxyTitle}`,
             }}
-            heading={`Delete ${galaxy.title}?`}
-            description="This deletes the map from your computer. It cannot be undone."
-            confirmLabel="Delete map"
-            busyLabel="Deleting…"
+            heading={t`Delete ${galaxyTitle}?`}
+            description={t`This deletes the map from your computer. It cannot be undone.`}
+            confirmLabel={t`Delete map`}
+            busyLabel={t`Deleting…`}
             onConfirm={async () => {
               await conquestDelete({ id: galaxy.id });
               await refreshGalaxies();
@@ -1105,37 +1218,45 @@ function GalaxyCard({
   );
 }
 
+/** An option whose label is read when the picker draws, so it follows the
+ * language. */
+const option = (value: string, label: () => string) => ({
+  value,
+  get label() {
+    return label();
+  },
+});
 const FACTION_OPTIONS = [
-  { value: "1", label: "One enemy faction" },
-  { value: "2", label: "Two enemy factions" },
-  { value: "3", label: "Three enemy factions" },
+  option("1", () => t`One enemy faction`),
+  option("2", () => t`Two enemy factions`),
+  option("3", () => t`Three enemy factions`),
 ];
 const LAYOUT_OPTIONS = [
-  { value: "random", label: "Surprise me" },
-  { value: "scatter", label: "Scattered disc" },
-  { value: "spiral", label: "Spiral arms" },
-  { value: "clusters", label: "Clusters" },
-  { value: "ring", label: "Ring" },
-  { value: "realstars", label: "Real stars (the solar neighbourhood)" },
+  option("random", () => t`Surprise me`),
+  option("scatter", () => t`Scattered disc`),
+  option("spiral", () => t`Spiral arms`),
+  option("clusters", () => t`Clusters`),
+  option("ring", () => t`Ring`),
+  option("realstars", () => t`Real stars (the solar neighbourhood)`),
 ];
 // Real stars are a galaxy and nothing else, and a disc and arms are a galaxy's
 // words, so every other style gets the same shapes under plainer names.
 const PLAIN_LAYOUT_OPTIONS = [
-  { value: "random", label: "Surprise me" },
-  { value: "scatter", label: "Scattered" },
-  { value: "spiral", label: "Spiral" },
-  { value: "clusters", label: "Clusters" },
-  { value: "ring", label: "Ring" },
+  option("random", () => t`Surprise me`),
+  option("scatter", () => t`Scattered`),
+  option("spiral", () => t`Spiral`),
+  option("clusters", () => t`Clusters`),
+  option("ring", () => t`Ring`),
 ];
 // The land styles describe the land rather than how points are scattered.
 const LAND_LAYOUT_OPTIONS = [
-  { value: "random", label: "Surprise me" },
-  { value: "continent", label: "One continent" },
-  { value: "coast", label: "Coast" },
-  { value: "continents", label: "Two continents" },
-  { value: "archipelago", label: "Archipelago" },
-  { value: "inlandsea", label: "Inland sea" },
-  { value: "landlocked", label: "Landlocked" },
+  option("random", () => t`Surprise me`),
+  option("continent", () => t`One continent`),
+  option("coast", () => t`Coast`),
+  option("continents", () => t`Two continents`),
+  option("archipelago", () => t`Archipelago`),
+  option("inlandsea", () => t`Inland sea`),
+  option("landlocked", () => t`Landlocked`),
 ];
 /** The shapes a style offers. A land style on a planet whose sea cannot be
  * crossed offers only the single-mass shapes. */
@@ -1155,29 +1276,51 @@ const LAND_PREVIEW_DELAY_MS = 300;
 // Real-star galaxies are sized by radius, not by node count: every system
 // inside the radius is on the map. Counts come from the catalogue so they
 // cannot drift from the data.
-const RADIUS_OPTIONS = RADIUS_CHOICES.map((ly) => ({
-  value: String(ly),
-  label: `${ly} light years (${systemCountWithin(ly)} systems)`,
-}));
+const RADIUS_OPTIONS = RADIUS_CHOICES.map((ly) =>
+  option(String(ly), () => {
+    const count = systemCountWithin(ly);
+    return t`${ly} light years (${plural(count, { one: "# system", other: "# systems" })})`;
+  }),
+);
 /** Sentinel for "let the generator decide" (the classic full-frontier start for
  * procedural maps, capital-only for real stars). An empty string cannot be
  * used: Radix Select reads it as no selection and falls back to the
  * placeholder, leaving the row looking blank. */
 const STARTING_DEFAULT = "auto";
 /** The starting territory choices, counted in the style's own locations. */
-function startingOptions(
-  noun: { one: string; many: string },
-  realStars: boolean,
-) {
+function startingOptions(style: MapSkin, realStars: boolean) {
   return [
-    {
-      value: STARTING_DEFAULT,
-      label: realStars ? "Capital only (default)" : "Full frontier (default)",
-    },
-    { value: "1", label: "Capital only" },
-    { value: "2", label: `Capital + 1 ${noun.one}` },
-    { value: "3", label: `Capital + 2 ${noun.many}` },
-    { value: "4", label: `Capital + 3 ${noun.many}` },
+    option(STARTING_DEFAULT, () =>
+      realStars ? t`Capital only (default)` : t`Full frontier (default)`,
+    ),
+    option("1", () => t`Capital only`),
+    option("2", () =>
+      select(style, {
+        galaxy: "Capital + 1 system",
+        theatre: "Capital + 1 location",
+        cities: "Capital + 1 city",
+        territories: "Capital + 1 province",
+        other: "Capital + 1 location",
+      }),
+    ),
+    option("3", () =>
+      select(style, {
+        galaxy: "Capital + 2 systems",
+        theatre: "Capital + 2 locations",
+        cities: "Capital + 2 cities",
+        territories: "Capital + 2 provinces",
+        other: "Capital + 2 locations",
+      }),
+    ),
+    option("4", () =>
+      select(style, {
+        galaxy: "Capital + 3 systems",
+        theatre: "Capital + 3 locations",
+        cities: "Capital + 3 cities",
+        territories: "Capital + 3 provinces",
+        other: "Capital + 3 locations",
+      }),
+    ),
   ];
 }
 
@@ -1220,6 +1363,7 @@ function GenerateGalaxyForm({
    */
   initialGameName?: string;
 }) {
+  const { t } = useLingui();
   const { target, loading: targetLoading } = usePreferredTarget();
   const scan = useUnitsyncScan(target?.enginePath, target?.dataDir);
   const brandingEntries = useBrandingCatalog();
@@ -1348,10 +1492,10 @@ function GenerateGalaxyForm({
   );
   const realStars = layout === "realstars";
   const land = isLandSkin(style);
-  const noun = locationNoun(style);
+  const locationKey = locationNounKey(style);
   const starting = offeredOr(
     choices.starting,
-    startingOptions(noun, realStars),
+    startingOptions(style, realStars),
     STARTING_DEFAULT,
   );
   const factions = offeredOr(choices.factions, FACTION_OPTIONS, "2");
@@ -1362,7 +1506,7 @@ function GenerateGalaxyForm({
   const ceiling = unlockedLevel(unlocks, effectiveShort);
   const threat = (choices.threat ?? 0) <= ceiling ? (choices.threat ?? 0) : 0;
   // A size above 80 follows the same unlocks.
-  const size = offeredOr(choices.size, sizeOptions(ceiling, noun.many), "18");
+  const size = offeredOr(choices.size, sizeOptions(ceiling, locationKey), "18");
   const nodeCount = Number(size);
   const startUnlocked = startPositionUnlocked(unlocks, effectiveShort);
   const startPosition =
@@ -1479,41 +1623,44 @@ function GenerateGalaxyForm({
   const previewFailed = land && !previewStale && landPreview?.doc === null;
   // Not knowing yet is not the same as having none: while the installed engines
   // are being read, the form waits rather than telling the player to install one.
+  const reason = scan.error;
+  const onlyGameName = gameChoices[0]?.name;
   const blocked: ReactNode =
     !target && targetLoading ? (
-      "Looking for an engine…"
+      t`Looking for an engine…`
     ) : !target ? (
-      <>
+      <Trans>
         Install an engine first (
         <Link className="underline underline-offset-4" to="/settings/engines">
           Settings → Engines
         </Link>
         ).
-      </>
+      </Trans>
     ) : scan.error ? (
-      `The content scan failed, so installed games are not listed: ${scan.error}`
+      t`The content scan failed, so installed games are not listed: ${reason}`
     ) : scan.data &&
       (scan.data.games.length === 0 || gameChoices.length === 0) ? (
-      <>
+      <Trans>
         Install a game first (
         <Link className="underline underline-offset-4" to="/library/games">
           Content → Games
         </Link>
         ).
-      </>
+      </Trans>
     ) : maps.length === 0 && scan.data ? (
-      <>
+      <Trans>
         Install at least one map first (
         <Link className="underline underline-offset-4" to="/library/maps">
           Content → Maps
         </Link>
         ).
-      </>
+      </Trans>
     ) : null;
 
   // Said under the picker, which stays usable so another game can be chosen.
+  const selectedName = selected?.name;
   const stylesBlock = hidesStyles
-    ? `${selected?.name} plays Conquest only on the maps the game carries. Pick one from the Conquest list.`
+    ? t`${selectedName} plays Conquest only on the maps the game carries. Pick one from the Conquest list.`
     : null;
   // The opponents are fought with the game's skirmish AIs, so a map cannot be
   // made until the list is in, but the rest of the form can be filled in.
@@ -1521,11 +1668,11 @@ function GenerateGalaxyForm({
     !selected || stylesBlock
       ? null
       : aisFailed
-        ? "The skirmish AIs for this game could not be listed."
+        ? t`The skirmish AIs for this game could not be listed.`
         : !aisLoaded
-          ? "Loading this game's skirmish AIs."
+          ? t`Loading this game's skirmish AIs.`
           : ais.length === 0
-            ? "This game has no skirmish AIs to fight against."
+            ? t`This game has no skirmish AIs to fight against.`
             : null;
 
   // Creating a map is not a launch, so this does not stop the form. The
@@ -1583,7 +1730,7 @@ function GenerateGalaxyForm({
             if (picked) chooseGame(gameChoiceKey(picked));
           }}
           onBack={() => setPickingGame(false)}
-          backLabel="Back to the map form"
+          backLabel={t`Back to the map form`}
           gamesLoading={scan.loading}
           scanError={scan.error}
         />
@@ -1599,20 +1746,23 @@ function GenerateGalaxyForm({
         <>
           {gameChoices.length > 1 && (
             <div className="flex flex-col gap-1.5 text-sm">
-              <span className="font-medium">Game</span>
+              <span className="font-medium">
+                <Trans>Game</Trans>
+              </span>
               <GamePickerButton
                 value={selected?.name ?? ""}
                 games={gameChoices}
                 headers={gameHeaders}
-                placeholder={scan.loading ? "Scanning…" : "Select a game"}
+                placeholder={scan.loading ? t`Scanning…` : t`Select a game`}
                 onClick={() => setPickingGame(true)}
               />
             </div>
           )}
           {gameChoices.length === 1 && (
             <p className="text-sm text-muted-foreground">
-              Game:{" "}
-              <span className="text-foreground">{gameChoices[0].name}</span>
+              <Trans>
+                Game: <span className="text-foreground">{onlyGameName}</span>
+              </Trans>
             </p>
           )}
           {/* Reuse the same branding catalog art shown on game detail (issue
@@ -1626,7 +1776,9 @@ function GenerateGalaxyForm({
           ) : (
             <>
               <div className="flex flex-col gap-1.5 text-sm">
-                <span className="font-medium">Map style</span>
+                <span className="font-medium">
+                  <Trans>Map style</Trans>
+                </span>
                 {factsLoading ? (
                   // Which styles this game offers is not known yet, and one shown
                   // now could be taken away when it is (issues #3616 and #3674).
@@ -1635,7 +1787,7 @@ function GenerateGalaxyForm({
                     role="status"
                   >
                     <Loader2 className="size-4 animate-spin" aria-hidden />
-                    Checking which maps this game carries…
+                    <Trans>Checking which maps this game carries…</Trans>
                   </div>
                 ) : (
                   <OptionSelect
@@ -1649,7 +1801,9 @@ function GenerateGalaxyForm({
               </div>
               {land && (
                 <div className="flex flex-col gap-1.5 text-sm">
-                  <span className="font-medium">Planet</span>
+                  <span className="font-medium">
+                    <Trans>Planet</Trans>
+                  </span>
                   <OptionSelect
                     value={planet}
                     onValueChange={(planet) => choose({ planet })}
@@ -1658,7 +1812,9 @@ function GenerateGalaxyForm({
                 </div>
               )}
               <div className="flex flex-col gap-1.5 text-sm">
-                <span className="font-medium">Shape</span>
+                <span className="font-medium">
+                  <Trans>Shape</Trans>
+                </span>
                 <OptionSelect
                   value={layout}
                   onValueChange={(layout) => choose({ layout })}
@@ -1667,7 +1823,7 @@ function GenerateGalaxyForm({
               </div>
               <div className="flex flex-col gap-1.5 text-sm">
                 <span className="font-medium">
-                  {realStars ? "Radius from Sol" : "Map size"}
+                  {realStars ? t`Radius from Sol` : t`Map size`}
                 </span>
                 {realStars ? (
                   <OptionSelect
@@ -1679,18 +1835,22 @@ function GenerateGalaxyForm({
                   <OptionSelect
                     value={String(nodeCount)}
                     onValueChange={(size) => choose({ size })}
-                    options={sizeOptions(ceiling, noun.many)}
+                    options={sizeOptions(ceiling, locationKey)}
                   />
                 )}
                 {realStars && (
                   <span className="text-xs text-muted-foreground">
-                    Every real system within the radius, at its true position.
-                    You start at Sol, in the middle.
+                    <Trans>
+                      Every real system within the radius, at its true position.
+                      You start at Sol, in the middle.
+                    </Trans>
                   </span>
                 )}
               </div>
               <div className="flex flex-col gap-1.5 text-sm">
-                <span className="font-medium">Opposition</span>
+                <span className="font-medium">
+                  <Trans>Opposition</Trans>
+                </span>
                 <OptionSelect
                   value={factions}
                   onValueChange={(factions) => choose({ factions })}
@@ -1710,20 +1870,33 @@ function GenerateGalaxyForm({
                 />
               )}
               <div className="flex flex-col gap-1.5 text-sm">
-                <span className="font-medium">Starting territory</span>
+                <span className="font-medium">
+                  <Trans>Starting territory</Trans>
+                </span>
                 <OptionSelect
                   value={starting}
                   onValueChange={(starting) => choose({ starting })}
-                  options={startingOptions(noun, realStars)}
+                  options={startingOptions(style, realStars)}
                 />
               </div>
               <div className="flex items-center justify-between gap-3 text-sm">
                 <label htmlFor="conquest-fog" className="flex flex-col gap-0.5">
-                  <span className="font-medium">Fog of war</span>
+                  <span className="font-medium">
+                    <Trans>Fog of war</Trans>
+                  </span>
                   <span className="text-xs text-muted-foreground">
-                    Hide {noun.many} more than two{" "}
-                    {style === "galaxy" ? "jumps" : "moves"} from your
-                    territory.
+                    {select(style, {
+                      galaxy:
+                        "Hide systems more than two jumps from your territory.",
+                      theatre:
+                        "Hide locations more than two moves from your territory.",
+                      cities:
+                        "Hide cities more than two moves from your territory.",
+                      territories:
+                        "Hide provinces more than two moves from your territory.",
+                      other:
+                        "Hide locations more than two moves from your territory.",
+                    })}
                   </span>
                 </label>
                 <Switch
@@ -1733,13 +1906,15 @@ function GenerateGalaxyForm({
                 />
               </div>
               <div className="flex flex-col gap-1.5 text-sm">
-                <span className="font-medium">Seed</span>
+                <span className="font-medium">
+                  <Trans>Seed</Trans>
+                </span>
                 <div className="flex gap-2">
                   <Input
                     value={seed}
                     onChange={(e) => setSeed(e.target.value.replace(/\D/g, ""))}
                     inputMode="numeric"
-                    aria-label="Map seed"
+                    aria-label={t`Map seed`}
                   />
                   <Button
                     variant="outline"
@@ -1748,18 +1923,22 @@ function GenerateGalaxyForm({
                     }
                   >
                     <Dices className="size-4" aria-hidden />
-                    <span className="sr-only">Reroll seed</span>
+                    <span className="sr-only">
+                      <Trans>Reroll seed</Trans>
+                    </span>
                   </Button>
                 </div>
                 <span className="text-xs text-muted-foreground">
                   {realStars
-                    ? "The stars never change. The seed sets the factions, where your enemies start, and which maps each system is fought on."
-                    : "The same seed always builds the same map."}
+                    ? t`The stars never change. The seed sets the factions, where your enemies start, and which maps each system is fought on.`
+                    : t`The same seed always builds the same map.`}
                 </span>
               </div>
               {!realStars && (preview || (land && canPreview)) && (
                 <div className="flex flex-col gap-1.5 text-sm">
-                  <span className="font-medium">Preview</span>
+                  <span className="font-medium">
+                    <Trans>Preview</Trans>
+                  </span>
                   {preview ? (
                     <div className={previewStale ? "opacity-50" : undefined}>
                       <GalaxyPreview2D
@@ -1770,8 +1949,10 @@ function GenerateGalaxyForm({
                   ) : null}
                   {previewFailed ? (
                     <span className="text-xs text-muted-foreground">
-                      These choices could not be built into a map. Try another
-                      seed.
+                      <Trans>
+                        These choices could not be built into a map. Try another
+                        seed.
+                      </Trans>
                     </span>
                   ) : (
                     land &&
@@ -1784,7 +1965,7 @@ function GenerateGalaxyForm({
                           className="size-3.5 motion-safe:animate-spin"
                           aria-hidden
                         />
-                        Building the preview…
+                        <Trans>Building the preview…</Trans>
                       </span>
                     )
                   )}
@@ -1792,7 +1973,7 @@ function GenerateGalaxyForm({
                     !previewStale &&
                     preview.nodes.length < nodeCount && (
                       <span className="text-xs text-muted-foreground">
-                        Capped at {preview.nodes.length} named {noun.many}.
+                        {cappedMessage(style, preview.nodes.length)}
                       </span>
                     )}
                 </div>
@@ -1814,7 +1995,7 @@ function GenerateGalaxyForm({
                     aria-hidden
                   />
                 )}
-                {busy ? "Generating…" : "Create map"}
+                {busy ? t`Generating…` : t`Create map`}
               </Button>
             </>
           )}
@@ -1845,6 +2026,7 @@ function ImportChallengeForm({
   /** A confirmed `coilbox://` import code to prefill and run once (issue #388). */
   initialCode?: string;
 }) {
+  const { t } = useLingui();
   const { target } = usePreferredTarget();
   const scan = useUnitsyncScan(target?.enginePath, target?.dataDir);
   const brandingEntries = useBrandingCatalog();
@@ -1875,12 +2057,14 @@ function ImportChallengeForm({
       candidateGames(settings.game, games)[0];
     if (!installedGame) {
       if (scanError) {
+        const reason = scanError;
         throw new Error(
-          `The content scan failed, so installed games are not listed: ${scanError}`,
+          t`The content scan failed, so installed games are not listed: ${reason}`,
         );
       }
+      const shortname = settings.game.shortname;
       throw new Error(
-        `This challenge needs "${settings.game.shortname}", which isn't installed. Install it from Content → Games, then try again.`,
+        t`This challenge needs "${shortname}", which isn't installed. Install it from Content → Games, then try again.`,
       );
     }
 
@@ -1897,14 +2081,16 @@ function ImportChallengeForm({
       const checked = await loadChallengeMap(settings.map, installedGame.name);
       if (!checked.ok) throw new Error(checked.message);
       const { map } = checked;
+      const mapTitle = map.title;
+      const mapId = map.id;
       if (galaxies.some((g) => g.galaxy.id === map.id)) {
         throw new Error(
-          `The hand-made map "${map.title}" has the id "${map.id}", which another map in your list already uses, so it cannot be opened. Delete that map on the Conquest page, then import this code again.`,
+          t`The hand-made map "${mapTitle}" has the id "${mapId}", which another map in your list already uses, so it cannot be opened. Delete that map on the Conquest page, then import this code again.`,
         );
       }
       if (file.conquests[map.id]) {
         throw new Error(
-          `You already have a conquest on the hand-made map "${map.title}", and a map holds one conquest at a time. Abandon that conquest on the Conquest page, then import this code again.`,
+          t`You already have a conquest on the hand-made map "${mapTitle}", and a map holds one conquest at a time. Abandon that conquest on the Conquest page, then import this code again.`,
         );
       }
       // The conquest starts on the map's own page, once the player has picked
@@ -1945,8 +2131,8 @@ function ImportChallengeForm({
 
   return (
     <SharedImportChallengeForm
-      helpText="Paste a challenge code shared by another player to generate the identical map on your own install. A challenge made on a hand-made map needs that map installed here."
-      substitutedNoun="locations"
+      helpText={t`Paste a challenge code shared by another player to generate the identical map on your own install. A challenge made on a hand-made map needs that map installed here.`}
+      substitutedNoun={t`locations`}
       initialCode={initialCode}
       decode={decodeConquestImport}
       identityOf={conquestImportIdentity}

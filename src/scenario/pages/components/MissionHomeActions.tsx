@@ -13,6 +13,7 @@
  * (`src/scenario/index.ts`), so a player-focused build never reaches this page.
  */
 
+import { Trans, useLingui } from "@lingui/react/macro";
 import { Button, Input, useDrawer } from "@picoframe/frame";
 import { Package, PackageOpen } from "lucide-react";
 import { useState } from "react";
@@ -48,6 +49,7 @@ export function MissionHomeActions({
 }) {
   const drawer = useDrawer();
   const navigate = useNavigate();
+  const { t } = useLingui();
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
@@ -59,6 +61,11 @@ export function MissionHomeActions({
     loaded?.source === "game" && loaded.origin?.loose ? loaded.origin : null;
 
   if (!canPutIn && !inGame) return null;
+
+  const gameName = game?.name;
+  const scenarioName = scenario.name;
+  const homeGameName = inGame?.gameName;
+  const homeFolder = inGame?.folder;
 
   /** Re-read the list so the mission is found in its new home, then show it
    *  there. The document keeps its id either way, so the route is the same one
@@ -87,8 +94,8 @@ export function MissionHomeActions({
     <div className="flex flex-col gap-2 rounded border border-border/60 px-3 py-2">
       <p className="text-xs text-muted-foreground">
         {inGame
-          ? `This mission lives in ${inGame.gameName}, under missions/${inGame.folder}/, so the game ships it to anyone who installs it.`
-          : `This mission lives in coilbox. ${game?.name} is a loose folder, so it can hold the mission itself and ship it with the game.`}
+          ? t`This mission lives in ${homeGameName}, under missions/${homeFolder}/, so the game ships it to anyone who installs it.`
+          : t`This mission lives in coilbox. ${gameName} is a loose folder, so it can hold the mission itself and ship it with the game.`}
       </p>
       <div>
         {inGame ? (
@@ -99,7 +106,7 @@ export function MissionHomeActions({
             onClick={() => void takeOut()}
           >
             <PackageOpen className="size-3.5" />
-            {busy ? "Taking it out" : "Take it out of the game"}
+            {busy ? t`Taking it out` : t`Take it out of the game`}
           </Button>
         ) : (
           <Button
@@ -108,7 +115,7 @@ export function MissionHomeActions({
             onClick={() =>
               game &&
               drawer.open({
-                title: `Put ${scenario.name} in ${game.name}`,
+                title: t`Put ${scenarioName} in ${gameName}`,
                 width: "28rem",
                 content: (
                   <PutInGameForm
@@ -120,7 +127,8 @@ export function MissionHomeActions({
               })
             }
           >
-            <Package className="size-3.5" /> Put this mission in the game
+            <Package className="size-3.5" />{" "}
+            <Trans>Put this mission in the game</Trans>
           </Button>
         )}
       </div>
@@ -147,10 +155,13 @@ function PutInGameForm({
   onDone: () => Promise<void>;
 }) {
   const drawer = useDrawer();
+  const { t } = useLingui();
   const [typed, setTyped] = useState(scenario.name);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const folder = missionFolderName(typed);
+  const gameName = game.name;
+  const archiveName = game.primaryArchive.name;
 
   async function run() {
     setBusy(true);
@@ -169,21 +180,27 @@ function PutInGameForm({
   return (
     <div className="flex flex-col gap-4">
       <p className="text-sm text-muted-foreground">
-        The document and the compiled mission move into {game.name}. Coilbox
-        keeps no second copy, so the game is where this mission is edited from
-        now on. Take it out again to bring it back.
+        <Trans>
+          The document and the compiled mission move into {gameName}. Coilbox
+          keeps no second copy, so the game is where this mission is edited from
+          now on. Take it out again to bring it back.
+        </Trans>
       </p>
       <Label className="flex flex-col items-stretch gap-1.5 text-sm font-normal">
-        <span className="font-medium leading-none">Folder name</span>
+        <span className="font-medium leading-none">
+          <Trans>Folder name</Trans>
+        </span>
         <Input value={typed} onChange={(e) => setTyped(e.target.value)} />
       </Label>
       <p className="text-xs text-muted-foreground">
-        It is written to <code>missions/{folder}/</code> inside{" "}
-        <code className="break-all">{game.primaryArchive.name}</code>.
+        <Trans>
+          It is written to <code>missions/{folder}/</code> inside{" "}
+          <code className="break-all">{archiveName}</code>.
+        </Trans>
       </p>
       <Button disabled={busy} onClick={() => void run()}>
         <Package className="size-4" />
-        {busy ? "Moving it in" : "Put it in the game"}
+        {busy ? t`Moving it in` : t`Put it in the game`}
       </Button>
       {error ? <p className="text-xs text-destructive">{error}</p> : null}
     </div>

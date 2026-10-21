@@ -33,6 +33,7 @@
  * `startUnits` has in one note rather than one per index.
  */
 
+import { Trans, useLingui } from "@lingui/react/macro";
 import { Button, Input } from "@picoframe/frame";
 import { Flag, X } from "lucide-react";
 import { useState } from "react";
@@ -72,28 +73,31 @@ export function StartConditions({
   issues: MissionIssue[];
   onChange: (next: Scenario) => void;
 }) {
+  const { t } = useLingui();
   const units = useGameUnits(scenario.setup.gameName);
   const warning = startsWarning(scenario);
   const participants: Participant[] = scenario.setup.participants;
 
   return (
     <EditorPanel
-      title="Start conditions"
+      title={t`Start conditions`}
       icon={Flag}
       summary={
         participants.length === 0
-          ? "Nobody to start yet"
+          ? t`Nobody to start yet`
           : startsSummary(scenario)
       }
     >
       <div className="flex max-w-2xl flex-col gap-3">
         <p className="text-xs text-muted-foreground">
-          What each participant opens the mission with, which the skirmish setup
-          cannot say. Start units arrive on that team's start position, so they
-          are an opening force rather than a group placed where you clicked. A
-          team the mission declares opens on the bank set here and nothing else:
-          leaving both empty is a team with no metal and no energy, not one on
-          the game's usual allowance.
+          <Trans>
+            What each participant opens the mission with, which the skirmish
+            setup cannot say. Start units arrive on that team's start position,
+            so they are an opening force rather than a group placed where you
+            clicked. A team the mission declares opens on the bank set here and
+            nothing else: leaving both empty is a team with no metal and no
+            energy, not one on the game's usual allowance.
+          </Trans>
         </p>
 
         {warning && (
@@ -104,7 +108,10 @@ export function StartConditions({
 
         {participants.length === 0 ? (
           <p className="text-xs text-muted-foreground">
-            Add a participant under Setup and its start conditions appear here.
+            <Trans>
+              Add a participant under Setup and its start conditions appear
+              here.
+            </Trans>
           </p>
         ) : (
           <ul className="flex flex-col gap-3">
@@ -183,7 +190,9 @@ function TeamStart({
   onAmount: (field: AmountField, which: Amount, value: number | null) => void;
   onNoCommander: (on: boolean) => void;
 }) {
+  const { t } = useLingui();
   const counts = startUnits(team);
+  const participantName = participant.name;
   const [r, g, b] = participant.color;
   const switchId = `no-commander-${participant.id}`;
   // On when the mission places this team's start itself. The document records
@@ -200,7 +209,7 @@ function TeamStart({
         <span className="text-xs font-medium">{participant.name}</span>
         <div className="ml-auto flex items-center gap-2">
           <Label htmlFor={switchId} className="text-xs font-normal">
-            The mission places this team's start
+            <Trans>The mission places this team's start</Trans>
           </Label>
           <Switch
             id={switchId}
@@ -212,34 +221,37 @@ function TeamStart({
 
       <div className="flex flex-wrap items-center gap-1.5">
         <span className="w-20 shrink-0 text-[11px] text-muted-foreground">
-          Start units
+          <Trans>Start units</Trans>
         </span>
-        {counts.map((entry) => (
-          <span
-            key={entry.def}
-            className="flex items-center gap-1 rounded-md border border-border/50 py-0.5 pr-0.5 pl-2 font-mono text-xs"
-          >
-            {entry.def}
-            <CountBox
-              label={`How many ${entry.def} for ${participant.name}`}
-              count={entry.count}
-              onCommit={(count) => onCount(entry.def, count)}
-            />
-            <Button
-              size="sm"
-              variant="ghost"
-              className="size-6 p-0 text-destructive hover:text-destructive"
-              aria-label={`Take ${entry.def} off ${participant.name}'s start`}
-              onClick={() => onRemoveUnit(entry.def)}
+        {counts.map((entry) => {
+          const def = entry.def;
+          return (
+            <span
+              key={entry.def}
+              className="flex items-center gap-1 rounded-md border border-border/50 py-0.5 pr-0.5 pl-2 font-mono text-xs"
             >
-              <X className="size-3.5" />
-            </Button>
-          </span>
-        ))}
+              {entry.def}
+              <CountBox
+                label={t`How many ${def} for ${participantName}`}
+                count={entry.count}
+                onCommit={(count) => onCount(entry.def, count)}
+              />
+              <Button
+                size="sm"
+                variant="ghost"
+                className="size-6 p-0 text-destructive hover:text-destructive"
+                aria-label={t`Take ${def} off ${participantName}'s start`}
+                onClick={() => onRemoveUnit(entry.def)}
+              >
+                <X className="size-3.5" />
+              </Button>
+            </span>
+          );
+        })}
         <AddStartUnit
           units={units}
           loading={unitsLoading}
-          label={`Add a start unit for ${participant.name}`}
+          label={t`Add a start unit for ${participantName}`}
           onAdd={onAddUnit}
         />
       </div>
@@ -248,18 +260,15 @@ function TeamStart({
 
       <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
         <AmountPair
-          label="Bank"
           who={participant.name}
           field="resources"
           pair={team.resources}
           onAmount={onAmount}
         />
         <AmountPair
-          label="Income"
           who={participant.name}
           field="income"
           pair={team.income}
-          suffix="per second"
           onAmount={onAmount}
         />
       </div>
@@ -339,39 +348,39 @@ function AddStartUnit({
 
 /** The metal and energy of one field, either of which may be unset. */
 function AmountPair({
-  label,
   who,
   field,
   pair,
-  suffix,
   onAmount,
 }: {
-  label: string;
   who: string;
   field: AmountField;
   pair: { metal?: number; energy?: number } | undefined;
-  suffix?: string;
   onAmount: (field: AmountField, which: Amount, value: number | null) => void;
 }) {
+  const { t } = useLingui();
+  const bank = field === "resources";
   return (
     <div className="flex flex-wrap items-center gap-1.5">
       <span className="w-20 shrink-0 text-[11px] text-muted-foreground">
-        {label}
+        {bank ? <Trans>Bank</Trans> : <Trans>Income</Trans>}
       </span>
       <AmountBox
-        label={`${label} metal for ${who}`}
-        placeholder="Metal"
+        label={bank ? t`Bank metal for ${who}` : t`Income metal for ${who}`}
+        placeholder={t`Metal`}
         value={pair?.metal}
         onCommit={(value) => onAmount(field, "metal", value)}
       />
       <AmountBox
-        label={`${label} energy for ${who}`}
-        placeholder="Energy"
+        label={bank ? t`Bank energy for ${who}` : t`Income energy for ${who}`}
+        placeholder={t`Energy`}
         value={pair?.energy}
         onCommit={(value) => onAmount(field, "energy", value)}
       />
-      {suffix && (
-        <span className="text-[11px] text-muted-foreground">{suffix}</span>
+      {!bank && (
+        <span className="text-[11px] text-muted-foreground">
+          <Trans>per second</Trans>
+        </span>
       )}
     </div>
   );

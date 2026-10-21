@@ -1,3 +1,4 @@
+import { useLingui } from "@lingui/react/macro";
 import { ArrowLeft } from "lucide-react";
 import { HUD_CARD_CLASS } from "./hudChrome";
 
@@ -23,11 +24,12 @@ export function BackToMapButton({
   onClick: () => void;
   className?: string;
 }) {
+  const { t } = useLingui();
   return (
     <button
       type="button"
       onClick={onClick}
-      aria-label="Back to map"
+      aria-label={t`Back to map`}
       className={`pointer-events-auto flex items-center justify-center p-3.5 text-muted-foreground backdrop-blur-sm transition-colors hover:border-border hover:text-foreground ${HUD_CARD_CLASS} ${className}`}
     >
       <ArrowLeft className="size-5" aria-hidden />

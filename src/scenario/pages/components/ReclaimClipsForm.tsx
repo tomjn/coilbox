@@ -1,3 +1,5 @@
+import { plural, t } from "@lingui/core/macro";
+import { Trans } from "@lingui/react/macro";
 import { Button } from "@picoframe/frame";
 import { Loader2, Trash2 } from "lucide-react";
 import { useEffect, useState } from "react";
@@ -18,9 +20,17 @@ const msg = (e: unknown): string =>
 /** One line saying what a sweep covers, dry run or applied. */
 function summarize(s: MediaSweepSummary): string {
   const n = sweptCount(s);
-  if (n === 0) return "No leftover dialogue clips - nothing to reclaim.";
-  const clips = `${n} ${n === 1 ? "clip" : "clips"}`;
-  return `${s.applied ? "Removed" : "Can reclaim"} ${clips} (${formatBytes(s.bytes)}).`;
+  if (n === 0) return t`No leftover dialogue clips - nothing to reclaim.`;
+  const size = formatBytes(s.bytes);
+  return s.applied
+    ? plural(n, {
+        one: `Removed # clip (${size}).`,
+        other: `Removed # clips (${size}).`,
+      })
+    : plural(n, {
+        one: `Can reclaim # clip (${size}).`,
+        other: `Can reclaim # clips (${size}).`,
+      });
 }
 
 /**
@@ -101,7 +111,7 @@ export function ReclaimClipsForm({ onDone }: { onDone: () => void }) {
     return (
       <p className="flex items-center gap-2 text-sm text-muted-foreground">
         <Loader2 className="size-4 animate-spin" />
-        Looking for leftover dialogue clips...
+        <Trans>Looking for leftover dialogue clips...</Trans>
       </p>
     );
   if (error)
@@ -113,13 +123,15 @@ export function ReclaimClipsForm({ onDone }: { onDone: () => void }) {
       <p className="text-sm">{summarize(preview)}</p>
       {!clean && (
         <p className="text-xs text-muted-foreground">
-          Portraits and voice clips that no stored scenario and no campaign
-          mission names. This can't be undone.
+          <Trans>
+            Portraits and voice clips that no stored scenario and no campaign
+            mission names. This can't be undone.
+          </Trans>
         </p>
       )}
       <div className="flex justify-end gap-2">
         <Button type="button" variant="ghost" size="sm" onClick={onDone}>
-          {clean ? "Close" : "Cancel"}
+          {clean ? t`Close` : t`Cancel`}
         </Button>
         {!clean && (
           <Button
@@ -134,7 +146,7 @@ export function ReclaimClipsForm({ onDone }: { onDone: () => void }) {
             ) : (
               <Trash2 className="size-4" />
             )}
-            Reclaim
+            <Trans>Reclaim</Trans>
           </Button>
         )}
       </div>

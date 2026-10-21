@@ -25,6 +25,8 @@
  * `setup.ts`.
  */
 
+import { plural, t } from "@lingui/core/macro";
+import { Trans, useLingui } from "@lingui/react/macro";
 import { Button, useDrawer } from "@picoframe/frame";
 import { AlertTriangle, Bookmark, SlidersHorizontal } from "lucide-react";
 import {
@@ -51,6 +53,7 @@ import { mergeMapTiers } from "@/content/mapTiers";
 import { ScanFailed } from "@/content/pages/components/states";
 import { useGameUnits } from "@/content/useGameUnits";
 import { useFactionLogos } from "@/factions/logos";
+import { getLocale } from "@/i18n";
 import { withoutGeneratedGames } from "@/lib/generatedGames";
 import {
   defaultAi,
@@ -113,23 +116,30 @@ type Pending =
 
 /** "1 actor, 2 groups and a base", for saying what something holds. */
 function list(parts: string[]): string {
-  if (parts.length === 0) return "nothing";
-  if (parts.length === 1) return parts[0];
-  return `${parts.slice(0, -1).join(", ")} and ${parts.at(-1)}`;
+  if (parts.length === 0) return t`nothing`;
+  return new Intl.ListFormat(getLocale(), {
+    style: "long",
+    type: "conjunction",
+  }).format(parts);
 }
 
-const count = (n: number, one: string, many = `${one}s`) =>
-  `${n} ${n === 1 ? one : many}`;
+const participantCount = (n: number) =>
+  plural(n, { one: "# participant", other: "# participants" });
 
 /** What a document has standing on its map, by kind: "1 zone and 2 actors". */
 function placedList(scenario: Scenario): string {
-  const kinds: [number, string][] = [
-    [scenario.zones.length, "zone"],
-    [scenario.actors.length, "actor"],
-    [scenario.groups.length, "group"],
-    [scenario.bases.length, "base"],
-  ];
-  return list(kinds.filter(([n]) => n > 0).map(([n, one]) => count(n, one)));
+  const parts: string[] = [];
+  const zones = scenario.zones.length;
+  const actors = scenario.actors.length;
+  const groups = scenario.groups.length;
+  const bases = scenario.bases.length;
+  if (zones > 0) parts.push(plural(zones, { one: "# zone", other: "# zones" }));
+  if (actors > 0)
+    parts.push(plural(actors, { one: "# actor", other: "# actors" }));
+  if (groups > 0)
+    parts.push(plural(groups, { one: "# group", other: "# groups" }));
+  if (bases > 0) parts.push(plural(bases, { one: "# base", other: "# bases" }));
+  return list(parts);
 }
 
 export function SetupPanel({
@@ -153,6 +163,7 @@ export function SetupPanel({
   issues: MissionIssue[];
   onChange: (next: Scenario) => void;
 }) {
+  const { t } = useLingui();
   const drawer = useDrawer();
   const { presets } = useSkirmishPresets();
   const { target } = usePreferredTarget();
@@ -308,7 +319,7 @@ export function SetupPanel({
 
   const openPresets = () =>
     drawer.open({
-      title: "Set up from preset",
+      title: t`Set up from preset`,
       width: "32rem",
       content: (
         <PresetPickerDrawer
@@ -338,9 +349,9 @@ export function SetupPanel({
   // The starts are named only once something is set, so a shut panel says a
   // scenario has them rather than always saying it has not.
   const summary = [
-    setup.gameName || "No game",
-    setup.mapName || "No map",
-    count(setup.participants.length, "participant"),
+    setup.gameName || t`No game`,
+    setup.mapName || t`No map`,
+    participantCount(setup.participants.length),
     ...(Object.keys(scenario.teams).length ? [startsSummary(scenario)] : []),
   ].join(" · ");
 
@@ -352,13 +363,14 @@ export function SetupPanel({
   const teamNotes = rows
     .map((p) => {
       const problem = entryProblem(issues, "teams", p.id);
-      return problem ? `${p.name || "This participant"}: ${problem}` : null;
+      const who = p.name || t`This participant`;
+      return problem ? t`${who}: ${problem}` : null;
     })
     .filter((message): message is string => message !== null);
 
   return (
     <EditorPanel
-      title="Setup"
+      title={t`Setup`}
       icon={SlidersHorizontal}
       summary={summary}
       defaultOpen={!setup.gameName || !setup.mapName}
@@ -366,8 +378,10 @@ export function SetupPanel({
       <div className="flex flex-col gap-4">
         <div className="flex items-center gap-3">
           <p className="text-xs text-muted-foreground">
-            The game, map and participants this scenario is authored and played
-            on.
+            <Trans>
+              The game, map and participants this scenario is authored and
+              played on.
+            </Trans>
           </p>
           <Button
             size="sm"
@@ -375,7 +389,7 @@ export function SetupPanel({
             className="ml-auto shrink-0"
             onClick={openPresets}
           >
-            <Bookmark className="size-3.5" /> From preset
+            <Bookmark className="size-3.5" /> <Trans>From preset</Trans>
           </Button>
         </div>
 
@@ -561,8 +575,9 @@ export function SetupMissing({
   hasGame: boolean;
   hasMap: boolean;
 }) {
+  const { t } = useLingui();
   if (scan.error) {
-    return <ScanFailed noun="games or maps" reason={scan.error} />;
+    return <ScanFailed noun={t`games or maps`} reason={scan.error} />;
   }
   return (
     <>
@@ -576,8 +591,11 @@ export function SetupMissing({
 function MissingNote({ what }: { what: string }) {
   return (
     <p className="flex items-center gap-1.5 text-xs text-amber-600 dark:text-amber-400">
-      <AlertTriangle className="size-3.5 shrink-0" /> {what} is not installed
-      for the engine coilbox is using, so it cannot be drawn or played.
+      <AlertTriangle className="size-3.5 shrink-0" />{" "}
+      <Trans>
+        {what} is not installed for the engine coilbox is using, so it cannot be
+        drawn or played.
+      </Trans>
     </p>
   );
 }
@@ -626,7 +644,10 @@ function MapChangeNotice({
   onScale: (from: MapExtent, to: MapExtent) => void;
   onCancel: () => void;
 }) {
+  const { t } = useLingui();
   const cost = mapCost(scenario, to);
+  const placed = placedList(scenario);
+  const offMapCount = cost.offMap;
   const canScale = !!from && !!to && (from.x !== to.x || from.z !== to.z);
 
   return (
@@ -635,7 +656,7 @@ function MapChangeNotice({
         <>
           {canScale && from && to && (
             <Button size="sm" onClick={() => onScale(from, to)}>
-              Rescale onto {mapName}
+              <Trans>Rescale onto {mapName}</Trans>
             </Button>
           )}
           <Button
@@ -643,22 +664,24 @@ function MapChangeNotice({
             variant={canScale ? "outline" : "default"}
             onClick={onKeep}
           >
-            Keep the positions
+            <Trans>Keep the positions</Trans>
           </Button>
           <Button size="sm" variant="ghost" onClick={onCancel}>
-            Cancel
+            <Trans>Cancel</Trans>
           </Button>
         </>
       }
     >
       <span>
-        {placedList(scenario)} stand somewhere on the current map, and the same
-        position is a different place on {mapName}.{" "}
+        {t`${placed} stand somewhere on the current map, and the same position is a different place on ${mapName}.`}{" "}
         {to
           ? cost.offMap > 0
-            ? `Kept as they are, ${count(cost.offMap, "coordinate")} would be off ${mapName}, where the engine clamps whatever stands there onto the edge.`
-            : `Kept as they are, all of them are still on ${mapName}, though the ground under them is not the ground they were placed on.`
-          : `Coilbox does not know ${mapName}'s size, so it cannot say how much of this would still be on it.`}
+            ? plural(offMapCount, {
+                one: `Kept as they are, # coordinate would be off ${mapName}, where the engine clamps whatever stands there onto the edge.`,
+                other: `Kept as they are, # coordinates would be off ${mapName}, where the engine clamps whatever stands there onto the edge.`,
+              })
+            : t`Kept as they are, all of them are still on ${mapName}, though the ground under them is not the ground they were placed on.`
+          : t`Coilbox does not know ${mapName}'s size, so it cannot say how much of this would still be on it.`}
       </span>
     </Ask>
   );
@@ -683,37 +706,58 @@ function GameChangeNotice({
   onConfirm: () => void;
   onCancel: () => void;
 }) {
+  const { t } = useLingui();
   const units = useGameUnits(gameName);
   const missing = useMemo(
     () => defsMissingFrom(defs, units.units),
     [defs, units.units],
   );
+  const missingList = list(missing);
+  const defCount = defs.length;
+  const missingCount = missing.length;
+  const formerGame = oldGameName || t`the old game`;
 
   return (
     <Ask
       actions={
         <>
           <Button size="sm" onClick={onConfirm}>
-            Change the game
+            <Trans>Change the game</Trans>
           </Button>
           <Button size="sm" variant="ghost" onClick={onCancel}>
-            Cancel
+            <Trans>Cancel</Trans>
           </Button>
         </>
       }
     >
       <span>
         {defs.length === 0
-          ? `This scenario names no units, so changing to ${gameName} costs nothing on the map.`
+          ? t`This scenario names no units, so changing to ${gameName} costs nothing on the map.`
           : units.loading
-            ? `Reading ${gameName}'s units…`
+            ? t`Reading ${gameName}'s units…`
             : units.gameMissing
-              ? `${gameName} is not installed, so coilbox cannot say which of the ${count(defs.length, "unit type")} this scenario names it has.`
+              ? plural(defCount, {
+                  one: `${gameName} is not installed, so coilbox cannot say which of the # unit type this scenario names it has.`,
+                  other: `${gameName} is not installed, so coilbox cannot say which of the # unit types this scenario names it has.`,
+                })
               : missing.length === 0
-                ? `${gameName} has all ${count(defs.length, "unit type")} this scenario names.`
-                : `${count(missing.length, "unit type")} this scenario names ${missing.length === 1 ? "is" : "are"} not in ${gameName}: ${list(missing)}. They stay in the document until you change them, and the ones standing on the map draw as boxes.`}
-        {optionCount > 0 &&
-          ` The ${count(optionCount, "mod option")} set for ${oldGameName || "the old game"} ${optionCount === 1 ? "is" : "are"} dropped, because ${gameName} declares its own.`}
+                ? plural(defCount, {
+                    one: `${gameName} has all # unit type this scenario names.`,
+                    other: `${gameName} has all # unit types this scenario names.`,
+                  })
+                : plural(missingCount, {
+                    one: `# unit type this scenario names is not in ${gameName}: ${missingList}. They stay in the document until you change them, and the ones standing on the map draw as boxes.`,
+                    other: `# unit types this scenario names are not in ${gameName}: ${missingList}. They stay in the document until you change them, and the ones standing on the map draw as boxes.`,
+                  })}
+        {optionCount > 0 && (
+          <>
+            {" "}
+            {plural(optionCount, {
+              one: `The # mod option set for ${formerGame} is dropped, because ${gameName} declares its own.`,
+              other: `The # mod options set for ${formerGame} are dropped, because ${gameName} declares its own.`,
+            })}
+          </>
+        )}
       </span>
     </Ask>
   );
@@ -737,19 +781,26 @@ function ParticipantRemovalNotice({
   onRemove: (to: string | null) => void;
   onCancel: () => void;
 }) {
+  const { t } = useLingui();
   const held = participantHoldings(scenario, id);
+  const actorCount = held.actors;
+  const groupCount = held.groups;
+  const baseCount = held.bases;
+  const triggerCount = held.triggers;
   const others = scenario.setup.participants.filter((p) => p.id !== id);
   const [to, setTo] = useState(others[0]?.id ?? "");
   const name = scenario.setup.participants.find((p) => p.id === id)?.name ?? id;
 
   const holds = list(
     [
-      held.actors > 0 && count(held.actors, "actor"),
-      held.groups > 0 && count(held.groups, "group"),
-      held.bases > 0 && count(held.bases, "base"),
+      held.actors > 0 &&
+        plural(actorCount, { one: "# actor", other: "# actors" }),
+      held.groups > 0 &&
+        plural(groupCount, { one: "# group", other: "# groups" }),
+      held.bases > 0 && plural(baseCount, { one: "# base", other: "# bases" }),
       // Listed rather than only explained below, because a participant whose
       // only holding is a start used to read as owning nothing at all.
-      held.team && "a start",
+      held.team && t`a start`,
     ].filter((part): part is string => !!part),
   );
 
@@ -767,7 +818,7 @@ function ParticipantRemovalNotice({
                 options={others.map((p) => ({ value: p.id, label: p.name }))}
               />
               <Button size="sm" onClick={() => onRemove(to)} disabled={!to}>
-                Hand them over
+                <Trans>Hand them over</Trans>
               </Button>
             </>
           )}
@@ -777,20 +828,32 @@ function ParticipantRemovalNotice({
             className="text-destructive"
             onClick={() => onRemove(null)}
           >
-            Delete them
+            <Trans>Delete them</Trans>
           </Button>
           <Button size="sm" variant="ghost" onClick={onCancel}>
-            Cancel
+            <Trans>Cancel</Trans>
           </Button>
         </>
       }
     >
       <span>
-        {name} owns {holds}.
-        {held.triggers > 0 &&
-          ` ${count(held.triggers, "trigger condition or action")} name${held.triggers === 1 ? "s" : ""} it, and ${held.triggers === 1 ? "is" : "are"} carried over only if you hand its things to somebody.`}
-        {held.team &&
-          " Its start units, resources and income go either way: they belong to the participant being removed."}
+        {t`${name} owns ${holds}.`}
+        {held.triggers > 0 && (
+          <>
+            {" "}
+            {plural(triggerCount, {
+              one: "# trigger condition or action names it, and is carried over only if you hand its things to somebody.",
+              other:
+                "# trigger conditions or actions name it, and are carried over only if you hand its things to somebody.",
+            })}
+          </>
+        )}
+        {held.team && (
+          <>
+            {" "}
+            {t`Its start units, resources and income go either way: they belong to the participant being removed.`}
+          </>
+        )}
       </span>
     </Ask>
   );
@@ -799,7 +862,7 @@ function ParticipantRemovalNotice({
 /** Setting up from a preset, which replaces the whole setup at once. */
 function PresetNotice({
   preset,
-  participantCount,
+  participantCount: participantCountNow,
   onConfirm,
   onCancel,
 }: {
@@ -808,26 +871,28 @@ function PresetNotice({
   onConfirm: () => void;
   onCancel: () => void;
 }) {
+  const { t } = useLingui();
+  const presetName = preset.name;
+  const game = preset.gameName || t`no game`;
+  const map = preset.mapName || t`no map`;
+  const mine = participantCount(participantCountNow);
+  const theirs = participantCount(preset.participants.length);
   return (
     <Ask
       actions={
         <>
           <Button size="sm" onClick={onConfirm}>
-            Use "{preset.name}"
+            <Trans>Use "{presetName}"</Trans>
           </Button>
           <Button size="sm" variant="ghost" onClick={onCancel}>
-            Cancel
+            <Trans>Cancel</Trans>
           </Button>
         </>
       }
     >
       <span>
-        "{preset.name}" replaces the game, the map, the participants and the
-        game options with {preset.gameName || "no game"} on{" "}
-        {preset.mapName || "no map"}. This scenario's{" "}
-        {count(participantCount, "participant")} hand over to the preset's{" "}
-        {count(preset.participants.length, "participant")} in list order, and
-        every position stays where it is on the new map.
+        {t`"${presetName}" replaces the game, the map, the participants and the game options with ${game} on ${map}.`}{" "}
+        {t`This scenario's ${mine} hand over to the preset's ${theirs} in list order, and every position stays where it is on the new map.`}
       </span>
     </Ask>
   );

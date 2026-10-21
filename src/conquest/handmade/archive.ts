@@ -1,3 +1,4 @@
+import { t } from "@lingui/core/macro";
 import {
   type GameItem,
   unitsyncArchiveFile,
@@ -16,6 +17,9 @@ import {
 import type { HandmadeMapError } from "./errors";
 import { gltfUriEntries, resolveGltfUri } from "./gltf";
 import { MANIFEST_FILE } from "./manifest";
+
+// Example JSON shown in a message. A literal brace is not allowed in one.
+const exampleSettings = '{ "onlyOwnMaps": true }';
 
 /**
  * Hand-made maps a game archive carries (issue #3511). A game maker puts each
@@ -130,7 +134,7 @@ export function parseArchiveIndex(text: string): {
       errors: [
         {
           code: "manifest-json",
-          message: `${where} is not valid JSON, so its settings are not used.`,
+          message: t`${where} is not valid JSON, so its settings are not used.`,
         },
       ],
     };
@@ -141,7 +145,7 @@ export function parseArchiveIndex(text: string): {
       errors: [
         {
           code: "manifest-json",
-          message: `${where} must hold an object such as { "onlyOwnMaps": true }.`,
+          message: t`${where} must hold an object such as ${exampleSettings}.`,
         },
       ],
     };
@@ -156,7 +160,7 @@ export function parseArchiveIndex(text: string): {
       {
         code: "manifest-field",
         path: "onlyOwnMaps",
-        message: `${where}: onlyOwnMaps must be true or false.`,
+        message: t`${where}: onlyOwnMaps must be true or false.`,
       },
     ],
   };
@@ -198,13 +202,13 @@ function textUrl(text: string): string {
 }
 
 /** Why a member that is in the archive could not be read, for the author. */
-function unreadable(file: string, why: string): ArchiveRead {
+function unreadable(file: string, message: string): ArchiveRead {
   return {
     ok: false,
     error: {
       code: "archive-unreadable",
       file,
-      message: `"${file}" is in the game archive, but ${why}`,
+      message,
     },
   };
 }
@@ -254,11 +258,13 @@ export function createArchiveReader(target: ArchiveTarget): ArchiveReader {
       ...(raw ? { raw } : {}),
     });
 
-  const failed = (file: string, e: unknown) =>
-    unreadable(
+  const failed = (file: string, e: unknown) => {
+    const detail = e instanceof Error ? e.message : String(e);
+    return unreadable(
       file,
-      `it could not be read. ${e instanceof Error ? e.message : String(e)}`,
+      t`"${file}" is in the game archive, but it could not be read. ${detail}`,
     );
+  };
 
   /** Read a member's own bytes into a blob URL. */
   const readRaw = async (
@@ -275,13 +281,14 @@ export function createArchiveReader(target: ArchiveTarget): ArchiveReader {
     if (res.truncated) {
       return unreadable(
         file,
-        "it is larger than 256 MB, the most coilbox reads from a game archive for one file.",
+        t`"${file}" is in the game archive, but it is larger than 256 MB, the most coilbox reads from a game archive for one file.`,
       );
     }
     if (!res.dataUrl) {
+      const details = res.errors.join(" ");
       return unreadable(
         file,
-        `it could not be read. ${res.errors.join(" ")}`.trim(),
+        t`"${file}" is in the game archive, but it could not be read. ${details}`.trim(),
       );
     }
     const bytes = dataUrlBytes(res.dataUrl);
@@ -310,7 +317,11 @@ export function createArchiveReader(target: ArchiveTarget): ArchiveReader {
       return { ok: true, url: res.dataUrl };
     }
     if (res.errors.length > 0 && !res.truncated) {
-      return unreadable(file, `it could not be read. ${res.errors.join(" ")}`);
+      const details = res.errors.join(" ");
+      return unreadable(
+        file,
+        t`"${file}" is in the game archive, but it could not be read. ${details}`,
+      );
     }
     // Too large for a preview, or a kind the preview does not return. The map
     // reader says so when the bytes are not a picture or text it can use.
@@ -537,6 +548,6 @@ export function createArchiveReader(target: ArchiveTarget): ArchiveReader {
 function unreadableIndex(): HandmadeMapError {
   return {
     code: "manifest-json",
-    message: "The file could not be read from the game archive.",
+    message: t`The file could not be read from the game archive.`,
   };
 }

@@ -14,6 +14,8 @@
  * scenario's game, `UnitPickerButton` to pick one of them.
  */
 
+import { t } from "@lingui/core/macro";
+import { Trans, useLingui } from "@lingui/react/macro";
 import { Button, Input } from "@picoframe/frame";
 import {
   Blocks,
@@ -235,10 +237,16 @@ export interface EditorMode {
  */
 const panMode: EditorMode = {
   id: "pan",
-  label: "Pan",
+  get label() {
+    return t`Pan`;
+  },
   icon: Hand,
-  what: "Moves the view. Puts nothing down and selects nothing new.",
-  hint: "Drag the map to move the view. Click something to select it, and drag it to move it. Right-drag turns the camera.",
+  get what() {
+    return t`Moves the view. Puts nothing down and selects nothing new.`;
+  },
+  get hint() {
+    return t`Drag the map to move the view. Click something to select it, and drag it to move it. Right-drag turns the camera.`;
+  },
   use: () => ({ place: null }),
 };
 
@@ -258,13 +266,19 @@ const panMode: EditorMode = {
  */
 const selectMode: EditorMode = {
   id: "select",
-  label: "Select",
+  get label() {
+    return t`Select`;
+  },
   icon: MousePointer2,
-  what: "Takes hold of what is already on the map. Puts nothing down.",
+  get what() {
+    return t`Takes hold of what is already on the map. Puts nothing down.`;
+  },
   // Dragging a unit and dragging a zone's handle are true in every mode, so the
   // strip under the map says both for all of them. This says the ones that are
   // only true here (issue #2285).
-  hint: "Drag a box round things to select them all, Shift-click to add one, and click bare ground to let go. Middle-drag pans while this mode is on.",
+  get hint() {
+    return t`Drag a box round things to select them all, Shift-click to add one, and click bare ground to let go. Middle-drag pans while this mode is on.`;
+  },
   use: ({ scenario, placements, paths, onSelectMany }) => {
     const [band, setBand] = useState<ScenarioZone | null>(null);
     // The box is redrawn on the next frame rather than on every pointer move.
@@ -343,11 +357,18 @@ const DRAFT_ZONE_ID = "draft-zone";
  */
 const zonesMode: EditorMode = {
   id: "zones",
-  label: "Zones",
+  get label() {
+    return t`Zones`;
+  },
   icon: Square,
-  what: "A named piece of ground, for a trigger to ask questions about.",
-  hint: "Drag anywhere to draw a zone, inside another one if you like, or click once for one at the default size. Click a zone to select it, then drag its orange middle handle to move it. Middle-drag pans while this mode is on.",
+  get what() {
+    return t`A named piece of ground, for a trigger to ask questions about.`;
+  },
+  get hint() {
+    return t`Drag anywhere to draw a zone, inside another one if you like, or click once for one at the default size. Click a zone to select it, then drag its orange middle handle to move it. Middle-drag pans while this mode is on.`;
+  },
   use: ({ onChange, onSelect }) => {
+    const { t } = useLingui();
     const [shape, setShape] = useState<ZoneShape>("box");
     const [draft, setDraft] = useState<ScenarioZone | null>(null);
 
@@ -394,10 +415,14 @@ const zonesMode: EditorMode = {
           value={shape}
           onValueChange={(next) => setShape(next as ZoneShape)}
           options={[
-            { value: "box", label: "Box", icon: <Square className="size-3" /> },
+            {
+              value: "box",
+              label: t`Box`,
+              icon: <Square className="size-3" />,
+            },
             {
               value: "circle",
-              label: "Circle",
+              label: t`Circle`,
               icon: <Circle className="size-3" />,
             },
           ]}
@@ -418,10 +443,16 @@ const zonesMode: EditorMode = {
  */
 const actorsMode: EditorMode = {
   id: "actors",
-  label: "Actors",
+  get label() {
+    return t`Actors`;
+  },
   icon: User,
-  what: "One named unit, which a trigger can watch, order and kill by name.",
-  hint: "Pick a unit, then click the map to place one.",
+  get what() {
+    return t`One named unit, which a trigger can watch, order and kill by name.`;
+  },
+  get hint() {
+    return t`Pick a unit, then click the map to place one.`;
+  },
   use: ({ scenario, onChange, onSelect }) => {
     const [unitDef, setUnitDef] = useState("");
     const [team, setTeam] = useState("");
@@ -473,11 +504,18 @@ const actorsMode: EditorMode = {
  */
 const groupsMode: EditorMode = {
   id: "groups",
-  label: "Groups",
+  get label() {
+    return t`Groups`;
+  },
   icon: Users,
-  what: "A squad of mobile units the mission spawns, wakes and orders as one.",
-  hint: "Pick a unit and a count, then click the map to place a group. A group is the mobile half: buildings that stand from the start belong in a base.",
+  get what() {
+    return t`A squad of mobile units the mission spawns, wakes and orders as one.`;
+  },
+  get hint() {
+    return t`Pick a unit and a count, then click the map to place a group. A group is the mobile half: buildings that stand from the start belong in a base.`;
+  },
   use: ({ scenario, onChange, onSelect }) => {
+    const { t } = useLingui();
     const [unitDef, setUnitDef] = useState("");
     const [count, setCount] = useState(DEFAULT_GROUP_COUNT);
     const [team, setTeam] = useState("");
@@ -514,7 +552,7 @@ const groupsMode: EditorMode = {
             className="w-48"
           />
           <Input
-            aria-label="How many units"
+            aria-label={t`How many units`}
             type="number"
             min={1}
             max={MAX_GROUP_COUNT}
@@ -560,10 +598,16 @@ function selectedBase(scenario: Scenario, key: string | null) {
  */
 const basesMode: EditorMode = {
   id: "bases",
-  label: "Bases",
+  get label() {
+    return t`Bases`;
+  },
   icon: Factory,
-  what: "Buildings standing on the ground from the start, laid out as one cluster.",
-  hint: "Pick a building and click the map. Clicks add to the base you have selected. Stop placing with the button beside the picker, or Escape. A base is the building half: mobile units belong in a group.",
+  get what() {
+    return t`Buildings standing on the ground from the start, laid out as one cluster.`;
+  },
+  get hint() {
+    return t`Pick a building and click the map. Clicks add to the base you have selected. Stop placing with the button beside the picker, or Escape. A base is the building half: mobile units belong in a group.`;
+  },
   use: ({
     scenario,
     onChange,
@@ -693,7 +737,7 @@ const basesMode: EditorMode = {
               className="h-8 gap-1.5 bg-card/80 text-xs backdrop-blur"
               onClick={() => onSelect(null)}
             >
-              <Plus className="size-3.5" /> New base
+              <Plus className="size-3.5" /> <Trans>New base</Trans>
             </Button>
           ) : (
             <TeamSelect
@@ -731,10 +775,16 @@ const basesMode: EditorMode = {
  */
 const layoutsMode: EditorMode = {
   id: "layouts",
-  label: "Blueprints",
+  get label() {
+    return t`Blueprints`;
+  },
   icon: Blocks,
-  what: "A base somebody already laid out, dropped whole in one click.",
-  hint: "Pick a blueprint and a team, then click the map to place the whole base.",
+  get what() {
+    return t`A base somebody already laid out, dropped whole in one click.`;
+  },
+  get hint() {
+    return t`Pick a blueprint and a team, then click the map to place the whole base.`;
+  },
   use: ({ scenario, onChange, onSelect, layout: choice, onLayout }) => {
     const [team, setTeam] = useState("");
     const participants = scenario.setup.participants;

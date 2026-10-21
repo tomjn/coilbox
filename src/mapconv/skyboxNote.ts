@@ -1,3 +1,5 @@
+import { t } from "@lingui/core/macro";
+
 /**
  * What to say about a map's sky, and when to say nothing.
  *
@@ -59,15 +61,13 @@ export function skyboxNote(
   switch (problem) {
     case "unreadable":
       return {
-        label: "flat sky",
-        title:
-          "Coilbox cannot read this map's skybox. The map ships one, in a DDS format the reader does not handle, so the preview draws the map's sky colour instead.",
+        label: t`flat sky`,
+        title: t`Coilbox cannot read this map's skybox. The map ships one, in a DDS format the reader does not handle, so the preview draws the map's sky colour instead.`,
       };
     case "not-a-cube-map":
       return {
-        label: "flat sky",
-        title:
-          "This map's skybox is a DDS, but not a cube map, so the preview draws the map's sky colour instead.",
+        label: t`flat sky`,
+        title: t`This map's skybox is a DDS, but not a cube map, so the preview draws the map's sky colour instead.`,
       };
     default:
       return null;

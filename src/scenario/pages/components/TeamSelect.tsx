@@ -7,6 +7,7 @@
  * belongs to, and the selection bar, which changes what an existing one does.
  */
 
+import { useLingui } from "@lingui/react/macro";
 import { OptionSelect } from "@/components/OptionSelect";
 import type { Participant } from "@/play/config";
 
@@ -31,13 +32,14 @@ export function TeamSelect({
   /** The id of a message paragraph explaining why, `FieldProblem`'s. */
   describedBy?: string;
 }) {
+  const { t } = useLingui();
   return (
     <OptionSelect
       size="sm"
       className={className}
       value={value}
       onValueChange={onValueChange}
-      placeholder="Team"
+      placeholder={t`Team`}
       ariaLabel={ariaLabel}
       ariaInvalid={ariaInvalid}
       describedBy={describedBy}
