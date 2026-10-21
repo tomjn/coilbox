@@ -159,6 +159,8 @@ describe("Language picker", () => {
       "Español",
       "日本語",
       expect.stringContaining("中文"),
+      // The pseudo-locale (#4593), listed because tests run as a dev build.
+      "Pseudo",
     ]);
   });
 });

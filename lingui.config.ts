@@ -1,10 +1,21 @@
 import { defineConfig } from "@lingui/cli";
 import { formatter } from "@lingui/format-po";
-import { LOCALES, SOURCE_LOCALE } from "./src/i18n/locales";
+import { LOCALES, PSEUDO_LOCALE, SOURCE_LOCALE } from "./src/i18n/locales";
 
 export default defineConfig({
   sourceLocale: SOURCE_LOCALE,
-  locales: [...LOCALES],
+  locales: [...LOCALES, PSEUDO_LOCALE],
+  // The pseudo catalog is extracted with no translations, and compiling it
+  // accents the English source, pads it by 30 percent with "~" (the extra
+  // length German and French often run to) and wraps it in brackets.
+  // Placeholders and plural syntax are left alone.
+  pseudoLocale: {
+    locale: PSEUDO_LOCALE,
+    prepend: "[",
+    append: "]",
+    extend: 0.3,
+    extendCharacter: "~",
+  },
   // An untranslated message falls back to its English source.
   fallbackLocales: { default: "en" },
   catalogs: [
