@@ -23,6 +23,7 @@
  * checksum at the time, so the drift check (issue #1281) can say when the
  * source has moved.
  */
+import { t } from "@lingui/core/macro";
 import { type PostChange, parsePostChange } from "./beforePost";
 import { clearOverride, resolvedDef, setOverride } from "./overrides";
 import { librarySupport } from "./weaponRefs";
@@ -361,13 +362,13 @@ export function equipRefusal(
   const carries = (name: string) =>
     Object.keys(own).some((k) => k.toLowerCase() === name);
   if (carries(key))
-    return `${unitName} already carries a weapon definition called ${key}, and equipping this would replace it. Copy the weapon into the library under another name.`;
+    return t`${unitName} already carries a weapon definition called ${key}, and equipping this would replace it. Copy the weapon into the library under another name.`;
   // The library weapons this one names go into the unit beside it (issue
   // #2641), so a clash with one of those replaces a definition just the same.
   const child = librarySupport(library, key).find(carries);
   return child === undefined
     ? undefined
-    : `${key} brings ${child} from the library along with it, and ${unitName} already carries a weapon definition called ${child}, which it would replace. Copy ${child} into the library under another name and point ${key} at that.`;
+    : t`${key} brings ${child} from the library along with it, and ${unitName} already carries a weapon definition called ${child}, which it would replace. Copy ${child} into the library under another name and point ${key} at that.`;
 }
 
 /** Read the library out of untrusted JSON, dropping any entry it cannot use. */

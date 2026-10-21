@@ -14,6 +14,7 @@
  * or three files still read as an answer you can go and check, and past that
  * the count is the honest summary.
  */
+import { plural, t } from "@lingui/core/macro";
 import type {
   CustomParamConsumers,
   CustomParamsResult,
@@ -68,28 +69,34 @@ export function consumerNote(
   if (!consumers || consumers.files === 0) {
     // Nothing names the key. That is only "nothing uses it" if nothing reads
     // the table whole either, and something usually does, so say which.
+    const wholeTableFiles = scan.wholeTableFiles;
     const unattributed =
-      scan.wholeTableFiles > 0
-        ? ` ${scan.wholeTableFiles} file${scan.wholeTableFiles === 1 ? "" : "s"} read the whole customParams table, so a gadget may still use it without naming it.`
+      wholeTableFiles > 0
+        ? ` ${plural(wholeTableFiles, {
+            one: "# file reads the whole customParams table, so a gadget may still use it without naming it.",
+            other:
+              "# files read the whole customParams table, so a gadget may still use it without naming it.",
+          })}`
         : "";
     const partial = scan.truncated
-      ? " The scan stopped before it had read the whole archive."
+      ? ` ${t`The scan stopped before it had read the whole archive.`}`
       : "";
     return {
-      text: `No file in this game names this parameter.${unattributed}${partial}`,
+      text: `${t`No file in this game names this parameter.`}${unattributed}${partial}`,
       files: [],
     };
   }
 
   if (consumers.files > MAX_LISTED) {
+    const fileCount = consumers.files;
     return {
-      text: `Named in ${consumers.files} of this game's Lua files, so no one of them is the answer.`,
+      text: t`Named in ${fileCount} of this game's Lua files, so no one of them is the answer.`,
       files: [],
     };
   }
 
   return {
-    text: onlySet(consumers) ? "Set by" : "Read by",
+    text: onlySet(consumers) ? t`Set by` : t`Read by`,
     files: consumers.sites.map((s) => s.file),
   };
 }

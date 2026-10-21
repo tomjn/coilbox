@@ -11,6 +11,7 @@
  * carries a backup or created marker, computed in `diff.rs` so the frontend
  * needs no diff library of its own.
  */
+import { t } from "@lingui/core/macro";
 import { defineCommand } from "@picoframe/plugin-sdk";
 import type { BuildMenuOp } from "./buildMenus";
 import type { UnitClone } from "./clones";
@@ -303,8 +304,11 @@ export const workshopInPlaceDiffs = defineCommand<
 
 /** One refused change as a line a person reads. */
 export function describeRefusal(r: RefusedChange): string {
-  const where = r.file
-    ? ` (${r.file}${r.location ? `, line ${r.location.start.line}` : ""})`
-    : "";
-  return `${r.unit} ${r.field}${where}: ${r.message}`;
+  const { unit, field, file, message } = r;
+  const line = r.location?.start.line;
+  let where = "";
+  if (file)
+    where =
+      line === undefined ? ` (${file})` : ` ${t`(${file}, line ${line})`}`;
+  return t`${unit} ${field}${where}: ${message}`;
 }
