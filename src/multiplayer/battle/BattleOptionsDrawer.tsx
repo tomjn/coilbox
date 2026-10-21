@@ -10,7 +10,7 @@ import {
   GroupReset,
   ModOptionGroups,
 } from "@/play/pages/components/GameOptionsPanel";
-import { START_POS_OPTIONS } from "@/startbox/mode";
+import { startPosOptions } from "@/startbox/mode";
 import type { Battle } from "../bindings";
 import { BattleTweakDecodeSection } from "./BattleTweakDecodeSection";
 import {
@@ -238,7 +238,7 @@ export function BattleOptionsDrawer({
                     <OptionSelect
                       value={startPos}
                       disabled={!canEdit}
-                      options={START_POS_OPTIONS}
+                      options={startPosOptions()}
                       onValueChange={(v) =>
                         setOption(STARTPOSTYPE_KEY, "startpostype", v)
                       }

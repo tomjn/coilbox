@@ -1,3 +1,4 @@
+import { Trans, useLingui } from "@lingui/react/macro";
 import { Button, Input, useSetting } from "@picoframe/frame";
 import { Globe, Plus, Server, Swords, Trash2 } from "lucide-react";
 import { Field } from "@/components/Field";
@@ -26,6 +27,7 @@ import { useDownloadsConfig } from "../config";
  * engine list).
  */
 export default function DownloadsSettings() {
+  const { t } = useLingui();
   const [cfg, setCfg] = useDownloadsConfig();
   const [autoOnJoin, setAutoOnJoin] = useSetting<boolean>(
     AUTO_DOWNLOAD_ON_JOIN_KEY,
@@ -47,6 +49,10 @@ export default function DownloadsSettings() {
         r.id === id ? { ...r, [key]: value } : r,
       ),
     });
+  const removeLabel = (r: { name: string; url: string }) => {
+    const repoName = r.name || r.url || t`repository`;
+    return t`Remove ${repoName}`;
+  };
   const removeRepo = (id: string) =>
     setCfg({ ...cfg, rapidRepos: cfg.rapidRepos.filter((r) => r.id !== id) });
 
@@ -56,28 +62,31 @@ export default function DownloadsSettings() {
       <section className="space-y-3">
         <div className="flex items-center justify-between">
           <h2 className="flex items-center gap-2 text-sm font-semibold uppercase tracking-wide text-muted-foreground">
-            <Server size={15} /> Rapid repositories
+            <Server size={15} /> <Trans>Rapid repositories</Trans>
           </h2>
           <Button variant="outline" size="sm" onClick={addRepo}>
-            <Plus /> Add repository
+            <Plus /> <Trans>Add repository</Trans>
           </Button>
         </div>
         {cfg.rapidRepos.length === 0 ? (
           <p className="rounded-md border border-dashed border-border px-4 py-6 text-center text-sm text-muted-foreground">
-            No rapid repositories. Add one to browse and download games from it.
+            <Trans>
+              No rapid repositories. Add one to browse and download games from
+              it.
+            </Trans>
           </p>
         ) : (
           <ul className="space-y-2">
             {cfg.rapidRepos.map((r) => (
               <li key={r.id} className="flex items-end gap-2">
-                <Field label="Name" className="flex-1">
+                <Field label={t`Name`} className="flex-1">
                   <Input
                     value={r.name}
                     onChange={(e) => updateRepo(r.id, "name", e.target.value)}
                     placeholder="Beyond All Reason"
                   />
                 </Field>
-                <Field label="Master URL" className="flex-[2]">
+                <Field label={t`Master URL`} className="flex-[2]">
                   <Input
                     value={r.url}
                     onChange={(e) => updateRepo(r.id, "url", e.target.value)}
@@ -89,7 +98,7 @@ export default function DownloadsSettings() {
                   variant="outline"
                   size="sm"
                   onClick={() => removeRepo(r.id)}
-                  aria-label={`Remove ${r.name || r.url || "repository"}`}
+                  aria-label={removeLabel(r)}
                 >
                   <Trash2 />
                 </Button>
@@ -102,7 +111,7 @@ export default function DownloadsSettings() {
       {/* Joining a battle */}
       <section className="space-y-3">
         <h2 className="flex items-center gap-2 text-sm font-semibold uppercase tracking-wide text-muted-foreground">
-          <Swords size={15} /> Joining a battle
+          <Swords size={15} /> <Trans>Joining a battle</Trans>
         </h2>
         <label
           htmlFor="auto-download-on-join"
@@ -110,12 +119,14 @@ export default function DownloadsSettings() {
         >
           <span className="flex flex-col">
             <span className="text-sm font-medium">
-              Download missing content automatically
+              <Trans>Download missing content automatically</Trans>
             </span>
             <span className="text-xs text-muted-foreground">
-              When you join a battle whose game or map you don't have, start the
-              download straight away instead of waiting for a click. The
-              Download button stays available to pause or retry.
+              <Trans>
+                When you join a battle whose game or map you don't have, start
+                the download straight away instead of waiting for a click. The
+                Download button stays available to pause or retry.
+              </Trans>
             </span>
           </span>
           <Switch
@@ -130,7 +141,7 @@ export default function DownloadsSettings() {
       {isHubEnabled() && (
         <section className="space-y-3">
           <h2 className="flex items-center gap-2 text-sm font-semibold uppercase tracking-wide text-muted-foreground">
-            <Globe size={15} /> Coilbox hub
+            <Globe size={15} /> <Trans>Coilbox hub</Trans>
           </h2>
           <HubAddressField />
         </section>

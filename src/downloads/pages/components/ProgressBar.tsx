@@ -1,3 +1,5 @@
+import { t } from "@lingui/core/macro";
+import { useLingui } from "@lingui/react/macro";
 import { cn } from "@picoframe/frame";
 import { useEffect, useId, useState } from "react";
 import { Progress } from "@/components/ui/progress";
@@ -33,11 +35,11 @@ export function progressCaption(
 ): string {
   const parts: string[] = [];
   if (p.phase === "extracting") {
-    parts.push("Extracting…");
+    parts.push(t`Extracting…`);
   } else if (p.totalBytes != null) {
-    parts.push(
-      `${formatBytes(p.downloadedBytes)} of ${formatBytes(p.totalBytes)}`,
-    );
+    const downloaded = formatBytes(p.downloadedBytes);
+    const total = formatBytes(p.totalBytes);
+    parts.push(t`${downloaded} of ${total}`);
   } else if (p.downloadedBytes > 0) {
     parts.push(formatBytes(p.downloadedBytes));
   } else if (p.percent != null) {
@@ -48,19 +50,21 @@ export function progressCaption(
     // arrives with no length, and pr-downloader reports it once and never
     // again. Held back for a second or two so a download that is merely
     // starting does not announce it.
-    parts.push("Size unknown");
+    parts.push(t`Size unknown`);
   }
 
   if (p.phase !== "extracting") {
-    if (rate.stalled) parts.push("stalled");
+    if (rate.stalled) parts.push(t`stalled`);
     else if (rate.bytesPerSec != null)
       parts.push(formatSpeed(rate.bytesPerSec));
   }
 
   if (rate.secondsLeft != null && p.phase !== "extracting") {
-    parts.push(`${formatDuration(rate.secondsLeft)} left`);
+    const left = formatDuration(rate.secondsLeft);
+    parts.push(t`${left} left`);
   } else if (elapsedSec >= MIN_ELAPSED_SEC) {
-    parts.push(`${formatDuration(elapsedSec)} elapsed`);
+    const elapsed = formatDuration(elapsedSec);
+    parts.push(t`${elapsed} elapsed`);
   }
   return parts.join(" · ");
 }
@@ -105,6 +109,7 @@ export function ProgressBar({
   startedAt: number | null;
   className?: string;
 }) {
+  const { t } = useLingui();
   const determinate = progress.percent != null;
   const value = determinate ? Math.round(progress.percent ?? 0) : undefined;
   const elapsedSec = useElapsedSeconds(startedAt);
@@ -116,14 +121,14 @@ export function ProgressBar({
         <Progress
           value={value}
           className="h-1.5 bg-muted"
-          aria-label="Download progress"
+          aria-label={t`Download progress`}
           aria-describedby={label ? captionId : undefined}
         />
       ) : (
         <div
           className="h-1.5 w-full overflow-hidden rounded-full bg-muted"
           role="progressbar"
-          aria-label="Download progress"
+          aria-label={t`Download progress`}
           aria-describedby={label ? captionId : undefined}
         >
           <div className="h-full w-1/3 animate-pulse rounded-full bg-primary motion-reduce:animate-none" />
@@ -147,19 +152,20 @@ export function ProgressBar({
  * Without it a screen shows a disabled button and nothing moving.
  */
 export function StartingBar({ className }: { className?: string }) {
+  const { t } = useLingui();
   const captionId = useId();
   return (
     <div className={cn("flex flex-col gap-1", className)}>
       <div
         className="h-1.5 w-full overflow-hidden rounded-full bg-muted"
         role="progressbar"
-        aria-label="Download progress"
+        aria-label={t`Download progress`}
         aria-describedby={captionId}
       >
         <div className="h-full w-1/3 animate-pulse rounded-full bg-primary motion-reduce:animate-none" />
       </div>
       <span id={captionId} className="text-xs text-muted-foreground">
-        Starting…
+        {t`Starting…`}
       </span>
     </div>
   );

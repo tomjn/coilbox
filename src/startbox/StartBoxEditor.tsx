@@ -1,3 +1,4 @@
+import { useLingui } from "@lingui/react/macro";
 import { X } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { allyLetter, readableText } from "@/lib/allyDisplay";
@@ -86,6 +87,7 @@ export function StartBoxEditor({
   /** Delete one ally's box, from the button on the box itself. */
   onClear: (ally: number) => void;
 }) {
+  const { t } = useLingui();
   const surfaceRef = useRef<HTMLDivElement>(null);
   const [drag, setDrag] = useState<Drag | null>(null);
 
@@ -203,6 +205,7 @@ export function StartBoxEditor({
     >
       {boxes.map(({ ally, rect }) => {
         const color = allyPaletteColor(ally);
+        const letter = allyLetter(ally);
         return (
           <div
             key={ally}
@@ -241,8 +244,8 @@ export function StartBoxEditor({
               </span>
               <button
                 type="button"
-                aria-label={`Clear ally ${allyLetter(ally)}'s start box`}
-                title={`Clear ally ${allyLetter(ally)}'s start box`}
+                aria-label={t`Clear ally ${letter}'s start box`}
+                title={t`Clear ally ${letter}'s start box`}
                 // The drag surface below reads pointerdown, so the press must
                 // stop here or clearing a box starts by moving it.
                 onPointerDown={(e) => e.stopPropagation()}

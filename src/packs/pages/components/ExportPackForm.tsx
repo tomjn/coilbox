@@ -1,3 +1,4 @@
+import { Trans, useLingui } from "@lingui/react/macro";
 import { Button, Input } from "@picoframe/frame";
 import { Package } from "lucide-react";
 import { useMemo, useState } from "react";
@@ -64,6 +65,7 @@ function CheckList({
  * installed game, map and preset.
  */
 export function ExportPackForm() {
+  const { t } = useLingui();
   // Read the target here rather than taking it as a prop. A drawer's content
   // is built once, when the button is pressed, so a target read at open time
   // would stay stale for as long as the drawer is open (issue #1377), the
@@ -98,6 +100,7 @@ export function ExportPackForm() {
     [scan.data],
   );
 
+  const scanError = scan.error;
   const [title, setTitle] = useState("");
   const [selectedGames, setSelectedGames] = useState<Set<string>>(new Set());
   const [selectedMaps, setSelectedMaps] = useState<Set<string>>(new Set());
@@ -166,7 +169,7 @@ export function ExportPackForm() {
       })),
     });
     if (!built) {
-      setError("Pick at least one game or map first.");
+      setError(t`Pick at least one game or map first.`);
       return;
     }
     const encoded = encodeSetupPack(built);
@@ -181,7 +184,7 @@ export function ExportPackForm() {
     return (
       <ChallengeCodeView
         code={code}
-        helpText="Anyone who pastes this into Import setup pack gets its games and maps offered as downloads (or confirmed already installed), plus any presets and blueprints you included."
+        helpText={t`Anyone who pastes this into Import setup pack gets its games and maps offered as downloads (or confirmed already installed), plus any presets and blueprints you included.`}
       />
     );
   }
@@ -189,67 +192,78 @@ export function ExportPackForm() {
   return (
     <div className="flex flex-col gap-4 p-4">
       <div className="flex flex-col gap-1.5">
-        <Label htmlFor="pack-title">Name</Label>
+        <Label htmlFor="pack-title">
+          <Trans>Name</Trans>
+        </Label>
         <Input
           id="pack-title"
           value={title}
           onChange={(e) => setTitle(e.target.value)}
-          placeholder="e.g. Popular water maps"
+          placeholder={t`e.g. Popular water maps`}
         />
       </div>
 
       <div className="flex flex-col gap-1.5">
-        <Label>Games</Label>
+        <Label>
+          <Trans>Games</Trans>
+        </Label>
         <CheckList
           items={games.map((g) => ({ id: g.name, label: g.name }))}
           selected={selectedGames}
           onToggle={toggleGame}
           emptyMessage={
             scan.error
-              ? `The scan failed, so no games are listed. unitsync said: ${scan.error}`
-              : "No games installed for this engine."
+              ? t`The scan failed, so no games are listed. unitsync said: ${scanError}`
+              : t`No games installed for this engine.`
           }
         />
       </div>
 
       <div className="flex flex-col gap-1.5">
-        <Label>Maps</Label>
+        <Label>
+          <Trans>Maps</Trans>
+        </Label>
         <CheckList
           items={maps.map((m) => ({ id: m.name, label: m.name }))}
           selected={selectedMaps}
           onToggle={toggleMap}
           emptyMessage={
             scan.error
-              ? `The scan failed, so no maps are listed. unitsync said: ${scan.error}`
-              : "No maps installed for this engine."
+              ? t`The scan failed, so no maps are listed. unitsync said: ${scanError}`
+              : t`No maps installed for this engine.`
           }
         />
       </div>
 
       <div className="flex flex-col gap-1.5">
-        <Label>Presets (optional)</Label>
+        <Label>
+          <Trans>Presets (optional)</Trans>
+        </Label>
         <CheckList
           items={presetItems}
           selected={selectedPresetIds}
           onToggle={togglePreset}
-          emptyMessage="No saved presets to include."
+          emptyMessage={t`No saved presets to include.`}
         />
       </div>
 
       <div className="flex flex-col gap-1.5">
-        <Label>Blueprints (optional)</Label>
+        <Label>
+          <Trans>Blueprints (optional)</Trans>
+        </Label>
         <CheckList
           items={blueprintItems}
           selected={selectedBlueprintIds}
           onToggle={toggleBlueprint}
-          emptyMessage="No saved blueprints to include."
+          emptyMessage={t`No saved blueprints to include.`}
         />
       </div>
 
       {error && <ErrorBanner message={error} />}
 
       <Button onClick={onExport}>
-        <Package className="mr-1.5 size-4" aria-hidden /> Create pack code
+        <Package className="mr-1.5 size-4" aria-hidden />{" "}
+        <Trans>Create pack code</Trans>
       </Button>
     </div>
   );

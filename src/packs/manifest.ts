@@ -1,3 +1,4 @@
+import { t } from "@lingui/core/macro";
 import {
   type StoredBlueprint,
   setupPackSource,
@@ -193,9 +194,11 @@ export type SetupPackCode =
 export function encodeSetupPack(manifest: SetupPackManifest): SetupPackCode {
   const result = encodePackEnvelope(manifest);
   if (result.ok) return result;
+  const packSize = formatBytes(result.bytes);
+  const limit = formatBytes(result.limit);
   return {
     ok: false,
-    message: `This pack is ${formatBytes(result.bytes)}, past the ${formatBytes(result.limit)} a share code can carry. Take some blueprints out.`,
+    message: t`This pack is ${packSize}, past the ${limit} a share code can carry. Take some blueprints out.`,
   };
 }
 

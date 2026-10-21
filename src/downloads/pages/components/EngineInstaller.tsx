@@ -1,3 +1,4 @@
+import { Trans, useLingui } from "@lingui/react/macro";
 import { Button } from "@picoframe/frame";
 import {
   AlertCircle,
@@ -49,6 +50,7 @@ interface EngineItem {
  * plugin's Engines settings page.
  */
 export function EngineInstaller() {
+  const { t } = useLingui();
   const { path: writePath, loading: writeRootLoading } = useWriteRoot();
   // Only once the read has landed and said there is none. Before that `writePath`
   // is undefined whatever the user has configured (issue #1104).
@@ -122,10 +124,12 @@ export function EngineInstaller() {
   const engineInput = useCallback(
     (item: EngineItem): EnqueueInput | null => {
       if (!writePath) return null;
+      const engineTitle = item.title;
+      const label = t`Engine ${engineTitle}`;
       if (source === "recoil") {
         return {
           kind: "engineRecoil",
-          label: `Engine ${item.title}`,
+          label,
           args: {
             version: item.key,
             assetUrl: item.assetUrl ?? "",
@@ -135,26 +139,30 @@ export function EngineInstaller() {
       }
       return {
         kind: "engineSpring",
-        label: `Engine ${item.title}`,
+        label,
         args: { version: item.key, writePath },
       };
     },
-    [writePath, source],
+    [writePath, source, t],
   );
 
   return (
     <section className="space-y-3 border-t border-border pt-5">
-      <h2 className="text-sm font-semibold">Download an engine</h2>
+      <h2 className="text-sm font-semibold">
+        <Trans>Download an engine</Trans>
+      </h2>
       <p className="text-xs text-muted-foreground">
-        Installs an engine matching this platform into the configured content
-        folder's <code>engine/</code> directory (set the destination in{" "}
-        <Link
-          className="underline underline-offset-4"
-          to="/settings/content-folders"
-        >
-          Content folders settings
-        </Link>
-        ).
+        <Trans>
+          Installs an engine matching this platform into the configured content
+          folder's <code>engine/</code> directory (set the destination in{" "}
+          <Link
+            className="underline underline-offset-4"
+            to="/settings/content-folders"
+          >
+            Content folders settings
+          </Link>
+          ).
+        </Trans>
       </p>
       <div className="flex items-center gap-2">
         <OptionSelect
@@ -162,7 +170,7 @@ export function EngineInstaller() {
           onValueChange={(v) => setSource(v as Source)}
           className="w-56"
           options={[
-            { value: "recoil", label: "Recoil (GitHub releases)" },
+            { value: "recoil", label: t`Recoil (GitHub releases)` },
             { value: "springfiles", label: "springfiles" },
           ]}
         />
@@ -177,25 +185,28 @@ export function EngineInstaller() {
           ) : (
             <RefreshCw className="size-4" />
           )}
-          Refresh
+          <Trans>Refresh</Trans>
         </Button>
       </div>
       {noWriteRoot && (
         <p className="text-xs text-muted-foreground">
-          No download destination set — choose a content folder in{" "}
-          <Link
-            className="underline underline-offset-4"
-            to="/settings/content-folders"
-          >
-            Content folders settings
-          </Link>{" "}
-          to enable engine downloads.
+          <Trans>
+            No download destination set — choose a content folder in{" "}
+            <Link
+              className="underline underline-offset-4"
+              to="/settings/content-folders"
+            >
+              Content folders settings
+            </Link>{" "}
+            to enable engine downloads.
+          </Trans>
         </p>
       )}
 
       {loading && (
         <p className="flex items-center gap-2 text-sm text-muted-foreground">
-          <Loader2 size={15} className="animate-spin" /> loading engines…
+          <Loader2 size={15} className="animate-spin" />{" "}
+          <Trans>loading engines…</Trans>
         </p>
       )}
       {error && (
@@ -217,6 +228,7 @@ export function EngineInstaller() {
             const input = engineInput(item);
             const queueItem = input ? itemFor(identityOf(input)) : null;
             const status = queueItem?.status ?? null;
+            const engineName = item.title;
             return (
               <li key={item.key} className="flex flex-col gap-2 px-4 py-2">
                 <div className="flex items-center justify-between gap-3">
@@ -225,7 +237,7 @@ export function EngineInstaller() {
                       {item.title}
                       {item.prerelease && (
                         <span className="ml-2 rounded bg-muted px-1.5 py-0.5 text-xs font-normal text-muted-foreground">
-                          pre-release
+                          <Trans>pre-release</Trans>
                         </span>
                       )}
                     </p>
@@ -253,7 +265,7 @@ export function EngineInstaller() {
                       status === "active" ||
                       status === "done"
                     }
-                    aria-label={`Download engine ${item.title}`}
+                    aria-label={t`Download engine ${engineName}`}
                   >
                     {status === "active" ? (
                       <Loader2 className="animate-spin" />
@@ -263,14 +275,14 @@ export function EngineInstaller() {
                       <Download />
                     )}
                     {status === "active"
-                      ? "Installing…"
+                      ? t`Installing…`
                       : status === "queued"
-                        ? "Queued"
+                        ? t`Queued`
                         : status === "done"
-                          ? "Done"
+                          ? t`Done`
                           : active
-                            ? "Add to queue"
-                            : "Install"}
+                            ? t`Add to queue`
+                            : t`Install`}
                   </Button>
                 </div>
                 <QueueProgress item={queueItem} />

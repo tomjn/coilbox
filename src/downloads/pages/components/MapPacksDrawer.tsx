@@ -1,3 +1,4 @@
+import { Trans, useLingui } from "@lingui/react/macro";
 import { Button } from "@picoframe/frame";
 import {
   Check,
@@ -49,6 +50,7 @@ export function MapPacksDrawer({
   installed: Set<string>;
   thumbFor?: (map: SuggestedMap) => string | undefined;
 }) {
+  const { t } = useLingui();
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const selected = packs.find((p) => p.id === selectedId) ?? null;
 
@@ -69,17 +71,17 @@ export function MapPacksDrawer({
               <Button
                 variant="ghost"
                 size="icon"
-                aria-label="Back to all packs"
+                aria-label={t`Back to all packs`}
                 onClick={() => setSelectedId(null)}
               >
                 <ChevronLeft className="size-4" />
               </Button>
             )}
             <DialogPrimitive.Title className="min-w-0 flex-1 truncate text-base font-semibold">
-              {selected ? selected.title : "Map packs"}
+              {selected ? selected.title : t`Map packs`}
             </DialogPrimitive.Title>
             <DialogPrimitive.Close asChild>
-              <Button variant="ghost" size="icon" aria-label="Close">
+              <Button variant="ghost" size="icon" aria-label={t`Close`}>
                 <X className="size-4" />
               </Button>
             </DialogPrimitive.Close>
@@ -169,6 +171,8 @@ function PackRow({
   onSelect: (id: string) => void;
 }) {
   const { summary } = usePackStates(pack, writePath, installed);
+  const done = summary.done;
+  const total = summary.total;
   return (
     <li>
       <button
@@ -182,7 +186,7 @@ function PackRow({
             {summary.complete && (
               <Badge variant="outline" className="gap-1 text-emerald-600">
                 <Check className="size-3" />
-                Complete
+                <Trans>Complete</Trans>
               </Badge>
             )}
           </div>
@@ -192,7 +196,9 @@ function PackRow({
             </p>
           )}
           <p className="mt-1 text-xs text-muted-foreground">
-            {summary.done} / {summary.total} downloaded
+            <Trans>
+              {done} / {total} downloaded
+            </Trans>
           </p>
         </div>
         <ChevronRight className="size-4 shrink-0 text-muted-foreground" />
@@ -212,12 +218,15 @@ function PackDetail({
   installed: Set<string>;
   thumbFor?: (map: SuggestedMap) => string | undefined;
 }) {
+  const { t } = useLingui();
   const { enqueue } = useDownloadQueue();
   const { rows, summary } = usePackStates(pack, writePath, installed);
   const downloadAll = () => {
     for (const r of rows)
       if (r.state === "available" && r.input) enqueue(r.input);
   };
+  const packTitle = pack.title;
+  const pending = summary.pending;
   return (
     <div className="flex flex-col gap-3">
       {pack.blurb && (
@@ -229,14 +238,14 @@ function PackDetail({
         className="w-full"
         onClick={downloadAll}
         disabled={!writePath || summary.pending === 0}
-        aria-label={`Download all maps in ${pack.title}`}
+        aria-label={t`Download all maps in ${packTitle}`}
       >
         <Download className="size-4" />
         {summary.complete
-          ? "All downloaded"
+          ? t`All downloaded`
           : summary.pending === 0
-            ? "Queued"
-            : `Download all (${summary.pending})`}
+            ? t`Queued`
+            : t`Download all (${pending})`}
       </Button>
       <ul className="flex flex-col gap-2">
         {rows.map(({ map, input, item, state }) => (
@@ -270,12 +279,14 @@ function MapRow({
   canDownload: boolean;
   onDownload: () => void;
 }) {
+  const { t } = useLingui();
+  const mapTitle = map.title;
   return (
     <li className="flex items-center gap-3 rounded-lg border border-border/50 bg-card p-2">
       <div className="flex size-12 shrink-0 items-center justify-center overflow-hidden rounded bg-muted/40">
         <CachedThumb
           url={thumb}
-          alt={`Minimap of ${map.title}`}
+          alt={t`Minimap of ${mapTitle}`}
           className="size-full object-cover"
           fallback={<ImageOff className="size-4 text-muted-foreground" />}
         />
@@ -312,11 +323,12 @@ function MapAction({
   canDownload: boolean;
   onDownload: () => void;
 }) {
+  const { t } = useLingui();
   if (state === "installed") {
     return (
       <span className="flex items-center gap-1 px-1 text-xs text-emerald-600">
         <Check className="size-4" />
-        Installed
+        <Trans>Installed</Trans>
       </span>
     );
   }
@@ -324,7 +336,7 @@ function MapAction({
     return (
       <span className="flex items-center gap-1 px-1 text-xs text-muted-foreground">
         <Loader2 className="size-3.5 animate-spin" />
-        {state === "active" ? "Downloading…" : "Queued"}
+        {state === "active" ? t`Downloading…` : t`Queued`}
       </span>
     );
   }
@@ -334,10 +346,10 @@ function MapAction({
       size="sm"
       onClick={onDownload}
       disabled={!canDownload || state === "unavailable"}
-      aria-label="Download map"
+      aria-label={t`Download map`}
     >
       <Download className="size-4" />
-      {state === "unavailable" ? "Unavailable" : "Download"}
+      {state === "unavailable" ? t`Unavailable` : t`Download`}
     </Button>
   );
 }

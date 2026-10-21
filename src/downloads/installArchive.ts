@@ -1,3 +1,4 @@
+import { plural, t } from "@lingui/core/macro";
 import { basename, errorText } from "@/lib/helpers";
 
 /**
@@ -73,7 +74,8 @@ export async function planArchives(
   const refused: string[] = [];
   for (const path of [...new Set(paths)]) {
     if (!isArchivePath(path)) {
-      refused.push(`${basename(path)} is not a .sdz or .sd7 archive.`);
+      const fileName = basename(path);
+      refused.push(t`${fileName} is not a .sdz or .sd7 archive.`);
       continue;
     }
     try {
@@ -92,21 +94,30 @@ export function describeOffers(offers: ArchiveOffer[]): {
 } {
   if (offers.length === 1) {
     const [only] = offers;
+    const { fileName, destDir } = only;
     return {
-      title: `Install a ${only.kind}`,
+      title: only.kind === "game" ? t`Install a game` : t`Install a map`,
       lines: [
-        `Install the ${only.kind} ${only.fileName}?`,
-        `It is copied to ${only.destDir}. The file you opened stays where it is.`,
+        only.kind === "game"
+          ? t`Install the game ${fileName}?`
+          : t`Install the map ${fileName}?`,
+        t`It is copied to ${destDir}. The file you opened stays where it is.`,
       ],
     };
   }
   return {
-    title: `Install ${offers.length} archives`,
+    title: plural(offers.length, {
+      one: "Install # archive",
+      other: "Install # archives",
+    }),
     lines: [
-      ...offers.map(
-        (o) => `${o.fileName}, a ${o.kind}, is copied to ${o.destDir}.`,
-      ),
-      "The files you opened stay where they are.",
+      ...offers.map((o) => {
+        const { fileName, destDir } = o;
+        return o.kind === "game"
+          ? t`${fileName}, a game, is copied to ${destDir}.`
+          : t`${fileName}, a map, is copied to ${destDir}.`;
+      }),
+      t`The files you opened stay where they are.`,
     ],
   };
 }

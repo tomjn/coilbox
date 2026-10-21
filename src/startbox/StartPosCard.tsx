@@ -1,6 +1,7 @@
+import { Trans } from "@lingui/react/macro";
 import type { ReactNode } from "react";
 import { OptionSelect } from "@/components/OptionSelect";
-import { START_POS_OPTIONS, startPosLabel } from "./mode";
+import { startPosLabel, startPosOptions } from "./mode";
 
 /**
  * The start-position card: the mode picker, and whatever the mode needs under it.
@@ -43,7 +44,7 @@ export function StartPosCard({
   return (
     <div className="rounded-lg border border-border/50 bg-card px-4 py-3">
       <span className="block text-[11px] uppercase tracking-wide text-muted-foreground">
-        Start positions
+        <Trans>Start positions</Trans>
       </span>
       {unavailable ? (
         <span className="mt-1 block text-sm text-muted-foreground">
@@ -55,7 +56,7 @@ export function StartPosCard({
           size="sm"
           value={String(value)}
           disabled={disabled}
-          options={START_POS_OPTIONS}
+          options={startPosOptions()}
           onValueChange={(v) => onChange(Number(v))}
         />
       ) : (

@@ -1,3 +1,4 @@
+import { t } from "@lingui/core/macro";
 import { loadGithubGameRepos } from "../content/branding";
 import { dlDownloadFileRaw, dlDownloadRaw } from "./bindings";
 import { type DownloadAttempt, downloadKey, hostOf } from "./downloadHistory";
@@ -137,8 +138,10 @@ async function downloadGameAnySourceImpl(opts: {
         // version could never satisfy the battle room's exact-name check
         // afterwards. Other sources still get a chance further down the loop.
         if (!hit) {
+          const releaseCount = archives.length;
+          const newest = archives[0].filename;
           throw new Error(
-            `${repo} has no release matching "${gameName}" in its latest ${archives.length} release(s) (newest: ${archives[0].filename})`,
+            t`${repo} has no release matching "${gameName}" in its latest ${releaseCount} release(s) (newest: ${newest})`,
           );
         }
         log.begin("github", {
@@ -224,8 +227,9 @@ async function downloadGameAnySourceImpl(opts: {
     }
   }
 
+  const errors = log.errors.join("; ");
   throw new SourceWalkError(
-    `No source could provide "${gameName}". ${log.errors.join("; ")}`,
+    t`No source could provide "${gameName}". ${errors}`,
     null,
   );
 }

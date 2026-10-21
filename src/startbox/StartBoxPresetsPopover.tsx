@@ -1,3 +1,4 @@
+import { Trans, useLingui } from "@lingui/react/macro";
 import { Button } from "@picoframe/frame";
 import { LayoutGrid, X } from "lucide-react";
 import { useState } from "react";
@@ -102,6 +103,7 @@ export function StartBoxPresetsPopover({
   onSetBox: (ally: number, rect: StartRect) => void;
   onClearBox: (ally: number) => void;
 }) {
+  const { t, i18n } = useLingui();
   const [open, setOpen] = useState(false);
   const [sizePct, setSizePct] = useState(30);
   const [saved, setSaved] = useSavedStartBoxes();
@@ -138,6 +140,17 @@ export function StartBoxPresetsPopover({
     });
   };
 
+  const applyTitle = (number: number, boxes: LayoutBoxes) => {
+    const allies = Object.keys(boxes)
+      .map((a) => {
+        const letter = allyLetter(Number(a));
+        return t`ally ${letter}`;
+      })
+      .join(", ");
+    return t`Apply saved layout ${number}: ${allies}`;
+  };
+  const deleteTitle = (number: number) => t`Delete saved layout ${number}`;
+
   const hasBoxes = Object.keys(rects).length > 0;
   const alreadySaved = layoutAlreadySaved(saved, mapName, rects);
 
@@ -146,16 +159,21 @@ export function StartBoxPresetsPopover({
       <PopoverTrigger asChild>
         <Button variant="outline" size="sm">
           <LayoutGrid className="size-3.5" />
-          Box presets
+          <Trans>Box presets</Trans>
         </Button>
       </PopoverTrigger>
       <PopoverContent align="end" className="w-64 p-3 text-xs">
         <Tabs defaultValue="presets">
           <TabsList className="w-full">
-            <TabsTrigger value="presets">Presets</TabsTrigger>
+            <TabsTrigger value="presets">
+              <Trans>Presets</Trans>
+            </TabsTrigger>
             <TabsTrigger value="map">
-              This map
-              {savedForMap.length > 0 && ` (${savedForMap.length})`}
+              {savedForMap.length > 0 ? (
+                <Trans>This map ({savedForMap.length})</Trans>
+              ) : (
+                <Trans>This map</Trans>
+              )}
             </TabsTrigger>
           </TabsList>
 
@@ -170,6 +188,10 @@ export function StartBoxPresetsPopover({
                   start,
                 );
                 const spare = slots.length > allyOrder.length;
+                const presetLabel = i18n._(p.label);
+                const shownBoxes = window.length;
+                const totalBoxes = slots.length;
+                const allyCount = allyOrder.length;
                 return (
                   <button
                     key={p.kind}
@@ -178,8 +200,8 @@ export function StartBoxPresetsPopover({
                     className={TILE}
                     title={
                       spare
-                        ? `${p.label}: ${window.length} of ${slots.length} boxes for your ${allyOrder.length} allies. Click again for the next set.`
-                        : p.label
+                        ? t`${presetLabel}: ${shownBoxes} of ${totalBoxes} boxes for your ${allyCount} allies. Click again for the next set.`
+                        : presetLabel
                     }
                   >
                     <BoxPreview
@@ -194,7 +216,9 @@ export function StartBoxPresetsPopover({
                         };
                       })}
                     />
-                    <span className="text-[10px] leading-none">{p.label}</span>
+                    <span className="text-[10px] leading-none">
+                      {presetLabel}
+                    </span>
                   </button>
                 );
               })}
@@ -206,7 +230,7 @@ export function StartBoxPresetsPopover({
                   htmlFor="startbox-size"
                   className="text-muted-foreground"
                 >
-                  Box size
+                  <Trans>Box size</Trans>
                 </label>
                 <span className="tabular-nums">{sizePct}%</span>
               </div>
@@ -224,7 +248,10 @@ export function StartBoxPresetsPopover({
           <TabsContent value="map" className="mt-3 space-y-3">
             {savedForMap.length === 0 ? (
               <p className="text-muted-foreground">
-                Nothing saved for this map yet. Draw a layout and keep it here.
+                <Trans>
+                  Nothing saved for this map yet. Draw a layout and keep it
+                  here.
+                </Trans>
               </p>
             ) : (
               <div className="grid grid-cols-3 gap-1.5">
@@ -237,11 +264,7 @@ export function StartBoxPresetsPopover({
                       type="button"
                       onClick={() => applyBoxes(layout.boxes)}
                       className={TILE}
-                      title={`Apply saved layout ${i + 1}: ${Object.keys(
-                        layout.boxes,
-                      )
-                        .map((a) => `ally ${allyLetter(Number(a))}`)
-                        .join(", ")}`}
+                      title={applyTitle(i + 1, layout.boxes)}
                     >
                       <BoxPreview
                         boxes={Object.entries(layout.boxes).map(
@@ -252,13 +275,13 @@ export function StartBoxPresetsPopover({
                         )}
                       />
                       <span className="text-[10px] leading-none">
-                        Saved {i + 1}
+                        <Trans>Saved {i + 1}</Trans>
                       </span>
                     </button>
                     <button
                       type="button"
-                      aria-label={`Delete saved layout ${i + 1}`}
-                      title={`Delete saved layout ${i + 1}`}
+                      aria-label={deleteTitle(i + 1)}
+                      title={deleteTitle(i + 1)}
                       onClick={() =>
                         setSaved(removeMapLayout(saved, mapName, layout.id))
                       }
@@ -277,14 +300,14 @@ export function StartBoxPresetsPopover({
               disabled={!hasBoxes || alreadySaved}
               title={
                 !hasBoxes
-                  ? "Draw some boxes first"
+                  ? t`Draw some boxes first`
                   : alreadySaved
-                    ? `These boxes are already saved for ${mapName}`
-                    : `Save these boxes for ${mapName}`
+                    ? t`These boxes are already saved for ${mapName}`
+                    : t`Save these boxes for ${mapName}`
               }
               onClick={() => setSaved(addMapLayout(saved, mapName, rects))}
             >
-              {alreadySaved ? "Already saved" : "Save current boxes"}
+              {alreadySaved ? t`Already saved` : t`Save current boxes`}
             </Button>
           </TabsContent>
         </Tabs>

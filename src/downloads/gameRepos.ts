@@ -1,3 +1,4 @@
+import { t } from "@lingui/core/macro";
 /**
  * Curated GitHub game sources: games distributed as `.sd7`/`.sdz` archives on a
  * repo's GitHub releases (not rapid or springfiles). Shared by the Downloads →
@@ -98,9 +99,8 @@ export function resolveGithubRepo(
 ): string {
   const repo = dl.repo ?? repoForKey(repos, dl.sourceKey ?? "");
   if (!repo) {
-    throw new Error(
-      `No GitHub repo declared for source "${dl.sourceKey ?? ""}".`,
-    );
+    const sourceKey = dl.sourceKey ?? "";
+    throw new Error(t`No GitHub repo declared for source "${sourceKey}".`);
   }
   return repo;
 }

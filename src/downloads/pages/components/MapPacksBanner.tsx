@@ -1,3 +1,4 @@
+import { Plural, Trans } from "@lingui/react/macro";
 import { ChevronRight, Layers } from "lucide-react";
 import { useCallback, useMemo, useState } from "react";
 import { type SuggestedMap, useSuggestedMapLists } from "@/content/branding";
@@ -97,11 +98,19 @@ export function MapPacksBanner({
       >
         <Layers className="size-5 shrink-0 text-muted-foreground" />
         <div className="min-w-0 flex-1">
-          <p className="text-sm font-semibold">Map packs</p>
+          <p className="text-sm font-semibold">
+            <Trans>Map packs</Trans>
+          </p>
           <p className="text-xs text-muted-foreground">
-            {available > 0
-              ? `${available} pack${available === 1 ? "" : "s"} available · curated map sets`
-              : "All packs downloaded"}
+            {available > 0 ? (
+              <Plural
+                value={available}
+                one="# pack available · curated map sets"
+                other="# packs available · curated map sets"
+              />
+            ) : (
+              <Trans>All packs downloaded</Trans>
+            )}
           </p>
         </div>
         <ChevronRight className="size-4 shrink-0 text-muted-foreground" />

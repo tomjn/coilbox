@@ -1,3 +1,4 @@
+import { t } from "@lingui/core/macro";
 import { defineCommand } from "@picoframe/plugin-sdk";
 import type { Channel } from "@tauri-apps/api/core";
 import { withDownloadNotify } from "./downloadNotify";
@@ -336,7 +337,10 @@ export const dlDownloadEngineRecoil = withDownloadNotify(
     },
     { message: string; path: string }
   >("coilbox-downloads", "dl_download_engine_recoil"),
-  (a) => `Engine ${a.version}`,
+  (a) => {
+    const version = a.version;
+    return t`Engine ${version}`;
+  },
 );
 
 /** Download a classic Spring engine via the sidecar's `--download-engine`. */
@@ -351,5 +355,8 @@ export const dlDownloadEngineSpring = withDownloadNotify(
     },
     { message: string; version: string }
   >("coilbox-downloads", "dl_download_engine_spring"),
-  (a) => `Engine ${a.version}`,
+  (a) => {
+    const version = a.version;
+    return t`Engine ${version}`;
+  },
 );

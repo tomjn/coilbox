@@ -1,3 +1,4 @@
+import { Trans, useLingui } from "@lingui/react/macro";
 import { Button, cn } from "@picoframe/frame";
 import Markdown, { type Components } from "react-markdown";
 import { Link } from "react-router";
@@ -23,6 +24,7 @@ const CHANGELOG_COMPONENTS: Components = {
 
 /** Settings section at /settings/game-updates. */
 export default function GameUpdatesSection() {
+  const { t } = useLingui();
   const {
     repo,
     release,
@@ -43,10 +45,14 @@ export default function GameUpdatesSection() {
   // is undefined whatever the user has configured (issue #1104).
   const noWriteRoot = !writeRootLoading && !writePath;
 
+  const releaseName = release ? release.name || release.tag : "";
+  const releaseTag = release?.tag ?? "";
+  const fileName = currentFile ?? "…";
+
   if (!repo) {
     return (
       <p className="text-sm text-muted-foreground">
-        This build has no game-update source configured.
+        <Trans>This build has no game-update source configured.</Trans>
       </p>
     );
   }
@@ -54,17 +60,19 @@ export default function GameUpdatesSection() {
   return (
     <div className="flex flex-col gap-4">
       <div>
-        <div className="text-sm text-muted-foreground">Update source</div>
+        <div className="text-sm text-muted-foreground">
+          <Trans>Update source</Trans>
+        </div>
         <div className="font-mono text-sm">{repo}</div>
       </div>
 
       <div className="flex items-center gap-3">
         <Button onClick={() => void runCheck()} disabled={checking}>
-          {checking ? "Checking…" : "Check for updates"}
+          {checking ? t`Checking…` : t`Check for updates`}
         </Button>
         {release && (
           <span className="text-xs text-muted-foreground">
-            Latest: {release.name || release.tag}
+            <Trans>Latest: {releaseName}</Trans>
           </span>
         )}
       </div>
@@ -73,27 +81,29 @@ export default function GameUpdatesSection() {
 
       {noWriteRoot && (
         <p className="text-sm text-muted-foreground">
-          Set a download folder in{" "}
-          <Link
-            className="underline underline-offset-4"
-            to="/settings/content-folders"
-          >
-            Content folders settings
-          </Link>{" "}
-          to enable updates.
+          <Trans>
+            Set a download folder in{" "}
+            <Link
+              className="underline underline-offset-4"
+              to="/settings/content-folders"
+            >
+              Content folders settings
+            </Link>{" "}
+            to enable updates.
+          </Trans>
         </p>
       )}
 
       {release && !updateAvailable && !checking && (
         <p className="text-sm text-muted-foreground">
-          You have the latest game version ({release.tag}).
+          <Trans>You have the latest game version ({releaseTag}).</Trans>
         </p>
       )}
 
       {release && updateAvailable && (
         <div className="flex flex-col gap-3 rounded-lg border p-4">
           <div className="font-medium">
-            {release.name || release.tag} available
+            <Trans>{releaseName} available</Trans>
           </div>
           {release.body && (
             <div
@@ -115,25 +125,29 @@ export default function GameUpdatesSection() {
             profileUpdated ? (
               <div className="flex items-center gap-3">
                 <span className="text-sm">
-                  Installed — restart to apply the updated profile.
+                  <Trans>
+                    Installed — restart to apply the updated profile.
+                  </Trans>
                 </span>
-                <Button onClick={() => void restart()}>Restart now</Button>
+                <Button onClick={() => void restart()}>
+                  <Trans>Restart now</Trans>
+                </Button>
               </div>
             ) : (
               <p className="text-sm text-muted-foreground">
-                Installed and ready.
+                <Trans>Installed and ready.</Trans>
               </p>
             )
           ) : installing ? (
             <div className="flex flex-col gap-2">
               <div className="text-sm text-muted-foreground">
-                Downloading {currentFile ?? "…"}
+                <Trans>Downloading {fileName}</Trans>
               </div>
               <QueueProgress item={download} />
             </div>
           ) : (
             <Button onClick={() => void install()} disabled={!writePath}>
-              Download &amp; install
+              <Trans>Download &amp; install</Trans>
             </Button>
           )}
         </div>

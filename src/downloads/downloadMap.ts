@@ -1,3 +1,4 @@
+import { t } from "@lingui/core/macro";
 import { dlDownloadMapRaw } from "./bindings";
 import type { DownloadAttempt } from "./downloadHistory";
 import { downloadFromMirrors } from "./downloadMirrors";
@@ -175,8 +176,9 @@ async function downloadMapAnySourceImpl(opts: {
     }
   }
 
+  const errors = log.errors.join("; ");
   throw new SourceWalkError(
-    `No source could provide "${mapName}". ${log.errors.join("; ")}`,
+    t`No source could provide "${mapName}". ${errors}`,
     null,
   );
 }
