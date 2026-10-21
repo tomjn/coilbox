@@ -93,7 +93,7 @@ The widget panel opens by itself the first time you start a match. If it never a
 2. Open the panel. Select the Blueprints button on the right of the screen, or type /coilbox_blueprints in the game's chat.
 3. Select one or more builders.
 4. Select a blueprint in the list. Its buildings follow the cursor, which holds the building nearest the middle. A building the ground will not take is marked with dark stripes and a dashed red outline.
-5. Press [ or ] to turn it, F to flip it side to side or G to flip it top to bottom. It turns and flips around the building under the cursor. Shift+[ and Shift+] switch to the previous or next blueprint.
+5. Press [ or ] to turn it, F to flip it side to side or G to flip it top to bottom. It turns and flips around the building under the cursor. A blueprint with an extractor or a geothermal plant is held by that building instead, and jumps onto a metal or geothermal spot when the cursor is near one, with the rest of the blueprint around it. Shift+[ and Shift+] switch to the previous or next blueprint.
 6. Left click to place it.
 
 While you place a blueprint, a second panel opens beside the first. It shows what the blueprint costs and how long your selected builders take to build it. Its buttons do the same as the keys, and each is labelled with the key that does it.

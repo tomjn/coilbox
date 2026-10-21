@@ -163,11 +163,48 @@ function M.extent(resolved, rotation, flip)
 	return minX, maxX, minZ, maxZ
 end
 
---- The building a layout is held by while it is placed: the one nearest
+-- How far from the cursor a spot pulls a spot-bound building onto it, in
+-- elmos. The distance Splinter Faction's own extractor snapping uses.
+M.SPOT_SNAP = 90
+
+--- Whether a def only builds on a spot: "geo" for a geothermal, which the
+-- engine only allows on a geothermal feature, "metal" for an extractor,
+-- marked by the engine's extractsMetal or Splinter Faction's metal_extractor
+-- custom param, and nil for anything else.
+function M.spotKind(def)
+	if def.needGeo then
+		return "geo"
+	end
+	if (def.extractsMetal or 0) > 0 or (def.customParams and def.customParams.metal_extractor) then
+		return "metal"
+	end
+	return nil
+end
+
+--- The spot nearest a point within reach, or nil.
+-- @param spots table[] { x, z }
+function M.nearestSpot(spots, x, z, reach)
+	local best, bestD = nil, reach * reach
+	for _, spot in ipairs(spots or {}) do
+		local d = (spot.x - x) ^ 2 + (spot.z - z) ^ 2
+		if d <= bestD then
+			best, bestD = spot, d
+		end
+	end
+	return best
+end
+
+--- The building a layout is held by while it is placed. The first that only
+-- builds on a spot, so the layout can snap to one, otherwise the one nearest
 -- the middle of the layout, the first in layout order on a tie. The cursor
 -- holds it, and the layout turns and flips about it.
 -- @return integer? its index in resolved.buildings, nil for an empty layout
 function M.pivot(resolved)
+	for i, b in ipairs(resolved.buildings) do
+		if M.spotKind(b.def) then
+			return i
+		end
+	end
 	local minX, maxX, minZ, maxZ = M.extent(resolved, 0)
 	local mx, mz = (minX + maxX) / 2, (minZ + maxZ) / 2
 	local best, bestD

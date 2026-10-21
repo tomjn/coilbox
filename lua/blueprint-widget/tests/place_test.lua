@@ -139,6 +139,21 @@ local pivotLayout = PLACE.resolve({
 })
 check("the pivot is the building nearest the middle of the layout", PLACE.pivot(pivotLayout) == 2, tostring(PLACE.pivot(pivotLayout)))
 check("an empty layout has no pivot", PLACE.pivot({ buildings = {} }) == nil)
+check("a geothermal and an extractor only build on spots", PLACE.spotKind({ needGeo = true }) == "geo" and PLACE.spotKind({ extractsMetal = 0.002 }) == "metal" and PLACE.spotKind({ customParams = { metal_extractor = "1" } }) == "metal" and PLACE.spotKind({}) == nil)
+local MEX = support.def(5, "armmex", { isBuilding = true, xsize = 4, zsize = 4, extractsMetal = 0.001 })
+E.UnitDefs[5], E.UnitDefNames.armmex = MEX, MEX
+local spotLayout = PLACE.resolve({
+	buildings = {
+		{ def = "armsolar", offset = { x = 0, z = 0 }, facing = 0 },
+		{ def = "armsolar", offset = { x = 64, z = 0 }, facing = 0 },
+		{ def = "armmex", offset = { x = 128, z = 0 }, facing = 0 },
+	},
+})
+check("a layout with an extractor is held by the extractor, so it can snap to a spot", PLACE.pivot(spotLayout) == 3, tostring(PLACE.pivot(spotLayout)))
+local spots = { { x = 100, z = 100 }, { x = 400, z = 400 }, { x = 160, z = 100 } }
+check("the nearest spot within reach is found", PLACE.nearestSpot(spots, 150, 110, PLACE.SPOT_SNAP) == spots[3])
+check("a spot out of reach is not", PLACE.nearestSpot(spots, 700, 700, PLACE.SPOT_SNAP) == nil and PLACE.nearestSpot(nil, 0, 0, 90) == nil)
+
 local px, pz = PLACE.pivotAt(pivotLayout, 2, 0, nil, 500, 500)
 check("the pivot lands on the grid the engine snaps it to", px == 504 and pz == 504, px .. "," .. pz)
 local pivotOrigin = pivotLayout.buildings[2].offset

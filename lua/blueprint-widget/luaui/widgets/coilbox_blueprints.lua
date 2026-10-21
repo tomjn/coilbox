@@ -484,6 +484,32 @@ function readCost()
 	MODEL.touch(panel)
 end
 
+--- The spots a spot-bound building can go on. Geothermal spots are the
+-- map's geothermal features, which every game has. Metal spots are whichever
+-- list the game's own widgets publish: BAR and Zero-K style games keep
+-- WG.metalSpots or WG.resource_spot_finder.metalSpotsList, Splinter Faction
+-- WG.metalMakerSpots and WG.mapmetalspots. A game with none gets no snapping.
+local function spotsFor(kind)
+	if kind == "geo" then
+		local out = {}
+		for _, featureID in ipairs(Spring.GetAllFeatures() or {}) do
+			local def = FeatureDefs[Spring.GetFeatureDefID(featureID)]
+			if def and def.geoThermal then
+				local x, _, z = Spring.GetFeaturePosition(featureID)
+				out[#out + 1] = { x = x, z = z }
+			end
+		end
+		return out
+	end
+	local finder = WG.resource_spot_finder
+	for _, list in ipairs({ WG.metalSpots, finder and finder.metalSpotsList, WG.metalMakerSpots, WG.mapmetalspots }) do
+		if type(list) == "table" and #list > 0 then
+			return list
+		end
+	end
+	return {}
+end
+
 local function stopPlacing()
 	if placing then
 		placing = nil
@@ -514,6 +540,8 @@ local function startPlacing(key)
 	bindDefaults()
 	readKeys()
 	placing = { item = item, rotation = 0, flip = { x = false, z = false }, pivot = PLACE.pivot(item.resolved), foot = nil }
+	local kind = PLACE.spotKind(item.resolved.buildings[placing.pivot].def)
+	placing.spots = kind and spotsFor(kind) or nil
 	panel.placing = { key = key, name = item.name, rotation = 0, flip = placing.flip }
 	readCost()
 end
@@ -578,7 +606,16 @@ local function trackCursor()
 	if not placing.extent then
 		placing.extent = { PLACE.extent(resolved, placing.rotation, placing.flip) }
 	end
-	local ax, az = PLACE.pivotAt(resolved, placing.pivot, placing.rotation, placing.flip, pos[1], pos[3])
+	-- a layout held by an extractor or a geothermal jumps onto the nearest
+	-- spot for it, read once per pick up
+	local cx, cz = pos[1], pos[3]
+	if placing.spots then
+		local spot = PLACE.nearestSpot(placing.spots, cx, cz, PLACE.SPOT_SNAP)
+		if spot then
+			cx, cz = spot.x, spot.z
+		end
+	end
+	local ax, az = PLACE.pivotAt(resolved, placing.pivot, placing.rotation, placing.flip, cx, cz)
 	if placing.foot and placing.ax == ax and placing.az == az then
 		return
 	end
