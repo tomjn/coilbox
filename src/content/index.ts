@@ -137,6 +137,8 @@ const contentPlugin: FramePlugin = {
       ],
     },
   ],
+  // The URL segment above every page here, which has no route of its own.
+  crumbs: { "/library": lazyText(msg`Library`) },
   routes: [
     {
       path: "library/maps",
