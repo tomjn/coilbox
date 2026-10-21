@@ -60,6 +60,10 @@ msgstr ""
 msgid "(unnamed)"
 msgstr ""
 
+#: src/content/pages/components/ReplayBaseCrops.tsx
+msgid "(you)"
+msgstr ""
+
 #. placeholder {0}: drawn.contributing
 #: src/content/pages/components/MapAggregate.tsx
 msgid "{0, plural, one {{contributing} of {available} has anything on this layer in {when}.} other {{contributing} of {available} have anything on this layer in {when}.}}"
@@ -90,9 +94,29 @@ msgstr ""
 msgid "{0, plural, one {# blueprint added to your library.} other {# blueprints added to your library.}}"
 msgstr ""
 
+#. placeholder {0}: fit.orders
+#: src/content/pages/components/UnitListNotes.tsx
+msgid "{0, plural, one {# build order} other {# build orders}}"
+msgstr ""
+
+#. placeholder {0}: finished.offMap
+#: src/content/pages/components/ReplayEventLayers.tsx
+msgid "{0, plural, one {# building stands off the map and is not drawn.} other {# buildings stand off the map and are not drawn.}}"
+msgstr ""
+
 #. placeholder {0}: outcome.missingOriginal.length
 #: src/content/pages/components/Convert3doDrawer.tsx
 msgid "{0, plural, one {# converted model has no original .3do to replace: {missingNames}.} other {# converted models have no original .3do to replace: {missingNames}.}}"
+msgstr ""
+
+#. placeholder {0}: ev.deaths.length - ev.costed
+#: src/content/pages/components/ReplayEventLayers.tsx
+msgid "{0, plural, one {# death is of a unit with no stated cost and counts nothing.} other {# deaths are of a unit with no stated cost and count nothing.}}"
+msgstr ""
+
+#. placeholder {0}: ev.field.dropped
+#: src/content/pages/components/ReplayEventLayers.tsx
+msgid "{0, plural, one {# death was off the map and is not drawn.} other {# deaths were off the map and are not drawn.}}"
 msgstr ""
 
 #. placeholder {0}: built.defOverrides
@@ -110,9 +134,41 @@ msgstr ""
 msgid "{0, plural, one {# faction} other {# factions}}"
 msgstr ""
 
+#. placeholder {0}: fit.queuedStatic
+#: src/content/pages/components/UnitListNotes.tsx
+msgid "{0, plural, one {# factory order names a unit that does not} other {# factory orders name a unit that does not}}"
+msgstr ""
+
+#. placeholder {0}: built.unplaced
+#: src/content/pages/components/ReplayMap.tsx
+msgid "{0, plural, one {# factory queue order has no position and is not drawn.} other {# factory queue orders have no position and are not drawn.}}"
+msgstr ""
+
+#. placeholder {0}: finished.unknown
+#: src/content/pages/components/ReplayEventLayers.tsx
+msgid "{0, plural, one {# finished unit has no definition in the installed game and is not drawn.} other {# finished units have no definition in the installed game and are not drawn.}}"
+msgstr ""
+
+#. placeholder {0}: finished.mobile
+#: src/content/pages/components/ReplayEventLayers.tsx
+msgid "{0, plural, one {# finished unit that moves is not drawn, because only a building can be compared with an order.} other {# finished units that move are not drawn, because only a building can be compared with an order.}}"
+msgstr ""
+
 #. placeholder {0}: f.games
 #: src/content/pages/GameDetailPage.tsx
 msgid "{0, plural, one {# game · outcome unknown} other {# games · outcome unknown}}"
+msgstr ""
+
+#. placeholder {0}: summary.total
+#: src/content/pages/StatsPage.tsx
+msgid "{0, plural, one {# game indexed} other {# games indexed}}"
+msgstr ""
+
+#. placeholder {0}: p.games
+#. placeholder {0}: record.games
+#: src/content/pages/components/AiRecordSection.tsx
+#: src/content/pages/components/PlayerPicker.tsx
+msgid "{0, plural, one {# game} other {# games}}"
 msgstr ""
 
 #. placeholder {0}: unknown.length
@@ -135,9 +191,19 @@ msgstr ""
 msgid "{0, plural, one {# link icon unknown} other {# link icons unknown}}"
 msgstr ""
 
+#. placeholder {0}: -streak
+#: src/content/pages/StatsPage.tsx
+msgid "{0, plural, one {# loss} other {# losses}}"
+msgstr ""
+
 #. placeholder {0}: outcome.alreadyInstalled.length
 #: src/content/pages/components/Convert3doDrawer.tsx
 msgid "{0, plural, one {# model was already installed.} other {# models were already installed.}}"
+msgstr ""
+
+#. placeholder {0}: rest.length
+#: src/content/pages/components/ReplayAnalysisSection.tsx
+msgid "{0, plural, one {# more figure} other {# more figures}}"
 msgstr ""
 
 #. placeholder {0}: counts.plain
@@ -145,12 +211,54 @@ msgstr ""
 msgid "{0, plural, one {# option} other {# options}}"
 msgstr ""
 
+#. placeholder {0}: fit.outOfRange
+#: src/content/pages/components/UnitListNotes.tsx
+msgid "{0, plural, one {# order names an id past the end of the list} other {# orders name an id past the end of the list}}"
+msgstr ""
+
+#. placeholder {0}: result.removals
+#: src/content/pages/components/ReplayBuildOrders.tsx
+msgid "{0, plural, one {# order that took units off a factory queue is not listed.} other {# orders that took units off a factory queue are not listed.}}"
+msgstr ""
+
+#. placeholder {0}: allOrders.custom
+#: src/content/pages/components/ReplayMap.tsx
+msgid "{0, plural, one {# order was a command the engine does not define, which a game or a widget made up and which says nothing about where it points, and is left out.} other {# orders were a command the engine does not define, which a game or a widget made up and which says nothing about where it points, and are left out.}}"
+msgstr ""
+
+#. placeholder {0}: allOrders.unitAimed
+#: src/content/pages/components/ReplayMap.tsx
+msgid "{0, plural, one {# order was aimed at a unit in the whole match, which the window cannot narrow.} other {# orders were aimed at a unit in the whole match, which the window cannot narrow.}}"
+msgstr ""
+
+#. placeholder {0}: allOrders.unitAimed
+#: src/content/pages/components/ReplayMap.tsx
+msgid "{0, plural, one {# order was aimed at a unit.} other {# orders were aimed at a unit.}}"
+msgstr ""
+
+#. placeholder {0}: orderField?.dropped ?? 0
+#: src/content/pages/components/ReplayMap.tsx
+msgid "{0, plural, one {# order was aimed off the map and is not drawn.} other {# orders were aimed off the map and are not drawn.}}"
+msgstr ""
+
+#. placeholder {0}: built.offMap
+#: src/content/pages/components/ReplayMap.tsx
+msgid "{0, plural, one {# order was placed off the map and is not drawn.} other {# orders were placed off the map and are not drawn.}}"
+msgstr ""
+
 #. placeholder {0}: countPieces(model.root)
 #: src/content/pages/components/UnitModelPanel.tsx
 msgid "{0, plural, one {# piece} other {# pieces}}"
 msgstr ""
 
+#. placeholder {0}: fit.placedMobile
+#: src/content/pages/components/UnitListNotes.tsx
+msgid "{0, plural, one {# placed order names a unit that moves} other {# placed orders name a unit that moves}}"
+msgstr ""
+
 #. placeholder {0}: draft.participants.length
+#. placeholder {0}: r.playerCount
+#: src/content/pages/ReplaysPage.tsx
 #: src/play/presetParts.ts
 msgid "{0, plural, one {# player} other {# players}}"
 msgstr ""
@@ -168,6 +276,11 @@ msgstr ""
 #. placeholder {0}: home.issues.length
 #: src/profile/health.ts
 msgid "{0, plural, one {# problem in `home`} other {# problems in `home`}}"
+msgstr ""
+
+#. placeholder {0}: counts.projectiles
+#: src/content/pages/components/ReplayMapView.tsx
+msgid "{0, plural, one {# projectile} other {# projectiles}}"
 msgstr ""
 
 #. placeholder {0}: family.refights
@@ -190,6 +303,11 @@ msgstr ""
 msgid "{0, plural, one {# replay could not be read and is not in the picture.} other {# replays could not be read and are not in the picture.}}"
 msgstr ""
 
+#. placeholder {0}: set.members.length
+#: src/content/pages/components/ReplaySetsManager.tsx
+msgid "{0, plural, one {# replay} other {# replays}}"
+msgstr ""
+
 #. placeholder {0}: family.duplicates
 #: src/content/pages/components/MapAggregate.tsx
 msgid "{0, plural, one {# second file of a match already counted} other {# second files of matches already counted}}"
@@ -205,9 +323,29 @@ msgstr ""
 msgid "{0, plural, one {# start from {matchesWithStart}.} other {# starts from {matchesWithStart}.}}"
 msgstr ""
 
+#. placeholder {0}: tracks.length
+#: src/content/pages/components/ReplayStartUnitLayer.tsx
+msgid "{0, plural, one {# starting unit recorded.} other {# starting units recorded.}}"
+msgstr ""
+
+#. placeholder {0}: startEnds.length
+#: src/content/pages/components/ReplayStartUnitLayer.tsx
+msgid "{0, plural, one {# starting unit was lost in this window.} other {# starting units were lost in this window.}}"
+msgstr ""
+
+#. placeholder {0}: startEnds.length
+#: src/content/pages/components/ReplayStartUnitLayer.tsx
+msgid "{0, plural, one {# starting unit was lost.} other {# starting units were lost.}}"
+msgstr ""
+
 #. placeholder {0}: counts.tweak
 #: src/play/presetParts.ts
 msgid "{0, plural, one {# tweak slot} other {# tweak slots}}"
+msgstr ""
+
+#. placeholder {0}: cost.unpriced
+#: src/content/pages/components/ReplayBuildOrders.tsx
+msgid "{0, plural, one {# unit could not be priced and is left out.} other {# units could not be priced and are left out.}}"
 msgstr ""
 
 #. placeholder {0}: r.disabledUnits.length
@@ -215,8 +353,17 @@ msgstr ""
 msgid "{0, plural, one {# unit disabled} other {# units disabled}}"
 msgstr ""
 
+#. placeholder {0}: counts.unitCreated
+#: src/content/pages/components/ReplayAnalysisSection.tsx
+msgid "{0, plural, one {# unit made} other {# units made}}"
+msgstr ""
+
+#. placeholder {0}: counts.units
 #. placeholder {0}: hub.unit_count
+#. placeholder {0}: row.split.unpriced
 #: src/content/pages/components/GameLibrarySummary.tsx
+#: src/content/pages/components/ReplayMapView.tsx
+#: src/content/pages/components/ReplayOpeningSplit.tsx
 msgid "{0, plural, one {# unit} other {# units}}"
 msgstr ""
 
@@ -235,6 +382,11 @@ msgstr ""
 msgid "{0, plural, one {# win} other {# wins}}"
 msgstr ""
 
+#. placeholder {0}: counts.wrecks
+#: src/content/pages/components/ReplayMapView.tsx
+msgid "{0, plural, one {# wreck} other {# wrecks}}"
+msgstr ""
+
 #. placeholder {0}: group.paletteModels.length
 #: src/content/pages/components/Convert3doDrawer.tsx
 msgid "{0, plural, one {across # model} other {across # models}}"
@@ -243,6 +395,16 @@ msgstr ""
 #. placeholder {0}: missions.length
 #: src/content/pages/components/MissionRuntimeSection.tsx
 msgid "{0, plural, one {Coilbox has written # mission into this game} other {Coilbox has written # missions into this game}}"
+msgstr ""
+
+#. placeholder {0}: preview.deleted
+#: src/content/pages/components/ClearUnfinishedButton.tsx
+msgid "{0, plural, one {Delete # unfinished recording?} other {Delete # unfinished recordings?}}"
+msgstr ""
+
+#. placeholder {0}: estimate.runs
+#: src/content/pages/components/ReplayAnalysisSection.tsx
+msgid "{0, plural, one {Estimated from # earlier recording of this game on this computer.} other {Estimated from # earlier recordings of this game on this computer.}}"
 msgstr ""
 
 #. placeholder {0}: info.gameVersions.length
@@ -260,9 +422,19 @@ msgstr ""
 msgid "{0, plural, one {Hide settings: # id, which matches a section} other {Hide settings: # ids, all match a section}}"
 msgstr ""
 
+#. placeholder {0}: data.sharedTeamGames
+#: src/content/pages/components/PlayerMatchFigures.tsx
+msgid "{0, plural, one {In # game another player shared control of {playerName}'s army.} other {In # games another player shared control of {playerName}'s army.}}"
+msgstr ""
+
 #. placeholder {0}: offers.length
 #: src/downloads/installArchive.ts
 msgid "{0, plural, one {Install # archive} other {Install # archives}}"
+msgstr ""
+
+#. placeholder {0}: set.members.length
+#: src/content/pages/components/ReplaySetsManager.tsx
+msgid "{0, plural, one {Its # replay stays in your library.} other {Its # replays stay in your library.}}"
 msgstr ""
 
 #. placeholder {0}: icons.length
@@ -275,6 +447,11 @@ msgstr ""
 msgid "{0, plural, one {Map version: {mapVersions}.} other {Map versions: {mapVersions}.}}"
 msgstr ""
 
+#. placeholder {0}: data.games
+#: src/content/pages/components/PlayerMatchFigures.tsx
+msgid "{0, plural, one {None of {playerName}'s # game has figures recorded, so there are no figures to show.} other {None of {playerName}'s # games has figures recorded, so there are no figures to show.}}"
+msgstr ""
+
 #. placeholder {0}: preview.length
 #: src/content/pages/components/MissionRuntimeSection.tsx
 msgid "{0, plural, one {Removes # runtime file from the folder coilbox no longer writes to, then installs again into the game's own.} other {Removes # runtime files from the folder coilbox no longer writes to, then installs again into the game's own.}}"
@@ -283,6 +460,11 @@ msgstr ""
 #. placeholder {0}: w.contributing
 #: src/content/mapImage.ts
 msgid "{0, plural, one {Replays: {matches} of this map. # has something on this layer, {events}{inWindow}.} other {Replays: {matches} of this map. # have something on this layer, {events}{inWindow}.}}"
+msgstr ""
+
+#. placeholder {0}: players.length
+#: src/content/pages/components/PlayerPicker.tsx
+msgid "{0, plural, one {Search # player…} other {Search # players…}}"
 msgstr ""
 
 #. placeholder {0}: teams.decided
@@ -340,9 +522,24 @@ msgstr ""
 msgid "{0, select, win {You won your last game against {aiName} {at}. Try {suggested}?} other {You lost your last game against {aiName} {at}. Try {suggested}?}}"
 msgstr ""
 
+#. placeholder {0}: o.label
+#: src/content/pages/components/ReplayAnalysisSection.tsx
+msgid "{0} (did not reproduce this match)"
+msgstr ""
+
+#. placeholder {0}: formatNumber(Math.round(Number(v)))
+#: src/content/pages/components/LivingValueChart.tsx
+msgid "{0} {resourceName}"
+msgstr ""
+
 #. placeholder {0}: d.asset
 #: src/content/gameSourceRows.ts
 msgid "{0} from the newest release"
+msgstr ""
+
+#. placeholder {0}: formatRate(value)
+#: src/content/pages/components/PlayerMatchFigures.tsx
+msgid "{0} per minute"
 msgstr ""
 
 #. placeholder {0}: gamesText || mapsText
@@ -373,6 +570,14 @@ msgstr ""
 
 #: src/content/pages/components/MapRecords.tsx
 msgid "{amount} elmos"
+msgstr ""
+
+#: src/content/pages/components/PlayerUnitUsage.tsx
+msgid "{analysedNoTeamGames} analysed with no team recorded for {name} in the library, so their events are not counted."
+msgstr ""
+
+#: src/content/pages/components/PlayerUnitUsage.tsx
+msgid "{analysedUnnamedGames} analysed before the recorder kept the engine's unit list, so their events cannot be named and are not counted. Analysing them again adds them."
 msgstr ""
 
 #: src/content/pages/components/UnitRendersRow.tsx
@@ -411,8 +616,16 @@ msgstr ""
 msgid "{bots, plural, one {# bot} other {# bots}}"
 msgstr ""
 
+#: src/content/pages/components/MatchStatsSection.tsx
+msgid "{bots} of them bots"
+msgstr ""
+
 #: src/play/presetParts.ts
 msgid "{boxes, plural, one {# box} other {# boxes}}"
+msgstr ""
+
+#: src/content/pages/components/ReplayMap.tsx
+msgid "{boxTeam} start box"
 msgstr ""
 
 #: src/profile/health.ts
@@ -427,6 +640,10 @@ msgstr ""
 msgid "{campaignFailureCount} campaign(s) failed to load"
 msgstr ""
 
+#: src/content/pages/components/ReplayStartUnitLayer.tsx
+msgid "{changed, plural, one {# changed hands and keeps the colour of the player who started with it.} other {# changed hands and keep the colour of the player who started with them.}}"
+msgstr ""
+
 #: src/play/pages/components/GameOptionsPanel.tsx
 msgid "{changed, plural, one {# option changed} other {# options changed}}"
 msgstr ""
@@ -437,6 +654,10 @@ msgstr ""
 
 #: src/runlite/pages/RunPage.tsx
 msgid "{cheapest} salvage"
+msgstr ""
+
+#: src/content/pages/components/ReplayRoster.tsx
+msgid "{clicks} mouse clicks"
 msgstr ""
 
 #: src/play/PresetPartsView.tsx
@@ -459,8 +680,24 @@ msgstr ""
 msgid "{count, plural, one {# diagnostic} other {# diagnostics}}"
 msgstr ""
 
+#: src/content/pages/components/ReplayAnalysisSection.tsx
+msgid "{count, plural, one {# minute} other {# minutes}}"
+msgstr ""
+
+#: src/content/pages/components/ReplayMap.tsx
+msgid "{count, plural, one {# order within {radius} elmos of one spot in this window} other {# orders within {radius} elmos of one spot in this window}}"
+msgstr ""
+
+#: src/content/pages/components/ReplayMap.tsx
+msgid "{count, plural, one {# order within {radius} elmos of one spot} other {# orders within {radius} elmos of one spot}}"
+msgstr ""
+
 #: src/content/pages/components/MapRecords.tsx
 msgid "{count, plural, one {# place with this name} other {# places with this name}}"
+msgstr ""
+
+#: src/content/pages/components/ReplayAnalysisSection.tsx
+msgid "{count, plural, one {# second} other {# seconds}}"
 msgstr ""
 
 #: src/sound/MusicSource.tsx
@@ -495,8 +732,25 @@ msgstr ""
 msgid "{count} downloading · {summary}"
 msgstr ""
 
+#: src/content/pages/components/PlayerMatchFigures.tsx
+msgid "{countedGames}, oldest to newest"
+msgstr ""
+
 #: src/notify/NotificationsBell.tsx
 msgid "{days}d"
+msgstr ""
+
+#: src/content/pages/PlayerDossierPage.tsx
+#: src/content/pages/StatsPage.tsx
+msgid "{decidedCount} with a known result"
+msgstr ""
+
+#: src/content/pages/components/ClearUnfinishedButton.tsx
+msgid "{deleted, plural, one {Deleted # unfinished recording.} other {Deleted # unfinished recordings.}}"
+msgstr ""
+
+#: src/content/pages/components/ReplayEventLayers.tsx
+msgid "{diedCount, plural, one {# unit died.} other {# units died.}}"
 msgstr ""
 
 #: src/content/pages/components/MapAggregate.tsx
@@ -523,8 +777,16 @@ msgstr ""
 msgid "{earlier} and {last}"
 msgstr ""
 
+#: src/content/pages/components/AchievementsSection.tsx
+msgid "{earnedCount} of {resultCount} earned"
+msgstr ""
+
 #: src/downloads/pages/components/ProgressBar.tsx
 msgid "{elapsed} elapsed"
+msgstr ""
+
+#: src/content/pages/components/ReplayOpeningSplit.tsx
+msgid "{energy} energy"
 msgstr ""
 
 #: src/profile/health.ts
@@ -559,6 +821,14 @@ msgstr ""
 msgid "{factionWins}W of {factionGames}"
 msgstr ""
 
+#: src/content/pages/StatsPage.tsx
+msgid "{failedCount} could not be read"
+msgstr ""
+
+#: src/content/pages/components/PlayerUnitUsage.tsx
+msgid "{failedGames} left out: the replay could not be read."
+msgstr ""
+
 #: src/content/replayAnalysis.ts
 msgid "{figure} for team {team}: the replay recorded {recorded}, the playback gave {observed}."
 msgstr ""
@@ -583,6 +853,10 @@ msgstr ""
 msgid "{fileName}, a map, is copied to {destDir}."
 msgstr ""
 
+#: src/content/pages/components/ReplayEventLayers.tsx
+msgid "{finishedCount, plural, one {# building finished.} other {# buildings finished.}}"
+msgstr ""
+
 #: src/home/zones/Greeting.tsx
 msgid "{first} and {second}"
 msgstr ""
@@ -597,6 +871,18 @@ msgstr ""
 
 #: src/direct/room.ts
 msgid "{front} and {last}"
+msgstr ""
+
+#: src/content/pages/components/LivingValueChart.tsx
+msgid "{game} is not installed, so nothing says what a unit costs or what it is for."
+msgstr ""
+
+#: src/content/pages/components/ReplayAnalysisEvents.tsx
+msgid "{game} is not installed, so the units cannot be named. Each event shows its unit definition id."
+msgstr ""
+
+#: src/content/pages/components/ReplayBuildOrders.tsx
+msgid "{game} is not installed, so the units cannot be named. Each order shows the unit definition id the replay recorded."
 msgstr ""
 
 #: src/packs/pages/components/ImportPackForm.tsx
@@ -649,6 +935,10 @@ msgstr ""
 msgid "{generated} It is not offered anywhere a game is picked, which is why you will not find it in Singleplayer or in a scenario's setup."
 msgstr ""
 
+#: src/content/pages/components/MatchStatsExportButton.tsx
+msgid "{hiddenCount, plural, one {Writes the lines on the chart. # unchecked in the roster is left out.} other {Writes the lines on the chart. # unchecked in the roster are left out.}}"
+msgstr ""
+
 #: src/runlite/pages/components/EncounterOverlay.tsx
 #: src/runlite/pages/RunPage.tsx
 msgid "{hostileCount} × hostile"
@@ -657,6 +947,10 @@ msgstr ""
 #: src/runlite/pages/components/EncounterOverlay.tsx
 #: src/runlite/pages/RunPage.tsx
 msgid "{hostileCount} × hostile (+{hostileHandicap}%)"
+msgstr ""
+
+#: src/content/replayMatchFigures.ts
+msgid "{hours, plural, one {# hour} other {# hours}}"
 msgstr ""
 
 #: src/content/pages/components/GameSourcesTab.tsx
@@ -692,6 +986,10 @@ msgstr ""
 msgid "{incomplete, plural, one {# replay could not be read to the end and may be missing later orders.} other {# replays could not be read to the end and may be missing later orders.}}"
 msgstr ""
 
+#: src/content/pages/components/ReplayTimeWindowControl.tsx
+msgid "{inside} of {total} {countNoun}."
+msgstr ""
+
 #: src/profile/health.ts
 msgid "{installedCount, plural, one {Filter ({filterDesc}) matched none of the # installed game: {sample}{more}. Adjust it to match one of these.} other {Filter ({filterDesc}) matched none of the # installed games: {sample}{more}. Adjust it to match one of these.}}"
 msgstr ""
@@ -712,8 +1010,32 @@ msgstr ""
 msgid "{joined, plural, one {# player joined} other {# players joined}}"
 msgstr ""
 
+#: src/content/pages/components/ReplayTimeline.tsx
+msgid "{kind}, {time}"
+msgstr ""
+
+#: src/content/pages/components/ReplayTimeline.tsx
+msgid "{kind}, {time}, {lines}"
+msgstr ""
+
 #: src/sound/LevelRow.tsx
 msgid "{label} volume"
+msgstr ""
+
+#: src/content/pages/components/ReplayEventLayers.tsx
+msgid "{landed} damage landed in this window."
+msgstr ""
+
+#: src/content/pages/components/ReplayEventLayers.tsx
+msgid "{landed} damage landed."
+msgstr ""
+
+#: src/content/replayMapView/timelineKeys.ts
+msgid "{LARGE_STEP_SECONDS, plural, one {Back # second} other {Back # seconds}}"
+msgstr ""
+
+#: src/content/replayMapView/timelineKeys.ts
+msgid "{LARGE_STEP_SECONDS, plural, one {Forward # second} other {Forward # seconds}}"
 msgstr ""
 
 #: src/content/mapImage.ts
@@ -722,6 +1044,10 @@ msgstr ""
 
 #: src/content/pages/components/MapAggregate.tsx
 msgid "{layerName} · {layerMatches}"
+msgstr ""
+
+#: src/content/pages/components/ReplayEventLayers.tsx
+msgid "{layerNames} draw events from an analysis."
 msgstr ""
 
 #: src/home/config.ts
@@ -735,6 +1061,10 @@ msgstr ""
 
 #: src/content/pages/components/MapAggregate.tsx
 msgid "{leftOutCount, plural, one {{leftOut} is left out, so each match counts once.} other {{leftOut} are left out, so each match counts once.}}"
+msgstr ""
+
+#: src/content/pages/components/AiRecordSection.tsx
+msgid "{losses}L"
 msgstr ""
 
 #: src/packs/pages/components/ImportPackForm.tsx
@@ -757,8 +1087,29 @@ msgstr ""
 msgid "{matches}, {note}"
 msgstr ""
 
+#: src/content/pages/components/ReplayAnalysisEvents.tsx
+msgid "{matchingCount} of {totalCount} events match."
+msgstr ""
+
 #: src/content/pages/GameUnitPage.tsx
 msgid "{maxDepth} deep"
+msgstr ""
+
+#: src/content/pages/MatchupPage.tsx
+msgid "{me} vs {other}"
+msgstr ""
+
+#: src/content/pages/components/PlayerUnitUsage.tsx
+#: src/content/pages/components/ReplayOpeningSplit.tsx
+msgid "{metal} metal"
+msgstr ""
+
+#: src/content/replayEventLayers.ts
+msgid "{metal} metal of units lost within {radius} elmos of one spot"
+msgstr ""
+
+#: src/content/replayEventLayers.ts
+msgid "{metal} metal of units lost within {radius} elmos of one spot in this window"
 msgstr ""
 
 #: src/direct/ReachablePorts.tsx
@@ -814,12 +1165,28 @@ msgstr ""
 msgid "{mins}m {rest}s"
 msgstr ""
 
+#: src/content/replayMatchFigures.ts
+msgid "{minutes} minutes"
+msgstr ""
+
 #: src/content/gameSourceRows.ts
 msgid "{mirrors, plural, one {# mirror} other {# mirrors}}"
 msgstr ""
 
 #: src/content/pages/components/MapAggregate.tsx
 msgid "{misfit, plural, one {# match left out: orders do not fit the unit list.} other {# matches left out: orders do not fit the unit list.}}"
+msgstr ""
+
+#: src/content/pages/components/PlayerUnitUsage.tsx
+msgid "{misfitGames} left out with {misfitOrders}: the orders do not fit the unit list."
+msgstr ""
+
+#: src/content/pages/components/ReplaySetsManager.tsx
+msgid "{missing} not in your library. They stay in the set."
+msgstr ""
+
+#: src/content/pages/components/PlayerMatchFigures.tsx
+msgid "{missing} with no {lowerFigure}"
 msgstr ""
 
 #: src/content/pages/components/ModelViewport.tsx
@@ -846,6 +1213,10 @@ msgstr ""
 msgid "{modelsWritten} models on a {atlasSide} pixel sheet of {tilesPacked} tiles ({atlas})"
 msgstr ""
 
+#: src/content/pages/MatchupPage.tsx
+msgid "{myFaction} vs {theirFaction}"
+msgstr ""
+
 #: src/direct/roomSeed.ts
 msgid "{n, plural, =0 {no bots} one {# bot} other {# bots}}"
 msgstr ""
@@ -854,12 +1225,54 @@ msgstr ""
 msgid "{n, plural, one {{count} match} other {{count} matches}}"
 msgstr ""
 
+#: src/content/pages/components/ReplayPlaybackBar.tsx
+msgid "{n, plural, one {# chat line from {at}} other {# chat lines from {at}}}"
+msgstr ""
+
+#: src/content/pages/components/ReplayTimeline.tsx
+msgid "{n, plural, one {# event} other {# events}}"
+msgstr ""
+
+#: src/content/matchupFormat.ts
+#: src/content/pages/components/PlayerMatchFigures.tsx
+#: src/content/pages/components/PlayerUnitUsage.tsx
+msgid "{n, plural, one {# game} other {# games}}"
+msgstr ""
+
+#: src/content/pages/components/ReplayTimeline.tsx
+msgid "{n, plural, one {# line} other {# lines}}"
+msgstr ""
+
 #: src/play/presetParts.ts
 msgid "{n, plural, one {# map option} other {# map options}}"
 msgstr ""
 
+#: src/content/pages/components/PlayerUnitUsage.tsx
+msgid "{n, plural, one {# order} other {# orders}}"
+msgstr ""
+
+#: src/content/pages/components/ReplayPlaybackBar.tsx
+msgid "{n, plural, one {# player left from {at}} other {# players left from {at}}}"
+msgstr ""
+
 #: src/content/pages/components/MapAggregate.tsx
 msgid "{n, plural, one {# player} other {# players}}"
+msgstr ""
+
+#: src/content/pages/components/GatherReplaysButton.tsx
+msgid "{n, plural, one {Can move # replay ({size}).} other {Can move # replays ({size}).}}"
+msgstr ""
+
+#: src/content/pages/components/GatherReplaysButton.tsx
+msgid "{n, plural, one {Moved # replay ({size}).} other {Moved # replays ({size}).}}"
+msgstr ""
+
+#: src/content/pages/components/ReplayPlaybackBar.tsx
+msgid "{n} units destroyed from {at}"
+msgstr ""
+
+#: src/content/pages/components/ReplayMap.tsx
+msgid "{name} (you)"
 msgstr ""
 
 #: src/direct/PendingJoins.tsx
@@ -870,6 +1283,10 @@ msgstr ""
 msgid "{name} is deleted from disk and you would have to download it again. Replays and saves that need it stop working."
 msgstr ""
 
+#: src/content/replayTimeline.ts
+msgid "{names}'s army was eliminated"
+msgstr ""
+
 #: src/downloads/downloadRate.ts
 msgid "{next}h"
 msgstr ""
@@ -878,8 +1295,16 @@ msgstr ""
 msgid "{next}m"
 msgstr ""
 
+#: src/content/pages/components/ReplayEventLayers.tsx
+msgid "{noAttacker, plural, one {# death has no attacker recorded, such as a cancelled build, and is counted like the rest.} other {# deaths have no attacker recorded, such as a cancelled build, and are counted like the rest.}}"
+msgstr ""
+
 #: src/content/pages/components/MapRecords.tsx
 msgid "{noLength, plural, one {# match has no length in the replay's header and is left out of it.} other {# matches have no length in the replay's header and are left out of it.}}"
+msgstr ""
+
+#: src/content/pages/components/PlayerUnitUsage.tsx
+msgid "{noListGames} left out with {noListOrders}: no unit list is kept and that build is not installed."
 msgstr ""
 
 #: src/content/pages/components/MapAggregate.tsx
@@ -906,8 +1331,44 @@ msgstr ""
 msgid "{offerCost} salvage"
 msgstr ""
 
+#: src/content/pages/components/ReplayEventLayers.tsx
+msgid "{offMap} of it landed on a unit off the map and is not drawn."
+msgstr ""
+
 #: src/i18n/frameStrings.ts
 msgid "{op} failed"
+msgstr ""
+
+#: src/content/pages/components/ReplayBuildOrders.tsx
+msgid "{orderCount, plural, one {# order} other {# orders}}"
+msgstr ""
+
+#: src/content/pages/components/ReplayBaseCrops.tsx
+msgid "{ordered} ordered"
+msgstr ""
+
+#: src/content/pages/components/PlayerUnitUsage.tsx
+msgid "{ordered} ordered in {replays}"
+msgstr ""
+
+#: src/content/pages/components/ReplayMap.tsx
+msgid "{orders} orders are on it, from the player's own selection, widgets acting for them and AIs alike, and {widgets} of them were sent by widgets."
+msgstr ""
+
+#: src/content/pages/components/ReplayMap.tsx
+msgid "{orders} orders are on it, from the player's own selection, widgets acting for them and AIs alike."
+msgstr ""
+
+#: src/content/pages/components/ReplayRoster.tsx
+msgid "{orders} orders given"
+msgstr ""
+
+#: src/content/pages/components/ReplayMap.tsx
+msgid "{orders} orders in this window are on it, from the player's own selection, widgets acting for them and AIs alike, and {widgets} of them were sent by widgets."
+msgstr ""
+
+#: src/content/pages/components/ReplayMap.tsx
+msgid "{orders} orders in this window are on it, from the player's own selection, widgets acting for them and AIs alike."
 msgstr ""
 
 #: src/content/pages/components/MapAggregate.tsx
@@ -922,6 +1383,30 @@ msgstr ""
 msgid "{othersCount, plural, one {{name} and # other} other {{name} and # others}}"
 msgstr ""
 
+#: src/content/pages/components/PlayerUnitUsage.tsx
+msgid "{out} left out."
+msgstr ""
+
+#: src/content/pages/components/ReplayBaseCrops.tsx
+msgid "{outside} outside this view"
+msgstr ""
+
+#: src/content/pages/MatchupPage.tsx
+msgid "{overallGames} against {other}: {overallRecord}."
+msgstr ""
+
+#: src/content/pages/components/ReplayEventLayers.tsx
+msgid "{own} of it a player did to their own units."
+msgstr ""
+
+#: src/content/pages/components/ReplayMapView.tsx
+msgid "{owner} (AI), {side}"
+msgstr ""
+
+#: src/content/pages/components/ReplayMapView.tsx
+msgid "{owner}, {side}"
+msgstr ""
+
 #: src/content/pages/components/Convert3doDrawer.tsx
 msgid "{paletteFaces} faces took a palette colour nothing could resolve"
 msgstr ""
@@ -930,12 +1415,48 @@ msgstr ""
 msgid "{path} already exists; confirm a replace before packaging over it"
 msgstr ""
 
+#: src/content/replayEventLayers.ts
+msgid "{peak, plural, one {# death within {radius} elmos of one spot in this window} other {# deaths within {radius} elmos of one spot in this window}}"
+msgstr ""
+
+#: src/content/replayEventLayers.ts
+msgid "{peak, plural, one {# death within {radius} elmos of one spot} other {# deaths within {radius} elmos of one spot}}"
+msgstr ""
+
+#: src/content/replayDamage.ts
+msgid "{peak} damage landed within {radius} elmos of one spot"
+msgstr ""
+
+#: src/content/replayDamage.ts
+msgid "{peak} damage landed within {radius} elmos of one spot in this window"
+msgstr ""
+
+#: src/content/replayDamage.ts
+msgid "{peak} damage was dealt from within {radius} elmos of one spot"
+msgstr ""
+
+#: src/content/replayDamage.ts
+msgid "{peak} damage was dealt from within {radius} elmos of one spot in this window"
+msgstr ""
+
+#: src/content/pages/components/PlayerUnitUsage.tsx
+msgid "{pending} still being read."
+msgstr ""
+
 #: src/content/pages/GameUnitPage.tsx
 msgid "{pieceCount, plural, one {# piece} other {# pieces}}"
 msgstr ""
 
+#: src/content/pages/components/ReplayRoster.tsx
+msgid "{pixels} pixels of mouse travel"
+msgstr ""
+
 #: src/content/pages/components/MapRecords.tsx
 msgid "{played} played, {decidedCount} with a recorded result."
+msgstr ""
+
+#: src/content/replayMatchFigures.ts
+msgid "{player}'s own total"
 msgstr ""
 
 #: src/content/mapAggregateExport.ts
@@ -950,8 +1471,28 @@ msgstr ""
 msgid "{playerName} colour"
 msgstr ""
 
+#: src/content/pages/components/PlayerMatchFigures.tsx
+msgid "{playerName}'s own figures, per minute"
+msgstr ""
+
+#: src/content/pages/components/PlayerMatchFigures.tsx
+msgid "{playerName}'s own figures, ratios with no unit"
+msgstr ""
+
 #: src/play/presetParts.ts
 msgid "{players}, {botCount}"
+msgstr ""
+
+#: src/content/pages/components/CommandRateChart.tsx
+msgid "{pregameCount} orders before the game started are left out."
+msgstr ""
+
+#: src/content/pages/StatsPage.tsx
+msgid "{presentCount} of {memberCount} in your library"
+msgstr ""
+
+#: src/content/pages/StatsPage.tsx
+msgid "{presentCount} of {memberCount} in your library, {missingCount} missing"
 msgstr ""
 
 #: src/home/continue.ts
@@ -962,8 +1503,16 @@ msgstr ""
 msgid "{presetLabel}: {shownBoxes} of {totalBoxes} boxes for your {allyCount} allies. Click again for the next set."
 msgstr ""
 
+#: src/content/pages/components/ReplayRoster.tsx
+msgid "{presses} key presses"
+msgstr ""
+
 #: src/profile/health.ts
 msgid "{problemCount} problem(s) in the bundled content"
+msgstr ""
+
+#: src/content/pages/components/ReplayAnalysisSection.tsx
+msgid "{queuedAt, plural, one {Queued, with # replay ahead of it.} other {Queued, with # replays ahead of it.}}"
 msgstr ""
 
 #: src/content/mapAggregate.ts
@@ -972,6 +1521,26 @@ msgstr ""
 
 #: src/content/mapAggregate.ts
 msgid "{rate, plural, one {{shown} {one}} other {{shown} {many}}}"
+msgstr ""
+
+#: src/content/pages/components/CommandRateChart.tsx
+msgid "{rate} a minute"
+msgstr ""
+
+#: src/content/pages/components/ReplayRoster.tsx
+msgid "{reached} reached a unit"
+msgstr ""
+
+#: src/content/pages/components/ReplayMap.tsx
+msgid "{recordedGame} is not installed, so nothing says what each building is for and every mark is the same shape."
+msgstr ""
+
+#: src/content/pages/components/ReplayEventLayers.tsx
+msgid "{recordedGame} is not installed, so nothing says which finished units are buildings, so this layer needs the game installed."
+msgstr ""
+
+#: src/content/pages/components/ReplayAnalysisSection.tsx
+msgid "{recordings, plural, one {The estimate goes by the # recording of this game this computer has finished.} other {The estimate goes by the # recordings of this game this computer has finished.}}"
 msgstr ""
 
 #: src/game-updates/pages/GameUpdatesSection.tsx
@@ -1054,6 +1623,10 @@ msgstr ""
 msgid "{stageCount, plural, one {# upgrade} other {# upgrades}}"
 msgstr ""
 
+#: src/content/pages/components/ReplayTimeline.tsx
+msgid "{start} to {end}"
+msgstr ""
+
 #: src/content/pages/MapDetailPage.tsx
 msgid "{startCount, plural, one {Preview · # start position} other {Preview · # start positions}}"
 msgstr ""
@@ -1074,6 +1647,26 @@ msgstr ""
 msgid "{startUnitName}, this run's start unit, is not one of the units in {gameName}, so coilbox cannot limit your units. Every unit is available."
 msgstr ""
 
+#: src/content/replayMapView/timelineKeys.ts
+msgid "{STEP_SECONDS, plural, one {Back # second} other {Back # seconds}}"
+msgstr ""
+
+#: src/content/replayMapView/timelineKeys.ts
+msgid "{STEP_SECONDS, plural, one {Forward # second} other {Forward # seconds}}"
+msgstr ""
+
+#: src/content/pages/components/ReplayStartUnitLayer.tsx
+msgid "{still, plural, one {# did not move and shows as a dot alone.} other {# did not move and show as a dot alone.}}"
+msgstr ""
+
+#: src/content/pages/components/ReplayStartUnitLayer.tsx
+msgid "{still, plural, one {# did not move in this window and shows as a dot alone.} other {# did not move in this window and show as a dot alone.}}"
+msgstr ""
+
+#: src/content/pages/StatsPage.tsx
+msgid "{streak, plural, one {# win} other {# wins}}"
+msgstr ""
+
 #: src/content/replayUnitDefs.ts
 msgid "{subject} come from the unit list recorded when this replay was read on {date}, from {game}, a loose game folder that can change under that name."
 msgstr ""
@@ -1086,6 +1679,10 @@ msgstr ""
 msgid "{subject} come from the unit list the engine wrote when this replay was analysed on {date}, on {game}."
 msgstr ""
 
+#: src/content/pages/components/ReplayTimeWindowControl.tsx
+msgid "{subjectLabel} from {rangeStart} to {rangeEnd}."
+msgstr ""
+
 #: src/content/compatReport.ts
 msgid "{tag}, {change} ({userCount})"
 msgstr ""
@@ -1096,6 +1693,10 @@ msgstr ""
 
 #: src/content/pages/components/ModelViewport.tsx
 msgid "{teamColourCount} of this model's textures are team-colour regions, which the engine paints in the owning player's colour. There is no player here, so they are drawn in one blue."
+msgstr ""
+
+#: src/content/pages/components/ReplayPlaybackBar.tsx
+msgid "{text}, {at}"
 msgstr ""
 
 #: src/profile/SettingsSection.tsx
@@ -1114,6 +1715,14 @@ msgstr ""
 msgid "{title} downloaded."
 msgstr ""
 
+#: src/content/pages/MatchupPage.tsx
+msgid "{togetherLabel} on the same team not counted."
+msgstr ""
+
+#: src/content/pages/components/ReplayAnalysisEvents.tsx
+msgid "{total, plural, one {# event} other {# events}}"
+msgstr ""
+
 #: src/content/pages/GameUnitsPage.tsx
 msgid "{total, plural, one {# unit} other {# units}}"
 msgstr ""
@@ -1126,8 +1735,16 @@ msgstr ""
 msgid "{total}s"
 msgstr ""
 
+#: src/content/pages/components/ReplayAnalysisEvents.tsx
+msgid "{totalCount} events."
+msgstr ""
+
 #: src/downloads/pages/components/RapidBrowser.tsx
 msgid "{totalVersions, plural, one {# version} other {# versions}}"
+msgstr ""
+
+#: src/content/pages/components/CommandRateChart.tsx
+msgid "{trailingCount} orders in the last part-period are left out."
 msgstr ""
 
 #: src/content/pages/GameUnitPage.tsx
@@ -1158,8 +1775,20 @@ msgstr ""
 msgid "{unattacked, plural, one {# death names no attacker, which is how a cancelled build and a self destruct are recorded.} other {# deaths name no attacker, which is how a cancelled build and a self destruct are recorded.}}"
 msgstr ""
 
+#: src/content/pages/components/ReplayEventLayers.tsx
+msgid "{unattacked} of it had no attacker, such as a fall or a script, and has no place to come from."
+msgstr ""
+
+#: src/content/pages/components/CommandRateChart.tsx
+msgid "{unattributedCount} orders from players with no team are left out."
+msgstr ""
+
 #: src/content/pages/components/MapAggregate.tsx
 msgid "{unclassified, plural, one {# match was played on a game or version that is not installed, so nothing says what its buildings are for and it is left out of this layer.} other {# matches were played on a game or version that is not installed, so nothing says what their buildings are for and they are left out of this layer.}}"
+msgstr ""
+
+#: src/content/pages/components/AiRecordSection.tsx
+msgid "{undecided} undecided"
 msgstr ""
 
 #: src/content/pages/components/MapRecords.tsx
@@ -1178,6 +1807,10 @@ msgstr ""
 msgid "{units, plural, one {# unit disabled} other {# units disabled}}"
 msgstr ""
 
+#: src/content/pages/MatchupPage.tsx
+msgid "{unknownLabel} with an unknown team not counted."
+msgstr ""
+
 #: src/runlite/pages/RunPage.tsx
 msgid "{unlocks} unlock, {perks} perk"
 msgstr ""
@@ -1188,6 +1821,18 @@ msgstr ""
 
 #: src/profile/health.ts
 msgid "{unmatched}. Section ids: {sectionIds}."
+msgstr ""
+
+#: src/content/pages/components/PlayerUnitUsage.tsx
+msgid "{unnamedOrders} left out: the unit list does not reach the unit's number."
+msgstr ""
+
+#: src/content/pages/components/LivingValueChart.tsx
+msgid "{unpricedCount} of {finishedCount} finished units have no cost in the installed game and count nothing."
+msgstr ""
+
+#: src/content/pages/components/PlayerUnitUsage.tsx
+msgid "{unpricedUnits} units ordered have no metal cost in their list and add nothing to the metal."
 msgstr ""
 
 #: src/content/pages/components/MapRecords.tsx
@@ -1210,6 +1855,14 @@ msgstr ""
 msgid "{updateName} via {updateVia}"
 msgstr ""
 
+#: src/content/pages/components/ReplayStartUnitLayer.tsx
+msgid "{upgraded, plural, one {# upgrade in this window.} other {# upgrades in this window.}}"
+msgstr ""
+
+#: src/content/pages/components/ReplayStartUnitLayer.tsx
+msgid "{upgraded, plural, one {# upgrade.} other {# upgrades.}}"
+msgstr ""
+
 #: src/downloads/failureReason.ts
 msgid "{who} answered {code} for {file}"
 msgstr ""
@@ -1222,8 +1875,44 @@ msgstr ""
 msgid "{who} did not answer in time for {file}"
 msgstr ""
 
+#: src/content/replayTimeline.ts
+msgid "{who} gave away all the units of an army"
+msgstr ""
+
 #: src/direct/room.ts
 msgid "{who} is waiting for you to let them into your room. Open the battle room to answer."
+msgstr ""
+
+#: src/content/replayTimeline.ts
+msgid "{who} joined as a spectator"
+msgstr ""
+
+#: src/content/replayTimeline.ts
+msgid "{who} joined the game"
+msgstr ""
+
+#: src/content/replayTimeline.ts
+msgid "{who} left the game"
+msgstr ""
+
+#: src/content/replayTimeline.ts
+msgid "{who} left the game (reason code {code})"
+msgstr ""
+
+#: src/content/replayTimeline.ts
+msgid "{who} lost connection"
+msgstr ""
+
+#: src/content/replayTimeline.ts
+msgid "{who} paused the game"
+msgstr ""
+
+#: src/content/replayTimeline.ts
+msgid "{who} resigned"
+msgstr ""
+
+#: src/content/replayTimeline.ts
+msgid "{who} sent an army action this app does not name (code {action})"
 msgstr ""
 
 #: src/downloads/failureReason.ts
@@ -1234,12 +1923,58 @@ msgstr ""
 msgid "{who} stopped sending {file} for {duration}"
 msgstr ""
 
+#: src/content/replayTimeline.ts
+msgid "{who} unpaused the game"
+msgstr ""
+
+#: src/content/replayTimeline.ts
+msgid "{who} was kicked"
+msgstr ""
+
+#: src/content/pages/components/ReplayStartUnitLayer.tsx
+msgid "{who}: destroyed at {when} by {attacker}"
+msgstr ""
+
+#: src/content/pages/components/ReplayStartUnitLayer.tsx
+msgid "{who}: destroyed at {when} by their own units"
+msgstr ""
+
+#: src/content/pages/components/ReplayStartUnitLayer.tsx
+msgid "{who}: destroyed at {when}, with no attacker recorded"
+msgstr ""
+
+#: src/content/pages/components/ReplayStartUnitLayer.tsx
+msgid "{who}: removed by the game's own script at {when}"
+msgstr ""
+
 #: src/play/presetRecord.ts
 msgid "{wins} in {attempts}"
 msgstr ""
 
+#: src/content/matchupFormat.ts
+msgid "{wins} of {decided} won"
+msgstr ""
+
+#: src/content/matchupFormat.ts
+msgid "{wins} of {decided} won, {undecided} with no recorded result"
+msgstr ""
+
+#: src/content/pages/components/AiRecordSection.tsx
+msgid "{wins}W"
+msgstr ""
+
 #: src/content/pages/MapDetailPage.tsx
+#: src/content/pages/PlayerDossierPage.tsx
+#: src/content/pages/StatsPage.tsx
 msgid "{wins}W · {losses}L"
+msgstr ""
+
+#: src/content/pages/PlayerDossierPage.tsx
+msgid "{winsAgainst}W of {gamesAgainst} as opponents"
+msgstr ""
+
+#: src/content/pages/PlayerDossierPage.tsx
+msgid "{winsTogether}W of {gamesTogether} on the same team"
 msgstr ""
 
 #: src/content/pages/components/MapAggregate.tsx
@@ -1248,6 +1983,14 @@ msgstr ""
 
 #: src/content/pages/components/MapAggregate.tsx
 msgid "{withOrders, plural, one {# has orders recorded} other {# have orders recorded}}"
+msgstr ""
+
+#: src/content/pages/components/PlayerUnitUsage.tsx
+msgid "{won} of {decided}"
+msgstr ""
+
+#: src/content/pages/components/UnitListNotes.tsx
+msgid "{wrong, plural, one {# of {orderCount} does not fit this unit list, so names and costs may be wrong.} other {# of {orderCount} do not fit this unit list, so names and costs may be wrong.}}"
 msgstr ""
 
 #: src/profile/onlyOwnMaps.ts
@@ -1363,6 +2106,10 @@ msgstr ""
 msgid "<0/> isn't open"
 msgstr ""
 
+#: src/content/pages/ReplayDetailPage.tsx
+msgid "<0>{mapName}</0> isn't installed, so its preview can't be rendered."
+msgstr ""
+
 #. placeholder {0}: at.member
 #. placeholder {1}: at.wantedBy
 #: src/content/pages/components/Convert3doDrawer.tsx
@@ -1383,6 +2130,10 @@ msgstr ""
 
 #: src/profile/pages.ts
 msgid "> **Include error:** include nesting too deep at `{include}`"
+msgstr ""
+
+#: src/content/pages/components/ReplaySetsManager.tsx
+msgid "1 not in your library. It stays in the set."
 msgstr ""
 
 #: src/content/stats.ts
@@ -1430,6 +2181,14 @@ msgstr ""
 msgid "A choice on the wire — no battle."
 msgstr ""
 
+#: src/content/pages/ReplaysPage.tsx
+msgid "A coilbox remix — rewritten to run on a local build"
+msgstr ""
+
+#: src/content/pages/PlayerDossierPage.tsx
+msgid "A coilbox remix — rewritten to run on a local build. Doesn't count toward stats."
+msgstr ""
+
 #: src/home/config.ts
 msgid "a custom `html` entry"
 msgstr ""
@@ -1446,12 +2205,24 @@ msgstr ""
 msgid "A different engine is the likely reason."
 msgstr ""
 
+#: src/content/pages/components/ReplayAnalysisSection.tsx
+msgid "A different engine often computes a different match, because the engine only keeps its playback in step within one version. The result is kept only if the playback matches the recorded match exactly: who won, how long it lasted and every team's final totals. If it does not, no events and no track are kept and the page says so."
+msgstr ""
+
 #: src/content/replayAnalysis.ts
 msgid "A different engine or game version is the likely reason."
 msgstr ""
 
+#: src/content/pages/components/ReplayAnalysisSection.tsx
+msgid "A different engine or game version often computes a different match, because the engine only keeps its playback in step within one version. The result is kept only if the playback matches the recorded match exactly: who won, how long it lasted and every team's final totals. If it does not, no events and no track are kept and the page says so."
+msgstr ""
+
 #: src/content/replayAnalysis.ts
 msgid "A different game version is the likely reason."
+msgstr ""
+
+#: src/content/pages/components/ReplayAnalysisSection.tsx
+msgid "A different game version often computes a different match, because the engine only keeps its playback in step within one version. The result is kept only if the playback matches the recorded match exactly: who won, how long it lasted and every team's final totals. If it does not, no events and no track are kept and the page says so."
 msgstr ""
 
 #: src/content/pages/components/MapAggregate.tsx
@@ -1466,6 +2237,10 @@ msgstr ""
 msgid "A distribution profile is active (loaded from <0>{source}</0>). It reskins and narrows this build:"
 msgstr ""
 
+#: src/content/pages/components/ReplayMap.tsx
+msgid "A dot is where a player's start was set before the game. The engine can move a start into its start box, so the commander may have appeared a short way off. Point at a dot to see whose it is."
+msgstr ""
+
 #: src/content/pages/components/MapAggregate.tsx
 msgid "A dot is where one team's start was set before one match. The engine can move a start into its start box, so a commander may have appeared a short way off."
 msgstr ""
@@ -1478,6 +2253,13 @@ msgstr ""
 msgid "A folder is read-only"
 msgstr ""
 
+#: src/content/pages/components/AiRecordSection.tsx
+msgid "A game against several different AIs shows on each one's row. Games from campaign, Conquest and Warpath are not counted."
+msgstr ""
+
+#: src/content/pages/components/OpenInEngineButton.tsx
+#: src/content/pages/components/WatchButton.tsx
+#: src/content/pages/components/WatchWithRewindButton.tsx
 #: src/play/pages/SavegamesPage.tsx
 msgid "A game is already running."
 msgstr ""
@@ -1486,8 +2268,24 @@ msgstr ""
 msgid "A game with no hand-made map to offer keeps them, so there is always something to pick."
 msgstr ""
 
+#: src/content/pages/components/PlayerMatchFigures.tsx
+msgid "A game with no recorded result is in All only. The store holds end-of-match totals, so these figures cannot say how far ahead a player was at a given minute."
+msgstr ""
+
 #: src/runlite/pages/RunPage.tsx
 msgid "A hostile garrison. Win to bank salvage; lose and you retreat, scarred."
+msgstr ""
+
+#: src/content/pages/components/ReplayStartUnitLayer.tsx
+msgid "A line is where one starting unit went in this window, in its player's colour. The dot is where the line begins and the name is where it ends."
+msgstr ""
+
+#: src/content/pages/components/ReplayStartUnitLayer.tsx
+msgid "A line is where one starting unit went, in its player's colour. The dot is where the line begins and the name is where it ends."
+msgstr ""
+
+#: src/content/pages/components/UnitListNotes.tsx
+msgid "A list read from a loose game folder is what the folder held that day. A folder can change under the same name, and a packaged archive cannot. Analysing a replay records the list the engine itself used, which is the most reliable of the three."
 msgstr ""
 
 #: src/uberstress/index.ts
@@ -1498,12 +2296,20 @@ msgstr ""
 msgid "A map needs both a start and a goal, or neither of them."
 msgstr ""
 
+#: src/content/pages/components/ReplayMap.tsx
+msgid "A mark is one order, in its player's colour."
+msgstr ""
+
 #: src/sound/events.ts
 msgid "A match is found"
 msgstr ""
 
 #: src/content/pages/components/MapRecords.tsx
 msgid "A match with no recorded result is in no win or loss. Every figure about wins is a count of the matches that have one, with the number it is out of beside it."
+msgstr ""
+
+#: src/content/pages/MatchupPage.tsx
+msgid "A matchup is the games where you were on opposing teams, from the replays in your content folders."
 msgstr ""
 
 #: src/profile/health.ts
@@ -1514,8 +2320,44 @@ msgstr ""
 msgid "A newer game version is available to download."
 msgstr ""
 
+#: src/content/pages/components/ReplayMapView.tsx
+msgid "A pale line is a projectile, drawn along the way it is moving. A grey square is a wreck, or anything else left on the map during the match."
+msgstr ""
+
+#: src/content/pages/components/ReplayMapView.tsx
+msgid "A picture of this map is not available, so the match is drawn on plain ground."
+msgstr ""
+
+#: src/content/pages/components/ReplayStartUnitLayer.tsx
+msgid "A player's first unit has to be made for them at the start, not given to them, to count as a starting unit."
+msgstr ""
+
 #: src/profile/SettingsSection.tsx
 msgid "A profile is already there: <0/>. Edit that file, then restart Coilbox to pick it up."
+msgstr ""
+
+#: src/content/pages/components/PlayerMatchFigures.tsx
+msgid "A ratio is one figure over another for the same army, and is not per minute. A game where the lower figure is zero has no ratio. It is left out of the average and counted beside it."
+msgstr ""
+
+#: src/content/pages/components/ReplayMapView.tsx
+msgid "A rectangle is a unit, in its team's colour and the size of its footprint, with a line the way it faces. A unit still being built is faint. On a large map a mark is never smaller than 3 pixels, so small units look bigger than they are."
+msgstr ""
+
+#: src/content/pages/PlayerDossierPage.tsx
+msgid "A refought setup — a rerun of an existing replay. Doesn't count toward stats."
+msgstr ""
+
+#: src/content/replayEventLayers.ts
+msgid "A remix has no analysis of its own. Analyse the original match."
+msgstr ""
+
+#: src/content/pages/components/UnitListNotes.tsx
+msgid "A replay names a unit by a number that only means something in the build of the game it was played on. Coilbox keeps the unit list a replay was read against, so the replay still names its units after the game is updated or removed."
+msgstr ""
+
+#: src/content/pages/components/PlayerUnitUsage.tsx
+msgid "A replay's unit numbers only mean something against the unit list of the build it was played on. A game with no such list is left out whole, and so is a game whose own orders do not fit its list."
 msgstr ""
 
 #: src/play/pages/SkirmishPage.tsx
@@ -1530,12 +2372,28 @@ msgstr ""
 msgid "A set called “{trimmed}” already exists."
 msgstr ""
 
+#: src/content/pages/components/ReplaySetPicker.tsx
+msgid "A set groups replays. Adding or removing here never changes the replay file."
+msgstr ""
+
+#: src/content/pages/components/ReplaySetsManager.tsx
+msgid "A set is a named group of replays, such as a tournament or a night of games. Deleting a set never deletes the replays in it. To delete replays, use the replay's own page."
+msgstr ""
+
 #: src/play/pages/components/NoEngineNotice.tsx
 msgid "a skirmish"
 msgstr ""
 
+#: src/content/pages/components/ReplayMap.tsx
+msgid "A start box is where a team was allowed to start."
+msgstr ""
+
 #: src/content/pages/components/MapRecords.tsx
 msgid "A start within {tolerance} of a position the map declares is counted at it. That is half the distance between the two closest declared positions, so a start is never near two."
+msgstr ""
+
+#: src/content/pages/components/ReplayStartUnitLayer.tsx
+msgid "A starting unit is one a player had on the frame their first unit appeared, made by no builder. In most games that is the commander, but the engine does not say which unit is a commander, so none is called one here."
 msgstr ""
 
 #: src/runlite/generate.ts
@@ -1598,12 +2456,20 @@ msgstr ""
 msgid "Accounts"
 msgstr ""
 
+#: src/content/pages/components/AchievementsSection.tsx
+msgid "Achievements"
+msgstr ""
+
 #: src/content/pages/components/VersionList.tsx
 msgid "Across {count} versions of this map"
 msgstr ""
 
 #: src/content/mapAggregate.ts
 msgid "across {matches}"
+msgstr ""
+
+#: src/content/pages/components/MatchStatsSection.tsx
+msgid "across {measured} teams"
 msgstr ""
 
 #: src/content/pages/components/GameVersionsTab.tsx
@@ -1615,12 +2481,37 @@ msgstr ""
 msgid "Actions"
 msgstr ""
 
+#: src/content/pages/components/ReplayRoster.tsx
+msgid "Actions per minute"
+msgstr ""
+
+#: src/content/pages/components/AchievementsSection.tsx
+msgid "Activity"
+msgstr ""
+
 #: src/profile/health.ts
 msgid "Add a Content Folder so Coilbox can find the game."
 msgstr ""
 
+#: src/content/pages/components/ReplaySetsManager.tsx
+msgid "Add every replay in the list as filtered now"
+msgstr ""
+
 #: src/downloads/pages/SettingsSection.tsx
 msgid "Add repository"
+msgstr ""
+
+#: src/content/pages/ReplayDetailPage.tsx
+msgid "Add tag…"
+msgstr ""
+
+#. placeholder {0}: shown.length
+#: src/content/pages/components/ReplaySetsManager.tsx
+msgid "Add the {0} shown"
+msgstr ""
+
+#: src/content/pages/components/ReplaySetPicker.tsx
+msgid "Add to or remove from a set"
 msgstr ""
 
 #: src/downloads/pages/components/EngineInstaller.tsx
@@ -1645,10 +2536,23 @@ msgstr ""
 msgid "Advertise on the local network"
 msgstr ""
 
+#: src/content/pages/PlayerDossierPage.tsx
+msgid "Against"
+msgstr ""
+
+#: src/content/pages/components/AiRecordSection.tsx
+msgid "Against AI"
+msgstr ""
+
+#: src/content/commandRates.ts
+msgid "AI"
+msgstr ""
+
 #: src/content/replayBuildOrders.ts
 msgid "AI on team {aiTeam}"
 msgstr ""
 
+#: src/content/pages/components/RefightPanel.tsx
 #: src/play/pages/components/NewPresetFromReplayButton.tsx
 msgid "AI to fill every player"
 msgstr ""
@@ -1662,6 +2566,7 @@ msgid "Alerts"
 msgstr ""
 
 #: src/content/pages/components/BuildTreeExportButton.tsx
+#: src/content/pages/components/PlayerMatchFigures.tsx
 #: src/downloads/pages/ActivityPage.tsx
 msgid "All"
 msgstr ""
@@ -1678,11 +2583,28 @@ msgstr ""
 msgid "All downloads"
 msgstr ""
 
+#: src/content/pages/components/ReplayAnalysisEvents.tsx
+msgid "All kinds"
+msgstr ""
+
+#: src/content/pages/components/ReplayBuildOrders.tsx
+msgid "All orders"
+msgstr ""
+
+#: src/content/pages/ReplaysPage.tsx
+msgid "All origins"
+msgstr ""
+
 #: src/downloads/pages/components/MapPacksBanner.tsx
 msgid "All packs downloaded"
 msgstr ""
 
+#: src/content/pages/components/ReplayAnalysisEvents.tsx
+msgid "All players"
+msgstr ""
+
 #: src/content/pages/components/MapAggregate.tsx
+#: src/content/pages/StatsPage.tsx
 msgid "All replays"
 msgstr ""
 
@@ -1694,8 +2616,20 @@ msgstr ""
 msgid "All settings"
 msgstr ""
 
+#: src/content/pages/ReplaysPage.tsx
+msgid "All tags"
+msgstr ""
+
 #: src/content/pages/GameDetailPage.tsx
 msgid "All units"
+msgstr ""
+
+#: src/content/pages/components/ReplayTimeline.tsx
+msgid "Allies"
+msgstr ""
+
+#: src/content/pages/components/PlayerMatchFigures.tsx
+msgid "Allies on one side each have their own figures. Only players who share control of one army have the same figures."
 msgstr ""
 
 #: src/play/pages/components/ParticipantsTable.tsx
@@ -1710,8 +2644,16 @@ msgstr ""
 msgid "Already saved"
 msgstr ""
 
+#: src/content/pages/components/ReplayAnalysisSection.tsx
+msgid "Already tried, and did not reproduce the match: {triedLabels}."
+msgstr ""
+
 #: src/content/pages/components/BuildTreeDrawer.tsx
 msgid "Also buildable by"
+msgstr ""
+
+#: src/content/pages/components/RemixPanel.tsx
+msgid "Also stamp the engine version"
 msgstr ""
 
 #: src/i18n/frameStrings.ts
@@ -1726,12 +2668,53 @@ msgstr ""
 msgid "An address has no spaces in it."
 msgstr ""
 
+#: src/content/replayTimeline.ts
+msgid "An army was eliminated"
+msgstr ""
+
 #: src/runlite/generate.ts
 msgid "An automated depot offers to patch your hull — for a price in salvage."
 msgstr ""
 
+#: src/content/pages/components/StaleRemixNotice.tsx
+msgid "An older coilbox made this remix, and it will play on {playsOn}, not on {gameType}."
+msgstr ""
+
+#: src/content/pages/ReplaysPage.tsx
+msgid "An older coilbox made this remix. It plays on the game it was recorded with. Open it to remake it from the original."
+msgstr ""
+
+#: src/content/pages/components/ReplayEventLayers.tsx
+msgid "An outline is one finished building, in its player's colour. Beside Buildings ordered, a fill with an outline round it is an order that was carried out, a fill alone is an order with no building finished there, and an outline alone is a building no order in the window placed."
+msgstr ""
+
+#: src/content/pages/ReplayDetailPage.tsx
+msgid "an unknown engine"
+msgstr ""
+
+#: src/content/pages/components/ReplayAnalysisSection.tsx
 #: src/content/replayAnalysis.ts
 msgid "an unnamed game"
+msgstr ""
+
+#: src/content/pages/components/ReplayAnalysisSection.tsx
+msgid "Analyse and record again"
+msgstr ""
+
+#: src/content/pages/components/ReplayAnalysisSection.tsx
+msgid "Analyse and record this replay"
+msgstr ""
+
+#: src/content/pages/components/ReplayAnalysisSection.tsx
+msgid "Analyse and record this replay?"
+msgstr ""
+
+#: src/content/pages/components/ReplayAnalysisSection.tsx
+msgid "Analyse and record with {chosenLabel}"
+msgstr ""
+
+#: src/content/pages/components/ReplayAnalysisSection.tsx
+msgid "Analyse this replay"
 msgstr ""
 
 #: src/content/mapAggregateExport.ts
@@ -1750,8 +2733,32 @@ msgstr ""
 msgid "Analysed or not"
 msgstr ""
 
+#: src/content/pages/components/ReplayAnalysisSection.tsx
+msgid "Analysed. {unitsMade}, {finished} finished and {lost} lost."
+msgstr ""
+
+#: src/content/pages/components/ReplayAnalysisSection.tsx
+msgid "Analysing plays the match back in the game's engine on this computer, to record where units were made and lost. The same playback records the whole match as a track, which is what the page shows and rewinds."
+msgstr ""
+
+#: src/content/pages/components/ReplayAnalysisSection.tsx
+msgid "Analysis and recording"
+msgstr ""
+
 #: src/direct/ReachablePorts.tsx
 msgid "and"
+msgstr ""
+
+#: src/content/pages/components/MatchStatsChart.tsx
+msgid "and {hidden} more"
+msgstr ""
+
+#: src/content/pages/components/ReplayTimeline.tsx
+msgid "and {hiddenCount} more"
+msgstr ""
+
+#: src/content/pages/components/StaleRemixNotice.tsx
+msgid "and remix it again to get one that plays on {gameType}."
 msgstr ""
 
 #: src/content/pages/components/useUnitRenders.ts
@@ -1790,6 +2797,10 @@ msgstr ""
 msgid "Any launch of your own: a skirmish, a battle, a campaign mission, a saved game or a replay."
 msgstr ""
 
+#: src/content/replayMatchFigures.ts
+msgid "Any length"
+msgstr ""
+
 #: src/content/mapAggregateExport.ts
 msgid "any number of players"
 msgstr ""
@@ -1820,6 +2831,10 @@ msgstr ""
 
 #: src/deeplink/pages/ImportSection.tsx
 msgid "Anything coilbox shares goes here: {kindsSentence}."
+msgstr ""
+
+#: src/content/pages/components/ReplayRoster.tsx
+msgid "APM"
 msgstr ""
 
 #: src/profile/health.ts
@@ -1925,8 +2940,16 @@ msgstr ""
 msgid "Assemble units from parts and inspect s3o models."
 msgstr ""
 
+#: src/content/replayAnalysisEvents.ts
+msgid "at"
+msgstr ""
+
 #: src/play/pages/components/ParticipantsTable.tsx
 msgid "at {fromPercent}"
+msgstr ""
+
+#: src/content/replayAnalysisEvents.ts
+msgid "attacker"
 msgstr ""
 
 #: src/play/presetRecord.ts
@@ -1945,20 +2968,41 @@ msgstr ""
 msgid "Authoring tools"
 msgstr ""
 
+#: src/content/pages/ReplaysPage.tsx
+msgid "Average non-spectator player skill, with the min-max range below"
+msgstr ""
+
 #: src/content/pages/components/states.tsx
 #: src/content/pages/GameUnitPage.tsx
 #: src/i18n/frameStrings.ts
 msgid "Back"
 msgstr ""
 
+#: src/content/replayMapView/timelineKeys.ts
+msgid "Back one frame"
+msgstr ""
+
 #: src/downloads/pages/components/MapPacksDrawer.tsx
 msgid "Back to all packs"
+msgstr ""
+
+#: src/content/replayProvenanceLink.ts
+msgid "Back to conquest map"
 msgstr ""
 
 #: src/runlite/pages/components/EncounterOverlay.tsx
 #: src/runlite/pages/components/NodeOverlays.tsx
 #: src/runlite/pages/RunPage.tsx
 msgid "Back to map"
+msgstr ""
+
+#: src/content/replayProvenanceLink.ts
+msgid "Back to mission"
+msgstr ""
+
+#: src/content/pages/ReplayDetailPage.tsx
+#: src/content/replayProvenanceLink.ts
+msgid "Back to original replay"
 msgstr ""
 
 #: src/play/pages/components/PresetsDrawer.tsx
@@ -1982,6 +3026,10 @@ msgstr ""
 msgid "Back to warpath hub"
 msgstr ""
 
+#: src/content/replayProvenanceLink.ts
+msgid "Back to warpath run"
+msgstr ""
+
 #: src/i18n/frameStrings.ts
 msgid "Back/forward buttons"
 msgstr ""
@@ -1992,6 +3040,11 @@ msgstr ""
 
 #: src/i18n/frameStrings.ts
 msgid "Base color"
+msgstr ""
+
+#: src/content/pages/components/ReplayBaseCrops.tsx
+#: src/content/pages/components/ReplayMap.tsx
+msgid "Bases"
 msgstr ""
 
 #: src/runlite/pages/components/EncounterOverlay.tsx
@@ -2024,8 +3077,28 @@ msgstr ""
 msgid "Battles won"
 msgstr ""
 
+#: src/content/achievements.ts
+msgid "Beat 3 different AIs."
+msgstr ""
+
+#: src/content/achievements.ts
+msgid "Beat 5 different AIs."
+msgstr ""
+
+#: src/content/pages/components/ReplayTimeline.tsx
+msgid "Before"
+msgstr ""
+
+#: src/content/pages/components/ReplayTimeline.tsx
+msgid "Before the game"
+msgstr ""
+
 #: src/runlite/pages/components/RunSetupForm.tsx
 msgid "Begin warpath"
+msgstr ""
+
+#: src/content/pages/components/ReplayTimeWindowControl.tsx
+msgid "Behind the range, {activityLabel} across all teams."
 msgstr ""
 
 #: src/play/PresetPartsView.tsx
@@ -2036,8 +3109,21 @@ msgstr ""
 msgid "Belongs to {presetGame}. Take the game as well, or leave this out."
 msgstr ""
 
+#: src/content/pages/ReplayDetailPage.tsx
+msgid "Best effort — an exact version match isn't guaranteed."
+msgstr ""
+
+#: src/content/replayMatchFigures.ts
+msgid "best single army"
+msgstr ""
+
 #: src/play/presetRecord.ts
 msgid "Best win {bestTime} · {wins} in {attempts}"
+msgstr ""
+
+#: src/content/pages/PlayerDossierPage.tsx
+#: src/content/pages/StatsPage.tsx
+msgid "Best win run"
 msgstr ""
 
 #: src/content/pages/components/MapAggregate.tsx
@@ -2066,6 +3152,14 @@ msgstr ""
 
 #: src/animation/index.ts
 msgid "BOS → Lua"
+msgstr ""
+
+#: src/content/pages/components/ReplayRoster.tsx
+msgid "Bot"
+msgstr ""
+
+#: src/content/achievements.ts
+msgid "Bot basher"
 msgstr ""
 
 #: src/startbox/StartBoxPresetsPopover.tsx
@@ -2100,6 +3194,14 @@ msgstr ""
 msgid "Browse units"
 msgstr ""
 
+#: src/content/pages/components/ReplayBuildOrders.tsx
+msgid "build orders"
+msgstr ""
+
+#: src/content/pages/components/ReplayBuildOrders.tsx
+msgid "Build orders"
+msgstr ""
+
 #: src/content/pages/components/UnitStatsTable.tsx
 msgid "Build time"
 msgstr ""
@@ -2117,7 +3219,12 @@ msgid "Build your own campaigns and scenarios."
 msgstr ""
 
 #: src/content/pages/components/BuildTreeDrawer.tsx
+#: src/content/pages/components/PlayerUnitUsage.tsx
 msgid "Builder"
+msgstr ""
+
+#: src/content/pages/components/LivingValueChart.tsx
+msgid "Builders, factories, sensors and transports"
 msgstr ""
 
 #: src/content/pages/components/BuildTreeDrawer.tsx
@@ -2126,7 +3233,12 @@ msgid "Building"
 msgstr ""
 
 #: src/content/mapAggregate.ts
+#: src/content/pages/components/ReplayMap.tsx
 msgid "Building density"
+msgstr ""
+
+#: src/content/pages/components/ReplayMap.tsx
+msgid "building orders"
 msgstr ""
 
 #: src/runlite/RunMapView.tsx
@@ -2137,12 +3249,28 @@ msgstr ""
 msgid "Building the sheet for {folder}"
 msgstr ""
 
+#: src/content/pages/components/ReplayMap.tsx
+msgid "Buildings finished"
+msgstr ""
+
+#: src/content/pages/components/ReplayMap.tsx
+msgid "Buildings ordered"
+msgstr ""
+
+#: src/content/pages/components/ReplayMap.tsx
+msgid "Buildings ordered shows the orders each player gave, not what was built. An order that was cancelled or never carried out is drawn like any other."
+msgstr ""
+
 #: src/content/pages/components/BuildTreeDrawer.tsx
 msgid "Builds (hover)"
 msgstr ""
 
 #: src/content/pages/components/BuildTreeDrawer.tsx
 msgid "Built by (hover)"
+msgstr ""
+
+#: src/content/pages/PlayerDossierPage.tsx
+msgid "Built from the replays in your content folders. Fully offline — no server, no account."
 msgstr ""
 
 #: src/profile/health.ts
@@ -2158,10 +3286,27 @@ msgstr ""
 msgid "Bundled content: {summary}"
 msgstr ""
 
+#: src/content/achievements.ts
+msgid "Busy week"
+msgstr ""
+
+#: src/content/pages/MatchupPage.tsx
+msgid "By faction pairing (yours vs theirs)"
+msgstr ""
+
+#: src/content/pages/MatchupPage.tsx
+msgid "By game length"
+msgstr ""
+
+#: src/content/pages/MatchupPage.tsx
+msgid "By map"
+msgstr ""
+
 #: src/content/index.ts
 msgid "Camera mode, edge scrolling and the mouse."
 msgstr ""
 
+#: src/content/pages/ReplaysPage.tsx
 #: src/home/continue.ts
 msgid "Campaign"
 msgstr ""
@@ -2188,11 +3333,16 @@ msgid "Can be upgraded from"
 msgstr ""
 
 #: src/components/ConfirmPopover.tsx
+#: src/content/pages/components/ClearUnfinishedButton.tsx
 #: src/content/pages/components/Convert3doDrawer.tsx
 #: src/content/pages/components/DeleteArchiveButton.tsx
 #: src/content/pages/components/GameCard.tsx
+#: src/content/pages/components/GatherReplaysButton.tsx
 #: src/content/pages/components/LibraryMapCard.tsx
 #: src/content/pages/components/MissionRuntimeSection.tsx
+#: src/content/pages/components/ReplayAnalysisSection.tsx
+#: src/content/pages/components/ReplaySetsManager.tsx
+#: src/content/pages/ReplayDetailPage.tsx
 #: src/deeplink/ConfirmDialog.tsx
 #: src/direct/HostRoomForm.tsx
 #: src/direct/JoinRoomForm.tsx
@@ -2223,6 +3373,14 @@ msgstr ""
 msgid "Career"
 msgstr ""
 
+#: src/content/achievements.ts
+msgid "Cartographer"
+msgstr ""
+
+#: src/content/achievements.ts
+msgid "Centurion"
+msgstr ""
+
 #: src/home/groupDescription.ts
 msgid "Change what a game's units cost, carry and can do."
 msgstr ""
@@ -2236,10 +3394,31 @@ msgstr ""
 msgid "changed in {version}"
 msgstr ""
 
+#: src/content/pages/components/MatchStatsChart.tsx
+msgid "Chart"
+msgstr ""
+
 #: src/runlite/pages/RunPage.tsx
 msgid "Chart a course here"
 msgstr ""
 
+#: src/content/pages/components/MatchStatsChart.tsx
+msgid "Charted lines"
+msgstr ""
+
+#: src/content/pages/components/MatchStatsChart.tsx
+msgid "Charted metric"
+msgstr ""
+
+#: src/content/pages/components/MatchStatsPicker.tsx
+msgid "Charted metric, showing each metric's shape"
+msgstr ""
+
+#: src/content/pages/components/MatchStatsChart.tsx
+msgid "Charted values"
+msgstr ""
+
+#: src/content/pages/components/ReplayPlaybackBar.tsx
 #: src/multiplayer/index.tsx
 msgid "Chat"
 msgstr ""
@@ -2248,8 +3427,16 @@ msgstr ""
 msgid "Chat highlights"
 msgstr ""
 
+#: src/content/pages/components/ReplayChat.tsx
+msgid "Chat log"
+msgstr ""
+
 #: src/multiplayer/index.tsx
 msgid "Chat logs"
+msgstr ""
+
+#: src/content/pages/components/ReplayPlaybackBar.tsx
+msgid "Chat, {at}: {text}"
 msgstr ""
 
 #: src/runlite/pages/RunPage.tsx
@@ -2263,6 +3450,14 @@ msgstr ""
 
 #: src/content/pages/components/states.tsx
 msgid "Checking"
+msgstr ""
+
+#: src/content/pages/components/useWatchTarget.ts
+msgid "Checking for the engine this replay needs."
+msgstr ""
+
+#: src/content/pages/components/RefightPanel.tsx
+msgid "Checking installed content…"
 msgstr ""
 
 #: src/play/pages/SkirmishPage.tsx
@@ -2279,6 +3474,14 @@ msgstr ""
 
 #: src/content/pages/GameDetailPage.tsx
 msgid "Checking this game…"
+msgstr ""
+
+#: src/content/pages/components/WatchWithRewindButton.tsx
+msgid "Checking this replay."
+msgstr ""
+
+#: src/content/pages/components/ClearUnfinishedButton.tsx
+msgid "Checking what can be deleted..."
 msgstr ""
 
 #: src/runlite/pages/components/RunSetupForm.tsx
@@ -2384,8 +3587,16 @@ msgstr ""
 msgid "Clear record"
 msgstr ""
 
+#: src/content/pages/ReplaysPage.tsx
+msgid "Clear the map filter"
+msgstr ""
+
 #: src/play/PresetList.tsx
 msgid "Clear the record for {presetName}"
+msgstr ""
+
+#: src/content/pages/components/ClearUnfinishedButton.tsx
+msgid "Clear unfinished ({unfinishedCount})"
 msgstr ""
 
 #: src/runlite/galaxyAdapter.ts
@@ -2395,6 +3606,7 @@ msgstr ""
 #: src/components/SlideDrawer.tsx
 #: src/components/ui/dialog.tsx
 #: src/content/pages/components/BrandingScreenshots.tsx
+#: src/content/pages/components/GatherReplaysButton.tsx
 #: src/content/pages/components/MissionRuntimeSection.tsx
 #: src/deeplink/ConfirmDialog.tsx
 #: src/downloads/pages/components/MapPacksDrawer.tsx
@@ -2483,6 +3695,10 @@ msgstr ""
 msgid "Coilbox file"
 msgstr ""
 
+#: src/content/pages/components/ReplayAnalysisSection.tsx
+msgid "Coilbox forgets that the playback did not match. The replay is not touched."
+msgstr ""
+
 #: src/content/pages/components/MissionRuntimeSection.tsx
 msgid "Coilbox found no runtime marker in this game, so it cannot play scenarios yet. Installing writes coilbox's luarules, luaui and missions folders into the game folder."
 msgstr ""
@@ -2547,6 +3763,7 @@ msgid "Colour scheme"
 msgstr ""
 
 #: src/content/pages/components/MapAggregate.tsx
+#: src/content/pages/components/ReplayMap.tsx
 msgid "Colours compare places on this map with each other, not with another picture."
 msgstr ""
 
@@ -2569,6 +3786,10 @@ msgstr ""
 
 #: src/content/pages/components/BuildTreeDrawer.tsx
 msgid "Commander"
+msgstr ""
+
+#: src/content/pages/components/CommandRateChart.tsx
+msgid "Commands per minute"
 msgstr ""
 
 #: src/hub/index.tsx
@@ -2632,11 +3853,16 @@ msgstr ""
 msgid "Confirm this before it runs."
 msgstr ""
 
+#: src/content/achievements.ts
+msgid "Conqueror"
+msgstr ""
+
 #: src/play/pages/components/GameChoiceOffer.tsx
 msgid "conquest"
 msgstr ""
 
 #: src/conquest/index.ts
+#: src/content/pages/ReplaysPage.tsx
 #: src/home/continue.ts
 msgid "Conquest"
 msgstr ""
@@ -2732,6 +3958,26 @@ msgstr ""
 
 #: src/content/pages/components/Convert3doDrawer.tsx
 msgid "Copying the output over the game is not enough on its own: the engine tries <0>.3do</0> before <1>.s3o</1> for a unit whose <2>objectname</2> has no extension, so it keeps loading the old models while both are there. The original <3>.3do</3> files have to go, and any unit definition that spells <4>.3do</4> in its <5>objectname</5> has to lose it too."
+msgstr ""
+
+#: src/content/pages/components/ReplayOpeningSplit.tsx
+msgid "Cost by kind of unit"
+msgstr ""
+
+#: src/content/pages/components/ReplayOpeningSplit.tsx
+msgid "Cost by kind of unit, to minute {cutMinutes}"
+msgstr ""
+
+#: src/content/pages/components/LivingValueChart.tsx
+msgid "Cost in"
+msgstr ""
+
+#: src/content/pages/components/ReplayEventLayers.tsx
+msgid "Costs"
+msgstr ""
+
+#: src/content/pages/components/LivingValueChart.tsx
+msgid "Costs and kinds"
 msgstr ""
 
 #: src/content/pages/components/Convert3doDrawer.tsx
@@ -2845,6 +4091,10 @@ msgstr ""
 msgid "Counted"
 msgstr ""
 
+#: src/content/pages/components/ReplaySetPicker.tsx
+msgid "Create"
+msgstr ""
+
 #: src/play/pages/components/NewPresetFromReplayButton.tsx
 msgid "Create from replay"
 msgstr ""
@@ -2865,6 +4115,10 @@ msgstr ""
 msgid "Create run with no unit limit"
 msgstr ""
 
+#: src/content/pages/components/ReplaySetsManager.tsx
+msgid "Create set"
+msgstr ""
+
 #: src/i18n/frameStrings.ts
 msgid "Crimson"
 msgstr ""
@@ -2875,6 +4129,14 @@ msgstr ""
 
 #: src/runlite/pages/RunListPage.tsx
 msgid "Cross a forward-only map once — fight, take rewards, grow your build, and reach the warlord before your health runs out. Win or die, then set out again."
+msgstr ""
+
+#: src/content/pages/components/MatchStatsExportButton.tsx
+msgid "CSV"
+msgstr ""
+
+#: src/content/pages/components/MatchStatsChart.tsx
+msgid "Cumulative"
 msgstr ""
 
 #: src/home/zones/SuggestedMap.tsx
@@ -2907,6 +4169,14 @@ msgstr ""
 msgid "Damage"
 msgstr ""
 
+#: src/content/pages/components/ReplayMap.tsx
+msgid "Damage dealt"
+msgstr ""
+
+#: src/content/pages/components/ReplayEventLayers.tsx
+msgid "Damage dealt is every hit on a unit that took health off it, added up where the unit stood, or where its attacker stood. A hit larger than the health its target had left counts for what was left. Paralysis and healing are not counted. Every player's damage is on it, whoever is highlighted, and it is drawn in the deaths layer's colours, so only one of the two shows at a time."
+msgstr ""
+
 #: src/i18n/frameStrings.ts
 msgid "Dark"
 msgstr ""
@@ -2916,15 +4186,21 @@ msgid "death"
 msgstr ""
 
 #: src/content/mapAggregate.ts
+#: src/content/useReplayEventLayers.ts
 msgid "deaths"
 msgstr ""
 
 #: src/content/mapAggregate.ts
+#: src/content/pages/components/ReplayMap.tsx
 msgid "Deaths"
 msgstr ""
 
 #: src/content/pages/components/MapAggregate.tsx
 msgid "Deaths come from playing a match back, which is run from a replay's own page."
+msgstr ""
+
+#: src/content/replayEventLayers.ts
+msgid "Deaths, Damage dealt, Buildings finished and the two starting unit layers"
 msgstr ""
 
 #: src/content/pages/components/MapRecords.tsx
@@ -2941,6 +4217,7 @@ msgstr ""
 msgid "Default"
 msgstr ""
 
+#: src/content/pages/components/RefightPanel.tsx
 #: src/play/pages/components/NewPresetFromReplayButton.tsx
 msgid "Default AI"
 msgstr ""
@@ -2969,14 +4246,26 @@ msgstr ""
 msgid "Defeat."
 msgstr ""
 
+#: src/content/pages/components/LivingValueChart.tsx
+#: src/content/pages/components/PlayerUnitUsage.tsx
+#: src/content/pages/components/ReplayOpeningSplit.tsx
+msgid "Defence"
+msgstr ""
+
 #: src/content/mapAggregate.ts
 msgid "Defences"
 msgstr ""
 
+#: src/content/pages/components/ClearUnfinishedButton.tsx
 #: src/content/pages/components/DeleteArchiveButton.tsx
 #: src/content/pages/components/MapRecords.tsx
+#: src/content/pages/ReplayDetailPage.tsx
 #: src/play/pages/SavegamesPage.tsx
 msgid "Delete"
+msgstr ""
+
+#: src/content/pages/components/ReplayAnalysisSection.tsx
+msgid "Delete analysis"
 msgstr ""
 
 #: src/play/pages/components/PresetsDrawer.tsx
@@ -2991,12 +4280,32 @@ msgstr ""
 msgid "Delete savegame {saveFilename}"
 msgstr ""
 
+#: src/content/pages/components/ReplaySetsManager.tsx
+msgid "Delete set"
+msgstr ""
+
+#: src/content/pages/components/ClearUnfinishedButton.tsx
+msgid "Delete the empty replays that games left when they did not finish recording"
+msgstr ""
+
 #: src/content/pages/components/MapRecords.tsx
 msgid "Delete the name {name}"
 msgstr ""
 
+#: src/content/pages/components/ReplaySetsManager.tsx
+msgid "Delete the set “{setName}”? Only the set goes."
+msgstr ""
+
+#: src/content/pages/components/ReplayAnalysisSection.tsx
+msgid "Delete this analysis?"
+msgstr ""
+
 #: src/content/pages/components/DeleteArchiveButton.tsx
 msgid "Delete this archive?"
+msgstr ""
+
+#: src/content/pages/ReplayDetailPage.tsx
+msgid "Delete this replay?"
 msgstr ""
 
 #: src/play/pages/SavegamesPage.tsx
@@ -3009,6 +4318,14 @@ msgstr ""
 
 #: src/content/pages/components/DeleteArchiveButton.tsx
 msgid "Deleted {name}."
+msgstr ""
+
+#: src/content/pages/components/ReplayAnalysisSection.tsx
+msgid "Deleting"
+msgstr ""
+
+#: src/content/pages/ReplaysPage.tsx
+msgid "Demo files in your content folder."
 msgstr ""
 
 #: src/content/pages/components/MapAggregate.tsx
@@ -3048,8 +4365,16 @@ msgstr ""
 msgid "Derelict Hulk"
 msgstr ""
 
+#: src/content/pages/components/ReplaySetsManager.tsx
+msgid "Description (optional)"
+msgstr ""
+
 #: src/notify/NotificationsSettings.tsx
 msgid "Desktop notifications"
+msgstr ""
+
+#: src/content/pages/components/ReplayStartUnitLayer.tsx
+msgid "destroyed"
 msgstr ""
 
 #: src/content/replayAnalysis.ts
@@ -3057,11 +4382,17 @@ msgid "Desync warnings from the engine"
 msgstr ""
 
 #: src/components/ResultCard.tsx
+#: src/content/pages/components/ReplayAnalysisEvents.tsx
+#: src/content/pages/ReplayDetailPage.tsx
 msgid "Details"
 msgstr ""
 
 #: src/content/pages/components/Convert3doDrawer.tsx
 msgid "Did not fit on the sheet ({didNotFitCount})"
+msgstr ""
+
+#: src/content/pages/components/PlayerUnitUsage.tsx
+msgid "Died"
 msgstr ""
 
 #: src/runlite/pages/components/EncounterOverlay.tsx
@@ -3082,6 +4413,7 @@ msgstr ""
 msgid "Direct"
 msgstr ""
 
+#: src/content/pages/components/ReplayAnalysisSection.tsx
 #: src/play/pages/SkirmishPage.tsx
 msgid "Dismiss"
 msgstr ""
@@ -3110,6 +4442,10 @@ msgstr ""
 
 #: src/runlite/generate.ts
 msgid "Dock and repair"
+msgstr ""
+
+#: src/content/achievements.ts
+msgid "Dominant"
 msgstr ""
 
 #: src/downloads/pages/ActivityPage.tsx
@@ -3187,6 +4523,7 @@ msgstr ""
 msgid "Download complete"
 msgstr ""
 
+#: src/content/pages/ReplayDetailPage.tsx
 #: src/play/pages/components/NoEngineNotice.tsx
 msgid "Download engine"
 msgstr ""
@@ -3199,6 +4536,19 @@ msgstr ""
 msgid "Download failed"
 msgstr ""
 
+#: src/content/pages/components/ReplayAnalysisEvents.tsx
+msgid "Download failed: {reason}"
+msgstr ""
+
+#: src/content/pages/ReplayDetailPage.tsx
+msgid "Download game"
+msgstr ""
+
+#: src/content/pages/components/ReplayAnalysisEvents.tsx
+msgid "Download log"
+msgstr ""
+
+#: src/content/pages/ReplayDetailPage.tsx
 #: src/downloads/pages/components/MapPacksDrawer.tsx
 msgid "Download map"
 msgstr ""
@@ -3209,6 +4559,14 @@ msgstr ""
 
 #: src/downloads/pages/components/ProgressBar.tsx
 msgid "Download progress"
+msgstr ""
+
+#: src/content/pages/components/useWatchTarget.ts
+msgid "Download the engine this replay needs"
+msgstr ""
+
+#: src/content/pages/components/ReplayAnalysisEvents.tsx
+msgid "Download the event log"
 msgstr ""
 
 #: src/play/LaunchContentProvider.tsx
@@ -3225,6 +4583,10 @@ msgstr ""
 
 #: src/content/pages/components/SuggestionsList.tsx
 msgid "Downloaded"
+msgstr ""
+
+#: src/content/pages/ReplayDetailPage.tsx
+msgid "Downloaded {gameType}."
 msgstr ""
 
 #: src/content/pages/components/GameCard.tsx
@@ -3294,8 +4656,18 @@ msgstr ""
 msgid "Drawing…"
 msgstr ""
 
+#. placeholder {0}: data.counted
+#: src/content/pages/components/PlayerMatchFigures.tsx
+msgid "Drawn from {0} of {gameCount}."
+msgstr ""
+
 #: src/deeplink/DeepLinkHandler.tsx
 msgid "Drop to install"
+msgstr ""
+
+#: src/content/pages/components/MatchStatsSection.tsx
+#: src/content/pages/ReplayDetailPage.tsx
+msgid "Duration"
 msgstr ""
 
 #: src/play/pages/components/DebriefDrawer.tsx
@@ -3304,6 +4676,18 @@ msgstr ""
 
 #: src/packs/pages/components/ExportPackForm.tsx
 msgid "e.g. Popular water maps"
+msgstr ""
+
+#: src/content/pages/components/ReplayBaseCrops.tsx
+msgid "Each base view shows the buildings a player ordered, not the buildings that were built."
+msgstr ""
+
+#: src/content/pages/components/ReplayEventLayers.tsx
+msgid "Each death counts its unit's metal cost from the installed game, so this is where value was lost and not where units died."
+msgstr ""
+
+#: src/content/pages/components/PlayerMatchFigures.tsx
+msgid "Each figure is the total for the army {playerName} controlled, divided by the match's minutes, averaged over the games counted. The average is the mean of each game's own rate, with the median beside it."
 msgstr ""
 
 #: src/content/pages/components/MapAggregate.tsx
@@ -3326,8 +4710,20 @@ msgstr ""
 msgid "Each of these plays a sound you can change. A sound's final volume is the master, times the group it sits under, times its own. Play lets you hear one whether or not it is muted."
 msgstr ""
 
+#: src/content/pages/components/ReplayBuildOrders.tsx
+msgid "Each player's opening is their orders folded into a sequence, with repeats shown as a count."
+msgstr ""
+
+#: src/content/pages/MatchupPage.tsx
+msgid "Each square is one game, oldest first. Filled is a win, red is a loss, an outline is no recorded result."
+msgstr ""
+
 #: src/startbox/mode.ts
 msgid "Each team spawns at its numbered map position. Pick a team in the player list to choose yours."
+msgstr ""
+
+#: src/content/pages/components/AchievementsSection.tsx
+msgid "Earned"
 msgstr ""
 
 #: src/play/scenarioDifficulty.ts
@@ -3336,10 +4732,14 @@ msgstr ""
 
 #: src/content/mapAggregate.ts
 #: src/content/matchStats.ts
+#: src/content/pages/components/LivingValueChart.tsx
+#: src/content/pages/components/PlayerUnitUsage.tsx
+#: src/content/pages/components/ReplayOpeningSplit.tsx
 msgid "Economy"
 msgstr ""
 
 #: src/campaign/index.ts
+#: src/content/pages/components/ReplaySetsManager.tsx
 msgid "Edit"
 msgstr ""
 
@@ -3349,6 +4749,10 @@ msgstr ""
 
 #: src/runlite/generate.ts
 msgid "Efficient Logistics"
+msgstr ""
+
+#: src/content/pages/components/ReplayTimeline.tsx
+msgid "Eliminated"
 msgstr ""
 
 #: src/runlite/galaxyAdapter.ts
@@ -3394,6 +4798,11 @@ msgstr ""
 msgid "End it for everybody"
 msgstr ""
 
+#: src/content/pages/components/LivingValueChart.tsx
+msgid "energy"
+msgstr ""
+
+#: src/content/pages/components/LivingValueChart.tsx
 #: src/content/pages/components/UnitStatsTable.tsx
 msgid "Energy cost"
 msgstr ""
@@ -3403,10 +4812,15 @@ msgid "engine"
 msgstr ""
 
 #: src/content/pages/components/GameLibrarySummary.tsx
+#: src/content/pages/ReplayDetailPage.tsx
 #: src/downloads/DownloadQueueBadge.tsx
 #: src/play/pages/components/CrashDrawer.tsx
 #: src/play/pages/EngineLogSection.tsx
 msgid "Engine"
+msgstr ""
+
+#: src/content/pages/components/ReplayAnalysisSection.tsx
+msgid "engine {attemptEngine} with {attemptGame}"
 msgstr ""
 
 #: src/downloads/pages/components/EngineInstaller.tsx
@@ -3421,6 +4835,10 @@ msgstr ""
 msgid "Engine {engineVersion} has no headless build, which the playback needs."
 msgstr ""
 
+#: src/content/pages/ReplayDetailPage.tsx
+msgid "Engine {engineVersion} is not installed, and no download was found for it on this platform. Install it yourself in Settings, Engines."
+msgstr ""
+
 #: src/content/replayAnalysis.ts
 msgid "Engine {engineVersion} is not installed, and no other engine is installed."
 msgstr ""
@@ -3429,8 +4847,16 @@ msgstr ""
 msgid "Engine {engineVersion} is not installed, and none of the engines that are installed can run an analysis, which needs one with a headless build."
 msgstr ""
 
+#: src/content/pages/ReplayDetailPage.tsx
+msgid "Engine {engineVersion} is not installed. Set a download folder in <0>Content folders settings</0> to download it."
+msgstr ""
+
 #: src/profile/health.ts
 msgid "engine {engineVersions}"
+msgstr ""
+
+#: src/content/useResolveContent.ts
+msgid "Engine {reqLabel}"
 msgstr ""
 
 #: src/downloads/bindings.ts
@@ -3441,6 +4867,10 @@ msgstr ""
 msgid "Engine AIs"
 msgstr ""
 
+#: src/content/pages/components/OpenInEngineButton.tsx
+#: src/content/pages/components/RefightPanel.tsx
+#: src/content/pages/components/useWatchReplay.ts
+#: src/content/pages/components/WatchWithRewindButton.tsx
 #: src/play/detect.ts
 #: src/play/pages/SavegamesPage.tsx
 #: src/play/pages/SkirmishPage.tsx
@@ -3449,6 +4879,10 @@ msgstr ""
 
 #: src/play/index.ts
 msgid "Engine log"
+msgstr ""
+
+#: src/content/pages/ReplayDetailPage.tsx
+msgid "Engine not installed"
 msgstr ""
 
 #: src/home/groupDescription.ts
@@ -3463,8 +4897,16 @@ msgstr ""
 msgid "Engine Settings"
 msgstr ""
 
+#: src/content/pages/components/ReplayAnalysisSection.tsx
+msgid "Engine to use"
+msgstr ""
+
 #: src/content/index.ts
 msgid "Engines"
+msgstr ""
+
+#: src/content/pages/components/ReplayAnalysisSection.tsx
+msgid "Engines are listed newest first. Coilbox has no measure of which version is nearest to the one the replay was recorded on, so it has not picked one for that."
 msgstr ""
 
 #: src/direct/room.ts
@@ -3495,6 +4937,22 @@ msgstr ""
 msgid "Event"
 msgstr ""
 
+#: src/content/pages/components/ReplayAnalysisEvents.tsx
+msgid "Event log downloaded."
+msgstr ""
+
+#: src/content/pages/components/ReplayTimeline.tsx
+msgid "Event, {kind}, {time}"
+msgstr ""
+
+#: src/content/pages/components/ReplayTimeline.tsx
+msgid "Event, {kind}, {time}, {count}"
+msgstr ""
+
+#: src/content/pages/components/ReplayTimeWindowControl.tsx
+msgid "Events"
+msgstr ""
+
 #: src/content/pages/components/Convert3doDrawer.tsx
 msgid "Every <0>.3do</0> under <1>objects3d/</1> becomes an <2>.s3o</2>. Each folder's models share one texture, so the engine binds one sheet for a faction rather than one per unit. This archive has {models} of them."
 msgstr ""
@@ -3511,8 +4969,16 @@ msgstr ""
 msgid "Every game is installed."
 msgstr ""
 
+#: src/content/pages/components/ReplayAnalysisSection.tsx
+msgid "Every installed engine has been tried and did not reproduce the match. Pick one to try it again."
+msgstr ""
+
 #: src/content/pages/GamesPage.tsx
 msgid "Every installed game is up to date."
+msgstr ""
+
+#: src/content/pages/components/MatchStatsChart.tsx
+msgid "Every line is unchecked in the roster."
 msgstr ""
 
 #: src/content/pages/MapsPage.tsx
@@ -3531,8 +4997,20 @@ msgstr ""
 msgid "Every player counts in the faction record, so two players of one faction on one team count twice. In a team game a faction's record is not separated from the team it was on or the factions beside it. Skirmish AIs are not counted."
 msgstr ""
 
+#: src/content/pages/components/ReplayEventLayers.tsx
+msgid "Every player's deaths are counted, whoever is highlighted."
+msgstr ""
+
+#: src/content/pages/components/GatherReplaysButton.tsx
+msgid "Every replay is already in one folder."
+msgstr ""
+
 #: src/play/pages/components/NewPresetFromReplayButton.tsx
 msgid "Every seated player becomes an AI opponent, keeping the map, factions, colours and options."
+msgstr ""
+
+#: src/content/pages/components/RefightPanel.tsx
+msgid "Every seated player from this replay becomes an AI opponent, keeping the map, factions, colours and options. \"You\" starts as a spectator — take a seat from the Skirmish page if you want to play."
 msgstr ""
 
 #: src/content/pages/UnitReferencePage.tsx
@@ -3543,12 +5021,24 @@ msgstr ""
 msgid "Every unit that was destroyed counts, whatever destroyed it."
 msgstr ""
 
+#: src/content/pages/components/ReplayBaseCrops.tsx
+msgid "Every view is {sideText} elmos across, the same for every player, and is centred on that player's start unless the start is near the edge of the map. The bar at the bottom left of a view is {barText} elmos. A mark is one order to place a building, in its player's colour, and the dot with a white edge is the player's start. An order that was cancelled or never carried out is drawn like any other. Under each view is how many buildings that player ordered, and how many of those fall outside the view."
+msgstr ""
+
+#: src/content/pages/components/ReplayTimeline.tsx
+msgid "Everyone"
+msgstr ""
+
 #: src/content/pages/GamesPage.tsx
 msgid "Everything you can play, and everything the hub knows how to fetch."
 msgstr ""
 
 #: src/general/fullscreen.tsx
 msgid "Exit fullscreen"
+msgstr ""
+
+#: src/content/pages/components/ReplayAnalysisSection.tsx
+msgid "Expect about {expected}."
 msgstr ""
 
 #: src/content/pages/components/BuildTreeExportButton.tsx
@@ -3572,8 +5062,13 @@ msgstr ""
 msgid "Export compatibility mutator"
 msgstr ""
 
+#: src/content/pages/components/MatchStatsExportButton.tsx
+msgid "Export CSV"
+msgstr ""
+
 #: src/content/pages/components/BuildTreeExportButton.tsx
 #: src/content/pages/components/MapExportButtons.tsx
+#: src/content/pages/components/MatchStatsExportButton.tsx
 msgid "Export failed: {reason}"
 msgstr ""
 
@@ -3583,6 +5078,10 @@ msgstr ""
 
 #: src/content/pages/components/MapExportButtons.tsx
 msgid "Export layer CSV"
+msgstr ""
+
+#: src/content/pages/components/MatchStatsExportButton.tsx
+msgid "Export match statistics"
 msgstr ""
 
 #: src/content/pages/components/MapExportButtons.tsx
@@ -3633,7 +5132,13 @@ msgid "Faction / side"
 msgstr ""
 
 #: src/content/pages/components/BuildTreeExportButton.tsx
+#: src/content/pages/PlayerDossierPage.tsx
+#: src/content/pages/StatsPage.tsx
 msgid "Factions"
+msgstr ""
+
+#: src/content/pages/components/PlayerUnitUsage.tsx
+msgid "Factory"
 msgstr ""
 
 #: src/downloads/pages/ActivityPage.tsx
@@ -3656,6 +5161,15 @@ msgstr ""
 msgid "Failing"
 msgstr ""
 
+#: src/content/replayMapView/timelineKeys.ts
+msgid "Faster"
+msgstr ""
+
+#: src/content/pages/PlayerDossierPage.tsx
+#: src/content/pages/StatsPage.tsx
+msgid "Favourite maps"
+msgstr ""
+
 #: src/content/libraryGames.ts
 msgid "Featured"
 msgstr ""
@@ -3676,6 +5190,10 @@ msgstr ""
 msgid "Field upgrade"
 msgstr ""
 
+#: src/content/pages/components/MatchStatsSection.tsx
+msgid "Figures are sampled every {period} seconds."
+msgstr ""
+
 #: src/downloads/pages/ActivityPage.tsx
 msgid "file"
 msgstr ""
@@ -3687,12 +5205,24 @@ msgstr ""
 msgid "File"
 msgstr ""
 
+#: src/content/pages/ReplayDetailPage.tsx
+msgid "File size"
+msgstr ""
+
 #: src/content/mapCompatReport.ts
 msgid "Files"
 msgstr ""
 
 #: src/profile/health.ts
 msgid "Filter ({filterDesc}) has nothing to match yet — no games are installed. Install the game, or check the filter."
+msgstr ""
+
+#: src/content/pages/ReplaysPage.tsx
+msgid "Filter replays"
+msgstr ""
+
+#: src/content/pages/ReplaysPage.tsx
+msgid "Filter replays…"
 msgstr ""
 
 #: src/downloads/pages/components/RapidBrowser.tsx
@@ -3731,6 +5261,22 @@ msgstr ""
 msgid "Find it another way, or on this network use <0>{lan}</0>."
 msgstr ""
 
+#: src/content/pages/components/PlayerUnitUsage.tsx
+msgid "Finished"
+msgstr ""
+
+#: src/content/pages/components/PlayerUnitUsage.tsx
+msgid "Finished and died come from playing a game back with coilbox's own recorder, so only analysed games have them. They are the units of {name}'s team, counted for a unit only in games where {name} ordered it. Died counts finished units only."
+msgstr ""
+
+#: src/content/pages/components/PlayerUnitUsage.tsx
+msgid "Finished and died from {analysedGames} analysed."
+msgstr ""
+
+#: src/content/useReplayEventLayers.ts
+msgid "finished buildings"
+msgstr ""
+
 #: src/content/replayTimeWindow.ts
 msgid "First {minutes} minutes"
 msgstr ""
@@ -3741,6 +5287,14 @@ msgstr ""
 
 #: src/content/pages/components/MapAggregate.tsx
 msgid "First 5 minutes"
+msgstr ""
+
+#: src/content/achievements.ts
+msgid "First game"
+msgstr ""
+
+#: src/content/achievements.ts
+msgid "First win"
 msgstr ""
 
 #: src/play/presetRecord.ts
@@ -3799,6 +5353,10 @@ msgstr ""
 msgid "Footprint"
 msgstr ""
 
+#: src/content/pages/components/ReplayTimeWindowControl.tsx
+msgid "For orders the window is when each was given, not when anything was built. For events it is when each happened in the playback."
+msgstr ""
+
 #: src/direct/share.ts
 msgid "for somebody on the same network as this machine's {interfaceName}"
 msgstr ""
@@ -3815,6 +5373,22 @@ msgstr ""
 msgid "for somebody who is not on your network, who can join this room and chat but cannot start the game"
 msgstr ""
 
+#: src/content/pages/components/ReplayAnalysisSection.tsx
+msgid "Forget"
+msgstr ""
+
+#: src/content/pages/components/ReplaySetsManager.tsx
+msgid "Forget {missing} missing"
+msgstr ""
+
+#: src/content/pages/components/ReplayAnalysisSection.tsx
+msgid "Forget it"
+msgstr ""
+
+#: src/content/pages/components/ReplayAnalysisSection.tsx
+msgid "Forget this attempt?"
+msgstr ""
+
 #: src/content/pages/components/BuildTreeExportButton.tsx
 #: src/content/pages/components/UnitModelPanel.tsx
 #: src/content/pages/GameUnitPage.tsx
@@ -3825,6 +5399,10 @@ msgstr ""
 msgid "Forward"
 msgstr ""
 
+#: src/content/replayMapView/timelineKeys.ts
+msgid "Forward one frame"
+msgstr ""
+
 #: src/content/replayAnalysis.ts
 msgid "Frame {current} of {last}"
 msgstr ""
@@ -3833,12 +5411,24 @@ msgstr ""
 msgid "Free for all"
 msgstr ""
 
+#: src/content/replayAnalysisEvents.ts
+msgid "from"
+msgstr ""
+
+#: src/content/pages/components/PlayerUnitUsage.tsx
+msgid "From {counted} of {gameCount}."
+msgstr ""
+
 #: src/sound/MusicSource.tsx
 msgid "From a game"
 msgstr ""
 
 #: src/direct/JoinRoomForm.tsx
 msgid "From a link, to a room at {linkAddress}:{linkPort}. Nothing connects until you press Join, and if the host has stopped hosting you will be told so."
+msgstr ""
+
+#: src/content/pages/components/ReplayBuildOrders.tsx
+msgid "from a widget"
 msgstr ""
 
 #: src/content/pages/components/MapAggregate.tsx
@@ -3851,6 +5441,10 @@ msgstr ""
 
 #: src/content/replaySources.ts
 msgid "From playing the match back with coilbox's own recorder, which is kept only when the playback reproduced the recorded match exactly. These are events, not orders."
+msgstr ""
+
+#: src/content/pages/components/ReplayMapView.tsx
+msgid "From playing the match back with coilbox's own recorder. Nothing here runs the game."
 msgstr ""
 
 #: src/content/replaySources.ts
@@ -3908,6 +5502,7 @@ msgstr ""
 
 #: src/content/index.ts
 #: src/content/pages/components/ArchiveTypeBadge.tsx
+#: src/content/pages/ReplayDetailPage.tsx
 #: src/direct/HostRoomForm.tsx
 #: src/downloads/DownloadQueueBadge.tsx
 #: src/play/pages/components/CrashDrawer.tsx
@@ -3921,6 +5516,14 @@ msgstr ""
 msgid "Game AIs (Lua)"
 msgstr ""
 
+#: src/content/pages/ReplayDetailPage.tsx
+msgid "Game and engine not installed"
+msgstr ""
+
+#: src/content/pages/ReplayDetailPage.tsx
+msgid "Game and map not installed"
+msgstr ""
+
 #: src/profile/SettingsSection.tsx
 msgid "Game filter"
 msgstr ""
@@ -3931,6 +5534,10 @@ msgstr ""
 
 #: src/profile/health.ts
 msgid "Game filter regex is invalid"
+msgstr ""
+
+#: src/content/pages/ReplayDetailPage.tsx
+msgid "Game not installed"
 msgstr ""
 
 #: src/play/pages/components/GameOptionsPanel.tsx
@@ -3965,14 +5572,28 @@ msgstr ""
 msgid "Game updates"
 msgstr ""
 
+#: src/content/pages/components/RefightPanel.tsx
 #: src/play/pages/components/NewPresetFromReplayButton.tsx
 msgid "Game version"
+msgstr ""
+
+#: src/content/pages/ReplayDetailPage.tsx
+msgid "Game, map and engine not installed"
+msgstr ""
+
+#: src/content/pages/ReplayDetailPage.tsx
+msgid "Game: {gameType}"
+msgstr ""
+
+#: src/content/useResolveContent.ts
+msgid "Game: {reqLabel}"
 msgstr ""
 
 #: src/content/pages/components/SuggestionsList.tsx
 msgid "Game: {title}"
 msgstr ""
 
+#: src/content/pages/components/RemixPanel.tsx
 #: src/content/pages/GamesPage.tsx
 #: src/play/pages/components/GamePickerGrid.tsx
 msgid "games"
@@ -3980,8 +5601,12 @@ msgstr ""
 
 #: src/content/index.ts
 #: src/content/pages/components/GameHeader.tsx
+#: src/content/pages/components/PlayerUnitUsage.tsx
 #: src/content/pages/GamesPage.tsx
 #: src/content/pages/MapDetailPage.tsx
+#: src/content/pages/MatchupPage.tsx
+#: src/content/pages/PlayerDossierPage.tsx
+#: src/content/pages/StatsPage.tsx
 #: src/packs/pages/components/ExportPackForm.tsx
 msgid "Games"
 msgstr ""
@@ -3998,8 +5623,17 @@ msgstr ""
 msgid "Games often ship their own soundtrack. Coilbox can play it in the lobby, though it was written to score a battle rather than a menu."
 msgstr ""
 
+#: src/content/pages/components/RefightPanel.tsx
 #: src/play/pages/components/NewPresetFromReplayButton.tsx
 msgid "games or maps"
+msgstr ""
+
+#: src/content/pages/components/GatherReplaysButton.tsx
+msgid "Gather replays"
+msgstr ""
+
+#: src/content/pages/components/ReplayTimeline.tsx
+msgid "Gave away"
 msgstr ""
 
 #: src/general/index.ts
@@ -4014,6 +5648,10 @@ msgstr ""
 msgid "Get started — download a map"
 msgstr ""
 
+#: src/content/achievements.ts
+msgid "Getting started"
+msgstr ""
+
 #: src/direct/share.ts
 msgid "Give joiners the address for the network they are on."
 msgstr ""
@@ -4024,6 +5662,31 @@ msgstr ""
 
 #: src/content/replaySets.ts
 msgid "Give the set a name."
+msgstr ""
+
+#: src/content/pages/components/ReplayMapView.tsx
+msgid "Go to recording"
+msgstr ""
+
+#: src/content/pages/components/ReplayEventLayers.tsx
+#: src/content/pages/components/ReplayStartUnitLayer.tsx
+msgid "Go to the analysis section"
+msgstr ""
+
+#: src/content/replayMapView/timelineKeys.ts
+msgid "Go to the end"
+msgstr ""
+
+#: src/content/replayMapView/timelineKeys.ts
+msgid "Go to the next mark"
+msgstr ""
+
+#: src/content/replayMapView/timelineKeys.ts
+msgid "Go to the previous mark"
+msgstr ""
+
+#: src/content/replayMapView/timelineKeys.ts
+msgid "Go to the start"
 msgstr ""
 
 #: src/notify/NotificationsSettings.tsx
@@ -4050,6 +5713,10 @@ msgstr ""
 msgid "Hard"
 msgstr ""
 
+#: src/content/pages/PlayerDossierPage.tsx
+msgid "Head-to-head with you ({me})"
+msgstr ""
+
 #: src/content/pages/components/UnitStatsTable.tsx
 #: src/profile/HealthChecklist.tsx
 msgid "Health"
@@ -4065,6 +5732,10 @@ msgstr ""
 
 #: src/play/pages/components/MapOverlay.tsx
 msgid "Height"
+msgstr ""
+
+#: src/content/pages/components/UnitListNotes.tsx
+msgid "Here {reasonList}."
 msgstr ""
 
 #: src/profile/SettingsSection.tsx
@@ -4117,6 +5788,18 @@ msgstr ""
 
 #: src/profile/health.ts
 msgid "hideSettings id ''{id}'' matches nothing"
+msgstr ""
+
+#: src/content/pages/components/ReplayRoster.tsx
+msgid "Highlight {label} on the chart"
+msgstr ""
+
+#: src/content/pages/components/MatchStatsChart.tsx
+msgid "Highlight me"
+msgstr ""
+
+#: src/content/pages/components/ReplayRoster.tsx
+msgid "Highlight on the chart"
 msgstr ""
 
 #: src/uberstress/index.ts
@@ -4362,6 +6045,10 @@ msgstr ""
 msgid "Imported preset"
 msgstr ""
 
+#: src/content/pages/components/PlayerUnitUsage.tsx
+msgid "In {incompleteGames} the recording stops early, so later orders are missing."
+msgstr ""
+
 #: src/content/pages/components/MapRecords.tsx
 msgid "In a 1v1 each start is a team of one, so a position's record is the record of whoever held it against one opponent."
 msgstr ""
@@ -4377,6 +6064,10 @@ msgstr ""
 #: src/content/index.ts
 #: src/play/InGameBadge.tsx
 msgid "In game"
+msgstr ""
+
+#: src/content/pages/components/MatchStatsChart.tsx
+msgid "In-game colours"
 msgstr ""
 
 #: src/content/pages/components/BuildTreeExportButton.tsx
@@ -4433,8 +6124,16 @@ msgstr ""
 msgid "Install an engine first (<0>Settings → Engines</0>)."
 msgstr ""
 
+#: src/content/pages/ReplayDetailPage.tsx
+msgid "Install an engine to preview this map."
+msgstr ""
+
 #: src/play/pages/SavegamesPage.tsx
 msgid "Install an engine to resume savegames."
+msgstr ""
+
+#: src/content/pages/components/useWatchTarget.ts
+msgid "Install an engine to watch replays."
 msgstr ""
 
 #: src/content/pages/components/Convert3doDrawer.tsx
@@ -4546,8 +6245,24 @@ msgstr ""
 msgid "Invite people to this room"
 msgstr ""
 
+#: src/content/pages/components/ReplayStartUnitLayer.tsx
+msgid "is a starting unit that was destroyed."
+msgstr ""
+
+#: src/content/pages/components/ReplayStartUnitLayer.tsx
+msgid "is one the game's own script took away with nothing recorded in its place."
+msgstr ""
+
 #: src/content/pages/components/CompatMode.tsx
 msgid "is out of date: {staleReasons}."
+msgstr ""
+
+#: src/content/pages/components/ReplayStartUnitLayer.tsx
+msgid "is where a game swapped a starting unit for another unit, which is how some games upgrade one. The line carries on as the new unit, and the swap is not a loss. Two units are joined only when the game's own script destroyed the old one with no attacker and made the new one for the same player, with no builder, on exactly the same spot, on the same frame or the one before. A game that destroys a starting unit and spawns an unrelated unit on that spot at that moment would be drawn as an upgrade."
+msgstr ""
+
+#: src/content/pages/components/LivingValueChart.tsx
+msgid "It did not record a unit changing hands, so a unit that was given away or captured is counted for its first owner throughout."
 msgstr ""
 
 #: src/play/engineConfirmation.ts
@@ -4607,6 +6322,10 @@ msgstr ""
 msgid "It used engine {usedEngine}, and the replay was recorded on engine {recordedEngine}."
 msgstr ""
 
+#: src/content/pages/components/ReplayAnalysisSection.tsx
+msgid "It was allowed {allowed}, which is the length of the match plus time for the engine to start. Nothing was stored."
+msgstr ""
+
 #: src/direct/room.ts
 msgid "It was handing out {previous} earlier."
 msgstr ""
@@ -4616,8 +6335,19 @@ msgstr ""
 msgid "Item"
 msgstr ""
 
+#: src/content/pages/components/RefightPanel.tsx
+#: src/content/pages/components/RemixPanel.tsx
 #: src/play/pages/components/NewPresetFromReplayButton.tsx
 msgid "Its exact game couldn't be confirmed from the replay, so this is a name-only check."
+msgstr ""
+
+#. placeholder {0}: formatBytes(track.bytes) ?? "0 B"
+#: src/content/pages/ReplayDetailPage.tsx
+msgid "Its recorded track is deleted too, freeing {0}."
+msgstr ""
+
+#: src/content/pages/components/MatchStatsSection.tsx
+msgid "Its trailer couldn't be read: {error}"
 msgstr ""
 
 #: src/direct/LanRooms.tsx
@@ -4649,6 +6379,10 @@ msgstr ""
 msgid "Join the room at {roomAddress}:{roomPort}?"
 msgstr ""
 
+#: src/content/pages/components/ReplayTimeline.tsx
+msgid "Joined late"
+msgstr ""
+
 #: src/direct/JoinRoomForm.tsx
 msgid "Joining {roomTitle}, found on this network."
 msgstr ""
@@ -4663,6 +6397,10 @@ msgstr ""
 
 #: src/direct/PendingJoins.tsx
 msgid "Joins waiting for you"
+msgstr ""
+
+#: src/content/pages/components/ReplayAnalysisEvents.tsx
+msgid "JSON lines"
 msgstr ""
 
 #: src/workshop/pages/components/CommandPalette.tsx
@@ -4709,8 +6447,22 @@ msgstr ""
 msgid "Keybinds"
 msgstr ""
 
+#: src/content/pages/components/ReplayPlaybackBar.tsx
+msgid "Kills"
+msgstr ""
+
 #: src/content/pages/components/GameVersionsTab.tsx
+#: src/content/pages/components/PlayerUnitUsage.tsx
+#: src/content/pages/components/ReplayAnalysisEvents.tsx
 msgid "Kind"
+msgstr ""
+
+#: src/content/pages/components/ReplayAnalysisEvents.tsx
+msgid "Kind of event"
+msgstr ""
+
+#: src/content/pages/components/LivingValueChart.tsx
+msgid "Kinds of unit"
 msgstr ""
 
 #: src/general/pages/SettingsSection.tsx
@@ -4718,6 +6470,7 @@ msgid "Language"
 msgstr ""
 
 #: src/content/libraryMaps.ts
+#: src/content/pages/ReplaysPage.tsx
 msgid "Largest"
 msgstr ""
 
@@ -4741,8 +6494,16 @@ msgstr ""
 msgid "Last result"
 msgstr ""
 
+#: src/content/pages/PlayerDossierPage.tsx
+msgid "Last seen"
+msgstr ""
+
 #: src/game-updates/pages/GameUpdatesSection.tsx
 msgid "Latest: {releaseName}"
+msgstr ""
+
+#: src/content/pages/components/RefightPanel.tsx
+msgid "Launching…"
 msgstr ""
 
 #: src/content/pages/components/MapExportButtons.tsx
@@ -4759,6 +6520,10 @@ msgstr ""
 
 #: src/components/HeatLegend.tsx
 msgid "Least"
+msgstr ""
+
+#: src/content/pages/ReplaysPage.tsx
+msgid "Least {metricName}"
 msgstr ""
 
 #: src/direct/HostRoomForm.tsx
@@ -4778,8 +6543,28 @@ msgstr ""
 msgid "Leave the depot"
 msgstr ""
 
+#: src/content/pages/components/ReplayTimeline.tsx
+msgid "Left"
+msgstr ""
+
+#: src/content/pages/components/ClearUnfinishedButton.tsx
+msgid "Left alone:"
+msgstr ""
+
 #: src/content/pages/components/MapRecords.tsx
 msgid "Left out of the start positions:"
+msgstr ""
+
+#: src/content/playerMatchFigures.ts
+msgid "Left out: {noLength} with no usable length."
+msgstr ""
+
+#: src/content/playerMatchFigures.ts
+msgid "Left out: {noTotals} with no figures recorded (older or unmeasured replays) and {noLength} with no usable length."
+msgstr ""
+
+#: src/content/playerMatchFigures.ts
+msgid "Left out: {noTotals} with no figures recorded (older or unmeasured replays)."
 msgstr ""
 
 #: src/lego/index.ts
@@ -4882,6 +6667,10 @@ msgstr ""
 msgid "Loading the match"
 msgstr ""
 
+#: src/content/pages/components/ReplayMapView.tsx
+msgid "Loading this part of the match"
+msgstr ""
+
 #: src/runlite/unitLimit.ts
 msgid "Loading unit data…"
 msgstr ""
@@ -4936,6 +6725,7 @@ msgid "long"
 msgstr ""
 
 #: src/content/pages/components/MapRecords.tsx
+#: src/content/pages/ReplaysPage.tsx
 msgid "Longest"
 msgstr ""
 
@@ -4945,6 +6735,10 @@ msgstr ""
 
 #: src/content/pages/components/MissionRuntimeSection.tsx
 msgid "Looking for duplicate runtime files..."
+msgstr ""
+
+#: src/content/pages/components/GatherReplaysButton.tsx
+msgid "Looking for replays inside the engine folders..."
 msgstr ""
 
 #: src/play/pages/EngineLogSection.tsx
@@ -4957,6 +6751,20 @@ msgstr ""
 
 #: src/content/pages/components/SddBadge.tsx
 msgid "Loose .sdd directory (uncompressed)"
+msgstr ""
+
+#: src/content/pages/components/PlayerMatchFigures.tsx
+#: src/content/pages/MatchupPage.tsx
+#: src/content/pages/PlayerDossierPage.tsx
+msgid "Loss"
+msgstr ""
+
+#: src/content/pages/components/PlayerMatchFigures.tsx
+msgid "Losses"
+msgstr ""
+
+#: src/content/pages/components/ReplayRoster.tsx
+msgid "Lost"
 msgstr ""
 
 #: src/animation/index.ts
@@ -4980,6 +6788,10 @@ msgstr ""
 msgid "Lua scan: {0}"
 msgstr ""
 
+#: src/content/achievements.ts
+msgid "Machine breaker"
+msgstr ""
+
 #: src/content/mapImage.ts
 msgid "Made with coilbox"
 msgstr ""
@@ -4991,6 +6803,10 @@ msgstr ""
 
 #: src/content/replayAnalysis.ts
 msgid "Making the track"
+msgstr ""
+
+#: src/content/pages/components/ReplayAnalysisSection.tsx
+msgid "Making the track from the recording."
 msgstr ""
 
 #: src/content/pages/MapDetailPage.tsx
@@ -5006,6 +6822,22 @@ msgstr ""
 #: src/play/pages/components/MapOverlay.tsx
 #: src/play/presetParts.ts
 msgid "Map"
+msgstr ""
+
+#: src/content/pages/ReplayDetailPage.tsx
+msgid "Map · {infoMapName}"
+msgstr ""
+
+#: src/content/pages/ReplayDetailPage.tsx
+msgid "Map and engine not installed"
+msgstr ""
+
+#: src/content/pages/components/ReplayMap.tsx
+msgid "Map layers"
+msgstr ""
+
+#: src/content/pages/ReplayDetailPage.tsx
+msgid "Map not installed"
 msgstr ""
 
 #: src/content/pages/MapDetailPage.tsx
@@ -5028,6 +6860,18 @@ msgstr ""
 
 #: src/runlite/pages/components/RunSetupForm.tsx
 msgid "Map style"
+msgstr ""
+
+#: src/content/pages/ReplaysPage.tsx
+msgid "Map: {mapFilter}"
+msgstr ""
+
+#: src/content/pages/ReplayDetailPage.tsx
+msgid "Map: {mapName}"
+msgstr ""
+
+#: src/content/useResolveContent.ts
+msgid "Map: {reqLabel}"
 msgstr ""
 
 #: src/content/pages/components/SuggestionsList.tsx
@@ -5066,6 +6910,19 @@ msgstr ""
 msgid "Maps by {author} on the Coilbox hub"
 msgstr ""
 
+#: src/content/pages/PlayerDossierPage.tsx
+msgid "Maps you've shared"
+msgstr ""
+
+#: src/content/pages/ReplaysPage.tsx
+msgid "Mark unwatched"
+msgstr ""
+
+#: src/content/pages/ReplayDetailPage.tsx
+#: src/content/pages/ReplaysPage.tsx
+msgid "Mark watched"
+msgstr ""
+
 #: src/downloads/pages/SettingsSection.tsx
 msgid "Master URL"
 msgstr ""
@@ -5078,8 +6935,32 @@ msgstr ""
 msgid "Match debrief"
 msgstr ""
 
+#: src/content/pages/components/PlayerMatchFigures.tsx
+msgid "Match figures"
+msgstr ""
+
+#: src/content/pages/components/PlayerMatchFigures.tsx
+msgid "Match figures are not available yet."
+msgstr ""
+
 #: src/home/continue.ts
 msgid "Match in progress · hosted by {host}"
+msgstr ""
+
+#: src/content/pages/components/MatchStatsSection.tsx
+msgid "Match statistics"
+msgstr ""
+
+#: src/content/pages/components/MatchStatsExportButton.tsx
+msgid "Match statistics exported."
+msgstr ""
+
+#: src/content/pages/components/ReplayTimeWindowControl.tsx
+msgid "Match time window"
+msgstr ""
+
+#: src/content/replayMatchFigures.ts
+msgid "match total"
 msgstr ""
 
 #: src/content/pages/components/MapRecords.tsx
@@ -5118,6 +6999,7 @@ msgstr ""
 msgid "Matchmaking pairs you up and starts the accept countdown."
 msgstr ""
 
+#: src/content/pages/MatchupPage.tsx
 #: src/multiplayer/index.tsx
 msgid "Matchup"
 msgstr ""
@@ -5132,6 +7014,10 @@ msgstr ""
 
 #: src/content/pages/components/MapRecords.tsx
 msgid "Median"
+msgstr ""
+
+#: src/content/pages/components/PlayerMatchFigures.tsx
+msgid "median {median}"
 msgstr ""
 
 #: src/sound/events.ts
@@ -5159,20 +7045,49 @@ msgstr ""
 msgid "Metadata"
 msgstr ""
 
+#: src/content/pages/components/LivingValueChart.tsx
+msgid "metal"
+msgstr ""
+
+#: src/content/pages/components/PlayerUnitUsage.tsx
 #: src/play/pages/components/MapOverlay.tsx
 msgid "Metal"
 msgstr ""
 
+#: src/content/pages/components/LivingValueChart.tsx
 #: src/content/pages/components/UnitStatsTable.tsx
 msgid "Metal cost"
+msgstr ""
+
+#: src/content/pages/components/ReplayEventLayers.tsx
+msgid "Metal cost lost"
+msgstr ""
+
+#: src/content/pages/components/PlayerUnitUsage.tsx
+msgid "Metal is the units ordered times the unit's metal cost, from the unit list of the build each game was played on. Other is builders, factories, sensors and transports. Unclassified is a unit whose definition does not say what it is for."
+msgstr ""
+
+#: src/content/pages/components/PlayerUnitUsage.tsx
+msgid "Metal ordered by kind of unit"
+msgstr ""
+
+#: src/content/pages/components/AchievementsSection.tsx
+msgid "Milestones"
 msgstr ""
 
 #: src/content/matchStats.ts
 msgid "Military"
 msgstr ""
 
+#. placeholder {0}: r.mapName
+#: src/content/pages/ReplaysPage.tsx
+msgid "Minimap of {0}"
+msgstr ""
+
 #: src/content/pages/components/LibraryMapCard.tsx
 #: src/content/pages/components/MapAggregate.tsx
+#: src/content/pages/components/ReplayMap.tsx
+#: src/content/pages/components/ReplayMapView.tsx
 #: src/direct/LanRooms.tsx
 #: src/play/pages/components/MapCard.tsx
 #: src/play/pages/components/MapPickerGrid.tsx
@@ -5245,6 +7160,10 @@ msgstr ""
 msgid "Most"
 msgstr ""
 
+#: src/content/pages/ReplaysPage.tsx
+msgid "Most {metricName}"
+msgstr ""
+
 #: src/components/HeatLegend.tsx
 msgid "Most is {peak}."
 msgstr ""
@@ -5255,6 +7174,14 @@ msgstr ""
 
 #: src/startbox/StartBoxControls.tsx
 msgid "Move each of the {boxHolders} boxes on to the next ally"
+msgstr ""
+
+#: src/content/pages/components/GatherReplaysButton.tsx
+msgid "Move replays out of the engine folders into your content folder"
+msgstr ""
+
+#: src/content/pages/components/GatherReplaysButton.tsx
+msgid "Move them"
 msgstr ""
 
 #: src/play/pages/components/GameChoiceOffer.tsx
@@ -5272,6 +7199,7 @@ msgstr ""
 msgid "Moved {0, plural, one {# original model} other {# original models}} aside."
 msgstr ""
 
+#: src/content/pages/ReplaysPage.tsx
 #: src/home/zones/ResumeRail.tsx
 #: src/multiplayer/index.tsx
 msgid "Multiplayer"
@@ -5307,6 +7235,10 @@ msgstr ""
 msgid "Mute all sound"
 msgstr ""
 
+#: src/content/pages/ReplaysPage.tsx
+msgid "My figures"
+msgstr ""
+
 #: src/content/libraryGames.ts
 msgid "My Games"
 msgstr ""
@@ -5324,6 +7256,7 @@ msgstr ""
 
 #: src/content/libraryGames.ts
 #: src/content/libraryMaps.ts
+#: src/content/pages/ReplaysPage.tsx
 #: src/play/pages/SavegamesPage.tsx
 msgid "Name A–Z"
 msgstr ""
@@ -5338,6 +7271,7 @@ msgstr ""
 
 #: src/content/libraryGames.ts
 #: src/content/libraryMaps.ts
+#: src/content/pages/ReplaysPage.tsx
 #: src/play/pages/SavegamesPage.tsx
 msgid "Name Z–A"
 msgstr ""
@@ -5379,12 +7313,23 @@ msgid "Needs at least two allies with a box"
 msgstr ""
 
 #: src/content/pages/components/BuildTreeExportButton.tsx
+#: src/content/replayAnalysisEvents.ts
 #: src/i18n/frameStrings.ts
 msgid "Neutral"
 msgstr ""
 
 #: src/content/pages/MapDetailPage.tsx
+#: src/content/pages/MatchupPage.tsx
+#: src/content/pages/PlayerDossierPage.tsx
 msgid "never"
+msgstr ""
+
+#: src/content/pages/PlayerDossierPage.tsx
+msgid "never as opponents"
+msgstr ""
+
+#: src/content/pages/PlayerDossierPage.tsx
+msgid "never on the same team"
 msgstr ""
 
 #: src/play/presetRecord.ts
@@ -5411,10 +7356,23 @@ msgstr ""
 msgid "New project"
 msgstr ""
 
+#: src/content/pages/components/ReplaySetsManager.tsx
+msgid "New set"
+msgstr ""
+
+#: src/content/pages/components/ReplaySetPicker.tsx
+msgid "New set name"
+msgstr ""
+
+#: src/content/pages/components/RemixPanel.tsx
+msgid "New target game"
+msgstr ""
+
 #: src/runlite/pages/RunListPage.tsx
 msgid "New warpath"
 msgstr ""
 
+#: src/content/pages/ReplaysPage.tsx
 #: src/play/pages/SavegamesPage.tsx
 msgid "Newest"
 msgstr ""
@@ -5429,6 +7387,10 @@ msgstr ""
 
 #: src/content/pages/GameUnitPage.tsx
 msgid "No"
+msgstr ""
+
+#: src/content/pages/components/ReplayTimeWindowControl.tsx
+msgid "No {countNoun}."
 msgstr ""
 
 #: src/content/pages/MapsPage.tsx
@@ -5447,6 +7409,7 @@ msgstr ""
 msgid "No AIs found"
 msgstr ""
 
+#: src/content/pages/components/RefightPanel.tsx
 #: src/play/pages/components/NewPresetFromReplayButton.tsx
 msgid "No AIs found for this game."
 msgstr ""
@@ -5467,12 +7430,32 @@ msgstr ""
 msgid "no bonus"
 msgstr ""
 
+#: src/content/pages/components/AiRecordSection.tsx
+msgid "No bonus"
+msgstr ""
+
 #: src/content/pages/components/BuildTreeDrawer.tsx
 msgid "No build options found for this faction. This game may not expose unit <0>buildoptions</0> (e.g. legacy TDF games), or its commander builds nothing."
 msgstr ""
 
+#: src/content/pages/components/PlayerUnitUsage.tsx
+msgid "No build orders to show."
+msgstr ""
+
+#: src/content/pages/components/ReplayBuildOrders.tsx
+msgid "No build orders were recorded in this replay."
+msgstr ""
+
+#: src/content/pages/components/ReplayMap.tsx
+msgid "No buildings were ordered in this replay."
+msgstr ""
+
 #: src/runlite/generate.ts
 msgid "No change"
+msgstr ""
+
+#: src/content/pages/components/ReplayChat.tsx
+msgid "No chat was recorded in this replay."
 msgstr ""
 
 #: src/profile/health.ts
@@ -5485,6 +7468,27 @@ msgstr ""
 
 #: src/profile/health.ts
 msgid "No content folders configured"
+msgstr ""
+
+#: src/content/pages/components/PlayerMatchFigures.tsx
+msgid "No counted game has a figure for {label}."
+msgstr ""
+
+#: src/content/pages/components/ReplayEventLayers.tsx
+msgid "No damage was recorded in this window."
+msgstr ""
+
+#: src/content/pages/components/ReplayEventLayers.tsx
+msgid "No damage was recorded."
+msgstr ""
+
+#: src/content/pages/PlayerDossierPage.tsx
+#: src/content/pages/StatsPage.tsx
+msgid "no decided games"
+msgstr ""
+
+#: src/content/pages/StatsPage.tsx
+msgid "No decodable players found in your replays."
 msgstr ""
 
 #: src/profile/health.ts
@@ -5553,8 +7557,17 @@ msgstr ""
 msgid "No engines found in your content folders. Add a folder in <0>Content folders</0> or install one from <1>Engines</1>."
 msgstr ""
 
+#: src/content/pages/components/ReplayAnalysisEvents.tsx
+msgid "No event matches these filters."
+msgstr ""
+
 #: src/content/pages/components/MapRecords.tsx
 msgid "No faction is recorded for these matches."
+msgstr ""
+
+#: src/content/pages/PlayerDossierPage.tsx
+#: src/content/pages/StatsPage.tsx
+msgid "No factions recorded."
 msgstr ""
 
 #: src/downloads/pages/ActivityPage.tsx
@@ -5563,6 +7576,10 @@ msgstr ""
 
 #: src/downloads/pages/ActivityPage.tsx
 msgid "No finished downloads."
+msgstr ""
+
+#: src/content/pages/components/LivingValueChart.tsx
+msgid "No finished unit with a {resourceName} cost belongs to the lines on the chart above."
 msgstr ""
 
 #: src/play/pages/components/GameOptionsPanel.tsx
@@ -5575,6 +7592,10 @@ msgstr ""
 
 #: src/play/pages/components/GameSelectCard.tsx
 msgid "No game selected"
+msgstr ""
+
+#: src/content/matchupFormat.ts
+msgid "no games"
 msgstr ""
 
 #: src/play/pages/components/GamePickerGrid.tsx
@@ -5621,6 +7642,14 @@ msgstr ""
 msgid "No GitHub repo declared for source \"{sourceKey}\"."
 msgstr ""
 
+#: src/content/pages/components/RemixPanel.tsx
+msgid "No installed games found to target."
+msgstr ""
+
+#: src/content/pages/components/LivingValueChart.tsx
+msgid "No line is on the chart above."
+msgstr ""
+
 #: src/content/compatReport.ts
 msgid "No luaui folder"
 msgstr ""
@@ -5631,6 +7660,10 @@ msgstr ""
 
 #: src/direct/lan.ts
 msgid "No machine called {address}. Check the spelling, or use its address instead of its name."
+msgstr ""
+
+#: src/content/pages/ReplayDetailPage.tsx
+msgid "No map recorded for this replay."
 msgstr ""
 
 #: src/play/pages/components/MapCard.tsx
@@ -5666,6 +7699,11 @@ msgstr ""
 msgid "No maps match “{query}”."
 msgstr ""
 
+#: src/content/pages/PlayerDossierPage.tsx
+#: src/content/pages/StatsPage.tsx
+msgid "No maps recorded."
+msgstr ""
+
 #: src/content/pages/MapsPage.tsx
 msgid "No maps yet — try one of these"
 msgstr ""
@@ -5680,6 +7718,10 @@ msgstr ""
 
 #: src/content/pages/components/MapAggregate.tsx
 msgid "No match on this map passes these filters."
+msgstr ""
+
+#: src/content/pages/components/ReplayTimeWindowControl.tsx
+msgid "No match statistics are drawn behind the range."
 msgstr ""
 
 #: src/content/pages/MapDetailPage.tsx
@@ -5703,12 +7745,28 @@ msgstr ""
 msgid "No notifications yet."
 msgstr ""
 
+#: src/content/pages/components/ReplayBuildOrders.tsx
+msgid "No orders were given in this stretch."
+msgstr ""
+
+#: src/content/pages/components/ReplayMap.tsx
+msgid "No orders with a place on the map were given in this replay."
+msgstr ""
+
 #: src/direct/room.ts
 msgid "no password"
 msgstr ""
 
 #: src/content/buildPicMissing.ts
 msgid "no pic"
+msgstr ""
+
+#: src/content/pages/MatchupPage.tsx
+msgid "No player to compare against yet."
+msgstr ""
+
+#: src/content/pages/components/PlayerPicker.tsx
+msgid "No players match \"{query}\"."
 msgstr ""
 
 #: src/play/pages/components/PresetsDrawer.tsx
@@ -5731,6 +7789,10 @@ msgstr ""
 msgid "No rapid repositories. Add one to browse and download games from it."
 msgstr ""
 
+#: src/content/pages/components/MatchStatsTable.tsx
+msgid "no reading"
+msgstr ""
+
 #: src/content/pages/components/GameSourcesTab.tsx
 #: src/downloads/pages/ActivityPage.tsx
 msgid "no reason given"
@@ -5738,6 +7800,10 @@ msgstr ""
 
 #: src/downloads/emptyEngineList.ts
 msgid "No Recoil builds for this platform ({platform}). On macOS, add an engine manually."
+msgstr ""
+
+#: src/content/matchupFormat.ts
+msgid "no recorded result in {gameCount}"
 msgstr ""
 
 #: src/content/pages/components/SuggestionsList.tsx
@@ -5752,20 +7818,53 @@ msgstr ""
 msgid "No replay available for this match."
 msgstr ""
 
+#: src/content/pages/PlayerDossierPage.tsx
+msgid "No replays found for this player."
+msgstr ""
+
 #: src/play/pages/components/NewPresetFromReplayButton.tsx
 msgid "No replays found."
+msgstr ""
+
+#: src/content/pages/ReplaysPage.tsx
+msgid "No replays found. Watch a game, or place .sdfz files in your demos folder."
+msgstr ""
+
+#: src/content/pages/ReplaysPage.tsx
+msgid "No replays in “{activeSetName}” match the filters."
+msgstr ""
+
+#: src/content/pages/ReplaysPage.tsx
+msgid "No replays match “{filterText}”."
+msgstr ""
+
+#: src/content/pages/ReplaysPage.tsx
+msgid "No replays on “{mapFilter}”."
 msgstr ""
 
 #: src/content/pages/MapDetailPage.tsx
 msgid "No replays recorded on this map yet."
 msgstr ""
 
+#: src/content/pages/PlayerDossierPage.tsx
+msgid "No replays recorded."
+msgstr ""
+
+#: src/content/pages/StatsPage.tsx
+msgid "No replays to build stats from yet. Watch a game, or place .sdfz files in your demos folder."
+msgstr ""
+
 #: src/downloads/pages/components/RapidBrowser.tsx
 msgid "No repositories match “{repoQuery}”."
 msgstr ""
 
+#: src/content/pages/components/AiRecordSection.tsx
 #: src/content/pages/components/MapRecords.tsx
 msgid "no result"
+msgstr ""
+
+#: src/content/pages/components/PlayerMatchFigures.tsx
+msgid "No result"
 msgstr ""
 
 #: src/direct/LanRooms.tsx
@@ -5800,8 +7899,16 @@ msgstr ""
 msgid "No server would say what your public address is."
 msgstr ""
 
+#: src/content/pages/components/ReplaySetPicker.tsx
+msgid "No sets yet."
+msgstr ""
+
 #: src/i18n/frameStrings.ts
 msgid "No settings available."
+msgstr ""
+
+#: src/content/pages/components/AiRecordSection.tsx
+msgid "No skirmishes against AI yet. Games from campaign, Conquest and Warpath are not counted here."
 msgstr ""
 
 #: src/content/pages/components/GameSourcesTab.tsx
@@ -5837,6 +7944,26 @@ msgstr ""
 msgid "No start position is counted for these matches."
 msgstr ""
 
+#: src/content/pages/components/ReplayStartUnitLayer.tsx
+msgid "No starting unit was alive in this window."
+msgstr ""
+
+#: src/content/pages/components/ReplayStartUnitLayer.tsx
+msgid "No starting unit was alive."
+msgstr ""
+
+#: src/content/pages/components/ReplayStartUnitLayer.tsx
+msgid "No starting unit was lost in this window."
+msgstr ""
+
+#: src/content/pages/components/ReplayStartUnitLayer.tsx
+msgid "No starting unit was lost."
+msgstr ""
+
+#: src/content/pages/components/ReplayMapView.tsx
+msgid "no team"
+msgstr ""
+
 #: src/content/pages/MapsPage.tsx
 msgid "No team maps in the first {checked}."
 msgstr ""
@@ -5848,6 +7975,14 @@ msgstr ""
 #: src/home/zones/Greeting.tsx
 #: src/i18n/frameStrings.ts
 msgid "No tools available yet."
+msgstr ""
+
+#: src/content/pages/components/ReplayAnalysisSection.tsx
+msgid "No track was made."
+msgstr ""
+
+#: src/content/pages/components/ReplayEventLayers.tsx
+msgid "No unit died in this analysis."
 msgstr ""
 
 #: src/content/pages/GameUnitsPage.tsx
@@ -5916,8 +8051,20 @@ msgstr ""
 msgid "none found"
 msgstr ""
 
+#: src/content/pages/components/ReplayEventLayers.tsx
+msgid "None of it has an attacker, so it came from nowhere on the map."
+msgstr ""
+
 #: src/content/pages/components/MapRecords.tsx
 msgid "None of the {twoSides} matches of two teams has a recorded result, so neither team has a record."
+msgstr ""
+
+#: src/content/pages/components/CommandRateChart.tsx
+msgid "None of the lines on the chart above gave orders of this kind."
+msgstr ""
+
+#: src/content/pages/StatsPage.tsx
+msgid "None of the replays in this set are in your library."
 msgstr ""
 
 #: src/content/pages/components/MapAggregate.tsx
@@ -5938,6 +8085,14 @@ msgstr ""
 
 #: src/content/pages/GameDetailPage.tsx
 msgid "None of this game's sides resolve to a start unit in its roster, so every build tree below is empty. All units still lists the full roster."
+msgstr ""
+
+#: src/content/pages/components/ReplayBaseCrops.tsx
+msgid "None ordered"
+msgstr ""
+
+#: src/content/pages/components/ReplayBaseCrops.tsx
+msgid "None ordered in this window"
 msgstr ""
 
 #: src/play/scenarioDifficulty.ts
@@ -5992,8 +8147,16 @@ msgstr ""
 msgid "Not portable (standard per-user install)"
 msgstr ""
 
+#: src/content/pages/components/ReplayOpeningSplit.tsx
+msgid "Not priced"
+msgstr ""
+
 #: src/direct/hostingRoute.ts
 msgid "Not reachable"
+msgstr ""
+
+#: src/content/pages/components/ReplayAnalysisSection.tsx
+msgid "Not recorded for rewind."
 msgstr ""
 
 #: src/components/SaveStatus.tsx
@@ -6012,12 +8175,20 @@ msgstr ""
 msgid "not writable"
 msgstr ""
 
+#: src/content/pages/components/AchievementsSection.tsx
+msgid "Not yet earned"
+msgstr ""
+
 #: src/runlite/unitLimit.ts
 msgid "Nothing can be built from {startUnit}, the start unit for {sideName}, so coilbox cannot limit your units. Rewards will offer perks only and every unit will be available from the first battle."
 msgstr ""
 
 #: src/runlite/unitLimit.ts
 msgid "Nothing can be built from {startUnitName}, this run's start unit, so coilbox cannot limit your units. Every unit is available."
+msgstr ""
+
+#: src/content/pages/components/GatherReplaysButton.tsx
+msgid "Nothing can move right now."
 msgstr ""
 
 #: src/downloads/pages/ActivityPage.tsx
@@ -6069,8 +8240,16 @@ msgstr ""
 msgid "Nothing is hosting on {where}. Check the port with the host, and that their room is still up."
 msgstr ""
 
+#: src/content/pages/components/ReplayAnalysisSection.tsx
+msgid "Nothing of this game has been recorded on this computer yet."
+msgstr ""
+
 #: src/content/pages/components/Convert3doDrawer.tsx
 msgid "nothing picked yet"
+msgstr ""
+
+#: src/content/pages/MatchupPage.tsx
+msgid "Nothing recorded."
 msgstr ""
 
 #: src/startbox/StartBoxPresetsPopover.tsx
@@ -6087,6 +8266,10 @@ msgstr ""
 
 #: src/content/pages/components/MissionRuntimeSection.tsx
 msgid "Nothing to merge - this game has one of each runtime folder."
+msgstr ""
+
+#: src/content/pages/components/RemixPanel.tsx
+msgid "Nothing to remix onto. This game isn't installed."
 msgstr ""
 
 #: src/deeplink/DeepLinkHandler.tsx
@@ -6139,6 +8322,12 @@ msgstr ""
 msgid "Off"
 msgstr ""
 
+#: src/content/pages/components/LivingValueChart.tsx
+#: src/content/pages/components/PlayerUnitUsage.tsx
+#: src/content/pages/components/ReplayOpeningSplit.tsx
+msgid "Offence"
+msgstr ""
+
 #: src/runlite/pages/RunPage.tsx
 msgid "Offers"
 msgstr ""
@@ -6151,6 +8340,11 @@ msgstr ""
 msgid "ok · {when} · {took}"
 msgstr ""
 
+#: src/content/pages/components/ReplayAnalysisSection.tsx
+msgid "Older tracks will be removed to stay within the {limit} limit."
+msgstr ""
+
+#: src/content/pages/ReplaysPage.tsx
 #: src/play/pages/SavegamesPage.tsx
 msgid "Oldest"
 msgstr ""
@@ -6166,6 +8360,10 @@ msgstr ""
 
 #: src/i18n/frameStrings.ts
 msgid "On a narrow window, the sidebar becomes a menu button and opens fullscreen."
+msgstr ""
+
+#: src/content/achievements.ts
+msgid "On a roll"
 msgstr ""
 
 #: src/content/mapAggregate.ts
@@ -6188,12 +8386,28 @@ msgstr ""
 msgid "On this network"
 msgstr ""
 
+#: src/content/pages/components/PlayerMatchFigures.tsx
+msgid "One game so far: {onlyValue} on {onlyDate}. A line needs at least two games."
+msgstr ""
+
+#: src/content/pages/components/CommandRateChart.tsx
+msgid "One order is one command. This is not the same count as the trailer's, so neither checks the other."
+msgstr ""
+
 #: src/content/pages/components/BuildTreeExportButton.tsx
 msgid "One self-contained file with pics inlined — larger, but drop-in."
 msgstr ""
 
+#: src/content/pages/components/MatchStatsSection.tsx
+msgid "one team"
+msgstr ""
+
 #: src/content/pages/components/MissionRuntimeSection.tsx
 msgid "Only coilbox's own files. The game's gadgets, widgets and missions stay where they are. This can't be undone."
+msgstr ""
+
+#: src/content/pages/components/RemixPanel.tsx
+msgid "Only needed to watch on a release engine."
 msgstr ""
 
 #: src/profile/health.ts
@@ -6249,6 +8463,10 @@ msgstr ""
 msgid "Open game downloads"
 msgstr ""
 
+#: src/content/pages/components/OpenInEngineButton.tsx
+msgid "Open in engine"
+msgstr ""
+
 #: src/content/pages/MapDetailPage.tsx
 msgid "Open in mapconv decompile"
 msgstr ""
@@ -6281,12 +8499,33 @@ msgstr ""
 msgid "Open the map \"{id}\"."
 msgstr ""
 
+#: src/content/pages/components/StaleRemixNotice.tsx
+msgid "Open the original replay"
+msgstr ""
+
 #: src/deeplink/actions.ts
 msgid "Open the replay \"{id}\"."
 msgstr ""
 
 #: src/deeplink/actions.ts
 msgid "Open Warpath."
+msgstr ""
+
+#: src/content/pages/ReplayDetailPage.tsx
+msgid "Opened the remixed replay — use Watch to run it."
+msgstr ""
+
+#: src/content/pages/components/ReplayMap.tsx
+msgid "opened with {opening}"
+msgstr ""
+
+#: src/content/pages/components/ReplayBaseCrops.tsx
+#: src/content/pages/components/ReplayMap.tsx
+msgid "Opened with {opening}"
+msgstr ""
+
+#: src/content/pages/components/ReplayBuildOrders.tsx
+msgid "Opening"
 msgstr ""
 
 #: src/deeplink/parse.ts
@@ -6297,8 +8536,21 @@ msgstr ""
 msgid "Opening \"{screenName}\" needs an id."
 msgstr ""
 
+#: src/content/pages/components/ReplayBuildOrders.tsx
+msgid "Opening length in minutes"
+msgstr ""
+
+#: src/content/pages/components/ReplayBuildOrders.tsx
+msgid "Opening, first {cutMinutes} min"
+msgstr ""
+
+#: src/content/pages/components/OpenInEngineButton.tsx
 #: src/content/pages/MapDetailPage.tsx
 msgid "Opening…"
+msgstr ""
+
+#: src/content/pages/components/OpenInEngineButton.tsx
+msgid "Opens the engine, paused at the moment shown."
 msgstr ""
 
 #: src/direct/roomSeed.ts
@@ -6323,7 +8575,12 @@ msgid "order"
 msgstr ""
 
 #: src/content/mapAggregate.ts
+#: src/content/pages/components/ReplayMap.tsx
 msgid "Order density"
+msgstr ""
+
+#: src/content/pages/components/ReplayMap.tsx
+msgid "Order density shows where orders were aimed, which is roughly where attention went."
 msgstr ""
 
 #: src/content/mapAggregate.ts
@@ -6338,8 +8595,50 @@ msgstr ""
 msgid "order to place an economy building"
 msgstr ""
 
+#: src/content/pages/components/ReplayBuildOrders.tsx
+msgid "Ordered cost: {metal} metal and {energy} energy."
+msgstr ""
+
 #: src/content/mapAggregate.ts
+#: src/content/pages/components/ReplayTimeWindowControl.tsx
 msgid "orders"
+msgstr ""
+
+#: src/content/commandRates.ts
+msgid "Orders a skirmish AI gave. This is an AI's rate and is not comparable with a person's."
+msgstr ""
+
+#: src/content/commandRates.ts
+msgid "Orders a widget on the player's machine sent to named units. The engine's actions per minute does not count these, and a widget can send thousands a minute."
+msgstr ""
+
+#: src/content/pages/components/ReplayMap.tsx
+msgid "Orders aimed at a unit are not on it, as the replay holds the unit and not its position."
+msgstr ""
+
+#: src/content/pages/components/ReplayTimeWindowControl.tsx
+msgid "Orders given"
+msgstr ""
+
+#: src/content/pages/components/ReplayTimeWindowControl.tsx
+msgid "Orders given and events"
+msgstr ""
+
+#. placeholder {0}: rates.periodSec
+#: src/content/pages/components/CommandRateChart.tsx
+msgid "Orders given in each {0} second stretch, shown as a rate per minute."
+msgstr ""
+
+#: src/content/pages/components/ReplayMap.tsx
+msgid "orders on the map"
+msgstr ""
+
+#: src/content/pages/components/CommandRateChart.tsx
+msgid "Orders sent by"
+msgstr ""
+
+#: src/content/commandRates.ts
+msgid "Orders the player gave through the engine's own interface, and from a widget calling Spring.GiveOrder. The engine's actions per minute counts these."
 msgstr ""
 
 #: src/content/mapAggregate.ts
@@ -6356,7 +8655,13 @@ msgstr ""
 
 #: src/content/mapAggregate.ts
 #: src/content/pages/components/ArchiveTypeBadge.tsx
+#: src/content/pages/components/PlayerUnitUsage.tsx
+#: src/content/pages/components/ReplayOpeningSplit.tsx
 msgid "Other"
+msgstr ""
+
+#: src/content/pages/components/ReplayTimeline.tsx
+msgid "Other events"
 msgstr ""
 
 #: src/content/pages/components/MapRecords.tsx
@@ -6387,8 +8692,16 @@ msgstr ""
 msgid "Output folder"
 msgstr ""
 
+#: src/content/replayMatchFigures.ts
+msgid "Over {length}"
+msgstr ""
+
 #: src/content/stats.ts
 msgid "Over 2 hours"
+msgstr ""
+
+#: src/content/pages/MatchupPage.tsx
+msgid "Overall"
 msgstr ""
 
 #: src/runlite/generate.ts
@@ -6459,8 +8772,16 @@ msgstr ""
 msgid "Paste it into chat or Discord."
 msgstr ""
 
+#: src/content/pages/components/ReplayPlaybackBar.tsx
+msgid "Pause"
+msgstr ""
+
 #: src/sound/SoundSettings.tsx
 msgid "Pause music"
+msgstr ""
+
+#: src/content/pages/components/ReplayTimeline.tsx
+msgid "Pauses"
 msgstr ""
 
 #: src/direct/hostingRoute.ts
@@ -6473,6 +8794,10 @@ msgstr ""
 
 #: src/multiplayer/index.tsx
 msgid "People whose messages coilbox hides from you."
+msgstr ""
+
+#: src/content/pages/components/MatchStatsChart.tsx
+msgid "Per minute"
 msgstr ""
 
 #: src/content/mapAggregate.ts
@@ -6504,6 +8829,10 @@ msgstr ""
 msgid "Pick a game"
 msgstr ""
 
+#: src/content/pages/components/RemixPanel.tsx
+msgid "Pick a game build"
+msgstr ""
+
 #: src/sound/MusicSource.tsx
 msgid "Pick a game to see what it ships."
 msgstr ""
@@ -6514,6 +8843,14 @@ msgstr ""
 
 #: src/play/pages/components/ParticipantsTable.tsx
 msgid "Pick an AI"
+msgstr ""
+
+#: src/content/pages/components/ReplayAnalysisSection.tsx
+msgid "Pick an engine"
+msgstr ""
+
+#: src/content/pages/MatchupPage.tsx
+msgid "Pick another player to see a matchup."
 msgstr ""
 
 #: src/packs/pages/components/ExportPackForm.tsx
@@ -6557,21 +8894,75 @@ msgstr ""
 #: src/content/pages/components/GameCard.tsx
 #: src/content/pages/components/GameHeader.tsx
 #: src/content/pages/components/LibraryMapCard.tsx
+#: src/content/pages/components/ReplayPlaybackBar.tsx
 #: src/play/index.ts
 #: src/runlite/index.ts
 #: src/scenario/index.ts
 msgid "Play"
 msgstr ""
 
+#: src/content/achievements.ts
+msgid "Play 10 games within 7 days."
+msgstr ""
+
+#: src/content/achievements.ts
+msgid "Play 10 games."
+msgstr ""
+
+#: src/content/achievements.ts
+msgid "Play 100 games."
+msgstr ""
+
+#: src/content/achievements.ts
+msgid "Play 3 different factions."
+msgstr ""
+
+#: src/content/achievements.ts
+msgid "Play 50 games."
+msgstr ""
+
+#: src/content/pages/components/ReplayPlaybackBar.tsx
+msgid "Play in reverse"
+msgstr ""
+
 #: src/sound/SoundSettings.tsx
 msgid "Play music"
+msgstr ""
+
+#: src/content/achievements.ts
+msgid "Play on 15 different maps."
+msgstr ""
+
+#: src/content/achievements.ts
+msgid "Play on 5 different maps."
+msgstr ""
+
+#: src/content/replayMapView/timelineKeys.ts
+msgid "Play or pause"
+msgstr ""
+
+#: src/content/replayMapView/timelineKeys.ts
+msgid "Play the other way"
 msgstr ""
 
 #: src/content/pages/MapDetailPage.tsx
 msgid "Play this map"
 msgstr ""
 
+#: src/content/achievements.ts
+msgid "Play your first recorded game."
+msgstr ""
+
+#: src/content/pages/components/ReplayAnalysisSection.tsx
+msgid "Playback progress"
+msgstr ""
+
+#: src/content/pages/components/ReplayPlaybackBar.tsx
+msgid "Playback speed"
+msgstr ""
+
 #: src/content/pages/components/MapRecords.tsx
+#: src/content/pages/ReplayDetailPage.tsx
 msgid "Played"
 msgstr ""
 
@@ -6591,17 +8982,51 @@ msgstr ""
 msgid "played until {playedUntil}"
 msgstr ""
 
+#: src/content/pages/components/ReplayAnalysisEvents.tsx
+#: src/content/pages/components/ReplayOpeningSplit.tsx
+#: src/content/pages/components/ReplayRoster.tsx
+#: src/content/pages/MatchupPage.tsx
+#: src/content/pages/PlayerDossierPage.tsx
+#: src/content/pages/StatsPage.tsx
 #: src/multiplayer/index.tsx
 #: src/play/pages/components/ParticipantsTable.tsx
 msgid "Player"
+msgstr ""
+
+#. placeholder {0}: dest.player
+#: src/content/pages/components/ReplayChat.tsx
+msgid "Player {0}"
+msgstr ""
+
+#: src/content/pages/components/ReplayChat.tsx
+msgid "Player {player}"
 msgstr ""
 
 #: src/content/replayBuildOrders.ts
 msgid "Player {playerNumber}"
 msgstr ""
 
+#: src/content/pages/components/ReplayMapView.tsx
+msgid "player {slot}"
+msgstr ""
+
+#: src/content/replayTimeline.ts
+msgid "Player {slot}"
+msgstr ""
+
+#: src/content/pages/PlayerDossierPage.tsx
 #: src/multiplayer/index.tsx
 msgid "Player stats"
+msgstr ""
+
+#: src/content/commandRates.ts
+msgid "Player's own"
+msgstr ""
+
+#: src/content/pages/components/MatchStatsChart.tsx
+#: src/content/pages/components/MatchStatsSection.tsx
+#: src/content/pages/components/ReplayRoster.tsx
+msgid "Players"
 msgstr ""
 
 #: src/direct/ReachablePorts.tsx
@@ -6616,16 +9041,36 @@ msgstr ""
 msgid "Players in the match"
 msgstr ""
 
+#: src/content/pages/components/ReplayPlaybackBar.tsx
+msgid "Players leaving"
+msgstr ""
+
 #: src/play/pages/components/CrashDrawer.tsx
 msgid "Playing"
+msgstr ""
+
+#: src/content/pages/components/ReplayAnalysisSection.tsx
+msgid "Playing the match back. {label}."
 msgstr ""
 
 #: src/play/pages/SkirmishPage.tsx
 msgid "Playing with \"{projectName}\""
 msgstr ""
 
+#: src/content/pages/ReplaysPage.tsx
+msgid "Plays original game"
+msgstr ""
+
 #: src/content/pages/components/MapExportButtons.tsx
 msgid "PNG image"
+msgstr ""
+
+#: src/content/pages/components/ReplayMapView.tsx
+msgid "Point at a unit to name it. Click one to keep it named, and click the ground to let it go."
+msgstr ""
+
+#: src/content/pages/components/ReplayChat.tsx
+msgid "Point at or focus a mark to read it. Select a chat mark to open the chat log at that line."
 msgstr ""
 
 #: src/direct/JoinRoomForm.tsx
@@ -6654,6 +9099,11 @@ msgstr ""
 
 #: src/downloads/pages/components/RapidBrowser.tsx
 msgid "pr-downloader sidecar unavailable"
+msgstr ""
+
+#: src/content/pages/components/ReplayChat.tsx
+#: src/content/pages/components/ReplayTimeline.tsx
+msgid "Pre-game"
 msgstr ""
 
 #: src/downloads/pages/components/EngineInstaller.tsx
@@ -6755,7 +9205,16 @@ msgstr ""
 msgid "Queued ({count}) · {total} + {unknown} of unknown size"
 msgstr ""
 
+#: src/content/pages/components/ReplayAnalysisSection.tsx
+msgid "Queued. It is next."
+msgstr ""
+
+#: src/content/pages/components/ReplayAnalysisSection.tsx
+msgid "Queued. It starts when the game you are playing ends."
+msgstr ""
+
 #: src/content/pages/components/SuggestionsList.tsx
+#: src/content/pages/ReplayDetailPage.tsx
 msgid "Queued…"
 msgstr ""
 
@@ -6806,6 +9265,10 @@ msgstr ""
 msgid "Rapid repositories"
 msgstr ""
 
+#: src/content/pages/components/ReplayRoster.tsx
+msgid "Rating"
+msgstr ""
+
 #: src/profile/SettingsSection.tsx
 msgid "Re-run validation"
 msgstr ""
@@ -6818,13 +9281,40 @@ msgstr ""
 msgid "Reading"
 msgstr ""
 
+#: src/content/pages/components/PlayerUnitUsage.tsx
+msgid "Reading {gameCount}."
+msgstr ""
+
 #: src/content/pages/components/UnitHero.tsx
 #: src/content/pages/components/UnitModelPanel.tsx
 msgid "Reading <0>{object}</0> out of {gameArchive}."
 msgstr ""
 
+#: src/content/pages/components/ReplayBuildOrders.tsx
+#: src/content/pages/components/ReplayMap.tsx
+msgid "Reading build orders…"
+msgstr ""
+
+#: src/content/pages/components/ReplayChat.tsx
+msgid "Reading chat…"
+msgstr ""
+
 #: src/direct/room.ts
 msgid "Reading content…"
+msgstr ""
+
+#: src/content/pages/components/LivingValueChart.tsx
+msgid "Reading events and unit definitions…"
+msgstr ""
+
+#: src/content/pages/components/ReplayAnalysisEvents.tsx
+#: src/content/pages/components/ReplayEventLayers.tsx
+msgid "Reading events…"
+msgstr ""
+
+#: src/content/pages/components/CommandRateChart.tsx
+#: src/content/pages/components/ReplayMap.tsx
+msgid "Reading orders…"
 msgstr ""
 
 #: src/play/pages/components/NewPresetFromReplayButton.tsx
@@ -6860,12 +9350,27 @@ msgstr ""
 msgid "Reading the rapid index…"
 msgstr ""
 
+#: src/content/pages/components/ReplayMapView.tsx
+msgid "Reading the recorded track."
+msgstr ""
+
 #: src/content/pages/GameDetailPage.tsx
 msgid "Reading this game's options…"
 msgstr ""
 
+#: src/content/pages/components/MatchStatsSection.tsx
+msgid "Reading this replay's statistics…"
+msgstr ""
+
 #: src/content/pages/components/MapAggregate.tsx
 msgid "Reading unit definitions…"
+msgstr ""
+
+#: src/content/pages/components/ReplayAnalysisEvents.tsx
+#: src/content/pages/components/ReplayBuildOrders.tsx
+#: src/content/pages/components/ReplayEventLayers.tsx
+#: src/content/pages/components/ReplayMap.tsx
+msgid "Reading unit names…"
 msgstr ""
 
 #: src/play/pages/components/GamePickerGrid.tsx
@@ -6892,6 +9397,55 @@ msgstr ""
 msgid "Reconnect all"
 msgstr ""
 
+#: src/content/pages/components/ReplayAnalysisSection.tsx
+msgid "Record this replay"
+msgstr ""
+
+#: src/content/pages/components/WatchWithRewindButton.tsx
+msgid "Record this replay in the analysis and recording section, which can use another engine."
+msgstr ""
+
+#: src/content/pages/components/WatchWithRewindButton.tsx
+msgid "Record this replay, then watch it with rewind?"
+msgstr ""
+
+#: src/content/pages/components/ReplayAnalysisEvents.tsx
+msgid "Recorded events"
+msgstr ""
+
+#: src/content/pages/components/ReplayAnalysisSection.tsx
+msgid "Recorded for rewind. The track takes {size}."
+msgstr ""
+
+#: src/content/pages/components/ReplayMapView.tsx
+msgid "Recorded match"
+msgstr ""
+
+#: src/content/pages/ReplayDetailPage.tsx
+msgid "Recorded on {engineVersion}. A replay only plays on that version."
+msgstr ""
+
+#: src/content/pages/ReplayDetailPage.tsx
+msgid "Recorded on {recordedOn}. Watching with {watchingWith} — may not sync."
+msgstr ""
+
+#: src/content/pages/ReplayDetailPage.tsx
+#: src/content/pages/ReplaysPage.tsx
+msgid "Recording did not finish"
+msgstr ""
+
+#: src/content/pages/components/WatchWithRewindButton.tsx
+msgid "Recording finished. A game is running, so the engine did not open."
+msgstr ""
+
+#: src/content/pages/components/WatchWithRewindButton.tsx
+msgid "Recording is turned off in this distribution."
+msgstr ""
+
+#: src/content/pages/components/WatchWithRewindButton.tsx
+msgid "Recording this replay. The engine opens when it finishes."
+msgstr ""
+
 #: src/recordsGroup.ts
 msgid "Records"
 msgstr ""
@@ -6915,6 +9469,23 @@ msgstr ""
 #: src/content/index.ts
 #: src/workshop/index.ts
 msgid "Reference"
+msgstr ""
+
+#: src/content/pages/PlayerDossierPage.tsx
+#: src/content/pages/ReplaysPage.tsx
+msgid "Refight"
+msgstr ""
+
+#: src/content/pages/components/RefightPanel.tsx
+msgid "Refight now"
+msgstr ""
+
+#: src/content/pages/components/RefightPanel.tsx
+msgid "Refight this setup"
+msgstr ""
+
+#: src/content/pages/components/RefightPanel.tsx
+msgid "Refight: {mapName}"
 msgstr ""
 
 #: src/downloads/pages/components/EngineInstaller.tsx
@@ -6997,6 +9568,29 @@ msgstr ""
 msgid "Rematch: {rematchMapName}"
 msgstr ""
 
+#: src/content/pages/components/RemixPanel.tsx
+#: src/content/pages/PlayerDossierPage.tsx
+#: src/content/pages/ReplayDetailPage.tsx
+#: src/content/pages/ReplaysPage.tsx
+msgid "Remix"
+msgstr ""
+
+#: src/content/pages/ReplayDetailPage.tsx
+msgid "Remix created"
+msgstr ""
+
+#: src/content/pages/components/RemixPanel.tsx
+msgid "Remix this replay"
+msgstr ""
+
+#: src/content/pages/ReplaysPage.tsx
+msgid "Remixed"
+msgstr ""
+
+#: src/content/pages/ReplayDetailPage.tsx
+msgid "Remixed from"
+msgstr ""
+
 #: src/content/pages/components/CompatMode.tsx
 #: src/content/pages/components/MissionRuntimeSection.tsx
 msgid "Remove"
@@ -7018,12 +9612,20 @@ msgstr ""
 msgid "Remove from queue"
 msgstr ""
 
+#: src/content/pages/ReplayDetailPage.tsx
+msgid "Remove tag {tag}"
+msgstr ""
+
 #: src/content/compatReport.ts
 msgid "removed"
 msgstr ""
 
 #: src/content/pages/components/MissionRuntimeSection.tsx
 msgid "Removed {missionName} from the game."
+msgstr ""
+
+#: src/content/pages/components/ReplayStartUnitLayer.tsx
+msgid "removed by the game"
 msgstr ""
 
 #: src/content/compatReport.ts
@@ -7096,10 +9698,26 @@ msgstr ""
 msgid "Replay analysis is turned off in this distribution."
 msgstr ""
 
+#: src/content/pages/ReplayDetailPage.tsx
+msgid "Replay deleted"
+msgstr ""
+
+#: src/content/pages/ReplaysPage.tsx
+msgid "Replay map"
+msgstr ""
+
 #: src/content/mapImage.ts
 msgid "replay set {replaySet}"
 msgstr ""
 
+#: src/content/pages/ReplaysPage.tsx
+msgid "replays"
+msgstr ""
+
+#: src/content/pages/PlayerDossierPage.tsx
+#: src/content/pages/ReplayDetailPage.tsx
+#: src/content/pages/ReplaysPage.tsx
+#: src/content/pages/StatsPage.tsx
 #: src/play/index.ts
 msgid "Replays"
 msgstr ""
@@ -7153,6 +9771,10 @@ msgstr ""
 msgid "Reset to default"
 msgstr ""
 
+#: src/content/pages/components/ReplayTimeline.tsx
+msgid "Resigned"
+msgstr ""
+
 #: src/i18n/frameStrings.ts
 msgid "Resize sidebar"
 msgstr ""
@@ -7192,6 +9814,9 @@ msgid "Restricted battle — {summary}"
 msgstr ""
 
 #: src/content/pages/components/MapRecords.tsx
+#: src/content/pages/components/MatchStatsSection.tsx
+#: src/content/pages/components/ReplayRoster.tsx
+#: src/content/pages/ReplayDetailPage.tsx
 msgid "Result"
 msgstr ""
 
@@ -7248,6 +9873,14 @@ msgstr ""
 msgid "Reward"
 msgstr ""
 
+#: src/content/pages/components/RemixPanel.tsx
+msgid "Rewrite"
+msgstr ""
+
+#: src/content/pages/components/RemixPanel.tsx
+msgid "Rewriting…"
+msgstr ""
+
 #: src/direct/room.ts
 msgid "Room at {host}"
 msgstr ""
@@ -7280,6 +9913,10 @@ msgstr ""
 msgid "Run"
 msgstr ""
 
+#: src/content/pages/components/ReplayAnalysisSection.tsx
+msgid "Run {at} with {game} on engine {engine}, in {took}."
+msgstr ""
+
 #: src/general/pages/SettingsSection.tsx
 msgid "Run Coilbox in fullscreen. Also toggleable with F11 or the top-bar button; the choice is remembered across restarts."
 msgstr ""
@@ -7294,6 +9931,10 @@ msgstr ""
 
 #: src/profile/HealthChecklist.tsx
 msgid "Running checks…"
+msgstr ""
+
+#: src/content/pages/components/ReplayAnalysisSection.tsx
+msgid "Running for {elapsed}. You can leave this page."
 msgstr ""
 
 #: src/lego/index.ts
@@ -7335,6 +9976,7 @@ msgstr ""
 msgid "Salvage: {salvage} · cheapest {cheapest} salvage"
 msgstr ""
 
+#: src/content/pages/components/ReplaySetsManager.tsx
 #: src/play/pages/components/NewPresetFromReplayButton.tsx
 #: src/play/pages/components/SaveAsPresetButton.tsx
 msgid "Save"
@@ -7435,6 +10077,7 @@ msgstr ""
 msgid "Scanned {scanRootCount} content folder(s): {scanRootPaths}."
 msgstr ""
 
+#: src/content/pages/components/RemixPanel.tsx
 #: src/runlite/pages/RunListPage.tsx
 msgid "Scanning installed games…"
 msgstr ""
@@ -7469,6 +10112,7 @@ msgid "Schematic"
 msgstr ""
 
 #: src/content/pages/components/MapAggregate.tsx
+#: src/content/pages/StatsPage.tsx
 msgid "Scope to a set"
 msgstr ""
 
@@ -7525,6 +10169,10 @@ msgstr ""
 msgid "Search units…"
 msgstr ""
 
+#: src/content/achievements.ts
+msgid "Seasoned"
+msgstr ""
+
 #: src/play/pages/components/GameOptionsPanel.tsx
 msgid "section"
 msgstr ""
@@ -7539,6 +10187,10 @@ msgstr ""
 
 #: src/play/pages/components/ParticipantsTable.tsx
 msgid "See that game"
+msgstr ""
+
+#: src/content/pages/PlayerDossierPage.tsx
+msgid "See the matchup by map, faction and game length"
 msgstr ""
 
 #: src/direct/HostRoomForm.tsx
@@ -7565,8 +10217,20 @@ msgstr ""
 msgid "Select an engine"
 msgstr ""
 
+#: src/content/pages/components/PlayerPicker.tsx
+msgid "Select player"
+msgstr ""
+
 #: src/notify/NotificationsSettings.tsx
 msgid "Send test notification"
+msgstr ""
+
+#: src/content/pages/components/PlayerUnitUsage.tsx
+msgid "Sensor"
+msgstr ""
+
+#: src/content/pages/components/ReplayChat.tsx
+msgid "Server"
 msgstr ""
 
 #: src/multiplayer/index.tsx
@@ -7575,6 +10239,10 @@ msgstr ""
 
 #: src/play/pages/components/ParticipantsTable.tsx
 msgid "Set"
+msgstr ""
+
+#: src/content/pages/ReplayDetailPage.tsx
+msgid "Set a download folder in <0>Content folders settings</0> first."
 msgstr ""
 
 #: src/content/pages/components/SuggestionsList.tsx
@@ -7601,6 +10269,10 @@ msgstr ""
 msgid "Set all"
 msgstr ""
 
+#: src/content/pages/components/ReplaySetsManager.tsx
+msgid "Set name"
+msgstr ""
+
 #: src/play/pages/SkirmishPage.tsx
 msgid "Set up this battle for hosting"
 msgstr ""
@@ -7614,8 +10286,31 @@ msgstr ""
 msgid "Set up this preset"
 msgstr ""
 
+#: src/content/pages/ReplaysPage.tsx
+msgid "Set: {activeSetName}"
+msgstr ""
+
+#: src/content/pages/ReplaysPage.tsx
+msgid "Set: {activeSetName} ({missingCount} not in library)"
+msgstr ""
+
 #: src/content/pages/components/MapAggregate.tsx
+#: src/content/pages/StatsPage.tsx
 msgid "Set: {setName}"
+msgstr ""
+
+#: src/content/pages/components/ReplaySetPicker.tsx
+#: src/content/pages/components/ReplaySetsManager.tsx
+#: src/content/pages/ReplayDetailPage.tsx
+msgid "Sets"
+msgstr ""
+
+#: src/content/pages/components/ReplaySetsManager.tsx
+msgid "Sets ({setCount})"
+msgstr ""
+
+#: src/content/pages/components/ReplaySetPicker.tsx
+msgid "Sets for this replay"
 msgstr ""
 
 #: src/general/index.ts
@@ -7627,8 +10322,16 @@ msgstr ""
 msgid "Setup pack imported"
 msgstr ""
 
+#: src/content/pages/components/ReplayTimeWindowControl.tsx
+msgid "Shaded: {activityLabel}"
+msgstr ""
+
 #: src/content/index.ts
 msgid "Shadows, water, particles and anti-aliasing."
+msgstr ""
+
+#: src/content/pages/components/ReplayEventLayers.tsx
+msgid "Shapes and the choice of buildings"
 msgstr ""
 
 #: src/direct/ShareRoomButton.tsx
@@ -7655,18 +10358,68 @@ msgstr ""
 msgid "Shares a team with {leaderName} — team settings come from the first member"
 msgstr ""
 
+#: src/content/pages/ReplaysPage.tsx
+msgid "Short replays"
+msgstr ""
+
 #: src/content/pages/components/MapRecords.tsx
+#: src/content/pages/ReplaysPage.tsx
 msgid "Shortest"
 msgstr ""
 
+#: src/content/pages/components/ReplaySetsManager.tsx
 #: src/content/pages/GamesPage.tsx
 #: src/content/pages/MapsPage.tsx
 #: src/downloads/pages/ActivityPage.tsx
 msgid "Show"
 msgstr ""
 
+#: src/content/pages/components/ReplayRoster.tsx
+msgid "Show {label} on the chart"
+msgstr ""
+
+#: src/content/pages/components/ReplayBuildOrders.tsx
+msgid "Show {moreCount} more of {entryCount} entries"
+msgstr ""
+
+#: src/content/pages/components/ReplayAnalysisEvents.tsx
+msgid "Show {moreCount} more of {matchingCount}"
+msgstr ""
+
+#: src/content/pages/components/ReplayBuildOrders.tsx
+msgid "Show {moreCount} more of {orderCount}"
+msgstr ""
+
 #: src/notify/NotificationsSettings.tsx
 msgid "Show a native notification when the app is in the background."
+msgstr ""
+
+#: src/content/pages/components/MatchStatsChart.tsx
+msgid "Show all"
+msgstr ""
+
+#: src/content/pages/components/ReplayRoster.tsx
+msgid "Show all of {sideName} on the chart"
+msgstr ""
+
+#: src/content/pages/ReplaysPage.tsx
+msgid "Show and sort the figures for {primary} alone instead of the whole match"
+msgstr ""
+
+#: src/content/pages/components/ReplayBuildOrders.tsx
+msgid "Show build orders"
+msgstr ""
+
+#: src/content/pages/components/ReplayChat.tsx
+msgid "Show chat log"
+msgstr ""
+
+#: src/content/pages/components/CommandRateChart.tsx
+msgid "Show commands per minute"
+msgstr ""
+
+#: src/content/pages/ReplaysPage.tsx
+msgid "Show every replay again"
 msgstr ""
 
 #: src/general/pages/SettingsSection.tsx
@@ -7689,8 +10442,16 @@ msgstr ""
 msgid "Show more ({remaining} remaining)"
 msgstr ""
 
+#: src/content/pages/components/ReplayRoster.tsx
+msgid "Show on the chart"
+msgstr ""
+
 #: src/i18n/frameStrings.ts
 msgid "Show only the current page; reveal the full path on hover."
+msgstr ""
+
+#: src/content/pages/ReplaysPage.tsx
+msgid "Show replays under a minute long"
 msgstr ""
 
 #: src/i18n/frameStrings.ts
@@ -7709,16 +10470,41 @@ msgstr ""
 msgid "Show updates"
 msgstr ""
 
+#: src/content/pages/components/LivingValueChart.tsx
+msgid "Show value of living units by kind"
+msgstr ""
+
+#: src/content/pages/components/ReplaySetsManager.tsx
+msgid "Showing"
+msgstr ""
+
+#: src/content/pages/components/ReplayBaseCrops.tsx
+msgid "Showing orders given across the whole match."
+msgstr ""
+
+#: src/content/pages/components/ReplayBaseCrops.tsx
+msgid "Showing orders given from {from} to {to}."
+msgstr ""
+
 #: src/profile/SettingsSection.tsx
 msgid "Shown"
+msgstr ""
+
+#: src/content/pages/components/MatchStatsChart.tsx
+msgid "Shown as"
 msgstr ""
 
 #: src/general/pages/SettingsSection.tsx
 msgid "Shows how many frames a second each 3D view draws, in its bottom right corner."
 msgstr ""
 
+#: src/content/pages/components/ReplayRoster.tsx
 #: src/content/pages/components/useUnitRenders.ts
 msgid "Side"
+msgstr ""
+
+#: src/content/pages/components/ReplayBaseCrops.tsx
+msgid "Side not described"
 msgstr ""
 
 #: src/i18n/frameStrings.ts
@@ -7727,6 +10513,10 @@ msgstr ""
 
 #: src/content/pages/GameDetailPage.tsx
 msgid "Sides"
+msgstr ""
+
+#: src/content/pages/components/ReplayRoster.tsx
+msgid "Sides on the chart"
 msgstr ""
 
 #: src/content/pages/components/UnitStatsTable.tsx
@@ -7773,6 +10563,11 @@ msgstr ""
 msgid "Skeletor S3O"
 msgstr ""
 
+#: src/content/pages/ReplaysPage.tsx
+msgid "Skill"
+msgstr ""
+
+#: src/content/pages/ReplaysPage.tsx
 #: src/play/PlayProvider.tsx
 msgid "Skirmish"
 msgstr ""
@@ -7789,6 +10584,10 @@ msgstr ""
 msgid "Slate"
 msgstr ""
 
+#: src/content/replayMapView/timelineKeys.ts
+msgid "Slower"
+msgstr ""
+
 #: src/content/mapCompatReport.ts
 msgid "SM3 map, not supported since Spring 95.0"
 msgstr ""
@@ -7798,6 +10597,7 @@ msgid "Small sounds as Coilbox gets on with things."
 msgstr ""
 
 #: src/content/libraryMaps.ts
+#: src/content/pages/ReplaysPage.tsx
 msgid "Smallest"
 msgstr ""
 
@@ -7807,6 +10607,10 @@ msgstr ""
 
 #: src/downloads/pages/components/RapidBrowser.tsx
 msgid "Snapshot"
+msgstr ""
+
+#: src/content/pages/components/GatherReplaysButton.tsx
+msgid "Some engines record into their own folder, so deleting that engine deletes those replays. This moves them into the demos folder alongside the rest."
 msgstr ""
 
 #: src/sound/events.ts
@@ -7862,6 +10666,14 @@ msgstr ""
 msgid "Spectate"
 msgstr ""
 
+#: src/content/pages/components/ReplayTimeline.tsx
+msgid "Spectators"
+msgstr ""
+
+#: src/content/pages/components/ReplayRoster.tsx
+msgid "Spectators: {spectatorNames}"
+msgstr ""
+
 #: src/content/pages/components/UnitStatsTable.tsx
 msgid "Speed"
 msgstr ""
@@ -7914,6 +10726,10 @@ msgstr ""
 msgid "Star twinkle, nebulae and other decorative touches. Turn off for a plainer interface. Sound is controlled separately, in Sound settings."
 msgstr ""
 
+#: src/content/pages/components/ReplayAnalysisSection.tsx
+msgid "Start"
+msgstr ""
+
 #: src/content/pages/components/StartModeActions.tsx
 msgid "Start a conquest"
 msgstr ""
@@ -7934,8 +10750,17 @@ msgstr ""
 msgid "Start a warpath run"
 msgstr ""
 
+#: src/content/pages/components/ReplayMap.tsx
 #: src/startbox/StartBoxControls.tsx
 msgid "Start boxes"
+msgstr ""
+
+#: src/content/pages/components/ReplayMap.tsx
+msgid "Start boxes come from the match setup."
+msgstr ""
+
+#: src/content/pages/components/ReplayMap.tsx
+msgid "Start boxes per team."
 msgstr ""
 
 #: src/profile/start.ts
@@ -7983,7 +10808,12 @@ msgstr ""
 msgid "Start position {position} (unclaimed)"
 msgstr ""
 
+#: src/content/pages/components/ReplayMap.tsx
+msgid "Start position of {says}"
+msgstr ""
+
 #: src/content/pages/components/MapRecords.tsx
+#: src/content/pages/components/ReplayMap.tsx
 #: src/play/presetParts.ts
 #: src/startbox/StartPosCard.tsx
 msgid "Start positions"
@@ -8029,6 +10859,18 @@ msgstr ""
 msgid "Starting the engine"
 msgstr ""
 
+#: src/content/pages/components/ReplayMap.tsx
+msgid "Starting unit deaths"
+msgstr ""
+
+#: src/content/pages/components/ReplayMap.tsx
+msgid "Starting unit paths"
+msgstr ""
+
+#: src/content/useReplayEventLayers.ts
+msgid "starting units lost"
+msgstr ""
+
 #: src/direct/room.ts
 #: src/downloads/DownloadQueueBadge.tsx
 #: src/downloads/pages/components/ProgressBar.tsx
@@ -8043,8 +10885,16 @@ msgstr ""
 msgid "State"
 msgstr ""
 
+#: src/content/pages/StatsPage.tsx
+msgid "Stats"
+msgstr ""
+
 #: src/play/pages/components/GameChoiceOffer.tsx
 msgid "Stay on {currentName}"
+msgstr ""
+
+#: src/content/pages/components/GatherReplaysButton.tsx
+msgid "Staying where they are:"
 msgstr ""
 
 #: src/content/pages/GameDetailPage.tsx
@@ -8083,6 +10933,14 @@ msgstr ""
 msgid "Strained"
 msgstr ""
 
+#: src/content/pages/StatsPage.tsx
+msgid "Streak"
+msgstr ""
+
+#: src/content/pages/components/AchievementsSection.tsx
+msgid "Streaks"
+msgstr ""
+
 #: src/runlite/generate.ts
 msgid "Strip it for salvage"
 msgstr ""
@@ -8103,10 +10961,15 @@ msgstr ""
 msgid "Swap the two allies' boxes"
 msgstr ""
 
+#: src/content/pages/components/ReplayTimeline.tsx
 #: src/general/pages/SettingsSection.tsx
 #: src/i18n/frameStrings.ts
 #: src/play/pages/EngineLogSection.tsx
 msgid "System"
+msgstr ""
+
+#: src/content/pages/components/MatchStatsChart.tsx
+msgid "Table"
 msgstr ""
 
 #: src/runlite/pages/components/NodeOverlays.tsx
@@ -8130,6 +10993,10 @@ msgstr ""
 msgid "Taken is the number of starts at the place. The result column counts only those in a match with a recorded result. Positions you give one name are one row, counted together."
 msgstr ""
 
+#: src/content/pages/components/ReplayAnalysisSection.tsx
+msgid "Takes {onDisk} on disk."
+msgstr ""
+
 #: src/i18n/frameStrings.ts
 msgid "Teal"
 msgstr ""
@@ -8149,6 +11016,10 @@ msgstr ""
 
 #: src/content/pages/components/MapRecords.tsx
 msgid "Team 1 is the team with the lower number in the match, so the team record does not say which slot or which side of the map is stronger."
+msgstr ""
+
+#: src/content/pages/components/MatchStatsChart.tsx
+msgid "Teams"
 msgstr ""
 
 #: src/play/presetParts.ts
@@ -8262,8 +11133,45 @@ msgstr ""
 msgid "the \"{kind}\" zone"
 msgstr ""
 
+#: src/content/pages/components/LivingValueChart.tsx
+msgid "The {resourceName} cost of each line's finished, living units every {periodSec} seconds, stacked by what each unit is for. A unit counts from the moment it is finished until it is destroyed, and moves with it when it is given away or captured. A unit still being built counts nothing. Costs and kinds come from the installed game's unit definitions, and every panel has the same scale. Metal and energy are never added together."
+msgstr ""
+
+#: src/content/pages/components/ReplayEventLayers.tsx
+msgid "The analysis adds damage up as the match plays and keeps totals for each {seconds} seconds and each square of the map's grid, not a line for each hit. So the time window keeps or drops whole stretches of {seconds} seconds, by when each begins."
+msgstr ""
+
+#: src/content/pages/components/ReplayAnalysisSection.tsx
+msgid "the analysis and recording"
+msgstr ""
+
+#: src/content/pages/components/ReplayAnalysisSection.tsx
+msgid "The analysis and recording could not be run."
+msgstr ""
+
+#: src/content/pages/components/ReplayAnalysisSection.tsx
+msgid "The analysis will use engine {chosenLabel} instead."
+msgstr ""
+
+#: src/content/pages/components/PlayerMatchFigures.tsx
+msgid "The average is the mean of each game's own ratio, with the median beside it. A game with very little in the lower figure can pull the mean up."
+msgstr ""
+
 #: src/packs/pages/components/ImportPackForm.tsx
 msgid "The blueprints were not all saved: {reason}"
+msgstr ""
+
+#: src/content/pages/components/ReplayBuildOrders.tsx
+#: src/content/pages/components/ReplayMap.tsx
+msgid "The build orders could not be read from this replay."
+msgstr ""
+
+#: src/content/pages/components/ReplayChat.tsx
+msgid "The chat could not be read from this replay."
+msgstr ""
+
+#: src/content/pages/components/ReplayChat.tsx
+msgid "the chat log"
 msgstr ""
 
 #: src/i18n/uiError.ts
@@ -8282,16 +11190,32 @@ msgstr ""
 msgid "The content scan failed: {reason}"
 msgstr ""
 
+#: src/content/pages/components/ReplayOpeningSplit.tsx
+msgid "The cost table is the cost of what was ordered, not of what was built. Other is builders, factories, sensors and transports. Unclassified is units whose definition does not say what they are for, which includes anything whose income the game sets outside the unit definition."
+msgstr ""
+
 #: src/content/useMapAggregate.ts
 msgid "the counts are not on this map's grid"
+msgstr ""
+
+#: src/content/pages/components/ReplayEventLayers.tsx
+msgid "The damage was recorded on a map of another size than the one installed, so it cannot be placed."
 msgstr ""
 
 #: src/i18n/uiError.ts
 msgid "The download failed part way through."
 msgstr ""
 
+#: src/content/pages/components/ReplayAnalysisSection.tsx
+msgid "The earlier track was kept."
+msgstr ""
+
 #: src/home/continue.ts
 msgid "the engine"
+msgstr ""
+
+#: src/content/pages/components/ReplayAnalysisSection.tsx
+msgid "The engine and the game the replay used must be installed. The result is kept, so this happens once."
 msgstr ""
 
 #: src/play/PlayProvider.tsx
@@ -8310,6 +11234,18 @@ msgstr ""
 msgid "The engine exited normally."
 msgstr ""
 
+#: src/content/pages/components/ReplayAnalysisSection.tsx
+msgid "The engine has written nothing yet."
+msgstr ""
+
+#: src/content/pages/ReplayDetailPage.tsx
+msgid "the engine in a folder named {folderEngineVersion}, which has not had its version checked yet"
+msgstr ""
+
+#: src/content/pages/components/ReplayAnalysisSection.tsx
+msgid "The engine stopped before the match ended."
+msgstr ""
+
 #: src/play/crash.ts
 msgid "The engine stopped with an error. It exited with code {exitCode}."
 msgstr ""
@@ -8318,12 +11254,37 @@ msgstr ""
 msgid "The engine versions you have, and getting more."
 msgstr ""
 
+#: src/content/pages/components/ClearUnfinishedButton.tsx
+msgid "The engine writes a replay only when its game ends, so a game running right now has an empty file like this too. Deleting that file loses the replay."
+msgstr ""
+
 #: src/play/pages/components/CrashDrawer.tsx
 msgid "The engine wrote no log for this run, so it stopped before it got that far. The newest log on disk is from an earlier session, and would tell you nothing about this."
 msgstr ""
 
+#: src/content/pages/components/MatchStatsSection.tsx
+msgid "The engine wrote none for it. Either the recording was abandoned, or the match ended without its statistics ever being written."
+msgstr ""
+
+#: src/content/pages/components/LivingValueChart.tsx
+#: src/content/pages/components/ReplayEventLayers.tsx
+msgid "The events could not be read from this replay's analysis."
+msgstr ""
+
+#: src/content/pages/components/ReplayAnalysisEvents.tsx
+msgid "The events could not be read."
+msgstr ""
+
 #: src/downloads/failureReason.ts
 msgid "the file"
+msgstr ""
+
+#: src/content/pages/ReplaysPage.tsx
+msgid "The file is empty. The game that was recording it did not finish, or is still running."
+msgstr ""
+
+#: src/content/pages/ReplayDetailPage.tsx
+msgid "The file is permanently removed from your demos folder — this can't be undone. If this replay has been analysed, its stored analysis is deleted with it."
 msgstr ""
 
 #: src/downloads/installArchive.ts
@@ -8336,6 +11297,10 @@ msgstr ""
 
 #: src/sound/events.ts
 msgid "The founder of the battle you are in goes in game."
+msgstr ""
+
+#: src/content/pages/components/ReplayAnalysisSection.tsx
+msgid "The frame shown is where the playback had got to when a unit was last made or lost, so it can stand still for a while."
 msgstr ""
 
 #: src/i18n/uiError.ts
@@ -8354,12 +11319,24 @@ msgstr ""
 msgid "The game is not installed."
 msgstr ""
 
+#: src/content/pages/components/StaleRemixNotice.tsx
+msgid "the game it was recorded with"
+msgstr ""
+
 #: src/content/replayAnalysis.ts
 msgid "The game over"
 msgstr ""
 
 #: src/play/pages/components/CrashDrawer.tsx
 msgid "The game stopped unexpectedly"
+msgstr ""
+
+#: src/content/pages/components/ReplayAnalysisSection.tsx
+msgid "The game this replay was recorded on, {recordedGame}, is not installed. The analysis will use {gameUsed}, another version of it."
+msgstr ""
+
+#: src/content/pages/components/ReplayAnalysisSection.tsx
+msgid "The game version used is the highest numbered one installed, and coilbox cannot tell whether it is the nearest."
 msgstr ""
 
 #: src/play/crash.ts
@@ -8442,12 +11419,24 @@ msgstr ""
 msgid "The hub stopped answering part way through."
 msgstr ""
 
+#: src/content/pages/components/UnitListNotes.tsx
+msgid "The installed game is read with the match's own mod options, teams and AIs, because a game's unit list can change with them. With the right list, a placed order names a building and a factory order names a unit that moves. A list can still be the wrong one, for a build that is not the match's or a unit that a map adds, and then some orders do not fit."
+msgstr ""
+
 #: src/deeplink/DeepLinkHandler.tsx
 msgid "The join form opens filled in. Nothing connects until you press Join in it."
 msgstr ""
 
+#: src/content/pages/components/ReplayMapView.tsx
+msgid "The keys work while focus is in the map or the timeline."
+msgstr ""
+
 #: src/runlite/RunMapView.tsx
 msgid "The land of this map could not be built. {landError}"
+msgstr ""
+
+#: src/content/pages/components/WatchWithRewindButton.tsx
+msgid "The last recording failed. Try again, then watch it with rewind?"
 msgstr ""
 
 #: src/content/replayAnalysis.ts
@@ -8460,6 +11449,10 @@ msgstr ""
 
 #: src/i18n/uiError.ts
 msgid "the login did not finish within {seconds}s"
+msgstr ""
+
+#: src/content/pages/components/ReplayMap.tsx
+msgid "the map"
 msgstr ""
 
 #: src/mapconv/index.ts
@@ -8484,6 +11477,14 @@ msgstr ""
 
 #: src/content/replayAnalysis.ts
 msgid "The map is not installed."
+msgstr ""
+
+#: src/content/pages/components/ReplayAnalysisSection.tsx
+msgid "The match is {duration} long, and playback runs faster than the match did."
+msgstr ""
+
+#: src/content/pages/MatchupPage.tsx
+msgid "the matchup"
 msgstr ""
 
 #: src/content/mapImage.ts
@@ -8519,6 +11520,15 @@ msgstr ""
 msgid "The one match of two teams has no recorded result, so neither team has a record."
 msgstr ""
 
+#: src/content/pages/components/CommandRateChart.tsx
+#: src/content/pages/components/ReplayMap.tsx
+msgid "The orders could not be read from this replay."
+msgstr ""
+
+#: src/content/pages/components/StaleRemixNotice.tsx
+msgid "The original replay is not in your library, so it cannot be made again."
+msgstr ""
+
 #: src/content/pages/components/MapRecords.tsx
 msgid "The other maps are counted under the same filters. Nothing here tests whether a difference in length is more than chance, and with few matches on either row it may be."
 msgstr ""
@@ -8535,16 +11545,88 @@ msgstr ""
 msgid "the pixels did not reach the worker intact."
 msgstr ""
 
+#: src/content/replayEventLayers.ts
+msgid "The playback did not reproduce the recorded match, so what it recorded was thrown away and there is nothing to draw."
+msgstr ""
+
+#: src/content/pages/components/ReplayAnalysisSection.tsx
+msgid "The playback did not reproduce the recorded match, so what it recorded was thrown away."
+msgstr ""
+
+#: src/content/pages/components/WatchWithRewindButton.tsx
+msgid "The playback did not reproduce this match when it was recorded, so there is no track to rewind."
+msgstr ""
+
 #: src/content/replayAnalysis.ts
 msgid "The playback still matched the recorded match exactly, so the events are kept."
+msgstr ""
+
+#: src/content/pages/components/ReplayAnalysisSection.tsx
+msgid "The playback took too long and was stopped."
+msgstr ""
+
+#: src/content/pages/components/ReplayRoster.tsx
+msgid "the players"
 msgstr ""
 
 #: src/profile/health.ts
 msgid "The profile's `icon` was not applied"
 msgstr ""
 
+#: src/content/pages/components/ReplayAnalysisSection.tsx
+msgid "The recorded events are deleted. The replay is not touched, and it can be analysed again."
+msgstr ""
+
+#: src/content/pages/components/ReplayMapView.tsx
+msgid "the recorded match"
+msgstr ""
+
+#: src/content/pages/components/ReplayMapView.tsx
+msgid "The recorded track could not be read. {reason}."
+msgstr ""
+
+#: src/content/pages/components/ReplayMapView.tsx
+msgid "The recorded track could not be read. It has no window {windowIndex}."
+msgstr ""
+
+#: src/content/pages/components/ReplayMapView.tsx
+msgid "The recorded track does not say how large the map is, so it is not shown."
+msgstr ""
+
+#: src/content/pages/components/ReplayMapView.tsx
+msgid "The recorded track is no longer on this computer."
+msgstr ""
+
+#: src/content/pages/components/ReplayMapView.tsx
+msgid "The recorded track is not shown: its {field} is {found} and this version of coilbox reads {expected}."
+msgstr ""
+
+#: src/content/pages/components/ReplayAnalysisSection.tsx
+msgid "The recorded track is out of date and is not played. A new run replaces it."
+msgstr ""
+
+#: src/content/pages/components/WatchWithRewindButton.tsx
+msgid "The recorded track is out of date. Record it again, then watch it with rewind?"
+msgstr ""
+
+#: src/content/pages/components/ReplayAnalysisSection.tsx
+msgid "The recording could not be made into a track."
+msgstr ""
+
 #: src/content/gameSourceRows.ts
 msgid "the release archive for the version asked for"
+msgstr ""
+
+#: src/content/pages/components/LivingValueChart.tsx
+msgid "The replay itself records what was produced and lost, not what a player owned at any moment."
+msgstr ""
+
+#: src/content/pages/components/CommandRateChart.tsx
+msgid "The replay named no period, so the engine's default is used."
+msgstr ""
+
+#: src/content/pages/components/PlayerUnitUsage.tsx
+msgid "The replays could not be read: {error}"
 msgstr ""
 
 #: src/play/pages/SkirmishPage.tsx
@@ -8599,6 +11681,10 @@ msgstr ""
 msgid "The sector warlord. Break it to win the run."
 msgstr ""
 
+#: src/content/replayTimeline.ts
+msgid "The server"
+msgstr ""
+
 #: src/i18n/uiError.ts
 msgid "the server refused the login"
 msgstr ""
@@ -8631,12 +11717,52 @@ msgstr ""
 msgid "The test mutator brings {conditionCount} conditions and {actionCount} actions"
 msgstr ""
 
+#: src/content/pages/components/ReplayChat.tsx
+msgid "the timeline"
+msgstr ""
+
 #: src/i18n/frameStrings.ts
 msgid "The top bar loses its background and sits over the content as it scrolls."
 msgstr ""
 
+#: src/content/pages/components/ReplayMapView.tsx
+msgid "The track has to be recorded again before the match can be shown here."
+msgstr ""
+
+#: src/content/pages/components/ReplayMapView.tsx
+msgid "The track stored for this replay belongs to another match, so it is not shown."
+msgstr ""
+
+#: src/content/pages/components/ReplayAnalysisSection.tsx
+msgid "The track would be larger than the whole {limit} limit. It is kept and every other track is removed."
+msgstr ""
+
+#: src/content/pages/components/ReplayAnalysisEvents.tsx
+msgid "The units of {gameName} could not be read, so each event shows its unit definition id."
+msgstr ""
+
+#: src/content/pages/components/ReplayBuildOrders.tsx
+msgid "The units of {gameName} could not be read, so each order shows the unit definition id the replay recorded."
+msgstr ""
+
+#: src/content/pages/components/ReplayMap.tsx
+msgid "The units of this replay's game could not be read, so every mark is the same shape."
+msgstr ""
+
+#: src/content/pages/components/LivingValueChart.tsx
+msgid "The units of this replay's game could not be read, so nothing says what a unit costs or what it is for."
+msgstr ""
+
+#: src/content/pages/components/ReplayEventLayers.tsx
+msgid "The units of this replay's game could not be read, so nothing says which finished units are buildings, so this layer needs the game installed."
+msgstr ""
+
 #: src/runlite/pages/components/RunHud.tsx
 msgid "The units you can currently build, out of your faction's full tree. Rewards and depots unlock more, but unlocking raises a shared tech ceiling, so the enemy escalates with you. Your personal edge comes from perks, not unlocks."
+msgstr ""
+
+#: src/content/pages/components/ReplayAnalysisSection.tsx
+msgid "The usual reason a playback does not match is that the installed game or engine is not exactly the one the match was played on."
 msgstr ""
 
 #: src/runlite/pages/RunListPage.tsx
@@ -8651,8 +11777,20 @@ msgstr ""
 msgid "the whole match"
 msgstr ""
 
+#: src/content/pages/components/ReplayTimeWindowControl.tsx
+msgid "The whole match, {matchStart} to {matchEnd}."
+msgstr ""
+
 #: src/content/pages/components/MapAggregate.tsx
 msgid "The window is {when} of each match by its own clock, in whole minutes."
+msgstr ""
+
+#: src/content/pages/components/ReplayTimeWindowControl.tsx
+msgid "The window is when an order was given, not when anything was built."
+msgstr ""
+
+#: src/content/pages/components/ReplayTimeWindowControl.tsx
+msgid "The window is when each event happened in the playback."
 msgstr ""
 
 #: src/i18n/frameStrings.ts
@@ -8665,6 +11803,10 @@ msgstr ""
 
 #: src/profile/SettingsSection.tsx
 msgid "Theme overrides"
+msgstr ""
+
+#: src/content/pages/components/ReplayBaseCrops.tsx
+msgid "There are no base views, because this replay holds no start position to centre one on."
 msgstr ""
 
 #: src/profile/health.ts
@@ -8683,8 +11825,16 @@ msgstr ""
 msgid "There's nothing to share yet."
 msgstr ""
 
+#: src/content/pages/components/PlayerUnitUsage.tsx
+msgid "These are orders {name} gave, not units built. A replay does not say whether an order was carried out, and a unit taken off a factory queue is not taken off these counts. A skirmish AI's orders are not counted."
+msgstr ""
+
 #: src/content/pages/components/MapAggregate.tsx
 msgid "These are orders given, which is what players meant to do and not what happened. An order that was cancelled or never carried out counts like any other."
+msgstr ""
+
+#: src/content/pages/components/ReplayBuildOrders.tsx
+msgid "These are the orders each player gave, not what was built. An order that was cancelled or never carried out is listed like any other."
 msgstr ""
 
 #: src/startbox/StartBoxPresetsPopover.tsx
@@ -8699,8 +11849,17 @@ msgstr ""
 msgid "These come with the game and play as the game itself. They are listed under Play, and coilbox neither wrote them nor removes them."
 msgstr ""
 
+#: src/content/pages/components/ReplayBuildOrders.tsx
+#: src/content/pages/components/ReplayOpeningSplit.tsx
+msgid "These costs come from a different build and may be wrong."
+msgstr ""
+
 #: src/content/pages/components/MapRecords.tsx
 msgid "These matches are not all one arrangement, so positions are not split by team here, and a position's record is not controlled for the team it was on. Choose an arrangement above to split them."
+msgstr ""
+
+#: src/content/pages/components/ReplayEventLayers.tsx
+msgid "These sums differ from the damage figures in the match chart. The engine's own total counts each hit as the health its target was already missing, up to the size of the hit, so the first hit on an undamaged unit adds nothing to it."
 msgstr ""
 
 #: src/direct/share.ts
@@ -8722,6 +11881,31 @@ msgstr ""
 
 #: src/play/pages/components/GameChoiceOffer.tsx
 msgid "This {nounText} was started on <0>{pinnedName}</0>, which is not installed. Another version of that game is installed. Continue on <1>{newerName}</1>?"
+msgstr ""
+
+#: src/content/pages/components/ReplayStartUnitLayer.tsx
+msgid "This analysis is from an older logger, so a path may stop where the unit was upgraded."
+msgstr ""
+
+#: src/content/pages/components/ReplayStartUnitLayer.tsx
+msgid "This analysis recorded no starting unit."
+msgstr ""
+
+#: src/content/pages/components/ReplayAnalysisSection.tsx
+msgid "This analysis was made by an earlier version of coilbox, which recorded less than this one does. Analyse it again to bring it up to date."
+msgstr ""
+
+#: src/content/pages/components/ReplayEventLayers.tsx
+msgid "This analysis was recorded before coilbox logged damage, so there is nothing to draw. Analyse the replay again to record it."
+msgstr ""
+
+#: src/content/pages/components/ReplayStartUnitLayer.tsx
+msgid "This analysis was recorded before coilbox logged starting units, so there is nothing to draw. Analyse the replay again to record them."
+msgstr ""
+
+#: src/content/pages/components/ReplayAnalysisEvents.tsx
+#: src/content/replayEventLayers.ts
+msgid "This analysis was recorded by an older logger and may lack newer kinds of event."
 msgstr ""
 
 #: src/content/pages/components/useUnitRenders.ts
@@ -8806,6 +11990,10 @@ msgstr ""
 
 #: src/content/replayAnalysis.ts
 msgid "This file does not read as a replay."
+msgstr ""
+
+#: src/content/pages/ReplayDetailPage.tsx
+msgid "This file is empty and nothing in it can be played. A game that was closed, killed or crashed before it ended leaves a file like this."
 msgstr ""
 
 #: src/runlite/pages/components/ImportChallengeForm.tsx
@@ -8897,6 +12085,14 @@ msgstr ""
 msgid "This is a remix. The result it recorded belongs to the original match, so there is nothing to check a playback of it against. Analyse the original."
 msgstr ""
 
+#: src/content/pages/components/ReplayRoster.tsx
+msgid "This is the rating the lobby recorded for its declared game mode, which may not be the one this match was played in. The start script says: {skill}"
+msgstr ""
+
+#: src/content/pages/components/ReplayRoster.tsx
+msgid "This is the rating the lobby recorded for its declared game mode, which may not be the one this match was played in. The start script says: {skill}. The lobby recorded an uncertainty of {uncertainty} with the rating."
+msgstr ""
+
 #: src/deeplink/build.ts
 msgid "This is too large to share as a link."
 msgstr ""
@@ -8967,6 +12163,26 @@ msgstr ""
 msgid "This match never recorded a game over, usually because it was quit before it ended. There is nothing to check a playback against, so it cannot be analysed."
 msgstr ""
 
+#: src/content/pages/components/ReplayMap.tsx
+msgid "This match set no start boxes."
+msgstr ""
+
+#: src/content/pages/components/LivingValueChart.tsx
+msgid "This needs an analysis, and a remix has no analysis of its own. Analyse the original match."
+msgstr ""
+
+#: src/content/pages/components/LivingValueChart.tsx
+msgid "This needs an analysis, and this replay has not been analysed."
+msgstr ""
+
+#: src/content/pages/components/LivingValueChart.tsx
+msgid "This needs an analysis, and this replay has not been analysed. This copy of coilbox cannot analyse replays."
+msgstr ""
+
+#: src/content/pages/components/LivingValueChart.tsx
+msgid "This needs an analysis. The playback did not reproduce the recorded match, so what it recorded was thrown away and there is nothing to add up."
+msgstr ""
+
 #: src/deeplink/parse.ts
 msgid "This open link has no screen."
 msgstr ""
@@ -8981,6 +12197,10 @@ msgstr ""
 
 #: src/content/pages/components/MapAggregate.tsx
 msgid "this page's map"
+msgstr ""
+
+#: src/content/pages/components/ReplayMapView.tsx
+msgid "This part of the match cannot be read from the track."
 msgstr ""
 
 #: src/play/PresetTweaksView.tsx
@@ -9003,6 +12223,24 @@ msgstr ""
 msgid "This project has no edits, so there is nothing to pack for a lobby."
 msgstr ""
 
+#: src/content/pages/components/ReplayBuildOrders.tsx
+#: src/content/pages/components/ReplayMap.tsx
+msgid "This replay could not be read to the end, so later build orders may be missing."
+msgstr ""
+
+#: src/content/pages/components/CommandRateChart.tsx
+#: src/content/pages/components/ReplayMap.tsx
+msgid "This replay could not be read to the end, so later orders may be missing."
+msgstr ""
+
+#: src/content/pages/components/ReplayChat.tsx
+msgid "This replay could not be read to the end, so the chat log may be incomplete."
+msgstr ""
+
+#: src/content/pages/components/ReplayChat.tsx
+msgid "This replay could not be read to the end, so the timeline stops at the last line read and may be incomplete."
+msgstr ""
+
 #: src/content/replayAnalysis.ts
 msgid "This replay does not say which engine recorded it, and no other engine is installed."
 msgstr ""
@@ -9011,24 +12249,136 @@ msgstr ""
 msgid "This replay does not say which engine recorded it, and none of the engines that are installed can run an analysis, which needs one with a headless build."
 msgstr ""
 
+#: src/content/pages/components/ReplayAnalysisSection.tsx
+msgid "This replay does not say which engine recorded it."
+msgstr ""
+
+#: src/content/pages/components/ReplayTrackBadge.tsx
+msgid "This replay has a recorded track."
+msgstr ""
+
 #: src/content/replayAnalysis.ts
 msgid "This replay has no game id, so there is nothing to file an analysis under."
 msgstr ""
 
+#: src/content/pages/components/RefightPanel.tsx
 #: src/play/pages/components/NewPresetFromReplayButton.tsx
 msgid "This replay has no seated players to refight."
+msgstr ""
+
+#: src/content/pages/components/MatchStatsSection.tsx
+msgid "This replay has no statistics."
+msgstr ""
+
+#: src/content/replayEventLayers.ts
+msgid "This replay has not been analysed."
+msgstr ""
+
+#: src/content/replayEventLayers.ts
+msgid "This replay has not been analysed. This copy of coilbox cannot analyse replays."
+msgstr ""
+
+#: src/content/pages/components/ReplayAnalysisSection.tsx
+msgid "This replay is already analysed and recorded."
+msgstr ""
+
+#: src/content/pages/components/ReplayAnalysisSection.tsx
+msgid "This replay is already in the queue."
+msgstr ""
+
+#: src/content/pages/components/WatchWithRewindButton.tsx
+msgid "This replay is being recorded."
+msgstr ""
+
+#. placeholder {0}: rates.periodSec
+#: src/content/pages/components/CommandRateChart.tsx
+msgid "This replay is shorter than one {0} second period, so there is no rate to draw."
+msgstr ""
+
+#: src/content/pages/components/LivingValueChart.tsx
+msgid "This replay is shorter than one {periodSec} second period, so there is nothing to draw."
+msgstr ""
+
+#: src/content/pages/components/useWatchTarget.ts
+msgid "This replay needs engine {version}, which is not installed and cannot be downloaded here."
+msgstr ""
+
+#: src/content/pages/components/ReplayMap.tsx
+msgid "This replay recorded no start positions."
+msgstr ""
+
+#. placeholder {0}: units.recorded
+#: src/content/pages/components/ReplayEventLayers.tsx
+msgid "This replay was played on {0}, which is not installed. Costs come from {sourceGame}, a different build, and may be wrong."
+msgstr ""
+
+#. placeholder {0}: units.recorded
+#: src/content/pages/components/ReplayEventLayers.tsx
+msgid "This replay was played on {0}, which is not installed. Shapes and the choice of buildings come from {sourceGame}, a different build, and may be wrong."
+msgstr ""
+
+#: src/content/pages/components/ReplayAnalysisEvents.tsx
+#: src/content/pages/components/ReplayBuildOrders.tsx
+msgid "This replay was played on {recorded}, which is not installed. Unit names come from {gameName}, a different build, and may be wrong."
+msgstr ""
+
+#: src/content/pages/components/LivingValueChart.tsx
+msgid "This replay was played on {recordedGame}, which is not installed. Costs and kinds come from {installedGame}, a different build, and may be wrong."
+msgstr ""
+
+#: src/content/pages/components/ReplayMap.tsx
+msgid "This replay was played on {recordedGame}, which is not installed. Shapes come from {differentBuildName}, a different build, and may be wrong."
+msgstr ""
+
+#: src/content/pages/components/ReplayAnalysisSection.tsx
+msgid "This replay was recorded on engine {recordedEngine}, which is not installed."
+msgstr ""
+
+#: src/content/pages/components/UncheckedEngineNotice.tsx
+msgid "This replay was recorded on engine {version}. An engine in a folder with that name has not had its version checked yet. Pressing Watch checks it first."
 msgstr ""
 
 #: src/content/replayAnalysis.ts
 msgid "This replay was recorded on the replay playback game. It has no match of its own to record."
 msgstr ""
 
+#: src/content/pages/components/LivingValueChart.tsx
+#: src/content/pages/components/ReplayAnalysisEvents.tsx
+#: src/content/pages/components/ReplayBuildOrders.tsx
+#: src/content/pages/components/ReplayEventLayers.tsx
+msgid "This replay's game"
+msgstr ""
+
+#: src/content/pages/components/RefightPanel.tsx
+msgid "This replay's game and map aren't installed. Download them below first."
+msgstr ""
+
+#: src/content/pages/components/ReplayBaseCrops.tsx
+msgid "This replay's game is not installed, so every mark is the same shape."
+msgstr ""
+
+#: src/content/pages/components/ReplayMap.tsx
+msgid "This replay's game is not installed, so nothing says what each building is for and every mark is the same shape."
+msgstr ""
+
 #: src/play/pages/components/NewPresetFromReplayButton.tsx
 msgid "This replay's game isn't installed."
 msgstr ""
 
+#: src/content/pages/components/RefightPanel.tsx
+msgid "This replay's game isn't installed. Download it below first."
+msgstr ""
+
 #: src/play/pages/components/NewPresetFromReplayButton.tsx
 msgid "This replay's map isn't installed."
+msgstr ""
+
+#: src/content/pages/components/RefightPanel.tsx
+msgid "This replay's map isn't installed. Download it below first."
+msgstr ""
+
+#: src/content/pages/components/CommandRateChart.tsx
+msgid "This replay's order stream holds no orders to count."
 msgstr ""
 
 #: src/direct/share.ts
@@ -9063,12 +12413,20 @@ msgstr ""
 msgid "This run has no start unit, so coilbox cannot limit your units. Every unit is available."
 msgstr ""
 
+#: src/content/pages/components/ReplayAnalysisSection.tsx
+msgid "This runs the game once, without a window."
+msgstr ""
+
 #: src/direct/invite.ts
 msgid "This server's address names a network card on this computer, so it would mean nothing to a friend. Save the server under its full IPv6 address, without the % part, to get a link."
 msgstr ""
 
 #: src/packs/envelope.ts
 msgid "This setup pack was made by a newer version of coilbox."
+msgstr ""
+
+#: src/content/pages/components/ReplayTrackBadge.tsx
+msgid "This track was made by another version of the recorder, or cannot be read. It is not played, and recording the replay again replaces it."
 msgstr ""
 
 #: src/content/pages/components/UnitHero.tsx
@@ -9112,6 +12470,19 @@ msgstr ""
 msgid "Tier {i}"
 msgstr ""
 
+#: src/content/pages/components/MatchStatsTable.tsx
+#: src/content/pages/components/ReplayAnalysisEvents.tsx
+msgid "Time"
+msgstr ""
+
+#: src/content/pages/components/ReplayPlaybackBar.tsx
+msgid "Time in the match"
+msgstr ""
+
+#: src/content/pages/components/ReplayTimeWindowControl.tsx
+msgid "Time window"
+msgstr ""
+
 #: src/content/mapImage.ts
 msgid "Time window: {window} of each match, by its own clock."
 msgstr ""
@@ -9120,12 +12491,40 @@ msgstr ""
 msgid "Time window: the whole match."
 msgstr ""
 
+#: src/content/pages/components/ReplayAnalysisSection.tsx
+msgid "Time: about {timeNeeded}"
+msgstr ""
+
+#: src/content/pages/components/ReplayAnalysisSection.tsx
+msgid "Time: unknown"
+msgstr ""
+
+#: src/content/pages/components/ReplayChat.tsx
+msgid "Timeline"
+msgstr ""
+
 #: src/profile/SettingsSection.tsx
 msgid "Title"
 msgstr ""
 
+#: src/content/pages/components/ReplayChat.tsx
+msgid "to {target}"
+msgstr ""
+
+#: src/content/pages/components/ReplayChat.tsx
+msgid "to allies"
+msgstr ""
+
 #: src/content/pages/components/MapAggregate.tsx
 msgid "To minute"
+msgstr ""
+
+#: src/content/pages/components/ReplayChat.tsx
+msgid "to spectators"
+msgstr ""
+
+#: src/content/pages/PlayerDossierPage.tsx
+msgid "Together"
 msgstr ""
 
 #: src/i18n/frameStrings.ts
@@ -9152,8 +12551,52 @@ msgstr ""
 msgid "Top faction"
 msgstr ""
 
+#: src/content/pages/components/ReplayTrackBadge.tsx
+msgid "Track out of date"
+msgstr ""
+
+#: src/content/pages/components/ReplayTrackBadge.tsx
+msgid "Track recorded"
+msgstr ""
+
+#: src/content/pages/components/ReplayAnalysisSection.tsx
+msgid "Track size: about {sizeNeeded}"
+msgstr ""
+
+#: src/content/pages/components/ReplayAnalysisSection.tsx
+msgid "Track size: unknown"
+msgstr ""
+
 #: src/home/config.ts
 msgid "tracking the default"
+msgstr ""
+
+#: src/content/pages/components/ReplayAnalysisSection.tsx
+msgid "Tracks share a limit on disk space. When a new track takes them past it, tracks that are out of date are removed first and then the ones watched longest ago. Their analyses stay."
+msgstr ""
+
+#: src/content/pages/components/PlayerUnitUsage.tsx
+msgid "Transport"
+msgstr ""
+
+#: src/content/pages/components/PlayerMatchFigures.tsx
+msgid "Trend metric"
+msgstr ""
+
+#: src/content/pages/components/PlayerMatchFigures.tsx
+msgid "Trend, {playerName}'s own figures, per minute"
+msgstr ""
+
+#: src/content/pages/components/PlayerMatchFigures.tsx
+msgid "Trend, {playerName}'s own figures, ratio with no unit"
+msgstr ""
+
+#: src/content/pages/components/ReplayAnalysisSection.tsx
+msgid "Tried {at} with {game} on engine {engine}, in {took}."
+msgstr ""
+
+#: src/content/pages/components/ReplayAnalysisSection.tsx
+msgid "Tried so far, and none reproduced the match: {triedList}."
 msgstr ""
 
 #: src/downloads/activityRows.ts
@@ -9161,6 +12604,7 @@ msgid "Try {label}"
 msgstr ""
 
 #: src/content/pages/components/ModelReadFailed.tsx
+#: src/content/pages/components/ReplayAnalysisSection.tsx
 #: src/direct/QuickRoom.tsx
 msgid "Try again"
 msgstr ""
@@ -9175,6 +12619,10 @@ msgstr ""
 
 #: src/runlite/pages/components/EncounterOverlay.tsx
 msgid "Try reading the unit data again"
+msgstr ""
+
+#: src/content/pages/components/ReplayAnalysisSection.tsx
+msgid "Try with {chosenLabel}"
 msgstr ""
 
 #: src/content/pages/GameDetailPage.tsx
@@ -9193,8 +12641,26 @@ msgstr ""
 msgid "uberstress"
 msgstr ""
 
+#: src/content/pages/components/ReplayRoster.tsx
+msgid "Unassigned"
+msgstr ""
+
 #: src/downloads/pages/components/MapPacksDrawer.tsx
 msgid "Unavailable"
+msgstr ""
+
+#: src/content/pages/components/MatchStatsChart.tsx
+msgid "Unchecked players still count in the total for {partialLabels}."
+msgstr ""
+
+#: src/content/pages/components/LivingValueChart.tsx
+#: src/content/pages/components/PlayerUnitUsage.tsx
+#: src/content/pages/components/ReplayOpeningSplit.tsx
+msgid "Unclassified"
+msgstr ""
+
+#: src/content/pages/components/ReplayMapView.tsx
+msgid "Under the map, the knob sets the time and the buttons play the match forward or in reverse, at the speed beside them. A tall bar is a unit destroyed, a dot is chat and a diamond is a player leaving, taken from the replay and its analysis. Marks that would touch are drawn as one, larger, and clicking it goes to the earliest event in it. A replay that has not been analysed has no kills. The address holds the time, so a link opens at that moment."
 msgstr ""
 
 #: src/content/pages/components/Convert3doDrawer.tsx
@@ -9203,7 +12669,19 @@ msgstr ""
 
 #: src/content/index.ts
 #: src/content/pages/components/BuildTreeDrawer.tsx
+#: src/content/pages/components/PlayerUnitUsage.tsx
+#: src/content/pages/components/ReplayAnalysisEvents.tsx
 msgid "Unit"
+msgstr ""
+
+#. placeholder {0}: entry.unitDefId
+#. placeholder {0}: order.unitDefId
+#: src/content/pages/components/ReplayBuildOrders.tsx
+msgid "Unit {0}"
+msgstr ""
+
+#: src/content/pages/components/ReplayAnalysisEvents.tsx
+msgid "Unit {def}"
 msgstr ""
 
 #: src/lego/index.ts
@@ -9218,8 +12696,16 @@ msgstr ""
 msgid "Unit defs: {defsError}"
 msgstr ""
 
+#: src/content/pages/components/ReplayPlaybackBar.tsx
+msgid "Unit destroyed, {at}"
+msgstr ""
+
 #: src/content/replayUnitDefs.ts
 msgid "Unit names"
+msgstr ""
+
+#: src/content/pages/components/ReplayBuildOrders.tsx
+msgid "Unit names come from {gameName}, matched by name and version."
 msgstr ""
 
 #: src/content/pages/UnitReferencePage.tsx
@@ -9239,6 +12725,7 @@ msgstr ""
 
 #: src/content/index.ts
 #: src/content/matchStats.ts
+#: src/content/pages/components/PlayerUnitUsage.tsx
 #: src/content/pages/GameDetailPage.tsx
 msgid "Units"
 msgstr ""
@@ -9263,12 +12750,21 @@ msgstr ""
 msgid "Units given to the team, as the log counted them"
 msgstr ""
 
+#: src/content/pages/components/ReplayEventLayers.tsx
 #: src/content/replayAnalysis.ts
 msgid "Units lost"
 msgstr ""
 
 #: src/content/replayAnalysis.ts
 msgid "Units made"
+msgstr ""
+
+#: src/content/pages/components/ReplayMapView.tsx
+msgid "Units on {mapName} at the chosen time"
+msgstr ""
+
+#: src/content/pages/components/PlayerUnitUsage.tsx
+msgid "Units ordered"
 msgstr ""
 
 #: src/content/replayAnalysis.ts
@@ -9300,11 +12796,14 @@ msgstr ""
 msgid "unitsync said: {reason}"
 msgstr ""
 
+#: src/content/pages/components/ReplayAnalysisSection.tsx
 #: src/content/replayAnalysis.ts
 #: src/play/pages/components/DebriefDrawer.tsx
 msgid "unknown"
 msgstr ""
 
+#: src/content/pages/MatchupPage.tsx
+#: src/content/pages/PlayerDossierPage.tsx
 #: src/content/replaySideLabel.ts
 #: src/content/stats.ts
 msgid "Unknown"
@@ -9314,8 +12813,16 @@ msgstr ""
 msgid "Unknown action \"{shownAction}\"."
 msgstr ""
 
+#: src/content/pages/ReplaysPage.tsx
+msgid "Unknown origin"
+msgstr ""
+
 #: src/deeplink/parse.ts
 msgid "Unknown screen \"{screen}\"."
+msgstr ""
+
+#: src/content/pages/components/ReplayMapView.tsx
+msgid "unknown unit"
 msgstr ""
 
 #: src/profile/widgets.tsx
@@ -9331,6 +12838,7 @@ msgstr ""
 msgid "Unlocked {0}"
 msgstr ""
 
+#: src/content/pages/components/ReplayBaseCrops.tsx
 #: src/content/replayMapLayers.ts
 msgid "Unnamed player"
 msgstr ""
@@ -9341,6 +12849,14 @@ msgstr ""
 
 #: src/components/SaveStatus.tsx
 msgid "Unsaved changes"
+msgstr ""
+
+#: src/content/achievements.ts
+msgid "Unstoppable"
+msgstr ""
+
+#: src/content/pages/ReplaysPage.tsx
+msgid "Unwatched"
 msgstr ""
 
 #: src/content/stats.ts
@@ -9397,6 +12913,10 @@ msgstr ""
 msgid "Updates for this build are managed by its distributor."
 msgstr ""
 
+#: src/content/pages/StatsPage.tsx
+msgid "updating…"
+msgstr ""
+
 #: src/content/pages/GameUnitPage.tsx
 msgid "Upgrade path"
 msgstr ""
@@ -9437,6 +12957,18 @@ msgstr ""
 msgid "Validate profile"
 msgstr ""
 
+#: src/content/pages/components/LivingValueChart.tsx
+msgid "Value of living units by kind"
+msgstr ""
+
+#: src/content/pages/components/AchievementsSection.tsx
+msgid "Variety"
+msgstr ""
+
+#: src/content/achievements.ts
+msgid "Versatile"
+msgstr ""
+
 #: src/content/pages/components/GameVersionsTab.tsx
 msgid "Version"
 msgstr ""
@@ -9467,6 +12999,14 @@ msgstr ""
 
 #: src/content/pages/components/BrowserToolbar.tsx
 msgid "via {currentLabel}"
+msgstr ""
+
+#: src/content/achievements.ts
+msgid "Victor"
+msgstr ""
+
+#: src/content/pages/components/AchievementsSection.tsx
+msgid "Victories"
 msgstr ""
 
 #: src/runlite/pages/components/EncounterOverlay.tsx
@@ -9526,6 +13066,7 @@ msgstr ""
 msgid "warpath"
 msgstr ""
 
+#: src/content/pages/ReplaysPage.tsx
 #: src/runlite/galaxyAdapter.ts
 #: src/runlite/index.ts
 #: src/runlite/pages/RunListPage.tsx
@@ -9566,8 +13107,26 @@ msgstr ""
 msgid "was around {x}, {z}"
 msgstr ""
 
+#: src/content/pages/components/WatchButton.tsx
+#: src/content/pages/components/WatchWithRewindButton.tsx
+msgid "Watch"
+msgstr ""
+
 #: src/play/PresetList.tsx
 msgid "Watch the best replay for {presetName}"
+msgstr ""
+
+#: src/content/pages/components/WatchWithRewindButton.tsx
+msgid "Watch with rewind"
+msgstr ""
+
+#: src/content/pages/ReplayDetailPage.tsx
+#: src/content/pages/ReplaysPage.tsx
+msgid "Watched"
+msgstr ""
+
+#: src/content/pages/components/WatchButton.tsx
+msgid "Watching…"
 msgstr ""
 
 #: src/content/libraryMaps.ts
@@ -9586,6 +13145,10 @@ msgstr ""
 msgid "Welcome screen"
 msgstr ""
 
+#: src/content/achievements.ts
+msgid "Well travelled"
+msgstr ""
+
 #: src/content/pages/components/MapAggregate.tsx
 msgid "What a building is for is read from the unit list that replay's own page names its orders from: the engine's own list when the match was analysed, then the installed game with exactly the name and version the replay records, read with the match's own mod options and AIs. A match whose build orders do not fit that list, or whose orders could not be checked against it, is left out of Defences and Economy."
 msgstr ""
@@ -9596,6 +13159,10 @@ msgstr ""
 
 #: src/content/pages/GameUnitPage.tsx
 msgid "What builds it"
+msgstr ""
+
+#: src/content/pages/components/ReplayAnalysisSection.tsx
+msgid "What disagreed:"
 msgstr ""
 
 #: src/content/index.ts
@@ -9612,6 +13179,18 @@ msgstr ""
 
 #: src/content/pages/GameUnitPage.tsx
 msgid "What it builds"
+msgstr ""
+
+#: src/content/pages/components/ReplayEventLayers.tsx
+msgid "What the deaths are counted as"
+msgstr ""
+
+#: src/content/pages/components/ReplayAnalysisSection.tsx
+msgid "What the engine is saying"
+msgstr ""
+
+#: src/content/pages/components/ReplayAnalysisSection.tsx
+msgid "What the engine said"
 msgstr ""
 
 #: src/content/pages/components/MapRecords.tsx
@@ -9635,7 +13214,16 @@ msgid "When you join a battle whose game or map you don't have, start the downlo
 msgstr ""
 
 #: src/content/pages/components/MapAggregate.tsx
+#: src/content/pages/components/ReplayMap.tsx
 msgid "Where buildings were ordered"
+msgstr ""
+
+#: src/content/replayDamage.ts
+msgid "Where damage came from"
+msgstr ""
+
+#: src/content/replayDamage.ts
+msgid "Where damage landed"
 msgstr ""
 
 #: src/content/pages/components/MapAggregate.tsx
@@ -9658,11 +13246,24 @@ msgstr ""
 msgid "Where games and maps come from."
 msgstr ""
 
+#: src/content/pages/components/ReplayEventLayers.tsx
+msgid "Where it came from"
+msgstr ""
+
 #: src/content/pages/GameUnitPage.tsx
 msgid "Where it can be built"
 msgstr ""
 
+#: src/content/pages/components/ReplayEventLayers.tsx
+msgid "Where it landed"
+msgstr ""
+
+#: src/content/replayEventLayers.ts
+msgid "Where metal was lost"
+msgstr ""
+
 #: src/content/pages/components/MapAggregate.tsx
+#: src/content/pages/components/ReplayMap.tsx
 msgid "Where orders were aimed"
 msgstr ""
 
@@ -9683,11 +13284,16 @@ msgid "Where these numbers come from"
 msgstr ""
 
 #: src/content/pages/components/MapAggregate.tsx
+#: src/content/replayEventLayers.ts
 msgid "Where units died"
 msgstr ""
 
 #: src/content/index.ts
 msgid "Where your games, maps and engines live, and where new ones come from."
+msgstr ""
+
+#: src/content/pages/components/ReplayEventLayers.tsx
+msgid "Which end of the damage is drawn"
 msgstr ""
 
 #: src/content/pages/components/MapRecords.tsx
@@ -9696,6 +13302,10 @@ msgstr ""
 
 #: src/content/pages/components/MapRecords.tsx
 msgid "Which team won"
+msgstr ""
+
+#: src/content/pages/components/ReplayTimeline.tsx
+msgid "Whispers"
 msgstr ""
 
 #: src/content/mapImage.ts
@@ -9707,7 +13317,39 @@ msgid "Who won"
 msgstr ""
 
 #: src/content/pages/components/MapAggregate.tsx
+#: src/content/pages/components/ReplayBuildOrders.tsx
+#: src/content/pages/components/ReplayTimeWindowControl.tsx
 msgid "Whole match"
+msgstr ""
+
+#: src/content/commandRates.ts
+msgid "Widgets"
+msgstr ""
+
+#: src/content/pages/components/PlayerMatchFigures.tsx
+#: src/content/pages/MatchupPage.tsx
+#: src/content/pages/PlayerDossierPage.tsx
+msgid "Win"
+msgstr ""
+
+#: src/content/achievements.ts
+msgid "Win 10 games in a row."
+msgstr ""
+
+#: src/content/achievements.ts
+msgid "Win 10 games."
+msgstr ""
+
+#: src/content/achievements.ts
+msgid "Win 3 games in a row."
+msgstr ""
+
+#: src/content/achievements.ts
+msgid "Win 5 games in a row."
+msgstr ""
+
+#: src/content/achievements.ts
+msgid "Win 50 games."
 msgstr ""
 
 #: src/runlite/pages/components/EncounterOverlay.tsx
@@ -9715,11 +13357,17 @@ msgid "Win it to clear the location."
 msgstr ""
 
 #: src/content/pages/MapDetailPage.tsx
+#: src/content/pages/PlayerDossierPage.tsx
+#: src/content/pages/StatsPage.tsx
 msgid "Win rate"
 msgstr ""
 
 #: src/play/presetRecord.ts
 msgid "Win recorded on {name}, but the replay gave no time."
+msgstr ""
+
+#: src/content/achievements.ts
+msgid "Win your first game."
 msgstr ""
 
 #: src/play/pages/components/MapCard.tsx
@@ -9730,6 +13378,14 @@ msgstr ""
 msgid "Window of match time"
 msgstr ""
 
+#: src/content/pages/components/ReplayRoster.tsx
+msgid "Winner"
+msgstr ""
+
+#: src/content/pages/components/PlayerMatchFigures.tsx
+msgid "Wins"
+msgstr ""
+
 #: src/content/pages/components/MapRecords.tsx
 msgid "With more than one version in, every start is placed on {mapName}, this page's map. Another version may declare other positions, and a start of its that is near none of this map's is grouped with the others by distance."
 msgstr ""
@@ -9738,8 +13394,21 @@ msgstr ""
 msgid "with no bonus"
 msgstr ""
 
+#: src/content/pages/PlayerDossierPage.tsx
+msgid "with you: {lastTogether}"
+msgstr ""
+
+#: src/content/pages/components/PlayerUnitUsage.tsx
+#: src/content/pages/components/ReplayRoster.tsx
+msgid "Won"
+msgstr ""
+
 #: src/content/pages/components/MapRecords.tsx
 msgid "won {won} of {known}"
+msgstr ""
+
+#: src/content/pages/components/PlayerUnitUsage.tsx
+msgid "Won is the games {name} won out of the games with a recorded result in which they ordered the unit. It is what happened in those games, not a sign that the unit caused it."
 msgstr ""
 
 #: src/multiplayer/index.tsx
@@ -9766,8 +13435,20 @@ msgstr ""
 msgid "Write root portability n/a (not portable)"
 msgstr ""
 
+#: src/content/pages/components/RemixPanel.tsx
+msgid "Writes a copy that loads a locally installed game in place of the one it was recorded on. A desync during playback usually means your build differs from the recording. The original replay is left untouched."
+msgstr ""
+
 #: src/content/pages/components/MapExportButtons.tsx
 msgid "Writes each start position with how many times it was taken and how many of those won."
+msgstr ""
+
+#: src/content/pages/components/ReplayAnalysisEvents.tsx
+msgid "Writes every event, whatever the filters show."
+msgstr ""
+
+#: src/content/pages/components/MatchStatsExportButton.tsx
+msgid "Writes every line on the chart. Nothing is hidden."
 msgstr ""
 
 #: src/content/pages/components/MapExportButtons.tsx
@@ -9791,6 +13472,10 @@ msgstr ""
 msgid "Wrote the archive to {archiveDir} but the rescan did not find it."
 msgstr ""
 
+#: src/content/aiRecord.ts
+msgid "x{income} income"
+msgstr ""
+
 #: src/i18n/frameStrings.ts
 msgid "Yellow"
 msgstr ""
@@ -9799,9 +13484,17 @@ msgstr ""
 msgid "Yes"
 msgstr ""
 
+#: src/content/pages/components/ReplayMap.tsx
+msgid "you"
+msgstr ""
+
 #: src/play/pages/components/ParticipantsTable.tsx
 #: src/runlite/galaxyAdapter.ts
 msgid "You"
+msgstr ""
+
+#: src/content/pages/MatchupPage.tsx
+msgid "You and {other} have not played on opposing teams. {leftLabel} on the same team or with an unknown team are not counted."
 msgstr ""
 
 #: src/direct/lan.ts
@@ -9817,8 +13510,16 @@ msgstr ""
 msgid "You have {installedVersion}"
 msgstr ""
 
+#: src/content/pages/MatchupPage.tsx
+msgid "You have not shared a replay with {other}."
+msgstr ""
+
 #: src/game-updates/pages/GameUpdatesSection.tsx
 msgid "You have the latest game version ({releaseTag})."
+msgstr ""
+
+#: src/content/pages/PlayerDossierPage.tsx
+msgid "You haven't shared a replay with {playerName} yet."
 msgstr ""
 
 #: src/sound/events.ts
@@ -9878,6 +13579,10 @@ msgstr ""
 msgid "Your name"
 msgstr ""
 
+#: src/content/pages/ReplayDetailPage.tsx
+msgid "Your notes"
+msgstr ""
+
 #: src/content/index.ts
 msgid "Your player name and team highlighting."
 msgstr ""
@@ -9888,6 +13593,10 @@ msgstr ""
 
 #: src/content/pages/MapDetailPage.tsx
 msgid "Your record on this map"
+msgstr ""
+
+#: src/content/pages/StatsPage.tsx
+msgid "Your record, built from the replays in your content folders. Fully offline — no server, no account."
 msgstr ""
 
 #: src/direct/HostRoomForm.tsx
