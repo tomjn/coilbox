@@ -53,6 +53,7 @@ import {
   planLabel,
   SHEET_MARGIN,
 } from "@/hub/preview";
+import { type BuildingRole, roleCss } from "./role";
 
 /** How much colour each layer takes, in the illustration's order: a grid the eye
  *  skims, then a tinted fill under a stronger outline. */
@@ -126,6 +127,7 @@ export function LayoutPlan({
   shape,
   className,
   pictures,
+  roles,
 }: {
   shape: BlueprintShape;
   /** How big to draw it. The caller owns the size because a card and a page
@@ -135,6 +137,10 @@ export function LayoutPlan({
   /** A picture per building, keyed on the lower cased def, from
    *  `useHeldUnitPictures`. A def with no entry is drawn as its square. */
   pictures?: ReadonlyMap<string, PlanPicture>;
+  /** What each building does, from `useBuildingRoles`, which colours it the
+   *  way the in-game widget does. A def with no role, or no lookup at all, is
+   *  drawn in the plan's own colour. */
+  roles?: (def: string) => BuildingRole | undefined;
 }) {
   const [box, setBox] = useState<PlanBox | null>(null);
   const frame = useRef<HTMLDivElement>(null);
@@ -163,6 +169,7 @@ export function LayoutPlan({
         shape={shape}
         box={box ?? nominalBox(shape)}
         pictures={pictures ?? EMPTY}
+        roles={roles}
       />
     </div>
   );
@@ -176,10 +183,12 @@ function Sheet({
   shape,
   box,
   pictures,
+  roles,
 }: {
   shape: BlueprintShape;
   box: PlanBox;
   pictures: ReadonlyMap<string, PlanPicture>;
+  roles?: (def: string) => BuildingRole | undefined;
 }) {
   const sheet = blueprintSheet(shape, box);
   const centres = shape.squares.map(
@@ -270,28 +279,32 @@ function Sheet({
           />
         );
       })}
-      {shape.squares.map((square) => (
-        <rect
-          // Keyed by where it stands, which is what makes it that building.
-          key={`${square.def}@${square.x},${square.y}`}
-          x={square.x}
-          y={square.y}
-          width={square.width}
-          height={square.height}
-          rx={corner(sheet, square.width, square.height)}
-          fill="currentColor"
-          // A building showing its own picture needs no tint under it, and one
-          // the payload never sized keeps its empty outline.
-          fillOpacity={
-            pictures.has(square.def.toLowerCase()) || !square.sized ? 0 : FILL
-          }
-          stroke="currentColor"
-          strokeOpacity={OUTLINE}
-          strokeWidth={1.25}
-          strokeDasharray={square.sized ? undefined : "2 2"}
-          vectorEffect="non-scaling-stroke"
-        />
-      ))}
+      {shape.squares.map((square) => {
+        const role = roles?.(square.def);
+        const color = (role && roleCss(role)) ?? "currentColor";
+        return (
+          <rect
+            // Keyed by where it stands, which is what makes it that building.
+            key={`${square.def}@${square.x},${square.y}`}
+            x={square.x}
+            y={square.y}
+            width={square.width}
+            height={square.height}
+            rx={corner(sheet, square.width, square.height)}
+            fill={color}
+            // A building showing its own picture needs no tint under it, and one
+            // the payload never sized keeps its empty outline.
+            fillOpacity={
+              pictures.has(square.def.toLowerCase()) || !square.sized ? 0 : FILL
+            }
+            stroke={color}
+            strokeOpacity={OUTLINE}
+            strokeWidth={1.25}
+            strokeDasharray={square.sized ? undefined : "2 2"}
+            vectorEffect="non-scaling-stroke"
+          />
+        );
+      })}
       {start && (
         // Where the build order starts, drawn over the building it starts on.
         <circle

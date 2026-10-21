@@ -11,7 +11,7 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { barFormat } from "../../bar";
 import {
   type PackPick,
@@ -26,6 +26,13 @@ import {
   type ArrivingPackConversion,
   type PackView,
 } from "./ArrivingPack";
+
+// The thumbnail colours its buildings from the game's units, a read this
+// render does not stand up. What colour a building gets is tested in
+// `../../role.test.ts`.
+vi.mock("../../useBuildingRoles", () => ({
+  useBuildingRoles: () => undefined,
+}));
 
 const PACK = readFileSync(
   join(__dirname, "..", "..", "fixtures", "bar-pack.json"),

@@ -8,17 +8,22 @@
  *
  * Nothing is drawn for a layout with no buildings in it. An empty box reads as
  * broken where an absence reads as a layout nobody has drawn yet.
+ *
+ * Its buildings are coloured by what they do when the layout's game is
+ * installed, the way the in-game widget colours them.
  */
 
 import { blueprintShape } from "@/hub/preview";
 import { LayoutPlan } from "../../LayoutPlan";
 import type { BlueprintPayload } from "../../payload";
+import { useBuildingRoles } from "../../useBuildingRoles";
 
 export function LayoutThumb({ layout }: { layout: BlueprintPayload }) {
+  const roles = useBuildingRoles(layout.game);
   const shape = blueprintShape(layout);
   if (!shape) return null;
 
   // The whole of whatever box it was put in, because the plan is a sheet now and
   // a sheet fills the space it is given (issue #1508).
-  return <LayoutPlan shape={shape} className="size-full" />;
+  return <LayoutPlan shape={shape} roles={roles} className="size-full" />;
 }

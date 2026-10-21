@@ -43,6 +43,7 @@ import {
 } from "@/conquest/model";
 import { generatedTerrain } from "@/conquest/territories";
 import type { Container } from "@/container/container";
+import type { GameIdentity } from "@/container/gameIdentity";
 import { type Participant, RANDOM_SIDE, type Rgb } from "@/play/participants";
 import {
   optionsFromChallenge as optionsFromWarpathChallenge,
@@ -179,6 +180,9 @@ export interface PackBlueprint {
   name: string;
   /** Null for a layout with no buildings, which has nothing to draw. */
   layout: BlueprintShape | null;
+  /** The game the layout names, which is what its buildings are coloured from.
+   *  Absent on a layout exported where the game could not be named. */
+  game?: GameIdentity;
 }
 
 export type HubPreview =
@@ -316,7 +320,13 @@ function setupPackPreview(payload: Record<string, unknown>): HubPreview | null {
   ).flatMap((raw): PackBlueprint[] => {
     const layout = parseBlueprintPayload(raw);
     return layout
-      ? [{ name: layout.name, layout: blueprintShape(layout) }]
+      ? [
+          {
+            name: layout.name,
+            layout: blueprintShape(layout),
+            ...(layout.game ? { game: layout.game } : {}),
+          },
+        ]
       : [];
   });
 

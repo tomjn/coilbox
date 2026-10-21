@@ -10,11 +10,18 @@
 
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { blueprintArrival } from "../../arrival";
 import type { BlueprintPayload } from "../../payload";
 import { knownUnits } from "../../units";
 import { ArrivingBlueprint } from "./ArrivingBlueprint";
+
+// The thumbnail colours its buildings from the game's units, a read this
+// render does not stand up. What colour a building gets is tested in
+// `../../role.test.ts`.
+vi.mock("../../useBuildingRoles", () => ({
+  useBuildingRoles: () => undefined,
+}));
 
 const INSTALLED = [
   { name: "Balanced Antihilation 12.34", info: { shortname: "BA" } },
