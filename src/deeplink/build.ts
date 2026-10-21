@@ -10,6 +10,7 @@
  * together whenever the grammar moves.
  */
 
+import { t } from "@lingui/core/macro";
 import {
   normaliseHostPort,
   normaliseServerAddress,
@@ -73,10 +74,10 @@ function buildRoom(
     action.port < 1 ||
     action.port > 65535
   ) {
-    return invalid("This room has no port to join on.");
+    return invalid(t`This room has no port to join on.`);
   }
   const address = normaliseHostPort(action.address.trim(), action.port);
-  if (!address) return invalid("This room has no address to join at.");
+  if (!address) return invalid(t`This room has no address to join at.`);
   const params = new URLSearchParams({
     address: address.host,
     port: String(address.port),
@@ -90,14 +91,14 @@ function buildJoin(
   // The same checks the parser makes, so a link that would be refused on
   // arrival is never handed out.
   const address = normaliseServerAddress(action.server);
-  if (!address) return invalid("This battle has no server to join.");
+  if (!address) return invalid(t`This battle has no server to join.`);
   const battle = battleIdFrom(action.battle);
-  if (!battle) return invalid("This battle has no id to join.");
+  if (!battle) return invalid(t`This battle has no id to join.`);
   if (
     action.password !== undefined &&
     !validLinkBattlePassword(action.password)
   ) {
-    return invalid("This battle's password cannot go in a link.");
+    return invalid(t`This battle's password cannot go in a link.`);
   }
   const params = new URLSearchParams({ server: address.address, battle });
   if (action.password) params.set("password", action.password);
@@ -110,9 +111,9 @@ function buildImport(
   const { source } = action;
   if (source.type === "code") {
     const trimmed = source.code.trim();
-    if (trimmed === "") return invalid("There is nothing to share yet.");
+    if (trimmed === "") return invalid(t`There is nothing to share yet.`);
     if (trimmed.length > MAX_CODE_LENGTH) {
-      return invalid("This is too large to share as a link.");
+      return invalid(t`This is too large to share as a link.`);
     }
     const params = new URLSearchParams({ code: trimmed });
     return {
@@ -122,18 +123,18 @@ function buildImport(
   }
 
   const trimmedUrl = source.url.trim();
-  if (trimmedUrl === "") return invalid("There is no URL to share.");
+  if (trimmedUrl === "") return invalid(t`There is no URL to share.`);
   if (trimmedUrl.length > MAX_URL_LENGTH) {
-    return invalid("This URL is too long for a link.");
+    return invalid(t`This URL is too long for a link.`);
   }
   let parsed: URL;
   try {
     parsed = new URL(trimmedUrl);
   } catch {
-    return invalid("That URL is invalid.");
+    return invalid(t`That URL is invalid.`);
   }
   if (parsed.protocol !== "https:") {
-    return invalid("Import URLs must be https.");
+    return invalid(t`Import URLs must be https.`);
   }
   const params = new URLSearchParams({ url: parsed.toString() });
   return { ok: true, url: `${DEEP_LINK_SCHEME}://import?${params.toString()}` };
@@ -144,13 +145,14 @@ function buildOpen(
 ): BuildDeepLinkResult {
   const spec = OPEN_SCREENS[action.screen];
   if (spec.needsId && !action.id) {
-    return invalid(`Opening "${action.screen}" needs an id.`);
+    const screenName = action.screen;
+    return invalid(t`Opening "${screenName}" needs an id.`);
   }
   if (action.id !== undefined && !validField(action.id)) {
-    return invalid("This id is invalid for a link.");
+    return invalid(t`This id is invalid for a link.`);
   }
   if (action.id !== undefined && !validOpenId(action.id.trim())) {
-    return invalid("This id is invalid for a link.");
+    return invalid(t`This id is invalid for a link.`);
   }
   const params = new URLSearchParams({ screen: action.screen });
   if (spec.needsId && action.id) params.set("id", action.id.trim());

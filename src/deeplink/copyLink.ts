@@ -1,3 +1,4 @@
+import { t } from "@lingui/core/macro";
 import { toast } from "sonner";
 import { notify } from "@/notify/notify";
 
@@ -15,17 +16,17 @@ import { notify } from "@/notify/notify";
  */
 export async function copyDeepLink(link: string | null): Promise<void> {
   if (!link) {
-    void notify({ title: "There's nothing to share yet.", level: "error" });
+    void notify({ title: t`There's nothing to share yet.`, level: "error" });
     return;
   }
   try {
     await navigator.clipboard.writeText(link);
-    toast.success("Link copied", {
-      description: "Paste it into chat or Discord.",
+    toast.success(t`Link copied`, {
+      description: t`Paste it into chat or Discord.`,
     });
   } catch (e) {
     void notify({
-      title: "Couldn't copy the link",
+      title: t`Couldn't copy the link`,
       body: e instanceof Error ? e.message : String(e),
       level: "error",
     });

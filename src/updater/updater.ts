@@ -1,3 +1,4 @@
+import { t } from "@lingui/core/macro";
 import { getVersion } from "@tauri-apps/api/app";
 import { invoke } from "@tauri-apps/api/core";
 import { relaunch } from "@tauri-apps/plugin-process";
@@ -92,8 +93,9 @@ async function installPortable(
 ): Promise<void> {
   const asset = portableAsset(update.rawJson);
   if (!asset) {
+    const newVersion = update.version;
     throw new Error(
-      `Coilbox ${update.version} has no portable download, so it cannot be installed over this copy. Update the package instead.`,
+      t`Coilbox ${newVersion} has no portable download, so it cannot be installed over this copy. Update the package instead.`,
     );
   }
 

@@ -1,3 +1,4 @@
+import { t } from "@lingui/core/macro";
 import { I18nProvider } from "@lingui/react";
 import type { HomeOverride } from "@picoframe/frame";
 import { getCurrentWindow } from "@tauri-apps/api/window";
@@ -57,7 +58,7 @@ if (import.meta.env.DEV) performance.mark("coilbox:boot:profile");
 // player's language: the Language setting, or the system's when it is unset.
 await loadLocale(bootLocale(settingsStorage.get(LANGUAGE_KEY)));
 if (import.meta.env.DEV) performance.mark("coilbox:boot:locale");
-const appTitle = profile.title ?? "Coilbox";
+const appTitle = profile.title ?? t`Coilbox`;
 
 // Paint the profile's boot background immediately (ending any white flash this
 // session) and cache it so the index.html boot script applies it before first paint

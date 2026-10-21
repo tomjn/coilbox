@@ -1,7 +1,9 @@
+import { msg, t } from "@lingui/core/macro";
 import type { FramePlugin } from "@picoframe/plugin-sdk";
 import { SlidersHorizontal } from "lucide-react";
 import { gateAdvanced, useAdvancedMode } from "../general/advanced";
 import { insideSection } from "../general/nav";
+import { lazyText } from "../i18n/pluginText";
 import { cachedProjectName } from "./project";
 import { projectSectionLabel } from "./routes";
 
@@ -21,12 +23,12 @@ const workshopPlugin: FramePlugin = {
   nav: [
     {
       id: "workshop",
-      label: "workshop",
+      label: lazyText(msg`workshop`),
       order: 46,
       items: [
         {
           id: "workshop.units",
-          label: "Unit tweaks",
+          label: lazyText(msg`Unit tweaks`),
           to: "/workshop",
           // Lit on the list and on a project you have open, which is where the
           // time goes (issue #2719).
@@ -43,7 +45,7 @@ const workshopPlugin: FramePlugin = {
     {
       path: "workshop",
       lazy: gateAdvanced(() => import("./pages/ProjectsPage")),
-      crumb: "Unit tweaks",
+      crumb: lazyText(msg`Unit tweaks`),
     },
     {
       // The reference table and comparison view (issue #1316), resolved
@@ -53,7 +55,7 @@ const workshopPlugin: FramePlugin = {
       // matches, and the one below matches this path too.
       path: "workshop/:id/reference",
       lazy: gateAdvanced(() => import("./pages/ReferencePage")),
-      crumb: "Reference",
+      crumb: lazyText(msg`Reference`),
     },
     {
       // The unit is a query parameter rather than a path segment, so picking one
@@ -72,8 +74,8 @@ const workshopPlugin: FramePlugin = {
       crumb: (c) =>
         projectSectionLabel(c.params.section) ??
         (c.params.id === "new"
-          ? "New project"
-          : (c.params.id && cachedProjectName(c.params.id)) || "Project"),
+          ? t`New project`
+          : (c.params.id && cachedProjectName(c.params.id)) || t`Project`),
     },
   ],
   settings: [],

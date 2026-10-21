@@ -1,5 +1,7 @@
+import { msg } from "@lingui/core/macro";
 import type { FramePlugin } from "@picoframe/plugin-sdk";
 import { Import as ImportIcon } from "lucide-react";
+import { lazyText } from "../i18n/pluginText";
 import { DeepLinkHandler } from "./DeepLinkHandler";
 import ImportSection from "./pages/ImportSection";
 
@@ -30,8 +32,8 @@ const deepLinkPlugin: FramePlugin = {
   settings: [
     {
       id: "import",
-      title: "Import",
-      description: "Paste a share code or link somebody sent you.",
+      title: lazyText(msg`Import`),
+      description: lazyText(msg`Paste a share code or link somebody sent you.`),
       parent: "library",
       order: 50,
       icon: ImportIcon,

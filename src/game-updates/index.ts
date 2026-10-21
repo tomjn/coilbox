@@ -1,5 +1,7 @@
+import { msg } from "@lingui/core/macro";
 import type { FramePlugin } from "@picoframe/plugin-sdk";
 import { Gamepad2 } from "lucide-react";
+import { lazyText } from "../i18n/pluginText";
 import { getProfile } from "../profile/profile";
 import GameUpdateBadge from "./GameUpdateBadge";
 import { GameUpdatesProvider } from "./GameUpdatesProvider";
@@ -28,7 +30,7 @@ const gameUpdatesPlugin: FramePlugin = {
   settings: [
     {
       id: "game-updates",
-      title: "Game updates",
+      title: lazyText(msg`Game updates`),
       order: 60,
       icon: Gamepad2,
       useVisible: hasUpdateRepo,

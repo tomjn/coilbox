@@ -1,5 +1,7 @@
+import { msg, t } from "@lingui/core/macro";
 import type { FramePlugin } from "@picoframe/plugin-sdk";
 import { Orbit } from "lucide-react";
+import { lazyText } from "../i18n/pluginText";
 import { NeedsGameNavBadge } from "../play/navBadges";
 import { gateProfileHidden, isProfileHidden } from "../profile/hidden";
 import { getCachedGalaxy } from "./conquests";
@@ -28,12 +30,12 @@ const conquestPlugin: FramePlugin = {
   nav: [
     {
       id: "play",
-      label: "Play",
+      label: lazyText(msg`Play`),
       order: 5,
       items: [
         {
           id: "conquest.list",
-          label: "Conquest",
+          label: lazyText(msg`Conquest`),
           to: "/conquest",
           order: 2,
           icon: Orbit,
@@ -51,7 +53,7 @@ const conquestPlugin: FramePlugin = {
         "conquest.list",
         () => import("./pages/ConquestListPage"),
       ),
-      crumb: "Conquest",
+      crumb: lazyText(msg`Conquest`),
     },
     {
       // The battle briefing lives on this page as an overlay (camera zooms to
@@ -69,7 +71,7 @@ const conquestPlugin: FramePlugin = {
         (c.params.id &&
           (getCachedGalaxy(c.params.id)?.galaxy.title ??
             getCachedHandmadeMap(c.params.id)?.title)) ||
-        "Galaxy",
+        t`Galaxy`,
     },
   ],
 };

@@ -1,3 +1,4 @@
+import { Trans } from "@lingui/react/macro";
 import { exit } from "@tauri-apps/plugin-process";
 import { LogOut } from "lucide-react";
 import { getProfile } from "../profile/profile";
@@ -35,7 +36,7 @@ export function QuitControl() {
     >
       <LogOut size={18} className="shrink-0" />
       <span className="truncate group-data-[collapsed]/sidebar:hidden">
-        Quit
+        <Trans>Quit</Trans>
       </span>
     </button>
   );

@@ -1,3 +1,4 @@
+import { msg } from "@lingui/core/macro";
 import type { FramePlugin } from "@picoframe/plugin-sdk";
 import {
   BookOpen,
@@ -7,6 +8,7 @@ import {
   PackageOpen,
 } from "lucide-react";
 import { gateAdvanced, useAdvancedMode } from "../general/advanced";
+import { lazyText } from "../i18n/pluginText";
 import MapconvSettings from "./pages/SettingsSection";
 
 /**
@@ -29,12 +31,12 @@ const mapconvPlugin: FramePlugin = {
       // The group is the map making tools, of which mapconv is one. The id,
       // the routes and the settings section keep the tool's own name, because
       // that is what a distribution profile and the docs refer to.
-      label: "Mapping Tools",
+      label: lazyText(msg`Mapping Tools`),
       order: 40,
       items: [
         {
           id: "mapconv.projects",
-          label: "Projects",
+          label: lazyText(msg`Projects`),
           to: "/mapconv/projects",
           order: 0,
           icon: LayoutGrid,
@@ -42,7 +44,7 @@ const mapconvPlugin: FramePlugin = {
         },
         {
           id: "mapconv.compile",
-          label: "Compile",
+          label: lazyText(msg`Compile`),
           to: "/mapconv",
           end: true,
           order: 1,
@@ -51,7 +53,7 @@ const mapconvPlugin: FramePlugin = {
         },
         {
           id: "mapconv.decompile",
-          label: "Decompile",
+          label: lazyText(msg`Decompile`),
           to: "/mapconv/decompile",
           order: 2,
           icon: PackageOpen,
@@ -61,7 +63,7 @@ const mapconvPlugin: FramePlugin = {
         // the system browser via the Tauri opener.
         {
           id: "mapconv.mapping-wiki",
-          label: "Mapping Wiki",
+          label: lazyText(msg`Mapping Wiki`),
           href: "https://springrts.com/wiki/Mapdev:Main",
           icon: BookOpen,
           sidebar: false,
@@ -75,24 +77,26 @@ const mapconvPlugin: FramePlugin = {
     {
       path: "mapconv/projects",
       lazy: gateAdvanced(() => import("./pages/ProjectsPage")),
-      crumb: "Projects",
+      crumb: lazyText(msg`Projects`),
     },
     {
       path: "mapconv",
       lazy: gateAdvanced(() => import("./pages/CompilePage")),
-      crumb: "mapconv",
+      crumb: lazyText(msg`mapconv`),
     },
     {
       path: "mapconv/decompile",
       lazy: gateAdvanced(() => import("./pages/DecompilePage")),
-      crumb: "Decompile",
+      crumb: lazyText(msg`Decompile`),
     },
   ],
   settings: [
     {
       id: "mapconv",
-      title: "mapconv",
-      description: "The map compiler coilbox builds and takes apart maps with.",
+      title: lazyText(msg`mapconv`),
+      description: lazyText(
+        msg`The map compiler coilbox builds and takes apart maps with.`,
+      ),
       parent: "advanced",
       order: 10,
       icon: MapIcon,

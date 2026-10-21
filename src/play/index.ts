@@ -1,5 +1,7 @@
+import { msg, t } from "@lingui/core/macro";
 import type { FramePlugin } from "@picoframe/plugin-sdk";
 import { Clapperboard, FileText, Save, Swords } from "lucide-react";
+import { lazyText } from "../i18n/pluginText";
 import { RECORDS_GROUP } from "../recordsGroup";
 import InGameBadge from "./InGameBadge";
 import { PlayProvider } from "./PlayProvider";
@@ -22,19 +24,19 @@ const playPlugin: FramePlugin = {
   nav: [
     {
       id: "play",
-      label: "Play",
+      label: lazyText(msg`Play`),
       order: 5,
       items: [
         {
           id: "play.skirmish",
-          label: "Singleplayer",
+          label: lazyText(msg`Singleplayer`),
           to: "/play/skirmish",
           order: 0,
           icon: Swords,
         },
         {
           id: "play.savegames",
-          label: "Save Games",
+          label: lazyText(msg`Save Games`),
           to: "/play/savegames",
           // Last in the aggregated Play section (Campaigns=1, Conquest=2 arrive
           // from sibling plugins), so keep this clearly above them.
@@ -48,7 +50,7 @@ const playPlugin: FramePlugin = {
       items: [
         {
           id: "play.replays",
-          label: "Replays",
+          label: lazyText(msg`Replays`),
           to: "/play/replays",
           // Last in Records: the raw material behind Career and Player stats.
           order: 2,
@@ -61,12 +63,12 @@ const playPlugin: FramePlugin = {
     {
       path: "play/skirmish",
       lazy: () => import("./pages/SkirmishPage"),
-      crumb: "Singleplayer",
+      crumb: lazyText(msg`Singleplayer`),
     },
     {
       path: "play/replays",
       lazy: () => import("../content/pages/ReplaysPage"),
-      crumb: "Replays",
+      crumb: lazyText(msg`Replays`),
       // Replays lives in Records now, so the trail reads "Replays" like Career
       // and Player stats, not "Play / Replays". The URL is unchanged.
       crumbSpan: 2,
@@ -74,12 +76,12 @@ const playPlugin: FramePlugin = {
     {
       path: "play/replays/:name",
       lazy: () => import("../content/pages/ReplayDetailPage"),
-      crumb: (c) => c.params.name ?? "Replay",
+      crumb: (c) => c.params.name ?? t`Replay`,
     },
     {
       path: "play/savegames",
       lazy: () => import("./pages/SavegamesPage"),
-      crumb: "Save Games",
+      crumb: lazyText(msg`Save Games`),
     },
   ],
   // Declared into Engine Settings, which the content plugin owns, because that
@@ -88,9 +90,10 @@ const playPlugin: FramePlugin = {
   settings: [
     {
       id: "engine-log",
-      title: "Engine log",
-      description:
-        "Where the engine last wrote its log, and the system it ran on.",
+      title: lazyText(msg`Engine log`),
+      description: lazyText(
+        msg`Where the engine last wrote its log, and the system it ran on.`,
+      ),
       parent: "engine-settings",
       order: 70,
       icon: FileText,

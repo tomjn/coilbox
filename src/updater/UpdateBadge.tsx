@@ -1,3 +1,4 @@
+import { useLingui } from "@lingui/react/macro";
 import { Download, RefreshCw } from "lucide-react";
 import { Link } from "react-router";
 import { useUpdater } from "./UpdaterProvider";
@@ -13,15 +14,16 @@ import { useUpdater } from "./UpdaterProvider";
  * the install.
  */
 export default function UpdateBadge() {
+  const { t } = useLingui();
   const { update, progress, installed } = useUpdater();
   if (!update || progress.status === "downloading") return null;
 
   const restart = installed;
   const label = restart
-    ? "Restart to update"
+    ? t`Restart to update`
     : progress.status === "installing"
-      ? "Installing update"
-      : "Update available";
+      ? t`Installing update`
+      : t`Update available`;
   return (
     <Link
       to="/settings/updates"

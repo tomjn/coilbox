@@ -1,3 +1,5 @@
+import { t } from "@lingui/core/macro";
+import { Trans } from "@lingui/react/macro";
 import { Button } from "@picoframe/frame";
 import { getVersion } from "@tauri-apps/api/app";
 import { openUrl } from "@tauri-apps/plugin-opener";
@@ -111,12 +113,16 @@ export class ErrorBoundary extends Component<Props, State> {
       <main className="flex h-full min-h-0 flex-col items-center justify-center gap-4 p-10 text-center">
         <Alert variant="destructive" className="max-w-lg text-left">
           <AlertCircle />
-          <AlertTitle>Something went wrong</AlertTitle>
+          <AlertTitle>
+            <Trans>Something went wrong</Trans>
+          </AlertTitle>
           <AlertDescription className="grid min-w-0 gap-3">
             <p>
-              The screen you were on hit an unexpected error. Reloading usually
-              clears it. If this keeps happening, copy the details below and
-              report it so it can be fixed.
+              <Trans>
+                The screen you were on hit an unexpected error. Reloading
+                usually clears it. If this keeps happening, copy the details
+                below and report it so it can be fixed.
+              </Trans>
             </p>
             <Collapsible
               defaultOpen
@@ -124,11 +130,11 @@ export class ErrorBoundary extends Component<Props, State> {
             >
               <CollapsibleTrigger className="group flex cursor-pointer items-center gap-1 text-left text-xs text-muted-foreground">
                 <ChevronRight className="size-3.5 shrink-0 transition-transform group-data-[state=open]:rotate-90" />
-                Error details
+                <Trans>Error details</Trans>
               </CollapsibleTrigger>
               <CollapsibleContent>
                 <p className="mt-2 break-words font-mono text-xs text-muted-foreground">
-                  {route || "(unknown route)"}
+                  {route || t`(unknown route)`}
                 </p>
                 <pre className="mt-1 max-h-48 overflow-auto whitespace-pre-wrap [overflow-wrap:anywhere] font-mono text-xs text-muted-foreground">
                   {error.message}
@@ -139,13 +145,15 @@ export class ErrorBoundary extends Component<Props, State> {
           </AlertDescription>
         </Alert>
         <div className="flex flex-wrap items-center justify-center gap-2">
-          <Button onClick={() => location.reload()}>Reload</Button>
+          <Button onClick={() => location.reload()}>
+            <Trans>Reload</Trans>
+          </Button>
           <Button
             variant="outline"
             className="gap-1.5"
             onClick={() => openUrl(newIssueUrl(this.report())).catch(() => {})}
           >
-            <Bug className="size-4" /> Report an issue
+            <Bug className="size-4" /> <Trans>Report an issue</Trans>
           </Button>
           <Button variant="outline" className="gap-1.5" onClick={this.copy}>
             {copied ? (
@@ -153,7 +161,7 @@ export class ErrorBoundary extends Component<Props, State> {
             ) : (
               <Copy className="size-4" />
             )}
-            {copied ? "Copied" : "Copy details"}
+            {copied ? t`Copied` : t`Copy details`}
           </Button>
         </div>
       </main>

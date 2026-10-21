@@ -1,5 +1,7 @@
+import { msg } from "@lingui/core/macro";
 import type { FramePlugin } from "@picoframe/plugin-sdk";
 import { Bell } from "lucide-react";
+import { lazyText } from "../i18n/pluginText";
 import NotificationsBell from "./NotificationsBell";
 import NotificationsSettings from "./NotificationsSettings";
 import { NotifyProvider } from "./NotifyProvider";
@@ -21,7 +23,7 @@ const notifyPlugin: FramePlugin = {
   settings: [
     {
       id: "notifications",
-      title: "Notifications",
+      title: lazyText(msg`Notifications`),
       order: 30,
       icon: Bell,
       Component: NotificationsSettings,

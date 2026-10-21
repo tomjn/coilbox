@@ -1,3 +1,4 @@
+import { Trans, useLingui } from "@lingui/react/macro";
 import { Button, useSetting } from "@picoframe/frame";
 import {
   isPermissionGranted,
@@ -12,6 +13,7 @@ import { setPermGranted } from "./prefs";
 
 /** Settings section at /settings/notifications. */
 export default function NotificationsSettings() {
+  const { t } = useLingui();
   const [osEnabled, setOsEnabled] = useSetting<boolean>(
     NOTIFY_OS_ENABLED_KEY,
     true,
@@ -39,9 +41,13 @@ export default function NotificationsSettings() {
         className="flex items-center justify-between gap-4"
       >
         <span className="flex flex-col">
-          <span className="text-sm font-medium">Desktop notifications</span>
+          <span className="text-sm font-medium">
+            <Trans>Desktop notifications</Trans>
+          </span>
           <span className="text-xs text-muted-foreground">
-            Show a native notification when the app is in the background.
+            <Trans>
+              Show a native notification when the app is in the background.
+            </Trans>
           </span>
         </span>
         <Switch
@@ -56,11 +62,15 @@ export default function NotificationsSettings() {
         className="flex items-center justify-between gap-4"
       >
         <span className="flex flex-col">
-          <span className="text-sm font-medium">Notification sound</span>
+          <span className="text-sm font-medium">
+            <Trans>Notification sound</Trans>
+          </span>
           <span className="text-xs text-muted-foreground">
-            Let the banner make your system's notification sound. Your operating
-            system owns that sound and its volume, so Coilbox's own volume does
-            not apply, though muting all sound does.
+            <Trans>
+              Let the banner make your system's notification sound. Your
+              operating system owns that sound and its volume, so Coilbox's own
+              volume does not apply, though muting all sound does.
+            </Trans>
           </span>
         </span>
         <Switch
@@ -74,18 +84,20 @@ export default function NotificationsSettings() {
       <div className="flex items-center gap-3">
         {granted === null ? (
           <span className="text-sm text-muted-foreground">
-            Checking permission…
+            <Trans>Checking permission…</Trans>
           </span>
         ) : granted ? (
           <span className="text-sm text-muted-foreground">
-            Permission granted.
+            <Trans>Permission granted.</Trans>
           </span>
         ) : (
           <>
             <span className="text-sm text-muted-foreground">
-              Permission not granted.
+              <Trans>Permission not granted.</Trans>
             </span>
-            <Button onClick={() => void grant()}>Grant permission</Button>
+            <Button onClick={() => void grant()}>
+              <Trans>Grant permission</Trans>
+            </Button>
           </>
         )}
       </div>
@@ -97,12 +109,12 @@ export default function NotificationsSettings() {
           onClick={() =>
             void notify({
               title: "Coilbox",
-              body: "Test notification",
+              body: t`Test notification`,
               level: "success",
             })
           }
         >
-          Send test notification
+          <Trans>Send test notification</Trans>
         </Button>
       </div>
     </div>

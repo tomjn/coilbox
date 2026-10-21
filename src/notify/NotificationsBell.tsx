@@ -1,3 +1,5 @@
+import { t as translate } from "@lingui/core/macro";
+import { Trans, useLingui } from "@lingui/react/macro";
 import { Button, cn } from "@picoframe/frame";
 import { Bell } from "lucide-react";
 import { useNavigate } from "react-router";
@@ -24,12 +26,13 @@ const DOT_CLASS: Record<NotifyLevel, string> = {
 /** Short relative time, e.g. "now", "3m", "2h", "5d". Pure for testing. */
 export function relativeTime(at: number, now: number = Date.now()): string {
   const secs = Math.max(0, Math.round((now - at) / 1000));
-  if (secs < 45) return "now";
+  if (secs < 45) return translate`now`;
   const mins = Math.round(secs / 60);
-  if (mins < 60) return `${mins}m`;
+  if (mins < 60) return translate`${mins}m`;
   const hours = Math.round(mins / 60);
-  if (hours < 24) return `${hours}h`;
-  return `${Math.round(hours / 24)}d`;
+  if (hours < 24) return translate`${hours}h`;
+  const days = Math.round(hours / 24);
+  return translate`${days}d`;
 }
 
 /**
@@ -39,6 +42,7 @@ export function relativeTime(at: number, now: number = Date.now()): string {
  * the relevant screen, and clear-all. Opening the panel clears the unread badge.
  */
 export default function NotificationsBell() {
+  const { t } = useLingui();
   const { entries, unread } = useNotifyHistory();
   const navigate = useNavigate();
 
@@ -48,7 +52,7 @@ export default function NotificationsBell() {
         <button
           type="button"
           aria-label={
-            unread > 0 ? `Notifications: ${unread} unread` : "Notifications"
+            unread > 0 ? t`Notifications: ${unread} unread` : t`Notifications`
           }
           className="relative flex size-8 items-center justify-center rounded-md hover:bg-accent focus-visible:outline-2 focus-visible:outline-ring"
         >
@@ -62,7 +66,9 @@ export default function NotificationsBell() {
       </PopoverTrigger>
       <PopoverContent align="end" className="w-80 p-0">
         <div className="flex items-center justify-between border-b border-border px-3 py-2">
-          <span className="text-sm font-medium">Notifications</span>
+          <span className="text-sm font-medium">
+            <Trans>Notifications</Trans>
+          </span>
           {entries.length > 0 && (
             <Button
               variant="ghost"
@@ -70,13 +76,13 @@ export default function NotificationsBell() {
               className="h-6 px-2 text-xs"
               onClick={() => clearHistory()}
             >
-              Clear all
+              <Trans>Clear all</Trans>
             </Button>
           )}
         </div>
         {entries.length === 0 ? (
           <p className="px-3 py-6 text-center text-sm text-muted-foreground">
-            No notifications yet.
+            <Trans>No notifications yet.</Trans>
           </p>
         ) : (
           <ul className="max-h-96 divide-y divide-border overflow-y-auto">

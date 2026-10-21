@@ -26,6 +26,7 @@
  * unit-testable without a real network.
  */
 
+import { t } from "@lingui/core/macro";
 import { type ImportPlan, prepareImport } from "./actions";
 
 /** Largest shared import payload we will read. Mirrors `IMPORT_FETCH_LIMIT` in
@@ -77,10 +78,10 @@ export async function fetchImportPlan(
   try {
     scheme = new URL(url).protocol;
   } catch {
-    return { ok: false, reason: "This import URL is not valid." };
+    return { ok: false, reason: t`This import URL is not valid.` };
   }
   if (scheme !== "https:") {
-    return { ok: false, reason: "Import URLs must be https." };
+    return { ok: false, reason: t`Import URLs must be https.` };
   }
 
   const fetched = await fetchText(url);

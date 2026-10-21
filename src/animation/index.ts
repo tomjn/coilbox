@@ -1,6 +1,8 @@
+import { msg } from "@lingui/core/macro";
 import type { FramePlugin } from "@picoframe/plugin-sdk";
 import { Binary, BookOpen, Code2, FileCode2, ScrollText } from "lucide-react";
 import { gateAdvanced, useAdvancedMode } from "../general/advanced";
+import { lazyText } from "../i18n/pluginText";
 
 /**
  * The animation plugin: tools for Spring/Recoil unit-script animation. It
@@ -14,12 +16,12 @@ const animationPlugin: FramePlugin = {
   nav: [
     {
       id: "animation",
-      label: "animation",
+      label: lazyText(msg`animation`),
       order: 50,
       items: [
         {
           id: "animation.bos2lua",
-          label: "BOS → Lua",
+          label: lazyText(msg`BOS → Lua`),
           to: "/animation",
           end: true,
           order: 0,
@@ -28,7 +30,7 @@ const animationPlugin: FramePlugin = {
         },
         {
           id: "animation.cob",
-          label: "COB tools",
+          label: lazyText(msg`COB tools`),
           to: "/animation/cob",
           order: 1,
           icon: Binary,
@@ -38,7 +40,7 @@ const animationPlugin: FramePlugin = {
         // opened in the system browser via the Tauri opener.
         {
           id: "animation.guide-skeletor-ik",
-          label: "Skeletor IK Animation Guide",
+          label: lazyText(msg`Skeletor IK Animation Guide`),
           href: "https://docs.google.com/document/d/1-oMLkWHBhfN6a3a5aEZU6X02lY4aZE52nZRtrvIe4cM/edit?tab=t.0#heading=h.ria8yldeo799",
           icon: BookOpen,
           sidebar: false,
@@ -47,7 +49,7 @@ const animationPlugin: FramePlugin = {
         },
         {
           id: "animation.skeletor-s3o",
-          label: "Skeletor S3O",
+          label: lazyText(msg`Skeletor S3O`),
           href: "https://github.com/Beherith/Skeletor_S3O",
           icon: Code2,
           sidebar: false,
@@ -56,7 +58,7 @@ const animationPlugin: FramePlugin = {
         },
         {
           id: "animation.lua-animations",
-          label: "Lua Animations",
+          label: lazyText(msg`Lua Animations`),
           href: "https://springrts.com/wiki/Animation-LuaScripting",
           icon: ScrollText,
           sidebar: false,
@@ -70,12 +72,12 @@ const animationPlugin: FramePlugin = {
     {
       path: "animation",
       lazy: gateAdvanced(() => import("./pages/Bos2LuaPage")),
-      crumb: "Animation",
+      crumb: lazyText(msg`Animation`),
     },
     {
       path: "animation/cob",
       lazy: gateAdvanced(() => import("./pages/CobPage")),
-      crumb: "COB tools",
+      crumb: lazyText(msg`COB tools`),
     },
   ],
   settings: [],

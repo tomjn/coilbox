@@ -1,3 +1,4 @@
+import { Trans, useLingui } from "@lingui/react/macro";
 import { Button, useSetting } from "@picoframe/frame";
 import { Pause, Play, RotateCcw, Square } from "lucide-react";
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
@@ -38,6 +39,7 @@ import {
 
 /** Settings section at /settings/sound. */
 export default function SoundSettings() {
+  const { t, i18n } = useLingui();
   const [volume, setVolume] = useSetting<number>(
     SOUND_VOLUME_KEY,
     DEFAULT_SOUND_VOLUME,
@@ -49,11 +51,15 @@ export default function SoundSettings() {
       <section className="flex flex-col gap-4">
         <div className="flex flex-col gap-2">
           <label htmlFor="sound-volume" className="flex flex-col">
-            <span className="text-sm font-medium">Master volume</span>
+            <span className="text-sm font-medium">
+              <Trans>Master volume</Trans>
+            </span>
             <span className="text-xs text-muted-foreground">
-              Scales every sound Coilbox makes. Audio played by a campaign
-              briefing or a profile page has its own controls and is not
-              affected.
+              <Trans>
+                Scales every sound Coilbox makes. Audio played by a campaign
+                briefing or a profile page has its own controls and is not
+                affected.
+              </Trans>
             </span>
           </label>
           <div className="flex items-center gap-4">
@@ -66,7 +72,7 @@ export default function SoundSettings() {
               value={[volume]}
               onValueChange={([v]) => setVolume(v)}
               disabled={muted}
-              aria-label="Master volume"
+              aria-label={t`Master volume`}
             />
             <span className="w-10 text-sm tabular-nums text-muted-foreground">
               {volume}%
@@ -79,9 +85,13 @@ export default function SoundSettings() {
           className="flex items-center justify-between gap-4"
         >
           <span className="flex flex-col">
-            <span className="text-sm font-medium">Mute all sound</span>
+            <span className="text-sm font-medium">
+              <Trans>Mute all sound</Trans>
+            </span>
             <span className="text-xs text-muted-foreground">
-              Silence everything without losing your volume setting.
+              <Trans>
+                Silence everything without losing your volume setting.
+              </Trans>
             </span>
           </span>
           <Switch id="sound-muted" checked={muted} onCheckedChange={setMuted} />
@@ -90,7 +100,7 @@ export default function SoundSettings() {
 
       <section className="flex flex-col gap-3">
         <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
-          Music
+          <Trans>Music</Trans>
         </h2>
         <MusicSource />
         <MusicHangNotice />
@@ -98,7 +108,7 @@ export default function SoundSettings() {
 
       <section className="flex flex-col gap-3">
         <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
-          Groups
+          <Trans>Groups</Trans>
         </h2>
         {/* Music is always on the list now that coilbox bundles a track of its
             own, so the group always controls something whatever the
@@ -106,16 +116,18 @@ export default function SoundSettings() {
         {visibleGroupIds(true).map((id) => (
           <div key={id} className="flex items-center justify-between gap-4">
             <span className="flex flex-col">
-              <span className="text-sm font-medium">{GROUPS[id].label}</span>
+              <span className="text-sm font-medium">
+                {i18n._(GROUPS[id].label)}
+              </span>
               <span className="text-xs text-muted-foreground">
-                {GROUPS[id].description}
+                {i18n._(GROUPS[id].description)}
               </span>
             </span>
             <div className="flex items-center gap-3">
               {id === "music" && <MusicToggle />}
               <LevelRow
                 id={`sound-group-${id}`}
-                label={GROUPS[id].label}
+                label={i18n._(GROUPS[id].label)}
                 volumeKey={groupVolumeKey(id)}
                 mutedKey={groupMutedKey(id)}
                 defaultMuted={groupMutedByDefault(id)}
@@ -129,24 +141,26 @@ export default function SoundSettings() {
 
       <section className="flex flex-col gap-3">
         <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
-          Sounds
+          <Trans>Sounds</Trans>
         </h2>
         <p className="text-xs text-muted-foreground">
-          Each of these plays a sound you can change. A sound's final volume is
-          the master, times the group it sits under, times its own. Play lets
-          you hear one whether or not it is muted.
+          <Trans>
+            Each of these plays a sound you can change. A sound's final volume
+            is the master, times the group it sits under, times its own. Play
+            lets you hear one whether or not it is muted.
+          </Trans>
         </p>
         <table className="w-full border-collapse text-sm">
           <thead>
             <tr className="border-b text-left text-xs uppercase tracking-wide text-muted-foreground">
               <th scope="col" className="py-2 pr-4 font-medium">
-                When
+                <Trans>When</Trans>
               </th>
               <th scope="col" className="py-2 pr-4 font-medium">
-                Sound
+                <Trans>Sound</Trans>
               </th>
               <th scope="col" className="py-2 font-medium">
-                Volume
+                <Trans>Volume</Trans>
               </th>
             </tr>
           </thead>
@@ -160,7 +174,7 @@ export default function SoundSettings() {
                   colSpan={3}
                   className="border-b pt-5 pb-2 text-left text-xs font-semibold uppercase tracking-wide text-muted-foreground"
                 >
-                  {GROUPS[group].label}
+                  {i18n._(GROUPS[group].label)}
                 </th>
               </tr>
               {VISIBLE_EVENT_IDS.filter((id) => EVENTS[id].group === group).map(
@@ -185,8 +199,10 @@ function MusicHangNotice() {
   if (!turnedOff) return null;
   return (
     <p className="text-xs text-muted-foreground">
-      Music was turned off because the last attempt to play it stopped Coilbox
-      responding.
+      <Trans>
+        Music was turned off because the last attempt to play it stopped Coilbox
+        responding.
+      </Trans>
     </p>
   );
 }
@@ -197,6 +213,7 @@ function MusicHangNotice() {
  * it where it was.
  */
 function MusicToggle() {
+  const { t } = useLingui();
   const [playing, setPlaying] = useSetting<boolean>(
     MUSIC_PLAYING_KEY,
     musicOnByDefault(),
@@ -211,7 +228,7 @@ function MusicToggle() {
         clearTurnedOffByHang();
         setPlaying(!playing);
       }}
-      aria-label={playing ? "Pause music" : "Play music"}
+      aria-label={playing ? t`Pause music` : t`Play music`}
     >
       {playing ? <Pause /> : <Play />}
     </Button>
@@ -219,7 +236,10 @@ function MusicToggle() {
 }
 
 function EventRow({ id }: { id: EventId }) {
+  const { t, i18n } = useLingui();
   const event = EVENTS[id];
+  const eventLabel = i18n._(event.label);
+  const defaultSoundLabel = SOUNDS[event.sound].label;
   const [sound, setSound] = useSetting<string | null>(eventSoundKey(id), null);
   const chosen = isSoundId(sound) ? sound : event.sound;
   const [playing, setPlaying] = useState(false);
@@ -245,9 +265,9 @@ function EventRow({ id }: { id: EventId }) {
   return (
     <tr className="border-b align-top last:border-0">
       <th scope="row" className="py-3 pr-4 text-left font-normal">
-        <span className="block text-sm font-medium">{event.label}</span>
+        <span className="block text-sm font-medium">{eventLabel}</span>
         <span className="block max-w-sm text-xs font-normal text-muted-foreground">
-          {event.description}
+          {i18n._(event.description)}
         </span>
       </th>
       <td className="py-3 pr-4">
@@ -263,18 +283,18 @@ function EventRow({ id }: { id: EventId }) {
               // anything else.
               onValueChange={(v) => setSound(v === event.sound ? null : v)}
               size="sm"
-              ariaLabel={`Sound for ${event.label}`}
+              ariaLabel={t`Sound for ${eventLabel}`}
               options={SOUND_IDS.map((soundId) => ({
                 value: soundId,
                 label: SOUNDS[soundId].label,
-                group: SOUNDS[soundId].group,
+                group: i18n._(SOUNDS[soundId].group),
                 // Named in the list as well as offered by the reset button,
                 // because a player browsing 21 sounds should be able to see
                 // which one they started with.
                 trailing:
                   soundId === event.sound ? (
                     <span className="text-xs text-muted-foreground">
-                      Default
+                      <Trans>Default</Trans>
                     </span>
                   ) : undefined,
               }))}
@@ -285,7 +305,7 @@ function EventRow({ id }: { id: EventId }) {
             size="sm"
             onClick={preview}
             aria-label={
-              playing ? `Stop ${event.label}` : `Preview ${event.label}`
+              playing ? t`Stop ${eventLabel}` : t`Preview ${eventLabel}`
             }
           >
             {playing ? <Square /> : <Play />}
@@ -295,7 +315,7 @@ function EventRow({ id }: { id: EventId }) {
             size="sm"
             onClick={() => setSound(null)}
             disabled={chosen === event.sound}
-            aria-label={`Reset ${event.label} to ${SOUNDS[event.sound].label}`}
+            aria-label={t`Reset ${eventLabel} to ${defaultSoundLabel}`}
           >
             <RotateCcw />
           </Button>
@@ -304,7 +324,7 @@ function EventRow({ id }: { id: EventId }) {
       <td className="py-3">
         <LevelRow
           id={`sound-event-${id}`}
-          label={event.label}
+          label={eventLabel}
           volumeKey={eventVolumeKey(id)}
           mutedKey={eventMutedKey(id)}
           compact

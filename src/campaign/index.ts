@@ -1,7 +1,9 @@
+import { msg, t } from "@lingui/core/macro";
 import type { FramePlugin } from "@picoframe/plugin-sdk";
 import { Hammer, Milestone } from "lucide-react";
 import { gateAdvanced, useAdvancedMode } from "../general/advanced";
 import CoilMark from "../general/CoilMark";
+import { lazyText } from "../i18n/pluginText";
 import { gateProfileHidden, isProfileHidden } from "../profile/hidden";
 import { getCachedCampaign, useHasCampaigns } from "./campaigns";
 
@@ -24,12 +26,12 @@ const campaignPlugin: FramePlugin = {
   nav: [
     {
       id: "play",
-      label: "Play",
+      label: lazyText(msg`Play`),
       order: 5,
       items: [
         {
           id: "campaign.list",
-          label: "Campaigns",
+          label: lazyText(msg`Campaigns`),
           to: "/campaign",
           order: 1,
           icon: Milestone,
@@ -39,12 +41,12 @@ const campaignPlugin: FramePlugin = {
     },
     {
       id: "builder",
-      label: "Campaign Builder",
+      label: lazyText(msg`Campaign Builder`),
       order: 35,
       items: [
         {
           id: "campaign.builder",
-          label: "Campaigns",
+          label: lazyText(msg`Campaigns`),
           to: "/campaign-builder",
           order: 1,
           icon: Hammer,
@@ -56,7 +58,7 @@ const campaignPlugin: FramePlugin = {
         // the system browser via the Tauri opener.
         {
           id: "campaign.guide",
-          label: "Campaigns guide",
+          label: lazyText(msg`Campaigns guide`),
           href: "https://tomjn.github.io/coilbox/developers/campaigns",
           icon: CoilMark,
           sidebar: false,
@@ -71,7 +73,7 @@ const campaignPlugin: FramePlugin = {
     {
       path: "campaign",
       lazy: () => import("./pages/CampaignsPage"),
-      crumb: "Campaigns",
+      crumb: lazyText(msg`Campaigns`),
     },
     {
       // Crumbs resolve the campaign/mission *titles* from the session cache; the
@@ -101,7 +103,7 @@ const campaignPlugin: FramePlugin = {
         const mission = loaded?.campaign.missions.find(
           (m) => m.id === c.params.missionId,
         );
-        return mission?.title || "Mission";
+        return mission?.title || t`Mission`;
       },
     },
     {
@@ -112,7 +114,7 @@ const campaignPlugin: FramePlugin = {
           () => import("./pages/CampaignBuilderPage"),
         ),
       ),
-      crumb: "Campaign Builder",
+      crumb: lazyText(msg`Campaign Builder`),
     },
     {
       path: "campaign-builder/:id",
@@ -122,7 +124,7 @@ const campaignPlugin: FramePlugin = {
           () => import("./pages/CampaignEditPage"),
         ),
       ),
-      crumb: "Edit",
+      crumb: lazyText(msg`Edit`),
     },
   ],
 };

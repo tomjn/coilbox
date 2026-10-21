@@ -1,5 +1,7 @@
+import { msg, t } from "@lingui/core/macro";
 import type { FramePlugin } from "@picoframe/plugin-sdk";
 import { Rocket } from "lucide-react";
+import { lazyText } from "../i18n/pluginText";
 import { NeedsGameNavBadge } from "../play/navBadges";
 import { gateProfileHidden, isProfileHidden } from "../profile/hidden";
 import { getCachedRun } from "./runs";
@@ -23,12 +25,12 @@ const runlitePlugin: FramePlugin = {
   nav: [
     {
       id: "play",
-      label: "Play",
+      label: lazyText(msg`Play`),
       order: 5,
       items: [
         {
           id: "runlite.list",
-          label: "Warpath",
+          label: lazyText(msg`Warpath`),
           to: "/warpath",
           order: 3,
           icon: Rocket,
@@ -46,7 +48,7 @@ const runlitePlugin: FramePlugin = {
         "runlite.list",
         () => import("./pages/RunListPage"),
       ),
-      crumb: "Warpath",
+      crumb: lazyText(msg`Warpath`),
     },
     {
       path: "warpath/:runId",
@@ -56,7 +58,7 @@ const runlitePlugin: FramePlugin = {
       appearance: "dark",
       lazy: gateProfileHidden("runlite.list", () => import("./pages/RunPage")),
       crumb: (c) =>
-        (c.params.runId && getCachedRun(c.params.runId)?.name) || "Warpath",
+        (c.params.runId && getCachedRun(c.params.runId)?.name) || t`Warpath`,
     },
   ],
 };

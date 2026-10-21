@@ -1,4 +1,4 @@
-import { useLingui } from "@lingui/react/macro";
+import { Trans, useLingui } from "@lingui/react/macro";
 import { Maximize2, Sparkles, Wrench } from "lucide-react";
 import { Field } from "@/components/Field";
 import { OptionSelect } from "@/components/OptionSelect";
@@ -50,7 +50,7 @@ export default function GeneralSettings() {
     <div className="space-y-8">
       <section className="space-y-3">
         <h2 className="flex items-center gap-2 text-sm font-semibold uppercase tracking-wide text-muted-foreground">
-          <Wrench size={15} /> Advanced tools
+          <Wrench size={15} /> <Trans>Advanced tools</Trans>
         </h2>
         <Label
           htmlFor="advanced-mode"
@@ -63,11 +63,15 @@ export default function GeneralSettings() {
             className="mt-0.5"
           />
           <span className="space-y-1">
-            <span className="block text-sm font-medium">Advanced mode</span>
+            <span className="block text-sm font-medium">
+              <Trans>Advanced mode</Trans>
+            </span>
             <span className="block text-xs text-muted-foreground">
-              Show the developer and modding tools — uberstress, mapconv,
-              animation, and the archive explorer — in the sidebar and welcome
-              screen. Off by default for a player-focused layout.
+              <Trans>
+                Show the developer and modding tools — uberstress, mapconv,
+                animation, and the archive explorer — in the sidebar and welcome
+                screen. Off by default for a player-focused layout.
+              </Trans>
             </span>
           </span>
         </Label>
@@ -75,7 +79,7 @@ export default function GeneralSettings() {
 
       <section className="space-y-3">
         <h2 className="flex items-center gap-2 text-sm font-semibold uppercase tracking-wide text-muted-foreground">
-          <Maximize2 size={15} /> Display
+          <Maximize2 size={15} /> <Trans>Display</Trans>
         </h2>
         <Field label={t`Language`} className="w-56">
           <OptionSelect
@@ -104,12 +108,16 @@ export default function GeneralSettings() {
             />
           </div>
           <span className="space-y-1">
-            <span className="block text-sm font-medium">Interface size</span>
+            <span className="block text-sm font-medium">
+              <Trans>Interface size</Trans>
+            </span>
             <span className="block text-xs text-muted-foreground">
-              Scales the whole of Coilbox: text, spacing and the 3D views. Fit
-              more on a small screen, or make everything easier to read on a
-              large one. Cmd or Ctrl with plus and minus does the same, and with
-              zero puts it back to 100%.
+              <Trans>
+                Scales the whole of Coilbox: text, spacing and the 3D views. Fit
+                more on a small screen, or make everything easier to read on a
+                large one. Cmd or Ctrl with plus and minus does the same, and
+                with zero puts it back to 100%.
+              </Trans>
             </span>
           </span>
         </div>
@@ -125,10 +133,14 @@ export default function GeneralSettings() {
               className="mt-0.5"
             />
             <span className="space-y-1">
-              <span className="block text-sm font-medium">Fullscreen</span>
+              <span className="block text-sm font-medium">
+                <Trans>Fullscreen</Trans>
+              </span>
               <span className="block text-xs text-muted-foreground">
-                Run Coilbox in fullscreen. Also toggleable with F11 or the
-                top-bar button; the choice is remembered across restarts.
+                <Trans>
+                  Run Coilbox in fullscreen. Also toggleable with F11 or the
+                  top-bar button; the choice is remembered across restarts.
+                </Trans>
               </span>
             </span>
           </Label>
@@ -145,10 +157,14 @@ export default function GeneralSettings() {
               className="mt-0.5"
             />
             <span className="space-y-1">
-              <span className="block text-sm font-medium">Startup splash</span>
+              <span className="block text-sm font-medium">
+                <Trans>Startup splash</Trans>
+              </span>
               <span className="block text-xs text-muted-foreground">
-                Show the brand splash when Coilbox launches. Click it or press
-                Escape to dismiss it early.
+                <Trans>
+                  Show the brand splash when Coilbox launches. Click it or press
+                  Escape to dismiss it early.
+                </Trans>
               </span>
             </span>
           </Label>
@@ -164,10 +180,14 @@ export default function GeneralSettings() {
             className="mt-0.5"
           />
           <span className="space-y-1">
-            <span className="block text-sm font-medium">Show frame rate</span>
+            <span className="block text-sm font-medium">
+              <Trans>Show frame rate</Trans>
+            </span>
             <span className="block text-xs text-muted-foreground">
-              Shows how many frames a second each 3D view draws, in its bottom
-              right corner.
+              <Trans>
+                Shows how many frames a second each 3D view draws, in its bottom
+                right corner.
+              </Trans>
             </span>
           </span>
         </Label>
@@ -175,7 +195,7 @@ export default function GeneralSettings() {
 
       <section className="space-y-3">
         <h2 className="flex items-center gap-2 text-sm font-semibold uppercase tracking-wide text-muted-foreground">
-          <Sparkles size={15} /> Motion &amp; effects
+          <Sparkles size={15} /> <Trans>Motion &amp; effects</Trans>
         </h2>
         <div className="flex items-start gap-3">
           <div className="w-40">
@@ -184,18 +204,22 @@ export default function GeneralSettings() {
               onValueChange={(v) => setReduceMotion(v as ReduceMotionSetting)}
               size="sm"
               options={[
-                { value: "system", label: "Follow system" },
-                { value: "on", label: "Reduce motion" },
-                { value: "off", label: "Full motion" },
+                { value: "system", label: t`Follow system` },
+                { value: "on", label: t`Reduce motion` },
+                { value: "off", label: t`Full motion` },
               ]}
             />
           </div>
           <span className="space-y-1">
-            <span className="block text-sm font-medium">Reduce motion</span>
+            <span className="block text-sm font-medium">
+              <Trans>Reduce motion</Trans>
+            </span>
             <span className="block text-xs text-muted-foreground">
-              Stops ambient animation — the galaxy twinkle, scrolling panoramas,
-              spinning map previews and result flourishes. "Follow system"
-              respects your OS accessibility preference.
+              <Trans>
+                Stops ambient animation — the galaxy twinkle, scrolling
+                panoramas, spinning map previews and result flourishes. "Follow
+                system" respects your OS accessibility preference.
+              </Trans>
             </span>
           </span>
         </div>
@@ -210,11 +234,15 @@ export default function GeneralSettings() {
             className="mt-0.5"
           />
           <span className="space-y-1">
-            <span className="block text-sm font-medium">Ambient effects</span>
+            <span className="block text-sm font-medium">
+              <Trans>Ambient effects</Trans>
+            </span>
             <span className="block text-xs text-muted-foreground">
-              Star twinkle, nebulae and other decorative touches. Turn off for a
-              plainer interface. Sound is controlled separately, in Sound
-              settings.
+              <Trans>
+                Star twinkle, nebulae and other decorative touches. Turn off for
+                a plainer interface. Sound is controlled separately, in Sound
+                settings.
+              </Trans>
             </span>
           </span>
         </Label>
@@ -229,10 +257,14 @@ export default function GeneralSettings() {
             className="mt-0.5"
           />
           <span className="space-y-1">
-            <span className="block text-sm font-medium">Performance mode</span>
+            <span className="block text-sm font-medium">
+              <Trans>Performance mode</Trans>
+            </span>
             <span className="block text-xs text-muted-foreground">
-              Renders 3D views at a lower resolution with fewer particles — for
-              laptops and older GPUs.
+              <Trans>
+                Renders 3D views at a lower resolution with fewer particles —
+                for laptops and older GPUs.
+              </Trans>
             </span>
           </span>
         </Label>
