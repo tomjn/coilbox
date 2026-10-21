@@ -75,18 +75,39 @@ function M.resolve(entry)
 	return out
 end
 
---- Where every building of a resolved entry lands, for a given anchor and
--- rotation, snapped and tested against the ground.
+--- A facing flipped side to side (east and west swap) or top to bottom
+-- (south and north swap). Facing 0 is south, 1 east, 2 north, 3 west.
+function M.flippedFacing(facing, flipX, flipZ)
+	if flipX and facing % 2 == 1 then
+		facing = (facing + 2) % 4
+	end
+	if flipZ and facing % 2 == 0 then
+		facing = (facing + 2) % 4
+	end
+	return facing
+end
+
+--- Where every building of a resolved entry lands, for a given anchor,
+-- rotation and flip, snapped and tested against the ground. The flip comes
+-- after the turn, so it is always along the map's own x or z.
 -- @param resolved table from M.resolve
 -- @param rotation integer quarter turns
 -- @param ax number anchor x, elmos
 -- @param az number anchor z, elmos
+-- @param flip table? { x = boolean, z = boolean }
 -- @return table[] { defID, def, x, y, z, facing, blocked }
-function M.footprint(resolved, rotation, ax, az)
+function M.footprint(resolved, rotation, ax, az, flip)
+	local flipX, flipZ = flip and flip.x, flip and flip.z
 	local out = {}
 	for i, b in ipairs(resolved.buildings) do
 		local ox, oz = M.turned(b.offset.x, b.offset.z, rotation)
-		local facing = (b.facing + rotation) % 4
+		if flipX then
+			ox = -ox
+		end
+		if flipZ then
+			oz = -oz
+		end
+		local facing = M.flippedFacing((b.facing + rotation) % 4, flipX, flipZ)
 		local x, y, z = Spring.Pos2BuildPos(b.defID, ax + ox, 0, az + oz, facing)
 		local status = Spring.TestBuildOrder(b.defID, x, y, z, facing)
 		out[i] = { defID = b.defID, def = b.def, x = x, y = y, z = z, facing = facing, blocked = status == 0 }
@@ -94,11 +115,12 @@ function M.footprint(resolved, rotation, ax, az)
 	return out
 end
 
---- What the selected units can build.
+--- What the selected units can build, and how fast.
 -- @param unitIDs integer[]
--- @return table { union = { defID = true }, byUnit = { unitID = { defID = true } }, builders = unitID[] }
+-- @return table { union = { defID = true }, byUnit = { unitID = { defID = true } },
+--   builders = unitID[], speed = { unitID = build speed } }
 function M.capabilities(unitIDs)
-	local out = { union = {}, byUnit = {}, builders = {} }
+	local out = { union = {}, byUnit = {}, builders = {}, speed = {} }
 	for _, unitID in ipairs(unitIDs) do
 		local defID = Spring.GetUnitDefID(unitID)
 		local def = defID and UnitDefs[defID]
@@ -111,6 +133,7 @@ function M.capabilities(unitIDs)
 			end
 			out.byUnit[unitID] = own
 			out.builders[#out.builders + 1] = unitID
+			out.speed[unitID] = def.buildSpeed or 0
 		end
 	end
 	return out
@@ -134,14 +157,78 @@ function M.classify(resolved, can)
 	return "never"
 end
 
+--- Who builds each position when builders split the work. Each building
+-- goes to the nearest builder able to build it, until that builder has its
+-- fair share of the build time, its build speed's part of the whole. The
+-- buildings that most clearly belong to one builder, by how much further the
+-- next nearest is, are given out first.
+-- @return table position index -> unitID
+local function split(foot, can)
+	local at, totalSpeed = {}, 0
+	for _, unitID in ipairs(can.builders) do
+		local x, _, z = Spring.GetUnitPosition(unitID)
+		at[unitID] = x and { x = x, z = z } or { x = 0, z = 0 }
+		totalSpeed = totalSpeed + (can.speed[unitID] or 0)
+	end
+	local jobs, work = {}, 0
+	for i, p in ipairs(foot) do
+		if not p.blocked then
+			local options = {}
+			for _, unitID in ipairs(can.builders) do
+				if can.byUnit[unitID][p.defID] then
+					local d = math.sqrt((p.x - at[unitID].x) ^ 2 + (p.z - at[unitID].z) ^ 2)
+					options[#options + 1] = { unitID = unitID, d = d }
+				end
+			end
+			if #options > 0 then
+				table.sort(options, function(a, b)
+					return a.d < b.d
+				end)
+				local regret = options[2] and options[2].d - options[1].d or math.huge
+				jobs[#jobs + 1] = { i = i, options = options, regret = regret, time = p.def.buildTime or 0 }
+				work = work + (p.def.buildTime or 0)
+			end
+		end
+	end
+	table.sort(jobs, function(a, b)
+		if a.regret ~= b.regret then
+			return a.regret > b.regret
+		end
+		return a.i < b.i
+	end)
+	-- a builder's fair share, in build time, before it stops taking more
+	local share, load = {}, {}
+	for _, unitID in ipairs(can.builders) do
+		share[unitID] = totalSpeed > 0 and work * (can.speed[unitID] or 0) / totalSpeed or math.huge
+		load[unitID] = 0
+	end
+	local who = {}
+	for _, job in ipairs(jobs) do
+		local pick = job.options[1].unitID
+		for _, option in ipairs(job.options) do
+			if load[option.unitID] < share[option.unitID] then
+				pick = option.unitID
+				break
+			end
+		end
+		who[job.i] = pick
+		load[pick] = load[pick] + job.time
+	end
+	return who
+end
+
 --- Turn a footprint into orders.
 -- @param foot table[] from M.footprint
 -- @param can table from M.capabilities
 -- @param shift boolean whether the player holds shift, which appends everything
+-- @param mode string? "help", the default, gives every builder every building
+--   it can build, so they help each other with each one in turn. "split"
+--   gives each building to one builder, for games that stop builders helping.
 -- @return table { orders = { { unitID, cmds } }, remainder = foot entries nobody
 --   can build, blocked = count of positions skipped because the ground refused }
-function M.plan(foot, can, shift)
+function M.plan(foot, can, shift, mode)
 	local out = { orders = {}, remainder = {}, blocked = 0 }
+	local who = mode == "split" and split(foot, can) or nil
 	local taken = {}
 	for _, unitID in ipairs(can.builders) do
 		local own = can.byUnit[unitID]
@@ -149,7 +236,7 @@ function M.plan(foot, can, shift)
 		for i, p in ipairs(foot) do
 			if own[p.defID] then
 				taken[i] = true
-				if not p.blocked then
+				if not p.blocked and (not who or who[i] == unitID) then
 					local opts = (shift or #cmds > 0) and { "shift" } or {}
 					cmds[#cmds + 1] = { -p.defID, { p.x, p.y, p.z, p.facing }, opts }
 				end
@@ -167,6 +254,30 @@ function M.plan(foot, can, shift)
 		end
 	end
 	return out
+end
+
+--- What a layout costs, and how long the selected builders take to build
+-- the part they can, working together.
+-- @param resolved table from M.resolve
+-- @param can table from M.capabilities
+-- @return number metal, number energy, number? seconds, nil with no builder
+--   for any of it
+function M.cost(resolved, can)
+	local metal, energy, work, speed = 0, 0, 0, 0
+	for _, b in ipairs(resolved.buildings) do
+		metal = metal + (b.def.metalCost or 0)
+		energy = energy + (b.def.energyCost or 0)
+		if can.union[b.defID] then
+			work = work + (b.def.buildTime or 0)
+		end
+	end
+	for _, unitID in ipairs(can.builders) do
+		speed = speed + (can.speed[unitID] or 0)
+	end
+	if work == 0 or speed <= 0 then
+		return metal, energy, nil
+	end
+	return metal, energy, work / speed
 end
 
 --- Send a plan's orders to the engine.

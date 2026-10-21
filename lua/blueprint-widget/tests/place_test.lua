@@ -98,6 +98,31 @@ check(
 	show(turnedFoot[2])
 )
 
+local flipX = PLACE.footprint(resolved, 0, 320, 320, { x = true })
+check(
+	"flipping side to side mirrors x offsets and swaps east and west facings",
+	flipX[2].x == 264 and flipX[2].z == foot[2].z and flipX[2].facing == 3 and flipX[3].facing == 1 and flipX[1].facing == 0,
+	show(flipX[2])
+)
+local flipZ = PLACE.footprint(resolved, 0, 320, 320, { z = true })
+check(
+	"flipping top to bottom mirrors z offsets and swaps south and north facings",
+	flipZ[3].z == 320 - 48 and flipZ[3].x == foot[3].x and flipZ[1].facing == 2 and flipZ[2].facing == 1,
+	show(flipZ[3])
+)
+local turnedFlip = PLACE.footprint(resolved, 1, 320, 320, { x = true })
+check("a flip applies after the turn, along the map's x", turnedFlip[2].z == turnedFoot[2].z and turnedFlip[2].facing == 2, show(turnedFlip[2]))
+check("flipping both ways is a half turn", (function()
+	local both = PLACE.footprint(resolved, 0, 320, 320, { x = true, z = true })
+	local half = PLACE.footprint(resolved, 2, 320, 320)
+	for i = 1, #both do
+		if both[i].x ~= half[i].x or both[i].z ~= half[i].z or both[i].facing ~= half[i].facing then
+			return false
+		end
+	end
+	return true
+end)())
+
 local blockedFoot = PLACE.footprint(resolved, 0, 1024, 0)
 check("a blocked square is marked", blockedFoot[1].blocked == true and blockedFoot[4].blocked == false, show(blockedFoot))
 
@@ -155,6 +180,52 @@ check("skipped positions are counted", blockedPlan.blocked == 3)
 
 local emptyPlan = PLACE.plan(foot, none, false)
 check("no builders means no orders and everything left over", #emptyPlan.orders == 0 and #emptyPlan.remainder == 4)
+
+-- splitting the work
+local SPLIT_SOLAR = support.def(20, "splitsolar", { isBuilding = true, xsize = 4, zsize = 4, buildTime = 100, metalCost = 10, energyCost = 0 })
+local SPLIT_CON = support.def(21, "splitcon", { buildOptions = { 20 }, buildSpeed = 10, speed = 50 })
+local SPLIT_LAB = support.def(22, "splitlab", { isBuilding = true, xsize = 8, zsize = 8, buildTime = 400, metalCost = 200, energyCost = 1000 })
+local splitE = support.engine({ SPLIT_SOLAR, SPLIT_CON, SPLIT_LAB }, {
+	units = {
+		[300] = { def = 21, x = 0, z = 0 },
+		[301] = { def = 21, x = 1000, z = 0 },
+	},
+})
+PLACE.use(splitE)
+local row = {}
+for i, x in ipairs({ 0, 32, 64, 936, 968, 1000 }) do
+	row[i] = { defID = 20, def = SPLIT_SOLAR, x = x, y = 0, z = 0, facing = 0, blocked = false }
+end
+local twoCons = PLACE.capabilities({ 300, 301 })
+check("capabilities records each builder's build speed", twoCons.speed[300] == 10 and twoCons.speed[301] == 10)
+local helped = PLACE.plan(row, twoCons, false)
+check("helping gives both builders every building", #helped.orders == 2 and #helped.orders[1].cmds == 6 and #helped.orders[2].cmds == 6)
+local splitPlan = PLACE.plan(row, twoCons, false, "split")
+local function xs(order)
+	local out = {}
+	for i, cmd in ipairs(order.cmds) do
+		out[i] = cmd[2][1]
+	end
+	return out
+end
+check("splitting gives each building to one builder, the nearest", same(xs(splitPlan.orders[1]), { 0, 32, 64 }) and same(xs(splitPlan.orders[2]), { 936, 968, 1000 }), show(splitPlan.orders))
+check("split orders still replace the queue first and then append", same(splitPlan.orders[2].cmds[1][3], {}) and same(splitPlan.orders[2].cmds[2][3], { "shift" }))
+local clustered = {}
+for i = 1, 4 do
+	clustered[i] = { defID = 20, def = SPLIT_SOLAR, x = 16 * i, y = 0, z = 0, facing = 0, blocked = false }
+end
+local shared = PLACE.plan(clustered, twoCons, false, "split")
+check("when it is all near one builder, the other still takes a share", #shared.orders == 2 and #shared.orders[1].cmds + #shared.orders[2].cmds == 4, show(shared.orders))
+row[2].blocked = true
+local splitBlocked = PLACE.plan(row, twoCons, false, "split")
+check("splitting skips and counts blocked positions", #splitBlocked.orders[1].cmds == 2 and splitBlocked.blocked == 1 and #splitBlocked.remainder == 0)
+
+local m, en, secs = PLACE.cost({ buildings = { { defID = 20, def = SPLIT_SOLAR }, { defID = 22, def = SPLIT_LAB } } }, twoCons)
+check("cost adds every building's metal and energy", m == 210 and en == 1000, m .. " " .. en)
+check("build time counts only what the builders can build, at their speed together", secs == 100 / 20, tostring(secs))
+local _, _, noTime = PLACE.cost({ buildings = { { defID = 20, def = SPLIT_SOLAR } } }, PLACE.capabilities({}))
+check("with no builder there is no build time", noTime == nil)
+PLACE.use(E)
 
 E.orders = {}
 local issued = PLACE.issue(plan)
