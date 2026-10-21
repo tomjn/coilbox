@@ -14,6 +14,7 @@
  * so a button's tooltip and the overflow menu's list read the same words.
  */
 
+import { t } from "@lingui/core/macro";
 import { modKeyLabel } from "@/lib/scenarioEditing/history";
 
 /** The parts of a key press these read, so they can be tested without a DOM,
@@ -81,18 +82,16 @@ export interface EditorShortcut {
 export function editorShortcuts(): EditorShortcut[] {
   const mod = modKeyLabel();
   return [
-    { description: "Test in game", keys: `${mod} Enter` },
+    { description: t`Test in game`, keys: `${mod} Enter` },
     {
-      description:
-        "Switch mode: Select, Zones, Actors, Groups, Bases, Blueprints",
+      description: t`Switch mode: Select, Zones, Actors, Groups, Bases, Blueprints`,
       keys: "1 – 6",
     },
     {
-      description:
-        "Duplicate the selected placement, or the trigger you are editing",
+      description: t`Duplicate the selected placement, or the trigger you are editing`,
       keys: `${mod} D`,
     },
-    { description: "Undo", keys: `${mod} Z` },
-    { description: "Redo", keys: `${mod} Shift Z` },
+    { description: t`Undo`, keys: `${mod} Z` },
+    { description: t`Redo`, keys: `${mod} Shift Z` },
   ];
 }

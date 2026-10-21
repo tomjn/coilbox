@@ -11,6 +11,8 @@
  * picker's list, which is the practical reason to.
  */
 
+import { plural } from "@lingui/core/macro";
+import { Trans, useLingui } from "@lingui/react/macro";
 import { Button, Input } from "@picoframe/frame";
 import { Plus, Trash2, Variable } from "lucide-react";
 import { useEffect, useRef } from "react";
@@ -51,7 +53,9 @@ export function VarPanel({
    *  select into here, the row is the whole of it. */
   focus?: RowFocus | null;
 }) {
+  const { t } = useLingui();
   const names = Object.keys(scenario.vars);
+  const variableCount = names.length;
   const panelRef = useRef<EditorPanelHandle>(null);
   const rowRefs = useRef(new Map<string, HTMLLIElement>());
 
@@ -69,21 +73,26 @@ export function VarPanel({
   return (
     <EditorPanel
       ref={panelRef}
-      title="Variables"
+      title={t`Variables`}
       icon={Variable}
       summary={
         names.length === 0
-          ? "Nothing counted yet"
-          : `${names.length} variable${names.length === 1 ? "" : "s"}`
+          ? t`Nothing counted yet`
+          : plural(variableCount, {
+              one: "# variable",
+              other: "# variables",
+            })
       }
     >
       <div className="flex max-w-xl flex-col gap-2">
         {names.length === 0 ? (
           <p className="text-xs text-muted-foreground">
-            A variable is a number the mission counts with: waves sent,
-            prisoners freed, whether the bridge is down. Triggers read it with
-            the <code>var</code> condition and move it with <code>set_var</code>{" "}
-            and <code>add_var</code>.
+            <Trans>
+              A variable is a number the mission counts with: waves sent,
+              prisoners freed, whether the bridge is down. Triggers read it with
+              the <code>var</code> condition and move it with{" "}
+              <code>set_var</code> and <code>add_var</code>.
+            </Trans>
           </p>
         ) : (
           <ul className="flex flex-col gap-1.5">
@@ -98,7 +107,7 @@ export function VarPanel({
               >
                 <NameField
                   name={name}
-                  label={`Name of ${name}`}
+                  label={t`Name of ${name}`}
                   className="h-7 w-full font-mono text-xs"
                   onRename={(wanted) => {
                     const next = renameVar(scenario, name, wanted, extensions);
@@ -108,24 +117,24 @@ export function VarPanel({
                     }
                     const trimmed = wanted.trim();
                     return trimmed
-                      ? `A variable called ${trimmed} already exists`
-                      : "A variable needs a name";
+                      ? t`A variable called ${trimmed} already exists`
+                      : t`A variable needs a name`;
                   }}
                 />
                 <ValueField
                   key={`${name}-value`}
                   value={scenario.vars[name]}
-                  label={`Starting value of ${name}`}
+                  label={t`Starting value of ${name}`}
                   onCommit={(value) => onChange(setVar(scenario, name, value))}
                 />
                 <Button
                   size="sm"
                   variant="ghost"
                   className="size-7 shrink-0 p-0 text-destructive hover:text-destructive"
-                  aria-label={`Undeclare ${name}`}
+                  aria-label={t`Undeclare ${name}`}
                   onClick={() => {
                     onChange(removeVar(scenario, name));
-                    notifyDeleted(`Undeclared variable "${name}".`, onUndo);
+                    notifyDeleted(t`Undeclared variable "${name}".`, onUndo);
                   }}
                 >
                   <Trash2 className="size-3.5" />
@@ -141,13 +150,15 @@ export function VarPanel({
           className="h-7 w-fit gap-1.5 px-2 text-xs"
           onClick={() => onChange(addVar(scenario, nextVarName(scenario.vars)))}
         >
-          <Plus className="size-3.5" /> New variable
+          <Plus className="size-3.5" /> <Trans>New variable</Trans>
         </Button>
 
         {names.length > 0 && (
           <p className="text-[11px] text-muted-foreground">
-            Renaming one carries the triggers that read it over. Undeclaring one
-            leaves them alone, and they read it as 0.
+            <Trans>
+              Renaming one carries the triggers that read it over. Undeclaring
+              one leaves them alone, and they read it as 0.
+            </Trans>
           </p>
         )}
       </div>

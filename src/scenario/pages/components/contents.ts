@@ -12,6 +12,7 @@
  * picked is `focusCamera` in `scene.ts`.
  */
 
+import { plural, t } from "@lingui/core/macro";
 import { GROUP_SPACING } from "@/lib/scenarioEditing/placements";
 import { parsePlacementKey, placementKey } from "@/placement/placements";
 import {
@@ -20,7 +21,13 @@ import {
   type Point,
   type Scenario,
 } from "../../model";
-import { baseLabels, groupSize, parsePathKey, uniqueLabels } from "./groups";
+import {
+  baseLabels,
+  groupLabel,
+  groupSize,
+  parsePathKey,
+  uniqueLabels,
+} from "./groups";
 import { parseZoneKey, zoneCenter, zoneExtent, zoneKey } from "./zones";
 
 /** The kinds of thing the list holds, in the order it lists them. */
@@ -55,11 +62,15 @@ export interface ContentEntry {
  *  to a group for (#842). */
 function groupDetail(group: Scenario["groups"][number]): string {
   const size = groupSize(group);
-  const units = `${size} unit${size === 1 ? "" : "s"}`;
-  const orders = group.orders.length;
-  return orders === 0
-    ? units
-    : `${units} · ${orders} order${orders === 1 ? "" : "s"}`;
+  const units = plural(size, { one: "# unit", other: "# units" });
+  const orderCount = group.orders.length;
+  if (orderCount === 0) return units;
+  const orders = plural(orderCount, { one: "# order", other: "# orders" });
+  return t`${units} · ${orders}`;
+}
+
+function buildingCount(count: number): string {
+  return plural(count, { one: "# building", other: "# buildings" });
 }
 
 /** How far a group's formation reaches from its point, in elmos. The runtime
@@ -112,11 +123,11 @@ export function sceneContents(
     span: 0,
     team: actor.team,
   }));
-  const groups = scenario.groups.map<ContentEntry>((group, i) => ({
+  const groups = scenario.groups.map<ContentEntry>((group) => ({
     key: placementKey("group", group.id, 0),
     kind: "group",
     id: group.id,
-    label: `Group ${i + 1}`,
+    label: groupLabel(scenario.groups, group.id),
     detail: groupDetail(group),
     pos: group.pos,
     span: groupSpan(group),
@@ -130,7 +141,7 @@ export function sceneContents(
       kind: "base",
       id: base.id,
       label: baseNames[i],
-      detail: `${buildings.length} building${buildings.length === 1 ? "" : "s"}`,
+      detail: buildingCount(buildings.length),
       pos: base.origin,
       span: baseSpan(buildings),
       team: base.team,
@@ -142,7 +153,7 @@ export function sceneContents(
     kind: "zone",
     id: zone.id,
     label: zoneLabels[i],
-    detail: zone.shape,
+    detail: zone.shape === "box" ? t`box` : t`circle`,
     pos: zoneCenter(zone),
     span: Math.max(...Object.values(zoneExtent(zone))),
     team: null,
@@ -182,12 +193,11 @@ export function unplacedLayouts(
     .filter((layout) => !placed.has(layout.id))
     .map((layout) => {
       const count = layout.buildings.length;
+      const buildings = buildingCount(count);
       return {
         id: layout.id,
         name: layout.name,
-        detail: `${count} building${count === 1 ? "" : "s"}${
-          layout.ordered ? " · build order" : ""
-        }`,
+        detail: layout.ordered ? t`${buildings} · build order` : buildings,
         empty: count === 0,
       };
     });

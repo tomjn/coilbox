@@ -15,6 +15,7 @@
  * than a click that silently does nothing.
  */
 
+import { Trans } from "@lingui/react/macro";
 import { Button } from "@picoframe/frame";
 import { ChevronRight, TriangleAlert } from "lucide-react";
 import { useMemo } from "react";
@@ -113,8 +114,10 @@ export function MissionProblemsList({
           open and watch it empty. */}
       {blocking.length === 0 && warnings.length === 0 ? (
         <p className="text-sm text-muted-foreground">
-          Every reference in this mission resolves, and there is nothing in it a
-          player would read as a bug.
+          <Trans>
+            Every reference in this mission resolves, and there is nothing in it
+            a player would read as a bug.
+          </Trans>
         </p>
       ) : null}
     </div>

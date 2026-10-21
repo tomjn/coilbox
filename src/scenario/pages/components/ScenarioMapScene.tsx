@@ -1,3 +1,4 @@
+import { Trans, useLingui } from "@lingui/react/macro";
 import { Layers, Loader2, MountainSnow, Unplug } from "lucide-react";
 import {
   forwardRef,
@@ -181,6 +182,7 @@ export const ScenarioMapScene = forwardRef<
   { scenario, onChange, extensions, picking, history, focus, issues = [] },
   ref,
 ) {
+  const { t } = useLingui();
   const mapName = scenario.setup.mapName;
   // The map's own 16 bit heights as well as the picture of them, because the
   // buildings placed here are checked against the ground they stand on and the
@@ -542,6 +544,10 @@ export const ScenarioMapScene = forwardRef<
     />
   ) : null;
 
+  const modeHint = mode.hint;
+  const pathName = pathRef ? pathLabel(paths, pathRef.groupId) : "";
+  const pointNumber = pathRef ? pathRef.waypoint + 1 : 0;
+
   const status = mapSceneStatus({
     mapName,
     hasEngine: !!assets.enginePath && !!assets.dataDir,
@@ -745,7 +751,7 @@ export const ScenarioMapScene = forwardRef<
         }
       : pathRef && selected
         ? {
-            deleteLabel: "Delete point",
+            deleteLabel: t`Delete point`,
             onDelete: () => {
               onChange((doc) => removePathWaypoint(doc, selected));
               // Back to the path the point belonged to rather than to nothing,
@@ -764,32 +770,38 @@ export const ScenarioMapScene = forwardRef<
   const stand =
     status === "no-map" ? (
       <SurfaceMessage icon={<Layers className="size-6" />}>
-        Pick a setup to choose the map this scenario is authored on.
+        <Trans>
+          Pick a setup to choose the map this scenario is authored on.
+        </Trans>
       </SurfaceMessage>
     ) : status === "loading" ? (
       <SurfaceMessage
         icon={<Loader2 className="size-6 animate-spin opacity-40" />}
       >
-        Reading {mapName}…
+        <Trans>Reading {mapName}…</Trans>
       </SurfaceMessage>
     ) : status === "no-engine" ? (
       <SurfaceMessage icon={<Unplug className="size-6" />}>
         <p>
-          Coilbox reads maps through an engine, and there is no engine installed
-          to read {mapName} with.
+          <Trans>
+            Coilbox reads maps through an engine, and there is no engine
+            installed to read {mapName} with.
+          </Trans>
         </p>
         <Link
           to="/settings/engines"
           className="mt-1 inline-block underline underline-offset-2 hover:text-foreground"
         >
-          Install an engine
+          <Trans>Install an engine</Trans>
         </Link>
       </SurfaceMessage>
     ) : status === "error" ? (
       <SurfaceMessage icon={<MountainSnow className="size-6" />}>
         <p>
-          {mapName} could not be read. It is most likely not installed for the
-          engine coilbox is using.
+          <Trans>
+            {mapName} could not be read. It is most likely not installed for the
+            engine coilbox is using.
+          </Trans>
         </p>
         {assets.error && (
           <p className="mt-1 font-mono text-xs opacity-70">{assets.error}</p>
@@ -798,7 +810,7 @@ export const ScenarioMapScene = forwardRef<
           to="/library/maps"
           className="mt-1 inline-block underline underline-offset-2 hover:text-foreground"
         >
-          Manage maps
+          <Trans>Manage maps</Trans>
         </Link>
       </SurfaceMessage>
     ) : null;
@@ -819,10 +831,10 @@ export const ScenarioMapScene = forwardRef<
         worldHeight: assets.worldHeight,
       }}
       onScene={onScene}
-      frameLabel="Frame map"
+      frameLabel={t`Frame map`}
       stand={stand}
       keyboard={{
-        label: mapName ? `Scenario map, ${mapName}` : "Scenario map",
+        label: mapName ? t`Scenario map, ${mapName}` : t`Scenario map`,
         help: keys.help,
         said: keys.said,
         cursor: keys.cursor,
@@ -900,10 +912,8 @@ export const ScenarioMapScene = forwardRef<
           )}
           {pathRef && selected && (
             <PathBar
-              what={`${pathLabel(paths, pathRef.groupId)} · point ${
-                pathRef.waypoint + 1
-              }`}
-              hint="drag it to move it"
+              what={t`${pathName} · point ${pointNumber}`}
+              hint={t`drag it to move it`}
             >
               {groupControls}
             </PathBar>
@@ -911,7 +921,7 @@ export const ScenarioMapScene = forwardRef<
           {selectedLine && (
             <PathBar
               what={pathLabel(paths, selectedLine)}
-              hint="drag one of its points to move it"
+              hint={t`drag one of its points to move it`}
             />
           )}
           {pickedZone && (
@@ -972,10 +982,10 @@ export const ScenarioMapScene = forwardRef<
       // Zones to draw one and Select to drag a marquee (issue #2279), so the
       // shared half only claims the middle button.
       footer={
-        <>
-          {mapName} · {mode.hint} · middle-drag to pan · drag a unit to move it
-          · drag a zone's middle handle to move it · right-drag to turn the view
-        </>
+        <Trans>
+          {mapName} · {modeHint} · middle-drag to pan · drag a unit to move it ·
+          drag a zone's middle handle to move it · right-drag to turn the view
+        </Trans>
       }
     />
   );
