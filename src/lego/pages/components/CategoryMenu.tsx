@@ -4,6 +4,7 @@
  * the closed menu too, because the chip is part of the entry's text.
  */
 
+import { Trans, useLingui } from "@lingui/react/macro";
 import { cn } from "@picoframe/frame";
 
 import {
@@ -35,19 +36,20 @@ export function CategoryMenu({
   disabled?: boolean;
   className?: string;
 }) {
+  const { t } = useLingui();
   return (
     <Select value={value} onValueChange={onValueChange} disabled={disabled}>
       <SelectTrigger
         size="sm"
         className={cn("w-44 shrink-0", className)}
-        aria-label="Category"
+        aria-label={t`Category`}
       >
         <SelectValue />
       </SelectTrigger>
       <SelectContent>
         <SelectItem value={EVERY_CATEGORY}>
           <ColourwayChip colours={colours} />
-          All categories
+          <Trans>All categories</Trans>
         </SelectItem>
         {groups.map((group) => (
           <SelectGroup key={group.label ?? "entries"}>

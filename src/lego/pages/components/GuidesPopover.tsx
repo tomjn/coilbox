@@ -6,6 +6,7 @@
  * view while a guide is being placed.
  */
 
+import { Trans, useLingui } from "@lingui/react/macro";
 import { Button, Input } from "@picoframe/frame";
 import {
   DraftingCompass,
@@ -60,6 +61,7 @@ export function GuidesPopover({
   onPick,
   symmetryPlane = false,
 }: Props) {
+  const { t } = useLingui();
   const [open, setOpen] = useState(false);
   const [axis, setAxis] = useState<GuideAxis>("x");
   const [kind, setKind] = useState<GuidePick["kind"]>("plane");
@@ -108,8 +110,8 @@ export function GuidesPopover({
         <Button
           size="icon"
           variant={picking !== null ? "default" : "outline"}
-          title="Guides"
-          aria-label="Guides"
+          title={t`Guides`}
+          aria-label={t`Guides`}
           aria-pressed={picking !== null}
         >
           <DraftingCompass className="size-4" />
@@ -121,8 +123,12 @@ export function GuidesPopover({
             {symmetryPlane ? (
               <li className="flex items-center gap-1 text-xs text-muted-foreground">
                 <Lock className="size-3.5 shrink-0" />
-                <span className="flex-1">Symmetry (x = 0)</span>
-                <span>Locked</span>
+                <span className="flex-1">
+                  <Trans>Symmetry (x = 0)</Trans>
+                </span>
+                <span>
+                  <Trans>Locked</Trans>
+                </span>
               </li>
             ) : null}
             {guides.map((guide) => (
@@ -141,7 +147,12 @@ export function GuidesPopover({
         ) : null}
 
         <div className="flex items-center gap-1">
-          {(["plane", "line"] as const).map((k) => (
+          {(
+            [
+              { kind: "plane", label: t`plane` },
+              { kind: "line", label: t`line` },
+            ] as const
+          ).map(({ kind: k, label }) => (
             <Button
               key={k}
               size="sm"
@@ -150,46 +161,52 @@ export function GuidesPopover({
               onClick={() => setKind(k)}
               className="flex-1 capitalize"
             >
-              {k}
+              {label}
             </Button>
           ))}
         </div>
 
         <div className="flex items-center gap-1">
-          {GUIDE_AXES.map((a) => (
-            <Button
-              key={a}
-              size="sm"
-              variant={axis === a ? "default" : "outline"}
-              aria-pressed={axis === a}
-              aria-label={`${a.toUpperCase()} axis`}
-              onClick={() => setAxis(a)}
-              className="w-8 px-0"
-            >
-              {a.toUpperCase()}
-            </Button>
-          ))}
-          {kind === "line" ? (
-            [first, second].map((a, index) => (
-              <Input
+          {GUIDE_AXES.map((a) => {
+            const axisName = a.toUpperCase();
+            return (
+              <Button
                 key={a}
-                value={across[index]}
-                onChange={(event) =>
-                  setAcross((now) =>
-                    now.map((value, i) =>
-                      i === index ? event.target.value : value,
-                    ),
-                  )
-                }
-                onKeyDown={(event) => {
-                  if (event.key === "Enter") add();
-                }}
-                inputMode="decimal"
-                aria-label={`${a.toUpperCase()} position`}
-                placeholder={a.toUpperCase()}
-                className="h-8 min-w-0 flex-1 text-right text-xs"
-              />
-            ))
+                size="sm"
+                variant={axis === a ? "default" : "outline"}
+                aria-pressed={axis === a}
+                aria-label={t`${axisName} axis`}
+                onClick={() => setAxis(a)}
+                className="w-8 px-0"
+              >
+                {axisName}
+              </Button>
+            );
+          })}
+          {kind === "line" ? (
+            [first, second].map((a, index) => {
+              const axisName = a.toUpperCase();
+              return (
+                <Input
+                  key={a}
+                  value={across[index]}
+                  onChange={(event) =>
+                    setAcross((now) =>
+                      now.map((value, i) =>
+                        i === index ? event.target.value : value,
+                      ),
+                    )
+                  }
+                  onKeyDown={(event) => {
+                    if (event.key === "Enter") add();
+                  }}
+                  inputMode="decimal"
+                  aria-label={t`${axisName} position`}
+                  placeholder={axisName}
+                  className="h-8 min-w-0 flex-1 text-right text-xs"
+                />
+              );
+            })
           ) : (
             <Input
               value={offset}
@@ -198,18 +215,18 @@ export function GuidesPopover({
                 if (event.key === "Enter") add();
               }}
               inputMode="decimal"
-              aria-label="Offset"
+              aria-label={t`Offset`}
               className="h-8 min-w-0 flex-1 text-right text-xs"
             />
           )}
           <Button size="sm" onClick={add} disabled={!usable}>
-            Add
+            <Trans>Add</Trans>
           </Button>
           <Button
             size="icon"
             variant={picking ? "default" : "outline"}
-            title="Click the model to place it"
-            aria-label="Click the model to place it"
+            title={t`Click the model to place it`}
+            aria-label={t`Click the model to place it`}
             aria-pressed={picking !== null}
             onClick={() => {
               onPick(picking ? null : { kind, axis });
@@ -233,6 +250,7 @@ function GuideRow({
   onChange: (change: Partial<Omit<LegoGuide, "id">>) => void;
   onRemove: () => void;
 }) {
+  const { t } = useLingui();
   const [name, setName] = useState(guide.name);
   useEffect(() => setName(guide.name), [guide.name]);
 
@@ -241,6 +259,11 @@ function GuideRow({
     if (trimmed === "") setName(guide.name);
     else if (trimmed !== guide.name) onChange({ name: trimmed });
   }
+
+  const guideLabel = guide.name;
+  const hideLabel = guide.hidden
+    ? t`Show ${guideLabel}`
+    : t`Hide ${guideLabel}`;
 
   return (
     <li className="flex items-center gap-1">
@@ -252,11 +275,12 @@ function GuideRow({
           if (event.key === "Enter") event.currentTarget.blur();
           if (event.key === "Escape") setName(guide.name);
         }}
-        aria-label={`Name of ${guide.name}`}
+        aria-label={t`Name of ${guideLabel}`}
         className="h-7 min-w-0 flex-1 text-xs"
       />
       {guide.kind === "line" ? (
         crossAxes(guide.axis).map((a) => {
+          const axisName = a.toUpperCase();
           const index = GUIDE_AXES.indexOf(a);
           return (
             <div key={a} className="w-16 shrink-0">
@@ -264,7 +288,7 @@ function GuideRow({
                 value={guide.point?.[index] ?? 0}
                 axis={a.toUpperCase()}
                 colour={AXIS_COLOUR[a]}
-                label={`${a.toUpperCase()} of ${guide.name}`}
+                label={t`${axisName} of ${guideLabel}`}
                 onCommit={(value) => {
                   const point: [number, number, number] = [
                     ...(guide.point ?? [0, 0, 0]),
@@ -282,7 +306,7 @@ function GuideRow({
             value={guide.offset ?? 0}
             axis={guide.axis.toUpperCase()}
             colour={AXIS_COLOUR[guide.axis]}
-            label={`Offset of ${guide.name}`}
+            label={t`Offset of ${guideLabel}`}
             onCommit={(offset) => onChange({ offset })}
           />
         </div>
@@ -291,8 +315,8 @@ function GuideRow({
         size="icon"
         variant="ghost"
         className="size-7"
-        title={guide.hidden ? "Show" : "Hide"}
-        aria-label={`${guide.hidden ? "Show" : "Hide"} ${guide.name}`}
+        title={guide.hidden ? t`Show` : t`Hide`}
+        aria-label={hideLabel}
         onClick={() => onChange({ hidden: !guide.hidden })}
       >
         {guide.hidden ? (
@@ -305,8 +329,8 @@ function GuideRow({
         size="icon"
         variant="ghost"
         className="size-7"
-        title="Delete"
-        aria-label={`Delete ${guide.name}`}
+        title={t`Delete`}
+        aria-label={t`Delete ${guideLabel}`}
         onClick={onRemove}
       >
         <Trash2 className="size-3.5" />

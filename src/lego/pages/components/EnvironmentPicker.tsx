@@ -11,6 +11,7 @@
  * See `environment.ts`.
  */
 
+import { Trans, useLingui } from "@lingui/react/macro";
 import { Button, Input } from "@picoframe/frame";
 import { Mountain } from "lucide-react";
 import { useEffect, useState } from "react";
@@ -58,20 +59,21 @@ export function EnvironmentPicker({
   /** The unit's movement class, absent for a unit that does not move. */
   movement?: LegoMovement;
 }) {
+  const { t } = useLingui();
   return (
     <Popover>
       <PopoverTrigger asChild>
         <Button
           size="icon"
           variant="outline"
-          title="Backdrop and ground"
-          aria-label="Backdrop and ground"
+          title={t`Backdrop and ground`}
+          aria-label={t`Backdrop and ground`}
         >
           <Mountain className="size-4" />
         </Button>
       </PopoverTrigger>
       <PopoverContent side="top" align="end" className="w-64 space-y-3">
-        <Field label="Backdrop" hint={backdropById(backdrop).hint}>
+        <Field label={t`Backdrop`} hint={backdropById(backdrop).hint}>
           <ToggleGroup
             type="single"
             value={backdrop}
@@ -90,7 +92,7 @@ export function EnvironmentPicker({
           </ToggleGroup>
         </Field>
 
-        <Field label="Ground" hint={groundById(ground.id).hint}>
+        <Field label={t`Ground`} hint={groundById(ground.id).hint}>
           <ToggleGroup
             type="single"
             value={ground.id}
@@ -115,7 +117,7 @@ export function EnvironmentPicker({
           <div className="space-y-2">
             <div className="flex gap-2">
               <NumberField
-                label="Angle (°)"
+                label={t`Angle (°)`}
                 value={ground.degrees}
                 valid={validGroundDegrees}
                 onCommit={(degrees) =>
@@ -124,7 +126,7 @@ export function EnvironmentPicker({
               />
               {shape.kind === "uneven" && (
                 <NumberField
-                  label="Width (elmos)"
+                  label={t`Width (elmos)`}
                   value={ground.width}
                   placeholder={String(shape.width)}
                   valid={(width) =>
@@ -138,7 +140,7 @@ export function EnvironmentPicker({
               <SlopeVerdict movement={movement} degrees={ground.degrees} />
             )}
             <CheckField
-              label="Upright"
+              label={t`Upright`}
               checked={ground.upright}
               onChange={(upright) => onGround({ ...ground, upright })}
             />
@@ -146,7 +148,9 @@ export function EnvironmentPicker({
         )}
 
         <p className="text-xs text-muted-foreground">
-          A view setting. Neither one is saved with the unit or exported.
+          <Trans>
+            A view setting. Neither one is saved with the unit or exported.
+          </Trans>
         </p>
       </PopoverContent>
     </Popover>

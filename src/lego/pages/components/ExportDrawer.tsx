@@ -28,6 +28,8 @@
  * https://github.com/tomjn/coilbox/issues/715.
  */
 
+import { plural, t } from "@lingui/core/macro";
+import { Plural, Trans, useLingui } from "@lingui/react/macro";
 import { Button, Input } from "@picoframe/frame";
 import { open, save } from "@tauri-apps/plugin-dialog";
 import { FolderOpen, X } from "lucide-react";
@@ -281,7 +283,7 @@ async function decodedTexture(texture: BlenderTextureRef) {
 
 /** A field's value as the drawer shows it. */
 function shown(value: unknown): string {
-  if (value === null || value === undefined) return "nothing";
+  if (value === null || value === undefined) return t`nothing`;
   if (typeof value === "object") return JSON.stringify(value);
   return String(value);
 }
@@ -295,28 +297,42 @@ function KeptDefinition({
   /** Whether the build has weapons, which then stay as the file has them. */
   weapons: boolean;
 }) {
-  const weaponLine = weapons ? " Its weapons are as that file has them." : null;
+  const weaponLine = weapons ? (
+    <>
+      {" "}
+      <Trans>Its weapons are as that file has them.</Trans>
+    </>
+  ) : null;
   if (kept.reason === "workshopBackup")
     return (
       <p className="text-muted-foreground">
-        The unit definition has been left alone, because the workshop has
-        changes in it that you have not accepted or undone. Undo would put the
-        old file back over this export. Accept or undo them, then export again.
+        <Trans>
+          The unit definition has been left alone, because the workshop has
+          changes in it that you have not accepted or undone. Undo would put the
+          old file back over this export. Accept or undo them, then export
+          again.
+        </Trans>
         {weaponLine}
       </p>
     );
-  if (kept.reason === "unreadable")
+  if (kept.reason === "unreadable") {
+    const { message } = kept;
     return (
       <p className="text-muted-foreground">
-        The unit definition there does not run, so it has been left alone:{" "}
-        {kept.message}
+        <Trans>
+          The unit definition there does not run, so it has been left alone:{" "}
+          {message}
+        </Trans>
         {weaponLine}
       </p>
     );
+  }
   return (
     <p className="text-muted-foreground">
-      A unit definition was already there that coilbox has no record of writing,
-      so it has been left alone.
+      <Trans>
+        A unit definition was already there that coilbox has no record of
+        writing, so it has been left alone.
+      </Trans>
       {weaponLine}
     </p>
   );
@@ -330,6 +346,7 @@ function FieldChanges({
   changes: FieldChange[];
   built: Record<string, unknown>;
 }) {
+  const { t } = useLingui();
   const written = changes.filter(
     (field) => field.change !== "kept" && field.change !== "refused",
   );
@@ -340,40 +357,54 @@ function FieldChanges({
       {written.length > 0 ? (
         <>
           <p className="text-muted-foreground">
-            Brought up to date in the unit definition:
+            <Trans>Brought up to date in the unit definition:</Trans>
           </p>
           <ul className="flex flex-col gap-0.5">
-            {written.map((field) => (
-              <li key={field.path}>
-                <code>{field.path}</code>{" "}
-                {field.change === "removed"
-                  ? `taken out, was ${shown(field.was)}`
-                  : field.change === "added"
-                    ? `added as ${shown(defValue(built, field.path))}`
-                    : `${shown(field.was)} to ${shown(defValue(built, field.path))}`}
-              </li>
-            ))}
+            {written.map((field) => {
+              const was = shown(field.was);
+              const value = shown(defValue(built, field.path));
+              return (
+                <li key={field.path}>
+                  <code>{field.path}</code>{" "}
+                  {field.change === "removed"
+                    ? t`taken out, was ${was}`
+                    : field.change === "added"
+                      ? t`added as ${value}`
+                      : t`${was} to ${value}`}
+                </li>
+              );
+            })}
           </ul>
         </>
       ) : null}
       {kept.length > 0 ? (
         <>
           <p className="text-muted-foreground">
-            Kept, because they were changed after the last export:
+            <Trans>
+              Kept, because they were changed after the last export:
+            </Trans>
           </p>
           <ul className="flex flex-col gap-0.5">
-            {kept.map((field) => (
-              <li key={field.path}>
-                <code>{field.path}</code> is {shown(field.was)}, the build gives{" "}
-                {shown(defValue(built, field.path))}
-              </li>
-            ))}
+            {kept.map((field) => {
+              const { path } = field;
+              const was = shown(field.was);
+              const gives = shown(defValue(built, path));
+              return (
+                <li key={path}>
+                  <Trans>
+                    <code>{path}</code> is {was}, the build gives {gives}
+                  </Trans>
+                </li>
+              );
+            })}
           </ul>
         </>
       ) : null}
       {refused.length > 0 ? (
         <>
-          <p className="text-destructive">Not brought up to date:</p>
+          <p className="text-destructive">
+            <Trans>Not brought up to date:</Trans>
+          </p>
           <ul className="flex flex-col gap-0.5">
             {refused.map((field) => (
               <li key={field.path}>
@@ -436,6 +467,7 @@ export function ExportDrawer({
   onAdoptLoadout,
   onLoadoutUnitName,
 }: Props) {
+  const { t } = useLingui();
   // The unit the drawer describes: the project, or with loadouts the one on
   // screen as its own unit under its own name and receipts (#3282).
   const project =
@@ -678,12 +710,39 @@ export function ExportDrawer({
   const { atlas, atlasFile, installed } = facts;
   const sheetNames = sheetTextureNames(project.unitName);
   const credits = liftCredits(project);
+  const { unitName } = project;
+  const projectName = project.name;
+  const unitsFile = languageUnitsFile(language);
+  const unreadable = gameText.state === "failed" ? gameText.message : "";
+  const collisionScript = `scripts/${pieceCollisionScriptPath(unitName)}`;
+  const placeCount = imported?.place.length ?? 0;
+  const blenderMask = blender?.mask?.writeAs ?? "";
+  const blenderColour = blender?.colour?.writeAs ?? "";
+  const objTexture =
+    (sheetFrom
+      ? sheetNames.texture1
+      : blender
+        ? blender.colour?.writeAs
+        : atlasFile) ?? "";
+  const sheetTexture1 = sheetNames.texture1;
+  const sheetTexture2 = sheetNames.texture2;
+  const done = result.state === "done" ? result : null;
+  const donePictureProblem = done?.pictureProblem ?? "";
+  const doneLockedProblem = done?.lockedProblem ?? "";
+  const doneBlenderProblem = done?.blenderProblem ?? "";
+  const texturesKept = done?.texturesKept.join(", ") ?? "";
+  const texturesKeptCount = done?.texturesKept.length ?? 0;
+  const scaledSizes =
+    done?.blenderTextures
+      .filter((written) => written.scaled)
+      .map((written) => `${written.width}x${written.height}`)
+      .join(", ") ?? "";
 
   async function chooseFolder() {
     const picked = await open({
       directory: true,
       multiple: false,
-      title: "Choose the game folder to export into",
+      title: t`Choose the game folder to export into`,
     });
     if (typeof picked !== "string") return;
     setDir(picked);
@@ -715,9 +774,9 @@ export function ExportDrawer({
 
   async function saveGlb() {
     const target = await save({
-      title: "Save the .glb",
+      title: t`Save the .glb`,
       defaultPath: `${project.unitName}.glb`,
-      filters: [{ name: "glTF Binary", extensions: ["glb"] }],
+      filters: [{ name: t`glTF Binary`, extensions: ["glb"] }],
     });
     if (typeof target !== "string") return;
     if (heldBack) {
@@ -734,7 +793,7 @@ export function ExportDrawer({
       if (!bytes) {
         setGlbSave({
           state: "failed",
-          message: "This unit has no root piece.",
+          message: t`This unit has no root piece.`,
         });
         return;
       }
@@ -783,7 +842,7 @@ export function ExportDrawer({
           texture1: imported ? imported.texture1 : atlasFile,
           texture2: imported?.texture2,
         });
-    if (!model) throw new Error("This unit has no root piece.");
+    if (!model) throw new Error(t`This unit has no root piece.`);
     // Measured rather than taken off the build: a build's `mid` is the header's,
     // which is the aim point, and the definition is derived from the bounding
     // box. Derived once here because two things read it: the Lua file the engine
@@ -1083,10 +1142,10 @@ export function ExportDrawer({
         <DialogPrimitive.Content className="fixed inset-y-0 right-0 z-50 flex w-[460px] max-w-[92vw] flex-col border-l border-border bg-background shadow-xl duration-200 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:slide-out-to-right data-[state=open]:slide-in-from-right">
           <div className="flex items-center justify-between border-b border-border/60 px-5 py-4">
             <DialogPrimitive.Title className="text-base font-semibold">
-              Export {project.unitName}
+              <Trans>Export {unitName}</Trans>
             </DialogPrimitive.Title>
             <DialogPrimitive.Close asChild>
-              <Button variant="ghost" size="icon" aria-label="Close">
+              <Button variant="ghost" size="icon" aria-label={t`Close`}>
                 <X className="size-4" />
               </Button>
             </DialogPrimitive.Close>
@@ -1094,41 +1153,52 @@ export function ExportDrawer({
 
           <div className="flex flex-col gap-5 overflow-y-auto px-5 pt-4 pb-8">
             <div className="flex flex-col gap-2">
-              <span className="text-sm font-medium">Game folder</span>
+              <span className="text-sm font-medium">
+                <Trans>Game folder</Trans>
+              </span>
               <p className="text-xs text-muted-foreground">
-                The folder holding <code>objects3d</code> and{" "}
-                <code>unittextures</code>. For a game you are working on, that
-                is the <code>.sdd</code> directory.
+                <Trans>
+                  The folder holding <code>objects3d</code> and{" "}
+                  <code>unittextures</code>. For a game you are working on, that
+                  is the <code>.sdd</code> directory.
+                </Trans>
               </p>
               <div className="flex items-center gap-2">
                 <span className="min-w-0 flex-1 truncate rounded border border-border px-2 py-1 text-xs">
-                  {dir || "Nothing chosen"}
+                  {dir || t`Nothing chosen`}
                 </span>
                 <Button variant="outline" size="sm" onClick={chooseFolder}>
-                  <FolderOpen className="size-4" /> Choose
+                  <FolderOpen className="size-4" /> <Trans>Choose</Trans>
                 </Button>
               </div>
             </div>
 
             {whole.loadouts ? (
               <div className="flex flex-col gap-2">
-                <span className="text-sm font-medium">Loadouts</span>
+                <span className="text-sm font-medium">
+                  <Trans>Loadouts</Trans>
+                </span>
                 <ToggleGroup
                   type="single"
                   variant="outline"
                   size="sm"
                   value={scope}
-                  aria-label="Which loadouts to export"
+                  aria-label={t`Which loadouts to export`}
                   onValueChange={(value) => {
                     if (value === "active" || value === "all") setScope(value);
                   }}
                 >
-                  <ToggleGroupItem value="active">This loadout</ToggleGroupItem>
-                  <ToggleGroupItem value="all">All loadouts</ToggleGroupItem>
+                  <ToggleGroupItem value="active">
+                    <Trans>This loadout</Trans>
+                  </ToggleGroupItem>
+                  <ToggleGroupItem value="all">
+                    <Trans>All loadouts</Trans>
+                  </ToggleGroupItem>
                 </ToggleGroup>
                 <ul className="flex flex-col gap-1.5">
                   {whole.loadouts.map((loadout) => {
                     const name = loadoutNames.get(loadout.id) ?? "";
+                    const loadoutName = loadout.name;
                     const written =
                       scope === "all" || loadout.id === whole.activeLoadout;
                     return (
@@ -1141,12 +1211,12 @@ export function ExportDrawer({
                         </span>
                         {overBudget.has(loadout.id) ? (
                           <span className="shrink-0 text-destructive">
-                            Over budget
+                            <Trans>Over budget</Trans>
                           </span>
                         ) : null}
                         <Input
                           key={`${loadout.id}:${name}`}
-                          aria-label={`Unit name for ${loadout.name}`}
+                          aria-label={t`Unit name for ${loadoutName}`}
                           className="h-7 text-xs"
                           defaultValue={name}
                           onBlur={(event) => {
@@ -1165,13 +1235,17 @@ export function ExportDrawer({
             ) : null}
 
             <div className="flex flex-col gap-2">
-              <span className="text-sm font-medium">Unit definition</span>
+              <span className="text-sm font-medium">
+                <Trans>Unit definition</Trans>
+              </span>
               <p className="text-xs text-muted-foreground">
-                Export always writes <code>{project.unitName}.lua</code> to{" "}
-                <code>units</code>, the definition the engine spawns from. There
-                is no checkbox for it: without one, the engine has nothing to
-                give a model to. A re-export updates only the fields the build
-                decides, and never one you have changed.
+                <Trans>
+                  Export always writes <code>{unitName}.lua</code> to{" "}
+                  <code>units</code>, the definition the engine spawns from.
+                  There is no checkbox for it: without one, the engine has
+                  nothing to give a model to. A re-export updates only the
+                  fields the build decides, and never one you have changed.
+                </Trans>
               </p>
             </div>
 
@@ -1180,43 +1254,51 @@ export function ExportDrawer({
                 because the wrong answer is invisible in coilbox and wrong only
                 in the game (issue #2683). */}
             <div className="flex flex-col gap-2">
-              <span className="text-sm font-medium">This unit's name</span>
+              <span className="text-sm font-medium">
+                <Trans>This unit's name</Trans>
+              </span>
               {gameText.state === "reading" ? (
                 <p className="text-xs text-muted-foreground">
-                  Reading what this game names its units in.
+                  <Trans>Reading what this game names its units in.</Trans>
                 </p>
               ) : gameText.state === "failed" ? (
                 <p className="text-xs text-destructive">
-                  This game has a <code>{languageUnitsFile(language)}</code>{" "}
-                  that will not read, so coilbox cannot tell where it names its
-                  units: {gameText.message}. The name goes into the definition,
-                  which is where most games read it. If the game reads names out
-                  of that file instead, this unit will show as{" "}
-                  <code>units.names.{project.unitName}</code> until the file is
-                  fixed.
+                  <Trans>
+                    This game has a <code>{unitsFile}</code> that will not read,
+                    so coilbox cannot tell where it names its units:{" "}
+                    {unreadable}. The name goes into the definition, which is
+                    where most games read it. If the game reads names out of
+                    that file instead, this unit will show as{" "}
+                    <code>units.names.{unitName}</code> until the file is fixed.
+                  </Trans>
                 </p>
               ) : writesLanguage ? (
                 <p className="text-xs text-muted-foreground">
-                  This game names its units in{" "}
-                  <code>{languageUnitsFile(language)}</code> rather than in
-                  their definitions, so <strong>{project.name}</strong> goes
-                  into <code>language/{language}/coilbox.json</code> beside it.
-                  That is coilbox's own file, holding the names of the units
-                  coilbox put in this folder and nothing else. The game's own
-                  file is never opened for writing.
+                  <Trans>
+                    This game names its units in <code>{unitsFile}</code> rather
+                    than in their definitions, so <strong>{projectName}</strong>{" "}
+                    goes into <code>language/{language}/coilbox.json</code>{" "}
+                    beside it. That is coilbox's own file, holding the names of
+                    the units coilbox put in this folder and nothing else. The
+                    game's own file is never opened for writing.
+                  </Trans>
                 </p>
               ) : gameNamesThisUnit ? (
                 <p className="text-xs text-muted-foreground">
-                  This game already names a unit <code>{project.unitName}</code>{" "}
-                  in <code>{languageUnitsFile(language)}</code>, so coilbox
-                  writes no name for it. That unit's definition is the game's
-                  own and is left alone too.
+                  <Trans>
+                    This game already names a unit <code>{unitName}</code> in{" "}
+                    <code>{unitsFile}</code>, so coilbox writes no name for it.
+                    That unit's definition is the game's own and is left alone
+                    too.
+                  </Trans>
                 </p>
               ) : (
                 <p className="text-xs text-muted-foreground">
-                  <strong>{project.name}</strong> goes into the definition, as{" "}
-                  <code>name</code> and <code>description</code>, which is where
-                  the engine and nearly every game read it.
+                  <Trans>
+                    <strong>{projectName}</strong> goes into the definition, as{" "}
+                    <code>name</code> and <code>description</code>, which is
+                    where the engine and nearly every game read it.
+                  </Trans>
                 </p>
               )}
             </div>
@@ -1230,15 +1312,22 @@ export function ExportDrawer({
               />
               <div>
                 <Label htmlFor="lego-export-script">
-                  Write the unit script
+                  <Trans>Write the unit script</Trans>
                 </Label>
                 <p className="mt-0.5 text-xs text-muted-foreground">
-                  Puts <code>{project.unitName}.lua</code> in{" "}
-                  <code>scripts</code>,{" "}
-                  {project.script === undefined
-                    ? "generated from the animations applied to this unit"
-                    : "the script this unit owns, exactly as it stands"}
-                  . A script you have changed is never overwritten.
+                  {project.script === undefined ? (
+                    <Trans>
+                      Puts <code>{unitName}.lua</code> in <code>scripts</code>,
+                      generated from the animations applied to this unit. A
+                      script you have changed is never overwritten.
+                    </Trans>
+                  ) : (
+                    <Trans>
+                      Puts <code>{unitName}.lua</code> in <code>scripts</code>,
+                      the script this unit owns, exactly as it stands. A script
+                      you have changed is never overwritten.
+                    </Trans>
+                  )}
                 </p>
               </div>
             </div>
@@ -1247,31 +1336,38 @@ export function ExportDrawer({
                 written, because it is a file nobody asked for by name and it
                 lands in somebody else's game folder. */}
             <div className="flex flex-col gap-2">
-              <span className="text-sm font-medium">Piece collision</span>
+              <span className="text-sm font-medium">
+                <Trans>Piece collision</Trans>
+              </span>
               <p className="text-xs text-muted-foreground">
-                Export always writes{" "}
-                <code className="break-all">
-                  scripts/{pieceCollisionScriptPath(project.unitName)}
-                </code>
-                , the Lua that gives this unit's pieces the collision boxes set
-                in the collision panel. No checkbox and no keeping an older
-                copy: this one is coilbox's own and is rewritten every time, so
-                it stays in step with the unit even once the script beside it
-                belongs to you. A unit that changes nothing gets an empty file,
-                since the script's <code>include</code> has to find something.
+                <Trans>
+                  Export always writes{" "}
+                  <code className="break-all">{collisionScript}</code>, the Lua
+                  that gives this unit's pieces the collision boxes set in the
+                  collision panel. No checkbox and no keeping an older copy:
+                  this one is coilbox's own and is rewritten every time, so it
+                  stays in step with the unit even once the script beside it
+                  belongs to you. A unit that changes nothing gets an empty
+                  file, since the script's <code>include</code> has to find
+                  something.
+                </Trans>
               </p>
             </div>
 
             {sheetFrom ? (
               <div className="flex flex-col gap-2">
-                <span className="text-sm font-medium">Texture sheet</span>
+                <span className="text-sm font-medium">
+                  <Trans>Texture sheet</Trans>
+                </span>
                 <p className="text-xs text-muted-foreground">
-                  This unit mixes parts with pieces lifted from a game, so
-                  export always writes one sheet of their textures,{" "}
-                  <code>{sheetNames.texture1}</code>, and one of their second
-                  textures, <code>{sheetNames.texture2}</code>, to{" "}
-                  <code>unittextures</code>. Both are made again from the build
-                  every time, from:
+                  <Trans>
+                    This unit mixes parts with pieces lifted from a game, so
+                    export always writes one sheet of their textures,{" "}
+                    <code>{sheetTexture1}</code>, and one of their second
+                    textures, <code>{sheetTexture2}</code>, to{" "}
+                    <code>unittextures</code>. Both are made again from the
+                    build every time, from:
+                  </Trans>
                 </p>
                 <ul className="text-xs text-muted-foreground">
                   {sheetFrom.map((source) => (
@@ -1282,7 +1378,7 @@ export function ExportDrawer({
             ) : (
               <div className="flex flex-col gap-2">
                 <span className="text-sm font-medium">
-                  {imported ? "Textures" : "Texture"}
+                  {imported ? t`Textures` : t`Texture`}
                 </span>
                 <div className="flex items-start gap-2">
                   <Checkbox
@@ -1296,29 +1392,37 @@ export function ExportDrawer({
                   />
                   <div>
                     <Label htmlFor="lego-export-texture">
-                      Also place the {imported ? "textures" : "texture"}
+                      {imported ? (
+                        <Trans>Also place the textures</Trans>
+                      ) : (
+                        <Trans>Also place the texture</Trans>
+                      )}
                     </Label>
                     <p className="mt-0.5 text-xs text-muted-foreground">
                       {imported ? (
-                        <>
+                        <Trans>
                           Copies this unit's own{" "}
-                          {imported.place.length === 1 ? "texture" : "textures"}{" "}
+                          <Plural
+                            value={placeCount}
+                            one="texture"
+                            other="textures"
+                          />{" "}
                           into <code>unittextures</code>, under the{" "}
-                          {imported.place.length === 1 ? "name" : "names"} the
-                          model already gives{" "}
-                          {imported.place.length === 1 ? "it" : "them"}. A file
-                          already at that name is left alone unless "Replace
-                          textures already there" below is checked, since it may
-                          be the game's own.
-                        </>
+                          <Plural value={placeCount} one="name" other="names" />{" "}
+                          the model already gives{" "}
+                          <Plural value={placeCount} one="it" other="them" />. A
+                          file already at that name is left alone unless
+                          "Replace textures already there" below is checked,
+                          since it may be the game's own.
+                        </Trans>
                       ) : (
-                        <>
+                        <Trans>
                           Copies the atlas into <code>unittextures</code> as{" "}
                           <code>{atlasFile}</code>. Every unit sampling this
                           atlas uses it, so this only needs doing once per game.
                           A file already at that name is left alone unless
                           "Replace textures already there" below is checked.
-                        </>
+                        </Trans>
                       )}
                     </p>
                   </div>
@@ -1336,13 +1440,19 @@ export function ExportDrawer({
                   />
                   <div>
                     <Label htmlFor="lego-export-texture-overwrite">
-                      Replace {imported ? "textures" : "a texture"} already
-                      there
+                      {imported ? (
+                        <Trans>Replace textures already there</Trans>
+                      ) : (
+                        <Trans>Replace a texture already there</Trans>
+                      )}
                     </Label>
                     <p className="mt-0.5 text-xs text-muted-foreground">
-                      Off by default, so a file the game already has under that
-                      name is left alone, since it may be the game's own. Turn
-                      this on to overwrite it with this export's copy instead.
+                      <Trans>
+                        Off by default, so a file the game already has under
+                        that name is left alone, since it may be the game's own.
+                        Turn this on to overwrite it with this export's copy
+                        instead.
+                      </Trans>
                     </p>
                   </div>
                 </div>
@@ -1351,34 +1461,44 @@ export function ExportDrawer({
 
             {imported || installed || sheetFrom ? null : (
               <p className="text-xs text-muted-foreground">
-                <code>{atlas}</code> is not installed, so the texture cannot be
-                copied and the Blender files cannot be written. The{" "}
-                <code>.s3o</code> still names it, so installing the atlas pack
-                and exporting again completes the unit.
+                <Trans>
+                  <code>{atlas}</code> is not installed, so the texture cannot
+                  be copied and the Blender files cannot be written. The{" "}
+                  <code>.s3o</code> still names it, so installing the atlas pack
+                  and exporting again completes the unit.
+                </Trans>
               </p>
             )}
 
             <div className="flex flex-col gap-2 border-t border-border/60 pt-4">
-              <span className="text-sm font-medium">For Blender</span>
+              <span className="text-sm font-medium">
+                <Trans>For Blender</Trans>
+              </span>
               <p className="text-xs text-muted-foreground">
-                Neither is read by the engine. Both are for taking the unit into
-                Blender, to check it against the <code>.s3o</code> or finish it
-                by hand, and both go into a <code>blender</code> folder
-                alongside the game's own.
+                <Trans>
+                  Neither is read by the engine. Both are for taking the unit
+                  into Blender, to check it against the <code>.s3o</code> or
+                  finish it by hand, and both go into a <code>blender</code>{" "}
+                  folder alongside the game's own.
+                </Trans>
               </p>
               {blender ? (
                 <p className="text-xs text-muted-foreground">
-                  Blender reads no <code>.dds</code>, so this unit's textures
-                  are decoded to PNG on the way in, and one over 2048 across is
-                  written smaller. The full size copy still goes to{" "}
-                  <code>unittextures</code> for the engine.
+                  <Trans>
+                    Blender reads no <code>.dds</code>, so this unit's textures
+                    are decoded to PNG on the way in, and one over 2048 across
+                    is written smaller. The full size copy still goes to{" "}
+                    <code>unittextures</code> for the engine.
+                  </Trans>
                   {blender.mask ? (
                     <>
                       {" "}
-                      <code>{blender.mask.writeAs}</code> goes in beside them:
-                      it is the model's second texture, which the engine reads
-                      as glow, shine and visibility rather than as colour, so
-                      neither file samples it.
+                      <Trans>
+                        <code>{blenderMask}</code> goes in beside them: it is
+                        the model's second texture, which the engine reads as
+                        glow, shine and visibility rather than as colour, so
+                        neither file samples it.
+                      </Trans>
                     </>
                   ) : null}
                 </p>
@@ -1394,21 +1514,27 @@ export function ExportDrawer({
                 className="mt-0.5"
               />
               <div>
-                <Label htmlFor="lego-export-glb">Also write a .glb</Label>
+                <Label htmlFor="lego-export-glb">
+                  <Trans>Also write a .glb</Trans>
+                </Label>
                 <p className="mt-0.5 text-xs text-muted-foreground">
-                  <code>{project.unitName}.glb</code>, with{" "}
                   {blender ? (
                     blender.colour ? (
-                      <>
-                        <code>{blender.colour.writeAs}</code> embedded
-                      </>
+                      <Trans>
+                        <code>{unitName}.glb</code>, with{" "}
+                        <code>{blenderColour}</code> embedded.
+                      </Trans>
                     ) : (
-                      "no texture, since this unit's could not be found"
+                      <Trans>
+                        <code>{unitName}.glb</code>, with no texture, since this
+                        unit's could not be found.
+                      </Trans>
                     )
                   ) : (
-                    "the texture embedded"
+                    <Trans>
+                      <code>{unitName}.glb</code>, with the texture embedded.
+                    </Trans>
                   )}
-                  .
                 </p>
               </div>
             </div>
@@ -1425,11 +1551,13 @@ export function ExportDrawer({
                   }
                   onClick={() => void saveGlb()}
                 >
-                  {glbSave.state === "working" ? "Saving" : "Save GLB…"}
+                  {glbSave.state === "working" ? t`Saving` : t`Save GLB…`}
                 </Button>
                 <span className="text-xs text-muted-foreground">
-                  Builds a .glb on its own and saves it wherever you like,
-                  without touching the game folder.
+                  <Trans>
+                    Builds a .glb on its own and saves it wherever you like,
+                    without touching the game folder.
+                  </Trans>
                 </span>
               </div>
               {glbSave.state === "done" ? (
@@ -1453,25 +1581,22 @@ export function ExportDrawer({
               />
               <div>
                 <Label htmlFor="lego-export-obj">
-                  Also write an .obj and .mtl
+                  <Trans>Also write an .obj and .mtl</Trans>
                 </Label>
                 <p className="mt-0.5 text-xs text-muted-foreground">
-                  <code>{project.unitName}.obj</code> and{" "}
-                  <code>{project.unitName}.mtl</code>
                   {blender && !blender.colour ? (
-                    ", with no material texture, since this unit's could not be found."
+                    <Trans>
+                      <code>{unitName}.obj</code> and{" "}
+                      <code>{unitName}.mtl</code>, with no material texture,
+                      since this unit's could not be found.
+                    </Trans>
                   ) : (
-                    <>
-                      , with a copy of{" "}
-                      <code>
-                        {sheetFrom
-                          ? sheetNames.texture1
-                          : blender
-                            ? blender.colour?.writeAs
-                            : atlasFile}
-                      </code>{" "}
-                      next to them so the material resolves.
-                    </>
+                    <Trans>
+                      <code>{unitName}.obj</code> and{" "}
+                      <code>{unitName}.mtl</code>, with a copy of{" "}
+                      <code>{objTexture}</code> next to them so the material
+                      resolves.
+                    </Trans>
                   )}
                 </p>
               </div>
@@ -1479,24 +1604,27 @@ export function ExportDrawer({
 
             {claimable
               .filter((unit) => definitionsThere.includes(unit.path))
-              .map((unit) => (
-                <div
-                  key={unit.path}
-                  className="flex items-center gap-2 text-xs"
-                >
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    disabled={adopting}
-                    title={unit.path}
-                    onClick={() => void adoptDefinition(unit)}
+              .map((unit) => {
+                const claimName = unit.unitName;
+                return (
+                  <div
+                    key={unit.path}
+                    className="flex items-center gap-2 text-xs"
                   >
-                    {unit.id
-                      ? `Treat ${unit.unitName}.lua as coilbox's`
-                      : "Treat this file as coilbox's"}
-                  </Button>
-                </div>
-              ))}
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      disabled={adopting}
+                      title={unit.path}
+                      onClick={() => void adoptDefinition(unit)}
+                    >
+                      {unit.id
+                        ? t`Treat ${claimName}.lua as coilbox's`
+                        : t`Treat this file as coilbox's`}
+                    </Button>
+                  </div>
+                );
+              })}
 
             {/* What a rename left in the game folder. Shown rather than cleared
                 on its own: two units under two names is occasionally what
@@ -1505,67 +1633,77 @@ export function ExportDrawer({
             {leftovers && leftovers.length > 0 ? (
               <div className="flex flex-col gap-3 rounded border border-border bg-muted/40 p-3">
                 <span className="text-sm font-medium">
-                  Left behind by a rename
+                  <Trans>Left behind by a rename</Trans>
                 </span>
                 <p className="text-xs text-muted-foreground">
-                  Export names its files after the unit, so renaming one and
-                  exporting again writes a second set rather than moving the
-                  first. The game reads what is left as another unit, which it
-                  will build and spawn.
+                  <Trans>
+                    Export names its files after the unit, so renaming one and
+                    exporting again writes a second set rather than moving the
+                    first. The game reads what is left as another unit, which it
+                    will build and spawn.
+                  </Trans>
                 </p>
-                {leftovers.map((entry) => (
-                  <div
-                    key={`${entry.stale.dir}/${entry.stale.unitName}`}
-                    className="flex flex-col gap-1.5 text-xs"
-                  >
-                    <span className="font-medium">
-                      Still there as <code>{entry.stale.unitName}</code>
-                    </span>
-                    {entry.ours.map((path) => (
-                      <code key={path} className="break-all">
-                        {path}
-                      </code>
-                    ))}
-                    {/* The explanation goes above the paths it is about, so it
+                {leftovers.map((entry) => {
+                  const staleName = entry.stale.unitName;
+                  const keptCount = entry.kept.length;
+                  const oursCount = entry.ours.length;
+                  return (
+                    <div
+                      key={`${entry.stale.dir}/${staleName}`}
+                      className="flex flex-col gap-1.5 text-xs"
+                    >
+                      <span className="font-medium">
+                        <Trans>
+                          Still there as <code>{staleName}</code>
+                        </Trans>
+                      </span>
+                      {entry.ours.map((path) => (
+                        <code key={path} className="break-all">
+                          {path}
+                        </code>
+                      ))}
+                      {/* The explanation goes above the paths it is about, so it
                         is clear which of the files it names. */}
-                    {entry.kept.length > 0 ? (
-                      <>
-                        <p className="pt-1 text-muted-foreground">
-                          {entry.kept.length === 1
-                            ? "This one is not"
-                            : "These are not"}{" "}
-                          what coilbox wrote, so removing{" "}
-                          {entry.kept.length === 1 ? "it" : "them"} is not
-                          offered. Either the file was edited after the export,
-                          or the game had one of that name already.
-                        </p>
-                        {entry.kept.map((path) => (
-                          <code key={path} className="break-all">
-                            {path}
-                          </code>
-                        ))}
-                      </>
-                    ) : null}
-                    <div className="flex flex-wrap gap-2 pt-0.5">
-                      {entry.ours.length > 0 ? (
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          disabled={clearing !== null}
-                          onClick={() => void clearStale(entry)}
-                        >
-                          {clearing === entry.stale.unitName
-                            ? "Removing"
-                            : `Remove the ${entry.ours.length} file${entry.ours.length === 1 ? "" : "s"}`}
-                        </Button>
+                      {entry.kept.length > 0 ? (
+                        <>
+                          <p className="pt-1 text-muted-foreground">
+                            <Plural
+                              value={keptCount}
+                              one="This one is not what coilbox wrote, so removing it is not offered. Either the file was edited after the export, or the game had one of that name already."
+                              other="These are not what coilbox wrote, so removing them is not offered. Either the file was edited after the export, or the game had one of that name already."
+                            />
+                          </p>
+                          {entry.kept.map((path) => (
+                            <code key={path} className="break-all">
+                              {path}
+                            </code>
+                          ))}
+                        </>
                       ) : null}
-                      <ShowMe
-                        path={entry.ours[0] ?? entry.kept[0]}
-                        variant="ghost"
-                      />
+                      <div className="flex flex-wrap gap-2 pt-0.5">
+                        {entry.ours.length > 0 ? (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            disabled={clearing !== null}
+                            onClick={() => void clearStale(entry)}
+                          >
+                            {clearing === staleName
+                              ? t`Removing`
+                              : plural(oursCount, {
+                                  one: "Remove the # file",
+                                  other: "Remove the # files",
+                                })}
+                          </Button>
+                        ) : null}
+                        <ShowMe
+                          path={entry.ours[0] ?? entry.kept[0]}
+                          variant="ghost"
+                        />
+                      </div>
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             ) : null}
 
@@ -1579,7 +1717,7 @@ export function ExportDrawer({
                   }
                 />
                 <Label htmlFor="lego-export-picture">
-                  Also write the build picture
+                  <Trans>Also write the build picture</Trans>
                 </Label>
               </div>
             ) : null}
@@ -1601,37 +1739,45 @@ export function ExportDrawer({
                   !dir || result.state === "working" || heldBack !== null
                 }
               >
-                {result.state === "working" ? "Exporting" : "Export"}
+                {result.state === "working" ? t`Exporting` : t`Export`}
               </Button>
             </div>
 
             {batch ? (
               <ul className="flex flex-col gap-1 text-xs">
-                {batch.map((line) => (
-                  <li
-                    key={line.unitName}
-                    className={line.problem ? "text-destructive" : undefined}
-                  >
-                    {line.problem
-                      ? `${line.unitName} was not written: ${line.problem}`
-                      : `${line.unitName} written`}
-                  </li>
-                ))}
+                {batch.map((line) => {
+                  const { problem } = line;
+                  const lineName = line.unitName;
+                  return (
+                    <li
+                      key={lineName}
+                      className={problem ? "text-destructive" : undefined}
+                    >
+                      {problem
+                        ? t`${lineName} was not written: ${problem}`
+                        : t`${lineName} written`}
+                    </li>
+                  );
+                })}
               </ul>
             ) : null}
 
             {result.state === "done" ? (
               <div className="flex flex-col gap-2 text-xs">
-                <p className="text-muted-foreground">Written:</p>
+                <p className="text-muted-foreground">
+                  <Trans>Written:</Trans>
+                </p>
                 <code className="break-all">{result.model}</code>
                 {result.texture ? (
                   <code className="break-all">{result.texture}</code>
                 ) : null}
                 {result.textureKept ? (
                   <p className="text-muted-foreground">
-                    A texture called <code>{atlasFile}</code> was already there
-                    and has been left alone. Turn on "Replace textures already
-                    there" and export again to replace it.
+                    <Trans>
+                      A texture called <code>{atlasFile}</code> was already
+                      there and has been left alone. Turn on "Replace textures
+                      already there" and export again to replace it.
+                    </Trans>
                   </p>
                 ) : null}
                 {result.textures.map((written) => (
@@ -1641,10 +1787,11 @@ export function ExportDrawer({
                 ))}
                 {result.texturesKept.length > 0 ? (
                   <p className="text-muted-foreground">
-                    {result.texturesKept.join(", ")} was already there and has
-                    been left alone, since that name is the game's own. Turn on
-                    "Replace textures already there" and export again to replace
-                    it.
+                    <Plural
+                      value={texturesKeptCount}
+                      one={`${texturesKept} was already there and has been left alone, since that name is the game's own. Turn on "Replace textures already there" and export again to replace it.`}
+                      other={`${texturesKept} were already there and have been left alone, since those names are the game's own. Turn on "Replace textures already there" and export again to replace them.`}
+                    />
                   </p>
                 ) : null}
                 {result.script ? (
@@ -1652,8 +1799,11 @@ export function ExportDrawer({
                 ) : null}
                 {result.scriptKept ? (
                   <p className="text-muted-foreground">
-                    The unit script there has been changed since coilbox wrote
-                    it, or coilbox did not write it, so it has been left alone.
+                    <Trans>
+                      The unit script there has been changed since coilbox wrote
+                      it, or coilbox did not write it, so it has been left
+                      alone.
+                    </Trans>
                   </p>
                 ) : null}
                 {result.cobVars ? (
@@ -1661,16 +1811,23 @@ export function ExportDrawer({
                 ) : null}
                 {result.cobVars || result.cobVarsKept ? (
                   <p className="text-muted-foreground">
-                    {result.cobVarsKept
-                      ? "lualibs/cob_vars.lua was already there and has been left alone. "
-                      : null}
-                    This unit's script can keep shared COB unit values as rules
-                    params. For the game's synced gadgets to set them, and its
-                    gadgets and widgets to read them, put{" "}
-                    <code>VFS.Include("lualibs/cob_vars.lua")</code> on the
-                    first line of <code>LuaRules/main.lua</code>,{" "}
-                    <code>LuaRules/draw.lua</code> and <code>luaui.lua</code>{" "}
-                    (or <code>LuaUI/main.lua</code>).
+                    {result.cobVarsKept ? (
+                      <>
+                        <Trans>
+                          lualibs/cob_vars.lua was already there and has been
+                          left alone.
+                        </Trans>{" "}
+                      </>
+                    ) : null}
+                    <Trans>
+                      This unit's script can keep shared COB unit values as
+                      rules params. For the game's synced gadgets to set them,
+                      and its gadgets and widgets to read them, put{" "}
+                      <code>VFS.Include("lualibs/cob_vars.lua")</code> on the
+                      first line of <code>LuaRules/main.lua</code>,{" "}
+                      <code>LuaRules/draw.lua</code> and <code>luaui.lua</code>{" "}
+                      (or <code>LuaUI/main.lua</code>).
+                    </Trans>
                   </p>
                 ) : null}
                 {result.pieceCollision ? (
@@ -1697,9 +1854,11 @@ export function ExportDrawer({
                 ) : null}
                 {result.wreckFeatureKept ? (
                   <p className="text-muted-foreground">
-                    The wreck's feature file there has been changed since
-                    coilbox wrote it, or coilbox did not write it, so it has
-                    been left alone.
+                    <Trans>
+                      The wreck's feature file there has been changed since
+                      coilbox wrote it, or coilbox did not write it, so it has
+                      been left alone.
+                    </Trans>
                   </p>
                 ) : null}
                 {result.weapons.map((written) => (
@@ -1709,7 +1868,7 @@ export function ExportDrawer({
                 ))}
                 {result.weaponsMissing.map((line) => (
                   <p key={line} className="text-destructive">
-                    Weapon left out: {line}
+                    <Trans>Weapon left out: {line}</Trans>
                   </p>
                 ))}
                 {result.language ? (
@@ -1720,14 +1879,18 @@ export function ExportDrawer({
                 ) : null}
                 {result.pictureKept ? (
                   <p className="text-muted-foreground">
-                    A build picture was already there that coilbox did not
-                    write, and has been left alone.
+                    <Trans>
+                      A build picture was already there that coilbox did not
+                      write, and has been left alone.
+                    </Trans>
                   </p>
                 ) : null}
                 {result.pictureProblem ? (
                   <p className="text-destructive">
-                    The unit is exported, but the build picture is not:{" "}
-                    {result.pictureProblem}
+                    <Trans>
+                      The unit is exported, but the build picture is not:{" "}
+                      {donePictureProblem}
+                    </Trans>
                   </p>
                 ) : null}
                 {result.lockedList ? (
@@ -1735,8 +1898,10 @@ export function ExportDrawer({
                 ) : null}
                 {result.lockedEmptied.length > 0 ? (
                   <p className="text-muted-foreground">
-                    The chassis was renamed, so the list of locked units under
-                    its old name was emptied:{" "}
+                    <Trans>
+                      The chassis was renamed, so the list of locked units under
+                      its old name was emptied:
+                    </Trans>{" "}
                     {result.lockedEmptied.map((path) => (
                       <code key={path} className="break-all">
                         {path}
@@ -1746,8 +1911,10 @@ export function ExportDrawer({
                 ) : null}
                 {result.lockedKept.length > 0 ? (
                   <p className="text-muted-foreground">
-                    A list of locked units under the old name was edited since
-                    it was written, and has been left alone:{" "}
+                    <Trans>
+                      A list of locked units under the old name was edited since
+                      it was written, and has been left alone:
+                    </Trans>{" "}
                     {result.lockedKept.map((path) => (
                       <code key={path} className="break-all">
                         {path}
@@ -1757,8 +1924,10 @@ export function ExportDrawer({
                 ) : null}
                 {result.lockedProblem ? (
                   <p className="text-destructive">
-                    The unit is exported, but the list of locked units is not:{" "}
-                    {result.lockedProblem}
+                    <Trans>
+                      The unit is exported, but the list of locked units is not:{" "}
+                      {doneLockedProblem}
+                    </Trans>
                   </p>
                 ) : null}
                 {result.glb ? (
@@ -1777,20 +1946,19 @@ export function ExportDrawer({
                 ))}
                 {result.blenderTextures.some((written) => written.scaled) ? (
                   <p className="text-muted-foreground">
-                    A texture larger than 2048 was written smaller for Blender,
-                    at{" "}
-                    {result.blenderTextures
-                      .filter((written) => written.scaled)
-                      .map((written) => `${written.width}x${written.height}`)
-                      .join(", ")}
-                    . The game's own copy in <code>unittextures</code> is
-                    untouched.
+                    <Trans>
+                      A texture larger than 2048 was written smaller for
+                      Blender, at {scaledSizes}. The game's own copy in{" "}
+                      <code>unittextures</code> is untouched.
+                    </Trans>
                   </p>
                 ) : null}
                 {result.blenderProblem ? (
                   <p className="text-destructive">
-                    The unit is exported, but the Blender files are not:{" "}
-                    {result.blenderProblem}
+                    <Trans>
+                      The unit is exported, but the Blender files are not:{" "}
+                      {doneBlenderProblem}
+                    </Trans>
                   </p>
                 ) : null}
                 <ShowMe path={result.model} />

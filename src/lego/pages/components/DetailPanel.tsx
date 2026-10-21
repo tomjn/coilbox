@@ -11,6 +11,8 @@
  * checking a piece usually means looking at the face the grid hides.
  */
 
+import { plural } from "@lingui/core/macro";
+import { Trans, useLingui } from "@lingui/react/macro";
 import { Button, cn, Input } from "@picoframe/frame";
 import { Copy, Plus, X } from "lucide-react";
 import {
@@ -190,9 +192,10 @@ function Frame({
   size: ReactNode;
   children: ReactNode;
 }) {
+  const { t } = useLingui();
   return (
     <aside
-      aria-label={`${name} details`}
+      aria-label={t`${name} details`}
       className={cn(
         "flex w-72 shrink-0 flex-col overflow-y-auto border-l border-border pl-4",
         frame.className,
@@ -210,7 +213,7 @@ function Frame({
           variant="ghost"
           className="size-8 shrink-0 text-muted-foreground"
           onClick={frame.onClose}
-          aria-label="Close details"
+          aria-label={t`Close details`}
         >
           <X size={16} />
         </Button>
@@ -245,8 +248,14 @@ function PartBody({
   part: LegoPartInfo;
   onSelect: (part: LegoPartInfo) => void;
 }) {
+  const { t } = useLingui();
   const variants = shapeColourways(pack, part);
   const colours = useColourwayColours(pack);
+  const triangles = part.iCount / 3;
+  const vertices = part.vCount;
+  const uvFrom = part.uvBox.min.map((n) => formatFixed(n, 2)).join(", ");
+  const uvTo = part.uvBox.max.map((n) => formatFixed(n, 2)).join(", ");
+  const uvIncomplete = part.uvIncomplete;
   return (
     <Frame
       frame={frame}
@@ -274,9 +283,11 @@ function PartBody({
           <>
             {/* A row of its own, as three names with chips are wider than
                 the column beside the labels. */}
-            <dt className="col-span-2">Colourway</dt>
+            <dt className="col-span-2">
+              <Trans>Colourway</Trans>
+            </dt>
             <dd className="col-span-2 mb-1">
-              <ButtonGroup aria-label="Colourway">
+              <ButtonGroup aria-label={t`Colourway`}>
                 {variants.map((variant) => (
                   <Button
                     key={variant.id}
@@ -298,40 +309,61 @@ function PartBody({
           </>
         ) : null}
 
-        <dt>Shape</dt>
+        <dt>
+          <Trans>Shape</Trans>
+        </dt>
         <dd>{part.shape}</dd>
 
-        <dt>Tags</dt>
+        <dt>
+          <Trans>Tags</Trans>
+        </dt>
         <dd>{visibleTags(part.tags).join(", ")}</dd>
 
-        <dt>Triangles</dt>
+        <dt>
+          <Trans>Triangles</Trans>
+        </dt>
         <dd>
-          {part.iCount / 3} from {part.vCount} vertices
+          {plural(vertices, {
+            one: `${triangles} from # vertex`,
+            other: `${triangles} from # vertices`,
+          })}
         </dd>
 
-        <dt>Atlas</dt>
+        <dt>
+          <Trans>Atlas</Trans>
+        </dt>
         <dd>
-          {part.uvBox.min.map((n) => formatFixed(n, 2)).join(", ")} to{" "}
-          {part.uvBox.max.map((n) => formatFixed(n, 2)).join(", ")}
+          <Trans>
+            {uvFrom} to {uvTo}
+          </Trans>
         </dd>
 
         {pack.library.packs.length > 1 ? (
           <>
-            <dt>Pack</dt>
+            <dt>
+              <Trans>Pack</Trans>
+            </dt>
             <dd>{part.packId}</dd>
           </>
         ) : null}
 
-        <dt>Part id</dt>
+        <dt>
+          <Trans>Part id</Trans>
+        </dt>
         <dd className="font-mono">{part.id}</dd>
 
-        <dt>In the source</dt>
+        <dt>
+          <Trans>In the source</Trans>
+        </dt>
         <dd className="font-mono break-all">{part.sourceNames.join(", ")}</dd>
       </Facts>
 
-      {part.uvIncomplete ? (
+      {uvIncomplete ? (
         <p className="mt-3 text-xs text-muted-foreground">
-          {part.uvIncomplete} corners have no texture coordinate.
+          {plural(uvIncomplete, {
+            one: "# corner has no texture coordinate.",
+            other: "# corners have no texture coordinate.",
+          })}
         </p>
       ) : null}
     </Frame>
@@ -378,10 +410,14 @@ function ShapeBody({
       />
 
       <Facts>
-        <dt>Kind</dt>
+        <dt>
+          <Trans>Kind</Trans>
+        </dt>
         <dd className="font-mono">{shape.kind}</dd>
 
-        <dt>Size</dt>
+        <dt>
+          <Trans>Size</Trans>
+        </dt>
         <dd>{shape.size.join(" x ")}</dd>
 
         {Object.entries(shape.options ?? {}).map(([name, value]) => (
@@ -391,14 +427,16 @@ function ShapeBody({
           </Fragment>
         ))}
 
-        <dt>Tags</dt>
+        <dt>
+          <Trans>Tags</Trans>
+        </dt>
         <dd>{shape.tags.join(", ")}</dd>
       </Facts>
 
       {onAdd ? (
         <Actions>
           <Button size="sm" onClick={() => onAdd(shape)}>
-            <Plus size={14} /> Add
+            <Plus size={14} /> <Trans>Add</Trans>
           </Button>
         </Actions>
       ) : null}
@@ -459,6 +497,7 @@ function ModuleBody({
   const liftedFrom = holdsLiftedPieces(module) ? module.game?.name : undefined;
   const credits = liftedFrom ? liftCredits(module) : [];
   const count = module.pieces.length;
+  const { t } = useLingui();
   const reduceMotion = useReduceMotion();
 
   // The module as last saved from here. A save lands in `compounds` a moment
@@ -536,7 +575,17 @@ function ModuleBody({
     <Frame
       frame={frame}
       name={module.name}
-      size={`${builtIn ? "Built in" : "Saved"} · ${count} ${count === 1 ? "piece" : "pieces"}`}
+      size={
+        builtIn
+          ? plural(count, {
+              one: "Built in · # piece",
+              other: "Built in · # pieces",
+            })
+          : plural(count, {
+              one: "Saved · # piece",
+              other: "Saved · # pieces",
+            })
+      }
     >
       <Preview
         {...previewSize(frame, builtIn)}
@@ -556,7 +605,7 @@ function ModuleBody({
 
       {builtIn ? null : (
         <div className="mt-3 flex flex-col gap-3">
-          <Field label="Name">
+          <Field label={t`Name`}>
             <Input
               value={name}
               onChange={(event) => {
@@ -576,7 +625,7 @@ function ModuleBody({
                   setNameError(null);
                 }
               }}
-              aria-label="Module name"
+              aria-label={t`Module name`}
               aria-invalid={nameError ? true : undefined}
               aria-describedby={nameError ? "module-name-error" : undefined}
             />
@@ -620,25 +669,35 @@ function ModuleBody({
         <Facts>
           {builtIn ? (
             <>
-              <dt>Category</dt>
-              <dd>{module.category ?? "Uncategorised"}</dd>
+              <dt>
+                <Trans>Category</Trans>
+              </dt>
+              <dd>{module.category ?? t`Uncategorised`}</dd>
               {module.tags?.length ? (
                 <>
-                  <dt>Tags</dt>
+                  <dt>
+                    <Trans>Tags</Trans>
+                  </dt>
                   <dd>{module.tags.join(", ")}</dd>
                 </>
               ) : null}
-              <dt>Pieces</dt>
+              <dt>
+                <Trans>Pieces</Trans>
+              </dt>
               <dd>{count}</dd>
             </>
           ) : null}
           {liftedFrom ? (
             <>
-              <dt>Lifted from</dt>
+              <dt>
+                <Trans>Lifted from</Trans>
+              </dt>
               <dd>{liftedFrom}</dd>
               {credits.length > 0 ? (
                 <>
-                  <dt>Credits</dt>
+                  <dt>
+                    <Trans>Credits</Trans>
+                  </dt>
                   <dd className="flex flex-col">
                     {credits.map((credit) => (
                       <span key={credit}>{credit}</span>
@@ -654,7 +713,7 @@ function ModuleBody({
       <Actions>
         {onPlace ? (
           <Button size="sm" onClick={() => onPlace(module)}>
-            <Plus size={14} /> Place
+            <Plus size={14} /> <Trans>Place</Trans>
           </Button>
         ) : null}
         {builtIn ? (
@@ -663,7 +722,7 @@ function ModuleBody({
             variant="outline"
             onClick={() => void actions.onCopy(module).then(onCopied)}
           >
-            <Copy size={14} /> Make my own copy
+            <Copy size={14} /> <Trans>Make my own copy</Trans>
           </Button>
         ) : null}
         {actions.onSaveFile && !liftedFrom ? (
@@ -672,7 +731,7 @@ function ModuleBody({
             variant="outline"
             onClick={() => actions.onSaveFile?.(module)}
           >
-            Save to file
+            <Trans>Save to file</Trans>
           </Button>
         ) : null}
         {actions.onShare && !builtIn ? (
@@ -681,7 +740,7 @@ function ModuleBody({
             variant="outline"
             onClick={() => actions.onShare?.(module)}
           >
-            Share
+            <Trans>Share</Trans>
           </Button>
         ) : null}
         {builtIn ? null : (
@@ -694,7 +753,7 @@ function ModuleBody({
               onDeleted();
             }}
           >
-            Delete
+            <Trans>Delete</Trans>
           </Button>
         )}
       </Actions>
@@ -800,7 +859,7 @@ function Preview({
       />
       {hint ? (
         <span className="pointer-events-none absolute bottom-1.5 left-0 text-[11px] text-muted-foreground">
-          Drag to turn
+          <Trans>Drag to turn</Trans>
         </span>
       ) : null}
     </div>

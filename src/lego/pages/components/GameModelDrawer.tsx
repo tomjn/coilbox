@@ -13,6 +13,8 @@
  * `gameImport.ts`.
  */
 
+import { plural } from "@lingui/core/macro";
+import { Trans, useLingui } from "@lingui/react/macro";
 import { Button, Input } from "@picoframe/frame";
 import { Blocks, ChevronLeft, Search, X } from "lucide-react";
 import { Dialog as DialogPrimitive } from "radix-ui";
@@ -88,6 +90,7 @@ export function GameModelDrawer({
   onOpened,
   onExisting,
 }: Props) {
+  const { t } = useLingui();
   const [game, setGame] = useState<GameItem | null>(null);
   const [query, setQuery] = useState("");
   const [stage, setStage] = useState<ImportStage>({ state: "idle" });
@@ -231,11 +234,10 @@ export function GameModelDrawer({
     try {
       found = await adoptGameScript(project, target);
     } catch (error) {
+      const reason = error instanceof Error ? error.message : String(error);
       found = {
         ...NO_SCRIPT,
-        notes: [
-          `The animation could not be read: ${error instanceof Error ? error.message : String(error)}`,
-        ],
+        notes: [t`The animation could not be read: ${reason}`],
       };
     }
     if (thisPick !== pickCount.current) return;
@@ -292,17 +294,17 @@ export function GameModelDrawer({
               <Button
                 variant="ghost"
                 size="icon"
-                aria-label="Back to the games"
+                aria-label={t`Back to the games`}
                 onClick={back}
               >
                 <ChevronLeft className="size-4" />
               </Button>
             ) : null}
             <DialogPrimitive.Title className="flex-1 truncate text-base font-semibold">
-              {game ? game.name : "Open a model from a game"}
+              {game ? game.name : t`Open a model from a game`}
             </DialogPrimitive.Title>
             <DialogPrimitive.Close asChild>
-              <Button variant="ghost" size="icon" aria-label="Close">
+              <Button variant="ghost" size="icon" aria-label={t`Close`}>
                 <X className="size-4" />
               </Button>
             </DialogPrimitive.Close>
@@ -327,7 +329,7 @@ export function GameModelDrawer({
                   )
                 }
                 onAccept={accept}
-                pending={adopting ? "Reading the animation" : null}
+                pending={adopting ? t`Reading the animation` : null}
               >
                 {adopting || adopted ? (
                   <GameScriptPanel
@@ -351,7 +353,7 @@ export function GameModelDrawer({
                   size="sm"
                   onClick={() => setStage({ state: "idle" })}
                 >
-                  Pick another
+                  <Trans>Pick another</Trans>
                 </Button>
               ) : null}
             </div>
@@ -362,19 +364,19 @@ export function GameModelDrawer({
                 <Input
                   value={query}
                   onChange={(event) => setQuery(event.target.value)}
-                  placeholder="Search this game's models"
-                  aria-label="Search this game's models"
+                  placeholder={t`Search this game's models`}
+                  aria-label={t`Search this game's models`}
                   className="h-8 pl-8"
                 />
               </div>
 
               {loading ? (
                 <p className="text-xs text-muted-foreground">
-                  Reading what this game holds.
+                  <Trans>Reading what this game holds.</Trans>
                 </p>
               ) : !models ? (
                 <p className="text-xs text-muted-foreground">
-                  Could not read this game's archive.
+                  <Trans>Could not read this game's archive.</Trans>
                 </p>
               ) : (
                 <>
@@ -427,7 +429,7 @@ export function GameList({
   if (loading) {
     return (
       <p className="px-5 py-4 text-xs text-muted-foreground">
-        Looking for installed games.
+        <Trans>Looking for installed games.</Trans>
       </p>
     );
   }
@@ -441,8 +443,10 @@ export function GameList({
   if (games.length === 0) {
     return (
       <p className="px-5 py-4 text-xs text-muted-foreground">
-        No games are installed, so there is nothing to open a model out of. Add
-        one under Library &gt; Games.
+        <Trans>
+          No games are installed, so there is nothing to open a model out of.
+          Add one under Library &gt; Games.
+        </Trans>
       </p>
     );
   }
@@ -479,7 +483,7 @@ function ModelList({
   if (rows.length === 0) {
     return (
       <p className="text-xs text-muted-foreground">
-        Nothing in this game matched.
+        <Trans>Nothing in this game matched.</Trans>
       </p>
     );
   }
@@ -506,7 +510,7 @@ function ModelList({
             </span>
             {row.openedAs ? (
               <Badge variant="ghost" className="shrink-0 text-[0.625rem]">
-                Already open
+                <Trans>Already open</Trans>
               </Badge>
             ) : null}
           </button>
@@ -533,11 +537,12 @@ function BuildPic({
   display?: UnitDisplay;
   pending: boolean;
 }) {
+  const { t } = useLingui();
   if (!row.unit) {
     return (
       <span
         className="flex size-9 shrink-0 items-center justify-center rounded bg-muted text-muted-foreground"
-        title="No unit in this game is drawn with this model, so it is a feature, a wreck or something else the game places itself."
+        title={t`No unit in this game is drawn with this model, so it is a feature, a wreck or something else the game places itself.`}
       >
         <Blocks className="size-4" />
       </span>
@@ -559,15 +564,20 @@ function Footnotes({
   unresolved: number;
   unopenable: number;
 }) {
+  const { t } = useLingui();
   const notes: string[] = [];
   if (matched > shown) {
     notes.push(
-      `Showing the first ${shown} of ${matched}. Search to narrow it down.`,
+      t`Showing the first ${shown} of ${matched}. Search to narrow it down.`, // i18n: not a plural
     );
   }
   if (unresolved > 0) {
     notes.push(
-      `${unresolved} ${unresolved === 1 ? "unit names" : "units name"} a model this archive does not hold at all, usually one that lives in a game this one depends on.`,
+      plural(unresolved, {
+        one: "# unit names a model this archive does not hold at all, usually one that lives in a game this one depends on.",
+        other:
+          "# units name a model this archive does not hold at all, usually one that lives in a game this one depends on.",
+      }),
     );
   }
   // A different sentence from the one above on purpose. Saying a model is
@@ -575,7 +585,11 @@ function Footnotes({
   // that is already there.
   if (unopenable > 0) {
     notes.push(
-      `${unopenable} ${unopenable === 1 ? "unit names a model" : "units name models"} in a format the builder cannot open, which the archive does hold.`,
+      plural(unopenable, {
+        one: "# unit names a model in a format the builder cannot open, which the archive does hold.",
+        other:
+          "# units name models in a format the builder cannot open, which the archive does hold.",
+      }),
     );
   }
   if (notes.length === 0) return null;
