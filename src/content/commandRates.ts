@@ -14,23 +14,24 @@
  * resampling. A bucket's count is turned into a rate for display.
  */
 
+import type { MessageDescriptor } from "@lingui/core";
+import { msg } from "@lingui/core/macro";
 import type { DemoCommandRates, OrderSource } from "./bindings";
 import type { ChartRow } from "./matchStats";
 
 const SEC_PER_MINUTE = 60;
 
 /** What each sender is called, and what it is. */
-export const SENDER_LABEL: Record<OrderSource, string> = {
-  selection: "Player's own",
-  lua: "Widgets",
-  ai: "AI",
+export const SENDER_LABEL: Record<OrderSource, MessageDescriptor> = {
+  selection: msg`Player's own`,
+  lua: msg`Widgets`,
+  ai: msg`AI`,
 };
 
-export const SENDER_NOTE: Record<OrderSource, string> = {
-  selection:
-    "Orders the player gave through the engine's own interface, and from a widget calling Spring.GiveOrder. The engine's actions per minute counts these.",
-  lua: "Orders a widget on the player's machine sent to named units. The engine's actions per minute does not count these, and a widget can send thousands a minute.",
-  ai: "Orders a skirmish AI gave. This is an AI's rate and is not comparable with a person's.",
+export const SENDER_NOTE: Record<OrderSource, MessageDescriptor> = {
+  selection: msg`Orders the player gave through the engine's own interface, and from a widget calling Spring.GiveOrder. The engine's actions per minute counts these.`,
+  lua: msg`Orders a widget on the player's machine sent to named units. The engine's actions per minute does not count these, and a widget can send thousands a minute.`,
+  ai: msg`Orders a skirmish AI gave. This is an AI's rate and is not comparable with a person's.`,
 };
 
 /** The senders that gave at least one order, in the order they are offered. */

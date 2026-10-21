@@ -1,4 +1,6 @@
-import { formatNumber } from "@/lib/format";
+import { plural } from "@lingui/core/macro";
+import { useLingui as useLocale } from "@lingui/react";
+import { Trans, useLingui } from "@lingui/react/macro";
 import type { UnitSource } from "../../replayBuildOrders";
 import {
   misfits,
@@ -28,10 +30,6 @@ export function StoredListNote({
   );
 }
 
-function count(n: number, one: string, many: string): string {
-  return `${formatNumber(n)} ${n === 1 ? one : many}`;
-}
-
 /**
  * Warns when a replay's build orders do not fit the unit list they are being
  * named from (#3847). Nothing when every order fits. One line, because it
@@ -39,14 +37,19 @@ function count(n: number, one: string, many: string): string {
  * [`UnitListHelp`].
  */
 export function OrderFitNote({ fit }: { fit: OrderFit }) {
+  useLocale();
   const wrong = misfits(fit);
   if (wrong === 0) return null;
+  const orderCount = plural(fit.orders, {
+    one: "# build order",
+    other: "# build orders",
+  });
   return (
     <p className="text-xs text-amber-600 dark:text-amber-400">
-      {formatNumber(wrong)} of{" "}
-      {count(fit.orders, "build order", "build orders")}{" "}
-      {wrong === 1 ? "does" : "do"} not fit this unit list, so names and costs
-      may be wrong.
+      {plural(wrong, {
+        one: `# of ${orderCount} does not fit this unit list, so names and costs may be wrong.`,
+        other: `# of ${orderCount} do not fit this unit list, so names and costs may be wrong.`,
+      })}
     </p>
   );
 }
@@ -57,37 +60,55 @@ export function OrderFitNote({ fit }: { fit: OrderFit }) {
  * what it means for orders not to fit a list.
  */
 export function UnitListHelp({ fit }: { fit?: OrderFit | null }) {
+  const { t } = useLingui();
   const reasons = fit
     ? [
         fit.placedMobile > 0 &&
-          `${count(fit.placedMobile, "placed order names", "placed orders name")} a unit that moves`,
+          plural(fit.placedMobile, {
+            one: "# placed order names a unit that moves",
+            other: "# placed orders name a unit that moves",
+          }),
         fit.queuedStatic > 0 &&
-          `${count(fit.queuedStatic, "factory order names", "factory orders name")} a unit that does not`,
+          plural(fit.queuedStatic, {
+            one: "# factory order names a unit that does not",
+            other: "# factory orders name a unit that does not",
+          }),
         fit.outOfRange > 0 &&
-          `${count(fit.outOfRange, "order names", "orders name")} an id past the end of the list`,
+          plural(fit.outOfRange, {
+            one: "# order names an id past the end of the list",
+            other: "# orders name an id past the end of the list",
+          }),
       ].filter((reason): reason is string => Boolean(reason))
     : [];
+  const reasonList = reasons.join(", ");
   return (
     <>
       <p>
-        A replay names a unit by a number that only means something in the build
-        of the game it was played on. Coilbox keeps the unit list a replay was
-        read against, so the replay still names its units after the game is
-        updated or removed.
+        <Trans>
+          A replay names a unit by a number that only means something in the
+          build of the game it was played on. Coilbox keeps the unit list a
+          replay was read against, so the replay still names its units after the
+          game is updated or removed.
+        </Trans>
       </p>
       <p>
-        A list read from a loose game folder is what the folder held that day. A
-        folder can change under the same name, and a packaged archive cannot.
-        Analysing a replay records the list the engine itself used, which is the
-        most reliable of the three.
+        <Trans>
+          A list read from a loose game folder is what the folder held that day.
+          A folder can change under the same name, and a packaged archive
+          cannot. Analysing a replay records the list the engine itself used,
+          which is the most reliable of the three.
+        </Trans>
       </p>
       <p>
-        The installed game is read with the match's own mod options, teams and
-        AIs, because a game's unit list can change with them. With the right
-        list, a placed order names a building and a factory order names a unit
-        that moves. A list can still be the wrong one, for a build that is not
-        the match's or a unit that a map adds, and then some orders do not fit.
-        {reasons.length > 0 && ` Here ${reasons.join(", ")}.`}
+        <Trans>
+          The installed game is read with the match's own mod options, teams and
+          AIs, because a game's unit list can change with them. With the right
+          list, a placed order names a building and a factory order names a unit
+          that moves. A list can still be the wrong one, for a build that is not
+          the match's or a unit that a map adds, and then some orders do not
+          fit.
+        </Trans>
+        {reasons.length > 0 && <> {t`Here ${reasonList}.`}</>}
       </p>
     </>
   );

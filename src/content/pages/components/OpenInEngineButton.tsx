@@ -1,3 +1,5 @@
+import { t } from "@lingui/core/macro";
+import { useLingui } from "@lingui/react/macro";
 import { Button } from "@picoframe/frame";
 import { ExternalLink } from "lucide-react";
 import { useState } from "react";
@@ -36,6 +38,7 @@ export function OpenInEngineButton({
   game?: string;
   clock: ReplayClock;
 }) {
+  const { t: tr } = useLingui();
   const resolveTarget = useWatchTarget(engineVersion, watch);
   const { running, launchReplayPlayback } = usePlay();
   const [pending, setPending] = useState(false);
@@ -58,7 +61,8 @@ export function OpenInEngineButton({
         paused: true,
       });
       if (res.exitCode && res.exitCode !== 0) {
-        setError(`Engine exited with code ${res.exitCode}.`);
+        const exitCode = res.exitCode;
+        setError(t`Engine exited with code ${exitCode}.`);
       }
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
@@ -70,8 +74,8 @@ export function OpenInEngineButton({
   const title =
     launchBlockedReason(watch, dependencyBlock) ??
     (running && !pending
-      ? "A game is already running."
-      : "Opens the engine, paused at the moment shown.");
+      ? tr`A game is already running.`
+      : tr`Opens the engine, paused at the moment shown.`);
 
   return (
     <div className="flex flex-col items-end gap-1">
@@ -85,7 +89,7 @@ export function OpenInEngineButton({
         className="gap-1.5"
       >
         <ExternalLink className="size-4" />
-        {pending ? "Opening…" : "Open in engine"}
+        {pending ? tr`Opening…` : tr`Open in engine`}
       </Button>
       {error && (
         <p className="max-w-xs text-right text-xs text-destructive">{error}</p>

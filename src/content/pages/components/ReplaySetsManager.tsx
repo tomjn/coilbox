@@ -1,3 +1,4 @@
+import { Plural, Trans, useLingui } from "@lingui/react/macro";
 import { Button, Input } from "@picoframe/frame";
 import { Layers } from "lucide-react";
 import { useState } from "react";
@@ -15,9 +16,6 @@ import type {
   ResolvedSet,
 } from "../../replaySets";
 
-const plural = (n: number, one: string, many: string) =>
-  `${n} ${n === 1 ? one : many}`;
-
 /** Name and description form for a new set or an existing one. */
 function SetForm({
   initialName,
@@ -33,6 +31,7 @@ function SetForm({
   onSubmit: (name: string, description: string) => string | null;
   onCancel?: () => void;
 }) {
+  const { t } = useLingui();
   const [name, setName] = useState(initialName);
   const [description, setDescription] = useState(initialDescription);
   const [error, setError] = useState<string | null>(null);
@@ -50,7 +49,7 @@ function SetForm({
         }
       }}
     >
-      <Field label="Set name">
+      <Field label={t`Set name`}>
         <Input
           value={name}
           onChange={(e) => {
@@ -61,7 +60,7 @@ function SetForm({
           className="h-8"
         />
       </Field>
-      <Field label="Description (optional)">
+      <Field label={t`Description (optional)`}>
         <Textarea
           value={description}
           onChange={(e) => setDescription(e.target.value)}
@@ -79,7 +78,7 @@ function SetForm({
         </Button>
         {onCancel && (
           <Button type="button" size="sm" variant="ghost" onClick={onCancel}>
-            Cancel
+            <Trans>Cancel</Trans>
           </Button>
         )}
       </div>
@@ -102,8 +101,10 @@ function SetRow({
   active: boolean;
   onFilter: (id: string) => void;
 }) {
+  const { t } = useLingui();
   const [mode, setMode] = useState<"view" | "edit" | "delete">("view");
   const missing = resolved.missing.length;
+  const setName = set.name;
 
   if (mode === "edit") {
     return (
@@ -111,7 +112,7 @@ function SetRow({
         <SetForm
           initialName={set.name}
           initialDescription={set.description ?? ""}
-          submitLabel="Save"
+          submitLabel={t`Save`}
           onSubmit={(name, description) => {
             const err = api.update(set.id, name, description);
             if (!err) setMode("view");
@@ -130,7 +131,7 @@ function SetRow({
           {set.name}
         </span>
         <span className="shrink-0 text-xs text-muted-foreground">
-          {plural(set.members.length, "replay", "replays")}
+          <Plural value={set.members.length} one="# replay" other="# replays" />
         </span>
       </div>
       {set.description && (
@@ -138,18 +139,25 @@ function SetRow({
       )}
       {missing > 0 && (
         <p className="text-xs text-muted-foreground">
-          {missing} not in your library.{" "}
-          {missing === 1 ? "It stays" : "They stay"} in the set.
+          {missing === 1 ? (
+            <Trans>1 not in your library. It stays in the set.</Trans>
+          ) : (
+            <Trans>{missing} not in your library. They stay in the set.</Trans>
+          )}
         </p>
       )}
       {mode === "delete" ? (
         <div className="flex flex-col gap-1.5">
           <p className="text-xs">
-            Delete the set “{set.name}”? Only the set goes.
-            {set.members.length > 0 &&
-              ` Its ${plural(set.members.length, "replay", "replays")} ${
-                set.members.length === 1 ? "stays" : "stay"
-              } in your library.`}
+            <Trans>Delete the set “{setName}”? Only the set goes.</Trans>
+            {set.members.length > 0 && " "}
+            {set.members.length > 0 && (
+              <Plural
+                value={set.members.length}
+                one="Its # replay stays in your library."
+                other="Its # replays stay in your library."
+              />
+            )}
           </p>
           <div className="flex gap-1.5">
             <Button
@@ -160,10 +168,10 @@ function SetRow({
                 if (active) onFilter("");
               }}
             >
-              Delete set
+              <Trans>Delete set</Trans>
             </Button>
             <Button size="sm" variant="ghost" onClick={() => setMode("view")}>
-              Cancel
+              <Trans>Cancel</Trans>
             </Button>
           </div>
         </div>
@@ -175,16 +183,16 @@ function SetRow({
             aria-pressed={active}
             onClick={() => onFilter(active ? "" : set.id)}
           >
-            {active ? "Showing" : "Show"}
+            {active ? <Trans>Showing</Trans> : <Trans>Show</Trans>}
           </Button>
           <Button
             size="sm"
             variant="outline"
             disabled={shown.length === 0}
             onClick={() => api.add(set.id, shown)}
-            title="Add every replay in the list as filtered now"
+            title={t`Add every replay in the list as filtered now`}
           >
-            Add the {shown.length} shown
+            <Trans>Add the {shown.length} shown</Trans>
           </Button>
           {missing > 0 && (
             <Button
@@ -197,14 +205,14 @@ function SetRow({
                 )
               }
             >
-              Forget {missing} missing
+              <Trans>Forget {missing} missing</Trans>
             </Button>
           )}
           <Button size="sm" variant="ghost" onClick={() => setMode("edit")}>
-            Edit
+            <Trans>Edit</Trans>
           </Button>
           <Button size="sm" variant="ghost" onClick={() => setMode("delete")}>
-            Delete set
+            <Trans>Delete set</Trans>
           </Button>
         </div>
       )}
@@ -230,12 +238,18 @@ export function ReplaySetsManager({
   activeId: string;
   onFilter: (id: string) => void;
 }) {
+  const { t } = useLingui();
+  const setCount = api.sets.length;
   return (
     <Popover>
       <PopoverTrigger asChild>
         <Button variant="outline" size="sm" className="gap-1.5">
-          <Layers className="size-4" /> Sets
-          {api.sets.length > 0 ? ` (${api.sets.length})` : ""}
+          <Layers className="size-4" />{" "}
+          {api.sets.length > 0 ? (
+            <Trans>Sets ({setCount})</Trans>
+          ) : (
+            <Trans>Sets</Trans>
+          )}
         </Button>
       </PopoverTrigger>
       <PopoverContent
@@ -243,9 +257,11 @@ export function ReplaySetsManager({
         className="flex max-h-[32rem] w-96 flex-col gap-3 overflow-y-auto"
       >
         <p className="text-xs text-muted-foreground">
-          A set is a named group of replays, such as a tournament or a night of
-          games. Deleting a set never deletes the replays in it. To delete
-          replays, use the replay's own page.
+          <Trans>
+            A set is a named group of replays, such as a tournament or a night
+            of games. Deleting a set never deletes the replays in it. To delete
+            replays, use the replay's own page.
+          </Trans>
         </p>
         {api.sets.length > 0 && (
           <ul className="flex flex-col gap-2">
@@ -263,11 +279,13 @@ export function ReplaySetsManager({
           </ul>
         )}
         <div className="flex flex-col gap-1.5 border-t border-border/60 pt-3">
-          <h3 className="text-sm font-medium">New set</h3>
+          <h3 className="text-sm font-medium">
+            <Trans>New set</Trans>
+          </h3>
           <SetForm
             initialName=""
             initialDescription=""
-            submitLabel="Create set"
+            submitLabel={t`Create set`}
             onSubmit={(name, description) => {
               const r = api.create(name, description);
               return "error" in r ? r.error : null;

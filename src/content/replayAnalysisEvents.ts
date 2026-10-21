@@ -6,6 +6,7 @@
  * unless this file knows how to say it better.
  */
 
+import { t } from "@lingui/core/macro";
 import type {
   DemoInfo,
   ReplayEventCounts,
@@ -21,7 +22,11 @@ export const ALL_KINDS = "*";
 export const ALL_PLAYERS = "all";
 export const NEUTRAL_PLAYER = "neutral";
 
-/** What an event whose team no player controls is listed under. */
+/**
+ * The English source of what an event whose team no player controls is listed
+ * under. The label shown is `t` at call time, in `teamLabel` and
+ * `playerOptions`.
+ */
 export const NEUTRAL_LABEL = "Neutral";
 
 function snakeCase(name: string): string {
@@ -95,7 +100,7 @@ export function teamLabel(
   labels: ReadonlyMap<number, string>,
 ): string {
   if (team === undefined) return "";
-  return labels.get(team) ?? NEUTRAL_LABEL;
+  return labels.get(team) ?? t`Neutral`;
 }
 
 /** The fields of an event that hold an engine team: the unit's owner, what
@@ -129,7 +134,7 @@ export function playerOptions(
     label: labels.get(t) as string,
   }));
   if ([...teams].some((t) => !labels.has(t))) {
-    options.push({ value: NEUTRAL_PLAYER, label: NEUTRAL_LABEL });
+    options.push({ value: NEUTRAL_PLAYER, label: t`Neutral` });
   }
   return options;
 }
@@ -206,7 +211,7 @@ export function eventDetails(
     (k) => typeof event[k] === "number",
   );
   if (hasPosition) {
-    out.push({ name: "at", text: `${event.x}, ${event.y}, ${event.z}` });
+    out.push({ name: t`at`, text: `${event.x}, ${event.y}, ${event.z}` });
   }
   for (const [name, value] of Object.entries(event)) {
     if (COLUMN_FIELDS.has(name) || value === undefined || value === null) {
@@ -214,11 +219,11 @@ export function eventDetails(
     }
     if (hasPosition && (name === "x" || name === "y" || name === "z")) continue;
     if (name === "attackerTeam" && typeof value === "number") {
-      out.push({ name: "attacker", text: teamLabel(value, labels) });
+      out.push({ name: t`attacker`, text: teamLabel(value, labels) });
       continue;
     }
     if (name === "from" && typeof value === "number") {
-      out.push({ name: "from", text: teamLabel(value, labels) });
+      out.push({ name: t`from`, text: teamLabel(value, labels) });
       continue;
     }
     out.push({ name, text: fieldText(value) });

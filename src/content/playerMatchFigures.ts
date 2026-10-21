@@ -1,3 +1,4 @@
+import { t } from "@lingui/core/macro";
 import type { Metric, MetricRatio, StatRecord } from "./bindings";
 import { formatRate } from "./matchStats";
 import { matchFigure } from "./replayMatchFigures";
@@ -260,13 +261,12 @@ export function formatRateValue(value: number | null): string {
 
 /** The sentence saying how many games were left out, or null when none were. */
 export function leftOutNote(r: PlayerRateGames): string | null {
-  const parts: string[] = [];
-  if (r.leftOutNoTotals > 0)
-    parts.push(
-      `${r.leftOutNoTotals} with no figures recorded (older or unmeasured replays)`,
-    );
-  if (r.leftOutNoLength > 0)
-    parts.push(`${r.leftOutNoLength} with no usable length`);
-  if (parts.length === 0) return null;
-  return `Left out: ${parts.join(" and ")}.`;
+  const noTotals = r.leftOutNoTotals;
+  const noLength = r.leftOutNoLength;
+  if (noTotals > 0 && noLength > 0)
+    return t`Left out: ${noTotals} with no figures recorded (older or unmeasured replays) and ${noLength} with no usable length.`;
+  if (noTotals > 0)
+    return t`Left out: ${noTotals} with no figures recorded (older or unmeasured replays).`;
+  if (noLength > 0) return t`Left out: ${noLength} with no usable length.`;
+  return null;
 }

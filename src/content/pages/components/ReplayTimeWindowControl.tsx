@@ -1,3 +1,6 @@
+import type { MessageDescriptor } from "@lingui/core";
+import { msg } from "@lingui/core/macro";
+import { Trans, useLingui } from "@lingui/react/macro";
 import { Button } from "@picoframe/frame";
 import { useEffect, useRef, useState } from "react";
 import { Slider } from "@/components/ui/slider";
@@ -24,23 +27,11 @@ export interface WindowCount {
  *  have a time they happened in the playback, and the two are not added up. */
 export type WindowSubject = "orders" | "events" | "both";
 
-const SUBJECT_TEXT: Record<WindowSubject, string> = {
-  orders: "Orders given",
-  events: "Events",
-  both: "Orders given and events",
+const SUBJECT_NOTE: Record<WindowSubject, MessageDescriptor> = {
+  orders: msg`The window is when an order was given, not when anything was built.`,
+  events: msg`The window is when each event happened in the playback.`,
+  both: msg`For orders the window is when each was given, not when anything was built. For events it is when each happened in the playback.`,
 };
-
-const SUBJECT_NOTE: Record<WindowSubject, string> = {
-  orders: "The window is when an order was given, not when anything was built.",
-  events: "The window is when each event happened in the playback.",
-  both: "For orders the window is when each was given, not when anything was built. For events it is when each happened in the playback.",
-};
-
-/** A count as a short label, such as "2,897 of 2,897 building orders". */
-function countText(count: WindowCount, noun: string): string {
-  if (count.total === 0) return `No ${noun}.`;
-  return `${formatNumber(count.inside)} of ${formatNumber(count.total)} ${noun}.`;
-}
 
 /**
  * What the window means, for the section's help entry: what it filters by, and
@@ -53,12 +44,16 @@ export function TimeWindowHelp({
   activity: ActivitySeries | null;
   subject: WindowSubject;
 }) {
+  const { i18n } = useLingui();
+  const activityLabel = activity?.label.toLowerCase();
   return (
     <p>
-      {SUBJECT_NOTE[subject]}
-      {activity
-        ? ` Behind the range, ${activity.label.toLowerCase()} across all teams.`
-        : " No match statistics are drawn behind the range."}
+      {i18n._(SUBJECT_NOTE[subject])}{" "}
+      {activity ? (
+        <Trans>Behind the range, {activityLabel} across all teams.</Trans>
+      ) : (
+        <Trans>No match statistics are drawn behind the range.</Trans>
+      )}
     </p>
   );
 }
@@ -81,7 +76,7 @@ export function ReplayTimeWindowControl({
   onChange,
   activity,
   count,
-  noun = "orders",
+  noun,
   also,
   events = [],
   subject = "orders",
@@ -103,6 +98,20 @@ export function ReplayTimeWindowControl({
   /** Which kinds of layer are on. Default orders. */
   subject?: WindowSubject;
 }) {
+  const { t } = useLingui();
+  const subjectText: Record<WindowSubject, string> = {
+    orders: t`Orders given`,
+    events: t`Events`,
+    both: t`Orders given and events`,
+  };
+  /** A count as a short label, such as "2,897 of 2,897 building orders". */
+  const countText = (count: WindowCount, countNoun: string): string => {
+    if (count.total === 0) return t`No ${countNoun}.`;
+    const inside = formatNumber(count.inside);
+    const total = formatNumber(count.total);
+    return t`${inside} of ${total} ${countNoun}.`;
+  };
+  const layerNoun = noun ?? t`orders`;
   const [draft, setDraft] = useState<[number, number] | null>(null);
   const latest = useRef<[number, number] | null>(null);
   const frame = useRef<number | null>(null);
@@ -143,14 +152,22 @@ export function ReplayTimeWindowControl({
   const narrowed = shown[0] > 0 || shown[1] < domainSec;
   const path = activity ? activityPath(activity.points, domainSec) : null;
   const presets = windowPresets(domainSec);
+  const activityLabel = activity?.label.toLowerCase();
+  const subjectLabel = subjectText[subject];
+  const rangeStart = axisTime(shown[0]);
+  const rangeEnd = axisTime(shown[1]);
+  const matchStart = axisTime(0);
+  const matchEnd = axisTime(domainSec);
 
   return (
     <div className="flex flex-col gap-1.5" data-testid="time-window">
       <div className="flex flex-wrap items-baseline gap-x-2">
-        <span className="text-xs font-medium">Time window</span>
+        <span className="text-xs font-medium">
+          <Trans>Time window</Trans>
+        </span>
         {activity && (
           <span className="text-xs text-muted-foreground">
-            {`Shaded: ${activity.label.toLowerCase()}`}
+            {t`Shaded: ${activityLabel}`}
           </span>
         )}
       </div>
@@ -161,7 +178,7 @@ export function ReplayTimeWindowControl({
           aria-pressed={window === null}
           onClick={() => onChange(null)}
         >
-          Whole match
+          <Trans>Whole match</Trans>
         </Button>
         {presets.map((preset) => (
           <Button
@@ -177,7 +194,7 @@ export function ReplayTimeWindowControl({
       </div>
 
       {/* biome-ignore lint/a11y/useSemanticElements: a fieldset is a native form element, which this app does not use */}
-      <div role="group" aria-label="Match time window">
+      <div role="group" aria-label={t`Match time window`}>
         <div className="relative">
           {path && (
             <svg
@@ -231,9 +248,9 @@ export function ReplayTimeWindowControl({
 
       <p className="text-xs text-muted-foreground">
         {narrowed
-          ? `${SUBJECT_TEXT[subject]} from ${axisTime(shown[0])} to ${axisTime(shown[1])}.`
-          : `The whole match, ${axisTime(0)} to ${axisTime(domainSec)}.`}
-        {count && ` ${countText(count, noun)}`}
+          ? t`${subjectLabel} from ${rangeStart} to ${rangeEnd}.`
+          : t`The whole match, ${matchStart} to ${matchEnd}.`}
+        {count && ` ${countText(count, layerNoun)}`}
         {also?.count && ` ${countText(also.count, also.noun)}`}
         {events.map((e) => ` ${countText(e, e.noun)}`)}
       </p>

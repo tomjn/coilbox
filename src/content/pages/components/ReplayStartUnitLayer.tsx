@@ -1,6 +1,8 @@
+import { plural, t } from "@lingui/core/macro";
+import { Plural, Trans, useLingui } from "@lingui/react/macro";
 import { cn } from "@picoframe/frame";
 import { useEffect, useMemo, useRef } from "react";
-import { formatDuration, formatNumber } from "@/lib/format";
+import { formatDuration } from "@/lib/format";
 import type { DemoInfo } from "../../bindings";
 import { FRAMES_PER_SECOND } from "../../chatClock";
 import { playerLabels, teamLabel } from "../../replayAnalysisEvents";
@@ -234,9 +236,6 @@ export function StartUnitCanvas({
   );
 }
 
-const plural = (n: number, one: string, many: string) =>
-  `${formatNumber(n)} ${n === 1 ? one : many}`;
-
 function endInWords(
   end: StartUnitEnd,
   names: ReadonlyMap<number, string>,
@@ -244,12 +243,13 @@ function endInWords(
   const who = teamLabel(end.team, names);
   const when = formatDuration(Math.max(0, end.frame / FRAMES_PER_SECOND));
   if (end.cause === "removed")
-    return `${who}: removed by the game's own script at ${when}`;
+    return t`${who}: removed by the game's own script at ${when}`;
   if (end.attackerTeam === undefined)
-    return `${who}: destroyed at ${when}, with no attacker recorded`;
-  return end.attackerTeam === end.team
-    ? `${who}: destroyed at ${when} by their own units`
-    : `${who}: destroyed at ${when} by ${teamLabel(end.attackerTeam, names)}`;
+    return t`${who}: destroyed at ${when}, with no attacker recorded`;
+  if (end.attackerTeam === end.team)
+    return t`${who}: destroyed at ${when} by their own units`;
+  const attacker = teamLabel(end.attackerTeam, names);
+  return t`${who}: destroyed at ${when} by ${attacker}`;
 }
 
 /**
@@ -264,6 +264,7 @@ export function StartUnitNotes({
   ev: EventLayers;
   info: DemoInfo;
 }) {
+  const { t } = useLingui();
   const names = useMemo(() => playerLabels(info), [info]);
   if (ev.state.kind !== "ready" || !(ev.startDeathsOn || ev.startPathsOn))
     return null;
@@ -272,14 +273,16 @@ export function StartUnitNotes({
   if (!ev.startUnitsRecorded)
     return (
       <p className="text-xs text-muted-foreground" data-testid="start-units">
-        This analysis was recorded before coilbox logged starting units, so
-        there is nothing to draw. Analyse the replay again to record them.{" "}
+        <Trans>
+          This analysis was recorded before coilbox logged starting units, so
+          there is nothing to draw. Analyse the replay again to record them.
+        </Trans>{" "}
         <button
           type="button"
           className="rounded-sm underline hover:no-underline focus-visible:ring-1 focus-visible:ring-ring"
           onClick={goToAnalysis}
         >
-          Go to the analysis section
+          <Trans>Go to the analysis section</Trans>
         </button>
       </p>
     );
@@ -288,52 +291,82 @@ export function StartUnitNotes({
   if (tracks.length === 0)
     return (
       <p className="text-xs text-muted-foreground" data-testid="start-units">
-        This analysis recorded no starting unit.
+        <Trans>This analysis recorded no starting unit.</Trans>
       </p>
     );
 
   const removed = startEnds.filter((e) => e.cause === "removed").length;
-  const inWindow = ev.windowed ? " in this window" : "";
   const upgraded = ev.startUpgrades.length;
 
   return (
     <div className="flex flex-col gap-2" data-testid="start-units">
       <p className="text-xs text-muted-foreground">
-        {plural(tracks.length, "starting unit", "starting units")} recorded.
+        <Plural
+          value={tracks.length}
+          one="# starting unit recorded."
+          other="# starting units recorded."
+        />
         {ev.startPathsOn && upgraded > 0 && (
           <>
             {" "}
-            <UpgradeIcon /> {plural(upgraded, "upgrade", "upgrades")}
-            {inWindow}.
+            <UpgradeIcon />{" "}
+            {ev.windowed
+              ? plural(upgraded, {
+                  one: "# upgrade in this window.",
+                  other: "# upgrades in this window.",
+                })
+              : plural(upgraded, { one: "# upgrade.", other: "# upgrades." })}
           </>
         )}
       </p>
       {!ev.replacementsRecorded && (
         <p className="text-xs text-amber-600 dark:text-amber-400">
-          This analysis is from an older logger, so a path may stop where the
-          unit was upgraded.
+          <Trans>
+            This analysis is from an older logger, so a path may stop where the
+            unit was upgraded.
+          </Trans>
         </p>
       )}
 
       {ev.startPathsOn && startPaths.length === 0 && (
         <p className="text-xs text-muted-foreground">
-          No starting unit was alive{inWindow}.
+          {ev.windowed
+            ? t`No starting unit was alive in this window.`
+            : t`No starting unit was alive.`}
         </p>
       )}
 
       {ev.startDeathsOn && (
         <>
           <p className="text-xs text-muted-foreground">
-            {startEnds.length === 0
-              ? `No starting unit was lost${inWindow}.`
-              : `${plural(startEnds.length, "starting unit was", "starting units were")} lost${inWindow}.`}
+            {startEnds.length === 0 ? (
+              ev.windowed ? (
+                t`No starting unit was lost in this window.`
+              ) : (
+                t`No starting unit was lost.`
+              )
+            ) : ev.windowed ? (
+              <Plural
+                value={startEnds.length}
+                one="# starting unit was lost in this window."
+                other="# starting units were lost in this window."
+              />
+            ) : (
+              <Plural
+                value={startEnds.length}
+                one="# starting unit was lost."
+                other="# starting units were lost."
+              />
+            )}
             {startEnds.length > 0 && (
               <>
                 {" "}
-                <EndIcon cause="destroyed" /> destroyed
+                <EndIcon cause="destroyed" /> <Trans>destroyed</Trans>
                 {removed > 0 && (
                   <>
-                    , <EndIcon cause="removed" /> removed by the game
+                    {", "}
+                    <EndIcon cause="removed" />{" "}
+                    <Trans>removed by the game</Trans>
                   </>
                 )}
               </>
@@ -368,54 +401,97 @@ export function StartUnitHelp({ ev }: { ev: EventLayers }) {
   if (tracks.length === 0)
     return (
       <p>
-        A player's first unit has to be made for them at the start, not given to
-        them, to count as a starting unit.
+        <Trans>
+          A player's first unit has to be made for them at the start, not given
+          to them, to count as a starting unit.
+        </Trans>
       </p>
     );
 
   const changed = tracks.filter((t) => t.changedTeam).length;
   const still = startPaths.filter((p) => trackLength(p.points) === 0).length;
   const removed = startEnds.filter((e) => e.cause === "removed").length;
-  const inWindow = ev.windowed ? " in this window" : "";
   return (
     <>
       <p>
-        A starting unit is one a player had on the frame their first unit
-        appeared, made by no builder. In most games that is the commander, but
-        the engine does not say which unit is a commander, so none is called one
-        here.
-        {changed > 0 &&
-          ` ${plural(changed, "changed hands and keeps", "changed hands and keep")} the colour of the player who started with ${changed === 1 ? "it" : "them"}.`}
+        <Trans>
+          A starting unit is one a player had on the frame their first unit
+          appeared, made by no builder. In most games that is the commander, but
+          the engine does not say which unit is a commander, so none is called
+          one here.
+        </Trans>
+        {changed > 0 && (
+          <>
+            {" "}
+            <Plural
+              value={changed}
+              one="# changed hands and keeps the colour of the player who started with it."
+              other="# changed hands and keep the colour of the player who started with them."
+            />
+          </>
+        )}
       </p>
       {ev.startPathsOn && startPaths.length > 0 && (
         <p>
-          A line is where one starting unit went{inWindow}, in its player's
-          colour. The dot is where the line begins and the name is where it
-          ends.
-          {still > 0 &&
-            ` ${formatNumber(still)} did not move${inWindow} and ${still === 1 ? "shows" : "show"} as a dot alone.`}
+          {ev.windowed ? (
+            <Trans>
+              A line is where one starting unit went in this window, in its
+              player's colour. The dot is where the line begins and the name is
+              where it ends.
+            </Trans>
+          ) : (
+            <Trans>
+              A line is where one starting unit went, in its player's colour.
+              The dot is where the line begins and the name is where it ends.
+            </Trans>
+          )}
+          {still > 0 && (
+            <>
+              {" "}
+              {ev.windowed ? (
+                <Plural
+                  value={still}
+                  one="# did not move in this window and shows as a dot alone."
+                  other="# did not move in this window and show as a dot alone."
+                />
+              ) : (
+                <Plural
+                  value={still}
+                  one="# did not move and shows as a dot alone."
+                  other="# did not move and show as a dot alone."
+                />
+              )}
+            </>
+          )}
         </p>
       )}
       {ev.startPathsOn && ev.replacementsRecorded && (
         <p>
-          <UpgradeIcon /> is where a game swapped a starting unit for another
-          unit, which is how some games upgrade one. The line carries on as the
-          new unit, and the swap is not a loss. Two units are joined only when
-          the game's own script destroyed the old one with no attacker and made
-          the new one for the same player, with no builder, on exactly the same
-          spot, on the same frame or the one before. A game that destroys a
-          starting unit and spawns an unrelated unit on that spot at that moment
-          would be drawn as an upgrade.
+          <UpgradeIcon />{" "}
+          <Trans>
+            is where a game swapped a starting unit for another unit, which is
+            how some games upgrade one. The line carries on as the new unit, and
+            the swap is not a loss. Two units are joined only when the game's
+            own script destroyed the old one with no attacker and made the new
+            one for the same player, with no builder, on exactly the same spot,
+            on the same frame or the one before. A game that destroys a starting
+            unit and spawns an unrelated unit on that spot at that moment would
+            be drawn as an upgrade.
+          </Trans>
         </p>
       )}
       {ev.startDeathsOn && startEnds.length > 0 && (
         <p>
-          <EndIcon cause="destroyed" /> is a starting unit that was destroyed.
+          <EndIcon cause="destroyed" />{" "}
+          <Trans>is a starting unit that was destroyed.</Trans>
           {removed > 0 && (
             <>
               {" "}
-              <EndIcon cause="removed" /> is one the game's own script took away
-              with nothing recorded in its place.
+              <EndIcon cause="removed" />{" "}
+              <Trans>
+                is one the game's own script took away with nothing recorded in
+                its place.
+              </Trans>
             </>
           )}
         </p>

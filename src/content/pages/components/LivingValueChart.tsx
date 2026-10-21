@@ -1,3 +1,6 @@
+import type { MessageDescriptor } from "@lingui/core";
+import { msg } from "@lingui/core/macro";
+import { Trans, useLingui } from "@lingui/react/macro";
 import { Button, cn, useTheme } from "@picoframe/frame";
 import { useEffect, useMemo, useState } from "react";
 import {
@@ -52,20 +55,18 @@ import { StoredListNote } from "./UnitListNotes";
  * never one number.
  */
 
-const LABEL: Record<SplitBucket, string> = {
-  economy: "Economy",
-  defence: "Defence",
-  offence: "Offence",
-  other: "Builders, factories, sensors and transports",
-  unclassified: "Unclassified",
+const LABEL: Record<SplitBucket, MessageDescriptor> = {
+  economy: msg`Economy`,
+  defence: msg`Defence`,
+  offence: msg`Offence`,
+  other: msg`Builders, factories, sensors and transports`,
+  unclassified: msg`Unclassified`,
 };
 
 const axisTick = { fontSize: 11, fill: "currentColor", opacity: 0.65 };
 const axisTime = (sec: number) => formatDuration(Math.round(sec));
 const axisValue = (v: number) =>
   v >= 1000 ? `${Math.round(v / 100) / 10}k` : String(Math.round(v));
-
-const HEADING = "Value of living units by kind";
 
 type Read =
   | { status: "loading" }
@@ -88,7 +89,9 @@ const frame = (children: React.ReactNode, help?: React.ReactNode) => (
     data-testid="living-value"
   >
     <div className="flex items-center gap-1">
-      <h3 className="text-sm font-medium">{HEADING}</h3>
+      <h3 className="text-sm font-medium">
+        <Trans>Value of living units by kind</Trans>
+      </h3>
       {help && (
         <SectionHelp section="the value of living units by kind" source="log">
           {help}
@@ -104,6 +107,7 @@ const note = (text: string) => (
 
 export function LivingValueChart(props: ChartProps) {
   const { info } = props;
+  const { t } = useLingui();
   const analyses = useStoredAnalyses();
   const stored =
     info.remixed || !info.gameId ? undefined : analyses.get(info.gameId);
@@ -113,26 +117,28 @@ export function LivingValueChart(props: ChartProps) {
   if (state.kind === "remix")
     return frame(
       note(
-        "This needs an analysis, and a remix has no analysis of its own. Analyse the original match.",
+        t`This needs an analysis, and a remix has no analysis of its own. Analyse the original match.`,
       ),
     );
   if (state.kind === "diverged")
     return frame(
       note(
-        "This needs an analysis. The playback did not reproduce the recorded match, so what it recorded was thrown away and there is nothing to add up.",
+        t`This needs an analysis. The playback did not reproduce the recorded match, so what it recorded was thrown away and there is nothing to add up.`,
       ),
     );
   if (state.kind === "notAnalysed")
     return frame(
       note(
         state.canAnalyse
-          ? "This needs an analysis, and this replay has not been analysed."
-          : "This needs an analysis, and this replay has not been analysed. This copy of coilbox cannot analyse replays.",
+          ? t`This needs an analysis, and this replay has not been analysed.`
+          : t`This needs an analysis, and this replay has not been analysed. This copy of coilbox cannot analyse replays.`,
       ),
       state.canAnalyse ? (
         <p>
-          The replay itself records what was produced and lost, not what a
-          player owned at any moment.
+          <Trans>
+            The replay itself records what was produced and lost, not what a
+            player owned at any moment.
+          </Trans>
         </p>
       ) : undefined,
     );
@@ -147,7 +153,7 @@ export function LivingValueChart(props: ChartProps) {
           className="self-start"
           onClick={() => setOpen(true)}
         >
-          Show value of living units by kind
+          <Trans>Show value of living units by kind</Trans>
         </Button>
       </div>
     );
@@ -163,6 +169,7 @@ function OpenValueChart({
   periodSec,
   state,
 }: ChartProps & { state: Extract<EventState, { kind: "ready" }> }) {
+  const { t, i18n } = useLingui();
   const [resource, setResource] = useState<ValueResource>("metal");
   const [read, setRead] = useState<Read>({ status: "loading" });
   const units = useReplayUnits(info, true, "events");
@@ -218,11 +225,17 @@ function OpenValueChart({
     [panels],
   );
 
+  const recordedGame = units.recorded;
+  const installedGame =
+    units.source?.kind === "differentBuild" ? units.source.game.name : "";
+  const resourceName = resource === "metal" ? t`metal` : t`energy`;
   const body = () => {
     if (read.status === "failed")
       return (
         <p className="text-xs text-destructive">
-          The events could not be read from this replay's analysis.
+          <Trans>
+            The events could not be read from this replay's analysis.
+          </Trans>
         </p>
       );
     if (
@@ -230,34 +243,46 @@ function OpenValueChart({
       units.status === "loading" ||
       !units.source
     )
-      return note("Reading events and unit definitions…");
-    if (units.source.kind === "notInstalled")
+      return note(t`Reading events and unit definitions…`);
+    if (units.source.kind === "notInstalled") {
+      const game = units.recorded || t`This replay's game`;
       return note(
-        `${units.recorded || "This replay's game"} is not installed, so nothing says what a unit costs or what it is for.`,
+        t`${game} is not installed, so nothing says what a unit costs or what it is for.`,
       );
+    }
     if (!value)
       return note(
-        "The units of this replay's game could not be read, so nothing says what a unit costs or what it is for.",
+        t`The units of this replay's game could not be read, so nothing says what a unit costs or what it is for.`,
       );
     if (value.seconds.length < 2)
       return note(
-        `This replay is shorter than one ${periodSec} second period, so there is nothing to draw.`,
+        t`This replay is shorter than one ${periodSec} second period, so there is nothing to draw.`,
       );
     return (
       <>
-        <StoredListNote source={units.source} subject="Costs and kinds" />
+        <StoredListNote source={units.source} subject={t`Costs and kinds`} />
         {units.source.kind === "differentBuild" && (
           <p className="text-xs text-amber-600 dark:text-amber-400">
-            This replay was played on {units.recorded}, which is not installed.
-            Costs and kinds come from {units.source.game.name}, a different
-            build, and may be wrong.
+            <Trans>
+              This replay was played on {recordedGame}, which is not installed.
+              Costs and kinds come from {installedGame}, a different build, and
+              may be wrong.
+            </Trans>
           </p>
         )}
         {state.outdated && (
           <p className="text-xs text-amber-600 dark:text-amber-400">
             {OUTDATED_NOTE}
-            {state.loggerVersion < GIVEN_LOGGER_VERSION &&
-              " It did not record a unit changing hands, so a unit that was given away or captured is counted for its first owner throughout."}
+            {state.loggerVersion < GIVEN_LOGGER_VERSION && (
+              <>
+                {" "}
+                <Trans>
+                  It did not record a unit changing hands, so a unit that was
+                  given away or captured is counted for its first owner
+                  throughout.
+                </Trans>
+              </>
+            )}
           </p>
         )}
         <ToggleGroup
@@ -266,18 +291,18 @@ function OpenValueChart({
           size="sm"
           value={resource}
           onValueChange={(v) => v && setResource(v as ValueResource)}
-          aria-label="Cost in"
+          aria-label={t`Cost in`}
           className="self-start"
         >
           <ToggleGroupItem value="metal" className="px-3 text-xs">
-            Metal cost
+            <Trans>Metal cost</Trans>
           </ToggleGroupItem>
           <ToggleGroupItem value="energy" className="px-3 text-xs">
-            Energy cost
+            <Trans>Energy cost</Trans>
           </ToggleGroupItem>
         </ToggleGroup>
         <ul
-          aria-label="Kinds of unit"
+          aria-label={t`Kinds of unit`}
           className="flex flex-wrap gap-x-3 gap-y-1 text-xs text-muted-foreground"
         >
           {SPLIT_BUCKETS.map((bucket) => (
@@ -286,15 +311,15 @@ function OpenValueChart({
                 className="inline-block size-2.5 rounded-sm"
                 style={{ backgroundColor: colours[bucket] }}
               />
-              {LABEL[bucket]}
+              {i18n._(LABEL[bucket])}
             </li>
           ))}
         </ul>
         {panels.length === 0 || peak === 0 ? (
           note(
             panels.length === 0
-              ? "No line is on the chart above."
-              : `No finished unit with a ${resource} cost belongs to the lines on the chart above.`,
+              ? t`No line is on the chart above.`
+              : t`No finished unit with a ${resourceName} cost belongs to the lines on the chart above.`,
           )
         ) : (
           <div className="grid grid-cols-[repeat(auto-fill,minmax(16rem,1fr))] gap-3">
@@ -348,8 +373,10 @@ function OpenValueChart({
                       />
                       <Tooltip
                         formatter={(v, name) => [
-                          `${formatNumber(Math.round(Number(v)))} ${resource}`,
-                          LABEL[name as SplitBucket] ?? name,
+                          t`${formatNumber(Math.round(Number(v)))} ${resourceName}`,
+                          LABEL[name as SplitBucket]
+                            ? i18n._(LABEL[name as SplitBucket])
+                            : name,
                         ]}
                         labelFormatter={(t) => axisTime(Number(t))}
                         isAnimationActive={false}
@@ -385,19 +412,30 @@ function OpenValueChart({
     units.source.kind !== "notInstalled" &&
     !!value &&
     value.seconds.length >= 2;
+  const unpricedCount = value ? formatNumber(value.unpriced) : "";
+  const finishedCount = value ? formatNumber(value.finished) : "";
   return frame(
     body(),
     explained && value ? (
       <p>
-        The {resource} cost of each line's finished, living units every{" "}
-        {periodSec} seconds, stacked by what each unit is for. A unit counts
-        from the moment it is finished until it is destroyed, and moves with it
-        when it is given away or captured. A unit still being built counts
-        nothing. Costs and kinds come from the installed game's unit
-        definitions, and every panel has the same scale. Metal and energy are
-        never added together.
-        {value.unpriced > 0 &&
-          ` ${formatNumber(value.unpriced)} of ${formatNumber(value.finished)} finished units have no cost in the installed game and count nothing.`}
+        <Trans>
+          The {resourceName} cost of each line's finished, living units every{" "}
+          {periodSec} seconds, stacked by what each unit is for. A unit counts
+          from the moment it is finished until it is destroyed, and moves with
+          it when it is given away or captured. A unit still being built counts
+          nothing. Costs and kinds come from the installed game's unit
+          definitions, and every panel has the same scale. Metal and energy are
+          never added together.
+        </Trans>
+        {value.unpriced > 0 && (
+          <>
+            {" "}
+            <Trans>
+              {unpricedCount} of {finishedCount} finished units have no cost in
+              the installed game and count nothing.
+            </Trans>
+          </>
+        )}
       </p>
     ) : undefined,
   );

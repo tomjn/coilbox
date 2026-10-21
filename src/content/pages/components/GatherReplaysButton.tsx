@@ -1,3 +1,5 @@
+import { plural, t } from "@lingui/core/macro";
+import { Trans, useLingui } from "@lingui/react/macro";
 import { Button } from "@picoframe/frame";
 import { FolderInput, Loader2 } from "lucide-react";
 import { useState } from "react";
@@ -21,11 +23,19 @@ function summarize(s: GatherSummary): string {
     // with something left behind is a different answer, and the reasons are
     // listed under it.
     return s.skipped.length > 0
-      ? "Nothing can move right now."
-      : "Every replay is already in one folder.";
+      ? t`Nothing can move right now.`
+      : t`Every replay is already in one folder.`;
   }
-  const files = `${n} ${n === 1 ? "replay" : "replays"}`;
-  return `${s.applied ? "Moved" : "Can move"} ${files} (${formatBytes(s.bytes)}).`;
+  const size = formatBytes(s.bytes);
+  return s.applied
+    ? plural(n, {
+        one: `Moved # replay (${size}).`,
+        other: `Moved # replays (${size}).`,
+      })
+    : plural(n, {
+        one: `Can move # replay (${size}).`,
+        other: `Can move # replays (${size}).`,
+      });
 }
 
 /**
@@ -50,6 +60,7 @@ export function GatherReplaysButton({
   /** Re-read the list, so the moved files show their new home. */
   onGathered: () => void;
 }) {
+  const { t: tr } = useLingui();
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const [applying, setApplying] = useState(false);
@@ -98,17 +109,17 @@ export function GatherReplaysButton({
           size="sm"
           className="gap-1.5"
           disabled={!rootPath}
-          title="Move replays out of the engine folders into your content folder"
+          title={tr`Move replays out of the engine folders into your content folder`}
         >
           <FolderInput className="size-4" />
-          Gather replays
+          <Trans>Gather replays</Trans>
         </Button>
       </PopoverTrigger>
       <PopoverContent align="end" className="w-96">
         {loading ? (
           <p className="flex items-center gap-2 text-sm text-muted-foreground">
             <Loader2 className="size-4 animate-spin" />
-            Looking for replays inside the engine folders...
+            <Trans>Looking for replays inside the engine folders...</Trans>
           </p>
         ) : error ? (
           <p className="break-words text-sm text-destructive">{error}</p>
@@ -117,15 +128,17 @@ export function GatherReplaysButton({
             <p className="text-sm">{summarize(preview)}</p>
             {!nothing && (
               <p className="text-xs text-muted-foreground">
-                Some engines record into their own folder, so deleting that
-                engine deletes those replays. This moves them into the demos
-                folder alongside the rest.
+                <Trans>
+                  Some engines record into their own folder, so deleting that
+                  engine deletes those replays. This moves them into the demos
+                  folder alongside the rest.
+                </Trans>
               </p>
             )}
             {preview.skipped.length > 0 && (
               <div className="flex flex-col gap-1">
                 <p className="text-xs text-muted-foreground">
-                  Staying where they are:
+                  <Trans>Staying where they are:</Trans>
                 </p>
                 <ul className="max-h-32 overflow-y-auto text-xs text-muted-foreground">
                   {preview.skipped.map((line) => (
@@ -143,7 +156,7 @@ export function GatherReplaysButton({
                 size="sm"
                 onClick={() => setOpen(false)}
               >
-                {nothing ? "Close" : "Cancel"}
+                {nothing ? tr`Close` : tr`Cancel`}
               </Button>
               {!nothing && (
                 <Button
@@ -157,7 +170,7 @@ export function GatherReplaysButton({
                   ) : (
                     <FolderInput className="size-4" />
                   )}
-                  Move them
+                  <Trans>Move them</Trans>
                 </Button>
               )}
             </div>

@@ -1,3 +1,4 @@
+import { t } from "@lingui/core/macro";
 import type { ReplayProvenance } from "./replayUserState";
 
 /**
@@ -19,7 +20,7 @@ export function provenanceLink(
         to: p.nodeId
           ? `/conquest/${encodeURIComponent(p.galaxyId)}?node=${encodeURIComponent(p.nodeId)}`
           : `/conquest/${encodeURIComponent(p.galaxyId)}`,
-        label: "Back to conquest map",
+        label: t`Back to conquest map`,
       };
     case "warpath":
       if (!p.runId) return null;
@@ -27,19 +28,19 @@ export function provenanceLink(
         to: p.nodeId
           ? `/warpath/${encodeURIComponent(p.runId)}?node=${encodeURIComponent(p.nodeId)}`
           : `/warpath/${encodeURIComponent(p.runId)}`,
-        label: "Back to warpath run",
+        label: t`Back to warpath run`,
       };
     case "campaign":
       if (!p.campaignId || !p.missionId) return null;
       return {
         to: `/campaign/${encodeURIComponent(p.campaignId)}/${encodeURIComponent(p.missionId)}`,
-        label: "Back to mission",
+        label: t`Back to mission`,
       };
     case "refight":
       if (!p.sourceReplayFilename) return null;
       return {
         to: `/play/replays/${encodeURIComponent(p.sourceReplayFilename)}`,
-        label: "Back to original replay",
+        label: t`Back to original replay`,
       };
     default:
       return null;

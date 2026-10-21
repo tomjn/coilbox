@@ -1,3 +1,5 @@
+import { plural as icuPlural, t } from "@lingui/core/macro";
+import { Plural, Trans, useLingui } from "@lingui/react/macro";
 import { Button } from "@picoframe/frame";
 import { ChevronRight, Loader2, ScanSearch, Trash2, X } from "lucide-react";
 import {
@@ -89,15 +91,22 @@ function when(ms: number): string {
   });
 }
 
+/**
+ * English-only count phrase, kept for `ReplayMapView`, which passes it English
+ * words. Messages in this file use ICU plurals instead.
+ */
 export function plural(n: number, one: string, many: string): string {
   return `${formatNumber(n)} ${n === 1 ? one : many}`;
 }
 
 /** A length of time in words, to the nearest sensible unit. */
 export function roughly(seconds: number): string {
-  if (seconds < 90)
-    return plural(Math.max(1, Math.round(seconds)), "second", "seconds");
-  return plural(Math.round(seconds / 60), "minute", "minutes");
+  if (seconds < 90) {
+    const count = Math.max(1, Math.round(seconds));
+    return icuPlural(count, { one: "# second", other: "# seconds" });
+  }
+  const count = Math.round(seconds / 60);
+  return icuPlural(count, { one: "# minute", other: "# minutes" });
 }
 
 /**
@@ -169,6 +178,7 @@ function AnalysisBody({
   downloads = null,
   engines,
 }: SectionProps & { engines: InstalledEngine[] }) {
+  const { t } = useLingui();
   const hidden = analysisRunHidden();
   const queue = useAnalysisQueue();
   const analyses = useStoredAnalyses();
@@ -282,9 +292,9 @@ function AnalysisBody({
         force: stored !== undefined || track !== undefined,
       });
       if (outcome === "alreadyQueued") {
-        setNote("This replay is already in the queue.");
+        setNote(t`This replay is already in the queue.`);
       } else if (outcome === "alreadyDone") {
-        setNote("This replay is already analysed and recorded.");
+        setNote(t`This replay is already analysed and recorded.`);
       }
     } catch (e) {
       setError(errMessage(e));
@@ -311,16 +321,20 @@ function AnalysisBody({
   const recorded = track?.state === "current";
   // What the button is for. A run always makes both, so the words say what is
   // missing and the confirmation says what the run costs.
-  const label =
-    failure || stored?.state === "diverged"
-      ? "Try again"
-      : analysed && !track
-        ? "Record this replay"
-        : recorded && !stored
-          ? "Analyse this replay"
-          : stored || track
-            ? "Analyse and record again"
-            : "Analyse and record this replay";
+  const tryAgain = !!failure || stored?.state === "diverged";
+  const label = tryAgain
+    ? t`Try again`
+    : analysed && !track
+      ? t`Record this replay`
+      : recorded && !stored
+        ? t`Analyse this replay`
+        : stored || track
+          ? t`Analyse and record again`
+          : t`Analyse and record this replay`;
+  const chosenLabel = chosen?.label;
+  const withChosen = tryAgain
+    ? t`Try with ${chosenLabel}`
+    : t`Analyse and record with ${chosenLabel}`;
 
   const offer = (
     <>
@@ -348,9 +362,7 @@ function AnalysisBody({
             ) : (
               <ScanSearch className="size-4" />
             )}
-            {chosen
-              ? `${label === "Try again" ? "Try" : "Analyse and record"} with ${chosen.label}`
-              : label}
+            {chosen ? withChosen : label}
           </Button>
         </PopoverTrigger>
         <PopoverContent align="start" className="flex w-80 flex-col gap-3">
@@ -377,11 +389,13 @@ function AnalysisBody({
     <section
       id={ANALYSIS_SECTION_ID}
       className="flex flex-col gap-2"
-      aria-label="Analysis and recording"
+      aria-label={t`Analysis and recording`}
     >
       <div className="flex items-center gap-1">
-        <h2 className="text-sm font-medium">Analysis and recording</h2>
-        <SectionHelp section="the analysis and recording">
+        <h2 className="text-sm font-medium">
+          <Trans>Analysis and recording</Trans>
+        </h2>
+        <SectionHelp section={t`the analysis and recording`}>
           <AnalysisHelp
             canRun={!hidden}
             matchSeconds={info.durationSec}
@@ -403,10 +417,13 @@ function AnalysisBody({
           <div className="flex flex-wrap items-center justify-between gap-2">
             <p>
               {queue.waitingForGame
-                ? "Queued. It starts when the game you are playing ends."
+                ? t`Queued. It starts when the game you are playing ends.`
                 : queuedAt === 0
-                  ? "Queued. It is next."
-                  : `Queued, with ${plural(queuedAt, "replay", "replays")} ahead of it.`}
+                  ? t`Queued. It is next.`
+                  : icuPlural(queuedAt, {
+                      one: "Queued, with # replay ahead of it.",
+                      other: "Queued, with # replays ahead of it.",
+                    })}
             </p>
             <Button
               type="button"
@@ -415,7 +432,7 @@ function AnalysisBody({
               className="gap-1.5"
               onClick={() => act(() => cancelAnalysis(queued.id))}
             >
-              <X className="size-4" /> Cancel
+              <X className="size-4" /> <Trans>Cancel</Trans>
             </Button>
           </div>
         ) : (
@@ -470,68 +487,116 @@ function AnalysisHelp({
   running: boolean;
   diverged: boolean;
 }) {
-  const different =
-    hasEngineOptions && gameUsed
-      ? "engine or game version"
-      : hasEngineOptions
-        ? "engine"
-        : "game version";
+  const duration = formatDuration(matchSeconds);
+  const expected = estimate ? roughly(estimate.seconds) : "";
+  const recordings = estimate ? estimate.runs : 0;
   return (
     <>
       <p>
-        Analysing plays the match back in the game's engine on this computer, to
-        record where units were made and lost. The same playback records the
-        whole match as a track, which is what the page shows and rewinds.
+        <Trans>
+          Analysing plays the match back in the game's engine on this computer,
+          to record where units were made and lost. The same playback records
+          the whole match as a track, which is what the page shows and rewinds.
+        </Trans>
       </p>
       {canRun && (
         <>
           <p>
-            The match is {formatDuration(matchSeconds)} long, and playback runs
-            faster than the match did.
-            {estimate && ` Expect about ${roughly(estimate.seconds)}.`}
-            {estimate &&
-              ` The estimate goes by the ${plural(estimate.runs, "recording", "recordings")} of this game this computer has finished.`}{" "}
-            The engine and the game the replay used must be installed. The
-            result is kept, so this happens once.
+            <Trans>
+              The match is {duration} long, and playback runs faster than the
+              match did.
+            </Trans>
+            {estimate && (
+              <>
+                {" "}
+                <Trans>Expect about {expected}.</Trans>
+              </>
+            )}
+            {estimate && (
+              <>
+                {" "}
+                <Plural
+                  value={recordings}
+                  one="The estimate goes by the # recording of this game this computer has finished."
+                  other="The estimate goes by the # recordings of this game this computer has finished."
+                />
+              </>
+            )}{" "}
+            <Trans>
+              The engine and the game the replay used must be installed. The
+              result is kept, so this happens once.
+            </Trans>
           </p>
           <p>
-            A different {different} often computes a different match, because
-            the engine only keeps its playback in step within one version. The
-            result is kept only if the playback matches the recorded match
-            exactly: who won, how long it lasted and every team's final totals.
-            If it does not, no events and no track are kept and the page says
-            so.
+            {hasEngineOptions && gameUsed ? (
+              <Trans>
+                A different engine or game version often computes a different
+                match, because the engine only keeps its playback in step within
+                one version. The result is kept only if the playback matches the
+                recorded match exactly: who won, how long it lasted and every
+                team's final totals. If it does not, no events and no track are
+                kept and the page says so.
+              </Trans>
+            ) : hasEngineOptions ? (
+              <Trans>
+                A different engine often computes a different match, because the
+                engine only keeps its playback in step within one version. The
+                result is kept only if the playback matches the recorded match
+                exactly: who won, how long it lasted and every team's final
+                totals. If it does not, no events and no track are kept and the
+                page says so.
+              </Trans>
+            ) : (
+              <Trans>
+                A different game version often computes a different match,
+                because the engine only keeps its playback in step within one
+                version. The result is kept only if the playback matches the
+                recorded match exactly: who won, how long it lasted and every
+                team's final totals. If it does not, no events and no track are
+                kept and the page says so.
+              </Trans>
+            )}
           </p>
           <p>
-            Tracks share a limit on disk space. When a new track takes them past
-            it, tracks that are out of date are removed first and then the ones
-            watched longest ago. Their analyses stay.
+            <Trans>
+              Tracks share a limit on disk space. When a new track takes them
+              past it, tracks that are out of date are removed first and then
+              the ones watched longest ago. Their analyses stay.
+            </Trans>
           </p>
           {hasEngineOptions && (
             <p>
-              Engines are listed newest first. Coilbox has no measure of which
-              version is nearest to the one the replay was recorded on, so it
-              has not picked one for that.
+              <Trans>
+                Engines are listed newest first. Coilbox has no measure of which
+                version is nearest to the one the replay was recorded on, so it
+                has not picked one for that.
+              </Trans>
             </p>
           )}
           {gameUsed && (
             <p>
-              The game version used is the highest numbered one installed, and
-              coilbox cannot tell whether it is the nearest.
+              <Trans>
+                The game version used is the highest numbered one installed, and
+                coilbox cannot tell whether it is the nearest.
+              </Trans>
             </p>
           )}
         </>
       )}
       {running && (
         <p>
-          The frame shown is where the playback had got to when a unit was last
-          made or lost, so it can stand still for a while.
+          <Trans>
+            The frame shown is where the playback had got to when a unit was
+            last made or lost, so it can stand still for a while.
+          </Trans>
         </p>
       )}
       {diverged && (
         <p>
-          The usual reason a playback does not match is that the installed game
-          or engine is not exactly the one the match was played on.
+          <Trans>
+            The usual reason a playback does not match is that the installed
+            game or engine is not exactly the one the match was played on.
+          </Trans>
         </p>
       )}
     </>
@@ -564,33 +629,38 @@ function Substitution({
   recordedGame: string | null;
   gameUsed: string | null;
 }) {
+  const { t } = useLingui();
   const tried = options.filter((o) => o.tried);
+  const chosenLabel = chosen?.label;
+  const triedLabels = tried.map((o) => o.label).join(", ");
   return (
     <div className="flex max-w-prose flex-col gap-2">
       {options.length > 0 && (
         <>
           <p>
             {recordedEngine
-              ? `This replay was recorded on engine ${recordedEngine}, which is not installed.`
-              : "This replay does not say which engine recorded it."}{" "}
+              ? t`This replay was recorded on engine ${recordedEngine}, which is not installed.`
+              : t`This replay does not say which engine recorded it.`}{" "}
             {chosen
-              ? `The analysis will use engine ${chosen.label} instead.`
-              : "Every installed engine has been tried and did not reproduce the match. Pick one to try it again."}
+              ? t`The analysis will use engine ${chosenLabel} instead.`
+              : t`Every installed engine has been tried and did not reproduce the match. Pick one to try it again.`}
           </p>
           {options.length > 1 && (
             <div className="flex flex-col gap-1">
-              <span className="text-xs font-medium">Engine to use</span>
+              <span className="text-xs font-medium">
+                <Trans>Engine to use</Trans>
+              </span>
               <OptionSelect
                 value={chosen?.path ?? ""}
                 onValueChange={onPick}
-                placeholder="Pick an engine"
+                placeholder={t`Pick an engine`}
                 size="sm"
                 className="max-w-sm"
-                ariaLabel="Engine to use"
+                ariaLabel={t`Engine to use`}
                 options={options.map((o) => ({
                   value: o.path,
                   label: o.tried
-                    ? `${o.label} (did not reproduce this match)`
+                    ? t`${o.label} (did not reproduce this match)`
                     : o.label,
                 }))}
               />
@@ -598,16 +668,19 @@ function Substitution({
           )}
           {tried.length > 0 && (
             <p className="text-xs text-muted-foreground">
-              Already tried, and did not reproduce the match:{" "}
-              {tried.map((o) => o.label).join(", ")}.
+              <Trans>
+                Already tried, and did not reproduce the match: {triedLabels}.
+              </Trans>
             </p>
           )}
         </>
       )}
       {recordedGame && gameUsed && (
         <p>
-          The game this replay was recorded on, {recordedGame}, is not
-          installed. The analysis will use {gameUsed}, another version of it.
+          <Trans>
+            The game this replay was recorded on, {recordedGame}, is not
+            installed. The analysis will use {gameUsed}, another version of it.
+          </Trans>
         </p>
       )}
     </div>
@@ -624,8 +697,8 @@ export function Confirmation({
   ownBytes,
   onCancel,
   onStart,
-  heading = "Analyse and record this replay?",
-  startLabel = "Start",
+  heading,
+  startLabel,
 }: {
   estimate: Estimate;
   /** What the replay's own track takes now, which a new one replaces. */
@@ -636,6 +709,7 @@ export function Confirmation({
   heading?: string;
   startLabel?: string;
 }) {
+  const { t } = useLingui();
   const usage = useTrackUsage();
   const { budgetBytes } = useTrackBudget();
   const effect = budgetEffect({
@@ -644,41 +718,52 @@ export function Confirmation({
     ownBytes,
     estimateBytes: estimate?.bytes ?? null,
   });
+  const timeNeeded = estimate ? roughly(estimate.seconds) : null;
+  const sizeNeeded = estimate ? formatBytes(estimate.bytes) : null;
+  const limit = formatBytes(budgetBytes);
   return (
     <>
       <div className="flex flex-col gap-1.5">
-        <h3 className="text-sm font-medium">{heading}</h3>
+        <h3 className="text-sm font-medium">
+          {heading ?? t`Analyse and record this replay?`}
+        </h3>
         <p className="text-xs text-muted-foreground">
-          This runs the game once, without a window.
+          <Trans>This runs the game once, without a window.</Trans>
         </p>
         <p className="text-xs">
-          {`Time: ${estimate ? `about ${roughly(estimate.seconds)}` : "unknown"}`}
+          {timeNeeded ? t`Time: about ${timeNeeded}` : t`Time: unknown`}
         </p>
         <p className="text-xs">
-          {`Track size: ${estimate ? `about ${formatBytes(estimate.bytes)}` : "unknown"}`}
+          {sizeNeeded
+            ? t`Track size: about ${sizeNeeded}`
+            : t`Track size: unknown`}
         </p>
         <p className="text-xs text-muted-foreground">
           {estimate
-            ? `Estimated from ${plural(estimate.runs, "earlier recording", "earlier recordings")} of this game on this computer.`
-            : "Nothing of this game has been recorded on this computer yet."}
+            ? icuPlural(estimate.runs, {
+                one: "Estimated from # earlier recording of this game on this computer.",
+                other:
+                  "Estimated from # earlier recordings of this game on this computer.",
+              })
+            : t`Nothing of this game has been recorded on this computer yet.`}
         </p>
         {effect === "removesOlder" && (
           <p className="text-xs text-amber-700 dark:text-amber-400">
-            {`Older tracks will be removed to stay within the ${formatBytes(budgetBytes)} limit.`}
+            {t`Older tracks will be removed to stay within the ${limit} limit.`}
           </p>
         )}
         {effect === "largerThanBudget" && (
           <p className="text-xs text-amber-700 dark:text-amber-400">
-            {`The track would be larger than the whole ${formatBytes(budgetBytes)} limit. It is kept and every other track is removed.`}
+            {t`The track would be larger than the whole ${limit} limit. It is kept and every other track is removed.`}
           </p>
         )}
       </div>
       <div className="flex justify-end gap-2">
         <Button type="button" size="sm" variant="outline" onClick={onCancel}>
-          Cancel
+          <Trans>Cancel</Trans>
         </Button>
         <Button type="button" size="sm" onClick={onStart}>
-          {startLabel}
+          {startLabel ?? t`Start`}
         </Button>
       </div>
     </>
@@ -687,17 +772,27 @@ export function Confirmation({
 
 /** Whether the replay has a track for rewind, beside what its analysis says. */
 function TrackLine({ track }: { track: StoredReplayTrack | undefined }) {
-  if (!track) return <p>Not recorded for rewind.</p>;
+  if (!track)
+    return (
+      <p>
+        <Trans>Not recorded for rewind.</Trans>
+      </p>
+    );
   if (track.state === "stale") {
     return (
       <p className="text-xs text-amber-700 dark:text-amber-400">
-        The recorded track is out of date and is not played. A new run replaces
-        it.
+        <Trans>
+          The recorded track is out of date and is not played. A new run
+          replaces it.
+        </Trans>
       </p>
     );
   }
+  const size = formatBytes(track.sizeBytes);
   return (
-    <p>Recorded for rewind. The track takes {formatBytes(track.sizeBytes)}.</p>
+    <p>
+      <Trans>Recorded for rewind. The track takes {size}.</Trans>
+    </p>
   );
 }
 
@@ -708,6 +803,7 @@ function Running({
   job: ReplayAnalysisRunningJob;
   onCancel: () => void;
 }) {
+  const { t } = useLingui();
   const label = analysisProgressLabel(job);
   const [now, setNow] = useState(() => Date.now());
   const [outputOpen, setOutputOpen] = useState(false);
@@ -744,15 +840,15 @@ function Running({
     const box = outputBox.current;
     if (box && atEnd.current) box.scrollTop = box.scrollHeight;
   }, [output]);
-  const elapsed = Math.max(0, (now - job.startedAtMs) / 1000);
+  const elapsed = formatDuration(Math.max(0, (now - job.startedAtMs) / 1000));
   return (
     <div className="flex flex-col gap-2">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <p className="flex items-center gap-1.5">
           <Loader2 className="size-4 animate-spin motion-reduce:animate-none" />
           {job.phase === "thinning"
-            ? "Making the track from the recording."
-            : `Playing the match back. ${label}.`}
+            ? t`Making the track from the recording.`
+            : t`Playing the match back. ${label}.`}
         </p>
         <Button
           type="button"
@@ -762,7 +858,7 @@ function Running({
           disabled={job.cancelling}
           onClick={onCancel}
         >
-          <X className="size-4" /> Cancel
+          <X className="size-4" /> <Trans>Cancel</Trans>
         </Button>
       </div>
       {/* A bar only once there is a frame to draw it from. */}
@@ -770,17 +866,17 @@ function Running({
         <Progress
           value={analysisPercent(job)}
           className="h-1.5 bg-muted"
-          aria-label="Playback progress"
+          aria-label={t`Playback progress`}
         />
       )}
       <p className="text-xs text-muted-foreground">
-        Running for {formatDuration(elapsed)}. You can leave this page.
+        <Trans>Running for {elapsed}. You can leave this page.</Trans>
       </p>
       <Collapsible open={outputOpen} onOpenChange={setOutputOpen}>
         <CollapsibleTrigger asChild>
           <Button variant="ghost" size="sm" className="group w-fit gap-1.5">
             <ChevronRight className="size-4 transition-transform group-data-[state=open]:rotate-90 motion-reduce:transition-none" />
-            What the engine is saying
+            <Trans>What the engine is saying</Trans>
           </Button>
         </CollapsibleTrigger>
         <CollapsibleContent>
@@ -796,7 +892,7 @@ function Running({
           >
             {output.length > 0
               ? output.join("\n")
-              : "The engine has written nothing yet."}
+              : t`The engine has written nothing yet.`}
           </pre>
         </CollapsibleContent>
       </Collapsible>
@@ -811,32 +907,52 @@ function Stored({
   stored: StoredReplayAnalysis;
   onDelete: () => void | Promise<void>;
 }) {
+  const { t } = useLingui();
   const diverged = stored.state === "diverged";
   const { counts } = stored;
   const difference = differenceNote(stored);
   const attempts = divergedAttempts(stored);
+  const unitsMade = icuPlural(counts.unitCreated, {
+    one: "# unit made",
+    other: "# units made",
+  });
+  const finished = formatNumber(counts.unitFinished);
+  const lost = formatNumber(counts.unitDestroyed);
+  const at = when(stored.analysedAtMs);
+  const game = stored.game || t`an unnamed game`;
+  const engine = stored.engine || t`unknown`;
+  const took = roughly(stored.wallSeconds);
+  const onDisk = formatBytes(stored.sizeBytes) ?? "0 B";
+  const triedList = attempts
+    .map((a) => {
+      const attemptEngine = a.engine || t`unknown`;
+      const attemptGame = a.game;
+      return t`engine ${attemptEngine} with ${attemptGame}`;
+    })
+    .join(", ");
   return (
     <div className="flex flex-col gap-2">
       <div className="flex flex-wrap items-start justify-between gap-2">
         <div className="flex flex-col gap-1">
           {diverged ? (
             <p>
-              The playback did not reproduce the recorded match, so what it
-              recorded was thrown away.
+              <Trans>
+                The playback did not reproduce the recorded match, so what it
+                recorded was thrown away.
+              </Trans>
             </p>
           ) : (
             <p>
-              Analysed. {plural(counts.unitCreated, "unit made", "units made")},{" "}
-              {formatNumber(counts.unitFinished)} finished and{" "}
-              {formatNumber(counts.unitDestroyed)} lost.
+              <Trans>
+                Analysed. {unitsMade}, {finished} finished and {lost} lost.
+              </Trans>
             </p>
           )}
           <p className="text-xs text-muted-foreground">
-            {diverged ? "Tried" : "Run"} {when(stored.analysedAtMs)} with{" "}
-            {stored.game || "an unnamed game"} on engine{" "}
-            {stored.engine || "unknown"}, in {roughly(stored.wallSeconds)}.
-            {!diverged &&
-              ` Takes ${formatBytes(stored.sizeBytes) ?? "0 B"} on disk.`}
+            {diverged
+              ? t`Tried ${at} with ${game} on engine ${engine}, in ${took}.`
+              : t`Run ${at} with ${game} on engine ${engine}, in ${took}.`}
+            {!diverged && ` ${t`Takes ${onDisk} on disk.`}`}
           </p>
           {difference && (
             <p className="max-w-prose text-xs text-amber-700 dark:text-amber-400">
@@ -850,35 +966,37 @@ function Stored({
             size: "sm",
             className: "gap-1.5",
           }}
-          heading={diverged ? "Forget this attempt?" : "Delete this analysis?"}
+          heading={
+            diverged ? t`Forget this attempt?` : t`Delete this analysis?`
+          }
           description={
             diverged
-              ? "Coilbox forgets that the playback did not match. The replay is not touched."
-              : "The recorded events are deleted. The replay is not touched, and it can be analysed again."
+              ? t`Coilbox forgets that the playback did not match. The replay is not touched.`
+              : t`The recorded events are deleted. The replay is not touched, and it can be analysed again.`
           }
-          confirmLabel={diverged ? "Forget it" : "Delete analysis"}
-          busyLabel="Deleting"
+          confirmLabel={diverged ? t`Forget it` : t`Delete analysis`}
+          busyLabel={t`Deleting`}
           onConfirm={onDelete}
         >
           <Trash2 className="size-4" />{" "}
-          {diverged ? "Forget" : "Delete analysis"}
+          {diverged ? t`Forget` : t`Delete analysis`}
         </ConfirmPopover>
       </div>
       {diverged && <Disagreements stored={stored} />}
       {diverged && attempts.length > 1 && (
         <p className="text-xs text-muted-foreground">
-          Tried so far, and none reproduced the match:{" "}
-          {attempts
-            .map((a) => `engine ${a.engine || "unknown"} with ${a.game}`)
-            .join(", ")}
-          .
+          <Trans>
+            Tried so far, and none reproduced the match: {triedList}.
+          </Trans>
         </p>
       )}
       {stored.state === "outdated" && (
         <p className="text-xs text-amber-700 dark:text-amber-400">
-          This analysis was made by an earlier version of coilbox, which
-          recorded less than this one does. Analyse it again to bring it up to
-          date.
+          <Trans>
+            This analysis was made by an earlier version of coilbox, which
+            recorded less than this one does. Analyse it again to bring it up to
+            date.
+          </Trans>
         </p>
       )}
     </div>
@@ -887,6 +1005,7 @@ function Stored({
 
 function Disagreements({ stored }: { stored: StoredReplayAnalysis }) {
   // A team statistic is named the way the rest of the page names it.
+  const { t } = useLingui();
   const registry = useMetricRegistry();
   const labels = new Map(registry.map((m) => [m.key as string, m.label]));
   const figures = stored.disagreements.map((d) =>
@@ -896,7 +1015,7 @@ function Disagreements({ stored }: { stored: StoredReplayAnalysis }) {
   const rest = figures.slice(FIGURES_SHOWN);
   return (
     <div className="flex flex-col gap-1 text-xs">
-      <p className="text-muted-foreground">What disagreed:</p>
+      <p className="text-muted-foreground">{t`What disagreed:`}</p>
       <ul className="flex list-disc flex-col gap-0.5 pl-4">
         {first.map((f) => (
           <li key={f}>{f}</li>
@@ -907,7 +1026,10 @@ function Disagreements({ stored }: { stored: StoredReplayAnalysis }) {
           <CollapsibleTrigger asChild>
             <Button variant="ghost" size="sm" className="group w-fit gap-1.5">
               <ChevronRight className="size-4 transition-transform group-data-[state=open]:rotate-90 motion-reduce:transition-none" />
-              {plural(rest.length, "more figure", "more figures")}
+              {icuPlural(rest.length, {
+                one: "# more figure",
+                other: "# more figures",
+              })}
             </Button>
           </CollapsibleTrigger>
           <CollapsibleContent>
@@ -923,11 +1045,23 @@ function Disagreements({ stored }: { stored: StoredReplayAnalysis }) {
   );
 }
 
+/**
+ * Getters, so a caller that indexes this at render reads the active language
+ * (`WatchWithRewindButton` does).
+ */
 export const FAILURE_WORDS: Record<ReplayAnalysisFailure["reason"], string> = {
-  tookTooLong: "The playback took too long and was stopped.",
-  engineFailed: "The engine stopped before the match ended.",
-  couldNotRun: "The analysis and recording could not be run.",
-  thinFailed: "The recording could not be made into a track.",
+  get tookTooLong() {
+    return t`The playback took too long and was stopped.`;
+  },
+  get engineFailed() {
+    return t`The engine stopped before the match ended.`;
+  },
+  get couldNotRun() {
+    return t`The analysis and recording could not be run.`;
+  },
+  get thinFailed() {
+    return t`The recording could not be made into a track.`;
+  },
 };
 
 function Failed({
@@ -940,6 +1074,9 @@ function Failed({
   earlierTrack: boolean;
   onDismiss: () => void;
 }) {
+  const { t } = useLingui();
+  const allowed = failure.limitSeconds ? roughly(failure.limitSeconds) : "";
+  const reasonText = `${failure.message.charAt(0).toUpperCase()}${failure.message.slice(1)}`;
   return (
     <div className="flex flex-col gap-1.5" role="alert">
       <div className="flex flex-wrap items-start justify-between gap-2">
@@ -947,12 +1084,12 @@ function Failed({
           <p className="text-destructive">{FAILURE_WORDS[failure.reason]}</p>
           <p className="text-xs text-muted-foreground">
             {failure.reason === "tookTooLong" && failure.limitSeconds
-              ? `It was allowed ${roughly(failure.limitSeconds)}, which is the length of the match plus time for the engine to start. Nothing was stored.`
-              : `${failure.message.charAt(0).toUpperCase()}${failure.message.slice(1)}. ${earlierTrack ? "The earlier track was kept." : "No track was made."}`}
+              ? t`It was allowed ${allowed}, which is the length of the match plus time for the engine to start. Nothing was stored.`
+              : `${reasonText}. ${earlierTrack ? t`The earlier track was kept.` : t`No track was made.`}`}
           </p>
         </div>
         <Button type="button" variant="ghost" size="sm" onClick={onDismiss}>
-          Dismiss
+          <Trans>Dismiss</Trans>
         </Button>
       </div>
       {failure.logExcerpt.length > 0 && (
@@ -960,7 +1097,7 @@ function Failed({
           <CollapsibleTrigger asChild>
             <Button variant="ghost" size="sm" className="group w-fit gap-1.5">
               <ChevronRight className="size-4 transition-transform group-data-[state=open]:rotate-90 motion-reduce:transition-none" />
-              What the engine said
+              <Trans>What the engine said</Trans>
             </Button>
           </CollapsibleTrigger>
           <CollapsibleContent>

@@ -1,8 +1,9 @@
+import { plural, t } from "@lingui/core/macro";
 import type { ScopedRecord } from "./stats";
 
 /** "1 game", "3 games". */
 export function gamesLabel(n: number): string {
-  return `${n} ${n === 1 ? "game" : "games"}`;
+  return plural(n, { one: "# game", other: "# games" });
 }
 
 /**
@@ -15,9 +16,13 @@ export function gamesLabel(n: number): string {
 export function recordCounts(
   r: Pick<ScopedRecord, "games" | "decided" | "wins">,
 ): string {
-  if (r.games === 0) return "no games";
-  if (r.decided === 0) return `no recorded result in ${gamesLabel(r.games)}`;
+  if (r.games === 0) return t`no games`;
+  const gameCount = gamesLabel(r.games);
+  if (r.decided === 0) return t`no recorded result in ${gameCount}`;
   const undecided = r.games - r.decided;
-  const tail = undecided > 0 ? `, ${undecided} with no recorded result` : "";
-  return `${r.wins} of ${r.decided} won${tail}`;
+  const wins = r.wins;
+  const decided = r.decided;
+  if (undecided > 0)
+    return t`${wins} of ${decided} won, ${undecided} with no recorded result`;
+  return t`${wins} of ${decided} won`;
 }

@@ -12,6 +12,7 @@
  * numbers.
  */
 
+import { t } from "@lingui/core/macro";
 import { formatNumber } from "@/lib/format";
 import { heatGridSize } from "@/lib/heatField";
 import type { LogEvent } from "./replayAnalysisEvents";
@@ -174,14 +175,19 @@ export function damageLegend(
   inWindow: boolean,
 ): { label: string; peak: string } {
   const peak = formatNumber(Math.round(field.peakWithinRadius ?? 0));
-  const where = `within ${formatNumber(Math.round(field.radius))} elmos of one spot${inWindow ? " in this window" : ""}`;
-  return mode === "at"
-    ? {
-        label: "Where damage landed",
-        peak: `${peak} damage landed ${where}`,
-      }
-    : {
-        label: "Where damage came from",
-        peak: `${peak} damage was dealt from ${where}`,
-      };
+  const radius = formatNumber(Math.round(field.radius));
+  if (mode === "at") {
+    return {
+      label: t`Where damage landed`,
+      peak: inWindow
+        ? t`${peak} damage landed within ${radius} elmos of one spot in this window`
+        : t`${peak} damage landed within ${radius} elmos of one spot`,
+    };
+  }
+  return {
+    label: t`Where damage came from`,
+    peak: inWindow
+      ? t`${peak} damage was dealt from within ${radius} elmos of one spot in this window`
+      : t`${peak} damage was dealt from within ${radius} elmos of one spot`,
+  };
 }

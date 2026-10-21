@@ -1,3 +1,6 @@
+import { plural, t } from "@lingui/core/macro";
+import { useLingui as useLocale } from "@lingui/react";
+import { Trans } from "@lingui/react/macro";
 import { Bot } from "lucide-react";
 import { useMemo } from "react";
 import { GameIcon } from "@/components/GameIcon";
@@ -10,13 +13,15 @@ function resultText(r: {
   losses: number;
   undecided: number;
 }): string {
-  const parts = [`${r.wins}W`, `${r.losses}L`];
-  if (r.undecided > 0) parts.push(`${r.undecided} undecided`);
+  const { wins, losses, undecided } = r;
+  const parts = [t`${wins}W`, t`${losses}L`];
+  if (undecided > 0) parts.push(t`${undecided} undecided`);
   return parts.join(" · ");
 }
 
 /** One AI at one bonus in one game. */
 function AiRow({ row }: { row: AiRecordRow }) {
+  useLocale();
   const decided = row.wins + row.losses;
   return (
     <li className="flex items-center gap-3 py-1.5">
@@ -27,7 +32,7 @@ function AiRow({ row }: { row: AiRecordRow }) {
             {row.ai}
           </span>
           <span className="shrink-0 rounded bg-muted px-1.5 py-0.5 text-xs text-muted-foreground">
-            {row.bonus ?? "No bonus"}
+            {row.bonus ?? t`No bonus`}
           </span>
         </div>
         <p className="truncate text-xs text-muted-foreground" title={row.game}>
@@ -41,7 +46,7 @@ function AiRow({ row }: { row: AiRecordRow }) {
         <TallyBar games={decided} wins={row.wins} />
       ) : (
         <span className="w-24 shrink-0 text-right text-xs text-muted-foreground">
-          no result
+          <Trans>no result</Trans>
         </span>
       )}
     </li>
@@ -66,6 +71,7 @@ export function AiRecordSection({
   /** Replays from campaign, Conquest and Warpath, which this section leaves out. */
   scripted: ReadonlySet<string>;
 }) {
+  useLocale();
   const record = useMemo(
     () => aiRecordFor(records, playerName, refights, scripted),
     [records, playerName, refights, scripted],
@@ -75,18 +81,20 @@ export function AiRecordSection({
     <section className="rounded-lg border border-border/60 bg-card p-4">
       <h2 className="mb-1 flex items-center gap-2 text-sm font-medium">
         <Bot className="size-4 text-muted-foreground" />
-        Against AI
+        <Trans>Against AI</Trans>
         {record.games > 0 && (
           <span className="ml-auto text-xs font-normal tabular-nums text-muted-foreground">
-            {record.games} game{record.games === 1 ? "" : "s"} ·{" "}
+            {plural(record.games, { one: "# game", other: "# games" })} ·{" "}
             {resultText(record)}
           </span>
         )}
       </h2>
       {record.games === 0 ? (
         <p className="text-sm text-muted-foreground">
-          No skirmishes against AI yet. Games from campaign, Conquest and
-          Warpath are not counted here.
+          <Trans>
+            No skirmishes against AI yet. Games from campaign, Conquest and
+            Warpath are not counted here.
+          </Trans>
         </p>
       ) : (
         <>
@@ -96,8 +104,10 @@ export function AiRecordSection({
             ))}
           </ul>
           <p className="mt-2 text-xs text-muted-foreground">
-            A game against several different AIs shows on each one's row. Games
-            from campaign, Conquest and Warpath are not counted.
+            <Trans>
+              A game against several different AIs shows on each one's row.
+              Games from campaign, Conquest and Warpath are not counted.
+            </Trans>
           </p>
         </>
       )}

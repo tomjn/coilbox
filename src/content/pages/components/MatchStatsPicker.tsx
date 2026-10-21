@@ -1,3 +1,4 @@
+import { useLingui } from "@lingui/react/macro";
 import { Fragment, memo } from "react";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import type { MetricKey } from "../../bindings";
@@ -79,6 +80,7 @@ export function MatchStatsPicker({
   plotHeight: number;
   onChange: (key: MetricKey) => void;
 }) {
+  const { t } = useLingui();
   return (
     <ToggleGroup
       type="single"
@@ -87,7 +89,7 @@ export function MatchStatsPicker({
       // Radix clears the value when the lit tile is pressed again, and a chart
       // with no metric has nothing to draw, so an empty change is ignored.
       onValueChange={(v) => v && onChange(v as MetricKey)}
-      aria-label="Charted metric, showing each metric's shape"
+      aria-label={t`Charted metric, showing each metric's shape`}
       style={{ "--plot-h": `${plotHeight}px` } as React.CSSProperties}
       // Beside the plot on a wide window and under it on a narrow one, where a
       // column would leave neither readable. Under it, the tiles run across

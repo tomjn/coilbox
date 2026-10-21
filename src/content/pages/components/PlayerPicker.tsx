@@ -1,3 +1,5 @@
+import { plural } from "@lingui/core/macro";
+import { Trans, useLingui } from "@lingui/react/macro";
 import { cn, Input } from "@picoframe/frame";
 import { Check, ChevronsUpDown, Search } from "lucide-react";
 import { useMemo, useState } from "react";
@@ -37,6 +39,7 @@ export function PlayerPicker({
   players: PlayerPickerOption[];
   className?: string;
 }) {
+  const { t } = useLingui();
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
 
@@ -68,7 +71,7 @@ export function PlayerPicker({
             className,
           )}
         >
-          <span className="truncate">{value || "Select player"}</span>
+          <span className="truncate">{value || t`Select player`}</span>
           <ChevronsUpDown className="size-4 shrink-0 text-muted-foreground" />
         </button>
       </PopoverTrigger>
@@ -78,7 +81,10 @@ export function PlayerPicker({
           <Input
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            placeholder={`Search ${players.length} player${players.length === 1 ? "" : "s"}…`}
+            placeholder={plural(players.length, {
+              one: "Search # player…",
+              other: "Search # players…",
+            })}
             className="h-8 pl-8 text-sm"
             autoFocus
           />
@@ -99,14 +105,14 @@ export function PlayerPicker({
                 />
                 <span className="truncate">{p.name}</span>
                 <span className="ml-auto shrink-0 text-xs text-muted-foreground">
-                  {p.games} game{p.games === 1 ? "" : "s"}
+                  {plural(p.games, { one: "# game", other: "# games" })}
                 </span>
               </button>
             </li>
           ))}
           {matches.length === 0 && (
             <li className="px-2 py-1.5 text-sm text-muted-foreground">
-              No players match "{query}".
+              <Trans>No players match "{query}".</Trans>
             </li>
           )}
         </ul>

@@ -1,3 +1,5 @@
+import { plural } from "@lingui/core/macro";
+import { Trans, useLingui } from "@lingui/react/macro";
 import { useMemo, useState } from "react";
 import {
   CartesianGrid,
@@ -42,16 +44,18 @@ const shortDate = (ms: number) =>
   formatDate(new Date(ms), { dateStyle: "medium" });
 
 function games(n: number): string {
-  return `${n} ${n === 1 ? "game" : "games"}`;
+  return plural(n, { one: "# game", other: "# games" });
 }
 
 function Cell({ s }: { s: RateSummary }) {
+  const { t } = useLingui();
+  const median = formatRateValue(s.median);
+  const figure = s.games > 0 ? t`median ${median}` : null;
   return (
     <td className="px-2 py-1.5 text-right align-top">
       <div className="tabular-nums">{formatRateValue(s.mean)}</div>
       <div className="text-[11px] text-muted-foreground tabular-nums">
-        {s.games > 0 ? `median ${formatRateValue(s.median)} · ` : ""}
-        {games(s.games)}
+        {[figure, games(s.games)].filter(Boolean).join(" · ")}
       </div>
     </td>
   );
@@ -65,15 +69,19 @@ function RatioCell({
   s: RatioSummary;
   lowerFigure: string;
 }) {
+  const { t } = useLingui();
+  const median = formatRateValue(s.median);
+  const missing = s.noDenominator;
+  const parts = [
+    s.games > 0 ? t`median ${median}` : null,
+    games(s.games),
+    s.noDenominator > 0 ? t`${missing} with no ${lowerFigure}` : null,
+  ];
   return (
     <td className="px-2 py-1.5 text-right align-top">
       <div className="tabular-nums">{formatRateValue(s.mean)}</div>
       <div className="text-[11px] text-muted-foreground tabular-nums">
-        {s.games > 0 ? `median ${formatRateValue(s.median)} · ` : ""}
-        {games(s.games)}
-        {s.noDenominator > 0
-          ? ` · ${s.noDenominator} with no ${lowerFigure}`
-          : ""}
+        {parts.filter(Boolean).join(" · ")}
       </div>
     </td>
   );
@@ -88,10 +96,11 @@ function TrendTooltip({
   payload?: { payload?: TrendPoint }[];
   describe: (value: number) => string;
 }) {
+  const { t } = useLingui();
   const p = active ? payload?.[0]?.payload : undefined;
   if (!p) return null;
   const result =
-    p.won === true ? "Win" : p.won === false ? "Loss" : "No result";
+    p.won === true ? t`Win` : p.won === false ? t`Loss` : t`No result`;
   return (
     <div className="rounded-md border border-border/60 bg-popover p-2 text-xs shadow-md">
       <p className="font-medium">{shortDate(p.startTimeMs)}</p>
@@ -114,15 +123,19 @@ function Trend({
   if (points.length === 0) {
     return (
       <p className="text-sm text-muted-foreground">
-        No counted game has a figure for {label}.
+        <Trans>No counted game has a figure for {label}.</Trans>
       </p>
     );
   }
   if (points.length === 1) {
+    const onlyValue = describe(points[0].value);
+    const onlyDate = shortDate(points[0].startTimeMs);
     return (
       <p className="text-sm text-muted-foreground">
-        One game so far: {describe(points[0].value)} on{" "}
-        {shortDate(points[0].startTimeMs)}. A line needs at least two games.
+        <Trans>
+          One game so far: {onlyValue} on {onlyDate}. A line needs at least two
+          games.
+        </Trans>
       </p>
     );
   }
@@ -192,6 +205,7 @@ export function PlayerMatchFigures({
   /** The registry's ratios. One whose halves are not in `metrics` is not shown. */
   ratios?: MetricRatio[];
 }) {
+  const { t } = useLingui();
   const shownRatios = useMemo(
     () =>
       ratios.filter(
@@ -231,49 +245,68 @@ export function PlayerMatchFigures({
   const describeTrend = (value: number) =>
     trendIsRatio
       ? `${formatRate(value)} ${trendMetric?.label.toLowerCase()}`
-      : `${formatRate(value)} per minute`;
+      : t`${formatRate(value)} per minute`;
   const points = useMemo(
     () => (trendMetric ? trendSeries(data.list, trendMetric.key) : []),
     [data, trendMetric],
   );
   const note = leftOutNote(data);
-  const basis = `${playerName}'s own figures`;
+  const gameCount = games(data.games);
+  const countedGames = games(points.length);
 
   return (
     <section className="rounded-lg border border-border/60 bg-card p-4">
       <div className="mb-2 flex items-center gap-1">
-        <h2 className="text-sm font-medium">Match figures</h2>
+        <h2 className="text-sm font-medium">
+          <Trans>Match figures</Trans>
+        </h2>
         <SectionHelp section="match figures">
           <p>
-            Each figure is the total for the army {playerName} controlled,
-            divided by the match's minutes, averaged over the games counted. The
-            average is the mean of each game's own rate, with the median beside
-            it.
+            <Trans>
+              Each figure is the total for the army {playerName} controlled,
+              divided by the match's minutes, averaged over the games counted.
+              The average is the mean of each game's own rate, with the median
+              beside it.
+            </Trans>
           </p>
           <p>
-            Allies on one side each have their own figures. Only players who
-            share control of one army have the same figures.
-            {data.sharedTeamGames > 0
-              ? ` In ${games(data.sharedTeamGames)} another player shared control of ${playerName}'s army.`
-              : ""}
+            <Trans>
+              Allies on one side each have their own figures. Only players who
+              share control of one army have the same figures.
+            </Trans>
+            {data.sharedTeamGames > 0 && (
+              <>
+                {" "}
+                {plural(data.sharedTeamGames, {
+                  one: `In # game another player shared control of ${playerName}'s army.`,
+                  other: `In # games another player shared control of ${playerName}'s army.`,
+                })}
+              </>
+            )}
           </p>
           {note && <p>{note}</p>}
           <p>
-            A game with no recorded result is in All only. The store holds
-            end-of-match totals, so these figures cannot say how far ahead a
-            player was at a given minute.
+            <Trans>
+              A game with no recorded result is in All only. The store holds
+              end-of-match totals, so these figures cannot say how far ahead a
+              player was at a given minute.
+            </Trans>
           </p>
           {ratioTable.length > 0 && (
             <>
               <p>
-                A ratio is one figure over another for the same army, and is not
-                per minute. A game where the lower figure is zero has no ratio.
-                It is left out of the average and counted beside it.
+                <Trans>
+                  A ratio is one figure over another for the same army, and is
+                  not per minute. A game where the lower figure is zero has no
+                  ratio. It is left out of the average and counted beside it.
+                </Trans>
               </p>
               <p>
-                The average is the mean of each game's own ratio, with the
-                median beside it. A game with very little in the lower figure
-                can pull the mean up.
+                <Trans>
+                  The average is the mean of each game's own ratio, with the
+                  median beside it. A game with very little in the lower figure
+                  can pull the mean up.
+                </Trans>
               </p>
             </>
           )}
@@ -283,24 +316,35 @@ export function PlayerMatchFigures({
       {data.counted === 0 || metrics.length === 0 ? (
         <p className="text-sm text-muted-foreground">
           {metrics.length === 0
-            ? "Match figures are not available yet."
-            : `None of ${playerName}'s ${games(data.games)} has figures recorded, so there are no figures to show.`}
+            ? t`Match figures are not available yet.`
+            : plural(data.games, {
+                one: `None of ${playerName}'s # game has figures recorded, so there are no figures to show.`,
+                other: `None of ${playerName}'s # games has figures recorded, so there are no figures to show.`,
+              })}
         </p>
       ) : (
         <>
           <p className="mb-2 text-xs text-muted-foreground">
-            Drawn from {data.counted} of {games(data.games)}.
+            <Trans>
+              Drawn from {data.counted} of {gameCount}.
+            </Trans>
           </p>
           <div>
             <table className="w-full text-sm">
               <thead>
                 <tr className="text-xs text-muted-foreground">
                   <th className="px-2 py-1 text-left font-medium">
-                    {basis}, per minute
+                    <Trans>{playerName}'s own figures, per minute</Trans>
                   </th>
-                  <th className="px-2 py-1 text-right font-medium">All</th>
-                  <th className="px-2 py-1 text-right font-medium">Wins</th>
-                  <th className="px-2 py-1 text-right font-medium">Losses</th>
+                  <th className="px-2 py-1 text-right font-medium">
+                    <Trans>All</Trans>
+                  </th>
+                  <th className="px-2 py-1 text-right font-medium">
+                    <Trans>Wins</Trans>
+                  </th>
+                  <th className="px-2 py-1 text-right font-medium">
+                    <Trans>Losses</Trans>
+                  </th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-border/40">
@@ -326,7 +370,9 @@ export function PlayerMatchFigures({
                       colSpan={4}
                       className="px-2 pt-3 pb-1 text-left text-xs font-medium text-muted-foreground"
                     >
-                      {basis}, ratios with no unit
+                      <Trans>
+                        {playerName}'s own figures, ratios with no unit
+                      </Trans>
                     </th>
                   </tr>
                   {ratioTable.map((r) => {
@@ -353,13 +399,18 @@ export function PlayerMatchFigures({
             <div className="mt-4">
               <div className="mb-2 flex flex-wrap items-center gap-2">
                 <h3 className="text-xs font-medium text-muted-foreground">
-                  Trend, {basis},{" "}
-                  {trendIsRatio ? "ratio with no unit" : "per minute"}
+                  {trendIsRatio ? (
+                    <Trans>
+                      Trend, {playerName}'s own figures, ratio with no unit
+                    </Trans>
+                  ) : (
+                    <Trans>Trend, {playerName}'s own figures, per minute</Trans>
+                  )}
                 </h3>
                 <OptionSelect
                   size="sm"
                   className="w-48"
-                  ariaLabel="Trend metric"
+                  ariaLabel={t`Trend metric`}
                   value={trendMetric.key}
                   onValueChange={setPicked}
                   options={[
@@ -371,7 +422,7 @@ export function PlayerMatchFigures({
                   ]}
                 />
                 <span className="text-xs text-muted-foreground">
-                  {games(points.length)}, oldest to newest
+                  <Trans>{countedGames}, oldest to newest</Trans>
                 </span>
               </div>
               <Trend

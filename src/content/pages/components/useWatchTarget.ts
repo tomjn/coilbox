@@ -1,3 +1,4 @@
+import { t } from "@lingui/core/macro";
 import { type PlayTarget, useReplayTarget } from "../../../play/config";
 import { useLaunchContent } from "../../../play/LaunchContentProvider";
 import { type ReplayWatch, replayEngineRequirement } from "../../replayEngine";
@@ -14,12 +15,13 @@ export function launchBlockedReason(
   dependencyBlock?: string | null,
 ): string | undefined {
   if (dependencyBlock) return dependencyBlock;
-  if (watch.kind === "none") return "Install an engine to watch replays.";
+  if (watch.kind === "none") return t`Install an engine to watch replays.`;
   if (watch.kind === "unavailable") {
-    return `This replay needs engine ${watch.version}, which is not installed and cannot be downloaded here.`;
+    const { version } = watch;
+    return t`This replay needs engine ${version}, which is not installed and cannot be downloaded here.`;
   }
   if (watch.kind === "wait")
-    return "Checking for the engine this replay needs.";
+    return t`Checking for the engine this replay needs.`;
   return undefined;
 }
 
@@ -48,7 +50,7 @@ export function useWatchTarget(engineVersion: string, watch: ReplayWatch) {
     if (watch.kind === "download" || watch.kind === "verify") {
       const check = await ensureContent({
         requirements: [replayEngineRequirement(engineVersion)],
-        title: "Download the engine this replay needs",
+        title: t`Download the engine this replay needs`,
       });
       // Closed the drawer, so nothing is launched.
       if (!check.ready) return null;

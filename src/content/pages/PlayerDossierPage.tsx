@@ -1,3 +1,5 @@
+import { t } from "@lingui/core/macro";
+import { Trans, useLingui } from "@lingui/react/macro";
 import { useSetting } from "@picoframe/frame";
 import {
   ArrowLeft,
@@ -37,14 +39,14 @@ import { StatCard, TallyRow } from "./components/StatWidgets";
 import { EmptyState, ErrorBanner, SkeletonList } from "./components/states";
 
 function playedAt(ms: number): string {
-  if (!ms) return "never";
+  if (!ms) return t`never`;
   return formatDate(new Date(ms), { dateStyle: "medium" });
 }
 
 function outcomeLabel(won: boolean | undefined): string {
-  if (won === true) return "Win";
-  if (won === false) return "Loss";
-  return "Unknown";
+  if (won === true) return t`Win`;
+  if (won === false) return t`Loss`;
+  return t`Unknown`;
 }
 
 /**
@@ -56,12 +58,13 @@ function ExclusionBadge({
 }: {
   reason: PlayerReplay["excludedReason"];
 }) {
+  const { t } = useLingui();
   if (!reason) return null;
-  const label = reason === "remix" ? "Remix" : "Refight";
+  const label = reason === "remix" ? t`Remix` : t`Refight`;
   const title =
     reason === "remix"
-      ? "A coilbox remix — rewritten to run on a local build. Doesn't count toward stats."
-      : "A refought setup — a rerun of an existing replay. Doesn't count toward stats.";
+      ? t`A coilbox remix — rewritten to run on a local build. Doesn't count toward stats.`
+      : t`A refought setup — a rerun of an existing replay. Doesn't count toward stats.`;
   return (
     <Badge
       variant="ghost"
@@ -85,6 +88,7 @@ function ExclusionBadge({
  * plugin (moved from `content/stats/:name` in #467).
  */
 export default function PlayerDossierPage() {
+  const { t } = useLingui();
   const { name } = useParams();
   const playerName = name ?? "";
   const { state } = useContentState();
@@ -130,6 +134,14 @@ export default function PlayerDossierPage() {
     [records, playerName, refights],
   );
 
+  const decidedCount = profile?.decided ?? 0;
+  const wins = profile?.wins ?? 0;
+  const losses = profile?.losses ?? 0;
+  const lastTogether = playedAt(relation?.lastPlayedMs ?? 0);
+  const winsTogether = relation?.winsTogether ?? 0;
+  const gamesTogether = relation?.gamesTogether ?? 0;
+  const winsAgainst = relation?.winsAgainst ?? 0;
+  const gamesAgainst = relation?.gamesAgainst ?? 0;
   const winRatePct =
     profile?.winRate == null ? null : Math.round(profile.winRate * 100);
   const togetherRate =
@@ -148,12 +160,14 @@ export default function PlayerDossierPage() {
           to="/stats"
           className="inline-flex w-fit items-center gap-1 text-xs text-muted-foreground hover:underline"
         >
-          <ArrowLeft className="size-3.5" /> Player stats
+          <ArrowLeft className="size-3.5" /> {t`Player stats`}
         </Link>
-        <h1 className="text-lg font-semibold">{playerName || "Player"}</h1>
+        <h1 className="text-lg font-semibold">{playerName || t`Player`}</h1>
         <p className="text-sm text-muted-foreground">
-          Built from the replays in your content folders. Fully offline — no
-          server, no account.
+          <Trans>
+            Built from the replays in your content folders. Fully offline — no
+            server, no account.
+          </Trans>
         </p>
       </header>
 
@@ -162,42 +176,42 @@ export default function PlayerDossierPage() {
       {ingesting && records.length === 0 ? (
         <SkeletonList />
       ) : !profile || profile.games === 0 ? (
-        <EmptyState label="No replays found for this player." />
+        <EmptyState label={t`No replays found for this player.`} />
       ) : (
         <>
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
             <StatCard
               icon={<Swords className="size-3.5" />}
-              label="Games"
+              label={t`Games`}
               value={String(profile.games)}
               sub={
                 profile.decided < profile.games
-                  ? `${profile.decided} with a known result`
+                  ? t`${decidedCount} with a known result`
                   : undefined
               }
             />
             <StatCard
               icon={<Trophy className="size-3.5" />}
-              label="Win rate"
+              label={t`Win rate`}
               value={winRatePct == null ? "—" : `${winRatePct}%`}
               sub={
                 profile.decided > 0
-                  ? `${profile.wins}W · ${profile.losses}L`
-                  : "no decided games"
+                  ? t`${wins}W · ${losses}L`
+                  : t`no decided games`
               }
             />
             <StatCard
               icon={<Flame className="size-3.5" />}
-              label="Best win run"
+              label={t`Best win run`}
               value={String(profile.longestWinStreak)}
             />
             <StatCard
               icon={<Calendar className="size-3.5" />}
-              label="Last seen"
+              label={t`Last seen`}
               value={playedAt(profile.lastPlayedMs)}
               sub={
                 relation && relation.gamesShared > 0
-                  ? `with you: ${playedAt(relation.lastPlayedMs)}`
+                  ? t`with you: ${lastTogether}`
                   : undefined
               }
             />
@@ -207,32 +221,34 @@ export default function PlayerDossierPage() {
             <section className="rounded-lg border border-border/60 bg-card p-4">
               <h2 className="mb-3 flex items-center gap-2 text-sm font-medium">
                 <Users className="size-4 text-muted-foreground" />
-                Head-to-head with you ({me})
+                <Trans>Head-to-head with you ({me})</Trans>
               </h2>
               {relation.gamesShared === 0 ? (
                 <p className="text-sm text-muted-foreground">
-                  You haven't shared a replay with {playerName} yet.
+                  <Trans>
+                    You haven't shared a replay with {playerName} yet.
+                  </Trans>
                 </p>
               ) : (
                 <div className="grid gap-3 sm:grid-cols-2">
                   <StatCard
                     icon={<Trophy className="size-3.5" />}
-                    label="Together"
+                    label={t`Together`}
                     value={togetherRate == null ? "—" : `${togetherRate}%`}
                     sub={
                       relation.gamesTogether > 0
-                        ? `${relation.winsTogether}W of ${relation.gamesTogether} on the same team`
-                        : "never on the same team"
+                        ? t`${winsTogether}W of ${gamesTogether} on the same team`
+                        : t`never on the same team`
                     }
                   />
                   <StatCard
                     icon={<Swords className="size-3.5" />}
-                    label="Against"
+                    label={t`Against`}
                     value={againstRate == null ? "—" : `${againstRate}%`}
                     sub={
                       relation.gamesAgainst > 0
-                        ? `${relation.winsAgainst}W of ${relation.gamesAgainst} as opponents`
-                        : "never as opponents"
+                        ? t`${winsAgainst}W of ${gamesAgainst} as opponents`
+                        : t`never as opponents`
                     }
                   />
                 </div>
@@ -242,15 +258,15 @@ export default function PlayerDossierPage() {
                   to={`/stats/${encodeURIComponent(playerName)}/matchup?me=${encodeURIComponent(me)}`}
                   className="mt-3 inline-flex w-fit items-center gap-1 text-xs text-primary hover:underline"
                 >
-                  <Swords className="size-3.5" /> See the matchup by map,
-                  faction and game length
+                  <Swords className="size-3.5" />{" "}
+                  <Trans>See the matchup by map, faction and game length</Trans>
                 </Link>
               )}
               {relation.commonMaps.length > 0 && (
                 <div className="mt-3">
                   <h3 className="mb-1 flex items-center gap-2 text-xs font-medium text-muted-foreground">
                     <MapIcon className="size-3.5" />
-                    Maps you've shared
+                    {t`Maps you've shared`}
                   </h3>
                   <ul className="divide-y divide-border/40">
                     {relation.commonMaps.slice(0, 8).map((m) => (
@@ -289,11 +305,11 @@ export default function PlayerDossierPage() {
             <section className="rounded-lg border border-border/60 bg-card p-4">
               <h2 className="mb-1 flex items-center gap-2 text-sm font-medium">
                 <MapIcon className="size-4 text-muted-foreground" />
-                Favourite maps
+                {t`Favourite maps`}
               </h2>
               {profile.favouriteMaps.length === 0 ? (
                 <p className="text-sm text-muted-foreground">
-                  No maps recorded.
+                  {t`No maps recorded.`}
                 </p>
               ) : (
                 <ul className="divide-y divide-border/40">
@@ -312,11 +328,11 @@ export default function PlayerDossierPage() {
             <section className="rounded-lg border border-border/60 bg-card p-4">
               <h2 className="mb-1 flex items-center gap-2 text-sm font-medium">
                 <Swords className="size-4 text-muted-foreground" />
-                Factions
+                {t`Factions`}
               </h2>
               {profile.factions.length === 0 ? (
                 <p className="text-sm text-muted-foreground">
-                  No factions recorded.
+                  {t`No factions recorded.`}
                 </p>
               ) : (
                 <ul className="divide-y divide-border/40">
@@ -336,11 +352,11 @@ export default function PlayerDossierPage() {
           <section className="rounded-lg border border-border/60 bg-card p-4">
             <h2 className="mb-1 flex items-center gap-2 text-sm font-medium">
               <History className="size-4 text-muted-foreground" />
-              Replays
+              {t`Replays`}
             </h2>
             {replays.length === 0 ? (
               <p className="text-sm text-muted-foreground">
-                No replays recorded.
+                {t`No replays recorded.`}
               </p>
             ) : (
               <ul className="divide-y divide-border/40">

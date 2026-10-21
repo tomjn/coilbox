@@ -1,3 +1,5 @@
+import { plural, t } from "@lingui/core/macro";
+import { Plural, Trans, useLingui } from "@lingui/react/macro";
 import { Button } from "@picoframe/frame";
 import { Loader2, Trash2 } from "lucide-react";
 import { useState } from "react";
@@ -17,8 +19,8 @@ const msg = (e: unknown): string =>
   e instanceof Error ? e.message : String(e);
 
 /** What deleting an empty file risks, in the words every surface uses. */
-export const UNFINISHED_WARNING =
-  "The engine writes a replay only when its game ends, so a game running right now has an empty file like this too. Deleting that file loses the replay.";
+export const unfinishedWarning = (): string =>
+  t`The engine writes a replay only when its game ends, so a game running right now has an empty file like this too. Deleting that file loses the replay.`;
 
 /**
  * "Clear unfinished recordings" for the Replays screen (issue #3868).
@@ -37,6 +39,7 @@ export function ClearUnfinishedButton({
   /** Re-read the list, which just lost files. */
   onCleared: () => void;
 }) {
+  const { t: tr } = useLingui();
   const unfinished = replays.filter((r) => r.unfinished);
   const [open, setOpen] = useState(false);
   const [preview, setPreview] = useState<ReplayDeleteSummary | null>(null);
@@ -44,6 +47,7 @@ export function ClearUnfinishedButton({
   const [error, setError] = useState<string | null>(null);
 
   if (unfinished.length === 0) return null;
+  const unfinishedCount = unfinished.length;
   const paths = unfinished.map((r) => r.path);
 
   const onOpenChange = (next: boolean) => {
@@ -65,8 +69,12 @@ export function ClearUnfinishedButton({
         apply: true,
         onlyUnfinished: true,
       });
+      const deleted = summary.deleted;
       void notify({
-        title: `Deleted ${summary.deleted} unfinished ${summary.deleted === 1 ? "recording" : "recordings"}.`,
+        title: plural(deleted, {
+          one: "Deleted # unfinished recording.",
+          other: "Deleted # unfinished recordings.",
+        }),
         level: "success",
       });
       setOpen(false);
@@ -86,10 +94,10 @@ export function ClearUnfinishedButton({
           variant="outline"
           size="sm"
           className="gap-1.5"
-          title="Delete the empty replays that games left when they did not finish recording"
+          title={tr`Delete the empty replays that games left when they did not finish recording`}
         >
           <Trash2 className="size-4" />
-          Clear unfinished ({unfinished.length})
+          <Trans>Clear unfinished ({unfinishedCount})</Trans>
         </Button>
       </PopoverTrigger>
       <PopoverContent align="end" className="flex w-96 flex-col gap-3">
@@ -98,22 +106,27 @@ export function ClearUnfinishedButton({
         ) : preview === null ? (
           <p className="flex items-center gap-2 text-sm text-muted-foreground">
             <Loader2 className="size-4 animate-spin" />
-            Checking what can be deleted...
+            <Trans>Checking what can be deleted...</Trans>
           </p>
         ) : (
           <>
             <div className="flex flex-col gap-1">
               <h3 className="text-sm font-medium">
-                Delete {preview.deleted} unfinished{" "}
-                {preview.deleted === 1 ? "recording" : "recordings"}?
+                <Plural
+                  value={preview.deleted}
+                  one="Delete # unfinished recording?"
+                  other="Delete # unfinished recordings?"
+                />
               </h3>
               <p className="text-xs text-muted-foreground">
-                {UNFINISHED_WARNING}
+                {unfinishedWarning()}
               </p>
             </div>
             {preview.skipped.length > 0 && (
               <div className="flex flex-col gap-1">
-                <p className="text-xs text-muted-foreground">Left alone:</p>
+                <p className="text-xs text-muted-foreground">
+                  <Trans>Left alone:</Trans>
+                </p>
                 <ul className="max-h-32 overflow-y-auto text-xs text-muted-foreground">
                   {preview.skipped.map((line) => (
                     <li key={line} className="break-words font-mono">
@@ -131,7 +144,7 @@ export function ClearUnfinishedButton({
                 onClick={() => setOpen(false)}
                 disabled={pending}
               >
-                Cancel
+                <Trans>Cancel</Trans>
               </Button>
               <Button
                 type="button"
@@ -146,7 +159,7 @@ export function ClearUnfinishedButton({
                 ) : (
                   <Trash2 className="size-4" />
                 )}
-                Delete
+                <Trans>Delete</Trans>
               </Button>
             </div>
           </>

@@ -1,3 +1,4 @@
+import { t } from "@lingui/core/macro";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { EngineRelease, SpringfilesEngine } from "../downloads/bindings";
 import { useWriteRoot } from "../downloads/config";
@@ -177,6 +178,7 @@ export function useResolveContent(
   const enqueueInputFor = useCallback(
     (req: ContentRequirement) => {
       const key = req.downloadKey ?? req.label;
+      const reqLabel = req.label;
       if (req.kind === "game") {
         if (!gamesPath) return null;
         // Resolve across every source in policy order (GitHub and mirrors first,
@@ -184,7 +186,7 @@ export function useResolveContent(
         // SplinterFaction installs instead of failing on rapid.
         return {
           kind: "game" as const,
-          label: `Game: ${req.label}`,
+          label: t`Game: ${reqLabel}`,
           args: { gameName: key, writePath: gamesPath },
         };
       }
@@ -194,7 +196,7 @@ export function useResolveContent(
         // pr-downloader last, per issue 511), matching the game requirement above.
         return {
           kind: "mapAnySource" as const,
-          label: `Map: ${req.label}`,
+          label: t`Map: ${reqLabel}`,
           args: { mapName: key, writePath: mapsPath },
         };
       }
@@ -203,7 +205,7 @@ export function useResolveContent(
       if (recoil) {
         return {
           kind: "engineRecoil" as const,
-          label: `Engine ${req.label}`,
+          label: t`Engine ${reqLabel}`,
           args: {
             version: recoil.version,
             assetUrl: recoil.assetUrl,
@@ -215,7 +217,7 @@ export function useResolveContent(
       if (spring) {
         return {
           kind: "engineSpring" as const,
-          label: `Engine ${req.label}`,
+          label: t`Engine ${reqLabel}`,
           args: { version: spring.version, writePath },
         };
       }

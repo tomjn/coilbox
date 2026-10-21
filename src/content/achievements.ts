@@ -1,3 +1,5 @@
+import { i18n, type MessageDescriptor } from "@lingui/core";
+import { msg } from "@lingui/core/macro";
 import type { AiWinFact } from "./aiRecord";
 import type { PlayerGameFact } from "./stats";
 
@@ -42,8 +44,8 @@ interface Measurement {
 /** One achievement in the catalog - plain data plus a pure progress function. */
 export interface Achievement {
   id: string;
-  name: string;
-  description: string;
+  name: MessageDescriptor;
+  description: MessageDescriptor;
   category: AchievementCategory;
   target: number;
   /** Compute progress over the player's chronological genuine-match games. */
@@ -189,128 +191,128 @@ function windowMeasure(
 export const ACHIEVEMENTS: Achievement[] = [
   {
     id: "games-first",
-    name: "First game",
-    description: "Play your first recorded game.",
+    name: msg`First game`,
+    description: msg`Play your first recorded game.`,
     category: "Milestones",
     target: 1,
     measure: countMeasure(() => true, 1),
   },
   {
     id: "games-10",
-    name: "Getting started",
-    description: "Play 10 games.",
+    name: msg`Getting started`,
+    description: msg`Play 10 games.`,
     category: "Milestones",
     target: 10,
     measure: countMeasure(() => true, 10),
   },
   {
     id: "games-50",
-    name: "Seasoned",
-    description: "Play 50 games.",
+    name: msg`Seasoned`,
+    description: msg`Play 50 games.`,
     category: "Milestones",
     target: 50,
     measure: countMeasure(() => true, 50),
   },
   {
     id: "games-100",
-    name: "Centurion",
-    description: "Play 100 games.",
+    name: msg`Centurion`,
+    description: msg`Play 100 games.`,
     category: "Milestones",
     target: 100,
     measure: countMeasure(() => true, 100),
   },
   {
     id: "win-first",
-    name: "First win",
-    description: "Win your first game.",
+    name: msg`First win`,
+    description: msg`Win your first game.`,
     category: "Victories",
     target: 1,
     measure: countMeasure((g) => g.won === true, 1),
   },
   {
     id: "wins-10",
-    name: "Victor",
-    description: "Win 10 games.",
+    name: msg`Victor`,
+    description: msg`Win 10 games.`,
     category: "Victories",
     target: 10,
     measure: countMeasure((g) => g.won === true, 10),
   },
   {
     id: "wins-50",
-    name: "Conqueror",
-    description: "Win 50 games.",
+    name: msg`Conqueror`,
+    description: msg`Win 50 games.`,
     category: "Victories",
     target: 50,
     measure: countMeasure((g) => g.won === true, 50),
   },
   {
     id: "streak-3",
-    name: "On a roll",
-    description: "Win 3 games in a row.",
+    name: msg`On a roll`,
+    description: msg`Win 3 games in a row.`,
     category: "Streaks",
     target: 3,
     measure: winStreakMeasure(3),
   },
   {
     id: "streak-5",
-    name: "Unstoppable",
-    description: "Win 5 games in a row.",
+    name: msg`Unstoppable`,
+    description: msg`Win 5 games in a row.`,
     category: "Streaks",
     target: 5,
     measure: winStreakMeasure(5),
   },
   {
     id: "streak-10",
-    name: "Dominant",
-    description: "Win 10 games in a row.",
+    name: msg`Dominant`,
+    description: msg`Win 10 games in a row.`,
     category: "Streaks",
     target: 10,
     measure: winStreakMeasure(10),
   },
   {
     id: "maps-5",
-    name: "Well travelled",
-    description: "Play on 5 different maps.",
+    name: msg`Well travelled`,
+    description: msg`Play on 5 different maps.`,
     category: "Variety",
     target: 5,
     measure: distinctMeasure((g) => g.mapName, 5),
   },
   {
     id: "maps-15",
-    name: "Cartographer",
-    description: "Play on 15 different maps.",
+    name: msg`Cartographer`,
+    description: msg`Play on 15 different maps.`,
     category: "Variety",
     target: 15,
     measure: distinctMeasure((g) => g.mapName, 15),
   },
   {
     id: "factions-3",
-    name: "Versatile",
-    description: "Play 3 different factions.",
+    name: msg`Versatile`,
+    description: msg`Play 3 different factions.`,
     category: "Variety",
     target: 3,
     measure: distinctMeasure((g) => g.side, 3),
   },
   {
     id: "ais-3",
-    name: "Bot basher",
-    description: "Beat 3 different AIs.",
+    name: msg`Bot basher`,
+    description: msg`Beat 3 different AIs.`,
     category: "Variety",
     target: 3,
     measure: distinctAiMeasure(3),
   },
   {
     id: "ais-5",
-    name: "Machine breaker",
-    description: "Beat 5 different AIs.",
+    name: msg`Machine breaker`,
+    description: msg`Beat 5 different AIs.`,
     category: "Variety",
     target: 5,
     measure: distinctAiMeasure(5),
   },
   {
     id: "week-10",
-    name: "Busy week",
-    description: "Play 10 games within 7 days.",
+    name: msg`Busy week`,
+    description: msg`Play 10 games within 7 days.`,
     category: "Activity",
     target: 10,
     measure: windowMeasure(10, WEEK_MS),
@@ -320,7 +322,8 @@ export const ACHIEVEMENTS: Achievement[] = [
 /**
  * Evaluate the whole catalog for one player's genuine-match games. An empty
  * `games` list yields every achievement unearned with zero progress. Earned
- * dates are only reported for earned achievements.
+ * dates are only reported for earned achievements. Names and descriptions are
+ * resolved in the active language at the time of the call.
  */
 export function evaluateAchievements(
   games: PlayerGameFact[],
@@ -331,8 +334,8 @@ export function evaluateAchievements(
     const earned = current >= a.target;
     return {
       id: a.id,
-      name: a.name,
-      description: a.description,
+      name: i18n._(a.name),
+      description: i18n._(a.description),
       category: a.category,
       target: a.target,
       current,

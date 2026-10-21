@@ -1,3 +1,6 @@
+import type { MessageDescriptor } from "@lingui/core";
+import { msg, plural } from "@lingui/core/macro";
+import { Trans, useLingui } from "@lingui/react/macro";
 import { Button, useSetting } from "@picoframe/frame";
 import {
   Clock,
@@ -76,15 +79,15 @@ import { EmptyState, ErrorBanner, SkeletonList } from "./components/states";
 /** A fixed sort from the list below, or a `metric:<key>:<direction>` value. */
 type SortKey = string;
 
-const SORT_OPTIONS = [
-  { value: "date-desc", label: "Newest" },
-  { value: "date-asc", label: "Oldest" },
-  { value: "name-asc", label: "Name A–Z" },
-  { value: "name-desc", label: "Name Z–A" },
-  { value: "size-desc", label: "Largest" },
-  { value: "size-asc", label: "Smallest" },
-  { value: "duration-desc", label: "Longest" },
-  { value: "duration-asc", label: "Shortest" },
+const SORT_OPTIONS: { value: string; label: MessageDescriptor }[] = [
+  { value: "date-desc", label: msg`Newest` },
+  { value: "date-asc", label: msg`Oldest` },
+  { value: "name-asc", label: msg`Name A–Z` },
+  { value: "name-desc", label: msg`Name Z–A` },
+  { value: "size-desc", label: msg`Largest` },
+  { value: "size-asc", label: msg`Smallest` },
+  { value: "duration-desc", label: msg`Longest` },
+  { value: "duration-asc", label: msg`Shortest` },
 ];
 
 /** `Damage dealt` becomes `damage dealt`, to follow "Most" or "Least". */
@@ -101,27 +104,28 @@ type OriginFilterValue = ReplayOrigin | "all";
  * before this feature, or a best-effort tag that didn't land — not a mode of
  * its own.
  */
-const ORIGIN_OPTIONS: { value: OriginFilterValue; label: string }[] = [
-  { value: "all", label: "All origins" },
-  { value: "conquest", label: "Conquest" },
-  { value: "warpath", label: "Warpath" },
-  { value: "campaign", label: "Campaign" },
-  { value: "skirmish", label: "Skirmish" },
-  { value: "multiplayer", label: "Multiplayer" },
-  { value: "refight", label: "Refight" },
-  { value: "other", label: "Unknown origin" },
-];
+const ORIGIN_OPTIONS: { value: OriginFilterValue; label: MessageDescriptor }[] =
+  [
+    { value: "all", label: msg`All origins` },
+    { value: "conquest", label: msg`Conquest` },
+    { value: "warpath", label: msg`Warpath` },
+    { value: "campaign", label: msg`Campaign` },
+    { value: "skirmish", label: msg`Skirmish` },
+    { value: "multiplayer", label: msg`Multiplayer` },
+    { value: "refight", label: msg`Refight` },
+    { value: "other", label: msg`Unknown origin` },
+  ];
 
 const ORIGIN_BADGE: Record<
   ReplayOrigin,
-  { label: string; icon: typeof Orbit } | null
+  { label: MessageDescriptor; icon: typeof Orbit } | null
 > = {
-  conquest: { label: "Conquest", icon: Orbit },
-  warpath: { label: "Warpath", icon: Rocket },
-  campaign: { label: "Campaign", icon: Milestone },
-  skirmish: { label: "Skirmish", icon: Swords },
-  multiplayer: { label: "Multiplayer", icon: Gamepad2 },
-  refight: { label: "Refight", icon: Repeat },
+  conquest: { label: msg`Conquest`, icon: Orbit },
+  warpath: { label: msg`Warpath`, icon: Rocket },
+  campaign: { label: msg`Campaign`, icon: Milestone },
+  skirmish: { label: msg`Skirmish`, icon: Swords },
+  multiplayer: { label: msg`Multiplayer`, icon: Gamepad2 },
+  refight: { label: msg`Refight`, icon: Repeat },
   // No badge for "other" — there's nothing known to show, and a badge on
   // every row would just be noise.
   other: null,
@@ -145,6 +149,7 @@ const fmtSkill = (v?: number) => (v == null ? "—" : formatFixed(v, 1));
 
 /** The mode badge for a replay's row/detail header, when its origin is known. */
 export function OriginBadge({ origin }: { origin: ReplayOrigin }) {
+  const { i18n } = useLingui();
   const badge = ORIGIN_BADGE[origin];
   if (!badge) return null;
   const Icon = badge.icon;
@@ -153,7 +158,7 @@ export function OriginBadge({ origin }: { origin: ReplayOrigin }) {
       variant="ghost"
       className="shrink-0 gap-1 rounded bg-muted px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground"
     >
-      <Icon className="size-2.5" /> {badge.label}
+      <Icon className="size-2.5" /> {i18n._(badge.label)}
     </Badge>
   );
 }
@@ -166,6 +171,7 @@ export function OriginBadge({ origin }: { origin: ReplayOrigin }) {
  * (map preview, players, winner).
  */
 export default function ReplaysPage() {
+  const { t, i18n } = useLingui();
   const { targets, selected, selectedKey } = useScanTargetSelection();
   const replaysRoot = useReplaysRoot(selected?.rootPath);
   const { replays, loading, error, refresh, ready } = useReplays(replaysRoot);
@@ -277,19 +283,22 @@ export default function ReplaysPage() {
 
   const sortOptions = useMemo(
     () => [
-      ...SORT_OPTIONS,
-      ...metrics.flatMap((m) => [
-        {
-          value: metricSortValue(m.key, "desc"),
-          label: `Most ${lowerFirst(m.label)}`,
-        },
-        {
-          value: metricSortValue(m.key, "asc"),
-          label: `Least ${lowerFirst(m.label)}`,
-        },
-      ]),
+      ...SORT_OPTIONS.map((o) => ({ value: o.value, label: i18n._(o.label) })),
+      ...metrics.flatMap((m) => {
+        const metricName = lowerFirst(m.label);
+        return [
+          {
+            value: metricSortValue(m.key, "desc"),
+            label: t`Most ${metricName}`,
+          },
+          {
+            value: metricSortValue(m.key, "asc"),
+            label: t`Least ${metricName}`,
+          },
+        ];
+      }),
     ],
-    [metrics],
+    [metrics, i18n, t],
   );
   // A saved sort the page cannot offer now (statistics hidden, or the registry
   // has not arrived) falls back to newest rather than showing a blank select.
@@ -316,6 +325,7 @@ export default function ReplaysPage() {
   );
   const resolveForList = (set: Parameters<typeof resolveSet>[0]) =>
     resolveSet(set, replays, gameIdOf);
+  const activeSetName = activeSet?.name ?? "";
   const activeResolved = useMemo(
     () => (activeSet ? resolveSet(activeSet, replays, gameIdOf) : null),
     [activeSet, replays, gameIdOf],
@@ -326,10 +336,10 @@ export default function ReplaysPage() {
   );
   const tagOptions = useMemo(
     () => [
-      { value: "", label: "All tags" },
-      ...userState.allTags().map((t) => ({ value: t, label: t })),
+      { value: "", label: t`All tags` },
+      ...userState.allTags().map((tag) => ({ value: tag, label: tag })),
     ],
-    [userState],
+    [userState, t],
   );
 
   // Which toggle filters could match anything, so a filter that can only ever
@@ -430,15 +440,21 @@ export default function ReplaysPage() {
   // Busy only while actually loading or before the first load completes for the
   // selected target — NOT when a load finished and simply found no replays (that
   // must fall through to the empty state, not spin a skeleton forever).
+  const filterText = filter.trim();
+  const missingCount = activeResolved?.missing.length ?? 0;
+  const originOptions = ORIGIN_OPTIONS.map((o) => ({
+    value: o.value,
+    label: i18n._(o.label),
+  }));
   const busy = loading || (!!replaysRoot && !ready);
 
   return (
     <TooltipProvider>
       <div className="flex flex-col gap-4 p-4">
         <header className="flex flex-col gap-1">
-          <h1 className="text-lg font-semibold">Replays</h1>
+          <h1 className="text-lg font-semibold">{t`Replays`}</h1>
           <p className="text-sm text-muted-foreground">
-            Demo files in your content folder.
+            <Trans>Demo files in your content folder.</Trans>
           </p>
         </header>
 
@@ -472,15 +488,15 @@ export default function ReplaysPage() {
           <FilterBar
             search={filter}
             onSearch={setFilter}
-            searchPlaceholder="Filter replays…"
-            searchLabel="Filter replays"
+            searchPlaceholder={t`Filter replays…`}
+            searchLabel={t`Filter replays`}
             sort={effectiveSort}
             onSort={setSort}
             sortOptions={sortOptions}
             sortClassName="w-48"
             total={replays.length}
             shown={sorted.length}
-            noun="replays"
+            noun={t`replays`}
             trailing={
               <>
                 {mapFilter && (
@@ -489,9 +505,9 @@ export default function ReplaysPage() {
                     size="sm"
                     onClick={clearMapFilter}
                     className="gap-1.5"
-                    title="Clear the map filter"
+                    title={t`Clear the map filter`}
                   >
-                    Map: {mapFilter} <X className="size-3.5" />
+                    <Trans>Map: {mapFilter}</Trans> <X className="size-3.5" />
                   </Button>
                 )}
                 {mineBasis && (
@@ -501,9 +517,9 @@ export default function ReplaysPage() {
                     onClick={() => setMineOnly(!mineOnly)}
                     aria-pressed={mineOnly}
                     className="gap-1.5"
-                    title={`Show and sort the figures for ${primary} alone instead of the whole match`}
+                    title={t`Show and sort the figures for ${primary} alone instead of the whole match`}
                   >
-                    <User className="size-4" /> My figures
+                    <User className="size-4" /> {t`My figures`}
                   </Button>
                 )}
                 {filterVisibility.watched && (
@@ -514,7 +530,7 @@ export default function ReplaysPage() {
                     aria-pressed={watchedOnly}
                     className="gap-1.5"
                   >
-                    <Eye className="size-4" /> Watched
+                    <Eye className="size-4" /> {t`Watched`}
                   </Button>
                 )}
                 {filterVisibility.remixed && (
@@ -525,7 +541,7 @@ export default function ReplaysPage() {
                     aria-pressed={remixedOnly}
                     className="gap-1.5"
                   >
-                    <Code2 className="size-4" /> Remixed
+                    <Code2 className="size-4" /> {t`Remixed`}
                   </Button>
                 )}
                 {filterVisibility.short && (
@@ -535,9 +551,9 @@ export default function ReplaysPage() {
                     onClick={() => setShowShort(!showShort)}
                     aria-pressed={showShort}
                     className="gap-1.5"
-                    title="Show replays under a minute long"
+                    title={t`Show replays under a minute long`}
                   >
-                    <Clock className="size-4" /> Short replays
+                    <Clock className="size-4" /> {t`Short replays`}
                   </Button>
                 )}
                 {activeSet && activeResolved && (
@@ -546,12 +562,11 @@ export default function ReplaysPage() {
                     size="sm"
                     onClick={() => setSetFilterId("")}
                     className="gap-1.5"
-                    title="Show every replay again"
+                    title={t`Show every replay again`}
                   >
-                    Set: {activeSet.name}
                     {activeResolved.missing.length > 0
-                      ? ` (${activeResolved.missing.length} not in library)`
-                      : ""}
+                      ? t`Set: ${activeSetName} (${missingCount} not in library)`
+                      : t`Set: ${activeSetName}`}
                     <X className="size-3.5" />
                   </Button>
                 )}
@@ -577,7 +592,7 @@ export default function ReplaysPage() {
                 <OptionSelect
                   value={originFilter}
                   onValueChange={(v) => setOriginFilter(v as OriginFilterValue)}
-                  options={ORIGIN_OPTIONS}
+                  options={originOptions}
                   size="sm"
                   className="w-44"
                 />
@@ -591,15 +606,17 @@ export default function ReplaysPage() {
         {busy ? (
           <SkeletonList />
         ) : replays.length === 0 ? (
-          <EmptyState label="No replays found. Watch a game, or place .sdfz files in your demos folder." />
+          <EmptyState
+            label={t`No replays found. Watch a game, or place .sdfz files in your demos folder.`}
+          />
         ) : sorted.length === 0 ? (
           <EmptyState
             label={
               mapFilter
-                ? `No replays on “${mapFilter}”.`
+                ? t`No replays on “${mapFilter}”.`
                 : activeSet && !filter.trim()
-                  ? `No replays in “${activeSet.name}” match the filters.`
-                  : `No replays match “${filter.trim()}”.`
+                  ? t`No replays in “${activeSetName}” match the filters.`
+                  : t`No replays match “${filterText}”.`
             }
           />
         ) : (
@@ -610,7 +627,10 @@ export default function ReplaysPage() {
                 playedAt(dateOf(r)),
                 r.durationSec != null ? formatDuration(r.durationSec) : null,
                 r.playerCount != null
-                  ? `${r.playerCount} player${r.playerCount === 1 ? "" : "s"}`
+                  ? plural(r.playerCount, {
+                      one: "# player",
+                      other: "# players",
+                    })
                   : null,
                 formatBytes(r.sizeBytes),
               ].filter(Boolean);
@@ -632,7 +652,7 @@ export default function ReplaysPage() {
                         width={thumb?.width}
                         height={thumb?.height}
                         alt={
-                          r.mapName ? `Minimap of ${r.mapName}` : "Replay map"
+                          r.mapName ? t`Minimap of ${r.mapName}` : t`Replay map`
                         }
                         loading={!!r.mapName && thumbsLoading && !thumb}
                       />
@@ -649,27 +669,27 @@ export default function ReplaysPage() {
                           <Badge
                             variant="ghost"
                             className="shrink-0 gap-1 rounded bg-primary/15 px-1.5 py-0.5 text-[10px] font-medium text-primary"
-                            title="A coilbox remix — rewritten to run on a local build"
+                            title={t`A coilbox remix — rewritten to run on a local build`}
                           >
-                            <Code2 className="size-2.5" /> Remix
+                            <Code2 className="size-2.5" /> {t`Remix`}
                           </Badge>
                         )}
                         {r.unfinished && (
                           <Badge
                             variant="ghost"
                             className="shrink-0 rounded bg-amber-500/15 px-1.5 py-0.5 text-[10px] font-medium text-amber-600 dark:text-amber-400"
-                            title="The file is empty. The game that was recording it did not finish, or is still running."
+                            title={t`The file is empty. The game that was recording it did not finish, or is still running.`}
                           >
-                            Recording did not finish
+                            {t`Recording did not finish`}
                           </Badge>
                         )}
                         {r.staleRemix && (
                           <Badge
                             variant="ghost"
                             className="shrink-0 rounded bg-amber-500/15 px-1.5 py-0.5 text-[10px] font-medium text-amber-600 dark:text-amber-400"
-                            title="An older coilbox made this remix. It plays on the game it was recorded with. Open it to remake it from the original."
+                            title={t`An older coilbox made this remix. It plays on the game it was recorded with. Open it to remake it from the original.`}
                           >
-                            Plays original game
+                            {t`Plays original game`}
                           </Badge>
                         )}
                         <OriginBadge origin={replayOrigin(us)} />
@@ -678,7 +698,7 @@ export default function ReplaysPage() {
                           remixed={r.remixed}
                         />
                         {r.filename === resumeFilename && (
-                          <ContinueBadge label="Unwatched" />
+                          <ContinueBadge label={t`Unwatched`} />
                         )}
                       </div>
                       <span className="truncate text-xs text-muted-foreground">
@@ -691,12 +711,12 @@ export default function ReplaysPage() {
                       )}
                       {(us.tags?.length ?? 0) > 0 && (
                         <div className="mt-0.5 flex flex-wrap gap-1">
-                          {us.tags?.map((t) => (
+                          {us.tags?.map((tag) => (
                             <span
-                              key={t}
+                              key={tag}
                               className="rounded bg-muted px-1.5 py-0.5 text-[11px] text-muted-foreground"
                             >
-                              {t}
+                              {tag}
                             </span>
                           ))}
                         </div>
@@ -737,7 +757,7 @@ export default function ReplaysPage() {
                         <TooltipTrigger asChild>
                           <div className="text-right text-xs text-muted-foreground">
                             <div className="text-[10px] uppercase tracking-wide">
-                              Skill
+                              {t`Skill`}
                             </div>
                             <div className="font-mono text-sm text-foreground">
                               {fmtSkill(r.skillAvg)}
@@ -748,8 +768,10 @@ export default function ReplaysPage() {
                           </div>
                         </TooltipTrigger>
                         <TooltipContent>
-                          Average non-spectator player skill, with the min-max
-                          range below
+                          <Trans>
+                            Average non-spectator player skill, with the min-max
+                            range below
+                          </Trans>
                         </TooltipContent>
                       </Tooltip>
                     )}
@@ -766,9 +788,9 @@ export default function ReplaysPage() {
                       }
                       aria-pressed={!!us.watched}
                       aria-label={
-                        us.watched ? "Mark unwatched" : "Mark watched"
+                        us.watched ? t`Mark unwatched` : t`Mark watched`
                       }
-                      title={us.watched ? "Watched" : "Mark watched"}
+                      title={us.watched ? t`Watched` : t`Mark watched`}
                     >
                       <Eye
                         className={`size-4 ${us.watched ? "text-primary" : "text-muted-foreground"}`}

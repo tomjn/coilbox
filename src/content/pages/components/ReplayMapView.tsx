@@ -1,3 +1,6 @@
+import { plural, t } from "@lingui/core/macro";
+import { useLingui as useLocale } from "@lingui/react";
+import { Trans, useLingui } from "@lingui/react/macro";
 import { Button } from "@picoframe/frame";
 import { Loader2 } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -29,7 +32,6 @@ import { useReplayTrack } from "../../replayTrack";
 import { useStoredTracks } from "../../replayTracks";
 import { useReplayTimelineMarks } from "../../useReplayTimelineMarks";
 import { OpenInEngineButton } from "./OpenInEngineButton";
-import { plural } from "./ReplayAnalysisSection";
 import {
   performAction,
   ReplayPlaybackBar,
@@ -39,8 +41,8 @@ import { SectionHelp } from "./SectionHelp";
 
 /** Said under the analysis and recording section, which has already said the
  *  track is out of date. This says what that means here. */
-const STALE_WORDS =
-  "The track has to be recorded again before the match can be shown here.";
+const staleWords = () =>
+  t`The track has to be recorded again before the match can be shown here.`;
 
 const capital = (s: string) => `${s.charAt(0).toUpperCase()}${s.slice(1)}`;
 
@@ -95,22 +97,25 @@ export function ReplayMapViewSection({
     stored?.state === "current" && gameId ? gameId : null,
   );
   const minimap = useUnitsyncMinimap(enginePath, dataDir, info.mapName);
+  const { t: tr } = useLingui();
 
   if (!stored) return null;
 
   return (
-    <section className="flex flex-col gap-2" aria-label="Recorded match">
+    <section className="flex flex-col gap-2" aria-label={tr`Recorded match`}>
       <div className="flex items-center gap-1">
-        <h2 className="text-sm font-medium">Recorded match</h2>
+        <h2 className="text-sm font-medium">
+          <Trans>Recorded match</Trans>
+        </h2>
         {track.status === "ready" && (
-          <SectionHelp section="the recorded match">
+          <SectionHelp section={tr`the recorded match`}>
             <Legend header={track.handle.header} />
           </SectionHelp>
         )}
       </div>
       <div className="flex flex-col gap-3 rounded-lg border border-border/50 bg-card p-3 text-sm">
         {stored.state === "stale" ? (
-          <NotShown words={STALE_WORDS} />
+          <NotShown words={staleWords()} />
         ) : track.status === "error" ? (
           <NotShown words={faultWords(track.error)} />
         ) : track.status === "ready" ? (
@@ -127,7 +132,9 @@ export function ReplayMapViewSection({
               minimapUrl={minimap.url}
             />
           ) : (
-            <NotShown words="The recorded track does not say how large the map is, so it is not shown." />
+            <NotShown
+              words={tr`The recorded track does not say how large the map is, so it is not shown.`}
+            />
           )
         ) : (
           <p
@@ -135,7 +142,7 @@ export function ReplayMapViewSection({
             className="flex items-center gap-1.5 text-muted-foreground"
           >
             <Loader2 className="size-4 animate-spin motion-reduce:animate-none" />
-            Reading the recorded track.
+            <Trans>Reading the recorded track.</Trans>
           </p>
         )}
       </div>
@@ -147,19 +154,25 @@ function faultWords(error: ReplayTrackError): string {
   const { fault } = error;
   switch (fault.kind) {
     case "stale":
-      return STALE_WORDS;
+      return staleWords();
     case "missing":
-      return "The recorded track is no longer on this computer.";
+      return t`The recorded track is no longer on this computer.`;
     case "otherGame":
-      return "The track stored for this replay belongs to another match, so it is not shown.";
-    case "unknownFormat":
-      return `The recorded track is not shown: its ${fault.field} is ${fault.found} and this version of coilbox reads ${fault.expected}.`;
-    case "noSuchWindow":
-      return `The recorded track could not be read. It has no window ${fault.window}.`;
+      return t`The track stored for this replay belongs to another match, so it is not shown.`;
+    case "unknownFormat": {
+      const { field, found, expected } = fault;
+      return t`The recorded track is not shown: its ${field} is ${found} and this version of coilbox reads ${expected}.`;
+    }
+    case "noSuchWindow": {
+      const windowIndex = fault.window;
+      return t`The recorded track could not be read. It has no window ${windowIndex}.`;
+    }
     case "unreadable":
     case "corruptWindow":
-    case "io":
-      return `The recorded track could not be read. ${capital(fault.message)}.`;
+    case "io": {
+      const reason = capital(fault.message);
+      return t`The recorded track could not be read. ${reason}.`;
+    }
   }
 }
 
@@ -183,7 +196,7 @@ function NotShown({ words }: { words: string }) {
             ?.focus();
         }}
       >
-        Go to recording
+        <Trans>Go to recording</Trans>
       </Button>
     </div>
   );
@@ -191,34 +204,45 @@ function NotShown({ words }: { words: string }) {
 
 /** What the marks are, and whose colour is whose. Behind the help button. */
 function Legend({ header }: { header: ReplayTrackHeader }) {
+  useLocale();
   return (
     <>
       <p className="text-muted-foreground">
-        From playing the match back with coilbox's own recorder. Nothing here
-        runs the game.
+        <Trans>
+          From playing the match back with coilbox's own recorder. Nothing here
+          runs the game.
+        </Trans>
       </p>
       <p>
-        A rectangle is a unit, in its team's colour and the size of its
-        footprint, with a line the way it faces. A unit still being built is
-        faint. On a large map a mark is never smaller than 3 pixels, so small
-        units look bigger than they are.
+        <Trans>
+          A rectangle is a unit, in its team's colour and the size of its
+          footprint, with a line the way it faces. A unit still being built is
+          faint. On a large map a mark is never smaller than 3 pixels, so small
+          units look bigger than they are.
+        </Trans>
       </p>
       <p>
-        A pale line is a projectile, drawn along the way it is moving. A grey
-        square is a wreck, or anything else left on the map during the match.
+        <Trans>
+          A pale line is a projectile, drawn along the way it is moving. A grey
+          square is a wreck, or anything else left on the map during the match.
+        </Trans>
       </p>
       <p>
-        Point at a unit to name it. Click one to keep it named, and click the
-        ground to let it go.
+        <Trans>
+          Point at a unit to name it. Click one to keep it named, and click the
+          ground to let it go.
+        </Trans>
       </p>
       <p>
-        Under the map, the knob sets the time and the buttons play the match
-        forward or in reverse, at the speed beside them. A tall bar is a unit
-        destroyed, a dot is chat and a diamond is a player leaving, taken from
-        the replay and its analysis. Marks that would touch are drawn as one,
-        larger, and clicking it goes to the earliest event in it. A replay that
-        has not been analysed has no kills. The address holds the time, so a
-        link opens at that moment.
+        <Trans>
+          Under the map, the knob sets the time and the buttons play the match
+          forward or in reverse, at the speed beside them. A tall bar is a unit
+          destroyed, a dot is chat and a diamond is a player leaving, taken from
+          the replay and its analysis. Marks that would touch are drawn as one,
+          larger, and clicking it goes to the earliest event in it. A replay
+          that has not been analysed has no kills. The address holds the time,
+          so a link opens at that moment.
+        </Trans>
       </p>
       <dl className="grid grid-cols-[max-content_1fr] gap-x-3 gap-y-0.5">
         {TIMELINE_KEYS.map((row) => (
@@ -229,7 +253,7 @@ function Legend({ header }: { header: ReplayTrackHeader }) {
         ))}
       </dl>
       <p className="text-muted-foreground">
-        The keys work while focus is in the map or the timeline.
+        <Trans>The keys work while focus is in the map or the timeline.</Trans>
       </p>
       <ul className="flex flex-col gap-1">
         {header.teams.map((team) => (
@@ -249,10 +273,12 @@ function Legend({ header }: { header: ReplayTrackHeader }) {
 
 /** Whose a team is, in words, so two teams are told apart without colour. */
 function ownerWords(header: ReplayTrackHeader, teamId: number): string {
-  const team = header.teams.find((t) => t.id === teamId);
-  if (!team) return "no team";
-  const owner = team.leader || `player ${team.id + 1}`;
-  return `${owner}${team.isAi ? " (AI)" : ""}, ${teamLabel(team.allyTeam)}`;
+  const team = header.teams.find((candidate) => candidate.id === teamId);
+  if (!team) return t`no team`;
+  const slot = team.id + 1;
+  const owner = team.leader || t`player ${slot}`;
+  const side = teamLabel(team.allyTeam);
+  return team.isAi ? t`${owner} (AI), ${side}` : t`${owner}, ${side}`;
 }
 
 /** The address's name for the time, in frames of the track. */
@@ -287,6 +313,7 @@ function RecordedMatch({
   mapName: string;
   minimapUrl: string | null;
 }) {
+  const { t: tr } = useLingui();
   const { header } = handle;
   const [params, setParams] = useSearchParams();
   // Read once, when the match is opened. The address follows the time after.
@@ -352,7 +379,7 @@ function RecordedMatch({
     // biome-ignore lint/a11y/useSemanticElements: a box that holds the map and the bar, which a fieldset would restyle.
     <div
       role="group"
-      aria-label="Recorded match"
+      aria-label={tr`Recorded match`}
       // biome-ignore lint/a11y/noNoninteractiveTabindex: the one place keyboard focus lands to use the timeline's keys on the map and the bar together.
       tabIndex={0}
       onKeyDown={onKeyDown}
@@ -394,8 +421,10 @@ function RecordedMatch({
       )}
       {!minimapUrl && (
         <p className="text-xs text-muted-foreground">
-          A picture of this map is not available, so the match is drawn on plain
-          ground.
+          <Trans>
+            A picture of this map is not available, so the match is drawn on
+            plain ground.
+          </Trans>
         </p>
       )}
     </div>
@@ -424,6 +453,7 @@ function RecordedMatchCanvas({
   /** Tells the timeline when the picture is waiting for a window. */
   onStatus: (status: MapViewStatus) => void;
 }) {
+  const { t: tr } = useLingui();
   const { header } = handle;
   const [mapX, mapZ] = header.mapSize;
   const groundRef = useRef<HTMLDivElement | null>(null);
@@ -470,9 +500,12 @@ function RecordedMatchCanvas({
       onPainted: (_frame, counts) => {
         if (!countsRef.current) return;
         countsRef.current.textContent = [
-          plural(counts.units, "unit", "units"),
-          plural(counts.projectiles, "projectile", "projectiles"),
-          plural(counts.wrecks, "wreck", "wrecks"),
+          plural(counts.units, { one: "# unit", other: "# units" }),
+          plural(counts.projectiles, {
+            one: "# projectile",
+            other: "# projectiles",
+          }),
+          plural(counts.wrecks, { one: "# wreck", other: "# wrecks" }),
         ].join(", ");
       },
       onHighlightLost: () => {
@@ -534,6 +567,9 @@ function RecordedMatchCanvas({
 
   // The ring goes round the unit the pointer is on, or the chosen one.
   const named = pointed ?? chosen;
+  const unitName = named
+    ? (header.unitDefs[named.def] ?? tr`unknown unit`)
+    : "";
   useEffect(() => {
     viewRef.current?.setHighlight(named?.serial ?? null);
   }, [named?.serial]);
@@ -568,7 +604,7 @@ function RecordedMatchCanvas({
           // Dimmed, so a team colour stands out from ground of the same hue.
           <img
             src={minimapUrl}
-            alt={`Minimap of ${mapName}`}
+            alt={tr`Minimap of ${mapName}`}
             className="absolute inset-0 size-full object-fill opacity-55 saturate-50"
           />
         )}
@@ -576,7 +612,7 @@ function RecordedMatchCanvas({
           ref={canvasRef}
           data-layer="recorded-units"
           role="img"
-          aria-label={`Units on ${mapName} at the chosen time`}
+          aria-label={tr`Units on ${mapName} at the chosen time`}
           className="absolute inset-0 size-full"
           onPointerMove={(event) => {
             const found = unitAt(event);
@@ -590,7 +626,7 @@ function RecordedMatchCanvas({
         {status.kind === "loading" && (
           <span
             role="status"
-            aria-label="Loading this part of the match"
+            aria-label={tr`Loading this part of the match`}
             className="pointer-events-none absolute right-1.5 top-1.5 rounded bg-black/70 p-1 text-white"
           >
             <Loader2 className="size-3.5 animate-spin motion-reduce:animate-none" />
@@ -601,7 +637,11 @@ function RecordedMatchCanvas({
             role="alert"
             className="pointer-events-none absolute inset-x-0 bottom-0 flex flex-col gap-0.5 bg-black/80 px-2 py-1.5 text-xs text-white"
           >
-            <span>This part of the match cannot be read from the track.</span>
+            <span>
+              <Trans>
+                This part of the match cannot be read from the track.
+              </Trans>
+            </span>
             <span className="text-white/70">
               {capital(status.error.message)}.
             </span>
@@ -611,9 +651,7 @@ function RecordedMatchCanvas({
       <div className="flex min-h-4 flex-wrap items-baseline justify-between gap-x-4 text-xs">
         <p ref={countsRef} className="text-muted-foreground tabular-nums" />
         <p data-testid="recorded-unit-name" className="font-medium">
-          {named
-            ? `${header.unitDefs[named.def] ?? "unknown unit"}, ${ownerWords(header, named.team)}`
-            : ""}
+          {named ? `${unitName}, ${ownerWords(header, named.team)}` : ""}
         </p>
       </div>
     </div>

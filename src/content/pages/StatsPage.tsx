@@ -1,3 +1,5 @@
+import { plural } from "@lingui/core/macro";
+import { Plural, Trans, useLingui } from "@lingui/react/macro";
 import { useSetting } from "@picoframe/frame";
 import { Flame, Map as MapIcon, Swords, Trophy } from "lucide-react";
 import { useMemo } from "react";
@@ -30,6 +32,7 @@ import { EmptyState, ErrorBanner, SkeletonList } from "./components/states";
  * records are deferred follow-ups.
  */
 export default function StatsPage() {
+  const { t } = useLingui();
   const { state } = useContentState();
   const { selected } = useScanTargetSelection();
   const roots = useMemo(() => (state?.roots ?? []).map((r) => r.path), [state]);
@@ -77,21 +80,30 @@ export default function StatsPage() {
 
   const winRatePct =
     profile?.winRate == null ? null : Math.round(profile.winRate * 100);
+  const presentCount = scoped?.present.length ?? 0;
+  const memberCount = activeSet?.members.length ?? 0;
+  const missingCount = scoped?.missing.length ?? 0;
+  const decidedCount = profile?.decided ?? 0;
+  const wins = profile?.wins ?? 0;
+  const losses = profile?.losses ?? 0;
+  const failedCount = summary?.failed ?? 0;
   const streak = profile?.currentStreak ?? 0;
   const streakLabel =
     streak === 0
       ? "—"
       : streak > 0
-        ? `${streak} win${streak === 1 ? "" : "s"}`
-        : `${-streak} loss${streak === -1 ? "" : "es"}`;
+        ? plural(streak, { one: "# win", other: "# wins" })
+        : plural(-streak, { one: "# loss", other: "# losses" });
 
   return (
     <div className="flex flex-col gap-4 p-4">
       <header className="flex flex-col gap-1">
-        <h1 className="text-lg font-semibold">Stats</h1>
+        <h1 className="text-lg font-semibold">{t`Stats`}</h1>
         <p className="text-sm text-muted-foreground">
-          Your record, built from the replays in your content folders. Fully
-          offline — no server, no account.
+          <Trans>
+            Your record, built from the replays in your content folders. Fully
+            offline — no server, no account.
+          </Trans>
         </p>
       </header>
 
@@ -100,40 +112,46 @@ export default function StatsPage() {
       {ingesting && allRecords.length === 0 ? (
         <SkeletonList />
       ) : allRecords.length === 0 ? (
-        <EmptyState label="No replays to build stats from yet. Watch a game, or place .sdfz files in your demos folder." />
+        <EmptyState
+          label={t`No replays to build stats from yet. Watch a game, or place .sdfz files in your demos folder.`}
+        />
       ) : (
         <>
           {sets.length > 0 && (
             <div className="flex flex-wrap items-center gap-3">
-              <span className="text-sm text-muted-foreground">Replays</span>
+              <span className="text-sm text-muted-foreground">
+                {t`Replays`}
+              </span>
               <OptionSelect
                 value={activeSet?.id ?? "all"}
                 onValueChange={(v) => setStoredSet(v === "all" ? "" : v)}
                 options={[
-                  { value: "all", label: "All replays" },
-                  ...sets.map((s) => ({
-                    value: s.id,
-                    label: `Set: ${s.name}`,
-                  })),
+                  { value: "all", label: t`All replays` },
+                  ...sets.map((s) => {
+                    const setName = s.name;
+                    return { value: s.id, label: t`Set: ${setName}` };
+                  }),
                 ]}
-                ariaLabel="Scope to a set"
+                ariaLabel={t`Scope to a set`}
                 className="w-56"
               />
               {scoped && (
                 <span className="text-xs text-muted-foreground">
-                  {scoped.present.length} of {activeSet?.members.length} in your
-                  library
                   {scoped.missing.length > 0
-                    ? `, ${scoped.missing.length} missing`
-                    : ""}
+                    ? t`${presentCount} of ${memberCount} in your library, ${missingCount} missing`
+                    : t`${presentCount} of ${memberCount} in your library`}
                 </span>
               )}
             </div>
           )}
           {records.length === 0 ? (
-            <EmptyState label="None of the replays in this set are in your library." />
+            <EmptyState
+              label={t`None of the replays in this set are in your library.`}
+            />
           ) : !profile ? (
-            <EmptyState label="No decodable players found in your replays." />
+            <EmptyState
+              label={t`No decodable players found in your replays.`}
+            />
           ) : (
             <>
               <div className="flex flex-wrap items-center gap-3">
@@ -141,7 +159,7 @@ export default function StatsPage() {
                   htmlFor="stats-player"
                   className="text-sm text-muted-foreground"
                 >
-                  Player
+                  {t`Player`}
                 </label>
                 <div className="w-56">
                   <PlayerPicker
@@ -153,11 +171,15 @@ export default function StatsPage() {
                 </div>
                 {summary && (
                   <span className="text-xs text-muted-foreground">
-                    {summary.total} game{summary.total === 1 ? "" : "s"} indexed
+                    <Plural
+                      value={summary.total}
+                      one="# game indexed"
+                      other="# games indexed"
+                    />
                     {summary.failed > 0
-                      ? ` · ${summary.failed} could not be read`
+                      ? ` · ${t`${failedCount} could not be read`}`
                       : ""}
-                    {ingesting ? " · updating…" : ""}
+                    {ingesting ? ` · ${t`updating…`}` : ""}
                   </span>
                 )}
               </div>
@@ -165,32 +187,32 @@ export default function StatsPage() {
               <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
                 <StatCard
                   icon={<Swords className="size-3.5" />}
-                  label="Games"
+                  label={t`Games`}
                   value={String(profile.games)}
                   sub={
                     profile.decided < profile.games
-                      ? `${profile.decided} with a known result`
+                      ? t`${decidedCount} with a known result`
                       : undefined
                   }
                 />
                 <StatCard
                   icon={<Trophy className="size-3.5" />}
-                  label="Win rate"
+                  label={t`Win rate`}
                   value={winRatePct == null ? "—" : `${winRatePct}%`}
                   sub={
                     profile.decided > 0
-                      ? `${profile.wins}W · ${profile.losses}L`
-                      : "no decided games"
+                      ? t`${wins}W · ${losses}L`
+                      : t`no decided games`
                   }
                 />
                 <StatCard
                   icon={<Flame className="size-3.5" />}
-                  label="Streak"
+                  label={t`Streak`}
                   value={streakLabel}
                 />
                 <StatCard
                   icon={<Trophy className="size-3.5" />}
-                  label="Best win run"
+                  label={t`Best win run`}
                   value={String(profile.longestWinStreak)}
                 />
               </div>
@@ -199,11 +221,11 @@ export default function StatsPage() {
                 <section className="rounded-lg border border-border/60 bg-card p-4">
                   <h2 className="mb-1 flex items-center gap-2 text-sm font-medium">
                     <MapIcon className="size-4 text-muted-foreground" />
-                    Favourite maps
+                    {t`Favourite maps`}
                   </h2>
                   {profile.favouriteMaps.length === 0 ? (
                     <p className="text-sm text-muted-foreground">
-                      No maps recorded.
+                      {t`No maps recorded.`}
                     </p>
                   ) : (
                     <ul className="divide-y divide-border/40">
@@ -222,11 +244,11 @@ export default function StatsPage() {
                 <section className="rounded-lg border border-border/60 bg-card p-4">
                   <h2 className="mb-1 flex items-center gap-2 text-sm font-medium">
                     <Swords className="size-4 text-muted-foreground" />
-                    Factions
+                    {t`Factions`}
                   </h2>
                   {profile.factions.length === 0 ? (
                     <p className="text-sm text-muted-foreground">
-                      No factions recorded.
+                      {t`No factions recorded.`}
                     </p>
                   ) : (
                     <ul className="divide-y divide-border/40">

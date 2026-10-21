@@ -1,3 +1,5 @@
+import { plural } from "@lingui/core/macro";
+import { Trans, useLingui } from "@lingui/react/macro";
 import { Button } from "@picoframe/frame";
 import { save } from "@tauri-apps/plugin-dialog";
 import { Download, Loader2 } from "lucide-react";
@@ -25,22 +27,24 @@ export function MatchStatsExportButton({
   /** Lines the roster has unchecked, which the file leaves out. */
   hiddenCount?: number;
 }) {
+  const { t } = useLingui();
   const [busy, setBusy] = useState(false);
 
   async function exportCsv() {
     setBusy(true);
     try {
       const dest = await save({
-        title: "Export match statistics",
+        title: t`Export match statistics`,
         defaultPath: matchStatsCsvFileName(input.info, input.metric),
-        filters: [{ name: "CSV", extensions: ["csv"] }],
+        filters: [{ name: t`CSV`, extensions: ["csv"] }],
       });
       if (!dest) return;
       await contentWriteFile({ dest, text: matchStatsCsv(input) });
-      void notify({ title: "Match statistics exported.", level: "success" });
+      void notify({ title: t`Match statistics exported.`, level: "success" });
     } catch (e) {
+      const reason = e instanceof Error ? e.message : String(e);
       void notify({
-        title: `Export failed: ${e instanceof Error ? e.message : e}`,
+        title: t`Export failed: ${reason}`,
         level: "error",
       });
     } finally {
@@ -57,8 +61,12 @@ export function MatchStatsExportButton({
       disabled={busy || input.series.length === 0}
       title={
         hiddenCount > 0
-          ? `Writes the lines on the chart. ${hiddenCount} unchecked in the roster ${hiddenCount === 1 ? "is" : "are"} left out.`
-          : "Writes every line on the chart. Nothing is hidden."
+          ? plural(hiddenCount, {
+              one: "Writes the lines on the chart. # unchecked in the roster is left out.",
+              other:
+                "Writes the lines on the chart. # unchecked in the roster are left out.",
+            })
+          : t`Writes every line on the chart. Nothing is hidden.`
       }
       onClick={exportCsv}
     >
@@ -67,7 +75,7 @@ export function MatchStatsExportButton({
       ) : (
         <Download className="size-4" aria-hidden />
       )}
-      Export CSV
+      <Trans>Export CSV</Trans>
     </Button>
   );
 }
