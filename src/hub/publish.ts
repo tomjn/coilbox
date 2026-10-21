@@ -1,4 +1,4 @@
-import { t } from "@lingui/core/macro";
+import { select, t } from "@lingui/core/macro";
 import { defineCommand } from "@picoframe/plugin-sdk";
 import {
   asContainer,
@@ -92,7 +92,12 @@ export function whyNotPublishable(publication: Publication): string | null {
 
   if (!(HUB_KINDS as readonly string[]).includes(found.kind)) {
     const kind = found.kind;
-    return t`The hub does not carry ${kind}s yet.`;
+    return select(kind, {
+      campaign: "The hub does not carry campaigns yet.",
+      keymap: "The hub does not carry keymaps yet.",
+      module: "The hub does not carry modules yet.",
+      other: "The hub does not carry this kind of file yet.",
+    });
   }
 
   // The ceiling the hub enforces, measured the way it measures it: on the

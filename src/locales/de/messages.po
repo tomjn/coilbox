@@ -1210,6 +1210,10 @@ msgstr ""
 msgid "{keys}: nothing bound"
 msgstr ""
 
+#: src/hub/publish.ts
+msgid "{kind, select, campaign {The hub does not carry campaigns yet.} keymap {The hub does not carry keymaps yet.} module {The hub does not carry modules yet.} other {The hub does not carry this kind of file yet.}}"
+msgstr ""
+
 #: src/content/pages/components/ReplayTimeline.tsx
 msgid "{kind}, {time}"
 msgstr ""
@@ -16903,10 +16907,6 @@ msgstr ""
 
 #: src/hub/publish.ts
 msgid "The hub could not publish it."
-msgstr ""
-
-#: src/hub/publish.ts
-msgid "The hub does not carry {kind}s yet."
 msgstr ""
 
 #: src/content/pages/GamesPage.tsx

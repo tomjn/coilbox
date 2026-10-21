@@ -1210,6 +1210,10 @@ msgstr "{joined, plural, one {# player joined} other {# players joined}}"
 msgid "{keys}: nothing bound"
 msgstr "{keys}: nothing bound"
 
+#: src/hub/publish.ts
+msgid "{kind, select, campaign {The hub does not carry campaigns yet.} keymap {The hub does not carry keymaps yet.} module {The hub does not carry modules yet.} other {The hub does not carry this kind of file yet.}}"
+msgstr "{kind, select, campaign {The hub does not carry campaigns yet.} keymap {The hub does not carry keymaps yet.} module {The hub does not carry modules yet.} other {The hub does not carry this kind of file yet.}}"
+
 #: src/content/pages/components/ReplayTimeline.tsx
 msgid "{kind}, {time}"
 msgstr "{kind}, {time}"
@@ -16904,10 +16908,6 @@ msgstr "The hub could not answer."
 #: src/hub/publish.ts
 msgid "The hub could not publish it."
 msgstr "The hub could not publish it."
-
-#: src/hub/publish.ts
-msgid "The hub does not carry {kind}s yet."
-msgstr "The hub does not carry {kind}s yet."
 
 #: src/content/pages/GamesPage.tsx
 msgid "The hub features no games."
