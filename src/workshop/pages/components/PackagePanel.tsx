@@ -39,6 +39,8 @@
  * export is restricted to, since that is what would ship. Both export modes
  * pack the same compiled output, so one view covers both.
  */
+import { t as coreT, plural } from "@lingui/core/macro";
+import { Trans, useLingui } from "@lingui/react/macro";
 import { Button } from "@picoframe/frame";
 import { join } from "@tauri-apps/api/path";
 import { ask, open, save } from "@tauri-apps/plugin-dialog";
@@ -102,11 +104,29 @@ type TweakSlotPhase =
   | { state: "done"; pack: TweakSlotPack; typedNote: string | null }
   | { state: "failed"; message: string };
 
+/** What to say when preflight found blockers. `forLobby` is the tweak-slot
+ *  route, where the line goes out in a lobby's chat. */
+function blockersMessage(blockers: string[], forLobby: boolean): string {
+  const [first, ...rest] = blockers;
+  const more = rest.length;
+  const lead = forLobby
+    ? plural(blockers.length, {
+        one: `# blocker would reach the lobby broken: ${first}`,
+        other: `# blockers would reach the lobby broken: ${first}`,
+      })
+    : plural(blockers.length, {
+        one: `# blocker would reach whoever plays this broken: ${first}`,
+        other: `# blockers would reach whoever plays this broken: ${first}`,
+      });
+  return more > 0 ? coreT`${lead} (and ${more} more)` : lead;
+}
+
 /** One press to put a line on the clipboard. Local to this file rather than
  *  shared, matching the copy button `LuaTableValue.tsx` already rolls for
  *  itself: small enough that a shared component would cost more to find and
  *  read than to repeat. */
-function CopyLineButton({ value, label }: { value: string; label: string }) {
+function CopyLineButton({ value, slot }: { value: string; slot: string }) {
+  const { t } = useLingui();
   const [copied, setCopied] = useState(false);
   return (
     <Button
@@ -114,7 +134,7 @@ function CopyLineButton({ value, label }: { value: string; label: string }) {
       size="sm"
       variant="outline"
       className="h-6 shrink-0 gap-1 px-2"
-      aria-label={label}
+      aria-label={t`Copy ${slot}`}
       onClick={() => {
         navigator.clipboard
           .writeText(value)
@@ -123,7 +143,7 @@ function CopyLineButton({ value, label }: { value: string; label: string }) {
       }}
     >
       {copied ? <Check className="size-3" /> : <Copy className="size-3" />}
-      {copied ? "Copied" : "Copy"}
+      {copied ? t`Copied` : t`Copy`}
     </Button>
   );
 }
@@ -140,21 +160,26 @@ function TweakFitWarning({
   pack: TweakSlotPack;
   routeOptions: ConfigOption[] | undefined;
 }) {
+  const { t } = useLingui();
   const fit = tweakSlotFit(pack, routeOptions ?? []);
+  const available = fit.available;
   const messages: string[] = [];
   if (!fit.fits) {
     messages.push(
-      `This pack needs ${fit.needed} tweakdefs slot${fit.needed === 1 ? "" : "s"}, but this game only declares ${fit.available}.`,
+      plural(fit.needed, {
+        one: `This pack needs # tweakdefs slot, but this game only declares ${available}.`,
+        other: `This pack needs # tweakdefs slots, but this game only declares ${available}.`,
+      }),
     );
   }
   for (const title of pack.oversized) {
     messages.push(
-      `${title} would exceed the per-slot limit even alone in an empty slot, so it was left out.`,
+      t`${title} would exceed the per-slot limit even alone in an empty slot, so it was left out.`,
     );
   }
   for (const title of pack.unplaced) {
     messages.push(
-      `${title} would have fit a slot on its own, but every slot the game exposes was already used, so it was left out.`,
+      t`${title} would have fit a slot on its own, but every slot the game exposes was already used, so it was left out.`,
     );
   }
   if (messages.length === 0) return null;
@@ -189,6 +214,7 @@ function TweakSlotExportSection({
    *  when it is not installed here. */
   game: { enginePath: string; dataDir: string; archive: string } | null;
 }) {
+  const { t } = useLingui();
   const [phase, setPhase] = useState<TweakSlotPhase>({ state: "idle" });
   const busy =
     phase.state === "checking" ||
@@ -200,10 +226,9 @@ function TweakSlotExportSection({
     try {
       const preflight = await workshopPreflight({ project });
       if (preflight.blockers.length > 0) {
-        const [first, ...rest] = preflight.blockers;
         setPhase({
           state: "failed",
-          message: `${preflight.blockers.length} blocker${preflight.blockers.length === 1 ? "" : "s"} would reach the lobby broken: ${first}${rest.length > 0 ? ` (and ${rest.length} more)` : ""}`,
+          message: blockersMessage(preflight.blockers, true),
         });
         return;
       }
@@ -243,9 +268,11 @@ function TweakSlotExportSection({
   return (
     <div className="flex flex-col gap-3">
       <p className="text-xs text-muted-foreground">
-        Packs this project into `!bset` lines for the game's numbered tweak
-        slots. Paste each line into the target lobby's chat, in order, for a
-        server that answers to `!bset` (a SPADS-based autohost).
+        <Trans>
+          Packs this project into `!bset` lines for the game's numbered tweak
+          slots. Paste each line into the target lobby's chat, in order, for a
+          server that answers to `!bset` (a SPADS-based autohost).
+        </Trans>
       </p>
       {unchecked ? (
         <p className="text-xs text-amber-700 dark:text-amber-400">
@@ -255,12 +282,12 @@ function TweakSlotExportSection({
       <Button onClick={() => void run()} disabled={busy}>
         <Package className="size-4" />
         {phase.state === "checking"
-          ? "Checking"
+          ? t`Checking`
           : phase.state === "settling"
-            ? "Checking typed values against the game"
+            ? t`Checking typed values against the game`
             : phase.state === "packing"
-              ? "Packing"
-              : "Pack for tweak slots"}
+              ? t`Packing`
+              : t`Pack for tweak slots`}
       </Button>
 
       {phase.state === "failed" ? (
@@ -275,7 +302,9 @@ function TweakSlotExportSection({
           ) : null}
           {lines.length === 0 ? (
             <p className="text-xs text-muted-foreground">
-              This project has nothing that packs into a tweak slot.
+              <Trans>
+                This project has nothing that packs into a tweak slot.
+              </Trans>
             </p>
           ) : (
             <ul className="flex flex-col gap-2">
@@ -286,10 +315,7 @@ function TweakSlotExportSection({
                   <code className="min-w-0 flex-1 break-all rounded bg-muted/40 px-2 py-1 text-xs">
                     {line}
                   </code>
-                  <CopyLineButton
-                    value={line}
-                    label={`Copy ${line.split(" ")[1]}`}
-                  />
+                  <CopyLineButton value={line} slot={line.split(" ")[1]} />
                 </li>
               ))}
             </ul>
@@ -331,6 +357,7 @@ export function PackagePanel({
   equipped: EquippedWeapons;
   clones: UnitClones;
 }) {
+  const { t } = useLingui();
   const [phase, setPhase] = useState<Phase>({ state: "idle" });
   const busy =
     phase.state === "checking" ||
@@ -373,6 +400,10 @@ export function PackagePanel({
   const compiled = useCompiledProject(scopedProject, true);
 
   const nextVersion = (project.distributionVersion ?? 0) + 1;
+  const projectName = project.name;
+  const gameName = project.gameName;
+  const bumpedFrom = project.distributionVersion;
+  const writtenVersion = phase.state === "done" ? phase.version : 0;
   const nothingToPackage =
     !compiled.loading && (compiled.compiled?.files.length ?? 0) === 0;
 
@@ -385,10 +416,9 @@ export function PackagePanel({
       // only flag (issue #2748).
       const preflight = await workshopPreflight({ project: scopedProject });
       if (preflight.blockers.length > 0) {
-        const [first, ...rest] = preflight.blockers;
         setPhase({
           state: "failed",
-          message: `${preflight.blockers.length} blocker${preflight.blockers.length === 1 ? "" : "s"} would reach whoever plays this broken: ${first}${rest.length > 0 ? ` (and ${rest.length} more)` : ""}`,
+          message: blockersMessage(preflight.blockers, false),
         });
         return;
       }
@@ -398,7 +428,7 @@ export function PackagePanel({
         // A directory picker rather than a file save dialog, since an .sdd
         // is a folder the engine expects to find at that name (issue #3160).
         const parentDir = await open({
-          title: "Choose where to write the .sdd",
+          title: t`Choose where to write the .sdd`,
           directory: true,
           multiple: false,
         });
@@ -412,9 +442,9 @@ export function PackagePanel({
         );
       } else {
         const picked = await save({
-          title: "Package tweak project",
+          title: t`Package tweak project`,
           defaultPath: packagedMutatorFileName(project, nextVersion),
-          filters: [{ name: "Mutator archive", extensions: ["sdz"] }],
+          filters: [{ name: t`Mutator archive`, extensions: ["sdz"] }],
         });
         if (!picked) {
           setPhase({ state: "idle" });
@@ -463,8 +493,8 @@ export function PackagePanel({
             UI_ERROR_CODES.packageTargetExists
         ) {
           const replace = await ask(
-            `${dest} already exists. Replace it? Anything already there will be deleted first.`,
-            { title: "Replace existing folder?", kind: "warning" },
+            t`${dest} already exists. Replace it? Anything already there will be deleted first.`,
+            { title: t`Replace existing folder?`, kind: "warning" },
           );
           if (!replace) {
             setPhase({ state: "idle" });
@@ -501,9 +531,9 @@ export function PackagePanel({
         <p className="text-sm text-muted-foreground">
           {mode === "mutator"
             ? shape === "sdd"
-              ? `Write ${project.name} out as an unpacked .sdd folder for ${project.gameName}, for a game you keep as a loose directory under version control.`
-              : `Write ${project.name} out as a .sdz for ${project.gameName}, ready to hand to somebody else or upload.`
-            : `Pack ${project.name} across ${project.gameName}'s numbered tweak slots, for a lobby you are not hosting yourself.`}
+              ? t`Write ${projectName} out as an unpacked .sdd folder for ${gameName}, for a game you keep as a loose directory under version control.`
+              : t`Write ${projectName} out as a .sdz for ${gameName}, ready to hand to somebody else or upload.`
+            : t`Pack ${projectName} across ${gameName}'s numbered tweak slots, for a lobby you are not hosting yourself.`}
         </p>
         {/* Which export to prepare. Kept ahead of everything else so
             switching modes never disturbs a run already under way in the
@@ -516,10 +546,14 @@ export function PackagePanel({
           size="sm"
           value={mode}
           onValueChange={(v) => v && setMode(v as ExportMode)}
-          aria-label="Which export to prepare"
+          aria-label={t`Which export to prepare`}
         >
-          <ToggleGroupItem value="mutator">Mutator archive</ToggleGroupItem>
-          <ToggleGroupItem value="tweak-slots">Tweak slots</ToggleGroupItem>
+          <ToggleGroupItem value="mutator">
+            <Trans>Mutator archive</Trans>
+          </ToggleGroupItem>
+          <ToggleGroupItem value="tweak-slots">
+            <Trans>Tweak slots</Trans>
+          </ToggleGroupItem>
         </ToggleGroup>
 
         {/* The mutator mode's own output shape: a zipped .sdz somebody else
@@ -534,10 +568,14 @@ export function PackagePanel({
             size="sm"
             value={shape}
             onValueChange={(v) => v && setShape(v as ExportShape)}
-            aria-label="What shape to write the export as"
+            aria-label={t`What shape to write the export as`}
           >
-            <ToggleGroupItem value="sdz">Archive (.sdz)</ToggleGroupItem>
-            <ToggleGroupItem value="sdd">Folder (.sdd)</ToggleGroupItem>
+            <ToggleGroupItem value="sdz">
+              <Trans>Archive (.sdz)</Trans>
+            </ToggleGroupItem>
+            <ToggleGroupItem value="sdd">
+              <Trans>Folder (.sdd)</Trans>
+            </ToggleGroupItem>
           </ToggleGroup>
         )}
 
@@ -550,21 +588,23 @@ export function PackagePanel({
             value={restrictTo}
             onValueChange={setRestrictTo}
             options={[
-              { value: "", label: "Whole project" },
+              { value: "", label: t`Whole project` },
               ...collectionTree(collections).map((n) => ({
                 value: n.collection.id,
                 label: `${"— ".repeat(n.depth)}${n.collection.name}`,
               })),
             ]}
             size="sm"
-            ariaLabel="Restrict this export to a collection"
+            ariaLabel={t`Restrict this export to a collection`}
           />
         )}
 
         {mode === "tweak-slots" ? (
           nothingToPackage ? (
             <p className="text-xs text-muted-foreground">
-              This project has no edits yet, so there is nothing to pack.
+              <Trans>
+                This project has no edits yet, so there is nothing to pack.
+              </Trans>
             </p>
           ) : (
             <TweakSlotExportSection
@@ -585,11 +625,13 @@ export function PackagePanel({
         ) : (
           <>
             <div className="flex flex-col gap-1 rounded border border-border/60 px-3 py-2 text-sm">
-              <span className="font-medium">Version {nextVersion}</span>
+              <span className="font-medium">
+                <Trans>Version {nextVersion}</Trans>
+              </span>
               <span className="text-xs text-muted-foreground">
-                {project.distributionVersion
-                  ? `Bumped from ${project.distributionVersion} automatically. Two players on different builds of the same name is a sync error, so the number always moves on rather than being typed in.`
-                  : "This project has not been packaged before. Coilbox bumps this number itself on every export after this one, so a re-download never lands on the same version as a different build."}
+                {bumpedFrom
+                  ? t`Bumped from ${bumpedFrom} automatically. Two players on different builds of the same name is a sync error, so the number always moves on rather than being typed in.`
+                  : t`This project has not been packaged before. Coilbox bumps this number itself on every export after this one, so a re-download never lands on the same version as a different build.`}
               </span>
             </div>
 
@@ -600,24 +642,26 @@ export function PackagePanel({
               >
                 <Package className="size-4" />
                 {phase.state === "checking"
-                  ? "Checking"
+                  ? t`Checking`
                   : phase.state === "settling"
-                    ? "Checking typed values against the game"
+                    ? t`Checking typed values against the game`
                     : phase.state === "packaging"
                       ? shape === "sdd"
-                        ? "Writing the folder"
-                        : "Writing the archive"
+                        ? t`Writing the folder`
+                        : t`Writing the archive`
                       : nothingToPackage
-                        ? "Nothing to package yet"
+                        ? t`Nothing to package yet`
                         : shape === "sdd"
-                          ? "Save as .sdd…"
-                          : "Save as .sdz…"}
+                          ? t`Save as .sdd…`
+                          : t`Save as .sdz…`}
               </Button>
             </div>
 
             {nothingToPackage ? (
               <p className="text-xs text-muted-foreground">
-                This project has no edits yet, so there is nothing to package.
+                <Trans>
+                  This project has no edits yet, so there is nothing to package.
+                </Trans>
               </p>
             ) : null}
 
@@ -627,7 +671,9 @@ export function PackagePanel({
 
             {phase.state === "done" ? (
               <div className="flex flex-col gap-2 text-xs text-muted-foreground">
-                <p>Wrote version {phase.version} to:</p>
+                <p>
+                  <Trans>Wrote version {writtenVersion} to:</Trans>
+                </p>
                 <p className="break-all">
                   <code>{phase.path}</code>
                 </p>

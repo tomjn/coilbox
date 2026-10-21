@@ -47,6 +47,7 @@
  * drawer's own undo is for (issue #3027), not something a checkpoint should
  * do as a side effect of putting `edits` back.
  */
+import { t } from "@lingui/core/macro";
 import { useSetting } from "@picoframe/frame";
 import { formatDateTime } from "@/lib/format";
 import { updateStoredSetting } from "../lib/storedSetting";
@@ -162,7 +163,7 @@ export function saveCheckpoint(
 ): ProjectCheckpoints {
   return addCheckpoint(all, projectId, {
     kind: "manual",
-    name: name.trim() || "Checkpoint",
+    name: name.trim() || t`Checkpoint`,
     description,
     edits,
   });
@@ -189,12 +190,13 @@ export function autosaveCheckpoint(
   isEmpty: boolean,
 ): ProjectCheckpoints {
   if (isEmpty) return all;
+  const when = formatDateTime(new Date());
   const [latest] = checkpointsFor(all, projectId);
   if (latest && JSON.stringify(latest.edits) === JSON.stringify(edits))
     return all;
   return addCheckpoint(all, projectId, {
     kind: "autosave",
-    name: `Autosave ${formatDateTime(new Date())}`,
+    name: t`Autosave ${when}`,
     edits,
   });
 }

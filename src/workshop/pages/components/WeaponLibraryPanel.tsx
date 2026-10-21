@@ -10,6 +10,8 @@
  * where everybody starts. The field list is the same one the Weapons tab
  * draws, so a weapon is edited here exactly as it is in a slot.
  */
+import { plural } from "@lingui/core/macro";
+import { Trans, useLingui } from "@lingui/react/macro";
 import { Button, Input } from "@picoframe/frame";
 import { Plus, Trash2 } from "lucide-react";
 import { useMemo, useState } from "react";
@@ -76,6 +78,7 @@ export function WeaponLibraryPanel({
   postOf?: (key: string, row: FieldRow) => PostNote | undefined;
   onOpenMount: (mount: WeaponMount) => void;
 }) {
+  const { t } = useLingui();
   const [search, setSearch] = useState("");
   const [source, setSource] = useState<string | undefined>();
   const [name, setName] = useState("");
@@ -103,15 +106,14 @@ export function WeaponLibraryPanel({
   const selected =
     (picked !== undefined ? library[picked] : undefined) ?? weapons[0];
   const mounts = selected ? mountsOf(equipped, selected.key) : [];
+  const copiedFrom = selected?.source;
   const fields = selected
     ? libraryWeaponGroup(
         selected,
         view,
-        `Copied from ${selected.source}. ${
-          mounts.length === 0
-            ? "No slot fires it yet, so it is not in the game. Equip it from a unit's Weapons tab."
-            : `A change here reaches every slot that fires it, and no other unit.`
-        }`,
+        mounts.length === 0
+          ? t`Copied from ${copiedFrom}. No slot fires it yet, so it is not in the game. Equip it from a unit's Weapons tab.`
+          : t`Copied from ${copiedFrom}. A change here reaches every slot that fires it, and no other unit.`,
       )
     : undefined;
 
@@ -127,23 +129,32 @@ export function WeaponLibraryPanel({
     setSearch("");
   };
 
+  const weaponCount = keys.length;
+  const moreCount = matches.length - SHOWN;
   return (
     <div className="grid gap-6 lg:grid-cols-[minmax(0,24rem)_minmax(0,1fr)]">
       <div className="flex flex-col gap-6">
         <p className="text-sm text-muted-foreground">
-          Weapons this project owns. Copy one out of {gameName}, change it here,
-          then equip it into any unit's slot on that unit's Weapons tab.
+          <Trans>
+            Weapons this project owns. Copy one out of {gameName}, change it
+            here, then equip it into any unit's slot on that unit's Weapons tab.
+          </Trans>
         </p>
         <section className="flex flex-col gap-3">
-          <h3 className="text-sm font-medium">Add a weapon from {gameName}</h3>
+          <h3 className="text-sm font-medium">
+            <Trans>Add a weapon from {gameName}</Trans>
+          </h3>
           <Field
-            label="Find a weapon"
-            hint={`${keys.length} weapon definitions in the game.`}
+            label={t`Find a weapon`}
+            hint={plural(weaponCount, {
+              one: "# weapon definition in the game.",
+              other: "# weapon definitions in the game.",
+            })}
           >
             <Input
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              placeholder="Name or key"
+              placeholder={t`Name or key`}
               className="h-8"
               autoComplete="off"
               spellCheck={false}
@@ -151,7 +162,7 @@ export function WeaponLibraryPanel({
           </Field>
           <ul
             className="flex max-h-56 flex-col gap-0.5 overflow-y-auto rounded-md border border-border/60 p-1"
-            aria-label="Weapons in the game"
+            aria-label={t`Weapons in the game`}
           >
             {matches.slice(0, SHOWN).map((key) => (
               <li key={key}>
@@ -172,12 +183,14 @@ export function WeaponLibraryPanel({
             ))}
             {matches.length === 0 && (
               <li className="p-2 text-xs text-muted-foreground">
-                No weapon in {gameName} matches that.
+                <Trans>No weapon in {gameName} matches that.</Trans>
               </li>
             )}
             {matches.length > SHOWN && (
               <li className="p-2 text-xs text-muted-foreground">
-                {matches.length - SHOWN} more. Type more of a name to find them.
+                <Trans>
+                  {moreCount} more. Type more of a name to find them.
+                </Trans>
               </li>
             )}
           </ul>
@@ -190,16 +203,16 @@ export function WeaponLibraryPanel({
               }}
             >
               <Field
-                label={`Name for the copy of ${source}`}
+                label={t`Name for the copy of ${source}`}
                 className="min-w-64 flex-1"
                 hint={
                   check.ok
-                    ? "Lowercase letters, numbers and underscores."
+                    ? t`Lowercase letters, numbers and underscores.`
                     : check.verdict === "empty"
-                      ? "Give the copy a name."
+                      ? t`Give the copy a name.`
                       : check.verdict === "invalid"
-                        ? "A weapon name can only use lowercase letters, numbers and underscores."
-                        : `The library already has a weapon called ${check.key}.`
+                        ? t`A weapon name can only use lowercase letters, numbers and underscores.`
+                        : t`The library already has a weapon called ${check.key}.`
                 }
               >
                 <Input
@@ -212,7 +225,7 @@ export function WeaponLibraryPanel({
               </Field>
               <Button type="submit" size="sm" disabled={!check.ok}>
                 <Plus className="size-3.5" />
-                Add to library
+                <Trans>Add to library</Trans>
               </Button>
             </form>
           )}
@@ -220,15 +233,17 @@ export function WeaponLibraryPanel({
 
         <section className="flex flex-col gap-3">
           <h3 className="text-sm font-medium">
-            In this project{" "}
+            <Trans>In this project</Trans>{" "}
             <span className="text-xs font-normal text-muted-foreground">
               {weapons.length}
             </span>
           </h3>
           {weapons.length === 0 ? (
             <p className="text-sm text-muted-foreground">
-              Nothing yet. A weapon added above, or copied from a unit's slot,
-              is listed here.
+              <Trans>
+                Nothing yet. A weapon added above, or copied from a unit's slot,
+                is listed here.
+              </Trans>
             </p>
           ) : (
             <ToggleGroup
@@ -239,7 +254,7 @@ export function WeaponLibraryPanel({
               className="flex-wrap"
               value={selected?.key ?? ""}
               onValueChange={(key) => key && setPicked(key)}
-              aria-label="Library weapon"
+              aria-label={t`Library weapon`}
             >
               {weapons.map((weapon) => {
                 const changed = libraryChangeCount(weapon);
@@ -253,7 +268,10 @@ export function WeaponLibraryPanel({
                     {changed > 0 && (
                       <span
                         className="rounded-full bg-primary px-1.5 font-sans text-[10px] text-primary-foreground"
-                        title={`${changed} field${changed === 1 ? "" : "s"} changed`}
+                        title={plural(changed, {
+                          one: "# field changed",
+                          other: "# fields changed",
+                        })}
                       >
                         {changed}
                       </span>
@@ -276,8 +294,11 @@ export function WeaponLibraryPanel({
                 </h3>
                 <p className="text-xs text-muted-foreground">
                   {mounts.length === 0
-                    ? "Not equipped anywhere."
-                    : `Equipped in ${mounts.length} place${mounts.length === 1 ? "" : "s"}:`}
+                    ? t`Not equipped anywhere.`
+                    : plural(mounts.length, {
+                        one: "Equipped in # place:",
+                        other: "Equipped in # places:",
+                      })}
                 </p>
                 {mounts.length > 0 && (
                   <ul className="flex flex-wrap gap-1">
@@ -304,10 +325,14 @@ export function WeaponLibraryPanel({
                   size="sm"
                   value={view}
                   onValueChange={(v) => v && setView(v as FieldView)}
-                  aria-label="Which weapon fields to show"
+                  aria-label={t`Which weapon fields to show`}
                 >
-                  <ToggleGroupItem value="relevant">Relevant</ToggleGroupItem>
-                  <ToggleGroupItem value="all">All</ToggleGroupItem>
+                  <ToggleGroupItem value="relevant">
+                    <Trans>Relevant</Trans>
+                  </ToggleGroupItem>
+                  <ToggleGroupItem value="all">
+                    <Trans>All</Trans>
+                  </ToggleGroupItem>
                 </ToggleGroup>
                 <DeleteWeaponButton
                   name={selected.key}
@@ -326,7 +351,7 @@ export function WeaponLibraryPanel({
                 hidden: fields.all - fields.relevant,
               }}
               consumers={consumers}
-              inheritedLabel="Copied value"
+              inheritedLabel={t`Copied value`}
               post={postOf && ((row) => postOf(selected.key, row))}
               onChange={(row, value) => onChange(selected.key, row, value)}
               onReset={(row) => onReset(selected.key, row)}
@@ -348,24 +373,29 @@ function DeleteWeaponButton({
   mounts: number;
   onDelete: () => void;
 }) {
+  const { t } = useLingui();
   const [open, setOpen] = useState(false);
   return (
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
         <Button variant="outline" size="sm">
           <Trash2 className="size-3.5" />
-          Delete
+          <Trans>Delete</Trans>
         </Button>
       </PopoverTrigger>
       <PopoverContent align="end" className="flex w-80 flex-col gap-3">
         <div className="flex flex-col gap-1">
-          <h3 className="text-sm font-medium">Delete {name}?</h3>
+          <h3 className="text-sm font-medium">
+            <Trans>Delete {name}?</Trans>
+          </h3>
           <p className="text-xs text-muted-foreground">
-            It goes out of the library
             {mounts > 0
-              ? `, and the ${mounts} slot${mounts === 1 ? "" : "s"} that fire it go back to the game's own weapon`
-              : ""}
-            . Undo puts it back.
+              ? plural(mounts, {
+                  one: "It goes out of the library, and the # slot that fires it goes back to the game's own weapon. Undo puts it back.",
+                  other:
+                    "It goes out of the library, and the # slots that fire it go back to the game's own weapon. Undo puts it back.",
+                })
+              : t`It goes out of the library. Undo puts it back.`}
           </p>
         </div>
         <div className="flex justify-end gap-2">
@@ -375,7 +405,7 @@ function DeleteWeaponButton({
             size="sm"
             onClick={() => setOpen(false)}
           >
-            Cancel
+            <Trans>Cancel</Trans>
           </Button>
           <Button
             type="button"
@@ -385,7 +415,7 @@ function DeleteWeaponButton({
               onDelete();
             }}
           >
-            Delete
+            <Trans>Delete</Trans>
           </Button>
         </div>
       </PopoverContent>

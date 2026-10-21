@@ -32,6 +32,7 @@
  *    though `setOverride` drops the `overrides` key, so it still follows the
  *    next update.
  */
+import { t } from "@lingui/core/macro";
 import {
   applyBatchRounding,
   type BatchOperation,
@@ -485,20 +486,30 @@ export function describeRelative(rule: RelativeRule): string {
   const base = formatNumber(rule.base);
   const percent = signed((rule.factor - 1) * 100);
   if (rule.factor !== 1 || rule.offset === 0) {
-    const add = rule.offset !== 0 ? ` ${signed(rule.offset)}` : "";
-    return `${percent}%${add} of ${base} = ${result}`;
+    if (rule.offset !== 0) {
+      const add = signed(rule.offset);
+      return t`${percent}% ${add} of ${base} = ${result}`;
+    }
+    return t`${percent}% of ${base} = ${result}`;
   }
-  return `${signed(rule.offset)} on ${base} = ${result}`;
+  const offset = signed(rule.offset);
+  return t`${offset} on ${base} = ${result}`;
 }
 
 /** What the checks list says about one rule after opening the project. */
 export function describeFollow(follow: RelativeFollow): string {
   const { unit, path } = follow;
-  if (follow.kind === "moved")
-    return `${unit} ${path} follows the game: game ${formatNumber(follow.gameBefore)} to ${formatNumber(follow.gameNow)}, project ${formatNumber(follow.projectBefore)} to ${formatNumber(follow.projectNow)}.`;
+  if (follow.kind === "moved") {
+    const gameBefore = formatNumber(follow.gameBefore);
+    const gameNow = formatNumber(follow.gameNow);
+    const projectBefore = formatNumber(follow.projectBefore);
+    const projectNow = formatNumber(follow.projectNow);
+    return t`${unit} ${path} follows the game: game ${gameBefore} to ${gameNow}, project ${projectBefore} to ${projectNow}.`;
+  }
+  const kept = formatNumber(follow.kept);
   if (follow.kind === "missing")
-    return `The game no longer has ${path} on ${unit}, so the change that followed it keeps its last number, ${formatNumber(follow.kept)}.`;
-  return `${unit} ${path} is no longer a number in the game, so the change that followed it keeps its last number, ${formatNumber(follow.kept)}.`;
+    return t`The game no longer has ${path} on ${unit}, so the change that followed it keeps its last number, ${kept}.`;
+  return t`${unit} ${path} is no longer a number in the game, so the change that followed it keeps its last number, ${kept}.`;
 }
 
 /** Only the three rounding rules `batchEdit.ts` knows. */

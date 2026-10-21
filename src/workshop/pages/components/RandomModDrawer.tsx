@@ -15,6 +15,8 @@
  * is chosen, on the same 23 second read the editor already pays once per
  * session.
  */
+import { plural } from "@lingui/core/macro";
+import { Trans, useLingui } from "@lingui/react/macro";
 import { Button, Drawer, Input } from "@picoframe/frame";
 import { Dice5 } from "lucide-react";
 import { useMemo, useState } from "react";
@@ -106,6 +108,7 @@ export function RandomModDrawer({
   dataDir?: string;
   onStarted: (input: NewProject) => void;
 }) {
+  const { t } = useLingui();
   const [open, setOpen] = useState(false);
   return (
     <>
@@ -113,16 +116,16 @@ export function RandomModDrawer({
         size="sm"
         variant="secondary"
         onClick={() => setOpen(true)}
-        title="Randomise a game's units into rarity tiers and start a project from the result"
+        title={t`Randomise a game's units into rarity tiers and start a project from the result`}
       >
         <Dice5 className="mr-1 size-3.5" />
-        Randomise
+        <Trans>Randomise</Trans>
       </Button>
       <Drawer
         open={open}
         onOpenChange={setOpen}
-        title="Randomised mod"
-        description="Pick a game, a seed and a scope. Two people who type the same seed and rules against the same game get the same mod."
+        title={t`Randomised mod`}
+        description={t`Pick a game, a seed and a scope. Two people who type the same seed and rules against the same game get the same mod.`}
         width="28rem"
       >
         {open ? (
@@ -178,12 +181,13 @@ export function RegenerateRandomModDrawer({
   dataDir?: string;
   onRegenerate: (overrides: UnitOverrides, recipe: RandomModRecipe) => void;
 }) {
+  const { t } = useLingui();
   return (
     <Drawer
       open={open}
       onOpenChange={onOpenChange}
-      title="Regenerate"
-      description="The seed and rules this project was made from. Change one, preview the result and apply it as a single change you can undo."
+      title={t`Regenerate`}
+      description={t`The seed and rules this project was made from. Change one, preview the result and apply it as a single change you can undo.`}
       width="28rem"
     >
       {open ? (
@@ -241,6 +245,7 @@ function RandomModForm({
   };
   onStarted?: (input: NewProject) => void;
 }) {
+  const { t } = useLingui();
   const recipe = regenerate?.project.randomModRecipe;
   const [pickedGameName, setPickedGameName] = useState("");
   const gameName = regenerate?.project.gameName ?? pickedGameName;
@@ -337,11 +342,27 @@ function RandomModForm({
         selectedName={gameName}
         onSelect={setPickedGameName}
         onBack={() => setPickingGame(false)}
-        backLabel="Back to the randomised mod"
+        backLabel={t`Back to the randomised mod`}
         gamesLoading={scanning}
       />
     );
   }
+
+  const unitsInScope = plural(scopedUnits.length, {
+    one: "# unit",
+    other: "# units",
+  });
+  const scopeSummary = t`${unitsInScope} in scope, ${changed} will change.`;
+  const keptFields = plural(handEditedFieldCount, {
+    one: "# hand-edited field",
+    other: "# hand-edited fields",
+  });
+  const keptUnits = plural(handEditedUnitCount, {
+    one: "# unit",
+    other: "# units",
+  });
+  const keptSummary = t`${keptFields} across ${keptUnits} will be kept as they are, not replaced by this run.`;
+  const weightLabel = (tier: string) => t`${tier} weight`;
 
   function toggleField(id: string, on: boolean) {
     setFields((prev) => (on ? [...prev, id] : prev.filter((f) => f !== id)));
@@ -391,19 +412,19 @@ function RandomModForm({
     <div className="flex flex-col gap-4">
       {regenerate ? (
         <Field
-          label="Game"
-          hint="A regenerate cannot move this project to another game."
+          label={t`Game`}
+          hint={t`A regenerate cannot move this project to another game.`}
         >
           <p className="text-muted-foreground text-sm">{gameName}</p>
         </Field>
       ) : (
         <Field
-          label="Game"
-          hint="Every roll reads this game's own numbers, so it has to be read first."
+          label={t`Game`}
+          hint={t`Every roll reads this game's own numbers, so it has to be read first.`}
         >
           <GamePickerButton
-            ariaLabel="Game to randomise"
-            placeholder={scanning ? "Scanning…" : "Pick a game"}
+            ariaLabel={t`Game to randomise`}
+            placeholder={scanning ? t`Scanning…` : t`Pick a game`}
             value={gameName}
             games={games}
             headers={headers}
@@ -414,25 +435,25 @@ function RandomModForm({
 
       {gameName && status === "loading" ? (
         <p className="text-muted-foreground text-xs">
-          Reading {gameName}'s units…
+          <Trans>Reading {gameName}'s units…</Trans>
         </p>
       ) : null}
       {gameName && status === "error" ? (
         <p className="text-destructive text-xs">
-          Could not read {gameName}'s units.
+          <Trans>Could not read {gameName}'s units.</Trans>
         </p>
       ) : null}
 
       {gameName && status === "ready" ? (
         <>
           <Field
-            label="Seed"
-            hint="The same seed and rules against this game always produce the same mod."
+            label={t`Seed`}
+            hint={t`The same seed and rules against this game always produce the same mod.`}
           >
             <div className="flex gap-2">
               <Input
                 type="number"
-                aria-label="Seed"
+                aria-label={t`Seed`}
                 value={seed}
                 onChange={(event) =>
                   setSeed(Math.trunc(Number(event.target.value)) || 0)
@@ -444,22 +465,22 @@ function RandomModForm({
                 size="sm"
                 onClick={() => setSeed(randomSeed())}
               >
-                New seed
+                <Trans>New seed</Trans>
               </Button>
             </div>
           </Field>
 
-          <Field label="Scope" hint="Which units this mod touches.">
+          <Field label={t`Scope`} hint={t`Which units this mod touches.`}>
             <OptionSelect
               value={scopeKind}
               onValueChange={(value) => setScopeKind(value as ScopeKind)}
-              ariaLabel="Scope"
+              ariaLabel={t`Scope`}
               options={[
-                { value: "all", label: "All units" },
-                { value: "query", label: "A search query" },
+                { value: "all", label: t`All units` },
+                { value: "query", label: t`A search query` },
                 {
                   value: "collection",
-                  label: "A collection",
+                  label: t`A collection`,
                   disabled: collectionChoices.length === 0,
                 },
               ]}
@@ -468,11 +489,11 @@ function RandomModForm({
 
           {scopeKind === "query" ? (
             <Field
-              label="Query"
-              hint='The same predicate language the unit search box takes, e.g. "cost < 500".'
+              label={t`Query`}
+              hint={t`The same predicate language the unit search box takes, e.g. "cost < 500".`}
             >
               <Input
-                aria-label="Search query"
+                aria-label={t`Search query`}
                 value={query}
                 placeholder="cost < 500"
                 onChange={(event) => setQuery(event.target.value)}
@@ -482,26 +503,26 @@ function RandomModForm({
 
           {scopeKind === "collection" ? (
             <Field
-              label="Collection"
+              label={t`Collection`}
               hint={
                 collectionChoices.length === 0
-                  ? "No collection has been defined against this game yet."
-                  : "From any project already started against this game."
+                  ? t`No collection has been defined against this game yet.`
+                  : t`From any project already started against this game.`
               }
             >
               <OptionSelect
                 value={collectionKey}
                 onValueChange={setCollectionKey}
-                ariaLabel="Collection"
-                placeholder="Pick a collection"
+                ariaLabel={t`Collection`}
+                placeholder={t`Pick a collection`}
                 options={collectionChoices}
               />
             </Field>
           ) : null}
 
           <Field
-            label="Fields"
-            hint="Skips a unit that has none of these as a real number."
+            label={t`Fields`}
+            hint={t`Skips a unit that has none of these as a real number.`}
           >
             <div className="flex flex-col gap-2">
               {RANDOM_FIELDS.map((field) => (
@@ -516,8 +537,8 @@ function RandomModForm({
           </Field>
 
           <Field
-            label="Tier weights"
-            hint="How often a unit lands each rarity. Not required to add up to 100."
+            label={t`Tier weights`}
+            hint={t`How often a unit lands each rarity. Not required to add up to 100.`}
           >
             <div className="flex flex-col gap-2">
               {RARITY_TIERS.map((tier) => (
@@ -532,7 +553,7 @@ function RandomModForm({
                     type="number"
                     min={0}
                     className="w-20"
-                    aria-label={`${tier.label} weight`}
+                    aria-label={weightLabel(tier.label)}
                     value={tierWeights[tier.id] ?? 0}
                     onChange={(event) =>
                       setTierWeights((prev) => ({
@@ -547,18 +568,9 @@ function RandomModForm({
           </Field>
 
           <div className="flex flex-col gap-1 rounded border border-border bg-muted/30 p-2 text-xs">
-            <span>
-              {scopedUnits.length} unit{scopedUnits.length === 1 ? "" : "s"} in
-              scope, {changed} will change.
-            </span>
+            <span>{scopeSummary}</span>
             {regenerate && handEditedFieldCount > 0 ? (
-              <span>
-                {handEditedFieldCount} hand-edited field
-                {handEditedFieldCount === 1 ? "" : "s"} across{" "}
-                {handEditedUnitCount} unit
-                {handEditedUnitCount === 1 ? "" : "s"} will be kept as they are,
-                not replaced by this run.
-              </span>
+              <span>{keptSummary}</span>
             ) : null}
             <ul className="flex flex-col gap-0.5 text-muted-foreground">
               {plan
@@ -585,7 +597,7 @@ function RandomModForm({
               }
             >
               <Dice5 className="size-4" />
-              {regenerate ? "Regenerate" : "Create project"}
+              {regenerate ? t`Regenerate` : t`Create project`}
             </Button>
           </div>
         </>
