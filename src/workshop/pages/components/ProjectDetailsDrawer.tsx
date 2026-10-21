@@ -20,6 +20,7 @@
  * unit table, so renaming shows the game and does not offer to change it.
  */
 
+import { Trans, useLingui } from "@lingui/react/macro";
 import { Button, Drawer, Input } from "@picoframe/frame";
 import { useState } from "react";
 import { Field } from "@/components/Field";
@@ -70,15 +71,16 @@ export function ProjectDetailsDrawer({
   existing: readonly { name: string }[];
   onSubmit: (details: ProjectDetails) => void;
 }) {
+  const { t } = useLingui();
   return (
     <Drawer
       open={open}
       onOpenChange={onOpenChange}
-      title={project ? "Rename project" : "New tweak project"}
+      title={project ? t`Rename project` : t`New tweak project`}
       description={
         project
-          ? "What this project is called, and what it is for."
-          : "A project changes one game. Start another for a second game."
+          ? t`What this project is called, and what it is for.`
+          : t`A project changes one game. Start another for a second game.`
       }
       width="26rem"
     >
@@ -119,6 +121,7 @@ function ProjectDetailsForm({
   existing: readonly { name: string }[];
   onSubmit: (details: ProjectDetails) => void;
 }) {
+  const { t } = useLingui();
   const [gameName, setGameName] = useState(project?.gameName ?? "");
   const [name, setName] = useState(project?.name ?? "");
   const [description, setDescription] = useState(project?.description ?? "");
@@ -143,7 +146,7 @@ function ProjectDetailsForm({
         selectedName={gameName}
         onSelect={setGameName}
         onBack={() => setPickingGame(false)}
-        backLabel="Back to the project details"
+        backLabel={t`Back to the project details`}
         gamesLoading={scanning}
       />
     );
@@ -159,17 +162,20 @@ function ProjectDetailsForm({
       }}
     >
       {project ? (
-        <Field label="Game" hint="A project cannot be moved to another game.">
+        <Field
+          label={t`Game`}
+          hint={t`A project cannot be moved to another game.`}
+        >
           <p className="text-muted-foreground text-sm">{project.gameName}</p>
         </Field>
       ) : (
         <Field
-          label="Game"
-          hint="Every edit in the project is a patch against this game's own units."
+          label={t`Game`}
+          hint={t`Every edit in the project is a patch against this game's own units.`}
         >
           <GamePickerButton
-            ariaLabel="Game for the new project"
-            placeholder={scanning ? "Scanning…" : "Pick a game"}
+            ariaLabel={t`Game for the new project`}
+            placeholder={scanning ? t`Scanning…` : t`Pick a game`}
             value={gameName}
             games={games}
             headers={headers}
@@ -183,36 +189,36 @@ function ProjectDetailsForm({
           <ScanFailed noun="games" reason={scanFailure} />
         ) : (
           <p className="text-muted-foreground text-xs">
-            No games are installed. Add one from the Library.
+            <Trans>No games are installed. Add one from the Library.</Trans>
           </p>
         )
       ) : null}
 
       <Field
-        label="Name"
+        label={t`Name`}
         hint={
           project
             ? undefined
-            : "Optional. Left empty it takes the game's name, and you can change it later."
+            : t`Optional. Left empty it takes the game's name, and you can change it later.`
         }
       >
         <Input
           autoFocus={!!project}
-          aria-label={project ? "Project name" : "Name for the new project"}
+          aria-label={project ? t`Project name` : t`Name for the new project`}
           value={name}
-          placeholder={fallback || "Name"}
+          placeholder={fallback || t`Name`}
           onChange={(event) => setName(event.target.value)}
         />
       </Field>
 
       <Field
-        label="Description"
-        hint="Optional. Shown on the project's card, and to anybody you send it to."
+        label={t`Description`}
+        hint={t`Optional. Shown on the project's card, and to anybody you send it to.`}
       >
         <Textarea
-          aria-label="What the project is for"
+          aria-label={t`What the project is for`}
           value={description}
-          placeholder="What this changes, and why."
+          placeholder={t`What this changes, and why.`}
           className="min-h-20"
           onChange={(event) => setDescription(event.target.value)}
         />
@@ -220,7 +226,7 @@ function ProjectDetailsForm({
 
       <div className="flex justify-end">
         <Button type="submit" size="sm" disabled={!gameName || !chosen}>
-          {project ? "Save" : "Start editing"}
+          {project ? t`Save` : t`Start editing`}
         </Button>
       </div>
     </form>

@@ -18,6 +18,7 @@
  * it is asked for just before a test, a package or a pack, not on every
  * keystroke.
  */
+import { plural, t } from "@lingui/core/macro";
 import { defineCommand } from "@picoframe/plugin-sdk";
 import { describeError } from "@/i18n/uiError";
 import type { ModProject } from "./project";
@@ -122,10 +123,14 @@ export function fieldLabel(report: TypedValueReport): string {
   switch (report.field.kind) {
     case "unit":
       return `${report.field.unit} ${report.field.path}`;
-    case "clone":
-      return `${report.field.unit} ${report.field.path} (copy)`;
-    case "weapon":
-      return `library weapon ${report.field.weapon} ${report.field.path}`;
+    case "clone": {
+      const { unit, path } = report.field;
+      return t`${unit} ${path} (copy)`;
+    }
+    case "weapon": {
+      const { weapon, path } = report.field;
+      return t`library weapon ${weapon} ${path}`;
+    }
   }
 }
 
@@ -142,11 +147,19 @@ export function settledSummary(settled: SettledTypedValues): string | null {
   const parts: string[] = [];
   if (written.length > 0)
     parts.push(
-      `${written.length} typed value${written.length === 1 ? " is" : "s are"} written so the game's own Lua turns ${written.length === 1 ? "it" : "them"} into the typed number, checked by loading the game.`,
+      plural(written.length, {
+        one: "# typed value is written so the game's own Lua turns it into the typed number, checked by loading the game.",
+        other:
+          "# typed values are written so the game's own Lua turns them into the typed number, checked by loading the game.",
+      }),
     );
   if (unproven.length > 0)
     parts.push(
-      `${unproven.length} ${unproven.length === 1 ? "is" : "are"} written as typed, and the game may load ${unproven.length === 1 ? "it" : "them"} as something else.`,
+      plural(unproven.length, {
+        one: "# is written as typed, and the game may load it as something else.",
+        other:
+          "# are written as typed, and the game may load them as something else.",
+      }),
     );
   return parts.join(" ");
 }
@@ -161,8 +174,8 @@ export function gameNotFoundNote(
   initFailure: string | null,
 ): string {
   return initFailure
-    ? `The content scan failed, so ${gameName} could not be found to check typed values (${initFailure}). They are written as typed and the game may load some of them as something else.`
-    : `${gameName} is not installed here, so typed values are written as typed and the game may load some of them as something else.`;
+    ? t`The content scan failed, so ${gameName} could not be found to check typed values (${initFailure}). They are written as typed and the game may load some of them as something else.`
+    : t`${gameName} is not installed here, so typed values are written as typed and the game may load some of them as something else.`;
 }
 
 /**
@@ -178,9 +191,10 @@ export async function settleTypedValues(
   try {
     return { ok: true, settled: await workshopSettleTypedValues(args) };
   } catch (e) {
+    const reason = describeError(e);
     return {
       ok: false,
-      message: `Coilbox could not load the game to check typed values, so they are written as typed: ${describeError(e)}`,
+      message: t`Coilbox could not load the game to check typed values, so they are written as typed: ${reason}`,
     };
   }
 }
@@ -194,9 +208,10 @@ export async function settleTypedValuesInPlace(
   try {
     return { ok: true, settled: await workshopSettleTypedValuesInPlace(args) };
   } catch (e) {
+    const reason = describeError(e);
     return {
       ok: false,
-      message: `Coilbox could not load the game to check typed values, so they are written as typed: ${describeError(e)}`,
+      message: t`Coilbox could not load the game to check typed values, so they are written as typed: ${reason}`,
     };
   }
 }
@@ -210,9 +225,10 @@ export async function settleTypedValuesTweaks(
   try {
     return { ok: true, settled: await workshopSettleTypedValuesTweaks(args) };
   } catch (e) {
+    const reason = describeError(e);
     return {
       ok: false,
-      message: `Coilbox could not load the game to check typed values, so they are written as typed: ${describeError(e)}`,
+      message: t`Coilbox could not load the game to check typed values, so they are written as typed: ${reason}`,
     };
   }
 }

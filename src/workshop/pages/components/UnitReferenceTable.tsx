@@ -21,6 +21,7 @@
  * shows the game's own value on hover when an edit elsewhere has moved it
  * (issue #3114).
  */
+import { Trans, useLingui } from "@lingui/react/macro";
 import { ArrowDown, ArrowUp } from "lucide-react";
 import { type ReactNode, useLayoutEffect, useMemo, useState } from "react";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -109,6 +110,7 @@ function ReferenceValueCell({
   label: string;
   unitName: string;
 }) {
+  const { t } = useLingui();
   const text = formatReferenceValue(shown);
   if (
     shown === undefined ||
@@ -117,14 +119,16 @@ function ReferenceValueCell({
   )
     return <>{text}</>;
   const diff = shown - gameValue;
-  const before = `Before this project's edits: ${formatReferenceValue(gameValue)} (${formatDiff(diff)})`;
+  const game = formatReferenceValue(gameValue);
+  const change = formatDiff(diff);
+  const before = t`Before this project's edits: ${game} (${change})`;
   return (
     <TooltipProvider>
       <Tooltip>
         <TooltipTrigger asChild>
           <button
             type="button"
-            aria-label={`${label} for ${unitName}, now ${text}. ${before}`}
+            aria-label={t`${label} for ${unitName}, now ${text}. ${before}`}
             className="underline decoration-dotted underline-offset-2"
           >
             {text}
@@ -203,6 +207,7 @@ export function UnitReferenceTable({
     onCommit: (key: string, columnId: string, value: number) => void;
   };
 }) {
+  const { t } = useLingui();
   const [sort, setSort] = useState<SortState>({
     columnId: "name",
     direction: "asc",
@@ -272,6 +277,8 @@ export function UnitReferenceTable({
     );
   };
 
+  const selectLabel = (name: string) => t`Select ${name} to compare`;
+
   const totalColumns =
     REFERENCE_COLUMNS.length + LEADING_COLUMNS + (factionOf ? 1 : 0);
 
@@ -290,11 +297,15 @@ export function UnitReferenceTable({
                   checked={allShownSelected}
                   disabled={rows.length === 0}
                   onCheckedChange={onToggleShown}
-                  aria-label="Select every unit shown"
+                  aria-label={t`Select every unit shown`}
                 />
               </TableHead>
-              <TableHead>{sortButton("name", "Name")}</TableHead>
-              {factionOf && <TableHead>Faction</TableHead>}
+              <TableHead>{sortButton("name", t`Name`)}</TableHead>
+              {factionOf && (
+                <TableHead>
+                  <Trans>Faction</Trans>
+                </TableHead>
+              )}
               {REFERENCE_COLUMNS.map((column) => (
                 <TableHead key={column.id} className="text-right">
                   {columnHeader(column)}
@@ -321,7 +332,7 @@ export function UnitReferenceTable({
                   <Checkbox
                     checked={selected.has(row.key)}
                     onCheckedChange={() => onToggle(row.key)}
-                    aria-label={`Select ${row.name} to compare`}
+                    aria-label={selectLabel(row.name)}
                   />
                 </TableCell>
                 <TableCell className="w-full max-w-0 font-medium">

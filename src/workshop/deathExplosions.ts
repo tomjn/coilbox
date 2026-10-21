@@ -30,6 +30,7 @@
  * by the field's name instead of a slot number).
  */
 
+import { plural, t } from "@lingui/core/macro";
 import type { UnitOverrides } from "./overrides";
 import type { FieldView, RenderedGroup } from "./unitSections";
 import {
@@ -53,11 +54,15 @@ export const EXPLOSION_FOCUS = [
   "cameraShake",
 ] as const;
 
-/** How each field is written in the engine's own spelling, and named. */
-const MOUNT_INFO: Record<DeathMount, { field: string; label: string }> = {
-  explodeas: { field: "explodeAs", label: "Death explosion" },
-  selfdestructas: { field: "selfDestructAs", label: "Self-destruct explosion" },
+/** How each field is written in the engine's own spelling. */
+const MOUNT_FIELD: Record<DeathMount, string> = {
+  explodeas: "explodeAs",
+  selfdestructas: "selfDestructAs",
 };
+
+/** What each field is called. Read at call time so it follows the language. */
+const mountLabel = (mount: DeathMount): string =>
+  mount === "explodeas" ? t`Death explosion` : t`Self-destruct explosion`;
 
 /** One of a unit's two death explosions. */
 export interface DeathExplosion {
@@ -160,8 +165,8 @@ export function deathExplosions(
     const name = mount === "selfdestructas" && follows ? dies.name : own.name;
     return {
       mount,
-      label: MOUNT_INFO[mount].label,
-      field: own.key ?? MOUNT_INFO[mount].field,
+      label: mountLabel(mount),
+      field: own.key ?? MOUNT_FIELD[mount],
       name,
       follows: mount === "selfdestructas" && follows,
       definition: resolve(name, def, shared, owners),
@@ -200,8 +205,9 @@ export function deathExplosionView(
 ): WeaponSlotView {
   const what =
     explosion.mount === "explodeas"
-      ? `What ${unitName} explodes as when it dies.`
-      : `What ${unitName} explodes as when it self-destructs.`;
+      ? t`What ${unitName} explodes as when it dies.`
+      : t`What ${unitName} explodes as when it self-destructs.`;
+  const label = explosion.label;
   const draw = (
     group: Omit<RenderedGroup, "sections">,
     def: Record<string, unknown>,
@@ -225,12 +231,21 @@ export function deathExplosionView(
   const { fires } = options;
   if (fires) {
     const others = fires.mounts - 1;
+    const weaponKey = fires.weapon.key;
+    const source = fires.weapon.source;
+    const note =
+      others > 0
+        ? plural(others, {
+            one: `${what} It is ${weaponKey}, copied from ${source} into the project's weapon library. A change here is a change to the library weapon, so it reaches the # other place it is equipped too.`,
+            other: `${what} It is ${weaponKey}, copied from ${source} into the project's weapon library. A change here is a change to the library weapon, so it reaches the # other places it is equipped too.`,
+          })
+        : t`${what} It is ${weaponKey}, copied from ${source} into the project's weapon library. A change here is a change to the library weapon, and no unit uses it but this one.`;
     return draw(
       {
         id: "explosion",
-        label: `${explosion.label}: library weapon`,
+        label: t`${label}: library weapon`,
         identifier: fires.weapon.key,
-        note: `${what} It is ${fires.weapon.key}, copied from ${fires.weapon.source} into the project's weapon library. A change here is a change to the library weapon${others > 0 ? `, so it reaches the ${others} other place${others === 1 ? "" : "s"} it is equipped too` : ", and no unit uses it but this one"}.`,
+        note,
       },
       fires.weapon.def,
       fires.weapon.changes ?? {},
@@ -244,25 +259,38 @@ export function deathExplosionView(
     return draw(
       {
         id: "explosion",
-        label: `${explosion.label}:`,
+        label: t`${label}:`,
         identifier: definition.key,
-        note: `${what} ${unitName} carries this definition itself, so a change here reaches no other unit.`,
+        note: t`${what} ${unitName} carries this definition itself, so a change here reaches no other unit.`,
       },
       definition.def,
       overrides[unitKey] ?? {},
       definition.path,
     );
   const others = options.usedBy - 1;
+  const copyKey = options.copyKey;
+  const explosionName = explosion.name;
+  const note =
+    others > 0
+      ? plural(others, {
+          one: `Shared with # other unit. Editing makes a copy for ${unitName}.`,
+          other: `Shared with # other units. Editing makes a copy for ${unitName}.`,
+        })
+      : t`Editing makes a copy for ${unitName}.`;
+  const noteDetail =
+    others > 0
+      ? plural(others, {
+          one: `${what} ${explosionName} is in the game's shared weapon table, and # other unit uses it. Changing a field here copies it into the project's weapon library as ${copyKey}, so every other unit keeps its own.`,
+          other: `${what} ${explosionName} is in the game's shared weapon table, and # other units use it. Changing a field here copies it into the project's weapon library as ${copyKey}, so every other unit keeps its own.`,
+        })
+      : t`${what} ${explosionName} is in the game's shared weapon table. Changing a field here copies it into the project's weapon library as ${copyKey}, so the game keeps its own.`;
   return draw(
     {
       id: "explosion",
-      label: `${explosion.label}:`,
+      label: t`${label}:`,
       identifier: explosion.name,
-      note:
-        others > 0
-          ? `Shared with ${others} other unit${others === 1 ? "" : "s"}. Editing makes a copy for ${unitName}.`
-          : `Editing makes a copy for ${unitName}.`,
-      noteDetail: `${what} ${explosion.name} is in the game's shared weapon table${others > 0 ? `, and ${others} other unit${others === 1 ? "" : "s"} use${others === 1 ? "s" : ""} it` : ""}. Changing a field here copies it into the project's weapon library as ${options.copyKey}, so ${others > 0 ? "every other unit keeps" : "the game keeps"} its own.`,
+      note,
+      noteDetail,
     },
     definition.def,
     {},

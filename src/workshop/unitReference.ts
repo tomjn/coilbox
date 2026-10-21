@@ -16,15 +16,16 @@
  * definition is what fires, the same as before that feature existed.
  */
 
+import { t } from "@lingui/core/macro";
 import { formatNumber } from "@/lib/format";
 import {
-  ALPHA_DAMAGE_HELP,
-  COST_PER_HIT_POINT_HELP,
-  DPS_HELP,
-  DPS_PER_100_METAL_HELP,
-  HIT_POINTS_PER_BUILD_SECOND_HELP,
+  alphaDamageHelp,
+  costPerHitPointHelp,
+  dpsHelp,
+  dpsPer100MetalHelp,
+  hitPointsPerBuildSecondHelp,
   numberField,
-  RANGE_PER_COST_HELP,
+  rangePerCostHelp,
   type UnitDerivedStats,
 } from "./derivedStats";
 import { evaluateUnitQuery, parseUnitQuery } from "./searchQuery";
@@ -123,6 +124,26 @@ export interface ReferenceColumn {
   help?: string;
 }
 
+/** A column whose label is translated each time it is read, not once when the
+ *  module loads. */
+function column(
+  id: string,
+  label: () => string,
+  value: ReferenceColumn["value"],
+  help?: () => string,
+): ReferenceColumn {
+  return {
+    id,
+    get label() {
+      return label();
+    },
+    value,
+    get help() {
+      return help?.();
+    },
+  };
+}
+
 /**
  * The columns that matter (issue #1316): the raw fields a player already
  * compares by eye, then the derived numbers `derivedStats.ts` computes and
@@ -132,48 +153,72 @@ export interface ReferenceColumn {
  * store.
  */
 export const REFERENCE_COLUMNS: ReferenceColumn[] = [
-  { id: "health", label: "Health", value: (r) => r.health },
-  { id: "metalCost", label: "Metal cost", value: (r) => r.metalCost },
-  { id: "buildTime", label: "Build time", value: (r) => r.buildTime },
-  { id: "sightDistance", label: "Sight", value: (r) => r.sightDistance },
-  { id: "speed", label: "Speed", value: (r) => r.speed },
-  { id: "maxRange", label: "Range", value: (r) => r.maxRange },
-  {
-    id: "dps",
-    label: "DPS",
-    value: (r) => r.derived.dps ?? undefined,
-    help: DPS_HELP,
-  },
-  {
-    id: "alphaDamage",
-    label: "Volley damage",
-    value: (r) => r.derived.alphaDamage ?? undefined,
-    help: ALPHA_DAMAGE_HELP,
-  },
-  {
-    id: "costPerHitPoint",
-    label: "Cost per HP",
-    value: (r) => r.derived.costPerHitPoint ?? undefined,
-    help: COST_PER_HIT_POINT_HELP,
-  },
-  {
-    id: "dpsPer100Metal",
-    label: "DPS per 100 metal",
-    value: (r) => r.derived.dpsPer100Metal ?? undefined,
-    help: DPS_PER_100_METAL_HELP,
-  },
-  {
-    id: "hitPointsPerBuildSecond",
-    label: "HP per build second",
-    value: (r) => r.derived.hitPointsPerBuildSecond ?? undefined,
-    help: HIT_POINTS_PER_BUILD_SECOND_HELP,
-  },
-  {
-    id: "rangePerCost",
-    label: "Range per cost",
-    value: (r) => r.derived.rangePerCost ?? undefined,
-    help: RANGE_PER_COST_HELP,
-  },
+  column(
+    "health",
+    () => t`Health`,
+    (r) => r.health,
+  ),
+  column(
+    "metalCost",
+    () => t`Metal cost`,
+    (r) => r.metalCost,
+  ),
+  column(
+    "buildTime",
+    () => t`Build time`,
+    (r) => r.buildTime,
+  ),
+  column(
+    "sightDistance",
+    () => t`Sight`,
+    (r) => r.sightDistance,
+  ),
+  column(
+    "speed",
+    () => t`Speed`,
+    (r) => r.speed,
+  ),
+  column(
+    "maxRange",
+    () => t`Range`,
+    (r) => r.maxRange,
+  ),
+  column(
+    "dps",
+    () => t`DPS`,
+    (r) => r.derived.dps ?? undefined,
+    dpsHelp,
+  ),
+  column(
+    "alphaDamage",
+    () => t`Volley damage`,
+    (r) => r.derived.alphaDamage ?? undefined,
+    alphaDamageHelp,
+  ),
+  column(
+    "costPerHitPoint",
+    () => t`Cost per HP`,
+    (r) => r.derived.costPerHitPoint ?? undefined,
+    costPerHitPointHelp,
+  ),
+  column(
+    "dpsPer100Metal",
+    () => t`DPS per 100 metal`,
+    (r) => r.derived.dpsPer100Metal ?? undefined,
+    dpsPer100MetalHelp,
+  ),
+  column(
+    "hitPointsPerBuildSecond",
+    () => t`HP per build second`,
+    (r) => r.derived.hitPointsPerBuildSecond ?? undefined,
+    hitPointsPerBuildSecondHelp,
+  ),
+  column(
+    "rangePerCost",
+    () => t`Range per cost`,
+    (r) => r.derived.rangePerCost ?? undefined,
+    rangePerCostHelp,
+  ),
 ];
 
 export type SortDirection = "asc" | "desc";

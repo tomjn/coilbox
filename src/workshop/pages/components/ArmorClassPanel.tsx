@@ -10,6 +10,8 @@
  * `overrides` to hold. It always goes through the mutator, which ships its own
  * whole `gamedata/armordefs.lua` in place of the game's.
  */
+import { plural } from "@lingui/core/macro";
+import { Trans, useLingui } from "@lingui/react/macro";
 import { Button, Input } from "@picoframe/frame";
 import { FileCog, RotateCcw } from "lucide-react";
 import { useState } from "react";
@@ -32,6 +34,7 @@ export function ArmorClassPanel({
   options: ArmorClassSummary[];
   onChange: (className: string) => void;
 }) {
+  const { t } = useLingui();
   const [adding, setAdding] = useState(false);
   const [draft, setDraft] = useState("");
   const overridden = current.toLowerCase() !== inherited.toLowerCase();
@@ -43,18 +46,18 @@ export function ArmorClassPanel({
     ? options.map((o) => ({
         value: o.name,
         label: o.name,
-        description: `${o.units} unit${o.units === 1 ? "" : "s"}`,
+        description: plural(o.units, { one: "# unit", other: "# units" }),
       }))
     : [
         {
           value: current,
           label: current,
-          description: `Not in ${unitName}'s game or project yet`,
+          description: t`Not in ${unitName}'s game or project yet`,
         },
         ...options.map((o) => ({
           value: o.name,
           label: o.name,
-          description: `${o.units} unit${o.units === 1 ? "" : "s"}`,
+          description: plural(o.units, { one: "# unit", other: "# units" }),
         })),
       ];
 
@@ -69,11 +72,13 @@ export function ArmorClassPanel({
   return (
     <div className="flex flex-col gap-1.5 rounded-md border p-2.5 text-xs">
       <div className="flex flex-wrap items-center gap-2">
-        <span className="font-medium">Armour class</span>
+        <span className="font-medium">
+          <Trans>Armour class</Trans>
+        </span>
         <OptionSelect
           size="sm"
-          ariaLabel="Armour class"
-          placeholder="default"
+          ariaLabel={t`Armour class`}
+          placeholder={t`default`}
           value={current}
           onValueChange={onChange}
           options={selectOptions}
@@ -86,13 +91,13 @@ export function ArmorClassPanel({
             className="h-8 text-[10px]"
             onClick={() => setAdding(true)}
           >
-            Add a class
+            <Trans>Add a class</Trans>
           </Button>
         ) : (
           <span className="flex items-center gap-1.5">
             <Input
               className="h-8 w-40 font-mono text-xs"
-              aria-label="New armour class name"
+              aria-label={t`New armour class name`}
               value={draft}
               onChange={(e) => setDraft(e.target.value)}
               onKeyDown={(e) => {
@@ -113,7 +118,7 @@ export function ArmorClassPanel({
               className="h-8 text-[10px]"
               onClick={addClass}
             >
-              Use this name
+              <Trans>Use this name</Trans>
             </Button>
           </span>
         )}
@@ -123,8 +128,8 @@ export function ArmorClassPanel({
             size="icon"
             className="size-7"
             onClick={() => onChange(inherited)}
-            title={`Reset the armour class to ${inherited}, the game's own`}
-            aria-label={`Reset the armour class to ${inherited}, the game's own`}
+            title={t`Reset the armour class to ${inherited}, the game's own`}
+            aria-label={t`Reset the armour class to ${inherited}, the game's own`}
           >
             <RotateCcw className="size-3.5" />
           </Button>
@@ -133,13 +138,20 @@ export function ArmorClassPanel({
       <span className="flex items-start gap-1 text-[10px] text-muted-foreground">
         <FileCog className="mt-px size-3 shrink-0" />
         <span>
-          An armour class is a name in the game's own{" "}
-          <span className="font-mono">gamedata/armordefs.lua</span>, not a field
-          on {unitName}, so this always goes through the mutator route: it ships
-          a whole copy of that file with {unitName} moved.
-          {overridden
-            ? ` The game itself puts ${unitName} in ${inherited}.`
-            : ""}
+          <Trans>
+            An armour class is a name in the game's own{" "}
+            <span className="font-mono">gamedata/armordefs.lua</span>, not a
+            field on {unitName}, so this always goes through the mutator route:
+            it ships a whole copy of that file with {unitName} moved.
+          </Trans>
+          {overridden ? (
+            <>
+              {" "}
+              <Trans>
+                The game itself puts {unitName} in {inherited}.
+              </Trans>
+            </>
+          ) : null}
         </span>
       </span>
     </div>

@@ -19,6 +19,8 @@
  * change on this panel is: through the project's own edit path, so undo
  * reaches it too.
  */
+import { t as coreT, plural } from "@lingui/core/macro";
+import { Trans, useLingui } from "@lingui/react/macro";
 import { Button, Input } from "@picoframe/frame";
 import { CopyPlus, FolderPlus, Trash2 } from "lucide-react";
 import { useMemo, useState } from "react";
@@ -68,7 +70,7 @@ function parentOptions(collections: Collections, excludeId?: string) {
     }
   }
   return [
-    { value: "", label: "No parent (top level)" },
+    { value: "", label: coreT`No parent (top level)` },
     ...collectionTree(collections)
       .filter((n) => !blocked.has(n.collection.id))
       .map((n) => ({
@@ -128,6 +130,7 @@ export function CollectionsPanel({
    *  so the panel can say so. Required whenever `otherProjects` is non-empty. */
   onImport?: (source: Collection) => { name: string; droppedUnits: string[] };
 }) {
+  const { t } = useLingui();
   const [name, setName] = useState("");
   const [newParent, setNewParent] = useState("");
   const [selected, setSelected] = useState<string | undefined>();
@@ -149,6 +152,7 @@ export function CollectionsPanel({
   const activeUnits = active
     ? collectionUnits(collections, active.id, live)
     : undefined;
+  const activeName = active?.name ?? "";
   const ruleResult = active?.rule ? parseUnitQuery(active.rule) : undefined;
 
   const allUnits = useMemo(
@@ -164,6 +168,7 @@ export function CollectionsPanel({
         (u) => u.key.includes(needle) || u.label.toLowerCase().includes(needle),
       )
     : allUnits;
+  const hiddenCount = matches.length - SHOWN;
 
   const create = () => {
     if (!name.trim()) return;
@@ -181,10 +186,15 @@ export function CollectionsPanel({
   const runImport = () => {
     if (!importSourceCollection || !onImport) return;
     const result = onImport(importSourceCollection);
+    const addedName = result.name;
+    const dropped = result.droppedUnits.join(", ");
     setImportNote(
       result.droppedUnits.length > 0
-        ? `Added "${result.name}". This game doesn't have ${result.droppedUnits.length === 1 ? "this unit" : "these units"}, so ${result.droppedUnits.length === 1 ? "it was" : "they were"} left out: ${result.droppedUnits.join(", ")}.`
-        : `Added "${result.name}".`,
+        ? plural(result.droppedUnits.length, {
+            one: `Added "${addedName}". This game doesn't have this unit, so it was left out: ${dropped}.`,
+            other: `Added "${addedName}". This game doesn't have these units, so they were left out: ${dropped}.`,
+          })
+        : t`Added "${addedName}".`,
     );
     setImportCollectionId("");
   };
@@ -193,11 +203,15 @@ export function CollectionsPanel({
     <div className="grid gap-6 lg:grid-cols-[minmax(0,30rem)_minmax(0,1fr)]">
       <div className="flex flex-col gap-6">
         <p className="text-sm text-muted-foreground">
-          Named, nestable sets of units. A parent includes everything its
-          children hold.
+          <Trans>
+            Named, nestable sets of units. A parent includes everything its
+            children hold.
+          </Trans>
         </p>
         <section className="flex flex-col gap-3">
-          <h3 className="text-sm font-medium">New collection</h3>
+          <h3 className="text-sm font-medium">
+            <Trans>New collection</Trans>
+          </h3>
           <form
             className="flex flex-col gap-2"
             onSubmit={(e) => {
@@ -205,36 +219,38 @@ export function CollectionsPanel({
               create();
             }}
           >
-            <Field label="Name">
+            <Field label={t`Name`}>
               <Input
                 value={name}
                 onChange={(e) => setName(e.target.value)}
-                placeholder="Tier two"
+                placeholder={t`Tier two`}
                 className="h-8"
               />
             </Field>
             {tree.length > 0 && (
-              <Field label="Nest under">
+              <Field label={t`Nest under`}>
                 <OptionSelect
                   value={newParent}
                   onValueChange={setNewParent}
                   options={parentOptions(collections)}
                   size="sm"
-                  ariaLabel="Nest the new collection under"
+                  ariaLabel={t`Nest the new collection under`}
                 />
               </Field>
             )}
             <Button type="submit" size="sm" disabled={!name.trim()}>
               <FolderPlus className="size-3.5" />
-              Create
+              <Trans>Create</Trans>
             </Button>
           </form>
         </section>
 
         {otherProjects.length > 0 && (
           <section className="flex flex-col gap-3">
-            <h3 className="text-sm font-medium">Add from another project</h3>
-            <Field label="Project">
+            <h3 className="text-sm font-medium">
+              <Trans>Add from another project</Trans>
+            </h3>
+            <Field label={t`Project`}>
               <OptionSelect
                 value={importProjectId}
                 onValueChange={(v) => {
@@ -242,27 +258,27 @@ export function CollectionsPanel({
                   setImportCollectionId("");
                 }}
                 options={[
-                  { value: "", label: "Choose a project" },
+                  { value: "", label: t`Choose a project` },
                   ...otherProjects.map((p) => ({ value: p.id, label: p.name })),
                 ]}
                 size="sm"
-                ariaLabel="Project to add a collection from"
+                ariaLabel={t`Project to add a collection from`}
               />
             </Field>
             {importSourceProject && (
-              <Field label="Collection">
+              <Field label={t`Collection`}>
                 <OptionSelect
                   value={importCollectionId}
                   onValueChange={setImportCollectionId}
                   options={[
-                    { value: "", label: "Choose a collection" },
+                    { value: "", label: t`Choose a collection` },
                     ...importSourceProject.collections.map((c) => ({
                       value: c.id,
                       label: c.name,
                     })),
                   ]}
                   size="sm"
-                  ariaLabel="Collection to add"
+                  ariaLabel={t`Collection to add`}
                 />
               </Field>
             )}
@@ -273,7 +289,7 @@ export function CollectionsPanel({
               onClick={runImport}
             >
               <CopyPlus className="size-3.5" />
-              Add collection
+              <Trans>Add collection</Trans>
             </Button>
             {importNote && (
               <p className="text-xs text-muted-foreground">{importNote}</p>
@@ -283,14 +299,14 @@ export function CollectionsPanel({
 
         <section className="flex flex-col gap-3">
           <h3 className="text-sm font-medium">
-            In this project{" "}
+            <Trans>In this project</Trans>{" "}
             <span className="text-xs font-normal text-muted-foreground">
               {Object.keys(collections).length}
             </span>
           </h3>
           {tree.length === 0 ? (
             <p className="text-sm text-muted-foreground">
-              Nothing yet. Create one above.
+              <Trans>Nothing yet. Create one above.</Trans>
             </p>
           ) : (
             <ul className="flex flex-col gap-1">
@@ -324,16 +340,16 @@ export function CollectionsPanel({
         {active && (
           <section className="flex flex-col gap-3">
             <h3 className="text-sm font-medium">
-              Units in {active.name}{" "}
+              <Trans>Units in {activeName}</Trans>{" "}
               <span className="text-xs font-normal text-muted-foreground">
                 {activeUnits?.size ?? 0}
               </span>
             </h3>
-            <Field label="Rule (optional)">
+            <Field label={t`Rule (optional)`}>
               <Input
                 value={active.rule ?? ""}
                 onChange={(e) => onSetRule(active.id, e.target.value)}
-                placeholder="e.g. cost < 200"
+                placeholder={t`e.g. cost < 200`}
                 className="h-8 font-mono text-xs"
                 autoComplete="off"
                 spellCheck={false}
@@ -344,14 +360,16 @@ export function CollectionsPanel({
             )}
             {ruleResult?.ok && (
               <p className="text-xs text-muted-foreground">
-                Every unit matching this rule belongs too, kept up to date as
-                values change, on top of anything ticked below.
+                <Trans>
+                  Every unit matching this rule belongs too, kept up to date as
+                  values change, on top of anything ticked below.
+                </Trans>
               </p>
             )}
             <Input
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              placeholder="Find a unit"
+              placeholder={t`Find a unit`}
               className="h-8"
               autoComplete="off"
               spellCheck={false}
@@ -385,13 +403,14 @@ export function CollectionsPanel({
               })}
               {matches.length === 0 && (
                 <li className="p-2 text-xs text-muted-foreground">
-                  No unit matches that.
+                  <Trans>No unit matches that.</Trans>
                 </li>
               )}
               {matches.length > SHOWN && (
                 <li className="p-2 text-xs text-muted-foreground">
-                  {matches.length - SHOWN} more. Type more of a name to find
-                  them.
+                  <Trans>
+                    {hiddenCount} more. Type more of a name to find them.
+                  </Trans>
                 </li>
               )}
             </ul>
@@ -425,6 +444,8 @@ function CollectionRow({
   onSetParent: (parentId: string | undefined) => void;
   onDelete: () => void;
 }) {
+  const { t } = useLingui();
+  const collectionName = collection.name;
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(collection.name);
 
@@ -465,7 +486,7 @@ function CollectionRow({
             setEditing(true);
           }}
           aria-pressed={isSelected}
-          title="Click to edit its units, double click to rename"
+          title={t`Click to edit its units, double click to rename`}
         >
           <span className="truncate">{collection.name}</span>
           <span className="shrink-0 text-xs text-muted-foreground">
@@ -479,7 +500,7 @@ function CollectionRow({
           onValueChange={(v) => onSetParent(v || undefined)}
           options={parentOptions}
           size="sm"
-          ariaLabel={`Nest ${collection.name} under`}
+          ariaLabel={t`Nest ${collectionName} under`}
         />
       </div>
       <Button
@@ -488,8 +509,8 @@ function CollectionRow({
         size="sm"
         className="h-7 shrink-0 px-2"
         onClick={onDelete}
-        aria-label={`Delete ${collection.name}`}
-        title="Delete this collection. Its children move up to its own parent."
+        aria-label={t`Delete ${collectionName}`}
+        title={t`Delete this collection. Its children move up to its own parent.`}
       >
         <Trash2 className="size-3.5" />
       </Button>

@@ -15,7 +15,7 @@ import { Label } from "@/components/ui/label";
 import { formatNumber } from "@/lib/format";
 import { normaliseCloneKey } from "@/workshop/clones";
 import { useUnitDefs } from "@/workshop/config";
-import { DPS_HELP, type WeaponInput } from "@/workshop/derivedStats";
+import { dpsHelp, type WeaponInput } from "@/workshop/derivedStats";
 import { exportedInto } from "@/workshop/legoUnits";
 import { useModProjects } from "@/workshop/project";
 import { unitEditPath } from "@/workshop/routes";
@@ -208,7 +208,7 @@ export function StatsSection({
           <StatRow
             key={id}
             label={label}
-            title={id === "dps" ? DPS_HELP : undefined}
+            title={id === "dps" ? dpsHelp() : undefined}
             own={
               <span className="flex flex-wrap items-center gap-1.5">
                 <output aria-label={label}>{cell(id)}</output>

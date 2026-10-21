@@ -16,6 +16,8 @@
  * wide enough to hold the list and the preview side by side: choosing a model
  * by name alone is most of the problem this is meant to solve.
  */
+import { plural } from "@lingui/core/macro";
+import { Trans, useLingui } from "@lingui/react/macro";
 import { Button, cn, Input } from "@picoframe/frame";
 import { FileQuestion, Search, X } from "lucide-react";
 import { Dialog as DialogPrimitive } from "radix-ui";
@@ -79,6 +81,8 @@ function Preview({
   enginePath?: string;
   dataDir?: string;
 }) {
+  const { t } = useLingui();
+  const noun = field.kind.noun;
   const isModel = field.kind.id === "model";
   const { model, loading: modelLoading } = useUnitsyncUnitModel(
     enginePath,
@@ -97,20 +101,38 @@ function Preview({
     return (
       <Note>
         <FileQuestion className="size-5" />
-        Pick a {field.kind.noun} to see it.
+        <Trans>Pick a {noun} to see it.</Trans>
       </Note>
     );
 
   if (isModel) {
     if (modelLoading)
-      return <Note>Reading this model out of the archive.</Note>;
+      return (
+        <Note>
+          <Trans>Reading this model out of the archive.</Trans>
+        </Note>
+      );
     if (!model?.root)
-      return <Note>Nothing drawable came out of this file.</Note>;
+      return (
+        <Note>
+          <Trans>Nothing drawable came out of this file.</Trans>
+        </Note>
+      );
     return <ModelViewport model={model} className="h-full min-h-48" />;
   }
 
-  if (fileLoading) return <Note>Reading this file.</Note>;
-  if (!file) return <Note>Could not read this file.</Note>;
+  if (fileLoading)
+    return (
+      <Note>
+        <Trans>Reading this file.</Trans>
+      </Note>
+    );
+  if (!file)
+    return (
+      <Note>
+        <Trans>Could not read this file.</Trans>
+      </Note>
+    );
   if (file.kind === "image" && file.dataUrl)
     return (
       <div className="flex h-full items-center justify-center overflow-auto p-3">
@@ -127,11 +149,12 @@ function Preview({
         {file.text}
       </pre>
     );
+  const fileSize = formatBytes(file.size);
   return (
     <Note>
       {PICTURE.has(extensionOf(member))
-        ? "This picture is in a format coilbox cannot draw. The game can still read it."
-        : `No preview for this file (${formatBytes(file.size)}).`}
+        ? t`This picture is in a format coilbox cannot draw. The game can still read it.`
+        : t`No preview for this file (${fileSize}).`}
     </Note>
   );
 }
@@ -205,6 +228,7 @@ export function AssetPicker({
   dataDir?: string;
   onPick: (value: string) => void;
 }) {
+  const { t } = useLingui();
   const [query, setQuery] = useState("");
   const [selected, setSelected] = useState<string | null>(current ?? null);
 
@@ -231,6 +255,23 @@ export function AssetPicker({
     return held ? [held, ...rows.slice(0, ROW_CAP - 1)] : rows;
   }, [matched, selected]);
 
+  const noun = field.kind.noun;
+  const kindId = field.kind.id;
+  const searchLabel =
+    kindId === "model"
+      ? t`Search models`
+      : kindId === "script"
+        ? t`Search scripts`
+        : t`Search pictures`;
+  const noneHere =
+    kindId === "model"
+      ? t`No models here.`
+      : kindId === "script"
+        ? t`No scripts here.`
+        : t`No pictures here.`;
+  const fieldRoot = field.root;
+  const rowCap = ROW_CAP;
+  const total = matched.length;
   const take = (member: string) => {
     onPick(assetValue(field.root, member));
     onOpenChange(false);
@@ -244,16 +285,18 @@ export function AssetPicker({
           <div className="flex items-center gap-2 border-b border-border/60 px-5 py-4">
             <div className="flex min-w-0 flex-1 flex-col">
               <DialogPrimitive.Title className="truncate text-base font-semibold">
-                Choose a {field.kind.noun} for {label}
+                <Trans>
+                  Choose a {noun} for {label}
+                </Trans>
               </DialogPrimitive.Title>
               <DialogPrimitive.Description className="truncate text-xs text-muted-foreground">
                 {field.root === ""
                   ? archiveLabel
-                  : `${archiveLabel}, under ${field.root}/`}
+                  : t`${archiveLabel}, under ${fieldRoot}/`}
               </DialogPrimitive.Description>
             </div>
             <DialogPrimitive.Close asChild>
-              <Button variant="ghost" size="icon" aria-label="Close">
+              <Button variant="ghost" size="icon" aria-label={t`Close`}>
                 <X className="size-4" />
               </Button>
             </DialogPrimitive.Close>
@@ -266,8 +309,8 @@ export function AssetPicker({
                 <Input
                   value={query}
                   onChange={(event) => setQuery(event.target.value)}
-                  placeholder={`Search ${field.kind.noun}s`}
-                  aria-label={`Search ${field.kind.noun}s`}
+                  placeholder={searchLabel}
+                  aria-label={searchLabel}
                   className="h-8 pl-8"
                 />
               </div>
@@ -280,10 +323,10 @@ export function AssetPicker({
               />
               <p className="shrink-0 text-[11px] text-muted-foreground">
                 {matched.length === 0
-                  ? `No ${field.kind.noun}s here.`
-                  : matched.length > ROW_CAP
-                    ? `${ROW_CAP} of ${matched.length}. Search to narrow it.`
-                    : `${matched.length} ${matched.length === 1 ? "file" : "files"}.`}
+                  ? noneHere
+                  : total > rowCap
+                    ? t`${rowCap} of ${total}. Search to narrow it.`
+                    : plural(total, { one: "# file.", other: "# files." })}
               </p>
             </div>
 
@@ -304,14 +347,14 @@ export function AssetPicker({
                 >
                   {selected
                     ? assetValue(field.root, selected)
-                    : "Nothing picked"}
+                    : t`Nothing picked`}
                 </span>
                 <Button
                   size="sm"
                   disabled={!selected}
                   onClick={() => selected && take(selected)}
                 >
-                  Use this {field.kind.noun}
+                  <Trans>Use this {noun}</Trans>
                 </Button>
               </div>
             </div>

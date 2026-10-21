@@ -35,6 +35,7 @@
  * least 1, so cost, health and build time can shrink to something silly but
  * never to zero, negative, or something the compiler would reject.
  */
+import { t } from "@lingui/core/macro";
 import { hashString, mulberry32 } from "../conquest/rng";
 import { findField, toNumber } from "./batchEdit";
 import { type Collections, collectionUnits } from "./collections";
@@ -50,11 +51,33 @@ export interface RandomFieldDef {
   label: string;
 }
 
+// `label` is a getter so it is translated each time it is read, not once when
+// the module loads.
 export const RANDOM_FIELDS: readonly RandomFieldDef[] = [
-  { id: "cost", label: "Metal cost" },
-  { id: "health", label: "Health" },
-  { id: "speed", label: "Speed" },
-  { id: "buildtime", label: "Build time" },
+  {
+    id: "cost",
+    get label() {
+      return t`Metal cost`;
+    },
+  },
+  {
+    id: "health",
+    get label() {
+      return t`Health`;
+    },
+  },
+  {
+    id: "speed",
+    get label() {
+      return t`Speed`;
+    },
+  },
+  {
+    id: "buildtime",
+    get label() {
+      return t`Build time`;
+    },
+  },
 ];
 
 /** A rarity tier's multiply range. The ladder itself is fixed (issue #1318's
@@ -69,11 +92,40 @@ export interface RarityTier {
   factorMax: number;
 }
 
+// `label` is a getter for the same reason as in `RANDOM_FIELDS`.
 export const RARITY_TIERS: readonly RarityTier[] = [
-  { id: "common", label: "Common", factorMin: 0.85, factorMax: 1.15 },
-  { id: "uncommon", label: "Uncommon", factorMin: 0.6, factorMax: 1.6 },
-  { id: "rare", label: "Rare", factorMin: 0.3, factorMax: 2.2 },
-  { id: "legendary", label: "Legendary", factorMin: 0.15, factorMax: 3.5 },
+  {
+    id: "common",
+    get label() {
+      return t`Common`;
+    },
+    factorMin: 0.85,
+    factorMax: 1.15,
+  },
+  {
+    id: "uncommon",
+    get label() {
+      return t`Uncommon`;
+    },
+    factorMin: 0.6,
+    factorMax: 1.6,
+  },
+  {
+    id: "rare",
+    get label() {
+      return t`Rare`;
+    },
+    factorMin: 0.3,
+    factorMax: 2.2,
+  },
+  {
+    id: "legendary",
+    get label() {
+      return t`Legendary`;
+    },
+    factorMin: 0.15,
+    factorMax: 3.5,
+  },
 ];
 
 /** A tier's share of the roll, by tier id. Not required to sum to 100: every
@@ -105,9 +157,14 @@ export type RandomScope =
  *  header. Does not say how many units matched: the caller already knows that
  *  from {@link resolveRandomScope}'s own length. */
 export function describeRandomScope(scope: RandomScope): string {
-  if (scope.kind === "all") return "all units";
-  if (scope.kind === "query") return `units matching "${scope.query}"`;
-  return scope.collections[scope.collectionId]?.name ?? "an unnamed collection";
+  if (scope.kind === "all") return t`all units`;
+  if (scope.kind === "query") {
+    const query = scope.query;
+    return t`units matching "${query}"`;
+  }
+  return (
+    scope.collections[scope.collectionId]?.name ?? t`an unnamed collection`
+  );
 }
 
 /** Every unit key `scope` names, sorted, out of `units` (the game's def
@@ -257,7 +314,7 @@ export function randomModChangeCount(rows: readonly RandomModRow[]): number {
 
 /** A name nobody has to invent: the game, and the seed that reproduces it. */
 export function randomModProjectName(gameName: string, seed: number): string {
-  return `${gameName} random ${seed}`;
+  return t`${gameName} random ${seed}`;
 }
 
 /** The seed and rules in words, for the project's description. Written so
@@ -270,14 +327,19 @@ export function describeRandomModRules(
   const fieldLabels = RANDOM_FIELDS.filter((f) =>
     rules.fields.includes(f.id),
   ).map((f) => f.label);
-  const tierText = RARITY_TIERS.map(
-    (tier) => `${tier.label} ${rules.tierWeights[tier.id] ?? 0}`,
-  ).join(", ");
+  const tierText = RARITY_TIERS.map((tier) => {
+    const label = tier.label;
+    const weight = rules.tierWeights[tier.id] ?? 0;
+    return t`${label} ${weight}`;
+  }).join(", ");
+  const seed = rules.seed;
+  const scopeText = describeRandomScope(scope);
+  const fieldText = fieldLabels.length > 0 ? fieldLabels.join(", ") : t`none`;
   return [
-    `Randomised units (seed ${rules.seed}).`,
-    `Scope: ${describeRandomScope(scope)}.`,
-    `Fields: ${fieldLabels.length > 0 ? fieldLabels.join(", ") : "none"}.`,
-    `Tier weights: ${tierText}.`,
+    t`Randomised units (seed ${seed}).`,
+    t`Scope: ${scopeText}.`,
+    t`Fields: ${fieldText}.`,
+    t`Tier weights: ${tierText}.`,
   ].join(" ");
 }
 

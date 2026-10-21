@@ -30,14 +30,17 @@
  * it is part of the project's Package section (issue #3111, which covers
  * #3101), because somebody reads it to see what they are about to ship.
  */
+import type { MessageDescriptor } from "@lingui/core";
+import { msg } from "@lingui/core/macro";
+import { Trans, useLingui } from "@lingui/react/macro";
 import { CodeBlock } from "@/components/CodeBlock";
 import type { CompiledChunk, CompileState } from "../../compile";
 import type { ModProject } from "../../project";
 
 /** What each form is, in the fewest words that distinguish them. */
-const FORM_LABEL: Record<CompiledChunk["form"], string> = {
-  table: "Table",
-  block: "do ... end",
+const FORM_LABEL: Record<CompiledChunk["form"], MessageDescriptor> = {
+  table: msg`Table`,
+  block: msg`do ... end`,
 };
 
 /**
@@ -60,29 +63,44 @@ export function CompiledLuaPanel({
    *  knows this is the Lua for that part of the project only. */
   scope?: string;
 }) {
+  const { t } = useLingui();
   const { compiled, loading, error } = state;
+  const readOnlyCount = project.readOnlyLua?.length ?? 0;
+  const fileLabel = (path: string) =>
+    langOf(path) === "json" ? t`${path} as JSON` : t`${path} as Lua`;
+  const readOnlyLabel = (title: string) => t`${title} as Lua, read only`;
+  const projectName = project.name;
+  const gameName = project.gameName;
   return (
     <section className="flex min-w-0 flex-col gap-3">
       <div className="flex flex-col gap-1">
-        <h2 className="text-base font-semibold">Generated Lua</h2>
+        <h2 className="text-base font-semibold">
+          <Trans>Generated Lua</Trans>
+        </h2>
         <p className="max-w-prose text-sm text-muted-foreground">
-          What {scope ? `the ${scope} collection of ` : ""}
-          {project.name} compiles to on top of {project.gameName}. Built from
-          the project every time it is opened, so there is nothing here to save.
+          {scope
+            ? t`What the ${scope} collection of ${projectName} compiles to on top of ${gameName}. Built from the project every time it is opened, so there is nothing here to save.`
+            : t`What ${projectName} compiles to on top of ${gameName}. Built from the project every time it is opened, so there is nothing here to save.`}
         </p>
       </div>
       <div className="flex flex-col gap-5">
-        {loading && <p className="text-muted-foreground text-sm">Compiling…</p>}
+        {loading && (
+          <p className="text-muted-foreground text-sm">
+            <Trans>Compiling…</Trans>
+          </p>
+        )}
 
         {error && (
           <p className="text-destructive text-sm">
-            The compiler could not run: {error}
+            <Trans>The compiler could not run: {error}</Trans>
           </p>
         )}
 
         {compiled && compiled.notes.length > 0 && (
           <section className="flex flex-col gap-2 rounded-md border border-border/60 bg-muted/40 p-3">
-            <h3 className="font-medium text-sm">Worth knowing</h3>
+            <h3 className="font-medium text-sm">
+              <Trans>Worth knowing</Trans>
+            </h3>
             <ul className="flex list-disc flex-col gap-1.5 pl-4 text-muted-foreground text-xs">
               {compiled.notes.map((note) => (
                 <li key={note}>{note}</li>
@@ -100,13 +118,18 @@ export function CompiledLuaPanel({
           compiled.files.length === 0 &&
           !loading && (
             <p className="text-muted-foreground text-sm">
-              This project changes nothing yet, so there is nothing to compile.
+              <Trans>
+                This project changes nothing yet, so there is nothing to
+                compile.
+              </Trans>
             </p>
           )}
 
         {compiled && compiled.chunks.length > 0 && (
           <section className="flex flex-col gap-2">
-            <h3 className="font-medium text-sm">What the compiler chose</h3>
+            <h3 className="font-medium text-sm">
+              <Trans>What the compiler chose</Trans>
+            </h3>
             <ul className="flex flex-col gap-2">
               {compiled.chunks.map((chunk) => (
                 <li
@@ -114,7 +137,7 @@ export function CompiledLuaPanel({
                   className="flex items-baseline gap-2 text-xs"
                 >
                   <span className="shrink-0 rounded border border-border/60 px-1.5 py-0.5 font-mono text-[0.65rem] text-muted-foreground">
-                    {FORM_LABEL[chunk.form]}
+                    {t(FORM_LABEL[chunk.form])}
                   </span>
                   <span className="min-w-0">
                     <span className="font-medium">{chunk.title}</span>{" "}
@@ -136,7 +159,7 @@ export function CompiledLuaPanel({
             <CodeBlock
               code={file.contents}
               lang={langOf(file.path)}
-              label={`${file.path} as ${langOf(file.path) === "json" ? "JSON" : "Lua"}`}
+              label={fileLabel(file.path)}
               className="max-h-96 rounded-lg border border-border/50"
             />
           </section>
@@ -145,14 +168,16 @@ export function CompiledLuaPanel({
         {project.readOnlyLua && project.readOnlyLua.length > 0 && (
           <section className="flex flex-col gap-3 border-border/60 border-t pt-4">
             <h3 className="font-medium text-sm">
-              Carried as written ({project.readOnlyLua.length})
+              <Trans>Carried as written ({readOnlyCount})</Trans>
             </h3>
             <p className="text-muted-foreground text-xs">
-              Recovered from a decoded import that turned out to be a program
-              rather than data. Coilbox cannot edit it, so it is compiled into
-              the output exactly as it arrived, ahead of this project's own
-              changes. A block that never parsed as Lua is left out, and says so
-              below.
+              <Trans>
+                Recovered from a decoded import that turned out to be a program
+                rather than data. Coilbox cannot edit it, so it is compiled into
+                the output exactly as it arrived, ahead of this project's own
+                changes. A block that never parsed as Lua is left out, and says
+                so below.
+              </Trans>
             </p>
             {project.readOnlyLua.map((block, index) => (
               <div
@@ -168,7 +193,7 @@ export function CompiledLuaPanel({
                 <CodeBlock
                   code={block.lua}
                   lang="lua"
-                  label={`${block.title} as Lua, read only`}
+                  label={readOnlyLabel(block.title)}
                   className="max-h-96 rounded-lg border border-border/50"
                 />
               </div>

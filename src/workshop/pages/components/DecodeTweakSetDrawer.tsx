@@ -16,6 +16,7 @@
  * act on: a data table becomes new units, and a program or anything
  * unrecognised is carried along as read-only Lua rather than dropped.
  */
+import { Trans, useLingui } from "@lingui/react/macro";
 import { Button, Drawer } from "@picoframe/frame";
 import { FileCode2 } from "lucide-react";
 import { useState } from "react";
@@ -58,6 +59,7 @@ export function DecodeTweakSetDrawer({
    *  open the project the way it does for any other import. */
   onStarted: (input: NewProject) => void;
 }) {
+  const { t } = useLingui();
   const [open, setOpen] = useState(false);
   const [text, setText] = useState("");
   const [gameName, setGameName] = useState("");
@@ -92,7 +94,7 @@ export function DecodeTweakSetDrawer({
   function startProject() {
     if (!plan || !gameName) return;
     onStarted({
-      name: `${gameName} tweaks, decoded`,
+      name: t`${gameName} tweaks, decoded`,
       gameName,
       ...(plan.clones.length > 0
         ? {
@@ -125,16 +127,16 @@ export function DecodeTweakSetDrawer({
           setPickingGame(false);
           setOpen(true);
         }}
-        title="Decode a base64 tweak payload, or a set of a battle's mod options, back to Lua"
+        title={t`Decode a base64 tweak payload, or a set of a battle's mod options, back to Lua`}
       >
         <FileCode2 className="mr-1 size-3.5" />
-        Decode
+        <Trans>Decode</Trans>
       </Button>
       <Drawer
         open={open}
         onOpenChange={setOpen}
-        title="Decode a tweak set"
-        description="Paste a payload a lobby showed you, a whole !bset line, or several lines copied out of a battle's mod options. Coilbox shows the Lua and, where the shape allows, turns it into an editable project."
+        title={t`Decode a tweak set`}
+        description={t`Paste a payload a lobby showed you, a whole !bset line, or several lines copied out of a battle's mod options. Coilbox shows the Lua and, where the shape allows, turns it into an editable project.`}
         width="26rem"
       >
         {pickingGame ? (
@@ -144,17 +146,17 @@ export function DecodeTweakSetDrawer({
             selectedName={gameName}
             onSelect={setGameName}
             onBack={() => setPickingGame(false)}
-            backLabel="Back to the decoded payload"
+            backLabel={t`Back to the decoded payload`}
             gamesLoading={scanning}
           />
         ) : (
           <div className="flex flex-col gap-4">
             <Field
-              label="Payload"
-              hint="One line for a single payload, or several for a whole set of slots."
+              label={t`Payload`}
+              hint={t`One line for a single payload, or several for a whole set of slots.`}
             >
               <Textarea
-                aria-label="Tweak payload to decode"
+                aria-label={t`Tweak payload to decode`}
                 value={text}
                 placeholder="!bset tweakdefs3 eyJ..."
                 // `field-sizing-content` grows the box to fit, and a whole
@@ -170,7 +172,7 @@ export function DecodeTweakSetDrawer({
               disabled={!text.trim() || phase.state === "decoding"}
             >
               <FileCode2 className="size-4" />
-              {phase.state === "decoding" ? "Decoding" : "Decode"}
+              {phase.state === "decoding" ? t`Decoding` : t`Decode`}
             </Button>
 
             {phase.state === "failed" ? (
@@ -180,7 +182,9 @@ export function DecodeTweakSetDrawer({
             {phase.state === "done" ? (
               allSlots(phase.set).length === 0 ? (
                 <p className="text-xs text-muted-foreground">
-                  Nothing there matched a tweakdefs or tweakunits slot.
+                  <Trans>
+                    Nothing there matched a tweakdefs or tweakunits slot.
+                  </Trans>
                 </p>
               ) : (
                 <div className="flex flex-col gap-3 border-t border-border/60 pt-3">
@@ -195,18 +199,20 @@ export function DecodeTweakSetDrawer({
 
                   {nothingToStart ? (
                     <p className="text-xs text-muted-foreground">
-                      Nothing here decoded to a shape coilbox can carry into a
-                      project.
+                      <Trans>
+                        Nothing here decoded to a shape coilbox can carry into a
+                        project.
+                      </Trans>
                     </p>
                   ) : (
                     <div className="flex flex-col gap-2">
                       <Field
-                        label="Game"
-                        hint="Nothing in a payload says which game it is for."
+                        label={t`Game`}
+                        hint={t`Nothing in a payload says which game it is for.`}
                       >
                         <GamePickerButton
-                          ariaLabel="Game for the decoded project"
-                          placeholder={scanning ? "Scanning…" : "Pick a game"}
+                          ariaLabel={t`Game for the decoded project`}
+                          placeholder={scanning ? t`Scanning…` : t`Pick a game`}
                           value={gameName}
                           games={games}
                           headers={headers}
@@ -214,7 +220,7 @@ export function DecodeTweakSetDrawer({
                         />
                       </Field>
                       <Button onClick={startProject} disabled={!gameName}>
-                        Start a project from this
+                        <Trans>Start a project from this</Trans>
                       </Button>
                     </div>
                   )}
