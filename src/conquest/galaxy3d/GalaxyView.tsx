@@ -1,3 +1,4 @@
+import { t } from "@lingui/core/macro";
 import { useEffect, useRef } from "react";
 import * as THREE from "three";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
@@ -254,15 +255,87 @@ const NEUTRAL_COLOR = "#6b7280";
 // `tint` = how far the hot centre lerps toward white (dwarfs stay saturated,
 // hot stars blow out); `glow` scales the corona/flare intensity.
 const STAR_TYPES = [
-  { name: "red dwarf", color: "#c92f12", size: 0.62, tint: 0.14, glow: 0.55 },
-  { name: "orange dwarf", color: "#ff8c3a", size: 0.8, tint: 0.28, glow: 0.75 },
-  { name: "yellow star", color: "#ffd76e", size: 1.0, tint: 0.45, glow: 1 },
-  { name: "white star", color: "#f2f5ff", size: 1.05, tint: 0.7, glow: 1 },
-  { name: "white dwarf", color: "#cfe4ff", size: 0.55, tint: 0.65, glow: 0.7 },
-  { name: "blue giant", color: "#7fa8ff", size: 1.9, tint: 0.5, glow: 1.25 },
-  { name: "red giant", color: "#ff5230", size: 2.05, tint: 0.3, glow: 1.2 },
+  {
+    name: "red dwarf",
+    get label() {
+      return t`red dwarf`;
+    },
+    color: "#c92f12",
+    size: 0.62,
+    tint: 0.14,
+    glow: 0.55,
+  },
+  {
+    name: "orange dwarf",
+    get label() {
+      return t`orange dwarf`;
+    },
+    color: "#ff8c3a",
+    size: 0.8,
+    tint: 0.28,
+    glow: 0.75,
+  },
+  {
+    name: "yellow star",
+    get label() {
+      return t`yellow star`;
+    },
+    color: "#ffd76e",
+    size: 1.0,
+    tint: 0.45,
+    glow: 1,
+  },
+  {
+    name: "white star",
+    get label() {
+      return t`white star`;
+    },
+    color: "#f2f5ff",
+    size: 1.05,
+    tint: 0.7,
+    glow: 1,
+  },
+  {
+    name: "white dwarf",
+    get label() {
+      return t`white dwarf`;
+    },
+    color: "#cfe4ff",
+    size: 0.55,
+    tint: 0.65,
+    glow: 0.7,
+  },
+  {
+    name: "blue giant",
+    get label() {
+      return t`blue giant`;
+    },
+    color: "#7fa8ff",
+    size: 1.9,
+    tint: 0.5,
+    glow: 1.25,
+  },
+  {
+    name: "red giant",
+    get label() {
+      return t`red giant`;
+    },
+    color: "#ff5230",
+    size: 2.05,
+    tint: 0.3,
+    glow: 1.2,
+  },
   // Substellar, so it never lights up. Only real catalogue data selects it.
-  { name: "brown dwarf", color: "#7a2a18", size: 0.4, tint: 0.05, glow: 0.2 },
+  {
+    name: "brown dwarf",
+    get label() {
+      return t`brown dwarf`;
+    },
+    color: "#7a2a18",
+    size: 0.4,
+    tint: 0.05,
+    glow: 0.2,
+  },
 ] as const;
 const GIANT_TYPES = [5, 6]; // indices into STAR_TYPES
 // Dwarfs are common, giants rare, mirroring a real stellar population. Brown
@@ -374,22 +447,31 @@ export function starSystemFor(
 }
 
 /** A human label for a node's stellar system (selection panel). */
-/** Word for a system of three or more stars, by component count. */
-const MULTIPLICITY: Record<number, string> = {
-  3: "triple",
-  4: "quadruple",
-  5: "quintuple",
-};
+/** A system of three or more stars, worded by component count. */
+function multipleSystemLabel(count: number, names: string): string {
+  switch (count) {
+    case 3:
+      return t`triple system, ${names}`;
+    case 4:
+      return t`quadruple system, ${names}`;
+    case 5:
+      return t`quintuple system, ${names}`;
+    default:
+      return t`multiple system, ${names}`;
+  }
+}
 
 export function starSystemLabel(system: StarSystem): string {
   if (system.members.length >= 3) {
-    const word = MULTIPLICITY[system.members.length] ?? "multiple";
-    const names = system.members.map((m) => m.name).join(" + ");
-    return `${word} system, ${names}`;
+    const names = system.members.map((m) => m.label).join(" + ");
+    return multipleSystemLabel(system.members.length, names);
   }
-  return system.companion
-    ? `binary pair — ${system.primary.name} + ${system.companion.name}`
-    : system.primary.name;
+  if (system.companion) {
+    const primary = system.primary.label;
+    const companion = system.companion.label;
+    return t`binary pair — ${primary} + ${companion}`;
+  }
+  return system.primary.label;
 }
 
 /**
@@ -406,13 +488,20 @@ export type ExoticClass =
   | "carbon"
   | "dysonswarm";
 
-const EXOTIC_LABEL: Record<ExoticClass, string> = {
-  pulsar: "pulsar",
-  variable: "variable star",
-  gasgiant: "ringed gas giant",
-  carbon: "carbon star",
-  dysonswarm: "dyson swarm",
-};
+function exoticLabel(exotic: ExoticClass): string {
+  switch (exotic) {
+    case "pulsar":
+      return t`pulsar`;
+    case "variable":
+      return t`variable star`;
+    case "gasgiant":
+      return t`ringed gas giant`;
+    case "carbon":
+      return t`carbon star`;
+    case "dysonswarm":
+      return t`dyson swarm`;
+  }
+}
 
 /** The exotic class for a node, or `undefined` for an ordinary star (~93%). */
 export function exoticClassFor(nodeId: string): ExoticClass | undefined {
@@ -439,7 +528,7 @@ export function nodeBodyLabel(
   if (voidBody) return bodyLabel(voidBody);
   if (!capital && !star) {
     const exotic = exoticClassFor(nodeId);
-    if (exotic) return EXOTIC_LABEL[exotic];
+    if (exotic) return exoticLabel(exotic);
   }
   return starSystemLabel(starSystemFor(nodeId, capital, star));
 }
