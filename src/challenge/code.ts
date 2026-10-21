@@ -21,6 +21,7 @@
  * as a pasted code with no extra branch.
  */
 
+import { t } from "@lingui/core/macro";
 import {
   asContainer,
   CONTAINER_VERSION,
@@ -166,12 +167,12 @@ export function challengeDecodeErrorMessage(
 ): string {
   switch (error) {
     case "unknown-format":
-      return "That doesn't look like a coilbox challenge code.";
+      return t`That doesn't look like a coilbox challenge code.`;
     case "unsupported-version":
-      return "This challenge code was made by a newer version of coilbox.";
+      return t`This challenge code was made by a newer version of coilbox.`;
     case "wrong-kind":
-      return "That challenge code is for a different game mode.";
+      return t`That challenge code is for a different game mode.`;
     default:
-      return "That challenge code is corrupted or incomplete.";
+      return t`That challenge code is corrupted or incomplete.`;
   }
 }

@@ -1,3 +1,4 @@
+import { Trans, useLingui } from "@lingui/react/macro";
 import { Button } from "@picoframe/frame";
 import { AlertTriangle, X } from "lucide-react";
 import { Dialog as DialogPrimitive } from "radix-ui";
@@ -24,6 +25,7 @@ export function ImportHoldDrawer({
   onAccept: () => void;
   onCancel: () => void;
 }) {
+  const { t } = useLingui();
   return (
     <DialogPrimitive.Root open onOpenChange={(o) => !o && onCancel()}>
       <DialogPrimitive.Portal>
@@ -31,13 +33,13 @@ export function ImportHoldDrawer({
         <DialogPrimitive.Content className="fixed inset-y-0 right-0 z-50 flex w-[420px] max-w-[92vw] flex-col border-l border-border bg-background shadow-xl">
           <div className="flex items-center justify-between border-b border-border/60 px-5 py-4">
             <DialogPrimitive.Title className="text-base font-semibold">
-              {hold.canRetry ? "Could not read unit data" : "No unit limit"}
+              {hold.canRetry ? t`Could not read unit data` : t`No unit limit`}
             </DialogPrimitive.Title>
             <DialogPrimitive.Close asChild>
               <Button
                 variant="ghost"
                 size="icon"
-                aria-label="Close"
+                aria-label={t`Close`}
                 onClick={onCancel}
               >
                 <X className="size-4" />
@@ -45,7 +47,7 @@ export function ImportHoldDrawer({
             </DialogPrimitive.Close>
           </div>
           <DialogPrimitive.Description className="sr-only">
-            Nothing has been imported yet.
+            <Trans>Nothing has been imported yet.</Trans>
           </DialogPrimitive.Description>
 
           <div className="flex flex-1 flex-col gap-3 overflow-y-auto px-5 py-4">
@@ -68,11 +70,11 @@ export function ImportHoldDrawer({
 
           <div className="flex justify-end gap-2 border-t border-border/60 px-5 py-4">
             <Button variant="outline" onClick={onCancel} disabled={busy}>
-              Cancel
+              <Trans>Cancel</Trans>
             </Button>
             {hold.canRetry && (
               <Button variant="outline" onClick={onRetry} disabled={busy}>
-                Try again
+                <Trans>Try again</Trans>
               </Button>
             )}
             <Button onClick={onAccept} disabled={busy}>
