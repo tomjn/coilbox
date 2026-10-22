@@ -22,6 +22,8 @@ describe("resolveLocaleTag", () => {
     ["zh-MO", "en"],
     ["DE-at", "de"],
     ["ja", "ja"],
+    ["pl", "pl"],
+    ["pl-PL", "pl"],
     ["", "en"],
   ])("resolves %s to %s", (tag, expected) => {
     expect(resolveLocaleTag(tag)).toBe(expected);
@@ -43,6 +45,7 @@ describe("localeDisplayName", () => {
   it("names a locale in its own language", () => {
     expect(localeDisplayName("fr")).toBe("Français");
     expect(localeDisplayName("de")).toBe("Deutsch");
+    expect(localeDisplayName("pl")).toBe("Polski");
   });
 });
 
