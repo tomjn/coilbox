@@ -2149,6 +2149,14 @@ msgstr ""
 msgid "{keys}: nothing bound"
 msgstr ""
 
+#: src/container/names.ts
+msgid "{kind, select, campaign {a campaign for {game}} coilbox_campaign {a coilbox campaign for {game}} preset {a singleplayer preset for {game}} challenge {a challenge for {game}} conquest_challenge {a conquest challenge for {game}} warpath_challenge {a warpath challenge for {game}} setup_pack {a setup pack for {game}} scenario {a scenario for {game}} keymap {a keymap for {game}} blueprint {a base blueprint for {game}} mod_project {a unit tweak project for {game}} module {a unit builder module for {game}} other {an import for {game}}}"
+msgstr ""
+
+#: src/container/names.ts
+msgid "{kind, select, campaign {a campaign} coilbox_campaign {a coilbox campaign} preset {a singleplayer preset} challenge {a challenge} conquest_challenge {a conquest challenge} warpath_challenge {a warpath challenge} setup_pack {a setup pack} scenario {a scenario} keymap {a keymap} blueprint {a base blueprint} mod_project {a unit tweak project} module {a unit builder module} other {an import}}"
+msgstr ""
+
 #: src/hub/publish.ts
 msgid "{kind, select, campaign {The hub does not carry campaigns yet.} keymap {The hub does not carry keymaps yet.} module {The hub does not carry modules yet.} other {The hub does not carry this kind of file yet.}}"
 msgstr ""
@@ -3933,6 +3941,10 @@ msgstr ""
 msgid "{teamCount, plural, one {{playing} playing across # team} other {{playing} playing across # teams}}"
 msgstr ""
 
+#: src/content/matchStatsCsv.ts
+msgid "{teamCount, plural, one {team {teamNames}} other {teams {teamNames}}}"
+msgstr ""
+
 #: src/multiplayer/matchmaking.ts
 msgid "{teams} teams of {size}"
 msgstr ""
@@ -4984,14 +4996,6 @@ msgstr ""
 
 #: src/content/unitFieldNotes.ts
 msgid "65536 COB angle units is a full turn. Only used when turret is off."
-msgstr ""
-
-#: src/deeplink/readImport.ts
-msgid "a {label}"
-msgstr ""
-
-#: src/deeplink/readImport.ts
-msgid "a {label} for {name}"
 msgstr ""
 
 #: src/multiplayer/battles/CreateLobbyPopover.tsx
@@ -9355,10 +9359,6 @@ msgstr ""
 
 #: src/content/pages/components/UnitModelPanel.tsx
 msgid "coilbox asked for an angle the hub does not store."
-msgstr ""
-
-#: src/deeplink/readImport.ts
-msgid "coilbox campaign"
 msgstr ""
 
 #: src/hub/pages/components/GamePicturesControl.tsx
@@ -15522,16 +15522,16 @@ msgstr ""
 msgid "Import {phrase}"
 msgstr ""
 
+#: src/deeplink/DeepLinkHandler.tsx
+msgid "Import {planPhrase} downloaded from {host}?"
+msgstr ""
+
+#: src/deeplink/DeepLinkHandler.tsx
+msgid "Import {planPhrase} shared with you?"
+msgstr ""
+
 #: src/mapconv/pages/ProjectsPage.tsx
 msgid "Import a .sdd map folder"
-msgstr ""
-
-#: src/deeplink/DeepLinkHandler.tsx
-msgid "Import a {planLabel} downloaded from {host}?"
-msgstr ""
-
-#: src/deeplink/DeepLinkHandler.tsx
-msgid "Import a {planLabel} shared with you?"
 msgstr ""
 
 #: src/scenario/pages/components/DialoguePanel.tsx
@@ -28800,7 +28800,7 @@ msgid "The hub has nothing on it yet. Anything you share will show up here."
 msgstr ""
 
 #: src/hub/pages/ItemPage.tsx
-msgid "The hub lists this as a {listed}, but what it sent is a {sent}."
+msgid "The hub lists this as {listed}, but what it sent is {sent}."
 msgstr ""
 
 #: src/hub/api.ts

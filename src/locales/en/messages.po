@@ -2150,6 +2150,14 @@ msgstr "{key} was made to stand in for {gameName}'s own unit of that name, which
 msgid "{keys}: nothing bound"
 msgstr "{keys}: nothing bound"
 
+#: src/container/names.ts
+msgid "{kind, select, campaign {a campaign for {game}} coilbox_campaign {a coilbox campaign for {game}} preset {a singleplayer preset for {game}} challenge {a challenge for {game}} conquest_challenge {a conquest challenge for {game}} warpath_challenge {a warpath challenge for {game}} setup_pack {a setup pack for {game}} scenario {a scenario for {game}} keymap {a keymap for {game}} blueprint {a base blueprint for {game}} mod_project {a unit tweak project for {game}} module {a unit builder module for {game}} other {an import for {game}}}"
+msgstr "{kind, select, campaign {a campaign for {game}} coilbox_campaign {a coilbox campaign for {game}} preset {a singleplayer preset for {game}} challenge {a challenge for {game}} conquest_challenge {a conquest challenge for {game}} warpath_challenge {a warpath challenge for {game}} setup_pack {a setup pack for {game}} scenario {a scenario for {game}} keymap {a keymap for {game}} blueprint {a base blueprint for {game}} mod_project {a unit tweak project for {game}} module {a unit builder module for {game}} other {an import for {game}}}"
+
+#: src/container/names.ts
+msgid "{kind, select, campaign {a campaign} coilbox_campaign {a coilbox campaign} preset {a singleplayer preset} challenge {a challenge} conquest_challenge {a conquest challenge} warpath_challenge {a warpath challenge} setup_pack {a setup pack} scenario {a scenario} keymap {a keymap} blueprint {a base blueprint} mod_project {a unit tweak project} module {a unit builder module} other {an import}}"
+msgstr "{kind, select, campaign {a campaign} coilbox_campaign {a coilbox campaign} preset {a singleplayer preset} challenge {a challenge} conquest_challenge {a conquest challenge} warpath_challenge {a warpath challenge} setup_pack {a setup pack} scenario {a scenario} keymap {a keymap} blueprint {a base blueprint} mod_project {a unit tweak project} module {a unit builder module} other {an import}}"
+
 #: src/hub/publish.ts
 msgid "{kind, select, campaign {The hub does not carry campaigns yet.} keymap {The hub does not carry keymaps yet.} module {The hub does not carry modules yet.} other {The hub does not carry this kind of file yet.}}"
 msgstr "{kind, select, campaign {The hub does not carry campaigns yet.} keymap {The hub does not carry keymaps yet.} module {The hub does not carry modules yet.} other {The hub does not carry this kind of file yet.}}"
@@ -3934,6 +3942,10 @@ msgstr "{teamColourCount} of this model's textures are team-colour regions, whic
 msgid "{teamCount, plural, one {{playing} playing across # team} other {{playing} playing across # teams}}"
 msgstr "{teamCount, plural, one {{playing} playing across # team} other {{playing} playing across # teams}}"
 
+#: src/content/matchStatsCsv.ts
+msgid "{teamCount, plural, one {team {teamNames}} other {teams {teamNames}}}"
+msgstr "{teamCount, plural, one {team {teamNames}} other {teams {teamNames}}}"
+
 #: src/multiplayer/matchmaking.ts
 msgid "{teams} teams of {size}"
 msgstr "{teams} teams of {size}"
@@ -4986,14 +4998,6 @@ msgstr "65536 COB angle units is a full turn."
 #: src/content/unitFieldNotes.ts
 msgid "65536 COB angle units is a full turn. Only used when turret is off."
 msgstr "65536 COB angle units is a full turn. Only used when turret is off."
-
-#: src/deeplink/readImport.ts
-msgid "a {label}"
-msgstr "a {label}"
-
-#: src/deeplink/readImport.ts
-msgid "a {label} for {name}"
-msgstr "a {label} for {name}"
 
 #: src/multiplayer/battles/CreateLobbyPopover.tsx
 msgid "A {shape} lobby, with a start box for each side."
@@ -9357,10 +9361,6 @@ msgstr "Coilbox {newVersion} is ready to install."
 #: src/content/pages/components/UnitModelPanel.tsx
 msgid "coilbox asked for an angle the hub does not store."
 msgstr "coilbox asked for an angle the hub does not store."
-
-#: src/deeplink/readImport.ts
-msgid "coilbox campaign"
-msgstr "coilbox campaign"
 
 #: src/hub/pages/components/GamePicturesControl.tsx
 msgid "Coilbox can draw every unit in the games on this computer and send the pictures to the hub: the icon the game ships, and {angleCount} views of the model drawn here. It asks the hub what it already has first, so a game somebody else has covered costs one question."
@@ -15523,17 +15523,17 @@ msgstr "Import .sdd folder…"
 msgid "Import {phrase}"
 msgstr "Import {phrase}"
 
+#: src/deeplink/DeepLinkHandler.tsx
+msgid "Import {planPhrase} downloaded from {host}?"
+msgstr "Import {planPhrase} downloaded from {host}?"
+
+#: src/deeplink/DeepLinkHandler.tsx
+msgid "Import {planPhrase} shared with you?"
+msgstr "Import {planPhrase} shared with you?"
+
 #: src/mapconv/pages/ProjectsPage.tsx
 msgid "Import a .sdd map folder"
 msgstr "Import a .sdd map folder"
-
-#: src/deeplink/DeepLinkHandler.tsx
-msgid "Import a {planLabel} downloaded from {host}?"
-msgstr "Import a {planLabel} downloaded from {host}?"
-
-#: src/deeplink/DeepLinkHandler.tsx
-msgid "Import a {planLabel} shared with you?"
-msgstr "Import a {planLabel} shared with you?"
 
 #: src/scenario/pages/components/DialoguePanel.tsx
 msgid "Import a clip"
@@ -28801,8 +28801,8 @@ msgid "The hub has nothing on it yet. Anything you share will show up here."
 msgstr "The hub has nothing on it yet. Anything you share will show up here."
 
 #: src/hub/pages/ItemPage.tsx
-msgid "The hub lists this as a {listed}, but what it sent is a {sent}."
-msgstr "The hub lists this as a {listed}, but what it sent is a {sent}."
+msgid "The hub lists this as {listed}, but what it sent is {sent}."
+msgstr "The hub lists this as {listed}, but what it sent is {sent}."
 
 #: src/hub/api.ts
 msgid "The hub may be waking up after a quiet spell, which takes a few seconds. Try again in a moment."
