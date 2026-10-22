@@ -25,7 +25,7 @@
  * `coilbox-s3o` crate that wrote it.
  */
 
-import { plural, t } from "@lingui/core/macro";
+import { t } from "@lingui/core/macro";
 import * as THREE from "three";
 
 import { exportTextureName, type LegoAtlas } from "./atlas";

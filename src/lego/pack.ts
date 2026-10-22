@@ -550,8 +550,9 @@ export function mergePacks(sources: PackSource[]): MergedPacks {
       const packId = source.manifest.id;
       const firstName = first.name;
       const firstProblem = first.problem;
+      const unusableCount = unusable.length;
       problems.push(
-        plural(unusable.length, {
+        plural(unusableCount, {
           one: `"${packId}" states connectors that cannot be used for # part, which get the connectors their bounding boxes give them. The first is "${firstName}": ${firstProblem}.`,
           other: `"${packId}" states connectors that cannot be used for # parts, which get the connectors their bounding boxes give them. The first is "${firstName}": ${firstProblem}.`,
         }),
