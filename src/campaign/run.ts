@@ -1,3 +1,4 @@
+import { t } from "@lingui/core/macro";
 import { useCallback, useEffect, useState } from "react";
 import { useCompatSettings } from "../content/compatSettings";
 import { useUnitsyncScan } from "../content/config";
@@ -120,13 +121,13 @@ export function missionUnfinishedReason(
   campaign: Campaign,
   mission: CampaignMission,
 ): string | null {
-  const short = [
-    !mission.snapshot?.gameName && "game",
-    !mission.snapshot?.mapName && "map",
-  ].filter(Boolean);
-  if (short.length === 0) return null;
-  const at = campaign.missions.findIndex((m) => m.id === mission.id);
-  return `Mission ${at + 1} has no ${short.join(" or ")}`;
+  const noGame = !mission.snapshot?.gameName;
+  const noMap = !mission.snapshot?.mapName;
+  if (!noGame && !noMap) return null;
+  const position = campaign.missions.findIndex((m) => m.id === mission.id) + 1;
+  if (noGame && noMap) return t`Mission ${position} has no game or map`;
+  if (noGame) return t`Mission ${position} has no game`;
+  return t`Mission ${position} has no map`;
 }
 
 /**

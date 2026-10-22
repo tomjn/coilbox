@@ -19,6 +19,9 @@
  * https://github.com/tomjn/coilbox/issues/1314. Nothing here changes a name.
  */
 
+import { plural, t } from "@lingui/core/macro";
+import { getLocale } from "@/i18n";
+
 /** Whether the game has a unit of this name. */
 export type KnownUnits = (def: string) => boolean;
 
@@ -62,14 +65,23 @@ export function unknownBuildings(
 /** How many names to print before counting the rest. */
 const NAMES_SHOWN = 3;
 
+/** "a, b, c" in the app language, with no joining word. */
+const plainList = (parts: string[]) =>
+  new Intl.ListFormat(getLocale(), { type: "unit", style: "long" }).format(
+    parts,
+  );
+
 /** "a", "a or b", "a, b or c", "a, b, c and 2 more". */
 function names(defs: string[]): string {
-  if (defs.length <= 2) return defs.join(" or ");
+  if (defs.length === 1) return defs[0];
   if (defs.length <= NAMES_SHOWN) {
-    return `${defs.slice(0, -1).join(", ")} or ${defs[defs.length - 1]}`;
+    const first = plainList(defs.slice(0, -1));
+    const last = defs[defs.length - 1];
+    return t`${first} or ${last}`;
   }
-  const shown = defs.slice(0, NAMES_SHOWN).join(", ");
-  return `${shown} and ${defs.length - NAMES_SHOWN} more`;
+  const shown = plainList(defs.slice(0, NAMES_SHOWN));
+  const more = defs.length - NAMES_SHOWN;
+  return t`${shown} and ${more} more`;
 }
 
 /**
@@ -86,11 +98,11 @@ export function unknownUnitsWarning(
 ): string | null {
   if (unknown.length === 0) return null;
   const defs = [...new Set(unknown.map((one) => one.def))];
+  const list = names(defs);
   if (unknown.length >= buildings) {
-    return `This game has none of its units: ${names(defs)}. Nothing in it can be placed here, so it belongs to another game or another version of this one.`;
+    return t`This game has none of its units: ${list}. Nothing in it can be placed here, so it belongs to another game or another version of this one.`;
   }
-  const rest = buildings - unknown.length;
-  const fine =
-    rest === 1 ? "The other one is fine." : `The other ${rest} are fine.`;
-  return `${unknown.length} of its ${buildings} buildings cannot be placed here: this game has no ${names(defs)}. ${fine}`;
+  const missing = unknown.length;
+  const rest = buildings - missing;
+  return t`${missing} of its ${plural(buildings, { one: "# building", other: "# buildings" })} cannot be placed here: this game has no ${list}. ${plural(rest, { one: "The other one is fine.", other: "The other # are fine." })}`;
 }

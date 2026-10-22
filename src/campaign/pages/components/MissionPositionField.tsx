@@ -1,3 +1,4 @@
+import { useLingui } from "@lingui/react/macro";
 import { Input } from "@picoframe/frame";
 import { type KeyboardEvent, useEffect, useRef, useState } from "react";
 
@@ -39,6 +40,7 @@ export function MissionPositionField({
   /** Say something in the mission list's live region. */
   onSay: (message: string) => void;
 }) {
+  const { t } = useLingui();
   const at = index + 1;
   const [typed, setTyped] = useState(String(at));
 
@@ -87,7 +89,7 @@ export function MissionPositionField({
   // the same thing to the author, and they all leave the mission where it was.
   const refuse = () => {
     setTyped(String(at));
-    onSay(`Give ${title} a position between 1 and ${count}.`);
+    onSay(t`Give ${title} a position between 1 and ${count}.`);
   };
 
   const commit = (event: KeyboardEvent<HTMLInputElement>) => {
@@ -96,7 +98,7 @@ export function MissionPositionField({
     if (wanted < 1 || wanted > count) return refuse();
     if (wanted === at) {
       setTyped(String(at));
-      onSay(`${title} is already at position ${at}.`);
+      onSay(t`${title} is already at position ${at}.`);
       return;
     }
     box.current = { el: event.currentTarget, from: index };
@@ -112,8 +114,8 @@ export function MissionPositionField({
         max={count}
         // Named after what it does, the way the two arrows beside it are, so
         // the three read as one set of controls for the same mission.
-        aria-label={`Move ${title} to position`}
-        title="Type a position and press Enter"
+        aria-label={t`Move ${title} to position`}
+        title={t`Type a position and press Enter`}
         // A campaign of one has only the position the mission is already in,
         // which is why both its arrows are dead too.
         disabled={count < 2}

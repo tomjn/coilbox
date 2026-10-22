@@ -1,3 +1,4 @@
+import { Trans, useLingui } from "@lingui/react/macro";
 import { Button } from "@picoframe/frame";
 
 import { CheckField } from "@/components/Field";
@@ -27,9 +28,21 @@ export function JoinedTo({
   showFree: boolean;
   onShowFreeChange: (show: boolean) => void;
 }) {
+  const { t } = useLingui();
+  const joinLabel = ({
+    broken,
+    parentName,
+    toName,
+    connectorName,
+  }: JoinSummary) =>
+    broken
+      ? t`Broken: ${parentName} (${toName}) by its ${connectorName}`
+      : t`${parentName} (${toName}) by its ${connectorName}`;
   return (
     <div className="mt-2">
-      <span className="text-xs text-muted-foreground">Joined to</span>
+      <span className="text-xs text-muted-foreground">
+        <Trans>Joined to</Trans>
+      </span>
       <div className="mt-1 flex items-center gap-2 text-xs">
         {join ? (
           <>
@@ -39,12 +52,11 @@ export function JoinedTo({
               }`}
               title={
                 join.broken
-                  ? "A face this join names is missing from a part, so the piece stays where it was"
+                  ? t`A face this join names is missing from a part, so the piece stays where it was`
                   : undefined
               }
             >
-              {join.broken ? "Broken: " : ""}
-              {join.parentName} ({join.toName}) by its {join.connectorName}
+              {joinLabel(join)}
             </span>
             <Button
               size="sm"
@@ -52,11 +64,11 @@ export function JoinedTo({
               className="h-6 px-2 text-xs"
               onClick={onDetach}
             >
-              Detach
+              <Trans>Detach</Trans>
             </Button>
           </>
         ) : (
-          <span>{notice ?? "Free"}</span>
+          <span>{notice ?? t`Free`}</span>
         )}
       </div>
 
@@ -66,21 +78,21 @@ export function JoinedTo({
             value={join.offset[0]}
             axis=""
             colour={NEUTRAL}
-            label="Along"
+            label={t`Along`}
             onCommit={(along) => onPlace({ offset: [along, join.offset[1]] })}
           />
           <NumberField
             value={join.offset[1]}
             axis=""
             colour={NEUTRAL}
-            label="Up"
+            label={t`Up`}
             onCommit={(up) => onPlace({ offset: [join.offset[0], up] })}
           />
           <NumberField
             value={(join.twist * 180) / Math.PI}
             axis="°"
             colour={NEUTRAL}
-            label="Twist"
+            label={t`Twist`}
             onCommit={(degrees) =>
               onPlace({ twist: (degrees * Math.PI) / 180 })
             }
@@ -90,7 +102,7 @@ export function JoinedTo({
 
       <div className="mt-1">
         <CheckField
-          label="Show free faces"
+          label={t`Show free faces`}
           checked={showFree}
           onChange={onShowFreeChange}
         />

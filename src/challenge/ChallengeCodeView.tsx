@@ -1,3 +1,4 @@
+import { Trans, useLingui } from "@lingui/react/macro";
 import { Button } from "@picoframe/frame";
 import { Check, Copy, Download, Link as LinkIcon } from "lucide-react";
 import { type ReactNode, useState } from "react";
@@ -46,6 +47,7 @@ export function ChallengeCodeView({
    * (including a no-op resolve when the user cancels it). */
   onExportFile?: () => Promise<void>;
 }) {
+  const { t } = useLingui();
   const [copied, setCopied] = useState(false);
   const [fileBusy, setFileBusy] = useState(false);
   const [fileError, setFileError] = useState<string | null>(null);
@@ -96,11 +98,13 @@ export function ChallengeCodeView({
         <Button className="flex-1" onClick={copy}>
           {copied ? (
             <>
-              <Check className="mr-1.5 size-4" aria-hidden /> Copied
+              <Check className="mr-1.5 size-4" aria-hidden />{" "}
+              <Trans>Copied</Trans>
             </>
           ) : (
             <>
-              <Copy className="mr-1.5 size-4" aria-hidden /> Copy code
+              <Copy className="mr-1.5 size-4" aria-hidden />{" "}
+              <Trans>Copy code</Trans>
             </>
           )}
         </Button>
@@ -110,20 +114,23 @@ export function ChallengeCodeView({
             className="flex-1"
             onClick={() => copyDeepLink(link)}
           >
-            <LinkIcon className="mr-1.5 size-4" aria-hidden /> Copy link
+            <LinkIcon className="mr-1.5 size-4" aria-hidden />{" "}
+            <Trans>Copy link</Trans>
           </Button>
         )}
       </div>
       {!link && (
         <p className="text-xs text-muted-foreground">
-          Too long to share as a <code>coilbox://</code> link. Copy the code
-          itself, or export it as a file.
+          <Trans>
+            Too long to share as a <code>coilbox://</code> link. Copy the code
+            itself, or export it as a file.
+          </Trans>
         </p>
       )}
       {onExportFile && (
         <Button variant="outline" onClick={exportFile} disabled={fileBusy}>
           <Download className="mr-1.5 size-4" aria-hidden />
-          {fileBusy ? "Exporting…" : "Export as file"}
+          {fileBusy ? t`Exporting…` : t`Export as file`}
         </Button>
       )}
       <PublishSection code={code} />

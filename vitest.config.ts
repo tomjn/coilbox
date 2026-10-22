@@ -23,7 +23,7 @@ export default defineConfig({
     // project rather than a pattern.
     environment: "node",
     // Activates the source locale, so a `t` call in a plain module works.
-    setupFiles: ["./src/i18n/vitest.setup.ts"],
+    setupFiles: ["./src/vitest.runtime.setup.ts", "./src/i18n/vitest.setup.ts"],
     // `.tsx` for the tests that render a component, which write JSX rather than
     // nesting `createElement` calls by hand.
     include: ["src/**/*.test.ts", "src/**/*.test.tsx", "scripts/**/*.test.mjs"],

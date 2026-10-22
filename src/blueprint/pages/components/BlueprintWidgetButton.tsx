@@ -3,6 +3,7 @@
  * {@link WidgetPanel} owns the state and the buttons.
  */
 
+import { Trans, useLingui } from "@lingui/react/macro";
 import { Button, useDrawer } from "@picoframe/frame";
 import { Puzzle } from "lucide-react";
 
@@ -14,11 +15,12 @@ export function BlueprintWidgetButton({
   onChanged: (said: string) => void;
 }) {
   const drawer = useDrawer();
+  const { t } = useLingui();
 
   const openPanel = async () => {
     const { WidgetPanel } = await import("./WidgetPanel");
     drawer.open({
-      title: "In game widget",
+      title: t`In game widget`,
       width: "30rem",
       content: <WidgetPanel key={nextDrawerKey()} onChanged={onChanged} />,
     });
@@ -30,7 +32,7 @@ export function BlueprintWidgetButton({
       className="shrink-0 gap-1.5"
       onClick={() => void openPanel()}
     >
-      <Puzzle className="size-4" /> Widget
+      <Puzzle className="size-4" /> <Trans>Widget</Trans>
     </Button>
   );
 }

@@ -1,3 +1,5 @@
+import { plural, t } from "@lingui/core/macro";
+import { Trans, useLingui } from "@lingui/react/macro";
 import { Button, cn, Input, useDrawer } from "@picoframe/frame";
 import { Channel } from "@tauri-apps/api/core";
 import {
@@ -52,12 +54,17 @@ function ResultSummary({ report, file }: { report: Report; file: string }) {
   const headline = report.commands.filter(
     (c) => c.command === "LOGIN" || c.command === "PING",
   );
+  const seconds = formatFixed(report.duration_sec, 1);
   return (
     <div className="space-y-3 rounded-md border border-border bg-card/50 p-4">
       <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
-        <h3 className="text-sm font-semibold">Run complete</h3>
+        <h3 className="text-sm font-semibold">
+          <Trans>Run complete</Trans>
+        </h3>
         <span className="text-xs text-muted-foreground">
-          {formatFixed(report.duration_sec, 1)}s · saved to history ({file})
+          <Trans>
+            {seconds}s · saved to history ({file})
+          </Trans>
         </span>
       </div>
       <div className="flex flex-wrap gap-4 text-sm">
@@ -77,9 +84,9 @@ function ResultSummary({ report, file }: { report: Report; file: string }) {
 }
 
 function phaseLabel(elapsed: number, rampSec: number, durSec: number): string {
-  if (elapsed < rampSec) return "ramping up";
-  if (elapsed < rampSec + durSec) return "steady load";
-  return "finishing";
+  if (elapsed < rampSec) return t`ramping up`;
+  if (elapsed < rampSec + durSec) return t`steady load`;
+  return t`finishing`;
 }
 
 /** One live telemetry figure under the progress bar. */
@@ -120,12 +127,13 @@ function RunProgress({
   durSec: number | null;
   live: RunProgressData | null;
 }) {
+  const { t } = useLingui();
   const windowSec = rampSec != null && durSec != null ? rampSec + durSec : null;
   const pct = windowSec ? Math.min((elapsed / windowSec) * 100, 100) : null;
   const phase =
     rampSec != null && durSec != null
       ? phaseLabel(elapsed, rampSec, durSec)
-      : "running";
+      : t`running`;
   return (
     <div className="space-y-2 border-b border-border p-4">
       <div className="flex items-center justify-between gap-2 text-sm">
@@ -149,18 +157,20 @@ function RunProgress({
       )}
       {live ? (
         <div className="flex flex-wrap gap-x-4 gap-y-1 text-sm">
-          <LiveStat label="Sent" value={formatNumber(live.sent)} />
-          <LiveStat label="Rate" value={`${formatFixed(live.rate, 0)}/s`} />
+          <LiveStat label={t`Sent`} value={formatNumber(live.sent)} />
+          <LiveStat label={t`Rate`} value={`${formatFixed(live.rate, 0)}/s`} />
           <LiveStat
-            label="Errors"
+            label={t`Errors`}
             value={formatNumber(live.errors)}
             emphasis={live.errors > 0}
           />
         </div>
       ) : (
         <p className="text-[11px] text-muted-foreground">
-          Estimated from ramp + duration; live metrics appear once the run is
-          under way.
+          <Trans>
+            Estimated from ramp + duration; live metrics appear once the run is
+            under way.
+          </Trans>
         </p>
       )}
     </div>
@@ -169,6 +179,7 @@ function RunProgress({
 
 /** Drive a load/bench test against a server, streaming live output. */
 export default function RunPage() {
+  const { t } = useLingui();
   // Config is reactive from the frame settings store; seeds the form below.
   const [cfg] = useUberstressConfig();
   const drawer = useDrawer();
@@ -384,6 +395,12 @@ export default function RunPage() {
     }
   }
 
+  const logLineCount = logLines.length;
+  const lineCount = plural(logLineCount, {
+    one: "# line",
+    other: "# lines",
+  });
+
   const scenarioInput =
     scenarios.length > 0 ? (
       <OptionSelect
@@ -406,19 +423,18 @@ export default function RunPage() {
         className="border-b border-border px-6 py-4"
         title={
           <>
-            <Zap size={18} /> Run load test
+            <Zap size={18} /> <Trans>Run load test</Trans>
           </>
         }
-        description="Drive a scenario against a lobby server (load) or launch one locally and benchmark it (bench)."
+        description={t`Drive a scenario against a lobby server (load) or launch one locally and benchmark it (bench).`}
         actions={
           <Button
             variant="outline"
             size="sm"
             onClick={() =>
               drawer.open({
-                title: "Generate seed SQL",
-                description:
-                  "Pre-seed accounts so a load test can run with registration off.",
+                title: t`Generate seed SQL`,
+                description: t`Pre-seed accounts so a load test can run with registration off.`,
                 width: "44rem",
                 content: (
                   <SeedSqlForm
@@ -430,7 +446,7 @@ export default function RunPage() {
               })
             }
           >
-            <Database /> Seed SQL
+            <Database /> <Trans>Seed SQL</Trans>
           </Button>
         }
       />
@@ -451,7 +467,7 @@ export default function RunPage() {
           >
             {(["load", "bench"] as const).map((m) => (
               <ToggleGroupItem key={m} value={m} className="px-3 capitalize">
-                {m}
+                {m === "load" ? t`load` : t`bench`}
               </ToggleGroupItem>
             ))}
           </ToggleGroup>
@@ -459,15 +475,15 @@ export default function RunPage() {
           {/* Target */}
           {mode === "bench" && (
             <CheckField
-              label="Launch a local server"
-              hint="Uses the bench/DB settings on the Servers page. Uncheck to benchmark an external address."
+              label={t`Launch a local server`}
+              hint={t`Uses the bench/DB settings on the Servers page. Uncheck to benchmark an external address.`}
               checked={launch}
               onChange={setLaunch}
             />
           )}
           {needsAddr && (
             <div className="space-y-2">
-              <Field label="Target server">
+              <Field label={t`Target server`}>
                 <OptionSelect
                   value={serverChoice}
                   onValueChange={setServerChoice}
@@ -477,12 +493,12 @@ export default function RunPage() {
                       value: s.id,
                       label: `${s.name || s.addr} (${s.addr})`,
                     })),
-                    { value: MANUAL, label: "Manual address…" },
+                    { value: MANUAL, label: t`Manual address…` },
                   ]}
                 />
               </Field>
               {serverChoice === MANUAL && (
-                <Field label="Address">
+                <Field label={t`Address`}>
                   <Input
                     value={manualAddr}
                     onChange={(e) => setManualAddr(e.target.value)}
@@ -497,10 +513,10 @@ export default function RunPage() {
 
           {/* Core knobs */}
           <div className="grid grid-cols-2 gap-4">
-            <Field label="Scenario" className="col-span-2">
+            <Field label={t`Scenario`} className="col-span-2">
               {scenarioInput}
             </Field>
-            <Field label="Concurrent connections">
+            <Field label={t`Concurrent connections`}>
               <Input
                 type="number"
                 min={1}
@@ -509,7 +525,7 @@ export default function RunPage() {
                 disabled={running}
               />
             </Field>
-            <Field label="Ref label" hint="optional; tags the report">
+            <Field label={t`Ref label`} hint={t`optional; tags the report`}>
               <Input
                 value={refLabel}
                 onChange={(e) => setRefLabel(e.target.value)}
@@ -517,8 +533,8 @@ export default function RunPage() {
               />
             </Field>
             <Field
-              label="Hold time"
-              hint="hold connections after login, e.g. 30s"
+              label={t`Hold time`}
+              hint={t`hold connections after login, e.g. 30s`}
             >
               <Input
                 value={duration}
@@ -527,7 +543,7 @@ export default function RunPage() {
                 className="font-mono text-xs"
               />
             </Field>
-            <Field label="Ramp" hint="e.g. 10s">
+            <Field label={t`Ramp`} hint={t`e.g. 10s`}>
               <Input
                 value={ramp}
                 onChange={(e) => setRamp(e.target.value)}
@@ -537,8 +553,8 @@ export default function RunPage() {
             </Field>
           </div>
           <CheckField
-            label="Seed accounts before the timed phase (register)"
-            hint="Turn off if you pre-seeded accounts with the Seed SQL button."
+            label={t`Seed accounts before the timed phase (register)`}
+            hint={t`Turn off if you pre-seeded accounts with the Seed SQL button.`}
             checked={register}
             onChange={setRegister}
           />
@@ -550,32 +566,32 @@ export default function RunPage() {
                 size={15}
                 className="transition-transform group-data-[state=open]:rotate-90"
               />{" "}
-              Advanced options
+              <Trans>Advanced options</Trans>
             </CollapsibleTrigger>
             <CollapsibleContent>
               <div className="mt-3 grid grid-cols-2 gap-4">
-                <Field label="User prefix">
+                <Field label={t`User prefix`}>
                   <Input
                     value={userPrefix}
                     onChange={(e) => setUserPrefix(e.target.value)}
                     disabled={running}
                   />
                 </Field>
-                <Field label="Password">
+                <Field label={t`Password`}>
                   <Input
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                     disabled={running}
                   />
                 </Field>
-                <Field label="Channel" hint="chat scenarios">
+                <Field label={t`Channel`} hint={t`chat scenarios`}>
                   <Input
                     value={channel}
                     onChange={(e) => setChannel(e.target.value)}
                     disabled={running}
                   />
                 </Field>
-                <Field label="Channels">
+                <Field label={t`Channels`}>
                   <Input
                     type="number"
                     min={1}
@@ -584,14 +600,14 @@ export default function RunPage() {
                     disabled={running}
                   />
                 </Field>
-                <Field label="Say interval">
+                <Field label={t`Say interval`}>
                   <Input
                     value={sayInterval}
                     onChange={(e) => setSayInterval(e.target.value)}
                     disabled={running}
                   />
                 </Field>
-                <Field label="Battle hosts">
+                <Field label={t`Battle hosts`}>
                   <Input
                     type="number"
                     min={0}
@@ -600,7 +616,7 @@ export default function RunPage() {
                     disabled={running}
                   />
                 </Field>
-                <Field label="Pingers">
+                <Field label={t`Pingers`}>
                   <Input
                     type="number"
                     min={0}
@@ -609,7 +625,7 @@ export default function RunPage() {
                     disabled={running}
                   />
                 </Field>
-                <Field label="Ping interval">
+                <Field label={t`Ping interval`}>
                   <Input
                     value={pingInterval}
                     onChange={(e) => setPingInterval(e.target.value)}
@@ -618,8 +634,8 @@ export default function RunPage() {
                 </Field>
                 {mode === "bench" && (
                   <Field
-                    label="Compare to"
-                    hint="path to a prior report.json"
+                    label={t`Compare to`}
+                    hint={t`path to a prior report.json`}
                     className="col-span-2"
                   >
                     <Input
@@ -638,16 +654,17 @@ export default function RunPage() {
           <div className="flex items-center gap-2 pt-1">
             {running ? (
               <Button variant="outline" onClick={cancel}>
-                <Square /> Cancel
+                <Square /> <Trans>Cancel</Trans>
               </Button>
             ) : (
               <Button onClick={run} disabled={!canRun}>
-                <Play className="fill-current" /> Run test
+                <Play className="fill-current" /> <Trans>Run test</Trans>
               </Button>
             )}
             {running && (
               <span className="flex items-center gap-1.5 text-sm text-muted-foreground">
-                <Loader2 size={14} className="animate-spin" /> running…
+                <Loader2 size={14} className="animate-spin" />{" "}
+                <Trans>running…</Trans>
               </span>
             )}
           </div>
@@ -675,7 +692,7 @@ export default function RunPage() {
                   })
                 }
               >
-                <BarChart3 /> View results
+                <BarChart3 /> <Trans>View results</Trans>
               </Button>
             </div>
           )}
@@ -696,11 +713,9 @@ export default function RunPage() {
                 size={14}
                 className="transition-transform group-data-[state=open]:rotate-90"
               />
-              Output
+              <Trans>Output</Trans>
               {logLines.length > 0 && (
-                <span className="font-normal normal-case">
-                  ({logLines.length} lines)
-                </span>
+                <span className="font-normal normal-case">({lineCount})</span>
               )}
             </CollapsibleTrigger>
             <CollapsibleContent className="flex min-h-0 flex-1 flex-col">
@@ -708,7 +723,9 @@ export default function RunPage() {
                 {logLines.length === 0 ? (
                   <div className="flex h-full flex-col items-center justify-center gap-2 text-center text-sm text-muted-foreground">
                     <Zap size={26} className="opacity-30" />
-                    <p>Run output streams here.</p>
+                    <p>
+                      <Trans>Run output streams here.</Trans>
+                    </p>
                   </div>
                 ) : (
                   <pre className="whitespace-pre-wrap break-words font-mono text-xs leading-relaxed">

@@ -1,3 +1,5 @@
+import { plural } from "@lingui/core/macro";
+import { Trans, useLingui } from "@lingui/react/macro";
 import { useHideSidebar } from "@picoframe/frame";
 import { ArrowLeft, ChevronRight, CircleCheck, Lock } from "lucide-react";
 import type { CSSProperties } from "react";
@@ -42,7 +44,7 @@ export default function CampaignDetailPage() {
         <BackLink />
         <div className="flex flex-col items-center gap-2 rounded-lg border border-dashed p-10 text-center">
           <p className="text-sm text-muted-foreground">
-            This campaign isn't installed.
+            <Trans>This campaign isn't installed.</Trans>
           </p>
         </div>
       </div>
@@ -102,7 +104,7 @@ export default function CampaignDetailPage() {
                   <h1 className="text-lg font-semibold">{campaign.title}</h1>
                   {source === "bundled" && (
                     <span className="shrink-0 rounded bg-muted px-1.5 py-0.5 text-xs text-muted-foreground">
-                      Bundled
+                      <Trans>Bundled</Trans>
                     </span>
                   )}
                 </div>
@@ -117,7 +119,10 @@ export default function CampaignDetailPage() {
 
             <div className="flex flex-col gap-1.5">
               <span className="text-xs text-muted-foreground">
-                {completed}/{total} mission{total === 1 ? "" : "s"} complete
+                {plural(total, {
+                  one: `${completed}/# mission complete`,
+                  other: `${completed}/# missions complete`,
+                })}
               </span>
               <div className="h-1.5 overflow-hidden rounded-full bg-muted">
                 <div
@@ -130,7 +135,7 @@ export default function CampaignDetailPage() {
 
           <section className="flex min-w-0 flex-col gap-2">
             <h2 className="text-sm font-medium text-muted-foreground">
-              Missions
+              <Trans>Missions</Trans>
             </h2>
             {/* The rail: a vertical connector through the mission badges,
                 masked by each badge's solid background. */}
@@ -158,7 +163,7 @@ function BackLink() {
       to="/campaign"
       className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:underline"
     >
-      <ArrowLeft className="size-3.5" /> Campaigns
+      <ArrowLeft className="size-3.5" /> <Trans>Campaigns</Trans>
     </Link>
   );
 }
@@ -227,11 +232,12 @@ function MissionRow({
 }
 
 function MissionStateIcon({ state }: { state: MissionState }) {
+  const { t } = useLingui();
   if (state === "complete") {
     return (
       <CircleCheck
         className="ml-auto size-4 shrink-0 text-emerald-600 dark:text-emerald-400"
-        aria-label="Completed"
+        aria-label={t`Completed`}
       />
     );
   }
@@ -239,7 +245,7 @@ function MissionStateIcon({ state }: { state: MissionState }) {
     return (
       <Lock
         className="ml-auto size-4 shrink-0 text-muted-foreground"
-        aria-label="Locked"
+        aria-label={t`Locked`}
       />
     );
   }

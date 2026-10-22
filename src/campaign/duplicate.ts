@@ -23,6 +23,7 @@
  *   copy starts unplayed, which is what a copy made to be edited wants.
  */
 
+import { t } from "@lingui/core/macro";
 import { campaignMediaUrl, mediaKind } from "../lib/assetUrl";
 import { fetchAsDataUrl } from "../lib/dataUrl";
 import { campaignMediaImportData, campaignUnitsCopy } from "./bindings";
@@ -40,10 +41,13 @@ import { ensureCampaignScenarioMedia } from "./scenarioMedia";
  */
 export function copyTitle(title: string, taken: Iterable<string>): string {
   const used = new Set(taken);
-  const base = `Copy of ${title}`;
+  const base = t`Copy of ${title}`;
   let candidate = base;
   let n = 2;
-  while (used.has(candidate)) candidate = `${base} (${n++})`;
+  while (used.has(candidate)) {
+    const copyNumber = n++;
+    candidate = t`${base} (${copyNumber})`;
+  }
   return candidate;
 }
 

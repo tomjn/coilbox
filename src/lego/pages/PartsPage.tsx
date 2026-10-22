@@ -1,3 +1,4 @@
+import { Trans, useLingui } from "@lingui/react/macro";
 import { Button } from "@picoframe/frame";
 import { FileUp, ToyBrick } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
@@ -33,6 +34,8 @@ type Status =
  * where it came from.
  */
 export default function PartsPage() {
+  const { t } = useLingui();
+  const noPack = (reason: string) => t`No parts pack installed: ${reason}`;
   const [status, setStatus] = useState<Status>({ state: "loading" });
 
   useEffect(() => {
@@ -68,7 +71,7 @@ export default function PartsPage() {
         <PageHeader
           title={
             <>
-              <ToyBrick size={18} /> Lego Parts
+              <ToyBrick size={18} /> <Trans>Lego Parts</Trans>
             </>
           }
           actions={
@@ -81,7 +84,7 @@ export default function PartsPage() {
                   className="w-44"
                 />
                 <Button variant="outline" onClick={moduleFiles.loadFile}>
-                  <FileUp size={16} /> Load from file
+                  <FileUp size={16} /> <Trans>Load from file</Trans>
                 </Button>
               </>
             ) : null
@@ -90,7 +93,7 @@ export default function PartsPage() {
 
         {status.state === "loading" ? <Loading /> : null}
         {status.state === "missing" ? (
-          <ErrorBanner message={`No parts pack installed: ${status.message}`} />
+          <ErrorBanner message={noPack(status.message)} />
         ) : null}
 
         {pack ? (

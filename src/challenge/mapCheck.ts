@@ -1,3 +1,4 @@
+import { t } from "@lingui/core/macro";
 import { MANIFEST_FILE } from "../conquest/handmade/manifest";
 import type { HandmadeMapResult } from "../conquest/handmade/read";
 import type { GalaxyDoc } from "../conquest/model";
@@ -33,22 +34,25 @@ export function checkChallengeMap(
       first?.code === "file-missing" &&
       rest.length === 0 &&
       first.file === MANIFEST_FILE;
+    const mapName = nameOf(ref);
     if (notInstalled || !first) {
       return {
         ok: false,
-        message: `This challenge is played on the hand-made map ${nameOf(ref)}, which is made for ${gameName}. That map is not installed here, and a challenge code cannot carry it. Get the map from whoever shared the code, import it on the Conquest page, then import this code again.`,
+        message: t`This challenge is played on the hand-made map ${mapName}, which is made for ${gameName}. That map is not installed here, and a challenge code cannot carry it. Get the map from whoever shared the code, import it on the Conquest page, then import this code again.`,
       };
     }
+    const readError = first.message;
     return {
       ok: false,
-      message: `This challenge is played on the hand-made map ${nameOf(ref)}, which is made for ${gameName}. The copy installed here could not be read, so the challenge was not started. ${first.message}`,
+      message: t`This challenge is played on the hand-made map ${mapName}, which is made for ${gameName}. The copy installed here could not be read, so the challenge was not started. ${readError}`,
     };
   }
   const map = result.doc;
+  const mapName = nameOf(ref, map.title);
   if (ref.fingerprint && map.handmade?.fingerprint !== ref.fingerprint) {
     return {
       ok: false,
-      message: `This challenge was made on a different version of the hand-made map ${nameOf(ref, map.title)}, which is made for ${gameName}. The version installed here does not match it, so the challenge was not started. Get the version the code was made on from whoever shared it, import it on the Conquest page, then import this code again.`,
+      message: t`This challenge was made on a different version of the hand-made map ${mapName}, which is made for ${gameName}. The version installed here does not match it, so the challenge was not started. Get the version the code was made on from whoever shared it, import it on the Conquest page, then import this code again.`,
     };
   }
   return { ok: true, map };
@@ -59,5 +63,7 @@ export function challengeMapListFailure(
   ref: HandmadeMapRef,
   reason: unknown,
 ): string {
-  return `This challenge is played on the hand-made map ${nameOf(ref)}, and the hand-made maps could not be listed, so the challenge was not started. ${reason instanceof Error ? reason.message : String(reason)}`;
+  const mapName = nameOf(ref);
+  const cause = reason instanceof Error ? reason.message : String(reason);
+  return t`This challenge is played on the hand-made map ${mapName}, and the hand-made maps could not be listed, so the challenge was not started. ${cause}`;
 }

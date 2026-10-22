@@ -1,3 +1,5 @@
+import { t as coreT, plural } from "@lingui/core/macro";
+import { Trans, useLingui } from "@lingui/react/macro";
 import { Button } from "@picoframe/frame";
 import { Trash2 } from "lucide-react";
 import { useState } from "react";
@@ -7,6 +9,7 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import type { Scenario } from "@/scenario/model";
+import { getLocale } from "../../../i18n";
 import { missionMedia } from "../../media";
 import { scenarioAttachment } from "../../missionScenario";
 import type { CampaignMission } from "../../model";
@@ -42,8 +45,10 @@ export function MissionRemoveButton({
   /** Drops the mission and deletes its imported files. Reports its own failures. */
   onRemove: () => Promise<void>;
 }) {
+  const { t } = useLingui();
   const [open, setOpen] = useState(false);
   const [busy, setBusy] = useState(false);
+  const title = mission.title;
   const losses = missionLosses(mission, scenarios, others);
 
   // The page owns the error banner for a failed save, so there is nothing to
@@ -62,7 +67,7 @@ export function MissionRemoveButton({
           type="button"
           size="icon"
           variant="ghost"
-          aria-label={`Remove ${mission.title}`}
+          aria-label={t`Remove ${title}`}
         >
           <Trash2 className="size-4" />
         </Button>
@@ -70,12 +75,12 @@ export function MissionRemoveButton({
       <PopoverContent align="end" className="flex w-80 flex-col gap-3">
         <div className="flex flex-col gap-1">
           <h3 className="break-words text-sm font-medium">
-            Remove {mission.title}?
+            <Trans>Remove {title}?</Trans>
           </h3>
           {losses.length > 0 ? (
             <>
               <p className="text-xs text-muted-foreground">
-                This can't be undone. It takes with it:
+                <Trans>This can't be undone. It takes with it:</Trans>
               </p>
               <ul className="list-disc pl-4 text-xs text-muted-foreground">
                 {losses.map((loss) => (
@@ -87,8 +92,10 @@ export function MissionRemoveButton({
             </>
           ) : (
             <p className="text-xs text-muted-foreground">
-              This can't be undone, though nothing has been written on this
-              mission yet beyond its place in the campaign.
+              <Trans>
+                This can't be undone, though nothing has been written on this
+                mission yet beyond its place in the campaign.
+              </Trans>
             </p>
           )}
         </div>
@@ -100,7 +107,7 @@ export function MissionRemoveButton({
             disabled={busy}
             onClick={() => setOpen(false)}
           >
-            Cancel
+            <Trans>Cancel</Trans>
           </Button>
           <Button
             type="button"
@@ -110,7 +117,7 @@ export function MissionRemoveButton({
             disabled={busy}
             onClick={() => void remove()}
           >
-            <Trash2 className="size-4" /> {busy ? "Removing…" : "Remove"}
+            <Trash2 className="size-4" /> {busy ? t`Removing…` : t`Remove`}
           </Button>
         </div>
       </PopoverContent>
@@ -118,15 +125,12 @@ export function MissionRemoveButton({
   );
 }
 
-/** English for a count of something, so "1 objective" is not "1 objectives". */
-const plural = (n: number, one: string, many: string) =>
-  `${n} ${n === 1 ? one : many}`;
-
-/** "a", "a and b", "a, b and c". */
+/** "a", "a and b", "a, b and c", joined the way the app language joins them. */
 const asList = (items: string[]) =>
-  items.length < 2
-    ? (items[0] ?? "")
-    : `${items.slice(0, -1).join(", ")} and ${items.at(-1)}`;
+  new Intl.ListFormat(getLocale() === "en" ? "en-GB" : getLocale(), {
+    type: "conjunction",
+    style: "long",
+  }).format(items);
 
 /**
  * What this mission holds that removing it destroys, as sentence fragments.
@@ -141,17 +145,23 @@ export function missionLosses(
   others: CampaignMission[] = [],
 ): string[] {
   const losses: string[] = [];
-  if (mission.briefing.trim() !== "") losses.push("its briefing");
-  if (mission.objectives.length > 0) {
-    losses.push(plural(mission.objectives.length, "objective", "objectives"));
-  }
-  if (mission.disabledUnits.length > 0) {
+  if (mission.briefing.trim() !== "") losses.push(coreT`its briefing`);
+  const objectiveCount = mission.objectives.length;
+  const restrictionCount = mission.disabledUnits.length;
+  if (objectiveCount > 0) {
     losses.push(
-      plural(
-        mission.disabledUnits.length,
-        "unit restriction",
-        "unit restrictions",
-      ),
+      plural(objectiveCount, {
+        one: "# objective",
+        other: "# objectives",
+      }),
+    );
+  }
+  if (restrictionCount > 0) {
+    losses.push(
+      plural(restrictionCount, {
+        one: "# unit restriction",
+        other: "# unit restrictions",
+      }),
     );
   }
   // Only an imported file is deleted from disk. A bundled or inlined panorama
@@ -172,24 +182,30 @@ export function missionLosses(
     .map((m) => m.label);
   const kept = imported.filter((m) => shared.has(m.file)).map((m) => m.label);
   if (deleted.length > 0) {
-    losses.push(`its ${asList(deleted)}, deleted from disk`);
+    const list = asList(deleted);
+    losses.push(coreT`its ${list}, deleted from disk`);
   }
   if (kept.length > 0) {
-    const file = kept.length === 1 ? "file" : "files";
+    const list = asList(kept);
+    const keptCount = kept.length;
     losses.push(
-      `its ${asList(kept)}, kept on disk because another mission uses the same ${file}`,
+      plural(keptCount, {
+        one: `its ${list}, kept on disk because another mission uses the same file`,
+        other: `its ${list}, kept on disk because another mission uses the same files`,
+      }),
     );
   }
   const attached = scenarioAttachment(mission, scenarios);
+  const scenarioName = attached.state === "none" ? "" : attached.snapshot.name;
   switch (attached.state) {
     case "current":
       losses.push(
-        `its copy of the scenario "${attached.snapshot.name}", which stays in the scenario builder`,
+        coreT`its copy of the scenario "${scenarioName}", which stays in the scenario builder`,
       );
       break;
     case "stale":
       losses.push(
-        `its copy of the scenario "${attached.snapshot.name}", which is not the one the scenario builder now holds`,
+        coreT`its copy of the scenario "${scenarioName}", which is not the one the scenario builder now holds`,
       );
       break;
     case "orphaned": {
@@ -201,8 +217,8 @@ export function missionLosses(
       );
       losses.push(
         elsewhere
-          ? `its copy of the scenario "${attached.snapshot.name}", which is no longer in the scenario builder but which another mission also carries`
-          : `the only copy of the scenario "${attached.snapshot.name}", which is no longer in the scenario builder`,
+          ? coreT`its copy of the scenario "${scenarioName}", which is no longer in the scenario builder but which another mission also carries`
+          : coreT`the only copy of the scenario "${scenarioName}", which is no longer in the scenario builder`,
       );
       break;
     }

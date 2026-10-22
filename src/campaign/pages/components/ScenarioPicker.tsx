@@ -1,3 +1,4 @@
+import { Trans, useLingui } from "@lingui/react/macro";
 import { Input, useDrawer } from "@picoframe/frame";
 import { useMemo, useState } from "react";
 import { Link } from "react-router";
@@ -29,6 +30,7 @@ export function ScenarioPickerList({
   onNavigate?: () => void;
   initialGameName?: string;
 }) {
+  const { t } = useLingui();
   const [query, setQuery] = useState("");
   const [gameFilter, setGameFilter] = useState(initialGameName);
 
@@ -45,15 +47,17 @@ export function ScenarioPickerList({
   if (playable.length === 0) {
     return (
       <p className="text-sm text-muted-foreground">
-        No scenarios are ready to attach. Build one in the{" "}
-        <Link
-          className="font-medium underline underline-offset-4"
-          to="/scenario-builder"
-          onClick={onNavigate}
-        >
-          Scenario Builder
-        </Link>{" "}
-        and give it a game and a map first.
+        <Trans>
+          No scenarios are ready to attach. Build one in the{" "}
+          <Link
+            className="font-medium underline underline-offset-4"
+            to="/scenario-builder"
+            onClick={onNavigate}
+          >
+            Scenario Builder
+          </Link>{" "}
+          and give it a game and a map first.
+        </Trans>
       </p>
     );
   }
@@ -62,21 +66,23 @@ export function ScenarioPickerList({
     <div className="flex flex-col gap-3">
       {gameFilter && (
         <p className="text-xs text-muted-foreground">
-          Showing scenarios for{" "}
-          <span className="text-foreground">{gameFilter}</span>.{" "}
-          <button
-            type="button"
-            className="underline underline-offset-4"
-            onClick={() => setGameFilter(undefined)}
-          >
-            Show all
-          </button>
+          <Trans>
+            Showing scenarios for{" "}
+            <span className="text-foreground">{gameFilter}</span>.{" "}
+            <button
+              type="button"
+              className="underline underline-offset-4"
+              onClick={() => setGameFilter(undefined)}
+            >
+              Show all
+            </button>
+          </Trans>
         </p>
       )}
       <Input
         value={query}
         onChange={(e) => setQuery(e.target.value)}
-        placeholder="Search scenarios…"
+        placeholder={t`Search scenarios…`}
         className="h-8"
       />
       <ul className="flex max-h-80 flex-col gap-1.5 overflow-auto">
@@ -99,18 +105,22 @@ export function ScenarioPickerList({
         ))}
         {filtered.length === 0 && gameFilter && (
           <li className="text-xs text-muted-foreground">
-            No scenarios for {gameFilter}.{" "}
-            <button
-              type="button"
-              className="underline underline-offset-4"
-              onClick={() => setGameFilter(undefined)}
-            >
-              Show all
-            </button>
+            <Trans>
+              No scenarios for {gameFilter}.{" "}
+              <button
+                type="button"
+                className="underline underline-offset-4"
+                onClick={() => setGameFilter(undefined)}
+              >
+                Show all
+              </button>
+            </Trans>
           </li>
         )}
         {filtered.length === 0 && !gameFilter && (
-          <li className="text-xs text-muted-foreground">No scenarios match.</li>
+          <li className="text-xs text-muted-foreground">
+            <Trans>No scenarios match.</Trans>
+          </li>
         )}
       </ul>
     </div>

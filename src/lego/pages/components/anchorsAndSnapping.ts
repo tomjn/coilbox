@@ -1,3 +1,4 @@
+import { t } from "@lingui/core/macro";
 import * as THREE from "three";
 import {
   type LegoConnector,
@@ -41,6 +42,12 @@ import type { SceneState } from "./sceneState";
 import { draggedGroup } from "./slideHandle";
 
 /** What the viewport says while the next click puts a connector on the model. */
+export function placeConnectorHint(): string {
+  return t`Click the model to put a connector there. Escape to stop`;
+}
+
+/** The English text of `placeConnectorHint`, for the caller that has not
+ *  moved to the function yet. */
 export const PLACE_CONNECTOR_HINT =
   "Click the model to put a connector there. Escape to stop";
 

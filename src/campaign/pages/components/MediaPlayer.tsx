@@ -1,3 +1,4 @@
+import { useLingui } from "@lingui/react/macro";
 import { Button, cn } from "@picoframe/frame";
 import { Pause, Play, Volume2, VolumeX } from "lucide-react";
 import {
@@ -139,6 +140,7 @@ function MediaControlsCluster({
   onToggleMute: () => void;
   label: string;
 }) {
+  const { t } = useLingui();
   return (
     <div className="pointer-events-none absolute inset-0 flex items-end justify-end p-2">
       <div className="pointer-events-auto flex gap-1 rounded-md bg-black/55 p-1 opacity-0 backdrop-blur-sm transition-opacity duration-200 group-hover:opacity-100 group-focus-within:opacity-100 motion-reduce:transition-none [@media(pointer:coarse)]:opacity-100">
@@ -147,7 +149,7 @@ function MediaControlsCluster({
           variant="ghost"
           className="size-10 text-white hover:bg-white/20 hover:text-white"
           onClick={onTogglePlay}
-          aria-label={playing ? `Pause ${label}` : `Play ${label}`}
+          aria-label={playing ? t`Pause ${label}` : t`Play ${label}`}
         >
           {playing ? <Pause className="size-5" /> : <Play className="size-5" />}
         </Button>
@@ -156,7 +158,7 @@ function MediaControlsCluster({
           variant="ghost"
           className="size-10 text-white hover:bg-white/20 hover:text-white"
           onClick={onToggleMute}
-          aria-label={muted ? `Unmute ${label}` : `Mute ${label}`}
+          aria-label={muted ? t`Unmute ${label}` : t`Mute ${label}`}
         >
           {muted ? (
             <VolumeX className="size-5" />
@@ -260,6 +262,7 @@ export function CampaignAudio({
   playback?: MediaPlayback;
   label: string;
 }) {
+  const { t } = useLingui();
   const ref = useRef<HTMLAudioElement>(null);
   const resolved = resolvePlayback(playback, CUE_DEFAULTS);
   const { playing, muted, togglePlay, toggleMute } = useMediaControls(
@@ -281,7 +284,7 @@ export function CampaignAudio({
         variant="ghost"
         className="size-9"
         onClick={togglePlay}
-        aria-label={playing ? `Pause ${label}` : `Play ${label}`}
+        aria-label={playing ? t`Pause ${label}` : t`Play ${label}`}
       >
         {playing ? <Pause className="size-4" /> : <Play className="size-4" />}
       </Button>
@@ -290,7 +293,7 @@ export function CampaignAudio({
         variant="ghost"
         className="size-9"
         onClick={toggleMute}
-        aria-label={muted ? `Unmute ${label}` : `Mute ${label}`}
+        aria-label={muted ? t`Unmute ${label}` : t`Mute ${label}`}
       >
         {muted ? (
           <VolumeX className="size-4" />
@@ -355,6 +358,7 @@ export function PlaybackTuning({
   showScroll?: boolean;
   onChange: (playback: MediaPlayback) => void;
 }) {
+  const { t } = useLingui();
   const r = resolvePlayback(playback, defaults);
   const set = (patch: Partial<MediaPlayback>) =>
     onChange({ ...playback, ...patch });
@@ -362,14 +366,14 @@ export function PlaybackTuning({
     <div className="flex flex-col gap-3 rounded-md border border-border/50 bg-muted/20 p-3">
       {showScroll && (
         <SwitchRow
-          label="Scroll"
+          label={t`Scroll`}
           checked={r.scroll}
           onCheckedChange={(v) => set({ scroll: v })}
         />
       )}
       {showAutoplay && (
         <SwitchRow
-          label="Autoplay"
+          label={t`Autoplay`}
           checked={r.autoplay}
           onCheckedChange={(v) =>
             set(
@@ -382,14 +386,14 @@ export function PlaybackTuning({
       )}
       {showLoop && (
         <SwitchRow
-          label="Loop"
+          label={t`Loop`}
           checked={r.loop}
           onCheckedChange={(v) => set({ loop: v })}
         />
       )}
       {showMuted && (
         <SwitchRow
-          label="Start muted"
+          label={t`Start muted`}
           checked={r.muted}
           disabled={decorative && r.autoplay}
           onCheckedChange={(v) => set({ muted: v })}

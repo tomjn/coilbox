@@ -10,7 +10,7 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
-import { formatDateTime, formatFixed } from "@/lib/format";
+import { formatFixed, formatShortDateTime } from "@/lib/format";
 import type { Report, ReportSummary } from "../../bindings";
 
 // recharts renders to SVG and can't read CSS custom properties via `fill`, so the
@@ -24,18 +24,6 @@ const RUN_B = "#10b981";
 
 const axisTick = { fontSize: 11, fill: "currentColor", opacity: 0.65 };
 const gridStroke = "currentColor";
-
-function shortTime(iso: string): string {
-  const d = new Date(iso);
-  return Number.isNaN(d.getTime())
-    ? iso
-    : formatDateTime(d, {
-        month: "short",
-        day: "numeric",
-        hour: "2-digit",
-        minute: "2-digit",
-      });
-}
 
 /** Grouped p50/p95/p99 latency bars per command for one run. */
 export function LatencyBars({ report }: { report: Report }) {
@@ -156,7 +144,7 @@ export function CompareBars({
 export function TrendChart({ runs }: { runs: ReportSummary[] }) {
   // us_history is newest-first; reverse for a left-to-right time axis.
   const data = [...runs].reverse().map((r) => ({
-    when: shortTime(r.startedAt),
+    when: formatShortDateTime(r.startedAt),
     login: r.loginP99Ms ?? null,
     ping: r.pingP99Ms ?? null,
   }));

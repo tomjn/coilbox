@@ -28,12 +28,15 @@
  * the rows it did nothing to.
  */
 
+import { plural } from "@lingui/core/macro";
+import { Trans, useLingui } from "@lingui/react/macro";
 import { Button } from "@picoframe/frame";
 import { Blocks, Download, Loader2, Repeat } from "lucide-react";
 import { OptionSelect } from "@/components/OptionSelect";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Switch } from "@/components/ui/switch";
 import type { GameItem } from "@/content/bindings";
+import { getLocale } from "@/i18n";
 import { GamePickerButton } from "@/play/pages/components/GamePickerButton";
 import type { ArrivalNote } from "../../arrival";
 import {
@@ -48,12 +51,16 @@ import { LayoutThumb } from "./LayoutThumb";
 
 /** How the rows can be put in front of a reader. Fit first is the default: it
  *  is the order that puts the ones worth a look at the top. */
-const ORDERS: { value: PackOrder; label: string }[] = [
-  { value: "fit", label: "The ones that fit first" },
-  { value: "size", label: "Biggest first" },
-  { value: "name", label: "By name" },
-  { value: "file", label: "As they are in the file" },
-];
+function orders(
+  t: (strings: TemplateStringsArray) => string,
+): { value: PackOrder; label: string }[] {
+  return [
+    { value: "fit", label: t`The ones that fit first` },
+    { value: "size", label: t`Biggest first` },
+    { value: "name", label: t`By name` },
+    { value: "file", label: t`As they are in the file` },
+  ];
+}
 
 export interface PackView {
   order: PackOrder;
@@ -118,7 +125,12 @@ export function ArrivingPack({
   onClear: () => void;
   onKeep: () => void;
 }) {
+  const { t } = useLingui();
   const counts = packCounts(picks);
+  const placeable = counts.placeable;
+  const total = counts.total;
+  const unplaceable = counts.unplaceable;
+  const taken = counts.taking;
   const shown = orderPack(
     view.hideUnplaceable ? picks.filter((pick) => pick.fit !== "none") : picks,
     view.order,
@@ -131,21 +143,32 @@ export function ArrivingPack({
       </p>
 
       <div className="flex flex-col gap-1.5">
-        <span className="text-xs font-medium">Read them against</span>
+        <span className="text-xs font-medium">
+          <Trans>Read them against</Trans>
+        </span>
         <GamePickerButton
           value={game}
           games={games}
           headers={gameHeaders}
-          placeholder="Pick a game"
+          placeholder={t`Pick a game`}
           disabled={games.length === 0}
           onClick={onChooseGame}
         />
         <p className="text-xs text-muted-foreground">
-          A game's blueprint file says nothing about which game it is for, so
-          pick the one these were drawn in.{" "}
-          {checked
-            ? `${counts.placeable} of ${counts.total} can be placed in it.`
-            : "Its units have not been read, so nothing here has been checked against them."}
+          <Trans>
+            A game's blueprint file says nothing about which game it is for, so
+            pick the one these were drawn in.
+          </Trans>{" "}
+          {checked ? (
+            <Trans>
+              {placeable} of {total} can be placed in it.
+            </Trans>
+          ) : (
+            <Trans>
+              Its units have not been read, so nothing here has been checked
+              against them.
+            </Trans>
+          )}
         </p>
       </div>
 
@@ -159,10 +182,10 @@ export function ArrivingPack({
           onValueChange={(order) =>
             onView({ ...view, order: order as PackOrder })
           }
-          options={ORDERS}
+          options={orders(t)}
         />
         <Button size="sm" variant="outline" onClick={onTakeAll}>
-          Tick the {counts.placeable} that fit
+          <Trans>Tick the {placeable} that fit</Trans>
         </Button>
         <Button
           size="sm"
@@ -170,7 +193,7 @@ export function ArrivingPack({
           disabled={counts.taking === 0}
           onClick={onClear}
         >
-          Clear
+          <Trans>Clear</Trans>
         </Button>
       </div>
 
@@ -185,7 +208,7 @@ export function ArrivingPack({
             htmlFor="pack-hide-unplaceable"
             className="text-xs text-muted-foreground"
           >
-            Hide the {counts.unplaceable} this game cannot place at all
+            <Trans>Hide the {unplaceable} this game cannot place at all</Trans>
           </label>
         </div>
       )}
@@ -207,10 +230,11 @@ export function ArrivingPack({
 
       {unreadable > 0 && (
         <p className="text-[11px] text-muted-foreground">
-          {unreadable} other entr{unreadable === 1 ? "y is" : "ies are"} in this
-          file that coilbox cannot read. Nothing here writes to the file, so{" "}
-          {unreadable === 1 ? "it stays" : "they stay"} exactly as{" "}
-          {unreadable === 1 ? "it is" : "they are"}.
+          {plural(unreadable, {
+            one: "# other entry is in this file that coilbox cannot read. Nothing here writes to the file, so it stays exactly as it is.",
+            other:
+              "# other entries are in this file that coilbox cannot read. Nothing here writes to the file, so they stay exactly as they are.",
+          })}
         </p>
       )}
 
@@ -225,8 +249,8 @@ export function ArrivingPack({
           <Download className="mr-1.5 size-4" aria-hidden />
         )}
         {counts.taking === 0
-          ? "Tick the ones you want"
-          : `Add ${counts.taking} to my library`}
+          ? t`Tick the ones you want`
+          : t`Add ${taken} to my library`}
       </Button>
     </div>
   );
@@ -252,15 +276,29 @@ function PackSideChoiceList({
 }) {
   const { offer, takingAs, onTakeAs } = conversion;
   const chosen = offer.choices.find((one) => one.side === takingAs);
+  const fromCount = offer.from.length;
+  const firstFrom = offer.from[0];
+  const fromList = new Intl.ListFormat(getLocale(), {
+    style: "long",
+    type: "conjunction",
+  }).format(offer.from);
+  const chosenSide = chosen?.side ?? "";
+  const converts = chosen?.converts ?? 0;
+  const already = chosen?.already ?? 0;
+  const untouched = chosen?.untouched ?? 0;
+  const sideUnknown = offer.sideUnknown;
 
   return (
     <div className="flex flex-col gap-2 rounded border border-border/50 p-2">
       <p className="text-xs text-muted-foreground">
-        {offer.from.length === 1
-          ? `These are ${offer.from[0]}'s blueprints, and this game has another side's version of what is in them.`
-          : `These blueprints are ${offer.from.join(" and ")}'s.`}{" "}
-        Coilbox does not know which side you play, so they are kept as they are
-        unless you say otherwise.
+        {plural(fromCount, {
+          one: `These are ${firstFrom}'s blueprints, and this game has another side's version of what is in them.`,
+          other: `These blueprints are ${fromList}'s.`,
+        })}{" "}
+        <Trans>
+          Coilbox does not know which side you play, so they are kept as they
+          are unless you say otherwise.
+        </Trans>
       </p>
       <div className="flex flex-wrap gap-1.5">
         <Button
@@ -269,33 +307,48 @@ function PackSideChoiceList({
           variant={takingAs === "" ? "default" : "outline"}
           onClick={() => onTakeAs("")}
         >
-          Keep them as they are
+          <Trans>Keep them as they are</Trans>
         </Button>
-        {offer.choices.map((choice) => (
-          <Button
-            key={choice.side}
-            type="button"
-            size="sm"
-            variant={takingAs === choice.side ? "default" : "outline"}
-            className="gap-1.5"
-            onClick={() => onTakeAs(choice.side)}
-          >
-            <Repeat className="size-3.5" aria-hidden />
-            Take them all as {choice.side}
-          </Button>
-        ))}
+        {offer.choices.map((choice) => {
+          const side = choice.side;
+          return (
+            <Button
+              key={choice.side}
+              type="button"
+              size="sm"
+              variant={takingAs === choice.side ? "default" : "outline"}
+              className="gap-1.5"
+              onClick={() => onTakeAs(choice.side)}
+            >
+              <Repeat className="size-3.5" aria-hidden />
+              <Trans>Take them all as {side}</Trans>
+            </Button>
+          );
+        })}
       </div>
       {chosen && (
         <p className="text-xs text-muted-foreground">
-          {chosen.converts} of these are said in {chosen.side} now.
-          {chosen.already > 0
-            ? ` ${chosen.already} already ${chosen.already === 1 ? "was" : "were"}.`
+          <Trans>
+            {converts} of these are said in {chosenSide} now.
+          </Trans>
+          {already > 0
+            ? ` ${plural(already, {
+                one: "# already was.",
+                other: "# already were.",
+              })}`
             : ""}
-          {chosen.untouched > 0
-            ? ` ${chosen.untouched} ${chosen.untouched === 1 ? "has" : "have"} nothing in ${chosen.side} to be said in, so ${chosen.untouched === 1 ? "it stays" : "they stay"} exactly as ${chosen.untouched === 1 ? "it is" : "they are"}.`
+          {untouched > 0
+            ? ` ${plural(untouched, {
+                one: `# has nothing in ${chosenSide} to be said in, so it stays exactly as it is.`,
+                other: `# have nothing in ${chosenSide} to be said in, so they stay exactly as they are.`,
+              })}`
             : ""}
-          {offer.sideUnknown > 0
-            ? ` ${offer.sideUnknown} of them ${offer.sideUnknown === 1 ? "is" : "are"} made of more than one side's buildings, so what ${offer.sideUnknown === 1 ? "it was" : "they were"} cannot be told.`
+          {sideUnknown > 0
+            ? ` ${plural(sideUnknown, {
+                one: "# of them is made of more than one side's buildings, so what it was cannot be told.",
+                other:
+                  "# of them are made of more than one side's buildings, so what they were cannot be told.",
+              })}`
             : ""}
         </p>
       )}
@@ -314,8 +367,14 @@ function PackRow({
   takingAs: string;
   onToggle: (index: number) => void;
 }) {
+  const { t } = useLingui();
   const { entry, payload, arrival, fit, taking } = pick;
   const buildings = entry.buildings.length;
+  const buildingCount = plural(buildings, {
+    one: "# building",
+    other: "# buildings",
+  });
+  const keptAs = arrival.name;
   const id = `pack-layout-${entry.index}`;
   // Only the warnings. The rename note is on the row already, in the name it
   // would be kept under, and thirty rows repeating it is thirty lines nobody
@@ -351,9 +410,9 @@ function PackRow({
           {entry.name}
         </label>
         <span className="text-[11px] text-muted-foreground">
-          {buildings} building{buildings === 1 ? "" : "s"}
-          {entry.ordered ? " · build order" : ""}
-          {arrival.wasCalled ? ` · kept as "${arrival.name}"` : ""}
+          {buildingCount}
+          {entry.ordered ? ` · ${t`build order`}` : ""}
+          {arrival.wasCalled ? ` · ${t`kept as "${keptAs}"`}` : ""}
         </span>
         {warnings.map((note) => (
           <p

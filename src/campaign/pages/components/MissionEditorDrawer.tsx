@@ -1,3 +1,4 @@
+import { Trans, useLingui } from "@lingui/react/macro";
 import { Button, Input, useDrawer } from "@picoframe/frame";
 import { open } from "@tauri-apps/plugin-dialog";
 import { ChevronRight, Image, Plus, Trash2, Undo2, X } from "lucide-react";
@@ -109,6 +110,7 @@ function SpinControls({
   spinSpeed: number | undefined;
   onChange: (spinSpeed: number) => void;
 }) {
+  const { t } = useLingui();
   const spin = spinSpeed ?? 1;
   const magnitude = Math.abs(spin);
   const reversed = spin < 0;
@@ -116,7 +118,9 @@ function SpinControls({
     <>
       <div className="flex flex-col gap-1.5">
         <div className="flex items-center justify-between text-xs">
-          <span className="font-medium">Spin speed</span>
+          <span className="font-medium">
+            <Trans>Spin speed</Trans>
+          </span>
           <span className="font-mono text-muted-foreground">
             {formatFixed(magnitude, 2)}×
           </span>
@@ -127,12 +131,14 @@ function SpinControls({
           step={0.25}
           value={[magnitude]}
           onValueChange={([v]) => onChange(reversed ? -v : v)}
-          aria-label="Spin speed"
+          aria-label={t`Spin speed`}
         />
       </div>
       {/* biome-ignore lint/a11y/noLabelWithoutControl: wraps the <Switch> control (implicit label association) */}
       <label className="flex items-center justify-between gap-2 text-xs">
-        <span className="font-medium">Reverse spin</span>
+        <span className="font-medium">
+          <Trans>Reverse spin</Trans>
+        </span>
         <Switch
           checked={reversed}
           onCheckedChange={(v) => onChange((v ? -1 : 1) * magnitude)}
@@ -158,7 +164,9 @@ function MapPreviewTuning({
       />
       {/* biome-ignore lint/a11y/noLabelWithoutControl: wraps the <Switch> control (implicit label association) */}
       <label className="flex items-center justify-between gap-2 text-xs">
-        <span className="font-medium">Water</span>
+        <span className="font-medium">
+          <Trans>Water</Trans>
+        </span>
         <Switch
           checked={config.water ?? true}
           onCheckedChange={(v) => onChange({ ...config, water: v })}
@@ -189,8 +197,10 @@ function UnitSlotEditor({
   config: UnitPreviewConfig;
   onChange: (config: UnitPreviewConfig) => void;
 }) {
+  const { t } = useLingui();
   const { units, loading, gameMissing } = useGameUnits(gameName);
   const unit = useMissionUnit(gameName, config);
+  const unitDef = config.unitDef;
 
   return (
     <UnitGameProvider gameName={gameName}>
@@ -200,7 +210,7 @@ function UnitSlotEditor({
           value={config.unitDef}
           onValueChange={(unitDef) => onChange({ ...config, unitDef })}
           loading={loading}
-          placeholder="Pick a unit"
+          placeholder={t`Pick a unit`}
           size="sm"
         />
         <SpinControls
@@ -210,12 +220,16 @@ function UnitSlotEditor({
       </div>
       {gameMissing ? (
         <p className="text-xs text-muted-foreground">
-          {gameName} is not installed here, so its units can't be listed.
+          <Trans>
+            {gameName} is not installed here, so its units can't be listed.
+          </Trans>
         </p>
       ) : unit.unavailable ? (
         <p className="text-xs text-muted-foreground">
-          {gameName} has no model for "{config.unitDef}". The briefing will show
-          this slot's image instead.
+          <Trans>
+            {gameName} has no model for "{unitDef}". The briefing will show this
+            slot's image instead.
+          </Trans>
         </p>
       ) : (
         config.unitDef !== "" && (
@@ -287,15 +301,19 @@ function RevertButton({
           className="gap-1.5"
           disabled={disabled}
         >
-          <Undo2 className="size-4" /> Revert
+          <Undo2 className="size-4" /> <Trans>Revert</Trans>
         </Button>
       </PopoverTrigger>
       <PopoverContent align="start" className="flex w-72 flex-col gap-3">
         <div className="flex flex-col gap-1">
-          <h3 className="text-sm font-medium">Undo every change?</h3>
+          <h3 className="text-sm font-medium">
+            <Trans>Undo every change?</Trans>
+          </h3>
           <p className="text-xs text-muted-foreground">
-            This puts the mission back the way it was when you opened it, and
-            saves that. Anything imported since goes off disk with it.
+            <Trans>
+              This puts the mission back the way it was when you opened it, and
+              saves that. Anything imported since goes off disk with it.
+            </Trans>
           </p>
         </div>
         <div className="flex justify-end gap-2">
@@ -305,7 +323,7 @@ function RevertButton({
             variant="outline"
             onClick={() => setOpen(false)}
           >
-            Keep editing
+            <Trans>Keep editing</Trans>
           </Button>
           <Button
             type="button"
@@ -316,7 +334,7 @@ function RevertButton({
               onRevert();
             }}
           >
-            Revert
+            <Trans>Revert</Trans>
           </Button>
         </div>
       </PopoverContent>
@@ -448,6 +466,7 @@ export function MissionEditorDrawer({
   /** Store this mission, as part of the whole campaign. Called on every change. */
   onSave: (mission: CampaignMission) => Promise<void>;
 }) {
+  const { t } = useLingui();
   const drawer = useDrawer();
   const [groups, setGroup] = useMissionGroups();
   const [mission, setMission] = useState<CampaignMission>(initial);
@@ -462,6 +481,7 @@ export function MissionEditorDrawer({
   const write = useRef(onSave);
   write.current = onSave;
   const panel = useRef<HTMLDivElement>(null);
+  const mediaExample = "![](images/art.jpg)";
 
   // The panel outlives its own close: it goes when the slide-out animation
   // ends, so opening a second mission before that lands hands a new mission to
@@ -580,11 +600,11 @@ export function MissionEditorDrawer({
     setError(null);
     try {
       const src = await open({
-        title: "Choose panorama image or video",
+        title: t`Choose panorama image or video`,
         multiple: false,
         filters: [
           {
-            name: "Image or video",
+            name: t`Image or video`,
             extensions: [
               "png",
               "jpg",
@@ -647,7 +667,7 @@ export function MissionEditorDrawer({
       <div className="sticky -top-1 z-10 -mx-1 -mt-1 flex flex-col gap-1.5 bg-background px-1 pb-2 pt-1">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <p className="text-xs text-muted-foreground">
-            Changes save as you make them.
+            <Trans>Changes save as you make them.</Trans>
           </p>
           <SaveStatus state={save} onRetry={() => void persist(mission)} />
         </div>
@@ -672,14 +692,14 @@ export function MissionEditorDrawer({
       )}
 
       <Group
-        title="Content"
+        title={t`Content`}
         summary={contentSummary(mission)}
         open={groups.content}
         onOpenChange={(o) => setGroup("content", o)}
       >
         <div className="flex flex-col gap-2">
           <Label htmlFor="mission-title" className="text-sm font-medium">
-            Title
+            <Trans>Title</Trans>
           </Label>
           <Input
             id="mission-title"
@@ -694,12 +714,12 @@ export function MissionEditorDrawer({
 
         <div className="flex flex-col gap-2">
           <Label htmlFor="mission-subtitle" className="text-sm font-medium">
-            Subtitle
+            <Trans>Subtitle</Trans>
           </Label>
           <Input
             id="mission-subtitle"
             value={mission.subtitle ?? ""}
-            placeholder="Location line shown under the title"
+            placeholder={t`Location line shown under the title`}
             onChange={(e) => edit({ subtitle: e.target.value || undefined })}
             onBlur={persistTyped}
             onKeyDown={(e) => {
@@ -710,12 +730,14 @@ export function MissionEditorDrawer({
 
         <div className="flex flex-col gap-2">
           <Label htmlFor="mission-briefing" className="text-sm font-medium">
-            Briefing
+            <Trans>Briefing</Trans>
           </Label>
           <p className="text-xs text-muted-foreground">
-            Markdown supported. Embed bundled media with{" "}
-            <code className="font-mono">![](images/art.jpg)</code> — image,
-            audio or video by file extension.
+            <Trans>
+              Markdown supported. Embed bundled media with{" "}
+              <code className="font-mono">{mediaExample}</code> — image, audio
+              or video by file extension.
+            </Trans>
           </p>
           <Textarea
             id="mission-briefing"
@@ -727,30 +749,35 @@ export function MissionEditorDrawer({
         </div>
 
         <div className="flex flex-col gap-2">
-          <span className="text-sm font-medium">Objectives</span>
+          <span className="text-sm font-medium">
+            <Trans>Objectives</Trans>
+          </span>
           <ul className="flex flex-col gap-1.5">
-            {mission.objectives.map((o, i) => (
-              // biome-ignore lint/suspicious/noArrayIndexKey: objectives are a plain ordered string list with no stable id
-              <li key={i} className="flex items-center gap-1.5">
-                <Input
-                  value={o}
-                  placeholder={`Objective ${i + 1}`}
-                  onChange={(e) => setObjective(i, e.target.value)}
-                  onBlur={persistTyped}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter") e.currentTarget.blur();
-                  }}
-                />
-                <Button
-                  size="icon"
-                  variant="ghost"
-                  aria-label={`Remove objective ${i + 1}`}
-                  onClick={() => removeObjective(i)}
-                >
-                  <X className="size-4" />
-                </Button>
-              </li>
-            ))}
+            {mission.objectives.map((o, i) => {
+              const position = i + 1;
+              return (
+                // biome-ignore lint/suspicious/noArrayIndexKey: objectives are a plain ordered string list with no stable id
+                <li key={i} className="flex items-center gap-1.5">
+                  <Input
+                    value={o}
+                    placeholder={t`Objective ${position}`}
+                    onChange={(e) => setObjective(i, e.target.value)}
+                    onBlur={persistTyped}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") e.currentTarget.blur();
+                    }}
+                  />
+                  <Button
+                    size="icon"
+                    variant="ghost"
+                    aria-label={t`Remove objective ${position}`}
+                    onClick={() => removeObjective(i)}
+                  >
+                    <X className="size-4" />
+                  </Button>
+                </li>
+              );
+            })}
           </ul>
           <Button
             size="sm"
@@ -758,16 +785,20 @@ export function MissionEditorDrawer({
             className="self-start gap-1.5"
             onClick={addObjective}
           >
-            <Plus className="size-4" /> Add objective
+            <Plus className="size-4" /> <Trans>Add objective</Trans>
           </Button>
         </div>
 
         {/* biome-ignore lint/a11y/noLabelWithoutControl: wraps the <Switch> control (implicit label association) */}
         <label className="flex items-center justify-between gap-2 text-sm">
           <span className="flex flex-col">
-            <span className="font-medium">Skippable</span>
+            <span className="font-medium">
+              <Trans>Skippable</Trans>
+            </span>
             <span className="text-xs text-muted-foreground">
-              Playable even if the previous mission is incomplete.
+              <Trans>
+                Playable even if the previous mission is incomplete.
+              </Trans>
             </span>
           </span>
           <Switch
@@ -781,7 +812,7 @@ export function MissionEditorDrawer({
           in, so updating the copy in the field below clears the badge above
           it. */}
       <Group
-        title="Scenario"
+        title={t`Scenario`}
         summary={scenarioSummary(mission)}
         marker={
           scenarioAttachment(mission, scenarios).state === "stale" ? (
@@ -801,17 +832,21 @@ export function MissionEditorDrawer({
       </Group>
 
       <Group
-        title="Presentation"
+        title={t`Presentation`}
         summary={presentationSummary(mission)}
         open={groups.presentation}
         onOpenChange={(o) => setGroup("presentation", o)}
       >
         <div className="flex flex-col gap-2">
-          <span className="text-sm font-medium">Panorama</span>
+          <span className="text-sm font-medium">
+            <Trans>Panorama</Trans>
+          </span>
           <p className="text-xs text-muted-foreground">
-            The briefing backdrop: a horizontally-tiling image, a looping muted
-            video, the mission's map as a full-screen spinning 3D preview, or
-            one of the game's units turning on the spot.
+            <Trans>
+              The briefing backdrop: a horizontally-tiling image, a looping
+              muted video, the mission's map as a full-screen spinning 3D
+              preview, or one of the game's units turning on the spot.
+            </Trans>
           </p>
           <SlotSourceSelect
             value={slotSourceValue(panoramaSlot)}
@@ -873,7 +908,9 @@ export function MissionEditorDrawer({
                   onClick={pickImage}
                 >
                   <Image className="size-4" />{" "}
-                  {mission.panorama ? "Replace media" : "Choose image or video"}
+                  {mission.panorama
+                    ? t`Replace media`
+                    : t`Choose image or video`}
                 </Button>
                 <ArchiveMediaImportButton
                   campaignId={campaignId}
@@ -888,7 +925,7 @@ export function MissionEditorDrawer({
                     className="gap-1.5"
                     onClick={removeImage}
                   >
-                    <Trash2 className="size-4" /> Remove
+                    <Trash2 className="size-4" /> <Trans>Remove</Trans>
                   </Button>
                 )}
               </div>
@@ -897,11 +934,15 @@ export function MissionEditorDrawer({
         </div>
 
         <div className="flex flex-col gap-2">
-          <span className="text-sm font-medium">Side graphic</span>
+          <span className="text-sm font-medium">
+            <Trans>Side graphic</Trans>
+          </span>
           <p className="text-xs text-muted-foreground">
-            Shown beside the briefing card: a still image, a looping muted
-            video, or the mission's map or one of the game's units as a
-            drag-to-rotate spinning preview layered over the backdrop.
+            <Trans>
+              Shown beside the briefing card: a still image, a looping muted
+              video, or the mission's map or one of the game's units as a
+              drag-to-rotate spinning preview layered over the backdrop.
+            </Trans>
           </p>
           <SlotSourceSelect
             value={slotSourceValue(sideGraphicSlot)}
@@ -934,8 +975,8 @@ export function MissionEditorDrawer({
                 kind="sideGraphic"
                 value={mission.sideGraphic}
                 onChange={(sideGraphic) => patch({ sideGraphic })}
-                label="Image or video"
-                help="A unit render or emblem, for example. Image transparency is kept; a video loops muted."
+                label={t`Image or video`}
+                help={t`A unit render or emblem, for example. Image transparency is kept; a video loops muted.`}
                 gameName={mission.snapshot.gameName}
                 allowVideo
                 preview={
@@ -972,8 +1013,8 @@ export function MissionEditorDrawer({
             kind="audio"
             value={mission.voiceover}
             onChange={(voiceover) => patch({ voiceover })}
-            label="Briefing voiceover"
-            help="Optional audio played on the briefing screen."
+            label={t`Briefing voiceover`}
+            help={t`Optional audio played on the briefing screen.`}
             gameName={mission.snapshot.gameName}
           />
           {mission.voiceover && (
@@ -993,8 +1034,8 @@ export function MissionEditorDrawer({
             kind="video"
             value={mission.cutscene}
             onChange={(cutscene) => patch({ cutscene })}
-            label="Intro cutscene"
-            help="Optional video offered on the briefing screen."
+            label={t`Intro cutscene`}
+            help={t`Optional video offered on the briefing screen.`}
             gameName={mission.snapshot.gameName}
           />
           {mission.cutscene && (
@@ -1011,13 +1052,15 @@ export function MissionEditorDrawer({
       </Group>
 
       <Group
-        title="Rules"
+        title={t`Rules`}
         summary={rulesSummary(mission)}
         open={groups.rules}
         onOpenChange={(o) => setGroup("rules", o)}
       >
         <div className="flex flex-col gap-2">
-          <span className="text-sm font-medium">Unit restrictions</span>
+          <span className="text-sm font-medium">
+            <Trans>Unit restrictions</Trans>
+          </span>
           <UnitRestrictions
             gameName={mission.snapshot.gameName}
             builtUnits={builtUnits}
@@ -1038,7 +1081,7 @@ export function MissionEditorDrawer({
             drawer.close();
           }}
         >
-          Close
+          <Trans>Close</Trans>
         </Button>
       </div>
     </div>

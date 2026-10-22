@@ -16,6 +16,8 @@
  * written a moment after the last change, and again on the way out.
  */
 
+import { plural } from "@lingui/core/macro";
+import { Trans, useLingui } from "@lingui/react/macro";
 import { Button, useDrawer } from "@picoframe/frame";
 import {
   ArrowLeft,
@@ -77,6 +79,7 @@ export default function BlueprintDetailPage() {
   const { id = "" } = useParams();
   const navigate = useNavigate();
   const { records, loading, error } = useBlueprintLibrary();
+  const { t } = useLingui();
   // An edit here is a change the in game widget should see next match.
   useWidgetFiles();
 
@@ -178,13 +181,23 @@ export default function BlueprintDetailPage() {
         {error ? (
           <ErrorBanner message={error} />
         ) : (
-          <EmptyState label="That blueprint isn't in your library. It may have been deleted." />
+          <EmptyState
+            label={t`That blueprint isn't in your library. It may have been deleted.`}
+          />
         )}
       </div>
     );
   }
 
   const buildings = record.layout.buildings.length;
+  const takenOn = record.source?.at
+    ? formatDate(new Date(record.source.at))
+    : "";
+  const gameLine = claimedGame || t`No game named`;
+  const buildingCount = plural(buildings, {
+    one: "# building",
+    other: "# buildings",
+  });
 
   return (
     <div className="flex flex-col gap-4 p-4">
@@ -199,17 +212,18 @@ export default function BlueprintDetailPage() {
             {record.layout.name}
           </h1>
           <p className="truncate text-xs text-muted-foreground">
-            {claimedGame || "No game named"} · {buildings} building
-            {buildings === 1 ? "" : "s"}
-            {record.layout.ordered ? " · build order" : ""}
+            {gameLine} · {buildingCount}
+            {record.layout.ordered ? ` · ${t`build order`}` : ""}
           </p>
           {/* Said rather than done quietly, because the units below came out of
               a build this layout was not drawn on and one of them may have
               moved since. The editor names any that have. */}
           {resolved && resolved !== claimedGame && (
             <p className="text-xs text-muted-foreground">
-              You have {resolved}, which is the same game at another version, so
-              it is opened with that.
+              <Trans>
+                You have {resolved}, which is the same game at another version,
+                so it is opened with that.
+              </Trans>
             </p>
           )}
           {/* Where this copy came from, for a layout that did not start here
@@ -218,9 +232,7 @@ export default function BlueprintDetailPage() {
           {record.source && (
             <p className="break-all text-xs text-muted-foreground">
               {sourceSummary(record.source)}
-              {record.source.at
-                ? ` Taken on ${formatDate(new Date(record.source.at))}.`
-                : ""}
+              {record.source.at ? ` ${t`Taken on ${takenOn}.`}` : ""}
               {/* The recorded item id is the key back into the hub, so it is
                   worth a door rather than a number nothing opens (issue
                   #1487). The app's own item page rather than the website: it
@@ -236,7 +248,7 @@ export default function BlueprintDetailPage() {
                     to={hubItemRoute(record.source.item)}
                     className="underline underline-offset-2 hover:text-foreground"
                   >
-                    See it on the hub
+                    <Trans>See it on the hub</Trans>
                   </Link>
                 </>
               )}
@@ -255,7 +267,7 @@ export default function BlueprintDetailPage() {
                     to={scenarioRoute(record.source.scenario)}
                     className="underline underline-offset-2 hover:text-foreground"
                   >
-                    Open the scenario
+                    <Trans>Open the scenario</Trans>
                   </Link>
                 </>
               )}
@@ -289,7 +301,7 @@ export default function BlueprintDetailPage() {
         </div>
       </header>
 
-      {saveError && <ErrorBanner message={`Not saved: ${saveError}`} />}
+      {saveError && <ErrorBanner message={t`Not saved: ${saveError}`} />}
 
       <BlueprintEditor
         blueprint={layout}
@@ -316,15 +328,17 @@ export default function BlueprintDetailPage() {
           className="w-fit gap-1.5"
           onClick={() => setOnMap(true)}
         >
-          <MapPin className="size-4" /> Try it on a map
+          <MapPin className="size-4" /> <Trans>Try it on a map</Trans>
         </Button>
       )}
 
       <p className="text-xs text-muted-foreground">
-        A blueprint is a shape rather than a place, so there is no map here and
-        no team. Try it on a map to see which of its buildings a real terrain
-        would refuse. Put it down in a mission from the scenario builder, or
-        send it to a game's own blueprint file from there.
+        <Trans>
+          A blueprint is a shape rather than a place, so there is no map here
+          and no team. Try it on a map to see which of its buildings a real
+          terrain would refuse. Put it down in a mission from the scenario
+          builder, or send it to a game's own blueprint file from there.
+        </Trans>
       </p>
     </div>
   );
@@ -336,7 +350,7 @@ function BackLink() {
       to="/library/blueprints"
       className="inline-flex w-fit items-center gap-1 text-xs text-muted-foreground hover:underline"
     >
-      <ArrowLeft className="size-3.5" /> Blueprints
+      <ArrowLeft className="size-3.5" /> <Trans>Blueprints</Trans>
     </Link>
   );
 }
@@ -354,7 +368,7 @@ function SaveState({
   if (!saving) return null;
   return (
     <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
-      <Loader2 className="size-3.5 animate-spin" /> Saving
+      <Loader2 className="size-3.5 animate-spin" /> <Trans>Saving</Trans>
     </span>
   );
 }
@@ -366,13 +380,15 @@ function SaveState({
  */
 function ShareBlueprintButton({ record }: { record: StoredBlueprint }) {
   const drawer = useDrawer();
+  const { t } = useLingui();
+  const name = record.layout.name;
 
   const share = async () => {
     const { ShareBlueprintForm } = await import(
       "./components/ShareBlueprintForm"
     );
     drawer.open({
-      title: `Share ${record.layout.name}`,
+      title: t`Share ${name}`,
       width: "28rem",
       content: <ShareBlueprintForm key={nextDrawerKey()} record={record} />,
     });
@@ -386,7 +402,7 @@ function ShareBlueprintButton({ record }: { record: StoredBlueprint }) {
       className="gap-1.5"
       onClick={() => void share()}
     >
-      <Share2 className="size-4" /> Share
+      <Share2 className="size-4" /> <Trans>Share</Trans>
     </Button>
   );
 }
@@ -409,6 +425,7 @@ function DuplicateBlueprintButton({
   taken: string[];
 }) {
   const navigate = useNavigate();
+  const { t } = useLingui();
   const [busy, setBusy] = useState(false);
 
   async function duplicate() {
@@ -416,14 +433,16 @@ function DuplicateBlueprintButton({
     try {
       const copy = duplicatedBlueprint(record, taken);
       await saveBlueprint(copy);
+      const copyName = copy.layout.name;
       void notify({
-        title: `"${copy.layout.name}" is yours to change.`,
+        title: t`"${copyName}" is yours to change.`,
         level: "success",
       });
       navigate(blueprintRoute(copy.id));
     } catch (e) {
+      const reason = message(e);
       void notify({
-        title: `That blueprint could not be copied: ${message(e)}`,
+        title: t`That blueprint could not be copied: ${reason}`,
         level: "error",
       });
     } finally {
@@ -445,7 +464,7 @@ function DuplicateBlueprintButton({
       ) : (
         <Copy className="size-4" />
       )}
-      Duplicate
+      <Trans>Duplicate</Trans>
     </Button>
   );
 }
@@ -465,13 +484,15 @@ function SubstituteButton({
   onApply: (layout: BaseBlueprint) => void;
 }) {
   const drawer = useDrawer();
+  const { t } = useLingui();
+  const name = record.layout.name;
 
   const open = async () => {
     const { SubstituteBlueprintForm } = await import(
       "./components/SubstituteBlueprintForm"
     );
     drawer.open({
-      title: `Convert ${record.layout.name}`,
+      title: t`Convert ${name}`,
       width: "32rem",
       content: (
         <SubstituteBlueprintForm
@@ -494,7 +515,7 @@ function SubstituteButton({
       className="gap-1.5"
       onClick={() => void open()}
     >
-      <Repeat className="size-4" /> Convert
+      <Repeat className="size-4" /> <Trans>Convert</Trans>
     </Button>
   );
 }
@@ -525,15 +546,19 @@ function DeleteBlueprintButton({
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
         <Button type="button" size="sm" variant="outline" className="gap-1.5">
-          <Trash2 className="size-4" /> Delete
+          <Trash2 className="size-4" /> <Trans>Delete</Trans>
         </Button>
       </PopoverTrigger>
       <PopoverContent align="end" className="flex w-80 flex-col gap-3">
         <div className="flex flex-col gap-1">
-          <h3 className="text-sm font-medium">Delete this blueprint?</h3>
+          <h3 className="text-sm font-medium">
+            <Trans>Delete this blueprint?</Trans>
+          </h3>
           <p className="break-words text-xs text-muted-foreground">
-            "{name}" goes from your library. A scenario that already placed a
-            base from it keeps its own copy.
+            <Trans>
+              "{name}" goes from your library. A scenario that already placed a
+              base from it keeps its own copy.
+            </Trans>
           </p>
         </div>
         <div className="flex justify-end gap-2">
@@ -544,7 +569,7 @@ function DeleteBlueprintButton({
             disabled={busy}
             onClick={() => setOpen(false)}
           >
-            Cancel
+            <Trans>Cancel</Trans>
           </Button>
           <Button
             type="button"
@@ -559,7 +584,7 @@ function DeleteBlueprintButton({
             ) : (
               <Trash2 className="size-4" />
             )}
-            Delete
+            <Trans>Delete</Trans>
           </Button>
         </div>
         {error && (

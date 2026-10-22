@@ -1,3 +1,5 @@
+import { plural } from "@lingui/core/macro";
+import { Trans, useLingui } from "@lingui/react/macro";
 import { Button } from "@picoframe/frame";
 import { RotateCcw } from "lucide-react";
 import { useState } from "react";
@@ -20,10 +22,12 @@ export function ChallengeRecordLine({
   identity: string;
   className?: string;
 }) {
+  const { t } = useLingui();
   const { records, clear } = useChallengeRecords();
   const [open, setOpen] = useState(false);
   const record = records[identity];
   if (!record) return null;
+  const attemptCount = record.attempts;
   return (
     <div className={`flex items-center gap-1 text-xs ${className ?? ""}`}>
       <span>{recordSummary(record)}</span>
@@ -32,7 +36,7 @@ export function ChallengeRecordLine({
           <Button
             variant="ghost"
             size="icon"
-            aria-label="Clear the record for this challenge"
+            aria-label={t`Clear the record for this challenge`}
           >
             <RotateCcw className="size-4" />
           </Button>
@@ -40,9 +44,11 @@ export function ChallengeRecordLine({
         <PopoverContent align="end" className="w-72">
           <div className="flex flex-col gap-3">
             <p className="text-sm">
-              Clear the record for this challenge? That forgets{" "}
-              {record.attempts} {record.attempts === 1 ? "attempt" : "attempts"}{" "}
-              and the best result. Your runs stay.
+              {plural(attemptCount, {
+                one: "Clear the record for this challenge? That forgets # attempt and the best result. Your runs stay.",
+                other:
+                  "Clear the record for this challenge? That forgets # attempts and the best result. Your runs stay.",
+              })}
             </p>
             <div className="flex justify-end gap-2">
               <Button
@@ -50,7 +56,7 @@ export function ChallengeRecordLine({
                 size="sm"
                 onClick={() => setOpen(false)}
               >
-                Keep it
+                <Trans>Keep it</Trans>
               </Button>
               <Button
                 variant="destructive"
@@ -60,7 +66,7 @@ export function ChallengeRecordLine({
                   clear(identity);
                 }}
               >
-                Clear record
+                <Trans>Clear record</Trans>
               </Button>
             </div>
           </div>

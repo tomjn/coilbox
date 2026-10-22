@@ -7,6 +7,7 @@
  * the standing preference in this codebase.
  */
 
+import { Trans, useLingui } from "@lingui/react/macro";
 import { Button, useDrawer } from "@picoframe/frame";
 import { Layers } from "lucide-react";
 
@@ -19,11 +20,12 @@ export function BlueprintPackButton({
   onImported: (records: StoredBlueprint[]) => void;
 }) {
   const drawer = useDrawer();
+  const { t } = useLingui();
 
   const openPack = async () => {
     const { ImportPackForm } = await import("./ImportPackForm");
     drawer.open({
-      title: "Open a pack of blueprints",
+      title: t`Open a pack of blueprints`,
       // Wider than the single layout import: this is a list to skim, and thirty
       // rows each carrying a drawing want the room.
       width: "34rem",
@@ -45,7 +47,7 @@ export function BlueprintPackButton({
       className="shrink-0 gap-1.5"
       onClick={() => void openPack()}
     >
-      <Layers className="size-4" /> Open a pack
+      <Layers className="size-4" /> <Trans>Open a pack</Trans>
     </Button>
   );
 }

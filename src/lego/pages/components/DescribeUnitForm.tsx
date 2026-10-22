@@ -1,3 +1,4 @@
+import { Trans, useLingui } from "@lingui/react/macro";
 import { Button } from "@picoframe/frame";
 import { type ReactNode, useState } from "react";
 
@@ -32,6 +33,7 @@ const sizedBy = (plan: BodyPlan) => plan.basedOn ?? plan.id;
  * last is the size it is fitted to.
  */
 export function DescribeUnitForm({ onBack, onStart }: Props) {
+  const { t } = useLingui();
   const [answer, setAnswer] = useState<Description>({
     move: "biped",
     weapons: 0,
@@ -59,7 +61,7 @@ export function DescribeUnitForm({ onBack, onStart }: Props) {
         if (target) onStart(plan, target);
       }}
     >
-      <Question label="How does it move?">
+      <Question label={t`How does it move?`}>
         <ToggleGroup
           type="single"
           variant="outline"
@@ -70,7 +72,7 @@ export function DescribeUnitForm({ onBack, onStart }: Props) {
           onValueChange={(id) => {
             if (id !== "") change({ ...answer, move: id as MoveId });
           }}
-          aria-label="How does it move?"
+          aria-label={t`How does it move?`}
         >
           {MOVES.map((m) => (
             <ToggleGroupItem key={m.id} value={m.id}>
@@ -79,7 +81,7 @@ export function DescribeUnitForm({ onBack, onStart }: Props) {
           ))}
         </ToggleGroup>
       </Question>
-      <Question label="How many weapons?">
+      <Question label={t`How many weapons?`}>
         <ToggleGroup
           type="single"
           variant="outline"
@@ -88,7 +90,7 @@ export function DescribeUnitForm({ onBack, onStart }: Props) {
           onValueChange={(value) => {
             if (value !== "") change({ ...answer, weapons: Number(value) });
           }}
-          aria-label="How many weapons?"
+          aria-label={t`How many weapons?`}
         >
           {WEAPON_CHOICES.map((n) => (
             <ToggleGroupItem key={n} value={String(n)}>
@@ -97,11 +99,13 @@ export function DescribeUnitForm({ onBack, onStart }: Props) {
           ))}
         </ToggleGroup>
         <p className="text-xs text-muted-foreground">
-          One at most: a plan adds one turret, barrel and flare. Add more once
-          the unit has started.
+          <Trans>
+            One at most: a plan adds one turret, barrel and flare. Add more once
+            the unit has started.
+          </Trans>
         </p>
       </Question>
-      <Question label="Does it build?">
+      <Question label={t`Does it build?`}>
         <ToggleGroup
           type="single"
           variant="outline"
@@ -110,13 +114,17 @@ export function DescribeUnitForm({ onBack, onStart }: Props) {
           onValueChange={(value) => {
             if (value !== "") change({ ...answer, builds: value === "yes" });
           }}
-          aria-label="Does it build?"
+          aria-label={t`Does it build?`}
         >
-          <ToggleGroupItem value="no">No</ToggleGroupItem>
-          <ToggleGroupItem value="yes">Yes</ToggleGroupItem>
+          <ToggleGroupItem value="no">
+            <Trans>No</Trans>
+          </ToggleGroupItem>
+          <ToggleGroupItem value="yes">
+            <Trans>Yes</Trans>
+          </ToggleGroupItem>
         </ToggleGroup>
       </Question>
-      <Question label="How big?">
+      <Question label={t`How big?`}>
         <SkeletonTargetFields
           key={sizedBy(plan)}
           initial={defaultTarget(plan)}
@@ -125,10 +133,10 @@ export function DescribeUnitForm({ onBack, onStart }: Props) {
       </Question>
       <div className="flex justify-end gap-1">
         <Button type="button" size="sm" variant="outline" onClick={onBack}>
-          Back
+          <Trans>Back</Trans>
         </Button>
         <Button type="submit" size="sm" disabled={!target}>
-          Start
+          <Trans>Start</Trans>
         </Button>
       </div>
     </form>

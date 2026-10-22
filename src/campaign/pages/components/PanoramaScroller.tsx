@@ -1,3 +1,4 @@
+import { useLingui } from "@lingui/react/macro";
 import { cn } from "@picoframe/frame";
 import { useEffect, useRef } from "react";
 import { useEffectsEnabled, useReduceMotion } from "../../../general/display";
@@ -84,6 +85,7 @@ export function PanoramaScroller({
    */
   fill?: boolean;
 }) {
+  const { t } = useLingui();
   const src = useCampaignImage(campaignId, panorama);
   const isVideo = src ? mediaKind(src) === "video" : false;
   const ref = useRef<HTMLDivElement>(null);
@@ -145,7 +147,7 @@ export function PanoramaScroller({
         playback={playback}
         defaults={DECORATIVE_DEFAULTS}
         variant="background"
-        label="Briefing backdrop"
+        label={t`Briefing backdrop`}
         className={cn("rounded-md bg-muted", height, className)}
       />
     );

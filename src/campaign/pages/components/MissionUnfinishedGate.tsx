@@ -1,3 +1,4 @@
+import { Trans } from "@lingui/react/macro";
 import { buttonVariants, cn } from "@picoframe/frame";
 import { PencilRuler } from "lucide-react";
 import { Link } from "react-router";
@@ -26,20 +27,24 @@ export function MissionUnfinishedGate({
     <PhaseCard>
       <div className="flex items-center gap-2">
         <PencilRuler className="size-5 text-muted-foreground" />
-        <h2 className="text-lg font-semibold">Unfinished mission</h2>
+        <h2 className="text-lg font-semibold">
+          <Trans>Unfinished mission</Trans>
+        </h2>
       </div>
       <p className="text-sm text-muted-foreground">
-        <span className="font-medium text-foreground">{reason}</span>, so there
-        is nothing to launch it with. Whoever wrote the campaign left this
-        mission short of it, and only editing the campaign can fill it in.
-        Nothing here is missing from your install and there is nothing to
-        download.
+        <Trans>
+          <span className="font-medium text-foreground">{reason}</span>, so
+          there is nothing to launch it with. Whoever wrote the campaign left
+          this mission short of it, and only editing the campaign can fill it
+          in. Nothing here is missing from your install and there is nothing to
+          download.
+        </Trans>
       </p>
       <Link
         to={`/campaign/${encodeURIComponent(campaignId)}`}
         className={cn(buttonVariants({ variant: "outline" }), "w-fit")}
       >
-        Back to campaign
+        <Trans>Back to campaign</Trans>
       </Link>
     </PhaseCard>
   );

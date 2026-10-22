@@ -19,6 +19,7 @@
  * to the file that was opened.
  */
 
+import { Trans, useLingui } from "@lingui/react/macro";
 import { Button } from "@picoframe/frame";
 import { open } from "@tauri-apps/plugin-dialog";
 import { FolderOpen } from "lucide-react";
@@ -60,6 +61,7 @@ export function ImportPackForm({
   /** The layouts kept, once they are on disk and the library has been re-read. */
   onImported: (records: StoredBlueprint[]) => void;
 }) {
+  const { t } = useLingui();
   const [file, setFile] = useState<{ path: string; text: string } | null>(null);
   const [game, setGame] = useState("");
   const [taking, setTaking] = useState<ReadonlySet<number>>(new Set());
@@ -76,6 +78,7 @@ export function ImportPackForm({
   const { records } = useBlueprintLibrary();
   const { target } = usePreferredTarget();
   const scan = useUnitsyncScan(target?.enginePath, target?.dataDir);
+  const scanError = scan.error;
   const installed = useMemo(
     () => withoutGeneratedGames(scan.data?.games ?? []),
     [scan.data],
@@ -180,13 +183,13 @@ export function ImportPackForm({
     setError(null);
     try {
       const src = await open({
-        title: "Open a file of blueprints",
+        title: t`Open a file of blueprints`,
         multiple: false,
-        filters: [{ name: "Blueprints", extensions: ["json"] }],
+        filters: [{ name: t`Blueprints`, extensions: ["json"] }],
       });
       if (typeof src !== "string") return;
       const text = await appFileIO.read(src);
-      if (text === null) throw new Error("There is no file there.");
+      if (text === null) throw new Error(t`There is no file there.`);
       setTaking(new Set());
       setTakingAs("");
       setFile({ path: src, text });
@@ -242,7 +245,7 @@ export function ImportPackForm({
           setGame(name);
         }}
         onBack={() => setPickingGame(false)}
-        backLabel="Back to the pack"
+        backLabel={t`Back to the pack`}
         gamesLoading={scan.loading}
       />
     );
@@ -252,28 +255,30 @@ export function ImportPackForm({
     <div className="flex flex-col">
       <div className="flex flex-col gap-3 p-4">
         <p className="text-xs text-muted-foreground">
-          A file of blueprints is what the community gallery hands you, and what
-          a game writes its own saved bases into. Coilbox reads every blueprint
-          in it, draws each one, and keeps only the ones you tick. The file
-          itself is never written to.
+          <Trans>
+            A file of blueprints is what the community gallery hands you, and
+            what a game writes its own saved bases into. Coilbox reads every
+            blueprint in it, draws each one, and keeps only the ones you tick.
+            The file itself is never written to.
+          </Trans>
         </p>
         <Button variant="outline" className="gap-1.5" onClick={pickFile}>
           <FolderOpen className="size-4" />
-          {file ? "Open another file" : "Open a file…"}
+          {file ? t`Open another file` : t`Open a file…`}
         </Button>
       </div>
 
       {scan.error && (
         <div className="px-4 pb-4">
           <ErrorBanner
-            message={`Your games could not be read, so nothing here has been checked against them: ${scan.error}`}
+            message={t`Your games could not be read, so nothing here has been checked against them: ${scanError}`}
           />
         </div>
       )}
 
       {error && (
         <div className="px-4 pb-4">
-          <ErrorBanner message={`Not saved: ${error}`} />
+          <ErrorBanner message={t`Not saved: ${error}`} />
         </div>
       )}
 
@@ -286,8 +291,8 @@ export function ImportPackForm({
       {file && read?.pack && read.pack.entries.length === 0 ? (
         <p className="border-t px-4 py-4 text-xs text-muted-foreground">
           {identify(file.text).kind === "blueprint"
-            ? "That is a single coilbox blueprint rather than a file of them. Import it with the Import button instead."
-            : "There are no blueprints in this file that coilbox can read."}
+            ? t`That is a single coilbox blueprint rather than a file of them. Import it with the Import button instead.`
+            : t`There are no blueprints in this file that coilbox can read.`}
         </p>
       ) : null}
 

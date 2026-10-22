@@ -7,6 +7,7 @@
  * preference in this codebase.
  */
 
+import { Trans, useLingui } from "@lingui/react/macro";
 import { Button, useDrawer } from "@picoframe/frame";
 import { Download } from "lucide-react";
 import { useEffect } from "react";
@@ -28,11 +29,12 @@ export function BlueprintImportButton({
   onImported: (record: StoredBlueprint) => void;
 }) {
   const drawer = useDrawer();
+  const { t } = useLingui();
 
   const openImport = async (code?: string) => {
     const { ImportBlueprintForm } = await import("./ImportBlueprintForm");
     drawer.open({
-      title: "Import a blueprint",
+      title: t`Import a blueprint`,
       width: "28rem",
       content: (
         // A fresh form every time, because the last one may still be mounted
@@ -61,7 +63,7 @@ export function BlueprintImportButton({
       className="shrink-0 gap-1.5"
       onClick={() => void openImport()}
     >
-      <Download className="size-4" /> Import
+      <Download className="size-4" /> <Trans>Import</Trans>
     </Button>
   );
 }
