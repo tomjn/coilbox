@@ -30,6 +30,13 @@ type Option = {
   /** Optional badge pinned to the item's right edge (e.g. an AI's difficulty),
    * dropdown only. */
   trailing?: ReactNode;
+  /**
+   * Optional short dimmed text pinned to the right (e.g. a language code).
+   * Shown in the dropdown and, for the selected option, in the trigger. Outside
+   * `ItemText`, so Radix does not copy it into the trigger's value and
+   * typeahead ignores it.
+   */
+  hint?: string;
   /** Offered but not pickable, for an option the document cannot use yet.
    * Shown greyed rather than left out, so the list says what exists. */
   disabled?: boolean;
@@ -51,7 +58,16 @@ function renderOption(o: Option) {
       value={o.value}
       description={o.description}
       icon={o.preview}
-      trailing={o.trailing}
+      trailing={
+        o.hint ? (
+          <span className="flex items-center gap-2">
+            <span className="text-xs text-muted-foreground">{o.hint}</span>
+            {o.trailing}
+          </span>
+        ) : (
+          o.trailing
+        )
+      }
       disabled={o.disabled}
     >
       {o.icon ? (
@@ -121,6 +137,7 @@ export function OptionSelect({
   /** The id of a message paragraph explaining why, `FieldProblem`'s. */
   describedBy?: string;
 }) {
+  const hint = options.find((o) => o.value === value)?.hint;
   const grouped = options.some((o) => o.group !== undefined);
 
   return (
@@ -133,6 +150,14 @@ export function OptionSelect({
         aria-describedby={describedBy}
       >
         <SelectValue placeholder={placeholder} />
+        {hint ? (
+          <span
+            data-slot="select-hint"
+            className="ms-auto text-xs text-muted-foreground"
+          >
+            {hint}
+          </span>
+        ) : null}
       </SelectTrigger>
       <SelectContent>
         {grouped

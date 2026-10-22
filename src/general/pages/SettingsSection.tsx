@@ -91,6 +91,7 @@ export default function GeneralSettings() {
               ...pickerLocales().map((code) => ({
                 value: code,
                 label: localeDisplayName(code),
+                hint: code,
               })),
             ]}
           />
