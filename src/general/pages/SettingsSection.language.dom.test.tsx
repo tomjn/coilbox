@@ -18,6 +18,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { DownloadQueueProvider } from "../../downloads/DownloadQueueProvider";
 import { i18n, loadLocale } from "../../i18n";
 import { useApplyLanguage } from "../../i18n/language";
+import { SYSTEM_LANGUAGE } from "../../i18n/locales";
 import UpdatesSettingsSection from "../../updater/pages/UpdatesSettingsSection";
 import { UpdaterProvider } from "../../updater/UpdaterProvider";
 import GeneralSettings from "./SettingsSection";
@@ -58,11 +59,11 @@ vi.mock("@/components/OptionSelect", () => ({
   }: {
     value: string;
     onValueChange: (v: string) => void;
-    options: { value: string; label: string }[];
+    options: { value: string; label: string; hint?: string }[];
   }) => (
     <select value={value} onChange={(e) => onValueChange(e.target.value)}>
       {options.map((o) => (
-        <option key={o.value} value={o.value}>
+        <option key={o.value} value={o.value} data-hint={o.hint}>
           {o.label}
         </option>
       ))}
@@ -162,5 +163,44 @@ describe("Language picker", () => {
       // The pseudo-locale (#4593), listed because tests run as a dev build.
       "Pseudo",
     ]);
+  });
+
+  it("shows each locale's code beside its name, and nothing for System", async () => {
+    await act(async () => {
+      render(
+        <I18nProvider i18n={i18n}>
+          <GeneralSettings />
+        </I18nProvider>,
+      );
+    });
+    const hints = within(screen.getByLabelText("Language"))
+      .getAllByRole("option")
+      .map((o) => [o.getAttribute("value"), o.getAttribute("data-hint")]);
+    expect(hints).toContainEqual(["de", "de"]);
+    expect(hints).toContainEqual(["zh-Hans", "zh-Hans"]);
+    expect(hints).toContainEqual([SYSTEM_LANGUAGE, null]);
+  });
+
+  it("shows the selected option's code in the closed trigger", async () => {
+    const { OptionSelect } = await vi.importActual<
+      typeof import("@/components/OptionSelect")
+    >("@/components/OptionSelect");
+    const options = [
+      { value: SYSTEM_LANGUAGE, label: "System" },
+      { value: "de", label: "Deutsch", hint: "de" },
+    ];
+    const { container, rerender } = render(
+      <OptionSelect value="de" onValueChange={() => {}} options={options} />,
+    );
+    const hint = () => container.querySelector('[data-slot="select-hint"]');
+    expect(hint()?.textContent).toBe("de");
+    rerender(
+      <OptionSelect
+        value={SYSTEM_LANGUAGE}
+        onValueChange={() => {}}
+        options={options}
+      />,
+    );
+    expect(hint()).toBeNull();
   });
 });
