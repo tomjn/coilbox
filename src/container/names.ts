@@ -23,11 +23,11 @@ const KIND_NAMES: Record<ContainerKind, MessageDescriptor> = {
   campaign: msg`campaign`,
   preset: msg`singleplayer preset`,
   challenge: msg`challenge`,
-  setup_pack: msg`setup pack`,
+  "setup-pack": msg`setup pack`,
   scenario: msg`scenario`,
   keymap: msg`keymap`,
   blueprint: msg`base blueprint`,
-  mod_project: msg`unit tweak project`,
+  "mod-project": msg`unit tweak project`,
   module: msg`unit builder module`,
 };
 
@@ -36,11 +36,11 @@ const KIND_PLURALS: Record<ContainerKind, MessageDescriptor> = {
   campaign: msg`campaigns`,
   preset: msg`singleplayer presets`,
   challenge: msg`challenges`,
-  setup_pack: msg`setup packs`,
+  "setup-pack": msg`setup packs`,
   scenario: msg`scenarios`,
   keymap: msg`keymaps`,
   blueprint: msg`base blueprints`,
-  mod_project: msg`unit tweak projects`,
+  "mod-project": msg`unit tweak projects`,
   module: msg`unit builder modules`,
 };
 
