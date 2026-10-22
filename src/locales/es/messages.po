@@ -10229,7 +10229,7 @@ msgstr "Todas las campañas cargadas"
 #: src/lego/pages/components/CategoryMenu.tsx
 #, fuzzy
 msgid "All categories"
-msgstr "Todas las categorías"
+msgstr "Todas"
 
 #: src/workshop/pages/components/UnitReferenceView.tsx
 #, fuzzy
@@ -10337,7 +10337,7 @@ msgstr "Todos los escenarios cargados"
 #: src/uberstress/pages/HistoryPage.tsx
 #, fuzzy
 msgid "All servers"
-msgstr "Todos los servidores"
+msgstr "Cualquier servidor"
 
 #: src/general/index.ts
 #, fuzzy
@@ -15757,7 +15757,7 @@ msgstr "Actualización de Coilbox"
 #: src/updater/index.ts
 #, fuzzy
 msgid "Coilbox updates"
-msgstr "Actualizaciones de Coilbox"
+msgstr "Actualizaciones"
 
 #: src/multiplayer/battles/SaveSearchPopover.tsx
 #, fuzzy
@@ -17896,7 +17896,7 @@ msgstr "Tabla de datos"
 #: src/workshop/pages/ProjectsPage.tsx
 #, fuzzy
 msgid "Date created"
-msgstr "Fecha de creación"
+msgstr "Creado"
 
 #: src/multiplayer/chat/MemberActionsMenu.tsx
 #: src/multiplayer/DaysField.tsx
@@ -21405,7 +21405,7 @@ msgstr "Destacado"
 #: src/content/libraryGames.ts
 #, fuzzy
 msgid "Featured first"
-msgstr "Destacados primero"
+msgstr "Destacados"
 
 #: src/mapconv/pages/components/AdvancedOptions.tsx
 #, fuzzy
@@ -26116,7 +26116,7 @@ msgstr "No se pudo unir: {lastJoinError}"
 #: src/multiplayer/chat/ChannelBrowser.tsx
 #, fuzzy
 msgid "Join or create a channel…"
-msgstr "Unirse a un canal o crearlo…"
+msgstr "Abrir o crear un canal…"
 
 #: src/direct/JoinRoomForm.tsx
 #, fuzzy
@@ -31009,7 +31009,7 @@ msgstr "No se indica ningún juego"
 #: src/play/pages/components/GameSelectCard.tsx
 #, fuzzy
 msgid "No game selected"
-msgstr "No hay ningún juego seleccionado"
+msgstr "Ningún juego elegido"
 
 #: src/scenario/pages/ScenarioBuilderPage.tsx
 #, fuzzy
@@ -31231,7 +31231,7 @@ msgstr "No hay ningún mapa registrado para esta repetición."
 #: src/play/pages/components/MapCard.tsx
 #, fuzzy
 msgid "No map selected"
-msgstr "No hay ningún mapa seleccionado"
+msgstr "Ningún mapa elegido"
 
 #: src/scenario/pages/components/ScenarioMapThumb.tsx
 #, fuzzy
@@ -33635,27 +33635,27 @@ msgstr "ok · {when} · {took}"
 #: src/content/pages/components/BulkDeleteReplaysPanel.tsx
 #, fuzzy
 msgid "Older than 3 months"
-msgstr "Más antiguas de 3 meses"
+msgstr "Más de 3 meses"
 
 #: src/content/pages/components/BulkDeleteReplaysPanel.tsx
 #, fuzzy
 msgid "Older than 6 months"
-msgstr "Más antiguas de 6 meses"
+msgstr "Más de 6 meses"
 
 #: src/content/pages/components/BulkDeleteReplaysPanel.tsx
 #, fuzzy
 msgid "Older than a month"
-msgstr "Más antiguas de un mes"
+msgstr "Más de un mes"
 
 #: src/content/pages/components/BulkDeleteReplaysPanel.tsx
 #, fuzzy
 msgid "Older than a week"
-msgstr "Más antiguas de una semana"
+msgstr "Más de una semana"
 
 #: src/content/pages/components/BulkDeleteReplaysPanel.tsx
 #, fuzzy
 msgid "Older than a year"
-msgstr "Más antiguas de un año"
+msgstr "Más de un año"
 
 #: src/content/pages/components/ReplayAnalysisSection.tsx
 #, fuzzy
@@ -33666,7 +33666,7 @@ msgstr "Las pistas más antiguas se quitarán para no superar el límite de {lim
 #: src/play/pages/SavegamesPage.tsx
 #, fuzzy
 msgid "Oldest"
-msgstr "Más antiguos"
+msgstr "Más antiguas"
 
 #: src/play/modOptions.ts
 #: src/profile/SettingsSection.tsx
@@ -37689,7 +37689,7 @@ msgstr "Velocidad de reciclaje"
 #: src/downloads/pages/components/EngineInstaller.tsx
 #, fuzzy
 msgid "Recoil (GitHub releases)"
-msgstr "Recoil (versiones de GitHub)"
+msgstr "Recoil (GitHub)"
 
 #: src/lego/animPresets.ts
 #, fuzzy
@@ -39798,7 +39798,7 @@ msgstr "Igual que la precisión, pero se usa mientras la unidad que dispara se m
 #: src/content/pages/components/DownloadFolders.tsx
 #, fuzzy
 msgid "Same as default"
-msgstr "Igual que el valor por defecto"
+msgstr "Igual que por defecto"
 
 #: src/account/pages/SettingsSection.tsx
 #: src/content/pages/components/KeymapsPanel.tsx
@@ -42076,7 +42076,7 @@ msgstr "Repeticiones cortas"
 #: src/content/pages/ReplaysPage.tsx
 #, fuzzy
 msgid "Shortest"
-msgstr "Más corta"
+msgstr "Más cortas"
 
 #: src/lego/scriptMarks.ts
 #, fuzzy
@@ -51319,7 +51319,7 @@ msgstr "Campo desconocido \"{identifier}\". Prueba hp, speed, cost, metal, energ
 #: src/content/pages/ReplaysPage.tsx
 #, fuzzy
 msgid "Unknown origin"
-msgstr "Origen desconocido"
+msgstr "Desconocido"
 
 #: src/deeplink/parse.ts
 #, fuzzy
@@ -52382,7 +52382,7 @@ msgstr "No se pudieron leer los registros de Senda de guerra. No se muestra Send
 #: src/home/continue.ts
 #, fuzzy
 msgid "Warpath run"
-msgstr "Expedición de Senda de guerra"
+msgstr "Senda de guerra"
 
 #: src/content/pages/components/MapRecords.tsx
 #, fuzzy
