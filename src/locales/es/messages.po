@@ -50386,11 +50386,16 @@ msgstr "ttl, en frames."
 msgid "Tube"
 msgstr "Tubo"
 
-#: src/conquest/pages/GalaxyPage.tsx
 #: src/lego/animPresets.ts
 #: src/lego/pages/components/ModelViewport.tsx
 #: src/placement/SurfaceBars.tsx
 #, fuzzy
+msgid "Turn"
+msgstr "Turno"
+
+#: src/conquest/pages/GalaxyPage.tsx
+#, fuzzy
+msgctxt "Conquest turn"
 msgid "Turn"
 msgstr "Turno"
 

@@ -50386,13 +50386,18 @@ msgstr "ttl，以帧为单位。"
 msgid "Tube"
 msgstr "管状"
 
-#: src/conquest/pages/GalaxyPage.tsx
 #: src/lego/animPresets.ts
 #: src/lego/pages/components/ModelViewport.tsx
 #: src/placement/SurfaceBars.tsx
 #, fuzzy
 msgid "Turn"
 msgstr "旋转"
+
+#: src/conquest/pages/GalaxyPage.tsx
+#, fuzzy
+msgctxt "Conquest turn"
+msgid "Turn"
+msgstr "回合"
 
 #: src/content/pages/ArchiveDetailPage.tsx
 #, fuzzy

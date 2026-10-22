@@ -50386,11 +50386,16 @@ msgstr "ttl, w klatkach."
 msgid "Tube"
 msgstr "Rura"
 
-#: src/conquest/pages/GalaxyPage.tsx
 #: src/lego/animPresets.ts
 #: src/lego/pages/components/ModelViewport.tsx
 #: src/placement/SurfaceBars.tsx
 #, fuzzy
+msgid "Turn"
+msgstr "Tura"
+
+#: src/conquest/pages/GalaxyPage.tsx
+#, fuzzy
+msgctxt "Conquest turn"
 msgid "Turn"
 msgstr "Tura"
 
