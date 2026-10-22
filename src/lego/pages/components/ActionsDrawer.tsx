@@ -7,6 +7,8 @@
  * script the edit writes.
  */
 
+import { plural } from "@lingui/core/macro";
+import { Trans, useLingui } from "@lingui/react/macro";
 import { Button, Input } from "@picoframe/frame";
 import { ArrowDown, ArrowUp, Play, Trash2, X } from "lucide-react";
 import { Dialog as DialogPrimitive } from "radix-ui";
@@ -65,6 +67,7 @@ export function ActionsDrawer({
   playing,
   playDisabled,
 }: Props) {
+  const { t } = useLingui();
   const action = project.actions?.find((a) => a.id === actionId);
   const [name, setName] = useState(action?.name ?? "");
   useEffect(() => setName(action?.name ?? ""), [action?.name]);
@@ -105,9 +108,12 @@ export function ActionsDrawer({
   const clashText = [
     ...new Set(clashes.map((clash) => `${clash.piece.name} (${clash.with})`)),
   ];
+  const clashList = clashText.join(", ");
   const blend = blendOf(action, project);
   const edit = (change: (p: LegoProject) => LegoProject) => onEdit(change);
   const ownProblem = isOwn ? triggerProblem(project, action.trigger) : null;
+  const stopFunction = `${action.trigger}Stop`;
+  const stopsOn = stop ?? "";
 
   function commitName() {
     if (name.trim() === "" || name.trim() === action?.name) {
@@ -135,17 +141,17 @@ export function ActionsDrawer({
         >
           <div className="flex items-center justify-between gap-2 border-b border-border/60 px-5 py-4">
             <DialogPrimitive.Title className="text-base font-semibold">
-              Action timeline
+              <Trans>Action timeline</Trans>
             </DialogPrimitive.Title>
             <DialogPrimitive.Close asChild>
-              <Button variant="ghost" size="icon" aria-label="Close">
+              <Button variant="ghost" size="icon" aria-label={t`Close`}>
                 <X className="size-4" />
               </Button>
             </DialogPrimitive.Close>
           </div>
 
           <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto px-5 py-4">
-            <Field label="Name">
+            <Field label={t`Name`}>
               <Input
                 value={name}
                 onChange={(event) => setName(event.target.value)}
@@ -154,17 +160,17 @@ export function ActionsDrawer({
                   if (event.key === "Enter") event.currentTarget.blur();
                   if (event.key === "Escape") setName(action.name);
                 }}
-                aria-label="Action name"
+                aria-label={t`Action name`}
               />
             </Field>
 
-            <Field label="Starts on">
+            <Field label={t`Starts on`}>
               <OptionSelect
-                ariaLabel="Starts on"
+                ariaLabel={t`Starts on`}
                 value={isOwn ? OWN_FUNCTION : action.trigger}
                 options={[
                   ...hooks.map((hook) => ({ value: hook, label: hook })),
-                  { value: OWN_FUNCTION, label: "A function of its own" },
+                  { value: OWN_FUNCTION, label: t`A function of its own` },
                 ]}
                 onValueChange={(value) => {
                   if (value !== OWN_FUNCTION) {
@@ -185,7 +191,7 @@ export function ActionsDrawer({
                   onKeyDown={(event) => {
                     if (event.key === "Enter") event.currentTarget.blur();
                   }}
-                  aria-label="Function name"
+                  aria-label={t`Function name`}
                   aria-invalid={ownProblem !== null}
                 />
               ) : null}
@@ -196,15 +202,17 @@ export function ActionsDrawer({
 
             <div className="flex items-start justify-between gap-3">
               <Label htmlFor="action-loop" className="flex flex-col gap-0.5">
-                <span className="font-medium">Loops</span>
+                <span className="font-medium">
+                  <Trans>Loops</Trans>
+                </span>
                 <span className="text-xs font-normal text-muted-foreground">
                   {action.loop
                     ? stop
-                      ? `Stops on ${stop}.`
+                      ? t`Stops on ${stopsOn}.`
                       : isOwn
-                        ? `Stops when ${action.trigger}Stop is called.`
-                        : "Runs until it is started again."
-                    : "Plays once and holds the last pose."}
+                        ? t`Stops when ${stopFunction} is called.`
+                        : t`Runs until it is started again.`
+                    : t`Plays once and holds the last pose.`}
                 </span>
               </Label>
               <Switch
@@ -220,7 +228,9 @@ export function ActionsDrawer({
               {(["blendIn", "blendOut"] as const).map((which) => (
                 <Field
                   key={which}
-                  label={which === "blendIn" ? "Blend in (s)" : "Blend out (s)"}
+                  label={
+                    which === "blendIn" ? t`Blend in (s)` : t`Blend out (s)`
+                  }
                 >
                   <Input
                     type="number"
@@ -239,13 +249,13 @@ export function ActionsDrawer({
                     }}
                     aria-label={
                       which === "blendIn"
-                        ? "Seconds to ease in from where the pieces are"
-                        : "Seconds to ease back to rest"
+                        ? t`Seconds to ease in from where the pieces are`
+                        : t`Seconds to ease back to rest`
                     }
                     title={
                       which === "blendIn"
-                        ? "Seconds to reach the first key from wherever the pieces are. Empty uses the unit's time."
-                        : "Seconds to return to rest when it stops. Empty uses the unit's time."
+                        ? t`Seconds to reach the first key from wherever the pieces are. Empty uses the unit's time.`
+                        : t`Seconds to return to rest when it stops. Empty uses the unit's time.`
                     }
                     className="h-8 text-xs"
                   />
@@ -255,23 +265,26 @@ export function ActionsDrawer({
 
             <div className="flex flex-col gap-2">
               <div className="flex items-center justify-between text-xs">
-                <span className="font-medium">Keys</span>
+                <span className="font-medium">
+                  <Trans>Keys</Trans>
+                </span>
                 <span className="text-muted-foreground">
                   {seconds === 0
-                    ? "No time yet"
+                    ? t`No time yet`
                     : `${formatNumber(seconds, { maximumFractionDigits: 2 })} s`}
                 </span>
               </div>
               {action.keys.length === 0 ? (
                 <p className="text-xs text-muted-foreground">
                   {poses.length === 0
-                    ? "Save a pose first, from Poses in the view controls."
-                    : "Add a pose below."}
+                    ? t`Save a pose first, from Poses in the view controls.`
+                    : t`Add a pose below.`}
                 </p>
               ) : null}
               <ol className="flex flex-col gap-1.5">
                 {action.keys.map((key, index) => {
                   const known = poses.some((pose) => pose.id === key.pose);
+                  const keyNumber = index + 1;
                   return (
                     // biome-ignore lint/suspicious/noArrayIndexKey: a key has no identity of its own, only its place
                     <li key={index} className="flex items-center gap-1">
@@ -281,7 +294,7 @@ export function ActionsDrawer({
                       <div className="min-w-0 flex-1">
                         <OptionSelect
                           size="sm"
-                          ariaLabel={`Pose of key ${index + 1}`}
+                          ariaLabel={t`Pose of key ${keyNumber}`}
                           value={key.pose}
                           options={[
                             ...(known
@@ -289,7 +302,7 @@ export function ActionsDrawer({
                               : [
                                   {
                                     value: key.pose,
-                                    label: "Deleted pose",
+                                    label: t`Deleted pose`,
                                     disabled: true,
                                   },
                                 ]),
@@ -317,11 +330,11 @@ export function ActionsDrawer({
                               : Number(event.target.value);
                           edit((p) => setKeySeconds(p, actionId, index, next));
                         }}
-                        aria-label={`Seconds to reach key ${index + 1}`}
+                        aria-label={t`Seconds to reach key ${keyNumber}`}
                         title={
                           index === 0
-                            ? "Seconds from rest, or from the last key when it loops"
-                            : "Seconds from the key before"
+                            ? t`Seconds from rest, or from the last key when it loops`
+                            : t`Seconds from the key before`
                         }
                         className="h-8 w-16 text-xs"
                       />
@@ -329,8 +342,8 @@ export function ActionsDrawer({
                         size="icon"
                         variant="ghost"
                         className="size-7"
-                        title="Move earlier"
-                        aria-label={`Move key ${index + 1} earlier`}
+                        title={t`Move earlier`}
+                        aria-label={t`Move key ${keyNumber} earlier`}
                         disabled={index === 0}
                         onClick={() =>
                           edit((p) => moveKey(p, actionId, index, -1))
@@ -342,8 +355,8 @@ export function ActionsDrawer({
                         size="icon"
                         variant="ghost"
                         className="size-7"
-                        title="Move later"
-                        aria-label={`Move key ${index + 1} later`}
+                        title={t`Move later`}
+                        aria-label={t`Move key ${keyNumber} later`}
                         disabled={index === action.keys.length - 1}
                         onClick={() =>
                           edit((p) => moveKey(p, actionId, index, 1))
@@ -355,8 +368,8 @@ export function ActionsDrawer({
                         size="icon"
                         variant="ghost"
                         className="size-7"
-                        title="Remove"
-                        aria-label={`Remove key ${index + 1}`}
+                        title={t`Remove`}
+                        aria-label={t`Remove key ${keyNumber}`}
                         onClick={() =>
                           edit((p) => removeKey(p, actionId, index))
                         }
@@ -370,9 +383,9 @@ export function ActionsDrawer({
               {poses.length > 0 ? (
                 <OptionSelect
                   size="sm"
-                  ariaLabel="Add a pose as a key"
+                  ariaLabel={t`Add a pose as a key`}
                   value=""
-                  placeholder="Add a pose"
+                  placeholder={t`Add a pose`}
                   options={poses.map((pose) => ({
                     value: pose.id,
                     label: pose.name,
@@ -386,7 +399,7 @@ export function ActionsDrawer({
 
             {clashText.length > 0 ? (
               <p className="text-xs text-muted-foreground">
-                Also moved by something else: {clashText.join(", ")}.{" "}
+                <Trans>Also moved by something else: {clashList}.</Trans>{" "}
                 {sharedOutcome(project)}
               </p>
             ) : null}
@@ -395,8 +408,11 @@ export function ActionsDrawer({
           <div className="flex items-center justify-between gap-2 border-t border-border/60 px-5 py-3">
             <span className="text-xs text-muted-foreground">
               {lines === 0
-                ? "Writes nothing yet"
-                : `${lines} ${lines === 1 ? "line" : "lines"} of Lua`}
+                ? t`Writes nothing yet`
+                : plural(lines, {
+                    one: "# line of Lua",
+                    other: "# lines of Lua",
+                  })}
             </span>
             <Button
               size="sm"
@@ -405,7 +421,7 @@ export function ActionsDrawer({
               aria-pressed={playing}
               onClick={() => onPlay(action.id)}
             >
-              <Play size={14} /> Play
+              <Play size={14} /> <Trans>Play</Trans>
             </Button>
           </div>
         </DialogPrimitive.Content>

@@ -13,6 +13,9 @@
  * took from the inventory and so needs the same recent and favourite lists.
  */
 
+import type { MessageDescriptor } from "@lingui/core";
+import { t as coreT, msg } from "@lingui/core/macro";
+import { Trans, useLingui } from "@lingui/react/macro";
 import { Button, cn, Input } from "@picoframe/frame";
 import { FileUp } from "lucide-react";
 import {
@@ -49,16 +52,16 @@ import { useRootHeight } from "./gridScroll";
 import { PackSelect } from "./PartFilters";
 import { type GridItem, type GridSection, TileGrid } from "./TileGrid";
 
-const KINDS: { value: InventoryKind; label: string }[] = [
-  { value: "all", label: "All" },
-  { value: "parts", label: "Parts" },
-  { value: "modules", label: "Modules" },
+const KINDS: { value: InventoryKind; label: MessageDescriptor }[] = [
+  { value: "all", label: msg`All` },
+  { value: "parts", label: msg`Parts` },
+  { value: "modules", label: msg`Modules` },
 ];
 
 /** Only a unit has a game to take from, so the Lego Parts page leaves it out. */
-const GAME_UNITS_KIND: { value: InventoryKind; label: string } = {
+const GAME_UNITS_KIND: { value: InventoryKind; label: MessageDescriptor } = {
   value: "units",
-  label: "Game units",
+  label: msg`Game units`,
 };
 
 interface FiltersProps {
@@ -89,6 +92,7 @@ export function InventoryFilters({
   showPacks = true,
   className,
 }: FiltersProps) {
+  const { t, i18n } = useLingui();
   const colours = useColourwayColours(pack);
   const units = view.kind === "units";
   const groups = categoryMenu({
@@ -104,11 +108,11 @@ export function InventoryFilters({
         value={view.kind}
         onValueChange={(value) => view.setKind(value as InventoryKind)}
       >
-        <TabsList aria-label="Kind">
+        <TabsList aria-label={t`Kind`}>
           {(showGameUnits ? [...KINDS, GAME_UNITS_KIND] : KINDS).map(
             ({ value, label }) => (
               <TabsTrigger key={value} value={value}>
-                {label}
+                {i18n._(label)}
               </TabsTrigger>
             ),
           )}
@@ -117,9 +121,11 @@ export function InventoryFilters({
       <Input
         value={view.query}
         onChange={(event) => view.setQuery(event.target.value)}
-        placeholder="Search"
+        placeholder={t`Search`}
         className="w-56 min-w-32 flex-1"
-        aria-label={units ? "Search the game's units" : "Search the inventory"}
+        aria-label={
+          units ? t`Search the game's units` : t`Search the inventory`
+        }
       />
       <CategoryMenu
         groups={groups}
@@ -146,19 +152,23 @@ export function InventoryFilters({
           view.setList(value === "" ? "all" : (value as InventoryList))
         }
         disabled={units}
-        aria-label="List"
+        aria-label={t`List`}
         className="shrink-0"
       >
-        <ToggleGroupItem value="recent">Recent</ToggleGroupItem>
-        <ToggleGroupItem value="favourites">Favourites</ToggleGroupItem>
+        <ToggleGroupItem value="recent">
+          <Trans>Recent</Trans>
+        </ToggleGroupItem>
+        <ToggleGroupItem value="favourites">
+          <Trans>Favourites</Trans>
+        </ToggleGroupItem>
       </ToggleGroup>
       {onLoadModuleFile ? (
         <Button
           size="icon"
           variant="outline"
           onClick={onLoadModuleFile}
-          aria-label="Load from file"
-          title="Load from file"
+          aria-label={t`Load from file`}
+          title={t`Load from file`}
           className="size-8 shrink-0"
         >
           <FileUp size={14} />
@@ -217,9 +227,9 @@ interface GridsProps {
 }
 
 function emptyText(list: InventoryList): string {
-  if (list === "recent") return "Nothing used yet.";
-  if (list === "favourites") return "No favourites yet.";
-  return "Nothing matches.";
+  if (list === "recent") return coreT`Nothing used yet.`;
+  if (list === "favourites") return coreT`No favourites yet.`;
+  return coreT`Nothing matches.`;
 }
 
 export function InventoryGrids({
@@ -244,6 +254,9 @@ export function InventoryGrids({
   escapeAnywhere = false,
 }: GridsProps) {
   const { inventory } = view;
+  const {
+    i18n: { locale },
+  } = useLingui();
   // One choice for every kind, so a click on any tile replaces what the panel
   // was showing.
   const [selected, setSelected] = useState<InventoryRef | null>(null);
@@ -264,6 +277,7 @@ export function InventoryGrids({
     () => new Set(inventory.favourites.map(refKey)),
     [inventory.favourites],
   );
+  // biome-ignore lint/correctness/useExhaustiveDependencies: the headings are read from the catalog, so a language change rebuilds them
   const sections = useMemo(
     () =>
       inventorySections(
@@ -275,7 +289,14 @@ export function InventoryGrids({
         },
         compounds,
       ),
-    [view.shapes, view.parts, view.partFilter.total, view.modules, compounds],
+    [
+      view.shapes,
+      view.parts,
+      view.partFilter.total,
+      view.modules,
+      compounds,
+      locale,
+    ],
   );
   const empty = sections.every((section) => section.items.length === 0);
 
@@ -409,25 +430,25 @@ export function inventorySections(
   return [
     {
       id: "shapes",
-      label: "Shapes",
+      label: coreT`Shapes`,
       total: SHAPE_KINDS.length,
       items: view.shapes.map((shape) => ({ kind: "shape", shape })),
     },
     {
       id: "parts",
-      label: "Parts",
+      label: coreT`Parts`,
       total: view.partTotal,
       items: view.parts.map((part) => ({ kind: "part", part })),
     },
     {
       id: "built-in",
-      label: "Built in modules",
+      label: coreT`Built in modules`,
       total: builtInTotal,
       items: builtIn.map((module) => ({ kind: "module", module })),
     },
     {
       id: "saved",
-      label: "Saved modules",
+      label: coreT`Saved modules`,
       total: compounds.length - builtInTotal,
       items: saved.map((module) => ({ kind: "module", module })),
     },

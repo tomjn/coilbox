@@ -14,6 +14,8 @@
  * outright, so there is nothing to ask and nothing to get wrong.
  */
 
+import { plural, t } from "@lingui/core/macro";
+import { Trans, useLingui } from "@lingui/react/macro";
 import { Button } from "@picoframe/frame";
 import { ChevronRight, Loader2 } from "lucide-react";
 import type { ReactNode } from "react";
@@ -162,6 +164,7 @@ export async function readModel(options: {
     };
   }
 
+  const { problem } = recovery;
   await options.beforeImport?.([model.texture1, model.texture2]);
 
   // The id is settled before the import runs, because the geometry sidecar is
@@ -170,7 +173,7 @@ export async function readModel(options: {
   const result = await legoImportS3o({ path, id });
   return {
     state: "imported",
-    refused: `It was not made here: ${recovery.problem}`,
+    refused: t`It was not made here: ${problem}`,
     imported: projectFromImport(result, {
       id,
       source: options.source ?? path,
@@ -218,8 +221,7 @@ async function readThreeDo(options: {
 
   return {
     state: "imported",
-    refused:
-      "It was not made here: This is a .3do, the older model format. Coilbox has never written one, so it cannot be a model coming home, and it has been converted instead.",
+    refused: t`It was not made here: This is a .3do, the older model format. Coilbox has never written one, so it cannot be a model coming home, and it has been converted instead.`,
     notes: conversionNotes(result),
     imported: projectFromImport(result, {
       id,
@@ -265,12 +267,10 @@ async function readGlb(options: {
 
   return {
     state: "imported",
-    refused:
-      "A .glb is what coilbox writes for Blender, and no Spring engine reads one, so it is never a model coming home as parts. Its objects have been read as pieces exactly as they stand.",
+    refused: t`A .glb is what coilbox writes for Blender, and no Spring engine reads one, so it is never a model coming home as parts. Its objects have been read as pieces exactly as they stand.`,
     notes: glbNotes(result),
     textureNotes: glbTextureNotes(result),
-    textureFrom:
-      "It came out of the .glb itself rather than off a file, so there is nothing behind it to refresh from.",
+    textureFrom: t`It came out of the .glb itself rather than off a file, so there is nothing behind it to refresh from.`,
     imported: projectFromImport(result, {
       id,
       source: options.source ?? path,
@@ -319,8 +319,7 @@ async function readDae(options: {
 
   return {
     state: "imported",
-    refused:
-      "It was not made here: this is one of the formats the engine reads through Assimp, and coilbox has never written one, so it cannot be a unit coming home as parts. Its nodes have been read as pieces as they stand.",
+    refused: t`It was not made here: this is one of the formats the engine reads through Assimp, and coilbox has never written one, so it cannot be a unit coming home as parts. Its nodes have been read as pieces as they stand.`,
     notes: daeNotes(result),
     imported: projectFromImport(result, {
       id,
@@ -346,19 +345,28 @@ async function readDae(options: {
  */
 function daeNotes(result: DaeImport): string[] {
   const notes: string[] = [];
-  if (result.transformed > 0) {
+  const { transformed, imagesUsed, droppedFaces } = result;
+  if (transformed > 0) {
     notes.push(
-      `${result.transformed} ${result.transformed === 1 ? "node carries" : "nodes carry"} a rotation or a scale, which an .s3o piece cannot, so ${result.transformed === 1 ? "it has" : "they have"} been baked into the vertices. Blender writes its own up-axis turn that way, so a model exported from it reports at least one.`,
+      plural(transformed, {
+        one: "# node carries a rotation or a scale, which an .s3o piece cannot, so it has been baked into the vertices. Blender writes its own up-axis turn that way, so a model exported from it reports at least one.",
+        other:
+          "# nodes carry a rotation or a scale, which an .s3o piece cannot, so they have been baked into the vertices. Blender writes its own up-axis turn that way, so a model exported from it reports at least one.",
+      }),
     );
   }
-  if (result.imagesUsed > 1) {
+  if (imagesUsed > 1) {
     notes.push(
-      `The file paints with ${result.imagesUsed} textures where a Spring unit has one, so the first was taken and the rest of the model draws with it.`,
+      t`The file paints with ${imagesUsed} textures where a Spring unit has one, so the first was taken and the rest of the model draws with it.`,
     );
   }
-  if (result.droppedFaces > 0) {
+  if (droppedFaces > 0) {
     notes.push(
-      `${result.droppedFaces} ${result.droppedFaces === 1 ? "face was a point or a line" : "faces were points or lines"}, which a Spring model has no way to hold, so ${result.droppedFaces === 1 ? "it was" : "they were"} left out.`,
+      plural(droppedFaces, {
+        one: "# face was a point or a line, which a Spring model has no way to hold, so it was left out.",
+        other:
+          "# faces were points or lines, which a Spring model has no way to hold, so they were left out.",
+      }),
     );
   }
   return notes;
@@ -373,29 +381,46 @@ function daeNotes(result: DaeImport): string[] {
  */
 function glbNotes(result: GlbImport): string[] {
   const notes: string[] = [];
-  if (result.folded > 0) {
+  const { folded, transformed, flatShaded, skipped } = result;
+  if (folded > 0) {
     notes.push(
-      `${result.folded} ${result.folded === 1 ? "piece" : "pieces"} came in as an empty holding a same-named mesh, the shape every .glb coilbox 1.12.0 or earlier wrote for a piece with geometry, so ${result.folded === 1 ? "it has" : "they have"} been folded back into one piece each. That is why the count below may read lower than Blender showed.`,
+      plural(folded, {
+        one: "# piece came in as an empty holding a same-named mesh, the shape every .glb coilbox 1.12.0 or earlier wrote for a piece with geometry, so it has been folded back into one piece each. That is why the count below may read lower than Blender showed.",
+        other:
+          "# pieces came in as an empty holding a same-named mesh, the shape every .glb coilbox 1.12.0 or earlier wrote for a piece with geometry, so they have been folded back into one piece each. That is why the count below may read lower than Blender showed.",
+      }),
     );
   }
   if (result.inventedRoot) {
     notes.push(
-      "The file had several objects at its top level and a Spring model has exactly one root piece, so a root has been added to hold them. Rename it to whatever the unit's script should call it.",
+      t`The file had several objects at its top level and a Spring model has exactly one root piece, so a root has been added to hold them. Rename it to whatever the unit's script should call it.`,
     );
   }
-  if (result.transformed > 0) {
+  if (transformed > 0) {
     notes.push(
-      `${result.transformed} ${result.transformed === 1 ? "object carries" : "objects carry"} a rotation or a scale, which an .s3o piece cannot, so ${result.transformed === 1 ? "it has" : "they have"} been baked into the vertices. That is what the export does on the way out anyway, and it is what Upspring does on save.`,
+      plural(transformed, {
+        one: "# object carries a rotation or a scale, which an .s3o piece cannot, so it has been baked into the vertices. That is what the export does on the way out anyway, and it is what Upspring does on save.",
+        other:
+          "# objects carry a rotation or a scale, which an .s3o piece cannot, so they have been baked into the vertices. That is what the export does on the way out anyway, and it is what Upspring does on save.",
+      }),
     );
   }
-  if (result.flatShaded > 0) {
+  if (flatShaded > 0) {
     notes.push(
-      `${result.flatShaded} ${result.flatShaded === 1 ? "mesh came" : "meshes came"} with no normals, so they have been worked out from the faces. Fix them under Fix UVs and normals if the model lights oddly.`,
+      plural(flatShaded, {
+        one: "# mesh came with no normals, so they have been worked out from the faces. Fix them under Fix UVs and normals if the model lights oddly.",
+        other:
+          "# meshes came with no normals, so they have been worked out from the faces. Fix them under Fix UVs and normals if the model lights oddly.",
+      }),
     );
   }
-  if (result.skipped > 0) {
+  if (skipped > 0) {
     notes.push(
-      `${result.skipped} ${result.skipped === 1 ? "part of the file draws" : "parts of the file draw"} points or lines, which a Spring model has no way to hold, so ${result.skipped === 1 ? "it has" : "they have"} been left out.`,
+      plural(skipped, {
+        one: "# part of the file draws points or lines, which a Spring model has no way to hold, so it has been left out.",
+        other:
+          "# parts of the file draw points or lines, which a Spring model has no way to hold, so they have been left out.",
+      }),
     );
   }
   return notes;
@@ -410,18 +435,19 @@ function glbNotes(result: GlbImport): string[] {
  */
 function glbTextureNotes(result: GlbImport): string[] {
   const notes: string[] = [];
-  if (result.imagesUsed > 1) {
+  const { imagesUsed } = result;
+  if (imagesUsed > 1) {
     notes.push(
-      `The file paints with ${result.imagesUsed} pictures and a Spring model has one texture, so the first was taken and the rest were left. Pieces mapped onto one of the others will draw the wrong thing.`,
+      t`The file paints with ${imagesUsed} pictures and a Spring model has one texture, so the first was taken and the rest were left. Pieces mapped onto one of the others will draw the wrong thing.`,
     );
   }
   if (result.texture.key && !result.teamMask) {
     notes.push(
-      "Its picture is fully opaque. An .s3o reads that picture's alpha as the team-colour mask, and fully opaque means every pixel of the model is painted in the player's colour, so the alpha has been written to nothing instead: the model keeps its own colours and has no team-colour markings. The .glb export drops the mask on the way out, so this is what a coilbox model that has been to Blender and back looks like. Point the model at the game's own texture on the Texture tab to get the markings back.",
+      t`Its picture is fully opaque. An .s3o reads that picture's alpha as the team-colour mask, and fully opaque means every pixel of the model is painted in the player's colour, so the alpha has been written to nothing instead: the model keeps its own colours and has no team-colour markings. The .glb export drops the mask on the way out, so this is what a coilbox model that has been to Blender and back looks like. Point the model at the game's own texture on the Texture tab to get the markings back.`,
     );
   }
   notes.push(
-    "A .glb has one picture where an .s3o has two. The second is the shading map, holding glow in red, shine in green and in alpha the cut-out that decides whether a pixel is drawn at all, and it is not in this file. The model opens without one.",
+    t`A .glb has one picture where an .s3o has two. The second is the shading map, holding glow in red, shine in green and in alpha the cut-out that decides whether a pixel is drawn at all, and it is not in this file. The model opens without one.`,
   );
   return notes;
 }
@@ -435,34 +461,48 @@ function glbTextureNotes(result: GlbImport): string[] {
  */
 function conversionNotes(result: ThreeDoImport): string[] {
   const notes: string[] = [];
-  const found = result.tiles - result.missingTextures.length;
+  const { tiles, paletteFaces, droppedPieces, basePlateFaces } = result;
+  const found = tiles - result.missingTextures.length;
   if (result.sheetReused) {
     notes.push(
-      "Its texture tiles are already on a sheet a batch conversion of this game left behind, and this model has been mapped onto that sheet rather than getting one of its own.",
+      t`Its texture tiles are already on a sheet a batch conversion of this game left behind, and this model has been mapped onto that sheet rather than getting one of its own.`,
     );
   } else {
     notes.push(
-      `Its ${result.tiles} texture tiles have been packed into one sheet and every face given coordinates onto it, which is what makes it an ordinary model that exports as an .s3o.`,
+      t`Its ${tiles} texture tiles have been packed into one sheet and every face given coordinates onto it, which is what makes it an ordinary model that exports as an .s3o.`,
     );
   }
   if (result.missingTextures.length > 0) {
+    const missing = result.missingTextures.join(", ");
     notes.push(
-      `${found} of ${result.tiles} were found. Nothing in the game matched ${result.missingTextures.join(", ")}, so the faces using them are drawn plain.`,
+      t`${found} of ${tiles} were found. Nothing in the game matched ${missing}, so the faces using them are drawn plain.`,
     );
   }
-  if (result.paletteFaces > 0) {
+  if (paletteFaces > 0) {
     notes.push(
-      `${result.paletteFaces} ${result.paletteFaces === 1 ? "face names" : "faces name"} a Total Annihilation palette entry this import could not resolve to a colour, because there was no palette.pal beside the model or the entry is outside the 256 it holds, so ${result.paletteFaces === 1 ? "it is" : "they are"} drawn plain grey.`,
+      plural(paletteFaces, {
+        one: "# face names a Total Annihilation palette entry this import could not resolve to a colour, because there was no palette.pal beside the model or the entry is outside the 256 it holds, so it is drawn plain grey.",
+        other:
+          "# faces name a Total Annihilation palette entry this import could not resolve to a colour, because there was no palette.pal beside the model or the entry is outside the 256 it holds, so they are drawn plain grey.",
+      }),
     );
   }
-  if (result.droppedPieces > 0) {
+  if (droppedPieces > 0) {
     notes.push(
-      `${result.droppedPieces} empty child ${result.droppedPieces === 1 ? "piece" : "pieces"} shared an earlier sibling's name and drew nothing, so nothing could ever have addressed ${result.droppedPieces === 1 ? "it" : "them"} by that name. ${result.droppedPieces === 1 ? "It has" : "They have"} been left out.`,
+      plural(droppedPieces, {
+        one: "# empty child piece shared an earlier sibling's name and drew nothing, so nothing could ever have addressed it by that name. It has been left out.",
+        other:
+          "# empty child pieces shared an earlier sibling's name and drew nothing, so nothing could ever have addressed them by that name. They have been left out.",
+      }),
     );
   }
-  if (result.basePlateFaces > 0) {
+  if (basePlateFaces > 0) {
     notes.push(
-      `${result.basePlateFaces} base-plate ${result.basePlateFaces === 1 ? "face" : "faces"}, a flat panel some exporters left facing straight down to mark the selection box rather than real geometry, ${result.basePlateFaces === 1 ? "has" : "have"} been dropped.`,
+      plural(basePlateFaces, {
+        one: "# base-plate face, a flat panel some exporters left facing straight down to mark the selection box rather than real geometry, has been dropped.",
+        other:
+          "# base-plate faces, a flat panel some exporters left facing straight down to mark the selection box rather than real geometry, have been dropped.",
+      }),
     );
   }
   return notes;
@@ -497,11 +537,12 @@ export function ImportResult({
    *  Something still being read would be left off it otherwise. */
   pending?: string | null;
 }) {
+  const { t } = useLingui();
   if (stage.state === "reading") {
     return (
       <p className="flex items-center gap-2 text-xs text-muted-foreground">
         <Loader2 className="size-3.5 animate-spin" aria-hidden />
-        Reading the model.
+        <Trans>Reading the model.</Trans>
       </p>
     );
   }
@@ -530,9 +571,9 @@ export function ImportResult({
               {pending}
             </>
           ) : stage.state === "recovered" ? (
-            `Recover ${name}`
+            t`Recover ${name}`
           ) : (
-            `Open ${name}`
+            t`Open ${name}`
           )}
         </Button>
       </div>
@@ -547,27 +588,42 @@ function Recovered({
   stage: Extract<ImportStage, { state: "recovered" }>;
   onAtlasChange: (atlas: string | null) => void;
 }) {
+  const { t } = useLingui();
+  const pieceCount = stage.recovery.project.pieces.length;
+  const { matched, empty } = stage.recovery;
+  const { texture } = stage;
+  const packId = stage.named?.packId;
   return (
     <>
       <div className="flex flex-col gap-2 border-t border-border/60 pt-4">
         <span className="text-sm font-medium">
-          This model came out of coilbox
+          <Trans>This model came out of coilbox</Trans>
         </span>
         <p className="text-xs text-muted-foreground">
-          {stage.recovery.project.pieces.length} pieces.{" "}
-          {stage.recovery.matched} made of parts, and {stage.recovery.empty}{" "}
-          with no geometry, which is how a model carries hierarchy, flares and
-          aim points.
+          {plural(pieceCount, { one: "# piece.", other: "# pieces." })}{" "}
+          <Trans>
+            {matched} made of parts, and {empty} with no geometry, which is how
+            a model carries hierarchy, flares and aim points.
+          </Trans>
         </p>
       </div>
 
       <div className="flex flex-col gap-2">
-        <span className="text-sm font-medium">Atlas</span>
+        <span className="text-sm font-medium">
+          <Trans>Atlas</Trans>
+        </span>
         <p className="text-xs text-muted-foreground">
-          The model names <code>{stage.texture}</code>.{" "}
-          {stage.named
-            ? `That is the ${stage.named.packId} pack's atlas.`
-            : "No installed pack ships that texture, so confirm which atlas this model samples."}
+          <Trans>
+            The model names <code>{texture}</code>.
+          </Trans>{" "}
+          {stage.named ? (
+            <Trans>That is the {packId} pack's atlas.</Trans>
+          ) : (
+            <Trans>
+              No installed pack ships that texture, so confirm which atlas this
+              model samples.
+            </Trans>
+          )}
         </p>
         {stage.atlases.length > 1 ? (
           <Select
@@ -576,7 +632,7 @@ function Recovered({
               onAtlasChange(value === stage.atlases[0].tex1 ? null : value)
             }
           >
-            <SelectTrigger size="sm" aria-label="Atlas">
+            <SelectTrigger size="sm" aria-label={t`Atlas`}>
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -591,10 +647,14 @@ function Recovered({
       </div>
 
       <div className="flex flex-col gap-2">
-        <span className="text-sm font-medium">What does not come back</span>
+        <span className="text-sm font-medium">
+          <Trans>What does not come back</Trans>
+        </span>
         <p className="text-xs text-muted-foreground">
-          A model holds piece names, the tree they hang in and where each one
-          sits. Everything else the project had was never in the file.
+          <Trans>
+            A model holds piece names, the tree they hang in and where each one
+            sits. Everything else the project had was never in the file.
+          </Trans>
         </p>
         <ul className="list-disc pl-4 text-xs text-muted-foreground">
           {NOT_IN_AN_EXPORT.map((lost) => (
@@ -623,27 +683,44 @@ function Imported({
   const { project, meshes, vertices, triangles, converted, bytes } =
     stage.imported;
   const imported = project.imported;
+  const missingTexture = imported?.missingTexture;
+  const pieceCount = project.pieces.length;
+
+  const triangleCount = formatNumber(triangles);
+  const vertexCount = formatNumber(vertices);
+  const kibibytes = formatNumber(Math.max(1, Math.round(bytes / 1024)));
 
   const details: string[] = [...(stage.notes ?? [])];
   if (converted > 0) {
     details.push(
-      `${converted} ${converted === 1 ? "piece was" : "pieces were"} drawn as quads or a triangle strip and ${converted === 1 ? "has" : "have"} been converted to triangles, which is what the engine does on load anyway.`,
+      plural(converted, {
+        one: "# piece was drawn as quads or a triangle strip and has been converted to triangles, which is what the engine does on load anyway.",
+        other:
+          "# pieces were drawn as quads or a triangle strip and have been converted to triangles, which is what the engine does on load anyway.",
+      }),
     );
   }
   if (imported?.texture) {
+    const textureName = imported.texture.name;
     details.push(
       imported.texture.source
-        ? `${imported.texture.name} was copied into coilbox's own store, so the unit keeps working if the game folder goes away. It can be refreshed after editing it elsewhere.`
-        : `${imported.texture.name} was copied into coilbox's own store, so the unit keeps working if the game folder goes away. ${stage.textureFrom ?? "There is no file behind it to refresh from, because a packed archive holds no path to hand back."}`,
+        ? t`${textureName} was copied into coilbox's own store, so the unit keeps working if the game folder goes away. It can be refreshed after editing it elsewhere.`
+        : [
+            t`${textureName} was copied into coilbox's own store, so the unit keeps working if the game folder goes away.`,
+            stage.textureFrom ??
+              t`There is no file behind it to refresh from, because a packed archive holds no path to hand back.`,
+          ].join(" "),
     );
   }
   if (imported?.texture2) {
+    const shadingMap = imported.texture2.name;
     details.push(
-      `${imported.texture2.name} is the shading map, which the engine reads as glow in red and shine in green. It is kept with the unit and written back out by the export, though nothing here draws it.`,
+      t`${shadingMap} is the shading map, which the engine reads as glow in red and shine in green. It is kept with the unit and written back out by the export, though nothing here draws it.`,
     );
   } else if (imported?.missingTexture2) {
+    const shadingMap = imported.missingTexture2;
     details.push(
-      `The shading map, ${imported.missingTexture2}, was not found. The unit looks the same here either way, but the export will have no glow or shine to write out.`,
+      t`The shading map, ${shadingMap}, was not found. The unit looks the same here either way, but the export will have no glow or shine to write out.`,
     );
   }
   details.push(...(stage.textureNotes ?? []));
@@ -651,29 +728,42 @@ function Imported({
 
   return (
     <section className="flex flex-col gap-2 border-t border-border/60 pt-4">
-      <h3 className="text-sm font-medium">Model</h3>
+      <h3 className="text-sm font-medium">
+        <Trans>Model</Trans>
+      </h3>
       <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1 text-xs">
-        <dt className="text-muted-foreground">Pieces</dt>
+        <dt className="text-muted-foreground">
+          <Trans>Pieces</Trans>
+        </dt>
         <dd>
-          {project.pieces.length}, {meshes} with geometry
+          <Trans>
+            {pieceCount}, {meshes} with geometry
+          </Trans>
         </dd>
-        <dt className="text-muted-foreground">Size</dt>
+        <dt className="text-muted-foreground">
+          <Trans>Size</Trans>
+        </dt>
         <dd>
-          {formatNumber(triangles)} triangles, {formatNumber(vertices)}{" "}
-          vertices, {formatNumber(Math.max(1, Math.round(bytes / 1024)))} KiB
+          <Trans>
+            {triangleCount} triangles, {vertexCount} vertices, {kibibytes} KiB
+          </Trans>
         </dd>
-        <dt className="text-muted-foreground">Texture</dt>
+        <dt className="text-muted-foreground">
+          <Trans>Texture</Trans>
+        </dt>
         <dd className="min-w-0">
           {imported?.texture ? (
             <code className="break-all">{imported.texture.name}</code>
           ) : imported?.missingTexture ? (
             <span className="text-amber-500">
-              <code className="break-all">{imported.missingTexture}</code> was
-              not found, so it opens untextured
+              <Trans>
+                <code className="break-all">{missingTexture}</code> was not
+                found, so it opens untextured
+              </Trans>
             </span>
           ) : (
             <span className="text-muted-foreground">
-              None named, so it opens untextured
+              <Trans>None named, so it opens untextured</Trans>
             </span>
           )}
         </dd>
@@ -684,7 +774,7 @@ function Imported({
             className="size-3.5 transition-transform group-data-[state=open]:rotate-90"
             aria-hidden
           />
-          Import details
+          <Trans>Import details</Trans>
         </CollapsibleTrigger>
         <CollapsibleContent>
           <ul className="mt-2 flex list-disc flex-col gap-1 pl-4 text-xs text-muted-foreground">

@@ -1,3 +1,5 @@
+import { plural } from "@lingui/core/macro";
+import { Trans, useLingui } from "@lingui/react/macro";
 import { Button, cn, Input, useHideSidebar } from "@picoframe/frame";
 import {
   Blocks,
@@ -289,6 +291,7 @@ export default function BuilderPage() {
 }
 
 function Builder({ id }: { id: string | undefined }) {
+  const { t } = useLingui();
   const [pack, setPack] = useState<LoadedPack | null>(null);
   // Its own flag, because a null pack is both "still reading the library" and
   // "the library would not read". Without it the wait showed as a failure for
@@ -816,7 +819,7 @@ function Builder({ id }: { id: string | undefined }) {
     // by and a ghost to draw, like any module.
     if (holdsLiftedPieces(module)) {
       setPlacingPart(null);
-      void takeInLifted(module, "Add module").then((placed) => {
+      void takeInLifted(module, t`Add module`).then((placed) => {
         if (placed) beginPlacingModule(placed, now);
       });
       return;
@@ -857,7 +860,7 @@ function Builder({ id }: { id: string | undefined }) {
       const { module } = placingPart;
       const refused = mountRefusal(draft, target.parentId, target.to, module);
       if (refused) {
-        void notify({ title: "Mount point", body: refused, level: "warning" });
+        void notify({ title: t`Mount point`, body: refused, level: "warning" });
         return;
       }
       const inserted = placeModule(
@@ -887,7 +890,7 @@ function Builder({ id }: { id: string | undefined }) {
     const partRefused = mountPartRefusal(draft, target.parentId, target.to);
     if (partRefused) {
       void notify({
-        title: "Mount point",
+        title: t`Mount point`,
         body: partRefused,
         level: "warning",
       });
@@ -973,8 +976,8 @@ function Builder({ id }: { id: string | undefined }) {
     const parts = pickArmParts(pack.parts);
     if (!parts) {
       void notify({
-        title: "Could not add a build arm",
-        body: "This parts library has no block and beam to make one from.",
+        title: t`Could not add a build arm`,
+        body: t`This parts library has no block and beam to make one from.`,
         level: "error",
       });
       return;
@@ -997,8 +1000,8 @@ function Builder({ id }: { id: string | undefined }) {
     const parts = pickWeaponParts(pack.parts);
     if (!parts) {
       void notify({
-        title: "Could not add a weapon",
-        body: "This parts library has no block and beam to make one from.",
+        title: t`Could not add a weapon`,
+        body: t`This parts library has no block and beam to make one from.`,
         level: "error",
       });
       return;
@@ -1124,7 +1127,7 @@ function Builder({ id }: { id: string | undefined }) {
         await saveModuleMeshes(unitId, module);
       } catch (error) {
         void notify({
-          title: "Save as module",
+          title: t`Save as module`,
           body: error instanceof Error ? error.message : String(error),
           level: "error",
         });
@@ -1142,7 +1145,7 @@ function Builder({ id }: { id: string | undefined }) {
    * Whether a module holding pieces lifted from a game has to stay out of this
    * unit, saying why when it does. See `liftedModuleRefusal`.
    */
-  function refuseLifted(module: LegoProject, title = "Add module"): boolean {
+  function refuseLifted(module: LegoProject, title = t`Add module`): boolean {
     const refused = draft ? liftedModuleRefusal(draft, module) : null;
     if (refused) void notify({ title, body: refused, level: "warning" });
     return refused !== null;
@@ -1215,7 +1218,7 @@ function Builder({ id }: { id: string | undefined }) {
         ? seatRefusal(draft, pieceId, seat, compounds)
         : null;
     if (refused) {
-      void notify({ title: "Mount point", body: refused, level: "warning" });
+      void notify({ title: t`Mount point`, body: refused, level: "warning" });
     }
     if (before?.connection && pack && draft) {
       let detached: string | null = null;
@@ -1234,8 +1237,8 @@ function Builder({ id }: { id: string | undefined }) {
         );
         if (after && !after.connection) {
           detached = same(after.position, before.position)
-            ? "Detached: turned off its face."
-            : "Detached: moved off its face.";
+            ? t`Detached: turned off its face.`
+            : t`Detached: moved off its face.`;
         }
       } else {
         detached = typedJoinedTransform(draft, pack, pieceId, change).detached;
@@ -1367,12 +1370,17 @@ function Builder({ id }: { id: string | undefined }) {
       (project) =>
         swapPart(project, pack, pieceId, part.id)?.project ?? project,
     );
+    const droppedCount = result.droppedAnchors.length;
+    const droppedNames = result.droppedAnchors.join(", ");
     const notes = [
-      result.droppedAnchors.length > 0
-        ? `Dropped ${result.droppedAnchors.length === 1 ? "an anchor" : `${result.droppedAnchors.length} anchors`} outside the new part: ${result.droppedAnchors.join(", ")}.`
+      droppedCount > 0
+        ? plural(droppedCount, {
+            one: `Dropped an anchor outside the new part: ${droppedNames}.`,
+            other: `Dropped # anchors outside the new part: ${droppedNames}.`,
+          })
         : null,
       result.broken.length > 0
-        ? "A join lost its connector. See the problems list."
+        ? t`A join lost its connector. See the problems list.`
         : null,
     ].filter(Boolean);
     setSwapNote(notes.length > 0 ? notes.join(" ") : null);
@@ -1396,12 +1404,17 @@ function Builder({ id }: { id: string | undefined }) {
         resizePackBlock(project, pack, pieceId, axis, sign, size)?.project ??
         project,
     );
+    const droppedCount = result.droppedAnchors.length;
+    const droppedNames = result.droppedAnchors.join(", ");
     const notes = [
-      result.droppedAnchors.length > 0
-        ? `Dropped ${result.droppedAnchors.length === 1 ? "an anchor" : `${result.droppedAnchors.length} anchors`} outside the new part: ${result.droppedAnchors.join(", ")}.`
+      droppedCount > 0
+        ? plural(droppedCount, {
+            one: `Dropped an anchor outside the new part: ${droppedNames}.`,
+            other: `Dropped # anchors outside the new part: ${droppedNames}.`,
+          })
         : null,
       result.broken.length > 0
-        ? "A join lost its connector. See the problems list."
+        ? t`A join lost its connector. See the problems list.`
         : null,
     ].filter(Boolean);
     setSwapNote(notes.length > 0 ? notes.join(" ") : null);
@@ -1434,7 +1447,7 @@ function Builder({ id }: { id: string | undefined }) {
   function changeModule(
     pieceId: string,
     module: LegoProject,
-    title = "Swap module",
+    title = t`Swap module`,
   ) {
     setSwappingModule(false);
     if (!draft || !pack || refuseLifted(module, title)) return;
@@ -1471,16 +1484,18 @@ function Builder({ id }: { id: string | undefined }) {
     if (!result) return;
     docRef.current.edit(() => result.project);
     docRef.current.selectMany(result.rootPieceIds);
+    const movedNames = result.moved.join(", ");
+    const removedLabels = result.removedPresets
+      .map((id) => presetById(id)?.label ?? id)
+      .join(", ");
     const said = [
-      result.moved.length > 0
-        ? `Moved ${result.moved.join(", ")} to the new root.`
-        : null,
+      result.moved.length > 0 ? t`Moved ${movedNames} to the new root.` : null,
       result.removedPresets.length > 0
-        ? `Removed ${result.removedPresets.map((id) => presetById(id)?.label ?? id).join(", ")}, no piece uses it now.`
+        ? t`Removed ${removedLabels}, no piece uses it now.`
         : null,
       describePresets(result.presets),
       result.broken.length > 0
-        ? "A join lost its connector. See the problems list."
+        ? t`A join lost its connector. See the problems list.`
         : null,
     ].filter(Boolean);
     if (said.length > 0)
@@ -1494,7 +1509,7 @@ function Builder({ id }: { id: string | undefined }) {
   /** Update one out of date instance to the module as it is now. */
   function updateInstance(update: ModuleUpdate | UntrackedModule) {
     const module = compounds.find((c) => c.id === update.moduleId);
-    if (module) changeModule(update.rootPieceId, module, "Update module");
+    if (module) changeModule(update.rootPieceId, module, t`Update module`);
   }
 
   /** Record the module's stamp on an untracked instance. One edit, one undo. */
@@ -1552,7 +1567,7 @@ function Builder({ id }: { id: string | undefined }) {
       );
     } catch (e) {
       void notify({
-        title: "Couldn't copy to the clipboard",
+        title: t`Couldn't copy to the clipboard`,
         body: e instanceof Error ? e.message : String(e),
         level: "error",
       });
@@ -1567,7 +1582,7 @@ function Builder({ id }: { id: string | undefined }) {
       text = await navigator.clipboard.readText();
     } catch (e) {
       void notify({
-        title: "Couldn't read the clipboard",
+        title: t`Couldn't read the clipboard`,
         body: e instanceof Error ? e.message : String(e),
         level: "error",
       });
@@ -1578,7 +1593,7 @@ function Builder({ id }: { id: string | undefined }) {
     const result = parseClipboardPiece(text, knownPartIds);
     if (!result.ok) {
       void notify({
-        title: "Couldn't paste",
+        title: t`Couldn't paste`,
         body: result.reason,
         level: "error",
       });
@@ -1587,7 +1602,7 @@ function Builder({ id }: { id: string | undefined }) {
     // Pasting is the other way pieces lifted from a game get into a unit, so it
     // meets the same refusal as adding the module from the inventory.
     const pasted = pastedForUnit(result.piece, draft.id);
-    if (refuseLifted(pasted, "Couldn't paste")) return;
+    if (refuseLifted(pasted, t`Couldn't paste`)) return;
     try {
       const raw = await pasteIntoUnit(
         draft.id,
@@ -1597,7 +1612,7 @@ function Builder({ id }: { id: string | undefined }) {
       if (raw) geometry.adopt(raw);
     } catch (e) {
       void notify({
-        title: "Couldn't paste",
+        title: t`Couldn't paste`,
         body: e instanceof Error ? e.message : String(e),
         level: "error",
       });
@@ -1606,7 +1621,11 @@ function Builder({ id }: { id: string | undefined }) {
     if (result.piece.missingParts.length > 0) {
       const count = result.piece.missingParts.length;
       void notify({
-        title: `Pasted, but ${count} ${count === 1 ? "piece isn't" : "pieces aren't"} in this pack and won't show geometry until reassigned.`,
+        title: plural(count, {
+          one: "Pasted, but # piece isn't in this pack and won't show geometry until reassigned.",
+          other:
+            "Pasted, but # pieces aren't in this pack and won't show geometry until reassigned.",
+        }),
         level: "warning",
       });
     }
@@ -1880,7 +1899,7 @@ function Builder({ id }: { id: string | undefined }) {
     setStrip("script");
     setStripOpen(true);
     void notify({
-      title: "Script imported",
+      title: t`Script imported`,
       body: importSummary(result),
       level: result.unmatched.length > 0 ? "warning" : "success",
     });
@@ -1915,7 +1934,7 @@ function Builder({ id }: { id: string | undefined }) {
     const failed = (!doc.loading && !draft) || packFailed;
     return (
       <p className="px-6 py-10 text-center text-sm text-muted-foreground">
-        {failed ? "This unit could not be opened." : "Opening the unit."}
+        {failed ? t`This unit could not be opened.` : t`Opening the unit.`}
       </p>
     );
   }
@@ -1977,6 +1996,11 @@ function Builder({ id }: { id: string | undefined }) {
   const hasImportedGeometry = draft.pieces.some(
     (piece) => piece.meshId !== undefined,
   );
+
+  const undoShortcut = shortcutLabel("undo");
+  const redoShortcut = shortcutLabel("redo");
+  const pieceCount = draft.pieces.length;
+  const ringCount = selected?.ring?.count ?? 0;
 
   return (
     // The side panel collapses for the same reason the parts drawer does: a
@@ -2102,17 +2126,19 @@ function Builder({ id }: { id: string | undefined }) {
                           <Input
                             value={draft.name}
                             onChange={(event) => renameUnit(event.target.value)}
-                            aria-label="Unit name"
+                            aria-label={t`Unit name`}
                             className="h-6 border-transparent bg-transparent px-1 text-sm font-semibold hover:border-border focus-visible:border-border"
                           />
                           <p className="flex items-center gap-1 px-1 text-xs text-muted-foreground">
-                            {draft.pieces.length}{" "}
-                            {draft.pieces.length === 1 ? "piece" : "pieces"} ·
-                            exports as
+                            {plural(pieceCount, {
+                              one: "# piece",
+                              other: "# pieces",
+                            })}{" "}
+                            · <Trans>exports as</Trans>
                             <NameInput
                               value={draft.unitName}
                               onCommit={renameExport}
-                              aria-label="Export name"
+                              aria-label={t`Export name`}
                               className="h-5 w-40 border-transparent bg-transparent px-1 text-xs hover:border-border focus-visible:border-border"
                             />
                           </p>
@@ -2154,13 +2180,13 @@ function Builder({ id }: { id: string | undefined }) {
                                   variant="outline"
                                   onClick={undo}
                                   disabled={!canUndo}
-                                  aria-label="Undo"
+                                  aria-label={t`Undo`}
                                 >
                                   <Undo size={14} />
                                 </TipButton>
                               </TooltipTrigger>
                               <TooltipContent side="bottom">
-                                Undo ({shortcutLabel("undo")})
+                                <Trans>Undo ({undoShortcut})</Trans>
                               </TooltipContent>
                             </Tooltip>
                             <Tooltip>
@@ -2170,13 +2196,13 @@ function Builder({ id }: { id: string | undefined }) {
                                   variant="outline"
                                   onClick={redo}
                                   disabled={!canRedo}
-                                  aria-label="Redo"
+                                  aria-label={t`Redo`}
                                 >
                                   <Redo size={14} />
                                 </TipButton>
                               </TooltipTrigger>
                               <TooltipContent side="bottom">
-                                Redo ({shortcutLabel("redo")})
+                                <Trans>Redo ({redoShortcut})</Trans>
                               </TooltipContent>
                             </Tooltip>
                           </ButtonGroup>
@@ -2194,7 +2220,7 @@ function Builder({ id }: { id: string | undefined }) {
                                   onClick={() => doc.save()}
                                   disabled={doc.saving}
                                   className="relative"
-                                  aria-label="Save"
+                                  aria-label={t`Save`}
                                 >
                                   <Save size={14} />
                                   {doc.dirty || doc.saving ? (
@@ -2211,10 +2237,10 @@ function Builder({ id }: { id: string | undefined }) {
                               </TooltipTrigger>
                               <TooltipContent side="bottom">
                                 {doc.saving
-                                  ? "Saving"
+                                  ? t`Saving`
                                   : doc.dirty
-                                    ? "Unsaved changes - save now"
-                                    : "Saved"}
+                                    ? t`Unsaved changes - save now`
+                                    : t`Saved`}
                               </TooltipContent>
                             </Tooltip>
                             <Tooltip>
@@ -2223,13 +2249,13 @@ function Builder({ id }: { id: string | undefined }) {
                                   size="icon"
                                   variant="outline"
                                   onClick={() => setTesting(true)}
-                                  aria-label="Test in game"
+                                  aria-label={t`Test in game`}
                                 >
                                   <Rocket size={14} />
                                 </Button>
                               </TooltipTrigger>
                               <TooltipContent side="bottom">
-                                Test in game
+                                <Trans>Test in game</Trans>
                               </TooltipContent>
                             </Tooltip>
                             <Tooltip>
@@ -2243,13 +2269,13 @@ function Builder({ id }: { id: string | undefined }) {
                                     setSelectedId(null);
                                     setFitting(true);
                                   }}
-                                  aria-label="Fit a body plan"
+                                  aria-label={t`Fit a body plan`}
                                 >
                                   <Bone size={14} />
                                 </Button>
                               </TooltipTrigger>
                               <TooltipContent side="bottom">
-                                Fit a body plan
+                                <Trans>Fit a body plan</Trans>
                               </TooltipContent>
                             </Tooltip>
                             <Tooltip>
@@ -2259,7 +2285,7 @@ function Builder({ id }: { id: string | undefined }) {
                                   variant="outline"
                                   className="relative"
                                   onClick={() => setPicturing(true)}
-                                  aria-label="Build picture"
+                                  aria-label={t`Build picture`}
                                 >
                                   <ImageIcon size={14} />
                                   {pictureIsStale(draft) ? (
@@ -2272,8 +2298,8 @@ function Builder({ id }: { id: string | undefined }) {
                               </TooltipTrigger>
                               <TooltipContent side="bottom">
                                 {pictureIsStale(draft)
-                                  ? "Build picture - the unit has changed since it was taken"
-                                  : "Build picture"}
+                                  ? t`Build picture - the unit has changed since it was taken`
+                                  : t`Build picture`}
                               </TooltipContent>
                             </Tooltip>
                             {/* Only a unit that came from a file has a model to save
@@ -2295,13 +2321,13 @@ function Builder({ id }: { id: string | undefined }) {
                                 <Button
                                   size="icon"
                                   onClick={() => setExporting(true)}
-                                  aria-label="Export"
+                                  aria-label={t`Export`}
                                 >
                                   <Upload size={14} />
                                 </Button>
                               </TooltipTrigger>
                               <TooltipContent side="bottom">
-                                Export
+                                <Trans>Export</Trans>
                               </TooltipContent>
                             </Tooltip>
                           </ButtonGroup>
@@ -2313,8 +2339,8 @@ function Builder({ id }: { id: string | undefined }) {
                                   variant="outline"
                                   aria-label={
                                     asideOpen
-                                      ? "Hide the side panel"
-                                      : "Show the side panel"
+                                      ? t`Hide the side panel`
+                                      : t`Show the side panel`
                                   }
                                 >
                                   {asideOpen ? (
@@ -2327,8 +2353,8 @@ function Builder({ id }: { id: string | undefined }) {
                             </TooltipTrigger>
                             <TooltipContent side="bottom">
                               {asideOpen
-                                ? "Hide the side panel"
-                                : "Show the side panel"}
+                                ? t`Hide the side panel`
+                                : t`Show the side panel`}
                             </TooltipContent>
                           </Tooltip>
                         </div>
@@ -2595,11 +2621,11 @@ function Builder({ id }: { id: string | undefined }) {
                   aria-label={
                     stripOpen
                       ? effectiveStrip === "script"
-                        ? "Hide the script"
-                        : "Hide the parts"
+                        ? t`Hide the script`
+                        : t`Hide the parts`
                       : effectiveStrip === "script"
-                        ? "Show the script"
-                        : "Show the parts"
+                        ? t`Show the script`
+                        : t`Show the parts`
                   }
                 >
                   {stripOpen ? (
@@ -2621,7 +2647,7 @@ function Builder({ id }: { id: string | undefined }) {
                         }}
                         aria-pressed={strip === "inventory"}
                       >
-                        Inventory
+                        <Trans>Inventory</Trans>
                       </Button>
                     </>
                   )}
@@ -2636,7 +2662,7 @@ function Builder({ id }: { id: string | undefined }) {
                     }}
                     aria-pressed={effectiveStrip === "script"}
                   >
-                    Script
+                    <Trans>Script</Trans>
                   </Button>
                 </ButtonGroup>
 
@@ -2660,8 +2686,8 @@ function Builder({ id }: { id: string | undefined }) {
                     aria-pressed={stripFull}
                     aria-label={
                       stripFull
-                        ? "Bring the model back"
-                        : "Fill the window with this panel"
+                        ? t`Bring the model back`
+                        : t`Fill the window with this panel`
                     }
                   >
                     {stripFull ? (
@@ -2749,7 +2775,7 @@ function Builder({ id }: { id: string | undefined }) {
                   onClick={() => setAside("pieces")}
                   aria-pressed={aside === "pieces"}
                 >
-                  Pieces
+                  <Trans>Pieces</Trans>
                 </Button>
                 <Button
                   size="sm"
@@ -2757,7 +2783,7 @@ function Builder({ id }: { id: string | undefined }) {
                   onClick={() => setAside("animation")}
                   aria-pressed={aside === "animation"}
                 >
-                  Animation
+                  <Trans>Animation</Trans>
                 </Button>
                 <Button
                   size="sm"
@@ -2765,7 +2791,7 @@ function Builder({ id }: { id: string | undefined }) {
                   onClick={() => setAside("collision")}
                   aria-pressed={aside === "collision"}
                 >
-                  Collision
+                  <Trans>Collision</Trans>
                 </Button>
                 <Button
                   size="sm"
@@ -2773,7 +2799,7 @@ function Builder({ id }: { id: string | undefined }) {
                   onClick={() => setAside("aim")}
                   aria-pressed={aside === "aim"}
                 >
-                  Aim
+                  <Trans>Aim</Trans>
                 </Button>
                 {draft.skeleton ? (
                   <Button
@@ -2782,7 +2808,7 @@ function Builder({ id }: { id: string | undefined }) {
                     onClick={() => setAside("skeleton")}
                     aria-pressed={aside === "skeleton"}
                   >
-                    Skeleton
+                    <Trans>Skeleton</Trans>
                   </Button>
                 ) : null}
                 {/* Only for a unit imported whole: a parts-pack unit draws
@@ -2795,7 +2821,7 @@ function Builder({ id }: { id: string | undefined }) {
                     onClick={() => setAside("texture")}
                     aria-pressed={aside === "texture"}
                   >
-                    Texture
+                    <Trans>Texture</Trans>
                   </Button>
                 ) : null}
               </ButtonGroup>
@@ -2931,7 +2957,7 @@ function Builder({ id }: { id: string | undefined }) {
                 <>
                   <div className="flex items-center gap-1 border-b border-border px-3 py-2">
                     <h2 className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                      Pieces
+                      <Trans>Pieces</Trans>
                     </h2>
                     {pack && !draft.imported ? (
                       <Button
@@ -2939,8 +2965,8 @@ function Builder({ id }: { id: string | undefined }) {
                         variant="ghost"
                         className="ml-auto"
                         onClick={addArm}
-                        aria-label="Add a build arm"
-                        title="Add a build arm with its nozzle and nano point, and the build presets"
+                        aria-label={t`Add a build arm`}
+                        title={t`Add a build arm with its nozzle and nano point, and the build presets`}
                       >
                         <Wrench size={14} />
                       </Button>
@@ -2950,8 +2976,8 @@ function Builder({ id }: { id: string | undefined }) {
                         size="sm"
                         variant="ghost"
                         onClick={addWeapon}
-                        aria-label="Add a weapon"
-                        title="Add a turret with its barrel and muzzle flare, and the aiming and recoil presets"
+                        aria-label={t`Add a weapon`}
+                        title={t`Add a turret with its barrel and muzzle flare, and the aiming and recoil presets`}
                       >
                         <Crosshair size={14} />
                       </Button>
@@ -2963,7 +2989,7 @@ function Builder({ id }: { id: string | undefined }) {
                         pack && !draft.imported ? undefined : "ml-auto"
                       }
                       onClick={addEmpty}
-                      title="Add an empty piece, which is how flares and aim points are made"
+                      title={t`Add an empty piece, which is how flares and aim points are made`}
                     >
                       <Plus size={14} />
                     </Button>
@@ -3051,8 +3077,8 @@ function Builder({ id }: { id: string | undefined }) {
                           variant="ghost"
                           className="h-6 w-6 shrink-0"
                           onClick={() => setSelectedId(null)}
-                          aria-label="Close and deselect"
-                          title="Close and deselect"
+                          aria-label={t`Close and deselect`}
+                          title={t`Close and deselect`}
                         >
                           <X size={14} />
                         </Button>
@@ -3063,7 +3089,7 @@ function Builder({ id }: { id: string | undefined }) {
                             className="text-xs text-muted-foreground"
                             htmlFor="lego-piece-name"
                           >
-                            Name
+                            <Trans>Name</Trans>
                           </label>
                           <NameInput
                             id="lego-piece-name"
@@ -3124,13 +3150,13 @@ function Builder({ id }: { id: string | undefined }) {
                                 )
                               }
                             >
-                              Fit to steps
+                              <Trans>Fit to steps</Trans>
                             </Button>
                           ) : null}
                           {canMirror(draft, selected.id) ? (
                             <div className="mt-2">
                               <span className="text-xs text-muted-foreground">
-                                Mirror
+                                <Trans>Mirror</Trans>
                               </span>
                               <ButtonGroup className="mt-1 flex w-full">
                                 <Button
@@ -3139,7 +3165,8 @@ function Builder({ id }: { id: string | undefined }) {
                                   className="flex-1"
                                   onClick={mirrorSelection}
                                 >
-                                  <FlipHorizontal2 size={14} /> In place
+                                  <FlipHorizontal2 size={14} />{" "}
+                                  <Trans>In place</Trans>
                                 </Button>
                                 <Button
                                   size="sm"
@@ -3147,13 +3174,15 @@ function Builder({ id }: { id: string | undefined }) {
                                   className="flex-1"
                                   onClick={mirrorCopyOfSelection}
                                 >
-                                  <Copy size={14} /> As a copy
+                                  <Copy size={14} /> <Trans>As a copy</Trans>
                                 </Button>
                               </ButtonGroup>
                               <p className="mt-1 text-xs text-muted-foreground">
-                                Across the unit's centre line, taking everything
-                                under this piece with it. A copy is how one leg
-                                becomes the other.
+                                <Trans>
+                                  Across the unit's centre line, taking
+                                  everything under this piece with it. A copy is
+                                  how one leg becomes the other.
+                                </Trans>
                               </p>
                             </div>
                           ) : null}
@@ -3165,23 +3194,26 @@ function Builder({ id }: { id: string | undefined }) {
                           {imported ? (
                             <div className="mt-2">
                               <span className="text-xs text-muted-foreground">
-                                Fix UVs and normals
+                                <Trans>Fix UVs and normals</Trans>
                               </span>
                               <p className="mt-1 text-xs text-muted-foreground">
-                                For a model imported from somewhere else, whose
-                                UVs or lighting arrived wrong.
+                                <Trans>
+                                  For a model imported from somewhere else,
+                                  whose UVs or lighting arrived wrong.
+                                </Trans>
                               </p>
                               <div className="mt-1 grid grid-cols-[1fr_auto_auto] items-center gap-x-1.5 gap-y-1.5">
                                 <span />
                                 <span className="text-center text-[10px] uppercase text-muted-foreground">
-                                  This piece
+                                  <Trans>This piece</Trans>
                                 </span>
                                 <span className="text-center text-[10px] uppercase text-muted-foreground">
-                                  Whole model
+                                  <Trans>Whole model</Trans>
                                 </span>
 
                                 <span className="flex items-center gap-1 text-xs">
-                                  <FlipVertical2 size={12} /> Flip UVs
+                                  <FlipVertical2 size={12} />{" "}
+                                  <Trans>Flip UVs</Trans>
                                 </span>
                                 <Button
                                   size="sm"
@@ -3189,7 +3221,7 @@ function Builder({ id }: { id: string | undefined }) {
                                   disabled={!canFixMesh(selected)}
                                   onClick={() => fixSelectedUv("flip", "piece")}
                                 >
-                                  Flip
+                                  <Trans>Flip</Trans>
                                 </Button>
                                 <Button
                                   size="sm"
@@ -3197,11 +3229,12 @@ function Builder({ id }: { id: string | undefined }) {
                                   disabled={!hasImportedGeometry}
                                   onClick={() => fixSelectedUv("flip", "model")}
                                 >
-                                  Flip
+                                  <Trans>Flip</Trans>
                                 </Button>
 
                                 <span className="flex items-center gap-1 text-xs">
-                                  <FlipHorizontal2 size={12} /> Mirror UVs
+                                  <FlipHorizontal2 size={12} />{" "}
+                                  <Trans>Mirror UVs</Trans>
                                 </span>
                                 <Button
                                   size="sm"
@@ -3211,7 +3244,7 @@ function Builder({ id }: { id: string | undefined }) {
                                     fixSelectedUv("mirror", "piece")
                                   }
                                 >
-                                  Mirror
+                                  <Trans>Mirror</Trans>
                                 </Button>
                                 <Button
                                   size="sm"
@@ -3221,11 +3254,12 @@ function Builder({ id }: { id: string | undefined }) {
                                     fixSelectedUv("mirror", "model")
                                   }
                                 >
-                                  Mirror
+                                  <Trans>Mirror</Trans>
                                 </Button>
 
                                 <span className="flex items-center gap-1 text-xs">
-                                  <Sparkles size={12} /> Recalc normals
+                                  <Sparkles size={12} />{" "}
+                                  <Trans>Recalc normals</Trans>
                                 </span>
                                 <Button
                                   size="sm"
@@ -3233,7 +3267,7 @@ function Builder({ id }: { id: string | undefined }) {
                                   disabled={!canFixMesh(selected)}
                                   onClick={() => recalcSelectedNormals("piece")}
                                 >
-                                  Fix
+                                  <Trans>Fix</Trans>
                                 </Button>
                                 <Button
                                   size="sm"
@@ -3241,7 +3275,7 @@ function Builder({ id }: { id: string | undefined }) {
                                   disabled={!hasImportedGeometry}
                                   onClick={() => recalcSelectedNormals("model")}
                                 >
-                                  Fix
+                                  <Trans>Fix</Trans>
                                 </Button>
                               </div>
                               <div className="mt-1.5 flex items-center gap-2">
@@ -3249,7 +3283,7 @@ function Builder({ id }: { id: string | undefined }) {
                                   htmlFor="lego-normals-angle"
                                   className="text-xs text-muted-foreground"
                                 >
-                                  Smoothing angle
+                                  <Trans>Smoothing angle</Trans>
                                 </label>
                                 <Input
                                   id="lego-normals-angle"
@@ -3263,7 +3297,9 @@ function Builder({ id }: { id: string | undefined }) {
                                   className="h-6 w-16 text-right"
                                 />
                                 <span className="text-xs text-muted-foreground">
-                                  degrees, for the next recalculation
+                                  <Trans>
+                                    degrees, for the next recalculation
+                                  </Trans>
                                 </span>
                               </div>
                             </div>
@@ -3274,7 +3310,7 @@ function Builder({ id }: { id: string | undefined }) {
                             // using a pointer.
                             <div className="mt-2">
                               <span className="text-xs text-muted-foreground">
-                                Hangs off
+                                <Trans>Hangs off</Trans>
                               </span>
                               <Select
                                 value={selected.parentId ?? draft.rootPieceId}
@@ -3285,7 +3321,7 @@ function Builder({ id }: { id: string | undefined }) {
                                 <SelectTrigger
                                   size="sm"
                                   className="mt-1 w-full"
-                                  aria-label="Parent piece"
+                                  aria-label={t`Parent piece`}
                                 >
                                   <SelectValue />
                                 </SelectTrigger>
@@ -3329,7 +3365,7 @@ function Builder({ id }: { id: string | undefined }) {
                           {selected.twin && pieceById(draft, selected.twin) ? (
                             <div className="mt-2 flex items-center gap-2 text-xs">
                               <span className="text-muted-foreground">
-                                Twin
+                                <Trans>Twin</Trans>
                               </span>
                               <span className="min-w-0 flex-1 truncate">
                                 {pieceById(draft, selected.twin)?.name}
@@ -3344,7 +3380,7 @@ function Builder({ id }: { id: string | undefined }) {
                                   )
                                 }
                               >
-                                Break
+                                <Trans>Break</Trans>
                               </Button>
                             </div>
                           ) : null}
@@ -3352,10 +3388,13 @@ function Builder({ id }: { id: string | undefined }) {
                           ringMembers(draft.pieces, selected.id) ? (
                             <div className="mt-2 flex items-center gap-2 text-xs">
                               <span className="text-muted-foreground">
-                                Ring
+                                <Trans>Ring</Trans>
                               </span>
                               <span className="min-w-0 flex-1 truncate">
-                                {selected.ring.count} copies
+                                {plural(ringCount, {
+                                  one: "# copy",
+                                  other: "# copies",
+                                })}
                               </span>
                               <Button
                                 size="sm"
@@ -3367,7 +3406,7 @@ function Builder({ id }: { id: string | undefined }) {
                                   )
                                 }
                               >
-                                Break
+                                <Trans>Break</Trans>
                               </Button>
                             </div>
                           ) : null}
@@ -3383,7 +3422,7 @@ function Builder({ id }: { id: string | undefined }) {
                                   setSwapping(true);
                                 }}
                               >
-                                Change part
+                                <Trans>Change part</Trans>
                               </Button>
                               {swapNote ? (
                                 <p className="mt-1 text-xs text-muted-foreground">
@@ -3397,7 +3436,7 @@ function Builder({ id }: { id: string | undefined }) {
                             <div className="mt-2">
                               {missingModuleIds.has(selected.module.id) ? (
                                 <p className="mb-1 text-xs text-muted-foreground">
-                                  Module missing
+                                  <Trans>Module missing</Trans>
                                 </p>
                               ) : null}
                               <Button
@@ -3406,7 +3445,7 @@ function Builder({ id }: { id: string | undefined }) {
                                 className="w-full"
                                 onClick={() => setSwappingModule(true)}
                               >
-                                Swap module
+                                <Trans>Swap module</Trans>
                               </Button>
                             </div>
                           ) : null}
@@ -3414,7 +3453,7 @@ function Builder({ id }: { id: string | undefined }) {
                           {pivotBox ? (
                             <div className="mt-2">
                               <span className="text-xs text-muted-foreground">
-                                Turns about
+                                <Trans>Turns about</Trans>
                               </span>
                               <Select
                                 value={
@@ -3432,7 +3471,7 @@ function Builder({ id }: { id: string | undefined }) {
                                 <SelectTrigger
                                   size="sm"
                                   className="mt-1 w-full"
-                                  aria-label="Pivot point"
+                                  aria-label={t`Pivot point`}
                                 >
                                   <SelectValue />
                                 </SelectTrigger>
@@ -3448,9 +3487,11 @@ function Builder({ id }: { id: string | undefined }) {
                                 </SelectContent>
                               </Select>
                               <p className="mt-1 text-xs text-muted-foreground">
-                                The point this piece turns about, and that its
-                                children hang from. A leg wants its top, not its
-                                middle.
+                                <Trans>
+                                  The point this piece turns about, and that its
+                                  children hang from. A leg wants its top, not
+                                  its middle.
+                                </Trans>
                               </p>
                             </div>
                           ) : null}
@@ -3534,7 +3575,7 @@ function Builder({ id }: { id: string | undefined }) {
 
                           <div className="mt-2">
                             <span className="text-xs text-muted-foreground">
-                              Role
+                              <Trans>Role</Trans>
                             </span>
                             <Select
                               value={selected.role ?? NO_ROLE}
@@ -3548,12 +3589,14 @@ function Builder({ id }: { id: string | undefined }) {
                               <SelectTrigger
                                 size="sm"
                                 className="mt-1 w-full"
-                                aria-label="Animation role"
+                                aria-label={t`Animation role`}
                               >
                                 <SelectValue />
                               </SelectTrigger>
                               <SelectContent>
-                                <SelectItem value={NO_ROLE}>None</SelectItem>
+                                <SelectItem
+                                  value={NO_ROLE}
+                                >{t`None`}</SelectItem>
                                 {pickerRoles(draft.pieces).map((role) => (
                                   <SelectItem key={role.id} value={role.id}>
                                     {role.label}
@@ -3562,8 +3605,10 @@ function Builder({ id }: { id: string | undefined }) {
                               </SelectContent>
                             </Select>
                             <p className="mt-1 text-xs text-muted-foreground">
-                              What this piece is, so the animation presets know
-                              what to move.
+                              <Trans>
+                                What this piece is, so the animation presets
+                                know what to move.
+                              </Trans>
                             </p>
                             {restAngleWarnings(selected).map((warning) => (
                               <p
@@ -3577,8 +3622,8 @@ function Builder({ id }: { id: string | undefined }) {
 
                           <p className="mt-2 text-xs text-muted-foreground">
                             {pieceKind(selected, raw) === "geometry"
-                              ? "Geometry."
-                              : "Empty, so it carries other pieces and can be an emit point."}
+                              ? t`Geometry.`
+                              : t`Empty, so it carries other pieces and can be an emit point.`}
                           </p>
                         </div>
                       ) : null}

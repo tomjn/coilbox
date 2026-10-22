@@ -14,6 +14,7 @@
  * there writes offsets that hold it still instead.
  */
 
+import { Trans, useLingui } from "@lingui/react/macro";
 import { Button } from "@picoframe/frame";
 import { useMemo } from "react";
 import { OptionSelect } from "@/components/OptionSelect";
@@ -69,6 +70,7 @@ export function CollisionPanel({
   onPieceVolumeChange,
   pieceScript,
 }: Props) {
+  const { t } = useLingui();
   // Every vertex in the unit, so not on every keystroke elsewhere in the page.
   const bounds = useMemo(
     () => unitBounds(project, pack, raw),
@@ -90,13 +92,17 @@ export function CollisionPanel({
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto px-3 py-3">
       <p className="text-xs text-muted-foreground">
-        The shape the engine hits, clicks and shoots at. Without one it uses a
-        sphere around the whole unit, which is a far bigger click target than a
-        long unit looks.
+        <Trans>
+          The shape the engine hits, clicks and shoots at. Without one it uses a
+          sphere around the whole unit, which is a far bigger click target than
+          a long unit looks.
+        </Trans>
       </p>
 
       <div>
-        <span className="text-xs text-muted-foreground">Shape</span>
+        <span className="text-xs text-muted-foreground">
+          <Trans>Shape</Trans>
+        </span>
         <OptionSelect
           className="mt-1"
           size="sm"
@@ -111,75 +117,92 @@ export function CollisionPanel({
       </div>
 
       <Vec3Row
-        label="Size"
-        unit="elmos"
+        label={t`Size`}
+        unit={t`elmos`}
         values={volume.scales}
         onCommit={(axis, value) => setAxis("scales", axis, value)}
       />
       <Vec3Row
-        label="Offset from the aim point"
+        label={t`Offset from the aim point`}
         values={volume.offsets}
         onCommit={(axis, value) => setAxis("offsets", axis, value)}
       />
 
       <p className="text-xs text-muted-foreground">
-        Size is the volume's full width on each axis, not its radius. The offset
-        is measured from the unit's aim point, which the Aim panel sets and
-        which most units leave on the middle of their bounding box. Move the aim
-        point and these change to keep the volume where it is.
+        <Trans>
+          Size is the volume's full width on each axis, not its radius. The
+          offset is measured from the unit's aim point, which the Aim panel sets
+          and which most units leave on the middle of their bounding box. Move
+          the aim point and these change to keep the volume where it is.
+        </Trans>
       </p>
 
       <p className="text-xs text-muted-foreground">
-        While this panel is open the viewport's handles are on the volume rather
-        than on a piece, so you can drag it to size instead of typing. Move and
-        scale only: a volume has no rotation. Select a piece and they move onto
-        that piece's own box instead, which is the fields at the bottom.
+        <Trans>
+          While this panel is open the viewport's handles are on the volume
+          rather than on a piece, so you can drag it to size instead of typing.
+          Move and scale only: a volume has no rotation. Select a piece and they
+          move onto that piece's own box instead, which is the fields at the
+          bottom.
+        </Trans>
       </p>
 
       {volume.type === "sphere" ? (
         <p className="text-xs text-muted-foreground">
-          A sphere cannot be stretched, so the engine takes the largest of the
-          three sizes and uses it on every axis.
+          <Trans>
+            A sphere cannot be stretched, so the engine takes the largest of the
+            three sizes and uses it on every axis.
+          </Trans>
         </p>
       ) : null}
       {volume.type.startsWith("cyl") ? (
         <p className="text-xs text-muted-foreground">
-          A cylinder is round, so the engine takes the larger of the two sizes
-          across it and uses that for both.
+          <Trans>
+            A cylinder is round, so the engine takes the larger of the two sizes
+            across it and uses that for both.
+          </Trans>
         </p>
       ) : null}
 
       {isIgnoredByEngine(volume) ? (
         <p className="text-xs text-destructive">
-          Nothing here is more than an elmo across, so the engine will read it
-          as no volume at all and go back to its own sphere.
+          <Trans>
+            Nothing here is more than an elmo across, so the engine will read it
+            as no volume at all and go back to its own sphere.
+          </Trans>
         </p>
       ) : null}
 
       {custom ? (
         <Button size="sm" variant="outline" onClick={() => onChange(null)}>
-          Use the bounding box
+          <Trans>Use the bounding box</Trans>
         </Button>
       ) : (
         <p className="text-xs text-muted-foreground">
-          Derived from the model's bounding box, and re-derived as the unit
-          changes. Changing anything above takes it over.
+          <Trans>
+            Derived from the model's bounding box, and re-derived as the unit
+            changes. Changing anything above takes it over.
+          </Trans>
         </p>
       )}
 
       <div className="border-t border-border/60 pt-3">
-        <p className="text-xs font-medium">Use each piece instead</p>
+        <p className="text-xs font-medium">
+          <Trans>Use each piece instead</Trans>
+        </p>
         <p className="mt-1 text-xs text-muted-foreground">
-          The engine measures a box around every piece as it loads the model,
-          and can use those boxes rather than the shape above. Shooting and
-          clicking ask for them separately, so these are two switches: a walker
-          can be shot between its legs and still be easy to click on.
+          <Trans>
+            The engine measures a box around every piece as it loads the model,
+            and can use those boxes rather than the shape above. Shooting and
+            clicking ask for them separately, so these are two switches: a
+            walker can be shot between its legs and still be easy to click on.
+          </Trans>
         </p>
       </div>
 
       <div className="flex items-center justify-between gap-3">
         <Label htmlFor="piece-collision" className="text-xs font-medium">
-          Shoot at each piece
+          <Trans>Shoot at each piece</Trans>
         </Label>
         <Switch
           id="piece-collision"
@@ -189,14 +212,16 @@ export function CollisionPanel({
       </div>
 
       <p className="text-xs text-muted-foreground">
-        Writes <code>usepiececollisionvolumes</code>. A shot is then tested
-        against each piece's box, so one can pass between a walker's legs or
-        under a gantry rather than stopping at the shape above.
+        <Trans>
+          Writes <code>usepiececollisionvolumes</code>. A shot is then tested
+          against each piece's box, so one can pass between a walker's legs or
+          under a gantry rather than stopping at the shape above.
+        </Trans>
       </p>
 
       <div className="flex items-center justify-between gap-3">
         <Label htmlFor="piece-selection" className="text-xs font-medium">
-          Click on each piece
+          <Trans>Click on each piece</Trans>
         </Label>
         <Switch
           id="piece-selection"
@@ -206,24 +231,37 @@ export function CollisionPanel({
       </div>
 
       <p className="text-xs text-muted-foreground">
-        Writes <code>usepieceselectionvolumes</code>. The click target is then
-        the pieces rather than the shape above, which is what a gantry or a
-        spindly walker wants: it is otherwise selectable from the empty air it
-        encloses.
+        <Trans>
+          Writes <code>usepieceselectionvolumes</code>. The click target is then
+          the pieces rather than the shape above, which is what a gantry or a
+          spindly walker wants: it is otherwise selectable from the empty air it
+          encloses.
+        </Trans>
       </p>
 
       <p className="text-xs text-muted-foreground">
-        Turn a switch on and the viewport draws the boxes the engine will build.
-        A piece whose box is the wrong answer can be given another one, or taken
-        out of the hit test entirely, below.
+        <Trans>
+          Turn a switch on and the viewport draws the boxes the engine will
+          build. A piece whose box is the wrong answer can be given another one,
+          or taken out of the hit test entirely, below.
+        </Trans>
       </p>
 
       {project.pieceCollision || project.pieceSelection ? (
         <p className="text-xs text-muted-foreground">
-          The volume above is still worth getting right.{" "}
-          {project.pieceSelection
-            ? "It is the sphere an explosion measures to decide whether the unit was caught."
-            : "It is still what you click to select the unit, and it is the sphere an explosion measures to decide whether the unit was caught."}
+          <Trans>The volume above is still worth getting right.</Trans>{" "}
+          {project.pieceSelection ? (
+            <Trans>
+              It is the sphere an explosion measures to decide whether the unit
+              was caught.
+            </Trans>
+          ) : (
+            <Trans>
+              It is still what you click to select the unit, and it is the
+              sphere an explosion measures to decide whether the unit was
+              caught.
+            </Trans>
+          )}
         </p>
       ) : null}
 

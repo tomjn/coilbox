@@ -12,6 +12,7 @@
  * proportions it cannot measure.
  */
 
+import { Trans, useLingui } from "@lingui/react/macro";
 import { Button, Input } from "@picoframe/frame";
 import { X } from "lucide-react";
 import { Dialog as DialogPrimitive } from "radix-ui";
@@ -69,6 +70,7 @@ export function FitPlanDrawer({
   onOpenChange,
   onFit,
 }: Props) {
+  const { t } = useLingui();
   // The plan picked from the list, and the gun and build arm groups the
   // "Describe it instead" form adds to it (#3263), so a fitted unit can be
   // any plan a new one can.
@@ -150,8 +152,10 @@ export function FitPlanDrawer({
     ([bone, piece]) =>
       picks[bone] === undefined && !Object.values(picks).includes(piece),
   );
+  const planLabel = plan?.label;
   const proportionLabel = (id: string) =>
     plan?.proportions.find((p) => p.id === id)?.label ?? id;
+  const unmeasured = fit?.unmeasured.map(proportionLabel).join(", ");
 
   return (
     <DialogPrimitive.Root open modal={false} onOpenChange={onOpenChange}>
@@ -165,10 +169,10 @@ export function FitPlanDrawer({
         >
           <div className="flex items-center justify-between border-b border-border/60 px-5 py-4">
             <DialogPrimitive.Title className="text-base font-semibold">
-              {plan ? `Fit ${plan.label}` : "Fit a body plan"}
+              {plan ? t`Fit ${planLabel}` : t`Fit a body plan`}
             </DialogPrimitive.Title>
             <DialogPrimitive.Close asChild>
-              <Button variant="ghost" size="icon" aria-label="Close">
+              <Button variant="ghost" size="icon" aria-label={t`Close`}>
                 <X className="size-4" />
               </Button>
             </DialogPrimitive.Close>
@@ -196,13 +200,13 @@ export function FitPlanDrawer({
               <div className="space-y-2 border-b border-border/60 px-5 py-3">
                 {takesGun ? (
                   <CheckField
-                    label="Gun"
+                    label={t`Gun`}
                     checked={groups.weapon}
                     onChange={(weapon) => setGroups({ ...groups, weapon })}
                   />
                 ) : null}
                 <CheckField
-                  label="Builds"
+                  label={t`Builds`}
                   checked={groups.builds}
                   onChange={(builds) => setGroups({ ...groups, builds })}
                 />
@@ -236,19 +240,19 @@ export function FitPlanDrawer({
                   ))}
                 <div className="flex items-center justify-between gap-2">
                   <p className="text-xs text-muted-foreground">
-                    Select a piece for the highlighted bone
+                    <Trans>Select a piece for the highlighted bone</Trans>
                   </p>
                   <Button
                     size="sm"
                     variant="ghost"
                     onClick={() => setBase(null)}
                   >
-                    Change plan
+                    <Trans>Change plan</Trans>
                   </Button>
                 </div>
                 {unusedSuggestions ? (
                   <Button size="sm" variant="outline" onClick={takeSuggestions}>
-                    Use suggestions
+                    <Trans>Use suggestions</Trans>
                   </Button>
                 ) : null}
               </div>
@@ -258,6 +262,7 @@ export function FitPlanDrawer({
                   const label = boneLabel(bone, bones);
                   const pieceId = picks[bone.id];
                   const suggestion = suggested[bone.id];
+                  const suggestedName = suggestion ? nameOf(suggestion) : "";
                   return (
                     <li key={bone.id} className="flex items-center gap-1">
                       <button
@@ -268,14 +273,14 @@ export function FitPlanDrawer({
                       >
                         <span className="truncate">{label}</span>
                         <span className="shrink-0 truncate text-xs text-muted-foreground">
-                          {pieceId ? nameOf(pieceId) : "Unmatched"}
+                          {pieceId ? nameOf(pieceId) : t`Unmatched`}
                         </span>
                       </button>
                       {pieceId ? (
                         <Button
                           size="icon"
                           variant="ghost"
-                          aria-label={`Unmatch ${label}`}
+                          aria-label={t`Unmatch ${label}`}
                           onClick={() => unpick(bone.id)}
                         >
                           <X className="size-3" />
@@ -289,7 +294,7 @@ export function FitPlanDrawer({
                             setPicks(withPick(picks, bone.id, suggestion))
                           }
                         >
-                          Use {nameOf(suggestion)}
+                          <Trans>Use {suggestedName}</Trans>
                         </Button>
                       ) : null}
                     </li>
@@ -302,27 +307,40 @@ export function FitPlanDrawer({
                   <>
                     {fit.replaced.length > 0 ? (
                       <div>
-                        <p className="text-muted-foreground">Roles replaced</p>
+                        <p className="text-muted-foreground">
+                          <Trans>Roles replaced</Trans>
+                        </p>
                         <ul>
-                          {fit.replaced.map((r) => (
-                            <li key={r.pieceId}>
-                              {nameOf(r.pieceId)}: {roleLabel(r.from)} to{" "}
-                              {roleLabel(r.to)}
-                            </li>
-                          ))}
+                          {fit.replaced.map((r) => {
+                            const piece = nameOf(r.pieceId);
+                            const from = roleLabel(r.from);
+                            const to = roleLabel(r.to);
+                            return (
+                              <li key={r.pieceId}>
+                                <Trans>
+                                  {piece}: {from} to {to}
+                                </Trans>
+                              </li>
+                            );
+                          })}
                         </ul>
                       </div>
                     ) : null}
-                    {fit.presets.held.map((held) => (
-                      <p key={held.presetId} className="text-destructive">
-                        {presetById(held.presetId)?.label ?? held.presetId}{" "}
-                        needs {held.missing.map(roleLabel).join(", ")}
-                      </p>
-                    ))}
+                    {fit.presets.held.map((held) => {
+                      const preset =
+                        presetById(held.presetId)?.label ?? held.presetId;
+                      const missing = held.missing.map(roleLabel).join(", ");
+                      return (
+                        <p key={held.presetId} className="text-destructive">
+                          <Trans>
+                            {preset} needs {missing}
+                          </Trans>
+                        </p>
+                      );
+                    })}
                     {fit.unmeasured.length > 0 ? (
                       <p className="text-muted-foreground">
-                        Not measured:{" "}
-                        {fit.unmeasured.map(proportionLabel).join(", ")}
+                        <Trans>Not measured: {unmeasured}</Trans>
                       </p>
                     ) : null}
                   </>
@@ -336,7 +354,7 @@ export function FitPlanDrawer({
                       onOpenChange(false);
                     }}
                   >
-                    Fit
+                    <Trans>Fit</Trans>
                   </Button>
                 </div>
               </div>
