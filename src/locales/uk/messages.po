@@ -8101,17 +8101,17 @@ msgstr "600 кадрів – це 20 секунд."
 #: src/content/unitFieldNotes.ts
 #, fuzzy
 msgid "65536 COB angle units is a full turn, so 182 here is a degree per frame, or 30 degrees a second."
-msgstr "65536 одиниць кута COB – повний оберт, тож 182 тут – це градус за кадр, або 30 градусів на секунду."
+msgstr "65536 одиниць кута .cob – повний оберт, тож 182 тут – це градус за кадр, або 30 градусів на секунду."
 
 #: src/content/unitFieldNotes.ts
 #, fuzzy
 msgid "65536 COB angle units is a full turn."
-msgstr "65536 одиниць кута COB – повний оберт."
+msgstr "65536 одиниць кута .cob – повний оберт."
 
 #: src/content/unitFieldNotes.ts
 #, fuzzy
 msgid "65536 COB angle units is a full turn. Only used when turret is off."
-msgstr "65536 одиниць кута COB – повний оберт. Використовується лише тоді, коли turret вимкнено."
+msgstr "65536 одиниць кута .cob – повний оберт. Використовується лише тоді, коли turret вимкнено."
 
 #: src/lego/pages/components/ImportResult.tsx
 #, fuzzy
@@ -15206,13 +15206,13 @@ msgstr "Узбережжя"
 #: src/content/unitFieldNotes.ts
 #, fuzzy
 msgid "COB identifier"
-msgstr "Ідентифікатор COB"
+msgstr "Ідентифікатор .cob"
 
 #: src/animation/index.ts
 #: src/animation/pages/CobPage.tsx
 #, fuzzy
 msgid "COB tools"
-msgstr "Інструменти COB"
+msgstr "Інструменти .cob"
 
 #: src/lobby-servers/PasswordRecoveryForm.tsx
 #: src/multiplayer/chat/ChatPane.tsx
@@ -16604,7 +16604,7 @@ msgstr "Конвертувати знову"
 #: src/home/groupDescription.ts
 #, fuzzy
 msgid "Convert BOS to Lua, and work with COB scripts."
-msgstr "Конвертуйте BOS у Lua й працюйте зі скриптами COB."
+msgstr "Конвертуйте BOS у Lua й працюйте зі скриптами .cob."
 
 #: src/content/pages/ArchiveDetailPage.tsx
 #: src/content/pages/components/Convert3doDrawer.tsx
@@ -43180,7 +43180,7 @@ msgstr "Гучність звуку"
 #: src/lego/scriptMarks.ts
 #, fuzzy
 msgid "Sound, which a TA script does not name"
-msgstr "Звук, який скрипт TA не називає"
+msgstr "Звук, який скрипт Total Annihilation не називає"
 
 #: src/sound/SoundSettings.tsx
 #, fuzzy
@@ -49693,7 +49693,7 @@ msgstr "Власний скрипт цього юніта. Експорт зап
 #: src/lego/pages/components/ExportDrawer.tsx
 #, fuzzy
 msgid "This unit's script can keep shared COB unit values as rules params. For the game's synced gadgets to set them, and its gadgets and widgets to read them, put <0>VFS.Include(\"lualibs/cob_vars.lua\")</0> on the first line of <1>LuaRules/main.lua</1>, <2>LuaRules/draw.lua</2> and <3>luaui.lua</3> (or <4>LuaUI/main.lua</4>)."
-msgstr "Скрипт цього юніта може зберігати спільні значення COB як rules params. Щоб синхронізовані гаджети гри могли їх задавати, а її гаджети й віджети – читати, додайте <0>VFS.Include(\"lualibs/cob_vars.lua\")</0> першим рядком у <1>LuaRules/main.lua</1>, <2>LuaRules/draw.lua</2> і <3>luaui.lua</3> (або <4>LuaUI/main.lua</4>)."
+msgstr "Скрипт цього юніта може зберігати спільні значення скриптів .cob як rules params. Щоб синхронізовані гаджети гри могли їх задавати, а її гаджети й віджети – читати, додайте <0>VFS.Include(\"lualibs/cob_vars.lua\")</0> першим рядком у <1>LuaRules/main.lua</1>, <2>LuaRules/draw.lua</2> і <3>luaui.lua</3> (або <4>LuaUI/main.lua</4>)."
 
 #: src/lego/pages/components/PieceCollisionFields.tsx
 #, fuzzy
