@@ -26825,7 +26825,7 @@ msgstr "少ない"
 #: src/content/pages/ReplaysPage.tsx
 #, fuzzy
 msgid "Least {metricName}"
-msgstr "{metricName} が少ない順"
+msgstr "{metricName} 昇順"
 
 #: src/multiplayer/battle/BattleRoomHeader.tsx
 #: src/multiplayer/battles/BattleRow.tsx
@@ -29243,7 +29243,7 @@ msgstr "多い"
 #: src/content/pages/ReplaysPage.tsx
 #, fuzzy
 msgid "Most {metricName}"
-msgstr "{metricName} が多い順"
+msgstr "{metricName} 降順"
 
 #: src/components/HeatLegend.tsx
 #, fuzzy
