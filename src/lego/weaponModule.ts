@@ -28,6 +28,7 @@
  */
 
 import { t } from "@lingui/core/macro";
+import { describeError } from "@/i18n/uiError";
 import type { CompiledMod } from "@/workshop/compile";
 import { type WeaponInput, weaponStats } from "@/workshop/derivedStats";
 import { EMPTY_EDITS, type ModProject } from "@/workshop/project";
@@ -375,7 +376,7 @@ export async function exportWeapons(
         key,
       );
     } catch (error) {
-      reason = error instanceof Error ? error.message : String(error);
+      reason = describeError(error);
     }
     if (contents === null) {
       failed.add(libraryWeaponName(unit, key));

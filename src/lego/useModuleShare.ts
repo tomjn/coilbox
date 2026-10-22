@@ -6,10 +6,10 @@
 import { t } from "@lingui/core/macro";
 import { useDrawer } from "@picoframe/frame";
 import { createElement, useCallback, useEffect, useRef } from "react";
-
 import { useImportParam } from "@/deeplink/useImportParam";
 import { nextDrawerKey } from "@/general/drawerKey";
 import { useRecordHubImport } from "@/hub/imports";
+import { describeError } from "@/i18n/uiError";
 import { notify } from "@/notify/notify";
 import type { LegoProject } from "./model";
 import { sharedModuleToSave } from "./moduleShare";
@@ -86,7 +86,7 @@ export function useSharedModuleImport(
       (error: unknown) =>
         notify({
           title: t`Could not add the module`,
-          body: error instanceof Error ? error.message : String(error),
+          body: describeError(error),
           level: "error",
         }),
     );

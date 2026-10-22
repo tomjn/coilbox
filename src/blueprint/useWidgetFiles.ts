@@ -14,9 +14,9 @@
 
 import { plural, t } from "@lingui/core/macro";
 import { useEffect, useRef } from "react";
-
 import { useUnitsyncEngineConfig } from "@/content/config";
 import { engineConfigDir } from "@/content/enginePaths";
+import { describeError } from "@/i18n/uiError";
 import { notify } from "@/notify/notify";
 import { usePreferredTarget } from "@/play/config";
 import { usePlay } from "@/play/PlayProvider";
@@ -87,7 +87,7 @@ export function useWidgetFiles() {
         }
       })
       .catch((e) => {
-        const detail = e instanceof Error ? e.message : String(e);
+        const detail = describeError(e);
         void notify({
           title: t`Could not collect what the widget saved: ${detail}`,
           level: "error",

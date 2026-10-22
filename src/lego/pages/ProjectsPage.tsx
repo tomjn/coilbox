@@ -24,6 +24,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { describeError } from "@/i18n/uiError";
 import { legoThumbUrl } from "../../lib/assetUrl";
 import type { LegoAtlas } from "../atlas";
 import { BODY_PLANS, type BodyPlan, projectFromPlan } from "../bodyPlans";
@@ -227,7 +228,7 @@ export default function ProjectsPage() {
       await saveProject(project);
       navigate(`/lego/${project.id}`);
     } catch (e) {
-      const reason = e instanceof Error ? e.message : String(e);
+      const reason = describeError(e);
       setProblem(t`Could not start a model: ${reason}`);
     } finally {
       setBusy(false);
@@ -249,7 +250,7 @@ export default function ProjectsPage() {
       await saveProject(project);
       navigate(`/lego/${project.id}`);
     } catch (e) {
-      const reason = e instanceof Error ? e.message : String(e);
+      const reason = describeError(e);
       setProblem(t`Could not save the model: ${reason}`);
     }
   }

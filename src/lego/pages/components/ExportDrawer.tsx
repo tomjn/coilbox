@@ -35,10 +35,10 @@ import { open, save } from "@tauri-apps/plugin-dialog";
 import { FolderOpen, X } from "lucide-react";
 import { Dialog as DialogPrimitive } from "radix-ui";
 import { useCallback, useEffect, useState } from "react";
-
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
+import { describeError } from "@/i18n/uiError";
 import { workshopCompile } from "@/workshop/compile";
 import { useModProjects } from "@/workshop/project";
 import {
@@ -276,7 +276,7 @@ async function decodedTexture(texture: BlenderTextureRef) {
   try {
     return await legoTexturePng({ key: texture.key });
   } catch (error) {
-    const reason = error instanceof Error ? error.message : String(error);
+    const reason = describeError(error);
     throw new Error(`${texture.writeAs}: ${reason}`);
   }
 }
@@ -515,7 +515,7 @@ export function ExportDrawer({
     } catch (error) {
       setGameText({
         state: "failed",
-        message: error instanceof Error ? error.message : String(error),
+        message: describeError(error),
       });
     }
   }, []);
@@ -661,7 +661,7 @@ export function ExportDrawer({
     } catch (error) {
       setResult({
         state: "failed",
-        message: error instanceof Error ? error.message : String(error),
+        message: describeError(error),
       });
     } finally {
       setAdopting(false);
@@ -693,7 +693,7 @@ export function ExportDrawer({
     } catch (error) {
       setResult({
         state: "failed",
-        message: error instanceof Error ? error.message : String(error),
+        message: describeError(error),
       });
     } finally {
       setClearing(null);
@@ -805,7 +805,7 @@ export function ExportDrawer({
     } catch (error) {
       setGlbSave({
         state: "failed",
-        message: error instanceof Error ? error.message : String(error),
+        message: describeError(error),
       });
     }
   }
@@ -950,7 +950,7 @@ export function ExportDrawer({
       lockedEmptied = listed.emptied;
       lockedKept = listed.kept;
     } catch (error) {
-      lockedProblem = error instanceof Error ? error.message : String(error);
+      lockedProblem = describeError(error);
     }
 
     // The Blender half, which the engine reads none of. A texture the decoder
@@ -985,7 +985,7 @@ export function ExportDrawer({
         picturePath = placed.kept ? null : placed.path;
         owned = [...owned, ...placed.owned];
       } catch (error) {
-        pictureProblem = error instanceof Error ? error.message : String(error);
+        pictureProblem = describeError(error);
       }
     }
 
@@ -1046,7 +1046,7 @@ export function ExportDrawer({
         }
       }
     } catch (error) {
-      blenderProblem = error instanceof Error ? error.message : String(error);
+      blenderProblem = describeError(error);
     }
 
     // Only on the way out of a successful export, so the receipt never claims
@@ -1112,7 +1112,7 @@ export function ExportDrawer({
       } catch (error) {
         setResult({
           state: "failed",
-          message: error instanceof Error ? error.message : String(error),
+          message: describeError(error),
         });
       }
       return;
@@ -1127,7 +1127,7 @@ export function ExportDrawer({
       } catch (error) {
         lines.push({
           unitName: target.unit.unitName,
-          problem: error instanceof Error ? error.message : String(error),
+          problem: describeError(error),
         });
       }
     }

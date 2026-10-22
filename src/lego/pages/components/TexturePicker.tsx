@@ -39,12 +39,12 @@ import { Button } from "@picoframe/frame";
 import { open } from "@tauri-apps/plugin-dialog";
 import { Image, RefreshCw, TriangleAlert } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
-
 import {
   Popover,
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
+import { describeError } from "@/i18n/uiError";
 import { legoTextureUrl } from "@/lib/assetUrl";
 import { TEAM_COLOUR } from "@/lib/springTexture";
 import { textureHasAlpha } from "@/lib/textureAlpha";
@@ -93,7 +93,7 @@ export function TexturePicker({ imported, onChange }: Props) {
           : { texture2: texture, missingTexture2: undefined },
       );
     } catch (error) {
-      setProblem(error instanceof Error ? error.message : String(error));
+      setProblem(describeError(error));
     } finally {
       setBusy(null);
     }

@@ -30,6 +30,7 @@ import { useMemo, useState } from "react";
 import { useUnitsyncEngineConfig } from "@/content/config";
 import { engineConfigDir, underConfigDir } from "@/content/enginePaths";
 import { ErrorBanner } from "@/content/pages/components/states";
+import { describeError } from "@/i18n/uiError";
 import { usePreferredTarget } from "@/play/config";
 import { usePlay } from "@/play/PlayProvider";
 import { barFormat } from "../../bar";
@@ -40,7 +41,7 @@ import { packStrips, packWriteSummary } from "../../pack";
 import { useBlueprintLibrary } from "../../store";
 import { LeavingPack } from "./LeavingPack";
 
-const message = (e: unknown) => (e instanceof Error ? e.message : String(e));
+const message = (e: unknown) => describeError(e);
 
 export function WritePackForm({
   onWritten,

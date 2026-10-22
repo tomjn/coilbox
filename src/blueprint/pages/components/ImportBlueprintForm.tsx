@@ -29,13 +29,13 @@
 import { useLingui } from "@lingui/react/macro";
 import { open } from "@tauri-apps/plugin-dialog";
 import { useMemo, useRef, useState } from "react";
-
 import { ChallengeCodeInput } from "@/challenge/ChallengeCodeInput";
 import { identify } from "@/container/container";
 import { useUnitsyncScan } from "@/content/config";
 import { ErrorBanner } from "@/content/pages/components/states";
 import { useGameUnits } from "@/content/useGameUnits";
 import { notedHubItem } from "@/hub/importRecord";
+import { describeError } from "@/i18n/uiError";
 import { usePreferredTarget } from "@/play/config";
 import {
   arrivingGame,
@@ -251,7 +251,7 @@ export function ImportBlueprintForm({
       });
       onImported(saved);
     } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
+      setError(describeError(e));
       setBusy(false);
     }
   };

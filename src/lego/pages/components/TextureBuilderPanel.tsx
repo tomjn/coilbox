@@ -28,6 +28,7 @@ import { Button } from "@picoframe/frame";
 import { open } from "@tauri-apps/plugin-dialog";
 import { FolderOpen, X } from "lucide-react";
 import { useState } from "react";
+import { describeError } from "@/i18n/uiError";
 
 import {
   legoTextureComposeColour,
@@ -89,7 +90,7 @@ export function TextureBuilderPanel({ imported, unitName, onChange }: Props) {
       });
       setBuilt((current) => ({ ...current, colour: stored.name }));
     } catch (error) {
-      setProblem(error instanceof Error ? error.message : String(error));
+      setProblem(describeError(error));
     } finally {
       setBusy(null);
     }
@@ -116,7 +117,7 @@ export function TextureBuilderPanel({ imported, unitName, onChange }: Props) {
       });
       setBuilt((current) => ({ ...current, shading: stored.name }));
     } catch (error) {
-      setProblem(error instanceof Error ? error.message : String(error));
+      setProblem(describeError(error));
     } finally {
       setBusy(null);
     }

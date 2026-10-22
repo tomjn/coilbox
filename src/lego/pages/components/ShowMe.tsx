@@ -9,6 +9,7 @@
 import { t } from "@lingui/core/macro";
 import { Button } from "@picoframe/frame";
 import { type ReactNode, useState } from "react";
+import { describeError } from "@/i18n/uiError";
 
 import { legoOpenPath } from "../../bindings";
 
@@ -26,7 +27,7 @@ export function ShowMe({ path, variant = "outline", children }: Props) {
     try {
       await legoOpenPath({ path });
     } catch (error) {
-      setProblem(error instanceof Error ? error.message : String(error));
+      setProblem(describeError(error));
     }
   }
 

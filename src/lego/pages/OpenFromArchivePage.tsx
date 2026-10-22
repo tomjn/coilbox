@@ -23,13 +23,13 @@ import { Button } from "@picoframe/frame";
 import { Blocks } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router";
-
 import { PageHeader } from "@/components/PageHeader";
 import {
   useScanTargetSelection,
   useUnitsyncArchiveTree,
   useUnitsyncScan,
 } from "@/content/config";
+import { describeError } from "@/i18n/uiError";
 import { modelName, openableInBuilder, openRequest } from "../archiveOpen";
 import {
   modelSource,
@@ -157,7 +157,7 @@ export default function OpenFromArchivePage() {
         if (!live.current || startedFor.current !== requestKey) return;
         setStage({
           state: "failed",
-          message: error instanceof Error ? error.message : String(error),
+          message: describeError(error),
         });
       }
     })();
@@ -187,7 +187,7 @@ export default function OpenFromArchivePage() {
       await saveProject(project);
       navigate(`/lego/${project.id}`, { replace: true });
     } catch (error) {
-      const reason = error instanceof Error ? error.message : String(error);
+      const reason = describeError(error);
       setProblem(t`Could not save the unit: ${reason}`);
     }
   }
