@@ -26658,7 +26658,7 @@ msgstr "Dernière passerelle"
 #: src/workshop/pages/ProjectsPage.tsx
 #, fuzzy
 msgid "Last changed"
-msgstr "Dernière modification"
+msgstr "Modification"
 
 #: src/updater/pages/UpdatesSettingsSection.tsx
 #, fuzzy
@@ -30362,7 +30362,7 @@ msgstr "Plus récent"
 #: src/hub/pages/BrowsePage.tsx
 #, fuzzy
 msgid "Newest first"
-msgstr "Plus récents d’abord"
+msgstr "Plus récents"
 
 #: src/hub/pages/BrowsePage.tsx
 #, fuzzy
@@ -40032,7 +40032,7 @@ msgstr "Enregistré comme préréglage"
 #: src/content/index.ts
 #, fuzzy
 msgid "Saved configs"
-msgstr "Configurations enregistrées"
+msgstr "Configs enregistrées"
 
 #: src/lego/pages/components/BuildMenuSection.tsx
 #, fuzzy
@@ -40507,7 +40507,7 @@ msgstr "Rechercher dans les téléchargements"
 #: src/downloads/pages/ActivityPage.tsx
 #, fuzzy
 msgid "Search downloads…"
-msgstr "Rechercher dans les téléchargements…"
+msgstr "Rechercher…"
 
 #: src/multiplayer/chat/EmojiPicker.tsx
 #, fuzzy
