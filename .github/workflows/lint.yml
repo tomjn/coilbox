@@ -17,6 +17,28 @@ on:
 # slow run still finishes while a stall turns red within the hour.
 
 jobs:
+  # Which jobs a pull request's files can affect (scripts/ci-changes.sh). A
+  # pull request is checked out as a merge commit whose first parent is the
+  # base branch, so diffing the two lists the pull request's changes. A push to
+  # main runs every job, which also keeps main's caches saved.
+  changes:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 5
+    outputs:
+      rust: ${{ steps.filter.outputs.rust }}
+      lua: ${{ steps.filter.outputs.lua }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 2
+      - id: filter
+        run: |
+          if [ "${{ github.event_name }}" = pull_request ]; then
+            git diff --name-only HEAD^1 HEAD | scripts/ci-changes.sh | tee -a "$GITHUB_OUTPUT"
+          else
+            printf 'rust=true\nlua=true\n' | tee -a "$GITHUB_OUTPUT"
+          fi
+
   frontend:
     runs-on: ubuntu-22.04
     timeout-minutes: 15
@@ -107,6 +129,8 @@ jobs:
   # (scripts/mission-headless.sh) is not here: it needs a spring-headless build,
   # a game and a map, none of which a runner has.
   lua:
+    needs: changes
+    if: needs.changes.outputs.lua == 'true'
     runs-on: ubuntu-22.04
     timeout-minutes: 10
     steps:
@@ -126,6 +150,8 @@ jobs:
   # build the Tauri app crate and the unitsync worker from cold, which is the
   # long tail of the workflow.
   rust-lint:
+    needs: changes
+    if: needs.changes.outputs.rust == 'true'
     runs-on: ubuntu-22.04
     timeout-minutes: 30
     steps:
@@ -178,6 +204,8 @@ jobs:
   # Rust test would otherwise pass forever. The setup steps match rust-lint's,
   # and the comments there explain them.
   rust-test:
+    needs: changes
+    if: needs.changes.outputs.rust == 'true'
     runs-on: ubuntu-22.04
     timeout-minutes: 30
     steps:
@@ -219,7 +247,10 @@ jobs:
   # sidecars are not, so there are no placeholder resource folders or sidecar
   # builds here. The Linux libraries are what linking the Tauri crate needs.
   # The cache has no entry from another job, so it cannot freeze on one.
+  # A skipped compat-identical-builds skips compat-builds-match too.
   compat-identical-builds:
+    needs: changes
+    if: needs.changes.outputs.rust == 'true'
     runs-on: ${{ matrix.os }}
     timeout-minutes: 30
     strategy:

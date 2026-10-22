@@ -75,6 +75,8 @@ Don't reach for native `<select>` / `<input type=checkbox>` / `<textarea>`.
 
 Run the **full** lint and test suite locally. CI (`.github/workflows/lint.yml`) runs the seven commands below, split across parallel jobs, so run all seven even if you only touched one surface. Use the same commands CI runs, not a narrower subset:
 
+On a pull request, CI skips the Rust jobs when every changed file is in `src/` outside `src/data/`, in `docs/`, or a Markdown file at the root, and runs the Lua job only when `lua/` changes. `scripts/ci-changes.sh` holds the rules. Run all seven locally anyway.
+
 **Frontend**
 
 ```sh
