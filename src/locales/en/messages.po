@@ -1590,6 +1590,34 @@ msgstr "{converted, plural, one {# piece was drawn as quads or a triangle strip 
 msgid "{converts} of these are said in {chosenSide} now."
 msgstr "{converts} of these are said in {chosenSide} now."
 
+#: src/lego/animPresets.ts
+msgid "{copies, plural, one {# aim point} other {# aim points}}"
+msgstr "{copies, plural, one {# aim point} other {# aim points}}"
+
+#: src/lego/animPresets.ts
+msgid "{copies, plural, one {# barrel} other {# barrels}}"
+msgstr "{copies, plural, one {# barrel} other {# barrels}}"
+
+#: src/lego/animPresets.ts
+msgid "{copies, plural, one {# body} other {# bodies}}"
+msgstr "{copies, plural, one {# body} other {# bodies}}"
+
+#: src/lego/animPresets.ts
+msgid "{copies, plural, one {# build arm} other {# build arms}}"
+msgstr "{copies, plural, one {# build arm} other {# build arms}}"
+
+#: src/lego/animPresets.ts
+msgid "{copies, plural, one {# set of doors} other {# sets of doors}}"
+msgstr "{copies, plural, one {# set of doors} other {# sets of doors}}"
+
+#: src/lego/animPresets.ts
+msgid "{copies, plural, one {# set of legs} other {# sets of legs}}"
+msgstr "{copies, plural, one {# set of legs} other {# sets of legs}}"
+
+#: src/lego/animPresets.ts
+msgid "{copies, plural, one {# turret} other {# turrets}}"
+msgstr "{copies, plural, one {# turret} other {# turrets}}"
+
 #: src/blueprint/pages/components/LeavingPack.tsx
 msgid "{count, plural, =0 {Write them into a game's file} one {Write # blueprint into a game's file} other {Write # blueprints into a game's file}}"
 msgstr "{count, plural, =0 {Write them into a game's file} one {Write # blueprint into a game's file} other {Write # blueprints into a game's file}}"
@@ -4304,8 +4332,8 @@ msgid "{pieceName} has no texture recorded from the model it came from, so it ca
 msgstr "{pieceName} has no texture recorded from the model it came from, so it cannot go on this unit's texture sheet."
 
 #: src/lego/pages/components/GameScriptPanel.tsx
-msgid "{pieceName} is {role}"
-msgstr "{pieceName} is {role}"
+msgid "{pieceName} is {roleId, select, buildarm_nano {nano emit point} aim {aim point} flare {muzzle flare} turret {turret} barrel {barrel} buildarm_base {build arm base} buildarm_arm {build arm} wheel {wheel} other {{roleName}}}"
+msgstr "{pieceName} is {roleId, select, buildarm_nano {nano emit point} aim {aim point} flare {muzzle flare} turret {turret} barrel {barrel} buildarm_base {build arm base} buildarm_arm {build arm} wheel {wheel} other {{roleName}}}"
 
 #: src/lego/pages/components/GameUnitBrowser.tsx
 msgid "{pieceName} is not in this model."
@@ -4440,8 +4468,8 @@ msgid "{presetGame} on {presetMap}"
 msgstr "{presetGame} on {presetMap}"
 
 #: src/lego/pages/components/AnimationPanel.tsx
-msgid "{presetLabel}, {copies} {copyNoun}"
-msgstr "{presetLabel}, {copies} {copyNoun}"
+msgid "{presetLabel}, {copyCount}"
+msgstr "{presetLabel}, {copyCount}"
 
 #: src/lego/pages/components/AnimationPanel.tsx
 msgid "{presetLabel}: {paramLabel}"
@@ -8114,10 +8142,6 @@ msgid "Aim point"
 msgstr "Aim point"
 
 #: src/lego/animPresets.ts
-msgid "aim points"
-msgstr "aim points"
-
-#: src/lego/animPresets.ts
 msgid "Aim while building"
 msgstr "Aim while building"
 
@@ -9725,10 +9749,6 @@ msgstr "Barrel length"
 msgid "Barrel lift"
 msgstr "Barrel lift"
 
-#: src/lego/animPresets.ts
-msgid "barrels"
-msgstr "barrels"
-
 #: src/scenario/validate.ts
 msgid "Base"
 msgstr "Base"
@@ -10178,10 +10198,6 @@ msgid "Bobs the body up and down and rocks it gently side to side, the way an ai
 msgstr "Bobs the body up and down and rocks it gently side to side, the way an aircraft or hovercraft sits while holding position."
 
 #: src/lego/animPresets.ts
-msgid "bodies"
-msgstr "bodies"
-
-#: src/lego/animPresets.ts
 msgid "Body"
 msgstr "Body"
 
@@ -10509,10 +10525,6 @@ msgstr "Build arm"
 #: src/lego/animPresets.ts
 msgid "Build arm base"
 msgstr "Build arm base"
-
-#: src/lego/animPresets.ts
-msgid "build arms"
-msgstr "build arms"
 
 #: src/lego/pages/components/AnimationPanel.tsx
 msgid "Build distance"
@@ -33631,14 +33643,6 @@ msgstr "Sets a variable to a number, or to what another variable holds."
 msgid "Sets for this replay"
 msgstr "Sets for this replay"
 
-#: src/lego/animPresets.ts
-msgid "sets of doors"
-msgstr "sets of doors"
-
-#: src/lego/animPresets.ts
-msgid "sets of legs"
-msgstr "sets of legs"
-
 #: src/scenario/triggerTypes.ts
 msgid "Sets what a team is paid per second from now on. A negative number bleeds it instead."
 msgstr "Sets what a team is paid per second from now on. A negative number bleeds it instead."
@@ -40886,10 +40890,6 @@ msgstr "Turret looks around when idle"
 #: src/lego/animPresets.ts
 msgid "Turret sweep"
 msgstr "Turret sweep"
-
-#: src/lego/animPresets.ts
-msgid "turrets"
-msgstr "turrets"
 
 #: src/workshop/pages/components/DecodeTweakSetDrawer.tsx
 msgid "Tweak payload to decode"

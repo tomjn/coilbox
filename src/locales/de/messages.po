@@ -1590,6 +1590,34 @@ msgstr ""
 msgid "{converts} of these are said in {chosenSide} now."
 msgstr ""
 
+#: src/lego/animPresets.ts
+msgid "{copies, plural, one {# aim point} other {# aim points}}"
+msgstr ""
+
+#: src/lego/animPresets.ts
+msgid "{copies, plural, one {# barrel} other {# barrels}}"
+msgstr ""
+
+#: src/lego/animPresets.ts
+msgid "{copies, plural, one {# body} other {# bodies}}"
+msgstr ""
+
+#: src/lego/animPresets.ts
+msgid "{copies, plural, one {# build arm} other {# build arms}}"
+msgstr ""
+
+#: src/lego/animPresets.ts
+msgid "{copies, plural, one {# set of doors} other {# sets of doors}}"
+msgstr ""
+
+#: src/lego/animPresets.ts
+msgid "{copies, plural, one {# set of legs} other {# sets of legs}}"
+msgstr ""
+
+#: src/lego/animPresets.ts
+msgid "{copies, plural, one {# turret} other {# turrets}}"
+msgstr ""
+
 #: src/blueprint/pages/components/LeavingPack.tsx
 msgid "{count, plural, =0 {Write them into a game's file} one {Write # blueprint into a game's file} other {Write # blueprints into a game's file}}"
 msgstr ""
@@ -4303,7 +4331,7 @@ msgid "{pieceName} has no texture recorded from the model it came from, so it ca
 msgstr ""
 
 #: src/lego/pages/components/GameScriptPanel.tsx
-msgid "{pieceName} is {role}"
+msgid "{pieceName} is {roleId, select, buildarm_nano {nano emit point} aim {aim point} flare {muzzle flare} turret {turret} barrel {barrel} buildarm_base {build arm base} buildarm_arm {build arm} wheel {wheel} other {{roleName}}}"
 msgstr ""
 
 #: src/lego/pages/components/GameUnitBrowser.tsx
@@ -4439,7 +4467,7 @@ msgid "{presetGame} on {presetMap}"
 msgstr ""
 
 #: src/lego/pages/components/AnimationPanel.tsx
-msgid "{presetLabel}, {copies} {copyNoun}"
+msgid "{presetLabel}, {copyCount}"
 msgstr ""
 
 #: src/lego/pages/components/AnimationPanel.tsx
@@ -8113,10 +8141,6 @@ msgid "Aim point"
 msgstr ""
 
 #: src/lego/animPresets.ts
-msgid "aim points"
-msgstr ""
-
-#: src/lego/animPresets.ts
 msgid "Aim while building"
 msgstr ""
 
@@ -9724,10 +9748,6 @@ msgstr ""
 msgid "Barrel lift"
 msgstr ""
 
-#: src/lego/animPresets.ts
-msgid "barrels"
-msgstr ""
-
 #: src/scenario/validate.ts
 msgid "Base"
 msgstr ""
@@ -10177,10 +10197,6 @@ msgid "Bobs the body up and down and rocks it gently side to side, the way an ai
 msgstr ""
 
 #: src/lego/animPresets.ts
-msgid "bodies"
-msgstr ""
-
-#: src/lego/animPresets.ts
 msgid "Body"
 msgstr ""
 
@@ -10507,10 +10523,6 @@ msgstr ""
 
 #: src/lego/animPresets.ts
 msgid "Build arm base"
-msgstr ""
-
-#: src/lego/animPresets.ts
-msgid "build arms"
 msgstr ""
 
 #: src/lego/pages/components/AnimationPanel.tsx
@@ -33630,14 +33642,6 @@ msgstr ""
 msgid "Sets for this replay"
 msgstr ""
 
-#: src/lego/animPresets.ts
-msgid "sets of doors"
-msgstr ""
-
-#: src/lego/animPresets.ts
-msgid "sets of legs"
-msgstr ""
-
 #: src/scenario/triggerTypes.ts
 msgid "Sets what a team is paid per second from now on. A negative number bleeds it instead."
 msgstr ""
@@ -40884,10 +40888,6 @@ msgstr ""
 
 #: src/lego/animPresets.ts
 msgid "Turret sweep"
-msgstr ""
-
-#: src/lego/animPresets.ts
-msgid "turrets"
 msgstr ""
 
 #: src/workshop/pages/components/DecodeTweakSetDrawer.tsx
