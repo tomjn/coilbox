@@ -5,6 +5,7 @@
  * `flip`, so this turns one into the other.
  */
 
+import { t } from "@lingui/core/macro";
 import type { LegoProject } from "./model";
 import type { LoadedPack } from "./pack";
 import { type LegoShape, wedgeProfile } from "./shapes";
@@ -31,8 +32,6 @@ export function wedgeNumbers(shape: LegoShape): WedgeNumbers {
   };
 }
 
-const SIZE_LABELS = { width: "Width", depth: "Depth", height: "Height" };
-
 /**
  * The wedge with one of its numbers changed, or why it cannot take it. `flip`
  * is 1 to flip and 0 to put it back.
@@ -48,11 +47,18 @@ export function withWedgeNumber(
   };
   for (const key of ["width", "depth", "height"] as const) {
     if (!(next[key] > 0)) {
-      return { problem: `${SIZE_LABELS[key]} must be above 0.` };
+      return {
+        problem:
+          key === "width"
+            ? t`Width must be above 0.`
+            : key === "depth"
+              ? t`Depth must be above 0.`
+              : t`Height must be above 0.`,
+      };
     }
   }
   if (!(next.low >= 0 && next.low <= next.height)) {
-    return { problem: "Low end must be between 0 and the height." };
+    return { problem: t`Low end must be between 0 and the height.` };
   }
   return {
     shape: {

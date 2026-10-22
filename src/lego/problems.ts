@@ -1,3 +1,4 @@
+import { t } from "@lingui/core/macro";
 /**
  * The builder's problems list: one record for each thing a check found, from
  * every check, so the list can say how bad each is and which pieces it is
@@ -31,15 +32,60 @@ export interface Problem {
 
 /** Every source, in the order the list offers them for muting. */
 export const PROBLEM_SOURCES: { id: ProblemSource; label: string }[] = [
-  { id: "document", label: "Pieces" },
-  { id: "pack", label: "Parts" },
-  { id: "geometry", label: "Geometry" },
-  { id: "balance", label: "Balance" },
-  { id: "footprint", label: "Footprint" },
-  { id: "overlap", label: "Overlap" },
-  { id: "skeleton", label: "Skeleton" },
-  { id: "budget", label: "Budget" },
-  { id: "actions", label: "Actions" },
+  {
+    id: "document",
+    get label() {
+      return t`Pieces`;
+    },
+  },
+  {
+    id: "pack",
+    get label() {
+      return t`Parts`;
+    },
+  },
+  {
+    id: "geometry",
+    get label() {
+      return t`Geometry`;
+    },
+  },
+  {
+    id: "balance",
+    get label() {
+      return t`Balance`;
+    },
+  },
+  {
+    id: "footprint",
+    get label() {
+      return t`Footprint`;
+    },
+  },
+  {
+    id: "overlap",
+    get label() {
+      return t`Overlap`;
+    },
+  },
+  {
+    id: "skeleton",
+    get label() {
+      return t`Skeleton`;
+    },
+  },
+  {
+    id: "budget",
+    get label() {
+      return t`Budget`;
+    },
+  },
+  {
+    id: "actions",
+    get label() {
+      return t`Actions`;
+    },
+  },
 ];
 
 const SEVERITY_ORDER: ProblemSeverity[] = ["error", "warning", "note"];

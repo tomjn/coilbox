@@ -8,6 +8,7 @@
  * the same as the builder reads them for the loadout on screen.
  */
 
+import { t } from "@lingui/core/macro";
 import { formatNumber } from "@/lib/format";
 import { budgetStanding } from "./budget";
 import { loadoutUnit, loadoutUnitNames } from "./loadouts";
@@ -67,13 +68,16 @@ function allSame(cells: (string | null)[]): boolean {
 /** What is left of the chassis budget in each column, and which are over. */
 function budgetRow(budget: number, costs: (number | null)[]): FamilyRow {
   const standings = costs.map((cost) => budgetStanding(budget, cost));
-  const cells = standings.map((s) =>
-    s ? `${figure(Math.abs(s.left))} ${s.over ? "over" : "left"}` : null,
-  );
+  const cells = standings.map((s) => {
+    if (!s) return null;
+    const amount = figure(Math.abs(s.left));
+    return s.over ? t`${amount} over` : t`${amount} left`;
+  });
+  const total = figure(budget);
   return {
     id: "budget",
     kind: "budget",
-    label: `Budget (${figure(budget)})`,
+    label: t`Budget (${total})`,
     cells,
     differs: !allSame(cells),
     over: standings.flatMap((s, i) => (s?.over ? [i] : [])),

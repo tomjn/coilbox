@@ -6,6 +6,7 @@
  * least one call-in it fires has a body that does real work.
  */
 
+import { t } from "@lingui/core/macro";
 import { PRESETS } from "./animPresets";
 import type { Scenario } from "./scriptPlayback";
 
@@ -145,13 +146,15 @@ export function scenarioMark(
     (name) => !answered.has(name) && !OPTIONAL_CALLINS.has(name),
   );
   if (undefinedCallins.length === callins.length) {
-    return `Presets do not cover this. Take the script over and write ${undefinedCallins.join(", ")}.`;
+    const callinNames = undefinedCallins.join(", ");
+    return t`Presets do not cover this. Take the script over and write ${callinNames}.`;
   }
   const empty = callins.filter(
     (name) => answered.has(name) || OPTIONAL_CALLINS.has(name),
   );
   const fillers = presetsFilling(empty);
+  const presetNames = fillers.join(", ");
   return fillers.length > 0
-    ? `Nothing to do. Add ${fillers.join(", ")} to react.`
-    : "Nothing to do. No preset reacts to this.";
+    ? t`Nothing to do. Add ${presetNames} to react.`
+    : t`Nothing to do. No preset reacts to this.`;
 }

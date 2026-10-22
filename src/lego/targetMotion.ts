@@ -13,6 +13,7 @@
  * unit.
  */
 
+import { t } from "@lingui/core/macro";
 import {
   PREVIEW_FRAMES,
   type StandInKey,
@@ -44,10 +45,30 @@ export const DEFAULT_TARGET: TargetMotion = {
 };
 
 export const TARGET_PATHS: { value: TargetPath; label: string }[] = [
-  { value: "crossing", label: "Crossing in front" },
-  { value: "circling", label: "Circling the unit" },
-  { value: "approaching", label: "Coming closer" },
-  { value: "retreating", label: "Going away" },
+  {
+    value: "crossing",
+    get label() {
+      return t`Crossing in front`;
+    },
+  },
+  {
+    value: "circling",
+    get label() {
+      return t`Circling the unit`;
+    },
+  },
+  {
+    value: "approaching",
+    get label() {
+      return t`Coming closer`;
+    },
+  },
+  {
+    value: "retreating",
+    get label() {
+      return t`Going away`;
+    },
+  },
 ];
 
 /** What a motion needs to know about the unit it is beside. */

@@ -17,6 +17,7 @@
  * image pipeline.
  */
 
+import { t } from "@lingui/core/macro";
 import { join, tempDir } from "@tauri-apps/api/path";
 import * as THREE from "three";
 import { unitsyncArchiveExtract, unitsyncLuaExec } from "@/content/bindings";
@@ -205,31 +206,41 @@ export interface EffectBitmaps {
 /** Names a list of missing bitmaps, or null when nothing is missing. */
 export function missingNote(missing: string[]): string | null {
   if (missing.length === 0) return null;
-  const list =
-    missing.length === 1
-      ? missing[0]
-      : `${missing.slice(0, -1).join(", ")} and ${missing[missing.length - 1]}`;
-  return `The game has no ${list}, so those are drawn as a plain round sprite.`;
+  const head = missing.slice(0, -1).join(", ");
+  const last = missing[missing.length - 1];
+  const list = missing.length === 1 ? last : t`${head} and ${last}`;
+  return t`The game has no ${list}, so those are drawn as a plain round sprite.`;
 }
 
 /** Plain English names for the keys `RESOURCES_LUA` can report with no file,
  *  so the note reads as plain words rather than a `resources.lua` key. */
-const PLAIN_NAMES: Record<string, string> = {
-  muzzleflame: "muzzle flame bitmap",
-  laserfalloff: "laser bitmap",
-  laserend: "laser end bitmap",
-  heatcloud: "heat cloud bitmap",
-  explo: "explosion bitmap",
-  wake: "wake bitmap",
-};
+function plainName(key: string): string | undefined {
+  switch (key) {
+    case "muzzleflame":
+      return t`muzzle flame bitmap`;
+    case "laserfalloff":
+      return t`laser bitmap`;
+    case "laserend":
+      return t`laser end bitmap`;
+    case "heatcloud":
+      return t`heat cloud bitmap`;
+    case "explo":
+      return t`explosion bitmap`;
+    case "wake":
+      return t`wake bitmap`;
+  }
+}
 
 /** How a missing entry is named in a note: by its file under `bitmaps/` when
  *  it has one, otherwise in plain words for the key. */
 function missingName(entry: { key: string; file: string | null }): string {
   if (entry.file) return `bitmaps/${entry.file}`;
   const smoke = /^smoke(\d+)$/.exec(entry.key);
-  if (smoke) return `smoke bitmap ${smoke[1]}`;
-  return PLAIN_NAMES[entry.key] ?? entry.key;
+  if (smoke) {
+    const number = smoke[1];
+    return t`smoke bitmap ${number}`;
+  }
+  return plainName(entry.key) ?? entry.key;
 }
 
 // The engine builds four base archives (`cont/base/CMakeLists.txt:2-5`), and
@@ -328,9 +339,10 @@ export async function loadEffectBitmaps(
     source: RESOURCES_LUA,
   });
   if (res.error) {
+    const reason = res.error;
     return {
       atlas: null,
-      note: `Could not read the game's bitmaps, so effects are drawn as a plain round sprite: ${res.error}`,
+      note: t`Could not read the game's bitmaps, so effects are drawn as a plain round sprite: ${reason}`,
     };
   }
 

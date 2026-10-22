@@ -19,6 +19,7 @@
  * parent. So joins resolve one piece at a time, in any order.
  */
 
+import { t } from "@lingui/core/macro";
 import * as THREE from "three";
 
 import type {
@@ -92,25 +93,25 @@ function isVec3(value: unknown): value is Vec3 {
 /** What is wrong with one stated connector, or null when it is fine. */
 function statedProblem(entry: unknown): string | null {
   if (typeof entry !== "object" || entry === null || Array.isArray(entry)) {
-    return "it is not an object";
+    return t`it is not an object`;
   }
   const { id, position, facing, up } = entry as Record<string, unknown>;
   if (typeof id !== "string" || id === "") {
-    return "its id is not a name";
+    return t`its id is not a name`;
   }
-  if (!isVec3(position)) return "its position is not three numbers";
+  if (!isVec3(position)) return t`its position is not three numbers`;
   if (
     !isVec3(facing) ||
     Math.abs(Math.hypot(...facing) - 1) > STATED_TOLERANCE
   ) {
-    return "its facing is not three numbers of unit length";
+    return t`its facing is not three numbers of unit length`;
   }
   if (!isVec3(up) || Math.abs(Math.hypot(...up) - 1) > STATED_TOLERANCE) {
-    return "its up is not three numbers of unit length";
+    return t`its up is not three numbers of unit length`;
   }
   const dot = facing[0] * up[0] + facing[1] * up[1] + facing[2] * up[2];
   if (Math.abs(dot) > STATED_TOLERANCE) {
-    return "its up is not at right angles to its facing";
+    return t`its up is not at right angles to its facing`;
   }
   return null;
 }
@@ -126,19 +127,23 @@ export function readPartConnectors(
   raw: unknown,
 ): { connectors: LegoConnector[] } | { problem: string } {
   if (!Array.isArray(raw)) {
-    return { problem: "connectors is not a list" };
+    return { problem: t`connectors is not a list` };
   }
   const seen = new Set<string>();
   for (const [index, entry] of raw.entries()) {
     const problem = statedProblem(entry);
     if (problem) {
       const id = (entry as { id?: unknown } | null)?.id;
-      const name = typeof id === "string" && id !== "" ? ` "${id}"` : "";
-      return { problem: `connector ${index + 1}${name}: ${problem}` };
+      const position = index + 1;
+      const label =
+        typeof id === "string" && id !== ""
+          ? t`connector ${position} "${id}"`
+          : t`connector ${position}`;
+      return { problem: `${label}: ${problem}` };
     }
     const { id } = entry as LegoConnector;
     if (seen.has(id)) {
-      return { problem: `it names "${id}" twice` };
+      return { problem: t`it names "${id}" twice` };
     }
     seen.add(id);
   }
@@ -615,9 +620,14 @@ export function editJoined(
     return { project: withPiece(next), detached: null };
   }
 
-  const freed = (what: string) => ({
+  const freed = (what: "moved" | "turned" | "both") => ({
     project: withPiece(freePiece(next)),
-    detached: `Detached: ${what} off its face.`,
+    detached:
+      what === "moved"
+        ? t`Detached: moved off its face.`
+        : what === "turned"
+          ? t`Detached: turned off its face.`
+          : t`Detached: moved and turned off its face.`,
   });
   if (!parent) return freed("moved");
 
@@ -674,9 +684,7 @@ export function editJoined(
         (n, i) => Math.abs(n - (change.position as Vec3)[i]) < AGREE,
       ));
   if (!turnOk || !moveOk) {
-    return freed(
-      !moveOk && !turnOk ? "moved and turned" : moveOk ? "turned" : "moved",
-    );
+    return freed(!moveOk && !turnOk ? "both" : moveOk ? "turned" : "moved");
   }
   return {
     project: withPiece({ ...next, ...placed, connection: joinWith() }),
@@ -766,12 +774,24 @@ export interface JoinSummary {
 
 /** The unit faces +z and its right is -x, so +x is its left. */
 const BOX_FACE_NAMES: Record<string, string> = {
-  "+y": "top",
-  "-y": "bottom",
-  "+z": "front",
-  "-z": "back",
-  "+x": "left",
-  "-x": "right",
+  get "+y"() {
+    return t`top`;
+  },
+  get "-y"() {
+    return t`bottom`;
+  },
+  get "+z"() {
+    return t`front`;
+  },
+  get "-z"() {
+    return t`back`;
+  },
+  get "+x"() {
+    return t`left`;
+  },
+  get "-x"() {
+    return t`right`;
+  },
 };
 
 /**

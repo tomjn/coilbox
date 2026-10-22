@@ -9,6 +9,7 @@
  * part's `bbox`, so a count of steps is the elmos divided by it.
  */
 
+import { plural } from "@lingui/core/macro";
 import { type GuideLine, type GuidePlane, snapToGuides } from "./guides";
 import type { LegoProject } from "./model";
 import type { LoadedPack } from "./pack";
@@ -83,20 +84,22 @@ export function formatNumber(value: number): string {
   return String(rounded === 0 ? 0 : rounded);
 }
 
-function plural(count: string, one: string, many: string): string {
-  return count === "1" ? one : many;
-}
-
 /**
  * One length as a count of elmos and a count of steps. Elmos only when the pack
  * has no step to count in.
  */
 export function figure(elmos: number, step: number | null): string {
   const e = formatNumber(elmos);
-  const inElmos = `${e} ${plural(e, "elmo", "elmos")}`;
-  if (step === null) return inElmos;
+  const elmoCount = Number(e);
+  if (step === null) {
+    return plural(elmoCount, { one: `${e} elmo`, other: `${e} elmos` });
+  }
   const s = formatNumber(elmos / step);
-  return `${inElmos}, ${s} ${plural(s, "step", "steps")}`;
+  const stepCount = Number(s);
+  return plural(elmoCount, {
+    one: `${e} elmo, ${plural(stepCount, { one: `${s} step`, other: `${s} steps` })}`,
+    other: `${e} elmos, ${plural(stepCount, { one: `${s} step`, other: `${s} steps` })}`,
+  });
 }
 
 /** Three lengths, one per axis, as a line of elmos and a line of steps. */

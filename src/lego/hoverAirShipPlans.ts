@@ -45,17 +45,29 @@
  * - Barrel length: 5.2, from 3.7 to 6.8.
  */
 
+import { t } from "@lingui/core/macro";
 import type { BodyPlan, BodyPlanBone, BodyPlanProportion } from "./bodyPlans";
 
 function elmos(
   id: string,
-  label: string,
+  label: () => string,
   min: number,
   max: number,
   fallback: number,
   handle: NonNullable<BodyPlanProportion["handle"]>,
 ): BodyPlanProportion {
-  return { id, label, unit: "elmo", min, max, step: 0.1, fallback, handle };
+  return {
+    id,
+    get label() {
+      return label();
+    },
+    unit: "elmo",
+    min,
+    max,
+    step: 0.1,
+    fallback,
+    handle,
+  };
 }
 
 /**
@@ -67,23 +79,29 @@ function elmos(
  */
 export const HOVER: BodyPlan = {
   id: "hover",
-  label: "Hovercraft",
-  description:
-    "A hull that bobs over land and water and leaves a wake. It does not lean into turns.",
+  get label() {
+    return t`Hovercraft`;
+  },
+  get description() {
+    return t`A hull that bobs over land and water and leaves a wake. It does not lean into turns.`;
+  },
   proportions: [
-    elmos("hullLength", "Hull length", 20, 65, 40.2, {
+    elmos("hullLength", () => t`Hull length`, 20, 65, 40.2, {
       bone: "wake",
       axis: 2,
     }),
-    elmos("hullWidth", "Hull width", 15, 60, 31.1, {
+    elmos("hullWidth", () => t`Hull width`, 15, 60, 31.1, {
       bone: "skirt.l",
       axis: 0,
     }),
-    elmos("hullHeight", "Hull height", 5, 25, 14.9, {
+    elmos("hullHeight", () => t`Hull height`, 5, 25, 14.9, {
       bone: "deck",
       axis: 1,
     }),
-    elmos("gap", "Gap under the hull", 0, 5, 0.1, { bone: "hull", axis: 1 }),
+    elmos("gap", () => t`Gap under the hull`, 0, 5, 0.1, {
+      bone: "hull",
+      axis: 1,
+    }),
   ],
   bones({ hullLength, hullWidth, hullHeight, gap }) {
     const half = (hullWidth as number) / 2;
@@ -135,23 +153,26 @@ export const HOVER: BodyPlan = {
  */
 export const SHIP: BodyPlan = {
   id: "ship",
-  label: "Ship",
-  description:
-    "A hull with a gun turret, a wake and a rudder that swings as it turns. It does not rock on the water.",
+  get label() {
+    return t`Ship`;
+  },
+  get description() {
+    return t`A hull with a gun turret, a wake and a rudder that swings as it turns. It does not rock on the water.`;
+  },
   proportions: [
-    elmos("hullLength", "Hull length", 45, 135, 89.2, {
+    elmos("hullLength", () => t`Hull length`, 45, 135, 89.2, {
       bone: "wake",
       axis: 2,
     }),
-    elmos("deckHeight", "Deck height", 5, 15, 9.3, {
+    elmos("deckHeight", () => t`Deck height`, 5, 15, 9.3, {
       bone: "turret",
       axis: 1,
     }),
-    elmos("turretHeight", "Turret height", 0, 15, 5.8, {
+    elmos("turretHeight", () => t`Turret height`, 0, 15, 5.8, {
       bone: "barrel",
       axis: 1,
     }),
-    elmos("barrelLength", "Barrel length", 10, 35, 14.3, {
+    elmos("barrelLength", () => t`Barrel length`, 10, 35, 14.3, {
       bone: "flare",
       axis: 2,
     }),
@@ -217,13 +238,22 @@ export const SHIP: BodyPlan = {
  */
 export const AIRCRAFT: BodyPlan = {
   id: "aircraft",
-  label: "Aircraft",
-  description:
-    "A body with a gun that aims. It does not fly once exported, and has no rotors or landing gear.",
+  get label() {
+    return t`Aircraft`;
+  },
+  get description() {
+    return t`A body with a gun that aims. It does not fly once exported, and has no rotors or landing gear.`;
+  },
   proportions: [
-    elmos("gunForward", "Gun ahead", -20, 20, 5.1, { bone: "turret", axis: 2 }),
-    elmos("gunHeight", "Gun height", -5, 5, 1.9, { bone: "turret", axis: 1 }),
-    elmos("barrelLength", "Barrel length", 0, 10, 5.2, {
+    elmos("gunForward", () => t`Gun ahead`, -20, 20, 5.1, {
+      bone: "turret",
+      axis: 2,
+    }),
+    elmos("gunHeight", () => t`Gun height`, -5, 5, 1.9, {
+      bone: "turret",
+      axis: 1,
+    }),
+    elmos("barrelLength", () => t`Barrel length`, 0, 10, 5.2, {
       bone: "flare",
       axis: 2,
     }),

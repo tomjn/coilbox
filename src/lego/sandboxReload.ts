@@ -11,6 +11,7 @@
  * the digest of every file written.
  */
 
+import { t } from "@lingui/core/macro";
 import type { WrittenScratchUnit } from "./writeScratchGame";
 
 /**
@@ -124,43 +125,47 @@ export function afterTextureReload(
   return { ...loaded, textures: written.textures };
 }
 
-const NAME: Record<Exclude<RelaunchPart, "files">, string> = {
-  definition: "unit definition",
-  model: "model",
-  texture: "texture",
-};
-
-function list(names: string[]): string {
-  if (names.length < 2) return names.join("");
-  return `${names.slice(0, -1).join(", the ")} and the ${names[names.length - 1]}`;
-}
-
 /** Why a relaunch is needed, as the drawer says it. Null when it is not. */
 export function relaunchMessage(parts: RelaunchPart[]): string | null {
   const named = parts.filter(
     (p): p is Exclude<RelaunchPart, "files"> => p !== "files",
   );
   const sentences: string[] = [];
+  const has = (part: Exclude<RelaunchPart, "files">) => named.includes(part);
   if (named.length === 1) {
     const [part] = named;
-    sentences.push(
-      part === "texture"
-        ? "The texture is in a file the game did not start with, so relaunch to see it."
-        : `The ${NAME[part]} changed. The engine cannot reload a ${NAME[part]} in a running game, so relaunch to see it.`,
-    );
+    if (part === "texture") {
+      sentences.push(
+        t`The texture is in a file the game did not start with, so relaunch to see it.`,
+      );
+    } else if (part === "definition") {
+      sentences.push(
+        t`The unit definition changed. The engine cannot reload a unit definition in a running game, so relaunch to see it.`,
+      );
+    } else {
+      sentences.push(
+        t`The model changed. The engine cannot reload a model in a running game, so relaunch to see it.`,
+      );
+    }
   } else if (named.length > 1) {
-    const changed = `The ${list(named.map((p) => NAME[p]))} changed.`;
+    const changed = has("definition")
+      ? has("model") && has("texture")
+        ? t`The unit definition, the model and the texture changed.`
+        : has("model")
+          ? t`The unit definition and the model changed.`
+          : t`The unit definition and the texture changed.`
+      : t`The model and the texture changed.`;
     // A texture can be reloaded, just not this time, so a list with one in it
     // says only what to do.
     sentences.push(
-      named.includes("texture")
-        ? `${changed} Relaunch to see them in the game.`
-        : `${changed} The engine cannot reload them in a running game, so relaunch to see them.`,
+      has("texture")
+        ? `${changed} ${t`Relaunch to see them in the game.`}`
+        : `${changed} ${t`The engine cannot reload them in a running game, so relaunch to see them.`}`,
     );
   }
   if (parts.includes("files")) {
     sentences.push(
-      "The unit has files the game did not start with, so relaunch to see them.",
+      t`The unit has files the game did not start with, so relaunch to see them.`,
     );
   }
   return sentences.length > 0 ? sentences.join(" ") : null;

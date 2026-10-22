@@ -28,6 +28,7 @@
  * script and use the presets" is the way back.
  */
 
+import { t } from "@lingui/core/macro";
 import { animBos2lua, type ConversionWarning } from "../animation/bindings";
 import { unitsyncUnitScript } from "../content/bindings";
 import { inferRoles, type RoleFindings } from "./inferRoles";
@@ -192,13 +193,12 @@ export async function adoptGameScript(
       unit: game.unit,
     });
   } catch (error) {
+    const unit = game.unit;
+    const gameName = game.name;
+    const reason = error instanceof Error ? error.message : String(error);
     return {
       ...NOTHING,
-      notes: [
-        `Could not read ${game.unit}'s script from ${game.name}: ${
-          error instanceof Error ? error.message : String(error)
-        }`,
-      ],
+      notes: [t`Could not read ${unit}'s script from ${gameName}: ${reason}`],
     };
   }
 
@@ -215,10 +215,13 @@ export async function adoptGameScript(
     // Worth naming what was asked for. A definition that names a script the
     // archive does not carry is a different problem from one naming none, and
     // only the first is worth going and looking at.
+    const unit = game.unit;
+    const gameName = game.name;
+    const declared = result.declared;
     notes.push(
-      result.declared
-        ? `${game.unit} names ${result.declared} as its script, and ${game.name} has no such file.`
-        : `${game.unit} has no animation script in ${game.name}.`,
+      declared
+        ? t`${unit} names ${declared} as its script, and ${gameName} has no such file.`
+        : t`${unit} has no animation script in ${gameName}.`,
     );
     return { ...NOTHING, declared: result.declared, notes };
   }

@@ -25,6 +25,7 @@
  * own geometry counts, not its children's.
  */
 
+import { plural, t } from "@lingui/core/macro";
 import {
   type Geometry,
   meshVolume,
@@ -391,16 +392,15 @@ export function checkOverlap(
   };
 }
 
-function plural(count: number, word: string): string {
-  return `${count} ${word}${count === 1 ? "" : "s"}`;
-}
-
 /** The line the viewport shows while the check is on. */
 export function overlapSummary(result: OverlapResult): string {
-  if (result.buried.length === 0) return "No buried pieces.";
-  return `${plural(result.buried.length, "buried piece")} ${
-    result.buried.length === 1 ? "wastes" : "waste"
-  } ${plural(result.wastedTriangles, "triangle")}.`;
+  if (result.buried.length === 0) return t`No buried pieces.`;
+  const buried = result.buried.length;
+  const triangles = result.wastedTriangles;
+  return plural(buried, {
+    one: `# buried piece wastes ${plural(triangles, { one: "# triangle", other: "# triangles" })}.`,
+    other: `# buried pieces waste ${plural(triangles, { one: "# triangle", other: "# triangles" })}.`,
+  });
 }
 
 /** Pieces named before the list says "and N more". */
@@ -416,23 +416,26 @@ export function overlapProblems(
 ): Problem[] {
   const name = (id: string) =>
     project.pieces.find((p) => p.id === id)?.name ?? id;
-  const lines = result.buried
-    .slice(0, LISTED)
-    .map((b) =>
-      problem(
-        "overlap",
-        "warning",
-        `${name(b.id)} is buried inside ${name(b.holderId)} and wastes ${plural(b.triangles, "triangle")}.`,
-        [b.id, b.holderId],
-      ),
+  const lines = result.buried.slice(0, LISTED).map((b) => {
+    const piece = name(b.id);
+    const holder = name(b.holderId);
+    const triangles = b.triangles;
+    return problem(
+      "overlap",
+      "warning",
+      t`${piece} is buried inside ${holder} and wastes ${plural(triangles, { one: "# triangle", other: "# triangles" })}.`,
+      [b.id, b.holderId],
     );
+  });
   const rest = result.buried.slice(LISTED);
   if (rest.length > 0) {
+    const more = rest.length;
+    const triangles = result.wastedTriangles;
     lines.push(
       problem(
         "overlap",
         "warning",
-        `And ${rest.length} more. Buried pieces waste ${plural(result.wastedTriangles, "triangle")} in all.`,
+        t`And ${more} more. Buried pieces waste ${plural(triangles, { one: "# triangle", other: "# triangles" })} in all.`,
         [...new Set(rest.flatMap((b) => [b.id, b.holderId]))],
       ),
     );

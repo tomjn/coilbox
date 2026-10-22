@@ -25,6 +25,7 @@
  * unit's game, which `projectProblems` checks.
  */
 
+import { plural, t } from "@lingui/core/macro";
 import { comparablePath } from "./exportRecord";
 import { type Problem, type ProblemSeverity, problem } from "./problems";
 import type { RawGeometry } from "./rawGeometry";
@@ -1525,38 +1526,39 @@ export function projectProblems(project: LegoProject): Problem[] {
   const byId = new Map(project.pieces.map((piece) => [piece.id, piece]));
 
   if (!byId.has(project.rootPieceId)) {
-    add("error", "The root piece is missing.");
+    add("error", t`The root piece is missing.`);
   }
 
   const names = new Map<string, number>();
   for (const piece of project.pieces) {
+    const pieceName = piece.name;
     names.set(piece.name, (names.get(piece.name) ?? 0) + 1);
     if (piece.name !== normalisePieceName(piece.name)) {
       add(
         "warning",
-        `"${piece.name}" is not usable as a name in a unit script.`,
+        t`"${pieceName}" is not usable as a name in a unit script.`,
         [piece.id],
       );
     }
     if (piece.parentId !== null && !byId.has(piece.parentId)) {
-      add("error", `"${piece.name}" hangs off a piece that no longer exists.`, [
+      add("error", t`"${pieceName}" hangs off a piece that no longer exists.`, [
         piece.id,
       ]);
     }
     if (piece.parentId === null && piece.connection) {
       add(
         "warning",
-        `"${piece.name}" is saved as joined to a parent, but it has none.`,
+        t`"${pieceName}" is saved as joined to a parent, but it has none.`,
         [piece.id],
       );
     }
     if (piece.twin !== undefined && !byId.has(piece.twin)) {
-      add("warning", `"${piece.name}" has a twin that no longer exists.`, [
+      add("warning", t`"${pieceName}" has a twin that no longer exists.`, [
         piece.id,
       ]);
     }
     if (piece.ring !== undefined && !ringMembers(project.pieces, piece.id)) {
-      add("warning", `"${piece.name}" is in a ring that is not whole.`, [
+      add("warning", t`"${pieceName}" is in a ring that is not whole.`, [
         piece.id,
       ]);
     }
@@ -1565,7 +1567,10 @@ export function projectProblems(project: LegoProject): Problem[] {
     if (count > 1) {
       add(
         "error",
-        `${count} pieces are called "${name}".`,
+        plural(count, {
+          one: `# piece is called "${name}".`,
+          other: `# pieces are called "${name}".`,
+        }),
         project.pieces.filter((piece) => piece.name === name).map((p) => p.id),
       );
     }
@@ -1581,18 +1586,23 @@ export function projectProblems(project: LegoProject): Problem[] {
       misplaced.set(refused, [...(misplaced.get(refused) ?? []), piece]);
   }
   for (const [refused, pieces] of misplaced) {
+    const pieceNames = pieces.map((p) => p.name).join(", ");
     add(
       "warning",
-      `${refused} Pieces from a game: ${pieces.map((p) => p.name).join(", ")}.`,
+      `${refused} ${t`Pieces from a game: ${pieceNames}.`}`,
       pieces.map((p) => p.id),
     );
   }
 
   const roots = project.pieces.filter((piece) => piece.parentId === null);
   if (roots.length > 1) {
+    const rootCount = roots.length;
     add(
       "error",
-      `${roots.length} pieces have no parent, but a model has one root.`,
+      plural(rootCount, {
+        one: "# piece has no parent, but a model has one root.",
+        other: "# pieces have no parent, but a model has one root.",
+      }),
       roots.map((p) => p.id),
     );
   }
@@ -1602,9 +1612,14 @@ export function projectProblems(project: LegoProject): Problem[] {
   const reached = new Set(walkPieces(project).map((piece) => piece.id));
   const stranded = project.pieces.filter((piece) => !reached.has(piece.id));
   if (stranded.length > 0) {
+    const strandedCount = stranded.length;
     add(
       "error",
-      `${stranded.length} pieces cannot be reached from the root, so they are in a loop or detached.`,
+      plural(strandedCount, {
+        one: "# piece cannot be reached from the root, so it is in a loop or detached.",
+        other:
+          "# pieces cannot be reached from the root, so they are in a loop or detached.",
+      }),
       stranded.map((p) => p.id),
     );
   }

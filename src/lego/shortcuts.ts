@@ -1,3 +1,4 @@
+import { t } from "@lingui/core/macro";
 /**
  * The single source of truth for every keyboard shortcut in the unit
  * builder.
@@ -74,118 +75,154 @@ export const SHORTCUTS: Shortcut[] = [
   {
     id: "translate",
     group: "Transform",
-    description: "Move the selection",
+    get description() {
+      return t`Move the selection`;
+    },
     combos: [{ key: "g", shift: false }],
   },
   {
     id: "rotate",
     group: "Transform",
-    description: "Turn the selection",
+    get description() {
+      return t`Turn the selection`;
+    },
     combos: [{ key: "r", shift: false }],
   },
   {
     id: "scale",
     group: "Transform",
-    description: "Scale the selection",
+    get description() {
+      return t`Scale the selection`;
+    },
     combos: [{ key: "s", shift: false }],
   },
   {
     id: "snap-hold",
     group: "Transform",
-    description:
-      "Hold while dragging to place freely, with no step or snap. A joined part is detached",
+    get description() {
+      return t`Hold while dragging to place freely, with no step or snap. A joined part is detached`;
+    },
     combos: [{ key: "Alt" }],
     matches: (event) => event.altKey,
   },
   {
     id: "symmetry",
     group: "Transform",
-    description: "Mirror new pieces as you place them",
+    get description() {
+      return t`Mirror new pieces as you place them`;
+    },
     combos: [{ key: "m", mod: false, shift: false }],
   },
   {
     id: "place-face",
     group: "Transform",
-    description: "While placing a part or module, join by its next face",
+    get description() {
+      return t`While placing a part or module, join by its next face`;
+    },
     combos: [{ key: "n", mod: false, shift: false }],
   },
   {
     id: "place-twist",
     group: "Transform",
-    description:
-      "While placing a part or module, turn it a quarter about the face",
+    get description() {
+      return t`While placing a part or module, turn it a quarter about the face`;
+    },
     combos: [{ key: "t", mod: false, shift: false }],
   },
   {
     id: "place-stop",
     group: "Transform",
-    description: "Stop placing a part, a module or a connector",
+    get description() {
+      return t`Stop placing a part, a module or a connector`;
+    },
     combos: [{ key: "Escape" }],
   },
   {
     id: "frame",
     group: "View",
-    description: "Frame the selection",
+    get description() {
+      return t`Frame the selection`;
+    },
     combos: [{ key: "f", mod: false, shift: false }],
   },
   {
     id: "view-front",
     group: "View",
-    description: "Front view, with no perspective",
+    get description() {
+      return t`Front view, with no perspective`;
+    },
     combos: [{ key: "1", mod: false, shift: false }],
   },
   {
     id: "view-side",
     group: "View",
-    description: "Side view, with no perspective",
+    get description() {
+      return t`Side view, with no perspective`;
+    },
     combos: [{ key: "2", mod: false, shift: false }],
   },
   {
     id: "view-top",
     group: "View",
-    description: "Top view, with no perspective",
+    get description() {
+      return t`Top view, with no perspective`;
+    },
     combos: [{ key: "3", mod: false, shift: false }],
   },
   {
     id: "draw-mode",
     group: "View",
-    description: "Draw the unit solid, as edges, or solid with edges",
+    get description() {
+      return t`Draw the unit solid, as edges, or solid with edges`;
+    },
     combos: [{ key: "w", mod: false, shift: false }],
   },
   {
     id: "skeleton",
     group: "View",
-    description: "Show or hide the skeleton",
+    get description() {
+      return t`Show or hide the skeleton`;
+    },
     combos: [{ key: "k", mod: false, shift: false }],
   },
   {
     id: "measure",
     group: "View",
-    description: "Measure between two points",
+    get description() {
+      return t`Measure between two points`;
+    },
     combos: [{ key: "l", mod: false, shift: false }],
   },
   {
     id: "measure-stop",
     group: "View",
-    description: "Leave the measure tool",
+    get description() {
+      return t`Leave the measure tool`;
+    },
     combos: [{ key: "Escape" }],
   },
   {
     id: "shortcuts",
     group: "Help",
-    description: "Show this sheet",
+    get description() {
+      return t`Show this sheet`;
+    },
     combos: [{ key: "?" }],
   },
   {
     id: "undo",
     group: "Edit",
-    description: "Undo",
+    get description() {
+      return t`Undo`;
+    },
     combos: [{ key: "z", mod: true, shift: false }],
   },
   {
     id: "redo",
     group: "Edit",
-    description: "Redo",
+    get description() {
+      return t`Redo`;
+    },
     combos: [
       { key: "z", mod: true, shift: true },
       { key: "y", mod: true },
@@ -194,25 +231,33 @@ export const SHORTCUTS: Shortcut[] = [
   {
     id: "copy",
     group: "Edit",
-    description: "Copy the selection",
+    get description() {
+      return t`Copy the selection`;
+    },
     combos: [{ key: "c", mod: true }],
   },
   {
     id: "paste",
     group: "Edit",
-    description: "Paste",
+    get description() {
+      return t`Paste`;
+    },
     combos: [{ key: "v", mod: true }],
   },
   {
     id: "duplicate",
     group: "Edit",
-    description: "Duplicate the selection",
+    get description() {
+      return t`Duplicate the selection`;
+    },
     combos: [{ key: "d", mod: true }],
   },
   {
     id: "delete",
     group: "Edit",
-    description: "Delete the selection",
+    get description() {
+      return t`Delete the selection`;
+    },
     combos: [{ key: "Backspace" }, { key: "Delete" }],
   },
   {
@@ -222,7 +267,9 @@ export const SHORTCUTS: Shortcut[] = [
     // nothing prints is a shortcut nobody finds.
     id: "add-to-selection",
     group: "Edit",
-    description: "Add a piece to the selection, or take it out",
+    get description() {
+      return t`Add a piece to the selection, or take it out`;
+    },
     combos: [
       { key: "Click", shift: true },
       { key: "Click", mod: true },

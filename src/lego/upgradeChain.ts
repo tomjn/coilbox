@@ -11,6 +11,7 @@
  * upgrade data is #3287.
  */
 
+import { t } from "@lingui/core/macro";
 import type { LegoLoadout, LegoProject } from "./model";
 import { type Problem, problem } from "./problems";
 
@@ -22,15 +23,21 @@ export function upgradeRefusal(
 ): string | null {
   const loadouts = project.loadouts ?? [];
   const byId = new Map(loadouts.map((l) => [l.id, l]));
-  if (!byId.has(id) || !byId.has(from)) return "No such loadout.";
-  if (id === from) return "A loadout cannot upgrade from itself.";
+  if (!byId.has(id) || !byId.has(from)) return t`No such loadout.`;
+  if (id === from) return t`A loadout cannot upgrade from itself.`;
   const taken = loadouts.find((l) => l.id !== id && l.upgradesFrom === from);
-  if (taken)
-    return `${taken.name} already upgrades from ${byId.get(from)?.name}.`;
+  if (taken) {
+    const takenName = taken.name;
+    const fromName = byId.get(from)?.name ?? from;
+    return t`${takenName} already upgrades from ${fromName}.`;
+  }
   const seen = new Set<string>();
   for (let at = byId.get(from); at && !seen.has(at.id); ) {
-    if (at.id === id)
-      return `${byId.get(from)?.name} already upgrades from ${byId.get(id)?.name}.`;
+    if (at.id === id) {
+      const fromName = byId.get(from)?.name ?? from;
+      const idName = byId.get(id)?.name ?? id;
+      return t`${fromName} already upgrades from ${idName}.`;
+    }
     seen.add(at.id);
     at = at.upgradesFrom ? byId.get(at.upgradesFrom) : undefined;
   }
@@ -123,12 +130,12 @@ export function upgradeChainProblems(project: LegoProject): Problem[] {
     const loop = path.slice(path.indexOf(at.id));
     if (loop.some((id) => looped.has(id))) continue;
     for (const id of loop) looped.add(id);
-    const names = loop.map((id) => byId.get(id)?.name ?? id);
+    const names = loop.map((id) => byId.get(id)?.name ?? id).join(", ");
     out.push(
       problem(
         "document",
         "warning",
-        `${names.join(", ")} upgrade from each other in a loop. An upgrade path is a line.`,
+        t`${names} upgrade from each other in a loop. An upgrade path is a line.`,
       ),
     );
   }
@@ -142,14 +149,17 @@ export function upgradeChainProblems(project: LegoProject): Problem[] {
       ]);
   }
   for (const [from, names] of branches) {
-    if (names.length > 1)
+    if (names.length > 1) {
+      const together = names.join(" and ");
+      const fromName = byId.get(from)?.name ?? from;
       out.push(
         problem(
           "document",
           "warning",
-          `${names.join(" and ")} both upgrade from ${byId.get(from)?.name}. An upgrade path is a line.`,
+          t`${together} both upgrade from ${fromName}. An upgrade path is a line.`,
         ),
       );
+    }
   }
   return out;
 }

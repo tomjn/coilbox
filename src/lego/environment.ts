@@ -24,6 +24,7 @@
  * you could mistake for part of the model.
  */
 
+import { t } from "@lingui/core/macro";
 import * as THREE from "three";
 
 import { GROUND_ELMOS } from "./buildPlate";
@@ -66,14 +67,22 @@ export interface Backdrop {
 export const BACKDROPS: Backdrop[] = [
   {
     id: "studio",
-    label: "Plain",
-    hint: "A dark panel. The most contrast for the model.",
+    get label() {
+      return t`Plain`;
+    },
+    get hint() {
+      return t`A dark panel. The most contrast for the model.`;
+    },
     stops: [],
   },
   {
     id: "sky",
-    label: "Sky",
-    hint: "A dusk gradient, so the unit is seen outdoors.",
+    get label() {
+      return t`Sky`;
+    },
+    get hint() {
+      return t`A dusk gradient, so the unit is seen outdoors.`;
+    },
     stops: [
       { at: 0, colour: "#16202e" },
       { at: 0.4, colour: "#2f4a63" },
@@ -105,28 +114,48 @@ export interface GroundSurface {
 export const GROUND_SURFACES: GroundSurface[] = [
   {
     id: "grid",
-    label: "Grid only",
-    hint: "Markings over the backdrop, nothing solid.",
+    get label() {
+      return t`Grid only`;
+    },
+    get hint() {
+      return t`Markings over the backdrop, nothing solid.`;
+    },
   },
   {
     id: "terrain",
-    label: "Terrain",
-    hint: "A flat, muted surface under the markings.",
+    get label() {
+      return t`Terrain`;
+    },
+    get hint() {
+      return t`A flat, muted surface under the markings.`;
+    },
   },
   {
     id: "water",
-    label: "Water",
-    hint: "A see-through sea at y = 0, for how a hull sits in it.",
+    get label() {
+      return t`Water`;
+    },
+    get hint() {
+      return t`A see-through sea at y = 0, for how a hull sits in it.`;
+    },
   },
   {
     id: "slope",
-    label: "Slope",
-    hint: "A hill rising ahead of the unit.",
+    get label() {
+      return t`Slope`;
+    },
+    get hint() {
+      return t`A hill rising ahead of the unit.`;
+    },
   },
   {
     id: "uneven",
-    label: "Uneven",
-    hint: "Rows of bumps, steepest under the unit.",
+    get label() {
+      return t`Uneven`;
+    },
+    get hint() {
+      return t`Rows of bumps, steepest under the unit.`;
+    },
   },
 ];
 

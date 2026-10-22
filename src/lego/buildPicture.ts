@@ -9,6 +9,7 @@
  * renderer.
  */
 
+import { t } from "@lingui/core/macro";
 import type { PictureSurvey } from "./bindings";
 import { comparablePath } from "./exportRecord";
 import type { LegoExport, LegoProject, PictureViewId } from "./model";
@@ -26,14 +27,34 @@ export const PICTURE_VIEWS: {
   label: string;
   direction: Vec3;
 }[] = [
-  { id: "right", label: "Three-quarter, right", direction: THUMBNAIL_VIEW },
+  {
+    id: "right",
+    get label() {
+      return t`Three-quarter, right`;
+    },
+    direction: THUMBNAIL_VIEW,
+  },
   {
     id: "left",
-    label: "Three-quarter, left",
+    get label() {
+      return t`Three-quarter, left`;
+    },
     direction: [-viewX, viewY, viewZ],
   },
-  { id: "front", label: "Front", direction: [0, viewY, viewZ] },
-  { id: "side", label: "Side", direction: [viewZ, viewY, 0] },
+  {
+    id: "front",
+    get label() {
+      return t`Front`;
+    },
+    direction: [0, viewY, viewZ],
+  },
+  {
+    id: "side",
+    get label() {
+      return t`Side`;
+    },
+    direction: [viewZ, viewY, 0],
+  },
 ];
 
 /** The direction the camera takes for a stored view. */
@@ -118,14 +139,16 @@ export function pictureNotices(survey: PictureSurvey, size: number): string[] {
   const notices: string[] = [];
   const common = survey.pngSizes[0];
   if (common && (common.width !== size || common.height !== size)) {
+    const commonWidth = common.width;
+    const commonHeight = common.height;
     notices.push(
-      `Most of this game's PNG build pictures are ${common.width} by ${common.height} pixels. This one is ${size} by ${size}.`,
+      t`Most of this game's PNG build pictures are ${commonWidth} by ${commonHeight} pixels. This one is ${size} by ${size}.`,
     );
   }
   if (survey.otherFormats.length > 0) {
     const formats = survey.otherFormats.map((f) => f.extension).join(", ");
     notices.push(
-      `This game also has build pictures as ${formats} files. Coilbox writes a PNG.`,
+      t`This game also has build pictures as ${formats} files. Coilbox writes a PNG.`,
     );
   }
   return notices;

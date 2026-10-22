@@ -8,6 +8,7 @@
  * covered: that is `moduleFile.ts`, and it never goes through the hub.
  */
 
+import { t } from "@lingui/core/macro";
 import {
   decodeContainerText,
   moduleGeometryRefusal,
@@ -30,9 +31,11 @@ export function moduleShareCode(module: LegoProject): ModuleShareCode {
   if (refused) return { ok: false, reason: refused };
   const made = tryEncodeContainerCode("module", MODULE_KIND_VERSION, module);
   if (made.ok) return made;
+  const size = Math.round(made.bytes / 1024);
+  const limit = Math.round(made.limit / 1024);
   return {
     ok: false,
-    reason: `This module is ${Math.round(made.bytes / 1024)} KB, over the ${Math.round(made.limit / 1024)} KB a code can carry.`,
+    reason: t`This module is ${size} KB, over the ${limit} KB a code can carry.`,
   };
 }
 
@@ -58,8 +61,7 @@ export function readSharedModule(
   if (held) {
     return {
       ok: false,
-      reason:
-        "This module holds geometry from a game or a model, which a shared module cannot carry.",
+      reason: t`This module holds geometry from a game or a model, which a shared module cannot carry.`,
     };
   }
   if (!read.ok) {
@@ -67,8 +69,8 @@ export function readSharedModule(
       ok: false,
       reason:
         read.error === "unsupported-version"
-          ? "This module was made by a newer version of coilbox."
-          : "That is not a coilbox module.",
+          ? t`This module was made by a newer version of coilbox.`
+          : t`That is not a coilbox module.`,
     };
   }
   const project = read.payload;

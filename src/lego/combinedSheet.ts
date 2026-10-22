@@ -7,6 +7,7 @@
  * a piece moved onto another part of the atlas moves its region.
  */
 
+import { t } from "@lingui/core/macro";
 import {
   type BlenderTextureRef,
   legoTexturePrune,
@@ -74,7 +75,7 @@ export async function buildCombinedSheet(
     images: sources.map((source) => source.colour),
   });
   if (sizes.length !== sources.length) {
-    throw new Error("Coilbox could not measure the textures for the sheet.");
+    throw new Error(t`Coilbox could not measure the textures for the sheet.`);
   }
   const { pieces } = bakedPieces(project, pack, raw);
   const plan = planSheet(

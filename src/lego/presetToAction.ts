@@ -11,6 +11,7 @@
  * is what the preset's script plays.
  */
 
+import { t } from "@lingui/core/macro";
 import { freeActionName } from "./actions";
 import { type PresetMotion, presetById } from "./animPresets";
 import { localName, presetContexts } from "./luaScript";
@@ -23,10 +24,10 @@ export function presetMotions(
 ): PresetMotion[] | string {
   const preset = presetById(presetId);
   const entry = project.animations?.find((a) => a.presetId === presetId);
-  if (!preset || !entry) return "This unit does not have this preset.";
+  if (!preset || !entry) return t`This unit does not have this preset.`;
   if (typeof preset.motions === "string") return preset.motions;
   if ((project.loadouts?.length ?? 0) > 1) {
-    return "Actions are shared by every loadout, and this preset belongs to one.";
+    return t`Actions are shared by every loadout, and this preset belongs to one.`;
   }
   const { ctx } = presetContexts(project, new Set())(
     preset,
@@ -38,7 +39,7 @@ export function presetMotions(
     .filter((motion) => motion.keys.length > 0);
   return motions.length > 0
     ? motions
-    : "This unit has none of the pieces it moves.";
+    : t`This unit has none of the pieces it moves.`;
 }
 
 /** Why the preset cannot be converted on this unit, or null when it can. */

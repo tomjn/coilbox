@@ -7,6 +7,7 @@
  * would resolve the join and carry the piece straight back.
  */
 
+import { t } from "@lingui/core/macro";
 import { editJoined, freePiece, same, twistOf } from "./connectors";
 import { claimForLoadout } from "./loadouts";
 import { type LegoPiece, type LegoProject, pieceById } from "./model";
@@ -197,7 +198,7 @@ export function typedJoinedTransform(
     project: next,
     detached:
       was && !pieceById(next, pieceId)?.connection
-        ? "Detached: moved off its face."
+        ? t`Detached: moved off its face.`
         : null,
   };
 }

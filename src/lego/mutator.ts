@@ -13,6 +13,7 @@
  * [`MutatorStamp`] for how that is told.
  */
 
+import { t } from "@lingui/core/macro";
 import { unitsyncLuaExec } from "@/content/bindings";
 import { primeScan } from "@/content/config";
 import type { PlayTarget } from "@/play/config";
@@ -175,7 +176,8 @@ export async function luaRulesEntries(
     source: LUARULES_ENTRIES_LUA,
   });
   if (res.error) {
-    throw new Error(`Could not read ${baseGame}'s LuaRules: ${res.error}`);
+    const reason = res.error;
+    throw new Error(t`Could not read ${baseGame}'s LuaRules: ${reason}`);
   }
   const missing = missingLuaRulesEntries(res.result);
   const entry = buildLuaRulesEntry();
@@ -216,12 +218,13 @@ export async function buildListFor(
   });
   const names = entries.map((entry) => entry.unitName).join(", ");
   if (res.error) {
+    const reason = res.error;
     leftOut.push(
-      `Could not tell whether ${baseGame} reads a build list: ${res.error}`,
+      t`Could not tell whether ${baseGame} reads a build list: ${reason}`,
     );
   } else if (!readsBuildList(res.result)) {
     leftOut.push(
-      `${baseGame} loads its units without reading a build list from a mutator, so nothing in it builds ${names}.`,
+      t`${baseGame} loads its units without reading a build list from a mutator, so nothing in it builds ${names}.`,
     );
   }
   return { buildList: buildListTdf(entries), leftOut };
@@ -286,7 +289,7 @@ export async function prepareUnit(
         texture1: imported ? imported.texture1 : written,
         texture2: imported?.texture2,
       });
-  if (!model) throw new Error("This unit has no root piece.");
+  if (!model) throw new Error(t`This unit has no root piece.`);
 
   const textures = {
     atlas:
@@ -712,7 +715,7 @@ export async function writePreparedMutator(
   const name = await rescannedName(target, folder);
   if (!name) {
     throw new Error(
-      `The engine did not pick up ${folder}. Check that ${baseGame} is still installed.`,
+      t`The engine did not pick up ${folder}. Check that ${baseGame} is still installed.`,
     );
   }
   const record: MutatorStamp = { hash, dir, name, units: written };

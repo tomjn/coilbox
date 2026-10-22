@@ -3,6 +3,7 @@
  * the import a shared code or a hub item lands on the parts page with.
  */
 
+import { t } from "@lingui/core/macro";
 import { useDrawer } from "@picoframe/frame";
 import { createElement, useCallback, useEffect, useRef } from "react";
 
@@ -20,10 +21,11 @@ export function useShareModule(): (module: LegoProject) => void {
   const drawer = useDrawer();
   return useCallback(
     (module: LegoProject) => {
+      const moduleName = module.name;
       void import("./pages/components/ShareModuleForm").then(
         ({ ShareModuleForm }) =>
           drawer.open({
-            title: `Share ${module.name}`,
+            title: t`Share ${moduleName}`,
             width: "28rem",
             content: createElement(ShareModuleForm, {
               key: nextDrawerKey(),
@@ -60,7 +62,7 @@ export function useSharedModuleImport(
     });
     if (!read.ok) {
       notify({
-        title: "Could not add the module",
+        title: t`Could not add the module`,
         body: read.reason,
         level: "error",
       });
@@ -69,19 +71,21 @@ export function useSharedModuleImport(
     void saveCompound(read.project).then(
       (saved) => {
         recordHubImport(hubItemId, [saved.id], "/lego/parts");
+        const savedName = saved.name;
+        const parts = read.missingParts.join(", ");
         notify(
           read.missingParts.length > 0
             ? {
-                title: `Added ${saved.name}, with parts missing`,
-                body: `No installed pack has the parts for: ${read.missingParts.join(", ")}.`,
+                title: t`Added ${savedName}, with parts missing`,
+                body: t`No installed pack has the parts for: ${parts}.`,
                 level: "warning",
               }
-            : { title: `Added ${saved.name}`, level: "success" },
+            : { title: t`Added ${savedName}`, level: "success" },
         );
       },
       (error: unknown) =>
         notify({
-          title: "Could not add the module",
+          title: t`Could not add the module`,
           body: error instanceof Error ? error.message : String(error),
           level: "error",
         }),

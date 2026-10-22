@@ -12,6 +12,7 @@
  * the wheel role or is hung under a wheel bone. The preset stays as it is.
  */
 
+import { select } from "@lingui/core/macro";
 import * as THREE from "three";
 
 import {
@@ -203,15 +204,27 @@ export function wheelAxleProblems(project: LegoProject): Problem[] {
     );
     const lies =
       Math.abs(Math.abs(along.getComponent(nearest)) - 1) < 1e-4
-        ? `along ${AXIS_NAMES[nearest]}`
+        ? AXIS_NAMES[nearest]
         : "slanted";
+    const pieceName = piece.name;
+    const spinnerName = spinner.name;
     found.push(
       problem(
         "skeleton",
         "warning",
         spinner.id === piece.id
-          ? `"${piece.name}" turns about x but its axle is ${lies}.`
-          : `"${spinner.name}" turns about x but "${piece.name}" has its axle ${lies}.`,
+          ? select(lies, {
+              x: `"${pieceName}" turns about x but its axle is along x.`,
+              y: `"${pieceName}" turns about x but its axle is along y.`,
+              z: `"${pieceName}" turns about x but its axle is along z.`,
+              other: `"${pieceName}" turns about x but its axle is slanted.`,
+            })
+          : select(lies, {
+              x: `"${spinnerName}" turns about x but "${pieceName}" has its axle along x.`,
+              y: `"${spinnerName}" turns about x but "${pieceName}" has its axle along y.`,
+              z: `"${spinnerName}" turns about x but "${pieceName}" has its axle along z.`,
+              other: `"${spinnerName}" turns about x but "${pieceName}" has its axle slanted.`,
+            }),
         [piece.id],
       ),
     );

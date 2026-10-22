@@ -15,6 +15,7 @@
  * short name was never read on this machine.
  */
 
+import { t } from "@lingui/core/macro";
 import type { GameItem } from "@/content/bindings";
 import { carriedShortname, rememberedShortname } from "../container/shortnames";
 import { parkedPieces } from "./loadouts";
@@ -193,7 +194,9 @@ export function gameChangeRefusal(
   if (!current || sameGame(current, next, installed)) return null;
   const lifted = liftedPieces(project);
   if (lifted.length === 0) return null;
-  return `Remove the pieces from ${current.name} first: ${lifted.join(", ")}.`;
+  const gameName = current.name;
+  const pieces = lifted.join(", ");
+  return t`Remove the pieces from ${gameName} first: ${pieces}.`;
 }
 
 /**
@@ -207,8 +210,10 @@ export function liftRefusal(
   installed: readonly GameItem[] = [],
 ): string | null {
   const own = unitGame(project);
-  if (!own) return "This unit is for no game. Choose a game first.";
-  if (!from) return "This piece does not say which game it is from.";
+  if (!own) return t`This unit is for no game. Choose a game first.`;
+  if (!from) return t`This piece does not say which game it is from.`;
   if (sameGame(own, from, installed)) return null;
-  return `This piece is from ${from.name}. This unit is for ${own.name}.`;
+  const pieceGame = from.name;
+  const unitGameName = own.name;
+  return t`This piece is from ${pieceGame}. This unit is for ${unitGameName}.`;
 }

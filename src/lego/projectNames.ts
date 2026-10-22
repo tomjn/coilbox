@@ -3,6 +3,7 @@
  * the Tauri bindings) so it stays plain, testable logic.
  */
 
+import { t } from "@lingui/core/macro";
 import type { LegoProject } from "./model";
 
 /**
@@ -18,12 +19,12 @@ export function validateProjectName(
   name: string,
 ): string | null {
   const trimmed = name.trim();
-  if (trimmed === "") return "Name cannot be empty";
+  if (trimmed === "") return t`Name cannot be empty`;
   const clash = projects.some(
     (project) =>
       project.id !== id &&
       project.name.trim().toLowerCase() === trimmed.toLowerCase(),
   );
-  if (clash) return "Another unit already has this name";
+  if (clash) return t`Another unit already has this name`;
   return null;
 }

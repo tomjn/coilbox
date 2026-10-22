@@ -11,6 +11,7 @@
  * what it needs, and the panel can say what is missing.
  */
 
+import { select, t } from "@lingui/core/macro";
 import { formatFixed } from "@/lib/format";
 import { EVERY_CUT, WRECK_STAGES } from "./breakApart";
 import {
@@ -36,10 +37,34 @@ export interface LegoRole {
  * it is only numbered.
  */
 export function legRoleLabel(side: "l" | "r", pair: number, segment: string) {
-  const sided = side === "l" ? "left" : "right";
-  return pair === 1
-    ? `Front ${sided} ${segment}`
-    : `${sided === "left" ? "Left" : "Right"} ${segment}, pair ${pair}`;
+  if (pair === 1) {
+    return side === "l"
+      ? select(segment, {
+          thigh: "Front left thigh",
+          shin: "Front left shin",
+          foot: "Front left foot",
+          other: `Front left ${segment}`,
+        })
+      : select(segment, {
+          thigh: "Front right thigh",
+          shin: "Front right shin",
+          foot: "Front right foot",
+          other: `Front right ${segment}`,
+        });
+  }
+  return side === "l"
+    ? select(segment, {
+        thigh: `Left thigh, pair ${pair}`,
+        shin: `Left shin, pair ${pair}`,
+        foot: `Left foot, pair ${pair}`,
+        other: `Left ${segment}, pair ${pair}`,
+      })
+    : select(segment, {
+        thigh: `Right thigh, pair ${pair}`,
+        shin: `Right shin, pair ${pair}`,
+        foot: `Right foot, pair ${pair}`,
+        other: `Right ${segment}, pair ${pair}`,
+      });
 }
 
 /** The picker's entries for every leg of pairs 1 to `pairs`, front first. */
@@ -68,40 +93,136 @@ export function legRoleEntries(pairs: number): LegoRole[] {
  * one pair past the unit's last.
  */
 export const ROLES: LegoRole[] = [
-  { id: "base", label: "Body", group: "Structure" },
-  { id: "turret", label: "Turret", group: "Weapon" },
-  { id: "barrel", label: "Barrel", group: "Weapon" },
-  { id: "flare", label: "Muzzle flare", group: "Weapon" },
-  { id: "aim", label: "Aim point", group: "Weapon" },
-  { id: "wheel", label: "Wheel", group: "Movement" },
+  {
+    id: "base",
+    get label() {
+      return t`Body`;
+    },
+    group: "Structure",
+  },
+  {
+    id: "turret",
+    get label() {
+      return t`Turret`;
+    },
+    group: "Weapon",
+  },
+  {
+    id: "barrel",
+    get label() {
+      return t`Barrel`;
+    },
+    group: "Weapon",
+  },
+  {
+    id: "flare",
+    get label() {
+      return t`Muzzle flare`;
+    },
+    group: "Weapon",
+  },
+  {
+    id: "aim",
+    get label() {
+      return t`Aim point`;
+    },
+    group: "Weapon",
+  },
+  {
+    id: "wheel",
+    get label() {
+      return t`Wheel`;
+    },
+    group: "Movement",
+  },
   // The tread a tracked unit stands on. Nothing animates it, since a unit
   // script cannot scroll a texture, so it only tells the balance check where
   // the ground contact is.
-  { id: "track", label: "Track", group: "Movement" },
+  {
+    id: "track",
+    get label() {
+      return t`Track`;
+    },
+    group: "Movement",
+  },
   // A ship's rudder, at the stern with its joint at the hinge. It swings about
   // the vertical axis with the ship's turning, by `RUDDER_FOLLOWS`.
-  { id: "rudder", label: "Rudder", group: "Movement" },
+  {
+    id: "rudder",
+    get label() {
+      return t`Rudder`;
+    },
+    group: "Movement",
+  },
   // Where a ship's or hovercraft's wake comes from, usually an empty piece at
   // the stern on the waterline. Nothing moves it. `WAKE_WHILE_MOVING` emits a
   // wake from it while the unit moves.
-  { id: "wake", label: "Wake point", group: "Movement" },
+  {
+    id: "wake",
+    get label() {
+      return t`Wake point`;
+    },
+    group: "Movement",
+  },
   // An aircraft's landing gear, each piece's joint at the hinge. `LANDING_GEAR`
   // turns it up on take off and down on landing.
-  { id: "gear", label: "Landing gear", group: "Movement" },
+  {
+    id: "gear",
+    get label() {
+      return t`Landing gear`;
+    },
+    group: "Movement",
+  },
   // A gunship's rotor, its joint on the shaft. `ROTOR_SPIN` spins it about the
   // vertical axis while the aircraft is up.
-  { id: "rotor", label: "Rotor", group: "Movement" },
+  {
+    id: "rotor",
+    get label() {
+      return t`Rotor`;
+    },
+    group: "Movement",
+  },
   ...legRoleEntries(2),
-  { id: "buildarm.base", label: "Build arm base", group: "Build arm" },
-  { id: "buildarm.arm", label: "Build arm", group: "Build arm" },
-  { id: "buildarm.nozzle", label: "Build nozzle", group: "Build arm" },
+  {
+    id: "buildarm.base",
+    get label() {
+      return t`Build arm base`;
+    },
+    group: "Build arm",
+  },
+  {
+    id: "buildarm.arm",
+    get label() {
+      return t`Build arm`;
+    },
+    group: "Build arm",
+  },
+  {
+    id: "buildarm.nozzle",
+    get label() {
+      return t`Build nozzle`;
+    },
+    group: "Build arm",
+  },
   // Set on as many pieces as the unit has. A game model usually carries these
   // as empty pieces called nano1, nano2 and so on: they have no geometry and
   // exist only as the coordinate the build spray comes out of, which is why
   // they are their own role rather than the nozzle. A nozzle swings and gets
   // counter-rotated by `BUILDARM`. A nano point never moves.
-  { id: "buildarm.nano", label: "Nano emit point", group: "Build arm" },
-  { id: "door", label: "Door", group: "Structure" },
+  {
+    id: "buildarm.nano",
+    get label() {
+      return t`Nano emit point`;
+    },
+    group: "Build arm",
+  },
+  {
+    id: "door",
+    get label() {
+      return t`Door`;
+    },
+    group: "Structure",
+  },
 ];
 
 const ROLE_IDS = new Set(ROLES.map((role) => role.id));
@@ -1139,7 +1260,9 @@ function walkTrack(
 const WALK_PARAMS: PresetParam[] = [
   {
     id: "period",
-    label: "Stride time",
+    get label() {
+      return t`Stride time`;
+    },
     unit: "s",
     min: 0.2,
     max: 4,
@@ -1148,7 +1271,9 @@ const WALK_PARAMS: PresetParam[] = [
   },
   {
     id: "stride",
-    label: "Thigh swing",
+    get label() {
+      return t`Thigh swing`;
+    },
     unit: "deg",
     min: 0,
     max: 70,
@@ -1157,7 +1282,9 @@ const WALK_PARAMS: PresetParam[] = [
   },
   {
     id: "knee",
-    label: "Knee bend",
+    get label() {
+      return t`Knee bend`;
+    },
     unit: "deg",
     min: 0,
     max: 90,
@@ -1168,7 +1295,9 @@ const WALK_PARAMS: PresetParam[] = [
     // A walk keeps each foot down for more than half the time and a run for
     // less. Half is the walk this preset always made.
     id: "duty",
-    label: "Time on the ground",
+    get label() {
+      return t`Time on the ground`;
+    },
     unit: "%",
     min: 30,
     max: 80,
@@ -1191,16 +1320,24 @@ function legRoles(pairs: number[]): string[] {
 
 export const WALK_BIPED: AnimPreset = {
   id: "walk.biped",
-  label: "Walk, two legs",
-  description:
-    "Swings the legs in opposition and keeps the feet flat. Needs a thigh and a shin on each side.",
+  get label() {
+    return t`Walk, two legs`;
+  },
+  get description() {
+    return t`Swings the legs in opposition and keeps the feet flat. Needs a thigh and a shin on each side.`;
+  },
   requires: [
     { role: "leg.l1.thigh", count: 1 },
     { role: "leg.l1.shin", count: 1 },
     { role: "leg.r1.thigh", count: 1 },
     { role: "leg.r1.shin", count: 1 },
   ],
-  copies: { per: "instance", noun: "sets of legs" },
+  copies: {
+    per: "instance",
+    get noun() {
+      return t`sets of legs`;
+    },
+  },
   animates: legRoles([1]),
   params: WALK_PARAMS,
   track(t, params, role) {
@@ -1219,16 +1356,24 @@ export const WALK_BIPED: AnimPreset = {
 
 export const WALK_QUAD: AnimPreset = {
   id: "walk.quad",
-  label: "Walk, four legs",
-  description:
-    "A trot: diagonal pairs move together, so the body does not rock. Needs both pairs of legs.",
+  get label() {
+    return t`Walk, four legs`;
+  },
+  get description() {
+    return t`A trot: diagonal pairs move together, so the body does not rock. Needs both pairs of legs.`;
+  },
   requires: [
     { role: "leg.l1.thigh", count: 1 },
     { role: "leg.r1.thigh", count: 1 },
     { role: "leg.l2.thigh", count: 1 },
     { role: "leg.r2.thigh", count: 1 },
   ],
-  copies: { per: "instance", noun: "sets of legs" },
+  copies: {
+    per: "instance",
+    get noun() {
+      return t`sets of legs`;
+    },
+  },
   animates: legRoles([1, 2]),
   params: WALK_PARAMS,
   track(t, params, role) {
@@ -1290,9 +1435,12 @@ const WALK_LEGS_PARAMS: PresetParam[] = WALK_PARAMS.map((param) =>
  */
 export const WALK_LEGS: AnimPreset = {
   id: "walk.legs",
-  label: "Walk, any number of legs",
-  description:
-    "A wave of steps from the rear to the front along each side. Half the time on the ground is the tripod on six legs, more is slower and steadier. Needs a thigh and a shin on each leg.",
+  get label() {
+    return t`Walk, any number of legs`;
+  },
+  get description() {
+    return t`A wave of steps from the rear to the front along each side. Half the time on the ground is the tripod on six legs, more is slower and steadier. Needs a thigh and a shin on each leg.`;
+  },
   requires: [
     { role: "leg.l1.thigh", count: 1 },
     { role: "leg.l1.shin", count: 1 },
@@ -1306,7 +1454,12 @@ export const WALK_LEGS: AnimPreset = {
       .filter((role) => !role.endsWith(".foot"))
       .map((role) => ({ role, count: 1 }));
   },
-  copies: { per: "instance", noun: "sets of legs" },
+  copies: {
+    per: "instance",
+    get noun() {
+      return t`sets of legs`;
+    },
+  },
   animates: legRoles([1]),
   moves: (role) => parseLegRole(role) !== null,
   params: WALK_LEGS_PARAMS,
@@ -1501,16 +1654,27 @@ function refuseOutside(
 
 export const TURRET_TRACK: AnimPreset = {
   id: "turret.track",
-  label: "Turret sweep",
-  description:
-    "Turns the turret and lifts the barrel, the motion a turret makes tracking a target.",
+  get label() {
+    return t`Turret sweep`;
+  },
+  get description() {
+    return t`Turns the turret and lifts the barrel, the motion a turret makes tracking a target.`;
+  },
   requires: [{ role: "turret", count: 1 }],
-  copies: { per: "weapon", role: "turret", noun: "turrets" },
+  copies: {
+    per: "weapon",
+    role: "turret",
+    get noun() {
+      return t`turrets`;
+    },
+  },
   animates: ["turret", "barrel"],
   params: [
     {
       id: "period",
-      label: "Sweep time",
+      get label() {
+        return t`Sweep time`;
+      },
       unit: "s",
       min: 0.5,
       max: 12,
@@ -1519,7 +1683,9 @@ export const TURRET_TRACK: AnimPreset = {
     },
     {
       id: "sweep",
-      label: "Turn",
+      get label() {
+        return t`Turn`;
+      },
       unit: "deg",
       min: 0,
       max: 180,
@@ -1528,7 +1694,9 @@ export const TURRET_TRACK: AnimPreset = {
     },
     {
       id: "pitch",
-      label: "Barrel lift",
+      get label() {
+        return t`Barrel lift`;
+      },
       unit: "deg",
       min: 0,
       max: 60,
@@ -1556,8 +1724,9 @@ export const TURRET_TRACK: AnimPreset = {
    * callins instead of a thread. The sweep in the viewport is a demonstration
    * of the motion. In a game the target decides where it points.
    */
-  motions:
-    "Follows the target the weapon aims at, which no fixed pose can hold.",
+  get motions() {
+    return t`Follows the target the weapon aims at, which no fixed pose can hold.`;
+  },
   emit(ctx) {
     const speed = aimSpeeds(this, ctx.params);
     const hooks: EmitResult["hooks"] = {};
@@ -1636,15 +1805,20 @@ const UNDRIVEN_SPEED = 1;
  */
 export const WHEELS_ROLL: AnimPreset = {
   id: "wheels.roll",
-  label: "Wheels turning",
-  description:
-    "Turns every wheel at the unit's speed over the wheel's radius, backwards when it backs up. A wheel with no round shape to measure turns at a steady rate.",
+  get label() {
+    return t`Wheels turning`;
+  },
+  get description() {
+    return t`Turns every wheel at the unit's speed over the wheel's radius, backwards when it backs up. A wheel with no round shape to measure turns at a steady rate.`;
+  },
   requires: [{ role: "wheel", count: 1 }],
   animates: ["wheel"],
   params: [
     {
       id: "rate",
-      label: "Turns per second",
+      get label() {
+        return t`Turns per second`;
+      },
       unit: "hz",
       min: 0.1,
       max: 6,
@@ -1653,7 +1827,9 @@ export const WHEELS_ROLL: AnimPreset = {
     },
     {
       id: "radius",
-      label: "Wheel radius (0 measures it)",
+      get label() {
+        return t`Wheel radius (0 measures it)`;
+      },
       unit: "m",
       min: 0,
       max: 30,
@@ -1676,7 +1852,9 @@ export const WHEELS_ROLL: AnimPreset = {
     return { rotation: [rate * t, 0, 0] };
   },
   /** Continuous, so `Spin` rather than a thread of `Turn` calls. */
-  motions: "Turns with the unit's speed, which no fixed pose can hold.",
+  get motions() {
+    return t`Turns with the unit's speed, which no fixed pose can hold.`;
+  },
   emit(ctx) {
     const typed = value(this, ctx.params, "radius");
     const wheels = ctx.wheels().map((wheel) => ({
@@ -1775,15 +1953,20 @@ const RUDDER_PER_HEADING =
  */
 export const RUDDER_FOLLOWS: AnimPreset = {
   id: "rudder.follow",
-  label: "Rudder follows turns",
-  description:
-    "Swings each rudder with the unit's turning while it moves, and straightens it when the turn ends.",
+  get label() {
+    return t`Rudder follows turns`;
+  },
+  get description() {
+    return t`Swings each rudder with the unit's turning while it moves, and straightens it when the turn ends.`;
+  },
   requires: [{ role: "rudder", count: 1 }],
   animates: ["rudder"],
   params: [
     {
       id: "max",
-      label: "Largest angle",
+      get label() {
+        return t`Largest angle`;
+      },
       unit: "deg",
       min: 0,
       max: 45,
@@ -1798,7 +1981,9 @@ export const RUDDER_FOLLOWS: AnimPreset = {
   track() {
     return null;
   },
-  motions: "Follows the unit's turning, which no fixed pose can hold.",
+  get motions() {
+    return t`Follows the unit's turning, which no fixed pose can hold.`;
+  },
   emit(ctx) {
     const rudders = ctx.pieces("rudder");
     if (rudders.length === 0) return null;
@@ -1867,15 +2052,20 @@ const LEAN_PER_HEADING =
  */
 export const HOVER_LEAN: AnimPreset = {
   id: "hover.lean",
-  label: "Hull leans into turns",
-  description:
-    "Leans the hull into the unit's turning while it moves, and eases it level when the turn ends.",
+  get label() {
+    return t`Hull leans into turns`;
+  },
+  get description() {
+    return t`Leans the hull into the unit's turning while it moves, and eases it level when the turn ends.`;
+  },
   requires: [{ role: "base", count: 1 }],
   animates: ["base"],
   params: [
     {
       id: "max",
-      label: "Largest lean",
+      get label() {
+        return t`Largest lean`;
+      },
       unit: "deg",
       min: 0,
       max: 30,
@@ -1887,7 +2077,9 @@ export const HOVER_LEAN: AnimPreset = {
   track() {
     return null;
   },
-  motions: "Follows the unit's turning, which no fixed pose can hold.",
+  get motions() {
+    return t`Follows the unit's turning, which no fixed pose can hold.`;
+  },
   emit(ctx) {
     const hulls = ctx.pieces("base");
     if (hulls.length === 0) return null;
@@ -1956,15 +2148,20 @@ const STEER_PER_HEADING =
  */
 export const WHEELS_STEER: AnimPreset = {
   id: "wheels.steer",
-  label: "Front wheels steer",
-  description:
-    "Swings the wheels ahead of the middle of the wheels with the unit's turning while it moves, and straightens them when the turn ends.",
+  get label() {
+    return t`Front wheels steer`;
+  },
+  get description() {
+    return t`Swings the wheels ahead of the middle of the wheels with the unit's turning while it moves, and straightens them when the turn ends.`;
+  },
   requires: [{ role: "wheel", count: 1 }],
   animates: ["wheel"],
   params: [
     {
       id: "max",
-      label: "Largest angle",
+      get label() {
+        return t`Largest angle`;
+      },
       unit: "deg",
       min: 0,
       max: 45,
@@ -1976,7 +2173,9 @@ export const WHEELS_STEER: AnimPreset = {
   track() {
     return null;
   },
-  motions: "Follows the unit's turning, which no fixed pose can hold.",
+  get motions() {
+    return t`Follows the unit's turning, which no fixed pose can hold.`;
+  },
   emit(ctx) {
     const front = ctx.wheels().filter((wheel) => wheel.front);
     if (front.length === 0) return null;
@@ -2047,15 +2246,20 @@ const ROCK_LEVEL = 1e-4;
  */
 export const BODY_ROCK: AnimPreset = {
   id: "body.rock",
-  label: "Body rocks on starting and stopping",
-  description:
-    "Pitches the body back as the unit speeds up and forward as it brakes, in proportion to how hard, and eases it level again.",
+  get label() {
+    return t`Body rocks on starting and stopping`;
+  },
+  get description() {
+    return t`Pitches the body back as the unit speeds up and forward as it brakes, in proportion to how hard, and eases it level again.`;
+  },
   requires: [{ role: "base", count: 1 }],
   animates: ["base"],
   params: [
     {
       id: "strength",
-      label: "Lean at full power",
+      get label() {
+        return t`Lean at full power`;
+      },
       unit: "deg",
       min: 0,
       max: 20,
@@ -2067,8 +2271,9 @@ export const BODY_ROCK: AnimPreset = {
   track() {
     return null;
   },
-  motions:
-    "Follows how hard the unit speeds up and brakes, which no fixed pose can hold.",
+  get motions() {
+    return t`Follows how hard the unit speeds up and brakes, which no fixed pose can hold.`;
+  },
   emit(ctx) {
     const bodies = ctx.pieces("base");
     if (bodies.length === 0) return null;
@@ -2143,15 +2348,20 @@ const WAKE_INTERVAL_SECONDS = 0.12;
  */
 export const WAKE_WHILE_MOVING: AnimPreset = {
   id: "wake.moving",
-  label: "Wake while moving",
-  description:
-    "Emits a wake from each wake point while the unit moves, and a reverse wake while it backs up.",
+  get label() {
+    return t`Wake while moving`;
+  },
+  get description() {
+    return t`Emits a wake from each wake point while the unit moves, and a reverse wake while it backs up.`;
+  },
   requires: [{ role: "wake", count: 1 }],
   animates: [],
   params: [
     {
       id: "interval",
-      label: "Time between wakes",
+      get label() {
+        return t`Time between wakes`;
+      },
       unit: "s",
       min: 0.05,
       max: 0.5,
@@ -2163,7 +2373,9 @@ export const WAKE_WHILE_MOVING: AnimPreset = {
   track() {
     return null;
   },
-  motions: "Emits a wake and moves no piece.",
+  get motions() {
+    return t`Emits a wake and moves no piece.`;
+  },
   emit(ctx) {
     const points = ctx.pieces("wake");
     if (points.length === 0) return null;
@@ -2215,15 +2427,20 @@ const GEAR_PREVIEW_HOLD = 1;
  */
 export const LANDING_GEAR: AnimPreset = {
   id: "gear.stow",
-  label: "Landing gear",
-  description:
-    "Stows the landing gear on take off and lowers it on landing, once each.",
+  get label() {
+    return t`Landing gear`;
+  },
+  get description() {
+    return t`Stows the landing gear on take off and lowers it on landing, once each.`;
+  },
   requires: [{ role: "gear", count: 1 }],
   animates: ["gear"],
   params: [
     {
       id: "stow",
-      label: "Stowed angle",
+      get label() {
+        return t`Stowed angle`;
+      },
       unit: "deg",
       min: 10,
       max: 170,
@@ -2232,7 +2449,9 @@ export const LANDING_GEAR: AnimPreset = {
     },
     {
       id: "stowTime",
-      label: "Stowing time",
+      get label() {
+        return t`Stowing time`;
+      },
       unit: "s",
       min: 0.2,
       max: 8,
@@ -2255,8 +2474,9 @@ export const LANDING_GEAR: AnimPreset = {
           : Math.max(0, 1 - (at - time - GEAR_PREVIEW_HOLD) / time);
     return { rotation: [deg(value(this, params, "stow")) * stowed, 0, 0] };
   },
-  motions:
-    "Lowers the gear on landing, and an action that plays once never goes back to rest.",
+  get motions() {
+    return t`Lowers the gear on landing, and an action that plays once never goes back to rest.`;
+  },
   emit(ctx) {
     const gear = ctx.pieces("gear");
     if (gear.length === 0) return null;
@@ -2305,15 +2525,20 @@ export const LANDING_GEAR: AnimPreset = {
  */
 export const ROTOR_SPIN: AnimPreset = {
   id: "rotor.spin",
-  label: "Rotors spin while flying",
-  description:
-    "Spins every rotor from take off to landing, spinning up when the aircraft lifts and winding down when it lands.",
+  get label() {
+    return t`Rotors spin while flying`;
+  },
+  get description() {
+    return t`Spins every rotor from take off to landing, spinning up when the aircraft lifts and winding down when it lands.`;
+  },
   requires: [{ role: "rotor", count: 1 }],
   animates: ["rotor"],
   params: [
     {
       id: "rate",
-      label: "Turns per second",
+      get label() {
+        return t`Turns per second`;
+      },
       unit: "hz",
       min: 0.5,
       max: 10,
@@ -2322,7 +2547,9 @@ export const ROTOR_SPIN: AnimPreset = {
     },
     {
       id: "spinUp",
-      label: "Spin up and down time",
+      get label() {
+        return t`Spin up and down time`;
+      },
       unit: "s",
       min: 0.1,
       max: 8,
@@ -2338,7 +2565,9 @@ export const ROTOR_SPIN: AnimPreset = {
     const angle = t < ramp ? (top * t * t) / (2 * ramp) : top * (t - ramp / 2);
     return { rotation: [0, angle, 0] };
   },
-  motions: "Spins without end, which fixed poses cannot do.",
+  get motions() {
+    return t`Spins without end, which fixed poses cannot do.`;
+  },
   emit(ctx) {
     const rotors = ctx.pieces("rotor");
     if (rotors.length === 0) return null;
@@ -2362,16 +2591,26 @@ export const ROTOR_SPIN: AnimPreset = {
 
 export const BUILDARM: AnimPreset = {
   id: "buildarm",
-  label: "Build arm",
-  description:
-    "Sweeps the arm and keeps the nozzle level, the idle motion of a builder at work.",
+  get label() {
+    return t`Build arm`;
+  },
+  get description() {
+    return t`Sweeps the arm and keeps the nozzle level, the idle motion of a builder at work.`;
+  },
   requires: [{ role: "buildarm.arm", count: 1 }],
-  copies: { per: "instance", noun: "build arms" },
+  copies: {
+    per: "instance",
+    get noun() {
+      return t`build arms`;
+    },
+  },
   animates: ["buildarm.base", "buildarm.arm", "buildarm.nozzle"],
   params: [
     {
       id: "period",
-      label: "Cycle time",
+      get label() {
+        return t`Cycle time`;
+      },
       unit: "s",
       min: 0.5,
       max: 10,
@@ -2380,7 +2619,9 @@ export const BUILDARM: AnimPreset = {
     },
     {
       id: "swing",
-      label: "Base swing",
+      get label() {
+        return t`Base swing`;
+      },
       unit: "deg",
       min: 0,
       max: 90,
@@ -2389,7 +2630,9 @@ export const BUILDARM: AnimPreset = {
     },
     {
       id: "lift",
-      label: "Arm lift",
+      get label() {
+        return t`Arm lift`;
+      },
       unit: "deg",
       min: 0,
       max: 60,
@@ -2462,16 +2705,27 @@ function buildSwing(phase: number, angle: number, speed: number): number {
 
 export const BUILD_AIM: AnimPreset = {
   id: "build.aim",
-  label: "Aim while building",
-  description:
-    "Points the build arm at whatever the unit is building and holds it there until the job stops. A builder only.",
+  get label() {
+    return t`Aim while building`;
+  },
+  get description() {
+    return t`Points the build arm at whatever the unit is building and holds it there until the job stops. A builder only.`;
+  },
   requires: [{ role: "buildarm.arm", count: 1 }],
-  copies: { per: "instance", role: "buildarm.arm", noun: "build arms" },
+  copies: {
+    per: "instance",
+    role: "buildarm.arm",
+    get noun() {
+      return t`build arms`;
+    },
+  },
   animates: ["buildarm.base", "buildarm.arm"],
   params: [
     {
       id: "turnSpeed",
-      label: "Turn speed",
+      get label() {
+        return t`Turn speed`;
+      },
       unit: "deg/s",
       min: 15,
       max: 720,
@@ -2480,7 +2734,9 @@ export const BUILD_AIM: AnimPreset = {
     },
     {
       id: "liftSpeed",
-      label: "Lift speed",
+      get label() {
+        return t`Lift speed`;
+      },
       unit: "deg/s",
       min: 15,
       max: 720,
@@ -2544,8 +2800,9 @@ export const BUILD_AIM: AnimPreset = {
    * that instance's base. Every arm is set turning before any is waited for,
    * so two arms swing together rather than one after the other.
    */
-  motions:
-    "Points at whatever the unit is building, which no fixed pose can hold.",
+  get motions() {
+    return t`Points at whatever the unit is building, which no fixed pose can hold.`;
+  },
   emit(ctx) {
     const turns: string[] = [];
     const waits: string[] = [];
@@ -2606,15 +2863,20 @@ function factoryOpening(
 
 export const BUILD_FACTORY: AnimPreset = {
   id: "build.factory",
-  label: "Factory build cycle",
-  description:
-    "Opens the doors while a factory is building and shuts them when it stops. No aiming: the engine hands a factory nothing to point at.",
+  get label() {
+    return t`Factory build cycle`;
+  },
+  get description() {
+    return t`Opens the doors while a factory is building and shuts them when it stops. No aiming: the engine hands a factory nothing to point at.`;
+  },
   requires: [{ role: "door", count: 1 }],
   animates: ["door"],
   params: [
     {
       id: "open",
-      label: "Opening",
+      get label() {
+        return t`Opening`;
+      },
       unit: "deg",
       min: 10,
       max: FACTORY_MAX_OPEN,
@@ -2623,7 +2885,9 @@ export const BUILD_FACTORY: AnimPreset = {
     },
     {
       id: "openTime",
-      label: "Opening time",
+      get label() {
+        return t`Opening time`;
+      },
       unit: "s",
       min: 0.2,
       max: 8,
@@ -2650,8 +2914,9 @@ export const BUILD_FACTORY: AnimPreset = {
       : Math.max(0, reached - phase / openTime);
     return { rotation: [0, deg(factoryOpening(this, params)) * towards, 0] };
   },
-  motions:
-    "Shuts the doors when the build stops, and an action that plays once never goes back to rest.",
+  get motions() {
+    return t`Shuts the doors when the build stops, and an action that plays once never goes back to rest.`;
+  },
   emit(ctx) {
     const doors = ctx.pieces("door");
     if (doors.length === 0) return null;
@@ -2681,9 +2946,12 @@ export const BUILD_FACTORY: AnimPreset = {
 
 export const BUILD_NANO: AnimPreset = {
   id: "build.nano",
-  label: "Nano from the nozzle",
-  description:
-    "Sends the build spray out of the pieces marked as nano emit points, taking each in turn, rather than out of the model's origin.",
+  get label() {
+    return t`Nano from the nozzle`;
+  },
+  get description() {
+    return t`Sends the build spray out of the pieces marked as nano emit points, taking each in turn, rather than out of the model's origin.`;
+  },
   requires: [{ role: "buildarm.nano", count: 1 }],
   // Moves nothing. It answers a question the engine asks rather than posing
   // the model, which is why there is no track below either.
@@ -2702,7 +2970,9 @@ export const BUILD_NANO: AnimPreset = {
    * is a file-scope local, which is per unit rather than shared: the framework
    * compiles the chunk once and re-runs it in each unit's own environment.
    */
-  motions: "Picks where the build spray comes from and moves no piece.",
+  get motions() {
+    return t`Picks where the build spray comes from and moves no piece.`;
+  },
   emit(ctx) {
     const nano = ctx.pieces("buildarm.nano");
     if (nano.length === 0) return null;
@@ -2723,16 +2993,26 @@ export const BUILD_NANO: AnimPreset = {
 
 export const OPEN_CLOSE: AnimPreset = {
   id: "open.close",
-  label: "Doors",
-  description:
-    "Swings every door open and shut again, for hangars and silo covers.",
+  get label() {
+    return t`Doors`;
+  },
+  get description() {
+    return t`Swings every door open and shut again, for hangars and silo covers.`;
+  },
   requires: [{ role: "door", count: 1 }],
-  copies: { per: "instance", noun: "sets of doors" },
+  copies: {
+    per: "instance",
+    get noun() {
+      return t`sets of doors`;
+    },
+  },
   animates: ["door"],
   params: [
     {
       id: "period",
-      label: "Cycle time",
+      get label() {
+        return t`Cycle time`;
+      },
       unit: "s",
       min: 0.5,
       max: 12,
@@ -2741,7 +3021,9 @@ export const OPEN_CLOSE: AnimPreset = {
     },
     {
       id: "open",
-      label: "Opening",
+      get label() {
+        return t`Opening`;
+      },
       unit: "deg",
       min: 0,
       max: 170,
@@ -2772,16 +3054,26 @@ export const OPEN_CLOSE: AnimPreset = {
 
 export const HOVER_BOB: AnimPreset = {
   id: "hover.bob",
-  label: "Hover and bob",
-  description:
-    "Bobs the body up and down and rocks it gently side to side, the way an aircraft or hovercraft sits while holding position.",
+  get label() {
+    return t`Hover and bob`;
+  },
+  get description() {
+    return t`Bobs the body up and down and rocks it gently side to side, the way an aircraft or hovercraft sits while holding position.`;
+  },
   requires: [{ role: "base", count: 1 }],
-  copies: { per: "instance", noun: "bodies" },
+  copies: {
+    per: "instance",
+    get noun() {
+      return t`bodies`;
+    },
+  },
   animates: ["base"],
   params: [
     {
       id: "period",
-      label: "Cycle time",
+      get label() {
+        return t`Cycle time`;
+      },
       unit: "s",
       min: 0.5,
       max: 8,
@@ -2790,7 +3082,9 @@ export const HOVER_BOB: AnimPreset = {
     },
     {
       id: "height",
-      label: "Bob height",
+      get label() {
+        return t`Bob height`;
+      },
       unit: "m",
       min: 0,
       max: 2,
@@ -2799,7 +3093,9 @@ export const HOVER_BOB: AnimPreset = {
     },
     {
       id: "sway",
-      label: "Rock",
+      get label() {
+        return t`Rock`;
+      },
       unit: "deg",
       min: 0,
       max: 20,
@@ -2831,16 +3127,27 @@ export const HOVER_BOB: AnimPreset = {
 
 export const AIM_TRACK: AnimPreset = {
   id: "aim.track",
-  label: "Aim point",
-  description:
-    "Turns and lifts a single piece to face a target, for a unit with no separate turret and barrel.",
+  get label() {
+    return t`Aim point`;
+  },
+  get description() {
+    return t`Turns and lifts a single piece to face a target, for a unit with no separate turret and barrel.`;
+  },
   requires: [{ role: "aim", count: 1 }],
-  copies: { per: "weapon", role: "aim", noun: "aim points" },
+  copies: {
+    per: "weapon",
+    role: "aim",
+    get noun() {
+      return t`aim points`;
+    },
+  },
   animates: ["aim"],
   params: [
     {
       id: "period",
-      label: "Sweep time",
+      get label() {
+        return t`Sweep time`;
+      },
       unit: "s",
       min: 0.5,
       max: 12,
@@ -2849,7 +3156,9 @@ export const AIM_TRACK: AnimPreset = {
     },
     {
       id: "sweep",
-      label: "Turn",
+      get label() {
+        return t`Turn`;
+      },
       unit: "deg",
       min: 0,
       max: 180,
@@ -2858,7 +3167,9 @@ export const AIM_TRACK: AnimPreset = {
     },
     {
       id: "pitch",
-      label: "Lift",
+      get label() {
+        return t`Lift`;
+      },
       unit: "deg",
       min: 0,
       max: 60,
@@ -2885,8 +3196,9 @@ export const AIM_TRACK: AnimPreset = {
    * Aims rather than loops, so this emits callins instead of a thread, exactly
    * as turret.track does for its own pair of pieces.
    */
-  motions:
-    "Follows the target the weapon aims at, which no fixed pose can hold.",
+  get motions() {
+    return t`Follows the target the weapon aims at, which no fixed pose can hold.`;
+  },
   emit(ctx) {
     const speed = aimSpeeds(this, ctx.params);
     const hooks: EmitResult["hooks"] = {};
@@ -2926,16 +3238,27 @@ export const RECOIL_PREVIEW_PAUSE = 0.6;
 
 export const RECOIL: AnimPreset = {
   id: "recoil",
-  label: "Recoil on firing",
-  description:
-    "Kicks the barrel back along its own bore when the weapon fires, and eases it home. A one-shot, not a loop: the preview repeats it on a timer so there is something to watch.",
+  get label() {
+    return t`Recoil on firing`;
+  },
+  get description() {
+    return t`Kicks the barrel back along its own bore when the weapon fires, and eases it home. A one-shot, not a loop: the preview repeats it on a timer so there is something to watch.`;
+  },
   requires: [{ role: "barrel", count: 1 }],
-  copies: { per: "weapon", role: "barrel", noun: "barrels" },
+  copies: {
+    per: "weapon",
+    role: "barrel",
+    get noun() {
+      return t`barrels`;
+    },
+  },
   animates: ["barrel"],
   params: [
     {
       id: "kick",
-      label: "Kick distance",
+      get label() {
+        return t`Kick distance`;
+      },
       unit: "m",
       min: 0.02,
       max: 1,
@@ -2944,7 +3267,9 @@ export const RECOIL: AnimPreset = {
     },
     {
       id: "kickTime",
-      label: "Kick time",
+      get label() {
+        return t`Kick time`;
+      },
       unit: "s",
       min: 0.02,
       max: 0.3,
@@ -2953,7 +3278,9 @@ export const RECOIL: AnimPreset = {
     },
     {
       id: "returnTime",
-      label: "Return time",
+      get label() {
+        return t`Return time`;
+      },
       unit: "s",
       min: 0.05,
       max: 1.5,
@@ -3064,16 +3391,26 @@ function recoilMotions(preset: AnimPreset, ctx: EmitContext): PresetMotion[] {
 
 export const IDLE_SWAY: AnimPreset = {
   id: "idle.sway",
-  label: "Idle sway",
-  description:
-    "A slow turn back and forth while the unit stands still: a gentle body sway, or a scanning dish if that is what the piece is.",
+  get label() {
+    return t`Idle sway`;
+  },
+  get description() {
+    return t`A slow turn back and forth while the unit stands still: a gentle body sway, or a scanning dish if that is what the piece is.`;
+  },
   requires: [{ role: "base", count: 1 }],
-  copies: { per: "instance", noun: "bodies" },
+  copies: {
+    per: "instance",
+    get noun() {
+      return t`bodies`;
+    },
+  },
   animates: ["base"],
   params: [
     {
       id: "period",
-      label: "Cycle time",
+      get label() {
+        return t`Cycle time`;
+      },
       unit: "s",
       min: 1,
       max: 20,
@@ -3082,7 +3419,9 @@ export const IDLE_SWAY: AnimPreset = {
     },
     {
       id: "turn",
-      label: "Turn",
+      get label() {
+        return t`Turn`;
+      },
       unit: "deg",
       min: 0,
       max: 60,
@@ -3098,8 +3437,9 @@ export const IDLE_SWAY: AnimPreset = {
       rotation: [0, deg(value(this, params, "turn")) * Math.sin(phase), 0],
     };
   },
-  motions:
-    "Starts on Create and whenever the unit stops, and an action has one trigger.",
+  get motions() {
+    return t`Starts on Create and whenever the unit stops, and an action has one trigger.`;
+  },
   emit(ctx) {
     // The opposite of walking: idle motion picks up once the unit stops, and
     // stands down the moment it moves again. It also starts from `Create`,
@@ -3151,15 +3491,20 @@ const SETTLE_STEP_FRAMES = 3;
  */
 export const BODY_SETTLE: AnimPreset = {
   id: "body.settle",
-  label: "Body settles after a shot",
-  description:
-    "Tips the body a little away from the shot each time a weapon fires, and eases it level again.",
+  get label() {
+    return t`Body settles after a shot`;
+  },
+  get description() {
+    return t`Tips the body a little away from the shot each time a weapon fires, and eases it level again.`;
+  },
   requires: [{ role: "base", count: 1 }],
   animates: ["base"],
   params: [
     {
       id: "lean",
-      label: "Lean per shot",
+      get label() {
+        return t`Lean per shot`;
+      },
       unit: "deg",
       min: 0,
       max: 15,
@@ -3168,7 +3513,9 @@ export const BODY_SETTLE: AnimPreset = {
     },
     {
       id: "settle",
-      label: "Settle time",
+      get label() {
+        return t`Settle time`;
+      },
       unit: "s",
       min: 0.05,
       max: 1.5,
@@ -3180,7 +3527,9 @@ export const BODY_SETTLE: AnimPreset = {
   track() {
     return null;
   },
-  motions: "Leans away from each shot, which no fixed pose can hold.",
+  get motions() {
+    return t`Leans away from each shot, which no fixed pose can hold.`;
+  },
   emit(ctx) {
     const bodies = ctx.pieces("base");
     if (bodies.length === 0) return null;
@@ -3256,15 +3605,20 @@ const IDLE_LOOK_POLL_FRAMES = 10;
  */
 export const IDLE_LOOK: AnimPreset = {
   id: "idle.look",
-  label: "Turret looks around when idle",
-  description:
-    "After the unit has stood still without aiming or firing for a while, each turret slowly looks around inside its range. It stops when the unit moves or a weapon aims.",
+  get label() {
+    return t`Turret looks around when idle`;
+  },
+  get description() {
+    return t`After the unit has stood still without aiming or firing for a while, each turret slowly looks around inside its range. It stops when the unit moves or a weapon aims.`;
+  },
   requires: [{ role: "turret", count: 1 }],
   animates: ["turret"],
   params: [
     {
       id: "delay",
-      label: "Idle time before looking",
+      get label() {
+        return t`Idle time before looking`;
+      },
       unit: "s",
       min: 1,
       max: 30,
@@ -3273,7 +3627,9 @@ export const IDLE_LOOK: AnimPreset = {
     },
     {
       id: "speed",
-      label: "Turn speed",
+      get label() {
+        return t`Turn speed`;
+      },
       unit: "deg",
       min: 1,
       max: 90,
@@ -3282,7 +3638,9 @@ export const IDLE_LOOK: AnimPreset = {
     },
     {
       id: "pause",
-      label: "Pause at each look",
+      get label() {
+        return t`Pause at each look`;
+      },
       unit: "s",
       min: 0.1,
       max: 10,
@@ -3291,7 +3649,9 @@ export const IDLE_LOOK: AnimPreset = {
     },
     {
       id: "turn",
-      label: "Turn either side, with no range",
+      get label() {
+        return t`Turn either side, with no range`;
+      },
       unit: "deg",
       min: 5,
       max: 180,
@@ -3303,8 +3663,9 @@ export const IDLE_LOOK: AnimPreset = {
   track() {
     return null;
   },
-  motions:
-    "Waits until the unit has stood still without aiming for a while, which no action trigger does.",
+  get motions() {
+    return t`Waits until the unit has stood still without aiming for a while, which no action trigger does.`;
+  },
   emit(ctx) {
     const turrets = ctx.pieces("turret");
     if (turrets.length === 0) return null;
@@ -3385,15 +3746,20 @@ export const IDLE_LOOK: AnimPreset = {
 
 export const WRECK_POSE: AnimPreset = {
   id: "wreck.pose",
-  label: "Wreck pose",
-  description:
-    "Sinks and tilts the body into the wreck the unit leaves when it dies. Export bakes this pose into the wreck's own model. Not an animation: the piece snaps straight into the pose and stays there.",
+  get label() {
+    return t`Wreck pose`;
+  },
+  get description() {
+    return t`Sinks and tilts the body into the wreck the unit leaves when it dies. Export bakes this pose into the wreck's own model. Not an animation: the piece snaps straight into the pose and stays there.`;
+  },
   requires: [{ role: "base", count: 1 }],
   animates: ["base"],
   params: [
     {
       id: "sink",
-      label: "Sink",
+      get label() {
+        return t`Sink`;
+      },
       unit: "m",
       min: 0,
       max: 1,
@@ -3402,7 +3768,9 @@ export const WRECK_POSE: AnimPreset = {
     },
     {
       id: "tilt",
-      label: "Tilt",
+      get label() {
+        return t`Tilt`;
+      },
       unit: "deg",
       min: 0,
       max: 45,
@@ -3442,7 +3810,9 @@ export const WRECK_POSE: AnimPreset = {
    * because a wreck does not ease into place: it is simply what the unit
    * looks like once it stops being alive.
    */
-  motions: "Plays on Killed, which no action can start from.",
+  get motions() {
+    return t`Plays on Killed, which no action can start from.`;
+  },
   emit(ctx) {
     const base = ctx.pieces("base")[0];
     if (!base) return null;
@@ -3521,15 +3891,20 @@ const BREAK_GRADES: BreakGrade[] = [
 
 export const BREAK_APART: AnimPreset = {
   id: "wreck.breakApart",
-  label: "Break apart",
-  description:
-    "When the unit dies it comes apart along its joins. A light hit throws off a few of the biggest groups of parts, a heavy hit throws off every part one by one, smallest first, and the wreck follows what the hit left. A unit with no joins breaks along its piece tree.",
+  get label() {
+    return t`Break apart`;
+  },
+  get description() {
+    return t`When the unit dies it comes apart along its joins. A light hit throws off a few of the biggest groups of parts, a heavy hit throws off every part one by one, smallest first, and the wreck follows what the hit left. A unit with no joins breaks along its piece tree.`;
+  },
   requires: [],
   animates: [],
   params: [
     {
       id: "amount",
-      label: "How much breaks off",
+      get label() {
+        return t`How much breaks off`;
+      },
       unit: "%",
       min: 10,
       max: 100,
@@ -3538,7 +3913,9 @@ export const BREAK_APART: AnimPreset = {
     },
     {
       id: "light",
-      label: "Light hit up to",
+      get label() {
+        return t`Light hit up to`;
+      },
       unit: "%",
       min: 1,
       max: 100,
@@ -3547,7 +3924,9 @@ export const BREAK_APART: AnimPreset = {
     },
     {
       id: "medium",
-      label: "Medium hit up to",
+      get label() {
+        return t`Medium hit up to`;
+      },
       unit: "%",
       min: 1,
       max: 200,
@@ -3574,7 +3953,9 @@ export const BREAK_APART: AnimPreset = {
    * edit it. Every `if` returns, so `buildLuaScript` leaves out the
    * `Explode` and `return 1` it writes for a unit with nothing in `Killed`.
    */
-  motions: "Throws pieces off when the unit dies, which no action can do.",
+  get motions() {
+    return t`Throws pieces off when the unit dies, which no action can do.`;
+  },
   emit(ctx) {
     const root = ctx.root;
     if (!root) return null;
@@ -3778,8 +4159,11 @@ export function restAngleWarnings(piece: {
     const nearest = Math.round(degrees / 90) * 90;
     if (Math.abs(degrees - nearest) <= REST_ANGLE_TOLERANCE_DEG) continue;
     const clean = ((nearest % 360) + 360) % 360;
+    const role = roleLabel(piece.role);
+    const letter = AXIS_LETTERS[axis];
+    const rest = formatFixed(degrees, 1);
     warnings.push(
-      `${roleLabel(piece.role)} turns about ${AXIS_LETTERS[axis]}, and this piece's rest rotation there is ${formatFixed(degrees, 1)}°, not a right angle. A hand-edited Turn call may not land where it looks like it should. The nearest clean angle is ${clean}°.`,
+      t`${role} turns about ${letter}, and this piece's rest rotation there is ${rest}°, not a right angle. A hand-edited Turn call may not land where it looks like it should. The nearest clean angle is ${clean}°.`,
     );
   }
   return warnings;

@@ -23,6 +23,7 @@
  * double the latency of every scrub.
  */
 
+import { t } from "@lingui/core/macro";
 import { type DriveFrame, headingRadians, scriptDrive } from "./drive";
 import type { GroundShape } from "./environment";
 import {
@@ -265,8 +266,10 @@ export function resolveScenario(
       ? standInMid(track, event.frame, ctx.radius, ctx.ground)
       : null;
     if (!track || !target) {
+      const callinName = event.callin ?? "";
+      const frame = event.frame;
       notes.push(
-        `${event.callin} aims at a stand-in, and this scenario places no stand-in on frame ${event.frame}. It is aimed straight ahead instead.`,
+        t`${callinName} aims at a stand-in, and this scenario places no stand-in on frame ${frame}. It is aimed straight ahead instead.`,
       );
       return [{ ...rest, args: [0, 0] }];
     }
@@ -352,7 +355,7 @@ function anglesFor(
   const at = piece ? ctx.pieceRest.get(piece) : undefined;
   if (!at) {
     notes.push(
-      `This script names no ${callin} piece, so the aim is measured from the unit's origin rather than from where its weapon sits.`,
+      t`This script names no ${callin} piece, so the aim is measured from the unit's origin rather than from where its weapon sits.`,
     );
   }
   return (target, frame) => {
@@ -459,7 +462,11 @@ function keptAiming(
         const was = holding;
         holding = fault === null;
         if (!holding) {
-          note ??= `${reach.name} (weapon ${number}) stopped aiming on frame ${frame}: the target is ${fault === "range" ? "out of range" : "outside its arc"}.`;
+          const weaponName = reach.name;
+          note ??=
+            fault === "range"
+              ? t`${weaponName} (weapon ${number}) stopped aiming on frame ${frame}: the target is out of range.`
+              : t`${weaponName} (weapon ${number}) stopped aiming on frame ${frame}: the target is outside its arc.`;
         }
         // Picking the target up again aims at once.
         if (holding && !was) last = null;
@@ -497,8 +504,10 @@ function putDown(
   const pose =
     track && marker ? standInAt(track, marker.frame, radius, ground) : null;
   if (!pose) {
+    const callinName = event.callin ?? "";
+    const markerFrame = marker?.frame ?? 0;
     notes.push(
-      `${event.callin} puts the stand-in down where it stood on frame ${marker?.frame}, and this scenario places no stand-in then. It is put down at the unit's origin instead.`,
+      t`${callinName} puts the stand-in down where it stood on frame ${markerFrame}, and this scenario places no stand-in then. It is put down at the unit's origin instead.`,
     );
     return { ...rest, args: [STAND_IN_UNIT_ID, 0, 0, 0] };
   }

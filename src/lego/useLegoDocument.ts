@@ -10,6 +10,7 @@
  * page's concern: see `BuilderPage.tsx` and `clipboard.ts`.
  */
 
+import { t } from "@lingui/core/macro";
 import { useCallback, useEffect, useReducer, useRef, useState } from "react";
 import { notify } from "@/notify/notify";
 import {
@@ -279,7 +280,7 @@ export function useLegoDocument(
     edit(() => claimForLoadout(inserted.project, inserted.rootPieceIds));
     const said = describePresets(inserted.presets);
     if (said)
-      void notify({ title: "Module animations", body: said, level: "info" });
+      void notify({ title: t`Module animations`, body: said, level: "info" });
     return {
       rootPieceIds: inserted.rootPieceIds,
       held: inserted.presets.held,

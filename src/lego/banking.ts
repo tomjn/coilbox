@@ -24,6 +24,7 @@
  * The preview's roll is an illustration of these rules, not the flight model.
  */
 
+import { t } from "@lingui/core/macro";
 import type { FlightStyle, LegoMovement } from "./model";
 
 /** One banking key: its spelling in the definition and the engine's default. */
@@ -51,48 +52,72 @@ export interface BankingValues {
 const GUNSHIP_KEYS: BankingKey[] = [
   {
     key: "bankingAllowed",
-    label: "Banking allowed",
+    get label() {
+      return t`Banking allowed`;
+    },
     engineDefault: true,
     source: "UnitDef.cpp:522",
-    unit: "on or off",
+    get unit() {
+      return t`on or off`;
+    },
   },
 ];
 
 const PLANE_KEYS: BankingKey[] = [
   {
     key: "maxBank",
-    label: "Max bank",
+    get label() {
+      return t`Max bank`;
+    },
     engineDefault: 0.8,
     source: "UnitDef.cpp:559",
-    unit: "the sine of the roll angle, so 0.8 is 53 degrees",
+    get unit() {
+      return t`the sine of the roll angle, so 0.8 is 53 degrees`;
+    },
   },
   {
     key: "maxPitch",
-    label: "Max pitch",
+    get label() {
+      return t`Max pitch`;
+    },
     engineDefault: 0.45,
     source: "UnitDef.cpp:560",
-    unit: "the sine of the pitch angle, so 0.45 is 27 degrees",
+    get unit() {
+      return t`the sine of the pitch angle, so 0.45 is 27 degrees`;
+    },
   },
   {
     key: "maxAileron",
-    label: "Max aileron",
+    get label() {
+      return t`Max aileron`;
+    },
     engineDefault: 0.015,
     source: "UnitDef.cpp:564",
-    unit: "roll speed per elmo a frame of flying speed",
+    get unit() {
+      return t`roll speed per elmo a frame of flying speed`;
+    },
   },
   {
     key: "maxElevator",
-    label: "Max elevator",
+    get label() {
+      return t`Max elevator`;
+    },
     engineDefault: 0.01,
     source: "UnitDef.cpp:565",
-    unit: "pitch speed per elmo a frame of flying speed",
+    get unit() {
+      return t`pitch speed per elmo a frame of flying speed`;
+    },
   },
   {
     key: "maxRudder",
-    label: "Max rudder",
+    get label() {
+      return t`Max rudder`;
+    },
     engineDefault: 0.004,
     source: "UnitDef.cpp:566",
-    unit: "turn speed per elmo a frame of flying speed",
+    get unit() {
+      return t`turn speed per elmo a frame of flying speed`;
+    },
   },
 ];
 

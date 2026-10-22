@@ -34,12 +34,13 @@
  * measure one from, so a door is added by hand with the Door role.
  */
 
+import { t } from "@lingui/core/macro";
 import type { BodyPlan, BodyPlanBone, BodyPlanProportion } from "./bodyPlans";
 import { between, rise } from "./planMeasure";
 
 function elmos(
   id: string,
-  label: string,
+  label: () => string,
   min: number,
   max: number,
   fallback: number,
@@ -47,7 +48,9 @@ function elmos(
 ): BodyPlanProportion {
   return {
     id,
-    label,
+    get label() {
+      return label();
+    },
     unit: "elmo",
     min,
     max,
@@ -73,7 +76,7 @@ const BASE: BodyPlanBone = {
  */
 export const TURRET_HEIGHT = elmos(
   "turretHeight",
-  "Turret height",
+  () => t`Turret height`,
   0,
   45,
   13.7,
@@ -84,7 +87,7 @@ export const TURRET_HEIGHT = elmos(
 );
 export const BARREL_LENGTH = elmos(
   "barrelLength",
-  "Barrel length",
+  () => t`Barrel length`,
   5,
   160,
   41.1,
@@ -93,10 +96,14 @@ export const BARREL_LENGTH = elmos(
 
 export const TURRET_BUILDING: BodyPlan = {
   id: "turret.building",
-  label: "Turret building",
-  description: "A gun turret on a base that does not move.",
+  get label() {
+    return t`Turret building`;
+  },
+  get description() {
+    return t`A gun turret on a base that does not move.`;
+  },
   proportions: [
-    elmos("baseHeight", "Base height", 20, 225, 41, {
+    elmos("baseHeight", () => t`Base height`, 20, 225, 41, {
       bone: "turret",
       axis: 1,
     }),
@@ -144,8 +151,12 @@ export const TURRET_BUILDING: BodyPlan = {
 
 export const BUILDING: BodyPlan = {
   id: "building",
-  label: "Building",
-  description: "A base that does not move, with nothing to animate.",
+  get label() {
+    return t`Building`;
+  },
+  get description() {
+    return t`A base that does not move, with nothing to animate.`;
+  },
   proportions: [],
   bones() {
     return [BASE];
