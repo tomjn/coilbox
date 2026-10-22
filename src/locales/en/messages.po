@@ -1590,6 +1590,34 @@ msgstr "{converted, plural, one {# piece was drawn as quads or a triangle strip 
 msgid "{converts} of these are said in {chosenSide} now."
 msgstr "{converts} of these are said in {chosenSide} now."
 
+#: src/lego/animPresets.ts
+msgid "{copies, plural, one {# aim point} other {# aim points}}"
+msgstr "{copies, plural, one {# aim point} other {# aim points}}"
+
+#: src/lego/animPresets.ts
+msgid "{copies, plural, one {# barrel} other {# barrels}}"
+msgstr "{copies, plural, one {# barrel} other {# barrels}}"
+
+#: src/lego/animPresets.ts
+msgid "{copies, plural, one {# body} other {# bodies}}"
+msgstr "{copies, plural, one {# body} other {# bodies}}"
+
+#: src/lego/animPresets.ts
+msgid "{copies, plural, one {# build arm} other {# build arms}}"
+msgstr "{copies, plural, one {# build arm} other {# build arms}}"
+
+#: src/lego/animPresets.ts
+msgid "{copies, plural, one {# set of doors} other {# sets of doors}}"
+msgstr "{copies, plural, one {# set of doors} other {# sets of doors}}"
+
+#: src/lego/animPresets.ts
+msgid "{copies, plural, one {# set of legs} other {# sets of legs}}"
+msgstr "{copies, plural, one {# set of legs} other {# sets of legs}}"
+
+#: src/lego/animPresets.ts
+msgid "{copies, plural, one {# turret} other {# turrets}}"
+msgstr "{copies, plural, one {# turret} other {# turrets}}"
+
 #: src/blueprint/pages/components/LeavingPack.tsx
 msgid "{count, plural, =0 {Write them into a game's file} one {Write # blueprint into a game's file} other {Write # blueprints into a game's file}}"
 msgstr "{count, plural, =0 {Write them into a game's file} one {Write # blueprint into a game's file} other {Write # blueprints into a game's file}}"
@@ -1627,6 +1655,7 @@ msgid "{count, plural, one {# blocker would reach whoever plays this broken, so 
 msgstr "{count, plural, one {# blocker would reach whoever plays this broken, so it was not packaged: {blockers}} other {# blockers would reach whoever plays this broken, so it was not packaged: {blockers}}}"
 
 #: src/blueprint/pages/components/SubstitutionPanel.tsx
+#: src/lib/scenarioEditing/layoutPlacing.ts
 #: src/scenario/pages/components/contents.ts
 msgid "{count, plural, one {# building} other {# buildings}}"
 msgstr "{count, plural, one {# building} other {# buildings}}"
@@ -4303,8 +4332,8 @@ msgid "{pieceName} has no texture recorded from the model it came from, so it ca
 msgstr "{pieceName} has no texture recorded from the model it came from, so it cannot go on this unit's texture sheet."
 
 #: src/lego/pages/components/GameScriptPanel.tsx
-msgid "{pieceName} is {role}"
-msgstr "{pieceName} is {role}"
+msgid "{pieceName} is {roleName}"
+msgstr "{pieceName} is {roleName}"
 
 #: src/lego/pages/components/GameUnitBrowser.tsx
 msgid "{pieceName} is not in this model."
@@ -4439,8 +4468,8 @@ msgid "{presetGame} on {presetMap}"
 msgstr "{presetGame} on {presetMap}"
 
 #: src/lego/pages/components/AnimationPanel.tsx
-msgid "{presetLabel}, {copies} {copyNoun}"
-msgstr "{presetLabel}, {copies} {copyNoun}"
+msgid "{presetLabel}, {copyCount}"
+msgstr "{presetLabel}, {copyCount}"
 
 #: src/lego/pages/components/AnimationPanel.tsx
 msgid "{presetLabel}: {paramLabel}"
@@ -4618,6 +4647,10 @@ msgstr "{ringCount, plural, one {# copy} other {# copies}}"
 msgid "{role} turns about {letter}, and this piece's rest rotation there is {rest}°, not a right angle. A hand-edited Turn call may not land where it looks like it should. The nearest clean angle is {clean}°."
 msgstr "{role} turns about {letter}, and this piece's rest rotation there is {rest}°, not a right angle. A hand-edited Turn call may not land where it looks like it should. The nearest clean angle is {clean}°."
 
+#: src/lego/animPresets.ts
+msgid "{roleId, select, buildarm_nano {nano emit point} aim {aim point} flare {muzzle flare} turret {turret} barrel {barrel} buildarm_base {build arm base} buildarm_arm {build arm} wheel {wheel} other {{label}}}"
+msgstr "{roleId, select, buildarm_nano {nano emit point} aim {aim point} flare {muzzle flare} turret {turret} barrel {barrel} buildarm_base {build arm base} buildarm_arm {build arm} wheel {wheel} other {{label}}}"
+
 #: src/runlite/unitLimit.ts
 msgid "{rootCount, plural, one {{sideName} has no usable start unit in {gameName}, so the unit limit is based on the # mobile unit that can build and that no other unit builds or morphs into.} other {{sideName} has no usable start unit in {gameName}, so the unit limit is based on the # mobile units that can build and that no other unit builds or morphs into.}}"
 msgstr "{rootCount, plural, one {{sideName} has no usable start unit in {gameName}, so the unit limit is based on the # mobile unit that can build and that no other unit builds or morphs into.} other {{sideName} has no usable start unit in {gameName}, so the unit limit is based on the # mobile units that can build and that no other unit builds or morphs into.}}"
@@ -4710,13 +4743,13 @@ msgstr "{segment, select, thigh {Left thigh, pair {pair}} shin {Left shin, pair 
 msgid "{segment, select, thigh {Right thigh, pair {pair}} shin {Right shin, pair {pair}} foot {Right foot, pair {pair}} other {Right {segment}, pair {pair}}}"
 msgstr "{segment, select, thigh {Right thigh, pair {pair}} shin {Right shin, pair {pair}} foot {Right foot, pair {pair}} other {Right {segment}, pair {pair}}}"
 
+#: src/lego/pages/components/SetPanel.tsx
+msgid "{selectedCount, plural, one {# piece selected} other {# pieces selected}}"
+msgstr "{selectedCount, plural, one {# piece selected} other {# pieces selected}}"
+
 #: src/content/pages/components/UnitPicker.tsx
 msgid "{selectedCount} of {totalCount} {selectedWord}"
 msgstr "{selectedCount} of {totalCount} {selectedWord}"
-
-#: src/lego/pages/components/SetPanel.tsx
-msgid "{selectedCount} pieces selected"
-msgstr "{selectedCount} pieces selected"
 
 #: src/conquest/pages/ConquestListPage.tsx
 msgid "{selectedName} plays Conquest only on the maps the game carries. Pick one from the Conquest list."
@@ -8113,10 +8146,6 @@ msgid "Aim point"
 msgstr "Aim point"
 
 #: src/lego/animPresets.ts
-msgid "aim points"
-msgstr "aim points"
-
-#: src/lego/animPresets.ts
 msgid "Aim while building"
 msgstr "Aim while building"
 
@@ -9724,10 +9753,6 @@ msgstr "Barrel length"
 msgid "Barrel lift"
 msgstr "Barrel lift"
 
-#: src/lego/animPresets.ts
-msgid "barrels"
-msgstr "barrels"
-
 #: src/scenario/validate.ts
 msgid "Base"
 msgstr "Base"
@@ -10177,10 +10202,6 @@ msgid "Bobs the body up and down and rocks it gently side to side, the way an ai
 msgstr "Bobs the body up and down and rocks it gently side to side, the way an aircraft or hovercraft sits while holding position."
 
 #: src/lego/animPresets.ts
-msgid "bodies"
-msgstr "bodies"
-
-#: src/lego/animPresets.ts
 msgid "Body"
 msgstr "Body"
 
@@ -10508,10 +10529,6 @@ msgstr "Build arm"
 #: src/lego/animPresets.ts
 msgid "Build arm base"
 msgstr "Build arm base"
-
-#: src/lego/animPresets.ts
-msgid "build arms"
-msgstr "build arms"
 
 #: src/lego/pages/components/AnimationPanel.tsx
 msgid "Build distance"
@@ -20359,6 +20376,10 @@ msgstr "In the unit definition"
 msgid "In this project"
 msgstr "In this project"
 
+#: src/lib/scenarioEditing/layoutPlacing.ts
+msgid "In this scenario"
+msgstr "In this scenario"
+
 #: src/scenario/pages/components/mapKeyboard.ts
 msgid "in water too deep for it, in cyan"
 msgstr "in water too deep for it, in cyan"
@@ -26398,6 +26419,7 @@ msgstr "Not only the row you had in mind. uberserver removes every ban matching 
 msgid "Not opened yet"
 msgstr "Not opened yet"
 
+#: src/lib/scenarioEditing/layoutPlacing.ts
 #: src/scenario/pages/components/BlueprintPanel.tsx
 msgid "not placed"
 msgstr "not placed"
@@ -33629,14 +33651,6 @@ msgstr "Sets a variable to a number, or to what another variable holds."
 #: src/content/pages/components/ReplaySetPicker.tsx
 msgid "Sets for this replay"
 msgstr "Sets for this replay"
-
-#: src/lego/animPresets.ts
-msgid "sets of doors"
-msgstr "sets of doors"
-
-#: src/lego/animPresets.ts
-msgid "sets of legs"
-msgstr "sets of legs"
 
 #: src/scenario/triggerTypes.ts
 msgid "Sets what a team is paid per second from now on. A negative number bleeds it instead."
@@ -40886,10 +40900,6 @@ msgstr "Turret looks around when idle"
 msgid "Turret sweep"
 msgstr "Turret sweep"
 
-#: src/lego/animPresets.ts
-msgid "turrets"
-msgstr "turrets"
-
 #: src/workshop/pages/components/DecodeTweakSetDrawer.tsx
 msgid "Tweak payload to decode"
 msgstr "Tweak payload to decode"
@@ -43933,6 +43943,10 @@ msgstr "Your internet traffic goes through a VPN ({interfaceName}). Everything y
 #: src/direct/VpnWarning.tsx
 msgid "Your internet traffic goes through a VPN ({interfaceName}). Players may not be able to reach you directly, and everything anybody sends you goes through the VPN's server first, so pings will be worse for the whole battle. Turn the VPN off while you play."
 msgstr "Your internet traffic goes through a VPN ({interfaceName}). Players may not be able to reach you directly, and everything anybody sends you goes through the VPN's server first, so pings will be worse for the whole battle. Turn the VPN off while you play."
+
+#: src/lib/scenarioEditing/layoutPlacing.ts
+msgid "Your library"
+msgstr "Your library"
 
 #: src/home/groupDescription.ts
 msgid "Your maps, games and blueprints, what other players have shared, and what is downloading."

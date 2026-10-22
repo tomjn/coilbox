@@ -89,7 +89,7 @@ export function convertPresetToAction(
   motions.forEach((motion, index) => {
     const name = freeActionName(
       next,
-      motions.length > 1 ? `${preset.label} ${index + 1}` : preset.label,
+      motions.length > 1 ? `${preset.label} ${index + 1}` : preset.label, // i18n: not a plural
     );
     const id = convertedActionId(base, index + 1);
     const keys = motion.keys.map((key, at) => {

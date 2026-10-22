@@ -65,6 +65,7 @@ i18n_extract_check() {
 
 js_lane() {
   run_check biome bunx biome ci .
+  run_check plural-check scripts/plural-check.sh
   run_check i18n-extract i18n_extract_check
   run_check typecheck bun run typecheck
   run_check test bun run test

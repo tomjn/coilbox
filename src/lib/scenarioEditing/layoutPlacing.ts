@@ -24,6 +24,7 @@
  * that uses them is `modes.tsx`.
  */
 
+import { plural, t } from "@lingui/core/macro";
 import type { SnapBuilding } from "@/blueprint/footprint";
 import { recordGameName, type StoredBlueprint } from "@/blueprint/library";
 import type { BlueprintBuilding } from "@/blueprint/model";
@@ -135,9 +136,9 @@ export interface LayoutOption {
   disabled?: boolean;
 }
 
-/** "1 building" or "3 buildings", so a description reads as English. */
-function buildings(n: number): string {
-  return `${n} building${n === 1 ? "" : "s"}`;
+/** "1 building" or "3 buildings" in the app language. */
+function buildings(count: number): string {
+  return plural(count, { one: "# building", other: "# buildings" });
 }
 
 /**
@@ -162,9 +163,9 @@ export function layoutOptions(
     value: layoutChoiceKey({ from: "scenario", id: layout.id }),
     label: layout.name,
     description: [
-      "In this scenario",
+      t`In this scenario`,
       buildings(layout.buildings.length),
-      placed.has(layout.id) ? null : "not placed",
+      placed.has(layout.id) ? null : t`not placed`,
     ]
       .filter(Boolean)
       .join(" · "),
@@ -178,7 +179,7 @@ export function layoutOptions(
       value: layoutChoiceKey({ from: "library", id: record.id }),
       label: record.layout.name,
       description: [
-        "Your library",
+        t`Your library`,
         buildings(record.layout.buildings.length),
         mismatch ? game : null,
       ]

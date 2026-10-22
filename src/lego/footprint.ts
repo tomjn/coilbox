@@ -11,8 +11,8 @@
  */
 
 import { plural, t } from "@lingui/core/macro";
-import { formatNumber } from "@/lib/format";
-import { roleLabel } from "./animPresets";
+import { formatList, formatNumber } from "@/lib/format";
+import { roleNoun } from "./animPresets";
 import { SAME_POSITION } from "./balance";
 import type { LegoProject } from "./model";
 import type { LoadedPack } from "./pack";
@@ -207,9 +207,7 @@ export function footprintLines(result: FootprintResult): string[] {
     t`Footprint ${nowX}x${nowZ} steps, ${elmosX} by ${elmosZ} elmos.`,
   ];
   if (result.outlying.length > 0) {
-    const names = result.outlyingRoles
-      .map((role) => roleLabel(role).toLowerCase())
-      .join(", ");
+    const names = formatList(result.outlyingRoles.map(roleNoun), "conjunction");
     const baseX = base.x;
     const baseZ = base.z;
     lines.push(t`Without ${names}: ${baseX}x${baseZ}.`);

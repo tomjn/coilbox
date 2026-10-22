@@ -30,6 +30,10 @@ jobs:
         run: bun install --frozen-lockfile
       - name: Biome (lint + format check)
         run: bunx biome ci .
+      # An English plural built by hand cannot be translated. Counts go through
+      # an ICU plural message (#4605).
+      - name: No hand-rolled plurals
+        run: scripts/plural-check.sh
       - name: Typecheck
         run: bun run typecheck
       # A translatable string added, changed or removed without re-running

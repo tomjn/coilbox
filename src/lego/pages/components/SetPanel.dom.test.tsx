@@ -165,7 +165,7 @@ describe("the parent picker", () => {
     // and there is no move to offer.
     show(["root"]);
     expect(hangsOff()).toBeNull();
-    expect(document.body.textContent).toContain("1 pieces selected");
+    expect(document.body.textContent).toContain("1 piece selected");
   });
 
   it("shows the parent the set shares", () => {

@@ -210,7 +210,7 @@ function locate(p: Point, solid: Solid): Where {
   }
   let ray = unsure.findIndex((flag) => !flag);
   if (ray < 0) ray = 0;
-  return hits[ray] % 2 === 1 ? "inside" : "outside";
+  return hits[ray] % 2 === 1 ? "inside" : "outside"; // i18n: not a plural
 }
 
 interface Candidate {

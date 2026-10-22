@@ -89,7 +89,7 @@ function withAnchors(
 function nextName(anchors: readonly LegoAnchor[]): string {
   const taken = new Set(anchors.map((anchor) => anchor.name));
   for (let n = 1; ; n++) {
-    const name = n === 1 ? "anchor" : `anchor${n}`;
+    const name = n === 1 ? "anchor" : `anchor${n}`; // i18n: not a plural
     if (!taken.has(name)) return name;
   }
 }

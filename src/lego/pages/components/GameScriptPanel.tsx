@@ -28,7 +28,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import type { AdoptedScript } from "../../adoptGameScript";
-import { roleLabel } from "../../animPresets";
+import { roleNoun } from "../../animPresets";
 import type { RoleProposal } from "../../inferRoles";
 
 interface Props {
@@ -164,7 +164,8 @@ function Found({
               </p>
               {rows.map((row) => {
                 const pieceName = row.pieceName;
-                const role = roleLabel(row.role).toLowerCase();
+                const roleName = roleNoun(row.role);
+                const sentence = t`${pieceName} is ${roleName}`;
                 return (
                   <div key={row.pieceName} className="flex items-center gap-2">
                     <Checkbox
@@ -176,9 +177,7 @@ function Found({
                       htmlFor={`role-${row.pieceName}`}
                       className="text-xs font-normal"
                     >
-                      <Trans>
-                        {pieceName} is {role}
-                      </Trans>
+                      {sentence}
                     </Label>
                     <code className="ml-auto text-[0.6875rem] text-muted-foreground">
                       {row.callin}

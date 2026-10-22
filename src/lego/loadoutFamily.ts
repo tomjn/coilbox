@@ -176,7 +176,7 @@ export function loadoutFamily(
     return {
       id,
       kind: "mount",
-      label: (labelCount.get(label) ?? 0) > 1 ? `${pieceName} ${label}` : label,
+      label: (labelCount.get(label) ?? 0) > 1 ? `${pieceName} ${label}` : label, // i18n: not a plural
       cells,
       differs: !allSame(cells),
       ...mountChanges(cells),
