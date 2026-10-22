@@ -6,7 +6,7 @@
  */
 
 /** `en` is the source language, and the fallback for any tag nothing matches. */
-export const LOCALES = ["en", "fr", "de", "es", "pl", "ja", "zh-Hans"] as const;
+export const LOCALES = ["en", "fr", "de", "es", "pl", "uk", "ja", "zh-Hans"] as const;
 
 export type LocaleCode = (typeof LOCALES)[number];
 
