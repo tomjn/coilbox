@@ -16,6 +16,7 @@ import { Switch } from "@/components/ui/switch";
 import { FactionLogo } from "@/factions/FactionLogo";
 import type { FactionLogoSrc } from "@/factions/fallback";
 import { useFactionLogos } from "@/factions/logos";
+import { describeError } from "@/i18n/uiError";
 import { StartingUnits } from "../../campaign/pages/components/StartingUnits";
 import { carryUnits } from "../../campaign/units";
 import { ChallengeRecordLine } from "../../challenge/ChallengeRecordLine";
@@ -540,7 +541,7 @@ function GalaxyScreen({
       try {
         await writeState(galaxyId, next);
       } catch (e) {
-        const reason = e instanceof Error ? e.message : String(e);
+        const reason = describeError(e);
         setSaveError(t`Nothing was changed. ${reason}`);
       }
     },
@@ -1505,7 +1506,7 @@ export function RunSetupPanel({
           try {
             await onStart(effectiveSide, units);
           } catch (e) {
-            const reason = e instanceof Error ? e.message : String(e);
+            const reason = describeError(e);
             setStartError(t`The conquest was not started. ${reason}`);
           } finally {
             setBusy(false);

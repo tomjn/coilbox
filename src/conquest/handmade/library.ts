@@ -1,4 +1,5 @@
 import { t } from "@lingui/core/macro";
+import { describeError } from "@/i18n/uiError";
 import {
   assetUrl,
   conquestMapStagingUrl,
@@ -682,5 +683,5 @@ export async function removeHandmadeMap(id: string): Promise<void> {
 }
 
 function messageOf(e: unknown): string {
-  return e instanceof Error ? e.message : String(e);
+  return describeError(e);
 }

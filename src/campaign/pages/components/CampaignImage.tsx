@@ -4,6 +4,7 @@ import { open } from "@tauri-apps/plugin-dialog";
 import { ImageIcon, Milestone, Trash2 } from "lucide-react";
 import { type ReactNode, useState } from "react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { describeError } from "@/i18n/uiError";
 import { IMAGE_EXTS, mediaKind, VIDEO_EXTS } from "../../../lib/assetUrl";
 import {
   type CampaignImageKind,
@@ -192,7 +193,7 @@ export function CampaignImageField({
           : await campaignImageImport({ campaignId, srcPath: src, kind });
       onChange({ kind: "file", file });
     } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
+      setError(describeError(e));
     }
   };
 

@@ -4,6 +4,7 @@ import type { ReactNode } from "react";
 import { useMemo, useState } from "react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import type { ConfigOption } from "@/content/bindings";
+import { describeError } from "@/i18n/uiError";
 import { deliverySlots } from "@/multiplayer/battle/tweakDelivery";
 import { notify } from "@/notify/notify";
 import { deliveryRoutes } from "@/workshop/deliveryRoutes";
@@ -179,7 +180,7 @@ export function PresetTweaksView({
       }
       onApply(slots, project);
     } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
+      setError(describeError(e));
     } finally {
       setPacking(null);
     }

@@ -16,6 +16,7 @@ import {
   useUnitsyncArchiveTree,
   useUnitsyncScan,
 } from "@/content/config";
+import { describeError } from "@/i18n/uiError";
 import { formatBytes } from "@/lib/format";
 import { usePreferredTarget } from "@/play/config";
 import {
@@ -230,7 +231,7 @@ export function ArchiveMediaImportButton({
       setOpen(false);
       reset();
     } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
+      setError(describeError(e));
     } finally {
       setBusy(false);
     }

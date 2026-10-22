@@ -3,6 +3,7 @@ import { Button, Input, useDrawer } from "@picoframe/frame";
 import { Plus, RefreshCw, X } from "lucide-react";
 import { useMemo, useState } from "react";
 import { Link } from "react-router";
+import { describeError } from "@/i18n/uiError";
 import type { LegoProject } from "@/lego/model";
 import { loadPack } from "@/lego/pack";
 import { useLegoProjects } from "@/lego/projects";
@@ -181,7 +182,7 @@ export function CampaignUnits({
     try {
       await task();
     } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
+      setError(describeError(e));
     } finally {
       setBusy(null);
     }

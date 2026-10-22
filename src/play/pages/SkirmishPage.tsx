@@ -49,6 +49,7 @@ import {
 } from "@/content/resolveContent";
 import { hostBlockedReason, NEW_ROOM_TARGET } from "@/direct/room";
 import { useFactionLogos } from "@/factions/logos";
+import { describeError } from "@/i18n/uiError";
 import { withoutGeneratedGames } from "@/lib/generatedGames";
 import { useMyTeamColor } from "@/lib/useMyTeamColor";
 import { liveRoomKey } from "@/multiplayer/connections";
@@ -746,7 +747,7 @@ export default function SkirmishPage() {
         recordResult: recordPresetResult,
       });
     } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
+      setError(describeError(e));
     }
   }
 
@@ -903,7 +904,7 @@ export default function SkirmishPage() {
         dest,
       });
     } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
+      setError(describeError(e));
     }
   }
 
@@ -946,7 +947,7 @@ export default function SkirmishPage() {
       rememberCarriedShortname(identify(json).game);
       setPendingPreset(parsed);
     } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
+      setError(describeError(e));
     }
   }
 

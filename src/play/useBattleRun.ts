@@ -1,5 +1,6 @@
 import { t } from "@lingui/core/macro";
 import { useCallback, useEffect, useRef, useState } from "react";
+import { describeError } from "@/i18n/uiError";
 import { composeUnits, type UnitsOwner } from "../campaign/units";
 import type { GameRef, NodeScenario } from "../conquest/model";
 import type { SkirmishAi } from "../content/bindings";
@@ -250,7 +251,7 @@ export function useBattleRun<TResolved>(opts: UseBattleRunOptions<TResolved>) {
       try {
         await onGameChoice(choice);
       } catch (e) {
-        setError(e instanceof Error ? e.message : String(e));
+        setError(describeError(e));
       } finally {
         setChoosing(false);
       }
@@ -296,7 +297,7 @@ export function useBattleRun<TResolved>(opts: UseBattleRunOptions<TResolved>) {
         setAutoDetected(auto);
         setPhase(outcome);
       } catch (e) {
-        setError(e instanceof Error ? e.message : String(e));
+        setError(describeError(e));
         // Never strand the player on "checking": fall back to the manual
         // prompt, which shows this error and offers the buttons again.
         setPhase("result");
@@ -479,7 +480,7 @@ export function useBattleRun<TResolved>(opts: UseBattleRunOptions<TResolved>) {
         await applyResult(outcome, true);
       }
     } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
+      setError(describeError(e));
     }
   }, [
     target,

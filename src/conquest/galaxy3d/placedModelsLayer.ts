@@ -1,4 +1,5 @@
 import * as THREE from "three";
+import { describeError } from "@/i18n/uiError";
 import { onTextureArrived } from "@/lib/textureArrival";
 import type { PlacedModel } from "../placedModels";
 import {
@@ -54,8 +55,7 @@ const KEY_LIGHT = 2.2;
 const AMBIENT_LIGHT = 0.55;
 const SUN: [number, number, number] = [-1, 1.5, -1];
 
-const reasonOf = (err: unknown): string =>
-  err instanceof Error ? err.message : String(err);
+const reasonOf = (err: unknown): string => describeError(err);
 
 /** One `InstancedMesh` for each mesh of `model`, a copy at every transform. */
 function instancedMeshes(

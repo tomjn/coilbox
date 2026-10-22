@@ -1,4 +1,5 @@
 import { useEffect, useState, useSyncExternalStore } from "react";
+import { describeError } from "@/i18n/uiError";
 import type { GameItem } from "../../content/bindings";
 import { useScanEpoch } from "../../content/config";
 import { createDocumentStore } from "../../lib/documentStore";
@@ -203,7 +204,7 @@ export function useGameMapFacts(game: GameItem | null | undefined): {
           setAnswered({
             key,
             facts: NO_FACTS,
-            error: e instanceof Error ? e.message : String(e),
+            error: describeError(e),
           });
         }
       },
@@ -259,7 +260,7 @@ export function useHandmadeMap(id: string | undefined): {
         if (!cancelled) {
           setLoaded({
             id,
-            failure: e instanceof Error ? e.message : String(e),
+            failure: describeError(e),
           });
         }
       },

@@ -1,4 +1,5 @@
 import { useLingui } from "@lingui/react/macro";
+import { describeError } from "@/i18n/uiError";
 import { ImportChallengeForm as SharedImportChallengeForm } from "../../../challenge/ImportChallengeForm";
 import { warpathIdentity } from "../../../challenge/identity";
 import { ImportHold } from "../../../challenge/importHold";
@@ -56,7 +57,7 @@ async function readUnitData(
     const dataset = await unitsyncUnitDataset(args);
     return { startUnit, units: dataset.units };
   } catch (e) {
-    return { failure: e instanceof Error ? e.message : String(e) };
+    return { failure: describeError(e) };
   }
 }
 

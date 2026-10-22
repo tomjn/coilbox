@@ -23,6 +23,7 @@ import {
 import { Textarea } from "@/components/ui/textarea";
 import { useUnitsyncScan, useUnitsyncThumbnails } from "@/content/config";
 import { nextDrawerKey } from "@/general/drawerKey";
+import { describeError } from "@/i18n/uiError";
 import { relativeTime } from "@/lib/relativeTime";
 import { notify } from "@/notify/notify";
 import { usePreferredTarget } from "@/play/config";
@@ -226,7 +227,7 @@ export default function ScenarioBuilderPage() {
       navigate(`/scenario-builder/${copy.id}`);
     } catch (e) {
       const name = scenario.name;
-      const reason = e instanceof Error ? e.message : String(e);
+      const reason = describeError(e);
       void notify({
         title: t`Could not duplicate ${name}: ${reason}`,
         level: "error",
@@ -583,7 +584,7 @@ function NewScenarioForm({
       await refreshScenarios();
       onCreated(saved.id);
     } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
+      setError(describeError(e));
       setBusy(false);
     }
   };

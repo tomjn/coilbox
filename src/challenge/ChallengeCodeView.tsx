@@ -6,6 +6,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { buildImportCodeLink } from "@/deeplink/build";
 import { copyDeepLink } from "@/deeplink/copyLink";
 import { PublishSection } from "@/hub/PublishSection";
+import { describeError } from "@/i18n/uiError";
 import { ErrorBanner } from "../content/pages/components/states";
 
 /**
@@ -76,7 +77,7 @@ export function ChallengeCodeView({
     try {
       await onExportFile();
     } catch (e) {
-      setFileError(e instanceof Error ? e.message : String(e));
+      setFileError(describeError(e));
     } finally {
       setFileBusy(false);
     }

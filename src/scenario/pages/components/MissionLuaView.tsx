@@ -29,6 +29,7 @@ import {
   useRef,
   useState,
 } from "react";
+import { describeError } from "@/i18n/uiError";
 import { compileScenario, missionPath } from "../../compile";
 import type { Scenario } from "../../model";
 import { MissionLuaCode, type MissionLuaCodeHandle } from "./MissionLuaCode";
@@ -67,7 +68,7 @@ export function compiledMissionText(scenario: Scenario): {
   try {
     return { lua: compileScenario(scenario) };
   } catch (e) {
-    return { lua: "", error: e instanceof Error ? e.message : String(e) };
+    return { lua: "", error: describeError(e) };
   }
 }
 

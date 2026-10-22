@@ -29,6 +29,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { describeError } from "@/i18n/uiError";
 import { ErrorBanner } from "../../../content/pages/components/states";
 import type { Scenario } from "../../model";
 
@@ -153,7 +154,7 @@ export function DeleteScenarioForm({
       await onDelete();
       onDone();
     } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
+      setError(describeError(e));
       setBusy(false);
     }
   };

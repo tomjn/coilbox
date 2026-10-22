@@ -1,4 +1,5 @@
 import { t } from "@lingui/core/macro";
+import { describeError } from "@/i18n/uiError";
 import {
   type GameItem,
   unitsyncArchiveFile,
@@ -259,7 +260,7 @@ export function createArchiveReader(target: ArchiveTarget): ArchiveReader {
     });
 
   const failed = (file: string, e: unknown) => {
-    const detail = e instanceof Error ? e.message : String(e);
+    const detail = describeError(e);
     return unreadable(
       file,
       t`"${file}" is in the game archive, but it could not be read. ${detail}`,

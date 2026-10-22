@@ -63,6 +63,7 @@ import { knownUnits, unknownUnitsWarning } from "@/blueprint/units";
 import type { UnitDatasetEntry } from "@/content/bindings";
 import { useUnitsyncEngineConfig, useUnitsyncScan } from "@/content/config";
 import { engineConfigDir, underConfigDir } from "@/content/enginePaths";
+import { describeError } from "@/i18n/uiError";
 import { replaceBlueprint } from "@/lib/scenarioEditing/bases";
 import { BlueprintEditor } from "@/placement/BlueprintEditor";
 import { usePreferredTarget } from "@/play/config";
@@ -71,7 +72,7 @@ import type { Scenario } from "../../model";
 import { carryBlueprint } from "./blueprintImport";
 import { EditorPanel } from "./panels";
 
-const message = (e: unknown) => (e instanceof Error ? e.message : String(e));
+const message = (e: unknown) => describeError(e);
 
 export function BlueprintPanel({
   scenario,

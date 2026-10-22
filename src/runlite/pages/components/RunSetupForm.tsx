@@ -9,6 +9,7 @@ import { Slider } from "@/components/ui/slider";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { FactionLogo } from "@/factions/FactionLogo";
 import { useFactionLogos } from "@/factions/logos";
+import { describeError } from "@/i18n/uiError";
 import { withBuiltUnits } from "@/lego/buildList";
 import type { LegoProject } from "@/lego/model";
 import { withoutGeneratedGames } from "@/lib/generatedGames";
@@ -362,7 +363,7 @@ export function RunSetupForm({
         throw e;
       }
     } catch (e) {
-      const reason = e instanceof Error ? e.message : String(e);
+      const reason = describeError(e);
       setStartError(t`The warpath was not started. ${reason}`);
       return;
     }

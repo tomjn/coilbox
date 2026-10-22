@@ -22,6 +22,7 @@ import { useEffect, useState } from "react";
 import { ChallengeCodeView } from "@/challenge/ChallengeCodeView";
 import type { InstalledGameInfo } from "@/container/gameIdentity";
 import { ErrorBanner } from "@/content/pages/components/states";
+import { describeError } from "@/i18n/uiError";
 import { scenarioExport } from "../../bindings";
 import type { Scenario } from "../../model";
 import {
@@ -50,9 +51,7 @@ export function ShareScenarioForm({
     let live = true;
     gatherScenarioExport(scenario)
       .then((value) => live && setGathered(value))
-      .catch(
-        (e) => live && setError(e instanceof Error ? e.message : String(e)),
-      );
+      .catch((e) => live && setError(describeError(e)));
     return () => {
       live = false;
     };
@@ -163,7 +162,7 @@ function TooLargeToShare({
     try {
       await onExportFile();
     } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
+      setError(describeError(e));
     } finally {
       setBusy(false);
     }

@@ -5,6 +5,7 @@ import type {
   ContentRequirement,
   EngineReading,
 } from "@/content/resolveContent";
+import { describeError } from "@/i18n/uiError";
 import type { PlayTarget } from "./config";
 import {
   concludeEngine,
@@ -91,7 +92,7 @@ export function useEngineConfirmation(
         answer = {
           executable: toAsk,
           reported: null,
-          reason: err instanceof Error ? err.message : String(err),
+          reason: describeError(err),
         };
       }
       // No cancel on cleanup. The engine is marked as asked, so an answer

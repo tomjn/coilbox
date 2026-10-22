@@ -31,6 +31,7 @@ import { OptionSelect } from "@/components/OptionSelect";
 import { PageHeader } from "@/components/PageHeader";
 import { Card } from "@/components/ui/card";
 import { Switch } from "@/components/ui/switch";
+import { describeError } from "@/i18n/uiError";
 import { withoutGeneratedGames } from "@/lib/generatedGames";
 import { mostRecentOpen } from "@/lib/recency";
 import { challengeExport } from "../../challenge/bindings";
@@ -169,7 +170,7 @@ export default function ConquestListPage() {
     try {
       await saveFor(galaxyId, undefined);
     } catch (e) {
-      const reason = e instanceof Error ? e.message : String(e);
+      const reason = describeError(e);
       setAbandonError(t`The conquest was not abandoned. ${reason}`);
     }
   };
@@ -239,7 +240,7 @@ export default function ConquestListPage() {
       await refreshHandmadeMaps();
     } catch (e) {
       const title = map.title;
-      const reason = e instanceof Error ? e.message : String(e);
+      const reason = describeError(e);
       setMapError(t`"${title}" was not removed. ${reason}`);
     }
   };
@@ -1711,7 +1712,7 @@ function GenerateGalaxyForm({
       await refreshGalaxies();
       onCreated(id);
     } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
+      setError(describeError(e));
       setBusy(false);
     }
   };
