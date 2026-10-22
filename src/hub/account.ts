@@ -30,6 +30,7 @@
  */
 
 import { useCallback, useEffect, useSyncExternalStore } from "react";
+import { describeError } from "@/i18n/uiError";
 import { type HubIdentity, hubAccount, hubSignIn, hubSignOut } from "./auth";
 
 export interface HubAccount {
@@ -106,7 +107,7 @@ async function ask(hubUrl: string) {
       unknown: true,
       signedIn: false,
       account: null,
-      problem: e instanceof Error ? e.message : String(e),
+      problem: describeError(e),
     });
   } finally {
     asking.delete(hubUrl);
@@ -157,7 +158,7 @@ export async function signInToHub(hubUrl: string) {
       problem: problem ?? null,
     });
   } catch (e) {
-    update(hubUrl, { problem: e instanceof Error ? e.message : String(e) });
+    update(hubUrl, { problem: describeError(e) });
   } finally {
     update(hubUrl, { busy: false });
   }
@@ -183,7 +184,7 @@ export async function signOutOfHub(hubUrl: string) {
       loading: false,
     });
   } catch (e) {
-    update(hubUrl, { problem: e instanceof Error ? e.message : String(e) });
+    update(hubUrl, { problem: describeError(e) });
   } finally {
     update(hubUrl, { busy: false });
   }

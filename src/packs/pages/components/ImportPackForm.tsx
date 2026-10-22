@@ -2,6 +2,7 @@ import { plural } from "@lingui/core/macro";
 import { useLingui } from "@lingui/react/macro";
 import { useRef, useState } from "react";
 import { summarizeSubstitutions } from "@/conquest/ai";
+import { describeError } from "@/i18n/uiError";
 import { reconcileParticipantAis } from "@/play/reconcileAi";
 import type { StoredBlueprint } from "../../../blueprint/library";
 import {
@@ -124,7 +125,7 @@ export function ImportPackForm({
       try {
         await saveBlueprints(unsaved);
       } catch (e) {
-        const reason = e instanceof Error ? e.message : String(e);
+        const reason = describeError(e);
         throw new Error(t`The blueprints were not all saved: ${reason}`);
       }
     }

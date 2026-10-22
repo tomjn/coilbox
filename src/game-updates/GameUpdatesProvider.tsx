@@ -11,6 +11,7 @@ import {
   useRef,
   useState,
 } from "react";
+import { describeError } from "@/i18n/uiError";
 import { primeScan, useScanTargetSelection } from "../content/config";
 import { releaseIsNew } from "../content/updates";
 import { useUpdates } from "../content/useUpdates";
@@ -110,7 +111,7 @@ export function GameUpdatesProvider({ children }: { children: ReactNode }) {
     try {
       setRelease(await dlGithubLatestRelease({ repo }));
     } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
+      setError(describeError(e));
     } finally {
       setChecking(false);
     }
@@ -209,7 +210,7 @@ export function GameUpdatesProvider({ children }: { children: ReactNode }) {
       }
       setInstalled(true);
     } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
+      setError(describeError(e));
     } finally {
       setInstalling(false);
       setCurrentFile(null);

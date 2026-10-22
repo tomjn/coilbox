@@ -7,6 +7,7 @@ import {
   useEffect,
   useState,
 } from "react";
+import { describeError } from "@/i18n/uiError";
 import type { DownloadProgress } from "../downloads/bindings";
 import { useDownloadQueue } from "../downloads/DownloadQueueProvider";
 import type { ProgressSource } from "../downloads/pages/components/ProgressBar";
@@ -124,7 +125,7 @@ export function UpdaterProvider({ children }: { children: ReactNode }) {
       }
       setLastChecked(Date.now());
     } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
+      setError(describeError(e));
     } finally {
       setChecking(false);
     }
@@ -153,7 +154,7 @@ export function UpdaterProvider({ children }: { children: ReactNode }) {
       });
       setInstalled(true);
     } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
+      setError(describeError(e));
       setProgress({ status: "idle" });
     } finally {
       // However it ended, nothing is transferring now. A failed or abandoned

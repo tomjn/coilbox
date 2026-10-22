@@ -1,9 +1,10 @@
 import { t } from "@lingui/core/macro";
+import { describeError } from "@/i18n/uiError";
 import type { EnqueueInput } from "../../downloads/DownloadQueueProvider";
 import { loadGithubReleases } from "../../downloads/githubReleases";
 import type { HubGameDownload } from "../api";
 
-const msg = (e: unknown) => (e instanceof Error ? e.message : String(e));
+const msg = (e: unknown) => describeError(e);
 
 /**
  * Turn a hub game's ordered download sources into one download-queue request,
