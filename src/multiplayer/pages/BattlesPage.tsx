@@ -691,7 +691,7 @@ function BattlesPage() {
         if (ownKey) await disconnect(ownKey);
       });
     } catch (e) {
-      setStopError(e instanceof Error ? e.message : String(e));
+      setStopError(describeError(e));
     } finally {
       setRoomBusy(false);
     }

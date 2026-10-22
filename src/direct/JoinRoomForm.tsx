@@ -16,6 +16,7 @@ import { Trans, useLingui } from "@lingui/react/macro";
 import { Button, Input, useDrawer } from "@picoframe/frame";
 import { useState } from "react";
 import { battlePasswordProblem } from "@/deeplink/parse";
+import { describeError } from "@/i18n/uiError";
 import { identifierFieldProps } from "@/lib/identifierField";
 import { leaveAndLabel } from "../multiplayer/battles/oneBattle";
 import { addressProblem, splitHostPort } from "./lan";
@@ -129,7 +130,7 @@ export function JoinRoomForm({
       // Left open on success: a join lands in the battle room, and navigating
       // there closes every drawer, so there is nothing here to close.
     } catch (err) {
-      setError(err instanceof Error ? err.message : String(err));
+      setError(describeError(err));
     } finally {
       setJoining(false);
     }

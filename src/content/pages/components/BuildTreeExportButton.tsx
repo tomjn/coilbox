@@ -9,6 +9,7 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
+import { describeError } from "@/i18n/uiError";
 import { notify } from "@/notify/notify";
 import { useResolvedLocale } from "../../../i18n/language";
 import type { Side, UnitDatasetEntry } from "../../bindings";
@@ -149,7 +150,7 @@ export function BuildTreeExportButton({
       void notify({ title: t`Build tree exported.`, level: "success" });
       setOpen(false);
     } catch (e) {
-      const reason = e instanceof Error ? e.message : String(e);
+      const reason = describeError(e);
       void notify({
         title: t`Export failed: ${reason}`,
         level: "error",

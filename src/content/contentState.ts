@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState, useSyncExternalStore } from "react";
+import { describeError } from "@/i18n/uiError";
 import { type ContentState, contentStateLoad } from "./bindings";
 import { shareInFlight } from "./inFlight";
 
@@ -99,7 +100,7 @@ export function useContentState() {
       await refreshContentState();
       setError(null);
     } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
+      setError(describeError(e));
     } finally {
       setBusy(false);
     }
@@ -109,7 +110,7 @@ export function useContentState() {
     if (snapshot()) return;
     loadContentState().then(
       () => setError(null),
-      (e) => setError(e instanceof Error ? e.message : String(e)),
+      (e) => setError(describeError(e)),
     );
   }, []);
 

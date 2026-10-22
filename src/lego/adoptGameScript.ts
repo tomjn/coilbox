@@ -29,6 +29,7 @@
  */
 
 import { t } from "@lingui/core/macro";
+import { describeError } from "@/i18n/uiError";
 import { animBos2lua, type ConversionWarning } from "../animation/bindings";
 import { unitsyncUnitScript } from "../content/bindings";
 import { inferRoles, type RoleFindings } from "./inferRoles";
@@ -156,9 +157,7 @@ async function convert(
     return lua;
   } catch (error) {
     notes.push(
-      `${result.bosMember} could not be converted: ${
-        error instanceof Error ? error.message : String(error)
-      }`,
+      `${result.bosMember} could not be converted: ${describeError(error)}`,
     );
     return null;
   }
@@ -195,7 +194,7 @@ export async function adoptGameScript(
   } catch (error) {
     const unit = game.unit;
     const gameName = game.name;
-    const reason = error instanceof Error ? error.message : String(error);
+    const reason = describeError(error);
     return {
       ...NOTHING,
       notes: [t`Could not read ${unit}'s script from ${gameName}: ${reason}`],

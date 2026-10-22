@@ -182,7 +182,7 @@ it("keeps the code field open and shows the reason after a refused code", async 
   fireEvent.click(screen.getByRole("button", { name: "Reset password" }));
 
   expect(
-    await screen.findByText("Error: Wrong code entered too many times"),
+    await screen.findByText("Wrong code entered too many times"),
   ).toBeTruthy();
   // Still on the code step, not bounced back to email.
   expect(screen.getByLabelText("Code")).toBeTruthy();

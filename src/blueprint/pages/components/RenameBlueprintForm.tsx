@@ -16,9 +16,9 @@
 import { Trans, useLingui } from "@lingui/react/macro";
 import { Button, Input } from "@picoframe/frame";
 import { useId, useState } from "react";
-
 import { Label } from "@/components/ui/label";
 import { ErrorBanner } from "@/content/pages/components/states";
+import { describeError } from "@/i18n/uiError";
 import type { StoredBlueprint } from "../../library";
 import { saveBlueprint } from "../../store";
 
@@ -61,7 +61,7 @@ export function RenameBlueprintForm({
     try {
       onDone(await saveBlueprint(next));
     } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
+      setError(describeError(e));
       setBusy(false);
     }
   }

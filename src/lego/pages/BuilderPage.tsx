@@ -36,7 +36,6 @@ import {
   useState,
 } from "react";
 import { useParams } from "react-router";
-
 import { TipButton } from "@/components/TipButton";
 import { ButtonGroup } from "@/components/ui/button-group";
 import {
@@ -57,6 +56,7 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+import { describeError } from "@/i18n/uiError";
 import { notify } from "@/notify/notify";
 import { actionProblems } from "../actions";
 import { addShape } from "../addShape";
@@ -1128,7 +1128,7 @@ function Builder({ id }: { id: string | undefined }) {
       } catch (error) {
         void notify({
           title: t`Save as module`,
-          body: error instanceof Error ? error.message : String(error),
+          body: describeError(error),
           level: "error",
         });
         return;
@@ -1184,7 +1184,7 @@ function Builder({ id }: { id: string | undefined }) {
     } catch (error) {
       void notify({
         title,
-        body: error instanceof Error ? error.message : String(error),
+        body: describeError(error),
         level: "error",
       });
       return null;
@@ -1613,7 +1613,7 @@ function Builder({ id }: { id: string | undefined }) {
     } catch (e) {
       void notify({
         title: t`Couldn't paste`,
-        body: e instanceof Error ? e.message : String(e),
+        body: describeError(e),
         level: "error",
       });
       return;

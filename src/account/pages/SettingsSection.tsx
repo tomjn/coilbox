@@ -3,6 +3,7 @@ import { Button, Input } from "@picoframe/frame";
 import { type FormEvent, useEffect, useState } from "react";
 import { Field } from "@/components/Field";
 import { SlideDrawer } from "@/components/SlideDrawer";
+import { describeError } from "@/i18n/uiError";
 import { identifierFieldProps } from "@/lib/identifierField";
 import { lsStoreCredential } from "../../lobby-servers/bindings";
 import {
@@ -181,7 +182,7 @@ function AccountActions({
       await resendVerification(email, serverKey);
       setResendStatus(t`Verification email sent.`);
     } catch (err) {
-      setResendStatus(String(err));
+      setResendStatus(describeError(err));
     } finally {
       setResending(false);
     }
@@ -337,7 +338,7 @@ function ChangePasswordForm({
         }
       }
     } catch (err) {
-      setError(String(err));
+      setError(describeError(err));
     } finally {
       setSubmitting(false);
     }
@@ -453,7 +454,7 @@ function ChangeEmailForm({
       await changeEmailRequest(address.trim(), serverKey);
       setStage("code");
     } catch (err) {
-      setError(String(err));
+      setError(describeError(err));
     } finally {
       setSubmitting(false);
     }
@@ -467,7 +468,7 @@ function ChangeEmailForm({
       await changeEmail(address.trim(), code.trim(), serverKey);
       setStage("done");
     } catch (err) {
-      setError(String(err));
+      setError(describeError(err));
     } finally {
       setSubmitting(false);
     }

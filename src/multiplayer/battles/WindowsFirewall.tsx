@@ -15,6 +15,7 @@ import {
   CollapsibleContent,
   CollapsibleTrigger,
 } from "@/components/ui/collapsible";
+import { describeError } from "@/i18n/uiError";
 import { type Firewall, mpFirewall, mpFirewallAllow } from "../bindings";
 
 /**
@@ -71,7 +72,7 @@ export function WindowsFirewall({ engine }: { engine: string | null }) {
         programs: was?.programs ?? [],
         problem: {
           title: t`Coilbox could not reach Windows Firewall`,
-          details: [e instanceof Error ? e.message : String(e)],
+          details: [describeError(e)],
           fault: true,
         },
       }));

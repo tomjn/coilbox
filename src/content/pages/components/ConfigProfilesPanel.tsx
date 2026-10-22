@@ -6,6 +6,7 @@ import { RotateCcw, Save, Trash2, TriangleAlert } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
+import { describeError } from "@/i18n/uiError";
 import { formatDateTime } from "@/lib/format";
 import {
   type ConfigProfile,
@@ -48,7 +49,7 @@ export function ConfigProfilesPanel({ rootPath }: { rootPath: string }) {
       const { profiles } = await contentConfigProfiles({ rootPath });
       setProfiles(profiles);
     } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
+      setError(describeError(e));
     }
   }, [rootPath]);
 
@@ -70,7 +71,7 @@ export function ConfigProfilesPanel({ rootPath }: { rootPath: string }) {
       setStatus(t`Saved profile "${trimmed}".`);
       await refresh();
     } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
+      setError(describeError(e));
     } finally {
       setBusy(false);
     }
@@ -104,7 +105,7 @@ export function ConfigProfilesPanel({ rootPath }: { rootPath: string }) {
         await refresh();
       }
     } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
+      setError(describeError(e));
     } finally {
       setBusy(false);
     }
@@ -118,7 +119,7 @@ export function ConfigProfilesPanel({ rootPath }: { rootPath: string }) {
       if (confirmSlug === p.slug) setConfirmSlug(null);
       await refresh();
     } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
+      setError(describeError(e));
     } finally {
       setBusy(false);
     }

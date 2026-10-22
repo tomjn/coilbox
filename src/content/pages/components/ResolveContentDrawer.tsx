@@ -10,11 +10,12 @@ import {
 import { Dialog as DialogPrimitive } from "radix-ui";
 import { useEffect, useRef, useState } from "react";
 import { Link } from "react-router";
+import { describeError } from "@/i18n/uiError";
 import { QueueProgress } from "../../../downloads/pages/components/ProgressBar";
 import type { ContentRequirement, EngineReading } from "../../resolveContent";
 import { useResolveContent } from "../../useResolveContent";
 
-const errMessage = (e: unknown) => (e instanceof Error ? e.message : String(e));
+const errMessage = (e: unknown) => describeError(e);
 
 /** One missing-content row: label, a download button (or its live progress),
  * and an "unavailable" note when it can't be resolved automatically. */

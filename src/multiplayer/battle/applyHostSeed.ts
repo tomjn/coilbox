@@ -1,3 +1,4 @@
+import { describeError } from "@/i18n/uiError";
 import { mpAddBot } from "../bindings";
 import { hexToColorInt } from "./config";
 import type { HostSeedBot } from "./fromSkirmish";
@@ -41,9 +42,7 @@ export async function addHostSeedBots(
         aiDll: bot.aiDll,
       });
     } catch (e) {
-      failures.push(
-        `${bot.name}: ${e instanceof Error ? e.message : String(e)}`,
-      );
+      failures.push(`${bot.name}: ${describeError(e)}`);
     }
   }
   return failures;

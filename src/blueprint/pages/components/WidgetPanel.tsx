@@ -18,7 +18,6 @@ import { plural } from "@lingui/core/macro";
 import { Trans, useLingui } from "@lingui/react/macro";
 import { Button } from "@picoframe/frame";
 import { useCallback, useEffect, useState } from "react";
-
 import {
   contentWidgetInstall,
   contentWidgetRemove,
@@ -26,10 +25,11 @@ import {
   type WidgetStatus,
 } from "@/content/bindings";
 import { ErrorBanner } from "@/content/pages/components/states";
+import { describeError } from "@/i18n/uiError";
 import { usePreferredTarget } from "@/play/config";
 import { usePlay } from "@/play/PlayProvider";
 
-const message = (e: unknown) => (e instanceof Error ? e.message : String(e));
+const message = (e: unknown) => describeError(e);
 
 export function WidgetPanel({
   onChanged,

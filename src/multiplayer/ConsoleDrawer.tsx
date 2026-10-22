@@ -11,6 +11,7 @@ import {
 } from "@/components/ui/collapsible";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { describeError } from "@/i18n/uiError";
 import { identifierFieldProps } from "@/lib/identifierField";
 import type { LobbyProtocol } from "../lobby-servers/config";
 import { AccountPicker } from "./AccountPicker";
@@ -199,7 +200,7 @@ function TachyonSendBox({ serverKey }: { serverKey: string | null }) {
     setError(null);
     setSending(true);
     mpTachyonRequest({ serverKey, ...built.request })
-      .catch((e: unknown) => setError(e instanceof Error ? e.message : `${e}`))
+      .catch((e: unknown) => setError(describeError(e)))
       .finally(() => setSending(false));
   }
 

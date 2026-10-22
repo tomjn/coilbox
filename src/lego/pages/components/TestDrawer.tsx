@@ -333,7 +333,7 @@ export function TestDrawer({ open, onOpenChange, project, pack, raw }: Props) {
     } catch (error) {
       setPhase({
         state: "failed",
-        message: error instanceof Error ? error.message : String(error),
+        message: describeError(error),
       });
     } finally {
       // What a reload said was about the game that has now closed.
@@ -491,7 +491,7 @@ export function TestDrawer({ open, onOpenChange, project, pack, raw }: Props) {
     } catch (error) {
       setPhase({
         state: "failed",
-        message: error instanceof Error ? error.message : String(error),
+        message: describeError(error),
       });
     }
   }

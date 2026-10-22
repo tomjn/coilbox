@@ -10,6 +10,7 @@
 
 import { t } from "@lingui/core/macro";
 import { gzipSync } from "fflate";
+import { describeError } from "@/i18n/uiError";
 
 import { legoGeometrySave } from "./bindings";
 import { moduleForUnit, withMeshBoxes } from "./liftPiece";
@@ -60,7 +61,7 @@ async function copyMeshes(
   const [own, from] = await Promise.all([
     loadRawGeometryIfAny(unitId),
     loadRawGeometry(fromId).catch((error: unknown) => {
-      const reason = error instanceof Error ? error.message : String(error);
+      const reason = describeError(error);
       throw new Error(t`The meshes of ${name} could not be read: ${reason}`);
     }),
   ]);
@@ -95,7 +96,7 @@ async function writeNamedMeshes(
 
   const from = await loadRawGeometry(fromId).catch((error: unknown) => {
     const moduleName = module.name;
-    const reason = error instanceof Error ? error.message : String(error);
+    const reason = describeError(error);
     throw new Error(
       t`The meshes of ${moduleName} could not be read: ${reason}`,
     );

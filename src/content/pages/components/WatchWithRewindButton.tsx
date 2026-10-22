@@ -8,6 +8,7 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
+import { describeError } from "@/i18n/uiError";
 import { useReplayTarget } from "../../../play/config";
 import { usePlay } from "../../../play/PlayProvider";
 import { contentAnalysisCheck, type DemoInfo } from "../../bindings";
@@ -206,7 +207,7 @@ export function WatchWithRewindButton({
         setError(t`Engine exited with code ${exitCode}.`);
       }
     } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
+      setError(describeError(e));
     } finally {
       if (mounted.current) setPending(false);
     }
@@ -234,7 +235,7 @@ export function WatchWithRewindButton({
         setAwaiting(true);
       }
     } catch (e) {
-      if (mounted.current) setError(e instanceof Error ? e.message : String(e));
+      if (mounted.current) setError(describeError(e));
     } finally {
       if (mounted.current) setPending(false);
     }

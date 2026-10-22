@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { describeError } from "@/i18n/uiError";
 import { readTrackHeader, windowLoader } from "./commands";
 import { ReplayTrackError } from "./fault";
 import { createReplayTrackHandle, type ReplayTrackHandle } from "./handle";
@@ -63,7 +64,7 @@ export function useReplayTrack(gameId: string | null): ReplayTrackState {
             ? e
             : new ReplayTrackError({
                 kind: "io",
-                message: e instanceof Error ? e.message : String(e),
+                message: describeError(e),
               });
         setState({ for: gameId, at: { status: "error", handle: null, error } });
       },

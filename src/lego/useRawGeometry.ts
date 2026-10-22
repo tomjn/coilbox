@@ -15,6 +15,7 @@
 
 import { t } from "@lingui/core/macro";
 import { useCallback, useEffect, useRef, useState } from "react";
+import { describeError } from "@/i18n/uiError";
 
 import { legoTextureUrl } from "../lib/assetUrl";
 import type { LegoProject } from "./model";
@@ -122,7 +123,7 @@ export function useRawGeometry(
         setState({
           raw: null,
           loading: false,
-          error: error instanceof Error ? error.message : String(error),
+          error: describeError(error),
         });
       },
     );

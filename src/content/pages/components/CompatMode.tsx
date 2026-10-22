@@ -4,6 +4,7 @@ import { save } from "@tauri-apps/plugin-dialog";
 import { FileArchive, Loader2, Trash2, Wrench } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Switch } from "@/components/ui/switch";
+import { describeError } from "@/i18n/uiError";
 import {
   type CompatBuilt,
   type CompatExported,
@@ -20,8 +21,7 @@ import {
   withoutCompatEntry,
 } from "../../compatSettings";
 
-const msg = (e: unknown): string =>
-  e instanceof Error ? e.message : String(e);
+const msg = (e: unknown): string => describeError(e);
 
 /**
  * Compatibility mode for one game (issue #4561). The switch is the only thing

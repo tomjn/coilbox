@@ -1,4 +1,5 @@
 import { t } from "@lingui/core/macro";
+import { describeError } from "@/i18n/uiError";
 import { MANIFEST_FILE } from "../conquest/handmade/manifest";
 import type { HandmadeMapResult } from "../conquest/handmade/read";
 import type { GalaxyDoc } from "../conquest/model";
@@ -64,6 +65,6 @@ export function challengeMapListFailure(
   reason: unknown,
 ): string {
   const mapName = nameOf(ref);
-  const cause = reason instanceof Error ? reason.message : String(reason);
+  const cause = describeError(reason);
   return t`This challenge is played on the hand-made map ${mapName}, and the hand-made maps could not be listed, so the challenge was not started. ${cause}`;
 }

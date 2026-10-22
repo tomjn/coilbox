@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
+import { describeError } from "@/i18n/uiError";
 import { useUnitsyncScan } from "../content/config";
 import { usePreferredTarget } from "../play/config";
 import { gameScenarios } from "./gameScenarios";
@@ -145,7 +146,7 @@ export function useScenarios() {
         setError(null);
       })
       .catch((e) => {
-        if (!cancelled) setError(e instanceof Error ? e.message : String(e));
+        if (!cancelled) setError(describeError(e));
       })
       .finally(() => {
         if (!cancelled) setLoading(false);
@@ -206,7 +207,7 @@ export function useScenarios() {
     try {
       await refreshScenarios();
     } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
+      setError(describeError(e));
     }
   }, []);
 

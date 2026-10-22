@@ -8,6 +8,7 @@ import { Link, useNavigate } from "react-router";
 import { PageHeader } from "@/components/PageHeader";
 import { Badge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea";
+import { describeError } from "@/i18n/uiError";
 import { useUnitsyncScan, useUnitsyncThumbnails } from "../../content/config";
 import { ResolveContentGate } from "../../content/pages/components/ResolveContentDrawer";
 import {
@@ -173,7 +174,7 @@ export default function CampaignBuilderPage() {
       }
       setPendingCampaign(parsed);
     } catch (e) {
-      setActionError(e instanceof Error ? e.message : String(e));
+      setActionError(describeError(e));
     } finally {
       setBusy(false);
     }
@@ -228,7 +229,7 @@ export default function CampaignBuilderPage() {
       }
       navigate(`/campaign-builder/${copy.id}`);
     } catch (e) {
-      setActionError(e instanceof Error ? e.message : String(e));
+      setActionError(describeError(e));
     } finally {
       setBusy(false);
     }
@@ -261,7 +262,7 @@ export default function CampaignBuilderPage() {
       if (!dest) return;
       await campaignExport({ json: JSON.stringify(file, null, 2), dest });
     } catch (e) {
-      setActionError(e instanceof Error ? e.message : String(e));
+      setActionError(describeError(e));
     }
   };
 
@@ -448,7 +449,7 @@ function NewCampaignForm({
       await refreshCampaigns();
       onCreated(campaign.id);
     } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
+      setError(describeError(e));
       setBusy(false);
     }
   };

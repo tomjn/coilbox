@@ -20,6 +20,7 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
+import { describeError } from "@/i18n/uiError";
 import { isGeneratedGame } from "@/lib/generatedGames";
 import { notify } from "@/notify/notify";
 import {
@@ -48,8 +49,7 @@ import { useScenarios } from "@/scenario/scenarios";
 import type { GameItem } from "../../bindings";
 import { isSdd } from "../../format";
 
-const msg = (e: unknown): string =>
-  e instanceof Error ? e.message : String(e);
+const msg = (e: unknown): string => describeError(e);
 
 /** What the button says, per {@link runtimeInstallState}. */
 function installLabel(state: RuntimeInstallState): string {

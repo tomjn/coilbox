@@ -10,6 +10,7 @@ import {
 } from "@/content/config";
 import { dependencyBlockReason } from "@/content/gameDependencies";
 import { resolveVerdict } from "@/content/resolveContent";
+import { describeError } from "@/i18n/uiError";
 import { isBlackHex, pickTeamColorHex } from "@/lib/teamColor";
 import { notify } from "@/notify/notify";
 import {
@@ -88,7 +89,7 @@ import { useEngineVersionCheck } from "./useEngineVersionCheck";
 import { type TweakDelivery, useTweakDelivery } from "./useTweakDelivery";
 
 /** Format a rejected command for the action-error banner (matches useBattleLaunch). */
-const mpErr = (e: unknown) => (e instanceof Error ? e.message : String(e));
+const mpErr = (e: unknown) => describeError(e);
 
 /** Coalesce rapid colour-picker drags into one lobby command (trailing value
  *  wins). The native `<input type="color">` fires onChange per drag value; sending

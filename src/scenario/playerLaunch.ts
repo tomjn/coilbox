@@ -10,6 +10,7 @@
  */
 
 import { t } from "@lingui/core/macro";
+import { describeError } from "@/i18n/uiError";
 import type { GameItem } from "../content/bindings";
 import { primeScan } from "../content/config";
 import { sameGameFamily } from "../content/resolveContent";
@@ -77,7 +78,7 @@ export async function launchScenarioForPlayer(
       try {
         return (await primeScan(target.enginePath, target.dataDir, true)).games;
       } catch (e) {
-        const reason = e instanceof Error ? e.message : String(e);
+        const reason = describeError(e);
         throw new Error(t`The content scan failed: ${reason}`);
       }
     },

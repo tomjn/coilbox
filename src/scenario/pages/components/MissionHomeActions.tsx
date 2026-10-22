@@ -21,6 +21,7 @@ import { useNavigate } from "react-router";
 import { Label } from "@/components/ui/label";
 import type { GameItem } from "@/content/bindings";
 import { isSdd } from "@/content/format";
+import { describeError } from "@/i18n/uiError";
 import type { Scenario } from "../../model";
 import {
   missionFolderName,
@@ -34,7 +35,7 @@ import {
 } from "../../scenarios";
 import type { LoadedScenario } from "../../storage";
 
-const message = (e: unknown) => (e instanceof Error ? e.message : String(e));
+const message = (e: unknown) => describeError(e);
 
 export function MissionHomeActions({
   scenario,

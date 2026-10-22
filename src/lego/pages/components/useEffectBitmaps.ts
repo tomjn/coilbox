@@ -6,6 +6,7 @@
 import { useLingui } from "@lingui/react/macro";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useUnitsyncScan } from "@/content/config";
+import { describeError } from "@/i18n/uiError";
 import { usePreferredTarget } from "@/play/config";
 import { type EffectBitmaps, loadEffectBitmaps } from "../../effectBitmaps";
 import type { LegoProject } from "../../model";
@@ -63,7 +64,7 @@ export function useEffectBitmaps(project: LegoProject | null): EffectBitmaps {
       })
       .catch((error: unknown) => {
         if (!live) return;
-        const message = error instanceof Error ? error.message : String(error);
+        const message = describeError(error);
         setLoaded({
           atlas: null,
           note: t`Could not read the game's bitmaps, so effects are drawn as a plain round sprite: ${message}`,

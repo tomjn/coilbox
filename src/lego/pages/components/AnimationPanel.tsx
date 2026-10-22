@@ -45,6 +45,7 @@ import {
 } from "@/components/ui/select";
 import { Slider } from "@/components/ui/slider";
 import { Switch } from "@/components/ui/switch";
+import { describeError } from "@/i18n/uiError";
 import { formatFixed, formatNumber } from "@/lib/format";
 import { animCobProbe, animCobRun } from "../../../animation/bindings";
 import { OptionSelect } from "../../../components/OptionSelect";
@@ -754,7 +755,7 @@ export function AnimationPanel({
         onScriptTimeline(null);
         onScriptRun(null);
         onPlayingChange(false);
-        setFailure(error instanceof Error ? error.message : String(error));
+        setFailure(describeError(error));
       } finally {
         if (thisRun === latestRun.current) setRunning(false);
       }

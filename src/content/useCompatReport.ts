@@ -1,5 +1,6 @@
 import { useLingui } from "@lingui/react/macro";
 import { useEffect, useMemo, useState } from "react";
+import { describeError } from "@/i18n/uiError";
 import { useUnitDefs } from "@/workshop/config";
 import { type LuaCompatResult, unitsyncLuaCompatScan } from "./bindings";
 import { buildReport } from "./compatReport";
@@ -47,7 +48,7 @@ function useLuaCompatScan(
         setState({
           key,
           result: null,
-          error: e instanceof Error ? e.message : String(e),
+          error: describeError(e),
         });
       });
     return () => {

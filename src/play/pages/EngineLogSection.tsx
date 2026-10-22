@@ -3,6 +3,7 @@ import { Button } from "@picoframe/frame";
 import { getVersion } from "@tauri-apps/api/app";
 import { ClipboardCopy, RefreshCw } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
+import { describeError } from "@/i18n/uiError";
 import {
   type InfologTail,
   playInfolog,
@@ -51,7 +52,7 @@ export default function EngineLogSection() {
       setError(null);
     } catch (e) {
       setLog(null);
-      setError(e instanceof Error ? e.message : String(e));
+      setError(describeError(e));
     } finally {
       setLoading(false);
     }

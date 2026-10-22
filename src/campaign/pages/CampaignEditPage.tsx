@@ -28,6 +28,7 @@ import {
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { useUnitsyncThumbnails } from "@/content/config";
+import { describeError } from "@/i18n/uiError";
 import { refIsVideo } from "@/lib/assetUrl";
 import { createDocumentSaver, type DocumentSaver } from "@/lib/documentSaver";
 import { usePreferredTarget } from "@/play/config";
@@ -288,7 +289,7 @@ export default function CampaignEditPage() {
       },
       onError: (e) => {
         writeFailed.current = true;
-        setError(e instanceof Error ? e.message : String(e));
+        setError(describeError(e));
         setSave({ kind: "failed" });
       },
     });

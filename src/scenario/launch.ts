@@ -25,6 +25,7 @@
  */
 
 import { t } from "@lingui/core/macro";
+import { describeError } from "@/i18n/uiError";
 import type { ConfigOption, GameItem } from "../content/bindings";
 import { isSdd } from "../content/format";
 import { dependencyBlockReason } from "../content/gameDependencies";
@@ -522,7 +523,7 @@ async function readFromGame(
   try {
     source = await missionFileText(origin, "mission.lua");
   } catch (err) {
-    const message = err instanceof Error ? err.message : String(err);
+    const message = describeError(err);
     return { mission: path, issues: [{ path, message }] };
   }
 
@@ -547,7 +548,7 @@ async function readFromGame(
     } catch (err) {
       // Nothing was corrected, so playing on would play the stale mission the
       // author has already moved past. Refuse and say why.
-      const message = err instanceof Error ? err.message : String(err);
+      const message = describeError(err);
       return { mission: path, issues: [{ path, message }] };
     }
     return {
@@ -676,7 +677,7 @@ export async function launchScenario(
         const issues = [
           {
             path: missionPath(inGame.folder),
-            message: err instanceof Error ? err.message : String(err),
+            message: describeError(err),
           },
         ];
         return refuse(missionIssueMessage(reader, issues), issues);

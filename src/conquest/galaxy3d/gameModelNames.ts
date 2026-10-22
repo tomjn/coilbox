@@ -12,6 +12,7 @@
  */
 
 import { unitsyncLuaExec } from "@/content/bindings";
+import { describeError } from "@/i18n/uiError";
 
 /**
  * The Lua that lists every feature the game defines with the model it names,
@@ -107,8 +108,7 @@ export interface GameModelLookups<T> {
   featureObjects(): Promise<Map<string, string>>;
 }
 
-const reasonOf = (err: unknown): string =>
-  err instanceof Error ? err.message : String(err);
+const reasonOf = (err: unknown): string => describeError(err);
 
 /**
  * Read the model for every name, trying each name in this order:

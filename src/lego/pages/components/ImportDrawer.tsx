@@ -24,6 +24,7 @@ import { open } from "@tauri-apps/plugin-dialog";
 import { X } from "lucide-react";
 import { Dialog as DialogPrimitive } from "radix-ui";
 import { useEffect, useState } from "react";
+import { describeError } from "@/i18n/uiError";
 
 import { BUILDER_MODEL_EXTS } from "../../archiveOpen";
 import type { LegoProject } from "../../model";
@@ -84,7 +85,7 @@ export function ImportDrawer({ open: isOpen, onOpenChange, onOpened }: Props) {
         if (!live) return;
         setStage({
           state: "failed",
-          message: error instanceof Error ? error.message : String(error),
+          message: describeError(error),
         });
       }
     })();

@@ -27,6 +27,7 @@ import {
   useUnitsyncUnitDataset,
 } from "@/content/config";
 import { UnitIcon } from "@/content/pages/components/UnitIcon";
+import { describeError } from "@/i18n/uiError";
 import { usePreferredTarget } from "@/play/config";
 import { adoptGameScript } from "../../adoptGameScript";
 import {
@@ -214,7 +215,7 @@ export function GameUnitBrowser({
       if (thisRead !== reads.current) return;
       setPieces({
         state: "failed",
-        message: error instanceof Error ? error.message : String(error),
+        message: describeError(error),
       });
     }
   }
@@ -284,7 +285,7 @@ export function GameUnitBrowser({
       setLift({
         path: line.path,
         state: "failed",
-        message: error instanceof Error ? error.message : String(error),
+        message: describeError(error),
       });
     }
   }

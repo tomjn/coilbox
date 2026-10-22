@@ -21,6 +21,7 @@ import { ContinueBadge } from "@/components/ContinueBadge";
 import { PageHeader } from "@/components/PageHeader";
 import { FactionLogo } from "@/factions/FactionLogo";
 import { useFactionLogo } from "@/factions/logos";
+import { describeError } from "@/i18n/uiError";
 import { mostRecentOpen } from "@/lib/recency";
 import { PlanetSwatch } from "../../conquest/pages/components/PlanetSwatch";
 import { planetOf } from "../../conquest/planets";
@@ -77,7 +78,7 @@ export default function RunListPage() {
     try {
       await deleteRun(id);
     } catch (e) {
-      const reason = e instanceof Error ? e.message : String(e);
+      const reason = describeError(e);
       setAbandonError(t`The warpath was not abandoned. ${reason}`);
     }
   };

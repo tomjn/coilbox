@@ -18,12 +18,12 @@ import { Button } from "@picoframe/frame";
 import { save } from "@tauri-apps/plugin-dialog";
 import { FileDown } from "lucide-react";
 import { useState } from "react";
-
 import {
   Popover,
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
+import { describeError } from "@/i18n/uiError";
 import { basename } from "@/lib/helpers";
 import { notify } from "@/notify/notify";
 import { legoSaveS3o } from "../../bindings";
@@ -75,7 +75,7 @@ export function SaveModelPopover({ project, imported, pack, raw }: Props) {
     } catch (error) {
       notify({
         title: t`Could not save the model`,
-        body: error instanceof Error ? error.message : String(error),
+        body: describeError(error),
         level: "error",
       });
     } finally {

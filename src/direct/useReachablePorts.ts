@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { describeError } from "@/i18n/uiError";
 import {
   type DirectReachability,
   type DirectTransport,
@@ -76,7 +77,7 @@ export function useReachablePorts(ports: PortSpec[] | null): {
         .catch((e) => {
           if (!live) return;
           setReport(null);
-          setError(e instanceof Error ? e.message : String(e));
+          setError(describeError(e));
         })
         .finally(() => {
           if (live) setBusy(false);

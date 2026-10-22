@@ -8,6 +8,7 @@ import {
   exactGameRequirement,
   exactMapRequirement,
 } from "@/content/resolveContent";
+import { describeError } from "@/i18n/uiError";
 import { playImportPreset } from "./bindings";
 import type { PlayTarget } from "./config";
 import type { SkirmishDraft } from "./drafts";
@@ -53,7 +54,7 @@ export function usePresetImport(onError: (message: string | null) => void) {
       rememberCarriedShortname(identify(json).game);
       setPending(parsed);
     } catch (e) {
-      onError(e instanceof Error ? e.message : String(e));
+      onError(describeError(e));
     }
   };
 

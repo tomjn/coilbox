@@ -21,7 +21,6 @@ import { Trans, useLingui } from "@lingui/react/macro";
 import { Button, useDrawer } from "@picoframe/frame";
 import { Copy, Loader2, MoreVertical, Pencil } from "lucide-react";
 import { useState } from "react";
-
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -29,11 +28,12 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { nextDrawerKey } from "@/general/drawerKey";
+import { describeError } from "@/i18n/uiError";
 import { notify } from "@/notify/notify";
 import { duplicatedBlueprint, type StoredBlueprint } from "../../library";
 import { saveBlueprint } from "../../store";
 
-const message = (e: unknown) => (e instanceof Error ? e.message : String(e));
+const message = (e: unknown) => describeError(e);
 
 export function BlueprintCardMenu({
   record,

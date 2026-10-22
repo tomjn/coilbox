@@ -25,6 +25,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { describeError } from "@/i18n/uiError";
 import { formatFixed, formatNumber } from "@/lib/format";
 import {
   type Report,
@@ -52,7 +53,7 @@ import {
 const ALL = "__all__";
 
 function errMessage(e: unknown): string {
-  return e instanceof Error ? e.message : String(e);
+  return describeError(e);
 }
 
 /** Compact provenance line: ref or short SHA, server version. */

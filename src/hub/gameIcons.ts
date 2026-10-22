@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import type { GameItem } from "@/content/bindings";
 import { gameIconKey } from "@/content/gameIcon";
+import { describeError } from "@/i18n/uiError";
 import { createGameResolver } from "../career/games";
 import { fetchHubGames, type HubGame } from "./api";
 import { assetCdnBase } from "./assets/tier";
@@ -108,7 +109,7 @@ export function loadHubGames(
         return null;
       })
       .catch((e: unknown) => {
-        failures.set(hubUrl, e instanceof Error ? e.message : String(e));
+        failures.set(hubUrl, describeError(e));
         return null;
       })
       .then((games) => {

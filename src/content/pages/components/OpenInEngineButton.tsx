@@ -3,6 +3,7 @@ import { useLingui } from "@lingui/react/macro";
 import { Button } from "@picoframe/frame";
 import { ExternalLink } from "lucide-react";
 import { useState } from "react";
+import { describeError } from "@/i18n/uiError";
 import { usePlay } from "../../../play/PlayProvider";
 import type { ReplayWatch } from "../../replayEngine";
 import type { ReplayClock } from "../../replayMapView/clock";
@@ -65,7 +66,7 @@ export function OpenInEngineButton({
         setError(t`Engine exited with code ${exitCode}.`);
       }
     } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
+      setError(describeError(e));
     } finally {
       setPending(false);
     }

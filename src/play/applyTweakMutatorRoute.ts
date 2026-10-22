@@ -17,6 +17,7 @@
 import { t } from "@lingui/core/macro";
 import { primeScan } from "@/content/config";
 import { resolveMutatorDataDir } from "@/downloads/config";
+import { describeError } from "@/i18n/uiError";
 import { isWorkshopMutatorArchive } from "@/lib/generatedGames";
 import { settledSummary, settleTypedValues } from "@/workshop/loadsAs";
 import { workshopTestMutator } from "@/workshop/mutator";
@@ -67,7 +68,7 @@ export async function applyTweakMutatorRoute({
     target.dataDir,
     true,
   ).catch((error) => {
-    const reason = error instanceof Error ? error.message : String(error);
+    const reason = describeError(error);
     throw new Error(t`The content scan failed: ${reason}`);
   });
   const found = rescanned.games.find((g) =>

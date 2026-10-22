@@ -9,6 +9,7 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
+import { describeError } from "@/i18n/uiError";
 import { notify } from "../../notify/notify";
 import { battleRoomHref } from "../battle/battleRoomKey";
 import { leaveBattle } from "../battle/leaveBattle";
@@ -115,7 +116,7 @@ function useFollowDriver(follow: Follow | null): FollowBlock | null {
       leaveBattle(serverKey).catch((e) => {
         void notify({
           title: coreT`Could not leave the battle ${name} left`,
-          body: e instanceof Error ? e.message : String(e),
+          body: describeError(e),
           level: "error",
         });
       });

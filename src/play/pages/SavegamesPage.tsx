@@ -16,6 +16,7 @@ import {
   ErrorBanner,
   SkeletonList,
 } from "@/content/pages/components/states";
+import { describeError } from "@/i18n/uiError";
 import { formatBytes, formatDateTime } from "@/lib/format";
 import { usePlay } from "../PlayProvider";
 
@@ -109,7 +110,7 @@ export default function SavegamesPage() {
         setActionError(t`Engine exited with code ${exitCode}.`);
       }
     } catch (e) {
-      setActionError(e instanceof Error ? e.message : String(e));
+      setActionError(describeError(e));
     } finally {
       setPending(false);
     }
@@ -122,7 +123,7 @@ export default function SavegamesPage() {
       setConfirmDelete(null);
       await refresh();
     } catch (e) {
-      setActionError(e instanceof Error ? e.message : String(e));
+      setActionError(describeError(e));
     }
   };
 

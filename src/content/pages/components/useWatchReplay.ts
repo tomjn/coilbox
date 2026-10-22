@@ -1,5 +1,6 @@
 import { t } from "@lingui/core/macro";
 import { useState } from "react";
+import { describeError } from "@/i18n/uiError";
 import { usePlay } from "../../../play/PlayProvider";
 import type { ReplayWatch } from "../../replayEngine";
 import { useReplayUserState } from "../../replayUserState";
@@ -42,7 +43,7 @@ export function useWatchReplay(
         setError(t`Engine exited with code ${exitCode}.`);
       }
     } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
+      setError(describeError(e));
     } finally {
       setPending(false);
     }

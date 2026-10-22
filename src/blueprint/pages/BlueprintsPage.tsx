@@ -50,6 +50,7 @@ import {
 import { gameForIdentity } from "@/content/useGameUnits";
 import { useImportParam } from "@/deeplink/useImportParam";
 import { useRecordHubImport } from "@/hub/imports";
+import { describeError } from "@/i18n/uiError";
 import { withoutGeneratedGames } from "@/lib/generatedGames";
 import { notify } from "@/notify/notify";
 import { usePreferredTarget } from "@/play/config";
@@ -395,7 +396,7 @@ function NewBlueprintButton({
       await saveBlueprint(made);
       navigate(blueprintRoute(made.id));
     } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
+      setError(describeError(e));
     } finally {
       setBusy(false);
     }

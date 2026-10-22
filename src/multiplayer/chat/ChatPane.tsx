@@ -30,6 +30,7 @@ import {
   useMessageScroller,
 } from "@/components/ui/message-scroller";
 import { Textarea } from "@/components/ui/textarea";
+import { describeError } from "@/i18n/uiError";
 import { formatDate, formatTime as formatLocaleTime } from "@/lib/format";
 import { readableTeamTextColor } from "@/lib/teamColor";
 import type { ChatMsg } from "../bindings";
@@ -512,7 +513,7 @@ export function ChatPane({
         await onSend(line);
       } catch (e) {
         setDraft(lines.slice(i).join("\n"));
-        setSendError(String(e));
+        setSendError(describeError(e));
         return;
       }
     }

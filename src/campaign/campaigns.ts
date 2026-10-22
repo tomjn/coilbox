@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
+import { describeError } from "@/i18n/uiError";
 import { createDocumentStore } from "../lib/documentStore";
 import {
   campaignList,
@@ -116,7 +117,7 @@ export function useCampaignProgress() {
         setProgress(emptyProgress);
       }
     } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
+      setError(describeError(e));
     } finally {
       setLoading(false);
     }

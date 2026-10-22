@@ -1,4 +1,5 @@
 import { plural, t } from "@lingui/core/macro";
+import { describeError } from "@/i18n/uiError";
 import type { HandmadeMapRef } from "../challenge/mapRef";
 import { loadChallengeMap } from "../conquest/handmade/challenge";
 import { loadHandmadeMap } from "../conquest/handmade/library";
@@ -57,7 +58,7 @@ function readProblem(id: string, result: HandmadeMapResult): string | null {
 }
 
 function listProblem(e: unknown): string {
-  const reason = e instanceof Error ? e.message : String(e);
+  const reason = describeError(e);
   return t`The hand-made maps could not be listed. ${reason}`;
 }
 

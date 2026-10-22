@@ -27,11 +27,13 @@
  * decode command only fires when those values actually change, not on every
  * unrelated snapshot the room otherwise receives.
  */
+
 import { Trans } from "@lingui/react/macro";
 import { Button } from "@picoframe/frame";
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router";
 import type { ConfigOption } from "@/content/bindings";
+import { describeError } from "@/i18n/uiError";
 import {
   allSlots,
   type DecodedTweakSet,
@@ -83,7 +85,7 @@ export function BattleTweakDecodeSection({
         if (!cancelled) {
           setPhase({
             state: "failed",
-            message: error instanceof Error ? error.message : String(error),
+            message: describeError(error),
           });
         }
       });

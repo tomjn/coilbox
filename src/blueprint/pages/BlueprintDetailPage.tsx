@@ -30,7 +30,6 @@ import {
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router";
-
 import {
   Popover,
   PopoverContent,
@@ -45,6 +44,7 @@ import { useGameUnits } from "@/content/useGameUnits";
 import { nextDrawerKey } from "@/general/drawerKey";
 import { useBlueprintBackfill } from "@/hub/assets/useBlueprintBackfill";
 import { hubItemRoute, isHubItemPageReachable } from "@/hub/config";
+import { describeError } from "@/i18n/uiError";
 import { formatDate } from "@/lib/format";
 import { notify } from "@/notify/notify";
 import { BlueprintEditor } from "@/placement/BlueprintEditor";
@@ -73,7 +73,7 @@ import { useWidgetFiles } from "../useWidgetFiles";
  *  about it. */
 const SAVE_AFTER_MS = 800;
 
-const message = (e: unknown) => (e instanceof Error ? e.message : String(e));
+const message = (e: unknown) => describeError(e);
 
 export default function BlueprintDetailPage() {
   const { id = "" } = useParams();

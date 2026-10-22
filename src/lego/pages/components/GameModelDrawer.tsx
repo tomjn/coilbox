@@ -31,6 +31,7 @@ import { isSdd } from "@/content/format";
 import { SddBadge } from "@/content/pages/components/SddBadge";
 import { ScanFailed } from "@/content/pages/components/states";
 import { UnitIcon } from "@/content/pages/components/UnitIcon";
+import { describeError } from "@/i18n/uiError";
 import { withoutGeneratedGames } from "@/lib/generatedGames";
 import { usePreferredTarget } from "@/play/config";
 import {
@@ -220,7 +221,7 @@ export function GameModelDrawer({
       if (thisPick !== pickCount.current) return;
       setStage({
         state: "failed",
-        message: error instanceof Error ? error.message : String(error),
+        message: describeError(error),
       });
     }
   }
@@ -234,7 +235,7 @@ export function GameModelDrawer({
     try {
       found = await adoptGameScript(project, target);
     } catch (error) {
-      const reason = error instanceof Error ? error.message : String(error);
+      const reason = describeError(error);
       found = {
         ...NO_SCRIPT,
         notes: [t`The animation could not be read: ${reason}`],

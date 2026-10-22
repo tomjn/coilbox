@@ -28,6 +28,7 @@ import { identify } from "@/container/container";
 import { useUnitsyncGameHeaders, useUnitsyncScan } from "@/content/config";
 import { ErrorBanner } from "@/content/pages/components/states";
 import { useGameUnits } from "@/content/useGameUnits";
+import { describeError } from "@/i18n/uiError";
 import { withoutGeneratedGames } from "@/lib/generatedGames";
 import { usePreferredTarget } from "@/play/config";
 import { GamePickerPanel } from "@/play/pages/components/GamePickerPanel";
@@ -53,7 +54,7 @@ import { knownUnits } from "../../units";
 import { useGameSides } from "../../useGameSides";
 import { ArrivingPack, type PackView } from "./ArrivingPack";
 
-const message = (e: unknown) => (e instanceof Error ? e.message : String(e));
+const message = (e: unknown) => describeError(e);
 
 export function ImportPackForm({
   onImported,

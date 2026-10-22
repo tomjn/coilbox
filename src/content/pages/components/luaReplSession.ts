@@ -1,4 +1,5 @@
 import { useSyncExternalStore } from "react";
+import { describeError } from "@/i18n/uiError";
 import { type LuaReplResult, unitsyncLuaReplExec } from "../../bindings";
 
 /**
@@ -101,7 +102,7 @@ export async function evalChunk(
   try {
     res = await unitsyncLuaReplExec({ ...target, chunks });
   } catch (e) {
-    res = { error: e instanceof Error ? e.message : String(e), errors: [] };
+    res = { error: describeError(e), errors: [] };
   }
 
   const cur = sessions.get(key) ?? EMPTY;

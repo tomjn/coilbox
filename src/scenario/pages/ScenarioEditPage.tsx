@@ -33,6 +33,7 @@ import { useUnitsyncScan } from "@/content/config";
 import { UnitGameProvider } from "@/content/pages/components/UnitPicker";
 import { useGameUnits } from "@/content/useGameUnits";
 import { ErrorBoundary } from "@/general/ErrorBoundary";
+import { describeError } from "@/i18n/uiError";
 import { lockedExportedUnits } from "@/lego/locks";
 import { useLegoProjects } from "@/lego/projects";
 import {
@@ -304,7 +305,7 @@ export default function ScenarioEditPage() {
         await refreshScenarios();
       },
       onError: (e) => {
-        setError(e instanceof Error ? e.message : String(e));
+        setError(describeError(e));
         setSave({ kind: "failed" });
       },
     });
@@ -462,7 +463,7 @@ export default function ScenarioEditPage() {
       await refreshScenarios();
       navigate(`/scenario-builder/${copy.id}`);
     } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
+      setError(describeError(e));
     }
   };
 

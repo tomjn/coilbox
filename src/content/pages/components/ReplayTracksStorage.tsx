@@ -9,6 +9,7 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
+import { describeError } from "@/i18n/uiError";
 import { formatBytes } from "@/lib/format";
 import { notify } from "@/notify/notify";
 import { contentReplayTracksClear } from "../../bindings";
@@ -21,8 +22,7 @@ import {
 
 const MIB = 1024 * 1024;
 
-const msg = (e: unknown): string =>
-  e instanceof Error ? e.message : String(e);
+const msg = (e: unknown): string => describeError(e);
 
 /**
  * What recorded tracks take on disk, the limit on it, and a button that

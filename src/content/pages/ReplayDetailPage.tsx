@@ -18,6 +18,7 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
+import { describeError } from "@/i18n/uiError";
 import { formatBytes, formatDateTime, formatDuration } from "@/lib/format";
 import { notify } from "@/notify/notify";
 import { useWriteRoot, useWriteRootPath } from "../../downloads/config";
@@ -77,7 +78,7 @@ import { WatchButton } from "./components/WatchButton";
 import { WatchWithRewindButton } from "./components/WatchWithRewindButton";
 import { OriginBadge } from "./ReplaysPage";
 
-const errMessage = (e: unknown) => (e instanceof Error ? e.message : String(e));
+const errMessage = (e: unknown) => describeError(e);
 
 function playedAt(ms: number): string {
   if (!ms) return "";

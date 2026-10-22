@@ -2,6 +2,7 @@ import { plural } from "@lingui/core/macro";
 import { useLingui } from "@lingui/react/macro";
 import { open } from "@tauri-apps/plugin-dialog";
 import { useState } from "react";
+import { describeError } from "@/i18n/uiError";
 import { identify } from "../container/container";
 import { rememberCarriedShortname } from "../container/shortnames";
 import { ResolveContentGate } from "../content/pages/components/ResolveContentDrawer";
@@ -121,7 +122,7 @@ export function ImportChallengeForm<TSettings, TDoc>({
     try {
       if (await runFinish(held.settings, accepted)) setHeld(null);
     } catch (e) {
-      setHoldError(e instanceof Error ? e.message : String(e));
+      setHoldError(describeError(e));
     } finally {
       setHoldBusy(false);
     }

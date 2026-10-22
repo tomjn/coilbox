@@ -16,8 +16,8 @@
 
 import { plural, t } from "@lingui/core/macro";
 import { useCallback, useState } from "react";
-
 import { unitsyncLuaExec } from "@/content/bindings";
+import { describeError } from "@/i18n/uiError";
 import { usePreferredTarget } from "@/play/config";
 import { equivalentsKey, rememberShippedEquivalents } from "./equivalentsStore";
 import { SHIPPED_TABLE_LUA, shippedEquivalents } from "./shippedEquivalents";
@@ -83,7 +83,7 @@ export function useShippedEquivalents(
             }),
       );
     } catch (e) {
-      const detail = e instanceof Error ? e.message : String(e);
+      const detail = describeError(e);
       setNote(t`Could not read this game's table: ${detail}`);
     } finally {
       setReading(false);

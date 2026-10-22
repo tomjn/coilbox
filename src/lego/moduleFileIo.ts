@@ -7,6 +7,7 @@
 
 import { t } from "@lingui/core/macro";
 import { ask, open, save } from "@tauri-apps/plugin-dialog";
+import { describeError } from "@/i18n/uiError";
 
 import type { NotifyInput } from "@/notify/notify";
 import { legoReadTextFile, legoWriteTextFile } from "./bindings";
@@ -22,7 +23,7 @@ import { saveCompound } from "./projects";
 const filters = () => [{ name: t`Coilbox module`, extensions: ["json"] }];
 
 function message(error: unknown): string {
-  return error instanceof Error ? error.message : String(error);
+  return describeError(error);
 }
 
 /** Ask where, then write the module there. */

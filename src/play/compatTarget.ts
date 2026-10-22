@@ -9,7 +9,9 @@
  * current engine without its fixes is the failure compatibility mode exists to
  * prevent.
  */
+
 import { t } from "@lingui/core/macro";
+import { describeError } from "@/i18n/uiError";
 import { compatStatus } from "../compat/bindings";
 import { staleReason } from "../compat/staleReason";
 import type { CompatSettings } from "../content/compatSettings";
@@ -101,7 +103,7 @@ export async function resolveCompatTarget(opts: {
       baseName: game.name,
     };
   } catch (e) {
-    const reason = e instanceof Error ? e.message : String(e);
+    const reason = describeError(e);
     return blocked(
       t`Compatibility mode is on for ${gameName}, but its mutator could not be checked (${reason}). Open ${gameName} under Library > Games and choose Rebuild.`,
     );

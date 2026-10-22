@@ -9,12 +9,12 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
+import { describeError } from "@/i18n/uiError";
 import { formatBytes } from "@/lib/format";
 import { notify } from "@/notify/notify";
 import { contentDeleteEngine, type EngineUsage } from "../../bindings";
 
-const msg = (e: unknown): string =>
-  e instanceof Error ? e.message : String(e);
+const msg = (e: unknown): string => describeError(e);
 
 /**
  * Confirm-then-delete for one installed engine (issue #386). Stale engine

@@ -1,5 +1,6 @@
 import { i18n, type MessageDescriptor } from "@lingui/core";
 import { msg, plural, t } from "@lingui/core/macro";
+import { describeError } from "@/i18n/uiError";
 import { scenarioEvalMission, scenarioReadMission } from "./bindings";
 import { missionPath } from "./compile";
 import {
@@ -989,7 +990,7 @@ export async function validateCompiledMission(
   try {
     ({ mission } = await scenarioReadMission({ root, path }));
   } catch (err) {
-    const message = err instanceof Error ? err.message : String(err);
+    const message = describeError(err);
     return [{ path, message }];
   }
   return validateMission(mission, map, units);
@@ -1013,7 +1014,7 @@ export async function validateCompiledMissionText(
   try {
     ({ mission } = await scenarioEvalMission({ source: missionLua }));
   } catch (err) {
-    const message = err instanceof Error ? err.message : String(err);
+    const message = describeError(err);
     return [{ path: "mission.lua", message }];
   }
   return validateMission(mission, map, units);

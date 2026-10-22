@@ -4,6 +4,7 @@ import { Button } from "@picoframe/frame";
 import { save } from "@tauri-apps/plugin-dialog";
 import { Download, Loader2 } from "lucide-react";
 import { useState } from "react";
+import { describeError } from "@/i18n/uiError";
 import { notify } from "@/notify/notify";
 import { contentWriteFile } from "../../bindings";
 import {
@@ -42,7 +43,7 @@ export function MatchStatsExportButton({
       await contentWriteFile({ dest, text: matchStatsCsv(input) });
       void notify({ title: t`Match statistics exported.`, level: "success" });
     } catch (e) {
-      const reason = e instanceof Error ? e.message : String(e);
+      const reason = describeError(e);
       void notify({
         title: t`Export failed: ${reason}`,
         level: "error",

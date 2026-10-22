@@ -8,6 +8,7 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
+import { describeError } from "@/i18n/uiError";
 import { notify } from "@/notify/notify";
 import {
   contentDeleteReplays,
@@ -15,8 +16,7 @@ import {
   type ReplayFile,
 } from "../../bindings";
 
-const msg = (e: unknown): string =>
-  e instanceof Error ? e.message : String(e);
+const msg = (e: unknown): string => describeError(e);
 
 /** What deleting an empty file risks, in the words every surface uses. */
 export const unfinishedWarning = (): string =>

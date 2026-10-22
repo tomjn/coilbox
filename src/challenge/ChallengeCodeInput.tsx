@@ -3,6 +3,7 @@ import { Button } from "@picoframe/frame";
 import { Download, FolderOpen } from "lucide-react";
 import { type ReactNode, useEffect, useRef, useState } from "react";
 import { Textarea } from "@/components/ui/textarea";
+import { describeError } from "@/i18n/uiError";
 import { ErrorBanner } from "../content/pages/components/states";
 
 /**
@@ -61,7 +62,7 @@ export function ChallengeCodeInput({
     try {
       await onImport(value);
     } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
+      setError(describeError(e));
     } finally {
       setBusy(false);
     }
@@ -76,7 +77,7 @@ export function ChallengeCodeInput({
       setCode(text);
       await submit(text);
     } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
+      setError(describeError(e));
     }
   };
 

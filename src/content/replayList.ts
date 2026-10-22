@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState, useSyncExternalStore } from "react";
+import { describeError } from "@/i18n/uiError";
 import { contentListReplays, type ReplayFile } from "./bindings";
 import { shareInFlight } from "./inFlight";
 
@@ -110,7 +111,7 @@ export function useReplays(rootPath?: string) {
       try {
         await loadReplays(rootPath, refresh);
       } catch (e) {
-        setError(e instanceof Error ? e.message : String(e));
+        setError(describeError(e));
       } finally {
         setLoadedFor(rootPath);
         setLoading(false);

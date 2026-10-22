@@ -7,6 +7,7 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
+import { describeError } from "@/i18n/uiError";
 import { formatBytes } from "@/lib/format";
 import { notify } from "@/notify/notify";
 import { contentDeleteArchive, contentRescan } from "../../bindings";
@@ -17,8 +18,7 @@ import {
 } from "../../config";
 import { setContentState } from "../../contentState";
 
-const msg = (e: unknown): string =>
-  e instanceof Error ? e.message : String(e);
+const msg = (e: unknown): string => describeError(e);
 
 /**
  * Confirm-then-delete for one downloaded game or map archive (issue #978).

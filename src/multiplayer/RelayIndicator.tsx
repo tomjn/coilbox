@@ -8,6 +8,7 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import { useRelayHostingKey } from "@/direct/hostingRoute";
+import { describeError } from "@/i18n/uiError";
 import { notify } from "@/notify/notify";
 import { usePlay } from "@/play/PlayProvider";
 import { ASK_EVERY_MS, relayCarryingLabel } from "@/play/relayCarrying";
@@ -194,7 +195,7 @@ function OurRelay({
       await leaveBattle(serverKey);
       navigate("/battles");
     } catch (e) {
-      const reason = e instanceof Error ? e.message : String(e);
+      const reason = describeError(e);
       void notify({
         title: t`The battle is still open`,
         body: t`Coilbox could not close it: ${reason}.`,

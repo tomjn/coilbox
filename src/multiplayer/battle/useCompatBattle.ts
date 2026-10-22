@@ -1,5 +1,6 @@
 import { t } from "@lingui/core/macro";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { describeError } from "@/i18n/uiError";
 import { compatBuild, compatStatus } from "../../compat/bindings";
 import { primeGameInfo } from "../../content/config";
 import {
@@ -13,8 +14,7 @@ interface ScannedGame {
   primaryArchive: { name: string };
 }
 
-const msg = (e: unknown): string =>
-  e instanceof Error ? e.message : String(e);
+const msg = (e: unknown): string => describeError(e);
 
 /** Builds under way, so leaving a room and coming back does not start a second write of one folder. */
 const inFlight = new Map<string, Promise<CompatBattleState | null>>();

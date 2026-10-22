@@ -27,6 +27,7 @@ import { Slider } from "@/components/ui/slider";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import { useGameUnits } from "@/content/useGameUnits";
+import { describeError } from "@/i18n/uiError";
 import { formatFixed } from "@/lib/format";
 import type { Scenario } from "@/scenario/model";
 import {
@@ -510,7 +511,7 @@ export function MissionEditorDrawer({
       setError(null);
       setSave({ kind: "saved", at: new Date() });
     } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
+      setError(describeError(e));
       setSave({ kind: "failed" });
     }
   };
@@ -628,7 +629,7 @@ export function MissionEditorDrawer({
           : await campaignImageImport({ campaignId, srcPath: src });
       patch({ panorama: { kind: "file", file } });
     } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
+      setError(describeError(e));
     }
   };
 

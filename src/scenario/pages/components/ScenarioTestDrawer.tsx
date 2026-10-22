@@ -36,6 +36,7 @@ import { useCompatSettings } from "@/content/compatSettings";
 import { primeScan, useUnitsyncScan } from "@/content/config";
 import { loadReplays } from "@/content/replayList";
 import { useGameUnits } from "@/content/useGameUnits";
+import { describeError } from "@/i18n/uiError";
 import { playInfolog } from "@/play/bindings";
 import { resolveCompatTarget } from "@/play/compatTarget";
 import {
@@ -374,7 +375,7 @@ export function ScenarioTestDrawer({
     } catch (error) {
       setPhase({
         state: "failed",
-        message: error instanceof Error ? error.message : String(error),
+        message: describeError(error),
         issues: [],
       });
     }

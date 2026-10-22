@@ -13,9 +13,9 @@ import { Trans, useLingui } from "@lingui/react/macro";
 import { Button } from "@picoframe/frame";
 import { X } from "lucide-react";
 import { useState } from "react";
-
 import { RENDER_VERSION, renderUnit } from "@/hub/assets/renderTop";
 import { RENDER_ANGLES, renderFrame } from "@/hub/assets/vocabulary";
+import { describeError } from "@/i18n/uiError";
 import { toBase64 } from "@/lib/base64";
 import { formatFixed } from "@/lib/format";
 import type {
@@ -312,7 +312,7 @@ function HubRender({
         }),
       );
     } catch (e) {
-      setResult({ errors: [e instanceof Error ? e.message : String(e)] });
+      setResult({ errors: [describeError(e)] });
     } finally {
       setBusy(false);
     }

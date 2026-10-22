@@ -14,11 +14,11 @@ import { Button, Input } from "@picoframe/frame";
 import { X } from "lucide-react";
 import { Dialog as DialogPrimitive } from "radix-ui";
 import { useEffect, useState } from "react";
-
 import { Field } from "@/components/Field";
 import { OptionSelect } from "@/components/OptionSelect";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
+import { describeError } from "@/i18n/uiError";
 import { formatDateTime } from "@/lib/format";
 import { legoPictureSurvey, type PictureSurvey } from "../../bindings";
 import {
@@ -141,7 +141,7 @@ export function BuildPictureDrawer({
         fingerprint,
       });
     } catch (error) {
-      setProblem(error instanceof Error ? error.message : String(error));
+      setProblem(describeError(error));
     } finally {
       setWorking(false);
     }

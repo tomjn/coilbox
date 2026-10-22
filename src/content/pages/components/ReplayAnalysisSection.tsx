@@ -22,6 +22,7 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import { Progress } from "@/components/ui/progress";
+import { describeError } from "@/i18n/uiError";
 import {
   formatBytes,
   formatDateTime,
@@ -81,7 +82,7 @@ type Estimate = ReturnType<typeof estimateRecording>;
 const FIGURES_SHOWN = 4;
 
 function errMessage(e: unknown): string {
-  return e instanceof Error ? e.message : String(e);
+  return describeError(e);
 }
 
 function when(ms: number): string {

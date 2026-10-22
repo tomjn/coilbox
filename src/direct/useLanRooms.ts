@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { describeError } from "@/i18n/uiError";
 import {
   type DirectLanRoom,
   directLanRooms,
@@ -40,7 +41,7 @@ export function useLanRooms(): {
         })
         .catch((e) => {
           if (!live) return;
-          setError(e instanceof Error ? e.message : String(e));
+          setError(describeError(e));
         });
     };
     poll();

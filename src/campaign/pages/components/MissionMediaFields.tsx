@@ -4,6 +4,7 @@ import { open } from "@tauri-apps/plugin-dialog";
 import { Music, Trash2, Video } from "lucide-react";
 import { useState } from "react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { describeError } from "@/i18n/uiError";
 import { AUDIO_EXTS, VIDEO_EXTS } from "../../../lib/assetUrl";
 import { campaignMediaImport } from "../../bindings";
 import type { MediaPlayback, MediaRef } from "../../model";
@@ -113,7 +114,7 @@ export function MissionAvField({
       });
       onChange({ kind: "file", file });
     } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
+      setError(describeError(e));
     }
   };
 

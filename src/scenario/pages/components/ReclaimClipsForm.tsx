@@ -3,6 +3,7 @@ import { Trans } from "@lingui/react/macro";
 import { Button } from "@picoframe/frame";
 import { Loader2, Trash2 } from "lucide-react";
 import { useEffect, useState } from "react";
+import { describeError } from "@/i18n/uiError";
 import { formatBytes } from "@/lib/format";
 import { notify } from "@/notify/notify";
 import { loadedCampaigns } from "../../../campaign/campaigns";
@@ -14,8 +15,7 @@ import {
 import type { MediaSweepSummary } from "../../bindings";
 import { listScenarios, sweepScenarioMedia } from "../../storage";
 
-const msg = (e: unknown): string =>
-  e instanceof Error ? e.message : String(e);
+const msg = (e: unknown): string => describeError(e);
 
 /** One line saying what a sweep covers, dry run or applied. */
 function summarize(s: MediaSweepSummary): string {

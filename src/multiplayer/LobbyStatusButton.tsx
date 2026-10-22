@@ -20,6 +20,7 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import { Switch } from "@/components/ui/switch";
+import { describeError } from "@/i18n/uiError";
 import { cn } from "@/lib/utils";
 import {
   allServers,
@@ -264,7 +265,7 @@ export function LoginPanel({ onNavigate }: { onNavigate: () => void }) {
       await connect(server, account.username);
       setAdding(false);
     } catch (e) {
-      setError(String(e));
+      setError(describeError(e));
       if (tachyon) setNeedsSignIn(account);
     } finally {
       setPending(null);
@@ -276,7 +277,7 @@ export function LoginPanel({ onNavigate }: { onNavigate: () => void }) {
     try {
       await disconnect(serverKey);
     } catch (e) {
-      setError(String(e));
+      setError(describeError(e));
     }
   }
 
@@ -287,7 +288,7 @@ export function LoginPanel({ onNavigate }: { onNavigate: () => void }) {
       try {
         await disconnect(key);
       } catch (e) {
-        setError(String(e));
+        setError(describeError(e));
       }
     }
   }
@@ -305,7 +306,7 @@ export function LoginPanel({ onNavigate }: { onNavigate: () => void }) {
       try {
         await disconnect(replaced);
       } catch (e) {
-        setError(String(e));
+        setError(describeError(e));
         return;
       }
     }

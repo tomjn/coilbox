@@ -39,6 +39,7 @@ import {
 } from "lucide-react";
 import { useEffect, useId, useState } from "react";
 import { Textarea } from "@/components/ui/textarea";
+import { describeError } from "@/i18n/uiError";
 import { useFieldText } from "@/lib/useFieldText";
 import { loadedCampaigns } from "../../../campaign/campaigns";
 import { clipIsAttached } from "../../../campaign/scenarioMedia";
@@ -295,7 +296,7 @@ function DialogueForm({
       edit({ [field]: file });
       if (previous) await dropClip(scenario.id, previous);
     } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
+      setError(describeError(e));
     }
   };
 

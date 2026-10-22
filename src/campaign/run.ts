@@ -1,5 +1,6 @@
 import { t } from "@lingui/core/macro";
 import { useCallback, useEffect, useState } from "react";
+import { describeError } from "@/i18n/uiError";
 import { useCompatSettings } from "../content/compatSettings";
 import { useUnitsyncScan } from "../content/config";
 import { dependencyBlockReason } from "../content/gameDependencies";
@@ -253,7 +254,7 @@ export function useMissionRun(campaign: Campaign, mission: CampaignMission) {
         setAutoDetected(auto);
         setPhase(outcome);
       } catch (e) {
-        setError(e instanceof Error ? e.message : String(e));
+        setError(describeError(e));
         // A save failure must not strand the player on "checking" (which has
         // no error display or retry) — fall back to the manual prompt, which
         // shows this error and offers Victory/Defeat again. A no-op when
@@ -439,7 +440,7 @@ export function useMissionRun(campaign: Campaign, mission: CampaignMission) {
         await applyResult(outcome, true);
       }
     } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
+      setError(describeError(e));
     }
   }, [
     target,
@@ -471,7 +472,7 @@ export function useMissionRun(campaign: Campaign, mission: CampaignMission) {
       try {
         await save(chooseDifficulty(progress, campaign.id, level));
       } catch (e) {
-        setError(e instanceof Error ? e.message : String(e));
+        setError(describeError(e));
       }
     },
     [save, progress, campaign.id],

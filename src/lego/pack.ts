@@ -24,6 +24,7 @@
 import { plural, t } from "@lingui/core/macro";
 import { gunzipSync } from "fflate";
 import * as THREE from "three";
+import { describeError } from "@/i18n/uiError";
 
 import { legoExtraPackUrl, legoPackUrl } from "../lib/assetUrl";
 import { type LegoAtlas, unitAtlas } from "./atlas";
@@ -755,7 +756,7 @@ async function fetchLibrary(): Promise<LoadedPack> {
     dir = installed.dir;
     names = installed.names;
   } catch (error) {
-    const reason = error instanceof Error ? error.message : String(error);
+    const reason = describeError(error);
     problems.push(t`Could not look for extension packs: ${reason}`);
   }
 

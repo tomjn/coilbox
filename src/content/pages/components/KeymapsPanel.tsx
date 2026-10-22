@@ -4,6 +4,7 @@ import { Button, Input } from "@picoframe/frame";
 import { open, save } from "@tauri-apps/plugin-dialog";
 import { Download, Link2, Trash2, Upload } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
+import { describeError } from "@/i18n/uiError";
 import {
   asContainer,
   decodeContainerText,
@@ -91,7 +92,7 @@ export function KeymapsPanel({
       const { keymaps } = await contentKeymaps({ rootPath });
       setSaved(keymaps);
     } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
+      setError(describeError(e));
     }
   }, [rootPath]);
 
@@ -116,7 +117,7 @@ export function KeymapsPanel({
       setStatus(t`Saved "${trimmed}".`);
       await refresh();
     } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
+      setError(describeError(e));
     } finally {
       setBusy(false);
     }
@@ -129,7 +130,7 @@ export function KeymapsPanel({
       await contentKeymapDelete({ rootPath, slug: stored.slug });
       await refresh();
     } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
+      setError(describeError(e));
     } finally {
       setBusy(false);
     }
@@ -156,7 +157,7 @@ export function KeymapsPanel({
       });
       setStatus(t`Exported "${keymapName}".`);
     } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
+      setError(describeError(e));
     }
   }
 
@@ -186,7 +187,7 @@ export function KeymapsPanel({
       setStatus(problem ? null : t`Imported. Save to write it to uikeys.txt.`);
       setError(problem);
     } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
+      setError(describeError(e));
     }
   }
 

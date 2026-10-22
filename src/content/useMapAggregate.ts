@@ -1,5 +1,6 @@
 import { t } from "@lingui/core/macro";
 import { useEffect, useMemo, useRef, useState } from "react";
+import { describeError } from "@/i18n/uiError";
 import { heatGridSize } from "@/lib/heatField";
 import {
   contentReplayMapGrids,
@@ -96,7 +97,7 @@ export function useMapReplayCounts(
               answer.failed[0]?.error ?? "the replay was not read",
             );
         } catch (e) {
-          refused.set(key, e instanceof Error ? e.message : String(e));
+          refused.set(key, describeError(e));
         }
         if (live) setTick((t) => t + 1);
       }

@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { describeError } from "@/i18n/uiError";
 import { unitsyncLuaExec } from "./bindings";
 import { useUnitsyncArchiveTree } from "./config";
 import { shareInFlight } from "./inFlight";
@@ -67,7 +68,7 @@ function useMapInfoEntries(
         setState({
           key,
           entries: null,
-          error: e instanceof Error ? e.message : String(e),
+          error: describeError(e),
         });
       });
     return () => {

@@ -21,9 +21,9 @@ import { Button } from "@picoframe/frame";
 import { save } from "@tauri-apps/plugin-dialog";
 import { Download } from "lucide-react";
 import { useState } from "react";
-
 import { ChallengeCodeView } from "@/challenge/ChallengeCodeView";
 import { ErrorBanner } from "@/content/pages/components/states";
+import { describeError } from "@/i18n/uiError";
 import { appFileIO } from "../../fileIO";
 import type { StoredBlueprint } from "../../library";
 import { encodePayloadCode, encodePayloadJson } from "../../transfer";
@@ -49,7 +49,7 @@ export function ShareBlueprintForm({ record }: { record: StoredBlueprint }) {
     try {
       await saveFile();
     } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
+      setError(describeError(e));
     } finally {
       setBusy(false);
     }
