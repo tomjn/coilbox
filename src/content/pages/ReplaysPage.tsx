@@ -493,7 +493,7 @@ export default function ReplaysPage() {
             sort={effectiveSort}
             onSort={setSort}
             sortOptions={sortOptions}
-            sortClassName="w-48"
+            sortClassName="w-52"
             total={replays.length}
             shown={sorted.length}
             noun={t`replays`}
