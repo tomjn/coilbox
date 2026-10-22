@@ -10229,7 +10229,7 @@ msgstr "Wczytano wszystkie kampanie"
 #: src/lego/pages/components/CategoryMenu.tsx
 #, fuzzy
 msgid "All categories"
-msgstr "Wszystkie kategorie"
+msgstr "Wszystkie"
 
 #: src/workshop/pages/components/UnitReferenceView.tsx
 #, fuzzy
@@ -21405,7 +21405,7 @@ msgstr "Polecane"
 #: src/content/libraryGames.ts
 #, fuzzy
 msgid "Featured first"
-msgstr "Najpierw polecane"
+msgstr "Polecane"
 
 #: src/mapconv/pages/components/AdvancedOptions.tsx
 #, fuzzy
@@ -24810,7 +24810,7 @@ msgstr "Pominięto plik"
 #: src/multiplayer/index.tsx
 #, fuzzy
 msgid "Ignored users"
-msgstr "Ignorowani użytkownicy"
+msgstr "Ignorowane osoby"
 
 #: src/multiplayer/pages/IgnoreSettings.tsx
 #, fuzzy
@@ -26116,7 +26116,7 @@ msgstr "Dołączenie nie powiodło się: {lastJoinError}"
 #: src/multiplayer/chat/ChannelBrowser.tsx
 #, fuzzy
 msgid "Join or create a channel…"
-msgstr "Dołącz do kanału lub go utwórz…"
+msgstr "Dołącz lub utwórz kanał…"
 
 #: src/direct/JoinRoomForm.tsx
 #, fuzzy
@@ -26825,7 +26825,7 @@ msgstr "Najmniej"
 #: src/content/pages/ReplaysPage.tsx
 #, fuzzy
 msgid "Least {metricName}"
-msgstr "Najmniej: {metricName}"
+msgstr "Min. {metricName}"
 
 #: src/multiplayer/battle/BattleRoomHeader.tsx
 #: src/multiplayer/battles/BattleRow.tsx
@@ -29243,7 +29243,7 @@ msgstr "Najwięcej"
 #: src/content/pages/ReplaysPage.tsx
 #, fuzzy
 msgid "Most {metricName}"
-msgstr "Najwięcej: {metricName}"
+msgstr "Maks. {metricName}"
 
 #: src/components/HeatLegend.tsx
 #, fuzzy
@@ -41495,7 +41495,7 @@ msgstr "Ustaw temat kanału"
 #: src/lego/pages/components/BuilderReport.tsx
 #, fuzzy
 msgid "Set it in Unit tweaks"
-msgstr "Ustaw to w Poprawki jednostek"
+msgstr "Ustaw to w sekcji Poprawki jednostek"
 
 #: src/lobby-servers/pages/SettingsSection.tsx
 #, fuzzy
@@ -42218,12 +42218,12 @@ msgstr "Pokaż w folderze"
 #: src/downloads/pages/ActivityPage.tsx
 #, fuzzy
 msgid "Show in Games"
-msgstr "Pokaż w Gry"
+msgstr "Pokaż w grach"
 
 #: src/downloads/pages/ActivityPage.tsx
 #, fuzzy
 msgid "Show in Maps"
-msgstr "Pokaż w Mapy"
+msgstr "Pokaż w mapach"
 
 #: src/lego/pages/components/PieceTree.tsx
 #, fuzzy
@@ -43566,7 +43566,7 @@ msgstr "Rozpocznij z tego projekt"
 #: src/workshop/pages/UnitPage.tsx
 #, fuzzy
 msgid "Start a project under Unit tweaks to edit a game's units."
-msgstr "Rozpocznij projekt w Poprawki jednostek, aby edytować jednostki gry."
+msgstr "Rozpocznij projekt w sekcji Poprawki jednostek, aby edytować jednostki gry."
 
 #: src/home/groupDescription.ts
 #, fuzzy
@@ -45023,7 +45023,7 @@ msgstr "Tego szablonu już tu nie ma. Mógł zostać usunięty."
 #: src/workshop/pages/UnitPage.tsx
 #, fuzzy
 msgid "That project is not on this machine. Pick one under Unit tweaks."
-msgstr "Tego projektu nie ma na tym komputerze. Wybierz projekt w Poprawki jednostek."
+msgstr "Tego projektu nie ma na tym komputerze. Wybierz projekt w sekcji Poprawki jednostek."
 
 #: src/direct/lan.ts
 #, fuzzy
@@ -51319,7 +51319,7 @@ msgstr "Nieznane pole \"{identifier}\". Spróbuj hp, speed, cost, metal, energy,
 #: src/content/pages/ReplaysPage.tsx
 #, fuzzy
 msgid "Unknown origin"
-msgstr "Nieznane pochodzenie"
+msgstr "Nieznane źródło"
 
 #: src/deeplink/parse.ts
 #, fuzzy
