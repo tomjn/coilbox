@@ -1,3 +1,4 @@
+import { t } from "@lingui/core/macro";
 import { decodeContainerText, readContainer } from "../../container/container";
 import { parseGameIdentity } from "../../container/gameIdentity";
 import { sameGameFamily } from "../../content/resolveContent";
@@ -37,6 +38,21 @@ export const BLANK_BATTLE_MAP = "";
 /** Whether the author left this location's battle for coilbox to pick. */
 export function hasBlankBattle(node: { battle: NodeBattleSpec }): boolean {
   return node.battle.mapName === BLANK_BATTLE_MAP;
+}
+
+/** The error for a file `map.json` names that the folder does not have. */
+export function missingFileMessage(
+  what: "province image" | "picture" | "heightmap",
+  file: string,
+): string {
+  switch (what) {
+    case "province image":
+      return t`${MANIFEST_FILE} names the province image "${file}", but the folder has no file with that name.`;
+    case "picture":
+      return t`${MANIFEST_FILE} names the picture "${file}", but the folder has no file with that name.`;
+    case "heightmap":
+      return t`${MANIFEST_FILE} names the heightmap "${file}", but the folder has no file with that name.`;
+  }
 }
 
 export interface HandmadeMapInput {
@@ -90,21 +106,27 @@ export function readHandmadeMap(input: HandmadeMapInput): HandmadeMapResult {
 
   const { provinces: image, picture } = input;
   if (image.width !== picture.width || image.height !== picture.height) {
+    const provincesFile = manifest.files.provinces;
+    const pictureFile = manifest.files.picture;
+    const provincesWidth = image.width;
+    const provincesHeight = image.height;
+    const pictureWidth = picture.width;
+    const pictureHeight = picture.height;
     errors.push({
       code: "size-mismatch",
       provinces: { width: image.width, height: image.height },
       picture: { width: picture.width, height: picture.height },
-      message: `The province image "${manifest.files.provinces}" is ${image.width} by ${image.height} pixels and the map picture "${manifest.files.picture}" is ${picture.width} by ${picture.height}. They must be the same size.`,
+      message: t`The province image "${provincesFile}" is ${provincesWidth} by ${provincesHeight} pixels and the map picture "${pictureFile}" is ${pictureWidth} by ${pictureHeight}. They must be the same size.`,
     });
   }
 
-  const url = (what: string, file: string): string => {
+  const url = (what: "picture" | "heightmap", file: string): string => {
     const found = input.urlFor(file);
     if (found !== undefined) return found;
     errors.push({
       code: "file-missing",
       file,
-      message: `${MANIFEST_FILE} names the ${what} "${file}", but the folder has no file with that name.`,
+      message: missingFileMessage(what, file),
     });
     return "";
   };
@@ -121,7 +143,7 @@ export function readHandmadeMap(input: HandmadeMapInput): HandmadeMapResult {
     errors.push({
       code: "file-missing",
       file,
-      message: `${MANIFEST_FILE}: models[${i}] names the model file "${file}", but the folder has no file with that name.`,
+      message: t`${MANIFEST_FILE}: models[${i}] names the model file "${file}", but the folder has no file with that name.`,
     });
   });
 
@@ -139,21 +161,23 @@ export function readHandmadeMap(input: HandmadeMapInput): HandmadeMapResult {
   let traceTrusted = !errors.some((e) => e.code === "unknown-location");
   for (const region of traced.unlisted) {
     traceTrusted = false;
+    const { color, x, y } = region;
     errors.push({
       code: "color-not-listed",
       ...region,
-      message: `The province image has the colour ${region.color} at pixel ${region.x}, ${region.y} (counted from the top left), but ${MANIFEST_FILE} lists no province with that colour. Add a province for it, or repaint the area.`,
+      message: t`The province image has the colour ${color} at pixel ${x}, ${y} (counted from the top left), but ${MANIFEST_FILE} lists no province with that colour. Add a province for it, or repaint the area.`,
     });
   }
   manifest.provinces.forEach((p, i) => {
     if (traced.provinces[i]) return;
     traceTrusted = false;
+    const province = describeProvince(p.name, p.color);
     errors.push({
       code: "province-not-painted",
       id: p.id,
       name: p.name,
       color: p.color,
-      message: `The province ${describeProvince(p.name, p.color)} is listed in ${MANIFEST_FILE}, but its colour is not painted anywhere on the province image. Check the colour matches exactly.`,
+      message: t`The province ${province} is listed in ${MANIFEST_FILE}, but its colour is not painted anywhere on the province image. Check the colour matches exactly.`,
     });
   });
 
@@ -175,30 +199,40 @@ export function readHandmadeMap(input: HandmadeMapInput): HandmadeMapResult {
     const file = l.scenario;
     if (file === undefined) return undefined;
     const at = { id: l.id, name: l.name, file };
+    const name = l.name;
     if (input.urlFor(file) === undefined) {
       errors.push({
         code: "scenario-missing",
         ...at,
-        message: `${MANIFEST_FILE}: "${l.name}" names the scenario file "${file}", but the folder has no file with that name.`,
+        message: t`${MANIFEST_FILE}: "${name}" names the scenario file "${file}", but the folder has no file with that name.`,
       });
       return undefined;
     }
-    const invalid = (why: string) => {
+    const invalid = (message: string) => {
       errors.push({
         code: "scenario-invalid",
         ...at,
-        message: `The scenario file "${file}" for "${l.name}" cannot be used. ${why}`,
+        message,
       });
       return undefined;
     };
     const text = input.scenarios?.[file];
-    if (text === undefined) return invalid("The file could not be read.");
+    if (text === undefined) {
+      return invalid(
+        t`The scenario file "${file}" for "${name}" cannot be used. The file could not be read.`,
+      );
+    }
     const read = readScenarioFile(text);
-    if (!read.ok) return invalid(read.why);
+    if (!read.ok) {
+      const why = read.why;
+      return invalid(
+        t`The scenario file "${file}" for "${name}" cannot be used. ${why}`,
+      );
+    }
     const { doc, media, shortname } = read;
     if (!doc.setup.gameName || !doc.setup.mapName) {
       return invalid(
-        "It has no game and map yet. Set it up in the scenario builder and export it again.",
+        t`The scenario file "${file}" for "${name}" cannot be used. It has no game and map yet. Set it up in the scenario builder and export it again.`,
       );
     }
     const { game } = manifest;
@@ -209,11 +243,13 @@ export function readHandmadeMap(input: HandmadeMapInput): HandmadeMapResult {
       game.pinnedName !== undefined &&
       !sameGameFamily(doc.setup.gameName, game.pinnedName);
     if (otherShortname || otherFamily) {
+      const scenarioGame = doc.setup.gameName;
+      const mapGame = game.pinnedName ?? game.shortname;
       errors.push({
         code: "scenario-wrong-game",
         ...at,
         game: doc.setup.gameName,
-        message: `The scenario file "${file}" for "${l.name}" is for the game "${doc.setup.gameName}", and this map is for "${game.pinnedName ?? game.shortname}". A location can only play a scenario made for the map's game.`,
+        message: t`The scenario file "${file}" for "${name}" is for the game "${scenarioGame}", and this map is for "${mapGame}". A location can only play a scenario made for the map's game.`,
       });
       return undefined;
     }
@@ -283,11 +319,13 @@ export function readHandmadeMap(input: HandmadeMapInput): HandmadeMapResult {
     const painted = (id: string) => nodes.some((n) => n.id === id && n.outline);
     // An unpainted province already has its own error.
     if (!traceTrusted && !(painted(a) && painted(b))) continue;
+    const first = described.get(a) ?? a;
+    const second = described.get(b) ?? b;
     errors.push({
       code: "blocked-border-not-touching",
       a,
       b,
-      message: `${MANIFEST_FILE} blocks the border between ${described.get(a)} and ${described.get(b)}, but they do not touch on the province image.`,
+      message: t`${MANIFEST_FILE} blocks the border between ${first} and ${second}, but they do not touch on the province image.`,
     });
   }
   for (const [a, b] of manifest.crossings) {
@@ -301,23 +339,28 @@ export function readHandmadeMap(input: HandmadeMapInput): HandmadeMapResult {
   if (traceTrusted) {
     for (const stranded of findUnreachable(nodes, linkKinds)) {
       const node = stranded.node;
-      const who = described.get(node.id);
+      const who = described.get(node.id) ?? node.id;
       const painted = Boolean(node.outline);
-      const company =
-        stranded.group.length === 0
-          ? painted
-            ? "Nothing touches it."
-            : "No road or crossing joins it."
-          : `It is joined only to ${stranded.group.map((id) => described.get(id)).join(", ")}.`;
-      const advice = painted
-        ? `Add a crossing or a road in ${MANIFEST_FILE}, or paint it so it touches a neighbour.`
-        : `Add a road or a crossing to it in ${MANIFEST_FILE}.`;
+      const joined = stranded.group
+        .map((id) => described.get(id) ?? id)
+        .join(", ");
+      const isolated = stranded.group.length === 0;
+      let message: string;
+      if (painted) {
+        message = isolated
+          ? t`The province ${who} cannot be reached from the rest of the map. Nothing touches it. Add a crossing or a road in ${MANIFEST_FILE}, or paint it so it touches a neighbour.`
+          : t`The province ${who} cannot be reached from the rest of the map. It is joined only to ${joined}. Add a crossing or a road in ${MANIFEST_FILE}, or paint it so it touches a neighbour.`;
+      } else {
+        message = isolated
+          ? t`The location ${who} cannot be reached from the rest of the map. No road or crossing joins it. Add a road or a crossing to it in ${MANIFEST_FILE}.`
+          : t`The location ${who} cannot be reached from the rest of the map. It is joined only to ${joined}. Add a road or a crossing to it in ${MANIFEST_FILE}.`;
+      }
       errors.push({
         code: "unreachable",
         id: node.id,
         name: node.name,
         color: manifest.provinces.find((p) => p.id === node.id)?.color,
-        message: `${painted ? "The province" : "The location"} ${who} cannot be reached from the rest of the map. ${company} ${advice}`,
+        message,
       });
     }
   }
@@ -332,11 +375,13 @@ export function readHandmadeMap(input: HandmadeMapInput): HandmadeMapResult {
       routeAcrossMap({ nodes, links }, warpath.start, warpath.goal);
     } catch (e) {
       if (!(e instanceof MapRouteError)) throw e;
+      const start = described.get(warpath.start) ?? warpath.start;
+      const goal = described.get(warpath.goal) ?? warpath.goal;
       errors.push({
         code: "warpath-route",
         startId: warpath.start,
         goalId: warpath.goal,
-        message: `A Warpath run cannot get from the start ${described.get(warpath.start)} to the goal ${described.get(warpath.goal)}. Join them with a crossing or a road in ${MANIFEST_FILE}, or paint the land between them so it touches.`,
+        message: t`A Warpath run cannot get from the start ${start} to the goal ${goal}. Join them with a crossing or a road in ${MANIFEST_FILE}, or paint the land between them so it touches.`,
       });
     }
   }

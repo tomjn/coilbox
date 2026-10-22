@@ -1,3 +1,4 @@
+import { t } from "@lingui/core/macro";
 import { useEffect, useMemo, useRef } from "react";
 import type { LandPicture } from "../../landJob";
 import type { GalaxyDoc, LinkKind, MapSkin } from "../../model";
@@ -23,8 +24,8 @@ const SEA_COLOR = "#183a60";
 /** What a screen reader calls the preview. Only a galaxy is a galaxy. */
 export function previewLabel(skin: MapSkin | undefined): string {
   return skin === "galaxy" || skin === undefined
-    ? "Galaxy layout preview"
-    : "Map preview";
+    ? t`Galaxy layout preview`
+    : t`Map preview`;
 }
 
 export function GalaxyPreview2D({

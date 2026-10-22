@@ -10,6 +10,7 @@
  * `../../aimPoint.ts`.
  */
 
+import { Trans, useLingui } from "@lingui/react/macro";
 import { Button } from "@picoframe/frame";
 import { useMemo } from "react";
 
@@ -30,6 +31,7 @@ interface Props {
 }
 
 export function AimPointPanel({ project, pack, raw, onChange }: Props) {
+  const { t } = useLingui();
   // Every vertex in the unit, so not on every keystroke elsewhere in the page.
   const bounds = useMemo(
     () => unitBounds(project, pack, raw),
@@ -41,13 +43,15 @@ export function AimPointPanel({ project, pack, raw, onChange }: Props) {
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto px-3 py-3">
       <p className="text-xs text-muted-foreground">
-        The one point on the unit that another unit shoots at. The engine uses
-        it as the unit's middle too, for range checks and for leading a moving
-        target.
+        <Trans>
+          The one point on the unit that another unit shoots at. The engine uses
+          it as the unit's middle too, for range checks and for leading a moving
+          target.
+        </Trans>
       </p>
 
       <Vec3Row
-        label="Aim point"
+        label={t`Aim point`}
         unit="elmos"
         values={aim}
         onCommit={(axis, value) => {
@@ -58,47 +62,61 @@ export function AimPointPanel({ project, pack, raw, onChange }: Props) {
       />
 
       <p className="text-xs text-muted-foreground">
-        Measured from the unit's own origin, which sits on the ground, so y is
-        how far up the unit the shot lands.
+        <Trans>
+          Measured from the unit's own origin, which sits on the ground, so y is
+          how far up the unit the shot lands.
+        </Trans>
       </p>
 
       <p className="text-xs text-muted-foreground">
-        While this panel is open the viewport's handles are on the point itself,
-        so it can be dragged onto the body rather than typed. Move only: a point
-        has no size and nothing to turn.
+        <Trans>
+          While this panel is open the viewport's handles are on the point
+          itself, so it can be dragged onto the body rather than typed. Move
+          only: a point has no size and nothing to turn.
+        </Trans>
       </p>
 
       <p className="text-xs text-muted-foreground">
-        Worth moving whenever a long piece drags the bounding box off the body:
-        a crane arm, an aircraft tail, a raised dish. The middle of the box is
-        then out in the air beside the unit, and shots aimed at it miss what a
-        player is looking at.
+        <Trans>
+          Worth moving whenever a long piece drags the bounding box off the
+          body: a crane arm, an aircraft tail, a raised dish. The middle of the
+          box is then out in the air beside the unit, and shots aimed at it miss
+          what a player is looking at.
+        </Trans>
       </p>
 
       {own ? (
         <Button size="sm" variant="outline" onClick={() => onChange(null)}>
-          Use the bounding box centre
+          <Trans>Use the bounding box centre</Trans>
         </Button>
       ) : (
         <p className="text-xs text-muted-foreground">
-          The middle of the model's bounding box, re-measured as the unit
-          changes. Changing anything above takes it over.
+          <Trans>
+            The middle of the model's bounding box, re-measured as the unit
+            changes. Changing anything above takes it over.
+          </Trans>
         </p>
       )}
 
       <div className="border-t border-border/60 pt-3">
-        <p className="text-xs font-medium">What moves with it</p>
+        <p className="text-xs font-medium">
+          <Trans>What moves with it</Trans>
+        </p>
         <p className="mt-1 text-xs text-muted-foreground">
-          The collision sphere is centred here, so it is re-measured from
-          wherever you put this. The collision volume's offsets are measured
-          from here too, and those are adjusted so the volume stays on the
-          geometry rather than following the point.
+          <Trans>
+            The collision sphere is centred here, so it is re-measured from
+            wherever you put this. The collision volume's offsets are measured
+            from here too, and those are adjusted so the volume stays on the
+            geometry rather than following the point.
+          </Trans>
         </p>
       </div>
 
       <p className="text-xs text-muted-foreground">
-        Which piece a weapon fires from is a separate thing the engine reads out
-        of the unit's script, and the builder has no weapons to fire.
+        <Trans>
+          Which piece a weapon fires from is a separate thing the engine reads
+          out of the unit's script, and the builder has no weapons to fire.
+        </Trans>
       </p>
     </div>
   );

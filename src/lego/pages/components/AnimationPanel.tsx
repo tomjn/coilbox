@@ -13,6 +13,8 @@
  * the script the presets generate.
  */
 
+import { plural, t } from "@lingui/core/macro";
+import { Trans, useLingui } from "@lingui/react/macro";
 import { Button, Input } from "@picoframe/frame";
 import {
   ChevronRight,
@@ -216,37 +218,42 @@ const DRIVEN_VALUES = new Set([CURRENT_SPEED, 75, 82]);
 /** When `ChangeHeading` reaches the script: never, which is the engine's own
  *  `minScriptChangeHeading`, or on every frame the unit turns, which is a game
  *  lowering it to 1. */
-const CHANGE_HEADING_OPTIONS = [
-  { value: "engine", label: "ChangeHeading: never (default)" },
-  { value: "every", label: "ChangeHeading: every turning frame" },
-];
+function changeHeadingOptions() {
+  return [
+    { value: "engine", label: t`ChangeHeading: never (default)` },
+    { value: "every", label: t`ChangeHeading: every turning frame` },
+  ];
+}
 
-/** Where a drive's speed and turn rate came from, in words. */
+/** Where a drive's speed and turn rate came from, in words. One sentence each,
+ *  so no translated phrase sits inside another message. */
 function driveSourceText({
   motion,
   speed,
   turnRate,
   reverseSpeed,
 }: DriveSource): string {
-  const speedFrom = {
-    movement: "from Movement",
-    definition: "from the game's definition",
-    preview: "the preview's own",
+  const speedValue = Math.round(motion.speed * 30 * 10) / 10;
+  const turnValue = Math.round(motion.turnRate * 10) / 10;
+  const reverseValue = Math.round((motion.reverseSpeed ?? 0) * 30 * 10) / 10;
+  const speedText = {
+    movement: t`Speed ${speedValue} elmos/s, from Movement.`,
+    definition: t`Speed ${speedValue} elmos/s, from the game's definition.`,
+    preview: t`Speed ${speedValue} elmos/s, the preview's own.`,
   }[speed];
-  const turnFrom =
+  const turnText =
     turnRate === "none"
-      ? "none set, so the engine's least"
+      ? t`Turn rate ${turnValue}, none set, so the engine's least.`
       : turnRate === "movement"
-        ? "from Movement"
-        : "from the game's definition";
-  const reverseFrom =
+        ? t`Turn rate ${turnValue}, from Movement.`
+        : t`Turn rate ${turnValue}, from the game's definition.`;
+  const reverseText =
     reverseSpeed === "none"
-      ? "none set, so it never reverses"
+      ? t`Reverse speed ${reverseValue} elmos/s, none set, so it never reverses.`
       : reverseSpeed === "movement"
-        ? "from Movement"
-        : "from the game's definition";
-  const reverse = `Reverse speed ${Math.round((motion.reverseSpeed ?? 0) * 30 * 10) / 10} elmos/s, ${reverseFrom}.`;
-  return `Speed ${Math.round(motion.speed * 30 * 10) / 10} elmos/s, ${speedFrom}. Turn rate ${Math.round(motion.turnRate * 10) / 10}, ${turnFrom}. ${reverse}`;
+        ? t`Reverse speed ${reverseValue} elmos/s, from Movement.`
+        : t`Reverse speed ${reverseValue} elmos/s, from the game's definition.`;
+  return `${speedText} ${turnText} ${reverseText}`;
 }
 
 /** How fast a scenario's unit moves and when, from the speed the script is
@@ -262,8 +269,9 @@ function motionOf(
 function attachNotes(scenario: Scenario, named: Map<string, string>): string[] {
   const attach = scenario.standIn?.attach;
   if (!attach || named.has(attach.from)) return [];
+  const from = attach.from;
   return [
-    `This script names no ${attach.from} piece, so the stand-in stays where the scenario puts it rather than sitting on the unit.`,
+    t`This script names no ${from} piece, so the stand-in stays where the scenario puts it rather than sitting on the unit.`,
   ];
 }
 
@@ -309,7 +317,7 @@ const PARAM_SUFFIX: Record<PresetParam["unit"], string> = {
  * clamped up to 38, `workerTime` defaults to zero, which is the number that
  * makes a builder silently not one.
  */
-const BUILDER_FIELDS: {
+function builderFields(): {
   id: "workerTime" | "buildDistance";
   label: string;
   suffix: string;
@@ -317,26 +325,28 @@ const BUILDER_FIELDS: {
   max: number;
   step: number;
   note: string;
-}[] = [
-  {
-    id: "workerTime",
-    label: "Work rate",
-    suffix: "",
-    min: 10,
-    max: 2000,
-    step: 10,
-    note: "Writes workerTime, which is also the repair, reclaim and capture speed unless a definition sets those separately.",
-  },
-  {
-    id: "buildDistance",
-    label: "Build distance",
-    suffix: " elmos",
-    min: 38,
-    max: 1000,
-    step: 8,
-    note: "How far it reaches. The engine clamps anything under 38, which is the least that keeps a one by one builder clear of a one by one building.",
-  },
-];
+}[] {
+  return [
+    {
+      id: "workerTime",
+      label: t`Work rate`,
+      suffix: "",
+      min: 10,
+      max: 2000,
+      step: 10,
+      note: t`Writes workerTime, which is also the repair, reclaim and capture speed unless a definition sets those separately.`,
+    },
+    {
+      id: "buildDistance",
+      label: t`Build distance`,
+      suffix: " elmos",
+      min: 38,
+      max: 1000,
+      step: 8,
+      note: t`How far it reaches. The engine clamps anything under 38, which is the least that keeps a one by one builder clear of a one by one building.`,
+    },
+  ];
+}
 
 /**
  * How long a change to the call arguments, or to the generated script, has to
@@ -469,6 +479,7 @@ export function AnimationPanel({
   effectsNote,
   ground,
 }: Props) {
+  const { t } = useLingui();
   const reduceMotion = useReduceMotion();
   const [scenarioId, setScenarioId] = useState(SCENARIOS[0].id);
   const [timeline, setTimeline] = useState<ScriptTimeline | null>(null);
@@ -1036,7 +1047,7 @@ export function AnimationPanel({
       const args = parseArgList(argsText);
       if (args === null) {
         setCallArgsError(
-          "Numbers, comma separated. Call-ins that aim take radians, as the engine hands them.",
+          t`Numbers, comma separated. Call-ins that aim take radians, as the engine hands them.`,
         );
         return;
       }
@@ -1047,7 +1058,7 @@ export function AnimationPanel({
         resume,
       );
     },
-    [runEvents, values],
+    [runEvents, values, t],
   );
 
   /** A unit value changed, by hand or by reset: keep it, and run again with it. */
@@ -1280,8 +1291,12 @@ export function AnimationPanel({
 
   {
     const scenario = scenarioById(scenarioId);
+    const targetSpeed = target.speed;
+    const compiledMember = compiled?.member;
+    const ownPointCount = drive.own.length;
     const stopped = timeline?.error ?? null;
 
+    const previewSeconds = PREVIEW_SECONDS; // i18n: not a plural, a fixed duration
     const header = (
       <div className="flex flex-wrap items-center gap-x-2 gap-y-1 border-b border-border px-3 py-2">
         <Button
@@ -1305,31 +1320,31 @@ export function AnimationPanel({
         >
           {playing && !scriptPaused ? <Pause size={14} /> : <Play size={14} />}
           {running
-            ? "Running"
+            ? t`Running`
             : solo || soloAction
-              ? "Play all"
+              ? t`Play all`
               : !playing
-                ? "Play"
+                ? t`Play`
                 : scriptPaused
-                  ? "Resume"
-                  : "Pause"}
+                  ? t`Resume`
+                  : t`Pause`}
         </Button>
         {playing ? (
           <Button
             size="sm"
             variant="ghost"
             onClick={stop}
-            title="Stop and return to the built pose"
+            title={t`Stop and return to the built pose`}
           >
             <Square size={14} />
           </Button>
         ) : null}
         <span className="min-w-32 flex-1 text-xs text-muted-foreground">
           {reduceMotion
-            ? "Playback is off while your system asks for reduced motion."
+            ? t`Playback is off while your system asks for reduced motion.`
             : !playsOwnScript && !hasAnimation
-              ? "Apply one below."
-              : `${PREVIEW_SECONDS} seconds, looped`}
+              ? t`Apply one below.`
+              : t`${previewSeconds} seconds, looped`}
         </span>
       </div>
     );
@@ -1342,7 +1357,7 @@ export function AnimationPanel({
             variant="ghost"
             disabled={scriptFrame <= 0}
             onClick={() => step(-1)}
-            title="Step back one frame"
+            title={t`Step back one frame`}
           >
             <StepBack size={14} />
           </Button>
@@ -1356,7 +1371,7 @@ export function AnimationPanel({
                 onScriptPausedChange(true);
                 onScriptFrameChange(next);
               }}
-              aria-label="Scrub the script preview"
+              aria-label={t`Scrub the script preview`}
               // Match the h-8 step buttons so the row can go items-start:
               // with marks underneath, the column is taller than the
               // buttons, and items-center would otherwise centre the
@@ -1379,7 +1394,7 @@ export function AnimationPanel({
             variant="ghost"
             disabled={scriptFrame >= (timeline?.frames.length ?? 1) - 1}
             onClick={() => step(1)}
-            title="Step forward one frame"
+            title={t`Step forward one frame`}
           >
             <StepForward size={14} />
           </Button>
@@ -1390,20 +1405,29 @@ export function AnimationPanel({
       </div>
     ) : null;
 
+    const managedSeconds = timeline
+      ? formatFixed(timeline.frames.length / timeline.fps, 1)
+      : "";
     const problems = (
       <>
         {failure ? (
           <div className="flex flex-col gap-1 text-xs text-destructive">
             {playsOwnScript ? (
-              <p>The script could not be run: {failure}</p>
+              <p>
+                <Trans>The script could not be run: {failure}</Trans>
+              </p>
             ) : (
               <>
-                <p>The animation could not be run: {failure}</p>
                 <p>
-                  coilbox writes this script from the presets and the roles on
-                  your pieces, so it should always run. Check the presets you
-                  have applied and the roles you have given, and if they look
-                  right, report this as a bug in coilbox.
+                  <Trans>The animation could not be run: {failure}</Trans>
+                </p>
+                <p>
+                  <Trans>
+                    coilbox writes this script from the presets and the roles on
+                    your pieces, so it should always run. Check the presets you
+                    have applied and the roles you have given, and if they look
+                    right, report this as a bug in coilbox.
+                  </Trans>
                 </p>
                 <Button
                   size="sm"
@@ -1411,7 +1435,7 @@ export function AnimationPanel({
                   className="self-start"
                   onClick={onShowScript}
                 >
-                  <FileCode size={14} /> Open the Script tab
+                  <FileCode size={14} /> <Trans>Open the Script tab</Trans>
                 </Button>
               </>
             )}
@@ -1421,13 +1445,13 @@ export function AnimationPanel({
         {stopped ? (
           <div className="flex flex-col gap-1 rounded-md border border-destructive/50 px-2 py-2">
             <span className="text-xs font-medium text-destructive">
-              The script stopped
+              <Trans>The script stopped</Trans>
             </span>
             <p className="text-xs text-destructive">{stopped}</p>
             <p className="text-xs text-muted-foreground">
               {timeline && timeline.frames.length > 0
-                ? `Playing the ${formatFixed(timeline.frames.length / timeline.fps, 1)} seconds it managed first.`
-                : "It got no further than that, so there is nothing to play."}
+                ? t`Playing the ${managedSeconds} seconds it managed first.` // i18n: not a plural, a duration
+                : t`It got no further than that, so there is nothing to play.`}
             </p>
           </div>
         ) : null}
@@ -1437,7 +1461,9 @@ export function AnimationPanel({
     const body = (
       <>
         <div className="flex flex-col gap-1.5">
-          <span className="text-xs font-medium">What happens to the unit</span>
+          <span className="text-xs font-medium">
+            <Trans>What happens to the unit</Trans>
+          </span>
           <Select
             value={scenarioId}
             onValueChange={(next) => {
@@ -1456,7 +1482,7 @@ export function AnimationPanel({
             <SelectTrigger
               size="sm"
               className="w-full"
-              aria-label="What happens to the unit"
+              aria-label={t`What happens to the unit`}
             >
               <SelectValue />
             </SelectTrigger>
@@ -1468,7 +1494,7 @@ export function AnimationPanel({
                   trailing={
                     marks.has(option.id) ? (
                       <span className="text-xs text-muted-foreground">
-                        Nothing to do
+                        <Trans>Nothing to do</Trans>
                       </span>
                     ) : undefined
                   }
@@ -1476,7 +1502,9 @@ export function AnimationPanel({
                   {option.label}
                 </SelectItem>
               ))}
-              <SelectItem value={CALL_FUNCTION}>Call a function</SelectItem>
+              <SelectItem value={CALL_FUNCTION}>
+                <Trans>Call a function</Trans>
+              </SelectItem>
             </SelectContent>
           </Select>
           {isCallMode ? (
@@ -1491,9 +1519,9 @@ export function AnimationPanel({
                 <SelectTrigger
                   size="sm"
                   className="w-full"
-                  aria-label="Function to call"
+                  aria-label={t`Function to call`}
                 >
-                  <SelectValue placeholder="Choose a function" />
+                  <SelectValue placeholder={t`Choose a function`} />
                 </SelectTrigger>
                 <SelectContent>
                   {(timeline?.functions ?? []).map((name) => (
@@ -1505,13 +1533,15 @@ export function AnimationPanel({
               </Select>
               <Input
                 value={callArgsText}
-                aria-label="Arguments"
+                aria-label={t`Arguments`}
                 placeholder="0.8, 0.15"
                 onChange={(e) => onArgsTextChange(e.target.value)}
               />
               <p className="text-xs text-muted-foreground">
-                Numbers, comma separated. Call-ins that aim take radians, as the
-                engine hands them.
+                <Trans>
+                  Numbers, comma separated. Call-ins that aim take radians, as
+                  the engine hands them.
+                </Trans>
               </p>
               {callArgsError ? (
                 <p className="text-xs text-destructive">{callArgsError}</p>
@@ -1531,7 +1561,7 @@ export function AnimationPanel({
                 <div className="flex flex-col gap-1.5">
                   <OptionSelect
                     size="sm"
-                    ariaLabel="How the target moves"
+                    ariaLabel={t`How the target moves`}
                     value={target.path}
                     options={TARGET_PATHS}
                     onValueChange={(path) =>
@@ -1542,11 +1572,13 @@ export function AnimationPanel({
                     }
                   />
                   <div className="flex items-center justify-between text-xs">
-                    <span>Target speed</span>
+                    <span>
+                      <Trans>Target speed</Trans>
+                    </span>
                     <span className="text-muted-foreground">
                       {target.speed === 0
-                        ? "Still"
-                        : `${target.speed}× the unit's`}
+                        ? t`Still`
+                        : t`${targetSpeed}× the unit's`}
                     </span>
                   </div>
                   <Slider
@@ -1555,7 +1587,7 @@ export function AnimationPanel({
                     step={0.25}
                     value={[target.speed]}
                     onValueChange={([next]) => changeTargetSpeed(next)}
-                    aria-label="Target speed"
+                    aria-label={t`Target speed`}
                   />
                 </div>
               ) : null}
@@ -1563,7 +1595,7 @@ export function AnimationPanel({
                 <div className="flex flex-col gap-1.5">
                   <OptionSelect
                     size="sm"
-                    ariaLabel="Path to drive"
+                    ariaLabel={t`Path to drive`}
                     value={drive.path}
                     options={DRIVE_PATHS}
                     onValueChange={(path) =>
@@ -1577,8 +1609,11 @@ export function AnimationPanel({
                     <div className="flex items-center justify-between text-xs text-muted-foreground">
                       <span>
                         {drive.own.length === 0
-                          ? "Click the ground to add points."
-                          : `${drive.own.length} ${drive.own.length === 1 ? "point" : "points"}`}
+                          ? t`Click the ground to add points.`
+                          : plural(ownPointCount, {
+                              one: "# point",
+                              other: "# points",
+                            })}
                       </span>
                       {drive.own.length > 0 ? (
                         <Button
@@ -1589,7 +1624,7 @@ export function AnimationPanel({
                             changeDrive({ ...driveRef.current, own: [] })
                           }
                         >
-                          Clear
+                          <Trans>Clear</Trans>
                         </Button>
                       ) : null}
                     </div>
@@ -1600,9 +1635,9 @@ export function AnimationPanel({
                   {compiled ? null : (
                     <OptionSelect
                       size="sm"
-                      ariaLabel="When ChangeHeading is sent"
+                      ariaLabel={t`When ChangeHeading is sent`}
                       value={drive.everyTurn ? "every" : "engine"}
-                      options={CHANGE_HEADING_OPTIONS}
+                      options={changeHeadingOptions()}
                       onValueChange={(value) =>
                         changeDrive({
                           ...driveRef.current,
@@ -1619,10 +1654,14 @@ export function AnimationPanel({
 
         {timeline && timeline.asked.length > 0 ? (
           <div className="flex flex-col gap-2">
-            <span className="text-xs font-medium">Unit values</span>
+            <span className="text-xs font-medium">
+              <Trans>Unit values</Trans>
+            </span>
             <p className="text-xs text-muted-foreground">
-              What the script reads about its unit. Change one and the preview
-              runs again with it.
+              <Trans>
+                What the script reads about its unit. Change one and the preview
+                runs again with it.
+              </Trans>
             </p>
             {timeline.asked
               .filter(
@@ -1650,7 +1689,7 @@ export function AnimationPanel({
                             className="h-5 px-1.5 text-xs"
                             onClick={() => changeValue(asked.id, undefined)}
                           >
-                            Reset
+                            <Trans>Reset</Trans>
                           </Button>
                         ) : null}
                       </div>
@@ -1745,16 +1784,20 @@ export function AnimationPanel({
 
         {compiled ? (
           <p className="text-xs text-muted-foreground">
-            This unit's game animates it with{" "}
-            <code className="break-all">{compiled.member}</code>, which is
-            compiled rather than Lua. Coilbox runs it, so what you see is what
-            the game plays. It cannot be edited here and an export does not
-            write it.
+            <Trans>
+              This unit's game animates it with{" "}
+              <code className="break-all">{compiledMember}</code>, which is
+              compiled rather than Lua. Coilbox runs it, so what you see is what
+              the game plays. It cannot be edited here and an export does not
+              write it.
+            </Trans>
           </p>
         ) : playsOwnScript ? (
           <p className="text-xs text-muted-foreground">
-            This unit has its own script, so the presets no longer write it.
-            Edit it on the Script tab.
+            <Trans>
+              This unit has its own script, so the presets no longer write it.
+              Edit it on the Script tab.
+            </Trans>
           </p>
         ) : null}
       </>
@@ -1784,7 +1827,7 @@ export function AnimationPanel({
                 size={14}
                 className="transition-transform group-data-[state=open]:rotate-90"
               />
-              Preview
+              <Trans>Preview</Trans>
             </CollapsibleTrigger>
             <CollapsibleContent className="flex flex-col gap-3 px-3 pb-3">
               {body}
@@ -1801,15 +1844,19 @@ export function AnimationPanel({
             what say this unit builds. */}
           {isBuilder(project) ? (
             <div className="border-b border-border/60 px-3 py-2">
-              <p className="text-sm font-medium">What it builds with</p>
+              <p className="text-sm font-medium">
+                <Trans>What it builds with</Trans>
+              </p>
               <p className="mt-0.5 text-xs text-muted-foreground">
-                This unit has a build arm, so its definition is written as a
-                builder. All three go together: the engine reads a builder with
-                no work rate as not a builder at all.
+                <Trans>
+                  This unit has a build arm, so its definition is written as a
+                  builder. All three go together: the engine reads a builder
+                  with no work rate as not a builder at all.
+                </Trans>
               </p>
               <BuilderReport project={project} />
 
-              {BUILDER_FIELDS.map((field) => (
+              {builderFields().map((field) => (
                 <div key={field.id} className="mt-2">
                   <div className="flex items-center justify-between text-xs">
                     <span className="flex items-center gap-1.5">
@@ -1849,7 +1896,7 @@ export function AnimationPanel({
                     htmlFor="builder-factory"
                     className="text-xs font-medium"
                   >
-                    Factory
+                    <Trans>Factory</Trans>
                   </Label>
                   <Switch
                     id="builder-factory"
@@ -1863,7 +1910,7 @@ export function AnimationPanel({
 
               <div className="mt-3 flex items-center justify-between gap-3">
                 <Label htmlFor="builder-assist" className="text-xs font-medium">
-                  Can help another unit's build
+                  <Trans>Can help another unit's build</Trans>
                 </Label>
                 <Switch
                   id="builder-assist"
@@ -1915,17 +1962,21 @@ export function AnimationPanel({
             <div className="border-b border-border/60 px-3 py-2">
               <div className="flex items-start gap-2">
                 <div className="min-w-0 flex-1">
-                  <p className="text-sm font-medium">Actions</p>
+                  <p className="text-sm font-medium">
+                    <Trans>Actions</Trans>
+                  </p>
                   <p className="mt-0.5 text-xs text-muted-foreground">
-                    Saved poses in time, written into the script beside the
-                    presets.
+                    <Trans>
+                      Saved poses in time, written into the script beside the
+                      presets.
+                    </Trans>
                   </p>
                 </div>
                 <Button
                   size="sm"
                   variant="outline"
-                  aria-label="New action"
-                  title="New action"
+                  aria-label={t`New action`}
+                  title={t`New action`}
                   onClick={() => {
                     const id = crypto.randomUUID();
                     onActionsEdit((p) => addAction(p, { id, name: "Action" }));
@@ -1940,9 +1991,9 @@ export function AnimationPanel({
                   <label
                     htmlFor="action-blend"
                     className="min-w-0 flex-1 text-xs"
-                    title="Seconds an action takes to ease in from where the pieces are, and to ease back to rest. An action can set its own."
+                    title={t`Seconds an action takes to ease in from where the pieces are, and to ease back to rest. An action can set its own.`}
                   >
-                    Blend time (s)
+                    <Trans>Blend time (s)</Trans>
                   </label>
                   <Input
                     id="action-blend"
@@ -1964,6 +2015,9 @@ export function AnimationPanel({
                 </div>
               ) : null}
               {actions.map((action) => {
+                const actionName = action.name;
+                const trigger = action.trigger;
+                const keyCount = action.keys.length;
                 const shared = new Map<string, string[]>();
                 for (const clash of actionClashes(project)) {
                   if (clash.action.id !== action.id) continue;
@@ -1980,9 +2034,15 @@ export function AnimationPanel({
                           {action.name}
                         </p>
                         <p className="text-xs text-muted-foreground">
-                          {action.trigger}, {action.keys.length}{" "}
-                          {action.keys.length === 1 ? "key" : "keys"}
-                          {action.loop ? ", loops" : ""}
+                          {action.loop
+                            ? plural(keyCount, {
+                                one: `${trigger}, # key, loops`,
+                                other: `${trigger}, # keys, loops`,
+                              })
+                            : plural(keyCount, {
+                                one: `${trigger}, # key`,
+                                other: `${trigger}, # keys`,
+                              })}
                         </p>
                       </div>
                       <Button
@@ -1996,8 +2056,8 @@ export function AnimationPanel({
                           reduceMotion || running || action.keys.length === 0
                         }
                         aria-pressed={soloAction === action.id && playing}
-                        aria-label={`Preview ${action.name} on its own`}
-                        title="Play this action on its own, without changing the unit"
+                        aria-label={t`Preview ${actionName} on its own`}
+                        title={t`Play this action on its own, without changing the unit`}
                         onClick={() => playActionAlone(action.id)}
                       >
                         <Play size={14} />
@@ -2005,8 +2065,8 @@ export function AnimationPanel({
                       <Button
                         size="sm"
                         variant="outline"
-                        aria-label={`Edit ${action.name}`}
-                        title="Edit the timeline"
+                        aria-label={t`Edit ${actionName}`}
+                        title={t`Edit the timeline`}
                         onClick={() => setTimelineId(action.id)}
                       >
                         <Pencil size={14} />
@@ -2014,8 +2074,8 @@ export function AnimationPanel({
                       <Button
                         size="sm"
                         variant="ghost"
-                        aria-label={`Delete ${action.name}`}
-                        title="Delete"
+                        aria-label={t`Delete ${actionName}`}
+                        title={t`Delete`}
                         onClick={() => {
                           if (timelineId === action.id) setTimelineId(null);
                           onActionsEdit((p) => deleteAction(p, action.id));
@@ -2024,14 +2084,19 @@ export function AnimationPanel({
                         <Trash2 size={14} />
                       </Button>
                     </div>
-                    {[...shared].map(([other, pieces]) => (
-                      <p
-                        key={other}
-                        className="mt-0.5 text-xs text-muted-foreground"
-                      >
-                        {action.name} and {other} both move {pieces.join(", ")}.
-                      </p>
-                    ))}
+                    {[...shared].map(([other, pieces]) => {
+                      const moved = pieces.join(", ");
+                      return (
+                        <p
+                          key={other}
+                          className="mt-0.5 text-xs text-muted-foreground"
+                        >
+                          <Trans>
+                            {actionName} and {other} both move {moved}.
+                          </Trans>
+                        </p>
+                      );
+                    })}
                   </div>
                 );
               })}
@@ -2047,6 +2112,11 @@ export function AnimationPanel({
             const blocked = entry
               ? (conversionProblems.get(preset.id) ?? null)
               : null;
+            const presetLabel = preset.label;
+            const copyNoun = preset.copies?.noun;
+            const missingRoles = missing
+              .map((role) => roleLabel(role))
+              .join(", ");
 
             return (
               <div
@@ -2056,10 +2126,9 @@ export function AnimationPanel({
                 <div className="flex items-start gap-2">
                   <div className="min-w-0 flex-1">
                     <p className="text-sm font-medium">
-                      {preset.label}
                       {copies > 1 && preset.copies
-                        ? `, ${copies} ${preset.copies.noun}`
-                        : ""}
+                        ? t`${presetLabel}, ${copies} ${copyNoun}`
+                        : presetLabel}
                     </p>
                     <p className="mt-0.5 text-xs text-muted-foreground">
                       {preset.description}
@@ -2073,8 +2142,8 @@ export function AnimationPanel({
                       }
                       disabled={reduceMotion || running}
                       aria-pressed={solo === preset.id && playing}
-                      aria-label={`Preview ${preset.label} on its own`}
-                      title="Play this preset on its own, without changing the unit"
+                      aria-label={t`Preview ${presetLabel} on its own`}
+                      title={t`Play this preset on its own, without changing the unit`}
                       onClick={() => playSolo(preset.id)}
                     >
                       <Play size={14} />
@@ -2085,10 +2154,10 @@ export function AnimationPanel({
                       size="sm"
                       variant="outline"
                       disabled={blocked !== null}
-                      aria-label={`Convert ${preset.label} to an action`}
+                      aria-label={t`Convert ${presetLabel} to an action`}
                       title={
                         blocked ??
-                        "Replace with an action you can edit key by key"
+                        t`Replace with an action you can edit key by key`
                       }
                       onClick={() => {
                         const base = crypto.randomUUID();
@@ -2098,7 +2167,7 @@ export function AnimationPanel({
                         setTimelineId(convertedActionId(base, 1));
                       }}
                     >
-                      To action
+                      <Trans>To action</Trans>
                     </TipButton>
                   ) : null}
                   <Button
@@ -2109,14 +2178,13 @@ export function AnimationPanel({
                       entry ? remove(preset.id) : apply(preset.id)
                     }
                   >
-                    {entry ? "Remove" : "Apply"}
+                    {entry ? t`Remove` : t`Apply`}
                   </Button>
                 </div>
 
                 {!entry && missing.length > 0 ? (
                   <p className="mt-1 text-xs text-muted-foreground">
-                    Needs a piece set as{" "}
-                    {missing.map((role) => roleLabel(role)).join(", ")}.
+                    <Trans>Needs a piece set as {missingRoles}.</Trans>
                   </p>
                 ) : null}
 
@@ -2130,16 +2198,19 @@ export function AnimationPanel({
                   <div className="mt-2 flex items-center gap-2">
                     <OptionSelect
                       size="sm"
-                      ariaLabel={`${preset.label}: copy`}
+                      ariaLabel={t`${presetLabel}: copy`}
                       value={copy === null ? ALL_COPIES : COPY_PREFIX + copy}
                       options={[
-                        { value: ALL_COPIES, label: "All copies" },
-                        ...copyIds.map((id, index) => ({
-                          value: COPY_PREFIX + id,
-                          label: entry.instances?.[id]
-                            ? `Copy ${index + 1}, own settings`
-                            : `Copy ${index + 1}`,
-                        })),
+                        { value: ALL_COPIES, label: t`All copies` },
+                        ...copyIds.map((id, index) => {
+                          const copyNumber = index + 1;
+                          return {
+                            value: COPY_PREFIX + id,
+                            label: entry.instances?.[id]
+                              ? t`Copy ${copyNumber}, own settings`
+                              : t`Copy ${copyNumber}`,
+                          };
+                        }),
                       ]}
                       onValueChange={(next) =>
                         pickCopy(
@@ -2165,7 +2236,7 @@ export function AnimationPanel({
                           )
                         }
                       >
-                        Use shared
+                        <Trans>Use shared</Trans>
                       </Button>
                     ) : null}
                   </div>
@@ -2187,7 +2258,7 @@ export function AnimationPanel({
                         )
                       }
                     >
-                      Fit to body
+                      <Trans>Fit to body</Trans>
                     </Button>
                   </div>
                 ) : null}
@@ -2199,6 +2270,7 @@ export function AnimationPanel({
                       const shown =
                         shownParams(project, entry, copy)[param.id] ??
                         paramFor(entry, copy, param.id);
+                      const paramLabel = param.label;
                       return (
                         <div key={param.id} className="mt-2">
                           <div className="flex items-center justify-between text-xs">
@@ -2219,7 +2291,7 @@ export function AnimationPanel({
                             onValueChange={([next]) =>
                               setParam(preset.id, param.id, next, copy)
                             }
-                            aria-label={`${preset.label}: ${param.label}`}
+                            aria-label={t`${presetLabel}: ${paramLabel}`}
                           />
                         </div>
                       );
@@ -2231,8 +2303,10 @@ export function AnimationPanel({
 
           {applied.some((entry) => !presetById(entry.presetId)) ? (
             <p className="px-3 py-2 text-xs text-muted-foreground">
-              This unit also has an animation this build does not know. It is
-              left alone rather than dropped.
+              <Trans>
+                This unit also has an animation this build does not know. It is
+                left alone rather than dropped.
+              </Trans>
             </p>
           ) : null}
         </div>

@@ -1,3 +1,4 @@
+import { Trans } from "@lingui/react/macro";
 import { useEffect } from "react";
 import { OptionSelect } from "@/components/OptionSelect";
 import { FactionLogo } from "@/factions/FactionLogo";
@@ -64,7 +65,7 @@ export function SidePicker({
       <span
         className={`font-display text-[10px] font-medium uppercase tracking-[0.2em] ${HUD_ACCENT_INK.teal}`}
       >
-        Side
+        <Trans>Side</Trans>
       </span>
       <OptionSelect
         value={value}

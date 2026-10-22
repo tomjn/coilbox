@@ -1,3 +1,5 @@
+import { plural, select } from "@lingui/core/macro";
+import { Trans, useLingui } from "@lingui/react/macro";
 import { Button, Input, useHideSidebar } from "@picoframe/frame";
 import {
   ArrowLeft,
@@ -69,7 +71,7 @@ import {
 } from "../handmade/heldChallenge";
 import { useHandmadeMap, useHandmadeMaps } from "../handmade/useHandmadeMaps";
 import { regenerateOffThread } from "../landJobs";
-import { drawsAsGalaxy, locationNoun } from "../mapStyle";
+import { drawsAsGalaxy } from "../mapStyle";
 import type { ConquestState, GalaxyDoc, GalaxyNode, TurnEvent } from "../model";
 import { NEUTRAL, newConquestState, playableFactions } from "../model";
 import { mergeConquestNames } from "../names";
@@ -98,6 +100,7 @@ import { ThreatLevelSelect } from "./components/ThreatLevelSelect";
  * run yet.
  */
 export default function GalaxyPage() {
+  const { t } = useLingui();
   // The galaxy is full-bleed. The nav stays reachable from the top bar.
   useHideSidebar();
   const { id } = useParams();
@@ -125,7 +128,7 @@ export default function GalaxyPage() {
   if (!loaded || !galaxy) {
     // Not a stored galaxy, so it may be a hand-made map.
     if (id) return <HandmadeGalaxy id={id} listError={error} />;
-    return <NotOpened error={error} label="Map not found." />;
+    return <NotOpened error={error} label={t`Map not found.`} />;
   }
   return <GalaxyScreen key={galaxy.id} galaxy={galaxy} />;
 }
@@ -146,7 +149,7 @@ function NotOpened({
       <EmptyState label={label} />
       {children}
       <Link to="/conquest" className="text-sm text-primary hover:underline">
-        Back to Conquest
+        <Trans>Back to Conquest</Trans>
       </Link>
     </div>
   );
@@ -188,6 +191,7 @@ function HandmadeGalaxy({
   id: string;
   listError: string | null;
 }) {
+  const { t } = useLingui();
   const { loading, result, failure } = useHandmadeMap(id);
   const listed = useHandmadeMaps();
   const { file, loading: stateLoading, saveFor } = useConquestState();
@@ -300,24 +304,26 @@ function HandmadeGalaxy({
   if (failure) {
     return (
       <NotOpened
-        error={`The map folders could not be read. ${failure}`}
-        label="This map could not be opened."
+        error={t`The map folders could not be read. ${failure}`}
+        label={t`This map could not be opened.`}
       />
     );
   }
   if (!map) {
     const known = listed.maps.some((m) => m.id === id);
     if (!run && !known) {
-      return <NotOpened error={listError} label="Map not found." />;
+      return <NotOpened error={listError} label={t`Map not found.`} />;
     }
+    const carriedBy = run?.carriedBy ?? "";
+    const savedTitle = run?.title ?? id;
     return (
       <NotOpened
         label={
           known
-            ? "This map could not be read."
+            ? t`This map could not be read.`
             : run?.carriedBy
-              ? `The game ${run.carriedBy} no longer carries the map "${run.title}". A game update may have removed it.`
-              : `The map "${run?.title ?? id}" is no longer installed.`
+              ? t`The game ${carriedBy} no longer carries the map "${savedTitle}". A game update may have removed it.`
+              : t`The map "${savedTitle}" is no longer installed.`
         }
       >
         {known && result && !result.ok && (
@@ -325,18 +331,22 @@ function HandmadeGalaxy({
         )}
         {run && (
           <p className="text-sm text-muted-foreground">
-            Your conquest on it is saved and nothing has been changed.{" "}
+            <Trans>
+              Your conquest on it is saved and nothing has been changed.
+            </Trans>{" "}
             {known
-              ? "It carries on once the map can be read again."
+              ? t`It carries on once the map can be read again.`
               : run.carriedBy
-                ? "It carries on if a game carries the map again."
-                : "Import the map again from the Conquest page to carry on."}
+                ? t`It carries on if a game carries the map again.`
+                : t`Import the map again from the Conquest page to carry on.`}
           </p>
         )}
       </NotOpened>
     );
   }
   const blank = blankLocations(map, battles);
+  const blankCount = blank.length;
+  const reason = scanError;
   if (blank.length > 0) {
     // Until the scan answers there are no maps to pick from yet.
     if (target && !scanData && !scanError) return <PageLoading />;
@@ -344,10 +354,10 @@ function HandmadeGalaxy({
       <NotOpened
         error={
           scanError
-            ? `The content scan failed, so installed maps are not listed: ${scanError}`
+            ? t`The content scan failed, so installed maps are not listed: ${reason}`
             : null
         }
-        label={`This map leaves ${blank.length} of its battles for coilbox to choose, and there are no maps installed to choose from. Install at least one map in Content > Maps, then open it again.`}
+        label={t`This map leaves ${blankCount} of its battles for coilbox to choose, and there are no maps installed to choose from. Install at least one map in Content > Maps, then open it again.`}
       />
     );
   }
@@ -364,8 +374,10 @@ function HandmadeGalaxy({
           <>
             {staleChallenge && (
               <p className="text-sm text-muted-foreground">
-                The challenge you imported was made on a different version of
-                this map, so its settings are not used here.
+                <Trans>
+                  The challenge you imported was made on a different version of
+                  this map, so its settings are not used here.
+                </Trans>
               </p>
             )}
             <HandmadeOptionFields
@@ -404,14 +416,24 @@ function ChallengeSetupNote({
   const level = readThreatLevel(challenge.threatLevel);
   return (
     <div className="flex flex-col gap-2 text-sm">
-      <span className="font-medium">Imported challenge</span>
+      <span className="font-medium">
+        <Trans>Imported challenge</Trans>
+      </span>
       <p className="text-xs text-muted-foreground">
-        The challenge code sets this conquest up: fog of war is{" "}
-        {challenge.fogOfWar ? "on" : "off"} and the threat level is {level}.
-        Pick a faction and start.
+        {challenge.fogOfWar ? (
+          <Trans>
+            The challenge code sets this conquest up: fog of war is on and the
+            threat level is {level}. Pick a faction and start.
+          </Trans>
+        ) : (
+          <Trans>
+            The challenge code sets this conquest up: fog of war is off and the
+            threat level is {level}. Pick a faction and start.
+          </Trans>
+        )}
       </p>
       <Button variant="outline" onClick={onDrop}>
-        Choose my own settings
+        <Trans>Choose my own settings</Trans>
       </Button>
     </div>
   );
@@ -431,13 +453,18 @@ function HandmadeOptionFields({
   ceiling: number;
   onChange: (next: HandmadeConquestOptions) => void;
 }) {
+  const { t } = useLingui();
   return (
     <>
       <div className="flex items-center justify-between gap-3 text-sm">
         <label htmlFor="handmade-fog" className="flex flex-col gap-0.5">
-          <span className="font-medium">Fog of war</span>
+          <span className="font-medium">
+            <Trans>Fog of war</Trans>
+          </span>
           <span className="text-xs text-muted-foreground">
-            Hide locations more than two jumps from your territory.
+            <Trans>
+              Hide locations more than two jumps from your territory.
+            </Trans>
           </span>
         </label>
         <Switch
@@ -452,7 +479,9 @@ function HandmadeOptionFields({
         onChange={(threatLevel) => onChange({ ...options, threatLevel })}
       />
       <div className="flex flex-col gap-1.5 text-sm">
-        <span className="font-medium">Seed</span>
+        <span className="font-medium">
+          <Trans>Seed</Trans>
+        </span>
         <div className="flex gap-2">
           <Input
             value={String(options.seed)}
@@ -463,19 +492,23 @@ function HandmadeOptionFields({
               })
             }
             inputMode="numeric"
-            aria-label="Conquest seed"
+            aria-label={t`Conquest seed`}
           />
           <Button
             variant="outline"
             onClick={() => onChange({ ...options, seed: randomSeed() })}
           >
             <Dices className="size-4" aria-hidden />
-            <span className="sr-only">Reroll seed</span>
+            <span className="sr-only">
+              <Trans>Reroll seed</Trans>
+            </span>
           </Button>
         </div>
         <span className="text-xs text-muted-foreground">
-          The map never changes. The seed sets how your enemies move and which
-          battlefield each location the map leaves open is fought on.
+          <Trans>
+            The map never changes. The seed sets how your enemies move and which
+            battlefield each location the map leaves open is fought on.
+          </Trans>
         </span>
       </div>
     </>
@@ -490,6 +523,7 @@ function GalaxyScreen({
   /** Present while the galaxy is a hand-made map. */
   handmade?: HandmadeSetup;
 }) {
+  const { t } = useLingui();
   const {
     loading,
     error: stateError,
@@ -506,12 +540,11 @@ function GalaxyScreen({
       try {
         await writeState(galaxyId, next);
       } catch (e) {
-        setSaveError(
-          `Nothing was changed. ${e instanceof Error ? e.message : String(e)}`,
-        );
+        const reason = e instanceof Error ? e.message : String(e);
+        setSaveError(t`Nothing was changed. ${reason}`);
       }
     },
-    [writeState],
+    [writeState, t],
   );
   // A finished run counts toward its challenge's best result, once.
   const challengeId = galaxyIdentity(galaxy);
@@ -669,11 +702,12 @@ function GalaxyScreen({
           "#05070f",
       };
 
+  const terrainError = terrain.error;
   // Wait for the saved run to load before building the map: otherwise the first
   // build frames the *default* faction (state not yet known) and recentres with
   // a jump once the played faction resolves.
   if (loading) {
-    return <MapLoading label="Loading your campaign…" />;
+    return <MapLoading label={t`Loading your campaign…`} />;
   }
 
   return (
@@ -685,7 +719,7 @@ function GalaxyScreen({
         <div className="pointer-events-auto absolute left-1/2 top-4 z-50 w-[28rem] max-w-[90%] -translate-x-1/2">
           {stateError ? (
             <ErrorBanner
-              message={`Your conquest progress could not be read. Nothing has been changed. ${stateError}`}
+              message={t`Your conquest progress could not be read. Nothing has been changed. ${stateError}`}
             />
           ) : (
             <ErrorBanner message={saveError ?? ""} />
@@ -695,12 +729,15 @@ function GalaxyScreen({
       {terrain.error && (
         <div className="pointer-events-auto absolute left-1/2 top-4 z-50 w-[28rem] max-w-[90%] -translate-x-1/2">
           <ErrorBanner
-            message={`The land of this map could not be built. ${terrain.error}`}
+            message={t`The land of this map could not be built. ${terrainError}`}
           />
         </div>
       )}
       {terrain.pending ? (
-        <MapLoading label="Building the land…" className="absolute inset-0" />
+        <MapLoading
+          label={t`Building the land…`}
+          className="absolute inset-0"
+        />
       ) : terrain.error ? null : (
         <GalaxyView
           galaxy={themedGalaxy}
@@ -738,7 +775,7 @@ function GalaxyScreen({
           <BracketFrame className="pointer-events-auto flex items-stretch">
             <Link
               to="/conquest"
-              aria-label="Conquest"
+              aria-label={t`Conquest`}
               className="flex items-center justify-center px-3 text-muted-foreground transition-colors hover:text-foreground"
             >
               <ArrowLeft className="size-5" aria-hidden />
@@ -752,7 +789,7 @@ function GalaxyScreen({
             </span>
             {galaxy.importedChallenge && (
               <span className="shrink-0 rounded bg-muted px-1.5 py-0.5 text-[10px] uppercase tracking-wide text-muted-foreground">
-                Imported challenge
+                <Trans>Imported challenge</Trans>
               </span>
             )}
           </BracketFrame>
@@ -760,7 +797,7 @@ function GalaxyScreen({
           {state && (
             <BracketFrame className="pointer-events-auto flex flex-col justify-center px-3 py-1.5">
               <span className="font-display text-[10px] font-medium uppercase tracking-[0.18em] text-muted-foreground">
-                Turn
+                <Trans>Turn</Trans>
               </span>
               <span className="font-display text-xl font-semibold uppercase leading-none tracking-wide tabular-nums text-foreground">
                 {state.turn}
@@ -799,7 +836,8 @@ function GalaxyScreen({
                 onClick={() => saveFor(galaxy.id, advanceTurn(galaxy, state))}
                 className="flex items-center gap-1.5 px-2.5 py-2 font-display text-[11px] uppercase tracking-wide text-muted-foreground transition-colors hover:text-foreground"
               >
-                <Hourglass className="size-3.5" aria-hidden /> Hold
+                <Hourglass className="size-3.5" aria-hidden />{" "}
+                <Trans>Hold</Trans>
               </button>
             </BracketFrame>
           )}
@@ -811,6 +849,8 @@ function GalaxyScreen({
               .sort((a, b) => a.expiresOnTurn - b.expiresOnTurn)
               .map((inc) => {
                 const left = Math.max(0, inc.expiresOnTurn - state.turn);
+                const incursionName =
+                  galaxy.nodes.find((n) => n.id === inc.nodeId)?.name ?? "?";
                 return (
                   <BracketFrame
                     key={inc.nodeId}
@@ -829,10 +869,10 @@ function GalaxyScreen({
                         className="size-4 animate-pulse"
                         aria-hidden
                       />
-                      Incursion at{" "}
-                      {galaxy.nodes.find((n) => n.id === inc.nodeId)?.name ??
-                        "?"}{" "}
-                      — falls in {left} turn{left === 1 ? "" : "s"}
+                      {plural(left, {
+                        one: `Incursion at ${incursionName} — falls in # turn`,
+                        other: `Incursion at ${incursionName} — falls in # turns`,
+                      })}
                     </button>
                   </BracketFrame>
                 );
@@ -923,7 +963,7 @@ function GalaxyScreen({
       <p
         className={`pointer-events-none absolute bottom-2 left-3 z-10 px-2 py-1 text-[11px] ${MAP_BAND_CLASS} ${MAP_DIM_INK_CLASS}`}
       >
-        drag to pan · scroll to zoom · right-drag to tilt
+        <Trans>drag to pan · scroll to zoom · right-drag to tilt</Trans>
       </p>
     </div>
   );
@@ -939,12 +979,14 @@ function TurnRecap({
   galaxy: GalaxyDoc;
   events: TurnEvent[];
 }) {
+  const { t } = useLingui();
   const nodeName = (id: string) =>
     galaxy.nodes.find((n) => n.id === id)?.name ?? "?";
   const factionName = (id: string) =>
     id === NEUTRAL
-      ? "neutral space"
+      ? t`neutral space`
       : (galaxy.factions.find((f) => f.id === id)?.name ?? id);
+  const more = events.length - 5;
   return (
     <div
       className={`pointer-events-none absolute bottom-11 left-3 z-10 flex max-w-xs flex-col gap-1 px-2.5 py-2 backdrop-blur-sm ${MAP_BAND_CLASS}`}
@@ -952,20 +994,26 @@ function TurnRecap({
       <span
         className={`font-display text-[10px] uppercase tracking-[0.18em] ${MAP_DIM_INK_CLASS}`}
       >
-        Last turn
+        <Trans>Last turn</Trans>
       </span>
-      {events.slice(0, 5).map((e) => (
-        <span
-          key={`${e.factionId}-${e.nodeId}`}
-          className={`text-[11px] ${MAP_INK_CLASS}`}
-        >
-          {factionName(e.factionId)} took {nodeName(e.nodeId)}
-          {e.from !== NEUTRAL ? ` from ${factionName(e.from)}` : ""}
-        </span>
-      ))}
+      {events.slice(0, 5).map((e) => {
+        const faction = factionName(e.factionId);
+        const node = nodeName(e.nodeId);
+        const previous = factionName(e.from);
+        return (
+          <span
+            key={`${e.factionId}-${e.nodeId}`}
+            className={`text-[11px] ${MAP_INK_CLASS}`}
+          >
+            {e.from !== NEUTRAL
+              ? t`${faction} took ${node} from ${previous}`
+              : t`${faction} took ${node}`}
+          </span>
+        );
+      })}
       {events.length > 5 && (
         <span className={`text-[10px] ${MAP_DIM_INK_CLASS}`}>
-          +{events.length - 5} more
+          <Trans>+{more} more</Trans>
         </span>
       )}
     </div>
@@ -1035,7 +1083,7 @@ function TerritoryTally({
                 <span
                   className={`font-display text-[9px] uppercase tracking-[0.18em] ${HUD_ACCENT_INK.teal}`}
                 >
-                  You
+                  <Trans>You</Trans>
                 </span>
               )}
               <span className="font-mono tabular-nums text-foreground">
@@ -1049,7 +1097,7 @@ function TerritoryTally({
         <BracketFrame className="pointer-events-auto flex items-center gap-1.5 px-2.5 py-2 text-xs text-muted-foreground">
           <FactionDot color="#6b7280" />
           <span className="font-display text-[11px] uppercase tracking-wide">
-            Neutral
+            <Trans>Neutral</Trans>
           </span>
           <span className="font-mono tabular-nums text-foreground">
             {counts.get(NEUTRAL)}
@@ -1061,11 +1109,12 @@ function TerritoryTally({
 }
 
 function DifficultyPips({ value }: { value: number }) {
+  const { t } = useLingui();
   return (
     <span
       className="flex gap-0.5"
       role="img"
-      aria-label={`Difficulty ${value} of 5`}
+      aria-label={t`Difficulty ${value} of 5`}
     >
       {[1, 2, 3, 4, 5].map((i) => (
         <span
@@ -1101,6 +1150,8 @@ function SelectionPanel({
   onRestoreMap: (nodeId: string) => Promise<void>;
   onClose: () => void;
 }) {
+  const { t } = useLingui();
+  const skin = galaxy.theme?.skin ?? "galaxy";
   const owner = state.owners[node.id] ?? NEUTRAL;
   const faction = galaxy.factions.find((f) => f.id === owner);
   const isPlayers = owner === state.playerFactionId;
@@ -1121,8 +1172,8 @@ function SelectionPanel({
               color={faction?.color ?? "#6b7280"}
               sides={faction ? factionSides(galaxy, faction.id) : 0}
             />
-            {faction?.name ?? "Unclaimed"}
-            {node.kind === "capital" && " · Capital"}
+            {faction?.name ?? t`Unclaimed`}
+            {node.kind === "capital" && <> · {t`Capital`}</>}
           </span>
           {drawsAsGalaxy(galaxy) && (
             <span className="text-xs capitalize text-muted-foreground">
@@ -1135,14 +1186,19 @@ function SelectionPanel({
             </span>
           )}
         </div>
-        <Button variant="ghost" size="sm" onClick={onClose} aria-label="Close">
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={onClose}
+          aria-label={t`Close`}
+        >
           ×
         </Button>
       </header>
       <dl className="flex flex-col gap-1.5 text-xs">
         <div className="flex items-center justify-between">
           <dt className="font-display text-[10px] uppercase tracking-[0.18em] text-muted-foreground">
-            Difficulty
+            <Trans>Difficulty</Trans>
           </dt>
           <dd>
             <DifficultyPips value={node.difficulty} />
@@ -1150,7 +1206,7 @@ function SelectionPanel({
         </div>
         <div className="flex items-center justify-between gap-2">
           <dt className="font-display text-[10px] uppercase tracking-[0.18em] text-muted-foreground">
-            Battlefield
+            <Trans>Battlefield</Trans>
           </dt>
           <dd className="min-w-0 text-right">
             <span className="block truncate">{node.battle.mapName}</span>
@@ -1166,7 +1222,7 @@ function SelectionPanel({
       )}
       <div className="flex flex-col gap-1.5">
         <span className="font-display text-[10px] uppercase tracking-[0.18em] text-muted-foreground">
-          Battle history
+          <Trans>Battle history</Trans>
         </span>
         <ReplayHistoryList
           dataDir={dataDir}
@@ -1175,28 +1231,35 @@ function SelectionPanel({
             p.galaxyId === galaxy.id &&
             p.nodeId === node.id
           }
-          emptyLabel="No battles fought here yet."
+          emptyLabel={t`No battles fought here yet.`}
         />
       </div>
       {underIncursion ? (
         <Button className="w-full" onClick={() => onBattle(node.id)}>
-          <ShieldAlert className="mr-1.5 size-4" aria-hidden /> Defend
+          <ShieldAlert className="mr-1.5 size-4" aria-hidden />{" "}
+          <Trans>Defend</Trans>
         </Button>
       ) : attackable ? (
         <Button className="w-full" onClick={() => onBattle(node.id)}>
-          <Swords className="mr-1.5 size-4" aria-hidden /> Attack
+          <Swords className="mr-1.5 size-4" aria-hidden /> <Trans>Attack</Trans>
         </Button>
       ) : isPlayers ? (
         <p className="text-xs text-muted-foreground">
-          Under your control
-          {node.kind === "capital"
-            ? ` — your ${drawsAsGalaxy(galaxy) ? "homeworld" : "capital"}.`
-            : "."}
+          {node.kind !== "capital"
+            ? t`Under your control.`
+            : drawsAsGalaxy(galaxy)
+              ? t`Under your control — your homeworld.`
+              : t`Under your control — your capital.`}
         </p>
       ) : (
         <p className="text-xs text-muted-foreground">
-          Out of reach — capture an adjacent{" "}
-          {locationNoun(galaxy.theme?.skin).one} first.
+          {select(skin, {
+            galaxy: "Out of reach — capture an adjacent system first.",
+            theatre: "Out of reach — capture an adjacent location first.",
+            cities: "Out of reach — capture an adjacent city first.",
+            territories: "Out of reach — capture an adjacent province first.",
+            other: "Out of reach — capture an adjacent location first.",
+          })}
         </p>
       )}
     </BracketFrame>
@@ -1222,6 +1285,7 @@ export function RunSetupPanel({
     units: LegoProject[],
   ) => Promise<void>;
 }) {
+  const { t } = useLingui();
   const { target } = usePreferredTarget();
   const scan = useUnitsyncScan(target?.enginePath, target?.dataDir);
   const {
@@ -1315,10 +1379,10 @@ export function RunSetupPanel({
         <span
           className={`font-display text-[10px] font-medium uppercase tracking-[0.24em] ${HUD_ACCENT_INK.teal}`}
         >
-          New campaign
+          <Trans>New campaign</Trans>
         </span>
         <h2 className="font-display text-2xl font-bold uppercase leading-none tracking-wide text-foreground">
-          Begin conquest
+          <Trans>Begin conquest</Trans>
         </h2>
         <p className="pt-0.5 text-xs text-muted-foreground">
           {galaxy.description}
@@ -1329,7 +1393,7 @@ export function RunSetupPanel({
           <span
             className={`font-display text-[10px] font-medium uppercase tracking-[0.2em] ${HUD_ACCENT_INK.teal}`}
           >
-            Play as
+            <Trans>Play as</Trans>
           </span>
           <div className="flex flex-wrap gap-1.5">
             {choices.map((f) => (
@@ -1367,7 +1431,7 @@ export function RunSetupPanel({
           <span
             className={`font-display text-[10px] font-medium uppercase tracking-[0.2em] ${HUD_ACCENT_INK.teal}`}
           >
-            Side
+            <Trans>Side</Trans>
           </span>
           <div className="flex items-center gap-2 rounded-md border border-border/50 bg-muted/20 px-2.5 py-2">
             {chosenSideLogo ? (
@@ -1405,7 +1469,7 @@ export function RunSetupPanel({
           <span
             className={`font-display text-[10px] font-medium uppercase tracking-[0.2em] ${HUD_ACCENT_INK.teal}`}
           >
-            Units from the builder
+            <Trans>Units from the builder</Trans>
           </span>
         }
         picked={units}
@@ -1426,11 +1490,11 @@ export function RunSetupPanel({
           ) : (
             <Dices className="mr-1.5 size-4" aria-hidden />
           )}
-          {regenBusy ? "Regenerating…" : "Regenerate map"}
+          {regenBusy ? t`Regenerating…` : t`Regenerate map`}
         </Button>
       )}
       {canRegenerate && scanError && (
-        <ScanFailed noun="maps" reason={scanError} />
+        <ScanFailed noun={t`maps`} reason={scanError} />
       )}
       <Button
         disabled={busy || regenBusy}
@@ -1441,19 +1505,19 @@ export function RunSetupPanel({
           try {
             await onStart(effectiveSide, units);
           } catch (e) {
-            setStartError(
-              `The conquest was not started. ${e instanceof Error ? e.message : String(e)}`,
-            );
+            const reason = e instanceof Error ? e.message : String(e);
+            setStartError(t`The conquest was not started. ${reason}`);
           } finally {
             setBusy(false);
           }
         }}
       >
         {busy ? (
-          "Starting…"
+          t`Starting…`
         ) : (
           <>
-            <Swords className="mr-1.5 size-4" aria-hidden /> Start conquest
+            <Swords className="mr-1.5 size-4" aria-hidden />{" "}
+            <Trans>Start conquest</Trans>
           </>
         )}
       </Button>
@@ -1471,9 +1535,12 @@ function EndScreen({
   state: ConquestState;
   onRestart: () => void;
 }) {
+  const { t } = useLingui();
   const won = state.status === "won";
   const battles = state.history.length;
   const victories = state.history.filter((h) => h.outcome === "victory").length;
+  const turns = state.turn;
+  const galaxyTitle = galaxy.title;
   return (
     <div className="absolute inset-0 z-20 flex items-center justify-center bg-background/60 backdrop-blur-sm">
       <BracketFrame className="flex w-[26rem] max-w-[90%] flex-col items-center gap-3 p-6 text-center">
@@ -1482,25 +1549,39 @@ function EndScreen({
         >
           {won
             ? drawsAsGalaxy(galaxy)
-              ? "Galaxy conquered"
-              : "Conquest won"
-            : "Conquest lost"}
+              ? t`Galaxy conquered`
+              : t`Conquest won`
+            : t`Conquest lost`}
         </h2>
         <p className="text-sm text-muted-foreground">
           {won
-            ? `Every enemy capital has fallen. The ${drawsAsGalaxy(galaxy) ? "galaxy" : "map"} is yours.`
-            : "Your capital has fallen."}{" "}
-          {battles} battle{battles === 1 ? "" : "s"} fought over {state.turn}{" "}
-          turn{state.turn === 1 ? "" : "s"}, {victories} won.
+            ? drawsAsGalaxy(galaxy)
+              ? t`Every enemy capital has fallen. The galaxy is yours.`
+              : t`Every enemy capital has fallen. The map is yours.`
+            : t`Your capital has fallen.`}{" "}
+          {plural(battles, {
+            one: plural(turns, {
+              one: `${battles} battle fought over ${turns} turn, ${victories} won.`,
+              other: `${battles} battle fought over ${turns} turns, ${victories} won.`,
+            }),
+            other: plural(turns, {
+              one: `${battles} battles fought over ${turns} turn, ${victories} won.`,
+              other: `${battles} battles fought over ${turns} turns, ${victories} won.`,
+            }),
+          })}
         </p>
         <div className="flex gap-2">
-          <Button onClick={onRestart}>Start again</Button>
+          <Button onClick={onRestart}>
+            <Trans>Start again</Trans>
+          </Button>
           <Link to="/conquest">
-            <Button variant="outline">Back to Conquest</Button>
+            <Button variant="outline">
+              <Trans>Back to Conquest</Trans>
+            </Button>
           </Link>
         </div>
         <p className="text-xs text-muted-foreground">
-          Starting again resets {galaxy.title} with a new seed.
+          <Trans>Starting again resets {galaxyTitle} with a new seed.</Trans>
         </p>
       </BracketFrame>
     </div>

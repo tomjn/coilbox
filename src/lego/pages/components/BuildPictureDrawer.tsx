@@ -9,6 +9,7 @@
  * has changed and leaves the choice to the game maker.
  */
 
+import { Trans, useLingui } from "@lingui/react/macro";
 import { Button, Input } from "@picoframe/frame";
 import { X } from "lucide-react";
 import { Dialog as DialogPrimitive } from "radix-ui";
@@ -55,6 +56,7 @@ export function BuildPictureDrawer({
   capture,
   onTaken,
 }: Props) {
+  const { t } = useLingui();
   const taken = project.picture;
   const [size, setSize] = useState(taken?.size ?? DEFAULT_PICTURE_SIZE);
   const [view, setView] = useState<PictureViewId>(taken?.view ?? "right");
@@ -127,7 +129,7 @@ export function BuildPictureDrawer({
     try {
       const canvas = capture(shot);
       if (!canvas) {
-        setProblem("The unit is not ready to photograph yet.");
+        setProblem(t`The unit is not ready to photograph yet.`);
         return;
       }
       await savePicture(project.id, canvas);
@@ -147,6 +149,11 @@ export function BuildPictureDrawer({
 
   const notices = survey ? pictureNotices(survey, size) : [];
   const stale = pictureIsStale(project);
+  const projectName = project.name;
+  const takenWhen = taken?.takenAt
+    ? formatDateTime(new Date(taken.takenAt))
+    : "";
+  const takenSize = taken?.size ?? 0;
 
   return (
     <DialogPrimitive.Root open={isOpen} onOpenChange={onOpenChange}>
@@ -158,10 +165,10 @@ export function BuildPictureDrawer({
         >
           <div className="flex items-center justify-between border-b border-border/60 px-5 py-4">
             <DialogPrimitive.Title className="text-base font-semibold">
-              Build picture
+              <Trans>Build picture</Trans>
             </DialogPrimitive.Title>
             <DialogPrimitive.Close asChild>
-              <Button variant="ghost" size="icon" aria-label="Close">
+              <Button variant="ghost" size="icon" aria-label={t`Close`}>
                 <X className="size-4" />
               </Button>
             </DialogPrimitive.Close>
@@ -179,17 +186,17 @@ export function BuildPictureDrawer({
               {preview ? (
                 <img
                   src={preview}
-                  alt={`${project.name} as it will look on a build menu`}
+                  alt={t`${projectName} as it will look on a build menu`}
                   className="max-h-full max-w-full object-contain"
                 />
               ) : (
                 <span className="text-xs text-muted-foreground">
-                  Nothing to photograph yet
+                  <Trans>Nothing to photograph yet</Trans>
                 </span>
               )}
             </div>
 
-            <Field label="Camera angle">
+            <Field label={t`Camera angle`}>
               <OptionSelect
                 value={view}
                 onValueChange={(value) => setView(value as PictureViewId)}
@@ -197,11 +204,11 @@ export function BuildPictureDrawer({
                   value: v.id,
                   label: v.label,
                 }))}
-                ariaLabel="Camera angle"
+                ariaLabel={t`Camera angle`}
               />
             </Field>
 
-            <Field label="Size in pixels">
+            <Field label={t`Size in pixels`}>
               <Input
                 type="number"
                 min={1}
@@ -222,13 +229,13 @@ export function BuildPictureDrawer({
                   }
                 />
                 <Label htmlFor="lego-picture-transparent">
-                  Transparent background
+                  <Trans>Transparent background</Trans>
                 </Label>
               </div>
               {transparent ? null : (
                 <input
                   type="color"
-                  aria-label="Background colour"
+                  aria-label={t`Background colour`}
                   className="h-8 w-16 rounded border border-input"
                   value={colour}
                   onChange={(e) => setColour(e.target.value)}
@@ -244,18 +251,27 @@ export function BuildPictureDrawer({
 
             <div className="flex flex-col gap-2 border-t border-border/60 pt-4">
               <Button onClick={() => void take()} disabled={working}>
-                {working ? "Taking" : taken ? "Update picture" : "Take picture"}
+                {working
+                  ? t`Taking`
+                  : taken
+                    ? t`Update picture`
+                    : t`Take picture`}
               </Button>
               {taken ? (
                 <p className="text-xs text-muted-foreground">
-                  Taken{" "}
-                  {taken.takenAt ? formatDateTime(new Date(taken.takenAt)) : ""}
-                  , {taken.size} by {taken.size} pixels.
-                  {stale ? " The unit has changed since." : ""}
+                  <Trans>
+                    Taken {takenWhen}, {takenSize} by {takenSize} pixels.
+                  </Trans>
+                  {stale ? (
+                    <>
+                      {" "}
+                      <Trans>The unit has changed since.</Trans>
+                    </>
+                  ) : null}
                 </p>
               ) : (
                 <p className="text-xs text-muted-foreground">
-                  No picture taken yet.
+                  <Trans>No picture taken yet.</Trans>
                 </p>
               )}
               {problem ? (

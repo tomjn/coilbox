@@ -17,6 +17,7 @@
  * withdrawn with a null, and whoever took it puts their own layers on it.
  */
 
+import { useLingui } from "@lingui/react/macro";
 import { cn, useSetting } from "@picoframe/frame";
 import { Crosshair, GripHorizontal, Maximize2, Minimize2 } from "lucide-react";
 import {
@@ -140,7 +141,7 @@ export function PlacementSurface({
   ground,
   onScene,
   frame = frameGround,
-  frameLabel = "Frame",
+  frameLabel,
   stand,
   rail,
   bars,
@@ -184,6 +185,7 @@ export function PlacementSurface({
   /** What the keys do here, for a surface that answers them (issue #2269). */
   keyboard?: SurfaceKeyboard;
 }) {
+  const { t } = useLingui();
   const sceneRef = useRef<MapScene3D | null>(null);
   const [expanded, setExpanded] = useExpanded();
   const surfaceHeight = useSurfaceHeight();
@@ -302,11 +304,11 @@ export function PlacementSurface({
                 <GridToggle
                   on={grid}
                   onChange={setGrid}
-                  showTitle="Show the build grid the blueprint stands on"
+                  showTitle={t`Show the build grid the blueprint stands on`}
                 />
               )}
               <ResetViewButton
-                title={frameLabel}
+                title={frameLabel ?? t`Frame`}
                 onClick={() => {
                   if (sceneRef.current) frameRef.current(sceneRef.current);
                 }}
@@ -316,8 +318,8 @@ export function PlacementSurface({
                 onIcon={Minimize2}
                 on={expanded}
                 onChange={setExpanded}
-                hideTitle="Back to the page (Esc)"
-                showTitle="Fill the window"
+                hideTitle={t`Back to the page (Esc)`}
+                showTitle={t`Fill the window`}
               />
             </ViewControls>
           </div>
@@ -420,6 +422,7 @@ function SurfaceResizeHandle({
   onCommit: (next: number) => void;
   onStep: (direction: 1 | -1) => void;
 }) {
+  const { t } = useLingui();
   const dragStart = useRef<{ pointerY: number; height: number } | null>(null);
   const [dragging, setDragging] = useState(false);
 
@@ -472,7 +475,7 @@ function SurfaceResizeHandle({
     <div
       role="separator"
       aria-orientation="horizontal"
-      aria-label="Resize the working area"
+      aria-label={t`Resize the working area`}
       aria-valuenow={height}
       aria-valuemin={MIN_SURFACE_HEIGHT}
       aria-valuemax={MAX_SURFACE_HEIGHT}

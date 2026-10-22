@@ -1,3 +1,4 @@
+import { t } from "@lingui/core/macro";
 import type {
   CampaignUnit,
   ImageRef,
@@ -476,18 +477,20 @@ export function parseConquestStateFile(json: string): ConquestStateFile {
   try {
     data = JSON.parse(json);
   } catch {
-    throw new Error("state.json is not valid JSON");
+    throw new Error(t`state.json is not valid JSON`);
   }
   if (typeof data !== "object" || data === null || Array.isArray(data)) {
-    throw new Error("state.json is not a JSON object");
+    throw new Error(t`state.json is not a JSON object`);
   }
   const file = data as { schemaVersion?: unknown; conquests?: unknown };
   if (
     typeof file.schemaVersion === "number" &&
     file.schemaVersion > CONQUEST_STATE_SCHEMA_VERSION
   ) {
+    const fileVersion = file.schemaVersion;
+    const supportedVersion = CONQUEST_STATE_SCHEMA_VERSION;
     throw new Error(
-      `state.json was made by a newer version of coilbox (file version ${file.schemaVersion}, this version reads ${CONQUEST_STATE_SCHEMA_VERSION})`,
+      t`state.json was made by a newer version of coilbox (file version ${fileVersion}, this version reads ${supportedVersion})`,
     );
   }
   if (
@@ -495,7 +498,7 @@ export function parseConquestStateFile(json: string): ConquestStateFile {
     file.conquests === null ||
     Array.isArray(file.conquests)
   ) {
-    throw new Error("state.json has no conquests object");
+    throw new Error(t`state.json has no conquests object`);
   }
   return data as ConquestStateFile;
 }

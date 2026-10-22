@@ -20,6 +20,8 @@
  * https://github.com/tomjn/coilbox/issues/1315.
  */
 
+import { plural } from "@lingui/core/macro";
+import { Trans, useLingui } from "@lingui/react/macro";
 import { Button } from "@picoframe/frame";
 import { Blocks } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -128,6 +130,7 @@ export function BlueprintEditor({
    */
   history?: "own" | "caller";
 }) {
+  const { t } = useLingui();
   const [handle, setHandle] = useState<MapScene3D | null>(null);
   const [selected, setSelected] = useState<string | null>(null);
   const [unitDef, setUnitDef] = useState("");
@@ -400,7 +403,7 @@ export function BlueprintEditor({
         ground={{ kind: "grid", extent: GRID_EXTENT }}
         onScene={setHandle}
         frame={frame}
-        frameLabel="Frame blueprint"
+        frameLabel={t`Frame blueprint`}
         chrome={undoRedo && <HistoryControls {...undoRedo} />}
         bars={
           <>
@@ -442,10 +445,12 @@ export function BlueprintEditor({
                     }
                   />
                   <p className="text-xs text-muted-foreground">
-                    A blueprint is a shape rather than a place, so there is no
-                    map here and no team. Every building sits at an offset from
-                    the blueprint's own middle, and the squares under them are
-                    the ground the engine will give them.
+                    <Trans>
+                      A blueprint is a shape rather than a place, so there is no
+                      map here and no team. Every building sits at an offset
+                      from the blueprint's own middle, and the squares under
+                      them are the ground the engine will give them.
+                    </Trans>
                   </p>
                   <LayoutNotes
                     overlaps={overlaps}
@@ -495,8 +500,8 @@ export function BlueprintEditor({
 
             <p className="w-fit rounded bg-card/70 px-2 py-1 text-[11px] text-muted-foreground backdrop-blur">
               {unitDef
-                ? "Click the ground to put one down. Escape stops placing. Drag a building to move it within the blueprint."
-                : "Pick a building to start placing. Drag one to move it, click bare ground to deselect."}
+                ? t`Click the ground to put one down. Escape stops placing. Drag a building to move it within the blueprint.`
+                : t`Pick a building to start placing. Drag one to move it, click bare ground to deselect.`}
             </p>
 
             {/* Nothing here has been checked, said once in the open rather than
@@ -510,7 +515,7 @@ export function BlueprintEditor({
             {picked && (
               <SelectionBar
                 def={picked.def}
-                what={`building ${picked.index + 1}`}
+                what={t`building ${{ number: picked.index + 1 }}`}
                 turnable
                 onTurn={() =>
                   applyEdit((current) => turnPlacement(current, picked.key, 1))
@@ -569,10 +574,10 @@ export function BlueprintEditor({
         // about the surface, and saying it twice made the two look like
         // different statements (issue #1716).
         footer={
-          <>
+          <Trans>
             no map · a build grid, {GRID_EXTENT} elmos square · drag or
             middle-drag to pan · right-drag to turn the view · scroll to zoom
-          </>
+          </Trans>
         }
       />
     </UnitGameProvider>
@@ -600,11 +605,19 @@ function DrawnNote({
   drawing: boolean;
   placed: number;
 }) {
+  const { t } = useLingui();
   if (placed === 0) return null;
+  const missingList = missing.join(", ");
+  const missingCount = missing.length;
   const problem = gameMissing
-    ? `${gameName || "This blueprint's game"} is not installed, so nothing can be drawn with its models.`
+    ? gameName
+      ? t`${gameName} is not installed, so nothing can be drawn with its models.`
+      : t`This blueprint's game is not installed, so nothing can be drawn with its models.`
     : missing.length > 0
-      ? `${missing.length} unit type${missing.length === 1 ? "" : "s"} not in ${gameName}, drawn as boxes: ${missing.join(", ")}`
+      ? plural(missingCount, {
+          one: `# unit type not in ${gameName}, drawn as boxes: ${missingList}`,
+          other: `# unit types not in ${gameName}, drawn as boxes: ${missingList}`,
+        })
       : null;
 
   return (
@@ -616,8 +629,12 @@ function DrawnNote({
         </p>
       )}
       <p className="rounded bg-card/70 px-2 py-1 font-mono text-[11px] text-muted-foreground backdrop-blur">
-        {drawing ? "drawing " : ""}
-        {placed} building{placed === 1 ? "" : "s"}
+        {drawing
+          ? plural(placed, {
+              one: "drawing # building",
+              other: "drawing # buildings",
+            })
+          : plural(placed, { one: "# building", other: "# buildings" })}
       </p>
     </>
   );

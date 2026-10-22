@@ -3,6 +3,7 @@
  * the engine target changes and disposed as it is replaced or left behind.
  */
 
+import { useLingui } from "@lingui/react/macro";
 import { useEffect, useRef, useState } from "react";
 import { useUnitsyncScan } from "@/content/config";
 import { usePreferredTarget } from "@/play/config";
@@ -10,22 +11,13 @@ import { type EffectBitmaps, loadEffectBitmaps } from "../../effectBitmaps";
 import type { LegoProject } from "../../model";
 import { installedGameFor, unitGame } from "../../unitGame";
 
-const NO_GAME: EffectBitmaps = {
-  atlas: null,
-  note: "This unit has no game, so its effects are drawn as a plain round sprite.",
-};
-
-const NO_TARGET: EffectBitmaps = {
-  atlas: null,
-  note: "There is no engine set up to read the game's bitmaps, so effects are drawn as a plain round sprite.",
-};
-
 const LOADING: EffectBitmaps = { atlas: null, note: null };
 
 /** `project` is nullable so this can sit above the page's loading guard,
  *  alongside its other hooks, rather than being called conditionally. A null
  *  project reads the same as one with no game. */
 export function useEffectBitmaps(project: LegoProject | null): EffectBitmaps {
+  const { t } = useLingui();
   const { target } = usePreferredTarget();
   const scan = useUnitsyncScan(target?.enginePath, target?.dataDir);
   // The unit's own game (#3257), read from the installed build of it. A game
@@ -60,13 +52,13 @@ export function useEffectBitmaps(project: LegoProject | null): EffectBitmaps {
         const message = error instanceof Error ? error.message : String(error);
         setLoaded({
           atlas: null,
-          note: `Could not read the game's bitmaps, so effects are drawn as a plain round sprite: ${message}`,
+          note: t`Could not read the game's bitmaps, so effects are drawn as a plain round sprite: ${message}`,
         });
       });
     return () => {
       live = false;
     };
-  }, [archive, enginePath, dataDir]);
+  }, [archive, enginePath, dataDir, t]);
 
   // The atlas a new one replaces is disposed here, and so is whatever the
   // last one was when this component goes away.
@@ -83,7 +75,17 @@ export function useEffectBitmaps(project: LegoProject | null): EffectBitmaps {
     };
   }, []);
 
-  if (!archive) return NO_GAME;
-  if (!enginePath || !dataDir) return NO_TARGET;
+  if (!archive) {
+    return {
+      atlas: null,
+      note: t`This unit has no game, so its effects are drawn as a plain round sprite.`,
+    };
+  }
+  if (!enginePath || !dataDir) {
+    return {
+      atlas: null,
+      note: t`There is no engine set up to read the game's bitmaps, so effects are drawn as a plain round sprite.`,
+    };
+  }
   return loaded ?? LOADING;
 }

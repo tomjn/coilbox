@@ -8,6 +8,7 @@
  * and marked, and the document is left as it was.
  */
 
+import { useLingui } from "@lingui/react/macro";
 import { Input } from "@picoframe/frame";
 import { useEffect, useState } from "react";
 
@@ -19,12 +20,20 @@ interface Props {
   onChange: (limits: LegoPieceLimits | undefined) => void;
 }
 
-const AXES = {
-  yaw: { label: "Turn range, ° right", from: "Turn from", to: "Turn to" },
-  pitch: { label: "Lift range, ° up", from: "Lift from", to: "Lift to" },
-} as const;
-
 export function JointLimitFields({ piece, onChange }: Props) {
+  const { t } = useLingui();
+  const AXES = {
+    yaw: {
+      label: t`Turn range, ° right`,
+      from: t`Turn from`,
+      to: t`Turn to`,
+    },
+    pitch: {
+      label: t`Lift range, ° up`,
+      from: t`Lift from`,
+      to: t`Lift to`,
+    },
+  } as const;
   const axes = limitAxes(piece.role);
   if (axes.length === 0) return null;
 
@@ -67,6 +76,7 @@ function RangeRow({
   range: LegoAngleRange | undefined;
   onCommit: (range: LegoAngleRange | undefined) => void;
 }) {
+  const { t } = useLingui();
   const [from, setFrom] = useState(show(range?.min));
   const [to, setTo] = useState(show(range?.max));
 
@@ -118,8 +128,8 @@ function RangeRow({
     <div>
       <span className="text-xs text-muted-foreground">{label}</span>
       <div className="mt-1 grid grid-cols-2 gap-1">
-        {field(from, setFrom, fromLabel, "none")}
-        {field(to, setTo, toLabel, "none")}
+        {field(from, setFrom, fromLabel, t`none`)}
+        {field(to, setTo, toLabel, t`none`)}
       </div>
     </div>
   );

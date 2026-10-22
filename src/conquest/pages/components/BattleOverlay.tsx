@@ -1,3 +1,5 @@
+import { select } from "@lingui/core/macro";
+import { Trans, useLingui } from "@lingui/react/macro";
 import { Button, useDrawer } from "@picoframe/frame";
 import { ListTree, ShieldAlert, Swords } from "lucide-react";
 import { useMemo } from "react";
@@ -17,7 +19,7 @@ import { resolveGameByShortname } from "../../../play/installedGames";
 import { DIFFICULTY_LABEL } from "../../../play/scenarioDifficulty";
 import { factionSides } from "../../galaxy3d/factionShape";
 import { conquestGameRef } from "../../gameChoice";
-import { drawsAsGalaxy, locationNoun } from "../../mapStyle";
+import { drawsAsGalaxy } from "../../mapStyle";
 import type { ConquestState, GalaxyDoc, GalaxyNode } from "../../model";
 import { difficultyHandicap, difficultyTable } from "../../rules";
 import { useConquestBattleRun } from "../../run";
@@ -54,6 +56,7 @@ export function BattleOverlay({
   onRestoreMap: (nodeId: string) => Promise<void>;
   onClose: () => void;
 }) {
+  const { t } = useLingui();
   const run = useConquestBattleRun(galaxy, state, node, mode);
   const drawer = useDrawer();
 
@@ -65,6 +68,8 @@ export function BattleOverlay({
   const enemyCount =
     node.battle.enemyAiCount ?? difficultyTable(node.difficulty);
   const handicap = node.battle.handicap ?? difficultyHandicap(node.difficulty);
+  const nodeName = node.name;
+  const opponentName = enemyFaction?.name ?? t`garrison`;
 
   // Faction emblems for the briefing rows (chosen faction + opposition), by side.
   const { target } = usePreferredTarget();
@@ -127,16 +132,15 @@ export function BattleOverlay({
   const openTechTree = installedGame
     ? () =>
         drawer.open({
-          title: "Available units",
-          description:
-            "Units usable in this fight, lit up against your faction's build tree. Restricted units stay unlit.",
+          title: t`Available units`,
+          description: t`Units usable in this fight, lit up against your faction's build tree. Restricted units stay unlit.`,
           width: "40rem",
           content: (
             <UnitPicker
               units={techUnits}
               factions={playerStartUnit ? [{ startUnit: playerStartUnit }] : []}
               selected={availableUnits}
-              selectedLabel="available"
+              selectedLabel={t`available`}
               enginePath={target?.enginePath}
               dataDir={target?.dataDir}
               gameArchive={installedGame.primaryArchive.name}
@@ -155,7 +159,7 @@ export function BattleOverlay({
           free. */}
       <button
         type="button"
-        aria-label="Back to map"
+        aria-label={t`Back to map`}
         onClick={onClose}
         className="absolute inset-0 cursor-default"
       />
@@ -170,14 +174,14 @@ export function BattleOverlay({
           // A scenario is not a skirmish setup, so there is no preset to save.
           installedGame={!!run.installedGame && !run.scenario}
           getDraft={() => run.lastSnapshot ?? run.snapshot()}
-          defaultName={`${node.name} vs ${enemyFaction?.name ?? "garrison"}`}
+          defaultName={t`${nodeName} vs ${opponentName}`}
           extra={
             openTechTree && (
               <button
                 type="button"
                 onClick={openTechTree}
-                aria-label="View available units"
-                title="View tech tree"
+                aria-label={t`View available units`}
+                title={t`View tech tree`}
                 className={`pointer-events-auto absolute right-full top-32 mr-4 flex items-center justify-center p-3.5 text-muted-foreground backdrop-blur-sm transition-colors hover:border-border hover:text-foreground ${HUD_CARD_CLASS}`}
               >
                 <ListTree className="size-5" aria-hidden />
@@ -192,7 +196,11 @@ export function BattleOverlay({
             ) : (
               <Swords className="size-5 text-primary" aria-hidden />
             )}
-            {mode === "defend" ? "Defend" : "Attack"} {node.name}
+            {mode === "defend" ? (
+              <Trans>Defend {nodeName}</Trans>
+            ) : (
+              <Trans>Attack {nodeName}</Trans>
+            )}
           </h1>
           {node.blurb && (
             <p className="text-sm text-muted-foreground">{node.blurb}</p>
@@ -272,16 +280,21 @@ function Briefing({
   run: ReturnType<typeof useConquestBattleRun>;
   onRestoreMap: (nodeId: string) => Promise<void>;
 }) {
+  const { t } = useLingui();
   const playerFaction = galaxy.factions.find(
     (f) => f.id === state.playerFactionId,
   );
+  const nodeName = node.name;
+  const skin = galaxy.theme?.skin ?? "galaxy";
+  const heldCapital =
+    node.kind === "capital" && state.owners[node.id] === state.playerFactionId;
   return (
     <div className="flex flex-col gap-3">
       <dl className="flex flex-col gap-1.5 text-sm">
         {run.installedGame && (
           <div className="flex justify-between gap-2">
             <dt className="font-display text-[11px] uppercase tracking-[0.18em] text-muted-foreground">
-              Game
+              <Trans>Game</Trans>
             </dt>
             <dd className="min-w-0 text-right">
               <span className="block truncate">{run.installedGame.name}</span>
@@ -290,7 +303,7 @@ function Briefing({
         )}
         <div className="flex justify-between gap-2">
           <dt className="font-display text-[11px] uppercase tracking-[0.18em] text-muted-foreground">
-            Battlefield
+            <Trans>Battlefield</Trans>
           </dt>
           <dd className="min-w-0 text-right">
             <span className="block truncate">{run.mapName}</span>
@@ -307,7 +320,7 @@ function Briefing({
           <>
             <div className="flex justify-between gap-2">
               <dt className="font-display text-[11px] uppercase tracking-[0.18em] text-muted-foreground">
-                Scenario
+                <Trans>Scenario</Trans>
               </dt>
               <dd className="min-w-0 text-right">
                 <span className="block truncate">{run.scenario.name}</span>
@@ -318,7 +331,7 @@ function Briefing({
             {run.scenarioDifficulty && (
               <div className="flex justify-between gap-2">
                 <dt className="font-display text-[11px] uppercase tracking-[0.18em] text-muted-foreground">
-                  Difficulty
+                  <Trans>Difficulty</Trans>
                 </dt>
                 <dd className="min-w-0 text-right">
                   {DIFFICULTY_LABEL[run.scenarioDifficulty]}
@@ -329,7 +342,7 @@ function Briefing({
         ) : (
           <div className="flex justify-between gap-2">
             <dt className="font-display text-[11px] uppercase tracking-[0.18em] text-muted-foreground">
-              Opposition
+              <Trans>Opposition</Trans>
             </dt>
             <dd className="flex items-center gap-1.5">
               {enemyLogo ? (
@@ -340,7 +353,7 @@ function Briefing({
                   sides={enemySides}
                 />
               )}
-              {enemyCount} × {enemyName ?? "garrison"}
+              {enemyCount} × {enemyName ?? t`garrison`}
               {handicap > 0 ? ` (+${handicap}%)` : ""}
             </dd>
           </div>
@@ -348,7 +361,7 @@ function Briefing({
         {playerFaction && (
           <div className="flex justify-between gap-2">
             <dt className="font-display text-[11px] uppercase tracking-[0.18em] text-muted-foreground">
-              Fighting for
+              <Trans>Fighting for</Trans>
             </dt>
             <dd className="flex items-center gap-1.5">
               {playerLogo ? (
@@ -370,25 +383,42 @@ function Briefing({
         )}
         {run.scenario && (
           <p className="text-sm text-muted-foreground">
-            This location is a scenario, not a skirmish.
-            {run.scenario.description ? ` ${run.scenario.description}` : ""} Win
-            it to take {node.name}.
+            <Trans>This location is a scenario, not a skirmish.</Trans>
+            {run.scenario.description ? ` ${run.scenario.description}` : ""}{" "}
+            <Trans>Win it to take {nodeName}.</Trans>
           </p>
         )}
         {mode === "attack" && (
           <p className="text-xs text-muted-foreground">
-            Defeat costs nothing but the turn — the enemy may move.
+            <Trans>
+              Defeat costs nothing but the turn — the enemy may move.
+            </Trans>
           </p>
         )}
         {mode === "defend" && (
           <p className={`text-xs ${HUD_ACCENT_INK.amber}`}>
-            Lose this defence and the {locationNoun(galaxy.theme?.skin).one}{" "}
-            falls
-            {node.kind === "capital" &&
-            state.owners[node.id] === state.playerFactionId
-              ? ` — it is your ${drawsAsGalaxy(galaxy) ? "homeworld" : "capital"}`
-              : ""}
-            .
+            {!heldCapital
+              ? select(skin, {
+                  galaxy: "Lose this defence and the system falls.",
+                  theatre: "Lose this defence and the location falls.",
+                  cities: "Lose this defence and the city falls.",
+                  territories: "Lose this defence and the province falls.",
+                  other: "Lose this defence and the location falls.",
+                })
+              : drawsAsGalaxy(galaxy)
+                ? t`Lose this defence and the system falls — it is your homeworld.`
+                : select(skin, {
+                    galaxy:
+                      "Lose this defence and the system falls — it is your capital.",
+                    theatre:
+                      "Lose this defence and the location falls — it is your capital.",
+                    cities:
+                      "Lose this defence and the city falls — it is your capital.",
+                    territories:
+                      "Lose this defence and the province falls — it is your capital.",
+                    other:
+                      "Lose this defence and the location falls — it is your capital.",
+                  })}
           </p>
         )}
       </dl>
@@ -438,46 +468,61 @@ function Outcome({
   place: "galaxy" | "map";
   onContinue: () => void;
 }) {
+  const { t } = useLingui();
   const won = phase === "victory";
+  const nodeName = node.name;
   const consequence = won
     ? mode === "attack"
-      ? `${node.name} is yours.`
-      : `The incursion at ${node.name} is repelled.`
+      ? t`${nodeName} is yours.`
+      : t`The incursion at ${nodeName} is repelled.`
     : mode === "attack"
-      ? `The assault on ${node.name} failed. Your territory holds.`
-      : `${node.name} has fallen.`;
+      ? t`The assault on ${nodeName} failed. Your territory holds.`
+      : t`${nodeName} has fallen.`;
   const hasIncursion = (resolved?.incursions.length ?? 0) > 0;
   return (
     <div className="flex flex-col items-center gap-3 text-center">
       <h2
         className={`font-display text-2xl font-bold uppercase tracking-wide ${won ? "text-emerald-400" : HUD_ACCENT_INK.danger}`}
       >
-        {won ? "Victory" : "Defeat"}
+        {won ? t`Victory` : t`Defeat`}
       </h2>
       <p className="text-sm text-muted-foreground">{consequence}</p>
       {resolved?.status === "won" && (
         <p className="text-sm text-emerald-300">
-          Every enemy capital has fallen — the {place} is yours.
+          {place === "galaxy" ? (
+            <Trans>Every enemy capital has fallen — the galaxy is yours.</Trans>
+          ) : (
+            <Trans>Every enemy capital has fallen — the map is yours.</Trans>
+          )}
         </p>
       )}
       {resolved?.status === "lost" && (
         <p className={`text-sm ${HUD_ACCENT_INK.danger}`}>
-          Your capital is lost.
+          <Trans>Your capital is lost.</Trans>
         </p>
       )}
       {resolved?.status === "active" && hasIncursion && (
         <p className="flex items-center gap-1.5 text-sm text-amber-300">
           <ShieldAlert className="size-4" aria-hidden />
-          Enemy incursion detected — check the{" "}
-          {place === "galaxy" ? "galaxy map" : "map"}.
+          {place === "galaxy" ? (
+            <Trans>Enemy incursion detected — check the galaxy map.</Trans>
+          ) : (
+            <Trans>Enemy incursion detected — check the map.</Trans>
+          )}
         </p>
       )}
       {autoDetected && (
         <p className="text-xs text-muted-foreground">
-          Result detected from the replay.
+          <Trans>Result detected from the replay.</Trans>
         </p>
       )}
-      <Button onClick={onContinue}>Return to the {place}</Button>
+      <Button onClick={onContinue}>
+        {place === "galaxy" ? (
+          <Trans>Return to the galaxy</Trans>
+        ) : (
+          <Trans>Return to the map</Trans>
+        )}
+      </Button>
     </div>
   );
 }

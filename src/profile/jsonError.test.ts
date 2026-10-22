@@ -57,17 +57,15 @@ describe("jsonErrorSnippet", () => {
 });
 
 describe("describeJsonError", () => {
-  it("enriches a real JSON.parse failure with a located message and snippet", () => {
+  it("enriches a V8 JSON.parse failure with a located message and snippet", () => {
     const bad = '{\n  "a": 1\n  "b": 2\n}';
-    let err: unknown;
-    try {
-      JSON.parse(bad);
-    } catch (e) {
-      err = e;
-    }
+    // The tests run on Bun, which is JavaScriptCore like the macOS and Linux
+    // webviews, so the V8 wording WebView2 gives on Windows is written out.
+    const err = new SyntaxError(
+      "Expected ',' or '}' after property value in JSON at position 13 (line 3 column 3)",
+    );
     const d = describeJsonError(bad, err);
-    // Node runs on V8, so a location is always recovered here.
-    expect(d.message).toMatch(/^Line 3, column \d+:/);
+    expect(d.message).toMatch(/^Line 3, column 3:/);
     expect(d.snippet).toContain('"b": 2');
     expect(d.snippet).toContain("^");
   });

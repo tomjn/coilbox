@@ -1,15 +1,23 @@
+import { t } from "@lingui/core/macro";
+import { Trans } from "@lingui/react/macro";
 import { Lock } from "lucide-react";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
-import { levelChoices } from "../../unlocks";
+import { levelChoices, requirementSentence } from "../../unlocks";
 
 /** What each level does, in the setup's own words. The aggression behind them
  * is in `../../threat`. */
-const LEVEL_NOTES = [
-  "Opponents attack as they always have.",
-  "Opponents pick your territory over neutral ground more often.",
-  "Opponents pick your territory over neutral ground much more often.",
-  "Opponents treat your territory like any other target, so incursions come far more often.",
-];
+function levelNote(level: number): string {
+  switch (level) {
+    case 1:
+      return t`Opponents pick your territory over neutral ground more often.`;
+    case 2:
+      return t`Opponents pick your territory over neutral ground much more often.`;
+    case 3:
+      return t`Opponents treat your territory like any other target, so incursions come far more often.`;
+    default:
+      return t`Opponents attack as they always have.`;
+  }
+}
 
 /**
  * The threat level choice on the conquest setup. Every unlocked level is a
@@ -30,10 +38,11 @@ export function ThreatLevelSelect({
   onChange: (level: number) => void;
 }) {
   const { unlocked, locked } = levelChoices(ceiling);
+  const lockedLevel = locked?.level ?? 0;
   return (
     <div className="flex flex-col gap-1.5 text-sm">
       <span className="font-medium" id="conquest-threat-label">
-        Threat level
+        <Trans>Threat level</Trans>
       </span>
       <ToggleGroup
         type="single"
@@ -46,7 +55,7 @@ export function ThreatLevelSelect({
       >
         {unlocked.map((n) => (
           <ToggleGroupItem key={n} value={String(n)}>
-            Level {n}
+            <Trans>Level {n}</Trans>
           </ToggleGroupItem>
         ))}
         {locked && (
@@ -56,7 +65,7 @@ export function ThreatLevelSelect({
             aria-describedby="conquest-threat-locked"
           >
             <Lock className="size-3.5" aria-hidden />
-            Level {locked.level}
+            <Trans>Level {lockedLevel}</Trans>
           </ToggleGroupItem>
         )}
       </ToggleGroup>
@@ -64,14 +73,15 @@ export function ThreatLevelSelect({
         className="text-xs text-muted-foreground"
         data-testid="threat-level-note"
       >
-        {LEVEL_NOTES[value] ?? LEVEL_NOTES[0]}
+        {levelNote(value)}
       </span>
       {locked && (
         <span
           className="text-xs text-muted-foreground"
           id="conquest-threat-locked"
         >
-          Level {locked.level} is locked. {locked.requirement}.
+          <Trans>Level {lockedLevel} is locked.</Trans>{" "}
+          {requirementSentence(lockedLevel - 1)}
         </span>
       )}
     </div>

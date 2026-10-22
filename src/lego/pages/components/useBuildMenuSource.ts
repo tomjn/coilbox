@@ -4,6 +4,7 @@
  * read from (issue #3288). The same game and table the weapon picker reads.
  */
 
+import { useLingui } from "@lingui/react/macro";
 import type { GameItem } from "@/content/bindings";
 import { useUnitDefs } from "../../../workshop/config";
 import { exportedInto } from "../../../workshop/legoUnits";
@@ -26,6 +27,7 @@ export interface BuildMenuSource {
 }
 
 export function useBuildMenuSource(project: LegoProject): BuildMenuSource {
+  const { t } = useLingui();
   const { target, targetLoading, scan } = useTestGame();
   const own = unitGame(project);
   const installed = scan.data?.games ?? [];
@@ -41,18 +43,21 @@ export function useBuildMenuSource(project: LegoProject): BuildMenuSource {
     game?.primaryArchive.name,
   );
   const current = defs && defsFor === game?.primaryArchive.name ? defs : null;
-  const named = own?.name ?? "The game it was exported into";
+  const named = own?.name ?? t`The game it was exported into`;
+  const scanError = scan.error;
+  const gameLabel = game?.name ?? named;
+  const reason = error ?? t`its definitions could not be read`;
   const unavailable =
     !own && !(legacy && project.exported)
-      ? "Choose a game for this unit first."
+      ? t`Choose a game for this unit first.`
       : !targetLoading && !target
-        ? "No engine is installed, so the game cannot be read."
-        : scan.error
-          ? `The content scan failed: ${scan.error}`
+        ? t`No engine is installed, so the game cannot be read.`
+        : scanError
+          ? t`The content scan failed: ${scanError}`
           : scan.data && !game
-            ? `${named} is not installed.`
+            ? t`${named} is not installed.`
             : status === "error"
-              ? `Could not read ${game?.name ?? named}: ${error ?? "its definitions could not be read"}`
+              ? t`Could not read ${gameLabel}: ${reason}`
               : null;
   return {
     gameName: game?.name ?? null,

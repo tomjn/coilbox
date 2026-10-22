@@ -3,6 +3,7 @@
  * (issue #3305). See `gameFit.ts` for what each row means. It changes nothing.
  */
 
+import { Trans, useLingui } from "@lingui/react/macro";
 import { Link } from "react-router";
 import { normaliseArmorDefs } from "../../../workshop/armorClasses";
 import { useUnitDefs } from "../../../workshop/config";
@@ -22,6 +23,7 @@ interface Props {
 }
 
 export function GameFitSection({ project, bounds }: Props) {
+  const { t } = useLingui();
   const { target, targetLoading, scan } = useTestGame();
   const { projects: tweakProjects } = useModProjects();
   const own = unitGame(project);
@@ -33,18 +35,22 @@ export function GameFitSection({ project, bounds }: Props) {
   );
   const current = defs && defsFor === game?.primaryArchive.name ? defs : null;
 
+  const gameName = own?.name;
+  const scanError = scan.error;
   const unavailable = !own
-    ? "Choose a game for this unit to check it against."
+    ? t`Choose a game for this unit to check it against.`
     : !targetLoading && !target
-      ? "No engine is installed, so the game cannot be read."
-      : scan.error
-        ? `The content scan failed: ${scan.error}`
+      ? t`No engine is installed, so the game cannot be read.`
+      : scanError
+        ? t`The content scan failed: ${scanError}`
         : scan.data && !game
-          ? `${own.name} is not installed, so it cannot be read.`
+          ? t`${gameName} is not installed, so it cannot be read.`
           : status === "error"
-            ? `Could not read ${own.name}: ${error ?? "its definitions could not be read"}`
+            ? error
+              ? t`Could not read ${gameName}: ${error}`
+              : t`Could not read ${gameName}: its definitions could not be read`
             : !current
-              ? `Reading ${own.name}`
+              ? t`Reading ${gameName}`
               : null;
 
   let rows: FitRow[] = [];
@@ -72,37 +78,42 @@ export function GameFitSection({ project, bounds }: Props) {
 
   return (
     <div className="flex flex-col gap-1.5 border-b border-border/60 px-3 py-2">
-      <p className="text-sm font-medium">Fit to the game</p>
+      <p className="text-sm font-medium">
+        <Trans>Fit to the game</Trans>
+      </p>
       {unavailable ? (
         <p className="text-xs text-muted-foreground">{unavailable}</p>
       ) : (
         <>
           <p className="text-xs text-muted-foreground">
             {fromFile
-              ? "From the exported file"
-              : "As the builder would write it"}
+              ? t`From the exported file`
+              : t`As the builder would write it`}
           </p>
-          {rows.map((row) => (
-            <div key={row.id} className="text-xs">
-              <p
-                className={
-                  row.status === "warn" ? "text-destructive" : undefined
-                }
-              >
-                {row.text}
-              </p>
-              {row.suggested && row.suggested.length > 0 ? (
-                <p className="text-muted-foreground">
-                  Similar units use {row.suggested.join(", ")}.
+          {rows.map((row) => {
+            const suggestions = row.suggested?.join(", ");
+            return (
+              <div key={row.id} className="text-xs">
+                <p
+                  className={
+                    row.status === "warn" ? "text-destructive" : undefined
+                  }
+                >
+                  {row.text}
                 </p>
-              ) : null}
-              {row.status === "warn" && row.id !== "movement" && editPath ? (
-                <Link to={editPath} className="underline">
-                  Change in Unit tweaks
-                </Link>
-              ) : null}
-            </div>
-          ))}
+                {row.suggested && row.suggested.length > 0 ? (
+                  <p className="text-muted-foreground">
+                    <Trans>Similar units use {suggestions}.</Trans>
+                  </p>
+                ) : null}
+                {row.status === "warn" && row.id !== "movement" && editPath ? (
+                  <Link to={editPath} className="underline">
+                    <Trans>Change in Unit tweaks</Trans>
+                  </Link>
+                ) : null}
+              </div>
+            );
+          })}
         </>
       )}
     </div>

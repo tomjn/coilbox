@@ -1,0 +1,4 @@
+# Run package scripts on Bun, even when the tool's launcher asks for node
+# (tsc, vite, vitest, lingui, vitepress).
+[run]
+bun = true
