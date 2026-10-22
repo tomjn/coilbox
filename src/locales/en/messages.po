@@ -4332,8 +4332,8 @@ msgid "{pieceName} has no texture recorded from the model it came from, so it ca
 msgstr "{pieceName} has no texture recorded from the model it came from, so it cannot go on this unit's texture sheet."
 
 #: src/lego/pages/components/GameScriptPanel.tsx
-msgid "{pieceName} is {roleId, select, buildarm_nano {nano emit point} aim {aim point} flare {muzzle flare} turret {turret} barrel {barrel} buildarm_base {build arm base} buildarm_arm {build arm} wheel {wheel} other {{roleName}}}"
-msgstr "{pieceName} is {roleId, select, buildarm_nano {nano emit point} aim {aim point} flare {muzzle flare} turret {turret} barrel {barrel} buildarm_base {build arm base} buildarm_arm {build arm} wheel {wheel} other {{roleName}}}"
+msgid "{pieceName} is {roleName}"
+msgstr "{pieceName} is {roleName}"
 
 #: src/lego/pages/components/GameUnitBrowser.tsx
 msgid "{pieceName} is not in this model."
@@ -4646,6 +4646,10 @@ msgstr "{ringCount, plural, one {# copy} other {# copies}}"
 #: src/lego/animPresets.ts
 msgid "{role} turns about {letter}, and this piece's rest rotation there is {rest}°, not a right angle. A hand-edited Turn call may not land where it looks like it should. The nearest clean angle is {clean}°."
 msgstr "{role} turns about {letter}, and this piece's rest rotation there is {rest}°, not a right angle. A hand-edited Turn call may not land where it looks like it should. The nearest clean angle is {clean}°."
+
+#: src/lego/animPresets.ts
+msgid "{roleId, select, buildarm_nano {nano emit point} aim {aim point} flare {muzzle flare} turret {turret} barrel {barrel} buildarm_base {build arm base} buildarm_arm {build arm} wheel {wheel} other {{label}}}"
+msgstr "{roleId, select, buildarm_nano {nano emit point} aim {aim point} flare {muzzle flare} turret {turret} barrel {barrel} buildarm_base {build arm base} buildarm_arm {build arm} wheel {wheel} other {{label}}}"
 
 #: src/runlite/unitLimit.ts
 msgid "{rootCount, plural, one {{sideName} has no usable start unit in {gameName}, so the unit limit is based on the # mobile unit that can build and that no other unit builds or morphs into.} other {{sideName} has no usable start unit in {gameName}, so the unit limit is based on the # mobile units that can build and that no other unit builds or morphs into.}}"
@@ -20372,6 +20376,10 @@ msgstr "In the unit definition"
 msgid "In this project"
 msgstr "In this project"
 
+#: src/lib/scenarioEditing/layoutPlacing.ts
+msgid "In this scenario"
+msgstr "In this scenario"
+
 #: src/scenario/pages/components/mapKeyboard.ts
 msgid "in water too deep for it, in cyan"
 msgstr "in water too deep for it, in cyan"
@@ -26411,6 +26419,7 @@ msgstr "Not only the row you had in mind. uberserver removes every ban matching 
 msgid "Not opened yet"
 msgstr "Not opened yet"
 
+#: src/lib/scenarioEditing/layoutPlacing.ts
 #: src/scenario/pages/components/BlueprintPanel.tsx
 msgid "not placed"
 msgstr "not placed"
@@ -43934,6 +43943,10 @@ msgstr "Your internet traffic goes through a VPN ({interfaceName}). Everything y
 #: src/direct/VpnWarning.tsx
 msgid "Your internet traffic goes through a VPN ({interfaceName}). Players may not be able to reach you directly, and everything anybody sends you goes through the VPN's server first, so pings will be worse for the whole battle. Turn the VPN off while you play."
 msgstr "Your internet traffic goes through a VPN ({interfaceName}). Players may not be able to reach you directly, and everything anybody sends you goes through the VPN's server first, so pings will be worse for the whole battle. Turn the VPN off while you play."
+
+#: src/lib/scenarioEditing/layoutPlacing.ts
+msgid "Your library"
+msgstr "Your library"
 
 #: src/home/groupDescription.ts
 msgid "Your maps, games and blueprints, what other players have shared, and what is downloading."

@@ -24,7 +24,7 @@
  * that uses them is `modes.tsx`.
  */
 
-import { plural } from "@lingui/core/macro";
+import { plural, t } from "@lingui/core/macro";
 import type { SnapBuilding } from "@/blueprint/footprint";
 import { recordGameName, type StoredBlueprint } from "@/blueprint/library";
 import type { BlueprintBuilding } from "@/blueprint/model";
@@ -163,9 +163,9 @@ export function layoutOptions(
     value: layoutChoiceKey({ from: "scenario", id: layout.id }),
     label: layout.name,
     description: [
-      "In this scenario",
+      t`In this scenario`,
       buildings(layout.buildings.length),
-      placed.has(layout.id) ? null : "not placed",
+      placed.has(layout.id) ? null : t`not placed`,
     ]
       .filter(Boolean)
       .join(" · "),
@@ -179,7 +179,7 @@ export function layoutOptions(
       value: layoutChoiceKey({ from: "library", id: record.id }),
       label: record.layout.name,
       description: [
-        "Your library",
+        t`Your library`,
         buildings(record.layout.buildings.length),
         mismatch ? game : null,
       ]

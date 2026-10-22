@@ -4331,7 +4331,7 @@ msgid "{pieceName} has no texture recorded from the model it came from, so it ca
 msgstr ""
 
 #: src/lego/pages/components/GameScriptPanel.tsx
-msgid "{pieceName} is {roleId, select, buildarm_nano {nano emit point} aim {aim point} flare {muzzle flare} turret {turret} barrel {barrel} buildarm_base {build arm base} buildarm_arm {build arm} wheel {wheel} other {{roleName}}}"
+msgid "{pieceName} is {roleName}"
 msgstr ""
 
 #: src/lego/pages/components/GameUnitBrowser.tsx
@@ -4644,6 +4644,10 @@ msgstr ""
 
 #: src/lego/animPresets.ts
 msgid "{role} turns about {letter}, and this piece's rest rotation there is {rest}°, not a right angle. A hand-edited Turn call may not land where it looks like it should. The nearest clean angle is {clean}°."
+msgstr ""
+
+#: src/lego/animPresets.ts
+msgid "{roleId, select, buildarm_nano {nano emit point} aim {aim point} flare {muzzle flare} turret {turret} barrel {barrel} buildarm_base {build arm base} buildarm_arm {build arm} wheel {wheel} other {{label}}}"
 msgstr ""
 
 #: src/runlite/unitLimit.ts
@@ -20371,6 +20375,10 @@ msgstr ""
 msgid "In this project"
 msgstr ""
 
+#: src/lib/scenarioEditing/layoutPlacing.ts
+msgid "In this scenario"
+msgstr ""
+
 #: src/scenario/pages/components/mapKeyboard.ts
 msgid "in water too deep for it, in cyan"
 msgstr ""
@@ -26410,6 +26418,7 @@ msgstr ""
 msgid "Not opened yet"
 msgstr ""
 
+#: src/lib/scenarioEditing/layoutPlacing.ts
 #: src/scenario/pages/components/BlueprintPanel.tsx
 msgid "not placed"
 msgstr ""
@@ -43932,6 +43941,10 @@ msgstr ""
 
 #: src/direct/VpnWarning.tsx
 msgid "Your internet traffic goes through a VPN ({interfaceName}). Players may not be able to reach you directly, and everything anybody sends you goes through the VPN's server first, so pings will be worse for the whole battle. Turn the VPN off while you play."
+msgstr ""
+
+#: src/lib/scenarioEditing/layoutPlacing.ts
+msgid "Your library"
 msgstr ""
 
 #: src/home/groupDescription.ts
