@@ -774,12 +774,24 @@ export interface JoinSummary {
 
 /** The unit faces +z and its right is -x, so +x is its left. */
 const BOX_FACE_NAMES: Record<string, string> = {
-  "+y": "top",
-  "-y": "bottom",
-  "+z": "front",
-  "-z": "back",
-  "+x": "left",
-  "-x": "right",
+  get "+y"() {
+    return t`top`;
+  },
+  get "-y"() {
+    return t`bottom`;
+  },
+  get "+z"() {
+    return t`front`;
+  },
+  get "-z"() {
+    return t`back`;
+  },
+  get "+x"() {
+    return t`left`;
+  },
+  get "-x"() {
+    return t`right`;
+  },
 };
 
 /**
