@@ -1,3 +1,5 @@
+import { plural } from "@lingui/core/macro";
+import { Trans, useLingui } from "@lingui/react/macro";
 import { Input, useDrawer } from "@picoframe/frame";
 import { useMemo, useState } from "react";
 import { Link } from "react-router";
@@ -22,6 +24,7 @@ export function PresetPickerDrawer({
    */
   initialGameName?: string;
 }) {
+  const { t } = useLingui();
   const drawer = useDrawer();
   const [query, setQuery] = useState("");
   const [gameFilter, setGameFilter] = useState(initialGameName);
@@ -38,15 +41,17 @@ export function PresetPickerDrawer({
   if (presets.length === 0) {
     return (
       <p className="text-sm text-muted-foreground">
-        No skirmish presets yet. Set up a game on the{" "}
-        <Link
-          className="font-medium underline underline-offset-4"
-          to="/play/skirmish"
-          onClick={() => drawer.close()}
-        >
-          Play → Singleplayer
-        </Link>{" "}
-        screen and save it as a preset, then attach it here as a mission.
+        <Trans>
+          No skirmish presets yet. Set up a game on the{" "}
+          <Link
+            className="font-medium underline underline-offset-4"
+            to="/play/skirmish"
+            onClick={() => drawer.close()}
+          >
+            Play → Singleplayer
+          </Link>{" "}
+          screen and save it as a preset, then attach it here as a mission.
+        </Trans>
       </p>
     );
   }
@@ -55,46 +60,9 @@ export function PresetPickerDrawer({
     <div className="flex flex-col gap-3">
       {gameFilter && (
         <p className="text-xs text-muted-foreground">
-          Showing presets for{" "}
-          <span className="text-foreground">{gameFilter}</span>.{" "}
-          <button
-            type="button"
-            className="underline underline-offset-4"
-            onClick={() => setGameFilter(undefined)}
-          >
-            Show all
-          </button>
-        </p>
-      )}
-      <Input
-        value={query}
-        onChange={(e) => setQuery(e.target.value)}
-        placeholder="Search presets…"
-        className="h-8"
-      />
-      <ul className="flex flex-col gap-1.5">
-        {filtered.map((p) => (
-          <li key={p.id}>
-            <button
-              type="button"
-              onClick={() => {
-                onPick(p);
-                drawer.close();
-              }}
-              className="flex w-full flex-col gap-0.5 rounded-md border border-border/50 bg-card p-3 text-left hover:border-border hover:bg-muted/40"
-            >
-              <span className="truncate text-sm font-medium">{p.name}</span>
-              <span className="truncate text-xs text-muted-foreground">
-                {p.gameName || "No game"} · {p.mapName || "No map"} ·{" "}
-                {p.participants.length} participant
-                {p.participants.length === 1 ? "" : "s"}
-              </span>
-            </button>
-          </li>
-        ))}
-        {filtered.length === 0 && gameFilter && (
-          <li className="text-xs text-muted-foreground">
-            No presets for {gameFilter}.{" "}
+          <Trans>
+            Showing presets for{" "}
+            <span className="text-foreground">{gameFilter}</span>.{" "}
             <button
               type="button"
               className="underline underline-offset-4"
@@ -102,10 +70,59 @@ export function PresetPickerDrawer({
             >
               Show all
             </button>
+          </Trans>
+        </p>
+      )}
+      <Input
+        value={query}
+        onChange={(e) => setQuery(e.target.value)}
+        placeholder={t`Search presets…`}
+        className="h-8"
+      />
+      <ul className="flex flex-col gap-1.5">
+        {filtered.map((p) => {
+          const gameName = p.gameName || t`No game`;
+          const mapName = p.mapName || t`No map`;
+          const participants = p.participants.length;
+          return (
+            <li key={p.id}>
+              <button
+                type="button"
+                onClick={() => {
+                  onPick(p);
+                  drawer.close();
+                }}
+                className="flex w-full flex-col gap-0.5 rounded-md border border-border/50 bg-card p-3 text-left hover:border-border hover:bg-muted/40"
+              >
+                <span className="truncate text-sm font-medium">{p.name}</span>
+                <span className="truncate text-xs text-muted-foreground">
+                  {plural(participants, {
+                    one: `${gameName} · ${mapName} · # participant`,
+                    other: `${gameName} · ${mapName} · # participants`,
+                  })}
+                </span>
+              </button>
+            </li>
+          );
+        })}
+        {filtered.length === 0 && gameFilter && (
+          <li className="text-xs text-muted-foreground">
+            <Trans>
+              No presets for {gameFilter}.{" "}
+              <button
+                type="button"
+                className="underline underline-offset-4"
+                onClick={() => setGameFilter(undefined)}
+              >
+                Show all
+              </button>
+            </Trans>
           </li>
         )}
         {filtered.length === 0 && !gameFilter && (
-          <li className="text-xs text-muted-foreground">No presets match.</li>
+          <li className="text-xs text-muted-foreground">
+            <Trans>No presets match.</Trans>
+          </li>
         )}
       </ul>
     </div>

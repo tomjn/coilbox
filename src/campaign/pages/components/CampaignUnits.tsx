@@ -1,3 +1,4 @@
+import { Trans, useLingui } from "@lingui/react/macro";
 import { Button, Input, useDrawer } from "@picoframe/frame";
 import { Plus, RefreshCw, X } from "lucide-react";
 import { useMemo, useState } from "react";
@@ -36,6 +37,7 @@ export function UnitPickerList({
   onPick: (project: LegoProject) => void;
   onLeave?: () => void;
 }) {
+  const { t } = useLingui();
   const [query, setQuery] = useState("");
   const attached = new Set((owner.units ?? []).map((u) => u.projectId));
   const filtered = useMemo(() => {
@@ -51,15 +53,17 @@ export function UnitPickerList({
   if (projects.length === 0) {
     return (
       <p className="text-sm text-muted-foreground">
-        No saved units yet. Build one in the{" "}
-        <Link
-          className="font-medium underline underline-offset-4"
-          to="/lego"
-          onClick={onLeave}
-        >
-          unit builder
-        </Link>
-        .
+        <Trans>
+          No saved units yet. Build one in the{" "}
+          <Link
+            className="font-medium underline underline-offset-4"
+            to="/lego"
+            onClick={onLeave}
+          >
+            unit builder
+          </Link>
+          .
+        </Trans>
       </p>
     );
   }
@@ -69,13 +73,13 @@ export function UnitPickerList({
       <Input
         value={query}
         onChange={(e) => setQuery(e.target.value)}
-        placeholder="Search units…"
+        placeholder={t`Search units…`}
         className="h-8"
       />
       <ul className="flex max-h-72 flex-col gap-1.5 overflow-y-auto">
         {filtered.map((p) => {
           const refusal = attached.has(p.id)
-            ? "Already attached"
+            ? t`Already attached`
             : attachRefusal(owner, p);
           return (
             <li key={p.id}>
@@ -99,7 +103,9 @@ export function UnitPickerList({
           );
         })}
         {filtered.length === 0 && (
-          <li className="text-xs text-muted-foreground">No units match.</li>
+          <li className="text-xs text-muted-foreground">
+            <Trans>No units match.</Trans>
+          </li>
         )}
       </ul>
     </div>
@@ -148,6 +154,7 @@ export function CampaignUnits({
   campaign: Campaign;
   onChange: (change: (c: Campaign) => Campaign) => Promise<void>;
 }) {
+  const { t } = useLingui();
   const drawer = useDrawer();
   const { projects } = useLegoProjects();
   const { projects: workshopProjects } = useModProjects();
@@ -155,6 +162,7 @@ export function CampaignUnits({
   const [busy, setBusy] = useState<{ key: string; label: string } | null>(null);
   const [error, setError] = useState<string | null>(null);
   const units = campaign.units ?? [];
+  const unitCount = units.length;
 
   const source = async (project: LegoProject): Promise<UnitSource> => ({
     project,
@@ -179,14 +187,17 @@ export function CampaignUnits({
     }
   };
 
-  const attach = (project: LegoProject) =>
-    work(project.id, `Copying ${project.name}…`, async () => {
+  const attach = (project: LegoProject) => {
+    const name = project.name;
+    return work(project.id, t`Copying ${name}…`, async () => {
       const unit = await attachUnit(campaign, await source(project));
       await onChange((c) => withUnit(c, unit));
     });
+  };
 
-  const update = (project: LegoProject) =>
-    work(project.id, `Copying ${project.name}…`, async () => {
+  const update = (project: LegoProject) => {
+    const name = project.name;
+    return work(project.id, t`Copying ${name}…`, async () => {
       const { unit, replaces } = await updateUnit(
         campaign,
         await source(project),
@@ -194,16 +205,17 @@ export function CampaignUnits({
       await onChange((c) => withUnit(c, unit));
       if (replaces) await detachCopy(campaign.id, replaces);
     });
+  };
 
   const remove = (unitName: string, name: string) =>
-    work(unitName, `Removing ${name}…`, async () => {
+    work(unitName, t`Removing ${name}…`, async () => {
       await onChange((c) => withoutUnit(c, unitName));
       await detachCopy(campaign.id, unitName);
     });
 
   const openPicker = () =>
     drawer.open({
-      title: "Attach a unit",
+      title: t`Attach a unit`,
       width: "32rem",
       content: (
         <UnitPickerDrawer
@@ -217,7 +229,9 @@ export function CampaignUnits({
   return (
     <section className="flex flex-col gap-2">
       <div className="flex items-center justify-between gap-2">
-        <h2 className="text-base font-semibold">Units ({units.length})</h2>
+        <h2 className="text-base font-semibold">
+          <Trans>Units ({unitCount})</Trans>
+        </h2>
         <Button
           size="sm"
           variant="outline"
@@ -225,7 +239,7 @@ export function CampaignUnits({
           disabled={!!busy}
           onClick={openPicker}
         >
-          <Plus className="size-4" /> Attach unit
+          <Plus className="size-4" /> <Trans>Attach unit</Trans>
         </Button>
       </div>
       {error && <p className="text-xs text-destructive">{error}</p>}
@@ -234,10 +248,11 @@ export function CampaignUnits({
         <ul className="flex flex-col gap-1.5">
           {units.map((u) => {
             const project = projects.find((p) => p.id === u.projectId);
+            const unitLabel = u.name;
             const status = !project
-              ? "Not in the library"
+              ? t`Not in the library`
               : libraryChanged(u, project)
-                ? "Changed in the library"
+                ? t`Changed in the library`
                 : null;
             return (
               <li
@@ -258,12 +273,13 @@ export function CampaignUnits({
                   disabled={!project || !!busy}
                   onClick={() => project && void update(project)}
                 >
-                  <RefreshCw className="size-4" /> Update from library
+                  <RefreshCw className="size-4" />{" "}
+                  <Trans>Update from library</Trans>
                 </Button>
                 <Button
                   size="sm"
                   variant="ghost"
-                  aria-label={`Remove ${u.name}`}
+                  aria-label={t`Remove ${unitLabel}`}
                   disabled={!!busy}
                   onClick={() => void remove(u.unitName, u.name)}
                 >

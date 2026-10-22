@@ -1,3 +1,4 @@
+import { useLingui } from "@lingui/react/macro";
 import { useSetting } from "@picoframe/frame";
 import { useMemo } from "react";
 import { useCampaignProgress, useCampaigns } from "../campaign/campaigns";
@@ -67,6 +68,7 @@ export function settle(
  * only, and nothing is said about what is installed.
  */
 export function useCareer(): CareerData {
+  const { t } = useLingui();
   const campaigns = useCampaigns();
   const progress = useCampaignProgress();
   const galaxies = useGalaxies();
@@ -115,6 +117,7 @@ export function useCareer(): CareerData {
   // The stats read ingests replays on open. A failed ingest still returns what
   // was stored, so records with an error is a stale answer, not no answer.
   const haveRecords = stats.records.length > 0;
+  const statsError = stats.error;
   const aiStatus: SourceStatus = (() => {
     const base = settle(
       content.loading || (stats.ingesting && !haveRecords),
@@ -124,7 +127,7 @@ export function useCareer(): CareerData {
     return base.state === "ready" && stats.error
       ? {
           ...base,
-          warning: `Replay records could not be refreshed, so this may be out of date: ${stats.error}`,
+          warning: t`Replay records could not be refreshed, so this may be out of date: ${statsError}`,
         }
       : base;
   })();

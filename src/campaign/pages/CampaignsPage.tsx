@@ -1,3 +1,5 @@
+import { plural } from "@lingui/core/macro";
+import { Trans, useLingui } from "@lingui/react/macro";
 import { ChevronRight } from "lucide-react";
 import { useMemo } from "react";
 import { Link } from "react-router";
@@ -52,6 +54,7 @@ function findResumeTarget(
  * from having lost the campaign.
  */
 export default function CampaignsPage() {
+  const { t } = useLingui();
   const { campaigns, loading, error } = useCampaigns();
   const { progress } = useCampaignProgress();
 
@@ -63,10 +66,14 @@ export default function CampaignsPage() {
   return (
     <div className="flex flex-col gap-4 p-4">
       <header className="flex flex-col gap-1">
-        <h1 className="text-lg font-semibold">Campaigns</h1>
+        <h1 className="text-lg font-semibold">
+          <Trans>Campaigns</Trans>
+        </h1>
         <p className="text-sm text-muted-foreground">
-          Authored sequences of skirmish missions. Play a campaign mission by
-          mission, tracking your progress as you go.
+          <Trans>
+            Authored sequences of skirmish missions. Play a campaign mission by
+            mission, tracking your progress as you go.
+          </Trans>
         </p>
       </header>
 
@@ -75,7 +82,7 @@ export default function CampaignsPage() {
       {loading ? (
         <SkeletonList />
       ) : campaigns.length === 0 ? (
-        <EmptyState label="No campaigns yet." />
+        <EmptyState label={t`No campaigns yet.`} />
       ) : (
         <ul className="flex flex-col gap-2">
           {campaigns.map(({ campaign, source }) => (
@@ -151,12 +158,12 @@ function CampaignCard({
               author who saw it there recognises it here. */}
           {reason && (
             <Badge variant="outline" className="shrink-0 text-[10px]">
-              Draft
+              <Trans>Draft</Trans>
             </Badge>
           )}
           {bundled && (
             <span className="shrink-0 rounded bg-muted px-1.5 py-0.5 text-xs text-muted-foreground">
-              Bundled
+              <Trans>Bundled</Trans>
             </span>
           )}
         </div>
@@ -169,7 +176,10 @@ function CampaignCard({
             below says the same thing and says what to do about it. */}
         {!empty && (
           <span className="text-xs text-muted-foreground">
-            {completed}/{total} mission{total === 1 ? "" : "s"}
+            {plural(total, {
+              one: `${completed}/# mission`,
+              other: `${completed}/# missions`,
+            })}
           </span>
         )}
         {reason && (
@@ -201,7 +211,7 @@ function CampaignCard({
           to={`/campaign/${encodeURIComponent(campaign.id)}/${encodeURIComponent(continueMissionId)}`}
           className={cn(CONTINUE_BADGE_CLASS, "hover:bg-primary/25")}
         >
-          Continue
+          <Trans>Continue</Trans>
         </Link>
       ) : (
         !empty && (

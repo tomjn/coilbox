@@ -30,6 +30,9 @@
  * whole set loses on the way out, and what the write did to the file.
  */
 
+import { plural, t } from "@lingui/core/macro";
+
+import { getLocale } from "@/i18n";
 import type { InstalledGameInfo } from "../container/gameIdentity";
 import type { Facing } from "../scenario/model";
 import {
@@ -282,38 +285,51 @@ export function packConversionNotes(
   buildings: number,
 ): ArrivalNote[] {
   if (converted.state === "already") {
-    return [{ tone: "note", text: `Already ${toSide}'s.` }];
+    return [{ tone: "note", text: t`Already ${toSide}'s.` }];
   }
   if (converted.state === "cannot") {
     return [
       {
         tone: "note",
-        text: `Nothing in it could be said in ${toSide}, so it is kept as it is.`,
+        text: t`Nothing in it could be said in ${toSide}, so it is kept as it is.`,
       },
     ];
   }
 
   const { substituted, moved, overlapping } = converted.report;
+  const changed = substituted.length;
+  const overlappingCount = overlapping.length;
+  const movedCount = moved.length;
   const notes: ArrivalNote[] = [
     {
       tone: "note",
-      text: `${substituted.length} of ${buildings} building${buildings === 1 ? "" : "s"} said in ${toSide}.`,
+      text: t`${changed} of ${plural(buildings, { one: "# building", other: "# buildings" })} said in ${toSide}.`,
     },
   ];
 
   const wrong: string[] = [];
-  if (overlapping.length > 0) {
+  if (overlappingCount > 0) {
     wrong.push(
-      `${overlapping.length} will stand on ground another building wants`,
+      plural(overlappingCount, {
+        one: "# will stand on ground another building wants",
+        other: "# will stand on ground another building wants",
+      }),
     );
   }
-  if (moved.length > 0) {
-    wrong.push(`${moved.length} will not stand where they do now`);
+  if (movedCount > 0) {
+    wrong.push(
+      plural(movedCount, {
+        one: "# will not stand where it does now",
+        other: "# will not stand where they do now",
+      }),
+    );
   }
   if (wrong.length > 0) {
+    const [first, second] = wrong;
+    const list = second === undefined ? first : t`${first}, and ${second}`;
     notes.push({
       tone: "warn",
-      text: `${wrong.join(", and ")}, because the substitutes cover different ground.`,
+      text: t`${list}, because the substitutes cover different ground.`,
     });
   }
   return notes;
@@ -516,14 +532,18 @@ export function placeableIndexes(picks: readonly PackPick[]): Set<number> {
   );
 }
 
-/** "1 building" or "3 buildings", so a sentence reads as English. */
-function buildings(n: number): string {
-  return `${n} building${n === 1 ? "" : "s"}`;
-}
+/** "a, b, c" in the app language, with no joining word. */
+const plainList = (parts: string[]) =>
+  new Intl.ListFormat(getLocale(), { type: "unit", style: "long" }).format(
+    parts,
+  );
 
-/** "1 blueprint" or "3 blueprints", for the same reason. */
-function layouts(n: number): string {
-  return `${n} blueprint${n === 1 ? "" : "s"}`;
+/** "a", or "a, b and c" for more, the last part joined with a word. */
+function andList(parts: string[]): string {
+  if (parts.length < 2) return parts[0] ?? "";
+  const first = plainList(parts.slice(0, -1));
+  const last = parts[parts.length - 1];
+  return t`${first} and ${last}`;
 }
 
 /**
@@ -542,16 +562,28 @@ export function packChanges(pack: BlueprintPack): string | null {
   const said: string[] = [];
   if (turned > 0) {
     said.push(
-      `turned ${turned} of them onto the facing the game places ${turned === 1 ? "it" : "them"} at`,
+      plural(turned, {
+        one: "turned # of them onto the facing the game places it at",
+        other: "turned # of them onto the facing the game places them at",
+      }),
     );
   }
-  if (moved > 0) said.push(`moved ${buildings(moved)} onto the build grid`);
-  if (dropped.length > 0) said.push(`left behind ${dropped.join(", ")}`);
+  if (moved > 0) {
+    said.push(
+      plural(moved, {
+        one: "moved # building onto the build grid",
+        other: "moved # buildings onto the build grid",
+      }),
+    );
+  }
+  if (dropped.length > 0) {
+    const left = plainList(dropped);
+    said.push(t`left behind ${left}`);
+  }
   if (said.length === 0) return null;
 
-  const last = said.pop();
-  const all = said.length > 0 ? `${said.join(", ")} and ${last}` : last;
-  return `Reading this file ${all}.`;
+  const all = andList(said);
+  return t`Reading this file ${all}.`;
 }
 
 /**
@@ -582,15 +614,26 @@ export function packStrips(records: readonly StoredBlueprint[]): string[] {
   const said: string[] = [];
   if (designed > 0) {
     said.push(
-      `the map ${layouts(designed)} ${designed === 1 ? "was" : "were"} designed for`,
+      plural(designed, {
+        one: "the map # blueprint was designed for",
+        other: "the map # blueprints were designed for",
+      }),
     );
   }
   if (named > 0) {
-    said.push(`which game ${layouts(named)} ${named === 1 ? "is" : "are"} for`);
+    said.push(
+      plural(named, {
+        one: "which game # blueprint is for",
+        other: "which game # blueprints are for",
+      }),
+    );
   }
   if (sized > 0) {
     said.push(
-      `the footprints ${layouts(sized)} carr${sized === 1 ? "ies" : "y"}`,
+      plural(sized, {
+        one: "the footprints # blueprint carries",
+        other: "the footprints # blueprints carry",
+      }),
     );
   }
   return said;
@@ -610,19 +653,38 @@ export function packWriteSummary(
   outcome: Omit<MergeOutcome, "text">,
 ): string {
   const did: string[] = [];
-  if (outcome.added.length > 0)
-    did.push(`added ${layouts(outcome.added.length)}`);
-  if (outcome.replaced.length > 0) {
-    did.push(`replaced ${layouts(outcome.replaced.length)}`);
+  const addedCount = outcome.added.length;
+  const replacedCount = outcome.replaced.length;
+  if (addedCount > 0) {
+    did.push(
+      plural(addedCount, {
+        one: "added # blueprint",
+        other: "added # blueprints",
+      }),
+    );
+  }
+  if (replacedCount > 0) {
+    did.push(
+      plural(replacedCount, {
+        one: "replaced # blueprint",
+        other: "replaced # blueprints",
+      }),
+    );
   }
   const kept = outcome.kept;
+  const backup = outcome.backup;
+  const done = andList(did);
   return [
     did.length > 0
-      ? `Wrote into ${dest}: ${did.join(" and ")}.`
-      : `Wrote nothing into ${dest}.`,
-    outcome.backup ? `The file it was is kept at ${outcome.backup}.` : null,
+      ? t`Wrote into ${dest}: ${done}.`
+      : t`Wrote nothing into ${dest}.`,
+    backup ? t`The file it was is kept at ${backup}.` : null,
     kept > 0
-      ? `${kept} entr${kept === 1 ? "y" : "ies"} coilbox cannot read ${kept === 1 ? "was" : "were"} left exactly as ${kept === 1 ? "it was" : "they were"}.`
+      ? plural(kept, {
+          one: "# entry coilbox cannot read was left exactly as it was.",
+          other:
+            "# entries coilbox cannot read were left exactly as they were.",
+        })
       : null,
   ]
     .filter(Boolean)

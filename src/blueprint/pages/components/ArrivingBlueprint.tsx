@@ -21,6 +21,8 @@
  * out at all, which is `sideOffer` in `../../substitution.ts`.
  */
 
+import { plural } from "@lingui/core/macro";
+import { Trans, useLingui } from "@lingui/react/macro";
 import { Button } from "@picoframe/frame";
 import { Blocks, Download, Loader2, Repeat } from "lucide-react";
 
@@ -56,7 +58,12 @@ export function ArrivingBlueprint({
    *  layout whose game is not installed. Nothing said beats a guess. */
   conversion?: ArrivingConversion;
 }) {
+  const { t } = useLingui();
   const buildings = payload.buildings.length;
+  const buildingCount = plural(buildings, {
+    one: "# building",
+    other: "# buildings",
+  });
 
   return (
     <div className="flex flex-col gap-3 border-t p-4">
@@ -71,11 +78,11 @@ export function ArrivingBlueprint({
         <div className="flex min-w-0 flex-col gap-0.5">
           <span className="truncate text-sm font-medium">{arrival.name}</span>
           <span className="text-xs text-muted-foreground">
-            {buildings} building{buildings === 1 ? "" : "s"}
-            {payload.ordered ? " · build order" : ""}
+            {buildingCount}
+            {payload.ordered ? ` · ${t`build order`}` : ""}
           </span>
           <span className="truncate text-xs text-muted-foreground">
-            {payload.game?.name ?? "No game named"}
+            {payload.game?.name ?? t`No game named`}
           </span>
         </div>
       </div>
@@ -92,7 +99,7 @@ export function ArrivingBlueprint({
         ) : (
           <Download className="mr-1.5 size-4" aria-hidden />
         )}
-        {arrival.foreign ? "Keep it anyway" : "Add to my library"}
+        {arrival.foreign ? t`Keep it anyway` : t`Add to my library`}
       </Button>
     </div>
   );
@@ -113,14 +120,17 @@ export function ArrivingBlueprint({
  */
 function SideChoice({ conversion }: { conversion: ArrivingConversion }) {
   const { offer, takingAs, notes, onTakeAs } = conversion;
+  const from = offer.from;
+  const sideCount = offer.to.length;
+  const firstSide = offer.to[0];
 
   return (
     <div className="flex flex-col gap-2 rounded border border-border/50 p-2">
       <p className="text-xs text-muted-foreground">
-        Every building of this blueprint is {offer.from}'s, and this game has{" "}
-        {offer.to.length === 1 ? `${offer.to[0]}'s` : "the other sides'"}{" "}
-        version of it. Coilbox does not know which side you play, so it is kept
-        as {offer.from} unless you say otherwise.
+        {plural(sideCount, {
+          one: `Every building of this blueprint is ${from}'s, and this game has ${firstSide}'s version of it. Coilbox does not know which side you play, so it is kept as ${from} unless you say otherwise.`,
+          other: `Every building of this blueprint is ${from}'s, and this game has the other sides' version of it. Coilbox does not know which side you play, so it is kept as ${from} unless you say otherwise.`,
+        })}
       </p>
       <div className="flex flex-wrap gap-1.5">
         <Button
@@ -130,7 +140,7 @@ function SideChoice({ conversion }: { conversion: ArrivingConversion }) {
           className="gap-1.5"
           onClick={() => onTakeAs("")}
         >
-          Keep it as {offer.from}
+          <Trans>Keep it as {from}</Trans>
         </Button>
         {offer.to.map((side) => (
           <Button
@@ -142,7 +152,7 @@ function SideChoice({ conversion }: { conversion: ArrivingConversion }) {
             onClick={() => onTakeAs(side)}
           >
             <Repeat className="size-3.5" aria-hidden />
-            Take it as {side}
+            <Trans>Take it as {side}</Trans>
           </Button>
         ))}
       </div>

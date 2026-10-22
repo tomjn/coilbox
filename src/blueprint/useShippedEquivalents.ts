@@ -14,6 +14,7 @@
  * happened, and the conversion carries on suggesting what it suggested before.
  */
 
+import { plural, t } from "@lingui/core/macro";
 import { useCallback, useState } from "react";
 
 import { unitsyncLuaExec } from "@/content/bindings";
@@ -51,14 +52,15 @@ export function useShippedEquivalents(
         source: SHIPPED_TABLE_LUA,
       });
       if (res.error) {
-        setNote(`Could not read this game's table: ${res.error}`);
+        const detail = res.error;
+        setNote(t`Could not read this game's table: ${detail}`);
         return;
       }
 
       const theirs = shippedEquivalents(res.result, sides);
       if (theirs.groups.length === 0) {
         setNote(
-          "This game does not publish a table of which buildings are each side's version of the same thing, so there was nothing to read. Almost no game does.",
+          t`This game does not publish a table of which buildings are each side's version of the same thing, so there was nothing to read. Almost no game does.`,
         );
         return;
       }
@@ -67,15 +69,22 @@ export function useShippedEquivalents(
         equivalentsKey(gameArchive),
         theirs,
       );
+      const pairings = theirs.groups.length;
       setNote(
         gained > 0
-          ? `Read ${theirs.groups.length} pairings this game publishes, ${gained} of them ones coilbox did not have.`
-          : `Read ${theirs.groups.length} pairings this game publishes. Coilbox already had all of them.`,
+          ? plural(pairings, {
+              one: `Read # pairing this game publishes, ${gained} of them ones coilbox did not have.`,
+              other: `Read # pairings this game publishes, ${gained} of them ones coilbox did not have.`,
+            })
+          : plural(pairings, {
+              one: "Read # pairing this game publishes. Coilbox already had all of them.",
+              other:
+                "Read # pairings this game publishes. Coilbox already had all of them.",
+            }),
       );
     } catch (e) {
-      setNote(
-        `Could not read this game's table: ${e instanceof Error ? e.message : String(e)}`,
-      );
+      const detail = e instanceof Error ? e.message : String(e);
+      setNote(t`Could not read this game's table: ${detail}`);
     } finally {
       setReading(false);
     }

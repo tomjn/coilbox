@@ -1,3 +1,4 @@
+import { t } from "@lingui/core/macro";
 import {
   compareGameVersions,
   type InstalledGame,
@@ -179,7 +180,7 @@ export function createGameResolver(
     if (!trimmed) {
       return {
         key: UNKNOWN_GAME_KEY,
-        title: "Game not named",
+        title: t`Game not named`,
         installed: null,
         rank: 0,
       };

@@ -1,3 +1,4 @@
+import { useLingui } from "@lingui/react/macro";
 import { Button } from "@picoframe/frame";
 import { Download, FolderOpen } from "lucide-react";
 import { type ReactNode, useEffect, useRef, useState } from "react";
@@ -22,10 +23,10 @@ import { ErrorBanner } from "../content/pages/components/states";
  */
 export function ChallengeCodeInput({
   helpText,
-  placeholder = "Paste a challenge code…",
-  submitLabel = "Import challenge",
-  busyLabel = "Importing…",
-  fileButtonLabel = "Import from file…",
+  placeholder,
+  submitLabel,
+  busyLabel,
+  fileButtonLabel,
   initialCode,
   onImport,
   onPickFile,
@@ -48,6 +49,7 @@ export function ChallengeCodeInput({
    * the dialog was cancelled. */
   onPickFile?: () => Promise<string | null>;
 }) {
+  const { t } = useLingui();
   const [code, setCode] = useState(initialCode ?? "");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -95,7 +97,7 @@ export function ChallengeCodeInput({
       <Textarea
         value={code}
         onChange={(e) => setCode(e.target.value)}
-        placeholder={placeholder}
+        placeholder={placeholder ?? t`Paste a challenge code…`}
         rows={6}
         className="font-mono text-xs"
       />
@@ -103,12 +105,14 @@ export function ChallengeCodeInput({
       {error && <ErrorBanner message={error} />}
       <Button onClick={() => submit()} disabled={busy || !code.trim()}>
         <Download className="mr-1.5 size-4" aria-hidden />
-        {busy ? busyLabel : submitLabel}
+        {busy
+          ? (busyLabel ?? t`Importing…`)
+          : (submitLabel ?? t`Import challenge`)}
       </Button>
       {onPickFile && (
         <Button variant="outline" onClick={pickFile} disabled={busy}>
           <FolderOpen className="mr-1.5 size-4" aria-hidden />
-          {fileButtonLabel}
+          {fileButtonLabel ?? t`Import from file…`}
         </Button>
       )}
     </div>

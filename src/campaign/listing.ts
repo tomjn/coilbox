@@ -15,6 +15,7 @@
  * fields and is worth the same plain unit test.
  */
 
+import { plural, t } from "@lingui/core/macro";
 import { relativeTime } from "../lib/relativeTime";
 import type { Campaign } from "./model";
 
@@ -33,7 +34,8 @@ export function campaignGameLabel(campaign: Campaign): string | null {
   );
   if (names.size === 0) return null;
   if (names.size === 1) return [...names][0] as string;
-  return `${names.size} games`;
+  const gameCount = names.size;
+  return plural(gameCount, { one: "# game", other: "# games" });
 }
 
 /**
@@ -50,9 +52,9 @@ export function campaignSummary(
   const game = campaignGameLabel(campaign);
   if (game) parts.push(game);
   const count = campaign.missions.length;
-  parts.push(`${count} mission${count === 1 ? "" : "s"}`);
+  parts.push(plural(count, { one: "# mission", other: "# missions" }));
   const edited = relativeTime(campaign.updatedAt, now);
-  if (edited) parts.push(`edited ${edited}`);
+  if (edited) parts.push(t`edited ${edited}`);
   return parts.join(" · ");
 }
 
@@ -91,17 +93,18 @@ export function campaignIsPlayable(campaign: Campaign): boolean {
  * because that is how the detail page numbers them.
  */
 export function campaignUnplayableReason(campaign: Campaign): string | null {
-  if (campaign.missions.length === 0) return "No missions yet";
+  if (campaign.missions.length === 0) return t`No missions yet`;
   const at = campaign.missions.findIndex(
     (m) => !m.snapshot?.gameName || !m.snapshot?.mapName,
   );
   if (at === -1) return null;
   const snapshot = campaign.missions[at].snapshot;
-  const missing = [
-    !snapshot?.gameName && "game",
-    !snapshot?.mapName && "map",
-  ].filter(Boolean);
-  return `Mission ${at + 1} has no ${missing.join(" or ")}`;
+  const position = at + 1;
+  if (!snapshot?.gameName && !snapshot?.mapName) {
+    return t`Mission ${position} has no game or map`;
+  }
+  if (!snapshot?.gameName) return t`Mission ${position} has no game`;
+  return t`Mission ${position} has no map`;
 }
 
 /** Local campaigns before bundled ones, as the plugin already reads them. */

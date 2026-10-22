@@ -1,3 +1,4 @@
+import { Trans, useLingui } from "@lingui/react/macro";
 import { Button } from "@picoframe/frame";
 import { Plus, X } from "lucide-react";
 import { type ReactNode, useState } from "react";
@@ -38,6 +39,7 @@ export function StartingUnits({
   onChange: (next: LegoProject[]) => void;
   disabled?: boolean;
 }) {
+  const { t } = useLingui();
   const { projects } = useLegoProjects();
   const [open, setOpen] = useState(false);
   if (projects.length === 0) return null;
@@ -47,28 +49,31 @@ export function StartingUnits({
       {label}
       {picked.length > 0 && (
         <ul className="flex flex-col gap-1">
-          {picked.map((p) => (
-            <li
-              key={p.id}
-              className="flex items-center gap-2 rounded-md border border-border/50 bg-card px-2.5 py-1.5"
-            >
-              <div className="flex min-w-0 flex-1 flex-col">
-                <span className="truncate text-sm font-medium">{p.name}</span>
-                <span className="truncate font-mono text-xs text-muted-foreground">
-                  {p.unitName}
-                </span>
-              </div>
-              <Button
-                size="sm"
-                variant="ghost"
-                aria-label={`Remove ${p.name}`}
-                disabled={disabled}
-                onClick={() => onChange(picked.filter((q) => q.id !== p.id))}
+          {picked.map((p) => {
+            const name = p.name;
+            return (
+              <li
+                key={p.id}
+                className="flex items-center gap-2 rounded-md border border-border/50 bg-card px-2.5 py-1.5"
               >
-                <X className="size-4" />
-              </Button>
-            </li>
-          ))}
+                <div className="flex min-w-0 flex-1 flex-col">
+                  <span className="truncate text-sm font-medium">{p.name}</span>
+                  <span className="truncate font-mono text-xs text-muted-foreground">
+                    {p.unitName}
+                  </span>
+                </div>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  aria-label={t`Remove ${name}`}
+                  disabled={disabled}
+                  onClick={() => onChange(picked.filter((q) => q.id !== p.id))}
+                >
+                  <X className="size-4" />
+                </Button>
+              </li>
+            );
+          })}
         </ul>
       )}
       <Popover open={open} onOpenChange={setOpen}>
@@ -79,7 +84,7 @@ export function StartingUnits({
             className="gap-1.5 self-start"
             disabled={disabled}
           >
-            <Plus className="size-4" /> Add unit
+            <Plus className="size-4" /> <Trans>Add unit</Trans>
           </Button>
         </PopoverTrigger>
         <PopoverContent align="start" className="w-80">

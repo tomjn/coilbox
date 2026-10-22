@@ -1,3 +1,4 @@
+import { Trans, useLingui } from "@lingui/react/macro";
 import { Button, Drawer } from "@picoframe/frame";
 import { FileCode2, Flag, Link2Off } from "lucide-react";
 import { useState } from "react";
@@ -46,6 +47,7 @@ export function MissionScenarioField({
   mission: CampaignMission;
   onChange: (mission: CampaignMission) => void;
 }) {
+  const { t } = useLingui();
   const { scenarios: loaded, loading } = useScenarios();
   const scenarios = loaded.map((l) => l.scenario);
   const [open, setOpen] = useState(false);
@@ -57,6 +59,15 @@ export function MissionScenarioField({
   // a question they did not ask (issue #2163).
   const snapshot =
     attachment.state === "none" ? undefined : attachment.snapshot;
+  const snapshotName = snapshot?.name;
+  const attachedEdit =
+    attachment.state === "stale"
+      ? editedAt(attachment.snapshot.updatedAt) || t`an earlier edit`
+      : "";
+  const liveEdit =
+    attachment.state === "stale"
+      ? editedAt(attachment.live.updatedAt) || t`a later date`
+      : "";
 
   const pick = (scenario: Scenario) => {
     setOpen(false);
@@ -66,14 +77,18 @@ export function MissionScenarioField({
   return (
     <div className="flex flex-col gap-2">
       <p className="text-xs text-muted-foreground">
-        What the mission runtime plays once the engine is up: spawns, zones,
-        triggers, objectives and dialogue. Attaching copies the scenario into
-        this mission and sets the mission&apos;s game and map from it. A mission
-        with no scenario plays as an ordinary skirmish.
+        <Trans>
+          What the mission runtime plays once the engine is up: spawns, zones,
+          triggers, objectives and dialogue. Attaching copies the scenario into
+          this mission and sets the mission's game and map from it. A mission
+          with no scenario plays as an ordinary skirmish.
+        </Trans>
       </p>
 
       {attachment.state === "none" ? (
-        <p className="text-xs text-muted-foreground">No scenario attached.</p>
+        <p className="text-xs text-muted-foreground">
+          <Trans>No scenario attached.</Trans>
+        </p>
       ) : (
         <div className="flex flex-col gap-1 rounded-md border border-border/50 bg-muted/20 p-3">
           <span className="truncate text-sm font-medium">
@@ -84,19 +99,22 @@ export function MissionScenarioField({
           </span>
           {attachment.state === "stale" ? (
             <p className="text-xs text-amber-600 dark:text-amber-500">
-              This mission plays the copy attached from the version of{" "}
-              {editedAt(attachment.snapshot.updatedAt) || "an earlier edit"}.
-              The stored scenario has been edited since, on{" "}
-              {editedAt(attachment.live.updatedAt) || "a later date"}.
+              <Trans>
+                This mission plays the copy attached from the version of{" "}
+                {attachedEdit}. The stored scenario has been edited since, on{" "}
+                {liveEdit}.
+              </Trans>
             </p>
           ) : attachment.state === "orphaned" ? (
             <p className="text-xs text-muted-foreground">
-              No stored scenario has this id any more, so there is nothing to
-              compare against. The mission plays its own copy.
+              <Trans>
+                No stored scenario has this id any more, so there is nothing to
+                compare against. The mission plays its own copy.
+              </Trans>
             </p>
           ) : (
             <p className="text-xs text-muted-foreground">
-              Matches the stored scenario.
+              <Trans>Matches the stored scenario.</Trans>
             </p>
           )}
         </div>
@@ -108,14 +126,14 @@ export function MissionScenarioField({
             <Button size="sm" variant="outline" className="gap-1.5">
               <Flag className="size-4" />{" "}
               {attachment.state === "none"
-                ? "Attach scenario"
-                : "Change scenario"}
+                ? t`Attach scenario`
+                : t`Change scenario`}
             </Button>
           </PopoverTrigger>
           <PopoverContent align="start" className="w-96 p-3">
             {loading ? (
               <p className="text-xs text-muted-foreground">
-                Reading your scenarios…
+                <Trans>Reading your scenarios…</Trans>
               </p>
             ) : (
               <ScenarioPickerList scenarios={scenarios} onPick={pick} />
@@ -138,7 +156,7 @@ export function MissionScenarioField({
             className="gap-1.5"
             onClick={() => setShowLua(true)}
           >
-            <FileCode2 className="size-4" /> Mission Lua
+            <FileCode2 className="size-4" /> <Trans>Mission Lua</Trans>
           </Button>
         )}
 
@@ -149,7 +167,7 @@ export function MissionScenarioField({
             className="gap-1.5"
             onClick={() => onChange(detachScenario(mission))}
           >
-            <Link2Off className="size-4" /> Detach
+            <Link2Off className="size-4" /> <Trans>Detach</Trans>
           </Button>
         )}
       </div>
@@ -160,7 +178,7 @@ export function MissionScenarioField({
         <Drawer
           open={showLua}
           onOpenChange={setShowLua}
-          title={`${snapshot.name} as mission.lua`}
+          title={t`${snapshotName} as mission.lua`}
           width="44rem"
         >
           <MissionLuaView scenario={snapshot} />

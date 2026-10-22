@@ -18,6 +18,7 @@
  * `./widgetSync.ts`.
  */
 
+import { t } from "@lingui/core/macro";
 import { type StoredBlueprint, widgetSource } from "./library";
 import { type BlueprintPayload, parseBlueprintPayload } from "./payload";
 
@@ -63,17 +64,17 @@ export function readSpool(text: string | null): SpoolRead {
   try {
     value = JSON.parse(text);
   } catch (e) {
-    throw new Error(
-      `the spool is not JSON: ${e instanceof Error ? e.message : String(e)}`,
-    );
+    const detail = e instanceof Error ? e.message : String(e);
+    throw new Error(t`the spool is not JSON: ${detail}`);
   }
   if (typeof value !== "object" || value === null || Array.isArray(value)) {
-    throw new Error("the spool could not be read: it is not an object");
+    throw new Error(t`the spool could not be read: it is not an object`);
   }
   const v = value as Record<string, unknown>;
   if (v.version !== VERSION) {
+    const found = String(v.version);
     throw new Error(
-      `the spool is version ${String(v.version)}, and this coilbox reads version ${VERSION}`,
+      t`the spool is version ${found}, and this coilbox reads version ${VERSION}`,
     );
   }
   if (!Array.isArray(v.blueprints)) return { entries: [], skipped: 0 };

@@ -1,3 +1,5 @@
+import { t } from "@lingui/core/macro";
+import { Trans, useLingui } from "@lingui/react/macro";
 import { Button, cn } from "@picoframe/frame";
 import { open, save } from "@tauri-apps/plugin-dialog";
 import { openPath } from "@tauri-apps/plugin-opener";
@@ -23,7 +25,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { formatFixed } from "@/lib/format";
+import { formatFixed, formatNumber } from "@/lib/format";
 import {
   type Report,
   type ReportSummary,
@@ -55,7 +57,7 @@ function errMessage(e: unknown): string {
 
 /** Compact provenance line: ref or short SHA, server version. */
 function provenance(s: ReportSummary): string {
-  const tag = s.gitRef || s.commitSha?.slice(0, 12) || "adhoc";
+  const tag = s.gitRef || s.commitSha?.slice(0, 12) || t`adhoc`;
   return s.serverVersion ? `${tag} · ${s.serverVersion}` : tag;
 }
 
@@ -66,13 +68,13 @@ function CommandTable({ report }: { report: Report }) {
       <TableHeader>
         <TableRow className="border-b border-border text-left text-xs uppercase tracking-wide text-muted-foreground hover:bg-transparent">
           <TableHead className="py-2 pr-4 font-medium text-muted-foreground">
-            Command
+            <Trans>Command</Trans>
           </TableHead>
           <TableHead className="py-2 pr-4 text-right font-medium text-muted-foreground">
-            Count
+            <Trans>Count</Trans>
           </TableHead>
           <TableHead className="py-2 pr-4 text-right font-medium text-muted-foreground">
-            Err
+            <Trans>Err</Trans>
           </TableHead>
           <TableHead className="py-2 pr-4 text-right font-medium text-muted-foreground">
             p50
@@ -141,6 +143,7 @@ export default function HistoryPage() {
   const [compareReport, setCompareReport] = useState<Report | null>(null);
   const [typeFilter, setTypeFilter] = useState(ALL);
   const [serverFilter, setServerFilter] = useState(ALL);
+  const { t } = useLingui();
   const location = useLocation();
   const navigate = useNavigate();
 
@@ -207,9 +210,9 @@ export default function HistoryPage() {
   async function importReport() {
     try {
       const picked = await open({
-        title: "Import a run report",
+        title: t`Import a run report`,
         multiple: false,
-        filters: [{ name: "Report JSON", extensions: ["json"] }],
+        filters: [{ name: t`Report JSON`, extensions: ["json"] }],
       });
       if (typeof picked !== "string") return;
       const { file } = await usImportReport({ src: picked });
@@ -225,9 +228,9 @@ export default function HistoryPage() {
     if (!selected) return;
     try {
       const dest = await save({
-        title: "Export run report",
+        title: t`Export run report`,
         defaultPath: selected,
-        filters: [{ name: "Report JSON", extensions: ["json"] }],
+        filters: [{ name: t`Report JSON`, extensions: ["json"] }],
       });
       if (!dest) return;
       await usExportReport({ file: selected, dest });
@@ -262,26 +265,34 @@ export default function HistoryPage() {
       (typeFilter === ALL || r.scenario === typeFilter) &&
       (serverFilter === ALL || r.addr === serverFilter),
   );
+  const shownCount = formatNumber(filteredRuns.length);
+  const totalCount = formatNumber(allRuns.length);
+  const compareLabel = (r: ReportSummary) => {
+    const tag = r.gitRef || r.commitSha?.slice(0, 12) || t`adhoc`;
+    return `${tag} · ${fmtWhen(r.startedAt)}`;
+  };
+  const errBadge = (count: number) => t`${count} err`;
 
   // Same-scenario runs power the trend chart and the compare picker.
   const sameScenario = report
     ? allRuns.filter((r) => r.scenario === report.scenario)
     : [];
+  const scenario = report?.scenario ?? "";
   const compareOptions = sameScenario.filter((r) => r.file !== selected);
 
   return (
     <div className="flex h-full flex-col">
       <PageHeader
         className="border-b border-border px-6 py-4"
-        title="Run history"
-        description="Past load-test reports, newest first. Select a run to see its latency breakdown."
+        title={t`Run history`}
+        description={t`Past load-test reports, newest first. Select a run to see its latency breakdown.`}
         actions={
           <>
             <Button variant="outline" size="sm" onClick={importReport}>
-              <Upload /> Import
+              <Upload /> <Trans>Import</Trans>
             </Button>
             <Button variant="outline" size="sm" onClick={openFolder}>
-              <FolderOpen /> Open folder
+              <FolderOpen /> <Trans>Open folder</Trans>
             </Button>
           </>
         }
@@ -291,12 +302,14 @@ export default function HistoryPage() {
         {/* Left: run list */}
         <aside className="flex min-h-0 flex-col border-r border-border bg-card/30">
           <div className="flex items-center justify-between px-4 py-2.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-            <span>Runs</span>
+            <span>
+              <Trans>Runs</Trans>
+            </span>
             {runs && (
               <span className="font-normal normal-case">
                 {filteredRuns.length === allRuns.length
-                  ? allRuns.length
-                  : `${filteredRuns.length} / ${allRuns.length}`}
+                  ? totalCount
+                  : t`${shownCount} / ${totalCount}`}
               </span>
             )}
           </div>
@@ -308,8 +321,8 @@ export default function HistoryPage() {
                 value={typeFilter}
                 onValueChange={setTypeFilter}
                 options={[
-                  { value: ALL, label: "All types" },
-                  ...types.map((t) => ({ value: t, label: t })),
+                  { value: ALL, label: t`All types` },
+                  ...types.map((type) => ({ value: type, label: type })),
                 ]}
               />
               <OptionSelect
@@ -318,7 +331,7 @@ export default function HistoryPage() {
                 value={serverFilter}
                 onValueChange={setServerFilter}
                 options={[
-                  { value: ALL, label: "All servers" },
+                  { value: ALL, label: t`All servers` },
                   ...servers.map((s) => ({ value: s, label: s })),
                 ]}
               />
@@ -337,13 +350,15 @@ export default function HistoryPage() {
               <div className="flex h-full flex-col items-center justify-center gap-3 p-8 text-center text-sm text-muted-foreground">
                 <History size={28} className="opacity-40" />
                 <p className="max-w-xs">
-                  No runs yet. Run a load test to populate history.
+                  <Trans>
+                    No runs yet. Run a load test to populate history.
+                  </Trans>
                 </p>
               </div>
             )}
             {allRuns.length > 0 && filteredRuns.length === 0 && (
               <p className="p-6 text-center text-sm text-muted-foreground">
-                No runs match the filters.
+                <Trans>No runs match the filters.</Trans>
               </p>
             )}
             {filteredRuns.map((r) => (
@@ -362,7 +377,7 @@ export default function HistoryPage() {
                   </span>
                   {r.errorCount > 0 && (
                     <span className="shrink-0 rounded bg-destructive/15 px-1.5 py-0.5 text-[11px] font-medium text-destructive">
-                      {r.errorCount} err
+                      {errBadge(r.errorCount)}
                     </span>
                   )}
                 </div>
@@ -387,11 +402,14 @@ export default function HistoryPage() {
           {!selected ? (
             <div className="flex h-full flex-col items-center justify-center gap-3 p-8 text-center text-sm text-muted-foreground">
               <History size={28} className="opacity-40" />
-              <p className="max-w-xs">Select a run to view its data.</p>
+              <p className="max-w-xs">
+                <Trans>Select a run to view its data.</Trans>
+              </p>
             </div>
           ) : reportLoading ? (
             <p className="flex items-center gap-2 p-6 text-sm text-muted-foreground">
-              <Loader2 size={15} className="animate-spin" /> loading report…
+              <Loader2 size={15} className="animate-spin" />{" "}
+              <Trans>loading report…</Trans>
             </p>
           ) : reportError ? (
             <Alert variant="destructive" className="m-6">
@@ -406,10 +424,10 @@ export default function HistoryPage() {
                 <ReportHeader report={report} />
                 <div className="flex shrink-0 gap-2">
                   <Button variant="outline" size="sm" onClick={rerunTest}>
-                    <Play className="fill-current" /> Re-run
+                    <Play className="fill-current" /> <Trans>Re-run</Trans>
                   </Button>
                   <Button variant="outline" size="sm" onClick={exportReport}>
-                    <Download /> Export
+                    <Download /> <Trans>Export</Trans>
                   </Button>
                 </div>
               </div>
@@ -425,7 +443,7 @@ export default function HistoryPage() {
               {/* Per-command latency */}
               <div className="space-y-2">
                 <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                  Latency (p50 / p95 / p99)
+                  <Trans>Latency (p50 / p95 / p99)</Trans>
                 </h3>
                 <LatencyBars report={report} />
               </div>
@@ -435,17 +453,17 @@ export default function HistoryPage() {
                 <div className="space-y-2">
                   <div className="flex flex-wrap items-center gap-2">
                     <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                      Compare p99 with
+                      <Trans>Compare p99 with</Trans>
                     </h3>
                     <OptionSelect
                       value={compareFile}
                       onValueChange={selectCompare}
                       size="sm"
                       className="w-auto text-xs"
-                      placeholder="Select a run…"
+                      placeholder={t`Select a run…`}
                       options={compareOptions.map((r) => ({
                         value: r.file,
-                        label: `${r.gitRef || r.commitSha?.slice(0, 12) || "adhoc"} · ${fmtWhen(r.startedAt)}`,
+                        label: compareLabel(r),
                       }))}
                     />
                   </div>
@@ -454,12 +472,12 @@ export default function HistoryPage() {
                       a={report}
                       b={compareReport}
                       labelA={
-                        report.ref || report.commit_sha?.slice(0, 8) || "this"
+                        report.ref || report.commit_sha?.slice(0, 8) || t`this`
                       }
                       labelB={
                         compareReport.ref ||
                         compareReport.commit_sha?.slice(0, 8) ||
-                        "other"
+                        t`other`
                       }
                     />
                   )}
@@ -470,7 +488,7 @@ export default function HistoryPage() {
               {sameScenario.length >= 2 && (
                 <div className="space-y-2">
                   <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                    {report.scenario} p99 trend
+                    <Trans>{scenario} p99 trend</Trans>
                   </h3>
                   <TrendChart runs={sameScenario} />
                 </div>

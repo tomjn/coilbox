@@ -22,6 +22,7 @@
  * `ScenarioRowMenu`.
  */
 
+import { Trans, useLingui } from "@lingui/react/macro";
 import { Button, useDrawer } from "@picoframe/frame";
 import { Copy, MoreVertical, Pencil, Trash2, Upload } from "lucide-react";
 import { useState } from "react";
@@ -56,14 +57,16 @@ export function CampaignRowMenu({
   onExport: () => void;
   onDelete: () => Promise<void>;
 }) {
+  const { t } = useLingui();
   const navigate = useNavigate();
   const drawer = useDrawer();
+  const title = campaign.title;
 
   /** A drawer rather than a box hanging off a menu item, because the menu has
    *  closed by the time the confirmation is on screen. */
   const confirmDelete = () =>
     drawer.open({
-      title: `Delete ${campaign.title}`,
+      title: t`Delete ${title}`,
       width: "24rem",
       content: (
         <DeleteCampaignForm
@@ -82,7 +85,7 @@ export function CampaignRowMenu({
           size="icon"
           variant="ghost"
           className="size-8 shrink-0 text-muted-foreground opacity-60 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100 data-[state=open]:opacity-100"
-          aria-label={`Actions for ${campaign.title}`}
+          aria-label={t`Actions for ${title}`}
         >
           <MoreVertical className="size-4" aria-hidden="true" />
         </Button>
@@ -92,20 +95,22 @@ export function CampaignRowMenu({
           <DropdownMenuItem
             onSelect={() => navigate(`/campaign-builder/${campaign.id}`)}
           >
-            <Pencil className="size-4" aria-hidden="true" /> Edit
+            <Pencil className="size-4" aria-hidden="true" /> <Trans>Edit</Trans>
           </DropdownMenuItem>
         )}
         {/* No confirmation. A copy takes nothing away, and the copy is the one
             thing an author can undo by deleting it. */}
         <DropdownMenuItem onSelect={onDuplicate}>
-          <Copy className="size-4" aria-hidden="true" /> Duplicate
+          <Copy className="size-4" aria-hidden="true" />{" "}
+          <Trans>Duplicate</Trans>
         </DropdownMenuItem>
         <DropdownMenuItem onSelect={onExport}>
-          <Upload className="size-4" aria-hidden="true" /> Export
+          <Upload className="size-4" aria-hidden="true" /> <Trans>Export</Trans>
         </DropdownMenuItem>
         {deletable && (
           <DropdownMenuItem variant="destructive" onSelect={confirmDelete}>
-            <Trash2 className="size-4" aria-hidden="true" /> Delete
+            <Trash2 className="size-4" aria-hidden="true" />{" "}
+            <Trans>Delete</Trans>
           </DropdownMenuItem>
         )}
       </DropdownMenuContent>
@@ -124,8 +129,10 @@ function DeleteCampaignForm({
   onDelete: () => Promise<void>;
   onDone: () => void;
 }) {
+  const { t } = useLingui();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const title = campaign.title;
 
   const remove = async () => {
     setBusy(true);
@@ -142,8 +149,10 @@ function DeleteCampaignForm({
   return (
     <div className="flex flex-col gap-3">
       <p className="text-sm">
-        Delete <span className="font-medium">{campaign.title}</span> and its
-        images? This can't be undone.
+        <Trans>
+          Delete <span className="font-medium">{title}</span> and its images?
+          This can't be undone.
+        </Trans>
       </p>
       {error && <ErrorBanner message={error} />}
       <Button
@@ -153,7 +162,7 @@ function DeleteCampaignForm({
         onClick={() => void remove()}
       >
         <Trash2 className="size-4" aria-hidden="true" />{" "}
-        {busy ? "Deleting…" : "Delete"}
+        {busy ? t`Deleting…` : t`Delete`}
       </Button>
     </div>
   );
