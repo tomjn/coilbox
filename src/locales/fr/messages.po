@@ -3612,7 +3612,7 @@ msgstr "{left, plural, one {Incursion à {incursionName} : tombe dans # tour} o
 #: src/downloads/pages/components/ProgressBar.tsx
 #, fuzzy
 msgid "{left} left"
-msgstr "{left} restant(s)"
+msgstr "il reste {left}"
 
 #: src/scenario/pages/components/teams.ts
 #, fuzzy
@@ -4463,12 +4463,12 @@ msgstr "{models, plural, one {# modèle ancien} other {# modèles anciens}}"
 #: src/content/pages/components/CompatMode.tsx
 #, fuzzy
 msgid "{modelsWritten, plural, one {# model} other {# models}} converted"
-msgstr "{modelsWritten, plural, one {# modèle} other {# modèles}} converti(s)"
+msgstr "{modelsWritten, plural, one {# modèle converti} other {# modèles convertis}}"
 
 #: src/content/pages/components/CompatMode.tsx
 #, fuzzy
 msgid "{modelsWritten, plural, one {# model} other {# models}} converted of {modelsFound}"
-msgstr "{modelsWritten, plural, one {# modèle} other {# modèles}} converti(s) sur {modelsFound}"
+msgstr "{modelsWritten, plural, one {# modèle converti} other {# modèles convertis}} sur {modelsFound}"
 
 #: src/content/pages/components/Convert3doDrawer.tsx
 #, fuzzy
