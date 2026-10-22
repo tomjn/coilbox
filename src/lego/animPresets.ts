@@ -75,7 +75,9 @@ export function legRoleEntries(pairs: number): LegoRole[] {
       for (const segment of ["thigh", "shin", "foot"]) {
         entries.push({
           id: `leg.${side}${pair}.${segment}`,
-          label: legRoleLabel(side, pair, segment),
+          get label() {
+            return legRoleLabel(side, pair, segment);
+          },
           group: "Legs",
         });
       }
@@ -1291,20 +1293,25 @@ const WALK_PARAMS: PresetParam[] = [
     step: 1,
     fallback: 30,
   },
-  {
-    // A walk keeps each foot down for more than half the time and a run for
-    // less. Half is the walk this preset always made.
+  dutyParam(80),
+];
+
+// A walk keeps each foot down for more than half the time and a run for less.
+// Half is the walk this preset always made. Built fresh per list, because
+// spreading a param would read its label while the module loads.
+function dutyParam(max: number): PresetParam {
+  return {
     id: "duty",
     get label() {
       return t`Time on the ground`;
     },
     unit: "%",
     min: 30,
-    max: 80,
+    max,
     step: 5,
     fallback: 50,
-  },
-];
+  };
+}
 
 function legRoles(pairs: number[]): string[] {
   const roles: string[] = [];
@@ -1430,7 +1437,7 @@ export const WALK_PAIRS = "legPairs";
 const WALK_LEGS_PARAMS: PresetParam[] = WALK_PARAMS.map((param) =>
   // Up to the wave gait of eight legs, seven eighths of the cycle on the
   // ground, so the slow gaits of six and eight legs are in reach.
-  param.id === "duty" ? { ...param, max: 90 } : param,
+  param.id === "duty" ? dutyParam(90) : param,
 );
 
 /**
