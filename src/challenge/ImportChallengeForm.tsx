@@ -1,3 +1,5 @@
+import { plural } from "@lingui/core/macro";
+import { useLingui } from "@lingui/react/macro";
 import { open } from "@tauri-apps/plugin-dialog";
 import { useState } from "react";
 import { identify } from "../container/container";
@@ -64,6 +66,7 @@ export function ImportChallengeForm<TSettings, TDoc>({
   countSubstitutedMaps: (doc: TDoc) => number;
   onImported: (id: string) => void;
 }) {
+  const { t } = useLingui();
   const { target, loading: targetLoading } = usePreferredTarget();
   const [pending, setPending] = useState<TSettings | null>(null);
 
@@ -79,7 +82,7 @@ export function ImportChallengeForm<TSettings, TDoc>({
     settings: TSettings,
     accepted = false,
   ): Promise<boolean> => {
-    if (!target) throw new Error("Install an engine first.");
+    if (!target) throw new Error(t`Install an engine first.`);
     let saved: { id: string; doc: TDoc };
     try {
       saved = await finish(settings, target, accepted);
@@ -98,8 +101,11 @@ export function ImportChallengeForm<TSettings, TDoc>({
     const substituted = countSubstitutedMaps(doc);
     if (substituted > 0) {
       void notify({
-        title: `Imported with ${substituted} substituted ${substituted === 1 ? "map" : "maps"}`,
-        body: `You do not have every map this challenge names. Those ${substitutedNoun} say which map they should have used.`,
+        title: plural(substituted, {
+          one: "Imported with # substituted map",
+          other: "Imported with # substituted maps",
+        }),
+        body: t`You do not have every map this challenge names. Those ${substitutedNoun} say which map they should have used.`,
       });
     }
     onImported(id);
@@ -141,9 +147,9 @@ export function ImportChallengeForm<TSettings, TDoc>({
   // import (decode, resolve, generate) is identical to a pasted code.
   const pickChallengeFile = async (): Promise<string | null> => {
     const src = await open({
-      title: "Import challenge",
+      title: t`Import challenge`,
       multiple: false,
-      filters: [{ name: "Coilbox challenge", extensions: ["json"] }],
+      filters: [{ name: t`Coilbox challenge`, extensions: ["json"] }],
     });
     if (typeof src !== "string") return null;
     const { text } = await challengeImport({ src });
@@ -167,7 +173,7 @@ export function ImportChallengeForm<TSettings, TDoc>({
       />
       {pending && (
         <ResolveContentGate
-          title="Set up this challenge"
+          title={t`Set up this challenge`}
           requirements={[buildRequirement(pending)]}
           target={target ?? undefined}
           targetLoading={targetLoading}

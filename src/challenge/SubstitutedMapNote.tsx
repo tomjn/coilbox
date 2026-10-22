@@ -1,3 +1,4 @@
+import { useLingui } from "@lingui/react/macro";
 import { Button, cn } from "@picoframe/frame";
 import { Download, Undo2 } from "lucide-react";
 import { useState } from "react";
@@ -65,6 +66,7 @@ function SubstitutedMap({
   className?: string;
   onRestore: () => void | Promise<void>;
 }) {
+  const { t } = useLingui();
   const { target } = usePreferredTarget();
   const scan = useUnitsyncScan(target?.enginePath, target?.dataDir);
   const { isExcluded } = useMapEligibility();
@@ -73,7 +75,7 @@ function SubstitutedMap({
     // The challenge carries a map name and nothing else, so there is no picked
     // source to pin: resolve it across every source in policy order.
     kind: "mapAnySource",
-    label: `Map: ${original}`,
+    label: t`Map: ${original}`,
     args: { mapName: original, writePath },
   });
 
@@ -115,8 +117,8 @@ function SubstitutedMap({
     <div className={cn("text-[10px] text-muted-foreground", className)}>
       <span className="block">
         {arrived
-          ? `Stands in for ${original}, which you now have.`
-          : `Stands in for ${original}, which is not available here.`}
+          ? t`Stands in for ${original}, which you now have.`
+          : t`Stands in for ${original}, which is not available here.`}
       </span>
       {arrived && (
         <Button
@@ -126,17 +128,16 @@ function SubstitutedMap({
           disabled={restoring}
           // The sentence above names the map, so the button label stays short
           // enough to fit the narrowest panel it appears on.
-          aria-label={`Use ${original}`}
+          aria-label={t`Use ${original}`}
           onClick={restore}
         >
           <Undo2 className="size-3.5" aria-hidden />
-          {restoring ? "Switching…" : "Use it"}
+          {restoring ? t`Switching…` : t`Use it`}
         </Button>
       )}
       {hidden && (
         <span className="block">
-          You have this map, but it is hidden from warpath and galactic
-          conquest.
+          {t`You have this map, but it is hidden from warpath and galactic conquest.`}
         </span>
       )}
       {installed === false &&
@@ -150,15 +151,15 @@ function SubstitutedMap({
             disabled={mapDl.busy}
             // The sentence above names the map, so the button label stays short
             // enough to fit the narrowest panel it appears on.
-            aria-label={`Download ${original}`}
+            aria-label={t`Download ${original}`}
             onClick={download}
           >
             <Download className="size-3.5" aria-hidden />
             {mapDl.status === "queued"
-              ? "Queued…"
+              ? t`Queued…`
               : mapDl.busy
-                ? "Downloading…"
-                : "Download"}
+                ? t`Downloading…`
+                : t`Download`}
           </Button>
         ))}
       {mapDl.error && (

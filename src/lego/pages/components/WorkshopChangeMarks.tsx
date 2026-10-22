@@ -3,6 +3,7 @@
  * changes it and has not written the change into the unit's file (issue #4243).
  * The mark opens that field on the workshop's unit page.
  */
+import { Trans, useLingui } from "@lingui/react/macro";
 import { useMemo } from "react";
 import { Link } from "react-router";
 import {
@@ -51,15 +52,16 @@ export function WorkshopChangeMarks({
   unitKey: string | null;
   changes: WorkshopChange[];
 }) {
+  const { t } = useLingui();
   if (!unitKey || changes.length === 0) return null;
   return (
     <>
       {changes.map((change) => {
-        const sentence = `Changed to ${shown(change.value)} in the workshop project ${change.projectName}, ${
-          change.mutatorOnly
-            ? "sent through the mutator, so it is not written into the game"
-            : "not written into the game yet"
-        }.`;
+        const value = shown(change.value);
+        const projectName = change.projectName;
+        const sentence = change.mutatorOnly
+          ? t`Changed to ${value} in the workshop project ${projectName}, sent through the mutator, so it is not written into the game.`
+          : t`Changed to ${value} in the workshop project ${projectName}, not written into the game yet.`;
         return (
           <TooltipProvider
             key={`${change.projectId}:${change.path}`}
@@ -72,7 +74,9 @@ export function WorkshopChangeMarks({
                   aria-label={sentence}
                   className="shrink-0 rounded-full bg-amber-500/15 px-1.5 text-[10px] font-medium text-amber-700 dark:text-amber-400"
                 >
-                  {shown(change.value)} in {change.projectName}
+                  <Trans>
+                    {value} in {projectName}
+                  </Trans>
                 </Link>
               </TooltipTrigger>
               <TooltipContent className="text-left leading-snug">

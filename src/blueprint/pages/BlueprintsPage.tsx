@@ -15,6 +15,8 @@
  * only choice a new layout needs is which game's units it is drawn from.
  */
 
+import { plural } from "@lingui/core/macro";
+import { Trans, useLingui } from "@lingui/react/macro";
 import { Button, Input } from "@picoframe/frame";
 import {
   Blocks,
@@ -59,8 +61,8 @@ import {
   recordGameName,
   type StoredBlueprint,
   sourceLabel,
-  UNTITLED,
   uniqueLayoutName,
+  untitled,
 } from "../library";
 import { blueprintRoute, saveBlueprint, useBlueprintLibrary } from "../store";
 import { useWidgetFiles } from "../useWidgetFiles";
@@ -78,6 +80,7 @@ const ALL_GAMES = "every-game";
 
 export default function BlueprintsPage() {
   const { records, loading, error } = useBlueprintLibrary();
+  const { t } = useLingui();
   const { target } = usePreferredTarget();
   const scan = useUnitsyncScan(target?.enginePath, target?.dataDir);
   const installed = useMemo(
@@ -113,20 +116,25 @@ export default function BlueprintsPage() {
     [records, game],
   );
 
+  const shownCount = shown.length;
+  const totalCount = records.length;
+
   return (
     <div className="flex flex-col gap-4 p-4">
       <PageHeader
-        title="Base blueprints"
-        description="Blueprints of buildings you can put down anywhere. A blueprint has no map and no team, so the same one works in a mission, in a skirmish, and in somebody else's game."
+        title={t`Base blueprints`}
+        description={t`Blueprints of buildings you can put down anywhere. A blueprint has no map and no team, so the same one works in a mission, in a skirmish, and in somebody else's game.`}
         actions={
           <>
             <BlueprintPackButton
               onImported={(kept) => {
+                const firstName = kept[0]?.layout.name ?? "";
+                const keptCount = kept.length;
                 void notify({
-                  title:
-                    kept.length === 1
-                      ? `"${kept[0].layout.name}" is in your library.`
-                      : `${kept.length} blueprints are in your library.`,
+                  title: plural(keptCount, {
+                    one: `"${firstName}" is in your library.`,
+                    other: "# blueprints are in your library.",
+                  }),
                   level: "success",
                 });
               }}
@@ -152,8 +160,9 @@ export default function BlueprintsPage() {
                   [record.id],
                   blueprintRoute(record.id),
                 );
+                const keptName = record.layout.name;
                 void notify({
-                  title: `"${record.layout.name}" is in your library.`,
+                  title: t`"${keptName}" is in your library.`,
                   level: "success",
                 });
               }}
@@ -171,7 +180,7 @@ export default function BlueprintsPage() {
 
       {error && <ErrorBanner message={error} />}
 
-      {scan.error && <ScanFailed noun="games" reason={scan.error} />}
+      {scan.error && <ScanFailed noun={t`games`} reason={scan.error} />}
 
       {games.length > 1 && (
         <div className="flex items-center gap-2">
@@ -181,12 +190,14 @@ export default function BlueprintsPage() {
             value={game}
             onValueChange={setGame}
             options={[
-              { value: ALL_GAMES, label: "Every game" },
+              { value: ALL_GAMES, label: t`Every game` },
               ...games.map((name) => ({ value: name, label: name })),
             ]}
           />
           <span className="text-xs text-muted-foreground">
-            {shown.length} of {records.length}
+            <Trans>
+              {shownCount} of {totalCount}
+            </Trans>
           </span>
         </div>
       )}
@@ -196,17 +207,17 @@ export default function BlueprintsPage() {
       ) : records.length === 0 ? (
         <EmptyState
           label={
-            <>
+            <Trans>
               No blueprints yet. A blueprint is a layout of buildings you draw
               once and place wherever you like: an opening, a wall, a factory
               corner. Make one with the button above, import one somebody
               shared, or open a pack: a file of layouts out of a game or off the
               community gallery.
-            </>
+            </Trans>
           }
         />
       ) : shown.length === 0 ? (
-        <EmptyState label={`No blueprints for ${game}.`} />
+        <EmptyState label={t`No blueprints for ${game}.`} />
       ) : (
         <ul className="grid grid-cols-[repeat(auto-fill,minmax(14rem,1fr))] gap-3">
           {shown.map((record) => (
@@ -252,8 +263,13 @@ function BlueprintCard({
   /** Every name in the library, for the copy the menu makes. */
   taken: string[];
 }) {
+  const { t } = useLingui();
   const buildings = record.layout.buildings.length;
   const game = recordGameName(record);
+  const buildingCount = plural(buildings, {
+    one: "# building",
+    other: "# buildings",
+  });
 
   return (
     <div className="relative flex h-full flex-col gap-2 rounded-lg border border-border/50 bg-card p-3 transition-colors hover:border-primary/40 hover:bg-accent/50 focus-within:border-primary/40">
@@ -271,25 +287,23 @@ function BlueprintCard({
         {record.layout.name}
       </Link>
       <span className="flex items-center gap-2 text-xs text-muted-foreground">
-        <span>
-          {buildings} building{buildings === 1 ? "" : "s"}
-        </span>
+        <span>{buildingCount}</span>
         {record.layout.ordered && (
           <span className="flex items-center gap-1">
             <ListOrdered className="size-3.5" aria-hidden="true" />
-            build order
+            <Trans>build order</Trans>
           </span>
         )}
       </span>
       <span className="truncate text-xs text-muted-foreground">
-        {game || "No game named"}
+        {game || t`No game named`}
       </span>
       {/* Where it came from, so a layout out of somebody's collection does not
           look identical to one you drew (issues #1313, #1473). */}
       {record.source && <SourceLine source={record.source} />}
       {!installed && (
         <span className="text-xs text-amber-600 dark:text-amber-400">
-          That game is not installed here.
+          <Trans>That game is not installed here.</Trans>
         </span>
       )}
 
@@ -361,6 +375,7 @@ function NewBlueprintButton({
   scanError: string | null;
 }) {
   const navigate = useNavigate();
+  const { t } = useLingui();
   const [name, setName] = useState("");
   const [game, setGame] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -373,7 +388,7 @@ function NewBlueprintButton({
     setError(null);
     try {
       const made = newStoredBlueprint(
-        uniqueLayoutName(name || UNTITLED, taken),
+        uniqueLayoutName(name || untitled(), taken),
         pick,
         games,
       );
@@ -390,48 +405,54 @@ function NewBlueprintButton({
     <Popover>
       <PopoverTrigger asChild>
         <Button className="shrink-0 gap-1.5">
-          <Plus className="size-4" /> New blueprint
+          <Plus className="size-4" /> <Trans>New blueprint</Trans>
         </Button>
       </PopoverTrigger>
       <PopoverContent align="end" className="w-80 space-y-3">
         <div className="space-y-1.5">
           <label htmlFor="new-blueprint-name" className="text-xs font-medium">
-            Name
+            <Trans>Name</Trans>
           </label>
           <Input
             id="new-blueprint-name"
             value={name}
-            placeholder={UNTITLED}
+            placeholder={untitled()}
             onChange={(e) => setName(e.target.value)}
           />
         </div>
 
         <div className="space-y-1.5">
-          <span className="text-xs font-medium">Game</span>
+          <span className="text-xs font-medium">
+            <Trans>Game</Trans>
+          </span>
           <GamePickerField
             value={pick}
             onValueChange={setGame}
             games={games}
             headers={headers}
-            placeholder={scanning ? "Reading your games…" : "Pick a game"}
+            placeholder={scanning ? t`Reading your games…` : t`Pick a game`}
             disabled={games.length === 0}
             gamesLoading={scanning}
           />
           <p className="text-xs text-muted-foreground">
-            A layout names its buildings by the game's own unit names, so it is
-            drawn from one game's units.
+            <Trans>
+              A layout names its buildings by the game's own unit names, so it
+              is drawn from one game's units.
+            </Trans>
           </p>
         </div>
 
         {scanError && (
           <p className="text-xs text-destructive">
-            Your games could not be read: {scanError}
+            <Trans>Your games could not be read: {scanError}</Trans>
           </p>
         )}
         {games.length === 0 && !scanning && !scanError && (
           <p className="text-xs text-amber-600 dark:text-amber-400">
-            No games found. Install one under Library &gt; Games, then come
-            back.
+            <Trans>
+              No games found. Install one under Library &gt; Games, then come
+              back.
+            </Trans>
           </p>
         )}
         {error && <p className="text-xs text-destructive">{error}</p>}
@@ -441,7 +462,7 @@ function NewBlueprintButton({
           disabled={busy || !pick}
           onClick={() => void create()}
         >
-          Make it
+          <Trans>Make it</Trans>
         </Button>
       </PopoverContent>
     </Popover>

@@ -1,3 +1,4 @@
+import { Trans, useLingui } from "@lingui/react/macro";
 import { Button, buttonVariants, cn, useHideSidebar } from "@picoframe/frame";
 import {
   ArrowLeft,
@@ -85,7 +86,7 @@ function MissionBriefing({
         <BackLink campaignId={id} />
         <div className="flex flex-col items-center gap-2 rounded-lg border border-dashed p-10 text-center">
           <p className="text-sm text-muted-foreground">
-            This mission isn't part of the campaign.
+            <Trans>This mission isn't part of the campaign.</Trans>
           </p>
         </div>
       </div>
@@ -222,6 +223,7 @@ function Briefing({
   mission: CampaignMission;
   run: ReturnType<typeof useMissionRun>;
 }) {
+  const { t } = useLingui();
   const { target } = usePreferredTarget();
   // As for the panorama: a unit the player's install cannot draw falls back to
   // the slot's still image, or to no side graphic at all.
@@ -265,7 +267,7 @@ function Briefing({
         {mission.objectives.some((o) => o.trim() !== "") && (
           <div className="flex flex-col gap-2">
             <span className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-              Objectives
+              <Trans>Objectives</Trans>
             </span>
             <ul className="flex flex-col gap-1.5">
               {mission.objectives.map(
@@ -284,7 +286,7 @@ function Briefing({
 
         <div className="flex flex-col gap-2">
           <span className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-            Battle history
+            <Trans>Battle history</Trans>
           </span>
           <ReplayHistoryList
             dataDir={target?.dataDir}
@@ -293,7 +295,7 @@ function Briefing({
               p.campaignId === campaign.id &&
               p.missionId === mission.id
             }
-            emptyLabel="No attempts recorded yet."
+            emptyLabel={t`No attempts recorded yet.`}
           />
         </div>
 
@@ -307,7 +309,7 @@ function Briefing({
 
         {run.leftOut.map((line) => (
           <p key={line} className="text-xs text-muted-foreground">
-            Left out: {line}
+            <Trans>Left out: {line}</Trans>
           </p>
         ))}
 
@@ -351,6 +353,7 @@ function Briefing({
 
 /** The Start button plus the reasons it might be unavailable. */
 function StartArea({ run }: { run: ReturnType<typeof useMissionRun> }) {
+  const { t } = useLingui();
   return (
     <div className="flex flex-col gap-3">
       {/* Only for a mission that actually plays differently at each level
@@ -363,7 +366,7 @@ function StartArea({ run }: { run: ReturnType<typeof useMissionRun> }) {
           disabled={run.running}
         />
       )}
-      {run.scanError && <ScanFailed noun="games" reason={run.scanError} />}
+      {run.scanError && <ScanFailed noun={t`games`} reason={run.scanError} />}
       {run.dependencyBlock && (
         <DependencyBlocked reason={run.dependencyBlock} />
       )}
@@ -371,10 +374,10 @@ function StartArea({ run }: { run: ReturnType<typeof useMissionRun> }) {
         <Button onClick={run.start} disabled={!run.canStart}>
           <Play className="size-4 fill-current" />{" "}
           {run.running
-            ? "Game running…"
+            ? t`Game running…`
             : run.scanLoading
-              ? "Loading content…"
-              : "Start Mission"}
+              ? t`Loading content…`
+              : t`Start Mission`}
         </Button>
       </div>
     </div>
@@ -425,10 +428,12 @@ function Checking() {
     <PhaseCard>
       <div className="flex items-center gap-2">
         <Loader2 className="size-5 animate-spin text-muted-foreground" />
-        <h2 className="text-lg font-semibold">Checking result…</h2>
+        <h2 className="text-lg font-semibold">
+          <Trans>Checking result…</Trans>
+        </h2>
       </div>
       <p className="text-sm text-muted-foreground">
-        Reading the replay to see how the mission went.
+        <Trans>Reading the replay to see how the mission went.</Trans>
       </p>
       <div className="checking-shimmer h-1.5 w-full rounded-full" aria-hidden />
     </PhaseCard>
@@ -438,9 +443,11 @@ function Checking() {
 function ResultPrompt({ run }: { run: ReturnType<typeof useMissionRun> }) {
   return (
     <PhaseCard>
-      <h2 className="text-xl font-semibold">How did it go?</h2>
+      <h2 className="text-xl font-semibold">
+        <Trans>How did it go?</Trans>
+      </h2>
       <p className="text-sm text-muted-foreground">
-        Report the outcome to record your progress.
+        <Trans>Report the outcome to record your progress.</Trans>
       </p>
       {run.error && (
         <Alert variant="destructive" className="p-3">
@@ -451,14 +458,14 @@ function ResultPrompt({ run }: { run: ReturnType<typeof useMissionRun> }) {
       )}
       <div className="flex flex-wrap gap-3">
         <Button onClick={run.recordVictory} disabled={run.saving}>
-          <Trophy className="size-4" /> Victory
+          <Trophy className="size-4" /> <Trans>Victory</Trans>
         </Button>
         <Button
           variant="outline"
           onClick={run.recordDefeat}
           disabled={run.saving}
         >
-          <Skull className="size-4" /> Defeat
+          <Skull className="size-4" /> <Trans>Defeat</Trans>
         </Button>
       </div>
     </PhaseCard>
@@ -477,12 +484,16 @@ function Victory({
     <PhaseCard className="result-stamp">
       <div className="flex items-center gap-2">
         <Trophy className="size-6 text-amber-500" />
-        <h2 className="text-xl font-semibold">Victory</h2>
+        <h2 className="text-xl font-semibold">
+          <Trans>Victory</Trans>
+        </h2>
       </div>
       <p className="text-sm text-muted-foreground">
-        {next
-          ? "Mission complete. The next mission is ready."
-          : "Mission complete — you've finished the campaign!"}
+        {next ? (
+          <Trans>Mission complete. The next mission is ready.</Trans>
+        ) : (
+          <Trans>Mission complete — you've finished the campaign!</Trans>
+        )}
       </p>
       {run.autoDetected && <AutoDetectedNote />}
       <div className="flex flex-wrap gap-3">
@@ -493,14 +504,14 @@ function Victory({
             )}`}
             className={cn(buttonVariants())}
           >
-            <Play className="size-4 fill-current" /> Continue
+            <Play className="size-4 fill-current" /> <Trans>Continue</Trans>
           </Link>
         ) : null}
         <Link
           to={`/campaign/${encodeURIComponent(campaign.id)}`}
           className={cn(buttonVariants({ variant: "outline" }))}
         >
-          Back to campaign
+          <Trans>Back to campaign</Trans>
         </Link>
       </div>
     </PhaseCard>
@@ -513,21 +524,23 @@ function Defeat({ run }: { run: ReturnType<typeof useMissionRun> }) {
     <PhaseCard className="result-stamp">
       <div className="flex items-center gap-2">
         <Skull className="size-6 text-muted-foreground" />
-        <h2 className="text-xl font-semibold">Defeat</h2>
+        <h2 className="text-xl font-semibold">
+          <Trans>Defeat</Trans>
+        </h2>
       </div>
       <p className="text-sm text-muted-foreground">
-        No progress lost — regroup and try again.
+        <Trans>No progress lost — regroup and try again.</Trans>
       </p>
       {run.autoDetected && <AutoDetectedNote />}
       <div className="flex flex-wrap gap-3">
         <Button onClick={run.reset}>
-          <RotateCcw className="size-4" /> Retry
+          <RotateCcw className="size-4" /> <Trans>Retry</Trans>
         </Button>
         <Link
           to={`/campaign/${encodeURIComponent(id ?? "")}`}
           className={cn(buttonVariants({ variant: "outline" }))}
         >
-          Back to campaign
+          <Trans>Back to campaign</Trans>
         </Link>
       </div>
     </PhaseCard>
@@ -539,7 +552,7 @@ function Defeat({ run }: { run: ReturnType<typeof useMissionRun> }) {
 function AutoDetectedNote() {
   return (
     <p className="text-xs text-muted-foreground">
-      Result detected from the replay.
+      <Trans>Result detected from the replay.</Trans>
     </p>
   );
 }
@@ -550,7 +563,7 @@ function BackLink({ campaignId }: { campaignId?: string }) {
       to={`/campaign/${encodeURIComponent(campaignId ?? "")}`}
       className="inline-flex w-fit items-center gap-1 rounded bg-black/30 px-2 py-1 text-xs text-white backdrop-blur-sm hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-white"
     >
-      <ArrowLeft className="size-3.5" /> Back
+      <ArrowLeft className="size-3.5" /> <Trans>Back</Trans>
     </Link>
   );
 }

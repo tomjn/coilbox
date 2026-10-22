@@ -10,6 +10,7 @@
  * mid-keystroke. Rotation is shown in degrees and stored in radians.
  */
 
+import { useLingui } from "@lingui/react/macro";
 import { Button, Input } from "@picoframe/frame";
 import { Link, Unlink } from "lucide-react";
 import { useEffect, useState } from "react";
@@ -46,6 +47,7 @@ export function TransformFields({
   uniformScale,
   onUniformScaleChange,
 }: Props) {
+  const { t } = useLingui();
   function setAxis(
     field: "position" | "rotation" | "scale",
     axis: number,
@@ -73,12 +75,12 @@ export function TransformFields({
   return (
     <div className="mt-2 flex flex-col gap-2">
       <Vec3Row
-        label="Position"
+        label={t`Position`}
         values={piece.position}
         onCommit={(axis, value) => setAxis("position", axis, value)}
       />
       <Vec3Row
-        label="Rotation"
+        label={t`Rotation`}
         unit="°"
         values={piece.rotation.map(toDegrees) as Vec3}
         onCommit={(axis, value) =>
@@ -86,7 +88,7 @@ export function TransformFields({
         }
       />
       <Vec3Row
-        label="Scale"
+        label={t`Scale`}
         values={piece.scale}
         onCommit={(axis, value) => setAxis("scale", axis, value)}
         action={
@@ -98,8 +100,8 @@ export function TransformFields({
             aria-pressed={uniformScale}
             title={
               uniformScale
-                ? "Scaling keeps its proportions. Click to scale one axis at a time"
-                : "Scaling each axis on its own. Click to keep proportions"
+                ? t`Scaling keeps its proportions. Click to scale one axis at a time`
+                : t`Scaling each axis on its own. Click to keep proportions`
             }
           >
             {uniformScale ? <Link size={12} /> : <Unlink size={12} />}
@@ -125,6 +127,10 @@ export function Vec3Row({
   onCommit: (axis: number, value: number) => void;
   action?: React.ReactNode;
 }) {
+  const { t } = useLingui();
+  // i18n: the row's label and the axis letter stay two placeholders, so a
+  // translator can reorder them. The row label is translated by the caller.
+  const fieldLabel = (axisLetter: string) => t`${label} ${axisLetter}`;
   return (
     <div>
       <div className="flex items-center justify-between">
@@ -141,7 +147,7 @@ export function Vec3Row({
             value={values[index]}
             axis={axis.label}
             colour={axis.colour}
-            label={`${label} ${axis.label}`}
+            label={fieldLabel(axis.label)}
             onCommit={(value) => onCommit(index, value)}
           />
         ))}

@@ -26,6 +26,7 @@
  * the record says so rather than inventing a provenance.
  */
 
+import { useLingui } from "@lingui/react/macro";
 import { open } from "@tauri-apps/plugin-dialog";
 import { useMemo, useRef, useState } from "react";
 
@@ -99,6 +100,7 @@ export function ImportBlueprintForm({
   /** The stored layout, once it is on disk and the library has been re-read. */
   onImported: (record: StoredBlueprint) => void;
 }) {
+  const { t } = useLingui();
   const [payload, setPayload] = useState<BlueprintPayload | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -120,6 +122,7 @@ export function ImportBlueprintForm({
   // neither "still reading" nor "you have not got that game". The failure
   // itself is said out loud below.
   const unreadable = !!scan.error;
+  const scanError = scan.error;
   const installed =
     scan.data?.games ?? (scan.loading || unreadable ? null : []);
 
@@ -210,7 +213,8 @@ export function ImportBlueprintForm({
       const id = identify(text);
       if (id.warnings.length > 0) throw new Error(id.warnings[0]);
       if (id.kind !== "unknown" && id.kind !== "blueprint") {
-        throw new Error(`That code is a coilbox ${id.kind}, not a blueprint.`);
+        const kind = id.kind;
+        throw new Error(t`That code is a coilbox ${kind}, not a blueprint.`);
       }
       throw new Error(blueprintImportErrorMessage(read.error));
     }
@@ -219,13 +223,13 @@ export function ImportBlueprintForm({
 
   const pickFile = async () => {
     const src = await open({
-      title: "Import blueprint",
+      title: t`Import blueprint`,
       multiple: false,
-      filters: [{ name: "Coilbox blueprint", extensions: ["json"] }],
+      filters: [{ name: t`Coilbox blueprint`, extensions: ["json"] }],
     });
     if (typeof src !== "string") return null;
     const text = await appFileIO.read(src);
-    if (text === null) throw new Error("There is no file there.");
+    if (text === null) throw new Error(t`There is no file there.`);
     cameFromFile.current = src;
     return text;
   };
@@ -255,11 +259,11 @@ export function ImportBlueprintForm({
   return (
     <div className="flex flex-col">
       <ChallengeCodeInput
-        helpText="Paste a blueprint code someone shared, or browse to a blueprint file. Coilbox reads it first and tells you what it is for before anything is kept."
-        placeholder="Paste a blueprint code…"
-        submitLabel="Read it"
-        busyLabel="Reading…"
-        fileButtonLabel="Read a file…"
+        helpText={t`Paste a blueprint code someone shared, or browse to a blueprint file. Coilbox reads it first and tells you what it is for before anything is kept.`}
+        placeholder={t`Paste a blueprint code…`}
+        submitLabel={t`Read it`}
+        busyLabel={t`Reading…`}
+        fileButtonLabel={t`Read a file…`}
         initialCode={initialCode}
         onImport={decode}
         onPickFile={pickFile}
@@ -268,14 +272,14 @@ export function ImportBlueprintForm({
       {scan.error && (
         <div className="px-4 pb-4">
           <ErrorBanner
-            message={`Your games could not be read, so nothing here has been checked against them: ${scan.error}`}
+            message={t`Your games could not be read, so nothing here has been checked against them: ${scanError}`}
           />
         </div>
       )}
 
       {error && (
         <div className="px-4 pb-4">
-          <ErrorBanner message={`Not saved: ${error}`} />
+          <ErrorBanner message={t`Not saved: ${error}`} />
         </div>
       )}
 

@@ -38,6 +38,8 @@
  * hand. A layout on its own has no queues and none of this shows.
  */
 
+import { t as coreT, plural } from "@lingui/core/macro";
+import { Trans, useLingui } from "@lingui/react/macro";
 import { Button } from "@picoframe/frame";
 import { ArrowRight, BookOpen, Undo2, X } from "lucide-react";
 import { useMemo, useState } from "react";
@@ -45,6 +47,7 @@ import { OptionSelect } from "@/components/OptionSelect";
 import { Label } from "@/components/ui/label";
 import type { UnitDatasetEntry } from "@/content/bindings";
 import { UnitPickerButton } from "@/content/pages/components/UnitPicker";
+import { getLocale } from "@/i18n";
 import type { ArrivalNote } from "../../arrival";
 import {
   coveredDefsBySource,
@@ -128,6 +131,7 @@ export function SubstitutionPanel({
   /** What the last read found, or nothing before one. */
   shippedNote?: string;
 }) {
+  const { t } = useLingui();
   const defs = useMemo(() => layoutDefs(layout), [layout]);
   const queuedDefs = useMemo(() => distinctDefs(queued), [queued]);
   const known = useMemo(() => knownUnits(units), [units]);
@@ -164,6 +168,7 @@ export function SubstitutionPanel({
   // sides they could be. A def cannot be the side it is being converted to, so
   // that one is not offered (issue #1527).
   const needsSide = defsNeedingSide(plan, sides, table);
+  const needsSideCount = needsSide.length;
   const sideChoices = sideNames.filter((side) => side !== toSide);
 
   const preview = substituteBlueprint(layout, plan, footprintOf);
@@ -191,27 +196,39 @@ export function SubstitutionPanel({
     }
     onApply(preview.layout, plan);
   };
+  const totalBuildings = layout.buildings.length;
+  const swappedQueued = queues.swapped;
   const converting = [
     swapping > 0
-      ? `${swapping} of ${layout.buildings.length} buildings`
+      ? plural(totalBuildings, {
+          one: `${swapping} of # building`,
+          other: `${swapping} of # buildings`,
+        })
       : undefined,
-    queues.swapped > 0
-      ? `${queues.swapped} queued unit${queues.swapped === 1 ? "" : "s"}`
+    swappedQueued > 0
+      ? plural(swappedQueued, {
+          one: "# queued unit",
+          other: "# queued units",
+        })
       : undefined,
   ].filter((one) => one !== undefined);
+  const convertingList = new Intl.ListFormat(getLocale(), {
+    style: "long",
+    type: "conjunction",
+  }).format(converting);
 
   return (
     <div className="flex flex-col gap-4 p-4">
       {units.length === 0 ? (
         <p className="text-xs text-muted-foreground">
           {unitsLoading
-            ? "Reading this game's units."
-            : "Coilbox has not read this game's units, so it cannot offer substitutes or check that they fit. Install the game and open this again."}
+            ? t`Reading this game's units.`
+            : t`Coilbox has not read this game's units, so it cannot offer substitutes or check that they fit. Install the game and open this again.`}
         </p>
       ) : sideNames.length > 0 ? (
         <div className="space-y-1.5">
           <Label htmlFor="substitute-side" className="text-xs font-medium">
-            Say this blueprint in
+            <Trans>Say this blueprint in</Trans>
           </Label>
           <OptionSelect
             value={toSide}
@@ -226,18 +243,23 @@ export function SubstitutionPanel({
                 ? `${sides.find((one) => one.side === side)?.prefix}…`
                 : undefined,
             }))}
-            placeholder="Pick a side"
+            placeholder={t`Pick a side`}
             size="sm"
           />
           <p className="text-xs text-muted-foreground">
-            Suggested from what this game calls each side's units, and only
-            where the game has the unit. Change any of them.
+            <Trans>
+              Suggested from what this game calls each side's units, and only
+              where the game has the unit. Change any of them.
+            </Trans>
           </p>
           {learned.all > 0 && (
             <p className="text-xs text-muted-foreground">
-              {heldNote(learned)} Correcting one here corrects it for the next
-              layout as well. All of them are listed on this game's page under
-              Content, where one can be dropped without converting anything.
+              {heldNote(learned)}{" "}
+              <Trans>
+                Correcting one here corrects it for the next layout as well. All
+                of them are listed on this game's page under Content, where one
+                can be dropped without converting anything.
+              </Trans>
             </p>
           )}
           {onReadShipped && (
@@ -251,8 +273,8 @@ export function SubstitutionPanel({
             >
               <BookOpen className="size-3.5" aria-hidden />
               {readingShipped
-                ? "Reading this game's own pairings"
-                : "Read this game's own pairings"}
+                ? t`Reading this game's own pairings`
+                : t`Read this game's own pairings`}
             </Button>
           )}
           {shippedNote && (
@@ -261,19 +283,22 @@ export function SubstitutionPanel({
         </div>
       ) : (
         <p className="text-xs text-muted-foreground">
-          This game says nothing about which of its buildings are each side's
-          version of the same thing, so there is nothing to suggest. Pick a
-          substitute for each one and the rest of the layout, its spacing and
-          its build order, is kept.
+          <Trans>
+            This game says nothing about which of its buildings are each side's
+            version of the same thing, so there is nothing to suggest. Pick a
+            substitute for each one and the rest of the layout, its spacing and
+            its build order, is kept.
+          </Trans>
         </p>
       )}
 
       {needsSide.length > 0 && sideChoices.length > 0 && (
         <p className="text-xs text-muted-foreground">
-          Coilbox cannot tell which side{" "}
-          {needsSide.length === 1 ? "one" : "some"} of these belong to, so it
-          cannot remember the swap for next time. Say which side and it will.
-          Converting works either way.
+          {plural(needsSideCount, {
+            one: "Coilbox cannot tell which side one of these belongs to, so it cannot remember the swap for next time. Say which side and it will. Converting works either way.",
+            other:
+              "Coilbox cannot tell which side some of these belong to, so it cannot remember the swap for next time. Say which side and it will. Converting works either way.",
+          })}
         </p>
       )}
 
@@ -308,12 +333,16 @@ export function SubstitutionPanel({
 
       {queuedDefs.length > 0 && (
         <div className="flex flex-col gap-2">
-          <p className="text-xs font-medium">Queued on this base's factories</p>
+          <p className="text-xs font-medium">
+            <Trans>Queued on this base's factories</Trans>
+          </p>
           <p className="text-xs text-muted-foreground">
-            A queue belongs to the base rather than to the layout, so it is
-            converted here and nowhere else. A game names its two sides'
-            buildings alike far more often than it names their units alike, so
-            expect to pick most of these yourself.
+            <Trans>
+              A queue belongs to the base rather than to the layout, so it is
+              converted here and nowhere else. A game names its two sides'
+              buildings alike far more often than it names their units alike, so
+              expect to pick most of these yourself.
+            </Trans>
           </p>
           <ul className="flex flex-col gap-2">
             {queuedDefs.map((def) => (
@@ -362,8 +391,10 @@ export function SubstitutionPanel({
         >
           <ArrowRight className="size-4" aria-hidden />
           {converting.length === 0
-            ? "Nothing to convert"
-            : `Convert ${converting.join(" and ")}${toSide ? ` to ${toSide}` : ""}`}
+            ? t`Nothing to convert`
+            : toSide
+              ? t`Convert ${convertingList} to ${toSide}`
+              : t`Convert ${convertingList}`}
         </Button>
         {already > 0 && (
           <Button
@@ -375,16 +406,21 @@ export function SubstitutionPanel({
             }
           >
             <Undo2 className="size-4" aria-hidden />
-            Put {already === 1 ? "it" : "them"} back
+            {plural(already, {
+              one: "Put it back",
+              other: "Put them back",
+            })}
           </Button>
         )}
       </div>
 
       {already > 0 && queuedDefs.length > 0 && (
         <p className="text-[11px] text-muted-foreground">
-          Putting the buildings back leaves the queues as they are. A building
-          remembers what it was drawn as and a queue does not, so convert to the
-          side they came from to put those back.
+          <Trans>
+            Putting the buildings back leaves the queues as they are. A building
+            remembers what it was drawn as and a queue does not, so convert to
+            the side they came from to put those back.
+          </Trans>
         </p>
       )}
     </div>
@@ -405,38 +441,44 @@ export function SubstitutionPanel({
  * from converting still reads as one sentence about that.
  */
 function heldNote(held: DefsBySource): string {
-  const kinds: { alone: string; among: string }[] = [];
-  if (held.you > 0)
-    kinds.push({
-      alone: "all of them ones you picked while converting",
-      among: `${held.you} you picked while converting`,
-    });
-  if (held.game > 0)
-    kinds.push({
-      alone: "all of them brought by this game's own published table",
-      among: `${held.game} brought by this game's own published table`,
-    });
-  if (held.unsaid > 0)
-    kinds.push({
-      alone:
-        "all of them from before coilbox recorded where an answer came from",
-      among: `${held.unsaid} from before coilbox recorded where an answer came from`,
-    });
+  const all = held.all;
+  const you = held.you;
+  const game = held.game;
+  const unsaid = held.unsaid;
+  const kinds = [you, game, unsaid].filter((count) => count > 0).length;
 
-  const answers = `Coilbox also has answers for ${held.all} of this game's units and uses those first`;
-  if (kinds.length === 1) return `${answers}, ${kinds[0].alone}.`;
+  if (kinds === 1) {
+    if (you > 0)
+      return coreT`Coilbox also has answers for ${all} of this game's units and uses those first, all of them ones you picked while converting.`;
+    if (game > 0)
+      return coreT`Coilbox also has answers for ${all} of this game's units and uses those first, all of them brought by this game's own published table.`;
+    return coreT`Coilbox also has answers for ${all} of this game's units and uses those first, all of them from before coilbox recorded where an answer came from.`;
+  }
 
-  const among = kinds.map((kind) => kind.among);
-  const last = among[among.length - 1];
-  return `${answers}: ${among.slice(0, -1).join(", ")} and ${last}.`;
+  const among: string[] = [];
+  if (you > 0) among.push(coreT`${you} you picked while converting`);
+  if (game > 0)
+    among.push(coreT`${game} brought by this game's own published table`);
+  if (unsaid > 0)
+    among.push(
+      coreT`${unsaid} from before coilbox recorded where an answer came from`,
+    );
+  const amongList = new Intl.ListFormat(getLocale(), {
+    style: "long",
+    type: "conjunction",
+  }).format(among);
+  return coreT`Coilbox also has answers for ${all} of this game's units and uses those first: ${amongList}.`;
 }
 
 /** How many of a thing a row covers, in the words that thing is counted in. */
 function countOf(count: number, what: "building" | "queued"): string {
   if (what === "building")
-    return count === 1 ? "1 building" : `${count} buildings`;
-  if (count === 1) return "queued once";
-  return count === 2 ? "queued twice" : `queued ${count} times`;
+    return plural(count, { one: "# building", other: "# buildings" });
+  return plural(count, {
+    one: "queued once",
+    2: "queued twice",
+    other: "queued # times",
+  });
 }
 
 /**
@@ -483,8 +525,13 @@ function SubstituteRow({
   onSide: (side: string) => void;
   onPick: (def: string) => void;
 }) {
+  const { t } = useLingui();
   const from = footprint?.(def);
   const into = to ? footprint?.(to) : undefined;
+  const fromX = from?.x;
+  const fromZ = from?.z;
+  const intoX = into?.x;
+  const intoZ = into?.z;
   const resized =
     from !== undefined &&
     into !== undefined &&
@@ -496,7 +543,7 @@ function SubstituteRow({
         <span className="truncate font-mono text-xs">{def}</span>
         <span className="shrink-0 text-[11px] text-muted-foreground">
           {what}
-          {from ? ` · ${from.x} by ${from.z}` : ""}
+          {from ? ` · ${t`${fromX} by ${fromZ}`}` : ""}
         </span>
       </div>
       <div className="flex items-center gap-1.5">
@@ -505,7 +552,7 @@ function SubstituteRow({
           value={to}
           onValueChange={onPick}
           loading={unitsLoading}
-          placeholder="Leave as it is"
+          placeholder={t`Leave as it is`}
           size="sm"
           className="min-w-0 flex-1"
         />
@@ -515,7 +562,7 @@ function SubstituteRow({
             size="sm"
             variant="ghost"
             className="size-8 shrink-0 p-0"
-            aria-label={`Leave ${def} as it is`}
+            aria-label={t`Leave ${def} as it is`}
             onClick={() => onPick("")}
           >
             <X className="size-3.5" />
@@ -527,14 +574,16 @@ function SubstituteRow({
           value={side}
           onValueChange={onSide}
           options={sideChoices.map((one) => ({ value: one, label: one }))}
-          placeholder={`Say which side it is, so ${def} is remembered`}
+          placeholder={t`Say which side it is, so ${def} is remembered`}
           size="sm"
         />
       )}
       {resized && into && from && (
         <p data-tone="resized" className="text-[11px] text-amber-200">
-          {to} stands on {into.x} by {into.z} build squares rather than {from.x}{" "}
-          by {from.z}, so it will not stand where {def} does.
+          <Trans>
+            {to} stands on {intoX} by {intoZ} build squares rather than {fromX}{" "}
+            by {fromZ}, so it will not stand where {def} does.
+          </Trans>
         </p>
       )}
     </li>

@@ -23,6 +23,7 @@
  * nothing downstream needs to know it was composed rather than chosen.
  */
 
+import { Trans, useLingui } from "@lingui/react/macro";
 import { Button } from "@picoframe/frame";
 import { open } from "@tauri-apps/plugin-dialog";
 import { FolderOpen, X } from "lucide-react";
@@ -43,11 +44,8 @@ interface Props {
   onChange: (change: Partial<LegoImported>) => void;
 }
 
-const IMAGE_FILTER = [
-  { name: "Image", extensions: ["png", "dds", "tga", "bmp", "jpg", "jpeg"] },
-];
-
 export function TextureBuilderPanel({ imported, unitName, onChange }: Props) {
+  const { t } = useLingui();
   const [colour, setColour] = useState<string | null>(null);
   const [mask, setMask] = useState<string | null>(null);
   const [glow, setGlow] = useState<string | null>(null);
@@ -63,7 +61,12 @@ export function TextureBuilderPanel({ imported, unitName, onChange }: Props) {
     const picked = await open({
       multiple: false,
       title,
-      filters: IMAGE_FILTER,
+      filters: [
+        {
+          name: t`Image`,
+          extensions: ["png", "dds", "tga", "bmp", "jpg", "jpeg"],
+        },
+      ],
     });
     if (typeof picked === "string") setPath(picked);
   }
@@ -119,39 +122,53 @@ export function TextureBuilderPanel({ imported, unitName, onChange }: Props) {
     }
   }
 
+  const redChannelNote = t`Only the red channel is read. A colour picture is not converted to grey, just cut down to its red channel.`;
+  // File names the model carries, shown as they are.
+  const colourName =
+    imported.texture?.name ?? imported.missingTexture ?? "texture";
+  const shadingName =
+    imported.texture2?.name ?? imported.missingTexture2 ?? "texture2";
+  const builtColour = built.colour ?? "";
+  const builtShading = built.shading ?? "";
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-5 overflow-y-auto px-3 py-3">
       <p className="text-xs text-muted-foreground">
-        Compose this unit's two textures from separate layers, in the channel
-        layout the engine reads rather than the layout an image editor works in.
-        Building replaces the texture below, the same as choosing one by hand.
+        <Trans>
+          Compose this unit's two textures from separate layers, in the channel
+          layout the engine reads rather than the layout an image editor works
+          in. Building replaces the texture below, the same as choosing one by
+          hand.
+        </Trans>
       </p>
 
       <div className="flex flex-col gap-2 border-t border-border/60 pt-3">
-        <span className="text-sm font-medium">Colour texture</span>
+        <span className="text-sm font-medium">
+          <Trans>Colour texture</Trans>
+        </span>
         <p className="text-xs text-muted-foreground">
-          RGB colour, with the team-colour mask packed into its alpha. This is{" "}
-          <code>
-            {imported.texture?.name ?? imported.missingTexture ?? "texture"}
-          </code>
-          , what the unit is painted with.
+          <Trans>
+            RGB colour, with the team-colour mask packed into its alpha. This is{" "}
+            <code>{colourName}</code>, what the unit is painted with.
+          </Trans>
         </p>
         <PickRow
-          label="Colour picture"
+          label={t`Colour picture`}
           path={colour}
-          onChoose={() => void pick("Choose a colour picture", setColour)}
+          onChoose={() => void pick(t`Choose a colour picture`, setColour)}
           onClear={() => setColour(null)}
         />
         <PickRow
-          label="Team-colour mask (greyscale, optional)"
-          note="Only the red channel is read. A colour picture is not converted to grey, just cut down to its red channel."
+          label={t`Team-colour mask (greyscale, optional)`}
+          note={redChannelNote}
           path={mask}
-          onChoose={() => void pick("Choose a team-colour mask", setMask)}
+          onChoose={() => void pick(t`Choose a team-colour mask`, setMask)}
           onClear={() => setMask(null)}
         />
         <p className="text-xs text-muted-foreground">
-          With no mask, alpha is written 0 everywhere: the colour draws as
-          painted, with no team colour mixed in.
+          <Trans>
+            With no mask, alpha is written 0 everywhere: the colour draws as
+            painted, with no team colour mixed in.
+          </Trans>
         </p>
         <Button
           size="sm"
@@ -159,48 +176,53 @@ export function TextureBuilderPanel({ imported, unitName, onChange }: Props) {
           disabled={!colour || busy !== null}
           onClick={() => void buildColour()}
         >
-          {busy === "colour" ? "Building" : "Build texture"}
+          {busy === "colour" ? t`Building` : t`Build texture`}
         </Button>
         {built.colour ? (
           <p className="text-xs text-muted-foreground">
-            Built <code>{built.colour}</code>.
+            <Trans>
+              Built <code>{builtColour}</code>.
+            </Trans>
           </p>
         ) : null}
       </div>
 
       <div className="flex flex-col gap-2 border-t border-border/60 pt-3">
-        <span className="text-sm font-medium">Shading map</span>
+        <span className="text-sm font-medium">
+          <Trans>Shading map</Trans>
+        </span>
         <p className="text-xs text-muted-foreground">
-          Glow into red, reflectivity into green. Blue is not read by the
-          engine. Neither map here supplies alpha, the one-bit visibility cutout
-          the engine also reads from this texture, so if this unit already has
-          one, its existing cutout carries over into the result rather than
-          being erased. A cutout that cannot be carried over, because the new
-          size does not match it, is refused rather than guessed at. With no
-          existing texture, alpha is written fully opaque. This is{" "}
-          <code>
-            {imported.texture2?.name ?? imported.missingTexture2 ?? "texture2"}
-          </code>
-          , the model's second texture.
+          <Trans>
+            Glow into red, reflectivity into green. Blue is not read by the
+            engine. Neither map here supplies alpha, the one-bit visibility
+            cutout the engine also reads from this texture, so if this unit
+            already has one, its existing cutout carries over into the result
+            rather than being erased. A cutout that cannot be carried over,
+            because the new size does not match it, is refused rather than
+            guessed at. With no existing texture, alpha is written fully opaque.
+            This is <code>{shadingName}</code>, the model's second texture.
+          </Trans>
         </p>
         <PickRow
-          label="Glow (greyscale, optional)"
-          note="Only the red channel is read. A colour picture is not converted to grey, just cut down to its red channel."
+          label={t`Glow (greyscale, optional)`}
+          note={redChannelNote}
           path={glow}
-          onChoose={() => void pick("Choose a glow map", setGlow)}
+          onChoose={() => void pick(t`Choose a glow map`, setGlow)}
           onClear={() => setGlow(null)}
         />
         <PickRow
-          label="Reflectivity (greyscale, optional)"
-          note="Only the red channel is read. A colour picture is not converted to grey, just cut down to its red channel."
+          label={t`Reflectivity (greyscale, optional)`}
+          note={redChannelNote}
           path={reflectivity}
           onChoose={() =>
-            void pick("Choose a reflectivity map", setReflectivity)
+            void pick(t`Choose a reflectivity map`, setReflectivity)
           }
           onClear={() => setReflectivity(null)}
         />
         <p className="text-xs text-muted-foreground">
-          At least one of the two is needed. A side left out is written 0.
+          <Trans>
+            At least one of the two is needed. A side left out is written 0.
+          </Trans>
         </p>
         <Button
           size="sm"
@@ -208,11 +230,13 @@ export function TextureBuilderPanel({ imported, unitName, onChange }: Props) {
           disabled={(!glow && !reflectivity) || busy !== null}
           onClick={() => void buildShading()}
         >
-          {busy === "shading" ? "Building" : "Build shading map"}
+          {busy === "shading" ? t`Building` : t`Build shading map`}
         </Button>
         {built.shading ? (
           <p className="text-xs text-muted-foreground">
-            Built <code>{built.shading}</code>.
+            <Trans>
+              Built <code>{builtShading}</code>.
+            </Trans>
           </p>
         ) : null}
       </div>
@@ -238,6 +262,7 @@ function PickRow({
   onChoose: () => void;
   onClear: () => void;
 }) {
+  const { t } = useLingui();
   return (
     <div className="flex flex-col gap-1">
       <span className="text-xs text-muted-foreground">{label}</span>
@@ -249,14 +274,14 @@ function PickRow({
           onClick={onChoose}
         >
           <FolderOpen size={12} className="shrink-0" />
-          <span className="truncate">{path ?? "Choose a file"}</span>
+          <span className="truncate">{path ?? t`Choose a file`}</span>
         </Button>
         {path ? (
           <Button
             size="icon"
             variant="ghost"
             className="size-7 shrink-0"
-            aria-label={`Clear ${label}`}
+            aria-label={t`Clear ${label}`}
             onClick={onClear}
           >
             <X size={12} />

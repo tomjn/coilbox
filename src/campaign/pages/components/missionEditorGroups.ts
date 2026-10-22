@@ -27,8 +27,10 @@
  * nothing.
  */
 
+import { plural, t } from "@lingui/core/macro";
 import { useRef, useState } from "react";
 import { scenarioContents } from "@/scenario/listing";
+import { getLocale } from "../../../i18n";
 import { refIsVideo } from "../../../lib/assetUrl";
 import type { CampaignMission } from "../../model";
 
@@ -105,9 +107,16 @@ export function useMissionGroups(): [
   ];
 }
 
-/** "3 objectives", "1 objective", "0 objectives". */
-function count(n: number, noun: string): string {
-  return `${n} ${noun}${n === 1 ? "" : "s"}`;
+/**
+ * Summary parts as one line: joined the way the app language joins a short
+ * list, with the first letter capitalised.
+ */
+function summaryLine(parts: string[]): string {
+  const line = new Intl.ListFormat(getLocale(), {
+    type: "unit",
+    style: "long",
+  }).format(parts);
+  return line.charAt(0).toLocaleUpperCase(getLocale()) + line.slice(1);
 }
 
 /**
@@ -120,13 +129,13 @@ function count(n: number, noun: string): string {
  * to get at the media below it does not lose them.
  */
 export function contentSummary(mission: CampaignMission): string {
+  const objectives = mission.objectives.length;
   const parts = [
-    mission.briefing.trim() ? "briefing written" : "no briefing",
-    count(mission.objectives.length, "objective"),
+    mission.briefing.trim() ? t`briefing written` : t`no briefing`,
+    plural(objectives, { one: "# objective", other: "# objectives" }),
   ];
-  if (mission.skippable) parts.push("skippable");
-  const [first, ...rest] = parts;
-  return [first.charAt(0).toUpperCase() + first.slice(1), ...rest].join(", ");
+  if (mission.skippable) parts.push(t`skippable`);
+  return summaryLine(parts);
 }
 
 /**
@@ -140,10 +149,12 @@ export function contentSummary(mission: CampaignMission): string {
  */
 export function scenarioSummary(mission: CampaignMission): string {
   const scenario = mission.scenario;
-  if (!scenario) return "No scenario attached";
+  if (!scenario) return t`No scenario attached`;
   // The same counts the attached-scenario block and the scenario picker say,
   // so the shut group and the open one describe it the same way.
-  return `${scenario.name} · ${scenarioContents(scenario)}`;
+  const name = scenario.name;
+  const contents = scenarioContents(scenario);
+  return t`${name} · ${contents}`;
 }
 
 /** How a slot's source reads in a summary line, or nothing when it is unset. */
@@ -151,16 +162,20 @@ function slotSummary(
   mission: CampaignMission,
   slot: "panorama" | "sideGraphic",
 ): string | null {
-  const noun = slot === "panorama" ? "panorama" : "side graphic";
-  if (mission[slot === "panorama" ? "panoramaMap" : "sideGraphicMap"]) {
-    return `map ${noun}`;
+  const panorama = slot === "panorama";
+  if (mission[panorama ? "panoramaMap" : "sideGraphicMap"]) {
+    return panorama ? t`map panorama` : t`map side graphic`;
   }
-  const unit =
-    mission[slot === "panorama" ? "panoramaUnit" : "sideGraphicUnit"];
-  if (unit) return `${unit.unitDef || "unit"} ${noun}`;
+  const unit = mission[panorama ? "panoramaUnit" : "sideGraphicUnit"];
+  if (unit) {
+    const unitDef = unit.unitDef || t`unit`;
+    return panorama ? t`${unitDef} panorama` : t`${unitDef} side graphic`;
+  }
   const ref = mission[slot];
   if (!ref) return null;
-  return `${noun} ${refIsVideo(ref) ? "video" : "image"}`;
+  const video = refIsVideo(ref);
+  if (panorama) return video ? t`panorama video` : t`panorama image`;
+  return video ? t`side graphic video` : t`side graphic image`;
 }
 
 /**
@@ -175,19 +190,18 @@ export function presentationSummary(mission: CampaignMission): string {
   const set = [
     slotSummary(mission, "panorama"),
     slotSummary(mission, "sideGraphic"),
-    mission.voiceover ? "voiceover" : null,
-    mission.cutscene ? "cutscene" : null,
+    mission.voiceover ? t`voiceover` : null,
+    mission.cutscene ? t`cutscene` : null,
   ].filter((s): s is string => s !== null);
   if (set.length === 0) {
-    return "No panorama, side graphic, voiceover or cutscene";
+    return t`No panorama, side graphic, voiceover or cutscene`;
   }
-  const [first, ...rest] = set;
-  return [first.charAt(0).toUpperCase() + first.slice(1), ...rest].join(", ");
+  return summaryLine(set);
 }
 
 /** How many units the mission bans, which is all this group holds. */
 export function rulesSummary(mission: CampaignMission): string {
   const banned = mission.disabledUnits.length;
-  if (banned === 0) return "No restrictions";
-  return `${count(banned, "unit")} banned`;
+  if (banned === 0) return t`No restrictions`;
+  return plural(banned, { one: "# unit banned", other: "# units banned" });
 }

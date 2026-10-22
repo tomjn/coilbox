@@ -1,3 +1,4 @@
+import { useLingui } from "@lingui/react/macro";
 import { Input } from "@picoframe/frame";
 import { useId, useState } from "react";
 
@@ -27,6 +28,7 @@ function height(text: string): number | null {
  * where a unit is started and in the skeleton panel.
  */
 export function SkeletonTargetFields({ initial, onChange }: Props) {
+  const { t } = useLingui();
   const id = useId();
   const [text, setText] = useState({
     x: String(initial.footprint.x),
@@ -82,9 +84,9 @@ export function SkeletonTargetFields({ initial, onChange }: Props) {
 
   return (
     <div className="space-y-1.5">
-      {field("x", "Footprint across", "steps", "numeric")}
-      {field("z", "Footprint deep", "steps", "numeric")}
-      {field("height", "Height", "elmos", "decimal")}
+      {field("x", t`Footprint across`, t`steps`, "numeric")}
+      {field("z", t`Footprint deep`, t`steps`, "numeric")}
+      {field("height", t`Height`, t`elmos`, "decimal")}
     </div>
   );
 }

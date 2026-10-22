@@ -14,6 +14,8 @@
  * config file whose format is not coilbox's.
  */
 
+import { plural } from "@lingui/core/macro";
+import { Trans, useLingui } from "@lingui/react/macro";
 import { Button } from "@picoframe/frame";
 import { useCallback, useEffect, useState } from "react";
 
@@ -34,6 +36,7 @@ export function WidgetPanel({
 }: {
   onChanged?: (said: string) => void;
 }) {
+  const { t } = useLingui();
   const { target } = usePreferredTarget();
   const { running } = usePlay();
   const rootPath = target?.dataDir;
@@ -76,50 +79,64 @@ export function WidgetPanel({
     return (
       <div className="flex flex-col gap-3 p-4">
         <p className="text-sm text-muted-foreground">
-          Coilbox does not have an engine and content root to play with yet, so
-          there is nowhere to put the widget. Install an engine first.
+          <Trans>
+            Coilbox does not have an engine and content root to play with yet,
+            so there is nowhere to put the widget. Install an engine first.
+          </Trans>
         </p>
       </div>
     );
   }
 
-  const verb = !status?.installed
-    ? "Install"
+  const updating = status?.installed && !status.current;
+  const actionLabel = !status?.installed
+    ? t`Install widget`
     : status.current
-      ? "Reinstall"
-      : "Update";
+      ? t`Reinstall widget`
+      : t`Update widget`;
+
+  const staleCount = status?.stale.length ?? 0;
+  const fileCount = status?.files.length ?? 0;
 
   return (
     <div className="flex flex-col gap-4 p-4 text-sm">
       <p className="text-muted-foreground">
-        A widget that lists the blueprints in this library while you play,
-        places one at the cursor as ghosts and build orders, and saves the
-        buildings you have selected back here. It reads BAR's own
-        blueprints.json too, and never writes it. It opens no network
-        connection.
+        <Trans>
+          A widget that lists the blueprints in this library while you play,
+          places one at the cursor as ghosts and build orders, and saves the
+          buildings you have selected back here. It reads BAR's own
+          blueprints.json too, and never writes it. It opens no network
+          connection.
+        </Trans>
       </p>
 
       {error && <ErrorBanner message={error} />}
 
       <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1">
-        <dt className="text-muted-foreground">Goes into</dt>
+        <dt className="text-muted-foreground">
+          <Trans>Goes into</Trans>
+        </dt>
         <dd className="break-all font-mono text-xs">{rootPath}/LuaUI</dd>
-        <dt className="text-muted-foreground">State</dt>
+        <dt className="text-muted-foreground">
+          <Trans>State</Trans>
+        </dt>
         <dd>
           {status === null
-            ? "Checking…"
+            ? t`Checking…`
             : !status.installed
-              ? "Not installed"
+              ? t`Not installed`
               : status.current
-                ? "Installed and up to date"
-                : `Installed, and ${status.stale.length} of ${status.files.length} files differ from what this coilbox ships`}
+                ? t`Installed and up to date`
+                : t`Installed, and ${staleCount} of ${plural(fileCount, { one: "# file differs", other: "# files differ" })} from what this coilbox ships`}
         </dd>
       </dl>
 
       {running && (
         <p className="text-xs text-muted-foreground">
-          A game is running. The engine reads the widget when a match starts, so
-          a change now lands in the next one.
+          <Trans>
+            A game is running. The engine reads the widget when a match starts,
+            so a change now lands in the next one.
+          </Trans>
         </p>
       )}
 
@@ -129,11 +146,13 @@ export function WidgetPanel({
           onClick={() =>
             void act(
               () => contentWidgetInstall({ rootPath }),
-              `${verb === "Update" ? "Updated" : "Installed"} the blueprint widget. Its panel opens on its own the first time a match starts.`,
+              updating
+                ? t`Updated the blueprint widget. Its panel opens on its own the first time a match starts.`
+                : t`Installed the blueprint widget. Its panel opens on its own the first time a match starts.`,
             )
           }
         >
-          {busy ? "Working…" : `${verb} widget`}
+          {busy ? t`Working…` : actionLabel}
         </Button>
         {status?.installed && (
           <Button
@@ -142,32 +161,38 @@ export function WidgetPanel({
             onClick={() =>
               void act(
                 () => contentWidgetRemove({ rootPath }),
-                "Removed the blueprint widget. Your library file and anything saved in game stay where they are.",
+                t`Removed the blueprint widget. Your library file and anything saved in game stay where they are.`,
               )
             }
           >
-            Remove widget
+            <Trans>Remove widget</Trans>
           </Button>
         )}
       </div>
 
       <div className="flex flex-col gap-2 text-xs text-muted-foreground">
         <p>
-          The first time it runs, the panel opens on its own so you can see it
-          is there. If it never appears, press F11 in game and check "Coilbox
-          blueprints" is enabled: which widgets start enabled is the game's
-          choice, kept in a file of its own that coilbox does not edit.
+          <Trans>
+            The first time it runs, the panel opens on its own so you can see it
+            is there. If it never appears, press F11 in game and check "Coilbox
+            blueprints" is enabled: which widgets start enabled is the game's
+            choice, kept in a file of its own that coilbox does not edit.
+          </Trans>
         </p>
         <p>
-          Open the panel with the <code>coilbox_blueprints</code> action: bind a
-          key to it, or type <code>/coilbox_blueprints</code> in the console.
-          Turn a blueprint with [ and ], place it with a click, and put it down
-          with right click or escape.
+          <Trans>
+            Open the panel with the <code>coilbox_blueprints</code> action: bind
+            a key to it, or type <code>/coilbox_blueprints</code> in the
+            console. Turn a blueprint with [ and ], place it with a click, and
+            put it down with right click or escape.
+          </Trans>
         </p>
         <p>
-          Coilbox writes this library to the content root whenever it changes,
-          and collects what you saved in game when you come back here with no
-          game running.
+          <Trans>
+            Coilbox writes this library to the content root whenever it changes,
+            and collects what you saved in game when you come back here with no
+            game running.
+          </Trans>
         </p>
       </div>
     </div>

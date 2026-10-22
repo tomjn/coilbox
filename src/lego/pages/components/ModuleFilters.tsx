@@ -5,11 +5,15 @@
  * (#4538), in `CategoryMenu.tsx`.
  */
 
+import { Trans } from "@lingui/react/macro";
+
 /** Shown in place of the grid when a filter hides every module. */
 export function NoModuleMatches() {
   return (
     <p className="flex-1 px-6 py-10 text-center text-sm text-muted-foreground">
-      No module matches. Clear the search or pick another category.
+      <Trans>
+        No module matches. Clear the search or pick another category.
+      </Trans>
     </p>
   );
 }

@@ -58,6 +58,8 @@
  * `./pages/components/SubstituteBlueprintForm.tsx`.
  */
 
+import { plural, t } from "@lingui/core/macro";
+import { getLocale } from "@/i18n";
 import type { ArrivalNote } from "./arrival";
 import {
   type EquivalenceTable,
@@ -615,7 +617,15 @@ export function substitutedCount(layout: BaseBlueprint): number {
  *  Same counting as `../placement/LayoutControls.tsx`, because it is the same
  *  layout being talked about. */
 function listed(at: readonly number[]): string {
-  return at.map((n) => n + 1).join(", ");
+  return plainList(at.map((n) => n + 1));
+}
+
+/** "a, b, c" in the app language, with no joining word. */
+function plainList(parts: readonly (string | number)[]): string {
+  return new Intl.ListFormat(getLocale(), {
+    type: "unit",
+    style: "long",
+  }).format(parts.map(String));
 }
 
 /**
@@ -628,32 +638,47 @@ function listed(at: readonly number[]): string {
  */
 export function substitutionNotes(report: SubstitutionReport): ArrivalNote[] {
   const notes: ArrivalNote[] = [];
+  const overlappingCount = report.overlapping.length;
+  const overlapping = listed(report.overlapping);
+  const movedCount = report.moved.length;
+  const moved = listed(report.moved);
+  const keptCount = report.kept.length;
+  const kept = plainList(report.kept);
 
   if (report.overlapping.length > 0) {
     notes.push({
       tone: "warn",
-      text: `Building${report.overlapping.length === 1 ? " " : "s "}${listed(report.overlapping)} will stand on ground another building wants. The engine builds one of them and refuses the rest.`,
+      text: plural(overlappingCount, {
+        one: `Building ${overlapping} will stand on ground another building wants. The engine builds one of them and refuses the rest.`,
+        other: `Buildings ${overlapping} will stand on ground another building wants. The engine builds one of them and refuses the rest.`,
+      }),
     });
   }
 
   if (report.moved.length > 0) {
     notes.push({
       tone: "warn",
-      text: `Building${report.moved.length === 1 ? " " : "s "}${listed(report.moved)} will not stand where they do now: their substitutes cover different ground, so the engine puts them on the nearest build squares that will take them.`,
+      text: plural(movedCount, {
+        one: `Building ${moved} will not stand where it does now: its substitute covers different ground, so the engine puts it on the nearest build square that will take it.`,
+        other: `Buildings ${moved} will not stand where they do now: their substitutes cover different ground, so the engine puts them on the nearest build squares that will take them.`,
+      }),
     });
   }
 
   if (report.kept.length > 0 && report.substituted.length > 0) {
     notes.push({
       tone: "note",
-      text: `Nothing was picked for ${report.kept.join(", ")}, so ${report.kept.length === 1 ? "it stays" : "they stay"} as ${report.kept.length === 1 ? "it is" : "they are"}.`,
+      text: plural(keptCount, {
+        one: `Nothing was picked for ${kept}, so it stays as it is.`,
+        other: `Nothing was picked for ${kept}, so they stay as they are.`,
+      }),
     });
   }
 
   if (!report.checked && report.substituted.length > 0) {
     notes.push({
       tone: "note",
-      text: "Coilbox has not read this game's units, so nothing has been checked against what the substitutes stand on.",
+      text: t`Coilbox has not read this game's units, so nothing has been checked against what the substitutes stand on.`,
     });
   }
 
@@ -738,9 +763,13 @@ export function queueNote(
   toSide: string,
 ): ArrivalNote | undefined {
   if (report.stranded.length === 0) return undefined;
-  const one = report.stranded.length === 1;
+  const strandedCount = report.stranded.length;
+  const stranded = plainList(report.stranded);
   return {
     tone: "warn",
-    text: `Nothing was picked for ${report.stranded.join(", ")}, so ${one ? "it stays" : "they stay"} queued. A factory converted to ${toSide} cannot build another side's units, so ${one ? "that order builds" : "those orders build"} nothing.`,
+    text: plural(strandedCount, {
+      one: `Nothing was picked for ${stranded}, so it stays queued. A factory converted to ${toSide} cannot build another side's units, so that order builds nothing.`,
+      other: `Nothing was picked for ${stranded}, so they stay queued. A factory converted to ${toSide} cannot build another side's units, so those orders build nothing.`,
+    }),
   };
 }

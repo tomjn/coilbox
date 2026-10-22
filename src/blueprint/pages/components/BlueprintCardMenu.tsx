@@ -17,6 +17,7 @@
  * towards having one, so this lands the copy in the grid and leaves you in it.
  */
 
+import { Trans, useLingui } from "@lingui/react/macro";
 import { Button, useDrawer } from "@picoframe/frame";
 import { Copy, Loader2, MoreVertical, Pencil } from "lucide-react";
 import { useState } from "react";
@@ -44,6 +45,8 @@ export function BlueprintCardMenu({
   taken: string[];
 }) {
   const drawer = useDrawer();
+  const { t } = useLingui();
+  const name = record.layout.name;
   const [busy, setBusy] = useState(false);
 
   /** A drawer rather than a box in the menu, because a menu item that is a form
@@ -52,7 +55,7 @@ export function BlueprintCardMenu({
   async function rename() {
     const { RenameBlueprintForm } = await import("./RenameBlueprintForm");
     drawer.open({
-      title: `Rename ${record.layout.name}`,
+      title: t`Rename ${name}`,
       width: "24rem",
       content: (
         <RenameBlueprintForm
@@ -60,8 +63,9 @@ export function BlueprintCardMenu({
           record={record}
           onDone={(saved) => {
             drawer.close();
+            const savedName = saved.layout.name;
             void notify({
-              title: `That blueprint is now "${saved.layout.name}".`,
+              title: t`That blueprint is now "${savedName}".`,
               level: "success",
             });
           }}
@@ -75,13 +79,15 @@ export function BlueprintCardMenu({
     try {
       const copy = duplicatedBlueprint(record, taken);
       await saveBlueprint(copy);
+      const copyName = copy.layout.name;
       void notify({
-        title: `"${copy.layout.name}" is yours to change.`,
+        title: t`"${copyName}" is yours to change.`,
         level: "success",
       });
     } catch (e) {
+      const reason = message(e);
       void notify({
-        title: `That blueprint could not be copied: ${message(e)}`,
+        title: t`That blueprint could not be copied: ${reason}`,
         level: "error",
       });
     } finally {
@@ -97,7 +103,7 @@ export function BlueprintCardMenu({
           size="icon"
           variant="ghost"
           className="size-8 text-muted-foreground"
-          aria-label={`Actions for ${record.layout.name}`}
+          aria-label={t`Actions for ${name}`}
         >
           {busy ? (
             <Loader2 className="size-4 animate-spin" />
@@ -108,10 +114,11 @@ export function BlueprintCardMenu({
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="w-48">
         <DropdownMenuItem onSelect={() => void rename()}>
-          <Pencil className="size-4" aria-hidden="true" /> Rename
+          <Pencil className="size-4" aria-hidden="true" /> <Trans>Rename</Trans>
         </DropdownMenuItem>
         <DropdownMenuItem disabled={busy} onSelect={() => void duplicate()}>
-          <Copy className="size-4" aria-hidden="true" /> Duplicate
+          <Copy className="size-4" aria-hidden="true" />{" "}
+          <Trans>Duplicate</Trans>
         </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>

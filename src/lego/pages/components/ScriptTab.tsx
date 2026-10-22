@@ -32,6 +32,7 @@
  * each to one of the unit's pieces.
  */
 
+import { Plural, Trans, useLingui } from "@lingui/react/macro";
 import { Button, Drawer } from "@picoframe/frame";
 import { open } from "@tauri-apps/plugin-dialog";
 import { Check, Copy, FileCode2, FileUp, RefreshCw } from "lucide-react";
@@ -126,6 +127,7 @@ export function ScriptTab({
   onCompiledReload,
   onScriptImport,
 }: Props) {
+  const { t } = useLingui();
   const [copied, setCopied] = useState(false);
   const [checksOpen, setChecksOpen] = useState(false);
   const [selectedLine, setSelectedLine] = useState<number | null>(null);
@@ -218,7 +220,7 @@ export function ScriptTab({
           rule: "missing-piece",
           severity: "error",
           line: lineNamingPiece(shownLua, name),
-          message: `This unit has no piece called "${name}". The engine fails to load a script that names a piece the model does not have.`,
+          message: t`This unit has no piece called "${name}". The engine fails to load a script that names a piece the model does not have.`,
         });
       }
       for (const problem of lintLuaCallins(shownLua)) {
@@ -248,6 +250,7 @@ export function ScriptTab({
     owned,
     lastRun,
     draft,
+    t,
   ]);
 
   // 0-indexed line -> its diagnostics, for the gutter's marks and tints.
@@ -289,6 +292,7 @@ export function ScriptTab({
   // Whether reading it again is even possible: the archive has to be named on
   // the project and the engine that mounts it has to be configured.
   const fromGame = project.imported?.game;
+  const gameName = fromGame?.name;
   const canReload = Boolean(compiled && fromGame?.unit && target);
 
   /**
@@ -309,7 +313,9 @@ export function ScriptTab({
       } else {
         setReloadNote(
           found.notes[0] ??
-            `${fromGame?.name ?? "The game"} no longer has a compiled script for this unit.`,
+            (gameName
+              ? t`${gameName} no longer has a compiled script for this unit.`
+              : t`The game no longer has a compiled script for this unit.`),
         );
       }
     } finally {
@@ -339,7 +345,9 @@ export function ScriptTab({
       } else {
         setReloadNote(
           found.notes[0] ??
-            `${fromGame?.name ?? "The game"} has no .bos to convert for this unit.`,
+            (gameName
+              ? t`${gameName} has no .bos to convert for this unit.`
+              : t`The game has no .bos to convert for this unit.`),
         );
       }
     } finally {
@@ -350,10 +358,10 @@ export function ScriptTab({
   /** Ask for a `.lua` file and hand its text to the page to import. */
   async function importFile() {
     const picked = await open({
-      title: "Import a unit script",
+      title: t`Import a unit script`,
       multiple: false,
       directory: false,
-      filters: [{ name: "Lua unit script", extensions: ["lua"] }],
+      filters: [{ name: t`Lua unit script`, extensions: ["lua"] }],
     });
     if (typeof picked !== "string") return;
     setReloadNote(null);
@@ -361,7 +369,8 @@ export function ScriptTab({
       const { text } = await legoReadTextFile({ path: picked });
       onScriptImport(text);
     } catch (error) {
-      setReloadNote(`Could not read ${picked}: ${errorText(error)}`);
+      const reason = errorText(error);
+      setReloadNote(t`Could not read ${picked}: ${reason}`);
     }
   }
 
@@ -388,6 +397,9 @@ export function ScriptTab({
     }
   }
 
+  const unitName = project.unitName;
+  const checkCount = diagnostics.length;
+  const unmatchedNames = unmatched.join(", ");
   const severity = worstSeverity(diagnostics.map((d) => d.severity));
   const unsaved = owned && draft !== project.script;
   const empty = owned && shown.trim() === "";
@@ -408,8 +420,7 @@ export function ScriptTab({
               className={severity ? SEVERITY_COLOR[severity] : ""}
               onClick={() => setChecksOpen(true)}
             >
-              {diagnostics.length}{" "}
-              {diagnostics.length === 1 ? "check" : "checks"}
+              <Plural value={checkCount} one="# check" other="# checks" />
             </Button>
           )}
           {/* Gone entirely for a script the marks can never apply to, rather
@@ -427,19 +438,19 @@ export function ScriptTab({
                       checked={showCoverage && coverageReady}
                       onCheckedChange={setShowCoverage}
                       disabled={!coverageReady}
-                      aria-label="Show what ran"
+                      aria-label={t`Show what ran`}
                     />
                     <Label
                       htmlFor="script-tab-coverage"
                       className="text-xs text-muted-foreground"
                     >
-                      Show what ran
+                      <Trans>Show what ran</Trans>
                     </Label>
                   </div>
                 </TooltipTrigger>
                 {!coverageReady && (
                   <TooltipContent>
-                    Play the script once to see what it covers.
+                    <Trans>Play the script once to see what it covers.</Trans>
                   </TooltipContent>
                 )}
               </Tooltip>
@@ -459,7 +470,7 @@ export function ScriptTab({
               <RefreshCw
                 className={`size-4 ${reloading ? "animate-spin" : ""}`}
               />
-              {reloading ? "Reading" : "Reload"}
+              {reloading ? t`Reading` : t`Reload`}
             </Button>
           )}
           {canConvertAgain && (
@@ -469,15 +480,19 @@ export function ScriptTab({
                   <RefreshCw
                     className={`size-4 ${reloading ? "animate-spin" : ""}`}
                   />
-                  {reloading ? "Converting" : "Convert again"}
+                  {reloading ? t`Converting` : t`Convert again`}
                 </Button>
               </PopoverTrigger>
               <PopoverContent align="end" className="flex w-72 flex-col gap-3">
                 <div className="flex flex-col gap-1">
-                  <h3 className="text-sm font-medium">Replace this script?</h3>
+                  <h3 className="text-sm font-medium">
+                    <Trans>Replace this script?</Trans>
+                  </h3>
                   <p className="text-xs text-muted-foreground">
-                    It is converted from the game's BOS again. Edits you made
-                    since are lost.
+                    <Trans>
+                      It is converted from the game's BOS again. Edits you made
+                      since are lost.
+                    </Trans>
                   </p>
                 </div>
                 <div className="flex justify-end gap-2">
@@ -487,14 +502,14 @@ export function ScriptTab({
                     size="sm"
                     onClick={() => setConfirmConvert(false)}
                   >
-                    Cancel
+                    <Trans>Cancel</Trans>
                   </Button>
                   <Button
                     type="button"
                     size="sm"
                     onClick={() => void convertAgain()}
                   >
-                    Replace
+                    <Trans>Replace</Trans>
                   </Button>
                 </div>
               </PopoverContent>
@@ -507,7 +522,7 @@ export function ScriptTab({
             onClick={() => void importFile()}
           >
             <FileUp className="size-4" />
-            Import
+            <Trans>Import</Trans>
           </Button>
           <Button variant="outline" size="sm" onClick={() => void copy()}>
             {copied ? (
@@ -515,11 +530,11 @@ export function ScriptTab({
             ) : (
               <Copy className="size-4" />
             )}
-            {copied ? "Copied" : "Copy"}
+            {copied ? t`Copied` : t`Copy`}
           </Button>
           {owned && (
             <Button variant="outline" size="sm" onClick={onScriptRelease}>
-              Discard this script and use the presets
+              <Trans>Discard this script and use the presets</Trans>
             </Button>
           )}
         </div>
@@ -531,38 +546,46 @@ export function ScriptTab({
         <p className="border-b border-border/60 px-3 py-2 text-xs text-muted-foreground">
           {owned ? (
             <>
-              This unit's own script. Export writes it to{" "}
-              <code>scripts/{project.unitName}.lua</code> exactly as it is here,
-              if the script checkbox is ticked. A script already in the game
-              folder is never overwritten.{" "}
-              {unsaved ? "Not saved yet." : "Saved to the unit."}
+              <Trans>
+                This unit's own script. Export writes it to{" "}
+                <code>scripts/{unitName}.lua</code> exactly as it is here, if
+                the script checkbox is ticked. A script already in the game
+                folder is never overwritten.
+              </Trans>{" "}
+              {unsaved ? (
+                <Trans>Not saved yet.</Trans>
+              ) : (
+                <Trans>Saved to the unit.</Trans>
+              )}
             </>
           ) : (
-            <>
+            <Trans>
               Generated from the animations applied to this unit. Export writes
-              it to <code>scripts/{project.unitName}.lua</code> too, if the
-              script checkbox is ticked (on by default). An existing script is
-              never overwritten, so hand edits survive a re-export.
-            </>
+              it to <code>scripts/{unitName}.lua</code> too, if the script
+              checkbox is ticked (on by default). An existing script is never
+              overwritten, so hand edits survive a re-export.
+            </Trans>
           )}
         </p>
       )}
 
       {outdated && (
         <p className="border-b border-border/60 px-3 py-2 text-xs text-amber-500">
-          Converted before piece numbers were fixed. Convert again.
+          <Trans>
+            Converted before piece numbers were fixed. Convert again.
+          </Trans>
         </p>
       )}
 
       {unmatched.length > 0 && (
         <div className="flex items-center gap-2 border-b border-border/60 px-3 py-2 text-xs text-amber-500">
           <span className="min-w-0 flex-1 truncate">
-            Not on this unit: {unmatched.join(", ")}.
+            <Trans>Not on this unit: {unmatchedNames}.</Trans>
           </span>
           <Popover open={matchOpen} onOpenChange={setMatchOpen}>
             <PopoverTrigger asChild>
               <Button variant="outline" size="sm">
-                Match pieces
+                <Trans>Match pieces</Trans>
               </Button>
             </PopoverTrigger>
             <PopoverContent align="end" className="flex w-80 flex-col gap-3">
@@ -573,8 +596,8 @@ export function ScriptTab({
                   </span>
                   <OptionSelect
                     size="sm"
-                    ariaLabel={`Piece for ${name}`}
-                    placeholder="Leave it"
+                    ariaLabel={t`Piece for ${name}`}
+                    placeholder={t`Leave it`}
                     value={mapping[name] ?? ""}
                     onValueChange={(to) =>
                       setMapping((was) => ({ ...was, [name]: to }))
@@ -588,7 +611,7 @@ export function ScriptTab({
               ))}
               <div className="flex justify-end">
                 <Button type="button" size="sm" onClick={applyMapping}>
-                  Rename
+                  <Trans>Rename</Trans>
                 </Button>
               </div>
             </PopoverContent>
@@ -604,7 +627,9 @@ export function ScriptTab({
 
       {bosError ? (
         <p className="border-b border-border/60 px-3 py-2 text-xs text-destructive">
-          The compiled script could not be read back as BOS: {bosError}
+          <Trans>
+            The compiled script could not be read back as BOS: {bosError}
+          </Trans>
         </p>
       ) : (
         // The blur handler sits here rather than on the editor itself: React's
@@ -632,23 +657,37 @@ export function ScriptTab({
 
       {owned && (
         <p className="border-t border-border/60 px-3 py-2 text-xs text-muted-foreground">
-          {empty
-            ? "This script is empty, so the unit has no animation at all and the presets cannot reach it. Hand it back and the Animation panel works again."
-            : "Hand the script back and the unit is generated from the animation presets again, as it was before you took it over."}{" "}
-          The text above is discarded. Undo brings it back if that was a
-          mistake, so copy it first if you want to keep it beyond this session.
+          {empty ? (
+            <Trans>
+              This script is empty, so the unit has no animation at all and the
+              presets cannot reach it. Hand it back and the Animation panel
+              works again.
+            </Trans>
+          ) : (
+            <Trans>
+              Hand the script back and the unit is generated from the animation
+              presets again, as it was before you took it over.
+            </Trans>
+          )}{" "}
+          <Trans>
+            The text above is discarded. Undo brings it back if that was a
+            mistake, so copy it first if you want to keep it beyond this
+            session.
+          </Trans>
         </p>
       )}
 
       {!owned && !compiled && (
         <div className="flex flex-col gap-2 border-t border-border/60 px-3 py-3">
           <p className="text-xs text-muted-foreground">
-            Take this script over to edit it. The unit then keeps your version,
-            an export writes what you wrote, and the presets stop generating it.
-            You do not need to take it over to see the unit run, because the
-            Animation panel already plays this script. You can hand it back
-            later, which discards your version and puts the presets back in
-            charge.
+            <Trans>
+              Take this script over to edit it. The unit then keeps your
+              version, an export writes what you wrote, and the presets stop
+              generating it. You do not need to take it over to see the unit
+              run, because the Animation panel already plays this script. You
+              can hand it back later, which discards your version and puts the
+              presets back in charge.
+            </Trans>
           </p>
           <Button
             variant="outline"
@@ -656,7 +695,7 @@ export function ScriptTab({
             className="self-start"
             onClick={() => onScriptChange(buildLuaScript(project))}
           >
-            <FileCode2 size={14} /> Take ownership of this script
+            <FileCode2 size={14} /> <Trans>Take ownership of this script</Trans>
           </Button>
         </div>
       )}
@@ -664,29 +703,32 @@ export function ScriptTab({
       <Drawer
         open={checksOpen}
         onOpenChange={setChecksOpen}
-        title="Checks"
-        description="Problems this script's own text carries, and where a run of it stopped."
+        title={t`Checks`}
+        description={t`Problems this script's own text carries, and where a run of it stopped.`}
         width="34rem"
       >
         <div className="flex flex-col gap-5 text-sm">
           <CheckSection
-            title="Problems in the script"
+            title={t`Problems in the script`}
             count={diagnostics.length}
           >
-            {diagnostics.map((d, i) => (
-              <CheckItem
-                // biome-ignore lint/suspicious/noArrayIndexKey: a diagnostic carries no id of its own
-                key={i}
-                severity={d.severity}
-                location={`line ${d.line}`}
-                message={d.message}
-                tag={d.rule}
-                onSelect={() => {
-                  setSelectedLine(d.line);
-                  setChecksOpen(false);
-                }}
-              />
-            ))}
+            {diagnostics.map((d, i) => {
+              const line = d.line;
+              return (
+                <CheckItem
+                  // biome-ignore lint/suspicious/noArrayIndexKey: a diagnostic carries no id of its own
+                  key={i}
+                  severity={d.severity}
+                  location={t`line ${line}`}
+                  message={d.message}
+                  tag={d.rule}
+                  onSelect={() => {
+                    setSelectedLine(d.line);
+                    setChecksOpen(false);
+                  }}
+                />
+              );
+            })}
           </CheckSection>
         </div>
       </Drawer>

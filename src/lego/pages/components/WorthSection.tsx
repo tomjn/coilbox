@@ -5,6 +5,8 @@
  * page. See `worth.ts` for how the totals are worked out.
  */
 
+import { t } from "@lingui/core/macro";
+import { Trans, useLingui } from "@lingui/react/macro";
 import { Button, Input, useSetting } from "@picoframe/frame";
 import { formatNumber } from "@/lib/format";
 import type { LegoProject } from "../../model";
@@ -20,12 +22,29 @@ import {
   worthTotals,
 } from "../../worth";
 
-const LABEL: Record<WorthField, string> = {
-  health: "Health",
-  metal: "Metal",
-  energy: "Energy",
-  buildTime: "Build time",
-  mass: "Mass",
+const LABEL: Record<WorthField, () => string> = {
+  health: () => t`Health`,
+  metal: () => t`Metal`,
+  energy: () => t`Energy`,
+  buildTime: () => t`Build time`,
+  mass: () => t`Mass`,
+};
+
+/** The field's name inside a longer label, such as "Per volume health". */
+const LOWER_LABEL: Record<WorthField, () => string> = {
+  health: () => t`health`,
+  metal: () => t`metal`,
+  energy: () => t`energy`,
+  buildTime: () => t`build time`,
+  mass: () => t`mass`,
+};
+
+const TOTAL_LABEL: Record<WorthField, () => string> = {
+  health: () => t`Total health`,
+  metal: () => t`Total metal`,
+  energy: () => t`Total energy`,
+  buildTime: () => t`Total build time`,
+  mass: () => t`Total mass`,
 };
 
 interface Props {
@@ -82,14 +101,18 @@ export function WorthSection({ project, pack, onWorthChange }: Props) {
 
   return (
     <div className="flex flex-col gap-2 border-b border-border/60 px-3 py-2">
-      <p className="text-sm font-medium">Worth</p>
+      <p className="text-sm font-medium">
+        <Trans>Worth</Trans>
+      </p>
       {totals ? (
         <dl className="grid grid-cols-5 gap-1 text-xs tabular-nums">
           {WORTH_FIELDS.map((field) => (
             <div key={field} className="min-w-0">
-              <dt className="truncate text-muted-foreground">{LABEL[field]}</dt>
+              <dt className="truncate text-muted-foreground">
+                {LABEL[field]()}
+              </dt>
               <dd>
-                <output aria-label={`Total ${LABEL[field].toLowerCase()}`}>
+                <output aria-label={TOTAL_LABEL[field]()}>
                   {formatNumber(totals[field])}
                 </output>
               </dd>
@@ -98,24 +121,24 @@ export function WorthSection({ project, pack, onWorthChange }: Props) {
         </dl>
       ) : (
         <p className="text-xs text-muted-foreground">
-          This unit has no parts, so there is nothing to total.
+          <Trans>This unit has no parts, so there is nothing to total.</Trans>
         </p>
       )}
       {!project.worth ? (
         <p className="text-xs text-muted-foreground">
-          Placeholder amounts. Set your game's.
+          <Trans>Placeholder amounts. Set your game's.</Trans>
         </p>
       ) : null}
 
       {totals ? (
         <>
           <WorthRow
-            label="Per unit"
+            label={t`Per unit`}
             amounts={table.base}
             onChange={(field, text) => setRow("base", field, text)}
           />
           <WorthRow
-            label="Per volume"
+            label={t`Per volume`}
             amounts={table.perVolume}
             onChange={(field, text) => setRow("perVolume", field, text)}
           />
@@ -133,18 +156,18 @@ export function WorthSection({ project, pack, onWorthChange }: Props) {
               size="sm"
               variant="outline"
               onClick={() => setStored(table)}
-              title="Keep this table to use on other units"
+              title={t`Keep this table to use on other units`}
             >
-              Save table
+              <Trans>Save table</Trans>
             </Button>
             <Button
               size="sm"
               variant="outline"
               disabled={!savedTable}
               onClick={() => savedTable && onWorthChange(savedTable)}
-              title="Replace this unit's table with the saved one"
+              title={t`Replace this unit's table with the saved one`}
             >
-              Use saved table
+              <Trans>Use saved table</Trans>
             </Button>
           </div>
         </>
@@ -165,6 +188,10 @@ function WorthRow({
   fallback?: WorthAmounts;
   onChange: (field: WorthField, text: string) => void;
 }) {
+  const { t } = useLingui();
+  // i18n: the row's label and the field name stay two placeholders, so a
+  // translator can reorder them.
+  const rowLabel = (fieldName: string) => t`${label} ${fieldName}`;
   return (
     <div className="flex flex-col gap-0.5">
       <span className="text-xs text-muted-foreground">{label}</span>
@@ -176,9 +203,9 @@ function WorthRow({
             min={0}
             step="any"
             className="h-7 px-1 text-xs"
-            aria-label={`${label} ${LABEL[field].toLowerCase()}`}
+            aria-label={rowLabel(LOWER_LABEL[field]())}
             placeholder={fallback ? String(fallback[field]) : undefined}
-            title={LABEL[field]}
+            title={LABEL[field]()}
             value={amounts[field] ?? ""}
             onChange={(event) => onChange(field, event.target.value)}
           />

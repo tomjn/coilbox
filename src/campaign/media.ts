@@ -1,3 +1,4 @@
+import { t } from "@lingui/core/macro";
 import { campaignMediaDelete } from "./bindings";
 import type { Campaign, CampaignMission } from "./model";
 
@@ -28,16 +29,16 @@ export interface StoredMedia {
 
 /** Every mission slot that can hold an imported file, in the order they are edited. */
 const MISSION_SLOTS = [
-  ["panorama", "panorama"],
-  ["sideGraphic", "side graphic"],
-  ["voiceover", "briefing voiceover"],
-  ["cutscene", "intro cutscene"],
+  ["panorama", () => t`panorama`],
+  ["sideGraphic", () => t`side graphic`],
+  ["voiceover", () => t`briefing voiceover`],
+  ["cutscene", () => t`intro cutscene`],
 ] as const;
 
 /** The campaign's own two image slots. */
 const CAMPAIGN_SLOTS = [
-  ["icon", "icon"],
-  ["background", "background"],
+  ["icon", () => t`icon`],
+  ["background", () => t`background`],
 ] as const;
 
 /**
@@ -48,7 +49,7 @@ const CAMPAIGN_SLOTS = [
 export function missionMedia(mission: CampaignMission): StoredMedia[] {
   return MISSION_SLOTS.flatMap(([slot, label]) => {
     const ref = mission[slot];
-    return ref?.kind === "file" ? [{ label, file: ref.file }] : [];
+    return ref?.kind === "file" ? [{ label: label(), file: ref.file }] : [];
   });
 }
 

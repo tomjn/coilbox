@@ -23,6 +23,8 @@
  * reported, which is also what makes a round trip come back where it started.
  */
 
+import { plural, t } from "@lingui/core/macro";
+
 import type { BaseBuildingRole, Facing, Point } from "../scenario/model";
 import type { SnapBuilding } from "./footprint";
 import type {
@@ -77,17 +79,17 @@ function parseFile(text: string): {
   try {
     value = JSON.parse(text);
   } catch {
-    return raise("This file could not be read as JSON.");
+    return raise(t`This file could not be read as JSON.`);
   }
   if (!isRecord(value)) {
-    return raise("This file could not be read as a blueprints file.");
+    return raise(t`This file could not be read as a blueprints file.`);
   }
   const saved = value.savedBlueprints;
   // The widget writes `0` rather than an empty array when it has nothing to
   // save, so that is what an empty file looks like in the wild.
   if (saved === undefined || saved === 0) return { root: value, entries: [] };
   if (!Array.isArray(saved)) {
-    return raise("This file's savedBlueprints is not a list of blueprints.");
+    return raise(t`This file's savedBlueprints is not a list of blueprints.`);
   }
   return { root: value, entries: saved };
 }
@@ -200,7 +202,12 @@ function readEntry(
   const dropped: string[] = [];
   const spacing = value.spacing;
   if (typeof spacing === "number" && spacing > 0) {
-    dropped.push(`the ${spacing} square gap it repeats at`);
+    dropped.push(
+      plural(spacing, {
+        one: "the # square gap it repeats at",
+        other: "the # square gap it repeats at",
+      }),
+    );
   }
 
   const layout: Omit<BaseBlueprint, "id"> = { name, buildings };
@@ -262,11 +269,6 @@ export function barEntry(layout: BaseBlueprint): BarBlueprint {
   };
 }
 
-/** "1 building" or "3 buildings", so a warning reads as English. */
-function count(n: number): string {
-  return `${n} building${n === 1 ? "" : "s"}`;
-}
-
 /**
  * What writing a base out to this format loses.
  *
@@ -285,9 +287,30 @@ export function strippedByBar(roles: BaseBuildingRole[]): string[] {
   ).length;
   const repeating = roles.filter((role) => role.repeat === true).length;
   const out: string[] = [];
-  if (named > 0) out.push(`the trigger name on ${count(named)}`);
-  if (queued > 0) out.push(`the build queue on ${count(queued)}`);
-  if (repeating > 0) out.push(`the repeating queue on ${count(repeating)}`);
+  if (named > 0) {
+    out.push(
+      plural(named, {
+        one: "the trigger name on # building",
+        other: "the trigger name on # buildings",
+      }),
+    );
+  }
+  if (queued > 0) {
+    out.push(
+      plural(queued, {
+        one: "the build queue on # building",
+        other: "the build queue on # buildings",
+      }),
+    );
+  }
+  if (repeating > 0) {
+    out.push(
+      plural(repeating, {
+        one: "the repeating queue on # building",
+        other: "the repeating queue on # buildings",
+      }),
+    );
+  }
   return out;
 }
 

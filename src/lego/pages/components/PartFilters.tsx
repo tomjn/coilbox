@@ -14,6 +14,8 @@
  * control with one option is noise.
  */
 
+import { t } from "@lingui/core/macro";
+import { Plural, Trans } from "@lingui/react/macro";
 import { cn, Input } from "@picoframe/frame";
 import { TriangleAlert } from "lucide-react";
 
@@ -72,9 +74,9 @@ export function PartFilters({
       <Input
         value={query}
         onChange={(event) => onQuery(event.target.value)}
-        placeholder="Search parts"
+        placeholder={t`Search parts`}
         className="w-56 min-w-32 flex-1"
-        aria-label="Search parts"
+        aria-label={t`Search parts`}
       />
       <PackSelect
         pack={pack}
@@ -98,7 +100,7 @@ export function PartFilters({
         colours={colours}
       />
       <span className="ml-auto shrink-0 whitespace-nowrap text-sm text-muted-foreground">
-        {shown} {shown === 1 ? "part" : "parts"}
+        <Plural value={shown} one="# part" other="# parts" />
       </span>
     </div>
   );
@@ -130,11 +132,13 @@ export function PackSelect({
       onValueChange={(value) => onPackId(value === EVERY_PACK ? null : value)}
       disabled={disabled}
     >
-      <SelectTrigger size="sm" className={className} aria-label="Parts pack">
+      <SelectTrigger size="sm" className={className} aria-label={t`Parts pack`}>
         <SelectValue />
       </SelectTrigger>
       <SelectContent>
-        <SelectItem value={EVERY_PACK}>All packs</SelectItem>
+        <SelectItem value={EVERY_PACK}>
+          <Trans>All packs</Trans>
+        </SelectItem>
         {packs.map((manifest) => (
           <SelectItem key={manifest.id} value={manifest.id}>
             {manifest.id}
@@ -153,6 +157,7 @@ export function PackSelect({
  */
 export function PackProblems({ pack }: { pack: LoadedPack }) {
   if (pack.library.problems.length === 0) return null;
+  const packDir = pack.library.dir;
   return (
     <Alert variant="warning">
       <TriangleAlert />
@@ -165,8 +170,9 @@ export function PackProblems({ pack }: { pack: LoadedPack }) {
           ))}
           {pack.library.dir ? (
             <li className="break-words">
-              Extension packs live in <code>{pack.library.dir}</code>, one
-              folder each.
+              <Trans>
+                Extension packs live in <code>{packDir}</code>, one folder each.
+              </Trans>
             </li>
           ) : null}
         </ul>
@@ -185,10 +191,15 @@ export function PackProblems({ pack }: { pack: LoadedPack }) {
  */
 export function PackAtlases({ pack }: { pack: LoadedPack }) {
   const atlases = pack.library.atlases;
+  const atlasCount = atlases.length;
   if (atlases.length < 2) return null;
   return (
     <p className="text-xs text-muted-foreground">
-      {atlases.length} atlases installed, and a unit samples one of them:{" "}
+      <Plural
+        value={atlasCount}
+        one="# atlas installed, and a unit samples it:"
+        other="# atlases installed, and a unit samples one of them:"
+      />{" "}
       {atlases.map((atlas, index) => (
         <span key={atlas.tex1}>
           {index > 0 ? ", " : null}
@@ -204,8 +215,10 @@ export function PackAtlases({ pack }: { pack: LoadedPack }) {
 export function NoMatches() {
   return (
     <p className="flex-1 px-6 py-10 text-center text-sm text-muted-foreground">
-      Nothing matches. Try a shape like "beam", a size like "tiny", or clear the
-      search.
+      <Trans>
+        Nothing matches. Try a shape like "beam", a size like "tiny", or clear
+        the search.
+      </Trans>
     </p>
   );
 }

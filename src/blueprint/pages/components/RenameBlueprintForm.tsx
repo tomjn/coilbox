@@ -13,6 +13,7 @@
  * a delete. One name still, and one route to it per state the layout is in.
  */
 
+import { Trans, useLingui } from "@lingui/react/macro";
 import { Button, Input } from "@picoframe/frame";
 import { useId, useState } from "react";
 
@@ -46,6 +47,7 @@ export function RenameBlueprintForm({
   onDone: (record: StoredBlueprint) => void;
 }) {
   const id = useId();
+  const { t } = useLingui();
   const [text, setText] = useState(record.layout.name);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -74,7 +76,7 @@ export function RenameBlueprintForm({
     >
       <div className="flex flex-col gap-1.5">
         <Label htmlFor={id} className="text-xs font-medium">
-          Blueprint name
+          <Trans>Blueprint name</Trans>
         </Label>
         <Input
           id={id}
@@ -82,19 +84,22 @@ export function RenameBlueprintForm({
           // step nobody asked for.
           autoFocus
           value={text}
-          placeholder="What this blueprint is called"
+          placeholder={t`What this blueprint is called`}
           onChange={(e) => setText(e.target.value)}
         />
         <p className="text-xs text-muted-foreground">
-          What the library, the pickers and anybody you share it with call this
-          blueprint. Two blueprints can share a name, so this is yours to say.
+          <Trans>
+            What the library, the pickers and anybody you share it with call
+            this blueprint. Two blueprints can share a name, so this is yours to
+            say.
+          </Trans>
         </p>
       </div>
 
-      {error && <ErrorBanner message={`Not renamed: ${error}`} />}
+      {error && <ErrorBanner message={t`Not renamed: ${error}`} />}
 
       <Button type="submit" disabled={busy || !next}>
-        {busy ? "Renaming…" : "Rename"}
+        {busy ? t`Renaming…` : t`Rename`}
       </Button>
     </form>
   );

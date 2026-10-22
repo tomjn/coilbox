@@ -23,6 +23,8 @@
  * write is the format adapter, which is plain text in and plain text out.
  */
 
+import { t } from "@lingui/core/macro";
+
 import { underEngineConfig } from "@/content/enginePaths";
 import type { BlueprintFormat, MergePlan } from "./format";
 import type { BaseBlueprint } from "./model";
@@ -90,10 +92,11 @@ export async function mergeIntoGameFile({
   now = new Date(),
 }: MergeRequest): Promise<MergeOutcome> {
   if (gameRunning && underEngineConfig(configDir, path)) {
+    const label = format.label;
     throw new Error(
       configDir
-        ? `A game is running and this file is one it writes. ${format.label} writes its whole blueprints file back when it saves or exits, so anything written now would be thrown away. Close the game, or save somewhere the game does not write.`
-        : `A game is running, and coilbox does not know where this engine writes, so it cannot tell whether the game will write this file back over. ${format.label} writes its whole blueprints file back when it saves or exits, so anything written now would be thrown away. Close the game and try again.`,
+        ? t`A game is running and this file is one it writes. ${label} writes its whole blueprints file back when it saves or exits, so anything written now would be thrown away. Close the game, or save somewhere the game does not write.`
+        : t`A game is running, and coilbox does not know where this engine writes, so it cannot tell whether the game will write this file back over. ${label} writes its whole blueprints file back when it saves or exits, so anything written now would be thrown away. Close the game and try again.`,
     );
   }
 

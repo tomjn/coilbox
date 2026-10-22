@@ -1,3 +1,4 @@
+import { Trans, useLingui } from "@lingui/react/macro";
 import { Button } from "@picoframe/frame";
 import { RefreshCw } from "lucide-react";
 import { useState } from "react";
@@ -53,9 +54,19 @@ export function MissionScenarioUpdateButton({
   /** Stores the re-copied mission. Reports its own failures. */
   onUpdate: (mission: CampaignMission) => void | Promise<void>;
 }) {
+  const { t } = useLingui();
   const [open, setOpen] = useState(false);
   const [busy, setBusy] = useState(false);
   const { snapshot, live } = attachment;
+  const title = mission.title;
+  const liveName = live.name;
+  const takenAt = editedAt(snapshot.updatedAt) || t`an earlier date`;
+  const liveEditedAt = editedAt(live.updatedAt) || t`a later date`;
+  const none = t`none`;
+  const fromGame = mission.snapshot.gameName || none;
+  const toGame = live.setup.gameName || none;
+  const fromMap = mission.snapshot.mapName || none;
+  const toMap = live.setup.mapName || none;
   // Attaching takes the scenario's setup as the mission's launch snapshot, so a
   // scenario that moved to another game or map moves the mission with it.
   const gameMoved = mission.snapshot.gameName !== live.setup.gameName;
@@ -78,46 +89,57 @@ export function MissionScenarioUpdateButton({
           size="sm"
           variant="outline"
           className="gap-1.5"
-          aria-label={`Update to latest: ${mission.title}`}
+          aria-label={t`Update to latest: ${title}`}
         >
-          <RefreshCw className="size-4" /> Update to latest
+          <RefreshCw className="size-4" /> <Trans>Update to latest</Trans>
         </Button>
       </PopoverTrigger>
       <PopoverContent align="end" className="flex w-96 flex-col gap-3">
         <div className="flex flex-col gap-2">
           <h3 className="break-words text-sm font-medium">
-            Update to the latest &quot;{live.name}&quot;?
+            <Trans>Update to the latest "{liveName}"?</Trans>
           </h3>
           <p className="text-xs text-muted-foreground">
-            This mission plays a copy taken on{" "}
-            {editedAt(snapshot.updatedAt) || "an earlier date"}. Updating
-            replaces that copy with the scenario as the builder holds it now,
-            edited on {editedAt(live.updatedAt) || "a later date"}. There is no
-            undo, and no other copy of what the mission is playing, so anything
-            the builder&apos;s version has dropped goes with it.
+            <Trans>
+              This mission plays a copy taken on {takenAt}. Updating replaces
+              that copy with the scenario as the builder holds it now, edited on{" "}
+              {liveEditedAt}. There is no undo, and no other copy of what the
+              mission is playing, so anything the builder's version has dropped
+              goes with it.
+            </Trans>
           </p>
           <div className="flex flex-col gap-0.5 rounded-md border border-border/50 bg-muted/20 p-2 text-xs text-muted-foreground">
             <span className="break-words">
-              <span className="font-medium text-foreground">Attached</span>{" "}
+              <span className="font-medium text-foreground">
+                <Trans>Attached</Trans>
+              </span>{" "}
               {scenarioContents(snapshot)}
             </span>
             <span className="break-words">
-              <span className="font-medium text-foreground">Latest</span>{" "}
+              <span className="font-medium text-foreground">
+                <Trans>Latest</Trans>
+              </span>{" "}
               {scenarioContents(live)}
             </span>
           </div>
           <p className="text-xs text-muted-foreground">
-            The mission keeps its own title, briefing, objectives and images.
+            <Trans>
+              The mission keeps its own title, briefing, objectives and images.
+            </Trans>
           </p>
           {(gameMoved || mapMoved) && (
             <p className="text-xs text-amber-600 dark:text-amber-500">
-              {gameMoved &&
-                `The mission's game changes from ${mission.snapshot.gameName || "none"} to ${live.setup.gameName || "none"}. `}
-              {mapMoved &&
-                `The mission's map changes from ${mission.snapshot.mapName || "none"} to ${live.setup.mapName || "none"}. `}
-              {gameMoved &&
-                mission.disabledUnits.length > 0 &&
-                "Its unit restrictions name units from the game it is leaving, so they will not apply."}
+              {[
+                gameMoved &&
+                  t`The mission's game changes from ${fromGame} to ${toGame}.`,
+                mapMoved &&
+                  t`The mission's map changes from ${fromMap} to ${toMap}.`,
+                gameMoved &&
+                  mission.disabledUnits.length > 0 &&
+                  t`Its unit restrictions name units from the game it is leaving, so they will not apply.`,
+              ]
+                .filter(Boolean)
+                .join(" ")}
             </p>
           )}
         </div>
@@ -129,7 +151,7 @@ export function MissionScenarioUpdateButton({
             disabled={busy}
             onClick={() => setOpen(false)}
           >
-            Cancel
+            <Trans>Cancel</Trans>
           </Button>
           <Button
             type="button"
@@ -138,7 +160,7 @@ export function MissionScenarioUpdateButton({
             disabled={busy}
             onClick={() => void update()}
           >
-            <RefreshCw className="size-4" /> {busy ? "Updating…" : "Update"}
+            <RefreshCw className="size-4" /> {busy ? t`Updating…` : t`Update`}
           </Button>
         </div>
       </PopoverContent>
