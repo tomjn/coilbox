@@ -1447,6 +1447,7 @@ msgid "{count, plural, one {# blocker would reach whoever plays this broken, so 
 msgstr "{count, plural, one {# blocker would reach whoever plays this broken, so it was not packaged: {blockers}} other {# blockers would reach whoever plays this broken, so it was not packaged: {blockers}}}"
 
 #: src/blueprint/pages/components/SubstitutionPanel.tsx
+#: src/lib/scenarioEditing/layoutPlacing.ts
 #: src/scenario/pages/components/contents.ts
 msgid "{count, plural, one {# building} other {# buildings}}"
 msgstr "{count, plural, one {# building} other {# buildings}}"
@@ -4336,13 +4337,13 @@ msgstr "{secondsLeft}s left"
 msgid "{secs} s"
 msgstr "{secs} s"
 
+#: src/lego/pages/components/SetPanel.tsx
+msgid "{selectedCount, plural, one {# piece selected} other {# pieces selected}}"
+msgstr "{selectedCount, plural, one {# piece selected} other {# pieces selected}}"
+
 #: src/content/pages/components/UnitPicker.tsx
 msgid "{selectedCount} of {totalCount} {selectedWord}"
 msgstr "{selectedCount} of {totalCount} {selectedWord}"
-
-#: src/lego/pages/components/SetPanel.tsx
-msgid "{selectedCount} pieces selected"
-msgstr "{selectedCount} pieces selected"
 
 #: src/conquest/pages/ConquestListPage.tsx
 msgid "{selectedName} plays Conquest only on the maps the game carries. Pick one from the Conquest list."
