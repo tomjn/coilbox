@@ -6,6 +6,7 @@
  * Every change is an edit of its own, so each one undoes on its own.
  */
 
+import { Trans, useLingui } from "@lingui/react/macro";
 import { Button, Input } from "@picoframe/frame";
 import {
   Columns3,
@@ -87,12 +88,14 @@ export function LoadoutPicker({
   capture,
   moduleNames,
 }: Props) {
+  const { t } = useLingui();
   const loadouts = project.loadouts;
   const moduleName = (id: string) => moduleNames?.get(id) ?? id;
   const locks = unitLocks(project);
   const lockOf = (id: string | null) => locks.find((l) => l.loadoutId === id);
   const edit = (change: (project: LegoProject) => LegoProject) =>
     onEdit(change, { alone: true });
+  const fromLabel = (name: string) => t`From ${name}`;
   const [comparing, setComparing] = useState(false);
   const [pictures, setPictures] = useState<Record<string, string>>({});
 
@@ -119,21 +122,26 @@ export function LoadoutPicker({
     <div className="flex items-center gap-1 px-1 text-xs text-muted-foreground">
       {loadouts ? (
         <>
-          <span>loadout</span>
+          <span>
+            <Trans>loadout</Trans>
+          </span>
           <OptionSelect
             size="sm"
             value={project.activeLoadout ?? ""}
             onValueChange={switchTo}
             options={chainOrder(loadouts).map((l) => {
               const from = predecessorOf(project, l);
-              return {
-                value: l.id,
-                label: `${from ? `${l.name} (from ${from.name})` : l.name}${
-                  lockOf(l.id)?.locked ? " (locked)" : ""
-                }`,
-              };
+              const name = l.name;
+              const fromName = from?.name ?? "";
+              const locked = lockOf(l.id)?.locked;
+              let label = name;
+              if (from && locked)
+                label = t`${name} (from ${fromName}) (locked)`;
+              else if (from) label = t`${name} (from ${fromName})`;
+              else if (locked) label = t`${name} (locked)`;
+              return { value: l.id, label };
             })}
-            ariaLabel="Loadout"
+            ariaLabel={t`Loadout`}
             className="h-5 w-40 border-transparent bg-transparent px-1 text-xs hover:border-border focus-visible:border-border"
           />
         </>
@@ -146,11 +154,11 @@ export function LoadoutPicker({
             className={
               loadouts ? "size-5" : "h-5 gap-1 px-1 text-xs font-normal"
             }
-            title="Loadouts"
-            aria-label="Loadouts"
+            title={t`Loadouts`}
+            aria-label={t`Loadouts`}
           >
             <Layers className="size-3.5" />
-            {loadouts ? null : "Loadouts"}
+            {loadouts ? null : <Trans>Loadouts</Trans>}
           </Button>
         </PopoverTrigger>
         <PopoverContent side="bottom" align="start" className="w-72 space-y-3">
@@ -167,12 +175,12 @@ export function LoadoutPicker({
                     edit((p) => setLoadoutLocked(p, loadout.id, locked))
                   }
                   fromOptions={[
-                    { value: NO_PREDECESSOR, label: "Not an upgrade" },
+                    { value: NO_PREDECESSOR, label: t`Not an upgrade` },
                     ...loadouts
                       .filter((other) => other.id !== loadout.id)
                       .map((other) => ({
                         value: other.id,
-                        label: `From ${other.name}`,
+                        label: fromLabel(other.name),
                         disabled:
                           other.id !== loadout.upgradesFrom &&
                           upgradeRefusal(project, loadout.id, other.id) !==
@@ -204,7 +212,7 @@ export function LoadoutPicker({
               onClick={() => edit((p) => addLoadout(p, { newId }))}
             >
               <Plus className="size-3.5" />
-              Add
+              <Trans>Add</Trans>
             </Button>
             <Button
               size="sm"
@@ -213,7 +221,7 @@ export function LoadoutPicker({
               onClick={() => edit((p) => duplicateLoadout(p, { newId }))}
             >
               <Copy className="size-3.5" />
-              Duplicate
+              <Trans>Duplicate</Trans>
             </Button>
           </div>
           <PieceSharing project={project} pieceId={selectedId} onEdit={edit} />
@@ -231,8 +239,8 @@ export function LoadoutPicker({
             size="icon"
             variant="ghost"
             className="size-5"
-            title="Compare loadouts"
-            aria-label="Compare loadouts"
+            title={t`Compare loadouts`}
+            aria-label={t`Compare loadouts`}
             onClick={() => {
               remember();
               setComparing(true);
@@ -277,6 +285,8 @@ function LoadoutRow({
   onRename: (name: string) => void;
   onDelete: () => void;
 }) {
+  const { t } = useLingui();
+  const loadoutName = loadout.name;
   const [name, setName] = useState(loadout.name);
   useEffect(() => setName(loadout.name), [loadout.name]);
 
@@ -296,7 +306,7 @@ function LoadoutRow({
             if (event.key === "Enter") event.currentTarget.blur();
             if (event.key === "Escape") setName(loadout.name);
           }}
-          aria-label={`Name of ${loadout.name}`}
+          aria-label={t`Name of ${loadoutName}`}
           aria-current={active ? "true" : undefined}
           className={`h-7 min-w-0 flex-1 text-xs ${active ? "font-semibold" : ""}`}
         />
@@ -304,8 +314,8 @@ function LoadoutRow({
           size="icon"
           variant="ghost"
           className="size-7"
-          title="Locked until a campaign grants it"
-          aria-label={`Lock ${loadout.name}`}
+          title={t`Locked until a campaign grants it`}
+          aria-label={t`Lock ${loadoutName}`}
           aria-pressed={loadout.locked === true}
           onClick={() => onLock(loadout.locked !== true)}
         >
@@ -319,8 +329,8 @@ function LoadoutRow({
           size="icon"
           variant="ghost"
           className="size-7"
-          title="Delete"
-          aria-label={`Delete ${loadout.name}`}
+          title={t`Delete`}
+          aria-label={t`Delete ${loadoutName}`}
           onClick={onDelete}
         >
           <Trash2 className="size-3.5" />
@@ -337,7 +347,7 @@ function LoadoutRow({
           value={loadout.upgradesFrom ?? NO_PREDECESSOR}
           onValueChange={onUpgradesFrom}
           options={fromOptions}
-          ariaLabel={`Upgrade of, for ${loadout.name}`}
+          ariaLabel={t`Upgrade of, for ${loadoutName}`}
           className="h-6 w-full text-xs"
         />
       ) : null}
@@ -358,20 +368,22 @@ function PieceSharing({
   pieceId: string | null;
   onEdit: (change: (project: LegoProject) => LegoProject) => void;
 }) {
+  const { t } = useLingui();
   const active = project.loadouts?.find((l) => l.id === project.activeLoadout);
   const piece = pieceId ? pieceById(project, pieceId) : undefined;
   if (!active || !piece || piece.id === project.rootPieceId) return null;
   const owned = loadoutPieceIds(project);
   if (piece.parentId && owned.has(piece.parentId)) return null;
   const own = owned.has(piece.id);
+  const activeName = active.name;
 
   return (
     <div className="space-y-1">
       <p className="truncate text-xs text-muted-foreground">{piece.name}</p>
       <div className="flex items-center gap-1">
         {[
-          { value: false, label: "Every loadout" },
-          { value: true, label: `Only ${active.name}` },
+          { value: false, label: t`Every loadout` },
+          { value: true, label: t`Only ${activeName}` },
         ].map((option) => (
           <Button
             key={option.label}
@@ -407,13 +419,19 @@ function ModuleLocks({
   moduleName: (id: string) => string;
   onEdit: (change: (project: LegoProject) => LegoProject) => void;
 }) {
+  const { t } = useLingui();
   const held = heldModules(project);
   if (held.length === 0) return null;
   const locked = new Set(project.lockedModules ?? []);
+  const lockModuleLabel = (name: string) => t`Lock module ${name}`;
+  const unitName = project.unitName;
+  const reason = lock?.locked
+    ? (lockReason(lock, moduleName)?.toLowerCase() ?? "")
+    : "";
   return (
     <div className="space-y-1">
       <p className="text-xs text-muted-foreground">
-        Modules locked until a campaign grants them
+        <Trans>Modules locked until a campaign grants them</Trans>
       </p>
       <ul className="space-y-0.5">
         {held.map((id) => (
@@ -423,8 +441,8 @@ function ModuleLocks({
               size="icon"
               variant="ghost"
               className="size-6"
-              title="Locks every loadout that holds it"
-              aria-label={`Lock module ${moduleName(id)}`}
+              title={t`Locks every loadout that holds it`}
+              aria-label={lockModuleLabel(moduleName(id))}
               aria-pressed={locked.has(id)}
               onClick={() =>
                 onEdit((p) => setModuleLocked(p, id, !locked.has(id)))
@@ -441,7 +459,9 @@ function ModuleLocks({
       </ul>
       {lock?.locked ? (
         <p className="text-xs text-amber-300">
-          {project.unitName} is {lockReason(lock, moduleName)?.toLowerCase()}
+          <Trans>
+            {unitName} is {reason}
+          </Trans>
         </p>
       ) : null}
     </div>

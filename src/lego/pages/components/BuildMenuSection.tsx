@@ -8,6 +8,7 @@
  * A game maker's tool: nothing here is offered to a player.
  */
 
+import { Trans, useLingui } from "@lingui/react/macro";
 import { Button } from "@picoframe/frame";
 import { useMemo, useState } from "react";
 
@@ -33,6 +34,7 @@ import type { LegoProject } from "../../model";
 import { useBuildMenuSource } from "./useBuildMenuSource";
 
 export function BuildMenuSection({ project }: { project: LegoProject }) {
+  const { t } = useLingui();
   const source = useBuildMenuSource(project);
   const { projects, createProject, applyEdits } = useModProjects();
   const [chosen, setChosen] = useState<string | null>(null);
@@ -88,20 +90,29 @@ export function BuildMenuSection({ project }: { project: LegoProject }) {
     });
   }
 
+  const targetName = target?.name ?? "";
+  const nextProjectName = defaultProjectName(source.gameName ?? "", projects);
+
   const toggle = (id: string, on: boolean) =>
     setPicked((now) => (on ? [...now, id] : now.filter((x) => x !== id)));
 
   return (
     <section
-      aria-label="Build menu"
+      aria-label={t`Build menu`}
       className="flex shrink-0 flex-col gap-2 -mx-5 border-t border-border/60 px-5 pt-3"
     >
-      <h3 className="text-sm font-semibold">Build menu</h3>
+      <h3 className="text-sm font-semibold">
+        <Trans>Build menu</Trans>
+      </h3>
       {source.unavailable ? (
         <p className="text-xs text-muted-foreground">{source.unavailable}</p>
       ) : !builder ? (
         <p className="text-xs text-muted-foreground">
-          {source.units ? "The game has no builders." : "Reading the game."}
+          {source.units ? (
+            <Trans>The game has no builders.</Trans>
+          ) : (
+            <Trans>Reading the game.</Trans>
+          )}
         </p>
       ) : (
         <>
@@ -113,7 +124,7 @@ export function BuildMenuSection({ project }: { project: LegoProject }) {
               value: b.key,
               label: b.name === b.key ? b.key : `${b.name} (${b.key})`,
             }))}
-            ariaLabel="Builder"
+            ariaLabel={t`Builder`}
           />
           <ul className="flex flex-col gap-1">
             {variants.map((v) => (
@@ -127,14 +138,14 @@ export function BuildMenuSection({ project }: { project: LegoProject }) {
                     />
                     <Label htmlFor={`lego-menu-${v.id}`}>{v.name}</Label>
                     <span className="text-muted-foreground">
-                      {onMenu.has(v.unit) ? "On the menu" : v.unit}
+                      {onMenu.has(v.unit) ? t`On the menu` : v.unit}
                     </span>
                   </>
                 ) : (
                   <>
                     <span>{v.name}</span>
                     <span className="text-muted-foreground">
-                      Export it first.
+                      <Trans>Export it first.</Trans>
                     </span>
                   </>
                 )}
@@ -148,7 +159,7 @@ export function BuildMenuSection({ project }: { project: LegoProject }) {
               disabled={offered.length === 0}
               onClick={() => setPicked(offered.map((v) => v.id))}
             >
-              Select all
+              <Trans>Select all</Trans>
             </Button>
             <Button
               size="sm"
@@ -159,7 +170,7 @@ export function BuildMenuSection({ project }: { project: LegoProject }) {
                 )
               }
             >
-              Add
+              <Trans>Add</Trans>
             </Button>
             <Button
               size="sm"
@@ -171,13 +182,13 @@ export function BuildMenuSection({ project }: { project: LegoProject }) {
                 )
               }
             >
-              Remove
+              <Trans>Remove</Trans>
             </Button>
           </div>
           <p className="text-xs text-muted-foreground">
             {target
-              ? `Saved in ${target.name}.`
-              : `Starts ${defaultProjectName(source.gameName ?? "", projects)}.`}
+              ? t`Saved in ${targetName}.`
+              : t`Starts ${nextProjectName}.`}
           </p>
         </>
       )}

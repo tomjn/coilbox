@@ -5,6 +5,7 @@
  * builders are read from the unit's own game, as the build menu section does.
  */
 
+import { Trans, useLingui } from "@lingui/react/macro";
 import { Button } from "@picoframe/frame";
 import { ChevronsUpDown, X } from "lucide-react";
 import { useMemo, useState } from "react";
@@ -31,6 +32,7 @@ interface Props {
 }
 
 export function BuiltBySection({ project, onBuiltByChange }: Props) {
+  const { t } = useLingui();
   const source = useBuildMenuSource(project);
   const [open, setOpen] = useState(false);
   const builders = useMemo(
@@ -46,32 +48,41 @@ export function BuiltBySection({ project, onBuiltByChange }: Props) {
 
   return (
     <div className="flex flex-col gap-2 border-b border-border/60 px-3 py-2">
-      <p className="text-sm font-medium">Built by</p>
+      <p className="text-sm font-medium">
+        <Trans>Built by</Trans>
+      </p>
       {chosen.length > 0 ? (
         <ul className="flex flex-col gap-1">
-          {chosen.map((key) => (
-            <li key={key} className="flex items-center gap-2 text-xs">
-              <span className="min-w-0 flex-1 truncate">{nameOf(key)}</span>
-              <Button
-                size="sm"
-                variant="ghost"
-                aria-label={`Remove ${nameOf(key)}`}
-                title="Remove"
-                onClick={() => onBuiltByChange(chosen.filter((k) => k !== key))}
-              >
-                <X className="size-4" />
-              </Button>
-            </li>
-          ))}
+          {chosen.map((key) => {
+            const builderName = nameOf(key);
+            return (
+              <li key={key} className="flex items-center gap-2 text-xs">
+                <span className="min-w-0 flex-1 truncate">{nameOf(key)}</span>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  aria-label={t`Remove ${builderName}`}
+                  title={t`Remove`}
+                  onClick={() =>
+                    onBuiltByChange(chosen.filter((k) => k !== key))
+                  }
+                >
+                  <X className="size-4" />
+                </Button>
+              </li>
+            );
+          })}
         </ul>
       ) : null}
       {source.unavailable ? (
         <p className="text-xs text-muted-foreground">{source.unavailable}</p>
       ) : !source.units ? (
-        <p className="text-xs text-muted-foreground">Reading the game.</p>
+        <p className="text-xs text-muted-foreground">
+          <Trans>Reading the game.</Trans>
+        </p>
       ) : builders.length === 0 ? (
         <p className="text-xs text-muted-foreground">
-          The game has no builders.
+          <Trans>The game has no builders.</Trans>
         </p>
       ) : (
         <Popover open={open} onOpenChange={setOpen}>
@@ -83,16 +94,18 @@ export function BuiltBySection({ project, onBuiltByChange }: Props) {
               className="justify-between font-normal"
             >
               <span className="truncate text-muted-foreground">
-                Add a builder
+                <Trans>Add a builder</Trans>
               </span>
               <ChevronsUpDown className="ml-2 size-4 shrink-0 opacity-50" />
             </Button>
           </PopoverTrigger>
           <PopoverContent align="start" className="w-72 p-0">
             <Command>
-              <CommandInput placeholder="Search builders…" />
+              <CommandInput placeholder={t`Search builders…`} />
               <CommandList>
-                <CommandEmpty>No builder matches that.</CommandEmpty>
+                <CommandEmpty>
+                  <Trans>No builder matches that.</Trans>
+                </CommandEmpty>
                 <CommandGroup>
                   {offered.map((b) => (
                     <CommandItem

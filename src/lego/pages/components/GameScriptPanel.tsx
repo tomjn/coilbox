@@ -18,6 +18,9 @@
  * owns it does the applying when the unit is accepted.
  */
 
+import { i18n, type MessageDescriptor } from "@lingui/core";
+import { msg } from "@lingui/core/macro";
+import { Trans, useLingui } from "@lingui/react/macro";
 import { FileCode, Loader2 } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
@@ -42,9 +45,9 @@ interface Props {
 
 /** Each group of proposals gets a short heading, said once above the group
  *  rather than repeated on every row. */
-const EVIDENCE: Record<RoleProposal["evidence"], string> = {
-  stated: "Named by the script",
-  observed: "Worked out from what moved",
+const EVIDENCE: Record<RoleProposal["evidence"], MessageDescriptor> = {
+  stated: msg`Named by the script`,
+  observed: msg`Worked out from what moved`,
 };
 
 export function GameScriptPanel({
@@ -60,7 +63,9 @@ export function GameScriptPanel({
 
   return (
     <section className="flex flex-col gap-3">
-      <h3 className="text-sm font-medium">Animation</h3>
+      <h3 className="text-sm font-medium">
+        <Trans>Animation</Trans>
+      </h3>
       {adopted ? (
         <Found
           adopted={adopted}
@@ -72,7 +77,7 @@ export function GameScriptPanel({
       ) : (
         <p className="flex items-center gap-2 text-xs text-muted-foreground">
           <Loader2 className="size-3.5 animate-spin" aria-hidden />
-          Looking for this unit's animation script.
+          <Trans>Looking for this unit's animation script.</Trans>
         </p>
       )}
     </section>
@@ -86,6 +91,7 @@ function Found({
   taken,
   onToggleRole,
 }: Props & { adopted: AdoptedScript }) {
+  const { t } = useLingui();
   const proposals = adopted.findings?.proposals ?? [];
   const groups = (["stated", "observed"] as const)
     .map((evidence) => ({
@@ -99,13 +105,15 @@ function Found({
     <>
       {!member ? (
         <p className="text-xs text-muted-foreground">
-          No script found, so the unit opens with the animation presets.
+          <Trans>
+            No script found, so the unit opens with the animation presets.
+          </Trans>
         </p>
       ) : kind === "lua" ? (
         <ScriptFile
           member={member}
           badge="Lua"
-          detail="Imported as it is. Editable, and written by the export."
+          detail={t`Imported as it is. Editable, and written by the export.`}
         />
       ) : converted && adopted.script ? (
         <ToggleGroup
@@ -113,63 +121,71 @@ function Found({
           value={takeScript ? "lua" : "compiled"}
           onValueChange={(value) => value && onTakeScript(value === "lua")}
           className="flex w-full flex-col gap-2"
-          aria-label="How to import the animation"
+          aria-label={t`How to import the animation`}
         >
           <Option
             value="compiled"
-            title="Run the compiled script"
+            title={t`Run the compiled script`}
             member={member}
-            detail="Plays exactly as in the game. Read only, and not written by the export."
+            detail={t`Plays exactly as in the game. Read only, and not written by the export.`}
           />
           <Option
             value="lua"
-            title="Convert to Lua"
+            title={t`Convert to Lua`}
             member={converted.member}
             detail={
               adopted.notes.length > 0
-                ? "Editable, and written by the export. Anything the conversion could not carry over is listed below."
-                : "Editable, and written by the export."
+                ? t`Editable, and written by the export. Anything the conversion could not carry over is listed below.`
+                : t`Editable, and written by the export.`
             }
           />
         </ToggleGroup>
       ) : (
         <ScriptFile
           member={member}
-          badge="Compiled"
+          badge={t`Compiled`}
           detail={
             adopted.compiled
-              ? "Plays exactly as in the game. Read only, and not written by the export. The game ships no .bos source for it, so it cannot be converted to Lua."
-              : "The file could not be read, so the unit opens with the animation presets."
+              ? t`Plays exactly as in the game. Read only, and not written by the export. The game ships no .bos source for it, so it cannot be converted to Lua.`
+              : t`The file could not be read, so the unit opens with the animation presets.`
           }
         />
       )}
 
       {groups.length > 0 ? (
         <div className="flex flex-col gap-2">
-          <p className="text-xs font-medium">Piece roles</p>
+          <p className="text-xs font-medium">
+            <Trans>Piece roles</Trans>
+          </p>
           {groups.map(({ evidence, rows }) => (
             <div key={evidence} className="flex flex-col gap-1.5">
               <p className="text-xs text-muted-foreground">
-                {EVIDENCE[evidence]}
+                {i18n._(EVIDENCE[evidence])}
               </p>
-              {rows.map((row) => (
-                <div key={row.pieceName} className="flex items-center gap-2">
-                  <Checkbox
-                    id={`role-${row.pieceName}`}
-                    checked={taken.has(row.pieceName)}
-                    onCheckedChange={() => onToggleRole(row.pieceName)}
-                  />
-                  <Label
-                    htmlFor={`role-${row.pieceName}`}
-                    className="text-xs font-normal"
-                  >
-                    {row.pieceName} is {roleLabel(row.role).toLowerCase()}
-                  </Label>
-                  <code className="ml-auto text-[0.6875rem] text-muted-foreground">
-                    {row.callin}
-                  </code>
-                </div>
-              ))}
+              {rows.map((row) => {
+                const pieceName = row.pieceName;
+                const role = roleLabel(row.role).toLowerCase();
+                return (
+                  <div key={row.pieceName} className="flex items-center gap-2">
+                    <Checkbox
+                      id={`role-${row.pieceName}`}
+                      checked={taken.has(row.pieceName)}
+                      onCheckedChange={() => onToggleRole(row.pieceName)}
+                    />
+                    <Label
+                      htmlFor={`role-${row.pieceName}`}
+                      className="text-xs font-normal"
+                    >
+                      <Trans>
+                        {pieceName} is {role}
+                      </Trans>
+                    </Label>
+                    <code className="ml-auto text-[0.6875rem] text-muted-foreground">
+                      {row.callin}
+                    </code>
+                  </div>
+                );
+              })}
             </div>
           ))}
         </div>

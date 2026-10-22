@@ -10,6 +10,7 @@
  * place.
  */
 
+import { Trans, useLingui } from "@lingui/react/macro";
 import { Button, Input } from "@picoframe/frame";
 import { Crosshair, Plus, Trash2 } from "lucide-react";
 
@@ -53,11 +54,14 @@ export function AnchorList({
   onChange,
   onRemove,
 }: Props) {
+  const { t } = useLingui();
   const anchors = piece.customAnchors ?? [];
 
   return (
     <div className="mt-2">
-      <span className="text-xs text-muted-foreground">Connectors</span>
+      <span className="text-xs text-muted-foreground">
+        <Trans>Connectors</Trans>
+      </span>
       <ButtonGroup className="mt-1 flex w-full">
         <Button
           size="sm"
@@ -66,7 +70,12 @@ export function AnchorList({
           onClick={() => onPlacingChange(!placing)}
           aria-pressed={placing}
         >
-          <Crosshair size={14} /> {placing ? "Click the model" : "On the model"}
+          <Crosshair size={14} />{" "}
+          {placing ? (
+            <Trans>Click the model</Trans>
+          ) : (
+            <Trans>On the model</Trans>
+          )}
         </Button>
         <Button
           size="sm"
@@ -74,56 +83,59 @@ export function AnchorList({
           className="flex-1"
           onClick={onAddAtOrigin}
         >
-          <Plus size={14} /> At the origin
+          <Plus size={14} /> <Trans>At the origin</Trans>
         </Button>
       </ButtonGroup>
 
-      {anchors.map((anchor) => (
-        <div
-          key={anchor.id}
-          className="mt-2 rounded-md border border-border px-2 py-1.5"
-        >
-          <div className="flex items-center gap-1">
-            <Input
-              value={anchor.name}
-              onChange={(event) =>
-                onChange(anchor.id, { name: event.target.value })
-              }
-              aria-label="Connector name"
-              className="h-7 flex-1 text-xs"
+      {anchors.map((anchor) => {
+        const anchorName = anchor.name;
+        return (
+          <div
+            key={anchor.id}
+            className="mt-2 rounded-md border border-border px-2 py-1.5"
+          >
+            <div className="flex items-center gap-1">
+              <Input
+                value={anchor.name}
+                onChange={(event) =>
+                  onChange(anchor.id, { name: event.target.value })
+                }
+                aria-label={t`Connector name`}
+                className="h-7 flex-1 text-xs"
+              />
+              <Button
+                size="icon"
+                variant="ghost"
+                className="size-7 shrink-0"
+                onClick={() => onRemove(anchor.id)}
+                aria-label={t`Remove ${anchorName}`}
+                title={t`Remove this connector`}
+              >
+                <Trash2 size={12} />
+              </Button>
+            </div>
+            <Vec3Row
+              label={t`Position`}
+              values={anchor.position}
+              onCommit={(axis, value) => {
+                const position: [number, number, number] = [...anchor.position];
+                position[axis] = value;
+                onChange(anchor.id, { position });
+              }}
             />
-            <Button
-              size="icon"
-              variant="ghost"
-              className="size-7 shrink-0"
-              onClick={() => onRemove(anchor.id)}
-              aria-label={`Remove ${anchor.name}`}
-              title="Remove this connector"
-            >
-              <Trash2 size={12} />
-            </Button>
+            <Direction
+              label={t`Facing`}
+              values={connectors.find((c) => c.id === anchor.id)?.facing}
+              onChange={(facing) => onChange(anchor.id, { facing })}
+            />
+            <Direction
+              label={t`Up`}
+              values={connectors.find((c) => c.id === anchor.id)?.up}
+              onChange={(up) => onChange(anchor.id, { up })}
+            />
           </div>
-          <Vec3Row
-            label="Position"
-            values={anchor.position}
-            onCommit={(axis, value) => {
-              const position: [number, number, number] = [...anchor.position];
-              position[axis] = value;
-              onChange(anchor.id, { position });
-            }}
-          />
-          <Direction
-            label="Facing"
-            values={connectors.find((c) => c.id === anchor.id)?.facing}
-            onChange={(facing) => onChange(anchor.id, { facing })}
-          />
-          <Direction
-            label="Up"
-            values={connectors.find((c) => c.id === anchor.id)?.up}
-            onChange={(up) => onChange(anchor.id, { up })}
-          />
-        </div>
-      ))}
+        );
+      })}
     </div>
   );
 }
