@@ -106,7 +106,11 @@ function Cap({
       {first ? (
         <span className="w-full truncate text-[10px] leading-tight text-muted-foreground">
           {actionCommand(first.action)}
-          {bindings.length > 1 ? ` +${bindings.length - 1}` : ""}
+          {
+            bindings.length > 1
+              ? ` +${bindings.length - 1}`
+              : "" /* i18n: not a plural */
+          }
         </span>
       ) : null}
     </button>

@@ -259,7 +259,7 @@ export function teamSeries(
       const first = held[0];
       // Shared control puts several seats on one team, and one line covers them
       // all, so the label says whose line it also is rather than dropping them.
-      const extra = held.length > 1 ? ` +${held.length - 1}` : "";
+      const extra = held.length > 1 ? ` +${held.length - 1}` : ""; // i18n: not a plural
       const team = stat.team;
       return {
         id: teamId(team),

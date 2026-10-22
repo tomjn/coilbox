@@ -582,13 +582,6 @@ export function unjudgedSentence(count: PreviewCount): string {
   });
 }
 
-/** {@link unjudgedSentence} with the space that joins it on to the sentence
- *  before it, or nothing when there is nothing to add. */
-export function unjudgedClause(count: PreviewCount): string {
-  const sentence = unjudgedSentence(count);
-  return sentence === "" ? "" : ` ${sentence}`;
-}
-
 /**
  * What the marks under the pointer say, in words.
  *

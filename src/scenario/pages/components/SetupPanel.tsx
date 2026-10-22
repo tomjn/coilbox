@@ -53,7 +53,7 @@ import { mergeMapTiers } from "@/content/mapTiers";
 import { ScanFailed } from "@/content/pages/components/states";
 import { useGameUnits } from "@/content/useGameUnits";
 import { useFactionLogos } from "@/factions/logos";
-import { getLocale } from "@/i18n";
+import { formatList } from "@/lib/format";
 import { withoutGeneratedGames } from "@/lib/generatedGames";
 import {
   defaultAi,
@@ -117,10 +117,7 @@ type Pending =
 /** "1 actor, 2 groups and a base", for saying what something holds. */
 function list(parts: string[]): string {
   if (parts.length === 0) return t`nothing`;
-  return new Intl.ListFormat(getLocale(), {
-    style: "long",
-    type: "conjunction",
-  }).format(parts);
+  return formatList(parts, "conjunction");
 }
 
 const participantCount = (n: number) =>

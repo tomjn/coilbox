@@ -11,25 +11,23 @@
  * is vendored into tomjn/coilbox-hub by blob hash and a name a person reads is
  * not part of the format.
  *
- * Singular, lowercase and article-free, because that is what the deep-link
- * confirmation does with them: `../deeplink/readImport.ts` says "a {name}" and
- * "a {name} for {game}". A challenge's own arm still says which of the two it
- * is, since the mode is in the payload rather than in the kind.
+ * Singular, lowercase and article-free. The deep-link confirmation uses
+ * {@link containerKindPhrase} instead, which carries its own article.
  */
 
 import { i18n, type MessageDescriptor } from "@lingui/core";
-import { msg, t } from "@lingui/core/macro";
+import { msg, select, t } from "@lingui/core/macro";
 import type { ContainerKind } from "./container";
 
 const KIND_NAMES: Record<ContainerKind, MessageDescriptor> = {
   campaign: msg`campaign`,
   preset: msg`singleplayer preset`,
   challenge: msg`challenge`,
-  "setup-pack": msg`setup pack`,
+  setup_pack: msg`setup pack`,
   scenario: msg`scenario`,
   keymap: msg`keymap`,
   blueprint: msg`base blueprint`,
-  "mod-project": msg`unit tweak project`,
+  mod_project: msg`unit tweak project`,
   module: msg`unit builder module`,
 };
 
@@ -38,11 +36,11 @@ const KIND_PLURALS: Record<ContainerKind, MessageDescriptor> = {
   campaign: msg`campaigns`,
   preset: msg`singleplayer presets`,
   challenge: msg`challenges`,
-  "setup-pack": msg`setup packs`,
+  setup_pack: msg`setup packs`,
   scenario: msg`scenarios`,
   keymap: msg`keymaps`,
   blueprint: msg`base blueprints`,
-  "mod-project": msg`unit tweak projects`,
+  mod_project: msg`unit tweak projects`,
   module: msg`unit builder modules`,
 };
 
@@ -71,4 +69,64 @@ export function containerKindPlural(kind: ContainerKind): string {
  */
 export function containerKindsSentence(): string {
   return t`a campaign, a singleplayer preset, a challenge, a setup pack, a scenario, a keymap, a base blueprint, a unit tweak project or a unit builder module`;
+}
+
+/**
+ * What a confirmation dialog calls one thing it is about to import. A kind, or
+ * a challenge with its game mode, because the mode is in the payload rather
+ * than in the kind.
+ */
+export type ContainerPhraseKey =
+  | ContainerKind
+  | "coilbox-campaign"
+  | "conquest-challenge"
+  | "warpath-challenge";
+
+/**
+ * A noun phrase with its article: "a campaign", or "a campaign for BA" when a
+ * game is given.
+ *
+ * Each phrase is one message, so a translator can give it the article and
+ * gender its language needs rather than having an English "a" put in front of
+ * a translated name.
+ */
+export function containerKindPhrase(
+  key: ContainerPhraseKey,
+  gameName?: string,
+): string {
+  // ICU selector names cannot hold a hyphen.
+  const kind = key.replaceAll("-", "_");
+  if (gameName) {
+    const game = gameName;
+    return t`${select(kind, {
+      campaign: `a campaign for ${game}`,
+      coilbox_campaign: `a coilbox campaign for ${game}`,
+      preset: `a singleplayer preset for ${game}`,
+      challenge: `a challenge for ${game}`,
+      conquest_challenge: `a conquest challenge for ${game}`,
+      warpath_challenge: `a warpath challenge for ${game}`,
+      setup_pack: `a setup pack for ${game}`,
+      scenario: `a scenario for ${game}`,
+      keymap: `a keymap for ${game}`,
+      blueprint: `a base blueprint for ${game}`,
+      mod_project: `a unit tweak project for ${game}`,
+      module: `a unit builder module for ${game}`,
+      other: `an import for ${game}`,
+    })}`;
+  }
+  return t`${select(kind, {
+    campaign: "a campaign",
+    coilbox_campaign: "a coilbox campaign",
+    preset: "a singleplayer preset",
+    challenge: "a challenge",
+    conquest_challenge: "a conquest challenge",
+    warpath_challenge: "a warpath challenge",
+    setup_pack: "a setup pack",
+    scenario: "a scenario",
+    keymap: "a keymap",
+    blueprint: "a base blueprint",
+    mod_project: "a unit tweak project",
+    module: "a unit builder module",
+    other: "an import",
+  })}`;
 }

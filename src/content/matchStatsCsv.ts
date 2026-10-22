@@ -1,3 +1,4 @@
+import { plural } from "@lingui/core/macro";
 import type { DemoInfo, Metric } from "./bindings";
 import {
   type ChartMode,
@@ -113,10 +114,15 @@ function columnNames(
     let name = s.label;
     if ((count.get(name) ?? 0) > 1 || taken.has(name)) {
       const teams = seriesTeams(s, info);
+      const teamNames = teams.join(", ");
+      const teamCount = teams.length;
       const note =
         teams.length === 0
           ? s.id
-          : `${teams.length === 1 ? "team" : "teams"} ${teams.join(", ")}`;
+          : plural(teamCount, {
+              one: `team ${teamNames}`,
+              other: `teams ${teamNames}`,
+            });
       name = `${name} (${note})`;
     }
     // A name someone chose can still equal a disambiguated one. The line's id is

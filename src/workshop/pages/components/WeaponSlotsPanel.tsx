@@ -34,7 +34,7 @@ import { Plus, TriangleAlert, Undo2 } from "lucide-react";
 import { useState } from "react";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import type { CustomParamsResult } from "@/content/bindings";
-import { getLocale } from "@/i18n";
+import { formatList } from "@/lib/format";
 import type { AssetBrowsing } from "../../assetFields";
 import type { PostNote } from "../../beforePost";
 import type { DeathExplosion } from "../../deathExplosions";
@@ -412,15 +412,13 @@ export function WeaponSlotsPanel({
             {supporting.map((support) => {
               const changed = supportingEditCount(support, overrides, unitKey);
               const supportKey = support.key;
-              const namedBy = new Intl.ListFormat(getLocale(), {
-                style: "long",
-                type: "conjunction",
-              }).format(
+              const namedBy = formatList(
                 support.usedBy.map((u) => {
                   const from = u.from;
                   const field = u.field;
                   return t`${from}'s ${field}`;
                 }),
+                "conjunction",
               );
               return (
                 <ToggleGroupItem

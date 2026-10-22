@@ -30,7 +30,7 @@ import {
 } from "@/lib/scenarioEditing/editing";
 import type { Heading } from "@/placement/mapKeys";
 import { type Placement, parsePlacementKey } from "@/placement/placements";
-import { previewCount, unjudgedClause } from "@/placement/preview";
+import { previewCount, unjudgedSentence } from "@/placement/preview";
 import {
   baseBuildings,
   type Facing,
@@ -449,7 +449,7 @@ export function mapProblemsWords(marks: readonly FootprintMark[]): string {
       one: "# building, and it can be built where it stands.",
       other: "# buildings, and every one of them can be built where it stands.",
     });
-    return room + unjudgedClause(count);
+    return [room, unjudgedSentence(count)].filter(Boolean).join(" ");
   }
   const parts: string[] = [];
   if (count.clashes > 0) {
@@ -504,7 +504,7 @@ export function mapProblemsWords(marks: readonly FootprintMark[]): string {
           one: `# of ${total} cannot be built where it stands: ${list}.`,
           other: `# of ${total} cannot be built where they stand: ${list}.`,
         });
-  return verdict + unjudgedClause(count);
+  return [verdict, unjudgedSentence(count)].filter(Boolean).join(" ");
 }
 
 /** A zone's size, in elmos: what a resize changed and the number a resize

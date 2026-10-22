@@ -1,5 +1,5 @@
 import { t } from "@lingui/core/macro";
-import { getLocale } from "../i18n";
+import { formatList } from "../lib/format";
 import type { ChatLine, TimelineEvent } from "./bindings";
 import { FRAMES_PER_SECOND, PREGAME_FRAME } from "./chatClock";
 
@@ -183,10 +183,7 @@ export function toEventMarks(events: TimelineEvent[]): EventMark[] {
 /** "A", "A and B", "A, B and C" in the app language. */
 function nameList(names: string[]): string {
   if (names.length <= 1) return names[0] ?? "";
-  return new Intl.ListFormat(getLocale(), {
-    style: "long",
-    type: "conjunction",
-  }).format(names);
+  return formatList(names, "conjunction");
 }
 
 const SERVER = 255;

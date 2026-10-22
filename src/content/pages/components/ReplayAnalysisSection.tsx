@@ -91,14 +91,6 @@ function when(ms: number): string {
   });
 }
 
-/**
- * English-only count phrase, kept for `ReplayMapView`, which passes it English
- * words. Messages in this file use ICU plurals instead.
- */
-export function plural(n: number, one: string, many: string): string {
-  return `${formatNumber(n)} ${n === 1 ? one : many}`;
-}
-
 /** A length of time in words, to the nearest sensible unit. */
 export function roughly(seconds: number): string {
   if (seconds < 90) {
