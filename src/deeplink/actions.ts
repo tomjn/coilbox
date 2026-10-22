@@ -21,7 +21,7 @@ import {
   decodeContainerText,
   identify,
 } from "../container/container";
-import { containerKindName } from "../container/names";
+import { type ContainerPhraseKey, containerKindName } from "../container/names";
 import { type OpenScreen, openScreenRoute } from "./parse";
 
 /** Where a recognised import code should be sent, plus what to tell the user. */
@@ -35,6 +35,8 @@ export interface ImportPlan {
   route: string;
   /** A friendly noun for the confirm dialog, for example "warpath challenge". */
   label: string;
+  /** Which noun phrase names it, with its article, in the confirm dialog. */
+  phrase: ContainerPhraseKey;
   /** What happens after the user agrees, when it is not the usual "the importer
    * resolves missing content and saves". Set for a kind that lands in the import
    * box instead of an importer. */
@@ -96,6 +98,7 @@ export function prepareImport(code: string): PrepareImportResult {
           ...(base as ImportPlan),
           route: importRoute("/play/skirmish", code),
           label: containerKindName("preset"),
+          phrase: "preset",
         },
       };
     case "challenge": {
@@ -113,6 +116,7 @@ export function prepareImport(code: string): PrepareImportResult {
             // a galactic conquest and a warpath run is the whole of what a
             // reader wants from this sentence.
             label: `${mode} ${containerKindName("challenge")}`,
+            phrase: `${mode}-challenge`,
           },
         };
       }
@@ -128,6 +132,7 @@ export function prepareImport(code: string): PrepareImportResult {
           ...(base as ImportPlan),
           route: importRoute("/library/maps", code),
           label: containerKindName("setup-pack"),
+          phrase: "setup-pack",
         },
       };
     case "campaign":
@@ -141,6 +146,7 @@ export function prepareImport(code: string): PrepareImportResult {
           ...(base as ImportPlan),
           route: importRoute("/settings/import", code),
           label: containerKindName("campaign"),
+          phrase: "campaign",
           detail: t`It opens in the import box, which says where a campaign goes.`,
         },
       };
@@ -151,6 +157,7 @@ export function prepareImport(code: string): PrepareImportResult {
           ...(base as ImportPlan),
           route: importRoute("/scenarios", code),
           label: containerKindName("scenario"),
+          phrase: "scenario",
         },
       };
     case "blueprint":
@@ -165,6 +172,7 @@ export function prepareImport(code: string): PrepareImportResult {
           ...(base as ImportPlan),
           route: importRoute("/library/blueprints", code),
           label: containerKindName("blueprint"),
+          phrase: "blueprint",
         },
       };
     case "keymap":
@@ -177,6 +185,7 @@ export function prepareImport(code: string): PrepareImportResult {
           ...(base as ImportPlan),
           route: importRoute("/settings/engine-keybinds", code),
           label: containerKindName("keymap"),
+          phrase: "keymap",
           detail: t`It opens in the keybinds editor, unsaved.`,
         },
       };
@@ -191,6 +200,7 @@ export function prepareImport(code: string): PrepareImportResult {
           ...(base as ImportPlan),
           route: importRoute("/workshop", code),
           label: containerKindName("mod-project"),
+          phrase: "mod-project",
           detail: t`It is saved to Unit tweaks and opened, which needs Advanced mode turned on in Settings.`,
         },
       };
@@ -203,6 +213,7 @@ export function prepareImport(code: string): PrepareImportResult {
           ...(base as ImportPlan),
           route: importRoute("/lego/parts", code),
           label: containerKindName("module"),
+          phrase: "module",
           detail: t`It is added to your modules, which needs Advanced mode turned on in Settings.`,
         },
       };

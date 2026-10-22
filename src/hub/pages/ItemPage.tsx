@@ -27,6 +27,7 @@ import { Link, useNavigate, useParams } from "react-router";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { asContainer, decodeContainerText } from "@/container/container";
+import { containerKindPhrase } from "@/container/names";
 import { useScanTargetSelection, useUnitsyncMinimap } from "@/content/config";
 import type { ImportPlan } from "@/deeplink/actions";
 import { ConfirmDialog, type Pending } from "@/deeplink/ConfirmDialog";
@@ -171,10 +172,15 @@ export default function ItemPage() {
       }
       const notes = [...result.plan.warnings];
       if (result.plan.kind !== item.kind) {
-        const listed = describeItem(item.kind, item.mode).toLowerCase();
-        const sent = result.plan.label;
+        const listed = containerKindPhrase(
+          item.kind === "challenge" &&
+            (item.mode === "conquest" || item.mode === "warpath")
+            ? `${item.mode}-challenge`
+            : item.kind,
+        );
+        const sent = containerKindPhrase(result.plan.phrase);
         notes.push(
-          t`The hub lists this as a ${listed}, but what it sent is a ${sent}.`,
+          t`The hub lists this as ${listed}, but what it sent is ${sent}.`,
         );
       }
       const container = asContainer(decodeContainerText(result.text));

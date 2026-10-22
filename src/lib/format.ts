@@ -35,6 +35,23 @@ export function formatCompact(
   return formatNumber(n, { notation: "compact", ...opts });
 }
 
+/**
+ * `items` joined as a list in the app language: "a, b and c" for
+ * `conjunction`, "a, b or c" for `disjunction`, "a, b, c" for `unit`. `Intl`
+ * treats `en` as US English and adds an Oxford comma, so `en` is mapped to
+ * `en-GB`, which matches the app's English copy.
+ */
+export function formatList(
+  items: string[],
+  type: "conjunction" | "disjunction" | "unit",
+): string {
+  const locale = getLocale();
+  return new Intl.ListFormat(locale === "en" ? "en-GB" : locale, {
+    style: "long",
+    type,
+  }).format(items);
+}
+
 type DateInput = Date | number | string;
 
 /** The date part of `d` in the app language. `opts` is `Intl.DateTimeFormatOptions`. */

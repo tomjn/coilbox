@@ -15,6 +15,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { fileDropClaimed } from "@/lib/fileDropClaim";
+import { containerKindPhrase } from "../container/names";
 import { invalidateScans } from "../content/config";
 import { dlInspectArchive, dlInstallArchive } from "../downloads/bindings";
 import { useWriteRoot } from "../downloads/config";
@@ -239,13 +240,13 @@ export function DeepLinkHandler({ children }: { children: React.ReactNode }) {
   // set for a fetch-URL import so the dialog says where the content came from.
   const buildImportPending = useCallback(
     (plan: ImportPlan, host?: string, hubItemId?: string): Pending => {
-      const planLabel = plan.label;
+      const planPhrase = containerKindPhrase(plan.phrase);
       return {
         title: t`Import from a link`,
         lines: [
           host
-            ? t`Import a ${planLabel} downloaded from ${host}?`
-            : t`Import a ${planLabel} shared with you?`,
+            ? t`Import ${planPhrase} downloaded from ${host}?`
+            : t`Import ${planPhrase} shared with you?`,
           plan.detail ??
             t`It opens in the importer, which resolves any missing content before saving.`,
         ],

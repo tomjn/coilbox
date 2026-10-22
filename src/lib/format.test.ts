@@ -6,6 +6,7 @@ import {
   formatDate,
   formatDateTime,
   formatDuration,
+  formatList,
   formatNumber,
   formatTime,
 } from "./format";
@@ -106,5 +107,17 @@ describe("locale formatters", () => {
       "12:00",
     );
     expect(formatDateTime(at, { timeZone: "UTC" })).toBe("1.9.2026, 12:00:00");
+  });
+});
+
+describe("formatList", () => {
+  it("writes English lists without an Oxford comma", () => {
+    expect(formatList(["a", "b", "c"], "conjunction")).toBe("a, b and c");
+    expect(formatList(["a", "b", "c"], "disjunction")).toBe("a, b or c");
+  });
+
+  it("follows the app language", () => {
+    activate("de");
+    expect(formatList(["a", "b", "c"], "conjunction")).toBe("a, b und c");
   });
 });

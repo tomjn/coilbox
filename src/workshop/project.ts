@@ -37,7 +37,6 @@
  * named-collection pattern this follows, down to writing `gameName` beside the
  * shared `game` identity.
  */
-import { i18n } from "@lingui/core";
 import { plural, t } from "@lingui/core/macro";
 import { useSetting } from "@picoframe/frame";
 import {
@@ -55,6 +54,7 @@ import {
 } from "../container/gameIdentity";
 import { rememberedShortname } from "../container/shortnames";
 import { MAX_CODE_LENGTH } from "../deeplink/parse";
+import { formatList } from "../lib/format";
 import { readStoredSetting, updateStoredSetting } from "../lib/storedSetting";
 import {
   type ArmorClasses,
@@ -319,9 +319,7 @@ export function describeEdits(edits: GameEdits): string {
         other: "# death explosions",
       }),
   ].filter((part): part is string => typeof part === "string");
-  const usedIn = new Intl.ListFormat(i18n.locale, {
-    type: "conjunction",
-  }).format(uses);
+  const usedIn = formatList(uses, "conjunction");
   const libraryWeapons =
     uses.length === 0
       ? plural(weapons, {
@@ -358,9 +356,7 @@ export function describeEdits(edits: GameEdits): string {
   ].filter((part): part is string => typeof part === "string");
   return parts.length === 0
     ? t`Nothing changed yet`
-    : new Intl.ListFormat(i18n.locale, { type: "unit", style: "long" }).format(
-        parts,
-      );
+    : formatList(parts, "unit");
 }
 
 /** A named set of edits against one game, as it is stored and as it is shared. */

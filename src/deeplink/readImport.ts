@@ -35,6 +35,10 @@
 import { t } from "@lingui/core/macro";
 import { COMPRESSED_CODE_PREFIX, identify } from "../container/container";
 import type { GameIdentity } from "../container/gameIdentity";
+import {
+  type ContainerPhraseKey,
+  containerKindPhrase,
+} from "../container/names";
 import { type ImportPlan, prepareImport } from "./actions";
 import { parseDeepLink } from "./parse";
 
@@ -52,11 +56,11 @@ const COILBOX_LINK = /^coilbox:/i;
 
 /** Name a container as a noun phrase, so one wording serves both "This is …"
  * and "Your clipboard holds …". */
-function phraseFor(label: string, game?: GameIdentity): string {
+function phraseFor(key: ContainerPhraseKey, game?: GameIdentity): string {
   // The archive name pins a build and is the more useful of the two. The
   // shortname is all a challenge ever carries.
   const name = game?.name ?? game?.shortname;
-  return name ? t`a ${label} for ${name}` : t`a ${label}`;
+  return containerKindPhrase(key, name);
 }
 
 /** True when the text parses as JSON, which separates "not a coilbox file" from
@@ -107,7 +111,7 @@ function readContainerText(text: string): ReadImportResult {
   // behind Advanced mode. Say so, rather than routing to a screen that will not
   // take a code (issue #1333 keeps campaign code import out of scope).
   if (id.kind === "campaign") {
-    const campaignPhrase = phraseFor(t`coilbox campaign`, id.game);
+    const campaignPhrase = phraseFor("coilbox-campaign", id.game);
     return {
       outcome: "rejected",
       reason: t`This is ${campaignPhrase}. Campaigns import from a file: turn on Advanced mode in Settings, then use Campaign Builder and its Import button.`,
@@ -118,7 +122,7 @@ function readContainerText(text: string): ReadImportResult {
   if (!prepared.ok) return { outcome: "rejected", reason: prepared.reason };
   return {
     outcome: "confirm",
-    phrase: phraseFor(prepared.plan.label, id.game),
+    phrase: phraseFor(prepared.plan.phrase, id.game),
     plan: prepared.plan,
   };
 }

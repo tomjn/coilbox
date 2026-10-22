@@ -42,7 +42,7 @@ import {
   normaliseFieldPath,
   type ResolvedField,
 } from "@/content/unitFields";
-import { getLocale } from "@/i18n";
+import { formatList } from "@/lib/format";
 import { fieldState, readPath, type UnitOverrides } from "./overrides";
 import type {
   FieldRow,
@@ -377,10 +377,7 @@ const DEFINITION_SECTIONS: { id: string; label: MessageDescriptor }[] = [
 
 /** "A", "A and B", "A, B and C" in the app language. */
 function nameList(names: string[]): string {
-  return new Intl.ListFormat(getLocale(), {
-    style: "long",
-    type: "conjunction",
-  }).format(names);
+  return formatList(names, "conjunction");
 }
 
 function definitionSection(leaf: string, field: ResolvedField): string {
