@@ -1,4 +1,4 @@
-import { Trans, useLingui } from "@lingui/react/macro";
+import { Plural, Trans, useLingui } from "@lingui/react/macro";
 import { Button } from "@picoframe/frame";
 import {
   AlignCenterHorizontal,
@@ -81,7 +81,11 @@ export function SetPanel({
     <div className="max-h-[55%] min-h-0 overflow-y-auto border-t border-border px-3 py-2">
       <p className="text-xs text-muted-foreground">
         {/* A set is only shown for two or more pieces, so there is no singular. */}
-        <Trans>{selectedCount} pieces selected</Trans>
+        <Plural
+          value={selectedCount}
+          one="# piece selected"
+          other="# pieces selected"
+        />
       </p>
       <ul className="mt-1 flex flex-wrap gap-1">
         {selectedIds.map((pieceId) => {
