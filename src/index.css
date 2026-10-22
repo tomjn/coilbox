@@ -4,13 +4,13 @@
 @import "@picoframe/frame/theme.css";
 /* Country flag sprites (fi fi-xx) for lobby user/battle lists — see multiplayer/UserBadges. */
 @import "flag-icons/css/flag-icons.min.css";
-/* Oxanium: a self-hosted display face for the conquest/warpath "command console"
+/* Tektur: a self-hosted display face for the conquest/warpath "command console"
    chrome only. Bundled (offline-safe, no CDN) like flag-icons above. Exposed as a
    `font-display` utility via the theme token below; the app-wide default font is
    left untouched, so only elements that opt in with `font-display` change. */
-@import "@fontsource-variable/oxanium";
+@import "@fontsource-variable/tektur";
 @theme {
-  --font-display: "Oxanium Variable", ui-sans-serif, system-ui, sans-serif;
+  --font-display: "Tektur Variable", ui-sans-serif, system-ui, sans-serif;
   /* Tailwind stops at 2xl (96rem). 3xl is the first step above a 1920 CSS pixel
      window, which is a 1080p screen at 100% and a 4K screen at 200%. It is a
      window width, so it follows the UI zoom and not the monitor's resolution. */
