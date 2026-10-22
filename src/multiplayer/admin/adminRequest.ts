@@ -1,5 +1,6 @@
 import { t } from "@lingui/core/macro";
 import { useCallback, useRef, useState } from "react";
+import { describeError } from "@/i18n/uiError";
 import {
   type AdminOutcome,
   type AdminReply,
@@ -62,7 +63,7 @@ export function requestStateFor(outcome: AdminOutcome): AdminRequestState {
 }
 
 function errorText(e: unknown): string {
-  return e instanceof Error ? e.message : String(e);
+  return describeError(e);
 }
 
 /**

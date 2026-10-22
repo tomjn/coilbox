@@ -2,6 +2,7 @@ import { Button, Input } from "@picoframe/frame";
 import { type FormEvent, useState } from "react";
 import { Field } from "@/components/Field";
 import { OptionSelect } from "@/components/OptionSelect";
+import { describeError } from "@/i18n/uiError";
 import { identifierFieldProps } from "@/lib/identifierField";
 import { serverKeyFor, useMultiplayer } from "../multiplayer/store";
 import { lsStoreCredential } from "./bindings";
@@ -92,7 +93,7 @@ export function RegisterForm({
       }
       onSuccess();
     } catch (err) {
-      setError(String(err));
+      setError(describeError(err));
     } finally {
       setSubmitting(false);
     }

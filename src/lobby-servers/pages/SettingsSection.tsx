@@ -20,6 +20,7 @@ import { type FormEvent, useEffect, useRef, useState } from "react";
 import { CheckField, Field } from "@/components/Field";
 import { OptionSelect } from "@/components/OptionSelect";
 import { SlideDrawer } from "@/components/SlideDrawer";
+import { describeError } from "@/i18n/uiError";
 import { identifierFieldProps } from "@/lib/identifierField";
 import { updateStoredSetting } from "@/lib/storedSetting";
 import {
@@ -782,7 +783,7 @@ function AddAccountForm({
         if (mounted.current) {
           setBusy(false);
           setError(
-            `Coilbox could not save the password to your keychain, so the login was not added. ${String(err)}`,
+            `Coilbox could not save the password to your keychain, so the login was not added. ${describeError(err)}`,
           );
         }
         return;
@@ -1237,7 +1238,7 @@ function TachyonSignIn({
       await action;
       onChanged(outcome);
     } catch (e) {
-      setError(String(e));
+      setError(describeError(e));
     }
   };
 

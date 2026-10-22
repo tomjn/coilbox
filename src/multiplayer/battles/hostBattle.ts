@@ -9,11 +9,10 @@
  */
 
 import { t } from "@lingui/core/macro";
+import { describeError } from "@/i18n/uiError";
 
 export function hostBattleFailure(error: unknown): string {
-  const raw = (
-    error instanceof Error ? error.message : String(error ?? "")
-  ).trim();
+  const raw = describeError(error ?? "").trim();
   return raw
     ? t`Could not host the battle: ${raw}`
     : t`Could not host the battle.`;

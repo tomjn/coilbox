@@ -9,6 +9,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { describeError } from "@/i18n/uiError";
 import { identifierFieldProps } from "@/lib/identifierField";
 import { agreementWantsCode } from "./agreement";
 import { serverNameFor, useMultiplayer, useProtocolServers } from "./store";
@@ -62,7 +63,7 @@ export function VerificationCodeDialog() {
     try {
       await submitAgreementCode(code.trim());
     } catch (e) {
-      setError(String(e));
+      setError(describeError(e));
     } finally {
       setBusy(false);
     }

@@ -30,6 +30,7 @@
  */
 
 import { plural, t } from "@lingui/core/macro";
+import { describeError } from "@/i18n/uiError";
 import type { TweakSlotPack } from "@/workshop/tweakPack";
 import { MODOPT_PREFIX } from "./battleOptions";
 
@@ -302,7 +303,7 @@ export async function runDelivery(
     try {
       await io.send(slot);
     } catch (error) {
-      stop(i, error instanceof Error ? error.message : String(error), said());
+      stop(i, describeError(error), said());
       break;
     }
 

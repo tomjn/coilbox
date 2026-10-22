@@ -11,6 +11,7 @@ import { RoomMovedPanel } from "@/direct/RoomMoved";
 import { closeEndsTheRoom, hostedRoomKey } from "@/direct/room";
 import { stopHostedRoom } from "@/direct/stopRoom";
 import { useFactionLogos } from "@/factions/logos";
+import { describeError } from "@/i18n/uiError";
 import { notify } from "@/notify/notify";
 import { useSkirmishAis } from "@/play/config";
 import type { SkirmishDraft } from "@/play/drafts";
@@ -483,7 +484,7 @@ function BattleRoomPage() {
         // Said out here rather than in the room's own line, which is on the page
         // this is about to leave for and describes a room that is still up. The
         // "Stop room" button beside it is the way out.
-        const reason = e instanceof Error ? e.message : String(e);
+        const reason = describeError(e);
         void notify({
           title: t`The room is still running`,
           body: t`Coilbox could not close it: ${reason}. Stop it from the Battles page.`,

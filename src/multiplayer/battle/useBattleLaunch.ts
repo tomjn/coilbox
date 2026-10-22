@@ -2,6 +2,7 @@ import { t } from "@lingui/core/macro";
 import { useCallback, useState } from "react";
 import { loadReplays } from "@/content/replayList";
 import { useReplayUserState } from "@/content/replayUserState";
+import { describeError } from "@/i18n/uiError";
 import { notify } from "@/notify/notify";
 import type { BattleConfig } from "@/play/bindings";
 import type { PlayTarget } from "@/play/config";
@@ -197,7 +198,7 @@ export function useBattleLaunch(
         );
       }
     } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
+      setError(describeError(e));
     }
   }, [serverKey, target, host, blocked, launch, setProvenance]);
 

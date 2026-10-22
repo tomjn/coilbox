@@ -6,6 +6,7 @@ import { useEffect, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
 import { useNavigate } from "react-router";
 import { SlideDrawer } from "@/components/SlideDrawer";
+import { describeError } from "@/i18n/uiError";
 import { BATTLE_PASSWORD_REFUSAL, battleKeyFor } from "../../deeplink/parse";
 import {
   allServers,
@@ -143,7 +144,7 @@ export function InviteLinkHost() {
     );
     if (offer.kind === "connect") {
       connect(offer.server, offer.account.username).catch((e) =>
-        setError(e instanceof Error ? e.message : String(e)),
+        setError(describeError(e)),
       );
     } else if (offer.kind === "login") {
       // A saved login that cannot connect in one press is in the topbar's

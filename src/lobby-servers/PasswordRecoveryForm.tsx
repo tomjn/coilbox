@@ -4,6 +4,7 @@ import { openUrl } from "@tauri-apps/plugin-opener";
 import { type FormEvent, useEffect, useRef, useState } from "react";
 import { Field } from "@/components/Field";
 import { OptionSelect } from "@/components/OptionSelect";
+import { describeError } from "@/i18n/uiError";
 import { identifierFieldProps } from "@/lib/identifierField";
 import { serverKeyFor, useMultiplayer } from "../multiplayer/store";
 import { type LobbyServer, serverProtocol } from "./config";
@@ -93,7 +94,7 @@ export function PasswordRecoveryForm({
         setStage("redirected");
       }
     } catch (err) {
-      setError(String(err));
+      setError(describeError(err));
     } finally {
       setSubmitting(false);
     }
@@ -112,7 +113,7 @@ export function PasswordRecoveryForm({
       // A wrong code leaves the connection open for uberserver's remaining
       // attempts, so the stage stays "code" and the field stays open for a
       // retry rather than resetting to the email step.
-      setError(String(err));
+      setError(describeError(err));
     } finally {
       setSubmitting(false);
     }

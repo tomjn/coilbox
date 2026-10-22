@@ -23,6 +23,7 @@ import {
   useUnitsyncGameHeaders,
   useUnitsyncThumbnails,
 } from "@/content/config";
+import { describeError } from "@/i18n/uiError";
 import { identifierFieldProps } from "@/lib/identifierField";
 import { useSkirmishAis } from "@/play/config";
 import type { SkirmishDraft } from "@/play/drafts";
@@ -244,7 +245,7 @@ export function HostRoomForm({
       // in its battle room, and that navigation closes every drawer, so there is
       // nothing here to close and nothing to race with.
     } catch (err) {
-      setError(err instanceof Error ? err.message : String(err));
+      setError(describeError(err));
     } finally {
       setStarting(false);
     }

@@ -2,6 +2,7 @@ import { Trans, useLingui } from "@lingui/react/macro";
 import { Input } from "@picoframe/frame";
 import { Hash, MessageSquare, Search, Swords, User } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
+import { describeError } from "@/i18n/uiError";
 import { formatDateTime, formatTime } from "@/lib/format";
 import {
   type ChatLogAccount,
@@ -68,7 +69,7 @@ export default function ChatLogPage() {
   useEffect(() => {
     mpChatLogs({})
       .then((r) => setAccounts(r.accounts))
-      .catch((e) => setError(e instanceof Error ? e.message : String(e)));
+      .catch((e) => setError(describeError(e)));
   }, []);
 
   // Load the selected thread's transcript.
@@ -89,7 +90,7 @@ export default function ChatLogPage() {
         if (!cancelled) setMessages(r.messages);
       })
       .catch((e) => {
-        if (!cancelled) setError(e instanceof Error ? e.message : String(e));
+        if (!cancelled) setError(describeError(e));
       })
       .finally(() => {
         if (!cancelled) setLoading(false);

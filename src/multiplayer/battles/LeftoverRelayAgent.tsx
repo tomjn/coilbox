@@ -2,6 +2,7 @@ import { t } from "@lingui/core/macro";
 import { Trans } from "@lingui/react/macro";
 import { Button } from "@picoframe/frame";
 import { useState } from "react";
+import { describeError } from "@/i18n/uiError";
 import { mpAskLeftoverRelayToStop } from "../bindings";
 
 /** What the relay agent did when it was asked to stop. */
@@ -82,9 +83,7 @@ export function LeftoverRelayAgent({
       const { outcome } = await mpAskLeftoverRelayToStop({});
       setOutcome(outcome);
     } catch (err) {
-      setFailed(
-        err instanceof Error ? err.message : String(err ?? t`it could not be`),
-      );
+      setFailed(describeError(err ?? t`it could not be`));
     } finally {
       setAsking(false);
     }

@@ -17,6 +17,7 @@ import { Trans, useLingui } from "@lingui/react/macro";
 import { Button } from "@picoframe/frame";
 import { useEffect, useRef, useState } from "react";
 import { Link } from "react-router";
+import { describeError } from "@/i18n/uiError";
 import { hostEngineVersion } from "../multiplayer/battles/hostEngineVersion";
 import { leaveAndLabel } from "../multiplayer/battles/oneBattle";
 import {
@@ -104,7 +105,7 @@ export function QuickRoom({
         // closes every drawer.
       } catch (e) {
         started.current = false;
-        setError(e instanceof Error ? e.message : String(e));
+        setError(describeError(e));
       }
     })();
   }, [canRun, target, name, gameName, mapName, modhash, maphash, attempt]);

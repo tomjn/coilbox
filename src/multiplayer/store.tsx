@@ -12,6 +12,7 @@ import {
   useRef,
   useState,
 } from "react";
+import { describeError } from "@/i18n/uiError";
 import { directServer } from "../direct/room";
 import { lsGetCredential } from "../lobby-servers/bindings";
 import {
@@ -1545,7 +1546,7 @@ export function MultiplayerProvider({ children }: { children: ReactNode }) {
         // its entry would otherwise read as disconnected with no reason.
         dispatchMirror(serverKey, {
           type: "connectFailed",
-          reason: e instanceof Error ? e.message : String(e),
+          reason: describeError(e),
         });
         throw e;
       } finally {
