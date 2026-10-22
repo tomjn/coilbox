@@ -44,7 +44,7 @@ function files(count: number): FileDiff[] {
 }
 
 /** The message ID Lingui gives a plural whose count variable is `variable`. */
-function pluralId(variable: string, one: string, other: string): string {
+function icuPluralId(variable: string, one: string, other: string): string {
   return generateMessageId(
     `{${variable}, plural, one {${one}} other {${other}}}`,
   );
@@ -57,7 +57,7 @@ function fixtureCatalog() {
     other: string,
     fr: string[],
   ) => [
-    pluralId(variable, one, other),
+    icuPluralId(variable, one, other),
     compileMessage(`{${variable}, plural, one {${fr[0]}} other {${fr[1]}}}`),
   ];
   return Object.fromEntries([
