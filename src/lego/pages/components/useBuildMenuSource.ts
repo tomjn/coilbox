@@ -43,10 +43,10 @@ export function useBuildMenuSource(project: LegoProject): BuildMenuSource {
     game?.primaryArchive.name,
   );
   const current = defs && defsFor === game?.primaryArchive.name ? defs : null;
-  const named = own?.name ?? t`The game it was exported into`;
+  const ownName = own?.name;
+  const gameName = game?.name ?? ownName;
   const scanError = scan.error;
-  const gameLabel = game?.name ?? named;
-  const reason = error ?? t`its definitions could not be read`;
+  const detail = error ?? null;
   const unavailable =
     !own && !(legacy && project.exported)
       ? t`Choose a game for this unit first.`
@@ -55,9 +55,17 @@ export function useBuildMenuSource(project: LegoProject): BuildMenuSource {
         : scanError
           ? t`The content scan failed: ${scanError}`
           : scan.data && !game
-            ? t`${named} is not installed.`
+            ? ownName
+              ? t`${ownName} is not installed.`
+              : t`The game it was exported into is not installed.`
             : status === "error"
-              ? t`Could not read ${gameLabel}: ${reason}`
+              ? gameName
+                ? detail
+                  ? t`Could not read ${gameName}: ${detail}`
+                  : t`Could not read ${gameName}: its definitions could not be read`
+                : detail
+                  ? t`Could not read the game it was exported into: ${detail}`
+                  : t`Could not read the game it was exported into: its definitions could not be read`
               : null;
   return {
     gameName: game?.name ?? null,

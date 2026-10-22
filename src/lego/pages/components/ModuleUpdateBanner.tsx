@@ -6,6 +6,7 @@
  * changes again.
  */
 
+import { Plural, Trans } from "@lingui/react/macro";
 import { Button } from "@picoframe/frame";
 
 import type { ModuleUpdate, UntrackedModule } from "../../moduleUpdates";
@@ -35,64 +36,87 @@ export function ModuleUpdateBanner({
     >
       <div className="flex items-center justify-between gap-3">
         <span>
-          {count === 0
-            ? "Some parts of this unit are not tracked."
-            : count === 1
-              ? "1 part of this unit uses an older module."
-              : `${count} parts of this unit use an older module.`}
+          {count === 0 ? (
+            <Trans>Some parts of this unit are not tracked.</Trans>
+          ) : (
+            <Plural
+              value={count}
+              one="# part of this unit uses an older module."
+              other="# parts of this unit use an older module."
+            />
+          )}
         </span>
         <Button size="sm" variant="ghost" onClick={onDismiss}>
-          Dismiss
+          <Trans>Dismiss</Trans>
         </Button>
       </div>
       <ul className="mt-1 space-y-1">
-        {updates.map((update) => (
-          <li
-            key={update.instance}
-            className="flex items-center justify-between gap-3"
-          >
-            <span className="text-muted-foreground">
-              {update.name} uses an older {update.moduleName}.
-              {update.edited > 0
-                ? ` Update resets ${update.edited} edited ${update.edited === 1 ? "piece" : "pieces"}.`
-                : ""}
-            </span>
-            <Button
-              size="sm"
-              variant="outline"
-              onClick={() => onUpdate(update)}
+        {updates.map((update) => {
+          const updateName = update.name;
+          const updateModule = update.moduleName;
+          const edited = update.edited;
+          return (
+            <li
+              key={update.instance}
+              className="flex items-center justify-between gap-3"
             >
-              Update
-            </Button>
-          </li>
-        ))}
-        {untracked.map((item) => (
-          <li
-            key={item.instance}
-            className="flex items-center justify-between gap-3"
-          >
-            <span className="text-muted-foreground">
-              {item.name} ({item.moduleName}). Added before changes were
-              tracked.
-            </span>
-            <span className="flex gap-1">
+              <span className="text-muted-foreground">
+                <Trans>
+                  {updateName} uses an older {updateModule}.
+                </Trans>
+                {update.edited > 0 ? (
+                  <>
+                    {" "}
+                    <Plural
+                      value={edited}
+                      one="Update resets # edited piece."
+                      other="Update resets # edited pieces."
+                    />
+                  </>
+                ) : null}
+              </span>
               <Button
                 size="sm"
                 variant="outline"
-                onClick={() => onMark?.(item)}
+                onClick={() => onUpdate(update)}
               >
-                Mark as current
+                <Trans>Update</Trans>
               </Button>
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={() => onUpdate(item)}
-              >
-                Update now
-              </Button>
-            </span>
-          </li>
-        ))}
+            </li>
+          );
+        })}
+        {untracked.map((item) => {
+          const itemName = item.name;
+          const itemModule = item.moduleName;
+          return (
+            <li
+              key={item.instance}
+              className="flex items-center justify-between gap-3"
+            >
+              <span className="text-muted-foreground">
+                <Trans>
+                  {itemName} ({itemModule}). Added before changes were tracked.
+                </Trans>
+              </span>
+              <span className="flex gap-1">
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => onMark?.(item)}
+                >
+                  <Trans>Mark as current</Trans>
+                </Button>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => onUpdate(item)}
+                >
+                  <Trans>Update now</Trans>
+                </Button>
+              </span>
+            </li>
+          );
+        })}
       </ul>
     </div>
   );

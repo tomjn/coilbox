@@ -20,6 +20,7 @@
  * mounts the builder behind a unitsync read of a game.
  */
 
+import { Plural, Trans, useLingui } from "@lingui/react/macro";
 import { Button } from "@picoframe/frame";
 import { PersonStanding } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -112,6 +113,7 @@ export function ReferencePicker({
   /** Called with the chosen game unit, or `null` when none is chosen. */
   onUnit?: (unit: ReferenceUnit | null) => void;
 }) {
+  const { t } = useLingui();
   const { target } = usePreferredTarget();
   const scan = useUnitsyncScan(target?.enginePath, target?.dataDir);
   /** Null until somebody picks, so the list opens on the unit's own game. */
@@ -183,8 +185,8 @@ export function ReferencePicker({
         <Button
           size="icon"
           variant={show ? "default" : "outline"}
-          title="A unit at its real size, for scale"
-          aria-label="Reference unit"
+          title={t`A unit at its real size, for scale`}
+          aria-label={t`Reference unit`}
           aria-pressed={show}
         >
           <PersonStanding className="size-4" />
@@ -193,7 +195,7 @@ export function ReferencePicker({
       <PopoverContent side="top" align="end" className="w-72 space-y-3">
         <div className="flex items-center justify-between gap-3">
           <Label htmlFor="lego-reference-show" className="text-xs font-medium">
-            Stand it beside the build
+            <Trans>Stand it beside the build</Trans>
           </Label>
           <Switch
             id="lego-reference-show"
@@ -202,7 +204,7 @@ export function ReferencePicker({
           />
         </div>
 
-        <Field label="Game">
+        <Field label={t`Game`}>
           <OptionSelect
             value={gameName}
             onValueChange={(value) => {
@@ -210,7 +212,7 @@ export function ReferencePicker({
               setUnitName("");
             }}
             options={[
-              { value: BUILT_IN, label: "None: solar collector" },
+              { value: BUILT_IN, label: t`None: solar collector` },
               ...games.map((g) => ({ value: g.name, label: g.name })),
             ]}
             disabled={games.length === 0}
@@ -218,7 +220,7 @@ export function ReferencePicker({
         </Field>
 
         {game && (
-          <Field label="Unit">
+          <Field label={t`Unit`}>
             <UnitPickerButton
               gameArchive={archive}
               enginePath={target?.enginePath}
@@ -245,7 +247,7 @@ export function ReferencePicker({
                 }
               : {
                   counts: REFERENCE_COUNTS,
-                  label: "Solar collector (a building)",
+                  label: t`Solar collector (a building)`,
                 }
           }
         />
@@ -302,34 +304,56 @@ function Note({
   onRetry: () => void;
   datasetFailed: boolean;
 }) {
+  const { t } = useLingui();
   if (!game) {
     return (
       <Text>
-        The solar collector is built in, so it is here whether or not a game is.
-        {scanning
-          ? " Reading the installed games."
-          : " Pick a game to stand one of its units at its real size instead."}
+        {scanning ? (
+          <Trans>
+            The solar collector is built in, so it is here whether or not a game
+            is. Reading the installed games.
+          </Trans>
+        ) : (
+          <Trans>
+            The solar collector is built in, so it is here whether or not a game
+            is. Pick a game to stand one of its units at its real size instead.
+          </Trans>
+        )}
       </Text>
     );
   }
   if (datasetFailed) {
     return (
-      <Text>Could not read {game}'s units. Showing the solar collector.</Text>
+      <Text>
+        <Trans>
+          Could not read {game}'s units. Showing the solar collector.
+        </Trans>
+      </Text>
     );
   }
-  if (!unit) return <Text>Pick a unit of {game} to stand beside yours.</Text>;
+  if (!unit) {
+    return (
+      <Text>
+        <Trans>Pick a unit of {game} to stand beside yours.</Trans>
+      </Text>
+    );
+  }
   if (!object) {
     return (
       <Text>
-        This unit's definition names no model, so the engine draws nothing for
-        it either. Showing the solar collector.
+        <Trans>
+          This unit's definition names no model, so the engine draws nothing for
+          it either. Showing the solar collector.
+        </Trans>
       </Text>
     );
   }
   if (loading)
     return (
       <Text>
-        Reading {object} out of {game}.
+        <Trans>
+          Reading {object} out of {game}.
+        </Trans>
       </Text>
     );
   if (failed) {
@@ -337,7 +361,7 @@ function Note({
       <Text>
         <ModelReadFailed
           error={error}
-          fallback={`Could not reach unitsync to read ${object}. Showing the solar collector.`}
+          fallback={t`Could not reach unitsync to read ${object}. Showing the solar collector.`}
           onRetry={onRetry}
         />
       </Text>
@@ -345,25 +369,39 @@ function Note({
   }
   if (!model) return null;
   if (!drawable) {
+    const firstError = model.errors[0];
     return (
       <Text>
-        {model.errors[0] ?? `Nothing drawable came out of ${object}.`} Showing
-        the solar collector.
+        {firstError ? (
+          <Trans>{firstError} Showing the solar collector.</Trans>
+        ) : (
+          <Trans>
+            Nothing drawable came out of {object}. Showing the solar collector.
+          </Trans>
+        )}
       </Text>
     );
   }
 
   const missing = missingTextures(model);
+  const missingCount = missing.length;
+  const missingNames = missing.map((m) => m.name).join(", ");
+  const unitName = unitLabel(unit);
   return (
     <>
       <Text>
-        {unitLabel(unit)} is standing to the left of the plates at the size the
-        engine draws it.
+        <Trans>
+          {unitName} is standing to the left of the plates at the size the
+          engine draws it.
+        </Trans>
       </Text>
-      {missing.length > 0 && (
+      {missingCount > 0 && (
         <Text>
-          {missing.length} of its textures are not in {game}, so those faces are
-          drawn plain: {missing.map((t) => t.name).join(", ")}.
+          <Plural
+            value={missingCount}
+            one={`# of its textures is not in ${game}, so that face is drawn plain: ${missingNames}.`}
+            other={`# of its textures are not in ${game}, so those faces are drawn plain: ${missingNames}.`}
+          />
         </Text>
       )}
     </>

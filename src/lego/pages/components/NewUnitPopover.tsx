@@ -1,3 +1,4 @@
+import { Trans, useLingui } from "@lingui/react/macro";
 import { Button } from "@picoframe/frame";
 import { Plus } from "lucide-react";
 import { useState } from "react";
@@ -43,6 +44,7 @@ interface Props {
  * asks for the footprint and height to fit its skeleton to.
  */
 export function NewUnitPopover({ plans, label, busy, game, onChoose }: Props) {
+  const { t } = useLingui();
   const [open, setOpen] = useState(false);
   const [picked, setPicked] = useState<BodyPlan | null>(null);
   const [target, setTarget] = useState<SkeletonTarget | null>(null);
@@ -90,7 +92,7 @@ export function NewUnitPopover({ plans, label, busy, game, onChoose }: Props) {
       <PopoverContent align="end" className="w-72 p-1">
         {game ? (
           <div className="p-2">
-            <Field label="Game">
+            <Field label={t`Game`}>
               <OptionSelect
                 size="sm"
                 value={game.value}
@@ -128,10 +130,10 @@ export function NewUnitPopover({ plans, label, busy, game, onChoose }: Props) {
                 variant="outline"
                 onClick={() => setPicked(null)}
               >
-                Back
+                <Trans>Back</Trans>
               </Button>
               <Button type="submit" size="sm" disabled={!target}>
-                Start
+                <Trans>Start</Trans>
               </Button>
             </div>
           </form>
@@ -139,8 +141,8 @@ export function NewUnitPopover({ plans, label, busy, game, onChoose }: Props) {
           <>
             <ul className="space-y-0.5">
               <Entry
-                label="Blank"
-                description="One empty piece to build from."
+                label={t`Blank`}
+                description={t`One empty piece to build from.`}
                 onClick={chooseBlank}
               />
               {plans.map((plan) => (
@@ -157,7 +159,7 @@ export function NewUnitPopover({ plans, label, busy, game, onChoose }: Props) {
               onClick={() => setDescribing(true)}
               className="mt-1 w-full rounded border-t border-border px-2 py-1.5 text-left text-sm font-medium hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
             >
-              Describe it instead
+              <Trans>Describe it instead</Trans>
             </button>
           </>
         )}

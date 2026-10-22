@@ -34,6 +34,7 @@
  * what happened and leaves the click to the user (#1912). See `textureMask.ts`.
  */
 
+import { Trans, useLingui } from "@lingui/react/macro";
 import { Button } from "@picoframe/frame";
 import { open } from "@tauri-apps/plugin-dialog";
 import { Image, RefreshCw, TriangleAlert } from "lucide-react";
@@ -67,11 +68,12 @@ interface Props {
 }
 
 export function TexturePicker({ imported, onChange }: Props) {
+  const { t } = useLingui();
   const [busy, setBusy] = useState<Slot | null>(null);
   const [problem, setProblem] = useState<string | null>(null);
 
   const label =
-    imported.texture?.name ?? imported.missingTexture ?? "no texture";
+    imported.texture?.name ?? imported.missingTexture ?? t`no texture`;
   const note = maskLossNote(maskLoss(imported.texture, useAlpha(imported)));
 
   /** Put a file in the store and point the unit at it. */
@@ -100,10 +102,10 @@ export function TexturePicker({ imported, onChange }: Props) {
   async function choose(slot: Slot) {
     const picked = await open({
       multiple: false,
-      title: slot === "texture" ? "Choose a texture" : "Choose a shading map",
+      title: slot === "texture" ? t`Choose a texture` : t`Choose a shading map`,
       filters: [
         {
-          name: "Texture",
+          name: t`Texture`,
           extensions: ["dds", "png", "tga", "bmp", "jpg", "jpeg"],
         },
       ],
@@ -117,7 +119,7 @@ export function TexturePicker({ imported, onChange }: Props) {
       ?.source;
     if (!source) {
       setProblem(
-        "This texture has no file to re-read. Choose one, and refresh will pick up edits to it after that.",
+        t`This texture has no file to re-read. Choose one, and refresh will pick up edits to it after that.`,
       );
       return;
     }
@@ -126,7 +128,9 @@ export function TexturePicker({ imported, onChange }: Props) {
 
   return (
     <div className="flex items-center gap-1 px-1 text-xs text-muted-foreground">
-      <span>texture</span>
+      <span>
+        <Trans>texture</Trans>
+      </span>
       <Popover>
         <PopoverTrigger asChild>
           <Button
@@ -148,7 +152,7 @@ export function TexturePicker({ imported, onChange }: Props) {
                   className="shrink-0 text-amber-500"
                 />
                 <span className="sr-only">
-                  This unit's team-colour mask is missing
+                  <Trans>This unit's team-colour mask is missing</Trans>
                 </span>
               </>
             ) : null}
@@ -157,8 +161,8 @@ export function TexturePicker({ imported, onChange }: Props) {
         <PopoverContent align="start" className="w-80">
           <div className="flex flex-col gap-4">
             <TextureSlot
-              title="Texture"
-              hint="What this unit is painted with. Its UV map points onto this image, so a different one is a different look rather than a remap."
+              title={t`Texture`}
+              hint={t`What this unit is painted with. Its UV map points onto this image, so a different one is a different look rather than a remap.`}
               texture={imported.texture}
               missing={imported.missingTexture}
               note={note}
@@ -168,8 +172,8 @@ export function TexturePicker({ imported, onChange }: Props) {
               onRefresh={() => void refresh("texture")}
             />
             <TextureSlot
-              title="Shading map"
-              hint="The model's second texture, which the engine reads as glow in red and shine in green rather than as a picture. Kept with the unit and written back out by the export, but nothing here draws it."
+              title={t`Shading map`}
+              hint={t`The model's second texture, which the engine reads as glow in red and shine in green rather than as a picture. Kept with the unit and written back out by the export, but nothing here draws it.`}
               texture={imported.texture2}
               missing={imported.missingTexture2}
               busy={busy === "texture2"}
@@ -187,8 +191,8 @@ export function TexturePicker({ imported, onChange }: Props) {
         variant="ghost"
         size="icon"
         className="size-5"
-        aria-label="Refresh the texture"
-        title="Re-read the texture file, to pick up an edit made elsewhere"
+        aria-label={t`Refresh the texture`}
+        title={t`Re-read the texture file, to pick up an edit made elsewhere`}
         disabled={busy !== null || !imported.texture?.source}
         onClick={() => void refresh("texture")}
       >
@@ -252,6 +256,9 @@ function TextureSlot({
   onChoose: () => void;
   onRefresh: () => void;
 }) {
+  const { t } = useLingui();
+  const source = texture?.source;
+  const missingName = missing ?? "";
   return (
     <div className="flex flex-col gap-2">
       <span className="text-sm font-medium text-foreground">{title}</span>
@@ -261,26 +268,28 @@ function TextureSlot({
           <TexturePreview
             url={legoTextureUrl(texture.key)}
             teamColour={previewTeamColour}
-            label={title}
           />
           <code className="break-all text-xs">{texture.name}</code>
           {texture.source ? (
             <p className="break-all text-xs text-muted-foreground">
-              from {texture.source}
+              <Trans>from {source}</Trans>
             </p>
           ) : (
             <p className="text-xs text-muted-foreground">
-              Coilbox has its own copy and there is no file behind it to
-              re-read, which is what a model out of a packed game or map leaves
-              you with. Choose one, and refresh picks up edits to it after that.
+              <Trans>
+                Coilbox has its own copy and there is no file behind it to
+                re-read, which is what a model out of a packed game or map
+                leaves you with. Choose one, and refresh picks up edits to it
+                after that.
+              </Trans>
             </p>
           )}
         </>
       ) : (
         <p className="text-xs text-muted-foreground">
           {missing
-            ? `The model names ${missing}, and no such file was found beside it.`
-            : "The model names none."}
+            ? t`The model names ${missingName}, and no such file was found beside it.`
+            : t`The model names none.`}
         </p>
       )}
       {note ? (
@@ -291,7 +300,7 @@ function TextureSlot({
       ) : null}
       <div className="flex items-center gap-2">
         <Button variant="outline" size="sm" disabled={busy} onClick={onChoose}>
-          {texture ? "Change" : "Choose"}
+          {texture ? t`Change` : t`Choose`}
         </Button>
         <Button
           variant="outline"
@@ -299,7 +308,7 @@ function TextureSlot({
           disabled={busy || !texture?.source}
           onClick={onRefresh}
         >
-          <RefreshCw size={14} /> Refresh
+          <RefreshCw size={14} /> <Trans>Refresh</Trans>
         </Button>
       </div>
     </div>
@@ -330,15 +339,13 @@ const PREVIEW_MAX = 128;
 function TexturePreview({
   url,
   teamColour,
-  label,
 }: {
   url: string;
   /** Whether to mix in the builder's team colour the way the 3D viewport
    *  does, or just force the image opaque (the shading map). */
   teamColour: boolean;
-  /** The slot's own title, so the preview has something to be announced by. */
-  label: string;
 }) {
+  const { t } = useLingui();
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [state, setState] = useState<"loading" | "ready" | "error">("loading");
 
@@ -384,7 +391,7 @@ function TexturePreview({
   if (state === "error")
     return (
       <p className="text-xs text-muted-foreground">
-        Coilbox cannot draw a preview of this texture.
+        <Trans>Coilbox cannot draw a preview of this texture.</Trans>
       </p>
     );
 
@@ -394,8 +401,8 @@ function TexturePreview({
       role="img"
       aria-label={
         teamColour
-          ? `Preview of the ${label.toLowerCase()}, with its team-colour areas shown in the builder's own colour`
-          : `Preview of the ${label.toLowerCase()}`
+          ? t`Preview of the texture, with its team-colour areas shown in the builder's own colour`
+          : t`Preview of the shading map`
       }
       aria-busy={state === "loading"}
       className="h-32 w-full rounded border border-border/50 bg-muted object-contain"

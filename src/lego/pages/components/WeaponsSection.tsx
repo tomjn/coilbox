@@ -6,6 +6,7 @@
  * falls back to the game it was exported into.
  */
 
+import { Trans, useLingui } from "@lingui/react/macro";
 import { Button, Input } from "@picoframe/frame";
 import { Check, ChevronsUpDown } from "lucide-react";
 import { useState } from "react";
@@ -57,6 +58,7 @@ export interface WeaponSource {
 }
 
 export function useWeaponSource(project: LegoProject): WeaponSource {
+  const { t } = useLingui();
   const { target, targetLoading, scan } = useTestGame();
   const { projects } = useModProjects();
   const own = unitGame(project);
@@ -75,18 +77,29 @@ export function useWeaponSource(project: LegoProject): WeaponSource {
     game?.primaryArchive.name,
   );
   const current = defs && defsFor === game?.primaryArchive.name ? defs : null;
-  const named = own?.name ?? "The game it was exported into";
+  const ownName = own?.name;
+  const gameName = game?.name ?? ownName;
+  const scanError = scan.error;
+  const detail = error ?? null;
   const unavailable =
     !own && !(legacy && project.exported)
-      ? "Choose a game for this unit first."
+      ? t`Choose a game for this unit first.`
       : !targetLoading && !target
-        ? "No engine is installed, so the game cannot be read."
-        : scan.error
-          ? `The content scan failed: ${scan.error}`
+        ? t`No engine is installed, so the game cannot be read.`
+        : scanError
+          ? t`The content scan failed: ${scanError}`
           : scan.data && !game
-            ? `${named} is not installed.`
+            ? ownName
+              ? t`${ownName} is not installed.`
+              : t`The game it was exported into is not installed.`
             : status === "error"
-              ? `Could not read ${game?.name ?? named}: ${error ?? "its definitions could not be read"}`
+              ? gameName
+                ? detail
+                  ? t`Could not read ${gameName}: ${detail}`
+                  : t`Could not read ${gameName}: its definitions could not be read`
+                : detail
+                  ? t`Could not read the game it was exported into: ${detail}`
+                  : t`Could not read the game it was exported into: its definitions could not be read`
               : null;
   return {
     gameName: game?.name ?? null,
@@ -111,11 +124,13 @@ function WeaponPicker({
   onPick: (ref: LegoWeaponRef | undefined) => void;
   label: string;
 }) {
+  const { t } = useLingui();
   const [open, setOpen] = useState(false);
   const options =
     source.gameName && !source.unavailable
       ? weaponOptions(source.gameName, source.weaponDefs ?? {}, source.projects)
       : [];
+  const readingGame = source.gameName ?? "";
   const groups = [...new Set(options.map((o) => o.group))];
   const pick = (ref: LegoWeaponRef | undefined) => {
     setOpen(false);
@@ -148,7 +163,7 @@ function WeaponPicker({
           className="justify-between font-normal"
         >
           <span className={cn("truncate", !value && "text-muted-foreground")}>
-            {value ? refLabel(value) : "Pick a weapon"}
+            {value ? refLabel(value) : t`Pick a weapon`}
           </span>
           <ChevronsUpDown className="ml-2 size-4 shrink-0 opacity-50" />
         </Button>
@@ -160,20 +175,26 @@ function WeaponPicker({
           </p>
         ) : !source.gameName || !source.weaponDefs ? (
           <p className="p-3 text-xs text-muted-foreground">
-            Reading {source.gameName ?? "games"}
+            {source.gameName ? (
+              <Trans>Reading {readingGame}</Trans>
+            ) : (
+              <Trans>Reading games</Trans>
+            )}
           </p>
         ) : (
           <Command>
-            <CommandInput placeholder="Search weapons…" />
+            <CommandInput placeholder={t`Search weapons…`} />
             <CommandList>
-              <CommandEmpty>No weapon matches that.</CommandEmpty>
+              <CommandEmpty>
+                <Trans>No weapon matches that.</Trans>
+              </CommandEmpty>
               {value ? (
                 <CommandGroup>
                   <CommandItem
-                    value="No weapon"
+                    value={t`No weapon`}
                     onSelect={() => pick(undefined)}
                   >
-                    No weapon
+                    <Trans>No weapon</Trans>
                   </CommandItem>
                 </CommandGroup>
               ) : null}
@@ -191,6 +212,7 @@ function WeaponPicker({
 }
 
 export function WeaponsSection({ project, onWeaponChange }: Props) {
+  const { t } = useLingui();
   const source = useWeaponSource(project);
   const carriers = weaponCarriers(project);
   if (carriers.length === 0) return null;
@@ -198,8 +220,11 @@ export function WeaponsSection({ project, onWeaponChange }: Props) {
 
   return (
     <div className="flex flex-col gap-3 border-b border-border/60 px-3 py-2">
-      <p className="text-sm font-medium">Weapons</p>
+      <p className="text-sm font-medium">
+        <Trans>Weapons</Trans>
+      </p>
       {carriers.map((piece) => {
+        const pieceName = piece.name;
         const weapon = piece.weapon ?? {};
         const slot = mounted.findIndex((m) => m.piece.id === piece.id) + 1;
         const picked = weapon.fires
@@ -230,13 +255,13 @@ export function WeaponsSection({ project, onWeaponChange }: Props) {
             <p className="text-xs">
               {piece.name}
               <span className="text-muted-foreground">
-                {slot > 0 ? `, weapon ${slot}` : ", fires nothing"}
+                {slot > 0 ? t`, weapon ${slot}` : t`, fires nothing`}
               </span>
             </p>
             <WeaponPicker
               value={weapon.fires}
               source={source}
-              label={`Weapon for ${piece.name}`}
+              label={t`Weapon for ${pieceName}`}
               onPick={(fires) => {
                 const { fires: _old, ...rest } = weapon;
                 set(fires ? { ...rest, fires } : rest);
@@ -251,7 +276,7 @@ export function WeaponsSection({ project, onWeaponChange }: Props) {
             ) : null}
             {weapon.fires ? (
               <div className="grid grid-cols-2 gap-2">
-                <Field label="Arc, degrees">
+                <Field label={t`Arc, degrees`}>
                   <Input
                     type="number"
                     min={1}
@@ -263,7 +288,7 @@ export function WeaponsSection({ project, onWeaponChange }: Props) {
                   />
                 </Field>
                 {arc < 360 ? (
-                  <Field label="Facing, degrees right">
+                  <Field label={t`Facing, degrees right`}>
                     <Input
                       type="number"
                       min={-180}

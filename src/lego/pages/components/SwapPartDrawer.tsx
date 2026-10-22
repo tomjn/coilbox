@@ -6,6 +6,7 @@
  * The other colours of the piece's shape come first.
  */
 
+import { Trans, useLingui } from "@lingui/react/macro";
 import { Button } from "@picoframe/frame";
 import { X } from "lucide-react";
 import { Dialog as DialogPrimitive } from "radix-ui";
@@ -36,6 +37,7 @@ export function SwapPartDrawer({
   atlas,
   onPick,
 }: Props) {
+  const { t } = useLingui();
   const filter = usePartFilter(pack);
   const parts = useMemo(
     () => variantsFirst(pack, current, filter.parts),
@@ -45,12 +47,12 @@ export function SwapPartDrawer({
     () => [
       {
         id: "parts",
-        label: "Parts",
+        label: t`Parts`,
         total: filter.total,
         items: parts.map((part) => ({ kind: "part" as const, part })),
       },
     ],
-    [filter.total, parts],
+    [filter.total, parts, t],
   );
 
   return (
@@ -63,10 +65,10 @@ export function SwapPartDrawer({
         >
           <div className="flex items-center justify-between border-b border-border/60 px-5 py-4">
             <DialogPrimitive.Title className="text-base font-semibold">
-              Change part
+              <Trans>Change part</Trans>
             </DialogPrimitive.Title>
             <DialogPrimitive.Close asChild>
-              <Button variant="ghost" size="icon" aria-label="Close">
+              <Button variant="ghost" size="icon" aria-label={t`Close`}>
                 <X className="size-4" />
               </Button>
             </DialogPrimitive.Close>

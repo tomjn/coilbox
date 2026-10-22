@@ -23,8 +23,16 @@ msgstr ""
 msgid "-10% AI handicap (easier)"
 msgstr ""
 
+#: src/lego/pages/components/WeaponsSection.tsx
+msgid ", fires nothing"
+msgstr ""
+
 #: src/direct/ShareRoomButton.tsx
 msgid ", has a warning"
+msgstr ""
+
+#: src/lego/pages/components/WeaponsSection.tsx
+msgid ", weapon {slot}"
 msgstr ""
 
 #: src/content/mapCompatReport.ts
@@ -1074,6 +1082,10 @@ msgstr ""
 msgid "{assetWidth} by {assetHeight}, {assetKb} KB, {encodeProfile}"
 msgstr ""
 
+#: src/lego/pages/components/PartFilters.tsx
+msgid "{atlasCount, plural, one {# atlas installed, and a unit samples it:} other {# atlases installed, and a unit samples one of them:}}"
+msgstr ""
+
 #: src/challenge/record.ts
 msgid "{attemptCount, plural, one {# attempt} other {# attempts}}"
 msgstr ""
@@ -1282,6 +1294,10 @@ msgstr ""
 msgid "{campaignFailureCount} campaign(s) failed to load"
 msgstr ""
 
+#: src/lego/pages/components/PieceTree.tsx
+msgid "{carriedName} onto {ontoName}"
+msgstr ""
+
 #: src/multiplayer/DebriefingDrawer.tsx
 msgid "{category} rating"
 msgstr ""
@@ -1316,6 +1332,10 @@ msgstr ""
 
 #: src/runlite/pages/RunPage.tsx
 msgid "{cheapest} salvage"
+msgstr ""
+
+#: src/lego/pages/components/ScriptTab.tsx
+msgid "{checkCount, plural, one {# check} other {# checks}}"
 msgstr ""
 
 #: src/scenario/pages/components/mapKeyboard.ts
@@ -1372,6 +1392,14 @@ msgstr ""
 
 #: src/hub/maps/catalogSweep.ts
 msgid "{conflicts, plural, one {# map differs from the version everyone else has under the same name, so it would not match in a game.} other {# maps differ from the version everyone else has under the same name, so they would not match in a game.}}"
+msgstr ""
+
+#: src/lego/pages/components/MountPointList.tsx
+msgid "{connectorLabel}: {onIt}"
+msgstr ""
+
+#: src/lego/pages/components/MountPointList.tsx
+msgid "{connectorLabel}: empty"
 msgstr ""
 
 #: src/lego/pages/components/ImportResult.tsx
@@ -1458,6 +1486,10 @@ msgstr ""
 
 #: src/content/pages/components/ReplayMap.tsx
 msgid "{count, plural, one {# order within {radius} elmos of one spot} other {# orders within {radius} elmos of one spot}}"
+msgstr ""
+
+#: src/lego/pages/components/ModuleUpdateBanner.tsx
+msgid "{count, plural, one {# part of this unit uses an older module.} other {# parts of this unit use an older module.}}"
 msgstr ""
 
 #: src/content/pages/components/MapRecords.tsx
@@ -1598,6 +1630,10 @@ msgstr ""
 msgid "{countedGames}, oldest to newest"
 msgstr ""
 
+#: src/lego/pages/components/UnitGamePicker.tsx
+msgid "{currentName} (not installed)"
+msgstr ""
+
 #: src/notify/NotificationsBell.tsx
 msgid "{days}d"
 msgstr ""
@@ -1707,6 +1743,10 @@ msgstr ""
 msgid "{earnedCount} of {resultCount} earned"
 msgstr ""
 
+#: src/lego/pages/components/ModuleUpdateBanner.tsx
+msgid "{edited, plural, one {Update resets # edited piece.} other {Update resets # edited pieces.}}"
+msgstr ""
+
 #: src/workshop/pages/components/UnitList.tsx
 msgid "{edits, plural, one {# field changed} other {# fields changed}}"
 msgstr ""
@@ -1725,6 +1765,11 @@ msgstr ""
 
 #: src/downloads/pages/components/ProgressBar.tsx
 msgid "{elapsed} elapsed"
+msgstr ""
+
+#: src/lego/pages/components/MeasureReadout.tsx
+#: src/lego/pages/components/ProportionsPanel.tsx
+msgid "{elmos} elmos"
 msgstr ""
 
 #: src/content/pages/components/ReplayOpeningSplit.tsx
@@ -1900,6 +1945,10 @@ msgstr ""
 msgid "{first}, and {second}"
 msgstr ""
 
+#: src/lego/pages/components/ReferencePicker.tsx
+msgid "{firstError} Showing the solar collector."
+msgstr ""
+
 #: src/placement/preview.ts
 msgid "{firstWords} and {secondFar} {secondWay}"
 msgstr ""
@@ -2066,6 +2115,10 @@ msgstr ""
 msgid "{gameName} has changed {weaponSource} since {weaponKey} was copied from it: {movedKeys}. The copy keeps the values it was copied with."
 msgstr ""
 
+#: src/lego/pages/components/ScriptTab.tsx
+msgid "{gameName} has no .bos to convert for this unit."
+msgstr ""
+
 #: src/campaign/pages/components/MissionEditorDrawer.tsx
 msgid "{gameName} has no model for \"{unitDef}\". The briefing will show this slot's image instead."
 msgstr ""
@@ -2165,6 +2218,10 @@ msgstr ""
 msgid "{gameName} loading screen"
 msgstr ""
 
+#: src/lego/pages/components/ScriptTab.tsx
+msgid "{gameName} no longer has a compiled script for this unit."
+msgstr ""
+
 #: src/workshop/compatibility.ts
 msgid "{gameName} now has a unit of its own called {key}, so this copy replaces it rather than adding a unit. Rename the copy if that is not what you want."
 msgstr ""
@@ -2203,6 +2260,10 @@ msgstr ""
 
 #: src/workshop/pages/components/ProjectChecks.tsx
 msgid "{gameName}'s mod options could not be read, so which routes it supports is not known."
+msgstr ""
+
+#: src/lego/pages/components/MovementSection.tsx
+msgid "{gameNameShown} has no {stored} class, so the engine drops this unit at load. Pick another."
 msgstr ""
 
 #: src/career/pages/CareerPage.tsx
@@ -2354,6 +2415,10 @@ msgstr ""
 msgid "{ip} is not a single machine's address, so the engine cannot connect to it."
 msgstr ""
 
+#: src/lego/pages/components/ModuleUpdateBanner.tsx
+msgid "{itemName} ({itemModule}). Added before changes were tracked."
+msgstr ""
+
 #: src/content/AnalysisQueueBadge.tsx
 msgid "{jobs, plural, one {Analysing # replay} other {Analysing # replays}}"
 msgstr ""
@@ -2446,8 +2511,20 @@ msgstr ""
 msgid "{label} ({container} {number})"
 msgstr ""
 
+#: src/lego/pages/components/ModelViewport.tsx
+msgid "{label} ({key})"
+msgstr ""
+
 #: src/scenario/pages/components/registries.ts
 msgid "{label} (locked)"
+msgstr ""
+
+#: src/lego/pages/components/TransformFields.tsx
+msgid "{label} {axisLetter}"
+msgstr ""
+
+#: src/lego/pages/components/WorthSection.tsx
+msgid "{label} {fieldName}"
 msgstr ""
 
 #: src/workshop/randomMod.ts
@@ -2474,6 +2551,10 @@ msgstr ""
 msgid "{label} volume"
 msgstr ""
 
+#: src/lego/pages/components/StatsSection.tsx
+msgid "{label}, {referenceName}"
+msgstr ""
+
 #: src/workshop/pages/components/ProjectSectionBar.tsx
 msgid "{label}, {summary}"
 msgstr ""
@@ -2490,12 +2571,20 @@ msgstr ""
 msgid "{label}:"
 msgstr ""
 
+#: src/lego/pages/components/ProblemsButton.tsx
+msgid "{label}: checking."
+msgstr ""
+
 #: src/multiplayer/chat/ConversationSidebar.tsx
 msgid "{label}: join the battles they join and leave when they leave"
 msgstr ""
 
 #: src/workshop/deathExplosions.ts
 msgid "{label}: library weapon"
+msgstr ""
+
+#: src/lego/pages/components/ProblemsButton.tsx
+msgid "{label}: not checked while a script plays."
 msgstr ""
 
 #: src/content/AnalysisQueueBadge.tsx
@@ -2572,6 +2661,10 @@ msgstr ""
 msgid "{left} of {total} teams still take the game's own start. A game whose start is a sequence of pre-game phases, a faction picker or a start spot picker, runs the whole sequence unless the mission owns every team's start, so those phases will play over this mission. Mark every team, or none."
 msgstr ""
 
+#: src/lego/pages/components/StatsSection.tsx
+msgid "{leftBudget} left"
+msgstr ""
+
 #: src/hub/maps/pictureSweep.ts
 msgid "{leftCount, plural, one {# more map is still waiting.} other {# more maps are still waiting.}}"
 msgstr ""
@@ -2619,6 +2712,10 @@ msgstr ""
 #: src/career/pages/CareerPage.tsx
 #: src/content/pages/components/AiRecordSection.tsx
 msgid "{losses}L"
+msgstr ""
+
+#: src/lego/pages/components/ProportionsPanel.tsx
+msgid "{lostCount, plural, one {This removes {lostNames}. What is hung on it stays where it is, on the bone above.} other {This removes {lostNames}. What is hung on them stays where it is, on the bone above.}}"
 msgstr ""
 
 #: src/conquest/pages/ConquestListPage.tsx
@@ -3157,6 +3254,10 @@ msgstr ""
 msgid "{misfitGames} left out with {misfitOrders}: the orders do not fit the unit list."
 msgstr ""
 
+#: src/lego/pages/components/PosesPopover.tsx
+msgid "{missing, plural, one {# piece deleted} other {# pieces deleted}}"
+msgstr ""
+
 #: src/content/pages/components/ReplaySetsManager.tsx
 msgid "{missing} not in your library. They stay in the set."
 msgstr ""
@@ -3167,6 +3268,10 @@ msgstr ""
 
 #: src/content/pages/components/PlayerMatchFigures.tsx
 msgid "{missing} with no {lowerFigure}"
+msgstr ""
+
+#: src/lego/pages/components/ReferencePicker.tsx
+msgid "{missingCount, plural, one {# of its textures is not in {game}, so that face is drawn plain: {missingNames}.} other {# of its textures are not in {game}, so those faces are drawn plain: {missingNames}.}}"
 msgstr ""
 
 #: src/placement/BlueprintEditor.tsx
@@ -3224,6 +3329,14 @@ msgstr ""
 
 #: src/workshop/weaponSlots.ts
 msgid "{mountedBy, plural, one {# unit mounts it} other {# units mount it}}"
+msgstr ""
+
+#: src/lego/pages/components/PieceTree.tsx
+msgid "{mountName}: {onIt}"
+msgstr ""
+
+#: src/lego/pages/components/PieceTree.tsx
+msgid "{mountName}: empty"
 msgstr ""
 
 #: src/workshop/pages/components/WeaponLibraryPanel.tsx
@@ -3360,6 +3473,10 @@ msgstr ""
 msgid "{name} · {contents}"
 msgstr ""
 
+#: src/lego/pages/components/PieceCollisionFields.tsx
+msgid "{name} (changed)"
+msgstr ""
+
 #: src/lobby-servers/pages/SettingsSection.tsx
 #: src/lobby-servers/PasswordRecoveryForm.tsx
 msgid "{name} (custom)"
@@ -3457,16 +3574,20 @@ msgstr ""
 msgid "{name} went offline"
 msgstr ""
 
+#: src/lego/pages/components/TileGrid.tsx
+msgid "{name}, {partTags}"
+msgstr ""
+
+#: src/lego/pages/components/TileGrid.tsx
+msgid "{name}, {shapeSize}"
+msgstr ""
+
 #: src/blueprint/bar.ts
 msgid "{named, plural, one {the trigger name on # building} other {the trigger name on # buildings}}"
 msgstr ""
 
 #: src/blueprint/pack.ts
 msgid "{named, plural, one {which game # blueprint is for} other {which game # blueprints are for}}"
-msgstr ""
-
-#: src/lego/pages/components/useBuildMenuSource.ts
-msgid "{named} is not installed."
 msgstr ""
 
 #: src/content/replayTimeline.ts
@@ -3663,6 +3784,10 @@ msgstr ""
 msgid "{overallGames} against {other}: {overallRecord}."
 msgstr ""
 
+#: src/lego/pages/components/StatsSection.tsx
+msgid "{overBudget} over"
+msgstr ""
+
 #: src/placement/LayoutControls.tsx
 msgid "{overlapCount, plural, one {Building {overlapList} stands on ground another building wants, marked in red. The engine builds one of them and refuses the rest.} other {Buildings {overlapList} stand on ground another building wants, marked in red. The engine builds one of them and refuses the rest.}}"
 msgstr ""
@@ -3685,6 +3810,15 @@ msgstr ""
 
 #: src/content/pages/components/ReplayMapView.tsx
 msgid "{owner}, {side}"
+msgstr ""
+
+#: src/lego/pages/components/MovementSection.tsx
+msgid "{ownName} is not installed, so there are no movement classes to read."
+msgstr ""
+
+#: src/lego/pages/components/useBuildMenuSource.ts
+#: src/lego/pages/components/WeaponsSection.tsx
+msgid "{ownName} is not installed."
 msgstr ""
 
 #: src/lego/pages/components/AnimationPanel.tsx
@@ -3812,6 +3946,10 @@ msgstr ""
 msgid "{piece}: {from} to {to}"
 msgstr ""
 
+#: src/lego/pages/components/TileGrid.tsx
+msgid "{pieceCount, plural, one {{name}, # piece} other {{name}, # pieces}}"
+msgstr ""
+
 #: src/lego/pages/ProjectsPage.tsx
 msgid "{pieceCount, plural, one {# piece · {unitName}} other {# pieces · {unitName}}}"
 msgstr ""
@@ -3835,6 +3973,14 @@ msgstr ""
 
 #: src/lego/pages/components/GameUnitBrowser.tsx
 msgid "{pieceName} is not in this model."
+msgstr ""
+
+#: src/lego/pages/components/PieceCollisionFields.tsx
+msgid "{pieceName} is on the box the engine measures round its vertices, {measuredSize} elmos. Changing anything above takes it over."
+msgstr ""
+
+#: src/lego/pages/components/PieceCollisionFields.tsx
+msgid "{pieceName} is selected, so the viewport's handles are on its box and it is drawn wide to stand out from the rest. Size needs the scale tool: those handles are plates on the box's six faces. Deselect to put them back on the unit's volume."
 msgstr ""
 
 #: src/content/pages/components/ReplayRoster.tsx
@@ -3863,6 +4009,14 @@ msgstr ""
 
 #: src/scenario/pages/components/SetupPanel.tsx
 msgid "{placed} stand somewhere on the current map, and the same position is a different place on {mapName}."
+msgstr ""
+
+#: src/lego/pages/components/ProportionsPanel.tsx
+msgid "{planLabel}, fitted to this unit's pieces"
+msgstr ""
+
+#: src/lego/pages/components/ProportionsPanel.tsx
+msgid "{planLabel}. Drag a handle in the view or set a number."
 msgstr ""
 
 #: src/content/pages/components/MapRecords.tsx
@@ -3977,6 +4131,10 @@ msgstr ""
 msgid "{projectName} writes this field on each export. Writing a change to it into the game stops the builder updating it."
 msgstr ""
 
+#: src/lego/pages/components/ProportionsPanel.tsx
+msgid "{proportionLabel} (elmos)"
+msgstr ""
+
 #: src/blueprint/bar.ts
 msgid "{queued, plural, one {the build queue on # building} other {the build queue on # buildings}}"
 msgstr ""
@@ -4019,6 +4177,10 @@ msgstr ""
 
 #: src/content/pages/components/ReplayAnalysisSection.tsx
 msgid "{recordings, plural, one {The estimate goes by the # recording of this game this computer has finished.} other {The estimate goes by the # recordings of this game this computer has finished.}}"
+msgstr ""
+
+#: src/lego/pages/components/StatsSection.tsx
+msgid "{referenceName} is not in {referenceGame}."
 msgstr ""
 
 #: src/multiplayer/invite/InviteLinkHost.tsx
@@ -4169,6 +4331,10 @@ msgstr ""
 msgid "{selectedCount} of {totalCount} {selectedWord}"
 msgstr ""
 
+#: src/lego/pages/components/SetPanel.tsx
+msgid "{selectedCount} pieces selected"
+msgstr ""
+
 #: src/conquest/pages/ConquestListPage.tsx
 msgid "{selectedName} plays Conquest only on the maps the game carries. Pick one from the Conquest list."
 msgstr ""
@@ -4246,8 +4412,16 @@ msgstr ""
 msgid "{shortname} · health {hull}/{maxHull}"
 msgstr ""
 
+#: src/lego/pages/components/PartFilters.tsx
+msgid "{shown, plural, one {# part} other {# parts}}"
+msgstr ""
+
 #: src/blueprint/units.ts
 msgid "{shown} and {more} more"
+msgstr ""
+
+#: src/lego/pages/components/ProportionsPanel.tsx
+msgid "{shown} and {rest} more"
 msgstr ""
 
 #: src/content/pages/components/GameCard.tsx
@@ -4255,6 +4429,7 @@ msgid "{shown} installed"
 msgstr ""
 
 #: src/content/pages/components/BindingList.tsx
+#: src/lego/pages/components/sectionGrid.ts
 msgid "{shown} of {total}"
 msgstr ""
 
@@ -4286,6 +4461,10 @@ msgstr ""
 msgid "{side} (won)"
 msgstr ""
 
+#: src/lego/pages/components/MovementSection.tsx
+msgid "{side} by {side}"
+msgstr ""
+
 #: src/blueprint/pages/components/ArrivingBlueprint.tsx
 msgid "{sideCount, plural, one {Every building of this blueprint is {from}'s, and this game has {firstSide}'s version of it. Coilbox does not know which side you play, so it is kept as {from} unless you say otherwise.} other {Every building of this blueprint is {from}'s, and this game has the other sides' version of it. Coilbox does not know which side you play, so it is kept as {from} unless you say otherwise.}}"
 msgstr ""
@@ -4314,6 +4493,10 @@ msgstr ""
 
 #: src/campaign/pages/components/ArchiveMediaImportButton.tsx
 msgid "{sizeLabel}. No preview before import here. It plays in the field below once imported."
+msgstr ""
+
+#: src/lego/pages/components/PieceCollisionFields.tsx
+msgid "{sizeX} by {sizeY} by {sizeZ}"
 msgstr ""
 
 #: src/conquest/pages/components/BattleOverlay.tsx
@@ -4412,6 +4595,22 @@ msgstr ""
 msgid "{startUnitName}, this run's start unit, is not one of the units in {gameName}, so coilbox cannot limit your units. Every unit is available."
 msgstr ""
 
+#: src/lego/pages/components/MovementSection.tsx
+msgid "{stateGameName} has no {noneFitKinds} movement class, so this unit does not move."
+msgstr ""
+
+#: src/lego/pages/components/MovementSection.tsx
+msgid "{stateGameName} has no {standInsText} class, so these are its nearest kind"
+msgstr ""
+
+#: src/lego/pages/components/MovementSection.tsx
+msgid "{stateGameName}'s {kindsText} classes, from its movedefs.lua"
+msgstr ""
+
+#: src/lego/pages/components/MovementSection.tsx
+msgid "{stateGameName}'s movement classes, from its movedefs.lua"
+msgstr ""
+
 #: src/content/replayMapView/timelineKeys.ts
 msgid "{STEP_SECONDS, plural, one {Back # second} other {Back # seconds}}"
 msgstr ""
@@ -4436,12 +4635,20 @@ msgstr ""
 msgid "{stepCount, plural, one {Build order · # step} other {Build order · # steps}}"
 msgstr ""
 
+#: src/lego/pages/components/MeasureReadout.tsx
+msgid "{steps} steps"
+msgstr ""
+
 #: src/content/pages/components/ReplayStartUnitLayer.tsx
 msgid "{still, plural, one {# did not move and shows as a dot alone.} other {# did not move and show as a dot alone.}}"
 msgstr ""
 
 #: src/content/pages/components/ReplayStartUnitLayer.tsx
 msgid "{still, plural, one {# did not move in this window and shows as a dot alone.} other {# did not move in this window and show as a dot alone.}}"
+msgstr ""
+
+#: src/lego/pages/components/MovementSection.tsx
+msgid "{stored} is not from this unit's game, because it has none."
 msgstr ""
 
 #: src/blueprint/substitution.ts
@@ -4594,6 +4801,10 @@ msgstr ""
 
 #: src/workshop/pages/components/RandomModDrawer.tsx
 msgid "{tier} weight"
+msgstr ""
+
+#: src/lego/pages/components/UnitCheckResult.tsx
+msgid "{times, plural, one {# time} other {# times}}"
 msgstr ""
 
 #: src/multiplayer/chatLogNames.ts
@@ -4906,6 +5117,10 @@ msgstr ""
 msgid "{unit} was moved to the armour class {className}, which {gameName} no longer has. It still compiles, as a class of its own that no weapon's damage table names, so {unit} takes default damage exactly as it would if it had never been moved."
 msgstr ""
 
+#: src/lego/pages/components/MovementSection.tsx
+msgid "{unitCount, plural, one {# unit} other {# units}}"
+msgstr ""
+
 #: src/content/pages/GameDetailPage.tsx
 msgid "{unitCount, plural, one {Sides · # unit} other {Sides · # units}}"
 msgstr ""
@@ -4952,6 +5167,10 @@ msgstr ""
 
 #: src/lego/pages/components/LoadoutPicker.tsx
 msgid "{unitName} is {reason}"
+msgstr ""
+
+#: src/lego/pages/components/ReferencePicker.tsx
+msgid "{unitName} is standing to the left of the plates at the size the engine draws it."
 msgstr ""
 
 #. placeholder {0}: death || t`nothing`
@@ -5091,6 +5310,10 @@ msgstr ""
 msgid "{untried, plural, one {One more {untriedNoun} was not tried.} other {# more {untriedNoun} were not tried.}}"
 msgstr ""
 
+#: src/lego/pages/components/ModuleUpdateBanner.tsx
+msgid "{updateName} uses an older {updateModule}."
+msgstr ""
+
 #: src/content/pages/components/GameLibrarySummary.tsx
 msgid "{updateName} via {updateVia}"
 msgstr ""
@@ -5148,6 +5371,10 @@ msgstr ""
 
 #: src/lego/pages/components/DetailPanel.tsx
 msgid "{uvIncomplete, plural, one {# corner has no texture coordinate.} other {# corners have no texture coordinate.}}"
+msgstr ""
+
+#: src/lego/pages/components/WorkshopChangeMarks.tsx
+msgid "{value} in {projectName}"
 msgstr ""
 
 #: src/scenario/pages/components/VarPanel.tsx
@@ -5640,6 +5867,10 @@ msgstr ""
 msgid "<0>{unitName}.obj</0> and <1>{unitName}.mtl</1>, with no material texture, since this unit's could not be found."
 msgstr ""
 
+#: src/lego/pages/components/TestDrawer.tsx
+msgid "<0>{unitName}</0> is the scratch game's start unit, so it is waiting at your start position a second into the match. Nothing has to build it and no cheats are needed."
+msgstr ""
+
 #: src/multiplayer/admin/PlayerLookupSection.tsx
 msgid "<0>{username}</0> is a static account. uberserver keeps no further details about it."
 msgstr ""
@@ -5883,6 +6114,10 @@ msgstr ""
 msgid "A blueprint there was already called \"{layoutName}\"."
 msgstr ""
 
+#: src/lego/pages/components/ProportionsPanel.tsx
+msgid "A bone you moved by hand goes back to the plan when a proportion that places it changes."
+msgstr ""
+
 #: src/lego/pages/components/ExportDrawer.tsx
 msgid "A build picture was already there that coilbox did not write, and has been left alone."
 msgstr ""
@@ -5929,6 +6164,10 @@ msgstr ""
 
 #: src/workshop/pages/components/RandomModDrawer.tsx
 msgid "A collection"
+msgstr ""
+
+#: src/lego/pages/components/ModelViewport.tsx
+msgid "A collision volume has no rotation"
 msgstr ""
 
 #: src/career/pages/CareerPage.tsx
@@ -6054,6 +6293,7 @@ msgstr ""
 #: src/content/pages/components/OpenInEngineButton.tsx
 #: src/content/pages/components/WatchButton.tsx
 #: src/content/pages/components/WatchWithRewindButton.tsx
+#: src/lego/pages/components/TestDrawer.tsx
 #: src/play/pages/SavegamesPage.tsx
 #: src/scenario/launch.ts
 #: src/workshop/pages/components/PlayLocallyButton.tsx
@@ -6469,6 +6709,10 @@ msgstr ""
 msgid "A trigger runs its actions when its conditions hold. Everything a mission does beyond placing units is one of these."
 msgstr ""
 
+#: src/lego/pages/components/ReferencePicker.tsx
+msgid "A unit at its real size, for scale"
+msgstr ""
+
 #: src/lego/pages/components/ExportDrawer.tsx
 msgid "A unit definition was already there that coilbox has no record of writing, so it has been left alone."
 msgstr ""
@@ -6637,6 +6881,10 @@ msgstr ""
 
 #: src/content/unitFieldNotes.ts
 msgid "Acceleration (old name)"
+msgstr ""
+
+#: src/lego/pages/components/MovementSection.tsx
+msgid "Acceleration, elmos a frame squared"
 msgstr ""
 
 #: src/profile/SettingsSection.tsx
@@ -7154,6 +7402,10 @@ msgstr ""
 msgid "Addresses let through"
 msgstr ""
 
+#: src/lego/pages/components/ProportionsPanel.tsx
+msgid "Adds {addedNames}."
+msgstr ""
+
 #: src/workshop/pages/components/CloneActions.tsx
 msgid "Adds {cloneKey} as a new unit. Nothing in the game is called that."
 msgstr ""
@@ -7239,6 +7491,7 @@ msgid "Aim"
 msgstr ""
 
 #: src/lego/pages/components/AimPointPanel.tsx
+#: src/lego/pages/components/ModelViewport.tsx
 msgid "Aim point"
 msgstr ""
 
@@ -7276,6 +7529,30 @@ msgstr ""
 
 #: src/sound/events.ts
 msgid "Alerts"
+msgstr ""
+
+#: src/lego/pages/components/SetPanel.tsx
+msgid "Align {axisName} high"
+msgstr ""
+
+#: src/lego/pages/components/SetPanel.tsx
+msgid "Align {axisName} high. A piece with no shape lines up by its origin."
+msgstr ""
+
+#: src/lego/pages/components/SetPanel.tsx
+msgid "Align {axisName} low"
+msgstr ""
+
+#: src/lego/pages/components/SetPanel.tsx
+msgid "Align {axisName} low. A piece with no shape lines up by its origin."
+msgstr ""
+
+#: src/lego/pages/components/SetPanel.tsx
+msgid "Align {axisName} middle"
+msgstr ""
+
+#: src/lego/pages/components/SetPanel.tsx
+msgid "Align {axisName} middle. A piece with no shape lines up by its origin."
 msgstr ""
 
 #: src/content/pages/components/BuildTreeExportButton.tsx
@@ -7353,6 +7630,10 @@ msgstr ""
 
 #: src/content/pages/ReplaysPage.tsx
 msgid "All origins"
+msgstr ""
+
+#: src/lego/pages/components/PartFilters.tsx
+msgid "All packs"
 msgstr ""
 
 #: src/downloads/pages/components/MapPacksBanner.tsx
@@ -7585,6 +7866,10 @@ msgstr ""
 msgid "An address has no spaces in it."
 msgstr ""
 
+#: src/lego/pages/components/ModelViewport.tsx
+msgid "An aim point is one point, so it only moves"
+msgstr ""
+
 #: src/content/unitFieldNotes.ts
 msgid "An aircraft holds height against a smoothed version of the terrain rather than every bump of it."
 msgstr ""
@@ -7754,6 +8039,10 @@ msgstr ""
 msgid "Analysis paused"
 msgstr ""
 
+#: src/lego/pages/components/ModelViewport.tsx
+msgid "Anchors"
+msgstr ""
+
 #: src/direct/ReachablePorts.tsx
 #: src/multiplayer/chat/ChatPane.tsx
 msgid "and"
@@ -7911,6 +8200,10 @@ msgstr ""
 msgid "Anyone browsing the hub will be able to find and import this."
 msgstr ""
 
+#: src/lego/pages/components/ShareModuleForm.tsx
+msgid "Anyone who opens this gets the module in their unit builder."
+msgstr ""
+
 #: src/conquest/pages/ConquestListPage.tsx
 msgid "Anyone who pastes this code into Import challenge (needs the same game installed) plays the identical map, so results are directly comparable."
 msgstr ""
@@ -7945,6 +8238,10 @@ msgstr ""
 
 #: src/deeplink/pages/ImportSection.tsx
 msgid "Anything coilbox shares goes here: {kindsSentence}."
+msgstr ""
+
+#: src/lego/pages/components/PieceCollisionFields.tsx
+msgid "Anything hits {pieceName}"
 msgstr ""
 
 #: src/scenario/pages/components/RestrictionPanel.tsx
@@ -7991,8 +8288,13 @@ msgstr ""
 
 #: src/content/pages/components/KeymapsPanel.tsx
 #: src/lego/pages/components/AnimationPanel.tsx
+#: src/lego/pages/components/PosesPopover.tsx
 #: src/multiplayer/battle/ApplySkirmishPresetDrawer.tsx
 msgid "Apply"
+msgstr ""
+
+#: src/lego/pages/components/PosesPopover.tsx
+msgid "Apply {poseName}"
 msgstr ""
 
 #: src/play/PresetTweaksRow.tsx
@@ -8029,6 +8331,10 @@ msgstr ""
 
 #: src/content/unitFieldNotes.ts
 msgid "Arc of fire"
+msgstr ""
+
+#: src/lego/pages/components/WeaponsSection.tsx
+msgid "Arc, degrees"
 msgstr ""
 
 #: src/conquest/pages/ConquestListPage.tsx
@@ -8249,6 +8555,10 @@ msgstr ""
 msgid "at least"
 msgstr ""
 
+#: src/lego/pages/components/TextureBuilderPanel.tsx
+msgid "At least one of the two is needed. A side left out is written 0."
+msgstr ""
+
 #: src/scenario/triggerTypes.ts
 msgid "at most"
 msgstr ""
@@ -8416,12 +8726,17 @@ msgstr ""
 msgid "Away"
 msgstr ""
 
+#: src/lego/pages/components/ShapeFields.tsx
+msgid "Axis"
+msgstr ""
+
 #: src/campaign/pages/CampaignEditPage.tsx
 #: src/campaign/pages/MissionBriefingPage.tsx
 #: src/content/pages/components/states.tsx
 #: src/content/pages/GameUnitPage.tsx
 #: src/i18n/frameStrings.ts
 #: src/lego/pages/components/DescribeUnitForm.tsx
+#: src/lego/pages/components/NewUnitPopover.tsx
 #: src/multiplayer/chat/MemberActionsMenu.tsx
 #: src/multiplayer/LobbyStatusButton.tsx
 msgid "Back"
@@ -8520,6 +8835,10 @@ msgstr ""
 
 #: src/direct/HostRoomForm.tsx
 msgid "Back to the room form"
+msgstr ""
+
+#: src/lego/pages/components/TestDrawer.tsx
+msgid "Back to the test settings"
 msgstr ""
 
 #: src/content/pages/components/UnitModelPanel.tsx
@@ -9007,6 +9326,10 @@ msgstr ""
 msgid "Bindings a game brings with it:"
 msgstr ""
 
+#: src/lego/pages/components/NewUnitPopover.tsx
+msgid "Blank"
+msgstr ""
+
 #: src/lego/pages/components/ActionsDrawer.tsx
 msgid "Blend in (s)"
 msgstr ""
@@ -9162,6 +9485,10 @@ msgstr ""
 msgid "Bots"
 msgstr ""
 
+#: src/lego/pages/components/ShapeFields.tsx
+msgid "Bottom radius"
+msgstr ""
+
 #: src/content/unitFieldNotes.ts
 #: src/workshop/pages/components/WeaponSlotsPanel.tsx
 msgid "Bounce effect"
@@ -9187,6 +9514,10 @@ msgstr ""
 msgid "Bounces off water"
 msgstr ""
 
+#: src/lego/pages/components/ShapeFields.tsx
+msgid "Bowl"
+msgstr ""
+
 #: src/scenario/pages/components/contents.ts
 #: src/scenario/pages/components/triggers.ts
 msgid "box"
@@ -9204,8 +9535,13 @@ msgstr ""
 msgid "Box presets"
 msgstr ""
 
+#: src/lego/pages/components/PieceCollisionFields.tsx
 #: src/startbox/StartBoxPresetsPopover.tsx
 msgid "Box size"
+msgstr ""
+
+#: src/lego/pages/components/MovementSection.tsx
+msgid "Brake rate, elmos a frame squared"
 msgstr ""
 
 #: src/content/unitFieldNotes.ts
@@ -9281,6 +9617,10 @@ msgstr ""
 msgid "Broadcast (dialog)"
 msgstr ""
 
+#: src/lego/pages/components/PieceTree.tsx
+msgid "Broken join to {parentName}"
+msgstr ""
+
 #: src/lego/pages/components/JoinedTo.tsx
 msgid "Broken: {parentName} ({toName}) by its {connectorName}"
 msgstr ""
@@ -9335,6 +9675,14 @@ msgstr ""
 msgid "Browse units"
 msgstr ""
 
+#: src/lego/pages/components/StatsSection.tsx
+msgid "Budget"
+msgstr ""
+
+#: src/lego/pages/components/StatsSection.tsx
+msgid "Budget left"
+msgstr ""
+
 #: src/placement/LayoutControls.tsx
 msgid "Build {def} later"
 msgstr ""
@@ -9358,6 +9706,10 @@ msgstr ""
 #: src/lego/pages/components/BuildMenuSection.tsx
 #: src/workshop/pages/components/BuildMenuPanel.tsx
 msgid "Build menu"
+msgstr ""
+
+#: src/lego/pages/components/TestDrawer.tsx
+msgid "Build on"
 msgstr ""
 
 #: src/blueprint/pages/BlueprintDetailPage.tsx
@@ -9407,6 +9759,14 @@ msgstr ""
 msgid "Build range is a sphere"
 msgstr ""
 
+#: src/lego/pages/components/TextureBuilderPanel.tsx
+msgid "Build shading map"
+msgstr ""
+
+#: src/lego/pages/components/TextureBuilderPanel.tsx
+msgid "Build texture"
+msgstr ""
+
 #: src/scenario/pages/components/BaseControls.tsx
 msgid "Build the queue over and over"
 msgstr ""
@@ -9415,8 +9775,13 @@ msgstr ""
 msgid "Build these in this order"
 msgstr ""
 
+#: src/lego/pages/components/WorthSection.tsx
+msgid "build time"
+msgstr ""
+
 #: src/content/pages/components/UnitStatsTable.tsx
 #: src/content/unitFieldNotes.ts
+#: src/lego/pages/components/WorthSection.tsx
 #: src/workshop/randomMod.ts
 #: src/workshop/unitReference.ts
 msgid "Build time"
@@ -9450,6 +9815,7 @@ msgstr ""
 
 #: src/content/pages/components/BuildTreeDrawer.tsx
 #: src/content/pages/components/CompatMode.tsx
+#: src/lego/pages/components/TextureBuilderPanel.tsx
 #: src/multiplayer/battle/compatBattle.ts
 #: src/scenario/pages/components/RestrictionPanel.tsx
 #: src/scenario/validate.ts
@@ -9548,6 +9914,14 @@ msgstr ""
 
 #: src/workshop/pages/components/UnitList.tsx
 msgid "built"
+msgstr ""
+
+#: src/lego/pages/components/TextureBuilderPanel.tsx
+msgid "Built <0>{builtColour}</0>."
+msgstr ""
+
+#: src/lego/pages/components/TextureBuilderPanel.tsx
+msgid "Built <0>{builtShading}</0>."
 msgstr ""
 
 #: src/lego/pages/components/BuiltBySection.tsx
@@ -9873,6 +10247,8 @@ msgstr ""
 #: src/direct/HostRoomForm.tsx
 #: src/direct/JoinRoomForm.tsx
 #: src/downloads/pages/ActivityPage.tsx
+#: src/lego/pages/components/ProportionsPanel.tsx
+#: src/lego/pages/components/ScriptTab.tsx
 #: src/lobby-servers/pages/SettingsSection.tsx
 #: src/lobby-servers/PasswordRecoveryForm.tsx
 #: src/mapconv/pages/CompilePage.tsx
@@ -10024,8 +10400,17 @@ msgstr ""
 msgid "Categories"
 msgstr ""
 
+#: src/lego/pages/components/MountPointList.tsx
+msgid "Categories {mountName} takes"
+msgstr ""
+
+#: src/lego/pages/components/MountPointList.tsx
+msgid "Categories, comma separated"
+msgstr ""
+
 #: src/lego/pages/components/CategoryMenu.tsx
 #: src/lego/pages/components/DetailPanel.tsx
+#: src/lego/pages/components/ModuleLabelsFields.tsx
 msgid "Category"
 msgstr ""
 
@@ -10059,6 +10444,10 @@ msgstr ""
 
 #: src/content/unitFieldNotes.ts
 msgid "Chance of setting static map features alight on impact."
+msgstr ""
+
+#: src/lego/pages/components/TexturePicker.tsx
+msgid "Change"
 msgstr ""
 
 #: src/multiplayer/admin/StaffSection.tsx
@@ -10099,6 +10488,7 @@ msgstr ""
 
 #: src/lego/pages/components/BuilderReport.tsx
 #: src/lego/pages/components/GameFitSection.tsx
+#: src/lego/pages/components/StatsSection.tsx
 msgid "Change in Unit tweaks"
 msgstr ""
 
@@ -10114,7 +10504,12 @@ msgstr ""
 msgid "Change map"
 msgstr ""
 
+#: src/lego/pages/components/PieceCollisionFields.tsx
+msgid "Change one piece's box"
+msgstr ""
+
 #: src/lego/pages/BuilderPage.tsx
+#: src/lego/pages/components/SwapPartDrawer.tsx
 msgid "Change part"
 msgstr ""
 
@@ -10173,8 +10568,20 @@ msgstr ""
 msgid "Changed in the library"
 msgstr ""
 
+#: src/lego/pages/components/PieceCollisionFields.tsx
+msgid "Changed on {changedNames}."
+msgstr ""
+
 #: src/workshop/pages/components/UnitList.tsx
 msgid "Changed only"
+msgstr ""
+
+#: src/lego/pages/components/WorkshopChangeMarks.tsx
+msgid "Changed to {value} in the workshop project {projectName}, not written into the game yet."
+msgstr ""
+
+#: src/lego/pages/components/WorkshopChangeMarks.tsx
+msgid "Changed to {value} in the workshop project {projectName}, sent through the mutator, so it is not written into the game."
 msgstr ""
 
 #: src/lego/pages/components/AnimationPanel.tsx
@@ -10317,6 +10724,10 @@ msgstr ""
 msgid "Check for updates"
 msgstr "Vérifier les mises à jour"
 
+#: src/lego/pages/components/TestDrawer.tsx
+msgid "Check it loads"
+msgstr ""
+
 #: src/multiplayer/battle/useBattleLaunch.ts
 msgid "Check the host's address"
 msgstr ""
@@ -10441,6 +10852,7 @@ msgstr ""
 
 #: src/animation/pages/Bos2LuaPage.tsx
 #: src/animation/pages/CobPage.tsx
+#: src/lego/pages/components/ScriptTab.tsx
 #: src/workshop/routes.ts
 msgid "Checks"
 msgstr ""
@@ -10456,6 +10868,7 @@ msgid "checksum {checksum}"
 msgstr ""
 
 #: src/lego/pages/components/ExportDrawer.tsx
+#: src/lego/pages/components/TexturePicker.tsx
 msgid "Choose"
 msgstr ""
 
@@ -10476,8 +10889,16 @@ msgstr ""
 msgid "Choose a collection"
 msgstr ""
 
+#: src/lego/pages/components/TextureBuilderPanel.tsx
+msgid "Choose a colour picture"
+msgstr ""
+
 #: src/content/pages/components/MapExportButtons.tsx
 msgid "Choose a density layer first."
+msgstr ""
+
+#: src/lego/pages/components/TextureBuilderPanel.tsx
+msgid "Choose a file"
 msgstr ""
 
 #: src/content/pages/components/Convert3doDrawer.tsx
@@ -10494,6 +10915,7 @@ msgid "Choose a game"
 msgstr ""
 
 #: src/lego/pages/components/useBuildMenuSource.ts
+#: src/lego/pages/components/WeaponsSection.tsx
 msgid "Choose a game for this unit first."
 msgstr ""
 
@@ -10501,8 +10923,20 @@ msgstr ""
 msgid "Choose a game for this unit to check it against."
 msgstr ""
 
+#: src/lego/pages/components/MovementSection.tsx
+msgid "Choose a game for this unit to pick one of its movement classes."
+msgstr ""
+
+#: src/lego/pages/components/StatsSection.tsx
+msgid "Choose a game unit with the reference button to compare."
+msgstr ""
+
 #: src/multiplayer/battles/HostBattleForm.tsx
 msgid "Choose a game."
+msgstr ""
+
+#: src/lego/pages/components/TextureBuilderPanel.tsx
+msgid "Choose a glow map"
 msgstr ""
 
 #: src/direct/HostRoomForm.tsx
@@ -10523,6 +10957,22 @@ msgstr ""
 
 #: src/workshop/pages/components/CollectionsPanel.tsx
 msgid "Choose a project"
+msgstr ""
+
+#: src/lego/pages/components/TextureBuilderPanel.tsx
+msgid "Choose a reflectivity map"
+msgstr ""
+
+#: src/lego/pages/components/TexturePicker.tsx
+msgid "Choose a shading map"
+msgstr ""
+
+#: src/lego/pages/components/TextureBuilderPanel.tsx
+msgid "Choose a team-colour mask"
+msgstr ""
+
+#: src/lego/pages/components/TexturePicker.tsx
+msgid "Choose a texture"
 msgstr ""
 
 #: src/home/zones/Greeting.tsx
@@ -10619,6 +11069,10 @@ msgstr ""
 msgid "Class"
 msgstr ""
 
+#: src/lego/pages/components/MovementSection.tsx
+msgid "Classes {stateGameName}'s units use, not narrowed by kind: its movedefs.lua could not be read"
+msgstr ""
+
 #: src/workshop/unitSections.ts
 msgid "Classification"
 msgstr ""
@@ -10644,6 +11098,7 @@ msgstr ""
 #: src/blueprint/pages/components/LeavingPack.tsx
 #: src/content/pages/components/DateFilter.tsx
 #: src/lego/pages/components/AnimationPanel.tsx
+#: src/lego/pages/components/MeasureReadout.tsx
 #: src/multiplayer/NoteButton.tsx
 #: src/play/pages/SkirmishPage.tsx
 #: src/scenario/pages/components/GroupControls.tsx
@@ -10652,6 +11107,7 @@ msgstr ""
 msgid "Clear"
 msgstr ""
 
+#: src/lego/pages/components/TextureBuilderPanel.tsx
 #: src/mapconv/pages/components/PathField.tsx
 #: src/scenario/pages/components/TriggerSteps.tsx
 msgid "Clear {label}"
@@ -10725,8 +11181,28 @@ msgstr ""
 msgid "Clears out inconsistent server state left over from a crash or a bug. Announces the attempt in #moderator, then the result there and here."
 msgstr ""
 
+#: src/lego/pages/components/ModelViewport.tsx
+msgid "Click a face to place the module, which has no mount so joins by its first piece. {faceKey} next face, {twistKey} twist, Escape to stop"
+msgstr ""
+
+#: src/lego/pages/components/ModelViewport.tsx
+msgid "Click a face to place the module. {faceKey} next face, {twistKey} twist, Escape to stop"
+msgstr ""
+
+#: src/lego/pages/components/ModelViewport.tsx
+msgid "Click a face to place the part. {faceKey} next face, {twistKey} twist, Escape to stop"
+msgstr ""
+
 #: src/lego/pages/components/CollisionPanel.tsx
 msgid "Click on each piece"
+msgstr ""
+
+#: src/lego/pages/components/ProblemsButton.tsx
+msgid "Click one to select its pieces."
+msgstr ""
+
+#: src/lego/pages/components/MeasureReadout.tsx
+msgid "Click the first point"
 msgstr ""
 
 #: src/lego/pages/components/AnimationPanel.tsx
@@ -10771,8 +11247,20 @@ msgstr ""
 msgid "Click the model to place it"
 msgstr ""
 
+#: src/lego/pages/components/ModelViewport.tsx
+msgid "Click the model to put a {axisName} line there. Escape to stop"
+msgstr ""
+
+#: src/lego/pages/components/ModelViewport.tsx
+msgid "Click the model to put a {axisName} plane there. Escape to stop"
+msgstr ""
+
 #: src/lego/pages/components/anchorsAndSnapping.ts
 msgid "Click the model to put a connector there. Escape to stop"
+msgstr ""
+
+#: src/lego/pages/components/MeasureReadout.tsx
+msgid "Click the second point"
 msgstr ""
 
 #: src/workshop/pages/components/CollectionsPanel.tsx
@@ -10781,6 +11269,10 @@ msgstr ""
 
 #: src/workshop/pages/components/CheckpointsDrawer.tsx
 msgid "Click to rename or describe this checkpoint"
+msgstr ""
+
+#: src/lego/pages/components/ModelViewport.tsx
+msgid "Click two points to measure, or drag an end to move it. {stopKey} to leave"
 msgstr ""
 
 #: src/multiplayer/admin/PlayerLookupSection.tsx
@@ -10821,6 +11313,9 @@ msgstr ""
 #: src/lego/pages/components/ImportDrawer.tsx
 #: src/lego/pages/components/LoadoutFamilyDrawer.tsx
 #: src/lego/pages/components/ShortcutSheet.tsx
+#: src/lego/pages/components/SwapModuleDrawer.tsx
+#: src/lego/pages/components/SwapPartDrawer.tsx
+#: src/lego/pages/components/TestDrawer.tsx
 #: src/lobby-servers/PasswordRecoveryForm.tsx
 #: src/multiplayer/battle/ApplySkirmishPresetDrawer.tsx
 #: src/multiplayer/battle/BattleOptionsDrawer.tsx
@@ -10985,6 +11480,10 @@ msgstr ""
 
 #: src/hub/pages/components/MapPicturesControl.tsx
 msgid "Coilbox can read the minimap out of every map on this computer and send it to the hub, so a map somebody is looking at there has a picture of it rather than a drawing of its name. It asks the hub what it already has first, so a map somebody else has covered costs one question."
+msgstr ""
+
+#: src/lego/pages/components/TexturePicker.tsx
+msgid "Coilbox cannot draw a preview of this texture."
 msgstr ""
 
 #: src/workshop/pages/components/AssetPreview.tsx
@@ -11189,6 +11688,10 @@ msgstr ""
 msgid "Coilbox has checked this route against Beyond All Reason's and Zero-K's own code only. How {gameName} reads a tweakdefs slot is unverified, so check the changes in game."
 msgstr ""
 
+#: src/lego/pages/components/TexturePicker.tsx
+msgid "Coilbox has its own copy and there is no file behind it to re-read, which is what a model out of a packed game or map leaves you with. Choose one, and refresh picks up edits to it after that."
+msgstr ""
+
 #: src/workshop/pages/components/UnitFieldRow.tsx
 msgid "Coilbox has no description for this field yet, so this is the engine's own key rather than a label."
 msgstr ""
@@ -11367,6 +11870,10 @@ msgstr ""
 msgid "Coilbox's own"
 msgstr ""
 
+#: src/lego/pages/components/PieceTree.tsx
+msgid "Collapse {pieceName}"
+msgstr ""
+
 #: src/i18n/frameStrings.ts
 msgid "Collapse breadcrumb"
 msgstr ""
@@ -11484,8 +11991,16 @@ msgstr ""
 msgid "Colour cycle"
 msgstr ""
 
+#: src/lego/pages/components/TextureBuilderPanel.tsx
+msgid "Colour picture"
+msgstr ""
+
 #: src/profile/SettingsSection.tsx
 msgid "Colour scheme"
+msgstr ""
+
+#: src/lego/pages/components/TextureBuilderPanel.tsx
+msgid "Colour texture"
 msgstr ""
 
 #: src/content/pages/components/MapAggregate.tsx
@@ -11706,6 +12221,10 @@ msgstr ""
 
 #: src/campaign/pages/CampaignDetailPage.tsx
 msgid "Completed"
+msgstr ""
+
+#: src/lego/pages/components/TextureBuilderPanel.tsx
+msgid "Compose this unit's two textures from separate layers, in the channel layout the engine reads rather than the layout an image editor works in. Building replaces the texture below, the same as choosing one by hand."
 msgstr ""
 
 #: src/mapconv/pages/components/AdvancedOptions.tsx
@@ -11982,6 +12501,7 @@ msgid "Convert a <0>.bos</0> unit script to Lua."
 msgstr ""
 
 #: src/content/pages/components/OldConversionNotice.tsx
+#: src/lego/pages/components/ScriptTab.tsx
 msgid "Convert again"
 msgstr ""
 
@@ -11999,12 +12519,20 @@ msgstr ""
 msgid "Convert to Lua"
 msgstr ""
 
+#: src/lego/pages/components/ScriptTab.tsx
+msgid "Converted before piece numbers were fixed. Convert again."
+msgstr ""
+
 #: src/animation/pages/Bos2LuaPage.tsx
 msgid "Converted Lua"
 msgstr ""
 
 #: src/animation/pages/Bos2LuaPage.tsx
 msgid "Converted Lua appears here as you type."
+msgstr ""
+
+#: src/lego/pages/components/ScriptTab.tsx
+msgid "Converting"
 msgstr ""
 
 #: src/content/pages/components/Convert3doDrawer.tsx
@@ -12033,6 +12561,7 @@ msgstr ""
 #: src/direct/CopyButton.tsx
 #: src/general/ErrorBoundary.tsx
 #: src/hub/PublishSection.tsx
+#: src/lego/pages/components/ScriptTab.tsx
 #: src/placement/LayoutControls.tsx
 #: src/play/pages/components/CrashDrawer.tsx
 #: src/play/pages/EngineLogSection.tsx
@@ -12079,8 +12608,16 @@ msgstr ""
 msgid "Copied value"
 msgstr ""
 
+#: src/lego/pages/components/SymmetryPopover.tsx
+msgid "Copies"
+msgstr ""
+
 #: src/workshop/pages/components/EquipWeaponPopover.tsx
 msgid "Copies <0>{copySource}</0> as it stands into the project's weapon library, and {usesCopy}. Changing the copy changes no other unit."
+msgstr ""
+
+#: src/lego/pages/components/SymmetryPopover.tsx
+msgid "Copies round the axis"
 msgstr ""
 
 #: src/lego/pages/components/ExportDrawer.tsx
@@ -12093,6 +12630,7 @@ msgstr ""
 
 #: src/content/pages/components/FilePreview.tsx
 #: src/direct/ReachablePorts.tsx
+#: src/lego/pages/components/ScriptTab.tsx
 #: src/scenario/pages/components/MissionLuaView.tsx
 #: src/uberstress/pages/components/SeedSqlForm.tsx
 #: src/workshop/pages/components/DecodedSlotCard.tsx
@@ -12225,6 +12763,10 @@ msgstr ""
 
 #: src/content/pages/components/Convert3doDrawer.tsx
 msgid "Copying the output over the game is not enough on its own: the engine tries <0>.3do</0> before <1>.s3o</1> for a unit whose <2>objectname</2> has no extension, so it keeps loading the old models while both are there. The original <3>.3do</3> files have to go, and any unit definition that spells <4>.3do</4> in its <5>objectname</5> has to lose it too."
+msgstr ""
+
+#: src/lego/pages/components/ModelViewport.tsx
+msgid "Corners"
 msgstr ""
 
 #: src/blueprint/pages/components/SubstitutionPanel.tsx
@@ -12363,6 +12905,10 @@ msgstr ""
 msgid "Could not reach the hub at {host}. Check your connection."
 msgstr ""
 
+#: src/lego/pages/components/ReferencePicker.tsx
+msgid "Could not reach unitsync to read {object}. Showing the solar collector."
+msgstr ""
+
 #: src/content/pages/components/ArchiveModelPreview.tsx
 #: src/workshop/pages/components/AssetPreview.tsx
 msgid "Could not reach unitsync to read this model."
@@ -12377,8 +12923,13 @@ msgstr ""
 msgid "Could not read {archive}. It may have been moved or removed since it was browsed."
 msgstr ""
 
+#: src/lego/pages/components/ReferencePicker.tsx
+msgid "Could not read {game}'s units. Showing the solar collector."
+msgstr ""
+
 #: src/lego/pages/components/useBuildMenuSource.ts
-msgid "Could not read {gameLabel}: {reason}"
+#: src/lego/pages/components/WeaponsSection.tsx
+msgid "Could not read {gameName}: {detail}"
 msgstr ""
 
 #: src/lego/pages/components/GameFitSection.tsx
@@ -12386,11 +12937,17 @@ msgid "Could not read {gameName}: {error}"
 msgstr ""
 
 #: src/lego/pages/components/GameFitSection.tsx
+#: src/lego/pages/components/useBuildMenuSource.ts
+#: src/lego/pages/components/WeaponsSection.tsx
 msgid "Could not read {gameName}: its definitions could not be read"
 msgstr ""
 
 #: src/workshop/pages/components/RandomModDrawer.tsx
 msgid "Could not read {gameName}'s units."
+msgstr ""
+
+#: src/lego/pages/components/ScriptTab.tsx
+msgid "Could not read {picked}: {reason}"
 msgstr ""
 
 #: src/home/markup.ts
@@ -12399,6 +12956,14 @@ msgstr ""
 
 #: src/profile/refs.ts
 msgid "Could not read {reference}"
+msgstr ""
+
+#: src/lego/pages/components/StatsSection.tsx
+msgid "Could not read {referenceGame}."
+msgstr ""
+
+#: src/lego/pages/components/MovementSection.tsx
+msgid "Could not read {stateGameName}: {stateMessage}"
 msgstr ""
 
 #: src/content/modelFile.ts
@@ -12416,6 +12981,16 @@ msgstr ""
 
 #: src/multiplayer/battles/hostEngineVersion.ts
 msgid "Could not read the engine's version."
+msgstr ""
+
+#: src/lego/pages/components/useBuildMenuSource.ts
+#: src/lego/pages/components/WeaponsSection.tsx
+msgid "Could not read the game it was exported into: {detail}"
+msgstr ""
+
+#: src/lego/pages/components/useBuildMenuSource.ts
+#: src/lego/pages/components/WeaponsSection.tsx
+msgid "Could not read the game it was exported into: its definitions could not be read"
 msgstr ""
 
 #: src/lego/pages/components/useEffectBitmaps.ts
@@ -12470,6 +13045,10 @@ msgstr ""
 
 #: src/lego/pages/ProjectsPage.tsx
 msgid "Could not read your saved models: {error}"
+msgstr ""
+
+#: src/lego/pages/components/SaveModelPopover.tsx
+msgid "Could not save the model"
 msgstr ""
 
 #: src/lego/pages/ProjectsPage.tsx
@@ -12553,9 +13132,14 @@ msgstr ""
 msgid "Couldn't save preset"
 msgstr ""
 
+#: src/lego/pages/components/SymmetryPopover.tsx
 #: src/uberstress/pages/HistoryPage.tsx
 #: src/workshop/pages/components/ExplosionGeneratorEditor.tsx
 msgid "Count"
+msgstr ""
+
+#: src/lego/pages/components/ViewportBar.tsx
+msgid "Count the barrel, muzzle flare, aim point and build nozzle in the base footprint"
 msgstr ""
 
 #: src/content/pages/components/MapRecords.tsx
@@ -12726,6 +13310,10 @@ msgstr ""
 
 #: src/content/unitFieldNotes.ts
 msgid "Cruise altitude (old name)"
+msgstr ""
+
+#: src/lego/pages/components/MovementSection.tsx
+msgid "Cruise altitude, elmos"
 msgstr ""
 
 #: src/content/unitFieldNotes.ts
@@ -13161,6 +13749,7 @@ msgstr ""
 #: src/lego/pages/components/DetailPanel.tsx
 #: src/lego/pages/components/GuidesPopover.tsx
 #: src/lego/pages/components/LoadoutPicker.tsx
+#: src/lego/pages/components/PosesPopover.tsx
 #: src/placement/SurfaceBars.tsx
 #: src/play/pages/SavegamesPage.tsx
 #: src/scenario/pages/components/DialoguePanel.tsx
@@ -13176,6 +13765,10 @@ msgstr ""
 
 #: src/lego/pages/ProjectsPage.tsx
 msgid "Delete \"{name}\"? This cannot be undone."
+msgstr ""
+
+#: src/lego/pages/components/ModelViewport.tsx
+msgid "Delete (Backspace)"
 msgstr ""
 
 #: src/lego/pages/components/AnimationPanel.tsx
@@ -13226,6 +13819,10 @@ msgstr ""
 #: src/workshop/pages/components/CloneActions.tsx
 #: src/workshop/pages/components/WeaponLibraryPanel.tsx
 msgid "Delete {name}?"
+msgstr ""
+
+#: src/lego/pages/components/PosesPopover.tsx
+msgid "Delete {poseName}"
 msgstr ""
 
 #: src/lego/pages/ProjectsPage.tsx
@@ -13335,6 +13932,10 @@ msgstr ""
 
 #: src/content/pages/components/MapRecords.tsx
 msgid "Delete the name {name}"
+msgstr ""
+
+#: src/lego/pages/components/ModelViewport.tsx
+msgid "Delete the selection"
 msgstr ""
 
 #: src/content/pages/components/ReplaySetsManager.tsx
@@ -13485,6 +14086,7 @@ msgstr ""
 msgid "Depot"
 msgstr ""
 
+#: src/lego/pages/components/ShapeFields.tsx
 #: src/runlite/pages/components/RunHud.tsx
 msgid "Depth"
 msgstr ""
@@ -13499,6 +14101,10 @@ msgstr ""
 
 #: src/lego/pages/components/CollisionPanel.tsx
 msgid "Derived from the model's bounding box, and re-derived as the unit changes. Changing anything above takes it over."
+msgstr ""
+
+#: src/lego/pages/components/NewUnitPopover.tsx
+msgid "Describe it instead"
 msgstr ""
 
 #: src/campaign/pages/CampaignEditPage.tsx
@@ -13535,6 +14141,10 @@ msgstr ""
 #: src/campaign/pages/components/MissionScenarioField.tsx
 #: src/lego/pages/components/JoinedTo.tsx
 msgid "Detach"
+msgstr ""
+
+#: src/lego/pages/components/SetPanel.tsx
+msgid "Detached: {detached}"
 msgstr ""
 
 #: src/lego/pages/BuilderPage.tsx
@@ -13668,6 +14278,10 @@ msgstr ""
 msgid "Disarms a trigger until something enables it again."
 msgstr ""
 
+#: src/lego/pages/components/ScriptTab.tsx
+msgid "Discard this script and use the presets"
+msgstr ""
+
 #: src/multiplayer/VerificationCodeDialog.tsx
 msgid "Disconnect"
 msgstr ""
@@ -13703,6 +14317,7 @@ msgstr ""
 
 #: src/content/pages/components/ReplayAnalysisSection.tsx
 #: src/content/pages/components/SetupCard.tsx
+#: src/lego/pages/components/ModuleUpdateBanner.tsx
 #: src/multiplayer/LobbyStatusButton.tsx
 #: src/multiplayer/RejoinOfferPanel.tsx
 #: src/play/pages/SkirmishPage.tsx
@@ -13736,6 +14351,14 @@ msgstr ""
 msgid "Distress Signal"
 msgstr ""
 
+#: src/lego/pages/components/SetPanel.tsx
+msgid "Distribute {axisName}"
+msgstr ""
+
+#: src/lego/pages/components/SetPanel.tsx
+msgid "Distribute {axisName}: equal gaps, ends stay. Needs 3 pieces."
+msgstr ""
+
 #: src/profile/index.ts
 #: src/profile/SettingsSection.tsx
 msgid "Distribution profile"
@@ -13761,6 +14384,7 @@ msgstr ""
 msgid "Does not include Gaia."
 msgstr ""
 
+#: src/lego/pages/components/MovementSection.tsx
 #: src/workshop/pages/UnitPage.tsx
 msgid "Does not move"
 msgstr ""
@@ -13771,6 +14395,10 @@ msgstr ""
 
 #: src/multiplayer/admin/EmailDomainsSection.tsx
 msgid "Domain to unblock"
+msgstr ""
+
+#: src/lego/pages/components/ShapeFields.tsx
+msgid "Dome"
 msgstr ""
 
 #: src/content/achievements.ts
@@ -14110,6 +14738,10 @@ msgstr ""
 msgid "Drag to turn"
 msgstr ""
 
+#: src/lego/pages/components/ShapeFields.tsx
+msgid "Dragging a round side sets the radius."
+msgstr ""
+
 #: src/scenario/pages/components/GroupControls.tsx
 msgid "Draw"
 msgstr ""
@@ -14124,6 +14756,18 @@ msgstr ""
 
 #: src/startbox/StartBoxPresetsPopover.tsx
 msgid "Draw some boxes first"
+msgstr ""
+
+#: src/lego/pages/components/ViewportBar.tsx
+msgid "Draw the unit as edges ({key})"
+msgstr ""
+
+#: src/lego/pages/components/ViewportBar.tsx
+msgid "Draw the unit solid ({key})"
+msgstr ""
+
+#: src/lego/pages/components/ViewportBar.tsx
+msgid "Draw the unit solid with edges ({key})"
 msgstr ""
 
 #: src/i18n/frameStrings.ts
@@ -14231,6 +14875,7 @@ msgstr ""
 #: src/blueprint/pages/components/BlueprintCardMenu.tsx
 #: src/campaign/pages/components/CampaignRowMenu.tsx
 #: src/lego/pages/components/LoadoutPicker.tsx
+#: src/lego/pages/components/PosesPopover.tsx
 #: src/scenario/pages/components/DialoguePanel.tsx
 #: src/scenario/pages/components/ObjectivePanel.tsx
 #: src/scenario/pages/components/ScenarioRowMenu.tsx
@@ -14240,12 +14885,24 @@ msgstr ""
 msgid "Duplicate"
 msgstr ""
 
+#: src/lego/pages/components/ModelViewport.tsx
+msgid "Duplicate (Cmd D)"
+msgstr ""
+
 #: src/campaign/pages/CampaignEditPage.tsx
 msgid "Duplicate {missionTitle}"
 msgstr ""
 
+#: src/lego/pages/components/PosesPopover.tsx
+msgid "Duplicate {poseName}"
+msgstr ""
+
 #: src/scenario/pages/components/shortcuts.ts
 msgid "Duplicate the selected placement, or the trigger you are editing"
+msgstr ""
+
+#: src/lego/pages/components/ModelViewport.tsx
+msgid "Duplicate the selection"
 msgstr ""
 
 #: src/workshop/unitSections.ts
@@ -14409,6 +15066,7 @@ msgstr ""
 #: src/campaign/pages/CampaignEditPage.tsx
 #: src/campaign/pages/components/CampaignRowMenu.tsx
 #: src/content/pages/components/ReplaySetsManager.tsx
+#: src/lego/pages/components/ShortcutSheet.tsx
 #: src/scenario/pages/components/ScenarioRowMenu.tsx
 msgid "Edit"
 msgstr ""
@@ -14512,6 +15170,8 @@ msgid "Elite garrison"
 msgstr ""
 
 #: src/lego/pages/components/CollisionPanel.tsx
+#: src/lego/pages/components/PieceCollisionFields.tsx
+#: src/lego/pages/components/SkeletonTargetFields.tsx
 msgid "elmos"
 msgstr ""
 
@@ -14562,6 +15222,14 @@ msgstr ""
 
 #: src/deeplink/parse.ts
 msgid "Empty link."
+msgstr ""
+
+#: src/lego/pages/components/PieceTree.tsx
+msgid "Empty piece"
+msgstr ""
+
+#: src/lego/pages/components/PieceTree.tsx
+msgid "Empty piece: a hierarchy node, flare, aim point or emitter"
 msgstr ""
 
 #: src/lego/pages/BuilderPage.tsx
@@ -14623,9 +15291,11 @@ msgid "Enemy incursion detected — check the map."
 msgstr ""
 
 #: src/content/pages/components/LivingValueChart.tsx
+#: src/lego/pages/components/WorthSection.tsx
 msgid "energy"
 msgstr ""
 
+#: src/lego/pages/components/WorthSection.tsx
 #: src/scenario/pages/components/StartConditions.tsx
 msgid "Energy"
 msgstr ""
@@ -14903,6 +15573,8 @@ msgid "Error details"
 msgstr ""
 
 #: src/content/compatReport.ts
+#: src/lego/pages/components/ProblemsButton.tsx
+#: src/lego/pages/components/UnitCheckResult.tsx
 #: src/uberstress/pages/components/ReportDetail.tsx
 #: src/uberstress/pages/RunPage.tsx
 msgid "Errors"
@@ -15158,6 +15830,10 @@ msgstr ""
 msgid "Exit fullscreen"
 msgstr ""
 
+#: src/lego/pages/components/PieceTree.tsx
+msgid "Expand {pieceName}"
+msgstr ""
+
 #: src/content/pages/components/ReplayAnalysisSection.tsx
 msgid "Expect about {expected}."
 msgstr ""
@@ -15350,6 +16026,10 @@ msgstr ""
 msgid "exports as"
 msgstr ""
 
+#: src/lego/pages/components/PartFilters.tsx
+msgid "Extension packs live in <0>{packDir}</0>, one folder each."
+msgstr ""
+
 #: src/multiplayer/admin/PlayerLookupSection.tsx
 msgid "External ID"
 msgstr ""
@@ -15382,6 +16062,10 @@ msgstr ""
 msgid "Extraction depth"
 msgstr ""
 
+#: src/lego/pages/components/ModelViewport.tsx
+msgid "Faces"
+msgstr ""
+
 #: src/scenario/pages/components/ActorControls.tsx
 msgid "Faces east"
 msgstr ""
@@ -15405,6 +16089,10 @@ msgstr ""
 
 #: src/scenario/pages/components/mapKeyboard.ts
 msgid "Facing {way}."
+msgstr ""
+
+#: src/lego/pages/components/WeaponsSection.tsx
+msgid "Facing, degrees right"
 msgstr ""
 
 #: src/content/pages/components/MapRecords.tsx
@@ -15498,9 +16186,25 @@ msgstr ""
 msgid "Faster"
 msgstr ""
 
+#: src/lego/pages/components/TileGrid.tsx
+msgid "Favourite"
+msgstr ""
+
 #: src/content/pages/PlayerDossierPage.tsx
 #: src/content/pages/StatsPage.tsx
 msgid "Favourite maps"
+msgstr ""
+
+#: src/lego/pages/components/TileGrid.tsx
+msgid "Favourite the {name} module"
+msgstr ""
+
+#: src/lego/pages/components/TileGrid.tsx
+msgid "Favourite the {name} part"
+msgstr ""
+
+#: src/lego/pages/components/TileGrid.tsx
+msgid "Favourite the {name} shape"
 msgstr ""
 
 #: src/lego/pages/components/Inventory.tsx
@@ -15837,6 +16541,7 @@ msgid "First win on {name}, in {time}."
 msgstr ""
 
 #: src/lego/pages/components/FitPlanDrawer.tsx
+#: src/lego/pages/components/ProportionsPanel.tsx
 msgid "Fit"
 msgstr ""
 
@@ -15907,6 +16612,10 @@ msgstr ""
 
 #: src/play/pages/components/ParticipantsTable.tsx
 msgid "Fixed start positions: team N spawns at the map's start position N."
+msgstr ""
+
+#: src/lego/pages/components/ViewportBar.tsx
+msgid "Fixed views"
 msgstr ""
 
 #: src/multiplayer/pages/HighlightsSettings.tsx
@@ -15987,6 +16696,14 @@ msgstr ""
 
 #: src/content/unitFieldNotes.ts
 msgid "Flies"
+msgstr ""
+
+#: src/lego/pages/components/MovementSection.tsx
+msgid "Flies, gunship"
+msgstr ""
+
+#: src/lego/pages/components/MovementSection.tsx
+msgid "Flies, plane"
 msgstr ""
 
 #: src/lego/pages/BuilderPage.tsx
@@ -16070,6 +16787,10 @@ msgstr ""
 msgid "Follow system"
 msgstr ""
 
+#: src/lego/pages/components/ViewportBar.tsx
+msgid "Follow the driving unit with the camera"
+msgstr ""
+
 #: src/multiplayer/follow/FollowIndicator.tsx
 msgid "Followed {name} into their battle"
 msgstr ""
@@ -16102,8 +16823,16 @@ msgstr ""
 msgid "Footprint"
 msgstr ""
 
+#: src/lego/pages/components/SkeletonTargetFields.tsx
+msgid "Footprint across"
+msgstr ""
+
 #: src/workshop/unitSections.ts
 msgid "Footprint and placement"
+msgstr ""
+
+#: src/lego/pages/components/SkeletonTargetFields.tsx
+msgid "Footprint deep"
 msgstr ""
 
 #: src/content/unitFieldNotes.ts
@@ -16112,6 +16841,10 @@ msgstr ""
 
 #: src/content/unitFieldNotes.ts
 msgid "Footprint width"
+msgstr ""
+
+#: src/lego/pages/components/UnitGamePicker.tsx
+msgid "for"
 msgstr ""
 
 #: src/lego/pages/BuilderPage.tsx
@@ -16237,6 +16970,10 @@ msgstr ""
 msgid "Frame {current} of {last}"
 msgstr ""
 
+#: src/lego/pages/components/ScrubberMarks.tsx
+msgid "Frame {frame}: {what}"
+msgstr ""
+
 #: src/placement/BlueprintEditor.tsx
 #: src/placement/BlueprintOnMap.tsx
 msgid "Frame blueprint"
@@ -16324,6 +17061,7 @@ msgid "From {scenarioName}"
 msgstr ""
 
 #: src/lego/pages/components/LoadoutFamilyDrawer.tsx
+#: src/lego/pages/components/TexturePicker.tsx
 msgid "from {source}"
 msgstr ""
 
@@ -16516,6 +17254,9 @@ msgstr ""
 #: src/downloads/DownloadQueueBadge.tsx
 #: src/hub/pages/BrowsePage.tsx
 #: src/hub/pages/ItemPage.tsx
+#: src/lego/pages/components/NewUnitPopover.tsx
+#: src/lego/pages/components/ReferencePicker.tsx
+#: src/lego/pages/components/UnitGamePicker.tsx
 #: src/multiplayer/battle/BattleOptionsDrawer.tsx
 #: src/multiplayer/battles/BattleFilterPopover.tsx
 #: src/multiplayer/battles/HostBattleForm.tsx
@@ -16615,6 +17356,7 @@ msgstr ""
 msgid "Game required"
 msgstr ""
 
+#: src/lego/pages/components/TestDrawer.tsx
 #: src/scenario/pages/components/ScenarioTestDrawer.tsx
 #: src/workshop/pages/components/PlayLocallyButton.tsx
 msgid "Game running"
@@ -16789,6 +17531,10 @@ msgstr ""
 msgid "Generate seed SQL"
 msgstr ""
 
+#: src/lego/pages/components/ScriptTab.tsx
+msgid "Generated from the animations applied to this unit. Export writes it to <0>scripts/{unitName}.lua</0> too, if the script checkbox is ticked (on by default). An existing script is never overwritten, so hand edits survive a re-export."
+msgstr ""
+
 #: src/workshop/pages/components/CompiledLuaPanel.tsx
 msgid "Generated Lua"
 msgstr ""
@@ -16808,6 +17554,10 @@ msgstr ""
 #: src/conquest/pages/ConquestListPage.tsx
 #: src/uberstress/pages/components/SeedSqlForm.tsx
 msgid "Generating…"
+msgstr ""
+
+#: src/lego/pages/components/PieceTree.tsx
+msgid "Geometry piece"
 msgstr ""
 
 #: src/lego/pages/BuilderPage.tsx
@@ -16906,6 +17656,14 @@ msgstr ""
 
 #: src/content/pages/components/LuaRepl.tsx
 msgid "Globals persist across runs via replay — each Run re-executes the whole session against <0>{archive}</0>. End with <1>return …</1> to see a value. Enter runs; Shift+Enter for a newline."
+msgstr ""
+
+#: src/lego/pages/components/TextureBuilderPanel.tsx
+msgid "Glow (greyscale, optional)"
+msgstr ""
+
+#: src/lego/pages/components/TextureBuilderPanel.tsx
+msgid "Glow into red, reflectivity into green. Blue is not read by the engine. Neither map here supplies alpha, the one-bit visibility cutout the engine also reads from this texture, so if this unit already has one, its existing cutout carries over into the result rather than being erased. A cutout that cannot be carried over, because the new size does not match it, is refused rather than guessed at. With no existing texture, alpha is written fully opaque. This is <0>{shadingName}</0>, the model's second texture."
 msgstr ""
 
 #: src/lego/pages/components/ExportDrawer.tsx
@@ -17079,11 +17837,20 @@ msgid "Guard"
 msgstr ""
 
 #: src/lego/pages/components/GuidesPopover.tsx
+#: src/lego/pages/components/ModelViewport.tsx
 msgid "Guides"
 msgstr ""
 
 #: src/lego/pages/components/FitPlanDrawer.tsx
 msgid "Gun"
+msgstr ""
+
+#: src/lego/pages/components/ModuleLabelsFields.tsx
+msgid "gun, heavy"
+msgstr ""
+
+#: src/lego/pages/components/ScriptTab.tsx
+msgid "Hand the script back and the unit is generated from the animation presets again, as it was before you took it over."
 msgstr ""
 
 #: src/scenario/pages/components/SetupPanel.tsx
@@ -17099,6 +17866,7 @@ msgid "Hands a group's units to another team, though the mission keeps ordering 
 msgstr ""
 
 #: src/lego/pages/BuilderPage.tsx
+#: src/lego/pages/components/SetPanel.tsx
 msgid "Hangs off"
 msgstr ""
 
@@ -17130,6 +17898,10 @@ msgstr ""
 
 #: src/content/unitFieldNotes.ts
 msgid "Has a special weapon (old name)"
+msgstr ""
+
+#: src/lego/pages/components/PieceTree.tsx
+msgid "Has geometry"
 msgstr ""
 
 #: src/content/unitFieldNotes.ts
@@ -17168,8 +17940,13 @@ msgstr ""
 msgid "Head-to-head with you ({me})"
 msgstr ""
 
+#: src/lego/pages/components/WorthSection.tsx
+msgid "health"
+msgstr ""
+
 #: src/content/pages/components/UnitStatsTable.tsx
 #: src/content/unitFieldNotes.ts
+#: src/lego/pages/components/WorthSection.tsx
 #: src/profile/HealthChecklist.tsx
 #: src/workshop/randomMod.ts
 #: src/workshop/unitReference.ts
@@ -17204,6 +17981,12 @@ msgstr ""
 msgid "heatfalloff: how fast the cloud's heat drains, not a fixed frame count. This class has no colour of its own."
 msgstr ""
 
+#: src/lego/pages/components/ProportionsPanel.tsx
+msgid "height"
+msgstr ""
+
+#: src/lego/pages/components/ShapeFields.tsx
+#: src/lego/pages/components/SkeletonTargetFields.tsx
 #: src/mapconv/pages/DecompilePage.tsx
 #: src/play/pages/components/MapOverlay.tsx
 msgid "Height"
@@ -17229,6 +18012,11 @@ msgstr ""
 msgid "Heightmap (-h)"
 msgstr ""
 
+#: src/lego/pages/components/ProportionsPanel.tsx
+msgid "Held to {min} to {max}."
+msgstr ""
+
+#: src/lego/pages/components/ShortcutSheet.tsx
 #: src/mapconv/pages/components/Help.tsx
 msgid "Help"
 msgstr ""
@@ -17286,6 +18074,10 @@ msgstr ""
 msgid "Hide {guideLabel}"
 msgstr ""
 
+#: src/lego/pages/components/PieceTree.tsx
+msgid "Hide {pieceName}"
+msgstr ""
+
 #: src/content/unitFieldNotes.ts
 msgid "Hide health from enemies"
 msgstr ""
@@ -17294,12 +18086,20 @@ msgstr ""
 msgid "hide id ''{id}'' matches nothing"
 msgstr ""
 
+#: src/lego/pages/components/PieceTree.tsx
+msgid "Hide in the viewport"
+msgstr ""
+
 #: src/conquest/pages/GalaxyPage.tsx
 msgid "Hide locations more than two jumps from your territory."
 msgstr ""
 
 #: src/workshop/pages/components/AssetPreview.tsx
 msgid "Hide model"
+msgstr ""
+
+#: src/lego/pages/components/ViewportBar.tsx
+msgid "Hide script effects"
 msgstr ""
 
 #: src/i18n/frameStrings.ts
@@ -17314,8 +18114,32 @@ msgstr ""
 msgid "Hide the {unplaceable} this game cannot place at all"
 msgstr ""
 
+#: src/lego/pages/components/ViewportBar.tsx
+msgid "Hide the aim point"
+msgstr ""
+
+#: src/lego/pages/components/ViewportBar.tsx
+msgid "Hide the balance check"
+msgstr ""
+
+#: src/lego/pages/components/ViewportBar.tsx
+msgid "Hide the collision volume"
+msgstr ""
+
+#: src/lego/pages/components/ViewportBar.tsx
+msgid "Hide the footprint check"
+msgstr ""
+
 #: src/components/ViewControls.tsx
 msgid "Hide the ground grid"
+msgstr ""
+
+#: src/lego/pages/components/ViewportBar.tsx
+msgid "Hide the guides"
+msgstr ""
+
+#: src/lego/pages/components/ViewportBar.tsx
+msgid "Hide the overlap check"
 msgstr ""
 
 #: src/lego/pages/BuilderPage.tsx
@@ -17334,12 +18158,32 @@ msgstr ""
 msgid "Hide the sidebar and open it from a menu button instead."
 msgstr ""
 
+#: src/lego/pages/components/ViewportBar.tsx
+msgid "Hide the skeleton ({skeletonKey})"
+msgstr ""
+
+#: src/lego/pages/components/ViewportBar.tsx
+msgid "Hide the stand-in unit"
+msgstr ""
+
 #: src/content/pages/MapDetailPage.tsx
 msgid "Hide this map"
 msgstr ""
 
+#: src/lego/pages/components/ViewportBar.tsx
+msgid "Hide weapon ranges"
+msgstr ""
+
 #: src/profile/health.ts
 msgid "hideSettings id ''{id}'' matches nothing"
+msgstr ""
+
+#: src/lego/pages/components/ShapeFields.tsx
+msgid "High at back"
+msgstr ""
+
+#: src/lego/pages/components/ShapeFields.tsx
+msgid "High at front"
 msgstr ""
 
 #: src/content/unitFieldNotes.ts
@@ -17421,6 +18265,10 @@ msgstr ""
 
 #: src/conquest/pages/GalaxyPage.tsx
 msgid "Hold"
+msgstr ""
+
+#: src/lego/pages/components/ModelViewport.tsx
+msgid "Hold Alt to place freely"
 msgstr ""
 
 #: src/uberstress/pages/RunPage.tsx
@@ -17624,6 +18472,10 @@ msgstr ""
 
 #: src/i18n/frameStrings.ts
 msgid "Hover-reveal sidebar"
+msgstr ""
+
+#: src/lego/pages/components/MovementSection.tsx
+msgid "hovers over its target"
 msgstr ""
 
 #: src/lego/pages/components/DescribeUnitForm.tsx
@@ -17839,6 +18691,10 @@ msgstr ""
 msgid "Hub"
 msgstr ""
 
+#: src/lego/pages/components/ShapeFields.tsx
+msgid "Hub on ends"
+msgstr ""
+
 #: src/hub/pages/BrowsePage.tsx
 msgid "Hub results"
 msgstr ""
@@ -17895,6 +18751,10 @@ msgstr ""
 msgid "Idle self repair"
 msgstr ""
 
+#: src/lego/pages/components/TestDrawer.tsx
+msgid "If it is not there, press Enter and type <0>/cheat</0> then <1>/give {unitName}</1> to place one by hand."
+msgstr ""
+
 #: src/lobby-servers/PasswordRecoveryForm.tsx
 msgid "If nothing arrives, start again and ask for a new code."
 msgstr ""
@@ -17930,6 +18790,7 @@ msgstr ""
 
 #: src/campaign/pages/components/CampaignImage.tsx
 #: src/campaign/slots.ts
+#: src/lego/pages/components/TextureBuilderPanel.tsx
 #: src/scenario/pages/components/DialoguePanel.tsx
 msgid "Image"
 msgstr ""
@@ -17984,6 +18845,7 @@ msgstr ""
 #: src/deeplink/index.ts
 #: src/deeplink/pages/ImportSection.tsx
 #: src/hub/pages/ItemPage.tsx
+#: src/lego/pages/components/ScriptTab.tsx
 #: src/play/PresetLibraryToolbar.tsx
 #: src/scenario/pages/components/ScenarioImportButton.tsx
 #: src/uberstress/pages/HistoryPage.tsx
@@ -18029,6 +18891,10 @@ msgstr ""
 
 #: src/content/pages/MapsPage.tsx
 msgid "Import a setup pack"
+msgstr ""
+
+#: src/lego/pages/components/ScriptTab.tsx
+msgid "Import a unit script"
 msgstr ""
 
 #: src/campaign/pages/components/ArchiveMediaImportButton.tsx
@@ -18677,6 +19543,10 @@ msgstr ""
 msgid "It is carrying a battle this coilbox is hosting right now. Leave that battle before opening another one."
 msgstr ""
 
+#: src/lego/pages/components/ScriptTab.tsx
+msgid "It is converted from the game's BOS again. Edits you made since are lost."
+msgstr ""
+
 #: src/downloads/installArchive.ts
 msgid "It is copied to {destDir}. The file you opened stays where it is."
 msgstr ""
@@ -18817,10 +19687,6 @@ msgstr ""
 msgid "its copy of the scenario \"{scenarioName}\", which stays in the scenario builder"
 msgstr ""
 
-#: src/lego/pages/components/useBuildMenuSource.ts
-msgid "its definitions could not be read"
-msgstr ""
-
 #: src/content/pages/components/RefightPanel.tsx
 #: src/content/pages/components/RemixPanel.tsx
 #: src/play/pages/components/NewPresetFromReplayButton.tsx
@@ -18954,6 +19820,14 @@ msgstr ""
 msgid "Joined to"
 msgstr ""
 
+#: src/lego/pages/components/PieceTree.tsx
+msgid "Joined to {parentName}"
+msgstr ""
+
+#: src/lego/pages/components/PieceTree.tsx
+msgid "Joined to {parentName}: its {connectorName} to the {toName}"
+msgstr ""
+
 #: src/direct/JoinRoomForm.tsx
 msgid "Joining {roomTitle}, found on this network."
 msgstr ""
@@ -19006,6 +19880,10 @@ msgstr ""
 msgid "Kamikaze trigger distance"
 msgstr ""
 
+#: src/lego/pages/components/ProportionsPanel.tsx
+msgid "Keep"
+msgstr ""
+
 #: src/content/index.ts
 msgid "Keep a copy of your whole engine config, and put it back."
 msgstr ""
@@ -19035,6 +19913,10 @@ msgstr ""
 msgid "Keep playing"
 msgstr ""
 
+#: src/lego/pages/components/ViewportBar.tsx
+msgid "Keep the camera still while the unit drives"
+msgstr ""
+
 #: src/workshop/pages/components/DiskDiffDrawer.tsx
 #: src/workshop/pages/components/InPlaceWrite.tsx
 msgid "Keep the changes?"
@@ -19060,12 +19942,24 @@ msgstr ""
 msgid "Keep this map out of generated warpaths and conquests. It stays playable in skirmish and multiplayer."
 msgstr ""
 
+#: src/lego/pages/components/WorthSection.tsx
+msgid "Keep this table to use on other units"
+msgstr ""
+
 #: src/play/PresetPartsPicker.tsx
 msgid "Keep tweak slots this preset does not set"
 msgstr ""
 
 #: src/content/unitFieldNotes.ts
 msgid "Keeps cannon stages touching"
+msgstr ""
+
+#: src/lego/pages/components/ProportionsPanel.tsx
+msgid "Keeps every piece."
+msgstr ""
+
+#: src/lego/pages/components/ShapeFields.tsx
+msgid "Kept"
 msgstr ""
 
 #: src/blueprint/pages/components/ArrivingPack.tsx
@@ -19128,8 +20022,13 @@ msgstr ""
 msgid "Keybinds"
 msgstr ""
 
+#: src/lego/pages/components/ShortcutSheet.tsx
 #: src/scenario/pages/ScenarioEditPage.tsx
 msgid "Keyboard shortcuts"
+msgstr ""
+
+#: src/lego/pages/components/ViewportBar.tsx
+msgid "Keyboard shortcuts (?)"
 msgstr ""
 
 #: src/container/names.ts
@@ -19350,6 +20249,14 @@ msgstr ""
 msgid "Launch battle"
 msgstr ""
 
+#: src/lego/pages/components/TestDrawer.tsx
+msgid "Launch sandbox with targets"
+msgstr ""
+
+#: src/lego/pages/components/TestDrawer.tsx
+msgid "Launch with it as start unit"
+msgstr ""
+
 #: src/content/unitFieldNotes.ts
 msgid "Launches along a fixed heading"
 msgstr ""
@@ -19436,6 +20343,10 @@ msgstr ""
 msgid "Leave channel"
 msgstr ""
 
+#: src/lego/pages/components/ScriptTab.tsx
+msgid "Leave it"
+msgstr ""
+
 #: src/runlite/pages/components/NodeOverlays.tsx
 msgid "Leave it — press on"
 msgstr ""
@@ -19448,8 +20359,32 @@ msgstr ""
 msgid "Leave out unused code"
 msgstr ""
 
+#: src/lego/pages/components/PosesPopover.tsx
+msgid "Leave posing"
+msgstr ""
+
+#: src/lego/pages/components/ViewportBar.tsx
+msgid "Leave the barrel, muzzle flare, aim point and build nozzle out of the base footprint"
+msgstr ""
+
 #: src/runlite/pages/components/NodeOverlays.tsx
 msgid "Leave the depot"
+msgstr ""
+
+#: src/lego/pages/components/ViewportBar.tsx
+msgid "Leave the front view ({key})"
+msgstr ""
+
+#: src/lego/pages/components/ViewportBar.tsx
+msgid "Leave the measure tool ({measureKey})"
+msgstr ""
+
+#: src/lego/pages/components/ViewportBar.tsx
+msgid "Leave the side view ({key})"
+msgstr ""
+
+#: src/lego/pages/components/ViewportBar.tsx
+msgid "Leave the top view ({key})"
 msgstr ""
 
 #: src/hub/pages/components/AssetUploadControl.tsx
@@ -19530,6 +20465,7 @@ msgstr ""
 
 #: src/campaign/pages/MissionBriefingPage.tsx
 #: src/conquest/pages/components/BattleOverlayParts.tsx
+#: src/lego/pages/components/TestDrawer.tsx
 msgid "Left out: {line}"
 msgstr ""
 
@@ -19558,7 +20494,12 @@ msgstr ""
 msgid "Lego Parts"
 msgstr ""
 
+#: src/lego/pages/components/ProportionsPanel.tsx
+msgid "length"
+msgstr ""
+
 #: src/hub/preview.ts
+#: src/lego/pages/components/ShapeFields.tsx
 #: src/runlite/pages/components/RunSetupForm.tsx
 msgid "Length"
 msgstr ""
@@ -19583,6 +20524,7 @@ msgstr ""
 msgid "Lets go of a group: its units stay put and keep their owner, and the mission stops ordering them."
 msgstr ""
 
+#: src/lego/pages/components/TestDrawer.tsx
 #: src/scenario/pages/components/ScenarioTestDrawer.tsx
 #: src/workshop/pages/components/PlayLocallyButton.tsx
 msgid "Letting the engine find it"
@@ -19705,6 +20647,7 @@ msgstr ""
 
 #: src/animation/pages/Bos2LuaPage.tsx
 #: src/animation/pages/LintProblems.tsx
+#: src/lego/pages/components/ScriptTab.tsx
 msgid "line {line}"
 msgstr ""
 
@@ -20037,6 +20980,18 @@ msgstr ""
 msgid "Longest"
 msgstr ""
 
+#: src/lego/pages/components/ViewportBar.tsx
+msgid "Look at the front with no perspective ({key})"
+msgstr ""
+
+#: src/lego/pages/components/ViewportBar.tsx
+msgid "Look at the side with no perspective ({key})"
+msgstr ""
+
+#: src/lego/pages/components/ViewportBar.tsx
+msgid "Look at the top with no perspective ({key})"
+msgstr ""
+
 #: src/multiplayer/admin/PlayerLookupSection.tsx
 msgid "Look up"
 msgstr ""
@@ -20145,6 +21100,10 @@ msgstr ""
 msgid "Lost, and it counted toward no rating"
 msgstr ""
 
+#: src/lego/pages/components/ShapeFields.tsx
+msgid "Low end"
+msgstr ""
+
 #: src/workshop/pages/components/EquipWeaponPopover.tsx
 #: src/workshop/pages/components/ExplosionGeneratorEditor.tsx
 #: src/workshop/pages/components/WeaponLibraryPanel.tsx
@@ -20187,6 +21146,10 @@ msgstr ""
 #. placeholder {0}: lua.error
 #: src/content/useCompatReport.ts
 msgid "Lua scan: {0}"
+msgstr ""
+
+#: src/lego/pages/components/ScriptTab.tsx
+msgid "Lua unit script"
 msgstr ""
 
 #: src/lego/pages/components/ExportDrawer.tsx
@@ -20299,6 +21262,7 @@ msgstr ""
 #: src/downloads/DownloadQueueBadge.tsx
 #: src/hub/pages/BrowsePage.tsx
 #: src/hub/pages/ItemPage.tsx
+#: src/lego/pages/components/TestDrawer.tsx
 #: src/multiplayer/battle/BattleOptionsDrawer.tsx
 #: src/multiplayer/battles/BattleFilterPopover.tsx
 #: src/multiplayer/battles/CreateLobbyPopover.tsx
@@ -20523,6 +21487,18 @@ msgstr ""
 msgid "Maps you've shared"
 msgstr ""
 
+#: src/lego/pages/components/MountPointList.tsx
+msgid "Mark a connector"
+msgstr ""
+
+#: src/lego/pages/components/MountPointList.tsx
+msgid "Mark a connector as a mount point"
+msgstr ""
+
+#: src/lego/pages/components/ModuleUpdateBanner.tsx
+msgid "Mark as current"
+msgstr ""
+
 #: src/content/pages/ReplaysPage.tsx
 msgid "Mark unwatched"
 msgstr ""
@@ -20548,7 +21524,12 @@ msgstr ""
 msgid "Marks where reclaimable/extractable metal is. The <0>red channel</0> sets metal density (brighter red = more); paint small red spots where you want metal spots in game."
 msgstr ""
 
+#: src/lego/pages/components/WorthSection.tsx
+msgid "mass"
+msgstr ""
+
 #: src/content/unitFieldNotes.ts
+#: src/lego/pages/components/WorthSection.tsx
 msgid "Mass"
 msgstr ""
 
@@ -20582,6 +21563,10 @@ msgstr ""
 
 #: src/home/continue.ts
 msgid "Match in progress · hosted by {host}"
+msgstr ""
+
+#: src/lego/pages/components/ScriptTab.tsx
+msgid "Match pieces"
 msgstr ""
 
 #: src/multiplayer/DebriefingDrawer.tsx
@@ -20691,6 +21676,14 @@ msgstr ""
 msgid "Maximum water depth"
 msgstr ""
 
+#: src/lego/pages/components/MeasureReadout.tsx
+msgid "Measure"
+msgstr ""
+
+#: src/lego/pages/components/ViewportBar.tsx
+msgid "Measure between two points ({measureKey})"
+msgstr ""
+
 #: src/lego/pages/components/AimPointPanel.tsx
 msgid "Measured from the unit's own origin, which sits on the ground, so y is how far up the unit the shot lands."
 msgstr ""
@@ -20762,10 +21755,12 @@ msgid "Metadata"
 msgstr ""
 
 #: src/content/pages/components/LivingValueChart.tsx
+#: src/lego/pages/components/WorthSection.tsx
 msgid "metal"
 msgstr ""
 
 #: src/content/pages/components/PlayerUnitUsage.tsx
+#: src/lego/pages/components/WorthSection.tsx
 #: src/play/pages/components/MapOverlay.tsx
 #: src/scenario/pages/components/StartConditions.tsx
 msgid "Metal"
@@ -20926,6 +21921,10 @@ msgstr ""
 msgid "Mirror UVs"
 msgstr ""
 
+#: src/lego/pages/components/SymmetryPopover.tsx
+msgid "Mirrored twin"
+msgstr ""
+
 #: src/content/unitFieldNotes.ts
 msgid "Missile and Torpedo only. Fraction of the distance to the target added as extra arc height; at 1.0 the arc is as tall as it is long."
 msgstr ""
@@ -21059,6 +22058,10 @@ msgstr ""
 msgid "Model file"
 msgstr ""
 
+#: src/lego/pages/components/SaveModelPopover.tsx
+msgid "Model saved"
+msgstr ""
+
 #: src/content/mapCompatReport.ts
 #: src/lego/index.ts
 #: src/lego/pages/ProjectsPage.tsx
@@ -21081,12 +22084,20 @@ msgstr ""
 msgid "Mods"
 msgstr ""
 
+#: src/lego/pages/components/ModuleLabelsFields.tsx
+msgid "Module category"
+msgstr ""
+
 #: src/lego/pages/BuilderPage.tsx
 msgid "Module missing"
 msgstr ""
 
 #: src/lego/pages/components/DetailPanel.tsx
 msgid "Module name"
+msgstr ""
+
+#: src/lego/pages/components/ModuleLabelsFields.tsx
+msgid "Module tags"
 msgstr ""
 
 #: src/lego/pages/components/Inventory.tsx
@@ -21137,8 +22148,29 @@ msgstr ""
 msgid "Mount"
 msgstr ""
 
+#: src/lego/pages/components/SaveCompoundPopover.tsx
+msgid "Mount connector"
+msgstr ""
+
 #: src/lego/pages/BuilderPage.tsx
 msgid "Mount point"
+msgstr ""
+
+#: src/lego/pages/components/MountPointList.tsx
+msgid "Mount point name"
+msgstr ""
+
+#: src/lego/pages/components/MountPointList.tsx
+#: src/lego/pages/components/PieceTree.tsx
+msgid "Mount points"
+msgstr ""
+
+#: src/lego/pages/components/SaveCompoundPopover.tsx
+msgid "Mounts on the unit by"
+msgstr ""
+
+#: src/lego/pages/components/ModelViewport.tsx
+msgid "Move"
 msgstr ""
 
 #: src/scenario/pages/components/BaseControls.tsx
@@ -21229,6 +22261,10 @@ msgstr ""
 msgid "Move up"
 msgstr ""
 
+#: src/lego/pages/components/MeasureReadout.tsx
+msgid "Moved"
+msgstr ""
+
 #. placeholder {0}: outcome.originalsMovedAside.length
 #. placeholder {1}: outcome.unitDefsPatched.length
 #: src/content/pages/components/Convert3doDrawer.tsx
@@ -21256,6 +22292,7 @@ msgstr ""
 msgid "Moved the base's origin, now at {spot}."
 msgstr ""
 
+#: src/lego/pages/components/MovementSection.tsx
 #: src/workshop/unitSections.ts
 msgid "Movement"
 msgstr ""
@@ -21265,7 +22302,12 @@ msgid "Movement and sensors"
 msgstr ""
 
 #: src/content/unitFieldNotes.ts
+#: src/lego/pages/components/MovementSection.tsx
 msgid "Movement class"
+msgstr ""
+
+#: src/lego/pages/components/ProportionsPanel.tsx
+msgid "Moves {movedNames}."
 msgstr ""
 
 #: src/scenario/triggerTypes.ts
@@ -21284,8 +22326,16 @@ msgstr ""
 msgid "Moves the view. Puts nothing down and selects nothing new."
 msgstr ""
 
+#: src/lego/pages/components/ModelViewport.tsx
+msgid "Moving in steps of {steppedBy}. Hold Alt to place freely"
+msgstr ""
+
 #: src/scenario/pages/components/MissionHomeActions.tsx
 msgid "Moving it in"
+msgstr ""
+
+#: src/lego/pages/components/SetPanel.tsx
+msgid "Moving, turning or scaling this set works on each piece about the middle of the set, so it keeps its shape. A piece already carried by another in the set is left to its parent."
 msgstr ""
 
 #: src/content/pages/ReplaysPage.tsx
@@ -21499,6 +22549,10 @@ msgstr ""
 msgid "Name of {name}"
 msgstr ""
 
+#: src/lego/pages/components/PosesPopover.tsx
+msgid "Name of {poseName}"
+msgstr ""
+
 #: src/content/unitFieldNotes.ts
 msgid "Name of a model to use for the projectile. Without one, the weapon falls back to 2D sprites."
 msgstr ""
@@ -21697,6 +22751,10 @@ msgstr ""
 
 #: src/lego/pages/components/ExportDrawer.tsx
 msgid "Neither is read by the engine. Both are for taking the unit into Blender, to check it against the <0>.s3o</0> or finish it by hand, and both go into a <1>blender</1> folder alongside the game's own."
+msgstr ""
+
+#: src/lego/pages/components/PieceCollisionFields.tsx
+msgid "Neither switch above is on, so the engine never looks at a piece's box and none of this reaches a game."
 msgstr ""
 
 #: src/workshop/pages/components/CollectionsPanel.tsx
@@ -21943,6 +23001,10 @@ msgstr ""
 
 #: src/content/pages/components/ReplayTimeWindowControl.tsx
 msgid "No {countNoun}."
+msgstr ""
+
+#: src/lego/pages/components/MovementSection.tsx
+msgid "no {standsIn} class"
 msgstr ""
 
 #: src/scenario/validate.ts
@@ -22277,7 +23339,12 @@ msgstr ""
 
 #: src/lego/pages/components/GameFitSection.tsx
 #: src/lego/pages/components/useBuildMenuSource.ts
+#: src/lego/pages/components/WeaponsSection.tsx
 msgid "No engine is installed, so the game cannot be read."
+msgstr ""
+
+#: src/lego/pages/components/MovementSection.tsx
+msgid "No engine is installed, so there is no game to read classes from."
 msgstr ""
 
 #: src/scenario/launch.ts
@@ -22290,6 +23357,10 @@ msgstr ""
 
 #: src/scenario/launch.ts
 msgid "No engine is installed. Add one from Content before testing a scenario."
+msgstr ""
+
+#: src/lego/pages/components/TestDrawer.tsx
+msgid "No engine is installed. Add one from Content before testing a unit."
 msgstr ""
 
 #: src/play/pages/components/NoEngineNotice.tsx
@@ -22359,6 +23430,10 @@ msgstr ""
 msgid "No file in this game names this parameter."
 msgstr ""
 
+#: src/lego/pages/components/SaveModelPopover.tsx
+msgid "No file to save over"
+msgstr ""
+
 #: src/content/pages/components/ArchiveTree.tsx
 msgid "No files listed for this archive."
 msgstr ""
@@ -22377,6 +23452,7 @@ msgstr ""
 
 #: src/campaign/pages/components/MissionFacts.tsx
 #: src/campaign/pages/components/PresetPickerDrawer.tsx
+#: src/lego/pages/components/UnitGamePicker.tsx
 #: src/lego/pages/ProjectsPage.tsx
 #: src/play/pages/components/GameOptionsPanel.tsx
 #: src/scenario/pages/components/SetupPanel.tsx
@@ -22385,6 +23461,14 @@ msgstr ""
 
 #: src/profile/health.ts
 msgid "No game filter set"
+msgstr ""
+
+#: src/lego/pages/components/TestDrawer.tsx
+msgid "No game installed"
+msgstr ""
+
+#: src/lego/pages/components/TestDrawer.tsx
+msgid "No game is installed. A unit needs one to be built on top of."
 msgstr ""
 
 #: src/workshop/pages/components/ProjectChecks.tsx
@@ -22550,10 +23634,12 @@ msgstr ""
 msgid "no map · a build grid, {GRID_EXTENT} elmos square · drag or middle-drag to pan · right-drag to turn the view · scroll to zoom"
 msgstr ""
 
+#: src/lego/pages/components/TestDrawer.tsx
 #: src/workshop/pages/components/PlayLocallyButton.tsx
 msgid "No map installed"
 msgstr ""
 
+#: src/lego/pages/components/TestDrawer.tsx
 #: src/workshop/pages/components/PlayLocallyButton.tsx
 msgid "No map is installed. Download one from Content first."
 msgstr ""
@@ -22673,6 +23759,18 @@ msgstr ""
 msgid "No models yet"
 msgstr ""
 
+#: src/lego/pages/components/SwapModuleDrawer.tsx
+msgid "No module matches"
+msgstr ""
+
+#: src/lego/pages/components/ModuleFilters.tsx
+msgid "No module matches. Clear the search or pick another category."
+msgstr ""
+
+#: src/lego/pages/components/SaveCompoundPopover.tsx
+msgid "No mount"
+msgstr ""
+
 #: src/sound/MusicSource.tsx
 msgid "No music"
 msgstr ""
@@ -22719,6 +23817,10 @@ msgstr ""
 
 #: src/content/pages/components/ReplayMap.tsx
 msgid "No orders with a place on the map were given in this replay."
+msgstr ""
+
+#: src/lego/pages/components/SwapModuleDrawer.tsx
+msgid "No other modules in this category"
 msgstr ""
 
 #: src/multiplayer/chat/UserPicker.tsx
@@ -22825,6 +23927,10 @@ msgstr ""
 
 #: src/workshop/pages/components/ProjectChecks.tsx
 msgid "No problems found"
+msgstr ""
+
+#: src/lego/pages/components/ProblemsButton.tsx
+msgid "No problems."
 msgstr ""
 
 #: src/campaign/pages/MissionBriefingPage.tsx
@@ -23192,6 +24298,10 @@ msgstr ""
 msgid "no text, so the radio panel opens on an empty message"
 msgstr ""
 
+#: src/lego/pages/components/TexturePicker.tsx
+msgid "no texture"
+msgstr ""
+
 #: src/lego/pages/components/ActionsDrawer.tsx
 msgid "No time yet"
 msgstr ""
@@ -23316,6 +24426,10 @@ msgstr ""
 msgid "No water maps."
 msgstr ""
 
+#: src/lego/pages/components/WeaponsSection.tsx
+msgid "No weapon"
+msgstr ""
+
 #: src/workshop/pages/components/WeaponSlotsPanel.tsx
 msgid "No weapon definition in this game is called {explosionName}, so the engine uses its empty NOWEAPON definition and the unit explodes as nothing."
 msgstr ""
@@ -23326,6 +24440,10 @@ msgstr ""
 
 #: src/workshop/pages/components/WeaponLibraryPanel.tsx
 msgid "No weapon in {gameName} matches that."
+msgstr ""
+
+#: src/lego/pages/components/WeaponsSection.tsx
+msgid "No weapon matches that."
 msgstr ""
 
 #: src/workshop/pages/components/ReferenceBulkEdit.tsx
@@ -23385,6 +24503,7 @@ msgstr ""
 #: src/animation/pages/Bos2LuaPage.tsx
 #: src/lego/pages/BuilderPage.tsx
 #: src/lego/pages/components/LoadoutFamilyDrawer.tsx
+#: src/lego/pages/components/StatsSection.tsx
 #: src/multiplayer/battle/BattleEngineCard.tsx
 #: src/profile/SettingsSection.tsx
 msgid "None"
@@ -23464,6 +24583,10 @@ msgstr ""
 
 #: src/multiplayer/battles/SavedSearchSettings.tsx
 msgid "None yet. Use Alert me on the Battles page to be told when a battle you want appears."
+msgstr ""
+
+#: src/lego/pages/components/ReferencePicker.tsx
+msgid "None: solar collector"
 msgstr ""
 
 #: src/multiplayer/admin/StaffSection.tsx
@@ -23637,6 +24760,10 @@ msgstr ""
 msgid "Not known yet"
 msgstr ""
 
+#: src/lego/pages/components/ProportionsPanel.tsx
+msgid "Not measured"
+msgstr ""
+
 #: src/lego/pages/components/FitPlanDrawer.tsx
 msgid "Not measured: {unmeasured}"
 msgstr ""
@@ -23651,6 +24778,10 @@ msgstr ""
 
 #: src/content/pages/components/GameCard.tsx
 msgid "not on the hub"
+msgstr ""
+
+#: src/lego/pages/components/ScriptTab.tsx
+msgid "Not on this unit: {unmatchedNames}."
 msgstr ""
 
 #: src/multiplayer/admin/BansSection.tsx
@@ -23697,6 +24828,10 @@ msgstr ""
 msgid "Not renamed: {error}"
 msgstr ""
 
+#: src/lego/pages/components/ScriptTab.tsx
+msgid "Not saved yet."
+msgstr ""
+
 #: src/blueprint/pages/components/ImportBlueprintForm.tsx
 #: src/blueprint/pages/components/ImportPackForm.tsx
 msgid "Not saved: {error}"
@@ -23722,8 +24857,36 @@ msgstr ""
 msgid "not set"
 msgstr ""
 
+#: src/lego/pages/components/MovementSection.tsx
+msgid "Not set"
+msgstr ""
+
 #: src/workshop/pages/components/UnitFieldRow.tsx
 msgid "Not set by this game."
+msgstr ""
+
+#: src/lego/pages/components/MovementSection.tsx
+msgid "Not set, the engine allows banking"
+msgstr ""
+
+#: src/lego/pages/components/MovementSection.tsx
+msgid "Not set, the engine brakes at the acceleration"
+msgstr ""
+
+#: src/lego/pages/components/MovementSection.tsx
+msgid "Not set, the engine uses {engineDefault}"
+msgstr ""
+
+#: src/lego/pages/components/MovementSection.tsx
+msgid "Not set, the engine uses 0 and the unit follows the ground at once"
+msgstr ""
+
+#: src/lego/pages/components/MovementSection.tsx
+msgid "Not set, the engine uses 0.5"
+msgstr ""
+
+#: src/lego/pages/components/MovementSection.tsx
+msgid "Not set, the unit never backs up"
 msgstr ""
 
 #: src/account/pages/SettingsSection.tsx
@@ -23783,6 +24946,10 @@ msgstr ""
 msgid "Note: {name}"
 msgstr ""
 
+#: src/lego/pages/components/ProblemsButton.tsx
+msgid "Notes"
+msgstr ""
+
 #: src/lego/pages/components/ExportDrawer.tsx
 #: src/scenario/pages/components/mapKeyboard.ts
 #: src/scenario/pages/components/SetupPanel.tsx
@@ -23835,6 +25002,10 @@ msgstr ""
 msgid "Nothing drawable came out of {object}: it has pieces but no faces."
 msgstr ""
 
+#: src/lego/pages/components/ReferencePicker.tsx
+msgid "Nothing drawable came out of {object}. Showing the solar collector."
+msgstr ""
+
 #: src/content/pages/components/ArchiveModelPreview.tsx
 msgid "Nothing drawable came out of this file: it has pieces but no faces."
 msgstr ""
@@ -23862,6 +25033,10 @@ msgstr ""
 
 #: src/challenge/ImportHoldDrawer.tsx
 msgid "Nothing has been imported yet."
+msgstr ""
+
+#: src/lego/pages/components/TestDrawer.tsx
+msgid "Nothing has changed since the game started."
 msgstr ""
 
 #: src/direct/hostingRoute.ts
@@ -23902,6 +25077,14 @@ msgstr ""
 
 #: src/workshop/pages/components/ProjectChecks.tsx
 msgid "Nothing here needs attention."
+msgstr ""
+
+#: src/lego/pages/components/PieceCollisionFields.tsx
+msgid "Nothing hits {pieceName}, so it has no box on screen and the viewport's handles stay on the unit's volume."
+msgstr ""
+
+#: src/lego/pages/components/PieceCollisionFields.tsx
+msgid "Nothing in a model or a unit definition can set these, so coilbox writes them as Lua instead. Exporting the unit puts them in a file of coilbox's own next to the game's scripts, and the unit script pulls that file in with one line. Nothing is written until you export, and the file is rewritten every time, so it keeps up with what you set here even after you have taken the script over."
 msgstr ""
 
 #: src/workshop/pages/components/DecodeTweakSetDrawer.tsx
@@ -23964,13 +25147,25 @@ msgstr ""
 msgid "Nothing is saved until you add the server."
 msgstr ""
 
+#: src/lego/pages/components/PieceCollisionFields.tsx
+msgid "Nothing is selected, so the viewport's handles are on the unit's volume. Select {pieceName} to move them onto its box."
+msgstr ""
+
 #: src/lego/pages/components/Inventory.tsx
 msgid "Nothing matches."
+msgstr ""
+
+#: src/lego/pages/components/PartFilters.tsx
+msgid "Nothing matches. Try a shape like \"beam\", a size like \"tiny\", or clear the search."
 msgstr ""
 
 #: src/scenario/pages/components/mapKeyboard.ts
 #: src/scenario/pages/components/useMapKeyboard.ts
 msgid "Nothing moved."
+msgstr ""
+
+#: src/lego/pages/components/ProportionsPanel.tsx
+msgid "Nothing moves."
 msgstr ""
 
 #: src/content/pages/components/ReplayAnalysisSection.tsx
@@ -24066,6 +25261,10 @@ msgstr ""
 
 #: src/scenario/pages/components/TriggerSteps.tsx
 msgid "Nothing to pick yet"
+msgstr ""
+
+#: src/lego/pages/components/TestDrawer.tsx
+msgid "Nothing to play on."
 msgstr ""
 
 #: src/scenario/pages/components/GroupControls.tsx
@@ -24330,6 +25529,10 @@ msgstr ""
 msgid "Offset from the aim point"
 msgstr ""
 
+#: src/lego/pages/components/PieceCollisionFields.tsx
+msgid "Offset in the piece"
+msgstr ""
+
 #: src/lego/pages/components/GuidesPopover.tsx
 msgid "Offset of {guideLabel}"
 msgstr ""
@@ -24488,6 +25691,10 @@ msgstr ""
 msgid "One continent"
 msgstr ""
 
+#: src/lego/pages/components/NewUnitPopover.tsx
+msgid "One empty piece to build from."
+msgstr ""
+
 #: src/conquest/pages/ConquestListPage.tsx
 msgid "One enemy faction"
 msgstr ""
@@ -24611,6 +25818,10 @@ msgstr ""
 
 #: src/hub/pages/BrowsePage.tsx
 msgid "Only the first {scanned} items on the hub were read, so there may be more for this game than are listed here. Search to narrow it down."
+msgstr ""
+
+#: src/lego/pages/components/TextureBuilderPanel.tsx
+msgid "Only the red channel is read. A colour picture is not converted to grey, just cut down to its red channel."
 msgstr ""
 
 #: src/scenario/pages/components/RestrictionPanel.tsx
@@ -25130,6 +26341,10 @@ msgstr ""
 msgid "Other events"
 msgstr ""
 
+#: src/lego/pages/components/ProportionsPanel.tsx
+msgid "Other pieces stay where they are."
+msgstr ""
+
 #: src/content/pages/components/MapRecords.tsx
 msgid "Other starts are grouped when they are within {scale} of one another, directly or through others, which is 1/32 of the map's shorter side and the grain of the density layers. Nothing measured says that suits every map, and a group with a wide radius may be more than one position."
 msgstr ""
@@ -25232,8 +26447,16 @@ msgstr ""
 msgid "Overwrite .cob?"
 msgstr ""
 
+#: src/lego/pages/components/PosesPopover.tsx
+msgid "Overwrite {poseName}"
+msgstr ""
+
 #: src/content/pages/components/ConfigProfilesPanel.tsx
 msgid "Overwrite the current settings with this profile?"
+msgstr ""
+
+#: src/lego/pages/components/PosesPopover.tsx
+msgid "Overwrite with the pose being held"
 msgstr ""
 
 #: src/content/unitFieldNotes.ts
@@ -25314,6 +26537,7 @@ msgid "parameter {name} is an enum with no values"
 msgstr ""
 
 #: src/lego/pages/BuilderPage.tsx
+#: src/lego/pages/components/SetPanel.tsx
 msgid "Parent piece"
 msgstr ""
 
@@ -25347,7 +26571,12 @@ msgid "Particles"
 msgstr ""
 
 #: src/lego/pages/components/Inventory.tsx
+#: src/lego/pages/components/SwapPartDrawer.tsx
 msgid "Parts"
+msgstr ""
+
+#: src/lego/pages/components/PartFilters.tsx
+msgid "Parts pack"
 msgstr ""
 
 #: src/lego/index.ts
@@ -25425,6 +26654,18 @@ msgstr ""
 
 #: src/uberstress/pages/HistoryPage.tsx
 msgid "Past load-test reports, newest first. Select a run to see its latency breakdown."
+msgstr ""
+
+#: src/lego/pages/components/ProportionsPanel.tsx
+msgid "Past the target in {where}."
+msgstr ""
+
+#: src/lego/pages/components/ModelViewport.tsx
+msgid "Paste"
+msgstr ""
+
+#: src/lego/pages/components/ModelViewport.tsx
+msgid "Paste (Cmd V)"
 msgstr ""
 
 #: src/blueprint/pages/components/ImportBlueprintForm.tsx
@@ -25557,6 +26798,14 @@ msgstr ""
 msgid "per second"
 msgstr ""
 
+#: src/lego/pages/components/WorthSection.tsx
+msgid "Per unit"
+msgstr ""
+
+#: src/lego/pages/components/WorthSection.tsx
+msgid "Per volume"
+msgstr ""
+
 #: src/general/pages/SettingsSection.tsx
 msgid "Performance mode"
 msgstr ""
@@ -25664,6 +26913,10 @@ msgstr ""
 msgid "Pick a unit and a count, then click the map to place a group. A group is the mobile half: buildings that stand from the start belong in a base."
 msgstr ""
 
+#: src/lego/pages/components/ReferencePicker.tsx
+msgid "Pick a unit of {game} to stand beside yours."
+msgstr ""
+
 #: src/workshop/pages/UnitPage.tsx
 msgid "Pick a unit to see its fields."
 msgstr ""
@@ -25674,6 +26927,10 @@ msgstr ""
 
 #: src/scenario/pages/components/TriggerSteps.tsx
 msgid "Pick a variable for {label}"
+msgstr ""
+
+#: src/lego/pages/components/WeaponsSection.tsx
+msgid "Pick a weapon"
 msgstr ""
 
 #: src/play/pages/components/ParticipantsTable.tsx
@@ -25732,12 +26989,24 @@ msgstr ""
 msgid "Picture uploads stopped early"
 msgstr ""
 
+#: src/lego/pages/components/PieceCollisionFields.tsx
+msgid "Piece"
+msgstr ""
+
+#: src/lego/pages/components/ModelViewport.tsx
+msgid "Piece boxes"
+msgstr ""
+
 #: src/lego/pages/components/ExportDrawer.tsx
 msgid "Piece collision"
 msgstr ""
 
 #: src/content/unitFieldNotes.ts
 msgid "Piece explosion effects"
+msgstr ""
+
+#: src/lego/pages/components/ScriptTab.tsx
+msgid "Piece for {name}"
 msgstr ""
 
 #: src/lego/pages/components/GameScriptPanel.tsx
@@ -25747,6 +27016,7 @@ msgstr ""
 #: src/lego/pages/BuilderPage.tsx
 #: src/lego/pages/components/DetailPanel.tsx
 #: src/lego/pages/components/ImportResult.tsx
+#: src/lego/pages/components/UnitCounts.tsx
 msgid "Pieces"
 msgstr ""
 
@@ -25803,12 +27073,20 @@ msgstr ""
 msgid "Place {layoutName} on the map"
 msgstr ""
 
+#: src/lego/pages/components/TileGrid.tsx
+msgid "Place {name} on a connector. Alt adds it to the selected piece"
+msgstr ""
+
 #: src/scenario/pages/components/useMapKeyboard.ts
 msgid "Placed at {spot}."
 msgstr ""
 
 #: src/scenario/triggerTypes.ts
 msgid "placed unit"
+msgstr ""
+
+#: src/lego/pages/components/WorthSection.tsx
+msgid "Placeholder amounts. Set your game's."
 msgstr ""
 
 #: src/scenario/triggerTypes.ts
@@ -25940,6 +27218,10 @@ msgstr ""
 
 #: src/content/replayMapView/timelineKeys.ts
 msgid "Play the other way"
+msgstr ""
+
+#: src/lego/pages/components/ScriptTab.tsx
+msgid "Play the script once to see what it covers."
 msgstr ""
 
 #: src/lego/pages/components/AnimationPanel.tsx
@@ -26205,8 +27487,20 @@ msgstr ""
 msgid "Ports run from 1 to 65535."
 msgstr ""
 
+#: src/lego/pages/components/PosesPopover.tsx
+msgid "Pose name"
+msgstr ""
+
 #: src/lego/pages/components/ActionsDrawer.tsx
 msgid "Pose of key {keyNumber}"
+msgstr ""
+
+#: src/lego/pages/components/PosesPopover.tsx
+msgid "Pose the unit"
+msgstr ""
+
+#: src/lego/pages/components/PosesPopover.tsx
+msgid "Poses"
 msgstr ""
 
 #: src/scenario/triggerTypes.ts
@@ -26214,6 +27508,7 @@ msgid "position"
 msgstr ""
 
 #: src/lego/pages/components/AnchorList.tsx
+#: src/lego/pages/components/TransformFields.tsx
 msgid "Position"
 msgstr ""
 
@@ -26347,6 +27642,14 @@ msgstr ""
 msgid "Preview {presetLabel} on its own"
 msgstr ""
 
+#: src/lego/pages/components/TexturePicker.tsx
+msgid "Preview of the shading map"
+msgstr ""
+
+#: src/lego/pages/components/TexturePicker.tsx
+msgid "Preview of the texture, with its team-colour areas shown in the builder's own colour"
+msgstr ""
+
 #: src/hub/pages/BrowsePage.tsx
 msgid "Previous"
 msgstr ""
@@ -26390,6 +27693,10 @@ msgstr ""
 msgid "Probe Zero-K / Steam"
 msgstr ""
 
+#: src/lego/pages/components/ProblemsButton.tsx
+msgid "Problems"
+msgstr ""
+
 #: src/scenario/pages/ScenarioEditPage.tsx
 msgid "Problems in {scenarioName}"
 msgstr ""
@@ -26398,8 +27705,24 @@ msgstr ""
 msgid "Problems in the BOS"
 msgstr ""
 
+#: src/lego/pages/components/ScriptTab.tsx
+msgid "Problems in the script"
+msgstr ""
+
 #: src/animation/pages/Bos2LuaPage.tsx
 msgid "Problems the lint pass found in the BOS, and where the Lua may do something different from it."
+msgstr ""
+
+#: src/lego/pages/components/ScriptTab.tsx
+msgid "Problems this script's own text carries, and where a run of it stopped."
+msgstr ""
+
+#: src/lego/pages/components/ProblemsButton.tsx
+msgid "Problems with this unit"
+msgstr ""
+
+#: src/lego/pages/components/ProblemsButton.tsx
+msgid "Problems with this unit: {shownCount}"
 msgstr ""
 
 #: src/workshop/pages/components/WeaponSlotsPanel.tsx
@@ -26723,6 +28046,10 @@ msgstr ""
 msgid "Radar stealth"
 msgstr ""
 
+#: src/lego/pages/components/ShapeFields.tsx
+msgid "Radius"
+msgstr ""
+
 #: src/scenario/pages/components/mapKeyboard.ts
 msgid "radius {radius} elmos"
 msgstr ""
@@ -26733,6 +28060,18 @@ msgstr ""
 
 #: src/content/unitFieldNotes.ts
 msgid "Radius when being built"
+msgstr ""
+
+#: src/lego/pages/components/ShapeFields.tsx
+msgid "Radius X"
+msgstr ""
+
+#: src/lego/pages/components/ShapeFields.tsx
+msgid "Radius Y"
+msgstr ""
+
+#: src/lego/pages/components/ShapeFields.tsx
+msgid "Radius Z"
 msgstr ""
 
 #: src/i18n/frameStrings.ts
@@ -26848,6 +28187,10 @@ msgstr ""
 #: src/content/pages/components/ReplayRoster.tsx
 #: src/multiplayer/rating.ts
 msgid "Rating"
+msgstr ""
+
+#: src/lego/pages/components/TexturePicker.tsx
+msgid "Re-read the texture file, to pick up an edit made elsewhere"
 msgstr ""
 
 #: src/animation/pages/CobPage.tsx
@@ -26974,6 +28317,7 @@ msgstr ""
 
 #: src/hub/pages/components/GameFactsControl.tsx
 #: src/hub/pages/components/GamePicturesControl.tsx
+#: src/lego/pages/components/ScriptTab.tsx
 #: src/play/pages/EngineLogSection.tsx
 msgid "Reading"
 msgstr ""
@@ -27012,6 +28356,22 @@ msgstr ""
 
 #: src/lego/pages/OpenFromArchivePage.tsx
 msgid "Reading {member} out of {archive}."
+msgstr ""
+
+#: src/lego/pages/components/ReferencePicker.tsx
+msgid "Reading {object} out of {game}."
+msgstr ""
+
+#: src/lego/pages/components/WeaponsSection.tsx
+msgid "Reading {readingGame}"
+msgstr ""
+
+#: src/lego/pages/components/StatsSection.tsx
+msgid "Reading {referenceGame}"
+msgstr ""
+
+#: src/lego/pages/components/MovementSection.tsx
+msgid "Reading {stateGameName}'s movement classes"
 msgstr ""
 
 #: src/content/pages/components/UnitHero.tsx
@@ -27053,6 +28413,12 @@ msgstr ""
 msgid "Reading every unit definition in {gameLabel}. This mounts the game's archives and can take a while the first time."
 msgstr ""
 
+#: src/lego/pages/components/MovementSection.tsx
+#: src/lego/pages/components/TestDrawer.tsx
+#: src/lego/pages/components/WeaponsSection.tsx
+msgid "Reading games"
+msgstr ""
+
 #: src/content/pages/KeybindsSection.tsx
 msgid "Reading games..."
 msgstr ""
@@ -27065,6 +28431,7 @@ msgstr ""
 msgid "Reading map…"
 msgstr ""
 
+#: src/lego/pages/components/TestDrawer.tsx
 #: src/workshop/pages/components/PlayLocallyButton.tsx
 msgid "Reading maps"
 msgstr ""
@@ -27514,6 +28881,10 @@ msgstr ""
 msgid "Reference"
 msgstr ""
 
+#: src/lego/pages/components/ReferencePicker.tsx
+msgid "Reference unit"
+msgstr ""
+
 #: src/content/pages/PlayerDossierPage.tsx
 #: src/content/pages/ReplaysPage.tsx
 msgid "Refight"
@@ -27531,9 +28902,14 @@ msgstr ""
 msgid "Refight: {mapName}"
 msgstr ""
 
+#: src/lego/pages/components/TextureBuilderPanel.tsx
+msgid "Reflectivity (greyscale, optional)"
+msgstr ""
+
 #: src/content/pages/StorageSection.tsx
 #: src/downloads/pages/components/EngineInstaller.tsx
 #: src/downloads/pages/components/RapidBrowser.tsx
+#: src/lego/pages/components/TexturePicker.tsx
 #: src/multiplayer/chat/ChannelBrowser.tsx
 msgid "Refresh"
 msgstr ""
@@ -27548,6 +28924,10 @@ msgstr ""
 
 #: src/multiplayer/admin/ServerAddressSection.tsx
 msgid "Refresh the address (admins only)"
+msgstr ""
+
+#: src/lego/pages/components/TexturePicker.tsx
+msgid "Refresh the texture"
 msgstr ""
 
 #: src/lib/relativeTime.ts
@@ -27625,6 +29005,10 @@ msgstr ""
 msgid "rejoined"
 msgstr ""
 
+#: src/lego/pages/components/TestDrawer.tsx
+msgid "Relaunch"
+msgstr ""
+
 #: src/play/relayCarrying.ts
 msgid "Relay running"
 msgstr ""
@@ -27664,9 +29048,14 @@ msgstr ""
 
 #: src/content/pages/components/UnitStatsTable.tsx
 #: src/general/ErrorBoundary.tsx
+#: src/lego/pages/components/ScriptTab.tsx
 #: src/multiplayer/admin/MaintenanceSection.tsx
 #: src/play/pages/EngineLogSection.tsx
 msgid "Reload"
+msgstr ""
+
+#: src/lego/pages/components/TestDrawer.tsx
+msgid "Reload into the sandbox"
 msgstr ""
 
 #: src/profile/SettingsSection.tsx
@@ -27691,6 +29080,18 @@ msgstr ""
 
 #: src/multiplayer/admin/MaintenanceSection.tsx
 msgid "Reload…"
+msgstr ""
+
+#: src/lego/pages/components/TestDrawer.tsx
+msgid "Reloaded the script. Every {unitName} in the game runs it now."
+msgstr ""
+
+#: src/lego/pages/components/TestDrawer.tsx
+msgid "Reloaded the texture. Every {unitName} in the game shows it now."
+msgstr ""
+
+#: src/lego/pages/components/TestDrawer.tsx
+msgid "Reloading"
 msgstr ""
 
 #: src/multiplayer/admin/MaintenanceSection.tsx
@@ -27751,6 +29152,7 @@ msgstr ""
 #: src/lego/pages/components/AnimationPanel.tsx
 #: src/lego/pages/components/BuildMenuSection.tsx
 #: src/lego/pages/components/BuiltBySection.tsx
+#: src/lego/pages/components/ProportionsPanel.tsx
 #: src/multiplayer/battle/MemberRow.tsx
 #: src/workshop/pages/components/ExplosionGeneratorEditor.tsx
 msgid "Remove"
@@ -27858,6 +29260,10 @@ msgstr ""
 msgid "Remove friend"
 msgstr ""
 
+#: src/lego/pages/components/TileGrid.tsx
+msgid "Remove from favourites"
+msgstr ""
+
 #: src/downloads/pages/ActivityPage.tsx
 msgid "Remove from queue"
 msgstr ""
@@ -27884,6 +29290,10 @@ msgstr ""
 
 #: src/lobby-servers/pages/SettingsSection.tsx
 msgid "Remove server"
+msgstr ""
+
+#: src/lego/pages/components/ProportionsPanel.tsx
+msgid "Remove skeleton"
 msgstr ""
 
 #: src/workshop/pages/components/ExplosionGeneratorEditor.tsx
@@ -28005,6 +29415,7 @@ msgstr ""
 
 #: src/blueprint/pages/components/BlueprintCardMenu.tsx
 #: src/blueprint/pages/components/RenameBlueprintForm.tsx
+#: src/lego/pages/components/ScriptTab.tsx
 #: src/workshop/pages/components/ProjectCardMenu.tsx
 msgid "Rename"
 msgstr ""
@@ -28101,6 +29512,14 @@ msgstr ""
 msgid "Repairs itself"
 msgstr ""
 
+#: src/lego/pages/components/ProportionsPanel.tsx
+msgid "Reparents {name} from {from} to {to}."
+msgstr ""
+
+#: src/lego/pages/components/ProportionsPanel.tsx
+msgid "Reparents {name} from the unit to {to}."
+msgstr ""
+
 #: src/scenario/pages/components/TriggerPanel.tsx
 msgid "repeats"
 msgstr ""
@@ -28111,6 +29530,7 @@ msgstr ""
 
 #: src/campaign/pages/components/CampaignImage.tsx
 #: src/campaign/pages/components/MissionMediaFields.tsx
+#: src/lego/pages/components/ScriptTab.tsx
 msgid "Replace"
 msgstr ""
 
@@ -28136,6 +29556,14 @@ msgstr ""
 
 #: src/conquest/pages/ConquestListPage.tsx
 msgid "Replace the map"
+msgstr ""
+
+#: src/lego/pages/components/ScriptTab.tsx
+msgid "Replace this script?"
+msgstr ""
+
+#: src/lego/pages/components/WorthSection.tsx
+msgid "Replace this unit's table with the saved one"
 msgstr ""
 
 #: src/lego/pages/components/AnimationPanel.tsx
@@ -28318,6 +29746,7 @@ msgstr ""
 #: src/content/pages/components/EngineSettingField.tsx
 #: src/content/pages/components/KeyBindingEditor.tsx
 #: src/lego/pages/components/AnimationPanel.tsx
+#: src/lego/pages/components/ProportionsPanel.tsx
 #: src/play/pages/components/GameOptionsPanel.tsx
 msgid "Reset"
 msgstr ""
@@ -28375,6 +29804,7 @@ msgid "Reset the armour class to {inherited}, the game's own"
 msgstr ""
 
 #: src/components/ViewControls.tsx
+#: src/lego/pages/components/ViewportBar.tsx
 msgid "Reset the view"
 msgstr ""
 
@@ -28384,6 +29814,14 @@ msgstr ""
 
 #: src/content/pages/components/EngineSettingField.tsx
 msgid "Reset to engine default ({defaultValue})"
+msgstr ""
+
+#: src/lego/pages/components/ProportionsPanel.tsx
+msgid "Reset to plan"
+msgstr ""
+
+#: src/lego/pages/components/PosesPopover.tsx
+msgid "Reset to the built shape"
 msgstr ""
 
 #: src/lobby-servers/PasswordRecoveryForm.tsx
@@ -28416,6 +29854,10 @@ msgstr ""
 
 #: src/placement/PlacementSurface.tsx
 msgid "Resize the working area"
+msgstr ""
+
+#: src/lego/pages/components/StripResizer.tsx
+msgid "Resize this panel"
 msgstr ""
 
 #: src/content/unitFieldNotes.ts
@@ -28623,6 +30065,10 @@ msgstr ""
 msgid "Reverse speed {reverseValue} elmos/s, none set, so it never reverses."
 msgstr ""
 
+#: src/lego/pages/components/MovementSection.tsx
+msgid "Reverse speed, elmos a second"
+msgstr ""
+
 #: src/campaign/pages/components/MissionEditorDrawer.tsx
 msgid "Reverse spin"
 msgstr ""
@@ -28653,6 +30099,10 @@ msgstr ""
 msgid "Rewriting…"
 msgstr ""
 
+#: src/lego/pages/components/TextureBuilderPanel.tsx
+msgid "RGB colour, with the team-colour mask packed into its alpha. This is <0>{colourName}</0>, what the unit is painted with."
+msgstr ""
+
 #: src/conquest/pages/ConquestListPage.tsx
 #: src/lego/pages/BuilderPage.tsx
 #: src/multiplayer/battle/MemberRow.tsx
@@ -28665,6 +30115,10 @@ msgstr ""
 
 #: src/conquest/galaxy3d/GalaxyView.tsx
 msgid "ringed gas giant"
+msgstr ""
+
+#: src/lego/pages/components/ShapeFields.tsx
+msgid "Rings"
 msgstr ""
 
 #: src/lego/pages/BuilderPage.tsx
@@ -28711,8 +30165,16 @@ msgstr ""
 msgid "Rose"
 msgstr ""
 
+#: src/lego/pages/components/TransformFields.tsx
+msgid "Rotation"
+msgstr ""
+
 #: src/content/unitFieldNotes.ts
 msgid "Roughly the same as a zero area of effect but without that value's side effects, and it also stops cratering."
+msgstr ""
+
+#: src/lego/pages/components/SymmetryPopover.tsx
+msgid "Round the vertical axis"
 msgstr ""
 
 #: src/workshop/pages/components/ReferenceBulkEdit.tsx
@@ -28813,6 +30275,10 @@ msgstr ""
 msgid "Running for {elapsed}. You can leave this page."
 msgstr ""
 
+#: src/lego/pages/components/TestDrawer.tsx
+msgid "Running the engine"
+msgstr ""
+
 #: src/uberstress/pages/RunPage.tsx
 msgid "running…"
 msgstr ""
@@ -28884,6 +30350,8 @@ msgstr ""
 #: src/content/pages/components/KeymapsPanel.tsx
 #: src/content/pages/components/ReplaySetsManager.tsx
 #: src/lego/pages/BuilderPage.tsx
+#: src/lego/pages/components/PosesPopover.tsx
+#: src/lego/pages/components/SaveCompoundPopover.tsx
 #: src/multiplayer/NoteButton.tsx
 #: src/play/pages/components/NewPresetFromReplayButton.tsx
 #: src/play/pages/components/SaveAsPresetButton.tsx
@@ -28923,6 +30391,10 @@ msgstr ""
 msgid "Save as .sdz…"
 msgstr ""
 
+#: src/lego/pages/components/SaveCompoundPopover.tsx
+msgid "Save as a module"
+msgstr ""
+
 #: src/lego/pages/BuilderPage.tsx
 msgid "Save as module"
 msgstr ""
@@ -28960,6 +30432,14 @@ msgstr ""
 msgid "Save it in Coilbox, then replace it with one of your own in Settings, Account."
 msgstr ""
 
+#: src/lego/pages/components/SaveModelPopover.tsx
+msgid "Save model"
+msgstr ""
+
+#: src/lego/pages/components/SaveModelPopover.tsx
+msgid "Save over {writableName}"
+msgstr ""
+
 #: src/play/PresetLibraryToolbar.tsx
 msgid "Save preset"
 msgstr ""
@@ -28968,12 +30448,24 @@ msgstr ""
 msgid "Save search"
 msgstr ""
 
+#: src/lego/pages/components/WorthSection.tsx
+msgid "Save table"
+msgstr ""
+
 #: src/lego/pages/components/ExportDrawer.tsx
 msgid "Save the .glb"
 msgstr ""
 
+#: src/lego/pages/components/SaveModelPopover.tsx
+msgid "Save the model"
+msgstr ""
+
 #: src/animation/pages/CobPage.tsx
 msgid "Save the rebuilt .bos"
+msgstr ""
+
+#: src/lego/pages/components/SaveCompoundPopover.tsx
+msgid "Save the selection as a module"
 msgstr ""
 
 #: src/startbox/StartBoxPresetsPopover.tsx
@@ -28982,6 +30474,10 @@ msgstr ""
 
 #: src/multiplayer/pages/BattleRoomPage.tsx
 msgid "Save this battle"
+msgstr ""
+
+#: src/lego/pages/components/SaveModelPopover.tsx
+msgid "Save to a chosen file"
 msgstr ""
 
 #: src/lego/pages/components/DetailPanel.tsx
@@ -29082,6 +30578,10 @@ msgstr ""
 msgid "Saved to Singleplayer presets"
 msgstr ""
 
+#: src/lego/pages/components/ScriptTab.tsx
+msgid "Saved to the unit."
+msgstr ""
+
 #: src/play/pages/components/SaveAsPresetButton.tsx
 msgid "Saved to your Singleplayer presets to replay later."
 msgstr ""
@@ -29135,12 +30635,25 @@ msgstr ""
 msgid "Say which side it is, so {def} is remembered"
 msgstr ""
 
+#: src/lego/pages/components/ModelViewport.tsx
+#: src/lego/pages/components/TransformFields.tsx
+msgid "Scale"
+msgstr ""
+
 #: src/sound/SoundSettings.tsx
 msgid "Scales every sound Coilbox makes. Audio played by a campaign briefing or a profile page has its own controls and is not affected."
 msgstr ""
 
 #: src/general/pages/SettingsSection.tsx
 msgid "Scales the whole of Coilbox: text, spacing and the 3D views. Fit more on a small screen, or make everything easier to read on a large one. Cmd or Ctrl with plus and minus does the same, and with zero puts it back to 100%."
+msgstr ""
+
+#: src/lego/pages/components/TransformFields.tsx
+msgid "Scaling each axis on its own. Click to keep proportions"
+msgstr ""
+
+#: src/lego/pages/components/TransformFields.tsx
+msgid "Scaling keeps its proportions. Click to scale one axis at a time"
 msgstr ""
 
 #: src/content/mapImage.ts
@@ -29157,6 +30670,10 @@ msgstr ""
 
 #: src/content/pages/MapsPage.tsx
 msgid "Scan cancelled. Press Rescan to load maps."
+msgstr ""
+
+#: src/lego/pages/components/TestDrawer.tsx
+msgid "Scan failed"
 msgstr ""
 
 #: src/content/pages/FoldersSection.tsx
@@ -29432,8 +30949,16 @@ msgstr ""
 msgid "Search models and games"
 msgstr ""
 
+#: src/lego/pages/components/SwapModuleDrawer.tsx
+msgid "Search modules"
+msgstr ""
+
 #: src/multiplayer/chat/UserPicker.tsx
 msgid "Search online users…"
+msgstr ""
+
+#: src/lego/pages/components/PartFilters.tsx
+msgid "Search parts"
 msgstr ""
 
 #: src/workshop/pages/components/AssetPicker.tsx
@@ -29517,6 +31042,10 @@ msgstr ""
 
 #: src/campaign/pages/components/ArchiveMediaImportButton.tsx
 msgid "Search video files…"
+msgstr ""
+
+#: src/lego/pages/components/WeaponsSection.tsx
+msgid "Search weapons…"
 msgstr ""
 
 #: src/hub/pages/BrowsePage.tsx
@@ -29676,6 +31205,10 @@ msgstr ""
 
 #: src/workshop/pages/components/UnitReferenceTable.tsx
 msgid "Select {name} to compare"
+msgstr ""
+
+#: src/lego/pages/components/SetPanel.tsx
+msgid "Select {pieceName} on its own"
 msgstr ""
 
 #: src/animation/pages/CobPage.tsx
@@ -30336,8 +31869,17 @@ msgstr ""
 msgid "Setup packs"
 msgstr ""
 
+#: src/lego/pages/components/SetPanel.tsx
+msgid "Several"
+msgstr ""
+
 #: src/content/pages/components/ReplayTimeWindowControl.tsx
 msgid "Shaded: {activityLabel}"
+msgstr ""
+
+#: src/lego/pages/components/TextureBuilderPanel.tsx
+#: src/lego/pages/components/TexturePicker.tsx
+msgid "Shading map"
 msgstr ""
 
 #: src/content/index.ts
@@ -30347,6 +31889,7 @@ msgstr ""
 #: src/conquest/pages/ConquestListPage.tsx
 #: src/lego/pages/components/CollisionPanel.tsx
 #: src/lego/pages/components/DetailPanel.tsx
+#: src/lego/pages/components/PieceCollisionFields.tsx
 msgid "Shape"
 msgstr ""
 
@@ -30626,6 +32169,7 @@ msgstr ""
 #: src/content/pages/MapsPage.tsx
 #: src/downloads/pages/ActivityPage.tsx
 #: src/lego/pages/components/GuidesPopover.tsx
+#: src/lego/pages/components/ProblemsButton.tsx
 msgid "Show"
 msgstr ""
 
@@ -30647,6 +32191,10 @@ msgstr ""
 
 #: src/content/pages/components/ReplayBuildOrders.tsx
 msgid "Show {moreCount} more of {orderCount}"
+msgstr ""
+
+#: src/lego/pages/components/PieceTree.tsx
+msgid "Show {pieceName}"
 msgstr ""
 
 #: src/notify/NotificationsSettings.tsx
@@ -30689,6 +32237,10 @@ msgstr ""
 msgid "Show commands per minute"
 msgstr ""
 
+#: src/lego/pages/components/ViewportBar.tsx
+msgid "Show each weapon's stated range and firing arc"
+msgstr ""
+
 #: src/content/pages/ReplaysPage.tsx
 msgid "Show every replay again"
 msgstr ""
@@ -30713,6 +32265,22 @@ msgstr ""
 
 #: src/downloads/pages/ActivityPage.tsx
 msgid "Show in Maps"
+msgstr ""
+
+#: src/lego/pages/components/PieceTree.tsx
+msgid "Show in the viewport"
+msgstr ""
+
+#: src/lego/pages/components/ShowMe.tsx
+msgid "Show me"
+msgstr ""
+
+#: src/lego/pages/components/UnitCheckResult.tsx
+msgid "Show me the engine log"
+msgstr ""
+
+#: src/lego/pages/components/TestDrawer.tsx
+msgid "Show me the scratch game"
 msgstr ""
 
 #: src/workshop/pages/components/AssetPreview.tsx
@@ -30747,6 +32315,10 @@ msgstr ""
 msgid "Show replays under a minute long"
 msgstr ""
 
+#: src/lego/pages/components/ViewportBar.tsx
+msgid "Show script effects, such as nano spray, from the unit's own script"
+msgstr ""
+
 #: src/multiplayer/admin/ServerAddressSection.tsx
 msgid "Show server IP"
 msgstr ""
@@ -30759,8 +32331,16 @@ msgstr ""
 msgid "Show the {label} model"
 msgstr ""
 
+#: src/lego/pages/components/ViewportBar.tsx
+msgid "Show the aim point, the one point another unit shoots at"
+msgstr ""
+
 #: src/i18n/frameStrings.ts
 msgid "Show the back and forward navigation buttons in the top bar."
+msgstr ""
+
+#: src/lego/pages/components/ViewportBar.tsx
+msgid "Show the balance check: where the weight looks centred, against the ground the feet or wheels cover. An estimate from piece volumes at one density, not a mass. The engine does not simulate balance"
 msgstr ""
 
 #: src/general/pages/SettingsSection.tsx
@@ -30771,6 +32351,10 @@ msgstr ""
 msgid "Show the build grid the blueprint stands on"
 msgstr ""
 
+#: src/lego/pages/components/ViewportBar.tsx
+msgid "Show the collision volume, the shape the engine hits and clicks"
+msgstr ""
+
 #: src/general/pages/SettingsSection.tsx
 msgid "Show the developer and modding tools — uberstress, mapconv, animation, and the archive explorer — in the sidebar and welcome screen. Off by default for a player-focused layout."
 msgstr ""
@@ -30779,8 +32363,28 @@ msgstr ""
 msgid "Show the file this would write"
 msgstr ""
 
+#: src/lego/pages/components/PieceCollisionFields.tsx
+msgid "Show the file this writes"
+msgstr ""
+
+#: src/lego/pages/components/ViewportBar.tsx
+msgid "Show the footprint check: the footprint the export writes, drawn on the ground under the unit"
+msgstr ""
+
+#: src/lego/pages/components/ViewportBar.tsx
+msgid "Show the ground grid, marked in footprint steps and plate sizes"
+msgstr ""
+
+#: src/lego/pages/components/ViewportBar.tsx
+msgid "Show the guides"
+msgstr ""
+
 #: src/content/unitFieldNotes.ts
 msgid "Show the nanoframe"
+msgstr ""
+
+#: src/lego/pages/components/ViewportBar.tsx
+msgid "Show the overlap check: outlines pieces buried wholly inside another piece, which the model still draws and the export still writes"
 msgstr ""
 
 #: src/lego/pages/BuilderPage.tsx
@@ -30799,12 +32403,24 @@ msgstr ""
 msgid "Show the side panel"
 msgstr ""
 
+#: src/lego/pages/components/ViewportBar.tsx
+msgid "Show the skeleton: a line from each bone to its parent, a dot on each joint and its role ({skeletonKey})"
+msgstr ""
+
+#: src/lego/pages/components/ViewportBar.tsx
+msgid "Show the stand-in unit, the thing a scenario aims at, builds or carries"
+msgstr ""
+
 #: src/content/pages/components/GameLibrarySummary.tsx
 msgid "Show updates"
 msgstr ""
 
 #: src/content/pages/components/LivingValueChart.tsx
 msgid "Show value of living units by kind"
+msgstr ""
+
+#: src/lego/pages/components/ScriptTab.tsx
+msgid "Show what ran"
 msgstr ""
 
 #: src/content/pages/components/ReplaySetsManager.tsx
@@ -30907,6 +32523,7 @@ msgid "Sidebar as popover menu"
 msgstr ""
 
 #: src/content/pages/GameDetailPage.tsx
+#: src/lego/pages/components/ShapeFields.tsx
 #: src/multiplayer/battles/CreateLobbyPopover.tsx
 msgid "Sides"
 msgstr ""
@@ -31054,6 +32671,18 @@ msgstr ""
 msgid "Singleplayer saves in your content folder. Resume one to launch the engine into it."
 msgstr ""
 
+#: src/lego/pages/components/ModelViewport.tsx
+msgid "Sit on the ground"
+msgstr ""
+
+#: src/lego/pages/components/ModelViewport.tsx
+msgid "Sit on the ground: the unit is already on it"
+msgstr ""
+
+#: src/lego/pages/components/ModelViewport.tsx
+msgid "Sit the unit on the ground"
+msgstr ""
+
 #: src/content/pages/components/ArchiveModelPreview.tsx
 #: src/content/pages/components/UnitModelPanel.tsx
 #: src/content/pages/GameUnitPage.tsx
@@ -31061,9 +32690,14 @@ msgstr ""
 #: src/lego/pages/components/CollisionPanel.tsx
 #: src/lego/pages/components/DetailPanel.tsx
 #: src/lego/pages/components/ImportResult.tsx
+#: src/lego/pages/components/MeasureReadout.tsx
 #: src/mapconv/pages/DecompilePage.tsx
 #: src/workshop/explosionGenerators.ts
 msgid "Size"
+msgstr ""
+
+#: src/lego/pages/components/ProportionsPanel.tsx
+msgid "Size {sizeText}"
 msgstr ""
 
 #: src/content/pages/components/ReclaimCachesButton.tsx
@@ -31072,6 +32706,10 @@ msgstr ""
 
 #: src/lego/pages/components/BuildPictureDrawer.tsx
 msgid "Size in pixels"
+msgstr ""
+
+#: src/lego/pages/components/PieceCollisionFields.tsx
+msgid "Size is the box's full width, and the offset is measured from the piece's own origin rather than from the unit's aim point, so it turns and moves with the piece. No axis can be under one elmo: the engine clamps them."
 msgstr ""
 
 #: src/lego/pages/components/CollisionPanel.tsx
@@ -31141,8 +32779,24 @@ msgstr ""
 msgid "Slaved to weapon"
 msgstr ""
 
+#: src/lego/pages/components/ProportionsPanel.tsx
+msgid "Slide {proportionLabel}"
+msgstr ""
+
 #: src/content/unitFieldNotes.ts
 msgid "Slide tolerance"
+msgstr ""
+
+#: src/lego/pages/components/ModelViewport.tsx
+msgid "Sliding on the face, offset {slidBy}, in steps of {steppedBy}. Hold Alt to place freely and detach"
+msgstr ""
+
+#: src/lego/pages/components/ShapeFields.tsx
+msgid "Slope direction"
+msgstr ""
+
+#: src/lego/pages/components/MovementSection.tsx
+msgid "Slope smoothing"
 msgstr ""
 
 #: src/content/replayMapView/timelineKeys.ts
@@ -31222,6 +32876,14 @@ msgstr ""
 msgid "Smoothing angle"
 msgstr ""
 
+#: src/lego/pages/components/ModelViewport.tsx
+msgid "Snapped to \"{snappedTo}\". Hold Alt to place freely"
+msgstr ""
+
+#: src/lego/pages/components/ModelViewport.tsx
+msgid "Snapped. Hold Alt to place freely"
+msgstr ""
+
 #: src/content/pages/components/GameVersionsTab.tsx
 msgid "snapshot"
 msgstr ""
@@ -31234,6 +32896,10 @@ msgstr ""
 msgid "Snapshot and swap this content folder's <0>springsettings.cfg</0>, <1>LuaUI/Config</1> and <2>uikeys.txt</2>."
 msgstr ""
 
+#: src/lego/pages/components/ReferencePicker.tsx
+msgid "Solar collector (a building)"
+msgstr ""
+
 #: src/content/pages/components/ResolveContentDrawer.tsx
 msgid "Some content this needs isn't installed, and coilbox cannot download it. Nothing is imported until it is installed."
 msgstr ""
@@ -31244,6 +32910,10 @@ msgstr ""
 
 #: src/content/pages/components/GatherReplaysButton.tsx
 msgid "Some engines record into their own folder, so deleting that engine deletes those replays. This moves them into the demos folder alongside the rest."
+msgstr ""
+
+#: src/lego/pages/components/ModuleUpdateBanner.tsx
+msgid "Some parts of this unit are not tracked."
 msgstr ""
 
 #: src/sound/events.ts
@@ -31423,6 +33093,10 @@ msgstr ""
 msgid "Speed {speedValue} elmos/s, the preview's own."
 msgstr ""
 
+#: src/lego/pages/components/MovementSection.tsx
+msgid "Speed, elmos a second"
+msgstr ""
+
 #: src/runlite/pages/components/RunHud.tsx
 msgid "Spend at depots"
 msgstr ""
@@ -31457,6 +33131,10 @@ msgstr ""
 
 #: src/mapconv/pages/DecompilePage.tsx
 msgid "Spring map or archive"
+msgstr ""
+
+#: src/lego/pages/components/SaveModelPopover.tsx
+msgid "Spring model"
 msgstr ""
 
 #: src/downloads/index.ts
@@ -31521,6 +33199,10 @@ msgstr ""
 msgid "Stand boss down"
 msgstr ""
 
+#: src/lego/pages/components/ReferencePicker.tsx
+msgid "Stand it beside the build"
+msgstr ""
+
 #: src/scenario/pages/ScenariosPage.tsx
 msgid "Standalone missions: a map, a starting force and something to do. Play one on its own, without a campaign around it."
 msgstr ""
@@ -31560,6 +33242,7 @@ msgstr ""
 #: src/content/pages/components/ReplayAnalysisSection.tsx
 #: src/hub/pages/components/ItemPreview.tsx
 #: src/lego/pages/components/DescribeUnitForm.tsx
+#: src/lego/pages/components/NewUnitPopover.tsx
 #: src/multiplayer/battle/startButtonLabel.ts
 msgid "Start"
 msgstr ""
@@ -31868,6 +33551,7 @@ msgid "Static builder, because {reason}."
 msgstr ""
 
 #: src/content/pages/StatsPage.tsx
+#: src/lego/pages/components/StatsSection.tsx
 msgid "Stats"
 msgstr ""
 
@@ -31897,6 +33581,10 @@ msgstr ""
 
 #: src/lego/pages/components/AnimationPanel.tsx
 msgid "Step forward one frame"
+msgstr ""
+
+#: src/lego/pages/components/SkeletonTargetFields.tsx
+msgid "steps"
 msgstr ""
 
 #: src/lego/pages/components/AnimationPanel.tsx
@@ -31937,6 +33625,10 @@ msgstr ""
 
 #: src/i18n/frameStrings.ts
 msgid "Stone"
+msgstr ""
+
+#: src/lego/pages/components/TestDrawer.tsx
+msgid "Stop"
 msgstr ""
 
 #: src/sound/SoundSettings.tsx
@@ -32017,6 +33709,10 @@ msgstr ""
 
 #: src/multiplayer/admin/ServerAdminHelp.tsx
 msgid "Stored channel history older than 14 days is deleted."
+msgstr ""
+
+#: src/lego/pages/components/MovementSection.tsx
+msgid "strafes past its target"
 msgstr ""
 
 #: src/runlite/pages/components/RunHud.tsx
@@ -32103,6 +33799,7 @@ msgid "Swap"
 msgstr ""
 
 #: src/lego/pages/BuilderPage.tsx
+#: src/lego/pages/components/SwapModuleDrawer.tsx
 msgid "Swap module"
 msgstr ""
 
@@ -32142,8 +33839,24 @@ msgstr ""
 msgid "Symbols"
 msgstr ""
 
+#: src/lego/pages/components/ModelViewport.tsx
+msgid "Symmetry"
+msgstr ""
+
 #: src/lego/pages/components/GuidesPopover.tsx
 msgid "Symmetry (x = 0)"
+msgstr ""
+
+#: src/lego/pages/components/SymmetryPopover.tsx
+msgid "Symmetry mode"
+msgstr ""
+
+#: src/lego/pages/components/SymmetryPopover.tsx
+msgid "Symmetry options"
+msgstr ""
+
+#: src/lego/pages/components/ModelViewport.tsx
+msgid "Symmetry: a new piece gets a twin or a ring of copies, which follow it (M)"
 msgstr ""
 
 #: src/multiplayer/battle/SyncStatusPill.tsx
@@ -32169,6 +33882,7 @@ msgstr ""
 #: src/hub/pages/ItemPage.tsx
 #: src/hub/PublishSection.tsx
 #: src/lego/pages/components/DetailPanel.tsx
+#: src/lego/pages/components/ModuleLabelsFields.tsx
 msgid "Tags"
 msgstr ""
 
@@ -32204,6 +33918,10 @@ msgstr ""
 msgid "Take only the parts you want. Everything you leave unticked stays as you have it."
 msgstr ""
 
+#: src/lego/pages/components/ScriptTab.tsx
+msgid "Take ownership of this script"
+msgstr ""
+
 #: src/lego/pages/components/BuildPictureDrawer.tsx
 msgid "Take picture"
 msgstr ""
@@ -32214,6 +33932,10 @@ msgstr ""
 
 #: src/blueprint/pages/components/ArrivingPack.tsx
 msgid "Take them all as {side}"
+msgstr ""
+
+#: src/lego/pages/components/ScriptTab.tsx
+msgid "Take this script over to edit it. The unit then keeps your version, an export writes what you wrote, and the presets stop generating it. You do not need to take it over to see the unit run, because the Animation panel already plays this script. You can hand it back later, which discards your version and puts the presets back in charge."
 msgstr ""
 
 #: src/content/pages/components/MapRecords.tsx
@@ -32350,6 +34072,10 @@ msgstr ""
 msgid "Team setup"
 msgstr ""
 
+#: src/lego/pages/components/TextureBuilderPanel.tsx
+msgid "Team-colour mask (greyscale, optional)"
+msgstr ""
+
 #: src/content/pages/components/MatchStatsChart.tsx
 #: src/hub/preview.ts
 #: src/multiplayer/battles/zerokBattle.ts
@@ -32418,6 +34144,10 @@ msgstr ""
 msgid "Test {projectName} in {gameName} on this machine. Nothing is uploaded and nothing is shared."
 msgstr ""
 
+#: src/lego/pages/components/TestDrawer.tsx
+msgid "Test {unitName} in game"
+msgstr ""
+
 #: src/lego/pages/BuilderPage.tsx
 #: src/scenario/pages/components/ScenarioTestDrawer.tsx
 #: src/scenario/pages/components/shortcuts.ts
@@ -32437,9 +34167,14 @@ msgstr ""
 msgid "text file; one feature per line: [tdfname] [x] [y] [z] [rotation]"
 msgstr ""
 
+#: src/lego/pages/components/TexturePicker.tsx
+msgid "texture"
+msgstr ""
+
 #: src/lego/pages/BuilderPage.tsx
 #: src/lego/pages/components/ExportDrawer.tsx
 #: src/lego/pages/components/ImportResult.tsx
+#: src/lego/pages/components/TexturePicker.tsx
 #: src/workshop/explosionGenerators.ts
 msgid "Texture"
 msgstr ""
@@ -32838,6 +34573,10 @@ msgstr ""
 msgid "The compiled mission.lua, updated as you edit."
 msgstr ""
 
+#: src/lego/pages/components/ScriptTab.tsx
+msgid "The compiled script could not be read back as BOS: {bosError}"
+msgstr ""
+
 #: src/workshop/pages/components/CompiledLuaPanel.tsx
 msgid "The compiler could not run: {error}"
 msgstr ""
@@ -32882,7 +34621,10 @@ msgstr ""
 
 #: src/campaign/pages/components/UnitRestrictions.tsx
 #: src/lego/pages/components/GameFitSection.tsx
+#: src/lego/pages/components/MovementSection.tsx
+#: src/lego/pages/components/TestDrawer.tsx
 #: src/lego/pages/components/useBuildMenuSource.ts
+#: src/lego/pages/components/WeaponsSection.tsx
 #: src/scenario/launch.ts
 #: src/scenario/pages/components/ScenarioTestDrawer.tsx
 #: src/workshop/pages/components/PlayLocallyButton.tsx
@@ -32986,6 +34728,10 @@ msgstr ""
 msgid "The engine at {executable} is no longer installed."
 msgstr ""
 
+#: src/lego/pages/components/MovementSection.tsx
+msgid "The engine banks aircraft, not the script. The preview's roll illustrates these keys."
+msgstr ""
+
 #: src/content/unitFieldNotes.ts
 msgid "The engine calls this a fudge factor for lining up a plane's speed and the way its nose points."
 msgstr ""
@@ -33022,6 +34768,7 @@ msgstr ""
 msgid "The engine exited normally."
 msgstr ""
 
+#: src/lego/pages/components/TestDrawer.tsx
 #: src/scenario/pages/components/ScenarioTestDrawer.tsx
 #: src/workshop/pages/components/PlayLocallyButton.tsx
 msgid "The engine exited with code {exitCode}. Its infolog says why."
@@ -33247,6 +34994,10 @@ msgstr ""
 msgid "The game did not answer within {seconds} seconds. Its infolog says why."
 msgstr ""
 
+#: src/lego/pages/components/TestDrawer.tsx
+msgid "The game has closed. Launch again to test a change."
+msgstr ""
+
 #: src/scenario/pages/components/ScenarioTestDrawer.tsx
 msgid "The game has closed. Play it again from here."
 msgstr ""
@@ -33261,6 +35012,10 @@ msgstr ""
 
 #: src/multiplayer/debriefing.ts
 msgid "The game has finished"
+msgstr ""
+
+#: src/lego/pages/components/ScriptTab.tsx
+msgid "The game has no .bos to convert for this unit."
 msgstr ""
 
 #: src/lego/pages/components/BuildMenuSection.tsx
@@ -33281,7 +35036,8 @@ msgid "The game is not installed."
 msgstr ""
 
 #: src/lego/pages/components/useBuildMenuSource.ts
-msgid "The game it was exported into"
+#: src/lego/pages/components/WeaponsSection.tsx
+msgid "The game it was exported into is not installed."
 msgstr ""
 
 #: src/content/pages/components/StaleRemixNotice.tsx
@@ -33294,6 +35050,10 @@ msgstr ""
 
 #: src/workshop/relativeEdits.ts
 msgid "The game no longer has {path} on {unit}, so the change that followed it keeps its last number, {kept}."
+msgstr ""
+
+#: src/lego/pages/components/ScriptTab.tsx
+msgid "The game no longer has a compiled script for this unit."
 msgstr ""
 
 #: src/content/replayAnalysis.ts
@@ -33890,8 +35650,20 @@ msgstr ""
 msgid "The model file under objects3d/."
 msgstr ""
 
+#: src/lego/pages/components/TexturePicker.tsx
+msgid "The model names {missingName}, and no such file was found beside it."
+msgstr ""
+
 #: src/lego/pages/components/ImportResult.tsx
 msgid "The model names <0>{texture}</0>."
+msgstr ""
+
+#: src/lego/pages/components/TexturePicker.tsx
+msgid "The model names none."
+msgstr ""
+
+#: src/lego/pages/components/TexturePicker.tsx
+msgid "The model's second texture, which the engine reads as glow in red and shine in green rather than as a picture. Kept with the unit and written back out by the export, but nothing here draws it."
 msgstr ""
 
 #: src/content/unitFieldNotes.ts
@@ -34398,6 +36170,14 @@ msgstr ""
 msgid "the small overview image shown in-lobby and in-game"
 msgstr ""
 
+#: src/lego/pages/components/ReferencePicker.tsx
+msgid "The solar collector is built in, so it is here whether or not a game is. Pick a game to stand one of its units at its real size instead."
+msgstr ""
+
+#: src/lego/pages/components/ReferencePicker.tsx
+msgid "The solar collector is built in, so it is here whether or not a game is. Reading the installed games."
+msgstr ""
+
 #: src/sound/events.ts
 msgid "The soundtrack, whichever one you pick above."
 msgstr ""
@@ -34448,6 +36228,10 @@ msgstr ""
 
 #: src/content/pages/components/MissionRuntimeSection.tsx
 msgid "The test mutator brings {conditionCount} conditions and {actionCount} actions"
+msgstr ""
+
+#: src/lego/pages/components/ScriptTab.tsx
+msgid "The text above is discarded. Undo brings it back if that was a mistake, so copy it first if you want to keep it beyond this session."
 msgstr ""
 
 #: src/content/pages/components/ReplayChat.tsx
@@ -34544,6 +36328,10 @@ msgstr ""
 
 #: src/lego/pages/components/BuildPictureDrawer.tsx
 msgid "The unit is not ready to photograph yet."
+msgstr ""
+
+#: src/lego/pages/components/TestDrawer.tsx
+msgid "The unit is written into a scratch game of coilbox's own, which depends on the game you pick below. Your install is not touched, and deleting <0>{SCRATCH_FOLDER}</0> undoes all of it."
 msgstr ""
 
 #: src/content/unitFieldNotes.ts
@@ -35497,6 +37285,10 @@ msgstr ""
 msgid "This model is {modelSize}, past the {previewCap} a preview reads. Download it to look at it."
 msgstr ""
 
+#: src/lego/pages/components/SaveModelPopover.tsx
+msgid "This model was opened from inside a packed archive, which holds no path to write back to. Save it to a chosen path instead."
+msgstr ""
+
 #: src/workshop/pages/components/ProjectChecks.tsx
 msgid "This mutator would overwrite {gameName}'s own post-processing, listed under Needs attention above."
 msgstr ""
@@ -35879,6 +37671,10 @@ msgstr ""
 msgid "This script includes {includes}. A script pasted here cannot load its includes, so it cannot be converted. Load the .bos from its folder instead, or open the unit out of its game."
 msgstr ""
 
+#: src/lego/pages/components/ScriptTab.tsx
+msgid "This script is empty, so the unit has no animation at all and the presets cannot reach it. Hand it back and the Animation panel works again."
+msgstr ""
+
 #: src/lego/pages/components/AnimationPanel.tsx
 msgid "This script names no {from} piece, so the stand-in stays where the scenario puts it rather than sitting on the unit."
 msgstr ""
@@ -35923,12 +37719,20 @@ msgstr ""
 msgid "This slot names its weapon and nothing else, so it has no mount fields to change."
 msgstr ""
 
+#: src/lego/pages/components/TexturePicker.tsx
+msgid "This texture has no file to re-read. Choose one, and refresh will pick up edits to it after that."
+msgstr ""
+
 #: src/content/pages/components/ReplayTrackBadge.tsx
 msgid "This track was made by another version of the recorder, or cannot be read. It is not played, and recording the replay again replaces it."
 msgstr ""
 
 #: src/content/pages/KeybindsSection.tsx
 msgid "This uikeys.txt was written by hand or by another tool. The first save keeps a copy of it as uikeys.txt.bak."
+msgstr ""
+
+#: src/lego/pages/components/StatsSection.tsx
+msgid "This unit"
 msgstr ""
 
 #: src/lego/pages/components/AnimationPanel.tsx
@@ -35959,7 +37763,16 @@ msgstr ""
 msgid "This unit has no game, so its effects are drawn as a plain round sprite."
 msgstr ""
 
+#: src/lego/pages/components/WorthSection.tsx
+msgid "This unit has no parts, so there is nothing to total."
+msgstr ""
+
+#: src/lego/pages/components/ScriptTab.tsx
+msgid "This unit has no piece called \"{name}\". The engine fails to load a script that names a piece the model does not have."
+msgstr ""
+
 #: src/lego/pages/components/ExportDrawer.tsx
+#: src/lego/pages/components/SaveModelPopover.tsx
 msgid "This unit has no root piece."
 msgstr ""
 
@@ -35988,6 +37801,10 @@ msgstr ""
 msgid "This unit's definition names no model, so the engine draws nothing for it either."
 msgstr ""
 
+#: src/lego/pages/components/ReferencePicker.tsx
+msgid "This unit's definition names no model, so the engine draws nothing for it either. Showing the solar collector."
+msgstr ""
+
 #: src/content/pages/components/useUnitRenders.ts
 msgid "This unit's definition names no model, so there is nothing to render."
 msgstr ""
@@ -36000,8 +37817,20 @@ msgstr ""
 msgid "This unit's name"
 msgstr ""
 
+#: src/lego/pages/components/ScriptTab.tsx
+msgid "This unit's own script. Export writes it to <0>scripts/{unitName}.lua</0> exactly as it is here, if the script checkbox is ticked. A script already in the game folder is never overwritten."
+msgstr ""
+
 #: src/lego/pages/components/ExportDrawer.tsx
 msgid "This unit's script can keep shared COB unit values as rules params. For the game's synced gadgets to set them, and its gadgets and widgets to read them, put <0>VFS.Include(\"lualibs/cob_vars.lua\")</0> on the first line of <1>LuaRules/main.lua</1>, <2>LuaRules/draw.lua</2> and <3>luaui.lua</3> (or <4>LuaUI/main.lua</4>)."
+msgstr ""
+
+#: src/lego/pages/components/PieceCollisionFields.tsx
+msgid "This unit's script is your own and does not pull the file in, so nothing set here reaches a game. Add <0>{includeLine}</0> near the top of it. A script generated after these were set carries that line already."
+msgstr ""
+
+#: src/lego/pages/components/TexturePicker.tsx
+msgid "This unit's team-colour mask is missing"
 msgstr ""
 
 #: src/deeplink/build.ts
@@ -36238,6 +38067,10 @@ msgstr ""
 msgid "Top faction"
 msgstr ""
 
+#: src/lego/pages/components/ShapeFields.tsx
+msgid "Top radius"
+msgstr ""
+
 #: src/multiplayer/chat/ChannelTopicMenu.tsx
 msgid "Topic text"
 msgstr ""
@@ -36254,8 +38087,28 @@ msgstr ""
 msgid "Total"
 msgstr ""
 
+#: src/lego/pages/components/WorthSection.tsx
+msgid "Total build time"
+msgstr ""
+
 #: src/workshop/derivedStats.ts
 msgid "Total damage in one burst from every weapon counted in DPS above. Sometimes called alpha damage."
+msgstr ""
+
+#: src/lego/pages/components/WorthSection.tsx
+msgid "Total energy"
+msgstr ""
+
+#: src/lego/pages/components/WorthSection.tsx
+msgid "Total health"
+msgstr ""
+
+#: src/lego/pages/components/WorthSection.tsx
+msgid "Total mass"
+msgstr ""
+
+#: src/lego/pages/components/WorthSection.tsx
+msgid "Total metal"
 msgstr ""
 
 #: src/multiplayer/battle/GameTypePresetsControls.tsx
@@ -36324,6 +38177,10 @@ msgstr ""
 msgid "Trajectory choice"
 msgstr ""
 
+#: src/lego/pages/components/ShortcutSheet.tsx
+msgid "Transform"
+msgstr ""
+
 #: src/lego/pages/components/BuildPictureDrawer.tsx
 msgid "Transparent background"
 msgstr ""
@@ -36357,6 +38214,7 @@ msgid "Trend, {playerName}'s own figures, ratio with no unit"
 msgstr ""
 
 #: src/lego/pages/components/DetailPanel.tsx
+#: src/lego/pages/components/UnitCounts.tsx
 msgid "Triangles"
 msgstr ""
 
@@ -36460,6 +38318,7 @@ msgid "ttl, in frames."
 msgstr ""
 
 #: src/conquest/pages/GalaxyPage.tsx
+#: src/lego/pages/components/ModelViewport.tsx
 #: src/placement/SurfaceBars.tsx
 msgid "Turn"
 msgstr ""
@@ -36525,6 +38384,7 @@ msgid "Turn range, ° right"
 msgstr ""
 
 #: src/content/unitFieldNotes.ts
+#: src/lego/pages/components/MovementSection.tsx
 msgid "Turn rate"
 msgstr ""
 
@@ -36578,6 +38438,10 @@ msgstr ""
 
 #: src/lego/pages/BuilderPage.tsx
 msgid "Turns about"
+msgstr ""
+
+#: src/lego/pages/components/ModelViewport.tsx
+msgid "Turns here"
 msgstr ""
 
 #: src/content/unitFieldNotes.ts
@@ -36724,6 +38588,7 @@ msgid "Unblock…"
 msgstr ""
 
 #: src/lego/pages/components/DetailPanel.tsx
+#: src/lego/pages/components/ModuleLabelsFields.tsx
 msgid "Uncategorised"
 msgstr ""
 
@@ -36850,6 +38715,7 @@ msgstr ""
 #: src/content/pages/components/BuildTreeDrawer.tsx
 #: src/content/pages/components/PlayerUnitUsage.tsx
 #: src/content/pages/components/ReplayAnalysisEvents.tsx
+#: src/lego/pages/components/ReferencePicker.tsx
 #: src/scenario/validate.ts
 msgid "Unit"
 msgstr ""
@@ -36882,6 +38748,10 @@ msgstr ""
 
 #: src/container/names.ts
 msgid "unit builder modules"
+msgstr ""
+
+#: src/lego/pages/components/UnitCounts.tsx
+msgid "Unit counts"
 msgstr ""
 
 #: src/lego/pages/components/ExportDrawer.tsx
@@ -36990,6 +38860,10 @@ msgstr ""
 
 #: src/lego/pages/components/AnimationPanel.tsx
 msgid "Unit values"
+msgstr ""
+
+#: src/lego/pages/components/ModelViewport.tsx
+msgid "Unit volume"
 msgstr ""
 
 #: src/content/index.ts
@@ -37188,6 +39062,14 @@ msgstr ""
 msgid "Unlocked loadouts: {loadouts} · event pools: {eventPools}"
 msgstr ""
 
+#: src/lego/pages/components/MountPointList.tsx
+msgid "Unmark {mountName}"
+msgstr ""
+
+#: src/lego/pages/components/MountPointList.tsx
+msgid "Unmark this mount point"
+msgstr ""
+
 #: src/lego/pages/components/FitPlanDrawer.tsx
 msgid "Unmatch {label}"
 msgstr ""
@@ -37295,6 +39177,7 @@ msgstr ""
 #: src/campaign/pages/components/MissionScenarioUpdateButton.tsx
 #: src/content/pages/components/GameCard.tsx
 #: src/content/pages/components/GameLibrarySummary.tsx
+#: src/lego/pages/components/ModuleUpdateBanner.tsx
 msgid "Update"
 msgstr ""
 
@@ -37330,6 +39213,10 @@ msgstr ""
 
 #: src/lego/pages/BuilderPage.tsx
 msgid "Update module"
+msgstr ""
+
+#: src/lego/pages/components/ModuleUpdateBanner.tsx
+msgid "Update now"
 msgstr ""
 
 #: src/lego/pages/components/BuildPictureDrawer.tsx
@@ -37449,6 +39336,10 @@ msgstr ""
 msgid "Use its script"
 msgstr ""
 
+#: src/lego/pages/components/WorthSection.tsx
+msgid "Use saved table"
+msgstr ""
+
 #: src/lego/pages/components/AnimationPanel.tsx
 msgid "Use shared"
 msgstr ""
@@ -37467,6 +39358,10 @@ msgstr ""
 
 #: src/content/unitFieldNotes.ts
 msgid "Use the footprint as the volume"
+msgstr ""
+
+#: src/lego/pages/components/PieceCollisionFields.tsx
+msgid "Use the measured box"
 msgstr ""
 
 #: src/content/pages/components/GameSourcesTab.tsx
@@ -37655,6 +39550,10 @@ msgstr ""
 msgid "Vertical"
 msgstr ""
 
+#: src/lego/pages/components/UnitCounts.tsx
+msgid "Vertices"
+msgstr ""
+
 #: src/runlite/pages/components/RunHud.tsx
 msgid "Veteran"
 msgstr ""
@@ -37696,6 +39595,7 @@ msgstr ""
 msgid "Video from game files"
 msgstr ""
 
+#: src/lego/pages/components/ShortcutSheet.tsx
 #: src/runlite/pages/RunListPage.tsx
 msgid "View"
 msgstr ""
@@ -37810,6 +39710,10 @@ msgstr ""
 msgid "waiting for the battle"
 msgstr ""
 
+#: src/lego/pages/components/TestDrawer.tsx
+msgid "Waiting for the engine to start"
+msgstr ""
+
 #: src/multiplayer/MatchFoundPanel.tsx
 msgid "Waiting for the other players, {readyCount} so far."
 msgstr ""
@@ -37843,9 +39747,18 @@ msgstr ""
 msgid "Waits for a trigger to spawn it"
 msgstr ""
 
+#: src/lego/pages/components/ShapeFields.tsx
+msgid "Wall"
+msgstr ""
+
 #: src/runlite/galaxyAdapter.ts
 #: src/runlite/pages/components/EncounterOverlay.tsx
 msgid "Warlord"
+msgstr ""
+
+#: src/lego/pages/components/ProblemsButton.tsx
+#: src/lego/pages/components/UnitCheckResult.tsx
+msgid "Warnings"
 msgstr ""
 
 #: src/play/pages/components/GameChoiceOffer.tsx
@@ -37990,12 +39903,20 @@ msgstr ""
 msgid "Weapon {slotNumber}, {slotName}"
 msgstr ""
 
+#: src/lego/pages/components/ModelViewport.tsx
+msgid "Weapon {weaponNumber}"
+msgstr ""
+
 #: src/workshop/weaponSlots.ts
 msgid "Weapon definition {weaponKey}"
 msgstr ""
 
 #: src/workshop/weaponSlots.ts
 msgid "Weapon definition {weaponKey}, shared"
+msgstr ""
+
+#: src/lego/pages/components/WeaponsSection.tsx
+msgid "Weapon for {pieceName}"
 msgstr ""
 
 #: src/content/unitFieldNotes.ts
@@ -38018,6 +39939,7 @@ msgstr ""
 msgid "Weapon type"
 msgstr ""
 
+#: src/lego/pages/components/WeaponsSection.tsx
 #: src/workshop/pages/UnitPage.tsx
 #: src/workshop/routes.ts
 msgid "Weapons"
@@ -38196,6 +40118,10 @@ msgstr ""
 msgid "What the project is for"
 msgstr ""
 
+#: src/lego/pages/components/ScrubberMarks.tsx
+msgid "What the script announced"
+msgstr ""
+
 #: src/lego/pages/components/AnimationPanel.tsx
 msgid "What the script reads about its unit. Change one and the preview runs again with it."
 msgstr ""
@@ -38247,6 +40173,10 @@ msgstr ""
 
 #: src/workshop/pages/components/ProjectDetailsDrawer.tsx
 msgid "What this project is called, and what it is for."
+msgstr ""
+
+#: src/lego/pages/components/TexturePicker.tsx
+msgid "What this unit is painted with. Its UV map points onto this image, so a different one is a different look rather than a remap."
 msgstr ""
 
 #: src/multiplayer/admin/ServerAdminHelp.tsx
@@ -38516,6 +40446,10 @@ msgstr ""
 msgid "Whoever shared this wrote no description."
 msgstr ""
 
+#: src/lego/pages/components/ShapeFields.tsx
+msgid "Whole"
+msgstr ""
+
 #: src/content/pages/components/MapAggregate.tsx
 #: src/content/pages/components/ReplayBuildOrders.tsx
 #: src/content/pages/components/ReplayTimeWindowControl.tsx
@@ -38567,6 +40501,10 @@ msgstr ""
 msgid "whose size coilbox could not work out"
 msgstr ""
 
+#: src/lego/pages/components/UnitCheckResult.tsx
+msgid "Why"
+msgstr ""
+
 #: src/workshop/pages/components/UnitFieldRow.tsx
 msgid "Why {label} cannot be written in place"
 msgstr ""
@@ -38585,6 +40523,14 @@ msgstr ""
 
 #: src/content/commandRates.ts
 msgid "Widgets"
+msgstr ""
+
+#: src/lego/pages/components/ProportionsPanel.tsx
+msgid "width"
+msgstr ""
+
+#: src/lego/pages/components/ShapeFields.tsx
+msgid "Width"
 msgstr ""
 
 #: src/lego/pages/components/EnvironmentPicker.tsx
@@ -38731,6 +40677,10 @@ msgstr ""
 msgid "With no in-game time left, the server deletes the account 28 days after its last login."
 msgstr ""
 
+#: src/lego/pages/components/TextureBuilderPanel.tsx
+msgid "With no mask, alpha is written 0 everywhere: the colour draws as painted, with no team colour mixed in."
+msgstr ""
+
 #: src/hub/maps/pictureSweep.ts
 msgid "with no minimap to draw"
 msgstr ""
@@ -38741,6 +40691,10 @@ msgstr ""
 
 #: src/scenario/pages/components/TriggerSteps.tsx
 msgid "With no orders the group carries on with what it was already doing."
+msgstr ""
+
+#: src/lego/pages/components/MovementSection.tsx
+msgid "With no speed the engine treats it as static."
 msgstr ""
 
 #: src/scenario/pages/components/TriggerPanel.tsx
@@ -38853,6 +40807,10 @@ msgstr ""
 msgid "world height at white; default 1"
 msgstr ""
 
+#: src/lego/pages/components/WorthSection.tsx
+msgid "Worth"
+msgstr ""
+
 #: src/workshop/pages/components/ProjectChecks.tsx
 #: src/workshop/pages/components/UnitFieldRow.tsx
 msgid "Worth a look"
@@ -38939,6 +40897,10 @@ msgstr ""
 msgid "Writes nothing yet"
 msgstr ""
 
+#: src/lego/pages/components/SaveModelPopover.tsx
+msgid "Writes the <0>.s3o</0> alone: no unit definition, no script, no collision file."
+msgstr ""
+
 #: src/multiplayer/admin/MaintenanceSection.tsx
 msgid "Writes the server's command counts, login counts and agent stats to its own log file. Nothing is shown here."
 msgstr ""
@@ -38959,6 +40921,10 @@ msgstr ""
 msgid "Writing the folder"
 msgstr ""
 
+#: src/lego/pages/components/TestDrawer.tsx
+msgid "Writing the scratch game"
+msgstr ""
+
 #: src/workshop/pages/components/PlayLocallyButton.tsx
 msgid "Writing the test game"
 msgstr ""
@@ -38977,6 +40943,10 @@ msgstr ""
 
 #: src/workshop/pages/components/ExplosionGeneratorEditor.tsx
 msgid "Written as effects/{ownedKey}.lua. Coilbox cannot render what this looks like in game; use Test to launch a real skirmish and see it."
+msgstr ""
+
+#: src/lego/pages/components/PieceCollisionFields.tsx
+msgid "Written on export to <0>{scriptPath}</0> inside the game you export to, and nowhere else. Saving the project does not write it. Change these numbers rather than the file: an export overwrites it."
 msgstr ""
 
 #: src/lego/pages/components/ExportDrawer.tsx
@@ -39484,6 +41454,10 @@ msgstr ""
 
 #: src/runlite/pages/components/EncounterOverlay.tsx
 msgid "Your start unit and unlocked units are all in {gameName}."
+msgstr ""
+
+#: src/lego/pages/components/UnitCounts.tsx
+msgid "Your unit"
 msgstr ""
 
 #: src/runlite/pages/components/RunHud.tsx

@@ -4,6 +4,7 @@
  * holding game geometry gets the reason instead, and no code.
  */
 
+import { t } from "@lingui/core/macro";
 import { ChallengeCodeView } from "@/challenge/ChallengeCodeView";
 import type { LegoProject } from "../../model";
 import { moduleShareCode } from "../../moduleShare";
@@ -16,7 +17,7 @@ export function ShareModuleForm({ module }: { module: LegoProject }) {
   return (
     <ChallengeCodeView
       code={made.code}
-      helpText="Anyone who opens this gets the module in their unit builder."
+      helpText={t`Anyone who opens this gets the module in their unit builder.`}
     />
   );
 }

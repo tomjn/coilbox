@@ -6,6 +6,7 @@
  * caller, which decides when to keep it.
  */
 
+import { t } from "@lingui/core/macro";
 import { Button, Input } from "@picoframe/frame";
 
 import { Field } from "@/components/Field";
@@ -46,14 +47,14 @@ export function ModuleLabelsFields({
     : {};
   return (
     <>
-      <Field label="Category">
+      <Field label={t`Category`}>
         <Input
           value={draft.category}
           onChange={(event) =>
             onChange({ ...draft, category: event.target.value })
           }
-          placeholder="Uncategorised"
-          aria-label="Module category"
+          placeholder={t`Uncategorised`}
+          aria-label={t`Module category`}
           {...commitProps}
         />
       </Field>
@@ -77,12 +78,12 @@ export function ModuleLabelsFields({
           </Button>
         ))}
       </div>
-      <Field label="Tags">
+      <Field label={t`Tags`}>
         <Input
           value={draft.tags}
           onChange={(event) => onChange({ ...draft, tags: event.target.value })}
-          placeholder="gun, heavy"
-          aria-label="Module tags"
+          placeholder={t`gun, heavy`}
+          aria-label={t`Module tags`}
           {...commitProps}
         />
       </Field>

@@ -19,6 +19,7 @@
  * the other half of this aside and is not on screen while this is.
  */
 
+import { Trans, useLingui } from "@lingui/react/macro";
 import { Button } from "@picoframe/frame";
 import { useMemo } from "react";
 import { OptionSelect } from "@/components/OptionSelect";
@@ -113,6 +114,7 @@ export function PieceCollisionFields({
   onChange,
   script,
 }: Props) {
+  const { t } = useLingui();
   // Every vertex in the unit, so not on every keystroke elsewhere in the page.
   const volumes = useMemo(
     () =>
@@ -124,6 +126,7 @@ export function PieceCollisionFields({
     [volumes],
   );
 
+  const changedLabel = (name: string) => t`${name} (changed)`;
   const pieces = orderedPieces(project);
   // The root is a piece like any other and the engine boxes it too, so it is
   // offered. A piece the model does not carry vertices for is offered as well:
@@ -147,6 +150,14 @@ export function PieceCollisionFields({
 
   const { volume, derived, hit } = entry;
   const own = picked.collision;
+  const pieceName = picked.name;
+  const [sizeX, sizeY, sizeZ] = derived.scales.map((n) =>
+    formatNumber(n, { maximumFractionDigits: 1 }),
+  );
+  const measuredSize = t`${sizeX} by ${sizeY} by ${sizeZ}`;
+  const includeLine = pieceCollisionInclude(project.unitName);
+  const scriptPath = `scripts/${pieceCollisionScriptPath(project.unitName)}`;
+  const changedNames = overridden.map((piece) => piece.name).join(", ");
 
   /** Write a volume onto the piece, keeping whether it is hit. */
   function setVolume(next: {
@@ -173,18 +184,24 @@ export function PieceCollisionFields({
 
   return (
     <div className="flex flex-col gap-3 border-t border-border/60 pt-3">
-      <p className="text-xs font-medium">Change one piece's box</p>
+      <p className="text-xs font-medium">
+        <Trans>Change one piece's box</Trans>
+      </p>
       <p className="text-xs text-muted-foreground">
-        Nothing in a model or a unit definition can set these, so coilbox writes
-        them as Lua instead. Exporting the unit puts them in a file of coilbox's
-        own next to the game's scripts, and the unit script pulls that file in
-        with one line. Nothing is written until you export, and the file is
-        rewritten every time, so it keeps up with what you set here even after
-        you have taken the script over.
+        <Trans>
+          Nothing in a model or a unit definition can set these, so coilbox
+          writes them as Lua instead. Exporting the unit puts them in a file of
+          coilbox's own next to the game's scripts, and the unit script pulls
+          that file in with one line. Nothing is written until you export, and
+          the file is rewritten every time, so it keeps up with what you set
+          here even after you have taken the script over.
+        </Trans>
       </p>
 
       <div>
-        <span className="text-xs text-muted-foreground">Piece</span>
+        <span className="text-xs text-muted-foreground">
+          <Trans>Piece</Trans>
+        </span>
         <OptionSelect
           className="mt-1"
           size="sm"
@@ -192,22 +209,22 @@ export function PieceCollisionFields({
           onValueChange={onSelect}
           options={pieces.map((piece) => ({
             value: piece.id,
-            label: piece.collision ? `${piece.name} (changed)` : piece.name,
+            label: piece.collision ? changedLabel(piece.name) : piece.name,
           }))}
         />
       </div>
 
       <p className="text-xs text-muted-foreground">
         {!selectedId
-          ? `Nothing is selected, so the viewport's handles are on the unit's volume. Select ${picked.name} to move them onto its box.`
+          ? t`Nothing is selected, so the viewport's handles are on the unit's volume. Select ${pieceName} to move them onto its box.`
           : hit
-            ? `${picked.name} is selected, so the viewport's handles are on its box and it is drawn wide to stand out from the rest. Size needs the scale tool: those handles are plates on the box's six faces. Deselect to put them back on the unit's volume.`
-            : `Nothing hits ${picked.name}, so it has no box on screen and the viewport's handles stay on the unit's volume.`}
+            ? t`${pieceName} is selected, so the viewport's handles are on its box and it is drawn wide to stand out from the rest. Size needs the scale tool: those handles are plates on the box's six faces. Deselect to put them back on the unit's volume.`
+            : t`Nothing hits ${pieceName}, so it has no box on screen and the viewport's handles stay on the unit's volume.`}
       </p>
 
       <div className="flex items-center justify-between gap-3">
         <Label htmlFor="piece-hit" className="text-xs font-medium">
-          Anything hits {picked.name}
+          <Trans>Anything hits {pieceName}</Trans>
         </Label>
         <Switch
           id="piece-hit"
@@ -224,7 +241,9 @@ export function PieceCollisionFields({
       </div>
 
       <div>
-        <span className="text-xs text-muted-foreground">Shape</span>
+        <span className="text-xs text-muted-foreground">
+          <Trans>Shape</Trans>
+        </span>
         <OptionSelect
           className="mt-1"
           size="sm"
@@ -239,22 +258,24 @@ export function PieceCollisionFields({
       </div>
 
       <Vec3Row
-        label="Box size"
-        unit="elmos"
+        label={t`Box size`}
+        unit={t`elmos`}
         values={volume.scales}
         onCommit={(axis, value) => setAxis("scales", axis, value)}
       />
       <Vec3Row
-        label="Offset in the piece"
+        label={t`Offset in the piece`}
         values={volume.offsets}
         onCommit={(axis, value) => setAxis("offsets", axis, value)}
       />
 
       <p className="text-xs text-muted-foreground">
-        Size is the box's full width, and the offset is measured from the
-        piece's own origin rather than from the unit's aim point, so it turns
-        and moves with the piece. No axis can be under one elmo: the engine
-        clamps them.
+        <Trans>
+          Size is the box's full width, and the offset is measured from the
+          piece's own origin rather than from the unit's aim point, so it turns
+          and moves with the piece. No axis can be under one elmo: the engine
+          clamps them.
+        </Trans>
       </p>
 
       {own ? (
@@ -263,40 +284,40 @@ export function PieceCollisionFields({
           variant="outline"
           onClick={() => onChange(picked.id, null)}
         >
-          Use the measured box
+          <Trans>Use the measured box</Trans>
         </Button>
       ) : (
         <p className="text-xs text-muted-foreground">
-          {picked.name} is on the box the engine measures round its vertices,{" "}
-          {derived.scales
-            .map((n) => formatNumber(n, { maximumFractionDigits: 1 }))
-            .join(" by ")}{" "}
-          elmos. Changing anything above takes it over.
+          <Trans>
+            {pieceName} is on the box the engine measures round its vertices,{" "}
+            {measuredSize} elmos. Changing anything above takes it over.
+          </Trans>
         </p>
       )}
 
       {!project.pieceCollision && !project.pieceSelection ? (
         <p className="text-xs text-destructive">
-          Neither switch above is on, so the engine never looks at a piece's box
-          and none of this reaches a game.
+          <Trans>
+            Neither switch above is on, so the engine never looks at a piece's
+            box and none of this reaches a game.
+          </Trans>
         </p>
       ) : null}
 
       {missingInclude ? (
         <p className="text-xs text-destructive">
-          This unit's script is your own and does not pull the file in, so
-          nothing set here reaches a game. Add{" "}
-          <code className="break-all">
-            {pieceCollisionInclude(project.unitName)}
-          </code>{" "}
-          near the top of it. A script generated after these were set carries
-          that line already.
+          <Trans>
+            This unit's script is your own and does not pull the file in, so
+            nothing set here reaches a game. Add{" "}
+            <code className="break-all">{includeLine}</code> near the top of it.
+            A script generated after these were set carries that line already.
+          </Trans>
         </p>
       ) : null}
 
       {overridden.length > 0 ? (
         <p className="text-xs text-muted-foreground">
-          Changed on {overridden.map((piece) => piece.name).join(", ")}.
+          <Trans>Changed on {changedNames}.</Trans>
         </p>
       ) : null}
 
@@ -306,18 +327,18 @@ export function PieceCollisionFields({
       <Collapsible>
         <CollapsibleTrigger asChild>
           <Button size="sm" variant="outline" className="w-full">
-            Show the file this writes
+            <Trans>Show the file this writes</Trans>
           </Button>
         </CollapsibleTrigger>
         <CollapsibleContent>
           <p className="mt-2 text-xs text-muted-foreground">
-            Written on export to{" "}
-            <code className="break-all">
-              scripts/{pieceCollisionScriptPath(project.unitName)}
-            </code>{" "}
-            inside the game you export to, and nowhere else. Saving the project
-            does not write it. Change these numbers rather than the file: an
-            export overwrites it.
+            <Trans>
+              Written on export to{" "}
+              <code className="break-all">{scriptPath}</code> inside the game
+              you export to, and nowhere else. Saving the project does not write
+              it. Change these numbers rather than the file: an export
+              overwrites it.
+            </Trans>
           </p>
           <pre className="mt-2 max-h-64 overflow-auto rounded border border-border/60 bg-muted/40 p-2 text-[11px] leading-relaxed">
             {script}

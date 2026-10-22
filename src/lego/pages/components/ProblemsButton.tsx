@@ -3,6 +3,8 @@
  * are, and a drawer holding them. Clicking a problem hands it to the page, which
  * selects its pieces and frames them.
  */
+import { t } from "@lingui/core/macro";
+import { Trans } from "@lingui/react/macro";
 import { Button, Drawer } from "@picoframe/frame";
 import { TriangleAlert } from "lucide-react";
 import { useState } from "react";
@@ -29,16 +31,18 @@ import { useMutedProblemSources } from "../../useMutedProblemSources";
 /** Why a check has no answer to show right now. */
 export type CheckStatus = "checking" | "paused";
 
-const STATUS_TEXT: Record<CheckStatus, string> = {
-  checking: "Checking",
-  paused: "Not checked while a script plays",
-};
+/** One finished sentence about a source whose check has no answer yet. */
+function statusSentence(label: string, status: CheckStatus): string {
+  return status === "paused"
+    ? t`${label}: not checked while a script plays.`
+    : t`${label}: checking.`;
+}
 
-const GROUP_TITLE: Record<ProblemSeverity, string> = {
-  error: "Errors",
-  warning: "Warnings",
-  note: "Notes",
-};
+function groupTitle(severity: ProblemSeverity): string {
+  if (severity === "error") return t`Errors`;
+  if (severity === "warning") return t`Warnings`;
+  return t`Notes`;
+}
 
 const ROW_SEVERITY: Record<ProblemSeverity, CheckSeverity> = {
   error: "error",
@@ -68,10 +72,11 @@ export function ProblemsButton({
 
   if (problems.length === 0) return null;
 
+  const shownCount = shown.length;
   const label =
-    shown.length > 0
-      ? `Problems with this unit: ${shown.length}`
-      : "Problems with this unit";
+    shownCount > 0
+      ? t`Problems with this unit: ${shownCount}`
+      : t`Problems with this unit`;
   return (
     <>
       <Button
@@ -95,31 +100,31 @@ export function ProblemsButton({
       <Drawer
         open={open}
         onOpenChange={setOpen}
-        title="Problems"
-        description="Click one to select its pieces."
+        title={t`Problems`}
+        description={t`Click one to select its pieces.`}
         width="30rem"
       >
         <div className="flex flex-col gap-5 text-sm">
           {pending.length > 0 ? (
             <p className="text-xs text-muted-foreground">
               {pending
-                .map(
-                  (s) =>
-                    `${s.label}: ${STATUS_TEXT[statuses[s.id] ?? "checking"].toLowerCase()}`,
+                .map((s) =>
+                  statusSentence(s.label, statuses[s.id] ?? "checking"),
                 )
-                .join(". ")}
-              .
+                .join(" ")}
             </p>
           ) : null}
 
           {shown.length === 0 ? (
-            <p className="text-xs text-muted-foreground">No problems.</p>
+            <p className="text-xs text-muted-foreground">
+              <Trans>No problems.</Trans>
+            </p>
           ) : null}
 
           {groupProblems(shown).map((group) => (
             <CheckSection
               key={group.severity}
-              title={GROUP_TITLE[group.severity]}
+              title={groupTitle(group.severity)}
               count={group.problems.length}
             >
               {group.problems.map((p) => (
@@ -138,7 +143,9 @@ export function ProblemsButton({
 
           {sources.length > 0 ? (
             <section className="flex flex-col gap-2">
-              <h3 className="font-medium text-sm">Show</h3>
+              <h3 className="font-medium text-sm">
+                <Trans>Show</Trans>
+              </h3>
               {sources.map((s) => (
                 <CheckField
                   key={s.id}
