@@ -8,12 +8,12 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
+import { describeError } from "@/i18n/uiError";
 import { formatBytes } from "@/lib/format";
 import { notify } from "@/notify/notify";
 import { contentGatherReplays, type GatherSummary } from "../../bindings";
 
-const msg = (e: unknown): string =>
-  e instanceof Error ? e.message : String(e);
+const msg = (e: unknown): string => describeError(e);
 
 /** One line saying what a gather covers, preview or applied. */
 function summarize(s: GatherSummary): string {

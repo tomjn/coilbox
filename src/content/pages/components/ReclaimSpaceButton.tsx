@@ -7,12 +7,12 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
+import { describeError } from "@/i18n/uiError";
 import { notify } from "@/notify/notify";
 import { contentPruneRapidPool, type PruneSummary } from "../../bindings";
 import { isClean, summarize } from "../../rapidPool";
 
-const msg = (e: unknown): string =>
-  e instanceof Error ? e.message : String(e);
+const msg = (e: unknown): string => describeError(e);
 
 /**
  * Per-root "Reclaim space" control. Opening it runs a dry-run prune of the root's

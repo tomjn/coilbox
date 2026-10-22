@@ -14,6 +14,7 @@
  */
 
 import { useCallback, useEffect, useState } from "react";
+import { describeError } from "@/i18n/uiError";
 
 export interface DocumentStore<T> {
   /** Every mounted consumer's view of the data, kept in step with refreshes
@@ -73,7 +74,7 @@ export function createDocumentStore<T>(
   }
 
   function describe(e: unknown): string {
-    return e instanceof Error ? e.message : String(e);
+    return describeError(e);
   }
 
   async function refresh(): Promise<T> {

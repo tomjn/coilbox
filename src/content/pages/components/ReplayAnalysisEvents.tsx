@@ -18,6 +18,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { describeError } from "@/i18n/uiError";
 import { formatNumber } from "@/lib/format";
 import { notify } from "@/notify/notify";
 import {
@@ -135,7 +136,7 @@ function DownloadButton({
       });
       void notify({ title: t`Event log downloaded.`, level: "success" });
     } catch (e) {
-      const reason = e instanceof Error ? e.message : String(e);
+      const reason = describeError(e);
       void notify({
         title: t`Download failed: ${reason}`,
         level: "error",

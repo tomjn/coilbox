@@ -3,6 +3,7 @@ import { Trans } from "@lingui/react/macro";
 import { Button } from "@picoframe/frame";
 import { Loader2 } from "lucide-react";
 import { useEffect, useState } from "react";
+import { describeError } from "@/i18n/uiError";
 import { notify } from "@/notify/notify";
 import { content3doInstallStatus, contentUndo3doInstall } from "../../bindings";
 
@@ -55,7 +56,7 @@ export function OldConversionNotice({
         level: "success",
       });
     } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
+      setError(describeError(e));
     } finally {
       setBusy(false);
     }

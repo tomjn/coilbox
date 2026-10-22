@@ -10,6 +10,7 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
+import { describeError } from "@/i18n/uiError";
 import { useReplayTarget } from "../../../play/config";
 import { compareGameVersions } from "../../../play/installedGames";
 import { contentRewriteDemo } from "../../bindings";
@@ -20,7 +21,7 @@ import {
 } from "../../resolveContent";
 import { ScanFailed } from "./states";
 
-const errMessage = (e: unknown) => (e instanceof Error ? e.message : String(e));
+const errMessage = (e: unknown) => describeError(e);
 
 /**
  * "Remix": rewrite a copy of the replay so its embedded `gametype` points at a

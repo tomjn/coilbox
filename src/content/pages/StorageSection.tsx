@@ -14,6 +14,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { describeError } from "@/i18n/uiError";
 import { formatBytes } from "@/lib/format";
 import { useDownloadQueue } from "../../downloads/DownloadQueueProvider";
 import {
@@ -33,8 +34,7 @@ import { ReclaimCachesButton } from "./components/ReclaimCachesButton";
 import { ReclaimSpaceButton } from "./components/ReclaimSpaceButton";
 import { ReplayTracksStorage } from "./components/ReplayTracksStorage";
 
-const msg = (e: unknown): string =>
-  e instanceof Error ? e.message : String(e);
+const msg = (e: unknown): string => describeError(e);
 
 /**
  * Sizes already computed this session, keyed by root path. Walking a rapid pool

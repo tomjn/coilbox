@@ -5,10 +5,11 @@ import { useState } from "react";
 import { Field } from "@/components/Field";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Textarea } from "@/components/ui/textarea";
+import { describeError } from "@/i18n/uiError";
 import { usSeedSql } from "../../bindings";
 
 function errMessage(e: unknown): string {
-  return e instanceof Error ? e.message : String(e);
+  return describeError(e);
 }
 
 /**

@@ -25,6 +25,7 @@ import {
 } from "@/components/ui/collapsible";
 import { Progress } from "@/components/ui/progress";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
+import { describeError } from "@/i18n/uiError";
 import { formatFixed, formatNumber } from "@/lib/format";
 import {
   type LogLine,
@@ -44,7 +45,7 @@ import { EarlyTerminationNotice } from "./components/ReportDetail";
 import SeedSqlForm from "./components/SeedSqlForm";
 
 function errMessage(e: unknown): string {
-  return e instanceof Error ? e.message : String(e);
+  return describeError(e);
 }
 
 const MANUAL = "__manual__";

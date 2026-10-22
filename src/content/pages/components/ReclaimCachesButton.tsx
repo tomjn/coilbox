@@ -7,13 +7,13 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
+import { describeError } from "@/i18n/uiError";
 import { formatBytes } from "@/lib/format";
 import { notify } from "@/notify/notify";
 import { type CacheReclaimSummary, contentReclaimCaches } from "../../bindings";
 import { isEmpty, nonEmptyCaches, summarizeCaches } from "../../caches";
 
-const msg = (e: unknown): string =>
-  e instanceof Error ? e.message : String(e);
+const msg = (e: unknown): string => describeError(e);
 
 /**
  * "Reclaim caches" control. Opening it runs a dry-run size of every generated-image

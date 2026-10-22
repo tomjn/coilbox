@@ -32,6 +32,7 @@ import { CheckField } from "@/components/Field";
 import { PageHeader } from "@/components/PageHeader";
 import { SourceEditor } from "@/components/SourceEditor";
 import { Label } from "@/components/ui/label";
+import { describeError } from "@/i18n/uiError";
 import { useClaimFileDrop } from "@/lib/fileDropClaim";
 import { errorText } from "@/lib/helpers";
 import { MissionLuaCode } from "@/scenario/pages/components/MissionLuaCode";
@@ -165,7 +166,7 @@ export default function Bos2LuaPage() {
         if (ticket === latest.current) {
           setConverted({
             ...EMPTY,
-            error: error instanceof Error ? error.message : String(error),
+            error: describeError(error),
           });
         }
       });

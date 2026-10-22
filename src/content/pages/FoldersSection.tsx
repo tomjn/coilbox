@@ -7,6 +7,7 @@ import { CheckField } from "@/components/Field";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Skeleton } from "@/components/ui/skeleton";
+import { describeError } from "@/i18n/uiError";
 import { useDefaultWriteRoot, useWriteRootPath } from "../../downloads/config";
 import {
   type ContentState,
@@ -22,8 +23,7 @@ import { useContentPrefs, useContentState, useSetupStatus } from "../config";
 import { DownloadFolders } from "./components/DownloadFolders";
 import { RootCard } from "./components/RootCard";
 
-const msg = (e: unknown): string =>
-  e instanceof Error ? e.message : String(e);
+const msg = (e: unknown): string => describeError(e);
 
 /**
  * Content Folders settings section: lists tracked Spring/Recoil data roots,

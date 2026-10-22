@@ -8,6 +8,7 @@ import {
   useState,
   useSyncExternalStore,
 } from "react";
+import { describeError } from "@/i18n/uiError";
 import { rememberShortnames } from "../container/shortnames";
 import { unitsyncHeaderUrl, unitsyncThumbUrl } from "../lib/assetUrl";
 import type { MapAppearance } from "../mapconv/bindings";
@@ -451,9 +452,7 @@ export async function primeScan(
           // disk may have room.
           if (res.initFailure) throw new ScanInitFailure(res);
         } catch (e) {
-          cancelled = /cancelled/i.test(
-            e instanceof Error ? e.message : `${e}`,
-          );
+          cancelled = /cancelled/i.test(describeError(e));
           // A cancel is the user stopping the scan, so nothing restarts it.
           if (staleScans.has(key) && !cancelled) continue;
           throw e;
@@ -474,7 +473,7 @@ export async function primeScan(
         return res;
       }
     } catch (e) {
-      const msg = e instanceof Error ? e.message : String(e);
+      const msg = describeError(e);
       // A cancel is not a failure of the target, so it is not kept as one, or
       // the next open would show "cancelled" as a scan error.
       if (!(e instanceof ScanInitFailure) && !cancelled)
@@ -629,7 +628,7 @@ export function useUnitsyncScan(enginePath?: string, dataDir?: string) {
         setData(found);
         return { data: found, error: null };
       } catch (e) {
-        const msg = e instanceof Error ? e.message : String(e);
+        const msg = describeError(e);
         if (e instanceof ScanInitFailure) setUnvouched(e.result);
         // A cancel lands in a stable "cancelled" state rather than an error,
         // and keeps the answer before it: nothing was learned. Any other
@@ -684,7 +683,7 @@ export function useUnitsyncScan(enginePath?: string, dataDir?: string) {
         },
         (e) => {
           if (!live) return;
-          const msg = e instanceof Error ? e.message : String(e);
+          const msg = describeError(e);
           // As in `runWithReason`: a cancel keeps the answer before it, and
           // every hook of the target says it was cancelled, not only the one
           // whose page stopped it.
@@ -1397,7 +1396,7 @@ export function useUnitsyncUnitModel(
       })
       .catch((e: unknown) => {
         if (cancelled) return;
-        setError(e instanceof Error ? e.message : String(e));
+        setError(describeError(e));
         setFailed(true);
         setLoading(false);
       });
@@ -1668,7 +1667,7 @@ export function useUnitsyncEngineConfig(enginePath?: string, dataDir?: string) {
         engineConfigCache.set(key, res);
         setData(res);
       } catch (e) {
-        setError(e instanceof Error ? e.message : String(e));
+        setError(describeError(e));
       } finally {
         setLoading(false);
       }
@@ -1749,7 +1748,7 @@ export function useKeybinds(configDir?: string) {
     try {
       setData(await contentKeybindsRead({ configDir }));
     } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
+      setError(describeError(e));
     } finally {
       setLoading(false);
     }
@@ -1764,7 +1763,7 @@ export function useKeybinds(configDir?: string) {
         setData({ path: res.path, exists: true, text, ours: true });
         return null;
       } catch (e) {
-        return e instanceof Error ? e.message : String(e);
+        return describeError(e);
       }
     },
     [configDir],
@@ -2229,7 +2228,7 @@ export function useUnitsyncMinimap(
       apply(res);
     })()
       .catch((e) => {
-        if (!cancelled) setError(e instanceof Error ? e.message : String(e));
+        if (!cancelled) setError(describeError(e));
       })
       .finally(() => {
         if (!cancelled) setLoading(false);
@@ -2365,7 +2364,7 @@ function useUnitsyncMapAsset<
       apply(res);
     })()
       .catch((e) => {
-        if (!cancelled) setError(e instanceof Error ? e.message : String(e));
+        if (!cancelled) setError(describeError(e));
       })
       .finally(() => {
         if (!cancelled) setLoading(false);
@@ -2527,7 +2526,7 @@ export function useSaves(rootPath?: string) {
       const res = await contentListSaves({ root: rootPath });
       setSaves(res.saves);
     } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
+      setError(describeError(e));
     } finally {
       setLoadedFor(rootPath);
       setLoading(false);
@@ -2590,7 +2589,7 @@ export function useDemoInfo(enginePath?: string, replayPath?: string) {
           setSettled({
             path: replayPath,
             info: null,
-            error: e instanceof Error ? e.message : String(e),
+            error: describeError(e),
           });
       })
       .finally(() => {
@@ -2674,7 +2673,7 @@ export function useReplayStats(roots: string[], enginePath?: string) {
       setRecords(res.records);
       setSummary(res.summary);
     } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
+      setError(describeError(e));
       // Ingest failed — still surface whatever's already in the store.
       try {
         const q = await contentStatsQuery(undefined);

@@ -8,6 +8,7 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
+import { describeError } from "@/i18n/uiError";
 import {
   aiByline,
   gameOptionSchema,
@@ -27,7 +28,7 @@ import { loadReplays } from "../../replayList";
 import { useReplayUserState } from "../../replayUserState";
 import { ScanFailed } from "./states";
 
-const errMessage = (e: unknown) => (e instanceof Error ? e.message : String(e));
+const errMessage = (e: unknown) => describeError(e);
 
 /** Encode/decode an AI select value as `kind:shortName`. */
 const aiValue = (a: { kind: string; shortName: string }) =>

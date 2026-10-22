@@ -1,9 +1,10 @@
 import { useEffect, useState } from "react";
+import { describeError } from "@/i18n/uiError";
 import type { DemoTrailer, Metric } from "./bindings";
 import { contentReplayTrailer } from "./bindings";
 import { metricRegistry } from "./useMetricRegistry";
 
-const errMessage = (e: unknown) => (e instanceof Error ? e.message : String(e));
+const errMessage = (e: unknown) => describeError(e);
 
 /**
  * Decoded trailers, kept for the session because decoding re-reads the whole

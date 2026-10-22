@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { describeError } from "@/i18n/uiError";
 import {
   contentReplayUnitOrders,
   type ReplayUnitOrders,
@@ -60,7 +61,7 @@ export function useUnitUsage(
           replays: new Map(),
           lists: new Map(),
           failed: new Set(),
-          error: e instanceof Error ? e.message : String(e),
+          error: describeError(e),
         });
       },
     );

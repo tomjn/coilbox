@@ -1,3 +1,4 @@
+import { describeError } from "@/i18n/uiError";
 /**
  * Small one-line helpers duplicated across plugin folders, grouped here
  * since each is unrelated but too small to earn its own file (issue #2434).
@@ -22,5 +23,5 @@ export function basename(path: string): string {
 
 /** Normalise a thrown value to a display string. */
 export function errorText(e: unknown): string {
-  return e instanceof Error ? e.message : String(e);
+  return describeError(e);
 }

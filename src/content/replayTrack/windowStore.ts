@@ -1,3 +1,4 @@
+import { describeError } from "@/i18n/uiError";
 import { ReplayTrackError } from "./fault";
 import type { TrackWindow } from "./trackWindow";
 
@@ -61,7 +62,7 @@ function asError(e: unknown): ReplayTrackError {
   if (e instanceof ReplayTrackError) return e;
   return new ReplayTrackError({
     kind: "io",
-    message: e instanceof Error ? e.message : String(e),
+    message: describeError(e),
   });
 }
 

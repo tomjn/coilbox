@@ -16,6 +16,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { describeError } from "@/i18n/uiError";
 import { formatBytes } from "@/lib/format";
 import { notify } from "@/notify/notify";
 import {
@@ -34,8 +35,7 @@ import {
   selectReplaysForCleanup,
 } from "../../storage";
 
-const errorText = (e: unknown): string =>
-  e instanceof Error ? e.message : String(e);
+const errorText = (e: unknown): string => describeError(e);
 
 /** The age choices, in days. "Any age" is the filter being off. */
 const AGE_OPTIONS = [

@@ -4,6 +4,7 @@ import { useState } from "react";
 import { Link } from "react-router";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Skeleton } from "@/components/ui/skeleton";
+import { describeError } from "@/i18n/uiError";
 import { EngineInstaller } from "../../downloads/pages/components/EngineInstaller";
 import {
   type ContentState,
@@ -15,8 +16,7 @@ import { useContentState, usePreferredEngine } from "../config";
 import { useEngineUpdate } from "../useUpdates";
 import { EngineRow } from "./components/EngineRow";
 
-const msg = (e: unknown): string =>
-  e instanceof Error ? e.message : String(e);
+const msg = (e: unknown): string => describeError(e);
 
 /**
  * Engines settings section: lists engine installs grouped by content root, with

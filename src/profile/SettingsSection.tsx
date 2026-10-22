@@ -10,6 +10,7 @@ import {
   RefreshCw,
 } from "lucide-react";
 import { useState } from "react";
+import { describeError } from "@/i18n/uiError";
 import { useUnitsyncScan } from "../content/config";
 import { useAdvancedModeSetting } from "../general/advanced";
 import { useFullscreenSetting } from "../general/fullscreen";
@@ -203,7 +204,7 @@ function ProfileAuthoring() {
       });
       setResult(await scaffoldProfile(profile));
     } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
+      setError(describeError(e));
     } finally {
       setBusy(false);
     }

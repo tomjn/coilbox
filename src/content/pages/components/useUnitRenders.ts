@@ -34,6 +34,7 @@ import { unitsyncUnitRender, unitsyncUnitRenderKeys } from "@/content/bindings";
 import { localRenders, rememberLocalRender } from "@/hub/assets/localRenders";
 import { RENDER_VERSION, renderUnit } from "@/hub/assets/renderTop";
 import { RENDER_ANGLES, renderVariant } from "@/hub/assets/vocabulary";
+import { describeError } from "@/i18n/uiError";
 import { hubAssetUrl } from "@/lib/assetUrl";
 import { toBase64 } from "@/lib/base64";
 import { renderSkipReason } from "./UnitModelPanel";
@@ -310,7 +311,7 @@ export function useUnitRenders(
           [angle]: {
             angle,
             status: "unavailable",
-            message: e instanceof Error ? e.message : String(e),
+            message: describeError(e),
           },
         }));
       }

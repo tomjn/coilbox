@@ -1,5 +1,6 @@
 import type { Accent, ThemeMode } from "@picoframe/frame";
 import { defineCommand } from "@picoframe/plugin-sdk";
+import { describeError } from "@/i18n/uiError";
 import type { ConquestNames } from "../conquest/names";
 import type { MapExclusion, SuggestedMapList } from "../content/branding";
 import type { HomeConfig } from "../home/config";
@@ -565,7 +566,7 @@ export function loadProfile(): Promise<{
       })
       .catch((e) => {
         console.warn("profile: load failed", e);
-        loadedError = e instanceof Error ? e.message : String(e);
+        loadedError = describeError(e);
         loadedErrorSnippet = null;
         return { profile: EMPTY_PROFILE, source: "default" as ProfileSource };
       });

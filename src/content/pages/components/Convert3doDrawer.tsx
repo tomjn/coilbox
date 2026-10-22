@@ -10,6 +10,7 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import { Progress } from "@/components/ui/progress";
+import { describeError } from "@/i18n/uiError";
 import { formatNumber } from "@/lib/format";
 import { notify } from "@/notify/notify";
 import {
@@ -26,8 +27,7 @@ import {
 } from "../../bindings";
 import { invalidateArchiveTree } from "../../config";
 
-const msg = (e: unknown): string =>
-  e instanceof Error ? e.message : String(e);
+const msg = (e: unknown): string => describeError(e);
 
 /**
  * Convert every `.3do` in one game to `.s3o` (issue #2573).
@@ -102,7 +102,7 @@ export function Convert3doDrawer({
         }),
       );
     } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
+      setError(describeError(e));
     } finally {
       setRunning(false);
       opId.current = null;
