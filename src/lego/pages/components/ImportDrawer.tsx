@@ -16,6 +16,9 @@
  * the same for both.
  */
 
+import { i18n } from "@lingui/core";
+import { msg } from "@lingui/core/macro";
+import { Trans, useLingui } from "@lingui/react/macro";
 import { Button } from "@picoframe/frame";
 import { open } from "@tauri-apps/plugin-dialog";
 import { X } from "lucide-react";
@@ -40,6 +43,7 @@ interface Props {
 }
 
 export function ImportDrawer({ open: isOpen, onOpenChange, onOpened }: Props) {
+  const { t } = useLingui();
   const [stage, setStage] = useState<ImportStage>({ state: "idle" });
 
   // Opening is the ask, so the picker goes up straight away. Closing forgets
@@ -53,12 +57,15 @@ export function ImportDrawer({ open: isOpen, onOpenChange, onOpened }: Props) {
     void (async () => {
       const picked = await open({
         multiple: false,
-        title: "Choose a model",
+        title: i18n._(msg`Choose a model`),
         // `.glb` on the end rather than in the shared list: the builder opens
         // one picked by hand, as the way back from Blender, but no game ships
         // one for the engine to draw, so the game picker never offers it.
         filters: [
-          { name: "Model", extensions: [...BUILDER_MODEL_EXTS, "glb"] },
+          {
+            name: i18n._(msg`Model`),
+            extensions: [...BUILDER_MODEL_EXTS, "glb"],
+          },
         ],
       });
       if (!live) return;
@@ -102,10 +109,10 @@ export function ImportDrawer({ open: isOpen, onOpenChange, onOpened }: Props) {
         <DialogPrimitive.Content className="fixed inset-y-0 right-0 z-50 flex w-[460px] max-w-[92vw] flex-col border-l border-border bg-background shadow-xl duration-200 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:slide-out-to-right data-[state=open]:slide-in-from-right">
           <div className="flex items-center justify-between border-b border-border/60 px-5 py-4">
             <DialogPrimitive.Title className="text-base font-semibold">
-              Open a model
+              <Trans>Open a model</Trans>
             </DialogPrimitive.Title>
             <DialogPrimitive.Close asChild>
-              <Button variant="ghost" size="icon" aria-label="Close">
+              <Button variant="ghost" size="icon" aria-label={t`Close`}>
                 <X className="size-4" />
               </Button>
             </DialogPrimitive.Close>

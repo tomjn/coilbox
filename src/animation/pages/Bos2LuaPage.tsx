@@ -1,3 +1,5 @@
+import { t as coreT, plural } from "@lingui/core/macro";
+import { Trans, useLingui } from "@lingui/react/macro";
 import { Button, Drawer, Input } from "@picoframe/frame";
 import { getCurrentWebview } from "@tauri-apps/api/webview";
 import { open } from "@tauri-apps/plugin-dialog";
@@ -80,9 +82,23 @@ const EMPTY: Converted = { lua: "", warnings: [], cobVars: null, error: null };
  *  elsewhere, or nothing for a warning that names no location at all. */
 function warningLocation(warning: ConversionWarning): string | undefined {
   if (warning.file === null || warning.line === null) return undefined;
-  if (warning.main) return `line ${warning.line}`;
+  if (warning.main) {
+    const line = warning.line;
+    return coreT`line ${line}`;
+  }
   const name = warning.file.split(/[\\/]/).pop() ?? warning.file;
   return `${name}:${warning.line}`;
+}
+
+/** Why a script with missing includes was not converted. */
+function missingIncludesError(
+  fileName: string,
+  includes: string,
+  fromDisk: boolean,
+): string {
+  return fromDisk
+    ? coreT`${fileName} includes ${includes}, which could not be found beside it or in a scripts folder above it, so it cannot be converted.`
+    : coreT`This script includes ${includes}. A script pasted here cannot load its includes, so it cannot be converted. Load the .bos from its folder instead, or open the unit out of its game.`;
 }
 
 /**
@@ -93,6 +109,7 @@ function warningLocation(warning: ConversionWarning): string | undefined {
  * converted without the macros and functions those files hold.
  */
 export default function Bos2LuaPage() {
+  const { t } = useLingui();
   const [bos, setBos] = useState("");
   const [fileName, setFileName] = useState("script.bos");
   // Where the script was loaded from, so its includes are read from beside it.
@@ -134,9 +151,11 @@ export default function Bos2LuaPage() {
         if (missingIncludes.length > 0) {
           setConverted({
             ...EMPTY,
-            error: path
-              ? `${fileName} includes ${missingIncludes.join(", ")}, which could not be found beside it or in a scripts folder above it, so it cannot be converted.`
-              : `This script includes ${missingIncludes.join(", ")}. A script pasted here cannot load its includes, so it cannot be converted. Load the .bos from its folder instead, or open the unit out of its game.`,
+            error: missingIncludesError(
+              fileName,
+              missingIncludes.join(", "),
+              path !== null,
+            ),
           });
           return;
         }
@@ -225,9 +244,9 @@ export default function Bos2LuaPage() {
 
   async function browse() {
     const picked = await open({
-      title: "Select a .bos unit script to convert",
+      title: t`Select a .bos unit script to convert`,
       multiple: false,
-      filters: [{ name: "Unit script source", extensions: ["bos", "txt"] }],
+      filters: [{ name: t`Unit script source`, extensions: ["bos", "txt"] }],
     });
     if (typeof picked === "string") await loadPath(picked);
   }
@@ -309,6 +328,8 @@ export default function Bos2LuaPage() {
   };
 
   const searching = query.trim() !== "";
+  const matchPosition = (matchAt ?? 0) + 1;
+  const matchTotal = matches.length;
   const warningCount = converted.warnings.length;
   const problemCount = diagnostics.length;
   // The button's count is only what needs acting on: errors, lint warnings
@@ -344,13 +365,13 @@ export default function Bos2LuaPage() {
         className="border-b border-border px-6 py-4"
         title={
           <>
-            <FileCode2 size={18} /> BOS → Lua
+            <FileCode2 size={18} /> <Trans>BOS → Lua</Trans>
           </>
         }
         description={
-          <>
+          <Trans>
             Convert a <code>.bos</code> unit script to Lua.
-          </>
+          </Trans>
         }
         actions={
           <>
@@ -371,10 +392,10 @@ export default function Bos2LuaPage() {
                   <Info className="size-4" />
                 )}
                 {lintError
-                  ? "Parse error"
+                  ? t`Parse error`
                   : severeCount > 0
-                    ? `${severeCount} ${severeCount === 1 ? "check" : "checks"}`
-                    : `${infoCount} ${infoCount === 1 ? "note" : "notes"}`}
+                    ? plural(severeCount, { one: "# check", other: "# checks" })
+                    : plural(infoCount, { one: "# note", other: "# notes" })}
               </Button>
             )}
             {converted.cobVars && (
@@ -384,11 +405,11 @@ export default function Bos2LuaPage() {
                 onClick={() => setCobVarsOpen(true)}
               >
                 <FileCode2 className="size-4" />
-                Needs cob_vars.lua
+                <Trans>Needs cob_vars.lua</Trans>
               </Button>
             )}
             <Button variant="outline" size="sm" onClick={() => void browse()}>
-              <Upload /> Load .bos…
+              <Upload /> <Trans>Load .bos…</Trans>
             </Button>
             <Button
               size="sm"
@@ -396,7 +417,7 @@ export default function Bos2LuaPage() {
               disabled={!converted.lua}
             >
               {copied === "lua" ? <Check /> : <Copy />}{" "}
-              {copied === "lua" ? "Copied" : "Copy Lua"}
+              {copied === "lua" ? t`Copied` : t`Copy Lua`}
             </Button>
           </>
         }
@@ -409,11 +430,12 @@ export default function Bos2LuaPage() {
               htmlFor="bos-input"
               className="block min-w-0 overflow-hidden text-ellipsis whitespace-nowrap text-sm font-medium text-muted-foreground"
             >
-              BOS
-              {path && (
-                <>
-                  , from <code className="font-mono text-xs">{path}</code>
-                </>
+              {path ? (
+                <Trans>
+                  BOS, from <code className="font-mono text-xs">{path}</code>
+                </Trans>
+              ) : (
+                "BOS"
               )}
             </Label>
             {!findOpen && !searching ? (
@@ -421,7 +443,7 @@ export default function Bos2LuaPage() {
                 size="icon"
                 variant="ghost"
                 className="ml-auto size-8 shrink-0"
-                aria-label="Find in the BOS (Cmd+F)"
+                aria-label={t`Find in the BOS (Cmd+F)`}
                 onClick={openFind}
               >
                 <Search className="size-4" />
@@ -450,8 +472,8 @@ export default function Bos2LuaPage() {
                     e.preventDefault();
                     goToMatch(e.shiftKey ? -1 : 1);
                   }}
-                  placeholder="Find (Cmd+F)"
-                  aria-label="Find in the BOS"
+                  placeholder={t`Find (Cmd+F)`}
+                  aria-label={t`Find in the BOS`}
                   className="h-8 pl-7 text-xs"
                 />
               </div>
@@ -462,7 +484,7 @@ export default function Bos2LuaPage() {
                   size="icon"
                   variant="ghost"
                   className="size-8"
-                  aria-label="Previous match"
+                  aria-label={t`Previous match`}
                   disabled={matches.length === 0}
                   onClick={() => goToMatch(-1)}
                 >
@@ -472,7 +494,7 @@ export default function Bos2LuaPage() {
                   size="icon"
                   variant="ghost"
                   className="size-8"
-                  aria-label="Next match"
+                  aria-label={t`Next match`}
                   disabled={matches.length === 0}
                   onClick={() => goToMatch(1)}
                 >
@@ -487,8 +509,8 @@ export default function Bos2LuaPage() {
               {!searching
                 ? ""
                 : matchAt === null
-                  ? "None"
-                  : `${matchAt + 1} of ${matches.length}`}
+                  ? t`None`
+                  : t`${matchPosition} of ${matchTotal}`}
             </span>
           </div>
           <SourceEditor
@@ -511,7 +533,7 @@ export default function Bos2LuaPage() {
             <h2 className="text-sm font-medium text-muted-foreground">Lua</h2>
             <div className="ml-auto">
               <CheckField
-                label="Leave out unused code"
+                label={t`Leave out unused code`}
                 checked={prune}
                 onChange={setPrune}
               />
@@ -524,11 +546,11 @@ export default function Bos2LuaPage() {
                 tokens={tokens}
                 matches={[]}
                 activeMatch={null}
-                label="Converted Lua"
+                label={t`Converted Lua`}
               />
             ) : (
               <p className="flex h-full items-center justify-center rounded-md border border-dashed border-border/50 p-4 text-xs text-muted-foreground">
-                Converted Lua appears here as you type.
+                <Trans>Converted Lua appears here as you type.</Trans>
               </p>
             )}
           </div>
@@ -542,8 +564,8 @@ export default function Bos2LuaPage() {
       <Drawer
         open={checksOpen && showChecks}
         onOpenChange={setChecksOpen}
-        title="Checks"
-        description="Problems the lint pass found in the BOS, and where the Lua may do something different from it."
+        title={t`Checks`}
+        description={t`Problems the lint pass found in the BOS, and where the Lua may do something different from it.`}
         width="34rem"
       >
         <div className="flex flex-col gap-5 text-sm">
@@ -558,7 +580,7 @@ export default function Bos2LuaPage() {
             />
           )}
           {warningCount > 0 && (
-            <CheckSection title="Conversion warnings" count={warningCount}>
+            <CheckSection title={t`Conversion warnings`} count={warningCount}>
               {converted.warnings.map((warning, i) => {
                 const jumpTo = warning.main ? warning.line : null;
                 return (
@@ -587,22 +609,26 @@ export default function Bos2LuaPage() {
       <Drawer
         open={cobVarsOpen && converted.cobVars !== null}
         onOpenChange={setCobVarsOpen}
-        title="Add lualibs/cob_vars.lua to the game"
-        description="This script shares values with other units, which it keeps as rules params."
+        title={t`Add lualibs/cob_vars.lua to the game`}
+        description={t`This script shares values with other units, which it keeps as rules params.`}
         width="34rem"
       >
         <div className="flex flex-col gap-3 text-sm">
           <p>
-            The file lets the game's synced gadgets set those values, and its
-            gadgets and widgets read them, through{" "}
-            <code>Spring.SetUnitCOBValue</code>,{" "}
-            <code>Spring.GetCOBTeamVar</code> and their siblings.
+            <Trans>
+              The file lets the game's synced gadgets set those values, and its
+              gadgets and widgets read them, through{" "}
+              <code>Spring.SetUnitCOBValue</code>,{" "}
+              <code>Spring.GetCOBTeamVar</code> and their siblings.
+            </Trans>
           </p>
           <p>
-            Put <code>VFS.Include("lualibs/cob_vars.lua")</code> on the first
-            line of <code>LuaRules/main.lua</code>,{" "}
-            <code>LuaRules/draw.lua</code> and <code>luaui.lua</code> (or{" "}
-            <code>LuaUI/main.lua</code>).
+            <Trans>
+              Put <code>VFS.Include("lualibs/cob_vars.lua")</code> on the first
+              line of <code>LuaRules/main.lua</code>,{" "}
+              <code>LuaRules/draw.lua</code> and <code>luaui.lua</code> (or{" "}
+              <code>LuaUI/main.lua</code>).
+            </Trans>
           </p>
           <Button
             variant="outline"
@@ -611,7 +637,7 @@ export default function Bos2LuaPage() {
             onClick={() => void copy(converted.cobVars ?? "", "cobVars")}
           >
             {copied === "cobVars" ? <Check /> : <Copy />}{" "}
-            {copied === "cobVars" ? "Copied" : "Copy file"}
+            {copied === "cobVars" ? t`Copied` : t`Copy file`}
           </Button>
         </div>
       </Drawer>

@@ -1,3 +1,4 @@
+import { select, t } from "@lingui/core/macro";
 import type { ConquestState, GalaxyDoc } from "./model";
 import { BASE_SIZES, LARGE_SIZES } from "./size";
 import { MAX_THREAT_LEVEL, readThreatLevel } from "./threat";
@@ -132,6 +133,15 @@ export function startPositionRequirement(): string {
   return levelChoices(0).locked?.requirement ?? "";
 }
 
+/**
+ * What unlocks the level above `top`, as a sentence of its own. The same words
+ * as `requirement`, with the full stop inside the message so a language that
+ * ends a sentence differently can.
+ */
+export function requirementSentence(top: number): string {
+  return top === 0 ? t`Win a conquest.` : t`Win a conquest at level ${top}.`;
+}
+
 /** What the setup offers at a given unlocked level. */
 export interface LevelChoices {
   /** Every level that can be chosen, 0 first. */
@@ -150,7 +160,7 @@ export function levelChoices(ceiling: number): LevelChoices {
     locked: {
       level: top + 1,
       requirement:
-        top === 0 ? "Win a conquest" : `Win a conquest at level ${top}`,
+        top === 0 ? t`Win a conquest` : t`Win a conquest at level ${top}`,
     },
   };
 }
@@ -161,6 +171,82 @@ export interface SizeOption {
   label: string;
   description?: string;
   disabled?: boolean;
+}
+
+/**
+ * The size list's wording for one size. `many` is the English plural of what the
+ * map style calls its locations ("systems", "provinces"), which picks the whole
+ * sentence so each language can word the noun and the number together.
+ */
+function sizeLabel(count: number, many: string): string {
+  switch (count) {
+    case 12:
+      return select(many, {
+        systems: "Small (12 systems)",
+        locations: "Small (12 locations)",
+        cities: "Small (12 cities)",
+        provinces: "Small (12 provinces)",
+        other: `Small (12 ${many})`,
+      });
+    case 18:
+      return select(many, {
+        systems: "Medium (18 systems)",
+        locations: "Medium (18 locations)",
+        cities: "Medium (18 cities)",
+        provinces: "Medium (18 provinces)",
+        other: `Medium (18 ${many})`,
+      });
+    case 28:
+      return select(many, {
+        systems: "Large (28 systems)",
+        locations: "Large (28 locations)",
+        cities: "Large (28 cities)",
+        provinces: "Large (28 provinces)",
+        other: `Large (28 ${many})`,
+      });
+    case 40:
+      return select(many, {
+        systems: "Sprawling (40 systems)",
+        locations: "Sprawling (40 locations)",
+        cities: "Sprawling (40 cities)",
+        provinces: "Sprawling (40 provinces)",
+        other: `Sprawling (40 ${many})`,
+      });
+    case 56:
+      return select(many, {
+        systems: "Vast (56 systems)",
+        locations: "Vast (56 locations)",
+        cities: "Vast (56 cities)",
+        provinces: "Vast (56 provinces)",
+        other: `Vast (56 ${many})`,
+      });
+    case 80:
+      return select(many, {
+        systems: "Immense (80 systems)",
+        locations: "Immense (80 locations)",
+        cities: "Immense (80 cities)",
+        provinces: "Immense (80 provinces)",
+        other: `Immense (80 ${many})`,
+      });
+    case 120:
+      return select(many, {
+        systems: "Colossal (120 systems)",
+        locations: "Colossal (120 locations)",
+        cities: "Colossal (120 cities)",
+        provinces: "Colossal (120 provinces)",
+        other: `Colossal (120 ${many})`,
+      });
+    case 160:
+      return select(many, {
+        systems: "Titanic (160 systems)",
+        locations: "Titanic (160 locations)",
+        cities: "Titanic (160 cities)",
+        provinces: "Titanic (160 provinces)",
+        other: `Titanic (160 ${many})`,
+      });
+    default:
+      return `${count} ${many}`;
+  }
 }
 
 /**
@@ -178,20 +264,24 @@ export interface SizeOption {
  */
 export function sizeOptions(ceiling: number, many = "systems"): SizeOption[] {
   const options: SizeOption[] = BASE_SIZES.map((s) => ({
-    ...s,
-    label: s.label.replace(/ systems\)$/, ` ${many})`),
+    value: s.value,
+    label: sizeLabel(Number(s.value), many),
   }));
   const next = LARGE_SIZES.find((s) => ceiling < s.level);
   for (const size of LARGE_SIZES) {
-    const label = `${size.label} (${size.count} ${many})`;
+    const label = sizeLabel(size.count, many);
     if (ceiling >= size.level) {
       options.push({ value: String(size.count), label });
     } else if (size === next) {
-      const requirement = levelChoices(size.level - 1).locked?.requirement;
+      const top = size.level - 1;
+      const requirement =
+        top === 0
+          ? t`Locked. Win a conquest.`
+          : t`Locked. Win a conquest at level ${top}.`;
       options.push({
         value: String(size.count),
         label,
-        description: `Locked. ${requirement}.`,
+        description: requirement,
         disabled: true,
       });
     }

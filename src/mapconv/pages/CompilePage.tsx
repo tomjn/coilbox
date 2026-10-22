@@ -1,3 +1,6 @@
+import { i18n } from "@lingui/core";
+import { msg } from "@lingui/core/macro";
+import { Trans, useLingui } from "@lingui/react/macro";
 import { Button, Input } from "@picoframe/frame";
 import { Channel } from "@tauri-apps/api/core";
 import {
@@ -46,18 +49,11 @@ import { HelpTip, LearnMore, WIKI } from "./components/Help";
 import { MapPreview3D } from "./components/MapPreview3D";
 import { PathField } from "./components/PathField";
 
-const TEXTURE_FILTERS = [
-  {
-    name: "Images",
-    extensions: ["png", "bmp", "tga", "jpg", "jpeg", "tif", "tiff"],
-  },
-];
-
 const CT_OPTIONS = [
-  { value: "1", label: "1 — No compression" },
-  { value: "2", label: "2 — Fast (compare last N tiles)" },
-  { value: "3", label: "3 — Insane (whole map; very slow)" },
-  { value: "4", label: "4 — High quality fast" },
+  { value: "1", label: msg`1 — No compression` },
+  { value: "2", label: msg`2 — Fast (compare last N tiles)` },
+  { value: "3", label: msg`3 — Insane (whole map; very slow)` },
+  { value: "4", label: msg`4 — High quality fast` },
 ];
 
 /** The parent dir of a native path (handles both / and \ separators). */
@@ -95,6 +91,13 @@ function countAdvanced(a: AdvancedCompileOpts): number {
 
 /** Build a `.smf`/`.smt` from source images via the `mapcompile` sidecar. */
 export default function CompilePage() {
+  const { t } = useLingui();
+  const TEXTURE_FILTERS = [
+    {
+      name: t`Images`,
+      extensions: ["png", "bmp", "tga", "jpg", "jpeg", "tif", "tiff"],
+    },
+  ];
   const [cfg, setCfg] = useMapconvConfig();
   const [draft, setDraft] = useCompileDraft();
   const { upsertProject } = useMapProjects();
@@ -345,19 +348,26 @@ export default function CompilePage() {
   }, []);
 
   const advancedCount = countAdvanced(advanced);
+  const textureWidth = textureInfo?.width ?? 0;
+  const textureHeight = textureInfo?.height ?? 0;
+  const smfPath = result?.smfPath ?? "";
+  const minHeight = advanced.minh;
+  const maxHeight = advanced.maxh;
 
   return (
     <div className="@container flex h-full flex-col">
       <header className="border-b border-border px-6 py-4">
         <h1 className="flex items-center gap-2 text-lg font-semibold leading-none">
-          <Hammer size={18} /> Compile map
+          <Hammer size={18} /> <Trans>Compile map</Trans>
         </h1>
         <p className="mt-1 max-w-prose text-sm text-muted-foreground">
-          Build a Spring <code>.smf</code>/<code>.smt</code> from a main texture
-          and optional source maps.{" "}
+          <Trans>
+            Build a Spring <code>.smf</code>/<code>.smt</code> from a main
+            texture and optional source maps.
+          </Trans>{" "}
           <span className="inline-flex gap-3">
-            <LearnMore href={WIKI.tutorial} label="Beginner guide" />
-            <LearnMore href={WIKI.main} label="Mapping wiki" />
+            <LearnMore href={WIKI.tutorial} label={t`Beginner guide`} />
+            <LearnMore href={WIKI.main} label={t`Mapping wiki`} />
           </span>
         </p>
       </header>
@@ -369,8 +379,10 @@ export default function CompilePage() {
         >
           <AlertCircle size={15} />
           <AlertDescription>
-            The <code>mapcompile</code> sidecar was not found. Bundle
-            SpringMapConvNG or set <code>MAPCONV_MAPCOMPILE_SIDECAR</code>.
+            <Trans>
+              The <code>mapcompile</code> sidecar was not found. Bundle
+              SpringMapConvNG or set <code>MAPCONV_MAPCOMPILE_SIDECAR</code>.
+            </Trans>
           </AlertDescription>
         </Alert>
       )}
@@ -379,17 +391,19 @@ export default function CompilePage() {
         {/* Left: form */}
         <div className="min-h-0 space-y-5 overflow-auto border-b border-border px-6 py-5 @3xl:border-r @3xl:border-b-0">
           <PathField
-            label="Main texture (-t)"
-            hint="required · the map's diffuse colour image · sets the map size · siblings auto-fill below"
+            label={t`Main texture (-t)`}
+            hint={t`required · the map's diffuse colour image · sets the map size · siblings auto-fill below`}
             help={
               <HelpTip>
                 <span>
-                  The diffuse colour image painted across the whole map. Its
-                  width and height set the map's size and{" "}
-                  <strong>must each be a multiple of 1024</strong> (e.g. 1024,
-                  2048, 8192). Name companion images <code>heightmap.png</code>,{" "}
-                  <code>metalmap.png</code>, etc. in the same folder and they
-                  auto-fill below.
+                  <Trans>
+                    The diffuse colour image painted across the whole map. Its
+                    width and height set the map's size and{" "}
+                    <strong>must each be a multiple of 1024</strong> (e.g. 1024,
+                    2048, 8192). Name companion images{" "}
+                    <code>heightmap.png</code>, <code>metalmap.png</code>, etc.
+                    in the same folder and they auto-fill below.
+                  </Trans>
                 </span>
               </HelpTip>
             }
@@ -406,15 +420,17 @@ export default function CompilePage() {
             <Alert variant="warning" className="p-2.5">
               <AlertCircle size={14} />
               <AlertDescription className="text-xs">
-                Texture is {textureInfo.width} × {textureInfo.height}px — each
-                side must be a multiple of 1024. mapcompile will likely reject
-                it. <LearnMore href={WIKI.sizes} label="Map sizes" />
+                <Trans>
+                  Texture is {textureWidth} × {textureHeight}px — each side must
+                  be a multiple of 1024. mapcompile will likely reject it.
+                </Trans>{" "}
+                <LearnMore href={WIKI.sizes} label={t`Map sizes`} />
               </AlertDescription>
             </Alert>
           )}
           <PathField
-            label="Output folder"
-            hint="where the .smf/.smt are written"
+            label={t`Output folder`}
+            hint={t`where the .smf/.smt are written`}
             value={outDir}
             onChange={setOutDir}
             disabled={running}
@@ -422,8 +438,8 @@ export default function CompilePage() {
             defaultPath={cfg.lastOutDir}
           />
           <Field
-            label="Output name (-o)"
-            hint="basename for the .smf/.smt (no extension)"
+            label={t`Output name (-o)`}
+            hint={t`basename for the .smf/.smt (no extension)`}
           >
             <Input
               value={outSuffix}
@@ -433,17 +449,20 @@ export default function CompilePage() {
             />
           </Field>
           <Field
-            label="Compression type (-ct)"
-            hint="4 (high quality fast) is a good default"
+            label={t`Compression type (-ct)`}
+            hint={t`4 (high quality fast) is a good default`}
             help={
               <HelpTip>
                 <span>
-                  How the <code>.smt</code> tile texture is compressed — a
-                  trade-off of file size, speed and quality:
-                  <br />1 — none (largest file, fastest build)
-                  <br />2 — fast (compares the last N tiles)
-                  <br />3 — insane (compares the whole map; smallest, very slow)
-                  <br />4 — high quality fast (recommended)
+                  <Trans>
+                    How the <code>.smt</code> tile texture is compressed — a
+                    trade-off of file size, speed and quality:
+                    <br />1 — none (largest file, fastest build)
+                    <br />2 — fast (compares the last N tiles)
+                    <br />3 — insane (compares the whole map; smallest, very
+                    slow)
+                    <br />4 — high quality fast (recommended)
+                  </Trans>
                 </span>
               </HelpTip>
             }
@@ -452,7 +471,10 @@ export default function CompilePage() {
               value={ct}
               onValueChange={setCt}
               disabled={running}
-              options={CT_OPTIONS}
+              options={CT_OPTIONS.map((o) => ({
+                ...o,
+                label: i18n._(o.label),
+              }))}
             />
           </Field>
 
@@ -463,8 +485,9 @@ export default function CompilePage() {
                 size={15}
                 className="transition-transform group-data-[state=open]:rotate-90"
               />{" "}
-              Advanced options
-              {advancedCount > 0 ? ` (${advancedCount})` : ""}
+              {advancedCount > 0
+                ? t`Advanced options (${advancedCount})`
+                : t`Advanced options`}
             </CollapsibleTrigger>
             <CollapsibleContent>
               <div className="mt-4">
@@ -482,9 +505,11 @@ export default function CompilePage() {
             <Alert variant="warning" className="p-2.5">
               <AlertCircle size={14} />
               <AlertDescription className="text-xs">
-                Min height ({advanced.minh}) is at or above max height (
-                {advanced.maxh}) — the terrain will be flat or inverted. Set min
-                below max.
+                <Trans>
+                  Min height ({minHeight}) is at or above max height (
+                  {maxHeight}) — the terrain will be flat or inverted. Set min
+                  below max.
+                </Trans>
               </AlertDescription>
             </Alert>
           )}
@@ -492,16 +517,17 @@ export default function CompilePage() {
           <div className="flex items-center gap-2 pt-1">
             {running ? (
               <Button variant="outline" onClick={cancel}>
-                <Square /> Cancel
+                <Square /> <Trans>Cancel</Trans>
               </Button>
             ) : (
               <Button onClick={run} disabled={!canRun}>
-                <Play className="fill-current" /> Compile
+                <Play className="fill-current" /> <Trans>Compile</Trans>
               </Button>
             )}
             {running && (
               <span className="flex items-center gap-1.5 text-sm text-muted-foreground">
-                <Loader2 size={14} className="animate-spin" /> compiling…
+                <Loader2 size={14} className="animate-spin" />{" "}
+                <Trans>compiling…</Trans>
               </span>
             )}
           </div>
@@ -533,8 +559,10 @@ export default function CompilePage() {
                   className="mt-px shrink-0 text-emerald-600 dark:text-emerald-400"
                 />
                 <span className="min-w-0 break-all">
-                  Compiled{" "}
-                  <span className="font-mono text-xs">{result.smfPath}</span>
+                  <Trans>
+                    Compiled{" "}
+                    <span className="font-mono text-xs">{smfPath}</span>
+                  </Trans>
                 </span>
               </div>
               <Button
@@ -543,7 +571,7 @@ export default function CompilePage() {
                 className="mt-3"
                 onClick={() => mcOpenPath({ path: outDir }).catch(() => {})}
               >
-                <FolderOpen /> Show in folder
+                <FolderOpen /> <Trans>Show in folder</Trans>
               </Button>
             </div>
           )}
@@ -562,7 +590,9 @@ export default function CompilePage() {
             {logLines.length === 0 ? (
               <div className="flex h-full flex-col items-center justify-center gap-2 text-center text-sm text-muted-foreground">
                 <Hammer size={26} className="opacity-30" />
-                <p>Compile output streams here.</p>
+                <p>
+                  <Trans>Compile output streams here.</Trans>
+                </p>
               </div>
             ) : (
               <pre className="whitespace-pre-wrap break-words font-mono text-xs leading-relaxed">

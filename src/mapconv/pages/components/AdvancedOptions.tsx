@@ -1,15 +1,8 @@
+import { Trans, useLingui } from "@lingui/react/macro";
 import { Input } from "@picoframe/frame";
 import { CheckField, Field } from "@/components/Field";
 import { HelpTip, LearnMore, WIKI } from "./Help";
 import { PathField } from "./PathField";
-
-/** Image file filters shared by the optional map pickers. */
-const IMAGE_FILTERS = [
-  {
-    name: "Images",
-    extensions: ["png", "bmp", "tga", "jpg", "jpeg", "tif", "tiff"],
-  },
-];
 
 /**
  * The optional `mapcompile` flags, held as strings so empty == omit. The page
@@ -61,25 +54,37 @@ export default function AdvancedOptions({
   defaultPath?: string;
   disabled?: boolean;
 }) {
+  const { t } = useLingui();
   const set = (p: Partial<AdvancedCompileOpts>) => onChange({ ...value, ...p });
+  // Image file filters shared by the optional map pickers.
+  const IMAGE_FILTERS = [
+    {
+      name: t`Images`,
+      extensions: ["png", "bmp", "tga", "jpg", "jpeg", "tif", "tiff"],
+    },
+  ];
 
   return (
     <div className="space-y-6">
       <section className="space-y-4">
         <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-          Source maps
+          <Trans>Source maps</Trans>
         </h3>
         <PathField
-          label="Heightmap (-h)"
-          hint="grayscale; white = high, black = low"
+          label={t`Heightmap (-h)`}
+          hint={t`grayscale; white = high, black = low`}
           help={
             <HelpTip>
               <span>
-                Defines the terrain elevation. A grayscale image where{" "}
-                <strong>white is the highest point and black the lowest</strong>
-                . Greys are heights in between. It should be{" "}
-                <code>(texture ÷ 8) + 1</code> pixels on each side (e.g. an
-                8192px texture needs a 1025px heightmap).
+                <Trans>
+                  Defines the terrain elevation. A grayscale image where{" "}
+                  <strong>
+                    white is the highest point and black the lowest
+                  </strong>
+                  . Greys are heights in between. It should be{" "}
+                  <code>(texture ÷ 8) + 1</code> pixels on each side (e.g. an
+                  8192px texture needs a 1025px heightmap).
+                </Trans>
               </span>
             </HelpTip>
           }
@@ -92,14 +97,17 @@ export default function AdvancedOptions({
           preview
         />
         <PathField
-          label="Metal map (-m)"
-          hint="red channel marks metal deposits"
+          label={t`Metal map (-m)`}
+          hint={t`red channel marks metal deposits`}
           help={
             <HelpTip>
               <span>
-                Marks where reclaimable/extractable metal is. The{" "}
-                <strong>red channel</strong> sets metal density (brighter red =
-                more); paint small red spots where you want metal spots in game.
+                <Trans>
+                  Marks where reclaimable/extractable metal is. The{" "}
+                  <strong>red channel</strong> sets metal density (brighter red
+                  = more); paint small red spots where you want metal spots in
+                  game.
+                </Trans>
               </span>
             </HelpTip>
           }
@@ -112,14 +120,16 @@ export default function AdvancedOptions({
           preview
         />
         <PathField
-          label="Type map (-z)"
-          hint="terrain-type index per pixel"
+          label={t`Type map (-z)`}
+          hint={t`terrain-type index per pixel`}
           help={
             <HelpTip>
               <span>
-                Assigns a terrain type per pixel (each pixel value is an index
-                into the map's terrain types, which set speed/hardness for
-                units).
+                <Trans>
+                  Assigns a terrain type per pixel (each pixel value is an index
+                  into the map's terrain types, which set speed/hardness for
+                  units).
+                </Trans>
               </span>
             </HelpTip>
           }
@@ -132,14 +142,16 @@ export default function AdvancedOptions({
           preview
         />
         <PathField
-          label="Minimap (-minimap)"
-          hint="the small overview image shown in-lobby and in-game"
+          label={t`Minimap (-minimap)`}
+          hint={t`the small overview image shown in-lobby and in-game`}
           help={
             <HelpTip>
               <span>
-                The low-resolution overview image players see in the lobby and
-                the in-game minimap. If omitted, the engine can derive one from
-                the texture.
+                <Trans>
+                  The low-resolution overview image players see in the lobby and
+                  the in-game minimap. If omitted, the engine can derive one
+                  from the texture.
+                </Trans>
               </span>
             </HelpTip>
           }
@@ -152,13 +164,15 @@ export default function AdvancedOptions({
           preview
         />
         <PathField
-          label="Vegetation map (-v)"
-          hint="grayscale; brightness = grass density"
+          label={t`Vegetation map (-v)`}
+          hint={t`grayscale; brightness = grass density`}
           help={
             <HelpTip>
               <span>
-                Controls where engine grass/vegetation grows. A grayscale image
-                where brighter = denser grass.
+                <Trans>
+                  Controls where engine grass/vegetation grows. A grayscale
+                  image where brighter = denser grass.
+                </Trans>
               </span>
             </HelpTip>
           }
@@ -171,15 +185,17 @@ export default function AdvancedOptions({
           preview
         />
         <PathField
-          label="Features file (-features)"
-          hint="text file; one feature per line: [tdfname] [x] [y] [z] [rotation]"
+          label={t`Features file (-features)`}
+          hint={t`text file; one feature per line: [tdfname] [x] [y] [z] [rotation]`}
           help={
             <HelpTip>
               <span>
-                Places map features (trees, rocks, wreckage). A text file with
-                one feature per line:{" "}
-                <code>[tdfname] [x] [y] [z] [rotation]</code>, where tdfname is
-                the feature's definition name.
+                <Trans>
+                  Places map features (trees, rocks, wreckage). A text file with
+                  one feature per line:{" "}
+                  <code>[tdfname] [x] [y] [z] [rotation]</code>, where tdfname
+                  is the feature's definition name.
+                </Trans>
               </span>
             </HelpTip>
           }
@@ -193,18 +209,20 @@ export default function AdvancedOptions({
 
       <section className="space-y-4">
         <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-          Height range
+          <Trans>Height range</Trans>
         </h3>
         <div className="grid grid-cols-2 gap-4">
           <Field
-            label="Min height (-minh)"
-            hint="world height at black; default 0"
+            label={t`Min height (-minh)`}
+            hint={t`world height at black; default 0`}
             help={
               <HelpTip>
                 <span>
-                  The in-world height (in map units) that pure black in the
-                  heightmap maps to — the map's lowest point. Below 0 is
-                  underwater.
+                  <Trans>
+                    The in-world height (in map units) that pure black in the
+                    heightmap maps to — the map's lowest point. Below 0 is
+                    underwater.
+                  </Trans>
                 </span>
               </HelpTip>
             }
@@ -218,14 +236,16 @@ export default function AdvancedOptions({
             />
           </Field>
           <Field
-            label="Max height (-maxh)"
-            hint="world height at white; default 1"
+            label={t`Max height (-maxh)`}
+            hint={t`world height at white; default 1`}
             help={
               <HelpTip>
                 <span>
-                  The in-world height (in map units) that pure white maps to —
-                  the map's highest point. The gap between min and max sets how
-                  steep the terrain is.
+                  <Trans>
+                    The in-world height (in map units) that pure white maps to —
+                    the map's highest point. The gap between min and max sets
+                    how steep the terrain is.
+                  </Trans>
                 </span>
               </HelpTip>
             }
@@ -240,8 +260,8 @@ export default function AdvancedOptions({
           </Field>
         </div>
         <CheckField
-          label="Disable height clamping (-noclamp)"
-          hint="Not recommended; you lose precision. Prefer min/max height instead."
+          label={t`Disable height clamping (-noclamp)`}
+          hint={t`Not recommended; you lose precision. Prefer min/max height instead.`}
           checked={value.noclamp}
           onChange={(v) => set({ noclamp: v })}
         />
@@ -249,12 +269,12 @@ export default function AdvancedOptions({
 
       <section className="space-y-4">
         <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-          Compression tuning
+          <Trans>Compression tuning</Trans>
         </h3>
         <div className="grid grid-cols-2 gap-4">
           <Field
-            label="Threshold (-th)"
-            hint="tile match tolerance; default 0.8"
+            label={t`Threshold (-th)`}
+            hint={t`tile match tolerance; default 0.8`}
           >
             <Input
               type="number"
@@ -266,8 +286,8 @@ export default function AdvancedOptions({
             />
           </Field>
           <Field
-            label="Compare count (-ccount)"
-            hint="tiles to compare in modes 2 & 4; default 64"
+            label={t`Compare count (-ccount)`}
+            hint={t`tiles to compare in modes 2 & 4; default 64`}
           >
             <Input
               type="number"
@@ -280,8 +300,8 @@ export default function AdvancedOptions({
           </Field>
         </div>
         <CheckField
-          label="Smooth texture (-smooth)"
-          hint="Blur the main texture before compiling."
+          label={t`Smooth texture (-smooth)`}
+          hint={t`Blur the main texture before compiling.`}
           checked={value.smooth}
           onChange={(v) => set({ smooth: v })}
         />

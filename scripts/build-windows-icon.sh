@@ -58,7 +58,7 @@ magick "$TMP_DIR/cropped.png" \
 # Generate a full icon set from the padded-down source, then keep only the
 # .ico. `tauri icon` also writes macOS/Linux/Android/iOS assets into the
 # output directory. Those are discarded, not the committed ones.
-( cd "$ROOT" && bunx tauri icon "$TMP_DIR/windows-source.png" -o "$TMP_DIR/out" >/dev/null )
+( cd "$ROOT" && bunx --bun tauri icon "$TMP_DIR/windows-source.png" -o "$TMP_DIR/out" >/dev/null )
 
 cp "$TMP_DIR/out/icon.ico" "$DEST"
 echo "wrote $DEST"

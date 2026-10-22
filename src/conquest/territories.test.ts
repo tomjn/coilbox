@@ -99,8 +99,8 @@ describe("the planet of a generated territories map", () => {
       generateTerritories({ ...base, seed, planet: "desert" }),
     );
     expect(random?.planet).toBe("desert");
-    expect(random?.land).toEqual(named?.land);
-    expect(random?.heightmap).toEqual(named?.heightmap);
+    expect(sameBytes(random?.land, named?.land)).toBe(true);
+    expect(sameBytes(random?.heightmap, named?.heightmap)).toBe(true);
     expect(random?.planet).toEqual(named?.planet);
   });
 
@@ -109,9 +109,15 @@ describe("the planet of a generated territories map", () => {
       generateTerritories({ ...base, planet: "desert" }),
     );
     const b = generatedTerrain(generateTerritories(base));
-    expect(a?.land).toEqual(b?.land);
+    expect(sameBytes(a?.land, b?.land)).toBe(true);
   });
 });
+
+/** Byte for byte. `toEqual` walks a large array one element at a time, which
+ *  took most of these tests' time and pushed one past the timeout on CI. */
+function sameBytes(a?: Uint8Array, b?: Uint8Array): boolean {
+  return a !== undefined && b !== undefined && Buffer.compare(a, b) === 0;
+}
 
 const SHAPES: TerrainShape[] = [...LAND_LAYOUTS];
 

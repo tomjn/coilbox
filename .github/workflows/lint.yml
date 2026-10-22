@@ -95,7 +95,7 @@ jobs:
       - name: Install dependencies
         run: bun install --frozen-lockfile
       - name: Map generator fixtures
-        run: bunx vitest run Golden.test
+        run: bun run test Golden.test
 
   # The mission runtime and the blueprint widget are Lua the engine runs, so
   # neither the frontend nor the Rust job compiles them and a break would

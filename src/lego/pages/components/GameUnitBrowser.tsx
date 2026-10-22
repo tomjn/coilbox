@@ -11,6 +11,7 @@
  * being built (#643). The page decides what the script becomes.
  */
 
+import { Trans, useLingui } from "@lingui/react/macro";
 import { Button } from "@picoframe/frame";
 import {
   ArrowUpFromLine,
@@ -106,6 +107,7 @@ export function GameUnitBrowser({
   onLift,
   onUseScript,
 }: Props) {
+  const { t } = useLingui();
   const { target } = usePreferredTarget();
   const scan = useUnitsyncScan(target?.enginePath, target?.dataDir);
   const installed = useMemo(() => scan.data?.games ?? [], [scan.data]);
@@ -180,7 +182,7 @@ export function GameUnitBrowser({
     if (!canLift(row.member)) {
       setPieces({
         state: "failed",
-        message: "Pieces cannot be listed for this kind of model.",
+        message: t`Pieces cannot be listed for this kind of model.`,
       });
       return;
     }
@@ -260,7 +262,10 @@ export function GameUnitBrowser({
         whole,
         roles: await scriptRoles(whole, target),
       });
-      if (!module) throw new Error(`${line.name} is not in this model.`);
+      if (!module) {
+        const pieceName = line.name;
+        throw new Error(t`${pieceName} is not in this model.`);
+      }
       // The import wrote every mesh of the model. Keep only the lifted ones.
       // Its meshes are then read back for the box of each, for the connectors
       // and pivots the piece gets. A piece without one is measured when it goes
@@ -309,14 +314,15 @@ export function GameUnitBrowser({
       target,
     );
     if (adopted.script === null) {
+      const unitName = row.unit;
       setScriptRead({
         member: row.member,
         state: "failed",
         message:
           adopted.notes[0] ??
           (adopted.kind === "cob"
-            ? `${row.unit} has only a compiled script.`
-            : `${row.unit} has no script.`),
+            ? t`${unitName} has only a compiled script.`
+            : t`${unitName} has no script.`),
       });
       return;
     }
@@ -331,16 +337,31 @@ export function GameUnitBrowser({
     return <Note>{source.message}</Note>;
   }
   if (treeLoading || status === "loading") {
-    return <Note>Reading {source.game.name}.</Note>;
+    const gameName = source.game.name;
+    return (
+      <Note>
+        <Trans>Reading {gameName}.</Trans>
+      </Note>
+    );
   }
   if (!rows) {
-    return <Note>Could not read this game's archive.</Note>;
+    return (
+      <Note>
+        <Trans>Could not read this game's archive.</Trans>
+      </Note>
+    );
   }
   if (matched.length === 0) {
-    return <Note>No units match.</Note>;
+    return (
+      <Note>
+        <Trans>No units match.</Trans>
+      </Note>
+    );
   }
 
   const shown = matched.slice(0, ROW_CAP);
+  const shownCount = shown.length;
+  const matchedCount = matched.length;
   return (
     <ul className="flex min-h-0 flex-1 flex-col overflow-y-auto px-2 py-1">
       {shown.map((row) => {
@@ -379,12 +400,12 @@ export function GameUnitBrowser({
                   disabled={scriptRead?.state === "reading"}
                   onClick={() => void takeScript(row)}
                 >
-                  <FileCode2 size={14} /> Use its script
+                  <FileCode2 size={14} /> <Trans>Use its script</Trans>
                 </Button>
                 {scriptRead?.member === row.member ? (
                   <span className="min-w-0 text-xs text-muted-foreground">
                     {scriptRead.state === "reading"
-                      ? "Reading."
+                      ? t`Reading.`
                       : scriptRead.message}
                   </span>
                 ) : null}
@@ -402,7 +423,9 @@ export function GameUnitBrowser({
       })}
       {matched.length > shown.length ? (
         <li className="px-2 py-1 text-xs text-muted-foreground">
-          First {shown.length} of {matched.length}. Search to narrow it down.
+          <Trans>
+            First {shownCount} of {matchedCount}. Search to narrow it down.
+          </Trans>
         </li>
       ) : null}
     </ul>
@@ -443,8 +466,13 @@ function PieceList({
   lift: Lift | null;
   onLift?: (line: PieceLine) => void;
 }) {
+  const { t } = useLingui();
   if (pieces.state === "loading") {
-    return <p className="py-1 pl-12 text-xs text-muted-foreground">Reading.</p>;
+    return (
+      <p className="py-1 pl-12 text-xs text-muted-foreground">
+        <Trans>Reading.</Trans>
+      </p>
+    );
   }
   if (pieces.state === "failed") {
     return (
@@ -457,6 +485,8 @@ function PieceList({
     <ul className="py-1 pl-12 text-sm">
       {pieces.lines.map((line) => {
         const here = lift?.path === line.path ? lift : null;
+        const pieceName = line.name;
+        const roles = here?.state === "done" ? here.roles : null;
         return (
           <li
             key={line.path}
@@ -471,8 +501,8 @@ function PieceList({
                 className="h-6 px-1 opacity-0 transition-opacity focus:opacity-100 group-hover:opacity-100"
                 disabled={lift?.state === "lifting"}
                 onClick={() => onLift(line)}
-                aria-label={`Lift ${line.name} into the inventory`}
-                title="Lift this piece and the pieces under it into the inventory"
+                aria-label={t`Lift ${pieceName} into the inventory`}
+                title={t`Lift this piece and the pieces under it into the inventory`}
               >
                 <ArrowUpFromLine size={14} />
               </Button>
@@ -480,11 +510,11 @@ function PieceList({
             {here ? (
               <span className="truncate text-xs text-muted-foreground">
                 {here.state === "lifting"
-                  ? "Lifting."
+                  ? t`Lifting.`
                   : here.state === "done"
-                    ? here.roles
-                      ? `Lifted. Roles: ${here.roles}.`
-                      : "Lifted."
+                    ? roles
+                      ? t`Lifted. Roles: ${roles}.`
+                      : t`Lifted.`
                     : here.message}
               </span>
             ) : null}

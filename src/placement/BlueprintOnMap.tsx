@@ -23,6 +23,7 @@
  * The arithmetic is `mapCheck.ts`, which is tested. This file is the wiring.
  */
 
+import { Trans, useLingui } from "@lingui/react/macro";
 import { Button } from "@picoframe/frame";
 import { Loader2, MapPin, MountainSnow, Unplug, X } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -96,6 +97,7 @@ export function BlueprintOnMap({
   /** Put the map away again, back to a page that has read none. */
   onClose: () => void;
 }) {
+  const { t } = useLingui();
   const { target, loading: enginesLoading } = usePreferredTarget();
   const scan = useUnitsyncScan(target?.enginePath, target?.dataDir);
   const { thumbs } = useUnitsyncThumbnails(target?.enginePath, target?.dataDir);
@@ -320,39 +322,45 @@ export function BlueprintOnMap({
   const stand =
     status === "no-map" ? (
       <SurfaceMessage icon={<MapPin className="size-6" />}>
-        Pick a map to see which of this layout's buildings the ground would
-        take. The layout is not changed by anything you do here.
+        <Trans>
+          Pick a map to see which of this layout's buildings the ground would
+          take. The layout is not changed by anything you do here.
+        </Trans>
       </SurfaceMessage>
     ) : status === "loading" ? (
       <SurfaceMessage
         icon={<Loader2 className="size-6 animate-spin opacity-40" />}
       >
-        Reading {mapName}…
+        <Trans>Reading {mapName}…</Trans>
       </SurfaceMessage>
     ) : status === "no-engine" ? (
       <SurfaceMessage icon={<Unplug className="size-6" />}>
         <p>
-          Coilbox reads maps through an engine, and there is no engine installed
-          to read {mapName} with.
+          <Trans>
+            Coilbox reads maps through an engine, and there is no engine
+            installed to read {mapName} with.
+          </Trans>
         </p>
         <Link
           to="/settings/engines"
           className="mt-1 inline-block underline underline-offset-2 hover:text-foreground"
         >
-          Install an engine
+          <Trans>Install an engine</Trans>
         </Link>
       </SurfaceMessage>
     ) : status === "error" ? (
       <SurfaceMessage icon={<MountainSnow className="size-6" />}>
         <p>
-          {mapName} could not be read. It is most likely not installed for the
-          engine coilbox is using.
+          <Trans>
+            {mapName} could not be read. It is most likely not installed for the
+            engine coilbox is using.
+          </Trans>
         </p>
         <Link
           to="/library/maps"
           className="mt-1 inline-block underline underline-offset-2 hover:text-foreground"
         >
-          Manage maps
+          <Trans>Manage maps</Trans>
         </Link>
       </SurfaceMessage>
     ) : null;
@@ -371,7 +379,7 @@ export function BlueprintOnMap({
           disabled={scan.loading && maps.length === 0}
           onClick={() => setPicking(true)}
         >
-          <MapPin className="size-4" /> {mapName || "Choose a map"}
+          <MapPin className="size-4" /> {mapName || t`Choose a map`}
         </Button>
         <Button
           type="button"
@@ -380,7 +388,7 @@ export function BlueprintOnMap({
           className="gap-1.5"
           onClick={onClose}
         >
-          <X className="size-4" /> Done with the map
+          <X className="size-4" /> <Trans>Done with the map</Trans>
         </Button>
       </div>
 
@@ -400,7 +408,7 @@ export function BlueprintOnMap({
         }}
         onScene={setHandle}
         frame={frame}
-        frameLabel="Frame blueprint"
+        frameLabel={t`Frame blueprint`}
         stand={stand}
         bars={
           <>
@@ -447,8 +455,8 @@ export function BlueprintOnMap({
                 strays={strayDefs(units, blueprint.buildings)}
               />
               <p className="text-[11px] text-muted-foreground">
-                {spotSentence(origin)} Click the ground to stand it somewhere
-                else.
+                {spotSentence(origin)}{" "}
+                <Trans>Click the ground to stand it somewhere else.</Trans>
               </p>
               {/* Where the whole thing would stand instead, offered rather than
                   done: a base half in a cliff is a real thing an author might
@@ -483,10 +491,10 @@ export function BlueprintOnMap({
           </>
         }
         footer={
-          <>
+          <Trans>
             {mapName} · click or drag to stand the layout somewhere else · this
             changes the layout in no way · right-drag to turn the view
-          </>
+          </Trans>
         }
       />
 

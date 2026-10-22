@@ -1,3 +1,4 @@
+import { Trans, useLingui } from "@lingui/react/macro";
 import { Button, cn, Input } from "@picoframe/frame";
 import { open } from "@tauri-apps/plugin-dialog";
 import { FolderOpen, X } from "lucide-react";
@@ -43,9 +44,10 @@ export function PathField({
   preview?: boolean;
   onInfo?: (info: { width: number; height: number }) => void;
 }) {
+  const { t } = useLingui();
   async function browse() {
     const picked = await open({
-      title: `Select ${label}`,
+      title: t`Select ${label}`,
       directory,
       multiple: false,
       filters: directory ? undefined : filters,
@@ -67,7 +69,7 @@ export function PathField({
         <Input
           value={value}
           readOnly
-          placeholder="(none)"
+          placeholder={t`(none)`}
           className="font-mono text-xs"
           disabled={disabled}
         />
@@ -76,7 +78,7 @@ export function PathField({
             type="button"
             variant="outline"
             onClick={() => onChange("")}
-            aria-label={`Clear ${label}`}
+            aria-label={t`Clear ${label}`}
             className={cn("shrink-0")}
           >
             <X />
@@ -87,10 +89,10 @@ export function PathField({
           variant="outline"
           onClick={browse}
           disabled={disabled}
-          aria-label={`Browse for ${label}`}
+          aria-label={t`Browse for ${label}`}
           className={cn("shrink-0")}
         >
-          <FolderOpen /> Browse
+          <FolderOpen /> <Trans>Browse</Trans>
         </Button>
       </div>
       {preview && value && <AssetPreview path={value} onInfo={onInfo} />}

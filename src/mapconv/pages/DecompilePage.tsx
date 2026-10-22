@@ -1,3 +1,4 @@
+import { Trans, useLingui } from "@lingui/react/macro";
 import { Button, cn } from "@picoframe/frame";
 import { Channel } from "@tauri-apps/api/core";
 import { getCurrentWebview } from "@tauri-apps/api/webview";
@@ -35,9 +36,6 @@ import { useMapProjects } from "../projects";
 import { MapPreview3D } from "./components/MapPreview3D";
 import { PathField } from "./components/PathField";
 
-const INPUT_FILTERS = [
-  { name: "Spring map or archive", extensions: ["smf", "sdz", "sd7"] },
-];
 // A `.sdd` is a directory archive — it can't be picked via the file dialog's
 // filters (handled by the separate folder button), but it can be dragged in.
 const ACCEPTS = /\.(smf|sdz|sd7|sdd)$/i;
@@ -59,6 +57,10 @@ type Result = DecompileResult;
 
 /** Extract source images from a `.smf`, or a `.sdz`/`.sd7` archive. */
 export default function DecompilePage() {
+  const { t } = useLingui();
+  const INPUT_FILTERS = [
+    { name: t`Spring map or archive`, extensions: ["smf", "sdz", "sd7"] },
+  ];
   const [cfg, setCfg] = useMapconvConfig();
   const [draft, setDraft] = useDecompileDraft();
   const { upsertProject } = useMapProjects();
@@ -119,7 +121,7 @@ export default function DecompilePage() {
             setInputPath(file);
             setRunError(null);
           } else if (p.paths.length) {
-            setRunError("Drop a .smf, .sdz, .sd7, or .sdd folder.");
+            setRunError(t`Drop a .smf, .sdz, .sd7, or .sdd folder.`);
           }
         }
       })
@@ -132,7 +134,7 @@ export default function DecompilePage() {
       active = false;
       unlisten?.();
     };
-  }, []);
+  }, [t]);
 
   // biome-ignore lint/correctness/useExhaustiveDependencies: logLines is the trigger that should re-run the scroll, not read in the body
   useEffect(() => {
@@ -193,7 +195,7 @@ export default function DecompilePage() {
 
   async function browseFolder() {
     const picked = await open({
-      title: "Select a .sdd map folder",
+      title: t`Select a .sdd map folder`,
       directory: true,
       multiple: false,
       defaultPath: cfg.lastSmfDir,
@@ -214,18 +216,23 @@ export default function DecompilePage() {
     }
   }
 
+  const directory = result?.directory ?? "";
+  const author = result?.appearance?.author ?? "";
+
   return (
     <div className="@container flex h-full flex-col">
       <header className="border-b border-border px-6 py-4">
         <h1 className="flex items-center gap-2 text-lg font-semibold leading-none">
-          <PackageOpen size={18} /> Decompile map
+          <PackageOpen size={18} /> <Trans>Decompile map</Trans>
         </h1>
         <p className="mt-1 max-w-prose text-sm text-muted-foreground">
-          Extract the source images (texture, heightmap, metal/type maps,
-          features) from a Spring <code>.smf</code>, from a packaged{" "}
-          <code>.sdz</code>/<code>.sd7</code> archive (extracted automatically
-          to a <code>.sdd</code> folder), or from an existing <code>.sdd</code>{" "}
-          directory archive.
+          <Trans>
+            Extract the source images (texture, heightmap, metal/type maps,
+            features) from a Spring <code>.smf</code>, from a packaged{" "}
+            <code>.sdz</code>/<code>.sd7</code> archive (extracted automatically
+            to a <code>.sdd</code> folder), or from an existing{" "}
+            <code>.sdd</code> directory archive.
+          </Trans>
         </p>
       </header>
 
@@ -236,8 +243,10 @@ export default function DecompilePage() {
         >
           <AlertCircle size={15} />
           <AlertDescription>
-            The <code>mapdecompile</code> sidecar was not found. Bundle
-            SpringMapConvNG or set <code>MAPCONV_MAPDECOMPILE_SIDECAR</code>.
+            <Trans>
+              The <code>mapdecompile</code> sidecar was not found. Bundle
+              SpringMapConvNG or set <code>MAPCONV_MAPDECOMPILE_SIDECAR</code>.
+            </Trans>
           </AlertDescription>
         </Alert>
       )}
@@ -251,8 +260,8 @@ export default function DecompilePage() {
           )}
         >
           <PathField
-            label="Map (.smf / .sdz / .sd7 / .sdd)"
-            hint="browse a file, drag one onto the window, or pick a .sdd folder · archives are extracted then decompiled"
+            label={t`Map (.smf / .sdz / .sd7 / .sdd)`}
+            hint={t`browse a file, drag one onto the window, or pick a .sdd folder · archives are extracted then decompiled`}
             value={inputPath}
             onChange={setInputPath}
             disabled={running}
@@ -267,22 +276,23 @@ export default function DecompilePage() {
             onClick={browseFolder}
             disabled={running}
           >
-            <FolderInput /> Pick a .sdd folder…
+            <FolderInput /> <Trans>Pick a .sdd folder…</Trans>
           </Button>
 
           <div className="flex items-center gap-2 pt-1">
             {running ? (
               <Button variant="outline" onClick={cancel}>
-                <Square /> Cancel
+                <Square /> <Trans>Cancel</Trans>
               </Button>
             ) : (
               <Button onClick={run} disabled={!canRun}>
-                <Play className="fill-current" /> Decompile
+                <Play className="fill-current" /> <Trans>Decompile</Trans>
               </Button>
             )}
             {running && (
               <span className="flex items-center gap-1.5 text-sm text-muted-foreground">
-                <Loader2 size={14} className="animate-spin" /> decompiling…
+                <Loader2 size={14} className="animate-spin" />{" "}
+                <Trans>decompiling…</Trans>
               </span>
             )}
           </div>
@@ -298,8 +308,10 @@ export default function DecompilePage() {
                   className="mt-px shrink-0 text-emerald-600 dark:text-emerald-400"
                 />
                 <span className="min-w-0 break-all">
-                  Extracted into{" "}
-                  <span className="font-mono text-xs">{result.directory}</span>
+                  <Trans>
+                    Extracted into{" "}
+                    <span className="font-mono text-xs">{directory}</span>
+                  </Trans>
                 </span>
               </div>
               {result.appearance?.name && (
@@ -319,7 +331,7 @@ export default function DecompilePage() {
                   )}
                   {result.appearance.author && (
                     <p className="mt-0.5 text-xs text-muted-foreground">
-                      by {result.appearance.author}
+                      <Trans>by {author}</Trans>
                     </p>
                   )}
                 </div>
@@ -329,7 +341,7 @@ export default function DecompilePage() {
                   {result.minimap && (
                     <img
                       src={result.minimap}
-                      alt="Map minimap"
+                      alt={t`Map minimap`}
                       className="h-32 w-32 rounded-md border border-border object-cover"
                     />
                   )}
@@ -363,7 +375,7 @@ export default function DecompilePage() {
                     mcOpenPath({ path: result.directory }).catch(() => {})
                   }
                 >
-                  <FolderOpen /> Show in folder
+                  <FolderOpen /> <Trans>Show in folder</Trans>
                 </Button>
                 <Button
                   variant="outline"
@@ -374,7 +386,7 @@ export default function DecompilePage() {
                     })
                   }
                 >
-                  <Hammer /> Recompile
+                  <Hammer /> <Trans>Recompile</Trans>
                 </Button>
               </div>
             </div>
@@ -394,7 +406,9 @@ export default function DecompilePage() {
             {logLines.length === 0 ? (
               <div className="flex h-full flex-col items-center justify-center gap-2 text-center text-sm text-muted-foreground">
                 <PackageOpen size={26} className="opacity-30" />
-                <p>Decompile output streams here.</p>
+                <p>
+                  <Trans>Decompile output streams here.</Trans>
+                </p>
               </div>
             ) : (
               <pre className="whitespace-pre-wrap break-words font-mono text-xs leading-relaxed">
@@ -423,10 +437,12 @@ export default function DecompilePage() {
 
 /** Compact facts read from the SMF header. */
 function MapFacts({ info }: { info: MapInfo }) {
+  const { t } = useLingui();
+  const { mapx, mapy, worldWidth, worldHeight, minHeight, maxHeight } = info;
   const rows: [string, string][] = [
-    ["Size", `${info.mapx} × ${info.mapy} squares`],
-    ["World", `${info.worldWidth} × ${info.worldHeight} elmos`],
-    ["Height", `${info.minHeight} → ${info.maxHeight}`],
+    [t`Size`, t`${mapx} × ${mapy} squares`],
+    [t`World`, t`${worldWidth} × ${worldHeight} elmos`],
+    [t`Height`, `${minHeight} → ${maxHeight}`],
   ];
   return (
     <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 text-sm">

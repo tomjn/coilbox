@@ -9,6 +9,8 @@
  * Clicking a column's head makes that loadout the active one.
  */
 
+import { plural } from "@lingui/core/macro";
+import { Trans, useLingui } from "@lingui/react/macro";
 import { Button } from "@picoframe/frame";
 import { Lock, X } from "lucide-react";
 import { Dialog as DialogPrimitive } from "radix-ui";
@@ -78,6 +80,7 @@ function statsOf(
 }
 
 export function LoadoutFamilyDrawer(props: Props) {
+  const { t } = useLingui();
   return (
     <DialogPrimitive.Root open={props.open} onOpenChange={props.onOpenChange}>
       <DialogPrimitive.Portal>
@@ -88,10 +91,10 @@ export function LoadoutFamilyDrawer(props: Props) {
         >
           <div className="flex items-center justify-between border-b border-border/60 px-5 py-4">
             <DialogPrimitive.Title className="text-base font-semibold">
-              Compare loadouts
+              <Trans>Compare loadouts</Trans>
             </DialogPrimitive.Title>
             <DialogPrimitive.Close asChild>
-              <Button variant="ghost" size="icon" aria-label="Close">
+              <Button variant="ghost" size="icon" aria-label={t`Close`}>
                 <X className="size-4" />
               </Button>
             </DialogPrimitive.Close>
@@ -111,6 +114,7 @@ function FamilyTable({
   onSwitch,
   moduleName,
 }: Props) {
+  const { t } = useLingui();
   const source = useWeaponSource(project);
   const [showSame, setShowSame] = useState(false);
   const family = loadoutFamily(
@@ -122,6 +126,9 @@ function FamilyTable({
 
   const same = family.rows.filter((row) => !row.differs);
   const shown = family.rows.filter((row) => row.differs || showSame);
+  const sameCount = same.length;
+  const switchLabel = (name: string) => t`Switch to ${name}`;
+  const fromLabel = (source: string) => t`from ${source}`;
 
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-3 px-5 pt-4 pb-3">
@@ -132,7 +139,10 @@ function FamilyTable({
           onCheckedChange={(checked) => setShowSame(checked === true)}
         />
         <Label htmlFor="lego-family-same">
-          Show {same.length} identical {same.length === 1 ? "row" : "rows"}
+          {plural(sameCount, {
+            one: "Show # identical row",
+            other: "Show # identical rows",
+          })}
         </Label>
       </div>
 
@@ -150,7 +160,7 @@ function FamilyTable({
                   <button
                     type="button"
                     onClick={() => onSwitch(column.id)}
-                    aria-label={`Switch to ${column.name}`}
+                    aria-label={switchLabel(column.name)}
                     aria-current={column.active ? "true" : undefined}
                     className={cn(
                       "flex w-full flex-col items-center gap-1 rounded-md border p-2 text-center hover:bg-accent",
@@ -166,7 +176,7 @@ function FamilyTable({
                         />
                       ) : (
                         <span className="px-1 text-muted-foreground">
-                          Not opened yet
+                          <Trans>Not opened yet</Trans>
                         </span>
                       )}
                     </span>
@@ -175,7 +185,7 @@ function FamilyTable({
                     </span>
                     {column.upgradesFrom ? (
                       <span className="max-w-full truncate text-muted-foreground">
-                        from {column.upgradesFrom}
+                        {fromLabel(column.upgradesFrom)}
                       </span>
                     ) : null}
                     <span className="max-w-full truncate text-muted-foreground">
@@ -201,7 +211,7 @@ function FamilyTable({
                   colSpan={family.columns.length + 1}
                   className="p-3 text-muted-foreground"
                 >
-                  These loadouts are the same.
+                  <Trans>These loadouts are the same.</Trans>
                 </td>
               </tr>
             ) : (
@@ -216,6 +226,7 @@ function FamilyTable({
 }
 
 function Row({ row }: { row: FamilyRow }) {
+  const { t } = useLingui();
   return (
     <tr
       data-differs={row.differs ? "true" : undefined}
@@ -237,7 +248,7 @@ function Row({ row }: { row: FamilyRow }) {
               row.over?.includes(index) && "text-destructive",
             )}
           >
-            {cell ?? <span className="text-muted-foreground">None</span>}
+            {cell ?? <span className="text-muted-foreground">{t`None`}</span>}
           </span>
           {row.changes?.[index] ? (
             <span className="ml-1 text-muted-foreground">
@@ -245,10 +256,14 @@ function Row({ row }: { row: FamilyRow }) {
             </span>
           ) : null}
           {row.highest?.includes(index) ? (
-            <span className="ml-1 text-muted-foreground">highest</span>
+            <span className="ml-1 text-muted-foreground">
+              <Trans>highest</Trans>
+            </span>
           ) : null}
           {row.lowest?.includes(index) ? (
-            <span className="ml-1 text-muted-foreground">lowest</span>
+            <span className="ml-1 text-muted-foreground">
+              <Trans>lowest</Trans>
+            </span>
           ) : null}
         </td>
       ))}
