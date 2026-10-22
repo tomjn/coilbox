@@ -4125,6 +4125,25 @@ export function roleLabel(id: string): string {
   return ROLES.find((role) => role.id === id)?.label ?? id;
 }
 
+/** A role as a noun inside a sentence, "Barrel is turret". Falls back to the
+ *  label for roles with no noun form, such as legs. */
+export function roleNoun(id: string): string {
+  // ICU select keys cannot hold a dot.
+  const roleId = id.replaceAll(".", "_");
+  const label = roleLabel(id);
+  return select(roleId, {
+    buildarm_nano: "nano emit point",
+    aim: "aim point",
+    flare: "muzzle flare",
+    turret: "turret",
+    barrel: "barrel",
+    buildarm_base: "build arm base",
+    buildarm_arm: "build arm",
+    wheel: "wheel",
+    other: label,
+  });
+}
+
 /**
  * Which local axes (0 = x, 1 = y, 2 = z) a role's rotation actually turns
  * about, read off every preset's `track` above rather than assumed.

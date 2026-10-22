@@ -19,7 +19,7 @@
  */
 
 import { i18n, type MessageDescriptor } from "@lingui/core";
-import { msg, select } from "@lingui/core/macro";
+import { msg } from "@lingui/core/macro";
 import { Trans, useLingui } from "@lingui/react/macro";
 import { FileCode, Loader2 } from "lucide-react";
 
@@ -28,7 +28,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import type { AdoptedScript } from "../../adoptGameScript";
-import { roleLabel } from "../../animPresets";
+import { roleNoun } from "../../animPresets";
 import type { RoleProposal } from "../../inferRoles";
 
 interface Props {
@@ -164,19 +164,8 @@ function Found({
               </p>
               {rows.map((row) => {
                 const pieceName = row.pieceName;
-                const roleId = row.role.replaceAll(".", "_");
-                const roleName = roleLabel(row.role);
-                const sentence = t`${pieceName} is ${select(roleId, {
-                  buildarm_nano: "nano emit point",
-                  aim: "aim point",
-                  flare: "muzzle flare",
-                  turret: "turret",
-                  barrel: "barrel",
-                  buildarm_base: "build arm base",
-                  buildarm_arm: "build arm",
-                  wheel: "wheel",
-                  other: roleName,
-                })}`;
+                const roleName = roleNoun(row.role);
+                const sentence = t`${pieceName} is ${roleName}`;
                 return (
                   <div key={row.pieceName} className="flex items-center gap-2">
                     <Checkbox
