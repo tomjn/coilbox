@@ -17896,7 +17896,7 @@ msgstr "Datentabelle"
 #: src/workshop/pages/ProjectsPage.tsx
 #, fuzzy
 msgid "Date created"
-msgstr "Erstellungsdatum"
+msgstr "Erstellt"
 
 #: src/multiplayer/chat/MemberActionsMenu.tsx
 #: src/multiplayer/DaysField.tsx
@@ -21405,7 +21405,7 @@ msgstr "Empfohlen"
 #: src/content/libraryGames.ts
 #, fuzzy
 msgid "Featured first"
-msgstr "Empfohlene zuerst"
+msgstr "Empfohlen"
 
 #: src/mapconv/pages/components/AdvancedOptions.tsx
 #, fuzzy
@@ -26116,7 +26116,7 @@ msgstr "Beitritt fehlgeschlagen: {lastJoinError}"
 #: src/multiplayer/chat/ChannelBrowser.tsx
 #, fuzzy
 msgid "Join or create a channel…"
-msgstr "Kanal betreten oder erstellen…"
+msgstr "Kanal öffnen oder anlegen…"
 
 #: src/direct/JoinRoomForm.tsx
 #, fuzzy
@@ -26825,7 +26825,7 @@ msgstr "Am wenigsten"
 #: src/content/pages/ReplaysPage.tsx
 #, fuzzy
 msgid "Least {metricName}"
-msgstr "Am wenigsten {metricName}"
+msgstr "Min. {metricName}"
 
 #: src/multiplayer/battle/BattleRoomHeader.tsx
 #: src/multiplayer/battles/BattleRow.tsx
@@ -29243,7 +29243,7 @@ msgstr "Am meisten"
 #: src/content/pages/ReplaysPage.tsx
 #, fuzzy
 msgid "Most {metricName}"
-msgstr "Meiste {metricName}"
+msgstr "Max. {metricName}"
 
 #: src/components/HeatLegend.tsx
 #, fuzzy
@@ -51319,7 +51319,7 @@ msgstr "Unbekanntes Feld \"{identifier}\". Versuchen Sie hp, speed, cost, metal,
 #: src/content/pages/ReplaysPage.tsx
 #, fuzzy
 msgid "Unknown origin"
-msgstr "Unbekannte Herkunft"
+msgstr "Unbekannt"
 
 #: src/deeplink/parse.ts
 #, fuzzy
