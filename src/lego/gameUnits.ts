@@ -8,6 +8,7 @@
  * Pure, so the rules are testable without unitsync or a webview.
  */
 
+import { t } from "@lingui/core/macro";
 import type { GameItem } from "@/content/bindings";
 import type { GameModelRow } from "./gameModels";
 import type { LegoProject } from "./model";
@@ -32,12 +33,13 @@ export function browseSource(
   if (!own || refusal) {
     return {
       state: "no-game",
-      message: refusal ?? "This unit is for no game. Choose a game first.",
+      message: refusal ?? t`This unit is for no game. Choose a game first.`,
     };
   }
   const game = installedGameFor(own, installed);
   if (!game) {
-    return { state: "not-installed", message: `${own.name} is not installed.` };
+    const ownName = own.name;
+    return { state: "not-installed", message: t`${ownName} is not installed.` };
   }
   return { state: "ready", game };
 }

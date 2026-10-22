@@ -25,6 +25,7 @@
  * is told which way the unit sets off.
  */
 
+import { t } from "@lingui/core/macro";
 import {
   unitAccelerationOf,
   unitBrakeRateOf,
@@ -207,11 +208,36 @@ export function driveMotion(project: LegoProject): DriveSource {
 export type DrivePath = "straight" | "bend" | "circle" | "behind" | "own";
 
 export const DRIVE_PATHS: { value: DrivePath; label: string }[] = [
-  { value: "straight", label: "Straight ahead" },
-  { value: "bend", label: "Turning right" },
-  { value: "circle", label: "A circle to the left" },
-  { value: "behind", label: "Behind the unit" },
-  { value: "own", label: "Your own path" },
+  {
+    value: "straight",
+    get label() {
+      return t`Straight ahead`;
+    },
+  },
+  {
+    value: "bend",
+    get label() {
+      return t`Turning right`;
+    },
+  },
+  {
+    value: "circle",
+    get label() {
+      return t`A circle to the left`;
+    },
+  },
+  {
+    value: "behind",
+    get label() {
+      return t`Behind the unit`;
+    },
+  },
+  {
+    value: "own",
+    get label() {
+      return t`Your own path`;
+    },
+  },
 ];
 
 /** Points on the circle. Close enough together that heading for the next one

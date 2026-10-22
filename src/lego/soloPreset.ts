@@ -5,6 +5,7 @@
  * carries only that preset, so the project itself is never edited.
  */
 
+import { t } from "@lingui/core/macro";
 import { presetById } from "./animPresets";
 import { presetRoles } from "./luaScript";
 import type { LegoProject } from "./model";
@@ -53,8 +54,12 @@ export const SOLO_SCENARIOS: Record<string, string> = {
 /** Presets that change no piece, so a solo run only shows where something comes
  *  from. The row says so. */
 export const SOLO_MOVES_NOTHING: Record<string, string> = {
-  "build.nano": "Moves nothing. The run shows where the spray comes from.",
-  "wake.moving": "Moves nothing. The run shows where the wake comes from.",
+  get "build.nano"() {
+    return t`Moves nothing. The run shows where the spray comes from.`;
+  },
+  get "wake.moving"() {
+    return t`Moves nothing. The run shows where the wake comes from.`;
+  },
 };
 
 export function soloScenario(presetId: string): string | undefined {

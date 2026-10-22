@@ -16,6 +16,7 @@
  * the game's own file may have one the game maker wrote by hand.
  */
 
+import { plural, t } from "@lingui/core/macro";
 import { insertCompound } from "./compounds";
 import {
   type LegoPiece,
@@ -57,9 +58,11 @@ export function builderKind(
   if (!isBuilder(project)) return null;
   const movement = project.movement;
   if (movesInGame(movement)) {
+    const moveClass = movement.moveClass;
+    const speed = movement.speed;
     return {
       kind: "mobile",
-      reason: `it moves on ${movement.moveClass} at ${movement.speed}`,
+      reason: t`it moves on ${moveClass} at ${speed}`,
     };
   }
   const yardmap = entryNamed(gameDef, "yardmap");
@@ -67,13 +70,13 @@ export function builderKind(
     project.builder?.factory ||
     (typeof yardmap === "string" && yardmap !== "")
   ) {
-    return { kind: "factory", reason: "it cannot move and has a yardmap" };
+    return { kind: "factory", reason: t`it cannot move and has a yardmap` };
   }
   return {
     kind: "static",
     reason: movement?.moveClass.trim()
-      ? "it has no speed"
-      : "it has no movement class",
+      ? t`it has no speed`
+      : t`it has no movement class`,
   };
 }
 
@@ -82,13 +85,19 @@ const NAMED_UNITS = 4;
 
 /** One line on what a builder builds, from its build list. */
 export function buildsLine(options: string[]): string {
-  if (options.length === 0) return "Builds nothing yet.";
+  if (options.length === 0) return t`Builds nothing yet.`;
   const named = options.slice(0, NAMED_UNITS).join(", ");
   const rest = options.length - NAMED_UNITS;
-  const count = `${options.length} ${options.length === 1 ? "unit" : "units"}`;
+  const total = options.length;
   return rest > 0
-    ? `Builds ${count}: ${named} and ${rest} more.`
-    : `Builds ${count}: ${named}.`;
+    ? plural(total, {
+        one: `Builds # unit: ${named} and ${rest} more.`,
+        other: `Builds # units: ${named} and ${rest} more.`,
+      })
+    : plural(total, {
+        one: `Builds # unit: ${named}.`,
+        other: `Builds # units: ${named}.`,
+      });
 }
 
 /** The three parts of geometry the arm is made from. */

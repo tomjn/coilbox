@@ -10,6 +10,7 @@
  * nothing else, and the format's shape is `crates/coilbox-s3o`'s `Model`.
  */
 
+import { t } from "@lingui/core/macro";
 import * as THREE from "three";
 
 import { ENGINE_ROTATION_ORDER, type TrackDelta } from "./animPresets";
@@ -139,8 +140,10 @@ export function assertShapesKnown(project: LegoProject): void {
     (p) => p.shape && !isKnownShapeKind(p.shape.kind),
   );
   if (piece?.shape) {
+    const pieceName = piece.name;
+    const kind = piece.shape.kind;
     throw new Error(
-      `"${piece.name}" is a "${piece.shape.kind}" shape, which this version of coilbox cannot make, so it cannot be exported. Delete the piece or update coilbox.`,
+      t`"${pieceName}" is a "${kind}" shape, which this version of coilbox cannot make, so it cannot be exported. Delete the piece or update coilbox.`,
     );
   }
 }

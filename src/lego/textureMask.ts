@@ -16,6 +16,7 @@
  * Pure, so the rule can be tested without a webview or a texture store.
  */
 
+import { t } from "@lingui/core/macro";
 import type { LegoTexture } from "./model";
 
 /**
@@ -56,9 +57,7 @@ export function maskLoss(
 /** What to tell somebody looking at a unit missing its markings. */
 export function maskLossNote(loss: MaskLoss): string | null {
   if (loss === null) return null;
-  const why =
-    "This texture has no alpha channel, and that is where the model keeps its team-colour mask, so the unit draws with no markings. Coilbox stored it before it started keeping the alpha.";
   return loss === "refresh"
-    ? `${why} Refresh re-reads the file it came from and puts the mask back.`
-    : `${why} There is no file to re-read, because it came out of a packed archive, so importing the unit again is what gets the mask back.`;
+    ? t`This texture has no alpha channel, and that is where the model keeps its team-colour mask, so the unit draws with no markings. Coilbox stored it before it started keeping the alpha. Refresh re-reads the file it came from and puts the mask back.`
+    : t`This texture has no alpha channel, and that is where the model keeps its team-colour mask, so the unit draws with no markings. Coilbox stored it before it started keeping the alpha. There is no file to re-read, because it came out of a packed archive, so importing the unit again is what gets the mask back.`;
 }

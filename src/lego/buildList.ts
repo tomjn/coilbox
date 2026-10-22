@@ -16,6 +16,7 @@
  * mutator then leaves the file out and says why.
  */
 
+import { t } from "@lingui/core/macro";
 import type { UnitDatasetEntry } from "@/content/bindings";
 import { isValidUnitKey } from "@/workshop/clones";
 
@@ -63,16 +64,16 @@ export function buildListEntries(
   for (const { unitName, builtBy } of units) {
     if (builtBy.length === 0) continue;
     if (!isValidUnitKey(unitName)) {
-      leftOut.push(`${unitName} cannot go on a build list.`);
+      leftOut.push(t`${unitName} cannot go on a build list.`);
       continue;
     }
     const kept: string[] = [];
     for (const builder of builtBy) {
       if (!isValidUnitKey(builder)) {
-        leftOut.push(`${builder} cannot build ${unitName}.`);
+        leftOut.push(t`${builder} cannot build ${unitName}.`);
       } else if (known && !Object.hasOwn(known, builder)) {
         leftOut.push(
-          `${builder} is not in ${gameName}, so it does not build ${unitName}.`,
+          t`${builder} is not in ${gameName}, so it does not build ${unitName}.`,
         );
       } else if (!kept.includes(builder)) {
         kept.push(builder);

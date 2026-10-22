@@ -14,6 +14,7 @@
  * `LegoProject.movement` (issue #3324).
  */
 
+import { t } from "@lingui/core/macro";
 import {
   climbableDegrees,
   DEFAULT_MAX_SLOPE,
@@ -105,12 +106,13 @@ export function movementProblems(project: LegoProject): Problem[] {
   if (project.movement) return [];
   const kinds = builtAs(project);
   if (kinds.length === 0) return [];
-  const parts = kinds.includes("kbot") ? "legs" : "wheels or tracks";
   return [
     problem(
       "skeleton",
       "warning",
-      `It has ${parts} but no movement class, so it exports as a building.`,
+      kinds.includes("kbot")
+        ? t`It has legs but no movement class, so it exports as a building.`
+        : t`It has wheels or tracks but no movement class, so it exports as a building.`,
     ),
   ];
 }
@@ -268,7 +270,7 @@ export function suggestMotion(
         game.units,
         new Set(sameKind.map((entry) => entry.name.toLowerCase())),
       ),
-      label: `on ${KIND_LABEL[kind]} classes`,
+      label: `on ${KIND_WORD[kind]} classes`,
     });
   }
 
@@ -447,6 +449,25 @@ function setBankingAllowed(
 
 /** The kinds in words, for the picker and for where a number came from. */
 export const KIND_LABEL: Record<MoveKind, string> = {
+  get tank() {
+    return t`vehicle`;
+  },
+  get kbot() {
+    return t`walker`;
+  },
+  get hover() {
+    return t`hover`;
+  },
+  get ship() {
+    return t`ship`;
+  },
+};
+
+/**
+ * The same words as {@link KIND_LABEL}, always English. Where a number came from
+ * is written into the unit's document, so it does not follow the app language.
+ */
+const KIND_WORD: Record<MoveKind, string> = {
   tank: "vehicle",
   kbot: "walker",
   hover: "hover",
@@ -514,7 +535,7 @@ export function movementState(input: {
     return {
       state: "error",
       gameName,
-      message: input.error ?? "The game's definitions could not be read.",
+      message: input.error ?? t`The game's definitions could not be read.`,
     };
   }
   if (input.status !== "ready" || !input.game) {
@@ -559,16 +580,20 @@ export function slopeVerdict(
       )
     : undefined;
   if (!move) {
-    return `Climbing limit unknown: ${name}'s maxSlope is not read from the game.`;
+    return t`Climbing limit unknown: ${name}'s maxSlope is not read from the game.`;
   }
   const limit = climbableDegrees(move);
-  if (limit === null) return `${name} is a ship class, which has no maxSlope.`;
-  const written =
-    move.maxSlope === undefined
-      ? `default maxSlope ${DEFAULT_MAX_SLOPE[move.kind]}`
-      : `maxSlope ${move.maxSlope}`;
-  const reach = `climbs up to ${degreesText(limit)}\u00b0 (${written})`;
-  return degrees <= limit + 1e-9
-    ? `${name} can climb this: it ${reach}.`
-    : `${name} cannot climb this: it ${reach}.`;
+  if (limit === null) return t`${name} is a ship class, which has no maxSlope.`;
+  const reaches = degrees <= limit + 1e-9;
+  const up = degreesText(limit);
+  if (move.maxSlope === undefined) {
+    const slope = String(DEFAULT_MAX_SLOPE[move.kind]);
+    return reaches
+      ? t`${name} can climb this: it climbs up to ${up}° (default maxSlope ${slope}).`
+      : t`${name} cannot climb this: it climbs up to ${up}° (default maxSlope ${slope}).`;
+  }
+  const slope = String(move.maxSlope);
+  return reaches
+    ? t`${name} can climb this: it climbs up to ${up}° (maxSlope ${slope}).`
+    : t`${name} cannot climb this: it climbs up to ${up}° (maxSlope ${slope}).`;
 }

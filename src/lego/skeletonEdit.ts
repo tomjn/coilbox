@@ -12,6 +12,7 @@
  * alone by one that does not.
  */
 
+import { t } from "@lingui/core/macro";
 import * as THREE from "three";
 
 import {
@@ -273,7 +274,7 @@ export function resetToPlan(
   }
 
   const name = (id: string | null) =>
-    filled.pieces.find((p) => p.id === id)?.name ?? "the unit";
+    filled.pieces.find((p) => p.id === id)?.name ?? t`the unit`;
   const moved: LegoPiece[] = [];
   const reparented: ResetReparent[] = [];
   const placed = filled.pieces.map((piece): LegoPiece => {

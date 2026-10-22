@@ -6,6 +6,7 @@
  * covers both and the builder never has to ask twice.
  */
 
+import { t } from "@lingui/core/macro";
 import { useMemo } from "react";
 import { legoThumbUrl } from "../lib/assetUrl";
 import { createDocumentStore } from "../lib/documentStore";
@@ -116,7 +117,7 @@ export async function saveCompound(
 
 export async function deleteCompound(id: string): Promise<void> {
   if (isBuiltInModule({ id })) {
-    throw new Error("A built in module cannot be deleted.");
+    throw new Error(t`A built in module cannot be deleted.`);
   }
   await legoDelete({ kind: "compound", id });
   await refreshProjects();
@@ -175,7 +176,7 @@ export async function savePicture(
   const blob = await new Promise<Blob | null>((resolve) =>
     picture.toBlob(resolve, "image/png"),
   );
-  if (!blob) throw new Error("The picture could not be encoded as a PNG.");
+  if (!blob) throw new Error(t`The picture could not be encoded as a PNG.`);
   const bytes = new Uint8Array(await blob.arrayBuffer());
   await legoPictureSave({ id, png: Array.from(bytes) });
 }

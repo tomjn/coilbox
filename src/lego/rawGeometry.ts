@@ -16,6 +16,7 @@
  * exactly as a part does.
  */
 
+import { plural, t } from "@lingui/core/macro";
 import { gunzipSync } from "fflate";
 import * as THREE from "three";
 
@@ -60,17 +61,20 @@ export interface RawGeometry {
  */
 export function parseRawGeometry(blob: Uint8Array): RawGeometry {
   if (blob.length < BLOB_HEADER_SIZE) {
-    throw new Error("the geometry file is too short to be one");
+    throw new Error(t`the geometry file is too short to be one`);
   }
   const view = new DataView(blob.buffer, blob.byteOffset, blob.byteLength);
   const magic = String.fromCharCode(...blob.subarray(0, 8));
   if (magic !== BLOB_MAGIC) {
-    throw new Error("the geometry file does not start with the expected magic");
+    throw new Error(
+      t`the geometry file does not start with the expected magic`,
+    );
   }
   const version = view.getUint32(8, true);
   if (version !== SUPPORTED_BLOB_VERSION) {
+    const supported = SUPPORTED_BLOB_VERSION;
     throw new Error(
-      `the geometry file is version ${version}, this build understands ${SUPPORTED_BLOB_VERSION}`,
+      t`the geometry file is version ${version}, this build understands ${supported}`,
     );
   }
 
@@ -81,7 +85,7 @@ export function parseRawGeometry(blob: Uint8Array): RawGeometry {
   const directoryOffset = view.getUint32(32, true);
   const directoryBytes = view.getUint32(36, true);
   if (directoryOffset + directoryBytes > blob.length) {
-    throw new Error("the geometry file is truncated");
+    throw new Error(t`the geometry file is truncated`);
   }
 
   // Copy rather than view: the blob comes out of gunzip at an arbitrary byte
@@ -100,7 +104,7 @@ export function parseRawGeometry(blob: Uint8Array): RawGeometry {
   try {
     meshes = JSON.parse(directory) as RawMesh[];
   } catch {
-    throw new Error("the geometry file's index is not readable");
+    throw new Error(t`the geometry file's index is not readable`);
   }
 
   return {
@@ -220,7 +224,7 @@ export async function loadRawGeometry(projectId: string): Promise<RawGeometry> {
   const raw = await loadRawGeometryIfAny(projectId);
   if (!raw) {
     throw new Error(
-      "this unit's geometry file is missing (404). It was written when the model was imported, and it is the only copy of the meshes.",
+      t`this unit's geometry file is missing (404). It was written when the model was imported, and it is the only copy of the meshes.`,
     );
   }
   return raw;
@@ -236,8 +240,9 @@ export async function loadRawGeometryIfAny(
   const response = await fetch(legoGeometryUrl(projectId));
   if (response.status === 404) return null;
   if (!response.ok) {
+    const status = response.status;
     throw new Error(
-      `this unit's geometry file could not be read (${response.status}). It is the only copy of the meshes.`,
+      t`this unit's geometry file could not be read (${status}). It is the only copy of the meshes.`,
     );
   }
   const packed = new Uint8Array(await response.arrayBuffer());
@@ -482,9 +487,11 @@ export function rawGeometryProblems(
     problem(
       "geometry",
       "warning",
-      missing === 1
-        ? "1 piece names geometry this unit does not have, so it shows nothing. Geometry belongs to the unit it was imported into."
-        : `${missing} pieces name geometry this unit does not have, so they show nothing. Geometry belongs to the unit it was imported into.`,
+      plural(missing, {
+        one: "# piece names geometry this unit does not have, so it shows nothing. Geometry belongs to the unit it was imported into.",
+        other:
+          "# pieces name geometry this unit does not have, so they show nothing. Geometry belongs to the unit it was imported into.",
+      }),
       lost.map((piece) => piece.id),
     ),
   ];

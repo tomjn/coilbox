@@ -13,6 +13,7 @@
  * alone.
  */
 
+import { t } from "@lingui/core/macro";
 import { receiptFor } from "./exportRecord";
 import { loadoutUnit, loadoutUnitNames } from "./loadouts";
 import type { LegoProject } from "./model";
@@ -191,9 +192,11 @@ export function lockedExportedUnits(
       const entry = loadouts?.find((l) => l.id === lock.loadoutId);
       const receipt = receiptFor(entry ?? project, gameFolder);
       if (!receipt) continue;
+      const loadoutName = entry?.name ?? "";
+      const projectName = project.name;
       out.push({
         name: receipt.unitName.toLowerCase(),
-        label: entry ? `${entry.name} of ${project.name}` : project.name,
+        label: entry ? t`${loadoutName} of ${projectName}` : projectName,
       });
     }
   }

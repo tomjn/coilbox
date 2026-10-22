@@ -5,6 +5,7 @@
  * Each function returns the message to show, or null when the user cancelled.
  */
 
+import { t } from "@lingui/core/macro";
 import { ask, open, save } from "@tauri-apps/plugin-dialog";
 
 import type { NotifyInput } from "@/notify/notify";
@@ -18,7 +19,7 @@ import {
 } from "./moduleFile";
 import { saveCompound } from "./projects";
 
-const FILTERS = [{ name: "Coilbox module", extensions: ["json"] }];
+const filters = () => [{ name: t`Coilbox module`, extensions: ["json"] }];
 
 function message(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
@@ -29,9 +30,9 @@ export async function saveModuleToFile(
   module: LegoProject,
 ): Promise<NotifyInput | null> {
   const target = await save({
-    title: "Save the module",
+    title: t`Save the module`,
     defaultPath: `${module.name}.coilbox-module.json`,
-    filters: FILTERS,
+    filters: filters(),
   });
   if (typeof target !== "string") return null;
   try {
@@ -41,12 +42,13 @@ export async function saveModuleToFile(
     });
   } catch (error) {
     return {
-      title: "Could not save the module",
+      title: t`Could not save the module`,
       body: message(error),
       level: "error",
     };
   }
-  return { title: `Saved ${module.name}`, body: target, level: "success" };
+  const name = module.name;
+  return { title: t`Saved ${name}`, body: target, level: "success" };
 }
 
 /**
@@ -58,15 +60,15 @@ export async function loadModuleFromFile(
   knownPartIds: ReadonlySet<string>,
 ): Promise<NotifyInput | null> {
   const picked = await open({
-    title: "Load a module",
+    title: t`Load a module`,
     multiple: false,
     directory: false,
-    filters: FILTERS,
+    filters: filters(),
   });
   if (typeof picked !== "string") return null;
 
   const failed = (body: string): NotifyInput => ({
-    title: "Could not load the module",
+    title: t`Could not load the module`,
     body,
     level: "error",
   });
@@ -81,13 +83,14 @@ export async function loadModuleFromFile(
   if (!parsed.ok) return failed(parsed.reason);
 
   const { project, missingParts } = parsed.piece;
+  const installedName = project.name;
   const replace = needsChoice(project, existing)
     ? await ask(
-        `A module with this id is already installed: ${project.name}.`,
+        t`A module with this id is already installed: ${installedName}.`,
         {
-          title: "Load a module",
-          okLabel: "Replace",
-          cancelLabel: "Keep both",
+          title: t`Load a module`,
+          okLabel: t`Replace`,
+          cancelLabel: t`Keep both`,
         },
       )
     : false;
@@ -103,12 +106,14 @@ export async function loadModuleFromFile(
     return failed(message(error));
   }
 
+  const loadedName = toSave.name;
   if (missingParts.length > 0) {
+    const parts = missingParts.join(", ");
     return {
-      title: `Loaded ${toSave.name}, with parts missing`,
-      body: `No installed pack has the parts for: ${missingParts.join(", ")}.`,
+      title: t`Loaded ${loadedName}, with parts missing`,
+      body: t`No installed pack has the parts for: ${parts}.`,
       level: "warning",
     };
   }
-  return { title: `Loaded ${toSave.name}`, level: "success" };
+  return { title: t`Loaded ${loadedName}`, level: "success" };
 }

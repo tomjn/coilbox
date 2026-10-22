@@ -27,6 +27,7 @@
  * project or weapon is gone is left out of the slots and reported.
  */
 
+import { t } from "@lingui/core/macro";
 import type { CompiledMod } from "@/workshop/compile";
 import { type WeaponInput, weaponStats } from "@/workshop/derivedStats";
 import { EMPTY_EDITS, type ModProject } from "@/workshop/project";
@@ -194,19 +195,22 @@ export function weaponExportPlan(
   for (const { piece, weapon, fires } of mountedWeapons(project)) {
     if (fires.from === "library") {
       const source = projects.find((p) => p.id === fires.projectId);
+      const key = fires.key;
       if (!source) {
-        plan.missing.push(`${fires.key}: its workshop project is gone.`);
+        plan.missing.push(t`${key}: its workshop project is gone.`);
         continue;
       }
+      const sourceName = source.name;
       if (!source.edits.weapons?.[fires.key]) {
-        plan.missing.push(`${fires.key} is no longer in ${source.name}.`);
+        plan.missing.push(t`${key} is no longer in ${sourceName}.`);
         continue;
       }
       // One file per name on this unit, so two projects cannot both have one.
       const taken = plan.files.find((file) => file.key === fires.key);
       if (taken && taken.project.id !== source.id) {
+        const takenName = taken.project.name;
         plan.missing.push(
-          `${fires.key} from ${source.name}: ${taken.project.name} has a weapon of the same name on this unit.`,
+          t`${key} from ${sourceName}: ${takenName} has a weapon of the same name on this unit.`,
         );
         continue;
       }
@@ -323,15 +327,20 @@ export function pickedWeapon(
 ): { def: Record<string, unknown> } | { problem: string } | null {
   if (ref.from === "library") {
     const source = projects.find((p) => p.id === ref.projectId);
-    if (!source) return { problem: "Its workshop project is gone." };
+    if (!source) return { problem: t`Its workshop project is gone.` };
     const weapon = source.edits.weapons?.[ref.key];
-    if (!weapon) return { problem: `No longer in ${source.name}.` };
+    if (!weapon) {
+      const sourceName = source.name;
+      return { problem: t`No longer in ${sourceName}.` };
+    }
     return { def: libraryWeaponDef(weapon) };
   }
   // Nothing to say until the game is read.
   if (!weaponDefs) return null;
   const def = weaponDefs[ref.name.toLowerCase()];
-  return def ? { def } : { problem: `${gameName} has no weapon of that name.` };
+  return def
+    ? { def }
+    : { problem: t`${gameName} has no weapon of that name.` };
 }
 
 /** What an export writes for the unit's weapons, files and all. */
@@ -358,7 +367,7 @@ export async function exportWeapons(
   const missing = [...plan.missing];
   for (const { key, project: source } of plan.files) {
     let contents: string | null = null;
-    let reason = "the workshop wrote no file for it";
+    let reason = t`the workshop wrote no file for it`;
     try {
       contents = pickWeaponFile(
         await compile(weaponFileProject(unit, key, source)),
@@ -370,7 +379,8 @@ export async function exportWeapons(
     }
     if (contents === null) {
       failed.add(libraryWeaponName(unit, key));
-      missing.push(`${key} from ${source.name}: ${reason}.`);
+      const sourceName = source.name;
+      missing.push(t`${key} from ${sourceName}: ${reason}.`);
     } else {
       files.push({ name: weaponFileName(unit, key), contents });
     }
@@ -414,7 +424,8 @@ export async function scratchWeapons(
     ) {
       return piece;
     }
-    absent.push(`${fires.name} (not in this game).`);
+    const weaponName = fires.name;
+    absent.push(t`${weaponName} (not in this game).`);
     const { fires: _fires, ...weapon } = piece.weapon;
     return { ...piece, weapon };
   });
@@ -434,11 +445,14 @@ function figure(n: number): string {
 /** Range, damage and reload in one line, from `weaponStats`. */
 export function weaponSummary(def: WeaponInput["def"]): string {
   const stats = weaponStats({ def });
-  const damage =
-    stats.alphaDamage !== null
-      ? `${figure(stats.alphaDamage)} damage`
-      : `no damage (${stats.omitted})`;
-  return `Range ${figure(stats.range)}, ${damage}, reloads in ${figure(stats.cycleSeconds)}s`;
+  const range = figure(stats.range);
+  const reload = figure(stats.cycleSeconds);
+  if (stats.alphaDamage !== null) {
+    const damage = figure(stats.alphaDamage);
+    return t`Range ${range}, ${damage} damage, reloads in ${reload}s`;
+  }
+  const omitted = String(stats.omitted);
+  return t`Range ${range}, no damage (${omitted}), reloads in ${reload}s`;
 }
 
 /** The two parts of geometry the module is made from. */

@@ -28,6 +28,7 @@
  * everything (`docs/lego-builder.md`, "Test in game").
  */
 
+import { t } from "@lingui/core/macro";
 import type { GameItem, StartPos } from "@/content/bindings";
 import {
   loadUnitsyncMinimap,
@@ -224,7 +225,7 @@ export function buildDownloadMenu(
   if (!builder) return `${header.join("\n")}\n`;
   for (const name of [builder, unitName]) {
     if (!isValidUnitKey(name.toLowerCase())) {
-      throw new Error(`${name} cannot go on a build menu.`);
+      throw new Error(t`${name} cannot go on a build menu.`);
     }
   }
   const lines = [
@@ -402,7 +403,7 @@ export async function prepareSandbox(opts: {
   );
   if (!spot) {
     throw new Error(
-      `${mapName} has no start positions, so there is nowhere to put the targets. Pick another map.`,
+      t`${mapName} has no start positions, so there is nowhere to put the targets. Pick another map.`,
     );
   }
 

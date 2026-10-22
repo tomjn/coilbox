@@ -8,6 +8,7 @@
  * names the piece to select. None of them blocks saving or export.
  */
 
+import { t } from "@lingui/core/macro";
 import * as THREE from "three";
 
 import { isSupportRole, SAME_POSITION, worldGeometry } from "./balance";
@@ -102,11 +103,15 @@ function feetOffGround(
       lowest = origins.get(piece.id)?.[1];
     }
     if (lowest === undefined || Math.abs(lowest) <= SAME_POSITION) continue;
+    const pieceName = piece.name;
+    const distance = elmos(Math.abs(lowest));
     out.push(
       problem(
         "skeleton",
         "warning",
-        `"${piece.name}" is ${elmos(Math.abs(lowest))} elmos ${lowest > 0 ? "above" : "below"} the ground.`,
+        lowest > 0
+          ? t`"${pieceName}" is ${distance} elmos above the ground.`
+          : t`"${pieceName}" is ${distance} elmos below the ground.`,
         [piece.id],
       ),
     );
@@ -131,11 +136,12 @@ function pivotsAwayFromJoints(
     // put the origin, so it is left out.
     const bbox = piece.meshId ? undefined : pieceOwnBox(pack, piece);
     if (!bbox || currentPivot({ bbox }, piece.pivot) !== "middle") continue;
+    const pieceName = piece.name;
     out.push(
       problem(
         "skeleton",
         "warning",
-        `"${piece.name}" turns about its middle, not its joint.`,
+        t`"${pieceName}" turns about its middle, not its joint.`,
         [piece.id],
       ),
     );
@@ -205,13 +211,16 @@ function mismatchedSides(
   for (const piece of sided) {
     const isLeft = /^leg\.l/.test(piece.role);
     const others = sided.filter((p) => p.role === mirrorRole(piece.role));
+    const pieceName = piece.name;
     if (others.length === 0) {
       found.push({
         piece,
         problem: problem(
           "skeleton",
           "warning",
-          `"${piece.name}" has no ${isLeft ? "right" : "left"} side piece.`,
+          isLeft
+            ? t`"${pieceName}" has no right side piece.`
+            : t`"${pieceName}" has no left side piece.`,
           [piece.id],
         ),
       });
@@ -245,12 +254,13 @@ function mismatchedSides(
         );
     }
     if (!matches) {
+      const otherName = other.name;
       found.push({
         piece,
         problem: problem(
           "skeleton",
           "warning",
-          `"${other.name}" does not mirror "${piece.name}".`,
+          t`"${otherName}" does not mirror "${pieceName}".`,
           [other.id, piece.id],
         ),
       });

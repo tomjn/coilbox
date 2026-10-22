@@ -18,6 +18,7 @@
  * Pure, so it can be tested without Tauri.
  */
 
+import { t } from "@lingui/core/macro";
 import type { GameItem } from "@/content/bindings";
 import type { S3oImport } from "./bindings";
 import { selectionAsCompound } from "./compounds";
@@ -158,8 +159,13 @@ export function withMeshBoxes(
 
 /** The credit for one lifted piece: "From Beyond All Reason, unit armcom". */
 export function liftCredit(lifted: LegoLifted): string {
-  const what = lifted.unit ? `unit ${lifted.unit}` : `model ${lifted.member}`;
-  return `From ${lifted.game.name}, ${what}`;
+  const gameName = lifted.game.name;
+  if (lifted.unit) {
+    const unit = lifted.unit;
+    return t`From ${gameName}, unit ${unit}`;
+  }
+  const member = lifted.member;
+  return t`From ${gameName}, model ${member}`;
 }
 
 /** Every game and unit the pieces of this document were lifted from, once each. */
@@ -188,7 +194,7 @@ export function liftedModuleRefusal(
   );
   if (sources.length === 0) return null;
   if (project.imported)
-    return "Lifted pieces go into a unit built from parts, not one opened from a model.";
+    return t`Lifted pieces go into a unit built from parts, not one opened from a model.`;
   // Every piece is checked, since a module can hold pieces from two games.
   for (const from of sources) {
     const refused = liftRefusal(project, from.game, installed);

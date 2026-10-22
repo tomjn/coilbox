@@ -21,6 +21,7 @@
  * Format: docs/reference/lego-parts-pack.md.
  */
 
+import { plural, t } from "@lingui/core/macro";
 import { gunzipSync } from "fflate";
 import * as THREE from "three";
 
@@ -236,7 +237,7 @@ export function readSwatches(value: unknown): {
   if (!Array.isArray(value)) {
     return {
       usable: [],
-      problem: 'states "swatches" that are not a list, so it offers no shapes.',
+      problem: t`states "swatches" that are not a list, so it offers no shapes.`,
     };
   }
   const usable: ShapeSwatch[] = [];
@@ -275,7 +276,11 @@ export function readSwatches(value: unknown): {
     problem:
       refused === 0
         ? null
-        : `states ${refused} ${refused === 1 ? "swatch" : "swatches"} that cannot be used, so shapes cannot take ${refused === 1 ? "it" : "them"}.`,
+        : plural(refused, {
+            one: "states # swatch that cannot be used, so shapes cannot take it.",
+            other:
+              "states # swatches that cannot be used, so shapes cannot take them.",
+          }),
   };
 }
 
@@ -293,8 +298,7 @@ export function readRoundPanels(value: unknown): {
   if (!Array.isArray(value)) {
     return {
       usable: [],
-      problem:
-        'states "roundPanels" that are not a list, so shapes cannot show them.',
+      problem: t`states "roundPanels" that are not a list, so shapes cannot show them.`,
     };
   }
   const usable: ShapeRoundPanel[] = [];
@@ -324,7 +328,11 @@ export function readRoundPanels(value: unknown): {
     problem:
       refused === 0
         ? null
-        : `states ${refused} ${refused === 1 ? "round panel" : "round panels"} that cannot be used, so shapes cannot show ${refused === 1 ? "it" : "them"}.`,
+        : plural(refused, {
+            one: "states # round panel that cannot be used, so shapes cannot show it.",
+            other:
+              "states # round panels that cannot be used, so shapes cannot show them.",
+          }),
   };
 }
 
@@ -361,22 +369,29 @@ export function extensionProblem(
   folder: string,
 ): string | null {
   if (raw.schemaVersion !== SUPPORTED_SCHEMA) {
-    return `"${folder}" uses pack schema ${raw.schemaVersion}, and this build understands ${SUPPORTED_SCHEMA}.`;
+    const schema = raw.schemaVersion;
+    const supported = SUPPORTED_SCHEMA;
+    return t`"${folder}" uses pack schema ${schema}, and this build understands ${supported}.`;
   }
   if (!raw.id) {
-    return `"${folder}" has no pack id.`;
+    return t`"${folder}" has no pack id.`;
   }
   if (raw.id === base.id) {
-    return `"${folder}" calls itself "${raw.id}", which is the base pack's own id.`;
+    const id = raw.id;
+    return t`"${folder}" calls itself "${id}", which is the base pack's own id.`;
   }
   if (!raw.extends) {
-    return `"${folder}" names no base pack, so it cannot be added to one. An extension pack sets "extends" to the id of the pack whose atlas it uses, and an atlas pack sets "reskins" to the id of the pack whose atlas it replaces.`;
+    return t`"${folder}" names no base pack, so it cannot be added to one. An extension pack sets "extends" to the id of the pack whose atlas it uses, and an atlas pack sets "reskins" to the id of the pack whose atlas it replaces.`;
   }
   if (raw.extends !== base.id) {
-    return `"${folder}" extends "${raw.extends}", and the installed base pack is "${base.id}".`;
+    const extended = raw.extends;
+    const baseId = base.id;
+    return t`"${folder}" extends "${extended}", and the installed base pack is "${baseId}".`;
   }
   if (raw.textures && raw.textures.tex1 !== base.textures.tex1) {
-    return `"${folder}" names its own texture, "${raw.textures.tex1}", rather than the base pack's "${base.textures.tex1}". A unit samples one texture, so a pack with its own atlas cannot be mixed into another.`;
+    const own = raw.textures.tex1;
+    const baseTexture = base.textures.tex1;
+    return t`"${folder}" names its own texture, "${own}", rather than the base pack's "${baseTexture}". A unit samples one texture, so a pack with its own atlas cannot be mixed into another.`;
   }
   return null;
 }
@@ -406,33 +421,38 @@ export function readAtlasPack(
   installed: LegoAtlas[],
 ): AtlasPackResult {
   if (raw.schemaVersion !== SUPPORTED_SCHEMA) {
+    const schema = raw.schemaVersion;
+    const supported = SUPPORTED_SCHEMA;
     return {
-      problem: `"${folder}" uses pack schema ${raw.schemaVersion}, and this build understands ${SUPPORTED_SCHEMA}.`,
+      problem: t`"${folder}" uses pack schema ${schema}, and this build understands ${supported}.`,
     };
   }
   if (!raw.id) {
-    return { problem: `"${folder}" has no pack id.` };
+    return { problem: t`"${folder}" has no pack id.` };
   }
   if (raw.reskins !== base.id) {
+    const reskinned = raw.reskins;
+    const baseId = base.id;
     return {
-      problem: `"${folder}" reskins "${raw.reskins}", and the installed base pack is "${base.id}".`,
+      problem: t`"${folder}" reskins "${reskinned}", and the installed base pack is "${baseId}".`,
     };
   }
   if (raw.parts !== undefined || raw.geometry !== undefined) {
     return {
-      problem: `"${folder}" brings parts as well as an atlas. An atlas pack reskins the parts that are already there, so it has no "parts" and no "geometry" of its own.`,
+      problem: t`"${folder}" brings parts as well as an atlas. An atlas pack reskins the parts that are already there, so it has no "parts" and no "geometry" of its own.`,
     };
   }
   const tex1 = raw.textures?.tex1;
   if (!tex1) {
     return {
-      problem: `"${folder}" names no texture, so there is no atlas to use. An atlas pack sets "textures.tex1" to the name of the PNG it ships.`,
+      problem: t`"${folder}" names no texture, so there is no atlas to use. An atlas pack sets "textures.tex1" to the name of the PNG it ships.`,
     };
   }
   const clash = installed.find((atlas) => atlas.tex1 === tex1);
   if (clash) {
+    const owner = clash.packId;
     return {
-      problem: `"${folder}" ships its atlas as "${tex1}", which is what "${clash.packId}" already calls its own. Two atlases in one game folder need different file names.`,
+      problem: t`"${folder}" ships its atlas as "${tex1}", which is what "${owner}" already calls its own. Two atlases in one game folder need different file names.`,
     };
   }
   return { atlas: { tex1, packId: raw.id, folder } };
@@ -458,8 +478,10 @@ export function mergePacks(sources: PackSource[]): MergedPacks {
   // extension pack cannot move it, so it is settled before the packs are read.
   const baseUnit = base.manifest.unit;
   if (baseUnit !== undefined && !isUnit(baseUnit)) {
+    const baseId = base.manifest.id;
+    const fallback = DEFAULT_PART_UNIT;
     problems.push(
-      `"${base.manifest.id}" states a unit of ${baseUnit}, which is not a positive number. The unit is ${DEFAULT_PART_UNIT} instead.`,
+      t`"${baseId}" states a unit of ${baseUnit}, which is not a positive number. The unit is ${fallback} instead.`,
     );
   }
   const unit = isUnit(baseUnit) ? baseUnit : DEFAULT_PART_UNIT;
@@ -488,8 +510,10 @@ export function mergePacks(sources: PackSource[]): MergedPacks {
       source.manifest.unit !== undefined &&
       source.manifest.unit !== unit
     ) {
+      const packId = source.manifest.id;
+      const stated = source.manifest.unit;
       problems.push(
-        `"${source.manifest.id}" states a unit of ${source.manifest.unit}, and the library's is ${unit}, the base pack's. A unit built from several packs has one step size, so this one is ignored.`,
+        t`"${packId}" states a unit of ${stated}, and the library's is ${unit}, the base pack's. A unit built from several packs has one step size, so this one is ignored.`,
       );
     }
     for (const part of source.manifest.parts) {
@@ -513,14 +537,25 @@ export function mergePacks(sources: PackSource[]): MergedPacks {
       byId.set(moved.id, moved);
     }
     if (taken > 0) {
+      const packId = source.manifest.id;
       problems.push(
-        `"${source.manifest.id}" reuses ${taken} part ${taken === 1 ? "id" : "ids"} an earlier pack already uses. Those parts were skipped, so a part id always means the same geometry.`,
+        plural(taken, {
+          one: `"${packId}" reuses # part id an earlier pack already uses. Those parts were skipped, so a part id always means the same geometry.`,
+          other: `"${packId}" reuses # part ids an earlier pack already uses. Those parts were skipped, so a part id always means the same geometry.`,
+        }),
       );
     }
     if (unusable.length > 0) {
       const [first] = unusable;
+      const packId = source.manifest.id;
+      const firstName = first.name;
+      const firstProblem = first.problem;
+      const unusableCount = unusable.length;
       problems.push(
-        `"${source.manifest.id}" states connectors that cannot be used for ${unusable.length} ${unusable.length === 1 ? "part" : "parts"}, which get the connectors their bounding boxes give them. The first is "${first.name}": ${first.problem}.`,
+        plural(unusableCount, {
+          one: `"${packId}" states connectors that cannot be used for # part, which get the connectors their bounding boxes give them. The first is "${firstName}": ${firstProblem}.`,
+          other: `"${packId}" states connectors that cannot be used for # parts, which get the connectors their bounding boxes give them. The first is "${firstName}": ${firstProblem}.`,
+        }),
       );
     }
     vertexBlocks.push(source.vertices);
@@ -584,22 +619,25 @@ export function projectPackProblems(
   const problems: Problem[] = [];
   const installed = pack.library.packs.map((manifest) => manifest.id);
   if (project.packId && !installed.includes(project.packId)) {
+    const builtAgainst = project.packId;
     problems.push(
       problem(
         "pack",
         "warning",
-        `This unit was built against the "${project.packId}" pack, and that pack is not installed.`,
+        t`This unit was built against the "${builtAgainst}" pack, and that pack is not installed.`,
       ),
     );
   }
 
   const atlas = unitAtlas(project, pack.library.atlases);
   if (!atlas.installed) {
+    const texture = atlas.texture;
+    const drawnWith = atlas.drawWith.tex1;
     problems.push(
       problem(
         "pack",
         "warning",
-        `This unit's atlas, "${atlas.texture}", is not installed, so it is drawn with "${atlas.drawWith.tex1}" instead. An export still names its own.`,
+        t`This unit's atlas, "${texture}", is not installed, so it is drawn with "${drawnWith}" instead. An export still names its own.`,
       ),
     );
   }
@@ -613,9 +651,11 @@ export function projectPackProblems(
       problem(
         "pack",
         "warning",
-        missing === 1
-          ? "1 piece names a part no installed pack has, so it shows no geometry."
-          : `${missing} pieces name parts no installed pack has, so they show no geometry.`,
+        plural(missing, {
+          one: "# piece names a part no installed pack has, so it shows no geometry.",
+          other:
+            "# pieces name parts no installed pack has, so they show no geometry.",
+        }),
         lost.map((piece) => piece.id),
       ),
     );
@@ -626,14 +666,17 @@ export function projectPackProblems(
   const unknown = project.pieces.filter(
     (piece) => piece.shape && !isKnownShapeKind(piece.shape.kind),
   );
-  if (unknown.length > 0) {
+  const unknownShapes = unknown.length;
+  if (unknownShapes > 0) {
     problems.push(
       problem(
         "pack",
         "warning",
-        unknown.length === 1
-          ? "1 piece is a shape this version of coilbox cannot make, so it shows no geometry."
-          : `${unknown.length} pieces are shapes this version of coilbox cannot make, so they show no geometry.`,
+        plural(unknownShapes, {
+          one: "# piece is a shape this version of coilbox cannot make, so it shows no geometry.",
+          other:
+            "# pieces are shapes this version of coilbox cannot make, so they show no geometry.",
+        }),
         unknown.map((piece) => piece.id),
       ),
     );
@@ -645,11 +688,12 @@ export function projectPackProblems(
   for (const id of broken) {
     const piece = project.pieces.find((p) => p.id === id);
     if (piece?.parentId === null) continue;
+    const pieceName = piece?.name ?? id;
     problems.push(
       problem(
         "pack",
         "warning",
-        `"${piece?.name}" is joined by a connector that its part or its parent's part does not have, so it stays where it was.`,
+        t`"${pieceName}" is joined by a connector that its part or its parent's part does not have, so it stays where it was.`,
         [id],
       ),
     );
@@ -711,9 +755,8 @@ async function fetchLibrary(): Promise<LoadedPack> {
     dir = installed.dir;
     names = installed.names;
   } catch (error) {
-    problems.push(
-      `Could not look for extension packs: ${error instanceof Error ? error.message : String(error)}`,
-    );
+    const reason = error instanceof Error ? error.message : String(error);
+    problems.push(t`Could not look for extension packs: ${reason}`);
   }
 
   for (const folder of names) {
@@ -767,16 +810,18 @@ async function fetchPack(
   const manifest =
     known ?? (await fetchJson<LegoPackManifest>(url("pack.json")));
   if (manifest.schemaVersion !== SUPPORTED_SCHEMA) {
+    const schema = manifest.schemaVersion;
+    const supported = SUPPORTED_SCHEMA;
     throw new Error(
-      `parts pack uses schema ${manifest.schemaVersion}, this build understands ${SUPPORTED_SCHEMA}`,
+      t`parts pack uses schema ${schema}, this build understands ${supported}`,
     );
   }
 
   const response = await fetch(url(manifest.geometry.file));
   if (!response.ok) {
-    throw new Error(
-      `could not read ${manifest.geometry.file}: ${response.status}`,
-    );
+    const file = manifest.geometry.file;
+    const status = response.status;
+    throw new Error(t`could not read ${file}: ${status}`);
   }
   const raw = new Uint8Array(await response.arrayBuffer());
   const blob = manifest.geometry.encoding === "gzip" ? gunzipSync(raw) : raw;
@@ -785,8 +830,12 @@ async function fetchPack(
   // with the wrong blob indexes the wrong bytes and draws nonsense rather than
   // failing. That happens whenever a pack is replaced under a running app.
   if (blob.length !== manifest.geometry.bytes) {
+    const packId = manifest.id;
+    const described = manifest.geometry.bytes;
+    const file = manifest.geometry.file;
+    const held = blob.length;
     throw new Error(
-      `parts pack "${manifest.id}" is inconsistent: the manifest describes ${manifest.geometry.bytes} bytes of geometry but ${manifest.geometry.file} holds ${blob.length}. Reload, and rebuild the pack if it persists.`,
+      t`parts pack "${packId}" is inconsistent: the manifest describes ${described} bytes of geometry but ${file} holds ${held}. Reload, and rebuild the pack if it persists.`,
     );
   }
 
@@ -797,12 +846,13 @@ function readBlob(blob: Uint8Array) {
   const view = new DataView(blob.buffer, blob.byteOffset, blob.byteLength);
   const magic = String.fromCharCode(...blob.subarray(0, 8));
   if (magic !== BLOB_MAGIC) {
-    throw new Error("parts blob does not start with the expected magic");
+    throw new Error(t`parts blob does not start with the expected magic`);
   }
   const version = view.getUint32(8, true);
   if (version !== SUPPORTED_BLOB_VERSION) {
+    const supported = SUPPORTED_BLOB_VERSION;
     throw new Error(
-      `parts blob is version ${version}, this build understands ${SUPPORTED_BLOB_VERSION}`,
+      t`parts blob is version ${version}, this build understands ${supported}`,
     );
   }
 
@@ -826,7 +876,8 @@ function readBlob(blob: Uint8Array) {
 async function fetchJson<T>(url: string): Promise<T> {
   const response = await fetch(url);
   if (!response.ok) {
-    throw new Error(`could not read the parts pack: ${response.status}`);
+    const status = response.status;
+    throw new Error(t`could not read the parts pack: ${status}`);
   }
   return (await response.json()) as T;
 }

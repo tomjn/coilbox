@@ -1,3 +1,5 @@
+import { t } from "@lingui/core/macro";
+
 /**
  * A Lua unit script gets its call-ins by exact name, so a definition that is
  * close but not exact never runs, and nothing says so at load: the script
@@ -151,7 +153,7 @@ export function lintLuaCallins(lua: string): CallinLintProblem[] {
         problems.push({
           line,
           severity: "warning",
-          message: `\`unit_script.lua\` only reads numbered weapon call-ins when the script defines \`AimWeapon1\` or \`AimShield1\`, and this one defines neither, so \`${name}\` is never called.`,
+          message: t`\`unit_script.lua\` only reads numbered weapon call-ins when the script defines \`AimWeapon1\` or \`AimShield1\`, and this one defines neither, so \`${name}\` is never called.`,
         });
       }
       continue;
@@ -161,10 +163,12 @@ export function lintLuaCallins(lua: string): CallinLintProblem[] {
       (callin) => callin.toLowerCase() === name.toLowerCase(),
     );
     if (nearMiss) {
+      const callin = `script.${nearMiss}`;
+      const written = `script.${name}`;
       problems.push({
         line,
         severity: "warning",
-        message: `The engine calls \`script.${nearMiss}\`, not \`script.${name}\`, so this never runs.`,
+        message: t`The engine calls \`${callin}\`, not \`${written}\`, so this never runs.`,
       });
     }
   }

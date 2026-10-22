@@ -10,6 +10,7 @@
  * position, and that is also where the viewport's plates sit.
  */
 
+import { plural, t } from "@lingui/core/macro";
 import { formatNumber } from "@/lib/format";
 import { roleLabel } from "./animPresets";
 import { SAME_POSITION } from "./balance";
@@ -150,7 +151,7 @@ export function checkFootprint(
 ): FootprintResult {
   const { world, ranges } = bakedPieces(project, pack, raw);
   if (world.length === 0) {
-    return { status: "notApplicable", reason: "The unit has no geometry." };
+    return { status: "notApplicable", reason: t`The unit has no geometry.` };
   }
 
   const left = new Set<number>();
@@ -192,38 +193,45 @@ export function checkFootprint(
   };
 }
 
-function elmos(steps: Footprint): string {
-  return `${steps.x * ELMOS_PER_FOOTPRINT} by ${steps.z * ELMOS_PER_FOOTPRINT} elmos`;
-}
-
-function plural(count: number): string {
-  return count === 1 ? "1 step" : `${count} steps`;
-}
-
 /** What the viewport says about a result, one line each. */
 export function footprintLines(result: FootprintResult): string[] {
   if (result.status === "notApplicable") {
-    return [`Footprint not checked. ${result.reason}`];
+    return [t`Footprint not checked. The unit has no geometry.`];
   }
   const { now, base } = result;
-  const lines = [`Footprint ${now.x}x${now.z} steps, ${elmos(now)}.`];
+  const nowX = now.x;
+  const nowZ = now.z;
+  const elmosX = now.x * ELMOS_PER_FOOTPRINT;
+  const elmosZ = now.z * ELMOS_PER_FOOTPRINT;
+  const lines = [
+    t`Footprint ${nowX}x${nowZ} steps, ${elmosX} by ${elmosZ} elmos.`,
+  ];
   if (result.outlying.length > 0) {
     const names = result.outlyingRoles
       .map((role) => roleLabel(role).toLowerCase())
       .join(", ");
-    lines.push(`Without ${names}: ${base.x}x${base.z}.`);
+    const baseX = base.x;
+    const baseZ = base.z;
+    lines.push(t`Without ${names}: ${baseX}x${baseZ}.`);
   }
   if (result.differs && result.written) {
-    const from = result.written.source === "game" ? "The game has" : "Exported";
+    const writtenX = result.written.x;
+    const writtenZ = result.written.z;
     lines.push(
-      `${from} ${result.written.x}x${result.written.z}, now ${now.x}x${now.z}. The exported definition is not updated by a re-export.`,
+      result.written.source === "game"
+        ? t`The game has ${writtenX}x${writtenZ}, now ${nowX}x${nowZ}. The exported definition is not updated by a re-export.`
+        : t`Exported ${writtenX}x${writtenZ}, now ${nowX}x${nowZ}. The exported definition is not updated by a re-export.`,
     );
   }
   const { wasted } = result;
   for (const axis of ["x", "z"] as const) {
-    if (wasted[axis] > 0) {
+    const steps = wasted[axis];
+    if (steps > 0) {
       lines.push(
-        `Footprint is ${plural(wasted[axis])} bigger than the base on ${axis}.`,
+        plural(steps, {
+          one: `Footprint is # step bigger than the base on ${axis}.`,
+          other: `Footprint is # steps bigger than the base on ${axis}.`,
+        }),
       );
     }
   }
@@ -235,13 +243,16 @@ export function footprintProblems(result: FootprintResult): Problem[] {
   if (result.status !== "ok") return [];
   const { overhang, written, now } = result;
   const inForce = written ?? now;
+  const forceX = inForce.x;
+  const forceZ = inForce.z;
   return (["x", "z"] as const)
     .filter((axis) => overhang[axis] > 0)
-    .map((axis) =>
-      problem(
+    .map((axis) => {
+      const by = formatNumber(overhang[axis], { maximumFractionDigits: 2 });
+      return problem(
         "footprint",
         "warning",
-        `Sticks out of its ${inForce.x}x${inForce.z} footprint by ${formatNumber(overhang[axis], { maximumFractionDigits: 2 })} elmos on ${axis}.`,
-      ),
-    );
+        t`Sticks out of its ${forceX}x${forceZ} footprint by ${by} elmos on ${axis}.`,
+      );
+    });
 }

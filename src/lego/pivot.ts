@@ -12,6 +12,7 @@
  * the part's own space, before the piece's rotation and scale.
  */
 
+import { t } from "@lingui/core/macro";
 import * as THREE from "three";
 
 import { childrenOf, type LegoProject, pieceById } from "./model";
@@ -39,13 +40,55 @@ export function pivotChoices(part: Pick<LegoPartInfo, "bbox">): PivotChoice[] {
   ];
 
   return [
-    { id: "middle", label: "Middle", position: mid },
-    { id: "top", label: "Top", position: [mid[0], max[1], mid[2]] },
-    { id: "bottom", label: "Bottom", position: [mid[0], min[1], mid[2]] },
-    { id: "left", label: "Left", position: [min[0], mid[1], mid[2]] },
-    { id: "right", label: "Right", position: [max[0], mid[1], mid[2]] },
-    { id: "back", label: "Back", position: [mid[0], mid[1], min[2]] },
-    { id: "front", label: "Front", position: [mid[0], mid[1], max[2]] },
+    {
+      id: "middle",
+      get label() {
+        return t`Middle`;
+      },
+      position: mid,
+    },
+    {
+      id: "top",
+      get label() {
+        return t`Top`;
+      },
+      position: [mid[0], max[1], mid[2]],
+    },
+    {
+      id: "bottom",
+      get label() {
+        return t`Bottom`;
+      },
+      position: [mid[0], min[1], mid[2]],
+    },
+    {
+      id: "left",
+      get label() {
+        return t`Left`;
+      },
+      position: [min[0], mid[1], mid[2]],
+    },
+    {
+      id: "right",
+      get label() {
+        return t`Right`;
+      },
+      position: [max[0], mid[1], mid[2]],
+    },
+    {
+      id: "back",
+      get label() {
+        return t`Back`;
+      },
+      position: [mid[0], mid[1], min[2]],
+    },
+    {
+      id: "front",
+      get label() {
+        return t`Front`;
+      },
+      position: [mid[0], mid[1], max[2]],
+    },
   ];
 }
 

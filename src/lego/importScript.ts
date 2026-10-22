@@ -16,6 +16,7 @@
  * it is taken apart.
  */
 
+import { plural, t } from "@lingui/core/macro";
 import { actionHooks, STOP_CALLIN, triggerProblem } from "./actions";
 import { pieceNameLiterals, renameScriptPieces } from "./luaPieces";
 import { buildLuaScript } from "./luaScript";
@@ -605,18 +606,22 @@ export function importScript(
 
 /** What an import did, in one short line for a notice. */
 export function importSummary(result: ScriptImport): string {
+  const actions = result.actions;
   const parts = [
     result.as === "actions"
-      ? `Read as ${result.actions} ${result.actions === 1 ? "action" : "actions"}.`
-      : "Kept as this unit's own script.",
+      ? plural(actions, {
+          one: "Read as # action.",
+          other: "Read as # actions.",
+        })
+      : t`Kept as this unit's own script.`,
   ];
   if (result.renamed.length > 0) {
-    parts.push(
-      `Renamed ${result.renamed.map((r) => `${r.from} to ${r.to}`).join(", ")}.`,
-    );
+    const renamed = result.renamed.map((r) => `${r.from} → ${r.to}`).join(", ");
+    parts.push(t`Renamed ${renamed}.`);
   }
   if (result.unmatched.length > 0) {
-    parts.push(`Not on this unit: ${result.unmatched.join(", ")}.`);
+    const unmatched = result.unmatched.join(", ");
+    parts.push(t`Not on this unit: ${unmatched}.`);
   }
   return parts.join(" ");
 }

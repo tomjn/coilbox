@@ -10,6 +10,7 @@
  * (issue #3245). For those the file's value is the unit's value.
  */
 
+import { t } from "@lingui/core/macro";
 import {
   numberField,
   unitDerivedStats,
@@ -21,11 +22,36 @@ import { withValue } from "./reexport";
 import { DERIVED_FIELDS, defValue } from "./unitDef";
 
 export const STATS = [
-  { id: "cost", label: "Cost" },
-  { id: "health", label: "Health" },
-  { id: "speed", label: "Speed" },
-  { id: "range", label: "Range" },
-  { id: "dps", label: "DPS" },
+  {
+    id: "cost",
+    get label() {
+      return t`Cost`;
+    },
+  },
+  {
+    id: "health",
+    get label() {
+      return t`Health`;
+    },
+  },
+  {
+    id: "speed",
+    get label() {
+      return t`Speed`;
+    },
+  },
+  {
+    id: "range",
+    get label() {
+      return t`Range`;
+    },
+  },
+  {
+    id: "dps",
+    get label() {
+      return t`DPS`;
+    },
+  },
 ] as const;
 
 export type StatId = (typeof STATS)[number]["id"];

@@ -8,6 +8,7 @@
  * Pure and DOM-free: the dialogs and the disk are in moduleFileIo.ts.
  */
 
+import { t } from "@lingui/core/macro";
 import {
   CLIPBOARD_MARKER,
   type ClipboardPiece,
@@ -46,14 +47,14 @@ export function parseModuleFile(
   try {
     data = JSON.parse(text);
   } catch {
-    return { ok: false, reason: "The file does not hold JSON." };
+    return { ok: false, reason: t`The file does not hold JSON.` };
   }
   const envelope = (typeof data === "object" ? data : null) as Record<
     string,
     unknown
   > | null;
   if (!envelope || envelope.marker !== CLIPBOARD_MARKER) {
-    return { ok: false, reason: "The file does not hold a module." };
+    return { ok: false, reason: t`The file does not hold a module.` };
   }
   // A clipboard payload has no file version and is accepted as version 1.
   if (
@@ -62,18 +63,22 @@ export function parseModuleFile(
   ) {
     return {
       ok: false,
-      reason: "The file was made by a newer version of coilbox.",
+      reason: t`The file was made by a newer version of coilbox.`,
     };
   }
   const parsed = parseClipboardPiece(text, knownPartIds);
   if (!parsed.ok) {
-    return { ok: false, reason: "The module in the file could not be read." };
+    return {
+      ok: false,
+      reason: t`The module in the file could not be read.`,
+    };
   }
   const unplaced = piecesWithoutGame(envelope.project);
   if (unplaced.length > 0) {
+    const names = unplaced.join(", ");
     return {
       ok: false,
-      reason: `${unplaced.join(", ")} came from a game, but the file does not say which. A piece from a game only goes in units for that game.`,
+      reason: t`${names} came from a game, but the file does not say which. A piece from a game only goes in units for that game.`,
     };
   }
   return parsed;
@@ -91,8 +96,9 @@ function piecesWithoutGame(project: unknown): string[] {
     const p = (piece ?? {}) as { name?: unknown; lifted?: unknown };
     if (p.lifted === undefined || p.lifted === null) return [];
     if (parseLifted(p.lifted)) return [];
+    const position = index + 1;
     return [
-      typeof p.name === "string" && p.name ? p.name : `piece ${index + 1}`,
+      typeof p.name === "string" && p.name ? p.name : t`piece ${position}`,
     ];
   });
 }

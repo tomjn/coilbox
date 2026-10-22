@@ -25,6 +25,7 @@
  * `coilbox-s3o` crate that wrote it.
  */
 
+import { t } from "@lingui/core/macro";
 import * as THREE from "three";
 
 import { exportTextureName, type LegoAtlas } from "./atlas";
@@ -89,15 +90,33 @@ export type S3oRecoveryResult =
  * is the point: a recovered unit that quietly lost its animation would be worse
  * than one that never claimed to have it.
  */
-export const NOT_IN_AN_EXPORT: string[] = [
-  "Roles, tags, hidden pieces and custom anchors.",
-  "Animation presets and the unit script. An export writes the script as its own file, and this reads only the model.",
-  "The unit definition, the collision volume, notes, and where the unit was last exported to.",
-  "Which pieces were dropped in as a module. A module is copied into the unit when it is used, so the copy is all there ever was in the model.",
-  "A rotation or scale on a piece with no geometry, which the format cannot store. It comes back on the pieces below it instead, so the unit is the same shape.",
-  "The axis a mirrored piece was mirrored on. It comes back as a negative scale on x, which is what the builder writes for any reflection.",
-  "Exact numbers. A model stores 32-bit floats where the document stores 64, so positions, rotations and scales come back correct to about the seventh digit.",
-];
+export const NOT_IN_AN_EXPORT: string[] = localisedList([
+  () => t`Roles, tags, hidden pieces and custom anchors.`,
+  () =>
+    t`Animation presets and the unit script. An export writes the script as its own file, and this reads only the model.`,
+  () =>
+    t`The unit definition, the collision volume, notes, and where the unit was last exported to.`,
+  () =>
+    t`Which pieces were dropped in as a module. A module is copied into the unit when it is used, so the copy is all there ever was in the model.`,
+  () =>
+    t`A rotation or scale on a piece with no geometry, which the format cannot store. It comes back on the pieces below it instead, so the unit is the same shape.`,
+  () =>
+    t`The axis a mirrored piece was mirrored on. It comes back as a negative scale on x, which is what the builder writes for any reflection.`,
+  () =>
+    t`Exact numbers. A model stores 32-bit floats where the document stores 64, so positions, rotations and scales come back correct to about the seventh digit.`,
+]);
+
+/**
+ * An array whose entries are worked out each time they are read, so a message
+ * held in a module level list follows the app language.
+ */
+function localisedList(items: (() => string)[]): string[] {
+  const list: string[] = new Array(items.length);
+  items.forEach((item, index) => {
+    Object.defineProperty(list, index, { get: item, enumerable: true });
+  });
+  return list;
+}
 
 /**
  * Which installed atlas a file's texture name points at, if any.
@@ -137,9 +156,13 @@ export function recoverProject(
 
   const strip = nodes.find((node) => node.piece.primitiveType !== 0);
   if (strip) {
+    const stripName = strip.piece.name;
     return {
       ok: false,
-      problem: `"${strip.piece.name}" is drawn as a ${strip.piece.primitiveType === 1 ? "triangle strip" : "quad list"}, and coilbox only ever writes triangles. This model was made somewhere else.`,
+      problem:
+        strip.piece.primitiveType === 1
+          ? t`"${stripName}" is drawn as a triangle strip, and coilbox only ever writes triangles. This model was made somewhere else.`
+          : t`"${stripName}" is drawn as a quad list, and coilbox only ever writes triangles. This model was made somewhere else.`,
     };
   }
 
@@ -147,8 +170,7 @@ export function recoverProject(
   if (geometry.length === 0) {
     return {
       ok: false,
-      problem:
-        "This model has no geometry in it, so there is nothing to match against the parts library.",
+      problem: t`This model has no geometry in it, so there is nothing to match against the parts library.`,
     };
   }
 
@@ -160,9 +182,12 @@ export function recoverProject(
     else unmatched.push(node.piece.name);
   }
   if (unmatched.length > 0) {
+    const unmatchedCount = unmatched.length;
+    const total = geometry.length;
+    const firstUnmatched = unmatched[0];
     return {
       ok: false,
-      problem: `${unmatched.length} of ${geometry.length} pieces are not made of parts from the installed packs, starting with "${unmatched[0]}". A model can only be turned back into a project when every piece is a part from the installed packs. A generated shape or a mesh made elsewhere cannot.`,
+      problem: t`${unmatchedCount} of ${total} pieces are not made of parts from the installed packs, starting with "${firstUnmatched}". A model can only be turned back into a project when every piece is a part from the installed packs. A generated shape or a mesh made elsewhere cannot.`,
     };
   }
 
@@ -318,16 +343,18 @@ function place(
 
   let pivot: THREE.Vector3 | null = null;
   if (part) {
+    const pieceName = node.piece.name;
+    const partName = part.name;
     const fitted = fitPart(pack, part, node.piece.vertices);
     if (fitted === "flat") {
-      return `"${node.piece.name}" is made of the part "${part.name}", whose vertices all lie in one plane. How a flat part was turned cannot be read back off a model, so this unit cannot be rebuilt.`;
+      return t`"${pieceName}" is made of the part "${partName}", whose vertices all lie in one plane. How a flat part was turned cannot be read back off a model, so this unit cannot be rebuilt.`;
     }
     if (fitted === "misfit") {
-      return `"${node.piece.name}" carries the part "${part.name}"'s texture mapping, but no rotation and scale put that part where the file has it. This model was not exported from a project.`;
+      return t`"${pieceName}" carries the part "${partName}"'s texture mapping, but no rotation and scale put that part where the file has it. This model was not exported from a project.`;
     }
     const reversed = fitted.linear.determinant() < 0;
     if (!sameIndices(pack, part, node.piece, reversed)) {
-      return `"${node.piece.name}" has the part "${part.name}" wound the wrong way round for how it is placed. This model was not exported from a project.`;
+      return t`"${pieceName}" has the part "${partName}" wound the wrong way round for how it is placed. This model was not exported from a project.`;
     }
     node.linear = fitted.linear;
     pivot = fitted.pivot;
@@ -336,7 +363,8 @@ function place(
   }
 
   if (parentLinear.determinant() === 0) {
-    return `"${node.piece.name}" hangs off a piece scaled to nothing, so where it sits cannot be worked out.`;
+    const pieceName = node.piece.name;
+    return t`"${pieceName}" hangs off a piece scaled to nothing, so where it sits cannot be worked out.`;
   }
   const parentInverse = parentLinear.clone().invert();
 

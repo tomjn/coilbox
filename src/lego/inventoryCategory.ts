@@ -10,6 +10,7 @@
  * the rules in `filter.ts` and `moduleFilter.ts` do the narrowing.
  */
 
+import { t } from "@lingui/core/macro";
 import { SHAPES_CATEGORY } from "./filter";
 import type { InventoryKind } from "./inventory";
 import type { LegoProject } from "./model";
@@ -138,15 +139,15 @@ export function categoryMenu({
   const groups: MenuGroup[] = [];
   if (kind === "all") {
     if (colourways.length > 0) {
-      groups.push({ label: "Colourways", entries: colourways });
+      groups.push({ label: t`Colourways`, entries: colourways });
     }
     if (moduleCategories.length > 0) {
-      groups.push({ label: "Module categories", entries: moduleCategories });
+      groups.push({ label: t`Module categories`, entries: moduleCategories });
     }
   } else if (kind === "parts") {
     const shapeEntry =
       shapes || current?.kind === "shapes"
-        ? [{ value: categoryValue({ kind: "shapes" }), label: "Shapes" }]
+        ? [{ value: categoryValue({ kind: "shapes" }), label: t`Shapes` }]
         : [];
     groups.push({ entries: [...colourways, ...shapeEntry] });
   } else if (kind === "modules") {
@@ -155,7 +156,7 @@ export function categoryMenu({
         ? [
             {
               value: categoryValue({ kind: "uncategorised" }),
-              label: "Uncategorised",
+              label: t`Uncategorised`,
             },
           ]
         : [];
