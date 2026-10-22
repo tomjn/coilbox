@@ -17,6 +17,21 @@
   --breakpoint-3xl: 128rem;
 }
 
+/* Tektur has no CJK glyphs, so Chinese and Japanese fall through to a system
+   face. They share Han code points but not glyph shapes, and the first CJK font
+   in the stack decides the shape, so each language gets its own stack. */
+:lang(ja) {
+  --font-display:
+    "Tektur Variable", "Hiragino Sans", "Hiragino Kaku Gothic ProN",
+    "Yu Gothic UI", "Yu Gothic", Meiryo, "Noto Sans CJK JP", "Noto Sans JP",
+    ui-sans-serif, system-ui, sans-serif;
+}
+:lang(zh) {
+  --font-display:
+    "Tektur Variable", "PingFang SC", "Microsoft YaHei UI", "Microsoft YaHei",
+    "Noto Sans CJK SC", "Noto Sans SC", ui-sans-serif, system-ui, sans-serif;
+}
+
 /* Width of the sidebar beside the battle room and the singleplayer setup screen
    (`BattleRoomPage`, `SkirmishPage`). Both read it, so the map and the start-box
    editor stay the same size in both places. Above 3xl it becomes a share of the
