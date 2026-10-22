@@ -198,7 +198,7 @@ export default function GeneralSettings() {
           <Sparkles size={15} /> <Trans>Motion &amp; effects</Trans>
         </h2>
         <div className="flex items-start gap-3">
-          <div className="w-40">
+          <div className="w-52">
             <OptionSelect
               value={reduceMotion}
               onValueChange={(v) => setReduceMotion(v as ReduceMotionSetting)}
