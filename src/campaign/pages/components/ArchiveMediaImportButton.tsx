@@ -1,3 +1,4 @@
+import { Trans, useLingui } from "@lingui/react/macro";
 import { Button, Input } from "@picoframe/frame";
 import { join, tempDir } from "@tauri-apps/api/path";
 import { FolderSearch } from "lucide-react";
@@ -70,7 +71,7 @@ export function ArchiveMediaImportButton({
   gameName,
   mediaType,
   imageKind,
-  triggerLabel = "From game files",
+  triggerLabel,
   onImported,
 }: {
   campaignId: string;
@@ -86,6 +87,7 @@ export function ArchiveMediaImportButton({
   triggerLabel?: string;
   onImported: (file: string) => void;
 }) {
+  const { t } = useLingui();
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
   const [selected, setSelected] = useState<string | null>(null);
@@ -200,8 +202,8 @@ export function ArchiveMediaImportButton({
         if (preview?.kind !== "image" || !preview.dataUrl) {
           throw new Error(
             preview?.truncated
-              ? "This image is too large to import from the archive. Use the file picker instead."
-              : "Couldn't read this file as an image.",
+              ? t`This image is too large to import from the archive. Use the file picker instead.`
+              : t`Couldn't read this file as an image.`,
           );
         }
         ({ file } = await campaignImageImportData({
@@ -213,8 +215,8 @@ export function ArchiveMediaImportButton({
         if (preview?.kind !== "audio" || !preview.dataUrl) {
           throw new Error(
             preview?.truncated
-              ? "This clip is too large to import from the archive. Use the file picker instead."
-              : "Couldn't read this file as audio.",
+              ? t`This clip is too large to import from the archive. Use the file picker instead.`
+              : t`Couldn't read this file as audio.`,
           );
         }
         ({ file } = await campaignMediaImportData({
@@ -234,12 +236,26 @@ export function ArchiveMediaImportButton({
     }
   };
 
-  const noun =
+  const searchPlaceholder =
     mediaType === "audio"
-      ? "audio clip"
+      ? t`Search audio clip files…`
       : mediaType === "video"
-        ? "video"
-        : "image";
+        ? t`Search video files…`
+        : t`Search image files…`;
+  const noMatches =
+    mediaType === "audio" ? (
+      <Trans>No audio clip files matched in this game's archive.</Trans>
+    ) : mediaType === "video" ? (
+      <Trans>No video files matched in this game's archive.</Trans>
+    ) : (
+      <Trans>No image files matched in this game's archive.</Trans>
+    );
+  const sizeLabel =
+    selectedEntry?.size != null
+      ? formatBytes(selectedEntry.size)
+      : t`Unknown size`;
+  const scanError = scan.error;
+  const matchCount = filtered.length;
   const resolving = scan.loading || (Boolean(archiveName) && treeLoading);
 
   return (
@@ -252,14 +268,17 @@ export function ArchiveMediaImportButton({
     >
       <PopoverTrigger asChild>
         <Button size="sm" variant="outline" className="gap-1.5">
-          <FolderSearch className="size-4" /> {triggerLabel}
+          <FolderSearch className="size-4" />{" "}
+          {triggerLabel ?? t`From game files`}
         </Button>
       </PopoverTrigger>
       <PopoverContent align="start" className="flex w-96 flex-col gap-3 p-3">
         {!gameName ? (
           <p className="text-xs text-muted-foreground">
-            This mission has no game set yet, so there is no archive to browse.
-            Use the file picker instead.
+            <Trans>
+              This mission has no game set yet, so there is no archive to
+              browse. Use the file picker instead.
+            </Trans>
           </p>
         ) : resolving ? (
           <div className="flex flex-col gap-2">
@@ -268,19 +287,23 @@ export function ArchiveMediaImportButton({
           </div>
         ) : scan.error ? (
           <p className="text-xs text-destructive">
-            The scan of your games failed, so this game&apos;s files can&apos;t
-            be browsed. Use the file picker instead. unitsync said: {scan.error}
+            <Trans>
+              The scan of your games failed, so this game's files can't be
+              browsed. Use the file picker instead. unitsync said: {scanError}
+            </Trans>
           </p>
         ) : !game ? (
           <p className="text-xs text-muted-foreground">
-            &quot;{gameName}&quot; isn&apos;t installed under the current play
-            target, so its files can&apos;t be browsed. Use the file picker
-            instead.
+            <Trans>
+              "{gameName}" isn't installed under the current play target, so its
+              files can't be browsed. Use the file picker instead.
+            </Trans>
           </p>
         ) : !tree ? (
           <p className="text-xs text-muted-foreground">
-            Could not read this game&apos;s archive. Use the file picker
-            instead.
+            <Trans>
+              Could not read this game's archive. Use the file picker instead.
+            </Trans>
           </p>
         ) : (
           <>
@@ -290,13 +313,13 @@ export function ArchiveMediaImportButton({
                 setQuery(e.target.value);
                 setSelected(null);
               }}
-              placeholder={`Search ${noun} files…`}
+              placeholder={searchPlaceholder}
               className="h-8"
             />
             <ul className="flex max-h-40 flex-col overflow-auto rounded-md border border-border/50">
               {visible.length === 0 ? (
                 <li className="p-2 text-xs text-muted-foreground">
-                  No {noun} files matched in this game&apos;s archive.
+                  {noMatches}
                 </li>
               ) : (
                 visible.map((f) => (
@@ -317,8 +340,10 @@ export function ArchiveMediaImportButton({
             </ul>
             {filtered.length > RESULT_LIMIT && (
               <p className="text-xs text-muted-foreground">
-                Showing the first {RESULT_LIMIT} of {filtered.length} matches.
-                Narrow your search to see the rest.
+                <Trans>
+                  Showing the first {RESULT_LIMIT} of {matchCount} matches.
+                  Narrow your search to see the rest.
+                </Trans>
               </p>
             )}
 
@@ -326,11 +351,7 @@ export function ArchiveMediaImportButton({
               <div className="flex flex-col gap-2 rounded-md border border-border/50 bg-muted/20 p-2">
                 {mediaType === "video" ? (
                   <p className="text-xs text-muted-foreground">
-                    {selectedEntry?.size != null
-                      ? formatBytes(selectedEntry.size)
-                      : "Unknown size"}
-                    . No preview before import here. It plays in the field below
-                    once imported.
+                    {t`${sizeLabel}. No preview before import here. It plays in the field below once imported.`}
                   </p>
                 ) : previewLoading ? (
                   <Skeleton className="h-20 w-full" />
@@ -346,15 +367,17 @@ export function ArchiveMediaImportButton({
                 ) : (
                   <p className="text-xs text-muted-foreground">
                     {preview?.truncated
-                      ? "Too large to preview."
-                      : "No preview available for this file."}
+                      ? t`Too large to preview.`
+                      : t`No preview available for this file.`}
                   </p>
                 )}
                 {dup && (
                   <Alert className="p-2">
                     <AlertDescription className="text-xs">
-                      Already imported from this archive earlier this session.
-                      Import again to add a second copy.
+                      <Trans>
+                        Already imported from this archive earlier this session.
+                        Import again to add a second copy.
+                      </Trans>
                     </AlertDescription>
                   </Alert>
                 )}
@@ -374,7 +397,7 @@ export function ArchiveMediaImportButton({
               onClick={doImport}
               disabled={!selected || busy || previewLoading}
             >
-              {busy ? "Importing…" : dup ? "Import again" : "Import"}
+              {busy ? t`Importing…` : dup ? t`Import again` : t`Import`}
             </Button>
           </>
         )}

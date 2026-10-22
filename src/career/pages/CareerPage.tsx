@@ -1,3 +1,5 @@
+import { plural } from "@lingui/core/macro";
+import { Trans, useLingui } from "@lingui/react/macro";
 import { buttonVariants, cn } from "@picoframe/frame";
 import { Award, Bot, Milestone, Orbit, Rocket, Trophy } from "lucide-react";
 import type { ReactNode } from "react";
@@ -13,6 +15,7 @@ import {
   ErrorBanner,
   SkeletonList,
 } from "../../content/pages/components/states";
+import { getLocale } from "../../i18n";
 import { isProfileHidden } from "../../profile/hidden";
 import {
   type AiSummary,
@@ -30,21 +33,6 @@ import {
   useCareer,
 } from "../useCareer";
 
-/** What each source is called in a notice, and what its failure costs. */
-const SOURCE_NOTICE: Record<SourceId, { name: string; effect: string }> = {
-  campaigns: { name: "Campaign progress", effect: "Campaigns are not shown." },
-  conquest: { name: "Conquest records", effect: "Conquests are not shown." },
-  warpath: { name: "Warpath records", effect: "Warpath is not shown." },
-  ai: {
-    name: "Replay records",
-    effect: "The record against AI and achievements are not shown.",
-  },
-  games: {
-    name: "The installed games",
-    effect: "Games are matched by name only.",
-  },
-};
-
 const SOURCE_ORDER: SourceId[] = [
   "campaigns",
   "conquest",
@@ -53,8 +41,11 @@ const SOURCE_ORDER: SourceId[] = [
   "games",
 ];
 
-const plural = (n: number, one: string, many = `${one}s`) =>
-  `${n} ${n === 1 ? one : many}`;
+/** The items in the app language's list style, e.g. `A, B, C` under `en`. */
+const joinList = (parts: string[]) =>
+  new Intl.ListFormat(getLocale(), { type: "unit", style: "long" }).format(
+    parts,
+  );
 
 function SectionHeading({
   icon,
@@ -84,11 +75,33 @@ function SectionHeading({
   );
 }
 
+function CampaignRowStatus({ row }: { row: CampaignRow }) {
+  const { t } = useLingui();
+  const missions = row.missions;
+  const completed = row.completed;
+  const nextMission = row.nextMission;
+  const progress = row.finished
+    ? plural(missions, {
+        one: "Finished, # mission",
+        other: "Finished, # missions",
+      })
+    : plural(missions, {
+        one: `${completed} of # mission`,
+        other: `${completed} of # missions`,
+      });
+  return (
+    <>
+      {progress}
+      {nextMission ? ` · ${t`next: ${nextMission}`}` : ""}
+    </>
+  );
+}
+
 function CampaignsSection({ rows }: { rows: CampaignRow[] }) {
   return (
     <section className="flex flex-col">
       <SectionHeading icon={<Milestone className="size-4" />}>
-        Campaigns
+        <Trans>Campaigns</Trans>
       </SectionHeading>
       <ul className="divide-y divide-border/40">
         {rows.map((row) => (
@@ -105,10 +118,7 @@ function CampaignsSection({ rows }: { rows: CampaignRow[] }) {
               {row.title}
             </Link>
             <span className="shrink-0 text-xs tabular-nums text-muted-foreground">
-              {row.finished
-                ? `Finished, ${plural(row.missions, "mission")}`
-                : `${row.completed} of ${plural(row.missions, "mission")}`}
-              {row.nextMission ? ` · next: ${row.nextMission}` : ""}
+              <CampaignRowStatus row={row} />
             </span>
           </li>
         ))}
@@ -118,20 +128,23 @@ function CampaignsSection({ rows }: { rows: CampaignRow[] }) {
 }
 
 function ConquestSection({ conquest }: { conquest: ConquestSummary }) {
+  const { t } = useLingui();
+  const { won, finished, threatLevel, inProgress } = conquest;
+  const maxThreat = MAX_THREAT_LEVEL;
   const parts = [
-    `${conquest.won} won of ${conquest.finished} finished`,
-    `highest threat level unlocked: ${conquest.threatLevel} of ${MAX_THREAT_LEVEL}`,
+    t`${won} won of ${finished} finished`,
+    t`highest threat level unlocked: ${threatLevel} of ${maxThreat}`,
   ];
-  if (conquest.inProgress > 0) {
-    parts.push(`${conquest.inProgress} in progress`);
+  if (inProgress > 0) {
+    parts.push(t`${inProgress} in progress`);
   }
   return (
     <section>
       <SectionHeading
         icon={<Orbit className="size-4" />}
-        link={{ to: "/conquest", label: "Open Conquest" }}
+        link={{ to: "/conquest", label: t`Open Conquest` }}
       >
-        Conquest
+        <Trans>Conquest</Trans>
       </SectionHeading>
       <p className="text-sm text-muted-foreground">{parts.join(" · ")}</p>
     </section>
@@ -139,23 +152,33 @@ function ConquestSection({ conquest }: { conquest: ConquestSummary }) {
 }
 
 function AiSection({ ai, showLink }: { ai: AiSummary; showLink: boolean }) {
-  const result = [`${ai.wins}W`, `${ai.losses}L`];
-  if (ai.undecided > 0) result.push(`${ai.undecided} undecided`);
+  const { t } = useLingui();
+  const { wins, losses, undecided } = ai;
+  const games = ai.games;
+  const result = [t`${wins}W`, t`${losses}L`];
+  if (undecided > 0) result.push(t`${undecided} undecided`);
+  const gamesText = plural(games, { one: "# game", other: "# games" });
+  const topGames = ai.topAi?.games ?? 0;
+  const topName = ai.topAi?.bonus
+    ? `${ai.topAi.ai} (${ai.topAi.bonus})`
+    : (ai.topAi?.ai ?? "");
+  const mostPlayed = plural(topGames, {
+    one: `most played: ${topName}, # game`,
+    other: `most played: ${topName}, # games`,
+  });
   return (
     <section>
       <SectionHeading
         icon={<Bot className="size-4" />}
         link={
-          showLink ? { to: "/stats", label: "Open Player stats" } : undefined
+          showLink ? { to: "/stats", label: t`Open Player stats` } : undefined
         }
       >
-        Against AI
+        <Trans>Against AI</Trans>
       </SectionHeading>
       <p className="text-sm text-muted-foreground">
-        {plural(ai.games, "game")} · {result.join(" · ")}
-        {ai.topAi
-          ? ` · most played: ${ai.topAi.ai}${ai.topAi.bonus ? ` (${ai.topAi.bonus})` : ""}, ${plural(ai.topAi.games, "game")}`
-          : ""}
+        {gamesText} · {result.join(" · ")}
+        {ai.topAi ? ` · ${mostPlayed}` : ""}
       </p>
     </section>
   );
@@ -163,34 +186,37 @@ function AiSection({ ai, showLink }: { ai: AiSummary; showLink: boolean }) {
 
 /** What a Warpath summary says: the runs, then what the game offers. */
 function WarpathLines({ warpath }: { warpath: WarpathSummary }) {
+  const { t } = useLingui();
+  const { runs, wins, deepest, ascensionTier, maxAscension } = warpath;
+  const loadouts =
+    warpath.loadouts.length > 0 ? joinList(warpath.loadouts) : t`none yet`;
+  const eventPools =
+    warpath.eventPools.length > 0 ? joinList(warpath.eventPools) : t`none yet`;
   return (
     <>
       <p className="flex items-center gap-2 text-sm text-muted-foreground">
         <Rocket className="size-4" />
-        {plural(warpath.runs, "run")} · {plural(warpath.wins, "win")} · deepest
-        column {warpath.deepest} · ascension tier {warpath.ascensionTier} of{" "}
-        {warpath.maxAscension}
+        {plural(runs, { one: "# run", other: "# runs" })} ·{" "}
+        {plural(wins, { one: "# win", other: "# wins" })} ·{" "}
+        {t`deepest column ${deepest}`} ·{" "}
+        {t`ascension tier ${ascensionTier} of ${maxAscension}`}
       </p>
       <p className="text-sm text-muted-foreground">
-        Unlocked loadouts:{" "}
-        {warpath.loadouts.length > 0 ? warpath.loadouts.join(", ") : "none yet"}
-        {" · "}event pools:{" "}
-        {warpath.eventPools.length > 0
-          ? warpath.eventPools.join(", ")
-          : "none yet"}
+        {t`Unlocked loadouts: ${loadouts} · event pools: ${eventPools}`}
       </p>
     </>
   );
 }
 
 function WarpathSection({ warpath }: { warpath: WarpathSummary }) {
+  const { t } = useLingui();
   return (
     <section>
       <SectionHeading
         icon={<Rocket className="size-4" />}
-        link={{ to: "/warpath", label: "Open Warpath" }}
+        link={{ to: "/warpath", label: t`Open Warpath` }}
       >
-        Warpath
+        <Trans>Warpath</Trans>
       </SectionHeading>
       <WarpathLines warpath={warpath} />
     </section>
@@ -221,7 +247,7 @@ function GameCard({
         {game.title}
         {game.installed === false && (
           <Badge variant="outline" className="font-normal">
-            Not installed
+            <Trans>Not installed</Trans>
           </Badge>
         )}
       </h2>
@@ -258,7 +284,7 @@ function LegacyWarpathCard({
         id="career-warpath"
         className="flex items-center gap-2 text-base font-semibold"
       >
-        Earlier Warpath runs
+        <Trans>Earlier Warpath runs</Trans>
         {showLink && (
           <Link
             to="/warpath"
@@ -267,13 +293,15 @@ function LegacyWarpathCard({
               "ml-auto",
             )}
           >
-            Open Warpath
+            <Trans>Open Warpath</Trans>
           </Link>
         )}
       </h2>
       <p className="text-xs text-muted-foreground">
-        Runs from before records were kept per game, or with no game recorded.
-        What they unlocked is offered in every game.
+        <Trans>
+          Runs from before records were kept per game, or with no game recorded.
+          What they unlocked is offered in every game.
+        </Trans>
       </p>
       <WarpathLines warpath={warpath} />
     </section>
@@ -292,6 +320,7 @@ function AchievementsSummary({
   achievements: AchievementResult[] | null;
   statsLink: boolean;
 }) {
+  const { t } = useLingui();
   // A failure is already named by the notice at the top of the page.
   if (status.state === "error") return null;
   const digest = achievements
@@ -300,6 +329,8 @@ function AchievementsSummary({
   const left = digest ? digest.total - digest.shown.length : 0;
   const notEarned = digest ? digest.total - digest.earned : 0;
   const moreEarned = digest ? digest.earned - digest.shown.length : 0;
+  const earned = digest?.earned ?? 0;
+  const total = digest?.total ?? 0;
   return (
     <section
       aria-labelledby="career-achievements"
@@ -310,24 +341,30 @@ function AchievementsSummary({
         className="mb-1 flex items-center gap-2 text-sm font-medium"
       >
         <Trophy className="size-4 text-muted-foreground" />
-        Achievements
+        <Trans>Achievements</Trans>
         {digest && (
           <span className="ml-auto text-xs font-normal tabular-nums text-muted-foreground">
-            {digest.earned} of {digest.total} earned
+            <Trans>
+              {earned} of {total} earned
+            </Trans>
           </span>
         )}
       </h3>
       {status.state === "loading" && !digest && (
-        <p className="text-sm text-muted-foreground">Reading replay records…</p>
+        <p className="text-sm text-muted-foreground">
+          <Trans>Reading replay records…</Trans>
+        </p>
       )}
       {status.state === "ready" && !digest && (
         <p className="text-sm text-muted-foreground">
-          No replay records yet, so there are no achievements to show.
+          <Trans>
+            No replay records yet, so there are no achievements to show.
+          </Trans>
         </p>
       )}
       {digest && digest.shown.length === 0 && (
         <p className="text-sm text-muted-foreground">
-          None earned yet. {digest.total} to go.
+          <Trans>None earned yet. {total} to go.</Trans>
         </p>
       )}
       {digest && digest.shown.length > 0 && (
@@ -339,13 +376,14 @@ function AchievementsSummary({
       )}
       {digest && left > 0 && digest.shown.length > 0 && (
         <p className="mt-1 text-xs text-muted-foreground">
-          {moreEarned > 0 ? `${moreEarned} more earned, ` : ""}
-          {notEarned} not yet earned.
+          {moreEarned > 0
+            ? t`${moreEarned} more earned, ${notEarned} not yet earned.`
+            : t`${notEarned} not yet earned.`}
           {statsLink && (
             <>
               {" "}
               <Link to="/stats" className="text-primary hover:underline">
-                See them all on Player stats
+                <Trans>See them all on Player stats</Trans>
               </Link>
             </>
           )}
@@ -372,8 +410,12 @@ function Overview({
   hideWarpath: boolean;
   hideStats: boolean;
 }) {
+  const { t } = useLingui();
   const { career, sources } = data;
   const totals = careerTotals(career);
+  const aiWins = totals.aiWins;
+  const conquestsFinished = totals.conquestsFinished;
+  const campaignsStarted = totals.campaignsStarted;
   const cards: {
     key: string;
     icon: ReactNode;
@@ -381,22 +423,25 @@ function Overview({
     value: string;
     sub: string;
   }[] = [];
-  if (totals.aiGames > 0) {
+  const aiGames = totals.aiGames;
+  const warpathRuns = totals.warpathRuns;
+  const warpathWins = totals.warpathWins;
+  if (aiGames > 0) {
     cards.push({
       key: "ai",
       icon: <Bot className="size-3.5" />,
-      label: "Games against AI",
-      value: plural(totals.aiGames, "game"),
-      sub: `${totals.aiWins} won`,
+      label: t`Games against AI`,
+      value: plural(aiGames, { one: "# game", other: "# games" }),
+      sub: t`${aiWins} won`,
     });
   }
   if (!hideConquest && totals.conquestsFinished > 0) {
     cards.push({
       key: "conquest",
       icon: <Orbit className="size-3.5" />,
-      label: "Conquests won",
+      label: t`Conquests won`,
       value: String(totals.conquestsWon),
-      sub: `of ${totals.conquestsFinished} finished`,
+      sub: t`of ${conquestsFinished} finished`,
     });
   }
   if (
@@ -406,18 +451,18 @@ function Overview({
     cards.push({
       key: "warpath",
       icon: <Rocket className="size-3.5" />,
-      label: "Warpath",
-      value: plural(totals.warpathRuns, "run"),
-      sub: `${plural(totals.warpathWins, "win")}`,
+      label: t`Warpath`,
+      value: plural(warpathRuns, { one: "# run", other: "# runs" }),
+      sub: plural(warpathWins, { one: "# win", other: "# wins" }),
     });
   }
   if (totals.campaignsStarted > 0) {
     cards.push({
       key: "campaigns",
       icon: <Milestone className="size-3.5" />,
-      label: "Campaigns finished",
+      label: t`Campaigns finished`,
       value: String(totals.campaignsFinished),
-      sub: `of ${totals.campaignsStarted} started`,
+      sub: t`of ${campaignsStarted} started`,
     });
   }
   const statsTo = data.player
@@ -427,7 +472,7 @@ function Overview({
     <section aria-labelledby="career-overview" className="flex flex-col gap-3">
       <div className="flex items-center gap-2">
         <h2 id="career-overview" className="text-base font-semibold">
-          Overview
+          <Trans>Overview</Trans>
         </h2>
         {!hideStats && (
           <Link
@@ -437,7 +482,7 @@ function Overview({
               "ml-auto",
             )}
           >
-            Your player stats
+            <Trans>Your player stats</Trans>
           </Link>
         )}
       </div>
@@ -463,17 +508,47 @@ function SourceNotices({
 }: {
   sources: Record<SourceId, SourceStatus>;
 }) {
+  const { t } = useLingui();
+  const sourceNotice = (id: SourceId, error: string) => {
+    switch (id) {
+      case "campaigns":
+        return t`Campaign progress could not be read. Campaigns are not shown. ${error}`;
+      case "conquest":
+        return t`Conquest records could not be read. Conquests are not shown. ${error}`;
+      case "warpath":
+        return t`Warpath records could not be read. Warpath is not shown. ${error}`;
+      case "ai":
+        return t`Replay records could not be read. The record against AI and achievements are not shown. ${error}`;
+      case "games":
+        return t`The installed games could not be read. Games are matched by name only. ${error}`;
+    }
+  };
+  const sourceName = (id: SourceId) => {
+    switch (id) {
+      case "campaigns":
+        return t`campaign progress`;
+      case "conquest":
+        return t`conquest records`;
+      case "warpath":
+        return t`warpath records`;
+      case "ai":
+        return t`replay records`;
+      case "games":
+        return t`the installed games`;
+    }
+  };
   const failed = SOURCE_ORDER.filter((id) => sources[id].state === "error");
   const warned = SOURCE_ORDER.filter(
     (id) => sources[id].state === "ready" && sources[id].warning,
   );
   const loading = SOURCE_ORDER.filter((id) => sources[id].state === "loading");
+  const stillReading = joinList(loading.map(sourceName));
   return (
     <>
       {failed.map((id) => (
         <ErrorBanner
           key={id}
-          message={`${SOURCE_NOTICE[id].name} could not be read. ${SOURCE_NOTICE[id].effect} ${sources[id].message}`}
+          message={sourceNotice(id, sources[id].message ?? "")}
         />
       ))}
       {warned.map((id) => (
@@ -481,8 +556,7 @@ function SourceNotices({
       ))}
       {loading.length > 0 && (
         <p role="status" className="text-xs text-muted-foreground">
-          Still reading:{" "}
-          {loading.map((id) => SOURCE_NOTICE[id].name.toLowerCase()).join(", ")}
+          {t`Still reading: ${stillReading}`}
         </p>
       )}
     </>
@@ -497,28 +571,36 @@ function StartPoints({
   hideConquest: boolean;
   hideWarpath: boolean;
 }) {
+  const { t } = useLingui();
   const links = [
-    { to: "/play/skirmish", label: "a skirmish against AI" },
-    { to: "/campaign", label: "a campaign" },
-    ...(hideConquest ? [] : [{ to: "/conquest", label: "a Conquest" }]),
-    ...(hideWarpath ? [] : [{ to: "/warpath", label: "a Warpath run" }]),
+    { to: "/play/skirmish", label: t`a skirmish against AI` },
+    { to: "/campaign", label: t`a campaign` },
+    ...(hideConquest ? [] : [{ to: "/conquest", label: t`a Conquest` }]),
+    ...(hideWarpath ? [] : [{ to: "/warpath", label: t`a Warpath run` }]),
   ];
+  const byLabel = new Map(links.map((l) => [l.label, l]));
+  let offset = 0;
+  const options = new Intl.ListFormat(getLocale(), { type: "disjunction" })
+    .formatToParts(links.map((l) => l.label))
+    .map((part) => {
+      const at = offset;
+      offset += part.value.length;
+      const link = part.type === "element" ? byLabel.get(part.value) : null;
+      return link ? (
+        <Link key={at} to={link.to} className="text-primary hover:underline">
+          {link.label}
+        </Link>
+      ) : (
+        <span key={at}>{part.value}</span>
+      );
+    });
   return (
     <EmptyState
       label={
-        <>
+        <Trans>
           Nothing to show yet. Your progress appears here as you play. Start
-          with{" "}
-          {links.map((l, i) => (
-            <span key={l.to}>
-              {i > 0 && (i === links.length - 1 ? " or " : ", ")}
-              <Link to={l.to} className="text-primary hover:underline">
-                {l.label}
-              </Link>
-            </span>
-          ))}
-          .
-        </>
+          with {options}.
+        </Trans>
       }
     />
   );
@@ -565,11 +647,14 @@ export default function CareerPage() {
       <header className="flex flex-col gap-1">
         <h1 className="flex items-center gap-2 text-lg font-semibold">
           <Award className="size-5 text-muted-foreground" />
-          Career
+          <Trans>Career</Trans>
         </h1>
         <p className="text-sm text-muted-foreground">
-          Your progress in each game. It is read from your campaigns, Conquests,
-          Warpath runs and replays, and nothing here can be changed.
+          <Trans>
+            Your progress in each game. It is read from your campaigns,
+            Conquests, Warpath runs and replays, and nothing here can be
+            changed.
+          </Trans>
         </p>
       </header>
 

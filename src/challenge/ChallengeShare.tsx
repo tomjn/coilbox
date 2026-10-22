@@ -1,3 +1,4 @@
+import { useLingui } from "@lingui/react/macro";
 import { type ComponentProps, useState } from "react";
 import { CheckField } from "@/components/Field";
 import { ChallengeCodeView } from "./ChallengeCodeView";
@@ -15,9 +16,11 @@ export function ChallengeShare({
   identity,
   ...view
 }: ComponentProps<typeof ChallengeCodeView> & { identity: string | null }) {
+  const { t } = useLingui();
   const { records } = useChallengeRecords();
   const [include, setInclude] = useState(false);
   const best = identity ? records[identity]?.best : null;
+  const bestText = best ? describeBest(best) : "";
   return (
     <ChallengeCodeView
       {...view}
@@ -25,8 +28,8 @@ export function ChallengeShare({
       extra={
         best ? (
           <CheckField
-            label="Include my best result as text"
-            hint={`Copy code adds a line under the code: "${describeBest(best)}". It is your claim, and coilbox does not check it.`}
+            label={t`Include my best result as text`}
+            hint={t`Copy code adds a line under the code: "${bestText}". It is your claim, and coilbox does not check it.`}
             checked={include}
             onChange={setInclude}
           />

@@ -1,3 +1,4 @@
+import { t } from "@lingui/core/macro";
 import { missingLaunchContent } from "@/play/launchContent";
 
 /** One thing a mission needs and this machine does not have. */
@@ -73,24 +74,23 @@ export function needNotice(input: {
 }): NeedNotice {
   const { need, failure, engineRelease, noWriteRoot } = input;
   if (need.kind === "atlas") {
+    const pack = need.name;
     return {
       canDownload: false,
-      message: `${need.name} is an atlas pack one of this campaign's units is drawn with. Put it in the parts library's extension packs folder and restart coilbox.`,
+      message: t`${pack} is an atlas pack one of this campaign's units is drawn with. Put it in the parts library's extension packs folder and restart coilbox.`,
     };
   }
   if (noWriteRoot) {
     return {
       canDownload: false,
-      message:
-        "Set a download folder in Content folders settings to enable this.",
+      message: t`Set a download folder in Content folders settings to enable this.`,
     };
   }
   if (need.kind === "engine") {
     if (engineRelease === "none") {
       return {
         canDownload: false,
-        message:
-          "No engine build is available to download for this platform. Install one from Settings → Engines.",
+        message: t`No engine build is available to download for this platform. Install one from Settings → Engines.`,
       };
     }
     return {
@@ -99,9 +99,10 @@ export function needNotice(input: {
     };
   }
   if (need.kind === "game" && failure) {
+    const game = need.name;
     return {
       canDownload: true,
-      message: `${need.name} is the exact version this mission was made for, and it could not be downloaded. It may no longer be published, or the download failed (${failure}). Another version will not run this mission.`,
+      message: t`${game} is the exact version this mission was made for, and it could not be downloaded. It may no longer be published, or the download failed (${failure}). Another version will not run this mission.`,
     };
   }
   return { canDownload: true, message: failure };

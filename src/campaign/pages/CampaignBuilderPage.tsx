@@ -1,3 +1,5 @@
+import { plural } from "@lingui/core/macro";
+import { Trans, useLingui } from "@lingui/react/macro";
 import { Button, Input, useDrawer } from "@picoframe/frame";
 import { open, save } from "@tauri-apps/plugin-dialog";
 import { Download, Loader2, Plus, RefreshCw } from "lucide-react";
@@ -71,6 +73,7 @@ function requirementsForCampaign(campaign: Campaign) {
  * the Campaigns page and this one cannot disagree about it.
  */
 export default function CampaignBuilderPage() {
+  const { t } = useLingui();
   const { campaigns, loading, error, refresh } = useCampaigns();
   const navigate = useNavigate();
   const drawer = useDrawer();
@@ -80,7 +83,7 @@ export default function CampaignBuilderPage() {
 
   const openNew = (initialTitle?: string) =>
     drawer.open({
-      title: "New campaign",
+      title: t`New campaign`,
       width: "28rem",
       content: (
         <NewCampaignForm
@@ -100,7 +103,7 @@ export default function CampaignBuilderPage() {
   const presetGame = useGamePresetParam();
   // biome-ignore lint/correctness/useExhaustiveDependencies: run once when the preset arrives, not on every drawer identity change
   useEffect(() => {
-    if (presetGame) openNew(`${presetGame} Campaign`);
+    if (presetGame) openNew(t`${presetGame} Campaign`);
   }, [presetGame]);
 
   const rescan = async () => {
@@ -156,16 +159,16 @@ export default function CampaignBuilderPage() {
     setActionError(null);
     try {
       const src = await open({
-        title: "Import campaign",
+        title: t`Import campaign`,
         multiple: false,
-        filters: [{ name: "Coilbox campaign", extensions: ["json"] }],
+        filters: [{ name: t`Coilbox campaign`, extensions: ["json"] }],
       });
       if (typeof src !== "string") return;
       setBusy(true);
       const { json } = await campaignImport({ src });
       const parsed = parseCampaignExport(json);
       if (!parsed) {
-        setActionError("That file isn't a valid coilbox campaign.");
+        setActionError(t`That file isn't a valid coilbox campaign.`);
         return;
       }
       setPendingCampaign(parsed);
@@ -214,11 +217,12 @@ export default function CampaignBuilderPage() {
       await campaignSave({ id: copy.id, json: JSON.stringify(copy) });
       await refreshCampaigns();
       if (droppedMedia > 0) {
+        const campaignTitle = campaign.title;
         setActionError(
-          `Copied ${campaign.title} as ${title}, but ${droppedMedia} media ` +
-            `file${droppedMedia === 1 ? "" : "s"} could not be read and ${
-              droppedMedia === 1 ? "was" : "were"
-            } left out. The copy is in the list below.`,
+          plural(droppedMedia, {
+            one: `Copied ${campaignTitle} as ${title}, but # media file could not be read and was left out. The copy is in the list below.`,
+            other: `Copied ${campaignTitle} as ${title}, but # media files could not be read and were left out. The copy is in the list below.`,
+          }),
         );
         return;
       }
@@ -250,9 +254,9 @@ export default function CampaignBuilderPage() {
         scan.data?.games ?? [],
       );
       const dest = await save({
-        title: "Export campaign",
+        title: t`Export campaign`,
         defaultPath: `${campaign.title || "campaign"}.json`,
-        filters: [{ name: "Coilbox campaign", extensions: ["json"] }],
+        filters: [{ name: t`Coilbox campaign`, extensions: ["json"] }],
       });
       if (!dest) return;
       await campaignExport({ json: JSON.stringify(file, null, 2), dest });
@@ -264,11 +268,8 @@ export default function CampaignBuilderPage() {
   return (
     <div className="flex flex-col gap-5 p-4">
       <PageHeader
-        title="Campaign Builder"
-        description={
-          "Author a sequence of skirmish missions from your saved presets. " +
-          "Local campaigns are editable; bundled campaigns are read-only."
-        }
+        title={t`Campaign Builder`}
+        description={t`Author a sequence of skirmish missions from your saved presets. Local campaigns are editable; bundled campaigns are read-only.`}
         actions={
           <>
             <Button
@@ -282,7 +283,7 @@ export default function CampaignBuilderPage() {
               ) : (
                 <RefreshCw className="size-4" />
               )}
-              Rescan
+              <Trans>Rescan</Trans>
             </Button>
             <Button
               variant="outline"
@@ -290,10 +291,10 @@ export default function CampaignBuilderPage() {
               onClick={importCampaign}
               disabled={busy}
             >
-              <Download className="size-4" /> Import
+              <Download className="size-4" /> <Trans>Import</Trans>
             </Button>
             <Button className="gap-1.5" onClick={() => openNew()}>
-              <Plus className="size-4" /> New campaign
+              <Plus className="size-4" /> <Trans>New campaign</Trans>
             </Button>
           </>
         }
@@ -305,7 +306,9 @@ export default function CampaignBuilderPage() {
       {loading ? (
         <SkeletonList />
       ) : campaigns.length === 0 ? (
-        <EmptyState label="No campaigns yet. Start one with New campaign, or import a shared one." />
+        <EmptyState
+          label={t`No campaigns yet. Start one with New campaign, or import a shared one.`}
+        />
       ) : (
         <ul className="flex flex-col gap-2">
           {campaigns.map(({ campaign, source }) => {
@@ -347,12 +350,12 @@ export default function CampaignBuilderPage() {
                           variant="outline"
                           className="shrink-0 text-[10px]"
                         >
-                          Draft
+                          <Trans>Draft</Trans>
                         </Badge>
                       )}
                       {bundled && (
                         <span className="shrink-0 rounded bg-muted px-1.5 py-0.5 text-xs text-muted-foreground">
-                          Bundled
+                          <Trans>Bundled</Trans>
                         </span>
                       )}
                     </div>
@@ -391,7 +394,7 @@ export default function CampaignBuilderPage() {
 
       {pendingCampaign && (
         <ResolveContentGate
-          title="Set up this campaign"
+          title={t`Set up this campaign`}
           requirements={requirementsForCampaign(pendingCampaign.campaign)}
           target={target ?? undefined}
           targetLoading={targetLoading}
@@ -418,6 +421,7 @@ function NewCampaignForm({
   /** Seed from game detail's "New campaign" action (issue #372). */
   initialTitle?: string;
 }) {
+  const { t } = useLingui();
   const [title, setTitle] = useState(initialTitle ?? "");
   const [description, setDescription] = useState("");
   const [busy, setBusy] = useState(false);
@@ -453,12 +457,12 @@ function NewCampaignForm({
     <div className="flex flex-col gap-3">
       <Input
         value={title}
-        placeholder="Title"
+        placeholder={t`Title`}
         onChange={(e) => setTitle(e.target.value)}
       />
       <Textarea
         value={description}
-        placeholder="Description (optional)"
+        placeholder={t`Description (optional)`}
         className="min-h-16"
         onChange={(e) => setDescription(e.target.value)}
       />
@@ -468,7 +472,7 @@ function NewCampaignForm({
         onClick={create}
         disabled={!title.trim() || busy}
       >
-        <Plus className="size-4" /> {busy ? "Creating…" : "Create"}
+        <Plus className="size-4" /> {busy ? t`Creating…` : t`Create`}
       </Button>
     </div>
   );

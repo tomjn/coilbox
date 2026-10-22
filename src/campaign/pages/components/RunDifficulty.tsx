@@ -1,16 +1,11 @@
+import { Trans } from "@lingui/react/macro";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
+import { DIFFICULTY_LABEL } from "@/play/scenarioDifficulty";
 import {
   DEFAULT_DIFFICULTY,
   DIFFICULTIES,
   type Difficulty,
 } from "@/scenario/model";
-
-/** How each difficulty is written on its button, as the scenario drawer writes it. */
-const DIFFICULTY_LABEL: Record<Difficulty, string> = {
-  easy: "Easy",
-  normal: "Normal",
-  hard: "Hard",
-};
 
 /**
  * The difficulty a campaign run is played at (issue #2220), shown on the
@@ -40,7 +35,7 @@ export function RunDifficulty({
         className="text-xs font-medium uppercase tracking-wide text-muted-foreground"
         id="campaign-difficulty-label"
       >
-        Difficulty
+        <Trans>Difficulty</Trans>
       </span>
       <ToggleGroup
         type="single"
@@ -61,7 +56,9 @@ export function RunDifficulty({
         ))}
       </ToggleGroup>
       <p className="text-xs text-muted-foreground">
-        Applies to the rest of the campaign. Change it whenever you like.
+        <Trans>
+          Applies to the rest of the campaign. Change it whenever you like.
+        </Trans>
       </p>
     </div>
   );

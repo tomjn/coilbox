@@ -83,7 +83,7 @@ const campaignPlugin: FramePlugin = {
       lazy: () => import("./pages/CampaignDetailPage"),
       crumb: (c) =>
         (c.params.id && getCachedCampaign(c.params.id)?.campaign.title) ||
-        "Campaign",
+        t`Campaign`,
     },
     {
       // No literal segment between the ids, so the breadcrumb trail is

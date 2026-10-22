@@ -1,3 +1,4 @@
+import { Trans, useLingui } from "@lingui/react/macro";
 import { Button, Input } from "@picoframe/frame";
 import { Plus, Server, Trash2 } from "lucide-react";
 import { useEffect, useState } from "react";
@@ -13,6 +14,7 @@ import { useUberstressConfig } from "../config";
  * section title + padding, so this is just the form body.
  */
 export default function UberstressSettings() {
+  const { t } = useLingui();
   const [cfg, setCfg] = useUberstressConfig();
   const [scenarios, setScenarios] = useState<string[]>([]);
 
@@ -46,6 +48,10 @@ export default function UberstressSettings() {
         s.id === id ? { ...s, [key]: value } : s,
       ),
     });
+  const removeLabel = (s: { name: string; addr: string }) => {
+    const name = s.name || s.addr || t`server`;
+    return t`Remove ${name}`;
+  };
   const removeServer = (id: string) =>
     setCfg({ ...cfg, servers: cfg.servers.filter((s) => s.id !== id) });
 
@@ -55,28 +61,30 @@ export default function UberstressSettings() {
       <section className="space-y-3">
         <div className="flex items-center justify-between">
           <h2 className="flex items-center gap-2 text-sm font-semibold uppercase tracking-wide text-muted-foreground">
-            <Server size={15} /> Lobby servers
+            <Server size={15} /> <Trans>Lobby servers</Trans>
           </h2>
           <Button variant="outline" size="sm" onClick={addServer}>
-            <Plus /> Add server
+            <Plus /> <Trans>Add server</Trans>
           </Button>
         </div>
         {cfg.servers.length === 0 ? (
           <p className="rounded-md border border-dashed border-border px-4 py-6 text-center text-sm text-muted-foreground">
-            No servers yet. Add one to target it from the Run page.
+            <Trans>
+              No servers yet. Add one to target it from the Run page.
+            </Trans>
           </p>
         ) : (
           <ul className="space-y-2">
             {cfg.servers.map((s) => (
               <li key={s.id} className="flex items-end gap-2">
-                <Field label="Name" className="flex-1">
+                <Field label={t`Name`} className="flex-1">
                   <Input
                     value={s.name}
                     onChange={(e) => updateServer(s.id, "name", e.target.value)}
-                    placeholder="Local dev"
+                    placeholder={t`Local dev`}
                   />
                 </Field>
-                <Field label="Address" className="flex-1">
+                <Field label={t`Address`} className="flex-1">
                   <Input
                     value={s.addr}
                     onChange={(e) => updateServer(s.id, "addr", e.target.value)}
@@ -88,7 +96,7 @@ export default function UberstressSettings() {
                   variant="outline"
                   size="sm"
                   onClick={() => removeServer(s.id)}
-                  aria-label={`Remove ${s.name || s.addr || "server"}`}
+                  aria-label={removeLabel(s)}
                 >
                   <Trash2 />
                 </Button>
@@ -101,10 +109,10 @@ export default function UberstressSettings() {
       {/* Run defaults */}
       <section className="space-y-3">
         <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
-          Run defaults
+          <Trans>Run defaults</Trans>
         </h2>
         <div className="grid grid-cols-2 gap-4">
-          <Field label="Scenario">
+          <Field label={t`Scenario`}>
             {scenarios.length > 0 ? (
               <OptionSelect
                 value={cfg.defaults.scenario}
@@ -118,7 +126,7 @@ export default function UberstressSettings() {
               />
             )}
           </Field>
-          <Field label="Connections">
+          <Field label={t`Connections`}>
             <Input
               type="number"
               min={1}
@@ -126,14 +134,14 @@ export default function UberstressSettings() {
               onChange={(e) => patchDefaults({ conns: Number(e.target.value) })}
             />
           </Field>
-          <Field label="Duration" hint="Go duration, e.g. 30s">
+          <Field label={t`Duration`} hint={t`Go duration, e.g. 30s`}>
             <Input
               value={cfg.defaults.duration}
               onChange={(e) => patchDefaults({ duration: e.target.value })}
               className="font-mono text-xs"
             />
           </Field>
-          <Field label="Ramp" hint="e.g. 10s">
+          <Field label={t`Ramp`} hint={t`e.g. 10s`}>
             <Input
               value={cfg.defaults.ramp}
               onChange={(e) => patchDefaults({ ramp: e.target.value })}
@@ -146,17 +154,19 @@ export default function UberstressSettings() {
       {/* Bench + database */}
       <section className="space-y-3">
         <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
-          Bench &amp; database
+          <Trans>Bench &amp; database</Trans>
         </h2>
         <p className="text-xs text-muted-foreground">
-          Used only by bench mode, which launches an uberserver checkout locally
-          and resets the database before each run. Requires a checkout, a Python
-          venv, and a reachable MySQL on this machine.
+          <Trans>
+            Used only by bench mode, which launches an uberserver checkout
+            locally and resets the database before each run. Requires a
+            checkout, a Python venv, and a reachable MySQL on this machine.
+          </Trans>
         </p>
         <div className="grid grid-cols-2 gap-4">
           <Field
-            label="Server dir"
-            hint="uberserver checkout path"
+            label={t`Server dir`}
+            hint={t`uberserver checkout path`}
             className="col-span-2"
           >
             <Input
@@ -167,70 +177,70 @@ export default function UberstressSettings() {
             />
           </Field>
           <Field
-            label="Python"
-            hint="defaults to <server-dir>/venv/bin/python3"
+            label={t`Python`}
+            hint={t`defaults to <server-dir>/venv/bin/python3`}
             className="col-span-2"
           >
             <Input
               value={cfg.bench.serverPython}
               onChange={(e) => patchBench({ serverPython: e.target.value })}
-              placeholder="(auto)"
+              placeholder={t`(auto)`}
               className="font-mono text-xs"
             />
           </Field>
-          <Field label="Lobby port">
+          <Field label={t`Lobby port`}>
             <Input
               type="number"
               value={cfg.bench.port}
               onChange={(e) => patchBench({ port: Number(e.target.value) })}
             />
           </Field>
-          <Field label="NAT port">
+          <Field label={t`NAT port`}>
             <Input
               type="number"
               value={cfg.bench.natport}
               onChange={(e) => patchBench({ natport: Number(e.target.value) })}
             />
           </Field>
-          <Field label="DB driver">
+          <Field label={t`DB driver`}>
             <Input
               value={cfg.bench.db.driver}
               onChange={(e) => patchDb({ driver: e.target.value })}
             />
           </Field>
-          <Field label="DB name">
+          <Field label={t`DB name`}>
             <Input
               value={cfg.bench.db.name}
               onChange={(e) => patchDb({ name: e.target.value })}
             />
           </Field>
-          <Field label="DB host">
+          <Field label={t`DB host`}>
             <Input
               value={cfg.bench.db.host}
               onChange={(e) => patchDb({ host: e.target.value })}
             />
           </Field>
-          <Field label="DB port">
+          <Field label={t`DB port`}>
             <Input
               type="number"
               value={cfg.bench.db.port}
               onChange={(e) => patchDb({ port: Number(e.target.value) })}
             />
           </Field>
-          <Field label="DB user">
+          <Field label={t`DB user`}>
             <Input
               value={cfg.bench.db.user}
               onChange={(e) => patchDb({ user: e.target.value })}
             />
           </Field>
-          <Field label="DB password">
+          <Field label={t`DB password`}>
             <Input
               type="password"
               value={cfg.bench.db.password}
               onChange={(e) => patchDb({ password: e.target.value })}
             />
           </Field>
-          <Field label="mysql binary" className="col-span-2">
+          <Field label={t`mysql binary`} className="col-span-2">
             <Input
               value={cfg.bench.db.mysqlBin}
               onChange={(e) => patchDb({ mysqlBin: e.target.value })}
@@ -239,8 +249,8 @@ export default function UberstressSettings() {
           </Field>
         </div>
         <CheckField
-          label="Reset database before each bench run"
-          hint="Drops and recreates the database. Required for register-storm; leave on for clean A/B runs."
+          label={t`Reset database before each bench run`}
+          hint={t`Drops and recreates the database. Required for register-storm; leave on for clean A/B runs.`}
           checked={cfg.bench.dbReset}
           onChange={(v) => patchBench({ dbReset: v })}
         />

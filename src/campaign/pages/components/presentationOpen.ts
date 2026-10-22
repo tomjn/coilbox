@@ -19,6 +19,7 @@
  * {@link presentationOpen}.
  */
 
+import { t } from "@lingui/core/macro";
 import { useState } from "react";
 
 const KEY = "coilbox.campaign.presentationOpen";
@@ -86,8 +87,8 @@ export function presentationSummary(
   icon: boolean,
   background: boolean,
 ): string {
-  if (icon && background) return "Icon and background set";
-  if (icon) return "Icon set, no background";
-  if (background) return "Background set, no icon";
-  return "No icon or background yet";
+  if (icon && background) return t`Icon and background set`;
+  if (icon) return t`Icon set, no background`;
+  if (background) return t`Background set, no icon`;
+  return t`No icon or background yet`;
 }

@@ -23,6 +23,8 @@
  * to look at it without a library, a game or a file dialog to hand.
  */
 
+import { plural } from "@lingui/core/macro";
+import { Trans, useLingui } from "@lingui/react/macro";
 import { Button } from "@picoframe/frame";
 import { Blocks, Download, FileUp, Loader2 } from "lucide-react";
 
@@ -65,6 +67,7 @@ export function LeavingPack({
   onWriteToGame: () => void;
   onWriteToFile: () => void;
 }) {
+  const { t } = useLingui();
   const ticked = records.filter((record) => taking.has(record.id));
   const count = ticked.length;
   const games = new Set(ticked.map(recordGameName).filter(Boolean));
@@ -73,24 +76,31 @@ export function LeavingPack({
   // other: without one every write is the game's own as far as anything here can
   // say (issue #1488).
   const sharingStopped = gameRunning && !gameFile;
+  const total = records.length;
+  const gameCount = games.size;
+  const stripped = strips.join(", ");
 
   return (
     <div className="flex flex-col gap-3 p-4">
       <p className="text-xs text-muted-foreground">
-        Pick the layouts to put in one file. Coilbox writes them into a game's
-        own blueprints file, where the game's own widget reads them, or out to a
-        file you can post for somebody else to open. A layout the file already
-        holds under the same name replaces that entry where it stands, and the
-        file is copied before anything is written to it.
+        <Trans>
+          Pick the layouts to put in one file. Coilbox writes them into a game's
+          own blueprints file, where the game's own widget reads them, or out to
+          a file you can post for somebody else to open. A layout the file
+          already holds under the same name replaces that entry where it stands,
+          and the file is copied before anything is written to it.
+        </Trans>
       </p>
 
       <div className="flex items-center justify-between gap-2">
         <span className="text-xs text-muted-foreground">
-          {count} of {records.length} ticked
+          <Trans>
+            {count} of {total} ticked
+          </Trans>
         </span>
         <div className="flex items-center gap-1.5">
           <Button size="sm" variant="ghost" onClick={onAll}>
-            Tick every one
+            <Trans>Tick every one</Trans>
           </Button>
           <Button
             size="sm"
@@ -98,7 +108,7 @@ export function LeavingPack({
             disabled={count === 0}
             onClick={onClear}
           >
-            Clear
+            <Trans>Clear</Trans>
           </Button>
         </div>
       </div>
@@ -108,6 +118,10 @@ export function LeavingPack({
           const buildings = record.layout.buildings.length;
           const game = recordGameName(record);
           const id = `write-pack-${record.id}`;
+          const buildingCount = plural(buildings, {
+            one: "# building",
+            other: "# buildings",
+          });
           return (
             <li
               key={record.id}
@@ -130,8 +144,8 @@ export function LeavingPack({
                   {record.layout.name}
                 </span>
                 <span className="block truncate text-[11px] text-muted-foreground">
-                  {buildings} building{buildings === 1 ? "" : "s"}
-                  {record.layout.ordered ? " · build order" : ""}
+                  {buildingCount}
+                  {record.layout.ordered ? ` · ${t`build order`}` : ""}
                   {game ? ` · ${game}` : ""}
                 </span>
               </label>
@@ -144,45 +158,63 @@ export function LeavingPack({
         // The same promise a single layout's export already keeps: an export is
         // a conversion, so it says what it drops before it drops it.
         <p className="text-[11px] text-amber-200/80">
-          Writing these leaves behind {strips.join(", ")}. A game's file holds a
-          shape, a name and a build order, and works the rest out from the units
-          it has. Somebody opening the file without that game installed draws
-          each building as one square.
+          <Trans>
+            Writing these leaves behind {stripped}. A game's file holds a shape,
+            a name and a build order, and works the rest out from the units it
+            has. Somebody opening the file without that game installed draws
+            each building as one square.
+          </Trans>
         </p>
       )}
 
       {keepsProvenance && (
         <p className="text-[11px] text-muted-foreground">
-          Where your copy of each of these came from stays here. It is a note
-          about your library rather than part of a layout, so it never goes out
-          in a file.
+          <Trans>
+            Where your copy of each of these came from stays here. It is a note
+            about your library rather than part of a layout, so it never goes
+            out in a file.
+          </Trans>
         </p>
       )}
 
       {games.size > 1 && (
         <p className="text-[11px] text-muted-foreground">
-          These are for {games.size} different games. A blueprints file says
-          nothing about which game it is for, so one file holding all of them is
-          exactly what a player who plays both ends up with anyway.
+          <Trans>
+            These are for {gameCount} different games. A blueprints file says
+            nothing about which game it is for, so one file holding all of them
+            is exactly what a player who plays both ends up with anyway.
+          </Trans>
         </p>
       )}
 
       {gameRunning && (
         <p className="rounded bg-amber-950/60 px-2 py-1.5 text-[11px] text-amber-200">
-          A game is running. It writes its whole blueprints file back when it
-          saves or exits, so anything written into that file now could be thrown
-          away without a word.{" "}
-          {sharingStopped
-            ? "Coilbox does not know where this engine writes, so it cannot tell that file from any other. Close the game and come back."
-            : "Saving a file somewhere else is fine, because no game reads it. Close the game to write into a game's own file."}
+          <Trans>
+            A game is running. It writes its whole blueprints file back when it
+            saves or exits, so anything written into that file now could be
+            thrown away without a word.
+          </Trans>{" "}
+          {sharingStopped ? (
+            <Trans>
+              Coilbox does not know where this engine writes, so it cannot tell
+              that file from any other. Close the game and come back.
+            </Trans>
+          ) : (
+            <Trans>
+              Saving a file somewhere else is fine, because no game reads it.
+              Close the game to write into a game's own file.
+            </Trans>
+          )}
         </p>
       )}
 
       {gameFile && (
         <p className="break-all text-[11px] text-muted-foreground">
-          A game's file opens on <span className="font-mono">{gameFile}</span>,
-          where your engine writes. Pick another if you keep your games
-          somewhere else.
+          <Trans>
+            A game's file opens on <span className="font-mono">{gameFile}</span>
+            , where your engine writes. Pick another if you keep your games
+            somewhere else.
+          </Trans>
         </p>
       )}
 
@@ -196,13 +228,11 @@ export function LeavingPack({
           ) : (
             <Download className="mr-1.5 size-4" aria-hidden />
           )}
-          Write{" "}
-          {count === 0
-            ? "them"
-            : count === 1
-              ? "1 blueprint"
-              : `${count} blueprints`}{" "}
-          into a game's file
+          {plural(count, {
+            0: "Write them into a game's file",
+            one: "Write # blueprint into a game's file",
+            other: "Write # blueprints into a game's file",
+          })}
         </Button>
         <Button
           variant="outline"
@@ -210,7 +240,10 @@ export function LeavingPack({
           onClick={onWriteToFile}
         >
           <FileUp className="mr-1.5 size-4" aria-hidden />
-          Save {count === 1 ? "it" : "them"} as a file to share
+          {plural(count, {
+            one: "Save it as a file to share",
+            other: "Save them as a file to share",
+          })}
         </Button>
       </div>
     </div>

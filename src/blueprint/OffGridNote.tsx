@@ -12,6 +12,7 @@
  * The offer is deliberately not automatic and not on load. See `./offGrid.ts`.
  */
 
+import { Plural, Trans } from "@lingui/react/macro";
 import { Button } from "@picoframe/frame";
 
 import type { OffGridBuilding } from "./offGrid";
@@ -35,16 +36,21 @@ export function OffGridNote({
   onSnap: () => void;
 }) {
   if (offGrid.length === 0) return null;
-  const one = offGrid.length === 1;
+  const count = offGrid.length;
+  const places = listed(offGrid);
 
   return (
     <div className="space-y-2 rounded bg-slate-800/70 px-2 py-1.5 text-[11px] text-slate-300">
       <p>
-        This blueprint's numbers do not agree with the build grid. Building
-        {one ? " " : "s "}
-        {listed(offGrid)} {one ? "is" : "are"} drawn where the engine will build{" "}
-        {one ? "it" : "them"}, which is not the position the blueprint holds for{" "}
-        {one ? "it" : "them"}. Nothing has been changed.
+        <Trans>
+          This blueprint's numbers do not agree with the build grid.{" "}
+          <Plural
+            value={count}
+            one={`Building ${places} is drawn where the engine will build it, which is not the position the blueprint holds for it.`}
+            other={`Buildings ${places} are drawn where the engine will build them, which is not the position the blueprint holds for them.`}
+          />{" "}
+          Nothing has been changed.
+        </Trans>
       </p>
       <Button
         size="sm"
@@ -52,7 +58,7 @@ export function OffGridNote({
         className="h-7 w-full px-2 text-[11px]"
         onClick={onSnap}
       >
-        Put the blueprint on the build grid
+        <Trans>Put the blueprint on the build grid</Trans>
       </Button>
     </div>
   );

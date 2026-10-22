@@ -1,3 +1,4 @@
+import { plural, t } from "@lingui/core/macro";
 import { COMPRESSED_CODE_PREFIX } from "../container/container";
 import type { Ranking, ResultRecord } from "../records/bestResult";
 import {
@@ -54,29 +55,38 @@ export const challengeRanking: Ranking<
   },
 };
 
-const plural = (n: number, one: string) => `${n} ${n === 1 ? one : `${one}s`}`;
-
 /** A best result as a phrase, such as "won in 14 turns". */
 export function describeBest(best: ChallengeBest): string {
   if (best.mode === "conquest") {
+    const turns = best.measure;
     return best.won
-      ? `won in ${plural(best.measure, "turn")}`
-      : `lost after ${plural(best.measure, "turn")}`;
+      ? plural(turns, {
+          one: "won in # turn",
+          other: "won in # turns",
+        })
+      : plural(turns, {
+          one: "lost after # turn",
+          other: "lost after # turns",
+        });
   }
-  if (best.won && best.hull !== undefined && best.salvage !== undefined) {
-    return `won with ${best.hull} hull and ${best.salvage} salvage`;
+  const { hull, salvage } = best;
+  if (best.won && hull !== undefined && salvage !== undefined) {
+    return t`won with ${hull} hull and ${salvage} salvage`;
   }
-  return best.won
-    ? `won, reaching depth ${best.measure}`
-    : `lost at depth ${best.measure}`;
+  const depth = best.measure;
+  return best.won ? t`won, reaching depth ${depth}` : t`lost at depth ${depth}`;
 }
 
 /** The line a run's page and the import page show. */
 export function recordSummary(record: ResultRecord<ChallengeBest>): string {
-  const attempts = plural(record.attempts, "attempt");
-  return record.best
-    ? `Your best: ${describeBest(record.best)}. ${attempts}.`
-    : `${attempts}.`;
+  const attemptCount = record.attempts;
+  const attempts = plural(attemptCount, {
+    one: "# attempt",
+    other: "# attempts",
+  });
+  if (!record.best) return t`${attempts}.`;
+  const best = describeBest(record.best);
+  return t`Your best: ${best}. ${attempts}.`;
 }
 
 /**
@@ -89,7 +99,8 @@ export function shareText(
   best: ChallengeBest | undefined,
 ): string {
   if (!best) return code;
-  return `${code}\n\nMy best result so far (my claim, not checked by coilbox): ${describeBest(best)}`;
+  const result = describeBest(best);
+  return `${code}\n\n${t`My best result so far (my claim, not checked by coilbox): ${result}`}`;
 }
 
 /**

@@ -15,6 +15,7 @@
  * something coilbox shares.
  */
 
+import { t } from "@lingui/core/macro";
 import {
   decodeContainerText,
   encodeContainerJson,
@@ -152,9 +153,11 @@ export function encodePayloadCode(payload: BlueprintPayload): BlueprintCode {
     payload,
   );
   if (result.ok) return result;
+  const size = formatBytes(result.bytes);
+  const limit = formatBytes(result.limit);
   return {
     ok: false,
-    message: `This blueprint is ${formatBytes(result.bytes)}, past the ${formatBytes(result.limit)} a share code can carry. Export it as a file and send that instead.`,
+    message: t`This blueprint is ${size}, past the ${limit} a share code can carry. Export it as a file and send that instead.`,
   };
 }
 
@@ -207,12 +210,12 @@ export function blueprintFromPayload(
 export function blueprintImportErrorMessage(error: OpenError): string {
   switch (error) {
     case "unknown-format":
-      return "That file isn't a coilbox blueprint.";
+      return t`That file isn't a coilbox blueprint.`;
     case "unsupported-version":
-      return "That blueprint was made by a newer version of coilbox. Update coilbox to open it.";
+      return t`That blueprint was made by a newer version of coilbox. Update coilbox to open it.`;
     case "wrong-kind":
-      return "That's a coilbox file, but not a blueprint.";
+      return t`That's a coilbox file, but not a blueprint.`;
     default:
-      return "That blueprint file is damaged or incomplete.";
+      return t`That blueprint file is damaged or incomplete.`;
   }
 }

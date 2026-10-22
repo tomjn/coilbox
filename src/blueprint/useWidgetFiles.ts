@@ -12,6 +12,7 @@
  * has not asked for it gets a file they will never read, which costs nothing.
  */
 
+import { plural, t } from "@lingui/core/macro";
 import { useEffect, useRef } from "react";
 
 import { useUnitsyncEngineConfig } from "@/content/config";
@@ -67,23 +68,28 @@ export function useWidgetFiles() {
       .then(({ collected, skipped }) => {
         if (collected > 0) {
           void notify({
-            title:
-              collected === 1
-                ? "A blueprint saved in game is in your library."
-                : `${collected} blueprints saved in game are in your library.`,
+            title: plural(collected, {
+              one: "A blueprint saved in game is in your library.",
+              other: "# blueprints saved in game are in your library.",
+            }),
             level: "success",
           });
         }
         if (skipped > 0) {
           void notify({
-            title: `${skipped} ${skipped === 1 ? "entry" : "entries"} in the widget's spool could not be read and ${skipped === 1 ? "was" : "were"} dropped.`,
+            title: plural(skipped, {
+              one: "# entry in the widget's spool could not be read and was dropped.",
+              other:
+                "# entries in the widget's spool could not be read and were dropped.",
+            }),
             level: "warning",
           });
         }
       })
       .catch((e) => {
+        const detail = e instanceof Error ? e.message : String(e);
         void notify({
-          title: `Could not collect what the widget saved: ${e instanceof Error ? e.message : String(e)}`,
+          title: t`Could not collect what the widget saved: ${detail}`,
           level: "error",
         });
       });

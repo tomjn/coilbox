@@ -13,14 +13,37 @@
  * one, and so both slots answer it identically.
  */
 
+import { t } from "@lingui/core/macro";
 import type { MapPreviewConfig, UnitPreviewConfig } from "./model";
 
 /** The ways a slot can be filled, in the order the editor offers them. */
 export const SLOT_SOURCE_OPTIONS = [
-  { value: "image", label: "Image" },
-  { value: "map-textured", label: "Map (textured)" },
-  { value: "map-heightmap", label: "Map (wireframe)" },
-  { value: "unit", label: "Unit model" },
+  // Getters, so each read uses the language active at that moment. The editor
+  // reads these while rendering.
+  {
+    value: "image",
+    get label() {
+      return t`Image`;
+    },
+  },
+  {
+    value: "map-textured",
+    get label() {
+      return t`Map (textured)`;
+    },
+  },
+  {
+    value: "map-heightmap",
+    get label() {
+      return t`Map (wireframe)`;
+    },
+  },
+  {
+    value: "unit",
+    get label() {
+      return t`Unit model`;
+    },
+  },
 ] as const;
 
 /** The configs one slot holds. At most one is ever set. */

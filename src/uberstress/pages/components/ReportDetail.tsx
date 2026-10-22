@@ -1,3 +1,5 @@
+import { plural, t } from "@lingui/core/macro";
+import { Trans, useLingui } from "@lingui/react/macro";
 import { cn } from "@picoframe/frame";
 import { AlertTriangle } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
@@ -17,16 +19,18 @@ export function fmtWhen(iso: string): string {
   return Number.isNaN(d.getTime()) ? iso : formatDateTime(d);
 }
 
-/** Display labels for known config keys; others fall back to de-underscoring. */
-const CONFIG_LABELS: Record<string, string> = {
-  conns: "Concurrent connections",
-  duration: "Hold time",
-  ramp: "Ramp",
-};
-
-/** Prettify a params/counter key: `say_interval` -> `say interval`. */
+/** Prettify a params/counter key: `say_interval` -> `say interval`. Known config keys get a display label. */
 function prettyKey(key: string): string {
-  return CONFIG_LABELS[key] ?? key.replace(/_/g, " ");
+  switch (key) {
+    case "conns":
+      return t`Concurrent connections`;
+    case "duration":
+      return t`Hold time`;
+    case "ramp":
+      return t`Ramp`;
+    default:
+      return key.replace(/_/g, " ");
+  }
 }
 
 /** Run identity: scenario, address, when, and provenance (ref / commit / server greeting). */
@@ -35,6 +39,9 @@ export function ReportHeader({ report }: { report: Report }) {
     ? parseGreeting(report.server_version)
     : null;
   const sha = report.commit_sha?.slice(0, 12);
+  const protocolVersion = greeting?.fields?.protocolVersion;
+  const udpPort = greeting?.fields?.udpPort;
+  const serverMode = greeting?.fields?.serverMode;
   return (
     <div className="space-y-2">
       <h2 className="text-base font-semibold">
@@ -56,8 +63,9 @@ export function ReportHeader({ report }: { report: Report }) {
         {greeting &&
           (greeting.fields ? (
             <span className="text-muted-foreground" title={greeting.raw}>
-              TASSERVER v{greeting.fields.protocolVersion} · UDP{" "}
-              {greeting.fields.udpPort} · mode {greeting.fields.serverMode}
+              <Trans>
+                TASSERVER v{protocolVersion} · UDP {udpPort} · mode {serverMode}
+              </Trans>
             </span>
           ) : (
             <span className="font-mono text-muted-foreground">
@@ -98,25 +106,26 @@ function Stat({
 
 /** Derived headline figures across the whole run. */
 export function SummaryBand({ report }: { report: Report }) {
+  const { t } = useLingui();
   const s = summarize(report);
   return (
     <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
-      <Stat label="Requests" value={formatNumber(s.totalRequests)} />
-      <Stat label="Throughput" value={`${formatFixed(s.throughput, 1)}/s`} />
+      <Stat label={t`Requests`} value={formatNumber(s.totalRequests)} />
+      <Stat label={t`Throughput`} value={`${formatFixed(s.throughput, 1)}/s`} />
       <Stat
-        label="Errors"
+        label={t`Errors`}
         value={formatNumber(s.totalErrors)}
         emphasis={s.totalErrors > 0 ? "error" : undefined}
       />
       <Stat
-        label="Success"
+        label={t`Success`}
         value={
           s.successRate === null
             ? "—"
             : `${formatFixed(s.successRate * 100, 1)}%`
         }
       />
-      <Stat label="Elapsed" value={`${formatFixed(s.durationSec, 1)}s`} />
+      <Stat label={t`Elapsed`} value={`${formatFixed(s.durationSec, 1)}s`} />
     </div>
   );
 }
@@ -130,17 +139,27 @@ export function EarlyTerminationNotice({ report }: { report: Report }) {
   const early = detectEarlyTermination(report);
   if (!early) return null;
   const top = early.failedCommands[0];
+  const actual = formatFixed(early.actualSec, 1);
+  const expected = formatFixed(early.expectedSec, 0);
+  const errors = top?.errors ?? 0;
+  const command = top?.command ?? "";
   return (
     <Alert variant="warning">
       <AlertTriangle size={15} />
       <AlertTitle className="line-clamp-none">
-        Run ended early — {formatFixed(early.actualSec, 1)}s of the requested ~
-        {formatFixed(early.expectedSec, 0)}s window.
+        <Trans>
+          Run ended early — {actual}s of the requested ~{expected}s window.
+        </Trans>
       </AlertTitle>
       <AlertDescription>
-        {top
-          ? `${top.errors} ${top.command} attempt${top.errors === 1 ? "" : "s"} failed, so connections didn't stay open to sustain the hold.`
-          : "Connections didn't stay open to sustain the hold."}
+        {top ? (
+          plural(errors, {
+            one: `# ${command} attempt failed, so connections didn't stay open to sustain the hold.`,
+            other: `# ${command} attempts failed, so connections didn't stay open to sustain the hold.`,
+          })
+        ) : (
+          <Trans>Connections didn't stay open to sustain the hold.</Trans>
+        )}
       </AlertDescription>
     </Alert>
   );
@@ -153,7 +172,7 @@ export function ConfigPanel({ params }: { params: Record<string, string> }) {
   return (
     <div className="space-y-2">
       <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-        Configuration
+        <Trans>Configuration</Trans>
       </h3>
       <dl className="grid grid-cols-2 gap-x-6 gap-y-1.5 text-sm sm:grid-cols-3 lg:grid-cols-4">
         {entries.map(([k, v]) => (
@@ -180,7 +199,7 @@ export function CountersPanel({
   return (
     <div className="space-y-2">
       <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-        Counters
+        <Trans>Counters</Trans>
       </h3>
       <div className="flex flex-wrap gap-2 font-mono text-xs">
         {entries.map(([k, v]) => {

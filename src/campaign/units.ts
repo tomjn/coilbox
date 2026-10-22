@@ -22,6 +22,7 @@
  * lobby.
  */
 
+import { select, t } from "@lingui/core/macro";
 import { loadContentState } from "../content/contentState";
 import { legoScratchRemove } from "../lego/bindings";
 import type { BuiltBy } from "../lego/buildList";
@@ -105,14 +106,16 @@ export function attachRefusal(
   project: LegoProject,
 ): string | null {
   if (!/^[a-z0-9_]{1,64}$/.test(project.unitName)) {
-    return `${project.name} has no unit name a game can load. Give it one in the unit builder first.`;
+    const name = project.name;
+    return t`${name} has no unit name a game can load. Give it one in the unit builder first.`;
   }
   const taken = (owner.units ?? []).find(
     (u) => u.unitName === project.unitName && u.projectId !== project.id,
   );
-  return taken
-    ? `${taken.name} is already attached as ${project.unitName}. Rename one of them in the unit builder.`
-    : null;
+  if (!taken) return null;
+  const takenName = taken.name;
+  const unitName = project.unitName;
+  return t`${takenName} is already attached as ${unitName}. Rename one of them in the unit builder.`;
 }
 
 /** The entry the campaign document keeps for a copy. */
@@ -221,7 +224,10 @@ export async function updateUnit(
   const earlier = (owner.units ?? []).find(
     (u) => u.projectId === source.project.id,
   );
-  if (!earlier) throw new Error(`${source.project.name} is not attached.`);
+  if (!earlier) {
+    const name = source.project.name;
+    throw new Error(t`${name} is not attached.`);
+  }
   const refusal = attachRefusal(owner, source.project);
   if (refusal) throw new Error(refusal);
   const unit = await copyUnit(owner, source, now);
@@ -477,18 +483,18 @@ function withGameMovement(
   gameName: string,
 ): { unit: PreparedUnit; leftOut: string[] } {
   if (!builtToMove(copy.source)) return { unit: launched, leftOut: [] };
-  const stays = (why: string) => ({
-    unit: launched,
-    leftOut: [`${unit.name} launches as a building: ${why}`],
-  });
+  const name = unit.name;
+  const stays = (why: string) => ({ unit: launched, leftOut: [why] });
   const def = launched.def;
   if (!def) {
     return stays(
-      "its copy predates movement classes. Update the copy from the unit builder.",
+      t`${name} launches as a building: its copy predates movement classes. Update the copy from the unit builder.`,
     );
   }
   if (!game) {
-    return stays(`the movement classes of ${gameName} could not be read.`);
+    return stays(
+      t`${name} launches as a building: the movement classes of ${gameName} could not be read.`,
+    );
   }
   const footprint = Math.max(
     Number(def.footprintx) || 1,
@@ -496,7 +502,9 @@ function withGameMovement(
   );
   const movement = scratchMovement(copy.source, game, gameName, footprint);
   if (!movement) {
-    return stays(`${gameName} has no movement class that suits it.`);
+    return stays(
+      t`${name} launches as a building: ${gameName} has no movement class that suits it.`,
+    );
   }
   return {
     unit: {
@@ -513,13 +521,6 @@ function withGameMovement(
   };
 }
 
-/** What a player calls each kind of owner, in an error. */
-const OWNER_NOUN: Record<UnitsScope, string> = {
-  campaign: "campaign",
-  conquest: "conquest",
-  warpath: "warpath",
-};
-
 /**
  * Write the owner's units mutator against this base game and have unitsync
  * find it. Null for an owner with no units, which launches as it always did.
@@ -533,11 +534,16 @@ export async function composeUnits(
   const units = owner.units ?? [];
   if (units.length === 0) return null;
   const scope = owner.scope ?? "campaign";
-  const noun = OWNER_NOUN[scope];
-  const folder = unitsFolder(scope, owner.id);
+  const ownerId = owner.id;
+  const folder = unitsFolder(scope, ownerId);
   if (!folder) {
     throw new Error(
-      `This ${noun}'s id, ${owner.id}, cannot name a game folder, so its units cannot be loaded.`,
+      select(scope, {
+        campaign: `This campaign's id, ${ownerId}, cannot name a game folder, so its units cannot be loaded.`,
+        conquest: `This conquest's id, ${ownerId}, cannot name a game folder, so its units cannot be loaded.`,
+        warpath: `This warpath's id, ${ownerId}, cannot name a game folder, so its units cannot be loaded.`,
+        other: `This run's id, ${ownerId}, cannot name a game folder, so its units cannot be loaded.`,
+      }),
     );
   }
   const copies = await loadUnitCopies(owner.id, owner.scope);
@@ -548,8 +554,14 @@ export async function composeUnits(
   for (const unit of units) {
     const stored = copies.get(unit.unitName);
     if (!stored) {
+      const unitLabel = unit.name;
       throw new Error(
-        `This ${noun}'s copy of ${unit.name} is missing. Attach it again from the unit builder.`,
+        select(scope, {
+          campaign: `This campaign's copy of ${unitLabel} is missing. Attach it again from the unit builder.`,
+          conquest: `This conquest's copy of ${unitLabel} is missing. Attach it again from the unit builder.`,
+          warpath: `This warpath's copy of ${unitLabel} is missing. Attach it again from the unit builder.`,
+          other: `This run's copy of ${unitLabel} is missing. Attach it again from the unit builder.`,
+        }),
       );
     }
     const moving = withGameMovement(
