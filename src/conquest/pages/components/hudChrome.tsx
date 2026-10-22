@@ -226,7 +226,7 @@ export function BracketFrame({
  * One console tile: a top row with a tracked-allcaps `label` (left, with an
  * optional leading `icon` and trailing `action` such as a help popover) and
  * monospace `meta` figures (right), then a large display `value`, then optional
- * `children` (progress bar, pips, hint line). `label`/`value` use the Oxanium
+ * `children` (progress bar, pips, hint line). `label`/`value` use the Tektur
  * display face; `accent` tints the value + bracket.
  */
 export function StatCard({

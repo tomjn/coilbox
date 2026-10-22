@@ -5,7 +5,7 @@
     "": {
       "name": "coilbox",
       "dependencies": {
-        "@fontsource-variable/oxanium": "^5.3.0",
+        "@fontsource-variable/tektur": "^5.3.0",
         "@lingui/core": "6.10.0",
         "@lingui/react": "6.10.0",
         "@picoframe/frame": "^0.10.0",
@@ -215,7 +215,7 @@
 
     "@floating-ui/utils": ["@floating-ui/utils@0.2.11", "", {}, "sha512-RiB/yIh78pcIxl6lLMG0CgBXAZ2Y0eVHqMPYugu+9U0AeT6YBeiJpf7lbdJNIugFP5SIjwNRgo4DhR1Qxi26Gg=="],
 
-    "@fontsource-variable/oxanium": ["@fontsource-variable/oxanium@5.3.0", "", {}, "sha512-oVOH5mHRMDLQsxG6h2XAOCxyD+uQL2w5zAjy1FgnAlqt183JDVGPxy9FWK7dDnhEO8huXfP6V2C3QJUj1Ac/Sw=="],
+    "@fontsource-variable/tektur": ["@fontsource-variable/tektur@5.3.0", "", {}, "sha512-aTiP3FWurF3A7kIr3PyHib27A9PLurrkHfu6UwCv1eCHyi7k9AyPBhIspGH8n6fDWrpqFXqpWZ+zev/MbPZ/4A=="],
 
     "@iconify-json/simple-icons": ["@iconify-json/simple-icons@1.2.89", "", { "dependencies": { "@iconify/types": "*" } }, "sha512-hRaCY5s2G5oWAIhc4LCGYn6g6RrwLL4zhoLOT+KUO3joVCxVlZKA+839bv/47Nbe9/ZD4UA6dznZ4XPYcI53wA=="],
 
