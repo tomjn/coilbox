@@ -11,6 +11,8 @@
  * looking for a way to put the camera somewhere known already is.
  */
 
+import { t } from "@lingui/core/macro";
+import { useLingui } from "@lingui/react/macro";
 import {
   Bone,
   Crosshair,
@@ -115,17 +117,37 @@ const DRAW_MODE_ICONS: Record<DrawMode, LucideIcon> = {
 
 /** What pressing the button does from each mode, naming the mode it goes to. */
 const DRAW_MODE_TITLES: Record<DrawMode, (key: string) => string> = {
-  solid: (key) => `Draw the unit as edges (${key})`,
-  wireframe: (key) => `Draw the unit solid with edges (${key})`,
-  both: (key) => `Draw the unit solid (${key})`,
+  solid: (key) => t`Draw the unit as edges (${key})`,
+  wireframe: (key) => t`Draw the unit solid with edges (${key})`,
+  both: (key) => t`Draw the unit solid (${key})`,
 };
 
 /** The front, side and top views, top to bottom as the flyout lists them. */
-const VIEW_BUTTONS: { id: StandardView; icon: LucideIcon; label: string }[] = [
-  { id: "front", icon: Square, label: "front" },
-  { id: "side", icon: PanelLeft, label: "side" },
-  { id: "top", icon: PanelTop, label: "top" },
+const VIEW_BUTTONS: { id: StandardView; icon: LucideIcon }[] = [
+  { id: "front", icon: Square },
+  { id: "side", icon: PanelLeft },
+  { id: "top", icon: PanelTop },
 ];
+
+/** What the toggle for a fixed view says when it is on and when it is off. */
+function viewTitles(id: StandardView, key: string) {
+  if (id === "front") {
+    return {
+      hide: t`Leave the front view (${key})`,
+      show: t`Look at the front with no perspective (${key})`,
+    };
+  }
+  if (id === "side") {
+    return {
+      hide: t`Leave the side view (${key})`,
+      show: t`Look at the side with no perspective (${key})`,
+    };
+  }
+  return {
+    hide: t`Leave the top view (${key})`,
+    show: t`Look at the top with no perspective (${key})`,
+  };
+}
 
 export function ViewportBar({
   problems,
@@ -154,14 +176,17 @@ export function ViewportBar({
   compassRef,
   onResetView,
 }: ViewportBarProps) {
+  const { t } = useLingui();
   const DrawModeFace = DRAW_MODE_ICONS[drawMode];
+  const skeletonKey = shortcutLabel("skeleton");
+  const measureKey = shortcutLabel("measure");
   return (
     <ViewControls className="pointer-events-auto shrink-0">
       {problems}
       <GridToggle
         on={grid.on}
         onChange={grid.onChange}
-        showTitle="Show the ground grid, marked in footprint steps and plate sizes"
+        showTitle={t`Show the ground grid, marked in footprint steps and plate sizes`}
       />
       <ViewButton
         title={DRAW_MODE_TITLES[drawMode](shortcutLabel("draw-mode"))}
@@ -173,39 +198,39 @@ export function ViewportBar({
         icon={Shield}
         on={collision.on}
         onChange={collision.onChange}
-        hideTitle="Hide the collision volume"
-        showTitle="Show the collision volume, the shape the engine hits and clicks"
+        hideTitle={t`Hide the collision volume`}
+        showTitle={t`Show the collision volume, the shape the engine hits and clicks`}
       />
       {skeleton ? (
         <ViewToggle
           icon={Bone}
           on={skeleton.on}
           onChange={skeleton.onChange}
-          hideTitle={`Hide the skeleton (${shortcutLabel("skeleton")})`}
-          showTitle={`Show the skeleton: a line from each bone to its parent, a dot on each joint and its role (${shortcutLabel("skeleton")})`}
+          hideTitle={t`Hide the skeleton (${skeletonKey})`}
+          showTitle={t`Show the skeleton: a line from each bone to its parent, a dot on each joint and its role (${skeletonKey})`}
         />
       ) : null}
       <ViewToggle
         icon={Scale}
         on={balance.on}
         onChange={balance.onChange}
-        hideTitle="Hide the balance check"
-        showTitle="Show the balance check: where the weight looks centred, against the ground the feet or wheels cover. An estimate from piece volumes at one density, not a mass. The engine does not simulate balance"
+        hideTitle={t`Hide the balance check`}
+        showTitle={t`Show the balance check: where the weight looks centred, against the ground the feet or wheels cover. An estimate from piece volumes at one density, not a mass. The engine does not simulate balance`}
       />
       <ViewToggle
         icon={SquaresIntersect}
         on={overlap.on}
         onChange={overlap.onChange}
-        hideTitle="Hide the overlap check"
-        showTitle="Show the overlap check: outlines pieces buried wholly inside another piece, which the model still draws and the export still writes"
+        hideTitle={t`Hide the overlap check`}
+        showTitle={t`Show the overlap check: outlines pieces buried wholly inside another piece, which the model still draws and the export still writes`}
       />
       {footprint ? (
         <ViewToggle
           icon={Footprints}
           on={footprint.on}
           onChange={footprint.onChange}
-          hideTitle="Hide the footprint check"
-          showTitle="Show the footprint check: the footprint the export writes, drawn on the ground under the unit"
+          hideTitle={t`Hide the footprint check`}
+          showTitle={t`Show the footprint check: the footprint the export writes, drawn on the ground under the unit`}
         />
       ) : null}
       {footprint?.on ? (
@@ -213,32 +238,32 @@ export function ViewportBar({
           icon={Scissors}
           on={footprint.leaveOut}
           onChange={footprint.onLeaveOutChange}
-          hideTitle="Count the barrel, muzzle flare, aim point and build nozzle in the base footprint"
-          showTitle="Leave the barrel, muzzle flare, aim point and build nozzle out of the base footprint"
+          hideTitle={t`Count the barrel, muzzle flare, aim point and build nozzle in the base footprint`}
+          showTitle={t`Leave the barrel, muzzle flare, aim point and build nozzle out of the base footprint`}
         />
       ) : null}
       <ViewToggle
         icon={Crosshair}
         on={aim.on}
         onChange={aim.onChange}
-        hideTitle="Hide the aim point"
-        showTitle="Show the aim point, the one point another unit shoots at"
+        hideTitle={t`Hide the aim point`}
+        showTitle={t`Show the aim point, the one point another unit shoots at`}
       />
       {reach ? (
         <ViewToggle
           icon={Radar}
           on={reach.on}
           onChange={reach.onChange}
-          hideTitle="Hide weapon ranges"
-          showTitle="Show each weapon's stated range and firing arc"
+          hideTitle={t`Hide weapon ranges`}
+          showTitle={t`Show each weapon's stated range and firing arc`}
         />
       ) : null}
       <ViewToggle
         icon={RulerDimensionLine}
         on={measure.on}
         onChange={measure.onChange}
-        hideTitle={`Leave the measure tool (${shortcutLabel("measure")})`}
-        showTitle={`Measure between two points (${shortcutLabel("measure")})`}
+        hideTitle={t`Leave the measure tool (${measureKey})`}
+        showTitle={t`Measure between two points (${measureKey})`}
       />
       {poses}
       {guides}
@@ -248,8 +273,8 @@ export function ViewportBar({
           onIcon={Eye}
           on={guideVisibility.on}
           onChange={guideVisibility.onChange}
-          hideTitle="Hide the guides"
-          showTitle="Show the guides"
+          hideTitle={t`Hide the guides`}
+          showTitle={t`Show the guides`}
         />
       ) : null}
       {environment}
@@ -259,8 +284,8 @@ export function ViewportBar({
           icon={Target}
           on={standIn.on}
           onChange={standIn.onChange}
-          hideTitle="Hide the stand-in unit"
-          showTitle="Show the stand-in unit, the thing a scenario aims at, builds or carries"
+          hideTitle={t`Hide the stand-in unit`}
+          showTitle={t`Show the stand-in unit, the thing a scenario aims at, builds or carries`}
         />
       ) : null}
       {followDrive ? (
@@ -268,8 +293,8 @@ export function ViewportBar({
           icon={Video}
           on={followDrive.on}
           onChange={followDrive.onChange}
-          hideTitle="Keep the camera still while the unit drives"
-          showTitle="Follow the driving unit with the camera"
+          hideTitle={t`Keep the camera still while the unit drives`}
+          showTitle={t`Follow the driving unit with the camera`}
         />
       ) : null}
       {effects ? (
@@ -277,11 +302,11 @@ export function ViewportBar({
           icon={Sparkles}
           on={effects.on}
           onChange={effects.onChange}
-          hideTitle="Hide script effects"
-          showTitle="Show script effects, such as nano spray, from the unit's own script"
+          hideTitle={t`Hide script effects`}
+          showTitle={t`Show script effects, such as nano spray, from the unit's own script`}
         />
       ) : null}
-      <ViewButton title="Keyboard shortcuts (?)" onClick={onShortcuts}>
+      <ViewButton title={t`Keyboard shortcuts (?)`} onClick={onShortcuts}>
         <Keyboard className="size-4" />
       </ViewButton>
       <ViewsFlyout view={view} onView={onView}>
@@ -311,6 +336,7 @@ function ViewsFlyout({
   onView: (view: StandardView, on: boolean) => void;
   children: ReactNode;
 }) {
+  const { t } = useLingui();
   const wrapRef = useRef<HTMLDivElement>(null);
   const [hovered, setHovered] = useState(false);
   const [focused, setFocused] = useState(false);
@@ -379,17 +405,20 @@ function ViewsFlyout({
           data-views-flyout
           className="absolute bottom-full left-0 z-10 pb-1"
         >
-          <ButtonGroup orientation="vertical" aria-label="Fixed views">
-            {VIEW_BUTTONS.map(({ id, icon, label }) => (
-              <ViewToggle
-                key={id}
-                icon={icon}
-                on={view === id}
-                onChange={(on) => onView(id, on)}
-                hideTitle={`Leave the ${label} view (${shortcutLabel(`view-${id}`)})`}
-                showTitle={`Look at the ${label} with no perspective (${shortcutLabel(`view-${id}`)})`}
-              />
-            ))}
+          <ButtonGroup orientation="vertical" aria-label={t`Fixed views`}>
+            {VIEW_BUTTONS.map(({ id, icon }) => {
+              const titles = viewTitles(id, shortcutLabel(`view-${id}`));
+              return (
+                <ViewToggle
+                  key={id}
+                  icon={icon}
+                  on={view === id}
+                  onChange={(on) => onView(id, on)}
+                  hideTitle={titles.hide}
+                  showTitle={titles.show}
+                />
+              );
+            })}
           </ButtonGroup>
         </div>
       ) : null}
@@ -450,8 +479,9 @@ function AxisCompass({
   svgRef: RefObject<SVGSVGElement | null>;
   onClick: () => void;
 }) {
+  const { t } = useLingui();
   return (
-    <ViewButton title="Reset the view" onClick={onClick}>
+    <ViewButton title={t`Reset the view`} onClick={onClick}>
       {/* A `size-` class of its own, or the button's own icon rule shrinks any
           bare svg to 16px and the compass becomes a smudge. */}
       <svg

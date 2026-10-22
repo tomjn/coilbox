@@ -7,6 +7,7 @@
  * view while it is posed.
  */
 
+import { Plural, Trans, useLingui } from "@lingui/react/macro";
 import { Button, Input } from "@picoframe/frame";
 import {
   Copy,
@@ -55,6 +56,7 @@ export function PosesPopover({
   onDelete,
   onReset,
 }: Props) {
+  const { t } = useLingui();
   const poses = project.poses ?? [];
   const [name, setName] = useState("");
 
@@ -69,8 +71,8 @@ export function PosesPopover({
         <Button
           size="icon"
           variant={posing ? "default" : "outline"}
-          title="Poses"
-          aria-label="Poses"
+          title={t`Poses`}
+          aria-label={t`Poses`}
           aria-pressed={posing}
         >
           <PersonStanding className="size-4" />
@@ -85,14 +87,14 @@ export function PosesPopover({
             className="flex-1"
             onClick={() => onPosingChange(!posing)}
           >
-            {posing ? "Leave posing" : "Pose the unit"}
+            {posing ? t`Leave posing` : t`Pose the unit`}
           </Button>
           {posing ? (
             <Button
               size="icon"
               variant="outline"
-              title="Reset to the built shape"
-              aria-label="Reset to the built shape"
+              title={t`Reset to the built shape`}
+              aria-label={t`Reset to the built shape`}
               disabled={!changed}
               onClick={onReset}
             >
@@ -109,8 +111,8 @@ export function PosesPopover({
               onKeyDown={(event) => {
                 if (event.key === "Enter" && changed) save();
               }}
-              placeholder="Pose name"
-              aria-label="Pose name"
+              placeholder={t`Pose name`}
+              aria-label={t`Pose name`}
               className="h-8 min-w-0 flex-1 text-xs"
             />
             <Button
@@ -119,7 +121,7 @@ export function PosesPopover({
               disabled={!changed}
               onClick={save}
             >
-              Save
+              <Trans>Save</Trans>
             </Button>
           </div>
         ) : null}
@@ -165,6 +167,8 @@ function PoseRow({
   onDuplicate: () => void;
   onDelete: () => void;
 }) {
+  const { t } = useLingui();
+  const poseName = pose.name;
   const [name, setName] = useState(pose.name);
   useEffect(() => setName(pose.name), [pose.name]);
 
@@ -184,15 +188,15 @@ function PoseRow({
             if (event.key === "Enter") event.currentTarget.blur();
             if (event.key === "Escape") setName(pose.name);
           }}
-          aria-label={`Name of ${pose.name}`}
+          aria-label={t`Name of ${poseName}`}
           className="h-7 min-w-0 flex-1 text-xs"
         />
         <Button
           size="icon"
           variant="ghost"
           className="size-7"
-          title="Apply"
-          aria-label={`Apply ${pose.name}`}
+          title={t`Apply`}
+          aria-label={t`Apply ${poseName}`}
           onClick={onApply}
         >
           <Play className="size-3.5" />
@@ -201,8 +205,8 @@ function PoseRow({
           size="icon"
           variant="ghost"
           className="size-7"
-          title="Overwrite with the pose being held"
-          aria-label={`Overwrite ${pose.name}`}
+          title={t`Overwrite with the pose being held`}
+          aria-label={t`Overwrite ${poseName}`}
           disabled={!canOverwrite}
           onClick={onOverwrite}
         >
@@ -212,8 +216,8 @@ function PoseRow({
           size="icon"
           variant="ghost"
           className="size-7"
-          title="Duplicate"
-          aria-label={`Duplicate ${pose.name}`}
+          title={t`Duplicate`}
+          aria-label={t`Duplicate ${poseName}`}
           onClick={onDuplicate}
         >
           <Copy className="size-3.5" />
@@ -222,8 +226,8 @@ function PoseRow({
           size="icon"
           variant="ghost"
           className="size-7"
-          title="Delete"
-          aria-label={`Delete ${pose.name}`}
+          title={t`Delete`}
+          aria-label={t`Delete ${poseName}`}
           onClick={onDelete}
         >
           <Trash2 className="size-3.5" />
@@ -231,7 +235,11 @@ function PoseRow({
       </div>
       {missing > 0 ? (
         <p className="text-xs text-muted-foreground">
-          {missing === 1 ? "1 piece" : `${missing} pieces`} deleted
+          <Plural
+            value={missing}
+            one="# piece deleted"
+            other="# pieces deleted"
+          />
         </p>
       ) : null}
     </li>

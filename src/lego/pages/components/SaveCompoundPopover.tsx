@@ -6,6 +6,7 @@
  * would default to, and saving with "No mount" stores none.
  */
 
+import { Trans, useLingui } from "@lingui/react/macro";
 import { Button } from "@picoframe/frame";
 import { PackagePlus } from "lucide-react";
 import { useState } from "react";
@@ -58,6 +59,7 @@ function keyOf(mount: LegoMount | null): string {
 }
 
 export function SaveCompoundPopover({ disabled, options, onSave }: Props) {
+  const { t } = useLingui();
   const [open, setOpen] = useState(false);
   const [offered, setOffered] = useState<MountOptions | null>(null);
   const [picked, setPicked] = useState(NONE);
@@ -97,20 +99,20 @@ export function SaveCompoundPopover({ disabled, options, onSave }: Props) {
           size="icon"
           variant="outline"
           disabled={disabled}
-          aria-label="Save the selection as a module"
-          title="Save as a module"
+          aria-label={t`Save the selection as a module`}
+          title={t`Save as a module`}
         >
           <PackagePlus className="size-4" />
         </TipButton>
       </PopoverTrigger>
       <PopoverContent side="right" align="start" className="w-72 space-y-3">
-        <Field label="Mounts on the unit by">
+        <Field label={t`Mounts on the unit by`}>
           <OptionSelect
-            ariaLabel="Mount connector"
+            ariaLabel={t`Mount connector`}
             value={picked}
             onValueChange={setPicked}
             options={[
-              { value: NONE, label: "No mount" },
+              { value: NONE, label: t`No mount` },
               ...(offered?.choices ?? []).map((c) => ({
                 value: keyOf({ piece: c.piece, connector: c.connector }),
                 label: c.label,
@@ -124,7 +126,7 @@ export function SaveCompoundPopover({ disabled, options, onSave }: Props) {
           suggestions={categorySuggestions(offered?.known ?? [])}
         />
         <Button size="sm" onClick={save}>
-          Save
+          <Trans>Save</Trans>
         </Button>
       </PopoverContent>
     </Popover>

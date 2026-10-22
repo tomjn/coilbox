@@ -7,6 +7,7 @@
  * one.
  */
 
+import { useLingui } from "@lingui/react/macro";
 import { Input } from "@picoframe/frame";
 import { Orbit } from "lucide-react";
 import { useState } from "react";
@@ -34,6 +35,7 @@ export function SymmetryPopover({
   count,
   onCountChange,
 }: Props) {
+  const { t } = useLingui();
   // What is typed, which is not a usable count until it parses. The field shows
   // this while it has focus and the real count otherwise.
   const [draft, setDraft] = useState<string | null>(null);
@@ -44,32 +46,32 @@ export function SymmetryPopover({
         <TipButton
           size="icon"
           variant="outline"
-          aria-label="Symmetry options"
-          title="Symmetry options"
+          aria-label={t`Symmetry options`}
+          title={t`Symmetry options`}
         >
           <Orbit className="size-4" />
         </TipButton>
       </PopoverTrigger>
       <PopoverContent side="right" align="start" className="w-64 space-y-3">
-        <Field label="Copies">
+        <Field label={t`Copies`}>
           <OptionSelect
-            ariaLabel="Symmetry mode"
+            ariaLabel={t`Symmetry mode`}
             value={mode}
             onValueChange={(value) => onModeChange(value as SymmetryMode)}
             options={[
-              { value: "mirror", label: "Mirrored twin" },
-              { value: "ring", label: "Round the vertical axis" },
+              { value: "mirror", label: t`Mirrored twin` },
+              { value: "ring", label: t`Round the vertical axis` },
             ]}
           />
         </Field>
         {mode === "ring" ? (
-          <Field label="Count">
+          <Field label={t`Count`}>
             <Input
               type="number"
               min={RING_MIN}
               max={RING_MAX}
               step={1}
-              aria-label="Copies round the axis"
+              aria-label={t`Copies round the axis`}
               value={draft ?? String(count)}
               onChange={(event) => {
                 setDraft(event.target.value);

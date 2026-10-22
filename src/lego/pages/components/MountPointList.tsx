@@ -4,6 +4,8 @@
  * what sits there now.
  */
 
+import { t } from "@lingui/core/macro";
+import { Trans } from "@lingui/react/macro";
 import { Button, Input } from "@picoframe/frame";
 import { Trash2 } from "lucide-react";
 
@@ -39,61 +41,73 @@ export function MountPointList({
 
   return (
     <div className="mt-2">
-      <span className="text-xs text-muted-foreground">Mount points</span>
+      <span className="text-xs text-muted-foreground">
+        <Trans>Mount points</Trans>
+      </span>
       {unmarked.length > 0 ? (
         <OptionSelect
           value=""
           onValueChange={onMark}
           options={unmarked.map((c) => ({ value: c.id, label: c.label }))}
-          placeholder="Mark a connector"
+          placeholder={t`Mark a connector`}
           size="sm"
           className="mt-1 w-full"
-          ariaLabel="Mark a connector as a mount point"
+          ariaLabel={t`Mark a connector as a mount point`}
         />
       ) : null}
 
-      {mountContents(project, piece).map(({ mount, onIt }) => (
-        <div
-          key={mount.connector}
-          className="mt-2 rounded-md border border-border px-2 py-1.5"
-        >
-          <div className="flex items-center gap-1">
+      {mountContents(project, piece).map(({ mount, onIt }) => {
+        const mountName = mount.name;
+        const connectorLabel = labelOf(mount.connector);
+        return (
+          <div
+            key={mount.connector}
+            className="mt-2 rounded-md border border-border px-2 py-1.5"
+          >
+            <div className="flex items-center gap-1">
+              <Input
+                value={mount.name}
+                onChange={(event) =>
+                  onChange(mount.connector, { name: event.target.value })
+                }
+                aria-label={t`Mount point name`}
+                className="h-7 flex-1 text-xs"
+              />
+              <Button
+                size="icon"
+                variant="ghost"
+                className="size-7 shrink-0"
+                onClick={() => onRemove(mount.connector)}
+                aria-label={t`Unmark ${mountName}`}
+                title={t`Unmark this mount point`}
+              >
+                <Trash2 size={12} />
+              </Button>
+            </div>
             <Input
-              value={mount.name}
-              onChange={(event) =>
-                onChange(mount.connector, { name: event.target.value })
+              key={mount.accepts.join(",")}
+              defaultValue={mount.accepts.join(", ")}
+              onBlur={(event) =>
+                onChange(mount.connector, {
+                  accepts: parseCategories(event.target.value),
+                })
               }
-              aria-label="Mount point name"
-              className="h-7 flex-1 text-xs"
+              placeholder={t`Categories, comma separated`}
+              aria-label={t`Categories ${mountName} takes`}
+              className="mt-1 h-7 text-xs"
             />
-            <Button
-              size="icon"
-              variant="ghost"
-              className="size-7 shrink-0"
-              onClick={() => onRemove(mount.connector)}
-              aria-label={`Unmark ${mount.name}`}
-              title="Unmark this mount point"
-            >
-              <Trash2 size={12} />
-            </Button>
+            <p className="mt-1 truncate text-xs text-muted-foreground">
+              {onIt === null ? (
+                <Trans>{connectorLabel}: empty</Trans>
+              ) : (
+                <Trans>
+                  {connectorLabel}: {onIt}
+                </Trans>
+              )}
+            </p>
           </div>
-          <Input
-            key={mount.accepts.join(",")}
-            defaultValue={mount.accepts.join(", ")}
-            onBlur={(event) =>
-              onChange(mount.connector, {
-                accepts: parseCategories(event.target.value),
-              })
-            }
-            placeholder="Categories, comma separated"
-            aria-label={`Categories ${mount.name} takes`}
-            className="mt-1 h-7 text-xs"
-          />
-          <p className="mt-1 truncate text-xs text-muted-foreground">
-            {labelOf(mount.connector)}: {onIt ?? "empty"}
-          </p>
-        </div>
-      ))}
+        );
+      })}
     </div>
   );
 }

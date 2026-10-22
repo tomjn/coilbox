@@ -1,3 +1,5 @@
+import { t } from "@lingui/core/macro";
+
 /**
  * Where each tile of the inventory grid goes (#4536).
  *
@@ -208,5 +210,5 @@ export function stepFrom(
  * category or a list narrows the section.
  */
 export function sectionCount(shown: number, total: number): string {
-  return shown < total ? `${shown} of ${total}` : `${shown}`;
+  return shown < total ? t`${shown} of ${total}` : `${shown}`;
 }

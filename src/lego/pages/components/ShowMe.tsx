@@ -6,6 +6,7 @@
  * exactly like a button that does nothing.
  */
 
+import { t } from "@lingui/core/macro";
 import { Button } from "@picoframe/frame";
 import { type ReactNode, useState } from "react";
 
@@ -32,7 +33,7 @@ export function ShowMe({ path, variant = "outline", children }: Props) {
   return (
     <div className="flex flex-col gap-1">
       <Button variant={variant} size="sm" onClick={() => void show()}>
-        {children ?? "Show me"}
+        {children ?? t`Show me`}
       </Button>
       {problem ? <p className="text-xs text-destructive">{problem}</p> : null}
     </div>

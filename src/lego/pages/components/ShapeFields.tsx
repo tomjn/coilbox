@@ -9,6 +9,7 @@
  * pack's round panel on them (#4398), when the pack has one for its colourway.
  */
 
+import { Trans, useLingui } from "@lingui/react/macro";
 import { Button, Input } from "@picoframe/frame";
 import { useEffect, useId, useState } from "react";
 
@@ -54,6 +55,7 @@ export function ShapeFields({ shape, onChange }: Props) {
 }
 
 function SphereFields({ shape, onChange }: Props) {
+  const { t } = useLingui();
   const numbers = sphereNumbers(shape);
   const [problem, setProblem] = useState<string | null>(null);
 
@@ -69,24 +71,24 @@ function SphereFields({ shape, onChange }: Props) {
 
   const whole = numbers.keep === SPHERE_WHOLE;
   const keeps = [
-    { keep: SPHERE_WHOLE, label: "Whole" },
-    { keep: SPHERE_DOME, label: "Dome" },
-    { keep: SPHERE_BOWL, label: "Bowl" },
+    { keep: SPHERE_WHOLE, label: t`Whole` },
+    { keep: SPHERE_DOME, label: t`Dome` },
+    { keep: SPHERE_BOWL, label: t`Bowl` },
   ];
   const fields: { name: keyof SphereNumbers; label: string }[] = [
-    { name: "radiusX", label: "Radius X" },
-    { name: "radiusY", label: whole ? "Radius Y" : "Height" },
-    { name: "radiusZ", label: "Radius Z" },
-    { name: "rings", label: "Rings" },
-    { name: "sides", label: "Sides" },
+    { name: "radiusX", label: t`Radius X` },
+    { name: "radiusY", label: whole ? t`Radius Y` : t`Height` },
+    { name: "radiusZ", label: t`Radius Z` },
+    { name: "rings", label: t`Rings` },
+    { name: "sides", label: t`Sides` },
   ];
 
   return (
     <div className="mt-2 flex flex-col gap-2">
-      <ButtonGroup className="flex w-full" aria-label="Kept">
+      <ButtonGroup className="flex w-full" aria-label={t`Kept`}>
         {keeps.map(({ keep, label }) => (
           <Button
-            key={label}
+            key={keep}
             size="sm"
             variant={numbers.keep === keep ? "default" : "outline"}
             className="flex-1"
@@ -117,6 +119,7 @@ function SphereFields({ shape, onChange }: Props) {
 }
 
 function WedgeFields({ shape, onChange }: Props) {
+  const { t } = useLingui();
   const numbers = wedgeNumbers(shape);
   const [problem, setProblem] = useState<string | null>(null);
 
@@ -134,22 +137,22 @@ function WedgeFields({ shape, onChange }: Props) {
     name: "width" | "depth" | "height" | "low";
     label: string;
   }[] = [
-    { name: "width", label: "Width" },
-    { name: "depth", label: "Depth" },
-    { name: "height", label: "Height" },
-    { name: "low", label: "Low end" },
+    { name: "width", label: t`Width` },
+    { name: "depth", label: t`Depth` },
+    { name: "height", label: t`Height` },
+    { name: "low", label: t`Low end` },
   ];
   const directions = [
-    { flip: false, label: "High at back" },
-    { flip: true, label: "High at front" },
+    { flip: false, label: t`High at back` },
+    { flip: true, label: t`High at front` },
   ];
 
   return (
     <div className="mt-2 flex flex-col gap-2">
-      <ButtonGroup className="flex w-full" aria-label="Slope direction">
+      <ButtonGroup className="flex w-full" aria-label={t`Slope direction`}>
         {directions.map(({ flip, label }) => (
           <Button
-            key={label}
+            key={String(flip)}
             size="sm"
             variant={numbers.flip === flip ? "default" : "outline"}
             className="flex-1"
@@ -180,6 +183,7 @@ function WedgeFields({ shape, onChange }: Props) {
 }
 
 function RoundFields({ shape, onChange }: Props) {
+  const { t } = useLingui();
   const numbers = roundNumbers(shape);
   // About the number just typed. The panel is keyed by piece, so another
   // piece starts clear.
@@ -197,22 +201,24 @@ function RoundFields({ shape, onChange }: Props) {
 
   const cone = shape.kind === "cone";
   const fields: { name: keyof RoundNumbers; label: string }[] = [
-    { name: "radius", label: cone ? "Bottom radius" : "Radius" },
+    { name: "radius", label: cone ? t`Bottom radius` : t`Radius` },
     ...(numbers.top === undefined
       ? []
-      : [{ name: "top" as const, label: "Top radius" }]),
-    { name: "length", label: cone ? "Height" : "Length" },
+      : [{ name: "top" as const, label: t`Top radius` }]),
+    { name: "length", label: cone ? t`Height` : t`Length` },
     ...(numbers.wall === undefined
       ? []
-      : [{ name: "wall" as const, label: "Wall" }]),
-    { name: "sides", label: "Sides" },
+      : [{ name: "wall" as const, label: t`Wall` }]),
+    { name: "sides", label: t`Sides` },
   ];
 
   return (
     <div className="mt-2 flex flex-col gap-2">
       <div>
-        <span className="text-xs text-muted-foreground">Axis</span>
-        <ButtonGroup className="mt-1 flex w-full" aria-label="Axis">
+        <span className="text-xs text-muted-foreground">
+          <Trans>Axis</Trans>
+        </span>
+        <ButtonGroup className="mt-1 flex w-full" aria-label={t`Axis`}>
           {AXES.map((axis, index) => (
             <Button
               key={axis.label}
@@ -239,7 +245,7 @@ function RoundFields({ shape, onChange }: Props) {
       </div>
       {roundPanelFor(shape) ? (
         <CheckField
-          label="Hub on ends"
+          label={t`Hub on ends`}
           checked={(shape.options?.hub ?? 0) !== 0}
           onChange={(on) => {
             const { hub: _hub, ...rest } = shape.options ?? {};
@@ -248,7 +254,7 @@ function RoundFields({ shape, onChange }: Props) {
         />
       ) : null}
       <p className="text-xs text-muted-foreground">
-        Dragging a round side sets the radius.
+        <Trans>Dragging a round side sets the radius.</Trans>
       </p>
       {problem ? (
         <p role="alert" className="text-xs text-destructive">

@@ -12,6 +12,8 @@
  * opened from a file, so there is nothing to save back over.
  */
 
+import { t } from "@lingui/core/macro";
+import { Trans } from "@lingui/react/macro";
 import { Button } from "@picoframe/frame";
 import { save } from "@tauri-apps/plugin-dialog";
 import { FileDown } from "lucide-react";
@@ -42,6 +44,7 @@ export function SaveModelPopover({ project, imported, pack, raw }: Props) {
   const [open, setOpen] = useState(false);
   const [busy, setBusy] = useState(false);
   const writable = writableSource(imported);
+  const writableName = writable ? basename(writable) : "";
 
   function build() {
     const textures = importedTextures(imported);
@@ -58,7 +61,7 @@ export function SaveModelPopover({ project, imported, pack, raw }: Props) {
       // with instead, when a piece still has one (#2613).
       { useOriginalNames: true },
     );
-    if (!model) throw new Error("This unit has no root piece.");
+    if (!model) throw new Error(t`This unit has no root piece.`);
     return model;
   }
 
@@ -68,10 +71,10 @@ export function SaveModelPopover({ project, imported, pack, raw }: Props) {
       const model = build();
       await legoSaveS3o({ path, model });
       setOpen(false);
-      notify({ title: "Model saved", body: path, level: "success" });
+      notify({ title: t`Model saved`, body: path, level: "success" });
     } catch (error) {
       notify({
-        title: "Could not save the model",
+        title: t`Could not save the model`,
         body: error instanceof Error ? error.message : String(error),
         level: "error",
       });
@@ -82,9 +85,9 @@ export function SaveModelPopover({ project, imported, pack, raw }: Props) {
 
   async function saveAs() {
     const dest = await save({
-      title: "Save the model",
+      title: t`Save the model`,
       defaultPath: writable ?? `${project.unitName}.s3o`,
-      filters: [{ name: "Spring model", extensions: ["s3o"] }],
+      filters: [{ name: t`Spring model`, extensions: ["s3o"] }],
     });
     if (dest) await writeTo(dest);
   }
@@ -92,16 +95,20 @@ export function SaveModelPopover({ project, imported, pack, raw }: Props) {
   return (
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
-        <Button size="icon" variant="outline" aria-label="Save model">
+        <Button size="icon" variant="outline" aria-label={t`Save model`}>
           <FileDown size={14} />
         </Button>
       </PopoverTrigger>
       <PopoverContent align="end" className="w-80 space-y-3">
         <div className="space-y-0.5">
-          <p className="text-sm font-medium">Save the model</p>
+          <p className="text-sm font-medium">
+            <Trans>Save the model</Trans>
+          </p>
           <p className="text-xs text-muted-foreground">
-            Writes the <code>.s3o</code> alone: no unit definition, no script,
-            no collision file.
+            <Trans>
+              Writes the <code>.s3o</code> alone: no unit definition, no script,
+              no collision file.
+            </Trans>
           </p>
         </div>
         <div className="flex flex-col gap-2">
@@ -110,14 +117,18 @@ export function SaveModelPopover({ project, imported, pack, raw }: Props) {
             disabled={!writable || busy}
             onClick={() => writable && void writeTo(writable)}
           >
-            {writable
-              ? `Save over ${basename(writable)}`
-              : "No file to save over"}
+            {writable ? (
+              <Trans>Save over {writableName}</Trans>
+            ) : (
+              <Trans>No file to save over</Trans>
+            )}
           </Button>
           {!writable ? (
             <p className="text-xs text-muted-foreground">
-              This model was opened from inside a packed archive, which holds no
-              path to write back to. Save it to a chosen path instead.
+              <Trans>
+                This model was opened from inside a packed archive, which holds
+                no path to write back to. Save it to a chosen path instead.
+              </Trans>
             </p>
           ) : null}
           <Button
@@ -126,7 +137,7 @@ export function SaveModelPopover({ project, imported, pack, raw }: Props) {
             disabled={busy}
             onClick={() => void saveAs()}
           >
-            Save to a chosen file
+            <Trans>Save to a chosen file</Trans>
           </Button>
         </div>
       </PopoverContent>

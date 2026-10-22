@@ -16,6 +16,8 @@
  * shared geometry cache and the camera position with it.
  */
 
+import { t } from "@lingui/core/macro";
+import { Trans, useLingui } from "@lingui/react/macro";
 import { Button } from "@picoframe/frame";
 import {
   ArrowDownToLine,
@@ -231,13 +233,13 @@ const NO_OFFSETS: PoseOffsets = {};
 /** Buttons as well as keys, so turning a piece is not a keyboard secret. */
 const MODES: {
   id: GizmoMode;
-  label: string;
+  label: () => string;
   key: string;
   Icon: typeof Move;
 }[] = [
-  { id: "translate", label: "Move", key: "G", Icon: Move },
-  { id: "rotate", label: "Turn", key: "R", Icon: RotateCw },
-  { id: "scale", label: "Scale", key: "S", Icon: Scaling },
+  { id: "translate", label: () => t`Move`, key: "G", Icon: Move },
+  { id: "rotate", label: () => t`Turn`, key: "R", Icon: RotateCw },
+  { id: "scale", label: () => t`Scale`, key: "S", Icon: Scaling },
 ];
 
 /**
@@ -1816,6 +1818,46 @@ export function ModelViewport({
     toggleSkeleton: () => setSkeletonChoice(!showSkeleton),
   });
 
+  const { t } = useLingui();
+
+  // What the line at the foot of the view says about the gesture in progress.
+  function hintText(): string {
+    if (measure.active) {
+      const stopKey = shortcutLabel("measure-stop");
+      return t`Click two points to measure, or drag an end to move it. ${stopKey} to leave`;
+    }
+    if (pickingGuide) {
+      const axisName = pickingGuide.axis.toUpperCase();
+      return pickingGuide.kind === "line"
+        ? t`Click the model to put a ${axisName} line there. Escape to stop`
+        : t`Click the model to put a ${axisName} plane there. Escape to stop`;
+    }
+    if (placingAnchor) return PLACE_CONNECTOR_HINT;
+    if (placingPart) {
+      const faceKey = shortcutLabel("place-face");
+      const twistKey = shortcutLabel("place-twist");
+      if (!("module" in placingPart)) {
+        return t`Click a face to place the part. ${faceKey} next face, ${twistKey} twist, Escape to stop`;
+      }
+      return placingPart.module.mount
+        ? t`Click a face to place the module. ${faceKey} next face, ${twistKey} twist, Escape to stop`
+        : t`Click a face to place the module, which has no mount so joins by its first piece. ${faceKey} next face, ${twistKey} twist, Escape to stop`;
+    }
+    if (resizeNote !== null) return resizeNote;
+    if (snapped) {
+      return snappedTo
+        ? t`Snapped to "${snappedTo}". Hold Alt to place freely`
+        : t`Snapped. Hold Alt to place freely`;
+    }
+    if (slidBy !== null) {
+      return t`Sliding on the face, offset ${slidBy}, in steps of ${steppedBy}. Hold Alt to place freely and detach`;
+    }
+    if (steppedBy !== null) {
+      return t`Moving in steps of ${steppedBy}. Hold Alt to place freely`;
+    }
+    return t`Hold Alt to place freely`;
+  }
+
   // Whether the selected piece carries anchors of its own, which decides what
   // the key at the bottom of the view has to name.
   const ownAnchors = soleSelectedId
@@ -1857,7 +1899,8 @@ export function ModelViewport({
           <div className="pointer-events-auto flex min-h-0 flex-1 flex-col self-start overflow-y-auto pr-2">
             <div className="m-auto flex flex-col gap-2">
               <ButtonGroup orientation="vertical">
-                {MODES.map(({ id, label, key, Icon }) => {
+                {MODES.map(({ id, label: modeLabel, key, Icon }) => {
+                  const label = modeLabel();
                   // A collision volume is measured along the model's own axes and
                   // has nothing to turn, so the handles for it are move and scale.
                   // The aim point is a point: move is all it has.
@@ -1880,10 +1923,10 @@ export function ModelViewport({
                       </TooltipTrigger>
                       <TooltipContent side="right">
                         {!off
-                          ? `${label} (${key})`
+                          ? t`${label} (${key})`
                           : showAimPoint
-                            ? "An aim point is one point, so it only moves"
-                            : "A collision volume has no rotation"}
+                            ? t`An aim point is one point, so it only moves`
+                            : t`A collision volume has no rotation`}
                       </TooltipContent>
                     </Tooltip>
                   );
@@ -1901,15 +1944,15 @@ export function ModelViewport({
                         variant="outline"
                         onClick={onGround}
                         disabled={!canGround}
-                        aria-label="Sit the unit on the ground"
+                        aria-label={t`Sit the unit on the ground`}
                       >
                         <ArrowDownToLine className="size-4" />
                       </TipButton>
                     </TooltipTrigger>
                     <TooltipContent side="right">
                       {canGround
-                        ? "Sit on the ground"
-                        : "Sit on the ground: the unit is already on it"}
+                        ? t`Sit on the ground`
+                        : t`Sit on the ground: the unit is already on it`}
                     </TooltipContent>
                   </Tooltip>
                 </ButtonGroup>
@@ -1928,14 +1971,16 @@ export function ModelViewport({
                       variant={symmetryOn ? "default" : "outline"}
                       onClick={() => onSymmetryChange(!symmetryOn)}
                       aria-pressed={symmetryOn}
-                      aria-label="Symmetry"
+                      aria-label={t`Symmetry`}
                     >
                       <FlipHorizontal2 className="size-4" />
                     </Button>
                   </TooltipTrigger>
                   <TooltipContent side="right">
-                    Symmetry: a new piece gets a twin or a ring of copies, which
-                    follow it (M)
+                    <Trans>
+                      Symmetry: a new piece gets a twin or a ring of copies,
+                      which follow it (M)
+                    </Trans>
                   </TooltipContent>
                 </Tooltip>
                 <SymmetryPopover
@@ -1951,13 +1996,13 @@ export function ModelViewport({
                       variant="outline"
                       onClick={onDuplicate}
                       disabled={!canDuplicate}
-                      aria-label="Duplicate the selection"
+                      aria-label={t`Duplicate the selection`}
                     >
                       <Copy className="size-4" />
                     </TipButton>
                   </TooltipTrigger>
                   <TooltipContent side="right">
-                    Duplicate (Cmd D)
+                    <Trans>Duplicate (Cmd D)</Trans>
                   </TooltipContent>
                 </Tooltip>
                 <Tooltip>
@@ -1966,12 +2011,14 @@ export function ModelViewport({
                       size="icon"
                       variant="outline"
                       onClick={onPaste}
-                      aria-label="Paste"
+                      aria-label={t`Paste`}
                     >
                       <ClipboardPaste className="size-4" />
                     </Button>
                   </TooltipTrigger>
-                  <TooltipContent side="right">Paste (Cmd V)</TooltipContent>
+                  <TooltipContent side="right">
+                    <Trans>Paste (Cmd V)</Trans>
+                  </TooltipContent>
                 </Tooltip>
                 {onSaveAsCompound ? (
                   <SaveCompoundPopover
@@ -1987,13 +2034,13 @@ export function ModelViewport({
                       variant="outline"
                       onClick={onDelete}
                       disabled={!canDelete}
-                      aria-label="Delete the selection"
+                      aria-label={t`Delete the selection`}
                     >
                       <Trash2 className="size-4" />
                     </TipButton>
                   </TooltipTrigger>
                   <TooltipContent side="right">
-                    Delete (Backspace)
+                    <Trans>Delete (Backspace)</Trans>
                   </TooltipContent>
                 </Tooltip>
               </ButtonGroup>
@@ -2028,15 +2075,15 @@ export function ModelViewport({
           <div className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
             {soleSelectedId && !playing ? (
               <div className="flex gap-3">
-                <Dot colour="#8b5cf6" label="Turns here" />
+                <Dot colour="#8b5cf6" label={t`Turns here`} />
                 {/* A piece with anchors of its own offers only those, so the box's
                 key would be naming dots that are not drawn. */}
                 {ownAnchors > 0 ? (
-                  <Dot colour="#f472b6" label="Anchors" />
+                  <Dot colour="#f472b6" label={t`Anchors`} />
                 ) : (
                   <>
-                    <Dot colour="#38bdf8" label="Faces" shape="face" />
-                    <Dot colour="#fbbf24" label="Corners" shape="corner" />
+                    <Dot colour="#38bdf8" label={t`Faces`} shape="face" />
+                    <Dot colour="#fbbf24" label={t`Corners`} shape="corner" />
                   </>
                 )}
               </div>
@@ -2046,23 +2093,26 @@ export function ModelViewport({
             the thing that made a piece's box hard to place at all. */}
             {showCollision || editingVolume ? (
               <div className="flex gap-3">
-                <Dot colour="#f97316" label="Unit volume" />
+                <Dot colour="#f97316" label={t`Unit volume`} />
                 {project.pieceCollision ||
                 project.pieceSelection ||
                 editPieceCollisionId ? (
-                  <Dot colour="#facc15" label="Piece boxes" />
+                  <Dot colour="#facc15" label={t`Piece boxes`} />
                 ) : null}
               </div>
             ) : null}
             {showAim || showAimPoint ? (
               <div className="flex gap-3">
-                <Dot colour="#ef4444" label="Aim point" />
+                <Dot colour="#ef4444" label={t`Aim point`} />
               </div>
             ) : null}
             {showGuides &&
             (symmetryPlane || (project.guides ?? []).some((g) => !g.hidden)) ? (
               <div className="flex gap-3">
-                <Dot colour={`#${GUIDE_COLOUR.toString(16)}`} label="Guides" />
+                <Dot
+                  colour={`#${GUIDE_COLOUR.toString(16)}`}
+                  label={t`Guides`}
+                />
               </div>
             ) : null}
             {balance && (showBalance || balance.status === "outside") ? (
@@ -2091,36 +2141,19 @@ export function ModelViewport({
             ) : null}
             {showReach && reaches.length > 0 ? (
               <div className="flex gap-3">
-                {reaches.map((reach, index) => (
-                  <Dot
-                    key={reach.number}
-                    colour={reachColour(index)}
-                    label={`Weapon ${reach.number}`}
-                  />
-                ))}
+                {reaches.map((reach, index) => {
+                  const weaponNumber = reach.number;
+                  return (
+                    <Dot
+                      key={reach.number}
+                      colour={reachColour(index)}
+                      label={t`Weapon ${weaponNumber}`}
+                    />
+                  );
+                })}
               </div>
             ) : null}
-            <span>
-              {measure.active
-                ? `Click two points to measure, or drag an end to move it. ${shortcutLabel("measure-stop")} to leave`
-                : pickingGuide
-                  ? `Click the model to put a ${pickingGuide.axis.toUpperCase()} ${pickingGuide.kind === "line" ? "line" : "plane"} there. Escape to stop`
-                  : placingAnchor
-                    ? PLACE_CONNECTOR_HINT
-                    : placingPart
-                      ? `Click a face to place the ${"module" in placingPart ? (placingPart.module.mount ? "module" : "module, which has no mount so joins by its first piece") : "part"}. ${shortcutLabel("place-face")} next face, ${shortcutLabel("place-twist")} twist, Escape to stop`
-                      : resizeNote !== null
-                        ? resizeNote
-                        : snapped
-                          ? snappedTo
-                            ? `Snapped to "${snappedTo}". Hold Alt to place freely`
-                            : "Snapped. Hold Alt to place freely"
-                          : slidBy !== null
-                            ? `Sliding on the face, offset ${slidBy}, in steps of ${steppedBy}. Hold Alt to place freely and detach`
-                            : steppedBy !== null
-                              ? `Moving in steps of ${steppedBy}. Hold Alt to place freely`
-                              : "Hold Alt to place freely"}
-            </span>
+            <span>{hintText()}</span>
           </div>
 
           <ViewportBar

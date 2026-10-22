@@ -4,7 +4,7 @@
  */
 
 import { useLingui } from "@lingui/react/macro";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useUnitsyncScan } from "@/content/config";
 import { usePreferredTarget } from "@/play/config";
 import { type EffectBitmaps, loadEffectBitmaps } from "../../effectBitmaps";
@@ -18,6 +18,20 @@ const LOADING: EffectBitmaps = { atlas: null, note: null };
  *  project reads the same as one with no game. */
 export function useEffectBitmaps(project: LegoProject | null): EffectBitmaps {
   const { t } = useLingui();
+  const noGame = useMemo<EffectBitmaps>(
+    () => ({
+      atlas: null,
+      note: t`This unit has no game, so its effects are drawn as a plain round sprite.`,
+    }),
+    [t],
+  );
+  const noTarget = useMemo<EffectBitmaps>(
+    () => ({
+      atlas: null,
+      note: t`There is no engine set up to read the game's bitmaps, so effects are drawn as a plain round sprite.`,
+    }),
+    [t],
+  );
   const { target } = usePreferredTarget();
   const scan = useUnitsyncScan(target?.enginePath, target?.dataDir);
   // The unit's own game (#3257), read from the installed build of it. A game
@@ -75,17 +89,7 @@ export function useEffectBitmaps(project: LegoProject | null): EffectBitmaps {
     };
   }, []);
 
-  if (!archive) {
-    return {
-      atlas: null,
-      note: t`This unit has no game, so its effects are drawn as a plain round sprite.`,
-    };
-  }
-  if (!enginePath || !dataDir) {
-    return {
-      atlas: null,
-      note: t`There is no engine set up to read the game's bitmaps, so effects are drawn as a plain round sprite.`,
-    };
-  }
+  if (!archive) return noGame;
+  if (!enginePath || !dataDir) return noTarget;
   return loaded ?? LOADING;
 }

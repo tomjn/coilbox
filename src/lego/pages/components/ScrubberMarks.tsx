@@ -1,3 +1,5 @@
+import { t } from "@lingui/core/macro";
+import { Trans } from "@lingui/react/macro";
 import { useEffect, useRef, useState } from "react";
 
 import {
@@ -49,7 +51,7 @@ export function ScrubberMarks({
       <div
         ref={row}
         role="group"
-        aria-label="What the script announced"
+        aria-label={t`What the script announced`}
         // Inset by half the slider thumb's width (size-4, 16px) so a mark at
         // frame 0 or the last frame lines up with the thumb centre instead of
         // spilling past it. Radix's getThumbInBoundsOffset keeps the thumb
@@ -72,12 +74,18 @@ export function ScrubberMarks({
             </TooltipTrigger>
             <TooltipContent>
               <ul className="flex flex-col gap-0.5 text-xs">
-                {mark.events.map((event, index) => (
-                  // biome-ignore lint/suspicious/noArrayIndexKey: one frame can carry identical events, so position is the only stable key
-                  <li key={`${event.frame}-${index}`}>
-                    Frame {event.frame + 1}: {describeOutput(event)}
-                  </li>
-                ))}
+                {mark.events.map((event, index) => {
+                  const frame = event.frame + 1;
+                  const what = describeOutput(event);
+                  return (
+                    // biome-ignore lint/suspicious/noArrayIndexKey: one frame can carry identical events, so position is the only stable key
+                    <li key={`${event.frame}-${index}`}>
+                      <Trans>
+                        Frame {frame}: {what}
+                      </Trans>
+                    </li>
+                  );
+                })}
               </ul>
             </TooltipContent>
           </Tooltip>

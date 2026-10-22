@@ -21,6 +21,8 @@
  * and it is marked with the game's name.
  */
 
+import { plural } from "@lingui/core/macro";
+import { useLingui } from "@lingui/react/macro";
 import { Button, cn } from "@picoframe/frame";
 import { Star } from "lucide-react";
 import {
@@ -171,6 +173,7 @@ export function TileGrid({
   onFavourite,
   scrollRoot,
 }: Props) {
+  const { t } = useLingui();
   const scrollRef = useRef<HTMLDivElement>(null);
   const hostRef = useRef<HTMLDivElement>(null);
   const contentRef = useRef<HTMLDivElement>(null);
@@ -414,15 +417,23 @@ export function TileGrid({
       const module = item.kind === "module" ? item.module : undefined;
       const liftedFrom =
         module && holdsLiftedPieces(module) ? module.game?.name : undefined;
+      const shapeSize =
+        item.kind === "shape" ? item.shape.size.join(" x ") : "";
+      const partTags =
+        item.kind === "part" ? visibleTags(item.part.tags).join(", ") : "";
+      const pieceCount = item.kind === "module" ? item.module.pieces.length : 0;
       const title =
         item.kind === "shape"
-          ? `${name}, ${item.shape.size.join(" x ")}`
+          ? t`${name}, ${shapeSize}`
           : item.kind === "part"
-            ? `${name}, ${visibleTags(item.part.tags).join(", ")}`
+            ? t`${name}, ${partTags}`
             : [
                 placesModules
-                  ? `Place ${name} on a connector. Alt adds it to the selected piece`
-                  : `${name}, ${item.module.pieces.length} pieces`,
+                  ? t`Place ${name} on a connector. Alt adds it to the selected piece`
+                  : plural(pieceCount, {
+                      one: `${name}, # piece`,
+                      other: `${name}, # pieces`,
+                    }),
                 ...(liftedFrom ? liftCredits(item.module) : []),
               ]
                 .filter(Boolean)
@@ -503,8 +514,14 @@ export function TileGrid({
               className={`absolute right-0 top-0 size-6 transition-opacity focus:opacity-100 group-hover:opacity-100 ${starred ? "opacity-100" : "opacity-0"}`}
               onClick={onStar}
               aria-pressed={starred}
-              aria-label={`Favourite the ${name} ${item.kind}`}
-              title={starred ? "Remove from favourites" : "Favourite"}
+              aria-label={
+                item.kind === "shape"
+                  ? t`Favourite the ${name} shape`
+                  : item.kind === "part"
+                    ? t`Favourite the ${name} part`
+                    : t`Favourite the ${name} module`
+              }
+              title={starred ? t`Remove from favourites` : t`Favourite`}
             >
               <Star size={14} fill={starred ? "currentColor" : "none"} />
             </Button>

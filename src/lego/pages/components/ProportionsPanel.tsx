@@ -14,6 +14,8 @@
  * pieces it moves and reparents.
  */
 
+import { t } from "@lingui/core/macro";
+import { Plural, Trans, useLingui } from "@lingui/react/macro";
 import { Button, Input } from "@picoframe/frame";
 import { useEffect, useState } from "react";
 import {
@@ -22,6 +24,7 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import { Slider } from "@/components/ui/slider";
+import { getLocale } from "@/i18n";
 import { formatNumber } from "@/lib/format";
 import {
   type BodyPlan,
@@ -97,11 +100,13 @@ function RemoveSkeleton({ onRemove }: { onRemove: () => void }) {
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
         <Button size="sm" variant="outline" className="self-start">
-          Remove skeleton
+          <Trans>Remove skeleton</Trans>
         </Button>
       </PopoverTrigger>
       <PopoverContent align="start" className="w-56 p-2 text-xs">
-        <p>Keeps every piece.</p>
+        <p>
+          <Trans>Keeps every piece.</Trans>
+        </p>
         <div className="mt-2 flex gap-1">
           <Button
             size="sm"
@@ -111,10 +116,10 @@ function RemoveSkeleton({ onRemove }: { onRemove: () => void }) {
               onRemove();
             }}
           >
-            Remove
+            <Trans>Remove</Trans>
           </Button>
           <Button size="sm" variant="outline" onClick={() => setOpen(false)}>
-            Cancel
+            <Trans>Cancel</Trans>
           </Button>
         </div>
       </PopoverContent>
@@ -124,11 +129,18 @@ function RemoveSkeleton({ onRemove }: { onRemove: () => void }) {
 
 const NAMES_SHOWN = 6;
 
+/** Names in the app language's list style, as the unit-list `Intl` form. */
+function joinNames(names: string[]): string {
+  return new Intl.ListFormat(getLocale(), {
+    type: "unit",
+    style: "long",
+  }).format(names);
+}
+
 function nameList(names: string[]): string {
-  const shown = names.slice(0, NAMES_SHOWN).join(", ");
-  return names.length > NAMES_SHOWN
-    ? `${shown} and ${names.length - NAMES_SHOWN} more`
-    : shown;
+  const shown = joinNames(names.slice(0, NAMES_SHOWN));
+  const rest = names.length - NAMES_SHOWN;
+  return names.length > NAMES_SHOWN ? t`${shown} and ${rest} more` : shown;
 }
 
 /** Hands the fitted skeleton back to the plan, after saying what that does. */
@@ -145,28 +157,52 @@ function ResetToPlan({
   const { moved, reparented, added } = open
     ? resetToPlan(project, plan, () => "preview")
     : { moved: [], reparented: [], added: [] };
+  const movedNames = nameList(moved.map((piece) => piece.name));
+  const addedNames = nameList(added);
   return (
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
         <Button size="sm" variant="outline" className="self-start">
-          Reset to plan
+          <Trans>Reset to plan</Trans>
         </Button>
       </PopoverTrigger>
       <PopoverContent align="start" className="w-64 space-y-1 p-2 text-xs">
         {moved.length + reparented.length + added.length === 0 ? (
-          <p>Nothing moves.</p>
+          <p>
+            <Trans>Nothing moves.</Trans>
+          </p>
         ) : null}
         {moved.length > 0 ? (
-          <p>Moves {nameList(moved.map((piece) => piece.name))}.</p>
-        ) : null}
-        {reparented.map((piece) => (
-          <p key={piece.pieceId}>
-            Reparents {piece.name} from {piece.from ?? "the unit"} to {piece.to}
-            .
+          <p>
+            <Trans>Moves {movedNames}.</Trans>
           </p>
-        ))}
-        {added.length > 0 ? <p>Adds {nameList(added)}.</p> : null}
-        <p>Other pieces stay where they are.</p>
+        ) : null}
+        {reparented.map((piece) => {
+          const name = piece.name;
+          const from = piece.from;
+          const to = piece.to;
+          return (
+            <p key={piece.pieceId}>
+              {from === null || from === undefined ? (
+                <Trans>
+                  Reparents {name} from the unit to {to}.
+                </Trans>
+              ) : (
+                <Trans>
+                  Reparents {name} from {from} to {to}.
+                </Trans>
+              )}
+            </p>
+          );
+        })}
+        {added.length > 0 ? (
+          <p>
+            <Trans>Adds {addedNames}.</Trans>
+          </p>
+        ) : null}
+        <p>
+          <Trans>Other pieces stay where they are.</Trans>
+        </p>
         <div className="flex gap-1 pt-1">
           <Button
             size="sm"
@@ -175,10 +211,10 @@ function ResetToPlan({
               onReset();
             }}
           >
-            Reset
+            <Trans>Reset</Trans>
           </Button>
           <Button size="sm" variant="outline" onClick={() => setOpen(false)}>
-            Cancel
+            <Trans>Cancel</Trans>
           </Button>
         </div>
       </PopoverContent>
@@ -204,23 +240,30 @@ function FittedProportions({
   onRemove: () => void;
   onReset: () => void;
 }) {
+  const planLabel = plan.label;
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto px-3 py-3">
       <p className="text-xs text-muted-foreground">
-        {plan.label}, fitted to this unit's pieces
+        <Trans>{planLabel}, fitted to this unit's pieces</Trans>
       </p>
       <dl className="space-y-1 text-xs">
         {plan.proportions.map((proportion) => {
           const value = measured[proportion.id];
+          const elmos =
+            value === undefined
+              ? ""
+              : formatNumber(value, { maximumFractionDigits: 3 });
           return (
             <div key={proportion.id} className="flex justify-between gap-2">
               <dt className="text-muted-foreground">{proportion.label}</dt>
               <dd>
-                {value === undefined
-                  ? "Not measured"
-                  : proportion.unit === "elmo"
-                    ? `${formatNumber(value, { maximumFractionDigits: 3 })} elmos`
-                    : String(value)}
+                {value === undefined ? (
+                  <Trans>Not measured</Trans>
+                ) : proportion.unit === "elmo" ? (
+                  <Trans>{elmos} elmos</Trans>
+                ) : (
+                  String(value)
+                )}
               </dd>
             </div>
           );
@@ -241,6 +284,7 @@ function PlanProportions({
   onRemove,
   preview,
 }: Omit<Props, "onReset">) {
+  const planLabel = plan.label;
   const values = planProportions(plan, project.skeleton?.proportions);
   const shownValues =
     preview && preview.id in values
@@ -252,6 +296,8 @@ function PlanProportions({
     value: number;
     lost: LegoPiece[];
   } | null>(null);
+  const lostCount = asking?.lost.length ?? 0;
+  const lostNames = asking ? joinNames(asking.lost.map((p) => p.name)) : "";
 
   function commit(proportion: BodyPlanProportion, typed: number) {
     const { value, held: wasHeld } = clampProportion(proportion, typed);
@@ -270,9 +316,11 @@ function PlanProportions({
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto px-3 py-3">
       <p className="text-xs text-muted-foreground">
-        {plan.proportions.length > 0
-          ? `${plan.label}. Drag a handle in the view or set a number.`
-          : plan.label}
+        {plan.proportions.length > 0 ? (
+          <Trans>{planLabel}. Drag a handle in the view or set a number.</Trans>
+        ) : (
+          plan.label
+        )}
       </p>
       <SizeSection
         plan={plan}
@@ -305,9 +353,11 @@ function PlanProportions({
           className="rounded border border-destructive/50 p-2 text-xs"
         >
           <p>
-            This removes {asking.lost.map((piece) => piece.name).join(", ")}.
-            What is hung on {asking.lost.length === 1 ? "it" : "them"} stays
-            where it is, on the bone above.
+            <Plural
+              value={lostCount}
+              one={`This removes ${lostNames}. What is hung on it stays where it is, on the bone above.`}
+              other={`This removes ${lostNames}. What is hung on them stays where it is, on the bone above.`}
+            />
           </p>
           <div className="mt-2 flex gap-1">
             <Button
@@ -318,24 +368,30 @@ function PlanProportions({
                 setAsking(null);
               }}
             >
-              Remove
+              <Trans>Remove</Trans>
             </Button>
             <Button size="sm" variant="outline" onClick={() => setAsking(null)}>
-              Keep
+              <Trans>Keep</Trans>
             </Button>
           </div>
         </div>
       ) : null}
       <p className="text-xs text-muted-foreground">
-        A bone you moved by hand goes back to the plan when a proportion that
-        places it changes.
+        <Trans>
+          A bone you moved by hand goes back to the plan when a proportion that
+          places it changes.
+        </Trans>
       </p>
       <RemoveSkeleton onRemove={onRemove} />
     </div>
   );
 }
 
-const AXIS_NAMES = { x: "width", z: "length", height: "height" } as const;
+function axisName(axis: "x" | "z" | "height"): string {
+  if (axis === "x") return t`width`;
+  if (axis === "z") return t`length`;
+  return t`height`;
+}
 
 /** The skeleton's size, the target it is meant to stay within, and the fields
  *  to fit it to a new one. */
@@ -353,12 +409,19 @@ function SizeSection({
   const size = skeletonSize(plan, values, target);
   const over = target ? overTarget(size, target) : [];
   const initial = target ?? currentTarget(plan, values);
-  const where = over.map((axis) => AXIS_NAMES[axis]).join(" and ");
+  const where = new Intl.ListFormat(getLocale(), {
+    type: "conjunction",
+  }).format(over.map(axisName));
+  const sizeText = describeSize(size);
   return (
     <div className="space-y-2">
-      <p className="text-xs">Size {describeSize(size)}</p>
+      <p className="text-xs">
+        <Trans>Size {sizeText}</Trans>
+      </p>
       {over.length > 0 ? (
-        <p className="text-xs text-destructive">Past the target in {where}.</p>
+        <p className="text-xs text-destructive">
+          <Trans>Past the target in {where}.</Trans>
+        </p>
       ) : null}
       <FitFields
         key={JSON.stringify(initial)}
@@ -389,7 +452,7 @@ function FitFields({
           disabled={!typed}
           onClick={() => typed && onTarget(typed)}
         >
-          Fit
+          <Trans>Fit</Trans>
         </Button>
       </div>
     </>
@@ -411,6 +474,10 @@ function ProportionRow({
   onSlide: (value: number) => void;
   onSlideEnd: (value: number) => void;
 }) {
+  const { t } = useLingui();
+  const proportionLabel = proportion.label;
+  const min = proportion.min;
+  const max = proportion.max;
   const shown = String(Number(value.toFixed(3)));
   const [text, setText] = useState(shown);
   useEffect(() => setText(shown), [shown]);
@@ -433,8 +500,11 @@ function ProportionRow({
           className="text-xs text-muted-foreground"
           htmlFor={`proportion-${proportion.id}`}
         >
-          {proportion.label}
-          {proportion.unit === "elmo" ? " (elmos)" : ""}
+          {proportion.unit === "elmo" ? (
+            <Trans>{proportionLabel} (elmos)</Trans>
+          ) : (
+            proportion.label
+          )}
         </label>
         <Input
           id={`proportion-${proportion.id}`}
@@ -451,7 +521,7 @@ function ProportionRow({
       </div>
       <Slider
         className="mt-2"
-        aria-label={`Slide ${proportion.label}`}
+        aria-label={t`Slide ${proportionLabel}`}
         min={proportion.min}
         max={proportion.max}
         step={proportion.step}
@@ -467,7 +537,9 @@ function ProportionRow({
       />
       {held ? (
         <p className="mt-1 text-xs text-muted-foreground">
-          Held to {proportion.min} to {proportion.max}.
+          <Trans>
+            Held to {min} to {max}.
+          </Trans>
         </p>
       ) : null}
     </div>

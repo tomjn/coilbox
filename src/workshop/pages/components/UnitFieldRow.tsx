@@ -63,11 +63,11 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+import type { BuilderFieldMark } from "@/lego/builderFields";
 // The "?" tooltip mapconv already built for its own labelled fields. Shared
 // rather than copied: it is a generic control that happens to live in that
 // plugin's folder.
-import { getLocale } from "@/i18n";
-import type { BuilderFieldMark } from "@/lego/builderFields";
+import { formatList } from "@/lib/format";
 import { luaLiteral } from "@/lib/lua";
 import { HelpTip } from "@/mapconv/pages/components/Help";
 import {
@@ -579,10 +579,7 @@ export function UnitFieldRow({
 
   const engineDefaults =
     row.field.engine && row.field.engine.defaults.length > 0
-      ? new Intl.ListFormat(getLocale(), {
-          style: "long",
-          type: "disjunction",
-        }).format(row.field.engine.defaults.map(String))
+      ? formatList(row.field.engine.defaults.map(String), "disjunction")
       : t`a value it works out itself`;
   const current = typeof row.value === "string" ? row.value.trim() : "";
   const options =

@@ -9,8 +9,7 @@ import { OptionSelect } from "@/components/OptionSelect";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Toggle } from "@/components/ui/toggle";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
-import { getLocale } from "@/i18n";
-import { formatNumber } from "@/lib/format";
+import { formatList, formatNumber } from "@/lib/format";
 import { drawHeatField } from "@/lib/heatCanvas";
 import { HEAT_KIND_OF_LAYER } from "@/lib/heatRamp";
 import type { MapScene3D } from "@/lib/mapScene";
@@ -130,11 +129,7 @@ const NORMALISE_NOTE: Record<Normalise, MessageDescriptor> = {
 };
 
 /** "A", "A and B", "A, B and C" in the app language. */
-const joinList = (parts: string[]) =>
-  new Intl.ListFormat(getLocale(), {
-    style: "long",
-    type: "conjunction",
-  }).format(parts);
+const joinList = (parts: string[]) => formatList(parts, "conjunction");
 
 /**
  * Every match of one map in the library, drawn as one picture (#1161).

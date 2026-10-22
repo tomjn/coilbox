@@ -172,7 +172,7 @@ export function openingsByTeam(
     const unit = first ? resolveBuildUnit(first.unitDefId, units) : undefined;
     if (!first || !unit) continue;
     const name = unit.fullName || unit.name;
-    out.set(team, first.count > 1 ? `${name} ×${first.count}` : name);
+    out.set(team, first.count > 1 ? `${name} ×${first.count}` : name); // i18n: not a plural
   }
   return out;
 }

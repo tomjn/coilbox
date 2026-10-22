@@ -8,6 +8,7 @@
  * by hand in the game's file, which shows the file's value. See `unitStats.ts`.
  */
 
+import { Trans, useLingui } from "@lingui/react/macro";
 import { Input } from "@picoframe/frame";
 import type { ReactNode } from "react";
 import { Link } from "react-router";
@@ -78,6 +79,7 @@ export function StatsSection({
   reference,
   onBudgetChange,
 }: Props) {
+  const { t } = useLingui();
   const { target, scan } = useTestGame();
   const { projects: tweakProjects } = useModProjects();
   const source = useWeaponSource(project);
@@ -167,26 +169,34 @@ export function StatsSection({
           ),
         )
       : null;
+  const referenceGame = reference?.gameName ?? "";
+  const referenceName = reference?.label ?? "";
   const missingReference = !reference
-    ? "Choose a game unit with the reference button to compare."
+    ? t`Choose a game unit with the reference button to compare.`
     : compared.status === "error"
-      ? `Could not read ${reference.gameName}.`
+      ? t`Could not read ${referenceGame}.`
       : !comparedDefs
-        ? `Reading ${reference.gameName}`
+        ? t`Reading ${referenceGame}`
         : !referenceDef
-          ? `${reference.label} is not in ${reference.gameName}.`
+          ? t`${referenceName} is not in ${referenceGame}.`
           : null;
+  const overBudget = standing ? figure(-standing.left) : "";
+  const leftBudget = standing ? figure(standing.left) : "";
 
   function cell(id: StatId): ReactNode {
     const value = ownStats[id];
     if (value === null)
-      return <span className="text-muted-foreground">None</span>;
+      return (
+        <span className="text-muted-foreground">
+          <Trans>None</Trans>
+        </span>
+      );
     const field = fields?.[id];
     return game && key && field ? (
       <Link
         to={unitEditPath(tweakProjects, game.name, key, field)}
         className="underline"
-        title="Change in Unit tweaks"
+        title={t`Change in Unit tweaks`}
       >
         {figure(value)}
       </Link>
@@ -197,10 +207,14 @@ export function StatsSection({
 
   return (
     <div className="flex flex-col gap-1.5 border-b border-border/60 px-3 py-2">
-      <p className="text-sm font-medium">Stats</p>
+      <p className="text-sm font-medium">
+        <Trans>Stats</Trans>
+      </p>
       <dl className="grid grid-cols-[auto_1fr_1fr] gap-x-3 gap-y-0.5 text-xs tabular-nums">
         <dt />
-        <dd className="text-muted-foreground">This unit</dd>
+        <dd className="text-muted-foreground">
+          <Trans>This unit</Trans>
+        </dd>
         <dd className="truncate text-muted-foreground" title={reference?.label}>
           {reference?.label ?? ""}
         </dd>
@@ -220,9 +234,11 @@ export function StatsSection({
             }
             reference={
               referenceStats ? (
-                <output aria-label={`${label}, ${reference?.label}`}>
+                <output aria-label={t`${label}, ${referenceName}`}>
                   {referenceStats[id] === null ? (
-                    <span className="text-muted-foreground">None</span>
+                    <span className="text-muted-foreground">
+                      <Trans>None</Trans>
+                    </span>
                   ) : (
                     figure(referenceStats[id])
                   )}
@@ -235,7 +251,7 @@ export function StatsSection({
       {onBudgetChange || project.budget !== undefined ? (
         <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5 text-xs tabular-nums">
           <Label htmlFor="lego-budget" className="text-muted-foreground">
-            Budget
+            <Trans>Budget</Trans>
           </Label>
           <Input
             id="lego-budget"
@@ -258,12 +274,14 @@ export function StatsSection({
           />
           {standing ? (
             <output
-              aria-label="Budget left"
+              aria-label={t`Budget left`}
               className={standing.over ? "text-destructive" : undefined}
             >
-              {standing.over
-                ? `${figure(-standing.left)} over`
-                : `${figure(standing.left)} left`}
+              {standing.over ? (
+                <Trans>{overBudget} over</Trans>
+              ) : (
+                <Trans>{leftBudget} left</Trans>
+              )}
             </output>
           ) : null}
         </div>

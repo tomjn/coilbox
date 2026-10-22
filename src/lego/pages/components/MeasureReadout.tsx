@@ -6,6 +6,7 @@
  * line.
  */
 
+import { Trans } from "@lingui/react/macro";
 import { Button } from "@picoframe/frame";
 import { X } from "lucide-react";
 import { useMemo, useSyncExternalStore } from "react";
@@ -35,8 +36,14 @@ export function AxisFigures({
   const { elmos, steps } = axesText(values, step);
   return (
     <>
-      <div>{elmos} elmos</div>
-      {steps ? <div>{steps} steps</div> : null}
+      <div>
+        <Trans>{elmos} elmos</Trans>
+      </div>
+      {steps ? (
+        <div>
+          <Trans>{steps} steps</Trans>
+        </div>
+      ) : null}
     </>
   );
 }
@@ -87,7 +94,9 @@ export function MeasureReadout({
   return (
     <div className={`${card} max-h-48 min-w-48 overflow-y-auto`}>
       <div className="flex items-center justify-between gap-3">
-        <span className="font-medium">Measure</span>
+        <span className="font-medium">
+          <Trans>Measure</Trans>
+        </span>
         {measurements.length > 0 ? (
           <Button
             size="sm"
@@ -95,7 +104,7 @@ export function MeasureReadout({
             className="h-5 px-1 text-xs"
             onClick={onClear}
           >
-            <X size={12} /> Clear
+            <X size={12} /> <Trans>Clear</Trans>
           </Button>
         ) : null}
       </div>
@@ -118,11 +127,15 @@ export function MeasureReadout({
               <AxisFigures values={live.delta} step={step} />
             </>
           ) : (
-            <div>Click the second point</div>
+            <div>
+              <Trans>Click the second point</Trans>
+            </div>
           )}
         </div>
       ) : measurements.length === 0 ? (
-        <div className="mt-1">Click the first point</div>
+        <div className="mt-1">
+          <Trans>Click the first point</Trans>
+        </div>
       ) : null}
     </div>
   );
@@ -140,11 +153,15 @@ export function DragReadout({
 }) {
   return (
     <div className={card}>
-      <div className="font-medium">Moved</div>
+      <div className="font-medium">
+        <Trans>Moved</Trans>
+      </div>
       <AxisFigures values={moved} step={step} />
       {size ? (
         <>
-          <div className="mt-1 font-medium">Size</div>
+          <div className="mt-1 font-medium">
+            <Trans>Size</Trans>
+          </div>
           <AxisFigures values={size} step={step} />
         </>
       ) : null}
@@ -175,7 +192,9 @@ export function PieceSize({
   if (!size) return null;
   return (
     <div className="mt-2">
-      <span className="text-xs text-muted-foreground">Size</span>
+      <span className="text-xs text-muted-foreground">
+        <Trans>Size</Trans>
+      </span>
       <div className="mt-1 text-xs">
         <AxisFigures values={size} step={partUnit(pack)} />
       </div>

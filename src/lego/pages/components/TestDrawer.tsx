@@ -9,6 +9,8 @@
  * gadget to maintain.
  */
 
+import { t } from "@lingui/core/macro";
+import { Trans } from "@lingui/react/macro";
 import { Button, useSetting } from "@picoframe/frame";
 import {
   Crosshair,
@@ -124,12 +126,13 @@ type Reload =
 /** What the sandbox gadget puts before its reason when a reload did not happen. */
 const FAILED = `${SANDBOX_REPLY}failed:`;
 
-const BUSY_LABEL: Record<string, string> = {
-  writing: "Writing the scratch game",
-  scanning: "Letting the engine find it",
-  playing: "Game running",
-  checking: "Running the engine",
-};
+function busyLabel(state: Phase["state"]): string | undefined {
+  if (state === "writing") return t`Writing the scratch game`;
+  if (state === "scanning") return t`Letting the engine find it`;
+  if (state === "playing") return t`Game running`;
+  if (state === "checking") return t`Running the engine`;
+  return undefined;
+}
 
 export function TestDrawer({ open, onOpenChange, project, pack, raw }: Props) {
   const { target, targetLoading, scan, games, game, setGameName } =
@@ -188,17 +191,19 @@ export function TestDrawer({ open, onOpenChange, project, pack, raw }: Props) {
     phase.state === "playing" ||
     phase.state === "checking";
 
+  const scanError = scan.error;
+  const unitName = project.unitName;
   const blocker =
     !targetLoading && !target
-      ? "No engine is installed. Add one from Content before testing a unit."
-      : scan.error
-        ? `The content scan failed: ${scan.error}`
+      ? t`No engine is installed. Add one from Content before testing a unit.`
+      : scanError
+        ? t`The content scan failed: ${scanError}`
         : scan.data && games.length === 0
-          ? "No game is installed. A unit needs one to be built on top of."
+          ? t`No game is installed. A unit needs one to be built on top of.`
           : scan.data && maps.length === 0
-            ? "No map is installed. Download one from Content first."
+            ? t`No map is installed. Download one from Content first.`
             : running && !busy
-              ? "A game is already running."
+              ? t`A game is already running.`
               : null;
 
   const waiting = targetLoading || (!!target && !scan.data && scan.loading);
@@ -316,10 +321,11 @@ export function TestDrawer({ open, onOpenChange, project, pack, raw }: Props) {
         executable: target.executable,
         dataDir: target.dataDir,
       });
-      if (result.exitCode !== null && result.exitCode !== 0) {
+      const exitCode = result.exitCode;
+      if (exitCode !== null && exitCode !== 0) {
         setPhase({
           state: "failed",
-          message: `The engine exited with code ${result.exitCode}. Its infolog says why.`,
+          message: t`The engine exited with code ${exitCode}. Its infolog says why.`,
         });
         return;
       }
@@ -349,7 +355,7 @@ export function TestDrawer({ open, onOpenChange, project, pack, raw }: Props) {
   /** "Launch sandbox with targets": the sandbox mission (issue #3341). */
   function playSandbox() {
     return play("play", async () => {
-      if (!target || !game || !map) throw new Error("Nothing to play on.");
+      if (!target || !game || !map) throw new Error(t`Nothing to play on.`);
       const { sandbox, scenario } = await prepareSandbox({
         enginePath: target.enginePath,
         dataDir: target.dataDir,
@@ -411,7 +417,7 @@ export function TestDrawer({ open, onOpenChange, project, pack, raw }: Props) {
             },
         );
         said.push(
-          `Reloaded the script. Every ${project.unitName} in the game runs it now.`,
+          t`Reloaded the script. Every ${unitName} in the game runs it now.`,
         );
       }
       if (changes.textures) {
@@ -433,13 +439,13 @@ export function TestDrawer({ open, onOpenChange, project, pack, raw }: Props) {
             },
         );
         said.push(
-          `Reloaded the texture. Every ${project.unitName} in the game shows it now.`,
+          t`Reloaded the texture. Every ${unitName} in the game shows it now.`,
         );
       }
       const relaunch = relaunchMessage(changes.relaunch);
       if (relaunch) said.push(relaunch);
       if (said.length === 0) {
-        said.push("Nothing has changed since the game started.");
+        said.push(t`Nothing has changed since the game started.`);
       }
       setReload({
         state: "done",
@@ -497,10 +503,10 @@ export function TestDrawer({ open, onOpenChange, project, pack, raw }: Props) {
         <DialogPrimitive.Content className="fixed inset-y-0 right-0 z-50 flex w-[460px] max-w-[92vw] flex-col border-l border-border bg-background shadow-xl duration-200 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:slide-out-to-right data-[state=open]:slide-in-from-right">
           <div className="flex items-center justify-between border-b border-border/60 px-5 py-4">
             <DialogPrimitive.Title className="text-base font-semibold">
-              Test {project.unitName} in game
+              <Trans>Test {unitName} in game</Trans>
             </DialogPrimitive.Title>
             <DialogPrimitive.Close asChild>
-              <Button variant="ghost" size="icon" aria-label="Close">
+              <Button variant="ghost" size="icon" aria-label={t`Close`}>
                 <X className="size-4" />
               </Button>
             </DialogPrimitive.Close>
@@ -514,30 +520,35 @@ export function TestDrawer({ open, onOpenChange, project, pack, raw }: Props) {
                 selectedName={game?.name ?? ""}
                 onSelect={setGameName}
                 onBack={() => setPickingGame(false)}
-                backLabel="Back to the test settings"
+                backLabel={t`Back to the test settings`}
                 gamesLoading={waiting}
               />
             </div>
           ) : (
             <div className="flex flex-col gap-5 overflow-y-auto px-5 py-4">
               <p className="text-xs text-muted-foreground">
-                The unit is written into a scratch game of coilbox's own, which
-                depends on the game you pick below. Your install is not touched,
-                and deleting <code>{SCRATCH_FOLDER}</code> undoes all of it.
+                <Trans>
+                  The unit is written into a scratch game of coilbox's own,
+                  which depends on the game you pick below. Your install is not
+                  touched, and deleting <code>{SCRATCH_FOLDER}</code> undoes all
+                  of it.
+                </Trans>
               </p>
 
               <div className="flex flex-col gap-2">
-                <span className="text-sm font-medium">Build on</span>
+                <span className="text-sm font-medium">
+                  <Trans>Build on</Trans>
+                </span>
                 <GamePickerButton
                   value={game?.name ?? ""}
                   games={games}
                   headers={gameHeaders}
                   placeholder={
                     waiting
-                      ? "Reading games"
+                      ? t`Reading games`
                       : scan.error
-                        ? "Scan failed"
-                        : "No game installed"
+                        ? t`Scan failed`
+                        : t`No game installed`
                   }
                   disabled={busy || games.length === 0}
                   onClick={() => setPickingGame(true)}
@@ -545,17 +556,19 @@ export function TestDrawer({ open, onOpenChange, project, pack, raw }: Props) {
               </div>
 
               <div className="flex flex-col gap-2">
-                <span className="text-sm font-medium">Map</span>
+                <span className="text-sm font-medium">
+                  <Trans>Map</Trans>
+                </span>
                 <OptionSelect
                   value={map?.name ?? ""}
                   onValueChange={setMapName}
                   options={maps.map((m) => ({ value: m.name, label: m.name }))}
                   placeholder={
                     waiting
-                      ? "Reading maps"
+                      ? t`Reading maps`
                       : scan.error
-                        ? "Scan failed"
-                        : "No map installed"
+                        ? t`Scan failed`
+                        : t`No map installed`
                   }
                   disabled={busy || maps.length === 0}
                 />
@@ -563,14 +576,17 @@ export function TestDrawer({ open, onOpenChange, project, pack, raw }: Props) {
 
               <div className="flex flex-col gap-2 rounded border border-border/60 px-3 py-2 text-xs text-muted-foreground">
                 <p>
-                  <code>{project.unitName}</code> is the scratch game's start
-                  unit, so it is waiting at your start position a second into
-                  the match. Nothing has to build it and no cheats are needed.
+                  <Trans>
+                    <code>{unitName}</code> is the scratch game's start unit, so
+                    it is waiting at your start position a second into the
+                    match. Nothing has to build it and no cheats are needed.
+                  </Trans>
                 </p>
                 <p>
-                  If it is not there, press Enter and type <code>/cheat</code>{" "}
-                  then <code>/give {project.unitName}</code> to place one by
-                  hand.
+                  <Trans>
+                    If it is not there, press Enter and type <code>/cheat</code>{" "}
+                    then <code>/give {unitName}</code> to place one by hand.
+                  </Trans>
                 </p>
               </div>
 
@@ -581,8 +597,8 @@ export function TestDrawer({ open, onOpenChange, project, pack, raw }: Props) {
                 >
                   <Rocket className="size-4" />
                   {busy && action === "launch"
-                    ? BUSY_LABEL[phase.state]
-                    : "Launch with it as start unit"}
+                    ? busyLabel(phase.state)
+                    : t`Launch with it as start unit`}
                 </Button>
                 <Button
                   variant="outline"
@@ -591,8 +607,8 @@ export function TestDrawer({ open, onOpenChange, project, pack, raw }: Props) {
                 >
                   <Crosshair className="size-4" />
                   {busy && action === "play"
-                    ? BUSY_LABEL[phase.state]
-                    : "Launch sandbox with targets"}
+                    ? busyLabel(phase.state)
+                    : t`Launch sandbox with targets`}
                 </Button>
                 {running && sandboxRun ? (
                   <Button
@@ -602,10 +618,10 @@ export function TestDrawer({ open, onOpenChange, project, pack, raw }: Props) {
                   >
                     <RefreshCw className="size-4" />
                     {!sandboxRun.runId
-                      ? "Waiting for the engine to start"
+                      ? t`Waiting for the engine to start`
                       : reload.state === "reloading"
-                        ? "Reloading"
-                        : "Reload into the sandbox"}
+                        ? t`Reloading`
+                        : t`Reload into the sandbox`}
                   </Button>
                 ) : null}
                 {reload.state === "done" ? (
@@ -618,7 +634,7 @@ export function TestDrawer({ open, onOpenChange, project, pack, raw }: Props) {
                         disabled={!sandboxRun?.runId}
                       >
                         <RotateCcw className="size-4" />
-                        Relaunch
+                        <Trans>Relaunch</Trans>
                       </Button>
                     ) : null}
                   </div>
@@ -635,8 +651,8 @@ export function TestDrawer({ open, onOpenChange, project, pack, raw }: Props) {
                   >
                     <ScanSearch className="size-4" />
                     {busy && action === "check"
-                      ? BUSY_LABEL[phase.state]
-                      : "Check it loads"}
+                      ? busyLabel(phase.state)
+                      : t`Check it loads`}
                   </Button>
                   {phase.state === "checking" ? (
                     <Button
@@ -644,7 +660,7 @@ export function TestDrawer({ open, onOpenChange, project, pack, raw }: Props) {
                       onClick={() => void contentUnitCheckCancel(undefined)}
                     >
                       <Square className="size-4" />
-                      Stop
+                      <Trans>Stop</Trans>
                     </Button>
                   ) : null}
                 </div>
@@ -664,13 +680,15 @@ export function TestDrawer({ open, onOpenChange, project, pack, raw }: Props) {
 
               {phase.state === "done" ? (
                 <p className="text-xs text-muted-foreground">
-                  The game has closed. Launch again to test a change.
+                  <Trans>
+                    The game has closed. Launch again to test a change.
+                  </Trans>
                 </p>
               ) : null}
 
               {leftOut.map((line) => (
                 <p key={line} className="text-xs text-muted-foreground">
-                  Left out: {line}
+                  <Trans>Left out: {line}</Trans>
                 </p>
               ))}
 
@@ -678,7 +696,8 @@ export function TestDrawer({ open, onOpenChange, project, pack, raw }: Props) {
                 <div className="flex flex-col gap-2 text-xs">
                   <code className="break-all">{scratchDir}</code>
                   <ShowMe path={scratchDir}>
-                    <FolderOpen className="size-4" /> Show me the scratch game
+                    <FolderOpen className="size-4" />{" "}
+                    <Trans>Show me the scratch game</Trans>
                   </ShowMe>
                 </div>
               ) : null}

@@ -8,6 +8,7 @@
  * it.
  */
 
+import { Trans, useLingui } from "@lingui/react/macro";
 import { useState } from "react";
 import {
   Select,
@@ -29,12 +30,15 @@ interface Props {
 }
 
 export function UnitGamePicker({ project, onChange }: Props) {
+  const { t } = useLingui();
   const { games, scan } = useTestGame();
   const [refusal, setRefusal] = useState<string | null>(null);
   const current = unitGame(project);
   const installed = games.some(
     (g) => current && g.primaryArchive.name === current.archive,
   );
+
+  const currentName = current?.name ?? "";
 
   function pick(value: string) {
     const item = games.find((g) => g.primaryArchive.name === value);
@@ -48,20 +52,24 @@ export function UnitGamePicker({ project, onChange }: Props) {
   return (
     <div className="px-1 text-xs text-muted-foreground">
       <div className="flex items-center gap-1">
-        <span>for</span>
+        <span>
+          <Trans>for</Trans>
+        </span>
         <Select value={current?.archive ?? NO_GAME} onValueChange={pick}>
           <SelectTrigger
             size="sm"
             className="h-5 w-48 border-transparent bg-transparent px-1 text-xs hover:border-border focus-visible:border-border"
-            aria-label="Game"
+            aria-label={t`Game`}
           >
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value={NO_GAME}>No game</SelectItem>
+            <SelectItem value={NO_GAME}>
+              <Trans>No game</Trans>
+            </SelectItem>
             {current && !installed ? (
               <SelectItem value={current.archive}>
-                {current.name} (not installed)
+                <Trans>{currentName} (not installed)</Trans>
               </SelectItem>
             ) : null}
             {games.map((g) => (
