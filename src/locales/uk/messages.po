@@ -11003,7 +11003,7 @@ msgstr "Будь-який ваш запуск: сутичка, матч, міс�
 #: src/content/replayMatchFigures.ts
 #, fuzzy
 msgid "Any length"
-msgstr "Будь-яка тривалість"
+msgstr "Усі тривалості"
 
 #: src/hub/pages/BrowsePage.tsx
 #, fuzzy
@@ -24810,7 +24810,7 @@ msgstr "Проігноровано файл"
 #: src/multiplayer/index.tsx
 #, fuzzy
 msgid "Ignored users"
-msgstr "Ігноровані користувачі"
+msgstr "Ігноровані гравці"
 
 #: src/multiplayer/pages/IgnoreSettings.tsx
 #, fuzzy
@@ -26116,7 +26116,7 @@ msgstr "Не вдалося приєднатися: {lastJoinError}"
 #: src/multiplayer/chat/ChannelBrowser.tsx
 #, fuzzy
 msgid "Join or create a channel…"
-msgstr "Приєднатися до каналу або створити його…"
+msgstr "Назва каналу…"
 
 #: src/direct/JoinRoomForm.tsx
 #, fuzzy
@@ -37689,7 +37689,7 @@ msgstr "Швидкість переробки"
 #: src/downloads/pages/components/EngineInstaller.tsx
 #, fuzzy
 msgid "Recoil (GitHub releases)"
-msgstr "Recoil (випуски на GitHub)"
+msgstr "Recoil (релізи GitHub)"
 
 #: src/lego/animPresets.ts
 #, fuzzy
@@ -39798,7 +39798,7 @@ msgstr "Те саме, що accuracy, але використовується, �
 #: src/content/pages/components/DownloadFolders.tsx
 #, fuzzy
 msgid "Same as default"
-msgstr "Як за замовчуванням"
+msgstr "За замовчуванням"
 
 #: src/account/pages/SettingsSection.tsx
 #: src/content/pages/components/KeymapsPanel.tsx
@@ -51319,7 +51319,7 @@ msgstr "Невідоме поле \"{identifier}\". Спробуйте hp, speed
 #: src/content/pages/ReplaysPage.tsx
 #, fuzzy
 msgid "Unknown origin"
-msgstr "Невідоме походження"
+msgstr "Невідомо"
 
 #: src/deeplink/parse.ts
 #, fuzzy
