@@ -19,7 +19,7 @@
  */
 
 import { i18n, type MessageDescriptor } from "@lingui/core";
-import { msg } from "@lingui/core/macro";
+import { msg, select } from "@lingui/core/macro";
 import { Trans, useLingui } from "@lingui/react/macro";
 import { FileCode, Loader2 } from "lucide-react";
 
@@ -164,7 +164,19 @@ function Found({
               </p>
               {rows.map((row) => {
                 const pieceName = row.pieceName;
-                const role = roleLabel(row.role).toLowerCase();
+                const roleId = row.role.replaceAll(".", "_");
+                const roleName = roleLabel(row.role);
+                const sentence = t`${pieceName} is ${select(roleId, {
+                  buildarm_nano: "nano emit point",
+                  aim: "aim point",
+                  flare: "muzzle flare",
+                  turret: "turret",
+                  barrel: "barrel",
+                  buildarm_base: "build arm base",
+                  buildarm_arm: "build arm",
+                  wheel: "wheel",
+                  other: roleName,
+                })}`;
                 return (
                   <div key={row.pieceName} className="flex items-center gap-2">
                     <Checkbox
@@ -176,9 +188,7 @@ function Found({
                       htmlFor={`role-${row.pieceName}`}
                       className="text-xs font-normal"
                     >
-                      <Trans>
-                        {pieceName} is {role}
-                      </Trans>
+                      {sentence}
                     </Label>
                     <code className="ml-auto text-[0.6875rem] text-muted-foreground">
                       {row.callin}

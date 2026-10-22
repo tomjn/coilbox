@@ -11,7 +11,7 @@
  * what it needs, and the panel can say what is missing.
  */
 
-import { select, t } from "@lingui/core/macro";
+import { plural, select, t } from "@lingui/core/macro";
 import { formatFixed } from "@/lib/format";
 import { EVERY_CUT, WRECK_STAGES } from "./breakApart";
 import {
@@ -466,8 +466,8 @@ export interface PresetCopies {
   /** The role one copy cannot do without. Absent means any role the preset
    *  animates. */
   role?: string;
-  /** What the Animation panel calls them, plural, as in "2 turrets". */
-  noun: string;
+  /** What the Animation panel calls this many, as in "2 turrets". */
+  count(copies: number): string;
 }
 
 export interface AnimPreset {
@@ -1334,8 +1334,11 @@ export const WALK_BIPED: AnimPreset = {
   ],
   copies: {
     per: "instance",
-    get noun() {
-      return t`sets of legs`;
+    count(copies: number) {
+      return plural(copies, {
+        one: "# set of legs",
+        other: "# sets of legs",
+      });
     },
   },
   animates: legRoles([1]),
@@ -1370,8 +1373,11 @@ export const WALK_QUAD: AnimPreset = {
   ],
   copies: {
     per: "instance",
-    get noun() {
-      return t`sets of legs`;
+    count(copies: number) {
+      return plural(copies, {
+        one: "# set of legs",
+        other: "# sets of legs",
+      });
     },
   },
   animates: legRoles([1, 2]),
@@ -1456,8 +1462,11 @@ export const WALK_LEGS: AnimPreset = {
   },
   copies: {
     per: "instance",
-    get noun() {
-      return t`sets of legs`;
+    count(copies: number) {
+      return plural(copies, {
+        one: "# set of legs",
+        other: "# sets of legs",
+      });
     },
   },
   animates: legRoles([1]),
@@ -1664,8 +1673,11 @@ export const TURRET_TRACK: AnimPreset = {
   copies: {
     per: "weapon",
     role: "turret",
-    get noun() {
-      return t`turrets`;
+    count(copies: number) {
+      return plural(copies, {
+        one: "# turret",
+        other: "# turrets",
+      });
     },
   },
   animates: ["turret", "barrel"],
@@ -2600,8 +2612,11 @@ export const BUILDARM: AnimPreset = {
   requires: [{ role: "buildarm.arm", count: 1 }],
   copies: {
     per: "instance",
-    get noun() {
-      return t`build arms`;
+    count(copies: number) {
+      return plural(copies, {
+        one: "# build arm",
+        other: "# build arms",
+      });
     },
   },
   animates: ["buildarm.base", "buildarm.arm", "buildarm.nozzle"],
@@ -2715,8 +2730,11 @@ export const BUILD_AIM: AnimPreset = {
   copies: {
     per: "instance",
     role: "buildarm.arm",
-    get noun() {
-      return t`build arms`;
+    count(copies: number) {
+      return plural(copies, {
+        one: "# build arm",
+        other: "# build arms",
+      });
     },
   },
   animates: ["buildarm.base", "buildarm.arm"],
@@ -3002,8 +3020,11 @@ export const OPEN_CLOSE: AnimPreset = {
   requires: [{ role: "door", count: 1 }],
   copies: {
     per: "instance",
-    get noun() {
-      return t`sets of doors`;
+    count(copies: number) {
+      return plural(copies, {
+        one: "# set of doors",
+        other: "# sets of doors",
+      });
     },
   },
   animates: ["door"],
@@ -3063,8 +3084,11 @@ export const HOVER_BOB: AnimPreset = {
   requires: [{ role: "base", count: 1 }],
   copies: {
     per: "instance",
-    get noun() {
-      return t`bodies`;
+    count(copies: number) {
+      return plural(copies, {
+        one: "# body",
+        other: "# bodies",
+      });
     },
   },
   animates: ["base"],
@@ -3137,8 +3161,11 @@ export const AIM_TRACK: AnimPreset = {
   copies: {
     per: "weapon",
     role: "aim",
-    get noun() {
-      return t`aim points`;
+    count(copies: number) {
+      return plural(copies, {
+        one: "# aim point",
+        other: "# aim points",
+      });
     },
   },
   animates: ["aim"],
@@ -3248,8 +3275,11 @@ export const RECOIL: AnimPreset = {
   copies: {
     per: "weapon",
     role: "barrel",
-    get noun() {
-      return t`barrels`;
+    count(copies: number) {
+      return plural(copies, {
+        one: "# barrel",
+        other: "# barrels",
+      });
     },
   },
   animates: ["barrel"],
@@ -3400,8 +3430,11 @@ export const IDLE_SWAY: AnimPreset = {
   requires: [{ role: "base", count: 1 }],
   copies: {
     per: "instance",
-    get noun() {
-      return t`bodies`;
+    count(copies: number) {
+      return plural(copies, {
+        one: "# body",
+        other: "# bodies",
+      });
     },
   },
   animates: ["base"],

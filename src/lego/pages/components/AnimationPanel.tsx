@@ -2113,7 +2113,7 @@ export function AnimationPanel({
               ? (conversionProblems.get(preset.id) ?? null)
               : null;
             const presetLabel = preset.label;
-            const copyNoun = preset.copies?.noun;
+            const copyCount = preset.copies?.count(copies) ?? "";
             const missingRoles = missing
               .map((role) => roleLabel(role))
               .join(", ");
@@ -2127,7 +2127,7 @@ export function AnimationPanel({
                   <div className="min-w-0 flex-1">
                     <p className="text-sm font-medium">
                       {copies > 1 && preset.copies
-                        ? t`${presetLabel}, ${copies} ${copyNoun}`
+                        ? t`${presetLabel}, ${copyCount}`
                         : presetLabel}
                     </p>
                     <p className="mt-0.5 text-xs text-muted-foreground">
