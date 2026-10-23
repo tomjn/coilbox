@@ -32,7 +32,7 @@ const IRRELEVANT: WizardContext = {
 };
 
 let ctx: WizardContext = IRRELEVANT;
-const useWizardContext = vi.fn(() => ({ ctx, candidates: [] }));
+const useWizardContext = vi.fn(() => ({ ctx }));
 const useHubAnswer = vi.fn(() => ctx.hub);
 vi.mock("./useWizardContext", () => ({
   useWizardContext: () => useWizardContext(),

@@ -1,6 +1,5 @@
 import { useMemo } from "react";
 import {
-  type SuggestedGame,
   useBrandingCatalog,
   useCatalogLoaded,
   useSuggestedGames,
@@ -51,10 +50,7 @@ const NOTHING_ON_DISK = { games: new Set<string>(), maps: new Set<string>() };
  * `hub` comes from {@link useHubAnswer}, or answers as signed out when the
  * profile has the hub off, so this never asks the hub itself.
  */
-export function useWizardContext(hub: HubAnswer): {
-  ctx: WizardContext;
-  candidates: SuggestedGame[] | null;
-} {
+export function useWizardContext(hub: HubAnswer): { ctx: WizardContext } {
   const profile = getProfile();
   const [{ accounts }] = useLobbyAccounts();
 
@@ -108,5 +104,5 @@ export function useWizardContext(hub: HubAnswer): {
     lobbyAccountCount: accounts.length,
     games: decideGames({ candidates, hasGameFilter: matcher !== null }),
   };
-  return { ctx, candidates };
+  return { ctx };
 }
