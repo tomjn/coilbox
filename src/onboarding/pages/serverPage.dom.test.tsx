@@ -206,3 +206,11 @@ it("skips the page from Cancel on the Register tab", () => {
   expect(onSettle).toHaveBeenCalledWith("server");
   expect(screen.getByText("You're ready")).toBeTruthy();
 });
+
+it("paints the lobby drawing behind the forms", () => {
+  show();
+  const art = screen.getByTestId("page-art");
+  expect(art.getAttribute("data-art")).toBe("multiplayer.lobby");
+  expect(art.getAttribute("src")).toMatch(/^data:image\/svg\+xml,/);
+  expect(screen.getByRole("tab", { name: "Log in" })).toBeTruthy();
+});
