@@ -3,26 +3,11 @@ import { useLingui } from "@lingui/react/macro";
 import { Button, cn } from "@picoframe/frame";
 import { useEffect, useRef, useState } from "react";
 import type { QueueItem } from "@/downloads/DownloadQueueProvider";
-import { QueueProgress } from "@/downloads/pages/components/ProgressBar";
+import { DownloadsPill } from "./DownloadsPill";
 import type { PageId } from "./ids";
 import { PAGE_COMPONENTS } from "./pages/registry";
 
 const NEW_PAGES_EYEBROW = msg`New in Coilbox`;
-
-/** The background downloads, top right, with a bar each. */
-function DownloadsSlot({ items }: { items: QueueItem[] }) {
-  if (items.length === 0) return null;
-  return (
-    <div className="absolute top-3 right-4 flex w-56 flex-col gap-1 text-xs">
-      {items.map((item) => (
-        <div key={item.id}>
-          <span className="text-muted-foreground">{item.label}</span>
-          <QueueProgress item={item} />
-        </div>
-      ))}
-    </div>
-  );
-}
 
 /**
  * The full window setup wizard. It settles a page only on Continue or Skip, and
@@ -35,12 +20,16 @@ export function Wizard({
   onSettle,
   onClose,
   downloads,
+  onCancelDownload,
+  onRetryDownload,
 }: {
   pages: PageId[];
   newPagesRun: boolean;
   onSettle(id: PageId): void;
   onClose(): void;
   downloads: QueueItem[];
+  onCancelDownload(id: string): void;
+  onRetryDownload(id: string): void;
 }) {
   const { i18n, t } = useLingui();
   const [step, setStep] = useState(0);
@@ -73,7 +62,11 @@ export function Wizard({
       aria-labelledby="onboarding-title"
       className="fixed inset-0 z-40 flex flex-col bg-background text-foreground outline-none"
     >
-      <DownloadsSlot items={downloads} />
+      <DownloadsPill
+        items={downloads}
+        onCancel={onCancelDownload}
+        onRetry={onRetryDownload}
+      />
       <div className="flex min-h-0 flex-1 flex-col px-10 pt-10">
         <div className="mb-6 flex gap-1.5">
           {pages.map((page, i) => (

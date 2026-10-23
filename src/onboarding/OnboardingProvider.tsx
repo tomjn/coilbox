@@ -13,6 +13,7 @@ import { SETTLED_KEY, type SettleId } from "./ids";
 import { pageRelevance } from "./relevance";
 import { useOnboardingRerun } from "./rerun";
 import { addSettled, planRun, type RunPlan } from "./settle";
+import { useBackgroundDownloads } from "./useBackgroundDownloads";
 import { useWizardContext } from "./useWizardContext";
 import { Wizard } from "./Wizard";
 
@@ -41,7 +42,6 @@ export function OnboardingProvider({ children }: { children: ReactNode }) {
   const [plan, setPlan] = useState<DecidedPlan | null>(null);
   const [run, setRun] = useState(0);
   const [open, setOpen] = useState(false);
-  const downloads = NO_DOWNLOADS;
 
   // Several pages can settle in one event (Skip setup), before the setting
   // has re-rendered, so each write builds on the one before it.
@@ -56,6 +56,17 @@ export function OnboardingProvider({ children }: { children: ReactNode }) {
     },
     [setSettled],
   );
+
+  // The engine and game downloads run whether or not the wizard opens.
+  const {
+    items: downloads,
+    cancel,
+    retry,
+  } = useBackgroundDownloads({
+    settled,
+    games: ctx.games,
+    onSettle: (id) => settle([id]),
+  });
 
   const planning = plan === null || rerun;
   const relevance = pageRelevance(ctx);
@@ -103,6 +114,8 @@ export function OnboardingProvider({ children }: { children: ReactNode }) {
           onSettle={(id) => settle([id])}
           onClose={() => setOpen(false)}
           downloads={downloads}
+          onCancelDownload={cancel}
+          onRetryDownload={retry}
         />
       )}
     </WizardDownloadsContext.Provider>

@@ -36,6 +36,15 @@ vi.mock("./useWizardContext", () => ({
   useWizardContext: () => ({ ctx, candidates: [] }),
 }));
 
+// The background downloads have their own test. Here they would reach Tauri.
+vi.mock("./useBackgroundDownloads", () => ({
+  useBackgroundDownloads: () => ({
+    items: [],
+    cancel: () => {},
+    retry: () => {},
+  }),
+}));
+
 const { OnboardingProvider } = await import("./OnboardingProvider");
 const { requestOnboardingRerun } = await import("./rerun");
 const { SETTLED_KEY } = await import("./ids");
