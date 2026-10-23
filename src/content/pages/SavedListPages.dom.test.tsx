@@ -72,6 +72,7 @@ vi.mock("../branding", () => ({
   useGithubGameRepos: () => [],
   useBrandingEntry: () => undefined,
   useBrandingImage: () => undefined,
+  useBrandingImageState: () => ({ src: undefined, loading: false }),
   useCachedImage: () => undefined,
   useSuggestedGames: () => [],
   useSuggestedMaps: () => [],

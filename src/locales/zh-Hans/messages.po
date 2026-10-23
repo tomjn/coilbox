@@ -1465,6 +1465,10 @@ msgstr "{analysedUnnamedGames} 是在录制器保存引擎单位列表之前分�
 msgid "{angle} render of this unit"
 msgstr "此单位的 {angle} 渲染图"
 
+#: src/onboarding/pages/GamesPage.tsx
+msgid "{app} runs other games too. Find them in Games after setup."
+msgstr "{app} 也能运行其他游戏。设置完成后可在“游戏”中找到它们。"
+
 #: src/content/pages/components/Convert3doDrawer.tsx
 #, fuzzy
 msgid "{archive} is a packed archive, so coilbox cannot install into it directly. Copy the output folder over the game yourself, remove the original <0>.3do</0> files, and fix any unit definition that spells <1>.3do</1> in its <2>objectname</2>. Or extract the game to a <3>.sdd</3> copy first and run this again from there."
@@ -1585,7 +1589,7 @@ msgstr "{banned, plural, other {已禁用 # 个单位}}"
 msgid "{base} ({copyNumber})"
 msgstr "{base} ({copyNumber})"
 
-#: src/lobby-servers/pages/SettingsSection.tsx
+#: src/lobby-servers/AddAccountForm.tsx
 #, fuzzy
 msgid "{base} (alpha)"
 msgstr "{base}（alpha）"
@@ -4697,8 +4701,9 @@ msgstr "{name} · {contents}"
 msgid "{name} (changed)"
 msgstr "{name}（已更改）"
 
-#: src/lobby-servers/pages/SettingsSection.tsx
+#: src/lobby-servers/AddAccountForm.tsx
 #: src/lobby-servers/PasswordRecoveryForm.tsx
+#: src/lobby-servers/RegisterForm.tsx
 #, fuzzy
 msgid "{name} (custom)"
 msgstr "{name}（自定义）"
@@ -9323,6 +9328,7 @@ msgid "Accent"
 msgstr "强调色"
 
 #: src/i18n/frameStrings.ts
+#: src/onboarding/pages/AppearancePage.tsx
 #, fuzzy
 msgid "Accent color"
 msgstr "强调色"
@@ -9782,6 +9788,7 @@ msgstr "从其他项目添加"
 msgid "Add it anyway"
 msgstr "仍然添加"
 
+#: src/lobby-servers/AddAccountForm.tsx
 #: src/lobby-servers/pages/SettingsSection.tsx
 #, fuzzy
 msgid "Add login"
@@ -11117,6 +11124,7 @@ msgstr "应用图标：{iconPath}"
 
 #: src/general/index.ts
 #: src/i18n/frameStrings.ts
+#: src/onboarding/pages/registry.ts
 #: src/profile/index.ts
 #, fuzzy
 msgid "Appearance"
@@ -11762,6 +11770,7 @@ msgstr "后"
 #: src/lego/pivot.ts
 #: src/multiplayer/chat/MemberActionsMenu.tsx
 #: src/multiplayer/LobbyStatusButton.tsx
+#: src/onboarding/Wizard.tsx
 #, fuzzy
 msgid "Back"
 msgstr "返回"
@@ -12135,6 +12144,7 @@ msgid "base building {number}"
 msgstr "基地建筑 {number}"
 
 #: src/i18n/frameStrings.ts
+#: src/onboarding/pages/AppearancePage.tsx
 #, fuzzy
 msgid "Base color"
 msgstr "基础色"
@@ -13767,8 +13777,9 @@ msgstr "不会伤害自己的单位"
 #: src/downloads/pages/ActivityPage.tsx
 #: src/lego/pages/components/ProportionsPanel.tsx
 #: src/lego/pages/components/ScriptTab.tsx
-#: src/lobby-servers/pages/SettingsSection.tsx
+#: src/lobby-servers/AddAccountForm.tsx
 #: src/lobby-servers/PasswordRecoveryForm.tsx
+#: src/lobby-servers/RegisterForm.tsx
 #: src/mapconv/pages/CompilePage.tsx
 #: src/mapconv/pages/DecompilePage.tsx
 #: src/multiplayer/battle/BattleRoomHeader.tsx
@@ -13791,6 +13802,11 @@ msgstr "不会伤害自己的单位"
 #, fuzzy
 msgid "Cancel"
 msgstr "取消"
+
+#. placeholder {0}: item.label
+#: src/onboarding/DownloadsPill.tsx
+msgid "Cancel {0}"
+msgstr "取消 {0}"
 
 #: src/content/AnalysisQueueBadge.tsx
 #, fuzzy
@@ -14762,6 +14778,10 @@ msgstr "选择视频"
 msgid "Choose where to write the .sdd"
 msgstr "选择 .sdd 的写入位置"
 
+#: src/onboarding/pages/registry.ts
+msgid "Choose your language"
+msgstr "选择语言"
+
 #: src/scenario/pages/components/contents.ts
 #: src/scenario/pages/components/triggers.ts
 #, fuzzy
@@ -15221,6 +15241,7 @@ msgid "Code"
 msgstr "验证码"
 
 #: src/main.tsx
+#: src/onboarding/pages/GamesPage.tsx
 #: src/sound/library.ts
 #, fuzzy
 msgid "Coilbox"
@@ -15418,6 +15439,10 @@ msgstr "Coilbox 无法读取已安装的内容，因此尚未检查你是否已�
 #, fuzzy
 msgid "Coilbox could not read which process the relay is."
 msgstr "Coilbox 无法读取中继是哪个进程。"
+
+#: src/lobby-servers/AddAccountForm.tsx
+msgid "Coilbox could not save the password to your keychain, so the login was not added. {detail}"
+msgstr "Coilbox 无法将密码保存到你的钥匙串，因此未添加登录信息。{detail}"
 
 #: src/lobby-servers/pages/SettingsSection.tsx
 #, fuzzy
@@ -16524,6 +16549,7 @@ msgstr "内容（{fileCount} 个文件）"
 #: src/components/ContinueBadge.tsx
 #: src/deeplink/DeepLinkHandler.tsx
 #: src/deeplink/pages/ImportSection.tsx
+#: src/onboarding/Wizard.tsx
 #: src/runlite/model.ts
 #, fuzzy
 msgid "Continue"
@@ -19174,6 +19200,10 @@ msgstr "下载并安装"
 msgid "Download + data folders are writable"
 msgstr "下载文件夹和数据文件夹均可写入"
 
+#: src/onboarding/pages/GamesPage.tsx
+msgid "Download a game"
+msgstr "下载游戏"
+
 #: src/content/pages/components/GetStartedCard.tsx
 #, fuzzy
 msgid "Download a game or map to start playing."
@@ -20073,6 +20103,7 @@ msgid "elmos"
 msgstr "elmo"
 
 #: src/lobby-servers/PasswordRecoveryForm.tsx
+#: src/lobby-servers/RegisterForm.tsx
 #: src/multiplayer/admin/BansSection.tsx
 #: src/multiplayer/admin/PlayerLookupSection.tsx
 #, fuzzy
@@ -20317,17 +20348,12 @@ msgstr "引擎"
 #: src/hub/pages/components/SetupPackContents.tsx
 #: src/multiplayer/battle/BattleEngineCard.tsx
 #: src/multiplayer/battles/HostBattleForm.tsx
+#: src/onboarding/useBackgroundDownloads.ts
 #: src/play/pages/components/CrashDrawer.tsx
 #: src/play/pages/EngineLogSection.tsx
 #, fuzzy
 msgid "Engine"
 msgstr "引擎"
-
-#. placeholder {0}: release.version
-#: src/content/pages/components/SetupCard.tsx
-#, fuzzy
-msgid "Engine {0}"
-msgstr "引擎 {0}"
 
 #: src/content/pages/components/ReplayAnalysisSection.tsx
 #, fuzzy
@@ -20389,7 +20415,9 @@ msgstr "引擎 {engineVersions}"
 msgid "Engine {reqLabel}"
 msgstr "引擎 {reqLabel}"
 
+#: src/content/pages/components/SetupCard.tsx
 #: src/downloads/bindings.ts
+#: src/onboarding/useBackgroundDownloads.ts
 #, fuzzy
 msgid "Engine {version}"
 msgstr "引擎 {version}"
@@ -20500,6 +20528,10 @@ msgstr "请输入命令 id。"
 #, fuzzy
 msgid "Enter a port."
 msgstr "请输入端口。"
+
+#: src/lobby-servers/AddAccountForm.tsx
+msgid "Enter a username."
+msgstr "请输入用户名。"
 
 #: src/hub/pages/components/HubAddressField.tsx
 #, fuzzy
@@ -21407,6 +21439,10 @@ msgstr "推荐"
 msgid "Featured first"
 msgstr "推荐优先"
 
+#: src/onboarding/pages/GamesPage.tsx
+msgid "Featured games"
+msgstr "推荐游戏"
+
 #: src/mapconv/pages/components/AdvancedOptions.tsx
 #, fuzzy
 msgid "Features file (-features)"
@@ -21682,6 +21718,7 @@ msgid "Finish or cancel downloads before reclaiming space"
 msgstr "释放空间前请先完成或取消下载"
 
 #: src/hub/pages/components/HeaderAccount.tsx
+#: src/onboarding/pages/HubPage.tsx
 #, fuzzy
 msgid "Finish signing in the browser window that opened."
 msgstr "请在打开的浏览器窗口中完成登录。"
@@ -22983,6 +23020,11 @@ msgstr "要显示其绑定的游戏"
 #, fuzzy
 msgid "Game, map and engine not installed"
 msgstr "游戏、地图和引擎未安装"
+
+#. placeholder {0}: game.title
+#: src/onboarding/useBackgroundDownloads.ts
+msgid "Game: {0}"
+msgstr "游戏：{0}"
 
 #: src/content/pages/ReplayDetailPage.tsx
 #, fuzzy
@@ -24959,6 +25001,10 @@ msgstr "重新导入"
 msgid "Import an image"
 msgstr "导入图片"
 
+#: src/onboarding/pages/HubPage.tsx
+msgid "Import anything shared from a hub link"
+msgstr "导入通过中心链接分享的任何内容"
+
 #: src/hub/pages/ItemPage.tsx
 #, fuzzy
 msgid "Import anyway"
@@ -26330,6 +26376,10 @@ msgstr "保留此表以用于其他单位"
 msgid "Keep tweak slots this preset does not set"
 msgstr "保留此预设未设置的调整槽位"
 
+#: src/onboarding/pages/HubPage.tsx
+msgid "Keep your uploads under one name"
+msgstr "用同一个名称管理你的上传"
+
 #: src/content/unitFieldNotes.ts
 #, fuzzy
 msgid "Keeps cannon stages touching"
@@ -27658,6 +27708,7 @@ msgstr "日志"
 
 #: src/home/zones/ResumeRail.tsx
 #: src/multiplayer/pages/BattlesPage.tsx
+#: src/onboarding/pages/ServerPage.tsx
 #, fuzzy
 msgid "Log in"
 msgstr "登录"
@@ -27676,6 +27727,10 @@ msgstr "准备好后请从顶栏以 {username} 身份登录 {serverName}。"
 #, fuzzy
 msgid "Log in to a lobby server, chat, and join battles."
 msgstr "登录大厅服务器、聊天并加入对局。"
+
+#: src/onboarding/pages/registry.ts
+msgid "Log in to a server"
+msgstr "登录服务器"
 
 #: src/lobby-servers/pages/SettingsSection.tsx
 #, fuzzy
@@ -28556,6 +28611,10 @@ msgstr "该时间段内此图层上没有任何内容的对局不计入平均值
 #, fuzzy
 msgid "Matches your best on {name}, {best}."
 msgstr "与你在 {name} 上的最佳成绩持平：{best}。"
+
+#: src/onboarding/pages/LanguagePage.tsx
+msgid "Matches your system"
+msgstr "与系统一致"
 
 #: src/multiplayer/battle/MapSuggestionAction.tsx
 #, fuzzy
@@ -30814,6 +30873,7 @@ msgid "No engine found. Add a content folder with an engine in <0>Settings → C
 msgstr "未找到引擎。请先在<0>设置 → 内容文件夹</0>中添加含有引擎的内容文件夹。"
 
 #: src/content/pages/components/SetupCard.tsx
+#: src/onboarding/useBackgroundDownloads.ts
 #, fuzzy
 msgid "No engine is available to download for this platform."
 msgstr "没有适用于此平台的引擎可供下载。"
@@ -33118,6 +33178,14 @@ msgstr "列表为空，所以场景声明的任何队伍都无法建造任何东
 msgid "Nothing is on the list, so this rule does nothing."
 msgstr "列表为空，所以此规则不起作用。"
 
+#: src/lobby-servers/AddAccountForm.tsx
+msgid "Nothing is saved until you add the login."
+msgstr "在你添加登录信息之前，不会保存任何内容。"
+
+#: src/lobby-servers/AddAccountForm.tsx
+msgid "Nothing is saved until you add the login. You can choose channels to join automatically once it is added."
+msgstr "在你添加登录信息之前，不会保存任何内容。添加后，你可以选择自动加入的频道。"
+
 #: src/lobby-servers/pages/SettingsSection.tsx
 #, fuzzy
 msgid "Nothing is saved until you add the server."
@@ -34244,6 +34312,10 @@ msgstr "打开对局页面"
 msgid "Open the game \"{id}\"."
 msgstr "打开游戏 \"{id}\"。"
 
+#: src/onboarding/pages/HubPage.tsx
+msgid "Open the hub"
+msgstr "打开中心"
+
 #: src/deeplink/DeepLinkHandler.tsx
 #, fuzzy
 msgid "Open the join form"
@@ -34459,6 +34531,10 @@ msgstr "可选。留空则使用游戏名称，之后可以修改。"
 #, fuzzy
 msgid "Optional. Shown on the project's card, and to anybody you send it to."
 msgstr "可选。显示在项目卡片上，以及你发送给的任何人。"
+
+#: src/lobby-servers/RegisterForm.tsx
+msgid "Optional. Zero-K keeps it against your account and does not send a code."
+msgstr "可选。Zero-K 会将其保存在你的账号中，不会发送验证码。"
 
 #: src/content/pages/GameDetailPage.tsx
 #, fuzzy
@@ -35013,6 +35089,8 @@ msgstr "乘员跟随部件"
 msgid "Passengers survive its death"
 msgstr "乘员在其被摧毁后存活"
 
+#: src/lobby-servers/AddAccountForm.tsx
+#: src/lobby-servers/RegisterForm.tsx
 #: src/uberstress/pages/components/SeedSqlForm.tsx
 #: src/uberstress/pages/RunPage.tsx
 #, fuzzy
@@ -35698,6 +35776,7 @@ msgstr "Planet Wars"
 #: src/content/pages/components/ReplayPlaybackBar.tsx
 #: src/lego/pages/components/ActionsDrawer.tsx
 #: src/lego/pages/components/AnimationPanel.tsx
+#: src/onboarding/pages/AppearancePage.tsx
 #: src/placement/SurfaceBars.tsx
 #: src/play/index.ts
 #: src/runlite/index.ts
@@ -36294,6 +36373,10 @@ msgstr "按 N 可改为将其放下（{words}），放在能放下的位置并�
 msgid "Press on"
 msgstr "继续前进"
 
+#: src/lobby-servers/RegisterForm.tsx
+msgid "Press Register to create the account."
+msgstr "按“注册”以创建账号。"
+
 #: src/content/pages/components/KeyBindingEditor.tsx
 #, fuzzy
 msgid "Press the keys you want. Escape binds Escape, so use Cancel to back out."
@@ -36568,6 +36651,10 @@ msgstr "协议控制台"
 #, fuzzy
 msgid "Publish"
 msgstr "发布"
+
+#: src/onboarding/pages/HubPage.tsx
+msgid "Publish maps, scenarios and presets"
+msgstr "发布地图、场景和预设"
 
 #: src/hub/PublishSection.tsx
 #, fuzzy
@@ -37585,6 +37672,7 @@ msgstr "读取中…"
 #: src/multiplayer/battle/BattleMembersTable.tsx
 #: src/multiplayer/battle/BattleRoomHeader.tsx
 #: src/multiplayer/battle/MemberRow.tsx
+#: src/onboarding/pages/AppearancePage.tsx
 #, fuzzy
 msgid "Ready"
 msgstr "准备"
@@ -37981,7 +38069,9 @@ msgid "regex /{filterRegex}/i"
 msgstr "regex /{filterRegex}/i"
 
 #: src/lobby-servers/pages/SettingsSection.tsx
+#: src/lobby-servers/RegisterForm.tsx
 #: src/multiplayer/admin/ChannelsSection.tsx
+#: src/onboarding/pages/ServerPage.tsx
 #, fuzzy
 msgid "Register"
 msgstr "注册"
@@ -37995,6 +38085,10 @@ msgstr "注册新账号"
 #, fuzzy
 msgid "Registered"
 msgstr "注册时间"
+
+#: src/lobby-servers/RegisterForm.tsx
+msgid "Registering…"
+msgstr "正在注册…"
 
 #: src/multiplayer/admin/ChannelsSection.tsx
 #, fuzzy
@@ -39275,6 +39369,12 @@ msgstr "立即更换目标"
 msgid "Retry"
 msgstr "重试"
 
+#. placeholder {0}: item.label
+#. placeholder {0}: problem.label
+#: src/onboarding/DownloadsPill.tsx
+msgid "Retry {0}"
+msgstr "重试 {0}"
+
 #: src/multiplayer/battles/BattleRowMapThumb.tsx
 #, fuzzy
 msgid "Retry downloading the map for {battleTitle}"
@@ -39666,6 +39766,10 @@ msgstr "通过 unitsync 在 {archiveName} 中运行 Lua。"
 msgid "Run output streams here."
 msgstr "运行输出会显示在这里。"
 
+#: src/general/pages/SettingsSection.tsx
+msgid "Run setup again"
+msgstr "重新运行设置向导"
+
 #: src/uberstress/pages/RunPage.tsx
 #, fuzzy
 msgid "Run test"
@@ -40053,6 +40157,10 @@ msgstr "使用 coilbox widget 在游戏中保存，引擎为 {engine}。"
 #, fuzzy
 msgid "Saved in game with the coilbox widget."
 msgstr "使用 coilbox widget 在游戏中保存。"
+
+#: src/lobby-servers/AddAccountForm.tsx
+msgid "Saved in your keychain when you add the login."
+msgstr "添加登录信息时保存到你的钥匙串。"
 
 #: src/content/pages/components/KeymapsPanel.tsx
 #, fuzzy
@@ -40966,12 +41074,16 @@ msgstr "选择一次运行，查看其数据。"
 msgid "Select a run…"
 msgstr "选择一次运行…"
 
+#: src/lobby-servers/AddAccountForm.tsx
 #: src/lobby-servers/PasswordRecoveryForm.tsx
+#: src/lobby-servers/RegisterForm.tsx
 #, fuzzy
 msgid "Select a server"
 msgstr "选择服务器"
 
+#: src/lobby-servers/AddAccountForm.tsx
 #: src/lobby-servers/PasswordRecoveryForm.tsx
+#: src/lobby-servers/RegisterForm.tsx
 #, fuzzy
 msgid "Select a server."
 msgstr "请选择一个服务器。"
@@ -41322,7 +41434,9 @@ msgid "server"
 msgstr "服务器"
 
 #: src/content/pages/components/ReplayChat.tsx
+#: src/lobby-servers/AddAccountForm.tsx
 #: src/lobby-servers/PasswordRecoveryForm.tsx
+#: src/lobby-servers/RegisterForm.tsx
 #: src/multiplayer/admin/tools.tsx
 #, fuzzy
 msgid "Server"
@@ -41445,6 +41559,10 @@ msgstr "在<0>内容文件夹</0>中设置下载文件夹即可安装地图。"
 #, fuzzy
 msgid "Set a download folder in Content folders settings to download it."
 msgstr "在内容文件夹设置中设置下载文件夹即可下载。"
+
+#: src/content/pages/components/SuggestionsList.tsx
+msgid "Set a download folder in Content folders settings to enable downloads."
+msgstr "在内容文件夹设置中设置下载文件夹即可启用下载。"
 
 #: src/campaign/missionNeeds.ts
 #: src/content/pages/components/ResolveContentDrawer.tsx
@@ -41677,6 +41795,7 @@ msgstr "设置配置档案"
 msgid "Settle time"
 msgstr "稳定时间"
 
+#: src/general/pages/SettingsSection.tsx
 #: src/scenario/pages/components/SetupPanel.tsx
 #, fuzzy
 msgid "Setup"
@@ -42627,6 +42746,10 @@ msgstr "在 Coilbox 打开的页面上登录，然后回来。"
 msgid "Sign in to publish from here. Or copy the code and finish on the hub's own page."
 msgstr "登录后即可从这里发布。或者复制代码，在中心的页面上完成。"
 
+#: src/onboarding/pages/HubPage.tsx
+msgid "Sign in to the hub"
+msgstr "登录中心"
+
 #: src/hub/pages/components/AccountControl.tsx
 #, fuzzy
 msgid "Sign in with Discord"
@@ -42860,6 +42983,14 @@ msgstr "Skeletor S3O"
 msgid "Skill"
 msgstr "技能"
 
+#: src/onboarding/Wizard.tsx
+msgid "Skip"
+msgstr "跳过"
+
+#: src/onboarding/Wizard.tsx
+msgid "Skip setup"
+msgstr "跳过设置向导"
+
 #: src/campaign/pages/components/missionEditorGroups.ts
 #, fuzzy
 msgid "skippable"
@@ -43089,6 +43220,10 @@ msgstr "有些引擎会录制到自己的文件夹中，所以删除该引擎也
 #, fuzzy
 msgid "Some parts of this unit are not tracked."
 msgstr "此单位的部分零件未被追踪。"
+
+#: src/lobby-servers/RegisterForm.tsx
+msgid "Some servers email a verification code to confirm your account."
+msgstr "部分服务器会通过电子邮件发送验证码来确认你的账号。"
 
 #: src/sound/events.ts
 #, fuzzy
@@ -43683,6 +43818,10 @@ msgstr "静音开始"
 #, fuzzy
 msgid "Start one, then drop parts into it. Browse what is available under Lego Parts."
 msgstr "新建一个，然后把零件拖进去。在“Lego 零件”下浏览可用零件。"
+
+#: src/onboarding/Wizard.tsx
+msgid "Start playing"
+msgstr "开始游玩"
 
 #: src/conquest/pages/components/StartPositionSelect.tsx
 #, fuzzy
@@ -47881,6 +48020,7 @@ msgid "Their battle is locked."
 msgstr "对方的房间已锁定。"
 
 #: src/i18n/frameStrings.ts
+#: src/onboarding/pages/AppearancePage.tsx
 #, fuzzy
 msgid "Theme"
 msgstr "主题"
@@ -49480,6 +49620,10 @@ msgstr "此服务器不报告还有多少其他玩家在搜索，所以 coilbox 
 #, fuzzy
 msgid "This server has direct messages and battle chat, but no channels."
 msgstr "此服务器有私信和对局聊天，但没有频道。"
+
+#: src/lobby-servers/AddAccountForm.tsx
+msgid "This server has no password. Add the login, then sign in with your browser."
+msgstr "此服务器没有密码。请添加登录信息，然后通过浏览器登录。"
 
 #: src/lobby-servers/pages/SettingsSection.tsx
 #, fuzzy
@@ -51845,7 +51989,9 @@ msgid "username"
 msgstr "用户名"
 
 #: src/account/pages/SettingsSection.tsx
+#: src/lobby-servers/AddAccountForm.tsx
 #: src/lobby-servers/PasswordRecoveryForm.tsx
+#: src/lobby-servers/RegisterForm.tsx
 #: src/multiplayer/admin/BansSection.tsx
 #: src/multiplayer/admin/ChannelsSection.tsx
 #: src/multiplayer/admin/PlayerLookupSection.tsx
@@ -54007,6 +54153,7 @@ msgstr "你"
 msgid "You already have a conquest on the hand-made map \"{mapTitle}\", and a map holds one conquest at a time. Abandon that conquest on the Conquest page, then import this code again."
 msgstr "你已在手工地图“{mapTitle}”上有一场征服，而一张地图同一时间只能有一场征服。请在征服页面放弃那场征服，然后重新导入此代码。"
 
+#: src/lobby-servers/AddAccountForm.tsx
 #: src/lobby-servers/pages/SettingsSection.tsx
 #, fuzzy
 msgid "You already have this login."
@@ -54255,6 +54402,10 @@ msgstr "你赢了。可以从这里再玩一次。"
 #, fuzzy
 msgid "You're not currently in a battle. Browse open battles to join one."
 msgstr "你当前不在任何对局中。浏览开放的对局即可加入。"
+
+#: src/onboarding/pages/DonePage.tsx
+msgid "You're ready"
+msgstr "一切就绪"
 
 #: src/updater/pages/UpdatesSettingsSection.tsx
 #, fuzzy

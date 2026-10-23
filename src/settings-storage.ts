@@ -27,7 +27,9 @@ import { notify } from "./notify/notify";
  * backfill (#1690): somebody changed a setting, so somebody is looking at the
  * screen, and the answer they were given is untrue until they are told.
  */
-export async function createTauriSettingsStorage(): Promise<FlushableSettingsStorage> {
+export async function createTauriSettingsStorage(): Promise<
+  FlushableSettingsStorage & { loadedKeyCount: number }
+> {
   const cache = new Map<string, string>();
   try {
     const entries = await invoke<Record<string, string>>("app_settings_load");
@@ -76,5 +78,7 @@ export async function createTauriSettingsStorage(): Promise<FlushableSettingsSto
     flush: () => queue.then(() => undefined),
   };
   installSettingsStorage(storage);
-  return storage;
+  // How many settings the file held, so onboarding can tell an existing
+  // install from a fresh one before anything writes.
+  return Object.assign(storage, { loadedKeyCount: cache.size });
 }

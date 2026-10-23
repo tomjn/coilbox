@@ -1,5 +1,6 @@
+import { Trans, useLingui } from "@lingui/react/macro";
 import { Button, Input } from "@picoframe/frame";
-import { type FormEvent, useState } from "react";
+import { type FormEvent, useEffect, useState } from "react";
 import { Field } from "@/components/Field";
 import { OptionSelect } from "@/components/OptionSelect";
 import { describeError } from "@/i18n/uiError";
@@ -22,12 +23,20 @@ export function RegisterForm({
   defaultServerId,
   onSuccess,
   onCancel,
+  continueGuard,
 }: {
   servers: LobbyServer[];
   defaultServerId?: string;
   onSuccess: () => void;
   onCancel: () => void;
+  /**
+   * Set by the form for a Continue button outside it. It returns `true` with
+   * nothing typed. Otherwise it asks for Register and returns `false`, because
+   * creating an account is something the player presses for.
+   */
+  continueGuard?: { current: (() => boolean | undefined) | null };
 }) {
+  const { t } = useLingui();
   const { register, busyKeys } = useMultiplayer();
   const [accountsCfg, setAccountsCfg] = useLobbyAccounts();
   // A Tachyon server has no account for Coilbox to create, because signing in
@@ -58,11 +67,24 @@ export function RegisterForm({
     !submitting &&
     !isBusy;
 
+  useEffect(() => {
+    if (!continueGuard) return;
+    continueGuard.current = () => {
+      if (username.trim() === "" && password === "" && email.trim() === "")
+        return true;
+      setError(t`Press Register to create the account.`);
+      return false;
+    };
+    return () => {
+      continueGuard.current = null;
+    };
+  });
+
   const submit = async (e: FormEvent) => {
     e.preventDefault();
     const server = selected;
     if (!server) {
-      setError("Select a server.");
+      setError(t`Select a server.`);
       return;
     }
     setSubmitting(true);
@@ -101,18 +123,21 @@ export function RegisterForm({
 
   return (
     <form onSubmit={submit} className="flex flex-col gap-3">
-      <Field label="Server">
+      <Field label={t`Server`}>
         <OptionSelect
           value={serverId}
           onValueChange={setServerId}
-          options={registrable.map((s) => ({
-            value: s.id,
-            label: s.builtin ? s.name : `${s.name || s.host} (custom)`,
-          }))}
-          placeholder="Select a server"
+          options={registrable.map((s) => {
+            const name = s.name || s.host;
+            return {
+              value: s.id,
+              label: s.builtin ? s.name : t`${name} (custom)`,
+            };
+          })}
+          placeholder={t`Select a server`}
         />
       </Field>
-      <Field label="Username">
+      <Field label={t`Username`}>
         <Input
           value={username}
           onChange={(e) => setUsername(e.target.value)}
@@ -120,7 +145,7 @@ export function RegisterForm({
           {...identifierFieldProps}
         />
       </Field>
-      <Field label="Password">
+      <Field label={t`Password`}>
         <Input
           type="password"
           value={password}
@@ -130,11 +155,11 @@ export function RegisterForm({
         />
       </Field>
       <Field
-        label="Email"
+        label={t`Email`}
         hint={
           selected && serverProtocol(selected) === "zerok"
-            ? "Optional. Zero-K keeps it against your account and does not send a code."
-            : "Some servers email a verification code to confirm your account."
+            ? t`Optional. Zero-K keeps it against your account and does not send a code.`
+            : t`Some servers email a verification code to confirm your account.`
         }
       >
         <Input
@@ -145,7 +170,11 @@ export function RegisterForm({
           {...identifierFieldProps}
         />
       </Field>
-      {error && <p className="text-xs text-destructive">{error}</p>}
+      {error && (
+        <p role="alert" className="text-xs text-destructive">
+          {error}
+        </p>
+      )}
       <div className="flex justify-end gap-2">
         <Button
           type="button"
@@ -154,10 +183,10 @@ export function RegisterForm({
           onClick={onCancel}
           disabled={submitting}
         >
-          Cancel
+          <Trans>Cancel</Trans>
         </Button>
         <Button type="submit" size="sm" disabled={!canSubmit}>
-          {submitting ? "Registering…" : "Register"}
+          {submitting ? t`Registering…` : t`Register`}
         </Button>
       </div>
     </form>

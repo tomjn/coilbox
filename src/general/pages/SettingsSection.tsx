@@ -1,4 +1,5 @@
 import { Trans, useLingui } from "@lingui/react/macro";
+import { Button } from "@picoframe/frame";
 import { Maximize2, Sparkles, Wrench } from "lucide-react";
 import { Field } from "@/components/Field";
 import { OptionSelect } from "@/components/OptionSelect";
@@ -11,6 +12,7 @@ import {
   SYSTEM_LANGUAGE,
 } from "../../i18n/locales";
 import { clampUiZoom, UI_ZOOM_LEVELS } from "../../lib/uiZoom";
+import { requestOnboardingRerun } from "../../onboarding/rerun";
 import { useAdvancedModeSetting } from "../advanced";
 import {
   type ReduceMotionSetting,
@@ -269,6 +271,22 @@ export default function GeneralSettings() {
             </span>
           </span>
         </Label>
+      </section>
+
+      <section
+        aria-labelledby="setup-heading"
+        className="flex items-center gap-3"
+      >
+        <span id="setup-heading" className="text-sm font-medium">
+          <Trans>Setup</Trans>
+        </span>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => requestOnboardingRerun()}
+        >
+          <Trans>Run setup again</Trans>
+        </Button>
       </section>
 
       <AboutCoilbox />

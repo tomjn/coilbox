@@ -1465,6 +1465,10 @@ msgstr "{analysedUnnamedGames} analysées avant que l’enregistreur ne conserve
 msgid "{angle} render of this unit"
 msgstr "Rendu {angle} de cette unité"
 
+#: src/onboarding/pages/GamesPage.tsx
+msgid "{app} runs other games too. Find them in Games after setup."
+msgstr "{app} lance aussi d’autres jeux. Retrouvez-les dans Jeux après la configuration."
+
 #: src/content/pages/components/Convert3doDrawer.tsx
 #, fuzzy
 msgid "{archive} is a packed archive, so coilbox cannot install into it directly. Copy the output folder over the game yourself, remove the original <0>.3do</0> files, and fix any unit definition that spells <1>.3do</1> in its <2>objectname</2>. Or extract the game to a <3>.sdd</3> copy first and run this again from there."
@@ -1585,7 +1589,7 @@ msgstr "{banned, plural, one {# unité interdite} other {# unités interdites}}"
 msgid "{base} ({copyNumber})"
 msgstr "{base} ({copyNumber})"
 
-#: src/lobby-servers/pages/SettingsSection.tsx
+#: src/lobby-servers/AddAccountForm.tsx
 #, fuzzy
 msgid "{base} (alpha)"
 msgstr "{base} (alpha)"
@@ -4697,8 +4701,9 @@ msgstr "{name} · {contents}"
 msgid "{name} (changed)"
 msgstr "{name} (modifié)"
 
-#: src/lobby-servers/pages/SettingsSection.tsx
+#: src/lobby-servers/AddAccountForm.tsx
 #: src/lobby-servers/PasswordRecoveryForm.tsx
+#: src/lobby-servers/RegisterForm.tsx
 #, fuzzy
 msgid "{name} (custom)"
 msgstr "{name} (personnalisé)"
@@ -9323,6 +9328,7 @@ msgid "Accent"
 msgstr "Accent"
 
 #: src/i18n/frameStrings.ts
+#: src/onboarding/pages/AppearancePage.tsx
 #, fuzzy
 msgid "Accent color"
 msgstr "Couleur d’accent"
@@ -9782,6 +9788,7 @@ msgstr "Ajouter depuis un autre projet"
 msgid "Add it anyway"
 msgstr "L’ajouter quand même"
 
+#: src/lobby-servers/AddAccountForm.tsx
 #: src/lobby-servers/pages/SettingsSection.tsx
 #, fuzzy
 msgid "Add login"
@@ -11117,6 +11124,7 @@ msgstr "Icône de l’application : {iconPath}"
 
 #: src/general/index.ts
 #: src/i18n/frameStrings.ts
+#: src/onboarding/pages/registry.ts
 #: src/profile/index.ts
 #, fuzzy
 msgid "Appearance"
@@ -11762,6 +11770,7 @@ msgstr "arrière"
 #: src/lego/pivot.ts
 #: src/multiplayer/chat/MemberActionsMenu.tsx
 #: src/multiplayer/LobbyStatusButton.tsx
+#: src/onboarding/Wizard.tsx
 #, fuzzy
 msgid "Back"
 msgstr "Retour"
@@ -12135,6 +12144,7 @@ msgid "base building {number}"
 msgstr "bâtiment de base {number}"
 
 #: src/i18n/frameStrings.ts
+#: src/onboarding/pages/AppearancePage.tsx
 #, fuzzy
 msgid "Base color"
 msgstr "Couleur de base"
@@ -13767,8 +13777,9 @@ msgstr "Ne peut pas endommager sa propre unité"
 #: src/downloads/pages/ActivityPage.tsx
 #: src/lego/pages/components/ProportionsPanel.tsx
 #: src/lego/pages/components/ScriptTab.tsx
-#: src/lobby-servers/pages/SettingsSection.tsx
+#: src/lobby-servers/AddAccountForm.tsx
 #: src/lobby-servers/PasswordRecoveryForm.tsx
+#: src/lobby-servers/RegisterForm.tsx
 #: src/mapconv/pages/CompilePage.tsx
 #: src/mapconv/pages/DecompilePage.tsx
 #: src/multiplayer/battle/BattleRoomHeader.tsx
@@ -13791,6 +13802,11 @@ msgstr "Ne peut pas endommager sa propre unité"
 #, fuzzy
 msgid "Cancel"
 msgstr "Annuler"
+
+#. placeholder {0}: item.label
+#: src/onboarding/DownloadsPill.tsx
+msgid "Cancel {0}"
+msgstr "Annuler {0}"
 
 #: src/content/AnalysisQueueBadge.tsx
 #, fuzzy
@@ -14762,6 +14778,10 @@ msgstr "Choisir une vidéo"
 msgid "Choose where to write the .sdd"
 msgstr "Choisir où écrire le .sdd"
 
+#: src/onboarding/pages/registry.ts
+msgid "Choose your language"
+msgstr "Choisissez votre langue"
+
 #: src/scenario/pages/components/contents.ts
 #: src/scenario/pages/components/triggers.ts
 #, fuzzy
@@ -15221,6 +15241,7 @@ msgid "Code"
 msgstr "Code"
 
 #: src/main.tsx
+#: src/onboarding/pages/GamesPage.tsx
 #: src/sound/library.ts
 #, fuzzy
 msgid "Coilbox"
@@ -15418,6 +15439,10 @@ msgstr "Coilbox n’a pas pu lire ce qui est installé, il n’a donc pas vérif
 #, fuzzy
 msgid "Coilbox could not read which process the relay is."
 msgstr "Coilbox n’a pas pu identifier le processus du relais."
+
+#: src/lobby-servers/AddAccountForm.tsx
+msgid "Coilbox could not save the password to your keychain, so the login was not added. {detail}"
+msgstr "Coilbox n’a pas pu enregistrer le mot de passe dans votre trousseau, l’identifiant n’a donc pas été ajouté. {detail}"
 
 #: src/lobby-servers/pages/SettingsSection.tsx
 #, fuzzy
@@ -16524,6 +16549,7 @@ msgstr "Contenu ({fileCount} fichiers)"
 #: src/components/ContinueBadge.tsx
 #: src/deeplink/DeepLinkHandler.tsx
 #: src/deeplink/pages/ImportSection.tsx
+#: src/onboarding/Wizard.tsx
 #: src/runlite/model.ts
 #, fuzzy
 msgid "Continue"
@@ -19174,6 +19200,10 @@ msgstr "Télécharger et installer"
 msgid "Download + data folders are writable"
 msgstr "Les dossiers de téléchargement et de données sont accessibles en écriture"
 
+#: src/onboarding/pages/GamesPage.tsx
+msgid "Download a game"
+msgstr "Télécharger un jeu"
+
 #: src/content/pages/components/GetStartedCard.tsx
 #, fuzzy
 msgid "Download a game or map to start playing."
@@ -20073,6 +20103,7 @@ msgid "elmos"
 msgstr "elmos"
 
 #: src/lobby-servers/PasswordRecoveryForm.tsx
+#: src/lobby-servers/RegisterForm.tsx
 #: src/multiplayer/admin/BansSection.tsx
 #: src/multiplayer/admin/PlayerLookupSection.tsx
 #, fuzzy
@@ -20317,17 +20348,12 @@ msgstr "moteur"
 #: src/hub/pages/components/SetupPackContents.tsx
 #: src/multiplayer/battle/BattleEngineCard.tsx
 #: src/multiplayer/battles/HostBattleForm.tsx
+#: src/onboarding/useBackgroundDownloads.ts
 #: src/play/pages/components/CrashDrawer.tsx
 #: src/play/pages/EngineLogSection.tsx
 #, fuzzy
 msgid "Engine"
 msgstr "Moteur"
-
-#. placeholder {0}: release.version
-#: src/content/pages/components/SetupCard.tsx
-#, fuzzy
-msgid "Engine {0}"
-msgstr "Moteur {0}"
 
 #: src/content/pages/components/ReplayAnalysisSection.tsx
 #, fuzzy
@@ -20389,7 +20415,9 @@ msgstr "moteur {engineVersions}"
 msgid "Engine {reqLabel}"
 msgstr "Moteur {reqLabel}"
 
+#: src/content/pages/components/SetupCard.tsx
 #: src/downloads/bindings.ts
+#: src/onboarding/useBackgroundDownloads.ts
 #, fuzzy
 msgid "Engine {version}"
 msgstr "Moteur {version}"
@@ -20500,6 +20528,10 @@ msgstr "Saisissez un identifiant de commande."
 #, fuzzy
 msgid "Enter a port."
 msgstr "Saisissez un port."
+
+#: src/lobby-servers/AddAccountForm.tsx
+msgid "Enter a username."
+msgstr "Saisissez un nom d’utilisateur."
 
 #: src/hub/pages/components/HubAddressField.tsx
 #, fuzzy
@@ -21407,6 +21439,10 @@ msgstr "À la une"
 msgid "Featured first"
 msgstr "À la une d’abord"
 
+#: src/onboarding/pages/GamesPage.tsx
+msgid "Featured games"
+msgstr "Jeux à la une"
+
 #: src/mapconv/pages/components/AdvancedOptions.tsx
 #, fuzzy
 msgid "Features file (-features)"
@@ -21682,6 +21718,7 @@ msgid "Finish or cancel downloads before reclaiming space"
 msgstr "Terminez ou annulez les téléchargements avant de libérer de l’espace"
 
 #: src/hub/pages/components/HeaderAccount.tsx
+#: src/onboarding/pages/HubPage.tsx
 #, fuzzy
 msgid "Finish signing in the browser window that opened."
 msgstr "Terminez la connexion dans la fenêtre de navigateur qui s’est ouverte."
@@ -22983,6 +23020,11 @@ msgstr "Jeu dont afficher les raccourcis"
 #, fuzzy
 msgid "Game, map and engine not installed"
 msgstr "Jeu, carte et moteur non installés"
+
+#. placeholder {0}: game.title
+#: src/onboarding/useBackgroundDownloads.ts
+msgid "Game: {0}"
+msgstr "Jeu : {0}"
 
 #: src/content/pages/ReplayDetailPage.tsx
 #, fuzzy
@@ -24959,6 +25001,10 @@ msgstr "Importer à nouveau"
 msgid "Import an image"
 msgstr "Importer une image"
 
+#: src/onboarding/pages/HubPage.tsx
+msgid "Import anything shared from a hub link"
+msgstr "Importez tout ce qui est partagé par un lien du hub"
+
 #: src/hub/pages/ItemPage.tsx
 #, fuzzy
 msgid "Import anyway"
@@ -26330,6 +26376,10 @@ msgstr "Garder cette table pour d’autres unités"
 msgid "Keep tweak slots this preset does not set"
 msgstr "Garder les emplacements d’ajustement que ce préréglage ne définit pas"
 
+#: src/onboarding/pages/HubPage.tsx
+msgid "Keep your uploads under one name"
+msgstr "Regroupez vos envois sous un même nom"
+
 #: src/content/unitFieldNotes.ts
 #, fuzzy
 msgid "Keeps cannon stages touching"
@@ -27658,6 +27708,7 @@ msgstr "Journal"
 
 #: src/home/zones/ResumeRail.tsx
 #: src/multiplayer/pages/BattlesPage.tsx
+#: src/onboarding/pages/ServerPage.tsx
 #, fuzzy
 msgid "Log in"
 msgstr "Se connecter"
@@ -27676,6 +27727,10 @@ msgstr "Connectez-vous en tant que {username} sur {serverName} depuis la barre d
 #, fuzzy
 msgid "Log in to a lobby server, chat, and join battles."
 msgstr "Connectez-vous à un serveur de lobby, discutez, et rejoignez des parties."
+
+#: src/onboarding/pages/registry.ts
+msgid "Log in to a server"
+msgstr "Se connecter à un serveur"
 
 #: src/lobby-servers/pages/SettingsSection.tsx
 #, fuzzy
@@ -28556,6 +28611,10 @@ msgstr "Les parties sans rien sur ce calque dans la fenêtre ne sont pas dans la
 #, fuzzy
 msgid "Matches your best on {name}, {best}."
 msgstr "Égale votre meilleur résultat sur {name}, {best}."
+
+#: src/onboarding/pages/LanguagePage.tsx
+msgid "Matches your system"
+msgstr "Correspond à votre système"
 
 #: src/multiplayer/battle/MapSuggestionAction.tsx
 #, fuzzy
@@ -30814,6 +30873,7 @@ msgid "No engine found. Add a content folder with an engine in <0>Settings → C
 msgstr "Aucun moteur trouvé. Ajoutez d’abord un dossier de contenu contenant un moteur dans <0>Paramètres → Dossiers de contenu</0>."
 
 #: src/content/pages/components/SetupCard.tsx
+#: src/onboarding/useBackgroundDownloads.ts
 #, fuzzy
 msgid "No engine is available to download for this platform."
 msgstr "Aucun moteur à télécharger pour cette plateforme."
@@ -33118,6 +33178,14 @@ msgstr "La liste est vide, donc aucune équipe déclarée par le scénario ne pe
 msgid "Nothing is on the list, so this rule does nothing."
 msgstr "La liste est vide, donc cette règle ne fait rien."
 
+#: src/lobby-servers/AddAccountForm.tsx
+msgid "Nothing is saved until you add the login."
+msgstr "Rien n’est enregistré tant que vous n’avez pas ajouté l’identifiant."
+
+#: src/lobby-servers/AddAccountForm.tsx
+msgid "Nothing is saved until you add the login. You can choose channels to join automatically once it is added."
+msgstr "Rien n’est enregistré tant que vous n’avez pas ajouté l’identifiant. Une fois ajouté, vous pourrez choisir des canaux à rejoindre automatiquement."
+
 #: src/lobby-servers/pages/SettingsSection.tsx
 #, fuzzy
 msgid "Nothing is saved until you add the server."
@@ -34244,6 +34312,10 @@ msgstr "Ouvrir la page de la partie"
 msgid "Open the game \"{id}\"."
 msgstr "Ouvrir le jeu « {id} »."
 
+#: src/onboarding/pages/HubPage.tsx
+msgid "Open the hub"
+msgstr "Ouvrir le hub"
+
 #: src/deeplink/DeepLinkHandler.tsx
 #, fuzzy
 msgid "Open the join form"
@@ -34459,6 +34531,10 @@ msgstr "Facultatif. Laissé vide, il prend le nom du jeu, et vous pourrez le cha
 #, fuzzy
 msgid "Optional. Shown on the project's card, and to anybody you send it to."
 msgstr "Facultatif. Affiché sur la carte du projet, et à toute personne à qui vous l’envoyez."
+
+#: src/lobby-servers/RegisterForm.tsx
+msgid "Optional. Zero-K keeps it against your account and does not send a code."
+msgstr "Facultatif. Zero-K le conserve avec votre compte et n’envoie pas de code."
 
 #: src/content/pages/GameDetailPage.tsx
 #, fuzzy
@@ -35013,6 +35089,8 @@ msgstr "Les passagers suivent la pièce"
 msgid "Passengers survive its death"
 msgstr "Les passagers survivent à sa destruction"
 
+#: src/lobby-servers/AddAccountForm.tsx
+#: src/lobby-servers/RegisterForm.tsx
 #: src/uberstress/pages/components/SeedSqlForm.tsx
 #: src/uberstress/pages/RunPage.tsx
 #, fuzzy
@@ -35698,6 +35776,7 @@ msgstr "Planet Wars"
 #: src/content/pages/components/ReplayPlaybackBar.tsx
 #: src/lego/pages/components/ActionsDrawer.tsx
 #: src/lego/pages/components/AnimationPanel.tsx
+#: src/onboarding/pages/AppearancePage.tsx
 #: src/placement/SurfaceBars.tsx
 #: src/play/index.ts
 #: src/runlite/index.ts
@@ -36294,6 +36373,10 @@ msgstr "Appuyez sur N pour le poser {words} à la place, en contour, là où il 
 msgid "Press on"
 msgstr "Continuer"
 
+#: src/lobby-servers/RegisterForm.tsx
+msgid "Press Register to create the account."
+msgstr "Appuyez sur S’inscrire pour créer le compte."
+
 #: src/content/pages/components/KeyBindingEditor.tsx
 #, fuzzy
 msgid "Press the keys you want. Escape binds Escape, so use Cancel to back out."
@@ -36568,6 +36651,10 @@ msgstr "Console du protocole"
 #, fuzzy
 msgid "Publish"
 msgstr "Publier"
+
+#: src/onboarding/pages/HubPage.tsx
+msgid "Publish maps, scenarios and presets"
+msgstr "Publiez des cartes, des scénarios et des préréglages"
 
 #: src/hub/PublishSection.tsx
 #, fuzzy
@@ -37585,6 +37672,7 @@ msgstr "Lecture…"
 #: src/multiplayer/battle/BattleMembersTable.tsx
 #: src/multiplayer/battle/BattleRoomHeader.tsx
 #: src/multiplayer/battle/MemberRow.tsx
+#: src/onboarding/pages/AppearancePage.tsx
 #, fuzzy
 msgid "Ready"
 msgstr "Prêt"
@@ -37981,7 +38069,9 @@ msgid "regex /{filterRegex}/i"
 msgstr "regex /{filterRegex}/i"
 
 #: src/lobby-servers/pages/SettingsSection.tsx
+#: src/lobby-servers/RegisterForm.tsx
 #: src/multiplayer/admin/ChannelsSection.tsx
+#: src/onboarding/pages/ServerPage.tsx
 #, fuzzy
 msgid "Register"
 msgstr "S’inscrire"
@@ -37995,6 +38085,10 @@ msgstr "Créer un nouveau compte"
 #, fuzzy
 msgid "Registered"
 msgstr "Inscrit"
+
+#: src/lobby-servers/RegisterForm.tsx
+msgid "Registering…"
+msgstr "Inscription…"
 
 #: src/multiplayer/admin/ChannelsSection.tsx
 #, fuzzy
@@ -39275,6 +39369,12 @@ msgstr "Change de cible immédiatement"
 msgid "Retry"
 msgstr "Réessayer"
 
+#. placeholder {0}: item.label
+#. placeholder {0}: problem.label
+#: src/onboarding/DownloadsPill.tsx
+msgid "Retry {0}"
+msgstr "Réessayer {0}"
+
 #: src/multiplayer/battles/BattleRowMapThumb.tsx
 #, fuzzy
 msgid "Retry downloading the map for {battleTitle}"
@@ -39666,6 +39766,10 @@ msgstr "Exécuter du Lua via {archiveName} avec unitsync."
 msgid "Run output streams here."
 msgstr "La sortie de l’exécution s’affiche ici."
 
+#: src/general/pages/SettingsSection.tsx
+msgid "Run setup again"
+msgstr "Relancer la configuration"
+
 #: src/uberstress/pages/RunPage.tsx
 #, fuzzy
 msgid "Run test"
@@ -40053,6 +40157,10 @@ msgstr "Enregistré en jeu avec le widget coilbox, sur le moteur {engine}."
 #, fuzzy
 msgid "Saved in game with the coilbox widget."
 msgstr "Enregistré en jeu avec le widget coilbox."
+
+#: src/lobby-servers/AddAccountForm.tsx
+msgid "Saved in your keychain when you add the login."
+msgstr "Enregistré dans votre trousseau lorsque vous ajoutez l’identifiant."
 
 #: src/content/pages/components/KeymapsPanel.tsx
 #, fuzzy
@@ -40966,12 +41074,16 @@ msgstr "Sélectionnez une exécution pour voir ses données."
 msgid "Select a run…"
 msgstr "Sélectionner une exécution…"
 
+#: src/lobby-servers/AddAccountForm.tsx
 #: src/lobby-servers/PasswordRecoveryForm.tsx
+#: src/lobby-servers/RegisterForm.tsx
 #, fuzzy
 msgid "Select a server"
 msgstr "Sélectionner un serveur"
 
+#: src/lobby-servers/AddAccountForm.tsx
 #: src/lobby-servers/PasswordRecoveryForm.tsx
+#: src/lobby-servers/RegisterForm.tsx
 #, fuzzy
 msgid "Select a server."
 msgstr "Sélectionnez un serveur."
@@ -41322,7 +41434,9 @@ msgid "server"
 msgstr "serveur"
 
 #: src/content/pages/components/ReplayChat.tsx
+#: src/lobby-servers/AddAccountForm.tsx
 #: src/lobby-servers/PasswordRecoveryForm.tsx
+#: src/lobby-servers/RegisterForm.tsx
 #: src/multiplayer/admin/tools.tsx
 #, fuzzy
 msgid "Server"
@@ -41445,6 +41559,10 @@ msgstr "Définissez un dossier de téléchargement dans <0>Dossiers de contenu</
 #, fuzzy
 msgid "Set a download folder in Content folders settings to download it."
 msgstr "Définissez un dossier de téléchargement dans Paramètres des dossiers de contenu pour le télécharger."
+
+#: src/content/pages/components/SuggestionsList.tsx
+msgid "Set a download folder in Content folders settings to enable downloads."
+msgstr "Définissez un dossier de téléchargement dans Paramètres des dossiers de contenu pour activer les téléchargements."
 
 #: src/campaign/missionNeeds.ts
 #: src/content/pages/components/ResolveContentDrawer.tsx
@@ -41677,6 +41795,7 @@ msgstr "Profils de paramètres"
 msgid "Settle time"
 msgstr "Durée de stabilisation"
 
+#: src/general/pages/SettingsSection.tsx
 #: src/scenario/pages/components/SetupPanel.tsx
 #, fuzzy
 msgid "Setup"
@@ -42627,6 +42746,10 @@ msgstr "Connectez-vous sur la page ouverte par Coilbox, puis revenez."
 msgid "Sign in to publish from here. Or copy the code and finish on the hub's own page."
 msgstr "Connectez-vous pour publier d’ici. Ou copiez le code et terminez sur la page du hub."
 
+#: src/onboarding/pages/HubPage.tsx
+msgid "Sign in to the hub"
+msgstr "Se connecter au hub"
+
 #: src/hub/pages/components/AccountControl.tsx
 #, fuzzy
 msgid "Sign in with Discord"
@@ -42860,6 +42983,14 @@ msgstr "Skeletor S3O"
 msgid "Skill"
 msgstr "Niveau"
 
+#: src/onboarding/Wizard.tsx
+msgid "Skip"
+msgstr "Passer"
+
+#: src/onboarding/Wizard.tsx
+msgid "Skip setup"
+msgstr "Passer la configuration"
+
 #: src/campaign/pages/components/missionEditorGroups.ts
 #, fuzzy
 msgid "skippable"
@@ -43089,6 +43220,10 @@ msgstr "Certains moteurs enregistrent dans leur propre dossier, donc supprimer c
 #, fuzzy
 msgid "Some parts of this unit are not tracked."
 msgstr "Certaines parties de cette unité ne sont pas suivies."
+
+#: src/lobby-servers/RegisterForm.tsx
+msgid "Some servers email a verification code to confirm your account."
+msgstr "Certains serveurs envoient un code de vérification par e-mail pour confirmer votre compte."
 
 #: src/sound/events.ts
 #, fuzzy
@@ -43683,6 +43818,10 @@ msgstr "Démarrer en sourdine"
 #, fuzzy
 msgid "Start one, then drop parts into it. Browse what is available under Lego Parts."
 msgstr "Créez-en un, puis ajoutez-y des éléments. Parcourez ce qui est disponible dans Éléments Lego."
+
+#: src/onboarding/Wizard.tsx
+msgid "Start playing"
+msgstr "Commencer à jouer"
 
 #: src/conquest/pages/components/StartPositionSelect.tsx
 #, fuzzy
@@ -47881,6 +48020,7 @@ msgid "Their battle is locked."
 msgstr "Leur partie est verrouillée."
 
 #: src/i18n/frameStrings.ts
+#: src/onboarding/pages/AppearancePage.tsx
 #, fuzzy
 msgid "Theme"
 msgstr "Thème"
@@ -49480,6 +49620,10 @@ msgstr "Ce serveur n’indique pas combien d’autres joueurs cherchent, coilbox
 #, fuzzy
 msgid "This server has direct messages and battle chat, but no channels."
 msgstr "Ce serveur a des messages privés et la discussion de partie, mais pas de canaux."
+
+#: src/lobby-servers/AddAccountForm.tsx
+msgid "This server has no password. Add the login, then sign in with your browser."
+msgstr "Ce serveur n’a pas de mot de passe. Ajoutez l’identifiant, puis connectez-vous avec votre navigateur."
 
 #: src/lobby-servers/pages/SettingsSection.tsx
 #, fuzzy
@@ -51845,7 +51989,9 @@ msgid "username"
 msgstr "nom d’utilisateur"
 
 #: src/account/pages/SettingsSection.tsx
+#: src/lobby-servers/AddAccountForm.tsx
 #: src/lobby-servers/PasswordRecoveryForm.tsx
+#: src/lobby-servers/RegisterForm.tsx
 #: src/multiplayer/admin/BansSection.tsx
 #: src/multiplayer/admin/ChannelsSection.tsx
 #: src/multiplayer/admin/PlayerLookupSection.tsx
@@ -54007,6 +54153,7 @@ msgstr "Vous"
 msgid "You already have a conquest on the hand-made map \"{mapTitle}\", and a map holds one conquest at a time. Abandon that conquest on the Conquest page, then import this code again."
 msgstr "Vous avez déjà une conquête sur la carte faite main « {mapTitle} », et une carte ne contient qu’une conquête à la fois. Abandonnez cette conquête sur la page Conquête, puis importez à nouveau ce code."
 
+#: src/lobby-servers/AddAccountForm.tsx
 #: src/lobby-servers/pages/SettingsSection.tsx
 #, fuzzy
 msgid "You already have this login."
@@ -54255,6 +54402,10 @@ msgstr "Vous avez gagné. Rejouez-le d’ici."
 #, fuzzy
 msgid "You're not currently in a battle. Browse open battles to join one."
 msgstr "Vous n’êtes dans aucune partie. Parcourez les parties ouvertes pour en rejoindre une."
+
+#: src/onboarding/pages/DonePage.tsx
+msgid "You're ready"
+msgstr "Tout est prêt"
 
 #: src/updater/pages/UpdatesSettingsSection.tsx
 #, fuzzy

@@ -261,13 +261,19 @@ Forces a built-in accent colour — the `--primary` brand hue. This recolours th
 { "version": 1, "accent": "orange" }
 ```
 
-> These are picoframe's accent axis. The neutral **base** tint (zinc, slate, gray,
-> stone, …) is a separate control and isn't set from a profile — reach for `theme`
-> (below) if you need to touch base tokens.
-
 > Prefer `accent` over hand-rolling `theme` colours for the brand accent — it's one
 > line and stays consistent across light/dark. Use `theme` (below) only for tokens
 > the named accents don't cover.
+
+### `base` (string)
+
+Forces a built-in base, the neutral tint behind the whole shell. It is separate from `accent`, and uses the same force-each-launch / session-override behaviour. The full set of bases:
+
+`zinc`, `slate`, `gray`, `stone`, `neutral`, `rose`, `red`, `amber`, `green`, `teal`, `blue`, `indigo`, `violet`, `purple`, `sky`, `navy`, `fuchsia`, `orange`, `lime`, `emerald`, `yellow`, `crimson`.
+
+```json
+{ "version": 1, "base": "slate" }
+```
 
 ### `hide` (string[])
 
@@ -371,6 +377,18 @@ Sets the emblem shown for each faction, by side name. Coilbox shows these wherev
 - The value is a path relative to the `.coilbox/` folder, or an inline `data:` or `https:` URL. These are the same rules as [`splash.image`](#splash-object).
 
 An emblem set here always wins. Coilbox otherwise takes a faction's emblem from the game archive's side pictures or the branding catalog, and this field overrides both. A side you do not list keeps the emblem it would have had.
+
+### `setupImage` (string or false)
+
+Sets the picture behind "You're ready" on the last page of the setup wizard. Without it, that page shows the home page's backdrop, which [`home.background`](#the-backdrop) sets.
+
+```json
+{ "version": 1, "setupImage": "setup.webp" }
+```
+
+- The value is a path relative to the `.coilbox/` folder, or an inline `data:` or `https:` URL. These are the same rules as [`splash.image`](#splash-object).
+- `false` shows no picture.
+- If the image cannot be loaded, the home page's backdrop shows instead.
 
 ### `welcome` (object)
 

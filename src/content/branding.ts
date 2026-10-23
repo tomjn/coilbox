@@ -565,11 +565,26 @@ export function useBrandingImage(
   urls?: string[],
   reencode = false,
 ): string | undefined {
+  return useBrandingImageState(urls, reencode).src;
+}
+
+/**
+ * {@link useBrandingImage}, plus whether the current URLs are still being
+ * resolved. `loading` is false once they resolve, to a picture or to nothing,
+ * and false when there are no URLs.
+ */
+export function useBrandingImageState(
+  urls?: string[],
+  reencode = false,
+): { src: string | undefined; loading: boolean } {
   const key = imageCacheKey(urls, reencode);
-  const [dataUrl, setDataUrl] = useState<string | undefined>(undefined);
+  const [resolved, setResolved] = useState<{
+    key: string;
+    src: string | undefined;
+  } | null>(null);
   useEffect(() => {
     if (!key) {
-      setDataUrl(undefined);
+      setResolved(null);
       return;
     }
     let cancelled = false;
@@ -583,16 +598,16 @@ export function useBrandingImage(
     }
     promise
       .then((res) => {
-        if (!cancelled) setDataUrl(imageSrc(res));
+        if (!cancelled) setResolved({ key, src: imageSrc(res) });
       })
       .catch(() => {
-        if (!cancelled) setDataUrl(undefined);
+        if (!cancelled) setResolved({ key, src: undefined });
       });
     return () => {
       cancelled = true;
     };
   }, [key]);
-  return dataUrl;
+  return { src: resolved?.src, loading: !!key && resolved?.key !== key };
 }
 
 /**

@@ -4,6 +4,7 @@ import { Button, cn } from "@picoframe/frame";
 import { AlertCircle, CheckCircle2, Download, Loader2 } from "lucide-react";
 import { useMemo, useState } from "react";
 import { Link } from "react-router";
+import { Skeleton } from "@/components/ui/skeleton";
 import { errorText } from "@/lib/helpers";
 import type { WriteRoot } from "../../../downloads/config";
 import type { EnqueueInput } from "../../../downloads/DownloadQueueProvider";
@@ -22,7 +23,7 @@ import {
   type SuggestedGame,
   type SuggestedMap,
   useBrandingCatalog,
-  useBrandingImage,
+  useBrandingImageState,
   useGithubGameRepos,
 } from "../../branding";
 
@@ -38,7 +39,15 @@ interface SuggestionsListProps {
   writeRoot: WriteRoot;
   /** Called after a successful download (page rescans; card re-checks). */
   onComplete?: () => void;
-  heading?: string;
+  /** Called with each request as it goes on the queue. */
+  onQueued?: (request: EnqueueInput) => void;
+  /** Defaults to "Get started" wording. `null` draws no heading. */
+  heading?: string | null;
+  /** When there is no download folder, link to the setting that sets one.
+   * Defaults to true. False says the same in plain text. */
+  folderLink?: boolean;
+  /** Centre the cards in the row, rather than starting them at the left. */
+  centred?: boolean;
 }
 
 /**
@@ -50,7 +59,7 @@ interface SuggestionsListProps {
  * Async because a `github` suggestion names a repo, not a file: the release
  * archive has to be looked up before there is a URL to queue.
  */
-async function suggestionRequest(
+export async function suggestionRequest(
   dl: SuggestedDownload,
   kind: "game" | "map",
   label: string,
@@ -133,7 +142,10 @@ export function SuggestionsList({
   items,
   writeRoot,
   onComplete,
+  onQueued,
   heading,
+  folderLink = true,
+  centred = false,
 }: SuggestionsListProps) {
   const { t } = useLingui();
   const writePath = writeRoot.path;
@@ -168,33 +180,50 @@ export function SuggestionsList({
 
   return (
     <section className="flex flex-col gap-3">
-      <div className="space-y-1">
-        <h2 className="text-sm font-semibold">
-          {heading ??
-            (kind === "game"
-              ? t`Get started — download a game`
-              : t`Get started — download a map`)}
-        </h2>
-        {noWriteRoot && (
-          <p className="text-xs text-muted-foreground">
-            <Trans>
-              Set a download folder in{" "}
-              <Link
-                className="underline underline-offset-4"
-                to="/settings/content-folders"
-              >
-                Content folders settings
-              </Link>{" "}
-              to enable downloads.
-            </Trans>
-          </p>
-        )}
-      </div>
+      {(heading !== null || noWriteRoot) && (
+        <div className="space-y-1">
+          {heading !== null && (
+            <h2 className="text-sm font-semibold">
+              {heading ??
+                (kind === "game"
+                  ? t`Get started — download a game`
+                  : t`Get started — download a map`)}
+            </h2>
+          )}
+          {noWriteRoot && (
+            <p className="text-xs text-muted-foreground">
+              {folderLink ? (
+                <Trans>
+                  Set a download folder in{" "}
+                  <Link
+                    className="underline underline-offset-4"
+                    to="/settings/content-folders"
+                  >
+                    Content folders settings
+                  </Link>{" "}
+                  to enable downloads.
+                </Trans>
+              ) : (
+                t`Set a download folder in Content folders settings to enable downloads.`
+              )}
+            </p>
+          )}
+        </div>
+      )}
 
       {/* auto-fill, not auto-fit: a suggestion card stays game-card sized even
           when only one or two are shown on a wide window (issue #529). auto-fit
-          would stretch the real tracks to fill the row, blowing the art up. */}
-      <ul className="grid grid-cols-[repeat(auto-fill,minmax(14rem,1fr))] gap-3">
+          would stretch the real tracks to fill the row, blowing the art up.
+          Centred, the tracks keep the 14rem minimum as a fixed width, so
+          auto-fit drops the empty ones and the cards sit in the middle. */}
+      <ul
+        className={cn(
+          "grid gap-3",
+          centred
+            ? "grid-cols-[repeat(auto-fit,14rem)] justify-center"
+            : "grid-cols-[repeat(auto-fill,minmax(14rem,1fr))]",
+        )}
+      >
         {items.map((item) => (
           <SuggestionCard
             key={item.id}
@@ -208,6 +237,7 @@ export function SuggestionsList({
                 : (item as SuggestedMap).thumb
             }
             done={doneIds.has(item.id)}
+            onQueued={onQueued}
             onDownloaded={() => onDownloaded(item)}
             onFailed={(message) => setResult({ ok: false, message })}
           />
@@ -245,6 +275,7 @@ function SuggestionCard({
   writePath,
   art,
   done,
+  onQueued,
   onDownloaded,
   onFailed,
 }: {
@@ -256,12 +287,20 @@ function SuggestionCard({
   /** This item's download already succeeded this visit (issue #526): stays in
    * place, marked done, instead of vanishing or re-offering the download. */
   done: boolean;
+  onQueued?: (request: EnqueueInput) => void;
   onDownloaded: () => void;
   onFailed: (message: string) => void;
 }) {
   const { t } = useLingui();
   const title = item.title;
-  const imageUrl = useBrandingImage(art, true);
+  const image = useBrandingImageState(art, true);
+  const imageUrl = image.src;
+  // The picture that finished loading, and the one that failed, so the art
+  // shows a loading state until its picture is drawn.
+  const [loaded, setLoaded] = useState<string | null>(null);
+  const [failed, setFailed] = useState<string | null>(null);
+  const drawable = imageUrl && imageUrl !== failed ? imageUrl : undefined;
+  const waiting = image.loading || (!!drawable && drawable !== loaded);
   const dl = useQueuedDownload();
   const active = dl.busy;
   const disabled = !writePath || active;
@@ -276,6 +315,7 @@ function SuggestionCard({
         writePath,
         repos,
       );
+      onQueued?.(request);
       const settled = await dl.start(request);
       if (settled?.status === "done") onDownloaded();
       else if (settled?.error) onFailed(settled.error);
@@ -286,14 +326,19 @@ function SuggestionCard({
 
   return (
     <li className="flex flex-col overflow-hidden rounded-lg border border-border/50 bg-card">
-      <div className="aspect-video w-full overflow-hidden bg-muted">
-        {imageUrl && (
+      <div className="relative aspect-video w-full overflow-hidden bg-muted">
+        {drawable && (
           <img
-            src={imageUrl}
+            src={drawable}
             alt=""
             className="size-full object-cover"
             loading="lazy"
+            onLoad={() => setLoaded(drawable)}
+            onError={() => setFailed(drawable)}
           />
+        )}
+        {waiting && (
+          <Skeleton className="absolute inset-0 rounded-none bg-muted-foreground/15" />
         )}
       </div>
       <div className="flex flex-1 flex-col gap-2 p-3">
