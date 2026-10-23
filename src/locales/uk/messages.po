@@ -1465,6 +1465,10 @@ msgstr "{analysedUnnamedGames} проаналізовано до того, як 
 msgid "{angle} render of this unit"
 msgstr "Рендер цього юніта: {angle}"
 
+#: src/onboarding/pages/GamesPage.tsx
+msgid "{app} runs other games too. Find them in Games after setup."
+msgstr "{app} запускає й інші ігри. Знайдіть їх у розділі Ігри після налаштування."
+
 #: src/content/pages/components/Convert3doDrawer.tsx
 #, fuzzy
 msgid "{archive} is a packed archive, so coilbox cannot install into it directly. Copy the output folder over the game yourself, remove the original <0>.3do</0> files, and fix any unit definition that spells <1>.3do</1> in its <2>objectname</2>. Or extract the game to a <3>.sdd</3> copy first and run this again from there."
@@ -1585,7 +1589,7 @@ msgstr "{banned, plural, one {# юніт заборонено} few {# юніти
 msgid "{base} ({copyNumber})"
 msgstr "{base} ({copyNumber})"
 
-#: src/lobby-servers/pages/SettingsSection.tsx
+#: src/lobby-servers/AddAccountForm.tsx
 #, fuzzy
 msgid "{base} (alpha)"
 msgstr "{base} (альфа)"
@@ -4697,7 +4701,7 @@ msgstr "{name} · {contents}"
 msgid "{name} (changed)"
 msgstr "{name} (змінено)"
 
-#: src/lobby-servers/pages/SettingsSection.tsx
+#: src/lobby-servers/AddAccountForm.tsx
 #: src/lobby-servers/PasswordRecoveryForm.tsx
 #, fuzzy
 msgid "{name} (custom)"
@@ -9323,6 +9327,7 @@ msgid "Accent"
 msgstr "Акцент"
 
 #: src/i18n/frameStrings.ts
+#: src/onboarding/pages/AppearancePage.tsx
 #, fuzzy
 msgid "Accent color"
 msgstr "Колір акценту"
@@ -11117,6 +11122,7 @@ msgstr "Значок застосунку: {iconPath}"
 
 #: src/general/index.ts
 #: src/i18n/frameStrings.ts
+#: src/onboarding/pages/registry.ts
 #: src/profile/index.ts
 #, fuzzy
 msgid "Appearance"
@@ -11762,6 +11768,7 @@ msgstr "ззаду"
 #: src/lego/pivot.ts
 #: src/multiplayer/chat/MemberActionsMenu.tsx
 #: src/multiplayer/LobbyStatusButton.tsx
+#: src/onboarding/Wizard.tsx
 #, fuzzy
 msgid "Back"
 msgstr "Назад"
@@ -12135,6 +12142,7 @@ msgid "base building {number}"
 msgstr "будівля бази {number}"
 
 #: src/i18n/frameStrings.ts
+#: src/onboarding/pages/AppearancePage.tsx
 #, fuzzy
 msgid "Base color"
 msgstr "Основний колір"
@@ -13767,7 +13775,7 @@ msgstr "Не може пошкодити власний юніт"
 #: src/downloads/pages/ActivityPage.tsx
 #: src/lego/pages/components/ProportionsPanel.tsx
 #: src/lego/pages/components/ScriptTab.tsx
-#: src/lobby-servers/pages/SettingsSection.tsx
+#: src/lobby-servers/AddAccountForm.tsx
 #: src/lobby-servers/PasswordRecoveryForm.tsx
 #: src/mapconv/pages/CompilePage.tsx
 #: src/mapconv/pages/DecompilePage.tsx
@@ -13791,6 +13799,11 @@ msgstr "Не може пошкодити власний юніт"
 #, fuzzy
 msgid "Cancel"
 msgstr "Скасувати"
+
+#. placeholder {0}: item.label
+#: src/onboarding/DownloadsPill.tsx
+msgid "Cancel {0}"
+msgstr "Скасувати: {0}"
 
 #: src/content/AnalysisQueueBadge.tsx
 #, fuzzy
@@ -14762,6 +14775,10 @@ msgstr "Вибрати відео"
 msgid "Choose where to write the .sdd"
 msgstr "Вибрати, куди записати .sdd"
 
+#: src/onboarding/pages/registry.ts
+msgid "Choose your language"
+msgstr "Виберіть мову"
+
 #: src/scenario/pages/components/contents.ts
 #: src/scenario/pages/components/triggers.ts
 #, fuzzy
@@ -15221,6 +15238,7 @@ msgid "Code"
 msgstr "Код"
 
 #: src/main.tsx
+#: src/onboarding/pages/GamesPage.tsx
 #: src/sound/library.ts
 #, fuzzy
 msgid "Coilbox"
@@ -15950,6 +15968,10 @@ msgstr "Колірна схема"
 msgid "Colour texture"
 msgstr "Кольорова текстура"
 
+#: src/onboarding/pages/AppearancePage.tsx
+msgid "Colours are set by this distribution"
+msgstr "Кольори задає ця дистрибуція"
+
 #: src/content/pages/components/MapAggregate.tsx
 #: src/content/pages/components/ReplayMap.tsx
 #, fuzzy
@@ -16524,6 +16546,7 @@ msgstr "Вміст (файлів: {fileCount})"
 #: src/components/ContinueBadge.tsx
 #: src/deeplink/DeepLinkHandler.tsx
 #: src/deeplink/pages/ImportSection.tsx
+#: src/onboarding/Wizard.tsx
 #: src/runlite/model.ts
 #, fuzzy
 msgid "Continue"
@@ -19174,6 +19197,10 @@ msgstr "Завантажити й встановити"
 msgid "Download + data folders are writable"
 msgstr "Папки завантажень і даних доступні для запису"
 
+#: src/onboarding/pages/GamesPage.tsx
+msgid "Download a game"
+msgstr "Завантажити гру"
+
 #: src/content/pages/components/GetStartedCard.tsx
 #, fuzzy
 msgid "Download a game or map to start playing."
@@ -19292,6 +19319,7 @@ msgid "Download newest engine ({newestVersion})"
 msgstr "Завантажити найновіший рушій ({newestVersion})"
 
 #: src/downloads/pages/components/ProgressBar.tsx
+#: src/onboarding/DownloadsPill.tsx
 #, fuzzy
 msgid "Download progress"
 msgstr "Прогрес завантаження"
@@ -20317,17 +20345,12 @@ msgstr "рушій"
 #: src/hub/pages/components/SetupPackContents.tsx
 #: src/multiplayer/battle/BattleEngineCard.tsx
 #: src/multiplayer/battles/HostBattleForm.tsx
+#: src/onboarding/useBackgroundDownloads.ts
 #: src/play/pages/components/CrashDrawer.tsx
 #: src/play/pages/EngineLogSection.tsx
 #, fuzzy
 msgid "Engine"
 msgstr "Рушій"
-
-#. placeholder {0}: release.version
-#: src/content/pages/components/SetupCard.tsx
-#, fuzzy
-msgid "Engine {0}"
-msgstr "Рушій {0}"
 
 #: src/content/pages/components/ReplayAnalysisSection.tsx
 #, fuzzy
@@ -20389,7 +20412,9 @@ msgstr "рушій {engineVersions}"
 msgid "Engine {reqLabel}"
 msgstr "Рушій {reqLabel}"
 
+#: src/content/pages/components/SetupCard.tsx
 #: src/downloads/bindings.ts
+#: src/onboarding/useBackgroundDownloads.ts
 #, fuzzy
 msgid "Engine {version}"
 msgstr "Рушій {version}"
@@ -21407,6 +21432,10 @@ msgstr "Рекомендовані"
 msgid "Featured first"
 msgstr "Рекомендовані"
 
+#: src/onboarding/pages/GamesPage.tsx
+msgid "Featured games"
+msgstr "Рекомендовані ігри"
+
 #: src/mapconv/pages/components/AdvancedOptions.tsx
 #, fuzzy
 msgid "Features file (-features)"
@@ -21682,6 +21711,7 @@ msgid "Finish or cancel downloads before reclaiming space"
 msgstr "Завершіть або скасуйте завантаження, перш ніж звільняти місце"
 
 #: src/hub/pages/components/HeaderAccount.tsx
+#: src/onboarding/pages/HubPage.tsx
 #, fuzzy
 msgid "Finish signing in the browser window that opened."
 msgstr "Завершіть вхід у вікні браузера, що відкрилося."
@@ -22983,6 +23013,11 @@ msgstr "Гра, сполучення клавіш якої показати"
 #, fuzzy
 msgid "Game, map and engine not installed"
 msgstr "Гру, мапу й рушій не встановлено"
+
+#. placeholder {0}: game.title
+#: src/onboarding/useBackgroundDownloads.ts
+msgid "Game: {0}"
+msgstr "Гра: {0}"
 
 #: src/content/pages/ReplayDetailPage.tsx
 #, fuzzy
@@ -24959,6 +24994,10 @@ msgstr "Імпортувати знову"
 msgid "Import an image"
 msgstr "Імпортувати зображення"
 
+#: src/onboarding/pages/HubPage.tsx
+msgid "Import anything shared from a hub link"
+msgstr "Імпортуйте все, чим поділилися посиланням на хаб"
+
 #: src/hub/pages/ItemPage.tsx
 #, fuzzy
 msgid "Import anyway"
@@ -26330,6 +26369,10 @@ msgstr "Зберегти цю таблицю для інших юнітів"
 msgid "Keep tweak slots this preset does not set"
 msgstr "Залишити слоти правок, які цей шаблон не задає"
 
+#: src/onboarding/pages/HubPage.tsx
+msgid "Keep your uploads under one name"
+msgstr "Тримайте свої вивантаження під одним ім’ям"
+
 #: src/content/unitFieldNotes.ts
 #, fuzzy
 msgid "Keeps cannon stages touching"
@@ -27289,6 +27332,10 @@ msgstr "Світла"
 msgid "Light hit up to"
 msgstr "Легке влучання до"
 
+#: src/onboarding/pages/AppearancePage.tsx
+msgid "Light or dark is set by this distribution"
+msgstr "Світлу чи темну тему задає ця дистрибуція"
+
 #: src/lego/scriptPlayback.ts
 #, fuzzy
 msgid "Lightly hit and destroyed"
@@ -27658,6 +27705,7 @@ msgstr "Журнал"
 
 #: src/home/zones/ResumeRail.tsx
 #: src/multiplayer/pages/BattlesPage.tsx
+#: src/onboarding/pages/ServerPage.tsx
 #, fuzzy
 msgid "Log in"
 msgstr "Увійти"
@@ -27676,6 +27724,10 @@ msgstr "Увійдіть як {username} на {serverName} з верхньої �
 #, fuzzy
 msgid "Log in to a lobby server, chat, and join battles."
 msgstr "Увійдіть на сервер лобі, спілкуйтеся й приєднуйтеся до матчів."
+
+#: src/onboarding/pages/registry.ts
+msgid "Log in to a server"
+msgstr "Увійти на сервер"
 
 #: src/lobby-servers/pages/SettingsSection.tsx
 #, fuzzy
@@ -28556,6 +28608,10 @@ msgstr "Матчі, в яких цей шар у проміжку порожні
 #, fuzzy
 msgid "Matches your best on {name}, {best}."
 msgstr "Дорівнює вашому найкращому результату на {name}, {best}."
+
+#: src/onboarding/pages/LanguagePage.tsx
+msgid "Matches your system"
+msgstr "Як у системі"
 
 #: src/multiplayer/battle/MapSuggestionAction.tsx
 #, fuzzy
@@ -30814,6 +30870,7 @@ msgid "No engine found. Add a content folder with an engine in <0>Settings → C
 msgstr "Рушій не знайдено. Спочатку додайте папку вмісту з рушієм у <0>Налаштування → Папки вмісту</0>."
 
 #: src/content/pages/components/SetupCard.tsx
+#: src/onboarding/useBackgroundDownloads.ts
 #, fuzzy
 msgid "No engine is available to download for this platform."
 msgstr "Для цієї платформи немає рушія для завантаження."
@@ -35698,6 +35755,7 @@ msgstr "Planet Wars"
 #: src/content/pages/components/ReplayPlaybackBar.tsx
 #: src/lego/pages/components/ActionsDrawer.tsx
 #: src/lego/pages/components/AnimationPanel.tsx
+#: src/onboarding/pages/AppearancePage.tsx
 #: src/placement/SurfaceBars.tsx
 #: src/play/index.ts
 #: src/runlite/index.ts
@@ -36568,6 +36626,10 @@ msgstr "Консоль протоколу"
 #, fuzzy
 msgid "Publish"
 msgstr "Опублікувати"
+
+#: src/onboarding/pages/HubPage.tsx
+msgid "Publish maps, scenarios and presets"
+msgstr "Публікуйте мапи, сценарії та шаблони"
 
 #: src/hub/PublishSection.tsx
 #, fuzzy
@@ -37585,6 +37647,7 @@ msgstr "Читання…"
 #: src/multiplayer/battle/BattleMembersTable.tsx
 #: src/multiplayer/battle/BattleRoomHeader.tsx
 #: src/multiplayer/battle/MemberRow.tsx
+#: src/onboarding/pages/AppearancePage.tsx
 #, fuzzy
 msgid "Ready"
 msgstr "Готовність"
@@ -37982,6 +38045,7 @@ msgstr "regex /{filterRegex}/i"
 
 #: src/lobby-servers/pages/SettingsSection.tsx
 #: src/multiplayer/admin/ChannelsSection.tsx
+#: src/onboarding/pages/ServerPage.tsx
 #, fuzzy
 msgid "Register"
 msgstr "Зареєструвати"
@@ -39275,6 +39339,12 @@ msgstr "Негайно змінює ціль"
 msgid "Retry"
 msgstr "Повторити"
 
+#. placeholder {0}: item.label
+#. placeholder {0}: problem.label
+#: src/onboarding/DownloadsPill.tsx
+msgid "Retry {0}"
+msgstr "Повторити: {0}"
+
 #: src/multiplayer/battles/BattleRowMapThumb.tsx
 #, fuzzy
 msgid "Retry downloading the map for {battleTitle}"
@@ -39665,6 +39735,10 @@ msgstr "Виконати Lua через {archiveName} за допомогою un
 #, fuzzy
 msgid "Run output streams here."
 msgstr "Вивід прогону з’являється тут."
+
+#: src/general/pages/SettingsSection.tsx
+msgid "Run setup again"
+msgstr "Запустити налаштування знову"
 
 #: src/uberstress/pages/RunPage.tsx
 #, fuzzy
@@ -41446,6 +41520,10 @@ msgstr "Задайте папку завантажень у <0>Папках вм
 msgid "Set a download folder in Content folders settings to download it."
 msgstr "Задайте папку завантажень у налаштуваннях папок вмісту, щоб завантажити це."
 
+#: src/content/pages/components/SuggestionsList.tsx
+msgid "Set a download folder in Content folders settings to enable downloads."
+msgstr "Задайте папку завантажень у налаштуваннях папок вмісту, щоб увімкнути завантаження."
+
 #: src/campaign/missionNeeds.ts
 #: src/content/pages/components/ResolveContentDrawer.tsx
 #, fuzzy
@@ -41677,6 +41755,7 @@ msgstr "Профілі налаштувань"
 msgid "Settle time"
 msgstr "Час заспокоєння"
 
+#: src/general/pages/SettingsSection.tsx
 #: src/scenario/pages/components/SetupPanel.tsx
 #, fuzzy
 msgid "Setup"
@@ -42627,6 +42706,10 @@ msgstr "Увійдіть на сторінці, яку відкрив Coilbox, �
 msgid "Sign in to publish from here. Or copy the code and finish on the hub's own page."
 msgstr "Увійдіть, щоб публікувати звідси. Або скопіюйте код і завершіть на власній сторінці хабу."
 
+#: src/onboarding/pages/registry.ts
+msgid "Sign in to the hub"
+msgstr "Увійти в хаб"
+
 #: src/hub/pages/components/AccountControl.tsx
 #, fuzzy
 msgid "Sign in with Discord"
@@ -42859,6 +42942,14 @@ msgstr "Skeletor S3O"
 #, fuzzy
 msgid "Skill"
 msgstr "Навичка"
+
+#: src/onboarding/Wizard.tsx
+msgid "Skip"
+msgstr "Пропустити"
+
+#: src/onboarding/Wizard.tsx
+msgid "Skip setup"
+msgstr "Пропустити налаштування"
 
 #: src/campaign/pages/components/missionEditorGroups.ts
 #, fuzzy
@@ -43683,6 +43774,10 @@ msgstr "Починати без звуку"
 #, fuzzy
 msgid "Start one, then drop parts into it. Browse what is available under Lego Parts."
 msgstr "Створіть його, а потім перетягніть у нього деталі. Перегляньте доступні в розділі «Деталі Lego»."
+
+#: src/onboarding/Wizard.tsx
+msgid "Start playing"
+msgstr "Почати гру"
 
 #: src/conquest/pages/components/StartPositionSelect.tsx
 #, fuzzy
@@ -47881,6 +47976,7 @@ msgid "Their battle is locked."
 msgstr "Їхній матч заблоковано."
 
 #: src/i18n/frameStrings.ts
+#: src/onboarding/pages/AppearancePage.tsx
 #, fuzzy
 msgid "Theme"
 msgstr "Тема"
@@ -54255,6 +54351,10 @@ msgstr "Ви перемогли. Грайте знову звідси."
 #, fuzzy
 msgid "You're not currently in a battle. Browse open battles to join one."
 msgstr "Зараз ви не в матчі. Перегляньте відкриті матчі, щоб приєднатися."
+
+#: src/onboarding/pages/DonePage.tsx
+msgid "You're ready"
+msgstr "Усе готово"
 
 #: src/updater/pages/UpdatesSettingsSection.tsx
 #, fuzzy

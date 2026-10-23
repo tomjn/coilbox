@@ -1206,6 +1206,10 @@ msgstr ""
 msgid "{angle} render of this unit"
 msgstr ""
 
+#: src/onboarding/pages/GamesPage.tsx
+msgid "{app} runs other games too. Find them in Games after setup."
+msgstr ""
+
 #: src/content/pages/components/Convert3doDrawer.tsx
 msgid "{archive} is a packed archive, so coilbox cannot install into it directly. Copy the output folder over the game yourself, remove the original <0>.3do</0> files, and fix any unit definition that spells <1>.3do</1> in its <2>objectname</2>. Or extract the game to a <3>.sdd</3> copy first and run this again from there."
 msgstr ""
@@ -1302,7 +1306,7 @@ msgstr ""
 msgid "{base} ({copyNumber})"
 msgstr ""
 
-#: src/lobby-servers/pages/SettingsSection.tsx
+#: src/lobby-servers/AddAccountForm.tsx
 msgid "{base} (alpha)"
 msgstr ""
 
@@ -3799,7 +3803,7 @@ msgstr ""
 msgid "{name} (changed)"
 msgstr ""
 
-#: src/lobby-servers/pages/SettingsSection.tsx
+#: src/lobby-servers/AddAccountForm.tsx
 #: src/lobby-servers/PasswordRecoveryForm.tsx
 msgid "{name} (custom)"
 msgstr ""
@@ -7507,6 +7511,7 @@ msgid "Accent"
 msgstr ""
 
 #: src/i18n/frameStrings.ts
+#: src/onboarding/pages/AppearancePage.tsx
 msgid "Accent color"
 msgstr ""
 
@@ -8955,6 +8960,7 @@ msgstr ""
 
 #: src/general/index.ts
 #: src/i18n/frameStrings.ts
+#: src/onboarding/pages/registry.ts
 #: src/profile/index.ts
 msgid "Appearance"
 msgstr ""
@@ -9477,6 +9483,7 @@ msgstr ""
 #: src/lego/pivot.ts
 #: src/multiplayer/chat/MemberActionsMenu.tsx
 #: src/multiplayer/LobbyStatusButton.tsx
+#: src/onboarding/Wizard.tsx
 msgid "Back"
 msgstr ""
 
@@ -9778,6 +9785,7 @@ msgid "base building {number}"
 msgstr ""
 
 #: src/i18n/frameStrings.ts
+#: src/onboarding/pages/AppearancePage.tsx
 msgid "Base color"
 msgstr ""
 
@@ -11104,7 +11112,7 @@ msgstr ""
 #: src/downloads/pages/ActivityPage.tsx
 #: src/lego/pages/components/ProportionsPanel.tsx
 #: src/lego/pages/components/ScriptTab.tsx
-#: src/lobby-servers/pages/SettingsSection.tsx
+#: src/lobby-servers/AddAccountForm.tsx
 #: src/lobby-servers/PasswordRecoveryForm.tsx
 #: src/mapconv/pages/CompilePage.tsx
 #: src/mapconv/pages/DecompilePage.tsx
@@ -11126,6 +11134,11 @@ msgstr ""
 #: src/workshop/pages/components/ReferenceBulkEdit.tsx
 #: src/workshop/pages/components/WeaponLibraryPanel.tsx
 msgid "Cancel"
+msgstr ""
+
+#. placeholder {0}: item.label
+#: src/onboarding/DownloadsPill.tsx
+msgid "Cancel {0}"
 msgstr ""
 
 #: src/content/AnalysisQueueBadge.tsx
@@ -11915,6 +11928,10 @@ msgstr ""
 msgid "Choose where to write the .sdd"
 msgstr ""
 
+#: src/onboarding/pages/registry.ts
+msgid "Choose your language"
+msgstr ""
+
 #: src/scenario/pages/components/contents.ts
 #: src/scenario/pages/components/triggers.ts
 msgid "circle"
@@ -12296,6 +12313,7 @@ msgid "Code"
 msgstr ""
 
 #: src/main.tsx
+#: src/onboarding/pages/GamesPage.tsx
 #: src/sound/library.ts
 msgid "Coilbox"
 msgstr ""
@@ -12882,6 +12900,10 @@ msgstr ""
 msgid "Colour texture"
 msgstr ""
 
+#: src/onboarding/pages/AppearancePage.tsx
+msgid "Colours are set by this distribution"
+msgstr ""
+
 #: src/content/pages/components/MapAggregate.tsx
 #: src/content/pages/components/ReplayMap.tsx
 msgid "Colours compare places on this map with each other, not with another picture."
@@ -13346,6 +13368,7 @@ msgstr ""
 #: src/components/ContinueBadge.tsx
 #: src/deeplink/DeepLinkHandler.tsx
 #: src/deeplink/pages/ImportSection.tsx
+#: src/onboarding/Wizard.tsx
 #: src/runlite/model.ts
 msgid "Continue"
 msgstr ""
@@ -15500,6 +15523,10 @@ msgstr ""
 msgid "Download + data folders are writable"
 msgstr ""
 
+#: src/onboarding/pages/GamesPage.tsx
+msgid "Download a game"
+msgstr ""
+
 #: src/content/pages/components/GetStartedCard.tsx
 msgid "Download a game or map to start playing."
 msgstr ""
@@ -15596,6 +15623,7 @@ msgid "Download newest engine ({newestVersion})"
 msgstr ""
 
 #: src/downloads/pages/components/ProgressBar.tsx
+#: src/onboarding/DownloadsPill.tsx
 msgid "Download progress"
 msgstr ""
 
@@ -16431,14 +16459,10 @@ msgstr ""
 #: src/hub/pages/components/SetupPackContents.tsx
 #: src/multiplayer/battle/BattleEngineCard.tsx
 #: src/multiplayer/battles/HostBattleForm.tsx
+#: src/onboarding/useBackgroundDownloads.ts
 #: src/play/pages/components/CrashDrawer.tsx
 #: src/play/pages/EngineLogSection.tsx
 msgid "Engine"
-msgstr ""
-
-#. placeholder {0}: release.version
-#: src/content/pages/components/SetupCard.tsx
-msgid "Engine {0}"
 msgstr ""
 
 #: src/content/pages/components/ReplayAnalysisSection.tsx
@@ -16489,7 +16513,9 @@ msgstr ""
 msgid "Engine {reqLabel}"
 msgstr ""
 
+#: src/content/pages/components/SetupCard.tsx
 #: src/downloads/bindings.ts
+#: src/onboarding/useBackgroundDownloads.ts
 msgid "Engine {version}"
 msgstr ""
 
@@ -17311,6 +17337,10 @@ msgstr ""
 msgid "Featured first"
 msgstr ""
 
+#: src/onboarding/pages/GamesPage.tsx
+msgid "Featured games"
+msgstr ""
+
 #: src/mapconv/pages/components/AdvancedOptions.tsx
 msgid "Features file (-features)"
 msgstr ""
@@ -17533,6 +17563,7 @@ msgid "Finish or cancel downloads before reclaiming space"
 msgstr ""
 
 #: src/hub/pages/components/HeaderAccount.tsx
+#: src/onboarding/pages/HubPage.tsx
 msgid "Finish signing in the browser window that opened."
 msgstr ""
 
@@ -18582,6 +18613,11 @@ msgstr ""
 
 #: src/content/pages/ReplayDetailPage.tsx
 msgid "Game, map and engine not installed"
+msgstr ""
+
+#. placeholder {0}: game.title
+#: src/onboarding/useBackgroundDownloads.ts
+msgid "Game: {0}"
 msgstr ""
 
 #: src/content/pages/ReplayDetailPage.tsx
@@ -20179,6 +20215,10 @@ msgstr ""
 msgid "Import an image"
 msgstr ""
 
+#: src/onboarding/pages/HubPage.tsx
+msgid "Import anything shared from a hub link"
+msgstr ""
+
 #: src/hub/pages/ItemPage.tsx
 msgid "Import anyway"
 msgstr ""
@@ -21288,6 +21328,10 @@ msgstr ""
 msgid "Keep tweak slots this preset does not set"
 msgstr ""
 
+#: src/onboarding/pages/HubPage.tsx
+msgid "Keep your uploads under one name"
+msgstr ""
+
 #: src/content/unitFieldNotes.ts
 msgid "Keeps cannon stages touching"
 msgstr ""
@@ -22061,6 +22105,10 @@ msgstr ""
 msgid "Light hit up to"
 msgstr ""
 
+#: src/onboarding/pages/AppearancePage.tsx
+msgid "Light or dark is set by this distribution"
+msgstr ""
+
 #: src/lego/scriptPlayback.ts
 msgid "Lightly hit and destroyed"
 msgstr ""
@@ -22360,6 +22408,7 @@ msgstr ""
 
 #: src/home/zones/ResumeRail.tsx
 #: src/multiplayer/pages/BattlesPage.tsx
+#: src/onboarding/pages/ServerPage.tsx
 msgid "Log in"
 msgstr ""
 
@@ -22373,6 +22422,10 @@ msgstr ""
 
 #: src/home/groupDescription.ts
 msgid "Log in to a lobby server, chat, and join battles."
+msgstr ""
+
+#: src/onboarding/pages/registry.ts
+msgid "Log in to a server"
 msgstr ""
 
 #: src/lobby-servers/pages/SettingsSection.tsx
@@ -23087,6 +23140,10 @@ msgstr ""
 
 #: src/play/presetRecord.ts
 msgid "Matches your best on {name}, {best}."
+msgstr ""
+
+#: src/onboarding/pages/LanguagePage.tsx
+msgid "Matches your system"
 msgstr ""
 
 #: src/multiplayer/battle/MapSuggestionAction.tsx
@@ -24915,6 +24972,7 @@ msgid "No engine found. Add a content folder with an engine in <0>Settings → C
 msgstr ""
 
 #: src/content/pages/components/SetupCard.tsx
+#: src/onboarding/useBackgroundDownloads.ts
 msgid "No engine is available to download for this platform."
 msgstr ""
 
@@ -28850,6 +28908,7 @@ msgstr ""
 #: src/content/pages/components/ReplayPlaybackBar.tsx
 #: src/lego/pages/components/ActionsDrawer.tsx
 #: src/lego/pages/components/AnimationPanel.tsx
+#: src/onboarding/pages/AppearancePage.tsx
 #: src/placement/SurfaceBars.tsx
 #: src/play/index.ts
 #: src/runlite/index.ts
@@ -29554,6 +29613,10 @@ msgstr ""
 
 #: src/hub/PublishSection.tsx
 msgid "Publish"
+msgstr ""
+
+#: src/onboarding/pages/HubPage.tsx
+msgid "Publish maps, scenarios and presets"
 msgstr ""
 
 #: src/hub/PublishSection.tsx
@@ -30380,6 +30443,7 @@ msgstr ""
 #: src/multiplayer/battle/BattleMembersTable.tsx
 #: src/multiplayer/battle/BattleRoomHeader.tsx
 #: src/multiplayer/battle/MemberRow.tsx
+#: src/onboarding/pages/AppearancePage.tsx
 msgid "Ready"
 msgstr ""
 
@@ -30703,6 +30767,7 @@ msgstr ""
 
 #: src/lobby-servers/pages/SettingsSection.tsx
 #: src/multiplayer/admin/ChannelsSection.tsx
+#: src/onboarding/pages/ServerPage.tsx
 msgid "Register"
 msgstr ""
 
@@ -31751,6 +31816,12 @@ msgstr ""
 msgid "Retry"
 msgstr ""
 
+#. placeholder {0}: item.label
+#. placeholder {0}: problem.label
+#: src/onboarding/DownloadsPill.tsx
+msgid "Retry {0}"
+msgstr ""
+
 #: src/multiplayer/battles/BattleRowMapThumb.tsx
 msgid "Retry downloading the map for {battleTitle}"
 msgstr ""
@@ -32063,6 +32134,10 @@ msgstr ""
 
 #: src/uberstress/pages/RunPage.tsx
 msgid "Run output streams here."
+msgstr ""
+
+#: src/general/pages/SettingsSection.tsx
+msgid "Run setup again"
 msgstr ""
 
 #: src/uberstress/pages/RunPage.tsx
@@ -33506,6 +33581,10 @@ msgstr ""
 msgid "Set a download folder in Content folders settings to download it."
 msgstr ""
 
+#: src/content/pages/components/SuggestionsList.tsx
+msgid "Set a download folder in Content folders settings to enable downloads."
+msgstr ""
+
 #: src/campaign/missionNeeds.ts
 #: src/content/pages/components/ResolveContentDrawer.tsx
 msgid "Set a download folder in Content folders settings to enable this."
@@ -33692,6 +33771,7 @@ msgstr ""
 msgid "Settle time"
 msgstr ""
 
+#: src/general/pages/SettingsSection.tsx
 #: src/scenario/pages/components/SetupPanel.tsx
 msgid "Setup"
 msgstr ""
@@ -34458,6 +34538,10 @@ msgstr ""
 msgid "Sign in to publish from here. Or copy the code and finish on the hub's own page."
 msgstr ""
 
+#: src/onboarding/pages/registry.ts
+msgid "Sign in to the hub"
+msgstr ""
+
 #: src/hub/pages/components/AccountControl.tsx
 msgid "Sign in with Discord"
 msgstr ""
@@ -34646,6 +34730,14 @@ msgstr ""
 
 #: src/content/pages/ReplaysPage.tsx
 msgid "Skill"
+msgstr ""
+
+#: src/onboarding/Wizard.tsx
+msgid "Skip"
+msgstr ""
+
+#: src/onboarding/Wizard.tsx
+msgid "Skip setup"
 msgstr ""
 
 #: src/campaign/pages/components/missionEditorGroups.ts
@@ -35311,6 +35403,10 @@ msgstr ""
 
 #: src/lego/pages/ProjectsPage.tsx
 msgid "Start one, then drop parts into it. Browse what is available under Lego Parts."
+msgstr ""
+
+#: src/onboarding/Wizard.tsx
+msgid "Start playing"
 msgstr ""
 
 #: src/conquest/pages/components/StartPositionSelect.tsx
@@ -38688,6 +38784,7 @@ msgid "Their battle is locked."
 msgstr ""
 
 #: src/i18n/frameStrings.ts
+#: src/onboarding/pages/AppearancePage.tsx
 msgid "Theme"
 msgstr ""
 
@@ -43826,6 +43923,10 @@ msgstr ""
 
 #: src/multiplayer/pages/BattleRoomPage.tsx
 msgid "You're not currently in a battle. Browse open battles to join one."
+msgstr ""
+
+#: src/onboarding/pages/DonePage.tsx
+msgid "You're ready"
 msgstr ""
 
 #: src/updater/pages/UpdatesSettingsSection.tsx
