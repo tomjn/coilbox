@@ -96,6 +96,10 @@ it("opens on a relevant page, ends on done, and settles nothing on open", () => 
   click("Continue");
   expect(screen.getByRole("heading", { name: "You're ready" })).toBeTruthy();
   expect(settled()).toContain("server");
+  // Theme names, not raw ids such as "zinc".
+  expect(
+    screen.getByText(/^(Light|Dark|System), [A-Z]\w* \/ [A-Z]\w*$/),
+  ).toBeTruthy();
   // The last page offers one way out.
   expect(screen.queryByRole("button", { name: "Skip" })).toBeNull();
   expect(screen.queryByRole("button", { name: "Back" })).toBeNull();
@@ -152,6 +156,54 @@ it("draws the overlay over the whole window below popovers", () => {
   expect(overlay.className).toContain("fixed");
   expect(overlay.className).toContain("inset-0");
   expect(overlay.className).toContain("z-40");
+});
+
+/** The wrapper the provider puts round the app. */
+const appIsInert = () =>
+  screen.getByText("home").parentElement?.hasAttribute("inert");
+
+it("makes the app inert while the wizard is open, and focuses the wizard", () => {
+  ctx = { ...IRRELEVANT, lobbyAccountCount: 0 };
+  show();
+  expect(appIsInert()).toBe(true);
+  expect(document.activeElement).toBe(screen.getByRole("dialog"));
+  click("Skip setup");
+  expect(wizard()).toBeNull();
+  expect(appIsInert()).toBe(false);
+});
+
+it("leaves the app alone when the wizard does not open", () => {
+  show();
+  expect(appIsInert()).toBe(false);
+});
+
+it("shows a blank frame while an unsettled page has not answered", () => {
+  ctx = { ...IRRELEVANT, games: null };
+  show();
+  expect(screen.getByTestId("onboarding-waiting").className).toContain(
+    "fixed inset-0 z-40",
+  );
+  expect(wizard()).toBeNull();
+  expect(appIsInert()).toBe(true);
+  expect(settled()).toEqual([]);
+});
+
+it("shows no blank frame when the unanswered page is already settled", () => {
+  storage.set(
+    SETTLED_KEY,
+    JSON.stringify([
+      "language",
+      "appearance",
+      "games",
+      "hub",
+      "server",
+      "done",
+    ]),
+  );
+  ctx = { ...IRRELEVANT, games: null };
+  show();
+  expect(screen.queryByTestId("onboarding-waiting")).toBeNull();
+  expect(appIsInert()).toBe(false);
 });
 
 it("uses the new pages eyebrow once done is settled", () => {

@@ -1,7 +1,7 @@
 import { msg } from "@lingui/core/macro";
 import { useLingui } from "@lingui/react/macro";
 import { Button, cn } from "@picoframe/frame";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { QueueItem } from "@/downloads/DownloadQueueProvider";
 import { QueueProgress } from "@/downloads/pages/components/ProgressBar";
 import type { PageId } from "./ids";
@@ -58,12 +58,20 @@ export function Wizard({
     onClose();
   };
 
+  // Focus starts in the wizard, since the app behind it is inert.
+  const dialog = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    dialog.current?.focus();
+  }, []);
+
   return (
     <div
+      ref={dialog}
+      tabIndex={-1}
       role="dialog"
       aria-modal="true"
       aria-labelledby="onboarding-title"
-      className="fixed inset-0 z-40 flex flex-col bg-background text-foreground"
+      className="fixed inset-0 z-40 flex flex-col bg-background text-foreground outline-none"
     >
       <DownloadsSlot items={downloads} />
       <div className="flex min-h-0 flex-1 flex-col px-10 pt-10">

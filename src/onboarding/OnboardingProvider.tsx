@@ -4,7 +4,7 @@ import {
   type ReactNode,
   useCallback,
   useContext,
-  useEffect,
+  useLayoutEffect,
   useRef,
   useState,
 } from "react";
@@ -63,11 +63,16 @@ export function OnboardingProvider({ children }: { children: ReactNode }) {
     ? planRun({ settled, relevance, rerun })
     : { status: "waiting" as const };
   const decided = next.status === "waiting" ? null : next;
+  // Some unsettled page has not answered yet. Never true on an install where
+  // everything is settled, because `planRun` only waits on unsettled pages.
+  const waiting = planning && next.status === "waiting";
+  const showWizard = open && plan?.status === "open";
 
   // StrictMode runs an effect twice with one render's values, and the settled
-  // list is written once per plan.
+  // list is written once per plan. A layout effect, so the wizard replaces the
+  // blank frame before the app behind it can paint.
   const applied = useRef<DecidedPlan | null>(null);
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (!decided || applied.current === decided) return;
     applied.current = decided;
     setPlan(decided);
@@ -79,8 +84,18 @@ export function OnboardingProvider({ children }: { children: ReactNode }) {
 
   return (
     <WizardDownloadsContext.Provider value={downloads}>
-      {children}
-      {open && plan?.status === "open" && (
+      {/* `contents` adds no box. Radix portals mount on body, so selects
+          inside the wizard stay usable while this is inert. */}
+      <div className="contents" inert={waiting || showWizard || undefined}>
+        {children}
+      </div>
+      {waiting && (
+        <div
+          data-testid="onboarding-waiting"
+          className="fixed inset-0 z-40 bg-background"
+        />
+      )}
+      {showWizard && plan?.status === "open" && (
         <Wizard
           key={run}
           pages={plan.pages}
