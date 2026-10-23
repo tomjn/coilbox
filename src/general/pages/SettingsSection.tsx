@@ -1,4 +1,5 @@
 import { Trans, useLingui } from "@lingui/react/macro";
+import { Button } from "@picoframe/frame";
 import { Maximize2, Sparkles, Wrench } from "lucide-react";
 import { Field } from "@/components/Field";
 import { OptionSelect } from "@/components/OptionSelect";
@@ -11,6 +12,7 @@ import {
   SYSTEM_LANGUAGE,
 } from "../../i18n/locales";
 import { clampUiZoom, UI_ZOOM_LEVELS } from "../../lib/uiZoom";
+import { requestOnboardingRerun } from "../../onboarding/rerun";
 import { useAdvancedModeSetting } from "../advanced";
 import {
   type ReduceMotionSetting,
@@ -269,6 +271,19 @@ export default function GeneralSettings() {
             </span>
           </span>
         </Label>
+      </section>
+
+      <section>
+        <Field label={t`Setup`} className="w-56">
+          <Button
+            variant="outline"
+            size="sm"
+            aria-label={t`Run setup again`}
+            onClick={() => requestOnboardingRerun()}
+          >
+            {t`Run setup again`}
+          </Button>
+        </Field>
       </section>
 
       <AboutCoilbox />
