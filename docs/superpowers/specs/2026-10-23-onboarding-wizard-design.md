@@ -23,10 +23,10 @@ The wizard covers the whole window, sidebar included, like an installer.
 
 - It is a Coilbox plugin, `src/onboarding`, appended last in `app.plugins.ts`. picoframe wraps plugin Providers innermost-last, so its Provider sits inside the theme, settings store, router, download queue, hub and lobby providers, and draws the wizard as a fixed overlay beside its children. A sibling of `LocalisedAppFrame` would sit outside the theme and settings providers.
 - The overlay is `z-40`: above the frame, below Radix popovers (`z-50`) so selects inside the wizard open over it, and below `Splash`, so the wizard is in place when the splash fades.
-- Layout, top to bottom: a progress bar with one segment per visible page, the page title, the page body, and a footer. No page has an eyebrow line. The Done page draws its own heading in place of the title.
+- Layout, top to bottom: a progress bar with one segment per visible page, the page title, the page body, and a footer. No page has an eyebrow line. The games, hub and Done pages draw their own headings in place of the title.
 - Footer: "Skip setup" on the left. "Back", "Skip" and "Continue" on the right. The last page has "Start playing" only.
 - Escape does nothing. Leaving goes through "Skip setup", so an accidental key press cannot lose the flow.
-- Background downloads show as a pill in the title bar area, one entry per item with its percentage and a cancel control.
+- Background downloads show as a pill in the footer, between "Skip setup" and the buttons on the right, one entry per item with its percentage and a cancel control.
 - Components come from picoframe per `CLAUDE.md`. No inline help paragraphs.
 
 ## Pages
