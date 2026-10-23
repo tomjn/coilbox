@@ -44,7 +44,7 @@ export function Wizard({
     advance();
   };
   const skipSetup = () => {
-    for (const page of pages) onSettle(page);
+    for (const pageId of pages) onSettle(pageId);
     onClose();
   };
 
@@ -70,9 +70,9 @@ export function Wizard({
       />
       <div className="flex min-h-0 flex-1 flex-col px-10 pt-10">
         <div className="mb-6 flex gap-1.5">
-          {pages.map((page, i) => (
+          {pages.map((stepId, i) => (
             <span
-              key={page}
+              key={stepId}
               data-testid="wizard-step"
               className={cn(
                 "h-[3px] flex-1 rounded-full",

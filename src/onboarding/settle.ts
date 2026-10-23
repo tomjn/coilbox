@@ -14,12 +14,7 @@ export type AskedPage = Exclude<PageId, "done">;
 export type RunPlan =
   | { status: "waiting" }
   | { status: "none"; settleNow: SettleId[] }
-  | {
-      status: "open";
-      pages: PageId[];
-      settleNow: SettleId[];
-      newPagesRun: boolean;
-    };
+  | { status: "open"; pages: PageId[]; settleNow: SettleId[] };
 
 export function planRun(args: {
   settled: readonly string[];
@@ -43,12 +38,7 @@ export function planRun(args: {
     return { status: "none", settleNow };
   }
   const pages: PageId[] = needsDone ? [...shown, "done"] : shown;
-  return {
-    status: "open",
-    pages,
-    settleNow,
-    newPagesRun: !rerun && settled.includes("done"),
-  };
+  return { status: "open", pages, settleNow };
 }
 
 export function addSettled(

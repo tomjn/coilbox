@@ -65,10 +65,9 @@ describe("planRun", () => {
       status: "open",
       pages: ["language", "server", "done"],
       settleNow: ["appearance", "games", "hub"],
-      newPagesRun: false,
     });
   });
-  it("leaves out done and marks a new pages run once done is settled", () => {
+  it("leaves out done once done is settled", () => {
     const plan = planRun({
       settled: ["language", "appearance", "games", "hub", "done"],
       relevance: all(true),
@@ -78,7 +77,6 @@ describe("planRun", () => {
       status: "open",
       pages: ["server"],
       settleNow: [],
-      newPagesRun: true,
     });
   });
   it("keeps done for a first run closed partway", () => {
@@ -98,7 +96,6 @@ describe("planRun", () => {
     expect(plan).toMatchObject({
       status: "open",
       pages: ["hub", "done"],
-      newPagesRun: false,
     });
   });
 });
