@@ -13,12 +13,10 @@ import {
   useLobbyAccounts,
 } from "@/lobby-servers/config";
 import { RegisterForm } from "@/lobby-servers/RegisterForm";
-import { PageArt } from "./PageArt";
 import type { WizardPageProps } from "./registry";
 
 /**
- * The lobby settings' add login and register forms, side by side as tabs, in
- * a column on the left over the lobby login drawing from Home.
+ * The lobby settings' add login and register forms, side by side as tabs.
  * `allServers` already lists the profile's official server first. A
  * registration that finishes after the player has moved on does not move the
  * wizard a second time.
@@ -58,35 +56,31 @@ export default function ServerPage({ next, skip }: WizardPageProps) {
   };
 
   return (
-    <div className="relative min-h-full">
-      <PageArt toolId="multiplayer.lobby" />
-      {/* Positioned, so it paints over the drawing without a z-index. */}
-      <Tabs defaultValue="login" className="relative max-w-md">
-        <TabsList>
-          <TabsTrigger value="login">
-            <Trans>Log in</Trans>
-          </TabsTrigger>
-          <TabsTrigger value="register">
-            <Trans>Register</Trans>
-          </TabsTrigger>
-        </TabsList>
-        <TabsContent value="login" className="flex flex-col">
-          <AddAccountForm
-            draft={draft}
-            accounts={accountsCfg.accounts}
-            servers={servers}
-            onAdd={addAccount}
-            onCancel={skip}
-          />
-        </TabsContent>
-        <TabsContent value="register">
-          <RegisterForm
-            servers={servers}
-            onSuccess={registered}
-            onCancel={skip}
-          />
-        </TabsContent>
-      </Tabs>
-    </div>
+    <Tabs defaultValue="login" className="max-w-md">
+      <TabsList>
+        <TabsTrigger value="login">
+          <Trans>Log in</Trans>
+        </TabsTrigger>
+        <TabsTrigger value="register">
+          <Trans>Register</Trans>
+        </TabsTrigger>
+      </TabsList>
+      <TabsContent value="login" className="flex flex-col">
+        <AddAccountForm
+          draft={draft}
+          accounts={accountsCfg.accounts}
+          servers={servers}
+          onAdd={addAccount}
+          onCancel={skip}
+        />
+      </TabsContent>
+      <TabsContent value="register">
+        <RegisterForm
+          servers={servers}
+          onSuccess={registered}
+          onCancel={skip}
+        />
+      </TabsContent>
+    </Tabs>
   );
 }

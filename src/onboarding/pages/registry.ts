@@ -25,13 +25,21 @@ export interface WizardPageProps {
 }
 
 /**
- * A page the shell heads with a title, or one that draws its own heading with
- * `WIZARD_TITLE_ID`.
+ * What the shell paints behind a page: one of the bundled tool drawings by its
+ * key in `src/home/bundledArt.ts`, or `"setup"` for the profile's setup image
+ * with the Home backdrop as its fallback.
  */
-export type WizardPageEntry = { Component: FC<WizardPageProps> } & (
-  | { ownHeading?: false; title: MessageDescriptor }
-  | { ownHeading: true }
-);
+export type WizardArtSpec = { drawing: string } | "setup";
+
+/**
+ * A page the shell heads with a title, or one that draws its own heading with
+ * `WIZARD_TITLE_ID`. `art` is painted by the shell across the whole window
+ * above the footer.
+ */
+export type WizardPageEntry = {
+  Component: FC<WizardPageProps>;
+  art?: WizardArtSpec;
+} & ({ ownHeading?: false; title: MessageDescriptor } | { ownHeading: true });
 
 export const PAGE_COMPONENTS: Record<PageId, WizardPageEntry> = {
   language: {
@@ -49,13 +57,16 @@ export const PAGE_COMPONENTS: Record<PageId, WizardPageEntry> = {
   hub: {
     Component: HubPage,
     ownHeading: true,
+    art: { drawing: "hub.browse" },
   },
   server: {
     Component: ServerPage,
     title: msg`Log in to a server`,
+    art: { drawing: "multiplayer.lobby" },
   },
   done: {
     Component: DonePage,
     ownHeading: true,
+    art: "setup",
   },
 };

@@ -6,6 +6,7 @@ import { DownloadsPill } from "./DownloadsPill";
 import { type PageId, WIZARD_TITLE_ID } from "./ids";
 import { PAGE_COMPONENTS } from "./pages/registry";
 import type { BackgroundProblem } from "./useBackgroundDownloads";
+import { WizardArt } from "./WizardArt";
 
 /**
  * The full window setup wizard. It settles a page only on Continue or Skip, and
@@ -66,42 +67,48 @@ export function Wizard({
       aria-labelledby={WIZARD_TITLE_ID}
       className="fixed inset-0 z-40 flex flex-col bg-background text-foreground outline-none"
     >
+      {/* Everything above the footer, so a page's art runs behind the step
+      bar and to every window edge. */}
+      <div className="relative flex min-h-0 flex-1 flex-col">
+        {page.art && <WizardArt key={id} art={page.art} />}
+        <div className="relative flex min-h-0 flex-1 flex-col px-10 pt-10">
+          <div className="mb-6 flex gap-1.5">
+            {pages.map((stepId, i) => (
+              <span
+                key={stepId}
+                data-testid="wizard-step"
+                className={cn(
+                  "h-[3px] flex-1 rounded-full",
+                  i <= step ? "bg-primary" : "bg-border",
+                )}
+              />
+            ))}
+          </div>
+          {!page.ownHeading && (
+            <h2
+              id={WIZARD_TITLE_ID}
+              className="mb-5 text-2xl font-semibold tracking-tight"
+            >
+              {i18n._(page.title)}
+            </h2>
+          )}
+          <div className="min-h-0 flex-1 overflow-auto">
+            <Component
+              key={id}
+              next={advance}
+              skip={advance}
+              beforeContinue={beforeContinue}
+            />
+          </div>
+        </div>
+      </div>
+      {/* After the area above, so it paints over the art. */}
       <DownloadsPill
         items={downloads}
         problems={problems}
         onCancel={onCancelDownload}
         onRetry={onRetryDownload}
       />
-      <div className="flex min-h-0 flex-1 flex-col px-10 pt-10">
-        <div className="mb-6 flex gap-1.5">
-          {pages.map((stepId, i) => (
-            <span
-              key={stepId}
-              data-testid="wizard-step"
-              className={cn(
-                "h-[3px] flex-1 rounded-full",
-                i <= step ? "bg-primary" : "bg-border",
-              )}
-            />
-          ))}
-        </div>
-        {!page.ownHeading && (
-          <h2
-            id={WIZARD_TITLE_ID}
-            className="mb-5 text-2xl font-semibold tracking-tight"
-          >
-            {i18n._(page.title)}
-          </h2>
-        )}
-        <div className="min-h-0 flex-1 overflow-auto">
-          <Component
-            key={id}
-            next={advance}
-            skip={advance}
-            beforeContinue={beforeContinue}
-          />
-        </div>
-      </div>
       <div className="flex items-center gap-2.5 border-t px-10 py-4">
         {!last && (
           <Button variant="ghost" onClick={skipSetup}>
