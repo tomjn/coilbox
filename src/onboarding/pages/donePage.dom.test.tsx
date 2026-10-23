@@ -2,7 +2,9 @@
 
 /**
  * The Done page inside the real wizard shell. The profile is stubbed so a test
- * can set `setupImage` and decide whether it resolves.
+ * can set `setupImage` and `home.background`, and decide whether the image
+ * resolves. happy-dom drops the backdrop's inline SVG data URL from a style, so
+ * the real `backdropStyle` runs with that one value swapped for a plain URL.
  */
 
 import {
@@ -24,6 +26,17 @@ vi.mock("@/profile/profile", async (importOriginal) => ({
   getProfile: () => profile,
   resolveProfileImage: (path: string | undefined) => resolveImage(path),
 }));
+
+vi.mock("@/home/background", async (importOriginal) => {
+  const real = await importOriginal<typeof import("@/home/background")>();
+  return {
+    ...real,
+    backdropStyle: (...args: Parameters<typeof real.backdropStyle>) => {
+      const style = real.backdropStyle(...args);
+      return style && { ...style, backgroundImage: 'url("home-backdrop")' };
+    },
+  };
+});
 
 const { Wizard } = await import("../Wizard");
 const { WizardDownloadsContext } = await import("../wizardContexts");
@@ -96,24 +109,25 @@ it("shows no summary rows", () => {
   expect(screen.queryByText("Games")).toBeNull();
 });
 
-it("shows the Coilbox mark by default", async () => {
+const backdrop = () => screen.queryByTestId("done-backdrop");
+const setupImage = () => screen.queryByTestId("done-setup-image");
+
+it("paints the home backdrop by default", () => {
   show();
-  expect(screen.getByTestId("setup-mark")).toBeTruthy();
-  expect(screen.queryByTestId("setup-image")).toBeNull();
+  expect(backdrop()?.style.backgroundImage).toContain("url(");
+  expect(setupImage()).toBeNull();
+  expect(resolveImage).not.toHaveBeenCalled();
 });
 
-it("shows the profile's setup image when it resolves", async () => {
-  profile = { version: 1, setupImage: "setup.webp" };
-  resolveImage.mockResolvedValue("data:image/webp;base64,AAAA");
+it("paints no picture when the profile switches the home backdrop off", () => {
+  profile = { version: 1, home: { background: false } };
   show();
-  const image = await screen.findByTestId("setup-image");
-  expect(image.getAttribute("src")).toBe("data:image/webp;base64,AAAA");
-  expect(image.getAttribute("alt")).toBe("");
-  expect(resolveImage).toHaveBeenCalledWith("setup.webp");
-  expect(screen.queryByTestId("setup-mark")).toBeNull();
+  expect(backdrop()).toBeNull();
+  expect(setupImage()).toBeNull();
+  expect(screen.getByRole("heading", { name: "You're ready" })).toBeTruthy();
 });
 
-it("never shows the Coilbox mark before the setup image", async () => {
+it("paints the setup image, and never the backdrop before it", async () => {
   profile = { version: 1, setupImage: "setup.webp" };
   let settle: (src: string | null) => void = () => {};
   resolveImage.mockReturnValue(
@@ -122,29 +136,38 @@ it("never shows the Coilbox mark before the setup image", async () => {
     }),
   );
   show();
-  expect(screen.queryByTestId("setup-mark")).toBeNull();
-  expect(screen.getByTestId("setup-pending")).toBeTruthy();
+  expect(backdrop()).toBeNull();
+  expect(setupImage()).toBeNull();
   settle("data:image/webp;base64,AAAA");
-  expect(await screen.findByTestId("setup-image")).toBeTruthy();
-  expect(screen.queryByTestId("setup-mark")).toBeNull();
-  expect(screen.queryByTestId("setup-pending")).toBeNull();
+  const image = await screen.findByTestId("done-setup-image");
+  expect(image.getAttribute("src")).toBe("data:image/webp;base64,AAAA");
+  expect(image.getAttribute("alt")).toBe("");
+  expect(resolveImage).toHaveBeenCalledWith("setup.webp");
+  expect(backdrop()).toBeNull();
 });
 
-it("keeps the Coilbox mark when the setup image does not resolve", async () => {
+it("paints no picture when setupImage is false", () => {
+  profile = { version: 1, setupImage: false };
+  show();
+  expect(backdrop()).toBeNull();
+  expect(setupImage()).toBeNull();
+  expect(resolveImage).not.toHaveBeenCalled();
+});
+
+it("falls back to the backdrop when the setup image does not resolve", async () => {
   profile = { version: 1, setupImage: "missing.webp" };
   show();
-  expect(await screen.findByTestId("setup-mark")).toBeTruthy();
-  expect(resolveImage).toHaveBeenCalledWith("missing.webp");
-  expect(screen.queryByTestId("setup-image")).toBeNull();
+  expect(await screen.findByTestId("done-backdrop")).toBeTruthy();
+  expect(setupImage()).toBeNull();
 });
 
-it("falls back to the Coilbox mark when the setup image fails to load", async () => {
+it("falls back to the backdrop when the setup image fails to load", async () => {
   profile = { version: 1, setupImage: "https://example.com/setup.webp" };
   resolveImage.mockResolvedValue("https://example.com/setup.webp");
   show();
-  fireEvent.error(await screen.findByTestId("setup-image"));
-  expect(screen.getByTestId("setup-mark")).toBeTruthy();
-  expect(screen.queryByTestId("setup-image")).toBeNull();
+  fireEvent.error(await screen.findByTestId("done-setup-image"));
+  expect(backdrop()).toBeTruthy();
+  expect(setupImage()).toBeNull();
 });
 
 it("shows no progress row without downloads", () => {

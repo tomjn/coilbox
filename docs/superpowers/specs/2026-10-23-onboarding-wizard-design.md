@@ -88,7 +88,7 @@ Servers from `allServers`, with the profile's official server first. Log in and 
 
 ### Done
 
-A large "You're ready" heading on the left and the Coilbox mark on the right, or the profile's `setupImage` when it resolves, stacked on a narrow window. A progress row for each background download sits under the heading, and "Start playing" never waits for downloads.
+A large "You're ready" heading on the left, over the home page's backdrop, which `home.background` overrides. The profile's `setupImage` replaces that picture, or removes it when `false`. A progress row for each background download sits under the heading, and "Start playing" never waits for downloads.
 
 ## Which pages a launch shows
 

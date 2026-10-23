@@ -1,42 +1,73 @@
 import { useLingui } from "@lingui/react/macro";
 import { useEffect, useState } from "react";
 import { QueueProgress } from "@/downloads/pages/components/ProgressBar";
-import CoilMark from "@/general/CoilMark";
+import { resolveHome } from "@/home/config";
+import { useHomeBackdropStyle } from "@/home/useHomeBackdropStyle";
 import { getProfile, resolveProfileImage } from "@/profile/profile";
 import { WIZARD_TITLE_ID } from "../ids";
 import { useWizardDownloads } from "../wizardContexts";
 import type { WizardPageProps } from "./registry";
 
-const GRAPHIC = "size-48 shrink-0 md:size-64";
+const LAYER = "pointer-events-none absolute inset-0";
 
 /**
- * A large heading beside the profile's setup image or the Coilbox mark, and the
- * downloads still going in the background. The page draws its own heading, so
- * the shell shows no title.
+ * A large heading over a picture, and the downloads still going in the
+ * background. The picture is the profile's `setupImage`, or the home page's
+ * backdrop when there is none or it fails to load. The page draws its own
+ * heading, so the shell shows no title.
  */
 export default function DonePage(_: WizardPageProps) {
   const { t } = useLingui();
   const downloads = useWizardDownloads();
-  const wanted = getProfile().setupImage;
-  // undefined while the profile's image resolves, so the mark never shows first.
+  const { setupImage, home } = getProfile();
+  // The same backdrop and `home.background` key as the home page, read the way
+  // the hub's browse page reads it.
+  const backdrop = useHomeBackdropStyle(resolveHome(home).background);
+  // undefined while the setup image resolves, so the backdrop never shows first.
   const [image, setImage] = useState<string | null | undefined>(
-    wanted ? undefined : null,
+    typeof setupImage === "string" ? undefined : null,
   );
 
   useEffect(() => {
-    if (!wanted) return;
+    if (typeof setupImage !== "string") return;
     let live = true;
-    void resolveProfileImage(wanted).then((src) => {
+    void resolveProfileImage(setupImage).then((src) => {
       if (live) setImage(src);
     });
     return () => {
       live = false;
     };
-  }, [wanted]);
+  }, [setupImage]);
 
   return (
-    <div className="flex min-h-full flex-col items-center justify-center gap-10 py-6 md:flex-row md:justify-between md:gap-16">
-      <div className="w-full max-w-lg">
+    <div className="relative flex min-h-full items-center py-6">
+      {setupImage === false || image === undefined ? null : image ? (
+        <>
+          <img
+            src={image}
+            alt=""
+            data-testid="done-setup-image"
+            className={`${LAYER} size-full object-cover`}
+            onError={() => setImage(null)}
+          />
+          {/* Keeps the heading readable over a picture at full strength. */}
+          <div
+            aria-hidden="true"
+            className={`${LAYER} bg-gradient-to-r from-background via-background/70 to-transparent`}
+          />
+        </>
+      ) : (
+        backdrop && (
+          <div
+            aria-hidden="true"
+            data-testid="done-backdrop"
+            className={LAYER}
+            style={backdrop}
+          />
+        )
+      )}
+      {/* Positioned, so it paints over the picture without a z-index. */}
+      <div className="relative w-full max-w-lg">
         <h2
           id={WIZARD_TITLE_ID}
           className="text-5xl font-semibold tracking-tight"
@@ -54,21 +85,6 @@ export default function DonePage(_: WizardPageProps) {
           </div>
         )}
       </div>
-      {image === undefined ? (
-        <div data-testid="setup-pending" className={GRAPHIC} />
-      ) : image ? (
-        <img
-          src={image}
-          alt=""
-          data-testid="setup-image"
-          className={`${GRAPHIC} object-contain`}
-          onError={() => setImage(null)}
-        />
-      ) : (
-        <div data-testid="setup-mark" className="text-primary">
-          <CoilMark className={GRAPHIC} />
-        </div>
-      )}
     </div>
   );
 }
