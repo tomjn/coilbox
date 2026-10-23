@@ -243,11 +243,12 @@ export interface Profile {
    */
   factionLogos?: Record<string, string>;
   /**
-   * The picture beside "You're ready" on the setup wizard's last page, in place of
-   * the Coilbox mark. A `.coilbox`-relative path, `data:` URI, or `http(s)` URL.
-   * The mark stays when it does not resolve.
+   * The picture behind "You're ready" on the setup wizard's last page, in place
+   * of the home page's backdrop. A `.coilbox`-relative path, `data:` URI, or
+   * `http(s)` URL. The backdrop stays when it does not load. `false` shows no
+   * picture.
    */
-  setupImage?: string;
+  setupImage?: string | false;
   /** Branded landing page shown in place of the default launcher. */
   welcome?: WelcomeConfig;
   /**

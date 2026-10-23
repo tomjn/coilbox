@@ -378,16 +378,17 @@ Sets the emblem shown for each faction, by side name. Coilbox shows these wherev
 
 An emblem set here always wins. Coilbox otherwise takes a faction's emblem from the game archive's side pictures or the branding catalog, and this field overrides both. A side you do not list keeps the emblem it would have had.
 
-### `setupImage` (string)
+### `setupImage` (string or false)
 
-Replaces the Coilbox mark beside "You're ready" on the last page of the setup wizard.
+Sets the picture behind "You're ready" on the last page of the setup wizard. Without it, that page shows the home page's backdrop, which [`home.background`](#the-backdrop) sets.
 
 ```json
 { "version": 1, "setupImage": "setup.webp" }
 ```
 
 - The value is a path relative to the `.coilbox/` folder, or an inline `data:` or `https:` URL. These are the same rules as [`splash.image`](#splash-object).
-- If the image cannot be loaded, the Coilbox mark stays.
+- `false` shows no picture.
+- If the image cannot be loaded, the home page's backdrop shows instead.
 
 ### `welcome` (object)
 
