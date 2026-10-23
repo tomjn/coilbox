@@ -3,6 +3,7 @@
 // kebab-case), which `permissions/default.toml` aggregates into
 // `coilbox-hub:default`.
 const COMMANDS: &[&str] = &[
+    "hub_providers",
     "hub_sign_in",
     "hub_sign_out",
     "hub_account",

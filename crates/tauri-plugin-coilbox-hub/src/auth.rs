@@ -1,10 +1,11 @@
-//! Signing in to the Coilbox hub with Discord.
+//! Signing in to the Coilbox hub with Discord, GitHub, Twitch or whichever
+//! providers the hub lists.
 //!
 //! The flow itself is `coilbox-oauth`, the same one the lobby uses. What is here is
 //! the part that is the hub's own.
 //!
 //! The hub does not run its own accounts. It hands them to a Supabase project,
-//! which hands them to Discord, so coilbox has to be told which project before it
+//! which hands them to a provider such as Discord, so coilbox has to be told which project before it
 //! can start. `GET <hub>/api/v1/auth` is that answer, and it is the only thing
 //! about the account service this build knows. There is deliberately no built-in
 //! fallback: a hub whose `/api/v1/auth` does not answer cannot be signed in to, and
@@ -25,6 +26,8 @@ use serde::Serialize;
 use serde_json::{json, Value};
 use url::Url;
 
+use crate::endpoint::{api_url, json_client, read_capped};
+
 /// The hub route that says which account service to use. The one address here that
 /// is not read from somewhere else, and it hangs off the configured hub base rather
 /// than off any address of its own.
@@ -38,8 +41,17 @@ const AUTH_FORMAT: &str = "coilbox-hub-auth";
 /// a newer service is worse than saying so.
 const AUTH_VERSION: u64 = 1;
 
-/// The only provider the hub offers.
-const PROVIDER: &str = "discord";
+/// What a hub offers when its document names no providers. Every hub before
+/// tomjn/coilbox-hub#522 signed in with Discord alone.
+const DEFAULT_PROVIDER: &str = "discord";
+
+/// The hub route that answers with the display name the signed in person set on
+/// the hub (tomjn/coilbox-hub#522).
+const PROFILE_PATH: &str = "/api/v1/profile";
+
+/// Longest profile answer read. It is one short name, so anything near this is
+/// not the hub's profile route.
+const PROFILE_LIMIT: usize = 16 * 1024;
 
 /// The keychain's service name for a hub account.
 ///
@@ -61,6 +73,8 @@ pub struct HubAuth {
     /// `None` from a hub that has not shipped tomjn/coilbox-hub#165, which says
     /// nothing about whether this build agrees with it.
     asset_vocabulary: Option<String>,
+    /// The Supabase provider ids to offer, in the hub's order.
+    providers: Vec<String>,
 }
 
 impl HubAuth {
@@ -175,7 +189,35 @@ fn read_auth_document(hub_url: &str, status: u16, body: &str) -> Result<HubAuth,
         supabase_url: supabase_url.trim_end_matches('/').to_owned(),
         publishable_key,
         asset_vocabulary: field("asset_vocabulary"),
+        providers: read_providers(doc.get("providers")),
     })
+}
+
+/// The providers a document lists, or Discord alone when it lists none, which is
+/// what a hub from before tomjn/coilbox-hub#522 means.
+///
+/// Each id ends up in the address the browser is sent to, so one that is not a
+/// plain Supabase provider id is dropped rather than passed through.
+fn read_providers(field: Option<&Value>) -> Vec<String> {
+    let Some(listed) = field.and_then(Value::as_array) else {
+        return vec![DEFAULT_PROVIDER.to_owned()];
+    };
+    let mut providers: Vec<String> = Vec::new();
+    for id in listed.iter().filter_map(Value::as_str) {
+        let plain = !id.is_empty()
+            && id
+                .bytes()
+                .all(|b| b.is_ascii_lowercase() || b.is_ascii_digit() || b == b'_' || b == b'-');
+        if plain && !providers.iter().any(|p| p == id) {
+            providers.push(id.to_owned());
+        }
+    }
+    providers
+}
+
+/// Which providers this hub offers to sign in with, in the order to offer them.
+pub async fn providers(hub_url: &str) -> Result<Vec<String>, AuthError> {
+    Ok(discover(hub_url).await?.providers)
 }
 
 /// Is this build making pictures to a vocabulary the hub has moved on from
@@ -243,9 +285,10 @@ fn identities() -> &'static Mutex<HashMap<String, Identity>> {
 
 /// The user Supabase returned beside the tokens, if it returned one.
 ///
-/// Discord fills `user_metadata` differently depending on what the account has set,
-/// so the name is the first of the fields it might land in. The email is the last
-/// resort and the least welcome to show, which is why it is last.
+/// This is only the fallback for a hub that does not serve a display name (see
+/// [`fetch_display_name`]). Each provider fills `user_metadata` differently, so the
+/// name is the first of the fields it might land in. The email is the last resort
+/// and the least welcome to show, which is why it is last.
 fn identity_from(extra: &Value) -> Option<Identity> {
     let user = extra.get("user")?;
     let id = user.get("id").and_then(Value::as_str)?.to_owned();
@@ -268,7 +311,7 @@ fn identity_from(extra: &Value) -> Option<Identity> {
                 .filter(|s| !s.is_empty())
                 .map(str::to_owned)
         })
-        .unwrap_or_else(|| "Your Discord account".to_owned());
+        .unwrap_or_else(|| "Your hub account".to_owned());
     Some(Identity {
         id,
         name,
@@ -286,14 +329,73 @@ fn remember_identity(account: &str, answer: &TokenResponse) -> Option<Identity> 
     Some(identity)
 }
 
+/// The display name each hub account set on the hub, for the life of the process.
+/// Kept apart from [`IDENTITIES`] because every token refresh rewrites those from
+/// the provider's metadata, and that must not undo the name the hub gave.
+static DISPLAY_NAMES: OnceLock<Mutex<HashMap<String, String>>> = OnceLock::new();
+
+fn display_names() -> &'static Mutex<HashMap<String, String>> {
+    DISPLAY_NAMES.get_or_init(Default::default)
+}
+
 /// Who is signed in to this hub, as far as this process already knows, without
-/// asking anybody.
+/// asking anybody. The name is the hub's own when it has said one.
 pub fn cached_identity(hub_url: &str) -> Option<Identity> {
-    identities()
-        .lock()
-        .unwrap()
-        .get(&account_key(hub_url))
-        .cloned()
+    let account = account_key(hub_url);
+    let mut identity = identities().lock().unwrap().get(&account).cloned()?;
+    if let Some(name) = display_names().lock().unwrap().get(&account) {
+        identity.name = name.clone();
+    }
+    Some(identity)
+}
+
+/// Read what `/api/v1/profile` answered: the name, or `None` for anything else.
+fn read_profile(status: u16, body: &[u8]) -> Option<String> {
+    if status != 200 {
+        return None;
+    }
+    let doc: Value = serde_json::from_slice(body).ok()?;
+    doc.get("display_name")
+        .and_then(Value::as_str)
+        .map(str::trim)
+        .filter(|s| !s.is_empty())
+        .map(str::to_owned)
+}
+
+/// Ask the hub for the display name the signed in person set there, and keep it.
+///
+/// Every failure is silent. A hub that does not serve the route, a null name or a
+/// request that did not arrive all leave the name from the provider's metadata in
+/// place, because a missing name is not worth failing a sign-in over.
+pub async fn fetch_display_name(hub_url: &str, access_token: &str) {
+    let Ok(url) = api_url(hub_url, PROFILE_PATH, "Reading your hub name") else {
+        return;
+    };
+    let Ok(client) = json_client() else {
+        return;
+    };
+    let Ok(response) = client
+        .get(&url)
+        .header(
+            reqwest::header::AUTHORIZATION,
+            format!("Bearer {access_token}"),
+        )
+        .header(reqwest::header::ACCEPT, "application/json")
+        .send()
+        .await
+    else {
+        return;
+    };
+    let status = response.status().as_u16();
+    let Ok(body) = read_capped(response, PROFILE_LIMIT).await else {
+        return;
+    };
+    if let Some(name) = read_profile(status, &body) {
+        display_names()
+            .lock()
+            .unwrap()
+            .insert(account_key(hub_url), name);
+    }
 }
 
 // ----------------------------------------------------------------- the flow
@@ -301,10 +403,14 @@ pub fn cached_identity(hub_url: &str) -> Option<Identity> {
 /// Build the Supabase authorization URL the browser is sent to.
 ///
 /// `redirect_to` carries the `state` rather than a parameter of its own, because
-/// Supabase runs its own handshake with Discord and its own `state` with it, and
+/// Supabase runs its own handshake with the provider and its own `state` with it, and
 /// hands back only what it was given to redirect to. Supabase preserves the query
 /// on that address and appends `code`, so the value comes back with the callback.
-fn authorize_url(config: &HubAuth, request: &AuthRequest) -> Result<Url, AuthError> {
+fn authorize_url(
+    config: &HubAuth,
+    provider: &str,
+    request: &AuthRequest,
+) -> Result<Url, AuthError> {
     let mut redirect_to = Url::parse(&request.redirect_uri)
         .map_err(|e| AuthError::Listener(format!("loopback address is not a URL: {e}")))?;
     redirect_to
@@ -318,7 +424,7 @@ fn authorize_url(config: &HubAuth, request: &AuthRequest) -> Result<Url, AuthErr
             ))
         })?;
     url.query_pairs_mut()
-        .append_pair("provider", PROVIDER)
+        .append_pair("provider", provider)
         .append_pair("code_challenge_method", "s256")
         .append_pair("code_challenge", &request.challenge)
         .append_pair("redirect_to", redirect_to.as_str());
@@ -331,6 +437,7 @@ fn authorize_url(config: &HubAuth, request: &AuthRequest) -> Result<Url, AuthErr
 /// Supabase without a test writing to the real OS keychain.
 async fn authorize_and_exchange<F>(
     config: &HubAuth,
+    provider: &str,
     open_browser: F,
 ) -> Result<TokenResponse, AuthError>
 where
@@ -338,7 +445,7 @@ where
 {
     let authorization = coilbox_oauth::authorize(
         &config.supabase_url,
-        |request| authorize_url(config, request),
+        |request| authorize_url(config, provider, request),
         open_browser,
     )
     .await?;
@@ -371,17 +478,33 @@ pub struct SignedIn {
 /// next time (issue #1469). Failing here instead would throw away what the user
 /// had just spent a minute on, and tell them they were signed out while they
 /// could publish.
-pub async fn sign_in<F>(hub_url: &str, open_browser: F) -> Result<SignedIn, AuthError>
+///
+/// `provider` has to be one the hub lists. It ends up in the address the browser
+/// is sent to, so anything else is refused before a browser opens.
+pub async fn sign_in<F>(
+    hub_url: &str,
+    provider: &str,
+    open_browser: F,
+) -> Result<SignedIn, AuthError>
 where
     F: FnOnce(&str) -> Result<(), String>,
 {
     let config = discover(hub_url).await?;
-    let answer = authorize_and_exchange(&config, open_browser).await?;
+    if !config.providers.iter().any(|p| p == provider) {
+        return Err(AuthError::Discovery(format!(
+            "The hub at {} does not offer signing in with {provider}.",
+            host_of(hub_url)
+        )));
+    }
+    let answer = authorize_and_exchange(&config, provider, open_browser).await?;
     let account = account_key(hub_url);
     let identity = remember_identity(&account, &answer).ok_or_else(|| AuthError::Token {
         error: "invalid_response".into(),
         description: Some("no user".into()),
     })?;
+    display_names().lock().unwrap().remove(&account);
+    fetch_display_name(hub_url, &answer.tokens.access).await;
+    let identity = cached_identity(hub_url).unwrap_or(identity);
     let problem = match coilbox_oauth::remember(SERVICE, &account, answer.tokens).await {
         Ok(()) => None,
         Err(e) => Some(explain(&e, hub_url)),
@@ -400,6 +523,7 @@ where
 pub async fn sign_out(hub_url: &str) -> Result<(), AuthError> {
     let account = account_key(hub_url);
     identities().lock().unwrap().remove(&account);
+    display_names().lock().unwrap().remove(&account);
     coilbox_oauth::forget(SERVICE, &account).await
 }
 
@@ -524,6 +648,108 @@ mod tests {
         let config = document(&good_document()).unwrap();
         assert_eq!(config.supabase_url, "https://project.supabase.co");
         assert_eq!(config.publishable_key, "sb_publishable_abc");
+    }
+
+    // -------------------------------------------------------------- providers
+
+    /// A hub from before tomjn/coilbox-hub#522 sends no list, and it signed in with
+    /// Discord alone.
+    #[test]
+    fn a_hub_that_lists_no_providers_offers_discord() {
+        assert_eq!(document(&good_document()).unwrap().providers, ["discord"]);
+    }
+
+    #[test]
+    fn the_providers_are_read_in_the_hub_s_order() {
+        let mut doc: Value = serde_json::from_str(&good_document()).unwrap();
+        doc["providers"] = json!(["github", "discord", "twitch"]);
+        assert_eq!(
+            document(&doc.to_string()).unwrap().providers,
+            ["github", "discord", "twitch"]
+        );
+    }
+
+    /// Each id goes into the address the browser opens, so one that could change
+    /// that address is dropped rather than passed through.
+    #[test]
+    fn a_provider_id_that_is_not_plain_is_dropped() {
+        let mut doc: Value = serde_json::from_str(&good_document()).unwrap();
+        doc["providers"] = json!([
+            "github",
+            "discord&redirect_to=https://evil.example",
+            "",
+            "Twitch",
+            7,
+            "linkedin_oidc",
+            "github",
+        ]);
+        assert_eq!(
+            document(&doc.to_string()).unwrap().providers,
+            ["github", "linkedin_oidc"]
+        );
+    }
+
+    #[tokio::test]
+    async fn a_provider_the_hub_does_not_list_is_refused_before_a_browser_opens() {
+        let (base, _) = stand_in_hub().await;
+        let opened = std::sync::atomic::AtomicBool::new(false);
+        let refused = sign_in(&base, "google", |_| {
+            opened.store(true, std::sync::atomic::Ordering::SeqCst);
+            Ok(())
+        })
+        .await
+        .err()
+        .expect("a provider the hub did not list was accepted");
+        assert!(matches!(refused, AuthError::Discovery(_)), "{refused:?}");
+        assert!(!opened.load(std::sync::atomic::Ordering::SeqCst));
+    }
+
+    // ---------------------------------------------------------------- profile
+
+    #[test]
+    fn the_profile_answer_names_the_display_name() {
+        assert_eq!(
+            read_profile(200, br#"{"display_name":"Tom"}"#).as_deref(),
+            Some("Tom")
+        );
+    }
+
+    /// A null name is an account with no profile row, a 401 is a token the hub
+    /// would not take, and an older hub has no route at all. None of them names
+    /// anybody, so the provider's name stays.
+    #[test]
+    fn a_profile_answer_without_a_name_names_nobody() {
+        assert_eq!(read_profile(200, br#"{"display_name":null}"#), None);
+        assert_eq!(read_profile(200, br#"{"display_name":"  "}"#), None);
+        assert_eq!(read_profile(401, br#"{"error":"no token"}"#), None);
+        assert_eq!(read_profile(404, b"<html>"), None);
+        assert_eq!(read_profile(200, b"not json"), None);
+    }
+
+    /// Over a real request, with the bearer token the hub asks for, and kept
+    /// through the refresh that rewrites the provider's name afterwards.
+    #[tokio::test]
+    async fn the_hub_s_display_name_replaces_the_provider_s() {
+        let (base, _) = stand_in_hub().await;
+        let account = account_key(&base);
+        let from_provider = Identity {
+            id: "a-user-id".into(),
+            name: "tomjn".into(),
+            avatar_url: None,
+        };
+        identities()
+            .lock()
+            .unwrap()
+            .insert(account.clone(), from_provider.clone());
+
+        fetch_display_name(&base, "a-wrong-token").await;
+        assert_eq!(cached_identity(&base).unwrap().name, "tomjn");
+
+        fetch_display_name(&base, "an-access-token").await;
+        assert_eq!(cached_identity(&base).unwrap().name, "Tom on the hub");
+
+        identities().lock().unwrap().insert(account, from_provider);
+        assert_eq!(cached_identity(&base).unwrap().name, "Tom on the hub");
     }
 
     // --------------------------------------------------- vocabulary (issue #1708)
@@ -661,21 +887,21 @@ mod tests {
     // ----------------------------------------------------------- authorize URL
 
     #[test]
-    fn the_authorization_url_asks_supabase_for_discord_and_carries_the_state_home() {
+    fn the_authorization_url_asks_supabase_for_the_provider_and_carries_the_state_home() {
         let config = document(&good_document()).unwrap();
         let request = AuthRequest {
             challenge: "a-challenge".into(),
             state: "a-state".into(),
             redirect_uri: "http://127.0.0.1:41234/oauth2callback".into(),
         };
-        let url = authorize_url(&config, &request).unwrap();
+        let url = authorize_url(&config, "github", &request).unwrap();
         assert_eq!(
             url.origin().ascii_serialization(),
             "https://project.supabase.co"
         );
         assert_eq!(url.path(), "/auth/v1/authorize");
         let query: HashMap<String, String> = url.query_pairs().into_owned().collect();
-        assert_eq!(query["provider"], "discord");
+        assert_eq!(query["provider"], "github");
         assert_eq!(query["code_challenge_method"], "s256");
         assert_eq!(query["code_challenge"], "a-challenge");
         // Supabase keeps the query on the address it redirects to and appends the
@@ -709,10 +935,10 @@ mod tests {
         );
     }
 
-    /// Discord fills these differently depending on what the account has set, and
-    /// an account with none of them still has to be called something.
+    /// Providers fill these differently, and an account with none of them still has
+    /// to be called something that does not name a provider.
     #[test]
-    fn a_name_is_found_wherever_discord_put_it() {
+    fn a_name_is_found_wherever_the_provider_put_it() {
         let named = |metadata: Value, email: Value| {
             identity_from(&json!({
                 "user": { "id": "a-user-id", "email": email, "user_metadata": metadata },
@@ -730,7 +956,7 @@ mod tests {
             named(json!({}), json!("someone@example.test")),
             "someone@example.test"
         );
-        assert_eq!(named(json!({}), Value::Null), "Your Discord account");
+        assert_eq!(named(json!({}), Value::Null), "Your hub account");
     }
 
     #[test]
@@ -857,6 +1083,13 @@ mod tests {
                             "supabase_url": base,
                             "publishable_key": "sb_publishable_abc",
                         })
+                    } else if target.starts_with(PROFILE_PATH) {
+                        let lower = head.to_ascii_lowercase();
+                        json!({
+                            "display_name": lower
+                                .contains("authorization: bearer an-access-token")
+                                .then_some("Tom on the hub"),
+                        })
                     } else {
                         recorded
                             .lock()
@@ -957,7 +1190,7 @@ mod tests {
     async fn a_sign_in_goes_from_the_hub_s_answer_to_a_named_user() {
         let (base, seen) = stand_in_hub().await;
         let config = discover(&base).await.unwrap();
-        let answer = authorize_and_exchange(&config, |url| {
+        let answer = authorize_and_exchange(&config, "discord", |url| {
             // The browser's part: follow the redirect back to the loopback with a
             // code, the way Supabase does once Discord is done.
             let parsed = Url::parse(url).unwrap();
@@ -1015,7 +1248,7 @@ mod tests {
             .await
             .expect("discovery failed");
         println!("opening your browser, sign in there within a minute");
-        let answer = authorize_and_exchange(&config, |url| {
+        let answer = authorize_and_exchange(&config, "discord", |url| {
             tauri_plugin_opener::open_url(url, None::<&str>).map_err(|e| e.to_string())
         })
         .await
