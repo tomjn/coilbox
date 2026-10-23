@@ -41522,7 +41522,7 @@ msgstr "Legen Sie in den Einstellungen für Inhalte-Ordner einen Download-Ordner
 
 #: src/content/pages/components/SuggestionsList.tsx
 msgid "Set a download folder in Content folders settings to enable downloads."
-msgstr "Legen Sie in den Einstellungen für Inhalte-Ordner einen Download-Ordner fest, um Downloads zu aktivieren."
+msgstr "Legen Sie in den Einstellungen für Inhaltsordner einen Download-Ordner fest, um Downloads zu aktivieren."
 
 #: src/campaign/missionNeeds.ts
 #: src/content/pages/components/ResolveContentDrawer.tsx

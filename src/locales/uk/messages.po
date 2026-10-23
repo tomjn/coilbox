@@ -43777,7 +43777,7 @@ msgstr "Створіть його, а потім перетягніть у нь�
 
 #: src/onboarding/Wizard.tsx
 msgid "Start playing"
-msgstr "Почати гру"
+msgstr "Почати грати"
 
 #: src/conquest/pages/components/StartPositionSelect.tsx
 #, fuzzy

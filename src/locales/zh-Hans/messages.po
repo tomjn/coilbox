@@ -42949,7 +42949,7 @@ msgstr "跳过"
 
 #: src/onboarding/Wizard.tsx
 msgid "Skip setup"
-msgstr "跳过设置"
+msgstr "跳过设置向导"
 
 #: src/campaign/pages/components/missionEditorGroups.ts
 #, fuzzy
