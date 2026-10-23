@@ -5,7 +5,7 @@ import { type HandmadeMapRef, parseHandmadeMapRef } from "../challenge/mapRef";
 import { type GameRef, type MapSkin, readMapSkin } from "../conquest/model";
 import { sectorNameForSeed } from "../conquest/names";
 import { isPlanetId, type PlanetId } from "../conquest/planets";
-import { clamp } from "../lib/helpers";
+import { clamp } from "../lib/clamp";
 
 /**
  * Roguelite-run schema — the single source of truth for the shape of an active

@@ -1,7 +1,7 @@
 import { t } from "@lingui/core/macro";
 import { MAX_DIFFICULTY, MIN_DIFFICULTY } from "../conquest/model";
 import { MAX_THREAT_LEVEL, readThreatLevel } from "../conquest/threat";
-import { clamp } from "../lib/helpers";
+import { clamp } from "../lib/clamp";
 import { MAX_TIER } from "../runlite/generate";
 import { MAX_RUN_DIFFICULTY, MIN_RUN_DIFFICULTY } from "../runlite/model";
 import {

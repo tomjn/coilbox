@@ -38,7 +38,7 @@
  */
 
 import { hashString, mulberry32, pick, type Rng } from "../conquest/rng";
-import { clamp } from "../lib/helpers";
+import { clamp } from "../lib/clamp";
 import type { CardScheme } from "./art";
 
 /** Canvas the pattern is authored against. Cards crop it with `object-fit`. */

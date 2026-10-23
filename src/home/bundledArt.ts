@@ -41,7 +41,7 @@
  */
 
 import { mulberry32 } from "../conquest/rng";
-import { clamp } from "../lib/helpers";
+import { clamp } from "../lib/clamp";
 import type { CardArtSource, CardScheme } from "./art";
 import {
   FALLBACK_THEME_COLOR,

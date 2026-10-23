@@ -8,7 +8,7 @@ import {
   nodeMapsFrom,
   parseNodeMaps,
 } from "../challenge/nodeMaps";
-import { clamp } from "../lib/helpers";
+import { clamp } from "../lib/clamp";
 import type { GalaxyLayout, GenerateOptions } from "./generate";
 import {
   applyChallengeFactions,
