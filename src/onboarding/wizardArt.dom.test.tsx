@@ -17,6 +17,7 @@ import type { BackgroundProblem } from "./useBackgroundDownloads";
 
 vi.mock("@/hub/auth", () => ({
   hubAccount: async () => ({ signedIn: false, account: null, problem: null }),
+  hubProviders: async () => ({ providers: ["discord"] }),
   hubSignIn: () => new Promise(() => {}),
   hubSignOut: async () => {},
 }));

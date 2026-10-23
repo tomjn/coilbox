@@ -2,7 +2,7 @@ import { msg } from "@lingui/core/macro";
 import { Trans, useLingui } from "@lingui/react/macro";
 import { Button } from "@picoframe/frame";
 import { RotateCw } from "lucide-react";
-import { useHubAccount } from "../../account";
+import { useHubAccount, useHubProviders } from "../../account";
 
 /**
  * Signing in to the hub, in Settings > Coilbox hub (issue #1348).
@@ -78,7 +78,12 @@ export function AccountControl({ hubUrl }: { hubUrl: string }) {
           </p>
           <div className="flex flex-wrap gap-2">
             <TryAgainButton onRecheck={recheck} />
-            <SignInButton busy={busy} onSignIn={signIn} size="sm" />
+            <SignInButton
+              hubUrl={hubUrl}
+              busy={busy}
+              onSignIn={signIn}
+              size="sm"
+            />
           </div>
         </>
       ) : (
@@ -90,6 +95,7 @@ export function AccountControl({ hubUrl }: { hubUrl: string }) {
             </Trans>
           </p>
           <SignInButton
+            hubUrl={hubUrl}
             busy={busy}
             onSignIn={signIn}
             size="sm"
@@ -151,32 +157,68 @@ export function TryAgainButton({
   );
 }
 
+/** How each provider the hub might list is named. Brand names, so not
+ * translated. An id not here is shown as the hub sent it. */
+const PROVIDER_NAMES: Record<string, string> = {
+  discord: "Discord",
+  github: "GitHub",
+  google: "Google",
+  twitch: "Twitch",
+};
+
+export function providerName(id: string): string {
+  return PROVIDER_NAMES[id] ?? id;
+}
+
 /**
- * The one sign-in button, wherever it is offered. Its label says what the press
- * does next - a browser window opens and the sign-in finishes there - because
- * that is the surprising part of pressing it.
+ * The sign-in buttons, wherever they are offered: one per provider the hub
+ * lists, in its order (issue #2979). Each label says what the press does next -
+ * a browser window opens and the sign-in finishes there - because that is the
+ * surprising part of pressing it.
+ *
+ * While a sign-in is in flight the row becomes one button saying the app is
+ * waiting, which is the only sign it has not frozen during the minute the
+ * browser has. Nothing renders until the hub has said which providers it has,
+ * so nobody is offered one the hub then refuses.
  */
 export function SignInButton({
+  hubUrl,
   busy,
   onSignIn,
   size = "sm",
   variant = "outline",
 }: {
+  hubUrl: string;
   busy: boolean;
-  onSignIn: () => Promise<void>;
+  onSignIn: (provider: string) => Promise<void>;
   size?: "sm" | "default";
   variant?: "default" | "outline";
 }) {
   const { t } = useLingui();
+  const providers = useHubProviders(hubUrl);
+  if (busy) {
+    return (
+      <Button size={size} variant={variant} disabled aria-busy>
+        {t`Waiting for your browser`}
+      </Button>
+    );
+  }
+  if (!providers) return null;
   return (
-    <Button
-      size={size}
-      variant={variant}
-      onClick={() => void onSignIn()}
-      disabled={busy}
-      aria-busy={busy}
-    >
-      {busy ? t`Waiting for your browser` : t`Sign in with Discord`}
-    </Button>
+    <div className="flex flex-wrap gap-2">
+      {providers.map((provider) => {
+        const name = providerName(provider);
+        return (
+          <Button
+            key={provider}
+            size={size}
+            variant={variant}
+            onClick={() => void onSignIn(provider)}
+          >
+            {t`Sign in with ${name}`}
+          </Button>
+        );
+      })}
+    </div>
   );
 }

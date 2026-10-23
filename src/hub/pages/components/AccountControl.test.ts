@@ -29,7 +29,10 @@ const SIGNED_OUT: HubAccount = {
 
 let state: HubAccount = SIGNED_OUT;
 
-vi.mock("../../account", () => ({ useHubAccount: () => state }));
+vi.mock("../../account", () => ({
+  useHubAccount: () => state,
+  useHubProviders: () => ["discord", "github", "twitch"],
+}));
 
 const { AccountControl } = await import("./AccountControl");
 const { HeaderAccount } = await import("./HeaderAccount");
@@ -100,4 +103,19 @@ describe("the hub header, when the check could not find out", () => {
     expect(html).not.toContain("Try again");
     expect(html).toContain("Someone");
   });
+});
+
+/** Issue #2979. Whatever the hub lists is offered, in its order, on both. */
+describe("signing in offers every provider the hub lists", () => {
+  for (const surface of [AccountControl, HeaderAccount]) {
+    it(`in ${surface.name}`, () => {
+      const html = markup(surface, {});
+      const discord = html.indexOf("Sign in with Discord");
+      const github = html.indexOf("Sign in with GitHub");
+      const twitch = html.indexOf("Sign in with Twitch");
+      expect(discord).toBeGreaterThan(-1);
+      expect(github).toBeGreaterThan(discord);
+      expect(twitch).toBeGreaterThan(github);
+    });
+  }
 });

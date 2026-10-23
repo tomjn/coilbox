@@ -1,8 +1,8 @@
 import { defineCommand } from "@picoframe/plugin-sdk";
 
 /**
- * Typed bindings to the `coilbox-hub` plugin, which owns the Discord sign-in
- * (issue #1348).
+ * Typed bindings to the `coilbox-hub` plugin, which owns the hub sign-in
+ * (issues #1348 and #2978).
  *
  * No token is here, and none ever will be. The Rust side keeps the refresh token
  * in the OS keychain and the access token in process memory, and hands the webview
@@ -34,7 +34,8 @@ export interface HubAccountState {
 }
 
 /**
- * Sign in with Discord through the system browser. Resolves once the user has
+ * Sign in with one of the providers {@link hubProviders} listed, through the
+ * system browser. Resolves once the user has
  * finished there, which can take a minute, and rejects if they never do.
  *
  * `problem` beside the account is a sign-in that worked but was not kept: the
@@ -44,9 +45,18 @@ export interface HubAccountState {
  * browser again.
  */
 export const hubSignIn = defineCommand<
-  { hubUrl: string },
+  { hubUrl: string; provider: string },
   { account: HubIdentity; problem: string | null }
 >("coilbox-hub", "hub_sign_in");
+
+/**
+ * The Supabase provider ids this hub offers to sign in with, in the order to
+ * offer them. Asked of the hub each time, so a provider it adds needs no release.
+ */
+export const hubProviders = defineCommand<
+  { hubUrl: string },
+  { providers: string[] }
+>("coilbox-hub", "hub_providers");
 
 /**
  * Forget this machine's sign-in. Coilbox holds a publishable key, which can revoke

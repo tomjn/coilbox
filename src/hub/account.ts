@@ -31,7 +31,13 @@
 
 import { useCallback, useEffect, useSyncExternalStore } from "react";
 import { describeError } from "@/i18n/uiError";
-import { type HubIdentity, hubAccount, hubSignIn, hubSignOut } from "./auth";
+import {
+  type HubIdentity,
+  hubAccount,
+  hubProviders,
+  hubSignIn,
+  hubSignOut,
+} from "./auth";
 
 export interface HubAccount {
   /** The first answer has not come back yet. */
@@ -50,7 +56,7 @@ export interface HubAccount {
   /** Something to show the reader, or null. A hub nobody can reach says nothing
    * about the sign-in, so this is separate from `signedIn`. */
   problem: string | null;
-  signIn: () => Promise<void>;
+  signIn: (provider: string) => Promise<void>;
   signOut: () => Promise<void>;
   /** Ask again. The answer is kept for the session, so nothing else would. */
   recheck: () => Promise<void>;
@@ -149,10 +155,13 @@ export async function recheckHubAccount(hubUrl: string) {
  * Resolves to the failure's message, or null when this attempt signed in, so a
  * caller can tell its own attempt apart from what the store held before.
  */
-export async function signInToHub(hubUrl: string): Promise<string | null> {
+export async function signInToHub(
+  hubUrl: string,
+  provider: string,
+): Promise<string | null> {
   update(hubUrl, { busy: true, problem: null });
   try {
-    const { account, problem } = await hubSignIn({ hubUrl });
+    const { account, problem } = await hubSignIn({ hubUrl, provider });
     update(hubUrl, {
       account,
       signedIn: true,
@@ -213,16 +222,64 @@ export function useHubAccount(hubUrl: string): HubAccount {
 
   const recheck = useCallback(() => recheckHubAccount(hubUrl), [hubUrl]);
 
-  const signIn = useCallback(async () => {
-    await signInToHub(hubUrl);
-  }, [hubUrl]);
+  const signIn = useCallback(
+    async (provider: string) => {
+      await signInToHub(hubUrl, provider);
+    },
+    [hubUrl],
+  );
   const signOut = useCallback(() => signOutOfHub(hubUrl), [hubUrl]);
 
   return { ...state, signIn, signOut, recheck };
+}
+
+/**
+ * What a hub offers when it cannot be asked. Every hub before
+ * tomjn/coilbox-hub#522 signed in with Discord alone, and a hub that cannot be
+ * reached fails the sign-in itself with words that say so.
+ */
+const DEFAULT_PROVIDERS: readonly string[] = ["discord"];
+
+/** Each hub's providers, once asked. Separate from {@link known} because
+ * asking reaches the hub, and the account check must not wait on that. */
+const providersKnown = new Map<string, readonly string[]>();
+const providersAsking = new Set<string>();
+
+async function askProviders(hubUrl: string) {
+  if (providersKnown.has(hubUrl) || providersAsking.has(hubUrl)) return;
+  providersAsking.add(hubUrl);
+  let providers = DEFAULT_PROVIDERS;
+  try {
+    providers = (await hubProviders({ hubUrl })).providers;
+  } catch {
+    // Not worth a message of its own. Pressing sign in reaches the hub again
+    // and says what is wrong.
+  } finally {
+    providersAsking.delete(hubUrl);
+  }
+  providersKnown.set(hubUrl, providers);
+  for (const listener of listeners) listener();
+}
+
+/**
+ * Which providers to offer a sign-in with, or null until the hub has answered.
+ * Asked once a session per hub.
+ */
+export function useHubProviders(hubUrl: string): readonly string[] | null {
+  const providers = useSyncExternalStore(
+    subscribe,
+    useCallback(() => providersKnown.get(hubUrl) ?? null, [hubUrl]),
+  );
+  useEffect(() => {
+    void askProviders(hubUrl);
+  }, [hubUrl]);
+  return providers;
 }
 
 /** Forget every answer. For tests, which must not inherit each other's hubs. */
 export function forgetHubAccounts() {
   known.clear();
   asking.clear();
+  providersKnown.clear();
+  providersAsking.clear();
 }

@@ -5,7 +5,7 @@ const hubSignIn = vi.fn();
 const hubSignOut = vi.fn();
 vi.mock("./auth", () => ({
   hubAccount: (args: { hubUrl: string }) => hubAccount(args),
-  hubSignIn: (args: { hubUrl: string }) => hubSignIn(args),
+  hubSignIn: (args: { hubUrl: string; provider: string }) => hubSignIn(args),
   hubSignOut: (args: { hubUrl: string }) => hubSignOut(args),
 }));
 
@@ -107,7 +107,11 @@ describe("who is signed in to the hub", () => {
       account: signedIn.account,
       problem: "You are signed in for this session.",
     });
-    await signInToHub("https://hub.example");
+    await signInToHub("https://hub.example", "github");
+    expect(hubSignIn).toHaveBeenCalledWith({
+      hubUrl: "https://hub.example",
+      provider: "github",
+    });
     const state = hubAccountSnapshot("https://hub.example");
     expect(state.signedIn).toBe(true);
     expect(state.account).toEqual(signedIn.account);

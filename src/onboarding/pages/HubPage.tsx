@@ -31,9 +31,9 @@ export default function HubPage({ next }: WizardPageProps) {
     };
   }, []);
 
-  const signInThenNext = async () => {
+  const signInThenNext = async (provider: string) => {
     setFailure(null);
-    const failed = await signInToHub(hubUrl);
+    const failed = await signInToHub(hubUrl, provider);
     if (!shown.current) return;
     if (failed) setFailure(failed);
     else next();
@@ -64,6 +64,7 @@ export default function HubPage({ next }: WizardPageProps) {
         </ul>
         <div className="flex flex-wrap gap-2.5">
           <SignInButton
+            hubUrl={hubUrl}
             busy={busy}
             onSignIn={signInThenNext}
             size="default"

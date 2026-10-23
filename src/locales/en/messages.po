@@ -34584,8 +34584,8 @@ msgid "Sign in to the hub"
 msgstr "Sign in to the hub"
 
 #: src/hub/pages/components/AccountControl.tsx
-msgid "Sign in with Discord"
-msgstr "Sign in with Discord"
+msgid "Sign in with {name}"
+msgstr "Sign in with {name}"
 
 #: src/lobby-servers/pages/SettingsSection.tsx
 #: src/multiplayer/LobbyStatusButton.tsx

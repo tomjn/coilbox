@@ -34583,7 +34583,7 @@ msgid "Sign in to the hub"
 msgstr ""
 
 #: src/hub/pages/components/AccountControl.tsx
-msgid "Sign in with Discord"
+msgid "Sign in with {name}"
 msgstr ""
 
 #: src/lobby-servers/pages/SettingsSection.tsx

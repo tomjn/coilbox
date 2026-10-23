@@ -42751,9 +42751,8 @@ msgid "Sign in to the hub"
 msgstr "Iniciar sesión en el hub"
 
 #: src/hub/pages/components/AccountControl.tsx
-#, fuzzy
-msgid "Sign in with Discord"
-msgstr "Iniciar sesión con Discord"
+msgid "Sign in with {name}"
+msgstr "Iniciar sesión con {name}"
 
 #: src/lobby-servers/pages/SettingsSection.tsx
 #: src/multiplayer/LobbyStatusButton.tsx

@@ -27,7 +27,8 @@ const hubAccount = vi.fn();
 const hubSignIn = vi.fn();
 vi.mock("@/hub/auth", () => ({
   hubAccount: (args: { hubUrl: string }) => hubAccount(args),
-  hubSignIn: (args: { hubUrl: string }) => hubSignIn(args),
+  hubProviders: async () => ({ providers: ["discord", "github", "twitch"] }),
+  hubSignIn: (args: { hubUrl: string; provider: string }) => hubSignIn(args),
   hubSignOut: async () => {},
 }));
 
@@ -65,8 +66,8 @@ function show() {
   );
 }
 
-const signInButton = () =>
-  screen.getByRole("button", { name: "Sign in with Discord" });
+const signInButton = (name = "Discord") =>
+  screen.findByRole("button", { name: `Sign in with ${name}` });
 
 beforeEach(() => {
   forgetHubAccounts();
@@ -85,11 +86,14 @@ afterEach(() => {
   cleanup();
 });
 
-it("signs in when Sign in with Discord is pressed", async () => {
+it("signs in with the provider whose button is pressed", async () => {
   hubSignIn.mockReturnValue(new Promise(() => {}));
   show();
-  fireEvent.click(signInButton());
+  await signInButton("Discord");
+  await signInButton("Twitch");
+  fireEvent.click(await signInButton("GitHub"));
   expect(hubSignIn).toHaveBeenCalledTimes(1);
+  expect(hubSignIn).toHaveBeenCalledWith({ hubUrl: HUB, provider: "github" });
   const busy = await screen.findByRole("button", {
     name: "Waiting for your browser",
   });
@@ -104,7 +108,7 @@ it("moves on after a successful sign in", async () => {
     problem: null,
   });
   show();
-  fireEvent.click(signInButton());
+  fireEvent.click(await signInButton());
   await waitFor(() => expect(onSettle).toHaveBeenCalledWith("hub"));
   expect(screen.getByText("You're ready")).toBeTruthy();
 });
@@ -113,12 +117,12 @@ it("shows a failed sign in and stays on the page", async () => {
   const error = new Error("The sign in was cancelled in the browser");
   hubSignIn.mockRejectedValue(error);
   show();
-  fireEvent.click(signInButton());
+  fireEvent.click(await signInButton());
   const alert = await screen.findByRole("alert");
   expect(alert.textContent).toBe(describeError(error));
   expect(onSettle).not.toHaveBeenCalled();
   expect(screen.getByText("Sign in to the hub")).toBeTruthy();
-  expect(signInButton().hasAttribute("disabled")).toBe(false);
+  expect((await signInButton()).hasAttribute("disabled")).toBe(false);
   fireEvent.click(screen.getByRole("button", { name: "Skip" }));
   expect(onSettle).toHaveBeenCalledWith("hub");
 });
@@ -141,7 +145,7 @@ it("stays on the page when a sign in fails while already signed in", async () =>
   hubSignIn.mockRejectedValue(error);
   show();
   await waitFor(() => expect(hubAccount).toHaveBeenCalled());
-  fireEvent.click(signInButton());
+  fireEvent.click(await signInButton());
   const alert = await screen.findByRole("alert");
   expect(alert.textContent).toBe(describeError(error));
   expect(onSettle).not.toHaveBeenCalled();
@@ -155,7 +159,7 @@ it("paints the hub drawing behind the page", () => {
   expect(art.getAttribute("src")).toMatch(/^data:image\/svg\+xml,/);
 });
 
-it("holds the title and both buttons in one column", () => {
+it("holds the title and the buttons in one column", async () => {
   show();
   const column = screen.getByTestId("hub-column");
   const title = within(column).getByRole("heading", {
@@ -165,7 +169,7 @@ it("holds the title and both buttons in one column", () => {
     screen.getByRole("dialog", { name: "Sign in to the hub" }),
   ).toBeTruthy();
   expect(title.id).toBeTruthy();
-  within(column).getByRole("button", { name: "Sign in with Discord" });
+  await within(column).findByRole("button", { name: "Sign in with Discord" });
   within(column).getByRole("button", { name: "Open the hub" });
 });
 
