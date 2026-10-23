@@ -169,6 +169,15 @@ it("registers on the Register tab and moves on", async () => {
   await waitFor(() => expect(onSettle).toHaveBeenCalledWith("server"));
   expect(register).toHaveBeenCalledTimes(1);
   expect(register.mock.calls[0][1]).toBe("Newcomer");
+  expect(lsStoreCredential).toHaveBeenCalledWith({
+    serverId: "profile-official",
+    username: "Newcomer",
+    secret: "secret",
+  });
+  expect(storedAccounts().map((a) => [a.serverId, a.username])).toStrictEqual([
+    ["elsewhere", "Before"],
+    ["profile-official", "Newcomer"],
+  ]);
   expect(screen.getByText("You're ready")).toBeTruthy();
 });
 
