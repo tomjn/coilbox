@@ -60,13 +60,15 @@ it("paints nothing behind a page that declares no art", () => {
   expect(screen.queryByTestId("page-art")).toBeNull();
 });
 
-it("paints a page's drawing behind the step bar and the page, not the footer", () => {
+it("paints a page's drawing below the step bar, behind the page", () => {
   show();
   fireEvent.click(screen.getByRole("button", { name: "Continue" }));
   const art = screen.getByTestId("page-art");
   expect(art.getAttribute("data-art")).toBe("hub.browse");
   const area = layer()?.parentElement;
-  expect(area?.contains(screen.getAllByTestId("wizard-step")[0])).toBe(true);
+  const stepRow = screen.getAllByTestId("wizard-step")[0].parentElement;
+  // Neither the layer nor anything it shares a box with holds the step bar.
+  expect(area?.contains(stepRow ?? null)).toBe(false);
   expect(area?.contains(screen.getByRole("heading"))).toBe(true);
   expect(area?.contains(screen.getByRole("button", { name: "Continue" }))).toBe(
     false,
@@ -79,8 +81,10 @@ it("paints the Done picture in the same shell layer", () => {
   fireEvent.click(screen.getByRole("button", { name: "Continue" }));
   expect(screen.getByRole("heading", { name: "You're ready" })).toBeTruthy();
   expect(layer()?.contains(screen.getByTestId("done-backdrop"))).toBe(true);
-  // Fades into the footer rather than stopping at its border.
-  expect(layer()?.style.maskImage).toContain("transparent");
+  // Fades in below the step bar and out into the footer, with no edge at either.
+  expect(layer()?.style.maskImage).toMatch(
+    /^linear-gradient\(to bottom, transparent,.*transparent\)$/,
+  );
   expect(screen.queryByTestId("page-art")).toBeNull();
 });
 

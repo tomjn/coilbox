@@ -34,7 +34,7 @@ export type WizardArtSpec = { drawing: string } | "setup";
 /**
  * A page the shell heads with a title, or one that draws its own heading with
  * `WIZARD_TITLE_ID`. `art` is painted by the shell across the whole window
- * above the footer.
+ * between the step bar and the footer.
  */
 export type WizardPageEntry = {
   Component: FC<WizardPageProps>;

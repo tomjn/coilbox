@@ -27,17 +27,18 @@ const SOFT_EDGES_STYLE: CSSProperties = {
   WebkitMaskComposite: "source-in",
 };
 
-/** The same bottom fade the drawings get from {@link SOFT_EDGES}. */
-const FOOT_FADE = "linear-gradient(to bottom, black 85%, transparent)";
+/** The same top and bottom fades the drawings get from {@link SOFT_EDGES}. */
+const TOP_AND_FOOT_FADE =
+  "linear-gradient(to bottom, transparent, black 15%, black 85%, transparent)";
 
-const FOOT_FADE_STYLE: CSSProperties = {
-  maskImage: FOOT_FADE,
-  WebkitMaskImage: FOOT_FADE,
+const TOP_AND_FOOT_FADE_STYLE: CSSProperties = {
+  maskImage: TOP_AND_FOOT_FADE,
+  WebkitMaskImage: TOP_AND_FOOT_FADE,
 };
 
 /**
  * The picture behind the current page. The shell puts it first inside the
- * area above the footer, which is `relative`, and everything after it is
+ * area between the step bar and the footer, which is `relative`, and everything after it is
  * positioned, so the page paints on top without a z-index.
  */
 export function WizardArt({ art }: { art: WizardArtSpec }) {
@@ -46,9 +47,10 @@ export function WizardArt({ art }: { art: WizardArtSpec }) {
       aria-hidden="true"
       data-testid="wizard-art"
       className={LAYER}
-      // A drawing fades its own edges. The setup picture fills the window, so
-      // only its foot meets anything, the footer, and fades the same way.
-      style={art === "setup" ? FOOT_FADE_STYLE : undefined}
+      // A drawing fades its own edges. The setup picture runs to both window
+      // edges, so only its top, under the step bar, and its foot, at the
+      // footer, meet anything, and they fade the same way.
+      style={art === "setup" ? TOP_AND_FOOT_FADE_STYLE : undefined}
     >
       {art === "setup" ? <SetupArt /> : <Drawing toolId={art.drawing} />}
     </div>
