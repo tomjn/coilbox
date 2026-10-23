@@ -30617,7 +30617,7 @@ msgstr "Aucun canal rejoint. Parcourez la liste pour en rejoindre un."
 #: src/multiplayer/pages/ChatLogPage.tsx
 #, fuzzy
 msgid "No chat logs yet. Conversations you have while connected are saved here."
-msgstr "Pas encore dâhistorique de chat. Les conversations tenues pendant que vous êtes connecté sont enregistrées ici."
+msgstr "Pas encore d’historique de chat. Les conversations tenues pendant que vous êtes connecté sont enregistrées ici."
 
 #: src/content/pages/components/ReplayChat.tsx
 #, fuzzy
@@ -54304,7 +54304,7 @@ msgstr "Votre capitale est perdue."
 #: src/home/groupDescription.ts
 #, fuzzy
 msgid "Your career, player stats and replays of games already played."
-msgstr "Votre carrière, vos statistiques de joueur et les rediffusions des parties déjà jouées."
+msgstr "Votre carrière, vos statistiques et les rediffusions des parties déjà jouées."
 
 #: src/settings-storage.ts
 #, fuzzy
@@ -54453,7 +54453,7 @@ msgstr "Votre nom de joueur et la mise en évidence d’équipe."
 #: src/career/pages/CareerPage.tsx
 #, fuzzy
 msgid "Your player stats"
-msgstr "Vos statistiques de joueur"
+msgstr "Vos statistiques"
 
 #: src/career/pages/CareerPage.tsx
 #, fuzzy
