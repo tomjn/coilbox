@@ -4,6 +4,7 @@ import type { FC } from "react";
 import type { PageId } from "../ids";
 import AppearancePage from "./AppearancePage";
 import DonePage from "./DonePage";
+import GamesPage from "./GamesPage";
 import LanguagePage from "./LanguagePage";
 
 /**
@@ -42,7 +43,7 @@ export const PAGE_COMPONENTS: Record<PageId, WizardPageEntry> = {
     title: msg`Appearance`,
   },
   games: {
-    Component: Pending,
+    Component: GamesPage,
     eyebrow: msg`Something to play`,
     title: msg`Download a game`,
   },
