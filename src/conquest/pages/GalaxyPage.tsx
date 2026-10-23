@@ -798,7 +798,7 @@ function GalaxyScreen({
           {state && (
             <BracketFrame className="pointer-events-auto flex flex-col justify-center px-3 py-1.5">
               <span className="font-display text-[10px] font-medium uppercase tracking-[0.18em] text-muted-foreground">
-                <Trans>Turn</Trans>
+                <Trans context="Conquest turn">Turn</Trans>
               </span>
               <span className="font-display text-xl font-semibold uppercase leading-none tracking-wide tabular-nums text-foreground">
                 {state.turn}

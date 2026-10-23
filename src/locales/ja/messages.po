@@ -50386,13 +50386,18 @@ msgstr "ttl（フレーム単位）。"
 msgid "Tube"
 msgstr "チューブ"
 
-#: src/conquest/pages/GalaxyPage.tsx
 #: src/lego/animPresets.ts
 #: src/lego/pages/components/ModelViewport.tsx
 #: src/placement/SurfaceBars.tsx
 #, fuzzy
 msgid "Turn"
 msgstr "回転"
+
+#: src/conquest/pages/GalaxyPage.tsx
+#, fuzzy
+msgctxt "Conquest turn"
+msgid "Turn"
+msgstr "ターン"
 
 #: src/content/pages/ArchiveDetailPage.tsx
 #, fuzzy
