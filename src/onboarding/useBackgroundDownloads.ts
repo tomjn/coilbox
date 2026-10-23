@@ -2,7 +2,7 @@ import { useLingui } from "@lingui/react/macro";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useBundledEngine } from "@/content/BundledEngineSetup";
 import { contentCreateStandardRoot } from "@/content/bindings";
-import { useGithubGameRepos } from "@/content/branding";
+import { loadGithubGameRepos } from "@/content/branding";
 import { useSetupStatus } from "@/content/config";
 import { engineDownloadRequest } from "@/content/engineDownloadRequest";
 import { suggestionRequest } from "@/content/pages/components/SuggestionsList";
@@ -63,11 +63,6 @@ export function useBackgroundDownloads(args: {
   const bundled = useBundledEngine();
   const writePath = useWriteRootPath();
   const ensureWriteRoot = useDefaultWriteRoot();
-  const catalogRepos = useGithubGameRepos();
-  const repos = useMemo(
-    () => mergeGameRepos(catalogRepos, GAME_REPOS),
-    [catalogRepos],
-  );
   const [tracked, setTracked] = useState<
     Partial<Record<BackgroundId, Tracked>>
   >({});
@@ -206,10 +201,18 @@ export function useBackgroundDownloads(args: {
     started.current.add("game");
     const { game } = games;
     const label = t`Game: ${game.title}`;
-    void start("game", label, () =>
-      suggestionRequest(game.download, "game", label, writePath, repos),
+    // The catalog's repos are awaited here, because on first launch the
+    // decision can arrive before the catalog has loaded.
+    void start("game", label, async () =>
+      suggestionRequest(
+        game.download,
+        "game",
+        label,
+        writePath,
+        mergeGameRepos(await loadGithubGameRepos(), GAME_REPOS),
+      ),
     );
-  }, [blocked, games, writePath, repos, finish, start, t]);
+  }, [blocked, games, writePath, finish, start, t]);
 
   const items = useMemo(() => {
     const byId = new Map<string, QueueItem>();

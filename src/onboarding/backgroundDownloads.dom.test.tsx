@@ -80,10 +80,13 @@ vi.mock("@/content/pages/components/SuggestionsList", () => ({
   suggestionRequest: (...a: unknown[]) => suggestionRequest(...a),
 }));
 
-vi.mock("@/content/branding", () => ({ useGithubGameRepos: () => [] }));
+// The catalog answers after the hook first renders, as it does in the app.
+vi.mock("@/content/branding", () => ({
+  loadGithubGameRepos: async () => ["catalog repo"],
+}));
 vi.mock("@/downloads/gameRepos", () => ({
-  GAME_REPOS: [],
-  mergeGameRepos: () => [],
+  GAME_REPOS: ["seed repo"],
+  mergeGameRepos: (a: string[], b: string[]) => [...a, ...b],
 }));
 
 const { useBackgroundDownloads } = await import("./useBackgroundDownloads");
@@ -314,6 +317,10 @@ it("queues the game for an auto decision", async () => {
   expect(suggestionRequest.mock.calls[0][0]).toEqual(GAME.download);
   expect(suggestionRequest.mock.calls[0][1]).toBe("game");
   expect(suggestionRequest.mock.calls[0][3]).toBe("/data");
+  expect(suggestionRequest.mock.calls[0][4]).toEqual([
+    "catalog repo",
+    "seed repo",
+  ]);
   expect(enqueue).toHaveBeenCalledTimes(1);
 });
 
