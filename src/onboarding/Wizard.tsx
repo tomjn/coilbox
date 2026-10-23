@@ -42,6 +42,11 @@ export function Wizard({
     if (last) onClose();
     else setStep(step + 1);
   };
+  const beforeContinue = useRef<(() => void) | null>(null);
+  const continueOn = () => {
+    beforeContinue.current?.();
+    advance();
+  };
   const skipSetup = () => {
     for (const page of pages) onSettle(page);
     onClose();
@@ -90,7 +95,12 @@ export function Wizard({
           {i18n._(title)}
         </h2>
         <div className="min-h-0 flex-1 overflow-auto">
-          <Component key={id} next={advance} skip={advance} />
+          <Component
+            key={id}
+            next={advance}
+            skip={advance}
+            beforeContinue={beforeContinue}
+          />
         </div>
       </div>
       <div className="flex items-center gap-2.5 border-t px-10 py-4">
@@ -110,7 +120,9 @@ export function Wizard({
             {t`Skip`}
           </Button>
         )}
-        <Button onClick={advance}>{last ? t`Go to Home` : t`Continue`}</Button>
+        <Button onClick={continueOn}>
+          {last ? t`Go to Home` : t`Continue`}
+        </Button>
       </div>
     </div>
   );
