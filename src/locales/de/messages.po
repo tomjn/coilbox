@@ -14337,7 +14337,7 @@ msgstr "Chatprotokoll"
 #: src/multiplayer/pages/ChatLogPage.tsx
 #, fuzzy
 msgid "Chat logs"
-msgstr "Chatprotokolle"
+msgstr "Chatverlauf"
 
 #: src/uberstress/pages/RunPage.tsx
 #, fuzzy
@@ -30617,7 +30617,7 @@ msgstr "Keinem Kanal beigetreten. Durchsuchen Sie die Kanäle, um einem beizutre
 #: src/multiplayer/pages/ChatLogPage.tsx
 #, fuzzy
 msgid "No chat logs yet. Conversations you have while connected are saved here."
-msgstr "Noch keine Chatprotokolle. Gespräche, die Sie im verbundenen Zustand führen, werden hier gespeichert."
+msgstr "Noch kein Chatverlauf. Gespräche, die Sie im verbundenen Zustand führen, werden hier gespeichert."
 
 #: src/content/pages/components/ReplayChat.tsx
 #, fuzzy

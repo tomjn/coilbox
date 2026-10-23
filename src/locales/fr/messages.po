@@ -3395,12 +3395,12 @@ msgstr "{keys} : aucune action"
 #: src/container/names.ts
 #, fuzzy
 msgid "{kind, select, campaign {a campaign for {game}} coilbox_campaign {a coilbox campaign for {game}} preset {a singleplayer preset for {game}} challenge {a challenge for {game}} conquest_challenge {a conquest challenge for {game}} warpath_challenge {a warpath challenge for {game}} setup_pack {a setup pack for {game}} scenario {a scenario for {game}} keymap {a keymap for {game}} blueprint {a base blueprint for {game}} mod_project {a unit tweak project for {game}} module {a unit builder module for {game}} other {an import for {game}}}"
-msgstr "{kind, select, campaign {une campagne pour {game}} coilbox_campaign {une campagne coilbox pour {game}} preset {un préréglage solo pour {game}} challenge {un défi pour {game}} conquest_challenge {un défi de conquête pour {game}} warpath_challenge {un défi de sentier de guerre pour {game}} setup_pack {un pack de configuration pour {game}} scenario {un scénario pour {game}} keymap {une configuration de touches pour {game}} blueprint {un plan de base pour {game}} mod_project {un projet d’ajustement d’unités pour {game}} module {un module d’atelier d’unités pour {game}} other {une importation pour {game}}}"
+msgstr "{kind, select, campaign {une campagne pour {game}} coilbox_campaign {une campagne coilbox pour {game}} preset {un préréglage solo pour {game}} challenge {un défi pour {game}} conquest_challenge {un défi de conquête pour {game}} warpath_challenge {un défi de sentier de la guerre pour {game}} setup_pack {un pack de configuration pour {game}} scenario {un scénario pour {game}} keymap {une configuration de touches pour {game}} blueprint {un plan de base pour {game}} mod_project {un projet d’ajustement d’unités pour {game}} module {un module d’atelier d’unités pour {game}} other {une importation pour {game}}}"
 
 #: src/container/names.ts
 #, fuzzy
 msgid "{kind, select, campaign {a campaign} coilbox_campaign {a coilbox campaign} preset {a singleplayer preset} challenge {a challenge} conquest_challenge {a conquest challenge} warpath_challenge {a warpath challenge} setup_pack {a setup pack} scenario {a scenario} keymap {a keymap} blueprint {a base blueprint} mod_project {a unit tweak project} module {a unit builder module} other {an import}}"
-msgstr "{kind, select, campaign {une campagne} coilbox_campaign {une campagne coilbox} preset {un préréglage solo} challenge {un défi} conquest_challenge {un défi de conquête} warpath_challenge {un défi de sentier de guerre} setup_pack {un pack de configuration} scenario {un scénario} keymap {une configuration de touches} blueprint {un plan de base} mod_project {un projet d’ajustement d’unités} module {un module d’atelier d’unités} other {une importation}}"
+msgstr "{kind, select, campaign {une campagne} coilbox_campaign {une campagne coilbox} preset {un préréglage solo} challenge {un défi} conquest_challenge {un défi de conquête} warpath_challenge {un défi de sentier de la guerre} setup_pack {un pack de configuration} scenario {un scénario} keymap {une configuration de touches} blueprint {un plan de base} mod_project {un projet d’ajustement d’unités} module {un module d’atelier d’unités} other {une importation}}"
 
 #: src/hub/publish.ts
 #, fuzzy
@@ -3748,12 +3748,12 @@ msgstr "{MANIFEST_FILE} : « {firstName} » et « {secondName} » ont tous 
 #: src/conquest/handmade/manifest.ts
 #, fuzzy
 msgid "{MANIFEST_FILE}: \"{locationName}\" is the Warpath goal, so it cannot also have the kind \"{kind}\". Remove the kind, or move the goal."
-msgstr "{MANIFEST_FILE} : « {locationName} » est l’objectif du sentier de guerre, il ne peut donc pas aussi avoir le type « {kind} ». Retirez le type, ou déplacez l’objectif."
+msgstr "{MANIFEST_FILE} : « {locationName} » est l’objectif du sentier de la guerre, il ne peut donc pas aussi avoir le type « {kind} ». Retirez le type, ou déplacez l’objectif."
 
 #: src/conquest/handmade/manifest.ts
 #, fuzzy
 msgid "{MANIFEST_FILE}: \"{locationName}\" is the Warpath start, so it cannot also have the kind \"{kind}\". Remove the kind, or move the start."
-msgstr "{MANIFEST_FILE} : « {locationName} » est le départ du sentier de guerre, il ne peut donc pas aussi avoir le type « {kind} ». Retirez le type, ou déplacez le départ."
+msgstr "{MANIFEST_FILE} : « {locationName} » est le départ du sentier de la guerre, il ne peut donc pas aussi avoir le type « {kind} ». Retirez le type, ou déplacez le départ."
 
 #: src/conquest/handmade/manifest.ts
 #, fuzzy
@@ -3763,7 +3763,7 @@ msgstr "{MANIFEST_FILE} : « {name} » a un scénario et une bataille. Un lie
 #: src/conquest/handmade/manifest.ts
 #, fuzzy
 msgid "{MANIFEST_FILE}: \"{name}\" has the Warpath kind \"{kind}\", which Warpath does not know. Use one of: {kinds}."
-msgstr "{MANIFEST_FILE} : « {name} » a le type de sentier de guerre « {kind} », que le sentier de guerre ne connaît pas. Utilisez l’un de : {kinds}."
+msgstr "{MANIFEST_FILE} : « {name} » a le type de sentier de la guerre « {kind} », que le sentier de la guerre ne connaît pas. Utilisez l’un de : {kinds}."
 
 #: src/conquest/handmade/read.ts
 #, fuzzy
@@ -4063,17 +4063,17 @@ msgstr "{MANIFEST_FILE} : l’identifiant « {mapId} » ne correspond pas au 
 #: src/conquest/handmade/manifest.ts
 #, fuzzy
 msgid "{MANIFEST_FILE}: the Warpath start and goal are both \"{sameName}\". They must be different locations."
-msgstr "{MANIFEST_FILE} : le départ et l’objectif du sentier de guerre sont tous deux « {sameName} ». Ils doivent être des lieux différents."
+msgstr "{MANIFEST_FILE} : le départ et l’objectif du sentier de la guerre sont tous deux « {sameName} ». Ils doivent être des lieux différents."
 
 #: src/conquest/handmade/manifest.ts
 #, fuzzy
 msgid "{MANIFEST_FILE}: warpath has a goal and no start. Warpath needs both. Add warpath.start, or remove warpath.goal to offer the map in Conquest only."
-msgstr "{MANIFEST_FILE} : warpath a un objectif et pas de départ. Le sentier de guerre a besoin des deux. Ajoutez warpath.start, ou retirez warpath.goal pour proposer la carte en Conquête uniquement."
+msgstr "{MANIFEST_FILE} : warpath a un objectif et pas de départ. Le sentier de la guerre a besoin des deux. Ajoutez warpath.start, ou retirez warpath.goal pour proposer la carte en Conquête uniquement."
 
 #: src/conquest/handmade/manifest.ts
 #, fuzzy
 msgid "{MANIFEST_FILE}: warpath has a start and no goal. Warpath needs both. Add warpath.goal, or remove warpath.start to offer the map in Conquest only."
-msgstr "{MANIFEST_FILE} : warpath a un départ et pas d’objectif. Le sentier de guerre a besoin des deux. Ajoutez warpath.goal, ou retirez warpath.start pour proposer la carte en Conquête uniquement."
+msgstr "{MANIFEST_FILE} : warpath a un départ et pas d’objectif. Le sentier de la guerre a besoin des deux. Ajoutez warpath.goal, ou retirez warpath.start pour proposer la carte en Conquête uniquement."
 
 #: src/conquest/handmade/manifest.ts
 #, fuzzy
@@ -4453,7 +4453,7 @@ msgstr "{missions, plural, one {Terminé, # mission} other {Terminé, # missions
 #: src/hub/api.ts
 #, fuzzy
 msgid "{mode, select, conquest {Conquest challenge} warpath {Warpath challenge} other {{label} challenge}}"
-msgstr "{mode, select, conquest {Défi de conquête} warpath {Défi de sentier de guerre} other {Défi {label}}}"
+msgstr "{mode, select, conquest {Défi de conquête} warpath {Défi de sentier de la guerre} other {Défi {label}}}"
 
 #: src/content/pages/GameDetailPage.tsx
 #, fuzzy
@@ -4655,7 +4655,7 @@ msgstr "{n, plural, one {# scénario} other {# scénarios}}"
 #: src/hub/removePlan.ts
 #, fuzzy
 msgid "{n, plural, one {# warpath run} other {# warpath runs}}"
-msgstr "{n, plural, one {# partie de sentier de guerre} other {# parties de sentier de guerre}}"
+msgstr "{n, plural, one {# partie de sentier de la guerre} other {# parties de sentier de la guerre}}"
 
 #: src/content/pages/components/GatherReplaysButton.tsx
 #, fuzzy
@@ -5827,12 +5827,12 @@ msgstr "{scenarioName} en mission.lua"
 #: src/campaign/units.ts
 #, fuzzy
 msgid "{scope, select, campaign {This campaign's copy of {unitLabel} is missing. Attach it again from the unit builder.} conquest {This conquest's copy of {unitLabel} is missing. Attach it again from the unit builder.} warpath {This warpath's copy of {unitLabel} is missing. Attach it again from the unit builder.} other {This run's copy of {unitLabel} is missing. Attach it again from the unit builder.}}"
-msgstr "{scope, select, campaign {La copie de {unitLabel} de cette campagne manque. Rattachez-la à nouveau depuis l’atelier d’unités.} conquest {La copie de {unitLabel} de cette conquête manque. Rattachez-la à nouveau depuis l’atelier d’unités.} warpath {La copie de {unitLabel} de ce sentier de guerre manque. Rattachez-la à nouveau depuis l’atelier d’unités.} other {La copie de {unitLabel} de cette partie manque. Rattachez-la à nouveau depuis l’atelier d’unités.}}"
+msgstr "{scope, select, campaign {La copie de {unitLabel} de cette campagne manque. Rattachez-la à nouveau depuis l’atelier d’unités.} conquest {La copie de {unitLabel} de cette conquête manque. Rattachez-la à nouveau depuis l’atelier d’unités.} warpath {La copie de {unitLabel} de ce sentier de la guerre manque. Rattachez-la à nouveau depuis l’atelier d’unités.} other {La copie de {unitLabel} de cette partie manque. Rattachez-la à nouveau depuis l’atelier d’unités.}}"
 
 #: src/campaign/units.ts
 #, fuzzy
 msgid "{scope, select, campaign {This campaign's id, {ownerId}, cannot name a game folder, so its units cannot be loaded.} conquest {This conquest's id, {ownerId}, cannot name a game folder, so its units cannot be loaded.} warpath {This warpath's id, {ownerId}, cannot name a game folder, so its units cannot be loaded.} other {This run's id, {ownerId}, cannot name a game folder, so its units cannot be loaded.}}"
-msgstr "{scope, select, campaign {L’identifiant de cette campagne, {ownerId}, ne peut pas nommer un dossier de jeu, ses unités ne peuvent donc pas être chargées.} conquest {L’identifiant de cette conquête, {ownerId}, ne peut pas nommer un dossier de jeu, ses unités ne peuvent donc pas être chargées.} warpath {L’identifiant de ce sentier de guerre, {ownerId}, ne peut pas nommer un dossier de jeu, ses unités ne peuvent donc pas être chargées.} other {L’identifiant de cette partie, {ownerId}, ne peut pas nommer un dossier de jeu, ses unités ne peuvent donc pas être chargées.}}"
+msgstr "{scope, select, campaign {L’identifiant de cette campagne, {ownerId}, ne peut pas nommer un dossier de jeu, ses unités ne peuvent donc pas être chargées.} conquest {L’identifiant de cette conquête, {ownerId}, ne peut pas nommer un dossier de jeu, ses unités ne peuvent donc pas être chargées.} warpath {L’identifiant de ce sentier de la guerre, {ownerId}, ne peut pas nommer un dossier de jeu, ses unités ne peuvent donc pas être chargées.} other {L’identifiant de cette partie, {ownerId}, ne peut pas nommer un dossier de jeu, ses unités ne peuvent donc pas être chargées.}}"
 
 #: src/direct/roomSeed.ts
 #, fuzzy
@@ -7139,7 +7139,7 @@ msgstr "{unreadableCount, plural, one {# autre entrée de ce fichier ne peut pas
 #: src/runlite/pages/RunListPage.tsx
 #, fuzzy
 msgid "{unreadableCount, plural, one {# warpath run could not be read. It is kept in the file and has not been changed.} other {# warpath runs could not be read. They are kept in the file and have not been changed.}}"
-msgstr "{unreadableCount, plural, one {# partie de sentier de guerre n’a pas pu être lue. Elle est conservée dans le fichier et n’a pas été modifiée.} other {# parties de sentier de guerre n’ont pas pu être lues. Elles sont conservées dans le fichier et n’ont pas été modifiées.}}"
+msgstr "{unreadableCount, plural, one {# partie de sentier de la guerre n’a pas pu être lue. Elle est conservée dans le fichier et n’a pas été modifiée.} other {# parties de sentier de la guerre n’ont pas pu être lues. Elles sont conservées dans le fichier et n’ont pas été modifiées.}}"
 
 #: src/profile/health.ts
 #, fuzzy
@@ -8486,7 +8486,7 @@ msgstr "Une fonction à part"
 #: src/content/pages/components/AiRecordSection.tsx
 #, fuzzy
 msgid "A game against several different AIs shows on each one's row. Games from campaign, Conquest and Warpath are not counted."
-msgstr "Une partie contre plusieurs IA différentes apparaît sur la ligne de chacune. Les parties de campagne, de Conquête et de Sentier de guerre ne sont pas comptées."
+msgstr "Une partie contre plusieurs IA différentes apparaît sur la ligne de chacune. Les parties de campagne, de Conquête et de Sentier de la guerre ne sont pas comptées."
 
 #: src/conquest/pages/components/BattleOverlayParts.tsx
 #, fuzzy
@@ -9168,12 +9168,12 @@ msgstr "Un vote est ouvert dans votre partie."
 #: src/career/pages/CareerPage.tsx
 #, fuzzy
 msgid "a Warpath run"
-msgstr "une partie de Sentier de guerre"
+msgstr "une partie de Sentier de la guerre"
 
 #: src/conquest/handmade/read.ts
 #, fuzzy
 msgid "A Warpath run cannot get from the start {start} to the goal {goal}. Join them with a crossing or a road in {MANIFEST_FILE}, or paint the land between them so it touches."
-msgstr "Une partie de Sentier de guerre ne peut pas aller du départ {start} à l’objectif {goal}. Reliez-les par un passage ou une route dans {MANIFEST_FILE}, ou peignez le terrain entre eux pour qu’ils se touchent."
+msgstr "Une partie de Sentier de la guerre ne peut pas aller du départ {start} à l’objectif {goal}. Reliez-les par un passage ou une route dans {MANIFEST_FILE}, ou peignez le terrain entre eux pour qu’ils se touchent."
 
 #: src/lego/animPresets.ts
 #, fuzzy
@@ -9264,7 +9264,7 @@ msgstr "Abandonner cette campagne"
 #: src/runlite/pages/RunListPage.tsx
 #, fuzzy
 msgid "Abandon warpath"
-msgstr "Abandonner le sentier de guerre"
+msgstr "Abandonner le sentier de la guerre"
 
 #: src/conquest/pages/ConquestListPage.tsx
 #: src/runlite/pages/RunListPage.tsx
@@ -11053,7 +11053,7 @@ msgstr "Toute personne qui colle ce code dans Importer un défi (avec le même j
 #: src/runlite/pages/RunListPage.tsx
 #, fuzzy
 msgid "Anyone who pastes this code into Import challenge (needs the same game installed) plays the identical warpath, so results are directly comparable."
-msgstr "Toute personne qui colle ce code dans Importer un défi (avec le même jeu installé) joue exactement le même sentier de guerre, les résultats sont donc directement comparables."
+msgstr "Toute personne qui colle ce code dans Importer un défi (avec le même jeu installé) joue exactement le même sentier de la guerre, les résultats sont donc directement comparables."
 
 #: src/conquest/pages/ConquestListPage.tsx
 #, fuzzy
@@ -11896,18 +11896,18 @@ msgstr "Retour à la grille d’unités"
 #: src/runlite/pages/RunPage.tsx
 #, fuzzy
 msgid "Back to warpath"
-msgstr "Retour au sentier de guerre"
+msgstr "Retour au sentier de la guerre"
 
 #: src/runlite/pages/components/RunEndScreen.tsx
 #: src/runlite/pages/RunPage.tsx
 #, fuzzy
 msgid "Back to warpath hub"
-msgstr "Retour au hub du sentier de guerre"
+msgstr "Retour au hub du sentier de la guerre"
 
 #: src/content/replayProvenanceLink.ts
 #, fuzzy
 msgid "Back to warpath run"
-msgstr "Retour à la partie de sentier de guerre"
+msgstr "Retour à la partie de sentier de la guerre"
 
 #: src/content/pages/components/ConfigProfilesPanel.tsx
 #, fuzzy
@@ -12438,7 +12438,7 @@ msgstr "Commencer la conquête"
 #: src/runlite/pages/components/RunSetupForm.tsx
 #, fuzzy
 msgid "Begin warpath"
-msgstr "Commencer le sentier de guerre"
+msgstr "Commencer le sentier de la guerre"
 
 #: src/mapconv/pages/CompilePage.tsx
 #, fuzzy
@@ -14337,7 +14337,7 @@ msgstr "Journal du chat"
 #: src/multiplayer/pages/ChatLogPage.tsx
 #, fuzzy
 msgid "Chat logs"
-msgstr "Journaux du chat"
+msgstr "Historique de chat"
 
 #: src/uberstress/pages/RunPage.tsx
 #, fuzzy
@@ -18175,7 +18175,7 @@ msgstr "Défaite"
 #: src/runlite/pages/components/EncounterOverlay.tsx
 #, fuzzy
 msgid "Defeat costs health, not the warpath — you retreat and press on."
-msgstr "La défaite coûte de la santé, pas le sentier de guerre : vous battez en retraite et continuez."
+msgstr "La défaite coûte de la santé, pas le sentier de la guerre : vous battez en retraite et continuez."
 
 #: src/conquest/pages/components/BattleOverlay.tsx
 #, fuzzy
@@ -19883,7 +19883,7 @@ msgstr "Chaque équipe apparaît à sa position numérotée sur la carte. Choisi
 #: src/career/pages/CareerPage.tsx
 #, fuzzy
 msgid "Earlier Warpath runs"
-msgstr "Parties de Sentier de guerre précédentes"
+msgstr "Parties de Sentier de la guerre précédentes"
 
 #: src/content/pages/components/AchievementsSection.tsx
 #, fuzzy
@@ -24463,7 +24463,7 @@ msgstr "Sa portée. Le moteur borne tout ce qui est sous 38, le minimum qui gard
 #: src/runlite/pages/components/RunHud.tsx
 #, fuzzy
 msgid "How far you've crossed the map. Reach and beat the warlord at the far end to win the warpath."
-msgstr "Votre progression sur la carte. Atteignez et battez le seigneur de guerre au bout pour gagner le sentier de guerre."
+msgstr "Votre progression sur la carte. Atteignez et battez le seigneur de guerre au bout pour gagner le sentier de la guerre."
 
 #: src/content/unitFieldNotes.ts
 #, fuzzy
@@ -30345,7 +30345,7 @@ msgstr "Nouvelle variable"
 #: src/runlite/pages/RunListPage.tsx
 #, fuzzy
 msgid "New warpath"
-msgstr "Nouveau sentier de guerre"
+msgstr "Nouveau sentier de la guerre"
 
 #: src/content/pages/EnginesSection.tsx
 #, fuzzy
@@ -30440,7 +30440,7 @@ msgstr "Aucun compte n’a été vu sur cette IP."
 #: src/runlite/pages/RunPage.tsx
 #, fuzzy
 msgid "No active warpath."
-msgstr "Aucun sentier de guerre actif."
+msgstr "Aucun sentier de la guerre actif."
 
 #: src/lobby-servers/pages/SettingsSection.tsx
 #, fuzzy
@@ -30617,7 +30617,7 @@ msgstr "Aucun canal rejoint. Parcourez la liste pour en rejoindre un."
 #: src/multiplayer/pages/ChatLogPage.tsx
 #, fuzzy
 msgid "No chat logs yet. Conversations you have while connected are saved here."
-msgstr "Pas encore de journaux de discussion. Les conversations tenues pendant que vous êtes connecté sont enregistrées ici."
+msgstr "Pas encore d’historique de chat. Les conversations tenues pendant que vous êtes connecté sont enregistrées ici."
 
 #: src/content/pages/components/ReplayChat.tsx
 #, fuzzy
@@ -31930,7 +31930,7 @@ msgstr "Pas encore de préréglages d’escarmouche. Configurez une partie sur l
 #: src/content/pages/components/AiRecordSection.tsx
 #, fuzzy
 msgid "No skirmishes against AI yet. Games from campaign, Conquest and Warpath are not counted here."
-msgstr "Pas encore d’escarmouches contre l’IA. Les parties de campagne, de conquête et de sentier de guerre ne sont pas comptées ici."
+msgstr "Pas encore d’escarmouches contre l’IA. Les parties de campagne, de conquête et de sentier de la guerre ne sont pas comptées ici."
 
 #: src/content/pages/components/GameSourcesTab.tsx
 #, fuzzy
@@ -32205,7 +32205,7 @@ msgstr "Aucun fichier vidéo correspondant dans l’archive de ce jeu."
 #: src/runlite/pages/RunListPage.tsx
 #, fuzzy
 msgid "No warpath in progress. Start a new warpath to begin."
-msgstr "Aucun sentier de guerre en cours. Lancez un nouveau sentier de guerre pour commencer."
+msgstr "Aucun sentier de la guerre en cours. Lancez un nouveau sentier de la guerre pour commencer."
 
 #: src/content/pages/MapsPage.tsx
 #, fuzzy
@@ -34207,7 +34207,7 @@ msgstr "Ouvrez ou déposez un .bos à compiler, ou un .cob à relire."
 #: src/career/pages/CareerPage.tsx
 #, fuzzy
 msgid "Open Player stats"
-msgstr "Ouvrir les statistiques du joueur"
+msgstr "Ouvrir les statistiques"
 
 #: src/direct/ReachablePorts.tsx
 #, fuzzy
@@ -34297,12 +34297,12 @@ msgstr "Ouvrir l’onglet Script"
 #: src/career/pages/CareerPage.tsx
 #, fuzzy
 msgid "Open Warpath"
-msgstr "Ouvrir Sentier de guerre"
+msgstr "Ouvrir Sentier de la guerre"
 
 #: src/deeplink/actions.ts
 #, fuzzy
 msgid "Open Warpath."
-msgstr "Ouvrir Sentier de guerre."
+msgstr "Ouvrir Sentier de la guerre."
 
 #: src/lego/pages/ProjectsPage.tsx
 #, fuzzy
@@ -35092,7 +35092,7 @@ msgstr "Collez un code de défi partagé par un autre joueur pour générer la c
 #: src/runlite/pages/components/ImportChallengeForm.tsx
 #, fuzzy
 msgid "Paste a challenge code shared by another player to generate the identical warpath on your own install."
-msgstr "Collez un code de défi partagé par un autre joueur pour générer le sentier de guerre identique sur votre installation."
+msgstr "Collez un code de défi partagé par un autre joueur pour générer le sentier de la guerre identique sur votre installation."
 
 #: src/challenge/ChallengeCodeInput.tsx
 #, fuzzy
@@ -35935,7 +35935,7 @@ msgstr "Nom du joueur"
 #: src/multiplayer/index.tsx
 #, fuzzy
 msgid "Player stats"
-msgstr "Statistiques du joueur"
+msgstr "Statistiques"
 
 #: src/content/commandRates.ts
 #, fuzzy
@@ -40823,7 +40823,7 @@ msgstr "Voir la confrontation par carte, faction et durée de partie"
 #: src/career/pages/CareerPage.tsx
 #, fuzzy
 msgid "See them all on Player stats"
-msgstr "Tous les voir dans Statistiques du joueur"
+msgstr "Tous les voir dans Statistiques"
 
 #: src/conquest/pages/ConquestListPage.tsx
 #: src/conquest/pages/GalaxyPage.tsx
@@ -43571,17 +43571,17 @@ msgstr "Créez un projet dans Ajustements d’unités pour modifier les unités 
 #: src/home/groupDescription.ts
 #, fuzzy
 msgid "Start a skirmish, run a campaign, or pick up a Warpath run."
-msgstr "Lancez une escarmouche, une campagne, ou reprenez une partie Sentier de guerre."
+msgstr "Lancez une escarmouche, une campagne, ou reprenez une partie de Sentier de la guerre."
 
 #: src/runlite/pages/RunPage.tsx
 #, fuzzy
 msgid "Start a warpath"
-msgstr "Commencer un sentier de guerre"
+msgstr "Commencer un sentier de la guerre"
 
 #: src/content/pages/components/StartModeActions.tsx
 #, fuzzy
 msgid "Start a warpath run"
-msgstr "Commencer une partie Sentier de guerre"
+msgstr "Commencer une partie de Sentier de la guerre"
 
 #: src/conquest/pages/GalaxyPage.tsx
 #, fuzzy
@@ -45540,7 +45540,7 @@ msgstr "Le moteur ne peut pas les recharger dans une partie en cours, relancez d
 #: src/runlite/pages/components/RunContentNotice.tsx
 #, fuzzy
 msgid "The engine could not read your games, so this warpath cannot check for <0>{name}</0>. Open <1>Content > Games</1> to see what it did find, or pick another engine in Settings."
-msgstr "Le moteur n’a pas pu lire vos jeux, ce sentier de guerre ne peut donc pas vérifier <0>{name}</0>. Ouvrez <1>Contenu > Jeux</1> pour voir ce qu’il a trouvé, ou choisissez un autre moteur dans Paramètres."
+msgstr "Le moteur n’a pas pu lire vos jeux, ce sentier de la guerre ne peut donc pas vérifier <0>{name}</0>. Ouvrez <1>Contenu > Jeux</1> pour voir ce qu’il a trouvé, ou choisissez un autre moteur dans Paramètres."
 
 #: src/lego/unitCheck.ts
 #, fuzzy
@@ -46153,12 +46153,12 @@ msgstr "La carte faite main « {id} » n’a pas pu être lue."
 #: src/runlite/pages/RunPage.tsx
 #, fuzzy
 msgid "The hand-made map \"{mapTitle}\" has changed since this warpath began, and the run no longer fits it."
-msgstr "La carte faite main « {mapTitle} » a changé depuis le début de ce sentier de guerre, et la partie ne lui correspond plus."
+msgstr "La carte faite main « {mapTitle} » a changé depuis le début de ce sentier de la guerre, et la partie ne lui correspond plus."
 
 #: src/runlite/handmadeMap.ts
 #, fuzzy
 msgid "The hand-made map \"{mapTitle}\" has no Warpath start and goal, so it can only be played in Conquest."
-msgstr "La carte faite main « {mapTitle} » n’a ni départ ni objectif Sentier de guerre, elle ne peut donc être jouée qu’en Conquête."
+msgstr "La carte faite main « {mapTitle} » n’a ni départ ni objectif Sentier de la guerre, elle ne peut donc être jouée qu’en Conquête."
 
 #: src/conquest/pages/ConquestListPage.tsx
 #, fuzzy
@@ -46639,7 +46639,7 @@ msgstr "La carte n’a pas pu être dessinée."
 #: src/runlite/pages/components/RunSetupForm.tsx
 #, fuzzy
 msgid "The map decides how long this warpath is. This length crosses a map of {landLocationCount} {landLocationNoun}."
-msgstr "La carte détermine la longueur de ce sentier de guerre. Cette longueur traverse une carte de {landLocationCount} {landLocationNoun}."
+msgstr "La carte détermine la longueur de ce sentier de la guerre. Cette longueur traverse une carte de {landLocationCount} {landLocationNoun}."
 
 #: src/conquest/pages/GalaxyPage.tsx
 #, fuzzy
@@ -46649,7 +46649,7 @@ msgstr "Les dossiers de cartes n’ont pas pu être lus. {failure}"
 #: src/runlite/mapRun.ts
 #, fuzzy
 msgid "The map for this warpath could not be generated."
-msgstr "La carte de ce sentier de guerre n’a pas pu être générée."
+msgstr "La carte de ce sentier de la guerre n’a pas pu être générée."
 
 #: src/scenario/pages/components/ShortcutsList.tsx
 #, fuzzy
@@ -47328,7 +47328,7 @@ msgstr "La seconde minute doit être après la première. Toute la partie est af
 #: src/runlite/pages/components/RunEndScreen.tsx
 #, fuzzy
 msgid "The sector warlord is broken. The warpath is yours."
-msgstr "Le seigneur de guerre du secteur est vaincu. Le sentier de guerre est à vous."
+msgstr "Le seigneur de guerre du secteur est vaincu. Le sentier de la guerre est à vous."
 
 #: src/runlite/pages/RunPage.tsx
 #, fuzzy
@@ -47818,12 +47818,12 @@ msgstr "Le délai avant que l’unité puisse lancer un autre leurre."
 #: src/runlite/pages/RunListPage.tsx
 #, fuzzy
 msgid "The warpath was not abandoned. {reason}"
-msgstr "Le sentier de guerre n’a pas été abandonné. {reason}"
+msgstr "Le sentier de la guerre n’a pas été abandonné. {reason}"
 
 #: src/runlite/pages/components/RunSetupForm.tsx
 #, fuzzy
 msgid "The warpath was not started. {reason}"
-msgstr "Le sentier de guerre n’a pas été lancé. {reason}"
+msgstr "Le sentier de la guerre n’a pas été lancé. {reason}"
 
 #: src/content/pages/components/DeleteEngineButton.tsx
 #, fuzzy
@@ -48299,7 +48299,7 @@ msgstr "Ce code de défi a été créé par une version plus récente de coilbox
 #: src/runlite/handmadeMap.ts
 #, fuzzy
 msgid "This challenge is a Warpath run on the hand-made map \"{mapTitle}\", and the copy installed here has no Warpath start and goal, so the challenge was not started."
-msgstr "Ce défi est une partie Sentier de guerre sur la carte faite main « {mapTitle} », et la copie installée ici n’a ni départ ni objectif Sentier de guerre, le défi n’a donc pas été lancé."
+msgstr "Ce défi est une partie de Sentier de la guerre sur la carte faite main « {mapTitle} », et la copie installée ici n’a ni départ ni objectif Sentier de la guerre, le défi n’a donc pas été lancé."
 
 #: src/runlite/challenge.ts
 #, fuzzy
@@ -48414,7 +48414,7 @@ msgstr "Ceci supprime la carte de votre ordinateur. Ceci est irréversible."
 #: src/runlite/pages/RunListPage.tsx
 #, fuzzy
 msgid "This deletes the warpath for good, including its progress ({progressText}). It cannot be undone."
-msgstr "Ceci supprime définitivement le sentier de guerre, y compris sa progression ({progressText}). Ceci est irréversible."
+msgstr "Ceci supprime définitivement le sentier de la guerre, y compris sa progression ({progressText}). Ceci est irréversible."
 
 #: src/scenario/pages/components/MissionLuaView.tsx
 #, fuzzy
@@ -49720,22 +49720,22 @@ msgstr "Cette valeur a été modifiée par rapport à celle du jeu."
 #: src/runlite/pages/components/RunContentNotice.tsx
 #, fuzzy
 msgid "this warpath"
-msgstr "ce sentier de guerre"
+msgstr "ce sentier de la guerre"
 
 #: src/runlite/pages/RunPage.tsx
 #, fuzzy
 msgid "This warpath is drawn in columns until the map is back as it was, and it can still be played."
-msgstr "Ce sentier de guerre est dessiné en colonnes tant que la carte n’est pas revenue à son état d’origine, et il reste jouable."
+msgstr "Ce sentier de la guerre est dessiné en colonnes tant que la carte n’est pas revenue à son état d’origine, et il reste jouable."
 
 #: src/runlite/pages/components/RunContentNotice.tsx
 #, fuzzy
 msgid "This warpath needs the game <0>{name}</0>, which is not installed and has no download coilbox knows about. Add it in <1>Content > Games</1>."
-msgstr "Ce sentier de guerre nécessite le jeu <0>{name}</0>, qui n’est pas installé et pour lequel coilbox ne connaît aucun téléchargement. Ajoutez-le dans <1>Contenu > Jeux</1>."
+msgstr "Ce sentier de la guerre nécessite le jeu <0>{name}</0>, qui n’est pas installé et pour lequel coilbox ne connaît aucun téléchargement. Ajoutez-le dans <1>Contenu > Jeux</1>."
 
 #: src/runlite/pages/components/RunContentNotice.tsx
 #, fuzzy
 msgid "This warpath needs the game <0>{name}</0>, which is not installed."
-msgstr "Ce sentier de guerre nécessite le jeu <0>{name}</0>, qui n’est pas installé."
+msgstr "Ce sentier de la guerre nécessite le jeu <0>{name}</0>, qui n’est pas installé."
 
 #: src/deeplink/readImport.ts
 #, fuzzy
@@ -52331,7 +52331,7 @@ msgstr "Avertissements"
 #: src/play/pages/components/GameChoiceOffer.tsx
 #, fuzzy
 msgid "warpath"
-msgstr "sentier de guerre"
+msgstr "sentier de la guerre"
 
 #: src/career/pages/CareerPage.tsx
 #: src/content/pages/ReplaysPage.tsx
@@ -52340,54 +52340,54 @@ msgstr "sentier de guerre"
 #: src/runlite/pages/RunListPage.tsx
 #, fuzzy
 msgid "Warpath"
-msgstr "Sentier de guerre"
+msgstr "Sentier de la guerre"
 
 #: src/content/pages/MapDetailPage.tsx
 #, fuzzy
 msgid "Warpath and Galactic Conquest"
-msgstr "Sentier de guerre et Conquête galactique"
+msgstr "Sentier de la guerre et Conquête galactique"
 
 #: src/play/PlayProvider.tsx
 #, fuzzy
 msgid "Warpath battle"
-msgstr "Bataille Sentier de guerre"
+msgstr "Bataille Sentier de la guerre"
 
 #: src/runlite/pages/components/RunEndScreen.tsx
 #: src/runlite/pages/RunListPage.tsx
 #, fuzzy
 msgid "Warpath complete"
-msgstr "Sentier de guerre terminé"
+msgstr "Sentier de la guerre terminé"
 
 #: src/runlite/pages/components/RunEndScreen.tsx
 #: src/runlite/pages/RunListPage.tsx
 #, fuzzy
 msgid "Warpath ended"
-msgstr "Sentier de guerre fini"
+msgstr "Sentier de la guerre fini"
 
 #: src/runlite/pages/RunListPage.tsx
 #, fuzzy
 msgid "Warpath in progress"
-msgstr "Sentier de guerre en cours"
+msgstr "Sentier de la guerre en cours"
 
 #: src/career/pages/CareerPage.tsx
 #, fuzzy
 msgid "warpath records"
-msgstr "historique Sentier de guerre"
+msgstr "historique Sentier de la guerre"
 
 #: src/runlite/pages/components/RunSetupForm.tsx
 #, fuzzy
 msgid "Warpath records could not be read. Only the standard options are offered. The file has not been changed. {metaError}"
-msgstr "L’historique Sentier de guerre n’a pas pu être lu. Seules les options standard sont proposées. Le fichier n’a pas été modifié. {metaError}"
+msgstr "L’historique Sentier de la guerre n’a pas pu être lu. Seules les options standard sont proposées. Le fichier n’a pas été modifié. {metaError}"
 
 #: src/career/pages/CareerPage.tsx
 #, fuzzy
 msgid "Warpath records could not be read. Warpath is not shown. {error}"
-msgstr "L’historique Sentier de guerre n’a pas pu être lu. Sentier de guerre n’est pas affiché. {error}"
+msgstr "L’historique Sentier de la guerre n’a pas pu être lu. Sentier de la guerre n’est pas affiché. {error}"
 
 #: src/home/continue.ts
 #, fuzzy
 msgid "Warpath run"
-msgstr "Partie Sentier de guerre"
+msgstr "Sentier de la guerre"
 
 #: src/content/pages/components/MapRecords.tsx
 #, fuzzy
@@ -52588,7 +52588,7 @@ msgstr "Le centre de gravité est à {distance} elmos à l’extérieur des pied
 #: src/home/zones/Greeting.tsx
 #, fuzzy
 msgid "Welcome back {username}"
-msgstr "Bon retour, {username}"
+msgstr "Bienvenue, {username}"
 
 #: src/profile/SettingsSection.tsx
 #, fuzzy
@@ -54184,7 +54184,7 @@ msgstr "Vous avez la dernière version du jeu ({releaseTag})."
 #: src/challenge/SubstitutedMapNote.tsx
 #, fuzzy
 msgid "You have this map, but it is hidden from warpath and galactic conquest."
-msgstr "Vous avez cette carte, mais elle est masquée pour Sentier de guerre et Conquête galactique."
+msgstr "Vous avez cette carte, mais elle est masquée pour Sentier de la guerre et Conquête galactique."
 
 #: src/content/pages/PlayerDossierPage.tsx
 #, fuzzy
@@ -54304,7 +54304,7 @@ msgstr "Votre capitale est perdue."
 #: src/home/groupDescription.ts
 #, fuzzy
 msgid "Your career, player stats and replays of games already played."
-msgstr "Votre carrière, vos statistiques de joueur et les rediffusions des parties déjà jouées."
+msgstr "Votre carrière, vos statistiques et les rediffusions des parties déjà jouées."
 
 #: src/settings-storage.ts
 #, fuzzy
@@ -54453,12 +54453,12 @@ msgstr "Votre nom de joueur et la mise en évidence d’équipe."
 #: src/career/pages/CareerPage.tsx
 #, fuzzy
 msgid "Your player stats"
-msgstr "Vos statistiques de joueur"
+msgstr "Vos statistiques"
 
 #: src/career/pages/CareerPage.tsx
 #, fuzzy
 msgid "Your progress in each game. It is read from your campaigns, Conquests, Warpath runs and replays, and nothing here can be changed."
-msgstr "Votre progression dans chaque jeu. Elle est lue depuis vos campagnes, conquêtes, parties Sentier de guerre et rediffusions, et rien ici ne peut être modifié."
+msgstr "Votre progression dans chaque jeu. Elle est lue depuis vos campagnes, conquêtes, parties de Sentier de la guerre et rediffusions, et rien ici ne peut être modifié."
 
 #: src/content/pages/GameDetailPage.tsx
 #, fuzzy
@@ -54519,7 +54519,7 @@ msgstr "Votre mot de passe enregistré n’a pas été modifié."
 #: src/runlite/pages/components/RunEndScreen.tsx
 #, fuzzy
 msgid "Your ship gave out. The warpath is over."
-msgstr "Votre vaisseau a lâché. Le sentier de guerre est terminé."
+msgstr "Votre vaisseau a lâché. Le sentier de la guerre est terminé."
 
 #: src/runlite/pages/components/EncounterOverlay.tsx
 #, fuzzy
@@ -54534,17 +54534,17 @@ msgstr "Votre unité"
 #: src/runlite/pages/components/RunHud.tsx
 #, fuzzy
 msgid "Your warpath ends when this reaches zero. Losing a battle costs hull — you retreat and press on — while events and depots can restore it."
-msgstr "Votre sentier de guerre se termine quand ceci atteint zéro. Perdre une bataille coûte de la coque (vous battez en retraite et continuez), tandis que les événements et dépôts peuvent la restaurer."
+msgstr "Votre sentier de la guerre se termine quand ceci atteint zéro. Perdre une bataille coûte de la coque (vous battez en retraite et continuez), tandis que les événements et dépôts peuvent la restaurer."
 
 #: src/runlite/pages/RunPage.tsx
 #, fuzzy
 msgid "Your warpath runs could not be read. Nothing has been changed. {loadError}"
-msgstr "Vos parties Sentier de guerre n’ont pas pu être lues. Rien n’a été modifié. {loadError}"
+msgstr "Vos parties de Sentier de la guerre n’ont pas pu être lues. Rien n’a été modifié. {loadError}"
 
 #: src/runlite/pages/RunListPage.tsx
 #, fuzzy
 msgid "Your warpath runs could not be read. Nothing has been changed. {runsError}"
-msgstr "Vos parties Sentier de guerre n’ont pas pu être lues. Rien n’a été modifié. {runsError}"
+msgstr "Vos parties de Sentier de la guerre n’ont pas pu être lues. Rien n’a été modifié. {runsError}"
 
 #: src/content/pages/components/BindingList.tsx
 #: src/workshop/pages/components/BuildMenuPanel.tsx

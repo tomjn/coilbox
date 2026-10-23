@@ -14337,7 +14337,7 @@ msgstr "Журнал чату"
 #: src/multiplayer/pages/ChatLogPage.tsx
 #, fuzzy
 msgid "Chat logs"
-msgstr "Журнали чатів"
+msgstr "Історія чатів"
 
 #: src/uberstress/pages/RunPage.tsx
 #, fuzzy
@@ -30617,7 +30617,7 @@ msgstr "Ви не приєдналися до жодного каналу. Пе�
 #: src/multiplayer/pages/ChatLogPage.tsx
 #, fuzzy
 msgid "No chat logs yet. Conversations you have while connected are saved here."
-msgstr "Ще немає журналів чату. Тут зберігаються розмови, які ви ведете під час підключення."
+msgstr "Історія чатів поки порожня. Тут зберігаються розмови, які ви ведете під час підключення."
 
 #: src/content/pages/components/ReplayChat.tsx
 #, fuzzy
@@ -34207,7 +34207,7 @@ msgstr "Відкрийте або перетягніть .bos, щоб скомп
 #: src/career/pages/CareerPage.tsx
 #, fuzzy
 msgid "Open Player stats"
-msgstr "Відкрити статистику гравця"
+msgstr "Відкрити статистику"
 
 #: src/direct/ReachablePorts.tsx
 #, fuzzy
@@ -35935,7 +35935,7 @@ msgstr "Ім’я гравця"
 #: src/multiplayer/index.tsx
 #, fuzzy
 msgid "Player stats"
-msgstr "Статистика гравця"
+msgstr "Статистика"
 
 #: src/content/commandRates.ts
 #, fuzzy
@@ -40823,7 +40823,7 @@ msgstr "Переглянути протистояння за мапою, фра�
 #: src/career/pages/CareerPage.tsx
 #, fuzzy
 msgid "See them all on Player stats"
-msgstr "Переглянути всі в статистиці гравця"
+msgstr "Переглянути всі в статистиці"
 
 #: src/conquest/pages/ConquestListPage.tsx
 #: src/conquest/pages/GalaxyPage.tsx
@@ -54304,7 +54304,7 @@ msgstr "Вашу столицю втрачено."
 #: src/home/groupDescription.ts
 #, fuzzy
 msgid "Your career, player stats and replays of games already played."
-msgstr "Ваша кар’єра, статистика гравця й повтори вже зіграних ігор."
+msgstr "Ваша кар’єра, статистика й повтори вже зіграних ігор."
 
 #: src/settings-storage.ts
 #, fuzzy
@@ -54453,7 +54453,7 @@ msgstr "Ваше ім’я гравця й виділення команди."
 #: src/career/pages/CareerPage.tsx
 #, fuzzy
 msgid "Your player stats"
-msgstr "Ваша статистика гравця"
+msgstr "Ваша статистика"
 
 #: src/career/pages/CareerPage.tsx
 #, fuzzy

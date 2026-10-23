@@ -14337,7 +14337,7 @@ msgstr "Dziennik czatu"
 #: src/multiplayer/pages/ChatLogPage.tsx
 #, fuzzy
 msgid "Chat logs"
-msgstr "Dzienniki czatu"
+msgstr "Historia czatu"
 
 #: src/uberstress/pages/RunPage.tsx
 #, fuzzy
@@ -30617,7 +30617,7 @@ msgstr "Brak dołączonych kanałów. Przeglądaj, aby do któregoś dołączyć
 #: src/multiplayer/pages/ChatLogPage.tsx
 #, fuzzy
 msgid "No chat logs yet. Conversations you have while connected are saved here."
-msgstr "Nie ma jeszcze dzienników czatu. Rozmowy prowadzone po połączeniu są zapisywane tutaj."
+msgstr "Nie ma jeszcze historii czatu. Rozmowy prowadzone po połączeniu są zapisywane tutaj."
 
 #: src/content/pages/components/ReplayChat.tsx
 #, fuzzy
@@ -34207,7 +34207,7 @@ msgstr "Otwórz lub upuść plik .bos, aby go skompilować, albo .cob, aby go od
 #: src/career/pages/CareerPage.tsx
 #, fuzzy
 msgid "Open Player stats"
-msgstr "Otwórz statystyki gracza"
+msgstr "Otwórz statystyki"
 
 #: src/direct/ReachablePorts.tsx
 #, fuzzy
@@ -35935,7 +35935,7 @@ msgstr "Nazwa gracza"
 #: src/multiplayer/index.tsx
 #, fuzzy
 msgid "Player stats"
-msgstr "Statystyki gracza"
+msgstr "Statystyki"
 
 #: src/content/commandRates.ts
 #, fuzzy
@@ -40823,7 +40823,7 @@ msgstr "Zobacz starcie według mapy, frakcji i długości gry"
 #: src/career/pages/CareerPage.tsx
 #, fuzzy
 msgid "See them all on Player stats"
-msgstr "Zobacz wszystkie w statystykach gracza"
+msgstr "Zobacz wszystkie w statystykach"
 
 #: src/conquest/pages/ConquestListPage.tsx
 #: src/conquest/pages/GalaxyPage.tsx
@@ -54304,7 +54304,7 @@ msgstr "Twoja stolica jest stracona."
 #: src/home/groupDescription.ts
 #, fuzzy
 msgid "Your career, player stats and replays of games already played."
-msgstr "Twoja kariera, statystyki gracza i powtórki rozegranych gier."
+msgstr "Twoja kariera, statystyki i powtórki rozegranych gier."
 
 #: src/settings-storage.ts
 #, fuzzy
@@ -54453,7 +54453,7 @@ msgstr "Nazwa gracza i wyróżnianie drużyny."
 #: src/career/pages/CareerPage.tsx
 #, fuzzy
 msgid "Your player stats"
-msgstr "Twoje statystyki gracza"
+msgstr "Twoje statystyki"
 
 #: src/career/pages/CareerPage.tsx
 #, fuzzy

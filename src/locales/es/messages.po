@@ -14337,7 +14337,7 @@ msgstr "Registro de chat"
 #: src/multiplayer/pages/ChatLogPage.tsx
 #, fuzzy
 msgid "Chat logs"
-msgstr "Registros de chat"
+msgstr "Historial de chat"
 
 #: src/uberstress/pages/RunPage.tsx
 #, fuzzy
@@ -30617,7 +30617,7 @@ msgstr "No te has unido a ningún canal. Explora para unirte a uno."
 #: src/multiplayer/pages/ChatLogPage.tsx
 #, fuzzy
 msgid "No chat logs yet. Conversations you have while connected are saved here."
-msgstr "Todavía no hay registros de chat. Aquí se guardan las conversaciones que tienes mientras estás conectado."
+msgstr "Todavía no hay historial de chat. Aquí se guardan las conversaciones que tienes mientras estás conectado."
 
 #: src/content/pages/components/ReplayChat.tsx
 #, fuzzy
@@ -43581,7 +43581,7 @@ msgstr "Empezar una senda de guerra"
 #: src/content/pages/components/StartModeActions.tsx
 #, fuzzy
 msgid "Start a warpath run"
-msgstr "Empezar una expedición de senda de guerra"
+msgstr "Empezar una expedición de Senda de guerra"
 
 #: src/conquest/pages/GalaxyPage.tsx
 #, fuzzy
