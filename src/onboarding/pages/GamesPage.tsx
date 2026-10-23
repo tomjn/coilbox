@@ -18,6 +18,7 @@ export default function GamesPage() {
   return (
     <SuggestionsList
       kind="game"
+      centred
       heading={null}
       folderLink={false}
       items={games}

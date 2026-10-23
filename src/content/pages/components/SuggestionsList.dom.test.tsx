@@ -88,3 +88,17 @@ it("shows the plain box when there is no art", () => {
   expect(art()).toBeNull();
   expect(screen.getByText("Splinter Faction")).toBeTruthy();
 });
+
+it("starts the cards at the left unless asked to centre them", () => {
+  const view = show();
+  expect(screen.getByRole("list").className).not.toContain("justify-center");
+  view.rerender(
+    <SuggestionsList
+      kind="game"
+      items={[SF]}
+      writeRoot={{ path: "/data", loading: false }}
+      centred
+    />,
+  );
+  expect(screen.getByRole("list").className).toContain("justify-center");
+});

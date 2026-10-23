@@ -46,6 +46,8 @@ interface SuggestionsListProps {
   /** When there is no download folder, link to the setting that sets one.
    * Defaults to true. False says the same in plain text. */
   folderLink?: boolean;
+  /** Centre the cards in the row, rather than starting them at the left. */
+  centred?: boolean;
 }
 
 /**
@@ -143,6 +145,7 @@ export function SuggestionsList({
   onQueued,
   heading,
   folderLink = true,
+  centred = false,
 }: SuggestionsListProps) {
   const { t } = useLingui();
   const writePath = writeRoot.path;
@@ -210,8 +213,17 @@ export function SuggestionsList({
 
       {/* auto-fill, not auto-fit: a suggestion card stays game-card sized even
           when only one or two are shown on a wide window (issue #529). auto-fit
-          would stretch the real tracks to fill the row, blowing the art up. */}
-      <ul className="grid grid-cols-[repeat(auto-fill,minmax(14rem,1fr))] gap-3">
+          would stretch the real tracks to fill the row, blowing the art up.
+          Centred, the tracks keep the 14rem minimum as a fixed width, so
+          auto-fit drops the empty ones and the cards sit in the middle. */}
+      <ul
+        className={cn(
+          "grid gap-3",
+          centred
+            ? "grid-cols-[repeat(auto-fit,14rem)] justify-center"
+            : "grid-cols-[repeat(auto-fill,minmax(14rem,1fr))]",
+        )}
+      >
         {items.map((item) => (
           <SuggestionCard
             key={item.id}

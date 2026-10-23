@@ -238,3 +238,9 @@ it("says to set a download folder without a link out of the wizard", () => {
   ).toBeTruthy();
   expect(within(dialog).queryByRole("link")).toBeNull();
 });
+
+it("centres the cards", () => {
+  show();
+  const list = within(screen.getByRole("dialog")).getByRole("list");
+  expect(list.className).toContain("justify-center");
+});
