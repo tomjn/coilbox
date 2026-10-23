@@ -242,6 +242,12 @@ export interface Profile {
    * and the branding catalog, so a white-label build fully controls faction art.
    */
   factionLogos?: Record<string, string>;
+  /**
+   * The picture beside "You're ready" on the setup wizard's last page, in place of
+   * the Coilbox mark. A `.coilbox`-relative path, `data:` URI, or `http(s)` URL.
+   * The mark stays when it does not resolve.
+   */
+  setupImage?: string;
   /** Branded landing page shown in place of the default launcher. */
   welcome?: WelcomeConfig;
   /**
