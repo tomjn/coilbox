@@ -15975,10 +15975,6 @@ msgstr "Jeu de couleurs"
 msgid "Colour texture"
 msgstr "Texture de couleur"
 
-#: src/onboarding/pages/AppearancePage.tsx
-msgid "Colours are set by this distribution"
-msgstr "Les couleurs sont définies par cette distribution"
-
 #: src/content/pages/components/MapAggregate.tsx
 #: src/content/pages/components/ReplayMap.tsx
 #, fuzzy
@@ -27342,10 +27338,6 @@ msgstr "Clair"
 #, fuzzy
 msgid "Light hit up to"
 msgstr "Coup léger jusqu’à"
-
-#: src/onboarding/pages/AppearancePage.tsx
-msgid "Light or dark is set by this distribution"
-msgstr "Le mode clair ou sombre est défini par cette distribution"
 
 #: src/lego/scriptPlayback.ts
 #, fuzzy

@@ -15975,10 +15975,6 @@ msgstr "配色"
 msgid "Colour texture"
 msgstr "カラーテクスチャ"
 
-#: src/onboarding/pages/AppearancePage.tsx
-msgid "Colours are set by this distribution"
-msgstr "色はこの配布版で決められています"
-
 #: src/content/pages/components/MapAggregate.tsx
 #: src/content/pages/components/ReplayMap.tsx
 #, fuzzy
@@ -27342,10 +27338,6 @@ msgstr "ライト"
 #, fuzzy
 msgid "Light hit up to"
 msgstr "軽い被弾の上限"
-
-#: src/onboarding/pages/AppearancePage.tsx
-msgid "Light or dark is set by this distribution"
-msgstr "ライトかダークかはこの配布版で決められています"
 
 #: src/lego/scriptPlayback.ts
 #, fuzzy

@@ -112,16 +112,6 @@ export default function AppearancePage(_: WizardPageProps) {
 
   return (
     <div className="flex flex-col gap-4">
-      {modeLocked && (
-        <p className="text-sm text-muted-foreground">
-          {t`Light or dark is set by this distribution`}
-        </p>
-      )}
-      {coloursLocked && (
-        <p className="text-sm text-muted-foreground">
-          {t`Colours are set by this distribution`}
-        </p>
-      )}
       {!modeLocked && (
         <Row label={themeLabel}>
           <RadioGroup

@@ -15975,10 +15975,6 @@ msgstr "Колірна схема"
 msgid "Colour texture"
 msgstr "Кольорова текстура"
 
-#: src/onboarding/pages/AppearancePage.tsx
-msgid "Colours are set by this distribution"
-msgstr "Кольори задає ця дистрибуція"
-
 #: src/content/pages/components/MapAggregate.tsx
 #: src/content/pages/components/ReplayMap.tsx
 #, fuzzy
@@ -27342,10 +27338,6 @@ msgstr "Світла"
 #, fuzzy
 msgid "Light hit up to"
 msgstr "Легке влучання до"
-
-#: src/onboarding/pages/AppearancePage.tsx
-msgid "Light or dark is set by this distribution"
-msgstr "Світлу чи темну тему задає ця дистрибуція"
 
 #: src/lego/scriptPlayback.ts
 #, fuzzy

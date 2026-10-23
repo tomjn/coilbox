@@ -98,14 +98,11 @@ it("hides both colour rows when the profile sets the base", () => {
   expect(group("Accent color")).toBeNull();
 });
 
-it("says both are set when the profile forces the mode and the colours", () => {
+it("shows no rows and no note when the profile forces the mode and the colours", () => {
   profile = { mode: "dark", accent: "blue" };
   show();
-  expect(
-    screen.getByText("Light or dark is set by this distribution"),
-  ).toBeTruthy();
-  expect(screen.getByText("Colours are set by this distribution")).toBeTruthy();
   expect(screen.queryAllByRole("radiogroup")).toHaveLength(0);
+  expect(screen.queryByText(/set by this distribution/)).toBeNull();
 });
 
 const preview = () =>

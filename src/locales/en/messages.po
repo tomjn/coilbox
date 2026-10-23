@@ -12908,10 +12908,6 @@ msgstr "Colour scheme"
 msgid "Colour texture"
 msgstr "Colour texture"
 
-#: src/onboarding/pages/AppearancePage.tsx
-msgid "Colours are set by this distribution"
-msgstr "Colours are set by this distribution"
-
 #: src/content/pages/components/MapAggregate.tsx
 #: src/content/pages/components/ReplayMap.tsx
 msgid "Colours compare places on this map with each other, not with another picture."
@@ -22116,10 +22112,6 @@ msgstr "Light"
 #: src/lego/animPresets.ts
 msgid "Light hit up to"
 msgstr "Light hit up to"
-
-#: src/onboarding/pages/AppearancePage.tsx
-msgid "Light or dark is set by this distribution"
-msgstr "Light or dark is set by this distribution"
 
 #: src/lego/scriptPlayback.ts
 msgid "Lightly hit and destroyed"
