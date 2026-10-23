@@ -408,7 +408,8 @@ it("shows a failed download with its error and a retry control", async () => {
       onRetry={onRetry}
     />,
   );
-  expect(screen.getByText("no route")).toBeTruthy();
+  // One line, so long text truncates and the full text is its title.
+  expect(screen.getByText("no route").getAttribute("title")).toBe("no route");
   fireEvent.click(screen.getByRole("button", { name: "Retry Engine 1" }));
   expect(onRetry).toHaveBeenCalledWith("a");
 });
@@ -433,9 +434,11 @@ it("shows a problem with no queue item, and a retry only when it can retry", asy
       onRetry={onRetry}
     />,
   );
-  expect(
-    screen.getByText("No engine is available to download for this platform."),
-  ).toBeTruthy();
+  const line = screen.getByText(
+    "No engine is available to download for this platform.",
+  );
+  expect(line.getAttribute("title")).toBe(line.textContent);
+  expect(screen.getByText("Engine").getAttribute("title")).toBe("Engine");
   expect(screen.queryByRole("button", { name: "Retry Engine" })).toBeNull();
   expect(screen.getByText("no catalog")).toBeTruthy();
   fireEvent.click(screen.getByRole("button", { name: "Retry Game: SF" }));

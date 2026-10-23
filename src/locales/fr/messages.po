@@ -19319,7 +19319,6 @@ msgid "Download newest engine ({newestVersion})"
 msgstr "Télécharger le moteur le plus récent ({newestVersion})"
 
 #: src/downloads/pages/components/ProgressBar.tsx
-#: src/onboarding/DownloadsPill.tsx
 #, fuzzy
 msgid "Download progress"
 msgstr "Progression du téléchargement"

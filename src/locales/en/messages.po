@@ -15624,7 +15624,6 @@ msgid "Download newest engine ({newestVersion})"
 msgstr "Download newest engine ({newestVersion})"
 
 #: src/downloads/pages/components/ProgressBar.tsx
-#: src/onboarding/DownloadsPill.tsx
 msgid "Download progress"
 msgstr "Download progress"
 

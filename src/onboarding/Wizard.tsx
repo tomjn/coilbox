@@ -71,17 +71,7 @@ export function Wizard({
       bar and to every window edge. */}
       <div className="relative flex min-h-0 flex-1 flex-col">
         {page.art && <WizardArt key={id} art={page.art} />}
-        {/* The window's title and traffic lights are native, outside the
-        webview, so this top row is the nearest the pill gets to them. */}
-        <div className="relative flex justify-end px-4 pt-3">
-          <DownloadsPill
-            items={downloads}
-            problems={problems}
-            onCancel={onCancelDownload}
-            onRetry={onRetryDownload}
-          />
-        </div>
-        <div className="relative flex min-h-0 flex-1 flex-col px-10 pt-7">
+        <div className="relative flex min-h-0 flex-1 flex-col px-10 pt-10">
           <div className="mb-6 flex gap-1.5">
             {pages.map((stepId, i) => (
               <span
@@ -112,13 +102,25 @@ export function Wizard({
           </div>
         </div>
       </div>
-      <div className="flex items-center gap-2.5 border-t px-10 py-4">
+      <div
+        data-testid="wizard-footer"
+        className="flex items-center gap-2.5 border-t px-10 py-4"
+      >
         {!last && (
           <Button variant="ghost" onClick={skipSetup}>
             {t`Skip setup`}
           </Button>
         )}
-        <span className="flex-1" />
+        {/* Fills the gap between the buttons. Its lines are no taller than a
+        button, so the footer keeps its height. */}
+        <div className="flex min-w-0 flex-1 justify-center">
+          <DownloadsPill
+            items={downloads}
+            problems={problems}
+            onCancel={onCancelDownload}
+            onRetry={onRetryDownload}
+          />
+        </div>
         {!last && step > 0 && (
           <Button variant="outline" onClick={() => setStep(step - 1)}>
             {t`Back`}

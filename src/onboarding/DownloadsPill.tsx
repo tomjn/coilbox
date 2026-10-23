@@ -1,17 +1,18 @@
 import { useLingui } from "@lingui/react/macro";
 import { Button } from "@picoframe/frame";
 import { RotateCcw, X } from "lucide-react";
-import { Progress } from "@/components/ui/progress";
+import type { ReactNode } from "react";
 import type { QueueItem } from "@/downloads/DownloadQueueProvider";
 import type { BackgroundProblem } from "./useBackgroundDownloads";
 
 /**
- * The background downloads. The wizard puts it in its own row at the top
- * right, above the step bar. One entry each with its
- * percentage, a cancel control while it runs and the error with a retry control
- * when it fails. Finished and cancelled entries leave the pill. A download that
- * never reached the queue shows its problem, with a retry control when trying
- * again can help.
+ * The background downloads, one compact line each in the wizard's footer:
+ * the label, then the percentage or the error, and a cancel control while it
+ * runs or a retry control when it fails. A download that never reached the
+ * queue shows its problem, with a retry control when trying again can help.
+ * Finished and cancelled entries leave. The lines sit side by side so the
+ * footer keeps its height. Long text is cut short on screen, with the full
+ * text as its title.
  */
 export function DownloadsPill({
   items,
@@ -32,75 +33,97 @@ export function DownloadsPill({
   return (
     <div
       data-testid="downloads-pill"
-      className="flex w-64 flex-col gap-2 rounded-lg border bg-card p-2 text-xs"
+      className="flex min-w-0 items-center gap-2 overflow-hidden text-xs"
     >
       {shown.map((item) => {
         const percent = item.progress?.percent;
+        const failed = item.status === "error";
         return (
-          <div key={item.id} className="flex flex-col gap-1">
-            <div className="flex items-center gap-2">
-              <span className="min-w-0 flex-1 truncate">{item.label}</span>
-              {item.status !== "error" && percent != null && (
-                <span className="tabular-nums text-muted-foreground">
+          <Line key={item.id} label={item.label}>
+            {failed ? (
+              <Status text={item.error ?? ""} tone="text-destructive" />
+            ) : (
+              percent != null && (
+                <span className="shrink-0 tabular-nums text-muted-foreground">
                   {`${Math.round(percent)}%`}
                 </span>
-              )}
-              {item.status === "error" ? (
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  aria-label={t`Retry ${item.label}`}
-                  onClick={() => onRetry(item.id)}
-                >
-                  <RotateCcw />
-                </Button>
-              ) : (
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  aria-label={t`Cancel ${item.label}`}
-                  onClick={() => onCancel(item.id)}
-                >
-                  <X />
-                </Button>
-              )}
-            </div>
-            {item.status === "error" ? (
-              <p className="text-destructive">{item.error}</p>
-            ) : (
-              <Progress
-                value={percent == null ? undefined : Math.round(percent)}
-                className="h-1.5 bg-muted"
-                aria-label={t`Download progress`}
-              />
+              )
             )}
-          </div>
+            {failed ? (
+              <Control
+                label={t`Retry ${item.label}`}
+                onClick={() => onRetry(item.id)}
+              >
+                <RotateCcw />
+              </Control>
+            ) : (
+              <Control
+                label={t`Cancel ${item.label}`}
+                onClick={() => onCancel(item.id)}
+              >
+                <X />
+              </Control>
+            )}
+          </Line>
         );
       })}
       {problems.map((problem) => (
-        <div key={problem.id} className="flex flex-col gap-1">
-          <div className="flex items-center gap-2">
-            <span className="min-w-0 flex-1 truncate">{problem.label}</span>
-            {problem.retry && (
-              <Button
-                variant="ghost"
-                size="sm"
-                aria-label={t`Retry ${problem.label}`}
-                onClick={() => onRetry(problem.id)}
-              >
-                <RotateCcw />
-              </Button>
-            )}
-          </div>
-          <p
-            className={
-              problem.retry ? "text-destructive" : "text-muted-foreground"
-            }
-          >
-            {problem.message}
-          </p>
-        </div>
+        <Line key={problem.id} label={problem.label}>
+          <Status
+            text={problem.message}
+            tone={problem.retry ? "text-destructive" : "text-muted-foreground"}
+          />
+          {problem.retry && (
+            <Control
+              label={t`Retry ${problem.label}`}
+              onClick={() => onRetry(problem.id)}
+            >
+              <RotateCcw />
+            </Control>
+          )}
+        </Line>
       ))}
     </div>
+  );
+}
+
+function Line({ label, children }: { label: string; children: ReactNode }) {
+  return (
+    <div className="flex h-8 min-w-0 max-w-72 items-center gap-1.5 rounded-md border bg-card pr-1 pl-2.5">
+      <span title={label} className="min-w-0 shrink truncate">
+        {label}
+      </span>
+      {children}
+    </div>
+  );
+}
+
+function Status({ text, tone }: { text: string; tone: string }) {
+  return (
+    <span title={text} className={`min-w-0 flex-1 truncate ${tone}`}>
+      {text}
+    </span>
+  );
+}
+
+function Control({
+  label,
+  onClick,
+  children,
+}: {
+  label: string;
+  onClick(): void;
+  children: ReactNode;
+}) {
+  return (
+    <Button
+      variant="ghost"
+      size="icon"
+      className="size-6 shrink-0"
+      aria-label={label}
+      onClick={onClick}
+    >
+      {children}
+    </Button>
   );
 }

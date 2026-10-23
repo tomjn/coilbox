@@ -209,5 +209,7 @@ it("leaves an error that can be retried to the pill", () => {
     [{ id: "engine", label: "Engine", message: "offline", retry: true }],
   );
   expect(screen.queryByTestId("done-problem")).toBeNull();
-  expect(screen.getByText("offline")).toBeTruthy();
+  const pill = screen.getByTestId("downloads-pill");
+  expect(screen.getByTestId("wizard-footer").contains(pill)).toBe(true);
+  expect(pill.contains(screen.getByText("offline"))).toBe(true);
 });

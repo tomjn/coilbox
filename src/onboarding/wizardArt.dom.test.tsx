@@ -84,12 +84,21 @@ it("paints the Done picture in the same shell layer", () => {
   expect(screen.queryByTestId("page-art")).toBeNull();
 });
 
-it("keeps the downloads pill out of the step bar's row", () => {
+it("puts the downloads pill in the footer, clear of the step bar", () => {
   show([PROBLEM]);
   const pill = screen.getByTestId("downloads-pill");
+  expect(screen.getByTestId("wizard-footer").contains(pill)).toBe(true);
+  // Nothing sits above the step bar, so it is in the same place with or
+  // without a pill.
   const stepRow = screen.getAllByTestId("wizard-step")[0].parentElement;
-  expect(stepRow?.contains(pill)).toBe(false);
-  expect(pill.parentElement?.contains(stepRow ?? null)).toBe(false);
-  // Positioned over the page, it covered the end of the step bar.
-  expect(pill.className).not.toContain("absolute");
+  expect(stepRow?.previousElementSibling).toBeNull();
+  expect(stepRow?.parentElement?.previousElementSibling).toBeNull();
+});
+
+it("keeps the step bar's place the same without a pill", () => {
+  show();
+  expect(screen.queryByTestId("downloads-pill")).toBeNull();
+  const stepRow = screen.getAllByTestId("wizard-step")[0].parentElement;
+  expect(stepRow?.previousElementSibling).toBeNull();
+  expect(stepRow?.parentElement?.previousElementSibling).toBeNull();
 });
