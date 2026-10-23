@@ -48,11 +48,17 @@ export function addSettled(
   return [...new Set([...settled, ...ids])];
 }
 
+/**
+ * An install that had settings and no settled list predates onboarding, so it
+ * settles everything. A fresh install writes an empty list at once, because
+ * other settings are written before the plan settles anything, and closing the
+ * app in that gap would otherwise look like an existing install next time.
+ */
 export function seedExistingInstall(
   storage: { get(k: string): string | null; set(k: string, v: string): void },
   loadedKeyCount: number,
 ): void {
-  if (loadedKeyCount > 0 && storage.get(SETTLED_KEY) === null) {
-    storage.set(SETTLED_KEY, JSON.stringify([...PAGE_IDS, ...BACKGROUND_IDS]));
-  }
+  if (storage.get(SETTLED_KEY) !== null) return;
+  const ids = loadedKeyCount > 0 ? [...PAGE_IDS, ...BACKGROUND_IDS] : [];
+  storage.set(SETTLED_KEY, JSON.stringify(ids));
 }

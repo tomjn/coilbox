@@ -118,10 +118,30 @@ describe("seedExistingInstall", () => {
       ...BACKGROUND_IDS,
     ]);
   });
-  it("does not seed a fresh install", () => {
+  it("writes an empty list on a fresh install at once", () => {
     const { m, storage } = memoryStorage();
     seedExistingInstall(storage, 0);
-    expect(m.has(SETTLED_KEY)).toBe(false);
+    expect(m.get(SETTLED_KEY)).toBe("[]");
+  });
+  it("keeps a fresh install's empty list on the next launch", () => {
+    const { m, storage } = memoryStorage();
+    seedExistingInstall(storage, 0);
+    // Other code wrote settings before the app closed.
+    seedExistingInstall(storage, 4);
+    expect(m.get(SETTLED_KEY)).toBe("[]");
+  });
+  it("leaves every page unsettled when the list is empty", () => {
+    expect(
+      planRun({
+        settled: JSON.parse("[]"),
+        relevance: all(true),
+        rerun: false,
+      }),
+    ).toEqual({
+      status: "open",
+      pages: [...PAGE_IDS],
+      settleNow: [],
+    });
   });
   it("does not overwrite an existing list", () => {
     const { m, storage } = memoryStorage('["hub"]');
