@@ -4,6 +4,7 @@ import { Button, cn } from "@picoframe/frame";
 import { AlertCircle, CheckCircle2, Download, Loader2 } from "lucide-react";
 import { useMemo, useState } from "react";
 import { Link } from "react-router";
+import { Skeleton } from "@/components/ui/skeleton";
 import { errorText } from "@/lib/helpers";
 import type { WriteRoot } from "../../../downloads/config";
 import type { EnqueueInput } from "../../../downloads/DownloadQueueProvider";
@@ -22,7 +23,7 @@ import {
   type SuggestedGame,
   type SuggestedMap,
   useBrandingCatalog,
-  useBrandingImage,
+  useBrandingImageState,
   useGithubGameRepos,
 } from "../../branding";
 
@@ -280,7 +281,14 @@ function SuggestionCard({
 }) {
   const { t } = useLingui();
   const title = item.title;
-  const imageUrl = useBrandingImage(art, true);
+  const image = useBrandingImageState(art, true);
+  const imageUrl = image.src;
+  // The picture that finished loading, and the one that failed, so the art
+  // shows a loading state until its picture is drawn.
+  const [loaded, setLoaded] = useState<string | null>(null);
+  const [failed, setFailed] = useState<string | null>(null);
+  const drawable = imageUrl && imageUrl !== failed ? imageUrl : undefined;
+  const waiting = image.loading || (!!drawable && drawable !== loaded);
   const dl = useQueuedDownload();
   const active = dl.busy;
   const disabled = !writePath || active;
@@ -306,14 +314,19 @@ function SuggestionCard({
 
   return (
     <li className="flex flex-col overflow-hidden rounded-lg border border-border/50 bg-card">
-      <div className="aspect-video w-full overflow-hidden bg-muted">
-        {imageUrl && (
+      <div className="relative aspect-video w-full overflow-hidden bg-muted">
+        {drawable && (
           <img
-            src={imageUrl}
+            src={drawable}
             alt=""
             className="size-full object-cover"
             loading="lazy"
+            onLoad={() => setLoaded(drawable)}
+            onError={() => setFailed(drawable)}
           />
+        )}
+        {waiting && (
+          <Skeleton className="absolute inset-0 rounded-none bg-muted-foreground/15" />
         )}
       </div>
       <div className="flex flex-1 flex-col gap-2 p-3">
