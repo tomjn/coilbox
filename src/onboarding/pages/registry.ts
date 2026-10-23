@@ -2,6 +2,7 @@ import type { MessageDescriptor } from "@lingui/core";
 import { msg } from "@lingui/core/macro";
 import type { FC } from "react";
 import type { PageId } from "../ids";
+import AppearancePage from "./AppearancePage";
 import DonePage from "./DonePage";
 import LanguagePage from "./LanguagePage";
 
@@ -36,7 +37,7 @@ export const PAGE_COMPONENTS: Record<PageId, WizardPageEntry> = {
     title: msg`Choose your language`,
   },
   appearance: {
-    Component: Pending,
+    Component: AppearancePage,
     eyebrow: msg`Make it yours`,
     title: msg`Appearance`,
   },
