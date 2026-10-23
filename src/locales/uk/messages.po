@@ -42731,6 +42731,10 @@ msgstr "Висота огляду"
 msgid "Sight height (old name)"
 msgstr "Висота огляду (стара назва)"
 
+#: src/hub/pages/components/AccountControl.tsx
+msgid "Sign in"
+msgstr "Увійти"
+
 #: src/lobby-servers/pages/SettingsSection.tsx
 #, fuzzy
 msgid "Sign in again"

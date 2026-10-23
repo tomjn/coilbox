@@ -42731,6 +42731,10 @@ msgstr "Altura de visión"
 msgid "Sight height (old name)"
 msgstr "Altura de visión (nombre antiguo)"
 
+#: src/hub/pages/components/AccountControl.tsx
+msgid "Sign in"
+msgstr "Iniciar sesión"
+
 #: src/lobby-servers/pages/SettingsSection.tsx
 #, fuzzy
 msgid "Sign in again"

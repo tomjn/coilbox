@@ -28,10 +28,11 @@ const SIGNED_OUT: HubAccount = {
 };
 
 let state: HubAccount = SIGNED_OUT;
+let providers: string[] = ["discord", "github", "twitch"];
 
 vi.mock("../../account", () => ({
   useHubAccount: () => state,
-  useHubProviders: () => ["discord", "github", "twitch"],
+  useHubProviders: () => providers,
 }));
 
 const { AccountControl } = await import("./AccountControl");
@@ -105,17 +106,26 @@ describe("the hub header, when the check could not find out", () => {
   });
 });
 
-/** Issue #2979. Whatever the hub lists is offered, in its order, on both. */
-describe("signing in offers every provider the hub lists", () => {
+/** Issue #2979. More than one provider is one button opening a panel, so a
+ * provider the hub adds later does not widen the header. One provider is its
+ * own button, since a panel holding one choice is a wasted press. */
+describe("signing in", () => {
   for (const surface of [AccountControl, HeaderAccount]) {
-    it(`in ${surface.name}`, () => {
+    it(`offers one Sign in button for several providers in ${surface.name}`, () => {
       const html = markup(surface, {});
-      const discord = html.indexOf("Sign in with Discord");
-      const github = html.indexOf("Sign in with GitHub");
-      const twitch = html.indexOf("Sign in with Twitch");
-      expect(discord).toBeGreaterThan(-1);
-      expect(github).toBeGreaterThan(discord);
-      expect(twitch).toBeGreaterThan(github);
+      expect(html).toContain(">Sign in</button>");
+      expect(html).not.toContain("Sign in with");
+    });
+
+    it(`offers the only provider directly in ${surface.name}`, () => {
+      providers = ["github"];
+      try {
+        const html = markup(surface, {});
+        expect(html).toContain("Sign in with GitHub");
+        expect(html).not.toContain(">Sign in</button>");
+      } finally {
+        providers = ["discord", "github", "twitch"];
+      }
     });
   }
 });

@@ -66,8 +66,13 @@ function show() {
   );
 }
 
-const signInButton = (name = "Discord") =>
-  screen.findByRole("button", { name: `Sign in with ${name}` });
+/** A provider's button, behind the Sign in button that opens the panel. */
+async function signInButton(name = "Discord") {
+  const listed = screen.queryByRole("button", { name: `Sign in with ${name}` });
+  if (listed) return listed;
+  fireEvent.click(await screen.findByRole("button", { name: "Sign in" }));
+  return screen.findByRole("button", { name: `Sign in with ${name}` });
+}
 
 beforeEach(() => {
   forgetHubAccounts();
@@ -89,8 +94,9 @@ afterEach(() => {
 it("signs in with the provider whose button is pressed", async () => {
   hubSignIn.mockReturnValue(new Promise(() => {}));
   show();
-  await signInButton("Discord");
-  await signInButton("Twitch");
+  fireEvent.click(await screen.findByRole("button", { name: "Sign in" }));
+  await screen.findByRole("button", { name: "Sign in with Discord" });
+  await screen.findByRole("button", { name: "Sign in with Twitch" });
   fireEvent.click(await signInButton("GitHub"));
   expect(hubSignIn).toHaveBeenCalledTimes(1);
   expect(hubSignIn).toHaveBeenCalledWith({ hubUrl: HUB, provider: "github" });
@@ -169,7 +175,7 @@ it("holds the title and the buttons in one column", async () => {
     screen.getByRole("dialog", { name: "Sign in to the hub" }),
   ).toBeTruthy();
   expect(title.id).toBeTruthy();
-  await within(column).findByRole("button", { name: "Sign in with Discord" });
+  await within(column).findByRole("button", { name: "Sign in" });
   within(column).getByRole("button", { name: "Open the hub" });
 });
 

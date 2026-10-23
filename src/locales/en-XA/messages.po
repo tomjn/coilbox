@@ -34566,6 +34566,10 @@ msgstr ""
 msgid "Sight height (old name)"
 msgstr ""
 
+#: src/hub/pages/components/AccountControl.tsx
+msgid "Sign in"
+msgstr ""
+
 #: src/lobby-servers/pages/SettingsSection.tsx
 msgid "Sign in again"
 msgstr ""
