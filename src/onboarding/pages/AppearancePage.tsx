@@ -92,7 +92,7 @@ export default function AppearancePage(_: WizardPageProps) {
           {t`Light or dark is set by this distribution`}
         </p>
       )}
-      {coloursLocked && !modeLocked && (
+      {coloursLocked && (
         <p className="text-sm text-muted-foreground">
           {t`Colours are set by this distribution`}
         </p>
