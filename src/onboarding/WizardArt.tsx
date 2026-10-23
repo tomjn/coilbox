@@ -27,6 +27,14 @@ const SOFT_EDGES_STYLE: CSSProperties = {
   WebkitMaskComposite: "source-in",
 };
 
+/** The same bottom fade the drawings get from {@link SOFT_EDGES}. */
+const FOOT_FADE = "linear-gradient(to bottom, black 85%, transparent)";
+
+const FOOT_FADE_STYLE: CSSProperties = {
+  maskImage: FOOT_FADE,
+  WebkitMaskImage: FOOT_FADE,
+};
+
 /**
  * The picture behind the current page. The shell puts it first inside the
  * area above the footer, which is `relative`, and everything after it is
@@ -34,7 +42,14 @@ const SOFT_EDGES_STYLE: CSSProperties = {
  */
 export function WizardArt({ art }: { art: WizardArtSpec }) {
   return (
-    <div aria-hidden="true" data-testid="wizard-art" className={LAYER}>
+    <div
+      aria-hidden="true"
+      data-testid="wizard-art"
+      className={LAYER}
+      // A drawing fades its own edges. The setup picture fills the window, so
+      // only its foot meets anything, the footer, and fades the same way.
+      style={art === "setup" ? FOOT_FADE_STYLE : undefined}
+    >
       {art === "setup" ? <SetupArt /> : <Drawing toolId={art.drawing} />}
     </div>
   );

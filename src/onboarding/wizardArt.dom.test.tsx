@@ -79,6 +79,8 @@ it("paints the Done picture in the same shell layer", () => {
   fireEvent.click(screen.getByRole("button", { name: "Continue" }));
   expect(screen.getByRole("heading", { name: "You're ready" })).toBeTruthy();
   expect(layer()?.contains(screen.getByTestId("done-backdrop"))).toBe(true);
+  // Fades into the footer rather than stopping at its border.
+  expect(layer()?.style.maskImage).toContain("transparent");
   expect(screen.queryByTestId("page-art")).toBeNull();
 });
 
