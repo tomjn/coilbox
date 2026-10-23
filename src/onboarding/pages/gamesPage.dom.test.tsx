@@ -123,7 +123,7 @@ vi.mock("@/content/branding", async (original) => ({
   ...(await original<typeof import("@/content/branding")>()),
   useBrandingCatalog: () => [],
   useGithubGameRepos: () => [],
-  useBrandingImage: () => undefined,
+  useBrandingImageState: () => ({ src: undefined, loading: false }),
 }));
 
 let matcher: ((name: string) => boolean) | null = null;
