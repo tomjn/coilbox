@@ -14,7 +14,12 @@ import {
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { LANGUAGE_KEY } from "@/i18n/language";
-import { localeDisplayName, pickerLocales } from "@/i18n/locales";
+import {
+  LOCALES,
+  localeDisplayName,
+  PSEUDO_LOCALE,
+  pickerLocales,
+} from "@/i18n/locales";
 import { Wizard } from "../Wizard";
 
 let storage = memoryStorage();
@@ -54,13 +59,24 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
-it("offers one option per picker locale, named in its own language", () => {
+it("offers one option per locale, named in its own language", () => {
   show();
   const options = screen
     .getAllByRole("button")
     .filter((b) => b.hasAttribute("aria-pressed"));
-  expect(options).toHaveLength(pickerLocales().length);
-  for (const code of pickerLocales()) expect(option(code)).toBeTruthy();
+  expect(options).toHaveLength(LOCALES.length);
+  for (const code of LOCALES) expect(option(code)).toBeTruthy();
+});
+
+it("leaves out the pseudo-locale, which the Settings picker offers here", () => {
+  // Tests run as a dev build, where the Settings picker lists it.
+  expect(pickerLocales()).toContain(PSEUDO_LOCALE);
+  show();
+  expect(
+    screen.queryByRole("button", {
+      name: new RegExp(`^${localeDisplayName(PSEUDO_LOCALE)}`),
+    }),
+  ).toBeNull();
 });
 
 it("starts with the system locale selected", () => {

@@ -2,15 +2,12 @@ import { useLingui } from "@lingui/react/macro";
 import { Button, cn } from "@picoframe/frame";
 import { useEffect } from "react";
 import { useLanguageSetting, useResolvedLocale } from "@/i18n/language";
-import {
-  localeDisplayName,
-  pickerLocales,
-  resolveLocaleTag,
-} from "@/i18n/locales";
+import { LOCALES, localeDisplayName, resolveLocaleTag } from "@/i18n/locales";
 import type { WizardPageProps } from "./registry";
 
 /**
- * One button per locale. A pick is written straight away, so the app, and the
+ * One button per locale with a catalog. The pseudo-locale is a developer's
+ * check, so it stays in the Settings picker and never shows here. A pick is written straight away, so the app, and the
  * wizard's title with it, switches language at once. Until then the selection
  * is the locale the app already runs in, which is the system's, and Continue
  * writes it.
@@ -30,7 +27,7 @@ export default function LanguagePage({ beforeContinue }: WizardPageProps) {
 
   return (
     <div className="grid grid-cols-4 gap-2.5">
-      {pickerLocales().map((code) => (
+      {LOCALES.map((code) => (
         <Button
           key={code}
           variant="outline"
