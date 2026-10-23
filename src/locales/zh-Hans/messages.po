@@ -4703,6 +4703,7 @@ msgstr "{name}（已更改）"
 
 #: src/lobby-servers/AddAccountForm.tsx
 #: src/lobby-servers/PasswordRecoveryForm.tsx
+#: src/lobby-servers/RegisterForm.tsx
 #, fuzzy
 msgid "{name} (custom)"
 msgstr "{name}（自定义）"
@@ -9787,6 +9788,7 @@ msgstr "从其他项目添加"
 msgid "Add it anyway"
 msgstr "仍然添加"
 
+#: src/lobby-servers/AddAccountForm.tsx
 #: src/lobby-servers/pages/SettingsSection.tsx
 #, fuzzy
 msgid "Add login"
@@ -13777,6 +13779,7 @@ msgstr "不会伤害自己的单位"
 #: src/lego/pages/components/ScriptTab.tsx
 #: src/lobby-servers/AddAccountForm.tsx
 #: src/lobby-servers/PasswordRecoveryForm.tsx
+#: src/lobby-servers/RegisterForm.tsx
 #: src/mapconv/pages/CompilePage.tsx
 #: src/mapconv/pages/DecompilePage.tsx
 #: src/multiplayer/battle/BattleRoomHeader.tsx
@@ -15436,6 +15439,10 @@ msgstr "Coilbox 无法读取已安装的内容，因此尚未检查你是否已�
 #, fuzzy
 msgid "Coilbox could not read which process the relay is."
 msgstr "Coilbox 无法读取中继是哪个进程。"
+
+#: src/lobby-servers/AddAccountForm.tsx
+msgid "Coilbox could not save the password to your keychain, so the login was not added. {detail}"
+msgstr "Coilbox 无法将密码保存到你的钥匙串，因此未添加登录信息。{detail}"
 
 #: src/lobby-servers/pages/SettingsSection.tsx
 #, fuzzy
@@ -20100,6 +20107,7 @@ msgid "elmos"
 msgstr "elmo"
 
 #: src/lobby-servers/PasswordRecoveryForm.tsx
+#: src/lobby-servers/RegisterForm.tsx
 #: src/multiplayer/admin/BansSection.tsx
 #: src/multiplayer/admin/PlayerLookupSection.tsx
 #, fuzzy
@@ -20524,6 +20532,10 @@ msgstr "请输入命令 id。"
 #, fuzzy
 msgid "Enter a port."
 msgstr "请输入端口。"
+
+#: src/lobby-servers/AddAccountForm.tsx
+msgid "Enter a username."
+msgstr "请输入用户名。"
 
 #: src/hub/pages/components/HubAddressField.tsx
 #, fuzzy
@@ -33174,6 +33186,14 @@ msgstr "列表为空，所以场景声明的任何队伍都无法建造任何东
 msgid "Nothing is on the list, so this rule does nothing."
 msgstr "列表为空，所以此规则不起作用。"
 
+#: src/lobby-servers/AddAccountForm.tsx
+msgid "Nothing is saved until you add the login."
+msgstr "在你添加登录信息之前，不会保存任何内容。"
+
+#: src/lobby-servers/AddAccountForm.tsx
+msgid "Nothing is saved until you add the login. You can choose channels to join automatically once it is added."
+msgstr "在你添加登录信息之前，不会保存任何内容。添加后，你可以选择自动加入的频道。"
+
 #: src/lobby-servers/pages/SettingsSection.tsx
 #, fuzzy
 msgid "Nothing is saved until you add the server."
@@ -34520,6 +34540,10 @@ msgstr "可选。留空则使用游戏名称，之后可以修改。"
 msgid "Optional. Shown on the project's card, and to anybody you send it to."
 msgstr "可选。显示在项目卡片上，以及你发送给的任何人。"
 
+#: src/lobby-servers/RegisterForm.tsx
+msgid "Optional. Zero-K keeps it against your account and does not send a code."
+msgstr "可选。Zero-K 会将其保存在你的账号中，不会发送验证码。"
+
 #: src/content/pages/GameDetailPage.tsx
 #, fuzzy
 msgid "Options"
@@ -35073,6 +35097,8 @@ msgstr "乘员跟随部件"
 msgid "Passengers survive its death"
 msgstr "乘员在其被摧毁后存活"
 
+#: src/lobby-servers/AddAccountForm.tsx
+#: src/lobby-servers/RegisterForm.tsx
 #: src/uberstress/pages/components/SeedSqlForm.tsx
 #: src/uberstress/pages/RunPage.tsx
 #, fuzzy
@@ -36354,6 +36380,10 @@ msgstr "按 N 可改为将其放下（{words}），放在能放下的位置并�
 #, fuzzy
 msgid "Press on"
 msgstr "继续前进"
+
+#: src/lobby-servers/RegisterForm.tsx
+msgid "Press Register to create the account."
+msgstr "按“注册”以创建账号。"
 
 #: src/content/pages/components/KeyBindingEditor.tsx
 #, fuzzy
@@ -38047,6 +38077,7 @@ msgid "regex /{filterRegex}/i"
 msgstr "regex /{filterRegex}/i"
 
 #: src/lobby-servers/pages/SettingsSection.tsx
+#: src/lobby-servers/RegisterForm.tsx
 #: src/multiplayer/admin/ChannelsSection.tsx
 #: src/onboarding/pages/ServerPage.tsx
 #, fuzzy
@@ -38062,6 +38093,10 @@ msgstr "注册新账号"
 #, fuzzy
 msgid "Registered"
 msgstr "注册时间"
+
+#: src/lobby-servers/RegisterForm.tsx
+msgid "Registering…"
+msgstr "正在注册…"
 
 #: src/multiplayer/admin/ChannelsSection.tsx
 #, fuzzy
@@ -40131,6 +40166,10 @@ msgstr "使用 coilbox widget 在游戏中保存，引擎为 {engine}。"
 msgid "Saved in game with the coilbox widget."
 msgstr "使用 coilbox widget 在游戏中保存。"
 
+#: src/lobby-servers/AddAccountForm.tsx
+msgid "Saved in your keychain when you add the login."
+msgstr "添加登录信息时保存到你的钥匙串。"
+
 #: src/content/pages/components/KeymapsPanel.tsx
 #, fuzzy
 msgid "Saved keymaps"
@@ -41043,12 +41082,16 @@ msgstr "选择一次运行，查看其数据。"
 msgid "Select a run…"
 msgstr "选择一次运行…"
 
+#: src/lobby-servers/AddAccountForm.tsx
 #: src/lobby-servers/PasswordRecoveryForm.tsx
+#: src/lobby-servers/RegisterForm.tsx
 #, fuzzy
 msgid "Select a server"
 msgstr "选择服务器"
 
+#: src/lobby-servers/AddAccountForm.tsx
 #: src/lobby-servers/PasswordRecoveryForm.tsx
+#: src/lobby-servers/RegisterForm.tsx
 #, fuzzy
 msgid "Select a server."
 msgstr "请选择一个服务器。"
@@ -41399,7 +41442,9 @@ msgid "server"
 msgstr "服务器"
 
 #: src/content/pages/components/ReplayChat.tsx
+#: src/lobby-servers/AddAccountForm.tsx
 #: src/lobby-servers/PasswordRecoveryForm.tsx
+#: src/lobby-servers/RegisterForm.tsx
 #: src/multiplayer/admin/tools.tsx
 #, fuzzy
 msgid "Server"
@@ -43183,6 +43228,10 @@ msgstr "有些引擎会录制到自己的文件夹中，所以删除该引擎也
 #, fuzzy
 msgid "Some parts of this unit are not tracked."
 msgstr "此单位的部分零件未被追踪。"
+
+#: src/lobby-servers/RegisterForm.tsx
+msgid "Some servers email a verification code to confirm your account."
+msgstr "部分服务器会通过电子邮件发送验证码来确认你的账号。"
 
 #: src/sound/events.ts
 #, fuzzy
@@ -49580,6 +49629,10 @@ msgstr "此服务器不报告还有多少其他玩家在搜索，所以 coilbox 
 msgid "This server has direct messages and battle chat, but no channels."
 msgstr "此服务器有私信和对局聊天，但没有频道。"
 
+#: src/lobby-servers/AddAccountForm.tsx
+msgid "This server has no password. Add the login, then sign in with your browser."
+msgstr "此服务器没有密码。请添加登录信息，然后通过浏览器登录。"
+
 #: src/lobby-servers/pages/SettingsSection.tsx
 #, fuzzy
 msgid "This server has no password. Signing in opens its own page in your browser."
@@ -51944,7 +51997,9 @@ msgid "username"
 msgstr "用户名"
 
 #: src/account/pages/SettingsSection.tsx
+#: src/lobby-servers/AddAccountForm.tsx
 #: src/lobby-servers/PasswordRecoveryForm.tsx
+#: src/lobby-servers/RegisterForm.tsx
 #: src/multiplayer/admin/BansSection.tsx
 #: src/multiplayer/admin/ChannelsSection.tsx
 #: src/multiplayer/admin/PlayerLookupSection.tsx
@@ -54106,6 +54161,7 @@ msgstr "你"
 msgid "You already have a conquest on the hand-made map \"{mapTitle}\", and a map holds one conquest at a time. Abandon that conquest on the Conquest page, then import this code again."
 msgstr "你已在手工地图“{mapTitle}”上有一场征服，而一张地图同一时间只能有一场征服。请在征服页面放弃那场征服，然后重新导入此代码。"
 
+#: src/lobby-servers/AddAccountForm.tsx
 #: src/lobby-servers/pages/SettingsSection.tsx
 #, fuzzy
 msgid "You already have this login."

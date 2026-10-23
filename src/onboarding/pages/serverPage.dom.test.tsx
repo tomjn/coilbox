@@ -139,6 +139,11 @@ it("lists the profile's official server first on the Log in tab", () => {
   expect(screen.getByRole("button", { name: "Add login" })).toBeTruthy();
 });
 
+it("leaves out the drawer's explanatory paragraph", () => {
+  show();
+  expect(screen.queryByText(/Nothing is saved/)).toBeNull();
+});
+
 it("saves the login to the lobby accounts and moves on", async () => {
   show();
   type("Username", "Player");

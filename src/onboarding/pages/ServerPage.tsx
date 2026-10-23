@@ -80,6 +80,7 @@ export default function ServerPage({
           onAdd={addAccount}
           onCancel={skip}
           continueGuard={beforeContinue}
+          hideNotes
         />
       </TabsContent>
       <TabsContent value="register">

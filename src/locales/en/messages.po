@@ -3806,6 +3806,7 @@ msgstr "{name} (changed)"
 
 #: src/lobby-servers/AddAccountForm.tsx
 #: src/lobby-servers/PasswordRecoveryForm.tsx
+#: src/lobby-servers/RegisterForm.tsx
 msgid "{name} (custom)"
 msgstr "{name} (custom)"
 
@@ -7886,6 +7887,7 @@ msgstr "Add from another project"
 msgid "Add it anyway"
 msgstr "Add it anyway"
 
+#: src/lobby-servers/AddAccountForm.tsx
 #: src/lobby-servers/pages/SettingsSection.tsx
 msgid "Add login"
 msgstr "Add login"
@@ -11115,6 +11117,7 @@ msgstr "Can't damage its own unit"
 #: src/lego/pages/components/ScriptTab.tsx
 #: src/lobby-servers/AddAccountForm.tsx
 #: src/lobby-servers/PasswordRecoveryForm.tsx
+#: src/lobby-servers/RegisterForm.tsx
 #: src/mapconv/pages/CompilePage.tsx
 #: src/mapconv/pages/DecompilePage.tsx
 #: src/multiplayer/battle/BattleRoomHeader.tsx
@@ -12473,6 +12476,10 @@ msgstr "Coilbox could not read what is installed, so it has not checked whether 
 #: src/multiplayer/RelayIndicator.tsx
 msgid "Coilbox could not read which process the relay is."
 msgstr "Coilbox could not read which process the relay is."
+
+#: src/lobby-servers/AddAccountForm.tsx
+msgid "Coilbox could not save the password to your keychain, so the login was not added. {detail}"
+msgstr "Coilbox could not save the password to your keychain, so the login was not added. {detail}"
 
 #: src/lobby-servers/pages/SettingsSection.tsx
 msgid "Coilbox could not save the password to your keychain."
@@ -16260,6 +16267,7 @@ msgid "elmos"
 msgstr "elmos"
 
 #: src/lobby-servers/PasswordRecoveryForm.tsx
+#: src/lobby-servers/RegisterForm.tsx
 #: src/multiplayer/admin/BansSection.tsx
 #: src/multiplayer/admin/PlayerLookupSection.tsx
 msgid "Email"
@@ -16605,6 +16613,10 @@ msgstr "Enter a command id."
 #: src/direct/room.ts
 msgid "Enter a port."
 msgstr "Enter a port."
+
+#: src/lobby-servers/AddAccountForm.tsx
+msgid "Enter a username."
+msgstr "Enter a username."
 
 #: src/hub/pages/components/HubAddressField.tsx
 msgid "Enter a web address starting with http:// or https://, or clear the field."
@@ -26828,6 +26840,14 @@ msgstr "Nothing is on the list, so no team the scenario declares can build anyth
 msgid "Nothing is on the list, so this rule does nothing."
 msgstr "Nothing is on the list, so this rule does nothing."
 
+#: src/lobby-servers/AddAccountForm.tsx
+msgid "Nothing is saved until you add the login."
+msgstr "Nothing is saved until you add the login."
+
+#: src/lobby-servers/AddAccountForm.tsx
+msgid "Nothing is saved until you add the login. You can choose channels to join automatically once it is added."
+msgstr "Nothing is saved until you add the login. You can choose channels to join automatically once it is added."
+
 #: src/lobby-servers/pages/SettingsSection.tsx
 msgid "Nothing is saved until you add the server."
 msgstr "Nothing is saved until you add the server."
@@ -27913,6 +27933,10 @@ msgstr "Optional. Left empty it takes the game's name, and you can change it lat
 msgid "Optional. Shown on the project's card, and to anybody you send it to."
 msgstr "Optional. Shown on the project's card, and to anybody you send it to."
 
+#: src/lobby-servers/RegisterForm.tsx
+msgid "Optional. Zero-K keeps it against your account and does not send a code."
+msgstr "Optional. Zero-K keeps it against your account and does not send a code."
+
 #: src/content/pages/GameDetailPage.tsx
 msgid "Options"
 msgstr "Options"
@@ -28358,6 +28382,8 @@ msgstr "Passengers follow the piece"
 msgid "Passengers survive its death"
 msgstr "Passengers survive its death"
 
+#: src/lobby-servers/AddAccountForm.tsx
+#: src/lobby-servers/RegisterForm.tsx
 #: src/uberstress/pages/components/SeedSqlForm.tsx
 #: src/uberstress/pages/RunPage.tsx
 msgid "Password"
@@ -29396,6 +29422,10 @@ msgstr "Press N to put it down {words} instead, outlined, where it fits."
 #: src/runlite/generate.ts
 msgid "Press on"
 msgstr "Press on"
+
+#: src/lobby-servers/RegisterForm.tsx
+msgid "Press Register to create the account."
+msgstr "Press Register to create the account."
 
 #: src/content/pages/components/KeyBindingEditor.tsx
 msgid "Press the keys you want. Escape binds Escape, so use Cancel to back out."
@@ -30770,6 +30800,7 @@ msgid "regex /{filterRegex}/i"
 msgstr "regex /{filterRegex}/i"
 
 #: src/lobby-servers/pages/SettingsSection.tsx
+#: src/lobby-servers/RegisterForm.tsx
 #: src/multiplayer/admin/ChannelsSection.tsx
 #: src/onboarding/pages/ServerPage.tsx
 msgid "Register"
@@ -30782,6 +30813,10 @@ msgstr "Register a new account"
 #: src/multiplayer/admin/PlayerLookupSection.tsx
 msgid "Registered"
 msgstr "Registered"
+
+#: src/lobby-servers/RegisterForm.tsx
+msgid "Registering…"
+msgstr "Registering…"
 
 #: src/multiplayer/admin/ChannelsSection.tsx
 msgid "Registration and settings"
@@ -32458,6 +32493,10 @@ msgstr "Saved in game with the coilbox widget, on engine {engine}."
 msgid "Saved in game with the coilbox widget."
 msgstr "Saved in game with the coilbox widget."
 
+#: src/lobby-servers/AddAccountForm.tsx
+msgid "Saved in your keychain when you add the login."
+msgstr "Saved in your keychain when you add the login."
+
 #: src/content/pages/components/KeymapsPanel.tsx
 msgid "Saved keymaps"
 msgstr "Saved keymaps"
@@ -33197,11 +33236,15 @@ msgstr "Select a run to view its data."
 msgid "Select a run…"
 msgstr "Select a run…"
 
+#: src/lobby-servers/AddAccountForm.tsx
 #: src/lobby-servers/PasswordRecoveryForm.tsx
+#: src/lobby-servers/RegisterForm.tsx
 msgid "Select a server"
 msgstr "Select a server"
 
+#: src/lobby-servers/AddAccountForm.tsx
 #: src/lobby-servers/PasswordRecoveryForm.tsx
+#: src/lobby-servers/RegisterForm.tsx
 msgid "Select a server."
 msgstr "Select a server."
 
@@ -33485,7 +33528,9 @@ msgid "server"
 msgstr "server"
 
 #: src/content/pages/components/ReplayChat.tsx
+#: src/lobby-servers/AddAccountForm.tsx
 #: src/lobby-servers/PasswordRecoveryForm.tsx
+#: src/lobby-servers/RegisterForm.tsx
 #: src/multiplayer/admin/tools.tsx
 msgid "Server"
 msgstr "Server"
@@ -34928,6 +34973,10 @@ msgstr "Some engines record into their own folder, so deleting that engine delet
 #: src/lego/pages/components/ModuleUpdateBanner.tsx
 msgid "Some parts of this unit are not tracked."
 msgstr "Some parts of this unit are not tracked."
+
+#: src/lobby-servers/RegisterForm.tsx
+msgid "Some servers email a verification code to confirm your account."
+msgstr "Some servers email a verification code to confirm your account."
 
 #: src/sound/events.ts
 msgid "Someone says your name, or one of your highlight words, in chat or a private message."
@@ -40073,6 +40122,10 @@ msgstr "This server does not report how many other players are searching, so coi
 msgid "This server has direct messages and battle chat, but no channels."
 msgstr "This server has direct messages and battle chat, but no channels."
 
+#: src/lobby-servers/AddAccountForm.tsx
+msgid "This server has no password. Add the login, then sign in with your browser."
+msgstr "This server has no password. Add the login, then sign in with your browser."
+
 #: src/lobby-servers/pages/SettingsSection.tsx
 msgid "This server has no password. Signing in opens its own page in your browser."
 msgstr "This server has no password. Signing in opens its own page in your browser."
@@ -41986,7 +42039,9 @@ msgid "username"
 msgstr "username"
 
 #: src/account/pages/SettingsSection.tsx
+#: src/lobby-servers/AddAccountForm.tsx
 #: src/lobby-servers/PasswordRecoveryForm.tsx
+#: src/lobby-servers/RegisterForm.tsx
 #: src/multiplayer/admin/BansSection.tsx
 #: src/multiplayer/admin/ChannelsSection.tsx
 #: src/multiplayer/admin/PlayerLookupSection.tsx
@@ -43729,6 +43784,7 @@ msgstr "You"
 msgid "You already have a conquest on the hand-made map \"{mapTitle}\", and a map holds one conquest at a time. Abandon that conquest on the Conquest page, then import this code again."
 msgstr "You already have a conquest on the hand-made map \"{mapTitle}\", and a map holds one conquest at a time. Abandon that conquest on the Conquest page, then import this code again."
 
+#: src/lobby-servers/AddAccountForm.tsx
 #: src/lobby-servers/pages/SettingsSection.tsx
 msgid "You already have this login."
 msgstr "You already have this login."

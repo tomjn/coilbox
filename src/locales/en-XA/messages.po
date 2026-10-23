@@ -3805,6 +3805,7 @@ msgstr ""
 
 #: src/lobby-servers/AddAccountForm.tsx
 #: src/lobby-servers/PasswordRecoveryForm.tsx
+#: src/lobby-servers/RegisterForm.tsx
 msgid "{name} (custom)"
 msgstr ""
 
@@ -7885,6 +7886,7 @@ msgstr ""
 msgid "Add it anyway"
 msgstr ""
 
+#: src/lobby-servers/AddAccountForm.tsx
 #: src/lobby-servers/pages/SettingsSection.tsx
 msgid "Add login"
 msgstr ""
@@ -11114,6 +11116,7 @@ msgstr ""
 #: src/lego/pages/components/ScriptTab.tsx
 #: src/lobby-servers/AddAccountForm.tsx
 #: src/lobby-servers/PasswordRecoveryForm.tsx
+#: src/lobby-servers/RegisterForm.tsx
 #: src/mapconv/pages/CompilePage.tsx
 #: src/mapconv/pages/DecompilePage.tsx
 #: src/multiplayer/battle/BattleRoomHeader.tsx
@@ -12471,6 +12474,10 @@ msgstr ""
 
 #: src/multiplayer/RelayIndicator.tsx
 msgid "Coilbox could not read which process the relay is."
+msgstr ""
+
+#: src/lobby-servers/AddAccountForm.tsx
+msgid "Coilbox could not save the password to your keychain, so the login was not added. {detail}"
 msgstr ""
 
 #: src/lobby-servers/pages/SettingsSection.tsx
@@ -16259,6 +16266,7 @@ msgid "elmos"
 msgstr ""
 
 #: src/lobby-servers/PasswordRecoveryForm.tsx
+#: src/lobby-servers/RegisterForm.tsx
 #: src/multiplayer/admin/BansSection.tsx
 #: src/multiplayer/admin/PlayerLookupSection.tsx
 msgid "Email"
@@ -16603,6 +16611,10 @@ msgstr ""
 
 #: src/direct/room.ts
 msgid "Enter a port."
+msgstr ""
+
+#: src/lobby-servers/AddAccountForm.tsx
+msgid "Enter a username."
 msgstr ""
 
 #: src/hub/pages/components/HubAddressField.tsx
@@ -26827,6 +26839,14 @@ msgstr ""
 msgid "Nothing is on the list, so this rule does nothing."
 msgstr ""
 
+#: src/lobby-servers/AddAccountForm.tsx
+msgid "Nothing is saved until you add the login."
+msgstr ""
+
+#: src/lobby-servers/AddAccountForm.tsx
+msgid "Nothing is saved until you add the login. You can choose channels to join automatically once it is added."
+msgstr ""
+
 #: src/lobby-servers/pages/SettingsSection.tsx
 msgid "Nothing is saved until you add the server."
 msgstr ""
@@ -27912,6 +27932,10 @@ msgstr ""
 msgid "Optional. Shown on the project's card, and to anybody you send it to."
 msgstr ""
 
+#: src/lobby-servers/RegisterForm.tsx
+msgid "Optional. Zero-K keeps it against your account and does not send a code."
+msgstr ""
+
 #: src/content/pages/GameDetailPage.tsx
 msgid "Options"
 msgstr ""
@@ -28357,6 +28381,8 @@ msgstr ""
 msgid "Passengers survive its death"
 msgstr ""
 
+#: src/lobby-servers/AddAccountForm.tsx
+#: src/lobby-servers/RegisterForm.tsx
 #: src/uberstress/pages/components/SeedSqlForm.tsx
 #: src/uberstress/pages/RunPage.tsx
 msgid "Password"
@@ -29394,6 +29420,10 @@ msgstr ""
 
 #: src/runlite/generate.ts
 msgid "Press on"
+msgstr ""
+
+#: src/lobby-servers/RegisterForm.tsx
+msgid "Press Register to create the account."
 msgstr ""
 
 #: src/content/pages/components/KeyBindingEditor.tsx
@@ -30769,6 +30799,7 @@ msgid "regex /{filterRegex}/i"
 msgstr ""
 
 #: src/lobby-servers/pages/SettingsSection.tsx
+#: src/lobby-servers/RegisterForm.tsx
 #: src/multiplayer/admin/ChannelsSection.tsx
 #: src/onboarding/pages/ServerPage.tsx
 msgid "Register"
@@ -30780,6 +30811,10 @@ msgstr ""
 
 #: src/multiplayer/admin/PlayerLookupSection.tsx
 msgid "Registered"
+msgstr ""
+
+#: src/lobby-servers/RegisterForm.tsx
+msgid "Registering…"
 msgstr ""
 
 #: src/multiplayer/admin/ChannelsSection.tsx
@@ -32457,6 +32492,10 @@ msgstr ""
 msgid "Saved in game with the coilbox widget."
 msgstr ""
 
+#: src/lobby-servers/AddAccountForm.tsx
+msgid "Saved in your keychain when you add the login."
+msgstr ""
+
 #: src/content/pages/components/KeymapsPanel.tsx
 msgid "Saved keymaps"
 msgstr ""
@@ -33196,11 +33235,15 @@ msgstr ""
 msgid "Select a run…"
 msgstr ""
 
+#: src/lobby-servers/AddAccountForm.tsx
 #: src/lobby-servers/PasswordRecoveryForm.tsx
+#: src/lobby-servers/RegisterForm.tsx
 msgid "Select a server"
 msgstr ""
 
+#: src/lobby-servers/AddAccountForm.tsx
 #: src/lobby-servers/PasswordRecoveryForm.tsx
+#: src/lobby-servers/RegisterForm.tsx
 msgid "Select a server."
 msgstr ""
 
@@ -33484,7 +33527,9 @@ msgid "server"
 msgstr ""
 
 #: src/content/pages/components/ReplayChat.tsx
+#: src/lobby-servers/AddAccountForm.tsx
 #: src/lobby-servers/PasswordRecoveryForm.tsx
+#: src/lobby-servers/RegisterForm.tsx
 #: src/multiplayer/admin/tools.tsx
 msgid "Server"
 msgstr ""
@@ -34926,6 +34971,10 @@ msgstr ""
 
 #: src/lego/pages/components/ModuleUpdateBanner.tsx
 msgid "Some parts of this unit are not tracked."
+msgstr ""
+
+#: src/lobby-servers/RegisterForm.tsx
+msgid "Some servers email a verification code to confirm your account."
 msgstr ""
 
 #: src/sound/events.ts
@@ -40072,6 +40121,10 @@ msgstr ""
 msgid "This server has direct messages and battle chat, but no channels."
 msgstr ""
 
+#: src/lobby-servers/AddAccountForm.tsx
+msgid "This server has no password. Add the login, then sign in with your browser."
+msgstr ""
+
 #: src/lobby-servers/pages/SettingsSection.tsx
 msgid "This server has no password. Signing in opens its own page in your browser."
 msgstr ""
@@ -41985,7 +42038,9 @@ msgid "username"
 msgstr ""
 
 #: src/account/pages/SettingsSection.tsx
+#: src/lobby-servers/AddAccountForm.tsx
 #: src/lobby-servers/PasswordRecoveryForm.tsx
+#: src/lobby-servers/RegisterForm.tsx
 #: src/multiplayer/admin/BansSection.tsx
 #: src/multiplayer/admin/ChannelsSection.tsx
 #: src/multiplayer/admin/PlayerLookupSection.tsx
@@ -43728,6 +43783,7 @@ msgstr ""
 msgid "You already have a conquest on the hand-made map \"{mapTitle}\", and a map holds one conquest at a time. Abandon that conquest on the Conquest page, then import this code again."
 msgstr ""
 
+#: src/lobby-servers/AddAccountForm.tsx
 #: src/lobby-servers/pages/SettingsSection.tsx
 msgid "You already have this login."
 msgstr ""

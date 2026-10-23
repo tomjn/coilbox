@@ -210,6 +210,16 @@ describe("adding a login", () => {
     expect(storedAccounts()).toEqual([]);
   });
 
+  it("says nothing is saved until the login is added", () => {
+    show();
+    fireEvent.click(screen.getByRole("button", { name: "Add login" }));
+    expect(
+      drawer("New login").getByText(
+        /^Nothing is saved until you add the login\./,
+      ),
+    ).toBeTruthy();
+  });
+
   it("keeps Add disabled until there is a username", () => {
     show();
     fireEvent.click(screen.getByRole("button", { name: "Add login" }));

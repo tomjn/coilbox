@@ -4703,6 +4703,7 @@ msgstr "{name} (modifié)"
 
 #: src/lobby-servers/AddAccountForm.tsx
 #: src/lobby-servers/PasswordRecoveryForm.tsx
+#: src/lobby-servers/RegisterForm.tsx
 #, fuzzy
 msgid "{name} (custom)"
 msgstr "{name} (personnalisé)"
@@ -9787,6 +9788,7 @@ msgstr "Ajouter depuis un autre projet"
 msgid "Add it anyway"
 msgstr "L’ajouter quand même"
 
+#: src/lobby-servers/AddAccountForm.tsx
 #: src/lobby-servers/pages/SettingsSection.tsx
 #, fuzzy
 msgid "Add login"
@@ -13777,6 +13779,7 @@ msgstr "Ne peut pas endommager sa propre unité"
 #: src/lego/pages/components/ScriptTab.tsx
 #: src/lobby-servers/AddAccountForm.tsx
 #: src/lobby-servers/PasswordRecoveryForm.tsx
+#: src/lobby-servers/RegisterForm.tsx
 #: src/mapconv/pages/CompilePage.tsx
 #: src/mapconv/pages/DecompilePage.tsx
 #: src/multiplayer/battle/BattleRoomHeader.tsx
@@ -15436,6 +15439,10 @@ msgstr "Coilbox n’a pas pu lire ce qui est installé, il n’a donc pas vérif
 #, fuzzy
 msgid "Coilbox could not read which process the relay is."
 msgstr "Coilbox n’a pas pu identifier le processus du relais."
+
+#: src/lobby-servers/AddAccountForm.tsx
+msgid "Coilbox could not save the password to your keychain, so the login was not added. {detail}"
+msgstr "Coilbox n’a pas pu enregistrer le mot de passe dans votre trousseau, l’identifiant n’a donc pas été ajouté. {detail}"
 
 #: src/lobby-servers/pages/SettingsSection.tsx
 #, fuzzy
@@ -20100,6 +20107,7 @@ msgid "elmos"
 msgstr "elmos"
 
 #: src/lobby-servers/PasswordRecoveryForm.tsx
+#: src/lobby-servers/RegisterForm.tsx
 #: src/multiplayer/admin/BansSection.tsx
 #: src/multiplayer/admin/PlayerLookupSection.tsx
 #, fuzzy
@@ -20524,6 +20532,10 @@ msgstr "Saisissez un identifiant de commande."
 #, fuzzy
 msgid "Enter a port."
 msgstr "Saisissez un port."
+
+#: src/lobby-servers/AddAccountForm.tsx
+msgid "Enter a username."
+msgstr "Saisissez un nom d’utilisateur."
 
 #: src/hub/pages/components/HubAddressField.tsx
 #, fuzzy
@@ -33174,6 +33186,14 @@ msgstr "La liste est vide, donc aucune équipe déclarée par le scénario ne pe
 msgid "Nothing is on the list, so this rule does nothing."
 msgstr "La liste est vide, donc cette règle ne fait rien."
 
+#: src/lobby-servers/AddAccountForm.tsx
+msgid "Nothing is saved until you add the login."
+msgstr "Rien n’est enregistré tant que vous n’avez pas ajouté l’identifiant."
+
+#: src/lobby-servers/AddAccountForm.tsx
+msgid "Nothing is saved until you add the login. You can choose channels to join automatically once it is added."
+msgstr "Rien n’est enregistré tant que vous n’avez pas ajouté l’identifiant. Une fois ajouté, vous pourrez choisir des canaux à rejoindre automatiquement."
+
 #: src/lobby-servers/pages/SettingsSection.tsx
 #, fuzzy
 msgid "Nothing is saved until you add the server."
@@ -34520,6 +34540,10 @@ msgstr "Facultatif. Laissé vide, il prend le nom du jeu, et vous pourrez le cha
 msgid "Optional. Shown on the project's card, and to anybody you send it to."
 msgstr "Facultatif. Affiché sur la carte du projet, et à toute personne à qui vous l’envoyez."
 
+#: src/lobby-servers/RegisterForm.tsx
+msgid "Optional. Zero-K keeps it against your account and does not send a code."
+msgstr "Facultatif. Zero-K le conserve avec votre compte et n’envoie pas de code."
+
 #: src/content/pages/GameDetailPage.tsx
 #, fuzzy
 msgid "Options"
@@ -35073,6 +35097,8 @@ msgstr "Les passagers suivent la pièce"
 msgid "Passengers survive its death"
 msgstr "Les passagers survivent à sa destruction"
 
+#: src/lobby-servers/AddAccountForm.tsx
+#: src/lobby-servers/RegisterForm.tsx
 #: src/uberstress/pages/components/SeedSqlForm.tsx
 #: src/uberstress/pages/RunPage.tsx
 #, fuzzy
@@ -36354,6 +36380,10 @@ msgstr "Appuyez sur N pour le poser {words} à la place, en contour, là où il 
 #, fuzzy
 msgid "Press on"
 msgstr "Continuer"
+
+#: src/lobby-servers/RegisterForm.tsx
+msgid "Press Register to create the account."
+msgstr "Appuyez sur S’inscrire pour créer le compte."
 
 #: src/content/pages/components/KeyBindingEditor.tsx
 #, fuzzy
@@ -38047,6 +38077,7 @@ msgid "regex /{filterRegex}/i"
 msgstr "regex /{filterRegex}/i"
 
 #: src/lobby-servers/pages/SettingsSection.tsx
+#: src/lobby-servers/RegisterForm.tsx
 #: src/multiplayer/admin/ChannelsSection.tsx
 #: src/onboarding/pages/ServerPage.tsx
 #, fuzzy
@@ -38062,6 +38093,10 @@ msgstr "Créer un nouveau compte"
 #, fuzzy
 msgid "Registered"
 msgstr "Inscrit"
+
+#: src/lobby-servers/RegisterForm.tsx
+msgid "Registering…"
+msgstr "Inscription…"
 
 #: src/multiplayer/admin/ChannelsSection.tsx
 #, fuzzy
@@ -40131,6 +40166,10 @@ msgstr "Enregistré en jeu avec le widget coilbox, sur le moteur {engine}."
 msgid "Saved in game with the coilbox widget."
 msgstr "Enregistré en jeu avec le widget coilbox."
 
+#: src/lobby-servers/AddAccountForm.tsx
+msgid "Saved in your keychain when you add the login."
+msgstr "Enregistré dans votre trousseau lorsque vous ajoutez l’identifiant."
+
 #: src/content/pages/components/KeymapsPanel.tsx
 #, fuzzy
 msgid "Saved keymaps"
@@ -41043,12 +41082,16 @@ msgstr "Sélectionnez une exécution pour voir ses données."
 msgid "Select a run…"
 msgstr "Sélectionner une exécution…"
 
+#: src/lobby-servers/AddAccountForm.tsx
 #: src/lobby-servers/PasswordRecoveryForm.tsx
+#: src/lobby-servers/RegisterForm.tsx
 #, fuzzy
 msgid "Select a server"
 msgstr "Sélectionner un serveur"
 
+#: src/lobby-servers/AddAccountForm.tsx
 #: src/lobby-servers/PasswordRecoveryForm.tsx
+#: src/lobby-servers/RegisterForm.tsx
 #, fuzzy
 msgid "Select a server."
 msgstr "Sélectionnez un serveur."
@@ -41399,7 +41442,9 @@ msgid "server"
 msgstr "serveur"
 
 #: src/content/pages/components/ReplayChat.tsx
+#: src/lobby-servers/AddAccountForm.tsx
 #: src/lobby-servers/PasswordRecoveryForm.tsx
+#: src/lobby-servers/RegisterForm.tsx
 #: src/multiplayer/admin/tools.tsx
 #, fuzzy
 msgid "Server"
@@ -43183,6 +43228,10 @@ msgstr "Certains moteurs enregistrent dans leur propre dossier, donc supprimer c
 #, fuzzy
 msgid "Some parts of this unit are not tracked."
 msgstr "Certaines parties de cette unité ne sont pas suivies."
+
+#: src/lobby-servers/RegisterForm.tsx
+msgid "Some servers email a verification code to confirm your account."
+msgstr "Certains serveurs envoient un code de vérification par e-mail pour confirmer votre compte."
 
 #: src/sound/events.ts
 #, fuzzy
@@ -49580,6 +49629,10 @@ msgstr "Ce serveur n’indique pas combien d’autres joueurs cherchent, coilbox
 msgid "This server has direct messages and battle chat, but no channels."
 msgstr "Ce serveur a des messages privés et la discussion de partie, mais pas de canaux."
 
+#: src/lobby-servers/AddAccountForm.tsx
+msgid "This server has no password. Add the login, then sign in with your browser."
+msgstr "Ce serveur n’a pas de mot de passe. Ajoutez l’identifiant, puis connectez-vous avec votre navigateur."
+
 #: src/lobby-servers/pages/SettingsSection.tsx
 #, fuzzy
 msgid "This server has no password. Signing in opens its own page in your browser."
@@ -51944,7 +51997,9 @@ msgid "username"
 msgstr "nom d’utilisateur"
 
 #: src/account/pages/SettingsSection.tsx
+#: src/lobby-servers/AddAccountForm.tsx
 #: src/lobby-servers/PasswordRecoveryForm.tsx
+#: src/lobby-servers/RegisterForm.tsx
 #: src/multiplayer/admin/BansSection.tsx
 #: src/multiplayer/admin/ChannelsSection.tsx
 #: src/multiplayer/admin/PlayerLookupSection.tsx
@@ -54106,6 +54161,7 @@ msgstr "Vous"
 msgid "You already have a conquest on the hand-made map \"{mapTitle}\", and a map holds one conquest at a time. Abandon that conquest on the Conquest page, then import this code again."
 msgstr "Vous avez déjà une conquête sur la carte faite main « {mapTitle} », et une carte ne contient qu’une conquête à la fois. Abandonnez cette conquête sur la page Conquête, puis importez à nouveau ce code."
 
+#: src/lobby-servers/AddAccountForm.tsx
 #: src/lobby-servers/pages/SettingsSection.tsx
 #, fuzzy
 msgid "You already have this login."

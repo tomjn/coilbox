@@ -1,5 +1,5 @@
 import { t } from "@lingui/core/macro";
-import { Trans } from "@lingui/react/macro";
+import { Trans, useLingui } from "@lingui/react/macro";
 import { Button, Input } from "@picoframe/frame";
 import { Plus } from "lucide-react";
 import { type FormEvent, useEffect, useRef, useState } from "react";
@@ -83,6 +83,7 @@ export function AddAccountForm({
   onAdd,
   onCancel,
   continueGuard,
+  hideNotes = false,
 }: {
   draft: LobbyAccount;
   accounts: LobbyAccount[];
@@ -95,7 +96,10 @@ export function AddAccountForm({
    * cannot, and returns `false`, so only `onAdd` moves things on.
    */
   continueGuard?: { current: (() => boolean | undefined) | null };
+  /** Leaves out the explanatory paragraphs, for the setup wizard. */
+  hideNotes?: boolean;
 }) {
+  const { t } = useLingui();
   const [serverId, setServerId] = useState(draft.serverId);
   const [username, setUsername] = useState(draft.username);
   const [password, setPassword] = useState("");
@@ -120,8 +124,9 @@ export function AddAccountForm({
       } catch (err) {
         if (mounted.current) {
           setBusy(false);
+          const detail = describeError(err);
           setError(
-            `Coilbox could not save the password to your keychain, so the login was not added. ${describeError(err)}`,
+            t`Coilbox could not save the password to your keychain, so the login was not added. ${detail}`,
           );
         }
         return;
@@ -158,22 +163,24 @@ export function AddAccountForm({
   return (
     <form className="flex min-h-0 flex-1 flex-col" onSubmit={submit}>
       <div className="flex-1 space-y-3 overflow-y-auto p-4">
-        <p className="text-xs leading-snug text-muted-foreground">
-          Nothing is saved until you add the login.
-          {!tachyon &&
-            " You can choose channels to join automatically once it is added."}
-        </p>
-        <Field label="Server">
+        {!hideNotes && (
+          <p className="text-xs leading-snug text-muted-foreground">
+            {tachyon
+              ? t`Nothing is saved until you add the login.`
+              : t`Nothing is saved until you add the login. You can choose channels to join automatically once it is added.`}
+          </p>
+        )}
+        <Field label={t`Server`}>
           <OptionSelect
             value={serverId}
             onValueChange={setServerId}
             options={serverOptions(servers)}
-            placeholder="Select a server"
+            placeholder={t`Select a server`}
           />
         </Field>
         <Field
-          label="Username"
-          hint={taken ? "You already have this login." : undefined}
+          label={t`Username`}
+          hint={taken ? t`You already have this login.` : undefined}
         >
           <Input
             value={username}
@@ -182,14 +189,18 @@ export function AddAccountForm({
           />
         </Field>
         {tachyon ? (
-          <p className="text-xs leading-snug text-muted-foreground">
-            This server has no password. Add the login, then sign in with your
-            browser.
-          </p>
+          !hideNotes && (
+            <p className="text-xs leading-snug text-muted-foreground">
+              <Trans>
+                This server has no password. Add the login, then sign in with
+                your browser.
+              </Trans>
+            </p>
+          )
         ) : (
           <Field
-            label="Password"
-            hint="Saved in your keychain when you add the login."
+            label={t`Password`}
+            hint={t`Saved in your keychain when you add the login.`}
           >
             <Input
               type="password"
@@ -206,7 +217,7 @@ export function AddAccountForm({
         )}
       </div>
       <AddFooter
-        label="Add login"
+        label={t`Add login`}
         disabled={!ready || busy}
         onCancel={onCancel}
       />
