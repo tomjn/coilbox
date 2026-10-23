@@ -1,5 +1,5 @@
 import { useLingui } from "@lingui/react/macro";
-import { cn, type ThemeMode, useTheme } from "@picoframe/frame";
+import { Button, cn, type ThemeMode, useTheme } from "@picoframe/frame";
 import { type ReactNode, useId } from "react";
 import { Label } from "@/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
@@ -60,6 +60,31 @@ function Swatches<V extends string>({
         })}
       </RadioGroup>
     </Row>
+  );
+}
+
+/**
+ * A sample card in the app's own card, chip and button styles, so the picks
+ * show on real parts. It is decoration only, so it is inert and hidden from
+ * screen readers. The game name is a proper noun and is not translated.
+ */
+function Preview() {
+  const { t } = useLingui();
+  return (
+    <div
+      aria-hidden="true"
+      inert
+      className="pointer-events-none flex items-center gap-2.5 rounded-lg border border-border/60 bg-card p-3 text-sm"
+    >
+      <span className="rounded-full bg-primary px-2.5 py-0.5 text-xs text-primary-foreground">
+        {t`Ready`}
+      </span>
+      <span className="min-w-0 truncate">Splinter Faction</span>
+      <span className="flex-1" />
+      <Button size="sm" tabIndex={-1}>
+        {t`Play`}
+      </Button>
+    </div>
   );
 }
 
@@ -147,6 +172,7 @@ export default function AppearancePage(_: WizardPageProps) {
           />
         </>
       )}
+      {!(modeLocked && coloursLocked) && <Preview />}
     </div>
   );
 }

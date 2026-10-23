@@ -108,6 +108,43 @@ it("says both are set when the profile forces the mode and the colours", () => {
   expect(screen.queryAllByRole("radiogroup")).toHaveLength(0);
 });
 
+const preview = () =>
+  screen
+    .queryByText("Splinter Faction")
+    ?.closest<HTMLElement>("[aria-hidden='true']") ?? null;
+
+it("shows a preview card with the rows", () => {
+  show();
+  const card = preview();
+  if (!card) throw new Error("preview missing");
+  expect(within(card).getByText("Ready")).toBeTruthy();
+  expect(within(card).getByText("Play")).toBeTruthy();
+});
+
+it("keeps the preview out of the tab order and the accessibility tree", () => {
+  show();
+  const card = preview();
+  if (!card) throw new Error("preview missing");
+  expect(card.hasAttribute("inert")).toBe(true);
+  const focusable = card.querySelectorAll<HTMLElement>(
+    "a[href], button, input, select, textarea, [tabindex]",
+  );
+  for (const el of focusable) expect(el.tabIndex).toBe(-1);
+  expect(screen.queryByRole("button", { name: "Play" })).toBeNull();
+});
+
+it("shows the preview when only the mode row is shown", () => {
+  profile = { accent: "blue" };
+  show();
+  expect(preview()).toBeTruthy();
+});
+
+it("leaves the preview out when the profile sets the mode and the colours", () => {
+  profile = { mode: "dark", accent: "blue" };
+  show();
+  expect(screen.queryByText("Splinter Faction")).toBeNull();
+});
+
 it("applies an accent swatch straight away", () => {
   show();
   const teal = accentTeal();
