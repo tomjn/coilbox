@@ -24,6 +24,17 @@ import { usePreferredTarget } from "@/play/config";
 import { getGameMatcher, getProfile, isHubEnabled } from "@/profile/profile";
 import { decideGames, type WizardContext } from "./relevance";
 
+export type HubAnswer = WizardContext["hub"];
+
+/**
+ * Whether the player is signed in to the hub. It asks the backend, which reads
+ * the keychain, so it is only called when the profile has the hub on.
+ */
+export function useHubAnswer(): HubAnswer {
+  const hub = useHubAccount(useHubUrl());
+  return { loading: hub.loading, signedIn: hub.signedIn, unknown: hub.unknown };
+}
+
 const NOTHING_SCANNED: ScannedContent = { games: [], maps: [] };
 const NOTHING_ON_DISK = { games: new Set<string>(), maps: new Set<string>() };
 
@@ -36,13 +47,15 @@ const NOTHING_ON_DISK = { games: new Set<string>(), maps: new Set<string>() };
  * go: a scan that errored or was cancelled, no engine to scan, no content
  * folder to list. Otherwise the games decision would wait forever and so would
  * the wizard.
+ *
+ * `hub` comes from {@link useHubAnswer}, or answers as signed out when the
+ * profile has the hub off, so this never asks the hub itself.
  */
-export function useWizardContext(): {
+export function useWizardContext(hub: HubAnswer): {
   ctx: WizardContext;
   candidates: SuggestedGame[] | null;
 } {
   const profile = getProfile();
-  const hub = useHubAccount(useHubUrl());
   const [{ accounts }] = useLobbyAccounts();
 
   const catalogLoaded = useCatalogLoaded();
@@ -91,7 +104,7 @@ export function useWizardContext(): {
     profileMode: !!profile.mode,
     profileColours: !!(profile.accent || profile.base),
     hubEnabled: isHubEnabled(),
-    hub: { loading: hub.loading, signedIn: hub.signedIn, unknown: hub.unknown },
+    hub,
     lobbyAccountCount: accounts.length,
     games: decideGames({ candidates, hasGameFilter: matcher !== null }),
   };

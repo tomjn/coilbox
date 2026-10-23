@@ -32,8 +32,17 @@ const IRRELEVANT: WizardContext = {
 };
 
 let ctx: WizardContext = IRRELEVANT;
+const useWizardContext = vi.fn(() => ({ ctx, candidates: [] }));
+const useHubAnswer = vi.fn(() => ctx.hub);
 vi.mock("./useWizardContext", () => ({
-  useWizardContext: () => ({ ctx, candidates: [] }),
+  useWizardContext: () => useWizardContext(),
+  useHubAnswer: () => useHubAnswer(),
+}));
+
+let hubEnabled = true;
+vi.mock("@/profile/profile", async (original) => ({
+  ...(await original<typeof import("@/profile/profile")>()),
+  isHubEnabled: () => hubEnabled,
 }));
 
 // The background downloads have their own test. Here they would reach Tauri.
@@ -56,7 +65,7 @@ vi.mock("./usePickedDownloads", () => ({
 
 const { OnboardingProvider } = await import("./OnboardingProvider");
 const { requestOnboardingRerun } = await import("./rerun");
-const { SETTLED_KEY } = await import("./ids");
+const { BACKGROUND_IDS, PAGE_IDS, SETTLED_KEY } = await import("./ids");
 
 let storage = memoryStorage();
 
@@ -80,6 +89,9 @@ const click = (name: string) =>
 beforeEach(() => {
   storage = memoryStorage();
   ctx = IRRELEVANT;
+  hubEnabled = true;
+  useWizardContext.mockClear();
+  useHubAnswer.mockClear();
 });
 
 afterEach(() => {
@@ -279,4 +291,38 @@ it("opens again on a rerun request once everything is settled", () => {
     screen.getByRole("heading", { name: "Log in to a server" }),
   ).toBeTruthy();
   expect(screen.getAllByTestId("wizard-step")).toHaveLength(2);
+});
+
+it("never plans or asks the hub when every id is settled", () => {
+  storage.set(SETTLED_KEY, JSON.stringify([...PAGE_IDS, ...BACKGROUND_IDS]));
+  show();
+  expect(wizard()).toBeNull();
+  expect(useWizardContext).not.toHaveBeenCalled();
+  expect(useHubAnswer).not.toHaveBeenCalled();
+});
+
+it("does not ask the hub when the profile has it off", () => {
+  hubEnabled = false;
+  ctx = { ...IRRELEVANT, lobbyAccountCount: 0 };
+  show();
+  expect(wizard()).toBeTruthy();
+  expect(useWizardContext).toHaveBeenCalled();
+  expect(useHubAnswer).not.toHaveBeenCalled();
+});
+
+it("asks the hub while planning when the profile has it on", () => {
+  ctx = { ...IRRELEVANT, lobbyAccountCount: 0 };
+  show();
+  expect(useHubAnswer).toHaveBeenCalled();
+});
+
+it("stops reading the planning inputs once the plan is decided", () => {
+  ctx = { ...IRRELEVANT, languageStored: false, lobbyAccountCount: 0 };
+  show();
+  expect(wizard()).toBeTruthy();
+  const calls = useWizardContext.mock.calls.length;
+  click("Continue");
+  click("Skip");
+  expect(screen.getByRole("heading", { name: "You're ready" })).toBeTruthy();
+  expect(useWizardContext.mock.calls.length).toBe(calls);
 });

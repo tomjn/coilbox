@@ -56,6 +56,7 @@ const BASE: WizardContext = {
 let ctx: WizardContext = BASE;
 vi.mock("../useWizardContext", () => ({
   useWizardContext: () => ({ ctx, candidates: [] }),
+  useHubAnswer: () => ctx.hub,
 }));
 
 vi.mock("../useBackgroundDownloads", () => ({
