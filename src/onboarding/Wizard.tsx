@@ -71,7 +71,17 @@ export function Wizard({
       bar and to every window edge. */}
       <div className="relative flex min-h-0 flex-1 flex-col">
         {page.art && <WizardArt key={id} art={page.art} />}
-        <div className="relative flex min-h-0 flex-1 flex-col px-10 pt-10">
+        {/* The window's title and traffic lights are native, outside the
+        webview, so this top row is the nearest the pill gets to them. */}
+        <div className="relative flex justify-end px-4 pt-3">
+          <DownloadsPill
+            items={downloads}
+            problems={problems}
+            onCancel={onCancelDownload}
+            onRetry={onRetryDownload}
+          />
+        </div>
+        <div className="relative flex min-h-0 flex-1 flex-col px-10 pt-7">
           <div className="mb-6 flex gap-1.5">
             {pages.map((stepId, i) => (
               <span
@@ -102,13 +112,6 @@ export function Wizard({
           </div>
         </div>
       </div>
-      {/* After the area above, so it paints over the art. */}
-      <DownloadsPill
-        items={downloads}
-        problems={problems}
-        onCancel={onCancelDownload}
-        onRetry={onRetryDownload}
-      />
       <div className="flex items-center gap-2.5 border-t px-10 py-4">
         {!last && (
           <Button variant="ghost" onClick={skipSetup}>

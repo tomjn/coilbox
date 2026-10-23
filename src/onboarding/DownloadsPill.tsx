@@ -6,7 +6,8 @@ import type { QueueItem } from "@/downloads/DownloadQueueProvider";
 import type { BackgroundProblem } from "./useBackgroundDownloads";
 
 /**
- * The background downloads, top right of the wizard. One entry each with its
+ * The background downloads. The wizard puts it in its own row at the top
+ * right, above the step bar. One entry each with its
  * percentage, a cancel control while it runs and the error with a retry control
  * when it fails. Finished and cancelled entries leave the pill. A download that
  * never reached the queue shows its problem, with a retry control when trying
@@ -29,7 +30,10 @@ export function DownloadsPill({
   );
   if (shown.length === 0 && problems.length === 0) return null;
   return (
-    <div className="absolute top-3 right-4 flex w-64 flex-col gap-2 rounded-lg border bg-card p-2 text-xs">
+    <div
+      data-testid="downloads-pill"
+      className="flex w-64 flex-col gap-2 rounded-lg border bg-card p-2 text-xs"
+    >
       {shown.map((item) => {
         const percent = item.progress?.percent;
         return (

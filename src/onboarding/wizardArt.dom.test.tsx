@@ -13,6 +13,7 @@ import {
 } from "@picoframe/frame";
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, expect, it, vi } from "vitest";
+import type { BackgroundProblem } from "./useBackgroundDownloads";
 
 vi.mock("@/hub/auth", () => ({
   hubAccount: async () => ({ signedIn: false, account: null, problem: null }),
@@ -22,7 +23,14 @@ vi.mock("@/hub/auth", () => ({
 
 const { Wizard } = await import("./Wizard");
 
-function show() {
+const PROBLEM: BackgroundProblem = {
+  id: "engine",
+  label: "Engine",
+  message: "offline",
+  retry: true,
+};
+
+function show(problems: BackgroundProblem[] = []) {
   return render(
     <PersistentStoreProvider storage={memoryStorage()}>
       <ThemeProvider>
@@ -31,6 +39,7 @@ function show() {
           onSettle={() => {}}
           onClose={() => {}}
           downloads={[]}
+          problems={problems}
           onCancelDownload={() => {}}
           onRetryDownload={() => {}}
         />
@@ -71,4 +80,14 @@ it("paints the Done picture in the same shell layer", () => {
   expect(screen.getByRole("heading", { name: "You're ready" })).toBeTruthy();
   expect(layer()?.contains(screen.getByTestId("done-backdrop"))).toBe(true);
   expect(screen.queryByTestId("page-art")).toBeNull();
+});
+
+it("keeps the downloads pill out of the step bar's row", () => {
+  show([PROBLEM]);
+  const pill = screen.getByTestId("downloads-pill");
+  const stepRow = screen.getAllByTestId("wizard-step")[0].parentElement;
+  expect(stepRow?.contains(pill)).toBe(false);
+  expect(pill.parentElement?.contains(stepRow ?? null)).toBe(false);
+  // Positioned over the page, it covered the end of the step bar.
+  expect(pill.className).not.toContain("absolute");
 });
