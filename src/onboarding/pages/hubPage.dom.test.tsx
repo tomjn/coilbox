@@ -3,7 +3,8 @@
 /**
  * The hub page inside the real wizard shell. The Tauri commands under the hub
  * account store are stubbed, so `signInToHub` runs for real but never opens a
- * browser.
+ * browser. The profile names its own hub, and the external opener is stubbed,
+ * so a test can see which address Open the hub hands the browser.
  */
 
 import {
@@ -17,6 +18,7 @@ import {
   render,
   screen,
   waitFor,
+  within,
 } from "@testing-library/react";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { describeError } from "@/i18n/uiError";
@@ -27,6 +29,18 @@ vi.mock("@/hub/auth", () => ({
   hubAccount: (args: { hubUrl: string }) => hubAccount(args),
   hubSignIn: (args: { hubUrl: string }) => hubSignIn(args),
   hubSignOut: async () => {},
+}));
+
+const HUB = "https://hub.example";
+vi.mock("@/profile/profile", async (original) => ({
+  ...(await original<typeof import("@/profile/profile")>()),
+  getProfile: () => ({ version: 1, hubUrl: HUB }),
+}));
+
+const openExternal = vi.fn();
+vi.mock("@/home/navItem", async (original) => ({
+  ...(await original<typeof import("@/home/navItem")>()),
+  openExternal: (href: string) => openExternal(href),
 }));
 
 const { forgetHubAccounts } = await import("@/hub/account");
@@ -59,6 +73,7 @@ beforeEach(() => {
   hubAccount.mockReset();
   hubSignIn.mockReset();
   onSettle.mockReset();
+  openExternal.mockReset();
   hubAccount.mockResolvedValue({
     signedIn: false,
     account: null,
@@ -129,6 +144,36 @@ it("stays on the page when a sign in fails while already signed in", async () =>
   fireEvent.click(signInButton());
   const alert = await screen.findByRole("alert");
   expect(alert.textContent).toBe(describeError(error));
+  expect(onSettle).not.toHaveBeenCalled();
+  expect(screen.getByText("Sign in to the hub")).toBeTruthy();
+});
+
+it("paints the hub drawing behind the page", () => {
+  show();
+  const art = screen.getByTestId("page-art");
+  expect(art.getAttribute("data-art")).toBe("hub.browse");
+  expect(art.getAttribute("src")).toMatch(/^data:image\/svg\+xml,/);
+});
+
+it("holds the title and both buttons in one column", () => {
+  show();
+  const column = screen.getByTestId("hub-column");
+  const title = within(column).getByRole("heading", {
+    name: "Sign in to the hub",
+  });
+  expect(
+    screen.getByRole("dialog", { name: "Sign in to the hub" }),
+  ).toBeTruthy();
+  expect(title.id).toBeTruthy();
+  within(column).getByRole("button", { name: "Sign in with Discord" });
+  within(column).getByRole("button", { name: "Open the hub" });
+});
+
+it("opens the profile's hub in the browser without moving on", () => {
+  show();
+  fireEvent.click(screen.getByRole("button", { name: "Open the hub" }));
+  expect(openExternal).toHaveBeenCalledWith(HUB);
+  expect(hubSignIn).not.toHaveBeenCalled();
   expect(onSettle).not.toHaveBeenCalled();
   expect(screen.getByText("Sign in to the hub")).toBeTruthy();
 });

@@ -48,7 +48,7 @@ export const PAGE_COMPONENTS: Record<PageId, WizardPageEntry> = {
   },
   hub: {
     Component: HubPage,
-    title: msg`Sign in to the hub`,
+    ownHeading: true,
   },
   server: {
     Component: ServerPage,
