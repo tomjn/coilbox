@@ -7,6 +7,7 @@ import DonePage from "./DonePage";
 import GamesPage from "./GamesPage";
 import HubPage from "./HubPage";
 import LanguagePage from "./LanguagePage";
+import ServerPage from "./ServerPage";
 
 /**
  * What the shell hands a page. Both settle the current page and move on: a page
@@ -28,9 +29,6 @@ export interface WizardPageEntry {
   eyebrow: MessageDescriptor;
   title: MessageDescriptor;
 }
-
-/** Stands in for a page until its own task builds it. */
-const Pending: FC<WizardPageProps> = () => null;
 
 export const PAGE_COMPONENTS: Record<PageId, WizardPageEntry> = {
   language: {
@@ -54,7 +52,7 @@ export const PAGE_COMPONENTS: Record<PageId, WizardPageEntry> = {
     title: msg`Sign in to the hub`,
   },
   server: {
-    Component: Pending,
+    Component: ServerPage,
     eyebrow: msg`Multiplayer`,
     title: msg`Log in to a server`,
   },
