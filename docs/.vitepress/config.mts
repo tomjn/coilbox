@@ -240,6 +240,15 @@ export default defineConfig({
             },
           ],
         },
+        {
+          text: "Translation",
+          items: [
+            {
+              text: "Translate coilbox",
+              link: "/developers/translating-coilbox",
+            },
+          ],
+        },
       ],
       "/staff/": [
         {
