@@ -207,6 +207,81 @@ it("skips the page from Cancel on the Register tab", () => {
   expect(screen.getByText("You're ready")).toBeTruthy();
 });
 
+const pressContinue = () =>
+  fireEvent.click(screen.getByRole("button", { name: "Continue" }));
+
+it("saves a typed login when Continue is pressed and moves on", async () => {
+  show();
+  type("Username", "Player");
+  type(/^Password/, "secret");
+  pressContinue();
+  await waitFor(() => expect(onSettle).toHaveBeenCalledWith("server"));
+  expect(onSettle).toHaveBeenCalledTimes(1);
+  expect(lsStoreCredential).toHaveBeenCalledWith({
+    serverId: "profile-official",
+    username: "Player",
+    secret: "secret",
+  });
+  expect(storedAccounts().map((a) => a.username)).toStrictEqual([
+    "Before",
+    "Player",
+  ]);
+  expect(screen.getByText("You're ready")).toBeTruthy();
+});
+
+it("stays on the page when Continue cannot save the typed login", async () => {
+  const error = new Error("keychain locked");
+  lsStoreCredential.mockRejectedValueOnce(error);
+  show();
+  type("Username", "Player");
+  type(/^Password/, "secret");
+  pressContinue();
+  expect(
+    await screen.findByText(
+      `Coilbox could not save the password to your keychain, so the login was not added. ${describeError(error)}`,
+    ),
+  ).toBeTruthy();
+  expect(onSettle).not.toHaveBeenCalled();
+  expect(storedAccounts().map((a) => a.username)).toStrictEqual(["Before"]);
+});
+
+it("stays on the page when Continue finds a password and no username", () => {
+  show();
+  type(/^Password/, "secret");
+  pressContinue();
+  expect(screen.getByRole("alert").textContent).toBe("Enter a username.");
+  expect(onSettle).not.toHaveBeenCalled();
+  expect(lsStoreCredential).not.toHaveBeenCalled();
+});
+
+it("moves on from Continue with nothing typed", () => {
+  show();
+  pressContinue();
+  expect(onSettle).toHaveBeenCalledWith("server");
+  expect(lsStoreCredential).not.toHaveBeenCalled();
+  expect(storedAccounts().map((a) => a.username)).toStrictEqual(["Before"]);
+});
+
+it("stays on the Register tab when Continue is pressed with input typed", () => {
+  show();
+  openRegister();
+  type("Username", "Newcomer");
+  pressContinue();
+  expect(onSettle).not.toHaveBeenCalled();
+  expect(register).not.toHaveBeenCalled();
+  expect(screen.getByRole("alert").textContent).toBe(
+    "Press Register to create the account.",
+  );
+});
+
+it("moves on from an empty Register tab on Continue", () => {
+  show();
+  openRegister();
+  pressContinue();
+  expect(onSettle).toHaveBeenCalledWith("server");
+  expect(register).not.toHaveBeenCalled();
+});
+
 it("paints the lobby drawing behind the forms", () => {
   show();
   const art = screen.getByTestId("page-art");

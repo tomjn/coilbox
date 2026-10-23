@@ -19,7 +19,9 @@ export default function LanguagePage({ beforeContinue }: WizardPageProps) {
   const system = resolveLocaleTag(navigator.language);
 
   useEffect(() => {
-    beforeContinue.current = () => setLanguage(selected);
+    beforeContinue.current = () => {
+      setLanguage(selected);
+    };
     return () => {
       beforeContinue.current = null;
     };

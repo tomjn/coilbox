@@ -16,13 +16,17 @@ import ServerPage from "./ServerPage";
  *
  * `beforeContinue` is run by the footer's Continue button, and not by Skip, so
  * a page can save a choice the player accepted without changing it. A page sets
- * it in an effect and clears it in that effect's cleanup.
+ * it in an effect and clears it in that effect's cleanup. Returning `false`
+ * keeps the wizard on the page.
  */
 export interface WizardPageProps {
   next(): void;
   skip(): void;
-  beforeContinue: { current: (() => void) | null };
+  beforeContinue: { current: ContinueGuard | null };
 }
+
+/** Run before Continue moves on. `false` keeps the wizard on the page. */
+export type ContinueGuard = () => boolean | undefined;
 
 /**
  * What the shell paints behind a page: one of the bundled tool drawings by its

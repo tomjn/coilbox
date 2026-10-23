@@ -20,8 +20,15 @@ import type { WizardPageProps } from "./registry";
  * `allServers` already lists the profile's official server first. A
  * registration that finishes after the player has moved on does not move the
  * wizard a second time.
+ *
+ * Only the open tab's form is mounted, and it sets `beforeContinue`, so a login
+ * the player typed is saved on Continue rather than lost.
  */
-export default function ServerPage({ next, skip }: WizardPageProps) {
+export default function ServerPage({
+  next,
+  skip,
+  beforeContinue,
+}: WizardPageProps) {
   const [accountsCfg, setAccountsCfg] = useLobbyAccounts();
   const [customCfg] = useCustomServers();
   const servers = allServers(customCfg.servers);
@@ -72,6 +79,7 @@ export default function ServerPage({ next, skip }: WizardPageProps) {
           servers={servers}
           onAdd={addAccount}
           onCancel={skip}
+          continueGuard={beforeContinue}
         />
       </TabsContent>
       <TabsContent value="register">
@@ -79,6 +87,7 @@ export default function ServerPage({ next, skip }: WizardPageProps) {
           servers={servers}
           onSuccess={registered}
           onCancel={skip}
+          continueGuard={beforeContinue}
         />
       </TabsContent>
     </Tabs>

@@ -1,5 +1,6 @@
+import { t } from "@lingui/core/macro";
 import { Button, Input } from "@picoframe/frame";
-import { type FormEvent, useState } from "react";
+import { type FormEvent, useEffect, useState } from "react";
 import { Field } from "@/components/Field";
 import { OptionSelect } from "@/components/OptionSelect";
 import { describeError } from "@/i18n/uiError";
@@ -22,11 +23,18 @@ export function RegisterForm({
   defaultServerId,
   onSuccess,
   onCancel,
+  continueGuard,
 }: {
   servers: LobbyServer[];
   defaultServerId?: string;
   onSuccess: () => void;
   onCancel: () => void;
+  /**
+   * Set by the form for a Continue button outside it. It returns `true` with
+   * nothing typed. Otherwise it asks for Register and returns `false`, because
+   * creating an account is something the player presses for.
+   */
+  continueGuard?: { current: (() => boolean | undefined) | null };
 }) {
   const { register, busyKeys } = useMultiplayer();
   const [accountsCfg, setAccountsCfg] = useLobbyAccounts();
@@ -57,6 +65,19 @@ export function RegisterForm({
     password !== "" &&
     !submitting &&
     !isBusy;
+
+  useEffect(() => {
+    if (!continueGuard) return;
+    continueGuard.current = () => {
+      if (username.trim() === "" && password === "" && email.trim() === "")
+        return true;
+      setError(t`Press Register to create the account.`);
+      return false;
+    };
+    return () => {
+      continueGuard.current = null;
+    };
+  });
 
   const submit = async (e: FormEvent) => {
     e.preventDefault();
@@ -145,7 +166,11 @@ export function RegisterForm({
           {...identifierFieldProps}
         />
       </Field>
-      {error && <p className="text-xs text-destructive">{error}</p>}
+      {error && (
+        <p role="alert" className="text-xs text-destructive">
+          {error}
+        </p>
+      )}
       <div className="flex justify-end gap-2">
         <Button
           type="button"

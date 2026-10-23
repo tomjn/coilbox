@@ -82,12 +82,19 @@ export function AddAccountForm({
   servers,
   onAdd,
   onCancel,
+  continueGuard,
 }: {
   draft: LobbyAccount;
   accounts: LobbyAccount[];
   servers: LobbyServer[];
   onAdd: (a: LobbyAccount) => void;
   onCancel: () => void;
+  /**
+   * Set by the form for a Continue button outside it. With nothing typed it
+   * returns `true`. Otherwise it starts the same save as Add, or shows why it
+   * cannot, and returns `false`, so only `onAdd` moves things on.
+   */
+  continueGuard?: { current: (() => boolean | undefined) | null };
 }) {
   const [serverId, setServerId] = useState(draft.serverId);
   const [username, setUsername] = useState(draft.username);
@@ -102,8 +109,7 @@ export function AddAccountForm({
   const taken = identity.username !== "" && loginTaken(accounts, identity);
   const ready = server != null && identity.username !== "" && !taken;
 
-  const submit = async (e: FormEvent) => {
-    e.preventDefault();
+  const save = async () => {
     if (!ready || busy) return;
     const secret = tachyon ? "" : password;
     setBusy(true);
@@ -128,6 +134,26 @@ export function AddAccountForm({
     }
     onAdd({ ...draft, ...identity, hasSecret: secret !== "" });
   };
+  const submit = (e: FormEvent) => {
+    e.preventDefault();
+    void save();
+  };
+
+  // Rebuilt every render so it reads the current draft.
+  useEffect(() => {
+    if (!continueGuard) return;
+    continueGuard.current = () => {
+      const typed = identity.username !== "" || (!tachyon && password !== "");
+      if (!typed) return true;
+      if (server == null) setError(t`Select a server.`);
+      else if (identity.username === "") setError(t`Enter a username.`);
+      else void save();
+      return false;
+    };
+    return () => {
+      continueGuard.current = null;
+    };
+  });
 
   return (
     <form className="flex min-h-0 flex-1 flex-col" onSubmit={submit}>

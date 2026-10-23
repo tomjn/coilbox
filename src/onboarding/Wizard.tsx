@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import type { QueueItem } from "@/downloads/DownloadQueueProvider";
 import { DownloadsPill } from "./DownloadsPill";
 import { type PageId, WIZARD_TITLE_ID } from "./ids";
-import { PAGE_COMPONENTS } from "./pages/registry";
+import { type ContinueGuard, PAGE_COMPONENTS } from "./pages/registry";
 import type { BackgroundProblem } from "./useBackgroundDownloads";
 import { WizardArt } from "./WizardArt";
 
@@ -42,9 +42,9 @@ export function Wizard({
     if (last) onClose();
     else setStep(step + 1);
   };
-  const beforeContinue = useRef<(() => void) | null>(null);
+  const beforeContinue = useRef<ContinueGuard | null>(null);
   const continueOn = () => {
-    beforeContinue.current?.();
+    if (beforeContinue.current?.() === false) return;
     advance();
   };
   const skipSetup = () => {
