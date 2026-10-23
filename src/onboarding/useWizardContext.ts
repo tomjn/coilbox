@@ -29,8 +29,8 @@ const NOTHING_ON_DISK = { games: new Set<string>(), maps: new Set<string>() };
 
 /**
  * What the wizard's relevance rules read, live. The get-started offer's inputs
- * (`useCollectGetStartedOffer`) without its setup gate, because the wizard runs
- * before there is an engine.
+ * (see `src/content/getStartedOffer.ts`) without its setup gate, because the
+ * wizard runs before there is an engine.
  *
  * Every input that can fail answers as empty once it has gone as far as it will
  * go: a scan that errored or was cancelled, no engine to scan, no content
