@@ -145,8 +145,11 @@ export async function recheckHubAccount(hubUrl: string) {
  * not kept, most often a keychain that did not answer inside its deadline
  * (issue #1469). That is `problem` beside `signedIn`, not instead of it, because
  * this session can publish and only the next run is in doubt.
+ *
+ * Resolves to the failure's message, or null when this attempt signed in, so a
+ * caller can tell its own attempt apart from what the store held before.
  */
-export async function signInToHub(hubUrl: string) {
+export async function signInToHub(hubUrl: string): Promise<string | null> {
   update(hubUrl, { busy: true, problem: null });
   try {
     const { account, problem } = await hubSignIn({ hubUrl });
@@ -157,8 +160,11 @@ export async function signInToHub(hubUrl: string) {
       loading: false,
       problem: problem ?? null,
     });
+    return null;
   } catch (e) {
-    update(hubUrl, { problem: describeError(e) });
+    const failure = describeError(e);
+    update(hubUrl, { problem: failure });
+    return failure;
   } finally {
     update(hubUrl, { busy: false });
   }
@@ -207,7 +213,9 @@ export function useHubAccount(hubUrl: string): HubAccount {
 
   const recheck = useCallback(() => recheckHubAccount(hubUrl), [hubUrl]);
 
-  const signIn = useCallback(() => signInToHub(hubUrl), [hubUrl]);
+  const signIn = useCallback(async () => {
+    await signInToHub(hubUrl);
+  }, [hubUrl]);
   const signOut = useCallback(() => signOutOfHub(hubUrl), [hubUrl]);
 
   return { ...state, signIn, signOut, recheck };

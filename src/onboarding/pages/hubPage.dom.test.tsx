@@ -108,3 +108,28 @@ it("shows a failed sign in and stays on the page", async () => {
   fireEvent.click(screen.getByRole("button", { name: "Skip" }));
   expect(onSettle).toHaveBeenCalledWith("hub");
 });
+
+it("does not show a problem from the account check on open", async () => {
+  hubAccount.mockRejectedValue(new Error("The keychain did not answer"));
+  show();
+  await waitFor(() => expect(hubAccount).toHaveBeenCalled());
+  await Promise.resolve();
+  expect(screen.queryByRole("alert")).toBeNull();
+});
+
+it("stays on the page when a sign in fails while already signed in", async () => {
+  hubAccount.mockResolvedValue({
+    signedIn: true,
+    account: { id: "1", name: "Someone", avatarUrl: null },
+    problem: null,
+  });
+  const error = new Error("The sign in was cancelled in the browser");
+  hubSignIn.mockRejectedValue(error);
+  show();
+  await waitFor(() => expect(hubAccount).toHaveBeenCalled());
+  fireEvent.click(signInButton());
+  const alert = await screen.findByRole("alert");
+  expect(alert.textContent).toBe(describeError(error));
+  expect(onSettle).not.toHaveBeenCalled();
+  expect(screen.getByText("Sign in to the hub")).toBeTruthy();
+});

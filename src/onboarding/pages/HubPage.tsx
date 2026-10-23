@@ -1,19 +1,21 @@
 import { Trans } from "@lingui/react/macro";
-import { useEffect, useRef } from "react";
-import { hubAccountSnapshot, useHubAccount } from "@/hub/account";
+import { useEffect, useRef, useState } from "react";
+import { signInToHub, useHubAccount } from "@/hub/account";
 import { useHubUrl } from "@/hub/config";
 import { SignInButton } from "@/hub/pages/components/AccountControl";
 import type { WizardPageProps } from "./registry";
 
 /**
- * What the hub is for, and the same sign in button the hub screen uses. The
- * store catches a failed sign in into `problem`, so success is read back from
- * it. A sign in that finishes after the player has moved on does not move the
- * wizard a second time.
+ * What the hub is for, and the same sign in button the hub screen uses. Only
+ * this page's own attempt decides what happens, because the shared store can
+ * already hold a failed account check or an earlier sign in. A sign in that
+ * finishes after the player has moved on does not move the wizard a second
+ * time.
  */
 export default function HubPage({ next }: WizardPageProps) {
   const hubUrl = useHubUrl();
-  const { busy, problem, signIn } = useHubAccount(hubUrl);
+  const { busy } = useHubAccount(hubUrl);
+  const [failure, setFailure] = useState<string | null>(null);
   const shown = useRef(true);
 
   useEffect(() => {
@@ -24,8 +26,11 @@ export default function HubPage({ next }: WizardPageProps) {
   }, []);
 
   const signInThenNext = async () => {
-    await signIn();
-    if (shown.current && hubAccountSnapshot(hubUrl).signedIn) next();
+    setFailure(null);
+    const failed = await signInToHub(hubUrl);
+    if (!shown.current) return;
+    if (failed) setFailure(failed);
+    else next();
   };
 
   return (
@@ -52,9 +57,9 @@ export default function HubPage({ next }: WizardPageProps) {
           <Trans>Finish signing in the browser window that opened.</Trans>
         </p>
       )}
-      {problem && (
+      {failure && (
         <p role="alert" className="text-sm text-destructive">
-          {problem}
+          {failure}
         </p>
       )}
     </div>
