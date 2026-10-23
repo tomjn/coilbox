@@ -127,10 +127,15 @@ vi.mock("@/content/branding", async (original) => ({
 }));
 
 let matcher: ((name: string) => boolean) | null = null;
-vi.mock("@/profile/profile", async (original) => ({
-  ...(await original<typeof import("@/profile/profile")>()),
-  getGameMatcher: () => matcher,
-}));
+let profileTitle: string | undefined;
+vi.mock("@/profile/profile", async (original) => {
+  const real = await original<typeof import("@/profile/profile")>();
+  return {
+    ...real,
+    getGameMatcher: () => matcher,
+    getProfile: () => ({ ...real.getProfile(), title: profileTitle }),
+  };
+});
 
 const { OnboardingProvider } = await import("../OnboardingProvider");
 
@@ -160,6 +165,7 @@ beforeEach(() => {
   writeRoot = { path: "/data", loading: false };
   enqueue.mockClear();
   matcher = () => true;
+  profileTitle = undefined;
 });
 
 afterEach(() => {
@@ -267,4 +273,16 @@ it("centres the cards", () => {
   show();
   const list = within(screen.getByRole("dialog")).getByRole("list");
   expect(list.className).toContain("justify-center");
+});
+
+it("names the distribution in the featured games line", () => {
+  matcher = null;
+  profileTitle = "Splinterbox";
+  show();
+  expect(
+    screen.getByText(
+      "Splinterbox runs other games too. Find them in Games after setup.",
+    ),
+  ).toBeTruthy();
+  expect(screen.queryByText(FEATURED_LINE)).toBeNull();
 });

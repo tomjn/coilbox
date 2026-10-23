@@ -2,7 +2,7 @@ import { useLingui } from "@lingui/react/macro";
 import { cn } from "@picoframe/frame";
 import { SuggestionsList } from "@/content/pages/components/SuggestionsList";
 import { useWriteRoot } from "@/downloads/config";
-import { getGameMatcher } from "@/profile/profile";
+import { getGameMatcher, getProfile } from "@/profile/profile";
 import { WIZARD_TITLE_ID } from "../ids";
 import { useTrackWizardDownload, useWizardGames } from "../wizardContexts";
 
@@ -24,6 +24,8 @@ export default function GamesPage() {
   const gamesRoot = useWriteRoot("games");
   const track = useTrackWizardDownload();
   const featured = getGameMatcher() === null;
+  // The app's name as the window title gives it, in src/main.tsx.
+  const app = getProfile().title ?? t`Coilbox`;
 
   return (
     <>
@@ -38,7 +40,7 @@ export default function GamesPage() {
       </h2>
       {featured && (
         <p className="mb-5 text-sm text-muted-foreground">
-          {t`Coilbox runs other games too. Find them in Games after setup.`}
+          {t`${app} runs other games too. Find them in Games after setup.`}
         </p>
       )}
       <SuggestionsList
