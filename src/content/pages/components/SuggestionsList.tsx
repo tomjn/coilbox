@@ -38,7 +38,13 @@ interface SuggestionsListProps {
   writeRoot: WriteRoot;
   /** Called after a successful download (page rescans; card re-checks). */
   onComplete?: () => void;
-  heading?: string;
+  /** Called with each request as it goes on the queue. */
+  onQueued?: (request: EnqueueInput) => void;
+  /** Defaults to "Get started" wording. `null` draws no heading. */
+  heading?: string | null;
+  /** When there is no download folder, link to the setting that sets one.
+   * Defaults to true. False says the same in plain text. */
+  folderLink?: boolean;
 }
 
 /**
@@ -133,7 +139,9 @@ export function SuggestionsList({
   items,
   writeRoot,
   onComplete,
+  onQueued,
   heading,
+  folderLink = true,
 }: SuggestionsListProps) {
   const { t } = useLingui();
   const writePath = writeRoot.path;
@@ -168,28 +176,36 @@ export function SuggestionsList({
 
   return (
     <section className="flex flex-col gap-3">
-      <div className="space-y-1">
-        <h2 className="text-sm font-semibold">
-          {heading ??
-            (kind === "game"
-              ? t`Get started — download a game`
-              : t`Get started — download a map`)}
-        </h2>
-        {noWriteRoot && (
-          <p className="text-xs text-muted-foreground">
-            <Trans>
-              Set a download folder in{" "}
-              <Link
-                className="underline underline-offset-4"
-                to="/settings/content-folders"
-              >
-                Content folders settings
-              </Link>{" "}
-              to enable downloads.
-            </Trans>
-          </p>
-        )}
-      </div>
+      {(heading !== null || noWriteRoot) && (
+        <div className="space-y-1">
+          {heading !== null && (
+            <h2 className="text-sm font-semibold">
+              {heading ??
+                (kind === "game"
+                  ? t`Get started — download a game`
+                  : t`Get started — download a map`)}
+            </h2>
+          )}
+          {noWriteRoot && (
+            <p className="text-xs text-muted-foreground">
+              {folderLink ? (
+                <Trans>
+                  Set a download folder in{" "}
+                  <Link
+                    className="underline underline-offset-4"
+                    to="/settings/content-folders"
+                  >
+                    Content folders settings
+                  </Link>{" "}
+                  to enable downloads.
+                </Trans>
+              ) : (
+                t`Set a download folder in Content folders settings to enable downloads.`
+              )}
+            </p>
+          )}
+        </div>
+      )}
 
       {/* auto-fill, not auto-fit: a suggestion card stays game-card sized even
           when only one or two are shown on a wide window (issue #529). auto-fit
@@ -208,6 +224,7 @@ export function SuggestionsList({
                 : (item as SuggestedMap).thumb
             }
             done={doneIds.has(item.id)}
+            onQueued={onQueued}
             onDownloaded={() => onDownloaded(item)}
             onFailed={(message) => setResult({ ok: false, message })}
           />
@@ -245,6 +262,7 @@ function SuggestionCard({
   writePath,
   art,
   done,
+  onQueued,
   onDownloaded,
   onFailed,
 }: {
@@ -256,6 +274,7 @@ function SuggestionCard({
   /** This item's download already succeeded this visit (issue #526): stays in
    * place, marked done, instead of vanishing or re-offering the download. */
   done: boolean;
+  onQueued?: (request: EnqueueInput) => void;
   onDownloaded: () => void;
   onFailed: (message: string) => void;
 }) {
@@ -276,6 +295,7 @@ function SuggestionCard({
         writePath,
         repos,
       );
+      onQueued?.(request);
       const settled = await dl.start(request);
       if (settled?.status === "done") onDownloaded();
       else if (settled?.error) onFailed(settled.error);

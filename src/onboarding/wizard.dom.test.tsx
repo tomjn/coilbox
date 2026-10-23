@@ -45,6 +45,14 @@ vi.mock("./useBackgroundDownloads", () => ({
   }),
 }));
 
+vi.mock("./usePickedDownloads", () => ({
+  usePickedDownloads: () => ({
+    items: [],
+    track: () => {},
+    retry: () => false,
+  }),
+}));
+
 const { OnboardingProvider } = await import("./OnboardingProvider");
 const { requestOnboardingRerun } = await import("./rerun");
 const { SETTLED_KEY } = await import("./ids");

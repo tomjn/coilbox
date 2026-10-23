@@ -5,29 +5,40 @@ import {
   useCallback,
   useContext,
   useLayoutEffect,
+  useMemo,
   useRef,
   useState,
 } from "react";
 import type { SuggestedGame } from "@/content/branding";
-import type { QueueItem } from "@/downloads/DownloadQueueProvider";
+import type {
+  EnqueueInput,
+  QueueItem,
+} from "@/downloads/DownloadQueueProvider";
 import { SETTLED_KEY, type SettleId } from "./ids";
 import { pageRelevance } from "./relevance";
 import { useOnboardingRerun } from "./rerun";
 import { addSettled, planRun, type RunPlan } from "./settle";
 import { useBackgroundDownloads } from "./useBackgroundDownloads";
+import { usePickedDownloads } from "./usePickedDownloads";
 import { useWizardContext } from "./useWizardContext";
 import { Wizard } from "./Wizard";
 
 const NO_DOWNLOADS: QueueItem[] = [];
 const WizardDownloadsContext = createContext<QueueItem[]>(NO_DOWNLOADS);
 
-/** The background downloads the wizard started, for its pages to show. */
+/**
+ * The downloads the wizard follows, for its pages to show: the background
+ * engine and game, then any game the player started on the games page.
+ */
 export function useWizardDownloads(): QueueItem[] {
   return useContext(WizardDownloadsContext);
 }
 
 const NO_GAMES: SuggestedGame[] = [];
-const WizardGamesContext = createContext<SuggestedGame[]>(NO_GAMES);
+const WizardGamesContext = createContext<{
+  games: SuggestedGame[];
+  track(input: EnqueueInput): void;
+}>({ games: NO_GAMES, track: () => {} });
 
 /**
  * The games the games page offers: the `pick` decision's games as the plan
@@ -36,7 +47,12 @@ const WizardGamesContext = createContext<SuggestedGame[]>(NO_GAMES);
  * would empty the page under the player.
  */
 export function useWizardGames(): SuggestedGame[] {
-  return useContext(WizardGamesContext);
+  return useContext(WizardGamesContext).games;
+}
+
+/** Adds a download the player started to the ones the wizard follows. */
+export function useTrackWizardDownload(): (input: EnqueueInput) => void {
+  return useContext(WizardGamesContext).track;
 }
 
 type DecidedPlan = Exclude<RunPlan, { status: "waiting" }>;
@@ -73,15 +89,23 @@ export function OnboardingProvider({ children }: { children: ReactNode }) {
   );
 
   // The engine and game downloads run whether or not the wizard opens.
-  const {
-    items: downloads,
-    cancel,
-    retry,
-  } = useBackgroundDownloads({
+  const background = useBackgroundDownloads({
     settled,
     games: ctx.games,
     onSettle: (id) => settle([id]),
   });
+  const picked = usePickedDownloads();
+  const downloads = useMemo(
+    () => [...background.items, ...picked.items],
+    [background.items, picked.items],
+  );
+  const retry = (id: string) => {
+    if (!picked.retry(id)) background.retry(id);
+  };
+  const gamesValue = useMemo(
+    () => ({ games, track: picked.track }),
+    [games, picked.track],
+  );
 
   const planning = plan === null || rerun;
   const relevance = pageRelevance(ctx);
@@ -112,7 +136,7 @@ export function OnboardingProvider({ children }: { children: ReactNode }) {
 
   return (
     <WizardDownloadsContext.Provider value={downloads}>
-      <WizardGamesContext.Provider value={games}>
+      <WizardGamesContext.Provider value={gamesValue}>
         {/* `contents` adds no box. Radix portals mount on body, so selects
           inside the wizard stay usable while this is inert. */}
         <div className="contents" inert={waiting || showWizard || undefined}>
@@ -132,7 +156,7 @@ export function OnboardingProvider({ children }: { children: ReactNode }) {
             onSettle={(id) => settle([id])}
             onClose={() => setOpen(false)}
             downloads={downloads}
-            onCancelDownload={cancel}
+            onCancelDownload={background.cancel}
             onRetryDownload={retry}
           />
         )}

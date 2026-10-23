@@ -4,7 +4,8 @@
  * The games page inside the real onboarding provider and wizard shell. The
  * wizard context is stubbed so each test says which games the decision holds.
  * The download queue, the write folder and the branding catalog are stubbed
- * because each of them reaches Tauri.
+ * because each of them reaches Tauri. The fake queue keeps its items in a store
+ * so a download shows wherever the wizard reads the queue.
  */
 
 import {
@@ -12,10 +13,23 @@ import {
   PersistentStoreProvider,
   ThemeProvider,
 } from "@picoframe/frame";
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import {
+  cleanup,
+  fireEvent,
+  render,
+  screen,
+  within,
+} from "@testing-library/react";
+import { useSyncExternalStore } from "react";
 import { MemoryRouter } from "react-router";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import type { SuggestedGame } from "@/content/branding";
+import {
+  type EnqueueInput,
+  identityOf,
+  type QueueItem,
+} from "@/downloads/DownloadQueueProvider";
+import { IDLE_RATE } from "@/downloads/downloadRate";
 import type { WizardContext } from "../relevance";
 
 const SF: SuggestedGame = {
@@ -52,20 +66,56 @@ vi.mock("../useBackgroundDownloads", () => ({
   }),
 }));
 
-const enqueue = vi.fn((_input: { kind: string; args: unknown }) => "q1");
-vi.mock("@/downloads/DownloadQueueProvider", () => ({
+let queueItems: QueueItem[] = [];
+const listeners = new Set<() => void>();
+const subscribe = (l: () => void) => {
+  listeners.add(l);
+  return () => listeners.delete(l);
+};
+const enqueue = vi.fn((input: EnqueueInput) => {
+  const id = `q${queueItems.length + 1}`;
+  queueItems = [
+    ...queueItems,
+    {
+      ...input,
+      id,
+      identity: identityOf(input),
+      status: "active",
+      progress: {
+        phase: "downloading",
+        downloadedBytes: 10,
+        totalBytes: 100,
+        percent: 10,
+        bytesPerSec: null,
+      },
+      rate: IDLE_RATE,
+      startedAt: 1,
+      error: null,
+    } as QueueItem,
+  ];
+  for (const l of listeners) l();
+  return id;
+});
+vi.mock("@/downloads/DownloadQueueProvider", async (original) => ({
+  ...(await original<typeof import("@/downloads/DownloadQueueProvider")>()),
   useDownloadQueue: () => ({
     enqueue,
     waitFor: () => new Promise(() => {}),
-    items: [],
+    items: useSyncExternalStore(subscribe, () => queueItems),
+    settled: [],
     failureFor: () => null,
     completedFor: () => false,
   }),
 }));
 
+let writeRoot: { path?: string; loading: boolean } = {
+  path: "/data",
+  loading: false,
+};
+
 vi.mock("@/downloads/config", async (original) => ({
   ...(await original<typeof import("@/downloads/config")>()),
-  useWriteRoot: () => ({ path: "/data", loading: false }),
+  useWriteRoot: () => writeRoot,
 }));
 
 vi.mock("@/content/branding", async (original) => ({
@@ -99,6 +149,8 @@ const downloadButtons = () =>
 beforeEach(() => {
   storage = memoryStorage();
   ctx = BASE;
+  queueItems = [];
+  writeRoot = { path: "/data", loading: false };
   enqueue.mockClear();
 });
 
@@ -146,4 +198,45 @@ it("keeps the cards once a download installs a game mid run", () => {
   );
   expect(screen.getByText("home again")).toBeTruthy();
   expect(downloadButtons()).toHaveLength(2);
+});
+
+it("follows a game started on the page in the pill and on Done", async () => {
+  show();
+  fireEvent.click(
+    screen.getByRole("button", { name: "Download Splinter Faction" }),
+  );
+  await vi.waitFor(() =>
+    expect(
+      screen.getByRole("button", { name: "Cancel Game: Splinter Faction" }),
+    ).toBeTruthy(),
+  );
+  fireEvent.click(screen.getByRole("button", { name: "Continue" }));
+  expect(screen.getByText("You're ready")).toBeTruthy();
+  const gamesRow = screen.getByText("Games").parentElement as HTMLElement;
+  expect(gamesRow.textContent).toContain("Game: Splinter Faction");
+  expect(gamesRow.textContent).not.toContain("None chosen");
+  // The progress row, labelled with the download, beside the pill's own entry.
+  const rows = screen.getAllByText("Game: Splinter Faction");
+  const progressRow = rows
+    .map((el) => el.parentElement as HTMLElement)
+    .find((row) => row.querySelector("[role=progressbar]") && row !== gamesRow);
+  expect(progressRow).toBeTruthy();
+});
+
+it("draws no heading of its own under the wizard title", () => {
+  show();
+  expect(screen.queryByRole("heading", { name: "Games" })).toBeNull();
+  expect(screen.getAllByRole("heading")).toHaveLength(1);
+});
+
+it("says to set a download folder without a link out of the wizard", () => {
+  writeRoot = { path: undefined, loading: false };
+  show();
+  const dialog = screen.getByRole("dialog");
+  expect(
+    within(dialog).getByText(
+      "Set a download folder in Content folders settings to enable downloads.",
+    ),
+  ).toBeTruthy();
+  expect(within(dialog).queryByRole("link")).toBeNull();
 });
