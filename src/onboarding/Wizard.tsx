@@ -36,6 +36,10 @@ export function Wizard({
   const last = step === pages.length - 1;
   const page = PAGE_COMPONENTS[id];
   const { Component } = page;
+  // The Done page says under its heading what could not start and cannot be
+  // retried, so the pill leaves those out there.
+  const pillProblems =
+    id === "done" ? problems?.filter((p) => p.retry) : problems;
 
   const advance = () => {
     onSettle(id);
@@ -116,7 +120,7 @@ export function Wizard({
         <div className="flex min-w-0 flex-1 justify-center">
           <DownloadsPill
             items={downloads}
-            problems={problems}
+            problems={pillProblems}
             onCancel={onCancelDownload}
             onRetry={onRetryDownload}
           />

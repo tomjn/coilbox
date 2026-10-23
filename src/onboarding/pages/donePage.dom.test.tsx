@@ -197,10 +197,10 @@ it("says under the heading when the platform has no engine release", () => {
     [],
     [{ id: "engine", label: "Engine", message: PLATFORM, retry: false }],
   );
-  const lines = screen
-    .getAllByText(PLATFORM)
-    .filter((el) => el.closest("[data-testid=done-problem]"));
+  const lines = screen.getAllByText(PLATFORM);
   expect(lines).toHaveLength(1);
+  expect(lines[0].closest("[data-testid=done-problem]")).toBeTruthy();
+  expect(screen.queryByTestId("downloads-pill")).toBeNull();
 });
 
 it("leaves an error that can be retried to the pill", () => {
