@@ -7,25 +7,26 @@ import type { WizardPageProps } from "./registry";
 
 /**
  * One button per locale with a catalog. The pseudo-locale is a developer's
- * check, so it stays in the Settings picker and never shows here. A pick is written straight away, so the app, and the
- * wizard's title with it, switches language at once. Until then the selection
- * is the locale the app already runs in, which is the system's, and Continue
- * writes it.
+ * check, so it stays in the Settings picker and never shows here. A pick is
+ * written straight away, so the app, and the wizard's title with it, switches
+ * language at once. Until then the selection is the locale the app already
+ * runs in, which is the system's, and Continue writes "system", so the app
+ * keeps following the system language as the Settings picker's option does.
  */
 export default function LanguagePage({ beforeContinue }: WizardPageProps) {
   const { t } = useLingui();
-  const [, setLanguage] = useLanguageSetting();
+  const [language, setLanguage] = useLanguageSetting();
   const selected = useResolvedLocale();
   const system = resolveLocaleTag(navigator.language);
 
   useEffect(() => {
     beforeContinue.current = () => {
-      setLanguage(selected);
+      setLanguage(language);
     };
     return () => {
       beforeContinue.current = null;
     };
-  }, [beforeContinue, selected, setLanguage]);
+  }, [beforeContinue, language, setLanguage]);
 
   return (
     <div className="grid grid-cols-4 gap-2.5">

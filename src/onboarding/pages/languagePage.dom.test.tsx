@@ -93,10 +93,24 @@ it("writes a pick to general.language straight away", () => {
   expect(option("de").getAttribute("aria-pressed")).toBe("true");
 });
 
-it("writes the preselected locale on Continue with nothing changed", () => {
+it("follows the system language on Continue with nothing changed", () => {
   show();
   click("Continue");
+  expect(stored()).toBe(JSON.stringify("system"));
+});
+
+it("keeps an explicit pick of the system's language on Continue", () => {
+  show();
+  fireEvent.click(option("fr"));
+  click("Continue");
   expect(stored()).toBe(JSON.stringify("fr"));
+});
+
+it("keeps an explicit pick of another language on Continue", () => {
+  show();
+  fireEvent.click(option("de"));
+  click("Continue");
+  expect(stored()).toBe(JSON.stringify("de"));
 });
 
 it("leaves general.language unset on Skip", () => {
