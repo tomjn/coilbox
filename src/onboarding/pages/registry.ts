@@ -5,6 +5,7 @@ import type { PageId } from "../ids";
 import AppearancePage from "./AppearancePage";
 import DonePage from "./DonePage";
 import GamesPage from "./GamesPage";
+import HubPage from "./HubPage";
 import LanguagePage from "./LanguagePage";
 
 /**
@@ -48,7 +49,7 @@ export const PAGE_COMPONENTS: Record<PageId, WizardPageEntry> = {
     title: msg`Download a game`,
   },
   hub: {
-    Component: Pending,
+    Component: HubPage,
     eyebrow: msg`Coilbox hub`,
     title: msg`Sign in to the hub`,
   },
