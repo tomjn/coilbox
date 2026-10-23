@@ -126,6 +126,12 @@ vi.mock("@/content/branding", async (original) => ({
   useBrandingImage: () => undefined,
 }));
 
+let matcher: ((name: string) => boolean) | null = null;
+vi.mock("@/profile/profile", async (original) => ({
+  ...(await original<typeof import("@/profile/profile")>()),
+  getGameMatcher: () => matcher,
+}));
+
 const { OnboardingProvider } = await import("../OnboardingProvider");
 
 let storage = memoryStorage();
@@ -153,6 +159,7 @@ beforeEach(() => {
   queueItems = [];
   writeRoot = { path: "/data", loading: false };
   enqueue.mockClear();
+  matcher = () => true;
 });
 
 afterEach(() => {
@@ -237,6 +244,23 @@ it("says to set a download folder without a link out of the wizard", () => {
     ),
   ).toBeTruthy();
   expect(within(dialog).queryByRole("link")).toBeNull();
+});
+
+const FEATURED_LINE =
+  "Coilbox runs other games too. Find them in Games after setup.";
+
+it("calls the games featured when no profile filter narrows them", () => {
+  matcher = null;
+  show();
+  expect(screen.getByRole("dialog", { name: "Featured games" })).toBeTruthy();
+  expect(screen.getByText(FEATURED_LINE)).toBeTruthy();
+  expect(screen.queryByText("Download a game")).toBeNull();
+});
+
+it("says Download a game, with no line, when a profile filter picks them", () => {
+  show();
+  expect(screen.getByRole("dialog", { name: "Download a game" })).toBeTruthy();
+  expect(screen.queryByText(FEATURED_LINE)).toBeNull();
 });
 
 it("centres the cards", () => {

@@ -44,7 +44,7 @@ export const PAGE_COMPONENTS: Record<PageId, WizardPageEntry> = {
   },
   games: {
     Component: GamesPage,
-    title: msg`Download a game`,
+    ownHeading: true,
   },
   hub: {
     Component: HubPage,
