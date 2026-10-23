@@ -273,17 +273,20 @@ export default function GeneralSettings() {
         </Label>
       </section>
 
-      <section>
-        <Field label={t`Setup`} className="w-56">
-          <Button
-            variant="outline"
-            size="sm"
-            aria-label={t`Run setup again`}
-            onClick={() => requestOnboardingRerun()}
-          >
-            {t`Run setup again`}
-          </Button>
-        </Field>
+      <section
+        aria-labelledby="setup-heading"
+        className="flex items-center gap-3"
+      >
+        <span id="setup-heading" className="text-sm font-medium">
+          <Trans>Setup</Trans>
+        </span>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => requestOnboardingRerun()}
+        >
+          <Trans>Run setup again</Trans>
+        </Button>
       </section>
 
       <AboutCoilbox />

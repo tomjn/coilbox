@@ -11,6 +11,7 @@ import {
   fireEvent,
   render,
   screen,
+  within,
 } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { i18n, loadLocale } from "../../i18n";
@@ -64,10 +65,13 @@ describe("Setup row", () => {
       );
     });
 
-    expect(screen.getByText("Setup")).toBeTruthy();
+    const row = screen.getByRole("region", { name: "Setup" });
+    expect(within(row).getByText("Setup")).toBeTruthy();
     expect(requestOnboardingRerun).not.toHaveBeenCalled();
 
-    fireEvent.click(screen.getByRole("button", { name: "Run setup again" }));
+    fireEvent.click(
+      within(row).getByRole("button", { name: "Run setup again" }),
+    );
 
     expect(requestOnboardingRerun).toHaveBeenCalledTimes(1);
   });
