@@ -27736,6 +27736,10 @@ msgstr "Open the battle page"
 msgid "Open the game \"{id}\"."
 msgstr "Open the game \"{id}\"."
 
+#: src/onboarding/pages/HubPage.tsx
+msgid "Open the hub"
+msgstr "Open the hub"
+
 #: src/deeplink/DeepLinkHandler.tsx
 msgid "Open the join form"
 msgstr "Open the join form"
@@ -34539,7 +34543,7 @@ msgstr "Sign in on the page Coilbox opened, then come back."
 msgid "Sign in to publish from here. Or copy the code and finish on the hub's own page."
 msgstr "Sign in to publish from here. Or copy the code and finish on the hub's own page."
 
-#: src/onboarding/pages/registry.ts
+#: src/onboarding/pages/HubPage.tsx
 msgid "Sign in to the hub"
 msgstr "Sign in to the hub"
 

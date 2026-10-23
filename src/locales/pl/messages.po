@@ -34301,6 +34301,10 @@ msgstr "Otwórz stronę meczu"
 msgid "Open the game \"{id}\"."
 msgstr "Otwórz grę \"{id}\"."
 
+#: src/onboarding/pages/HubPage.tsx
+msgid "Open the hub"
+msgstr "Otwórz hub"
+
 #: src/deeplink/DeepLinkHandler.tsx
 #, fuzzy
 msgid "Open the join form"
@@ -42706,7 +42710,7 @@ msgstr "Zaloguj się na stronie otwartej przez Coilbox, a potem wróć."
 msgid "Sign in to publish from here. Or copy the code and finish on the hub's own page."
 msgstr "Zaloguj się, aby opublikować stąd. Albo skopiuj kod i dokończ na stronie hubu."
 
-#: src/onboarding/pages/registry.ts
+#: src/onboarding/pages/HubPage.tsx
 msgid "Sign in to the hub"
 msgstr "Zaloguj się do hubu"
 

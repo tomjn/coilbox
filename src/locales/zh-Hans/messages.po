@@ -34301,6 +34301,10 @@ msgstr "打开对局页面"
 msgid "Open the game \"{id}\"."
 msgstr "打开游戏 \"{id}\"。"
 
+#: src/onboarding/pages/HubPage.tsx
+msgid "Open the hub"
+msgstr "打开中心"
+
 #: src/deeplink/DeepLinkHandler.tsx
 #, fuzzy
 msgid "Open the join form"
@@ -42706,7 +42710,7 @@ msgstr "在 Coilbox 打开的页面上登录，然后回来。"
 msgid "Sign in to publish from here. Or copy the code and finish on the hub's own page."
 msgstr "登录后即可从这里发布。或者复制代码，在中心的页面上完成。"
 
-#: src/onboarding/pages/registry.ts
+#: src/onboarding/pages/HubPage.tsx
 msgid "Sign in to the hub"
 msgstr "登录中心"
 

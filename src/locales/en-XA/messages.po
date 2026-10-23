@@ -27735,6 +27735,10 @@ msgstr ""
 msgid "Open the game \"{id}\"."
 msgstr ""
 
+#: src/onboarding/pages/HubPage.tsx
+msgid "Open the hub"
+msgstr ""
+
 #: src/deeplink/DeepLinkHandler.tsx
 msgid "Open the join form"
 msgstr ""
@@ -34538,7 +34542,7 @@ msgstr ""
 msgid "Sign in to publish from here. Or copy the code and finish on the hub's own page."
 msgstr ""
 
-#: src/onboarding/pages/registry.ts
+#: src/onboarding/pages/HubPage.tsx
 msgid "Sign in to the hub"
 msgstr ""
 
