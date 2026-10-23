@@ -15,6 +15,7 @@ import { i18n, loadLocale } from "./i18n";
 import { LocalisedAppFrame } from "./i18n/LocalisedAppFrame";
 import { bootLocale, LANGUAGE_KEY } from "./i18n/language";
 import { applyUiZoom, DEFAULT_UI_ZOOM, UI_ZOOM_KEY } from "./lib/uiZoom";
+import { seedExistingInstall } from "./onboarding/settle";
 import { applyProfilePages } from "./profile/CustomPage";
 import { applyProfileSettingsHiding } from "./profile/hidden";
 import { applyProfileSlots, buildLayoutConfig } from "./profile/layout";
@@ -46,6 +47,9 @@ if (import.meta.env.DEV) performance.mark("coilbox:boot:start");
 // Hydrate the settings cache from app-data before first render, so useSetting
 // reads return persisted values synchronously on mount.
 const settingsStorage = await createTauriSettingsStorage();
+// An install that already had settings when onboarding shipped skips it. This
+// runs before anything else writes a setting, so the count is exact.
+seedExistingInstall(settingsStorage, settingsStorage.loadedKeyCount);
 if (import.meta.env.DEV) performance.mark("coilbox:boot:settings");
 
 // Load the distribution profile (a bundler-supplied .coilbox/profile.json) before

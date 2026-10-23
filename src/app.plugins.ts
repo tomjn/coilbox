@@ -16,6 +16,7 @@ import lobbyServersPlugin from "./lobby-servers";
 import mapconvPlugin from "./mapconv";
 import multiplayerPlugin from "./multiplayer";
 import notifyPlugin from "./notify";
+import onboardingPlugin from "./onboarding";
 import playPlugin from "./play";
 import profilePlugin from "./profile";
 import runlitePlugin from "./runlite";
@@ -55,4 +56,5 @@ export const plugins: FramePlugin[] = [
   gameUpdatesPlugin,
   notifyPlugin,
   soundPlugin,
+  onboardingPlugin,
 ];
