@@ -12,7 +12,11 @@ Each language has one file, `src/locales/<code>/messages.po`, in the [coilbox re
 - `src/locales/fr/messages.po`, `de`, `es`, `pl`, `uk`, `ja` and `zh-Hans` are the translations.
 - `src/locales/en-XA/messages.po` is the [pseudo-locale](#find-untranslated-text-with-the-pseudo-locale). It is generated, so leave it alone.
 
-The files use the gettext `.po` format, so any `.po` editor such as Poedit opens them, as does a plain text editor. Coilbox reads them through [Lingui](https://lingui.dev).
+The files use the gettext `.po` format, and coilbox reads them through [Lingui](https://lingui.dev). Any `.po` editor opens them:
+
+- [Poedit](https://poedit.net/), for Windows, macOS and Linux.
+- [Lokalize](https://apps.kde.org/lokalize/), KDE's translation editor.
+- Any plain text editor. Keep the entry layout as it is, so the pull request shows only the lines you changed.
 
 ## Read an entry
 
@@ -124,4 +128,10 @@ This site is in English only.
 
 ## Send your translation
 
-Open a pull request on the [coilbox repository](https://github.com/tomjn/coilbox) that changes the `.po` file. Say in the description which language it is and whether you are a native speaker, so a reviewer knows which `#, fuzzy` lines you took off on purpose.
+Translations come in as pull requests on GitHub. There is no translation website.
+
+1. [Fork](https://docs.github.com/en/pull-requests/collaborating-with-pull-requests/working-with-forks/fork-a-repo) the [coilbox repository](https://github.com/tomjn/coilbox).
+2. Edit your language's `.po` file in your fork.
+3. [Open a pull request](https://docs.github.com/en/pull-requests/collaborating-with-pull-requests/proposing-changes-to-your-work-with-pull-requests/creating-a-pull-request-from-a-fork) from your fork to coilbox.
+
+Say in the description which language it is and whether you are a native speaker, so a reviewer knows which `#, fuzzy` lines you took off on purpose.
