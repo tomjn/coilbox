@@ -16,6 +16,7 @@ import { useQueuedDownload } from "../../../downloads/useQueuedDownload";
 import { useBundledEngine } from "../../BundledEngineSetup";
 import { contentCreateStandardRoot, contentRecreateRoot } from "../../bindings";
 import { useSetupStatus } from "../../config";
+import { engineDownloadRequest } from "../../engineDownloadRequest";
 import {
   GetStartedOfferContext,
   useCollectGetStartedOffer,
@@ -115,22 +116,15 @@ export function SetupCard({ dismissible = false }: { dismissible?: boolean }) {
     setBusy("engine");
     setError(null);
     try {
-      const { release } = await fetchNewestRecoil();
-      if (!release) {
+      const request = await engineDownloadRequest(
+        writePath,
+        (version) => t`Engine ${version}`,
+      );
+      if (!request) {
         setError(t`No engine is available to download for this platform.`);
         return;
       }
-      // The queue's engineRecoil kind rescans content after the install, which
-      // is what installRecoil used to do here.
-      const settled = await engineDl.start({
-        kind: "engineRecoil",
-        label: t`Engine ${release.version}`,
-        args: {
-          version: release.version,
-          assetUrl: release.assetUrl,
-          writePath,
-        },
-      });
+      const settled = await engineDl.start(request);
       if (settled?.error) setError(settled.error);
       else if (settled?.status === "done") await refresh();
     } catch (e) {
