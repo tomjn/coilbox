@@ -1,19 +1,13 @@
 import { useSetting } from "@picoframe/frame";
 import {
-  createContext,
   type ReactNode,
   useCallback,
-  useContext,
   useLayoutEffect,
   useMemo,
   useRef,
   useState,
 } from "react";
 import type { SuggestedGame } from "@/content/branding";
-import type {
-  EnqueueInput,
-  QueueItem,
-} from "@/downloads/DownloadQueueProvider";
 import { SETTLED_KEY, type SettleId } from "./ids";
 import { pageRelevance } from "./relevance";
 import { useOnboardingRerun } from "./rerun";
@@ -22,38 +16,11 @@ import { useBackgroundDownloads } from "./useBackgroundDownloads";
 import { usePickedDownloads } from "./usePickedDownloads";
 import { useWizardContext } from "./useWizardContext";
 import { Wizard } from "./Wizard";
-
-const NO_DOWNLOADS: QueueItem[] = [];
-const WizardDownloadsContext = createContext<QueueItem[]>(NO_DOWNLOADS);
-
-/**
- * The downloads the wizard follows, for its pages to show: the background
- * engine and game, then any game the player started on the games page.
- */
-export function useWizardDownloads(): QueueItem[] {
-  return useContext(WizardDownloadsContext);
-}
-
-const NO_GAMES: SuggestedGame[] = [];
-const WizardGamesContext = createContext<{
-  games: SuggestedGame[];
-  track(input: EnqueueInput): void;
-}>({ games: NO_GAMES, track: () => {} });
-
-/**
- * The games the games page offers: the `pick` decision's games as the plan
- * froze, and empty otherwise. Frozen with the plan, because a download started
- * from the page installs a game, which turns the live decision to `none` and
- * would empty the page under the player.
- */
-export function useWizardGames(): SuggestedGame[] {
-  return useContext(WizardGamesContext).games;
-}
-
-/** Adds a download the player started to the ones the wizard follows. */
-export function useTrackWizardDownload(): (input: EnqueueInput) => void {
-  return useContext(WizardGamesContext).track;
-}
+import {
+  NO_GAMES,
+  WizardDownloadsContext,
+  WizardGamesContext,
+} from "./wizardContexts";
 
 type DecidedPlan = Exclude<RunPlan, { status: "waiting" }>;
 

@@ -5,7 +5,7 @@ import { QueueProgress } from "@/downloads/pages/components/ProgressBar";
 import { useFrameStrings } from "@/i18n/frameStrings";
 import { useResolvedLocale } from "@/i18n/language";
 import { localeDisplayName } from "@/i18n/locales";
-import { useWizardDownloads } from "../OnboardingProvider";
+import { useWizardDownloads } from "../wizardContexts";
 import type { WizardPageProps } from "./registry";
 
 function Row({ label, children }: { label: string; children: ReactNode }) {

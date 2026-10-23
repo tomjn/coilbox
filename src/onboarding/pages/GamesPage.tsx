@@ -1,6 +1,6 @@
 import { SuggestionsList } from "@/content/pages/components/SuggestionsList";
 import { useWriteRoot } from "@/downloads/config";
-import { useTrackWizardDownload, useWizardGames } from "../OnboardingProvider";
+import { useTrackWizardDownload, useWizardGames } from "../wizardContexts";
 
 /**
  * The games the run's decision offers, as `GetStartedCard` shows them. A
