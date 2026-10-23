@@ -13,7 +13,8 @@ import {
   useDownloadQueue,
 } from "@/downloads/DownloadQueueProvider";
 import { GAME_REPOS, mergeGameRepos } from "@/downloads/gameRepos";
-import type { BackgroundId } from "./ids";
+import { errorText } from "@/lib/helpers";
+import { BACKGROUND_IDS, type BackgroundId } from "./ids";
 import type { GamesDecision } from "./relevance";
 
 interface Tracked {
@@ -24,6 +25,17 @@ interface Tracked {
 const TERMINAL = new Set(["done", "error", "canceled"]);
 
 /**
+ * A background download that never reached the queue. `retry` is false when
+ * trying again cannot help, as on a platform with no engine release.
+ */
+export interface BackgroundProblem {
+  id: BackgroundId;
+  label: string;
+  message: string;
+  retry: boolean;
+}
+
+/**
  * Downloads the engine and a distribution's game on first launch, whether or
  * not the wizard opens (spec: Engine and Games).
  *
@@ -31,7 +43,8 @@ const TERMINAL = new Set(["done", "error", "canceled"]);
  * double effects cannot queue it twice. An id settles when its first item stops
  * running, when nothing can be queued, or when queueing throws. A retry queues
  * the same request again and is the player's own request, so it does not look at
- * the settled list.
+ * the settled list. A download that never reached the queue is a problem, shown
+ * beside the queued items, and its retry starts that id again.
  */
 export function useBackgroundDownloads(args: {
   settled: readonly string[];
@@ -39,6 +52,7 @@ export function useBackgroundDownloads(args: {
   onSettle(id: BackgroundId): void;
 }): {
   items: QueueItem[];
+  problems: BackgroundProblem[];
   cancel(id: string): void;
   retry(id: string): void;
 } {
@@ -63,6 +77,12 @@ export function useBackgroundDownloads(args: {
   const started = useRef(new Set<BackgroundId>());
   const reported = useRef(new Set<BackgroundId>());
   const folderTried = useRef(false);
+  // Ids the player retried, which start again even though they are settled.
+  // A new set on every retry, so the effects below run again.
+  const [forced, setForced] = useState<ReadonlySet<BackgroundId>>(new Set());
+  const [problemById, setProblemById] = useState<
+    Partial<Record<BackgroundId, BackgroundProblem>>
+  >({});
 
   const finish = useCallback((id: BackgroundId) => {
     if (reported.current.has(id) || latest.current.settled.includes(id)) return;
@@ -70,21 +90,50 @@ export function useBackgroundDownloads(args: {
     latest.current.onSettle(id);
   }, []);
 
+  const report = useCallback(
+    (problem: BackgroundProblem, reason: unknown) => {
+      console.warn(`Setup could not download the ${problem.id}:`, reason);
+      setProblemById((s) => ({ ...s, [problem.id]: problem }));
+      finish(problem.id);
+    },
+    [finish],
+  );
+
   const start = useCallback(
-    async (id: BackgroundId, build: () => Promise<EnqueueInput | null>) => {
+    async (
+      id: BackgroundId,
+      label: string,
+      build: () => Promise<EnqueueInput | null>,
+      unavailable?: string,
+    ) => {
       try {
         const input = await build();
         if (!input) {
-          finish(id);
+          if (unavailable) {
+            report(
+              { id, label, message: unavailable, retry: false },
+              "no release for this platform",
+            );
+          } else {
+            console.warn(`Setup has nothing to download for the ${id}`);
+            finish(id);
+          }
           return;
         }
         const queued = latest.current.queue.enqueue(input);
         setTracked((s) => ({ ...s, [id]: { id: queued, input } }));
-      } catch {
-        finish(id);
+      } catch (e) {
+        report({ id, label, message: errorText(e), retry: true }, e);
       }
     },
-    [finish],
+    [finish, report],
+  );
+
+  // Not started this run, and not settled unless the player retried it.
+  const blocked = useCallback(
+    (id: BackgroundId) =>
+      started.current.has(id) || (settled.includes(id) && !forced.has(id)),
+    [settled, forced],
   );
 
   // The bundled engine is being set up, or is about to be, so there is nothing
@@ -95,7 +144,7 @@ export function useBackgroundDownloads(args: {
     bundled.state.status === "done";
 
   useEffect(() => {
-    if (settled.includes("engine") || started.current.has("engine")) return;
+    if (blocked("engine")) return;
     if (setup.loading) return;
     if (setup.complete) {
       started.current.add("engine");
@@ -111,19 +160,31 @@ export function useBackgroundDownloads(args: {
           ensureWriteRoot(state);
           return setup.refresh();
         })
-        .catch(() => {
+        .catch((e) => {
           started.current.add("engine");
-          finish("engine");
+          report(
+            {
+              id: "engine",
+              label: t`Engine`,
+              message: errorText(e),
+              retry: true,
+            },
+            e,
+          );
         });
       return;
     }
     if (!setup.needsEngine || !writePath) return;
     started.current.add("engine");
-    void start("engine", () =>
-      engineDownloadRequest(writePath, (version) => t`Engine ${version}`),
+    void start(
+      "engine",
+      t`Engine`,
+      () => engineDownloadRequest(writePath, (version) => t`Engine ${version}`),
+      t`No engine is available to download for this platform.`,
     );
   }, [
-    settled,
+    blocked,
+    report,
     setup,
     bundleCovers,
     writePath,
@@ -134,7 +195,7 @@ export function useBackgroundDownloads(args: {
   ]);
 
   useEffect(() => {
-    if (settled.includes("game") || started.current.has("game")) return;
+    if (blocked("game")) return;
     if (games === null) return;
     if (games.kind !== "auto") {
       started.current.add("game");
@@ -144,16 +205,11 @@ export function useBackgroundDownloads(args: {
     if (!writePath) return;
     started.current.add("game");
     const { game } = games;
-    void start("game", () =>
-      suggestionRequest(
-        game.download,
-        "game",
-        t`Game: ${game.title}`,
-        writePath,
-        repos,
-      ),
+    const label = t`Game: ${game.title}`;
+    void start("game", label, () =>
+      suggestionRequest(game.download, "game", label, writePath, repos),
     );
-  }, [settled, games, writePath, repos, finish, start, t]);
+  }, [blocked, games, writePath, repos, finish, start, t]);
 
   const items = useMemo(() => {
     const byId = new Map<string, QueueItem>();
@@ -179,8 +235,22 @@ export function useBackgroundDownloads(args: {
     [],
   );
 
+  const problems = useMemo(
+    () => Object.values(problemById).filter((p) => p !== undefined),
+    [problemById],
+  );
+
   const retry = useCallback(
     (id: string) => {
+      const problem = BACKGROUND_IDS.find((b) => b === id && problemById[b]);
+      if (problem) {
+        if (!problemById[problem]?.retry) return;
+        setProblemById(({ [problem]: _, ...rest }) => rest);
+        started.current.delete(problem);
+        if (problem === "engine") folderTried.current = false;
+        setForced((s) => new Set(s).add(problem));
+        return;
+      }
       for (const [key, entry] of Object.entries(tracked)) {
         if (entry.id !== id) continue;
         const queued = latest.current.queue.enqueue(entry.input);
@@ -190,8 +260,8 @@ export function useBackgroundDownloads(args: {
         }));
       }
     },
-    [tracked],
+    [tracked, problemById],
   );
 
-  return { items, cancel, retry };
+  return { items, problems, cancel, retry };
 }

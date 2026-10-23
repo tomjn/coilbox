@@ -17,6 +17,7 @@ import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import type { QueueItem } from "@/downloads/DownloadQueueProvider";
 import { IDLE_RATE } from "@/downloads/downloadRate";
 import type { Profile } from "@/profile/profile";
+import type { BackgroundProblem } from "../useBackgroundDownloads";
 
 let profile: Profile = { version: 1 };
 const resolveImage =
@@ -39,7 +40,10 @@ vi.mock("@/home/background", async (importOriginal) => {
 });
 
 const { Wizard } = await import("../Wizard");
-const { WizardDownloadsContext } = await import("../wizardContexts");
+const { WizardDownloadsContext, WizardProblemsContext } = await import(
+  "../wizardContexts"
+);
+const PLATFORM = "No engine is available to download for this platform.";
 
 const GAME: QueueItem = {
   kind: "game",
@@ -62,19 +66,22 @@ const GAME: QueueItem = {
 
 const onClose = vi.fn();
 
-function show(downloads: QueueItem[] = []) {
+function show(downloads: QueueItem[] = [], problems: BackgroundProblem[] = []) {
   return render(
     <PersistentStoreProvider storage={memoryStorage()}>
       <ThemeProvider>
         <WizardDownloadsContext.Provider value={downloads}>
-          <Wizard
-            pages={["done"]}
-            onSettle={() => {}}
-            onClose={onClose}
-            downloads={downloads}
-            onCancelDownload={() => {}}
-            onRetryDownload={() => {}}
-          />
+          <WizardProblemsContext.Provider value={problems}>
+            <Wizard
+              pages={["done"]}
+              onSettle={() => {}}
+              onClose={onClose}
+              downloads={downloads}
+              problems={problems}
+              onCancelDownload={() => {}}
+              onRetryDownload={() => {}}
+            />
+          </WizardProblemsContext.Provider>
         </WizardDownloadsContext.Provider>
       </ThemeProvider>
     </PersistentStoreProvider>,
@@ -183,4 +190,24 @@ it("shows a progress row for each download", () => {
     .find(Boolean) as HTMLElement;
   expect(row).toBeTruthy();
   expect(row.querySelector("[role=progressbar]")).toBeTruthy();
+});
+
+it("says under the heading when the platform has no engine release", () => {
+  show(
+    [],
+    [{ id: "engine", label: "Engine", message: PLATFORM, retry: false }],
+  );
+  const lines = screen
+    .getAllByText(PLATFORM)
+    .filter((el) => el.closest("[data-testid=done-problem]"));
+  expect(lines).toHaveLength(1);
+});
+
+it("leaves an error that can be retried to the pill", () => {
+  show(
+    [],
+    [{ id: "engine", label: "Engine", message: "offline", retry: true }],
+  );
+  expect(screen.queryByTestId("done-problem")).toBeNull();
+  expect(screen.getByText("offline")).toBeTruthy();
 });

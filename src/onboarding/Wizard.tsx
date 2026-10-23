@@ -5,6 +5,7 @@ import type { QueueItem } from "@/downloads/DownloadQueueProvider";
 import { DownloadsPill } from "./DownloadsPill";
 import { type PageId, WIZARD_TITLE_ID } from "./ids";
 import { PAGE_COMPONENTS } from "./pages/registry";
+import type { BackgroundProblem } from "./useBackgroundDownloads";
 
 /**
  * The full window setup wizard. It settles a page only on Continue or Skip, and
@@ -16,6 +17,7 @@ export function Wizard({
   onSettle,
   onClose,
   downloads,
+  problems,
   onCancelDownload,
   onRetryDownload,
 }: {
@@ -23,6 +25,7 @@ export function Wizard({
   onSettle(id: PageId): void;
   onClose(): void;
   downloads: QueueItem[];
+  problems?: BackgroundProblem[];
   onCancelDownload(id: string): void;
   onRetryDownload(id: string): void;
 }) {
@@ -65,6 +68,7 @@ export function Wizard({
     >
       <DownloadsPill
         items={downloads}
+        problems={problems}
         onCancel={onCancelDownload}
         onRetry={onRetryDownload}
       />

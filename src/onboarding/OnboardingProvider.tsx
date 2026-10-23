@@ -20,6 +20,7 @@ import {
   NO_GAMES,
   WizardDownloadsContext,
   WizardGamesContext,
+  WizardProblemsContext,
 } from "./wizardContexts";
 
 type DecidedPlan = Exclude<RunPlan, { status: "waiting" }>;
@@ -103,30 +104,33 @@ export function OnboardingProvider({ children }: { children: ReactNode }) {
 
   return (
     <WizardDownloadsContext.Provider value={downloads}>
-      <WizardGamesContext.Provider value={gamesValue}>
-        {/* `contents` adds no box. Radix portals mount on body, so selects
+      <WizardProblemsContext.Provider value={background.problems}>
+        <WizardGamesContext.Provider value={gamesValue}>
+          {/* `contents` adds no box. Radix portals mount on body, so selects
           inside the wizard stay usable while this is inert. */}
-        <div className="contents" inert={waiting || showWizard || undefined}>
-          {children}
-        </div>
-        {waiting && (
-          <div
-            data-testid="onboarding-waiting"
-            className="fixed inset-0 z-40 bg-background"
-          />
-        )}
-        {showWizard && plan?.status === "open" && (
-          <Wizard
-            key={run}
-            pages={plan.pages}
-            onSettle={(id) => settle([id])}
-            onClose={() => setOpen(false)}
-            downloads={downloads}
-            onCancelDownload={background.cancel}
-            onRetryDownload={retry}
-          />
-        )}
-      </WizardGamesContext.Provider>
+          <div className="contents" inert={waiting || showWizard || undefined}>
+            {children}
+          </div>
+          {waiting && (
+            <div
+              data-testid="onboarding-waiting"
+              className="fixed inset-0 z-40 bg-background"
+            />
+          )}
+          {showWizard && plan?.status === "open" && (
+            <Wizard
+              key={run}
+              pages={plan.pages}
+              onSettle={(id) => settle([id])}
+              onClose={() => setOpen(false)}
+              downloads={downloads}
+              problems={background.problems}
+              onCancelDownload={background.cancel}
+              onRetryDownload={retry}
+            />
+          )}
+        </WizardGamesContext.Provider>
+      </WizardProblemsContext.Provider>
     </WizardDownloadsContext.Provider>
   );
 }

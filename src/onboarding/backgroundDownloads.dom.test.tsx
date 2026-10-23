@@ -140,7 +140,10 @@ beforeEach(() => {
   onSettle.mockClear();
   contentCreateStandardRoot.mockClear();
   ensureWriteRoot.mockClear();
+  warn.mockClear();
 });
+
+const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
 
 afterEach(cleanup);
 
@@ -205,6 +208,85 @@ it("settles the engine when queueing throws", async () => {
   mount({ settled: ["game"], games: NONE });
   await flush();
   expect(onSettle).toHaveBeenCalledWith("engine");
+});
+
+it("reports a platform with no engine release, with no retry", async () => {
+  engineDownloadRequest.mockResolvedValue(null);
+  const { result } = mount({ settled: ["game"], games: NONE });
+  await flush();
+  expect(result.current.problems).toEqual([
+    {
+      id: "engine",
+      label: "Engine",
+      message: "No engine is available to download for this platform.",
+      retry: false,
+    },
+  ]);
+  expect(warn).toHaveBeenCalledWith(
+    expect.stringContaining("engine"),
+    expect.anything(),
+  );
+});
+
+it("reports a request that throws, and retry asks again", async () => {
+  engineDownloadRequest.mockRejectedValueOnce(new Error("offline"));
+  const { result, rerender } = mount({ settled: ["game"], games: NONE });
+  await flush();
+  expect(result.current.problems).toEqual([
+    { id: "engine", label: "Engine", message: "offline", retry: true },
+  ]);
+  expect(warn).toHaveBeenCalled();
+  expect(onSettle).toHaveBeenCalledWith("engine");
+  rerender({ settled: ["engine", "game"], games: NONE });
+  await act(async () => result.current.retry("engine"));
+  await flush();
+  expect(engineDownloadRequest).toHaveBeenCalledTimes(2);
+  expect(enqueue).toHaveBeenCalledTimes(1);
+  expect(result.current.problems).toEqual([]);
+  expect(result.current.items.map((i) => i.label)).toEqual(["Engine 1"]);
+  expect(onSettle).toHaveBeenCalledTimes(1);
+});
+
+it("reports a folder that cannot be created, and retry tries again", async () => {
+  setup = { ...setup, needsFolder: true, needsEngine: false };
+  contentCreateStandardRoot.mockRejectedValueOnce(new Error("read only"));
+  const { result, rerender } = mount({ settled: ["game"], games: NONE });
+  await flush();
+  expect(result.current.problems).toEqual([
+    { id: "engine", label: "Engine", message: "read only", retry: true },
+  ]);
+  expect(onSettle).toHaveBeenCalledWith("engine");
+  rerender({ settled: ["engine", "game"], games: NONE });
+  await act(async () => result.current.retry("engine"));
+  await flush();
+  expect(contentCreateStandardRoot).toHaveBeenCalledTimes(2);
+  expect(ensureWriteRoot).toHaveBeenCalled();
+  expect(result.current.problems).toEqual([]);
+  // The folder now exists, so the engine is queued.
+  setup = { ...setup, needsFolder: false, needsEngine: true };
+  rerender({ settled: ["engine", "game"], games: NONE });
+  await flush();
+  expect(enqueue).toHaveBeenCalledTimes(1);
+});
+
+it("reports a game request that throws, and retry asks again", async () => {
+  suggestionRequest.mockRejectedValueOnce(new Error("no catalog"));
+  const { result } = mount({ settled: ["engine"], games: AUTO });
+  await flush();
+  expect(result.current.problems).toEqual([
+    {
+      id: "game",
+      label: "Game: Splinter Faction",
+      message: "no catalog",
+      retry: true,
+    },
+  ]);
+  expect(onSettle).toHaveBeenCalledWith("game");
+  await act(async () => result.current.retry("game"));
+  await flush();
+  expect(suggestionRequest).toHaveBeenCalledTimes(2);
+  expect(enqueue).toHaveBeenCalledTimes(1);
+  expect(result.current.problems).toEqual([]);
 });
 
 it("settles the engine when its item turns canceled", async () => {
@@ -329,4 +411,33 @@ it("shows a failed download with its error and a retry control", async () => {
   expect(screen.getByText("no route")).toBeTruthy();
   fireEvent.click(screen.getByRole("button", { name: "Retry Engine 1" }));
   expect(onRetry).toHaveBeenCalledWith("a");
+});
+
+it("shows a problem with no queue item, and a retry only when it can retry", async () => {
+  const { DownloadsPill } = await import("./DownloadsPill");
+  const { fireEvent, render, screen } = await import("@testing-library/react");
+  const onRetry = vi.fn();
+  render(
+    <DownloadsPill
+      items={[]}
+      problems={[
+        {
+          id: "engine",
+          label: "Engine",
+          message: "No engine is available to download for this platform.",
+          retry: false,
+        },
+        { id: "game", label: "Game: SF", message: "no catalog", retry: true },
+      ]}
+      onCancel={() => {}}
+      onRetry={onRetry}
+    />,
+  );
+  expect(
+    screen.getByText("No engine is available to download for this platform."),
+  ).toBeTruthy();
+  expect(screen.queryByRole("button", { name: "Retry Engine" })).toBeNull();
+  expect(screen.getByText("no catalog")).toBeTruthy();
+  fireEvent.click(screen.getByRole("button", { name: "Retry Game: SF" }));
+  expect(onRetry).toHaveBeenCalledWith("game");
 });

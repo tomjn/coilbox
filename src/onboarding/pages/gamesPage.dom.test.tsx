@@ -61,6 +61,7 @@ vi.mock("../useWizardContext", () => ({
 vi.mock("../useBackgroundDownloads", () => ({
   useBackgroundDownloads: () => ({
     items: [],
+    problems: [],
     cancel: () => {},
     retry: () => {},
   }),

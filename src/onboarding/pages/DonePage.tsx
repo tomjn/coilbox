@@ -5,20 +5,22 @@ import { resolveHome } from "@/home/config";
 import { useHomeBackdropStyle } from "@/home/useHomeBackdropStyle";
 import { getProfile, resolveProfileImage } from "@/profile/profile";
 import { WIZARD_TITLE_ID } from "../ids";
-import { useWizardDownloads } from "../wizardContexts";
+import { useWizardDownloads, useWizardProblems } from "../wizardContexts";
 import type { WizardPageProps } from "./registry";
 
 const LAYER = "pointer-events-none absolute inset-0";
 
 /**
  * A large heading over a picture, and the downloads still going in the
- * background. The picture is the profile's `setupImage`, or the home page's
+ * background, with a line under the heading for any that could not start. The picture is the profile's `setupImage`, or the home page's
  * backdrop when there is none or it fails to load. The page draws its own
  * heading, so the shell shows no title.
  */
 export default function DonePage(_: WizardPageProps) {
   const { t } = useLingui();
   const downloads = useWizardDownloads();
+  // A retry can help the others, so they stay in the pill with its control.
+  const unavailable = useWizardProblems().filter((p) => !p.retry);
   const { setupImage, home } = getProfile();
   // The same backdrop and `home.background` key as the home page, read the way
   // the hub's browse page reads it.
@@ -74,6 +76,15 @@ export default function DonePage(_: WizardPageProps) {
         >
           {t`You're ready`}
         </h2>
+        {unavailable.map((problem) => (
+          <p
+            key={problem.id}
+            data-testid="done-problem"
+            className="mt-3 text-muted-foreground"
+          >
+            {problem.message}
+          </p>
+        ))}
         {downloads.length > 0 && (
           <div className="mt-8 space-y-3 text-sm">
             {downloads.map((item) => (

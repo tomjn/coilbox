@@ -4,6 +4,7 @@ import type {
   EnqueueInput,
   QueueItem,
 } from "@/downloads/DownloadQueueProvider";
+import type { BackgroundProblem } from "./useBackgroundDownloads";
 
 /**
  * What `OnboardingProvider` hands the wizard's pages. Kept apart from the
@@ -20,6 +21,15 @@ export const WizardDownloadsContext = createContext<QueueItem[]>(NO_DOWNLOADS);
  */
 export function useWizardDownloads(): QueueItem[] {
   return useContext(WizardDownloadsContext);
+}
+
+const NO_PROBLEMS: BackgroundProblem[] = [];
+export const WizardProblemsContext =
+  createContext<BackgroundProblem[]>(NO_PROBLEMS);
+
+/** The background downloads that never reached the queue, and why. */
+export function useWizardProblems(): BackgroundProblem[] {
+  return useContext(WizardProblemsContext);
 }
 
 export const NO_GAMES: SuggestedGame[] = [];
