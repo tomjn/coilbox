@@ -1,4 +1,4 @@
-import { clamp } from "../lib/helpers";
+import { clamp } from "../lib/clamp";
 
 /**
  * Threat level: how hard the opposing factions press the player. Conquest's

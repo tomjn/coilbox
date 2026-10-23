@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
-import { basename, clamp, errorText, sleep } from "./helpers";
+import { clamp } from "./clamp";
+import { basename, errorText, sleep } from "./helpers";
 
 describe("clamp", () => {
   it("passes a value already inside the range through unchanged", () => {

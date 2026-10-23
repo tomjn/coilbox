@@ -6,7 +6,7 @@ import type {
   MediaRef,
 } from "../campaign/model";
 import { parseImageRef, parseMapDownload, parseUnits } from "../campaign/model";
-import { clamp } from "../lib/helpers";
+import { clamp } from "../lib/clamp";
 import type { MapRunKind } from "../runlite/mapRun";
 import type { Scenario } from "../scenario/model";
 import { expandRevealed } from "./fog";

@@ -15,7 +15,7 @@ import {
 } from "@/components/ui/popover";
 import { FactionLogo } from "@/factions/FactionLogo";
 import type { FactionLogoSrc } from "@/factions/fallback";
-import { clamp } from "@/lib/helpers";
+import { clamp } from "@/lib/clamp";
 import { toRoman } from "../../../conquest/names";
 import {
   BracketFrame,
