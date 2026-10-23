@@ -21,8 +21,8 @@ The interactive mockup is in `docs/reports/onboarding/mockup.html`, which is git
 
 The wizard covers the whole window, sidebar included, like an installer.
 
-- It mounts in `main.tsx` as a sibling of `LocalisedAppFrame`, beside `Splash`. The splash stacks above it, so the wizard is already in place when the splash fades.
-- It renders inside the theme and i18n providers, so the appearance and language pages apply live.
+- It is a Coilbox plugin, `src/onboarding`, appended last in `app.plugins.ts`. picoframe wraps plugin Providers innermost-last, so its Provider sits inside the theme, settings store, router, download queue, hub and lobby providers, and draws the wizard as a fixed overlay beside its children. A sibling of `LocalisedAppFrame` would sit outside the theme and settings providers.
+- The overlay is `z-40`: above the frame, below Radix popovers (`z-50`) so selects inside the wizard open over it, and below `Splash`, so the wizard is in place when the splash fades.
 - Layout, top to bottom: a progress bar with one segment per visible page, an eyebrow line, the page title, the page body, and a footer.
 - Footer: "Skip setup" on the left. "Back", "Skip" and "Continue" on the right. The last page has "Go to Home" only.
 - Escape does nothing. Leaving goes through "Skip setup", so an accidental key press cannot lose the flow.
@@ -76,7 +76,7 @@ Downloads go through the existing download queue and the `SuggestedDownload` kin
 
 ### Engine
 
-Not a page. When the wizard opens and no engine is found, it calls `fetchNewestRecoil` and queues the install. If the wizard does not open at all, the same check still runs at that launch, so an install with nothing to ask still gets an engine.
+Not a page. While the id `engine` is unsettled and no engine is found, the onboarding Provider creates the default content folder if there is none, calls `fetchNewestRecoil` and queues the install. This runs whether or not the wizard opens. A profile's bundled engine (`useBundledEngine`) covers it, as it does for `SetupCard`. `engine` settles when the download finishes, fails or is cancelled, or when an engine is found, so it is tried once per install and `SetupCard` covers anything after that. The automatic game download in Games case 2 works the same way under the id `game`.
 
 ### Hub
 
@@ -105,9 +105,9 @@ A run that opens with `done` already settled is a "new pages" run: the player ha
 
 ### Existing installs at rollout
 
-The first time a build with the wizard runs on an install that already has settings, it writes every current page id to `onboarding.settled` without showing anything. Pages added in later releases are the only ones that reach those players.
+The first time a build with the wizard runs on an install that already has settings, it writes every current page id, plus `engine` and `game`, to `onboarding.settled` without showing anything. Pages added in later releases are the only ones that reach those players.
 
-An install counts as existing when the settings store holds any key other than `onboarding.settled` at boot, read in `main.tsx` before first render, the same way `SPLASH_ENABLED_KEY` is read today. The implementation plan has to confirm that nothing writes a setting earlier in boot on a fresh install.
+An install counts as existing when the settings file held any key when `createTauriSettingsStorage` loaded it. The seeding runs in `main.tsx` straight after that call, before anything else can write a setting, so the count is exact.
 
 ### Run setup again
 
