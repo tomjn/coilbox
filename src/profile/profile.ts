@@ -1,4 +1,4 @@
-import type { Accent, ThemeMode } from "@picoframe/frame";
+import type { Accent, Base, ThemeMode } from "@picoframe/frame";
 import { defineCommand } from "@picoframe/plugin-sdk";
 import { describeError } from "@/i18n/uiError";
 import type { ConquestNames } from "../conquest/names";
@@ -304,6 +304,8 @@ export interface Profile {
   theme?: Record<string, string>;
   /** Force a built-in accent (zinc/blue/green/rose/violet/orange) each launch. */
   accent?: Accent;
+  /** Force a built-in base (the neutral tint: zinc, slate, stone, ...) each launch. */
+  base?: Base;
   /** Force the colour scheme each launch: "light" | "dark" | "system". */
   mode?: ThemeMode;
   /**
@@ -574,16 +576,17 @@ export function loadProfile(): Promise<{
   return loadPromise;
 }
 
-// picoframe persists the theme mode/accent in these localStorage keys; its
-// `defaultMode`/`defaultAccent` only seed them when unset. localStorage is keyed by
+// picoframe persists the theme mode/accent/base in these localStorage keys; its
+// `defaultMode`/`defaultAccent`/`defaultBase` only seed them when unset. localStorage is keyed by
 // app identifier and is NOT redirected by portable mode, so a bundled build can
 // inherit a player's existing vanilla-Coilbox theme. Pre-writing these keys before
 // first render makes the profile's brand authoritative on every launch.
 const THEME_MODE_KEY = "picoframe.theme";
 const ACCENT_KEY = "picoframe.accent";
+const BASE_KEY = "picoframe.base";
 
 /**
- * Where the player's own colour scheme and accent wait while a distribution's brand
+ * Where the player's own colour scheme, accent and base wait while a distribution's brand
  * holds picoframe's keys, so an ordinary launch can hand them back (issue #1118).
  *
  * `coilbox.bootBackground` has the same shape and needs no such store, because
@@ -601,6 +604,8 @@ export interface StoredTheme {
   mode: string | null;
   /** `picoframe.accent`. */
   accent: string | null;
+  /** `picoframe.base`. */
+  base: string | null;
   /** {@link THEME_BEFORE_PROFILE_KEY}, what the player had before a brand took over. */
   before: string | null;
 }
@@ -615,6 +620,7 @@ export interface ThemeWrite {
 interface ThemeBeforeProfile {
   mode?: string | null;
   accent?: string | null;
+  base?: string | null;
 }
 
 /** Read the put-aside values, treating anything unreadable as nothing put aside. */
@@ -629,7 +635,7 @@ function parseBeforeProfile(text: string | null): ThemeBeforeProfile {
   if (!raw || typeof raw !== "object") return {};
   const fields = raw as Record<string, unknown>;
   const out: ThemeBeforeProfile = {};
-  for (const field of ["mode", "accent"] as const) {
+  for (const field of ["mode", "accent", "base"] as const) {
     if (!(field in fields)) continue;
     const value = fields[field];
     if (value === null || typeof value === "string") out[field] = value;
@@ -651,7 +657,7 @@ function parseBeforeProfile(text: string | null): ThemeBeforeProfile {
  */
 export function planProfileTheme(
   stored: StoredTheme,
-  profile: Pick<Profile, "mode" | "accent">,
+  profile: Pick<Profile, "mode" | "accent" | "base">,
 ): ThemeWrite[] {
   const before = parseBeforeProfile(stored.before);
   const keep: ThemeBeforeProfile = {};
@@ -668,6 +674,12 @@ export function planProfileTheme(
       key: ACCENT_KEY,
       stored: stored.accent,
       force: profile.accent,
+    },
+    {
+      name: "base",
+      key: BASE_KEY,
+      stored: stored.base,
+      force: profile.base,
     },
   ] as const;
   for (const field of fields) {
@@ -689,7 +701,7 @@ export function planProfileTheme(
 }
 
 /**
- * Force the profile's colour scheme (`mode`) and/or accent (`accent`) by seeding
+ * Force the profile's colour scheme (`mode`), accent (`accent`) and/or base (`base`) by seeding
  * picoframe's persisted theme keys before render, and hand the player's own values
  * back on a launch with no profile to force them. In-session changes via Appearance
  * still apply for that session. The next launch of the same distribution puts its
@@ -702,6 +714,7 @@ export function forceProfileTheme(): void {
       {
         mode: localStorage.getItem(THEME_MODE_KEY),
         accent: localStorage.getItem(ACCENT_KEY),
+        base: localStorage.getItem(BASE_KEY),
         before: localStorage.getItem(THEME_BEFORE_PROFILE_KEY),
       },
       loaded,

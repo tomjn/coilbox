@@ -261,13 +261,19 @@ Forces a built-in accent colour — the `--primary` brand hue. This recolours th
 { "version": 1, "accent": "orange" }
 ```
 
-> These are picoframe's accent axis. The neutral **base** tint (zinc, slate, gray,
-> stone, …) is a separate control and isn't set from a profile — reach for `theme`
-> (below) if you need to touch base tokens.
-
 > Prefer `accent` over hand-rolling `theme` colours for the brand accent — it's one
 > line and stays consistent across light/dark. Use `theme` (below) only for tokens
 > the named accents don't cover.
+
+### `base` (string)
+
+Forces a built-in base, the neutral tint behind the whole shell. It is separate from `accent`, and uses the same force-each-launch / session-override behaviour. The full set of bases:
+
+`zinc`, `slate`, `gray`, `stone`, `neutral`, `rose`, `red`, `amber`, `green`, `teal`, `blue`, `indigo`, `violet`, `purple`, `sky`, `navy`, `fuchsia`, `orange`, `lime`, `emerald`, `yellow`, `crimson`.
+
+```json
+{ "version": 1, "base": "slate" }
+```
 
 ### `hide` (string[])
 

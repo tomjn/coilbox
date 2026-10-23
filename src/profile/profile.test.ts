@@ -13,6 +13,7 @@ import { type Profile, planProfileTheme } from "./profile";
 
 const MODE_KEY = "picoframe.theme";
 const ACCENT_KEY = "picoframe.accent";
+const BASE_KEY = "picoframe.base";
 const BEFORE_KEY = "coilbox.theme.beforeProfile";
 
 type Store = Map<string, string>;
@@ -22,11 +23,15 @@ type Store = Map<string, string>;
  * what happens across a sequence of these, so the tests below run them in order
  * against a single store rather than asserting one plan at a time.
  */
-function launch(store: Store, profile: Pick<Profile, "mode" | "accent">): void {
+function launch(
+  store: Store,
+  profile: Pick<Profile, "mode" | "accent" | "base">,
+): void {
   const writes = planProfileTheme(
     {
       mode: store.get(MODE_KEY) ?? null,
       accent: store.get(ACCENT_KEY) ?? null,
+      base: store.get(BASE_KEY) ?? null,
       before: store.get(BEFORE_KEY) ?? null,
     },
     profile,
@@ -47,11 +52,15 @@ function playerPicks(store: Store, accent: string): void {
  * which are themselves JSON, so writing them out by hand means two levels of
  * quoting for no gain.
  */
-function putAside(fields: { mode?: string | null; accent?: string | null }) {
+function putAside(fields: {
+  mode?: string | null;
+  accent?: string | null;
+  base?: string | null;
+}) {
   return JSON.stringify(fields);
 }
 
-const VANILLA: Pick<Profile, "mode" | "accent"> = {};
+const VANILLA: Pick<Profile, "mode" | "accent" | "base"> = {};
 
 describe("planProfileTheme", () => {
   it("writes nothing on a first ever launch with no profile", () => {
@@ -170,10 +179,47 @@ describe("planProfileTheme", () => {
         {
           mode: null,
           accent: settled.get(ACCENT_KEY) ?? null,
+          base: null,
           before: settled.get(BEFORE_KEY) ?? null,
         },
         { accent: "orange" },
       ),
     ).toEqual([]);
+  });
+});
+
+describe("planProfileTheme base", () => {
+  it("forces the base and puts the player's base aside", () => {
+    const store: Store = new Map();
+    store.set(BASE_KEY, '"stone"');
+    launch(store, { base: "slate" });
+    expect(store.get(BASE_KEY)).toBe('"slate"');
+    expect(store.get(BEFORE_KEY)).toBe(putAside({ base: '"stone"' }));
+  });
+
+  it("hands the base back on the ordinary launch after a branded one", () => {
+    const store: Store = new Map();
+    store.set(BASE_KEY, '"stone"');
+    launch(store, { base: "slate" });
+    launch(store, VANILLA);
+    expect(store.get(BASE_KEY)).toBe('"stone"');
+    expect(store.has(BEFORE_KEY)).toBe(false);
+  });
+
+  it("puts the base key back to unset when the player never picked one", () => {
+    const store: Store = new Map();
+    launch(store, { base: "slate" });
+    expect(store.get(BEFORE_KEY)).toBe(putAside({ base: null }));
+    launch(store, VANILLA);
+    expect(store.has(BASE_KEY)).toBe(false);
+    expect(store.has(BEFORE_KEY)).toBe(false);
+  });
+
+  it("leaves the base alone for a profile that only forces the accent", () => {
+    const store: Store = new Map();
+    store.set(BASE_KEY, '"stone"');
+    launch(store, { accent: "orange" });
+    expect(store.get(BASE_KEY)).toBe('"stone"');
+    expect(store.get(BEFORE_KEY)).toBe(putAside({ accent: null }));
   });
 });
