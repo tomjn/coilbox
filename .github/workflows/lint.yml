@@ -58,12 +58,19 @@ jobs:
         run: scripts/plural-check.sh
       - name: Typecheck
         run: bun run typecheck
+      # Each locale's translated share goes in the job summary, so a pull
+      # request that adds strings shows what it left untranslated. Only a failed
+      # extract fails this step. It calls Lingui directly with the flags
+      # `i18n:extract` uses, because under `bun run` the statistics table never
+      # reaches a pipe or a file.
+      - name: Translation coverage
+        run: |
+          bunx lingui extract --clean --verbose > "$RUNNER_TEMP/extract.log"
+          scripts/i18n-coverage.sh "$RUNNER_TEMP/extract.log" >> "$GITHUB_STEP_SUMMARY" || true
       # A translatable string added, changed or removed without re-running
       # extract leaves the catalogs behind the code, and the diff shows how.
       - name: Translation catalogs match the code
-        run: |
-          bun run i18n:extract
-          git diff --exit-code src/locales
+        run: git diff --exit-code src/locales
 
   # Vitest is the long tail of the frontend checks, so it runs in its own jobs,
   # split by file across two shards that run side by side.
