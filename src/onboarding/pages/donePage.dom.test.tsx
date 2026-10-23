@@ -10,7 +10,7 @@ import {
   PersistentStoreProvider,
   ThemeProvider,
 } from "@picoframe/frame";
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import type { QueueItem } from "@/downloads/DownloadQueueProvider";
 import { IDLE_RATE } from "@/downloads/downloadRate";
@@ -113,10 +113,36 @@ it("shows the profile's setup image when it resolves", async () => {
   expect(screen.queryByTestId("setup-mark")).toBeNull();
 });
 
+it("never shows the Coilbox mark before the setup image", async () => {
+  profile = { version: 1, setupImage: "setup.webp" };
+  let settle: (src: string | null) => void = () => {};
+  resolveImage.mockReturnValue(
+    new Promise((resolve) => {
+      settle = resolve;
+    }),
+  );
+  show();
+  expect(screen.queryByTestId("setup-mark")).toBeNull();
+  expect(screen.getByTestId("setup-pending")).toBeTruthy();
+  settle("data:image/webp;base64,AAAA");
+  expect(await screen.findByTestId("setup-image")).toBeTruthy();
+  expect(screen.queryByTestId("setup-mark")).toBeNull();
+  expect(screen.queryByTestId("setup-pending")).toBeNull();
+});
+
 it("keeps the Coilbox mark when the setup image does not resolve", async () => {
   profile = { version: 1, setupImage: "missing.webp" };
   show();
-  await vi.waitFor(() => expect(resolveImage).toHaveBeenCalled());
+  expect(await screen.findByTestId("setup-mark")).toBeTruthy();
+  expect(resolveImage).toHaveBeenCalledWith("missing.webp");
+  expect(screen.queryByTestId("setup-image")).toBeNull();
+});
+
+it("falls back to the Coilbox mark when the setup image fails to load", async () => {
+  profile = { version: 1, setupImage: "https://example.com/setup.webp" };
+  resolveImage.mockResolvedValue("https://example.com/setup.webp");
+  show();
+  fireEvent.error(await screen.findByTestId("setup-image"));
   expect(screen.getByTestId("setup-mark")).toBeTruthy();
   expect(screen.queryByTestId("setup-image")).toBeNull();
 });

@@ -17,17 +17,22 @@ const GRAPHIC = "size-48 shrink-0 md:size-64";
 export default function DonePage(_: WizardPageProps) {
   const { t } = useLingui();
   const downloads = useWizardDownloads();
-  const [image, setImage] = useState<string | null>(null);
+  const wanted = getProfile().setupImage;
+  // undefined while the profile's image resolves, so the mark never shows first.
+  const [image, setImage] = useState<string | null | undefined>(
+    wanted ? undefined : null,
+  );
 
   useEffect(() => {
+    if (!wanted) return;
     let live = true;
-    void resolveProfileImage(getProfile().setupImage).then((src) => {
+    void resolveProfileImage(wanted).then((src) => {
       if (live) setImage(src);
     });
     return () => {
       live = false;
     };
-  }, []);
+  }, [wanted]);
 
   return (
     <div className="flex min-h-full flex-col items-center justify-center gap-10 py-6 md:flex-row md:justify-between md:gap-16">
@@ -49,12 +54,15 @@ export default function DonePage(_: WizardPageProps) {
           </div>
         )}
       </div>
-      {image ? (
+      {image === undefined ? (
+        <div data-testid="setup-pending" className={GRAPHIC} />
+      ) : image ? (
         <img
           src={image}
           alt=""
           data-testid="setup-image"
           className={`${GRAPHIC} object-contain`}
+          onError={() => setImage(null)}
         />
       ) : (
         <div data-testid="setup-mark" className="text-primary">
