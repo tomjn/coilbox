@@ -1,8 +1,9 @@
 import { msg } from "@lingui/core/macro";
 import { Trans, useLingui } from "@lingui/react/macro";
-import { Button } from "@picoframe/frame";
+import { Button, cn } from "@picoframe/frame";
 import { RotateCw } from "lucide-react";
 import { useHubAccount, useHubProviders } from "../../account";
+import { ProviderLogo, providerColours, providerName } from "./ProviderLogo";
 
 /**
  * Signing in to the hub, in Settings > Coilbox hub (issue #1348).
@@ -157,22 +158,10 @@ export function TryAgainButton({
   );
 }
 
-/** How each provider the hub might list is named. Brand names, so not
- * translated. An id not here is shown as the hub sent it. */
-const PROVIDER_NAMES: Record<string, string> = {
-  discord: "Discord",
-  github: "GitHub",
-  google: "Google",
-  twitch: "Twitch",
-};
-
-export function providerName(id: string): string {
-  return PROVIDER_NAMES[id] ?? id;
-}
-
 /**
  * The sign-in buttons, wherever they are offered: one per provider the hub
- * lists, in its order (issue #2979). Each label says what the press does next -
+ * lists, in its order (issue #2979), in the provider's own colour with its mark
+ * the way the hub shows them. Each label says what the press does next -
  * a browser window opens and the sign-in finishes there - because that is the
  * surprising part of pressing it.
  *
@@ -208,13 +197,16 @@ export function SignInButton({
     <div className="flex flex-wrap gap-2">
       {providers.map((provider) => {
         const name = providerName(provider);
+        const colours = providerColours(provider);
         return (
           <Button
             key={provider}
             size={size}
-            variant={variant}
+            variant={colours ? "default" : variant}
+            className={cn(colours && cn("text-white", colours))}
             onClick={() => void onSignIn(provider)}
           >
+            <ProviderLogo provider={provider} />
             {t`Sign in with ${name}`}
           </Button>
         );
