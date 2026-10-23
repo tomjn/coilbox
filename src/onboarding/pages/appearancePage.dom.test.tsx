@@ -38,7 +38,6 @@ function show() {
       <ThemeProvider>
         <Wizard
           pages={["appearance", "done"]}
-          newPagesRun={false}
           onSettle={() => {}}
           onClose={() => {}}
           downloads={[]}

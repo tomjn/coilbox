@@ -14,3 +14,6 @@ export type BackgroundId = (typeof BACKGROUND_IDS)[number];
 export type SettleId = PageId | BackgroundId;
 
 export const SETTLED_KEY = "onboarding.settled";
+
+/** The id of the wizard's heading, which names the dialog. */
+export const WIZARD_TITLE_ID = "onboarding-title";

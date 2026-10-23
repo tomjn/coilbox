@@ -1,55 +1,66 @@
 import { useLingui } from "@lingui/react/macro";
-import { useTheme } from "@picoframe/frame";
-import type { ReactNode } from "react";
+import { useEffect, useState } from "react";
 import { QueueProgress } from "@/downloads/pages/components/ProgressBar";
-import { useFrameStrings } from "@/i18n/frameStrings";
-import { useResolvedLocale } from "@/i18n/language";
-import { localeDisplayName } from "@/i18n/locales";
+import CoilMark from "@/general/CoilMark";
+import { getProfile, resolveProfileImage } from "@/profile/profile";
+import { WIZARD_TITLE_ID } from "../ids";
 import { useWizardDownloads } from "../wizardContexts";
 import type { WizardPageProps } from "./registry";
 
-function Row({ label, children }: { label: string; children: ReactNode }) {
-  return (
-    <div className="flex gap-4 py-1.5">
-      <span className="w-32 shrink-0 text-muted-foreground">{label}</span>
-      <div className="min-w-0 flex-1">{children}</div>
-    </div>
-  );
-}
+const GRAPHIC = "size-48 shrink-0 md:size-64";
 
-/** What the run set up, and the downloads still going in the background. */
+/**
+ * A large heading beside the profile's setup image or the Coilbox mark, and the
+ * downloads still going in the background. The page draws its own heading, so
+ * the shell shows no title.
+ */
 export default function DonePage(_: WizardPageProps) {
   const { t } = useLingui();
-  const locale = useResolvedLocale();
-  const { mode, base, accent } = useTheme();
   const downloads = useWizardDownloads();
-  // The same names the Appearance settings section shows.
-  const strings = useFrameStrings();
-  const modeName = {
-    light: strings.light,
-    dark: strings.dark,
-    system: strings.system,
-  }[mode];
-  const baseName = strings.baseNames?.[base] ?? base;
-  const accentName = strings.accentNames?.[accent] ?? accent;
-  const games = downloads
-    .filter((item) => !item.kind.startsWith("engine"))
-    .map((item) => item.label);
+  const [image, setImage] = useState<string | null>(null);
+
+  useEffect(() => {
+    let live = true;
+    void resolveProfileImage(getProfile().setupImage).then((src) => {
+      if (live) setImage(src);
+    });
+    return () => {
+      live = false;
+    };
+  }, []);
 
   return (
-    <div className="text-sm">
-      <Row label={t`Language`}>{localeDisplayName(locale)}</Row>
-      <Row
-        label={t`Appearance`}
-      >{t`${modeName}, ${baseName} / ${accentName}`}</Row>
-      <Row label={t`Games`}>
-        {games.length > 0 ? games.join(", ") : t`None chosen`}
-      </Row>
-      {downloads.map((item) => (
-        <Row key={item.id} label={item.label}>
-          <QueueProgress item={item} />
-        </Row>
-      ))}
+    <div className="flex min-h-full flex-col items-center justify-center gap-10 py-6 md:flex-row md:justify-between md:gap-16">
+      <div className="w-full max-w-lg">
+        <h2
+          id={WIZARD_TITLE_ID}
+          className="text-5xl font-semibold tracking-tight"
+        >
+          {t`You're ready`}
+        </h2>
+        {downloads.length > 0 && (
+          <div className="mt-8 space-y-3 text-sm">
+            {downloads.map((item) => (
+              <div key={item.id} data-testid="done-download">
+                <p className="mb-1.5 text-muted-foreground">{item.label}</p>
+                <QueueProgress item={item} />
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+      {image ? (
+        <img
+          src={image}
+          alt=""
+          data-testid="setup-image"
+          className={`${GRAPHIC} object-contain`}
+        />
+      ) : (
+        <div data-testid="setup-mark" className="text-primary">
+          <CoilMark className={GRAPHIC} />
+        </div>
+      )}
     </div>
   );
 }

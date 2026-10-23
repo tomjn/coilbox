@@ -1,13 +1,10 @@
-import { msg } from "@lingui/core/macro";
 import { useLingui } from "@lingui/react/macro";
 import { Button, cn } from "@picoframe/frame";
 import { useEffect, useRef, useState } from "react";
 import type { QueueItem } from "@/downloads/DownloadQueueProvider";
 import { DownloadsPill } from "./DownloadsPill";
-import type { PageId } from "./ids";
+import { type PageId, WIZARD_TITLE_ID } from "./ids";
 import { PAGE_COMPONENTS } from "./pages/registry";
-
-const NEW_PAGES_EYEBROW = msg`New in Coilbox`;
 
 /**
  * The full window setup wizard. It settles a page only on Continue or Skip, and
@@ -16,7 +13,6 @@ const NEW_PAGES_EYEBROW = msg`New in Coilbox`;
  */
 export function Wizard({
   pages,
-  newPagesRun,
   onSettle,
   onClose,
   downloads,
@@ -24,7 +20,6 @@ export function Wizard({
   onRetryDownload,
 }: {
   pages: PageId[];
-  newPagesRun: boolean;
   onSettle(id: PageId): void;
   onClose(): void;
   downloads: QueueItem[];
@@ -35,7 +30,8 @@ export function Wizard({
   const [step, setStep] = useState(0);
   const id = pages[step];
   const last = step === pages.length - 1;
-  const { Component, eyebrow, title } = PAGE_COMPONENTS[id];
+  const page = PAGE_COMPONENTS[id];
+  const { Component } = page;
 
   const advance = () => {
     onSettle(id);
@@ -64,7 +60,7 @@ export function Wizard({
       tabIndex={-1}
       role="dialog"
       aria-modal="true"
-      aria-labelledby="onboarding-title"
+      aria-labelledby={WIZARD_TITLE_ID}
       className="fixed inset-0 z-40 flex flex-col bg-background text-foreground outline-none"
     >
       <DownloadsPill
@@ -85,15 +81,14 @@ export function Wizard({
             />
           ))}
         </div>
-        <p className="mb-1.5 text-xs text-muted-foreground">
-          {i18n._(newPagesRun ? NEW_PAGES_EYEBROW : eyebrow)}
-        </p>
-        <h2
-          id="onboarding-title"
-          className="mb-5 text-2xl font-semibold tracking-tight"
-        >
-          {i18n._(title)}
-        </h2>
+        {!page.ownHeading && (
+          <h2
+            id={WIZARD_TITLE_ID}
+            className="mb-5 text-2xl font-semibold tracking-tight"
+          >
+            {i18n._(page.title)}
+          </h2>
+        )}
         <div className="min-h-0 flex-1 overflow-auto">
           <Component
             key={id}
@@ -121,7 +116,7 @@ export function Wizard({
           </Button>
         )}
         <Button onClick={continueOn}>
-          {last ? t`Go to Home` : t`Continue`}
+          {last ? t`Start playing` : t`Continue`}
         </Button>
       </div>
     </div>

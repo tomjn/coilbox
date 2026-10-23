@@ -113,14 +113,10 @@ it("opens on a relevant page, ends on done, and settles nothing on open", () => 
   click("Continue");
   expect(screen.getByRole("heading", { name: "You're ready" })).toBeTruthy();
   expect(settled()).toContain("server");
-  // Theme names, not raw ids such as "zinc".
-  expect(
-    screen.getByText(/^(Light|Dark|System), [A-Z]\w* \/ [A-Z]\w*$/),
-  ).toBeTruthy();
   // The last page offers one way out.
   expect(screen.queryByRole("button", { name: "Skip" })).toBeNull();
   expect(screen.queryByRole("button", { name: "Back" })).toBeNull();
-  click("Go to Home");
+  click("Start playing");
   expect(wizard()).toBeNull();
   expect(settled()).toContain("done");
 });
@@ -223,17 +219,41 @@ it("shows no blank frame when the unanswered page is already settled", () => {
   expect(appIsInert()).toBe(false);
 });
 
-it("uses the new pages eyebrow once done is settled", () => {
+it("puts no eyebrow line above any page's title", () => {
+  ctx = {
+    ...IRRELEVANT,
+    languageStored: false,
+    profileMode: false,
+    lobbyAccountCount: 0,
+  };
+  show();
+  const titles: string[] = [];
+  for (;;) {
+    const heading = screen.getByRole("heading", { level: 2 });
+    titles.push(heading.textContent ?? "");
+    expect(heading.previousElementSibling?.tagName).not.toBe("P");
+    if (!screen.queryByRole("button", { name: "Skip" })) break;
+    click("Skip");
+  }
+  expect(titles).toEqual([
+    "Choose your language",
+    "Appearance",
+    "Log in to a server",
+    "You're ready",
+  ]);
+});
+
+it("ends a new pages run on its last page, with no eyebrow", () => {
   storage.set(
     SETTLED_KEY,
     JSON.stringify(["language", "appearance", "games", "hub", "done"]),
   );
   ctx = { ...IRRELEVANT, lobbyAccountCount: 0 };
   show();
-  expect(screen.getByText("New in Coilbox")).toBeTruthy();
+  expect(screen.queryByText("New in Coilbox")).toBeNull();
   expect(screen.getAllByTestId("wizard-step")).toHaveLength(1);
   // A one page run ends on that page.
-  click("Go to Home");
+  click("Start playing");
   expect(wizard()).toBeNull();
   expect(settled()).toContain("server");
 });

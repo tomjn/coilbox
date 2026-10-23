@@ -212,15 +212,12 @@ it("follows a game started on the page in the pill and on Done", async () => {
   );
   fireEvent.click(screen.getByRole("button", { name: "Continue" }));
   expect(screen.getByText("You're ready")).toBeTruthy();
-  const gamesRow = screen.getByText("Games").parentElement as HTMLElement;
-  expect(gamesRow.textContent).toContain("Game: Splinter Faction");
-  expect(gamesRow.textContent).not.toContain("None chosen");
   // The progress row, labelled with the download, beside the pill's own entry.
-  const rows = screen.getAllByText("Game: Splinter Faction");
-  const progressRow = rows
-    .map((el) => el.parentElement as HTMLElement)
-    .find((row) => row.querySelector("[role=progressbar]") && row !== gamesRow);
-  expect(progressRow).toBeTruthy();
+  const progressRow = screen
+    .getAllByText("Game: Splinter Faction")
+    .map((el) => el.closest("[data-testid=done-download]"))
+    .find(Boolean);
+  expect(progressRow?.querySelector("[role=progressbar]")).toBeTruthy();
 });
 
 it("draws no heading of its own under the wizard title", () => {

@@ -25,7 +25,6 @@ function show() {
       <ThemeProvider>
         <Wizard
           pages={["language", "done"]}
-          newPagesRun={false}
           onSettle={() => {}}
           onClose={() => {}}
           downloads={[]}

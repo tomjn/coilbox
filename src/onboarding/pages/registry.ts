@@ -24,41 +24,38 @@ export interface WizardPageProps {
   beforeContinue: { current: (() => void) | null };
 }
 
-export interface WizardPageEntry {
-  Component: FC<WizardPageProps>;
-  eyebrow: MessageDescriptor;
-  title: MessageDescriptor;
-}
+/**
+ * A page the shell heads with a title, or one that draws its own heading with
+ * `WIZARD_TITLE_ID`.
+ */
+export type WizardPageEntry = { Component: FC<WizardPageProps> } & (
+  | { ownHeading?: false; title: MessageDescriptor }
+  | { ownHeading: true }
+);
 
 export const PAGE_COMPONENTS: Record<PageId, WizardPageEntry> = {
   language: {
     Component: LanguagePage,
-    eyebrow: msg`Welcome to Coilbox`,
     title: msg`Choose your language`,
   },
   appearance: {
     Component: AppearancePage,
-    eyebrow: msg`Make it yours`,
     title: msg`Appearance`,
   },
   games: {
     Component: GamesPage,
-    eyebrow: msg`Something to play`,
     title: msg`Download a game`,
   },
   hub: {
     Component: HubPage,
-    eyebrow: msg`Coilbox hub`,
     title: msg`Sign in to the hub`,
   },
   server: {
     Component: ServerPage,
-    eyebrow: msg`Multiplayer`,
     title: msg`Log in to a server`,
   },
   done: {
     Component: DonePage,
-    eyebrow: msg`All set`,
-    title: msg`You're ready`,
+    ownHeading: true,
   },
 };

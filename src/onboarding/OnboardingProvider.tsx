@@ -119,7 +119,6 @@ export function OnboardingProvider({ children }: { children: ReactNode }) {
           <Wizard
             key={run}
             pages={plan.pages}
-            newPagesRun={plan.newPagesRun}
             onSettle={(id) => settle([id])}
             onClose={() => setOpen(false)}
             downloads={downloads}

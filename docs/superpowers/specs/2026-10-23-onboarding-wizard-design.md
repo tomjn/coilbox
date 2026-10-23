@@ -23,8 +23,8 @@ The wizard covers the whole window, sidebar included, like an installer.
 
 - It is a Coilbox plugin, `src/onboarding`, appended last in `app.plugins.ts`. picoframe wraps plugin Providers innermost-last, so its Provider sits inside the theme, settings store, router, download queue, hub and lobby providers, and draws the wizard as a fixed overlay beside its children. A sibling of `LocalisedAppFrame` would sit outside the theme and settings providers.
 - The overlay is `z-40`: above the frame, below Radix popovers (`z-50`) so selects inside the wizard open over it, and below `Splash`, so the wizard is in place when the splash fades.
-- Layout, top to bottom: a progress bar with one segment per visible page, an eyebrow line, the page title, the page body, and a footer.
-- Footer: "Skip setup" on the left. "Back", "Skip" and "Continue" on the right. The last page has "Go to Home" only.
+- Layout, top to bottom: a progress bar with one segment per visible page, the page title, the page body, and a footer. No page has an eyebrow line. The Done page draws its own heading in place of the title.
+- Footer: "Skip setup" on the left. "Back", "Skip" and "Continue" on the right. The last page has "Start playing" only.
 - Escape does nothing. Leaving goes through "Skip setup", so an accidental key press cannot lose the flow.
 - Background downloads show as a pill in the title bar area, one entry per item with its percentage and a cancel control.
 - Components come from picoframe per `CLAUDE.md`. No inline help paragraphs.
@@ -50,7 +50,7 @@ Order and relevance:
 | `games` | no game installed, and the profile's game filter does not resolve to exactly one catalog game | Continue or Skip |
 | `hub` | `profile.hub` is not false and `useHubAccount` reports signed out | sign in, Continue or Skip |
 | `server` | `lobbyServers.accounts` holds no saved login | log in, register, Continue or Skip |
-| `done` | `done` is unsettled and at least one other page shows | Go to Home |
+| `done` | `done` is unsettled and at least one other page shows | Start playing |
 
 ### Language
 
@@ -88,7 +88,7 @@ Servers from `allServers`, with the profile's official server first. Log in and 
 
 ### Done
 
-One row each for language, appearance and games, plus a progress row for each background download. "Go to Home" never waits for downloads.
+A large "You're ready" heading on the left and the Coilbox mark on the right, or the profile's `setupImage` when it resolves, stacked on a narrow window. A progress row for each background download sits under the heading, and "Start playing" never waits for downloads.
 
 ## Which pages a launch shows
 
@@ -101,7 +101,7 @@ One setting, `onboarding.settled`, holds a list of page ids.
 5. A page is added to the list when the player continues past it or skips it. "Skip setup" adds every page in the run.
 6. Closing the app mid-run leaves the remaining pages unsettled, so they show next launch.
 
-A run that opens with `done` already settled is a "new pages" run: the player has finished setup before, or the install was seeded at rollout. It uses "New in Coilbox" as the eyebrow and has no Done page. A first run closed partway leaves `done` unsettled, so its next launch still ends on Done.
+A run that opens with `done` already settled is a "new pages" run: the player has finished setup before, or the install was seeded at rollout. It has no Done page. A first run closed partway leaves `done` unsettled, so its next launch still ends on Done.
 
 ### Existing installs at rollout
 

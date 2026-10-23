@@ -83,7 +83,6 @@ function show() {
       <ThemeProvider>
         <Wizard
           pages={["server", "done"]}
-          newPagesRun={false}
           onSettle={onSettle}
           onClose={() => {}}
           downloads={[]}
