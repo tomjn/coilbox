@@ -1,6 +1,6 @@
 //! Coilbox hub account (Rust half).
 //!
-//! Ten commands: three about who is signed in to the hub, one that publishes as
+//! Eleven commands: four about signing in to the hub and who is signed in, one that publishes as
 //! them, three about sending pictures made from local archives, two about
 //! sending what coilbox read out of a map ([`maps`], issue #1736) and one about
 //! sending what it read out of a game ([`games`], issue #1875). None of them
@@ -47,7 +47,19 @@ use tauri::{
 
 use upload::{AssetUpload, AssetUploadProgress};
 
-/// `hub_sign_in`: sign in to a hub with Discord, through the system browser.
+/// `hub_providers`: which providers a hub offers to sign in with, in the order
+/// to offer them. Read from the hub on every call, so a provider the hub adds
+/// shows up without a release.
+#[tauri::command]
+async fn hub_providers(hub_url: String) -> CliResult {
+    match auth::providers(&hub_url).await {
+        Ok(providers) => CliResult::ok(json!({ "providers": providers })),
+        Err(e) => CliResult::err(auth::explain(&e, &hub_url)),
+    }
+}
+
+/// `hub_sign_in`: sign in to a hub with one of the providers `hub_providers`
+/// listed, through the system browser.
 ///
 /// Resolves only once the user has finished there, which can take a minute, and
 /// fails if they never do. What comes back is who signed in. The refresh token goes
@@ -59,10 +71,10 @@ use upload::{AssetUpload, AssetUploadProgress};
 /// not an error, because the session is signed in either way, and it is not
 /// nothing, because the next run may not be.
 #[tauri::command]
-async fn hub_sign_in(hub_url: String) -> CliResult {
+async fn hub_sign_in(hub_url: String, provider: String) -> CliResult {
     let open =
         |url: &str| tauri_plugin_opener::open_url(url, None::<&str>).map_err(|e| e.to_string());
-    match auth::sign_in(&hub_url, open).await {
+    match auth::sign_in(&hub_url, &provider, open).await {
         Ok(signed_in) => CliResult::ok(json!({
             "account": signed_in.identity,
             "problem": signed_in.problem,
@@ -119,13 +131,16 @@ async fn hub_account(hub_url: String) -> CliResult {
     if let Some(identity) = auth::cached_identity(&hub_url) {
         return answer(true, json!(identity), Value::Null);
     }
-    // Nothing known yet, so the stored token is spent on finding out. The token
-    // itself is dropped here: this is the one command that never needs it.
+    // Nothing known yet, so the stored token is spent on finding out, both the
+    // provider's name that comes back beside it and the name set on the hub.
     match auth::access_token(&hub_url).await {
-        Ok(_) => match auth::cached_identity(&hub_url) {
-            Some(identity) => answer(true, json!(identity), Value::Null),
-            None => answer(true, Value::Null, Value::Null),
-        },
+        Ok(token) => {
+            auth::fetch_display_name(&hub_url, &token).await;
+            match auth::cached_identity(&hub_url) {
+                Some(identity) => answer(true, json!(identity), Value::Null),
+                None => answer(true, Value::Null, Value::Null),
+            }
+        }
         Err(e) if e.needs_sign_in() => {
             answer(false, Value::Null, json!(auth::explain(&e, &hub_url)))
         }
@@ -379,6 +394,7 @@ fn hub_upload_cancel(op_id: String) -> CliResult {
 pub fn init<R: Runtime>() -> TauriPlugin<R> {
     Builder::new("coilbox-hub")
         .invoke_handler(tauri::generate_handler![
+            hub_providers,
             hub_sign_in,
             hub_sign_out,
             hub_account,

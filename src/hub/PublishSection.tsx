@@ -184,6 +184,7 @@ export function PublishSection({ code }: { code: string }) {
             className="flex-1"
           />
           <SignInButton
+            hubUrl={hubUrl}
             busy={account.busy}
             onSignIn={account.signIn}
             size="default"
@@ -210,6 +211,7 @@ export function PublishSection({ code }: { code: string }) {
           </Trans>
         </p>
         <SignInButton
+          hubUrl={hubUrl}
           busy={account.busy}
           onSignIn={account.signIn}
           size="default"

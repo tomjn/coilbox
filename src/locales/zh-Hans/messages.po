@@ -42731,6 +42731,10 @@ msgstr "视野高度"
 msgid "Sight height (old name)"
 msgstr "视野高度（旧名称）"
 
+#: src/hub/pages/components/AccountControl.tsx
+msgid "Sign in"
+msgstr "登录"
+
 #: src/lobby-servers/pages/SettingsSection.tsx
 #, fuzzy
 msgid "Sign in again"
@@ -42751,9 +42755,8 @@ msgid "Sign in to the hub"
 msgstr "登录中心"
 
 #: src/hub/pages/components/AccountControl.tsx
-#, fuzzy
-msgid "Sign in with Discord"
-msgstr "使用 Discord 登录"
+msgid "Sign in with {name}"
+msgstr "使用 {name} 登录"
 
 #: src/lobby-servers/pages/SettingsSection.tsx
 #: src/multiplayer/LobbyStatusButton.tsx

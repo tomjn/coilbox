@@ -1,8 +1,14 @@
 import { msg } from "@lingui/core/macro";
 import { Trans, useLingui } from "@lingui/react/macro";
-import { Button } from "@picoframe/frame";
+import { Button, cn } from "@picoframe/frame";
 import { RotateCw } from "lucide-react";
-import { useHubAccount } from "../../account";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import { useHubAccount, useHubProviders } from "../../account";
+import { ProviderLogo, providerColours, providerName } from "./ProviderLogo";
 
 /**
  * Signing in to the hub, in Settings > Coilbox hub (issue #1348).
@@ -78,7 +84,12 @@ export function AccountControl({ hubUrl }: { hubUrl: string }) {
           </p>
           <div className="flex flex-wrap gap-2">
             <TryAgainButton onRecheck={recheck} />
-            <SignInButton busy={busy} onSignIn={signIn} size="sm" />
+            <SignInButton
+              hubUrl={hubUrl}
+              busy={busy}
+              onSignIn={signIn}
+              size="sm"
+            />
           </div>
         </>
       ) : (
@@ -90,6 +101,7 @@ export function AccountControl({ hubUrl }: { hubUrl: string }) {
             </Trans>
           </p>
           <SignInButton
+            hubUrl={hubUrl}
             busy={busy}
             onSignIn={signIn}
             size="sm"
@@ -152,31 +164,102 @@ export function TryAgainButton({
 }
 
 /**
- * The one sign-in button, wherever it is offered. Its label says what the press
- * does next - a browser window opens and the sign-in finishes there - because
- * that is the surprising part of pressing it.
+ * The sign-in, wherever it is offered. One "Sign in" button that opens a panel
+ * with a button per provider the hub lists, in its order (issue #2979), each in
+ * the provider's own colour with its mark the way the hub shows them. A panel
+ * rather than a row because the hub will add providers, and a row of brand
+ * buttons does not fit a header. A hub listing one provider gets that
+ * provider's button directly, since a panel holding one choice is a wasted press.
+ *
+ * While a sign-in is in flight it becomes one button saying the app is
+ * waiting, which is the only sign it has not frozen during the minute the
+ * browser has. Nothing renders until the hub has said which providers it has,
+ * so nobody is offered one the hub then refuses.
  */
 export function SignInButton({
+  hubUrl,
   busy,
   onSignIn,
   size = "sm",
   variant = "outline",
 }: {
+  hubUrl: string;
   busy: boolean;
-  onSignIn: () => Promise<void>;
+  onSignIn: (provider: string) => Promise<void>;
   size?: "sm" | "default";
   variant?: "default" | "outline";
 }) {
   const { t } = useLingui();
+  const providers = useHubProviders(hubUrl);
+  if (busy) {
+    return (
+      <Button size={size} variant={variant} disabled aria-busy>
+        {t`Waiting for your browser`}
+      </Button>
+    );
+  }
+  if (!providers || providers.length === 0) return null;
+  if (providers.length === 1) {
+    return (
+      <ProviderButton
+        provider={providers[0]}
+        size={size}
+        variant={variant}
+        onSignIn={onSignIn}
+      />
+    );
+  }
+  return (
+    <Popover>
+      <PopoverTrigger asChild>
+        <Button size={size} variant={variant}>
+          {t`Sign in`}
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent align="end" className="w-64 p-2">
+        <div className="flex flex-col gap-2">
+          {providers.map((provider) => (
+            <ProviderButton
+              key={provider}
+              provider={provider}
+              size="default"
+              variant="outline"
+              onSignIn={onSignIn}
+              className="w-full justify-start"
+            />
+          ))}
+        </div>
+      </PopoverContent>
+    </Popover>
+  );
+}
+
+/** One provider's sign-in button, in its brand colour when it has one. */
+function ProviderButton({
+  provider,
+  size,
+  variant,
+  onSignIn,
+  className,
+}: {
+  provider: string;
+  size: "sm" | "default";
+  variant: "default" | "outline";
+  onSignIn: (provider: string) => Promise<void>;
+  className?: string;
+}) {
+  const { t } = useLingui();
+  const name = providerName(provider);
+  const colours = providerColours(provider);
   return (
     <Button
       size={size}
-      variant={variant}
-      onClick={() => void onSignIn()}
-      disabled={busy}
-      aria-busy={busy}
+      variant={colours ? "default" : variant}
+      className={cn(colours && cn("text-white", colours), className)}
+      onClick={() => void onSignIn(provider)}
     >
-      {busy ? t`Waiting for your browser` : t`Sign in with Discord`}
+      <ProviderLogo provider={provider} />
+      {t`Sign in with ${name}`}
     </Button>
   );
 }

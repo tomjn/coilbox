@@ -49,7 +49,7 @@ export function HeaderAccount({ hubUrl }: { hubUrl: string }) {
         // is the pair of ways out of it: ask again, or sign in regardless.
         <div className="flex items-center gap-2">
           <TryAgainButton onRecheck={recheck} />
-          <SignInButton busy={busy} onSignIn={signIn} />
+          <SignInButton hubUrl={hubUrl} busy={busy} onSignIn={signIn} />
         </div>
       ) : signedIn ? (
         <AccountPill
@@ -58,7 +58,7 @@ export function HeaderAccount({ hubUrl }: { hubUrl: string }) {
           onSignOut={signOut}
         />
       ) : (
-        <SignInButton busy={busy} onSignIn={signIn} />
+        <SignInButton hubUrl={hubUrl} busy={busy} onSignIn={signIn} />
       )}
       {busy && (
         <p className="max-w-xs text-right text-xs text-muted-foreground">

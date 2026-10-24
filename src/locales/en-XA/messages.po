@@ -34566,6 +34566,10 @@ msgstr ""
 msgid "Sight height (old name)"
 msgstr ""
 
+#: src/hub/pages/components/AccountControl.tsx
+msgid "Sign in"
+msgstr ""
+
 #: src/lobby-servers/pages/SettingsSection.tsx
 msgid "Sign in again"
 msgstr ""
@@ -34583,7 +34587,7 @@ msgid "Sign in to the hub"
 msgstr ""
 
 #: src/hub/pages/components/AccountControl.tsx
-msgid "Sign in with Discord"
+msgid "Sign in with {name}"
 msgstr ""
 
 #: src/lobby-servers/pages/SettingsSection.tsx
