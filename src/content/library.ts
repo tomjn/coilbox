@@ -470,6 +470,48 @@ function directParent(
 }
 
 /**
+ * The scanned name of the game at the bottom of each game's chain of
+ * dependencies, keyed by the scanned name of the game on top. A game with no
+ * installed dependency, whose dependencies are all missing, or that is part of a
+ * loop, has no entry.
+ */
+function chainBottoms(scanned: readonly GameItem[]): Map<string, string> {
+  const owner = ownersOf(scanned);
+  const direct = new Map<string, string>();
+  for (const g of scanned) {
+    const parent = directParent(g, owner);
+    if (parent) direct.set(g.name, parent);
+  }
+  const bottoms = new Map<string, string>();
+  for (const g of scanned) {
+    const seen = new Set([g.name]);
+    let bottom = direct.get(g.name);
+    while (bottom && direct.has(bottom) && !seen.has(bottom)) {
+      seen.add(bottom);
+      bottom = direct.get(bottom);
+    }
+    if (bottom && !seen.has(bottom)) bottoms.set(g.name, bottom);
+  }
+  return bottoms;
+}
+
+/**
+ * The base game of each mutator among the scanned games: the game at the bottom
+ * of its chain of dependencies, keyed by the mutator's scanned name. The hub
+ * facts sweep reads its base shortname from this, so the hub and the library
+ * agree on what a mutator's parent is.
+ */
+export function baseGames(scanned: readonly GameItem[]): Map<string, GameItem> {
+  const byName = new Map(scanned.map((g) => [g.name, g]));
+  const bases = new Map<string, GameItem>();
+  for (const [name, bottom] of chainBottoms(scanned)) {
+    const base = byName.get(bottom);
+    if (base) bases.set(name, base);
+  }
+  return bases;
+}
+
+/**
  * Sets `parent` on every mutator's record: the record of the game at the bottom
  * of its chain of dependencies. A game whose dependencies are all missing, or
  * that is part of a loop, has no parent.
@@ -478,25 +520,13 @@ function assignParents(
   records: Iterable<LibraryGame>,
   scanned: readonly GameItem[],
 ): void {
-  const owner = ownersOf(scanned);
   const recordOf = new Map<string, LibraryGame>();
   for (const r of records) {
     for (const g of r.installed) recordOf.set(g.name, r);
   }
-  const direct = new Map<string, string>();
-  for (const g of scanned) {
-    const parent = directParent(g, owner);
-    if (parent) direct.set(g.name, parent);
-  }
-  for (const g of scanned) {
-    const seen = new Set([g.name]);
-    let bottom = direct.get(g.name);
-    while (bottom && direct.has(bottom) && !seen.has(bottom)) {
-      seen.add(bottom);
-      bottom = direct.get(bottom);
-    }
-    const mutator = recordOf.get(g.name);
-    const base = bottom && !seen.has(bottom) ? recordOf.get(bottom) : undefined;
+  for (const [name, bottom] of chainBottoms(scanned)) {
+    const mutator = recordOf.get(name);
+    const base = recordOf.get(bottom);
     if (mutator && base && base !== mutator) mutator.parent = base.id;
   }
 }

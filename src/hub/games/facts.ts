@@ -75,6 +75,9 @@ export interface GameFacts {
    *  for a game the catalog does not recognise. The hub fills it only when
    *  its held value is still empty. */
   links?: GameLink[];
+  /** The modinfo shortname of the game this one is a mutator of. Left off for a
+   *  game with no installed parent. */
+  baseGame?: string;
   /** The start unit of each side that has one. */
   startUnits: string[];
   /** Every faction the game has. Sending them replaces the hub's held set for
