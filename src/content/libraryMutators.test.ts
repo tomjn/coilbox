@@ -93,6 +93,16 @@ describe("a mutator's parent", () => {
     ]);
   });
 
+  it("is kept apart from the base game when its name starts with the base's", () => {
+    const games = libraryOf([
+      base,
+      game("Base Game 1.0 (compat 17)", "compat.sdd", ["Base Game 1.0"]),
+    ]);
+    const baseRecord = find(games, "Base Game");
+    expect(baseRecord.installed.map((g) => g.name)).toEqual(["Base Game 1.0"]);
+    expect(find(games, "Base Game 1.0 (compat 17)").parent).toBe(baseRecord.id);
+  });
+
   it("is unset for games that depend on each other", () => {
     const games = libraryOf([
       game("Ping", "ping.sdz", ["Pong"]),

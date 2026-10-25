@@ -280,8 +280,13 @@ function buildGames(
     return { key: aliases.get(id.key) ?? id.key, title: id.title };
   };
 
+  const mutators = mutatorNames(scanned ?? []);
   for (const g of scanned ?? []) {
-    const id = resolver.byName(g.name);
+    // A mutator is never another version of its base game, even when its name
+    // starts with the base's, so it gets a record of its own.
+    const id = mutators.has(g.name)
+      ? { key: lc(g.name), title: g.name }
+      : resolver.byName(g.name);
     record(id.key, id.title).installed.push(g);
     byFile.set(lc(g.primaryArchive.name), id.key);
   }
@@ -423,44 +428,75 @@ function buildGames(
       r.sources.length === 0 && r.hub?.downloads.length === 0,
     );
   }
-  assignParents(records.values());
+  assignParents(records.values(), scanned ?? []);
   return [...records.values()].sort((a, b) => a.title.localeCompare(b.title));
 }
 
 /**
- * Sets `parent` on every record whose newest installed version depends on
- * another installed game. The engine has no mutator type, so this is the whole
- * rule. A dependency names a game by its name or its archive name, which are the
- * two forms the scan reports. A chain of mutators ends at the game at the bottom.
+ * The scanned name of each game that depends on another scanned game: a
+ * mutator, since the engine has no mutator type. A dependency names a game by
+ * its name or its archive name, which are the two forms the scan reports.
  */
-function assignParents(records: Iterable<LibraryGame>): void {
-  const all = [...records];
+function mutatorNames(scanned: readonly GameItem[]): Set<string> {
+  const owner = ownersOf(scanned);
+  return new Set(
+    scanned
+      .filter((g) => directParent(g, owner) !== undefined)
+      .map((g) => g.name),
+  );
+}
+
+/** Lowercased game name and archive name to the game's scanned name. */
+function ownersOf(scanned: readonly GameItem[]): Map<string, string> {
   const owner = new Map<string, string>();
-  for (const r of all) {
-    for (const g of r.installed) {
-      owner.set(lc(g.name), r.id);
-      owner.set(lc(g.primaryArchive.name), r.id);
-    }
+  for (const g of scanned) {
+    owner.set(lc(g.name), g.name);
+    owner.set(lc(g.primaryArchive.name), g.name);
+  }
+  return owner;
+}
+
+/** The scanned name of the first other game `g` depends on. */
+function directParent(
+  g: GameItem,
+  owner: ReadonlyMap<string, string>,
+): string | undefined {
+  for (const d of g.dependencyArchives) {
+    const parent = owner.get(lc(d.name));
+    if (parent && parent !== g.name) return parent;
+  }
+  return undefined;
+}
+
+/**
+ * Sets `parent` on every mutator's record: the record of the game at the bottom
+ * of its chain of dependencies. A game whose dependencies are all missing, or
+ * that is part of a loop, has no parent.
+ */
+function assignParents(
+  records: Iterable<LibraryGame>,
+  scanned: readonly GameItem[],
+): void {
+  const owner = ownersOf(scanned);
+  const recordOf = new Map<string, LibraryGame>();
+  for (const r of records) {
+    for (const g of r.installed) recordOf.set(g.name, r);
   }
   const direct = new Map<string, string>();
-  for (const r of all) {
-    for (const d of r.installed[0]?.dependencyArchives ?? []) {
-      const parent = owner.get(lc(d.name));
-      if (parent && parent !== r.id) {
-        direct.set(r.id, parent);
-        break;
-      }
-    }
+  for (const g of scanned) {
+    const parent = directParent(g, owner);
+    if (parent) direct.set(g.name, parent);
   }
-  for (const r of all) {
-    const seen = new Set([r.id]);
-    let bottom = direct.get(r.id);
+  for (const g of scanned) {
+    const seen = new Set([g.name]);
+    let bottom = direct.get(g.name);
     while (bottom && direct.has(bottom) && !seen.has(bottom)) {
       seen.add(bottom);
       bottom = direct.get(bottom);
     }
-    // A loop has no bottom, so none of its members is anyone's parent.
-    if (bottom && !seen.has(bottom)) r.parent = bottom;
+    const mutator = recordOf.get(g.name);
+    const base = bottom && !seen.has(bottom) ? recordOf.get(bottom) : undefined;
+    if (mutator && base && base !== mutator) mutator.parent = base.id;
   }
 }
 
