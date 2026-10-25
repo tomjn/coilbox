@@ -461,7 +461,8 @@ function directParent(
   g: GameItem,
   owner: ReadonlyMap<string, string>,
 ): string | undefined {
-  for (const d of g.dependencyArchives) {
+  // A saved list can predate the field.
+  for (const d of g.dependencyArchives ?? []) {
     const parent = owner.get(lc(d.name));
     if (parent && parent !== g.name) return parent;
   }
