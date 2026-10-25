@@ -103,6 +103,12 @@ export interface LibraryGame {
   rapidUpdate?: RapidUpdate;
   /** The queue's item for this game, running or not. */
   download?: LibraryDownload;
+  /**
+   * The `id` of the installed game this one is a mutator of, which is the game
+   * at the bottom of its chain of dependencies. Unset for a game that depends on
+   * no other installed game, and for a mutator whose parent is not installed.
+   */
+  parent?: string;
 }
 
 export interface LibraryMap {
@@ -417,7 +423,45 @@ function buildGames(
       r.sources.length === 0 && r.hub?.downloads.length === 0,
     );
   }
+  assignParents(records.values());
   return [...records.values()].sort((a, b) => a.title.localeCompare(b.title));
+}
+
+/**
+ * Sets `parent` on every record whose newest installed version depends on
+ * another installed game. The engine has no mutator type, so this is the whole
+ * rule. A dependency names a game by its name or its archive name, which are the
+ * two forms the scan reports. A chain of mutators ends at the game at the bottom.
+ */
+function assignParents(records: Iterable<LibraryGame>): void {
+  const all = [...records];
+  const owner = new Map<string, string>();
+  for (const r of all) {
+    for (const g of r.installed) {
+      owner.set(lc(g.name), r.id);
+      owner.set(lc(g.primaryArchive.name), r.id);
+    }
+  }
+  const direct = new Map<string, string>();
+  for (const r of all) {
+    for (const d of r.installed[0]?.dependencyArchives ?? []) {
+      const parent = owner.get(lc(d.name));
+      if (parent && parent !== r.id) {
+        direct.set(r.id, parent);
+        break;
+      }
+    }
+  }
+  for (const r of all) {
+    const seen = new Set([r.id]);
+    let bottom = direct.get(r.id);
+    while (bottom && direct.has(bottom) && !seen.has(bottom)) {
+      seen.add(bottom);
+      bottom = direct.get(bottom);
+    }
+    // A loop has no bottom, so none of its members is anyone's parent.
+    if (bottom && !seen.has(bottom)) r.parent = bottom;
+  }
 }
 
 function buildMaps(
