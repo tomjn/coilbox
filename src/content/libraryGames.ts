@@ -58,9 +58,9 @@ export function inGamesGrid(g: LibraryGame): boolean {
   return (
     !g.parent &&
     (!!g.hub ||
-    isOnDisk(g) ||
-    g.download?.status === "active" ||
-    g.download?.status === "queued")
+      isOnDisk(g) ||
+      g.download?.status === "active" ||
+      g.download?.status === "queued")
   );
 }
 

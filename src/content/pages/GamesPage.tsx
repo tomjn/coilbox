@@ -26,8 +26,8 @@ import {
   type GameChip,
   type GameSort,
   inGamesGrid,
-  isSearchableMutator,
   installRequest,
+  isSearchableMutator,
   matchesChip,
   matchesSearch,
   sortGames,
@@ -141,10 +141,9 @@ export default function GamesPage() {
   const shown = useMemo(
     () =>
       sortGames(
-        (search.trim()
-          ? [...records, ...mutators]
-          : records
-        ).filter((g) => matchesChip(g, chip) && matchesSearch(g, search)),
+        (search.trim() ? [...records, ...mutators] : records).filter(
+          (g) => matchesChip(g, chip) && matchesSearch(g, search),
+        ),
         sort,
       ),
     [records, mutators, chip, search, sort],

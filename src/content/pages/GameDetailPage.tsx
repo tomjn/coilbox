@@ -33,8 +33,8 @@ import {
   useUnitsyncUnitDataset,
 } from "../config";
 import { isDeletableArchive, isSdd } from "../format";
-import { mutatorsOf } from "../libraryGames";
 import { missingDependencyNotes } from "../gameDependencies";
+import { mutatorsOf } from "../libraryGames";
 import { refightFilenames, useReplayUserState } from "../replayUserState";
 import { allPlayers, factionRecordsFor, guessPrimaryPlayer } from "../stats";
 import { useCompatReport } from "../useCompatReport";
@@ -52,8 +52,8 @@ import {
   useFactionReachableCounts,
 } from "./components/FactionBuildList";
 import { GameHeader } from "./components/GameHeader";
-import { GameMutatorsTab } from "./components/GameMutatorsTab";
 import { GameLibrarySummary } from "./components/GameLibrarySummary";
+import { GameMutatorsTab } from "./components/GameMutatorsTab";
 import { GameSourcesTab } from "./components/GameSourcesTab";
 import { GameVersionsTab } from "./components/GameVersionsTab";
 import { MissionRuntimeSection } from "./components/MissionRuntimeSection";
