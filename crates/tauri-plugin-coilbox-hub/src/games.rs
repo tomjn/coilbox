@@ -173,6 +173,10 @@ pub struct GameFacts {
     /// a game the catalog does not recognise.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub links: Option<Vec<GameLink>>,
+    /// The modinfo shortname of the game this one is a mutator of. `None` for
+    /// a game with no installed parent, and then the field is not sent.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub base_game: Option<String>,
     /// The start unit of each side that has one, which is what roots the build
     /// graph the faction keys came from.
     #[serde(default)]
@@ -283,6 +287,9 @@ fn check_and_build(game: &GameFacts) -> Result<String, String> {
             .collect();
         built["links"] = serde_json::json!(trimmed);
     }
+    if let Some(base_game) = &game.base_game {
+        built["baseGame"] = serde_json::json!(base_game.trim());
+    }
     let body = built.to_string();
     if body.len() > MAX_BYTES {
         return Err(format!(
@@ -349,6 +356,15 @@ fn check_game(game: &GameFacts) -> Result<(), String> {
     }
     if let Some(description) = &game.description {
         optional_text("description", description, MAX_DESCRIPTION)?;
+    }
+    if let Some(base_game) = &game.base_game {
+        text("baseGame", base_game, MAX_SHORTNAME)?;
+        if base_game.trim().eq_ignore_ascii_case(game.shortname.trim()) {
+            return Err(format!(
+                "{} names itself as its base game, which the hub refuses.",
+                game.shortname.trim()
+            ));
+        }
     }
     if let Some(links) = &game.links {
         if links.len() > MAX_LINKS {
@@ -492,6 +508,7 @@ mod tests {
             name: None,
             description: None,
             links: None,
+            base_game: None,
             start_units: vec!["armcom".into(), "corcom".into()],
             factions: Some(vec![
                 faction("armada", "Armada"),
@@ -617,6 +634,57 @@ mod tests {
             sent["links"],
             serde_json::json!([{ "label": "Website", "url": "https://splinterfaction.info/" }])
         );
+    }
+
+    /// A mutator names the game it is built on, trimmed, as `baseGame`.
+    #[test]
+    fn a_mutator_sends_its_base_game() {
+        let facts = GameFacts {
+            base_game: Some("  zk  ".into()),
+            ..game()
+        };
+        let sent: Value = serde_json::from_str(&check_and_build(&facts).unwrap()).unwrap();
+        assert_eq!(sent["baseGame"], "zk");
+    }
+
+    /// A game with no parent sends no `baseGame` at all, neither null nor empty.
+    #[test]
+    fn a_game_with_no_base_game_sends_none() {
+        let sent: Value = serde_json::from_str(&check_and_build(&game()).unwrap()).unwrap();
+        assert!(sent.get("baseGame").is_none());
+    }
+
+    /// The field is serialised under the hub's own spelling when the struct
+    /// itself is, and skipped when it is `None`.
+    #[test]
+    fn the_struct_serialises_base_game_only_when_set() {
+        let set = serde_json::to_value(GameFacts {
+            base_game: Some("zk".into()),
+            ..game()
+        })
+        .unwrap();
+        assert_eq!(set["baseGame"], "zk");
+        let unset = serde_json::to_value(game()).unwrap();
+        assert!(unset.get("baseGame").is_none());
+    }
+
+    /// The hub answers 400 to a game that names itself as its base, so it is
+    /// refused before it is sent. An overlong or blank name is refused too.
+    #[test]
+    fn a_bad_base_game_is_refused_before_it_is_sent() {
+        for bad in ["ba", " BA ", "", "x"] {
+            let base_game = if bad == "x" {
+                "x".repeat(65)
+            } else {
+                bad.to_string()
+            };
+            let refused = check_game(&GameFacts {
+                base_game: Some(base_game),
+                ..game()
+            })
+            .unwrap_err();
+            assert!(!refused.is_empty());
+        }
     }
 
     /// No branding catalog match, no `links` field: absent rather than an
@@ -1257,6 +1325,7 @@ mod tests {
             name: None,
             description: None,
             links: None,
+            base_game: None,
             start_units: vec!["armcom".into(), "corcom".into()],
             factions: Some(vec![
                 faction("armada", "Armada"),
