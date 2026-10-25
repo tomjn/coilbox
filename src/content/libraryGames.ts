@@ -51,15 +51,35 @@ export function isOnDisk(g: LibraryGame): boolean {
 /**
  * Whether a record belongs on the Games page. The hub's list is the catalogue
  * and the disk is the install state, so a game only a mirror lists stays off
- * the page unless it is on disk or downloading.
+ * the page unless it is on disk or downloading. A mutator belongs on its
+ * parent's page, so it is left out (see `isSearchableMutator`).
  */
 export function inGamesGrid(g: LibraryGame): boolean {
   return (
-    !!g.hub ||
-    isOnDisk(g) ||
-    g.download?.status === "active" ||
-    g.download?.status === "queued"
+    !g.parent &&
+    (!!g.hub ||
+      isOnDisk(g) ||
+      g.download?.status === "active" ||
+      g.download?.status === "queued")
   );
+}
+
+/**
+ * Whether a record is a mutator that a search may list. The grid shows one card
+ * per game, so a mutator turns up only when the player searches for it.
+ */
+export function isSearchableMutator(g: LibraryGame): boolean {
+  return !!g.parent && isOnDisk(g);
+}
+
+/** The installed mutators built on the game `parentId`, by title. */
+export function mutatorsOf(
+  games: readonly LibraryGame[],
+  parentId: string,
+): LibraryGame[] {
+  return games
+    .filter((g) => g.parent === parentId && g.installed.length > 0)
+    .sort((a, b) => a.title.localeCompare(b.title));
 }
 
 export function matchesChip(g: LibraryGame, chip: GameChip): boolean {

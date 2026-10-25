@@ -24045,6 +24045,10 @@ msgstr "Music was turned off because the last attempt to play it stopped Coilbox
 msgid "Mutator archive"
 msgstr "Mutator archive"
 
+#: src/content/pages/GameDetailPage.tsx
+msgid "Mutators"
+msgstr "Mutators"
+
 #: src/campaign/pages/components/MediaPlayer.tsx
 #: src/sound/LevelRow.tsx
 msgid "Mute {label}"
@@ -28926,6 +28930,7 @@ msgstr "Planet Wars"
 #: src/conquest/index.ts
 #: src/content/pages/components/GameCard.tsx
 #: src/content/pages/components/GameHeader.tsx
+#: src/content/pages/components/GameMutatorsTab.tsx
 #: src/content/pages/components/LibraryMapCard.tsx
 #: src/content/pages/components/ReplayPlaybackBar.tsx
 #: src/lego/pages/components/ActionsDrawer.tsx

@@ -29721,6 +29721,10 @@ msgstr "La musique a été coupée car la dernière tentative de lecture a bloqu
 msgid "Mutator archive"
 msgstr "Archive du mutateur"
 
+#: src/content/pages/GameDetailPage.tsx
+msgid "Mutators"
+msgstr ""
+
 #: src/campaign/pages/components/MediaPlayer.tsx
 #: src/sound/LevelRow.tsx
 #, fuzzy
@@ -35772,6 +35776,7 @@ msgstr "Planet Wars"
 #: src/conquest/index.ts
 #: src/content/pages/components/GameCard.tsx
 #: src/content/pages/components/GameHeader.tsx
+#: src/content/pages/components/GameMutatorsTab.tsx
 #: src/content/pages/components/LibraryMapCard.tsx
 #: src/content/pages/components/ReplayPlaybackBar.tsx
 #: src/lego/pages/components/ActionsDrawer.tsx

@@ -152,6 +152,7 @@ vi.mock("../branding", () => ({ useBrandingEntry: () => null }));
 vi.mock("../useGameLibrary", () => ({
   useGameLibrary: () => ({
     record: undefined,
+    library: { games: [] },
     versions: { rows: [], snapshots: [] },
     indexAge: null,
     rapidLoading: false,

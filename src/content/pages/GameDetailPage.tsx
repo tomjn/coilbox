@@ -34,6 +34,7 @@ import {
 } from "../config";
 import { isDeletableArchive, isSdd } from "../format";
 import { missingDependencyNotes } from "../gameDependencies";
+import { mutatorsOf } from "../libraryGames";
 import { refightFilenames, useReplayUserState } from "../replayUserState";
 import { allPlayers, factionRecordsFor, guessPrimaryPlayer } from "../stats";
 import { useCompatReport } from "../useCompatReport";
@@ -52,6 +53,7 @@ import {
 } from "./components/FactionBuildList";
 import { GameHeader } from "./components/GameHeader";
 import { GameLibrarySummary } from "./components/GameLibrarySummary";
+import { GameMutatorsTab } from "./components/GameMutatorsTab";
 import { GameSourcesTab } from "./components/GameSourcesTab";
 import { GameVersionsTab } from "./components/GameVersionsTab";
 import { MissionRuntimeSection } from "./components/MissionRuntimeSection";
@@ -187,6 +189,16 @@ export default function GameDetailPage() {
     if (wantsCompat) setTab("compat");
   }, [wantsCompat]);
   const advanced = useAdvancedMode();
+  const mutators = useMemo(
+    () => (lib.record ? mutatorsOf(lib.library.games, lib.record.id) : []),
+    [lib.record, lib.library.games],
+  );
+  const parentRecord = lib.record?.parent
+    ? lib.library.games.find((r) => r.id === lib.record?.parent)
+    : undefined;
+  const parent = parentRecord?.installed[0]
+    ? { name: parentRecord.installed[0].name, title: parentRecord.title }
+    : undefined;
 
   if (error && !data)
     return (
@@ -286,11 +298,17 @@ export default function GameDetailPage() {
         enginePath={selected?.enginePath}
         dataDir={selected?.rootPath}
         onPlay={() => playGame(game.name)}
+        parent={parent}
       />
 
       <Tabs
         className="gap-4"
-        value={tab === "advanced" && !advanced ? "overview" : tab}
+        value={
+          (tab === "advanced" && !advanced) ||
+          (tab === "mutators" && mutators.length === 0)
+            ? "overview"
+            : tab
+        }
         onValueChange={setTab}
       >
         <TabsList>
@@ -303,6 +321,11 @@ export default function GameDetailPage() {
           <TabsTrigger value="sources">
             <Trans>Sources</Trans>
           </TabsTrigger>
+          {mutators.length > 0 && (
+            <TabsTrigger value="mutators">
+              <Trans>Mutators</Trans>
+            </TabsTrigger>
+          )}
           <TabsTrigger value="options">
             <Trans>Options</Trans>
           </TabsTrigger>
@@ -332,6 +355,9 @@ export default function GameDetailPage() {
             rows={lib.sources}
             onPin={(step) => setGamePin(lib.prefKey, step)}
           />
+        </TabsContent>
+        <TabsContent value="mutators">
+          <GameMutatorsTab mutators={mutators} onPlay={playGame} />
         </TabsContent>
         <TabsContent value="options">
           {gameInfoLoading ? (

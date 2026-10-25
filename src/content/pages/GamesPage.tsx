@@ -27,6 +27,7 @@ import {
   type GameSort,
   inGamesGrid,
   installRequest,
+  isSearchableMutator,
   matchesChip,
   matchesSearch,
   sortGames,
@@ -128,16 +129,24 @@ export default function GamesPage() {
     [library.games],
   );
   const counts = useMemo(() => chipCounts(records), [records]);
+  // A mutator is on its parent's page, and a search is the one way it is also
+  // listed here.
+  const mutators = useMemo(
+    () => library.games.filter(isSearchableMutator),
+    [library.games],
+  );
   // The player's own games until they pick a chip, or the games they could
   // get when they have none yet.
   const chip = picked ?? (counts.installed > 0 ? "installed" : "notInstalled");
   const shown = useMemo(
     () =>
       sortGames(
-        records.filter((g) => matchesChip(g, chip) && matchesSearch(g, search)),
+        (search.trim() ? [...records, ...mutators] : records).filter(
+          (g) => matchesChip(g, chip) && matchesSearch(g, search),
+        ),
         sort,
       ),
-    [records, chip, search, sort],
+    [records, mutators, chip, search, sort],
   );
 
   // Curated download suggestions, for when nothing is installed and the hub

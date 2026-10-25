@@ -27,6 +27,7 @@ export function GameHeader({
   enginePath,
   dataDir,
   onPlay,
+  parent,
 }: {
   game: GameItem;
   /** Every installed game, so the hub match tells this game from a sibling. */
@@ -34,6 +35,8 @@ export function GameHeader({
   enginePath?: string;
   dataDir?: string;
   onPlay: () => void;
+  /** The game this one is a mutator of, which the back link goes to. */
+  parent?: { name: string; title: string };
 }) {
   const { t } = useLingui();
   // Same art source as the Games grid: the batch loader keyed on cheap file
@@ -70,10 +73,15 @@ export function GameHeader({
       />
 
       <Link
-        to="/library/games"
+        to={
+          parent
+            ? `/library/games/${encodeURIComponent(parent.name)}`
+            : "/library/games"
+        }
         className="absolute left-3 top-3 inline-flex items-center gap-1 rounded bg-black/40 px-2 py-1 text-xs text-white backdrop-blur-sm hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-white"
       >
-        <ArrowLeft className="size-3.5" /> <Trans>Games</Trans>
+        <ArrowLeft className="size-3.5" />{" "}
+        {parent ? parent.title : <Trans>Games</Trans>}
       </Link>
 
       <div className="absolute inset-x-4 bottom-3 flex items-end justify-between gap-3">
