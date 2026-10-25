@@ -7,6 +7,7 @@ import {
 } from "@/content/bindings";
 import { loadBrandingCatalog, resolveBranding } from "@/content/branding";
 import { isSddName, isSdpName } from "@/content/format";
+import { baseGames } from "@/content/library";
 import { buildTechForest } from "@/content/techForest";
 import { dlRapidReleaseArchives } from "@/downloads/bindings";
 import { describeError } from "@/i18n/uiError";
@@ -149,6 +150,9 @@ export interface Sendable {
   game: GameItem;
   shortname: string;
   release: string;
+  /** The modinfo shortname of the game this one is a mutator of. Unset for a
+   *  game with no installed parent, so nothing is sent for it. */
+  baseGame?: string;
 }
 
 /**
@@ -167,6 +171,8 @@ export function gamesToSend(
 } {
   const skipped: SkippedGame[] = [];
   const best = new Map<string, Sendable>();
+  // The same parent rule the library uses, so the hub and the games list agree.
+  const bases = baseGames(games);
 
   for (const game of games) {
     if (isSddName(game.primaryArchive?.name)) {
@@ -202,11 +208,21 @@ export function gamesToSend(
     // library that has not changed makes the same choice every run, which is
     // what stops the hub's current facts moving between two installs for ever.
     const key = shortname.toLowerCase();
+    // The hub refuses a game that names itself as its base, so a parent that
+    // shares the mutator's shortname is left off.
+    const base = bases.get(game.name)?.info?.shortname?.trim();
+    const baseGame = base && base.toLowerCase() !== key ? base : undefined;
+    const entry: Sendable = {
+      game,
+      shortname,
+      release,
+      ...(baseGame ? { baseGame } : {}),
+    };
     const held = best.get(key);
     if (!held) {
-      best.set(key, { game, shortname, release });
+      best.set(key, entry);
     } else if (game.name > held.game.name) {
-      best.set(key, { game, shortname, release });
+      best.set(key, entry);
       skipped.push({ game: held.game.name, reason: "another-install" });
     } else {
       skipped.push({ game: game.name, reason: "another-install" });
@@ -300,7 +316,7 @@ export function factionKeys(
  *  the picture sweep, which sends a game's facts before its faction logos (issue
  *  #4387). */
 export function factsFor(
-  { game, shortname, release }: Sendable,
+  { game, shortname, release, baseGame }: Sendable,
   units: readonly UnitDatasetEntry[],
   sides: readonly Side[],
   brandingEntries: Awaited<ReturnType<typeof loadBrandingCatalog>>,
@@ -332,6 +348,7 @@ export function factsFor(
     ...(name ? { name } : {}),
     ...(description ? { description } : {}),
     ...(links && links.length > 0 ? { links } : {}),
+    ...(baseGame ? { baseGame } : {}),
     startUnits: sides
       .map((side) => side.startUnit?.trim())
       .filter((start): start is string => !!start),

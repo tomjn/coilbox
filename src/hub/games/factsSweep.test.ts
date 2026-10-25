@@ -521,6 +521,78 @@ describe("sweepGameFacts", () => {
   /// The stats the worker read travel to the hub untouched (issue #1876). The
   /// hub stores them as schemaless JSON and renders what arrives, so anything
   /// this reshaped would be a stat nobody could trace back to a unitdef.
+  it("sends a mutator's base game shortname", async () => {
+    const mutator = {
+      ...game("Extra Units 1", "extra1.sdz", {
+        shortname: "EXTRA",
+      }),
+      dependencyArchives: [{ name: "Balanced Annihilation 12.24" }],
+    } as GameItem;
+    const kit = tools([
+      game("Balanced Annihilation 12.24", "ba1224.sdz", { shortname: " BA " }),
+      mutator,
+    ]);
+
+    await sweepGameFacts(target, () => {}, kit);
+
+    const byShortname = Object.fromEntries(
+      kit.sent().map((facts) => [facts.shortname, facts]),
+    );
+    expect(byShortname.EXTRA.baseGame).toBe("BA");
+    expect(byShortname.BA).not.toHaveProperty("baseGame");
+  });
+
+  it("sends the bottom of a chain of mutators as the base game", async () => {
+    const on = (name: string, dep: string, shortname: string) =>
+      ({
+        ...game(name, `${shortname}.sdz`, { shortname }),
+        dependencyArchives: [{ name: dep }],
+      }) as GameItem;
+    const kit = tools([
+      game("Base 1", "base1.sdz", { shortname: "base" }),
+      on("Middle 1", "Base 1", "middle"),
+      on("Top 1", "Middle 1", "top"),
+    ]);
+
+    await sweepGameFacts(target, () => {}, kit);
+
+    const byShortname = Object.fromEntries(
+      kit.sent().map((facts) => [facts.shortname, facts]),
+    );
+    expect(byShortname.top.baseGame).toBe("base");
+    expect(byShortname.middle.baseGame).toBe("base");
+  });
+
+  it("sends no base game for a mutator whose parent is not installed", async () => {
+    const mutator = {
+      ...game("Extra Units 1", "extra1.sdz", { shortname: "EXTRA" }),
+      dependencyArchives: [{ name: "Not Installed 1" }],
+    } as GameItem;
+    const kit = tools([mutator]);
+
+    await sweepGameFacts(target, () => {}, kit);
+
+    expect(kit.sent()[0]).not.toHaveProperty("baseGame");
+  });
+
+  it("sends no base game that shares the mutator's own shortname", async () => {
+    const mutator = {
+      ...game("Zed Patch 1", "zedpatch1.sdz", { shortname: "ba" }),
+      dependencyArchives: [{ name: "Balanced Annihilation 12.24" }],
+    } as GameItem;
+    const kit = tools([
+      game("Balanced Annihilation 12.24", "ba1224.sdz", { shortname: "BA" }),
+      mutator,
+    ]);
+
+    await sweepGameFacts(target, () => {}, kit);
+
+    expect(kit.mounted()).toEqual(["zedpatch1.sdz"]);
+    for (const facts of kit.sent()) {
+      expect(facts).not.toHaveProperty("baseGame");
+    }
+  });
+
   it("sends the stats the worker read, as it read them", async () => {
     const kit = tools([game("Balanced Annihilation 12.24", "ba1224.sdz")], {
       "ba1224.sdz": [
