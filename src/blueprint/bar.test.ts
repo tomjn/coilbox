@@ -259,6 +259,65 @@ describe("strippedByBar", () => {
     expect(strippedByBar([{}, {}])).toEqual([]);
     expect(strippedByBar([])).toEqual([]);
   });
+
+  it("reports a layout's terrain steps as dropped (issue #4790)", () => {
+    const step = { kind: "smooth", shape: "area" };
+    expect(strippedByBar([], { terrain: [step] })).toEqual([
+      "1 terrain change",
+    ]);
+    expect(strippedByBar([{ id: "gate" }], { terrain: [step, step] })).toEqual([
+      "2 terrain changes",
+      "the trigger name on 1 building",
+    ]);
+  });
+
+  it("says nothing about a layout with no steps, or an empty list of them", () => {
+    expect(strippedByBar([], {})).toEqual([]);
+    expect(strippedByBar([], { terrain: [] })).toEqual([]);
+  });
+
+  it("is the report the format hands out", () => {
+    expect(barFormat.stripped([], { terrain: [{}] })).toEqual([
+      "1 terrain change",
+    ]);
+  });
+});
+
+describe("mergeBarFile with terrain steps (issue #4790)", () => {
+  const step = {
+    kind: "raise" as const,
+    shape: "wall" as const,
+    points: [
+      { x: 0, z: 0 },
+      { x: 32, z: 0 },
+    ],
+    height: 16,
+    before: 0,
+  };
+
+  it("writes the buildings of a layout that also has steps, and none of the steps", () => {
+    const plan = mergeBarFile("", [layout({ terrain: [step] })]);
+    const written = JSON.parse(plan.text);
+    expect(written.savedBlueprints).toHaveLength(1);
+    expect(written.savedBlueprints[0].units).toHaveLength(2);
+    expect(plan.text).not.toContain("terrain");
+    expect(plan.text).not.toContain('"raise"');
+  });
+
+  it("refuses a layout of steps alone, since there is nothing of it to write", () => {
+    expect(() =>
+      mergeBarFile(FIXTURE, [layout({ buildings: [], terrain: [step] })]),
+    ).toThrow(/has no buildings/);
+  });
+
+  it("refuses the whole set, so a file is never half written", () => {
+    expect(() =>
+      mergeBarFile("", [
+        layout(),
+        layout({ name: "Walls", buildings: [], terrain: [step] }),
+      ]),
+    ).toThrow(/Walls/);
+  });
 });
 
 describe("mergeBarFile", () => {
