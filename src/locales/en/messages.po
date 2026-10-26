@@ -24926,6 +24926,7 @@ msgid "No download destination set."
 msgstr "No download destination set."
 
 #: src/content/pages/components/GameCard.tsx
+#: src/content/pages/components/GameMutatorsTab.tsx
 msgid "no download source"
 msgstr "no download source"
 

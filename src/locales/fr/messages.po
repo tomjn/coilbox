@@ -30810,6 +30810,7 @@ msgid "No download destination set."
 msgstr "Aucune destination de téléchargement."
 
 #: src/content/pages/components/GameCard.tsx
+#: src/content/pages/components/GameMutatorsTab.tsx
 #, fuzzy
 msgid "no download source"
 msgstr "aucune source de téléchargement"
