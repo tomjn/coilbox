@@ -24,7 +24,8 @@
  * that uses them is `modes.tsx`.
  */
 
-import { plural, t } from "@lingui/core/macro";
+import { t } from "@lingui/core/macro";
+import { countLine } from "@/blueprint/countLine";
 import type { SnapBuilding } from "@/blueprint/footprint";
 import { recordGameName, type StoredBlueprint } from "@/blueprint/library";
 import type { BlueprintBuilding } from "@/blueprint/model";
@@ -131,14 +132,10 @@ export interface LayoutOption {
    * can never be clicked on again, so placing an empty layout would put a thing
    * in the document that the author cannot see, select or delete. Every other
    * reason a layout might be a bad fit, another game or a missing unit, is
-   * warned about and still allowed.
+   * warned about and still allowed. A layout of terrain steps alone is in this
+   * group too until a mission can apply steps (issue #4799).
    */
   disabled?: boolean;
-}
-
-/** "1 building" or "3 buildings" in the app language. */
-function buildings(count: number): string {
-  return plural(count, { one: "# building", other: "# buildings" });
 }
 
 /**
@@ -164,7 +161,7 @@ export function layoutOptions(
     label: layout.name,
     description: [
       t`In this scenario`,
-      buildings(layout.buildings.length),
+      countLine(layout.buildings.length, layout.terrain?.length ?? 0),
       placed.has(layout.id) ? null : t`not placed`,
     ]
       .filter(Boolean)
@@ -180,7 +177,10 @@ export function layoutOptions(
       label: record.layout.name,
       description: [
         t`Your library`,
-        buildings(record.layout.buildings.length),
+        countLine(
+          record.layout.buildings.length,
+          record.layout.terrain?.length ?? 0,
+        ),
         mismatch ? game : null,
       ]
         .filter(Boolean)

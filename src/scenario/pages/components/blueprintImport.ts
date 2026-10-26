@@ -18,6 +18,7 @@
  */
 
 import type { BaseBlueprint } from "@/blueprint/model";
+import { copyTerrainStep } from "@/blueprint/payload";
 import { addBase, setBlueprintOrdered } from "@/lib/scenarioEditing/bases";
 import type { Point, Scenario } from "../../model";
 
@@ -39,6 +40,7 @@ export function takeBlueprint(
     // otherwise would be inventing provenance (issue #1315).
     designedFor: layout.designedFor,
     buildings: layout.buildings,
+    terrain: layout.terrain,
   });
   return layout.ordered ? setBlueprintOrdered(placed, ids.base, true) : placed;
 }
@@ -80,6 +82,9 @@ export function carryBlueprint(
           },
         })),
         ...(layout.ordered ? { ordered: true } : {}),
+        ...(layout.terrain?.length
+          ? { terrain: layout.terrain.map(copyTerrainStep) }
+          : {}),
       },
     ],
   };

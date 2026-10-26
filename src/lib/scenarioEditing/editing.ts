@@ -364,6 +364,7 @@ export function duplicatePlacement(
       origin: shift(base.origin),
       name: layout?.name,
       designedFor: layout?.designedFor,
+      terrain: layout?.terrain,
       buildings: buildings.map((building) => ({
         def: building.def,
         offset: building.offset,

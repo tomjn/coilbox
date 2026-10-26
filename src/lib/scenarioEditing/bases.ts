@@ -44,7 +44,12 @@
  */
 
 import { BUILD_SQUARE } from "@/blueprint/footprint";
-import type { BaseBlueprint, BlueprintBuilding } from "@/blueprint/model";
+import type {
+  BaseBlueprint,
+  BlueprintBuilding,
+  TerrainStep,
+} from "@/blueprint/model";
+import { copyTerrainStep } from "@/blueprint/payload";
 import {
   type SubstitutionPlan,
   substituteQueue,
@@ -309,7 +314,8 @@ export function renameBlueprint(
  * solar moved. Copy on write is for an edit made through one base, which cannot
  * be told from a write through by looking at the base in front of you.
  *
- * A layout emptied of buildings takes its bases with it. A base with nothing in
+ * A layout emptied of buildings takes its bases with it, and the layout itself
+ * unless it has terrain steps left (issue #4790). A base with nothing in
  * it draws nothing and can never be clicked on again, so it would be a thing the
  * document held and the author could not reach.
  */
@@ -318,8 +324,20 @@ export function replaceBlueprint(
   layout: BaseBlueprint,
 ): Scenario {
   if (!scenario.blueprints.some((b) => b.id === layout.id)) return scenario;
-  if (layout.buildings.length === 0)
-    return removeBlueprint(scenario, layout.id);
+  if (layout.buildings.length === 0) {
+    // A layout of terrain steps alone is still a layout (issue #4790), but no
+    // base can be drawn from it, so the bases placed from it still go.
+    if (!layout.terrain?.length) return removeBlueprint(scenario, layout.id);
+    return {
+      ...scenario,
+      blueprints: edit<BaseBlueprint>(
+        scenario.blueprints,
+        layout.id,
+        () => layout,
+      ),
+      bases: scenario.bases.filter((base) => base.blueprint !== layout.id),
+    };
+  }
   return {
     ...scenario,
     blueprints: edit<BaseBlueprint>(
@@ -360,6 +378,9 @@ export function addBase(
      *  from somewhere else already carrying one. */
     designedFor?: string;
     buildings: PlacedBuilding[];
+    /** The layout's changes to the ground, carried over from the layout this
+     *  one is a copy of (issue #4790). */
+    terrain?: TerrainStep[];
   },
 ): Scenario {
   return {
@@ -375,6 +396,9 @@ export function addBase(
           offset: round(b.offset),
           facing: b.facing,
         })),
+        ...(base.terrain?.length
+          ? { terrain: base.terrain.map(copyTerrainStep) }
+          : {}),
       },
     ],
     bases: [

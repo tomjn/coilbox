@@ -44,6 +44,7 @@ import { Blocks, Download, Library, Pencil, Upload } from "lucide-react";
 import { useState } from "react";
 import { Link } from "react-router";
 import { barFormat } from "@/blueprint/bar";
+import { countLine } from "@/blueprint/countLine";
 import { appFileIO } from "@/blueprint/fileIO";
 import { buildGridSnap } from "@/blueprint/footprint";
 import type { ImportedBlueprint, ImportReport } from "@/blueprint/format";
@@ -425,14 +426,12 @@ export function BlueprintPanel({
                 );
                 const stripped = barFormat.stripped(
                   places.flatMap((base) => base.buildings),
+                  layout,
                 );
                 const strippedList = stripped.join(", ");
                 const buildingCount = layout.buildings.length;
                 const detail = [
-                  plural(buildingCount, {
-                    one: "# building",
-                    other: "# buildings",
-                  }),
+                  countLine(buildingCount, layout.terrain?.length ?? 0),
                   layout.ordered ? t`build order` : null,
                   // A layout stays in the scenario after the last base placed
                   // from it goes (#1424), so this list holds layouts nothing on
@@ -470,7 +469,11 @@ export function BlueprintPanel({
                         size="sm"
                         variant="ghost"
                         className="shrink-0"
-                        disabled={busy || layout.buildings.length === 0}
+                        disabled={
+                          busy ||
+                          (layout.buildings.length === 0 &&
+                            !layout.terrain?.length)
+                        }
                         onClick={() => void onKeep(layout.id)}
                       >
                         <Library className="mr-1 size-3.5" />{" "}
@@ -480,7 +483,10 @@ export function BlueprintPanel({
                         size="sm"
                         variant="ghost"
                         className="shrink-0"
-                        disabled={busy || running}
+                        // A game's file holds buildings only (issue #4790).
+                        disabled={
+                          busy || running || layout.buildings.length === 0
+                        }
                         onClick={() => onSend(layout.id, layout.name)}
                       >
                         <Download className="mr-1 size-3.5" />{" "}
@@ -510,7 +516,12 @@ export function BlueprintPanel({
                             onChange((current) =>
                               replaceBlueprint(current, next),
                             );
-                            if (next.buildings.length === 0) setEditing(null);
+                            if (
+                              next.buildings.length === 0 &&
+                              !next.terrain?.length
+                            ) {
+                              setEditing(null);
+                            }
                           }}
                         />
                       </div>
@@ -593,10 +604,7 @@ function FileContents({
               imported.unknown.length > 0 &&
               imported.unknown.length >= buildings;
             const missing = unknownUnitsWarning(imported.unknown, buildings);
-            const buildingsText = plural(buildings, {
-              one: "# building",
-              other: "# buildings",
-            });
+            const buildingsText = countLine(buildings, 0);
             return (
               <li
                 // A file is free to hold two layouts of the same name, and
