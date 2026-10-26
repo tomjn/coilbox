@@ -72,13 +72,16 @@ export function isSearchableMutator(g: LibraryGame): boolean {
   return !!g.parent && isOnDisk(g);
 }
 
-/** The installed mutators built on the game `parentId`, by title. */
+/**
+ * The mutators built on the game `parentId`, by title: the installed ones, and
+ * the hub's that are not installed yet.
+ */
 export function mutatorsOf(
   games: readonly LibraryGame[],
   parentId: string,
 ): LibraryGame[] {
   return games
-    .filter((g) => g.parent === parentId && g.installed.length > 0)
+    .filter((g) => g.parent === parentId && (g.installed.length > 0 || !!g.hub))
     .sort((a, b) => a.title.localeCompare(b.title));
 }
 

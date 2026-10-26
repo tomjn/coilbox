@@ -107,6 +107,8 @@ export interface LibraryGame {
    * The `id` of the installed game this one is a mutator of, which is the game
    * at the bottom of its chain of dependencies. Unset for a game that depends on
    * no other installed game, and for a mutator whose parent is not installed.
+   * A hub game that is not installed gets it from the hub's `base_game`, when
+   * that game is installed.
    */
   parent?: string;
 }
@@ -281,12 +283,18 @@ function buildGames(
   };
 
   const mutators = mutatorNames(scanned ?? []);
+  /** The key the resolver gives an installed mutator to its record's key. */
+  const mutatorKeys = new Map<string, string>();
+  const gameKeys = new Set<string>();
   for (const g of scanned ?? []) {
     // A mutator is never another version of its base game, even when its name
     // starts with the base's, so it gets a record of its own.
-    const id = mutators.has(g.name)
+    const isMutator = mutators.has(g.name);
+    const id = isMutator
       ? { key: lc(g.name), title: g.name }
       : resolver.byName(g.name);
+    if (isMutator) mutatorKeys.set(resolver.byName(g.name).key, id.key);
+    else gameKeys.add(id.key);
     record(id.key, id.title).installed.push(g);
     byFile.set(lc(g.primaryArchive.name), id.key);
   }
@@ -298,7 +306,11 @@ function buildGames(
       if (byTitle.installed) id = byTitle;
       else aliases.set(byTitle.key, id.key);
     }
-    const r = record(id.key, id.installed ? id.title : h.title);
+    // The hub's entry for an installed mutator joins the mutator's record.
+    const mutatorKey = gameKeys.has(id.key)
+      ? undefined
+      : mutatorKeys.get(id.key);
+    const r = record(mutatorKey ?? id.key, id.installed ? id.title : h.title);
     r.hub = h;
   }
 
@@ -429,6 +441,12 @@ function buildGames(
     );
   }
   assignParents(records.values(), scanned ?? []);
+  for (const r of records.values()) {
+    if (r.installed.length > 0 || r.parent || !r.hub?.base_game) continue;
+    const base = records.get(resolver.byShortname(r.hub.base_game).key);
+    if (!base || base === r || base.installed.length === 0) continue;
+    r.parent = base.parent ?? base.id;
+  }
   return [...records.values()].sort((a, b) => a.title.localeCompare(b.title));
 }
 
