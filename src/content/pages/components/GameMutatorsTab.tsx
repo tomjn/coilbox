@@ -49,21 +49,27 @@ export function GameMutatorsTab({
                   </span>
                 )}
               </div>
-              <Button
-                type="button"
-                size="sm"
-                variant="outline"
-                className="shrink-0 gap-1.5"
-                disabled={!canInstall || busy}
-                onClick={() => onInstall(m)}
-              >
-                {busy ? (
-                  <Loader2 className="size-4 animate-spin" />
-                ) : (
-                  <Download className="size-4" />
-                )}
-                <Trans>Install</Trans>
-              </Button>
+              {m.state === "noSource" ? (
+                <span className="shrink-0 text-xs text-destructive">
+                  <Trans>no download source</Trans>
+                </span>
+              ) : (
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  className="shrink-0 gap-1.5"
+                  disabled={!canInstall || busy}
+                  onClick={() => onInstall(m)}
+                >
+                  {busy ? (
+                    <Loader2 className="size-4 animate-spin" />
+                  ) : (
+                    <Download className="size-4" />
+                  )}
+                  <Trans>Install</Trans>
+                </Button>
+              )}
             </li>
           );
         }

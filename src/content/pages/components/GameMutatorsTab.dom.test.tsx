@@ -25,13 +25,19 @@ const hubMutator: LibraryGame = {
   parent: "bg",
 };
 
-function renderTab(overrides: { canInstall?: boolean; busy?: boolean } = {}) {
+function renderTab(
+  overrides: {
+    canInstall?: boolean;
+    busy?: boolean;
+    mutator?: LibraryGame;
+  } = {},
+) {
   const onInstall = vi.fn();
   const onPlay = vi.fn();
   render(
     <MemoryRouter>
       <GameMutatorsTab
-        mutators={[hubMutator]}
+        mutators={[overrides.mutator ?? hubMutator]}
         onPlay={onPlay}
         canInstall={overrides.canInstall ?? true}
         onInstall={onInstall}
@@ -67,5 +73,12 @@ describe("a mutator that is not installed", () => {
       (screen.getByRole("button", { name: "Install" }) as HTMLButtonElement)
         .disabled,
     ).toBe(true);
+  });
+
+  it("says it has no download source, with no Install button, when the hub gives none", () => {
+    renderTab({ mutator: { ...hubMutator, state: "noSource" } });
+    expect(screen.getByText("Hub Mode")).toBeTruthy();
+    expect(screen.getByText("no download source")).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "Install" })).toBeNull();
   });
 });
