@@ -16,7 +16,6 @@
  * written a moment after the last change, and again on the way out.
  */
 
-import { plural } from "@lingui/core/macro";
 import { Trans, useLingui } from "@lingui/react/macro";
 import { Button, useDrawer } from "@picoframe/frame";
 import {
@@ -50,6 +49,7 @@ import { notify } from "@/notify/notify";
 import { BlueprintEditor } from "@/placement/BlueprintEditor";
 import { BlueprintOnMap } from "@/placement/BlueprintOnMap";
 import { scenarioRoute } from "@/scenario/scenarios";
+import { countLine } from "../countLine";
 import {
   duplicatedBlueprint,
   footprintsFromUnits,
@@ -194,10 +194,10 @@ export default function BlueprintDetailPage() {
     ? formatDate(new Date(record.source.at))
     : "";
   const gameLine = claimedGame || t`No game named`;
-  const buildingCount = plural(buildings, {
-    one: "# building",
-    other: "# buildings",
-  });
+  const buildingCount = countLine(
+    buildings,
+    record.layout.terrain?.length ?? 0,
+  );
 
   return (
     <div className="flex flex-col gap-4 p-4">

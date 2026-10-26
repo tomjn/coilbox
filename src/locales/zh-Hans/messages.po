@@ -264,6 +264,10 @@ msgstr "“{name}”——可在单人游戏 → 预设中再次游玩。"
 msgid "\"{name}\" goes from your library. A scenario that already placed a base from it keeps its own copy."
 msgstr "“{name}”将从你的库中移除。已从中放置基地的场景会保留自己的副本。"
 
+#: src/blueprint/bar.ts
+msgid "\"{name}\" has no buildings, and a game's blueprints file holds buildings and nothing about the ground, so there is nothing of it to write."
+msgstr ""
+
 #: src/scenario/pages/components/BlueprintPanel.tsx
 #, fuzzy
 msgid "\"{name}\" is in your library."
@@ -1719,25 +1723,15 @@ msgstr "{buildingCount, plural, other {# 个基地建筑}}"
 msgid "{buildingCount, plural, one {# building, and it can be built where it stands.} other {# buildings, and every one of them can be built where it stands.}}"
 msgstr "{buildingCount, plural, other {# 个建筑，每一个都能在当前位置建造。}}"
 
-#: src/scenario/pages/components/BlueprintPanel.tsx
-#, fuzzy
-msgid "{buildingCount, plural, one {# building} other {# buildings}}"
-msgstr "{buildingCount, plural, other {# 个建筑}}"
-
 #: src/hub/pages/components/ItemPreview.tsx
 #, fuzzy
 msgid "{buildings, plural, one {# building, in build order} other {# buildings, in build order}}"
 msgstr "{buildings, plural, other {# 个建筑，按建造顺序}}"
 
-#: src/blueprint/pages/BlueprintDetailPage.tsx
-#: src/blueprint/pages/BlueprintsPage.tsx
-#: src/blueprint/pages/components/ArrivingBlueprint.tsx
-#: src/blueprint/pages/components/ArrivingPack.tsx
-#: src/blueprint/pages/components/LeavingPack.tsx
+#: src/blueprint/countLine.ts
 #: src/hub/pages/components/ItemPreview.tsx
 #: src/hub/pages/components/SetupPackContents.tsx
 #: src/placement/LayoutControls.tsx
-#: src/scenario/pages/components/BlueprintPanel.tsx
 #, fuzzy
 msgid "{buildings, plural, one {# building} other {# buildings}}"
 msgstr "{buildings, plural, other {# 个建筑}}"
@@ -1756,6 +1750,10 @@ msgstr "{buildings} · 建造顺序"
 #, fuzzy
 msgid "{buildingsText} · build order"
 msgstr "{buildingsText} · 建造顺序"
+
+#: src/blueprint/countLine.ts
+msgid "{built}, {changes}"
+msgstr ""
 
 #: src/workshop/pages/UnitPage.tsx
 #, fuzzy
@@ -2027,7 +2025,6 @@ msgid "{count, plural, one {# blocker would reach whoever plays this broken, so 
 msgstr "{count, plural, other {# 个阻碍项会导致玩家拿到损坏的内容，因此未打包：{blockers}}}"
 
 #: src/blueprint/pages/components/SubstitutionPanel.tsx
-#: src/lib/scenarioEditing/layoutPlacing.ts
 #: src/scenario/pages/components/contents.ts
 #, fuzzy
 msgid "{count, plural, one {# building} other {# buildings}}"
@@ -6263,6 +6260,11 @@ msgstr "{stepCount, plural, other {# 个条件}}"
 msgid "{stepCount, plural, one {Build order · # step} other {Build order · # steps}}"
 msgstr "{stepCount, plural, other {建造顺序 · # 步}}"
 
+#: src/blueprint/bar.ts
+#: src/blueprint/pack.ts
+msgid "{steps, plural, one {# terrain change} other {# terrain changes}}"
+msgstr ""
+
 #: src/lego/footprint.ts
 #, fuzzy
 msgid "{steps, plural, one {Footprint is # step bigger than the base on {axis}.} other {Footprint is # steps bigger than the base on {axis}.}}"
@@ -6457,6 +6459,10 @@ msgstr "{teams} 支 {size} 人队伍"
 #, fuzzy
 msgid "{teams} teams of {size}, ranked"
 msgstr "{teams} 支 {size} 人队伍，排位"
+
+#: src/blueprint/countLine.ts
+msgid "{terrain, plural, one {# terrain change} other {# terrain changes}}"
+msgstr ""
 
 #: src/content/pages/components/ReplayPlaybackBar.tsx
 #, fuzzy
@@ -30628,6 +30634,10 @@ msgstr "此回放中没有记录建造顺序。"
 msgid "No builder matches that."
 msgstr "没有匹配的建造单位。"
 
+#: src/blueprint/countLine.ts
+msgid "No buildings"
+msgstr ""
+
 #: src/content/pages/components/ReplayMap.tsx
 #, fuzzy
 msgid "No buildings were ordered in this replay."
@@ -34038,6 +34048,10 @@ msgstr "仅对没有移动类型的单位读取，即任何固定或飞行的单
 #, fuzzy
 msgid "Only shoots at"
 msgstr "只攻击"
+
+#: src/blueprint/pages/components/LeavingPack.tsx
+msgid "Only terrain changes. A game's file holds buildings and nothing about the ground, so there is nothing to write."
+msgstr ""
 
 #: src/workshop/pages/components/UnitCompareDrawer.tsx
 #, fuzzy
