@@ -357,7 +357,14 @@ export default function GameDetailPage() {
           />
         </TabsContent>
         <TabsContent value="mutators">
-          <GameMutatorsTab mutators={mutators} onPlay={playGame} />
+          <GameMutatorsTab
+            mutators={mutators}
+            onPlay={playGame}
+            canInstall={!!lib.writePath}
+            onInstall={lib.installGame}
+            installing={lib.installing}
+            failures={lib.installFailures}
+          />
         </TabsContent>
         <TabsContent value="options">
           {gameInfoLoading ? (

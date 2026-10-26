@@ -24,7 +24,13 @@ import type { ScanResult } from "./bindings";
 import { useGithubGameRepos } from "./branding";
 import { gameSourceRows } from "./gameSourceRows";
 import { type GameVersionRow, gameVersionRows } from "./gameVersionRows";
-import { gameKeys, gamePrefKey, updateRequest } from "./libraryGames";
+import type { LibraryGame } from "./library";
+import {
+  gameKeys,
+  gamePrefKey,
+  installRequest,
+  updateRequest,
+} from "./libraryGames";
 import { rapidReposOf, useGameRapidVersions } from "./useGameRapidVersions";
 import { type CatalogueRequest, useLibrary } from "./useLibrary";
 import { useUpdateSources } from "./useUpdates";
@@ -160,12 +166,37 @@ export function useGameLibrary(
     }
   };
 
+  // A mutator the player does not have yet installs from the Mutators tab.
+  const [installing, setInstalling] = useState<ReadonlySet<string>>(new Set());
+  const [installFailures, setInstallFailures] = useState<
+    Record<string, string>
+  >({});
+  const installGame = async (g: LibraryGame) => {
+    if (!writePath) return;
+    setInstalling((prev) => new Set(prev).add(g.id));
+    setInstallFailures(({ [g.id]: _, ...rest }) => rest);
+    try {
+      queue.enqueue(await installRequest(g, writePath));
+    } catch (e) {
+      setInstallFailures((prev) => ({ ...prev, [g.id]: errorText(e) }));
+    } finally {
+      setInstalling((prev) => {
+        const next = new Set(prev);
+        next.delete(g.id);
+        return next;
+      });
+    }
+  };
+
   const prefKey = record ? gamePrefKey(record) : downloadKey("game", name);
   return {
     writePath,
     statusOf,
     install,
     update,
+    installGame,
+    installing,
+    installFailures,
     updating,
     updateFailure,
     record,
