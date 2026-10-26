@@ -1,7 +1,8 @@
 import type { Facing, Point } from "../scenario/model";
 
 /**
- * A base blueprint: a named layout of buildings and nothing else (issue #1310).
+ * A base blueprint: a named layout of buildings, and optionally changes to the
+ * ground (issues #1310, #4790).
  *
  * A blueprint is the geometry a player means when they say "my opening base". It
  * names no team, stands on no map and answers to no trigger, so the same one is
@@ -46,7 +47,37 @@ export type BlueprintBuilding = {
   originalName?: string;
 };
 
-/** A named, reusable layout of buildings. */
+/**
+ * One change to the ground, placed relative to the blueprint's origin (issue
+ * #4790).
+ *
+ * Heights are relative so a blueprint fits any map. A `raise` adds its height
+ * to the ground under each point, and a negative height digs. A `level` height
+ * and the ends of a ramp are measured from the ground under the point the
+ * player holds the blueprint by when placing it. Restore, Zero-K's terraform
+ * type 5, is left out because it puts back the map's own ground, which depends
+ * on the map rather than on the blueprint.
+ *
+ * Points are offsets in elmos, snapped to the 8 elmo heightmap corner grid.
+ * The wire shape in `./payload.ts` is the same plain values.
+ */
+export type TerrainStep = {
+  kind: "level" | "raise" | "ramp" | "smooth";
+  /** An open path or a closed outline. A ramp is a path of two points. */
+  shape: "wall" | "area";
+  points: Point[];
+  /** Level and raise only. */
+  height?: number;
+  /** Ramp only: the height at each end, in the order of `points`. */
+  heights?: [number, number];
+  /** Ramp only, in elmos. */
+  width?: number;
+  /** The index in `buildings` this step comes before. `buildings.length` means
+   *  after all of them. */
+  before: number;
+};
+
+/** A named, reusable layout of buildings, and optionally changes to the ground. */
 export type BaseBlueprint = {
   id: string;
   /** What the author calls it, which is what a picker lists it by. */
@@ -80,4 +111,11 @@ export type BaseBlueprint = {
    */
   designedFor?: string;
   buildings: BlueprintBuilding[];
+  /**
+   * Changes to the ground, in build order among the buildings by each step's
+   * `before` (issue #4790). Absent on a layout that changes none, which is every
+   * layout made before terrain changes. A layout may have terrain steps and no
+   * buildings at all.
+   */
+  terrain?: TerrainStep[];
 };

@@ -1,4 +1,5 @@
 import type { BaseBlueprint, BlueprintBuilding } from "../blueprint/model";
+import { parseTerrainSteps } from "../blueprint/payload";
 import type { BattleRestrictions, SkirmishDraft } from "../play/drafts";
 import { type Participant, uniqueParticipantIds } from "../play/participants";
 import {
@@ -687,6 +688,7 @@ function parseBlueprint(b: Record<string, unknown>): BaseBlueprint | null {
   const bid = id(b.id);
   const buildings = parseLayout(b.buildings);
   if (bid === undefined || !buildings) return null;
+  const terrain = parseTerrainSteps(b.terrain, buildings.length);
   return {
     id: bid,
     // Left as it is read, blank and all. What a nameless layout is called is
@@ -700,6 +702,9 @@ function parseBlueprint(b: Record<string, unknown>): BaseBlueprint | null {
     // a map called nothing.
     designedFor: str(b.designedFor)?.trim() || undefined,
     buildings,
+    // Beside the buildings and absent on a layout that changes no ground
+    // (issue #4790), so a document without any reads back as it always did.
+    ...(terrain.length > 0 ? { terrain } : {}),
   };
 }
 
