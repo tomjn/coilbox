@@ -403,6 +403,6 @@ describe("the count line", () => {
 
   it("counts a layout's steps", () => {
     expect(terrainCount(mixed)).toBe(4);
-    expect(terrainCount({ buildings: [] })).toBe(0);
+    expect(terrainCount({})).toBe(0);
   });
 });
