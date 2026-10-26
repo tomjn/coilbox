@@ -25347,6 +25347,7 @@ msgstr "in der Mitte eingefügt"
 
 #: src/content/pages/components/Convert3doDrawer.tsx
 #: src/content/pages/components/GameCard.tsx
+#: src/content/pages/components/GameMutatorsTab.tsx
 #: src/content/pages/components/GameVersionsTab.tsx
 #: src/content/pages/components/LibraryMapCard.tsx
 #: src/deeplink/DeepLinkHandler.tsx
