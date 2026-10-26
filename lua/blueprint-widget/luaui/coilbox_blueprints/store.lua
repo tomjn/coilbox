@@ -13,9 +13,16 @@
 -- the library in the raw search order.
 --
 -- Every entry the store hands out has the same shape whatever file it came
--- from: key, name, source, ordered, game (or nil) and buildings, where a
--- building is { def, offset = { x, z }, facing }. Offsets are elmos from the
+-- from: key, name, source, ordered, game (or nil), buildings and terrain, where
+-- a building is { def, offset = { x, z }, facing }. Offsets are elmos from the
 -- layout origin and facing is 0 south, 1 east, 2 north, 3 west.
+--
+-- terrain is the layout's changes to the ground, always a list and empty for a
+-- layout with none. A step is { kind, shape, points = { { x, z } }, before,
+-- height?, heights?, width? }, the same fields coilbox writes (TerrainStep in
+-- src/blueprint/model.ts). before is how many buildings come ahead of the step,
+-- so before == #buildings means after all of them. A layout may hold steps and
+-- no buildings. BAR's file holds no terrain, so its entries have none.
 
 local M = {}
 
@@ -63,6 +70,63 @@ local function building(raw)
 	return { def = raw.def, offset = { x = x, z = z }, facing = facingOf(raw.facing) }
 end
 
+local KINDS = { level = true, raise = true, ramp = true, smooth = true }
+local SHAPES = { wall = true, area = true }
+
+--- One terrain step, or nil when it is damaged. A step of a kind this widget
+-- does not know, as a later coilbox may write, is dropped rather than guessed
+-- at, and costs the layout nothing else.
+-- @param raw any
+-- @param buildings integer how many buildings the layout kept
+local function step(raw, buildings)
+	if type(raw) ~= "table" or not KINDS[raw.kind] or not SHAPES[raw.shape] or type(raw.points) ~= "table" then
+		return nil
+	end
+	local points = {}
+	for _, p in ipairs(raw.points) do
+		if type(p) ~= "table" or type(p.x) ~= "number" or type(p.z) ~= "number" then
+			return nil
+		end
+		points[#points + 1] = { x = p.x, z = p.z }
+	end
+	local least = (raw.kind == "ramp" or raw.shape == "wall") and 2 or 3
+	if #points < least or (raw.kind == "ramp" and #points ~= 2) then
+		return nil
+	end
+	if type(raw.before) ~= "number" or raw.before < 0 or raw.before ~= math.floor(raw.before) then
+		return nil
+	end
+	local out = { kind = raw.kind, shape = raw.shape, points = points, before = math.min(raw.before, buildings) }
+	if raw.kind == "level" or raw.kind == "raise" then
+		if type(raw.height) ~= "number" then
+			return nil
+		end
+		out.height = raw.height
+	elseif raw.kind == "ramp" then
+		local h = raw.heights
+		if type(h) ~= "table" or type(h[1]) ~= "number" or type(h[2]) ~= "number" or type(raw.width) ~= "number" or raw.width <= 0 then
+			return nil
+		end
+		out.heights = { h[1], h[2] }
+		out.width = raw.width
+	end
+	return out
+end
+
+--- The steps of a library or spool entry that read, in order.
+local function terrainOf(raw, buildings)
+	local out = {}
+	if type(raw.terrain) == "table" then
+		for _, rawStep in ipairs(raw.terrain) do
+			local s = step(rawStep, buildings)
+			if s then
+				out[#out + 1] = s
+			end
+		end
+	end
+	return out
+end
+
 local function gameOf(raw)
 	if type(raw) ~= "table" then
 		return nil
@@ -81,7 +145,8 @@ local function gameOf(raw)
 end
 
 --- Parse the shape the library and the spool share. Entries without a
--- buildings array are skipped, and buildings without an offset are dropped.
+-- buildings array are skipped, and buildings without an offset are dropped. An
+-- entry with an empty buildings array is kept: it may hold terrain steps.
 local function parseShared(text, source, keyOf)
 	if text == nil then
 		return {}
@@ -116,6 +181,7 @@ local function parseShared(text, source, keyOf)
 				ordered = raw.ordered == true,
 				game = gameOf(raw.game),
 				buildings = buildings,
+				terrain = terrainOf(raw, #buildings),
 			}
 		end
 	end
@@ -200,6 +266,7 @@ function M.parseBar(text)
 				ordered = raw.ordered == true,
 				game = nil,
 				buildings = buildings,
+				terrain = {},
 			}
 		end
 	end
@@ -322,7 +389,8 @@ function Store:readSpoolText()
 end
 
 --- Append a recorded entry to the spool.
--- @param entry table name, game, designedFor, recordedAt, ordered, buildings, footprints
+-- @param entry table name, game, designedFor, recordedAt, ordered, buildings,
+--   footprints, and terrain when the layout has any
 -- @return boolean ok, string? message
 function Store:append(entry)
 	if self.io == nil then

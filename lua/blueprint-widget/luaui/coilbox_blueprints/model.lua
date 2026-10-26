@@ -388,7 +388,12 @@ local function rowDetail(item)
 	end
 	parts[#parts + 1] = SOURCE_TAGS[item.entry.source] or item.entry.source
 	local n = #item.entry.buildings
-	parts[#parts + 1] = n .. (n == 1 and " building" or " buildings")
+	local steps = #(item.entry.terrain or {})
+	local count = (n == 0 and steps > 0) and "No buildings" or (n .. (n == 1 and " building" or " buildings"))
+	if steps > 0 then
+		count = count .. ", " .. steps .. (steps == 1 and " terrain change" or " terrain changes")
+	end
+	parts[#parts + 1] = count
 	if item.entry.ordered then
 		parts[#parts + 1] = "ordered"
 	end
@@ -397,6 +402,8 @@ local function rowDetail(item)
 	end
 	return table.concat(parts, " | ")
 end
+
+M.rowDetail = rowDetail
 
 --- Up to PICS distinct def ids, in layout order.
 local function rowPics(item)
