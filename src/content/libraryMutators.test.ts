@@ -1,8 +1,10 @@
 import { describe, expect, it } from "vitest";
+import type { HubGame } from "../hub/api";
 import type { GameItem } from "./bindings";
 import { buildLibrary, type LibraryGame } from "./library";
 import {
   inGamesGrid,
+  installRequest,
   isSearchableMutator,
   matchesSearch,
   mutatorsOf,
@@ -131,5 +133,90 @@ describe("the Games grid and mutators", () => {
     expect(mutators.map((g) => g.title)).toEqual(["Deployment Mode"]);
     expect(matchesSearch(mutators[0], "deploy")).toBe(true);
     expect(matchesSearch(mutators[0], "base")).toBe(false);
+  });
+});
+
+const hubGame = (shortname: string, base: string | null): HubGame => ({
+  shortname,
+  title: `Hub ${shortname}`,
+  description: null,
+  featured: false,
+  downloads: [{ kind: "rapid", value: `${shortname}:test` }],
+  logo: null,
+  card: null,
+  faction_count: 0,
+  unit_count: 0,
+  item_count: 0,
+  base_game: base,
+});
+
+const hubLibrary = (scanned: GameItem[], hub: HubGame[]) =>
+  buildLibrary({
+    scan: { games: scanned, maps: [] },
+    files: null,
+    hubGames: hub,
+    catalogues: [],
+    queue: [],
+  }).games;
+
+describe("a hub mutator that is not installed", () => {
+  const installedBase = {
+    ...game("Base Game 1.0", "basegame_1.0.sdz"),
+    info: { shortname: "bg" },
+  };
+
+  it("goes under its installed base game and out of the grid", () => {
+    const games = hubLibrary(
+      [installedBase],
+      [hubGame("bg", null), hubGame("mode", "bg")],
+    );
+    const baseId = find(games, "Base Game").id;
+    const mode = find(games, "Hub mode");
+    expect(mode.parent).toBe(baseId);
+    expect(inGamesGrid(mode)).toBe(false);
+    expect(games.filter(inGamesGrid).map((g) => g.title)).toEqual([
+      "Base Game",
+    ]);
+    expect(mutatorsOf(games, baseId).map((g) => g.title)).toEqual(["Hub mode"]);
+  });
+
+  it("is installed from its hub sources", async () => {
+    const games = hubLibrary([installedBase], [hubGame("mode", "bg")]);
+    expect(await installRequest(find(games, "Hub mode"), "/data")).toEqual({
+      kind: "rapid",
+      label: "Hub mode",
+      args: { tag: "mode:test" },
+    });
+  });
+
+  it("stays in the grid when its base game is not in the library", () => {
+    const games = hubLibrary([], [hubGame("mode", "missing")]);
+    const mode = find(games, "Hub mode");
+    expect(mode.parent).toBeUndefined();
+    expect(inGamesGrid(mode)).toBe(true);
+  });
+
+  it("stays in the grid when its base game is only on the hub", () => {
+    const games = hubLibrary([], [hubGame("bg", null), hubGame("mode", "bg")]);
+    expect(inGamesGrid(find(games, "Hub mode"))).toBe(true);
+  });
+});
+
+describe("an installed mutator with a hub record", () => {
+  it("takes its parent from the scan, whatever the hub says", () => {
+    const scanned = [
+      {
+        ...game("Base Game 1.0", "basegame_1.0.sdz"),
+        info: { shortname: "bg" },
+      },
+      {
+        ...game("Mode Two", "two.sdz", ["Base Game 1.0"]),
+        info: { shortname: "mode" },
+      },
+    ];
+    const games = hubLibrary(scanned, [hubGame("mode", "other")]);
+    expect(find(games, "Mode Two").parent).toBe(find(games, "Base Game").id);
+    expect(find(games, "Mode Two").hub?.shortname).toBe("mode");
+    expect(games.filter((g) => g.hub?.shortname === "mode")).toHaveLength(1);
   });
 });

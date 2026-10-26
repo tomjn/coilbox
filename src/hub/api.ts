@@ -393,6 +393,8 @@ export interface HubGame {
   card: string | null;
   /** Absent from a hub that predates it. */
   banner?: string | null;
+  /** The modinfo shortname of the game this is a mutator of. Absent from a hub that predates it. */
+  base_game?: string | null;
   faction_count: number;
   unit_count: number;
   item_count: number;
