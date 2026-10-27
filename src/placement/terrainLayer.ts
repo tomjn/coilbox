@@ -216,13 +216,8 @@ export function overlayMesh(
 }
 
 export interface TerrainLayer {
-  /** Draw these marks, with one highlighted, replacing what was drawn before.
-   *  `dim` draws them faintly, for steps that are not changing the ground. */
-  draw: (
-    marks: readonly TerrainMark[],
-    selected: number | null,
-    dim: boolean,
-  ) => void;
+  /** Draw these marks, with one highlighted, replacing what was drawn before. */
+  draw: (marks: readonly TerrainMark[], selected: number | null) => void;
   dispose: () => void;
 }
 
@@ -304,14 +299,13 @@ export function createTerrainLayer(deps: {
   };
 
   return {
-    draw: (marks, selected, dim) => {
+    draw: (marks, selected) => {
       clear();
       const relief = deps.relief();
       if (!relief) {
         handle.render();
         return;
       }
-      const fade = dim ? 0.4 : 1;
       for (const mark of marks) {
         const chosen = mark.index === selected;
         if (mark.corners) {
@@ -320,8 +314,8 @@ export function createTerrainLayer(deps: {
             (x, z) => relief.heightAt(x, z),
             (x, z) => relief.baseAt(x, z),
           );
-          const face = (chosen ? SELECTED_FACE_ALPHA : FACE_ALPHA) * fade;
-          const wire = (a: number) => (chosen ? 1 : a) * fade;
+          const face = chosen ? SELECTED_FACE_ALPHA : FACE_ALPHA;
+          const wire = (a: number) => (chosen ? 1 : a);
           add(mesh.upFaces, "faces", RAISE, face, true);
           add(mesh.downFaces, "faces", DIG, face, false);
           add(
@@ -338,13 +332,7 @@ export function createTerrainLayer(deps: {
             wire(WIRE_DIG.alpha),
             false,
           );
-          add(
-            mesh.grid,
-            "lines",
-            GROUND_GRID.color,
-            GROUND_GRID.alpha * fade,
-            true,
-          );
+          add(mesh.grid, "lines", GROUND_GRID.color, GROUND_GRID.alpha, true);
         } else {
           // Not on the ground: the step as drawn, as thin lines on the ground.
           const flat: number[] = [];
@@ -359,7 +347,7 @@ export function createTerrainLayer(deps: {
             flat,
             "lines",
             GROUND_GRID.color,
-            chosen ? 1 : GROUND_GRID.alpha * fade,
+            chosen ? 1 : GROUND_GRID.alpha,
             false,
           );
         }

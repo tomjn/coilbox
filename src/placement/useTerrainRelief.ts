@@ -9,7 +9,7 @@
  * `relief` and `version` to `useScenarioUnits` in the ground's description.
  *
  * Switched off (the game's terrain switch, issue #4792) the ground is left as
- * it is and the steps are drawn faintly as the author drew them.
+ * it is and the steps are not drawn (issue #4814).
  */
 
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
@@ -223,19 +223,21 @@ export function useTerrainRelief({
     };
   }, [handle, worldWidth, worldHeight]);
 
+  // Nothing at all when the game's terrain switch is off (issue #4814), and
+  // while a build order is watched only the steps that have come into reach.
   const marks = useMemo(
     () =>
-      terrainMarks(
-        steps,
-        placement,
-        enabled ? (current?.results ?? NONE) : null,
-      ),
-    [steps, placement, enabled, current],
+      enabled
+        ? terrainMarks(steps, placement, current?.results ?? NONE).filter(
+            (mark) => live.includes(mark.index),
+          )
+        : [],
+    [steps, placement, enabled, current, live],
   );
   // Drawn after the ground it lies on, which is why `current` is a dependency.
   // biome-ignore lint/correctness/useExhaustiveDependencies: `current` is the signal that the ground under the lines moved
   useEffect(() => {
-    layer?.draw(marks, selected, !enabled);
+    layer?.draw(marks, selected);
   }, [layer, marks, selected, enabled, current]);
 
   return {
