@@ -158,8 +158,8 @@ local smooth = laidStep({ kind = "smooth", shape = "area", points = { { x = 0, z
 check("a smooth step is type 3 and carries no height", PLACE.terraformParams(smooth, { 200 }, 1, 3)[1] == 3 and PLACE.terraformParams(smooth, { 200 }, 1, 3)[7] == 0)
 local ramp = laidStep({ kind = "ramp", shape = "wall", points = { { x = 100, z = 200 }, { x = 100, z = 300 } }, heights = { 0, 24 }, width = 64, base = 100 })
 check(
-	"a ramp has its width, then each end as x, absolute y, z",
-	same(PLACE.terraformParams(ramp, { 200 }, 9, 3), { 4, 3, 100, 250, 9, 0, 64, 2, 1, 0, 100, 100, 200, 100, 124, 300, 200 }),
+	"a ramp has half its width, which the gadget doubles, then each end as x, absolute y, z",
+	same(PLACE.terraformParams(ramp, { 200 }, 9, 3), { 4, 3, 100, 250, 9, 0, 32, 2, 1, 0, 100, 100, 200, 100, 124, 300, 200 }),
 	show(PLACE.terraformParams(ramp, { 200 }, 9, 3))
 )
 

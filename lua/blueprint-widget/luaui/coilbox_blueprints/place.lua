@@ -276,7 +276,9 @@ function M.terraformParams(step, builders, tag, team)
 	elseif step.kind == "raise" then
 		height = step.height
 	elseif step.kind == "ramp" then
-		height = step.width
+		-- the step's width is the full width on the ground. Zero-K's lasso
+		-- sends half, and the gadget doubles it (unit_terraform.lua, AllowCommand)
+		height = step.width / 2
 	end
 	local out = { TERRAFORM_TYPE[step.kind], team, cx, cz, tag, step.shape == "area" and 1 or 0, height, #step.points, #builders, 0 }
 	for i, p in ipairs(step.points) do
