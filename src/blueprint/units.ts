@@ -42,6 +42,43 @@ export function knownUnits(units: { name: string }[]): KnownUnits {
   return (def) => names.has(def.toLowerCase());
 }
 
+/** The unit Zero-K's terraform gadget needs to exist
+ *  (`LuaRules/Gadgets/unit_terraform.lua`). */
+const TERRAFORM_UNIT = "terraunit";
+
+/**
+ * Whether a game can change the ground under a blueprint's terrain steps
+ * (issue #4792).
+ *
+ * True when the game's units include `terraunit`. Not `terraformSpeed`, which
+ * every game's builders have because the engine uses it to flatten the ground
+ * under a new building, and not the terraform command numbers, which Splinter
+ * Faction carries without having the gadget behind them. This is the default
+ * for the per-game switch in `./terrainSwitch.ts`, which can override it.
+ */
+export function terrainSupport(units: { name: string }[]): boolean {
+  return knownUnits(units)(TERRAFORM_UNIT);
+}
+
+/**
+ * What a card or a page says about terrain steps its game cannot make, or null
+ * when there are none to be said about (issue #4792).
+ *
+ * A layout of terrain steps alone has nothing left to place, and says so.
+ */
+export function terrainRefusal(
+  terrain: number,
+  buildings: number,
+): string | null {
+  if (terrain === 0) return null;
+  const changes = plural(terrain, {
+    one: "# terrain change this game cannot make",
+    other: "# terrain changes this game cannot make",
+  });
+  if (buildings === 0) return t`${changes}, so nothing in it can be placed`;
+  return changes;
+}
+
 /**
  * Every building of a layout the game has no unit for.
  *

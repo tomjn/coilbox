@@ -47,7 +47,7 @@ import {
   ScanFailed,
   SkeletonList,
 } from "@/content/pages/components/states";
-import { gameForIdentity } from "@/content/useGameUnits";
+import { gameForIdentity, useGameUnits } from "@/content/useGameUnits";
 import { useImportParam } from "@/deeplink/useImportParam";
 import { useRecordHubImport } from "@/hub/imports";
 import { describeError } from "@/i18n/uiError";
@@ -67,6 +67,8 @@ import {
   untitled,
 } from "../library";
 import { blueprintRoute, saveBlueprint, useBlueprintLibrary } from "../store";
+import { useTerrainChanges } from "../terrainSwitch";
+import { terrainRefusal } from "../units";
 import { useWidgetFiles } from "../useWidgetFiles";
 import { BlueprintCardMenu } from "./components/BlueprintCardMenu";
 import { BlueprintImportButton } from "./components/BlueprintImportButton";
@@ -74,6 +76,7 @@ import { BlueprintPackButton } from "./components/BlueprintPackButton";
 import { BlueprintPackWriteButton } from "./components/BlueprintPackWriteButton";
 import { BlueprintWidgetButton } from "./components/BlueprintWidgetButton";
 import { LayoutThumb } from "./components/LayoutThumb";
+import { TerrainSwitch } from "./components/TerrainSwitch";
 
 /** Every game, rather than one of them. A game's name is its archive name, so
  *  a bare word can never be one, and the select needs a value that is not the
@@ -117,6 +120,13 @@ export default function BlueprintsPage() {
         : records.filter((record) => recordGameName(record) === game),
     [records, game],
   );
+
+  // The one game the switch is for: the game picked, or the only game there is.
+  const switchGame =
+    game !== ALL_GAMES ? game : games.length === 1 ? (games[0] ?? "") : "";
+  const switchShortname = records.find(
+    (record) => recordGameName(record) === switchGame,
+  )?.layout.game?.shortname;
 
   const shownCount = shown.length;
   const totalCount = records.length;
@@ -184,23 +194,30 @@ export default function BlueprintsPage() {
 
       {scan.error && <ScanFailed noun={t`games`} reason={scan.error} />}
 
-      {games.length > 1 && (
-        <div className="flex items-center gap-2">
-          <OptionSelect
-            className="w-72"
-            size="sm"
-            value={game}
-            onValueChange={setGame}
-            options={[
-              { value: ALL_GAMES, label: t`Every game` },
-              ...games.map((name) => ({ value: name, label: name })),
-            ]}
-          />
-          <span className="text-xs text-muted-foreground">
-            <Trans>
-              {shownCount} of {totalCount}
-            </Trans>
-          </span>
+      {(games.length > 1 || switchGame) && (
+        <div className="flex items-center gap-4">
+          {games.length > 1 && (
+            <OptionSelect
+              className="w-72"
+              size="sm"
+              value={game}
+              onValueChange={setGame}
+              options={[
+                { value: ALL_GAMES, label: t`Every game` },
+                ...games.map((name) => ({ value: name, label: name })),
+              ]}
+            />
+          )}
+          {games.length > 1 && (
+            <span className="text-xs text-muted-foreground">
+              <Trans>
+                {shownCount} of {totalCount}
+              </Trans>
+            </span>
+          )}
+          {switchGame && (
+            <TerrainSwitch gameName={switchGame} shortname={switchShortname} />
+          )}
         </div>
       )}
 
@@ -268,10 +285,8 @@ function BlueprintCard({
   const { t } = useLingui();
   const buildings = record.layout.buildings.length;
   const game = recordGameName(record);
-  const buildingCount = countLine(
-    buildings,
-    record.layout.terrain?.length ?? 0,
-  );
+  const terrain = record.layout.terrain?.length ?? 0;
+  const buildingCount = countLine(buildings, terrain);
 
   return (
     <div className="relative flex h-full flex-col gap-2 rounded-lg border border-border/50 bg-card p-3 transition-colors hover:border-primary/40 hover:bg-accent/50 focus-within:border-primary/40">
@@ -303,6 +318,14 @@ function BlueprintCard({
       {/* Where it came from, so a layout out of somebody's collection does not
           look identical to one you drew (issues #1313, #1473). */}
       {record.source && <SourceLine source={record.source} />}
+      {terrain > 0 && (
+        <TerrainRefusalLine
+          game={game}
+          shortname={record.layout.game?.shortname}
+          terrain={terrain}
+          buildings={buildings}
+        />
+      )}
       {!installed && (
         <span className="text-xs text-amber-600 dark:text-amber-400">
           <Trans>That game is not installed here.</Trans>
@@ -315,6 +338,32 @@ function BlueprintCard({
         <BlueprintCardMenu record={record} taken={taken} />
       </div>
     </div>
+  );
+}
+
+/**
+ * How many terrain changes this card's game cannot make, said in the same
+ * amber as a game that is not installed (issue #4792). Its own component so a
+ * card with no terrain steps reads no unit list for it.
+ */
+function TerrainRefusalLine({
+  game,
+  shortname,
+  terrain,
+  buildings,
+}: {
+  game: string;
+  shortname?: string;
+  terrain: number;
+  buildings: number;
+}) {
+  const { units, archive } = useGameUnits(game, shortname);
+  const { enabled } = useTerrainChanges(archive, units);
+  if (enabled !== false) return null;
+  return (
+    <span className="text-xs text-amber-600 dark:text-amber-400">
+      {terrainRefusal(terrain, buildings)}
+    </span>
   );
 }
 

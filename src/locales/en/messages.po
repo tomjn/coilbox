@@ -1503,6 +1503,10 @@ msgstr "{changed} changed"
 msgid "{changed} of {buildings, plural, one {# building} other {# buildings}} said in {toSide}."
 msgstr "{changed} of {buildings, plural, one {# building} other {# buildings}} said in {toSide}."
 
+#: src/blueprint/units.ts
+msgid "{changes}, so nothing in it can be placed"
+msgstr "{changes}, so nothing in it can be placed"
+
 #: src/runlite/pages/RunPage.tsx
 msgid "{cheapest} salvage"
 msgstr "{cheapest} salvage"
@@ -5212,6 +5216,10 @@ msgstr "{teams} teams of {size}"
 #: src/multiplayer/matchmaking.ts
 msgid "{teams} teams of {size}, ranked"
 msgstr "{teams} teams of {size}, ranked"
+
+#: src/blueprint/units.ts
+msgid "{terrain, plural, one {# terrain change this game cannot make} other {# terrain changes this game cannot make}}"
+msgstr "{terrain, plural, one {# terrain change this game cannot make} other {# terrain changes this game cannot make}}"
 
 #: src/blueprint/countLine.ts
 msgid "{terrain, plural, one {# terrain change} other {# terrain changes}}"
@@ -36331,6 +36339,10 @@ msgstr "Terraform speed"
 #: src/lego/environment.ts
 msgid "Terrain"
 msgstr "Terrain"
+
+#: src/blueprint/pages/components/TerrainSwitch.tsx
+msgid "Terrain changes"
+msgstr "Terrain changes"
 
 #: src/mapconv/pages/components/AdvancedOptions.tsx
 msgid "terrain-type index per pixel"

@@ -16,6 +16,8 @@ The page is called Base blueprints. Each blueprint shows a small drawing of its 
 
 When your blueprints are for more than one game, a list above them picks one game or Every game.
 
+Next to the list is a Terrain changes switch for the game you picked. It also shows when all your blueprints are for one game. See [Which games support terrain changes](#which-games-support-terrain-changes).
+
 The buttons at the top of the page are:
 
 - Open a pack, which reads a file holding many blueprints. See [Open a pack](#open-a-pack).
@@ -112,6 +114,16 @@ A building that would sit partly off the map is marked like one the ground will 
 You can only pick up a blueprint your side can build. A blueprint with another side's buildings, such as one recorded by a player on the other faction, shows how many in its row and stays under the All tab.
 
 A building your side only gets by upgrading another, such as a Tech 2 factory that starts as a Tech 1 factory, is placed as the building it starts from. The row says how many buildings you then need to upgrade.
+
+### Which games support terrain changes
+
+Coilbox switches terrain changes on for a game that has the `terraunit` unit, which Zero-K's terraform gadget needs. Zero-K has it. Beyond All Reason, Splinter Faction and Metal Factions do not, so the switch starts off for them. You do not have to change anything for this.
+
+The Terrain changes switch is on the Blueprints page, next to the game list, once you have picked a game. It is also on the page of a blueprint that has terrain changes. Each game keeps its own setting. Turn it on for a game built on Zero-K's code that renamed `terraunit`, or off for a game that has it and where you do not want terrain changes.
+
+Turning the switch off never removes anything. A blueprint keeps its terrain changes, and they stay in a share, a pack and an export. The card and the blueprint's page say how many terrain changes the game cannot make, for example "3 terrain changes this game cannot make". A blueprint with only terrain changes stays in your library and can be shared, but has nothing to place in that game. Turn the switch back on and everything is as you left it.
+
+The widget in a match decides for itself from the builders you have selected, so this switch does not change what happens in a match. See [Place terrain changes](#place-terrain-changes).
 
 ### Place terrain changes
 
