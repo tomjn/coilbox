@@ -126,14 +126,15 @@ export interface LayoutOption {
   /** Where it lives and what it is made of, in a few words. */
   description: string;
   /**
-   * A layout with nothing in it, which is offered greyed rather than left out.
+   * A layout with no buildings and no terrain steps, which is offered greyed
+   * rather than left out.
    *
-   * The one thing here that refuses. A base with no buildings draws nothing and
-   * can never be clicked on again, so placing an empty layout would put a thing
-   * in the document that the author cannot see, select or delete. Every other
-   * reason a layout might be a bad fit, another game or a missing unit, is
-   * warned about and still allowed. A layout of terrain steps alone is in this
-   * group too until a mission can apply steps (issue #4799).
+   * The one thing here that refuses. Such a base draws nothing and changes
+   * nothing, so placing one would put a thing in the document that the author
+   * cannot see, select or delete. Every other reason a layout might be a bad
+   * fit, another game or a missing unit, is warned about and still allowed. A
+   * layout of terrain steps alone is placeable: a mission applies a base's
+   * steps (issues #4799, #4829).
    */
   disabled?: boolean;
 }
@@ -166,7 +167,9 @@ export function layoutOptions(
     ]
       .filter(Boolean)
       .join(" · "),
-    ...(layout.buildings.length === 0 ? { disabled: true } : {}),
+    ...(layout.buildings.length === 0 && !layout.terrain?.length
+      ? { disabled: true }
+      : {}),
   }));
 
   const theirs = records.map<LayoutOption>((record) => {
@@ -185,7 +188,9 @@ export function layoutOptions(
       ]
         .filter(Boolean)
         .join(" · "),
-      ...(record.layout.buildings.length === 0 ? { disabled: true } : {}),
+      ...(record.layout.buildings.length === 0 && !record.layout.terrain?.length
+        ? { disabled: true }
+        : {}),
     };
   });
 

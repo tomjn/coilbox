@@ -10,8 +10,8 @@
  *
  * Nothing here refuses on those grounds. A layout for another game is still a
  * layout somebody can want, so the warning is loud and the map still takes the
- * click. The one thing that is refused is a layout with no buildings in it, and
- * `./layoutPlacing.ts` says why.
+ * click. The one thing that is refused is a layout with no buildings and no
+ * terrain steps in it, and `@/lib/scenarioEditing/layoutPlacing.ts` says why.
  */
 
 import { Trans, useLingui } from "@lingui/react/macro";
@@ -27,6 +27,7 @@ import { unknownBuildings, unknownUnitsWarning } from "@/blueprint/units";
 import { OptionSelect } from "@/components/OptionSelect";
 import type { InstalledGameInfo } from "@/container/gameIdentity";
 import type { UnitDatasetEntry } from "@/content/bindings";
+import { blueprintShape } from "@/hub/preview";
 import {
   type LayoutChoice,
   layoutChoiceKey,
@@ -94,13 +95,15 @@ export function layoutPlacement(
  * out which was which. This is the drawing the library's own cards use, at the
  * size a dropdown row has room for.
  *
+ * A layout of terrain steps alone is drawn too, as its steps (issue #4829).
+ *
  * A library layout carries its own footprints, so it draws at the right size
  * wherever it came from. A scenario's own has none stored: they are worked out
  * from the game's units here, the same way saving one to the library works them
  * out. With the units unread every building falls back to one build square,
  * which is a rough plan rather than no plan.
  */
-function optionPreview(
+export function optionPreview(
   scenario: Scenario,
   records: readonly StoredBlueprint[],
   value: string,
@@ -115,7 +118,8 @@ function optionPreview(
           const layout = scenario.blueprints.find((b) => b.id === choice.id);
           return layout ? blueprintPayload(layout, { footprintOf }) : null;
         })();
-  if (!payload || payload.buildings.length === 0) return null;
+  // `LayoutThumb` draws nothing for a layout with no buildings and no steps.
+  if (!payload || !blueprintShape(payload)) return null;
   return (
     <span className="flex size-10 shrink-0 items-center justify-center">
       <LayoutThumb layout={payload} />

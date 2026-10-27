@@ -167,6 +167,44 @@ describe("compileScenario", () => {
     );
   });
 
+  it("exports a base made of terrain steps alone with its steps (issue #4829)", () => {
+    const emitted = compileScenario(
+      build({
+        blueprints: [
+          {
+            id: "ring",
+            name: "Wall ring",
+            buildings: [],
+            terrain: [
+              {
+                kind: "raise",
+                shape: "wall",
+                points: [
+                  { x: 0, z: 0 },
+                  { x: 64, z: 0 },
+                ],
+                height: 16,
+                before: 0,
+              },
+            ],
+          },
+        ],
+        bases: [
+          {
+            id: "b1",
+            blueprint: "ring",
+            team: "p0",
+            origin: { x: 512, z: 256 },
+            buildings: [],
+          },
+        ],
+      }),
+    );
+    expect(emitted).toContain("terrain = {");
+    expect(emitted).toContain('kind = "raise"');
+    expect(emitted).toContain("buildings = {}");
+  });
+
   it("emits a trigger's cooldown, and nothing when it has none", () => {
     const withWait = compileScenario(
       build({

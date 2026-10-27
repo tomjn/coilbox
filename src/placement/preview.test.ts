@@ -348,6 +348,14 @@ describe("nudgeToFit", () => {
     ),
   });
 
+  /** A layout of terrain steps alone has no footprint to clash with anything,
+   *  so it fits where it is (issue #4829). */
+  it("offers where it is for a layout with no buildings", () => {
+    const found = nudgeToFit([], footprintOf, [], standingOf);
+    expect(found?.squares).toEqual({ x: 0, z: 0 });
+    expect(found?.delta).toEqual({ x: 0, z: 0 });
+  });
+
   it("offers where it is when the layout already fits", () => {
     const found = nudgeToFit(
       [solarAt(1000, 1000)],

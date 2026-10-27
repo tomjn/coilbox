@@ -193,14 +193,21 @@ local quadVAO, quadVBO, quadIBO
 -- The panel's and the ground marks' buffers, grown as needed by upload().
 local panelSet = { capacity = 0 }
 local groundSet = { capacity = 0 }
--- The volumes of the terrain steps being shown, with their wire and grids
+-- The volumes of the terrain steps being shown, with their wire and grids,
+-- and a second set the next preview is uploaded into meanwhile
 local terrainSet = { capacity = 0 }
+local terrainBack = { capacity = 0 }
 local terrainMesh = nil
 local panelIndices, groundIndices = 0, 0
 local groundKey = nil
 -- What each terrain step being shown does, over the middle of it, in world
 -- space. Refilled with the ground marks and drawn by DrawScreen.
 local stepLabels = {}
+-- The ground marks and the terrain preview being worked out, in a coroutine
+-- that runs for at most PREVIEW_BUDGET_MS each frame, so a large layout is
+-- spread over several frames and the last finished preview is drawn meanwhile
+-- (issue #4811).
+local rebuild = nil
 
 local IDENTITY = { 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1 }
 local UNIT_RECT = { 0, 0, 1, 1 }
@@ -368,6 +375,7 @@ local function dropGL()
 	dropSet(panelSet)
 	dropSet(groundSet)
 	dropSet(terrainSet)
+	dropSet(terrainBack)
 	dropBuffers(quadVBO, quadIBO, quadVAO)
 	quadVBO, quadIBO, quadVAO = nil, nil, nil
 	if shader then
@@ -396,10 +404,16 @@ local function upload(set, verts, idx)
 	return #idx
 end
 
+-- How many numbers go to the engine in one upload of a preview. The largest
+-- example blueprint's 397000 numbers took 7.3 ms in one go (#4811), so a
+-- part takes about 0.15 ms.
+local UPLOAD_NUMBERS = 8192
+
 --- Upload a mesh of triangles and lines, which need fewer vertices for their
--- indices than the quads upload() is sized for.
+-- indices than the quads upload() is sized for, a part at a time.
+-- @param pause function() called after each part
 -- @return integer how many indices
-local function uploadMesh(set, verts, idx)
+local function uploadMesh(set, verts, idx, pause)
 	if #idx == 0 then
 		return 0
 	end
@@ -413,8 +427,16 @@ local function uploadMesh(set, verts, idx)
 			return 0
 		end
 	end
-	set.vbo:Upload(verts)
-	set.ibo:Upload(idx)
+	local stride = MODEL.STRIDE
+	local part = math.floor(UPLOAD_NUMBERS / stride) * stride
+	for first = 1, #verts, part do
+		set.vbo:Upload(verts, -1, (first - 1) / stride, first, math.min(first + part - 1, #verts))
+		pause()
+	end
+	for first = 1, #idx, UPLOAD_NUMBERS do
+		set.ibo:Upload(idx, -1, first - 1, first, math.min(first + UPLOAD_NUMBERS - 1, #idx))
+		pause()
+	end
 	return #idx
 end
 
@@ -1832,12 +1854,122 @@ function groundEnv()
 	}
 end
 
---- Refill the ground buffer when the marked positions change.
-local function groundMarks(foot, key, heightAt)
-	if groundKey ~= key then
-		groundKey = key
-		local verts, idx = MODEL.packGround(foot, markStyle, heightAt)
-		groundIndices = upload(groundSet, verts, idx)
+--- How long the preview may be worked on in one frame, in milliseconds. The
+-- clock is read at every corner, which cost the largest example no measurable
+-- time (#4811).
+local PREVIEW_BUDGET_MS = 4
+
+local previewTimer = Spring.GetTimerMicros or Spring.GetTimer
+local previewMicros = Spring.GetTimerMicros ~= nil
+local previewStarted = nil
+local function previewPause()
+	if Spring.DiffTimers(previewTimer(), previewStarted, true, previewMicros) >= PREVIEW_BUDGET_MS then
+		coroutine.yield()
+	end
+end
+
+--- Work out the ground every plan and the cursor leave, one after the other,
+-- the marks and the preview of it, and upload the preview into the buffer
+-- that is not being drawn. Runs in a coroutine, a share each frame.
+local function previewWork(job, foot, showSteps, pick)
+	local marks = {}
+	for _, plan in ipairs(plans) do
+		for _, p in ipairs(plan.positions) do
+			marks[#marks + 1] = p
+		end
+	end
+	for _, p in ipairs(foot or {}) do
+		marks[#marks + 1] = p
+	end
+	local groups = {}
+	for _, plan in ipairs(plans) do
+		groups[#groups + 1] = { steps = plan.steps, foot = plan.positions }
+	end
+	if showSteps then
+		groups[#groups + 1] = { steps = placing.steps or {}, foot = foot, cursor = true }
+	end
+	local steps = {}
+	local env = groundEnv()
+	env.pause = previewPause
+	local session = TERRAFORM.session(env)
+	for _, group in ipairs(groups) do
+		local before, workBefore = session.metal, session.work
+		local results = group.steps[1] and session.apply(group.steps, group.foot) or {}
+		if group.cursor then
+			job.cursor = { metal = session.metal - before, work = session.work - workBefore }
+		end
+		for _, step in ipairs(group.steps) do
+			steps[#steps + 1] = step
+		end
+		-- a building that would stand on a slope is marked like one the
+		-- ground refuses
+		local on = TERRAFORM.onSlope(results, group.foot)
+		for i, p in ipairs(group.foot) do
+			p.onSlope = on[i]
+		end
+	end
+	if not showSteps then
+		for _, p in ipairs(foot or {}) do
+			p.onSlope = nil
+		end
+	end
+	-- Buildings stand on the ground the steps leave, whatever their place in
+	-- the build order, so the marks and the ghosts follow it. drawY keeps the
+	-- height the engine gave the building and adds how far the steps moved the
+	-- ground under it, leaving p.y, which the build orders use, alone. It is
+	-- set when the preview is shown, so the ghosts move with it.
+	job.drawY = {}
+	for _, p in ipairs(marks) do
+		job.drawY[p] = p.y + session.heightAt(p.x, p.z) - Spring.GetGroundHeight(p.x, p.z)
+	end
+	marks[#marks + 1] = pick
+	job.groundVerts, job.groundIdx = MODEL.packGround(marks, markStyle, function(x, z)
+		previewPause()
+		return session.heightAt(x, z)
+	end)
+	job.mesh = TERRAIN.mesh(session.changed(), Spring.GetGroundHeight, previewPause)
+	job.mesh.indices = uploadMesh(terrainBack, job.mesh.verts, job.mesh.idx, previewPause)
+	job.labels = PLACE.labels(steps)
+end
+
+local function startPreview(key, foot, showSteps, pick)
+	local job = { key = key, placing = placing }
+	job.co = coroutine.create(function()
+		previewWork(job, foot, showSteps, pick)
+	end)
+	return job
+end
+
+--- Run a preview job for this frame's share of time.
+-- @return boolean whether it has finished
+local function resumePreview(job)
+	previewStarted = previewTimer()
+	local ok, err = coroutine.resume(job.co)
+	if not ok then
+		rebuild = nil
+		error(debug and debug.traceback(job.co, err) or err, 0)
+	end
+	return coroutine.status(job.co) == "dead"
+end
+
+--- Show a finished preview: its marks, the ghosts' heights, the volumes, the
+-- labels and the cost of the terraform being placed.
+local function finishPreview(job)
+	for p, y in pairs(job.drawY) do
+		p.drawY = y
+	end
+	groundKey = job.key
+	groundIndices = upload(groundSet, job.groundVerts, job.groundIdx)
+	terrainSet, terrainBack = terrainBack, terrainSet
+	terrainMesh = job.mesh
+	stepLabels = job.labels
+	-- the panel's cost counts the terraform being placed
+	if placing and placing == job.placing then
+		local was, cursor = placing.terra, job.cursor
+		if (was and was.metal or 0) ~= (cursor and cursor.metal or 0) or (was and was.work or 0) ~= (cursor and cursor.work or 0) then
+			placing.terra = cursor
+			readCost()
+		end
 	end
 end
 
@@ -1854,7 +1986,7 @@ function widget:DrawWorld()
 		pick = { x = (a.x + b.x) / 2, z = (a.z + b.z) / 2, facing = 0, def = { xsize = w / 4, zsize = h / 4 }, color = PICK_COLOR }
 	end
 	if not foot and #plans == 0 and not pick then
-		stepLabels, terrainMesh = {}, nil
+		stepLabels, terrainMesh, rebuild = {}, nil, nil
 		return
 	end
 	local teamID = Spring.GetMyTeamID()
@@ -1867,66 +1999,16 @@ function widget:DrawWorld()
 	local key = "plans:" .. plansSerial .. ":hover:" .. hover.key .. (foot and (":cursor:" .. placing.serial .. (showSteps and ":steps" or "")) or "")
 		.. (pick and (":pick:" .. pick.x .. ":" .. pick.z .. ":" .. pick.def.xsize .. ":" .. pick.def.zsize) or "")
 	if groundKey ~= key then
-		local marks = {}
-		for _, plan in ipairs(plans) do
-			for _, p in ipairs(plan.positions) do
-				marks[#marks + 1] = p
-			end
+		-- A job already running finishes first, so a preview dragged across the
+		-- map keeps catching up with the cursor. The next starts from the newest
+		-- placement.
+		if not rebuild then
+			rebuild = startPreview(key, foot, showSteps, pick)
 		end
-		for _, p in ipairs(foot or {}) do
-			marks[#marks + 1] = p
-		end
-		-- the ground every plan and the cursor leave, one after the other
-		local groups = {}
-		for _, plan in ipairs(plans) do
-			groups[#groups + 1] = { steps = plan.steps, foot = plan.positions }
-		end
-		if showSteps then
-			groups[#groups + 1] = { steps = placing.steps or {}, foot = foot, cursor = true }
-		end
-		local steps = {}
-		local session = TERRAFORM.session(groundEnv())
-		local cursor = nil
-		for _, group in ipairs(groups) do
-			local before, workBefore = session.metal, session.work
-			local results = group.steps[1] and session.apply(group.steps, group.foot) or {}
-			if group.cursor then
-				cursor = { metal = session.metal - before, work = session.work - workBefore }
-			end
-			for _, step in ipairs(group.steps) do
-				steps[#steps + 1] = step
-			end
-			-- a building that would stand on a slope is marked like one the
-			-- ground refuses
-			local on = TERRAFORM.onSlope(results, group.foot)
-			for i, p in ipairs(group.foot) do
-				p.onSlope = on[i]
-			end
-		end
-		if not showSteps then
-			for _, p in ipairs(foot or {}) do
-				p.onSlope = nil
-			end
-		end
-		-- Buildings stand on the ground the steps leave, whatever their place in
-		-- the build order, so the marks and the ghosts follow it. drawY keeps the
-		-- height the engine gave the building and adds how far the steps moved the
-		-- ground under it, leaving p.y, which the build orders use, alone.
-		for _, p in ipairs(marks) do
-			p.drawY = p.y + session.heightAt(p.x, p.z) - Spring.GetGroundHeight(p.x, p.z)
-		end
-		marks[#marks + 1] = pick
-		groundMarks(marks, key, session.heightAt)
-		terrainMesh = TERRAIN.mesh(session.changed(), Spring.GetGroundHeight)
-		terrainMesh.indices = uploadMesh(terrainSet, terrainMesh.verts, terrainMesh.idx)
-		stepLabels = PLACE.labels(steps)
-		-- the panel's cost counts the terraform being placed
-		if placing then
-			local was = placing.terra
-			if (was and was.metal or 0) ~= (cursor and cursor.metal or 0) or (was and was.work or 0) ~= (cursor and cursor.work or 0) then
-				placing.terra = cursor
-				readCost()
-			end
+		if resumePreview(rebuild) then
+			local done = rebuild
+			rebuild = nil
+			finishPreview(done)
 		end
 	end
 	-- The marks follow the heightmap, but the terrain the engine draws is
