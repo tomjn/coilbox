@@ -14,6 +14,13 @@
 #    own counter instead of WG.Terraform_GetNextTag.
 # 3. Checks what the gadget saw: which turrets went up on the raised ground
 #    and when, what each builder's queue held, and the ground across a wall.
+# 4. Saves the ground (issue #4798). One match raises a wall with two Lotus on
+#    it, levels a pad with a solar collector on it and digs a trench, then
+#    saves them with the blueprint widget's own record.lua and ground.lua, as
+#    Save selection and Save ground do. A second match places the saved
+#    selection on fresh ground and saves it again. ground_check.lua in the
+#    fixture checks both: the steps, where they are, the order, and that the
+#    second match left the same ground and saved the same steps.
 #
 # Every assertion is a count or a height the engine reported. A run in which
 # the engine never started, or the fixture never loaded, has nothing to
@@ -22,7 +29,7 @@
 # The heights are known for one version of Zero-K on one flat map. The script
 # names the version when it is given another.
 #
-# Needs a headless engine (see scripts/mission-engine.sh), Zero-K installed as a
+# Needs luajit, a headless engine (see scripts/mission-engine.sh), Zero-K installed as a
 # rapid package (pr-downloader --download-game zk:stable) and the map. CI has
 # none of these and does not run this script. Run it after changing how the
 # blueprint widget orders terrain changes in Zero-K.
@@ -36,6 +43,8 @@
 #                            zk:stable.
 #   COILBOX_ZK_MAP           the map archive's filename under maps/.
 #   COILBOX_ZK_MAP_NAME      the name that archive declares.
+#   COILBOX_ZK_ONLY          "ground" to play only the save ground matches.
+#   COILBOX_ZK_KEEP          set to keep the logs when everything passes.
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -108,7 +117,8 @@ expect() { # what, actual, expected
 }
 
 # Plays one match. Writes its log to $WORK/<name>/match.log.
-play() { # name, wall height, own tags (0 or 1), lasso off (0 or 1)
+play() { # name, wall height, own tags (0 or 1), lasso off (0 or 1), mode, steps file
+  local mode="${5:-terraform}"
   local dir="$WORK/$1"
   mkdir -p "$dir/data/games" "$dir/data/maps" "$dir/data/packages" "$dir/write/LuaUI/Config"
   ln -s "$BASE_CONTENT" "$dir/data/base"
@@ -121,6 +131,14 @@ play() { # name, wall height, own tags (0 or 1), lasso off (0 or 1)
   cp "$FIXTURE"/luarules/gadgets/*.lua "$game/LuaRules/Gadgets/"
   cp "$FIXTURE"/luaui/widgets/*.lua "$game/LuaUI/Widgets/"
   sed "s|@BASE@|$BASE_NAME|g" "$FIXTURE/modinfo.lua" >"$game/modinfo.lua"
+  if [ "$mode" != terraform ]; then
+    # The ground probe saves with the widget's own modules.
+    mkdir -p "$game/LuaUI/coilbox_blueprints"
+    cp "$ROOT"/lua/blueprint-widget/luaui/coilbox_blueprints/{json,ground,record}.lua "$game/LuaUI/coilbox_blueprints/"
+  fi
+  if [ -n "${6:-}" ]; then
+    cp "$6" "$game/LuaUI/coilbox_ground_steps.lua"
+  fi
 
   if [ "$4" = 1 ]; then
     # Zero-K's widget handler reads which widgets are on from this file. 0
@@ -129,7 +147,7 @@ play() { # name, wall height, own tags (0 or 1), lasso off (0 or 1)
   fi
 
   sed -e "s|@GAME@|$FIXTURE_NAME|" -e "s|@MAP@|$MAP_NAME|" -e "s|@END_FRAME@|9000|" \
-    -e "s|@WALL_HEIGHT@|$2|" -e "s|@OWN_TAGS@|$3|" \
+    -e "s|@WALL_HEIGHT@|$2|" -e "s|@OWN_TAGS@|$3|" -e "s|@MODE@|$mode|" \
     "$FIXTURE/start-script.tdf" >"$dir/script.txt"
 
   if ! timeout 900 "$ENGINE" --isolation --isolation-dir "$dir/data" --write-dir "$dir/write" --only-local \
@@ -222,6 +240,7 @@ check_common() { # log, height, profile, tag source
   expect "case 9 ground across the long wall" "$(profile "$log" 9)" "$3"
 }
 
+if [ "${COILBOX_ZK_ONLY:-}" != ground ]; then
 echo "== the default match: lasso widget on, a wall raised by 112"
 play default 112 0 0
 LOG="$WORK/default/match.log"
@@ -236,10 +255,30 @@ LOG="$WORK/lasso-off/match.log"
 expect "Zero-K's terraform widget was off" "$(field "$(line "$LOG" 'PROBE at-orders ')" lassoInitialised)" "nil"
 expect "WG.Terraform_GetNextTag was still there" "$(field "$(line "$LOG" 'PROBE at-orders ')" GetNextTag)" "function"
 check_common "$LOG" 70 "$KNOWN_PROFILE_70" own
+fi
+
+echo
+echo "== save the ground: build and save, then place the saved selection and save again"
+play ground-build 112 0 0 ground_build
+if luajit "$FIXTURE/ground_check.lua" steps "$WORK/ground-build/match.log" "$WORK/ground-steps.lua"; then
+  play ground-place 112 0 0 ground_place "$WORK/ground-steps.lua"
+  if ! luajit "$FIXTURE/ground_check.lua" check "$WORK/ground-build/match.log" "$WORK/ground-place/match.log"; then
+    failures=$((failures + 1))
+  fi
+  echo "  the changes in height the build match left:"
+  luajit "$FIXTURE/ground_check.lua" stats "$WORK/ground-build/match.log" | sed 's/^/    /'
+else
+  echo "  fail the build match saved no selection, see $WORK/ground-build/match.log"
+  failures=$((failures + 1))
+fi
 
 echo
 if [ "$failures" -eq 0 ]; then
-  rm -r "$WORK"
+  if [ -n "${COILBOX_ZK_KEEP:-}" ]; then
+    echo "The logs are in $WORK"
+  else
+    rm -r "$WORK"
+  fi
   echo "all passed in ${SECONDS}s"
 else
   echo "$failures failed. The logs are in $WORK"

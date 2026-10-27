@@ -36,6 +36,13 @@ local function lane(index)
 	return 16 * math.floor(cx / 16), cz
 end
 
+-- The save ground matches have a fixture of their own.
+function gadget:Initialize()
+	if ((Spring.GetModOptions() or {}).coilbox_mode or ""):sub(1, 6) == "ground" then
+		gadgetHandler:RemoveGadget(self)
+	end
+end
+
 if gadgetHandler:IsSyncedCode() then
 	local builders = {}
 	local caseOfBuilder = {}
