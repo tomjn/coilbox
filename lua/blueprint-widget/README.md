@@ -19,7 +19,7 @@ Coilbox installs `luaui/` into the content root as `LuaUI/` when you press the b
 - a building the team only gets by morphing is ordered as the first def back along the morph chain that the team can build, such as a tech 1 factory for a tech 2 one, and the row says how many are left to upgrade
 - what nobody selected can build stays on the map as a plan, drawn as ghosts. Pointing at a plan with builders selected outlines the building under the cursor in white, crosses it out if they cannot build it and sets the build cursor to match. A right click builds that building, a shift right click builds the whole plan after the builders' current orders, and a right click with nothing selected removes the plan
 - builders either help each other, each taking every building it can build, or split up, each building going to the nearest builder until it has its share of the build time. Splitting is for games such as Splinter Faction that stop a second builder joining a nanoframe, where the stopped builder loses its whole queue. The choice is kept per game
-- a layout's terrain changes are drawn as outlines on the ground while it is placed and in its plans, in the vertex buffer the footprint marks use: a wall as its path, an area as its outline and a ramp as its two ends joined, dashed red when a point is off the map. A layout of steps alone is held by the middle of its steps. They are only outlines, not the raised ground, the slopes or the cost
+- a layout's terrain changes are previewed while it is placed and in its plans, in the look of Zero-K's own terraform preview and Helwor's DrawTerra2 widget (`terrain.lua`, with attribution there). Each step is a see-through prism from the ground up or down to the height it will leave, green for raised ground and red for dug, with a wire grid every 16 elmos on its top and straight sides and a cyan grid on the ground under it, and a small white label with the change in elmos. Raised ground is drawn with the depth test on and depth writes off so it never hides a unit. A step is drawn the way the gadget picks the corners it sets, but not the slopes it adds round it, which are issue #4797's. It is built through the same vertex buffer path as the footprint marks, with a `ground` uniform of 2 in the shader for plain vertex colours and `GL.LINES` for the wire. A layout of steps alone is held by the middle of its steps
 - a layout's terrain changes are placed in Zero-K. For each step the widget sends Zero-K's terraform order (`CMD_TERRAFORM_INTERNAL`, 39801), which is never queued, and queues a level command (`CMD_LEVEL`, 39736) with the same tag among the builders' build orders at the step's place. The level command is what puts a builder to work on the terraform units. The first command of a builder's queue replaces it unless shift is held, and the rest append. Tags come from `WG.Terraform_GetNextTag`, and from a counter of the widget's own starting at 1000000 when that function is missing. Level heights and ramp ends are added to the ground under the pivot when the player clicks. Terraform is available in a match when a selected builder has a command described as `levelground` with that number, and otherwise when any of the team's builders does. When it is not available, or the Terrain choice is off, only the buildings are ordered and the message counts the steps skipped. A layout of steps alone is held by its origin and cannot be picked up then. Findings in issue #4789
 - the panel counts what the plans hold, and offers to build them all with whatever is selected, or to dismiss them
 - Save selection writes the selected buildings to a spool file that coilbox collects into the library next time it runs
@@ -44,6 +44,7 @@ luaui/coilbox_blueprints/json.lua         the JSON codec, since the engine ships
 luaui/coilbox_blueprints/store.lua        the three files, polling, the spool write
 luaui/coilbox_blueprints/model.lua        tabs, game filter, layout, vertex packing
 luaui/coilbox_blueprints/place.lua        turning, snapping, blocked marks, orders
+luaui/coilbox_blueprints/terrain.lua      the preview mesh of a layout's terrain steps
 luaui/coilbox_blueprints/record.lua       the selection as a spool entry
 tests/                                    luajit suites
 ```
@@ -74,6 +75,8 @@ When the widget loads it binds `[`, `]`, `Shift+[`, `Shift+]`, `f` and `g` to th
 scripts/mission-tests.sh
 luajit lua/blueprint-widget/tests/place_test.lua
 ```
+
+The suites run under LuaJIT, whose numbers are 64 bit doubles. The engine's Lua numbers are 32 bit floats, exact for integers only up to 2^24, so a test cannot see code that builds a large number, such as a key from both coordinates of a grid corner (the cause of a broken terrain preview in issue #4796). Keep keys as strings and run anything new that does arithmetic on big numbers in a real engine.
 
 The script runs every suite under `lua/*/tests/`, and CI runs the same script. There is no engine harness for the widget itself: it needs a window, and `spring-headless` has no `gl`.
 

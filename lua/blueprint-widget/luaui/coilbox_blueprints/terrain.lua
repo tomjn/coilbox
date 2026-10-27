@@ -50,9 +50,14 @@ local function snap16(v)
 	return math.floor((v + 8) / 16) * 16
 end
 
+--- A key for a corner of the 8 elmo grid. A string, not a number built from
+-- both coordinates: the engine's Lua numbers are 32 bit floats, which hold
+-- integers exactly only up to 2^24, so a number such as z * 65536 + x loses
+-- its low bits and corners at different x get one key.
 local function key(x, z)
-	return (math.floor(z / 8 + 0.5) + 32768) * 65536 + math.floor(x / 8 + 0.5)
+	return math.floor(x / 8 + 0.5) .. "," .. math.floor(z / 8 + 0.5)
 end
+M.key = key
 
 --- The corners of the 5 by 5 round each point of a wall, TerraformWall: each
 -- point snapped to 16, the gaps filled every 16.
