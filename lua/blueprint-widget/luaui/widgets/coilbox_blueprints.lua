@@ -7,8 +7,9 @@
 -- The panel lists the blueprints coilbox holds for this game, plus whatever
 -- BAR's own blueprints.json has. Pick one and it follows the cursor as ghosts,
 -- turned with [ and ], flipped with F and G, placed with a click as build
--- orders to the selected builders. Save selection writes the selected buildings to a spool file that
--- coilbox collects into the library.
+-- orders to the selected builders. Save selection writes the selected buildings, and the ground
+-- changed under and round them, to a spool file that coilbox collects into the library. Save ground
+-- writes the ground changed in a rectangle dragged on the map.
 --
 -- Everything that can be decided without the engine lives under
 -- LuaUI/coilbox_blueprints/ and is tested there. This file reads the engine,
@@ -25,6 +26,7 @@ local MODULE_DIR = "LuaUI/coilbox_blueprints/"
 
 local ACTION_TOGGLE = "coilbox_blueprints"
 local ACTION_SAVE = "coilbox_blueprints_save"
+local ACTION_SAVE_GROUND = "coilbox_blueprints_save_ground"
 local ACTION_LEFT = "coilbox_blueprints_rotate_left"
 local ACTION_RIGHT = "coilbox_blueprints_rotate_right"
 local ACTION_NEXT = "coilbox_blueprints_next"
@@ -123,7 +125,7 @@ end
 -- Modules
 --------------------------------------------------------------------------------
 
-local JSON, STORE, MODEL, PLACE, RECORD
+local JSON, STORE, MODEL, PLACE, GROUND, RECORD
 
 local function include(name)
 	local path = MODULE_DIR .. name
@@ -177,6 +179,9 @@ local drag = nil
 -- What the widget handler stored for us last time. The handler hands it over
 -- when the widget loads, before Initialize runs.
 local saved = nil
+-- Save ground waiting for a drag on the map: from and to are where the drag
+-- started and where it is now, on the ground.
+local picking = nil
 
 --------------------------------------------------------------------------------
 -- GL objects
@@ -859,8 +864,8 @@ end
 -- Saving
 --------------------------------------------------------------------------------
 
-local function saveSelection()
-	local entry, err = RECORD.selection({ nameFor = MODEL.contentName, now = os.time() })
+--- Put a recorded entry in the spool, or say why there is none.
+local function keep(entry, err)
 	if not entry then
 		say(err)
 		return false
@@ -874,6 +879,29 @@ local function saveSelection()
 	say("Saved " .. entry.name .. ". Coilbox picks it up next time it runs.")
 	refreshPanel()
 	return true
+end
+
+local function saveSelection()
+	return keep(RECORD.selection({ nameFor = MODEL.contentName, now = os.time() }))
+end
+
+--- Save the ground changed between two corners of a rectangle, in elmos.
+local function saveGround(x0, z0, x1, z1)
+	return keep(RECORD.ground(x0, z0, x1, z1, { now = os.time() }))
+end
+
+--- Wait for a drag on the map, and save the ground in it.
+local function pickGround()
+	picking = {}
+	say("Drag over the ground to save")
+end
+
+local function groundUnder(mx, my)
+	local kind, pos = Spring.TraceScreenRay(mx, my, true)
+	if kind == "ground" and pos then
+		return { x = pos[1], z = pos[3] }
+	end
+	return nil
 end
 
 --------------------------------------------------------------------------------
@@ -940,6 +968,8 @@ local function act(action)
 		plansChanged()
 	elseif kind == "save" then
 		saveSelection()
+	elseif kind == "saveGround" then
+		pickGround()
 	end
 end
 
@@ -981,6 +1011,9 @@ function widget:Initialize()
 		PLACE, err = include("place.lua")
 	end
 	if PLACE then
+		GROUND, err = include("ground.lua")
+	end
+	if GROUND then
 		RECORD, err = include("record.lua")
 	end
 	if not RECORD then
@@ -991,7 +1024,7 @@ function widget:Initialize()
 
 	STORE.use(JSON)
 	PLACE.use({ Spring = Spring, UnitDefs = UnitDefs, UnitDefNames = UnitDefNames, Game = Game })
-	RECORD.use({ Spring = Spring, UnitDefs = UnitDefs, Game = Game })
+	RECORD.use({ Spring = Spring, UnitDefs = UnitDefs, Game = Game, GROUND = GROUND })
 
 	store = STORE.new({
 		vfs = VFS,
@@ -1040,6 +1073,10 @@ function widget:Initialize()
 			saveSelection()
 			return true
 		end,
+		[ACTION_SAVE_GROUND] = function()
+			pickGround()
+			return true
+		end,
 		[ACTION_LEFT] = function()
 			return rotate(-1)
 		end,
@@ -1078,6 +1115,7 @@ function widget:Initialize()
 			startPlacing(key)
 		end,
 		save = saveSelection,
+		saveGround = saveGround,
 		rotate = rotate,
 		flip = flip,
 		step = step,
@@ -1250,6 +1288,16 @@ function widget:MousePress(x, y, button)
 			return true
 		end
 	end
+	if picking then
+		if button == 1 then
+			picking.from = groundUnder(x, y)
+			picking.to = picking.from
+		else
+			picking = nil
+			say("Save ground cancelled")
+		end
+		return true
+	end
 	if placing then
 		if button == 1 then
 			-- A press starts a line of copies that a drag lengthens, and the
@@ -1272,6 +1320,10 @@ function widget:MousePress(x, y, button)
 end
 
 function widget:MouseMove(x, y)
+	if picking and picking.from then
+		picking.to = groundUnder(x, y) or picking.to
+		return
+	end
 	if not drag then
 		return
 	end
@@ -1291,6 +1343,16 @@ function widget:MouseMove(x, y)
 end
 
 function widget:MouseRelease()
+	if picking then
+		local from, to = picking.from, picking.to
+		picking = nil
+		if from and to then
+			saveGround(from.x, from.z, to.x, to.z)
+		else
+			say("Save ground needs a drag on the map")
+		end
+		return true
+	end
 	if placing and placing.line then
 		trackCursor()
 		placeNow()
@@ -1343,6 +1405,11 @@ local function keySet(key, mods)
 end
 
 function widget:KeyPress(key, mods, isRepeat)
+	if picking and key == KEY_ESCAPE then
+		picking = nil
+		say("Save ground cancelled")
+		return true
+	end
 	if placing and key == KEY_ESCAPE then
 		stopPlacing()
 		return true
@@ -1424,6 +1491,9 @@ end
 -- outlined or crossed out while the cursor is over its plan.
 local markColors = {}
 local function markStyle(p)
+	if p.color then
+		return p.color, 0
+	end
 	local c = markColors[p.defID]
 	if not c then
 		local base = MODEL.categoryColor(p.def)
@@ -1456,9 +1526,19 @@ local function groundMarks(foot, key)
 	end
 end
 
+-- The colour of the rectangle Save ground is dragging.
+local PICK_COLOR = { 1, 1, 1, 0.15 }
+
 function widget:DrawWorld()
 	local foot = placing and placing.foot
-	if not foot and #plans == 0 then
+	-- the rectangle being dragged, as one mark spanning it
+	local pick
+	if picking and picking.from and picking.to then
+		local a, b = picking.from, picking.to
+		local w, h = math.max(8, math.abs(b.x - a.x)), math.max(8, math.abs(b.z - a.z))
+		pick = { x = (a.x + b.x) / 2, z = (a.z + b.z) / 2, facing = 0, def = { xsize = w / 4, zsize = h / 4 }, color = PICK_COLOR }
+	end
+	if not foot and #plans == 0 and not pick then
 		return
 	end
 	local teamID = Spring.GetMyTeamID()
@@ -1467,6 +1547,7 @@ function widget:DrawWorld()
 	-- the plans' marks and the cursor's in one buffer, rebuilt when either
 	-- changes
 	local key = "plans:" .. plansSerial .. ":hover:" .. hover.key .. (foot and (":cursor:" .. placing.serial) or "")
+		.. (pick and (":pick:" .. pick.x .. ":" .. pick.z .. ":" .. pick.def.xsize .. ":" .. pick.def.zsize) or "")
 	if groundKey ~= key then
 		local marks = {}
 		for _, plan in ipairs(plans) do
@@ -1477,6 +1558,7 @@ function widget:DrawWorld()
 		for _, p in ipairs(foot or {}) do
 			marks[#marks + 1] = p
 		end
+		marks[#marks + 1] = pick
 		groundMarks(marks, key)
 	end
 	-- The marks follow the heightmap, but the terrain the engine draws is

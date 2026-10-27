@@ -869,9 +869,12 @@ function M.layout(state, measure, view)
 		text(px + PAD, y + LINE / 2, SMALL, M.truncate(state.message, inner, measure, SMALL), C.warn)
 	end
 
-	-- footer: save on the left, the list and grid switch on the right
+	-- footer: the two saves on the left, the list and grid switch on the right
 	local by = py + (FOOTER - PILL) / 2
 	button(px + PAD, by, "Save selection", { kind = "save" })
+	local groundX = px + PAD + buttonW("Save selection") + GAP
+	button(groundX, by, "Save ground", { kind = "saveGround" })
+	local savesEnd = groundX + buttonW("Save ground")
 	local gx = px + W - PAD - PILL
 	iconButton(gx, by, {
 		{ 0.25, 0.25, 0.22, 0.22 },
@@ -892,8 +895,14 @@ function M.layout(state, measure, view)
 		local nx = gx - GAP - PILL - 2 * GAP - PILL
 		local lw = measure(label, SMALL)
 		local lx = nx - GAP - lw
+		-- a long label would run into the save buttons, so then the arrows go
+		-- without it
+		if lx - GAP - PILL < savesEnd + GAP then
+			lx = nx
+		else
+			text(lx, by + PILL / 2, SMALL, label, C.dim)
+		end
 		iconButton(nx, by, ARROW_NEXT, state.page < pages - 1 and { kind = "page", delta = 1 } or nil)
-		text(lx, by + PILL / 2, SMALL, label, C.dim)
 		iconButton(lx - GAP - PILL, by, ARROW_PREV, state.page > 0 and { kind = "page", delta = -1 } or nil)
 	end
 
