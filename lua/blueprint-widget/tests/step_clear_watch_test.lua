@@ -124,4 +124,74 @@ E.units[1] = nil
 CLEAR.update(120)
 check("a builder that is gone is no longer watched", CLEAR.count() == 0)
 
+--------------------------------------------------------------------------------
+-- builders waiting for each other before a step
+--------------------------------------------------------------------------------
+
+local WAIT = { 5, {} }
+local function released()
+	local out = {}
+	for _, o in ipairs(E.single) do
+		if o.cmdID == 5 and o.options == 0 then
+			out[#out + 1] = o.unitID
+		end
+	end
+	table.sort(out)
+	return table.concat(out, ",")
+end
+
+E = engine({
+	[1] = { def = 10, x = 0, z = 0, queue = { WAIT, level() } },
+	[2] = { def = 10, x = 0, z = 0, queue = { { 10, { 0, 0, 0 } }, WAIT, level() } },
+})
+CLEAR.gather(TAG, { 1, 2 })
+CLEAR.update(1)
+check("a builder at its wait holds while another is still on its way", released() == "" and CLEAR.gathering() == 1, show(E.single))
+table.remove(E.units[2].queue, 1)
+CLEAR.update(2)
+check("once both wait right before the step, both are let go together", released() == "1,2" and CLEAR.gathering() == 0, show(E.single))
+
+E = engine({
+	[1] = { def = 10, x = 0, z = 0, queue = { WAIT, level() } },
+	[2] = { def = 10, x = 0, z = 0, queue = { { 10, { 0, 0, 0 } }, WAIT, level() } },
+})
+CLEAR.gather(TAG, { 1, 2 })
+CLEAR.update(1)
+E.units[2] = nil
+CLEAR.update(2)
+check("a builder that dies cannot hold the others", released() == "1", show(E.single))
+
+E = engine({
+	[1] = { def = 10, x = 0, z = 0, queue = { WAIT, level() } },
+	[2] = { def = 10, x = 0, z = 0, queue = { { 10, { 0, 0, 0 } }, WAIT, level() } },
+})
+CLEAR.gather(TAG, { 1, 2 })
+CLEAR.update(1)
+E.units[2].queue = { { 10, { 500, 0, 500 } } }
+CLEAR.update(2)
+check("nor can one the player has given other orders", released() == "1", show(E.single))
+
+E = engine({
+	[1] = { def = 10, x = 0, z = 0, queue = { { 10, { 0, 0, 0 } }, WAIT, level() } },
+	[2] = { def = 10, x = 0, z = 0, queue = {} },
+})
+CLEAR.gather(TAG, { 1, 2 })
+CLEAR.update(1)
+check("one whose orders have not arrived yet is waited for", released() == "" and CLEAR.gathering() == 1)
+E = engine({
+	[1] = { def = 10, x = 0, z = 0, queue = { WAIT, level() } },
+	[2] = { def = 10, x = 0, z = 0, queue = {} },
+	[3] = { def = 10, x = 0, z = 0, queue = { WAIT, level() } },
+})
+CLEAR.gather(TAG, { 1, 2, 3 })
+CLEAR.update(1)
+check("but one standing idle while all the others wait does not hold them", released() == "1,3", show(E.single))
+E = engine({
+	[1] = { def = 10, x = 0, z = 0, queue = {} },
+	[2] = { def = 10, x = 0, z = 0, queue = {} },
+})
+CLEAR.gather(TAG, { 1, 2 })
+CLEAR.update(1)
+check("before anybody's orders have come, the gather is kept", CLEAR.gathering() == 1 and released() == "")
+
 support.report()

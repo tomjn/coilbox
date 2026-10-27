@@ -208,7 +208,7 @@ check("without the model's ground there is no move", ids(noModel.orders[1].cmds)
 
 for _, mode in ipairs({ "help", "split" }) do
 	local both = byUnit(PLACE.plan(turretOnWall, PLACE.capabilities({ 200, 201 }), false, mode, { steps = steps, on = true, ground = model(steps, turretOnWall) }))
-	check(mode .. ": each builder gets a move ahead of the step", both[200] and both[201] and both[200][1][1] == 10 and both[201][1][1] == 10 and both[200][2][1] == 39736 and both[201][2][1] == 39736, show(both))
+	check(mode .. ": each builder gets a move ahead of the step, then waits for the other", both[200] and both[201] and ids(both[200]):find("10,5,39736,-1", 1, true) == 1 and ids(both[201]):find("10,5,39736", 1, true) == 1, show(both))
 	check(mode .. ": each on its own side", both[200][1][2][3] > 1024 and both[201][1][2][3] < 1024, show({ both[200][1][2], both[201][1][2] }))
 end
 
@@ -310,10 +310,134 @@ for _, mode in ipairs({ "help", "split" }) do
 	local o = byUnit(PLACE.plan(foot, PLACE.capabilities({ 200, 201 }), false, mode, { steps = laidRing, on = true, ground = model(laidRing, foot) }))
 	for _, unitID in ipairs({ 200, 201 }) do
 		local q = o[unitID] or {}
-		check(mode .. ": builder " .. unitID .. " builds the solar inside, steps out of the ring, then raises it", q[1] and q[1][1] == -2 and q[2][1] == 10 and q[3][1] == 39736, ids(q))
+		check(mode .. ": builder " .. unitID .. " builds the solar inside, steps out of the ring, waits for the other, then raises it side by side", ids(q):find("-2,10,5,39736,10,5,39736,10,5,39736,10,5,39736,", 1, true) == 1, ids(q))
 		check(mode .. ": builder " .. unitID .. "'s spot is outside the ring", q[2] and not PLACE.inside(laidRing[1].ring, q[2][2][1], q[2][2][3]), show(q[2]))
 	end
 end
+
+--------------------------------------------------------------------------------
+-- the sweep: work farthest from the builders first, the ring closed last on
+-- their side
+--------------------------------------------------------------------------------
+
+local swept = PLACE.footprint(outpost, 0, 1024, 1024, nil, { x = 0, z = 0 })
+for i, p in ipairs(swept) do
+	p.seq = i
+end
+-- the builders are south of the outpost, which spans 1024 to 1344 each way
+local exit = { x = 1184, z = 1800 }
+local sweptSteps = PLACE.laySteps(outpost, 0, nil, { x = 0, z = 0 }, { { x = 1024, z = 1024 } }, swept, exit)
+check("the solar inside the ring still comes first", swept[1].def == SOLAR and swept[1].insideRing)
+check("the ring's sides go farthest from the builders first: the north side first", sweptSteps[1].points[1].z == 1024 and sweptSteps[1].points[2].z == 1024, show(sweptSteps[1].points))
+check("and the side on the builders' side last, closing the ring behind them", sweptSteps[4].points[1].z == 1344 and sweptSteps[4].points[2].z == 1344, show(sweptSteps[4].points))
+check("the turrets go farthest first too: the north ones before the south ones", swept[2].z == 1024 and swept[3].z == 1024 and swept[4].z == 1344 and swept[5].z == 1344, show({ swept[2].z, swept[3].z, swept[4].z, swept[5].z }))
+check("and are numbered in their new order", swept[2].seq == 2 and swept[5].seq == 5)
+
+E = engine({
+	[200] = { def = 10, x = 1150, z = 1800, cmdDescs = { LEVEL } },
+	[201] = { def = 10, x = 1220, z = 1800, cmdDescs = { LEVEL } },
+}, function()
+	return true
+end)
+local sweptPlan = PLACE.plan(swept, PLACE.capabilities({ 200, 201 }), false, nil, { steps = sweptSteps, on = true, ground = model(sweptSteps, swept) })
+local closing = sweptPlan.terraform[4].tag
+check("before the side that closes the ring, both builders wait for each other", sweptPlan.gathers[closing] and #sweptPlan.gathers[closing] == 2, show(sweptPlan.gathers))
+check("their spots for the closing side are outside the ring, on their side", (function()
+	for _, o in ipairs(sweptPlan.orders) do
+		local seen = 0
+		for i, c in ipairs(o.cmds) do
+			if c[1] == 39736 and c[2][4] == closing then
+				local move = o.cmds[i - 2]
+				return move[1] == 10 and move[2][3] > 1344 and not PLACE.inside(sweptSteps[4].ring, move[2][1], move[2][3])
+			end
+		end
+	end
+	return false
+end)(), show(sweptPlan.orders[1].cmds))
+
+for _, mode in ipairs({ "help", "split" }) do
+	local modePlan = PLACE.plan(swept, PLACE.capabilities({ 200, 201 }), false, mode, { steps = sweptSteps, on = true, ground = model(sweptSteps, swept) })
+	local q = byUnit(modePlan)
+	local closesWith = modePlan.terraform[4].tag
+	for _, unitID in ipairs({ 200, 201 }) do
+		local cmds = q[unitID] or {}
+		local closingAt
+		for i, c in ipairs(cmds) do
+			if c[1] == 39736 and c[2][4] == closesWith then
+				closingAt = i
+			end
+		end
+		check(mode .. ": builder " .. unitID .. " builds the solar inside first, then moves outside and waits", ids(cmds):find("-2,10,5,", 1, true) == 1 and not PLACE.inside(sweptSteps[1].ring, cmds[2][2][1], cmds[2][2][3]), ids(cmds))
+		check(mode .. ": builder " .. unitID .. " gets the ring's closing order only after moving outside and waiting", closingAt and cmds[closingAt - 1][1] == 5 and cmds[closingAt - 2][1] == 10 and not PLACE.inside(sweptSteps[1].ring, cmds[closingAt - 2][2][1], cmds[closingAt - 2][2][3]), ids(cmds))
+	end
+end
+
+local ordered = PLACE.resolve({ ordered = true, buildings = {
+	{ def = "turret", offset = { x = 0, z = 0 }, facing = 0 },
+	{ def = "turret", offset = { x = 0, z = 320 }, facing = 0 },
+}, terrain = {} })
+local orderedFoot = PLACE.footprint(ordered, 0, 1024, 1024, nil, { x = 0, z = 0 })
+PLACE.laySteps(ordered, 0, nil, { x = 0, z = 0 }, { { x = 1024, z = 1024 } }, orderedFoot, { x = 1024, z = 100 })
+check("a blueprint whose order is its build order keeps it", orderedFoot[1].z == 1024 and orderedFoot[2].z == 1344, show({ orderedFoot[1].z, orderedFoot[2].z }))
+
+-- a wall line, swept from its far end
+local line = PLACE.resolve({ buildings = {}, terrain = { { kind = "raise", shape = "wall", points = { { x = 0, z = 0 }, { x = 896, z = 0 } }, height = 112, before = 0 } } })
+local pieces = PLACE.laySteps(line, 0, nil, { x = 0, z = 0 }, { { x = 1024, z = 1024 } }, {}, { x = 2400, z = 1024 })
+check("a wall longer than one of Zero-K's blocks is laid block by block", #pieces == 4, show(#pieces))
+check("each block is at most a block long, cut on the 16 elmo grid", (function()
+	for _, piece in ipairs(pieces) do
+		local a, b = piece.points[1], piece.points[#piece.points]
+		if math.abs(b.x - a.x) > PLACE.WALL_BLOCK or a.x % 16 ~= 0 or b.x % 16 ~= 0 or piece.wall ~= pieces[1].wall then
+			return false
+		end
+	end
+	return true
+end)(), show(pieces))
+check("the block farthest from the builders goes first, the nearest last", pieces[1].points[1].x == 1024 and pieces[4].points[#pieces[4].points].x == 1024 + 896, show({ pieces[1].points, pieces[4].points }))
+check("the blocks cover the wall end to end", (function()
+	local covered = {}
+	for _, piece in ipairs(pieces) do
+		covered[#covered + 1] = { piece.points[1].x, piece.points[#piece.points].x }
+	end
+	table.sort(covered, function(a, b)
+		return a[1] < b[1]
+	end)
+	for i = 2, #covered do
+		if covered[i][1] ~= covered[i - 1][2] then
+			return false
+		end
+	end
+	return covered[1][1] == 1024 and covered[#covered][2] == 1920
+end)())
+local linePlan = PLACE.plan({}, PLACE.capabilities({ 200 }), false, nil, { steps = pieces, on = true })
+check("a wall's blocks are ordered together", #linePlan.terraform == 4 and linePlan.terraform[1].group == pieces[1].wall and linePlan.terraform[4].group == pieces[1].wall)
+check("a wall of one block is left whole", #PLACE.wallPieces({ kind = "raise", shape = "wall", points = { { x = 0, z = 0 }, { x = 224, z = 0 } } }) == 1)
+
+-- the engine takes a second order of one kind given with shift within 17
+-- elmos of a first as cancelling it, wait and all
+local function apartEnough(cmds, id)
+	for i = 1, #cmds do
+		for j = i + 1, #cmds do
+			local a, b = cmds[i], cmds[j]
+			if a[1] == id and b[1] == id and (a[2][1] - b[2][1]) ^ 2 + (a[2][3] - b[2][3]) ^ 2 < PLACE.COMMAND_CANCEL_DIST ^ 2 then
+				return false
+			end
+		end
+	end
+	return true
+end
+check("no two of a builder's moves are near enough for the engine to cancel one", (function()
+	for _, o in ipairs(sweptPlan.orders) do
+		if not apartEnough(o.cmds, 10) then
+			return false
+		end
+	end
+	return true
+end)())
+local concentric = { laid({ kind = "level", shape = "area", points = { { x = 960, z = 960 }, { x = 1088, z = 960 }, { x = 1088, z = 1088 }, { x = 960, z = 1088 } }, height = 40 }), wall() }
+concentric[2].points = { { x = 960, z = 1024 }, { x = 1088, z = 1024 } }
+local both = PLACE.plan({}, PLACE.capabilities({ 200 }), false, nil, { steps = concentric, on = true })
+check("two steps with the same middle get level commands far enough apart not to cancel", #both.orders[1].cmds == 2 and apartEnough(both.orders[1].cmds, 39736), show(both.orders[1].cmds))
 
 --------------------------------------------------------------------------------
 -- standing, as far as the player can see

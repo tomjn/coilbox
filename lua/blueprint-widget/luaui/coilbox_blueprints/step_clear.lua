@@ -18,6 +18,7 @@ local M = {}
 M.CMD_REPAIR = 40
 M.CMD_MOVE = 10
 M.CMD_INSERT = 1
+M.CMD_WAIT = 5
 M.OPT_ALT = 128
 -- Zero-K's level command and raw build (LuaRules/Configs/customcmds.lua). Zero-K
 -- puts a raw build in front of a repair to walk the builder into range
@@ -43,10 +44,34 @@ local watched = {}
 local sentFor = {}
 -- unitID -> { x, z } the spot each builder was last sent to
 local goals = {}
+-- tag -> { unitID -> { seen } } the builders waiting for each other before a
+-- step's level command
+local gathers = {}
 
 --- Forget everything, for a test.
 function M.reset()
-	watched, sentFor, goals = {}, {}, {}
+	watched, sentFor, goals, gathers = {}, {}, {}, {}
+end
+
+--- Builders that wait at their spots before a step until all of them are
+-- there: each has a wait in front of the step's level command.
+-- @param tag number the step's terraform tag
+-- @param units integer[]
+function M.gather(tag, units)
+	local g = gathers[tag] or {}
+	for _, unitID in ipairs(units) do
+		g[unitID] = g[unitID] or { seen = false }
+	end
+	gathers[tag] = g
+end
+
+--- How many gathers are still waiting, for a test.
+function M.gathering()
+	local n = 0
+	for _ in pairs(gathers) do
+		n = n + 1
+	end
+	return n
 end
 
 --- How many builders are watched.
@@ -118,9 +143,58 @@ local function holds(unitID, tag)
 	return false
 end
 
+--- Let a gather go once every builder still in it waits at the front of its
+-- queue, right before the step's level command. A builder that has died, or
+-- whose orders no longer hold the step, leaves the gather, so it cannot hold
+-- the others. One whose orders have not arrived yet is waited for, unless it
+-- stands idle while all the others wait.
+local function updateGathers()
+	for tag, g in pairs(gathers) do
+		-- waiting = every builder whose orders have come waits right before the
+		-- step; arrived = at least one has its orders
+		local waiting, arrived, pending = true, false, {}
+		for unitID, m in pairs(g) do
+			local h = holds(unitID, tag)
+			m.seen = m.seen or h == true
+			if h == nil or (h == false and m.seen) then
+				g[unitID] = nil
+			elseif h == false then
+				pending[#pending + 1] = unitID
+			else
+				arrived = true
+				local id = Spring.GetUnitCurrentCommand(unitID, 1)
+				local nextID, _, _, _, _, _, t = Spring.GetUnitCurrentCommand(unitID, 2)
+				if not (id == M.CMD_WAIT and nextID == M.CMD_LEVEL and t == tag) then
+					waiting = false
+				end
+			end
+		end
+		if arrived and waiting then
+			-- one whose orders never came holds nobody if it stands idle
+			for _, unitID in ipairs(pending) do
+				if Spring.GetUnitCommandCount(unitID) == 0 then
+					g[unitID] = nil
+				else
+					waiting = false
+				end
+			end
+		end
+		if next(g) == nil then
+			gathers[tag] = nil
+		elseif arrived and waiting then
+			-- a wait given without shift to a unit waiting takes its wait away
+			for unitID in pairs(g) do
+				Spring.GiveOrderToUnit(unitID, M.CMD_WAIT, {}, 0)
+			end
+			gathers[tag] = nil
+		end
+	end
+end
+
 --- Check every watched builder. Call it every game frame.
 -- @param frame integer the game frame
 function M.update(frame)
+	updateGathers()
 	for unitID, steps in pairs(watched) do
 		-- Zero-K walks a builder into range with a raw build in front of the
 		-- repair, so the repair can be second

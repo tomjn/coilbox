@@ -27,7 +27,8 @@ local TERRAFORM_WORK = { [40] = true, [39734] = true, [39736] = true, [39737] = 
 -- (#4816): the engine's move, and Zero-K's raw move and raw build
 -- (customcmds.lua), which a move turns into and which walks a builder into
 -- range. A move is over in a moment, too soon for the order to arrive in.
-local STEPPING = { [10] = true, [31109] = true, [31110] = true }
+-- The wait builders hold at their spots until all are clear goes the same way.
+local STEPPING = { [5] = true, [10] = true, [31109] = true, [31110] = true }
 -- How many buildings may still be ahead of a level step when its order goes.
 M.AHEAD = 1
 -- How often, in game frames, the whole of each queue is read to drop orders

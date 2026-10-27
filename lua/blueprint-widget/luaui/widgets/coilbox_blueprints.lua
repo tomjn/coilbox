@@ -692,6 +692,22 @@ end
 -- blueprint started again at 1 and a new one could show the last one's preview.
 local placingSerial = 0
 
+--- Where the selected builders are, the middle of them, which the work on a
+-- blueprint's ground sweeps towards (#4816). Nil with no builder selected.
+local function exitPoint()
+	local sx, sz, n = 0, 0, 0
+	for _, unitID in ipairs(can and can.builders or {}) do
+		local x, _, z = Spring.GetUnitPosition(unitID)
+		if x then
+			sx, sz, n = sx + x, sz + z, n + 1
+		end
+	end
+	if n == 0 then
+		return nil
+	end
+	return { x = sx / n, z = sz / n }
+end
+
 local function trackCursor()
 	local kind, pos
 	if placing.at then
@@ -738,7 +754,7 @@ local function trackCursor()
 	placing.foot, placing.anchors, placing.origin = foot, anchors, origin
 	-- the steps, for their outlines on the ground. They are laid again with the
 	-- ground as it is when the player clicks.
-	placing.steps = PLACE.laySteps(resolved, placing.rotation, placing.flip, origin, anchors, foot)
+	placing.steps = PLACE.laySteps(resolved, placing.rotation, placing.flip, origin, anchors, foot, exitPoint())
 	placingSerial = placingSerial + 1
 	placing.serial = placingSerial
 end
@@ -824,7 +840,7 @@ local function placeNow()
 	end
 	readSelection()
 	-- the ground under the pivot is read now, as the player clicks
-	local steps = PLACE.laySteps(placing.item.resolved, placing.rotation, placing.flip, placing.origin, placing.anchors, placing.foot)
+	local steps = PLACE.laySteps(placing.item.resolved, placing.rotation, placing.flip, placing.origin, placing.anchors, placing.foot, exitPoint())
 	local plan = PLACE.plan(placing.foot, can, shiftHeld(), panel.assist, terrainArg(steps, placing.foot))
 	local sent = PLACE.issue(plan, LATER, CLEAR)
 	say(placing.item.name .. ": " .. describe(plan, sent))
