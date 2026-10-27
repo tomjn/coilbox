@@ -19,6 +19,7 @@ Coilbox installs `luaui/` into the content root as `LuaUI/` when you press the b
 - a building the team only gets by morphing is ordered as the first def back along the morph chain that the team can build, such as a tech 1 factory for a tech 2 one, and the row says how many are left to upgrade
 - what nobody selected can build stays on the map as a plan, drawn as ghosts. Pointing at a plan with builders selected outlines the building under the cursor in white, crosses it out if they cannot build it and sets the build cursor to match. A right click builds that building, a shift right click builds the whole plan after the builders' current orders, and a right click with nothing selected removes the plan
 - builders either help each other, each taking every building it can build, or split up, each building going to the nearest builder until it has its share of the build time. Splitting is for games such as Splinter Faction that stop a second builder joining a nanoframe, where the stopped builder loses its whole queue. The choice is kept per game
+- a layout's terrain changes are placed in Zero-K. For each step the widget sends Zero-K's terraform order (`CMD_TERRAFORM_INTERNAL`, 39801), which is never queued, and queues a level command (`CMD_LEVEL`, 39736) with the same tag among the builders' build orders at the step's place. The level command is what puts a builder to work on the terraform units. The first command of a builder's queue replaces it unless shift is held, and the rest append. Tags come from `WG.Terraform_GetNextTag`, and from a counter of the widget's own starting at 1000000 when that function is missing. Level heights and ramp ends are added to the ground under the pivot when the player clicks. Terraform is available in a match when a selected builder has a command described as `levelground` with that number, and otherwise when any of the team's builders does. When it is not available, or the Terrain choice is off, only the buildings are ordered and the message counts the steps skipped. A layout of steps alone is held by its origin and cannot be picked up then. Findings in issue #4789
 - the panel counts what the plans hold, and offers to build them all with whatever is selected, or to dismiss them
 - Save selection writes the selected buildings to a spool file that coilbox collects into the library next time it runs
 
@@ -60,7 +61,7 @@ The shader is `#version 130` with `GL_ARB_explicit_attrib_location`, the lowest 
 
 ## Other widgets and games
 
-`WG.CoilboxBlueprints` offers `open`, `close`, `toggle`, `list`, `place(key)`, `save`, `rotate(turns)`, `flip(axis)` with `"x"` or `"z"`, `step(direction)` and `assist(mode)` with `"help"` or `"split"` to a game's own interface.
+`WG.CoilboxBlueprints` offers `open`, `close`, `toggle`, `list`, `place(key)`, `save`, `rotate(turns)`, `flip(axis)` with `"x"` or `"z"`, `step(direction)`, `assist(mode)` with `"help"` or `"split"` and `terrain(on)` with a boolean to a game's own interface.
 
 Widget actions: `coilbox_blueprints`, `coilbox_blueprints_save`, `coilbox_blueprints_rotate_left`, `coilbox_blueprints_rotate_right`, `coilbox_blueprints_prev`, `coilbox_blueprints_next`, `coilbox_blueprints_flip_x`, `coilbox_blueprints_flip_z`.
 

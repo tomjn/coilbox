@@ -113,6 +113,24 @@ You can only pick up a blueprint your side can build. A blueprint with another s
 
 A building your side only gets by upgrading another, such as a Tech 2 factory that starts as a Tech 1 factory, is placed as the building it starts from. The row says how many buildings you then need to upgrade.
 
+### Place terrain changes
+
+A blueprint can hold terrain changes, such as a wall raised from the ground or a flattened pad. Only Zero-K can make them in a match. In any other game the widget places the buildings and leaves the terrain changes out.
+
+In Zero-K your builders make each terrain change in the blueprint's order, and build the buildings after it once it is done. A turret on a raised wall is built when the wall is up. A blueprint with terrain changes and no buildings is placed the same way.
+
+When your selected builders can terraform and the blueprint has terrain changes, the placing panel has a Terrain row beside Builders, with On and Off. Off places the buildings only. The widget remembers your choice for each game.
+
+- Heights in a blueprint are measured from the ground under the building the cursor holds, at the moment you click. A blueprint with only terrain changes is held by its origin.
+- Together gives every terrain change to every selected builder that can terraform. Split up gives each change to the nearest of them.
+- Shift adds the changes after what the builders are already doing, as it does for buildings.
+- With no builders selected, a plan keeps its terrain changes. Building the plan sends them.
+- A terrain change with any point off the map is not ordered. The message says how many.
+
+The widget works out in each match whether terraform is available, from the commands your selected builders have. A mission can switch it off. When it is not available, or Terrain is Off, the widget places the buildings and the message says how many terrain changes it skipped. You cannot pick up a blueprint of terrain changes alone then. Its row says "no terraforming here" or "Terrain is off", and it stays under the All tab.
+
+Zero-K drops a terrain change that no builder has worked on for two minutes. A change that comes after more than two minutes of other orders in a queue can be dropped before the builder gets to it. Keep the buildings ahead of a terrain change few enough to finish well inside that time.
+
 ### Plan a base ahead
 
 You can place a blueprint with no builders selected. It stays on the map as a plan, drawn the way it looked while you placed it, and only you can see it. Place as many as you like. When you have the builders, select them and point at a plan. The building under the cursor gets a white outline, and the cursor shows whether they can build it. A building they cannot build is crossed out. Right click to build that building. Hold Shift to outline the whole plan, and right click to build all of it after whatever the builders are already doing. Right click a plan with nothing selected to remove it.
