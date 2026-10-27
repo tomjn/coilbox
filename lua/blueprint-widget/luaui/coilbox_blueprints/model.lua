@@ -94,6 +94,9 @@ function M.new()
 		-- "split": each building goes to one builder, for games that stop
 		-- builders helping
 		assist = "help",
+		-- whether a blueprint's terrain changes are placed with its buildings.
+		-- Only matters in a match that has terraform.
+		terrain = true,
 		placing = nil,
 		remainder = nil,
 		message = nil,
@@ -144,6 +147,12 @@ end
 --   for another side and goes under no tab but All.
 function M.refresh(state, entries, place, game, can, side)
 	local reach, standIns = side and side.reach, side and side.standIns
+	-- whether this match can terraform: what the widget found when nothing is
+	-- selected, otherwise whether a selected builder can
+	local available = can.terraformAvailable
+	if available == nil then
+		available = #(can.terraformers or {}) > 0
+	end
 	local items = {}
 	local counts = { now = 0, partly = 0, all = 0 }
 	for _, entry in ipairs(entries) do
@@ -153,7 +162,19 @@ function M.refresh(state, entries, place, game, can, side)
 			local upgrades
 			resolved, upgrades = place.substitute(resolved, standIns)
 			local tab = foreign > 0 and "never" or place.classify(resolved, can)
-			local item = { entry = entry, resolved = resolved, tab = tab, foreign = foreign, upgrades = upgrades }
+			local steps = #(entry.terrain or {})
+			-- a layout of steps alone can only be placed when they will be ordered
+			local stop
+			if steps > 0 and #resolved.buildings == 0 and #resolved.missing == 0 and foreign == 0 then
+				if not available then
+					stop = "no terraforming here"
+				elseif not state.terrain then
+					stop = "Terrain is off"
+				end
+				tab = stop and "never" or "now"
+			end
+			local placeable = foreign == 0 and (#resolved.buildings > 0 or (steps > 0 and stop == nil and #resolved.missing == 0))
+			local item = { entry = entry, resolved = resolved, tab = tab, foreign = foreign, upgrades = upgrades, stop = stop, placeable = placeable }
 			item.name = M.displayName(item)
 			items[#items + 1] = item
 			counts.all = counts.all + 1
@@ -213,7 +234,7 @@ end
 function M.step(state, step)
 	local keys = {}
 	for _, item in ipairs(M.visible(state)) do
-		if #item.resolved.buildings > 0 and (item.foreign or 0) == 0 then
+		if item.placeable then
 			keys[#keys + 1] = item.entry.key
 		end
 	end
@@ -265,6 +286,14 @@ end
 function M.setAssist(state, mode)
 	if (mode == "help" or mode == "split") and mode ~= state.assist then
 		state.assist = mode
+		M.touch(state)
+	end
+end
+
+--- Turn the placing of terrain changes on or off.
+function M.setTerrain(state, on)
+	if type(on) == "boolean" and on ~= state.terrain then
+		state.terrain = on
 		M.touch(state)
 	end
 end
@@ -382,6 +411,8 @@ local function rowDetail(item)
 	-- it off
 	if (item.foreign or 0) > 0 then
 		parts[1] = item.foreign .. " from another side"
+	elseif item.stop then
+		parts[1] = item.stop
 	end
 	if (item.upgrades or 0) > 0 then
 		parts[#parts + 1] = item.upgrades .. " to upgrade"
@@ -927,7 +958,7 @@ function M.layoutTray(state, L, measure, view)
 	local PILL = SMALL + 8 * S
 	local BR = M.BUTTON_RADIUS * S
 	local TW = M.TRAY_WIDTH * S
-	local TH = HEADER + 4 * LINE + PAD
+	local TH = HEADER + (placing.terrain and 5 or 4) * LINE + PAD
 
 	local function hovered(action)
 		return state.hover ~= nil and state.hover == M.actionId(action)
@@ -995,6 +1026,12 @@ function M.layoutTray(state, L, measure, view)
 		{ "Together", { kind = "assist", mode = "help" }, state.assist ~= "split" },
 		{ "Split up", { kind = "assist", mode = "split" }, state.assist == "split" },
 	})
+	if placing.terrain then
+		controls("Terrain", {
+			{ "On", { kind = "terrain", mode = "on" }, state.terrain },
+			{ "Off", { kind = "terrain", mode = "off" }, not state.terrain },
+		})
+	end
 end
 
 --- What a point is over: the topmost hit, or the panel itself, or nil when

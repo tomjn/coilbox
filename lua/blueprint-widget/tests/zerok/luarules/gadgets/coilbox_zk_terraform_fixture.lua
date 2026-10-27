@@ -18,9 +18,9 @@ function gadget:GetInfo()
 	}
 end
 
-local CASES = 10
+local CASES = 14
 -- Cases with more than one builder, which share the terraform and the turret.
-local BUILDERS = { [10] = 2 }
+local BUILDERS = { [10] = 2, [13] = 2 }
 -- Lanes run east to west along the middle of the map, side by side, this far
 -- apart.
 local LANE_GAP = 512
