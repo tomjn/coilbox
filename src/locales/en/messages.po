@@ -10313,6 +10313,10 @@ msgstr "Bot flags, and moderator or admin levels, are removed after 365 days wit
 msgid "Both buttons open on <0>{gameFile}</0>, where {engine} writes. Pick another file if you keep your games somewhere else. A player who has never saved a base in game has no file there yet, and sending one writes it."
 msgstr "Both buttons open on <0>{gameFile}</0>, where {engine} writes. Pick another file if you keep your games somewhere else. A player who has never saved a base in game has no file there yet, and sending one writes it."
 
+#: src/placement/TerrainControls.tsx
+msgid "Both ways"
+msgstr "Both ways"
+
 #: src/multiplayer/admin/tools.tsx
 msgid "Bots"
 msgstr "Bots"
@@ -27553,6 +27557,10 @@ msgstr "Only from"
 msgid "Only has an effect on a unit that flies. The engine drops it for anything else."
 msgstr "Only has an effect on a unit that flies. The engine drops it for anything else."
 
+#: src/placement/TerrainControls.tsx
+msgid "Only lower"
+msgstr "Only lower"
+
 #: src/content/unitFieldNotes.ts
 msgid "Only matters for a fighter."
 msgstr "Only matters for a fighter."
@@ -27572,6 +27580,10 @@ msgstr "Only own maps: generated map styles are hidden"
 #: src/content/unitFieldNotes.ts
 msgid "Only produced while the unit is switched on and its upkeep was paid that tick."
 msgstr "Only produced while the unit is switched on and its upkeep was paid that tick."
+
+#: src/placement/TerrainControls.tsx
+msgid "Only raise"
+msgstr "Only raise"
 
 #: src/content/unitFieldNotes.ts
 msgid "Only read for a unit with no movement class, which is anything immobile or flying. Defaults to on if the def has a WaterLine key at all."
@@ -43234,6 +43246,10 @@ msgstr "Which team won"
 #: src/workshop/pages/components/RandomModDrawer.tsx
 msgid "Which units this mod touches."
 msgstr "Which units this mod touches."
+
+#: src/placement/TerrainControls.tsx
+msgid "Which way the ground changes"
+msgstr "Which way the ground changes"
 
 #: src/workshop/pages/components/WeaponLibraryPanel.tsx
 msgid "Which weapon fields to show"

@@ -213,6 +213,95 @@ describe("terrain steps in the share payload", () => {
   });
 });
 
+describe("a level or ramp that only raises or only lowers (#4804)", () => {
+  const raising: BaseBlueprint = {
+    ...mixed,
+    terrain: [{ ...pad, only: "raise" }, { ...ramp, only: "lower" }, pad],
+  };
+
+  it("round trips through a share file, a share code and the library", () => {
+    const file = readBlueprintContainer(
+      encodeBlueprintJson(raising, { gameName: "Zero-K test" }),
+    );
+    expect(file.ok && blueprintFromPayload(file.payload)).toEqual(
+      without(raising),
+    );
+    const code = encodeBlueprintCode(raising, { gameName: "Zero-K test" });
+    expect(code.ok).toBe(true);
+    if (!code.ok) return;
+    const coded = readBlueprintContainer(code.code);
+    expect(coded.ok && blueprintFromPayload(coded.payload)).toEqual(
+      without(raising),
+    );
+    const record: StoredBlueprint = {
+      id: raising.id,
+      createdAt: "",
+      updatedAt: "",
+      layout: payloadOf(raising),
+    };
+    const read = parseStoredBlueprintJson(JSON.stringify(record));
+    expect(read && libraryLayout(read).terrain).toEqual(raising.terrain);
+  });
+
+  it("goes into the library file the widget reads, and a scenario document", () => {
+    const record: StoredBlueprint = {
+      id: raising.id,
+      createdAt: "",
+      updatedAt: "",
+      layout: payloadOf(raising),
+    };
+    const doc = JSON.parse(widgetLibraryText([record]));
+    expect(doc.blueprints[0].terrain.map((s: TerrainStep) => s.only)).toEqual([
+      "raise",
+      "lower",
+      undefined,
+    ]);
+    const scenario = parseScenario(
+      JSON.parse(
+        JSON.stringify({ ...newScenario("Only"), blueprints: [raising] }),
+      ),
+    );
+    expect(scenario?.blueprints[0].terrain).toEqual(raising.terrain);
+  });
+
+  it("is absent, not written, when a step changes the ground both ways", () => {
+    const written = JSON.parse(JSON.stringify(payloadOf(mixed)));
+    for (const step of written.terrain) expect(step).not.toHaveProperty("only");
+  });
+
+  it("copies the choice and leaves it out of a step that has none", () => {
+    expect(copyTerrainStep({ ...pad, only: "raise" }).only).toBe("raise");
+    expect(copyTerrainStep(pad)).not.toHaveProperty("only");
+  });
+
+  it("reads a value that is not raise or lower as both ways, and ignores it on other kinds", () => {
+    const read = parseBlueprintPayload({
+      ...JSON.parse(JSON.stringify(payloadOf(wallsOnly))),
+      terrain: [
+        { ...pad, only: "both" },
+        { ...pad, only: 2 },
+        { ...wall, only: "raise" },
+        { ...smooth, only: "lower" },
+        { ...ramp, only: "lower" },
+      ],
+    });
+    expect(read?.terrain).toEqual([
+      { ...pad, before: 0 },
+      { ...pad, before: 0 },
+      { ...wall, before: 0 },
+      { ...smooth, before: 0 },
+      { ...ramp, only: "lower", before: 0 },
+    ]);
+  });
+
+  it("survives a turn and a flip", () => {
+    const step: TerrainStep = { ...pad, only: "raise" };
+    const pivot = { x: 0, z: 0 };
+    expect(turnedStep(step, pivot, 1).only).toBe("raise");
+    expect(flippedStep(step, pivot, { x: true }).only).toBe("raise");
+  });
+});
+
 describe("terrain steps in the library", () => {
   const stored = (layout: BaseBlueprint): StoredBlueprint => ({
     id: layout.id,

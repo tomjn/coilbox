@@ -45,6 +45,7 @@ function M.laidSteps(prefab, pivot)
 			height = step.height,
 			heights = step.heights,
 			width = step.width,
+			only = step.only,
 			after = 0,
 			base = pivot,
 		}
