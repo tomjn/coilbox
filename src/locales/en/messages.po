@@ -11139,6 +11139,7 @@ msgstr "Can't damage its own unit"
 #: src/multiplayer/invite/InviteLinkHost.tsx
 #: src/multiplayer/LobbyStatusButton.tsx
 #: src/multiplayer/RelayIndicator.tsx
+#: src/placement/TerrainControls.tsx
 #: src/play/pages/components/GameOptionsPanel.tsx
 #: src/play/pages/SavegamesPage.tsx
 #: src/play/PresetLibraryToolbar.tsx
@@ -12106,14 +12107,6 @@ msgstr "Click on each piece"
 msgid "Click one to select its pieces."
 msgstr "Click one to select its pieces."
 
-#: src/placement/TerrainControls.tsx
-msgid "Click points along the wall. Enter or a double click finishes it, Escape cancels."
-msgstr "Click points along the wall. Enter or a double click finishes it, Escape cancels."
-
-#: src/placement/TerrainControls.tsx
-msgid "Click the corners, or drag a rectangle. Enter or a double click finishes it, Escape cancels."
-msgstr "Click the corners, or drag a rectangle. Enter or a double click finishes it, Escape cancels."
-
 #: src/lego/pages/components/MeasureReadout.tsx
 msgid "Click the first point"
 msgstr "Click the first point"
@@ -12129,10 +12122,6 @@ msgstr "Click the ground to put one down. Escape stops placing. Drag a building 
 #: src/placement/BlueprintOnMap.tsx
 msgid "Click the ground to stand it somewhere else."
 msgstr "Click the ground to stand it somewhere else."
-
-#: src/placement/TerrainControls.tsx
-msgid "Click the low end, then the high end. Escape cancels."
-msgstr "Click the low end, then the high end. Escape cancels."
 
 #: src/scenario/pages/components/BaseControls.tsx
 #: src/scenario/pages/components/GroupControls.tsx
@@ -12309,6 +12298,10 @@ msgstr "Close this battle? Everyone will be removed and it will disappear from t
 #: src/multiplayer/battle/BattleRoomHeader.tsx
 msgid "Close this battle? Everyone will be removed, and the room it is in will stop hosting and give its port back."
 msgstr "Close this battle? Everyone will be removed, and the room it is in will stop hosting and give its port back."
+
+#: src/placement/TerrainControls.tsx
+msgid "Close tool"
+msgstr "Close tool"
 
 #: src/content/unitFieldNotes.ts
 msgid "Closeness targeting weight"
@@ -15478,6 +15471,7 @@ msgstr "Dominant"
 #: src/i18n/frameStrings.ts
 #: src/lobby-servers/pages/SettingsSection.tsx
 #: src/placement/SurfaceBars.tsx
+#: src/placement/TerrainControls.tsx
 #: src/scenario/pages/components/ScenarioMapBars.tsx
 #: src/workshop/pages/components/ExplosionGeneratorEditor.tsx
 msgid "Done"
@@ -36416,11 +36410,6 @@ msgstr "Terrain tools"
 #: src/mapconv/pages/components/AdvancedOptions.tsx
 msgid "terrain-type index per pixel"
 msgstr "terrain-type index per pixel"
-
-#. placeholder {0}: toolName(tool)
-#: src/placement/TerrainControls.tsx
-msgid "Terrain: {0}"
-msgstr "Terrain: {0}"
 
 #: src/conquest/mapStyle.ts
 msgid "Territories (provinces on generated land)"

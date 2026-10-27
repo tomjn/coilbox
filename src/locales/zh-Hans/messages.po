@@ -13797,6 +13797,7 @@ msgstr "不会伤害自己的单位"
 #: src/multiplayer/invite/InviteLinkHost.tsx
 #: src/multiplayer/LobbyStatusButton.tsx
 #: src/multiplayer/RelayIndicator.tsx
+#: src/placement/TerrainControls.tsx
 #: src/play/pages/components/GameOptionsPanel.tsx
 #: src/play/pages/SavegamesPage.tsx
 #: src/play/PresetLibraryToolbar.tsx
@@ -14983,14 +14984,6 @@ msgstr "点击每个部件"
 msgid "Click one to select its pieces."
 msgstr "点击一项即可选择其部件。"
 
-#: src/placement/TerrainControls.tsx
-msgid "Click points along the wall. Enter or a double click finishes it, Escape cancels."
-msgstr ""
-
-#: src/placement/TerrainControls.tsx
-msgid "Click the corners, or drag a rectangle. Enter or a double click finishes it, Escape cancels."
-msgstr ""
-
 #: src/lego/pages/components/MeasureReadout.tsx
 #, fuzzy
 msgid "Click the first point"
@@ -15010,10 +15003,6 @@ msgstr "点击地面放置一个。按 Escape 停止放置。拖动建筑可在�
 #, fuzzy
 msgid "Click the ground to stand it somewhere else."
 msgstr "点击地面将其放到别处。"
-
-#: src/placement/TerrainControls.tsx
-msgid "Click the low end, then the high end. Escape cancels."
-msgstr ""
 
 #: src/scenario/pages/components/BaseControls.tsx
 #: src/scenario/pages/components/GroupControls.tsx
@@ -15222,6 +15211,10 @@ msgstr "关闭此房间？所有人都会被移出，房间也会从对局列表
 #, fuzzy
 msgid "Close this battle? Everyone will be removed, and the room it is in will stop hosting and give its port back."
 msgstr "关闭此房间？所有人都会被移出，所在的房间会停止托管并释放其端口。"
+
+#: src/placement/TerrainControls.tsx
+msgid "Close tool"
+msgstr ""
 
 #: src/content/unitFieldNotes.ts
 #, fuzzy
@@ -19131,6 +19124,7 @@ msgstr "压倒性"
 #: src/i18n/frameStrings.ts
 #: src/lobby-servers/pages/SettingsSection.tsx
 #: src/placement/SurfaceBars.tsx
+#: src/placement/TerrainControls.tsx
 #: src/scenario/pages/components/ScenarioMapBars.tsx
 #: src/workshop/pages/components/ExplosionGeneratorEditor.tsx
 #, fuzzy
@@ -44983,11 +44977,6 @@ msgstr ""
 #, fuzzy
 msgid "terrain-type index per pixel"
 msgstr "每个像素的地形类型索引"
-
-#. placeholder {0}: toolName(tool)
-#: src/placement/TerrainControls.tsx
-msgid "Terrain: {0}"
-msgstr ""
 
 #: src/conquest/mapStyle.ts
 #, fuzzy

@@ -4,10 +4,15 @@
  *
  * The pointer gestures are `useMapEditing`'s, the same ones that place and
  * drag buildings. This hook answers them for the steps: a click while a tool
- * is in use adds a point, a drag of a step or one of its handles reshapes it,
- * and the drawing is `terrainLayer.ts`. The keys a gesture can only make on
- * the ground's own element, Enter, a double click and a right click, are
- * listened for here.
+ * is in use adds a point, and a drag of a step or one of its handles reshapes
+ * it. What each of Enter, Escape, a double click, a right click, Done and
+ * Cancel does to a step being drawn is `draftReduce` in
+ * `@/blueprint/terrainDraft.ts`. The keys are listened for on the window, so
+ * they work whatever has the focus.
+ *
+ * Two layers draw: `terrainVolumes.ts`, what the steps look like, and
+ * `terrainLayer.ts`, what the pointer works with. The pointer's position is
+ * kept out of React, so moving it redraws those two and nothing else.
  *
  * Every change to the layout is one edit through `applyEdit`, so undo and
  * redo cover it.
@@ -18,9 +23,16 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { TerrainStep } from "@/blueprint/model";
 import { type StepLimit, stepRefusal } from "@/blueprint/terraform";
 import {
+  type DraftInput,
+  type DraftSettings,
+  type DraftState,
+  draftReduce,
+  draftStep,
+  NO_DRAFT,
+} from "@/blueprint/terrainDraft";
+import {
   edgeMiddle,
   enoughPoints,
-  newStep,
   rectanglePoints,
   snapPoint,
   type TerrainTool,
@@ -43,6 +55,7 @@ import {
   stepKey,
   type TerrainLayer,
 } from "./terrainLayer";
+import { createTerrainVolumes, type TerrainVolumes } from "./terrainVolumes";
 import type { GroundDragPhase } from "./useMapEditing";
 
 export interface TerrainEditingDeps {
@@ -70,6 +83,15 @@ export interface TerrainEditingDeps {
 export interface TerrainEditing {
   tool: TerrainTool | null;
   setTool: (tool: TerrainTool | null) => void;
+  /** What the step being drawn will be made with. */
+  settings: DraftSettings;
+  setSettings: (settings: Partial<DraftSettings>) => void;
+  /** Whether a step is part drawn. */
+  drawing: boolean;
+  /** Make the step drawn so far, or put the tool down. */
+  finish: () => void;
+  /** Throw away the step drawn so far and put the tool down. */
+  cancel: () => void;
   /** The layer, for `useMapEditing`'s overlays while steps can be picked. */
   overlay: TerrainLayer | null;
   /** A click on bare ground while a tool is in use. */
@@ -78,8 +100,9 @@ export interface TerrainEditing {
   onDragGround:
     | ((from: Point, to: Point, phase: GroundDragPhase) => void)
     | null;
-  onHover: ((pos: Point | null) => void) | null;
-  /** Whether a key is one of the steps', which the editor hands here. */
+  /** Where the pointer is, for the guide of a step being drawn. */
+  onHover: (pos: Point | null) => void;
+  /** Whether a key is one of the steps'. */
   owns: (key: string) => boolean;
   /** A press that took hold of a step's part: select the step. */
   select: (key: string) => void;
@@ -107,53 +130,44 @@ export function useTerrainEditing(deps: TerrainEditingDeps): TerrainEditing {
     placing,
   } = deps;
   const [layer, setLayer] = useState<TerrainLayer | null>(null);
-  const [tool, setToolState] = useState<TerrainTool | null>(null);
-  const [points, setPoints] = useState<Point[]>([]);
-  const [hover, setHover] = useState<Point | null>(null);
+  const [volumes, setVolumes] = useState<TerrainVolumes | null>(null);
+  const [draft, setDraft] = useState<DraftState>(NO_DRAFT);
   const [refused, setRefused] = useState<StepLimit | null>(null);
 
   useEffect(() => {
     if (!handle) return;
-    const made = createTerrainLayer({
-      handle,
-      worldWidth,
-      worldHeight,
-      groundAt,
-    });
-    setLayer(made);
+    const made = {
+      volumes: createTerrainVolumes({
+        handle,
+        worldWidth,
+        worldHeight,
+        groundAt,
+      }),
+      layer: createTerrainLayer({ handle, worldWidth, worldHeight, groundAt }),
+    };
+    setVolumes(made.volumes);
+    setLayer(made.layer);
     return () => {
-      made.dispose();
+      made.layer.dispose();
+      made.volumes.dispose();
       setLayer(null);
+      setVolumes(null);
     };
   }, [handle, worldWidth, worldHeight, groundAt]);
 
-  const active = tools ? tool : null;
-  const setTool = useCallback((next: TerrainTool | null) => {
-    setToolState(next);
-    setPoints([]);
-    setHover(null);
-    setRefused(null);
-  }, []);
+  // Read at the moment of an input, so two inputs before a render build on
+  // each other.
+  const draftRef = useRef(draft);
+  draftRef.current = draft;
 
-  /** A map position as an offset from the layout's origin. */
-  const offset = useCallback(
-    (pos: Point): Point =>
-      snapPoint({ x: pos.x - origin.x, z: pos.z - origin.z }),
-    [origin],
-  );
-
-  /** Make the step drawn so far, if the game would take it. */
-  const finish = useCallback(
-    (drawn: Point[]) => {
-      if (!active || !enoughPoints(active, drawn.length)) return;
-      const step = newStep(active, drawn);
-      const limit = stepRefusal(step);
-      setPoints([]);
-      if (limit) {
-        setRefused(limit);
-        return;
-      }
-      setRefused(null);
+  const dispatch = useCallback(
+    (input: DraftInput) => {
+      const result = draftReduce(draftRef.current, input);
+      draftRef.current = result.state;
+      setDraft(result.state);
+      setRefused(result.refused);
+      const step = result.step;
+      if (!step) return;
       let index = -1;
       applyEdit((doc) => {
         const added = addStep(doc, BLUEPRINT_BASE_ID, step);
@@ -162,110 +176,137 @@ export function useTerrainEditing(deps: TerrainEditingDeps): TerrainEditing {
       });
       if (index >= 0) onSelect(stepKey(index));
     },
-    [active, applyEdit, onSelect],
+    [applyEdit, onSelect],
   );
 
-  // Read by the listeners below, which are attached once per scene.
-  const latest = useRef({ points, finish, active });
-  latest.current = { points, finish, active };
+  const tool = tools ? draft.tool : null;
+  const pickable = tools && !tool && !placing;
+
+  /** A map position as an offset from the layout's origin. */
+  const offset = useCallback(
+    (pos: Point): Point =>
+      snapPoint({ x: pos.x - origin.x, z: pos.z - origin.z }),
+    [origin],
+  );
+
+  // The pointer, and a rectangle being dragged out, kept out of React.
+  const hover = useRef<Point | null>(null);
+  const band = useRef<Point[] | null>(null);
+
+  const redraw = useRef(() => {});
+  redraw.current = () => {
+    const at = hover.current;
+    // The step as it would be made now: the rectangle being dragged, or the
+    // points clicked so far and the one under the pointer.
+    const run = band.current ?? (at ? [...draft.points, at] : draft.points);
+    const preview =
+      tool && enoughPoints(tool, run.length)
+        ? draftStep(tool, run, draft.settings)
+        : null;
+    volumes?.draw(origin, terrain, hidden, preview);
+    layer?.draw({
+      origin,
+      steps: terrain,
+      selected,
+      hidden,
+      pickable,
+      guide: tool
+        ? {
+            points: band.current ?? draft.points,
+            hover: band.current ? null : at,
+            closed: tool === "area" || tool === "smooth",
+          }
+        : null,
+    });
+  };
+  useEffect(() => {
+    redraw.current();
+  });
+
+  const onHover = useCallback(
+    (pos: Point | null) => {
+      hover.current = pos ? offset(pos) : null;
+      // Only a step being drawn follows the pointer.
+      if (toolRef.current) redraw.current();
+    },
+    [offset],
+  );
 
   const onPlace = useMemo(() => {
-    if (!active) return null;
-    return (pos: Point) => {
-      const at = offset(pos);
-      const drawn = latest.current.points;
-      const last = drawn[drawn.length - 1];
-      // The second click of a double click lands where the first did.
-      if (last && last.x === at.x && last.z === at.z) return;
-      // A click on the first corner closes an area.
-      const closing =
-        (active === "area" || active === "smooth") &&
-        drawn.length >= 3 &&
-        drawn[0].x === at.x &&
-        drawn[0].z === at.z;
-      if (closing) {
-        finish(drawn);
-        return;
-      }
-      const next = [...drawn, at];
-      if (enoughPoints(active, next.length)) {
-        const limit = stepRefusal(newStep(active, next));
-        // A ramp shorter than the game allows is the second click being too
-        // close, so the first stays and the second can be tried again.
-        if (limit) {
-          setRefused(limit);
-          return;
-        }
-      }
-      setRefused(null);
-      if (active === "ramp" && next.length === 2) {
-        finish(next);
-        return;
-      }
-      setPoints(next);
-    };
-  }, [active, offset, finish]);
+    if (!tool) return null;
+    return (pos: Point) => dispatch({ type: "click", at: offset(pos) });
+  }, [tool, offset, dispatch]);
 
   const onDragGround = useMemo(() => {
-    if (active !== "area" && active !== "smooth") return null;
+    if (tool !== "area" && tool !== "smooth") return null;
     return (from: Point, to: Point, phase: GroundDragPhase) => {
-      // Only as the first thing drawn. Once a corner has been clicked, the
-      // outline is being drawn by clicking.
-      if (latest.current.points.length > 0 && phase === "move") return;
+      if (draftRef.current.points.length > 0) return;
       const corners = rectanglePoints(offset(from), offset(to));
-      if (phase === "cancel" || !corners) {
-        setPoints([]);
-        return;
-      }
       if (phase === "move") {
-        setPoints(corners);
-        setHover(null);
+        band.current = corners;
+        redraw.current();
         return;
       }
-      finish(corners);
-    };
-  }, [active, offset, finish]);
-
-  const onHover = useMemo(() => {
-    if (!active) return null;
-    return (pos: Point | null) => setHover(pos ? offset(pos) : null);
-  }, [active, offset]);
-
-  // Enter finishes and Escape cancels. Escape with nothing drawn puts the tool
-  // down, the way it puts down a building being placed.
-  useEffect(() => {
-    if (!active) return;
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (isTypingTarget(event.target as HTMLElement | null)) return;
-      if (event.key === "Enter") {
-        event.preventDefault();
-        latest.current.finish(latest.current.points);
-      } else if (event.key === "Escape") {
-        if (latest.current.points.length > 0) {
-          setPoints([]);
-        } else {
-          setTool(null);
-        }
+      band.current = null;
+      if (phase === "end" && corners) {
+        dispatch({ type: "rectangle", corners });
+      } else {
+        redraw.current();
       }
     };
-    window.addEventListener("keydown", onKeyDown);
-    return () => window.removeEventListener("keydown", onKeyDown);
-  }, [active, setTool]);
+  }, [tool, offset, dispatch]);
 
-  // A double click finishes, and a right click on a corner of the selected
-  // step removes it.
+  const finish = useCallback(() => dispatch({ type: "finish" }), [dispatch]);
+  const cancel = useCallback(() => dispatch({ type: "cancel" }), [dispatch]);
+  const setTool = useCallback(
+    (next: TerrainTool | null) => dispatch({ type: "pick", tool: next }),
+    [dispatch],
+  );
+  const setSettings = useCallback(
+    (settings: Partial<DraftSettings>) =>
+      dispatch({ type: "settings", settings }),
+    [dispatch],
+  );
+
+  // Enter finishes and Escape cancels, whatever has the focus. Escape is
+  // taken even in a field, so the tool bar's own Height box does not trap it.
+  // Enter in a field is that field's, which commits what was typed.
+  useEffect(() => {
+    if (!tool) return;
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        event.preventDefault();
+        dispatch({ type: "escape" });
+      } else if (
+        event.key === "Enter" &&
+        !isTypingTarget(event.target as HTMLElement | null)
+      ) {
+        event.preventDefault();
+        dispatch({ type: "finish" });
+      }
+    };
+    window.addEventListener("keydown", onKeyDown, true);
+    return () => window.removeEventListener("keydown", onKeyDown, true);
+  }, [tool, dispatch]);
+
+  // A double click or a right click finishes. With no tool, a right click on a
+  // corner of the selected step removes it.
   const selectedRef = useRef(selected);
   selectedRef.current = selected;
+  const toolRef = useRef(tool);
+  toolRef.current = tool;
   useEffect(() => {
     if (!handle || !layer) return;
     const dom = handle.renderer.domElement;
     const onDouble = () => {
-      if (latest.current.active) {
-        latest.current.finish(latest.current.points);
-      }
+      if (toolRef.current) dispatch({ type: "finish" });
     };
     const onContext = (event: MouseEvent) => {
-      if (latest.current.active) return;
+      if (toolRef.current) {
+        event.preventDefault();
+        dispatch({ type: "finish" });
+        return;
+      }
       const ref = layer.cornerAt(event.clientX, event.clientY);
       if (ref?.part !== "corner" || ref.index !== selectedRef.current) return;
       event.preventDefault();
@@ -279,29 +320,7 @@ export function useTerrainEditing(deps: TerrainEditingDeps): TerrainEditing {
       dom.removeEventListener("dblclick", onDouble);
       dom.removeEventListener("contextmenu", onContext);
     };
-  }, [handle, layer, applyEdit]);
-
-  const pickable = tools && !active && !placing;
-  useEffect(() => {
-    layer?.draw({
-      origin,
-      steps: terrain,
-      selected,
-      hidden,
-      pickable,
-      draft: active ? { tool: active, points, hover } : null,
-    });
-  }, [
-    layer,
-    origin,
-    terrain,
-    selected,
-    hidden,
-    pickable,
-    active,
-    points,
-    hover,
-  ]);
+  }, [handle, layer, applyEdit, dispatch]);
 
   /** A change to one step, kept to itself when the game would refuse it. */
   const reshape = useCallback(
@@ -319,8 +338,13 @@ export function useTerrainEditing(deps: TerrainEditingDeps): TerrainEditing {
   );
 
   return {
-    tool: active,
+    tool,
     setTool,
+    settings: draft.settings,
+    setSettings,
+    drawing: draft.points.length > 0,
+    finish,
+    cancel,
     overlay: pickable ? layer : null,
     onPlace,
     onDragGround,

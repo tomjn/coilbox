@@ -57,29 +57,28 @@ The button with the blueprint's name opens a box where you can rename it.
 
 ### Change the ground
 
-In a game that can make terrain changes, such as Zero-K, a Terrain button sits next to Pick a unit. It opens four tools:
+In a game that can make terrain changes, such as Zero-K, a Terrain button sits next to Pick a unit. Select it to show the terrain toolbar. No tool is picked until you pick one:
 
-- Wall: click points along a path. Press Enter or double click to finish it.
-- Area: click the corners of an outline, or drag a rectangle. Enter, a double click or a click on the first corner finishes it.
-- Ramp: click the low end, then the high end.
+- Wall: click points along a path.
+- Area: click the corners of an outline, or drag a rectangle. A click on the first corner also finishes it.
+- Ramp: click the low end, then the high end. The ramp is made on the second click.
 - Smooth: draw an area the same way as the Area tool. It evens out the ground inside.
 
-Escape throws away a change you are drawing, and a second Escape puts the tool down. Points snap to the 8 elmo grid the game changes the ground on.
+Enter, a double click, a right click or Done finishes the change you are drawing and puts the tool down. Escape throws the change away, and a second Escape puts the tool down. Cancel does both. Points snap to the 8 elmo grid the game changes the ground on.
 
-A new wall raises the ground it follows by 40 elmos. A new area levels the ground inside it to the height of the point you hold the blueprint by when you place it. A new ramp is 64 elmos wide and climbs 40 elmos.
+The toolbar sets what the change is made with, before you start drawing or while you draw:
 
-Select a change to show its buttons beside it:
+- Raise or Level, for walls and areas. Raise adds the height to the ground under each point. Level makes the ground that height above the point you hold the blueprint by. A wall starts as Raise and an area as Level.
+- Height, in elmos. A negative raise digs. A wall starts at 40 and an area at 0.
+- Width, Low end and High end, for ramps. A ramp starts 64 elmos wide and climbs 40 elmos.
 
-- Raise or Level, for walls and areas. Raise adds the height to the ground under each point. Level makes the ground that height above the point you hold the blueprint by.
-- Height, in elmos. A negative raise digs.
-- Width, Low end and High end, for ramps.
-- Delete.
+Each change is drawn the way the widget previews it in a match: a see-through green volume for raised ground and red for dug ground, with a wire grid on it and a cyan grid on the ground it covers. Buildings stand on the ground the changes leave. The slopes Zero-K adds round a change are not drawn yet.
 
-Drag a change to move it, and drag a corner to reshape it. Click the dot in the middle of a side to add a corner there, and right click a corner to remove it.
-
-Raised ground is drawn blue and other changes grey. The terrain changes switch for the game is in the Terrain button too. Turning it off hides the button, and the Blueprints page has the switch to turn it back on.
+Select a change to show its buttons beside it: Raise or Level, Height, the ramp's Width and ends, and Delete. Drag a change to move it, and drag a corner to reshape it. Click the dot in the middle of a side to add a corner there, and right click a corner to remove it.
 
 The tools stop at Zero-K's limits rather than make a change the game would refuse: a wall of more than 700 points (one every 16 elmos), an area wider or deeper than 2,000 elmos, more than 2,500 points in one change, and a ramp shorter than 64 or longer than 3,000 elmos, or narrower than 48 or wider than 1,600. A note says which limit stopped it.
+
+The toolbar also has the game's terrain changes switch. Turning it off hides the Terrain button, and the Blueprints page has the switch to turn it back on.
 
 A blueprint can be terrain changes alone, with no buildings.
 
@@ -151,7 +150,9 @@ Coilbox switches terrain changes on for a game that has the `terraunit` unit, wh
 
 The Terrain changes switch is on the Blueprints page, next to the game list, once you have picked a game. It is also on the page of a blueprint that has terrain changes. Each game keeps its own setting. Turn it on for a game built on Zero-K's code that renamed `terraunit`, or off for a game that has it and where you do not want terrain changes.
 
-Turning the switch off never removes anything. A blueprint keeps its terrain changes, and they stay in a share, a pack and an export. The card and the blueprint's page say how many terrain changes the game cannot make, for example "3 terrain changes this game cannot make". A blueprint with only terrain changes stays in your library and can be shared, but has nothing to place in that game. Turn the switch back on and everything is as you left it.
+Turning the switch off never removes anything. While it is off, a blueprint shows as a flat one: its terrain changes are hidden on its card and page and in the editor, and its buildings stand on flat ground. It keeps its terrain changes, and they stay in a share, a pack and an export. Turn the switch back on and everything is as you left it.
+
+For a game that cannot make terrain changes, the card and the blueprint's page say how many it cannot make, for example "3 terrain changes this game cannot make". A blueprint with only terrain changes stays in your library and can be shared, but has nothing to place in that game.
 
 The widget in a match decides for itself from the builders you have selected, so this switch does not change what happens in a match. See [Place terrain changes](#place-terrain-changes).
 

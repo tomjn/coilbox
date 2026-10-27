@@ -1,7 +1,7 @@
 /**
- * The blueprint editor's terrain tools (issue #4793): the Terrain button with
- * its four tools and the game's Terrain changes switch, and the buttons beside
- * a selected step.
+ * The blueprint editor's terrain tools (issue #4793): the Terrain button, the
+ * toolbar it shows with the four tools and the game's Terrain changes switch,
+ * and the buttons beside a selected step.
  *
  * Only controls. What a tool does on the ground is `useTerrainEditing.ts`, and
  * every edit these make goes through the shared rules in
@@ -13,22 +13,20 @@ import { Trans, useLingui } from "@lingui/react/macro";
 import { Button, Input } from "@picoframe/frame";
 import {
   BrickWall,
+  Check,
   Mountain,
   Square,
   Trash2,
   TrendingUp,
   Waves,
+  X,
 } from "lucide-react";
-import { useId, useState } from "react";
+import { useId } from "react";
 
 import type { TerrainStep } from "@/blueprint/model";
 import type { StepLimit } from "@/blueprint/terraform";
+import type { DraftSettings } from "@/blueprint/terrainDraft";
 import type { TerrainTool } from "@/blueprint/terrainEdit";
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@/components/ui/popover";
 import { Switch } from "@/components/ui/switch";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { useFieldText } from "@/lib/useFieldText";
@@ -72,18 +70,6 @@ export function limitText(limit: StepLimit): string {
   }
 }
 
-/** What the line over the surface says while a tool is in use. */
-export function toolHint(tool: TerrainTool): string {
-  switch (tool) {
-    case "wall":
-      return coreT`Click points along the wall. Enter or a double click finishes it, Escape cancels.`;
-    case "ramp":
-      return coreT`Click the low end, then the high end. Escape cancels.`;
-    default:
-      return coreT`Click the corners, or drag a rectangle. Enter or a double click finishes it, Escape cancels.`;
-  }
-}
-
 const TOOLS: { tool: TerrainTool; icon: typeof Square }[] = [
   { tool: "wall", icon: BrickWall },
   { tool: "area", icon: Square },
@@ -92,76 +78,27 @@ const TOOLS: { tool: TerrainTool; icon: typeof Square }[] = [
 ];
 
 /**
- * The Terrain button beside Pick a unit, and the tools it opens.
- *
- * The game's Terrain changes switch is in here as well, so it can be found
- * from a blueprint. Turning it off takes the button away with it, and the
- * library's game list has the switch to turn it back on.
+ * The Terrain button beside Pick a unit. It is a toggle: on, the terrain
+ * toolbar shows under the editor's own, and nothing pops up.
  */
 export function TerrainToolsButton({
-  tool,
-  onTool,
-  enabled,
-  onEnabled,
+  open,
+  onOpen,
 }: {
-  tool: TerrainTool | null;
-  onTool: (tool: TerrainTool | null) => void;
-  enabled: boolean;
-  onEnabled: (on: boolean) => void;
+  open: boolean;
+  onOpen: (open: boolean) => void;
 }) {
-  const { t } = useLingui();
-  const [open, setOpen] = useState(false);
   return (
-    <Popover open={open} onOpenChange={setOpen}>
-      <PopoverTrigger asChild>
-        <Button
-          size="sm"
-          variant={tool ? "secondary" : "ghost"}
-          className="h-8 gap-1.5 px-2 text-xs"
-        >
-          <Mountain className="size-3.5 shrink-0" />
-          {tool ? t`Terrain: ${toolName(tool)}` : t`Terrain`}
-        </Button>
-      </PopoverTrigger>
-      <PopoverContent align="start" className="w-72 space-y-3">
-        <ToggleGroup
-          type="single"
-          variant="outline"
-          size="sm"
-          value={tool ?? ""}
-          onValueChange={(value) => {
-            onTool((value || null) as TerrainTool | null);
-            if (value) setOpen(false);
-          }}
-          aria-label={t`Terrain tools`}
-          className="w-full"
-        >
-          {TOOLS.map(({ tool: one, icon: Icon }) => (
-            <ToggleGroupItem
-              key={one}
-              value={one}
-              className="flex-1 gap-1 text-xs"
-            >
-              <Icon className="size-3.5" />
-              {toolName(one)}
-            </ToggleGroupItem>
-          ))}
-        </ToggleGroup>
-        <div className="flex items-center justify-between gap-3 border-t border-border/60 pt-3">
-          <label
-            htmlFor="blueprint-terrain-changes"
-            className="text-xs font-medium"
-          >
-            <Trans>Terrain changes in this game</Trans>
-          </label>
-          <Switch
-            id="blueprint-terrain-changes"
-            checked={enabled}
-            onCheckedChange={onEnabled}
-          />
-        </div>
-      </PopoverContent>
-    </Popover>
+    <Button
+      size="sm"
+      variant={open ? "secondary" : "ghost"}
+      className="h-8 gap-1.5 px-2 text-xs"
+      aria-pressed={open}
+      onClick={() => onOpen(!open)}
+    >
+      <Mountain className="size-3.5 shrink-0" />
+      <Trans>Terrain</Trans>
+    </Button>
   );
 }
 
@@ -171,11 +108,13 @@ function ElmoField({
   value,
   onCommit,
   min,
+  disabled,
 }: {
   label: string;
   value: number;
   onCommit: (value: number) => void;
   min?: number;
+  disabled?: boolean;
 }) {
   const id = useId();
   const [text, setText] = useFieldText(String(value));
@@ -196,6 +135,7 @@ function ElmoField({
       <Input
         id={id}
         type="number"
+        disabled={disabled}
         step={8}
         min={min}
         value={text}
@@ -296,6 +236,152 @@ export function TerrainStepBar({
       >
         <Trash2 className="size-3.5" /> <Trans>Delete</Trans>
       </Button>
+    </div>
+  );
+}
+
+/**
+ * The terrain toolbar, shown while the Terrain button is on: the four tools,
+ * what the step being drawn will be made with, Done and Cancel, and the
+ * game's Terrain changes switch. No tool is pressed until one is picked. The
+ * settings apply to the step being drawn, so they can be set before the first
+ * click and changed part way through.
+ *
+ * The switch is here so it can be found from a blueprint. Turning it off
+ * takes the Terrain button away, and the library's game list has the switch to
+ * turn it back on.
+ */
+export function TerrainDraftBar({
+  tool,
+  onTool,
+  settings,
+  onSettings,
+  drawing,
+  onDone,
+  onCancel,
+  enabled,
+  onEnabled,
+}: {
+  tool: TerrainTool | null;
+  onTool: (tool: TerrainTool | null) => void;
+  settings: DraftSettings;
+  onSettings: (settings: Partial<DraftSettings>) => void;
+  /** Whether part of a step has been drawn, which is what Done makes. */
+  drawing: boolean;
+  onDone: () => void;
+  onCancel: () => void;
+  enabled: boolean;
+  onEnabled: (on: boolean) => void;
+}) {
+  const { t } = useLingui();
+  // With no tool picked, Raise or Level and Height show disabled, so the bar
+  // does not change shape when one is.
+  const heightened = tool === "wall" || tool === "area" || tool === null;
+  return (
+    <div className="flex w-fit max-w-full flex-wrap items-center gap-1.5 rounded-md border border-border/60 bg-card p-1">
+      <ToggleGroup
+        type="single"
+        variant="outline"
+        size="sm"
+        value={tool ?? ""}
+        onValueChange={(value) => onTool((value || null) as TerrainTool | null)}
+        aria-label={t`Terrain tools`}
+      >
+        {TOOLS.map(({ tool: one, icon: Icon }) => (
+          <ToggleGroupItem
+            key={one}
+            value={one}
+            className="h-7 gap-1 px-2 text-xs"
+          >
+            <Icon className="size-3.5" />
+            {toolName(one)}
+          </ToggleGroupItem>
+        ))}
+      </ToggleGroup>
+      {heightened && (
+        <>
+          <ToggleGroup
+            type="single"
+            variant="outline"
+            size="sm"
+            value={settings.kind}
+            onValueChange={(value) =>
+              value && onSettings({ kind: value as "raise" | "level" })
+            }
+            aria-label={t`Raise or level`}
+            disabled={!tool}
+          >
+            <ToggleGroupItem value="raise" className="h-7 px-2 text-xs">
+              <Trans>Raise</Trans>
+            </ToggleGroupItem>
+            <ToggleGroupItem value="level" className="h-7 px-2 text-xs">
+              <Trans>Level</Trans>
+            </ToggleGroupItem>
+          </ToggleGroup>
+          <ElmoField
+            label={t`Height`}
+            value={settings.height}
+            onCommit={(height) => onSettings({ height })}
+            disabled={!tool}
+          />
+        </>
+      )}
+      {tool === "ramp" && (
+        <>
+          <ElmoField
+            label={t`Width`}
+            value={settings.width}
+            min={48}
+            onCommit={(width) => onSettings({ width })}
+          />
+          <ElmoField
+            label={t`Low end`}
+            value={settings.heights[0]}
+            onCommit={(low) =>
+              onSettings({ heights: [low, settings.heights[1]] })
+            }
+          />
+          <ElmoField
+            label={t`High end`}
+            value={settings.heights[1]}
+            onCommit={(high) =>
+              onSettings({ heights: [settings.heights[0], high] })
+            }
+          />
+        </>
+      )}
+      <Button
+        size="sm"
+        variant="secondary"
+        className="h-7 gap-1.5 px-2 text-xs"
+        onClick={onDone}
+        disabled={!tool}
+      >
+        <Check className="size-3.5" />
+        {drawing ? t`Done` : t`Close tool`}
+      </Button>
+      <Button
+        size="sm"
+        variant="ghost"
+        className="h-7 gap-1.5 px-2 text-xs"
+        onClick={onCancel}
+        disabled={!tool}
+      >
+        <X className="size-3.5" /> <Trans>Cancel</Trans>
+      </Button>
+      <span className="flex items-center gap-1.5 border-l border-border/60 pl-2">
+        <Switch
+          id="blueprint-terrain-changes"
+          checked={enabled}
+          onCheckedChange={onEnabled}
+        />
+        <label
+          htmlFor="blueprint-terrain-changes"
+          className="text-[11px] text-muted-foreground"
+        >
+          <Trans>Terrain changes in this game</Trans>
+        </label>
+      </span>
     </div>
   );
 }

@@ -71,6 +71,7 @@ import {
 import { baseBuildings, type Point } from "@/scenario/model";
 import { BLUEPRINT_BASE_ID, blueprintDocument } from "./blueprintDocument";
 import { useLayoutHistory } from "./blueprintHistory";
+import { finishedGround } from "./finishedGround";
 import { GRID_EXTENT, GRID_ORIGIN, gridGround, layoutFraming } from "./ground";
 import {
   BuildOrderPopover,
@@ -99,15 +100,15 @@ import { focusCamera, focusDistance, worldToScene } from "./scene";
 import {
   limitText,
   stepName,
+  TerrainDraftBar,
   TerrainStepBar,
   TerrainToolsButton,
-  toolHint,
 } from "./TerrainControls";
 import { parseTerrainKey, stepKey } from "./terrainLayer";
 import { useLayoutPreview } from "./useLayoutPreview";
 import { useMapEditing } from "./useMapEditing";
 import { useScenarioFootprints } from "./useScenarioFootprints";
-import { useScenarioUnits } from "./useScenarioUnits";
+import { type MapExtent, useScenarioUnits } from "./useScenarioUnits";
 import { useTerrainEditing } from "./useTerrainEditing";
 
 /** How long one building of a build order stands on screen before the next one
@@ -117,6 +118,9 @@ const PLAYBACK_STEP_MS = 700;
 /** The ground every blueprint is drawn on: flat, gridded and the same size
  *  every time, so a layout looks the same wherever it is opened. */
 const GROUND = gridGround();
+
+/** That ground's height everywhere, before any terrain step. */
+const BASE_GROUND = () => 0;
 
 /** One list for every "nothing to draw", so a layer with nothing on it is not
  *  cleared and redrawn on every render. */
@@ -165,6 +169,9 @@ export function BlueprintEditor({
   const [handle, setHandle] = useState<MapScene3D | null>(null);
   const [selected, setSelected] = useState<string | null>(null);
   const [unitDef, setUnitDef] = useState("");
+  /** Whether the terrain toolbar is showing. Off until the Terrain button is
+   *  pressed, and with no tool picked when it is. */
+  const [terrainOpen, setTerrainOpen] = useState(false);
   const reduceMotion = useReduceMotion();
 
   const doc = useMemo(
@@ -184,7 +191,12 @@ export function BlueprintEditor({
   const { units, loading: unitsLoading, archive } = useGameUnits(gameName);
   const terrainChanges = useTerrainChanges(archive, units);
   const showTerrain = terrainTools && terrainChanges.showTools;
-  const terrain = blueprint.terrain ?? NO_STEPS;
+  // The steps as shown and stood on. With the game's switch off the layout is
+  // a flat one (issue #4814), and the steps stay in the layout untouched.
+  const terrain =
+    terrainChanges.enabled === false
+      ? NO_STEPS
+      : (blueprint.terrain ?? NO_STEPS);
   const buildings = useMemo(() => buildingUnits(units), [units]);
   const snap = useMemo(() => buildGridSnap(units), [units]);
   // What each building does, coloured the way the in-game widget colours it.
@@ -249,7 +261,22 @@ export function BlueprintEditor({
     return () => clearInterval(timer);
   }, [advancing, total]);
 
-  const drawn = useScenarioUnits(handle, doc, GROUND, undrawn);
+  // The ground the buildings stand on: flat, with the terrain steps built on
+  // it (issue #4793), so a building on a raised pad stands on top of it.
+  const builtOn = useMemo(() => finishedGround({ terrain }), [terrain]);
+  const standOn = useMemo<MapExtent>(
+    () =>
+      builtOn
+        ? {
+            ...GROUND,
+            heightWords: builtOn.grid,
+            minHeight: builtOn.minHeight,
+            maxHeight: builtOn.maxHeight,
+          }
+        : GROUND,
+    [builtOn],
+  );
+  const drawn = useScenarioUnits(handle, doc, standOn, undrawn);
   // The ground here is flat on purpose rather than unread, so every building
   // gets a real verdict and the squares are not a screen full of dashes saying
   // nothing is known (issue #1491).
@@ -376,7 +403,9 @@ export function BlueprintEditor({
     handle,
     worldWidth: GROUND.worldWidth,
     worldHeight: GROUND.worldHeight,
-    groundAt: drawn.groundAt,
+    // The steps are drawn up from the ground they start on, not the ground they
+    // leave, which is the flat.
+    groundAt: BASE_GROUND,
     origin: GRID_ORIGIN,
     terrain,
     tools: showTerrain,
@@ -409,7 +438,10 @@ export function BlueprintEditor({
         ? terrainEditing.select(key)
         : setSelected(key),
     onPlace: terrainEditing.onPlace ?? place,
-    onHover: terrainEditing.onHover ?? preview.onHover,
+    onHover: (pos) => {
+      terrainEditing.onHover(pos);
+      preview.onHover?.(pos);
+    },
     onDragUnit: preview.onDragUnit,
     onDragGround: terrainEditing.onDragGround,
     overlays: [terrainEditing.overlay],
@@ -517,13 +549,11 @@ export function BlueprintEditor({
 
               {showTerrain && (
                 <TerrainToolsButton
-                  tool={terrainTool}
-                  onTool={(tool) => {
-                    setTerrainTool(tool);
-                    if (tool) setUnitDef("");
+                  open={terrainOpen}
+                  onOpen={(open) => {
+                    setTerrainOpen(open);
+                    if (!open) setTerrainTool(null);
                   }}
-                  enabled={terrainChanges.enabled === true}
-                  onEnabled={terrainChanges.setEnabled}
                 />
               )}
 
@@ -632,15 +662,31 @@ export function BlueprintEditor({
               />
             </div>
 
-            <p className="w-fit rounded bg-card/70 px-2 py-1 text-[11px] text-muted-foreground backdrop-blur">
-              {terrainTool
-                ? toolHint(terrainTool)
-                : unitDef
+            {showTerrain && terrainOpen && (
+              <TerrainDraftBar
+                tool={terrainTool}
+                onTool={(tool) => {
+                  setTerrainTool(tool);
+                  if (tool) setUnitDef("");
+                }}
+                settings={terrainEditing.settings}
+                onSettings={terrainEditing.setSettings}
+                drawing={terrainEditing.drawing}
+                onDone={terrainEditing.finish}
+                onCancel={terrainEditing.cancel}
+                enabled={terrainChanges.enabled === true}
+                onEnabled={terrainChanges.setEnabled}
+              />
+            )}
+            {!terrainTool && (
+              <p className="w-fit rounded bg-card/70 px-2 py-1 text-[11px] text-muted-foreground backdrop-blur">
+                {unitDef
                   ? t`Click the ground to put one down. Escape stops placing. Drag a building to move it within the blueprint.`
                   : pickedStep !== null && showTerrain
                     ? t`Drag the change to move it, or a corner to reshape it. Click a side to add a corner, right click a corner to remove it.`
                     : t`Pick a building to start placing. Drag one to move it, click bare ground to deselect.`}
-            </p>
+              </p>
+            )}
 
             {terrainEditing.refused && (
               <p className="w-fit rounded bg-amber-950/70 px-2 py-1 text-[11px] text-amber-200 backdrop-blur">
