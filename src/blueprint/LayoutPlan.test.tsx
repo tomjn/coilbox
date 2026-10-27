@@ -235,6 +235,20 @@ describe("LayoutPlan", () => {
       expect(html.indexOf("text-blue-500")).toBeLessThan(html.indexOf("<rect"));
     });
 
+    it("draws a neutral wall solid and faint with square ends, as the widget does", () => {
+      const shape = blueprintShape({
+        name: "Smooth",
+        buildings: [],
+        footprints: {},
+        terrain: [{ ...WALL, kind: "smooth", height: undefined }],
+      });
+      if (!shape) throw new Error("nothing to draw");
+      const html = renderToStaticMarkup(<LayoutPlan shape={shape} />);
+      expect(html).not.toContain('stroke-dasharray="0.6');
+      expect(html).toContain('stroke-linecap="square"');
+      expect(html).toContain('stroke-opacity="0.3"');
+    });
+
     it("draws an arrow on a ramp whose ends differ", () => {
       const ramp = (heights: [number, number]) => {
         const shape = blueprintShape({
@@ -259,7 +273,7 @@ describe("LayoutPlan", () => {
         return renderToStaticMarkup(<LayoutPlan shape={shape} />);
       };
       const paths = (html: string) => html.match(/<path /g)?.length ?? 0;
-      expect(paths(ramp([0, 20]))).toBe(paths(ramp([5, 5])) + 2);
+      expect(paths(ramp([0, 20]))).toBe(paths(ramp([5, 5])) + 1);
     });
   });
 });
