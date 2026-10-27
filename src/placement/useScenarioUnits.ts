@@ -59,6 +59,11 @@ export interface MapExtent {
    * would not read is flattened too (issue #1497): this floor is level on
    * purpose and is known exactly, so a building on it gets a real verdict, and
    * that one is a guess nothing may be judged against.
+   *
+   * A floor that is level on purpose can still carry `heightWords`: the
+   * blueprint editor's grid with its terrain steps built on it (issue #4793).
+   * The models stand on those heights and are judged on them, and there is
+   * still no water, since the floor is not a map.
    */
   flat?: boolean;
   minHeight: number;
@@ -213,8 +218,8 @@ export function useScenarioUnits(
   // Held rather than recomputed: it is a float a sample, which on the largest
   // map is a 17 MB array, and the layer below is rebuilt whenever it moves.
   const field = useMemo(() => {
-    if (flat) return FLAT_FIELD;
-    return grid ? fieldFromGrid(grid) : null;
+    if (grid) return fieldFromGrid(grid);
+    return flat ? FLAT_FIELD : null;
   }, [flat, grid]);
 
   // What the models stand on, which is the flat once the map's own heights have
@@ -326,10 +331,11 @@ export function useScenarioUnits(
   );
 
   const ground = useMemo(() => {
-    if (flat) return flatGround();
-    return grid
+    const corners = grid
       ? cornerGround(grid, worldWidth, worldHeight, minHeight, maxHeight)
       : null;
+    if (flat) return corners ? { ...corners, hasWater: false } : flatGround();
+    return corners;
   }, [flat, grid, worldWidth, worldHeight, minHeight, maxHeight]);
 
   // A scan that failed has no data, so it cannot make the game missing.
