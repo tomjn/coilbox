@@ -10,7 +10,7 @@ import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 
-import { HistoryControls, TurnNote } from "./SurfaceBars";
+import { HistoryControls, turnNoteText } from "./SurfaceBars";
 
 const noop = () => {};
 
@@ -54,26 +54,21 @@ describe("HistoryControls", () => {
 /**
  * Issue #1541. The outlined square is the answer, and the sentence is what ties
  * it to the button the pointer is on.
- *
- * A square footprint does not move on a turn, which is most buildings, so the
- * silence has to be said as well: a control that draws something for some
- * buildings and nothing for others otherwise reads as broken.
  */
-describe("TurnNote", () => {
-  const note = (moves: boolean | null) =>
-    renderToStaticMarkup(createElement(TurnNote, { moves }));
+describe("turnNoteText", () => {
+  const note = (moves: boolean | null) => turnNoteText(moves) ?? "";
 
   it("says nothing until the turn is being considered", () => {
-    expect(note(null)).toBe("");
+    expect(turnNoteText(null)).toBeNull();
   });
 
   it("points at the outlined squares when the turn moves the building", () => {
     expect(note(true)).toContain("outlined");
   });
 
-  it("says the building stays where it is when the turn moves it nowhere", () => {
-    const html = note(false);
-    expect(html).toContain("same squares");
-    expect(html).not.toContain("outlined");
+  /** A square factory still faces a new way after a turn, so "nothing
+   *  changes" would be false. */
+  it("says nothing when the turn leaves the building on the same squares", () => {
+    expect(turnNoteText(false)).toBeNull();
   });
 });

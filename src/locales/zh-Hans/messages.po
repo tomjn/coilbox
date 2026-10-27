@@ -2139,6 +2139,10 @@ msgstr "{count, plural, other {# 个更新}}"
 msgid "{count, plural, one {# zone} other {# zones}}"
 msgstr "{count, plural, other {# 个区域}}"
 
+#: src/blueprint/OffGridNote.tsx
+msgid "{count, plural, one {Building {places} is saved off the build grid. It is drawn where the engine will build it.} other {Buildings {places} are saved off the build grid. They are drawn where the engine will build them.}}"
+msgstr ""
+
 #: src/lego/pages/components/DetailPanel.tsx
 #, fuzzy
 msgid "{count, plural, one {Built in · # piece} other {Built in · # pieces}}"
@@ -4151,11 +4155,6 @@ msgstr "{mapName} · {gameName} · {opponents}"
 #, fuzzy
 msgid "{mapName} · {modeHint} · middle-drag to pan · drag a unit to move it · drag a zone's middle handle to move it · right-drag to turn the view"
 msgstr "{mapName} · {modeHint} · 中键拖动以平移 · 拖动单位以移动 · 拖动区域的中间手柄以移动 · 右键拖动以旋转视角"
-
-#: src/placement/BlueprintOnMap.tsx
-#, fuzzy
-msgid "{mapName} · click or drag to stand the layout somewhere else · this changes the layout in no way · right-drag to turn the view"
-msgstr "{mapName} · 点击或拖动以将布局放到别处 · 这不会改变布局 · 右键拖动以旋转视角"
 
 #: src/multiplayer/battles/HostZerokBattlePopover.tsx
 #, fuzzy
@@ -8197,16 +8196,6 @@ msgstr "此场景中已有名为“{wasCalled}”的蓝图，因此此蓝图保�
 #, fuzzy
 msgid "A blueprint in your library is already called \"{wasCalled}\", so this one is kept as \"{name}\"."
 msgstr "你的库中已有名为“{wasCalled}”的蓝图，因此此蓝图保留为“{name}”。"
-
-#: src/placement/BlueprintEditor.tsx
-#, fuzzy
-msgid "A blueprint is a shape rather than a place, so there is no map here and no team. Every building sits at an offset from the blueprint's own middle, and the squares under them are the ground the engine will give them."
-msgstr "蓝图是一种形状而不是一个地点，因此这里没有地图，也没有队伍。每个建筑都位于相对于蓝图中心的偏移处，它们下方的格子就是引擎会分配给它们的地面。"
-
-#: src/blueprint/pages/BlueprintDetailPage.tsx
-#, fuzzy
-msgid "A blueprint is a shape rather than a place, so there is no map here and no team. Try it on a map to see which of its buildings a real terrain would refuse. Put it down in a mission from the scenario builder, or send it to a game's own blueprint file from there."
-msgstr "蓝图是一种形状而不是一个地点，因此这里没有地图，也没有队伍。在地图上试用它，看看真实地形会拒绝其中哪些建筑。可从场景编辑器将其放入任务中，或从那里发送到游戏自己的蓝图文件。"
 
 #: src/scenario/pages/components/BlueprintPanel.tsx
 #, fuzzy
@@ -12634,6 +12623,7 @@ msgstr "蓝巨星"
 msgid "Blueprint"
 msgstr "蓝图"
 
+#: src/blueprint/pages/BlueprintDetailPage.tsx
 #: src/blueprint/pages/components/RenameBlueprintForm.tsx
 #: src/placement/LayoutControls.tsx
 #, fuzzy
@@ -15003,9 +14993,8 @@ msgid "Click the ground to add points."
 msgstr "点击地面添加点。"
 
 #: src/placement/BlueprintEditor.tsx
-#, fuzzy
-msgid "Click the ground to put one down. Escape stops placing. Drag a building to move it within the blueprint."
-msgstr "点击地面放置一个。按 Escape 停止放置。拖动建筑可在蓝图内移动它。"
+msgid "Click the ground to put one down. Escape stops placing."
+msgstr ""
 
 #: src/placement/BlueprintOnMap.tsx
 #, fuzzy
@@ -19143,11 +19132,6 @@ msgstr "完成"
 #, fuzzy
 msgid "Done · {finished}"
 msgstr "完成 · {finished}"
-
-#: src/placement/BlueprintOnMap.tsx
-#, fuzzy
-msgid "Done with the map"
-msgstr "完成地图操作"
 
 #: src/multiplayer/admin/AdminRequestStatus.tsx
 #: src/multiplayer/admin/StaffSection.tsx
@@ -25141,9 +25125,8 @@ msgid "Imported challenge"
 msgstr "已导入的挑战"
 
 #: src/blueprint/library.ts
-#, fuzzy
-msgid "Imported from a code somebody shared. A code carries the blueprint and nothing about where it came from, so that is the whole of what is known about it."
-msgstr "从别人分享的分享码导入。分享码只携带蓝图，不含任何来源信息，所以这就是关于它的全部已知信息。"
+msgid "Imported from a code somebody shared."
+msgstr ""
 
 #: src/blueprint/library.ts
 #, fuzzy
@@ -31326,11 +31309,6 @@ msgstr "无地图"
 msgid "No map"
 msgstr "无地图"
 
-#: src/placement/BlueprintEditor.tsx
-#, fuzzy
-msgid "no map · a build grid, {GRID_EXTENT} elmos square · drag or middle-drag to pan · right-drag to turn the view · scroll to zoom"
-msgstr "无地图 · 建造网格，{GRID_EXTENT} elmo 见方 · 拖动或中键拖动以平移 · 右键拖动以旋转视角 · 滚动以缩放"
-
 #: src/lego/pages/components/TestDrawer.tsx
 #: src/workshop/pages/components/PlayLocallyButton.tsx
 #, fuzzy
@@ -35457,11 +35435,6 @@ msgstr "选择蓝图…"
 msgid "Pick a building and click the map. Clicks add to the base you have selected. Stop placing with the button beside the picker, or Escape. A base is the building half: mobile units belong in a group."
 msgstr "选择一个建筑并点击地图。每次点击都会添加到你选中的基地。用选择器旁边的按钮或 Escape 停止放置。基地是建筑部分：移动单位属于组。"
 
-#: src/placement/BlueprintEditor.tsx
-#, fuzzy
-msgid "Pick a building to start placing. Drag one to move it, click bare ground to deselect."
-msgstr "选择一个建筑开始放置。拖动建筑可移动它，点击空地可取消选择。"
-
 #: src/workshop/pages/components/RandomModDrawer.tsx
 #, fuzzy
 msgid "Pick a collection"
@@ -36812,11 +36785,6 @@ msgstr "恢复游戏的武器"
 #, fuzzy
 msgid "Put it in the game"
 msgstr "放入游戏"
-
-#: src/blueprint/OffGridNote.tsx
-#, fuzzy
-msgid "Put the blueprint on the build grid"
-msgstr "将蓝图对齐到建造网格"
 
 #: src/workshop/pages/components/CheckpointsDrawer.tsx
 #, fuzzy
@@ -38748,6 +38716,7 @@ msgstr "正在移除 {name}…"
 msgid "Removing…"
 msgstr "移除中…"
 
+#: src/blueprint/pages/BlueprintDetailPage.tsx
 #: src/blueprint/pages/components/BlueprintCardMenu.tsx
 #: src/blueprint/pages/components/RenameBlueprintForm.tsx
 #: src/lego/pages/components/ScriptTab.tsx
@@ -40132,6 +40101,10 @@ msgstr "保存表"
 #, fuzzy
 msgid "Save the .glb"
 msgstr "保存 .glb"
+
+#: src/blueprint/OffGridNote.tsx
+msgid "Save the drawn positions"
+msgstr ""
 
 #: src/lego/pages/components/SaveModelPopover.tsx
 #, fuzzy
@@ -44990,10 +44963,6 @@ msgid "Terrain changes"
 msgstr ""
 
 #: src/placement/TerrainControls.tsx
-msgid "Terrain changes in this game"
-msgstr ""
-
-#: src/placement/TerrainControls.tsx
 msgid "Terrain tools"
 msgstr ""
 
@@ -45017,6 +44986,7 @@ msgstr "第三纹理"
 msgid "Tertiary texture (old name)"
 msgstr "第三纹理（旧名称）"
 
+#: src/blueprint/pages/BlueprintDetailPage.tsx
 #: src/workshop/pages/components/CommandPalette.tsx
 #: src/workshop/pages/components/PlayLocallyButton.tsx
 #, fuzzy
@@ -48491,11 +48461,6 @@ msgstr "此蓝图适用于 {wanted}。无法读取你的游戏，所以没有与
 msgid "This blueprint's game is not installed, so nothing can be drawn with its models."
 msgstr "此蓝图的游戏未安装，所以无法用其模型绘制任何内容。"
 
-#: src/blueprint/OffGridNote.tsx
-#, fuzzy
-msgid "This blueprint's numbers do not agree with the build grid. {count, plural, one {Building {places} is drawn where the engine will build it, which is not the position the blueprint holds for it.} other {Buildings {places} are drawn where the engine will build them, which is not the position the blueprint holds for them.}} Nothing has been changed."
-msgstr "此蓝图的数值与建造网格不一致。{count, plural, other {建筑 {places} 绘制在引擎会建造它们的位置，而不是蓝图为它们保存的位置。}}没有做任何更改。"
-
 #: src/game-updates/pages/GameUpdatesSection.tsx
 #, fuzzy
 msgid "This build has no game-update source configured."
@@ -50625,11 +50590,6 @@ msgstr "重试"
 msgid "Try again, or download an engine instead."
 msgstr "请重试，或改为下载一个引擎。"
 
-#: src/blueprint/pages/BlueprintDetailPage.tsx
-#, fuzzy
-msgid "Try it on a map"
-msgstr "在地图上试用"
-
 #: src/downloads/activityRows.ts
 #, fuzzy
 msgid "Try next mirror"
@@ -50823,11 +50783,6 @@ msgstr "按游戏的放置方式旋转了 180 度"
 #, fuzzy
 msgid "turned three quarters of a turn, the way the game places it"
 msgstr "按游戏的放置方式旋转了 270 度"
-
-#: src/placement/SurfaceBars.tsx
-#, fuzzy
-msgid "Turning it leaves it on the same squares. Its footprint is square, so there is nowhere for it to move."
-msgstr "旋转后它仍在相同的格子上。它的占地是正方形，所以无处可移。"
 
 #: src/placement/SurfaceBars.tsx
 #, fuzzy

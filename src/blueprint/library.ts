@@ -289,10 +289,9 @@ function summaryOf(source: BlueprintSource): string {
       return t`Imported from the file ${file}.`;
     }
     case "code":
-      // The honest answer rather than a shrug. A code is the layout and
-      // nothing else, so there is no file, no author and no site to name, and
-      // saying so beats a card that looks like it forgot.
-      return t`Imported from a code somebody shared. A code carries the blueprint and nothing about where it came from, so that is the whole of what is known about it.`;
+      // A code is the layout and nothing else, so there is no file, no author
+      // and no site to name.
+      return t`Imported from a code somebody shared.`;
     case "hub": {
       const author = source.author;
       return author

@@ -2139,6 +2139,10 @@ msgstr "{count, plural, one {# оновлення} few {# оновлення} ma
 msgid "{count, plural, one {# zone} other {# zones}}"
 msgstr "{count, plural, one {# зона} few {# зони} many {# зон} other {# зони}}"
 
+#: src/blueprint/OffGridNote.tsx
+msgid "{count, plural, one {Building {places} is saved off the build grid. It is drawn where the engine will build it.} other {Buildings {places} are saved off the build grid. They are drawn where the engine will build them.}}"
+msgstr ""
+
 #: src/lego/pages/components/DetailPanel.tsx
 #, fuzzy
 msgid "{count, plural, one {Built in · # piece} other {Built in · # pieces}}"
@@ -4151,11 +4155,6 @@ msgstr "{mapName} · {gameName} · {opponents}"
 #, fuzzy
 msgid "{mapName} · {modeHint} · middle-drag to pan · drag a unit to move it · drag a zone's middle handle to move it · right-drag to turn the view"
 msgstr "{mapName} · {modeHint} · середня кнопка – панорама · перетягніть юніт, щоб перемістити його · перетягніть середній маркер зони, щоб перемістити її · права кнопка – поворот огляду"
-
-#: src/placement/BlueprintOnMap.tsx
-#, fuzzy
-msgid "{mapName} · click or drag to stand the layout somewhere else · this changes the layout in no way · right-drag to turn the view"
-msgstr "{mapName} · клацніть або перетягніть, щоб поставити макет деінде · це ніяк не змінює макет · права кнопка – поворот огляду"
 
 #: src/multiplayer/battles/HostZerokBattlePopover.tsx
 #, fuzzy
@@ -8197,16 +8196,6 @@ msgstr "У цьому сценарії вже є креслення «{wasCalled
 #, fuzzy
 msgid "A blueprint in your library is already called \"{wasCalled}\", so this one is kept as \"{name}\"."
 msgstr "У вашій бібліотеці вже є креслення «{wasCalled}», тому це збережено як «{name}»."
-
-#: src/placement/BlueprintEditor.tsx
-#, fuzzy
-msgid "A blueprint is a shape rather than a place, so there is no map here and no team. Every building sits at an offset from the blueprint's own middle, and the squares under them are the ground the engine will give them."
-msgstr "Креслення – це форма, а не місце, тому тут немає мапи й команди. Кожна будівля стоїть зі зміщенням від середини креслення, а клітинки під нею – це земля, яку дасть рушій."
-
-#: src/blueprint/pages/BlueprintDetailPage.tsx
-#, fuzzy
-msgid "A blueprint is a shape rather than a place, so there is no map here and no team. Try it on a map to see which of its buildings a real terrain would refuse. Put it down in a mission from the scenario builder, or send it to a game's own blueprint file from there."
-msgstr "Креслення – це форма, а не місце, тому тут немає мапи й команди. Спробуйте його на мапі, щоб побачити, які будівлі справжній рельєф не прийме. Розмістіть його в місії з редактора сценаріїв або надішліть звідти у власний файл креслень гри."
 
 #: src/scenario/pages/components/BlueprintPanel.tsx
 #, fuzzy
@@ -12634,6 +12623,7 @@ msgstr "блакитний гігант"
 msgid "Blueprint"
 msgstr "Креслення"
 
+#: src/blueprint/pages/BlueprintDetailPage.tsx
 #: src/blueprint/pages/components/RenameBlueprintForm.tsx
 #: src/placement/LayoutControls.tsx
 #, fuzzy
@@ -15003,9 +14993,8 @@ msgid "Click the ground to add points."
 msgstr "Клацніть на землі, щоб додати точки."
 
 #: src/placement/BlueprintEditor.tsx
-#, fuzzy
-msgid "Click the ground to put one down. Escape stops placing. Drag a building to move it within the blueprint."
-msgstr "Клацніть на землі, щоб поставити будівлю. Escape зупиняє розміщення. Перетягніть будівлю, щоб перемістити її в межах креслення."
+msgid "Click the ground to put one down. Escape stops placing."
+msgstr ""
 
 #: src/placement/BlueprintOnMap.tsx
 #, fuzzy
@@ -19143,11 +19132,6 @@ msgstr "Готово"
 #, fuzzy
 msgid "Done · {finished}"
 msgstr "Готово · {finished}"
-
-#: src/placement/BlueprintOnMap.tsx
-#, fuzzy
-msgid "Done with the map"
-msgstr "Завершити роботу з мапою"
 
 #: src/multiplayer/admin/AdminRequestStatus.tsx
 #: src/multiplayer/admin/StaffSection.tsx
@@ -25141,9 +25125,8 @@ msgid "Imported challenge"
 msgstr "Імпортований виклик"
 
 #: src/blueprint/library.ts
-#, fuzzy
-msgid "Imported from a code somebody shared. A code carries the blueprint and nothing about where it came from, so that is the whole of what is known about it."
-msgstr "Імпортовано з коду, яким хтось поділився. Код містить креслення й нічого про його походження, тож це все, що про нього відомо."
+msgid "Imported from a code somebody shared."
+msgstr ""
 
 #: src/blueprint/library.ts
 #, fuzzy
@@ -31326,11 +31309,6 @@ msgstr "немає мапи"
 msgid "No map"
 msgstr "Немає мапи"
 
-#: src/placement/BlueprintEditor.tsx
-#, fuzzy
-msgid "no map · a build grid, {GRID_EXTENT} elmos square · drag or middle-drag to pan · right-drag to turn the view · scroll to zoom"
-msgstr "немає мапи · сітка будівництва {GRID_EXTENT} ельмо в квадраті · перетягуйте або тягніть середньою кнопкою для зсуву · тягніть правою кнопкою, щоб повертати вигляд · прокручуйте для масштабу"
-
 #: src/lego/pages/components/TestDrawer.tsx
 #: src/workshop/pages/components/PlayLocallyButton.tsx
 #, fuzzy
@@ -35457,11 +35435,6 @@ msgstr "Виберіть креслення…"
 msgid "Pick a building and click the map. Clicks add to the base you have selected. Stop placing with the button beside the picker, or Escape. A base is the building half: mobile units belong in a group."
 msgstr "Виберіть будівлю й клацніть на мапі. Клацання додають до вибраної бази. Припиніть розміщення кнопкою поруч зі списком вибору або клавішею Escape. База – це будівельна половина: мобільні юніти належать до групи."
 
-#: src/placement/BlueprintEditor.tsx
-#, fuzzy
-msgid "Pick a building to start placing. Drag one to move it, click bare ground to deselect."
-msgstr "Виберіть будівлю, щоб почати розміщення. Перетягніть будівлю, щоб перемістити її, клацніть на порожній землі, щоб зняти виділення."
-
 #: src/workshop/pages/components/RandomModDrawer.tsx
 #, fuzzy
 msgid "Pick a collection"
@@ -36812,11 +36785,6 @@ msgstr "Повернути зброю гри"
 #, fuzzy
 msgid "Put it in the game"
 msgstr "Помістити в гру"
-
-#: src/blueprint/OffGridNote.tsx
-#, fuzzy
-msgid "Put the blueprint on the build grid"
-msgstr "Поставити креслення на сітку будівництва"
 
 #: src/workshop/pages/components/CheckpointsDrawer.tsx
 #, fuzzy
@@ -38748,6 +38716,7 @@ msgstr "Прибирання {name}…"
 msgid "Removing…"
 msgstr "Видалення…"
 
+#: src/blueprint/pages/BlueprintDetailPage.tsx
 #: src/blueprint/pages/components/BlueprintCardMenu.tsx
 #: src/blueprint/pages/components/RenameBlueprintForm.tsx
 #: src/lego/pages/components/ScriptTab.tsx
@@ -40132,6 +40101,10 @@ msgstr "Зберегти таблицю"
 #, fuzzy
 msgid "Save the .glb"
 msgstr "Зберегти .glb"
+
+#: src/blueprint/OffGridNote.tsx
+msgid "Save the drawn positions"
+msgstr ""
 
 #: src/lego/pages/components/SaveModelPopover.tsx
 #, fuzzy
@@ -44990,10 +44963,6 @@ msgid "Terrain changes"
 msgstr ""
 
 #: src/placement/TerrainControls.tsx
-msgid "Terrain changes in this game"
-msgstr ""
-
-#: src/placement/TerrainControls.tsx
 msgid "Terrain tools"
 msgstr ""
 
@@ -45017,6 +44986,7 @@ msgstr "Третя текстура"
 msgid "Tertiary texture (old name)"
 msgstr "Третя текстура (стара назва)"
 
+#: src/blueprint/pages/BlueprintDetailPage.tsx
 #: src/workshop/pages/components/CommandPalette.tsx
 #: src/workshop/pages/components/PlayLocallyButton.tsx
 #, fuzzy
@@ -48491,11 +48461,6 @@ msgstr "Це креслення для {wanted}. Не вдалося прочи�
 msgid "This blueprint's game is not installed, so nothing can be drawn with its models."
 msgstr "Гру цього креслення не встановлено, тож неможливо нічого намалювати з її моделями."
 
-#: src/blueprint/OffGridNote.tsx
-#, fuzzy
-msgid "This blueprint's numbers do not agree with the build grid. {count, plural, one {Building {places} is drawn where the engine will build it, which is not the position the blueprint holds for it.} other {Buildings {places} are drawn where the engine will build them, which is not the position the blueprint holds for them.}} Nothing has been changed."
-msgstr "Числа цього креслення не відповідають сітці будівництва. {count, plural, one {Будівлю {places} намальовано там, де її збудує рушій, а не в позиції, яку для неї зберігає креслення.} few {Будівлі {places} намальовано там, де їх збудує рушій, а не в позиціях, які для них зберігає креслення.} many {Будівлі {places} намальовано там, де їх збудує рушій, а не в позиціях, які для них зберігає креслення.} other {Будівлі {places} намальовано там, де їх збудує рушій, а не в позиціях, які для них зберігає креслення.}} Нічого не змінено."
-
 #: src/game-updates/pages/GameUpdatesSection.tsx
 #, fuzzy
 msgid "This build has no game-update source configured."
@@ -50625,11 +50590,6 @@ msgstr "Спробувати знову"
 msgid "Try again, or download an engine instead."
 msgstr "Спробуйте знову або натомість завантажте рушій."
 
-#: src/blueprint/pages/BlueprintDetailPage.tsx
-#, fuzzy
-msgid "Try it on a map"
-msgstr "Спробувати на мапі"
-
 #: src/downloads/activityRows.ts
 #, fuzzy
 msgid "Try next mirror"
@@ -50823,11 +50783,6 @@ msgstr "повернуто на пів оберту, як її ставить г
 #, fuzzy
 msgid "turned three quarters of a turn, the way the game places it"
 msgstr "повернуто на три чверті оберту, як її ставить гра"
-
-#: src/placement/SurfaceBars.tsx
-#, fuzzy
-msgid "Turning it leaves it on the same squares. Its footprint is square, so there is nowhere for it to move."
-msgstr "Поворот залишає її на тих самих клітинках. Її контур квадратний, тож їй немає куди зміщуватися."
 
 #: src/placement/SurfaceBars.tsx
 #, fuzzy

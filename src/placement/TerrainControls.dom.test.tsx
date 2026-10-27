@@ -33,8 +33,6 @@ function Harness() {
           drawing={false}
           onDone={() => setTool(null)}
           onCancel={() => setTool(null)}
-          enabled
-          onEnabled={() => {}}
         />
       )}
     </>

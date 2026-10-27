@@ -17,7 +17,6 @@
  */
 
 import { t as coreT } from "@lingui/core/macro";
-import { useLingui as useLocale } from "@lingui/react";
 import { Trans, useLingui } from "@lingui/react/macro";
 import { Button } from "@picoframe/frame";
 import {
@@ -241,6 +240,7 @@ export function SelectionBar({
   count,
   turnable,
   turnHint,
+  turnNote,
   onTurn,
   onTurnPreview,
   onDelete,
@@ -262,6 +262,10 @@ export function SelectionBar({
   turnable?: boolean;
   /** Why it cannot be turned, when it cannot. */
   turnHint?: string;
+  /** What the outlined squares a turn offers mean, as {@link turnNoteText}
+   *  words it. A line of the Turn button's tooltip, as in
+   *  {@link SelectionTools}, rather than a bar of its own. */
+  turnNote?: string | null;
   /** Left out by a surface whose rail carries the turn instead. */
   onTurn?: () => void;
   /**
@@ -288,27 +292,40 @@ export function SelectionBar({
       </span>
       {children}
       {onTurn && (
-        <Button
-          size="sm"
-          variant="ghost"
-          className="h-7 gap-1.5 px-2 text-xs"
-          onClick={onTurn}
-          disabled={!turnable}
-          title={
-            !turnable
-              ? turnHint
-              : count === undefined
-                ? t`Turn a quarter turn`
-                : t`Turn everything selected that turns a quarter turn. A group and a zone do not.`
-          }
-          onPointerEnter={() => onTurnPreview?.(true)}
-          onPointerLeave={() => onTurnPreview?.(false)}
-          onFocus={() => onTurnPreview?.(true)}
-          onBlur={() => onTurnPreview?.(false)}
-        >
-          <RotateCw className="size-3.5" />{" "}
-          {count === undefined ? t`Turn` : t`Turn all`}
-        </Button>
+        // One tooltip, below the bar so it covers the view rather than the
+        // bars under this one, and in a portal so showing it moves nothing.
+        <TooltipProvider>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                size="sm"
+                variant="ghost"
+                className="h-7 gap-1.5 px-2 text-xs"
+                onClick={onTurn}
+                disabled={!turnable}
+                onPointerEnter={() => onTurnPreview?.(true)}
+                onPointerLeave={() => onTurnPreview?.(false)}
+                onFocus={() => onTurnPreview?.(true)}
+                onBlur={() => onTurnPreview?.(false)}
+              >
+                <RotateCw className="size-3.5" />{" "}
+                {count === undefined ? t`Turn` : t`Turn all`}
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent side="bottom" align="start" className="max-w-64">
+              {!turnable ? (
+                <p>{turnHint}</p>
+              ) : count === undefined ? (
+                <>
+                  <p className="font-medium">{t`Turn a quarter turn`}</p>
+                  {turnNote && <p className="opacity-80">{turnNote}</p>}
+                </>
+              ) : (
+                <p>{t`Turn everything selected that turns a quarter turn. A group and a zone do not.`}</p>
+              )}
+            </TooltipContent>
+          </Tooltip>
+        </TooltipProvider>
       )}
       {onDelete && (
         <Button
@@ -330,45 +347,20 @@ export function SelectionBar({
 
 /**
  * What the outlined square beside a selected building means (issue #1541), in
- * words. Null when nobody is considering a turn, and then there is nothing to
- * say.
+ * words. Null when nobody is considering a turn, and when the turn leaves the
+ * building on the same squares.
  *
- * The squares are the answer and this is what ties them to the button the
- * pointer is on. Both cases are said, because most buildings are square and a
- * turn leaves those exactly where they are: a control that draws something for
- * some buildings and nothing for others otherwise reads as broken.
+ * Nothing is said about a square footprint. The building still turns, and for
+ * a factory or a turret which way it faces matters, so a sentence saying the
+ * turn changes nothing would be wrong.
  *
  * The sentence lives here rather than in either of the two things that show it,
- * a rail tooltip and {@link TurnNote}'s bar, so a surface that moved its turn
+ * a rail tooltip and the selection bar's Turn tooltip, so a surface that moved its turn
  * into the rail and one that did not say the same thing about the same squares.
  */
 export function turnNoteText(moves: boolean | null): string | null {
-  if (moves === null) return null;
-  return moves
-    ? coreT`Turning it stands it on the outlined squares. Its sides swap, so it moves half a build square.`
-    : coreT`Turning it leaves it on the same squares. Its footprint is square, so there is nowhere for it to move.`;
-}
-
-/**
- * {@link turnNoteText} as a bar over the surface, for an editor whose Turn is
- * still a button in the selection bar rather than a tool in a rail. A rail
- * says the same thing in the turn's own tooltip.
- */
-export function TurnNote({
-  moves,
-}: {
-  /** Whether the turn would move the building at all. Null when nobody is
-   *  considering a turn, and then nothing is said. */
-  moves: boolean | null;
-}) {
-  useLocale();
-  const said = turnNoteText(moves);
-  if (!said) return null;
-  return (
-    <p className="w-fit rounded bg-card/70 px-2 py-1 text-[11px] text-muted-foreground backdrop-blur">
-      {said}
-    </p>
-  );
+  if (!moves) return null;
+  return coreT`Turning it stands it on the outlined squares. Its sides swap, so it moves half a build square.`;
 }
 
 /**
