@@ -252,11 +252,21 @@ export function sanitizeColors(
 }
 
 /**
+ * The game's own side named Random, as BAR has, or undefined. The game rolls
+ * that side itself, so it stands in for `RANDOM_SIDE` rather than appearing
+ * beside it as a second Random.
+ */
+export function gameRandomSide(sides: { name: string }[]): string | undefined {
+  return sides.find((s) => s.name.toLowerCase() === "random")?.name;
+}
+
+/**
  * Resolve every `RANDOM_SIDE` participant to a concrete side, rolling
  * independently per row so a table of Random bots gets varied factions. Kept pure
  * by injecting `roll` (a 0..1 source, `Math.random` by default); the launch path
  * supplies the randomness, so the participant model itself stays deterministic.
  *
+ * A game with its own Random side gets that side, and rolls it at start.
  * Rows on a concrete side or on `""` (engine default) are left untouched. A single
  * side always resolves to that one; an empty sides list falls back to `""` (engine
  * default) so the sentinel never leaks into the start script and nothing crashes
@@ -267,10 +277,12 @@ export function resolveRandomSides(
   sides: { name: string }[],
   roll: () => number = Math.random,
 ): Participant[] {
+  const own = gameRandomSide(sides);
   let changed = false;
   const next = participants.map((p) => {
     if (p.side !== RANDOM_SIDE) return p;
     changed = true;
+    if (own) return { ...p, side: own };
     if (sides.length === 0) return { ...p, side: "" };
     const idx = Math.min(sides.length - 1, Math.floor(roll() * sides.length));
     return { ...p, side: sides[idx].name };

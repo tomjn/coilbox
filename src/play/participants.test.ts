@@ -121,6 +121,15 @@ describe("resolveRandomSides", () => {
     expect(out[0].side).toBe("");
   });
 
+  it("hands a Random row to the game's own Random side for the game to roll", () => {
+    const out = resolveRandomSides(
+      [randomAi("a")],
+      [...sides, { name: "Random" }],
+      () => 0,
+    );
+    expect(out[0].side).toBe("Random");
+  });
+
   it("clamps a roll of exactly 1 to the last side", () => {
     const out = resolveRandomSides([randomAi("a")], sides, () => 1);
     expect(out[0].side).toBe("Legion");

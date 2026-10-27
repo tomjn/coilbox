@@ -33,6 +33,7 @@ export {
   applyRestrictions,
   defaultAi,
   effectiveTeams,
+  gameRandomSide,
   hexToRgb,
   initialParticipants,
   makeAiParticipant,

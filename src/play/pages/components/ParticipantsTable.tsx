@@ -41,6 +41,7 @@ import {
 import {
   aiByline,
   effectiveTeams,
+  gameRandomSide,
   hexToRgb,
   type Participant,
   RANDOM_SIDE,
@@ -190,14 +191,20 @@ export function ParticipantsTable({
       (teamIndexById.get(b.id) ?? Number.MAX_SAFE_INTEGER),
   );
 
-  // Random sits first so any row (not just newly added AIs) can roll a faction;
-  // it resolves to a concrete side per-participant at launch.
+  // Random sits first so any row (not just newly added AIs) can roll a faction.
+  // It resolves to a concrete side per-participant at launch. A game with its
+  // own Random side offers that instead, and rows on ours show as it.
+  const ownRandom = gameRandomSide(sides);
   const sideOptions = [
-    {
-      value: RANDOM_SIDE,
-      label: t`Random`,
-      icon: <Dices className="size-4 text-muted-foreground" />,
-    },
+    ...(ownRandom
+      ? []
+      : [
+          {
+            value: RANDOM_SIDE,
+            label: t`Random`,
+            icon: <Dices className="size-4 text-muted-foreground" />,
+          },
+        ]),
     ...sides.map((s) => {
       const logo = factionLogos?.[s.name.toLowerCase()];
       return {
@@ -484,7 +491,11 @@ export function ParticipantsTable({
                       </Badge>
                     ) : (
                       <OptionSelect
-                        value={p.side}
+                        value={
+                          ownRandom && p.side === RANDOM_SIDE
+                            ? ownRandom
+                            : p.side
+                        }
                         size="sm"
                         // Wide enough for a faction name beside its emblem: the
                         // trigger spends 24px of its own on the logo and gap
