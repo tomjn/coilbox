@@ -61,14 +61,6 @@ export interface TerrainRelief {
   results: StepResult[];
   /** The estimate for every step, empty when switched off. */
   metal: number;
-  /**
-   * The finished ground's height in elmos at a map position, from the same
-   * heights the picture and the building verdicts use, or null before there is
-   * ground. A new function whenever the heights change, so it can be a
-   * dependency. For a hover readout, and for the difference in height between
-   * two steps.
-   */
-  heightAt: ((pos: Point) => number) | null;
 }
 
 const NONE: StepResult[] = [];
@@ -246,29 +238,9 @@ export function useTerrainRelief({
     layer?.draw(marks, selected, !enabled);
   }, [layer, marks, selected, enabled, current]);
 
-  const version = current?.version ?? 0;
-  // biome-ignore lint/correctness/useExhaustiveDependencies: a new version is a new reader
-  const heightAt = useMemo(
-    () =>
-      relief
-        ? (pos: Point) =>
-            groundHeight(
-              relief.field,
-              pos.x,
-              pos.z,
-              worldWidth,
-              worldHeight,
-              0,
-              1,
-            )
-        : null,
-    [relief, version, worldWidth, worldHeight],
-  );
-
   return {
     relief,
-    heightAt,
-    version,
+    version: current?.version ?? 0,
     results: enabled ? (current?.results ?? NONE) : NONE,
     metal: enabled ? (current?.metal ?? 0) : 0,
   };

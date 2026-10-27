@@ -6,7 +6,6 @@ import {
   CELL_LIMIT,
   drawnRuns,
   overlayMesh,
-  stepLabel,
   terrainMarks,
 } from "./terrainLayer";
 
@@ -42,33 +41,6 @@ function overlayOf(step: TerrainStep) {
 
 /** The heights of every vertex in a flat `x, y, z` run. */
 const ys = (run: number[]) => run.filter((_, i) => i % 3 === 1);
-
-describe("stepLabel", () => {
-  it("writes a raise and a dig with their sign", () => {
-    expect(stepLabel(wall)).toBe("+60");
-    expect(stepLabel(trench)).toBe("-30");
-  });
-
-  it("writes a ramp as its two ends", () => {
-    expect(
-      stepLabel({
-        kind: "ramp",
-        shape: "wall",
-        points: [
-          { x: 0, z: 0 },
-          { x: 64, z: 0 },
-        ],
-        heights: [0, 64],
-        width: 32,
-        before: 0,
-      }),
-    ).toBe("ramp 0 to +64");
-  });
-
-  it("says nothing for a smooth", () => {
-    expect(stepLabel({ ...wall, kind: "smooth" })).toBe("");
-  });
-});
 
 describe("overlayMesh", () => {
   it("makes a raised wall green faces, wire on top and down the slope", () => {
@@ -181,7 +153,6 @@ describe("terrainMarks", () => {
   it("gives a step the ground took its corners, slope included", () => {
     const { mark } = overlayOf(wall);
     expect(mark.corners?.length).toBeGreaterThan(0);
-    expect(mark.label).toBe("+60");
   });
 
   it("draws the step as drawn when the steps are not applied", () => {

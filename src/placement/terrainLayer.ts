@@ -5,10 +5,9 @@
  * The widget's own is `lua/blueprint-widget/luaui/coilbox_blueprints/terrain.lua`
  * and this follows it: a see-through green volume over raised ground and a red
  * one over dug ground, a thin wire grid on its top and down its slopes, a thin
- * cyan grid on the ground under the whole area a step touches, slopes included,
- * and a small white height number with a dark shadow. The colours, the alphas,
- * the 16 elmo spacing of the grids and the cap on cells are copied from there.
- * Dug ground is under the terrain, so it is drawn without the depth test.
+ * cyan grid on the ground under the whole area a step touches, slopes included.
+ * The colours, the alphas, the 16 elmo spacing of the grids and the cap on
+ * cells are copied from there. The editor draws no height number. Dug ground is under the terrain, so it is drawn without the depth test.
  *
  * `overlayMesh` is the arithmetic and is tested. `createTerrainLayer` is the
  * three.js half.
@@ -50,30 +49,12 @@ const GROUND_GRID = { color: 0x00b3b3, alpha: 0.6 };
 export interface TerrainMark {
   /** The step's index in the layout's `terrain`. */
   index: number;
-  /** What the step says, written beside it: `+112`, `-50`, `ramp 0 to +64`.
-   *  Empty for a smooth. */
-  label: string;
   /** The corners the ground took from this step, slope included, in map elmos.
    *  Null when the step is not on the ground (the game's terrain switch is off,
    *  or the gadget refused or cancelled it). */
   corners: Point[] | null;
   /** The step as its author drew it, for when it is not on the ground. */
   drawn: Point[][];
-}
-
-/** A signed height, as the widget writes one. */
-function signed(height: number): string {
-  return `${height > 0 ? "+" : ""}${height}`;
-}
-
-/** What a step says about itself, as the widget's label does. */
-export function stepLabel(step: TerrainStep): string {
-  if (step.kind === "ramp") {
-    const [from, to] = step.heights ?? [0, 0];
-    return `ramp ${signed(from)} to ${signed(to)}`;
-  }
-  if (step.kind === "smooth") return "";
-  return signed(step.height ?? 0);
 }
 
 /** A step as its author drew it, on the map: an area's outline closed up, a
@@ -124,7 +105,6 @@ export function terrainMarks(
     const built = result?.outcome === "built" && result.shape.length > 0;
     return {
       index,
-      label: stepLabel(step),
       corners: built ? [...result.shape, ...result.slope] : null,
       drawn: drawnRuns(step),
     };
@@ -244,36 +224,6 @@ export interface TerrainLayer {
     dim: boolean,
   ) => void;
   dispose: () => void;
-}
-
-/** A height written on a transparent card: white with a dark shadow. */
-function labelSprite(text: string): THREE.Sprite {
-  const canvas = document.createElement("canvas");
-  canvas.width = 256;
-  canvas.height = 64;
-  const ctx = canvas.getContext("2d");
-  if (ctx) {
-    ctx.font = "bold 40px sans-serif";
-    ctx.textAlign = "center";
-    ctx.textBaseline = "middle";
-    ctx.shadowColor = "rgba(0, 0, 0, 0.95)";
-    ctx.shadowBlur = 6;
-    ctx.shadowOffsetX = 2;
-    ctx.shadowOffsetY = 2;
-    ctx.fillStyle = "#ffffff";
-    ctx.fillText(text, 128, 32);
-  }
-  const texture = new THREE.CanvasTexture(canvas);
-  texture.colorSpace = THREE.SRGBColorSpace;
-  const sprite = new THREE.Sprite(
-    new THREE.SpriteMaterial({
-      map: texture,
-      transparent: true,
-      depthTest: false,
-    }),
-  );
-  sprite.renderOrder = 3;
-  return sprite;
 }
 
 export function createTerrainLayer(deps: {
@@ -412,34 +362,6 @@ export function createTerrainLayer(deps: {
             chosen ? 1 : GROUND_GRID.alpha * fade,
             false,
           );
-        }
-        const list = mark.corners ?? mark.drawn[0] ?? [];
-        if (mark.label && list.length > 0) {
-          let sumX = 0;
-          let sumZ = 0;
-          for (const p of list) {
-            sumX += p.x;
-            sumZ += p.z;
-          }
-          const centre = { x: sumX / list.length, z: sumZ / list.length };
-          const sprite = labelSprite(mark.label);
-          const s = worldToScene(
-            centre,
-            deps.worldWidth,
-            deps.worldHeight,
-            handle.scale,
-          );
-          const top = Math.max(
-            relief.heightAt(centre.x, centre.z),
-            relief.baseAt(centre.x, centre.z),
-          );
-          sprite.position.set(s.x, (top + 14) * handle.scale, s.z);
-          sprite.scale.set(64 * handle.scale, 16 * handle.scale, 1);
-          const material = sprite.material;
-          material.opacity = fade;
-          owned.push(material);
-          if (material.map) owned.push(material.map);
-          root.add(sprite);
         }
       }
       handle.render();
