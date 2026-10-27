@@ -28,7 +28,14 @@ import {
   Share2,
   Trash2,
 } from "lucide-react";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  type ReactNode,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import { Link, useNavigate, useParams } from "react-router";
 import { PageHeader } from "@/components/PageHeader";
 import {
@@ -241,7 +248,11 @@ export default function BlueprintDetailPage() {
           <>
             <SaveState saving={saving} error={saveError} />
             {claimedGame && (
-              <TerrainSwitch gameName={claimedGame} shortname={shortname} />
+              <TerrainSwitch
+                gameName={claimedGame}
+                shortname={shortname}
+                compact
+              />
             )}
             <Button
               type="button"
@@ -249,9 +260,13 @@ export default function BlueprintDetailPage() {
               variant={onMap ? "secondary" : "outline"}
               className="gap-1.5"
               aria-pressed={onMap}
+              title={t`Test it on a map`}
               onClick={() => setOnMap((on) => !on)}
             >
-              <MapPin className="size-4" /> <Trans>Test</Trans>
+              <MapPin className="size-4" />
+              <ActionLabel>
+                <Trans>Test</Trans>
+              </ActionLabel>
             </Button>
             <SubstituteButton
               record={record}
@@ -445,6 +460,12 @@ function TitleField({
   );
 }
 
+/** A header button's words, which go on a window too narrow for them beside the
+ *  title, leaving the icon. Still read out, so the button keeps its name. */
+function ActionLabel({ children }: { children: ReactNode }) {
+  return <span className="max-xl:sr-only">{children}</span>;
+}
+
 function BackLink() {
   return (
     <Link
@@ -502,8 +523,12 @@ function ShareBlueprintButton({ record }: { record: StoredBlueprint }) {
       variant="outline"
       className="gap-1.5"
       onClick={() => void share()}
+      title={t`Share`}
     >
-      <Share2 className="size-4" /> <Trans>Share</Trans>
+      <Share2 className="size-4" />
+      <ActionLabel>
+        <Trans>Share</Trans>
+      </ActionLabel>
     </Button>
   );
 }
@@ -559,13 +584,16 @@ function DuplicateBlueprintButton({
       className="gap-1.5"
       disabled={busy}
       onClick={() => void duplicate()}
+      title={t`Duplicate`}
     >
       {busy ? (
         <Loader2 className="size-4 animate-spin" />
       ) : (
         <Copy className="size-4" />
       )}
-      <Trans>Duplicate</Trans>
+      <ActionLabel>
+        <Trans>Duplicate</Trans>
+      </ActionLabel>
     </Button>
   );
 }
@@ -615,8 +643,12 @@ function SubstituteButton({
       variant="outline"
       className="gap-1.5"
       onClick={() => void open()}
+      title={t`Convert to another side's buildings`}
     >
-      <Repeat className="size-4" /> <Trans>Convert</Trans>
+      <Repeat className="size-4" />
+      <ActionLabel>
+        <Trans>Convert</Trans>
+      </ActionLabel>
     </Button>
   );
 }
@@ -628,6 +660,7 @@ function DeleteBlueprintButton({
   name: string;
   onDelete: () => Promise<void>;
 }) {
+  const { t } = useLingui();
   const [open, setOpen] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -646,8 +679,17 @@ function DeleteBlueprintButton({
   return (
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
-        <Button type="button" size="sm" variant="outline" className="gap-1.5">
-          <Trash2 className="size-4" /> <Trans>Delete</Trans>
+        <Button
+          type="button"
+          size="sm"
+          variant="outline"
+          className="gap-1.5 border-destructive/40 text-destructive hover:bg-destructive/10 hover:text-destructive"
+          title={t`Delete`}
+        >
+          <Trash2 className="size-4" />
+          <ActionLabel>
+            <Trans>Delete</Trans>
+          </ActionLabel>
         </Button>
       </PopoverTrigger>
       <PopoverContent align="end" className="flex w-80 flex-col gap-3">

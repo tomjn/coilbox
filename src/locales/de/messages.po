@@ -16650,6 +16650,10 @@ msgstr "BOS in Lua umwandeln und mit COB-Skripten arbeiten."
 msgid "Convert models"
 msgstr "Modelle konvertieren"
 
+#: src/blueprint/pages/BlueprintDetailPage.tsx
+msgid "Convert to another side's buildings"
+msgstr ""
+
 #: src/lego/pages/components/GameScriptPanel.tsx
 #, fuzzy
 msgid "Convert to Lua"
@@ -45015,6 +45019,10 @@ msgstr "{unitName} im Spiel testen"
 #, fuzzy
 msgid "Test in game"
 msgstr "Im Spiel testen"
+
+#: src/blueprint/pages/BlueprintDetailPage.tsx
+msgid "Test it on a map"
+msgstr ""
 
 #: src/notify/NotificationsSettings.tsx
 #, fuzzy

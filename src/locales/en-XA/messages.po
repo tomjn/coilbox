@@ -13463,6 +13463,10 @@ msgstr ""
 msgid "Convert models"
 msgstr ""
 
+#: src/blueprint/pages/BlueprintDetailPage.tsx
+msgid "Convert to another side's buildings"
+msgstr ""
+
 #: src/lego/pages/components/GameScriptPanel.tsx
 msgid "Convert to Lua"
 msgstr ""
@@ -36447,6 +36451,10 @@ msgstr ""
 #: src/scenario/pages/components/shortcuts.ts
 #: src/scenario/pages/ScenarioEditPage.tsx
 msgid "Test in game"
+msgstr ""
+
+#: src/blueprint/pages/BlueprintDetailPage.tsx
+msgid "Test it on a map"
 msgstr ""
 
 #: src/notify/NotificationsSettings.tsx

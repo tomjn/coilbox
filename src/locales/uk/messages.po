@@ -16650,6 +16650,10 @@ msgstr "Конвертуйте BOS у Lua й працюйте зі скрипт�
 msgid "Convert models"
 msgstr "Конвертувати моделі"
 
+#: src/blueprint/pages/BlueprintDetailPage.tsx
+msgid "Convert to another side's buildings"
+msgstr ""
+
 #: src/lego/pages/components/GameScriptPanel.tsx
 #, fuzzy
 msgid "Convert to Lua"
@@ -45015,6 +45019,10 @@ msgstr "Тестувати {unitName} у грі"
 #, fuzzy
 msgid "Test in game"
 msgstr "Тестувати в грі"
+
+#: src/blueprint/pages/BlueprintDetailPage.tsx
+msgid "Test it on a map"
+msgstr ""
 
 #: src/notify/NotificationsSettings.tsx
 #, fuzzy
