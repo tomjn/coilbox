@@ -45,6 +45,9 @@ export interface SpoolEntry {
   layout: BlueprintPayload;
   /** Seconds since the epoch, stamped by the widget. */
   recordedAt?: number;
+  /** The widget worked its terrain steps out of the ground in the match
+   *  (issue #4798). */
+  fromGround?: true;
 }
 
 /** What a spool held: the layouts that read, and how many entries did not. */
@@ -86,12 +89,13 @@ export function readSpool(text: string | null): SpoolRead {
       skipped += 1;
       continue;
     }
-    const recordedAt = (raw as Record<string, unknown>).recordedAt;
+    const { recordedAt, fromGround } = raw as Record<string, unknown>;
     entries.push({
       layout,
       ...(typeof recordedAt === "number" && Number.isFinite(recordedAt)
         ? { recordedAt }
         : {}),
+      ...(fromGround === true ? { fromGround } : {}),
     });
   }
   return { entries, skipped };
@@ -114,6 +118,6 @@ export function spoolRecords(
     createdAt: "",
     updatedAt: "",
     layout: entry.layout,
-    source: widgetSource(engine, at),
+    source: widgetSource(engine, at, entry.fromGround === true),
   }));
 }

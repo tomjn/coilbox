@@ -32491,6 +32491,18 @@ msgstr "Saved as preset"
 msgid "Saved configs"
 msgstr "Saved configs"
 
+#: src/blueprint/library.ts
+msgid "Saved from the ground"
+msgstr "Saved from the ground"
+
+#: src/blueprint/library.ts
+msgid "Saved from the ground in game with the coilbox widget, on engine {engine}."
+msgstr "Saved from the ground in game with the coilbox widget, on engine {engine}."
+
+#: src/blueprint/library.ts
+msgid "Saved from the ground in game with the coilbox widget."
+msgstr "Saved from the ground in game with the coilbox widget."
+
 #: src/lego/pages/components/BuildMenuSection.tsx
 msgid "Saved in {targetName}."
 msgstr "Saved in {targetName}."
