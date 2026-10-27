@@ -34153,6 +34153,10 @@ msgstr "Otwórz"
 msgid "Open .cob…"
 msgstr "Otwórz .cob…"
 
+#: src/multiplayer/battles/BattleRow.tsx
+msgid "Open {battleTitle}"
+msgstr ""
+
 #: src/scenario/pages/components/BlueprintPanel.tsx
 #, fuzzy
 msgid "Open {gameLabel}'s {gameFileName}"
