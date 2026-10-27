@@ -6,6 +6,7 @@
 
 import { describe, expect, it } from "vitest";
 import { heightGrid } from "@/placement/terrain";
+import ringSidesFixture from "./fixtures/ring-sides.json";
 import type { Rect } from "./footprint";
 import type { TerrainStep } from "./model";
 import {
@@ -13,6 +14,7 @@ import {
   gridFromGround,
   groundFromGrid,
   type LayoutPlacement,
+  ringSides,
   terraform,
 } from "./terraform";
 
@@ -580,6 +582,69 @@ describe("grid conversion", () => {
     const again = groundFromGrid(back.grid, back.minHeight, back.maxHeight);
     for (let i = 0; i < 4; i++) {
       expect(again.heights[i]).toBeCloseTo(g.heights[i], 2);
+    }
+  });
+});
+
+describe("a closed ring of wall (#4826)", () => {
+  // The widget orders a ring one side at a time, all sent together (#4816), and
+  // Zero-K charges the corners the sides share once for each side. This is the
+  // 384 elmo ring raised by 112 that the Zero-K driver measures: Zero-K
+  // estimated 1678.9024 metal for it, against about 1524 for one order.
+  const RING: TerrainStep = {
+    kind: "raise",
+    shape: "wall",
+    points: [
+      { x: -192, z: -192 },
+      { x: 192, z: -192 },
+      { x: 192, z: 192 },
+      { x: -192, z: 192 },
+      { x: -192, z: -192 },
+    ],
+    height: 112,
+    before: 0,
+  };
+
+  it("costs what Zero-K estimated for the four sides", () => {
+    const result = terraform(FLAT, [RING], AT_CENTRE, []);
+    expect(result.metal).toBeCloseTo(1678.9024, 2);
+  });
+
+  it("reports one result for the ring, with the sides' metal added up", () => {
+    const result = terraform(FLAT, [RING], AT_CENTRE, []);
+    expect(result.steps).toHaveLength(1);
+    expect(result.steps[0]).toMatchObject({ index: 0, outcome: "built" });
+    expect(result.steps[0].metal).toBeCloseTo(result.metal, 6);
+  });
+
+  it("raises the ground round the ring, corners included", () => {
+    const { ground: after } = terraform(FLAT, [RING], AT_CENTRE, []);
+    expect(heightAt(after, 512 - 192, 512 - 192)).toBe(112);
+    expect(heightAt(after, 512 + 192, 512 + 192)).toBe(112);
+    expect(heightAt(after, 512, 512 - 192)).toBe(112);
+    expect(heightAt(after, 512, 512)).toBe(0);
+  });
+
+  it("costs the same as the sides ordered as four walls of their own", () => {
+    const sides: TerrainStep[] = [0, 1, 2, 3].map((i) => ({
+      ...RING,
+      points: [RING.points[i], RING.points[i + 1]],
+    }));
+    const apart = terraform(FLAT, sides, AT_CENTRE, []);
+    const ring = terraform(FLAT, [RING], AT_CENTRE, []);
+    expect(ring.metal).toBeCloseTo(apart.metal, 9);
+    expect(Array.from(ring.ground.heights)).toEqual(
+      Array.from(apart.ground.heights),
+    );
+  });
+
+  it("splits a ring into the sides in the shared fixture", () => {
+    for (const c of ringSidesFixture) {
+      const sides = ringSides({ ...RING, points: c.points });
+      expect(
+        sides === null ? null : sides.map((s) => s.points),
+        c.name,
+      ).toEqual(c.sides);
     }
   });
 });

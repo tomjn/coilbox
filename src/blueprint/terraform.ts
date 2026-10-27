@@ -38,6 +38,9 @@
  *   once every block has finished, each point is at its target either way. The
  *   check that drops points too thin to hold (lines 2324-2407) also looks at the
  *   whole step rather than one block.
+ * - A closed ring of wall is modelled as its sides, one order each (see
+ *   `ringSides`), because that is how the widget orders it. The corners the
+ *   sides share are charged once for each side, as Zero-K does.
  * - A level or ramp is ordered with the gadget's volume selection its `only`
  *   names: both ways when it has none, raise or lower otherwise (lines
  *   523-535). Raise and smooth steps are always ordered with 0.
@@ -233,6 +236,47 @@ export function placedSteps(
 }
 
 /**
+ * The sides of a closed ring of wall, each a wall of two points, or null when
+ * the step is not a closed ring. A ring is a wall of four or more points whose
+ * last point is its first, to the elmo. The widget orders a ring this way, one
+ * order for each side (`ringSides` in `place.lua`), so that builders can reach
+ * every side from outside, and Zero-K charges the corners the sides share once
+ * for each side. `fixtures/ring-sides.json` holds cases both implementations are
+ * tested against.
+ */
+export function ringSides(step: TerrainStep): TerrainStep[] | null {
+  const { points } = step;
+  if (step.shape !== "wall" || points.length < 4) return null;
+  const first = points[0];
+  const last = points[points.length - 1];
+  if (Math.abs(first.x - last.x) >= 1 || Math.abs(first.z - last.z) >= 1) {
+    return null;
+  }
+  const sides: TerrainStep[] = [];
+  for (let i = 0; i < points.length - 1; i++) {
+    const a = points[i];
+    const b = points[i + 1];
+    if (a.x === b.x && a.z === b.z) continue;
+    sides.push({ ...step, points: [{ ...a }, { ...b }] });
+  }
+  return sides;
+}
+
+/** One step's result from the results of its parts: the cost added up, the
+ *  corners joined, and the outcome the parts share. */
+function joined(index: number, parts: readonly StepResult[]): StepResult {
+  if (parts.length === 1) return parts[0];
+  const outcomes = new Set(parts.map((p) => p.outcome));
+  return {
+    index,
+    outcome: outcomes.size === 1 ? parts[0].outcome : "built",
+    metal: parts.reduce((total, p) => total + p.metal, 0),
+    shape: parts.flatMap((p) => p.shape),
+    slope: parts.flatMap((p) => p.slope),
+  };
+}
+
+/**
  * The ground after a layout's steps, and what they cost.
  *
  * `footprints` are the layout's buildings where they stand on the map, by index
@@ -265,21 +309,28 @@ export function terraform(
       const rect = footprints[built];
       if (rect) addStructure(blocked, rect);
     }
-    const segments = stepSegments(step, original, pivot);
-    if (!segments) {
-      results.push({
-        index,
-        outcome: "refused",
-        metal: 0,
-        shape: [],
-        slope: [],
-      });
-      continue;
+    // A closed ring is ordered a side at a time, which is how the widget sends
+    // it, so each side is modelled as an order of its own. They all measure the
+    // ground as it was, so the order the sides are built in does not matter.
+    const parts = ringSides(step) ?? [step];
+    const done: StepResult[] = [];
+    for (const part of parts) {
+      const segments = stepSegments(part, original, pivot);
+      if (!segments) {
+        done.push({
+          index,
+          outcome: "refused",
+          metal: 0,
+          shape: [],
+          slope: [],
+        });
+        continue;
+      }
+      const cost = estimate(segments, original, mult);
+      metal += cost;
+      done.push({ index, metal: cost, ...build(segments, current, blocked) });
     }
-    const cost = estimate(segments, original, mult);
-    const done = build(segments, current, blocked);
-    metal += cost;
-    results.push({ index, metal: cost, ...done });
+    results.push(joined(index, done));
   }
   return {
     ground: {
