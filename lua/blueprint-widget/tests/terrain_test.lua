@@ -297,4 +297,38 @@ end
 checkFaces("a rectangle over uneven ground", rectangle, hills)
 checkFaces("a ramp over uneven ground", slab, hills)
 
+-- A flat platform is a level step: one flat top at the pivot's ground plus its
+-- height, whatever the ground under it does. A raise follows the ground.
+check("a level over uneven ground has one flat top", (function()
+	local _, tris = checkFaces("level", rectangle, hills)
+	local top
+	for _, t in ipairs(tris) do
+		if flatArea(t) > 0 then
+			for _, v in ipairs(t) do
+				if top and v.y ~= top then
+					return false
+				end
+				top = v.y
+			end
+		end
+	end
+	return top == 124
+end)())
+check("a raise over the same ground does not", (function()
+	local _, tris = checkFaces("raise", { kind = "raise", shape = "area", points = rectangle.points, height = 24, base = 100 }, hills)
+	local seen = {}
+	for _, t in ipairs(tris) do
+		if flatArea(t) > 0 then
+			for _, v in ipairs(t) do
+				seen[v.y] = true
+			end
+		end
+	end
+	local n = 0
+	for _ in pairs(seen) do
+		n = n + 1
+	end
+	return n > 1
+end)())
+
 support.report()
