@@ -982,7 +982,7 @@ end
 -- @param resolved table from M.resolve
 -- @param can table from M.capabilities
 -- @param terrain table? { metal, work } for the layout's terraform, from
---   ground.lua's session: metal is the estimate the game shows and work what
+--   terraform.lua's session: metal is the estimate the game shows and work what
 --   the builders spend doing it. It adds to the metal, and its time is the work
 --   over the build power of the selected builders that can terraform, in
 --   Zero-K the same power that builds units.

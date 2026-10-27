@@ -36,6 +36,13 @@ local function lane(index)
 	return 16 * math.floor(cx / 16), cz
 end
 
+-- The save ground matches have a fixture of their own.
+function gadget:Initialize()
+	if ((Spring.GetModOptions() or {}).coilbox_mode or ""):sub(1, 6) == "ground" then
+		gadgetHandler:RemoveGadget(self)
+	end
+end
+
 if gadgetHandler:IsSyncedCode() then
 	local builders = {}
 	local caseOfBuilder = {}
@@ -61,7 +68,7 @@ if gadgetHandler:IsSyncedCode() then
 	-- blueprint it orders, laid as the widget's placing code laid it. The model
 	-- is worked out from the heightmap as it is then, before any of the
 	-- terraform has been built, and compared with the ground near the end.
-	local GROUND = VFS.Include("LuaUI/coilbox_blueprints/ground.lua", nil, VFS.RAW_FIRST)
+	local TERRAFORM = VFS.Include("LuaUI/coilbox_blueprints/terraform.lua", nil, VFS.RAW_FIRST)
 	local predicted = {}
 
 	function gadget:RecvLuaMsg(msg)
@@ -76,7 +83,7 @@ if gadgetHandler:IsSyncedCode() then
 			structures = {},
 			costMult = tonumber((Spring.GetModOptions() or {}).terracostmult) or 1,
 		}
-		local session = GROUND.session(env)
+		local session = TERRAFORM.session(env)
 		session.apply(data.steps, data.foot)
 		predicted[tonumber(case)] = session.changed()
 		Spring.Echo(string.format("FIXTURE model case=%s metal=%.4f work=%.4f changed=%d", case, session.metal, session.work, #predicted[tonumber(case)]))

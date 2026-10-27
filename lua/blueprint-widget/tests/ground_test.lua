@@ -1,303 +1,457 @@
 -- Run: luajit lua/blueprint-widget/tests/ground_test.lua
 --
--- The ground a layout's terrain steps leave, with the slopes Zero-K adds
--- (issue #4797). The cases are src/blueprint/terraform.test.ts's, so the two
--- stay one model. The wall profiles marked #4789 were measured in a real
--- Zero-K match.
+-- Reading ground changes back as raise steps (issue #4798), on made-up grids.
+--
+-- Each grid holds the change in height at every 8 elmo corner, as the widget
+-- reads it from GetGroundHeight minus GetGroundOrigHeight. The raised and dug
+-- shapes are drawn the way Zero-K's terraform gadget leaves them: a top of 16
+-- elmo cells, and round it a slope one corner wide per ring. A raised slope
+-- drops by up to 28 a ring and ends in a step of 4, as measured in a real
+-- match on issue #4789. A dug slope rises by 8 in its first ring and then as a
+-- raised one does.
+--
+-- Every test checks the steps against what the gadget would raise for them:
+-- areaCells is a copy of how it fills an area outline, so a step whose
+-- outline it would fill differently is caught here rather than in a match.
 
 local support = dofile((arg[0]:match("^(.*)/[^/]+$") or ".") .. "/support.lua")
-local check, same, show = support.check, support.same, support.show
+local check, show = support.check, support.show
 local GROUND = support.module("ground.lua")
 
---- A map 1024 elmos square, 129 corners a side.
-local function ground(height)
-	return { heightAt = height, corners = { x = 129, z = 129 } }
-end
+-- The tolerance the widget uses, measured in two real matches (see
+-- ground.lua): over the 7.7 elmo dent Zero-K left where two terraform blocks
+-- of one wall met, and under the 28 a raised top drops to its first ring.
+local TOL = GROUND.TOLERANCE
+check("the tolerance keeps a 7.7 elmo dent in a top and leaves out the ring 28 below it", TOL >= 7.7 and TOL < 28, tostring(TOL))
 
-local FLAT = ground(function()
-	return 0
-end)
--- 4 elmos every 8 eastward, so 256 at x = 512
-local EAST_SLOPE = ground(function(x)
-	return x / 2
-end)
--- 2 elmos every 8 southward, so 128 at z = 512
-local SOUTH_SLOPE = ground(function(_, z)
-	return z / 4
-end)
+--------------------------------------------------------------------------------
+-- grids
+--------------------------------------------------------------------------------
 
-local AT = { x = 512, z = 512 }
-local SOUTH, NORTH, EAST = { x = 0, z = 8 }, { x = 0, z = -8 }, { x = 8, z = 0 }
-
---- A step as the widget lays it: points on the map, the pivot's ground, and
--- how many buildings come ahead of it.
-local function laid(step, after, base)
-	local points = {}
-	for i, p in ipairs(step.points) do
-		points[i] = { x = AT.x + p.x, z = AT.z + p.z }
+--- A grid of corners from (x, z), w by h, all unchanged.
+local function grid(x, z, w, h)
+	local g = { x = x, z = z, w = w, h = h, delta = {} }
+	for k = 1, w * h do
+		g.delta[k] = 0
 	end
-	local out = {}
-	for k, v in pairs(step) do
-		out[k] = v
+	return g
+end
+
+local function index(g, x, z)
+	local i, j = (x - g.x) / 8, (z - g.z) / 8
+	if i < 0 or j < 0 or i >= g.w or j >= g.h or i ~= math.floor(i) or j ~= math.floor(j) then
+		return nil
 	end
-	out.points, out.after, out.base = points, after or 0, base or 0
-	return out
+	return j * g.w + i + 1
 end
 
-local function wall(height, after)
-	return laid({ kind = "raise", shape = "wall", points = { { x = -128, z = 0 }, { x = 128, z = 0 } }, height = height }, after)
-end
-
-local function pad(kind, height, base)
-	return laid({ kind = kind, shape = "area", points = { { x = -64, z = -64 }, { x = 64, z = -64 }, { x = 64, z = 64 }, { x = -64, z = 64 } }, height = height }, 0, base)
-end
-
---- The ground after steps, as heights every 8 elmos from a point.
-local function run(env, steps, foot, structures)
-	local e = {}
-	for k, v in pairs(env) do
-		e[k] = v
+local function set(g, x, z, v)
+	local k = index(g, x, z)
+	if k then
+		g.delta[k] = v
 	end
-	e.structures = structures
-	local result = GROUND.terraform(e, steps, foot)
-	result.at = result.session.reader.at
-	return result
 end
 
-local function profile(result, from, step, count)
-	local out = {}
-	for i = 0, count - 1 do
-		out[#out + 1] = result.at(from.x + step.x * i, from.z + step.z * i)
-	end
-	return out
+local function get(g, x, z)
+	local k = index(g, x, z)
+	return k and g.delta[k] or 0
 end
 
-local function near(a, b)
-	if #a ~= #b then
-		return false
+--- The heights of a slope going out from a top of height h, ring by ring.
+local function slopeRings(h, dug)
+	local rings = {}
+	local sign = h < 0 and -1 or 1
+	local v = math.abs(h)
+	if dug then
+		v = v - 8
+		if v > 4 then
+			rings[#rings + 1] = sign * v
+		end
 	end
-	for i = 1, #a do
-		if math.abs(a[i] - b[i]) > 0.01 then
-			return false
+	while v - 28 > 4 do
+		v = v - 28
+		rings[#rings + 1] = sign * v
+	end
+	if math.abs(h) > 4 then
+		rings[#rings + 1] = sign * 4
+	end
+	return rings
+end
+
+--- Change the corners of a set (keyed "x:z") to h, and draw the slope round
+-- them. A slope corner keeps whichever change is further from 0, so slopes
+-- that meet do as the gadget's do and never cut into a top.
+local function shape(g, corners, h, dug)
+	local rings = slopeRings(h, dug)
+	local tops = {}
+	for key in pairs(corners) do
+		local x, z = key:match("^(-?%d+):(-?%d+)$")
+		x, z = tonumber(x), tonumber(z)
+		tops[#tops + 1] = { x = x, z = z }
+		set(g, x, z, h)
+	end
+	for _, t in ipairs(tops) do
+		for r, v in ipairs(rings) do
+			for dx = -r, r do
+				for dz = -r, r do
+					if math.max(math.abs(dx), math.abs(dz)) == r then
+						local x, z = t.x + dx * 8, t.z + dz * 8
+						if not corners[x .. ":" .. z] and math.abs(v) > math.abs(get(g, x, z)) then
+							set(g, x, z, v)
+						end
+					end
+				end
+			end
+		end
+	end
+end
+
+--- The corners of a rectangle, both ends included.
+local function rectCorners(x0, z0, x1, z1, into)
+	into = into or {}
+	for x = x0, x1, 8 do
+		for z = z0, z1, 8 do
+			into[x .. ":" .. z] = true
+		end
+	end
+	return into
+end
+
+--- The corners a Zero-K wall raises: 5 by 5 round each point of its path.
+local function wallCorners(points, into)
+	into = into or {}
+	for _, p in ipairs(points) do
+		rectCorners(p.x - 16, p.z - 16, p.x + 16, p.z + 16, into)
+	end
+	return into
+end
+
+--- The corners the steps would raise, each the gadget's own fill of its
+-- outline, and the corners two steps both raise.
+local function raised(regions)
+	local all, twice = {}, {}
+	for _, r in ipairs(regions) do
+		for key in pairs(GROUND.cellCorners(GROUND.areaCells(r.points))) do
+			if all[key] then
+				twice[key] = true
+			end
+			all[key] = true
+		end
+	end
+	return all, twice
+end
+
+local function count(set)
+	local n = 0
+	for _ in pairs(set) do
+		n = n + 1
+	end
+	return n
+end
+
+local function sameSet(a, b)
+	for k in pairs(a) do
+		if not b[k] then
+			return false, "extra " .. k
+		end
+	end
+	for k in pairs(b) do
+		if not a[k] then
+			return false, "missing " .. k
 		end
 	end
 	return true
 end
 
+local function heights(regions)
+	local out = {}
+	for i, r in ipairs(regions) do
+		out[i] = r.height
+	end
+	table.sort(out)
+	return table.concat(out, ",")
+end
+
 --------------------------------------------------------------------------------
--- a raised wall
+-- the gadget's fill
 --------------------------------------------------------------------------------
 
 do
-	local r = run(FLAT, { wall(112) })
-	local measured = { 112, 112, 112, 84, 56, 28, 4, 0 }
-	check("a wall raised by 112 reads 112, 112, 112, 84, 56, 28, 4, 0 south of its centre line (#4789)", same(profile(r, AT, SOUTH, 8), measured), show(profile(r, AT, SOUTH, 8)))
-	check("and the same north of it", same(profile(r, AT, NORTH, 8), measured))
+	local cells = GROUND.areaCells({ { x = 64, z = 96 }, { x = 176, z = 96 }, { x = 176, z = 112 }, { x = 64, z = 112 } })
+	local corners = GROUND.cellCorners(cells)
+	check("a rectangle outline fills its cells and one more to the right and below", count(cells) == 16, tostring(count(cells)))
+	local ok, why = sameSet(corners, rectCorners(64, 96, 192, 128))
+	check("a rectangle outline raises the corners from its first point to its last plus 16", ok, why)
+	local snapped = GROUND.areaCells({ { x = 70, z = 100 }, { x = 180, z = 100 }, { x = 180, z = 120 }, { x = 70, z = 120 } })
+	check("the fill snaps an outline down to 16 elmos, as the gadget does", sameSet(snapped, cells))
 end
+
+--------------------------------------------------------------------------------
+-- one shape at a time
+--------------------------------------------------------------------------------
+
 do
-	local r = run(FLAT, { wall(70) })
-	check("a wall raised by 70 reads 70, 70, 70, 42, 14, 4, 0 (#4789)", same(profile(r, AT, SOUTH, 7), { 70, 70, 70, 42, 14, 4, 0 }), show(profile(r, AT, SOUTH, 7)))
-	check("it slopes off its ends as well as its sides", same(profile(r, { x = 656, z = 512 }, EAST, 5), { 70, 42, 14, 4, 0 }), show(profile(r, { x = 656, z = 512 }, EAST, 5)))
-	local slope = r.steps[1].slope
-	local function listed(list, x, z)
-		for _, p in ipairs(list) do
-			if p.x == x and p.z == z then
-				return true
-			end
+	-- a straight wall raised by 112, from a Zero-K path along x
+	local g = grid(0, 0, 60, 40)
+	local top = wallCorners({ { x = 96, z = 160 }, { x = 112, z = 160 }, { x = 128, z = 160 }, { x = 144, z = 160 }, { x = 160, z = 160 } })
+	shape(g, top, 112)
+	local regions = GROUND.find(g, { tolerance = TOL })
+	check("a wall is one step", #regions == 1, show(regions))
+	check("the wall's step raises by the wall's height", regions[1] and regions[1].height == 112, show(regions[1]))
+	local got, twice = raised(regions)
+	local ok, why = sameSet(got, top)
+	check("the wall's step raises its top and none of its slope", ok, why)
+	check("nothing is raised twice", count(twice) == 0)
+	check("a straight wall is four points", regions[1] and #regions[1].points == 4, show(regions[1] and regions[1].points))
+end
+
+do
+	-- a flattened pad, level 40 above the flat ground it was made on
+	local g = grid(200, 200, 40, 40)
+	local top = rectCorners(256, 256, 352, 352)
+	shape(g, top, 40)
+	local regions = GROUND.find(g, { tolerance = TOL })
+	check("a pad is one step", #regions == 1 and regions[1].height == 40, show(regions))
+	local ok, why = sameSet((raised(regions)), top)
+	check("the pad's step covers the pad and not its slope", ok, why)
+end
+
+do
+	-- a trench dug 48 deep, with the gentler first ring a dug slope has
+	local g = grid(0, 0, 100, 30)
+	local top = rectCorners(400, 48, 560, 96)
+	shape(g, top, -48, true)
+	local regions = GROUND.find(g, { tolerance = TOL })
+	check("a trench is one step that digs", #regions == 1 and regions[1].height == -48, show(regions))
+	local ok, why = sameSet((raised(regions)), top)
+	check("the trench's step covers its floor and not its sides", ok, why)
+end
+
+do
+	-- a diagonal wall: each path point 16 along and 16 down from the last
+	local path = {}
+	for k = 0, 8 do
+		path[#path + 1] = { x = 160 + 16 * k, z = 160 + 16 * k }
+	end
+	local g = grid(64, 64, 60, 60)
+	local top = wallCorners(path)
+	shape(g, top, 84)
+	local regions = GROUND.find(g, { tolerance = TOL })
+	check("a diagonal wall is one step", #regions == 1, show(regions))
+	local ok, why = sameSet((raised(regions)), top)
+	check("the diagonal wall's step raises the same staircase", ok, why)
+	check("the diagonal wall's outline is a few corners, not one per cell", regions[1] and #regions[1].points <= 8, tostring(regions[1] and #regions[1].points))
+end
+
+do
+	-- two walls meeting at a corner, the same height
+	local g = grid(0, 0, 60, 60)
+	local top = wallCorners({ { x = 96, z = 96 }, { x = 112, z = 96 }, { x = 128, z = 96 }, { x = 144, z = 96 }, { x = 160, z = 96 } })
+	wallCorners({ { x = 96, z = 112 }, { x = 96, z = 128 }, { x = 96, z = 144 }, { x = 96, z = 160 } }, top)
+	shape(g, top, 70)
+	local regions = GROUND.find(g, { tolerance = TOL })
+	check("an L of wall is one step", #regions == 1 and regions[1].height == 70, show(regions))
+	local ok, why = sameSet((raised(regions)), top)
+	check("the L's step raises the L", ok, why)
+	-- six corners, and one more where the outline cuts the inside corner on a
+	-- diagonal, which fills the same cells
+	check("the L's outline has at most seven points", regions[1] and #regions[1].points <= 7, show(regions[1] and regions[1].points))
+end
+
+do
+	-- a closed ring of wall round a square of untouched ground
+	local g = grid(0, 0, 60, 60)
+	local top = rectCorners(96, 96, 288, 128)
+	rectCorners(96, 256, 288, 288, top)
+	rectCorners(96, 96, 128, 288, top)
+	rectCorners(256, 96, 288, 288, top)
+	shape(g, top, 112)
+	local regions = GROUND.find(g, { tolerance = TOL })
+	check("a ring of wall becomes more than one step, since an area cannot have a hole", #regions >= 2, show(regions))
+	local got, twice = raised(regions)
+	local ok, why = sameSet(got, top)
+	check("the ring's steps raise the ring and leave the middle alone", ok, why)
+	-- steps may share the corners along the line they were split on, which
+	-- raises them to the same height either way
+	local shared = true
+	for key in pairs(twice) do
+		shared = shared and top[key] == true
+	end
+	check("steps of a ring only overlap on the ring", shared)
+	for _, r in ipairs(regions) do
+		check("every ring step raises by 112", r.height == 112, show(r))
+	end
+end
+
+--------------------------------------------------------------------------------
+-- buildings, noise and edges
+--------------------------------------------------------------------------------
+
+do
+	-- a turret on a wall, its footprint levelled a little off the wall's top
+	local g = grid(0, 0, 60, 40)
+	local top = wallCorners({ { x = 96, z = 160 }, { x = 112, z = 160 }, { x = 128, z = 160 }, { x = 144, z = 160 }, { x = 160, z = 160 } })
+	shape(g, top, 112)
+	for x = 112, 144, 8 do
+		for z = 144, 176, 8 do
+			set(g, x, z, 109.5)
 		end
-		return false
 	end
-	check("the slope it added is corners outside the step", listed(slope, 512, 536) and listed(slope, 512, 552) and not listed(slope, 512, 528) and listed(r.steps[1].shape, 512, 528))
-	check("the slope's corners carry the height they are set to", (function()
-		for _, p in ipairs(slope) do
-			if p.x == 512 and p.z == 536 then
-				return p.target == 42
-			end
+	-- and a solar collector on the flat ground beside it, levelled by the
+	-- engine into a bump of a few elmos
+	for x = 304, 336, 8 do
+		for z = 200, 232, 8 do
+			set(g, x, z, ((x + z) % 3) * 2 - 1)
 		end
-	end)())
-end
-
---------------------------------------------------------------------------------
--- a dug trench
---------------------------------------------------------------------------------
-
-do
-	local r = run(FLAT, { wall(-50) })
-	local expected = { -50, -50, -50, -42, -14, -4, 0 }
-	check("a dug trench slopes up gently at first and then at 28 a square", same(profile(r, AT, SOUTH, 7), expected) and same(profile(r, AT, NORTH, 7), expected), show(profile(r, AT, SOUTH, 7)))
-end
-
---------------------------------------------------------------------------------
--- level and raise
---------------------------------------------------------------------------------
-
-do
-	local r = run(FLAT, { pad("level", 40) })
-	local want = { 4, 12 }
-	for _ = 1, 19 do
-		want[#want + 1] = 40
 	end
-	want[#want + 1], want[#want + 2], want[#want + 3] = 12, 4, 0
-	check("a level pad on flat ground is flat at its height with a slope of 28 and a lip of 4", same(profile(r, { x = 432, z = 512 }, EAST, 24), want), show(profile(r, { x = 432, z = 512 }, EAST, 24)))
+	local footprints = { { x0 = 112, z0 = 144, x1 = 144, z1 = 176 }, { x0 = 304, z0 = 200, x1 = 336, z1 = 232 } }
+	local regions, on = GROUND.find(g, { tolerance = TOL, footprints = footprints })
+	check("a turret on a wall leaves the wall one step", #regions == 1 and regions[1].height == 112, show(regions))
+	local ok, why = sameSet((raised(regions)), top)
+	check("the turret's footprint is part of the wall's step", ok, why)
+	check("the turret stands on the step and the solar does not", on[1] == true and not on[2], show(on))
 end
+
 do
-	local r = run(EAST_SLOPE, { pad("level", 0, 256) })
-	check("a level pad raises the low side to the pivot's height", same(profile(r, { x = 424, z = 512 }, EAST, 4), { 212, 216, 228, 256 }), show(profile(r, { x = 424, z = 512 }, EAST, 4)))
-	check("and cuts into the high side", r.at(592, 512) == 256 and same(profile(r, { x = 600, z = 512 }, EAST, 4), { 264, 292, 308, 312 }), show(profile(r, { x = 600, z = 512 }, EAST, 4)))
-end
-do
-	local r = run(EAST_SLOPE, { pad("raise", 40) })
-	check("a raise adds its height to the ground under each point, on a slope", same(profile(r, { x = 432, z = 512 }, EAST, 4), { 216, 236, 264, 268 }) and r.at(592, 512) == 336 and same(profile(r, { x = 600, z = 512 }, EAST, 3), { 308, 304, 308 }), show(profile(r, { x = 432, z = 512 }, EAST, 4)))
-end
-do
-	local r = run(FLAT, { pad("raise", 40) })
-	local ok = true
-	for _, c in ipairs({ { 440, 440 }, { 600, 440 }, { 440, 600 }, { 600, 600 } }) do
-		ok = ok and r.at(c[1], c[2]) == 4
+	-- a building levelled into the ground with a change too big for the
+	-- tolerance, on its own: nothing round it says it was terraformed
+	local g = grid(0, 0, 30, 30)
+	for x = 64, 128, 8 do
+		for z = 64, 128, 8 do
+			set(g, x, z, 18)
+		end
 	end
-	check("a pad raised by 40 keeps the 4 elmo foot on its diagonals (#4805)", ok and same(profile(r, { x = 432, z = 512 }, EAST, 4), { 4, 12, 40, 40 }), show(profile(r, { x = 432, z = 512 }, EAST, 4)))
-end
-
---------------------------------------------------------------------------------
--- ramp
---------------------------------------------------------------------------------
-
-do
-	local ramp = laid({ kind = "ramp", shape = "wall", points = { { x = -128, z = 0 }, { x = 128, z = 0 } }, heights = { 0, 64 }, width = 64 })
-	local r = run(FLAT, { ramp })
-	check("a ramp climbs evenly from one end's height to the other's", near(profile(r, { x = 384, z = 512 }, { x = 32, z = 0 }, 9), { 0, 8, 16, 24, 32, 40, 48, 56, 64 }), show(profile(r, { x = 384, z = 512 }, { x = 32, z = 0 }, 9)))
-	check("and slopes off its high end", near(profile(r, { x = 648, z = 512 }, EAST, 4), { 36, 8, 4, 0 }), show(profile(r, { x = 648, z = 512 }, EAST, 4)))
-	local s = laid({ kind = "ramp", shape = "wall", points = { { x = -128, z = 0 }, { x = 128, z = 0 } }, heights = { 0, 64 }, width = 64 }, 0, 128)
-	local on = run(SOUTH_SLOPE, { s })
-	check("a ramp measures its heights from the pivot's ground, on a slope", near(profile(on, { x = 384, z = 512 }, { x = 64, z = 0 }, 5), { 128, 144, 160, 176, 192 }), show(profile(on, { x = 384, z = 512 }, { x = 64, z = 0 }, 5)))
-	check("and slopes round its sides there", near(profile(on, { x = 512, z = 472 }, SOUTH, 13), { 120, 132, 160, 160, 160, 160, 160, 160, 160, 160, 144, 140, 142 }), show(profile(on, { x = 512, z = 472 }, SOUTH, 13)))
-	local short = laid({ kind = "ramp", shape = "wall", points = { { x = -128, z = 0 }, { x = -80, z = 0 } }, heights = { 0, 64 }, width = 64 })
-	local refused = run(FLAT, { short })
-	check("a ramp shorter than 64 elmos is refused and costs nothing", refused.steps[1].outcome == "refused" and refused.steps[1].metal == 0 and next(refused.session.reader.overlay) == nil)
-end
-
---------------------------------------------------------------------------------
--- smooth
---------------------------------------------------------------------------------
-
-do
-	local stepped = ground(function(x)
-		return x >= 512 and 40 or 0
-	end)
-	local smooth = laid({ kind = "smooth", shape = "wall", points = { { x = 0, z = -64 }, { x = 0, z = 64 } } })
-	local r = run(stepped, { smooth })
-	check("a smooth sets each point to the average of the 5 by 5 corners round it", same(profile(r, { x = 480, z = 512 }, EAST, 8), { 0, 4, 8, 16, 24, 32, 40, 40 }), show(profile(r, { x = 480, z = 512 }, EAST, 8)))
-	local flatSmooth = laid({ kind = "smooth", shape = "area", points = pad("level", 0).points })
-	local none = run(FLAT, { flatSmooth })
-	check("a smooth on flat ground changes nothing and costs nothing", none.metal == 0 and #none.session.changed() == 0)
-end
-
---------------------------------------------------------------------------------
--- a slope meeting a building
---------------------------------------------------------------------------------
-
-do
-	-- a building 128 by 64 centred at 512, 576, so its north edge is at z = 544
-	local building = { x = 512, z = 576, xsize = 16, zsize = 8, facing = 0 }
-	local r = run(FLAT, { wall(100, 1) }, { building })
-	check("a slope stops short of a building ahead of its step in the blueprint's order", same(profile(r, AT, SOUTH, 5), { 100, 72, 44, 16, 0 }) and same(profile(r, AT, NORTH, 8), { 100, 100, 100, 72, 44, 16, 4, 0 }), show(profile(r, AT, SOUTH, 5)))
-	local after = run(FLAT, { wall(100, 0) }, { building })
-	check("a building after the step does not stop it", same(profile(after, AT, SOUTH, 8), { 100, 100, 100, 72, 44, 16, 4, 0 }), show(profile(after, AT, SOUTH, 8)))
-	local standing = run(FLAT, { wall(100, 0) }, nil, { building })
-	check("a building already standing stops it, whatever the step's place", same(profile(standing, AT, SOUTH, 5), { 100, 72, 44, 16, 0 }), show(profile(standing, AT, SOUTH, 5)))
-	-- a building numbered 5 is ahead of a step that comes after 5, and not of one that comes after 4
-	local numbered = { x = 512, z = 576, xsize = 16, zsize = 8, facing = 0, seq = 5 }
-	local late = run(FLAT, { wall(100, 5) }, { numbered })
-	local early = run(FLAT, { wall(100, 4) }, { numbered })
-	check("a building is ahead of a step by its seq", same(profile(late, AT, SOUTH, 5), { 100, 72, 44, 16, 0 }) and same(profile(early, AT, SOUTH, 5), { 100, 100, 100, 72, 44 }), show(profile(early, AT, SOUTH, 5)))
-	local asked
-	local env = { heightAt = FLAT.heightAt, corners = FLAT.corners, structures = function(x1, z1, x2, z2)
-		asked = { x1, z1, x2, z2 }
-		return { building }
-	end }
-	local provided = GROUND.terraform(env, { wall(100, 0) })
-	check("buildings can be asked for once the steps' reach is known, and stop the slope", asked and asked[1] < 512 - 128 - 16 and asked[2] < 512 - 16 and asked[3] > 512 + 128 + 16 and asked[4] > 512 + 16 and same({ provided.session.reader.at(512, 512 + 8), provided.session.reader.at(512, 512 + 16), provided.session.reader.at(512, 512 + 32) }, { 72, 44, 0 }), show(asked))
-	local under = { x = 512, z = 512, xsize = 8, zsize = 8, facing = 0 }
-	local u = run(FLAT, { wall(20, 1) }, { under })
-	check("the ground under a building inside the step is left alone", u.at(512, 512) == 0 and u.at(560, 512) == 20, show({ u.at(512, 512), u.at(560, 512) }))
-	local turned = run(FLAT, { wall(100, 0) }, nil, { { x = 512, z = 576, xsize = 8, zsize = 16, facing = 1 } })
-	check("a building turned a quarter has its footprint turned", same(profile(turned, AT, SOUTH, 5), { 100, 72, 44, 16, 0 }), show(profile(turned, AT, SOUTH, 5)))
-end
-
---------------------------------------------------------------------------------
--- two steps
---------------------------------------------------------------------------------
-
-do
-	local across = laid({ kind = "raise", shape = "wall", points = { { x = 0, z = -128 }, { x = 0, z = 128 } }, height = 40 })
-	local r = run(FLAT, { wall(40), across })
-	check("two raises where they cross do not add up", r.at(512, 512) == 40 and r.at(512, 600) == 40 and r.at(600, 512) == 40)
-end
-do
-	local trench, raised = wall(-30, 0), wall(30, 1)
-	local r = run(FLAT, { raised, trench }, { { x = 0, z = 0, xsize = 0, zsize = 0 } })
-	check("steps are built in the blueprint's order, and a later one works on the ground before it", r.steps[1].index == 2 and r.steps[2].index == 1 and same(profile(r, AT, SOUTH, 6), { 30, 30, 30, 2, 4, 0 }), show(profile(r, AT, SOUTH, 6)))
-end
-do
-	local first, second = wall(40, 0), wall(40, 0)
-	local session = GROUND.session(FLAT)
-	session.apply({ first })
-	session.apply({ second })
-	check("a second layout works on the ground the first left", session.reader.at(512, 512) == 40 and session.metal > 0)
-end
-
---------------------------------------------------------------------------------
--- metal
---------------------------------------------------------------------------------
-
-do
-	local one = laid({ kind = "raise", shape = "wall", points = { { x = 0, z = 0 } }, height = 100 })
-	local r = run(FLAT, { one })
-	check("the estimate for one point raised by 100 is the gadget's own", math.abs(r.metal - 48.7168) < 1e-9, tostring(r.metal))
-	local doubled = GROUND.terraform({ heightAt = FLAT.heightAt, corners = FLAT.corners, costMult = 2 }, { one })
-	check("it scales by terracostmult, but not the base cost", math.abs(doubled.metal - 91.4336) < 1e-9, tostring(doubled.metal))
-	local both = run(FLAT, { one, one })
-	check("it adds up across steps", math.abs(both.metal - 2 * 48.7168) < 1e-9)
+	local regions = GROUND.find(g, { tolerance = TOL, footprints = { { x0 = 64, z0 = 64, x1 = 128, z1 = 128 } } })
+	check("ground changed only under a building is not a step", #regions == 0, show(regions))
 end
 
 do
-	-- The work is what the builders spend, which is the estimate with its guess
-	-- at the slope replaced by the slope's own volume. In a real match a wall of
-	-- three points raised by 112 had an estimate of 141.136 and took 158.7384
-	-- (#4797). The work here is 154.06, the estimate 12 percent short of what was
-	-- spent and the work 3 percent short.
-	local wall3 = laid({ kind = "raise", shape = "wall", points = { { x = -48, z = 0 }, { x = 0, z = 0 }, { x = 48, z = 0 } }, height = 112 }, 0, 118.105)
-	local r = GROUND.terraform({ heightAt = function()
-		return 118.105
-	end, corners = FLAT.corners }, { wall3 })
-	check("the work for a wall raised by 112 is the estimate with its slope replaced by the slope's volume", math.abs(r.metal - 141.136) < 1e-9 and math.abs(r.session.work - 154.0637) < 0.001, r.metal .. " " .. r.session.work)
-end
-
---------------------------------------------------------------------------------
--- off the map, and numbers the engine's Lua would hold badly
---------------------------------------------------------------------------------
-
-do
-	local edge = laid({ kind = "raise", shape = "wall", points = { { x = -512, z = 0 }, { x = -440, z = 0 } }, height = 40 })
-	local r = run(FLAT, { edge })
-	local least = math.huge
-	for _, p in ipairs(r.session.changed()) do
-		least = math.min(least, p.x)
+	-- slopes and nothing else, as round a wall that was cut out of the grid
+	local g = grid(0, 0, 40, 40)
+	for _, v in ipairs({ { 80, 84 }, { 88, 56 }, { 96, 28 }, { 104, 4 } }) do
+		for z = 0, 312, 8 do
+			set(g, v[1], z, v[2])
+		end
 	end
-	check("a step that runs off the map writes nothing off it", least >= 0 and #r.session.changed() > 0)
+	check("slopes on their own are not steps", #GROUND.find(g, { tolerance = TOL }) == 0)
 end
+
 do
-	-- a step far from the origin changes as many corners as the same step at
-	-- the origin. A key built into one large number loses its low bits in the
-	-- engine's 32 bit float Lua (#4796). Keys here are coordinates.
-	local function count(dx)
-		local env = { heightAt = function()
-			return 0
-		end, corners = { x = 4097, z = 4097 } }
-		local s = { kind = "level", shape = "area", points = { { x = dx, z = dx }, { x = dx + 128, z = dx }, { x = dx + 128, z = dx + 128 }, { x = dx, z = dx + 128 } }, height = 24, base = 0, after = 0 }
-		return #GROUND.terraform(env, { s }).session.changed()
+	-- untouched ground reads exactly 0, so any other change is a change, even
+	-- one smaller than the tolerance
+	local g = grid(0, 0, 30, 30)
+	shape(g, rectCorners(64, 64, 160, 160), 3)
+	local regions = GROUND.find(g, { tolerance = TOL })
+	check("a raise smaller than the tolerance is still a step", #regions == 1 and regions[1].height == 3, show(regions))
+end
+
+do
+	-- a wall placed as an area on rough ground in a real match, where its
+	-- two terraform blocks met: four corners left 2 to 7.7 below the top
+	local g = grid(0, 0, 60, 40)
+	local top = rectCorners(96, 144, 304, 176)
+	shape(g, top, 112)
+	set(g, 200, 152, 105.0)
+	set(g, 208, 152, 104.3)
+	set(g, 200, 160, 109.9)
+	set(g, 208, 160, 108.2)
+	local regions = GROUND.find(g, { tolerance = TOL })
+	local all112 = #regions > 0
+	for _, r in ipairs(regions) do
+		all112 = all112 and r.height == 112
 	end
-	check("a step on a big map changes as many corners as the same step near the origin", count(64) == count(16000) and count(64) > 300, count(64) .. " and " .. count(16000))
+	check("a dent where two terraform blocks met leaves the wall at one height", all112, show(regions))
+	local ok, why = sameSet((raised(regions)), top)
+	check("the dented wall's steps raise the whole wall", ok, why)
+end
+
+do
+	-- a narrow trench, where the first ring of its sides, 8 above the floor,
+	-- has more corners than the floor itself
+	local g = grid(0, 0, 40, 20)
+	local top = rectCorners(64, 64, 96, 80)
+	shape(g, top, -30, true)
+	local regions = GROUND.find(g, { tolerance = TOL })
+	check("a narrow trench digs to its floor, not to the ring round it", #regions == 1 and regions[1].height == -30, show(regions))
+end
+
+do
+	-- two walls of different heights side by side, slopes and all
+	local g = grid(0, 0, 80, 40)
+	local high = rectCorners(64, 96, 192, 128)
+	local low = rectCorners(208, 96, 336, 128)
+	shape(g, high, 112)
+	shape(g, low, 70)
+	-- the high wall's slope runs over the low wall's top, which the gadget
+	-- stops at; put the low top back
+	for key in pairs(low) do
+		local x, z = key:match("^(%d+):(%d+)$")
+		set(g, tonumber(x), tonumber(z), 70)
+	end
+	local regions = GROUND.find(g, { tolerance = TOL })
+	check("walls of two heights are two steps", heights(regions) == "70,112", heights(regions))
+	local both = {}
+	for k in pairs(high) do
+		both[k] = true
+	end
+	for k in pairs(low) do
+		both[k] = true
+	end
+	local ok, why = sameSet((raised(regions)), both)
+	check("each raises its own top", ok, why)
+end
+
+do
+	-- a grid that starts off the 16 elmo lines, and a wall cut by its edge
+	local g = grid(8, 8, 30, 30)
+	local top = rectCorners(96, 96, 288, 128)
+	shape(g, top, 56)
+	local regions = GROUND.find(g, { tolerance = TOL })
+	local inside = {}
+	for k in pairs(top) do
+		local x = tonumber(k:match("^(%d+):"))
+		if x <= 8 + 29 * 8 then
+			inside[k] = true
+		end
+	end
+	check("a wall cut by the grid's edge is one step", #regions == 1 and regions[1].height == 56, show(regions))
+	local ok, why = sameSet((raised(regions)), inside)
+	check("the cut wall's step covers the wall up to the grid's edge", ok, why)
+end
+
+do
+	-- A wall too long for one of the gadget's terraform blocks. The gadget
+	-- fills every block after the first 8 elmos off the 16 grid, which in a
+	-- real match raised a wall saved as one area 8 elmos past its end, so a
+	-- step never spans more than one block.
+	local g = grid(0, 0, 80, 20)
+	local top = rectCorners(16, 32, 576, 64)
+	shape(g, top, 30)
+	local regions = GROUND.find(g, { tolerance = TOL })
+	check("a wall longer than one terraform block is split", #regions >= 3, show(regions))
+	local widest, tallest = 0, 0
+	for _, r in ipairs(regions) do
+		local x0, x1, z0, z1 = math.huge, -math.huge, math.huge, -math.huge
+		for _, p in ipairs(r.points) do
+			x0, x1 = math.min(x0, p.x), math.max(x1, p.x)
+			z0, z1 = math.min(z0, p.z), math.max(z1, p.z)
+		end
+		widest, tallest = math.max(widest, x1 - x0), math.max(tallest, z1 - z0)
+	end
+	check("no piece spans more than one block of 200, its cells and the 16 the gadget adds", widest + 16 <= 200 and tallest + 16 <= 200, widest .. " by " .. tallest)
+	local ok, why = sameSet((raised(regions)), top)
+	check("the pieces raise the whole wall", ok, why)
+end
+
+do
+	-- every area has the three points a step needs, even a single cell
+	local g = grid(0, 0, 20, 20)
+	shape(g, rectCorners(64, 64, 80, 80), 50)
+	local regions = GROUND.find(g, { tolerance = TOL })
+	check("a single cell is one step", #regions == 1, show(regions))
+	check("a single cell's outline still has three points", regions[1] and #regions[1].points >= 3, show(regions[1]))
+	local ok, why = sameSet((raised(regions)), rectCorners(64, 64, 80, 80))
+	check("the single cell raises its nine corners", ok, why)
 end
 
 support.report()

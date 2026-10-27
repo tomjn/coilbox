@@ -225,6 +225,11 @@ local function lane(unitID)
 end
 
 function widget:Initialize()
+	-- the save ground matches have a probe of their own
+	if ((Spring.GetModOptions() or {}).coilbox_mode or ""):sub(1, 6) == "ground" then
+		widgetHandler:RemoveWidget(self)
+		return
+	end
 	Spring.Echo(string.format("PROBE loaded GetNextTag=%s lassoInitialised=%s",
 		type(WG.Terraform_GetNextTag), type(WG.Terraform_SetPlacingRectangle)))
 	-- Zero-K ends a match at its first frame when the other allyteam has no

@@ -123,6 +123,9 @@ export interface WidgetSource extends ArrivedHere {
   /** The engine folder the spool was under, which is the engine it was played
    *  on. Absent when the collector did not know. */
   engine?: string;
+  /** Its terrain steps were worked out of the ground in the match rather than
+   *  drawn, so they are an approximation (issue #4798). */
+  ground?: true;
 }
 
 /** What the library keeps for one layout. */
@@ -213,14 +216,17 @@ export function scenarioSource(
   };
 }
 
-/** For one saved in game by the widget and collected out of its spool. */
+/** For one saved in game by the widget and collected out of its spool.
+ *  `ground` when the widget read its terrain steps from the ground. */
 export function widgetSource(
   engine?: string,
   at: Date = new Date(),
+  ground = false,
 ): WidgetSource {
   return {
     kind: "widget",
     ...(engine ? { engine } : {}),
+    ...(ground ? { ground: true as const } : {}),
     ...arrived(undefined, at),
   };
 }
@@ -251,7 +257,7 @@ export function sourceLabel(source: BlueprintSource): string {
       return author ? t`From ${author} on the hub` : t`From the hub`;
     }
     case "widget":
-      return t`Saved in game`;
+      return source.ground ? t`Saved from the ground` : t`Saved in game`;
     default: {
       const scenarioName = source.scenarioName;
       return scenarioName ? t`From ${scenarioName}` : t`From a scenario`;
@@ -295,6 +301,11 @@ function summaryOf(source: BlueprintSource): string {
     }
     case "widget": {
       const engine = source.engine;
+      if (source.ground) {
+        return engine
+          ? t`Saved from the ground in game with the coilbox widget, on engine ${engine}.`
+          : t`Saved from the ground in game with the coilbox widget.`;
+      }
       return engine
         ? t`Saved in game with the coilbox widget, on engine ${engine}.`
         : t`Saved in game with the coilbox widget.`;
@@ -344,7 +355,12 @@ function parseBlueprintSource(value: unknown): BlueprintSource | undefined {
     }
     case "widget": {
       const engine = text("engine");
-      return { kind: "widget", ...(engine ? { engine } : {}), ...rest };
+      return {
+        kind: "widget",
+        ...(engine ? { engine } : {}),
+        ...(v.ground === true ? { ground: true as const } : {}),
+        ...rest,
+      };
     }
     case "scenario": {
       const scenario = text("scenario");

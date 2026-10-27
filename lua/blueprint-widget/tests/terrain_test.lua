@@ -2,13 +2,13 @@
 --
 -- The preview of the ground a blueprint's terrain steps leave (issues #4796 and
 -- #4797): the mesh of its surface, slopes included, its wire and the grid on
--- the ground. Which corners change, and to what, is ground.lua's and its own
+-- the ground. Which corners change, and to what, is terraform.lua's and its own
 -- test's.
 
 local support = dofile((arg[0]:match("^(.*)/[^/]+$") or ".") .. "/support.lua")
 local check, same, show = support.check, support.same, support.show
 local TERRAIN = support.module("terrain.lua")
-local GROUND = support.module("ground.lua")
+local TERRAFORM = support.module("terraform.lua")
 local MODEL = support.module("model.lua")
 
 local function flat()
@@ -18,7 +18,7 @@ end
 --- The mesh of some laid steps on ground, through the real model.
 local function meshOf(steps, heightAt)
 	local env = { heightAt = heightAt or flat, corners = { x = 4097, z = 4097 } }
-	local session = GROUND.session(env)
+	local session = TERRAFORM.session(env)
 	session.apply(steps)
 	return TERRAIN.mesh(session.changed(), env.heightAt), session
 end

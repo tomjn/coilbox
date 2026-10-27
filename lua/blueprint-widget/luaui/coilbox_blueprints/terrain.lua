@@ -8,7 +8,7 @@
 -- raised ground (s_elev_color 0, 1, 0), a brownish red for dug ground
 -- (s_dig_color 0.8, 0.4, 0.3), a cyan ground grid (s_ground_color 0, 0.7, 0.7).
 -- No code is taken from it. Which corners a step changes, and to what height,
--- is ground.lua's: the step's own corners and the slope the terraform gadget
+-- is terraform.lua's: the step's own corners and the slope the terraform gadget
 -- adds round them.
 --
 -- The geometry is plain Lua over a height function, so a test can run it. The
@@ -63,7 +63,7 @@ end
 
 --- The mesh of the ground a layout leaves.
 -- @param changed table[] { x, z, h } each corner a step changed, from
---   ground.lua's session.changed, h the height it is left at
+--   terraform.lua's session.changed, h the height it is left at
 -- @param heightAt function(x, z) -> the ground's height now
 -- @return table { verts, idx, faces, wire, downFaces, downWire, grid, cells,
 --   capped }. idx holds, one after another, the triangles of the faces over
