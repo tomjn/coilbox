@@ -1,6 +1,6 @@
 import { Trans, useLingui } from "@lingui/react/macro";
 import { Button, Input } from "@picoframe/frame";
-import { Check, Copy, ExternalLink, Globe } from "lucide-react";
+import { Check, Copy, ExternalLink, Globe, Loader2 } from "lucide-react";
 import { useCallback, useState } from "react";
 import { Field } from "@/components/Field";
 import { Textarea } from "@/components/ui/textarea";
@@ -36,12 +36,19 @@ import {
  * The upload itself happens in Rust, because that is where the access token is.
  * See `./publish`.
  */
-export function PublishSection({ code }: { code: string }) {
+export function PublishSection({
+  code,
+  title: initialTitle = "",
+}: {
+  code: string;
+  /** The item's own name, which the Title field starts with. */
+  title?: string;
+}) {
   const { t, i18n } = useLingui();
   const hubUrl = useHubUrl();
   const account = useHubAccount(hubUrl);
   const { loading: checking, signedIn } = account;
-  const [title, setTitle] = useState("");
+  const [title, setTitle] = useState(initialTitle);
   const [description, setDescription] = useState("");
   const [tags, setTags] = useState("");
   const [busy, setBusy] = useState(false);
@@ -150,15 +157,23 @@ export function PublishSection({ code }: { code: string }) {
     );
   }
 
+  // Holds the height of the form below, so the drawer does not jump when the
+  // check finishes and the form replaces this.
   if (checking) {
     return (
-      <div className="flex flex-col gap-1.5 border-t pt-3">
+      <div className="flex min-h-[22.4rem] flex-col gap-2 border-t pt-3">
         <h3 className="text-sm font-medium leading-none">
           <Trans>Coilbox hub</Trans>
         </h3>
-        <p className="text-xs text-muted-foreground">
-          <Trans>Checking whether you are signed in.</Trans>
-        </p>
+        <div
+          role="status"
+          className="flex flex-1 items-center justify-center text-muted-foreground"
+        >
+          <Loader2 className="size-5 motion-safe:animate-spin" aria-hidden />
+          <span className="sr-only">
+            <Trans>Checking whether you are signed in.</Trans>
+          </span>
+        </div>
       </div>
     );
   }

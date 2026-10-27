@@ -314,6 +314,7 @@ function RunCard({
         <ChallengeShare
           identity={runIdentity(run)}
           code={encodeWarpathChallenge(run)}
+          title={run.name}
           helpText={t`Anyone who pastes this code into Import challenge (needs the same game installed) plays the identical warpath, so results are directly comparable.`}
           onExportFile={exportChallengeFile}
         />
