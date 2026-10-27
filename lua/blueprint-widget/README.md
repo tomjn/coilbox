@@ -20,7 +20,8 @@ Coilbox installs `luaui/` into the content root as `LuaUI/` when you press the b
 - what nobody selected can build stays on the map as a plan, drawn as ghosts. Pointing at a plan with builders selected outlines the building under the cursor in white, crosses it out if they cannot build it and sets the build cursor to match. A right click builds that building, a shift right click builds the whole plan after the builders' current orders, and a right click with nothing selected removes the plan
 - builders either help each other, each taking every building it can build, or split up, each building going to the nearest builder until it has its share of the build time. Splitting is for games such as Splinter Faction that stop a second builder joining a nanoframe, where the stopped builder loses its whole queue. The choice is kept per game
 - the panel counts what the plans hold, and offers to build them all with whatever is selected, or to dismiss them
-- Save selection writes the selected buildings to a spool file that coilbox collects into the library next time it runs
+- Save selection writes the selected buildings to a spool file that coilbox collects into the library next time it runs, with the ground changed under and round them as raise steps (issue #4798)
+- Save ground waits for a rectangle dragged on the map and writes the ground changed inside it as raise steps, with no buildings
 
 BAR's own `LuaUI/Config/blueprints.json` is read too, so a BAR player sees the layouts they already have. It is never written.
 
@@ -42,7 +43,8 @@ luaui/coilbox_blueprints/json.lua         the JSON codec, since the engine ships
 luaui/coilbox_blueprints/store.lua        the three files, polling, the spool write
 luaui/coilbox_blueprints/model.lua        tabs, game filter, layout, vertex packing
 luaui/coilbox_blueprints/place.lua        turning, snapping, blocked marks, orders
-luaui/coilbox_blueprints/record.lua       the selection as a spool entry
+luaui/coilbox_blueprints/record.lua       the selection, or the ground in a rectangle, as a spool entry
+luaui/coilbox_blueprints/ground.lua       ground changes read back as raise steps, without their slopes
 tests/                                    luajit suites
 ```
 
@@ -60,9 +62,9 @@ The shader is `#version 130` with `GL_ARB_explicit_attrib_location`, the lowest 
 
 ## Other widgets and games
 
-`WG.CoilboxBlueprints` offers `open`, `close`, `toggle`, `list`, `place(key)`, `save`, `rotate(turns)`, `flip(axis)` with `"x"` or `"z"`, `step(direction)` and `assist(mode)` with `"help"` or `"split"` to a game's own interface.
+`WG.CoilboxBlueprints` offers `open`, `close`, `toggle`, `list`, `place(key)`, `save`, `saveGround(x0, z0, x1, z1)` in elmos, `rotate(turns)`, `flip(axis)` with `"x"` or `"z"`, `step(direction)` and `assist(mode)` with `"help"` or `"split"` to a game's own interface.
 
-Widget actions: `coilbox_blueprints`, `coilbox_blueprints_save`, `coilbox_blueprints_rotate_left`, `coilbox_blueprints_rotate_right`, `coilbox_blueprints_prev`, `coilbox_blueprints_next`, `coilbox_blueprints_flip_x`, `coilbox_blueprints_flip_z`.
+Widget actions: `coilbox_blueprints`, `coilbox_blueprints_save`, `coilbox_blueprints_save_ground`, `coilbox_blueprints_rotate_left`, `coilbox_blueprints_rotate_right`, `coilbox_blueprints_prev`, `coilbox_blueprints_next`, `coilbox_blueprints_flip_x`, `coilbox_blueprints_flip_z`.
 
 When the widget loads it binds `[`, `]`, `Shift+[`, `Shift+]`, `f` and `g` to the turn, step and flip actions, each only if nothing is bound to that action yet, and unbinds them when it shuts down. A key in `uikeys.txt`, or a `bind` typed in the console, replaces the default. The engine binds `[` and `]` to `buildfacing` and `f` and `g` to `fight` and `guard`. H and V, Factorio 2.0's flip keys, are not the defaults because Splinter Faction's share menu unbinds everything on H when it loads and takes H itself. LuaUI is offered a key's actions before the engine runs them, and the turn and flip actions take the key only while there is something to turn, the step actions only while the panel is open, so the rest of the time the key does its usual job. The placing panel labels its buttons with whichever keys are bound. Some widget handlers never run a widget action from a key: Splinter Faction's calls `actionHandler:KeyAction` without the key's bound actions, so the stock handler gives up and the engine runs the key's first engine action. The widget's `KeyPress` looks up the key's bindings itself and runs its own actions, which covers those handlers. A handler that does route the key has run the action and stopped the key already.
 
@@ -75,7 +77,7 @@ luajit lua/blueprint-widget/tests/place_test.lua
 
 The script runs every suite under `lua/*/tests/`, and CI runs the same script. There is no engine harness for the widget itself: it needs a window, and `spring-headless` has no `gl`.
 
-`scripts/zerok-terraform-headless.sh` plays a scripted Zero-K match in `spring-headless` with the scratch game in `tests/zerok/`. Its widget gives the orders the blueprint widget will give for terrain changes, a raised wall and then a turret on it, in ten ways, and the script checks where the turrets went up, what the builders' queues held and the ground across each wall. It needs Zero-K and an engine installed, so CI does not run it. Issue #4789 has what it found.
+`scripts/zerok-terraform-headless.sh` plays a scripted Zero-K match in `spring-headless` with the scratch game in `tests/zerok/`. Its widget gives the orders the blueprint widget will give for terrain changes, a raised wall and then a turret on it, in ten ways, and the script checks where the turrets went up, what the builders' queues held and the ground across each wall. It needs Zero-K and an engine installed, so CI does not run it. Issue #4789 has what it found. It then plays two more matches for saving the ground: one terraforms a wall with turrets, a pad and a trench and saves them with `record.lua` and `ground.lua`, and the next places the saved selection on fresh ground and saves it again. `tests/zerok/ground_check.lua` checks both and prints the changes in height the first left, which is where `ground.lua`'s tolerance comes from. `COILBOX_ZK_ONLY=ground` plays only those two.
 
 Zero-K's widget handler loads a widget from the content root only once its `LuaUI/Config/ZK_data.lua` has a `Local Widgets Config` entry, which Zero-K writes when the game closes. So the widget does not load in the first Zero-K match played from a data folder, and does from the second.
 
