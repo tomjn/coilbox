@@ -182,6 +182,26 @@ describe("level", () => {
 });
 
 describe("raise", () => {
+  // Zero-K builds a slope up gradually and reads the ground again at each
+  // update. The lip (lines 2741-2777) goes in first, so by the time the slope
+  // would drop to less than the lip, the ground there is already the lip's 4
+  // and the slope's check (line 2693) measures from that. A pad raised by 40
+  // would put its diagonal corner at 40 - 28 * sqrt 2 = 0.4. The match
+  // measured 4 (#4805).
+  it("keeps the 4 elmo foot on the diagonal of a pad raised by 40 (#4805)", () => {
+    const { ground: g } = terraform(FLAT, [pad("raise", 40)], AT_CENTRE, []);
+    for (const [x, z] of [
+      [440, 440],
+      [600, 440],
+      [440, 600],
+      [600, 600],
+    ]) {
+      expect(heightAt(g, x, z)).toBe(4);
+    }
+    // straight out from an edge it is 12, then the foot
+    expect(profile(g, { x: 432, z: 512 }, EAST, 4)).toEqual([4, 12, 40, 40]);
+  });
+
   it("adds its height to the ground under each point, on a slope", () => {
     // Line 1807: each point's own ground plus 40. West, 264 - 28 = 236 over
     // ground of 220 at x = 440. At 432, 264 is within 56 of 216, and 216 is

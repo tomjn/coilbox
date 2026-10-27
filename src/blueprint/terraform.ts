@@ -1074,6 +1074,33 @@ function build(
       }
     };
 
+    /** The lip's height under a raised slope's foot, when the lip would be
+     *  there. Zero-K builds the slope up over many updates and reads the ground
+     *  again at each, so the lip goes in first and the slope's check (line
+     *  2693) then measures from it. A slope that would end below the lip ends
+     *  on it instead (#4805). */
+    const footHeight = (
+      lookX: number,
+      lookZ: number,
+      groundHere: number,
+      parentGoal: number,
+    ): number => {
+      if (
+        groundHere + MAX_EDGE_HEIGHT_DIFF >= parentGoal ||
+        inArea(lookX, lookZ)
+      ) {
+        return Number.NEGATIVE_INFINITY;
+      }
+      const border = Math.min(
+        MAX_EDGE_HEIGHT_DIFF,
+        parentGoal - groundHere + MAX_EDGE_HEIGHT_DIFF,
+      );
+      const ahead = ground.at(lookX, lookZ);
+      return groundHere < ahead + border
+        ? ahead + border
+        : Number.NEGATIVE_INFINITY;
+    };
+
     // Lines 2663-2781: the first square out from each edge of the step.
     for (let id = 0; id < points.length; id++) {
       const p = points[id];
@@ -1101,7 +1128,17 @@ function build(
           extras[index] = {
             x,
             z,
-            target: newHeight - sign * maxDiff,
+            target: pyramid
+              ? Math.max(
+                  newHeight - maxDiff,
+                  footHeight(
+                    x + edge.checkX,
+                    z + edge.checkZ,
+                    here.ground0,
+                    p.aim,
+                  ),
+                )
+              : newHeight - sign * maxDiff,
             support: { x: p.x, z: p.z, h: newHeight, id },
             checkX: edge.checkX,
             checkZ: edge.checkZ,
@@ -1161,7 +1198,12 @@ function build(
           extras[index] = {
             x,
             z,
-            target: support.h - sign * allowed,
+            target: from.pyramid
+              ? Math.max(
+                  support.h - allowed,
+                  footHeight(x + diffX, z + diffZ, here.ground0, from.target),
+                )
+              : support.h - sign * allowed,
             support,
             checkX: from.checkX,
             checkZ: from.checkZ,
