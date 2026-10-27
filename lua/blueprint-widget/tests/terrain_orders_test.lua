@@ -7,6 +7,7 @@
 local support = dofile((arg[0]:match("^(.*)/[^/]+$") or ".") .. "/support.lua")
 local check, same, show = support.check, support.same, support.show
 local PLACE = support.module("place.lua")
+local LATER = support.module("pending_terraform.lua")
 
 local TURRET = support.def(1, "turret", { isBuilding = true, xsize = 4, zsize = 4 })
 local SOLAR = support.def(2, "solar", { isBuilding = true, xsize = 4, zsize = 4 })
@@ -23,6 +24,7 @@ local function engine(units, extra)
 	opts.WG = extra and extra.WG
 	local E = support.engine({ TURRET, SOLAR, CON, PLAIN }, opts)
 	PLACE.use(E)
+	LATER.use(E)
 	return E
 end
 
@@ -273,6 +275,8 @@ check("Split up gives each step to the nearest builder that can terraform", (fun
 	end
 	return has200 and has201 and #split.terraform == 2
 end)(), show(split.orders))
+check("each split step's level step is recorded for that builder alone", #split.terraform[1].levelAt == 1 and split.terraform[1].levelAt[1].unitID == 200 and #split.terraform[2].levelAt == 1 and split.terraform[2].levelAt[1].unitID == 201, show(split.terraform[2].levelAt))
+check("Together records the level step for every builder", #together.terraform[1].levelAt == 2)
 check("each split step's terraform order names only the builder that has it", split.terraform[1].unitID == 200 and split.terraform[1].params[9] == 1 and split.terraform[2].unitID == 201 and split.terraform[2].params[9] == 1, show(split.terraform))
 
 -- steps that are not ordered
@@ -311,12 +315,12 @@ check("split steps with no buildings go to the nearest builder each", #onlyTwo.o
 --------------------------------------------------------------------------------
 
 E.orders, E.single = {}, {}
-local sent = PLACE.issue(p)
+local sent = PLACE.issue(p, LATER)
 check("issue sends the terraform order to the builder first", #E.single == 1 and E.single[1].cmdID == 39801 and E.single[1].unitID == 200 and E.single[1].options == 0, show(E.single))
 check("then the queue", #E.orders == 1 and sent == 1 and E.orders[1].cmds[1][1] == 39736)
 
 E.orders, E.single = {}, {}
-PLACE.issue(PLACE.plan({}, canAll, false, nil, { steps = { step(0) }, on = true }))
+PLACE.issue(PLACE.plan({}, canAll, false, nil, { steps = { step(0) }, on = true }), LATER)
 check("a plan of steps alone issues its terraform order and its level step", #E.single == 1 and #E.orders == 1)
 
 support.report()

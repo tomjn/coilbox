@@ -125,7 +125,7 @@ end
 -- Modules
 --------------------------------------------------------------------------------
 
-local JSON, STORE, MODEL, PLACE, GROUND, RECORD, TERRAIN
+local JSON, STORE, MODEL, PLACE, GROUND, RECORD, TERRAIN, TERRAFORM, LATER
 
 local function include(name)
 	local path = MODULE_DIR .. name
@@ -544,7 +544,7 @@ function readCost()
 	if not placing then
 		return
 	end
-	local metal, energy, seconds = PLACE.cost(placing.item.resolved, can)
+	local metal, energy, seconds = PLACE.cost(placing.item.resolved, can, placing.terra)
 	panel.placing.cost = { metal = metal, energy = energy, seconds = seconds }
 	MODEL.touch(panel)
 end
@@ -687,6 +687,11 @@ end
 -- The cursor holds the pivot, the building nearest the layout's middle, and
 -- the layout turns and flips about it. During a shift drag it is copies in a
 -- line from where the drag began.
+-- Counts every placement the cursor has made, across blueprints, so the ground
+-- preview's key never repeats when another blueprint is picked up. A count per
+-- blueprint started again at 1 and a new one could show the last one's preview.
+local placingSerial = 0
+
 local function trackCursor()
 	local kind, pos
 	if placing.at then
@@ -734,7 +739,8 @@ local function trackCursor()
 	-- the steps, for their outlines on the ground. They are laid again with the
 	-- ground as it is when the player clicks.
 	placing.steps = PLACE.laySteps(resolved, placing.rotation, placing.flip, origin, anchors, foot)
-	placing.serial = (placing.serial or 0) + 1
+	placingSerial = placingSerial + 1
+	placing.serial = placingSerial
 end
 
 local function plansChanged()
@@ -814,7 +820,7 @@ local function placeNow()
 	-- the ground under the pivot is read now, as the player clicks
 	local steps = PLACE.laySteps(placing.item.resolved, placing.rotation, placing.flip, placing.origin, placing.anchors, placing.foot)
 	local plan = PLACE.plan(placing.foot, can, shiftHeld(), panel.assist, terrainArg(steps))
-	local sent = PLACE.issue(plan)
+	local sent = PLACE.issue(plan, LATER)
 	say(placing.item.name .. ": " .. describe(plan, sent))
 	addPlan(plan.remainder, plan.stepRemainder)
 	placing.line = nil
@@ -851,7 +857,7 @@ local function buildPlan(index, only)
 		end
 	end
 	local plan = PLACE.plan(foot, can, shiftHeld(), panel.assist, terrainArg(steps))
-	local sent = PLACE.issue(plan)
+	local sent = PLACE.issue(plan, LATER)
 	plans[index].steps = later
 	for _, step in ipairs(plan.stepRemainder) do
 		table.insert(plans[index].steps, step)
@@ -1220,7 +1226,13 @@ function widget:Initialize()
 	if RECORD then
 		TERRAIN, err = include("terrain.lua")
 	end
-	if not TERRAIN then
+	if TERRAIN then
+		TERRAFORM, err = include("terraform.lua")
+	end
+	if TERRAFORM then
+		LATER, err = include("pending_terraform.lua")
+	end
+	if not LATER then
 		log(LOG.ERROR, err)
 		widgetHandler:RemoveWidget(self)
 		return
@@ -1229,6 +1241,7 @@ function widget:Initialize()
 	STORE.use(JSON)
 	PLACE.use({ Spring = Spring, UnitDefs = UnitDefs, UnitDefNames = UnitDefNames, Game = Game, WG = WG })
 	RECORD.use({ Spring = Spring, UnitDefs = UnitDefs, Game = Game, GROUND = GROUND })
+	LATER.use({ Spring = Spring })
 
 	store = STORE.new({
 		vfs = VFS,
@@ -1331,6 +1344,11 @@ function widget:Initialize()
 		end,
 		placeAt = placeAt,
 		holdAt = holdAt,
+		-- what the layout being placed costs, as the panel says it: metal, energy
+		-- and seconds, with the terraform counted
+		cost = function()
+			return panel.placing and panel.placing.cost or nil
+		end,
 		terrain = function(on)
 			setTerrain(on == true or on == "on")
 		end,
@@ -1346,6 +1364,9 @@ function widget:Initialize()
 end
 
 function widget:Shutdown()
+	if LATER then
+		LATER.flush()
+	end
 	for action in pairs(keyActions) do
 		removeAction(action)
 	end
@@ -1355,6 +1376,11 @@ function widget:Shutdown()
 	boundKeys = {}
 	WG.CoilboxBlueprints = nil
 	dropGL()
+end
+
+-- Zero-K's terraform orders held until a builder nears their level step.
+function widget:GameFrame(frame)
+	LATER.update(frame)
 end
 
 function widget:ViewResize(x, y)
@@ -1722,7 +1748,7 @@ local function markStyle(p)
 		c = { base[1], base[2], base[3], 0.3 }
 		markColors[p.defID] = c
 	end
-	return c, (p.blocked and MODEL.MARK_REFUSED or 0) + (hover.marks[p] or 0)
+	return c, ((p.blocked or p.onSlope) and MODEL.MARK_REFUSED or 0) + (hover.marks[p] or 0)
 end
 
 --- One translucent model. It comes out in the team's colour whatever gl.Color
@@ -1737,6 +1763,45 @@ local function ghost(p, teamID)
 	gl.Rotate(90 * p.facing, 0, 1, 0)
 	gl.UnitShape(p.defID, teamID, false, false, false)
 	gl.PopMatrix()
+end
+
+-- How far from its position the footprint of the biggest building that stays
+-- put reaches, so a rectangle search finds every building whose footprint is
+-- in it. Read once.
+local structureHalf = nil
+
+--- The buildings standing in a rectangle, as Zero-K's terraform gadget counts
+-- them: every unit that cannot move, unless it is a building that moves.
+-- Slopes stop short of these. Only the units the player can see are listed.
+local function standingStructures(minX, minZ, maxX, maxZ)
+	if not structureHalf then
+		structureHalf = 0
+		for _, def in pairs(UnitDefs) do
+			if def.isImmobile then
+				structureHalf = math.max(structureHalf, math.max(def.xsize, def.zsize) * 4)
+			end
+		end
+	end
+	local out = {}
+	for _, unitID in ipairs(Spring.GetUnitsInRectangle(minX - structureHalf, minZ - structureHalf, maxX + structureHalf, maxZ + structureHalf) or {}) do
+		local def = UnitDefs[Spring.GetUnitDefID(unitID) or -1]
+		if def and def.isImmobile and not (def.customParams and def.customParams.mobilebuilding) then
+			local x, _, z = Spring.GetUnitPosition(unitID)
+			out[#out + 1] = { x = x, z = z, xsize = def.xsize, zsize = def.zsize, facing = Spring.GetUnitBuildFacing(unitID) or 0 }
+		end
+	end
+	return out
+end
+
+--- What the ground model reads: the heightmap, the size of the map, the
+-- buildings standing now, and the game's terraform cost multiplier.
+local function groundEnv()
+	return {
+		heightAt = Spring.GetGroundHeight,
+		corners = { x = Game.mapSizeX / 8 + 1, z = Game.mapSizeZ / 8 + 1 },
+		structures = standingStructures,
+		costMult = tonumber((Spring.GetModOptions() or {}).terracostmult) or 1,
+	}
 end
 
 --- Refill the ground buffer when the marked positions change.
@@ -1774,17 +1839,7 @@ function widget:DrawWorld()
 	local key = "plans:" .. plansSerial .. ":hover:" .. hover.key .. (foot and (":cursor:" .. placing.serial .. (showSteps and ":steps" or "")) or "")
 		.. (pick and (":pick:" .. pick.x .. ":" .. pick.z .. ":" .. pick.def.xsize .. ":" .. pick.def.zsize) or "")
 	if groundKey ~= key then
-		local marks, steps = {}, {}
-		for _, plan in ipairs(plans) do
-			for _, step in ipairs(plan.steps) do
-				steps[#steps + 1] = step
-			end
-		end
-		if showSteps then
-			for _, step in ipairs(placing.steps or {}) do
-				steps[#steps + 1] = step
-			end
-		end
+		local marks = {}
 		for _, plan in ipairs(plans) do
 			for _, p in ipairs(plan.positions) do
 				marks[#marks + 1] = p
@@ -1793,11 +1848,51 @@ function widget:DrawWorld()
 		for _, p in ipairs(foot or {}) do
 			marks[#marks + 1] = p
 		end
+		-- the ground every plan and the cursor leave, one after the other
+		local groups = {}
+		for _, plan in ipairs(plans) do
+			groups[#groups + 1] = { steps = plan.steps, foot = plan.positions }
+		end
+		if showSteps then
+			groups[#groups + 1] = { steps = placing.steps or {}, foot = foot, cursor = true }
+		end
+		local steps = {}
+		local session = TERRAFORM.session(groundEnv())
+		local cursor = nil
+		for _, group in ipairs(groups) do
+			local before, workBefore = session.metal, session.work
+			local results = group.steps[1] and session.apply(group.steps, group.foot) or {}
+			if group.cursor then
+				cursor = { metal = session.metal - before, work = session.work - workBefore }
+			end
+			for _, step in ipairs(group.steps) do
+				steps[#steps + 1] = step
+			end
+			-- a building that would stand on a slope is marked like one the
+			-- ground refuses
+			local on = TERRAFORM.onSlope(results, group.foot)
+			for i, p in ipairs(group.foot) do
+				p.onSlope = on[i]
+			end
+		end
+		if not showSteps then
+			for _, p in ipairs(foot or {}) do
+				p.onSlope = nil
+			end
+		end
 		marks[#marks + 1] = pick
 		groundMarks(marks, key)
-		terrainMesh = TERRAIN.mesh(steps, Spring.GetGroundHeight)
+		terrainMesh = TERRAIN.mesh(session.changed(), Spring.GetGroundHeight)
 		terrainMesh.indices = uploadMesh(terrainSet, terrainMesh.verts, terrainMesh.idx)
 		stepLabels = PLACE.labels(steps)
+		-- the panel's cost counts the terraform being placed
+		if placing then
+			local was = placing.terra
+			if (was and was.metal or 0) ~= (cursor and cursor.metal or 0) or (was and was.work or 0) ~= (cursor and cursor.work or 0) then
+				placing.terra = cursor
+				readCost()
+			end
+		end
 	end
 	-- The marks follow the heightmap, but the terrain the engine draws is
 	-- simplified with distance, so a depth test would still let it cut them.
