@@ -77,11 +77,40 @@ end
 -- does not have.
 local PLACE = VFS.Include("LuaUI/coilbox_blueprints/place.lua", nil, VFS.RAW_FIRST)
 
-local function blueprint(builders, cx, cz, shift, mode, withTurret)
+-- The widget's model of the ground a blueprint leaves (issue #4797) is run by
+-- the fixture gadget, which can read the real heightmap. A widget in a headless
+-- match reads an unsynced copy that is not kept up to date. The probe gives the
+-- gadget the laid steps and the buildings of each blueprint it orders, as the
+-- widget's own placing code laid them, and the gadget works out what the model
+-- expects and compares it with the ground the game then leaves.
+local function serialise(value)
+	if type(value) == "table" then
+		local parts = {}
+		for k, v in pairs(value) do
+			if type(v) ~= "function" and type(v) ~= "userdata" and k ~= "def" then
+				parts[#parts + 1] = "[" .. (type(k) == "string" and string.format("%q", k) or tostring(k)) .. "]=" .. serialise(v)
+			end
+		end
+		return "{" .. table.concat(parts, ",") .. "}"
+	elseif type(value) == "string" then
+		return string.format("%q", value)
+	end
+	return tostring(value)
+end
+
+local function model(case, steps, foot)
+	local plain = {}
+	for i, p in ipairs(foot or {}) do
+		plain[i] = { x = p.x, z = p.z, xsize = p.def and p.def.xsize, zsize = p.def and p.def.zsize, facing = p.facing, seq = p.seq }
+	end
+	Spring.SendLuaRulesMsg("coilbox_model " .. case .. " " .. serialise({ steps = steps, foot = plain }))
+end
+
+local function blueprint(builders, cx, cz, shift, mode, withTurret, case, terrain)
 	PLACE.use({ Spring = Spring, UnitDefs = UnitDefs, UnitDefNames = UnitDefNames, Game = Game, WG = WG })
 	local entry = {
 		buildings = withTurret and { { def = "turretlaser", offset = { x = 0, z = 0 }, facing = 0 } } or {},
-		terrain = { { kind = "raise", shape = "wall", points = { { x = -48, z = 0 }, { x = 0, z = 0 }, { x = 48, z = 0 } }, height = WALL_HEIGHT, before = 0 } },
+		terrain = terrain or { { kind = "raise", shape = "wall", points = { { x = -48, z = 0 }, { x = 0, z = 0 }, { x = 48, z = 0 } }, height = WALL_HEIGHT, before = 0 } },
 	}
 	local resolved = PLACE.resolve(entry)
 	local pivot = PLACE.pivot(resolved)
@@ -92,6 +121,9 @@ local function blueprint(builders, cx, cz, shift, mode, withTurret)
 		p.seq = i
 	end
 	local steps = PLACE.laySteps(resolved, 0, nil, origin, { { x = ax, z = az } }, foot)
+	if case then
+		model(case, steps, foot)
+	end
 	local plan = PLACE.plan(foot, PLACE.capabilities(builders), shift, mode, { steps = steps, on = true })
 	local sent = PLACE.issue(plan)
 	Spring.Echo(string.format("PROBE blueprint sent=%d terraform=%d skipped=%d offMap=%d remainder=%d blocked=%d", sent, #plan.terraform, plan.skipped, plan.offMap, #plan.remainder, plan.blocked))
@@ -140,6 +172,7 @@ local CASES = {
 		terraform(b, cx, cz, tag)
 	end },
 	{ name = "long wall, level then turret, no shift", run = function(b, cx, cz, tag)
+		model(9, { { kind = "raise", shape = "wall", points = { { x = cx - 176, z = cz }, { x = cx, z = cz }, { x = cx + 176, z = cz } }, height = WALL_HEIGHT, after = 0, base = Spring.GetGroundHeight(cx, cz) } })
 		terraform(b, cx, cz, tag, 176)
 		Spring.GiveOrderToUnitArray(b, CMD_LEVEL, stepParams(cx, cz, tag), 0)
 		Spring.GiveOrderToUnitArray(b, -turretDefID, turretParams(cx, cz), OPT_SHIFT)
@@ -151,7 +184,7 @@ local CASES = {
 	end },
 	-- The blueprint widget's placing code. They order the terraform themselves.
 	{ name = "blueprint with a wall and a turret, no shift", own = true, run = function(b, cx, cz)
-		blueprint(b, cx, cz, false, "help", true)
+		blueprint(b, cx, cz, false, "help", true, 11)
 	end },
 	{ name = "blueprint with a wall and a turret, shift", own = true, run = function(b, cx, cz)
 		blueprint(b, cx, cz, true, "help", true)
@@ -160,7 +193,18 @@ local CASES = {
 		blueprint(b, cx, cz, false, "split", true)
 	end },
 	{ name = "blueprint with a wall only", own = true, run = function(b, cx, cz)
-		blueprint(b, cx, cz, false, "help", false)
+		blueprint(b, cx, cz, false, "help", false, 14)
+	end },
+	-- The cost and the ground the model gave, against the game's, for the other
+	-- kinds of step. Each is a blueprint of terrain alone.
+	{ name = "blueprint with a pad levelled 40 above the pivot", own = true, run = function(b, cx, cz)
+		blueprint(b, cx, cz, false, "help", false, 15, { { kind = "level", shape = "area", points = { { x = -64, z = -64 }, { x = 64, z = -64 }, { x = 64, z = 64 }, { x = -64, z = 64 } }, height = 40, before = 0 } })
+	end },
+	{ name = "blueprint with a ramp from the ground to 64 above it", own = true, run = function(b, cx, cz)
+		blueprint(b, cx, cz, false, "help", false, 16, { { kind = "ramp", shape = "wall", points = { { x = -128, z = 0 }, { x = 128, z = 0 } }, heights = { 0, 64 }, width = 64, before = 0 } })
+	end },
+	{ name = "blueprint with a trench 50 deep", own = true, run = function(b, cx, cz)
+		blueprint(b, cx, cz, false, "help", false, 17, { { kind = "raise", shape = "wall", points = { { x = -96, z = 0 }, { x = 96, z = 0 } }, height = -50, before = 0 } })
 	end },
 }
 
