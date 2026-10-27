@@ -75,6 +75,10 @@ const MAX_TOTAL_RAMP_WIDTH = 800;
 const MIN_TOTAL_RAMP_LENGTH = 64;
 const MIN_TOTAL_RAMP_WIDTH = 48;
 
+/** Line 99: the most points one order can carry, which for a step is its own
+ *  `points`. */
+const MAX_COMMAND_POINTS = 2500;
+
 /** Lines 116-133: the cost constants, before the mod option scales them. */
 const VOLUME_COST = 0.0128;
 const POINT_EXTRA_AREA_COST = 0;
@@ -276,6 +280,33 @@ export function terraform(
     metal,
     steps: results,
   };
+}
+
+/**
+ * Which of the gadget's limits a step breaks, or null when it would take the
+ * order (issue #4793). The editor's tools ask this before making a step, so
+ * they stop at a limit rather than making one the game will refuse.
+ *
+ * - `points`: more than 2,500 points in the order (lines 99, 2078).
+ * - `wall`: a wall that fills out to more than 700 points (line 105).
+ * - `area`: an area wider or deeper than 2,000 elmos (line 102).
+ * - `ramp`: a ramp shorter than 64 or longer than 3,000 elmos, or narrower
+ *   than 48 or wider than 1,600 (lines 138-141, 2118).
+ */
+export type StepLimit = "points" | "wall" | "area" | "ramp";
+
+export function stepRefusal(step: TerrainStep): StepLimit | null {
+  if (step.points.length > MAX_COMMAND_POINTS) return "points";
+  if (step.points.length === 0) return null;
+  if (step.kind === "ramp") {
+    const [a, b] = step.points;
+    if (!a || !b) return null;
+    return rampSegments(a.x, 0, a.z, b.x, 0, b.z, step.width ?? 0)
+      ? null
+      : "ramp";
+  }
+  if (step.shape === "wall") return wallSegments(step.points) ? null : "wall";
+  return areaSegments(step.points) ? null : "area";
 }
 
 /** A point of a step with the height it is ordered to. */
