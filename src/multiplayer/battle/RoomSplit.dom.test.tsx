@@ -55,7 +55,13 @@ const DRAWN = 300;
  * what the real table's contents measure. Without it the table is empty and the
  * contents are unmeasured.
  */
-function Room({ contents }: { contents?: number }) {
+function Room({
+  contents,
+  squeezed,
+}: {
+  contents?: number;
+  squeezed?: { drawn: number; holds: number };
+}) {
   const split = useRoomSplit();
   return (
     <div ref={split.columnRef} data-testid="column">
@@ -63,6 +69,13 @@ function Room({ contents }: { contents?: number }) {
         {contents !== undefined && (
           <div data-testid="card">
             <div data-height={contents} />
+            {squeezed && (
+              <div
+                data-scrolls
+                data-height={squeezed.drawn}
+                data-scroll-height={squeezed.holds}
+              />
+            )}
           </div>
         )}
       </div>
@@ -72,7 +85,7 @@ function Room({ contents }: { contents?: number }) {
   );
 }
 
-function mount(contents?: number) {
+function mount(contents?: number, squeezed?: { drawn: number; holds: number }) {
   Object.defineProperty(HTMLElement.prototype, "getBoundingClientRect", {
     configurable: true,
     value() {
@@ -87,7 +100,13 @@ function mount(contents?: number) {
     configurable: true,
     get: () => DRAWN,
   });
-  return render(<Room contents={contents} />);
+  Object.defineProperty(HTMLElement.prototype, "scrollHeight", {
+    configurable: true,
+    get() {
+      return Number(this.getAttribute("data-scroll-height") ?? 0);
+    },
+  });
+  return render(<Room contents={contents} squeezed={squeezed} />);
 }
 
 function handle() {
@@ -196,4 +215,10 @@ it("follows the contents as they grow", async () => {
   screen.getByTestId("card").appendChild(document.createElement("div"));
   await waitFor(() => expect(value()).toBe(340));
   expect(handle().getAttribute("aria-valuemax")).toBe("340");
+});
+
+it("counts a squeezed scrolling block by what it holds", () => {
+  store.values.set(ROOM_SPLIT_KEY, 200);
+  mount(60, { drawn: 100, holds: 300 });
+  expect(handle().getAttribute("aria-valuemax")).toBe("360");
 });

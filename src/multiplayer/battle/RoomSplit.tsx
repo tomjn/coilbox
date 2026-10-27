@@ -52,7 +52,9 @@ function px(value: string): number {
  * The height the table's contents need. The card inside the table is a plain
  * stack of blocks, so this is their heights plus the card's border. Summed
  * rather than read from `scrollHeight`, which never goes below the card's own
- * height and so could not show contents shorter than the split.
+ * height and so could not show contents shorter than the split. A block marked
+ * `data-scrolls` is squeezed when the split is short, so it counts by what it
+ * holds instead.
  */
 function contentHeight(table: HTMLElement): number {
   const card = table.firstElementChild;
@@ -60,7 +62,9 @@ function contentHeight(table: HTMLElement): number {
   const style = getComputedStyle(card);
   let total = px(style.borderTopWidth) + px(style.borderBottomWidth);
   for (const child of card.children) {
-    total += child.getBoundingClientRect().height;
+    total += child.hasAttribute("data-scrolls")
+      ? child.scrollHeight
+      : child.getBoundingClientRect().height;
   }
   return total;
 }
@@ -103,9 +107,16 @@ function useMeasures(
     observer.observe(table);
     // The card's own height follows the split, so its contents are watched
     // instead. The spectator row comes and goes, so watch for new children too.
+    // A squeezed block keeps its height as rows join, so what is inside it is
+    // watched as well.
     const card = table.firstElementChild;
     const watchContents = () => {
-      for (const child of card?.children ?? []) observer.observe(child);
+      for (const child of card?.children ?? []) {
+        observer.observe(child);
+        if (child.hasAttribute("data-scrolls") && child.firstElementChild) {
+          observer.observe(child.firstElementChild);
+        }
+      }
     };
     const mutations = new MutationObserver(() => {
       watchContents();

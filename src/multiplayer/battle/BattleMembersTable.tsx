@@ -379,169 +379,181 @@ export function BattleMembersTable({
 
   return (
     // This card is the part of the room that gives way. It takes the height its
-    // rows need, shrinks when the chat would otherwise drop below its minimum,
-    // and scrolls inside that, spectators and the Add AI row included. The
-    // `min-h-24` floor is the header plus two rows, so it never collapses. The table component's own `overflow-x-auto` wrapper
-    // is switched off, because it made itself the sticky header's scroll
-    // container while never scrolling, so the header never pinned.
-    <div className="min-h-24 overflow-auto rounded-lg border border-border/50 bg-card [&_[data-slot=table-container]]:overflow-visible">
-      <Table className="border-collapse">
-        <TableHeader className="sticky top-0 z-10 bg-card">
-          <TooltipProvider>
-            <TableRow className="text-[11px] uppercase tracking-wide text-muted-foreground border-border/40 hover:bg-transparent">
-              <TableHead className="px-3 pb-2 pt-3 text-center font-medium text-muted-foreground">
-                <Trans>Ready</Trans>
-              </TableHead>
-              <TableHead className="w-full px-3 pb-2 pt-3 text-left font-medium text-muted-foreground">
-                <Trans>Player</Trans>
-              </TableHead>
-              <TableHead className="px-2 pb-2 pt-3 text-center font-medium text-muted-foreground">
-                <Tooltip>
-                  <TooltipTrigger className="inline-flex items-center rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
-                    <ChevronUp className="size-3.5" aria-hidden />
-                    <span className="sr-only">
+    // rows need and shrinks when the chat would otherwise drop below its
+    // minimum. Only the players scroll when it does: the spectators and the Add
+    // AI row stay pinned below them, so nobody has to scroll past every player
+    // to see who is watching. The `min-h-24` floor is the header plus two rows,
+    // so it never collapses.
+    <div className="flex min-h-24 flex-col overflow-hidden rounded-lg border border-border/50 bg-card">
+      {/* `data-scrolls` tells the room split to measure this by what it holds
+          rather than by the height it is squeezed to. The table component's own
+          `overflow-x-auto` wrapper is switched off, because it made itself the
+          sticky header's scroll container while never scrolling, so the header
+          never pinned. */}
+      <div
+        data-scrolls
+        className="min-h-0 overflow-auto [&_[data-slot=table-container]]:overflow-visible"
+      >
+        <Table className="border-collapse">
+          <TableHeader className="sticky top-0 z-10 bg-card">
+            <TooltipProvider>
+              <TableRow className="text-[11px] uppercase tracking-wide text-muted-foreground border-border/40 hover:bg-transparent">
+                <TableHead className="px-3 pb-2 pt-3 text-center font-medium text-muted-foreground">
+                  <Trans>Ready</Trans>
+                </TableHead>
+                <TableHead className="w-full px-3 pb-2 pt-3 text-left font-medium text-muted-foreground">
+                  <Trans>Player</Trans>
+                </TableHead>
+                <TableHead className="px-2 pb-2 pt-3 text-center font-medium text-muted-foreground">
+                  <Tooltip>
+                    <TooltipTrigger className="inline-flex items-center rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+                      <ChevronUp className="size-3.5" aria-hidden />
+                      <span className="sr-only">
+                        <Trans>Rank</Trans>
+                      </span>
+                    </TooltipTrigger>
+                    <TooltipContent>
                       <Trans>Rank</Trans>
-                    </span>
-                  </TooltipTrigger>
-                  <TooltipContent>
-                    <Trans>Rank</Trans>
-                  </TooltipContent>
-                </Tooltip>
-              </TableHead>
-              <TableHead className="px-2 pb-2 pt-3 text-center font-medium text-muted-foreground">
-                <Tooltip>
-                  <TooltipTrigger className="inline-flex items-center rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
-                    <StickyNote className="size-3.5" aria-hidden />
-                    <span className="sr-only">
-                      <Trans>Note</Trans>
-                    </span>
-                  </TooltipTrigger>
-                  <TooltipContent>
-                    <Trans>Private note</Trans>
-                  </TooltipContent>
-                </Tooltip>
-              </TableHead>
-              <TableHead className="px-2 pb-2 pt-3 text-center font-medium text-muted-foreground">
-                <Tooltip>
-                  <TooltipTrigger className="inline-flex items-center rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
-                    <Percent className="size-3.5" aria-hidden />
-                    <span className="sr-only">
-                      <Trans>Bonus</Trans>
-                    </span>
-                  </TooltipTrigger>
-                  <TooltipContent>
-                    <Trans>Resource bonus</Trans>
-                  </TooltipContent>
-                </Tooltip>
-              </TableHead>
-              {showFaction && (
+                    </TooltipContent>
+                  </Tooltip>
+                </TableHead>
+                <TableHead className="px-2 pb-2 pt-3 text-center font-medium text-muted-foreground">
+                  <Tooltip>
+                    <TooltipTrigger className="inline-flex items-center rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+                      <StickyNote className="size-3.5" aria-hidden />
+                      <span className="sr-only">
+                        <Trans>Note</Trans>
+                      </span>
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      <Trans>Private note</Trans>
+                    </TooltipContent>
+                  </Tooltip>
+                </TableHead>
+                <TableHead className="px-2 pb-2 pt-3 text-center font-medium text-muted-foreground">
+                  <Tooltip>
+                    <TooltipTrigger className="inline-flex items-center rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+                      <Percent className="size-3.5" aria-hidden />
+                      <span className="sr-only">
+                        <Trans>Bonus</Trans>
+                      </span>
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      <Trans>Resource bonus</Trans>
+                    </TooltipContent>
+                  </Tooltip>
+                </TableHead>
+                {showFaction && (
+                  <TableHead className="px-2 pb-2 pt-3 text-left font-medium text-muted-foreground">
+                    <Trans>Faction</Trans>
+                  </TableHead>
+                )}
+                {showTeam && (
+                  <TableHead className="px-2 pb-2 pt-3 text-left font-medium text-muted-foreground">
+                    <Trans>Team</Trans>
+                  </TableHead>
+                )}
                 <TableHead className="px-2 pb-2 pt-3 text-left font-medium text-muted-foreground">
-                  <Trans>Faction</Trans>
+                  <Trans>Ally</Trans>
                 </TableHead>
-              )}
-              {showTeam && (
-                <TableHead className="px-2 pb-2 pt-3 text-left font-medium text-muted-foreground">
-                  <Trans>Team</Trans>
-                </TableHead>
-              )}
-              <TableHead className="px-2 pb-2 pt-3 text-left font-medium text-muted-foreground">
-                <Trans>Ally</Trans>
-              </TableHead>
-              {showActions && (
-                <TableHead className="px-2 pb-2 pt-3">
-                  <span className="sr-only">
-                    <Trans>Actions</Trans>
-                  </span>
-                </TableHead>
-              )}
-            </TableRow>
-          </TooltipProvider>
-        </TableHeader>
-        <TableBody>
-          {displayOrder.map((row, index) => {
-            // A seated row whose team is led by an earlier row: it shows the
-            // branch glyph / Co-player badge instead of duplicated controls.
-            const leader = leaderByTeamId.get(row.teamId);
-            const sharedWith = leader && leader !== row ? leader : undefined;
-            const control = controlFor(row);
-            // Defensive flag (#501): a bot whose AI isn't in this game's
-            // addable list at all (a preset or hand-add from another game or
-            // version) reads as invalid rather than as a normal bot.
-            // `isAiUnavailable` compares by shortName only, so a valid AI
-            // whose `aiDll` carries an id/version prefix (#547) isn't
-            // flagged, and it never fires before the list has loaded.
-            const aiInvalid =
-              row.kind === "bot" &&
-              isAiUnavailable(row.aiDll, addableAis, addableAisReady);
-            return (
-              <MemberRow
-                key={`${row.kind}:${row.name}`}
-                row={row}
-                editable={row.self}
-                // A bot is nobody to the player, whatever it is called.
-                mark={
-                  row.self
-                    ? "you"
-                    : row.kind === "human"
-                      ? (markFor?.(row.name) ?? null)
-                      : null
-                }
-                aiInvalid={aiInvalid}
-                control={control}
-                personal={personalFor(row)}
-                sharedWith={sharedWith}
-                striped={index % 2 === 1}
-                showActions={showActions}
-                serverAssignsSeat={serverAssignsSeat}
-                flashIngame={justWentIngame.has(row.name)}
-                sideOptions={sideOptions}
-                showFaction={showFaction}
-                showTeam={showTeam}
-                teamOptions={teamOptions}
-                allyOptions={allyOptions}
-                aiOptions={aiOptions}
-                note={
-                  row.kind === "human" && !row.self && noteFor
-                    ? noteFor(row)
-                    : undefined
-                }
-                onSetNote={
-                  row.kind === "human" && !row.self && onSetNote
-                    ? (text) => onSetNote(row, text)
-                    : undefined
-                }
-                statsSummary={
-                  row.kind === "human" && !row.self
-                    ? statsSummaryFor?.(row)
-                    : undefined
-                }
-                onSetBonus={
-                  row.kind === "human" && onSetBonus
-                    ? (v) => onSetBonus(row.name, v)
-                    : undefined
-                }
-                onSide={onSide}
-                onTeam={onTeam}
-                onAlly={onAlly}
-                onColor={onColor}
-              />
-            );
-          })}
-          {players.length === 0 && (
-            <TableRow className="border-border/40 hover:bg-transparent">
-              <TableCell
-                colSpan={showActions ? 9 : 8}
-                className="px-3 py-6 text-center text-sm text-muted-foreground"
-              >
-                <Trans>Waiting for players…</Trans>
-              </TableCell>
-            </TableRow>
-          )}
-        </TableBody>
-      </Table>
+                {showActions && (
+                  <TableHead className="px-2 pb-2 pt-3">
+                    <span className="sr-only">
+                      <Trans>Actions</Trans>
+                    </span>
+                  </TableHead>
+                )}
+              </TableRow>
+            </TooltipProvider>
+          </TableHeader>
+          <TableBody>
+            {displayOrder.map((row, index) => {
+              // A seated row whose team is led by an earlier row: it shows the
+              // branch glyph / Co-player badge instead of duplicated controls.
+              const leader = leaderByTeamId.get(row.teamId);
+              const sharedWith = leader && leader !== row ? leader : undefined;
+              const control = controlFor(row);
+              // Defensive flag (#501): a bot whose AI isn't in this game's
+              // addable list at all (a preset or hand-add from another game or
+              // version) reads as invalid rather than as a normal bot.
+              // `isAiUnavailable` compares by shortName only, so a valid AI
+              // whose `aiDll` carries an id/version prefix (#547) isn't
+              // flagged, and it never fires before the list has loaded.
+              const aiInvalid =
+                row.kind === "bot" &&
+                isAiUnavailable(row.aiDll, addableAis, addableAisReady);
+              return (
+                <MemberRow
+                  key={`${row.kind}:${row.name}`}
+                  row={row}
+                  editable={row.self}
+                  // A bot is nobody to the player, whatever it is called.
+                  mark={
+                    row.self
+                      ? "you"
+                      : row.kind === "human"
+                        ? (markFor?.(row.name) ?? null)
+                        : null
+                  }
+                  aiInvalid={aiInvalid}
+                  control={control}
+                  personal={personalFor(row)}
+                  sharedWith={sharedWith}
+                  striped={index % 2 === 1}
+                  showActions={showActions}
+                  serverAssignsSeat={serverAssignsSeat}
+                  flashIngame={justWentIngame.has(row.name)}
+                  sideOptions={sideOptions}
+                  showFaction={showFaction}
+                  showTeam={showTeam}
+                  teamOptions={teamOptions}
+                  allyOptions={allyOptions}
+                  aiOptions={aiOptions}
+                  note={
+                    row.kind === "human" && !row.self && noteFor
+                      ? noteFor(row)
+                      : undefined
+                  }
+                  onSetNote={
+                    row.kind === "human" && !row.self && onSetNote
+                      ? (text) => onSetNote(row, text)
+                      : undefined
+                  }
+                  statsSummary={
+                    row.kind === "human" && !row.self
+                      ? statsSummaryFor?.(row)
+                      : undefined
+                  }
+                  onSetBonus={
+                    row.kind === "human" && onSetBonus
+                      ? (v) => onSetBonus(row.name, v)
+                      : undefined
+                  }
+                  onSide={onSide}
+                  onTeam={onTeam}
+                  onAlly={onAlly}
+                  onColor={onColor}
+                />
+              );
+            })}
+            {players.length === 0 && (
+              <TableRow className="border-border/40 hover:bg-transparent">
+                <TableCell
+                  colSpan={showActions ? 9 : 8}
+                  className="px-3 py-6 text-center text-sm text-muted-foreground"
+                >
+                  <Trans>Waiting for players…</Trans>
+                </TableCell>
+              </TableRow>
+            )}
+          </TableBody>
+        </Table>
+      </div>
 
+      {/* A long spectator list scrolls on its own rather than pushing the
+          players out of view. */}
       {spectators.length > 0 && (
-        <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5 border-t border-border/40 px-3 py-2">
+        <div className="flex max-h-24 shrink-0 flex-wrap items-center gap-x-3 gap-y-1.5 overflow-y-auto border-t border-border/40 px-3 py-2">
           <span className="text-xs font-medium text-muted-foreground">
             <Trans>Spectating</Trans>
           </span>
@@ -582,7 +594,7 @@ export function BattleMembersTable({
       )}
 
       {(canAddBot || botsRefused) && (
-        <div className="sticky bottom-0 flex items-center gap-2 border-t border-border/40 bg-card p-2">
+        <div className="flex shrink-0 items-center gap-2 border-t border-border/40 bg-card p-2">
           <span className="text-xs font-medium text-muted-foreground">
             <Trans>Add AI</Trans>
           </span>
