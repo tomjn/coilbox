@@ -216,14 +216,10 @@ function M.laySteps(resolved, rotation, flip, origin, anchors, foot)
 		local first = (c - 1) * n
 		local base = Spring.GetGroundHeight(at.x, at.z)
 		for _, step in ipairs(M.terrain(resolved.terrain, rotation, at.x, at.z, flip, origin)) do
-			local after = first
-			for i = 1, n do
-				local p = foot[first + i]
-				if p and (p.index or i) <= step.before then
-					after = first + i
-				end
-			end
-			step.after, step.base, step.blocked = after, base, false
+			-- Every step comes ahead of every building of its copy, whatever
+			-- before an older blueprint gave it, because a building cannot be
+			-- raised once it stands (#4817).
+			step.after, step.base, step.blocked = first, base, false
 			for _, point in ipairs(step.points) do
 				if pointOffMap(point.x, point.z) then
 					step.blocked = true
@@ -843,24 +839,6 @@ local function split(foot, can)
 	return who
 end
 
---- The builder nearest a step, from among those given.
-local function nearestTo(unitIDs, step)
-	local sx, sz = 0, 0
-	for _, p in ipairs(step.points) do
-		sx, sz = sx + p.x, sz + p.z
-	end
-	sx, sz = sx / #step.points, sz / #step.points
-	local best, bestD
-	for _, unitID in ipairs(unitIDs) do
-		local x, _, z = Spring.GetUnitPosition(unitID)
-		local d = x and (x - sx) ^ 2 + (z - sz) ^ 2 or math.huge
-		if not best or d < bestD then
-			best, bestD = unitID, d
-		end
-	end
-	return best
-end
-
 --- Turn a footprint, and the terrain steps among it, into orders.
 -- A terraform step becomes two things. Its terraform order is never queued,
 -- so it is kept in plan.terraform for M.issue to send. A level
@@ -875,7 +853,8 @@ end
 -- @param mode string? "help", the default, gives every builder every building
 --   it can build, so they help each other with each one in turn. "split"
 --   gives each building to one builder, for games that stop builders helping.
---   Each step goes to the nearest builder that can terraform.
+--   Every builder that can terraform is given every step, ahead of its
+--   first building, so none reaches a building before the ground is done.
 -- @param terrain table? { steps = from M.laySteps, on = boolean, why = string }.
 --   When on is false the steps are counted as skipped, for the reason why.
 -- @return table { orders = { { unitID, cmds } }, remainder = foot entries nobody
@@ -911,7 +890,7 @@ function M.plan(foot, can, shift, mode, terrain)
 				return a.i < b.i
 			end)
 			for _, u in ipairs(usable) do
-				local builders = mode == "split" and { nearestTo(can.terraformers, u.step) } or can.terraformers
+				local builders = can.terraformers
 				local tag = M.nextTag()
 				local team = Spring.GetUnitTeam(builders[1]) or Spring.GetMyTeamID()
 				local at = {}
