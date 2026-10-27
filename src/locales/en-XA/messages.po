@@ -1414,19 +1414,9 @@ msgstr ""
 msgid "{buildingCount, plural, one {# building, and it can be built where it stands.} other {# buildings, and every one of them can be built where it stands.}}"
 msgstr ""
 
-#: src/hub/pages/components/ItemPreview.tsx
-msgid "{buildings, plural, one {# building, in build order} other {# buildings, in build order}}"
-msgstr ""
-
 #: src/blueprint/countLine.ts
-#: src/hub/pages/components/ItemPreview.tsx
-#: src/hub/pages/components/SetupPackContents.tsx
 #: src/placement/LayoutControls.tsx
 msgid "{buildings, plural, one {# building} other {# buildings}}"
-msgstr ""
-
-#: src/hub/preview.ts
-msgid "{buildings, plural, one {# building} other {# buildings}} over {width} by {height} build squares"
 msgstr ""
 
 #: src/scenario/pages/components/contents.ts
@@ -1851,6 +1841,14 @@ msgstr ""
 
 #: src/content/pages/components/PlayerMatchFigures.tsx
 msgid "{countedGames}, oldest to newest"
+msgstr ""
+
+#: src/hub/preview.ts
+msgid "{counts} over {width} by {height} build squares"
+msgstr ""
+
+#: src/hub/pages/components/ItemPreview.tsx
+msgid "{counts}, in build order"
 msgstr ""
 
 #: src/lego/pages/components/UnitGamePicker.tsx

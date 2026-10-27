@@ -31,6 +31,7 @@
 
 import { Plural, Trans } from "@lingui/react/macro";
 import type { ReactNode } from "react";
+import { countLine } from "@/blueprint/countLine";
 import { LayoutPlan } from "@/blueprint/LayoutPlan";
 import { useBuildingRoles } from "@/blueprint/useBuildingRoles";
 import { useScanTargetSelection, useUnitsyncMinimap } from "@/content/config";
@@ -120,7 +121,10 @@ export function SetupPackContents({ pack }: { pack: PackContents }) {
 
 /** One layout a pack bundles, drawn as the plan the hub draws of it alone. */
 function PackLayout({ blueprint }: { blueprint: PackBlueprint }) {
-  const buildings = blueprint.layout?.squares.length ?? 0;
+  const counts = countLine(
+    blueprint.layout?.squares.length ?? 0,
+    blueprint.layout?.terrain.length ?? 0,
+  );
   const roles = useBuildingRoles(blueprint.game);
   return (
     <div className="flex flex-col gap-2">
@@ -133,9 +137,7 @@ function PackLayout({ blueprint }: { blueprint: PackBlueprint }) {
       )}
       <div className="flex flex-col">
         <span className="text-sm">{blueprint.name}</span>
-        <span className="text-xs text-muted-foreground">
-          <Plural value={buildings} one="# building" other="# buildings" />
-        </span>
+        <span className="text-xs text-muted-foreground">{counts}</span>
       </div>
     </div>
   );
