@@ -123,7 +123,7 @@ end
 -- Modules
 --------------------------------------------------------------------------------
 
-local JSON, STORE, MODEL, PLACE, RECORD, TERRAIN
+local JSON, STORE, MODEL, PLACE, RECORD, TERRAIN, GROUND
 
 local function include(name)
 	local path = MODULE_DIR .. name
@@ -539,7 +539,7 @@ function readCost()
 	if not placing then
 		return
 	end
-	local metal, energy, seconds = PLACE.cost(placing.item.resolved, can)
+	local metal, energy, seconds = PLACE.cost(placing.item.resolved, can, placing.terra)
 	panel.placing.cost = { metal = metal, energy = energy, seconds = seconds }
 	MODEL.touch(panel)
 end
@@ -1652,7 +1652,7 @@ local function markStyle(p)
 		c = { base[1], base[2], base[3], 0.3 }
 		markColors[p.defID] = c
 	end
-	return c, (p.blocked and MODEL.MARK_REFUSED or 0) + (hover.marks[p] or 0)
+	return c, ((p.blocked or p.onSlope) and MODEL.MARK_REFUSED or 0) + (hover.marks[p] or 0)
 end
 
 --- One translucent model. It comes out in the team's colour whatever gl.Color
@@ -1667,6 +1667,45 @@ local function ghost(p, teamID)
 	gl.Rotate(90 * p.facing, 0, 1, 0)
 	gl.UnitShape(p.defID, teamID, false, false, false)
 	gl.PopMatrix()
+end
+
+-- How far from its position the footprint of the biggest building that stays
+-- put reaches, so a rectangle search finds every building whose footprint is
+-- in it. Read once.
+local structureHalf = nil
+
+--- The buildings standing in a rectangle, as Zero-K's terraform gadget counts
+-- them: every unit that cannot move, unless it is a building that moves.
+-- Slopes stop short of these. Only the units the player can see are listed.
+local function standingStructures(minX, minZ, maxX, maxZ)
+	if not structureHalf then
+		structureHalf = 0
+		for _, def in pairs(UnitDefs) do
+			if def.isImmobile then
+				structureHalf = math.max(structureHalf, math.max(def.xsize, def.zsize) * 4)
+			end
+		end
+	end
+	local out = {}
+	for _, unitID in ipairs(Spring.GetUnitsInRectangle(minX - structureHalf, minZ - structureHalf, maxX + structureHalf, maxZ + structureHalf) or {}) do
+		local def = UnitDefs[Spring.GetUnitDefID(unitID) or -1]
+		if def and def.isImmobile and not (def.customParams and def.customParams.mobilebuilding) then
+			local x, _, z = Spring.GetUnitPosition(unitID)
+			out[#out + 1] = { x = x, z = z, xsize = def.xsize, zsize = def.zsize, facing = Spring.GetUnitBuildFacing(unitID) or 0 }
+		end
+	end
+	return out
+end
+
+--- What the ground model reads: the heightmap, the size of the map, the
+-- buildings standing now, and the game's terraform cost multiplier.
+local function groundEnv()
+	return {
+		heightAt = Spring.GetGroundHeight,
+		corners = { x = Game.mapSizeX / 8 + 1, z = Game.mapSizeZ / 8 + 1 },
+		structures = standingStructures,
+		costMult = tonumber((Spring.GetModOptions() or {}).terracostmult) or 1,
+	}
 end
 
 --- Refill the ground buffer when the marked positions change.
@@ -1693,17 +1732,7 @@ function widget:DrawWorld()
 	local showSteps = foot and can.terraformAvailable == true and panel.terrain
 	local key = "plans:" .. plansSerial .. ":hover:" .. hover.key .. (foot and (":cursor:" .. placing.serial .. (showSteps and ":steps" or "")) or "")
 	if groundKey ~= key then
-		local marks, steps = {}, {}
-		for _, plan in ipairs(plans) do
-			for _, step in ipairs(plan.steps) do
-				steps[#steps + 1] = step
-			end
-		end
-		if showSteps then
-			for _, step in ipairs(placing.steps or {}) do
-				steps[#steps + 1] = step
-			end
-		end
+		local marks = {}
 		for _, plan in ipairs(plans) do
 			for _, p in ipairs(plan.positions) do
 				marks[#marks + 1] = p
@@ -1712,10 +1741,50 @@ function widget:DrawWorld()
 		for _, p in ipairs(foot or {}) do
 			marks[#marks + 1] = p
 		end
+		-- the ground every plan and the cursor leave, one after the other
+		local groups = {}
+		for _, plan in ipairs(plans) do
+			groups[#groups + 1] = { steps = plan.steps, foot = plan.positions }
+		end
+		if showSteps then
+			groups[#groups + 1] = { steps = placing.steps or {}, foot = foot, cursor = true }
+		end
+		local steps = {}
+		local session = GROUND.session(groundEnv())
+		local cursor = nil
+		for _, group in ipairs(groups) do
+			local before, workBefore = session.metal, session.work
+			local results = group.steps[1] and session.apply(group.steps, group.foot) or {}
+			if group.cursor then
+				cursor = { metal = session.metal - before, work = session.work - workBefore }
+			end
+			for _, step in ipairs(group.steps) do
+				steps[#steps + 1] = step
+			end
+			-- a building that would stand on a slope is marked like one the
+			-- ground refuses
+			local on = GROUND.onSlope(results, group.foot)
+			for i, p in ipairs(group.foot) do
+				p.onSlope = on[i]
+			end
+		end
+		if not showSteps then
+			for _, p in ipairs(foot or {}) do
+				p.onSlope = nil
+			end
+		end
 		groundMarks(marks, key)
-		terrainMesh = TERRAIN.mesh(steps, Spring.GetGroundHeight)
+		terrainMesh = TERRAIN.mesh(session.changed(), Spring.GetGroundHeight)
 		terrainMesh.indices = uploadMesh(terrainSet, terrainMesh.verts, terrainMesh.idx)
 		stepLabels = PLACE.labels(steps)
+		-- the panel's cost counts the terraform being placed
+		if placing then
+			local was = placing.terra
+			if (was and was.metal or 0) ~= (cursor and cursor.metal or 0) or (was and was.work or 0) ~= (cursor and cursor.work or 0) then
+				placing.terra = cursor
+				readCost()
+			end
+		end
 	end
 	-- The marks follow the heightmap, but the terrain the engine draws is
 	-- simplified with distance, so a depth test would still let it cut them.
