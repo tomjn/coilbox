@@ -146,4 +146,48 @@ describe("the spool the widget writes", () => {
       at: "2026-08-23T12:00:00.000Z",
     });
   });
+
+  it("marks a layout the widget read from the ground (issue #4798)", () => {
+    const fromGround = JSON.stringify({
+      version: 1,
+      blueprints: [
+        {
+          name: "Raised ground",
+          recordedAt: 1793000000,
+          fromGround: true,
+          buildings: [],
+          footprints: {},
+          terrain: [
+            {
+              kind: "raise",
+              shape: "area",
+              points: [
+                { x: 0, z: 0 },
+                { x: 64, z: 0 },
+                { x: 64, z: 16 },
+                { x: 0, z: 16 },
+              ],
+              height: 112,
+              before: 0,
+            },
+          ],
+        },
+        // anything but true is not the mark
+        { name: "Plain", fromGround: "yes", buildings: [], footprints: {} },
+      ],
+    });
+    const read = readSpool(fromGround);
+    expect(read.entries[0].fromGround).toBe(true);
+    expect(read.entries[1].fromGround).toBeUndefined();
+    expect(read.entries[0].layout.terrain).toHaveLength(1);
+    const at = new Date("2026-10-27T12:00:00.000Z");
+    const [ground, plain] = spoolRecords(read.entries, "2026.09.01", at);
+    expect(ground.source).toEqual({
+      kind: "widget",
+      engine: "2026.09.01",
+      ground: true,
+      at: "2026-10-27T12:00:00.000Z",
+    });
+    expect(plain.source).not.toHaveProperty("ground");
+  });
 });
