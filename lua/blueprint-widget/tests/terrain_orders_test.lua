@@ -144,26 +144,6 @@ local hx, hz = PLACE.turned(-32 - 16, 0 - 16, 1)
 check("a turn is about the middle of the steps", heldTurned[1].points[1].x == 520 + hx and heldTurned[1].points[1].z == 520 + hz, show(heldTurned[1].points))
 
 --------------------------------------------------------------------------------
--- outlines
---------------------------------------------------------------------------------
-
-local outlined = PLACE.outlines({
-	{ kind = "raise", shape = "wall", points = { { x = 0, z = 0 }, { x = 48, z = 0 }, { x = 48, z = 32 } }, height = 40, base = 100, blocked = false },
-	{ kind = "level", shape = "area", points = { { x = 0, z = 0 }, { x = 32, z = 0 }, { x = 32, z = 32 } }, height = -8, base = 100, blocked = true },
-	{ kind = "ramp", shape = "wall", points = { { x = 100, z = 100 }, { x = 100, z = 164 } }, heights = { 0, 30 }, width = 32, base = 100, blocked = false },
-	{ kind = "smooth", shape = "area", points = { { x = 0, z = 0 }, { x = 32, z = 0 }, { x = 32, z = 32 } }, base = 100, blocked = false },
-})
-check("a wall is its path, joined point to point and not back to the start", #outlined == 2 + 3 + 1 + 3 and same(outlined[1], { x1 = 0, z1 = 0, x2 = 48, z2 = 0, blocked = false, lift = 40 }) and same(outlined[2], { x1 = 48, z1 = 0, x2 = 48, z2 = 32, blocked = false, lift = 40 }), show(outlined))
-check("an area is a closed outline", outlined[5].x1 == 32 and outlined[5].z1 == 32 and outlined[5].x2 == 0 and outlined[5].z2 == 0, show(outlined[5]))
-check("a ramp is its two ends joined", outlined[6].x1 == 100 and outlined[6].z1 == 100 and outlined[6].x2 == 100 and outlined[6].z2 == 164, show(outlined[6]))
-check("an outline says whether its step is off the map", outlined[3].blocked == true and outlined[1].blocked == false)
-check("no steps, no outlines", #PLACE.outlines({}) == 0 and #PLACE.outlines(nil) == 0)
-check("a raise stands at its height above the ground under each point", outlined[1].lift == 40 and outlined[1].y1 == nil)
-check("a level is drawn at the ground under the pivot plus its height", outlined[3].y1 == 92 and outlined[3].y2 == 92, show(outlined[3]))
-check("a ramp's ends are at the ground under the pivot plus each end's height", outlined[6].y1 == 100 and outlined[6].y2 == 130, show(outlined[6]))
-check("a smooth step has no height of its own, so it lies on the ground", outlined[7].lift == 0 and outlined[7].y1 == nil)
-
---------------------------------------------------------------------------------
 -- labels
 --------------------------------------------------------------------------------
 

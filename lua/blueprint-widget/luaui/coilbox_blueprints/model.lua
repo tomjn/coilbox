@@ -39,10 +39,6 @@ M.SNAP = 24
 M.BASE_HEIGHT = 1080
 --- One heightmap square in elmos, SQUARE_SIZE in the engine.
 M.HEIGHT_SQUARE = 8
--- How wide the outline of a terrain step is drawn on the ground, in elmos.
-M.OUTLINE_WIDTH = 6
--- How far apart the posts under a raised or dug outline stand, in elmos.
-M.POST_SPACING = 32
 --- Floats per vertex in pack(): position 3, uv 2, colour 4, shape 4.
 M.STRIDE = 13
 
@@ -62,8 +58,6 @@ local C = {
 	weapon = { 0.90, 0.33, 0.28, 1 },
 	-- a purer red than weapon's, for the dashed rim of a mark the ground refuses
 	blocked = { 1.0, 0.05, 0.10, 1 },
-	-- the outline of a terrain step on the ground
-	terrain = { 0.95, 0.65, 0.2, 1 },
 	text = { 1, 1, 1, 1 },
 	title = { 0.66, 0.68, 0.72, 1 },
 	dim = { 0.72, 0.74, 0.78, 1 },
@@ -1122,14 +1116,9 @@ M.MARK_CANNOT = 4
 -- @param positions table[] from place.footprint
 -- @param style function(p) -> rgba, and the mark's flags added together
 -- @param heightAt function(x, z) -> the ground's height
--- @param segments table[]? from place.outlines, drawn after the footprints as
---   strips M.OUTLINE_WIDTH wide at the height each will leave the ground at, a
---   pair of vertices at every heightmap square along each, with crossed posts
---   from the strip down to the ground, in the terrain colour and refused
---   when off the map
 -- @return number[] vertices, number[] indices, as M.pack, with uv spanning
 --   each whole mark
-function M.packGround(positions, style, heightAt, segments)
+function M.packGround(positions, style, heightAt)
 	local verts, idx = {}, {}
 	local v, n, base = 0, 0, 0
 	for _, p in ipairs(positions) do
@@ -1158,70 +1147,6 @@ function M.packGround(positions, style, heightAt, segments)
 			end
 		end
 		base = base + row * #zs
-	end
-	local t = C.terrain
-	-- The outline's height at a point a fraction f along the segment.
-	local function outlineY(seg, f, x, z)
-		if seg.y1 then
-			return seg.y1 + (seg.y2 - seg.y1) * f
-		end
-		return heightAt(x, z) + (seg.lift or 0)
-	end
-	local function vertex(x, y, z, u, w, shape1, shape2, flags)
-		verts[v + 1], verts[v + 2], verts[v + 3] = x, y, z
-		verts[v + 4], verts[v + 5] = u, w
-		verts[v + 6], verts[v + 7], verts[v + 8], verts[v + 9] = t[1], t[2], t[3], t[4]
-		verts[v + 10], verts[v + 11], verts[v + 12], verts[v + 13] = shape1, shape2, 0, flags
-		v = v + M.STRIDE
-	end
-	-- two triangles over the last four vertices, the way a strip's are
-	local function quadOver(first)
-		idx[n + 1], idx[n + 2], idx[n + 3] = first, first + 1, first + 2
-		idx[n + 4], idx[n + 5], idx[n + 6] = first + 1, first + 3, first + 2
-		n = n + 6
-	end
-	for _, seg in ipairs(segments or {}) do
-		local dx, dz = seg.x2 - seg.x1, seg.z2 - seg.z1
-		local length = math.sqrt(dx * dx + dz * dz)
-		if length > 0 then
-			local half = M.OUTLINE_WIDTH / 2
-			local nx, nz = -dz / length * half, dx / length * half
-			local stations = math.max(1, math.ceil(length / M.HEIGHT_SQUARE))
-			local flags = seg.blocked and M.MARK_REFUSED or 0
-			for i = 0, stations do
-				local f = i / stations
-				local cx, cz = seg.x1 + dx * f, seg.z1 + dz * f
-				local y = outlineY(seg, f, cx, cz)
-				for side = 0, 1 do
-					local sign = side == 0 and -1 or 1
-					vertex(cx + sign * nx, y, cz + sign * nz, f, side, length, M.OUTLINE_WIDTH, flags)
-				end
-			end
-			for i = 0, stations - 1 do
-				quadOver(base + i * 2)
-			end
-			base = base + (stations + 1) * 2
-			-- posts from the outline down to the ground, at both ends and every
-			-- POST_SPACING along it, each two quads crossed so it reads from
-			-- any side
-			local posts = math.ceil(length / M.POST_SPACING)
-			for k = 0, posts do
-				local f = k / posts
-				local cx, cz = seg.x1 + dx * f, seg.z1 + dz * f
-				local top, bottom = outlineY(seg, f, cx, cz), heightAt(cx, cz)
-				if math.abs(top - bottom) >= 1 then
-					local tall = math.abs(top - bottom)
-					for _, along in ipairs({ { half, 0 }, { 0, half } }) do
-						vertex(cx - along[1], top, cz - along[2], 0, 1, M.OUTLINE_WIDTH, tall, flags)
-						vertex(cx + along[1], top, cz + along[2], 1, 1, M.OUTLINE_WIDTH, tall, flags)
-						vertex(cx - along[1], bottom, cz - along[2], 0, 0, M.OUTLINE_WIDTH, tall, flags)
-						vertex(cx + along[1], bottom, cz + along[2], 1, 0, M.OUTLINE_WIDTH, tall, flags)
-						quadOver(base)
-						base = base + 4
-					end
-				end
-			end
-		end
 	end
 	return verts, idx
 end

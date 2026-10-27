@@ -123,7 +123,7 @@ end
 -- Modules
 --------------------------------------------------------------------------------
 
-local JSON, STORE, MODEL, PLACE, RECORD
+local JSON, STORE, MODEL, PLACE, RECORD, TERRAIN
 
 local function include(name)
 	local path = MODULE_DIR .. name
@@ -188,6 +188,9 @@ local quadVAO, quadVBO, quadIBO
 -- The panel's and the ground marks' buffers, grown as needed by upload().
 local panelSet = { capacity = 0 }
 local groundSet = { capacity = 0 }
+-- The volumes of the terrain steps being shown, with their wire and grids
+local terrainSet = { capacity = 0 }
+local terrainMesh = nil
 local panelIndices, groundIndices = 0, 0
 local groundKey = nil
 -- What each terrain step being shown does, over the middle of it, in world
@@ -239,6 +242,11 @@ in vec4 vColor;
 in vec4 vShape;
 out vec4 fragColor;
 void main() {
+	if (ground == 2) {
+		// the volumes and lines of a terrain preview: the vertex's colour as it is
+		fragColor = vColor;
+		return;
+	}
 	vec4 c = vColor;
 	if (useTex == 1) {
 		c *= texture(tex, vUv);
@@ -354,6 +362,7 @@ end
 local function dropGL()
 	dropSet(panelSet)
 	dropSet(groundSet)
+	dropSet(terrainSet)
 	dropBuffers(quadVBO, quadIBO, quadVAO)
 	quadVBO, quadIBO, quadVAO = nil, nil, nil
 	if shader then
@@ -368,6 +377,28 @@ local function upload(set, verts, idx)
 	if quads == 0 then
 		return 0
 	end
+	if set.capacity < quads then
+		dropBuffers(set.vbo, set.ibo, set.vao)
+		local capacity = math.max(quads, set.capacity * 2, 64)
+		set.vbo, set.ibo, set.vao = makeBuffers(capacity)
+		set.capacity = set.vao and capacity or 0
+		if not set.vao then
+			return 0
+		end
+	end
+	set.vbo:Upload(verts)
+	set.ibo:Upload(idx)
+	return #idx
+end
+
+--- Upload a mesh of triangles and lines, which need fewer vertices for their
+-- indices than the quads upload() is sized for.
+-- @return integer how many indices
+local function uploadMesh(set, verts, idx)
+	if #idx == 0 then
+		return 0
+	end
+	local quads = math.max(math.ceil(#verts / 13 / 4), math.ceil(#idx / 6))
 	if set.capacity < quads then
 		dropBuffers(set.vbo, set.ibo, set.vao)
 		local capacity = math.max(quads, set.capacity * 2, 64)
@@ -1153,7 +1184,10 @@ function widget:Initialize()
 	if PLACE then
 		RECORD, err = include("record.lua")
 	end
-	if not RECORD then
+	if RECORD then
+		TERRAIN, err = include("terrain.lua")
+	end
+	if not TERRAIN then
 		log(LOG.ERROR, err)
 		widgetHandler:RemoveWidget(self)
 		return
@@ -1595,9 +1629,10 @@ function widget:DrawScreen()
 			gl.Text(colourCode(t.color) .. t.text, t.x, t.y - drop, t.size, "x")
 		end
 	end
-	-- each terrain step's change in elmos, over the middle of its outline
-	local size = MODEL.FONT * MODEL.scaleFor(panel, { w = vsx, h = vsy })
-	local color = colourCode(MODEL.COLORS.terrain)
+	-- each terrain step's change in elmos, small and white with a dark outline,
+	-- over the middle of its top
+	local size = MODEL.SMALL * MODEL.scaleFor(panel, { w = vsx, h = vsy })
+	local color = colourCode({ 1, 1, 1 })
 	for _, label in ipairs(stepLabels) do
 		local sx, sy = Spring.WorldToScreenCoords(label.x, label.y, label.z)
 		if sx and sx >= 0 and sx <= vsx and sy >= 0 and sy <= vsy then
@@ -1635,10 +1670,10 @@ local function ghost(p, teamID)
 end
 
 --- Refill the ground buffer when the marked positions change.
-local function groundMarks(foot, key, segments)
+local function groundMarks(foot, key)
 	if groundKey ~= key then
 		groundKey = key
-		local verts, idx = MODEL.packGround(foot, markStyle, Spring.GetGroundHeight, segments)
+		local verts, idx = MODEL.packGround(foot, markStyle, Spring.GetGroundHeight)
 		groundIndices = upload(groundSet, verts, idx)
 	end
 end
@@ -1646,7 +1681,7 @@ end
 function widget:DrawWorld()
 	local foot = placing and placing.foot
 	if not foot and #plans == 0 then
-		stepLabels = {}
+		stepLabels, terrainMesh = {}, nil
 		return
 	end
 	local teamID = Spring.GetMyTeamID()
@@ -1677,7 +1712,9 @@ function widget:DrawWorld()
 		for _, p in ipairs(foot or {}) do
 			marks[#marks + 1] = p
 		end
-		groundMarks(marks, key, PLACE.outlines(steps))
+		groundMarks(marks, key)
+		terrainMesh = TERRAIN.mesh(steps, Spring.GetGroundHeight)
+		terrainMesh.indices = uploadMesh(terrainSet, terrainMesh.verts, terrainMesh.idx)
 		stepLabels = PLACE.labels(steps)
 	end
 	-- The marks follow the heightmap, but the terrain the engine draws is
@@ -1692,6 +1729,45 @@ function widget:DrawWorld()
 		gl.UniformInt(locGround, 1)
 		gl.Uniform(locBlocked, unpack(MODEL.COLORS.blocked))
 		groundSet.vao:DrawElements(GL.TRIANGLES, groundIndices, 0)
+		gl.UniformInt(locGround, 0)
+		gl.UseShader(0)
+	end
+
+	-- The terrain steps: a grid on the ground, then the volumes. Raised ground
+	-- is drawn with the depth test and no depth writes, so it is seen only where
+	-- nothing stands in front of it and never hides a unit. Dug ground is under
+	-- the terrain, so it is drawn through it.
+	if terrainMesh and terrainMesh.indices and terrainMesh.indices > 0 and terrainSet.vao then
+		local m = terrainMesh
+		local vao = terrainSet.vao
+		local downFaces = m.faces + m.wire
+		local grid = downFaces + m.downFaces + m.downWire
+		gl.UseShader(shader)
+		gl.UniformMatrix(locProj, "projection")
+		gl.UniformMatrix(locView, "view")
+		gl.Uniform(locRect, unpack(UNIT_RECT))
+		gl.UniformInt(locUseTex, 0)
+		gl.UniformInt(locGround, 2)
+		gl.LineWidth(1)
+		if m.grid > 0 then
+			vao:DrawElements(GL.LINES, m.grid, grid)
+		end
+		gl.DepthTest(true)
+		gl.DepthMask(false)
+		if m.faces > 0 then
+			vao:DrawElements(GL.TRIANGLES, m.faces, 0)
+		end
+		if m.wire > 0 then
+			vao:DrawElements(GL.LINES, m.wire, m.faces)
+		end
+		gl.DepthTest(false)
+		if m.downFaces > 0 then
+			vao:DrawElements(GL.TRIANGLES, m.downFaces, downFaces)
+		end
+		if m.downWire > 0 then
+			vao:DrawElements(GL.LINES, m.downWire, downFaces + m.downFaces)
+		end
+		gl.DepthMask(true)
 		gl.UniformInt(locGround, 0)
 		gl.UseShader(0)
 	end

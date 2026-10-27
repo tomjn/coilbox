@@ -317,44 +317,6 @@ function M.holdPoint(resolved, pivot)
 	return { x = math.floor((minX + maxX) / 16 + 0.5) * 8, z = math.floor((minZ + maxZ) / 16 + 0.5) * 8 }
 end
 
---- The lines to draw for laid steps, at the height each will leave the
--- ground at: a wall is its path, an area is its outline closed, and a ramp is
--- its two ends joined. A raise stands lift above the ground under each point
--- of the line, a level is at one height, a ramp climbs from one end to the
--- other, and a smooth step lies on the ground.
--- @param steps table[]? from M.laySteps
--- @return table[] { x1, z1, x2, z2, blocked, lift? or y1, y2 }, blocked when
---   the step has a point off the map, lift to add to the ground at each point
---   of the line, y1 and y2 the height at each end instead
-function M.outlines(steps)
-	local out = {}
-	local function add(step, a, b, heights)
-		local seg = { x1 = a.x, z1 = a.z, x2 = b.x, z2 = b.z, blocked = step.blocked == true }
-		if heights then
-			seg.y1, seg.y2 = heights[1], heights[2]
-		elseif step.kind == "level" then
-			seg.y1 = step.base + step.height
-			seg.y2 = seg.y1
-		elseif step.kind == "raise" then
-			seg.lift = step.height
-		else
-			seg.lift = 0
-		end
-		out[#out + 1] = seg
-	end
-	for _, step in ipairs(steps or {}) do
-		local points = step.points
-		local ends = step.kind == "ramp" and { step.base + step.heights[1], step.base + step.heights[2] } or nil
-		for i = 1, #points - 1 do
-			add(step, points[i], points[i + 1], ends)
-		end
-		if step.shape == "area" and #points > 2 then
-			add(step, points[#points], points[1], ends)
-		end
-	end
-	return out
-end
-
 -- How far above a step's finished height its label floats, in elmos.
 M.LABEL_LIFT = 24
 
