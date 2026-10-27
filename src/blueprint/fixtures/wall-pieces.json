@@ -1,0 +1,61 @@
+[
+  {
+    "name": "a wall of one block is left whole",
+    "points": [{ "x": 0, "z": 0 }, { "x": 224, "z": 0 }],
+    "pieces": null
+  },
+  {
+    "name": "a short bent wall is left whole",
+    "points": [{ "x": 0, "z": 0 }, { "x": 96, "z": 0 }, { "x": 96, "z": 96 }],
+    "pieces": null
+  },
+  {
+    "name": "a wall a hair over a block gets a short second piece",
+    "points": [{ "x": 0, "z": 0 }, { "x": 225, "z": 0 }],
+    "pieces": [
+      [{ "x": 0, "z": 0 }, { "x": 224, "z": 0 }],
+      [{ "x": 224, "z": 0 }, { "x": 225, "z": 0 }]
+    ]
+  },
+  {
+    "name": "a wall of exactly two blocks is two pieces",
+    "points": [{ "x": 0, "z": 0 }, { "x": 448, "z": 0 }],
+    "pieces": [
+      [{ "x": 0, "z": 0 }, { "x": 224, "z": 0 }],
+      [{ "x": 224, "z": 0 }, { "x": 448, "z": 0 }]
+    ]
+  },
+  {
+    "name": "a straight wall of three and a half blocks is cut every 224 elmos",
+    "points": [{ "x": -400, "z": 0 }, { "x": 400, "z": 0 }],
+    "pieces": [
+      [{ "x": -400, "z": 0 }, { "x": -176, "z": 0 }],
+      [{ "x": -176, "z": 0 }, { "x": 48, "z": 0 }],
+      [{ "x": 48, "z": 0 }, { "x": 272, "z": 0 }],
+      [{ "x": 272, "z": 0 }, { "x": 400, "z": 0 }]
+    ]
+  },
+  {
+    "name": "a corner does not restart the count, so the second piece bends",
+    "points": [
+      { "x": -200, "z": 150 },
+      { "x": 200, "z": 150 },
+      { "x": 200, "z": -150 }
+    ],
+    "pieces": [
+      [{ "x": -200, "z": 150 }, { "x": 32, "z": 144 }],
+      [{ "x": 32, "z": 144 }, { "x": 200, "z": 150 }, { "x": 208, "z": 96 }],
+      [{ "x": 208, "z": 96 }, { "x": 208, "z": -128 }],
+      [{ "x": 208, "z": -128 }, { "x": 200, "z": -150 }]
+    ]
+  },
+  {
+    "name": "a diagonal wall is cut on the 16 elmo grid",
+    "points": [{ "x": 0, "z": 0 }, { "x": 400, "z": 300 }],
+    "pieces": [
+      [{ "x": 0, "z": 0 }, { "x": 176, "z": 128 }],
+      [{ "x": 176, "z": 128 }, { "x": 352, "z": 272 }],
+      [{ "x": 352, "z": 272 }, { "x": 400, "z": 300 }]
+    ]
+  }
+]
