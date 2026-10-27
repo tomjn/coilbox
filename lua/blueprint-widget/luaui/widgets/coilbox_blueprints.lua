@@ -398,6 +398,30 @@ end
 -- label in a button centred whatever letters it has.
 local capHeight = nil
 
+--- Whether any builder the team has can terraform, for when none is selected.
+local function teamCanTerraform()
+	for _, unitID in ipairs(Spring.GetTeamUnits(Spring.GetMyTeamID()) or {}) do
+		local defID = Spring.GetUnitDefID(unitID)
+		local def = defID and UnitDefs[defID]
+		if def and def.buildOptions and #def.buildOptions > 0 and PLACE.canTerraform(unitID) then
+			return true
+		end
+	end
+	return false
+end
+
+--- Read what the selected units can do. Whether this match has terraform is
+-- the selected builders' say when there are any, since a mission can lock it,
+-- and otherwise the team's.
+local function readCan(selected)
+	can = PLACE.capabilities(selected)
+	if #can.builders > 0 then
+		can.terraformAvailable = #can.terraformers > 0
+	else
+		can.terraformAvailable = teamCanTerraform()
+	end
+end
+
 local function readSelection()
 	local selected = Spring.GetSelectedUnits()
 	local key = #selected .. ":" .. table.concat(selected, ",")
@@ -405,11 +429,12 @@ local function readSelection()
 		return false
 	end
 	selectionKey = key
-	can = PLACE.capabilities(selected)
+	readCan(selected)
 	return true
 end
 
 local readCost
+local syncTerrain
 
 -- What morphs into what, read once, and what the team can ever build, read
 -- again when the kinds of unit it has change.
@@ -456,6 +481,7 @@ local function refreshPanel()
 	readReach()
 	MODEL.refresh(panel, store:entries(), PLACE, Game, can, side)
 	readCost()
+	syncTerrain()
 	MODEL.touch(panel)
 end
 
@@ -522,6 +548,14 @@ local function spotsFor(kind, def)
 	return PLACE.metalSpots(metalScan, span)
 end
 
+--- Whether the Terrain choice shows: the match can terraform and the
+-- blueprint being placed has terrain changes.
+function syncTerrain()
+	if placing then
+		panel.placing.terrain = can.terraformAvailable and #(placing.item.entry.terrain or {}) > 0 or nil
+	end
+end
+
 local function stopPlacing()
 	if placing then
 		placing = nil
@@ -541,22 +575,26 @@ local function startPlacing(key)
 	if not item then
 		return
 	end
-	if #item.resolved.buildings == 0 then
-		say("Nothing in " .. item.name .. " exists in this game")
-		return
-	end
-	if item.foreign > 0 then
-		say(item.name .. " has buildings your side cannot build")
+	if not item.placeable then
+		if item.stop then
+			say(item.name .. " only changes the ground: " .. item.stop)
+		elseif item.foreign > 0 then
+			say(item.name .. " has buildings your side cannot build")
+		else
+			say("Nothing in " .. item.name .. " exists in this game")
+		end
 		return
 	end
 	bindDefaults()
 	readKeys()
 	placing = { item = item, rotation = 0, flip = { x = false, z = false }, pivot = PLACE.pivot(item.resolved), foot = nil }
-	local held = item.resolved.buildings[placing.pivot].def
-	local kind = PLACE.spotKind(held)
+	-- a layout of terrain steps alone has no building to hold it by or to snap
+	local held = placing.pivot and item.resolved.buildings[placing.pivot].def
+	local kind = held and PLACE.spotKind(held)
 	placing.spots = kind and spotsFor(kind, held) or nil
 	panel.placing = { key = key, name = item.name, rotation = 0, flip = placing.flip }
 	readCost()
+	syncTerrain()
 end
 
 --- Turn the layout being placed. Returns whether it did, so a key bound to
@@ -638,12 +676,14 @@ local function trackCursor()
 		anchors = PLACE.line(placing.line.x, placing.line.z, ax, az, unpack(placing.extent))
 	end
 	local foot = {}
+	local origin = placing.pivot and resolved.buildings[placing.pivot].offset or nil
 	for _, at in ipairs(anchors) do
-		for _, p in ipairs(PLACE.footprint(resolved, placing.rotation, at.x, at.z, placing.flip, resolved.buildings[placing.pivot].offset)) do
+		for _, p in ipairs(PLACE.footprint(resolved, placing.rotation, at.x, at.z, placing.flip, origin)) do
+			p.seq = #foot + 1
 			foot[#foot + 1] = p
 		end
 	end
-	placing.foot = foot
+	placing.foot, placing.anchors, placing.origin = foot, anchors, origin
 	placing.serial = (placing.serial or 0) + 1
 end
 
@@ -651,17 +691,21 @@ local function plansChanged()
 	plansSerial = plansSerial + 1
 	local count = 0
 	for _, plan in ipairs(plans) do
-		count = count + #plan.positions
+		count = count + #plan.positions + #plan.steps
 	end
 	panel.remainder = count > 0 and { count = count } or nil
 	MODEL.touch(panel)
 end
 
-local function addPlan(positions)
-	if #positions > 0 then
-		plans[#plans + 1] = { positions = positions }
+local function addPlan(positions, steps)
+	if #positions > 0 or #steps > 0 then
+		plans[#plans + 1] = { positions = positions, steps = steps }
 		plansChanged()
 	end
+end
+
+local function terrainChanges(n)
+	return n .. (n == 1 and " terrain change" or " terrain changes")
 end
 
 local function describe(plan, sent)
@@ -672,9 +716,16 @@ local function describe(plan, sent)
 	if plan.blocked > 0 then
 		parts[#parts + 1] = plan.blocked .. " blocked"
 	end
-	if #plan.remainder > 0 then
+	if (plan.skipped or 0) > 0 then
+		parts[#parts + 1] = terrainChanges(plan.skipped) .. " skipped (" .. (plan.skippedWhy or "") .. ")"
+	end
+	if (plan.offMap or 0) > 0 then
+		parts[#parts + 1] = terrainChanges(plan.offMap) .. " off the map"
+	end
+	local left = #plan.remainder + #(plan.stepRemainder or {})
+	if left > 0 then
 		local what = sent > 0 and " left for another builder" or " planned, right click it with builders to build"
-		parts[#parts + 1] = #plan.remainder .. what
+		parts[#parts + 1] = left .. what
 	end
 	if #parts == 0 then
 		return "nothing could be placed"
@@ -687,15 +738,28 @@ local function shiftHeld()
 	return shift == true
 end
 
+--- The terrain argument of PLACE.plan for some laid steps: ordered when the
+-- match can terraform and the player has Terrain on.
+local function terrainArg(steps)
+	local available = can.terraformAvailable == true
+	return {
+		steps = steps,
+		on = available and panel.terrain,
+		why = not available and "terraforming is not available here" or "Terrain is off",
+	}
+end
+
 local function placeNow()
 	if not placing or not placing.foot then
 		return
 	end
 	readSelection()
-	local plan = PLACE.plan(placing.foot, can, shiftHeld(), panel.assist)
+	-- the ground under the pivot is read now, as the player clicks
+	local steps = PLACE.laySteps(placing.item.resolved, placing.rotation, placing.flip, placing.origin, placing.anchors, placing.foot)
+	local plan = PLACE.plan(placing.foot, can, shiftHeld(), panel.assist, terrainArg(steps))
 	local sent = PLACE.issue(plan)
 	say(placing.item.name .. ": " .. describe(plan, sent))
-	addPlan(plan.remainder)
+	addPlan(plan.remainder, plan.stepRemainder)
 	placing.line = nil
 	-- Holding shift keeps the blueprint on the cursor for another copy.
 	if not shiftHeld() then
@@ -716,11 +780,25 @@ local function buildPlan(index, only)
 	for i, p in ipairs(positions) do
 		if not only or i == only then
 			local status = Spring.TestBuildOrder(p.defID, p.x, p.y, p.z, p.facing)
-			foot[#foot + 1] = { defID = p.defID, def = p.def, x = p.x, y = p.y, z = p.z, facing = p.facing, blocked = status == 0 }
+			foot[#foot + 1] = { defID = p.defID, def = p.def, x = p.x, y = p.y, z = p.z, facing = p.facing, blocked = status == 0, seq = p.seq }
 		end
 	end
-	local plan = PLACE.plan(foot, can, shiftHeld(), panel.assist)
+	-- One building takes the steps that come ahead of it, the whole plan takes
+	-- them all.
+	local steps, later = {}, {}
+	for _, step in ipairs(plans[index].steps) do
+		if not only or (positions[only].seq and step.after < positions[only].seq) then
+			steps[#steps + 1] = step
+		else
+			later[#later + 1] = step
+		end
+	end
+	local plan = PLACE.plan(foot, can, shiftHeld(), panel.assist, terrainArg(steps))
 	local sent = PLACE.issue(plan)
+	plans[index].steps = later
+	for _, step in ipairs(plan.stepRemainder) do
+		table.insert(plans[index].steps, step)
+	end
 	if only then
 		-- the one building leaves the plan once it is ordered or the ground
 		-- refuses it, and stays when nobody selected can build it
@@ -735,7 +813,7 @@ end
 
 local function dropEmptyPlans()
 	for i = #plans, 1, -1 do
-		if #plans[i].positions == 0 then
+		if #plans[i].positions == 0 and #plans[i].steps == 0 then
 			table.remove(plans, i)
 		end
 	end
@@ -745,13 +823,19 @@ end
 --- Build every plan with the selection, from the panel's Place button.
 local function placeRemainder()
 	readSelection()
-	local total = { blocked = 0, remainder = {} }
+	local total = { blocked = 0, remainder = {}, stepRemainder = {}, skipped = 0, offMap = 0 }
 	local sent = 0
 	for i = 1, #plans do
 		local plan, n = buildPlan(i)
 		total.blocked = total.blocked + plan.blocked
+		total.skipped = total.skipped + plan.skipped
+		total.offMap = total.offMap + plan.offMap
+		total.skippedWhy = plan.skippedWhy or total.skippedWhy
 		for _, p in ipairs(plan.remainder) do
 			total.remainder[#total.remainder + 1] = p
+		end
+		for _, step in ipairs(plan.stepRemainder) do
+			total.stepRemainder[#total.stepRemainder + 1] = step
 		end
 		sent = math.max(sent, n)
 	end
@@ -907,6 +991,25 @@ end
 -- Actions the panel's buttons and rows raise
 --------------------------------------------------------------------------------
 
+--- Turn the placing of terrain changes on or off. A blueprint of terrain
+-- changes alone cannot be placed with it off, so one being placed is put down.
+local function setTerrain(on)
+	MODEL.setTerrain(panel, on)
+	refreshPanel()
+	if placing then
+		for _, item in ipairs(panel.items) do
+			if item.entry.key == placing.item.entry.key then
+				placing.item = item
+				if not item.placeable then
+					say(item.name .. " only changes the ground: " .. (item.stop or ""))
+					stopPlacing()
+				end
+				break
+			end
+		end
+	end
+end
+
 local function act(action)
 	local kind = action.kind
 	if kind == "toggle" then
@@ -925,6 +1028,8 @@ local function act(action)
 		flip(action.axis)
 	elseif kind == "assist" then
 		MODEL.setAssist(panel, action.mode)
+	elseif kind == "terrain" then
+		setTerrain(action.mode == "on")
 	elseif kind == "place" then
 		if placing and placing.item.entry.key == action.key then
 			stopPlacing()
@@ -951,8 +1056,8 @@ function widget:SetConfigData(data)
 	saved = data
 end
 
--- Whether builders help each other or split the work, by game, since that
--- depends on the game's rules.
+-- Whether builders help each other or split the work, and whether terrain
+-- changes are placed, by game, since both depend on the game's rules.
 local function gameKey()
 	return Game.gameShortName or Game.gameName or ""
 end
@@ -965,7 +1070,14 @@ function widget:GetConfigData()
 	if panel then
 		assist[gameKey()] = panel.assist
 	end
-	return { seen = true, pos = panel and panel.pos, view = panel and panel.view, assist = assist }
+	local terrain = {}
+	for k, v in pairs(type(saved and saved.terrain) == "table" and saved.terrain or {}) do
+		terrain[k] = v
+	end
+	if panel then
+		terrain[gameKey()] = panel.terrain
+	end
+	return { seen = true, pos = panel and panel.pos, view = panel and panel.view, assist = assist, terrain = terrain }
 end
 
 function widget:Initialize()
@@ -990,7 +1102,7 @@ function widget:Initialize()
 	end
 
 	STORE.use(JSON)
-	PLACE.use({ Spring = Spring, UnitDefs = UnitDefs, UnitDefNames = UnitDefNames, Game = Game })
+	PLACE.use({ Spring = Spring, UnitDefs = UnitDefs, UnitDefNames = UnitDefNames, Game = Game, WG = WG })
 	RECORD.use({ Spring = Spring, UnitDefs = UnitDefs, Game = Game })
 
 	store = STORE.new({
@@ -1009,8 +1121,11 @@ function widget:Initialize()
 		if type(saved.assist) == "table" then
 			MODEL.setAssist(panel, saved.assist[gameKey()])
 		end
+		if type(saved.terrain) == "table" then
+			MODEL.setTerrain(panel, saved.terrain[gameKey()])
+		end
 	end
-	can = PLACE.capabilities({})
+	readCan({})
 
 	if not makeGL() then
 		widgetHandler:RemoveWidget(self)
@@ -1083,6 +1198,9 @@ function widget:Initialize()
 		step = step,
 		assist = function(mode)
 			MODEL.setAssist(panel, mode)
+		end,
+		terrain = function(on)
+			setTerrain(on == true or on == "on")
 		end,
 	}
 
