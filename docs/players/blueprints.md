@@ -172,7 +172,9 @@ The blueprint is named after what is in it, for example "2 Solar Collector, Ligh
 
 ### Which games it works with
 
-The widget loads in games that load widgets from your content folder. It has been checked with Splinter Faction and Metal Factions. It has not been checked with Beyond All Reason.
+The widget loads in games that load widgets from your content folder. It has been checked with Splinter Faction, Metal Factions and Zero-K. It has not been checked with Beyond All Reason.
+
+Zero-K only loads widgets from your content folder once it has saved its settings, which it does when the game closes. So the widget appears from your second Zero-K match, not the first.
 
 Beyond All Reason has its own blueprint tool. The widget reads that tool's blueprints, and lists them marked BAR. To use your coilbox blueprints with the Beyond All Reason tool, write them into its file. See [Save a pack](#save-a-pack).
 

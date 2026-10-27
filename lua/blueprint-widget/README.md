@@ -75,7 +75,11 @@ scripts/mission-tests.sh
 luajit lua/blueprint-widget/tests/place_test.lua
 ```
 
-The script runs every suite under `lua/*/tests/`, and CI runs the same script. There is no engine harness: the widget needs a window, and `spring-headless` has no `gl`.
+The script runs every suite under `lua/*/tests/`, and CI runs the same script. There is no engine harness for the widget itself: it needs a window, and `spring-headless` has no `gl`.
+
+`scripts/zerok-terraform-headless.sh` plays a scripted Zero-K match in `spring-headless` with the scratch game in `tests/zerok/`. Its widget gives the orders the blueprint widget will give for terrain changes, a raised wall and then a turret on it, in ten ways, and the script checks where the turrets went up, what the builders' queues held and the ground across each wall. It needs Zero-K and an engine installed, so CI does not run it. Issue #4789 has what it found.
+
+Zero-K's widget handler loads a widget from the content root only once its `LuaUI/Config/ZK_data.lua` has a `Local Widgets Config` entry, which Zero-K writes when the game closes. So the widget does not load in the first Zero-K match played from a data folder, and does from the second.
 
 ## Handler coverage
 

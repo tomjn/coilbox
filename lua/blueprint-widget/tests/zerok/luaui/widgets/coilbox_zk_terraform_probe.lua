@@ -70,33 +70,6 @@ local function turretParams(cx, cz)
 	return { cx, Spring.GetGroundHeight(cx, cz), cz, 0 }
 end
 
--- The blueprint widget's own placing code (lua/blueprint-widget/luaui/
--- coilbox_blueprints/place.lua, copied in beside this widget by the script),
--- given a blueprint with a raised wall and a Lotus on top, the way the widget
--- gives it after a click. The widget itself needs gl, which spring-headless
--- does not have.
-local PLACE = VFS.Include("LuaUI/coilbox_blueprints/place.lua", nil, VFS.RAW_FIRST)
-
-local function blueprint(builders, cx, cz, shift, mode, withTurret)
-	PLACE.use({ Spring = Spring, UnitDefs = UnitDefs, UnitDefNames = UnitDefNames, Game = Game, WG = WG })
-	local entry = {
-		buildings = withTurret and { { def = "turretlaser", offset = { x = 0, z = 0 }, facing = 0 } } or {},
-		terrain = { { kind = "raise", shape = "wall", points = { { x = -48, z = 0 }, { x = 0, z = 0 }, { x = 48, z = 0 } }, height = WALL_HEIGHT, before = 0 } },
-	}
-	local resolved = PLACE.resolve(entry)
-	local pivot = PLACE.pivot(resolved)
-	local ax, az = PLACE.pivotAt(resolved, pivot, 0, nil, cx, cz)
-	local origin = pivot and resolved.buildings[pivot].offset or nil
-	local foot = PLACE.footprint(resolved, 0, ax, az, nil, origin)
-	for i, p in ipairs(foot) do
-		p.seq = i
-	end
-	local steps = PLACE.laySteps(resolved, 0, nil, origin, { { x = ax, z = az } }, foot)
-	local plan = PLACE.plan(foot, PLACE.capabilities(builders), shift, mode, { steps = steps, on = true })
-	local sent = PLACE.issue(plan)
-	Spring.Echo(string.format("PROBE blueprint sent=%d terraform=%d skipped=%d offMap=%d remainder=%d blocked=%d", sent, #plan.terraform, plan.skipped, plan.offMap, #plan.remainder, plan.blocked))
-end
-
 -- What each case does after the terraform order.
 local CASES = {
 	{ name = "level then turret, no shift", run = function(b, cx, cz, tag)
@@ -149,19 +122,6 @@ local CASES = {
 		Spring.GiveOrderToUnitArray(b, CMD_LEVEL, stepParams(cx, cz, tag), OPT_SHIFT)
 		Spring.GiveOrderToUnitArray(b, -turretDefID, turretParams(cx, cz), OPT_SHIFT)
 	end },
-	-- The blueprint widget's placing code. They order the terraform themselves.
-	{ name = "blueprint with a wall and a turret, no shift", own = true, run = function(b, cx, cz)
-		blueprint(b, cx, cz, false, "help", true)
-	end },
-	{ name = "blueprint with a wall and a turret, shift", own = true, run = function(b, cx, cz)
-		blueprint(b, cx, cz, true, "help", true)
-	end },
-	{ name = "blueprint with a wall and a turret, two builders split up", own = true, run = function(b, cx, cz)
-		blueprint(b, cx, cz, false, "split", true)
-	end },
-	{ name = "blueprint with a wall only", own = true, run = function(b, cx, cz)
-		blueprint(b, cx, cz, false, "help", false)
-	end },
 }
 
 local builders = {}
@@ -211,9 +171,6 @@ function widget:GameFrame(frame)
 			if list then
 				local cx, cz = lane(list[1])
 				local tag, source = nextTag()
-				if case.own then
-					tag, source = 0, "blueprint"
-				end
 				case.run(list, cx, cz, tag)
 				Spring.Echo(string.format("PROBE ordered case=%d tag=%d source=%s builders=%d lane=%d,%d name=%s",
 					i, tag, source, #list, cx, cz, case.name))
