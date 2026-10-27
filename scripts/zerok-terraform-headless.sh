@@ -208,6 +208,20 @@ turret_on_ground() { # log, case
   expect "case $2 terraform unit decayed unbuilt" "$(field "$gone" health)" "0.000"
 }
 
+# Every turret of a case went up on the finished pad: all five stand on one
+# height, which a turret begun early on the old ground would not, and each was
+# started after the last of the case's terraform units had gone.
+pad_turrets() { # log, case
+  local log="$1" case="$2" finished created gone_last late grounds
+  finished="$(grep -c "FIXTURE finished case=$case .*unit=turretlaser " "$log" || true)"
+  expect "case $case: turrets finished" "$finished" 5
+  grounds="$(grep -E "FIXTURE finished case=$case .*unit=turretlaser " "$log" | sed 's/.* ground=\([-0-9.]*\) .*/\1/' | sort -u | wc -l | tr -d ' ')"
+  expect "case $case: the turrets stand on one height of ground" "$grounds" 1
+  gone_last="$(grep -E "FIXTURE terraunit-gone case=$case " "$log" | sed 's/.*frame=\([0-9]*\).*/\1/' | sort -n | tail -n 1)"
+  late="$(grep -E "FIXTURE created case=$case .*unit=turretlaser" "$log" | sed 's/.*frame=\([0-9]*\).*/\1/' | awk -v g="${gone_last:-999999}" '$1 <= g { n++ } END { print n + 0 }')"
+  expect "case $case: turrets begun before the terraform finished" "$late" 0
+}
+
 # The ground on one side of a case's wall, from the centre line outwards.
 profile() { # log, case
   line "$1" "FIXTURE profile-z case=$2 " | tr ' ' '\n' |
@@ -221,10 +235,10 @@ queue_at() { # log, case, frame
 
 check_common() { # log, height, profile, tag source
   local log="$1"
-  expect "the fixture created its builders" "$(grep -c 'FIXTURE builder ' "$log" || true)" 21
+  expect "the fixture created its builders" "$(grep -c 'FIXTURE builder ' "$log" || true)" 24
   expect "the fixture ended the match" "$(grep -c 'FIXTURE done ' "$log" || true)" 1
   expect "Zero-K did not end the match early" "$(grep -c 'game_message: .* has been destroyed' "$log" || true)" 0
-  expect "the probe ordered every case" "$(grep -c 'PROBE ordered ' "$log" || true)" 19
+  expect "the probe ordered every case" "$(grep -c 'PROBE ordered ' "$log" || true)" 20
   expect "tags came from" "$(field "$(line "$log" 'PROBE ordered case=1 ')" source)" "$4"
   expect "builders carry the level command as" "$(field "$(line "$log" 'PROBE level-desc ')" action)" "levelground"
 
@@ -256,7 +270,7 @@ check_common() { # log, height, profile, tag source
   expect "case 11 wall from a blueprint" "$(profile "$log" 11)" "$3"
   expect "case 14 wall from a blueprint alone" "$(profile "$log" 14)" "$3"
   expect "case 14 built no turret" "$(grep -c 'FIXTURE created case=14 .*unit=turretlaser' "$log" || true)" 0
-  expect "the blueprint cases were not skipped or off the map" "$(grep -c 'PROBE blueprint .*skipped=0 offMap=0' "$log" || true)" 9
+  expect "the blueprint cases were not skipped or off the map" "$(grep -c 'PROBE blueprint .*skipped=0 offMap=0' "$log" || true)" 10
   expect "case 1 ground across the wall" "$(profile "$log" 1)" "$3"
 
   # A wall behind more than two minutes of buildings (#4803), for a builder
@@ -267,6 +281,9 @@ check_common() { # log, height, profile, tag source
     expect "case $case reached the wall more than two minutes after the orders" "$([ -n "$reached" ] && [ "$reached" -gt 3675 ] && echo yes || echo no)" "yes"
     turret_on_wall "$log" "$case" "$2"
   done
+  # Split up with three builders on a raised pad with five turrets (#4817): no
+  # turret may go up before the pad is raised, which would leave a notch.
+  pad_turrets "$log" 20
   expect "case 9 ground across the long wall" "$(profile "$log" 9)" "$3"
   check_model "$log"
 }
@@ -298,7 +315,7 @@ check_model() { # log
   defs="$(line "$log" 'FIXTURE defs ')"
   speed="$(field "$defs" buildSpeed)"
   echo "  info $defs"
-  for case in 9 11 14 15 16 17; do
+  for case in 9 11 14 15 16 17 20; do
     model="$(field "$(line "$log" "FIXTURE model case=$case ")" metal)"
     work="$(field "$(line "$log" "FIXTURE model case=$case ")" work)"
     game="$(game_metal "$log" "$case")"
@@ -309,7 +326,7 @@ check_model() { # log
     expect "case $case: the panel's terraform metal is the game's estimate, to the rounding of the log" \
       "$(awk -v m="$model" -v g="$game" -v n="$units" 'BEGIN { d = m - g; if (d < 0) d = -d; print (m != "" && g != "" && d <= (n + 1) * 0.00005 + 1e-9) ? "yes" : "no (" m " against " g ")" }')" yes
   done
-  for case in 9 14 15 16 17; do
+  for case in 9 14 15 16 17 20; do
     compared="$(line "$log" "FIXTURE compare case=$case ")"
     worst="$(field "$compared" worst)"
     echo "  info case $case ground: $compared"
