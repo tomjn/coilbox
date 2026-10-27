@@ -1099,6 +1099,34 @@ function M.session(env)
 		return list
 	end
 
+	--- The ground at any point once every step so far is built: the height the
+	-- map gives, plus how far the steps moved the four corners around it. The
+	-- corners are blended the way the engine's ground is, a square cut along the
+	-- diagonal from top right to bottom left (Map/Ground.cpp), so a point the
+	-- steps did not touch reads exactly what env.heightAt gives. A building uses
+	-- this wherever its step comes in the build order, because the preview shows
+	-- the result.
+	-- @return number
+	function session.heightAt(x, z)
+		local base = env.heightAt(x, z)
+		if next(reader.overlay) == nil then
+			return base
+		end
+		local c, r = floor(x / SQUARE), floor(z / SQUARE)
+		local fx, fz = x / SQUARE - c, z / SQUARE - r
+		local function moved(dc, dr)
+			local px, pz = (c + dc) * SQUARE, (r + dr) * SQUARE
+			return reader.at(px, pz) - reader.original(px, pz)
+		end
+		local d
+		if fx + fz <= 1 then
+			d = moved(0, 0) * (1 - fx - fz) + moved(1, 0) * fx + moved(0, 1) * fz
+		else
+			d = moved(1, 1) * (fx + fz - 1) + moved(1, 0) * (1 - fz) + moved(0, 1) * (1 - fx)
+		end
+		return base + d
+	end
+
 	return session
 end
 

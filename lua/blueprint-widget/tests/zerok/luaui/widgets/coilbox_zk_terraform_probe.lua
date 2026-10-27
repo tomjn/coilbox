@@ -146,6 +146,14 @@ local LONG_AHEAD = {
 	{ def = "turretheavylaser", offset = { x = -160, z = -64 }, facing = 0 },
 }
 
+-- Four turrets at the corners of a pad, round the one at its centre.
+local PAD_TURRETS = {
+	{ def = "turretlaser", offset = { x = -32, z = -32 }, facing = 0 },
+	{ def = "turretlaser", offset = { x = 32, z = -32 }, facing = 0 },
+	{ def = "turretlaser", offset = { x = -32, z = 32 }, facing = 0 },
+	{ def = "turretlaser", offset = { x = 32, z = 32 }, facing = 0 },
+}
+
 -- What each case does after the terraform order.
 local CASES = {
 	{ name = "level then turret, no shift", run = function(b, cx, cz, tag)
@@ -232,6 +240,13 @@ local CASES = {
 	-- constructors die (the fixture kills them, see its spare builders).
 	{ name = "long blueprint for a builder the gadget no longer checks", own = true, run = function(b, cx, cz)
 		blueprint(b, cx, cz, false, "help", true, nil, nil, LONG_AHEAD)
+	end },
+	-- Split up with three builders on a raised pad with five turrets standing on
+	-- it. Every builder has to wait for the ground, or the turrets that go up
+	-- first leave notches in it (#4817). The pad says before = 2, which an older
+	-- blueprint could, and which placing treats as 0.
+	{ name = "blueprint with a raised pad and five turrets, three builders split up", own = true, run = function(b, cx, cz)
+		blueprint(b, cx, cz, false, "split", true, 20, { { kind = "level", shape = "area", points = { { x = -64, z = -64 }, { x = 64, z = -64 }, { x = 64, z = 64 }, { x = -64, z = 64 } }, height = 40, before = 2 } }, PAD_TURRETS)
 	end },
 }
 

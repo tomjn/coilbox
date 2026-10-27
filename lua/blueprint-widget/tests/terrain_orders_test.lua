@@ -92,7 +92,7 @@ check("a footprint entry keeps that place too", foot[1].index == 1 and foot[2].i
 
 local laid = PLACE.laySteps(layout, 0, nil, nil, { { x = 512, z = 512 } }, foot)
 check("every step is laid", #laid == 3)
-check("a step comes after the buildings ahead of it, counting the foot, not the entry", laid[1].after == 0 and laid[2].after == 1 and laid[3].after == 2, show({ laid[1].after, laid[2].after, laid[3].after }))
+check("every step comes ahead of every building, whatever its before says (#4817)", laid[1].after == 0 and laid[2].after == 0 and laid[3].after == 0, show({ laid[1].after, laid[2].after, laid[3].after }))
 check("a step's points are on the map", same(laid[1].points, { { x = 480, z = 512 }, { x = 544, z = 512 } }), show(laid[1].points))
 check("a step takes the ground height under the pivot as its base", laid[1].base == 100 and laid[2].base == 100)
 
@@ -114,7 +114,7 @@ local two = PLACE.laySteps(layout, 0, nil, nil, { { x = 512, z = 512 }, { x = 10
 	end
 	return both
 end)())
-check("each copy of a line lays its own steps after the copy before", #two == 6 and two[4].after == 2 and two[5].after == 3 and two[6].after == 4, show({ two[4].after, two[5].after, two[6].after }))
+check("each copy of a line lays its own steps ahead of its own buildings, after the copy before", #two == 6 and two[1].after == 0 and two[4].after == 2 and two[5].after == 2 and two[6].after == 2, show({ two[1].after, two[4].after, two[5].after, two[6].after }))
 check("each copy's steps are at that copy", two[4].points[1].x == 992)
 
 local edge = PLACE.laySteps(layout, 0, nil, nil, { { x = 16, z = 512 } }, PLACE.footprint(layout, 0, 16, 512))
@@ -274,7 +274,7 @@ check("Together makes one terraform order, naming every builder that will work o
 check("every builder is given the same tag", byUnit[200][2][2][4] == byUnit[201][2][2][4] and byUnit[200][2][2][4] == together.terraform[1].params[5])
 
 local splitCan = PLACE.capabilities({ 200, 201 })
-local nearFar = step(1)
+local nearFar = step(0)
 nearFar.points = { { x = 1900, z = 600 }, { x = 2000, z = 600 } }
 local split = PLACE.plan(foot2, splitCan, false, "split", { steps = { step(0), nearFar }, on = true })
 local splitBy = {}
@@ -288,19 +288,47 @@ local function ids(list)
 	end
 	return out
 end
-check("Split up gives each step to the nearest builder that can terraform", (function()
-	local has200, has201 = false, false
-	for _, c in ipairs(splitBy[200] or {}) do
-		has200 = has200 or c[1] == 39736
+check("Split up gives every builder every step's level step, ahead of its first building (#4817)", (function()
+	for _, unitID in ipairs({ 200, 201 }) do
+		local cmds = splitBy[unitID] or {}
+		if #cmds < 2 or cmds[1][1] ~= 39736 or cmds[2][1] ~= 39736 or cmds[1][2][4] == cmds[2][2][4] then
+			return false
+		end
 	end
-	for _, c in ipairs(splitBy[201] or {}) do
-		has201 = has201 or c[1] == 39736
-	end
-	return has200 and has201 and #split.terraform == 2
+	return #split.terraform == 2
 end)(), show(split.orders))
-check("each split step's level step is recorded for that builder alone", #split.terraform[1].levelAt == 1 and split.terraform[1].levelAt[1].unitID == 200 and #split.terraform[2].levelAt == 1 and split.terraform[2].levelAt[1].unitID == 201, show(split.terraform[2].levelAt))
+check("Split up still shares the buildings out, one builder each", (function()
+	local count = 0
+	for _, unitID in ipairs({ 200, 201 }) do
+		for _, c in ipairs(splitBy[unitID] or {}) do
+			if c[1] < 0 then
+				count = count + 1
+			end
+		end
+	end
+	return count == 2
+end)(), show(split.orders))
+check("each split step's level step is recorded for every builder, as Together does", #split.terraform[1].levelAt == 2 and #split.terraform[2].levelAt == 2, show(split.terraform[2].levelAt))
 check("Together records the level step for every builder", #together.terraform[1].levelAt == 2)
-check("each split step's terraform order names only the builder that has it", split.terraform[1].unitID == 200 and split.terraform[1].params[9] == 1 and split.terraform[2].unitID == 201 and split.terraform[2].params[9] == 1, show(split.terraform))
+check("each split step's terraform order names every builder", split.terraform[1].params[9] == 2 and split.terraform[2].params[9] == 2, show(split.terraform))
+
+-- every step ahead of every building, in both modes
+for _, mode in ipairs({ "help", "split" }) do
+	local both = PLACE.plan(foot2, PLACE.capabilities({ 200, 201 }), false, mode, { steps = { step(0), nearFar }, on = true })
+	local ok = #both.orders == 2
+	for _, order in ipairs(both.orders) do
+		local levels, firstBuilding = 0, nil
+		for i, c in ipairs(order.cmds) do
+			if c[1] == 39736 then
+				levels = levels + 1
+			elseif not firstBuilding then
+				firstBuilding = i
+			end
+		end
+		ok = ok and levels == 2 and (firstBuilding == nil or firstBuilding == 3)
+	end
+	check("in " .. mode .. " every builder has every step's level step before its first building", ok, show(both.orders))
+end
 
 -- steps that are not ordered
 local off = PLACE.plan(foot2, canAll, false, nil, { steps = { step(0, { blocked = true }), step(1) }, on = true })

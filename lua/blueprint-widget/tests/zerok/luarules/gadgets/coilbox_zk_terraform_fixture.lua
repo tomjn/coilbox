@@ -18,7 +18,7 @@ function gadget:GetInfo()
 	}
 end
 
-local CASES = 19
+local CASES = 20
 -- The case whose builder Zero-K's gadget stops checking. Zero-K v1.14.10.3's
 -- unit_terraform.lua moves the last constructor into a dead one's slot without
 -- telling it its new index (UnitDestroyed). When that one dies too, it moves the
@@ -27,7 +27,7 @@ local CASES = 19
 local UNCHECKED_CASE = 19
 local SPARES_DIE_FRAME = 33
 -- Cases with more than one builder, which share the terraform and the turret.
-local BUILDERS = { [10] = 2, [13] = 2 }
+local BUILDERS = { [10] = 2, [13] = 2, [20] = 3 }
 -- Lanes run east to west along the middle of the map, side by side, this far
 -- apart.
 local LANE_GAP = 512
@@ -36,6 +36,16 @@ local CREATE_FRAME = 30
 local REPORT_EVERY = 300
 local END_FRAME = tonumber((Spring.GetModOptions() or {}).coilbox_end_frame) or 9000
 local TEAM = 0
+
+-- The order the cases' builders are created in. The unchecked case goes last,
+-- so its builder is the last constructor, as that case needs.
+local CREATE_ORDER = {}
+for i = 1, CASES do
+	if i ~= UNCHECKED_CASE then
+		CREATE_ORDER[#CREATE_ORDER + 1] = i
+	end
+end
+CREATE_ORDER[#CREATE_ORDER + 1] = UNCHECKED_CASE
 
 local function lane(index)
 	local cx = 16 * math.floor(Game.mapSizeX / 32) + (index - (CASES + 1) / 2) * LANE_GAP
@@ -227,7 +237,7 @@ if gadgetHandler:IsSyncedCode() then
 		if frame == CREATE_FRAME then
 			local mx, mz = lane(1)
 			spare(mx - 256, mz - 256)
-			for i = 1, CASES do
+			for _, i in ipairs(CREATE_ORDER) do
 				local cx, cz = lane(i)
 				local lo, hi = math.huge, -math.huge
 				for dx = -200, 200, 8 do
