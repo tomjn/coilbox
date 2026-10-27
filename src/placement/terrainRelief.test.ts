@@ -195,6 +195,56 @@ describe("Relief", () => {
   });
 });
 
+/** Issue #4799: a scenario's bases, each on the ground the ones before it
+ *  left, the order the mission runtime sets them in. */
+describe("Relief.updateLayouts", () => {
+  it("works each layout out on the ground the ones before it left", () => {
+    const relief = new Relief(source());
+    relief.updateLayouts([
+      { steps: [wall(60)], placement: at(600, 600), footprints: [] },
+      { steps: [pad], placement: at(1400, 1400), footprints: [] },
+    ]);
+    const first = terraform(HILLS, [wall(60)], at(600, 600), []);
+    const both = terraform(first.ground, [pad], at(1400, 1400), []);
+    same(relief.heights, both.ground.heights);
+    expect(relief.layoutResults.map((r) => r.length)).toEqual([1, 1]);
+  });
+
+  it("puts the map's ground back under a layout that has gone", () => {
+    const relief = new Relief(source());
+    relief.updateLayouts([
+      { steps: [wall(60)], placement: at(600, 600), footprints: [] },
+      { steps: [pad], placement: at(1400, 1400), footprints: [] },
+    ]);
+    const change = relief.updateLayouts([
+      { steps: [pad], placement: at(1400, 1400), footprints: [] },
+    ]);
+    same(
+      relief.heights,
+      terraform(HILLS, [pad], at(1400, 1400), []).ground.heights,
+    );
+    // What it hands back is the ground before, over a block holding both.
+    const rect = change.rect;
+    expect(rect).not.toBeNull();
+    if (!rect || !change.before) return;
+    const w = rect.c1 - rect.c0 + 1;
+    const first = terraform(HILLS, [wall(60)], at(600, 600), []).ground.heights;
+    const c = 600 / 8;
+    expect(change.before[(c - rect.r0) * w + (c - rect.c0)]).toBe(
+      first[c * SIDE + c],
+    );
+  });
+
+  it("leaves the map alone for layouts with no steps", () => {
+    const relief = new Relief(source());
+    const change = relief.updateLayouts([
+      { steps: [], placement: at(600, 600), footprints: [] },
+    ]);
+    expect(change.rect).toBeNull();
+    same(relief.heights, HILLS.heights);
+  });
+});
+
 describe("a building beside a raised wall", () => {
   // A 2 by 2 build square building, 32 elmos across, which tolerates 10 degrees.
   const flat = () => new Relief(flatSource(257, 257));
