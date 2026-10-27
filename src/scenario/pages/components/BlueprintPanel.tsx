@@ -512,6 +512,10 @@ export function BlueprintPanel({
                           // its buttons are on the map above. A second one here
                           // would take two steps back on one press (#1442).
                           history="caller"
+                          // A mission sets a base's ground itself, in every
+                          // game, so the tools are offered here whatever the
+                          // game's builders can do (issue #4799).
+                          terrainTools="mission"
                           onChange={(next) => {
                             onChange((current) =>
                               replaceBlueprint(current, next),

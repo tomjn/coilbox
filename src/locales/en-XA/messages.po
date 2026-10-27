@@ -9775,6 +9775,10 @@ msgid "Barrel lift"
 msgstr ""
 
 #: src/scenario/validate.ts
+msgid "base"
+msgstr ""
+
+#: src/scenario/validate.ts
 msgid "Base"
 msgstr ""
 
@@ -24365,6 +24369,10 @@ msgid "Needs {name}"
 msgstr ""
 
 #: src/scenario/pages/components/triggers.ts
+msgid "Needs a base that appears from a trigger"
+msgstr ""
+
+#: src/scenario/pages/components/triggers.ts
 msgid "Needs a dialogue line"
 msgstr ""
 
@@ -28925,6 +28933,10 @@ msgstr ""
 
 #: src/lego/pages/components/WorthSection.tsx
 msgid "Placeholder amounts. Set your game's."
+msgstr ""
+
+#: src/scenario/triggerTypes.ts
+msgid "Places a base that appears from a trigger: its terrain changes, then its buildings."
 msgstr ""
 
 #: src/scenario/triggerTypes.ts
@@ -42474,6 +42486,10 @@ msgstr ""
 
 #: src/scenario/pages/components/TriggerPanel.tsx
 msgid "Waits"
+msgstr ""
+
+#: src/scenario/pages/components/BaseControls.tsx
+msgid "Waits for a trigger to place it"
 msgstr ""
 
 #: src/scenario/pages/components/GroupControls.tsx
