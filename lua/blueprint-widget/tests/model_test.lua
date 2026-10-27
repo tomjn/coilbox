@@ -931,6 +931,29 @@ for _, i in ipairs(mixedIdx) do
 	maxIndex = math.max(maxIndex, i)
 end
 check("outlines come after the footprints in the same buffer, with indices that continue", maxIndex == #mixed / MODEL.STRIDE - 1, maxIndex .. " " .. #mixed / MODEL.STRIDE)
+-- standing at a height above the ground, on posts
+local stands = { x1 = 0, z1 = 0, x2 = 24, z2 = 0, blocked = false, lift = 112 }
+local sv, si = MODEL.packGround({}, function() end, ground, { stands })
+check("a raised segment's strip is at its height above the ground", sv[2] == 10 + 112 and sv[6 * MODEL.STRIDE + 2] == 13 + 112, tostring(sv[2]))
+check("posts come down from it at each end, two crossed quads each", #sv == (8 + 2 * 2 * 4) * MODEL.STRIDE and #si == (3 + 2 * 2) * 6, #sv / MODEL.STRIDE .. " " .. #si)
+check("a post's top is the outline and its bottom is the ground", (function()
+	local o = 8 * MODEL.STRIDE
+	return sv[o + 2] == 122 and sv[o + MODEL.STRIDE * 2 + 2] == 10 and sv[o + 1] == -MODEL.OUTLINE_WIDTH / 2 and sv[o + MODEL.STRIDE + 1] == MODEL.OUTLINE_WIDTH / 2
+end)())
+check("the second quad of a post is across the first", (function()
+	local o = 12 * MODEL.STRIDE
+	return sv[o + 1] == 0 and sv[o + 3] == -MODEL.OUTLINE_WIDTH / 2 and sv[o + MODEL.STRIDE + 3] == MODEL.OUTLINE_WIDTH / 2
+end)())
+check("a post's shape says how wide and how tall it is", sv[8 * MODEL.STRIDE + 10] == MODEL.OUTLINE_WIDTH and sv[8 * MODEL.STRIDE + 11] == 112 and sv[8 * MODEL.STRIDE + 13] == 0)
+local longRun = MODEL.packGround({}, function() end, ground, { { x1 = 0, z1 = 0, x2 = 160, z2 = 0, blocked = false, lift = 20 } })
+local stationsLong = math.ceil(160 / 8) + 1
+check("a long segment has a post every few squares along it", #longRun == (stationsLong * 2 + (math.ceil(160 / MODEL.POST_SPACING) + 1) * 2 * 4) * MODEL.STRIDE, tostring(#longRun / MODEL.STRIDE))
+local dug = MODEL.packGround({}, function() end, ground, { { x1 = 0, z1 = 0, x2 = 8, z2 = 0, blocked = false, lift = -40 } })
+check("a dig has its outline below the ground and its posts run up from it", dug[2] == -30 and dug[4 * MODEL.STRIDE + 2] == -30 and dug[6 * MODEL.STRIDE + 2] == 10, show({ dug[2], dug[4 * MODEL.STRIDE + 2], dug[6 * MODEL.STRIDE + 2] }))
+local level = MODEL.packGround({}, function() end, ground, { { x1 = 0, z1 = 0, x2 = 8, z2 = 0, blocked = false, y1 = 50, y2 = 50 } })
+check("a level segment is at its own height wherever the ground is", level[2] == 50 and level[2 * MODEL.STRIDE + 2] == 50)
+local ramp = MODEL.packGround({}, function() end, ground, { { x1 = 0, z1 = 0, x2 = 16, z2 = 0, blocked = false, y1 = 0, y2 = 32 } })
+check("a ramp segment climbs from one end to the other", ramp[2] == 0 and ramp[2 * MODEL.STRIDE + 2] == 16 and ramp[4 * MODEL.STRIDE + 2] == 32)
 check("a zero length segment is skipped", #MODEL.packGround({}, function() end, ground, { { x1 = 5, z1 = 5, x2 = 5, z2 = 5, blocked = false } }) == 0)
 
 support.report()

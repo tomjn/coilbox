@@ -148,15 +148,39 @@ check("a turn is about the middle of the steps", heldTurned[1].points[1].x == 52
 --------------------------------------------------------------------------------
 
 local outlined = PLACE.outlines({
-	{ kind = "raise", shape = "wall", points = { { x = 0, z = 0 }, { x = 48, z = 0 }, { x = 48, z = 32 } }, blocked = false },
-	{ kind = "level", shape = "area", points = { { x = 0, z = 0 }, { x = 32, z = 0 }, { x = 32, z = 32 } }, blocked = true },
-	{ kind = "ramp", shape = "wall", points = { { x = 100, z = 100 }, { x = 100, z = 164 } }, blocked = false },
+	{ kind = "raise", shape = "wall", points = { { x = 0, z = 0 }, { x = 48, z = 0 }, { x = 48, z = 32 } }, height = 40, base = 100, blocked = false },
+	{ kind = "level", shape = "area", points = { { x = 0, z = 0 }, { x = 32, z = 0 }, { x = 32, z = 32 } }, height = -8, base = 100, blocked = true },
+	{ kind = "ramp", shape = "wall", points = { { x = 100, z = 100 }, { x = 100, z = 164 } }, heights = { 0, 30 }, width = 32, base = 100, blocked = false },
+	{ kind = "smooth", shape = "area", points = { { x = 0, z = 0 }, { x = 32, z = 0 }, { x = 32, z = 32 } }, base = 100, blocked = false },
 })
-check("a wall is its path, joined point to point and not back to the start", #outlined == 2 + 3 + 1 and same(outlined[1], { x1 = 0, z1 = 0, x2 = 48, z2 = 0, blocked = false }) and same(outlined[2], { x1 = 48, z1 = 0, x2 = 48, z2 = 32, blocked = false }), show(outlined))
-check("an area is a closed outline", same(outlined[5], { x1 = 32, z1 = 32, x2 = 0, z2 = 0, blocked = true }), show(outlined[5]))
-check("a ramp is its two ends joined", same(outlined[6], { x1 = 100, z1 = 100, x2 = 100, z2 = 164, blocked = false }), show(outlined[6]))
+check("a wall is its path, joined point to point and not back to the start", #outlined == 2 + 3 + 1 + 3 and same(outlined[1], { x1 = 0, z1 = 0, x2 = 48, z2 = 0, blocked = false, lift = 40 }) and same(outlined[2], { x1 = 48, z1 = 0, x2 = 48, z2 = 32, blocked = false, lift = 40 }), show(outlined))
+check("an area is a closed outline", outlined[5].x1 == 32 and outlined[5].z1 == 32 and outlined[5].x2 == 0 and outlined[5].z2 == 0, show(outlined[5]))
+check("a ramp is its two ends joined", outlined[6].x1 == 100 and outlined[6].z1 == 100 and outlined[6].x2 == 100 and outlined[6].z2 == 164, show(outlined[6]))
 check("an outline says whether its step is off the map", outlined[3].blocked == true and outlined[1].blocked == false)
 check("no steps, no outlines", #PLACE.outlines({}) == 0 and #PLACE.outlines(nil) == 0)
+check("a raise stands at its height above the ground under each point", outlined[1].lift == 40 and outlined[1].y1 == nil)
+check("a level is drawn at the ground under the pivot plus its height", outlined[3].y1 == 92 and outlined[3].y2 == 92, show(outlined[3]))
+check("a ramp's ends are at the ground under the pivot plus each end's height", outlined[6].y1 == 100 and outlined[6].y2 == 130, show(outlined[6]))
+check("a smooth step has no height of its own, so it lies on the ground", outlined[7].lift == 0 and outlined[7].y1 == nil)
+
+--------------------------------------------------------------------------------
+-- labels
+--------------------------------------------------------------------------------
+
+local function labelled(step)
+	return PLACE.labels({ step })[1]
+end
+local raised = labelled({ kind = "raise", shape = "wall", points = { { x = 0, z = 0 }, { x = 64, z = 0 } }, height = 112, base = 100 })
+check("a raise says how far, with its sign", raised.text == "+112", show(raised))
+check("a dig says so", labelled({ kind = "raise", shape = "wall", points = { { x = 0, z = 0 }, { x = 64, z = 0 } }, height = -40, base = 100 }).text == "-40")
+check("a level says what it is from the ground under the pivot", labelled({ kind = "level", shape = "area", points = { { x = 0, z = 0 }, { x = 64, z = 0 }, { x = 64, z = 64 } }, height = 24, base = 100 }).text == "level +24")
+check("a level at the pivot's own height has no sign", labelled({ kind = "level", shape = "area", points = { { x = 0, z = 0 }, { x = 64, z = 0 }, { x = 64, z = 64 } }, height = 0, base = 100 }).text == "level 0")
+check("a ramp says both ends", labelled({ kind = "ramp", shape = "wall", points = { { x = 0, z = 0 }, { x = 64, z = 0 } }, heights = { 0, 80 }, width = 32, base = 100 }).text == "ramp 0 to +80")
+check("a smooth step is just called smooth", labelled({ kind = "smooth", shape = "area", points = { { x = 0, z = 0 }, { x = 64, z = 0 }, { x = 64, z = 64 } }, base = 100 }).text == "smooth")
+check("a fraction is rounded", labelled({ kind = "raise", shape = "wall", points = { { x = 0, z = 0 }, { x = 64, z = 0 } }, height = 12.6, base = 100 }).text == "+13")
+check("a label is above the middle of its step, over the finished height", raised.x == 32 and raised.z == 0 and raised.y == 100 + 112 + PLACE.LABEL_LIFT, show(raised))
+check("a label over a level is at the level's height", labelled({ kind = "level", shape = "area", points = { { x = 0, z = 0 }, { x = 64, z = 0 }, { x = 64, z = 64 } }, height = 24, base = 100 }).y == 124 + PLACE.LABEL_LIFT)
+check("one label for each step", #PLACE.labels({ { kind = "raise", shape = "wall", points = { { x = 0, z = 0 }, { x = 8, z = 0 } }, height = 1, base = 0 }, { kind = "raise", shape = "wall", points = { { x = 0, z = 0 }, { x = 8, z = 0 } }, height = 2, base = 0 } }) == 2 and #PLACE.labels(nil) == 0)
 
 --------------------------------------------------------------------------------
 -- the terraform order

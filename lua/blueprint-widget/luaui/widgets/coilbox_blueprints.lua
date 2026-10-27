@@ -190,6 +190,9 @@ local panelSet = { capacity = 0 }
 local groundSet = { capacity = 0 }
 local panelIndices, groundIndices = 0, 0
 local groundKey = nil
+-- What each terrain step being shown does, over the middle of it, in world
+-- space. Refilled with the ground marks and drawn by DrawScreen.
+local stepLabels = {}
 
 local IDENTITY = { 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1 }
 local UNIT_RECT = { 0, 0, 1, 1 }
@@ -1592,6 +1595,15 @@ function widget:DrawScreen()
 			gl.Text(colourCode(t.color) .. t.text, t.x, t.y - drop, t.size, "x")
 		end
 	end
+	-- each terrain step's change in elmos, over the middle of its outline
+	local size = MODEL.FONT * MODEL.scaleFor(panel, { w = vsx, h = vsy })
+	local color = colourCode(MODEL.COLORS.terrain)
+	for _, label in ipairs(stepLabels) do
+		local sx, sy = Spring.WorldToScreenCoords(label.x, label.y, label.z)
+		if sx and sx >= 0 and sx <= vsx and sy >= 0 and sy <= vsy then
+			gl.Text(color .. label.text, sx, sy, size, "xco")
+		end
+	end
 end
 
 --- How a mark on the ground looks: the colour of what the building does, as
@@ -1634,6 +1646,7 @@ end
 function widget:DrawWorld()
 	local foot = placing and placing.foot
 	if not foot and #plans == 0 then
+		stepLabels = {}
 		return
 	end
 	local teamID = Spring.GetMyTeamID()
@@ -1665,6 +1678,7 @@ function widget:DrawWorld()
 			marks[#marks + 1] = p
 		end
 		groundMarks(marks, key, PLACE.outlines(steps))
+		stepLabels = PLACE.labels(steps)
 	end
 	-- The marks follow the heightmap, but the terrain the engine draws is
 	-- simplified with distance, so a depth test would still let it cut them.

@@ -317,23 +317,80 @@ function M.holdPoint(resolved, pivot)
 	return { x = math.floor((minX + maxX) / 16 + 0.5) * 8, z = math.floor((minZ + maxZ) / 16 + 0.5) * 8 }
 end
 
---- The lines to draw on the ground for laid steps: a wall is its path, an
--- area is its outline closed, and a ramp is its two ends joined. Nothing here
--- shows the raised ground or the slopes, only where the steps are.
+--- The lines to draw for laid steps, at the height each will leave the
+-- ground at: a wall is its path, an area is its outline closed, and a ramp is
+-- its two ends joined. A raise stands lift above the ground under each point
+-- of the line, a level is at one height, a ramp climbs from one end to the
+-- other, and a smooth step lies on the ground.
 -- @param steps table[]? from M.laySteps
--- @return table[] { x1, z1, x2, z2, blocked }, blocked when the step has a
---   point off the map
+-- @return table[] { x1, z1, x2, z2, blocked, lift? or y1, y2 }, blocked when
+--   the step has a point off the map, lift to add to the ground at each point
+--   of the line, y1 and y2 the height at each end instead
 function M.outlines(steps)
 	local out = {}
+	local function add(step, a, b, heights)
+		local seg = { x1 = a.x, z1 = a.z, x2 = b.x, z2 = b.z, blocked = step.blocked == true }
+		if heights then
+			seg.y1, seg.y2 = heights[1], heights[2]
+		elseif step.kind == "level" then
+			seg.y1 = step.base + step.height
+			seg.y2 = seg.y1
+		elseif step.kind == "raise" then
+			seg.lift = step.height
+		else
+			seg.lift = 0
+		end
+		out[#out + 1] = seg
+	end
 	for _, step in ipairs(steps or {}) do
 		local points = step.points
+		local ends = step.kind == "ramp" and { step.base + step.heights[1], step.base + step.heights[2] } or nil
 		for i = 1, #points - 1 do
-			out[#out + 1] = { x1 = points[i].x, z1 = points[i].z, x2 = points[i + 1].x, z2 = points[i + 1].z, blocked = step.blocked == true }
+			add(step, points[i], points[i + 1], ends)
 		end
 		if step.shape == "area" and #points > 2 then
-			local last = points[#points]
-			out[#out + 1] = { x1 = last.x, z1 = last.z, x2 = points[1].x, z2 = points[1].z, blocked = step.blocked == true }
+			add(step, points[#points], points[1], ends)
 		end
+	end
+	return out
+end
+
+-- How far above a step's finished height its label floats, in elmos.
+M.LABEL_LIFT = 24
+
+--- A change in elmos as a label reads it: a sign, or a bare 0.
+local function signed(n)
+	n = math.floor(n + 0.5)
+	if n == 0 then
+		return "0"
+	end
+	return string.format("%+d", n)
+end
+
+--- One label for each laid step, saying what it does to the ground, placed
+-- over the middle of the step at its finished height.
+-- @param steps table[]? from M.laySteps
+-- @return table[] { x, y, z, text } in world space
+function M.labels(steps)
+	local out = {}
+	for _, step in ipairs(steps or {}) do
+		local sx, sz = 0, 0
+		for _, p in ipairs(step.points) do
+			sx, sz = sx + p.x, sz + p.z
+		end
+		local cx, cz = sx / #step.points, sz / #step.points
+		local top, text
+		if step.kind == "raise" then
+			top, text = Spring.GetGroundHeight(cx, cz) + step.height, signed(step.height)
+		elseif step.kind == "level" then
+			top, text = step.base + step.height, "level " .. signed(step.height)
+		elseif step.kind == "ramp" then
+			top = step.base + (step.heights[1] + step.heights[2]) / 2
+			text = "ramp " .. signed(step.heights[1]) .. " to " .. signed(step.heights[2])
+		else
+			top, text = Spring.GetGroundHeight(cx, cz), "smooth"
+		end
+		out[#out + 1] = { x = cx, y = top + M.LABEL_LIFT, z = cz, text = text }
 	end
 	return out
 end
