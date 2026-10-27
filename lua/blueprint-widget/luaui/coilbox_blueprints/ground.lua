@@ -120,22 +120,29 @@ end
 
 --- RegisterStructure, lines 3527-3563: the corners a building blocks, edges
 -- included.
--- @param blocked table the set to add to
 -- @param s table { x, z, xsize, zsize, facing }, the position and the
 --   footprint in the engine's own units (half squares of 8 elmos), as a unit
 --   def gives it
-local function addStructure(blocked, s)
+-- @param visit function(x, z) called for each corner
+local function eachCorner(s, visit)
 	local ux = floor((s.x + 4) / SQUARE) * SQUARE
 	local uz = floor((s.z + 4) / SQUARE) * SQUARE
-	local hx, hz = s.xsize * 4, s.zsize * 4
+	local def = s.def
+	local hx, hz = (s.xsize or (def and def.xsize) or 0) * 4, (s.zsize or (def and def.zsize) or 0) * 4
 	if s.facing == 1 or s.facing == 3 then
 		hx, hz = hz, hx
 	end
 	for x = ux - hx, ux + hx, SQUARE do
 		for z = uz - hz, uz + hz, SQUARE do
-			setc(blocked, x, z, true)
+			visit(x, z)
 		end
 	end
+end
+
+local function addStructure(blocked, s)
+	eachCorner(s, function(x, z)
+		setc(blocked, x, z, true)
+	end)
 end
 M.addStructure = addStructure
 
@@ -552,7 +559,7 @@ local function estimate(segments, original, mult)
 	local volumeCost = VOLUME_COST * mult * INBUILT_COST_MULT
 	local perimeterCost = POINT_EXTRA_PERIMETER_COST * mult * INBUILT_COST_MULT
 	local areaCostEach = POINT_EXTRA_AREA_COST * mult * INBUILT_COST_MULT
-	local metal = 0
+	local metal, pyramidTotal = 0, 0
 	for _, segment in ipairs(segments) do
 		local area = {}
 		for _, p in ipairs(segment) do
@@ -586,9 +593,10 @@ local function estimate(segments, original, mult)
 		if volume ~= 0 then
 			local base = areaCost * areaCostEach + perimeter * perimeterCost + BASE_TERRAUNIT_COST
 			metal = metal + volume * volumeCost + base + pyramid
+			pyramidTotal = pyramidTotal + pyramid
 		end
 	end
-	return metal
+	return metal, pyramidTotal
 end
 
 --------------------------------------------------------------------------------
@@ -924,27 +932,32 @@ end
 -- A layout's steps
 --------------------------------------------------------------------------------
 
---- Start working out ground. Steps are added with session.apply, each group in
--- the order it was given, on the ground the groups before it left.
+--- Start working out ground. Steps are added with session.apply, each layout in
+-- the order it was given, on the ground the layouts before it left.
 -- @param env table { heightAt = function(x, z), corners = { x, z }?, structures
---   = table[]? , costMult = number? }. corners is how many heightmap corners the
---   map has each way, so reads and writes stay on the map. structures are the
---   buildings standing now, each { x, z, xsize, zsize, facing }.
+--   = table[] or function(minX, minZ, maxX, maxZ) -> table[], costMult =
+--   number? }. corners is how many heightmap corners the map has each way, so
+--   reads and writes stay on the map. structures are the buildings standing
+--   now, each { x, z, xsize, zsize, facing }. A function is asked once for each
+--   layout, for the buildings that could stop its slopes.
 -- @return table session
 function M.session(env)
 	local reader = newReader(env)
 	local blocked = {}
-	for _, s in ipairs(env.structures or {}) do
-		addStructure(blocked, s)
+	if type(env.structures) == "table" then
+		for _, s in ipairs(env.structures) do
+			addStructure(blocked, s)
+		end
 	end
-	local session = { metal = 0, results = {}, reader = reader, blocked = blocked }
+	local session = { metal = 0, work = 0, results = {}, reader = reader, blocked = blocked }
 
 	--- Add one layout's steps.
 	-- @param steps table[] laid steps. Each has after, how many of foot come
 	--   ahead of it, and base, the ground under the layout's pivot.
-	-- @param foot table[]? the layout's buildings in build order, each { x, z,
-	--   xsize, zsize, facing } (or def.xsize and def.zsize). Those ahead of a
-	--   step are standing when it is built and a slope stops short of them.
+	-- @param foot table[]? the layout's buildings, each { x, z, xsize, zsize,
+	--   facing } (or def.xsize and def.zsize), numbered by seq or by place. Those
+	--   numbered up to a step's after are standing when it is built, and a slope
+	--   stops short of them.
 	-- @return table[] a result for each step, in the order it was built
 	function session.apply(steps, foot)
 		foot = foot or {}
@@ -959,6 +972,39 @@ function M.session(env)
 			end
 			return a < b
 		end)
+
+		-- every step's points and estimate come first, from the ground as it is
+		-- now, since that is when the gadget works them out
+		local prepared = {}
+		local minX, minZ, maxX, maxZ = math.huge, math.huge, -math.huge, -math.huge
+		for _, index in ipairs(order) do
+			local step = steps[index]
+			local pivot = step.base or reader.original(step.points[1].x, step.points[1].z)
+			local segments = stepSegments(step, reader.original, pivot)
+			prepared[index] = { segments = segments }
+			if segments then
+				prepared[index].metal, prepared[index].pyramid = estimate(segments, reader.original, env.costMult or 1)
+				local most = 0
+				for _, segment in ipairs(segments) do
+					for _, p in ipairs(segment) do
+						minX, maxX = min(minX, p.x), max(maxX, p.x)
+						minZ, maxZ = min(minZ, p.z), max(maxZ, p.z)
+						most = max(most, abs(p.aim - reader.original(p.x, p.z)))
+					end
+				end
+				prepared[index].reach = M.reach(most)
+			end
+		end
+		if type(env.structures) == "function" and minX ~= math.huge then
+			local reach = 0
+			for _, p in pairs(prepared) do
+				reach = max(reach, p.reach or 0)
+			end
+			for _, s in ipairs(env.structures(minX - reach, minZ - reach, maxX + reach, maxZ + reach) or {}) do
+				addStructure(blocked, s)
+			end
+		end
+
 		-- the layout's own buildings stand only once they are built, so they go
 		-- into a copy
 		local copy = {}
@@ -969,28 +1015,39 @@ function M.session(env)
 			end
 			copy[iz] = r
 		end
+		local bySeq = {}
+		for i, b in ipairs(foot) do
+			bySeq[#bySeq + 1] = { seq = b.seq or i, building = b }
+		end
+		table.sort(bySeq, function(a, b)
+			return a.seq < b.seq
+		end)
 		local built = 0
 		local out = {}
 		for _, index in ipairs(order) do
 			local step = steps[index]
-			while built < min(step.after or 0, #foot) do
+			while bySeq[built + 1] and bySeq[built + 1].seq <= (step.after or 0) do
 				built = built + 1
-				local b = foot[built]
-				if b then
-					local def = b.def
-					addStructure(copy, { x = b.x, z = b.z, xsize = b.xsize or (def and def.xsize) or 0, zsize = b.zsize or (def and def.zsize) or 0, facing = b.facing or 0 })
-				end
+				addStructure(copy, bySeq[built].building)
 			end
-			local pivot = step.base or reader.original(step.points[1].x, step.points[1].z)
-			local segments = stepSegments(step, reader.original, pivot)
+			local segments = prepared[index].segments
 			local result
 			if not segments then
 				result = { index = index, outcome = "refused", metal = 0, shape = {}, slope = {} }
 			else
-				local cost = estimate(segments, reader.original, env.costMult or 1)
 				local done = build(segments, reader, copy)
-				done.index, done.metal = index, cost
-				session.metal = session.metal + cost
+				done.index, done.metal = index, prepared[index].metal
+				-- What the builders spend doing it. The estimate guesses the volume
+				-- of the slope from its height, and the work is the ground the slope
+				-- actually moves, which is more for a wall and about the same for a
+				-- pad (measured in #4797).
+				local moved = 0
+				for _, e in ipairs(done.slope) do
+					moved = moved + abs(e.target - reader.original(e.x, e.z))
+				end
+				done.work = prepared[index].metal - prepared[index].pyramid + moved * VOLUME_COST * (env.costMult or 1) * INBUILT_COST_MULT
+				session.metal = session.metal + done.metal
+				session.work = session.work + done.work
 				result = done
 			end
 			out[#out + 1] = result
@@ -1018,18 +1075,35 @@ function M.session(env)
 	return session
 end
 
---- The corners a building's footprint covers, as the gadget registers them.
--- @return function(x, z) -> boolean for a set of corners
-function M.footprintCorners(b)
-	local def = b.def
-	local set = {}
-	addStructure(set, { x = b.x, z = b.z, xsize = b.xsize or (def and def.xsize) or 0, zsize = b.zsize or (def and def.zsize) or 0, facing = b.facing or 0 })
-	return set
-end
-
---- Whether a corner is in a set M.footprintCorners made.
-function M.has(set, x, z)
-	return getc(set, x, z) == true
+--- Which of some buildings stand on a slope that a step built, which a
+-- building may not do.
+-- @param results table[] from session.apply
+-- @param foot table[] buildings, each { x, z, xsize, zsize, facing } or with a def
+-- @return boolean[] by place in foot
+function M.onSlope(results, foot)
+	local steep = {}
+	local any = false
+	for _, r in ipairs(results) do
+		for _, e in ipairs(r.slope) do
+			if e.steep then
+				setc(steep, e.x, e.z, true)
+				any = true
+			end
+		end
+	end
+	local out = {}
+	for i, b in ipairs(foot) do
+		local hit = false
+		if any then
+			eachCorner(b, function(x, z)
+				if getc(steep, x, z) then
+					hit = true
+				end
+			end)
+		end
+		out[i] = hit
+	end
+	return out
 end
 
 --- How far out from a step's points a slope can reach, for finding the

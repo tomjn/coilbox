@@ -205,6 +205,18 @@ do
 	check("a building after the step does not stop it", same(profile(after, AT, SOUTH, 8), { 100, 100, 100, 72, 44, 16, 4, 0 }), show(profile(after, AT, SOUTH, 8)))
 	local standing = run(FLAT, { wall(100, 0) }, nil, { building })
 	check("a building already standing stops it, whatever the step's place", same(profile(standing, AT, SOUTH, 5), { 100, 72, 44, 16, 0 }), show(profile(standing, AT, SOUTH, 5)))
+	-- a building numbered 5 is ahead of a step that comes after 5, and not of one that comes after 4
+	local numbered = { x = 512, z = 576, xsize = 16, zsize = 8, facing = 0, seq = 5 }
+	local late = run(FLAT, { wall(100, 5) }, { numbered })
+	local early = run(FLAT, { wall(100, 4) }, { numbered })
+	check("a building is ahead of a step by its seq", same(profile(late, AT, SOUTH, 5), { 100, 72, 44, 16, 0 }) and same(profile(early, AT, SOUTH, 5), { 100, 100, 100, 72, 44 }), show(profile(early, AT, SOUTH, 5)))
+	local asked
+	local env = { heightAt = FLAT.heightAt, corners = FLAT.corners, structures = function(x1, z1, x2, z2)
+		asked = { x1, z1, x2, z2 }
+		return { building }
+	end }
+	local provided = GROUND.terraform(env, { wall(100, 0) })
+	check("buildings can be asked for once the steps' reach is known, and stop the slope", asked and asked[1] < 512 - 128 - 16 and asked[2] < 512 - 16 and asked[3] > 512 + 128 + 16 and asked[4] > 512 + 16 and same({ provided.session.reader.at(512, 512 + 8), provided.session.reader.at(512, 512 + 16), provided.session.reader.at(512, 512 + 32) }, { 72, 44, 0 }), show(asked))
 	local under = { x = 512, z = 512, xsize = 8, zsize = 8, facing = 0 }
 	local u = run(FLAT, { wall(20, 1) }, { under })
 	check("the ground under a building inside the step is left alone", u.at(512, 512) == 0 and u.at(560, 512) == 20, show({ u.at(512, 512), u.at(560, 512) }))
@@ -246,6 +258,19 @@ do
 	check("it scales by terracostmult, but not the base cost", math.abs(doubled.metal - 91.4336) < 1e-9, tostring(doubled.metal))
 	local both = run(FLAT, { one, one })
 	check("it adds up across steps", math.abs(both.metal - 2 * 48.7168) < 1e-9)
+end
+
+do
+	-- The work is what the builders spend, which is the estimate with its guess
+	-- at the slope replaced by the slope's own volume. In a real match a wall of
+	-- three points raised by 112 had an estimate of 141.136 and took 158.7384
+	-- (#4797). The work here is 154.06, the estimate 12 percent short of what was
+	-- spent and the work 3 percent short.
+	local wall3 = laid({ kind = "raise", shape = "wall", points = { { x = -48, z = 0 }, { x = 0, z = 0 }, { x = 48, z = 0 } }, height = 112 }, 0, 118.105)
+	local r = GROUND.terraform({ heightAt = function()
+		return 118.105
+	end, corners = FLAT.corners }, { wall3 })
+	check("the work for a wall raised by 112 is the estimate with its slope replaced by the slope's volume", math.abs(r.metal - 141.136) < 1e-9 and math.abs(r.session.work - 154.0637) < 0.001, r.metal .. " " .. r.session.work)
 end
 
 --------------------------------------------------------------------------------
