@@ -328,7 +328,10 @@ export default function BlueprintDetailPage() {
 
       {saveError && <ErrorBanner message={t`Not saved: ${saveError}`} />}
 
+      {/* Keyed by the blueprint, so opening another one starts with nothing
+          selected, no tool in hand and the camera on the new layout. */}
       <BlueprintEditor
+        key={record.id}
         blueprint={layout}
         gameName={gameName}
         terrainTools
