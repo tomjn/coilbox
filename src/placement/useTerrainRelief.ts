@@ -84,7 +84,7 @@ export function useTerrainRelief({
   range: HeightRange;
   steps: readonly TerrainStep[];
   placement: LayoutPlacement;
-  /** `layoutRects`, held steady between renders. */
+  /** `layoutRects`. */
   footprints: readonly Rect[];
   /** The game's terrain switch. False draws the steps and leaves the ground. */
   enabled: boolean;
@@ -123,15 +123,23 @@ export function useTerrainRelief({
     return kept;
   }, [steps, enabled, playbackStep]);
 
+  // Compared by what they say, so a caller that builds them afresh each render
+  // does not work the ground out again each render.
+  const placementKey = JSON.stringify(placement);
+  const footprintsKey = JSON.stringify(footprints);
+  const latest = useRef({ placement, footprints });
+  latest.current = { placement, footprints };
+
   const wasWatching = useRef(false);
   // A layout effect, so the heights are worked out before the frame is painted
   // and nothing reads ground a step behind the one on screen.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: the keys stand for the placement and the footprints, which are read through the ref
   useLayoutEffect(() => {
     if (!relief) return;
     const change = relief.update(
       live.map((index) => steps[index]),
-      placement,
-      footprints,
+      latest.current.placement,
+      latest.current.footprints,
     );
     setApplied({
       relief,
@@ -144,7 +152,15 @@ export function useTerrainRelief({
       animate: playbackStep !== null && wasWatching.current && !reduceMotion,
     });
     wasWatching.current = playbackStep !== null;
-  }, [relief, live, steps, placement, footprints, playbackStep, reduceMotion]);
+  }, [
+    relief,
+    live,
+    steps,
+    placementKey,
+    footprintsKey,
+    playbackStep,
+    reduceMotion,
+  ]);
 
   const current = applied && applied.relief === relief ? applied : null;
 

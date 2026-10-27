@@ -9,6 +9,7 @@ import {
   terraform,
 } from "@/blueprint/terraform";
 import { decimateHeights } from "@/mapconv/heightGrid";
+import { heightGrid } from "./terrain";
 import {
   decimationFor,
   flatSource,
@@ -16,7 +17,6 @@ import {
   Relief,
   writeDisplacement,
 } from "./terrainRelief";
-import { heightGrid } from "./terrain";
 
 /** A 2048 elmo square map, 257 corners a side, with hills that are not
  *  symmetrical, so a window that read the wrong corners would show. */

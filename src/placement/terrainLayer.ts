@@ -310,7 +310,6 @@ export function createTerrainLayer(deps: {
     draw: (marks, selected, dim) => {
       clear();
       const groundAt = deps.groundAt();
-      const faint = dim ? 0.35 : 1;
       for (const mark of marks) {
         const chosen = mark.index === selected;
         const hex = chosen
@@ -318,7 +317,7 @@ export function createTerrainLayer(deps: {
           : mark.tone === "up"
             ? UP_HEX
             : GREY_HEX;
-        const opacity = chosen ? 1 : mark.asDrawn ? 0.55 * faint : 0.9 * faint;
+        const opacity = chosen ? 1 : dim ? 0.5 : mark.asDrawn ? 0.6 : 0.9;
         const add = (object: THREE.Object3D | null) => {
           if (object) root.add(object);
         };
