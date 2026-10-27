@@ -30,10 +30,12 @@ import {
   buildGridSnap,
   buildingFootprints,
   type FootprintMark,
+  SQUARE_SIZE,
 } from "@/blueprint/footprint";
-import type { BaseBlueprint } from "@/blueprint/model";
+import type { BaseBlueprint, TerrainStep } from "@/blueprint/model";
 import { offGridBuildings, onBuildGrid } from "@/blueprint/offGrid";
 import { buildingColors } from "@/blueprint/role";
+import { useTerrainChanges } from "@/blueprint/terrainSwitch";
 import {
   Popover,
   PopoverContent,
@@ -64,7 +66,13 @@ import { isTypingTarget } from "@/lib/scenarioEditing/history";
 import { baseBuildings, type Point } from "@/scenario/model";
 import { BLUEPRINT_BASE_ID, blueprintDocument } from "./blueprintDocument";
 import { useLayoutHistory } from "./blueprintHistory";
-import { GRID_EXTENT, GRID_ORIGIN, gridGround, layoutFraming } from "./ground";
+import {
+  GRID_EXTENT,
+  GRID_ORIGIN,
+  GRID_RELIEF,
+  gridGround,
+  layoutFraming,
+} from "./ground";
 import {
   BuildOrderPopover,
   LayoutNameField,
@@ -89,10 +97,12 @@ import {
   TurnNote,
 } from "./SurfaceBars";
 import { focusCamera, focusDistance, worldToScene } from "./scene";
+import { flatSource } from "./terrainRelief";
 import { useLayoutPreview } from "./useLayoutPreview";
 import { useMapEditing } from "./useMapEditing";
 import { useScenarioFootprints } from "./useScenarioFootprints";
 import { useScenarioUnits } from "./useScenarioUnits";
+import { layoutRects, useTerrainRelief } from "./useTerrainRelief";
 
 /** How long one building of a build order stands on screen before the next one
  *  arrives, the same pace the scenario editor watches a base go up at. */
@@ -101,6 +111,19 @@ const PLAYBACK_STEP_MS = 700;
 /** The ground every blueprint is drawn on: flat, gridded and the same size
  *  every time, so a layout looks the same wherever it is opened. */
 const GROUND = gridGround();
+
+/** The floor before any terrain step: level, a corner every 8 elmos. */
+const FLOOR = flatSource(
+  GROUND.worldWidth / SQUARE_SIZE + 1,
+  GROUND.worldHeight / SQUARE_SIZE + 1,
+);
+
+/** Where the layout stands on the floor, which is where a step's heights are
+ *  measured from. */
+const STANDING = { at: GRID_ORIGIN, quarters: 0 };
+
+/** For a layout with no terrain steps, so the hook is not handed a new list. */
+const NO_STEPS: TerrainStep[] = [];
 
 /** One list for every "nothing to draw", so a layer with nothing on it is not
  *  cleared and redrawn on every render. */
@@ -150,7 +173,7 @@ export function BlueprintEditor({
     onChange,
   });
 
-  const { units, loading: unitsLoading } = useGameUnits(gameName);
+  const { units, loading: unitsLoading, archive } = useGameUnits(gameName);
   const buildings = useMemo(() => buildingUnits(units), [units]);
   const snap = useMemo(() => buildGridSnap(units), [units]);
   // What each building does, coloured the way the in-game widget colours it.
@@ -194,7 +217,36 @@ export function BlueprintEditor({
     return () => clearInterval(timer);
   }, [advancing, total]);
 
-  const drawn = useScenarioUnits(handle, doc, GROUND, undrawn);
+  // The ground the terrain steps leave: drawn on the floor, and read by the
+  // models and the building verdicts below (issue #4794). Steps drawn faintly and
+  // the floor left level when the game's terrain switch is off.
+  const { enabled: terrainOn } = useTerrainChanges(archive, units);
+  const reliefInputs = useMemo(
+    () => layoutRects(blueprint.buildings, GRID_ORIGIN, units),
+    [blueprint.buildings, units],
+  );
+  const terrain = useTerrainRelief({
+    handle,
+    source: FLOOR,
+    range: GRID_RELIEF,
+    steps: blueprint.terrain ?? NO_STEPS,
+    placement: STANDING,
+    footprints: reliefInputs,
+    enabled: terrainOn !== false,
+    // The terrain tools' selected step goes here (issue #4793).
+    selected: null,
+    playbackStep: playing ? playing.step : null,
+    reduceMotion,
+  });
+  const ground = useMemo(
+    () => ({
+      ...GROUND,
+      relief: terrain.relief,
+      reliefVersion: terrain.version,
+    }),
+    [terrain.relief, terrain.version],
+  );
+  const drawn = useScenarioUnits(handle, doc, ground, undrawn);
   // The ground here is flat on purpose rather than unread, so every building
   // gets a real verdict and the squares are not a screen full of dashes saying
   // nothing is known (issue #1491).

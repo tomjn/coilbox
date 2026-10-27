@@ -94,6 +94,15 @@ export interface GroundHeights {
   height: number;
   /** Row-major, row 0 at the map's north, in elmos. */
   heights: Float32Array;
+  /**
+   * For a block cut out of a larger map: the map's corner this block's first
+   * corner is. Positions stay in the map's own elmos, so a result does not
+   * differ from the whole map's by a rounding of the sums, and a read or write
+   * outside the block is clamped or dropped as one outside the map is. 0, 0 if
+   * absent.
+   */
+  col?: number;
+  row?: number;
 }
 
 /** Where a layout stands, the way the widget's `place.lua` takes it: turned
@@ -271,6 +280,8 @@ export function terraform(
     ground: {
       width: ground.width,
       height: ground.height,
+      col: ground.col,
+      row: ground.row,
       heights: current.heights,
     },
     metal,
@@ -299,18 +310,23 @@ function mod(a: number, b: number): number {
  *  clamped to the map. */
 class Reader {
   constructor(
-    readonly dims: { width: number; height: number },
+    readonly dims: {
+      width: number;
+      height: number;
+      col?: number;
+      row?: number;
+    },
     readonly heights: Float32Array,
   ) {}
 
   private index(x: number, z: number): number {
     const c = Math.min(
       this.dims.width - 1,
-      Math.max(0, Math.round(x / SQUARE)),
+      Math.max(0, Math.round(x / SQUARE) - (this.dims.col ?? 0)),
     );
     const r = Math.min(
       this.dims.height - 1,
-      Math.max(0, Math.round(z / SQUARE)),
+      Math.max(0, Math.round(z / SQUARE) - (this.dims.row ?? 0)),
     );
     return r * this.dims.width + c;
   }
@@ -321,8 +337,8 @@ class Reader {
 
   /** A write off the map goes nowhere, as `Spring.SetHeightMap`'s does. */
   set(x: number, z: number, h: number): void {
-    const c = x / SQUARE;
-    const r = z / SQUARE;
+    const c = x / SQUARE - (this.dims.col ?? 0);
+    const r = z / SQUARE - (this.dims.row ?? 0);
     if (!Number.isInteger(c) || !Number.isInteger(r)) return;
     if (c < 0 || r < 0 || c >= this.dims.width || r >= this.dims.height) {
       return;
