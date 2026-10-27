@@ -7,6 +7,7 @@
 import { describe, expect, it } from "vitest";
 import { heightGrid } from "@/placement/terrain";
 import ringSidesFixture from "./fixtures/ring-sides.json";
+import wallPiecesFixture from "./fixtures/wall-pieces.json";
 import type { Rect } from "./footprint";
 import type { TerrainStep } from "./model";
 import {
@@ -16,6 +17,7 @@ import {
   type LayoutPlacement,
   ringSides,
   terraform,
+  wallPieces,
 } from "./terraform";
 
 /** A 1024 elmo square map, 129 corners a side. */
@@ -626,12 +628,24 @@ describe("a closed ring of wall (#4826)", () => {
   });
 
   it("costs the same as the sides ordered as four walls of their own", () => {
-    const sides: TerrainStep[] = [0, 1, 2, 3].map((i) => ({
+    // A ring of 192 elmo sides, so that no side is long enough to be cut into
+    // blocks when it is ordered as a wall of its own (#4833).
+    const small: TerrainStep = {
       ...RING,
-      points: [RING.points[i], RING.points[i + 1]],
+      points: [
+        { x: -96, z: -96 },
+        { x: 96, z: -96 },
+        { x: 96, z: 96 },
+        { x: -96, z: 96 },
+        { x: -96, z: -96 },
+      ],
+    };
+    const sides: TerrainStep[] = [0, 1, 2, 3].map((i) => ({
+      ...small,
+      points: [small.points[i], small.points[i + 1]],
     }));
     const apart = terraform(FLAT, sides, AT_CENTRE, []);
-    const ring = terraform(FLAT, [RING], AT_CENTRE, []);
+    const ring = terraform(FLAT, [small], AT_CENTRE, []);
     expect(ring.metal).toBeCloseTo(apart.metal, 9);
     expect(Array.from(ring.ground.heights)).toEqual(
       Array.from(apart.ground.heights),
@@ -645,6 +659,125 @@ describe("a closed ring of wall (#4826)", () => {
         sides === null ? null : sides.map((s) => s.points),
         c.name,
       ).toEqual(c.sides);
+    }
+  });
+});
+
+describe("an open wall longer than a block (#4833)", () => {
+  // The widget orders an open wall one block of 224 elmos at a time (#4816), and
+  // Zero-K charges the corners where two blocks meet once for each. These are
+  // the two walls the Zero-K driver measures, ordered as the widget orders
+  // them. Zero-K estimated these amounts of metal, and the ground it left was
+  // the model's to the elmo.
+  const STRAIGHT: TerrainStep = {
+    kind: "raise",
+    shape: "wall",
+    points: [
+      { x: -400, z: 0 },
+      { x: 400, z: 0 },
+    ],
+    height: 112,
+    before: 0,
+  };
+  const BENT: TerrainStep = {
+    ...STRAIGHT,
+    points: [
+      { x: -200, z: 150 },
+      { x: 200, z: 150 },
+      { x: 200, z: -150 },
+    ],
+  };
+
+  it("costs what Zero-K estimated for a straight wall of four blocks", () => {
+    expect(terraform(FLAT, [STRAIGHT], AT_CENTRE, []).metal).toBeCloseTo(
+      995.1864,
+      2,
+    );
+    expect(
+      terraform(FLAT, [{ ...STRAIGHT, height: 70 }], AT_CENTRE, []).metal,
+    ).toBeCloseTo(631.7688, 2);
+  });
+
+  it("costs what Zero-K estimated for a wall with a corner", () => {
+    // The driver held this wall 4 elmos off the 16 elmo grid in z, and where a
+    // wall sits on that grid changes where its corners overlap: held on the grid
+    // the model gives 893.9048 at 112, which the driver did not measure.
+    const off: LayoutPlacement = { at: { x: 512, z: 676 }, quarters: 0 };
+    expect(terraform(FLAT, [BENT], off, []).metal).toBeCloseTo(908.3736, 2);
+    expect(
+      terraform(FLAT, [{ ...BENT, height: 70 }], off, []).metal,
+    ).toBeCloseTo(578.2872, 2);
+    expect(terraform(FLAT, [BENT], AT_CENTRE, []).metal).toBeCloseTo(
+      893.9048,
+      2,
+    );
+  });
+
+  it("reports one result for the wall, with the blocks' metal added up", () => {
+    const result = terraform(FLAT, [STRAIGHT], AT_CENTRE, []);
+    expect(result.steps).toHaveLength(1);
+    expect(result.steps[0]).toMatchObject({ index: 0, outcome: "built" });
+    expect(result.steps[0].metal).toBeCloseTo(result.metal, 6);
+  });
+
+  it("costs the same as the blocks ordered as walls of their own", () => {
+    const fixture = wallPiecesFixture.find((c) =>
+      c.name.startsWith("a straight wall"),
+    );
+    if (!fixture?.pieces) throw new Error("the fixture has no straight wall");
+    const apart = terraform(
+      FLAT,
+      fixture.pieces.map((points) => ({ ...STRAIGHT, points })),
+      AT_CENTRE,
+      [],
+    );
+    const wall = terraform(FLAT, [STRAIGHT], AT_CENTRE, []);
+    expect(wall.metal).toBeCloseTo(apart.metal, 9);
+    expect(Array.from(wall.ground.heights)).toEqual(
+      Array.from(apart.ground.heights),
+    );
+  });
+
+  it("raises the ground along the whole wall, across the cuts too", () => {
+    const { ground: after } = terraform(FLAT, [STRAIGHT], AT_CENTRE, []);
+    const measured = [112, 112, 112, 84, 56, 28, 4, 0];
+    // across the wall in the middle of a block, and across a cut at x = 336
+    expect(profile(after, CENTRE, SOUTH, 8)).toEqual(measured);
+    expect(profile(after, { x: 336, z: 512 }, SOUTH, 8)).toEqual(measured);
+    expect(heightAt(after, 112, 512)).toBe(112);
+    expect(heightAt(after, 912, 512)).toBe(112);
+  });
+
+  it("leaves a wall of one block and a ramp as one order", () => {
+    const block = {
+      ...STRAIGHT,
+      points: [
+        { x: 0, z: 0 },
+        { x: 224, z: 0 },
+      ],
+    };
+    expect(wallPieces(block)).toBeNull();
+    const ramp: TerrainStep = {
+      kind: "ramp",
+      shape: "wall",
+      points: [
+        { x: -400, z: 0 },
+        { x: 400, z: 0 },
+      ],
+      heights: [0, 64],
+      width: 64,
+      before: 0,
+    };
+    expect(wallPieces(ramp)).toBeNull();
+  });
+
+  it("cuts a wall into the pieces in the shared fixture", () => {
+    for (const c of wallPiecesFixture) {
+      const pieces = wallPieces({ ...STRAIGHT, points: c.points });
+      expect(
+        pieces === null ? null : pieces.map((p) => p.points),
+        c.name,
+      ).toEqual(c.pieces);
     }
   });
 });

@@ -39,8 +39,10 @@
  *   check that drops points too thin to hold (lines 2324-2407) also looks at the
  *   whole step rather than one block.
  * - A closed ring of wall is modelled as its sides, one order each (see
- *   `ringSides`), because that is how the widget orders it. The corners the
- *   sides share are charged once for each side, as Zero-K does.
+ *   `ringSides`), and an open wall longer than 224 elmos as one order for each
+ *   block of that length (see `wallPieces`), because that is how the widget
+ *   orders them. The corners the parts share are charged once for each part, as
+ *   Zero-K does.
  * - A level or ramp is ordered with the gadget's volume selection its `only`
  *   names: both ways when it has none, raise or lower otherwise (lines
  *   523-535). Raise and smooth steps are always ordered with 0.
@@ -262,6 +264,60 @@ export function ringSides(step: TerrainStep): TerrainStep[] | null {
   return sides;
 }
 
+/** How long a block of wall Zero-K builds with one terraform unit is: 14 of
+ *  its path points, 16 elmos apart. */
+export const WALL_BLOCK = WALL_SEGMENT_LENGTH * 16;
+
+const length = (a: Point, b: Point) =>
+  Math.sqrt((b.x - a.x) ** 2 + (b.z - a.z) ** 2);
+
+/**
+ * The orders for an open wall longer than one block, or null when the step is
+ * not one. The widget cuts such a wall into one order for each block of 224
+ * elmos, measured along the wall round its corners, so that builders can work
+ * along it from outside (`wallPieces` in `place.lua`). Each cut is put on the
+ * 16 elmo grid, and the pieces share the point they meet at, so Zero-K charges
+ * that point's corners once for each piece. A ramp is one order and a closed
+ * ring is cut into sides (`ringSides`). `fixtures/wall-pieces.json` holds cases
+ * both implementations are tested against.
+ */
+export function wallPieces(step: TerrainStep): TerrainStep[] | null {
+  const { points } = step;
+  if (step.shape !== "wall" || step.kind === "ramp" || points.length < 2) {
+    return null;
+  }
+  let total = 0;
+  for (let i = 0; i < points.length - 1; i++) {
+    total += length(points[i], points[i + 1]);
+  }
+  if (total <= WALL_BLOCK) return null;
+  const snap = (v: number) => Math.floor(v / 16 + 0.5) * 16;
+  const pieces: Point[][] = [];
+  let current: Point[] = [{ x: points[0].x, z: points[0].z }];
+  let run = 0;
+  for (let i = 0; i < points.length - 1; i++) {
+    const a = points[i];
+    const b = points[i + 1];
+    const len = length(a, b);
+    let along = 0;
+    while (len - along > WALL_BLOCK - run) {
+      along += WALL_BLOCK - run;
+      const cut = {
+        x: snap(a.x + ((b.x - a.x) * along) / len),
+        z: snap(a.z + ((b.z - a.z) * along) / len),
+      };
+      current.push(cut);
+      pieces.push(current);
+      current = [{ x: cut.x, z: cut.z }];
+      run = 0;
+    }
+    run += len - along;
+    current.push({ x: b.x, z: b.z });
+  }
+  if (current.length > 1 && run > 0) pieces.push(current);
+  return pieces.map((piece) => ({ ...step, points: piece }));
+}
+
 /** One step's result from the results of its parts: the cost added up, the
  *  corners joined, and the outcome the parts share. */
 function joined(index: number, parts: readonly StepResult[]): StepResult {
@@ -309,10 +365,11 @@ export function terraform(
       const rect = footprints[built];
       if (rect) addStructure(blocked, rect);
     }
-    // A closed ring is ordered a side at a time, which is how the widget sends
-    // it, so each side is modelled as an order of its own. They all measure the
-    // ground as it was, so the order the sides are built in does not matter.
-    const parts = ringSides(step) ?? [step];
+    // A closed ring is ordered a side at a time and a long open wall a block at
+    // a time, which is how the widget sends them, so each part is modelled as an
+    // order of its own. They all measure the ground as it was, so the order the
+    // parts are built in does not matter.
+    const parts = ringSides(step) ?? wallPieces(step) ?? [step];
     const done: StepResult[] = [];
     for (const part of parts) {
       const segments = stepSegments(part, original, pivot);
