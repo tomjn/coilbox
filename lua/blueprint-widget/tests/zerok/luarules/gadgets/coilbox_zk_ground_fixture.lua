@@ -1,9 +1,9 @@
 -- The synced half of the Zero-K save ground fixture match (issue #4798).
 --
 -- Runs only when the start script's coilbox_mode is ground_build or
--- ground_place. It creates three constructors 1040 west of the map's middle,
--- gunships, because a walker that stands on a step while it rises is stranded
--- on top of it, and which one it stands on depends on its path. It keeps the
+-- ground_place. It creates three walking constructors 1040 west of the map's
+-- middle. Placing sends each clear of a step before it works on it, so none is
+-- stranded on top of a step that rises under it (#4816). It keeps the
 -- team's storage full, reports turrets and solar collectors as they
 -- finish, and ends the match at the end frame. The probe widget gives the
 -- orders and saves the ground.
@@ -70,7 +70,7 @@ if gadgetHandler:IsSyncedCode() then
 			local cz = 16 * math.floor(Game.mapSizeZ / 32)
 			for n = 1, BUILDERS do
 				local bx, bz = cx - 1040, cz + (n - 2) * 32
-				local unitID = Spring.CreateUnit("gunshipcon", bx, Spring.GetGroundHeight(bx, bz), bz, "east", TEAM)
+				local unitID = Spring.CreateUnit("cloakcon", bx, Spring.GetGroundHeight(bx, bz), bz, "east", TEAM)
 				Spring.SetUnitRulesParam(unitID, "coilbox_ground_builder", n)
 				builders[n] = unitID
 				Spring.Echo(string.format("GROUND fixture-builder n=%d id=%s", n, tostring(unitID)))

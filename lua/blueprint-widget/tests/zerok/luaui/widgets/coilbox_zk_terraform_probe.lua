@@ -29,6 +29,14 @@ local WALL_HEIGHT = tonumber(modOptions.coilbox_wall_height) or 112
 local OWN_TAGS = modOptions.coilbox_own_tags == "1"
 local PRIOR_FRAME = 60
 local ORDER_FRAME = 75
+-- With coilbox_shots=1, for a windowed run, it looks down on one case's lane,
+-- coilbox_shot_case, and takes a screenshot every SHOT_EVERY frames. It moves
+-- the camera only, never the mouse.
+local SHOTS = modOptions.coilbox_shots == "1"
+local SHOT_CASE = tonumber(modOptions.coilbox_shot_case) or 21
+local SHOT_EVERY = 150
+-- The first case with a ring of wall.
+local FIRST_RING_CASE = 21
 
 local turretDefID = UnitDefNames.turretlaser.id
 local solarDefID = UnitDefNames.energysolar.id
@@ -79,6 +87,13 @@ local PLACE = VFS.Include("LuaUI/coilbox_blueprints/place.lua", nil, VFS.RAW_FIR
 -- and the module that holds each terraform order until a builder nears its step
 local LATER = VFS.Include("LuaUI/coilbox_blueprints/pending_terraform.lua", nil, VFS.RAW_FIRST)
 LATER.use({ Spring = Spring })
+-- and the model of the ground each step changes, which placing sends the
+-- builders clear of (#4816). The orders go before any ground has changed, so
+-- the widget's copy of the heightmap is still the map's.
+local TERRAFORM = VFS.Include("LuaUI/coilbox_blueprints/terraform.lua", nil, VFS.RAW_FIRST)
+-- and the module that keeps each builder clear while it works on a step
+local CLEAR = VFS.Include("LuaUI/coilbox_blueprints/step_clear.lua", nil, VFS.RAW_FIRST)
+CLEAR.use({ Spring = Spring, UnitDefs = UnitDefs })
 
 -- The widget's model of the ground a blueprint leaves (issue #4797) is run by
 -- the fixture gadget, which can read the real heightmap. A widget in a headless
@@ -109,6 +124,9 @@ local function model(case, steps, foot)
 	Spring.SendLuaRulesMsg("coilbox_model " .. case .. " " .. serialise({ steps = steps, foot = plain }))
 end
 
+-- The case being ordered, for the log.
+local ordering = 0
+
 -- @param ahead table[]? buildings ahead of the wall in the blueprint's order
 local function blueprint(builders, cx, cz, shift, mode, withTurret, case, terrain, ahead)
 	PLACE.use({ Spring = Spring, UnitDefs = UnitDefs, UnitDefNames = UnitDefNames, Game = Game, WG = WG })
@@ -135,10 +153,41 @@ local function blueprint(builders, cx, cz, shift, mode, withTurret, case, terrai
 	if case then
 		model(case, steps, foot)
 	end
-	local plan = PLACE.plan(foot, PLACE.capabilities(builders), shift, mode, { steps = steps, on = true })
-	local sent = PLACE.issue(plan, LATER)
+	local ground = TERRAFORM.session({ heightAt = Spring.GetGroundHeight, corners = { x = Game.mapSizeX / 8 + 1, z = Game.mapSizeZ / 8 + 1 }, structures = {} }).apply(steps, foot)
+	local plan = PLACE.plan(foot, PLACE.capabilities(builders), shift, mode, { steps = steps, on = true, ground = ground })
+	local sent = PLACE.issue(plan, LATER, CLEAR)
 	Spring.Echo(string.format("PROBE blueprint sent=%d terraform=%d skipped=%d offMap=%d remainder=%d blocked=%d", sent, #plan.terraform, plan.skipped, plan.offMap, #plan.remainder, plan.blocked))
+	-- each builder's orders, and where each move sends it
+	for _, order in ipairs(plan.orders) do
+		local parts = {}
+		for _, c in ipairs(order.cmds) do
+			if c[1] == PLACE.CMD_MOVE then
+				parts[#parts + 1] = string.format("move@%d,%d", c[2][1] - cx, c[2][3] - cz)
+			else
+				parts[#parts + 1] = tostring(c[1])
+			end
+		end
+		Spring.Echo(string.format("PROBE orders case=%d unit=%d %s", ordering, order.unitID, table.concat(parts, ",")))
+	end
 end
+
+-- The walled outpost example (docs/reports/m93-examples): a turret on each
+-- corner of a ring of wall, and a solar collector inside it. The example's wall
+-- is 112 high, and these follow the match's wall height.
+local OUTPOST = {
+	{ def = "turretlaser", offset = { x = 0, z = 0 }, facing = 0 },
+	{ def = "turretlaser", offset = { x = 320, z = 0 }, facing = 0 },
+	{ def = "turretlaser", offset = { x = 320, z = 320 }, facing = 0 },
+	{ def = "turretlaser", offset = { x = 0, z = 320 }, facing = 0 },
+	{ def = "energysolar", offset = { x = 160, z = 160 }, facing = 0 },
+}
+local function ring(x0, z0, x1, z1)
+	return { { x = x0, z = z0 }, { x = x1, z = z0 }, { x = x1, z = z1 }, { x = x0, z = z1 }, { x = x0, z = z0 } }
+end
+local OUTPOST_RING = { { kind = "raise", shape = "wall", points = ring(0, 0, 320, 320), height = WALL_HEIGHT, before = 0 } }
+-- The wall ring, terrain only example, centred on the lane: its blueprint has
+-- no building to hold it by.
+local WALL_RING = { { kind = "raise", shape = "wall", points = ring(-192, -192, 192, 192), height = WALL_HEIGHT, before = 0 } }
 
 local LONG_AHEAD = {
 	{ def = "turretheavylaser", offset = { x = -160, z = 64 }, facing = 0 },
@@ -248,6 +297,17 @@ local CASES = {
 	{ name = "blueprint with a raised pad and five turrets, three builders split up", own = true, run = function(b, cx, cz)
 		blueprint(b, cx, cz, false, "split", true, 20, { { kind = "level", shape = "area", points = { { x = -64, z = -64 }, { x = 64, z = -64 }, { x = 64, z = 64 }, { x = -64, z = 64 } }, height = 40, before = 2 } }, PAD_TURRETS)
 	end },
+	-- Walking builders that have to step clear of what they raise (#4816). The
+	-- builders start on the west side of the ring's slope.
+	{ name = "the walled outpost, two builders together", own = true, run = function(b, cx, cz)
+		blueprint(b, cx, cz, false, "help", false, nil, OUTPOST_RING, OUTPOST)
+	end },
+	{ name = "the walled outpost, two builders split up", own = true, run = function(b, cx, cz)
+		blueprint(b, cx, cz, false, "split", false, nil, OUTPOST_RING, OUTPOST)
+	end },
+	{ name = "a ring of wall alone, two builders together", own = true, run = function(b, cx, cz)
+		blueprint(b, cx, cz, false, "help", false, 23, WALL_RING)
+	end },
 }
 
 local builders = {}
@@ -276,16 +336,40 @@ function widget:Initialize()
 		type(WG.Terraform_GetNextTag), type(WG.Terraform_SetPlacingRectangle)))
 	-- Zero-K ends a match at its first frame when the other allyteam has no
 	-- player or AI in it, unless cheats are on (game_over.lua, ProcessLastAlly).
-	Spring.SendCommands("cheat 1", "setmaxspeed 100", "setminspeed 100")
+	-- a windowed run goes slower, so it draws the frames it takes shots of
+	local speed = SHOTS and "10" or "100"
+	Spring.SendCommands("cheat 1", "setmaxspeed " .. speed, "setminspeed " .. speed)
+end
+
+local function shots(frame)
+	local list = builders[SHOT_CASE]
+	if not (list and list[1]) or frame < ORDER_FRAME then
+		return
+	end
+	if frame == ORDER_FRAME then
+		local cx, cz = lane(list[1])
+		local state = Spring.GetCameraState()
+		state.px, state.py, state.pz = cx, Spring.GetGroundHeight(cx, cz), cz
+		state.dist, state.height = 900, 900
+		Spring.SetCameraState(state, 0)
+	elseif frame % SHOT_EVERY == 0 then
+		Spring.SendCommands("screenshot png")
+	end
 end
 
 function widget:GameFrame(frame)
 	LATER.update(frame)
+	CLEAR.update(frame)
+	if SHOTS then
+		shots(frame)
+	end
 	if frame == PRIOR_FRAME then
 		findBuilders()
-		-- Something already in every queue, so shift has a job to do.
-		for _, list in pairs(builders) do
-			for _, unitID in ipairs(list) do
+		-- Something already in every queue, so shift has a job to do. Not for
+		-- the ring cases, which never use shift, and whose solar collector would
+		-- stand on the ring.
+		for case, list in pairs(builders) do
+			for _, unitID in ipairs(case < FIRST_RING_CASE and list or {}) do
 				local bx, _, bz = Spring.GetUnitPosition(unitID)
 				Spring.GiveOrderToUnit(unitID, -solarDefID, { bx, Spring.GetGroundHeight(bx, bz + 128), bz + 128, 0 }, 0)
 			end
@@ -306,6 +390,7 @@ function widget:GameFrame(frame)
 				if case.own then
 					tag, source = 0, "blueprint"
 				end
+				ordering = i
 				case.run(list, cx, cz, tag)
 				Spring.Echo(string.format("PROBE ordered case=%d tag=%d source=%s builders=%d lane=%d,%d name=%s",
 					i, tag, source, #list, cx, cz, case.name))
