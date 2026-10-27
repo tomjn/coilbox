@@ -173,4 +173,93 @@ describe("LayoutPlan", () => {
     // The lab is not in the game's units, so it keeps the plan's colour.
     expect(rects[1]).toContain('fill="currentColor"');
   });
+
+  describe("terrain steps", () => {
+    const WALL = {
+      kind: "raise" as const,
+      shape: "wall" as const,
+      points: [
+        { x: 0, z: 0 },
+        { x: 160, z: 0 },
+      ],
+      height: 16,
+      before: 0,
+    };
+
+    it("draws a layout of walls and no buildings", () => {
+      const shape = blueprintShape({
+        name: "Walls",
+        buildings: [],
+        footprints: {},
+        terrain: [WALL],
+      });
+      if (!shape) throw new Error("nothing to draw");
+      const html = renderToStaticMarkup(<LayoutPlan shape={shape} />);
+      expect(html).toContain("text-blue-500");
+      expect(html).not.toContain("<rect");
+    });
+
+    it("draws dug ground in the neutral tone and raised ground in blue", () => {
+      const shape = blueprintShape({
+        name: "Both",
+        buildings: [],
+        footprints: {},
+        terrain: [WALL, { ...WALL, height: -16 }],
+      });
+      if (!shape) throw new Error("nothing to draw");
+      const html = renderToStaticMarkup(<LayoutPlan shape={shape} />);
+      expect(html).toContain("text-blue-500");
+      expect(html).toContain("text-neutral-400");
+    });
+
+    it("draws steps before the buildings, so they are under them", () => {
+      const shape = blueprintShape({
+        ...LAYOUT,
+        terrain: [
+          {
+            kind: "level",
+            shape: "area",
+            points: [
+              { x: -80, z: -40 },
+              { x: 80, z: -40 },
+              { x: 80, z: 40 },
+            ],
+            height: 4,
+            before: 0,
+          },
+        ],
+      });
+      if (!shape) throw new Error("nothing to draw");
+      const html = renderToStaticMarkup(<LayoutPlan shape={shape} />);
+      expect(html.indexOf("text-blue-500")).toBeGreaterThan(-1);
+      expect(html.indexOf("text-blue-500")).toBeLessThan(html.indexOf("<rect"));
+    });
+
+    it("draws an arrow on a ramp whose ends differ", () => {
+      const ramp = (heights: [number, number]) => {
+        const shape = blueprintShape({
+          name: "Ramp",
+          buildings: [],
+          footprints: {},
+          terrain: [
+            {
+              kind: "ramp",
+              shape: "wall",
+              points: [
+                { x: 0, z: 0 },
+                { x: 80, z: 0 },
+              ],
+              heights,
+              width: 32,
+              before: 0,
+            },
+          ],
+        });
+        if (!shape) throw new Error("nothing to draw");
+        return renderToStaticMarkup(<LayoutPlan shape={shape} />);
+      };
+      const paths = (html: string) => html.match(/<path /g)?.length ?? 0;
+      expect(paths(ramp([0, 20]))).toBe(paths(ramp([5, 5])) + 2);
+    });
+  });
 });
