@@ -39,6 +39,8 @@ M.SNAP = 24
 M.BASE_HEIGHT = 1080
 --- One heightmap square in elmos, SQUARE_SIZE in the engine.
 M.HEIGHT_SQUARE = 8
+-- How wide the outline of a terrain step is drawn on the ground, in elmos.
+M.OUTLINE_WIDTH = 6
 --- Floats per vertex in pack(): position 3, uv 2, colour 4, shape 4.
 M.STRIDE = 13
 
@@ -58,6 +60,8 @@ local C = {
 	weapon = { 0.90, 0.33, 0.28, 1 },
 	-- a purer red than weapon's, for the dashed rim of a mark the ground refuses
 	blocked = { 1.0, 0.05, 0.10, 1 },
+	-- the outline of a terrain step on the ground
+	terrain = { 0.95, 0.65, 0.2, 1 },
 	text = { 1, 1, 1, 1 },
 	title = { 0.66, 0.68, 0.72, 1 },
 	dim = { 0.72, 0.74, 0.78, 1 },
@@ -1116,9 +1120,12 @@ M.MARK_CANNOT = 4
 -- @param positions table[] from place.footprint
 -- @param style function(p) -> rgba, and the mark's flags added together
 -- @param heightAt function(x, z) -> the ground's height
+-- @param segments table[]? from place.outlines, drawn after the footprints as
+--   strips M.OUTLINE_WIDTH wide, a pair of vertices at every heightmap square
+--   along each, in the terrain colour and refused when off the map
 -- @return number[] vertices, number[] indices, as M.pack, with uv spanning
 --   each whole mark
-function M.packGround(positions, style, heightAt)
+function M.packGround(positions, style, heightAt, segments)
 	local verts, idx = {}, {}
 	local v, n, base = 0, 0, 0
 	for _, p in ipairs(positions) do
@@ -1147,6 +1154,36 @@ function M.packGround(positions, style, heightAt)
 			end
 		end
 		base = base + row * #zs
+	end
+	local t = C.terrain
+	for _, seg in ipairs(segments or {}) do
+		local dx, dz = seg.x2 - seg.x1, seg.z2 - seg.z1
+		local length = math.sqrt(dx * dx + dz * dz)
+		if length > 0 then
+			local nx, nz = -dz / length * M.OUTLINE_WIDTH / 2, dx / length * M.OUTLINE_WIDTH / 2
+			local stations = math.max(1, math.ceil(length / M.HEIGHT_SQUARE))
+			local flags = seg.blocked and M.MARK_REFUSED or 0
+			for i = 0, stations do
+				local f = i / stations
+				local cx, cz = seg.x1 + dx * f, seg.z1 + dz * f
+				for side = 0, 1 do
+					local sign = side == 0 and -1 or 1
+					local x, z = cx + sign * nx, cz + sign * nz
+					verts[v + 1], verts[v + 2], verts[v + 3] = x, heightAt(x, z), z
+					verts[v + 4], verts[v + 5] = f, side
+					verts[v + 6], verts[v + 7], verts[v + 8], verts[v + 9] = t[1], t[2], t[3], t[4]
+					verts[v + 10], verts[v + 11], verts[v + 12], verts[v + 13] = length, M.OUTLINE_WIDTH, 0, flags
+					v = v + M.STRIDE
+				end
+			end
+			for i = 0, stations - 1 do
+				local a = base + i * 2
+				idx[n + 1], idx[n + 2], idx[n + 3] = a, a + 1, a + 2
+				idx[n + 4], idx[n + 5], idx[n + 6] = a + 1, a + 3, a + 2
+				n = n + 6
+			end
+			base = base + (stations + 1) * 2
+		end
 	end
 	return verts, idx
 end

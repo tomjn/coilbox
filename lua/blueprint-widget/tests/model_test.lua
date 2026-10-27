@@ -894,4 +894,43 @@ check("On is lit while terrain is on", (function()
 end)())
 check("the two choices have different ids for the hover", MODEL.actionId(terrainHits(withTerrain)[1].action) ~= MODEL.actionId(terrainHits(withTerrain)[2].action))
 
+--------------------------------------------------------------------------------
+-- terrain outlines on the ground (issue #4796)
+--------------------------------------------------------------------------------
+
+local function ground(x, z)
+	return 10 + x / 8
+end
+local ov, oi = MODEL.packGround({}, function() end, ground, { { x1 = 0, z1 = 0, x2 = 24, z2 = 0, blocked = false } })
+check("a segment is a strip with a pair of vertices at every heightmap line along it", #ov == 8 * MODEL.STRIDE and #oi == 3 * 6, #ov .. " " .. #oi)
+check("the strip's vertices lie on the ground, either side of the line", (function()
+	local function vertex(i)
+		local o = i * MODEL.STRIDE
+		return ov[o + 1], ov[o + 2], ov[o + 3]
+	end
+	local x0, y0, z0 = vertex(0)
+	local x1, y1, z1 = vertex(1)
+	local x3, y3 = vertex(6)
+	return x0 == 0 and z0 == -MODEL.OUTLINE_WIDTH / 2 and z1 == MODEL.OUTLINE_WIDTH / 2 and y0 == 10 and y3 == 13 and x3 == 24
+end)())
+check("its shape says how long and wide it is, for the shader's rim", ov[10] == 24 and ov[11] == MODEL.OUTLINE_WIDTH and ov[12] == 0 and ov[13] == 0)
+check("it has the terrain colour", same({ ov[6], ov[7], ov[8], ov[9] }, MODEL.COLORS.terrain))
+local bv = MODEL.packGround({}, function() end, ground, { { x1 = 0, z1 = 0, x2 = 8, z2 = 0, blocked = true } })
+check("a segment of a step off the map carries the refused flag", bv[13] == MODEL.MARK_REFUSED)
+local diag = MODEL.packGround({}, function() end, ground, { { x1 = 0, z1 = 0, x2 = 30, z2 = 40, blocked = false } })
+check("a slanted segment has a station about every heightmap square along it", #diag == 2 * 8 * MODEL.STRIDE, tostring(#diag / MODEL.STRIDE))
+check("the strip across a slanted segment is square to it", (function()
+	local ax, az, bx, bz = diag[1], diag[3], diag[MODEL.STRIDE + 1], diag[MODEL.STRIDE + 3]
+	return math.abs((bx - ax) * 30 + (bz - az) * 40) < 1e-6
+end)())
+local mixed, mixedIdx = MODEL.packGround({ { x = 8, y = 0, z = 8, defID = 1, facing = 0, def = { xsize = 2, zsize = 2 } } }, function()
+	return { 1, 1, 1, 1 }, 0
+end, ground, { { x1 = 0, z1 = 0, x2 = 8, z2 = 0, blocked = false } })
+local maxIndex = 0
+for _, i in ipairs(mixedIdx) do
+	maxIndex = math.max(maxIndex, i)
+end
+check("outlines come after the footprints in the same buffer, with indices that continue", maxIndex == #mixed / MODEL.STRIDE - 1, maxIndex .. " " .. #mixed / MODEL.STRIDE)
+check("a zero length segment is skipped", #MODEL.packGround({}, function() end, ground, { { x1 = 5, z1 = 5, x2 = 5, z2 = 5, blocked = false } }) == 0)
+
 support.report()

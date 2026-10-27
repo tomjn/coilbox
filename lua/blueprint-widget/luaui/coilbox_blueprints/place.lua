@@ -294,6 +294,50 @@ function M.terraformParams(step, builders, tag, team)
 	return out
 end
 
+--- What a layout is held by while it is placed, as an offset in the layout:
+-- the pivot building's, or for a layout of terrain steps alone the middle of
+-- its steps, on the 8 elmo heightmap grid the steps' points are on.
+-- @param resolved table from M.resolve
+-- @param pivot integer? from M.pivot
+-- @return table? { x, z }, nil for a layout with neither buildings nor steps
+function M.holdPoint(resolved, pivot)
+	if pivot then
+		return resolved.buildings[pivot].offset
+	end
+	local minX, maxX, minZ, maxZ = math.huge, -math.huge, math.huge, -math.huge
+	for _, step in ipairs(resolved.terrain or {}) do
+		for _, p in ipairs(step.points) do
+			minX, maxX = math.min(minX, p.x), math.max(maxX, p.x)
+			minZ, maxZ = math.min(minZ, p.z), math.max(maxZ, p.z)
+		end
+	end
+	if minX == math.huge then
+		return nil
+	end
+	return { x = math.floor((minX + maxX) / 16 + 0.5) * 8, z = math.floor((minZ + maxZ) / 16 + 0.5) * 8 }
+end
+
+--- The lines to draw on the ground for laid steps: a wall is its path, an
+-- area is its outline closed, and a ramp is its two ends joined. Nothing here
+-- shows the raised ground or the slopes, only where the steps are.
+-- @param steps table[]? from M.laySteps
+-- @return table[] { x1, z1, x2, z2, blocked }, blocked when the step has a
+--   point off the map
+function M.outlines(steps)
+	local out = {}
+	for _, step in ipairs(steps or {}) do
+		local points = step.points
+		for i = 1, #points - 1 do
+			out[#out + 1] = { x1 = points[i].x, z1 = points[i].z, x2 = points[i + 1].x, z2 = points[i + 1].z, blocked = step.blocked == true }
+		end
+		if step.shape == "area" and #points > 2 then
+			local last = points[#points]
+			out[#out + 1] = { x1 = last.x, z1 = last.z, x2 = points[1].x, z2 = points[1].z, blocked = step.blocked == true }
+		end
+	end
+	return out
+end
+
 --- Half a footprint's width and depth in elmos, for a facing. xsize and
 -- zsize are in the engine's 8 elmo half squares.
 function M.halfSpan(def, facing)

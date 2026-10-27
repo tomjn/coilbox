@@ -132,6 +132,32 @@ check("an empty layout of steps has no pivot", PLACE.pivot(onlySteps) == nil)
 local minX, maxX, minZ, maxZ = PLACE.extent(onlySteps, 0)
 check("extent reaches the steps' points when there are no buildings", minX == -32 and maxX == 64 and minZ == 0 and maxZ == 32, minX .. " " .. maxX .. " " .. minZ .. " " .. maxZ)
 
+-- what holds a layout of steps alone: the middle of its steps
+local hold = PLACE.holdPoint(onlySteps, nil)
+check("a layout of steps alone is held by the middle of its steps, on the heightmap grid", hold and hold.x == 16 and hold.z == 16, show(hold))
+check("a layout with buildings is held by its pivot building", PLACE.holdPoint(layout, 1) == layout.buildings[1].offset)
+check("a layout with nothing to hold has no hold point", PLACE.holdPoint(PLACE.resolve({ buildings = {} }), nil) == nil)
+local heldBare = PLACE.laySteps(onlySteps, 0, nil, hold, { { x = 520, z = 520 } }, {})
+check("the middle of the steps lands on the anchor", heldBare[1].points[1].x == 520 - 48 and heldBare[1].points[1].z == 520 - 16, show(heldBare[1].points))
+local heldTurned = PLACE.laySteps(onlySteps, 1, nil, hold, { { x = 520, z = 520 } }, {})
+local hx, hz = PLACE.turned(-32 - 16, 0 - 16, 1)
+check("a turn is about the middle of the steps", heldTurned[1].points[1].x == 520 + hx and heldTurned[1].points[1].z == 520 + hz, show(heldTurned[1].points))
+
+--------------------------------------------------------------------------------
+-- outlines
+--------------------------------------------------------------------------------
+
+local outlined = PLACE.outlines({
+	{ kind = "raise", shape = "wall", points = { { x = 0, z = 0 }, { x = 48, z = 0 }, { x = 48, z = 32 } }, blocked = false },
+	{ kind = "level", shape = "area", points = { { x = 0, z = 0 }, { x = 32, z = 0 }, { x = 32, z = 32 } }, blocked = true },
+	{ kind = "ramp", shape = "wall", points = { { x = 100, z = 100 }, { x = 100, z = 164 } }, blocked = false },
+})
+check("a wall is its path, joined point to point and not back to the start", #outlined == 2 + 3 + 1 and same(outlined[1], { x1 = 0, z1 = 0, x2 = 48, z2 = 0, blocked = false }) and same(outlined[2], { x1 = 48, z1 = 0, x2 = 48, z2 = 32, blocked = false }), show(outlined))
+check("an area is a closed outline", same(outlined[5], { x1 = 32, z1 = 32, x2 = 0, z2 = 0, blocked = true }), show(outlined[5]))
+check("a ramp is its two ends joined", same(outlined[6], { x1 = 100, z1 = 100, x2 = 100, z2 = 164, blocked = false }), show(outlined[6]))
+check("an outline says whether its step is off the map", outlined[3].blocked == true and outlined[1].blocked == false)
+check("no steps, no outlines", #PLACE.outlines({}) == 0 and #PLACE.outlines(nil) == 0)
+
 --------------------------------------------------------------------------------
 -- the terraform order
 --------------------------------------------------------------------------------

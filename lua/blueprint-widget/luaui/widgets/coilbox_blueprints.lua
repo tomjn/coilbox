@@ -589,6 +589,8 @@ local function startPlacing(key)
 	readKeys()
 	placing = { item = item, rotation = 0, flip = { x = false, z = false }, pivot = PLACE.pivot(item.resolved), foot = nil }
 	-- a layout of terrain steps alone has no building to hold it by or to snap
+	-- to a spot, so the middle of its steps is held
+	placing.hold = PLACE.holdPoint(item.resolved, placing.pivot)
 	local held = placing.pivot and item.resolved.buildings[placing.pivot].def
 	local kind = held and PLACE.spotKind(held)
 	placing.spots = kind and spotsFor(kind, held) or nil
@@ -682,7 +684,7 @@ local function trackCursor()
 		anchors = PLACE.line(placing.line.x, placing.line.z, ax, az, unpack(placing.extent))
 	end
 	local foot = {}
-	local origin = placing.pivot and resolved.buildings[placing.pivot].offset or nil
+	local origin = placing.hold
 	for _, at in ipairs(anchors) do
 		for _, p in ipairs(PLACE.footprint(resolved, placing.rotation, at.x, at.z, placing.flip, origin)) do
 			p.seq = #foot + 1
@@ -690,6 +692,9 @@ local function trackCursor()
 		end
 	end
 	placing.foot, placing.anchors, placing.origin = foot, anchors, origin
+	-- the steps, for their outlines on the ground. They are laid again with the
+	-- ground as it is when the player clicks.
+	placing.steps = PLACE.laySteps(resolved, placing.rotation, placing.flip, origin, anchors, foot)
 	placing.serial = (placing.serial or 0) + 1
 end
 
@@ -1014,14 +1019,30 @@ local function placeAt(x, z, shift)
 	if not placing then
 		return false
 	end
+	local held = placing.at
 	placing.at, placing.foot = { x = x, z = z }, nil
 	shiftOverride = shift == true
 	trackCursor()
 	placeNow()
 	shiftOverride = nil
 	if placing then
-		placing.at = nil
+		placing.at = held
+		placing.foot = nil
 	end
+	return true
+end
+
+--- Hold the blueprint being placed at a point on the map, as though the cursor
+-- were there, until it is put down or this is called with no point.
+-- @param x number? elmos
+-- @param z number? elmos
+-- @return boolean whether anything was held
+local function holdAt(x, z)
+	if not placing then
+		return false
+	end
+	placing.at = x and { x = x, z = z } or nil
+	placing.foot = nil
 	return true
 end
 
@@ -1234,6 +1255,7 @@ function widget:Initialize()
 			MODEL.setAssist(panel, mode)
 		end,
 		placeAt = placeAt,
+		holdAt = holdAt,
 		terrain = function(on)
 			setTerrain(on == true or on == "on")
 		end,
@@ -1601,10 +1623,10 @@ local function ghost(p, teamID)
 end
 
 --- Refill the ground buffer when the marked positions change.
-local function groundMarks(foot, key)
+local function groundMarks(foot, key, segments)
 	if groundKey ~= key then
 		groundKey = key
-		local verts, idx = MODEL.packGround(foot, markStyle, Spring.GetGroundHeight)
+		local verts, idx = MODEL.packGround(foot, markStyle, Spring.GetGroundHeight, segments)
 		groundIndices = upload(groundSet, verts, idx)
 	end
 end
@@ -1619,9 +1641,21 @@ function widget:DrawWorld()
 
 	-- the plans' marks and the cursor's in one buffer, rebuilt when either
 	-- changes
-	local key = "plans:" .. plansSerial .. ":hover:" .. hover.key .. (foot and (":cursor:" .. placing.serial) or "")
+	-- the cursor's terrain steps are outlined only when they would be ordered
+	local showSteps = foot and can.terraformAvailable == true and panel.terrain
+	local key = "plans:" .. plansSerial .. ":hover:" .. hover.key .. (foot and (":cursor:" .. placing.serial .. (showSteps and ":steps" or "")) or "")
 	if groundKey ~= key then
-		local marks = {}
+		local marks, steps = {}, {}
+		for _, plan in ipairs(plans) do
+			for _, step in ipairs(plan.steps) do
+				steps[#steps + 1] = step
+			end
+		end
+		if showSteps then
+			for _, step in ipairs(placing.steps or {}) do
+				steps[#steps + 1] = step
+			end
+		end
 		for _, plan in ipairs(plans) do
 			for _, p in ipairs(plan.positions) do
 				marks[#marks + 1] = p
@@ -1630,7 +1664,7 @@ function widget:DrawWorld()
 		for _, p in ipairs(foot or {}) do
 			marks[#marks + 1] = p
 		end
-		groundMarks(marks, key)
+		groundMarks(marks, key, PLACE.outlines(steps))
 	end
 	-- The marks follow the heightmap, but the terrain the engine draws is
 	-- simplified with distance, so a depth test would still let it cut them.
