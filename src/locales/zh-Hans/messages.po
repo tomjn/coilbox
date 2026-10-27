@@ -40155,6 +40155,18 @@ msgstr "已保存为预设"
 msgid "Saved configs"
 msgstr "已保存配置"
 
+#: src/blueprint/library.ts
+msgid "Saved from the ground"
+msgstr ""
+
+#: src/blueprint/library.ts
+msgid "Saved from the ground in game with the coilbox widget, on engine {engine}."
+msgstr ""
+
+#: src/blueprint/library.ts
+msgid "Saved from the ground in game with the coilbox widget."
+msgstr ""
+
 #: src/lego/pages/components/BuildMenuSection.tsx
 #, fuzzy
 msgid "Saved in {targetName}."

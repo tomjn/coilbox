@@ -15,6 +15,7 @@
 		coilbox_end_frame=@END_FRAME@;
 		coilbox_wall_height=@WALL_HEIGHT@;
 		coilbox_own_tags=@OWN_TAGS@;
+		coilbox_mode=@MODE@;
 	}
 	[player0]
 	{

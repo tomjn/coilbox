@@ -151,6 +151,10 @@ check("labels sit on the middle of their buttons", (function()
 	end
 	return false
 end)())
+check("Save ground sits right of Save selection on the same line (issue #4798)", (function()
+	local save, ground = hitsOf(L, "save")[1], hitsOf(L, "saveGround")[1]
+	return #hitsOf(L, "saveGround") == 1 and ground.x > save.x + save.w and ground.y == save.y and #textsWith(L, "Save ground") == 1
+end)(), show(hitsOf(L, "saveGround")))
 check("the footer switches between the list and the grid", #hitsOf(L, "view") == 2 and hitsOf(L, "view")[1].action.view == "grid" and hitsOf(L, "view")[2].action.view == "list")
 check("the title is the toggle, across the header left of the tabs", (function()
 	local t = hitsOf(L, "toggle")[1]
@@ -537,7 +541,23 @@ check("the pager sits right of Save selection", (function()
 		end
 	end
 end)())
+check("the pager sits right of Save ground", pagerOf(page2)[-1].x > hitsOf(page2, "saveGround")[1].x + hitsOf(page2, "saveGround")[1].w)
 check("every page is as tall as a full one", page2.box.h == LT.box.h, page2.box.h .. " vs " .. LT.box.h)
+do
+	-- so many pages that "10 / 40" would run into Save ground
+	local lots = {}
+	for i = 1, 40 * shown do
+		lots[i] = { key = "library:" .. i, name = "Entry " .. i, source = "library", ordered = false, buildings = { b("armsolar") } }
+	end
+	local long = MODEL.new()
+	MODEL.refresh(long, lots, PLACE, game, CAN)
+	long.open = true
+	MODEL.layout(long, measure, VIEW)
+	MODEL.turnPage(long, 9)
+	local LL = MODEL.layout(long, measure, VIEW)
+	local ground = hitsOf(LL, "saveGround")[1]
+	check("a pager label too long for the footer is left out rather than drawn over Save ground", pagerOf(LL)[-1].x > ground.x + ground.w and #textsWith(LL, "10 / 40") == 0, show(pagerOf(LL)[-1]))
+end
 MODEL.turnPage(tall, -100)
 check("turning back stops at the first page", tall.page == 0)
 MODEL.turnPage(tall, 1000)
