@@ -280,7 +280,26 @@ local SHOT_PLAN = {
 	{ before = 420, x = cx - 400, distance = 1300, take = true },
 }
 
+-- ground_only looks at each plaza before the orders and again once the
+-- builders are done: the Only raise one, then the both ways one.
+local ONLY_SHOTS = {
+	{ at = 60, plaza = 1 },
+	{ at = 100, plaza = 2 },
+	{ at = END_FRAME - 140, plaza = 1 },
+	{ at = END_FRAME - 100, plaza = 2 },
+}
+
 local function shots(frame)
+	if MODE == "ground_only" then
+		for _, s in ipairs(ONLY_SHOTS) do
+			if frame == s.at then
+				look(PLAZAS[s.plaza].x + 20, cz + 20, 560)
+			elseif frame == s.at + 20 then
+				shot()
+			end
+		end
+		return
+	end
 	for _, s in ipairs(SHOT_PLAN) do
 		if frame == SAVE_FRAME - s.before then
 			look(s.x, cz, s.distance)

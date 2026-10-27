@@ -368,18 +368,20 @@ sample() { # when, plaza
 }
 expect "the raise plaza was ordered with volume selection 1" "$(field "$(line "$LOG" 'GROUND plaza-order name=raise ')" volume)" 1
 expect "the other plaza was ordered with volume selection 0" "$(field "$(line "$LOG" 'GROUND plaza-order name=both ')" volume)" 0
+rock() { # when, plaza, field
+  field "$(line "$LOG" "GROUND rock at=$1 name=$2 ")" "$3"
+}
 for plaza in raise both; do
-  start="$(sample start "$plaza")"
   end="$(sample end "$plaza")"
   base="$(field "$(line "$LOG" "GROUND plaza-order name=$plaza ")" base)"
   expect "$plaza: the rock stood 60 above the map before the order" \
-    "$(awk -v r="$(field "$start" rock)" -v o="$(field "$start" rock-orig)" 'BEGIN { printf "%.1f", r - o }')" "60.0"
+    "$(awk -v r="$(rock start "$plaza" y)" -v o="$(rock start "$plaza" orig)" 'BEGIN { printf "%.1f", r - o }')" "60.0"
   expect "$plaza: the plaza is flat 5 above the ground under its middle" \
     "$(awk -v p="$(field "$end" plain)" -v b="$base" 'BEGIN { printf "%.1f", p - b }')" "5.0"
 done
-expect "only raise leaves the rock standing" "$(field "$(sample end raise)" rock)" "$(field "$(sample start raise)" rock)"
+expect "only raise leaves the rock standing" "$(rock end raise y)" "$(rock start raise y)"
 expect "both ways cuts the rock down to the plaza" \
-  "$(awk -v r="$(field "$(sample end both)" rock)" -v b="$(field "$(line "$LOG" 'GROUND plaza-order name=both ')" base)" 'BEGIN { printf "%.1f", r - b }')" "5.0"
+  "$(awk -v r="$(rock end both y)" -v b="$(field "$(line "$LOG" 'GROUND plaza-order name=both ')" base)" 'BEGIN { printf "%.1f", r - b }')" "5.0"
 
 echo
 if [ "$failures" -eq 0 ]; then

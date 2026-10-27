@@ -82,9 +82,26 @@ if gadgetHandler:IsSyncedCode() then
 		end)
 	end
 
+	-- The rocks as the synced side sees them, which is what the terraform
+	-- gadget reads. The unsynced heightmap lags a change made in synced code.
+	local function reportRocks(label)
+		local cx = 16 * math.floor(Game.mapSizeX / 32)
+		local cz = 16 * math.floor(Game.mapSizeZ / 32)
+		for name, plaza in pairs({ raise = cx - 400, both = cx + 200 }) do
+			local x, z = plaza + 56, cz + 56
+			Spring.Echo(string.format("GROUND rock at=%s name=%s y=%.3f orig=%.3f", label, name, Spring.GetGroundHeight(x, z), Spring.GetGroundOrigHeight(x, z)))
+		end
+	end
+
 	function gadget:GameFrame(frame)
-		if frame == 1 and MODE == "ground_only" then
-			raiseRocks()
+		if MODE == "ground_only" then
+			if frame == 1 then
+				raiseRocks()
+			elseif frame == 70 then
+				reportRocks("start")
+			elseif frame == END_FRAME - 50 then
+				reportRocks("end")
+			end
 		end
 		if frame == CREATE_FRAME then
 			local cx = 16 * math.floor(Game.mapSizeX / 32)
