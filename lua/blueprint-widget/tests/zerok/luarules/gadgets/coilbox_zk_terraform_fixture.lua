@@ -188,6 +188,15 @@ if gadgetHandler:IsSyncedCode() then
 				end
 			end
 		end
+		-- Two solar collectors beside the fourth lane's wall, for a windowed run
+		-- that shows a slope stopping short of a building. The scripted matches
+		-- leave this off.
+		if frame == CREATE_FRAME + 1 and (Spring.GetModOptions() or {}).coilbox_blockers == "1" then
+			local cx, cz = lane(4)
+			for _, dx in ipairs({ -48, 48 }) do
+				Spring.CreateUnit("energysolar", cx + dx, Spring.GetGroundHeight(cx + dx, cz + 64), cz + 64, "south", TEAM)
+			end
+		end
 		if frame == CREATE_FRAME then
 			for i = 1, CASES do
 				local cx, cz = lane(i)
