@@ -42,6 +42,19 @@ M.TAG_BASE = 1000000
 
 local TERRAFORM_TYPE = { level = 1, raise = 2, smooth = 3, ramp = 4 }
 
+-- The engine's move command (CMD.MOVE). A builder is sent clear of a step's
+-- ground with one, ahead of the step's level command (#4816).
+M.CMD_MOVE = 10
+-- How far Zero-K's terraform gadget lets a terraform unit roam from its place
+-- towards the constructor building it (unit_terraform.lua, terraUnitLeash), so
+-- a builder reaches that much further than its build range.
+M.TERRAUNIT_LEASH = 100
+-- How close a unit gets to a move's goal before the move is done: the engine's
+-- default goal radius, one square (CMobileCAI::SetGoal).
+M.MOVE_GOAL_RADIUS = 8
+-- The spacing of the spots tried for a builder to step clear to: a build square.
+M.CLEAR_GRID = 16
+
 --- Whether a footprint reaches past the edge of the map.
 local function offMap(x, z, hw, hd)
 	if not (Game and Game.mapSizeX) then
@@ -199,10 +212,109 @@ local function pointOffMap(x, z)
 	return x < 0 or z < 0 or x > Game.mapSizeX or z > Game.mapSizeZ
 end
 
+--- Whether a step is a wall that closes on itself: its last point is its first.
+function M.closedRing(step)
+	local points = step.points
+	if step.shape ~= "wall" or #points < 4 then
+		return false
+	end
+	local a, b = points[1], points[#points]
+	return math.abs(a.x - b.x) < 1 and math.abs(a.z - b.z) < 1
+end
+
+--- Whether a point is inside a closed outline, by the even-odd rule.
+-- @param outline table[] { x, z }
+function M.inside(outline, x, z)
+	local hit = false
+	local j = #outline
+	for i = 1, #outline do
+		local a, b = outline[i], outline[j]
+		if (a.z > z) ~= (b.z > z) and x < (b.x - a.x) * (z - a.z) / (b.z - a.z) + a.x then
+			hit = not hit
+		end
+		j = i
+	end
+	return hit
+end
+
+--- How far a point is from a line of points.
+local function lineDistance(points, x, z)
+	local best = math.huge
+	for i = 1, #points - 1 do
+		local a, b = points[i], points[i + 1]
+		local dx, dz = b.x - a.x, b.z - a.z
+		local len = dx * dx + dz * dz
+		local t = len > 0 and math.max(0, math.min(1, ((x - a.x) * dx + (z - a.z) * dz) / len)) or 0
+		best = math.min(best, math.sqrt((a.x + t * dx - x) ^ 2 + (a.z + t * dz - z) ^ 2))
+	end
+	return best
+end
+
+-- Half the width of the top of a Zero-K wall (unit_terraform.lua, TerraformWall,
+-- measured as 32 wide in the Zero-K driver).
+local WALL_HALF_WIDTH = 16
+
+--- Put the buildings inside a closed ring of wall ahead of the rest of their
+-- copy, and the ring after them, so nothing is built inside a ring once it has
+-- risen (#4816). A building is inside when its middle is inside the ring and
+-- its footprint is clear of the wall's top. The copy's slice of foot is
+-- reordered in place and numbered again, and each building inside is marked
+-- insideRing.
+-- @param steps table[] the copy's laid steps, each with after = first
+-- @param foot table[] every copy's footprint
+-- @param first integer how many of foot come before this copy
+-- @param n integer how many buildings the copy has
+local function ringsFirst(steps, foot, first, n)
+	local rings = {}
+	for _, step in ipairs(steps) do
+		if M.closedRing(step) then
+			rings[#rings + 1] = step
+		end
+	end
+	if #rings == 0 or n == 0 then
+		return
+	end
+	local within, rest = {}, {}
+	for i = first + 1, first + n do
+		local p = foot[i]
+		local hw, hd = M.halfSpan(p.def, p.facing)
+		local enclosed = false
+		for _, ring in ipairs(rings) do
+			if M.inside(ring.points, p.x, p.z) and lineDistance(ring.points, p.x, p.z) > math.max(hw, hd) + WALL_HALF_WIDTH then
+				enclosed = true
+			end
+		end
+		p.insideRing = enclosed or nil
+		if enclosed then
+			within[#within + 1] = p
+		else
+			rest[#rest + 1] = p
+		end
+	end
+	if #within == 0 then
+		return
+	end
+	for j, p in ipairs(within) do
+		foot[first + j] = p
+	end
+	for j, p in ipairs(rest) do
+		foot[first + #within + j] = p
+	end
+	for i = first + 1, first + n do
+		if foot[i].seq then
+			foot[i].seq = i
+		end
+	end
+	for _, ring in ipairs(rings) do
+		ring.after = first + #within
+	end
+end
+
 --- A layout's terrain steps on the ground, for the copies of it being placed.
 -- Each step comes out as M.terrain gives it, with where it falls among the
 -- footprint, the ground height under the pivot at this moment, and whether any
--- point is off the map.
+-- point is off the map. A closed ring of wall comes after the buildings inside
+-- it, which move to the front of their copy in foot (see ringsFirst).
 -- @param resolved table from M.resolve
 -- @param anchors table[] { x, z } the pivot of each copy, one for a single copy
 -- @param foot table[] the copies' footprints from M.footprint, one after the
@@ -215,7 +327,8 @@ function M.laySteps(resolved, rotation, flip, origin, anchors, foot)
 	for c, at in ipairs(anchors) do
 		local first = (c - 1) * n
 		local base = Spring.GetGroundHeight(at.x, at.z)
-		for _, step in ipairs(M.terrain(resolved.terrain, rotation, at.x, at.z, flip, origin)) do
+		local copy = M.terrain(resolved.terrain, rotation, at.x, at.z, flip, origin)
+		for _, step in ipairs(copy) do
 			-- Every step comes ahead of every building of its copy, whatever
 			-- before an older blueprint gave it, because a building cannot be
 			-- raised once it stands (#4817).
@@ -227,8 +340,190 @@ function M.laySteps(resolved, rotation, flip, origin, anchors, foot)
 			end
 			out[#out + 1] = step
 		end
+		if #foot >= first + n then
+			ringsFirst(copy, foot, first, n)
+		end
 	end
 	return out
+end
+
+--------------------------------------------------------------------------------
+-- Stepping clear of a step (#4816)
+--------------------------------------------------------------------------------
+
+-- A set of 8 elmo heightmap corners, by their place in the grid.
+local function mark(set, x, z)
+	local iz, ix = math.floor(z / 8 + 0.5), math.floor(x / 8 + 0.5)
+	local row = set[iz]
+	if not row then
+		row = {}
+		set[iz] = row
+	end
+	row[ix] = true
+end
+
+local function marked(set, x, z)
+	local row = set[math.floor(z / 8 + 0.5)]
+	return row ~= nil and row[math.floor(x / 8 + 0.5)] == true
+end
+
+--- What a builder must not stand on while a layout's steps are built: every
+-- corner a step changes, its slopes and their foot included, and every corner
+-- under one of the layout's buildings. Also the closed rings of wall, which it
+-- must not be shut inside.
+-- @param results table[] from the terraform model's session.apply, each with
+--   shape and slope lists of { x, z }
+-- @param steps table[] the laid steps, for their rings
+-- @param foot table[]? the layout's buildings
+-- @return table { corners = set, rings = { outline } }
+function M.keepOff(results, steps, foot)
+	local corners = {}
+	for _, r in ipairs(results or {}) do
+		for _, c in ipairs(r.shape or {}) do
+			mark(corners, c.x, c.z)
+		end
+		for _, c in ipairs(r.slope or {}) do
+			mark(corners, c.x, c.z)
+		end
+	end
+	for _, p in ipairs(foot or {}) do
+		if p.def then
+			local hw, hd = M.halfSpan(p.def, p.facing or 0)
+			for x = p.x - hw, p.x + hw, 8 do
+				for z = p.z - hd, p.z + hd, 8 do
+					mark(corners, x, z)
+				end
+			end
+		end
+	end
+	local rings = {}
+	for _, step in ipairs(steps or {}) do
+		if M.closedRing(step) then
+			rings[#rings + 1] = step.points
+		end
+	end
+	return { corners = corners, rings = rings }
+end
+
+--- The spots a builder could step clear to for one step, before the side it is
+-- on is taken into account: on the build grid, clear of keepOff's corners by
+-- clearance, outside every closed ring, on the map, and within range of the
+-- nearest corner the step raises or lowers. Each spot counts the step's
+-- corners it reaches with the terraform units' leash, so a spot that reaches
+-- all of it is preferred and the builder need not walk on to the far side.
+-- @param shape table[] the step's own corners, { x, z }, from the model
+-- @param off table from M.keepOff
+-- @param range number the builder's build range
+-- @param clearance number how far round the spot must be clear
+-- @return table[] { x, z, reach }
+function M.clearSpots(shape, off, range, clearance)
+	if #shape == 0 then
+		return {}
+	end
+	-- the reach is counted over the step's corners on the 16 elmo grid, a
+	-- quarter of them, to keep the work small
+	local sample = {}
+	local minX, maxX, minZ, maxZ = math.huge, -math.huge, math.huge, -math.huge
+	for _, c in ipairs(shape) do
+		minX, maxX = math.min(minX, c.x), math.max(maxX, c.x)
+		minZ, maxZ = math.min(minZ, c.z), math.max(maxZ, c.z)
+		if c.x % 16 == 0 and c.z % 16 == 0 then
+			sample[#sample + 1] = c
+		end
+	end
+	if #sample == 0 then
+		sample = shape
+	end
+	local g = M.CLEAR_GRID
+	local reach2 = (range + M.TERRAUNIT_LEASH) ^ 2
+	local range2 = range * range
+	local out = {}
+	for x = math.floor((minX - range) / g) * g, maxX + range, g do
+		for z = math.floor((minZ - range) / g) * g, maxZ + range, g do
+			local ok = not pointOffMap(x, z)
+			for cx = x - clearance, x + clearance, 8 do
+				if not ok then
+					break
+				end
+				for cz = z - clearance, z + clearance, 8 do
+					if marked(off.corners, cx, cz) then
+						ok = false
+						break
+					end
+				end
+			end
+			for _, ring in ipairs(off.rings) do
+				if ok and M.inside(ring, x, z) then
+					ok = false
+				end
+			end
+			if ok then
+				local near, reach = false, 0
+				for _, c in ipairs(shape) do
+					if (c.x - x) ^ 2 + (c.z - z) ^ 2 <= range2 then
+						near = true
+						break
+					end
+				end
+				if near then
+					for _, c in ipairs(sample) do
+						if (c.x - x) ^ 2 + (c.z - z) ^ 2 <= reach2 then
+							reach = reach + 1
+						end
+					end
+					out[#out + 1] = { x = x, z = z, reach = reach }
+				end
+			end
+		end
+	end
+	return out
+end
+
+--- Where a builder steps to before it works on a step: of spots from
+-- M.clearSpots, those on the builder's side of the step's middle, the one that
+-- reaches most of the step, the nearest to the builder of those. A builder at
+-- the middle of the step has no side.
+-- @param spots table[] from M.clearSpots
+-- @param shape table[] the step's corners, for its middle
+-- @param fx number where the builder is, or will be when it gets to the step
+-- @param fz number
+-- @param stand function(x, z) -> boolean? whether the builder can stand there
+-- @return table? { x, z }
+function M.clearSpot(spots, shape, fx, fz, stand)
+	if #spots == 0 then
+		return nil
+	end
+	local mx, mz = 0, 0
+	for _, c in ipairs(shape) do
+		mx, mz = mx + c.x, mz + c.z
+	end
+	mx, mz = mx / #shape, mz / #shape
+	local sx, sz = fx - mx, fz - mz
+	local sided = sx * sx + sz * sz >= 1
+	local list = {}
+	for _, s in ipairs(spots) do
+		if not sided or (s.x - mx) * sx + (s.z - mz) * sz > 0 then
+			list[#list + 1] = { x = s.x, z = s.z, reach = s.reach, d = (s.x - fx) ^ 2 + (s.z - fz) ^ 2 }
+		end
+	end
+	table.sort(list, function(a, b)
+		if a.reach ~= b.reach then
+			return a.reach > b.reach
+		end
+		if a.d ~= b.d then
+			return a.d < b.d
+		end
+		if a.x ~= b.x then
+			return a.x < b.x
+		end
+		return a.z < b.z
+	end)
+	for _, s in ipairs(list) do
+		if not stand or stand(s.x, s.z) then
+			return { x = s.x, z = s.z }
+		end
+	end
+	return nil
 end
 
 --- The next terraform tag: Zero-K's own counter when its terraform widget
@@ -855,8 +1150,11 @@ end
 --   gives each building to one builder, for games that stop builders helping.
 --   Every builder that can terraform is given every step, ahead of its
 --   first building, so none reaches a building before the ground is done.
--- @param terrain table? { steps = from M.laySteps, on = boolean, why = string }.
---   When on is false the steps are counted as skipped, for the reason why.
+-- @param terrain table? { steps = from M.laySteps, on = boolean, why = string,
+--   ground = table[]? }. When on is false the steps are counted as skipped,
+--   for the reason why. ground is the terraform model's results for steps,
+--   from session.apply(steps, foot). With it, each builder is sent clear of a
+--   step's ground with a move ahead of the step's level command (#4816).
 -- @return table { orders = { { unitID, cmds } }, remainder = foot entries nobody
 --   can build, blocked = count of positions skipped because the ground refused,
 --   terraform = { { unitID, params, tag, levelAt = { { unitID, index } }, where
@@ -898,8 +1196,24 @@ function M.plan(foot, can, shift, mode, terrain)
 					at[unitID] = true
 				end
 				local t = { unitID = builders[1], params = M.terraformParams(u.step, builders, tag, team), tag = tag, levelAt = {} }
-				steps[#steps + 1] = { step = u.step, tag = tag, at = at, t = t }
+				steps[#steps + 1] = { step = u.step, tag = tag, at = at, t = t, i = u.i }
 				out.terraform[#out.terraform + 1] = t
+			end
+			-- what each step changes, for the spot each builder steps clear to
+			if terrain.ground then
+				local byIndex = {}
+				for _, r in ipairs(terrain.ground) do
+					if r.index then
+						byIndex[r.index] = r
+					end
+				end
+				local off = M.keepOff(terrain.ground, given, foot)
+				for _, s in ipairs(steps) do
+					local r = byIndex[s.i]
+					if r and r.shape and #r.shape > 0 then
+						s.shape, s.off, s.spots = r.shape, off, {}
+					end
+				end
 			end
 		elseif #usable > 0 and #can.builders == 0 then
 			for _, u in ipairs(usable) do
@@ -918,11 +1232,33 @@ function M.plan(foot, can, shift, mode, terrain)
 		local function add(id, params)
 			cmds[#cmds + 1] = { id, params, (shift or #cmds > 0) and { "shift" } or {} }
 		end
+		-- where the builder will be when it gets to the next step: where it is,
+		-- then by the last building or spot it was sent to
+		local wx, _, wz = Spring.GetUnitPosition(unitID)
+		local def = UnitDefs[Spring.GetUnitDefID(unitID) or -1]
+		local function stepClear(s)
+			if not (s.spots and wx and def and def.buildDistance) then
+				return
+			end
+			-- clear of the step by half the builder's footprint and the distance
+			-- a move stops short of its goal
+			local clearance = (def.xsize or 2) * 4 + M.MOVE_GOAL_RADIUS
+			local key = def.buildDistance .. ":" .. clearance
+			s.spots[key] = s.spots[key] or M.clearSpots(s.shape, s.off, def.buildDistance, clearance)
+			local spot = M.clearSpot(s.spots[key], s.shape, wx, wz, function(x, z)
+				return not Spring.TestMoveOrder or Spring.TestMoveOrder(def.id, x, Spring.GetGroundHeight(x, z), z)
+			end)
+			if spot then
+				add(M.CMD_MOVE, { spot.x, Spring.GetGroundHeight(spot.x, spot.z), spot.z })
+				wx, wz = spot.x, spot.z
+			end
+		end
 		local next = 1
 		local function stepsBefore(seq)
 			while steps[next] and (seq == nil or steps[next].step.after < seq) do
 				local s = steps[next]
 				if s.at[unitID] then
+					stepClear(s)
 					local step = s.step
 					local sx, sz = 0, 0
 					for _, p in ipairs(step.points) do
@@ -939,8 +1275,11 @@ function M.plan(foot, can, shift, mode, terrain)
 			stepsBefore(p.seq or i)
 			if own[p.defID] then
 				taken[i] = true
-				if not p.blocked and (not who or who[i] == unitID) then
+				-- a building inside a ring of wall goes to every builder, so none
+				-- starts the ring while another is still inside it
+				if not p.blocked and (not who or who[i] == unitID or p.insideRing) then
 					add(-p.defID, { p.x, p.y, p.z, p.facing })
+					wx, wz = p.x, p.z
 				end
 			end
 		end
