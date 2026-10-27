@@ -278,6 +278,28 @@ check("the ring comes after the buildings inside it", laidRing[1].after == 1, to
 local again = PLACE.laySteps(outpost, 0, nil, { x = 0, z = 0 }, { { x = 1024, z = 1024 } }, foot)
 check("laying it again leaves the order as it is", foot[1].def == SOLAR and foot[2].x == 1024 and again[1].after == 1)
 
+-- the ring is ordered side by side, each side's terraform units pulled out
+check("a closed ring is laid as one step for each side", #laidRing == 4 and #laidRing[1].points == 2, show(#laidRing))
+check("each side keeps the ring's outline", laidRing[1].ring and #laidRing[1].ring == 5 and laidRing[4].ring == laidRing[1].ring)
+local bx, bz = laidRing[1].bias.x, laidRing[1].bias.z
+check("the first side's units are pulled a leash's length out from its middle", bx == 1184 and bz == 1024 - PLACE.TERRAUNIT_LEASH, show(laidRing[1].bias) .. " " .. show(laidRing[1].points))
+check("every side's pull is outside the ring", (function()
+	for _, side in ipairs(laidRing) do
+		if PLACE.inside(side.ring, side.bias.x, side.bias.z) then
+			return false
+		end
+	end
+	return true
+end)())
+local sideParams = PLACE.terraformParams(laidRing[1], { 200, 201 }, 9, 3)
+check("a side's order names no builders and has its pull as its centre", sideParams[3] == bx and sideParams[4] == bz and sideParams[9] == 0 and #sideParams == 10 + 4, show(sideParams))
+check("a ring has one label, over its middle", (function()
+	local labels = PLACE.labels(laidRing)
+	return #labels == 1 and labels[1].x == 1184 and labels[1].z == 1184
+end)(), show(PLACE.labels(laidRing)))
+local sidePlan = PLACE.plan(foot, PLACE.capabilities({ 200 }), false, nil, { steps = laidRing, on = true, ground = model(laidRing, foot) })
+check("the sides' orders are tied together", #sidePlan.terraform == 4 and sidePlan.terraform[1].group == laidRing[1].ring and sidePlan.terraform[4].group == laidRing[1].ring)
+
 E = engine({
 	[200] = { def = 10, x = 1184, z = 1600, cmdDescs = { LEVEL } },
 	[201] = { def = 10, x = 1184, z = 700, cmdDescs = { LEVEL } },
@@ -289,8 +311,21 @@ for _, mode in ipairs({ "help", "split" }) do
 	for _, unitID in ipairs({ 200, 201 }) do
 		local q = o[unitID] or {}
 		check(mode .. ": builder " .. unitID .. " builds the solar inside, steps out of the ring, then raises it", q[1] and q[1][1] == -2 and q[2][1] == 10 and q[3][1] == 39736, ids(q))
-		check(mode .. ": builder " .. unitID .. "'s spot is outside the ring", q[2] and not PLACE.inside(laidRing[1].points, q[2][2][1], q[2][2][3]), show(q[2]))
+		check(mode .. ": builder " .. unitID .. "'s spot is outside the ring", q[2] and not PLACE.inside(laidRing[1].ring, q[2][2][1], q[2][2][3]), show(q[2]))
 	end
 end
+
+--------------------------------------------------------------------------------
+-- standing, as far as the player can see
+--------------------------------------------------------------------------------
+
+local seen = engine({}, function()
+	return false
+end)
+seen.Spring.IsPosInLos = function(x)
+	return x < 1000
+end
+check("ground in sight is asked of the engine", PLACE.canStand(10, 500, 0) == false)
+check("ground out of sight, which the engine will not answer for, is taken to be fine", PLACE.canStand(10, 1500, 0) == true)
 
 support.report()

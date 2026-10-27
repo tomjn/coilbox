@@ -32,12 +32,15 @@ for z = -256, 256, 16 do
 	SPOTS[#SPOTS + 1] = { x = -200, z = z, reach = 0 }
 	SPOTS[#SPOTS + 1] = { x = -400, z = z, reach = 0 }
 end
+local E
 local function w()
-	return { spots = SPOTS, range = 128, stop = 16, apart = 16, defID = 10 }
+	return { spots = SPOTS, range = 128, stop = 16, apart = 16, defID = 10, stand = function(defID, x, z)
+		return not E.Spring.TestMoveOrder or E.Spring.TestMoveOrder(defID, x, 0, z)
+	end }
 end
 
 -- a builder at -200, 0, told to repair a terraform unit at 0, 200: 283 away
-local E = engine({
+E = engine({
 	[1] = { def = 10, x = -200, z = 0, queue = { { 40, { 50 } }, level() } },
 	[50] = { def = 20, x = -100, z = 200 },
 })
@@ -51,6 +54,15 @@ check("of those, the one nearest the builder", sent and sent.params[4] == -200 a
 
 CLEAR.update(2)
 check("the move goes in once for a terraform unit, not every frame", #E.single == 1)
+
+-- Zero-K's raw build in front of the repair
+E = engine({
+	[1] = { def = 10, x = -200, z = 0, queue = { { 31110, { -100, 0, 200, 126, 1 } }, { 40, { 50 } }, level() } },
+	[50] = { def = 20, x = -100, z = 200 },
+})
+CLEAR.watch(1, TAG, w())
+CLEAR.update(1)
+check("with Zero-K's raw build walking it into range, the move still goes in front", #E.single == 1 and E.single[1].params[1] == 0 and E.single[1].params[6] == 160, show(E.single))
 
 -- in range
 E = engine({

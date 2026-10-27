@@ -340,10 +340,62 @@ function M.laySteps(resolved, rotation, flip, origin, anchors, foot)
 					step.blocked = true
 				end
 			end
-			out[#out + 1] = step
 		end
 		if #foot >= first + n then
 			ringsFirst(copy, foot, first, n)
+		end
+		for _, step in ipairs(copy) do
+			if M.closedRing(step) then
+				for _, side in ipairs(M.ringSides(step)) do
+					out[#out + 1] = side
+				end
+			else
+				out[#out + 1] = step
+			end
+		end
+	end
+	return out
+end
+
+--- A closed ring of wall as one step for each side, ordered together (#4816).
+-- Zero-K puts each terraform unit up to 100 elmos from its place towards the
+-- middle of the order's builders, and moves it towards the builder working on
+-- it only once in a long while (unit_terraform.lua, GetTerraunitLeashedSpot and
+-- checkLoopFrames). For one order round a whole ring, the units of the far
+-- side end up inside the ring, where nobody outside can reach them. So each
+-- side is its own order, and names no builders, which makes the gadget pull its
+-- units towards the order's centre instead: bias, a leash's length out from the
+-- middle of the side. Each side keeps the ring's outline as ring, which is also
+-- what ties the sides together, since a raise is measured from the ground when
+-- it is ordered and the sides share their corners.
+-- @param step table a laid step that M.closedRing accepts
+-- @return table[] the sides, each a wall of two points
+function M.ringSides(step)
+	local points = step.points
+	local cx, cz = 0, 0
+	for i = 1, #points - 1 do
+		cx, cz = cx + points[i].x, cz + points[i].z
+	end
+	cx, cz = cx / (#points - 1), cz / (#points - 1)
+	local out = {}
+	for i = 1, #points - 1 do
+		local a, b = points[i], points[i + 1]
+		local dx, dz = b.x - a.x, b.z - a.z
+		local len = math.sqrt(dx * dx + dz * dz)
+		if len > 0 then
+			local mx, mz = (a.x + b.x) / 2, (a.z + b.z) / 2
+			local nx, nz = dz / len, -dx / len
+			if nx * (mx - cx) + nz * (mz - cz) < 0 then
+				nx, nz = -nx, -nz
+			end
+			local side = {}
+			for k, v in pairs(step) do
+				side[k] = v
+			end
+			side.points = { { x = a.x, z = a.z }, { x = b.x, z = b.z } }
+			side.ring = points
+			side.bias = { x = mx + nx * M.TERRAUNIT_LEASH, z = mz + nz * M.TERRAUNIT_LEASH }
+			out[#out + 1] = side
 		end
 	end
 	return out
@@ -398,10 +450,12 @@ function M.keepOff(results, steps, foot)
 			end
 		end
 	end
-	local rings = {}
+	local rings, seen = {}, {}
 	for _, step in ipairs(steps or {}) do
-		if M.closedRing(step) then
-			rings[#rings + 1] = step.points
+		local ring = step.ring or (M.closedRing(step) and step.points)
+		if ring and not seen[ring] then
+			seen[ring] = true
+			rings[#rings + 1] = ring
 		end
 	end
 	return { corners = corners, rings = rings }
@@ -479,6 +533,21 @@ function M.clearSpots(shape, off, range, clearance)
 		end
 	end
 	return out
+end
+
+--- Whether a unit can stand at a point, as far as the player can tell. The
+-- engine answers only where the player has line of sight
+-- (LuaSyncedRead::TestMoveOrder), so a point out of sight is taken to be fine:
+-- it is clear of the steps' ground, which is what matters most.
+function M.canStand(defID, x, z)
+	if not Spring.TestMoveOrder then
+		return true
+	end
+	local y = Spring.GetGroundHeight(x, z)
+	if Spring.IsPosInLos and not Spring.IsPosInLos(x, y, z) then
+		return true
+	end
+	return Spring.TestMoveOrder(defID, x, y, z)
 end
 
 --- Where a builder steps to before it works on a step: of spots from
@@ -563,6 +632,10 @@ function M.terraformParams(step, builders, tag, team)
 		sx, sz = sx + p.x, sz + p.z
 	end
 	local cx, cz = sx / #step.points, sz / #step.points
+	-- a side of a ring names no builders, so its units go towards its bias
+	if step.bias then
+		cx, cz, builders = step.bias.x, step.bias.z, {}
+	end
 	local height = 0
 	if step.kind == "level" then
 		height = step.base + step.height
@@ -628,26 +701,40 @@ end
 -- @return table[] { x, y, z, text } in world space
 function M.labels(steps)
 	local out = {}
+	local labelled = {}
 	for _, step in ipairs(steps or {}) do
-		local sx, sz = 0, 0
-		for _, p in ipairs(step.points) do
-			sx, sz = sx + p.x, sz + p.z
+		-- a ring ordered side by side has one label, over its middle, where its
+		-- last point is its first
+		local points, count = step.points, #step.points
+		if step.ring then
+			points, count = step.ring, #step.ring - 1
 		end
-		local cx, cz = sx / #step.points, sz / #step.points
-		local top, text
-		if step.kind == "raise" then
-			top, text = Spring.GetGroundHeight(cx, cz) + step.height, signed(step.height)
-		elseif step.kind == "level" then
-			top, text = step.base + step.height, "level " .. signed(step.height)
-		elseif step.kind == "ramp" then
-			top = step.base + (step.heights[1] + step.heights[2]) / 2
-			text = "ramp " .. signed(step.heights[1]) .. " to " .. signed(step.heights[2])
-		else
-			top, text = Spring.GetGroundHeight(cx, cz), "smooth"
+		if not labelled[points] then
+			labelled[points] = true
+			local sx, sz = 0, 0
+			for i = 1, count do
+				sx, sz = sx + points[i].x, sz + points[i].z
+			end
+			out[#out + 1] = M.label(step, sx / count, sz / count)
 		end
-		out[#out + 1] = { x = cx, y = top + M.LABEL_LIFT, z = cz, text = text }
 	end
 	return out
+end
+
+--- One step's label, over a point.
+function M.label(step, cx, cz)
+	local top, text
+	if step.kind == "raise" then
+		top, text = Spring.GetGroundHeight(cx, cz) + step.height, signed(step.height)
+	elseif step.kind == "level" then
+		top, text = step.base + step.height, "level " .. signed(step.height)
+	elseif step.kind == "ramp" then
+		top = step.base + (step.heights[1] + step.heights[2]) / 2
+		text = "ramp " .. signed(step.heights[1]) .. " to " .. signed(step.heights[2])
+	else
+		top, text = Spring.GetGroundHeight(cx, cz), "smooth"
+	end
+	return { x = cx, y = top + M.LABEL_LIFT, z = cz, text = text }
 end
 
 --- Half a footprint's width and depth in elmos, for a facing. xsize and
@@ -1199,7 +1286,7 @@ function M.plan(foot, can, shift, mode, terrain)
 				for _, unitID in ipairs(builders) do
 					at[unitID] = true
 				end
-				local t = { unitID = builders[1], params = M.terraformParams(u.step, builders, tag, team), tag = tag, levelAt = {} }
+				local t = { unitID = builders[1], params = M.terraformParams(u.step, builders, tag, team), tag = tag, levelAt = {}, group = u.step.ring }
 				steps[#steps + 1] = { step = u.step, tag = tag, at = at, t = t, i = u.i }
 				out.terraform[#out.terraform + 1] = t
 			end
@@ -1258,7 +1345,7 @@ function M.plan(foot, can, shift, mode, terrain)
 						return false
 					end
 				end
-				return not Spring.TestMoveOrder or Spring.TestMoveOrder(def.id, x, Spring.GetGroundHeight(x, z), z)
+				return M.canStand(def.id, x, z)
 			end)
 			if spot then
 				add(M.CMD_MOVE, { spot.x, Spring.GetGroundHeight(spot.x, spot.z), spot.z })
@@ -1363,9 +1450,16 @@ function M.issue(plan, later, clear)
 	local sent = 0
 	-- a terraform order whose level step is at or next to the front goes
 	-- first, so the level step finds its units
+	-- the sides of a ring go together, when any of them is near
+	local nearGroup = {}
+	for _, t in ipairs(plan.terraform or {}) do
+		if t.group and later.near(t, plan.shift) then
+			nearGroup[t.group] = true
+		end
+	end
 	local held = {}
 	for _, t in ipairs(plan.terraform or {}) do
-		if later.near(t, plan.shift) then
+		if (t.group and nearGroup[t.group]) or (not t.group and later.near(t, plan.shift)) then
 			Spring.GiveOrderToUnit(t.unitID, M.CMD_TERRAFORM_INTERNAL, t.params, 0)
 		else
 			held[#held + 1] = t
@@ -1380,7 +1474,7 @@ function M.issue(plan, later, clear)
 		later.add(t)
 	end
 	for _, c in ipairs(clear and plan.clear or {}) do
-		clear.watch(c.unitID, c.tag, { spots = c.spots, range = c.range, stop = c.stop, apart = c.apart, defID = c.defID })
+		clear.watch(c.unitID, c.tag, { spots = c.spots, range = c.range, stop = c.stop, apart = c.apart, defID = c.defID, stand = M.canStand })
 	end
 	return sent
 end

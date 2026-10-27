@@ -10,9 +10,7 @@
 -- So while a builder works on a step, this watches the front of its queue. When
 -- it is about to walk to a terraform unit out of its range, a move to a clear
 -- spot within range of that unit goes in front, the way Helwor's
--- MoveAwayFromLevelBuild.lua inserts one (line 179). The gadget pulls a
--- terraform unit towards the builder working on it (GetTerraunitLeashedSpot), so
--- once the builder is at the spot the unit is still in range.
+-- MoveAwayFromLevelBuild.lua inserts one (line 179).
 
 local M = {}
 
@@ -21,8 +19,11 @@ M.CMD_REPAIR = 40
 M.CMD_MOVE = 10
 M.CMD_INSERT = 1
 M.OPT_ALT = 128
--- Zero-K's level command (LuaRules/Configs/customcmds.lua), as in place.lua.
+-- Zero-K's level command and raw build (LuaRules/Configs/customcmds.lua). Zero-K
+-- puts a raw build in front of a repair to walk the builder into range
+-- (cmd_raw_move.lua, CheckConstructorBuild).
 M.CMD_LEVEL = 39736
+M.CMD_RAW_BUILD = 31110
 -- How often, in game frames, the watched builders are checked for a step that
 -- has left their queue.
 M.SWEEP_EVERY = 30
@@ -62,7 +63,8 @@ end
 -- @param tag number the step's terraform tag, as its level command carries it
 -- @param w table { spots = from place.lua's M.clearSpots, range = build range,
 --   stop = how far short of a move's goal it may stop, apart = how far its spot
---   must be from another builder's, defID }
+--   must be from another builder's, defID, stand = function(defID, x, z) ->
+--   whether the builder can stand there }
 function M.watch(unitID, tag, w)
 	watched[unitID] = watched[unitID] or {}
 	watched[unitID][tag] = w
@@ -74,8 +76,11 @@ local function isTerraunit(unitID)
 end
 
 --- The spot for a builder to stand at to reach a terraform unit: within range
--- of it, less how far short the move may stop, not near another builder's
--- spot, on ground the builder can stand on, and the nearest to the builder.
+-- of where the unit is, less how far short the move may stop, not near another
+-- builder's spot, on ground the builder can stand on, and the nearest to the
+-- builder. The gadget pulls a unit towards the builder working on it only when
+-- it next checks that builder, which for each builder is once in 1200 frames
+-- (unit_terraform.lua, checkLoopFrames), so the unit is taken to stay put.
 local function spotFor(unitID, w, bx, bz, tx, tz)
 	local reach = w.range - w.stop
 	local best, bestD
@@ -89,7 +94,7 @@ local function spotFor(unitID, w, bx, bz, tx, tz)
 						free = false
 					end
 				end
-				if free and (not Spring.TestMoveOrder or Spring.TestMoveOrder(w.defID, s.x, Spring.GetGroundHeight(s.x, s.z), s.z)) then
+				if free and (not w.stand or w.stand(w.defID, s.x, s.z)) then
 					best, bestD = s, d
 				end
 			end
@@ -117,8 +122,15 @@ end
 -- @param frame integer the game frame
 function M.update(frame)
 	for unitID, steps in pairs(watched) do
+		-- Zero-K walks a builder into range with a raw build in front of the
+		-- repair, so the repair can be second
+		local at = 1
 		local id, _, _, target = Spring.GetUnitCurrentCommand(unitID, 1)
-		local nextID, _, _, _, _, _, tag = Spring.GetUnitCurrentCommand(unitID, 2)
+		if id == M.CMD_RAW_BUILD then
+			at = 2
+			id, _, _, target = Spring.GetUnitCurrentCommand(unitID, 2)
+		end
+		local nextID, _, _, _, _, _, tag = Spring.GetUnitCurrentCommand(unitID, at + 1)
 		local w = nextID == M.CMD_LEVEL and steps[tag] or nil
 		if id == M.CMD_REPAIR and w and target and sentFor[unitID] ~= target and isTerraunit(target) then
 			local bx, _, bz = Spring.GetUnitPosition(unitID)
