@@ -261,3 +261,59 @@ export function movedInSequence(
   steps[to] = stepsFirst([terrain[entry.index]])[0];
   return { steps, index: to };
 }
+
+/** Whether two segments cross or touch. */
+function segmentsMeet(a: Point, b: Point, c: Point, d: Point): boolean {
+  const side = (p: Point, q: Point, r: Point) =>
+    Math.sign((q.x - p.x) * (r.z - p.z) - (q.z - p.z) * (r.x - p.x));
+  const between = (p: Point, q: Point, r: Point) =>
+    Math.min(p.x, q.x) <= r.x &&
+    r.x <= Math.max(p.x, q.x) &&
+    Math.min(p.z, q.z) <= r.z &&
+    r.z <= Math.max(p.z, q.z);
+  const d1 = side(c, d, a);
+  const d2 = side(c, d, b);
+  const d3 = side(a, b, c);
+  const d4 = side(a, b, d);
+  if (d1 !== d2 && d3 !== d4) return true;
+  return (
+    (d1 === 0 && between(c, d, a)) ||
+    (d2 === 0 && between(c, d, b)) ||
+    (d3 === 0 && between(a, b, c)) ||
+    (d4 === 0 && between(a, b, d))
+  );
+}
+
+/**
+ * The walls that close on themselves with no way out (issue #4816): a wall
+ * whose last point is its first, that raises or lowers the ground, and that no
+ * ramp crosses. Zero-K's slopes are too steep for most units to climb, so
+ * whatever is inside such a ring when it is built stays there. A ring with a
+ * gap is not closed. The indexes are into `steps`.
+ */
+export function trappingRings(steps: readonly TerrainStep[]): number[] {
+  const ramps = steps.filter((s) => s.kind === "ramp" && s.points.length >= 2);
+  const out: number[] = [];
+  steps.forEach((step, index) => {
+    const points = step.points;
+    const first = points[0];
+    const last = points[points.length - 1];
+    const closed =
+      step.shape === "wall" &&
+      (step.kind === "raise" || step.kind === "level") &&
+      (step.height ?? 0) !== 0 &&
+      points.length >= 4 &&
+      first.x === last.x &&
+      first.z === last.z;
+    if (!closed) return;
+    const crossed = ramps.some((ramp) =>
+      points
+        .slice(1)
+        .some((p, i) =>
+          segmentsMeet(points[i], p, ramp.points[0], ramp.points[1]),
+        ),
+    );
+    if (!crossed) out.push(index);
+  });
+  return out;
+}

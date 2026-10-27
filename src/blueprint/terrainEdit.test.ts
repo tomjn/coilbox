@@ -14,6 +14,7 @@ import {
   snapPoint,
   stepAdded,
   stepEdges,
+  trappingRings,
   withKind,
 } from "./terrainEdit";
 
@@ -199,5 +200,64 @@ describe("steps in the build order (issue #4817)", () => {
       -1,
     );
     expect(moved).toEqual({ steps: [wall(0, 8), wall(0, 0)], index: 0 });
+  });
+});
+
+describe("trappingRings", () => {
+  const ring = (height: number): TerrainStep => ({
+    kind: "raise",
+    shape: "wall",
+    points: [
+      { x: 0, z: 0 },
+      { x: 320, z: 0 },
+      { x: 320, z: 320 },
+      { x: 0, z: 320 },
+      { x: 0, z: 0 },
+    ],
+    height,
+    before: 0,
+  });
+  const ramp = (
+    from: { x: number; z: number },
+    to: { x: number; z: number },
+  ): TerrainStep => ({
+    kind: "ramp",
+    shape: "wall",
+    points: [from, to],
+    heights: [0, 112],
+    width: 64,
+    before: 0,
+  });
+
+  it("marks a raised wall that closes on itself", () => {
+    expect(trappingRings([ring(112)])).toEqual([0]);
+  });
+
+  it("marks a dug ring too, since its slopes trap as well", () => {
+    expect(trappingRings([ring(-40)])).toEqual([0]);
+  });
+
+  it("does not mark a ring with a ramp across it", () => {
+    expect(
+      trappingRings([ring(112), ramp({ x: 160, z: 160 }, { x: 160, z: 448 })]),
+    ).toEqual([]);
+  });
+
+  it("still marks a ring when the ramp stays outside it", () => {
+    expect(
+      trappingRings([ring(112), ramp({ x: 400, z: 0 }, { x: 400, z: 320 })]),
+    ).toEqual([0]);
+  });
+
+  it("does not mark a wall with a gap, an area or a ring that changes nothing", () => {
+    const open = { ...ring(112), points: ring(112).points.slice(0, 4) };
+    const area: TerrainStep = { ...ring(112), shape: "area" };
+    expect(trappingRings([open, area, ring(0)])).toEqual([]);
+  });
+
+  it("gives each trapping ring's index among the steps", () => {
+    expect(
+      trappingRings([ramp({ x: 900, z: 0 }, { x: 900, z: 64 }), ring(112)]),
+    ).toEqual([1]);
   });
 });
