@@ -19,6 +19,11 @@
 -- then the buildings on them. Then it saves again.
 --
 -- Both dump the change in height over the whole area, a row a line.
+--
+-- With coilbox_shots=1, for a windowed run, it also frames the work from
+-- above and takes screenshots, and saves through the coilbox widget when
+-- that is loaded too, so its panel shows the result. It moves the camera
+-- only, never the mouse.
 
 local MODE = (Spring.GetModOptions() or {}).coilbox_mode or ""
 
@@ -42,6 +47,7 @@ local TYPE_LEVEL, TYPE_RAISE = 1, 2
 local END_FRAME = tonumber((Spring.GetModOptions() or {}).coilbox_end_frame) or 9000
 local ORDER_FRAME = 75
 local SAVE_FRAME = END_FRAME - 60
+local SHOTS = (Spring.GetModOptions() or {}).coilbox_shots == "1"
 
 local cx = 16 * math.floor(Game.mapSizeX / 32)
 local cz = 16 * math.floor(Game.mapSizeZ / 32)
@@ -191,10 +197,55 @@ function widget:Initialize()
 	say("loaded mode=%s tolerance=%s centre=%d,%d", MODE, tostring(GROUND.TOLERANCE), cx, cz)
 	-- Zero-K ends a match at its first frame when the other allyteam has no
 	-- player or AI in it, unless cheats are on (game_over.lua, ProcessLastAlly).
-	Spring.SendCommands("cheat 1", "setmaxspeed 100", "setminspeed 100")
+	-- a windowed run goes slower, so it draws the frames it takes shots of
+	local speed = SHOTS and "10" or "100"
+	Spring.SendCommands("cheat 1", "setmaxspeed " .. speed, "setminspeed " .. speed)
+end
+
+--- Look at a point from this far away, in whatever camera the game uses:
+-- its own state with the point and the distance changed.
+local function look(x, z, distance)
+	local state = Spring.GetCameraState()
+	state.px, state.py, state.pz = x, Spring.GetGroundHeight(x, z), z
+	state.dist, state.height = distance, distance
+	Spring.SetCameraState(state, 0)
+end
+
+local function shot()
+	Spring.SendCommands("screenshot png")
+end
+
+-- What the windowed run looks at, and when: frames before the save.
+local SHOT_PLAN = {
+	{ before = 600, x = cx - 400, distance = 1300 },
+	{ before = 540, x = cx - 620, distance = 600, take = true },
+	{ before = 480, x = cx + 120, distance = 700, take = true },
+	{ before = 420, x = cx - 400, distance = 1300, take = true },
+}
+
+local function shots(frame)
+	for _, s in ipairs(SHOT_PLAN) do
+		if frame == SAVE_FRAME - s.before then
+			look(s.x, cz, s.distance)
+		elseif s.take and frame == SAVE_FRAME - s.before + 20 then
+			shot()
+		end
+	end
+	local api = WG.CoilboxBlueprints
+	if frame == SAVE_FRAME - 200 and api then
+		api.open()
+		if MODE == "ground_build" then
+			api.saveGround(cx - 120, cz - 100, cx + 420, cz + 100)
+		end
+	elseif frame == SAVE_FRAME - 170 then
+		shot()
+	end
 end
 
 function widget:GameFrame(frame)
+	if SHOTS then
+		shots(frame)
+	end
 	if frame == ORDER_FRAME then
 		for _, unitID in ipairs(Spring.GetTeamUnits(Spring.GetMyTeamID()) or {}) do
 			if Spring.GetUnitRulesParam(unitID, "coilbox_ground_builder") then
