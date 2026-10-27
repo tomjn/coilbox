@@ -72,6 +72,10 @@ export type TerrainStep = {
   heights?: [number, number];
   /** Ramp only, in elmos. */
   width?: number;
+  /** Level and ramp only: change the ground one way. `raise` fills ground below
+   *  the step's height and leaves higher ground standing, `lower` cuts ground
+   *  above it and leaves lower ground. Absent changes it both ways. */
+  only?: "raise" | "lower";
   /** The index in `buildings` this step comes before. `buildings.length` means
    *  after all of them. */
   before: number;

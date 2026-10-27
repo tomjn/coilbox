@@ -105,6 +105,9 @@ export interface PayloadTerrainStep {
   heights?: [number, number];
   /** Ramp only, in elmos. */
   width?: number;
+  /** Level and ramp only: `raise` leaves ground above the step's height
+   *  standing, `lower` leaves ground below it. Absent changes it both ways. */
+  only?: "raise" | "lower";
   /** The index in `buildings` this step comes before. `buildings.length` means
    *  after all of them. */
   before: number;
@@ -266,6 +269,14 @@ function parseTerrainStep(
     step.heights = [from, to];
     step.width = width;
   }
+  // Anything else reads as both ways, so a later coilbox's new value costs the
+  // step its choice and nothing more.
+  if (
+    (kind === "level" || kind === "ramp") &&
+    (v.only === "raise" || v.only === "lower")
+  ) {
+    step.only = v.only;
+  }
   return step;
 }
 
@@ -279,6 +290,7 @@ export function copyTerrainStep<T extends PayloadTerrainStep>(step: T): T {
     ...(step.height !== undefined ? { height: step.height } : {}),
     ...(step.heights ? { heights: [step.heights[0], step.heights[1]] } : {}),
     ...(step.width !== undefined ? { width: step.width } : {}),
+    ...(step.only ? { only: step.only } : {}),
     before: step.before,
   } as T;
 }

@@ -221,6 +221,98 @@ describe("raise", () => {
   });
 });
 
+describe("a level or ramp that only raises or only lowers (#4804)", () => {
+  // `checkPointCreation`, lines 523-535, with the order's volume selection: a
+  // point that would move the other way is never made, so it is not in the step.
+  // A rock of 30 stands in the pad's south-east, clear of the pivot at 512.
+  const rock = ground((x, z) =>
+    x >= 520 && x <= 584 && z >= 520 && z <= 584 ? 30 : 0,
+  );
+  const plaza = (only?: "raise" | "lower"): TerrainStep => ({
+    kind: "level",
+    shape: "area",
+    points: [
+      { x: -96, z: -96 },
+      { x: 96, z: -96 },
+      { x: 96, z: 96 },
+      { x: -96, z: 96 },
+    ],
+    height: 5,
+    before: 0,
+    ...(only ? { only } : {}),
+  });
+
+  it("with no choice cuts the rock down to the plaza, line 523", () => {
+    const { ground: g } = terraform(rock, [plaza()], AT_CENTRE, []);
+    expect(heightAt(g, 552, 552)).toBe(5);
+    expect(heightAt(g, 480, 480)).toBe(5);
+  });
+
+  it("only raise fills the low ground and leaves the rock standing", () => {
+    const { ground: g } = terraform(rock, [plaza("raise")], AT_CENTRE, []);
+    expect(heightAt(g, 480, 480)).toBe(5);
+    expect(heightAt(g, 512, 512)).toBe(5);
+    expect(heightAt(g, 552, 552)).toBe(30);
+  });
+
+  it("only lower cuts the rock and leaves the low ground alone", () => {
+    const { ground: g } = terraform(rock, [plaza("lower")], AT_CENTRE, []);
+    expect(heightAt(g, 552, 552)).toBe(5);
+    expect(heightAt(g, 480, 480)).toBe(0);
+    expect(heightAt(g, 512, 512)).toBe(0);
+  });
+
+  it("skips a point already at the height, line 527", () => {
+    const flat = ground(() => 5);
+    for (const only of ["raise", "lower"] as const) {
+      const { ground: g, metal } = terraform(
+        flat,
+        [{ ...plaza(only), height: 0 }],
+        AT_CENTRE,
+        [],
+      );
+      expect(g.heights.every((h) => h === 5)).toBe(true);
+      expect(metal).toBe(0);
+    }
+  });
+
+  it("costs only the ground it changes", () => {
+    const both = terraform(rock, [plaza()], AT_CENTRE, []).metal;
+    const raise = terraform(rock, [plaza("raise")], AT_CENTRE, []).metal;
+    const lower = terraform(rock, [plaza("lower")], AT_CENTRE, []).metal;
+    expect(raise).toBeLessThan(both);
+    expect(lower).toBeLessThan(both);
+  });
+
+  it("applies to a ramp: only raise leaves ground the ramp would cut", () => {
+    // The pivot's ground is 40 and the ramp climbs from 40 to 104 over ground
+    // that is 100 from x = 560 on.
+    const hill = ground((x) => (x >= 560 ? 100 : 40));
+    const ramp: TerrainStep = {
+      kind: "ramp",
+      shape: "wall",
+      points: [
+        { x: -128, z: 0 },
+        { x: 128, z: 0 },
+      ],
+      heights: [0, 64],
+      width: 64,
+      before: 0,
+    };
+    const both = terraform(hill, [ramp], AT_CENTRE, []).ground;
+    const raise = terraform(hill, [{ ...ramp, only: "raise" }], AT_CENTRE, []);
+    const lower = terraform(hill, [{ ...ramp, only: "lower" }], AT_CENTRE, []);
+    // At x = 576 the ramp is at 40 + 64 * 192 / 256 = 88, under the ground's 100.
+    expect(heightAt(both, 576, 512)).toBeCloseTo(88, 1);
+    expect(heightAt(raise.ground, 576, 512)).toBe(100);
+    expect(heightAt(lower.ground, 576, 512)).toBeCloseTo(88, 1);
+    // Where the ramp is above the flat 40, only lower has nothing to do.
+    expect(heightAt(both, 448, 512)).toBeCloseTo(56, 1);
+    expect(heightAt(raise.ground, 448, 512)).toBeCloseTo(56, 1);
+    expect(heightAt(lower.ground, 448, 512)).toBe(40);
+  });
+});
+
 describe("ramp", () => {
   const ramp: TerrainStep = {
     kind: "ramp",

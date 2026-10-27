@@ -12785,6 +12785,10 @@ msgstr "Flagi botów oraz poziomy moderatora i admina są usuwane po 365 dniach 
 msgid "Both buttons open on <0>{gameFile}</0>, where {engine} writes. Pick another file if you keep your games somewhere else. A player who has never saved a base in game has no file there yet, and sending one writes it."
 msgstr "Oba przyciski otwierają <0>{gameFile}</0>, gdzie zapisuje {engine}. Wybierz inny plik, jeśli trzymasz gry gdzie indziej. Jeśli w grze nigdy nie zapisano bazy, nie ma tam jeszcze pliku, a wysłanie go utworzy."
 
+#: src/placement/TerrainControls.tsx
+msgid "Both ways"
+msgstr ""
+
 #: src/multiplayer/admin/tools.tsx
 #, fuzzy
 msgid "Bots"
@@ -34054,6 +34058,10 @@ msgstr "Tylko od"
 msgid "Only has an effect on a unit that flies. The engine drops it for anything else."
 msgstr "Działa tylko na jednostkę latającą. Silnik pomija to dla wszystkiego innego."
 
+#: src/placement/TerrainControls.tsx
+msgid "Only lower"
+msgstr ""
+
 #: src/content/unitFieldNotes.ts
 #, fuzzy
 msgid "Only matters for a fighter."
@@ -34078,6 +34086,10 @@ msgstr "Tylko własne mapy: style map generowanych są ukryte"
 #, fuzzy
 msgid "Only produced while the unit is switched on and its upkeep was paid that tick."
 msgstr "Wytwarzane tylko wtedy, gdy jednostka jest włączona i w danym takcie opłacono jej utrzymanie."
+
+#: src/placement/TerrainControls.tsx
+msgid "Only raise"
+msgstr ""
 
 #: src/content/unitFieldNotes.ts
 #, fuzzy
@@ -53444,6 +53456,10 @@ msgstr "Która drużyna wygrała"
 #, fuzzy
 msgid "Which units this mod touches."
 msgstr "Których jednostek dotyczy ten mod."
+
+#: src/placement/TerrainControls.tsx
+msgid "Which way the ground changes"
+msgstr ""
 
 #: src/workshop/pages/components/WeaponLibraryPanel.tsx
 #, fuzzy

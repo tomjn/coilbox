@@ -19,7 +19,12 @@
 -- the steps, each builder stepping clear of a step before it works on it, then
 -- the buildings. Then it saves again.
 --
--- Both dump the change in height over the whole area, a row a line.
+-- ground_only (issue #4804) levels two plazas 5 above the ground, each with a
+-- rock 60 high standing in it, which the fixture gadget raises. One is ordered
+-- Only raise and the other both ways, through the blueprint widget's own
+-- place.lua, and the probe reports the ground at the rock and on the plaza.
+--
+-- All of them dump the change in height over the whole area, a row a line.
 --
 -- With coilbox_shots=1, for a windowed run, it also frames the work from
 -- above and takes screenshots, and saves through the coilbox widget when
@@ -122,6 +127,54 @@ local function middleOf(units)
 	return n > 0 and { x = sx / n, z = sz / n } or nil
 end
 
+--- The two plazas of ground_only: where each is centred, and the order's
+-- choice. The rock is 32 to 80 elmos east and south of the centre.
+local PLAZAS = {
+	{ name = "raise", x = cx - 400, only = "raise" },
+	{ name = "both", x = cx + 200 },
+}
+
+--- A level step ordered the way the blueprint widget orders one: the order
+-- place.lua builds, then the level step that follows it.
+local function orderPlaza(plaza)
+	tag = tag + 1
+	local half = 96
+	local step = {
+		kind = "level",
+		shape = "area",
+		points = {
+			{ x = plaza.x - half, z = cz - half },
+			{ x = plaza.x + half, z = cz - half },
+			{ x = plaza.x + half, z = cz + half },
+			{ x = plaza.x - half, z = cz + half },
+		},
+		height = 5,
+		base = Spring.GetGroundHeight(plaza.x, cz),
+		only = plaza.only,
+	}
+	local params = PLACE.terraformParams(step, builders, tag, Spring.GetMyTeamID())
+	say("plaza-order name=%s volume=%d base=%.3f", plaza.name, params[10], step.base)
+	Spring.GiveOrderToUnit(builders[1], CMD_TERRAFORM_INTERNAL, params, 0)
+	Spring.GiveOrderToUnitArray(builders, CMD_LEVEL, { plaza.x, step.base, cz, tag }, shift)
+	shift = OPT_SHIFT
+end
+
+--- The ground at a rock's middle and in a plaza's, with the map's own.
+local function sample(label)
+	for _, plaza in ipairs(PLAZAS) do
+		local rx, rz = plaza.x + 56, cz + 56
+		say(
+			"plaza-sample at=%s name=%s rock=%.3f rock-orig=%.3f plain=%.3f plain-orig=%.3f",
+			label,
+			plaza.name,
+			Spring.GetGroundHeight(rx, rz),
+			Spring.GetGroundOrigHeight(rx, rz),
+			Spring.GetGroundHeight(plaza.x, cz),
+			Spring.GetGroundOrigHeight(plaza.x, cz)
+		)
+	end
+end
+
 local function orderPlace()
 	local ok, saved = pcall(VFS.Include, "LuaUI/coilbox_ground_steps.lua")
 	if not ok or type(saved) ~= "table" then
@@ -202,9 +255,13 @@ local function save()
 end
 
 function widget:Initialize()
-	if MODE ~= "ground_build" and MODE ~= "ground_place" then
+	if MODE ~= "ground_build" and MODE ~= "ground_place" and MODE ~= "ground_only" then
 		widgetHandler:RemoveWidget(self)
 		return
+	end
+	if MODE == "ground_only" then
+		PLACE = VFS.Include("LuaUI/coilbox_blueprints/place.lua", nil, VFS.RAW_FIRST)
+		PLACE.use({ Spring = Spring, UnitDefs = UnitDefs, UnitDefNames = UnitDefNames, Game = Game, WG = WG })
 	end
 	JSON = VFS.Include("LuaUI/coilbox_blueprints/json.lua")
 	GROUND = VFS.Include("LuaUI/coilbox_blueprints/ground.lua")
@@ -245,7 +302,26 @@ local SHOT_PLAN = {
 	{ before = 420, x = cx - 400, distance = 1300, take = true },
 }
 
+-- ground_only looks at each plaza before the orders and again once the
+-- builders are done: the Only raise one, then the both ways one.
+local ONLY_SHOTS = {
+	{ at = 60, plaza = 1 },
+	{ at = 100, plaza = 2 },
+	{ at = END_FRAME - 140, plaza = 1 },
+	{ at = END_FRAME - 100, plaza = 2 },
+}
+
 local function shots(frame)
+	if MODE == "ground_only" then
+		for _, s in ipairs(ONLY_SHOTS) do
+			if frame == s.at then
+				look(PLAZAS[s.plaza].x + 20, cz + 20, 560)
+			elseif frame == s.at + 20 then
+				shot()
+			end
+		end
+		return
+	end
 	for _, s in ipairs(SHOT_PLAN) do
 		if frame == SAVE_FRAME - s.before then
 			look(s.x, cz, s.distance)
@@ -280,13 +356,22 @@ function widget:GameFrame(frame)
 		if #builders == 0 then
 			return
 		end
-		if MODE == "ground_build" then
+		if MODE == "ground_only" then
+			sample("start")
+			for _, plaza in ipairs(PLAZAS) do
+				orderPlaza(plaza)
+			end
+		elseif MODE == "ground_build" then
 			orderBuild()
 		else
 			orderPlace()
 		end
 	elseif frame == SAVE_FRAME then
-		save()
+		if MODE == "ground_only" then
+			sample("end")
+		else
+			save()
+		end
 		dumpGrid()
 	end
 end
