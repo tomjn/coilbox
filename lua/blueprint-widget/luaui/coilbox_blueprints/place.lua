@@ -981,9 +981,14 @@ end
 -- the part they can, working together.
 -- @param resolved table from M.resolve
 -- @param can table from M.capabilities
+-- @param terrain table? { metal, work } for the layout's terraform, from
+--   ground.lua's session: metal is the estimate the game shows and work what
+--   the builders spend doing it. It adds to the metal, and its time is the work
+--   over the build power of the selected builders that can terraform, in
+--   Zero-K the same power that builds units.
 -- @return number metal, number energy, number? seconds, nil with no builder
 --   for any of it
-function M.cost(resolved, can)
+function M.cost(resolved, can, terrain)
 	local metal, energy, work, speed = 0, 0, 0, 0
 	for _, b in ipairs(resolved.buildings) do
 		metal = metal + (b.def.metalCost or 0)
@@ -995,10 +1000,21 @@ function M.cost(resolved, can)
 	for _, unitID in ipairs(can.builders) do
 		speed = speed + (can.speed[unitID] or 0)
 	end
-	if work == 0 or speed <= 0 then
-		return metal, energy, nil
+	local seconds = nil
+	if work > 0 and speed > 0 then
+		seconds = work / speed
 	end
-	return metal, energy, work / speed
+	if terrain and terrain.metal and terrain.metal > 0 then
+		metal = metal + terrain.metal
+		local terraSpeed = 0
+		for _, unitID in ipairs(can.terraformers or {}) do
+			terraSpeed = terraSpeed + (can.speed[unitID] or 0)
+		end
+		if terraSpeed > 0 then
+			seconds = (seconds or 0) + (terrain.work or terrain.metal) / terraSpeed
+		end
+	end
+	return metal, energy, seconds
 end
 
 --- Send a plan's orders to the engine.
