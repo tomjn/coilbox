@@ -49,9 +49,11 @@ M.CMD_MOVE = 10
 -- towards the constructor building it (unit_terraform.lua, terraUnitLeash), so
 -- a builder reaches that much further than its build range.
 M.TERRAUNIT_LEASH = 100
--- How close a unit gets to a move's goal before the move is done: the engine's
--- default goal radius, one square (CMobileCAI::SetGoal).
-M.MOVE_GOAL_RADIUS = 8
+-- How far short of a move's goal a unit may stop. Zero-K turns a move into its
+-- raw move, which stops a walker given a goal of its own within 16 elmos
+-- (cmd_raw_move.lua, loneStopDist). The engine's own move stops within 8
+-- (CMobileCAI::SetGoal).
+M.MOVE_STOP = 16
 -- The spacing of the spots tried for a builder to step clear to: a build square.
 M.CLEAR_GRID = 16
 
@@ -1211,7 +1213,7 @@ function M.plan(foot, can, shift, mode, terrain)
 				for _, s in ipairs(steps) do
 					local r = byIndex[s.i]
 					if r and r.shape and #r.shape > 0 then
-						s.shape, s.off, s.spots = r.shape, off, {}
+						s.shape, s.off, s.spots, s.taken = r.shape, off, {}, {}
 					end
 				end
 			end
@@ -1242,14 +1244,23 @@ function M.plan(foot, can, shift, mode, terrain)
 			end
 			-- clear of the step by half the builder's footprint and the distance
 			-- a move stops short of its goal
-			local clearance = (def.xsize or 2) * 4 + M.MOVE_GOAL_RADIUS
+			local clearance = (def.xsize or 2) * 4 + M.MOVE_STOP
 			local key = def.buildDistance .. ":" .. clearance
 			s.spots[key] = s.spots[key] or M.clearSpots(s.shape, s.off, def.buildDistance, clearance)
+			-- each builder gets a spot of its own, a footprint from the others',
+			-- so none stops short of a spot another is standing on
+			local apart = (def.xsize or 2) * 8
 			local spot = M.clearSpot(s.spots[key], s.shape, wx, wz, function(x, z)
+				for _, t in ipairs(s.taken) do
+					if (t.x - x) ^ 2 + (t.z - z) ^ 2 < apart * apart then
+						return false
+					end
+				end
 				return not Spring.TestMoveOrder or Spring.TestMoveOrder(def.id, x, Spring.GetGroundHeight(x, z), z)
 			end)
 			if spot then
 				add(M.CMD_MOVE, { spot.x, Spring.GetGroundHeight(spot.x, spot.z), spot.z })
+				s.taken[#s.taken + 1] = spot
 				wx, wz = spot.x, spot.z
 			end
 		end

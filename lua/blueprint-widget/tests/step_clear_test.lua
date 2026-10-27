@@ -17,7 +17,7 @@ local SOLAR = support.def(2, "solar", { isBuilding = true, xsize = 10, zsize = 1
 local CON = support.def(10, "con", { buildOptions = { 1, 2 }, buildDistance = 128, xsize = 2, zsize = 2 })
 
 local RANGE = 128
-local CLEARANCE = 2 * 4 + PLACE.MOVE_GOAL_RADIUS
+local CLEARANCE = 2 * 4 + PLACE.MOVE_STOP
 
 local function engine(units, stand)
 	local E = support.engine({ TURRET, SOLAR, CON }, { units = units, mapSizeX = 4096, mapSizeZ = 4096 })
@@ -211,6 +211,19 @@ for _, mode in ipairs({ "help", "split" }) do
 	check(mode .. ": each builder gets a move ahead of the step", both[200] and both[201] and both[200][1][1] == 10 and both[201][1][1] == 10 and both[200][2][1] == 39736 and both[201][2][1] == 39736, show(both))
 	check(mode .. ": each on its own side", both[200][1][2][3] > 1024 and both[201][1][2][3] < 1024, show({ both[200][1][2], both[201][1][2] }))
 end
+
+-- two builders on the same side get spots of their own
+engine({
+	[200] = { def = 10, x = 1024, z = 1300, cmdDescs = { LEVEL } },
+	[201] = { def = 10, x = 1040, z = 1300, cmdDescs = { LEVEL } },
+}, function()
+	return true
+end)
+local sameSide = byUnit(PLACE.plan(turretOnWall, PLACE.capabilities({ 200, 201 }), false, nil, { steps = steps, on = true, ground = model(steps, turretOnWall) }))
+check("two builders on the same side are sent to spots a footprint apart", (function()
+	local a, b = sameSide[200][1][2], sameSide[201][1][2]
+	return math.sqrt((a[1] - b[1]) ^ 2 + (a[3] - b[3]) ^ 2) >= 2 * 8 and a[3] > 1024 and b[3] > 1024
+end)(), show({ sameSide[200][1][2], sameSide[201][1][2] }))
 
 -- a builder that cannot stand anywhere near is left as it was
 engine(units(), function()
