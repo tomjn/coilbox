@@ -45,6 +45,7 @@ import {
 } from "../../triggerTypes";
 import { copyName } from "./duplicate";
 import {
+  baseLabels,
   buildingTargets,
   groupSize,
   type TargetOption,
@@ -513,6 +514,7 @@ const NEEDS: Record<string, MessageDescriptor> = {
   zoneId: msg`Needs a zone`,
   actorId: msg`Needs an actor or a base`,
   groupId: msg`Needs a group`,
+  baseId: msg`Needs a base that appears from a trigger`,
   triggerId: msg`Needs a trigger`,
   objectiveId: msg`Needs an objective`,
   dialogueId: msg`Needs a dialogue line`,
@@ -580,6 +582,25 @@ export function registryOptions(
           }),
         };
       });
+    // Only the bases that wait for a trigger, because spawn_base places nothing
+    // that is already on the map.
+    case "baseId": {
+      const labels = baseLabels(scenario.blueprints, scenario.bases);
+      const teams = new Map(
+        scenario.setup.participants.map((p) => [p.id, p.name]),
+      );
+      return scenario.bases.flatMap((base, i) =>
+        base.dormant
+          ? [
+              {
+                value: base.id,
+                label: labels[i],
+                description: teams.get(base.team) ?? base.team,
+              },
+            ]
+          : [],
+      );
+    }
     // By name, with the id underneath as the value, the way a zone is picked.
     // Two triggers may share a name, so the labels are made to differ first,
     // otherwise the list offers the same word twice and neither is the one the

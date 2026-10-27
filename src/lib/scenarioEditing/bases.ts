@@ -529,7 +529,10 @@ export function editBase(
   scenario: Scenario,
   id: string,
   patch: Partial<
-    Pick<ScenarioBase, "team" | "origin" | "buildings" | "difficulty">
+    Pick<
+      ScenarioBase,
+      "team" | "origin" | "buildings" | "difficulty" | "dormant"
+    >
   >,
 ): Scenario {
   const bases = edit<ScenarioBase>(scenario.bases, id, (base) => ({
