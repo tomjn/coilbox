@@ -1,7 +1,7 @@
 -- The synced half of the Zero-K save ground fixture match (issue #4798).
 --
--- Runs only when the start script's coilbox_mode is ground_build or
--- ground_place. It creates three constructors 1040 west of the map's middle,
+-- Runs only when the start script's coilbox_mode is ground_build,
+-- ground_place or ground_only. It creates three constructors 1040 west of the map's middle,
 -- gunships, because a walker that stands on a step while it rises is stranded
 -- on top of it, and which one it stands on depends on its path. It keeps the
 -- team's storage full, reports turrets and solar collectors as they
@@ -64,7 +64,28 @@ if gadgetHandler:IsSyncedCode() then
 		end
 	end
 
+	-- ground_only (issue #4804): a rock stands in each of two plazas the probe
+	-- levels, so that the order's volume selection has ground above the plaza
+	-- to leave or to cut. The probe knows these places.
+	local ROCK_HEIGHT = 60
+	local function raiseRocks()
+		local cx = 16 * math.floor(Game.mapSizeX / 32)
+		local cz = 16 * math.floor(Game.mapSizeZ / 32)
+		Spring.SetHeightMapFunc(function()
+			for _, plaza in ipairs({ cx - 400, cx + 200 }) do
+				for x = plaza + 32, plaza + 80, 8 do
+					for z = cz + 32, cz + 80, 8 do
+						Spring.SetHeightMap(x, z, Spring.GetGroundOrigHeight(x, z) + ROCK_HEIGHT)
+					end
+				end
+			end
+		end)
+	end
+
 	function gadget:GameFrame(frame)
+		if frame == 1 and MODE == "ground_only" then
+			raiseRocks()
+		end
 		if frame == CREATE_FRAME then
 			local cx = 16 * math.floor(Game.mapSizeX / 32)
 			local cz = 16 * math.floor(Game.mapSizeZ / 32)
