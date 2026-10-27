@@ -1054,4 +1054,124 @@ check("On is lit while terrain is on", (function()
 end)())
 check("the two choices have different ids for the hover", MODEL.actionId(terrainHits(withTerrain)[1].action) ~= MODEL.actionId(terrainHits(withTerrain)[2].action))
 
+--------------------------------------------------------------------------------
+-- the drawings are big enough to read in a real match (issue #4819)
+--------------------------------------------------------------------------------
+
+-- The five example blueprints from the milestone, with Zero-K's footprints:
+-- a Lotus is 2 squares across and a solar collector 5. The layout maps in a
+-- row or a tile are under 40 pixels across, so a wall 0.6 of a square thick
+-- in a layout of 20 squares is under a pixel, and a Lotus two. The tests of
+-- layoutMap above passed while a real match drew the first as a dot, the
+-- trench as a hairline and the ring as an empty square.
+do
+	local LOTUS = support.def(21, "turretlaser", { isBuilding = true, xsize = 4, zsize = 4, weapons = { { weaponDef = 1 } } })
+	local SOLAR_ZK = support.def(22, "energysolar", { isBuilding = true, xsize = 10, zsize = 10, energyMake = 2 })
+	local CON_ZK = support.def(23, "cloakcon", { buildOptions = { 21, 22 } })
+	local ZK = support.engine({ LOTUS, SOLAR_ZK, CON_ZK }, {
+		selected = { 200 },
+		units = { [200] = { def = 23 } },
+		gameName = "Zero-K",
+		modName = "Zero-K v1.14.10.3",
+		gameShortName = "ZK",
+	})
+	PLACE.use(ZK)
+	local zkCan = PLACE.capabilities({ 200 })
+	local function p(x, z)
+		return { x = x, z = z }
+	end
+	local EXAMPLES = {
+		{
+			key = "library:outpost",
+			name = "Example: walled outpost",
+			buildings = { b("turretlaser", 0, 0), b("turretlaser", 320, 0), b("turretlaser", 320, 320), b("turretlaser", 0, 320), b("energysolar", 160, 160) },
+			terrain = { { kind = "raise", shape = "wall", points = { p(0, 0), p(320, 0), p(320, 320), p(0, 320), p(0, 0) }, height = 112, before = 0 } },
+		},
+		{
+			key = "library:plaza",
+			name = "Example: raised plaza",
+			buildings = { b("energysolar", 64, 64), b("energysolar", 192, 64), b("energysolar", 64, 192), b("energysolar", 192, 192) },
+			terrain = { { kind = "level", shape = "area", points = { p(0, 0), p(256, 0), p(256, 256), p(0, 256) }, height = 40, before = 0 } },
+		},
+		{
+			key = "library:ramp",
+			name = "Example: ramp up to a platform",
+			buildings = { b("turretlaser", 96, 96) },
+			terrain = {
+				{ kind = "level", shape = "area", points = { p(0, 0), p(192, 0), p(192, 192), p(0, 192) }, height = 80, before = 0 },
+				{ kind = "ramp", shape = "wall", points = { p(96, 448), p(96, 192) }, heights = { 0, 80 }, width = 64, before = 0 },
+			},
+		},
+		{
+			key = "library:trench",
+			name = "Example: trench line",
+			buildings = { b("turretlaser", 120, -64), b("turretlaser", 360, -64) },
+			terrain = { { kind = "raise", shape = "wall", points = { p(0, 0), p(480, 0) }, height = -40, before = 0 } },
+		},
+		{
+			key = "library:ring",
+			name = "Example: wall ring, terrain only",
+			buildings = {},
+			terrain = { { kind = "raise", shape = "wall", points = { p(0, 0), p(384, 0), p(384, 384), p(0, 384), p(0, 0) }, height = 112, before = 0 } },
+		},
+	}
+	for _, view in ipairs({ "list", "grid" }) do
+		local panel = MODEL.new()
+		MODEL.refresh(panel, EXAMPLES, PLACE, ZK.Game, zkCan)
+		panel.open, panel.tab = true, "all"
+		MODEL.setView(panel, view)
+		local drawn = MODEL.layout(panel, measure, VIEW)
+		local S = MODEL.scaleFor(panel, VIEW)
+		local maps = {}
+		for _, r in ipairs(drawn.rects) do
+			if r.kind == "map" then
+				maps[#maps + 1] = { map = r, marks = {}, buildings = {} }
+			elseif r.kind == "terrain" and #maps > 0 then
+				table.insert(maps[#maps].marks, r)
+			elseif r.kind == "building" and #maps > 0 then
+				table.insert(maps[#maps].buildings, r)
+			end
+		end
+		check(view .. ": all five examples are drawn", #maps == #EXAMPLES, #maps)
+		for n, m in ipairs(maps) do
+			local name = EXAMPLES[n] and EXAMPLES[n].name or tostring(n)
+			local want = #EXAMPLES[n].buildings
+			check(view .. ": " .. name .. " draws every building", #m.buildings == want, #m.buildings)
+			check(view .. ": " .. name .. " draws its terrain", #m.marks > 0)
+			local least = math.huge
+			for _, r in ipairs(m.buildings) do
+				least = math.min(least, r.w, r.h)
+			end
+			check(view .. ": " .. name .. " draws no building under 3 pixels a side", least >= 3 * S - 1e-6, least)
+			-- a line is a quad from its first corner to its second along it, and from
+			-- its second to its third across it, which is its thickness. A triangle of a
+			-- fill repeats its last corner and has no thickness to speak of.
+			local thin = math.huge
+			for _, r in ipairs(m.marks) do
+				local c = r.corners
+				local function dist(a, b)
+					return math.sqrt((a[1] - b[1]) ^ 2 + (a[2] - b[2]) ^ 2)
+				end
+				if not (c[3][1] == c[4][1] and c[3][2] == c[4][2]) then
+					thin = math.min(thin, dist(c[2], c[3]))
+				end
+			end
+			check(view .. ": " .. name .. " draws no line thinner than a pixel and a fifth", thin >= 1.2 * S - 1e-6, thin)
+			-- what is drawn fills the map along its longer side, inside the map
+			local x0, y0, x1, y1 = math.huge, math.huge, -math.huge, -math.huge
+			for _, r in ipairs(m.marks) do
+				for _, c in ipairs(r.corners) do
+					x0, y0, x1, y1 = math.min(x0, c[1]), math.min(y0, c[2]), math.max(x1, c[1]), math.max(y1, c[2])
+				end
+			end
+			for _, r in ipairs(m.buildings) do
+				x0, y0, x1, y1 = math.min(x0, r.x), math.min(y0, r.y), math.max(x1, r.x + r.w), math.max(y1, r.y + r.h)
+			end
+			check(view .. ": " .. name .. " fills most of its map", math.max(x1 - x0, y1 - y0) >= 0.8 * m.map.w, show({ x1 - x0, y1 - y0, m.map.w }))
+			check(view .. ": " .. name .. " stays inside its map", x0 >= m.map.x - 1e-6 and y0 >= m.map.y - 1e-6 and x1 <= m.map.x + m.map.w + 1e-6 and y1 <= m.map.y + m.map.h + 1e-6, show({ x0, y0, x1, y1, m.map.x, m.map.y, m.map.w }))
+		end
+	end
+	PLACE.use(E)
+end
+
 support.report()
