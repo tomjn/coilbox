@@ -23,6 +23,7 @@ import {
   useRef,
   useState,
 } from "react";
+import { anchorPlacements } from "@/lib/scenarioEditing/placements";
 import { type Placement, placementKey } from "@/placement/placements";
 import type { Scenario } from "../../model";
 import { parsePathLineKey } from "./groups";
@@ -170,7 +171,11 @@ export function useSelectionCleanup(
   useEffect(() => {
     const held = selectionRef.current;
     if (held.length === 0 || !settled) return;
-    const kept = stillThere(held, placements, scenario);
+    const kept = stillThere(
+      held,
+      [...placements, ...anchorPlacements(scenario)],
+      scenario,
+    );
     if (kept.length !== held.length) setSelection(kept);
   }, [placements, settled, scenario, setSelection]);
 }
