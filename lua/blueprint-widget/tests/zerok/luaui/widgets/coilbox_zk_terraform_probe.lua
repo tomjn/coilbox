@@ -76,6 +76,9 @@ end
 -- gives it after a click. The widget itself needs gl, which spring-headless
 -- does not have.
 local PLACE = VFS.Include("LuaUI/coilbox_blueprints/place.lua", nil, VFS.RAW_FIRST)
+-- and the module that holds each terraform order until a builder nears its step
+local LATER = VFS.Include("LuaUI/coilbox_blueprints/pending_terraform.lua", nil, VFS.RAW_FIRST)
+LATER.use({ Spring = Spring })
 
 -- The widget's model of the ground a blueprint leaves (issue #4797) is run by
 -- the fixture gadget, which can read the real heightmap. A widget in a headless
@@ -106,11 +109,19 @@ local function model(case, steps, foot)
 	Spring.SendLuaRulesMsg("coilbox_model " .. case .. " " .. serialise({ steps = steps, foot = plain }))
 end
 
-local function blueprint(builders, cx, cz, shift, mode, withTurret, case, terrain)
+-- @param ahead table[]? buildings ahead of the wall in the blueprint's order
+local function blueprint(builders, cx, cz, shift, mode, withTurret, case, terrain, ahead)
 	PLACE.use({ Spring = Spring, UnitDefs = UnitDefs, UnitDefNames = UnitDefNames, Game = Game, WG = WG })
+	local buildings = {}
+	for _, b in ipairs(ahead or {}) do
+		buildings[#buildings + 1] = b
+	end
+	if withTurret then
+		buildings[#buildings + 1] = { def = "turretlaser", offset = { x = 0, z = 0 }, facing = 0 }
+	end
 	local entry = {
-		buildings = withTurret and { { def = "turretlaser", offset = { x = 0, z = 0 }, facing = 0 } } or {},
-		terrain = terrain or { { kind = "raise", shape = "wall", points = { { x = -48, z = 0 }, { x = 0, z = 0 }, { x = 48, z = 0 } }, height = WALL_HEIGHT, before = 0 } },
+		buildings = buildings,
+		terrain = terrain or { { kind = "raise", shape = "wall", points = { { x = -48, z = 0 }, { x = 0, z = 0 }, { x = 48, z = 0 } }, height = WALL_HEIGHT, before = #(ahead or {}) } },
 	}
 	local resolved = PLACE.resolve(entry)
 	local pivot = PLACE.pivot(resolved)
@@ -125,9 +136,15 @@ local function blueprint(builders, cx, cz, shift, mode, withTurret, case, terrai
 		model(case, steps, foot)
 	end
 	local plan = PLACE.plan(foot, PLACE.capabilities(builders), shift, mode, { steps = steps, on = true })
-	local sent = PLACE.issue(plan)
+	local sent = PLACE.issue(plan, LATER)
 	Spring.Echo(string.format("PROBE blueprint sent=%d terraform=%d skipped=%d offMap=%d remainder=%d blocked=%d", sent, #plan.terraform, plan.skipped, plan.offMap, #plan.remainder, plan.blocked))
 end
+
+local LONG_AHEAD = {
+	{ def = "turretheavylaser", offset = { x = -160, z = 64 }, facing = 0 },
+	{ def = "turretheavylaser", offset = { x = 160, z = 64 }, facing = 0 },
+	{ def = "turretheavylaser", offset = { x = -160, z = -64 }, facing = 0 },
+}
 
 -- What each case does after the terraform order.
 local CASES = {
@@ -206,6 +223,16 @@ local CASES = {
 	{ name = "blueprint with a trench 50 deep", own = true, run = function(b, cx, cz)
 		blueprint(b, cx, cz, false, "help", false, 17, { { kind = "raise", shape = "wall", points = { { x = -96, z = 0 }, { x = 96, z = 0 } }, height = -50, before = 0 } })
 	end },
+	-- Three Stingers ahead of the wall, 90 seconds each for one Conjurer, more
+	-- than the two minutes Zero-K keeps a terraform nobody works on (#4803).
+	{ name = "blueprint with three minutes of work ahead of the wall", own = true, run = function(b, cx, cz)
+		blueprint(b, cx, cz, false, "help", true, nil, nil, LONG_AHEAD)
+	end },
+	-- The same, for a builder that Zero-K's gadget stops checking once two other
+	-- constructors die (the fixture kills them, see its spare builders).
+	{ name = "long blueprint for a builder the gadget no longer checks", own = true, run = function(b, cx, cz)
+		blueprint(b, cx, cz, false, "help", true, nil, nil, LONG_AHEAD)
+	end },
 }
 
 local builders = {}
@@ -238,6 +265,7 @@ function widget:Initialize()
 end
 
 function widget:GameFrame(frame)
+	LATER.update(frame)
 	if frame == PRIOR_FRAME then
 		findBuilders()
 		-- Something already in every queue, so shift has a job to do.

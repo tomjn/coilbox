@@ -209,6 +209,20 @@ function M.engine(defs, opts)
 			end
 			return out
 		end,
+		-- A unit's queue is a list of { id, params } under queue. A unit that is
+		-- not there has no count, as the engine has none for a dead one.
+		GetUnitCommandCount = function(unitID)
+			local unit = E.units[unitID]
+			return unit and #(unit.queue or {}) or nil
+		end,
+		GetUnitCurrentCommand = function(unitID, i)
+			local unit = E.units[unitID]
+			local cmd = unit and unit.queue and unit.queue[i or 1]
+			if not cmd then
+				return
+			end
+			return cmd[1], 0, i, unpack(cmd[2] or {})
+		end,
 		GiveOrderToUnit = function(unitID, cmdID, params, options)
 			E.single[#E.single + 1] = { unitID = unitID, cmdID = cmdID, params = params, options = options }
 			return true

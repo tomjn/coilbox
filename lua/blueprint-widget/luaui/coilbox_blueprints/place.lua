@@ -863,7 +863,7 @@ end
 
 --- Turn a footprint, and the terrain steps among it, into orders.
 -- A terraform step becomes two things. Its terraform order is never queued,
--- so it is kept in plan.terraform for M.issue to send at once. A level
+-- so it is kept in plan.terraform for M.issue to send. A level
 -- command with the order's tag goes into each working builder's queue at the
 -- step's place among the buildings, and that is what sends the builder to
 -- build the terraform. An entry of foot is placed by its seq, or its position
@@ -880,11 +880,12 @@ end
 --   When on is false the steps are counted as skipped, for the reason why.
 -- @return table { orders = { { unitID, cmds } }, remainder = foot entries nobody
 --   can build, blocked = count of positions skipped because the ground refused,
---   terraform = { { unitID, params } } to send before the orders, stepRemainder
+--   terraform = { { unitID, params, tag, levelAt = { { unitID, index } }, where
+--   each builder's level step is in its orders } }, stepRemainder
 --   = steps kept for when a builder is selected, skipped = steps not ordered
 --   for skippedWhy, offMap = steps with a point off the map }
 function M.plan(foot, can, shift, mode, terrain)
-	local out = { orders = {}, remainder = {}, blocked = 0, terraform = {}, stepRemainder = {}, skipped = 0, offMap = 0 }
+	local out = { orders = {}, remainder = {}, blocked = 0, terraform = {}, stepRemainder = {}, skipped = 0, offMap = 0, shift = shift }
 	local who = mode == "split" and split(foot, can) or nil
 
 	-- which steps are ordered, and to whom
@@ -917,8 +918,9 @@ function M.plan(foot, can, shift, mode, terrain)
 				for _, unitID in ipairs(builders) do
 					at[unitID] = true
 				end
-				steps[#steps + 1] = { step = u.step, tag = tag, at = at }
-				out.terraform[#out.terraform + 1] = { unitID = builders[1], params = M.terraformParams(u.step, builders, tag, team) }
+				local t = { unitID = builders[1], params = M.terraformParams(u.step, builders, tag, team), tag = tag, levelAt = {} }
+				steps[#steps + 1] = { step = u.step, tag = tag, at = at, t = t }
+				out.terraform[#out.terraform + 1] = t
 			end
 		elseif #usable > 0 and #can.builders == 0 then
 			for _, u in ipairs(usable) do
@@ -949,6 +951,7 @@ function M.plan(foot, can, shift, mode, terrain)
 					end
 					sx, sz = sx / #step.points, sz / #step.points
 					add(M.CMD_LEVEL, { sx, Spring.GetGroundHeight(sx, sz), sz, s.tag })
+					s.t.levelAt[#s.t.levelAt + 1] = { unitID = unitID, index = #cmds }
 				end
 				next = next + 1
 			end
@@ -1018,17 +1021,28 @@ function M.cost(resolved, can, terrain)
 end
 
 --- Send a plan's orders to the engine.
+-- @param later table the pending_terraform module, which holds each terraform
+--   order whose level step is further back until a builder nears it
 -- @return integer how many builders were given an array
-function M.issue(plan)
+function M.issue(plan, later)
 	local sent = 0
-	-- the terraform orders first, so the level commands find their units
+	-- a terraform order whose level step is at or next to the front goes
+	-- first, so the level step finds its units
+	local held = {}
 	for _, t in ipairs(plan.terraform or {}) do
-		Spring.GiveOrderToUnit(t.unitID, M.CMD_TERRAFORM_INTERNAL, t.params, 0)
+		if later.near(t, plan.shift) then
+			Spring.GiveOrderToUnit(t.unitID, M.CMD_TERRAFORM_INTERNAL, t.params, 0)
+		else
+			held[#held + 1] = t
+		end
 	end
 	for _, order in ipairs(plan.orders) do
 		if Spring.GiveOrderArrayToUnitArray({ order.unitID }, order.cmds) then
 			sent = sent + 1
 		end
+	end
+	for _, t in ipairs(held) do
+		later.add(t)
 	end
 	return sent
 end

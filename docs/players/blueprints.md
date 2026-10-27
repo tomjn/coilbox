@@ -145,8 +145,6 @@ The cost under the blueprint's name adds the terraform. Its metal is the estimat
 
 The widget works out in each match whether terraform is available, from the commands your selected builders have. A mission can switch it off. When it is not available, or Terrain is Off, the widget places the buildings and the message says how many terrain changes it skipped. You cannot pick up a blueprint of terrain changes alone then. Its row says "no terraforming here" or "Terrain is off", and it stays under the All tab.
 
-Zero-K drops a terrain change that no builder has worked on for two minutes. A change that comes after more than two minutes of other orders in a queue can be dropped before the builder gets to it. Keep the buildings ahead of a terrain change few enough to finish well inside that time.
-
 ### Plan a base ahead
 
 You can place a blueprint with no builders selected. It stays on the map as a plan, drawn the way it looked while you placed it, and only you can see it. Place as many as you like. When you have the builders, select them and point at a plan. The building under the cursor gets a white outline, and the cursor shows whether they can build it. A building they cannot build is crossed out. Right click to build that building. Hold Shift to outline the whole plan, and right click to build all of it after whatever the builders are already doing. Right click a plan with nothing selected to remove it.

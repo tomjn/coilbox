@@ -135,7 +135,8 @@ play() { # name, wall height, own tags (0 or 1), lasso off (0 or 1), mode, steps
   cp "$FIXTURE"/luarules/gadgets/*.lua "$game/LuaRules/Gadgets/"
   cp "$FIXTURE"/luaui/widgets/*.lua "$game/LuaUI/Widgets/"
   # the blueprint widget's own placing code, which the probe drives
-  cp "$ROOT/lua/blueprint-widget/luaui/coilbox_blueprints/place.lua" "$ROOT/lua/blueprint-widget/luaui/coilbox_blueprints/terraform.lua" "$game/LuaUI/coilbox_blueprints/"
+  cp "$ROOT/lua/blueprint-widget/luaui/coilbox_blueprints/place.lua" "$ROOT/lua/blueprint-widget/luaui/coilbox_blueprints/terraform.lua" \
+    "$ROOT/lua/blueprint-widget/luaui/coilbox_blueprints/pending_terraform.lua" "$game/LuaUI/coilbox_blueprints/"
   sed "s|@BASE@|$BASE_NAME|g" "$FIXTURE/modinfo.lua" >"$game/modinfo.lua"
   if [ "$mode" != terraform ]; then
     # The ground probe saves with the widget's own modules.
@@ -152,7 +153,12 @@ play() { # name, wall height, own tags (0 or 1), lasso off (0 or 1), mode, steps
     printf 'return {\n  version = 8,\n  ["Lasso Terraform GUI"] = 0,\n}\n' >"$dir/write/LuaUI/Config/ZK_order.lua"
   fi
 
-  sed -e "s|@GAME@|$FIXTURE_NAME|" -e "s|@MAP@|$MAP_NAME|" -e "s|@END_FRAME@|9000|" \
+  # The terraform matches run long enough for a wall behind three Stingers.
+  local end_frame=10800
+  if [ "$mode" != terraform ]; then
+    end_frame=9000
+  fi
+  sed -e "s|@GAME@|$FIXTURE_NAME|" -e "s|@MAP@|$MAP_NAME|" -e "s|@END_FRAME@|$end_frame|" \
     -e "s|@WALL_HEIGHT@|$2|" -e "s|@OWN_TAGS@|$3|" -e "s|@MODE@|$mode|" \
     "$FIXTURE/start-script.tdf" >"$dir/script.txt"
 
@@ -177,7 +183,7 @@ field() { # line, key
 # only after the last of the case's terraform units had finished.
 turret_on_wall() { # log, case, height
   local finished created gone_last
-  finished="$(line "$1" "FIXTURE finished case=$2 ")"
+  finished="$(line "$1" "FIXTURE finished case=$2 .*unit=turretlaser ")"
   created="$(line "$1" "FIXTURE created case=$2 .*unit=turretlaser")"
   gone_last="$(grep -E "FIXTURE terraunit-gone case=$2 " "$1" | sed 's/.*frame=\([0-9]*\).*/\1/' | sort -n | tail -n 1)"
   local raised
@@ -194,7 +200,7 @@ turret_on_wall() { # log, case, height
 # terraform unit was never worked on and decayed.
 turret_on_ground() { # log, case
   local finished gone
-  finished="$(line "$1" "FIXTURE finished case=$2 ")"
+  finished="$(line "$1" "FIXTURE finished case=$2 .*unit=turretlaser ")"
   gone="$(line "$1" "FIXTURE terraunit-gone case=$2 ")"
   local raised
   raised="$(awk -v y="$(field "$finished" y)" -v o="$(field "$finished" orig)" 'BEGIN { if (y == "" || o == "") print ""; else printf "%.1f", y - o }')"
@@ -215,10 +221,10 @@ queue_at() { # log, case, frame
 
 check_common() { # log, height, profile, tag source
   local log="$1"
-  expect "the fixture created its builders" "$(grep -c 'FIXTURE builder ' "$log" || true)" 19
+  expect "the fixture created its builders" "$(grep -c 'FIXTURE builder ' "$log" || true)" 21
   expect "the fixture ended the match" "$(grep -c 'FIXTURE done ' "$log" || true)" 1
   expect "Zero-K did not end the match early" "$(grep -c 'game_message: .* has been destroyed' "$log" || true)" 0
-  expect "the probe ordered every case" "$(grep -c 'PROBE ordered ' "$log" || true)" 17
+  expect "the probe ordered every case" "$(grep -c 'PROBE ordered ' "$log" || true)" 19
   expect "tags came from" "$(field "$(line "$log" 'PROBE ordered case=1 ')" source)" "$4"
   expect "builders carry the level command as" "$(field "$(line "$log" 'PROBE level-desc ')" action)" "levelground"
 
@@ -250,8 +256,17 @@ check_common() { # log, height, profile, tag source
   expect "case 11 wall from a blueprint" "$(profile "$log" 11)" "$3"
   expect "case 14 wall from a blueprint alone" "$(profile "$log" 14)" "$3"
   expect "case 14 built no turret" "$(grep -c 'FIXTURE created case=14 .*unit=turretlaser' "$log" || true)" 0
-  expect "the blueprint cases were not skipped or off the map" "$(grep -c 'PROBE blueprint .*skipped=0 offMap=0' "$log" || true)" 7
+  expect "the blueprint cases were not skipped or off the map" "$(grep -c 'PROBE blueprint .*skipped=0 offMap=0' "$log" || true)" 9
   expect "case 1 ground across the wall" "$(profile "$log" 1)" "$3"
+
+  # A wall behind more than two minutes of buildings (#4803), for a builder
+  # Zero-K's gadget checks and for one it has lost track of.
+  for case in 18 19; do
+    local reached
+    reached="$(grep -E "FIXTURE finished case=$case .*unit=turretheavylaser" "$log" | sed 's/.*frame=\([0-9]*\).*/\1/' | sort -n | tail -n 1 || true)"
+    expect "case $case reached the wall more than two minutes after the orders" "$([ -n "$reached" ] && [ "$reached" -gt 3675 ] && echo yes || echo no)" "yes"
+    turret_on_wall "$log" "$case" "$2"
+  done
   expect "case 9 ground across the long wall" "$(profile "$log" 9)" "$3"
   check_model "$log"
 }
@@ -278,7 +293,7 @@ game_seconds() { # log, case
 # it up over many updates, so a few corners at the foot of a slope, mostly the
 # diagonals, end up to the 4 elmos of the foot's step away from the model's.
 check_model() { # log
-  local log="$1" case model game work speed compared worst
+  local log="$1" case model game work speed compared worst units
   local defs
   defs="$(line "$log" 'FIXTURE defs ')"
   speed="$(field "$defs" buildSpeed)"
@@ -288,7 +303,11 @@ check_model() { # log
     work="$(field "$(line "$log" "FIXTURE model case=$case ")" work)"
     game="$(game_metal "$log" "$case")"
     echo "  info case $case terraform metal: panel $model, game $game. Time: panel $(awk -v w="$work" -v s="$speed" 'BEGIN { printf "%.1f", w / s }')s, game $(game_seconds "$log" "$case")s"
-    expect "case $case: the panel's terraform metal is the game's estimate" "$model" "$game"
+    # The log prints each figure to four places, and the game's is a sum of
+    # one per terraform unit, so each can be half a place out.
+    units="$(grep -c "FIXTURE terraunit-estimate case=$case " "$log" || true)"
+    expect "case $case: the panel's terraform metal is the game's estimate, to the rounding of the log" \
+      "$(awk -v m="$model" -v g="$game" -v n="$units" 'BEGIN { d = m - g; if (d < 0) d = -d; print (m != "" && g != "" && d <= (n + 1) * 0.00005 + 1e-9) ? "yes" : "no (" m " against " g ")" }')" yes
   done
   for case in 9 14 15 16 17; do
     compared="$(line "$log" "FIXTURE compare case=$case ")"

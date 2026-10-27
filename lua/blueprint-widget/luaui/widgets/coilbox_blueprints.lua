@@ -125,7 +125,7 @@ end
 -- Modules
 --------------------------------------------------------------------------------
 
-local JSON, STORE, MODEL, PLACE, GROUND, RECORD, TERRAIN, TERRAFORM
+local JSON, STORE, MODEL, PLACE, GROUND, RECORD, TERRAIN, TERRAFORM, LATER
 
 local function include(name)
 	local path = MODULE_DIR .. name
@@ -820,7 +820,7 @@ local function placeNow()
 	-- the ground under the pivot is read now, as the player clicks
 	local steps = PLACE.laySteps(placing.item.resolved, placing.rotation, placing.flip, placing.origin, placing.anchors, placing.foot)
 	local plan = PLACE.plan(placing.foot, can, shiftHeld(), panel.assist, terrainArg(steps))
-	local sent = PLACE.issue(plan)
+	local sent = PLACE.issue(plan, LATER)
 	say(placing.item.name .. ": " .. describe(plan, sent))
 	addPlan(plan.remainder, plan.stepRemainder)
 	placing.line = nil
@@ -857,7 +857,7 @@ local function buildPlan(index, only)
 		end
 	end
 	local plan = PLACE.plan(foot, can, shiftHeld(), panel.assist, terrainArg(steps))
-	local sent = PLACE.issue(plan)
+	local sent = PLACE.issue(plan, LATER)
 	plans[index].steps = later
 	for _, step in ipairs(plan.stepRemainder) do
 		table.insert(plans[index].steps, step)
@@ -1229,7 +1229,10 @@ function widget:Initialize()
 	if TERRAIN then
 		TERRAFORM, err = include("terraform.lua")
 	end
-	if not TERRAFORM then
+	if TERRAFORM then
+		LATER, err = include("pending_terraform.lua")
+	end
+	if not LATER then
 		log(LOG.ERROR, err)
 		widgetHandler:RemoveWidget(self)
 		return
@@ -1238,6 +1241,7 @@ function widget:Initialize()
 	STORE.use(JSON)
 	PLACE.use({ Spring = Spring, UnitDefs = UnitDefs, UnitDefNames = UnitDefNames, Game = Game, WG = WG })
 	RECORD.use({ Spring = Spring, UnitDefs = UnitDefs, Game = Game, GROUND = GROUND })
+	LATER.use({ Spring = Spring })
 
 	store = STORE.new({
 		vfs = VFS,
@@ -1360,6 +1364,9 @@ function widget:Initialize()
 end
 
 function widget:Shutdown()
+	if LATER then
+		LATER.flush()
+	end
 	for action in pairs(keyActions) do
 		removeAction(action)
 	end
@@ -1369,6 +1376,11 @@ function widget:Shutdown()
 	boundKeys = {}
 	WG.CoilboxBlueprints = nil
 	dropGL()
+end
+
+-- Zero-K's terraform orders held until a builder nears their level step.
+function widget:GameFrame(frame)
+	LATER.update(frame)
 end
 
 function widget:ViewResize(x, y)
