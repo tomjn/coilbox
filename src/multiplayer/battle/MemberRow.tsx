@@ -413,9 +413,9 @@ export function MemberRow({
             <OptionSelect
               value={String(row.side)}
               size="sm"
-              // Matches the skirmish roster: room for a faction name beside its
-              // emblem, which costs the trigger 24px before any text.
-              className={cn(SELECT_SIZE, "w-auto min-w-28")}
+              // Matches the skirmish roster: sized to the whole faction name,
+              // emblem and chevron, so the shrinking cell cannot cut it off.
+              className={cn(SELECT_SIZE, "w-max min-w-28")}
               disabled={sideOptions.length === 0}
               options={sideOptions}
               onValueChange={(v) => setSide(Number(v))}

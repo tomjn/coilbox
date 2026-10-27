@@ -497,10 +497,10 @@ export function ParticipantsTable({
                             : p.side
                         }
                         size="sm"
-                        // Wide enough for a faction name beside its emblem: the
-                        // trigger spends 24px of its own on the logo and gap
-                        // before any text, which min-w-20 predates.
-                        className="w-auto min-w-28"
+                        // Sized to the whole label, emblem and chevron. The cell
+                        // shrinks to its narrowest content, and the label's
+                        // truncation would otherwise let it cut the name off.
+                        className="w-max min-w-28"
                         disabled={disabled || sides.length === 0}
                         options={sideOptions}
                         onValueChange={(v) => onUpdate(p.id, { side: v })}
