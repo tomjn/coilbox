@@ -5,7 +5,7 @@
  * is cut off with an ellipsis, so the full text has to be on hover.
  */
 
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { Battle } from "../bindings";
 import { BATTLE_GRID, BattleRow } from "./BattleRow";
@@ -46,6 +46,28 @@ describe("battle card", () => {
     expect(
       screen.getByTitle("Some Long Map Name v2 · Game · host Host"),
     ).toBeTruthy();
+  });
+
+  it("the joined battle's title opens its room", () => {
+    const onOpen = vi.fn();
+    const onJoin = vi.fn();
+    render(
+      <ul>
+        <BattleRow
+          battle={battle}
+          joined
+          canJoin={false}
+          onJoin={onJoin}
+          onLeave={() => {}}
+          onOpen={onOpen}
+        />
+      </ul>,
+    );
+    fireEvent.click(
+      screen.getByRole("button", { name: `Open ${battle.title}` }),
+    );
+    expect(onOpen).toHaveBeenCalledOnce();
+    expect(onJoin).not.toHaveBeenCalled();
   });
 
   it("grid sizes columns from a minimum card width, not breakpoints", () => {

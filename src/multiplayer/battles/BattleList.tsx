@@ -39,6 +39,7 @@ export function BattleList({
   linkable,
   onJoin,
   onLeave,
+  onOpenJoined,
   enginePath,
   dataDir,
   serverAddress,
@@ -62,6 +63,8 @@ export function BattleList({
   linkable: boolean;
   onJoin: (b: Battle, key?: string) => void;
   onLeave: () => void;
+  /** Goes back to the room of the battle the user is in. */
+  onOpenJoined?: () => void;
   enginePath?: string;
   dataDir?: string;
   /** This connection's `host:port` (issue #498), threaded down to each row's
@@ -164,6 +167,7 @@ export function BattleList({
             battle={joinedBattle}
             joined
             friendsHere={friendsHere.get(joinedBattle.id)}
+            onOpen={onOpenJoined}
             {...rowProps}
           />
         </ul>

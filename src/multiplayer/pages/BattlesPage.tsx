@@ -313,6 +313,10 @@ function ServerBattles({
   const leave = useCallback(async () => {
     await leaveBattle(serverKey).catch(() => {});
   }, [serverKey]);
+  const openJoined = useCallback(
+    () => navigate(battleRoomHref(serverKey)),
+    [navigate, serverKey],
+  );
 
   // Every protocol opens a room in its own words, so the control swaps rather
   // than one of them being hidden. On TASServer this machine becomes the host.
@@ -383,6 +387,7 @@ function ServerBattles({
       linkable={ready}
       onJoin={onJoin}
       onLeave={leave}
+      onOpenJoined={openJoined}
       enginePath={selected?.enginePath}
       dataDir={selected?.rootPath}
       // What the row can hand out depends on what it is connected to, so both

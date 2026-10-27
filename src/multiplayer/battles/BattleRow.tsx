@@ -54,6 +54,7 @@ function BattleRowInner({
   connectionLabel,
   onJoin,
   onLeave,
+  onOpen,
   enginePath,
   dataDir,
   serverAddress,
@@ -81,6 +82,9 @@ function BattleRowInner({
   connectionLabel?: string;
   onJoin: (b: Battle, key?: string) => void;
   onLeave: () => void;
+  /** Goes to the battle room. Only the joined row uses it, as what clicking its
+   * title does. */
+  onOpen?: () => void;
   enginePath?: string;
   dataDir?: string;
   /** This connection's `host:port` (issue #498), for a "Copy invite link"
@@ -132,6 +136,11 @@ function BattleRowInner({
     if (asks) setPwOpen(true);
     else onJoin(battle);
   };
+  // The joined row's title goes back to the room instead.
+  const titleAction = joined ? onOpen : disabled ? undefined : activate;
+  const titleLabel = joined
+    ? t`Open ${battleTitle}`
+    : t`${actionLabel} ${battleTitle}`;
 
   // Tachyon's lobby list names no founder, so there is no host to name.
   const host = battle.host;
@@ -177,13 +186,13 @@ function BattleRowInner({
           enginePath={enginePath}
           dataDir={dataDir}
         />
-        {disabled ? (
+        {!titleAction ? (
           <div className="flex min-w-0 flex-1 items-center">{details}</div>
         ) : (
           <button
             type="button"
-            onClick={activate}
-            aria-label={t`${actionLabel} ${battleTitle}`}
+            onClick={titleAction}
+            aria-label={titleLabel}
             className="group/row flex min-w-0 flex-1 cursor-pointer items-center rounded-md text-left transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
           >
             {details}
