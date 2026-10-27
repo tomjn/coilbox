@@ -38,8 +38,9 @@
  *   once every block has finished, each point is at its target either way. The
  *   check that drops points too thin to hold (lines 2324-2407) also looks at the
  *   whole step rather than one block.
- * - Steps are ordered with the gadget's volume selection at 0, raise and lower
- *   both, since a step has no field for it (lines 523-525).
+ * - A level or ramp is ordered with the gadget's volume selection its `only`
+ *   names: both ways when it has none, raise or lower otherwise (lines
+ *   523-535). Raise and smooth steps are always ordered with 0.
  * - A building's own levelling of the ground under it is the engine's, not the
  *   gadget's, and is not modelled. Nor is a map's own terraform veto
  *   (`GG.map_AllowPositionTerraform`), or the cap of 7000 slope points per block
@@ -405,6 +406,35 @@ function addStructure(blocked: Set<number>, rect: Rect): void {
 /** A step's points as the gadget splits them into terraunits, each with its
  *  target height, or null when the gadget refuses the order. */
 function stepSegments(
+  step: TerrainStep,
+  original: Reader,
+  pivot: number,
+): Target[][] | null {
+  const segments = allSegments(step, original, pivot);
+  if (!segments || !step.only || step.kind === "raise") return segments;
+  return onlyMoving(segments, step.only, original);
+}
+
+/**
+ * `checkPointCreation`, lines 523-535, for a level or ramp with a volume
+ * selection: a point is made only if it moves the ground the chosen way, and a
+ * point already at its target height is never made. The ground read is the
+ * ground when the order was given (lines 849, 1212 and 1661).
+ */
+function onlyMoving(
+  segments: Target[][],
+  only: "raise" | "lower",
+  original: Reader,
+): Target[][] {
+  const wanted = (p: Target): boolean => {
+    const here = original.at(p.x, p.z);
+    return only === "raise" ? here < p.aim : here > p.aim;
+  };
+  // A block with no point left is discarded, line 1228.
+  return segments.map((s) => s.filter(wanted)).filter((s) => s.length > 0);
+}
+
+function allSegments(
   step: TerrainStep,
   original: Reader,
   pivot: number,

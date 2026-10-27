@@ -124,16 +124,23 @@ function heightened(kind: TerrainStep["kind"] | undefined): boolean {
   return kind === "raise" || kind === "level";
 }
 
+/** What {@link setStep} can change. `only: "both"` puts a level or ramp back to
+ *  changing the ground both ways, since an absent `only` means no change. */
+export type StepPatch = Partial<
+  Pick<TerrainStep, "kind" | "height" | "heights" | "width">
+> & { only?: "both" | "raise" | "lower" };
+
 /**
- * The document with a step's height, kind, ends or width changed. Only the
- * fields the step's kind uses are taken, so a wall cannot be handed a ramp's
- * width.
+ * The document with a step's height, kind, ends, width or `only` changed. Only
+ * the fields the step's kind uses are taken, so a wall cannot be handed a
+ * ramp's width. A step made a raise has no `only`, which only a level and a
+ * ramp have.
  */
 export function setStep(
   scenario: Scenario,
   id: string,
   index: number,
-  patch: Partial<Pick<TerrainStep, "kind" | "height" | "heights" | "width">>,
+  patch: StepPatch,
   how: LayoutEdit = "own",
 ): Scenario {
   return editStep(
@@ -150,6 +157,16 @@ export function setStep(
         patch.kind
       ) {
         next.kind = patch.kind;
+        if (patch.kind === "raise") delete next.only;
+        changed = true;
+      }
+      if (
+        patch.only &&
+        (next.kind === "level" || next.kind === "ramp") &&
+        patch.only !== (next.only ?? "both")
+      ) {
+        if (patch.only === "both") delete next.only;
+        else next.only = patch.only;
         changed = true;
       }
       if (

@@ -44,6 +44,13 @@ check("a step's points are moved to the base's origin",
 check("every step comes before every building", laid[1].after == 0)
 check("a step is measured from the ground under the origin", laid[1].base == 17)
 check("a ramp keeps its ends and its width", laid[1].heights[2] == 40 and laid[1].width == 64)
+local only = BASES.laidSteps({
+	origin = { x = 0, z = 0 },
+	terrain = {
+		{ kind = "level", shape = "area", points = { { x = 0, z = 0 }, { x = 96, z = 0 }, { x = 96, z = 96 } }, height = 5, only = "raise" },
+	},
+}, 0)
+check("a level keeps its only raise or only lower (#4804)", only[1].only == "raise")
 
 --------------------------------------------------------------------------------
 -- A walled base at the start, and one a trigger places.

@@ -29,6 +29,7 @@ import type { DraftSettings } from "@/blueprint/terrainDraft";
 import type { TerrainTool } from "@/blueprint/terrainEdit";
 import { Switch } from "@/components/ui/switch";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
+import type { StepPatch } from "@/lib/scenarioEditing/terrain";
 import { useFieldText } from "@/lib/useFieldText";
 
 /** What a tool is called, on its button and on the Terrain button while it is
@@ -152,7 +153,8 @@ function ElmoField({
 
 /**
  * The buttons beside a selected step, the way a selected building has Turn
- * and Delete. A wrapping row, so a later choice (issue #4804) has room.
+ * and Delete. A level or ramp also has Both ways, Only
+ * raise and Only lower (issue #4804).
  */
 export function TerrainStepBar({
   step,
@@ -163,13 +165,12 @@ export function TerrainStepBar({
   step: TerrainStep;
   /** Where it is in the build order, counting from 1. */
   number: number;
-  onChange: (
-    patch: Partial<Pick<TerrainStep, "kind" | "height" | "heights" | "width">>,
-  ) => void;
+  onChange: (patch: StepPatch) => void;
   onDelete: () => void;
 }) {
   const { t } = useLingui();
   const heightened = step.kind === "raise" || step.kind === "level";
+  const choosing = step.kind === "level" || step.kind === "ramp";
   return (
     <div className="flex w-fit max-w-full flex-wrap items-center gap-1.5 rounded-md border border-border/60 bg-card p-1 pl-2">
       <span className="text-[11px]">
@@ -227,6 +228,28 @@ export function TerrainStepBar({
             }
           />
         </>
+      )}
+      {choosing && (
+        <ToggleGroup
+          type="single"
+          variant="outline"
+          size="sm"
+          value={step.only ?? "both"}
+          onValueChange={(value) =>
+            value && onChange({ only: value as "both" | "raise" | "lower" })
+          }
+          aria-label={t`Which way the ground changes`}
+        >
+          <ToggleGroupItem value="both" className="h-7 px-2 text-xs">
+            <Trans>Both ways</Trans>
+          </ToggleGroupItem>
+          <ToggleGroupItem value="raise" className="h-7 px-2 text-xs">
+            <Trans>Only raise</Trans>
+          </ToggleGroupItem>
+          <ToggleGroupItem value="lower" className="h-7 px-2 text-xs">
+            <Trans>Only lower</Trans>
+          </ToggleGroupItem>
+        </ToggleGroup>
       )}
       <Button
         size="sm"

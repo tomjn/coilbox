@@ -499,7 +499,7 @@ end
 --   width
 -- @param original function(x, z) the ground as it was when the order was given
 -- @param pivot number the ground under the layout's pivot
-local function stepSegments(step, original, pivot, pause)
+local function allSegments(step, original, pivot, pause)
 	if step.kind == "ramp" then
 		local a, b = step.points[1], step.points[2]
 		local h1, h2 = 0, 0
@@ -548,6 +548,33 @@ local function stepSegments(step, original, pivot, pause)
 		end
 	end
 	return segments
+end
+
+--- A step's points as the gadget splits them, for the volume selection a level
+-- or ramp names with only (checkPointCreation, lines 523-535): a point is made
+-- only if it moves the ground that way, and one already at its target is never
+-- made. The ground read is the ground when the order was given.
+local function stepSegments(step, original, pivot, pause)
+	local segments = allSegments(step, original, pivot, pause)
+	if not segments or not step.only or step.kind == "raise" then
+		return segments
+	end
+	local raise = step.only == "raise"
+	local kept = {}
+	for _, segment in ipairs(segments) do
+		local points = {}
+		for _, p in ipairs(segment) do
+			local here = original(p.x, p.z)
+			if (raise and here < p.aim) or (not raise and here > p.aim) then
+				points[#points + 1] = p
+			end
+		end
+		-- a block with no point left is discarded, line 1228
+		if #points > 0 then
+			kept[#kept + 1] = points
+		end
+	end
+	return kept
 end
 
 --------------------------------------------------------------------------------

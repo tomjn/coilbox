@@ -110,6 +110,10 @@ local function step(raw, buildings)
 		out.heights = { h[1], h[2] }
 		out.width = raw.width
 	end
+	-- anything but raise or lower reads as both ways
+	if (raw.kind == "level" or raw.kind == "ramp") and (raw.only == "raise" or raw.only == "lower") then
+		out.only = raw.only
+	end
 	return out
 end
 
