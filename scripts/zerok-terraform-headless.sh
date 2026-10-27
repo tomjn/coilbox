@@ -293,7 +293,7 @@ game_seconds() { # log, case
 # it up over many updates, so a few corners at the foot of a slope, mostly the
 # diagonals, end up to the 4 elmos of the foot's step away from the model's.
 check_model() { # log
-  local log="$1" case model game work speed compared worst
+  local log="$1" case model game work speed compared worst units
   local defs
   defs="$(line "$log" 'FIXTURE defs ')"
   speed="$(field "$defs" buildSpeed)"
@@ -303,7 +303,11 @@ check_model() { # log
     work="$(field "$(line "$log" "FIXTURE model case=$case ")" work)"
     game="$(game_metal "$log" "$case")"
     echo "  info case $case terraform metal: panel $model, game $game. Time: panel $(awk -v w="$work" -v s="$speed" 'BEGIN { printf "%.1f", w / s }')s, game $(game_seconds "$log" "$case")s"
-    expect "case $case: the panel's terraform metal is the game's estimate" "$model" "$game"
+    # The log prints each figure to four places, and the game's is a sum of
+    # one per terraform unit, so each can be half a place out.
+    units="$(grep -c "FIXTURE terraunit-estimate case=$case " "$log" || true)"
+    expect "case $case: the panel's terraform metal is the game's estimate, to the rounding of the log" \
+      "$(awk -v m="$model" -v g="$game" -v n="$units" 'BEGIN { d = m - g; if (d < 0) d = -d; print (m != "" && g != "" && d <= (n + 1) * 0.00005 + 1e-9) ? "yes" : "no (" m " against " g ")" }')" yes
   done
   for case in 9 14 15 16 17; do
     compared="$(line "$log" "FIXTURE compare case=$case ")"
