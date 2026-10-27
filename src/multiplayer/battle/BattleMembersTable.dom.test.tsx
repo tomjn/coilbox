@@ -369,18 +369,21 @@ describe("giving way to the chat (#4186)", () => {
   it("scrolls inside a floor instead of a fixed viewport cap", () => {
     const { container } = renderTable([row({ name: "me", self: true })]);
     const cls = card(container)?.className ?? "";
-    expect(cls).toContain("overflow-auto");
     expect(cls).toContain("min-h-24");
     expect(cls).not.toContain("max-h-");
+    const players = card(container)?.querySelector("[data-scrolls]");
+    expect(players?.className).toContain("overflow-auto");
   });
 
-  it("scrolls the spectator list with the table", () => {
+  it("keeps the spectator list in view below the scrolling players", () => {
     const { container } = renderTable([
       row({ name: "me", self: true }),
       row({ name: "watcher", spectator: true }),
     ]);
     const chips = screen.getByText("Spectating").parentElement;
+    const players = card(container)?.querySelector("[data-scrolls]");
     expect(card(container)?.contains(chips)).toBe(true);
+    expect(players?.contains(chips)).toBe(false);
   });
 });
 
