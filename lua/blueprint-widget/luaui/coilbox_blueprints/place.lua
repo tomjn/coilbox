@@ -71,9 +71,10 @@ end
 
 --- Resolve an entry's def names against the game.
 -- @param entry table a store entry
--- @return table { buildings = { { defID, def, offset, facing } }, missing = { name } }
+-- @return table { buildings = { { defID, def, offset, facing } }, missing = { name },
+--   terrain = the entry's terrain steps, untouched }
 function M.resolve(entry)
-	local out = { buildings = {}, missing = {} }
+	local out = { buildings = {}, missing = {}, terrain = entry.terrain or {} }
 	for _, b in ipairs(entry.buildings) do
 		local def = defByName(b.def)
 		if def then
@@ -125,6 +126,48 @@ function M.footprint(resolved, rotation, ax, az, flip, origin)
 		local status = Spring.TestBuildOrder(b.defID, x, y, z, facing)
 		local hw, hd = M.halfSpan(b.def, facing)
 		out[i] = { defID = b.defID, def = b.def, x = x, y = y, z = z, facing = facing, blocked = status == 0 or offMap(x, z, hw, hd) }
+	end
+	return out
+end
+
+--- Where a layout's terrain steps land, for a given anchor, rotation and flip.
+-- Turned and flipped exactly as M.footprint turns and flips a building: the
+-- same quarter turn about the origin, then the flip along the map's own x or
+-- z. Each point comes back in map elmos. Heights, width, kind, shape and the
+-- step's place in the build order are the same after either, and a ramp keeps
+-- the order of its ends so its first height still belongs to its first point.
+-- @param steps table[]? the entry's terrain, from the store
+-- @param rotation integer quarter turns
+-- @param ax number anchor x, elmos
+-- @param az number anchor z, elmos
+-- @param flip table? { x = boolean, z = boolean }
+-- @param origin table? { x, z } in the layout's own offsets, 0, 0 if nil
+-- @return table[] steps, each with points = { { x, z } } on the map
+function M.terrain(steps, rotation, ax, az, flip, origin)
+	local flipX, flipZ = flip and flip.x, flip and flip.z
+	local cx, cz = origin and origin.x or 0, origin and origin.z or 0
+	local out = {}
+	for i, step in ipairs(steps or {}) do
+		local points = {}
+		for j, p in ipairs(step.points) do
+			local ox, oz = M.turned(p.x - cx, p.z - cz, rotation)
+			if flipX then
+				ox = -ox
+			end
+			if flipZ then
+				oz = -oz
+			end
+			points[j] = { x = ax + ox, z = az + oz }
+		end
+		out[i] = {
+			kind = step.kind,
+			shape = step.shape,
+			points = points,
+			before = step.before,
+			height = step.height,
+			heights = step.heights and { step.heights[1], step.heights[2] } or nil,
+			width = step.width,
+		}
 	end
 	return out
 end
@@ -485,7 +528,7 @@ function M.substitute(resolved, standIns)
 	if not standIns then
 		return resolved, 0
 	end
-	local out, n = { buildings = {}, missing = resolved.missing }, 0
+	local out, n = { buildings = {}, missing = resolved.missing, terrain = resolved.terrain }, 0
 	for i, b in ipairs(resolved.buildings) do
 		local source = standIns[b.defID]
 		if source then

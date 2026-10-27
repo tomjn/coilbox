@@ -33,6 +33,7 @@ import type { Footprint } from "./footprint";
 import type { BaseBlueprint } from "./model";
 import {
   type BlueprintPayload,
+  copyTerrainStep,
   type PayloadFootprint,
   parseBlueprintPayload,
 } from "./payload";
@@ -105,6 +106,9 @@ export function blueprintPayload(
       facing: building.facing,
       ...(building.originalName ? { originalName: building.originalName } : {}),
     })),
+    ...(layout.terrain?.length
+      ? { terrain: layout.terrain.map(copyTerrainStep) }
+      : {}),
     footprints: footprintsFor(layout, options.footprintOf),
   };
 }
@@ -203,6 +207,9 @@ export function blueprintFromPayload(
       facing: building.facing,
       ...(building.originalName ? { originalName: building.originalName } : {}),
     })),
+    ...(payload.terrain?.length
+      ? { terrain: payload.terrain.map(copyTerrainStep) }
+      : {}),
   };
 }
 

@@ -5,6 +5,7 @@ import { barFormat } from "./bar";
 import { buildGridSnap } from "./footprint";
 import type { StoredBlueprint } from "./library";
 import {
+  canWriteToGameFile,
   orderPack,
   type PackConverted,
   type PackPick,
@@ -480,6 +481,78 @@ describe("packStrips", () => {
 
   it("says nothing when there is nothing to leave behind", () => {
     expect(packStrips([kept()])).toEqual([]);
+  });
+
+  it("names the terrain steps a game's file has nowhere to keep (issue #4790)", () => {
+    const step = {
+      kind: "smooth" as const,
+      shape: "area" as const,
+      points: [
+        { x: 0, z: 0 },
+        { x: 32, z: 0 },
+        { x: 32, z: 32 },
+      ],
+      before: 0,
+    };
+    expect(
+      packStrips([
+        kept({ terrain: [step, step] }),
+        kept({ buildings: [], terrain: [step] }),
+        kept(),
+      ]),
+    ).toEqual(["3 terrain changes"]);
+  });
+});
+
+describe("canWriteToGameFile", () => {
+  it("is false for a layout of terrain steps alone, which has nothing a game's file holds", () => {
+    expect(canWriteToGameFile(kept())).toBe(true);
+    expect(canWriteToGameFile(kept({ buildings: [] }))).toBe(false);
+  });
+});
+
+describe("packPlan with terrain steps (issue #4790)", () => {
+  const step = {
+    kind: "level" as const,
+    shape: "area" as const,
+    points: [
+      { x: 0, z: 0 },
+      { x: 64, z: 0 },
+      { x: 64, z: 64 },
+    ],
+    height: 0,
+    before: 1,
+  };
+
+  it("keeps a layout's steps in the payload it would be kept as", () => {
+    const [entry] = pack().entries;
+    const [pick] = packPlan({
+      entries: [{ ...entry, terrain: [step] }],
+      taking: new Set([entry.index]),
+      taken: [],
+      installed: INSTALLED,
+      known: KNOWN,
+      footprintOf,
+      gameName: GAME,
+    });
+    expect(pick.payload.terrain).toEqual([step]);
+    expect(pick.payload.buildings).toEqual(entry.buildings);
+  });
+
+  it("keeps a layout of steps alone, with no buildings to check", () => {
+    const [entry] = pack().entries;
+    const [pick] = packPlan({
+      entries: [{ ...entry, buildings: [], terrain: [step] }],
+      taking: new Set([entry.index]),
+      taken: [],
+      installed: INSTALLED,
+      known: KNOWN,
+      footprintOf,
+      gameName: GAME,
+    });
+    expect(pick.payload.buildings).toEqual([]);
+    expect(pick.payload.terrain).toEqual([step]);
+    expect(pick.fit).toBe("all");
   });
 });
 

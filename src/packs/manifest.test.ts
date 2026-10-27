@@ -270,6 +270,27 @@ describe("encodeSetupPack / decodeSetupPack", () => {
     expect(decodeSetupPack(code(m))).toEqual({ ok: true, settings: m });
   });
 
+  it("round-trips the terrain steps a pack's blueprints carry (issue #4790)", () => {
+    const walls = {
+      ...layout({ name: "Ring of walls" }),
+      buildings: [],
+      terrain: [
+        {
+          kind: "raise" as const,
+          shape: "wall" as const,
+          points: [
+            { x: 0, z: 0 },
+            { x: 64, z: 0 },
+          ],
+          height: 24,
+          before: 0,
+        },
+      ],
+    };
+    const m = manifest({ blueprints: [layout(), walls] });
+    expect(decodeSetupPack(code(m))).toEqual({ ok: true, settings: m });
+  });
+
   it("still imports a pack shared before packs carried blueprints", () => {
     const old = encodeContainerCode("setup-pack", 1, {
       title: "Comet nights",

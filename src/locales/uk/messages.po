@@ -264,6 +264,10 @@ msgstr "«{name}» – зіграти знову можна з Одиночна 
 msgid "\"{name}\" goes from your library. A scenario that already placed a base from it keeps its own copy."
 msgstr "«{name}» буде прибрано з вашої бібліотеки. Сценарій, у якому вже розміщено базу з нього, зберігає власну копію."
 
+#: src/blueprint/bar.ts
+msgid "\"{name}\" has no buildings, and a game's blueprints file holds buildings and nothing about the ground, so there is nothing of it to write."
+msgstr ""
+
 #: src/scenario/pages/components/BlueprintPanel.tsx
 #, fuzzy
 msgid "\"{name}\" is in your library."
@@ -1719,25 +1723,15 @@ msgstr "{buildingCount, plural, one {# будівля бази} few {# буді�
 msgid "{buildingCount, plural, one {# building, and it can be built where it stands.} other {# buildings, and every one of them can be built where it stands.}}"
 msgstr "{buildingCount, plural, one {# будівля, і її можна збудувати на поточному місці.} few {# будівлі, і кожну з них можна збудувати на поточному місці.} many {# будівель, і кожну з них можна збудувати на поточному місці.} other {# будівлі, і кожну з них можна збудувати на поточному місці.}}"
 
-#: src/scenario/pages/components/BlueprintPanel.tsx
-#, fuzzy
-msgid "{buildingCount, plural, one {# building} other {# buildings}}"
-msgstr "{buildingCount, plural, one {# будівля} few {# будівлі} many {# будівель} other {# будівлі}}"
-
 #: src/hub/pages/components/ItemPreview.tsx
 #, fuzzy
 msgid "{buildings, plural, one {# building, in build order} other {# buildings, in build order}}"
 msgstr "{buildings, plural, one {# будівля, у черговості будівництва} few {# будівлі, у черговості будівництва} many {# будівель, у черговості будівництва} other {# будівлі, у черговості будівництва}}"
 
-#: src/blueprint/pages/BlueprintDetailPage.tsx
-#: src/blueprint/pages/BlueprintsPage.tsx
-#: src/blueprint/pages/components/ArrivingBlueprint.tsx
-#: src/blueprint/pages/components/ArrivingPack.tsx
-#: src/blueprint/pages/components/LeavingPack.tsx
+#: src/blueprint/countLine.ts
 #: src/hub/pages/components/ItemPreview.tsx
 #: src/hub/pages/components/SetupPackContents.tsx
 #: src/placement/LayoutControls.tsx
-#: src/scenario/pages/components/BlueprintPanel.tsx
 #, fuzzy
 msgid "{buildings, plural, one {# building} other {# buildings}}"
 msgstr "{buildings, plural, one {# будівля} few {# будівлі} many {# будівель} other {# будівлі}}"
@@ -1756,6 +1750,10 @@ msgstr "{buildings} · черговість будівництва"
 #, fuzzy
 msgid "{buildingsText} · build order"
 msgstr "{buildingsText} · черговість будівництва"
+
+#: src/blueprint/countLine.ts
+msgid "{built}, {changes}"
+msgstr ""
 
 #: src/workshop/pages/UnitPage.tsx
 #, fuzzy
@@ -2027,7 +2025,6 @@ msgid "{count, plural, one {# blocker would reach whoever plays this broken, so 
 msgstr "{count, plural, one {Через # блокувальну проблему гравці отримали б зламану версію, тому пакет не створено: {blockers}} few {Через # блокувальні проблеми гравці отримали б зламану версію, тому пакет не створено: {blockers}} many {Через # блокувальних проблем гравці отримали б зламану версію, тому пакет не створено: {blockers}} other {Через # блокувальної проблеми гравці отримали б зламану версію, тому пакет не створено: {blockers}}}"
 
 #: src/blueprint/pages/components/SubstitutionPanel.tsx
-#: src/lib/scenarioEditing/layoutPlacing.ts
 #: src/scenario/pages/components/contents.ts
 #, fuzzy
 msgid "{count, plural, one {# building} other {# buildings}}"
@@ -6263,6 +6260,11 @@ msgstr "{stepCount, plural, one {# умова} few {# умови} many {# умо
 msgid "{stepCount, plural, one {Build order · # step} other {Build order · # steps}}"
 msgstr "{stepCount, plural, one {Черговість будівництва · # крок} few {Черговість будівництва · # кроки} many {Черговість будівництва · # кроків} other {Черговість будівництва · # кроку}}"
 
+#: src/blueprint/bar.ts
+#: src/blueprint/pack.ts
+msgid "{steps, plural, one {# terrain change} other {# terrain changes}}"
+msgstr ""
+
 #: src/lego/footprint.ts
 #, fuzzy
 msgid "{steps, plural, one {Footprint is # step bigger than the base on {axis}.} other {Footprint is # steps bigger than the base on {axis}.}}"
@@ -6457,6 +6459,10 @@ msgstr "Команд: {teams}, гравців у команді: {size}"
 #, fuzzy
 msgid "{teams} teams of {size}, ranked"
 msgstr "Команд: {teams}, гравців у команді: {size}, рейтинговий"
+
+#: src/blueprint/countLine.ts
+msgid "{terrain, plural, one {# terrain change} other {# terrain changes}}"
+msgstr ""
 
 #: src/content/pages/components/ReplayPlaybackBar.tsx
 #, fuzzy
@@ -30628,6 +30634,10 @@ msgstr "У цьому повторі не записано черговості 
 msgid "No builder matches that."
 msgstr "Жоден будівельник не відповідає цьому."
 
+#: src/blueprint/countLine.ts
+msgid "No buildings"
+msgstr ""
+
 #: src/content/pages/components/ReplayMap.tsx
 #, fuzzy
 msgid "No buildings were ordered in this replay."
@@ -34038,6 +34048,10 @@ msgstr "Читається лише для юніта без класу руху
 #, fuzzy
 msgid "Only shoots at"
 msgstr "Стріляє лише по"
+
+#: src/blueprint/pages/components/LeavingPack.tsx
+msgid "Only terrain changes. A game's file holds buildings and nothing about the ground, so there is nothing to write."
+msgstr ""
 
 #: src/workshop/pages/components/UnitCompareDrawer.tsx
 #, fuzzy

@@ -29,7 +29,9 @@ import { Button } from "@picoframe/frame";
 import { Blocks, Download, FileUp, Loader2 } from "lucide-react";
 
 import { Checkbox } from "@/components/ui/checkbox";
+import { countLine } from "../../countLine";
 import { recordGameName, type StoredBlueprint } from "../../library";
+import { canWriteToGameFile } from "../../pack";
 import { LayoutThumb } from "./LayoutThumb";
 
 export function LeavingPack({
@@ -76,7 +78,7 @@ export function LeavingPack({
   // other: without one every write is the game's own as far as anything here can
   // say (issue #1488).
   const sharingStopped = gameRunning && !gameFile;
-  const total = records.length;
+  const total = records.filter(canWriteToGameFile).length;
   const gameCount = games.size;
   const stripped = strips.join(", ");
 
@@ -118,10 +120,11 @@ export function LeavingPack({
           const buildings = record.layout.buildings.length;
           const game = recordGameName(record);
           const id = `write-pack-${record.id}`;
-          const buildingCount = plural(buildings, {
-            one: "# building",
-            other: "# buildings",
-          });
+          const writable = canWriteToGameFile(record);
+          const buildingCount = countLine(
+            buildings,
+            record.layout.terrain?.length ?? 0,
+          );
           return (
             <li
               key={record.id}
@@ -130,6 +133,7 @@ export function LeavingPack({
               <Checkbox
                 id={id}
                 checked={taking.has(record.id)}
+                disabled={!writable}
                 onCheckedChange={() => onToggle(record.id)}
               />
               <span className="flex size-10 shrink-0 items-center justify-center">
@@ -139,7 +143,10 @@ export function LeavingPack({
                   <Blocks className="size-4 text-muted-foreground" />
                 )}
               </span>
-              <label htmlFor={id} className="min-w-0 flex-1 cursor-pointer">
+              <label
+                htmlFor={id}
+                className={`min-w-0 flex-1 ${writable ? "cursor-pointer" : ""}`}
+              >
                 <span className="block truncate text-sm">
                   {record.layout.name}
                 </span>
@@ -148,6 +155,14 @@ export function LeavingPack({
                   {record.layout.ordered ? ` · ${t`build order`}` : ""}
                   {game ? ` · ${game}` : ""}
                 </span>
+                {!writable && (
+                  <span className="block text-[11px] text-amber-200/80">
+                    <Trans>
+                      Only terrain changes. A game's file holds buildings and
+                      nothing about the ground, so there is nothing to write.
+                    </Trans>
+                  </span>
+                )}
               </label>
             </li>
           );

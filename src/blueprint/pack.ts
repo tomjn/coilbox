@@ -387,6 +387,7 @@ export function packPlan(input: PackPlanInput): PackPick[] {
       ...(entry.designedFor ? { designedFor: entry.designedFor } : {}),
       ...(entry.ordered ? { ordered: true } : {}),
       buildings: entry.buildings,
+      ...(entry.terrain?.length ? { terrain: entry.terrain } : {}),
     };
     const drawn = blueprintPayload(layout, {
       footprintOf,
@@ -587,12 +588,26 @@ export function packChanges(pack: BlueprintPack): string | null {
 }
 
 /**
+ * Whether a layout has anything a game's file can hold (issue #4790).
+ *
+ * A layout of terrain steps and no buildings has nothing to write: the file
+ * carries buildings only, so the pack form leaves it unticked and says why.
+ */
+export function canWriteToGameFile(record: StoredBlueprint): boolean {
+  return record.layout.buildings.length > 0;
+}
+
+/**
  * What writing a set of layouts into a game's file leaves behind (issue #1474).
  *
  * A single layout's export already names the mission-only fields it drops, and
  * this is the same promise kept for a set: an export is a conversion, so it says
  * what it did before it does it. The three here are the ones a library layout
  * carries that a game's file has nowhere for.
+ *
+ * The terrain steps are the other loss. A game's file holds buildings and
+ * nothing about the ground (issue #4790), so a layout's steps stay in the
+ * library and the file carries what stood on them.
  *
  * The footprints are the one worth understanding. A game does not need them: it
  * reads how much ground a building stands on out of its own units. They matter
@@ -607,11 +622,23 @@ export function packChanges(pack: BlueprintPack): string | null {
 export function packStrips(records: readonly StoredBlueprint[]): string[] {
   const designed = records.filter((r) => r.layout.designedFor).length;
   const named = records.filter((r) => r.layout.game?.name).length;
+  const steps = records.reduce(
+    (sum, r) => sum + (r.layout.terrain?.length ?? 0),
+    0,
+  );
   const sized = records.filter(
     (r) => Object.keys(r.layout.footprints).length > 0,
   ).length;
 
   const said: string[] = [];
+  if (steps > 0) {
+    said.push(
+      plural(steps, {
+        one: "# terrain change",
+        other: "# terrain changes",
+      }),
+    );
+  }
   if (designed > 0) {
     said.push(
       plural(designed, {

@@ -55,6 +55,7 @@ import { withoutGeneratedGames } from "@/lib/generatedGames";
 import { notify } from "@/notify/notify";
 import { usePreferredTarget } from "@/play/config";
 import { GamePickerField } from "@/play/pages/components/GamePickerButton";
+import { countLine } from "../countLine";
 import {
   type BlueprintSource,
   libraryGames,
@@ -267,10 +268,10 @@ function BlueprintCard({
   const { t } = useLingui();
   const buildings = record.layout.buildings.length;
   const game = recordGameName(record);
-  const buildingCount = plural(buildings, {
-    one: "# building",
-    other: "# buildings",
-  });
+  const buildingCount = countLine(
+    buildings,
+    record.layout.terrain?.length ?? 0,
+  );
 
   return (
     <div className="relative flex h-full flex-col gap-2 rounded-lg border border-border/50 bg-card p-3 transition-colors hover:border-primary/40 hover:bg-accent/50 focus-within:border-primary/40">

@@ -357,4 +357,51 @@ check("issue passes the commands through", same(E.orders[1].cmds, conOrders.cmds
 E.orders = {}
 check("issuing an empty plan sends nothing", PLACE.issue(emptyPlan) == 0 and #E.orders == 0)
 
+--------------------------------------------------------------------------------
+-- terrain steps turn and flip with the buildings (issue #4790)
+--------------------------------------------------------------------------------
+
+local steps = {
+	{ kind = "raise", shape = "wall", points = { { x = 32, z = -16 }, { x = 64, z = -16 } }, height = 24, before = 0 },
+	{ kind = "ramp", shape = "wall", points = { { x = 0, z = 0 }, { x = 0, z = 48 } }, heights = { 0, 32 }, width = 16, before = 2 },
+}
+local stepEntry = { buildings = {}, terrain = steps }
+check("resolve hands the terrain steps on", PLACE.resolve(stepEntry).terrain == steps)
+check("resolve gives an empty list when the entry has none", same(PLACE.resolve({ buildings = {} }).terrain, {}))
+
+local laid = PLACE.terrain(steps, 0, 320, 320)
+check("an unturned step lands on the anchor plus its offsets", same(laid[1].points, { { x = 352, z = 304 }, { x = 384, z = 304 } }), show(laid[1].points))
+check("a step keeps its kind, shape, heights, width and place in the build order", laid[2].kind == "ramp" and laid[2].shape == "wall" and same(laid[2].heights, { 0, 32 }) and laid[2].width == 16 and laid[2].before == 2 and laid[1].height == 24, show(laid))
+
+local turnedSteps = PLACE.terrain(steps, 1, 320, 320)
+local tx, tz = PLACE.turned(32, -16, 1)
+check("a turn moves step points the way it moves a building", turnedSteps[1].points[1].x == 320 + tx and turnedSteps[1].points[1].z == 320 + tz, show(turnedSteps[1].points))
+check("a turn leaves heights alone and keeps the ramp's ends in order", same(turnedSteps[2].heights, { 0, 32 }) and turnedSteps[2].points[1].x == 320 and turnedSteps[2].points[1].z == 320, show(turnedSteps[2]))
+
+local flippedX = PLACE.terrain(steps, 0, 320, 320, { x = true })
+check("flipping side to side mirrors x only", flippedX[1].points[1].x == 288 and flippedX[1].points[1].z == 304, show(flippedX[1].points))
+local flippedZ = PLACE.terrain(steps, 0, 320, 320, { z = true })
+check("flipping top to bottom mirrors z only", flippedZ[1].points[1].x == 352 and flippedZ[1].points[1].z == 336, show(flippedZ[1].points))
+local flipAfterTurn = PLACE.terrain(steps, 1, 320, 320, { x = true })
+check("a flip applies after the turn, along the map's x", flipAfterTurn[1].points[1].x == 320 - tx and flipAfterTurn[1].points[1].z == 320 + tz, show(flipAfterTurn[1].points))
+check("flipping both ways is a half turn", (function()
+	local both = PLACE.terrain(steps, 0, 320, 320, { x = true, z = true })
+	local half = PLACE.terrain(steps, 2, 320, 320)
+	for i = 1, #both do
+		for j = 1, #both[i].points do
+			if both[i].points[j].x ~= half[i].points[j].x or both[i].points[j].z ~= half[i].points[j].z then
+				return false
+			end
+		end
+	end
+	return true
+end)())
+local pivoted = PLACE.terrain(steps, 1, 320, 320, nil, { x = 32, z = -16 })
+check("a turn about the layout's origin keeps the origin on the anchor", pivoted[1].points[1].x == 320 and pivoted[1].points[1].z == 320, show(pivoted[1].points))
+check("the steps given are not changed by turning them", steps[1].points[1].x == 32 and steps[1].points[1].z == -16)
+check("a layout with no steps lays out none", same(PLACE.terrain(nil, 1, 0, 0), {}))
+
+local substituted = PLACE.substitute(PLACE.resolve(stepEntry), {})
+check("substituting keeps the terrain steps", substituted.terrain == steps)
+
 support.report()

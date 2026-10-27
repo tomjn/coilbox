@@ -786,4 +786,32 @@ check("ortho is sixteen numbers", #m == 16)
 -- column major: x maps to 2/w - 1, y to 2/h - 1
 check("ortho maps the view to clip space", m[1] == 2 / 1920 and m[6] == 2 / 1080 and m[13] == -1 and m[14] == -1 and m[16] == 1, show(m))
 
+--------------------------------------------------------------------------------
+-- the count line counts terrain changes (issue #4790)
+--------------------------------------------------------------------------------
+
+local terrainStep = { kind = "raise", shape = "wall", points = { { x = 0, z = 0 }, { x = 32, z = 0 } }, height = 8, before = 0 }
+local TERRAIN_ENTRIES = {
+	{ key = "library:walls", name = "Walls", source = "library", ordered = false, buildings = {}, terrain = { terrainStep, terrainStep, terrainStep } },
+	{ key = "library:both", name = "Both", source = "library", ordered = false, buildings = { b("armsolar") }, terrain = { terrainStep } },
+	{ key = "library:plain", name = "Plain", source = "library", ordered = false, buildings = { b("armsolar") } },
+}
+local terrainState = MODEL.new()
+MODEL.refresh(terrainState, TERRAIN_ENTRIES, PLACE, game, CAN)
+terrainState.open = true
+terrainState.tab = "all"
+local LT2 = MODEL.layout(terrainState, measure, VIEW)
+check("a layout of walls only is in the list", #terrainState.items == 3 and terrainState.counts.all == 3, show(terrainState.counts))
+local function detailOf(key)
+	for _, item in ipairs(terrainState.items) do
+		if item.entry.key == key then
+			return MODEL.rowDetail(item)
+		end
+	end
+end
+check("a layout with no buildings and steps says so", detailOf("library:walls") == "coilbox | No buildings, 3 terrain changes", detailOf("library:walls"))
+check("a layout with both counts both", detailOf("library:both") == "coilbox | 1 building, 1 terrain change", detailOf("library:both"))
+check("a layout with no steps counts buildings only", detailOf("library:plain") == "coilbox | 1 building", detailOf("library:plain"))
+check("a layout of walls only is not offered to step through", MODEL.step(terrainState, 1) == "library:both" and MODEL.step(terrainState, -1) == "library:plain", tostring(MODEL.step(terrainState, 1)))
+
 support.report()

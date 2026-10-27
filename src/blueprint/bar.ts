@@ -13,8 +13,11 @@
  *   repeats a layout at while dragging one out, which is a placement setting
  *   rather than a fact about the shape.
  * - Writing loses the mission-only fields a base carries on top of its layout:
- *   the trigger name, the factory queue and its repeat. {@link strippedByBar}
- *   names them so an author decides rather than finds out later.
+ *   the trigger name, the factory queue and its repeat. It also loses a
+ *   layout's terrain steps, because the file holds buildings and nothing about
+ *   the ground (issue #4790). {@link strippedByBar} names them so an author
+ *   decides rather than finds out later. A layout with steps and no buildings
+ *   has nothing left to write, so a merge refuses it.
  *
  * The one place this file is subtle is the blueprint's own `facing`. The game
  * stores the quarter turn a layout was last rotated to and applies it when
@@ -280,13 +283,25 @@ export function barEntry(layout: BaseBlueprint): BarBlueprint {
  * The team and the origin are not here. A blueprint has neither by design, which
  * is what makes it placeable anywhere, so leaving them behind is the feature.
  */
-export function strippedByBar(roles: BaseBuildingRole[]): string[] {
+export function strippedByBar(
+  roles: BaseBuildingRole[],
+  layout?: { terrain?: readonly unknown[] },
+): string[] {
   const named = roles.filter((role) => role.id !== undefined).length;
   const queued = roles.filter(
     (role) => role.queue !== undefined && role.queue.length > 0,
   ).length;
   const repeating = roles.filter((role) => role.repeat === true).length;
   const out: string[] = [];
+  const steps = layout?.terrain?.length ?? 0;
+  if (steps > 0) {
+    out.push(
+      plural(steps, {
+        one: "# terrain change",
+        other: "# terrain changes",
+      }),
+    );
+  }
   if (named > 0) {
     out.push(
       plural(named, {
@@ -344,6 +359,14 @@ export function mergeBarFile(
   const replaced: string[] = [];
   const added: string[] = [];
   for (const layout of layouts) {
+    // Refused rather than skipped: the caller asked for this layout to be in the
+    // file, and a file without it would be a quiet answer to a different request.
+    if (layout.buildings.length === 0) {
+      const name = layout.name;
+      raise(
+        t`"${name}" has no buildings, and a game's blueprints file holds buildings and nothing about the ground, so there is nothing of it to write.`,
+      );
+    }
     const entry = barEntry(layout);
     const at = out.findIndex((held) => entryName(held) === layout.name);
     if (at >= 0) {

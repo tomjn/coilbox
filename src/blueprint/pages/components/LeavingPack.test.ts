@@ -109,6 +109,38 @@ describe("LeavingPack", () => {
     );
   });
 
+  /** A layout of terrain steps alone has nothing a game's file holds (issue
+   *  #4790), so it is on the list but cannot be ticked, and says why. */
+  it("shows a layout of steps alone with its count, unticked and with the reason", () => {
+    const walls = record("w", {
+      layout: {
+        name: "Ring of walls",
+        buildings: [],
+        terrain: [
+          {
+            kind: "raise",
+            shape: "wall",
+            points: [
+              { x: 0, z: 0 },
+              { x: 64, z: 0 },
+            ],
+            height: 24,
+            before: 0,
+          },
+        ],
+        footprints: {},
+      },
+    });
+    const html = markup({
+      records: [record("a"), walls],
+      taking: new Set(["a"]),
+    });
+    expect(html).toContain("No buildings, 1 terrain change");
+    expect(html).toContain("Only terrain changes.");
+    expect(html).toContain("1 of 1 ticked");
+    expect(html).toMatch(/<button[^>]*disabled=""[^>]*id="write-pack-w"/);
+  });
+
   /** The provenance decision, said out loud where somebody is about to share
    *  (issue #1473). A path off your disk is not a stranger's business. */
   it("says where a copy came from stays behind rather than travelling", () => {

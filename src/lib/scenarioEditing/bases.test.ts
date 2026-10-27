@@ -730,6 +730,49 @@ describe("a layout edited as a layout", () => {
     const doc = document();
     expect(replaceBlueprint(doc, { ...layout, id: "other" })).toBe(doc);
   });
+
+  it("keeps a layout emptied of buildings that still has terrain steps (issue #4790)", () => {
+    const wall = {
+      kind: "raise" as const,
+      shape: "wall" as const,
+      points: [
+        { x: 0, z: 0 },
+        { x: 32, z: 0 },
+      ],
+      height: 16,
+      before: 0,
+    };
+    const next = replaceBlueprint(document(), {
+      ...layout,
+      buildings: [],
+      terrain: [wall],
+    });
+    expect(next.blueprints).toHaveLength(1);
+    expect(next.blueprints[0].terrain).toEqual([wall]);
+    // No base can be drawn from a layout with nothing standing in it.
+    expect(next.bases).toEqual([]);
+  });
+
+  it("carries a layout's terrain steps into a copy of its base (issue #4790)", () => {
+    const wall = {
+      kind: "raise" as const,
+      shape: "wall" as const,
+      points: [
+        { x: 0, z: 0 },
+        { x: 32, z: 0 },
+      ],
+      height: 16,
+      before: 0,
+    };
+    const next = addBase(newScenario("Copy"), "b9", "bp9", {
+      team: "p1",
+      origin: { x: 0, z: 0 },
+      buildings: [{ def: "armwin", offset: { x: 0, z: 0 }, facing: 0 }],
+      terrain: [wall],
+    });
+    expect(next.blueprints[0].terrain).toEqual([wall]);
+    expect(next.blueprints[0].terrain?.[0]).not.toBe(wall);
+  });
 });
 
 /**

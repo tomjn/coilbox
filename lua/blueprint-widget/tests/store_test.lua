@@ -226,4 +226,72 @@ local readOnly = STORE.new({ vfs = vfs, io = nil, log = function() end })
 local ok4, err4 = readOnly:append(entry)
 check("append without io fails with a message", ok4 == false and type(err4) == "string", err4)
 
+--------------------------------------------------------------------------------
+-- terrain steps (issue #4790)
+--------------------------------------------------------------------------------
+
+local WALL = {
+	kind = "raise",
+	shape = "wall",
+	points = { { x = 0, z = 0 }, { x = 64, z = 0 }, { x = 64, z = 32 } },
+	height = 24,
+	before = 0,
+}
+local RAMP = { kind = "ramp", shape = "wall", points = { { x = -32, z = 0 }, { x = 32, z = 0 } }, heights = { 0, 40 }, width = 48, before = 1 }
+local PAD = { kind = "level", shape = "area", points = { { x = 0, z = 0 }, { x = 64, z = 0 }, { x = 64, z = 64 }, { x = 0, z = 64 } }, height = -8, before = 1 }
+local SMOOTH = { kind = "smooth", shape = "area", points = { { x = 0, z = 0 }, { x = 32, z = 0 }, { x = 32, z = 32 } }, before = 1 }
+
+local withTerrain = STORE.parseLibrary(json.encode({
+	version = 1,
+	blueprints = {
+		{
+			id = "mixed",
+			name = "Walls and a factory",
+			buildings = { { def = "armlab", offset = { x = 0, z = 0 }, facing = 0 } },
+			terrain = { WALL, RAMP, PAD, SMOOTH },
+		},
+		{ id = "only", name = "Only walls", buildings = {}, terrain = { WALL } },
+		{ id = "none", name = "No terrain key", buildings = {} },
+	},
+}))
+check("a library entry keeps every kind of terrain step", #withTerrain[1].terrain == 4, show(withTerrain[1].terrain))
+check("a raise keeps its points, height and place in the build order", same(withTerrain[1].terrain[1], WALL), show(withTerrain[1].terrain[1]))
+check("a ramp keeps its end heights and width", same(withTerrain[1].terrain[2], RAMP), show(withTerrain[1].terrain[2]))
+check("a level keeps a negative height", withTerrain[1].terrain[3].height == -8)
+check("a smooth step has no height", withTerrain[1].terrain[4].height == nil)
+check("a layout with steps and no buildings is kept", #withTerrain == 3 and #withTerrain[2].buildings == 0 and #withTerrain[2].terrain == 1, show(withTerrain[2]))
+check("a layout with no terrain key has an empty list", same(withTerrain[3].terrain, {}), show(withTerrain[3]))
+check("a step placed past the last building is placed after it", withTerrain[2].terrain[1].before == 0)
+
+local clamped = STORE.parseLibrary(json.encode({
+	version = 1,
+	blueprints = { { id = "c", name = "Clamped", buildings = {}, terrain = { { kind = "raise", shape = "wall", points = WALL.points, height = 8, before = 9 } } } },
+}))
+check("a step before a building the layout does not have comes after them all", clamped[1].terrain[1].before == 0, show(clamped))
+
+local damaged = STORE.parseLibrary(json.encode({
+	version = 1,
+	blueprints = {
+		{
+			id = "d",
+			name = "Damaged",
+			buildings = {},
+			terrain = {
+				{ kind = "restore", shape = "area", points = PAD.points, before = 0 },
+				{ kind = "raise", shape = "wall", points = { { x = 0, z = 0 } }, height = 8, before = 0 },
+				{ kind = "raise", shape = "wall", points = WALL.points, before = 0 },
+				{ kind = "ramp", shape = "wall", points = RAMP.points, heights = { 0 }, width = 8, before = 0 },
+				WALL,
+			},
+		},
+	},
+}))
+check("steps that are damaged or of an unknown kind are dropped and the rest read", #damaged[1].terrain == 1 and same(damaged[1].terrain[1], WALL), show(damaged))
+
+local spooled2 = STORE.parseSpool(json.encode({ version = 1, blueprints = { { name = "Saved", buildings = {}, terrain = { WALL } } } }))
+check("the spool reads terrain the same way", #spooled2[1].terrain == 1, show(spooled2))
+
+local barOnly = STORE.parseBar(BAR)
+check("BAR's file holds no terrain", same(barOnly[1].terrain, {}), show(barOnly[1]))
+
 support.report()

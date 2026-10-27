@@ -264,6 +264,10 @@ msgstr "「{name}」はシングルプレイ → プリセットから再プレ�
 msgid "\"{name}\" goes from your library. A scenario that already placed a base from it keeps its own copy."
 msgstr "「{name}」をライブラリから外します。これを使ってベースを配置済みのシナリオは、独自のコピーを保持します。"
 
+#: src/blueprint/bar.ts
+msgid "\"{name}\" has no buildings, and a game's blueprints file holds buildings and nothing about the ground, so there is nothing of it to write."
+msgstr ""
+
 #: src/scenario/pages/components/BlueprintPanel.tsx
 #, fuzzy
 msgid "\"{name}\" is in your library."
@@ -1719,25 +1723,15 @@ msgstr "{buildingCount, plural, other {# 個のベースの建物}}"
 msgid "{buildingCount, plural, one {# building, and it can be built where it stands.} other {# buildings, and every one of them can be built where it stands.}}"
 msgstr "{buildingCount, plural, other {# 個の建物、すべて現在の位置に建設できます。}}"
 
-#: src/scenario/pages/components/BlueprintPanel.tsx
-#, fuzzy
-msgid "{buildingCount, plural, one {# building} other {# buildings}}"
-msgstr "{buildingCount, plural, other {# 個の建物}}"
-
 #: src/hub/pages/components/ItemPreview.tsx
 #, fuzzy
 msgid "{buildings, plural, one {# building, in build order} other {# buildings, in build order}}"
 msgstr "{buildings, plural, other {# 個の建物（建設順）}}"
 
-#: src/blueprint/pages/BlueprintDetailPage.tsx
-#: src/blueprint/pages/BlueprintsPage.tsx
-#: src/blueprint/pages/components/ArrivingBlueprint.tsx
-#: src/blueprint/pages/components/ArrivingPack.tsx
-#: src/blueprint/pages/components/LeavingPack.tsx
+#: src/blueprint/countLine.ts
 #: src/hub/pages/components/ItemPreview.tsx
 #: src/hub/pages/components/SetupPackContents.tsx
 #: src/placement/LayoutControls.tsx
-#: src/scenario/pages/components/BlueprintPanel.tsx
 #, fuzzy
 msgid "{buildings, plural, one {# building} other {# buildings}}"
 msgstr "{buildings, plural, other {# 個の建物}}"
@@ -1756,6 +1750,10 @@ msgstr "{buildings} · ビルドオーダー"
 #, fuzzy
 msgid "{buildingsText} · build order"
 msgstr "{buildingsText} · ビルドオーダー"
+
+#: src/blueprint/countLine.ts
+msgid "{built}, {changes}"
+msgstr ""
 
 #: src/workshop/pages/UnitPage.tsx
 #, fuzzy
@@ -2027,7 +2025,6 @@ msgid "{count, plural, one {# blocker would reach whoever plays this broken, so 
 msgstr "{count, plural, other {プレイする人の環境で壊れた状態になるブロッカーが # 件あるため、パッケージ化しませんでした：{blockers}}}"
 
 #: src/blueprint/pages/components/SubstitutionPanel.tsx
-#: src/lib/scenarioEditing/layoutPlacing.ts
 #: src/scenario/pages/components/contents.ts
 #, fuzzy
 msgid "{count, plural, one {# building} other {# buildings}}"
@@ -6263,6 +6260,11 @@ msgstr "{stepCount, plural, other {# 個の条件}}"
 msgid "{stepCount, plural, one {Build order · # step} other {Build order · # steps}}"
 msgstr "{stepCount, plural, other {ビルドオーダー · # ステップ}}"
 
+#: src/blueprint/bar.ts
+#: src/blueprint/pack.ts
+msgid "{steps, plural, one {# terrain change} other {# terrain changes}}"
+msgstr ""
+
 #: src/lego/footprint.ts
 #, fuzzy
 msgid "{steps, plural, one {Footprint is # step bigger than the base on {axis}.} other {Footprint is # steps bigger than the base on {axis}.}}"
@@ -6457,6 +6459,10 @@ msgstr "{size} 人 × {teams} チーム"
 #, fuzzy
 msgid "{teams} teams of {size}, ranked"
 msgstr "{size} 人 × {teams} チーム、ランク戦"
+
+#: src/blueprint/countLine.ts
+msgid "{terrain, plural, one {# terrain change} other {# terrain changes}}"
+msgstr ""
 
 #: src/content/pages/components/ReplayPlaybackBar.tsx
 #, fuzzy
@@ -30628,6 +30634,10 @@ msgstr "このリプレイにはビルドオーダーが記録されていませ
 msgid "No builder matches that."
 msgstr "一致する建設ユニットはありません。"
 
+#: src/blueprint/countLine.ts
+msgid "No buildings"
+msgstr ""
+
 #: src/content/pages/components/ReplayMap.tsx
 #, fuzzy
 msgid "No buildings were ordered in this replay."
@@ -34038,6 +34048,10 @@ msgstr "移動クラスのないユニット（固定または飛行するもの
 #, fuzzy
 msgid "Only shoots at"
 msgstr "攻撃対象"
+
+#: src/blueprint/pages/components/LeavingPack.tsx
+msgid "Only terrain changes. A game's file holds buildings and nothing about the ground, so there is nothing to write."
+msgstr ""
 
 #: src/workshop/pages/components/UnitCompareDrawer.tsx
 #, fuzzy

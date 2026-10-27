@@ -26,6 +26,51 @@ function fromFile(ordered: boolean) {
   return readBarFile(text).blueprints[0].layout;
 }
 
+describe("carrying terrain steps into a scenario (issue #4790)", () => {
+  const wall = {
+    kind: "raise" as const,
+    shape: "wall" as const,
+    points: [
+      { x: 0, z: 0 },
+      { x: 64, z: 0 },
+    ],
+    height: 24,
+    before: 0,
+  };
+
+  it("carryBlueprint keeps the steps of a layout with buildings and one without", () => {
+    const withBuildings = carryBlueprint(
+      newScenario("Walls"),
+      { ...fromFile(false), terrain: [wall] },
+      "bp1",
+    );
+    expect(withBuildings.blueprints[0].terrain).toEqual([wall]);
+    const only = carryBlueprint(
+      newScenario("Walls"),
+      { name: "Ring", buildings: [], terrain: [wall] },
+      "bp2",
+    );
+    expect(only.blueprints[0].buildings).toEqual([]);
+    expect(only.blueprints[0].terrain).toEqual([wall]);
+  });
+
+  it("carryBlueprint leaves the key off a layout with no steps", () => {
+    const next = carryBlueprint(newScenario("Plain"), fromFile(false), "bp1");
+    expect(next.blueprints[0]).not.toHaveProperty("terrain");
+  });
+
+  it("takeBlueprint keeps the steps of the layout it places", () => {
+    const next = takeBlueprint(
+      newScenario("Walls"),
+      { ...fromFile(false), terrain: [wall] },
+      "team",
+      IDS,
+      ORIGIN,
+    );
+    expect(next.blueprints[0].terrain).toEqual([wall]);
+  });
+});
+
 describe("takeBlueprint", () => {
   it("lands as a layout and one placement of it", () => {
     const done = takeBlueprint(

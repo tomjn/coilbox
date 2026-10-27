@@ -39,6 +39,7 @@ import type { GameItem } from "@/content/bindings";
 import { getLocale } from "@/i18n";
 import { GamePickerButton } from "@/play/pages/components/GamePickerButton";
 import type { ArrivalNote } from "../../arrival";
+import { countLine } from "../../countLine";
 import {
   orderPack,
   type PackOrder,
@@ -370,10 +371,7 @@ function PackRow({
   const { t } = useLingui();
   const { entry, payload, arrival, fit, taking } = pick;
   const buildings = entry.buildings.length;
-  const buildingCount = plural(buildings, {
-    one: "# building",
-    other: "# buildings",
-  });
+  const buildingCount = countLine(buildings, entry.terrain?.length ?? 0);
   const keptAs = arrival.name;
   const id = `pack-layout-${entry.index}`;
   // Only the warnings. The rename note is on the row already, in the name it

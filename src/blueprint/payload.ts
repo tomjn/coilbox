@@ -15,6 +15,9 @@
  *   origin in elmos, and a facing. The order is the build order when `ordered`
  *   says it was meant, which is the one thing a sequence cannot say about
  *   itself.
+ * - `terrain`, changes to the ground between the buildings (issue #4790). It is
+ *   additive: a reader that does not know the field reads the buildings and
+ *   drops the steps, which is why the container's `kindVersion` did not move.
  * - `footprints`, how much ground each def stands on. This is the field that
  *   makes the whole payload worth having. A footprint comes from the unit
  *   definition, which means unitsync, which means the game installed. The hub
@@ -79,6 +82,34 @@ export interface PayloadBuilding {
   originalName?: string;
 }
 
+/** The ways a terrain step changes the ground. Zero-K's terraform types 1 to 4;
+ *  restore, type 5, puts back the map's own ground and so is not a blueprint's
+ *  to say. */
+export const TERRAIN_KINDS = ["level", "raise", "ramp", "smooth"] as const;
+export type PayloadTerrainKind = (typeof TERRAIN_KINDS)[number];
+
+/** An open path or a closed outline. A ramp is a path of two points. */
+export const TERRAIN_SHAPES = ["wall", "area"] as const;
+export type PayloadTerrainShape = (typeof TERRAIN_SHAPES)[number];
+
+/** One change to the ground, placed relative to wherever the layout is put
+ *  down. Heights are relative: see `TerrainStep` in `./model.ts`. */
+export interface PayloadTerrainStep {
+  kind: PayloadTerrainKind;
+  shape: PayloadTerrainShape;
+  /** Offsets from the layout's origin in elmos, like a building's. */
+  points: { x: number; z: number }[];
+  /** Level and raise only. */
+  height?: number;
+  /** Ramp only: the height at each end, in the order of `points`. */
+  heights?: [number, number];
+  /** Ramp only, in elmos. */
+  width?: number;
+  /** The index in `buildings` this step comes before. `buildings.length` means
+   *  after all of them. */
+  before: number;
+}
+
 export interface BlueprintPayload {
   /** The game these def names belong to, named the shared way (issue #1335).
    *  Absent on a layout exported where the game could not be identified. */
@@ -98,6 +129,9 @@ export interface BlueprintPayload {
    *  drawn without caring, which is most of them. */
   ordered?: boolean;
   buildings: PayloadBuilding[];
+  /** Changes to the ground. Absent on a layout that makes none, and a layout
+   *  may have these and no buildings. */
+  terrain?: PayloadTerrainStep[];
   /** Def name in lower case to what it stands on. Not every def a layout uses
    *  is in here: one exported where the unit could not be read carries what it
    *  could. */
@@ -156,6 +190,117 @@ function parseBuilding(value: unknown): PayloadBuilding | null {
   };
 }
 
+function point(value: unknown): { x: number; z: number } | null {
+  if (typeof value !== "object" || value === null) return null;
+  const v = value as Record<string, unknown>;
+  const x = finite(v.x);
+  const z = finite(v.z);
+  return x === null || z === null ? null : { x, z };
+}
+
+/** The fewest points a step of this kind and shape can be drawn with. */
+function fewestPoints(
+  kind: PayloadTerrainKind,
+  shape: PayloadTerrainShape,
+): number {
+  if (kind === "ramp") return 2;
+  return shape === "area" ? 3 : 2;
+}
+
+/**
+ * One terrain step, or null when it is damaged.
+ *
+ * Fields that do not belong to the step's kind are left out, so a `smooth` step
+ * carrying a stray height reads back without one.
+ */
+function parseTerrainStep(
+  value: unknown,
+  buildings: number,
+): PayloadTerrainStep | null {
+  if (typeof value !== "object" || value === null) return null;
+  const v = value as Record<string, unknown>;
+  const kind = TERRAIN_KINDS.find((one) => one === v.kind);
+  const shape = TERRAIN_SHAPES.find((one) => one === v.shape);
+  if (!kind || !shape) return null;
+  if (kind === "ramp" && shape !== "wall") return null;
+
+  if (!Array.isArray(v.points)) return null;
+  const points: { x: number; z: number }[] = [];
+  for (const raw of v.points) {
+    const read = point(raw);
+    if (!read) return null;
+    points.push(read);
+  }
+  if (
+    kind === "ramp"
+      ? points.length !== 2
+      : points.length < fewestPoints(kind, shape)
+  ) {
+    return null;
+  }
+
+  const before = finite(v.before);
+  if (before === null || !Number.isInteger(before) || before < 0) return null;
+  // A step that comes before a building the layout does not have comes after
+  // them all, which is what the last place means.
+  const step: PayloadTerrainStep = {
+    kind,
+    shape,
+    points,
+    before: Math.min(before, buildings),
+  };
+
+  if (kind === "level" || kind === "raise") {
+    const height = finite(v.height);
+    if (height === null) return null;
+    step.height = height;
+  }
+  if (kind === "ramp") {
+    if (!Array.isArray(v.heights) || v.heights.length !== 2) return null;
+    const from = finite(v.heights[0]);
+    const to = finite(v.heights[1]);
+    const width = finite(v.width);
+    if (from === null || to === null || width === null || width <= 0) {
+      return null;
+    }
+    step.heights = [from, to];
+    step.width = width;
+  }
+  return step;
+}
+
+/** A terrain step as plain values, copied so a payload shares nothing with the
+ *  layout it was made from. Only the fields the step's kind uses are written. */
+export function copyTerrainStep<T extends PayloadTerrainStep>(step: T): T {
+  return {
+    kind: step.kind,
+    shape: step.shape,
+    points: step.points.map((one) => ({ x: one.x, z: one.z })),
+    ...(step.height !== undefined ? { height: step.height } : {}),
+    ...(step.heights ? { heights: [step.heights[0], step.heights[1]] } : {}),
+    ...(step.width !== undefined ? { width: step.width } : {}),
+    before: step.before,
+  } as T;
+}
+
+/**
+ * The readable steps of an untrusted `terrain` value, in order. Empty for
+ * anything that is not a list. `buildings` is how many buildings the layout has,
+ * which is the last place a step can come before.
+ */
+export function parseTerrainSteps(
+  value: unknown,
+  buildings: number,
+): PayloadTerrainStep[] {
+  if (!Array.isArray(value)) return [];
+  const steps: PayloadTerrainStep[] = [];
+  for (const entry of value) {
+    const step = parseTerrainStep(entry, buildings);
+    if (step) steps.push(step);
+  }
+  return steps;
+}
+
 /** One footprint, floored at a square the way the engine does, or null when it
  *  is not a pair of sides at all. */
 function parseFootprint(value: unknown): PayloadFootprint | null {
@@ -175,6 +320,10 @@ function parseFootprint(value: unknown): PayloadFootprint | null {
  * building is a different layout and nothing says which one it was. A damaged
  * footprint is dropped instead and the def falls back to one square: a
  * footprint is how the layout is drawn, not what the layout is.
+ *
+ * A damaged terrain step is dropped too. Steps sit beside the buildings and
+ * name them by index, so losing one moves nothing else, and a step of a kind a
+ * later version adds must not cost the buildings it travelled with.
  */
 export function parseBlueprintPayload(value: unknown): BlueprintPayload | null {
   if (typeof value !== "object" || value === null) return null;
@@ -188,6 +337,8 @@ export function parseBlueprintPayload(value: unknown): BlueprintPayload | null {
     if (!building) return null;
     buildings.push(building);
   }
+
+  const terrain = parseTerrainSteps(v.terrain, buildings.length);
 
   const footprints: Record<string, PayloadFootprint> = {};
   if (typeof v.footprints === "object" && v.footprints !== null) {
@@ -208,6 +359,7 @@ export function parseBlueprintPayload(value: unknown): BlueprintPayload | null {
     ...(designedFor ? { designedFor } : {}),
     ...(v.ordered === true ? { ordered: true } : {}),
     buildings,
+    ...(terrain.length > 0 ? { terrain } : {}),
     footprints,
   };
 }

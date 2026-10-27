@@ -213,6 +213,10 @@ msgstr ""
 msgid "\"{name}\" goes from your library. A scenario that already placed a base from it keeps its own copy."
 msgstr ""
 
+#: src/blueprint/bar.ts
+msgid "\"{name}\" has no buildings, and a game's blueprints file holds buildings and nothing about the ground, so there is nothing of it to write."
+msgstr ""
+
 #: src/scenario/pages/components/BlueprintPanel.tsx
 msgid "\"{name}\" is in your library."
 msgstr ""
@@ -1410,23 +1414,14 @@ msgstr ""
 msgid "{buildingCount, plural, one {# building, and it can be built where it stands.} other {# buildings, and every one of them can be built where it stands.}}"
 msgstr ""
 
-#: src/scenario/pages/components/BlueprintPanel.tsx
-msgid "{buildingCount, plural, one {# building} other {# buildings}}"
-msgstr ""
-
 #: src/hub/pages/components/ItemPreview.tsx
 msgid "{buildings, plural, one {# building, in build order} other {# buildings, in build order}}"
 msgstr ""
 
-#: src/blueprint/pages/BlueprintDetailPage.tsx
-#: src/blueprint/pages/BlueprintsPage.tsx
-#: src/blueprint/pages/components/ArrivingBlueprint.tsx
-#: src/blueprint/pages/components/ArrivingPack.tsx
-#: src/blueprint/pages/components/LeavingPack.tsx
+#: src/blueprint/countLine.ts
 #: src/hub/pages/components/ItemPreview.tsx
 #: src/hub/pages/components/SetupPackContents.tsx
 #: src/placement/LayoutControls.tsx
-#: src/scenario/pages/components/BlueprintPanel.tsx
 msgid "{buildings, plural, one {# building} other {# buildings}}"
 msgstr ""
 
@@ -1440,6 +1435,10 @@ msgstr ""
 
 #: src/scenario/pages/components/BlueprintPanel.tsx
 msgid "{buildingsText} · build order"
+msgstr ""
+
+#: src/blueprint/countLine.ts
+msgid "{built}, {changes}"
 msgstr ""
 
 #: src/workshop/pages/UnitPage.tsx
@@ -1659,7 +1658,6 @@ msgid "{count, plural, one {# blocker would reach whoever plays this broken, so 
 msgstr ""
 
 #: src/blueprint/pages/components/SubstitutionPanel.tsx
-#: src/lib/scenarioEditing/layoutPlacing.ts
 #: src/scenario/pages/components/contents.ts
 msgid "{count, plural, one {# building} other {# buildings}}"
 msgstr ""
@@ -5055,6 +5053,11 @@ msgstr ""
 msgid "{stepCount, plural, one {Build order · # step} other {Build order · # steps}}"
 msgstr ""
 
+#: src/blueprint/bar.ts
+#: src/blueprint/pack.ts
+msgid "{steps, plural, one {# terrain change} other {# terrain changes}}"
+msgstr ""
+
 #: src/lego/footprint.ts
 msgid "{steps, plural, one {Footprint is # step bigger than the base on {axis}.} other {Footprint is # steps bigger than the base on {axis}.}}"
 msgstr ""
@@ -5209,6 +5212,10 @@ msgstr ""
 
 #: src/multiplayer/matchmaking.ts
 msgid "{teams} teams of {size}, ranked"
+msgstr ""
+
+#: src/blueprint/countLine.ts
+msgid "{terrain, plural, one {# terrain change} other {# terrain changes}}"
 msgstr ""
 
 #: src/content/pages/components/ReplayPlaybackBar.tsx
@@ -24779,6 +24786,10 @@ msgstr ""
 msgid "No builder matches that."
 msgstr ""
 
+#: src/blueprint/countLine.ts
+msgid "No buildings"
+msgstr ""
+
 #: src/content/pages/components/ReplayMap.tsx
 msgid "No buildings were ordered in this replay."
 msgstr ""
@@ -27524,6 +27535,10 @@ msgstr ""
 
 #: src/content/unitFieldNotes.ts
 msgid "Only shoots at"
+msgstr ""
+
+#: src/blueprint/pages/components/LeavingPack.tsx
+msgid "Only terrain changes. A game's file holds buildings and nothing about the ground, so there is nothing to write."
 msgstr ""
 
 #: src/workshop/pages/components/UnitCompareDrawer.tsx

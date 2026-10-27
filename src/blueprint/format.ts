@@ -107,9 +107,13 @@ export interface BlueprintFormat {
   merge(existing: string, layouts: BaseBlueprint[]): MergePlan;
   /**
    * What this format cannot carry about a base, given the mission-only fields
-   * its buildings hold. Empty when nothing would be lost.
+   * its buildings hold, and what it cannot carry of the layout itself such as
+   * its terrain steps. Empty when nothing would be lost.
    */
-  stripped(roles: BaseBuildingRole[]): string[];
+  stripped(
+    roles: BaseBuildingRole[],
+    layout?: { terrain?: readonly unknown[] },
+  ): string[];
 }
 
 /** Every format coilbox can read and write. */

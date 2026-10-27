@@ -37,7 +37,7 @@ import { barFormat } from "../../bar";
 import { appFileIO } from "../../fileIO";
 import { mergeIntoGameFile } from "../../gameFile";
 import { libraryLayout } from "../../library";
-import { packStrips, packWriteSummary } from "../../pack";
+import { canWriteToGameFile, packStrips, packWriteSummary } from "../../pack";
 import { useBlueprintLibrary } from "../../store";
 import { LeavingPack } from "./LeavingPack";
 
@@ -72,7 +72,10 @@ export function WritePackForm({
     : undefined;
 
   const ticked = useMemo(
-    () => records.filter((record) => taking.has(record.id)),
+    () =>
+      records.filter(
+        (record) => taking.has(record.id) && canWriteToGameFile(record),
+      ),
     [records, taking],
   );
   const strips = useMemo(() => packStrips(ticked), [ticked]);
@@ -142,7 +145,13 @@ export function WritePackForm({
         keepsProvenance={ticked.some((record) => record.source)}
         busy={busy}
         onToggle={toggle}
-        onAll={() => setTaking(new Set(records.map((record) => record.id)))}
+        onAll={() =>
+          setTaking(
+            new Set(
+              records.filter(canWriteToGameFile).map((record) => record.id),
+            ),
+          )
+        }
         onClear={() => setTaking(new Set())}
         onWriteToGame={() =>
           void write({

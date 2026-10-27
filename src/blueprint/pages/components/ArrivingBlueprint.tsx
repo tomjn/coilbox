@@ -27,6 +27,7 @@ import { Button } from "@picoframe/frame";
 import { Blocks, Download, Loader2, Repeat } from "lucide-react";
 
 import type { ArrivalNote, BlueprintArrival } from "../../arrival";
+import { countLine } from "../../countLine";
 import type { BlueprintPayload } from "../../payload";
 import type { SideOffer } from "../../substitution";
 import { LayoutThumb } from "./LayoutThumb";
@@ -60,10 +61,7 @@ export function ArrivingBlueprint({
 }) {
   const { t } = useLingui();
   const buildings = payload.buildings.length;
-  const buildingCount = plural(buildings, {
-    one: "# building",
-    other: "# buildings",
-  });
+  const buildingCount = countLine(buildings, payload.terrain?.length ?? 0);
 
   return (
     <div className="flex flex-col gap-3 border-t p-4">
