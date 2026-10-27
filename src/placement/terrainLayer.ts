@@ -1,13 +1,17 @@
 /**
- * A blueprint's terrain steps as lines on the ground (issue #4794).
+ * A blueprint's terrain steps drawn over the ground, in the look of the in-game
+ * widget's preview (issue #4794).
  *
- * Each step gets a solid outline round the corners it levelled, and a dashed
- * line round the outer edge of the slope Zero-K adds, so the player can see how
- * much ground a step really takes. The colours are the plan drawings' and the
- * widget's: raised ground blue, anything else grey.
+ * The widget's own is `lua/blueprint-widget/luaui/coilbox_blueprints/terrain.lua`
+ * and this follows it: a see-through green volume over raised ground and a red
+ * one over dug ground, a thin wire grid on its top and down its slopes, a thin
+ * cyan grid on the ground under the whole area a step touches, slopes included,
+ * and a small white height number with a dark shadow. The colours, the alphas,
+ * the 16 elmo spacing of the grids and the cap on cells are copied from there.
+ * Dug ground is under the terrain, so it is drawn without the depth test.
  *
- * `terrainMarks` is the arithmetic and is tested. `createTerrainLayer` is the
- * three.js half, which drapes those lines over whatever relief the ground has.
+ * `overlayMesh` is the arithmetic and is tested. `createTerrainLayer` is the
+ * three.js half.
  */
 
 import * as THREE from "three";
@@ -19,81 +23,57 @@ import {
   placedSteps,
   type StepResult,
 } from "@/blueprint/terraform";
-import { type TerrainTone, toneOf } from "@/hub/terrainDraw";
 import type { MapScene3D } from "@/lib/mapScene";
 import type { Point } from "@/scenario/model";
 import { worldToScene } from "./scene";
+import type { Relief } from "./terrainRelief";
 
-/** Half a corner's square: a corner owns the ground this far round it. */
-const HALF = SQUARE_SIZE / 2;
+/** The widget's spacing of its grids, in elmos. */
+const GRID = 16;
+/** `M.CELL_LIMIT`: a step with more cells than this is not drawn. */
+export const CELL_LIMIT = 12000;
+/** `M.FACE_ALPHA`, and the selected step's, which is a deeper shade of the
+ *  same see-through face. */
+const FACE_ALPHA = 0.18;
+const SELECTED_FACE_ALPHA = 0.36;
+/** `M.GROUND_LIFT`: how far above the ground its grid floats, in elmos. */
+const GROUND_LIFT = 1;
 
-/** One step as lines, in map elmos. */
+/** `M.COLORS`. */
+const RAISE = 0x00ff00;
+const DIG = 0xff0000;
+const WIRE_RAISE = { color: 0x00ff00, alpha: 0.9 };
+const WIRE_DIG = { color: 0xcc6644, alpha: 0.8 };
+const GROUND_GRID = { color: 0x00b3b3, alpha: 0.6 };
+
+/** One step to draw. */
 export interface TerrainMark {
   /** The step's index in the layout's `terrain`. */
   index: number;
-  tone: TerrainTone;
-  /** Drawn solid. Each is a run of points to join up. */
-  solid: Point[][];
-  /** Drawn dashed. The outer edge of the slope. */
-  dashed: Point[][];
-  /** The step is drawn as the author drew it rather than as the ground took it:
-   *  switched off, refused, or cancelled. */
-  asDrawn: boolean;
+  /** What the step says, written beside it: `+112`, `-50`, `ramp 0 to +64`.
+   *  Empty for a smooth. */
+  label: string;
+  /** The corners the ground took from this step, slope included, in map elmos.
+   *  Null when the step is not on the ground (the game's terrain switch is off,
+   *  or the gadget refused or cancelled it). */
+  corners: Point[] | null;
+  /** The step as its author drew it, for when it is not on the ground. */
+  drawn: Point[][];
 }
 
-/**
- * The straight runs round a set of corners.
- *
- * Each corner owns the 8 elmo square centred on it, and the line is the edge of
- * the squares owned, so it follows the ground the step reached corner by corner.
- * Neighbouring edges are joined into one run, so a dashed line reads as dashes
- * and not as a dash for every 8 elmos.
- */
-export function boundaryRuns(corners: readonly Point[]): Point[][] {
-  const owned = new Set<string>();
-  const cell = (x: number, z: number) => `${x},${z}`;
-  for (const p of corners) owned.add(cell(p.x, p.z));
-  // Edge runs along x, by the z they are at, and along z by the x.
-  const along = new Map<string, number[]>();
-  const down = new Map<string, number[]>();
-  const add = (map: Map<string, number[]>, line: number, from: number) => {
-    const key = `${line}`;
-    const list = map.get(key);
-    if (list) list.push(from);
-    else map.set(key, [from]);
-  };
-  for (const p of corners) {
-    const { x, z } = p;
-    if (!owned.has(cell(x, z - SQUARE_SIZE))) add(along, z - HALF, x - HALF);
-    if (!owned.has(cell(x, z + SQUARE_SIZE))) add(along, z + HALF, x - HALF);
-    if (!owned.has(cell(x - SQUARE_SIZE, z))) add(down, x - HALF, z - HALF);
-    if (!owned.has(cell(x + SQUARE_SIZE, z))) add(down, x + HALF, z - HALF);
+/** A signed height, as the widget writes one. */
+function signed(height: number): string {
+  return `${height > 0 ? "+" : ""}${height}`;
+}
+
+/** What a step says about itself, as the widget's label does. */
+export function stepLabel(step: TerrainStep): string {
+  if (step.kind === "ramp") {
+    const [from, to] = step.heights ?? [0, 0];
+    return `ramp ${signed(from)} to ${signed(to)}`;
   }
-  const runs: Point[][] = [];
-  const join = (
-    map: Map<string, number[]>,
-    point: (line: number, at: number) => Point,
-  ) => {
-    for (const [key, starts] of map) {
-      const line = Number(key);
-      starts.sort((a, b) => a - b);
-      let from = starts[0];
-      let to = from + SQUARE_SIZE;
-      for (let i = 1; i < starts.length; i++) {
-        if (starts[i] === to) {
-          to += SQUARE_SIZE;
-          continue;
-        }
-        runs.push([point(line, from), point(line, to)]);
-        from = starts[i];
-        to = from + SQUARE_SIZE;
-      }
-      runs.push([point(line, from), point(line, to)]);
-    }
-  };
-  join(along, (z, x) => ({ x, z }));
-  join(down, (x, z) => ({ x, z }));
-  return runs;
+  if (step.kind === "smooth") return "";
+  return signed(step.height ?? 0);
 }
 
 /** A step as its author drew it, on the map: an area's outline closed up, a
@@ -126,12 +106,12 @@ export function drawnRuns(step: TerrainStep): Point[][] {
 }
 
 /**
- * Every step as the lines to draw for it.
+ * Every step as what to draw for it.
  *
- * `results` are what the ground took, in map elmos, and are absent when the
- * steps are not being applied (the game's terrain switch is off), when every
- * step is drawn as its author drew it. A step the gadget refused or cancelled
- * has no ground of its own and is drawn that way too.
+ * `results` are what the ground took, in map elmos. They are absent when the
+ * steps are not being applied, and then every step is drawn as its author drew
+ * it. A step the gadget refused or cancelled has no ground of its own and is
+ * drawn that way too.
  */
 export function terrainMarks(
   steps: readonly TerrainStep[],
@@ -141,45 +121,123 @@ export function terrainMarks(
   const placed = placedSteps(steps, placement);
   return placed.map((step, index) => {
     const result = results?.find((r) => r.index === index);
-    const tone = toneOf(step);
-    if (result?.outcome !== "built" || result.shape.length === 0) {
-      return {
-        index,
-        tone,
-        solid: drawnRuns(step),
-        dashed: [],
-        asDrawn: true,
-      };
-    }
+    const built = result?.outcome === "built" && result.shape.length > 0;
     return {
       index,
-      tone,
-      solid: boundaryRuns(result.shape),
-      // Only when the slope has anywhere to be, so a step on ground that
-      // already matched it is not drawn twice over.
-      dashed:
-        result.slope.length > 0
-          ? boundaryRuns([...result.shape, ...result.slope])
-          : [],
-      asDrawn: false,
+      label: stepLabel(step),
+      corners: built ? [...result.shape, ...result.slope] : null,
+      drawn: drawnRuns(step),
     };
   });
 }
 
-const UP_HEX = 0x3b82f6;
-const GREY_HEX = 0xa3a3a3;
-const SELECTED_HEX = 0xfbbf24;
+/** The pieces of one step's overlay, as flat `x, y, z` runs in map elmos:
+ *  triangles for the faces and pairs of points for the lines. */
+export interface OverlayMesh {
+  capped: boolean;
+  cells: number;
+  upFaces: number[];
+  upWire: number[];
+  downFaces: number[];
+  downWire: number[];
+  grid: number[];
+}
 
-/** How far above the ground a line is held, in elmos, so it is not buried in
- *  it. */
-const LIFT = 1.5;
-/** A dash and the gap after it, in elmos. */
-const DASH = 10;
-const GAP = 7;
+/**
+ * The overlay for the corners a step changed, as `M.mesh` in the widget builds
+ * it.
+ *
+ * Every 8 elmo cell with a changed corner is a face at the heights the ground is
+ * left at, green when the cell is raised on average and red when it is dug. A
+ * cell that moves less than half an elmo on average has no face and no wire.
+ * The wire and the grid on the ground go along the cell edges that lie on a 16
+ * elmo line, and along the outer edge of the whole area, so a shared edge is
+ * drawn once.
+ *
+ * `heightAt` is the ground now and `baseAt` the ground before any step.
+ */
+export function overlayMesh(
+  corners: readonly Point[],
+  heightAt: (x: number, z: number) => number,
+  baseAt: (x: number, z: number) => number,
+): OverlayMesh {
+  const out: OverlayMesh = {
+    capped: false,
+    cells: 0,
+    upFaces: [],
+    upWire: [],
+    downFaces: [],
+    downWire: [],
+    grid: [],
+  };
+  const key = (x: number, z: number) =>
+    `${Math.round(x / SQUARE_SIZE)},${Math.round(z / SQUARE_SIZE)}`;
+  const changed = new Set<string>();
+  for (const p of corners) changed.add(key(p.x, p.z));
+  const cells = new Map<string, Point>();
+  for (const p of corners) {
+    for (const dx of [-SQUARE_SIZE, 0]) {
+      for (const dz of [-SQUARE_SIZE, 0]) {
+        const cell = { x: p.x + dx, z: p.z + dz };
+        cells.set(key(cell.x, cell.z), cell);
+      }
+    }
+  }
+  out.cells = cells.size;
+  if (cells.size > CELL_LIMIT) {
+    out.capped = true;
+    return out;
+  }
+  const top = (x: number, z: number) =>
+    changed.has(key(x, z)) ? heightAt(x, z) : baseAt(x, z);
+  const has = (cx: number, cz: number) => cells.has(key(cx, cz));
+
+  for (const { x, z } of cells.values()) {
+    const at = [
+      [x, z],
+      [x + SQUARE_SIZE, z],
+      [x, z + SQUARE_SIZE],
+      [x + SQUARE_SIZE, z + SQUARE_SIZE],
+    ];
+    const fx = at.map(([cx, cz]) => top(cx, cz));
+    const gx = at.map(([cx, cz]) => baseAt(cx, cz));
+    let mean = 0;
+    for (let i = 0; i < 4; i++) mean += (fx[i] - gx[i]) / 4;
+    const up = mean >= 0;
+    const shown = Math.abs(mean) >= 0.5;
+    if (shown) {
+      const faces = up ? out.upFaces : out.downFaces;
+      for (const i of [0, 1, 2, 1, 3, 2]) faces.push(at[i][0], fx[i], at[i][1]);
+    }
+    const wire = up ? out.upWire : out.downWire;
+    // A cell's top and left edges are lines when they lie on a 16 elmo line or
+    // have no cell beyond them. Its bottom and right edges only when there is no
+    // cell beyond.
+    const edge = (a: number, b: number, onLine: boolean, beyond: boolean) => {
+      if (!onLine && beyond) return;
+      if (shown) {
+        wire.push(at[a][0], fx[a], at[a][1], at[b][0], fx[b], at[b][1]);
+      }
+      out.grid.push(
+        at[a][0],
+        gx[a] + GROUND_LIFT,
+        at[a][1],
+        at[b][0],
+        gx[b] + GROUND_LIFT,
+        at[b][1],
+      );
+    };
+    edge(0, 1, z % GRID === 0, has(x, z - SQUARE_SIZE));
+    edge(0, 2, x % GRID === 0, has(x - SQUARE_SIZE, z));
+    if (!has(x, z + SQUARE_SIZE)) edge(2, 3, false, false);
+    if (!has(x + SQUARE_SIZE, z)) edge(1, 3, false, false);
+  }
+  return out;
+}
 
 export interface TerrainLayer {
-  /** Draw these marks, with one highlighted, replacing what was drawn. `dim`
-   *  draws them faintly, for ground that is not being changed. */
+  /** Draw these marks, with one highlighted, replacing what was drawn before.
+   *  `dim` draws them faintly, for steps that are not changing the ground. */
   draw: (
     marks: readonly TerrainMark[],
     selected: number | null,
@@ -188,144 +246,201 @@ export interface TerrainLayer {
   dispose: () => void;
 }
 
+/** A height written on a transparent card: white with a dark shadow. */
+function labelSprite(text: string): THREE.Sprite {
+  const canvas = document.createElement("canvas");
+  canvas.width = 256;
+  canvas.height = 64;
+  const ctx = canvas.getContext("2d");
+  if (ctx) {
+    ctx.font = "bold 40px sans-serif";
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.shadowColor = "rgba(0, 0, 0, 0.95)";
+    ctx.shadowBlur = 6;
+    ctx.shadowOffsetX = 2;
+    ctx.shadowOffsetY = 2;
+    ctx.fillStyle = "#ffffff";
+    ctx.fillText(text, 128, 32);
+  }
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.colorSpace = THREE.SRGBColorSpace;
+  const sprite = new THREE.Sprite(
+    new THREE.SpriteMaterial({
+      map: texture,
+      transparent: true,
+      depthTest: false,
+    }),
+  );
+  sprite.renderOrder = 3;
+  return sprite;
+}
+
 export function createTerrainLayer(deps: {
   handle: MapScene3D;
   worldWidth: number;
   worldHeight: number;
-  /** The ground's height in elmos at a map position, as it stands now. */
-  groundAt: () => (pos: Point) => number;
+  /** The ground the steps are on, as it stands now. */
+  relief: () => Relief | null;
 }): TerrainLayer {
   const { handle } = deps;
   const root = new THREE.Group();
   handle.scene.add(root);
+  const owned: { dispose(): void }[] = [];
 
-  /** One line, held to the ground a point every 8 elmos. Returns positions and
-   *  how far along each is, in scene units, for the dashes. */
-  const drape = (
-    run: readonly Point[],
-    groundAt: (pos: Point) => number,
-    positions: number[],
-    distances: number[],
-  ) => {
-    let along = 0;
-    let last: THREE.Vector3 | null = null;
-    const at = (p: Point) => {
+  const clear = () => {
+    for (const child of [...root.children]) root.remove(child);
+    for (const one of owned) one.dispose();
+    owned.length = 0;
+  };
+
+  /** Map elmos with a height to scene units. */
+  const toScene = (flat: readonly number[]): Float32Array => {
+    const out = new Float32Array(flat.length);
+    for (let i = 0; i < flat.length; i += 3) {
       const s = worldToScene(
-        p,
+        { x: flat[i], z: flat[i + 2] },
         deps.worldWidth,
         deps.worldHeight,
         handle.scale,
       );
-      return new THREE.Vector3(s.x, (groundAt(p) + LIFT) * handle.scale, s.z);
-    };
-    for (let i = 0; i + 1 < run.length; i++) {
-      const a = run[i];
-      const b = run[i + 1];
-      const pieces = Math.max(
-        1,
-        Math.ceil(Math.hypot(b.x - a.x, b.z - a.z) / SQUARE_SIZE),
-      );
-      for (let k = 0; k < pieces; k++) {
-        const from =
-          last ??
-          at({
-            x: a.x + ((b.x - a.x) * k) / pieces,
-            z: a.z + ((b.z - a.z) * k) / pieces,
-          });
-        const to = at({
-          x: a.x + ((b.x - a.x) * (k + 1)) / pieces,
-          z: a.z + ((b.z - a.z) * (k + 1)) / pieces,
-        });
-        positions.push(from.x, from.y, from.z, to.x, to.y, to.z);
-        distances.push(along);
-        along += from.distanceTo(to);
-        distances.push(along);
-        last = to;
-      }
+      out[i] = s.x;
+      out[i + 1] = flat[i + 1] * handle.scale;
+      out[i + 2] = s.z;
     }
+    return out;
   };
 
-  const lines = (
-    runs: readonly (readonly Point[])[],
-    material: THREE.LineBasicMaterial | THREE.LineDashedMaterial,
-    groundAt: (pos: Point) => number,
-    lift: number,
-  ): THREE.LineSegments | null => {
-    const positions: number[] = [];
-    const distances: number[] = [];
-    for (const run of runs) drape(run, groundAt, positions, distances);
-    if (positions.length === 0) return null;
-    if (lift !== 0) {
-      for (let i = 1; i < positions.length; i += 3) {
-        positions[i] += lift * handle.scale;
-      }
-    }
+  const add = (
+    flat: readonly number[],
+    kind: "faces" | "lines",
+    color: number,
+    alpha: number,
+    depthTest: boolean,
+  ) => {
+    if (flat.length === 0) return;
     const geometry = new THREE.BufferGeometry();
     geometry.setAttribute(
       "position",
-      new THREE.Float32BufferAttribute(positions, 3),
+      new THREE.BufferAttribute(toScene(flat), 3),
     );
-    geometry.setAttribute(
-      "lineDistance",
-      new THREE.Float32BufferAttribute(distances, 1),
-    );
-    const object = new THREE.LineSegments(geometry, material);
-    object.renderOrder = 2;
-    return object;
-  };
-
-  const materials: (THREE.LineBasicMaterial | THREE.LineDashedMaterial)[] = [];
-  const clear = () => {
-    for (const child of [...root.children]) {
-      if (child instanceof THREE.LineSegments) child.geometry.dispose();
-      root.remove(child);
+    owned.push(geometry);
+    if (kind === "faces") {
+      const material = new THREE.MeshBasicMaterial({
+        color,
+        transparent: true,
+        opacity: alpha,
+        side: THREE.DoubleSide,
+        depthWrite: false,
+        depthTest,
+      });
+      owned.push(material);
+      const mesh = new THREE.Mesh(geometry, material);
+      mesh.renderOrder = 1;
+      root.add(mesh);
+      return;
     }
-    for (const m of materials) m.dispose();
-    materials.length = 0;
-  };
-  const solid = (hex: number, opacity: number) => {
-    const m = new THREE.LineBasicMaterial({
-      color: hex,
+    const material = new THREE.LineBasicMaterial({
+      color,
       transparent: true,
-      opacity,
-      depthTest: false,
+      opacity: alpha,
+      depthWrite: false,
+      depthTest,
     });
-    materials.push(m);
-    return m;
-  };
-  const dashed = (hex: number, opacity: number) => {
-    const m = new THREE.LineDashedMaterial({
-      color: hex,
-      transparent: true,
-      opacity,
-      depthTest: false,
-      dashSize: DASH * handle.scale,
-      gapSize: GAP * handle.scale,
-    });
-    materials.push(m);
-    return m;
+    owned.push(material);
+    const lines = new THREE.LineSegments(geometry, material);
+    lines.renderOrder = 2;
+    root.add(lines);
   };
 
   return {
     draw: (marks, selected, dim) => {
       clear();
-      const groundAt = deps.groundAt();
+      const relief = deps.relief();
+      if (!relief) {
+        handle.render();
+        return;
+      }
+      const fade = dim ? 0.4 : 1;
       for (const mark of marks) {
         const chosen = mark.index === selected;
-        const hex = chosen
-          ? SELECTED_HEX
-          : mark.tone === "up"
-            ? UP_HEX
-            : GREY_HEX;
-        const opacity = chosen ? 1 : dim ? 0.5 : mark.asDrawn ? 0.6 : 0.9;
-        const add = (object: THREE.Object3D | null) => {
-          if (object) root.add(object);
-        };
-        add(lines(mark.solid, solid(hex, opacity), groundAt, 0));
-        // A second line a little higher, so the selected outline is heavier
-        // than a hairline lines can only be.
-        if (chosen) add(lines(mark.solid, solid(hex, opacity), groundAt, 0.8));
-        add(lines(mark.dashed, dashed(hex, opacity * 0.85), groundAt, 0));
+        if (mark.corners) {
+          const mesh = overlayMesh(
+            mark.corners,
+            (x, z) => relief.heightAt(x, z),
+            (x, z) => relief.baseAt(x, z),
+          );
+          const face = (chosen ? SELECTED_FACE_ALPHA : FACE_ALPHA) * fade;
+          const wire = (a: number) => (chosen ? 1 : a) * fade;
+          add(mesh.upFaces, "faces", RAISE, face, true);
+          add(mesh.downFaces, "faces", DIG, face, false);
+          add(
+            mesh.upWire,
+            "lines",
+            WIRE_RAISE.color,
+            wire(WIRE_RAISE.alpha),
+            true,
+          );
+          add(
+            mesh.downWire,
+            "lines",
+            WIRE_DIG.color,
+            wire(WIRE_DIG.alpha),
+            false,
+          );
+          add(
+            mesh.grid,
+            "lines",
+            GROUND_GRID.color,
+            GROUND_GRID.alpha * fade,
+            true,
+          );
+        } else {
+          // Not on the ground: the step as drawn, as thin lines on the ground.
+          const flat: number[] = [];
+          for (const run of mark.drawn) {
+            for (let i = 0; i + 1 < run.length; i++) {
+              for (const p of [run[i], run[i + 1]]) {
+                flat.push(p.x, relief.heightAt(p.x, p.z) + GROUND_LIFT, p.z);
+              }
+            }
+          }
+          add(
+            flat,
+            "lines",
+            GROUND_GRID.color,
+            chosen ? 1 : GROUND_GRID.alpha * fade,
+            false,
+          );
+        }
+        const list = mark.corners ?? mark.drawn[0] ?? [];
+        if (mark.label && list.length > 0) {
+          let sumX = 0;
+          let sumZ = 0;
+          for (const p of list) {
+            sumX += p.x;
+            sumZ += p.z;
+          }
+          const centre = { x: sumX / list.length, z: sumZ / list.length };
+          const sprite = labelSprite(mark.label);
+          const s = worldToScene(
+            centre,
+            deps.worldWidth,
+            deps.worldHeight,
+            handle.scale,
+          );
+          const top = Math.max(
+            relief.heightAt(centre.x, centre.z),
+            relief.baseAt(centre.x, centre.z),
+          );
+          sprite.position.set(s.x, (top + 14) * handle.scale, s.z);
+          sprite.scale.set(64 * handle.scale, 16 * handle.scale, 1);
+          const material = sprite.material;
+          material.opacity = fade;
+          owned.push(material);
+          if (material.map) owned.push(material.map);
+          root.add(sprite);
+        }
       }
       handle.render();
     },

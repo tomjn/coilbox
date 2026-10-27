@@ -142,6 +142,21 @@ export class Relief {
     return this.fieldValue;
   }
 
+  /** A corner's height before any step, by its position on the map in elmos,
+   *  clamped to the map. */
+  baseAt(x: number, z: number): number {
+    const c = Math.min(this.width - 1, Math.max(0, Math.round(x / SQUARE)));
+    const r = Math.min(this.height - 1, Math.max(0, Math.round(z / SQUARE)));
+    return this.source.at(r * this.width + c);
+  }
+
+  /** A corner's height now, by its position on the map in elmos. */
+  heightAt(x: number, z: number): number {
+    const c = Math.min(this.width - 1, Math.max(0, Math.round(x / SQUARE)));
+    const r = Math.min(this.height - 1, Math.max(0, Math.round(z / SQUARE)));
+    return this.heights[r * this.width + c];
+  }
+
   /** The ground a verdict is worked out on, as the heights stand now. A new
    *  object each time, so a memo keyed on it notices the change. */
   ground(): Ground {

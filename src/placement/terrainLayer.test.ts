@@ -2,48 +2,145 @@ import { describe, expect, it } from "vitest";
 
 import type { TerrainStep } from "@/blueprint/model";
 import { terraform } from "@/blueprint/terraform";
-import { boundaryRuns, drawnRuns, terrainMarks } from "./terrainLayer";
+import {
+  CELL_LIMIT,
+  drawnRuns,
+  overlayMesh,
+  stepLabel,
+  terrainMarks,
+} from "./terrainLayer";
 
-const square = (x: number, z: number, n: number) => {
-  const out = [];
-  for (let i = 0; i < n; i++) {
-    for (let j = 0; j < n; j++) out.push({ x: x + i * 8, z: z + j * 8 });
-  }
-  return out;
+const wall: TerrainStep = {
+  kind: "raise",
+  shape: "wall",
+  points: [
+    { x: -64, z: 0 },
+    { x: 64, z: 0 },
+  ],
+  height: 60,
+  before: 0,
+};
+const trench: TerrainStep = { ...wall, height: -30 };
+const placement = { at: { x: 512, z: 512 }, quarters: 0 };
+const flat = {
+  width: 129,
+  height: 129,
+  heights: new Float32Array(129 * 129),
 };
 
-const length = (run: { x: number; z: number }[]) =>
-  Math.hypot(run[1].x - run[0].x, run[1].z - run[0].z);
+/** The overlay of one step on flat ground, read off the finished heights. */
+function overlayOf(step: TerrainStep) {
+  const done = terraform(flat, [step], placement, []);
+  const [mark] = terrainMarks([step], placement, done.steps);
+  const heightAt = (x: number, z: number) =>
+    done.ground.heights[(z / 8) * 129 + x / 8];
+  return {
+    mark,
+    mesh: overlayMesh(mark.corners ?? [], heightAt, () => 0),
+  };
+}
 
-describe("boundaryRuns", () => {
-  it("goes round the squares the corners own", () => {
-    const runs = boundaryRuns(square(100 * 8, 100 * 8, 3));
-    // Four sides, each one run of 24 elmos and not three runs of 8.
-    expect(runs).toHaveLength(4);
-    for (const run of runs) expect(length(run)).toBe(24);
-    const xs = runs.flatMap((run) => run.map((p) => p.x));
-    expect(Math.min(...xs)).toBe(796);
-    expect(Math.max(...xs)).toBe(820);
+/** The heights of every vertex in a flat `x, y, z` run. */
+const ys = (run: number[]) => run.filter((_, i) => i % 3 === 1);
+
+describe("stepLabel", () => {
+  it("writes a raise and a dig with their sign", () => {
+    expect(stepLabel(wall)).toBe("+60");
+    expect(stepLabel(trench)).toBe("-30");
   });
 
-  it("leaves a corner out of the line where its neighbours are", () => {
-    // An L of three corners has six edges, not eight.
-    const runs = boundaryRuns([
-      { x: 800, z: 800 },
-      { x: 808, z: 800 },
-      { x: 800, z: 808 },
-    ]);
-    expect(runs).toHaveLength(6);
+  it("writes a ramp as its two ends", () => {
+    expect(
+      stepLabel({
+        kind: "ramp",
+        shape: "wall",
+        points: [
+          { x: 0, z: 0 },
+          { x: 64, z: 0 },
+        ],
+        heights: [0, 64],
+        width: 32,
+        before: 0,
+      }),
+    ).toBe("ramp 0 to +64");
   });
 
-  it("is nothing for nothing", () => {
-    expect(boundaryRuns([])).toEqual([]);
+  it("says nothing for a smooth", () => {
+    expect(stepLabel({ ...wall, kind: "smooth" })).toBe("");
+  });
+});
+
+describe("overlayMesh", () => {
+  it("makes a raised wall green faces, wire on top and down the slope", () => {
+    const { mesh } = overlayOf(wall);
+    expect(mesh.upFaces.length).toBeGreaterThan(0);
+    expect(mesh.downFaces).toEqual([]);
+    expect(mesh.upWire.length).toBeGreaterThan(0);
+    // The faces reach the wall's top and come down to the ground's own height.
+    expect(Math.max(...ys(mesh.upFaces))).toBe(60);
+    expect(Math.min(...ys(mesh.upFaces))).toBeLessThan(60);
+  });
+
+  it("makes a trench red", () => {
+    const { mesh } = overlayOf(trench);
+    expect(mesh.downFaces.length).toBeGreaterThan(0);
+    expect(mesh.upFaces).toEqual([]);
+    expect(Math.min(...ys(mesh.downFaces))).toBe(-30);
+  });
+
+  it("puts the ground grid on the ground, lifted a little, over the whole area", () => {
+    const { mesh } = overlayOf(wall);
+    for (const y of ys(mesh.grid)) expect(y).toBe(1);
+    // Slopes included: the grid reaches past the wall's own 32 elmo top.
+    const zs = mesh.grid.filter((_, i) => i % 3 === 2);
+    expect(Math.max(...zs) - Math.min(...zs)).toBeGreaterThan(32);
+  });
+
+  it("draws a shared cell edge once", () => {
+    // Two corners side by side own six cells, not eight.
+    const mesh = overlayMesh(
+      [
+        { x: 800, z: 800 },
+        { x: 808, z: 800 },
+      ],
+      () => 10,
+      () => 0,
+    );
+    expect(mesh.cells).toBe(6);
+    // Two triangles of three vertices of three numbers a cell.
+    expect(mesh.upFaces.length / 18).toBe(6);
+  });
+
+  it("draws no face where the ground moved under half an elmo", () => {
+    const mesh = overlayMesh(
+      [{ x: 800, z: 800 }],
+      () => 0.2,
+      () => 0,
+    );
+    expect(mesh.upFaces).toEqual([]);
+    expect(mesh.downFaces).toEqual([]);
+    expect(mesh.grid.length).toBeGreaterThan(0);
+  });
+
+  it("is not drawn for a step with more cells than the widget draws", () => {
+    const corners = [];
+    const side = Math.ceil(Math.sqrt(CELL_LIMIT)) + 2;
+    for (let x = 0; x < side; x++) {
+      for (let z = 0; z < side; z++) corners.push({ x: x * 8, z: z * 8 });
+    }
+    const mesh = overlayMesh(
+      corners,
+      () => 10,
+      () => 0,
+    );
+    expect(mesh.capped).toBe(true);
+    expect(mesh.upFaces).toEqual([]);
   });
 });
 
 describe("drawnRuns", () => {
   it("closes an area", () => {
-    const step: TerrainStep = {
+    const [run] = drawnRuns({
       kind: "level",
       shape: "area",
       points: [
@@ -53,24 +150,13 @@ describe("drawnRuns", () => {
       ],
       height: 10,
       before: 0,
-    };
-    const [run] = drawnRuns(step);
+    });
     expect(run).toHaveLength(4);
     expect(run[3]).toEqual(run[0]);
   });
 
   it("leaves a wall open", () => {
-    const [run] = drawnRuns({
-      kind: "raise",
-      shape: "wall",
-      points: [
-        { x: 0, z: 0 },
-        { x: 64, z: 0 },
-      ],
-      height: 10,
-      before: 0,
-    });
-    expect(run).toHaveLength(2);
+    expect(drawnRuns(wall)[0]).toHaveLength(2);
   });
 
   it("draws a ramp as the band it covers", () => {
@@ -92,49 +178,16 @@ describe("drawnRuns", () => {
 });
 
 describe("terrainMarks", () => {
-  const wall: TerrainStep = {
-    kind: "raise",
-    shape: "wall",
-    points: [
-      { x: -64, z: 0 },
-      { x: 64, z: 0 },
-    ],
-    height: 60,
-    before: 0,
-  };
-  const trench: TerrainStep = { ...wall, height: -30 };
-  const placement = { at: { x: 512, z: 512 }, quarters: 0 };
-  const flat = {
-    width: 129,
-    height: 129,
-    heights: new Float32Array(129 * 129),
-  };
-
-  it("outlines the ground a step took and dashes the edge of its slope", () => {
-    const { steps } = terraform(flat, [wall], placement, []);
-    const [mark] = terrainMarks([wall], placement, steps);
-    expect(mark.asDrawn).toBe(false);
-    expect(mark.tone).toBe("up");
-    expect(mark.solid.length).toBeGreaterThan(0);
-    expect(mark.dashed.length).toBeGreaterThan(0);
-    // The dashed edge is outside the solid one: a slope is ground the step took
-    // beyond its own.
-    const reach = (runs: { x: number; z: number }[][]) =>
-      Math.max(...runs.flatMap((run) => run.map((p) => p.z))) -
-      Math.min(...runs.flatMap((run) => run.map((p) => p.z)));
-    expect(reach(mark.dashed)).toBeGreaterThan(reach(mark.solid));
-  });
-
-  it("is grey for ground dug", () => {
-    const { steps } = terraform(flat, [trench], placement, []);
-    expect(terrainMarks([trench], placement, steps)[0].tone).toBe("down");
+  it("gives a step the ground took its corners, slope included", () => {
+    const { mark } = overlayOf(wall);
+    expect(mark.corners?.length).toBeGreaterThan(0);
+    expect(mark.label).toBe("+60");
   });
 
   it("draws the step as drawn when the steps are not applied", () => {
     const [mark] = terrainMarks([wall], placement, null);
-    expect(mark.asDrawn).toBe(true);
-    expect(mark.dashed).toEqual([]);
-    expect(mark.solid[0]).toEqual([
+    expect(mark.corners).toBeNull();
+    expect(mark.drawn[0]).toEqual([
       { x: 448, z: 512 },
       { x: 576, z: 512 },
     ]);
@@ -154,6 +207,6 @@ describe("terrainMarks", () => {
     };
     const { steps } = terraform(flat, [huge], placement, []);
     expect(steps[0].outcome).not.toBe("built");
-    expect(terrainMarks([huge], placement, steps)[0].asDrawn).toBe(true);
+    expect(terrainMarks([huge], placement, steps)[0].corners).toBeNull();
   });
 });
