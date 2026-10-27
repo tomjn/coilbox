@@ -99,6 +99,33 @@ export function terrainEnabled(
   return override ?? detected;
 }
 
+/**
+ * A layout as it is shown and its buildings are stood on (issue #4814). With
+ * the switch off it is a flat blueprint: its steps are left out. Only what is
+ * shown changes. The saved layout keeps its steps, so turning the switch back
+ * on brings them back with nothing lost. Unknown is not off, so a game whose
+ * units have not been read yet shows them.
+ */
+export function shownLayout<T extends { terrain?: readonly unknown[] }>(
+  layout: T,
+  enabled: boolean | undefined,
+): T {
+  if (enabled !== false || !layout.terrain) return layout;
+  return { ...layout, terrain: undefined };
+}
+
+/**
+ * Whether to say a layout's terrain changes are ones the game cannot make
+ * (issue #4814). Only when the game cannot: a game the player switched off can
+ * make them, and its blueprints are shown flat with nothing said.
+ */
+export function cannotMakeTerrain(
+  detected: boolean | undefined,
+  enabled: boolean | undefined,
+): boolean {
+  return detected === false && enabled === false;
+}
+
 export interface TerrainChanges {
   /** What the game's units say, or undefined until they have been read. */
   detected: boolean | undefined;

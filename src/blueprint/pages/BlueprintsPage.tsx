@@ -67,7 +67,11 @@ import {
   untitled,
 } from "../library";
 import { blueprintRoute, saveBlueprint, useBlueprintLibrary } from "../store";
-import { useTerrainChanges } from "../terrainSwitch";
+import {
+  cannotMakeTerrain,
+  shownLayout,
+  useTerrainChanges,
+} from "../terrainSwitch";
 import { terrainRefusal } from "../units";
 import { useWidgetFiles } from "../useWidgetFiles";
 import { BlueprintCardMenu } from "./components/BlueprintCardMenu";
@@ -270,29 +274,60 @@ export default function BlueprintsPage() {
  * else (issue #1477). A menu button inside the anchor would be a link that
  * sometimes is not one.
  */
-function BlueprintCard({
-  record,
-  installed,
-  taken,
-}: {
+function BlueprintCard(props: BlueprintCardProps) {
+  // Only a card with terrain steps reads its game's units, for the switch.
+  return props.record.layout.terrain?.length ? (
+    <TerrainCard {...props} />
+  ) : (
+    <CardBody
+      {...props}
+      terrain={{ enabled: undefined, detected: undefined }}
+    />
+  );
+}
+
+interface BlueprintCardProps {
   record: StoredBlueprint;
   /** False when this layout's game is not on this machine, which is why its
    *  buildings would be drawn as boxes if it were opened. */
   installed: boolean;
   /** Every name in the library, for the copy the menu makes. */
   taken: string[];
+}
+
+/** A card with terrain steps, which reads its game's Terrain changes switch:
+ *  off, the card shows a flat blueprint (issue #4814). */
+function TerrainCard(props: BlueprintCardProps) {
+  const game = recordGameName(props.record);
+  const { units, archive } = useGameUnits(
+    game,
+    props.record.layout.game?.shortname,
+  );
+  const { enabled, detected } = useTerrainChanges(archive, units);
+  return <CardBody {...props} terrain={{ enabled, detected }} />;
+}
+
+function CardBody({
+  record,
+  installed,
+  taken,
+  terrain: terrainSwitch,
+}: BlueprintCardProps & {
+  terrain: { enabled: boolean | undefined; detected: boolean | undefined };
 }) {
   const { t } = useLingui();
-  const buildings = record.layout.buildings.length;
+  const layout = shownLayout(record.layout, terrainSwitch.enabled);
+  const buildings = layout.buildings.length;
   const game = recordGameName(record);
-  const terrain = record.layout.terrain?.length ?? 0;
+  const terrain = layout.terrain?.length ?? 0;
   const buildingCount = countLine(buildings, terrain);
+  const hidden = record.layout.terrain?.length ?? 0;
 
   return (
     <div className="relative flex h-full flex-col gap-2 rounded-lg border border-border/50 bg-card p-3 transition-colors hover:border-primary/40 hover:bg-accent/50 focus-within:border-primary/40">
       <div className="flex h-24 items-center justify-center">
-        {buildings > 0 ? (
-          <LayoutThumb layout={record.layout} />
+        {buildings > 0 || terrain > 0 ? (
+          <LayoutThumb layout={layout} />
         ) : (
           <Blocks className="size-6 text-muted-foreground" />
         )}
@@ -318,13 +353,10 @@ function BlueprintCard({
       {/* Where it came from, so a layout out of somebody's collection does not
           look identical to one you drew (issues #1313, #1473). */}
       {record.source && <SourceLine source={record.source} />}
-      {terrain > 0 && (
-        <TerrainRefusalLine
-          game={game}
-          shortname={record.layout.game?.shortname}
-          terrain={terrain}
-          buildings={buildings}
-        />
+      {cannotMakeTerrain(terrainSwitch.detected, terrainSwitch.enabled) && (
+        <span className="text-xs text-amber-600 dark:text-amber-400">
+          {terrainRefusal(hidden, buildings)}
+        </span>
       )}
       {!installed && (
         <span className="text-xs text-amber-600 dark:text-amber-400">
@@ -338,32 +370,6 @@ function BlueprintCard({
         <BlueprintCardMenu record={record} taken={taken} />
       </div>
     </div>
-  );
-}
-
-/**
- * How many terrain changes this card's game cannot make, said in the same
- * amber as a game that is not installed (issue #4792). Its own component so a
- * card with no terrain steps reads no unit list for it.
- */
-function TerrainRefusalLine({
-  game,
-  shortname,
-  terrain,
-  buildings,
-}: {
-  game: string;
-  shortname?: string;
-  terrain: number;
-  buildings: number;
-}) {
-  const { units, archive } = useGameUnits(game, shortname);
-  const { enabled } = useTerrainChanges(archive, units);
-  if (enabled !== false) return null;
-  return (
-    <span className="text-xs text-amber-600 dark:text-amber-400">
-      {terrainRefusal(terrain, buildings)}
-    </span>
   );
 }
 

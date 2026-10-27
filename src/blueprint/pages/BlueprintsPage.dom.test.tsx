@@ -153,13 +153,18 @@ describe("the Terrain changes switch on the Blueprints page", () => {
     ).toBeTruthy();
   });
 
-  it("can be turned off for Zero-K, which then counts the changes it cannot make", () => {
+  // Off is a choice rather than something the game cannot do, so the card is
+  // a flat blueprint with nothing said, and on again brings the steps back
+  // (issue #4814).
+  it("shows a Zero-K blueprint flat when turned off, and its steps again when on", () => {
     library.records = [record("a", "Zero-K", 2)];
     page();
+    expect(screen.getByText("2 buildings, 2 terrain changes")).toBeTruthy();
     fireEvent.click(switchEl());
-    expect(
-      screen.getByText(/2 terrain changes this game cannot make/),
-    ).toBeTruthy();
+    expect(screen.queryByText(/cannot make/)).toBeNull();
+    expect(screen.getByText("2 buildings")).toBeTruthy();
+    fireEvent.click(switchEl());
+    expect(screen.getByText("2 buildings, 2 terrain changes")).toBeTruthy();
   });
 
   it("is not shown while every game is listed and there is more than one", () => {

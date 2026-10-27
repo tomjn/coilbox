@@ -5396,11 +5396,6 @@ msgstr "{place} / {total}。"
 msgid "{placeable} of {total} can be placed in it."
 msgstr "其中 {total} 个中有 {placeable} 个可以放置。"
 
-#: src/placement/BlueprintEditor.tsx
-#, fuzzy
-msgid "{placed, plural, one {# building} other {# buildings}}"
-msgstr "{placed, plural, other {# 个建筑}}"
-
 #: src/scenario/pages/components/ScenarioMapBars.tsx
 #, fuzzy
 msgid "{placed, plural, one {# unit} other {# units}}"
@@ -11278,6 +11273,10 @@ msgstr "归档"
 msgid "Archives ({archiveCount})"
 msgstr "归档（{archiveCount}）"
 
+#: src/placement/TerrainControls.tsx
+msgid "Area"
+msgstr ""
+
 #: src/lego/pages/components/AnimationPanel.tsx
 #, fuzzy
 msgid "Arguments"
@@ -13798,6 +13797,7 @@ msgstr "不会伤害自己的单位"
 #: src/multiplayer/invite/InviteLinkHost.tsx
 #: src/multiplayer/LobbyStatusButton.tsx
 #: src/multiplayer/RelayIndicator.tsx
+#: src/placement/TerrainControls.tsx
 #: src/play/pages/components/GameOptionsPanel.tsx
 #: src/play/pages/SavegamesPage.tsx
 #: src/play/PresetLibraryToolbar.tsx
@@ -15211,6 +15211,10 @@ msgstr "关闭此房间？所有人都会被移出，房间也会从对局列表
 #, fuzzy
 msgid "Close this battle? Everyone will be removed, and the room it is in will stop hosting and give its port back."
 msgstr "关闭此房间？所有人都会被移出，所在的房间会停止托管并释放其端口。"
+
+#: src/placement/TerrainControls.tsx
+msgid "Close tool"
+msgstr ""
 
 #: src/content/unitFieldNotes.ts
 #, fuzzy
@@ -18275,6 +18279,7 @@ msgstr "连射中每发之间的间隔"
 #: src/lego/pages/components/LoadoutPicker.tsx
 #: src/lego/pages/components/PosesPopover.tsx
 #: src/placement/SurfaceBars.tsx
+#: src/placement/TerrainControls.tsx
 #: src/play/pages/SavegamesPage.tsx
 #: src/scenario/pages/components/DialoguePanel.tsx
 #: src/scenario/pages/components/ObjectivePanel.tsx
@@ -19119,6 +19124,7 @@ msgstr "压倒性"
 #: src/i18n/frameStrings.ts
 #: src/lobby-servers/pages/SettingsSection.tsx
 #: src/placement/SurfaceBars.tsx
+#: src/placement/TerrainControls.tsx
 #: src/scenario/pages/components/ScenarioMapBars.tsx
 #: src/workshop/pages/components/ExplosionGeneratorEditor.tsx
 #, fuzzy
@@ -19512,6 +19518,10 @@ msgstr "在地图上拖动以绘制盟友 {activeLetter} 的区域。拖动区�
 #, fuzzy
 msgid "drag one of its points to move it"
 msgstr "拖动其中一个点以移动"
+
+#: src/placement/BlueprintEditor.tsx
+msgid "Drag the change to move it, or a corner to reshape it. Click a side to add a corner, right click a corner to remove it."
+msgstr ""
 
 #: src/scenario/pages/components/modes.tsx
 #, fuzzy
@@ -23787,6 +23797,7 @@ msgstr "高度"
 #: src/lego/pages/components/ShapeFields.tsx
 #: src/lego/pages/components/SkeletonTargetFields.tsx
 #: src/mapconv/pages/DecompilePage.tsx
+#: src/placement/TerrainControls.tsx
 #: src/play/pages/components/MapOverlay.tsx
 #, fuzzy
 msgid "Height"
@@ -24038,6 +24049,10 @@ msgstr "后高"
 #, fuzzy
 msgid "High at front"
 msgstr "前高"
+
+#: src/placement/TerrainControls.tsx
+msgid "High end"
+msgstr ""
 
 #: src/content/unitFieldNotes.ts
 #, fuzzy
@@ -27197,6 +27212,10 @@ msgstr "释放一组单位：其单位原地不动并保持所有者，任务不
 msgid "Letting the engine find it"
 msgstr "正在让引擎查找"
 
+#: src/placement/TerrainControls.tsx
+msgid "Level"
+msgstr ""
+
 #: src/conquest/pages/components/ThreatLevelSelect.tsx
 #, fuzzy
 msgid "Level {lockedLevel}"
@@ -27211,6 +27230,14 @@ msgstr "等级 {lockedLevel} 已锁定。"
 #, fuzzy
 msgid "Level {n}"
 msgstr "等级 {n}"
+
+#: src/placement/TerrainControls.tsx
+msgid "Level area"
+msgstr ""
+
+#: src/placement/TerrainControls.tsx
+msgid "Level wall"
+msgstr ""
 
 #: src/content/index.ts
 #: src/content/pages/components/GameLibrarySummary.tsx
@@ -27964,6 +27991,7 @@ msgid "Lost, and it counted toward no rating"
 msgstr "失败，且不计入任何评分"
 
 #: src/lego/pages/components/ShapeFields.tsx
+#: src/placement/TerrainControls.tsx
 #, fuzzy
 msgid "Low end"
 msgstr "低端"
@@ -37000,16 +37028,33 @@ msgstr "半径 Z 必须大于 0。"
 msgid "Rainbow"
 msgstr "彩虹"
 
+#: src/placement/TerrainControls.tsx
+msgid "Raise"
+msgstr ""
+
+#: src/placement/TerrainControls.tsx
+msgid "Raise or level"
+msgstr ""
+
+#: src/placement/TerrainControls.tsx
+msgid "Raised area"
+msgstr ""
+
 #: src/content/unitFieldNotes.ts
 #, fuzzy
 msgid "Raised to 38 if set lower, the least that lets a 1x1 builder reach a 1x1 building."
 msgstr "低于 38 时会提升到 38，这是让 1x1 建造单位能够到 1x1 建筑的最小值。"
+
+#: src/placement/TerrainControls.tsx
+msgid "Raised wall"
+msgstr ""
 
 #: src/runlite/pages/components/NodeOverlays.tsx
 #, fuzzy
 msgid "raises tech ceiling · both sides"
 msgstr "提高科技上限 · 双方"
 
+#: src/placement/TerrainControls.tsx
 #: src/uberstress/pages/components/ReportDetail.tsx
 #: src/uberstress/pages/RunPage.tsx
 #: src/uberstress/pages/SettingsSection.tsx
@@ -43196,6 +43241,10 @@ msgstr "烟迹大小"
 msgid "Smoke trail update rate"
 msgstr "烟迹更新频率"
 
+#: src/placement/TerrainControls.tsx
+msgid "Smooth"
+msgstr ""
+
 #: src/mapconv/pages/components/AdvancedOptions.tsx
 #, fuzzy
 msgid "Smooth texture (-smooth)"
@@ -44148,6 +44197,10 @@ msgstr "稳定负载"
 msgid "Step"
 msgstr "步长"
 
+#: src/placement/TerrainControls.tsx
+msgid "step {number} of the build order"
+msgstr ""
+
 #: src/lego/pages/components/AnimationPanel.tsx
 #, fuzzy
 msgid "Step back one frame"
@@ -44903,12 +44956,21 @@ msgid "Terraform speed"
 msgstr "地形改造速度"
 
 #: src/lego/environment.ts
+#: src/placement/TerrainControls.tsx
 #, fuzzy
 msgid "Terrain"
 msgstr "地形"
 
 #: src/blueprint/pages/components/TerrainSwitch.tsx
 msgid "Terrain changes"
+msgstr ""
+
+#: src/placement/TerrainControls.tsx
+msgid "Terrain changes in this game"
+msgstr ""
+
+#: src/placement/TerrainControls.tsx
+msgid "Terrain tools"
 msgstr ""
 
 #: src/mapconv/pages/components/AdvancedOptions.tsx
@@ -52497,6 +52559,7 @@ msgid "walker"
 msgstr "步行"
 
 #: src/lego/pages/components/ShapeFields.tsx
+#: src/placement/TerrainControls.tsx
 #, fuzzy
 msgid "Wall"
 msgstr "壁厚"
@@ -53540,6 +53603,7 @@ msgid "width"
 msgstr "宽度"
 
 #: src/lego/pages/components/ShapeFields.tsx
+#: src/placement/TerrainControls.tsx
 #, fuzzy
 msgid "Width"
 msgstr "宽度"
@@ -54774,6 +54838,22 @@ msgstr "Z（elmo）"
 
 #: src/blueprint/pages/components/WidgetPanel.tsx
 msgid "Zero-K only loads widgets from your content folder from your second match, because it saves the setting that allows them when a game closes. The first match you play in Zero-K will not show the panel."
+msgstr ""
+
+#: src/placement/TerrainControls.tsx
+msgid "Zero-K refuses a ramp shorter than 64 or longer than 3,000 elmos, or narrower than 48 or wider than 1,600."
+msgstr ""
+
+#: src/placement/TerrainControls.tsx
+msgid "Zero-K refuses a terrain change of more than 2,500 points."
+msgstr ""
+
+#: src/placement/TerrainControls.tsx
+msgid "Zero-K refuses a wall that long. It allows 700 points, a point every 16 elmos."
+msgstr ""
+
+#: src/placement/TerrainControls.tsx
+msgid "Zero-K refuses an area wider or deeper than 2,000 elmos."
 msgstr ""
 
 #: src/i18n/frameStrings.ts
