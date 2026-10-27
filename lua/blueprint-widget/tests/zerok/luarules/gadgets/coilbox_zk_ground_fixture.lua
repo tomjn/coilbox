@@ -108,7 +108,9 @@ if gadgetHandler:IsSyncedCode() then
 			local cz = 16 * math.floor(Game.mapSizeZ / 32)
 			for n = 1, BUILDERS do
 				local bx, bz = cx - 1040, cz + (n - 2) * 32
-				local unitID = Spring.CreateUnit("gunshipcon", bx, Spring.GetGroundHeight(bx, bz), bz, "east", TEAM)
+				-- ground_only (#4804) uses walkers, which is what players build with
+			local def = MODE == "ground_only" and "cloakcon" or "gunshipcon"
+			local unitID = Spring.CreateUnit(def, bx, Spring.GetGroundHeight(bx, bz), bz, "east", TEAM)
 				Spring.SetUnitRulesParam(unitID, "coilbox_ground_builder", n)
 				builders[n] = unitID
 				Spring.Echo(string.format("GROUND fixture-builder n=%d id=%s", n, tostring(unitID)))
