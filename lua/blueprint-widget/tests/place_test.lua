@@ -299,6 +299,20 @@ check("cost adds every building's metal and energy", m == 210 and en == 1000, m 
 check("build time counts only what the builders can build, at their speed together", secs == 100 / 20, tostring(secs))
 local _, _, noTime = PLACE.cost({ buildings = { { defID = 20, def = SPLIT_SOLAR } } }, PLACE.capabilities({}))
 check("with no builder there is no build time", noTime == nil)
+do
+	local resolved = { buildings = { { defID = 20, def = SPLIT_SOLAR }, { defID = 22, def = SPLIT_LAB } } }
+	local first = twoCons.builders[1]
+	local withTerraform = { union = twoCons.union, builders = twoCons.builders, speed = twoCons.speed, terraformers = { first } }
+	local tm, te, ts = PLACE.cost(resolved, withTerraform, { metal = 100, work = 120 })
+	check("the terraform's metal adds to the cost", tm == 310 and te == 1000, tm .. " " .. te)
+	check("its time is its work over the build power of the builders that can terraform, added to the buildings'", ts == 100 / 20 + 120 / twoCons.speed[first], tostring(ts))
+	local nm, _, ns = PLACE.cost(resolved, twoCons, { metal = 100, work = 120 })
+	check("with no builder that can terraform the metal still counts and the time does not change", nm == 310 and ns == secs, tostring(ns))
+	local _, _, only = PLACE.cost({ buildings = {} }, withTerraform, { metal = 100, work = 120 })
+	check("terraform alone has a time too", only == 120 / twoCons.speed[first], tostring(only))
+	local _, _, none = PLACE.cost({ buildings = {} }, PLACE.capabilities({}), { metal = 100, work = 120 })
+	check("and none with no builder", none == nil)
+end
 PLACE.use(E)
 
 -- sides and morphs

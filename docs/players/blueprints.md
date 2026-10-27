@@ -133,7 +133,9 @@ In Zero-K your builders make each terrain change in the blueprint's order, and b
 
 When your selected builders can terraform and the blueprint has terrain changes, the placing panel has a Terrain row beside Builders, with On and Off. Off places the buildings only. The widget remembers your choice for each game.
 
-While you place it, each terrain change shows on the map as a see-through volume from the ground to the height it will leave, green for ground it raises and red for ground it digs, with a green wire grid on its top and sides and a cyan grid on the ground under it. A small white number says how much it changes the ground, for example +112 or level +24. The slopes Zero-K adds round a raised or dug area are not drawn yet. The preview shows only when the match can terraform and Terrain is On.
+While you place it, the ground the terrain changes leave shows on the map as a see-through surface over the ground, green where it rises and red where it is dug, with a green wire grid on it and a cyan grid on the ground under it. The surface includes the slopes Zero-K adds round a raised or dug area, and stops where a slope would reach a building. A small white number says how much each change moves the ground, for example +112 or level +24. A building that would stand on a slope is marked like a building the ground refuses. It is still ordered. The preview shows only when the match can terraform and Terrain is On, and the same preview shows for a plan.
+
+The cost under the blueprint's name adds the terraform. Its metal is the estimate Zero-K shows for the same terraform once you place it, and its time is the work over the build power of the selected builders that can terraform. The time is a little short of a real match, which also has builders walk to the work.
 
 - Heights in a blueprint are measured from the ground under the building the cursor holds, at the moment you click. A blueprint with only terrain changes is held by its origin.
 - Together gives every terrain change to every selected builder that can terraform. Split up gives each change to the nearest of them.

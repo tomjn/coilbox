@@ -18,7 +18,7 @@ function gadget:GetInfo()
 	}
 end
 
-local CASES = 14
+local CASES = 17
 -- Cases with more than one builder, which share the terraform and the turret.
 local BUILDERS = { [10] = 2, [13] = 2 }
 -- Lanes run east to west along the middle of the map, side by side, this far
@@ -60,6 +60,66 @@ if gadgetHandler:IsSyncedCode() then
 		end
 		return best
 	end
+	-- terraform units wait a couple of frames before their estimate is read, since
+	-- Zero-K sets it just after they are created
+	local pendingEstimate = {}
+
+	-- The widget's model of the ground (issue #4797). The probe widget sends each
+	-- blueprint it orders, laid as the widget's placing code laid it. The model
+	-- is worked out from the heightmap as it is then, before any of the
+	-- terraform has been built, and compared with the ground near the end.
+	local TERRAFORM = VFS.Include("LuaUI/coilbox_blueprints/terraform.lua", nil, VFS.RAW_FIRST)
+	local predicted = {}
+
+	function gadget:RecvLuaMsg(msg)
+		local case, body = msg:match("^coilbox_model (%d+) (.*)$")
+		if not case then
+			return
+		end
+		local data = loadstring("return " .. body)()
+		local env = {
+			heightAt = Spring.GetGroundHeight,
+			corners = { x = Game.mapSizeX / 8 + 1, z = Game.mapSizeZ / 8 + 1 },
+			structures = {},
+			costMult = tonumber((Spring.GetModOptions() or {}).terracostmult) or 1,
+		}
+		local session = TERRAFORM.session(env)
+		session.apply(data.steps, data.foot)
+		predicted[tonumber(case)] = session.changed()
+		Spring.Echo(string.format("FIXTURE model case=%s metal=%.4f work=%.4f changed=%d", case, session.metal, session.work, #predicted[tonumber(case)]))
+	end
+
+	-- Every corner the model changes against the game's ground, and every corner
+	-- in a box round them that the model leaves alone.
+	local function compare(case, list)
+		local byRow = {}
+		local minX, maxX, minZ, maxZ = math.huge, -math.huge, math.huge, -math.huge
+		local worst, bad = 0, 0
+		for _, c in ipairs(list) do
+			local row = byRow[c.z] or {}
+			byRow[c.z] = row
+			row[c.x] = true
+			minX, maxX, minZ, maxZ = math.min(minX, c.x), math.max(maxX, c.x), math.min(minZ, c.z), math.max(maxZ, c.z)
+			local game = Spring.GetGroundHeight(c.x, c.z)
+			local err = math.abs(game - c.h)
+			worst = math.max(worst, err)
+			if err > 0.05 then
+				bad = bad + 1
+				if bad <= 60 then
+					Spring.Echo(string.format("FIXTURE off case=%d x=%d z=%d model=%.3f game=%.3f orig=%.3f", case, c.x, c.z, c.h, game, Spring.GetGroundOrigHeight(c.x, c.z)))
+				end
+			end
+		end
+		local extra = 0
+		for x = minX - 24, maxX + 24, 8 do
+			for z = minZ - 24, maxZ + 24, 8 do
+				if not (byRow[z] and byRow[z][x]) and math.abs(Spring.GetGroundHeight(x, z) - Spring.GetGroundOrigHeight(x, z)) > 0.05 then
+					extra = extra + 1
+				end
+			end
+		end
+		Spring.Echo(string.format("FIXTURE compare case=%d changed=%d worst=%.4f off=%d unexpected=%d", case, #list, worst, bad, extra))
+	end
 
 	local function queue(unitID)
 		local commands = Spring.GetUnitCommands(unitID, -1) or {}
@@ -71,6 +131,9 @@ if gadgetHandler:IsSyncedCode() then
 	end
 
 	function gadget:UnitCreated(unitID, unitDefID, teamID, builderID)
+		if unitDefID == terraunitDefID then
+			pendingEstimate[unitID] = Spring.GetGameFrame() + 2
+		end
 		if unitDefID == terraunitDefID or unitDefID == turretDefID then
 			local x, y, z = Spring.GetUnitPosition(unitID)
 			Spring.Echo(string.format("FIXTURE created case=%d frame=%d unit=%s id=%d x=%.1f y=%.1f z=%.1f",
@@ -90,8 +153,10 @@ if gadgetHandler:IsSyncedCode() then
 	function gadget:UnitDestroyed(unitID, unitDefID)
 		if unitDefID == terraunitDefID then
 			local x, y, z = Spring.GetUnitPosition(unitID)
-			Spring.Echo(string.format("FIXTURE terraunit-gone case=%d frame=%d id=%d health=%.3f",
-				caseAt(x, z), Spring.GetGameFrame(), unitID, select(5, Spring.GetUnitHealth(unitID)) or -1))
+			Spring.Echo(string.format("FIXTURE terraunit-gone case=%d frame=%d id=%d health=%.3f estimate=%.4f spent=%.4f",
+				caseAt(x, z), Spring.GetGameFrame(), unitID, select(5, Spring.GetUnitHealth(unitID)) or -1,
+				Spring.GetUnitRulesParam(unitID, "terraform_estimate") or -1,
+				Spring.GetUnitRulesParam(unitID, "terraform_spent") or -1))
 		end
 	end
 
@@ -115,6 +180,30 @@ if gadgetHandler:IsSyncedCode() then
 	end
 
 	function gadget:GameFrame(frame)
+		if frame == 1 then
+			local t, b = UnitDefs[terraunitDefID], UnitDefNames.cloakcon
+			Spring.Echo(string.format("FIXTURE defs terraunit metalCost=%s buildTime=%s health=%s builder buildSpeed=%s",
+				tostring(t.metalCost), tostring(t.buildTime), tostring(t.health), tostring(b.buildSpeed)))
+		end
+		for unitID, due in pairs(pendingEstimate) do
+			if frame >= due then
+				pendingEstimate[unitID] = nil
+				if Spring.ValidUnitID(unitID) then
+					local x, _, z = Spring.GetUnitPosition(unitID)
+					Spring.Echo(string.format("FIXTURE terraunit-estimate case=%d frame=%d id=%d estimate=%.4f",
+						caseAt(x, z), frame, unitID, Spring.GetUnitRulesParam(unitID, "terraform_estimate") or -1))
+				end
+			end
+		end
+		-- Two solar collectors beside the fourth lane's wall, for a windowed run
+		-- that shows a slope stopping short of a building. The scripted matches
+		-- leave this off.
+		if frame == CREATE_FRAME + 1 and (Spring.GetModOptions() or {}).coilbox_blockers == "1" then
+			local cx, cz = lane(4)
+			for _, dx in ipairs({ -48, 48 }) do
+				Spring.CreateUnit("energysolar", cx + dx, Spring.GetGroundHeight(cx + dx, cz + 64), cz + 64, "south", TEAM)
+			end
+		end
 		if frame == CREATE_FRAME then
 			for i = 1, CASES do
 				local cx, cz = lane(i)
@@ -152,6 +241,12 @@ if gadgetHandler:IsSyncedCode() then
 			end
 		end
 		if frame == END_FRAME then
+			for case, list in pairs(predicted) do
+				-- the turret's own levelling is the engine's, not the model's
+				if case ~= 11 then
+					compare(case, list)
+				end
+			end
 			for i = 1, CASES do
 				profile(i)
 			end
