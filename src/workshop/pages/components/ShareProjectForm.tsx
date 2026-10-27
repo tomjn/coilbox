@@ -70,6 +70,7 @@ export function ShareProjectForm({
     return (
       <ChallengeCodeView
         code={code.code}
+        title={project.name}
         helpText={t`Anyone who pastes this into Unit tweaks → Import gets this project, opened against the game it names.`}
         onExportFile={saveFile}
       />

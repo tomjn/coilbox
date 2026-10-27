@@ -17,6 +17,7 @@ export function ShareModuleForm({ module }: { module: LegoProject }) {
   return (
     <ChallengeCodeView
       code={made.code}
+      title={module.name}
       helpText={t`Anyone who opens this gets the module in their unit builder.`}
     />
   );

@@ -870,6 +870,7 @@ function HandmadeChallengeShare({
     <ChallengeShare
       identity={galaxyIdentity(galaxy)}
       code={encodeHandmadeChallenge(galaxy) ?? ""}
+      title={galaxy.title}
       helpText={t`Anyone who pastes this code into Import challenge plays this map with the same settings, so results are directly comparable. They need the same game and the same version of this map installed. The code does not carry the map.`}
       onExportFile={exportChallengeFile}
     />
@@ -1081,6 +1082,7 @@ function GalaxyCard({
         <ChallengeShare
           identity={galaxyIdentity(galaxy)}
           code={challengeCode ?? ""}
+          title={galaxy.title}
           helpText={t`Anyone who pastes this code into Import challenge (needs the same game installed) plays the identical map, so results are directly comparable.`}
           onExportFile={exportChallengeFile}
         />
