@@ -136,6 +136,98 @@ end)())
 check("no steps, an empty mesh", #TERRAIN.mesh({}, flat).idx == 0 and #TERRAIN.mesh(nil, flat).idx == 0)
 
 --------------------------------------------------------------------------------
+-- the widget spreads a large preview over frames (issue #4811)
+--------------------------------------------------------------------------------
+
+-- A layout like the largest example: a pad, a wall and a trench across it, a
+-- ramp up to it and buildings in the way, on uneven ground.
+local function largeLayout()
+	return {
+		step("level", "area", { { x = 512, z = 512 }, { x = 992, z = 512 }, { x = 992, z = 992 }, { x = 512, z = 992 } }, { height = 40 }),
+		step("raise", "wall", { { x = 480, z = 752 }, { x = 1024, z = 752 } }, { height = 64, after = 2 }),
+		step("raise", "wall", { { x = 752, z = 480 }, { x = 752, z = 1024 } }, { height = -30, after = 2 }),
+		step("ramp", "wall", { { x = 992, z = 640 }, { x = 1472, z = 640 } }, { heights = { 40, 0 }, width = 96, after = 3 }),
+	}
+end
+local largeFoot = {
+	{ x = 600, z = 600, xsize = 4, zsize = 4, facing = 0, seq = 1 },
+	{ x = 900, z = 640, xsize = 6, zsize = 6, facing = 1, seq = 2 },
+	{ x = 1100, z = 900, xsize = 4, zsize = 4, facing = 0, seq = 3 },
+}
+local standing = { { x = 1200, z = 660, xsize = 4, zsize = 4, facing = 0 } }
+local function wavy(x, z)
+	return 100 + 20 * math.sin(x / 90) + 12 * math.cos(z / 70)
+end
+
+local function preview(pause)
+	local env = { heightAt = wavy, corners = { x = 4097, z = 4097 }, structures = standing, pause = pause }
+	local session = TERRAFORM.session(env)
+	local results = session.apply(largeLayout(), largeFoot)
+	local changed = session.changed()
+	table.sort(changed, function(a, b)
+		return a.z < b.z or (a.z == b.z and a.x < b.x)
+	end)
+	return { metal = session.metal, work = session.work, results = results, changed = changed, mesh = TERRAIN.mesh(changed, wavy, pause) }
+end
+
+local whole = preview(nil)
+local pauses = 0
+local spread
+local job = coroutine.create(function()
+	spread = preview(function()
+		pauses = pauses + 1
+		coroutine.yield()
+	end)
+end)
+local resumes = 0
+while coroutine.status(job) ~= "dead" do
+	local ok, err = coroutine.resume(job)
+	assert(ok, err)
+	resumes = resumes + 1
+end
+check("the large layout is a real test: thousands of cells, every step built", whole.mesh.cells > 2000 and not whole.mesh.capped and #whole.results == 4 and (function()
+	for _, r in ipairs(whole.results) do
+		if r.outcome ~= "built" then
+			return false
+		end
+	end
+	return true
+end)(), show({ cells = whole.mesh.cells, outcomes = { whole.results[1].outcome, whole.results[2].outcome, whole.results[3].outcome, whole.results[4].outcome } }))
+check("the model and the mesh pause once for each corner and cell", pauses >= whole.mesh.cells + #whole.changed and resumes == pauses + 1, show({ pauses = pauses, cells = whole.mesh.cells }))
+check("spread over a resume for each pause, the ground, the cost and the mesh are what one go gives", same(spread, whole))
+
+-- The mesh builder was rewritten to make no tables for each cell. It must give
+-- the mesh the old one gave, vertex for vertex and index for index.
+local reference = dofile(support.root() .. "/tests/terrain_reference.lua")(TERRAIN)
+local function sameAsBefore(name, steps, heightAt, foot, structures)
+	local env = { heightAt = heightAt, corners = { x = 4097, z = 4097 }, structures = structures }
+	local session = TERRAFORM.session(env)
+	session.apply(steps, foot)
+	local changed = session.changed()
+	local now, before = TERRAIN.mesh(changed, heightAt), reference(changed, heightAt)
+	check(name .. ": the mesh is the one the old builder made", same(now, before) and #now.idx > 0, show({ cells = now.cells, before = before.cells }))
+end
+sameAsBefore("a raised wall", { wall }, flat)
+sameAsBefore("a dug wall", { step("raise", "wall", { { x = 512, z = 512 }, { x = 560, z = 512 } }, { height = -30 }) }, flat)
+sameAsBefore("a rectangle over uneven ground", { step("level", "area", { { x = 512, z = 512 }, { x = 576, z = 512 }, { x = 576, z = 544 }, { x = 512, z = 544 } }, { height = 24 }) }, function(x, z)
+	return 100 + (x % 24) + (z % 16)
+end)
+sameAsBefore("a ramp", { step("ramp", "wall", { { x = 512, z = 512 }, { x = 640, z = 512 } }, { heights = { 24, 0 }, width = 48 }) }, flat)
+sameAsBefore("a level part above and part below the ground", { step("level", "area", { { x = 512, z = 512 }, { x = 576, z = 512 }, { x = 576, z = 576 }, { x = 512, z = 576 } }, { height = 0 }) }, function(x)
+	return x < 544 and 90 or 110
+end)
+sameAsBefore("the large layout", largeLayout(), wavy, largeFoot, standing)
+sameAsBefore("the large layout on odd corners", (function()
+	local steps = largeLayout()
+	for _, s in ipairs(steps) do
+		for _, p in ipairs(s.points) do
+			p.x, p.z = p.x + 8, p.z + 24
+		end
+	end
+	return steps
+end)(), wavy, largeFoot, standing)
+
+--------------------------------------------------------------------------------
 -- the faces are made of the right triangles
 --------------------------------------------------------------------------------
 
