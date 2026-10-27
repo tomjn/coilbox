@@ -499,7 +499,7 @@ end
 --   width
 -- @param original function(x, z) the ground as it was when the order was given
 -- @param pivot number the ground under the layout's pivot
-local function allSegments(step, original, pivot)
+local function allSegments(step, original, pivot, pause)
 	if step.kind == "ramp" then
 		local a, b = step.points[1], step.points[2]
 		local h1, h2 = 0, 0
@@ -544,6 +544,7 @@ local function allSegments(step, original, pivot)
 	for _, segment in ipairs(segments) do
 		for _, p in ipairs(segment) do
 			p.aim = aim(p.x, p.z)
+			pause()
 		end
 	end
 	return segments
@@ -553,8 +554,8 @@ end
 -- or ramp names with only (checkPointCreation, lines 523-535): a point is made
 -- only if it moves the ground that way, and one already at its target is never
 -- made. The ground read is the ground when the order was given.
-local function stepSegments(step, original, pivot)
-	local segments = allSegments(step, original, pivot)
+local function stepSegments(step, original, pivot, pause)
+	local segments = allSegments(step, original, pivot, pause)
 	if not segments or not step.only or step.kind == "raise" then
 		return segments
 	end
@@ -582,7 +583,7 @@ end
 
 --- The gadget's estimate for one step: totalCost + pyramidCostEstimate for each
 -- block, lines 937-990, 1294-1410 and 1785-1897.
-local function estimate(segments, original, mult)
+local function estimate(segments, original, mult, pause)
 	local volumeCost = VOLUME_COST * mult * INBUILT_COST_MULT
 	local perimeterCost = POINT_EXTRA_PERIMETER_COST * mult * INBUILT_COST_MULT
 	local areaCostEach = POINT_EXTRA_AREA_COST * mult * INBUILT_COST_MULT
@@ -594,6 +595,7 @@ local function estimate(segments, original, mult)
 		end
 		local volume, areaCost, perimeter, pyramid = 0, 0, 0, 0
 		for _, p in ipairs(segment) do
+			pause()
 			local diff = abs(p.aim - original(p.x, p.z))
 			volume = volume + diff
 			areaCost = areaCost + min(diff, POINT_EXTRA_AREA_COST_DEPTH)
@@ -658,7 +660,7 @@ end
 -- so the finished ground is the same.
 -- @return table { outcome, shape = { { x, z, aim } }, slope = { { x, z, target,
 --   steep } } }
-local function build(segments, ground, blocked)
+local function build(segments, ground, blocked, pause)
 	local points = {}
 	local seen = {}
 	-- Inside the step: true while the point is terraformed, false once it is cut
@@ -666,6 +668,7 @@ local function build(segments, ground, blocked)
 	local area = {}
 	for _, segment in ipairs(segments) do
 		for _, p in ipairs(segment) do
+			pause()
 			if not getc(seen, p.x, p.z) then
 				setc(seen, p.x, p.z, true)
 				local structure = getc(blocked, p.x, p.z) == true
@@ -716,6 +719,7 @@ local function build(segments, ground, blocked)
 		while removed do
 			removed = false
 			for _, p in ipairs(points) do
+				pause()
 				if not p.structure and not thick(p.x, p.z) then
 					if getc(area, p.x, p.z) then
 						setc(area, p.x, p.z, nil)
@@ -729,6 +733,7 @@ local function build(segments, ground, blocked)
 	-- updateTerraformEdgePoints, lines 2249-2322.
 	local function findEdges()
 		for _, p in ipairs(points) do
+			pause()
 			if p.structure then
 				p.edges = nil
 			else
@@ -831,6 +836,7 @@ local function build(segments, ground, blocked)
 		-- Lines 2663-2781: the first square out from each edge of the step.
 		for id = 1, #points do
 			local p = points[id]
+			pause()
 			if p.edges then
 				local newHeight = p.aim
 				local pyramid = p.aim - p.or_ > 0
@@ -872,6 +878,7 @@ local function build(segments, ground, blocked)
 		local i = 1
 		while i <= #extras do
 			local from = extras[i]
+			pause()
 			local support = from.support
 			if support then
 				local directions = {}
@@ -963,13 +970,17 @@ end
 -- the order it was given, on the ground the layouts before it left.
 -- @param env table { heightAt = function(x, z), corners = { x, z }?, structures
 --   = table[] or function(minX, minZ, maxX, maxZ) -> table[], costMult =
---   number? }. corners is how many heightmap corners the map has each way, so
+--   number?, pause = function()? }. corners is how many heightmap corners the map has each way, so
 --   reads and writes stay on the map. structures are the buildings standing
 --   now, each { x, z, xsize, zsize, facing }. A function is asked once for each
---   layout, for the buildings that could stop its slopes.
+--   layout, for the buildings that could stop its slopes. pause is called
+--   once for each corner worked on, so a caller running the
+--   session in a coroutine can yield there and spread a large layout over
+--   several frames.
 -- @return table session
 function M.session(env)
 	local reader = newReader(env)
+	local pause = env.pause or function() end
 	local blocked = {}
 	if type(env.structures) == "table" then
 		for _, s in ipairs(env.structures) do
@@ -1007,10 +1018,10 @@ function M.session(env)
 		for _, index in ipairs(order) do
 			local step = steps[index]
 			local pivot = step.base or reader.original(step.points[1].x, step.points[1].z)
-			local segments = stepSegments(step, reader.original, pivot)
+			local segments = stepSegments(step, reader.original, pivot, pause)
 			prepared[index] = { segments = segments }
 			if segments then
-				prepared[index].metal, prepared[index].pyramid = estimate(segments, reader.original, env.costMult or 1)
+				prepared[index].metal, prepared[index].pyramid = estimate(segments, reader.original, env.costMult or 1, pause)
 				local most = 0
 				for _, segment in ipairs(segments) do
 					for _, p in ipairs(segment) do
@@ -1062,7 +1073,7 @@ function M.session(env)
 			if not segments then
 				result = { index = index, outcome = "refused", metal = 0, shape = {}, slope = {} }
 			else
-				local done = build(segments, reader, copy)
+				local done = build(segments, reader, copy, pause)
 				done.index, done.metal = index, prepared[index].metal
 				-- What the builders spend doing it. The estimate guesses the volume
 				-- of the slope from its height, and the work is the ground the slope
@@ -1090,6 +1101,7 @@ function M.session(env)
 		local list = {}
 		for iz, row in pairs(reader.overlay) do
 			for ix, h in pairs(row) do
+				pause()
 				local x, z = ix * SQUARE, iz * SQUARE
 				if abs(h - reader.original(x, z)) >= 0.5 then
 					list[#list + 1] = { x = x, z = z, h = h }
