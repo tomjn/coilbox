@@ -36,6 +36,7 @@ export function ChallengeCodeView({
   onExportFile,
   copyText,
   extra,
+  title,
 }: {
   code: string;
   helpText: string;
@@ -44,6 +45,8 @@ export function ChallengeCodeView({
   copyText?: string;
   /** Options shown under the code, such as what else to copy beside it. */
   extra?: ReactNode;
+  /** The item's name, which the hub Title field starts with. */
+  title?: string;
   /** Save the challenge as a file. Resolves once the dialog is dismissed
    * (including a no-op resolve when the user cancels it). */
   onExportFile?: () => Promise<void>;
@@ -134,7 +137,7 @@ export function ChallengeCodeView({
           {fileBusy ? t`Exporting…` : t`Export as file`}
         </Button>
       )}
-      <PublishSection code={code} />
+      <PublishSection code={code} title={title} />
     </div>
   );
 }
