@@ -23,6 +23,7 @@ import { msg, t } from "@lingui/core/macro";
 /**
  * What a trigger parameter holds. The id kinds are string cross-references:
  * `zoneId` → `Scenario.zones`, `actorId` → `actors`, `groupId` → `groups`,
+ * `baseId` → `bases`,
  * `triggerId` → `triggers`, `objectiveId` → `objectives`, `dialogueId` →
  * `dialogue`, `teamId` → a `setup.participants` id (and `Scenario.teams` key),
  * `varName` → a `Scenario.vars` key.
@@ -46,6 +47,7 @@ export const PARAM_KINDS = [
   "zoneId",
   "actorId",
   "groupId",
+  "baseId",
   "triggerId",
   "objectiveId",
   "dialogueId",
@@ -535,6 +537,13 @@ export const ACTION_TYPES: Record<string, TypeSpec> = {
    */
   pause_game: {},
   unpause_game: {},
+  /**
+   * Place a base the scenario marks as appearing from a trigger: its terrain
+   * changes first, then its buildings on the ground they leave (issue #4799).
+   * Once only, because a raise step measured from the ground it finds would
+   * raise the walls twice.
+   */
+  spawn_base: { base: { kind: "baseId" } },
 };
 
 /**
@@ -589,6 +598,7 @@ const TYPE_DESCRIPTION_MESSAGES: Record<string, MessageDescriptor> = {
   give_storage: msg`Moves how much metal or energy a team can hold.`,
   pause_game: msg`Pauses the game, in single player only. Unpause from a trigger the player wakes, such as one waiting on a dismissed dialogue line.`,
   unpause_game: msg`Starts a paused game again, in single player only.`,
+  spawn_base: msg`Places a base that appears from a trigger: its terrain changes, then its buildings.`,
 };
 
 export const TYPE_DESCRIPTIONS: Record<string, string> = resolvedOnRead(
@@ -655,6 +665,7 @@ export const TYPE_GROUPS: Record<string, string> = {
   give_orders: "Units",
   gift_units: "Units",
   release_group: "Units",
+  spawn_base: "Units",
   unlock_unit: "Units",
   build_unit: "Units",
   give_resources: "Economy",
@@ -734,6 +745,9 @@ export const TYPE_RUNTIME_VERSION: Record<string, number> = {
   pause_game: 9,
   unpause_game: 9,
   dialogue_dismissed: 9,
+  /** Issue #4799. A runtime behind 10 has no implementation, and has already
+   *  placed the base at the start, without its terrain changes. */
+  spawn_base: 10,
 };
 
 /**

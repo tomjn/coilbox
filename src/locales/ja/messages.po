@@ -12122,6 +12122,10 @@ msgid "Barrel lift"
 msgstr "砲身の上昇"
 
 #: src/scenario/validate.ts
+msgid "base"
+msgstr ""
+
+#: src/scenario/validate.ts
 #, fuzzy
 msgid "Base"
 msgstr "ベース"
@@ -30104,6 +30108,10 @@ msgid "Needs {name}"
 msgstr "{name} が必要"
 
 #: src/scenario/pages/components/triggers.ts
+msgid "Needs a base that appears from a trigger"
+msgstr ""
+
+#: src/scenario/pages/components/triggers.ts
 #, fuzzy
 msgid "Needs a dialogue line"
 msgstr "セリフが必要"
@@ -35769,6 +35777,10 @@ msgstr "配置したユニット"
 #, fuzzy
 msgid "Placeholder amounts. Set your game's."
 msgstr "仮の数値です。ゲームの数値を設定してください。"
+
+#: src/scenario/triggerTypes.ts
+msgid "Places a base that appears from a trigger: its terrain changes, then its buildings."
+msgstr ""
 
 #: src/scenario/triggerTypes.ts
 #, fuzzy
@@ -52519,6 +52531,10 @@ msgstr "ブラウザーを待っています"
 #, fuzzy
 msgid "Waits"
 msgstr "待機"
+
+#: src/scenario/pages/components/BaseControls.tsx
+msgid "Waits for a trigger to place it"
+msgstr ""
 
 #: src/scenario/pages/components/GroupControls.tsx
 #, fuzzy

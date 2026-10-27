@@ -294,7 +294,9 @@ export function TerrainDraftBar({
   onDone: () => void;
   onCancel: () => void;
   enabled: boolean;
-  onEnabled: (on: boolean) => void;
+  /** Absent leaves the game's switch off the bar, for a mission, which sets
+   *  the ground itself in every game (issue #4799). */
+  onEnabled?: (on: boolean) => void;
 }) {
   const { t } = useLingui();
   // With no tool picked, Raise or Level and Height show disabled, so the bar
@@ -392,19 +394,21 @@ export function TerrainDraftBar({
       >
         <X className="size-3.5" /> <Trans>Cancel</Trans>
       </Button>
-      <span className="flex items-center gap-1.5 border-l border-border/60 pl-2">
-        <Switch
-          id="blueprint-terrain-changes"
-          checked={enabled}
-          onCheckedChange={onEnabled}
-        />
-        <label
-          htmlFor="blueprint-terrain-changes"
-          className="text-[11px] text-muted-foreground"
-        >
-          <Trans>Terrain changes in this game</Trans>
-        </label>
-      </span>
+      {onEnabled && (
+        <span className="flex items-center gap-1.5 border-l border-border/60 pl-2">
+          <Switch
+            id="blueprint-terrain-changes"
+            checked={enabled}
+            onCheckedChange={onEnabled}
+          />
+          <label
+            htmlFor="blueprint-terrain-changes"
+            className="text-[11px] text-muted-foreground"
+          >
+            <Trans>Terrain changes in this game</Trans>
+          </label>
+        </span>
+      )}
     </div>
   );
 }

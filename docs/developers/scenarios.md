@@ -123,6 +123,10 @@ Each building carries its own facing. A factory also carries the **Queue** it st
 
 The square drawn under each building is the ground it really stands on, taken from the game's own `footprintx` and `footprintz`. Placing, dragging and turning one puts it on the build grid, which is where the engine will build it and nowhere else, and moving a whole base goes in whole build squares so the layout survives the move. Turning matters because the sides swap on an east or west facing, so a rectangle takes a different part of the grid once it is on its side. Two buildings wanting the same ground both turn red and the base's **buildings** popover names them, because the engine will build one of them and refuse the rest.
 
+A blueprint can also change the ground: raise a wall, level a pad, dig a trench or lay a ramp. Open it under **Blueprints in this scenario** and use **Terrain**. The mission sets that ground itself when the base is placed, before any of its buildings stand on it, so it works in every game, whatever the game's own Terrain changes switch says. The map draws the ground each base leaves, raised in green and dug in red.
+
+A base is placed at game start unless you turn on **Waits for a trigger to place it**. Then a `spawn_base` action places it, ground first, once. A scenario with terrain changes or a waiting base needs mission runtime 10.
+
 Every building you place can be named by a trigger, the same way an actor can. It appears in the actor picker as "Base 1's corlab", so "when the keep's factory dies" is a **unit dead** condition on that building. A scenario that names one needs mission runtime 2, which is what stops a game with an older runtime playing it with that trigger dead.
 
 ### Zones
@@ -216,6 +220,7 @@ Both work in a multiplayer mission and in a replay. With no team set, any player
 | `give_orders` | Replaces a group's orders and wakes it. It does not place one. |
 | `gift_units` | Hands a group's units to another participant. The group keeps them, so the mission can go on ordering a squad it gave away. |
 | `release_group` | Stops the mission ordering a group. The units stay on the map and stay whoever's they are. |
+| `spawn_base` | Places a base that waits for a trigger: its terrain changes, then its buildings. Once only. |
 | `set_var` / `add_var` | Write a variable, or move one by a delta. Either takes a number or another variable. |
 | `enable_trigger` / `disable_trigger` | Arm or disarm another trigger. |
 | `complete_objective` / `fail_objective` | Settle an objective. The first outcome sticks. |

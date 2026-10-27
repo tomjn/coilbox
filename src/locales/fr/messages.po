@@ -12122,6 +12122,10 @@ msgid "Barrel lift"
 msgstr "Levée du canon"
 
 #: src/scenario/validate.ts
+msgid "base"
+msgstr ""
+
+#: src/scenario/validate.ts
 #, fuzzy
 msgid "Base"
 msgstr "Base"
@@ -30104,6 +30108,10 @@ msgid "Needs {name}"
 msgstr "Nécessite {name}"
 
 #: src/scenario/pages/components/triggers.ts
+msgid "Needs a base that appears from a trigger"
+msgstr ""
+
+#: src/scenario/pages/components/triggers.ts
 #, fuzzy
 msgid "Needs a dialogue line"
 msgstr "Nécessite une réplique"
@@ -35769,6 +35777,10 @@ msgstr "unité placée"
 #, fuzzy
 msgid "Placeholder amounts. Set your game's."
 msgstr "Montants provisoires. Définissez ceux de votre jeu."
+
+#: src/scenario/triggerTypes.ts
+msgid "Places a base that appears from a trigger: its terrain changes, then its buildings."
+msgstr ""
 
 #: src/scenario/triggerTypes.ts
 #, fuzzy
@@ -52519,6 +52531,10 @@ msgstr "En attente de votre navigateur"
 #, fuzzy
 msgid "Waits"
 msgstr "Attend"
+
+#: src/scenario/pages/components/BaseControls.tsx
+msgid "Waits for a trigger to place it"
+msgstr ""
 
 #: src/scenario/pages/components/GroupControls.tsx
 #, fuzzy

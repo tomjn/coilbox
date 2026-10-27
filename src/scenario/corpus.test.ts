@@ -260,6 +260,26 @@ describe("scenario fixture corpus", () => {
       "a range bounded at both ends": rangedEnds.some(
         (r) => r.atLeast && r.atMost,
       ),
+      // Issue #4799. A base whose ground is set at the start, and one whose
+      // ground is set when a trigger places it.
+      "a base with terrain changes placed at the start": fixtures.some(
+        ({ scenario }) =>
+          scenario.bases.some(
+            (base) =>
+              !base.dormant &&
+              (scenario.blueprints.find((b) => b.id === base.blueprint)?.terrain
+                ?.length ?? 0) > 0,
+          ),
+      ),
+      "a base with terrain changes a trigger places": fixtures.some(
+        ({ scenario }) =>
+          scenario.bases.some(
+            (base) =>
+              base.dormant === true &&
+              (scenario.blueprints.find((b) => b.id === base.blueprint)?.terrain
+                ?.length ?? 0) > 0,
+          ),
+      ),
     };
 
     const missing = Object.entries(shapes)
@@ -313,6 +333,8 @@ describe("scenario fixture corpus", () => {
         // is free to point north or west of it. The position it resolves to is
         // checked below instead.
         if (point.path.endsWith(".offset")) continue;
+        // A terrain step's points are offsets from the origin as well.
+        if (/\.terrain\[\d+\]\.points\[\d+\]$/.test(point.path)) continue;
         if (point.x <= 0 || point.z <= 0)
           offMap.push(`${file} ${point.path} at ${point.x},${point.z}`);
       }

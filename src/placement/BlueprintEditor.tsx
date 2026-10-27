@@ -176,11 +176,13 @@ export function BlueprintEditor({
    */
   history?: "own" | "caller";
   /**
-   * Whether the terrain tools are offered (issue #4793), when the game can
-   * make terrain changes. Off in the scenario editor, whose missions cannot
-   * apply a step yet (issue #4799). Steps are drawn either way.
+   * Whether the terrain tools are offered (issue #4793). `true` offers them
+   * when the game's Terrain changes switch is on, and a layout is shown flat
+   * when it is off. `"mission"` offers them and shows every step whatever the
+   * switch says, because a mission sets the ground itself in every game
+   * (issue #4799). Steps are drawn either way.
    */
-  terrainTools?: boolean;
+  terrainTools?: boolean | "mission";
 }) {
   const { t } = useLingui();
   const [handle, setHandle] = useState<MapScene3D | null>(null);
@@ -207,13 +209,13 @@ export function BlueprintEditor({
 
   const { units, loading: unitsLoading, archive } = useGameUnits(gameName);
   const terrainChanges = useTerrainChanges(archive, units);
-  const showTerrain = terrainTools && terrainChanges.showTools;
+  const mission = terrainTools === "mission";
+  const showTerrain =
+    mission || (terrainTools === true && terrainChanges.showTools);
   // The steps as shown and stood on. With the game's switch off the layout is
   // a flat one (issue #4814), and the steps stay in the layout untouched.
-  const terrain =
-    terrainChanges.enabled === false
-      ? NO_STEPS
-      : (blueprint.terrain ?? NO_STEPS);
+  const terrainOn = mission || terrainChanges.enabled !== false;
+  const terrain = terrainOn ? (blueprint.terrain ?? NO_STEPS) : NO_STEPS;
   const buildings = useMemo(() => buildingUnits(units), [units]);
   const snap = useMemo(() => buildGridSnap(units), [units]);
   // What each building does, coloured the way the in-game widget colours it.
@@ -322,7 +324,7 @@ export function BlueprintEditor({
     steps: reliefSteps,
     placement: STANDING,
     footprints: reliefInputs,
-    enabled: terrainChanges.enabled !== false,
+    enabled: terrainOn,
     selected: unbuilt ? null : pickedStepOf(selected, terrain.length),
     reduceMotion,
   });
@@ -716,7 +718,7 @@ export function BlueprintEditor({
                 onDone={terrainEditing.finish}
                 onCancel={terrainEditing.cancel}
                 enabled={terrainChanges.enabled === true}
-                onEnabled={terrainChanges.setEnabled}
+                onEnabled={mission ? undefined : terrainChanges.setEnabled}
               />
             )}
             {!terrainTool && (

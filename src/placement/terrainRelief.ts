@@ -93,6 +93,14 @@ export function flatSource(
   };
 }
 
+/** One layout's steps where it stands, as {@link Relief.updateLayouts} takes
+ *  them. */
+export interface ReliefLayout {
+  steps: readonly TerrainStep[];
+  placement: LayoutPlacement;
+  footprints: readonly (Rect | null | undefined)[];
+}
+
 /** What one {@link Relief.update} changed. */
 export interface ReliefChange {
   /** The corners that may differ from before. Null when nothing was drawn
@@ -116,8 +124,11 @@ export class Relief {
   metal = 0;
   private low: number;
   private high: number;
-  /** The corners the last update's steps reached. */
-  private reached: CornerRect | null = null;
+  /** What each layout's steps did, in the order the last
+   *  {@link Relief.updateLayouts} was given them. */
+  layoutResults: StepResult[][] = [];
+  /** The corners the last update's steps reached, one block per layout. */
+  private reached: CornerRect[] = [];
   private readonly fieldValue: HeightField;
 
   constructor(readonly source: CornerSource) {
@@ -186,25 +197,85 @@ export class Relief {
     placement: LayoutPlacement,
     footprints: readonly (Rect | null | undefined)[],
   ): ReliefChange {
-    const next =
-      steps.length > 0 ? this.solve(steps, placement, footprints) : null;
+    const change = this.updateLayouts([{ steps, placement, footprints }]);
+    this.results = this.layoutResults[0] ?? [];
+    return change;
+  }
+
+  /**
+   * Work the ground out again for several layouts on one map, each on the
+   * ground the ones before it left, the way a mission sets its bases' ground
+   * one after another (issue #4799). `results` holds every layout's results
+   * together, and `layoutResults` each layout's own.
+   */
+  updateLayouts(layouts: readonly ReliefLayout[]): ReliefChange {
     const previous = this.reached;
-    const union = bounds(previous, next?.rect ?? null);
-    this.version++;
-    this.results = next?.results ?? [];
-    this.metal = next?.metal ?? 0;
-    this.reached = next?.rect ?? null;
-    if (!union) {
-      this.low = this.source.min;
-      this.high = this.source.max;
-      return { rect: null, before: null };
+    const outer = bounds(...previous);
+    const before = outer ? this.read(this.heights, outer) : null;
+    for (const rect of previous) this.restore(rect);
+
+    const reached: CornerRect[] = [];
+    const results: StepResult[][] = [];
+    let metal = 0;
+    let low = this.source.min;
+    let high = this.source.max;
+    for (const layout of layouts) {
+      if (layout.steps.length === 0) {
+        results.push([]);
+        continue;
+      }
+      const next = this.solve(
+        layout.steps,
+        layout.placement,
+        layout.footprints,
+      );
+      this.write(next.rect, next.ground);
+      reached.push(next.rect);
+      results.push(next.results);
+      metal += next.metal;
+      low = Math.min(low, next.low);
+      high = Math.max(high, next.high);
     }
-    const before = this.read(this.heights, union);
-    if (previous) this.restore(previous);
-    if (next) this.write(next.rect, next.ground);
-    this.low = Math.min(this.source.min, next?.low ?? this.source.min);
-    this.high = Math.max(this.source.max, next?.high ?? this.source.max);
-    return { rect: union, before };
+
+    this.version++;
+    this.layoutResults = results;
+    this.results = results.flat();
+    this.metal = metal;
+    this.reached = reached;
+    this.low = low;
+    this.high = high;
+
+    const union = bounds(...previous, ...reached);
+    if (!union) return { rect: null, before: null };
+    // The heights before, over the whole block: the earlier block's as they
+    // were, and the map's own everywhere else.
+    const was = this.read(this.heights, union);
+    if (before && outer) {
+      const w = union.c1 - union.c0 + 1;
+      const ow = outer.c1 - outer.c0 + 1;
+      for (let r = 0; r <= union.r1 - union.r0; r++) {
+        for (let c = 0; c <= union.c1 - union.c0; c++) {
+          const row = union.r0 + r;
+          const col = union.c0 + c;
+          was[r * w + c] =
+            row >= outer.r0 &&
+            row <= outer.r1 &&
+            col >= outer.c0 &&
+            col <= outer.c1
+              ? before[(row - outer.r0) * ow + (col - outer.c0)]
+              : this.source.at(row * this.width + col);
+        }
+      }
+    } else {
+      for (let r = 0; r <= union.r1 - union.r0; r++) {
+        for (let c = 0; c <= union.c1 - union.c0; c++) {
+          was[r * (union.c1 - union.c0 + 1) + c] = this.source.at(
+            (union.r0 + r) * this.width + union.c0 + c,
+          );
+        }
+      }
+    }
+    return { rect: union, before: was };
   }
 
   /** The steps worked out on the smallest window that gives the map's answer. */
@@ -221,6 +292,9 @@ export class Relief {
         rect.r0 === 0 &&
         rect.c1 === this.width - 1 &&
         rect.r1 === this.height - 1;
+      // Read from the working heights rather than the map, so a layout stands
+      // on the ground the layouts before it left. Each update starts them from
+      // the map's own ground, so for one layout the two are the same.
       const done = terraform(this.crop(rect), steps, placement, footprints);
       if (!whole && !this.fits(done.steps, rect)) continue;
       let low = Number.POSITIVE_INFINITY;
@@ -286,7 +360,7 @@ export class Relief {
     const heights = new Float32Array(w * h);
     for (let r = 0; r < h; r++) {
       const from = (rect.r0 + r) * this.width + rect.c0;
-      for (let c = 0; c < w; c++) heights[r * w + c] = this.source.at(from + c);
+      for (let c = 0; c < w; c++) heights[r * w + c] = this.heights[from + c];
     }
     return { width: w, height: h, col: rect.c0, row: rect.r0, heights };
   }
@@ -325,16 +399,15 @@ export class Relief {
   }
 }
 
-/** The smallest block holding both, or whichever there is. */
-function bounds(a: CornerRect | null, b: CornerRect | null): CornerRect | null {
-  if (!a) return b;
-  if (!b) return a;
-  return {
+/** The smallest block holding all of them, or null for none. */
+function bounds(...rects: CornerRect[]): CornerRect | null {
+  if (rects.length === 0) return null;
+  return rects.reduce((a, b) => ({
     c0: Math.min(a.c0, b.c0),
     r0: Math.min(a.r0, b.r0),
     c1: Math.max(a.c1, b.c1),
     r1: Math.max(a.r1, b.r1),
-  };
+  }));
 }
 
 /** Where the steps' own points lie on the map, a ramp's width included, and the

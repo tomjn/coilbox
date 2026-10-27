@@ -83,6 +83,9 @@ function M.missionFiles(mission)
 		["luarules/mission_runtime/coilbox_difficulty.lua"] = module(
 			"luarules/mission_runtime/coilbox_difficulty.lua"),
 		["luarules/mission_runtime/coilbox_start.lua"] = module("luarules/mission_runtime/coilbox_start.lua"),
+		["luarules/mission_runtime/coilbox_terraform.lua"] = module(
+			"luarules/mission_runtime/coilbox_terraform.lua"),
+		["luarules/mission_runtime/coilbox_bases.lua"] = module("luarules/mission_runtime/coilbox_bases.lua"),
 		["luarules/mission_runtime/coilbox_triggers.lua"] = module("luarules/mission_runtime/coilbox_triggers.lua"),
 		["luarules/mission_runtime/coilbox_unit_conditions.lua"] = module(
 			"luarules/mission_runtime/coilbox_unit_conditions.lua"),
@@ -223,6 +226,14 @@ function M.newEngine(modOptions, files, options)
 		luaRulesMsgs = {},
 		-- Every console command sent through Spring.SendCommands.
 		commands = {},
+		-- Corner heights set through SetHeightMap, by "x,z". A corner nobody set
+		-- has the height `options.ground` gives it.
+		heights = {},
+		-- What happened to the world, in order: { "ground", corners } for each
+		-- SetHeightMapFunc call and { "unit", def, ground } for each unit created,
+		-- with the ground under it then. That order is the claim a base's terrain
+		-- makes: its ground is set before its buildings stand on it.
+		events = {},
 	}
 
 	local previous = options.survivors
@@ -446,10 +457,41 @@ function M.newEngine(modOptions, files, options)
 			Log = function(_, level, message)
 				table.insert(engine.logs, level .. ": " .. message)
 			end,
+			-- The ground: a corner's height once SetHeightMap has set it, otherwise
+			-- what `options.ground` says. Read at the nearest corner, which is all
+			-- the runtime asks of it.
 			GetGroundHeight = function(x, z)
+				local key = (math.floor(x / 8 + 0.5) * 8) .. "," .. (math.floor(z / 8 + 0.5) * 8)
+				if engine.heights[key] then
+					return engine.heights[key]
+				end
 				return (options.ground or function()
 					return 0
 				end)(x, z)
+			end,
+			-- `options.noHeightMap` is an engine without the call.
+			SetHeightMapFunc = not options.noHeightMap and function(fn)
+				local set = 0
+				engine.setting = function(x, z, h)
+					engine.heights[x .. "," .. z] = h
+					set = set + 1
+				end
+				fn()
+				engine.setting = nil
+				table.insert(engine.events, { "ground", set })
+				return set
+			end or nil,
+			-- Only inside SetHeightMapFunc, which is where the engine allows it.
+			SetHeightMap = function(x, z, h)
+				assert(engine.setting, "SetHeightMap outside SetHeightMapFunc")
+				engine.setting(x, z, h)
+			end,
+			GetUnitPosition = function(unitID)
+				local unit = engine.units[unitID]
+				return unit.x, unit.y, unit.z
+			end,
+			GetUnitBuildFacing = function(unitID)
+				return engine.units[unitID].facing or 0
 			end,
 			GetTeamStartPosition = function(team)
 				local pos = (options.startPositions or {})[team]
@@ -465,6 +507,7 @@ function M.newEngine(modOptions, files, options)
 				if (options.refuses or {})[def] then
 					return nil
 				end
+				table.insert(engine.events, { "unit", def, engine.env.Spring.GetGroundHeight(x, z) })
 				local unitID = engine.spawn(def, team, nil)
 				local unit = engine.units[unitID]
 				unit.x, unit.y, unit.z, unit.facing = x, y, z, facing
@@ -774,7 +817,7 @@ function M.newEngine(modOptions, files, options)
 				table.insert(engine.markers, { x, y, z, text, localOnly })
 			end,
 		},
-		Game = { mapName = "Test Map", gameSpeed = 30 },
+		Game = { mapName = "Test Map", gameSpeed = 30, mapSizeX = 4096, mapSizeZ = 4096 },
 		-- The engine's own command constants, at the numbers it uses.
 		CMD = {
 			OPT_SHIFT = 32,

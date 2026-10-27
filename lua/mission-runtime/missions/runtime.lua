@@ -105,8 +105,21 @@
 -- written. A game may already have installed 8 from a development build, and a
 -- second, different 8 is one the version check cannot tell from the first.
 
+-- 10 is a base's terrain changes (issue #4799). One action and two format
+-- features:
+--
+--   * a base may carry `terrain`, steps that raise, level, ramp or smooth the
+--     ground, and the runtime sets that ground before the base's buildings are
+--     placed on it
+--   * a base may be `dormant`, and then it is not placed at the start
+--   * spawn_base places a dormant base, ground first
+--
+-- A runtime behind 10 reads past both fields: it places a walled base with no
+-- walls, and places a dormant base at the start. So a scenario using either
+-- asks for 10.
+
 return {
-	version = 9,
+	version = 10,
 
 	-- The compiled mission format this runtime reads.
 	schemaVersion = 1,
@@ -153,5 +166,6 @@ return {
 		"give_storage",
 		"pause_game",
 		"unpause_game",
+		"spawn_base",
 	},
 }
