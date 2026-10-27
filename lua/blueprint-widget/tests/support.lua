@@ -117,6 +117,8 @@ function M.engine(defs, opts)
 		UnitDefs = {},
 		UnitDefNames = {},
 		orders = {},
+		single = {},
+		WG = opts.WG or {},
 		echoed = {},
 		units = opts.units or {},
 		selected = opts.selected or {},
@@ -179,6 +181,38 @@ function M.engine(defs, opts)
 		TestBuildOrder = function(defID, x, y, z, facing)
 			return E.blocked(defID, x, z, facing)
 		end,
+		GetGroundHeight = function(x, z)
+			return E.ground(x, z)
+		end,
+		GetMyTeamID = function()
+			return opts.team or 0
+		end,
+		GetUnitTeam = function(unitID)
+			local unit = E.units[unitID]
+			return unit and unit.team or opts.team or 0
+		end,
+		-- A unit's command descriptions are { id, action } tables under cmdDescs.
+		FindUnitCmdDesc = function(unitID, cmdID)
+			local unit = E.units[unitID]
+			for i, desc in ipairs(unit and unit.cmdDescs or {}) do
+				if desc.id == cmdID then
+					return i
+				end
+			end
+			return nil
+		end,
+		GetUnitCmdDescs = function(unitID, from, to)
+			local unit = E.units[unitID]
+			local out = {}
+			for i = from or 1, to or from or 1 do
+				out[#out + 1] = unit and unit.cmdDescs and unit.cmdDescs[i]
+			end
+			return out
+		end,
+		GiveOrderToUnit = function(unitID, cmdID, params, options)
+			E.single[#E.single + 1] = { unitID = unitID, cmdID = cmdID, params = params, options = options }
+			return true
+		end,
 		GiveOrderArrayToUnitArray = function(unitIDs, cmds)
 			E.orders[#E.orders + 1] = { units = unitIDs, cmds = cmds }
 			return true
@@ -192,6 +226,8 @@ function M.engine(defs, opts)
 		modName = opts.modName or "Test Game 1.0",
 		gameShortName = opts.gameShortName or "TEST",
 		mapName = opts.mapName or "Test Map",
+		mapSizeX = opts.mapSizeX,
+		mapSizeZ = opts.mapSizeZ,
 	}
 	return E
 end

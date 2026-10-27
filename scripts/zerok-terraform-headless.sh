@@ -12,6 +12,10 @@
 # 2. Plays it again with Zero-K's Lasso Terraform GUI widget turned off in the
 #    widget order file, a wall of another height, and tags from the probe's
 #    own counter instead of WG.Terraform_GetNextTag.
+#    Four more cases hand a blueprint of a raised wall and a turret on it to the
+#    blueprint widget's own placing code (place.lua, copied in beside the probe,
+#    since the widget itself needs gl): without and with shift, split between
+#    two builders, and a wall with no buildings.
 # 3. Checks what the gadget saw: which turrets went up on the raised ground
 #    and when, what each builder's queue held, and the ground across a wall.
 #
@@ -117,9 +121,11 @@ play() { # name, wall height, own tags (0 or 1), lasso off (0 or 1)
   ln -s "$DATA_DIR/maps/$MAP_ARCHIVE" "$dir/data/maps/$MAP_ARCHIVE"
 
   local game="$dir/data/games/coilbox-zk-terraform-fixture.sdd"
-  mkdir -p "$game/LuaRules/Gadgets" "$game/LuaUI/Widgets"
+  mkdir -p "$game/LuaRules/Gadgets" "$game/LuaUI/Widgets" "$game/LuaUI/coilbox_blueprints"
   cp "$FIXTURE"/luarules/gadgets/*.lua "$game/LuaRules/Gadgets/"
   cp "$FIXTURE"/luaui/widgets/*.lua "$game/LuaUI/Widgets/"
+  # the blueprint widget's own placing code, which the probe drives
+  cp "$ROOT/lua/blueprint-widget/luaui/coilbox_blueprints/place.lua" "$game/LuaUI/coilbox_blueprints/"
   sed "s|@BASE@|$BASE_NAME|g" "$FIXTURE/modinfo.lua" >"$game/modinfo.lua"
 
   if [ "$4" = 1 ]; then
@@ -191,16 +197,16 @@ queue_at() { # log, case, frame
 
 check_common() { # log, height, profile, tag source
   local log="$1"
-  expect "the fixture created its builders" "$(grep -c 'FIXTURE builder ' "$log" || true)" 11
+  expect "the fixture created its builders" "$(grep -c 'FIXTURE builder ' "$log" || true)" 16
   expect "the fixture ended the match" "$(grep -c 'FIXTURE done ' "$log" || true)" 1
   expect "Zero-K did not end the match early" "$(grep -c 'game_message: .* has been destroyed' "$log" || true)" 0
-  expect "the probe ordered every case" "$(grep -c 'PROBE ordered ' "$log" || true)" 10
+  expect "the probe ordered every case" "$(grep -c 'PROBE ordered ' "$log" || true)" 14
   expect "tags came from" "$(field "$(line "$log" 'PROBE ordered case=1 ')" source)" "$4"
   expect "builders carry the level command as" "$(field "$(line "$log" 'PROBE level-desc ')" action)" "levelground"
 
   # Level then turret, shift or not, by CMD_LEVEL or CMD_RAISE, appended by
   # CMD_INSERT, with one wall segment or two, and with two builders.
-  for case in 1 2 3 4 7 9 10; do
+  for case in 1 2 3 4 7 9 10 11 12 13; do
     turret_on_wall "$log" "$case" "$2"
   done
   # A turret ordered with no level step goes up on the ground as it was.
@@ -218,6 +224,15 @@ check_common() { # log, height, profile, tag source
   expect "case 4 queue inserted at the front" "$(queue_at "$log" 4 120)" "40,-599,39736,-406"
   expect "case 7 queue with the raise command" "$(queue_at "$log" 7 120)" "40,39737,-599"
 
+  # The blueprint widget's placing code: a wall and a turret on it, with the
+  # buildings and the steps in the blueprint's order, and a wall alone.
+  expect "case 11 queue from a blueprint without shift" "$(queue_at "$log" 11 120)" "40,39736,-599"
+  expect "case 12 queue from a blueprint with shift" "$(queue_at "$log" 12 120)" "-406,39736,-599"
+  expect "case 14 queue from a blueprint of a wall alone" "$(queue_at "$log" 14 120)" "40,39736"
+  expect "case 11 wall from a blueprint" "$(profile "$log" 11)" "$3"
+  expect "case 14 wall from a blueprint alone" "$(profile "$log" 14)" "$3"
+  expect "case 14 built no turret" "$(grep -c 'FIXTURE created case=14 .*unit=turretlaser' "$log" || true)" 0
+  expect "the blueprint cases were not skipped or off the map" "$(grep -c 'PROBE blueprint .*skipped=0 offMap=0' "$log" || true)" 4
   expect "case 1 ground across the wall" "$(profile "$log" 1)" "$3"
   expect "case 9 ground across the long wall" "$(profile "$log" 9)" "$3"
 }

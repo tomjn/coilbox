@@ -809,9 +809,89 @@ local function detailOf(key)
 		end
 	end
 end
-check("a layout with no buildings and steps says so", detailOf("library:walls") == "coilbox | No buildings, 3 terrain changes", detailOf("library:walls"))
+check("a layout with no buildings and steps says why it cannot be picked up when nothing can terraform", detailOf("library:walls") == "no terraforming here | coilbox | No buildings, 3 terrain changes", detailOf("library:walls"))
 check("a layout with both counts both", detailOf("library:both") == "coilbox | 1 building, 1 terrain change", detailOf("library:both"))
 check("a layout with no steps counts buildings only", detailOf("library:plain") == "coilbox | 1 building", detailOf("library:plain"))
-check("a layout of walls only is not offered to step through", MODEL.step(terrainState, 1) == "library:both" and MODEL.step(terrainState, -1) == "library:plain", tostring(MODEL.step(terrainState, 1)))
+check("a layout of walls only is not offered to step through when nothing can terraform", MODEL.step(terrainState, 1) == "library:both" and MODEL.step(terrainState, -1) == "library:plain", tostring(MODEL.step(terrainState, 1)))
+check("it is under no tab but All", terrainState.items[1].tab == "never" and terrainState.items[1].placeable == false and terrainState.items[2].placeable == true)
+
+-- a builder that can terraform
+local TERRAFORMER = support.def(12, "zkcon", { buildOptions = { 1, 2 } })
+local TE = support.engine({ SOLAR, LLT, LAB, CON, TERRAFORMER }, {
+	units = { [100] = { def = 10 }, [101] = { def = 12, cmdDescs = { { id = 39736, action = "levelground" } } } },
+	gameShortName = "TEST",
+})
+PLACE.use(TE)
+local CAN_TF = PLACE.capabilities({ 101 })
+local tf = MODEL.new()
+check("terrain is on unless the player turns it off", tf.terrain == true)
+MODEL.refresh(tf, TERRAIN_ENTRIES, PLACE, game, CAN_TF)
+tf.open, tf.tab = true, "all"
+check("with a builder that can terraform, a layout of walls only is now", tf.items[1].tab == "now" and tf.items[1].placeable == true and tf.items[1].stop == nil and tf.counts.now == 3, show(tf.counts))
+check("its row has no reason", MODEL.rowDetail(tf.items[1]) == "coilbox | No buildings, 3 terrain changes", MODEL.rowDetail(tf.items[1]))
+check("it can be stepped to", MODEL.step(tf, 1) == "library:walls")
+MODEL.setTerrain(tf, false)
+MODEL.setTerrain(tf, "sideways")
+check("the terrain choice switches off, and a value that is not a boolean is ignored", tf.terrain == false)
+MODEL.refresh(tf, TERRAIN_ENTRIES, PLACE, game, CAN_TF)
+check("with terrain off a layout of walls only cannot be picked up, and its row says so", tf.items[1].placeable == false and tf.items[1].tab == "never" and MODEL.rowDetail(tf.items[1]) == "Terrain is off | coilbox | No buildings, 3 terrain changes", MODEL.rowDetail(tf.items[1]))
+check("a layout with buildings can still be picked up with terrain off", tf.items[2].placeable == true and tf.items[2].stop == nil)
+check("a layout with nothing in this game is not placeable", (function()
+	local gone = MODEL.new()
+	MODEL.refresh(gone, { { key = "k", name = "k", source = "library", ordered = false, buildings = { b("corgant") } } }, PLACE, game, CAN_TF)
+	return gone.items[1].placeable == false
+end)())
+
+-- with no builder selected the widget says whether the match has terraform
+local watching = PLACE.capabilities({})
+watching.terraformAvailable = true
+local planning = MODEL.new()
+MODEL.refresh(planning, TERRAIN_ENTRIES, PLACE, game, watching)
+check("with no builder selected, a match known to have terraform lets walls be picked up", planning.items[1].placeable == true and planning.items[1].tab == "now")
+local locked = PLACE.capabilities({ 100 })
+locked.terraformAvailable = false
+MODEL.refresh(planning, TERRAIN_ENTRIES, PLACE, game, locked)
+check("a match without it does not", planning.items[1].placeable == false)
+
+-- the Terrain choice in the placing panel
+local function terrainHits(L)
+	local out = {}
+	for _, h in ipairs(L.hits) do
+		if h.action.kind == "terrain" then
+			out[#out + 1] = h
+		end
+	end
+	return out
+end
+local tray = MODEL.new()
+tray.open = true
+tray.placing = { key = "x", name = "X", rotation = 0, flip = { x = false, z = false } }
+local plain = MODEL.layout(tray, measure, VIEW)
+check("the placing panel has no Terrain choice unless the blueprint has steps and terraform is there", #terrainHits(plain) == 0 and #textsWith(plain, "Terrain") == 0)
+tray.placing.terrain = true
+local withTerrain = MODEL.layout(tray, measure, VIEW)
+check("with them it has On and Off", #terrainHits(withTerrain) == 2)
+check("the row is labelled Terrain", #textsWith(withTerrain, "Terrain") == 1)
+check("the tray grows by the row and its controls stay inside it", withTerrain.tray.h > plain.tray.h and (function()
+	for _, h in ipairs(terrainHits(withTerrain)) do
+		if h.y < withTerrain.tray.y or h.y + h.h > withTerrain.tray.y + withTerrain.tray.h or h.x + h.w > withTerrain.tray.x + withTerrain.tray.w then
+			return false
+		end
+	end
+	return true
+end)())
+check("On is lit while terrain is on", (function()
+	for _, h in ipairs(terrainHits(withTerrain)) do
+		if h.action.mode == "on" then
+			for _, r in ipairs(withTerrain.rects) do
+				if r.kind == "button" and r.x == h.x and r.y == h.y then
+					return same(r.color, MODEL.COLORS.pillActive)
+				end
+			end
+		end
+	end
+	return false
+end)())
+check("the two choices have different ids for the hover", MODEL.actionId(terrainHits(withTerrain)[1].action) ~= MODEL.actionId(terrainHits(withTerrain)[2].action))
 
 support.report()

@@ -189,6 +189,13 @@ export function WidgetPanel({
         </p>
         <p>
           <Trans>
+            Zero-K only loads widgets from your content folder from your second
+            match, because it saves the setting that allows them when a game
+            closes. The first match you play in Zero-K will not show the panel.
+          </Trans>
+        </p>
+        <p>
+          <Trans>
             Coilbox writes this library to the content root whenever it changes,
             and collects what you saved in game when you come back here with no
             game running.

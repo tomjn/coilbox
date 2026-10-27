@@ -54752,6 +54752,10 @@ msgstr "z"
 msgid "Z in elmos"
 msgstr "Z in Elmos"
 
+#: src/blueprint/pages/components/WidgetPanel.tsx
+msgid "Zero-K only loads widgets from your content folder from your second match, because it saves the setting that allows them when a game closes. The first match you play in Zero-K will not show the panel."
+msgstr ""
+
 #: src/i18n/frameStrings.ts
 #, fuzzy
 msgid "Zinc"

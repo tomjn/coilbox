@@ -123,7 +123,7 @@ end
 -- Modules
 --------------------------------------------------------------------------------
 
-local JSON, STORE, MODEL, PLACE, RECORD
+local JSON, STORE, MODEL, PLACE, RECORD, TERRAIN
 
 local function include(name)
 	local path = MODULE_DIR .. name
@@ -188,8 +188,14 @@ local quadVAO, quadVBO, quadIBO
 -- The panel's and the ground marks' buffers, grown as needed by upload().
 local panelSet = { capacity = 0 }
 local groundSet = { capacity = 0 }
+-- The volumes of the terrain steps being shown, with their wire and grids
+local terrainSet = { capacity = 0 }
+local terrainMesh = nil
 local panelIndices, groundIndices = 0, 0
 local groundKey = nil
+-- What each terrain step being shown does, over the middle of it, in world
+-- space. Refilled with the ground marks and drawn by DrawScreen.
+local stepLabels = {}
 
 local IDENTITY = { 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1 }
 local UNIT_RECT = { 0, 0, 1, 1 }
@@ -236,6 +242,11 @@ in vec4 vColor;
 in vec4 vShape;
 out vec4 fragColor;
 void main() {
+	if (ground == 2) {
+		// the volumes and lines of a terrain preview: the vertex's colour as it is
+		fragColor = vColor;
+		return;
+	}
 	vec4 c = vColor;
 	if (useTex == 1) {
 		c *= texture(tex, vUv);
@@ -351,6 +362,7 @@ end
 local function dropGL()
 	dropSet(panelSet)
 	dropSet(groundSet)
+	dropSet(terrainSet)
 	dropBuffers(quadVBO, quadIBO, quadVAO)
 	quadVBO, quadIBO, quadVAO = nil, nil, nil
 	if shader then
@@ -365,6 +377,28 @@ local function upload(set, verts, idx)
 	if quads == 0 then
 		return 0
 	end
+	if set.capacity < quads then
+		dropBuffers(set.vbo, set.ibo, set.vao)
+		local capacity = math.max(quads, set.capacity * 2, 64)
+		set.vbo, set.ibo, set.vao = makeBuffers(capacity)
+		set.capacity = set.vao and capacity or 0
+		if not set.vao then
+			return 0
+		end
+	end
+	set.vbo:Upload(verts)
+	set.ibo:Upload(idx)
+	return #idx
+end
+
+--- Upload a mesh of triangles and lines, which need fewer vertices for their
+-- indices than the quads upload() is sized for.
+-- @return integer how many indices
+local function uploadMesh(set, verts, idx)
+	if #idx == 0 then
+		return 0
+	end
+	local quads = math.max(math.ceil(#verts / 13 / 4), math.ceil(#idx / 6))
 	if set.capacity < quads then
 		dropBuffers(set.vbo, set.ibo, set.vao)
 		local capacity = math.max(quads, set.capacity * 2, 64)
@@ -398,6 +432,30 @@ end
 -- label in a button centred whatever letters it has.
 local capHeight = nil
 
+--- Whether any builder the team has can terraform, for when none is selected.
+local function teamCanTerraform()
+	for _, unitID in ipairs(Spring.GetTeamUnits(Spring.GetMyTeamID()) or {}) do
+		local defID = Spring.GetUnitDefID(unitID)
+		local def = defID and UnitDefs[defID]
+		if def and def.buildOptions and #def.buildOptions > 0 and PLACE.canTerraform(unitID) then
+			return true
+		end
+	end
+	return false
+end
+
+--- Read what the selected units can do. Whether this match has terraform is
+-- the selected builders' say when there are any, since a mission can lock it,
+-- and otherwise the team's.
+local function readCan(selected)
+	can = PLACE.capabilities(selected)
+	if #can.builders > 0 then
+		can.terraformAvailable = #can.terraformers > 0
+	else
+		can.terraformAvailable = teamCanTerraform()
+	end
+end
+
 local function readSelection()
 	local selected = Spring.GetSelectedUnits()
 	local key = #selected .. ":" .. table.concat(selected, ",")
@@ -405,11 +463,12 @@ local function readSelection()
 		return false
 	end
 	selectionKey = key
-	can = PLACE.capabilities(selected)
+	readCan(selected)
 	return true
 end
 
 local readCost
+local syncTerrain
 
 -- What morphs into what, read once, and what the team can ever build, read
 -- again when the kinds of unit it has change.
@@ -456,6 +515,7 @@ local function refreshPanel()
 	readReach()
 	MODEL.refresh(panel, store:entries(), PLACE, Game, can, side)
 	readCost()
+	syncTerrain()
 	MODEL.touch(panel)
 end
 
@@ -522,6 +582,14 @@ local function spotsFor(kind, def)
 	return PLACE.metalSpots(metalScan, span)
 end
 
+--- Whether the Terrain choice shows: the match can terraform and the
+-- blueprint being placed has terrain changes.
+function syncTerrain()
+	if placing then
+		panel.placing.terrain = can.terraformAvailable and #(placing.item.entry.terrain or {}) > 0 or nil
+	end
+end
+
 local function stopPlacing()
 	if placing then
 		placing = nil
@@ -541,22 +609,28 @@ local function startPlacing(key)
 	if not item then
 		return
 	end
-	if #item.resolved.buildings == 0 then
-		say("Nothing in " .. item.name .. " exists in this game")
-		return
-	end
-	if item.foreign > 0 then
-		say(item.name .. " has buildings your side cannot build")
+	if not item.placeable then
+		if item.stop then
+			say(item.name .. " only changes the ground: " .. item.stop)
+		elseif item.foreign > 0 then
+			say(item.name .. " has buildings your side cannot build")
+		else
+			say("Nothing in " .. item.name .. " exists in this game")
+		end
 		return
 	end
 	bindDefaults()
 	readKeys()
 	placing = { item = item, rotation = 0, flip = { x = false, z = false }, pivot = PLACE.pivot(item.resolved), foot = nil }
-	local held = item.resolved.buildings[placing.pivot].def
-	local kind = PLACE.spotKind(held)
+	-- a layout of terrain steps alone has no building to hold it by or to snap
+	-- to a spot, so the middle of its steps is held
+	placing.hold = PLACE.holdPoint(item.resolved, placing.pivot)
+	local held = placing.pivot and item.resolved.buildings[placing.pivot].def
+	local kind = held and PLACE.spotKind(held)
 	placing.spots = kind and spotsFor(kind, held) or nil
 	panel.placing = { key = key, name = item.name, rotation = 0, flip = placing.flip }
 	readCost()
+	syncTerrain()
 end
 
 --- Turn the layout being placed. Returns whether it did, so a key bound to
@@ -609,8 +683,14 @@ end
 -- the layout turns and flips about it. During a shift drag it is copies in a
 -- line from where the drag began.
 local function trackCursor()
-	local mx, my = Spring.GetMouseState()
-	local kind, pos = Spring.TraceScreenRay(mx, my, true)
+	local kind, pos
+	if placing.at then
+		-- placed by another widget, at a point, not by the cursor
+		kind, pos = "ground", { placing.at.x, 0, placing.at.z }
+	else
+		local mx, my = Spring.GetMouseState()
+		kind, pos = Spring.TraceScreenRay(mx, my, true)
+	end
 	if kind ~= "ground" or not pos then
 		placing.foot = nil
 		return
@@ -638,12 +718,17 @@ local function trackCursor()
 		anchors = PLACE.line(placing.line.x, placing.line.z, ax, az, unpack(placing.extent))
 	end
 	local foot = {}
+	local origin = placing.hold
 	for _, at in ipairs(anchors) do
-		for _, p in ipairs(PLACE.footprint(resolved, placing.rotation, at.x, at.z, placing.flip, resolved.buildings[placing.pivot].offset)) do
+		for _, p in ipairs(PLACE.footprint(resolved, placing.rotation, at.x, at.z, placing.flip, origin)) do
+			p.seq = #foot + 1
 			foot[#foot + 1] = p
 		end
 	end
-	placing.foot = foot
+	placing.foot, placing.anchors, placing.origin = foot, anchors, origin
+	-- the steps, for their outlines on the ground. They are laid again with the
+	-- ground as it is when the player clicks.
+	placing.steps = PLACE.laySteps(resolved, placing.rotation, placing.flip, origin, anchors, foot)
 	placing.serial = (placing.serial or 0) + 1
 end
 
@@ -651,17 +736,21 @@ local function plansChanged()
 	plansSerial = plansSerial + 1
 	local count = 0
 	for _, plan in ipairs(plans) do
-		count = count + #plan.positions
+		count = count + #plan.positions + #plan.steps
 	end
 	panel.remainder = count > 0 and { count = count } or nil
 	MODEL.touch(panel)
 end
 
-local function addPlan(positions)
-	if #positions > 0 then
-		plans[#plans + 1] = { positions = positions }
+local function addPlan(positions, steps)
+	if #positions > 0 or #steps > 0 then
+		plans[#plans + 1] = { positions = positions, steps = steps }
 		plansChanged()
 	end
+end
+
+local function terrainChanges(n)
+	return n .. (n == 1 and " terrain change" or " terrain changes")
 end
 
 local function describe(plan, sent)
@@ -672,9 +761,16 @@ local function describe(plan, sent)
 	if plan.blocked > 0 then
 		parts[#parts + 1] = plan.blocked .. " blocked"
 	end
-	if #plan.remainder > 0 then
+	if (plan.skipped or 0) > 0 then
+		parts[#parts + 1] = terrainChanges(plan.skipped) .. " skipped (" .. (plan.skippedWhy or "") .. ")"
+	end
+	if (plan.offMap or 0) > 0 then
+		parts[#parts + 1] = terrainChanges(plan.offMap) .. " off the map"
+	end
+	local left = #plan.remainder + #(plan.stepRemainder or {})
+	if left > 0 then
 		local what = sent > 0 and " left for another builder" or " planned, right click it with builders to build"
-		parts[#parts + 1] = #plan.remainder .. what
+		parts[#parts + 1] = left .. what
 	end
 	if #parts == 0 then
 		return "nothing could be placed"
@@ -682,9 +778,27 @@ local function describe(plan, sent)
 	return table.concat(parts, ", ")
 end
 
+-- Set while another widget places a blueprint with placeAt, to say whether
+-- shift counts as held.
+local shiftOverride = nil
+
 local function shiftHeld()
+	if shiftOverride ~= nil then
+		return shiftOverride
+	end
 	local _, _, _, shift = Spring.GetModKeyState()
 	return shift == true
+end
+
+--- The terrain argument of PLACE.plan for some laid steps: ordered when the
+-- match can terraform and the player has Terrain on.
+local function terrainArg(steps)
+	local available = can.terraformAvailable == true
+	return {
+		steps = steps,
+		on = available and panel.terrain,
+		why = not available and "terraforming is not available here" or "Terrain is off",
+	}
 end
 
 local function placeNow()
@@ -692,10 +806,12 @@ local function placeNow()
 		return
 	end
 	readSelection()
-	local plan = PLACE.plan(placing.foot, can, shiftHeld(), panel.assist)
+	-- the ground under the pivot is read now, as the player clicks
+	local steps = PLACE.laySteps(placing.item.resolved, placing.rotation, placing.flip, placing.origin, placing.anchors, placing.foot)
+	local plan = PLACE.plan(placing.foot, can, shiftHeld(), panel.assist, terrainArg(steps))
 	local sent = PLACE.issue(plan)
 	say(placing.item.name .. ": " .. describe(plan, sent))
-	addPlan(plan.remainder)
+	addPlan(plan.remainder, plan.stepRemainder)
 	placing.line = nil
 	-- Holding shift keeps the blueprint on the cursor for another copy.
 	if not shiftHeld() then
@@ -716,11 +832,25 @@ local function buildPlan(index, only)
 	for i, p in ipairs(positions) do
 		if not only or i == only then
 			local status = Spring.TestBuildOrder(p.defID, p.x, p.y, p.z, p.facing)
-			foot[#foot + 1] = { defID = p.defID, def = p.def, x = p.x, y = p.y, z = p.z, facing = p.facing, blocked = status == 0 }
+			foot[#foot + 1] = { defID = p.defID, def = p.def, x = p.x, y = p.y, z = p.z, facing = p.facing, blocked = status == 0, seq = p.seq }
 		end
 	end
-	local plan = PLACE.plan(foot, can, shiftHeld(), panel.assist)
+	-- One building takes the steps that come ahead of it, the whole plan takes
+	-- them all.
+	local steps, later = {}, {}
+	for _, step in ipairs(plans[index].steps) do
+		if not only or (positions[only].seq and step.after < positions[only].seq) then
+			steps[#steps + 1] = step
+		else
+			later[#later + 1] = step
+		end
+	end
+	local plan = PLACE.plan(foot, can, shiftHeld(), panel.assist, terrainArg(steps))
 	local sent = PLACE.issue(plan)
+	plans[index].steps = later
+	for _, step in ipairs(plan.stepRemainder) do
+		table.insert(plans[index].steps, step)
+	end
 	if only then
 		-- the one building leaves the plan once it is ordered or the ground
 		-- refuses it, and stays when nobody selected can build it
@@ -735,7 +865,7 @@ end
 
 local function dropEmptyPlans()
 	for i = #plans, 1, -1 do
-		if #plans[i].positions == 0 then
+		if #plans[i].positions == 0 and #plans[i].steps == 0 then
 			table.remove(plans, i)
 		end
 	end
@@ -745,13 +875,19 @@ end
 --- Build every plan with the selection, from the panel's Place button.
 local function placeRemainder()
 	readSelection()
-	local total = { blocked = 0, remainder = {} }
+	local total = { blocked = 0, remainder = {}, stepRemainder = {}, skipped = 0, offMap = 0 }
 	local sent = 0
 	for i = 1, #plans do
 		local plan, n = buildPlan(i)
 		total.blocked = total.blocked + plan.blocked
+		total.skipped = total.skipped + plan.skipped
+		total.offMap = total.offMap + plan.offMap
+		total.skippedWhy = plan.skippedWhy or total.skippedWhy
 		for _, p in ipairs(plan.remainder) do
 			total.remainder[#total.remainder + 1] = p
+		end
+		for _, step in ipairs(plan.stepRemainder) do
+			total.stepRemainder[#total.stepRemainder + 1] = step
 		end
 		sent = math.max(sent, n)
 	end
@@ -907,6 +1043,62 @@ end
 -- Actions the panel's buttons and rows raise
 --------------------------------------------------------------------------------
 
+--- Place the blueprint being held at a point on the map, as a click there
+-- would, for a game's own interface or a test driving the widget.
+-- @param x number elmos
+-- @param z number elmos
+-- @param shift boolean? whether to place it as if shift were held
+-- @return boolean whether anything was held
+local function placeAt(x, z, shift)
+	if not placing then
+		return false
+	end
+	local held = placing.at
+	placing.at, placing.foot = { x = x, z = z }, nil
+	shiftOverride = shift == true
+	trackCursor()
+	placeNow()
+	shiftOverride = nil
+	if placing then
+		placing.at = held
+		placing.foot = nil
+	end
+	return true
+end
+
+--- Hold the blueprint being placed at a point on the map, as though the cursor
+-- were there, until it is put down or this is called with no point.
+-- @param x number? elmos
+-- @param z number? elmos
+-- @return boolean whether anything was held
+local function holdAt(x, z)
+	if not placing then
+		return false
+	end
+	placing.at = x and { x = x, z = z } or nil
+	placing.foot = nil
+	return true
+end
+
+--- Turn the placing of terrain changes on or off. A blueprint of terrain
+-- changes alone cannot be placed with it off, so one being placed is put down.
+local function setTerrain(on)
+	MODEL.setTerrain(panel, on)
+	refreshPanel()
+	if placing then
+		for _, item in ipairs(panel.items) do
+			if item.entry.key == placing.item.entry.key then
+				placing.item = item
+				if not item.placeable then
+					say(item.name .. " only changes the ground: " .. (item.stop or ""))
+					stopPlacing()
+				end
+				break
+			end
+		end
+	end
+end
+
 local function act(action)
 	local kind = action.kind
 	if kind == "toggle" then
@@ -925,6 +1117,8 @@ local function act(action)
 		flip(action.axis)
 	elseif kind == "assist" then
 		MODEL.setAssist(panel, action.mode)
+	elseif kind == "terrain" then
+		setTerrain(action.mode == "on")
 	elseif kind == "place" then
 		if placing and placing.item.entry.key == action.key then
 			stopPlacing()
@@ -951,8 +1145,8 @@ function widget:SetConfigData(data)
 	saved = data
 end
 
--- Whether builders help each other or split the work, by game, since that
--- depends on the game's rules.
+-- Whether builders help each other or split the work, and whether terrain
+-- changes are placed, by game, since both depend on the game's rules.
 local function gameKey()
 	return Game.gameShortName or Game.gameName or ""
 end
@@ -965,7 +1159,14 @@ function widget:GetConfigData()
 	if panel then
 		assist[gameKey()] = panel.assist
 	end
-	return { seen = true, pos = panel and panel.pos, view = panel and panel.view, assist = assist }
+	local terrain = {}
+	for k, v in pairs(type(saved and saved.terrain) == "table" and saved.terrain or {}) do
+		terrain[k] = v
+	end
+	if panel then
+		terrain[gameKey()] = panel.terrain
+	end
+	return { seen = true, pos = panel and panel.pos, view = panel and panel.view, assist = assist, terrain = terrain }
 end
 
 function widget:Initialize()
@@ -983,14 +1184,17 @@ function widget:Initialize()
 	if PLACE then
 		RECORD, err = include("record.lua")
 	end
-	if not RECORD then
+	if RECORD then
+		TERRAIN, err = include("terrain.lua")
+	end
+	if not TERRAIN then
 		log(LOG.ERROR, err)
 		widgetHandler:RemoveWidget(self)
 		return
 	end
 
 	STORE.use(JSON)
-	PLACE.use({ Spring = Spring, UnitDefs = UnitDefs, UnitDefNames = UnitDefNames, Game = Game })
+	PLACE.use({ Spring = Spring, UnitDefs = UnitDefs, UnitDefNames = UnitDefNames, Game = Game, WG = WG })
 	RECORD.use({ Spring = Spring, UnitDefs = UnitDefs, Game = Game })
 
 	store = STORE.new({
@@ -1009,8 +1213,11 @@ function widget:Initialize()
 		if type(saved.assist) == "table" then
 			MODEL.setAssist(panel, saved.assist[gameKey()])
 		end
+		if type(saved.terrain) == "table" then
+			MODEL.setTerrain(panel, saved.terrain[gameKey()])
+		end
 	end
-	can = PLACE.capabilities({})
+	readCan({})
 
 	if not makeGL() then
 		widgetHandler:RemoveWidget(self)
@@ -1083,6 +1290,11 @@ function widget:Initialize()
 		step = step,
 		assist = function(mode)
 			MODEL.setAssist(panel, mode)
+		end,
+		placeAt = placeAt,
+		holdAt = holdAt,
+		terrain = function(on)
+			setTerrain(on == true or on == "on")
 		end,
 	}
 
@@ -1417,6 +1629,16 @@ function widget:DrawScreen()
 			gl.Text(colourCode(t.color) .. t.text, t.x, t.y - drop, t.size, "x")
 		end
 	end
+	-- each terrain step's change in elmos, small and white with a dark outline,
+	-- over the middle of its top
+	local size = MODEL.SMALL * MODEL.scaleFor(panel, { w = vsx, h = vsy })
+	local color = colourCode({ 1, 1, 1 })
+	for _, label in ipairs(stepLabels) do
+		local sx, sy = Spring.WorldToScreenCoords(label.x, label.y, label.z)
+		if sx and sx >= 0 and sx <= vsx and sy >= 0 and sy <= vsy then
+			gl.Text(color .. label.text, sx, sy, size, "xco")
+		end
+	end
 end
 
 --- How a mark on the ground looks: the colour of what the building does, as
@@ -1459,6 +1681,7 @@ end
 function widget:DrawWorld()
 	local foot = placing and placing.foot
 	if not foot and #plans == 0 then
+		stepLabels, terrainMesh = {}, nil
 		return
 	end
 	local teamID = Spring.GetMyTeamID()
@@ -1466,9 +1689,21 @@ function widget:DrawWorld()
 
 	-- the plans' marks and the cursor's in one buffer, rebuilt when either
 	-- changes
-	local key = "plans:" .. plansSerial .. ":hover:" .. hover.key .. (foot and (":cursor:" .. placing.serial) or "")
+	-- the cursor's terrain steps are outlined only when they would be ordered
+	local showSteps = foot and can.terraformAvailable == true and panel.terrain
+	local key = "plans:" .. plansSerial .. ":hover:" .. hover.key .. (foot and (":cursor:" .. placing.serial .. (showSteps and ":steps" or "")) or "")
 	if groundKey ~= key then
-		local marks = {}
+		local marks, steps = {}, {}
+		for _, plan in ipairs(plans) do
+			for _, step in ipairs(plan.steps) do
+				steps[#steps + 1] = step
+			end
+		end
+		if showSteps then
+			for _, step in ipairs(placing.steps or {}) do
+				steps[#steps + 1] = step
+			end
+		end
 		for _, plan in ipairs(plans) do
 			for _, p in ipairs(plan.positions) do
 				marks[#marks + 1] = p
@@ -1478,6 +1713,9 @@ function widget:DrawWorld()
 			marks[#marks + 1] = p
 		end
 		groundMarks(marks, key)
+		terrainMesh = TERRAIN.mesh(steps, Spring.GetGroundHeight)
+		terrainMesh.indices = uploadMesh(terrainSet, terrainMesh.verts, terrainMesh.idx)
+		stepLabels = PLACE.labels(steps)
 	end
 	-- The marks follow the heightmap, but the terrain the engine draws is
 	-- simplified with distance, so a depth test would still let it cut them.
@@ -1491,6 +1729,45 @@ function widget:DrawWorld()
 		gl.UniformInt(locGround, 1)
 		gl.Uniform(locBlocked, unpack(MODEL.COLORS.blocked))
 		groundSet.vao:DrawElements(GL.TRIANGLES, groundIndices, 0)
+		gl.UniformInt(locGround, 0)
+		gl.UseShader(0)
+	end
+
+	-- The terrain steps: a grid on the ground, then the volumes. Raised ground
+	-- is drawn with the depth test and no depth writes, so it is seen only where
+	-- nothing stands in front of it and never hides a unit. Dug ground is under
+	-- the terrain, so it is drawn through it.
+	if terrainMesh and terrainMesh.indices and terrainMesh.indices > 0 and terrainSet.vao then
+		local m = terrainMesh
+		local vao = terrainSet.vao
+		local downFaces = m.faces + m.wire
+		local grid = downFaces + m.downFaces + m.downWire
+		gl.UseShader(shader)
+		gl.UniformMatrix(locProj, "projection")
+		gl.UniformMatrix(locView, "view")
+		gl.Uniform(locRect, unpack(UNIT_RECT))
+		gl.UniformInt(locUseTex, 0)
+		gl.UniformInt(locGround, 2)
+		gl.LineWidth(1)
+		if m.grid > 0 then
+			vao:DrawElements(GL.LINES, m.grid, grid)
+		end
+		gl.DepthTest(true)
+		gl.DepthMask(false)
+		if m.faces > 0 then
+			vao:DrawElements(GL.TRIANGLES, m.faces, 0)
+		end
+		if m.wire > 0 then
+			vao:DrawElements(GL.LINES, m.wire, m.faces)
+		end
+		gl.DepthTest(false)
+		if m.downFaces > 0 then
+			vao:DrawElements(GL.TRIANGLES, m.downFaces, downFaces)
+		end
+		if m.downWire > 0 then
+			vao:DrawElements(GL.LINES, m.downWire, downFaces + m.downFaces)
+		end
+		gl.DepthMask(true)
 		gl.UniformInt(locGround, 0)
 		gl.UseShader(0)
 	end
