@@ -125,7 +125,7 @@ end
 -- Modules
 --------------------------------------------------------------------------------
 
-local JSON, STORE, MODEL, PLACE, GROUND, RECORD, TERRAIN, TERRAFORM, LATER
+local JSON, STORE, MODEL, PLACE, GROUND, RECORD, TERRAIN, TERRAFORM, LATER, CLEAR
 
 local function include(name)
 	local path = MODULE_DIR .. name
@@ -826,7 +826,7 @@ local function placeNow()
 	-- the ground under the pivot is read now, as the player clicks
 	local steps = PLACE.laySteps(placing.item.resolved, placing.rotation, placing.flip, placing.origin, placing.anchors, placing.foot)
 	local plan = PLACE.plan(placing.foot, can, shiftHeld(), panel.assist, terrainArg(steps, placing.foot))
-	local sent = PLACE.issue(plan, LATER)
+	local sent = PLACE.issue(plan, LATER, CLEAR)
 	say(placing.item.name .. ": " .. describe(plan, sent))
 	addPlan(plan.remainder, plan.stepRemainder)
 	placing.line = nil
@@ -863,7 +863,7 @@ local function buildPlan(index, only)
 		end
 	end
 	local plan = PLACE.plan(foot, can, shiftHeld(), panel.assist, terrainArg(steps, foot))
-	local sent = PLACE.issue(plan, LATER)
+	local sent = PLACE.issue(plan, LATER, CLEAR)
 	plans[index].steps = later
 	for _, step in ipairs(plan.stepRemainder) do
 		table.insert(plans[index].steps, step)
@@ -1238,7 +1238,10 @@ function widget:Initialize()
 	if TERRAFORM then
 		LATER, err = include("pending_terraform.lua")
 	end
-	if not LATER then
+	if LATER then
+		CLEAR, err = include("step_clear.lua")
+	end
+	if not CLEAR then
 		log(LOG.ERROR, err)
 		widgetHandler:RemoveWidget(self)
 		return
@@ -1248,6 +1251,7 @@ function widget:Initialize()
 	PLACE.use({ Spring = Spring, UnitDefs = UnitDefs, UnitDefNames = UnitDefNames, Game = Game, WG = WG })
 	RECORD.use({ Spring = Spring, UnitDefs = UnitDefs, Game = Game, GROUND = GROUND })
 	LATER.use({ Spring = Spring })
+	CLEAR.use({ Spring = Spring, UnitDefs = UnitDefs })
 
 	store = STORE.new({
 		vfs = VFS,
@@ -1384,9 +1388,11 @@ function widget:Shutdown()
 	dropGL()
 end
 
--- Zero-K's terraform orders held until a builder nears their level step.
+-- Zero-K's terraform orders held until a builder nears their level step, and
+-- builders kept clear of a step while they work on it.
 function widget:GameFrame(frame)
 	LATER.update(frame)
+	CLEAR.update(frame)
 end
 
 function widget:ViewResize(x, y)

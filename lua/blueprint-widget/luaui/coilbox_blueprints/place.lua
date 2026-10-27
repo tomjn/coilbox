@@ -1162,9 +1162,11 @@ end
 --   terraform = { { unitID, params, tag, levelAt = { { unitID, index } }, where
 --   each builder's level step is in its orders } }, stepRemainder
 --   = steps kept for when a builder is selected, skipped = steps not ordered
---   for skippedWhy, offMap = steps with a point off the map }
+--   for skippedWhy, offMap = steps with a point off the map, clear = { {
+--   unitID, tag, spots, range, stop, apart, defID } } for step_clear.lua to
+--   keep each builder clear while it works on each step }
 function M.plan(foot, can, shift, mode, terrain)
-	local out = { orders = {}, remainder = {}, blocked = 0, terraform = {}, stepRemainder = {}, skipped = 0, offMap = 0, shift = shift }
+	local out = { orders = {}, remainder = {}, blocked = 0, terraform = {}, stepRemainder = {}, skipped = 0, offMap = 0, shift = shift, clear = {} }
 	local who = mode == "split" and split(foot, can) or nil
 
 	-- which steps are ordered, and to whom
@@ -1263,6 +1265,8 @@ function M.plan(foot, can, shift, mode, terrain)
 				s.taken[#s.taken + 1] = spot
 				wx, wz = spot.x, spot.z
 			end
+			-- and kept clear while it works on the step (step_clear.lua)
+			out.clear[#out.clear + 1] = { unitID = unitID, tag = s.tag, spots = s.spots[key], range = def.buildDistance, stop = M.MOVE_STOP, apart = apart, defID = def.id }
 		end
 		local next = 1
 		local function stepsBefore(seq)
@@ -1352,8 +1356,10 @@ end
 --- Send a plan's orders to the engine.
 -- @param later table the pending_terraform module, which holds each terraform
 --   order whose level step is further back until a builder nears it
+-- @param clear table? the step_clear module, which keeps each builder clear of
+--   a step's ground while it works on it
 -- @return integer how many builders were given an array
-function M.issue(plan, later)
+function M.issue(plan, later, clear)
 	local sent = 0
 	-- a terraform order whose level step is at or next to the front goes
 	-- first, so the level step finds its units
@@ -1372,6 +1378,9 @@ function M.issue(plan, later)
 	end
 	for _, t in ipairs(held) do
 		later.add(t)
+	end
+	for _, c in ipairs(clear and plan.clear or {}) do
+		clear.watch(c.unitID, c.tag, { spots = c.spots, range = c.range, stop = c.stop, apart = c.apart, defID = c.defID })
 	end
 	return sent
 end
