@@ -102,7 +102,7 @@ function M.mesh(changed, heightAt)
 	end
 
 	local function vertex(x, y, z, c)
-		local v = #verts
+		local v = count * STRIDE
 		verts[v + 1], verts[v + 2], verts[v + 3] = x, y, z
 		verts[v + 4], verts[v + 5] = 0, 0
 		verts[v + 6], verts[v + 7], verts[v + 8], verts[v + 9] = c[1], c[2], c[3], c[4]
@@ -110,44 +110,73 @@ function M.mesh(changed, heightAt)
 		count = count + 1
 		return count - 1
 	end
-	local function line(into, x1, y1, z1, x2, y2, z2, c)
-		into[#into + 1] = vertex(x1, y1, z1, c)
-		into[#into + 1] = vertex(x2, y2, z2, c)
-	end
 	local function quad(into, a, b, c, d)
 		into[#into + 1], into[#into + 2], into[#into + 3] = a, b, c
 		into[#into + 1], into[#into + 2], into[#into + 3] = b, d, c
 	end
-	local function topAt(x, z)
-		return get(final, x, z) or heightAt(x, z)
+	-- the ground's height at a corner, asked of the engine once for the four
+	-- cells that share it
+	local groundCache = {}
+	local function groundAt(x, z)
+		local h = get(groundCache, x, z)
+		if not h then
+			h = heightAt(x, z)
+			put(groundCache, x, z, h)
+		end
+		return h
 	end
+	local function topAt(x, z)
+		return get(final, x, z) or groundAt(x, z)
+	end
+
+	-- A corner's vertices are made once for each use and shared by the cells and
+	-- lines that meet there. The surface and the wire come in two colours, for
+	-- raised and dug ground.
+	local caches = { up = {}, down = {}, wireUp = {}, wireDown = {}, grid = {} }
+	local function shared(cache, x, y, z, c)
+		local v = get(cache, x, z)
+		if not v then
+			v = vertex(x, y, z, c)
+			put(cache, x, z, v)
+		end
+		return v
+	end
+	local faceUp = { M.COLORS.raise[1], M.COLORS.raise[2], M.COLORS.raise[3], M.FACE_ALPHA }
+	local faceDown = { M.COLORS.dig[1], M.COLORS.dig[2], M.COLORS.dig[3], M.FACE_ALPHA }
 
 	for _, cell in ipairs(cellList) do
 		local x, z = cell.x, cell.z
 		local fx = { topAt(x, z), topAt(x + 8, z), topAt(x, z + 8), topAt(x + 8, z + 8) }
-		local gx = { heightAt(x, z), heightAt(x + 8, z), heightAt(x, z + 8), heightAt(x + 8, z + 8) }
+		local gx = { groundAt(x, z), groundAt(x + 8, z), groundAt(x, z + 8), groundAt(x + 8, z + 8) }
 		local mean = 0
 		for i = 1, 4 do
 			mean = mean + (fx[i] - gx[i]) / 4
 		end
 		local up = mean >= 0
 		local shown = abs(mean) >= 0.5
+		local corners = { { x, z }, { x + 8, z }, { x, z + 8 }, { x + 8, z + 8 } }
 		if shown then
-			local rgb = up and M.COLORS.raise or M.COLORS.dig
-			local face = { rgb[1], rgb[2], rgb[3], M.FACE_ALPHA }
-			quad(up and lists.faces or lists.downFaces, vertex(x, fx[1], z, face), vertex(x + 8, fx[2], z, face), vertex(x, fx[3], z + 8, face), vertex(x + 8, fx[4], z + 8, face))
+			local cache, face = up and caches.up or caches.down, up and faceUp or faceDown
+			local v = {}
+			for i = 1, 4 do
+				v[i] = shared(cache, corners[i][1], fx[i], corners[i][2], face)
+			end
+			quad(up and lists.faces or lists.downFaces, v[1], v[2], v[3], v[4])
 		end
 		local wire = up and M.COLORS.wireRaise or M.COLORS.wireDig
 		local wires = up and lists.wire or lists.downWire
+		local wireCache = up and caches.wireUp or caches.wireDown
 		-- Each cell's top and left edges are lines when they lie on a 16 elmo
 		-- line or have no cell beyond them, and its bottom and right edges only
 		-- when there is no cell beyond, so a shared edge is drawn once.
 		local function edge(ax, az, ai, bx, bz, bi, onLine, beyond)
 			if onLine or not beyond then
 				if shown then
-					line(wires, ax, fx[ai], az, bx, fx[bi], bz, wire)
+					wires[#wires + 1] = shared(wireCache, ax, fx[ai], az, wire)
+					wires[#wires + 1] = shared(wireCache, bx, fx[bi], bz, wire)
 				end
-				line(lists.grid, ax, gx[ai] + M.GROUND_LIFT, az, bx, gx[bi] + M.GROUND_LIFT, bz, M.COLORS.ground)
+				lists.grid[#lists.grid + 1] = shared(caches.grid, ax, gx[ai] + M.GROUND_LIFT, az, M.COLORS.ground)
+				lists.grid[#lists.grid + 1] = shared(caches.grid, bx, gx[bi] + M.GROUND_LIFT, bz, M.COLORS.ground)
 			end
 		end
 		edge(x, z, 1, x + 8, z, 2, z % 16 == 0, get(cells, x, z - 8))

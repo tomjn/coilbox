@@ -682,6 +682,11 @@ end
 -- The cursor holds the pivot, the building nearest the layout's middle, and
 -- the layout turns and flips about it. During a shift drag it is copies in a
 -- line from where the drag began.
+-- Counts every placement the cursor has made, across blueprints, so the ground
+-- preview's key never repeats when another blueprint is picked up. A count per
+-- blueprint started again at 1 and a new one could show the last one's preview.
+local placingSerial = 0
+
 local function trackCursor()
 	local kind, pos
 	if placing.at then
@@ -729,7 +734,8 @@ local function trackCursor()
 	-- the steps, for their outlines on the ground. They are laid again with the
 	-- ground as it is when the player clicks.
 	placing.steps = PLACE.laySteps(resolved, placing.rotation, placing.flip, origin, anchors, foot)
-	placing.serial = (placing.serial or 0) + 1
+	placingSerial = placingSerial + 1
+	placing.serial = placingSerial
 end
 
 local function plansChanged()
@@ -1187,7 +1193,10 @@ function widget:Initialize()
 	if RECORD then
 		TERRAIN, err = include("terrain.lua")
 	end
-	if not TERRAIN then
+	if TERRAIN then
+		GROUND, err = include("ground.lua")
+	end
+	if not GROUND then
 		log(LOG.ERROR, err)
 		widgetHandler:RemoveWidget(self)
 		return
@@ -1293,6 +1302,11 @@ function widget:Initialize()
 		end,
 		placeAt = placeAt,
 		holdAt = holdAt,
+		-- what the layout being placed costs, as the panel says it: metal, energy
+		-- and seconds, with the terraform counted
+		cost = function()
+			return panel.placing and panel.placing.cost or nil
+		end,
 		terrain = function(on)
 			setTerrain(on == true or on == "on")
 		end,
