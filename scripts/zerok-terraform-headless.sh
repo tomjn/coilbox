@@ -25,6 +25,10 @@
 #    selection on fresh ground and saves it again. ground_check.lua in the
 #    fixture checks both: the steps, where they are, the order, and that the
 #    second match left the same ground and saved the same steps.
+# 5. Only raise or only lower (issue #4804). A match raises a rock in each of
+#    two plazas and levels both 5 up, one ordered Only raise through place.lua
+#    and one both ways. The plaza with the choice must leave its rock standing
+#    and the other must cut it down.
 #
 # Every assertion is a count or a height the engine reported. A run in which
 # the engine never started, or the fixture never loaded, has nothing to
@@ -47,7 +51,8 @@
 #                            zk:stable.
 #   COILBOX_ZK_MAP           the map archive's filename under maps/.
 #   COILBOX_ZK_MAP_NAME      the name that archive declares.
-#   COILBOX_ZK_ONLY          "ground" to play only the save ground matches.
+#   COILBOX_ZK_ONLY          "ground" to play only the save ground matches, or
+#                            "only" to play only the only raise or lower match.
 #   COILBOX_ZK_KEEP          set to keep the logs when everything passes.
 set -euo pipefail
 
@@ -318,7 +323,7 @@ check_model() { # log
   done
 }
 
-if [ "${COILBOX_ZK_ONLY:-}" != ground ]; then
+if [ "${COILBOX_ZK_ONLY:-}" != ground ] && [ "${COILBOX_ZK_ONLY:-}" != only ]; then
 echo "== the default match: lasso widget on, a wall raised by 112"
 play default 112 0 0
 LOG="$WORK/default/match.log"
@@ -335,6 +340,7 @@ expect "WG.Terraform_GetNextTag was still there" "$(field "$(line "$LOG" 'PROBE 
 check_common "$LOG" 70 "$KNOWN_PROFILE_70" own
 fi
 
+if [ "${COILBOX_ZK_ONLY:-}" != only ]; then
 echo
 echo "== save the ground: build and save, then place the saved selection and save again"
 play ground-build 112 0 0 ground_build
@@ -349,6 +355,31 @@ else
   echo "  fail the build match saved no selection, see $WORK/ground-build/match.log"
   failures=$((failures + 1))
 fi
+fi
+
+echo
+echo "== only raise or only lower (#4804): two plazas levelled 5 up over a rock 60 high"
+# Both plazas are ordered through place.lua. The rock is raised at frame 1,
+# before the orders, which is the ground the gadget reads when it makes points.
+play only 112 0 0 ground_only
+LOG="$WORK/only/match.log"
+sample() { # when, plaza
+  line "$LOG" "GROUND plaza-sample at=$1 name=$2 "
+}
+expect "the raise plaza was ordered with volume selection 1" "$(field "$(line "$LOG" 'GROUND plaza-order name=raise ')" volume)" 1
+expect "the other plaza was ordered with volume selection 0" "$(field "$(line "$LOG" 'GROUND plaza-order name=both ')" volume)" 0
+for plaza in raise both; do
+  start="$(sample start "$plaza")"
+  end="$(sample end "$plaza")"
+  base="$(field "$(line "$LOG" "GROUND plaza-order name=$plaza ")" base)"
+  expect "$plaza: the rock stood 60 above the map before the order" \
+    "$(awk -v r="$(field "$start" rock)" -v o="$(field "$start" rock-orig)" 'BEGIN { printf "%.1f", r - o }')" "60.0"
+  expect "$plaza: the plaza is flat 5 above the ground under its middle" \
+    "$(awk -v p="$(field "$end" plain)" -v b="$base" 'BEGIN { printf "%.1f", p - b }')" "5.0"
+done
+expect "only raise leaves the rock standing" "$(field "$(sample end raise)" rock)" "$(field "$(sample start raise)" rock)"
+expect "both ways cuts the rock down to the plaza" \
+  "$(awk -v r="$(field "$(sample end both)" rock)" -v b="$(field "$(line "$LOG" 'GROUND plaza-order name=both ')" base)" 'BEGIN { printf "%.1f", r - b }')" "5.0"
 
 echo
 if [ "$failures" -eq 0 ]; then
