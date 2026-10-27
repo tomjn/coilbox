@@ -76,6 +76,24 @@ LATER.add(entry(8, { { unitID = 200, index = 5 } }))
 LATER.update(1)
 check("terraform work ahead does not count as a building: repair, other steps", same(sentTags(), { "200:8" }), show(sentTags()))
 
+-- a move to step clear of a step, or Zero-K's raw move or raw build, is over
+-- too soon for the order to arrive in (#4816)
+engine({ [200] = { def = 10, queue = { build(), { 10, { 0, 0, 0 } }, { 31109, { 0, 0, 0 } }, { 31110, { 0, 0, 0 } }, level(6) } } })
+LATER.add(entry(6, { { unitID = 200, index = 5 } }))
+LATER.update(1)
+check("a move ahead of the step does not count as a building, so the order goes while the building is built", same(sentTags(), { "200:6" }), show(sentTags()))
+
+-- the sides of a ring go together, so the shared corners are measured from
+-- the ground as it was (#4816)
+engine({ [200] = { def = 10, queue = { build(), level(11), build(), build(), level(12) } } })
+local ring = {}
+local side1, side2 = entry(11, { { unitID = 200, index = 2 } }), entry(12, { { unitID = 200, index = 5 } })
+side1.group, side2.group = ring, ring
+LATER.add(side1)
+LATER.add(side2)
+LATER.update(1)
+check("when one side of a ring is near, every side's order goes with it", same(sentTags(), { "200:11", "200:12" }) and LATER.count() == 0, show(sentTags()))
+
 engine({ [200] = { def = 10, queue = { build(), level(4), build(), level(9) } } })
 LATER.add(entry(4, { { unitID = 200, index = 2 } }))
 LATER.add(entry(9, { { unitID = 200, index = 4 } }))

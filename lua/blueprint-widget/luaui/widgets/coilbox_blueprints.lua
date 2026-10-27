@@ -125,7 +125,7 @@ end
 -- Modules
 --------------------------------------------------------------------------------
 
-local JSON, STORE, MODEL, PLACE, GROUND, RECORD, TERRAIN, TERRAFORM, LATER
+local JSON, STORE, MODEL, PLACE, GROUND, RECORD, TERRAIN, TERRAFORM, LATER, CLEAR
 
 local function include(name)
 	local path = MODULE_DIR .. name
@@ -714,6 +714,22 @@ end
 -- blueprint started again at 1 and a new one could show the last one's preview.
 local placingSerial = 0
 
+--- Where the selected builders are, the middle of them, which the work on a
+-- blueprint's ground sweeps towards (#4816). Nil with no builder selected.
+local function exitPoint()
+	local sx, sz, n = 0, 0, 0
+	for _, unitID in ipairs(can and can.builders or {}) do
+		local x, _, z = Spring.GetUnitPosition(unitID)
+		if x then
+			sx, sz, n = sx + x, sz + z, n + 1
+		end
+	end
+	if n == 0 then
+		return nil
+	end
+	return { x = sx / n, z = sz / n }
+end
+
 local function trackCursor()
 	local kind, pos
 	if placing.at then
@@ -760,7 +776,7 @@ local function trackCursor()
 	placing.foot, placing.anchors, placing.origin = foot, anchors, origin
 	-- the steps, for their outlines on the ground. They are laid again with the
 	-- ground as it is when the player clicks.
-	placing.steps = PLACE.laySteps(resolved, placing.rotation, placing.flip, origin, anchors, foot)
+	placing.steps = PLACE.laySteps(resolved, placing.rotation, placing.flip, origin, anchors, foot, exitPoint())
 	placingSerial = placingSerial + 1
 	placing.serial = placingSerial
 end
@@ -823,14 +839,20 @@ local function shiftHeld()
 	return shift == true
 end
 
+-- What the ground model reads, defined with the drawing below.
+local groundEnv
+
 --- The terrain argument of PLACE.plan for some laid steps: ordered when the
--- match can terraform and the player has Terrain on.
-local function terrainArg(steps)
+-- match can terraform and the player has Terrain on. The ground each step
+-- changes, from the model, is what the builders step clear of (#4816).
+local function terrainArg(steps, foot)
 	local available = can.terraformAvailable == true
+	local on = available and panel.terrain
 	return {
 		steps = steps,
-		on = available and panel.terrain,
+		on = on,
 		why = not available and "terraforming is not available here" or "Terrain is off",
+		ground = on and steps[1] and TERRAFORM.session(groundEnv()).apply(steps, foot) or nil,
 	}
 end
 
@@ -840,9 +862,9 @@ local function placeNow()
 	end
 	readSelection()
 	-- the ground under the pivot is read now, as the player clicks
-	local steps = PLACE.laySteps(placing.item.resolved, placing.rotation, placing.flip, placing.origin, placing.anchors, placing.foot)
-	local plan = PLACE.plan(placing.foot, can, shiftHeld(), panel.assist, terrainArg(steps))
-	local sent = PLACE.issue(plan, LATER)
+	local steps = PLACE.laySteps(placing.item.resolved, placing.rotation, placing.flip, placing.origin, placing.anchors, placing.foot, exitPoint())
+	local plan = PLACE.plan(placing.foot, can, shiftHeld(), panel.assist, terrainArg(steps, placing.foot))
+	local sent = PLACE.issue(plan, LATER, CLEAR)
 	say(placing.item.name .. ": " .. describe(plan, sent))
 	addPlan(plan.remainder, plan.stepRemainder)
 	placing.line = nil
@@ -865,7 +887,7 @@ local function buildPlan(index, only)
 	for i, p in ipairs(positions) do
 		if not only or i == only then
 			local status = Spring.TestBuildOrder(p.defID, p.x, p.y, p.z, p.facing)
-			foot[#foot + 1] = { defID = p.defID, def = p.def, x = p.x, y = p.y, z = p.z, facing = p.facing, blocked = status == 0, seq = p.seq }
+			foot[#foot + 1] = { defID = p.defID, def = p.def, x = p.x, y = p.y, z = p.z, facing = p.facing, blocked = status == 0, seq = p.seq, insideRing = p.insideRing }
 		end
 	end
 	-- One building takes the steps that come ahead of it, the whole plan takes
@@ -878,8 +900,8 @@ local function buildPlan(index, only)
 			later[#later + 1] = step
 		end
 	end
-	local plan = PLACE.plan(foot, can, shiftHeld(), panel.assist, terrainArg(steps))
-	local sent = PLACE.issue(plan, LATER)
+	local plan = PLACE.plan(foot, can, shiftHeld(), panel.assist, terrainArg(steps, foot))
+	local sent = PLACE.issue(plan, LATER, CLEAR)
 	plans[index].steps = later
 	for _, step in ipairs(plan.stepRemainder) do
 		table.insert(plans[index].steps, step)
@@ -1254,7 +1276,10 @@ function widget:Initialize()
 	if TERRAFORM then
 		LATER, err = include("pending_terraform.lua")
 	end
-	if not LATER then
+	if LATER then
+		CLEAR, err = include("step_clear.lua")
+	end
+	if not CLEAR then
 		log(LOG.ERROR, err)
 		widgetHandler:RemoveWidget(self)
 		return
@@ -1264,6 +1289,7 @@ function widget:Initialize()
 	PLACE.use({ Spring = Spring, UnitDefs = UnitDefs, UnitDefNames = UnitDefNames, Game = Game, WG = WG })
 	RECORD.use({ Spring = Spring, UnitDefs = UnitDefs, Game = Game, GROUND = GROUND })
 	LATER.use({ Spring = Spring })
+	CLEAR.use({ Spring = Spring, UnitDefs = UnitDefs })
 
 	store = STORE.new({
 		vfs = VFS,
@@ -1400,9 +1426,11 @@ function widget:Shutdown()
 	dropGL()
 end
 
--- Zero-K's terraform orders held until a builder nears their level step.
+-- Zero-K's terraform orders held until a builder nears their level step, and
+-- builders kept clear of a step while they work on it.
 function widget:GameFrame(frame)
 	LATER.update(frame)
+	CLEAR.update(frame)
 end
 
 function widget:ViewResize(x, y)
@@ -1817,7 +1845,7 @@ end
 
 --- What the ground model reads: the heightmap, the size of the map, the
 -- buildings standing now, and the game's terraform cost multiplier.
-local function groundEnv()
+function groundEnv()
 	return {
 		heightAt = Spring.GetGroundHeight,
 		corners = { x = Game.mapSizeX / 8 + 1, z = Game.mapSizeZ / 8 + 1 },

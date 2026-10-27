@@ -1,8 +1,8 @@
 /**
  * What the pointer works with on a layout's terrain steps (issue #4793): the
  * meshes a step is taken hold of by, the handles of the selected step, a thin
- * outline saying which one is selected, and the guide for a step being
- * drawn.
+ * outline saying which one is selected, a red line along each ring of wall
+ * with no way out, and the guide for a step being drawn.
  *
  * What a step looks like is not drawn here. That is `terrainLayer.ts` and the
  * relief it lies on (issue #4794). Everything here lies on the ground the
@@ -28,6 +28,7 @@ import {
   edgeMiddle,
   movedStep,
   stepEdges,
+  trappingRings,
 } from "@/blueprint/terrainEdit";
 import type { MapScene3D } from "@/lib/mapScene";
 import type { Point } from "@/scenario/model";
@@ -47,6 +48,10 @@ const GUIDE_COLOR = new THREE.Color(0, 1, 0);
 
 /** The selected step's outline and corner handles. */
 const SELECTED_COLOR = 0xffffff;
+
+/** A ring of wall with no way out (issue #4816), in the widget's red for
+ *  what the ground refuses (`blocked` in `model.lua`). */
+const TRAP_COLOR = new THREE.Color(1, 0.05, 0.1);
 
 /** How wide a wall is taken hold of, in elmos: the gadget's 5 by 5 corners
  *  round each wall point (`wallSegments` in `@/blueprint/terraform.ts`). */
@@ -324,9 +329,13 @@ export function createTerrainLayer(deps: TerrainLayerDeps): TerrainLayer {
     keys.clear();
     corners = [];
     const { origin } = shown;
+    const trapped = new Set(trappingRings(steps));
 
     steps.forEach((step, index) => {
       if (shown.hidden?.has(index) || step.points.length === 0) return;
+      if (trapped.has(index)) {
+        root.add(thinLine(origin, step.points, false, TRAP_COLOR));
+      }
       const outline = step.kind === "ramp" ? rampBand(step) : step.points;
       if (shown.pickable) {
         const flat =

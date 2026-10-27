@@ -141,7 +141,8 @@ play() { # name, wall height, own tags (0 or 1), lasso off (0 or 1), mode, steps
   cp "$FIXTURE"/luaui/widgets/*.lua "$game/LuaUI/Widgets/"
   # the blueprint widget's own placing code, which the probe drives
   cp "$ROOT/lua/blueprint-widget/luaui/coilbox_blueprints/place.lua" "$ROOT/lua/blueprint-widget/luaui/coilbox_blueprints/terraform.lua" \
-    "$ROOT/lua/blueprint-widget/luaui/coilbox_blueprints/pending_terraform.lua" "$game/LuaUI/coilbox_blueprints/"
+    "$ROOT/lua/blueprint-widget/luaui/coilbox_blueprints/pending_terraform.lua" "$ROOT/lua/blueprint-widget/luaui/coilbox_blueprints/step_clear.lua" \
+    "$game/LuaUI/coilbox_blueprints/"
   sed "s|@BASE@|$BASE_NAME|g" "$FIXTURE/modinfo.lua" >"$game/modinfo.lua"
   if [ "$mode" != terraform ]; then
     # The ground probe saves with the widget's own modules.
@@ -240,10 +241,10 @@ queue_at() { # log, case, frame
 
 check_common() { # log, height, profile, tag source
   local log="$1"
-  expect "the fixture created its builders" "$(grep -c 'FIXTURE builder ' "$log" || true)" 24
+  expect "the fixture created its builders" "$(grep -c 'FIXTURE builder ' "$log" || true)" 30
   expect "the fixture ended the match" "$(grep -c 'FIXTURE done ' "$log" || true)" 1
   expect "Zero-K did not end the match early" "$(grep -c 'game_message: .* has been destroyed' "$log" || true)" 0
-  expect "the probe ordered every case" "$(grep -c 'PROBE ordered ' "$log" || true)" 20
+  expect "the probe ordered every case" "$(grep -c 'PROBE ordered ' "$log" || true)" 23
   expect "tags came from" "$(field "$(line "$log" 'PROBE ordered case=1 ')" source)" "$4"
   expect "builders carry the level command as" "$(field "$(line "$log" 'PROBE level-desc ')" action)" "levelground"
 
@@ -268,14 +269,17 @@ check_common() { # log, height, profile, tag source
   expect "case 7 queue with the raise command" "$(queue_at "$log" 7 120)" "40,39737,-599"
 
   # The blueprint widget's placing code: a wall and a turret on it, with the
-  # buildings and the steps in the blueprint's order, and a wall alone.
+  # buildings and the steps in the blueprint's order, and a wall alone. Each
+  # builder steps clear of the wall first (#4816), with a move, 10. Without
+  # shift that is done by frame 120, and with it the move waits behind the
+  # solar collector.
   expect "case 11 queue from a blueprint without shift" "$(queue_at "$log" 11 120)" "40,39736,-599"
-  expect "case 12 queue from a blueprint with shift" "$(queue_at "$log" 12 120)" "-406,39736,-599"
+  expect "case 12 queue from a blueprint with shift" "$(queue_at "$log" 12 120)" "-406,10,39736,-599"
   expect "case 14 queue from a blueprint of a wall alone" "$(queue_at "$log" 14 120)" "40,39736"
   expect "case 11 wall from a blueprint" "$(profile "$log" 11)" "$3"
   expect "case 14 wall from a blueprint alone" "$(profile "$log" 14)" "$3"
   expect "case 14 built no turret" "$(grep -c 'FIXTURE created case=14 .*unit=turretlaser' "$log" || true)" 0
-  expect "the blueprint cases were not skipped or off the map" "$(grep -c 'PROBE blueprint .*skipped=0 offMap=0' "$log" || true)" 10
+  expect "the blueprint cases were not skipped or off the map" "$(grep -c 'PROBE blueprint .*skipped=0 offMap=0' "$log" || true)" 13
   expect "case 1 ground across the wall" "$(profile "$log" 1)" "$3"
 
   # A wall behind more than two minutes of buildings (#4803), for a builder
@@ -289,8 +293,43 @@ check_common() { # log, height, profile, tag source
   # Split up with three builders on a raised pad with five turrets (#4817): no
   # turret may go up before the pad is raised, which would leave a notch.
   pad_turrets "$log" 20
+  # The walled outpost, together and split up (#4816): the solar collector
+  # inside the ring goes up before the ring, on the ground as it was, and a
+  # turret on each corner of the wall.
+  for case in 21 22; do
+    expect "case $case: turrets on the wall finished" "$(grep -c "FIXTURE finished case=$case .*unit=turretlaser " "$log" || true)" 4
+    expect "case $case: every turret stands on ground raised by" \
+      "$(grep -E "FIXTURE finished case=$case .*unit=turretlaser " "$log" | awk '{ for (i = 1; i <= NF; i++) { split($i, kv, "="); v[kv[1]] = kv[2] } printf "%.1f\n", v["y"] - v["orig"] }' | sort -u | tr '\n' ' ')" "$2.0 "
+    expect "case $case: the solar collector inside finished on the ground as it was" \
+      "$(awk -v y="$(field "$(line "$log" "FIXTURE finished case=$case .*unit=energysolar ")" y)" -v o="$(field "$(line "$log" "FIXTURE finished case=$case .*unit=energysolar ")" orig)" 'BEGIN { if (y == "") print "none"; else printf "%.1f", y - o }')" "0.0"
+    expect "case $case: the solar collector was started before the ring" \
+      "$(awk -v s="$(field "$(line "$log" "FIXTURE created case=$case .*unit=energysolar")" frame)" -v t="$(field "$(line "$log" "FIXTURE created case=$case .*unit=terraunit")" frame)" 'BEGIN { print (s != "" && t != "" && s + 0 < t + 0) ? "yes" : "no (" s " against " t ")" }')" yes
+    # The builder that put up the solar collector inside left with the other
+    # before the ring started to rise (#4816).
+    expect "case $case: builders outside the ring when it starts to rise" \
+      "$(grep -E "FIXTURE ring-start case=$case " "$log" | grep -c 'inside=false' || true) of $(grep -cE "FIXTURE ring-start case=$case " "$log" || true)" "2 of 2"
+  done
+  leave "$log"
   expect "case 9 ground across the long wall" "$(profile "$log" 9)" "$3"
   check_model "$log"
+}
+
+# Every builder the blueprint widget's placing code ordered has finished its
+# orders and can walk away south at the end (#4816): not stranded on what it
+# raised, and not shut inside a ring of wall. Zero-K stops a walker sent to a
+# spot of its own within 16 elmos of it (cmd_raw_move.lua, loneStopDist), or a
+# little short of that when it sees something near the goal (IsPathFree). In
+# the runs for #4816 every builder that walked away ended within 26 of its spot,
+# and every stranded one 60 or more away, so 32 tells them apart.
+leave() { # log
+  local log="$1" count
+  count="$(grep -c 'FIXTURE leave-start ' "$log" || true)"
+  expect "builders of the blueprint cases sent to walk away" "$count" 19
+  expect "builders that had not finished their orders" "$(grep -E 'FIXTURE leave-start ' "$log" | grep -vc ' queued=0$' || true)" 0
+  grep -E 'FIXTURE leave-start ' "$log" | grep -v ' queued=0$' | sed 's/^.*FIXTURE /    /' || true
+  local stuck
+  stuck="$(grep -E 'FIXTURE leave-end ' "$log" | awk '{ for (i = 1; i <= NF; i++) { split($i, kv, "="); v[kv[1]] = kv[2] } if (v["away"] + 0 > 32) printf "case %s unit %s %s away; ", v["case"], v["unit"], v["away"] }')"
+  expect "builders that could not walk away" "${stuck:-none}" none
 }
 
 # What Zero-K estimated for a case's terraform units, added up.
@@ -320,7 +359,7 @@ check_model() { # log
   defs="$(line "$log" 'FIXTURE defs ')"
   speed="$(field "$defs" buildSpeed)"
   echo "  info $defs"
-  for case in 9 11 14 15 16 17 20; do
+  for case in 9 11 14 15 16 17 20 23; do
     model="$(field "$(line "$log" "FIXTURE model case=$case ")" metal)"
     work="$(field "$(line "$log" "FIXTURE model case=$case ")" work)"
     game="$(game_metal "$log" "$case")"
@@ -331,7 +370,7 @@ check_model() { # log
     expect "case $case: the panel's terraform metal is the game's estimate, to the rounding of the log" \
       "$(awk -v m="$model" -v g="$game" -v n="$units" 'BEGIN { d = m - g; if (d < 0) d = -d; print (m != "" && g != "" && d <= (n + 1) * 0.00005 + 1e-9) ? "yes" : "no (" m " against " g ")" }')" yes
   done
-  for case in 9 14 15 16 17 20; do
+  for case in 9 14 15 16 17 20 23; do
     compared="$(line "$log" "FIXTURE compare case=$case ")"
     worst="$(field "$compared" worst)"
     echo "  info case $case ground: $compared"

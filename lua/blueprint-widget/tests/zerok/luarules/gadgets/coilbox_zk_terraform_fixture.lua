@@ -18,7 +18,7 @@ function gadget:GetInfo()
 	}
 end
 
-local CASES = 20
+local CASES = 23
 -- The case whose builder Zero-K's gadget stops checking. Zero-K v1.14.10.3's
 -- unit_terraform.lua moves the last constructor into a dead one's slot without
 -- telling it its new index (UnitDestroyed). When that one dies too, it moves the
@@ -27,14 +27,26 @@ local CASES = 20
 local UNCHECKED_CASE = 19
 local SPARES_DIE_FRAME = 33
 -- Cases with more than one builder, which share the terraform and the turret.
-local BUILDERS = { [10] = 2, [13] = 2, [20] = 3 }
+local BUILDERS = { [10] = 2, [13] = 2, [20] = 3, [21] = 2, [22] = 2, [23] = 2 }
+-- The cases the blueprint widget's placing code orders. Near the end each of
+-- their builders is sent to a spot of its own west of its lane, between the
+-- lanes and on the strip, to show it stands on ground it can leave: not on top
+-- of what it raised, and not inside a ring of wall (#4816).
+local FIRST_BLUEPRINT_CASE = 11
 -- Lanes run east to west along the middle of the map, side by side, this far
 -- apart.
 local LANE_GAP = 512
 local BUILDER_OFFSET = -192
 local CREATE_FRAME = 30
 local REPORT_EVERY = 300
-local END_FRAME = tonumber((Spring.GetModOptions() or {}).coilbox_end_frame) or 9000
+-- The builders have until coilbox_end_frame for their orders. Then the
+-- blueprint cases' builders get 30 seconds to walk away, far more than the few
+-- hundred elmos take a Conjurer at its speed of 54, and the match ends.
+-- Where the team's starting commander is put, out of every lane's way: the
+-- flat east end of the map, far north of the lanes.
+local COMMANDER_AT = { x = 11700, z = 250 }
+local LEAVE_FRAME = tonumber((Spring.GetModOptions() or {}).coilbox_end_frame) or 9000
+local END_FRAME = LEAVE_FRAME + 900
 local TEAM = 0
 
 -- The order the cases' builders are created in. The unchecked case goes last,
@@ -47,9 +59,19 @@ for i = 1, CASES do
 end
 CREATE_ORDER[#CREATE_ORDER + 1] = UNCHECKED_CASE
 
+-- The first 20 lanes run along the middle of the map, where SpeedMetal is a
+-- strip 352 elmos wide. The cases with a ring of wall need more room, so they
+-- go where the map is flat from edge to edge: east of x = 11520 and west of
+-- x = 1792 (read from the map's heightmap).
+local ROW = 20
+local WIDE_LANES = { [21] = 12032, [22] = 12672, [23] = 1024 }
+
 local function lane(index)
-	local cx = 16 * math.floor(Game.mapSizeX / 32) + (index - (CASES + 1) / 2) * LANE_GAP
 	local cz = 16 * math.floor(Game.mapSizeZ / 32)
+	if WIDE_LANES[index] then
+		return WIDE_LANES[index], cz
+	end
+	local cx = 16 * math.floor(Game.mapSizeX / 32) + (index - (ROW + 1) / 2) * LANE_GAP
 	return 16 * math.floor(cx / 16), cz
 end
 
@@ -63,9 +85,46 @@ end
 if gadgetHandler:IsSyncedCode() then
 	local builders = {}
 	local caseOfBuilder = {}
+	-- The walled outposts' rings, which run 160 each way from the lane's middle.
+	-- When the ground along a ring first rises, the fixture says where each of
+	-- the case's builders is, inside the ring or out (#4816).
+	local OUTPOST_HALF = 160
+	local ringStarted = {}
+	local function watchRing(case)
+		if ringStarted[case] then
+			return
+		end
+		-- the ground along the ring, at its corners and the middles of its sides
+		local cx, cz = lane(case)
+		for _, d in ipairs({ { -1, -1 }, { 0, -1 }, { 1, -1 }, { 1, 0 }, { 1, 1 }, { 0, 1 }, { -1, 1 }, { -1, 0 } }) do
+			local x, z = cx + d[1] * OUTPOST_HALF, cz + d[2] * OUTPOST_HALF
+			if Spring.GetGroundHeight(x, z) > Spring.GetGroundOrigHeight(x, z) then
+				ringStarted[case] = true
+				for _, b in ipairs(builders) do
+					if caseOfBuilder[b] == case and Spring.ValidUnitID(b) then
+						local x, _, z = Spring.GetUnitPosition(b)
+						local inside = math.abs(x - cx) < OUTPOST_HALF and math.abs(z - cz) < OUTPOST_HALF
+						Spring.Echo(string.format("FIXTURE ring-start case=%d frame=%d unit=%d at=%.0f,%.0f inside=%s", case, Spring.GetGameFrame(), b, x - cx, z - cz, tostring(inside)))
+					end
+				end
+				return
+			end
+		end
+	end
+
+	-- where each builder is sent at LEAVE_FRAME, its own spot west of its lane
+	local leaveTo = {}
+
+	--- Where a builder stands, how far it has changed the ground under it, and
+	-- how many orders it still holds.
+	local function standing(unitID)
+		local x, _, z = Spring.GetUnitPosition(unitID)
+		return x, z, Spring.GetGroundHeight(x, z) - Spring.GetGroundOrigHeight(x, z), Spring.GetUnitCommandCount(unitID) or -1
+	end
 	local terraunitDefID = UnitDefNames.terraunit.id
 	local turretDefID = UnitDefNames.turretlaser.id
 	local heavyDefID = UnitDefNames.turretheavylaser.id
+	local solarDefID = UnitDefNames.energysolar.id
 	local spares = {}
 
 	-- A constructor that belongs to no case, there to be killed.
@@ -160,7 +219,7 @@ if gadgetHandler:IsSyncedCode() then
 		if unitDefID == terraunitDefID then
 			pendingEstimate[unitID] = Spring.GetGameFrame() + 2
 		end
-		if unitDefID == terraunitDefID or unitDefID == turretDefID then
+		if unitDefID == terraunitDefID or unitDefID == turretDefID or unitDefID == solarDefID then
 			local x, y, z = Spring.GetUnitPosition(unitID)
 			Spring.Echo(string.format("FIXTURE created case=%d frame=%d unit=%s id=%d x=%.1f y=%.1f z=%.1f",
 				caseAt(x, z), Spring.GetGameFrame(), UnitDefs[unitDefID].name, unitID, x, y, z))
@@ -172,10 +231,10 @@ if gadgetHandler:IsSyncedCode() then
 			local x, _, z = Spring.GetUnitPosition(unitID)
 			Spring.Echo(string.format("FIXTURE finished case=%d frame=%d unit=turretheavylaser id=%d", caseAt(x, z), Spring.GetGameFrame(), unitID))
 		end
-		if unitDefID == turretDefID then
+		if unitDefID == turretDefID or unitDefID == solarDefID then
 			local x, y, z = Spring.GetUnitPosition(unitID)
-			Spring.Echo(string.format("FIXTURE finished case=%d frame=%d unit=turretlaser id=%d x=%.1f y=%.1f z=%.1f ground=%.1f orig=%.1f",
-				caseAt(x, z), Spring.GetGameFrame(), unitID, x, y, z,
+			Spring.Echo(string.format("FIXTURE finished case=%d frame=%d unit=%s id=%d x=%.1f y=%.1f z=%.1f ground=%.1f orig=%.1f",
+				caseAt(x, z), Spring.GetGameFrame(), UnitDefs[unitDefID].name, unitID, x, y, z,
 				Spring.GetGroundHeight(x, z), Spring.GetGroundOrigHeight(x, z)))
 		end
 	end
@@ -235,6 +294,16 @@ if gadgetHandler:IsSyncedCode() then
 			end
 		end
 		if frame == CREATE_FRAME then
+			-- The team's starting commander stands at one of the map's start
+			-- positions, which can be inside a case's lane: in the ring of the
+			-- walled outpost it was shut in by walls it had nothing to do with.
+			-- It is moved where no lane reaches, before any builder is made.
+			for _, unitID in ipairs(Spring.GetTeamUnits(TEAM) or {}) do
+				local x, _, z = Spring.GetUnitPosition(unitID)
+				Spring.SetUnitPosition(unitID, COMMANDER_AT.x, COMMANDER_AT.z)
+				Spring.GiveOrderToUnit(unitID, CMD.STOP, {}, 0)
+				Spring.Echo(string.format("FIXTURE start-unit moved id=%d unit=%s from=%.0f,%.0f nearest=%d", unitID, UnitDefs[Spring.GetUnitDefID(unitID)].name, x, z, caseAt(x, z)))
+			end
 			local mx, mz = lane(1)
 			spare(mx - 256, mz - 256)
 			for _, i in ipairs(CREATE_ORDER) do
@@ -251,6 +320,9 @@ if gadgetHandler:IsSyncedCode() then
 					local unitID = Spring.CreateUnit("cloakcon", bx, Spring.GetGroundHeight(bx, bz), bz, "east", TEAM)
 					builders[#builders + 1] = unitID
 					caseOfBuilder[unitID] = i
+					-- the ring cases have room, so their spots are well clear of the slope
+					local out = WIDE_LANES[i] and 384 or LANE_GAP / 2
+					leaveTo[unitID] = { x = cx - out, z = cz - 128 + (n - 1) * 48 }
 					Spring.SetUnitRulesParam(unitID, "coilbox_case", i)
 					Spring.SetUnitRulesParam(unitID, "coilbox_lane_x", cx)
 					Spring.SetUnitRulesParam(unitID, "coilbox_lane_z", cz)
@@ -277,11 +349,37 @@ if gadgetHandler:IsSyncedCode() then
 		if frame > CREATE_FRAME and (frame % REPORT_EVERY == 0 or frame == 90 or frame == 120) then
 			for _, unitID in ipairs(builders) do
 				if Spring.ValidUnitID(unitID) then
-					Spring.Echo(string.format("FIXTURE queue case=%d frame=%d unit=%d %s", caseOfBuilder[unitID], frame, unitID, queue(unitID)))
+					-- where it stands against its lane, and how far the ground under it
+					-- has moved, so a builder stranded on what it raised shows
+					local x, z, raised = standing(unitID)
+					local lx, lz = lane(caseOfBuilder[unitID])
+					Spring.Echo(string.format("FIXTURE queue case=%d frame=%d unit=%d at=%.0f,%.0f raised=%.1f %s", caseOfBuilder[unitID], frame, unitID, x - lx, z - lz, raised, queue(unitID)))
+				end
+			end
+		end
+		watchRing(21)
+		watchRing(22)
+		if frame == LEAVE_FRAME then
+			for _, unitID in ipairs(builders) do
+				local case = caseOfBuilder[unitID]
+				if case >= FIRST_BLUEPRINT_CASE and Spring.ValidUnitID(unitID) then
+					local x, z, raised, queued = standing(unitID)
+					local cx, cz = lane(case)
+					Spring.Echo(string.format("FIXTURE leave-start case=%d unit=%d x=%.0f z=%.0f raised=%.1f queued=%d", case, unitID, x - cx, z - cz, raised, queued))
+					local to = leaveTo[unitID]
+					Spring.GiveOrderToUnit(unitID, CMD.MOVE, { to.x, Spring.GetGroundHeight(to.x, to.z), to.z }, 0)
 				end
 			end
 		end
 		if frame == END_FRAME then
+			for _, unitID in ipairs(builders) do
+				local case = caseOfBuilder[unitID]
+				if case >= FIRST_BLUEPRINT_CASE and Spring.ValidUnitID(unitID) then
+					local x, z = standing(unitID)
+					local to = leaveTo[unitID]
+					Spring.Echo(string.format("FIXTURE leave-end case=%d unit=%d away=%.1f", case, unitID, math.sqrt((x - to.x) ^ 2 + (z - to.z) ^ 2)))
+				end
+			end
 			for case, list in pairs(predicted) do
 				-- the turret's own levelling is the engine's, not the model's
 				if case ~= 11 then

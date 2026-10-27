@@ -26,10 +26,8 @@
 #
 # Usage: scripts/mission-sf-extension.sh [--keep]
 #
-#   COILBOX_SPRING_HEADLESS  the binary. Default is the first spring-headless
-#                            with base content beside it or in the data
-#                            directory: loose in COILBOX_SPRING_DATA, then the
-#                            installed engines under its engine/, then PATH.
+#   COILBOX_SPRING_HEADLESS  a spring-headless binary to use instead of
+#                            engine 2026.09.01 (scripts/mission-engine.sh).
 #   COILBOX_SPRING_DATA      where games/ and maps/ are. Default ~/.spring.
 #   COILBOX_SF_GAME          the game folder under games/. It must be a loose
 #                            .sdd, and the runtime is installed into it. Default

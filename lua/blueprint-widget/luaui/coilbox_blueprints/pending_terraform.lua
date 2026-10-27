@@ -23,6 +23,12 @@ M.CMD_LEVEL = 39736
 -- puts in front of a level step, and Zero-K's terraform steps (ramp, level,
 -- raise, smooth, restore). None of them counts as a building ahead.
 local TERRAFORM_WORK = { [40] = true, [39734] = true, [39736] = true, [39737] = true, [39738] = true, [39739] = true }
+-- Nor is the move placing puts in front of a level step to step clear of it
+-- (#4816): the engine's move, and Zero-K's raw move and raw build
+-- (customcmds.lua), which a move turns into and which walks a builder into
+-- range. A move is over in a moment, too soon for the order to arrive in.
+-- The wait builders hold at their spots until all are clear goes the same way.
+local STEPPING = { [5] = true, [10] = true, [31109] = true, [31110] = true }
 -- How many buildings may still be ahead of a level step when its order goes.
 M.AHEAD = 1
 -- How often, in game frames, the whole of each queue is read to drop orders
@@ -37,7 +43,10 @@ function M.use(engine)
 	Spring = engine.Spring
 end
 
--- Orders not yet sent: { unitID, params, tag, builders = unitID[], seen }
+-- Orders not yet sent: { unitID, params, tag, builders = unitID[], seen, group }.
+-- Orders with the same group, the sides of one ring of wall, go together: a
+-- raise is measured from the ground as it is when ordered, and the sides share
+-- their corners (#4816).
 local pending = {}
 
 --- Forget every held order, for a test.
@@ -74,7 +83,7 @@ function M.add(t)
 	for _, at in ipairs(t.levelAt or {}) do
 		builders[#builders + 1] = at.unitID
 	end
-	pending[#pending + 1] = { unitID = t.unitID, params = t.params, tag = t.tag, builders = builders, seen = false }
+	pending[#pending + 1] = { unitID = t.unitID, params = t.params, tag = t.tag, builders = builders, seen = false, group = t.group }
 end
 
 --- The tags of the level steps near the front of a builder's queue: those with
@@ -89,7 +98,7 @@ local function nearTags(unitID)
 		end
 		if id == M.CMD_LEVEL then
 			tags[#tags + 1] = tag
-		elseif not TERRAFORM_WORK[id] then
+		elseif not (TERRAFORM_WORK[id] or STEPPING[id]) then
 			ahead = ahead + 1
 			if ahead > M.AHEAD then
 				break
@@ -132,6 +141,8 @@ function M.update(frame)
 	local near = {}
 	local sweep = frame % M.SWEEP_EVERY == 0
 	local keep = {}
+	-- the groups sent this frame, by the builder they went to
+	local goGroup = {}
 	for _, p in ipairs(pending) do
 		local by
 		for _, unitID in ipairs(p.builders) do
@@ -144,6 +155,9 @@ function M.update(frame)
 		end
 		if by then
 			send(p, by)
+			if p.group then
+				goGroup[p.group] = by
+			end
 		elseif sweep then
 			-- held until its level step has reached a queue, since the plan's
 			-- orders arrive a frame or more after they are given, and dropped
@@ -162,7 +176,16 @@ function M.update(frame)
 			keep[#keep + 1] = p
 		end
 	end
-	pending = keep
+	-- the rest of a group goes with the first of it
+	local still = {}
+	for _, p in ipairs(keep) do
+		if p.group and goGroup[p.group] then
+			send(p, goGroup[p.group])
+		else
+			still[#still + 1] = p
+		end
+	end
+	pending = still
 end
 
 --- Send every held order whose level step is still queued, for when the

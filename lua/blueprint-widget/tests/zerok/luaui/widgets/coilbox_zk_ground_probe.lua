@@ -14,9 +14,10 @@
 -- does, with the coilbox widget's own record.lua and ground.lua.
 --
 -- ground_place reads the saved selection from LuaUI/coilbox_ground_steps.lua,
--- which the driver writes from the first match's log, and orders it again at
--- the same place on fresh ground: the buildings beside the steps, the steps,
--- then the buildings on them. Then it saves again.
+-- which the driver writes from the first match's log, and places it again at
+-- the same place on fresh ground with the blueprint widget's own placing code:
+-- the steps, each builder stepping clear of a step before it works on it, then
+-- the buildings. Then it saves again.
 --
 -- ground_only (issue #4804) levels two plazas 5 above the ground, each with a
 -- rock 60 high standing in it, which the fixture gadget raises. One is ordered
@@ -57,7 +58,7 @@ local SHOTS = (Spring.GetModOptions() or {}).coilbox_shots == "1"
 local cx = 16 * math.floor(Game.mapSizeX / 32)
 local cz = 16 * math.floor(Game.mapSizeZ / 32)
 
-local JSON, GROUND, RECORD, PLACE
+local JSON, GROUND, RECORD, PLACE, TERRAFORM, LATER, CLEAR
 local builders = {}
 local tag = 200000
 local shift = 0
@@ -112,6 +113,18 @@ local function orderBuild()
 	build("turretlaser", cx - 576, cz)
 	build("energysolar", cx, cz)
 	build("energysolar", cx - 960, cz)
+end
+
+--- The middle of some builders, which the widget sweeps the work towards.
+local function middleOf(units)
+	local sx, sz, n = 0, 0, 0
+	for _, unitID in ipairs(units) do
+		local x, _, z = Spring.GetUnitPosition(unitID)
+		if x then
+			sx, sz, n = sx + x, sz + z, n + 1
+		end
+	end
+	return n > 0 and { x = sx / n, z = sz / n } or nil
 end
 
 --- The two plazas of ground_only: where each is centred, and the order's
@@ -169,21 +182,24 @@ local function orderPlace()
 		return
 	end
 	local entry, ax, az = saved.entry, saved.anchor.x, saved.anchor.z
-	local steps = entry.terrain or {}
-	for i = 0, #entry.buildings do
-		for _, s in ipairs(steps) do
-			if s.before == i then
-				local points = {}
-				for j, p in ipairs(s.points) do
-					points[j] = { x = ax + p.x, z = az + p.z }
-				end
-				terraform(TYPE_RAISE, s.shape == "area" and 1 or 0, s.height, points)
-			end
+	-- placed with the blueprint widget's own placing code, which sends each
+	-- builder clear of a step's ground before it works on it (#4816)
+	PLACE.use({ Spring = Spring, UnitDefs = UnitDefs, UnitDefNames = UnitDefNames, Game = Game, WG = WG })
+	local resolved = PLACE.resolve(entry)
+	local foot = PLACE.footprint(resolved, 0, ax, az)
+	for i, p in ipairs(foot) do
+		p.seq = i
+	end
+	local steps = PLACE.laySteps(resolved, 0, nil, nil, { { x = ax, z = az } }, foot, middleOf(builders))
+	local ground = TERRAFORM.session({ heightAt = Spring.GetGroundHeight, corners = { x = Game.mapSizeX / 8 + 1, z = Game.mapSizeZ / 8 + 1 }, structures = {} }).apply(steps, foot)
+	local plan = PLACE.plan(foot, PLACE.capabilities(builders), false, "help", { steps = steps, on = true, ground = ground })
+	PLACE.issue(plan, LATER, CLEAR)
+	for _, order in ipairs(plan.orders) do
+		local parts = {}
+		for _, c in ipairs(order.cmds) do
+			parts[#parts + 1] = c[1] == PLACE.CMD_MOVE and string.format("move@%d,%d", c[2][1] - cx, c[2][3] - cz) or tostring(c[1])
 		end
-		local b = entry.buildings[i + 1]
-		if b then
-			build(b.def, ax + b.offset.x, az + b.offset.z, b.facing)
-		end
+		say("orders unit=%d %s", order.unitID, table.concat(parts, ","))
 	end
 	say("placed steps=%d buildings=%d", #steps, #entry.buildings)
 end
@@ -251,6 +267,12 @@ function widget:Initialize()
 	GROUND = VFS.Include("LuaUI/coilbox_blueprints/ground.lua")
 	RECORD = VFS.Include("LuaUI/coilbox_blueprints/record.lua")
 	RECORD.use({ Spring = Spring, UnitDefs = UnitDefs, Game = Game, GROUND = GROUND })
+	PLACE = VFS.Include("LuaUI/coilbox_blueprints/place.lua", nil, VFS.RAW_FIRST)
+	TERRAFORM = VFS.Include("LuaUI/coilbox_blueprints/terraform.lua", nil, VFS.RAW_FIRST)
+	LATER = VFS.Include("LuaUI/coilbox_blueprints/pending_terraform.lua", nil, VFS.RAW_FIRST)
+	LATER.use({ Spring = Spring })
+	CLEAR = VFS.Include("LuaUI/coilbox_blueprints/step_clear.lua", nil, VFS.RAW_FIRST)
+	CLEAR.use({ Spring = Spring, UnitDefs = UnitDefs })
 	say("loaded mode=%s tolerance=%s centre=%d,%d", MODE, tostring(GROUND.TOLERANCE), cx, cz)
 	-- Zero-K ends a match at its first frame when the other allyteam has no
 	-- player or AI in it, unless cheats are on (game_over.lua, ProcessLastAlly).
@@ -319,6 +341,8 @@ local function shots(frame)
 end
 
 function widget:GameFrame(frame)
+	LATER.update(frame)
+	CLEAR.update(frame)
 	if SHOTS then
 		shots(frame)
 	end
