@@ -673,6 +673,74 @@ local wide = MODEL.layoutMap({ buildings = {
 } }, 30)
 check("a wide layout is centred top to bottom", math.abs(wide[1].y - (30 - wide[1].y - wide[1].h)) < 1e-9, show(wide))
 check("an empty layout maps to nothing", #MODEL.layoutMap({ buildings = {} }, 30) == 0)
+check("an empty layout with no steps has no marks", #select(2, MODEL.layoutMap({ buildings = {} }, 30, {})) == 0)
+
+-- terrain steps in the layout map (issue #4795)
+local function near(a, b)
+	return math.abs(a - b) < 1e-6
+end
+local wallStep = { kind = "raise", shape = "wall", points = { { x = 0, z = 0 }, { x = 160, z = 0 } }, height = 16, before = 0 }
+local wallBoxes, wallMarks = MODEL.layoutMap({ buildings = {} }, 30, { wallStep })
+check("a layout of one wall has a mark and no building boxes", #wallBoxes == 0 and #wallMarks == 1, show(wallMarks))
+local wallMark = wallMarks[1]
+check("a wall is drawn 9.6 elmos thick, scaled with the map", near(wallMark.thickness, 9.6 * 30 / 169.6), show(wallMark))
+check("a layout with no buildings fills the box along its longer side, wall ends included", (function()
+	local lo = math.min(wallMark.points[1].x, wallMark.points[2].x) - wallMark.thickness / 2
+	local hi = math.max(wallMark.points[1].x, wallMark.points[2].x) + wallMark.thickness / 2
+	return near(lo, 0) and near(hi, 30)
+end)(), show(wallMark))
+check("a wall alone is centred top to bottom", near(wallMark.points[1].y, 15) and near(wallMark.points[2].y, 15), show(wallMark))
+check("a wall of raised ground is up", wallMark.tone == "up" and wallMark.band == nil and wallMark.arrow == nil)
+
+local padStep = {
+	kind = "level",
+	shape = "area",
+	points = { { x = -80, z = -80 }, { x = 80, z = -80 }, { x = 80, z = 80 }, { x = -80, z = 80 } },
+	height = 0,
+	before = 0,
+}
+local padBoxes, padMarks = MODEL.layoutMap(
+	{ buildings = { { def = { xsize = 4, zsize = 4 }, facing = 0, offset = { x = 0, z = 0 } } } },
+	30,
+	{ padStep }
+)
+check("the frame covers a pad round a factory, so the building is in the middle", near(padBoxes[1].x + padBoxes[1].w / 2, 15) and near(padBoxes[1].y + padBoxes[1].h / 2, 15), show(padBoxes))
+check("a pad fills the whole box", (function()
+	local lo, hi = math.huge, -math.huge
+	for _, p in ipairs(padMarks[1].points) do
+		lo, hi = math.min(lo, p.x), math.max(hi, p.x)
+	end
+	return near(lo, 0) and near(hi, 30)
+end)(), show(padMarks))
+check("a level of height 0 moves the ground neither way", padMarks[1].tone == "even")
+check("an area is flipped as the buildings are, z down the screen", (function()
+	local _, marks = MODEL.layoutMap({ buildings = {} }, 30, { { kind = "raise", shape = "area", points = { { x = 0, z = 0 }, { x = 16, z = 0 }, { x = 0, z = 32 } }, height = 4, before = 0 } })
+	local top, bottom = marks[1].points[3], marks[1].points[1]
+	return top.y < bottom.y
+end)())
+local _, dugMarks = MODEL.layoutMap({ buildings = {} }, 30, {
+	{ kind = "raise", shape = "wall", points = { { x = 0, z = 0 }, { x = 16, z = 0 } }, height = -8, before = 0 },
+	{ kind = "smooth", shape = "wall", points = { { x = 0, z = 0 }, { x = 16, z = 0 } }, before = 0 },
+})
+check("dug ground is down and a smooth is even", dugMarks[1].tone == "down" and dugMarks[2].tone == "even", show(dugMarks))
+
+local function ramp(low, high)
+	local _, marks = MODEL.layoutMap({ buildings = {} }, 30, { { kind = "ramp", shape = "wall", points = { { x = 0, z = 0 }, { x = 80, z = 0 } }, heights = { low, high }, width = 32, before = 0 } })
+	return marks[1]
+end
+local upRamp, downRamp = ramp(0, 20), ramp(20, 0)
+check("a ramp is a band of four corners", #upRamp.band == 4, show(upRamp))
+check("a ramp's band is its full width across, in map units", (function()
+	local lo, hi = math.huge, -math.huge
+	for _, p in ipairs(upRamp.band) do
+		lo, hi = math.min(lo, p.y), math.max(hi, p.y)
+	end
+	return near(hi - lo, 30 * 32 / 80)
+end)(), show(upRamp.band))
+check("the arrow of a ramp rising to the right points right", upRamp.arrow ~= nil and upRamp.arrow[2].x > upRamp.arrow[1].x, show(upRamp.arrow))
+check("the arrow of a ramp falling to the right points left", downRamp.arrow ~= nil and downRamp.arrow[2].x < downRamp.arrow[1].x, show(downRamp.arrow))
+check("a ramp between equal heights has no arrow", ramp(5, 5).arrow == nil)
+check("a ramp takes its tone from the mean of its two heights", ramp(-30, 10).tone == "down" and ramp(0, 20).tone == "up" and ramp(-5, 5).tone == "even")
 check("each row draws its layout map", (function()
 	local maps, buildings = 0, 0
 	for _, r in ipairs(L.rects) do
@@ -814,6 +882,78 @@ check("a layout with both counts both", detailOf("library:both") == "coilbox | 1
 check("a layout with no steps counts buildings only", detailOf("library:plain") == "coilbox | 1 building", detailOf("library:plain"))
 check("a layout of walls only is not offered to step through when nothing can terraform", MODEL.step(terrainState, 1) == "library:both" and MODEL.step(terrainState, -1) == "library:plain", tostring(MODEL.step(terrainState, 1)))
 check("it is under no tab but All", terrainState.items[1].tab == "never" and terrainState.items[1].placeable == false and terrainState.items[2].placeable == true)
+
+-- filling an area (issue #4795)
+local function trianglesArea(tris)
+	local total = 0
+	for _, t in ipairs(tris) do
+		local a, b, c = t[1], t[2], t[3]
+		local twice = (b.x - a.x) * (c.y - a.y) - (b.y - a.y) * (c.x - a.x)
+		if twice < 0 then
+			return nil
+		end
+		total = total + twice / 2
+	end
+	return total
+end
+local square = { { x = 0, y = 0 }, { x = 4, y = 0 }, { x = 4, y = 4 }, { x = 0, y = 4 } }
+local ell = { { x = 0, y = 0 }, { x = 4, y = 0 }, { x = 4, y = 2 }, { x = 2, y = 2 }, { x = 2, y = 4 }, { x = 0, y = 4 } }
+local function reversed(points)
+	local out = {}
+	for i = #points, 1, -1 do
+		out[#out + 1] = points[i]
+	end
+	return out
+end
+check("a square is two triangles that cover it", #MODEL.triangulate(square) == 2 and trianglesArea(MODEL.triangulate(square)) == 16)
+check("a concave outline is cut to cover exactly its own area", trianglesArea(MODEL.triangulate(ell)) == 12, tostring(trianglesArea(MODEL.triangulate(ell))))
+check("an outline drawn the other way round covers the same area", trianglesArea(MODEL.triangulate(reversed(ell))) == 12)
+check("fewer than three points is nothing to fill", #MODEL.triangulate({ { x = 0, y = 0 }, { x = 1, y = 1 } }) == 0)
+
+-- a row draws its steps under its buildings (issue #4795)
+local function kindsOf(L, kind)
+	local out = {}
+	for i, r in ipairs(L.rects) do
+		if r.kind == kind then
+			out[#out + 1] = i
+		end
+	end
+	return out
+end
+check("a layout of walls only draws terrain in its map and no building", (function()
+	local wallsOnly = MODEL.new()
+	MODEL.refresh(wallsOnly, { TERRAIN_ENTRIES[1] }, PLACE, game, CAN)
+	wallsOnly.open, wallsOnly.tab = true, "all"
+	local L = MODEL.layout(wallsOnly, measure, VIEW)
+	return #kindsOf(L, "map") == 1 and #kindsOf(L, "terrain") > 0 and #kindsOf(L, "building") == 0
+end)())
+check("steps are drawn after the map and before the buildings", (function()
+	local both = MODEL.new()
+	MODEL.refresh(both, { TERRAIN_ENTRIES[2] }, PLACE, game, CAN)
+	both.open, both.tab = true, "all"
+	local L = MODEL.layout(both, measure, VIEW)
+	local map, terrain, building = kindsOf(L, "map")[1], kindsOf(L, "terrain"), kindsOf(L, "building")
+	return #terrain > 0 and #building == 1 and map < terrain[1] and terrain[#terrain] < building[1]
+end)())
+check("every terrain rect has a bounding box and four corners", (function()
+	for _, i in ipairs(kindsOf(LT2, "terrain")) do
+		local r = LT2.rects[i]
+		if not (r.corners and #r.corners == 4 and r.w and r.h and r.color) then
+			return false
+		end
+	end
+	return true
+end)())
+check("a rect with corners packs at its corners, not its box", (function()
+	local verts, idx = MODEL.pack({ { x = 0, y = 0, w = 10, h = 10, color = { 1, 0, 0, 1 }, kind = "terrain", corners = { { 0, 5 }, { 5, 0 }, { 10, 5 }, { 5, 10 } } } })
+	local S = MODEL.STRIDE
+	return #verts == 4 * S and #idx == 6 and verts[1] == 0 and verts[2] == 5 and verts[S + 1] == 5 and verts[S + 2] == 0 and verts[3 * S + 1] == 5 and verts[3 * S + 2] == 10
+end)())
+check("a rect without corners still packs at its box", (function()
+	local verts = MODEL.pack({ { x = 1, y = 2, w = 3, h = 4, color = { 1, 1, 1, 1 }, kind = "building" } })
+	local S = MODEL.STRIDE
+	return verts[1] == 1 and verts[2] == 2 and verts[2 * S + 1] == 4 and verts[2 * S + 2] == 6
+end)())
 
 -- a builder that can terraform
 local TERRAFORMER = support.def(12, "zkcon", { buildOptions = { 1, 2 } })

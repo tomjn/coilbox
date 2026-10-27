@@ -53,6 +53,10 @@ local C = {
 	gold = { 0.93, 0.76, 0.25, 1 },
 	map = { 0.05, 0.06, 0.07, 1 },
 	building = { 0.45, 0.66, 0.74, 1 },
+	-- raised and dug ground in a layout's map, the blue and neutral grey the
+	-- plan in coilbox and on the website draw them in
+	raised = { 0.23, 0.51, 0.96, 1 },
+	dug = { 0.64, 0.64, 0.64, 1 },
 	energy = { 0.95, 0.80, 0.25, 1 },
 	builder = { 0.40, 0.80, 0.40, 1 },
 	weapon = { 0.90, 0.33, 0.28, 1 },
@@ -65,6 +69,11 @@ local C = {
 	warn = { 1, 0.75, 0.4, 1 },
 }
 M.COLORS = C
+-- How much colour a terrain step's fill, outline and arrow take, as the plan
+-- in coilbox draws them.
+M.TERRAIN_FILL = 0.3
+M.TERRAIN_OUTLINE = 0.62
+M.TERRAIN_START = 0.85
 
 local TITLE = "BLUEPRINTS"
 local TABS_LIST = { "now", "partly", "all" }
@@ -451,11 +460,157 @@ local function rowPics(item)
 	return out
 end
 
+--- A polygon as triangles by ear clipping, each { a, b, c } going anticlockwise
+-- in a y up map. The outline may go either way round and may be concave. An
+-- outline that crosses itself has no ears to find, and what is left of it is
+-- cut as a fan rather than dropped.
+-- @param points table[] { x, y }
+function M.triangulate(points)
+	local n = #points
+	local out = {}
+	if n < 3 then
+		return out
+	end
+	local area = 0
+	for i = 1, n do
+		local a, b = points[i], points[i % n + 1]
+		area = area + a.x * b.y - b.x * a.y
+	end
+	local ring = {}
+	for i = 1, n do
+		ring[i] = area >= 0 and points[i] or points[n - i + 1]
+	end
+	local function cross(a, b, c)
+		return (b.x - a.x) * (c.y - a.y) - (b.y - a.y) * (c.x - a.x)
+	end
+	local function inside(p, a, b, c)
+		return cross(a, b, p) >= 0 and cross(b, c, p) >= 0 and cross(c, a, p) >= 0
+	end
+	while #ring > 3 do
+		local cut = nil
+		local m = #ring
+		for i = 1, m do
+			local a, b, c = ring[(i - 2) % m + 1], ring[i], ring[i % m + 1]
+			if cross(a, b, c) > 0 then
+				local clear = true
+				for j = 1, m do
+					local p = ring[j]
+					if p ~= a and p ~= b and p ~= c and inside(p, a, b, c) then
+						clear = false
+						break
+					end
+				end
+				if clear then
+					cut = i
+					break
+				end
+			end
+		end
+		if not cut then
+			break
+		end
+		local m2 = #ring
+		out[#out + 1] = { ring[(cut - 2) % m2 + 1], ring[cut], ring[cut % m2 + 1] }
+		table.remove(ring, cut)
+	end
+	for i = 2, #ring - 1 do
+		out[#out + 1] = { ring[1], ring[i], ring[i + 1] }
+	end
+	return out
+end
+
+-- Elmos in one build square, and how thick a wall is drawn in them. A wall has
+-- no width of its own, only a path, so this is 0.6 of a square, as coilbox and
+-- the website draw it (src/hub/terrainDraw.ts).
+local BUILD_SQUARE = 16
+M.WALL_THICKNESS = 0.6 * BUILD_SQUARE
+-- The size of an uphill arrow's head at most, in elmos.
+local ARROW_HEAD = 0.8 * BUILD_SQUARE
+
+--- Which way a step moves the ground, which is all the two shades say.
+-- @return string "up" for raised ground, "down" for dug ground, "even" for a
+--   step that moves it neither way: a smooth, or a level of height 0
+local function toneOf(step)
+	local height = step.height or 0
+	if step.kind == "ramp" and step.heights then
+		height = (step.heights[1] + step.heights[2]) / 2
+	end
+	return height > 0 and "up" or height < 0 and "down" or "even"
+end
+
+--- A terrain step as outlines in elmos from the layout's origin, x to the
+-- right and z down the screen, before the map is scaled.
+-- @return table kind, shape, tone, points, band, arrow and reach, the ground
+--   the mark covers past its points
+local function placeStep(step)
+	local points = {}
+	for i, p in ipairs(step.points) do
+		points[i] = { x = p.x, y = p.z }
+	end
+	local mark = {
+		kind = step.kind,
+		shape = step.shape,
+		tone = toneOf(step),
+		points = points,
+		reach = step.shape == "wall" and M.WALL_THICKNESS / 2 or 0,
+	}
+	if step.kind ~= "ramp" or #points < 2 or not step.heights then
+		return mark
+	end
+	-- a ramp is a path of two points with a width on the ground, so the band is
+	-- the line between them pushed out half the width either side
+	local from, to = points[1], points[2]
+	local half = (step.width or 0) / 2
+	local length = math.sqrt((to.x - from.x) ^ 2 + (to.y - from.y) ^ 2)
+	local ax, ay = 1, 0
+	if length > 0 then
+		ax, ay = (to.x - from.x) / length, (to.y - from.y) / length
+	end
+	local cx, cy = -ay, ax
+	mark.band = {
+		{ x = from.x + cx * half, y = from.y + cy * half },
+		{ x = to.x + cx * half, y = to.y + cy * half },
+		{ x = to.x - cx * half, y = to.y - cy * half },
+		{ x = from.x - cx * half, y = from.y - cy * half },
+	}
+	mark.reach = 0
+	local low, high = step.heights[1], step.heights[2]
+	if low ~= high then
+		-- along the middle of the band towards the higher end, starting and
+		-- stopping a fifth of the way in so it stays inside the band
+		local uphill = high > low and 1 or -1
+		local start, finish = from, to
+		if uphill < 0 then
+			start, finish = to, from
+		end
+		local function at(t)
+			return { x = start.x + (finish.x - start.x) * t, y = start.y + (finish.y - start.y) * t }
+		end
+		local tail, tip = at(0.2), at(0.8)
+		local head = math.min(ARROW_HEAD, length * 0.3)
+		local bx, by = tip.x - ax * uphill * head, tip.y - ay * uphill * head
+		mark.arrow = {
+			tail,
+			tip,
+			{ x = bx + cx * head * 0.6, y = by + cy * head * 0.6 },
+			{ x = bx - cx * head * 0.6, y = by - cy * head * 0.6 },
+		}
+	end
+	return mark
+end
+
 --- Where each building sits in a size by size map of the layout: its
 -- footprint at its offset, x to the right and z down the screen, the way the
--- map is seen from above. The layout is scaled to fit and centred.
--- @return table[] { x, y, w, h } from the map's bottom left corner
-function M.layoutMap(resolved, size)
+-- map is seen from above. The layout is scaled to fit and centred. The frame
+-- covers the terrain steps as well as the buildings, so a layout of steps and
+-- no buildings fills its map.
+-- @param resolved table the layout's buildings
+-- @param size number the map's side
+-- @param terrain table[]? the layout's steps
+-- @return table[] { x, y, w, h } per building from the map's bottom left corner
+-- @return table[] per step the same outline as placeStep, scaled and flipped
+--   the same way, with the thickness of a wall if it is one
+function M.layoutMap(resolved, size, terrain)
 	local boxes = {}
 	local minX, minZ, maxX, maxZ = math.huge, math.huge, -math.huge, -math.huge
 	for _, b in ipairs(resolved.buildings) do
@@ -465,9 +620,18 @@ function M.layoutMap(resolved, size)
 		minX, maxX = math.min(minX, box.x0), math.max(maxX, box.x1)
 		minZ, maxZ = math.min(minZ, box.z0), math.max(maxZ, box.z1)
 	end
-	local out = {}
-	if #boxes == 0 then
-		return out
+	local steps = {}
+	for i, step in ipairs(terrain or {}) do
+		local mark = placeStep(step)
+		steps[i] = mark
+		for _, p in ipairs(mark.band or mark.points) do
+			minX, maxX = math.min(minX, p.x - mark.reach), math.max(maxX, p.x + mark.reach)
+			minZ, maxZ = math.min(minZ, p.y - mark.reach), math.max(maxZ, p.y + mark.reach)
+		end
+	end
+	local out, marks = {}, {}
+	if #boxes == 0 and #steps == 0 then
+		return out, marks
 	end
 	local spanX, spanZ = maxX - minX, maxZ - minZ
 	local scale = size / math.max(spanX, spanZ)
@@ -480,7 +644,28 @@ function M.layoutMap(resolved, size)
 			h = (box.z1 - box.z0) * scale,
 		}
 	end
-	return out
+	local function mapped(list)
+		if not list then
+			return nil
+		end
+		local moved = {}
+		for i, p in ipairs(list) do
+			moved[i] = { x = ox + (p.x - minX) * scale, y = size - oz - (p.y - minZ) * scale }
+		end
+		return moved
+	end
+	for i, mark in ipairs(steps) do
+		marks[i] = {
+			kind = mark.kind,
+			shape = mark.shape,
+			tone = mark.tone,
+			points = mapped(mark.points),
+			band = mapped(mark.band),
+			arrow = mapped(mark.arrow),
+			thickness = mark.shape == "wall" and M.WALL_THICKNESS * scale or nil,
+		}
+	end
+	return out, marks
 end
 
 local function emptyText(state)
@@ -795,14 +980,93 @@ function M.layout(state, measure, view)
 		end
 		return action and hovered(action) and lift(color) or color
 	end
+	-- a filled shape of corners, given as { x, y } going round, with a box round
+	-- it for anything that wants one
+	local function shape(corners, color, kind)
+		local x0, y0, x1, y1 = math.huge, math.huge, -math.huge, -math.huge
+		for _, c in ipairs(corners) do
+			x0, y0, x1, y1 = math.min(x0, c[1]), math.min(y0, c[2]), math.max(x1, c[1]), math.max(y1, c[2])
+		end
+		rect(x0, y0, x1 - x0, y1 - y0, color, kind, { corners = corners })
+	end
+	-- a line from a to b of the given thickness, square at both ends and
+	-- reaching `reach` past them
+	local function line(a, b, thickness, reach, color, ox, oy)
+		local dx, dy = b.x - a.x, b.y - a.y
+		local length = math.sqrt(dx * dx + dy * dy)
+		local ux, uy = 1, 0
+		if length > 0 then
+			ux, uy = dx / length, dy / length
+		end
+		local h = thickness / 2
+		local px, py = -uy * h, ux * h
+		local ax, ay = ox + a.x - ux * reach, oy + a.y - uy * reach
+		local bx, by = ox + b.x + ux * reach, oy + b.y + uy * reach
+		shape({ { ax - px, ay - py }, { bx - px, by - py }, { bx + px, by + py }, { ax + px, ay + py } }, color, "terrain")
+	end
+	local function outline(points, closed, thickness, color, ox, oy)
+		local n = #points
+		for i = 1, closed and n or n - 1 do
+			line(points[i], points[i % n + 1], thickness, thickness / 2, color, ox, oy)
+		end
+	end
+	local function filled(points, color, ox, oy)
+		for _, tri in ipairs(M.triangulate(points)) do
+			local a, b, c = tri[1], tri[2], tri[3]
+			-- a triangle is a quad with its last corner twice
+			shape({ { ox + a.x, oy + a.y }, { ox + b.x, oy + b.y }, { ox + c.x, oy + c.y }, { ox + c.x, oy + c.y } }, color, "terrain")
+		end
+	end
+	local function faded(color, alpha, dim)
+		local k = dim and 0.45 or 1
+		return { color[1] * k, color[2] * k, color[3] * k, color[4] * alpha }
+	end
+	-- one terrain step, under the buildings. An area is a filled outline, a wall
+	-- is a thick line and a ramp is a band with an arrow pointing uphill. Raised
+	-- ground and dug ground are two shades, and a step that moves the ground
+	-- neither way is the grey outline alone, as in coilbox and on the website.
+	local function terrainMark(mark, ox, oy, dim)
+		local base = mark.tone == "up" and C.raised or C.dug
+		local moves = mark.tone ~= "even"
+		local line1 = 1.25 * S
+		if mark.band then
+			if moves then
+				filled(mark.band, faded(base, M.TERRAIN_FILL, dim), ox, oy)
+			end
+			outline(mark.band, true, line1, faded(base, M.TERRAIN_OUTLINE, dim), ox, oy)
+			if mark.arrow then
+				local arrow = faded(base, M.TERRAIN_START, dim)
+				line(mark.arrow[1], mark.arrow[2], 1.5 * S, 0, arrow, ox, oy)
+				line(mark.arrow[3], mark.arrow[2], 1.5 * S, 0, arrow, ox, oy)
+				line(mark.arrow[4], mark.arrow[2], 1.5 * S, 0, arrow, ox, oy)
+			end
+		elseif mark.shape == "wall" then
+			local alpha = moves and M.TERRAIN_OUTLINE * 0.75 or M.TERRAIN_FILL
+			local color = faded(base, alpha, dim)
+			if #mark.points == 1 then
+				line(mark.points[1], mark.points[1], mark.thickness, mark.thickness / 2, color, ox, oy)
+			else
+				outline(mark.points, false, mark.thickness, color, ox, oy)
+			end
+		else
+			if moves then
+				filled(mark.points, faded(base, M.TERRAIN_FILL, dim), ox, oy)
+			end
+			outline(mark.points, true, line1, faded(base, M.TERRAIN_OUTLINE, dim), ox, oy)
+		end
+	end
 	-- the layout from above, so its shape shows before it is placed, each
-	-- building in the colour of what it does
+	-- building in the colour of what it does and the terrain steps under them
 	local function layoutMap(item, x, y, size)
 		rect(x, y, size, size, C.map, "map", { radius = M.PIC_RADIUS * S })
 		local never = item.tab == "never"
 		local edge = math.max(2 * S, size * 0.06)
+		local boxes, marks = M.layoutMap(item.resolved, size - 2 * edge, item.entry.terrain)
+		for _, mark in ipairs(marks) do
+			terrainMark(mark, x + edge, y + edge, never)
+		end
 		-- a pixel's gap between neighbours, so touching buildings stay apart
-		for n, box in ipairs(M.layoutMap(item.resolved, size - 2 * edge)) do
+		for n, box in ipairs(boxes) do
 			local w, h = math.max(1, box.w - S), math.max(1, box.h - S)
 			local fill = M.categoryColor(item.resolved.buildings[n].def)
 			if never then
@@ -1056,7 +1320,12 @@ local function quad(verts, idx, v, n, corners, c, shape, i)
 	return v, n + 6
 end
 
---- Flatten rectangles for the vertex buffer.
+--- The shape size a rect with corners is packed with.
+M.CORNERS_SHAPE = 100000
+
+--- Flatten rectangles for the vertex buffer. A rect with `corners` (four
+-- { x, y } going round) is drawn as that quad, filled, and its x, y, w, h are
+-- only the box round it.
 -- @param rects table[] x, y, w, h, color, and radius and border if set
 -- @return number[] vertices, STRIDE floats each (x, y, z, u, v, r, g, b, a,
 --   then the shape w, h, radius, border the shader rounds the corners with),
@@ -1066,12 +1335,29 @@ function M.pack(rects)
 	local verts, idx = {}, {}
 	local v, n = 0, 0
 	for i, r in ipairs(rects) do
-		v, n = quad(verts, idx, v, n, {
-			{ r.x, r.y, 0, 0, 0 },
-			{ r.x + r.w, r.y, 0, 1, 0 },
-			{ r.x + r.w, r.y + r.h, 0, 1, 1 },
-			{ r.x, r.y + r.h, 0, 0, 1 },
-		}, r.color, { r.w, r.h, r.radius or 0, r.border or 0 }, i)
+		local corners, shape
+		if r.corners then
+			-- a filled shape of four corners, any way round. The shader rounds a
+			-- box of the shape's size, so a shape far larger than the quad
+			-- leaves its whole area unrounded.
+			local c = r.corners
+			corners = {
+				{ c[1][1], c[1][2], 0, 0, 0 },
+				{ c[2][1], c[2][2], 0, 1, 0 },
+				{ c[3][1], c[3][2], 0, 1, 1 },
+				{ c[4][1], c[4][2], 0, 0, 1 },
+			}
+			shape = { M.CORNERS_SHAPE, M.CORNERS_SHAPE, 0, 0 }
+		else
+			corners = {
+				{ r.x, r.y, 0, 0, 0 },
+				{ r.x + r.w, r.y, 0, 1, 0 },
+				{ r.x + r.w, r.y + r.h, 0, 1, 1 },
+				{ r.x, r.y + r.h, 0, 0, 1 },
+			}
+			shape = { r.w, r.h, r.radius or 0, r.border or 0 }
+		end
+		v, n = quad(verts, idx, v, n, corners, r.color, shape, i)
 	end
 	return verts, idx
 end
