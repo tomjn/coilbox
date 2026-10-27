@@ -160,6 +160,24 @@ function holdsADialogueLine(scenario: Scenario): boolean {
   );
 }
 
+/**
+ * The runtime that first set a base's ground from its terrain changes, and
+ * that first left a dormant base for a trigger to place (issue #4799). A
+ * runtime behind this places a walled base with no walls, and places a dormant
+ * base at the start.
+ */
+const BASE_TERRAIN_VERSION = 10;
+
+/** Whether any base changes the ground or waits for a trigger. */
+function usesBaseTerrain(scenario: Scenario): boolean {
+  return scenario.bases.some(
+    (base) =>
+      base.dormant === true ||
+      (scenario.blueprints.find((b) => b.id === base.blueprint)?.terrain
+        ?.length ?? 0) > 0,
+  );
+}
+
 /** Every string a value carries, however deeply nested. */
 function stringsIn(value: unknown, out: Set<string>): void {
   if (typeof value === "string") out.add(value);
@@ -239,6 +257,9 @@ export function requiredRuntimeVersion(
   }
   if (holdsADialogueLine(scenario)) {
     version = Math.max(version, HELD_DIALOGUE_VERSION);
+  }
+  if (usesBaseTerrain(scenario)) {
+    version = Math.max(version, BASE_TERRAIN_VERSION);
   }
   return version;
 }

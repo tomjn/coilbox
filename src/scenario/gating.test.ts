@@ -398,6 +398,73 @@ describe("requiredRuntimeVersion", () => {
   });
 
   /**
+   * Issue #4799. Runtime 9 reads past a base's terrain and its dormancy, so it
+   * places a walled base with no walls and a dormant base at the start.
+   */
+  describe("a base with terrain changes or waiting for a trigger", () => {
+    const blueprint = {
+      id: "outpost",
+      name: "Outpost",
+      buildings: [
+        { def: "corllt", offset: { x: 0, z: 0 }, facing: 0 as const },
+      ],
+    };
+    const placed = {
+      id: "north-outpost",
+      blueprint: "outpost",
+      team: "enemy",
+      origin: { x: 500, z: 500 },
+      buildings: [],
+    };
+
+    it("needs runtime 10 for a base whose blueprint changes the ground", () => {
+      expect(
+        requiredRuntimeVersion({
+          ...withTrigger([], []),
+          blueprints: [
+            {
+              ...blueprint,
+              terrain: [
+                {
+                  kind: "raise",
+                  shape: "wall",
+                  points: [
+                    { x: 0, z: 0 },
+                    { x: 64, z: 0 },
+                  ],
+                  height: 40,
+                  before: 0,
+                },
+              ],
+            },
+          ],
+          bases: [placed],
+        }),
+      ).toBe(10);
+    });
+
+    it("needs runtime 10 for a dormant base", () => {
+      expect(
+        requiredRuntimeVersion({
+          ...withTrigger([], []),
+          blueprints: [blueprint],
+          bases: [{ ...placed, dormant: true }],
+        }),
+      ).toBe(10);
+    });
+
+    it("asks for nothing more for a plain base", () => {
+      expect(
+        requiredRuntimeVersion({
+          ...withTrigger([], []),
+          blueprints: [blueprint],
+          bases: [placed],
+        }),
+      ).toBe(1);
+    });
+  });
+
+  /**
    * Issue #808. Runtime 2 reads `{ var = "quota" }` as no number at all and
    * compares against zero, so "kills reached the quota" holds from the first
    * frame and "add the bonus" adds nothing.

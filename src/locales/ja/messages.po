@@ -5396,11 +5396,6 @@ msgstr "{place} / {total}。"
 msgid "{placeable} of {total} can be placed in it."
 msgstr "{total} 個中 {placeable} 個を配置できます。"
 
-#: src/placement/BlueprintEditor.tsx
-#, fuzzy
-msgid "{placed, plural, one {# building} other {# buildings}}"
-msgstr "{placed, plural, other {# 個の建物}}"
-
 #: src/scenario/pages/components/ScenarioMapBars.tsx
 #, fuzzy
 msgid "{placed, plural, one {# unit} other {# units}}"
@@ -11278,6 +11273,10 @@ msgstr "アーカイブ"
 msgid "Archives ({archiveCount})"
 msgstr "アーカイブ（{archiveCount}）"
 
+#: src/placement/TerrainControls.tsx
+msgid "Area"
+msgstr ""
+
 #: src/lego/pages/components/AnimationPanel.tsx
 #, fuzzy
 msgid "Arguments"
@@ -12121,6 +12120,10 @@ msgstr "砲身の長さ"
 #, fuzzy
 msgid "Barrel lift"
 msgstr "砲身の上昇"
+
+#: src/scenario/validate.ts
+msgid "base"
+msgstr ""
 
 #: src/scenario/validate.ts
 #, fuzzy
@@ -13798,6 +13801,7 @@ msgstr "自身のユニットにダメージを与えない"
 #: src/multiplayer/invite/InviteLinkHost.tsx
 #: src/multiplayer/LobbyStatusButton.tsx
 #: src/multiplayer/RelayIndicator.tsx
+#: src/placement/TerrainControls.tsx
 #: src/play/pages/components/GameOptionsPanel.tsx
 #: src/play/pages/SavegamesPage.tsx
 #: src/play/PresetLibraryToolbar.tsx
@@ -15211,6 +15215,10 @@ msgstr "このルームを閉じますか？全員が退出させられ、試合
 #, fuzzy
 msgid "Close this battle? Everyone will be removed, and the room it is in will stop hosting and give its port back."
 msgstr "このルームを閉じますか？全員が退出させられ、ルームのホストを停止してポートを解放します。"
+
+#: src/placement/TerrainControls.tsx
+msgid "Close tool"
+msgstr ""
 
 #: src/content/unitFieldNotes.ts
 #, fuzzy
@@ -18275,6 +18283,7 @@ msgstr "バースト内の射撃間隔"
 #: src/lego/pages/components/LoadoutPicker.tsx
 #: src/lego/pages/components/PosesPopover.tsx
 #: src/placement/SurfaceBars.tsx
+#: src/placement/TerrainControls.tsx
 #: src/play/pages/SavegamesPage.tsx
 #: src/scenario/pages/components/DialoguePanel.tsx
 #: src/scenario/pages/components/ObjectivePanel.tsx
@@ -19119,6 +19128,7 @@ msgstr "圧倒"
 #: src/i18n/frameStrings.ts
 #: src/lobby-servers/pages/SettingsSection.tsx
 #: src/placement/SurfaceBars.tsx
+#: src/placement/TerrainControls.tsx
 #: src/scenario/pages/components/ScenarioMapBars.tsx
 #: src/workshop/pages/components/ExplosionGeneratorEditor.tsx
 #, fuzzy
@@ -19512,6 +19522,10 @@ msgstr "マップ上をドラッグして味方 {activeLetter} のエリアを�
 #, fuzzy
 msgid "drag one of its points to move it"
 msgstr "ポイントをドラッグで移動"
+
+#: src/placement/BlueprintEditor.tsx
+msgid "Drag the change to move it, or a corner to reshape it. Click a side to add a corner, right click a corner to remove it."
+msgstr ""
 
 #: src/scenario/pages/components/modes.tsx
 #, fuzzy
@@ -23787,6 +23801,7 @@ msgstr "高さ"
 #: src/lego/pages/components/ShapeFields.tsx
 #: src/lego/pages/components/SkeletonTargetFields.tsx
 #: src/mapconv/pages/DecompilePage.tsx
+#: src/placement/TerrainControls.tsx
 #: src/play/pages/components/MapOverlay.tsx
 #, fuzzy
 msgid "Height"
@@ -24038,6 +24053,10 @@ msgstr "後ろを高く"
 #, fuzzy
 msgid "High at front"
 msgstr "前を高く"
+
+#: src/placement/TerrainControls.tsx
+msgid "High end"
+msgstr ""
 
 #: src/content/unitFieldNotes.ts
 #, fuzzy
@@ -27197,6 +27216,10 @@ msgstr "グループを解放します。ユニットはその場に留まり、
 msgid "Letting the engine find it"
 msgstr "エンジンに探させています"
 
+#: src/placement/TerrainControls.tsx
+msgid "Level"
+msgstr ""
+
 #: src/conquest/pages/components/ThreatLevelSelect.tsx
 #, fuzzy
 msgid "Level {lockedLevel}"
@@ -27211,6 +27234,14 @@ msgstr "レベル {lockedLevel} はロックされています。"
 #, fuzzy
 msgid "Level {n}"
 msgstr "レベル {n}"
+
+#: src/placement/TerrainControls.tsx
+msgid "Level area"
+msgstr ""
+
+#: src/placement/TerrainControls.tsx
+msgid "Level wall"
+msgstr ""
 
 #: src/content/index.ts
 #: src/content/pages/components/GameLibrarySummary.tsx
@@ -27964,6 +27995,7 @@ msgid "Lost, and it counted toward no rating"
 msgstr "敗北。どのレーティングにも反映されません"
 
 #: src/lego/pages/components/ShapeFields.tsx
+#: src/placement/TerrainControls.tsx
 #, fuzzy
 msgid "Low end"
 msgstr "下端"
@@ -30070,6 +30102,10 @@ msgstr "必要"
 #, fuzzy
 msgid "Needs {name}"
 msgstr "{name} が必要"
+
+#: src/scenario/pages/components/triggers.ts
+msgid "Needs a base that appears from a trigger"
+msgstr ""
 
 #: src/scenario/pages/components/triggers.ts
 #, fuzzy
@@ -35731,6 +35767,10 @@ msgid "Placeholder amounts. Set your game's."
 msgstr "仮の数値です。ゲームの数値を設定してください。"
 
 #: src/scenario/triggerTypes.ts
+msgid "Places a base that appears from a trigger: its terrain changes, then its buildings."
+msgstr ""
+
+#: src/scenario/triggerTypes.ts
 #, fuzzy
 msgid "Places a group on the map if it isn't there yet, and sends it off on its orders."
 msgstr "グループがまだマップになければ配置し、命令に従って出発させます。"
@@ -37000,16 +37040,33 @@ msgstr "半径 Z は 0 より大きくしてください。"
 msgid "Rainbow"
 msgstr "レインボー"
 
+#: src/placement/TerrainControls.tsx
+msgid "Raise"
+msgstr ""
+
+#: src/placement/TerrainControls.tsx
+msgid "Raise or level"
+msgstr ""
+
+#: src/placement/TerrainControls.tsx
+msgid "Raised area"
+msgstr ""
+
 #: src/content/unitFieldNotes.ts
 #, fuzzy
 msgid "Raised to 38 if set lower, the least that lets a 1x1 builder reach a 1x1 building."
 msgstr "これより小さい値は 38 に引き上げられます。これは 1x1 の建設ユニットが 1x1 の建物に届く最小値です。"
+
+#: src/placement/TerrainControls.tsx
+msgid "Raised wall"
+msgstr ""
 
 #: src/runlite/pages/components/NodeOverlays.tsx
 #, fuzzy
 msgid "raises tech ceiling · both sides"
 msgstr "技術の上限を上げる · 両陣営"
 
+#: src/placement/TerrainControls.tsx
 #: src/uberstress/pages/components/ReportDetail.tsx
 #: src/uberstress/pages/RunPage.tsx
 #: src/uberstress/pages/SettingsSection.tsx
@@ -43196,6 +43253,10 @@ msgstr "煙の軌跡のサイズ"
 msgid "Smoke trail update rate"
 msgstr "煙の軌跡の更新頻度"
 
+#: src/placement/TerrainControls.tsx
+msgid "Smooth"
+msgstr ""
+
 #: src/mapconv/pages/components/AdvancedOptions.tsx
 #, fuzzy
 msgid "Smooth texture (-smooth)"
@@ -44148,6 +44209,10 @@ msgstr "一定負荷"
 msgid "Step"
 msgstr "ステップ"
 
+#: src/placement/TerrainControls.tsx
+msgid "step {number} of the build order"
+msgstr ""
+
 #: src/lego/pages/components/AnimationPanel.tsx
 #, fuzzy
 msgid "Step back one frame"
@@ -44903,12 +44968,21 @@ msgid "Terraform speed"
 msgstr "地形変更の速度"
 
 #: src/lego/environment.ts
+#: src/placement/TerrainControls.tsx
 #, fuzzy
 msgid "Terrain"
 msgstr "地形"
 
 #: src/blueprint/pages/components/TerrainSwitch.tsx
 msgid "Terrain changes"
+msgstr ""
+
+#: src/placement/TerrainControls.tsx
+msgid "Terrain changes in this game"
+msgstr ""
+
+#: src/placement/TerrainControls.tsx
+msgid "Terrain tools"
 msgstr ""
 
 #: src/mapconv/pages/components/AdvancedOptions.tsx
@@ -52446,6 +52520,10 @@ msgstr "ブラウザーを待っています"
 msgid "Waits"
 msgstr "待機"
 
+#: src/scenario/pages/components/BaseControls.tsx
+msgid "Waits for a trigger to place it"
+msgstr ""
+
 #: src/scenario/pages/components/GroupControls.tsx
 #, fuzzy
 msgid "Waits for a trigger to spawn it"
@@ -52497,6 +52575,7 @@ msgid "walker"
 msgstr "歩行"
 
 #: src/lego/pages/components/ShapeFields.tsx
+#: src/placement/TerrainControls.tsx
 #, fuzzy
 msgid "Wall"
 msgstr "壁"
@@ -53540,6 +53619,7 @@ msgid "width"
 msgstr "幅"
 
 #: src/lego/pages/components/ShapeFields.tsx
+#: src/placement/TerrainControls.tsx
 #, fuzzy
 msgid "Width"
 msgstr "幅"
@@ -54774,6 +54854,22 @@ msgstr "Z（elmo）"
 
 #: src/blueprint/pages/components/WidgetPanel.tsx
 msgid "Zero-K only loads widgets from your content folder from your second match, because it saves the setting that allows them when a game closes. The first match you play in Zero-K will not show the panel."
+msgstr ""
+
+#: src/placement/TerrainControls.tsx
+msgid "Zero-K refuses a ramp shorter than 64 or longer than 3,000 elmos, or narrower than 48 or wider than 1,600."
+msgstr ""
+
+#: src/placement/TerrainControls.tsx
+msgid "Zero-K refuses a terrain change of more than 2,500 points."
+msgstr ""
+
+#: src/placement/TerrainControls.tsx
+msgid "Zero-K refuses a wall that long. It allows 700 points, a point every 16 elmos."
+msgstr ""
+
+#: src/placement/TerrainControls.tsx
+msgid "Zero-K refuses an area wider or deeper than 2,000 elmos."
 msgstr ""
 
 #: src/i18n/frameStrings.ts

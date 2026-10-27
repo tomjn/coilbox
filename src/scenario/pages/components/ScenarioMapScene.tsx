@@ -35,6 +35,8 @@ import {
 } from "@/placement/preview";
 import { turnNoteText } from "@/placement/SurfaceBars";
 import { mapSceneStatus } from "@/placement/scene";
+import { gridSource } from "@/placement/terrainRelief";
+import { baseLayouts, useBasesRelief } from "@/placement/useBasesRelief";
 import { useLayoutPreview } from "@/placement/useLayoutPreview";
 import { useMapEditing } from "@/placement/useMapEditing";
 import { useScenarioFootprints } from "@/placement/useScenarioFootprints";
@@ -197,7 +199,41 @@ export const ScenarioMapScene = forwardRef<
   const { playing, setPlayback, total, steps, undrawn } =
     useBasePlayback(scenario);
 
-  const units = useScenarioUnits(handle, scenario, assets, undrawn);
+  // The ground every base's terrain changes leave, drawn on the map and stood
+  // on by the models (issue #4799). Only read for a scenario whose bases have
+  // steps, so one without reads the map as it always did.
+  const terrainLayouts = useMemo(
+    () => baseLayouts(scenario.blueprints, scenario.bases),
+    [scenario.blueprints, scenario.bases],
+  );
+  const hasSteps = terrainLayouts.length > 0;
+  const { heightWords, minHeight, maxHeight } = assets;
+  const reliefSource = useMemo(
+    () =>
+      hasSteps && heightWords
+        ? gridSource(heightWords, minHeight, maxHeight)
+        : null,
+    [hasSteps, heightWords, minHeight, maxHeight],
+  );
+  const reliefRange = useMemo(
+    () => ({ min: minHeight, max: maxHeight }),
+    [minHeight, maxHeight],
+  );
+  const relief = useBasesRelief({
+    handle,
+    source: reliefSource,
+    range: reliefRange,
+    layouts: terrainLayouts,
+  });
+  const ground = useMemo(
+    () => ({
+      ...assets,
+      relief: relief.relief,
+      reliefVersion: relief.version,
+    }),
+    [assets, relief.relief, relief.version],
+  );
+  const units = useScenarioUnits(handle, scenario, ground, undrawn);
 
   // An author who has asked for less motion gets the steps and not the film.
   const reduceMotion = useReduceMotion();

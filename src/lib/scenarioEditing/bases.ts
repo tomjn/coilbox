@@ -54,6 +54,7 @@ import {
   type SubstitutionPlan,
   substituteQueue,
 } from "@/blueprint/substitution";
+import { stepsFirst } from "@/blueprint/terrainEdit";
 import type { UnitDatasetEntry } from "@/content/bindings";
 import type {
   BaseBuildingRole,
@@ -251,6 +252,35 @@ export function editBaseLayout(
   const buildings = update(layout.buildings);
   if (!buildings) return scenario;
   return writeLayout(scenario, base, layout, how, { buildings });
+}
+
+/**
+ * The document with one base's terrain steps changed, as {@link LayoutEdit}
+ * says (issue #4793). The same as {@link editBaseLayout}, for the steps rather
+ * than the buildings: the update returns `null` for an edit that lands on
+ * nothing, and the field goes when the last step does.
+ */
+export function editBaseTerrain(
+  scenario: Scenario,
+  id: string,
+  how: LayoutEdit,
+  update: (
+    terrain: TerrainStep[],
+    layout: BaseBlueprint,
+  ) => TerrainStep[] | null,
+): Scenario {
+  const base = scenario.bases.find((entry) => entry.id === id);
+  const layout = base
+    ? scenario.blueprints.find((b) => b.id === base.blueprint)
+    : undefined;
+  if (!base || !layout) return scenario;
+  const terrain = update(layout.terrain ?? [], layout);
+  if (!terrain) return scenario;
+  // Every step comes before every building (issue #4817), so one read in
+  // with a later place is written back first.
+  return writeLayout(scenario, base, layout, how, {
+    terrain: terrain.length > 0 ? stepsFirst(terrain) : undefined,
+  });
 }
 
 /**
@@ -499,7 +529,10 @@ export function editBase(
   scenario: Scenario,
   id: string,
   patch: Partial<
-    Pick<ScenarioBase, "team" | "origin" | "buildings" | "difficulty">
+    Pick<
+      ScenarioBase,
+      "team" | "origin" | "buildings" | "difficulty" | "dormant"
+    >
   >,
 ): Scenario {
   const bases = edit<ScenarioBase>(scenario.bases, id, (base) => ({

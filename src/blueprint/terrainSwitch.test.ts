@@ -7,9 +7,11 @@ import {
 } from "./library";
 import type { TerrainStep } from "./model";
 import {
+  cannotMakeTerrain,
   loadTerrainOverrides,
   resetTerrainOverrides,
   setTerrainOverride,
+  shownLayout,
   terrainEnabled,
   terrainOverrideFor,
 } from "./terrainSwitch";
@@ -156,5 +158,34 @@ describe("turning the switch off and on", () => {
     setTerrainOverride("mf", false);
     expect(libraryLayout(only).terrain).toEqual(steps);
     expect(libraryLayout(only).buildings).toEqual([]);
+  });
+});
+
+describe("a blueprint with the switch off (issue #4814)", () => {
+  const step: TerrainStep = {
+    kind: "raise",
+    shape: "wall",
+    points: [
+      { x: 0, z: 0 },
+      { x: 64, z: 0 },
+    ],
+    height: 40,
+    before: 0,
+  };
+  const layout = { name: "Walled", buildings: [], terrain: [step] };
+
+  it("is shown flat while off, and with its steps again when on", () => {
+    expect(shownLayout(layout, false).terrain).toBeUndefined();
+    expect(shownLayout(layout, true).terrain).toEqual([step]);
+    expect(shownLayout(layout, undefined).terrain).toEqual([step]);
+    // Showing it flat leaves the layout itself alone.
+    expect(layout.terrain).toEqual([step]);
+  });
+
+  it("says the game cannot make them only when the game cannot", () => {
+    expect(cannotMakeTerrain(false, false)).toBe(true);
+    expect(cannotMakeTerrain(true, false)).toBe(false);
+    expect(cannotMakeTerrain(undefined, false)).toBe(false);
+    expect(cannotMakeTerrain(false, true)).toBe(false);
   });
 });

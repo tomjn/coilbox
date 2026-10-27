@@ -21,12 +21,15 @@ import {
   ArrowUp,
   ClipboardCopy,
   ListOrdered,
+  Mountain,
   Play,
 } from "lucide-react";
 import { useState } from "react";
+import type { TerrainStep } from "@/blueprint/model";
 import { OffGridNote } from "@/blueprint/OffGridNote";
 import type { OffGridBuilding } from "@/blueprint/offGrid";
 import { buildOrderText } from "@/blueprint/order";
+import { type BuildEntry, buildSequence } from "@/blueprint/terrainEdit";
 import { type UnknownBuilding, unknownUnitsWarning } from "@/blueprint/units";
 import { Label } from "@/components/ui/label";
 import {
@@ -37,6 +40,7 @@ import {
 import { Switch } from "@/components/ui/switch";
 import { useFieldText } from "@/lib/useFieldText";
 import type { SceneUnchecked } from "./placements";
+import { stepName } from "./TerrainControls";
 
 /**
  * What the layout is called, which is what a picker will list it by.
@@ -420,6 +424,9 @@ export function BuildOrderPopover({
   onOrdered,
   onMoveBuilding,
   onPlay,
+  terrain,
+  selectedStep = -1,
+  onMoveEntry,
 }: {
   buildings: { def: string }[];
   /** Which building is selected, shown in green so a step can be found on the
@@ -429,9 +436,26 @@ export function BuildOrderPopover({
   onOrdered: (on: boolean) => void;
   onMoveBuilding: (index: number, delta: number) => void;
   onPlay: () => void;
+  /**
+   * The layout's terrain steps, listed among the buildings where they come in
+   * the order, by an editor that offers the terrain tools (issue #4793). Left
+   * out, the list is the buildings alone, as it always was.
+   */
+  terrain?: readonly TerrainStep[];
+  /** Which step is selected, in green like a building. -1 when none is. */
+  selectedStep?: number;
+  /** A place in the order moved, when `terrain` is given. */
+  onMoveEntry?: (entry: BuildEntry, delta: 1 | -1) => void;
 }) {
   const { t } = useLingui();
-  const stepCount = buildings.length;
+  const entries = terrain
+    ? buildSequence(buildings.length, terrain)
+    : buildings.map((_, at): BuildEntry => ({ kind: "building", index: at }));
+  const stepCount = entries.length;
+  const move = (entry: BuildEntry, delta: 1 | -1) =>
+    onMoveEntry
+      ? onMoveEntry(entry, delta)
+      : onMoveBuilding(entry.index, delta);
   const [copied, setCopied] = useState(false);
 
   const copy = async () => {
@@ -475,45 +499,58 @@ export function BuildOrderPopover({
         {ordered ? (
           <>
             <ol className="max-h-56 space-y-1.5 overflow-y-auto">
-              {buildings.map((building, at) => (
-                <li
-                  // biome-ignore lint/suspicious/noArrayIndexKey: a layout holds the same building twice as often as not, and where it stands in the order is the only thing naming it
-                  key={`${at}-${building.def}`}
-                  className="flex items-center gap-2"
-                >
-                  <span className="w-4 shrink-0 text-right text-[11px] text-muted-foreground">
-                    {at + 1}
-                  </span>
-                  <span
-                    className={cn(
-                      "min-w-0 flex-1 truncate font-mono text-xs",
-                      at === index && "text-lime-300",
+              {entries.map((entry, at) => {
+                const step =
+                  entry.kind === "step" ? terrain?.[entry.index] : undefined;
+                const def = step
+                  ? stepName(step)
+                  : (buildings[entry.index]?.def ?? "");
+                const picked = step
+                  ? entry.index === selectedStep
+                  : entry.index === index;
+                return (
+                  <li
+                    key={`${entry.kind}-${entry.index}`}
+                    className="flex items-center gap-2"
+                  >
+                    <span className="w-4 shrink-0 text-right text-[11px] text-muted-foreground">
+                      {at + 1}
+                    </span>
+                    {step && (
+                      <Mountain className="size-3.5 shrink-0 text-muted-foreground" />
                     )}
-                  >
-                    {building.def}
-                  </span>
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    className="size-7 p-0"
-                    aria-label={t`Build ${{ def: building.def }} sooner`}
-                    disabled={at === 0}
-                    onClick={() => onMoveBuilding(at, -1)}
-                  >
-                    <ArrowUp className="size-3.5" />
-                  </Button>
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    className="size-7 p-0"
-                    aria-label={t`Build ${{ def: building.def }} later`}
-                    disabled={at === buildings.length - 1}
-                    onClick={() => onMoveBuilding(at, 1)}
-                  >
-                    <ArrowDown className="size-3.5" />
-                  </Button>
-                </li>
-              ))}
+                    <span
+                      className={cn(
+                        "min-w-0 flex-1 truncate text-xs",
+                        !step && "font-mono",
+                        picked && "text-lime-300",
+                      )}
+                    >
+                      {def}
+                    </span>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      className="size-7 p-0"
+                      aria-label={t`Build ${{ def }} sooner`}
+                      disabled={entries[at - 1]?.kind !== entry.kind}
+                      onClick={() => move(entry, -1)}
+                    >
+                      <ArrowUp className="size-3.5" />
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      className="size-7 p-0"
+                      aria-label={t`Build ${{ def }} later`}
+                      disabled={entries[at + 1]?.kind !== entry.kind}
+                      onClick={() => move(entry, 1)}
+                    >
+                      <ArrowDown className="size-3.5" />
+                    </Button>
+                  </li>
+                );
+              })}
             </ol>
 
             <p className="text-[11px] text-muted-foreground">
@@ -530,7 +567,7 @@ export function BuildOrderPopover({
                 variant="outline"
                 className="h-7 flex-1 gap-1.5 px-2 text-xs"
                 onClick={onPlay}
-                disabled={buildings.length < 2}
+                disabled={entries.length < 2}
               >
                 <Play className="size-3.5" /> <Trans>Watch it go up</Trans>
               </Button>

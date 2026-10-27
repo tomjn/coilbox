@@ -30,8 +30,9 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router";
 
 import { buildGridSnap, type FootprintMark } from "@/blueprint/footprint";
-import type { BaseBlueprint } from "@/blueprint/model";
+import type { BaseBlueprint, TerrainStep } from "@/blueprint/model";
 import { buildingColors } from "@/blueprint/role";
+import { useTerrainChanges } from "@/blueprint/terrainSwitch";
 import { useMissionMapAssets } from "@/campaign/pages/components/useMissionMapAssets";
 import { useUnitsyncScan, useUnitsyncThumbnails } from "@/content/config";
 import { useGameUnits } from "@/content/useGameUnits";
@@ -76,14 +77,20 @@ import {
   mapSceneStatus,
   worldToScene,
 } from "./scene";
+import { gridSource } from "./terrainRelief";
 import { useLayoutPreview } from "./useLayoutPreview";
 import { useMapEditing } from "./useMapEditing";
 import { useScenarioFootprints } from "./useScenarioFootprints";
 import { useScenarioUnits } from "./useScenarioUnits";
+import { layoutRects, useTerrainRelief } from "./useTerrainRelief";
 
 /** One list for every "nothing to draw", so a layer with nothing on it is not
  *  cleared and redrawn on every render. */
 const NOTHING: FootprintMark[] = [];
+
+/** One list for a layout with no terrain steps, so the hook is not handed a new
+ *  one every render. */
+const NO_STEPS: TerrainStep[] = [];
 
 export function BlueprintOnMap({
   blueprint,
@@ -116,7 +123,7 @@ export function BlueprintOnMap({
   // map with no name.
   const assets = useMissionMapAssets(mapName, true);
 
-  const { units } = useGameUnits(gameName);
+  const { units, archive } = useGameUnits(gameName);
   // Undefined until the game's units are read, which is what stops a layout of
   // even-footprint buildings being stood on the wrong half of the grid by a
   // fallback that calls every def one square.
@@ -145,7 +152,50 @@ export function BlueprintOnMap({
     [blueprint, gameName, origin],
   );
 
-  const drawn = useScenarioUnits(handle, doc, assets);
+  // The ground the blueprint's terrain steps leave on this map, drawn on it and
+  // read by the models and the verdicts below (issue #4794). Only worked out for
+  // a layout that has steps, so a plain one reads the map as it always did. With
+  // the game's terrain switch off the steps are drawn faintly and the map is
+  // left as it is.
+  const { enabled: terrainOn } = useTerrainChanges(archive, units);
+  const steps = blueprint.terrain;
+  const hasSteps = !!steps && steps.length > 0;
+  const { heightWords, minHeight, maxHeight } = assets;
+  const source = useMemo(
+    () =>
+      hasSteps && heightWords
+        ? gridSource(heightWords, minHeight, maxHeight)
+        : null,
+    [hasSteps, heightWords, minHeight, maxHeight],
+  );
+  const range = useMemo(
+    () => ({ min: minHeight, max: maxHeight }),
+    [minHeight, maxHeight],
+  );
+  const standingAt = useMemo(() => ({ at: origin, quarters: 0 }), [origin]);
+  const reliefRects = useMemo(
+    () => layoutRects(buildings, origin, units),
+    [buildings, origin, units],
+  );
+  const terrain = useTerrainRelief({
+    handle,
+    source,
+    range,
+    steps: steps ?? NO_STEPS,
+    placement: standingAt,
+    footprints: reliefRects,
+    enabled: terrainOn !== false,
+    selected: null,
+  });
+  const ground = useMemo(
+    () => ({
+      ...assets,
+      relief: terrain.relief,
+      reliefVersion: terrain.version,
+    }),
+    [assets, terrain.relief, terrain.version],
+  );
+  const drawn = useScenarioUnits(handle, doc, ground);
   const footprints = useMemo(
     () => baseFootprints(drawn.placements, units, drawn.ground),
     [drawn.placements, units, drawn.ground],

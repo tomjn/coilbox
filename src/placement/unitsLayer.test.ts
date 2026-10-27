@@ -10,9 +10,10 @@
 
 import * as THREE from "three";
 import { describe, expect, it } from "vitest";
-
+import type { TerrainStep } from "@/blueprint/model";
 import type { MapScene3D } from "@/lib/mapScene";
 import type { Placement } from "./placements";
+import { flatSource, Relief } from "./terrainRelief";
 import { createUnitsLayer, type UnitsLayerDeps } from "./unitsLayer";
 
 /** Enough of a scene to hang objects off. Nothing here renders. */
@@ -210,5 +211,80 @@ describe("a units layer's redraws", () => {
     const second = units.draw([building(0), building(1)]);
     await Promise.all([first, second]);
     expect(seen).toEqual([2]);
+  });
+});
+
+describe("a units layer on ground a terrain step raised (issue #4794)", () => {
+  const wall = (height: number): TerrainStep => ({
+    kind: "raise",
+    shape: "wall",
+    points: [
+      { x: -64, z: 0 },
+      { x: 64, z: 0 },
+    ],
+    height,
+    before: 0,
+  });
+  const AT = { x: 256, z: 256 };
+  const on = (x: number, z: number): Placement => ({
+    ...building(0),
+    pos: { x, z },
+  });
+
+  /** The layer reads the relief's own field with a range of 0 to 1, which is
+   *  how `useScenarioUnits` hands it over. */
+  function standing(relief: Relief) {
+    const handle = scene();
+    const drawn = createUnitsLayer({
+      handle,
+      field: relief.field,
+      worldWidth: 512,
+      worldHeight: 512,
+      minHeight: 0,
+      maxHeight: 1,
+      objectName: () => undefined,
+      loadModels: () => Promise.reject(new Error("no models in a test")),
+      teamColor: () => [1, 1, 1],
+    });
+    return { drawn, handle };
+  }
+  const heightOf = (drawn: ReturnType<typeof standing>["drawn"]) =>
+    drawn.objects.get("base:pf1#0")?.position.y;
+
+  it("stands a building on a raised wall at the wall's height", async () => {
+    const relief = new Relief(flatSource(65, 65));
+    relief.update([wall(80)], { at: AT, quarters: 0 }, []);
+    const { drawn } = standing(relief);
+    await drawn.draw([on(256, 256)]);
+    expect(heightOf(drawn)).toBeCloseTo(80, 3);
+  });
+
+  it("stands a building on flat ground beside the wall on the floor", async () => {
+    const relief = new Relief(flatSource(65, 65));
+    relief.update([wall(80)], { at: AT, quarters: 0 }, []);
+    const { drawn } = standing(relief);
+    await drawn.draw([on(40, 40)]);
+    expect(heightOf(drawn)).toBeCloseTo(0, 3);
+  });
+
+  it("stands a building in a trench at the trench's depth", async () => {
+    const relief = new Relief(flatSource(65, 65));
+    relief.update([wall(-50)], { at: AT, quarters: 0 }, []);
+    const { drawn } = standing(relief);
+    await drawn.draw([on(256, 256)]);
+    expect(heightOf(drawn)).toBeCloseTo(-50, 3);
+  });
+
+  it("moves a building with the ground when it changes under it", async () => {
+    const relief = new Relief(flatSource(65, 65));
+    const { drawn } = standing(relief);
+    await drawn.draw([on(256, 256)]);
+    expect(heightOf(drawn)).toBeCloseTo(0, 3);
+    relief.update([wall(80)], { at: AT, quarters: 0 }, []);
+    drawn.restand();
+    expect(heightOf(drawn)).toBeCloseTo(80, 3);
+    relief.update([], { at: AT, quarters: 0 }, []);
+    drawn.restand();
+    expect(heightOf(drawn)).toBeCloseTo(0, 3);
   });
 });

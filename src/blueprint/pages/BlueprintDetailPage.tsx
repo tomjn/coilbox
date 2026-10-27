@@ -66,7 +66,11 @@ import {
   saveBlueprint,
   useBlueprintLibrary,
 } from "../store";
-import { useTerrainChanges } from "../terrainSwitch";
+import {
+  cannotMakeTerrain,
+  shownLayout,
+  useTerrainChanges,
+} from "../terrainSwitch";
 import { terrainRefusal } from "../units";
 import { useWidgetFiles } from "../useWidgetFiles";
 import { TerrainSwitch } from "./components/TerrainSwitch";
@@ -199,11 +203,16 @@ export default function BlueprintDetailPage() {
     : "";
   const gameLine = claimedGame || t`No game named`;
   const terrain = record.layout.terrain?.length ?? 0;
-  const buildingCount = countLine(buildings, terrain);
-  const cannotTerrain =
-    terrainChanges.enabled === false
-      ? terrainRefusal(terrain, buildings)
-      : null;
+  // Off, the blueprint is counted and shown as a flat one (issue #4814), and
+  // only a game that cannot make terrain changes is said to be unable to.
+  const shown = terrainChanges.enabled === false ? 0 : terrain;
+  const buildingCount = countLine(buildings, shown);
+  const cannotTerrain = cannotMakeTerrain(
+    terrainChanges.detected,
+    terrainChanges.enabled,
+  )
+    ? terrainRefusal(terrain, buildings)
+    : null;
 
   return (
     <div className="flex flex-col gap-4 p-4">
@@ -319,9 +328,13 @@ export default function BlueprintDetailPage() {
 
       {saveError && <ErrorBanner message={t`Not saved: ${saveError}`} />}
 
+      {/* Keyed by the blueprint, so opening another one starts with nothing
+          selected, no tool in hand and the camera on the new layout. */}
       <BlueprintEditor
+        key={record.id}
         blueprint={layout}
         gameName={gameName}
+        terrainTools
         onChange={(layout) =>
           edit(recordWithLayout(record, layout, footprints))
         }
@@ -332,7 +345,7 @@ export default function BlueprintDetailPage() {
           still needs none. */}
       {onMap ? (
         <BlueprintOnMap
-          blueprint={layout}
+          blueprint={shownLayout(layout, terrainChanges.enabled)}
           gameName={gameName}
           onClose={() => setOnMap(false)}
         />

@@ -214,6 +214,12 @@ export interface MapEditingDeps {
   overlays?: (OverlayLayer | null)[];
   /** A drag that finished, in elmos moved. */
   onMove: (key: string, delta: Point) => void;
+  /**
+   * Something that can be picked up, pressed and let go without moving (issue
+   * #4793). The press already selected it, so most surfaces leave this out. A
+   * terrain step's side takes it, because a click there adds a corner.
+   */
+  onTap?: ((key: string) => void) | null;
 }
 
 /** The placement a raycast hit belongs to. A hit is always a mesh somewhere
@@ -649,6 +655,8 @@ export function useMapEditing(deps: MapEditingDeps): void {
           // is what says it is the selected one.
           if (gesture.held) latest.current.onDragUnit?.(null);
           latest.current.onMove(gesture.key, gesture.delta);
+        } else {
+          latest.current.onTap?.(gesture.key);
         }
         return;
       }

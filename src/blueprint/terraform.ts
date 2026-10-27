@@ -75,6 +75,10 @@ const MAX_TOTAL_RAMP_WIDTH = 800;
 const MIN_TOTAL_RAMP_LENGTH = 64;
 const MIN_TOTAL_RAMP_WIDTH = 48;
 
+/** Line 99: the most points one order can carry, which for a step is its own
+ *  `points`. */
+const MAX_COMMAND_POINTS = 2500;
+
 /** Lines 116-133: the cost constants, before the mod option scales them. */
 const VOLUME_COST = 0.0128;
 const POINT_EXTRA_AREA_COST = 0;
@@ -94,6 +98,15 @@ export interface GroundHeights {
   height: number;
   /** Row-major, row 0 at the map's north, in elmos. */
   heights: Float32Array;
+  /**
+   * For a block cut out of a larger map: the map's corner this block's first
+   * corner is. Positions stay in the map's own elmos, so a result does not
+   * differ from the whole map's by a rounding of the sums, and a read or write
+   * outside the block is clamped or dropped as one outside the map is. 0, 0 if
+   * absent.
+   */
+  col?: number;
+  row?: number;
 }
 
 /** Where a layout stands, the way the widget's `place.lua` takes it: turned
@@ -271,11 +284,40 @@ export function terraform(
     ground: {
       width: ground.width,
       height: ground.height,
+      col: ground.col,
+      row: ground.row,
       heights: current.heights,
     },
     metal,
     steps: results,
   };
+}
+
+/**
+ * Which of the gadget's limits a step breaks, or null when it would take the
+ * order (issue #4793). The editor's tools ask this before making a step, so
+ * they stop at a limit rather than making one the game will refuse.
+ *
+ * - `points`: more than 2,500 points in the order (lines 99, 2078).
+ * - `wall`: a wall that fills out to more than 700 points (line 105).
+ * - `area`: an area wider or deeper than 2,000 elmos (line 102).
+ * - `ramp`: a ramp shorter than 64 or longer than 3,000 elmos, or narrower
+ *   than 48 or wider than 1,600 (lines 138-141, 2118).
+ */
+export type StepLimit = "points" | "wall" | "area" | "ramp";
+
+export function stepRefusal(step: TerrainStep): StepLimit | null {
+  if (step.points.length > MAX_COMMAND_POINTS) return "points";
+  if (step.points.length === 0) return null;
+  if (step.kind === "ramp") {
+    const [a, b] = step.points;
+    if (!a || !b) return null;
+    return rampSegments(a.x, 0, a.z, b.x, 0, b.z, step.width ?? 0)
+      ? null
+      : "ramp";
+  }
+  if (step.shape === "wall") return wallSegments(step.points) ? null : "wall";
+  return areaSegments(step.points) ? null : "area";
 }
 
 /** A point of a step with the height it is ordered to. */
@@ -299,18 +341,23 @@ function mod(a: number, b: number): number {
  *  clamped to the map. */
 class Reader {
   constructor(
-    readonly dims: { width: number; height: number },
+    readonly dims: {
+      width: number;
+      height: number;
+      col?: number;
+      row?: number;
+    },
     readonly heights: Float32Array,
   ) {}
 
   private index(x: number, z: number): number {
     const c = Math.min(
       this.dims.width - 1,
-      Math.max(0, Math.round(x / SQUARE)),
+      Math.max(0, Math.round(x / SQUARE) - (this.dims.col ?? 0)),
     );
     const r = Math.min(
       this.dims.height - 1,
-      Math.max(0, Math.round(z / SQUARE)),
+      Math.max(0, Math.round(z / SQUARE) - (this.dims.row ?? 0)),
     );
     return r * this.dims.width + c;
   }
@@ -321,8 +368,8 @@ class Reader {
 
   /** A write off the map goes nowhere, as `Spring.SetHeightMap`'s does. */
   set(x: number, z: number, h: number): void {
-    const c = x / SQUARE;
-    const r = z / SQUARE;
+    const c = x / SQUARE - (this.dims.col ?? 0);
+    const r = z / SQUARE - (this.dims.row ?? 0);
     if (!Number.isInteger(c) || !Number.isInteger(r)) return;
     if (c < 0 || r < 0 || c >= this.dims.width || r >= this.dims.height) {
       return;

@@ -4364,10 +4364,6 @@ msgstr "{place} of {total}."
 msgid "{placeable} of {total} can be placed in it."
 msgstr "{placeable} of {total} can be placed in it."
 
-#: src/placement/BlueprintEditor.tsx
-msgid "{placed, plural, one {# building} other {# buildings}}"
-msgstr "{placed, plural, one {# building} other {# buildings}}"
-
 #: src/scenario/pages/components/ScenarioMapBars.tsx
 msgid "{placed, plural, one {# unit} other {# units}}"
 msgstr "{placed, plural, one {# unit} other {# units}}"
@@ -9093,6 +9089,10 @@ msgstr "Archives"
 msgid "Archives ({archiveCount})"
 msgstr "Archives ({archiveCount})"
 
+#: src/placement/TerrainControls.tsx
+msgid "Area"
+msgstr "Area"
+
 #: src/lego/pages/components/AnimationPanel.tsx
 msgid "Arguments"
 msgstr "Arguments"
@@ -9774,6 +9774,10 @@ msgstr "Barrel length"
 #: src/lego/animPresets.ts
 msgid "Barrel lift"
 msgstr "Barrel lift"
+
+#: src/scenario/validate.ts
+msgid "base"
+msgstr "base"
 
 #: src/scenario/validate.ts
 msgid "Base"
@@ -11139,6 +11143,7 @@ msgstr "Can't damage its own unit"
 #: src/multiplayer/invite/InviteLinkHost.tsx
 #: src/multiplayer/LobbyStatusButton.tsx
 #: src/multiplayer/RelayIndicator.tsx
+#: src/placement/TerrainControls.tsx
 #: src/play/pages/components/GameOptionsPanel.tsx
 #: src/play/pages/SavegamesPage.tsx
 #: src/play/PresetLibraryToolbar.tsx
@@ -12297,6 +12302,10 @@ msgstr "Close this battle? Everyone will be removed and it will disappear from t
 #: src/multiplayer/battle/BattleRoomHeader.tsx
 msgid "Close this battle? Everyone will be removed, and the room it is in will stop hosting and give its port back."
 msgstr "Close this battle? Everyone will be removed, and the room it is in will stop hosting and give its port back."
+
+#: src/placement/TerrainControls.tsx
+msgid "Close tool"
+msgstr "Close tool"
 
 #: src/content/unitFieldNotes.ts
 msgid "Closeness targeting weight"
@@ -14778,6 +14787,7 @@ msgstr "Delay between shots in a burst"
 #: src/lego/pages/components/LoadoutPicker.tsx
 #: src/lego/pages/components/PosesPopover.tsx
 #: src/placement/SurfaceBars.tsx
+#: src/placement/TerrainControls.tsx
 #: src/play/pages/SavegamesPage.tsx
 #: src/scenario/pages/components/DialoguePanel.tsx
 #: src/scenario/pages/components/ObjectivePanel.tsx
@@ -15465,6 +15475,7 @@ msgstr "Dominant"
 #: src/i18n/frameStrings.ts
 #: src/lobby-servers/pages/SettingsSection.tsx
 #: src/placement/SurfaceBars.tsx
+#: src/placement/TerrainControls.tsx
 #: src/scenario/pages/components/ScenarioMapBars.tsx
 #: src/workshop/pages/components/ExplosionGeneratorEditor.tsx
 msgid "Done"
@@ -15787,6 +15798,10 @@ msgstr "Drag on the map to draw ally {activeLetter}'s box. Drag a box to move it
 #: src/scenario/pages/components/ScenarioMapScene.tsx
 msgid "drag one of its points to move it"
 msgstr "drag one of its points to move it"
+
+#: src/placement/BlueprintEditor.tsx
+msgid "Drag the change to move it, or a corner to reshape it. Click a side to add a corner, right click a corner to remove it."
+msgstr "Drag the change to move it, or a corner to reshape it. Click a side to add a corner, right click a corner to remove it."
 
 #: src/scenario/pages/components/modes.tsx
 msgid "Drag the map to move the view. Click something to select it, and drag it to move it. Right-drag turns the camera."
@@ -19251,6 +19266,7 @@ msgstr "height"
 #: src/lego/pages/components/ShapeFields.tsx
 #: src/lego/pages/components/SkeletonTargetFields.tsx
 #: src/mapconv/pages/DecompilePage.tsx
+#: src/placement/TerrainControls.tsx
 #: src/play/pages/components/MapOverlay.tsx
 msgid "Height"
 msgstr "Height"
@@ -19452,6 +19468,10 @@ msgstr "High at back"
 #: src/lego/pages/components/ShapeFields.tsx
 msgid "High at front"
 msgstr "High at front"
+
+#: src/placement/TerrainControls.tsx
+msgid "High end"
+msgstr "High end"
 
 #: src/content/unitFieldNotes.ts
 msgid "Higher is less accurate. 0 is perfect. Improves with the firing unit's experience."
@@ -22004,6 +22024,10 @@ msgstr "Lets go of a group: its units stay put and keep their owner, and the mis
 msgid "Letting the engine find it"
 msgstr "Letting the engine find it"
 
+#: src/placement/TerrainControls.tsx
+msgid "Level"
+msgstr "Level"
+
 #: src/conquest/pages/components/ThreatLevelSelect.tsx
 msgid "Level {lockedLevel}"
 msgstr "Level {lockedLevel}"
@@ -22015,6 +22039,14 @@ msgstr "Level {lockedLevel} is locked."
 #: src/conquest/pages/components/ThreatLevelSelect.tsx
 msgid "Level {n}"
 msgstr "Level {n}"
+
+#: src/placement/TerrainControls.tsx
+msgid "Level area"
+msgstr "Level area"
+
+#: src/placement/TerrainControls.tsx
+msgid "Level wall"
+msgstr "Level wall"
 
 #: src/content/index.ts
 #: src/content/pages/components/GameLibrarySummary.tsx
@@ -22624,6 +22656,7 @@ msgid "Lost, and it counted toward no rating"
 msgstr "Lost, and it counted toward no rating"
 
 #: src/lego/pages/components/ShapeFields.tsx
+#: src/placement/TerrainControls.tsx
 msgid "Low end"
 msgstr "Low end"
 
@@ -24335,6 +24368,10 @@ msgstr "Needs"
 #: src/scenario/pages/components/triggers.ts
 msgid "Needs {name}"
 msgstr "Needs {name}"
+
+#: src/scenario/pages/components/triggers.ts
+msgid "Needs a base that appears from a trigger"
+msgstr "Needs a base that appears from a trigger"
 
 #: src/scenario/pages/components/triggers.ts
 msgid "Needs a dialogue line"
@@ -28900,6 +28937,10 @@ msgid "Placeholder amounts. Set your game's."
 msgstr "Placeholder amounts. Set your game's."
 
 #: src/scenario/triggerTypes.ts
+msgid "Places a base that appears from a trigger: its terrain changes, then its buildings."
+msgstr "Places a base that appears from a trigger: its terrain changes, then its buildings."
+
+#: src/scenario/triggerTypes.ts
 msgid "Places a group on the map if it isn't there yet, and sends it off on its orders."
 msgstr "Places a group on the map if it isn't there yet, and sends it off on its orders."
 
@@ -29931,14 +29972,31 @@ msgstr "Radius Z must be above 0."
 msgid "Rainbow"
 msgstr "Rainbow"
 
+#: src/placement/TerrainControls.tsx
+msgid "Raise"
+msgstr "Raise"
+
+#: src/placement/TerrainControls.tsx
+msgid "Raise or level"
+msgstr "Raise or level"
+
+#: src/placement/TerrainControls.tsx
+msgid "Raised area"
+msgstr "Raised area"
+
 #: src/content/unitFieldNotes.ts
 msgid "Raised to 38 if set lower, the least that lets a 1x1 builder reach a 1x1 building."
 msgstr "Raised to 38 if set lower, the least that lets a 1x1 builder reach a 1x1 building."
+
+#: src/placement/TerrainControls.tsx
+msgid "Raised wall"
+msgstr "Raised wall"
 
 #: src/runlite/pages/components/NodeOverlays.tsx
 msgid "raises tech ceiling · both sides"
 msgstr "raises tech ceiling · both sides"
 
+#: src/placement/TerrainControls.tsx
 #: src/uberstress/pages/components/ReportDetail.tsx
 #: src/uberstress/pages/RunPage.tsx
 #: src/uberstress/pages/SettingsSection.tsx
@@ -34958,6 +35016,10 @@ msgstr "Smoke trail size"
 msgid "Smoke trail update rate"
 msgstr "Smoke trail update rate"
 
+#: src/placement/TerrainControls.tsx
+msgid "Smooth"
+msgstr "Smooth"
+
 #: src/mapconv/pages/components/AdvancedOptions.tsx
 msgid "Smooth texture (-smooth)"
 msgstr "Smooth texture (-smooth)"
@@ -35728,6 +35790,10 @@ msgstr "steady load"
 msgid "Step"
 msgstr "Step"
 
+#: src/placement/TerrainControls.tsx
+msgid "step {number} of the build order"
+msgstr "step {number} of the build order"
+
 #: src/lego/pages/components/AnimationPanel.tsx
 msgid "Step back one frame"
 msgstr "Step back one frame"
@@ -36337,12 +36403,21 @@ msgid "Terraform speed"
 msgstr "Terraform speed"
 
 #: src/lego/environment.ts
+#: src/placement/TerrainControls.tsx
 msgid "Terrain"
 msgstr "Terrain"
 
 #: src/blueprint/pages/components/TerrainSwitch.tsx
 msgid "Terrain changes"
 msgstr "Terrain changes"
+
+#: src/placement/TerrainControls.tsx
+msgid "Terrain changes in this game"
+msgstr "Terrain changes in this game"
+
+#: src/placement/TerrainControls.tsx
+msgid "Terrain tools"
+msgstr "Terrain tools"
 
 #: src/mapconv/pages/components/AdvancedOptions.tsx
 msgid "terrain-type index per pixel"
@@ -42414,6 +42489,10 @@ msgstr "Waiting for your browser"
 msgid "Waits"
 msgstr "Waits"
 
+#: src/scenario/pages/components/BaseControls.tsx
+msgid "Waits for a trigger to place it"
+msgstr "Waits for a trigger to place it"
+
 #: src/scenario/pages/components/GroupControls.tsx
 msgid "Waits for a trigger to spawn it"
 msgstr "Waits for a trigger to spawn it"
@@ -42455,6 +42534,7 @@ msgid "walker"
 msgstr "walker"
 
 #: src/lego/pages/components/ShapeFields.tsx
+#: src/placement/TerrainControls.tsx
 msgid "Wall"
 msgstr "Wall"
 
@@ -43295,6 +43375,7 @@ msgid "width"
 msgstr "width"
 
 #: src/lego/pages/components/ShapeFields.tsx
+#: src/placement/TerrainControls.tsx
 msgid "Width"
 msgstr "Width"
 
@@ -44290,6 +44371,22 @@ msgstr "Z in elmos"
 #: src/blueprint/pages/components/WidgetPanel.tsx
 msgid "Zero-K only loads widgets from your content folder from your second match, because it saves the setting that allows them when a game closes. The first match you play in Zero-K will not show the panel."
 msgstr "Zero-K only loads widgets from your content folder from your second match, because it saves the setting that allows them when a game closes. The first match you play in Zero-K will not show the panel."
+
+#: src/placement/TerrainControls.tsx
+msgid "Zero-K refuses a ramp shorter than 64 or longer than 3,000 elmos, or narrower than 48 or wider than 1,600."
+msgstr "Zero-K refuses a ramp shorter than 64 or longer than 3,000 elmos, or narrower than 48 or wider than 1,600."
+
+#: src/placement/TerrainControls.tsx
+msgid "Zero-K refuses a terrain change of more than 2,500 points."
+msgstr "Zero-K refuses a terrain change of more than 2,500 points."
+
+#: src/placement/TerrainControls.tsx
+msgid "Zero-K refuses a wall that long. It allows 700 points, a point every 16 elmos."
+msgstr "Zero-K refuses a wall that long. It allows 700 points, a point every 16 elmos."
+
+#: src/placement/TerrainControls.tsx
+msgid "Zero-K refuses an area wider or deeper than 2,000 elmos."
+msgstr "Zero-K refuses an area wider or deeper than 2,000 elmos."
 
 #: src/i18n/frameStrings.ts
 msgid "Zinc"

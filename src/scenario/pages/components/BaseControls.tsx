@@ -236,7 +236,9 @@ export function BaseControls({
   /** What the validator has found wrong with the mission (issue #2307). */
   issues: MissionIssue[];
   /** Change the base's own fields, as {@link editBase} takes them. */
-  onEdit: (patch: Partial<Pick<ScenarioBase, "team" | "difficulty">>) => void;
+  onEdit: (
+    patch: Partial<Pick<ScenarioBase, "team" | "difficulty" | "dormant">>,
+  ) => void;
   /** Rename the layout, which names a copy when it is shared and `sharedEdit`
    *  is off. */
   onRename: (name: string) => void;
@@ -566,6 +568,22 @@ export function BaseControls({
               <Trans>Say it in another side's buildings</Trans>
             </Button>
           )}
+
+          {/* A base a spawn_base action places later, terrain changes and all
+              (issue #4799). Unset rather than false when off, so a base that
+              never waited writes what it always wrote. */}
+          <div className="flex items-center justify-between gap-3 border-t border-border/60 pt-3">
+            <Label htmlFor="base-dormant" className="text-xs font-medium">
+              <Trans>Waits for a trigger to place it</Trans>
+            </Label>
+            <Switch
+              id="base-dormant"
+              checked={base.dormant === true}
+              onCheckedChange={(on) =>
+                onEdit({ dormant: on ? true : undefined })
+              }
+            />
+          </div>
 
           {/* This placement's, not the layout's (issue #2164). A layout two
               bases share says what the buildings are; which difficulties each
