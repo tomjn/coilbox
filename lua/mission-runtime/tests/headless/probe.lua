@@ -1463,6 +1463,34 @@ plans.reloaded = {
 	},
 }
 
+-- A base's terrain changes (issue #4799). The compound's wall ring stands from
+-- the start, and the outpost's hill rises when its trigger places it a minute
+-- in. Heights are read against the map's own, so any map will do.
+local function raisedBy(x, z)
+	return Spring.GetGroundHeight(x, z) - Spring.GetGroundOrigHeight(x, z)
+end
+
+plans.stronghold = {
+	deadline = 1860,
+	steps = {
+		{ frame = 5, run = function()
+			check("the compound's wall stands at the start, 48 above the map",
+				raisedBy(2400 - 192, 2400) == 48 and raisedBy(2400, 2400 + 192) == 48,
+				tostring(raisedBy(2400 - 192, 2400)) .. "/" .. tostring(raisedBy(2400, 2400 + 192)))
+			check("the compound's factory and turret are on the map",
+				owns(1, "corlab") == 1 and owns(1, "corllt") == 1,
+				owns(1, "corlab") .. "/" .. owns(1, "corllt"))
+			check("the outpost's hill is not there before its trigger", raisedBy(1600, 2400) == 0,
+				tostring(raisedBy(1600, 2400)))
+		end },
+		{ frame = 1830, run = function()
+			check("the outpost's hill rises when its trigger places it", raisedBy(1600, 2400) == 32,
+				tostring(raisedBy(1600, 2400)))
+			check("and its turret stands on it", owns(1, "corllt") == 2, tostring(owns(1, "corllt")))
+		end },
+	},
+}
+
 -- No mission at all: the modoption gate. The runtime is a file in the game
 -- whatever happens, so what has to be proved is that a normal game never gets a
 -- gadget out of it.

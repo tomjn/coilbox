@@ -172,6 +172,30 @@ check("a reloaded runtime knows the dormant base is on the map",
 check("and will not place it again", reloaded.GG.CoilboxMission.bases.spawn("outpost") == false)
 
 --------------------------------------------------------------------------------
+-- The emitted shape: src/scenario/fixtures/stronghold.json, as coilbox compiles
+-- it.
+--------------------------------------------------------------------------------
+
+local stronghold = load({ coilbox_mission = "demo" }, missionFiles(support.fixture("stronghold")), {
+	buildings = { corlab = true, corllt = true },
+})
+stronghold.env:Initialize()
+stronghold.env:GameStart()
+local strongGround = stronghold.env.Spring.GetGroundHeight
+check("the compound's ground is set before its buildings",
+	kinds(stronghold.events) == "ground corlab corllt", kinds(stronghold.events))
+check("the compound's wall ring stands at the start",
+	strongGround(2400 - 192, 2400) == 48 and strongGround(2400, 2400 + 192) == 48,
+	tostring(strongGround(2400 - 192, 2400)))
+check("the outpost's hill is not there until the trigger places it", strongGround(1600, 2400) == 0)
+for frame = 1, 60 * 30 + 1 do
+	stronghold.env:GameFrame(frame)
+end
+check("the trigger raises the outpost's hill, then places its turret",
+	strongGround(1600, 2400) == 32 and kinds(stronghold.events) == "ground corlab corllt ground corllt",
+	kinds(stronghold.events))
+
+--------------------------------------------------------------------------------
 -- An engine with no SetHeightMapFunc.
 --------------------------------------------------------------------------------
 

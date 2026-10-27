@@ -80,6 +80,7 @@ const NOUN = {
   zoneId: msg`zone`,
   actorId: msg`actor or building`,
   groupId: msg`group`,
+  baseId: msg`base`,
   triggerId: msg`trigger`,
   objectiveId: msg`objective`,
   dialogueId: msg`dialogue line`,
@@ -135,6 +136,7 @@ function registries(mission: Record<string, unknown>): Registry {
       ...declaredBuildings(mission.prefabs),
     ]),
     groupId: declared(mission.groups),
+    baseId: declared(mission.prefabs),
     triggerId: declared(mission.triggers),
     objectiveId: declared(mission.objectives),
     dialogueId: declared(mission.dialogue),
@@ -345,6 +347,10 @@ function checkPositions(
     // A prefab building's offset is measured from its prefab's origin and is
     // free to point north or west of it. Where it lands is checked below.
     if (point.path.endsWith(".offset")) continue;
+    // So is a terrain step's point (issue #4799). A step that runs off the map
+    // is cut at the edge, as the engine cuts any ground change, so it is not
+    // refused either.
+    if (/\.terrain\[\d+\]\.points\[\d+\]$/.test(point.path)) continue;
     const message = offMap(point.x, point.z, map);
     if (message) issues.push({ path: point.path, message });
   }

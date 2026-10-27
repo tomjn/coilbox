@@ -235,6 +235,12 @@ export type ScenarioBase = {
    * Splaunch's own example does.
    */
   difficulty?: DifficultyRange;
+  /**
+   * Not placed at the start. A `spawn_base` action places it later, terrain
+   * changes and all (issue #4799). Absent is a base that is there from the
+   * start, which is every base placed before this existed.
+   */
+  dormant?: boolean;
 };
 
 /**
@@ -777,6 +783,7 @@ function parseBase(p: Record<string, unknown>): ScenarioBase | null {
     origin,
     buildings: parseRoles(p.buildings),
     ...difficultyOf(p.difficulty),
+    ...(p.dormant === true ? { dormant: true } : {}),
   };
 }
 

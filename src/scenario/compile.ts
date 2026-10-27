@@ -3,6 +3,7 @@ import { effectiveTeams, type Participant } from "../play/participants";
 import type {
   DifficultyRange,
   Scenario,
+  ScenarioBase,
   ScenarioDialogue,
   ScenarioGroup,
   ScenarioObjective,
@@ -337,6 +338,34 @@ function restrictions(scenario: Scenario): LuaTable {
   ]);
 }
 
+/**
+ * A base's terrain changes, as offsets from its origin, or nothing for a base
+ * that has none (issue #4799).
+ *
+ * `before` is left out. Every step comes before every building (issue #4817),
+ * so the runtime sets a base's ground and then places its buildings, and has
+ * no order among them to read.
+ */
+function baseTerrain(
+  scenario: Scenario,
+  base: ScenarioBase,
+): LuaValue[] | undefined {
+  const steps = scenario.blueprints.find(
+    (b) => b.id === base.blueprint,
+  )?.terrain;
+  if (!steps || steps.length === 0) return undefined;
+  return steps.map((s) =>
+    tbl([
+      ["kind", s.kind],
+      ["shape", s.shape],
+      ["points", s.points.map(point)],
+      ["height", s.height],
+      ["heights", s.heights ? [s.heights[0], s.heights[1]] : undefined],
+      ["width", s.width],
+    ]),
+  );
+}
+
 /** A `setup` string field, when the captured skirmish actually carries one. */
 function setupString(value: string): string | undefined {
   return value !== "" ? value : undefined;
@@ -386,6 +415,10 @@ function mission(scenario: Scenario): LuaTable {
           ["team", p.team],
           ["origin", point(p.origin)],
           ["difficulty", difficulty(p.difficulty)],
+          // Only when set, like every flag here, so a scenario with neither
+          // emits the bytes it always did (issue #4799).
+          ["dormant", p.dormant === true ? true : undefined],
+          ["terrain", baseTerrain(scenario, p)],
           [
             "buildings",
             baseBuildings(scenario.blueprints, p).map((b) =>
