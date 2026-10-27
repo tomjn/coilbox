@@ -32498,6 +32498,18 @@ msgstr ""
 msgid "Saved configs"
 msgstr ""
 
+#: src/blueprint/library.ts
+msgid "Saved from the ground"
+msgstr ""
+
+#: src/blueprint/library.ts
+msgid "Saved from the ground in game with the coilbox widget, on engine {engine}."
+msgstr ""
+
+#: src/blueprint/library.ts
+msgid "Saved from the ground in game with the coilbox widget."
+msgstr ""
+
 #: src/lego/pages/components/BuildMenuSection.tsx
 msgid "Saved in {targetName}."
 msgstr ""

@@ -40167,6 +40167,18 @@ msgstr "Als Vorlage gespeichert"
 msgid "Saved configs"
 msgstr "Gespeichert"
 
+#: src/blueprint/library.ts
+msgid "Saved from the ground"
+msgstr ""
+
+#: src/blueprint/library.ts
+msgid "Saved from the ground in game with the coilbox widget, on engine {engine}."
+msgstr ""
+
+#: src/blueprint/library.ts
+msgid "Saved from the ground in game with the coilbox widget."
+msgstr ""
+
 #: src/lego/pages/components/BuildMenuSection.tsx
 #, fuzzy
 msgid "Saved in {targetName}."

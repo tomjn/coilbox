@@ -174,6 +174,7 @@ You can bind other keys. Type /bind followed by a key and an action in the game'
 - coilbox_blueprints_flip_x and coilbox_blueprints_flip_z flip it side to side and top to bottom
 - coilbox_blueprints_prev and coilbox_blueprints_next switch blueprint
 - coilbox_blueprints_save saves the selection
+- coilbox_blueprints_save_ground starts Save ground
 
 The widget only takes these keys while you place a blueprint, so the rest of the time F still means fight and G still means guard. Some games use [ and ] for their own keys, so those keys may not reach the widget. Bind other keys to the actions in that case.
 
@@ -183,6 +184,17 @@ The widget only takes these keys while you place a blueprint, so the rest of the
 2. Select Save selection at the bottom of the panel.
 
 The blueprint is named after what is in it, for example "2 Solar Collector, Light Laser Tower". It shows up on the Blueprints page the next time you open it with no game running. It is marked Saved in game.
+
+In a game with terraform, such as Zero-K, Save selection also saves the ground you changed under and round the buildings. A wall you raised with turrets on it is saved as the wall and the turrets. Ground changes that touch the buildings are followed to their end, and ground changes with untouched ground between them and the buildings are left out. The blueprint is then marked Saved from the ground.
+
+### Save ground changes on their own
+
+1. Select Save ground at the bottom of the panel.
+2. Drag a rectangle over the ground on the map.
+
+Only the ground changes inside the rectangle are saved, with no buildings. Right click or press Esc to stop without saving. The blueprint is named for what it holds, for example "Raised ground, dug ground", and is marked Saved from the ground.
+
+The game keeps no record of the shapes you drew, only the ground they left. So the widget works the shapes out from the ground: each area raised or dug by about the same height becomes one raise step, and the slopes round it are left out because the game makes them again when the step is placed. Detail is lost on the way. Ground levelled flat across a slope comes back as steps of different heights, for example. Open the blueprint in the editor and check it before you use it.
 
 ### Which games it works with
 

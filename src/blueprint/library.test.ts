@@ -355,6 +355,36 @@ describe("a layout saved in game by the widget (issue #1419)", () => {
   });
 });
 
+describe("a layout saved from the ground by the widget (issue #4798)", () => {
+  const at = new Date("2026-10-27T12:00:00.000Z");
+
+  it("is marked as read from the ground", () => {
+    expect(widgetSource("2026.09.01", at, true)).toEqual({
+      kind: "widget",
+      engine: "2026.09.01",
+      ground: true,
+      at: "2026-10-27T12:00:00.000Z",
+    });
+    expect(widgetSource("2026.09.01", at, false)).not.toHaveProperty("ground");
+  });
+
+  it("says it was saved from the ground", () => {
+    const source = widgetSource("2026.09.01", at, true);
+    expect(sourceLabel(source)).toBe("Saved from the ground");
+    expect(sourceSummary(source)).toContain("from the ground");
+    expect(sourceSummary(source)).toContain("2026.09.01");
+    expect(sourceSummary(widgetSource(undefined, at, true))).toContain(
+      "from the ground",
+    );
+  });
+
+  it("survives a trip through the stored document", () => {
+    const source = widgetSource("2026.09.01", at, true);
+    const read = parseStoredBlueprintJson(JSON.stringify(record({ source })));
+    expect(read?.source).toEqual(source);
+  });
+});
+
 describe("sortLibrary", () => {
   it("puts the most recently edited first", () => {
     const sorted = sortLibrary([
