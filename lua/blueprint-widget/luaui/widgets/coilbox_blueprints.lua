@@ -647,8 +647,14 @@ end
 -- the layout turns and flips about it. During a shift drag it is copies in a
 -- line from where the drag began.
 local function trackCursor()
-	local mx, my = Spring.GetMouseState()
-	local kind, pos = Spring.TraceScreenRay(mx, my, true)
+	local kind, pos
+	if placing.at then
+		-- placed by another widget, at a point, not by the cursor
+		kind, pos = "ground", { placing.at.x, 0, placing.at.z }
+	else
+		local mx, my = Spring.GetMouseState()
+		kind, pos = Spring.TraceScreenRay(mx, my, true)
+	end
 	if kind ~= "ground" or not pos then
 		placing.foot = nil
 		return
@@ -733,7 +739,14 @@ local function describe(plan, sent)
 	return table.concat(parts, ", ")
 end
 
+-- Set while another widget places a blueprint with placeAt, to say whether
+-- shift counts as held.
+local shiftOverride = nil
+
 local function shiftHeld()
+	if shiftOverride ~= nil then
+		return shiftOverride
+	end
 	local _, _, _, shift = Spring.GetModKeyState()
 	return shift == true
 end
@@ -991,6 +1004,27 @@ end
 -- Actions the panel's buttons and rows raise
 --------------------------------------------------------------------------------
 
+--- Place the blueprint being held at a point on the map, as a click there
+-- would, for a game's own interface or a test driving the widget.
+-- @param x number elmos
+-- @param z number elmos
+-- @param shift boolean? whether to place it as if shift were held
+-- @return boolean whether anything was held
+local function placeAt(x, z, shift)
+	if not placing then
+		return false
+	end
+	placing.at, placing.foot = { x = x, z = z }, nil
+	shiftOverride = shift == true
+	trackCursor()
+	placeNow()
+	shiftOverride = nil
+	if placing then
+		placing.at = nil
+	end
+	return true
+end
+
 --- Turn the placing of terrain changes on or off. A blueprint of terrain
 -- changes alone cannot be placed with it off, so one being placed is put down.
 local function setTerrain(on)
@@ -1199,6 +1233,7 @@ function widget:Initialize()
 		assist = function(mode)
 			MODEL.setAssist(panel, mode)
 		end,
+		placeAt = placeAt,
 		terrain = function(on)
 			setTerrain(on == true or on == "on")
 		end,

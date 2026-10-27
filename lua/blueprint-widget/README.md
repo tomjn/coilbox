@@ -61,7 +61,7 @@ The shader is `#version 130` with `GL_ARB_explicit_attrib_location`, the lowest 
 
 ## Other widgets and games
 
-`WG.CoilboxBlueprints` offers `open`, `close`, `toggle`, `list`, `place(key)`, `save`, `rotate(turns)`, `flip(axis)` with `"x"` or `"z"`, `step(direction)`, `assist(mode)` with `"help"` or `"split"` and `terrain(on)` with a boolean to a game's own interface.
+`WG.CoilboxBlueprints` offers `open`, `close`, `toggle`, `list`, `place(key)`, `save`, `rotate(turns)`, `flip(axis)` with `"x"` or `"z"`, `step(direction)`, `assist(mode)` with `"help"` or `"split"`, `terrain(on)` with a boolean and `placeAt(x, z, shift)`, which places the blueprint being held at a point as a click there would, to a game's own interface.
 
 Widget actions: `coilbox_blueprints`, `coilbox_blueprints_save`, `coilbox_blueprints_rotate_left`, `coilbox_blueprints_rotate_right`, `coilbox_blueprints_prev`, `coilbox_blueprints_next`, `coilbox_blueprints_flip_x`, `coilbox_blueprints_flip_z`.
 
