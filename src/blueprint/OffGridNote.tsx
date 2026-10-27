@@ -42,15 +42,11 @@ export function OffGridNote({
   return (
     <div className="space-y-2 rounded bg-slate-800/70 px-2 py-1.5 text-[11px] text-slate-300">
       <p>
-        <Trans>
-          This blueprint's numbers do not agree with the build grid.{" "}
-          <Plural
-            value={count}
-            one={`Building ${places} is drawn where the engine will build it, which is not the position the blueprint holds for it.`}
-            other={`Buildings ${places} are drawn where the engine will build them, which is not the position the blueprint holds for them.`}
-          />{" "}
-          Nothing has been changed.
-        </Trans>
+        <Plural
+          value={count}
+          one={`Building ${places} is saved off the build grid. It is drawn where the engine will build it.`}
+          other={`Buildings ${places} are saved off the build grid. They are drawn where the engine will build them.`}
+        />
       </p>
       <Button
         size="sm"
@@ -58,7 +54,7 @@ export function OffGridNote({
         className="h-7 w-full px-2 text-[11px]"
         onClick={onSnap}
       >
-        <Trans>Put the blueprint on the build grid</Trans>
+        <Trans>Save the drawn positions</Trans>
       </Button>
     </div>
   );
