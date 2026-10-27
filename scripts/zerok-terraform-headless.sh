@@ -135,7 +135,7 @@ play() { # name, wall height, own tags (0 or 1), lasso off (0 or 1), mode, steps
   cp "$FIXTURE"/luarules/gadgets/*.lua "$game/LuaRules/Gadgets/"
   cp "$FIXTURE"/luaui/widgets/*.lua "$game/LuaUI/Widgets/"
   # the blueprint widget's own placing code, which the probe drives
-  cp "$ROOT/lua/blueprint-widget/luaui/coilbox_blueprints/place.lua" "$game/LuaUI/coilbox_blueprints/"
+  cp "$ROOT/lua/blueprint-widget/luaui/coilbox_blueprints/place.lua" "$ROOT/lua/blueprint-widget/luaui/coilbox_blueprints/terraform.lua" "$game/LuaUI/coilbox_blueprints/"
   sed "s|@BASE@|$BASE_NAME|g" "$FIXTURE/modinfo.lua" >"$game/modinfo.lua"
   if [ "$mode" != terraform ]; then
     # The ground probe saves with the widget's own modules.
@@ -215,10 +215,10 @@ queue_at() { # log, case, frame
 
 check_common() { # log, height, profile, tag source
   local log="$1"
-  expect "the fixture created its builders" "$(grep -c 'FIXTURE builder ' "$log" || true)" 16
+  expect "the fixture created its builders" "$(grep -c 'FIXTURE builder ' "$log" || true)" 19
   expect "the fixture ended the match" "$(grep -c 'FIXTURE done ' "$log" || true)" 1
   expect "Zero-K did not end the match early" "$(grep -c 'game_message: .* has been destroyed' "$log" || true)" 0
-  expect "the probe ordered every case" "$(grep -c 'PROBE ordered ' "$log" || true)" 14
+  expect "the probe ordered every case" "$(grep -c 'PROBE ordered ' "$log" || true)" 17
   expect "tags came from" "$(field "$(line "$log" 'PROBE ordered case=1 ')" source)" "$4"
   expect "builders carry the level command as" "$(field "$(line "$log" 'PROBE level-desc ')" action)" "levelground"
 
@@ -250,9 +250,53 @@ check_common() { # log, height, profile, tag source
   expect "case 11 wall from a blueprint" "$(profile "$log" 11)" "$3"
   expect "case 14 wall from a blueprint alone" "$(profile "$log" 14)" "$3"
   expect "case 14 built no turret" "$(grep -c 'FIXTURE created case=14 .*unit=turretlaser' "$log" || true)" 0
-  expect "the blueprint cases were not skipped or off the map" "$(grep -c 'PROBE blueprint .*skipped=0 offMap=0' "$log" || true)" 4
+  expect "the blueprint cases were not skipped or off the map" "$(grep -c 'PROBE blueprint .*skipped=0 offMap=0' "$log" || true)" 7
   expect "case 1 ground across the wall" "$(profile "$log" 1)" "$3"
   expect "case 9 ground across the long wall" "$(profile "$log" 9)" "$3"
+  check_model "$log"
+}
+
+# What Zero-K estimated for a case's terraform units, added up.
+game_metal() { # log, case
+  grep -E "FIXTURE terraunit-estimate case=$2 " "$1" | sed 's/.*estimate=\([-0-9.]*\).*/\1/' | awk '{ t += $1 } END { printf "%.4f", t }'
+}
+
+# Seconds from a case's first terraform unit appearing to its last going, which
+# is when the builder had spent everything on it. The builder also walks there.
+game_seconds() { # log, case
+  { grep -E "FIXTURE created case=$2 .*unit=terraunit" "$1" | sed 's/.*frame=\([0-9]*\).*/c \1/'
+    grep -E "FIXTURE terraunit-gone case=$2 " "$1" | sed 's/.*frame=\([0-9]*\).*/g \1/'; } |
+    awk '$1 == "c" && (lo == "" || $2 < lo) { lo = $2 } $1 == "g" && $2 > hi { hi = $2 } END { printf "%.1f", (hi - lo) / 30 }'
+}
+
+# The widget's model of the ground against the game's (issue #4797): the metal
+# the cost panel adds for each terraform, against the estimate Zero-K puts on
+# the terraform units once ordered, and every corner the model changes against
+# the ground the game left. The model's metal is worked out as in Zero-K, so
+# the two should agree to the four places the log prints. The ground agrees to
+# the foot of a slope: the model works a slope out in one pass and Zero-K builds
+# it up over many updates, so a few corners at the foot of a slope, mostly the
+# diagonals, end up to the 4 elmos of the foot's step away from the model's.
+check_model() { # log
+  local log="$1" case model game work speed compared worst
+  local defs
+  defs="$(line "$log" 'FIXTURE defs ')"
+  speed="$(field "$defs" buildSpeed)"
+  echo "  info $defs"
+  for case in 9 11 14 15 16 17; do
+    model="$(field "$(line "$log" "FIXTURE model case=$case ")" metal)"
+    work="$(field "$(line "$log" "FIXTURE model case=$case ")" work)"
+    game="$(game_metal "$log" "$case")"
+    echo "  info case $case terraform metal: panel $model, game $game. Time: panel $(awk -v w="$work" -v s="$speed" 'BEGIN { printf "%.1f", w / s }')s, game $(game_seconds "$log" "$case")s"
+    expect "case $case: the panel's terraform metal is the game's estimate" "$model" "$game"
+  done
+  for case in 9 14 15 16 17; do
+    compared="$(line "$log" "FIXTURE compare case=$case ")"
+    worst="$(field "$compared" worst)"
+    echo "  info case $case ground: $compared"
+    expect "case $case: no corner is further than the foot's 4 elmos from the model's" "$(awk -v w="$worst" 'BEGIN { print (w <= 4.0001) ? "yes" : "no" }')" yes
+    expect "case $case: corners the game changed that the model did not" "$(field "$compared" unexpected)" 0
+  done
 }
 
 if [ "${COILBOX_ZK_ONLY:-}" != ground ]; then
