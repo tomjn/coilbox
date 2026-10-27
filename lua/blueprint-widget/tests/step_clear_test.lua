@@ -209,7 +209,9 @@ check("without the model's ground there is no move", ids(noModel.orders[1].cmds)
 for _, mode in ipairs({ "help", "split" }) do
 	local both = byUnit(PLACE.plan(turretOnWall, PLACE.capabilities({ 200, 201 }), false, mode, { steps = steps, on = true, ground = model(steps, turretOnWall) }))
 	check(mode .. ": each builder gets a move ahead of the step, then waits for the other", both[200] and both[201] and ids(both[200]):find("10,5,39736,-1", 1, true) == 1 and ids(both[201]):find("10,5,39736", 1, true) == 1, show(both))
-	check(mode .. ": each on its own side", both[200][1][2][3] > 1024 and both[201][1][2][3] < 1024, show({ both[200][1][2], both[201][1][2] }))
+	-- Zero-K pulls the step's terraform units to one builder at a time, so one
+	-- on the far side of the wall would be walked on to it (#4834)
+	check(mode .. ": both on the side of the first, within a build range of each other", both[200][1][2][3] > 1024 and both[201][1][2][3] > 1024 and math.sqrt((both[200][1][2][1] - both[201][1][2][1]) ^ 2 + (both[200][1][2][3] - both[201][1][2][3]) ^ 2) <= RANGE - PLACE.MOVE_STOP, show({ both[200][1][2], both[201][1][2] }))
 end
 
 -- two builders on the same side get spots of their own
@@ -411,7 +413,41 @@ check("the blocks cover the wall end to end", (function()
 end)())
 local linePlan = PLACE.plan({}, PLACE.capabilities({ 200 }), false, nil, { steps = pieces, on = true })
 check("a wall's blocks are ordered together", #linePlan.terraform == 4 and linePlan.terraform[1].group == pieces[1].wall and linePlan.terraform[4].group == pieces[1].wall)
-check("a wall of one block is left whole", #PLACE.wallPieces({ kind = "raise", shape = "wall", points = { { x = 0, z = 0 }, { x = 224, z = 0 } } }) == 1)
+-- two builders standing in line with the wall's end, one a little off its line:
+-- each block's spots for both are on one side of the wall and within a build
+-- range of each other, or Zero-K pulls a block's units to one and walks the
+-- other on to the wall (#4834)
+engine({
+	[200] = { def = 10, x = 800, z = 1024, cmdDescs = { LEVEL } },
+	[201] = { def = 10, x = 800, z = 1072, cmdDescs = { LEVEL } },
+}, function()
+	return true
+end)
+local longPlan = byUnit(PLACE.plan({}, PLACE.capabilities({ 200, 201 }), false, "help", { steps = pieces, on = true, ground = model(pieces, {}) }))
+check("each block's spots for two builders are on one side of the wall, within a build range of each other", (function()
+	local a, b = {}, {}
+	for _, c in ipairs(longPlan[200]) do
+		if c[1] == 10 then
+			a[#a + 1] = c[2]
+		end
+	end
+	for _, c in ipairs(longPlan[201]) do
+		if c[1] == 10 then
+			b[#b + 1] = c[2]
+		end
+	end
+	if #a ~= 4 or #b ~= 4 then
+		return false
+	end
+	for i = 1, 4 do
+		local sameSide = (a[i][3] - 1024) * (b[i][3] - 1024) > 0
+		if not sameSide or math.sqrt((a[i][1] - b[i][1]) ^ 2 + (a[i][3] - b[i][3]) ^ 2) > RANGE - PLACE.MOVE_STOP then
+			return false
+		end
+	end
+	return true
+end)(), show(longPlan))
+check("a wall of one block is left whole",#PLACE.wallPieces({ kind = "raise", shape = "wall", points = { { x = 0, z = 0 }, { x = 224, z = 0 } } }) == 1)
 
 -- the engine takes a second order of one kind given with shift within 17
 -- elmos of a first as cancelling it, wait and all

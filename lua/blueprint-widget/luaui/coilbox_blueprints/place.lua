@@ -714,8 +714,10 @@ end
 -- @param fx number where the builder is, or will be when it gets to the step
 -- @param fz number
 -- @param stand function(x, z) -> boolean? whether the builder can stand there
+-- @param side table? { x, z } to take the side from instead of fx, fz, so the
+--   builders of one step can share a side
 -- @return table? { x, z }
-function M.clearSpot(spots, shape, fx, fz, stand)
+function M.clearSpot(spots, shape, fx, fz, stand, side)
 	if #spots == 0 then
 		return nil
 	end
@@ -724,7 +726,7 @@ function M.clearSpot(spots, shape, fx, fz, stand)
 		mx, mz = mx + c.x, mz + c.z
 	end
 	mx, mz = mx / #shape, mz / #shape
-	local sx, sz = fx - mx, fz - mz
+	local sx, sz = (side and side.x or fx) - mx, (side and side.z or fz) - mz
 	local sided = sx * sx + sz * sz >= 1
 	local list = {}
 	for _, s in ipairs(spots) do
@@ -1516,17 +1518,29 @@ function M.plan(foot, can, shift, mode, terrain)
 			if s.step.exit then
 				fx, fz = s.step.exit.x, s.step.exit.z
 			end
-			local spot = M.clearSpot(s.spots[key], s.shape, fx, fz, function(x, z)
-				for _, t in ipairs(s.taken) do
-					if (t.x - x) ^ 2 + (t.z - z) ^ 2 < apart * apart then
+			-- Zero-K pulls a step's terraform units towards whichever builder it
+			-- checks, by up to the leash from where they began. Builders on
+			-- opposite sides of a wall are further apart than a build range, so
+			-- a unit pulled to one leaves the other walking on to the wall. So
+			-- the builders of a step stand within a build range of each other
+			-- when they can (#4834), on the side the first of them took.
+			local together = def.buildDistance - M.MOVE_STOP
+			local function pick(keepTogether)
+				return M.clearSpot(s.spots[key], s.shape, fx, fz, function(x, z)
+					for _, t in ipairs(s.taken) do
+						local d2 = (t.x - x) ^ 2 + (t.z - z) ^ 2
+						if d2 < apart * apart or (keepTogether and d2 > together * together) then
+							return false
+						end
+					end
+					if near(x, z, M.CMD_MOVE) then
 						return false
 					end
-				end
-				if near(x, z, M.CMD_MOVE) then
-					return false
-				end
-				return M.canStand(def.id, x, z)
-			end)
+					return M.canStand(def.id, x, z)
+				end, s.sideFrom)
+			end
+			s.sideFrom = s.sideFrom or { x = fx, z = fz }
+			local spot = pick(true) or pick(false)
 			if spot then
 				add(M.CMD_MOVE, { spot.x, Spring.GetGroundHeight(spot.x, spot.z), spot.z })
 				s.taken[#s.taken + 1] = spot
