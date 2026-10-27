@@ -83,6 +83,21 @@ if not START then
 	return false
 end
 
+-- The ground a base's terrain steps leave, by Zero-K's own rules. A copy of the
+-- blueprint widget's terraform.lua: a gadget cannot include a LuaUI file, and
+-- tests/terrain_test.lua fails when the two differ.
+local TERRAFORM, terraformError = includeTable("luarules/mission_runtime/coilbox_terraform.lua")
+if not TERRAFORM then
+	log("error", terraformError)
+	return false
+end
+
+local BASES, basesError = includeTable("luarules/mission_runtime/coilbox_bases.lua")
+if not BASES then
+	log("error", basesError)
+	return false
+end
+
 local TRIGGERS, triggersError = includeTable("luarules/mission_runtime/coilbox_triggers.lua")
 if not TRIGGERS then
 	log("error", triggersError)
@@ -537,12 +552,71 @@ if gadgetHandler:IsSyncedCode() then
 		end
 	end
 
+	--- Put one planned unit on the map, with everything the scenario says about
+	-- it. Answers the unit, or nil when the engine would not make it.
+	local function place(placement)
+		local unitID = create(placement)
+		if not unitID then
+			return nil
+		end
+		if placement.state then
+			applyState(unitID, placement.state)
+		end
+		if placement.queue then
+			applyQueue(unitID, placement.queue, placement.repeatQueue)
+		end
+		if placement.actor then
+			units[placement.actor] = unitID
+			actorOfUnit[unitID] = placement.actor
+			-- The unsynced half handles what is local to this player's
+			-- screen. It cannot read a synced table, so it is told which
+			-- unit each actor became.
+			SendToUnsynced(ACTOR_MESSAGE, placement.actor, unitID)
+			-- And LuaUI cannot be told at all, so it reads the same fact
+			-- out of a rules param.
+			Spring.SetGameRulesParam(ACTOR_RULES_PREFIX .. placement.actor, unitID)
+		end
+		return unitID
+	end
+
+	--- Set a base's ground from its terrain steps (issue #4799). Before its
+	-- buildings, so they stand on the ground the steps leave. An engine with no
+	-- SetHeightMapFunc leaves the ground as it is, and says so once.
+	local noHeightMap = false
+	local function setGround(prefab)
+		if not prefab.terrain or #prefab.terrain == 0 then
+			return
+		end
+		if not Spring.SetHeightMapFunc then
+			if not noHeightMap then
+				noHeightMap = true
+				log("error", "this engine has no Spring.SetHeightMapFunc, so no base's terrain changes were made")
+			end
+			return
+		end
+		local corners, refused = BASES.setGround(TERRAFORM, prefab)
+		if refused > 0 then
+			log("warning", string.format(
+				"base %s: %d of its %d terrain changes could not be made by the terraform rules",
+				tostring(prefab.id), refused, #prefab.terrain))
+		end
+		log("info", string.format("base %s changed %d corners of ground", tostring(prefab.id), corners))
+	end
+
 	local function spawn()
 		local startPositions = {}
 		for _, team in ipairs(teams) do
 			local x, _, z, valid = Spring.GetTeamStartPosition(team.team)
 			if valid then
 				startPositions[team.team] = { x = x, z = z }
+			end
+		end
+
+		-- Every base's ground before anything stands on the map, so each building
+		-- and each actor is placed on the ground the steps leave.
+		for _, prefab in ipairs(MISSION.prefabs or {}) do
+			if prefab.dormant ~= true and DIFFICULTY_GATE(prefab.difficulty) then
+				setGround(prefab)
 			end
 		end
 
@@ -560,26 +634,8 @@ if gadgetHandler:IsSyncedCode() then
 
 		local spawned = 0
 		for _, placement in ipairs(placements) do
-			local unitID = create(placement)
-			if unitID then
+			if place(placement) then
 				spawned = spawned + 1
-				if placement.state then
-					applyState(unitID, placement.state)
-				end
-				if placement.queue then
-					applyQueue(unitID, placement.queue, placement.repeatQueue)
-				end
-				if placement.actor then
-					units[placement.actor] = unitID
-					actorOfUnit[unitID] = placement.actor
-					-- The unsynced half handles what is local to this player's
-					-- screen. It cannot read a synced table, so it is told which
-					-- unit each actor became.
-					SendToUnsynced(ACTOR_MESSAGE, placement.actor, unitID)
-					-- And LuaUI cannot be told at all, so it reads the same fact
-					-- out of a rules param.
-					Spring.SetGameRulesParam(ACTOR_RULES_PREFIX .. placement.actor, unitID)
-				end
 			end
 		end
 
@@ -723,6 +779,32 @@ if gadgetHandler:IsSyncedCode() then
 			end,
 		})
 		published.groups = groups
+		-- A dormant base, placed by `spawn_base`: its ground, then its buildings,
+		-- through the same two steps the start takes.
+		published.bases = BASES.register(triggers, published, {
+			place = function(prefab)
+				local team
+				for _, entry in ipairs(teams) do
+					if entry.id == prefab.team then
+						team = entry.team
+					end
+				end
+				if not team then
+					log("error", string.format(
+						"base %s belongs to team %s, which the mission has no engine team for",
+						tostring(prefab.id), tostring(prefab.team)))
+					return 0
+				end
+				setGround(prefab)
+				local placed = 0
+				for _, placement in ipairs(START.basePlacements(prefab, team)) do
+					if place(placement) then
+						placed = placed + 1
+					end
+				end
+				return placed
+			end,
+		})
 		-- Before the first frame, so every objective has a state a panel can read
 		-- from the moment the mission starts.
 		published.objectives = OBJECTIVES.register(triggers, published)

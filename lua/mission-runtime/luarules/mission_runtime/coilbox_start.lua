@@ -214,6 +214,9 @@ end
 -- scenario placed it. An author who wants the extra turret and not the rest of
 -- the base puts the turret down as a base of its own (issue #2164).
 --
+-- A `dormant` base is left out too. `spawn_base` places it later, through
+-- basePlacements (issue #4799).
+--
 -- @param mission the compiled mission table
 -- @param plan the result of teamPlan
 -- @param gate `gate(range)` says whether a difficulty range applies to the
@@ -236,26 +239,41 @@ function M.prefabPlacements(mission, plan, gate)
 				problems[#problems + 1] = string.format(
 					"prefab %s belongs to team %s, which the mission has no engine team for",
 					tostring(prefab.id), tostring(prefab.team))
-			else
-				for _, building in ipairs(prefab.buildings or {}) do
-					placements[#placements + 1] = {
-						prefab = prefab.id,
-						actor = building.id,
-						unitDef = building.def,
-						team = team.team,
-						x = prefab.origin.x + building.offset.x,
-						z = prefab.origin.z + building.offset.z,
-						facing = building.facing or DEFAULT_FACING,
-						queue = building.queue,
-						-- `repeat` is a Lua keyword, so the compiled mission quotes it.
-						repeatQueue = building["repeat"] == true,
-					}
+			elseif prefab.dormant ~= true then
+				for _, placement in ipairs(M.basePlacements(prefab, team.team)) do
+					placements[#placements + 1] = placement
 				end
 			end
 		end
 	end
 
 	return placements, problems
+end
+
+--- One base's buildings, as placements in map coordinates. What
+-- prefabPlacements gives for each base at the start, and what `spawn_base`
+-- places for a dormant one later.
+--
+-- @param prefab one entry from the mission's `prefabs`
+-- @param team the engine team number the base belongs to
+-- @return array of placements
+function M.basePlacements(prefab, team)
+	local placements = {}
+	for _, building in ipairs(prefab.buildings or {}) do
+		placements[#placements + 1] = {
+			prefab = prefab.id,
+			actor = building.id,
+			unitDef = building.def,
+			team = team,
+			x = prefab.origin.x + building.offset.x,
+			z = prefab.origin.z + building.offset.z,
+			facing = building.facing or DEFAULT_FACING,
+			queue = building.queue,
+			-- `repeat` is a Lua keyword, so the compiled mission quotes it.
+			repeatQueue = building["repeat"] == true,
+		}
+	end
+	return placements
 end
 
 return M
