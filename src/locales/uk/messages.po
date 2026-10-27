@@ -1723,23 +1723,11 @@ msgstr "{buildingCount, plural, one {# будівля бази} few {# буді�
 msgid "{buildingCount, plural, one {# building, and it can be built where it stands.} other {# buildings, and every one of them can be built where it stands.}}"
 msgstr "{buildingCount, plural, one {# будівля, і її можна збудувати на поточному місці.} few {# будівлі, і кожну з них можна збудувати на поточному місці.} many {# будівель, і кожну з них можна збудувати на поточному місці.} other {# будівлі, і кожну з них можна збудувати на поточному місці.}}"
 
-#: src/hub/pages/components/ItemPreview.tsx
-#, fuzzy
-msgid "{buildings, plural, one {# building, in build order} other {# buildings, in build order}}"
-msgstr "{buildings, plural, one {# будівля, у черговості будівництва} few {# будівлі, у черговості будівництва} many {# будівель, у черговості будівництва} other {# будівлі, у черговості будівництва}}"
-
 #: src/blueprint/countLine.ts
-#: src/hub/pages/components/ItemPreview.tsx
-#: src/hub/pages/components/SetupPackContents.tsx
 #: src/placement/LayoutControls.tsx
 #, fuzzy
 msgid "{buildings, plural, one {# building} other {# buildings}}"
 msgstr "{buildings, plural, one {# будівля} few {# будівлі} many {# будівель} other {# будівлі}}"
-
-#: src/hub/preview.ts
-#, fuzzy
-msgid "{buildings, plural, one {# building} other {# buildings}} over {width} by {height} build squares"
-msgstr "{buildings, plural, one {# будівля} few {# будівлі} many {# будівель} other {# будівлі}} на ділянці {width} × {height} клітинок будівництва"
 
 #: src/scenario/pages/components/contents.ts
 #, fuzzy
@@ -2267,6 +2255,14 @@ msgstr "{count}, {lineCount} Lua"
 #, fuzzy
 msgid "{countedGames}, oldest to newest"
 msgstr "{countedGames}, від найстаріших до найновіших"
+
+#: src/hub/preview.ts
+msgid "{counts} over {width} by {height} build squares"
+msgstr ""
+
+#: src/hub/pages/components/ItemPreview.tsx
+msgid "{counts}, in build order"
+msgstr ""
 
 #: src/lego/pages/components/UnitGamePicker.tsx
 #, fuzzy

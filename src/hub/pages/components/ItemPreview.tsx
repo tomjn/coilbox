@@ -1,7 +1,8 @@
 import type { MessageDescriptor } from "@lingui/core";
-import { msg } from "@lingui/core/macro";
+import { msg, t } from "@lingui/core/macro";
 import { Plural, useLingui } from "@lingui/react/macro";
 import { useMemo } from "react";
+import { countLine } from "@/blueprint/countLine";
 import { LayoutPlan } from "@/blueprint/LayoutPlan";
 import { useBuildingRoles } from "@/blueprint/useBuildingRoles";
 import { locationNoun } from "@/conquest/mapStyle";
@@ -135,6 +136,7 @@ function BlueprintLayout({
   game: string | null;
 }) {
   const buildings = shape.squares.length;
+  const counts = countLine(buildings, shape.terrain.length);
   const defs = useMemo(
     () => shape.squares.map((square) => square.def),
     [shape],
@@ -156,15 +158,7 @@ function BlueprintLayout({
         className="mx-auto aspect-[4/3] w-full max-w-md"
       />
       <p className="text-xs text-muted-foreground">
-        {shape.ordered ? (
-          <Plural
-            value={buildings}
-            one="# building, in build order"
-            other="# buildings, in build order"
-          />
-        ) : (
-          <Plural value={buildings} one="# building" other="# buildings" />
-        )}
+        {shape.ordered && buildings > 0 ? t`${counts}, in build order` : counts}
       </p>
     </div>
   );

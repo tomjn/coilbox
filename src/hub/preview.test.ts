@@ -723,6 +723,7 @@ describe("blueprintSheet", () => {
     width,
     height,
     ordered: false,
+    terrain: [],
     squares: [{ def: "armlab", sized: true, x: 0, y: 0, width, height }],
   });
 
@@ -858,6 +859,7 @@ describe("planLabel", () => {
     width,
     height,
     ordered: false,
+    terrain: [],
     squares: Array.from({ length: buildings }, (_, i) => ({
       def: "armsolar",
       sized: true,

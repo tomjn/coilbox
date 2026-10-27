@@ -52,6 +52,8 @@ import {
   pictureBox,
   planLabel,
   SHEET_MARGIN,
+  type TerrainDraw,
+  WALL_THICKNESS,
 } from "@/hub/preview";
 import { type BuildingRole, roleCss } from "./role";
 
@@ -240,6 +242,11 @@ function Sheet({
           />
         ))}
       </g>
+      {shape.terrain.map((step, i) => (
+        // Under the order thread and the buildings: the ground they stand on.
+        // biome-ignore lint/suspicious/noArrayIndexKey: steps have no identity beyond their place in the list
+        <TerrainMark key={`t${i}`} step={step} />
+      ))}
       {thread && (
         <path
           d={`M${thread.map(([x, y]) => `${x} ${y}`).join(" L")}`}
@@ -316,6 +323,94 @@ function Sheet({
         />
       )}
     </svg>
+  );
+}
+
+/** The points of a path or outline as an SVG path, closed for an outline. */
+function pathOf(points: readonly { x: number; y: number }[], closed: boolean) {
+  const d = `M${points.map(({ x, y }) => `${x} ${y}`).join(" L")}`;
+  return closed ? `${d} Z` : d;
+}
+
+/**
+ * One terrain step (issue #4795). An area is a filled outline, a wall is a thick
+ * line, and a ramp is a band with an arrow pointing uphill.
+ *
+ * Raised ground is blue and dug ground the plan's neutral grey. A step that moves
+ * the ground neither way, a smooth or a level of height 0, is the grey outline
+ * alone. The website draws the same marks in the same tones.
+ */
+function TerrainMark({ step }: { step: TerrainDraw }) {
+  const tone = step.tone === "up" ? "text-blue-500" : "text-neutral-400";
+  const filled = step.tone !== "even";
+
+  if (step.band) {
+    return (
+      <g className={tone} fill="currentColor" stroke="currentColor">
+        <path
+          d={pathOf(step.band, true)}
+          fillOpacity={filled ? FILL : 0}
+          strokeOpacity={OUTLINE}
+          strokeWidth={1.25}
+          vectorEffect="non-scaling-stroke"
+        />
+        {step.arrow ? (
+          <>
+            <path
+              d={pathOf([step.arrow[0], step.arrow[1]], false)}
+              fill="none"
+              strokeOpacity={START}
+              strokeWidth={1.5}
+              strokeLinecap="round"
+              vectorEffect="non-scaling-stroke"
+            />
+            <path
+              d={pathOf([step.arrow[2], step.arrow[1], step.arrow[3]], false)}
+              fill="none"
+              strokeOpacity={START}
+              strokeWidth={1.5}
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              vectorEffect="non-scaling-stroke"
+            />
+          </>
+        ) : null}
+      </g>
+    );
+  }
+
+  if (step.shape === "wall") {
+    // A path of one point is still a mark, so it is drawn as a zero length
+    // segment that the round caps turn into a dot.
+    const points =
+      step.points.length === 1 ? [step.points[0], step.points[0]] : step.points;
+    return (
+      <path
+        className={tone}
+        d={pathOf(points, false)}
+        fill="none"
+        stroke="currentColor"
+        strokeOpacity={filled ? OUTLINE * 0.75 : FILL}
+        strokeWidth={WALL_THICKNESS}
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        strokeDasharray={filled ? undefined : "0.6 0.6"}
+      />
+    );
+  }
+
+  return (
+    <path
+      className={tone}
+      d={pathOf(step.points, true)}
+      fill="currentColor"
+      fillOpacity={filled ? FILL : 0}
+      stroke="currentColor"
+      strokeOpacity={OUTLINE}
+      strokeWidth={1.25}
+      strokeLinejoin="round"
+      vectorEffect="non-scaling-stroke"
+    />
   );
 }
 
