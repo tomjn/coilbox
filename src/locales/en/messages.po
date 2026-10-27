@@ -1414,20 +1414,10 @@ msgstr "{buildingCount, plural, one {# base building} other {# base buildings}}"
 msgid "{buildingCount, plural, one {# building, and it can be built where it stands.} other {# buildings, and every one of them can be built where it stands.}}"
 msgstr "{buildingCount, plural, one {# building, and it can be built where it stands.} other {# buildings, and every one of them can be built where it stands.}}"
 
-#: src/hub/pages/components/ItemPreview.tsx
-msgid "{buildings, plural, one {# building, in build order} other {# buildings, in build order}}"
-msgstr "{buildings, plural, one {# building, in build order} other {# buildings, in build order}}"
-
 #: src/blueprint/countLine.ts
-#: src/hub/pages/components/ItemPreview.tsx
-#: src/hub/pages/components/SetupPackContents.tsx
 #: src/placement/LayoutControls.tsx
 msgid "{buildings, plural, one {# building} other {# buildings}}"
 msgstr "{buildings, plural, one {# building} other {# buildings}}"
-
-#: src/hub/preview.ts
-msgid "{buildings, plural, one {# building} other {# buildings}} over {width} by {height} build squares"
-msgstr "{buildings, plural, one {# building} other {# buildings}} over {width} by {height} build squares"
 
 #: src/scenario/pages/components/contents.ts
 msgid "{buildings} · build order"
@@ -1856,6 +1846,14 @@ msgstr "{count}, {lineCount} of Lua"
 #: src/content/pages/components/PlayerMatchFigures.tsx
 msgid "{countedGames}, oldest to newest"
 msgstr "{countedGames}, oldest to newest"
+
+#: src/hub/preview.ts
+msgid "{counts} over {width} by {height} build squares"
+msgstr "{counts} over {width} by {height} build squares"
+
+#: src/hub/pages/components/ItemPreview.tsx
+msgid "{counts}, in build order"
+msgstr "{counts}, in build order"
 
 #: src/lego/pages/components/UnitGamePicker.tsx
 msgid "{currentName} (not installed)"

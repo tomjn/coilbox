@@ -22,7 +22,8 @@
  * app generates a real galaxy or run with, so a preview cannot drift from it.
  */
 
-import { plural, t } from "@lingui/core/macro";
+import { t } from "@lingui/core/macro";
+import { countLine } from "@/blueprint/countLine";
 import { BUILD_SQUARE, facedFootprint } from "@/blueprint/footprint";
 import {
   type BlueprintPayload,
@@ -55,6 +56,16 @@ import { type GenRunMap, generateRun } from "@/runlite/generate";
 import { resolveRunMap } from "@/runlite/mapRun";
 import type { RogueliteRun, RunNodeType } from "@/runlite/model";
 import { bleedFromPixels, RENDER_BLEED_SQUARES } from "./assets/vocabulary";
+import {
+  type BoxPoint,
+  placeStep,
+  type TerrainArrow,
+  type TerrainDraw,
+  WALL_THICKNESS,
+} from "./terrainDraw";
+
+export type { BoxPoint, TerrainDraw, TerrainTone } from "./terrainDraw";
+export { WALL_THICKNESS };
 
 /** A labelled fact, ready to draw. Values are strings because a layout name is
  * as much a fact about a challenge as its system count. */
@@ -159,6 +170,8 @@ export interface BlueprintShape {
   height: number;
   /** In the payload's own order, which is the build order when `ordered`. */
   squares: BlueprintSquare[];
+  /** The terrain steps, in the payload's order. Drawn under the squares. */
+  terrain: TerrainDraw[];
   ordered: boolean;
 }
 
@@ -179,7 +192,8 @@ export interface SetupPackContents {
 /** One layout a setup pack bundles. */
 export interface PackBlueprint {
   name: string;
-  /** Null for a layout with no buildings, which has nothing to draw. */
+  /** Null for a layout with no buildings and no terrain steps, which has
+   *  nothing to draw. */
   layout: BlueprintShape | null;
   /** The game the layout names, which is what its buildings are coloured from.
    *  Absent on a layout exported where the game could not be named. */
@@ -777,7 +791,8 @@ function blueprintPreview(payload: Record<string, unknown>): HubPreview | null {
 export function blueprintShape(
   blueprint: BlueprintPayload,
 ): BlueprintShape | null {
-  if (blueprint.buildings.length === 0) return null;
+  const steps = (blueprint.terrain ?? []).map(placeStep);
+  if (blueprint.buildings.length === 0 && steps.length === 0) return null;
 
   const rects = blueprint.buildings.map((building) => {
     const declared = declaredFootprint(blueprint, building.def);
@@ -798,10 +813,29 @@ export function blueprintShape(
   // Measured from the layout rather than from zero. Offsets run out from the
   // origin in both directions, so a box starting at zero would leave half the
   // base outside the picture.
-  const left = Math.min(...rects.map((rect) => rect.left));
-  const top = Math.min(...rects.map((rect) => rect.top));
-  const right = Math.max(...rects.map((rect) => rect.left + rect.width));
-  const bottom = Math.max(...rects.map((rect) => rect.top + rect.height));
+  const reaches = [
+    ...rects.map((rect) => ({
+      left: rect.left,
+      top: rect.top,
+      right: rect.left + rect.width,
+      bottom: rect.top + rect.height,
+    })),
+    // Every point a step draws, which for a ramp is its band's corners, and for
+    // a wall the ground its thickness covers either side of the path.
+    ...steps.flatMap((step) =>
+      (step.band ?? step.points).map((point) => ({
+        left: point.x - step.reach,
+        top: point.y - step.reach,
+        right: point.x + step.reach,
+        bottom: point.y + step.reach,
+      })),
+    ),
+  ];
+  const left = Math.min(...reaches.map((reach) => reach.left));
+  const top = Math.min(...reaches.map((reach) => reach.top));
+  const right = Math.max(...reaches.map((reach) => reach.right));
+  const bottom = Math.max(...reaches.map((reach) => reach.bottom));
+  const shift = (point: BoxPoint) => ({ x: point.x - left, y: point.y - top });
 
   return {
     width: right - left,
@@ -815,6 +849,12 @@ export function blueprintShape(
       // A footprint is at least one square, so this never reaches zero.
       width: rect.width - BUILDING_GAP * 2,
       height: rect.height - BUILDING_GAP * 2,
+    })),
+    terrain: steps.map(({ reach: _reach, ...step }) => ({
+      ...step,
+      points: step.points.map(shift),
+      band: step.band ? step.band.map(shift) : null,
+      arrow: step.arrow ? (step.arrow.map(shift) as TerrainArrow) : null,
     })),
   };
 }
@@ -907,10 +947,10 @@ function squareBleed(
  * "5.76 by 3.24 build squares" is a measurement nobody asked for.
  */
 export function planLabel(shape: BlueprintShape): string {
-  const buildings = shape.squares.length;
+  const counts = countLine(shape.squares.length, shape.terrain.length);
   const width = Math.round(shape.width);
   const height = Math.round(shape.height);
-  return t`${plural(buildings, { one: "# building", other: "# buildings" })} over ${width} by ${height} build squares`;
+  return t`${counts} over ${width} by ${height} build squares`;
 }
 
 /**
