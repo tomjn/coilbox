@@ -1,12 +1,12 @@
 /**
- * A layout's terrain steps drawn on the editor's ground (issue #4793).
+ * What the pointer works with on a layout's terrain steps (issue #4793): the
+ * meshes a step is taken hold of by, the handles of the selected step, a thin
+ * outline saying which one is selected, and the guide for a step being
+ * drawn.
  *
- * Each step is drawn simply, as an outline on the ground in the colours the
- * plan thumbnails use (`@/hub/terrainDraw.ts`): raised ground blue, dug or
- * levelled-flat ground grey, a wall as a band 0.6 build squares thick and a
- * ramp as its band with an uphill arrow. What the ground looks like afterwards
- * is not drawn here. That is issue #4794, which replaces {@link stepMarks} and
- * keeps everything else: the keys, the pick meshes and the handles.
+ * What a step looks like is not drawn here. That is `terrainVolumes.ts`, the
+ * widget's see-through volume, which issue #4794 replaces with the ground as
+ * the steps leave it. Nothing here needs to change when it does.
  *
  * Everything that can be pointed at carries a `placementKey`, so the shared
  * picking in `useMapEditing` treats a step the way it treats a zone: an
@@ -20,11 +20,7 @@
  */
 
 import * as THREE from "three";
-import { Line2 } from "three/addons/lines/Line2.js";
-import { LineGeometry } from "three/addons/lines/LineGeometry.js";
-import { LineMaterial } from "three/addons/lines/LineMaterial.js";
 
-import { BUILD_SQUARE } from "@/blueprint/footprint";
 import type { TerrainStep } from "@/blueprint/model";
 import {
   cornerAdded,
@@ -32,43 +28,34 @@ import {
   edgeMiddle,
   movedStep,
   stepEdges,
-  type TerrainTool,
 } from "@/blueprint/terrainEdit";
-import { placeStep, WALL_THICKNESS } from "@/hub/terrainDraw";
+import { VOLUME_COLORS } from "@/blueprint/terrainMesh";
 import type { MapScene3D } from "@/lib/mapScene";
 import type { Point } from "@/scenario/model";
 import { worldToScene } from "./scene";
 import type { OverlayLayer } from "./useMapEditing";
 
-/** What the steps are drawn under, so the layer can be found as one thing. */
+/** What the layer is drawn under, so it can be found as one thing. */
 const ROOT_NAME = "blueprint-terrain";
 
-/** How far above the ground a mark is drawn, in elmos, so it is not lost in
- *  the ground it lies on. */
+/** How far above the ground a guide is drawn, in elmos, so it is not lost in
+ *  the ground (the widget's `M.GROUND_LIFT`). */
 const LIFT_ELMOS = 1;
 
-/** The colours of the plan thumbnails: Tailwind's blue-500 for raised ground
- *  and neutral-400 for everything else. */
-const UP_COLOR = 0x3b82f6;
-const EVEN_COLOR = 0xa3a3a3;
+/** The widget's green, for the guide of a step being drawn and its points. */
+const GUIDE_COLOR = new THREE.Color(...VOLUME_COLORS.raise);
 
-/** The selected step, and a step being drawn: the lime the build order list
- *  marks the selection with. */
-const SELECTED_COLOR = 0xbef264;
+/** The selected step's outline and corner handles. */
+const SELECTED_COLOR = 0xffffff;
 
-/** Line widths in pixels. `Line2` rather than `THREE.Line`, because a driver
- *  ignores `linewidth` on a plain line. */
-const LINE_WIDTH = 2;
-const SELECTED_LINE_WIDTH = 3;
-
-/** How wide a wall's pick band is, in elmos: wider than the wall is drawn, so a
- *  thin wall can still be taken hold of. */
-const WALL_PICK_ELMOS = BUILD_SQUARE * 2;
+/** How wide a wall is taken hold of, in elmos: the gadget's 5 by 5 corners
+ *  round each wall point (`wallSegments` in `@/blueprint/terraform.ts`). */
+const WALL_PICK_ELMOS = 32;
 
 /** How big a handle is, as a fraction of the view's height. The same size on
  *  screen at any zoom. */
-const HANDLE_SIZE = 0.022;
-const EDGE_HANDLE_SIZE = 0.016;
+const HANDLE_SIZE = 0.018;
+const EDGE_HANDLE_SIZE = 0.012;
 
 /** The keys this layer draws, and what each one names. */
 export type TerrainRef =
@@ -112,12 +99,12 @@ export function draggedStep(
   });
 }
 
-/** A step being drawn with a tool: the points clicked so far and where the
- *  pointer is, both as offsets from the layout's origin. */
-export interface TerrainDraft {
-  tool: TerrainTool;
+/** A step being drawn: the points clicked so far and where the pointer is,
+ *  both as offsets from the layout's origin. */
+export interface TerrainGuide {
   points: Point[];
   hover: Point | null;
+  closed: boolean;
 }
 
 export interface TerrainView {
@@ -131,7 +118,7 @@ export interface TerrainView {
   /** Whether a step can be picked at all. Off while a tool is drawing, so a
    *  click on a step adds a point rather than taking hold of it. */
   pickable: boolean;
-  draft: TerrainDraft | null;
+  guide: TerrainGuide | null;
 }
 
 export interface TerrainLayer extends OverlayLayer {
@@ -168,8 +155,7 @@ function discTexture(): THREE.CanvasTexture {
   return new THREE.CanvasTexture(canvas);
 }
 
-/** The band a path is drawn as, `width` elmos across, with square ends, as
- *  triangles in elmos. */
+/** The band a path is taken hold of by, `width` elmos across, as triangles. */
 function bandTriangles(points: readonly Point[], width: number): number[] {
   const half = width / 2;
   const out: number[] = [];
@@ -190,19 +176,37 @@ function bandTriangles(points: readonly Point[], width: number): number[] {
       { x: to.x - across.x, z: to.z - across.z },
       { x: from.x - across.x, z: from.z - across.z },
     ];
-    for (const at of [0, 1, 2, 0, 2, 3]) out.push(c[at].x, 0, c[at].z);
+    for (const at of [0, 1, 2, 0, 2, 3]) out.push(c[at].x, c[at].z);
   }
   return out;
 }
 
-/** An outline's fill as triangles in elmos. */
+/** An outline's inside as triangles. */
 function fillTriangles(points: readonly Point[]): number[] {
   const contour = points.map((p) => new THREE.Vector2(p.x, p.z));
   const out: number[] = [];
   for (const [a, b, c] of THREE.ShapeUtils.triangulateShape(contour, [])) {
-    for (const at of [a, b, c]) out.push(points[at].x, 0, points[at].z);
+    for (const at of [a, b, c]) out.push(points[at].x, points[at].z);
   }
   return out;
+}
+
+/** A ramp's band on the ground, going round. */
+function rampBand(step: TerrainStep): Point[] {
+  const [from, to] = step.points;
+  if (!from || !to) return [];
+  const half = (step.width ?? 0) / 2;
+  const length = Math.hypot(to.x - from.x, to.z - from.z) || 1;
+  const across = {
+    x: (-(to.z - from.z) / length) * half,
+    z: ((to.x - from.x) / length) * half,
+  };
+  return [
+    { x: from.x + across.x, z: from.z + across.z },
+    { x: to.x + across.x, z: to.z + across.z },
+    { x: to.x - across.x, z: to.z - across.z },
+    { x: from.x - across.x, z: from.z - across.z },
+  ];
 }
 
 export function createTerrainLayer(deps: TerrainLayerDeps): TerrainLayer {
@@ -219,8 +223,8 @@ export function createTerrainLayer(deps: TerrainLayerDeps): TerrainLayer {
   /** The handles of the selected step, for the right click. */
   let corners: THREE.Object3D[] = [];
 
-  /** A point of the layout in scene units, at the ground under it. */
-  const sceneAt = (origin: Point, offset: Point): THREE.Vector3 => {
+  /** A point of the layout in scene units, `lift` elmos over the ground. */
+  const sceneAt = (origin: Point, offset: Point, lift = 0): THREE.Vector3 => {
     const world = { x: origin.x + offset.x, z: origin.z + offset.z };
     const at = worldToScene(
       world,
@@ -230,77 +234,20 @@ export function createTerrainLayer(deps: TerrainLayerDeps): TerrainLayer {
     );
     return new THREE.Vector3(
       at.x,
-      (deps.groundAt(world) + LIFT_ELMOS) * handle.scale,
+      (deps.groundAt(world) + LIFT_ELMOS + lift) * handle.scale,
       at.z,
     );
   };
 
-  /** Triangles in elmos, laid on the ground about the layout's origin. */
-  const meshOf = (
-    origin: Point,
-    triangles: number[],
-    material: THREE.Material,
-  ): THREE.Mesh => {
-    const positions = new Float32Array(triangles.length);
-    for (let i = 0; i < triangles.length; i += 3) {
-      const at = sceneAt(origin, { x: triangles[i], z: triangles[i + 2] });
-      positions[i] = at.x;
-      positions[i + 1] = at.y;
-      positions[i + 2] = at.z;
+  const pickMesh = (origin: Point, flat: number[], lift: number) => {
+    const positions = new Float32Array((flat.length / 2) * 3);
+    for (let i = 0; i < flat.length; i += 2) {
+      const at = sceneAt(origin, { x: flat[i], z: flat[i + 1] }, lift);
+      positions.set([at.x, at.y, at.z], (i / 2) * 3);
     }
     const geometry = new THREE.BufferGeometry();
     geometry.setAttribute("position", new THREE.BufferAttribute(positions, 3));
     geometry.computeBoundingSphere();
-    owned.push(geometry);
-    return new THREE.Mesh(geometry, material);
-  };
-
-  const lineOf = (
-    origin: Point,
-    points: readonly Point[],
-    closed: boolean,
-    color: number,
-    width: number,
-    opacity = 1,
-  ): Line2 => {
-    const run = closed && points.length > 2 ? [...points, points[0]] : points;
-    const geometry = new LineGeometry();
-    geometry.setPositions(
-      run.flatMap((p) => {
-        const at = sceneAt(origin, p);
-        return [at.x, at.y, at.z];
-      }),
-    );
-    const viewport = new THREE.Vector2();
-    handle.renderer.getSize(viewport);
-    const material = new LineMaterial({
-      color,
-      linewidth: width,
-      transparent: opacity < 1,
-      opacity,
-      depthTest: false,
-    });
-    material.resolution.copy(viewport);
-    owned.push(geometry, material);
-    const line = new Line2(geometry, material);
-    line.renderOrder = 3;
-    return line;
-  };
-
-  const fillMaterial = (color: number, opacity: number) => {
-    const material = new THREE.MeshBasicMaterial({
-      color,
-      transparent: true,
-      opacity,
-      side: THREE.DoubleSide,
-      depthWrite: false,
-    });
-    owned.push(material);
-    return material;
-  };
-
-  /** A material that is never seen, for the meshes a pointer takes hold of. */
-  const pickMaterial = () => {
     const material = new THREE.MeshBasicMaterial({
       transparent: true,
       opacity: 0,
@@ -308,131 +255,76 @@ export function createTerrainLayer(deps: TerrainLayerDeps): TerrainLayer {
       depthWrite: false,
       colorWrite: false,
     });
+    owned.push(geometry, material);
+    return new THREE.Mesh(geometry, material);
+  };
+
+  const thinLine = (
+    origin: Point,
+    points: readonly Point[],
+    lift: number,
+    closed: boolean,
+    color: THREE.ColorRepresentation,
+  ) => {
+    const geometry = new THREE.BufferGeometry().setFromPoints(
+      points.map((p) => sceneAt(origin, p, lift)),
+    );
+    const material = new THREE.LineBasicMaterial({
+      color,
+      transparent: true,
+      opacity: 0.95,
+      depthTest: false,
+    });
+    owned.push(geometry, material);
+    const line = closed
+      ? new THREE.LineLoop(geometry, material)
+      : new THREE.Line(geometry, material);
+    line.renderOrder = 4;
+    return line;
+  };
+
+  const sprite = (
+    position: THREE.Vector3,
+    map: THREE.Texture,
+    width: number,
+    height: number,
+    color: THREE.ColorRepresentation = 0xffffff,
+  ) => {
+    const material = new THREE.SpriteMaterial({
+      map,
+      color,
+      sizeAttenuation: false,
+      depthTest: false,
+      transparent: true,
+    });
     owned.push(material);
-    return material;
+    const one = new THREE.Sprite(material);
+    one.position.copy(position);
+    one.scale.set(width, height, 1);
+    one.renderOrder = 6;
+    return one;
   };
 
   const handleSprite = (
     origin: Point,
     at: Point,
+    lift: number,
     key: string,
     size: number,
-    color: number,
-  ): THREE.Sprite => {
-    const material = new THREE.SpriteMaterial({
-      map: disc,
-      color,
-      sizeAttenuation: false,
-      depthTest: false,
-    });
-    owned.push(material);
-    const sprite = new THREE.Sprite(material);
-    sprite.position.copy(sceneAt(origin, at));
-    sprite.scale.set(size, size, 1);
-    sprite.renderOrder = 5;
-    sprite.userData = { placementKey: key };
+    color: THREE.ColorRepresentation,
+  ) => {
+    const one = sprite(sceneAt(origin, at, lift), disc, size, size, color);
+    one.userData = { placementKey: key };
     keys.add(key);
-    return sprite;
+    return one;
   };
 
-  /**
-   * What one step looks like: the part issue #4794 replaces with the ground
-   * as the step leaves it.
-   */
-  const stepMarks = (
-    origin: Point,
-    step: TerrainStep,
-    selected: boolean,
-  ): THREE.Object3D[] => {
-    const placed = placeStep(step);
-    const color = placed.tone === "up" ? UP_COLOR : EVEN_COLOR;
-    const filled = placed.tone !== "even";
-    const outline = selected ? SELECTED_COLOR : color;
-    const width = selected ? SELECTED_LINE_WIDTH : LINE_WIDTH;
-    const out: THREE.Object3D[] = [];
-    if (step.kind === "ramp" && placed.band) {
-      const band = placed.band.map((p) => ({
-        x: p.x * BUILD_SQUARE,
-        z: p.y * BUILD_SQUARE,
-      }));
-      out.push(
-        meshOf(origin, fillTriangles(band), fillMaterial(color, 0.25)),
-        lineOf(origin, band, true, outline, width),
-      );
-      if (placed.arrow) {
-        const [tail, tip, left, right] = placed.arrow.map((p) => ({
-          x: p.x * BUILD_SQUARE,
-          z: p.y * BUILD_SQUARE,
-        }));
-        out.push(
-          lineOf(origin, [tail, tip], false, outline, width),
-          lineOf(origin, [left, tip, right], false, outline, width),
-        );
-      }
-      return out;
-    }
-    if (step.shape === "wall") {
-      out.push(
-        meshOf(
-          origin,
-          bandTriangles(step.points, WALL_THICKNESS * BUILD_SQUARE),
-          fillMaterial(color, filled ? 0.75 : 0.5),
-        ),
-      );
-      if (selected) {
-        out.push(lineOf(origin, step.points, false, outline, width));
-      }
-      return out;
-    }
-    out.push(
-      meshOf(
-        origin,
-        fillTriangles(step.points),
-        fillMaterial(color, filled ? 0.25 : 0.08),
-      ),
-      lineOf(origin, step.points, true, outline, width),
-    );
-    return out;
-  };
-
-  /** What a pointer takes hold of a step by. */
-  const stepPick = (origin: Point, step: TerrainStep): THREE.Mesh => {
-    const placed = placeStep(step);
-    const triangles =
-      step.kind === "ramp" && placed.band
-        ? fillTriangles(
-            placed.band.map((p) => ({
-              x: p.x * BUILD_SQUARE,
-              z: p.y * BUILD_SQUARE,
-            })),
-          )
-        : step.shape === "wall"
-          ? bandTriangles(step.points, WALL_PICK_ELMOS)
-          : fillTriangles(step.points);
-    return meshOf(origin, triangles, pickMaterial());
-  };
-
-  const draftMarks = (origin: Point, draft: TerrainDraft): THREE.Object3D[] => {
-    const points = draft.hover ? [...draft.points, draft.hover] : draft.points;
-    const out: THREE.Object3D[] = [];
-    if (points.length >= 2) {
-      const closed = draft.tool === "area" || draft.tool === "smooth";
-      out.push(lineOf(origin, points, closed, SELECTED_COLOR, LINE_WIDTH, 0.9));
-    }
-    draft.points.forEach((p, i) => {
-      const sprite = handleSprite(
-        origin,
-        p,
-        `terrain-draft:${i}`,
-        EDGE_HANDLE_SIZE,
-        SELECTED_COLOR,
-      );
-      // Drawn, never picked.
-      sprite.userData = {};
-      out.push(sprite);
-    });
-    return out;
-  };
+  /** How far above the ground a step's top is, for its handles and outline.
+   *  A ramp's are on the ground, since its top slopes. */
+  const topOf = (step: TerrainStep) =>
+    step.kind === "raise" || step.kind === "level"
+      ? Math.max(0, step.height ?? 0)
+      : 0;
 
   const render = (shown: TerrainView, steps: readonly TerrainStep[]) => {
     root.clear();
@@ -441,46 +333,90 @@ export function createTerrainLayer(deps: TerrainLayerDeps): TerrainLayer {
     keys.clear();
     corners = [];
     const { origin } = shown;
+
     steps.forEach((step, index) => {
       if (shown.hidden?.has(index) || step.points.length === 0) return;
-      const selected = index === shown.selected;
-      const group = new THREE.Group();
-      for (const mark of stepMarks(origin, step, selected)) group.add(mark);
+      const top = topOf(step);
+      const outline = step.kind === "ramp" ? rampBand(step) : step.points;
       if (shown.pickable) {
-        const pick = stepPick(origin, step);
+        const flat =
+          step.kind === "ramp"
+            ? fillTriangles(outline)
+            : step.shape === "wall"
+              ? bandTriangles(step.points, WALL_PICK_ELMOS)
+              : fillTriangles(step.points);
+        const pick = pickMesh(origin, flat, top);
         pick.userData = { placementKey: stepKey(index) };
         keys.add(stepKey(index));
-        group.add(pick);
+        root.add(pick);
       }
-      if (selected && shown.pickable) {
-        for (const edge of stepEdges(step)) {
-          group.add(
-            handleSprite(
-              origin,
-              edgeMiddle(step, edge),
-              partKey(index, "edge", edge),
-              EDGE_HANDLE_SIZE,
-              SELECTED_COLOR,
-            ),
-          );
-        }
-        step.points.forEach((p, at) => {
-          const sprite = handleSprite(
+      if (index !== shown.selected) return;
+      root.add(
+        thinLine(
+          origin,
+          outline,
+          top,
+          step.shape === "area" || step.kind === "ramp",
+          SELECTED_COLOR,
+        ),
+      );
+      if (!shown.pickable) return;
+      for (const edge of stepEdges(step)) {
+        root.add(
+          handleSprite(
             origin,
-            p,
-            partKey(index, "corner", at),
-            HANDLE_SIZE,
-            0xffffff,
-          );
-          corners.push(sprite);
-          group.add(sprite);
-        });
+            edgeMiddle(step, edge),
+            top,
+            partKey(index, "edge", edge),
+            EDGE_HANDLE_SIZE,
+            SELECTED_COLOR,
+          ),
+        );
       }
-      root.add(group);
+      step.points.forEach((p, at) => {
+        const one = handleSprite(
+          origin,
+          p,
+          top,
+          partKey(index, "corner", at),
+          HANDLE_SIZE,
+          SELECTED_COLOR,
+        );
+        corners.push(one);
+        root.add(one);
+      });
     });
-    if (shown.draft) {
-      for (const mark of draftMarks(origin, shown.draft)) root.add(mark);
+
+    const guide = shown.guide;
+    if (guide) {
+      const run = guide.hover ? [...guide.points, guide.hover] : guide.points;
+      if (run.length >= 2) {
+        root.add(thinLine(origin, run, 0, guide.closed, GUIDE_COLOR));
+      }
+      for (const p of guide.points) {
+        root.add(
+          sprite(
+            sceneAt(origin, p),
+            disc,
+            EDGE_HANDLE_SIZE,
+            EDGE_HANDLE_SIZE,
+            GUIDE_COLOR,
+          ),
+        );
+      }
+      if (guide.hover) {
+        root.add(
+          sprite(
+            sceneAt(origin, guide.hover),
+            disc,
+            EDGE_HANDLE_SIZE,
+            EDGE_HANDLE_SIZE,
+            GUIDE_COLOR,
+          ),
+        );
+      }
     }
+
     handle.render();
   };
 

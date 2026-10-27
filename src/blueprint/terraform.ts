@@ -310,7 +310,7 @@ export function stepRefusal(step: TerrainStep): StepLimit | null {
 }
 
 /** A point of a step with the height it is ordered to. */
-interface Target {
+export interface Target {
   x: number;
   z: number;
   aim: number;
@@ -384,6 +384,38 @@ function addStructure(blocked: Set<number>, rect: Rect): void {
   for (let x = cx - hx; x <= cx + hx; x += SQUARE) {
     for (let z = cz - hz; z <= cz + hz; z += SQUARE) blocked.add(key(x, z));
   }
+}
+
+/**
+ * The heightmap corners a step sets and the height each is aimed at, once
+ * each, or null when the gadget refuses the step (issue #4793). `pivot` is
+ * where the layout is held, which level and ramp heights are measured from.
+ * The editor draws a step's volume from these, as the widget's
+ * `terrain.lua` `M.corners` does.
+ */
+export function stepCorners(
+  step: TerrainStep,
+  ground: GroundHeights,
+  pivot: Point,
+): Target[] | null {
+  const reader = new Reader(ground, ground.heights);
+  const segments = stepSegments(
+    step,
+    reader,
+    reader.bilinear(pivot.x, pivot.z),
+  );
+  if (!segments) return null;
+  const seen = new Set<number>();
+  const out: Target[] = [];
+  for (const segment of segments) {
+    for (const corner of segment) {
+      const at = key(corner.x, corner.z);
+      if (seen.has(at)) continue;
+      seen.add(at);
+      out.push(corner);
+    }
+  }
+  return out;
 }
 
 /** A step's points as the gadget splits them into terraunits, each with its
