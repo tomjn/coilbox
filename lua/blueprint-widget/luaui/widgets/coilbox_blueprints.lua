@@ -1759,7 +1759,7 @@ local function ghost(p, teamID)
 	-- The stack holds the camera here, and UnitShape wants a pure model
 	-- matrix, so without this the ghost lands nowhere visible.
 	gl.LoadIdentity()
-	gl.Translate(p.x, p.y, p.z)
+	gl.Translate(p.x, p.drawY or p.y, p.z)
 	gl.Rotate(90 * p.facing, 0, 1, 0)
 	gl.UnitShape(p.defID, teamID, false, false, false)
 	gl.PopMatrix()
@@ -1805,10 +1805,10 @@ local function groundEnv()
 end
 
 --- Refill the ground buffer when the marked positions change.
-local function groundMarks(foot, key)
+local function groundMarks(foot, key, heightAt)
 	if groundKey ~= key then
 		groundKey = key
-		local verts, idx = MODEL.packGround(foot, markStyle, Spring.GetGroundHeight)
+		local verts, idx = MODEL.packGround(foot, markStyle, heightAt)
 		groundIndices = upload(groundSet, verts, idx)
 	end
 end
@@ -1880,8 +1880,15 @@ function widget:DrawWorld()
 				p.onSlope = nil
 			end
 		end
+		-- Buildings stand on the ground the steps leave, whatever their place in
+		-- the build order, so the marks and the ghosts follow it. drawY keeps the
+		-- height the engine gave the building and adds how far the steps moved the
+		-- ground under it, leaving p.y, which the build orders use, alone.
+		for _, p in ipairs(marks) do
+			p.drawY = p.y + session.heightAt(p.x, p.z) - Spring.GetGroundHeight(p.x, p.z)
+		end
 		marks[#marks + 1] = pick
-		groundMarks(marks, key)
+		groundMarks(marks, key, session.heightAt)
 		terrainMesh = TERRAIN.mesh(session.changed(), Spring.GetGroundHeight)
 		terrainMesh.indices = uploadMesh(terrainSet, terrainMesh.verts, terrainMesh.idx)
 		stepLabels = PLACE.labels(steps)

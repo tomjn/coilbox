@@ -300,4 +300,22 @@ do
 	check("a step on a big map changes as many corners as the same step near the origin", count(64) == count(16000) and count(64) > 300, count(64) .. " and " .. count(16000))
 end
 
+--------------------------------------------------------------------------------
+-- the ground a building stands on (#4813)
+--------------------------------------------------------------------------------
+
+do
+	-- a building on a wall raised by 112 stands at the wall's top, and one
+	-- that comes after its step in the build order stands there too
+	local r = run(FLAT, { wall(112, 0) },{ { x = 512, z = 512, xsize = 4, zsize = 4, facing = 0 } })
+	local h = r.session.heightAt
+	check("a point inside a raised step reads the step's height", h(512, 512) == 112 and h(520, 504) == 112, h(512, 512))
+	check("a point between two corners reads the slope between them", math.abs(h(512, 540) - 70) < 0.01, h(512, 540))
+	check("a point outside every step reads today's ground", h(512, 700) == 0 and h(100, 100) == 0)
+	local e = run(EAST_SLOPE, { wall(112) })
+	check("off the steps, the ground is the map's own between corners", e.session.heightAt(100, 100) == EAST_SLOPE.heightAt(100, 100) and e.session.heightAt(603, 777) == EAST_SLOPE.heightAt(603, 777))
+	local none = TERRAFORM.session(FLAT)
+	check("with no steps the height is today's ground", none.heightAt(333, 201) == 0)
+end
+
 support.report()
