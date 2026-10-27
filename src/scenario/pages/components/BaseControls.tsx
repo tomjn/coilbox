@@ -270,15 +270,16 @@ export function BaseControls({
 }) {
   const drawer = useDrawer();
   const { t } = useLingui();
-  // The selection is one of the base's buildings, so this is always one of them.
-  const building = buildings[index];
-  const buildingDef = building.def;
-  const queue = building.queue ?? [];
+  // The selection is one of the base's buildings, or the anchor of a base made
+  // of terrain steps alone, which has none (issue #4829).
+  const building: PlacedBuilding | undefined = buildings[index];
+  const buildingDef = building?.def ?? "";
+  const queue = building?.queue ?? [];
   const queuedCount = queue.length;
-  const repeat = building.repeat === true;
+  const repeat = building?.repeat === true;
   // Null while the dataset is unread and for a def the game has not got, which
   // is why the picker below falls back to every unit rather than to nothing.
-  const buildable = buildableBy(units, building.def);
+  const buildable = building ? buildableBy(units, building.def) : [];
   /**
    * Whether this building has a queue worth offering at all.
    *
@@ -332,7 +333,7 @@ export function BaseControls({
         <FieldProblem id={teamDescribedBy} problem={teamProblem} />
       </div>
 
-      {(queueable || queue.length > 0) && (
+      {building && (queueable || queue.length > 0) && (
         <Popover>
           <PopoverTrigger asChild>
             <Button
@@ -622,14 +623,16 @@ export function BaseControls({
         </PopoverContent>
       </Popover>
 
-      <BuildOrderPopover
-        buildings={buildings}
-        index={index}
-        ordered={ordered}
-        onOrdered={onOrdered}
-        onMoveBuilding={onMoveBuilding}
-        onPlay={onPlay}
-      />
+      {building && (
+        <BuildOrderPopover
+          buildings={buildings}
+          index={index}
+          ordered={ordered}
+          onOrdered={onOrdered}
+          onMoveBuilding={onMoveBuilding}
+          onPlay={onPlay}
+        />
+      )}
     </>
   );
 }

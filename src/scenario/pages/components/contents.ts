@@ -13,6 +13,8 @@
  */
 
 import { plural, t } from "@lingui/core/macro";
+import { countLine } from "@/blueprint/countLine";
+import type { TerrainStep } from "@/blueprint/model";
 import { GROUP_SPACING } from "@/lib/scenarioEditing/placements";
 import { parsePlacementKey, placementKey } from "@/placement/placements";
 import {
@@ -80,13 +82,17 @@ function groupSpan(group: Scenario["groups"][number]): number {
   return ((side - 1) / 2) * GROUP_SPACING;
 }
 
-/** How far a base's buildings reach from its origin, in elmos. */
-function baseSpan(buildings: PlacedBuilding[]): number {
-  return buildings.reduce(
-    (far, building) =>
-      Math.max(far, Math.abs(building.offset.x), Math.abs(building.offset.z)),
-    0,
-  );
+/** How far a base's buildings and terrain steps reach from its origin, in
+ *  elmos. */
+function baseSpan(
+  buildings: PlacedBuilding[],
+  terrain: readonly TerrainStep[] = [],
+): number {
+  const reach = (far: number, point: Point) =>
+    Math.max(far, Math.abs(point.x), Math.abs(point.z));
+  return terrain
+    .flatMap((step) => step.points)
+    .reduce(reach, buildings.map((b) => b.offset).reduce(reach, 0));
 }
 
 /**
@@ -136,14 +142,19 @@ export function sceneContents(
   const baseNames = baseLabels(scenario.blueprints, scenario.bases);
   const bases = scenario.bases.map<ContentEntry>((base, i) => {
     const buildings = baseBuildings(scenario.blueprints, base);
+    const terrain =
+      scenario.blueprints.find((b) => b.id === base.blueprint)?.terrain ?? [];
     return {
       key: placementKey("base", base.id, 0),
       kind: "base",
       id: base.id,
       label: baseNames[i],
-      detail: buildingCount(buildings.length),
+      detail:
+        terrain.length > 0
+          ? countLine(buildings.length, terrain.length)
+          : buildingCount(buildings.length),
       pos: base.origin,
-      span: baseSpan(buildings),
+      span: baseSpan(buildings, terrain),
       team: base.team,
     };
   });
@@ -169,7 +180,8 @@ export interface LayoutEntry {
   /** What it is made of, in a few words. */
   detail: string;
   /** Nothing in it, so there is no base to place from it (issue #1450). A base
-   *  with no buildings draws nothing and can never be selected again. */
+   *  with no buildings and no terrain steps draws nothing and can never be
+   *  selected again. */
   empty: boolean;
 }
 
@@ -193,12 +205,14 @@ export function unplacedLayouts(
     .filter((layout) => !placed.has(layout.id))
     .map((layout) => {
       const count = layout.buildings.length;
-      const buildings = buildingCount(count);
+      const steps = layout.terrain?.length ?? 0;
+      const buildings =
+        steps > 0 ? countLine(count, steps) : buildingCount(count);
       return {
         id: layout.id,
         name: layout.name,
         detail: layout.ordered ? t`${buildings} · build order` : buildings,
-        empty: count === 0,
+        empty: count === 0 && steps === 0,
       };
     });
 }
