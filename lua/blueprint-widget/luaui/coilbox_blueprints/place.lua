@@ -13,17 +13,34 @@ local M = {}
 --- One build square in elmos.
 M.BUILD_SQUARE = 16
 
-local Spring, UnitDefs, UnitDefNames, Game
+local Spring, UnitDefs, UnitDefNames, Game, WG
 
 --- Hand over the engine tables. A test passes a stub.
 -- @param engine table Spring, UnitDefs, UnitDefNames, and Game for the map's
---   size
+--   size. WG is optional, for Zero-K's terraform tag counter.
 function M.use(engine)
 	Spring = engine.Spring
 	UnitDefs = engine.UnitDefs
 	UnitDefNames = engine.UnitDefNames
 	Game = engine.Game
+	WG = engine.WG
 end
+
+-- Zero-K's terraform commands (LuaRules/Configs/customcmds.lua). The terraform
+-- order is never queued: its gadget makes the terraform units and refuses the
+-- order. A level command with the same tag in the builder's queue is what puts
+-- the builder to work on them (issue #4789).
+M.CMD_TERRAFORM_INTERNAL = 39801
+M.CMD_LEVEL = 39736
+-- The level command's description action, which tells Zero-K's command from
+-- another game's command with the same number.
+M.LEVEL_ACTION = "levelground"
+-- Where the widget's own terraform tags start, for when Zero-K's counter
+-- (which starts at 0) is not there. The gadget only matches a tag to its
+-- terraform units within a team.
+M.TAG_BASE = 1000000
+
+local TERRAFORM_TYPE = { level = 1, raise = 2, smooth = 3, ramp = 4 }
 
 --- Whether a footprint reaches past the edge of the map.
 local function offMap(x, z, hw, hd)
@@ -71,14 +88,16 @@ end
 
 --- Resolve an entry's def names against the game.
 -- @param entry table a store entry
--- @return table { buildings = { { defID, def, offset, facing } }, missing = { name },
+-- @return table { buildings = { { defID, def, offset, facing, index } }, missing = { name },
 --   terrain = the entry's terrain steps, untouched }
 function M.resolve(entry)
 	local out = { buildings = {}, missing = {}, terrain = entry.terrain or {} }
-	for _, b in ipairs(entry.buildings) do
+	for i, b in ipairs(entry.buildings) do
 		local def = defByName(b.def)
 		if def then
-			out.buildings[#out.buildings + 1] = { defID = def.id, def = def, offset = b.offset, facing = b.facing }
+			-- index is the building's place in the entry, which a step's before
+			-- counts, and which a missing def leaves a gap in
+			out.buildings[#out.buildings + 1] = { defID = def.id, def = def, offset = b.offset, facing = b.facing, index = i }
 		else
 			out.missing[#out.missing + 1] = b.def
 		end
@@ -108,7 +127,7 @@ end
 -- @param az number anchor z, elmos
 -- @param flip table? { x = boolean, z = boolean }
 -- @param origin table? { x, z } in the layout's own offsets, 0, 0 if nil
--- @return table[] { defID, def, x, y, z, facing, blocked }
+-- @return table[] { defID, def, x, y, z, facing, blocked, index }
 function M.footprint(resolved, rotation, ax, az, flip, origin)
 	local flipX, flipZ = flip and flip.x, flip and flip.z
 	local cx, cz = origin and origin.x or 0, origin and origin.z or 0
@@ -125,7 +144,7 @@ function M.footprint(resolved, rotation, ax, az, flip, origin)
 		local x, y, z = Spring.Pos2BuildPos(b.defID, ax + ox, 0, az + oz, facing)
 		local status = Spring.TestBuildOrder(b.defID, x, y, z, facing)
 		local hw, hd = M.halfSpan(b.def, facing)
-		out[i] = { defID = b.defID, def = b.def, x = x, y = y, z = z, facing = facing, blocked = status == 0 or offMap(x, z, hw, hd) }
+		out[i] = { defID = b.defID, def = b.def, x = x, y = y, z = z, facing = facing, blocked = status == 0 or offMap(x, z, hw, hd), index = b.index or i }
 	end
 	return out
 end
@@ -172,6 +191,107 @@ function M.terrain(steps, rotation, ax, az, flip, origin)
 	return out
 end
 
+--- Whether a point is past the edge of the map.
+local function pointOffMap(x, z)
+	if not (Game and Game.mapSizeX) then
+		return false
+	end
+	return x < 0 or z < 0 or x > Game.mapSizeX or z > Game.mapSizeZ
+end
+
+--- A layout's terrain steps on the ground, for the copies of it being placed.
+-- Each step comes out as M.terrain gives it, with where it falls among the
+-- footprint, the ground height under the pivot at this moment, and whether any
+-- point is off the map.
+-- @param resolved table from M.resolve
+-- @param anchors table[] { x, z } the pivot of each copy, one for a single copy
+-- @param foot table[] the copies' footprints from M.footprint, one after the
+--   other, each as long as resolved.buildings
+-- @return table[] steps with after = how many of foot's entries come ahead of
+--   it, base = the ground height at the pivot, and blocked
+function M.laySteps(resolved, rotation, flip, origin, anchors, foot)
+	local n = #resolved.buildings
+	local out = {}
+	for c, at in ipairs(anchors) do
+		local first = (c - 1) * n
+		local base = Spring.GetGroundHeight(at.x, at.z)
+		for _, step in ipairs(M.terrain(resolved.terrain, rotation, at.x, at.z, flip, origin)) do
+			local after = first
+			for i = 1, n do
+				local p = foot[first + i]
+				if p and (p.index or i) <= step.before then
+					after = first + i
+				end
+			end
+			step.after, step.base, step.blocked = after, base, false
+			for _, point in ipairs(step.points) do
+				if pointOffMap(point.x, point.z) then
+					step.blocked = true
+				end
+			end
+			out[#out + 1] = step
+		end
+	end
+	return out
+end
+
+--- The next terraform tag: Zero-K's own counter when its terraform widget
+-- file is loaded, otherwise the widget's.
+local ownTag = M.TAG_BASE - 1
+function M.nextTag()
+	if WG and type(WG.Terraform_GetNextTag) == "function" then
+		return WG.Terraform_GetNextTag()
+	end
+	ownTag = ownTag + 1
+	return ownTag
+end
+
+--- Whether a unit has Zero-K's level command. The action name is checked as
+-- well as the number, since another game could use the same number. A mission
+-- that has locked terraform takes the command away.
+function M.canTerraform(unitID)
+	local index = Spring.FindUnitCmdDesc(unitID, M.CMD_LEVEL)
+	if not index then
+		return false
+	end
+	local desc = Spring.GetUnitCmdDescs(unitID, index, index)[1]
+	return desc ~= nil and desc.action == M.LEVEL_ACTION
+end
+
+--- The parameters of Zero-K's terraform order for a step, laid out the way its
+-- lasso widget builds them (gui_lasso_terraform.lua, SendCommand).
+-- @param step table from M.laySteps
+-- @param builders integer[] the units that will work on it
+-- @param tag number
+-- @param team integer
+function M.terraformParams(step, builders, tag, team)
+	local sx, sz = 0, 0
+	for _, p in ipairs(step.points) do
+		sx, sz = sx + p.x, sz + p.z
+	end
+	local cx, cz = sx / #step.points, sz / #step.points
+	local height = 0
+	if step.kind == "level" then
+		height = step.base + step.height
+	elseif step.kind == "raise" then
+		height = step.height
+	elseif step.kind == "ramp" then
+		height = step.width
+	end
+	local out = { TERRAFORM_TYPE[step.kind], team, cx, cz, tag, step.shape == "area" and 1 or 0, height, #step.points, #builders, 0 }
+	for i, p in ipairs(step.points) do
+		out[#out + 1] = p.x
+		if step.kind == "ramp" then
+			out[#out + 1] = step.base + step.heights[i]
+		end
+		out[#out + 1] = p.z
+	end
+	for _, unitID in ipairs(builders) do
+		out[#out + 1] = unitID
+	end
+	return out
+end
+
 --- Half a footprint's width and depth in elmos, for a facing. xsize and
 -- zsize are in the engine's 8 elmo half squares.
 function M.halfSpan(def, facing)
@@ -199,6 +319,20 @@ function M.extent(resolved, rotation, flip)
 		local hw, hd = M.halfSpan(b.def, (b.facing + rotation) % 4)
 		minX, maxX = math.min(minX, ox - hw), math.max(maxX, ox + hw)
 		minZ, maxZ = math.min(minZ, oz - hd), math.max(maxZ, oz + hd)
+	end
+	-- the ground a layout changes reaches as far as a building does
+	for _, step in ipairs(resolved.terrain or {}) do
+		for _, p in ipairs(step.points) do
+			local ox, oz = M.turned(p.x, p.z, rotation)
+			if flipX then
+				ox = -ox
+			end
+			if flipZ then
+				oz = -oz
+			end
+			minX, maxX = math.min(minX, ox), math.max(maxX, ox)
+			minZ, maxZ = math.min(minZ, oz), math.max(maxZ, oz)
+		end
 	end
 	if minX == math.huge then
 		return 0, 0, 0, 0
@@ -345,9 +479,14 @@ end
 
 --- Where the pivot lands for a point on the ground: snapped to the build
 -- grid the way the engine snaps that building, at its facing once turned and
--- flipped. The layout's other buildings keep their place around it.
+-- flipped. The layout's other buildings keep their place around it. A layout
+-- of terrain steps alone has no building to hold it by, so it is held by its
+-- origin, snapped to the 8 elmo heightmap grid the steps' points are on.
 -- @return number x, number z
 function M.pivotAt(resolved, pivot, rotation, flip, x, z)
+	if not pivot then
+		return math.floor(x / 8 + 0.5) * 8, math.floor(z / 8 + 0.5) * 8
+	end
 	local b = resolved.buildings[pivot]
 	local facing = M.flippedFacing((b.facing + rotation) % 4, flip and flip.x, flip and flip.z)
 	local px, _, pz = Spring.Pos2BuildPos(b.defID, x, 0, z, facing)
@@ -457,9 +596,10 @@ end
 --- What the selected units can build, and how fast.
 -- @param unitIDs integer[]
 -- @return table { union = { defID = true }, byUnit = { unitID = { defID = true } },
---   builders = unitID[], speed = { unitID = build speed } }
+--   builders = unitID[], speed = { unitID = build speed }, terraformers = the
+--   builders that have Zero-K's level command, unitID[] }
 function M.capabilities(unitIDs)
-	local out = { union = {}, byUnit = {}, builders = {}, speed = {} }
+	local out = { union = {}, byUnit = {}, builders = {}, speed = {}, terraformers = {} }
 	for _, unitID in ipairs(unitIDs) do
 		local defID = Spring.GetUnitDefID(unitID)
 		local def = defID and UnitDefs[defID]
@@ -473,6 +613,9 @@ function M.capabilities(unitIDs)
 			out.byUnit[unitID] = own
 			out.builders[#out.builders + 1] = unitID
 			out.speed[unitID] = def.buildSpeed or 0
+			if M.canTerraform(unitID) then
+				out.terraformers[#out.terraformers + 1] = unitID
+			end
 		end
 	end
 	return out
@@ -533,7 +676,7 @@ function M.substitute(resolved, standIns)
 		local source = standIns[b.defID]
 		if source then
 			n = n + 1
-			out.buildings[i] = { defID = source, def = UnitDefs[source], offset = b.offset, facing = b.facing, upgradesTo = b.def }
+			out.buildings[i] = { defID = source, def = UnitDefs[source], offset = b.offset, facing = b.facing, upgradesTo = b.def, index = b.index }
 		else
 			out.buildings[i] = b
 		end
@@ -635,31 +778,126 @@ local function split(foot, can)
 	return who
 end
 
---- Turn a footprint into orders.
+--- The builder nearest a step, from among those given.
+local function nearestTo(unitIDs, step)
+	local sx, sz = 0, 0
+	for _, p in ipairs(step.points) do
+		sx, sz = sx + p.x, sz + p.z
+	end
+	sx, sz = sx / #step.points, sz / #step.points
+	local best, bestD
+	for _, unitID in ipairs(unitIDs) do
+		local x, _, z = Spring.GetUnitPosition(unitID)
+		local d = x and (x - sx) ^ 2 + (z - sz) ^ 2 or math.huge
+		if not best or d < bestD then
+			best, bestD = unitID, d
+		end
+	end
+	return best
+end
+
+--- Turn a footprint, and the terrain steps among it, into orders.
+-- A terraform step becomes two things. Its terraform order is never queued,
+-- so it is kept in plan.terraform for M.issue to send at once. A level
+-- command with the order's tag goes into each working builder's queue at the
+-- step's place among the buildings, and that is what sends the builder to
+-- build the terraform. An entry of foot is placed by its seq, or its position
+-- when it has none, and a step by its after, the seq it comes after, so a
+-- plan left over from an earlier one keeps the order it had.
 -- @param foot table[] from M.footprint
 -- @param can table from M.capabilities
 -- @param shift boolean whether the player holds shift, which appends everything
 -- @param mode string? "help", the default, gives every builder every building
 --   it can build, so they help each other with each one in turn. "split"
 --   gives each building to one builder, for games that stop builders helping.
+--   Each step goes to the nearest builder that can terraform.
+-- @param terrain table? { steps = from M.laySteps, on = boolean, why = string }.
+--   When on is false the steps are counted as skipped, for the reason why.
 -- @return table { orders = { { unitID, cmds } }, remainder = foot entries nobody
---   can build, blocked = count of positions skipped because the ground refused }
-function M.plan(foot, can, shift, mode)
-	local out = { orders = {}, remainder = {}, blocked = 0 }
+--   can build, blocked = count of positions skipped because the ground refused,
+--   terraform = { { unitID, params } } to send before the orders, stepRemainder
+--   = steps kept for when a builder is selected, skipped = steps not ordered
+--   for skippedWhy, offMap = steps with a point off the map }
+function M.plan(foot, can, shift, mode, terrain)
+	local out = { orders = {}, remainder = {}, blocked = 0, terraform = {}, stepRemainder = {}, skipped = 0, offMap = 0 }
 	local who = mode == "split" and split(foot, can) or nil
+
+	-- which steps are ordered, and to whom
+	local steps = {}
+	local given = terrain and terrain.steps or {}
+	if #given > 0 then
+		local usable = {}
+		for i, step in ipairs(given) do
+			if not terrain.on then
+				out.skipped = out.skipped + 1
+				out.skippedWhy = terrain.why
+			elseif step.blocked then
+				out.offMap = out.offMap + 1
+			else
+				usable[#usable + 1] = { step = step, i = i }
+			end
+		end
+		if #usable > 0 and #can.terraformers > 0 then
+			table.sort(usable, function(a, b)
+				if a.step.after ~= b.step.after then
+					return a.step.after < b.step.after
+				end
+				return a.i < b.i
+			end)
+			for _, u in ipairs(usable) do
+				local builders = mode == "split" and { nearestTo(can.terraformers, u.step) } or can.terraformers
+				local tag = M.nextTag()
+				local team = Spring.GetUnitTeam(builders[1]) or Spring.GetMyTeamID()
+				local at = {}
+				for _, unitID in ipairs(builders) do
+					at[unitID] = true
+				end
+				steps[#steps + 1] = { step = u.step, tag = tag, at = at }
+				out.terraform[#out.terraform + 1] = { unitID = builders[1], params = M.terraformParams(u.step, builders, tag, team) }
+			end
+		elseif #usable > 0 and #can.builders == 0 then
+			for _, u in ipairs(usable) do
+				out.stepRemainder[#out.stepRemainder + 1] = u.step
+			end
+		elseif #usable > 0 then
+			out.skipped = out.skipped + #usable
+			out.skippedWhy = "no selected builder can terraform"
+		end
+	end
+
 	local taken = {}
 	for _, unitID in ipairs(can.builders) do
 		local own = can.byUnit[unitID]
 		local cmds = {}
+		local function add(id, params)
+			cmds[#cmds + 1] = { id, params, (shift or #cmds > 0) and { "shift" } or {} }
+		end
+		local next = 1
+		local function stepsBefore(seq)
+			while steps[next] and (seq == nil or steps[next].step.after < seq) do
+				local s = steps[next]
+				if s.at[unitID] then
+					local step = s.step
+					local sx, sz = 0, 0
+					for _, p in ipairs(step.points) do
+						sx, sz = sx + p.x, sz + p.z
+					end
+					sx, sz = sx / #step.points, sz / #step.points
+					add(M.CMD_LEVEL, { sx, Spring.GetGroundHeight(sx, sz), sz, s.tag })
+				end
+				next = next + 1
+			end
+		end
 		for i, p in ipairs(foot) do
+			stepsBefore(p.seq or i)
 			if own[p.defID] then
 				taken[i] = true
 				if not p.blocked and (not who or who[i] == unitID) then
-					local opts = (shift or #cmds > 0) and { "shift" } or {}
-					cmds[#cmds + 1] = { -p.defID, { p.x, p.y, p.z, p.facing }, opts }
+					add(-p.defID, { p.x, p.y, p.z, p.facing })
 				end
 			end
 		end
+		stepsBefore(nil)
 		if #cmds > 0 then
 			out.orders[#out.orders + 1] = { unitID = unitID, cmds = cmds }
 		end
@@ -702,6 +940,10 @@ end
 -- @return integer how many builders were given an array
 function M.issue(plan)
 	local sent = 0
+	-- the terraform orders first, so the level commands find their units
+	for _, t in ipairs(plan.terraform or {}) do
+		Spring.GiveOrderToUnit(t.unitID, M.CMD_TERRAFORM_INTERNAL, t.params, 0)
+	end
 	for _, order in ipairs(plan.orders) do
 		if Spring.GiveOrderArrayToUnitArray({ order.unitID }, order.cmds) then
 			sent = sent + 1
