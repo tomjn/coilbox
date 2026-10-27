@@ -7,33 +7,30 @@
 # The base content matters as much as the binary: the engine parses even its
 # start script with Lua it loads out of springcontent.sdz, and without one it
 # dies claiming "GAME-section missing" from a script that has one, which points
-# nowhere near the cause. So the hunt only accepts a binary that has base
-# content, and prefers the copy beside the binary, the way an installed engine
-# under engine/<platform>/<version>/ ships, because that copy always matches.
+# nowhere near the cause. An installed engine ships its own beside the binary.
 #
-#   COILBOX_SPRING_HEADLESS  the binary. Default is the first spring-headless
-#                            with base content: loose in DATA_DIR, then the
-#                            installed engines under its engine/, then PATH.
+# There is one engine for this work, ENGINE_VERSION, and nothing searches for
+# another: an older build behaves and renders differently, so its results are
+# not evidence. If it is not installed the harness stops (#4827).
+#
+#   COILBOX_SPRING_HEADLESS  a spring-headless binary to use instead, for
+#                            someone who means to.
 
-usable_base() { # directory holding a spring-headless
-  [ -d "$1/base" ] || [ -d "$DATA_DIR/base" ]
-}
+ENGINE_VERSION="2026.09.01"
+ENGINE_PLATFORM="macos_arm64"
 
-ENGINE="${COILBOX_SPRING_HEADLESS:-}"
-if [ -z "$ENGINE" ]; then
-  candidates=("$DATA_DIR/spring-headless")
-  for bin in "$DATA_DIR"/engine/*/*/spring-headless; do
-    candidates+=("$bin")
-  done
-  candidates+=("$(command -v spring-headless || true)")
-  for bin in "${candidates[@]}"; do
-    { [ -n "$bin" ] && [ -x "$bin" ] && usable_base "$(dirname "$bin")"; } || continue
-    ENGINE="$bin"
-    break
-  done
+if [ -n "${COILBOX_SPRING_HEADLESS:-}" ]; then
+  ENGINE="$COILBOX_SPRING_HEADLESS"
+else
+  ENGINE="$DATA_DIR/engine/$ENGINE_PLATFORM/$ENGINE_VERSION/spring-headless"
 fi
-if [ -z "$ENGINE" ] || [ ! -x "$ENGINE" ]; then
-  echo "no headless engine with base content. Set COILBOX_SPRING_HEADLESS to a spring-headless binary" >&2
+if [ ! -x "$ENGINE" ]; then
+  if [ -n "${COILBOX_SPRING_HEADLESS:-}" ]; then
+    echo "COILBOX_SPRING_HEADLESS is $ENGINE, which is not an executable" >&2
+  else
+    echo "engine $ENGINE_VERSION is not installed: expected $ENGINE" >&2
+    echo "Install engine $ENGINE_VERSION there, or set COILBOX_SPRING_HEADLESS to a spring-headless binary on purpose." >&2
+  fi
   exit 2
 fi
 
