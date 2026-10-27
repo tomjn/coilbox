@@ -801,14 +801,20 @@ local function shiftHeld()
 	return shift == true
 end
 
+-- What the ground model reads, defined with the drawing below.
+local groundEnv
+
 --- The terrain argument of PLACE.plan for some laid steps: ordered when the
--- match can terraform and the player has Terrain on.
-local function terrainArg(steps)
+-- match can terraform and the player has Terrain on. The ground each step
+-- changes, from the model, is what the builders step clear of (#4816).
+local function terrainArg(steps, foot)
 	local available = can.terraformAvailable == true
+	local on = available and panel.terrain
 	return {
 		steps = steps,
-		on = available and panel.terrain,
+		on = on,
 		why = not available and "terraforming is not available here" or "Terrain is off",
+		ground = on and steps[1] and TERRAFORM.session(groundEnv()).apply(steps, foot) or nil,
 	}
 end
 
@@ -819,7 +825,7 @@ local function placeNow()
 	readSelection()
 	-- the ground under the pivot is read now, as the player clicks
 	local steps = PLACE.laySteps(placing.item.resolved, placing.rotation, placing.flip, placing.origin, placing.anchors, placing.foot)
-	local plan = PLACE.plan(placing.foot, can, shiftHeld(), panel.assist, terrainArg(steps))
+	local plan = PLACE.plan(placing.foot, can, shiftHeld(), panel.assist, terrainArg(steps, placing.foot))
 	local sent = PLACE.issue(plan, LATER)
 	say(placing.item.name .. ": " .. describe(plan, sent))
 	addPlan(plan.remainder, plan.stepRemainder)
@@ -843,7 +849,7 @@ local function buildPlan(index, only)
 	for i, p in ipairs(positions) do
 		if not only or i == only then
 			local status = Spring.TestBuildOrder(p.defID, p.x, p.y, p.z, p.facing)
-			foot[#foot + 1] = { defID = p.defID, def = p.def, x = p.x, y = p.y, z = p.z, facing = p.facing, blocked = status == 0, seq = p.seq }
+			foot[#foot + 1] = { defID = p.defID, def = p.def, x = p.x, y = p.y, z = p.z, facing = p.facing, blocked = status == 0, seq = p.seq, insideRing = p.insideRing }
 		end
 	end
 	-- One building takes the steps that come ahead of it, the whole plan takes
@@ -856,7 +862,7 @@ local function buildPlan(index, only)
 			later[#later + 1] = step
 		end
 	end
-	local plan = PLACE.plan(foot, can, shiftHeld(), panel.assist, terrainArg(steps))
+	local plan = PLACE.plan(foot, can, shiftHeld(), panel.assist, terrainArg(steps, foot))
 	local sent = PLACE.issue(plan, LATER)
 	plans[index].steps = later
 	for _, step in ipairs(plan.stepRemainder) do
@@ -1795,7 +1801,7 @@ end
 
 --- What the ground model reads: the heightmap, the size of the map, the
 -- buildings standing now, and the game's terraform cost multiplier.
-local function groundEnv()
+function groundEnv()
 	return {
 		heightAt = Spring.GetGroundHeight,
 		corners = { x = Game.mapSizeX / 8 + 1, z = Game.mapSizeZ / 8 + 1 },
