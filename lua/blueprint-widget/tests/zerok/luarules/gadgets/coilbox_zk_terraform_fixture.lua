@@ -18,7 +18,7 @@ function gadget:GetInfo()
 	}
 end
 
-local CASES = 23
+local CASES = 25
 -- The case whose builder Zero-K's gadget stops checking. Zero-K v1.14.10.3's
 -- unit_terraform.lua moves the last constructor into a dead one's slot without
 -- telling it its new index (UnitDestroyed). When that one dies too, it moves the
@@ -27,7 +27,7 @@ local CASES = 23
 local UNCHECKED_CASE = 19
 local SPARES_DIE_FRAME = 33
 -- Cases with more than one builder, which share the terraform and the turret.
-local BUILDERS = { [10] = 2, [13] = 2, [20] = 3, [21] = 2, [22] = 2, [23] = 2 }
+local BUILDERS = { [10] = 2, [13] = 2, [20] = 3, [21] = 2, [22] = 2, [23] = 2, [24] = 2, [25] = 2 }
 -- The cases the blueprint widget's placing code orders. Near the end each of
 -- their builders is sent to a spot of its own west of its lane, between the
 -- lanes and on the strip, to show it stands on ground it can leave: not on top
@@ -62,14 +62,23 @@ CREATE_ORDER[#CREATE_ORDER + 1] = UNCHECKED_CASE
 -- The first 20 lanes run along the middle of the map, where SpeedMetal is a
 -- strip 352 elmos wide. The cases with a ring of wall need more room, so they
 -- go where the map is flat from edge to edge: east of x = 11520 and west of
--- x = 1792 (read from the map's heightmap).
+-- x = 1792 (read from the map's heightmap). The map is 2048 elmos from north
+-- to south, so the two long walls (#4833) share the east end with the first
+-- ring, one on each side of it along z, clear of its slope.
 local ROW = 20
-local WIDE_LANES = { [21] = 12032, [22] = 12672, [23] = 1024 }
+local WIDE_LANES = {
+	[21] = { x = 12032 },
+	[22] = { x = 12672 },
+	[23] = { x = 1024 },
+	[24] = { x = 12032, z = 400 },
+	[25] = { x = 12032, z = 1700 },
+}
 
 local function lane(index)
 	local cz = 16 * math.floor(Game.mapSizeZ / 32)
-	if WIDE_LANES[index] then
-		return WIDE_LANES[index], cz
+	local wide = WIDE_LANES[index]
+	if wide then
+		return wide.x, wide.z or cz
 	end
 	local cx = 16 * math.floor(Game.mapSizeX / 32) + (index - (ROW + 1) / 2) * LANE_GAP
 	return 16 * math.floor(cx / 16), cz
@@ -138,7 +147,8 @@ if gadgetHandler:IsSyncedCode() then
 		local best, bestDistance
 		for i = 1, CASES do
 			local lx, lz = lane(i)
-			local distance = math.abs(x - lx)
+			-- the long walls share an x with a ring, so nearness is in both
+			local distance = (x - lx) ^ 2 + (z - lz) ^ 2
 			if not bestDistance or distance < bestDistance then
 				best, bestDistance = i, distance
 			end

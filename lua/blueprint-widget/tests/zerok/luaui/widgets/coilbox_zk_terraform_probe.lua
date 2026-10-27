@@ -215,6 +215,13 @@ local PAD_TURRETS = {
 	{ def = "turretlaser", offset = { x = 32, z = 32 }, facing = 0 },
 }
 
+-- Open walls longer than two of Zero-K's 224 elmo blocks (#4833), terrain only,
+-- one straight and one with a corner. The widget cuts each into a terraform
+-- order for each block. The layout is held by the middle of its steps, so the
+-- points are round that.
+local LONG_WALL = { { kind = "raise", shape = "wall", points = { { x = -400, z = 0 }, { x = 400, z = 0 } }, height = WALL_HEIGHT, before = 0 } }
+local BENT_WALL = { { kind = "raise", shape = "wall", points = { { x = -200, z = 150 }, { x = 200, z = 150 }, { x = 200, z = -150 } }, height = WALL_HEIGHT, before = 0 } }
+
 -- What each case does after the terraform order.
 local CASES = {
 	{ name = "level then turret, no shift", run = function(b, cx, cz, tag)
@@ -319,6 +326,12 @@ local CASES = {
 	end },
 	{ name = "a ring of wall alone, two builders together", own = true, run = function(b, cx, cz)
 		blueprint(b, cx, cz, false, "help", false, 23, WALL_RING)
+	end },
+	{ name = "a straight wall of three and a half blocks, two builders together", own = true, run = function(b, cx, cz)
+		blueprint(b, cx, cz, false, "help", false, 24, LONG_WALL)
+	end },
+	{ name = "a wall with a corner of three blocks and a bit, two builders together", own = true, run = function(b, cx, cz)
+		blueprint(b, cx, cz, false, "help", false, 25, BENT_WALL)
 	end },
 }
 
