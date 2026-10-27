@@ -55,6 +55,34 @@ Drag a building to move it. Select a building to show two buttons beside it. Tur
 
 The button with the blueprint's name opens a box where you can rename it.
 
+### Change the ground
+
+In a game that can make terrain changes, such as Zero-K, a Terrain button sits next to Pick a unit. It opens four tools:
+
+- Wall: click points along a path. Press Enter or double click to finish it.
+- Area: click the corners of an outline, or drag a rectangle. Enter, a double click or a click on the first corner finishes it.
+- Ramp: click the low end, then the high end.
+- Smooth: draw an area the same way as the Area tool. It evens out the ground inside.
+
+Escape throws away a change you are drawing, and a second Escape puts the tool down. Points snap to the 8 elmo grid the game changes the ground on.
+
+A new wall raises the ground it follows by 40 elmos. A new area levels the ground inside it to the height of the point you hold the blueprint by when you place it. A new ramp is 64 elmos wide and climbs 40 elmos.
+
+Select a change to show its buttons beside it:
+
+- Raise or Level, for walls and areas. Raise adds the height to the ground under each point. Level makes the ground that height above the point you hold the blueprint by.
+- Height, in elmos. A negative raise digs.
+- Width, Low end and High end, for ramps.
+- Delete.
+
+Drag a change to move it, and drag a corner to reshape it. Click the dot in the middle of a side to add a corner there, and right click a corner to remove it.
+
+Raised ground is drawn blue and other changes grey. The terrain changes switch for the game is in the Terrain button too. Turning it off hides the button, and the Blueprints page has the switch to turn it back on.
+
+The tools stop at Zero-K's limits rather than make a change the game would refuse: a wall of more than 700 points (one every 16 elmos), an area wider or deeper than 2,000 elmos, more than 2,500 points in one change, and a ramp shorter than 64 or longer than 3,000 elmos, or narrower than 48 or wider than 1,600. A note says which limit stopped it.
+
+A blueprint can be terrain changes alone, with no buildings.
+
 ### Set a build order
 
 At first the buildings are in the order you clicked them. To say what gets built first:
@@ -63,7 +91,9 @@ At first the buildings are in the order you clicked them. To say what gets built
 2. Turn on Build these in this order.
 3. Use the arrows beside each building to build it sooner or later.
 
-Watch it go up plays the layout being built one building at a time. Copy as a build order copies the list.
+A blueprint with terrain changes lists them among the buildings, each with a mountain icon. A new change goes before every building, because the ground is normally changed before anything stands on it. The same arrows move a change sooner or later.
+
+Watch it go up plays the layout being built one step at a time, terrain changes included. Copy as a build order copies the buildings.
 
 ### Try it on a map
 
