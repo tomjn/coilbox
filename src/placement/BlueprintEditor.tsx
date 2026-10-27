@@ -25,7 +25,7 @@ import { Trans, useLingui } from "@lingui/react/macro";
 import { Button } from "@picoframe/frame";
 import { Blocks } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-
+import { countLine } from "@/blueprint/countLine";
 import {
   buildGridSnap,
   buildingFootprints,
@@ -34,6 +34,8 @@ import {
 import type { BaseBlueprint } from "@/blueprint/model";
 import { offGridBuildings, onBuildGrid } from "@/blueprint/offGrid";
 import { buildingColors } from "@/blueprint/role";
+import { type BuildEntry, buildSequence } from "@/blueprint/terrainEdit";
+import { useTerrainChanges } from "@/blueprint/terrainSwitch";
 import {
   Popover,
   PopoverContent,
@@ -61,6 +63,11 @@ import {
   turnPlacement,
 } from "@/lib/scenarioEditing/editing";
 import { isTypingTarget } from "@/lib/scenarioEditing/history";
+import {
+  moveInBuildOrder,
+  removeStep,
+  setStep,
+} from "@/lib/scenarioEditing/terrain";
 import { baseBuildings, type Point } from "@/scenario/model";
 import { BLUEPRINT_BASE_ID, blueprintDocument } from "./blueprintDocument";
 import { useLayoutHistory } from "./blueprintHistory";
@@ -89,10 +96,19 @@ import {
   TurnNote,
 } from "./SurfaceBars";
 import { focusCamera, focusDistance, worldToScene } from "./scene";
+import {
+  limitText,
+  stepName,
+  TerrainStepBar,
+  TerrainToolsButton,
+  toolHint,
+} from "./TerrainControls";
+import { parseTerrainKey, stepKey } from "./terrainLayer";
 import { useLayoutPreview } from "./useLayoutPreview";
 import { useMapEditing } from "./useMapEditing";
 import { useScenarioFootprints } from "./useScenarioFootprints";
 import { useScenarioUnits } from "./useScenarioUnits";
+import { useTerrainEditing } from "./useTerrainEditing";
 
 /** How long one building of a build order stands on screen before the next one
  *  arrives, the same pace the scenario editor watches a base go up at. */
@@ -105,12 +121,21 @@ const GROUND = gridGround();
 /** One list for every "nothing to draw", so a layer with nothing on it is not
  *  cleared and redrawn on every render. */
 const NOTHING: FootprintMark[] = [];
+const NO_STEPS: NonNullable<BaseBlueprint["terrain"]> = [];
+
+/** The step a selection names, or null when it names anything else or a step
+ *  the layout no longer has. */
+function pickedStepOf(selected: string | null, steps: number): number | null {
+  const ref = parseTerrainKey(selected);
+  return ref?.part === "step" && ref.index < steps ? ref.index : null;
+}
 
 export function BlueprintEditor({
   blueprint,
   gameName,
   onChange,
   history = "own",
+  terrainTools = false,
 }: {
   blueprint: BaseBlueprint;
   /** The game whose units this layout is built from, which is what its models
@@ -129,6 +154,12 @@ export function BlueprintEditor({
    * one press.
    */
   history?: "own" | "caller";
+  /**
+   * Whether the terrain tools are offered (issue #4793), when the game can
+   * make terrain changes. Off in the scenario editor, whose missions cannot
+   * apply a step yet (issue #4799). Steps are drawn either way.
+   */
+  terrainTools?: boolean;
 }) {
   const { t } = useLingui();
   const [handle, setHandle] = useState<MapScene3D | null>(null);
@@ -150,7 +181,10 @@ export function BlueprintEditor({
     onChange,
   });
 
-  const { units, loading: unitsLoading } = useGameUnits(gameName);
+  const { units, loading: unitsLoading, archive } = useGameUnits(gameName);
+  const terrainChanges = useTerrainChanges(archive, units);
+  const showTerrain = terrainTools && terrainChanges.showTools;
+  const terrain = blueprint.terrain ?? NO_STEPS;
   const buildings = useMemo(() => buildingUnits(units), [units]);
   const snap = useMemo(() => buildGridSnap(units), [units]);
   // What each building does, coloured the way the in-game widget colours it.
@@ -167,19 +201,40 @@ export function BlueprintEditor({
     step: number;
     playing: boolean;
   } | null>(null);
-  const steps = blueprint.ordered ? blueprint.buildings : [];
+  // The build order, steps among the buildings (issue #4793), which is what
+  // Watch it go up plays.
+  const sequence = useMemo(
+    () =>
+      blueprint.ordered
+        ? buildSequence(blueprint.buildings.length, terrain)
+        : ([] as BuildEntry[]),
+    [blueprint.ordered, blueprint.buildings.length, terrain],
+  );
+  const steps = sequence;
   const playing = playback && steps.length > 0 ? playback : null;
 
-  const undrawn = useMemo(() => {
-    if (!playing) return null;
-    const out = new Set<string>();
+  const { undrawn, unbuilt } = useMemo(() => {
+    if (!playing) return { undrawn: null, unbuilt: undefined };
+    const buildings = new Set<string>();
+    const ground = new Set<number>();
     for (let at = playing.step; at < steps.length; at++) {
-      out.add(placementKey("base", BLUEPRINT_BASE_ID, at));
+      const entry = steps[at];
+      if (entry.kind === "step") ground.add(entry.index);
+      else buildings.add(placementKey("base", BLUEPRINT_BASE_ID, entry.index));
     }
-    return out;
-  }, [playing, steps.length]);
+    return { undrawn: buildings, unbuilt: ground };
+  }, [playing, steps]);
 
   const total = steps.length;
+  /** What one place in the build order is called on the playback bar. */
+  const entryLabel = (entry: BuildEntry | undefined): string => {
+    if (!entry) return "";
+    if (entry.kind === "building") {
+      return blueprint.buildings[entry.index]?.def ?? "";
+    }
+    const step = terrain[entry.index];
+    return step ? stepName(step) : "";
+  };
   const advancing = playing?.playing === true;
   useEffect(() => {
     if (!advancing) return;
@@ -317,6 +372,29 @@ export function BlueprintEditor({
       }
     : null;
 
+  const terrainEditing = useTerrainEditing({
+    handle,
+    worldWidth: GROUND.worldWidth,
+    worldHeight: GROUND.worldHeight,
+    groundAt: drawn.groundAt,
+    origin: GRID_ORIGIN,
+    terrain,
+    tools: showTerrain,
+    selected: pickedStepOf(selected, terrain.length),
+    onSelect: setSelected,
+    hidden: unbuilt,
+    applyEdit,
+    placing: unitDef !== "",
+  });
+  const { tool: terrainTool, setTool: setTerrainTool } = terrainEditing;
+
+  // A building being placed and a step being drawn are both what a click on
+  // the ground does, so taking up one puts the other down.
+  const pickUnit = (def: string) => {
+    setUnitDef(def);
+    if (def) setTerrainTool(null);
+  };
+
   useMapEditing({
     handle,
     layer: drawn.layer,
@@ -326,16 +404,24 @@ export function BlueprintEditor({
     groundAt: drawn.groundAt,
     selected,
     footprintAt,
-    onSelect: setSelected,
-    onPlace: place,
-    onHover: preview.onHover,
+    onSelect: (key) =>
+      key && terrainEditing.owns(key)
+        ? terrainEditing.select(key)
+        : setSelected(key),
+    onPlace: terrainEditing.onPlace ?? place,
+    onHover: terrainEditing.onHover ?? preview.onHover,
     onDragUnit: preview.onDragUnit,
-    onDragGround: null,
+    onDragGround: terrainEditing.onDragGround,
+    overlays: [terrainEditing.overlay],
     onMove: (key, delta) =>
-      applyEdit((current) => movePlacement(current, key, delta, snap)),
+      terrainEditing.owns(key)
+        ? terrainEditing.move(key, delta)
+        : applyEdit((current) => movePlacement(current, key, delta, snap)),
+    onTap: terrainEditing.tap,
   });
 
   const picked = drawn.placements.find((p) => p.key === selected) ?? null;
+  const pickedStep = pickedStepOf(selected, terrain.length);
 
   /**
    * Frame the layout rather than the ground it stands on.
@@ -344,14 +430,25 @@ export function BlueprintEditor({
    * across, so framing the ground would open on a speck. Read through a ref
    * because the button is pressed long after this was built.
    */
-  const framing = useRef({ placements: drawn.placements, at: drawn.groundAt });
-  framing.current = { placements: drawn.placements, at: drawn.groundAt };
+  const framing = useRef({ points: [] as Point[] });
+  framing.current = {
+    points: [
+      ...drawn.placements.map((p) => p.pos),
+      // A layout of steps alone is framed on its steps (issue #4793).
+      ...terrain.flatMap((step) =>
+        step.points.map((p) => ({
+          x: GRID_ORIGIN.x + p.x,
+          z: GRID_ORIGIN.z + p.z,
+        })),
+      ),
+    ],
+  };
   const frame = useCallback((scene: MapScene3D) => {
     const { camera, controls, render, scale } = scene;
-    const { centre, span } = layoutFraming(
-      framing.current.placements.map((p) => p.pos),
-      { x: GROUND.worldWidth / 2, z: GROUND.worldHeight / 2 },
-    );
+    const { centre, span } = layoutFraming(framing.current.points, {
+      x: GROUND.worldWidth / 2,
+      z: GROUND.worldHeight / 2,
+    });
     const at = worldToScene(
       centre,
       GROUND.worldWidth,
@@ -411,12 +508,24 @@ export function BlueprintEditor({
               <UnitPickerButton
                 units={buildings}
                 value={unitDef}
-                onValueChange={setUnitDef}
+                onValueChange={pickUnit}
                 onClear={() => setUnitDef("")}
                 loading={unitsLoading}
                 size="sm"
                 className="w-48"
               />
+
+              {showTerrain && (
+                <TerrainToolsButton
+                  tool={terrainTool}
+                  onTool={(tool) => {
+                    setTerrainTool(tool);
+                    if (tool) setUnitDef("");
+                  }}
+                  enabled={terrainChanges.enabled === true}
+                  onEnabled={terrainChanges.setEnabled}
+                />
+              )}
 
               <Popover>
                 <PopoverTrigger asChild>
@@ -495,14 +604,49 @@ export function BlueprintEditor({
                   )
                 }
                 onPlay={() => setPlayback({ step: 0, playing: !reduceMotion })}
+                // Steps are listed among the buildings wherever there are any,
+                // so a layout's order is never shown without them.
+                terrain={
+                  showTerrain || terrain.length > 0 ? terrain : undefined
+                }
+                selectedStep={pickedStep ?? -1}
+                onMoveEntry={(entry, delta) => {
+                  let moved = -1;
+                  applyEdit((current) => {
+                    const out = moveInBuildOrder(
+                      current,
+                      BLUEPRINT_BASE_ID,
+                      entry,
+                      delta,
+                    );
+                    moved = out.step;
+                    return out.scenario;
+                  });
+                  // A selected step keeps its selection as it moves in
+                  // `terrain`. A building's moves with it the way it always
+                  // did, which is not at all.
+                  if (entry.kind === "step" && entry.index === pickedStep) {
+                    if (moved >= 0) setSelected(stepKey(moved));
+                  }
+                }}
               />
             </div>
 
             <p className="w-fit rounded bg-card/70 px-2 py-1 text-[11px] text-muted-foreground backdrop-blur">
-              {unitDef
-                ? t`Click the ground to put one down. Escape stops placing. Drag a building to move it within the blueprint.`
-                : t`Pick a building to start placing. Drag one to move it, click bare ground to deselect.`}
+              {terrainTool
+                ? toolHint(terrainTool)
+                : unitDef
+                  ? t`Click the ground to put one down. Escape stops placing. Drag a building to move it within the blueprint.`
+                  : pickedStep !== null && showTerrain
+                    ? t`Drag the change to move it, or a corner to reshape it. Click a side to add a corner, right click a corner to remove it.`
+                    : t`Pick a building to start placing. Drag one to move it, click bare ground to deselect.`}
             </p>
+
+            {terrainEditing.refused && (
+              <p className="w-fit rounded bg-amber-950/70 px-2 py-1 text-[11px] text-amber-200 backdrop-blur">
+                {limitText(terrainEditing.refused)}
+              </p>
+            )}
 
             {/* Nothing here has been checked, said once in the open rather than
               per layout in a popover (issue #1496). The ground is flat on
@@ -534,11 +678,34 @@ export function BlueprintEditor({
               the note away, which puts the button back. */}
             <TurnNote moves={turning && picked ? turned.length > 0 : null} />
 
+            {pickedStep !== null && showTerrain && (
+              <TerrainStepBar
+                step={terrain[pickedStep]}
+                number={
+                  buildSequence(blueprint.buildings.length, terrain).findIndex(
+                    (entry) =>
+                      entry.kind === "step" && entry.index === pickedStep,
+                  ) + 1
+                }
+                onChange={(patch) =>
+                  applyEdit((current) =>
+                    setStep(current, BLUEPRINT_BASE_ID, pickedStep, patch),
+                  )
+                }
+                onDelete={() => {
+                  applyEdit((current) =>
+                    removeStep(current, BLUEPRINT_BASE_ID, pickedStep),
+                  );
+                  setSelected(null);
+                }}
+              />
+            )}
+
             {playing && (
               <PlaybackBar
                 step={playing.step}
                 total={total}
-                def={steps[playing.step - 1]?.def ?? ""}
+                def={entryLabel(steps[playing.step - 1])}
                 playing={playing.playing}
                 onStep={(step) =>
                   setPlayback((at) => at && { ...at, step, playing: false })
@@ -567,6 +734,7 @@ export function BlueprintEditor({
             missing={drawn.missing}
             drawing={drawn.drawing}
             placed={drawn.placed}
+            terrain={terrain.length}
           />
         }
         // What the ground is and how to move the camera over it. What a click
@@ -598,15 +766,18 @@ function DrawnNote({
   missing,
   drawing,
   placed,
+  terrain,
 }: {
   gameName: string;
   gameMissing: boolean;
   missing: string[];
   drawing: boolean;
   placed: number;
+  /** How many terrain steps the layout has, said after the buildings. */
+  terrain: number;
 }) {
   const { t } = useLingui();
-  if (placed === 0) return null;
+  if (placed === 0 && terrain === 0) return null;
   const missingList = missing.join(", ");
   const missingCount = missing.length;
   const problem = gameMissing
@@ -634,7 +805,7 @@ function DrawnNote({
               one: "drawing # building",
               other: "drawing # buildings",
             })
-          : plural(placed, { one: "# building", other: "# buildings" })}
+          : countLine(placed, terrain)}
       </p>
     </>
   );

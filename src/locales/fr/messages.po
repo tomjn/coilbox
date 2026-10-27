@@ -5396,11 +5396,6 @@ msgstr "{place} sur {total}."
 msgid "{placeable} of {total} can be placed in it."
 msgstr "{placeable} sur {total} peuvent y être placés."
 
-#: src/placement/BlueprintEditor.tsx
-#, fuzzy
-msgid "{placed, plural, one {# building} other {# buildings}}"
-msgstr "{placed, plural, one {# bâtiment} other {# bâtiments}}"
-
 #: src/scenario/pages/components/ScenarioMapBars.tsx
 #, fuzzy
 msgid "{placed, plural, one {# unit} other {# units}}"
@@ -11278,6 +11273,10 @@ msgstr "Archives"
 msgid "Archives ({archiveCount})"
 msgstr "Archives ({archiveCount})"
 
+#: src/placement/TerrainControls.tsx
+msgid "Area"
+msgstr ""
+
 #: src/lego/pages/components/AnimationPanel.tsx
 #, fuzzy
 msgid "Arguments"
@@ -14984,6 +14983,14 @@ msgstr "Cliquez sur chaque pièce"
 msgid "Click one to select its pieces."
 msgstr "Cliquez sur un problème pour sélectionner ses pièces."
 
+#: src/placement/TerrainControls.tsx
+msgid "Click points along the wall. Enter or a double click finishes it, Escape cancels."
+msgstr ""
+
+#: src/placement/TerrainControls.tsx
+msgid "Click the corners, or drag a rectangle. Enter or a double click finishes it, Escape cancels."
+msgstr ""
+
 #: src/lego/pages/components/MeasureReadout.tsx
 #, fuzzy
 msgid "Click the first point"
@@ -15003,6 +15010,10 @@ msgstr "Cliquez sur le sol pour en poser un. Escape arrête le placement. Faites
 #, fuzzy
 msgid "Click the ground to stand it somewhere else."
 msgstr "Cliquez sur le sol pour le placer ailleurs."
+
+#: src/placement/TerrainControls.tsx
+msgid "Click the low end, then the high end. Escape cancels."
+msgstr ""
 
 #: src/scenario/pages/components/BaseControls.tsx
 #: src/scenario/pages/components/GroupControls.tsx
@@ -18275,6 +18286,7 @@ msgstr "Délai entre les tirs d’une rafale"
 #: src/lego/pages/components/LoadoutPicker.tsx
 #: src/lego/pages/components/PosesPopover.tsx
 #: src/placement/SurfaceBars.tsx
+#: src/placement/TerrainControls.tsx
 #: src/play/pages/SavegamesPage.tsx
 #: src/scenario/pages/components/DialoguePanel.tsx
 #: src/scenario/pages/components/ObjectivePanel.tsx
@@ -19512,6 +19524,10 @@ msgstr "Faites glisser sur la carte pour tracer la zone de l’allié {activeLet
 #, fuzzy
 msgid "drag one of its points to move it"
 msgstr "glissez l’un de ses points pour le déplacer"
+
+#: src/placement/BlueprintEditor.tsx
+msgid "Drag the change to move it, or a corner to reshape it. Click a side to add a corner, right click a corner to remove it."
+msgstr ""
 
 #: src/scenario/pages/components/modes.tsx
 #, fuzzy
@@ -23787,6 +23803,7 @@ msgstr "hauteur"
 #: src/lego/pages/components/ShapeFields.tsx
 #: src/lego/pages/components/SkeletonTargetFields.tsx
 #: src/mapconv/pages/DecompilePage.tsx
+#: src/placement/TerrainControls.tsx
 #: src/play/pages/components/MapOverlay.tsx
 #, fuzzy
 msgid "Height"
@@ -24038,6 +24055,10 @@ msgstr "Haut à l’arrière"
 #, fuzzy
 msgid "High at front"
 msgstr "Haut à l’avant"
+
+#: src/placement/TerrainControls.tsx
+msgid "High end"
+msgstr ""
 
 #: src/content/unitFieldNotes.ts
 #, fuzzy
@@ -27197,6 +27218,10 @@ msgstr "Relâche un groupe : ses unités restent sur place et gardent leur prop
 msgid "Letting the engine find it"
 msgstr "Le moteur le cherche"
 
+#: src/placement/TerrainControls.tsx
+msgid "Level"
+msgstr ""
+
 #: src/conquest/pages/components/ThreatLevelSelect.tsx
 #, fuzzy
 msgid "Level {lockedLevel}"
@@ -27211,6 +27236,14 @@ msgstr "Le niveau {lockedLevel} est verrouillé."
 #, fuzzy
 msgid "Level {n}"
 msgstr "Niveau {n}"
+
+#: src/placement/TerrainControls.tsx
+msgid "Level area"
+msgstr ""
+
+#: src/placement/TerrainControls.tsx
+msgid "Level wall"
+msgstr ""
 
 #: src/content/index.ts
 #: src/content/pages/components/GameLibrarySummary.tsx
@@ -27964,6 +27997,7 @@ msgid "Lost, and it counted toward no rating"
 msgstr "Perdu, sans effet sur aucun classement"
 
 #: src/lego/pages/components/ShapeFields.tsx
+#: src/placement/TerrainControls.tsx
 #, fuzzy
 msgid "Low end"
 msgstr "Extrémité basse"
@@ -37000,16 +37034,33 @@ msgstr "Le rayon Z doit être supérieur à 0."
 msgid "Rainbow"
 msgstr "Arc-en-ciel"
 
+#: src/placement/TerrainControls.tsx
+msgid "Raise"
+msgstr ""
+
+#: src/placement/TerrainControls.tsx
+msgid "Raise or level"
+msgstr ""
+
+#: src/placement/TerrainControls.tsx
+msgid "Raised area"
+msgstr ""
+
 #: src/content/unitFieldNotes.ts
 #, fuzzy
 msgid "Raised to 38 if set lower, the least that lets a 1x1 builder reach a 1x1 building."
 msgstr "Porté à 38 si plus bas, le minimum qui permet à un constructeur 1x1 d’atteindre un bâtiment 1x1."
+
+#: src/placement/TerrainControls.tsx
+msgid "Raised wall"
+msgstr ""
 
 #: src/runlite/pages/components/NodeOverlays.tsx
 #, fuzzy
 msgid "raises tech ceiling · both sides"
 msgstr "relève le plafond technologique · les deux camps"
 
+#: src/placement/TerrainControls.tsx
 #: src/uberstress/pages/components/ReportDetail.tsx
 #: src/uberstress/pages/RunPage.tsx
 #: src/uberstress/pages/SettingsSection.tsx
@@ -43196,6 +43247,10 @@ msgstr "Taille de la traînée de fumée"
 msgid "Smoke trail update rate"
 msgstr "Fréquence de mise à jour de la traînée de fumée"
 
+#: src/placement/TerrainControls.tsx
+msgid "Smooth"
+msgstr ""
+
 #: src/mapconv/pages/components/AdvancedOptions.tsx
 #, fuzzy
 msgid "Smooth texture (-smooth)"
@@ -44148,6 +44203,10 @@ msgstr "charge stable"
 msgid "Step"
 msgstr "Pas"
 
+#: src/placement/TerrainControls.tsx
+msgid "step {number} of the build order"
+msgstr ""
+
 #: src/lego/pages/components/AnimationPanel.tsx
 #, fuzzy
 msgid "Step back one frame"
@@ -44903,6 +44962,7 @@ msgid "Terraform speed"
 msgstr "Vitesse de terraformation"
 
 #: src/lego/environment.ts
+#: src/placement/TerrainControls.tsx
 #, fuzzy
 msgid "Terrain"
 msgstr "Terrain"
@@ -44911,10 +44971,23 @@ msgstr "Terrain"
 msgid "Terrain changes"
 msgstr ""
 
+#: src/placement/TerrainControls.tsx
+msgid "Terrain changes in this game"
+msgstr ""
+
+#: src/placement/TerrainControls.tsx
+msgid "Terrain tools"
+msgstr ""
+
 #: src/mapconv/pages/components/AdvancedOptions.tsx
 #, fuzzy
 msgid "terrain-type index per pixel"
 msgstr "indice de type de terrain par pixel"
+
+#. placeholder {0}: toolName(tool)
+#: src/placement/TerrainControls.tsx
+msgid "Terrain: {0}"
+msgstr ""
 
 #: src/conquest/mapStyle.ts
 #, fuzzy
@@ -52497,6 +52570,7 @@ msgid "walker"
 msgstr "marcheur"
 
 #: src/lego/pages/components/ShapeFields.tsx
+#: src/placement/TerrainControls.tsx
 #, fuzzy
 msgid "Wall"
 msgstr "Paroi"
@@ -53540,6 +53614,7 @@ msgid "width"
 msgstr "largeur"
 
 #: src/lego/pages/components/ShapeFields.tsx
+#: src/placement/TerrainControls.tsx
 #, fuzzy
 msgid "Width"
 msgstr "Largeur"
@@ -54774,6 +54849,22 @@ msgstr "Z en elmos"
 
 #: src/blueprint/pages/components/WidgetPanel.tsx
 msgid "Zero-K only loads widgets from your content folder from your second match, because it saves the setting that allows them when a game closes. The first match you play in Zero-K will not show the panel."
+msgstr ""
+
+#: src/placement/TerrainControls.tsx
+msgid "Zero-K refuses a ramp shorter than 64 or longer than 3,000 elmos, or narrower than 48 or wider than 1,600."
+msgstr ""
+
+#: src/placement/TerrainControls.tsx
+msgid "Zero-K refuses a terrain change of more than 2,500 points."
+msgstr ""
+
+#: src/placement/TerrainControls.tsx
+msgid "Zero-K refuses a wall that long. It allows 700 points, a point every 16 elmos."
+msgstr ""
+
+#: src/placement/TerrainControls.tsx
+msgid "Zero-K refuses an area wider or deeper than 2,000 elmos."
 msgstr ""
 
 #: src/i18n/frameStrings.ts

@@ -322,6 +322,7 @@ export default function BlueprintDetailPage() {
       <BlueprintEditor
         blueprint={layout}
         gameName={gameName}
+        terrainTools
         onChange={(layout) =>
           edit(recordWithLayout(record, layout, footprints))
         }
