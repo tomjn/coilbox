@@ -80,14 +80,8 @@ describe("ground saved in a real Zero-K match (issue #4798)", () => {
         }
       }
     }
-    // The pad's four outer diagonal corners, where the model leaves 40 - 28 *
-    // sqrt(2) and Zero-K keeps its 4 elmo foot step (#4805). Empty this when
-    // that is fixed.
-    expect(differ.map((d) => d.split(":")[0])).toEqual([
-      "728,24",
-      "872,24",
-      "728,136",
-      "872,136",
-    ]);
+    // The pad's four outer diagonal corners used to differ, where the model left
+    // 40 - 28 * sqrt(2) and Zero-K keeps its 4 elmo foot step (#4805).
+    expect(differ).toEqual([]);
   });
 });

@@ -1,5 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { knownUnits, unknownBuildings, unknownUnitsWarning } from "./units";
+import {
+  knownUnits,
+  terrainRefusal,
+  terrainSupport,
+  unknownBuildings,
+  unknownUnitsWarning,
+} from "./units";
 
 /** What the game being imported into has. Everything else in these tests is a
  *  name from some other game. */
@@ -105,6 +111,45 @@ describe("unknownUnitsWarning", () => {
       ),
     ).toBe(
       "2 of its 3 buildings cannot be placed here: this game has no legsolar or legcom. The other one is fine.",
+    );
+  });
+});
+
+describe("terrainSupport", () => {
+  it("is true for a game with the unit Zero-K's terraform gadget needs", () => {
+    expect(terrainSupport([...UNITS, { name: "terraunit" }])).toBe(true);
+  });
+
+  it("is false for a game without it", () => {
+    expect(terrainSupport(UNITS)).toBe(false);
+  });
+
+  it("reads the name in whatever case the dataset holds it", () => {
+    expect(terrainSupport([{ name: "TerraUnit" }])).toBe(true);
+  });
+
+  it("does not take a similar name for it", () => {
+    expect(terrainSupport([{ name: "terraunit2" }, { name: "terra" }])).toBe(
+      false,
+    );
+  });
+});
+
+describe("terrainRefusal", () => {
+  it("says nothing when there are no terrain changes", () => {
+    expect(terrainRefusal(0, 4)).toBeNull();
+  });
+
+  it("counts the changes this game cannot make", () => {
+    expect(terrainRefusal(1, 4)).toBe("1 terrain change this game cannot make");
+    expect(terrainRefusal(3, 4)).toBe(
+      "3 terrain changes this game cannot make",
+    );
+  });
+
+  it("says there is nothing to place when only terrain is left", () => {
+    expect(terrainRefusal(2, 0)).toBe(
+      "2 terrain changes this game cannot make, so nothing in it can be placed",
     );
   });
 });

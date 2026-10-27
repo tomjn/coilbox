@@ -16,6 +16,8 @@ The page is called Base blueprints. Each blueprint shows a small drawing of its 
 
 When your blueprints are for more than one game, a list above them picks one game or Every game.
 
+Next to the list is a Terrain changes switch for the game you picked. It also shows when all your blueprints are for one game. See [Which games support terrain changes](#which-games-support-terrain-changes).
+
 The buttons at the top of the page are:
 
 - Open a pack, which reads a file holding many blueprints. See [Open a pack](#open-a-pack).
@@ -113,6 +115,16 @@ You can only pick up a blueprint your side can build. A blueprint with another s
 
 A building your side only gets by upgrading another, such as a Tech 2 factory that starts as a Tech 1 factory, is placed as the building it starts from. The row says how many buildings you then need to upgrade.
 
+### Which games support terrain changes
+
+Coilbox switches terrain changes on for a game that has the `terraunit` unit, which Zero-K's terraform gadget needs. Zero-K has it. Beyond All Reason, Splinter Faction and Metal Factions do not, so the switch starts off for them. You do not have to change anything for this.
+
+The Terrain changes switch is on the Blueprints page, next to the game list, once you have picked a game. It is also on the page of a blueprint that has terrain changes. Each game keeps its own setting. Turn it on for a game built on Zero-K's code that renamed `terraunit`, or off for a game that has it and where you do not want terrain changes.
+
+Turning the switch off never removes anything. A blueprint keeps its terrain changes, and they stay in a share, a pack and an export. The card and the blueprint's page say how many terrain changes the game cannot make, for example "3 terrain changes this game cannot make". A blueprint with only terrain changes stays in your library and can be shared, but has nothing to place in that game. Turn the switch back on and everything is as you left it.
+
+The widget in a match decides for itself from the builders you have selected, so this switch does not change what happens in a match. See [Place terrain changes](#place-terrain-changes).
+
 ### Place terrain changes
 
 A blueprint can hold terrain changes, such as a wall raised from the ground or a flattened pad. Only Zero-K can make them in a match. In any other game the widget places the buildings and leaves the terrain changes out.
@@ -121,7 +133,9 @@ In Zero-K your builders make each terrain change in the blueprint's order, and b
 
 When your selected builders can terraform and the blueprint has terrain changes, the placing panel has a Terrain row beside Builders, with On and Off. Off places the buildings only. The widget remembers your choice for each game.
 
-While you place it, each terrain change shows on the map as a see-through volume from the ground to the height it will leave, green for ground it raises and red for ground it digs, with a green wire grid on its top and sides and a cyan grid on the ground under it. A small white number says how much it changes the ground, for example +112 or level +24. The slopes Zero-K adds round a raised or dug area are not drawn yet. The preview shows only when the match can terraform and Terrain is On.
+While you place it, the ground the terrain changes leave shows on the map as a see-through surface over the ground, green where it rises and red where it is dug, with a green wire grid on it and a cyan grid on the ground under it. The surface includes the slopes Zero-K adds round a raised or dug area, and stops where a slope would reach a building. A small white number says how much each change moves the ground, for example +112 or level +24. A building that would stand on a slope is marked like a building the ground refuses. It is still ordered. The preview shows only when the match can terraform and Terrain is On, and the same preview shows for a plan.
+
+The cost under the blueprint's name adds the terraform. Its metal is the estimate Zero-K shows for the same terraform once you place it, and its time is the work over the build power of the selected builders that can terraform. The time is a little short of a real match, which also has builders walk to the work.
 
 - Heights in a blueprint are measured from the ground under the building the cursor holds, at the moment you click. A blueprint with only terrain changes is held by its origin.
 - Together gives every terrain change to every selected builder that can terraform. Split up gives each change to the nearest of them.
