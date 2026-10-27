@@ -33,6 +33,7 @@ import {
   type HeightGrid,
   standingField,
 } from "./terrain";
+import type { Relief } from "./terrainRelief";
 import { createUnitsLayer, type UnitsLayer } from "./unitsLayer";
 
 /** The map inputs the layer needs, as `useMissionMapAssets` reports them. */
@@ -59,17 +60,21 @@ export interface MapExtent {
    * would not read is flattened too (issue #1497): this floor is level on
    * purpose and is known exactly, so a building on it gets a real verdict, and
    * that one is a guess nothing may be judged against.
-   *
-   * A floor that is level on purpose can still carry `heightWords`: the
-   * blueprint editor's grid with its terrain steps built on it (issue #4793).
-   * The models stand on those heights and are judged on them, and there is
-   * still no water, since the floor is not a map.
    */
   flat?: boolean;
   minHeight: number;
   maxHeight: number;
   worldWidth: number;
   worldHeight: number;
+  /**
+   * The ground a blueprint's terrain steps have changed (issue #4794).
+   *
+   * When it is here the models stand on it and the verdicts read it, in place
+   * of the map's own heights, and `heightWords` is not read. Its arrays change
+   * in place, so `reliefVersion` is how the hook learns they did.
+   */
+  relief?: Relief | null;
+  reliefVersion?: number;
 }
 
 /** What the editor's surface can say about what it just drew, and what editing
@@ -214,20 +219,29 @@ export function useScenarioUnits(
   // Whether that read has finished, which a null grid cannot say: a read in
   // flight and a read that failed both leave it null, and only one of those is
   // worth telling somebody about (issue #1491).
-  const heightRead = flat || map.heightFieldRead !== false;
+  const relief = map.relief ?? null;
+  const reliefVersion = map.reliefVersion ?? 0;
+  const heightRead = flat || !!relief || map.heightFieldRead !== false;
   // Held rather than recomputed: it is a float a sample, which on the largest
   // map is a 17 MB array, and the layer below is rebuilt whenever it moves.
+  // The relief's own is the one array its owner changes in place, so it is never
+  // a reason to rebuild.
   const field = useMemo(() => {
-    if (grid) return fieldFromGrid(grid);
-    return flat ? FLAT_FIELD : null;
-  }, [flat, grid]);
+    if (relief) return relief.field;
+    if (flat) return FLAT_FIELD;
+    return grid ? fieldFromGrid(grid) : null;
+  }, [relief, flat, grid]);
 
   // What the models stand on, which is the flat once the map's own heights have
   // been asked for and refused (issue #1497).
   const standing = standingField(field, heightRead);
   const heightsUnread = field === null && standing !== null;
 
-  const { worldWidth, worldHeight, minHeight, maxHeight } = map;
+  const { worldWidth, worldHeight } = map;
+  // The relief's samples are heights in elmos already, which is a range of 0 to
+  // 1.
+  const minHeight = relief ? 0 : map.minHeight;
+  const maxHeight = relief ? 1 : map.maxHeight;
   // Behind a ref like the lookups above: a preference changed while the editor
   // is open is a reason to stop moving, not a reason to rebuild the layer and
   // re-read every model in the document.
@@ -278,6 +292,12 @@ export function useScenarioUnits(
     dataDir,
   ]);
 
+  // The ground moved under what is standing on it.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: the version is the signal that the field changed in place
+  useEffect(() => {
+    layer?.restand();
+  }, [layer, reliefVersion]);
+
   const [missing, setMissing] = useState<string[]>([]);
   const [drawing, setDrawing] = useState(false);
   // How far the current pass has got, and which layer has finished a pass,
@@ -314,6 +334,7 @@ export function useScenarioUnits(
     // the archive alone would leave the first draw's markers on the map.
   }, [layer, drawn, colorKey, defsReady, objectNames]);
 
+  // biome-ignore lint/correctness/useExhaustiveDependencies: a new version is a new reader, which is what redraws what lies on the ground
   const groundAt = useCallback(
     (pos: Point) =>
       standing
@@ -327,16 +348,32 @@ export function useScenarioUnits(
             maxHeight,
           )
         : 0,
-    [standing, worldWidth, worldHeight, minHeight, maxHeight],
+    [standing, worldWidth, worldHeight, minHeight, maxHeight, reliefVersion],
   );
 
+  // biome-ignore lint/correctness/useExhaustiveDependencies: a new version is a new ground, which is what redraws the verdicts
   const ground = useMemo(() => {
-    const corners = grid
-      ? cornerGround(grid, worldWidth, worldHeight, minHeight, maxHeight)
+    if (relief) return relief.ground();
+    if (flat) return flatGround();
+    return grid
+      ? cornerGround(
+          grid,
+          worldWidth,
+          worldHeight,
+          map.minHeight,
+          map.maxHeight,
+        )
       : null;
-    if (flat) return corners ? { ...corners, hasWater: false } : flatGround();
-    return corners;
-  }, [flat, grid, worldWidth, worldHeight, minHeight, maxHeight]);
+  }, [
+    relief,
+    reliefVersion,
+    flat,
+    grid,
+    worldWidth,
+    worldHeight,
+    map.minHeight,
+    map.maxHeight,
+  ]);
 
   // A scan that failed has no data, so it cannot make the game missing.
   const gameMissing = !!gameName && !!scan.data && !game;

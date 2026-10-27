@@ -117,6 +117,12 @@ export interface UnitsLayer {
   root: THREE.Group;
   /** Draw this list, replacing whatever was drawn before. */
   draw: (placements: Placement[]) => Promise<DrawResult>;
+  /**
+   * Stand everything that is drawn on the ground as it is now, for ground that
+   * moved under it and nothing else did (issue #4794). The field is changed in
+   * place, so nothing is rebuilt and no model is read again.
+   */
+  restand: () => void;
   /** The object drawn for a placement key, for selection and picking. */
   objects: Map<string, THREE.Object3D>;
   /**
@@ -527,9 +533,29 @@ export function createUnitsLayer(deps: UnitsLayerDeps): UnitsLayer {
     return { missing: drawnMissing() };
   };
 
+  const restand = () => {
+    for (const one of shown.values()) {
+      const placement = (one.object.userData as Partial<PlacementUserData>)
+        .placement;
+      if (!placement) continue;
+      one.object.position.y =
+        groundHeight(
+          deps.field,
+          placement.pos.x,
+          placement.pos.z,
+          deps.worldWidth,
+          deps.worldHeight,
+          deps.minHeight,
+          deps.maxHeight,
+        ) * handle.scale;
+    }
+    handle.render();
+  };
+
   return {
     root,
     draw,
+    restand,
     objects,
     onDrawn: (listener) => {
       watchers.add(listener);

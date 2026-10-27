@@ -533,7 +533,7 @@ export function BuildOrderPopover({
                       variant="ghost"
                       className="size-7 p-0"
                       aria-label={t`Build ${{ def }} sooner`}
-                      disabled={at === 0}
+                      disabled={entries[at - 1]?.kind !== entry.kind}
                       onClick={() => move(entry, -1)}
                     >
                       <ArrowUp className="size-3.5" />
@@ -543,7 +543,7 @@ export function BuildOrderPopover({
                       variant="ghost"
                       className="size-7 p-0"
                       aria-label={t`Build ${{ def }} later`}
-                      disabled={at === entries.length - 1}
+                      disabled={entries[at + 1]?.kind !== entry.kind}
                       onClick={() => move(entry, 1)}
                     >
                       <ArrowDown className="size-3.5" />

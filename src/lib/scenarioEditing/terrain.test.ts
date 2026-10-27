@@ -16,7 +16,6 @@ import {
 import { applyLayoutEdit } from "@/placement/blueprintHistory";
 import { placementKey } from "@/placement/placements";
 import type { Scenario } from "@/scenario/model";
-import { removeBuilding } from "./bases";
 import { removePlacement } from "./editing";
 import { type EditHistory, emptyHistory, redoEdit, undoEdit } from "./history";
 import {
@@ -68,16 +67,16 @@ function edited(
 }
 
 describe("terrain step edits", () => {
-  it("adds a step before every building and says where it went", () => {
+  it("adds a step after the other steps and before every building", () => {
     let index = -1;
     const out = edited(layout([wallStep(1)]), (doc) => {
       const added = addStep(doc, ID, pad);
       index = added.index;
       return added.scenario;
     });
-    expect(index).toBe(0);
-    expect(out.terrain?.map((s) => s.kind)).toEqual(["level", "raise"]);
-    expect(out.terrain?.[0].before).toBe(0);
+    expect(index).toBe(1);
+    expect(out.terrain?.map((s) => s.kind)).toEqual(["raise", "level"]);
+    expect(out.terrain?.map((s) => s.before)).toEqual([0, 0]);
   });
 
   it("makes a layout of steps alone", () => {
@@ -138,13 +137,6 @@ describe("terrain step edits", () => {
     expect(out.terrain).toBeUndefined();
   });
 
-  it("keeps steps in their place when a building is deleted", () => {
-    const out = edited(layout([wallStep(1), wallStep(2)]), (doc) =>
-      removeBuilding(doc, ID, 0),
-    );
-    expect(out.terrain?.map((s) => s.before)).toEqual([0, 1]);
-  });
-
   it("keeps the steps when the last building is deleted", () => {
     const one: BaseBlueprint = {
       ...layout([wallStep(1)]),
@@ -157,23 +149,25 @@ describe("terrain step edits", () => {
     expect(out.terrain).toEqual([{ ...wallStep(1), before: 0 }]);
   });
 
-  it("moves a step through the build order among the buildings", () => {
+  it("moves steps among steps and buildings among buildings only", () => {
     let at = -1;
-    const out = edited(layout([pad]), (doc) => {
+    const out = edited(layout([pad, wallStep(1)]), (doc) => {
       const moved = moveInBuildOrder(doc, ID, { kind: "step", index: 0 }, 1);
       at = moved.step;
       return moved.scenario;
     });
-    expect(at).toBe(0);
-    expect(out.terrain?.[0].before).toBe(1);
+    expect(at).toBe(1);
+    expect(out.terrain?.map((s) => s.kind)).toEqual(["raise", "level"]);
+    // Every step is written back before every building (issue #4817).
+    expect(out.terrain?.map((s) => s.before)).toEqual([0, 0]);
 
-    const building = edited(
-      layout([pad]),
-      (doc) =>
-        moveInBuildOrder(doc, ID, { kind: "building", index: 0 }, -1).scenario,
-    );
-    expect(building.terrain?.[0].before).toBe(1);
-    expect(building.buildings[0].def).toBe("factorycloak");
+    const doc = blueprintDocument(layout([pad]), "Zero-K");
+    expect(
+      moveInBuildOrder(doc, ID, { kind: "step", index: 0 }, 1).scenario,
+    ).toBe(doc);
+    expect(
+      moveInBuildOrder(doc, ID, { kind: "building", index: 0 }, -1).scenario,
+    ).toBe(doc);
 
     const swapped = edited(
       layout(),

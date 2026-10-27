@@ -10,9 +10,10 @@
  * `@/blueprint/terrainDraft.ts`. The keys are listened for on the window, so
  * they work whatever has the focus.
  *
- * Two layers draw: `terrainVolumes.ts`, what the steps look like, and
- * `terrainLayer.ts`, what the pointer works with. The pointer's position is
- * kept out of React, so moving it redraws those two and nothing else.
+ * What the steps look like is the relief (`useTerrainRelief`), and this hands
+ * it `drafting`, the step being drawn, so the ground rises as it is drawn.
+ * `terrainHandles.ts` draws what the pointer works with. The pointer's position
+ * is kept out of React, so moving it redraws the handles and nothing else.
  *
  * Every change to the layout is one edit through `applyEdit`, so undo and
  * redo cover it.
@@ -54,8 +55,7 @@ import {
   parseTerrainKey,
   stepKey,
   type TerrainLayer,
-} from "./terrainLayer";
-import { createTerrainVolumes, type TerrainVolumes } from "./terrainVolumes";
+} from "./terrainHandles";
 import type { GroundDragPhase } from "./useMapEditing";
 
 export interface TerrainEditingDeps {
@@ -88,6 +88,9 @@ export interface TerrainEditing {
   setSettings: (settings: Partial<DraftSettings>) => void;
   /** Whether a step is part drawn. */
   drawing: boolean;
+  /** The step being drawn as it would be made now, from the points clicked or
+   *  the rectangle being dragged, or null. */
+  drafting: TerrainStep | null;
   /** Make the step drawn so far, or put the tool down. */
   finish: () => void;
   /** Throw away the step drawn so far and put the tool down. */
@@ -130,28 +133,21 @@ export function useTerrainEditing(deps: TerrainEditingDeps): TerrainEditing {
     placing,
   } = deps;
   const [layer, setLayer] = useState<TerrainLayer | null>(null);
-  const [volumes, setVolumes] = useState<TerrainVolumes | null>(null);
   const [draft, setDraft] = useState<DraftState>(NO_DRAFT);
   const [refused, setRefused] = useState<StepLimit | null>(null);
 
   useEffect(() => {
     if (!handle) return;
-    const made = {
-      volumes: createTerrainVolumes({
-        handle,
-        worldWidth,
-        worldHeight,
-        groundAt,
-      }),
-      layer: createTerrainLayer({ handle, worldWidth, worldHeight, groundAt }),
-    };
-    setVolumes(made.volumes);
-    setLayer(made.layer);
+    const made = createTerrainLayer({
+      handle,
+      worldWidth,
+      worldHeight,
+      groundAt,
+    });
+    setLayer(made);
     return () => {
-      made.layer.dispose();
-      made.volumes.dispose();
+      made.dispose();
       setLayer(null);
-      setVolumes(null);
     };
   }, [handle, worldWidth, worldHeight, groundAt]);
 
@@ -189,21 +185,24 @@ export function useTerrainEditing(deps: TerrainEditingDeps): TerrainEditing {
     [origin],
   );
 
-  // The pointer, and a rectangle being dragged out, kept out of React.
+  // The pointer, kept out of React. A rectangle being dragged out is state,
+  // because the ground rises under it as it grows.
   const hover = useRef<Point | null>(null);
-  const band = useRef<Point[] | null>(null);
+  const [band, setBand] = useState<Point[] | null>(null);
+
+  // The step being drawn as it would be made now, which the relief shows.
+  const run = band ?? draft.points;
+  const drafting = useMemo(
+    () =>
+      tool && enoughPoints(tool, run.length)
+        ? draftStep(tool, run, draft.settings)
+        : null,
+    [tool, run, draft.settings],
+  );
 
   const redraw = useRef(() => {});
   redraw.current = () => {
     const at = hover.current;
-    // The step as it would be made now: the rectangle being dragged, or the
-    // points clicked so far and the one under the pointer.
-    const run = band.current ?? (at ? [...draft.points, at] : draft.points);
-    const preview =
-      tool && enoughPoints(tool, run.length)
-        ? draftStep(tool, run, draft.settings)
-        : null;
-    volumes?.draw(origin, terrain, hidden, preview);
     layer?.draw({
       origin,
       steps: terrain,
@@ -212,8 +211,8 @@ export function useTerrainEditing(deps: TerrainEditingDeps): TerrainEditing {
       pickable,
       guide: tool
         ? {
-            points: band.current ?? draft.points,
-            hover: band.current ? null : at,
+            points: band ?? draft.points,
+            hover: band ? null : at,
             closed: tool === "area" || tool === "smooth",
           }
         : null,
@@ -243,15 +242,12 @@ export function useTerrainEditing(deps: TerrainEditingDeps): TerrainEditing {
       if (draftRef.current.points.length > 0) return;
       const corners = rectanglePoints(offset(from), offset(to));
       if (phase === "move") {
-        band.current = corners;
-        redraw.current();
+        setBand(corners);
         return;
       }
-      band.current = null;
+      setBand(null);
       if (phase === "end" && corners) {
         dispatch({ type: "rectangle", corners });
-      } else {
-        redraw.current();
       }
     };
   }, [tool, offset, dispatch]);
@@ -343,6 +339,7 @@ export function useTerrainEditing(deps: TerrainEditingDeps): TerrainEditing {
     settings: draft.settings,
     setSettings,
     drawing: draft.points.length > 0,
+    drafting,
     finish,
     cancel,
     overlay: pickable ? layer : null,

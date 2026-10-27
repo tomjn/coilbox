@@ -14,7 +14,6 @@ import {
   snapPoint,
   stepAdded,
   stepEdges,
-  stepsWithoutBuilding,
   withKind,
 } from "./terrainEdit";
 
@@ -145,90 +144,60 @@ describe("reshaping a step", () => {
   });
 });
 
-describe("steps in the build order", () => {
-  it("lists steps among the buildings by `before`", () => {
+describe("steps in the build order (issue #4817)", () => {
+  it("lists every step before every building, whatever `before` says", () => {
     expect(buildSequence(2, [wall(1), wall(0), wall(2)])).toEqual([
-      { kind: "step", index: 1 },
-      { kind: "building", index: 0 },
       { kind: "step", index: 0 },
-      { kind: "building", index: 1 },
+      { kind: "step", index: 1 },
       { kind: "step", index: 2 },
+      { kind: "building", index: 0 },
+      { kind: "building", index: 1 },
     ]);
   });
 
-  it("puts a new step before every building, after the steps already there", () => {
+  it("puts a new step after the other steps, and writes every step first", () => {
     const added = stepAdded([wall(0), wall(1)], { ...square, before: 3 });
-    expect(added.index).toBe(1);
-    expect(added.terrain[1]).toMatchObject({ kind: "level", before: 0 });
-  });
-
-  it("keeps the steps after a deleted building in their place", () => {
-    expect(
-      stepsWithoutBuilding([wall(0), wall(1), wall(2)], 0).map((s) => s.before),
-    ).toEqual([0, 0, 1]);
-  });
-
-  it("moves a step past a building", () => {
-    const down = movedInSequence(2, [wall(0)], { kind: "step", index: 0 }, 1);
-    expect(down).toEqual({ steps: [wall(1)], index: 0 });
-    const up = movedInSequence(2, [wall(1)], { kind: "step", index: 0 }, -1);
-    expect(up).toEqual({ steps: [wall(0)], index: 0 });
+    expect(added.index).toBe(2);
+    expect(added.terrain.map((s) => s.before)).toEqual([0, 0, 0]);
+    expect(added.terrain[2].kind).toBe("level");
   });
 
   it("moves a step past another step by swapping them", () => {
-    const moved = movedInSequence(
-      1,
-      [wall(0, 0), wall(0, 8)],
-      { kind: "step", index: 0 },
-      1,
-    );
-    expect(moved).toEqual({ steps: [wall(0, 8), wall(0, 0)], index: 1 });
-  });
-
-  it("moves a building past a step by moving the step round it", () => {
-    const up = movedInSequence(
-      2,
-      [wall(1)],
-      { kind: "building", index: 1 },
-      -1,
-    );
-    expect(up).toEqual({ steps: [wall(2)], index: 0 });
-    const down = movedInSequence(
-      2,
-      [wall(1)],
-      { kind: "building", index: 0 },
-      1,
-    );
-    expect(down).toEqual({ steps: [wall(0)], index: 0 });
-  });
-
-  it("hands a building passing a building to the buildings' own move", () => {
-    expect(movedInSequence(2, [], { kind: "building", index: 0 }, 1)).toEqual({
-      buildings: { index: 0, delta: 1 },
-    });
-  });
-
-  it("stops at either end", () => {
-    expect(movedInSequence(1, [wall(0)], { kind: "step", index: 0 }, -1)).toBe(
-      null,
-    );
     expect(
-      movedInSequence(1, [wall(0)], { kind: "building", index: 0 }, 1),
+      movedInSequence(
+        1,
+        [wall(0, 0), wall(0, 8)],
+        { kind: "step", index: 0 },
+        1,
+      ),
+    ).toEqual({ steps: [wall(0, 8), wall(0, 0)], index: 1 });
+  });
+
+  it("never moves a step below a building", () => {
+    expect(
+      movedInSequence(2, [wall(0)], { kind: "step", index: 0 }, 1),
     ).toBeNull();
   });
 
-  it("lands a step that moves into a group next to the building it passed", () => {
-    // Two steps already after building 0. Moving the step before it down puts
-    // it first among them, straight after building 0.
+  it("never moves a building above a step", () => {
+    expect(
+      movedInSequence(2, [wall(0)], { kind: "building", index: 0 }, -1),
+    ).toBeNull();
+  });
+
+  it("hands a building passing a building to the buildings' own move", () => {
+    expect(
+      movedInSequence(2, [wall(0)], { kind: "building", index: 0 }, 1),
+    ).toEqual({ buildings: { index: 0, delta: 1 } });
+  });
+
+  it("writes a step read in with a later place as first when it moves", () => {
     const moved = movedInSequence(
-      1,
-      [wall(1, 8), wall(0, 0), wall(1, 16)],
+      0,
+      [wall(2, 0), wall(1, 8)],
       { kind: "step", index: 1 },
-      1,
+      -1,
     );
-    expect(moved).toEqual({
-      steps: [wall(1, 0), wall(1, 8), wall(1, 16)],
-      index: 0,
-    });
+    expect(moved).toEqual({ steps: [wall(0, 8), wall(0, 0)], index: 0 });
   });
 });

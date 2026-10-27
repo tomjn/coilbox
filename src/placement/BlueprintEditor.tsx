@@ -30,8 +30,9 @@ import {
   buildGridSnap,
   buildingFootprints,
   type FootprintMark,
+  SQUARE_SIZE,
 } from "@/blueprint/footprint";
-import type { BaseBlueprint } from "@/blueprint/model";
+import type { BaseBlueprint, TerrainStep } from "@/blueprint/model";
 import { offGridBuildings, onBuildGrid } from "@/blueprint/offGrid";
 import { buildingColors } from "@/blueprint/role";
 import { type BuildEntry, buildSequence } from "@/blueprint/terrainEdit";
@@ -71,8 +72,13 @@ import {
 import { baseBuildings, type Point } from "@/scenario/model";
 import { BLUEPRINT_BASE_ID, blueprintDocument } from "./blueprintDocument";
 import { useLayoutHistory } from "./blueprintHistory";
-import { finishedGround } from "./finishedGround";
-import { GRID_EXTENT, GRID_ORIGIN, gridGround, layoutFraming } from "./ground";
+import {
+  GRID_EXTENT,
+  GRID_ORIGIN,
+  GRID_RELIEF,
+  gridGround,
+  layoutFraming,
+} from "./ground";
 import {
   BuildOrderPopover,
   LayoutNameField,
@@ -104,12 +110,14 @@ import {
   TerrainStepBar,
   TerrainToolsButton,
 } from "./TerrainControls";
-import { parseTerrainKey, stepKey } from "./terrainLayer";
+import { parseTerrainKey, stepKey } from "./terrainHandles";
+import { flatSource } from "./terrainRelief";
 import { useLayoutPreview } from "./useLayoutPreview";
 import { useMapEditing } from "./useMapEditing";
 import { useScenarioFootprints } from "./useScenarioFootprints";
-import { type MapExtent, useScenarioUnits } from "./useScenarioUnits";
+import { useScenarioUnits } from "./useScenarioUnits";
 import { useTerrainEditing } from "./useTerrainEditing";
+import { layoutRects, useTerrainRelief } from "./useTerrainRelief";
 
 /** How long one building of a build order stands on screen before the next one
  *  arrives, the same pace the scenario editor watches a base go up at. */
@@ -119,13 +127,22 @@ const PLAYBACK_STEP_MS = 700;
  *  every time, so a layout looks the same wherever it is opened. */
 const GROUND = gridGround();
 
-/** That ground's height everywhere, before any terrain step. */
-const BASE_GROUND = () => 0;
+/** The floor before any terrain step: level, a corner every 8 elmos. */
+const FLOOR = flatSource(
+  GROUND.worldWidth / SQUARE_SIZE + 1,
+  GROUND.worldHeight / SQUARE_SIZE + 1,
+);
+
+/** Where the layout stands on the floor, which is where a step's heights are
+ *  measured from. */
+const STANDING = { at: GRID_ORIGIN, quarters: 0 };
 
 /** One list for every "nothing to draw", so a layer with nothing on it is not
  *  cleared and redrawn on every render. */
 const NOTHING: FootprintMark[] = [];
-const NO_STEPS: NonNullable<BaseBlueprint["terrain"]> = [];
+/** For a layout with no terrain steps, so the hooks are not handed a new
+ *  list. */
+const NO_STEPS: TerrainStep[] = [];
 
 /** The step a selection names, or null when it names anything else or a step
  *  the layout no longer has. */
@@ -261,22 +278,64 @@ export function BlueprintEditor({
     return () => clearInterval(timer);
   }, [advancing, total]);
 
-  // The ground the buildings stand on: flat, with the terrain steps built on
-  // it (issue #4793), so a building on a raised pad stands on top of it.
-  const builtOn = useMemo(() => finishedGround({ terrain }), [terrain]);
-  const standOn = useMemo<MapExtent>(
-    () =>
-      builtOn
-        ? {
-            ...GROUND,
-            heightWords: builtOn.grid,
-            minHeight: builtOn.minHeight,
-            maxHeight: builtOn.maxHeight,
-          }
-        : GROUND,
-    [builtOn],
+  const groundAtRef = useRef<(pos: Point) => number>(() => 0);
+  const finishedAt = useCallback((pos: Point) => groundAtRef.current(pos), []);
+  const terrainEditing = useTerrainEditing({
+    handle,
+    worldWidth: GROUND.worldWidth,
+    worldHeight: GROUND.worldHeight,
+    // The ground the steps leave, which the handles and the pointer's guide
+    // lie on. Read through a ref, because that ground is worked out from what
+    // this hook is drawing.
+    groundAt: finishedAt,
+    origin: GRID_ORIGIN,
+    terrain,
+    tools: showTerrain,
+    selected: pickedStepOf(selected, terrain.length),
+    onSelect: setSelected,
+    hidden: unbuilt,
+    applyEdit,
+    placing: unitDef !== "",
+  });
+  const { tool: terrainTool, setTool: setTerrainTool } = terrainEditing;
+  const drafting = terrainEditing.drafting;
+
+  // The ground the terrain steps leave: drawn on the floor, and read by the
+  // models and the building verdicts below (issue #4794). With the game's
+  // terrain switch off the floor is left level and no step is drawn (issue
+  // #4814). While a build order is watched only the steps reached so far are
+  // on the ground, and a step still being drawn is shown as it would be made.
+  const reliefInputs = useMemo(
+    () => layoutRects(blueprint.buildings, GRID_ORIGIN, units),
+    [blueprint.buildings, units],
   );
-  const drawn = useScenarioUnits(handle, doc, standOn, undrawn);
+  const reliefSteps = useMemo(() => {
+    const reached = unbuilt
+      ? terrain.filter((_, index) => !unbuilt.has(index))
+      : terrain;
+    return drafting ? [...reached, drafting] : reached;
+  }, [terrain, unbuilt, drafting]);
+  const relief = useTerrainRelief({
+    handle,
+    source: FLOOR,
+    range: GRID_RELIEF,
+    steps: reliefSteps,
+    placement: STANDING,
+    footprints: reliefInputs,
+    enabled: terrainChanges.enabled !== false,
+    selected: unbuilt ? null : pickedStepOf(selected, terrain.length),
+    reduceMotion,
+  });
+  const ground = useMemo(
+    () => ({
+      ...GROUND,
+      relief: relief.relief,
+      reliefVersion: relief.version,
+    }),
+    [relief.relief, relief.version],
+  );
+  const drawn = useScenarioUnits(handle, doc, ground, undrawn);
+  groundAtRef.current = drawn.groundAt;
   // The ground here is flat on purpose rather than unread, so every building
   // gets a real verdict and the squares are not a screen full of dashes saying
   // nothing is known (issue #1491).
@@ -398,24 +457,6 @@ export function BlueprintEditor({
         if (key) setSelected(key);
       }
     : null;
-
-  const terrainEditing = useTerrainEditing({
-    handle,
-    worldWidth: GROUND.worldWidth,
-    worldHeight: GROUND.worldHeight,
-    // The steps are drawn up from the ground they start on, not the ground they
-    // leave, which is the flat.
-    groundAt: BASE_GROUND,
-    origin: GRID_ORIGIN,
-    terrain,
-    tools: showTerrain,
-    selected: pickedStepOf(selected, terrain.length),
-    onSelect: setSelected,
-    hidden: unbuilt,
-    applyEdit,
-    placing: unitDef !== "",
-  });
-  const { tool: terrainTool, setTool: setTerrainTool } = terrainEditing;
 
   // A building being placed and a step being drawn are both what a click on
   // the ground does, so taking up one puts the other down.

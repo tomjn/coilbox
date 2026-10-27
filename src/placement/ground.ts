@@ -32,6 +32,16 @@ export const GRID_ORIGIN: Point = {
   z: GRID_EXTENT / 2,
 };
 
+/**
+ * The heights the editor's ground is drawn between, in elmos, with the floor at
+ * 0 in the middle.
+ *
+ * Only a scale for the drawing. Ground past either end is still drawn, so a
+ * wall can stand above the top and a trench go below the bottom. The middle is
+ * the floor so that there is room below it for a trench to show (issue #4794).
+ */
+export const GRID_RELIEF = { min: -512, max: 512 } as const;
+
 /** What a flat ground reports about itself, in the shape the drawing already
  *  asks a map for. `flat` is what says there is no heightmap to wait for. */
 export interface FlatGround {

@@ -54,7 +54,7 @@ import {
   type SubstitutionPlan,
   substituteQueue,
 } from "@/blueprint/substitution";
-import { stepsWithoutBuilding } from "@/blueprint/terrainEdit";
+import { stepsFirst } from "@/blueprint/terrainEdit";
 import type { UnitDatasetEntry } from "@/content/bindings";
 import type {
   BaseBuildingRole,
@@ -276,8 +276,10 @@ export function editBaseTerrain(
   if (!base || !layout) return scenario;
   const terrain = update(layout.terrain ?? [], layout);
   if (!terrain) return scenario;
+  // Every step comes before every building (issue #4817), so one read in
+  // with a later place is written back first.
   return writeLayout(scenario, base, layout, how, {
-    terrain: terrain.length > 0 ? terrain : undefined,
+    terrain: terrain.length > 0 ? stepsFirst(terrain) : undefined,
   });
 }
 
@@ -601,15 +603,7 @@ export function removeBuilding(
   const next = editBaseLayout(scenario, id, how, (buildings) =>
     buildings.filter((_, i) => i !== index),
   );
-  // The steps that came after it keep their place among the buildings left
-  // (issue #4793). A copy made by the edit above is only this base's, so the
-  // same `how` edits that copy rather than making another.
-  const stepped = layout.terrain?.length
-    ? editBaseTerrain(next, id, how, (terrain) =>
-        stepsWithoutBuilding(terrain, index),
-      )
-    : next;
-  return editBase(stepped, id, {
+  return editBase(next, id, {
     buildings: base.buildings.filter((_, i) => i !== index),
   });
 }

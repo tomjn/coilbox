@@ -1,460 +1,362 @@
 /**
- * What the pointer works with on a layout's terrain steps (issue #4793): the
- * meshes a step is taken hold of by, the handles of the selected step, a thin
- * outline saying which one is selected, and the guide for a step being
- * drawn.
+ * A blueprint's terrain steps drawn over the ground, in the look of the in-game
+ * widget's preview (issue #4794).
  *
- * What a step looks like is not drawn here. That is `terrainVolumes.ts`, the
- * widget's see-through volume, which issue #4794 replaces with the ground as
- * the steps leave it. Nothing here needs to change when it does.
+ * The widget's own is `lua/blueprint-widget/luaui/coilbox_blueprints/terrain.lua`
+ * and this follows it: a see-through green volume over raised ground and a red
+ * one over dug ground, a thin wire grid on its top and down its slopes, a thin
+ * cyan grid on the ground under the whole area a step touches, slopes included.
+ * The colours, the alphas, the 16 elmo spacing of the grids and the cap on
+ * cells are copied from there. The editor draws no height number. Dug ground is under the terrain, so it is drawn without the depth test.
  *
- * Everything that can be pointed at carries a `placementKey`, so the shared
- * picking in `useMapEditing` treats a step the way it treats a zone: an
- * overlay whose drags it is told about rather than moving the objects itself.
- *
- * - `terrain:<i>` is the step itself, and dragging it moves the step.
- * - `terrain:<i>:corner:<j>` is a corner of the selected step, and dragging it
- *   reshapes the step.
- * - `terrain:<i>:edge:<j>` is the middle of a side of the selected step. A
- *   click there adds a corner, and a drag adds one where it is let go.
+ * `overlayMesh` is the arithmetic and is tested. `createTerrainLayer` is the
+ * three.js half.
  */
 
 import * as THREE from "three";
 
+import { SQUARE_SIZE } from "@/blueprint/footprint";
 import type { TerrainStep } from "@/blueprint/model";
 import {
-  cornerAdded,
-  cornerMoved,
-  edgeMiddle,
-  movedStep,
-  stepEdges,
-} from "@/blueprint/terrainEdit";
-import { VOLUME_COLORS } from "@/blueprint/terrainMesh";
+  type LayoutPlacement,
+  placedSteps,
+  type StepResult,
+} from "@/blueprint/terraform";
 import type { MapScene3D } from "@/lib/mapScene";
 import type { Point } from "@/scenario/model";
 import { worldToScene } from "./scene";
-import type { OverlayLayer } from "./useMapEditing";
+import type { Relief } from "./terrainRelief";
 
-/** What the layer is drawn under, so it can be found as one thing. */
-const ROOT_NAME = "blueprint-terrain";
+/** The widget's spacing of its grids, in elmos. */
+const GRID = 16;
+/** `M.CELL_LIMIT`: a step with more cells than this is not drawn. */
+export const CELL_LIMIT = 12000;
+/** `M.FACE_ALPHA`, and the selected step's, which is a deeper shade of the
+ *  same see-through face. */
+const FACE_ALPHA = 0.18;
+const SELECTED_FACE_ALPHA = 0.36;
+/** `M.GROUND_LIFT`: how far above the ground its grid floats, in elmos. */
+const GROUND_LIFT = 1;
 
-/** How far above the ground a guide is drawn, in elmos, so it is not lost in
- *  the ground (the widget's `M.GROUND_LIFT`). */
-const LIFT_ELMOS = 1;
+/** `M.COLORS`. */
+const RAISE = 0x00ff00;
+const DIG = 0xff0000;
+const WIRE_RAISE = { color: 0x00ff00, alpha: 0.9 };
+const WIRE_DIG = { color: 0xcc6644, alpha: 0.8 };
+const GROUND_GRID = { color: 0x00b3b3, alpha: 0.6 };
 
-/** The widget's green, for the guide of a step being drawn and its points. */
-const GUIDE_COLOR = new THREE.Color(...VOLUME_COLORS.raise);
-
-/** The selected step's outline and corner handles. */
-const SELECTED_COLOR = 0xffffff;
-
-/** How wide a wall is taken hold of, in elmos: the gadget's 5 by 5 corners
- *  round each wall point (`wallSegments` in `@/blueprint/terraform.ts`). */
-const WALL_PICK_ELMOS = 32;
-
-/** How big a handle is, as a fraction of the view's height. The same size on
- *  screen at any zoom. */
-const HANDLE_SIZE = 0.018;
-const EDGE_HANDLE_SIZE = 0.012;
-
-/** The keys this layer draws, and what each one names. */
-export type TerrainRef =
-  | { part: "step"; index: number }
-  | { part: "corner"; index: number; at: number }
-  | { part: "edge"; index: number; at: number };
-
-export function stepKey(index: number): string {
-  return `terrain:${index}`;
+/** One step to draw. */
+export interface TerrainMark {
+  /** The step's index in the layout's `terrain`. */
+  index: number;
+  /** The corners the ground took from this step, slope included, in map elmos.
+   *  Null when the step is not on the ground (the game's terrain switch is off,
+   *  or the gadget refused or cancelled it). */
+  corners: Point[] | null;
+  /** The step as its author drew it, for when it is not on the ground. */
+  drawn: Point[][];
 }
 
-function partKey(index: number, part: "corner" | "edge", at: number): string {
-  return `terrain:${index}:${part}:${at}`;
-}
-
-export function parseTerrainKey(key: string | null): TerrainRef | null {
-  if (!key) return null;
-  const match = /^terrain:(\d+)(?::(corner|edge):(\d+))?$/.exec(key);
-  if (!match) return null;
-  const index = Number(match[1]);
-  if (!match[2]) return { part: "step", index };
-  return {
-    part: match[2] as "corner" | "edge",
-    index,
-    at: Number(match[3]),
-  };
-}
-
-/** A step as a drag would leave it, which is also what the drag lands as. */
-export function draggedStep(
-  step: TerrainStep,
-  ref: TerrainRef,
-  delta: Point,
-): TerrainStep {
-  if (ref.part === "step") return movedStep(step, delta);
-  if (ref.part === "corner") return cornerMoved(step, ref.at, delta);
-  const middle = edgeMiddle(step, ref.at);
-  return cornerAdded(step, ref.at, {
-    x: middle.x + delta.x,
-    z: middle.z + delta.z,
-  });
-}
-
-/** A step being drawn: the points clicked so far and where the pointer is,
- *  both as offsets from the layout's origin. */
-export interface TerrainGuide {
-  points: Point[];
-  hover: Point | null;
-  closed: boolean;
-}
-
-export interface TerrainView {
-  /** Where the layout's offsets are measured from, in map elmos. */
-  origin: Point;
-  steps: readonly TerrainStep[];
-  /** The selected step's index, which gets handles. */
-  selected: number | null;
-  /** Steps not drawn, which is the ones a playback has not reached. */
-  hidden?: ReadonlySet<number>;
-  /** Whether a step can be picked at all. Off while a tool is drawing, so a
-   *  click on a step adds a point rather than taking hold of it. */
-  pickable: boolean;
-  guide: TerrainGuide | null;
-}
-
-export interface TerrainLayer extends OverlayLayer {
-  draw: (view: TerrainView) => void;
-  /** The corner of the selected step under a screen point, for the right
-   *  click that removes one. */
-  cornerAt: (clientX: number, clientY: number) => TerrainRef | null;
-  dispose: () => void;
-}
-
-export interface TerrainLayerDeps {
-  handle: MapScene3D;
-  worldWidth: number;
-  worldHeight: number;
-  groundAt: (pos: Point) => number;
-}
-
-/** A disc for the handles, drawn once. */
-function discTexture(): THREE.CanvasTexture {
-  const size = 64;
-  const canvas = document.createElement("canvas");
-  canvas.width = size;
-  canvas.height = size;
-  const ctx = canvas.getContext("2d");
-  if (ctx) {
-    ctx.beginPath();
-    ctx.arc(size / 2, size / 2, size / 2 - 6, 0, Math.PI * 2);
-    ctx.fillStyle = "#ffffff";
-    ctx.fill();
-    ctx.lineWidth = 6;
-    ctx.strokeStyle = "#0f172a";
-    ctx.stroke();
-  }
-  return new THREE.CanvasTexture(canvas);
-}
-
-/** The band a path is taken hold of by, `width` elmos across, as triangles. */
-function bandTriangles(points: readonly Point[], width: number): number[] {
-  const half = width / 2;
-  const out: number[] = [];
-  for (let i = 0; i + 1 < points.length; i++) {
-    const a = points[i];
-    const b = points[i + 1];
+/** A step as its author drew it, on the map: an area's outline closed up, a
+ *  wall's path, and the band a ramp covers. */
+export function drawnRuns(step: TerrainStep): Point[][] {
+  if (step.points.length === 0) return [];
+  if (step.kind === "ramp") {
+    const [a, b] = step.points;
+    if (!a || !b) return [];
+    const half = (step.width ?? 0) / 2;
     const length = Math.hypot(b.x - a.x, b.z - a.z);
     const along =
       length > 0
         ? { x: (b.x - a.x) / length, z: (b.z - a.z) / length }
         : { x: 1, z: 0 };
     const across = { x: -along.z * half, z: along.x * half };
-    const from = { x: a.x - along.x * half, z: a.z - along.z * half };
-    const to = { x: b.x + along.x * half, z: b.z + along.z * half };
-    const c = [
-      { x: from.x + across.x, z: from.z + across.z },
-      { x: to.x + across.x, z: to.z + across.z },
-      { x: to.x - across.x, z: to.z - across.z },
-      { x: from.x - across.x, z: from.z - across.z },
+    return [
+      [
+        { x: a.x + across.x, z: a.z + across.z },
+        { x: b.x + across.x, z: b.z + across.z },
+        { x: b.x - across.x, z: b.z - across.z },
+        { x: a.x - across.x, z: a.z - across.z },
+        { x: a.x + across.x, z: a.z + across.z },
+      ],
     ];
-    for (const at of [0, 1, 2, 0, 2, 3]) out.push(c[at].x, c[at].z);
   }
-  return out;
-}
-
-/** An outline's inside as triangles. */
-function fillTriangles(points: readonly Point[]): number[] {
-  const contour = points.map((p) => new THREE.Vector2(p.x, p.z));
-  const out: number[] = [];
-  for (const [a, b, c] of THREE.ShapeUtils.triangulateShape(contour, [])) {
-    for (const at of [a, b, c]) out.push(points[at].x, points[at].z);
-  }
-  return out;
-}
-
-/** A ramp's band on the ground, going round. */
-function rampBand(step: TerrainStep): Point[] {
-  const [from, to] = step.points;
-  if (!from || !to) return [];
-  const half = (step.width ?? 0) / 2;
-  const length = Math.hypot(to.x - from.x, to.z - from.z) || 1;
-  const across = {
-    x: (-(to.z - from.z) / length) * half,
-    z: ((to.x - from.x) / length) * half,
-  };
   return [
-    { x: from.x + across.x, z: from.z + across.z },
-    { x: to.x + across.x, z: to.z + across.z },
-    { x: to.x - across.x, z: to.z - across.z },
-    { x: from.x - across.x, z: from.z - across.z },
+    step.shape === "area" ? [...step.points, step.points[0]] : step.points,
   ];
 }
 
-export function createTerrainLayer(deps: TerrainLayerDeps): TerrainLayer {
+/**
+ * Every step as what to draw for it.
+ *
+ * `results` are what the ground took, in map elmos. They are absent when the
+ * steps are not being applied, and then every step is drawn as its author drew
+ * it. A step the gadget refused or cancelled has no ground of its own and is
+ * drawn that way too.
+ */
+export function terrainMarks(
+  steps: readonly TerrainStep[],
+  placement: LayoutPlacement,
+  results: readonly StepResult[] | null,
+): TerrainMark[] {
+  const placed = placedSteps(steps, placement);
+  return placed.map((step, index) => {
+    const result = results?.find((r) => r.index === index);
+    const built = result?.outcome === "built" && result.shape.length > 0;
+    return {
+      index,
+      corners: built ? [...result.shape, ...result.slope] : null,
+      drawn: drawnRuns(step),
+    };
+  });
+}
+
+/** The pieces of one step's overlay, as flat `x, y, z` runs in map elmos:
+ *  triangles for the faces and pairs of points for the lines. */
+export interface OverlayMesh {
+  capped: boolean;
+  cells: number;
+  upFaces: number[];
+  upWire: number[];
+  downFaces: number[];
+  downWire: number[];
+  grid: number[];
+}
+
+/**
+ * The overlay for the corners a step changed, as `M.mesh` in the widget builds
+ * it.
+ *
+ * Every 8 elmo cell with a changed corner is a face at the heights the ground is
+ * left at, green when the cell is raised on average and red when it is dug. A
+ * cell that moves less than half an elmo on average has no face and no wire.
+ * The wire and the grid on the ground go along the cell edges that lie on a 16
+ * elmo line, and along the outer edge of the whole area, so a shared edge is
+ * drawn once.
+ *
+ * `heightAt` is the ground now and `baseAt` the ground before any step.
+ */
+export function overlayMesh(
+  corners: readonly Point[],
+  heightAt: (x: number, z: number) => number,
+  baseAt: (x: number, z: number) => number,
+): OverlayMesh {
+  const out: OverlayMesh = {
+    capped: false,
+    cells: 0,
+    upFaces: [],
+    upWire: [],
+    downFaces: [],
+    downWire: [],
+    grid: [],
+  };
+  const key = (x: number, z: number) =>
+    `${Math.round(x / SQUARE_SIZE)},${Math.round(z / SQUARE_SIZE)}`;
+  const changed = new Set<string>();
+  for (const p of corners) changed.add(key(p.x, p.z));
+  const cells = new Map<string, Point>();
+  for (const p of corners) {
+    for (const dx of [-SQUARE_SIZE, 0]) {
+      for (const dz of [-SQUARE_SIZE, 0]) {
+        const cell = { x: p.x + dx, z: p.z + dz };
+        cells.set(key(cell.x, cell.z), cell);
+      }
+    }
+  }
+  out.cells = cells.size;
+  if (cells.size > CELL_LIMIT) {
+    out.capped = true;
+    return out;
+  }
+  const top = (x: number, z: number) =>
+    changed.has(key(x, z)) ? heightAt(x, z) : baseAt(x, z);
+  const has = (cx: number, cz: number) => cells.has(key(cx, cz));
+
+  for (const { x, z } of cells.values()) {
+    const at = [
+      [x, z],
+      [x + SQUARE_SIZE, z],
+      [x, z + SQUARE_SIZE],
+      [x + SQUARE_SIZE, z + SQUARE_SIZE],
+    ];
+    const fx = at.map(([cx, cz]) => top(cx, cz));
+    const gx = at.map(([cx, cz]) => baseAt(cx, cz));
+    let mean = 0;
+    for (let i = 0; i < 4; i++) mean += (fx[i] - gx[i]) / 4;
+    const up = mean >= 0;
+    const shown = Math.abs(mean) >= 0.5;
+    if (shown) {
+      const faces = up ? out.upFaces : out.downFaces;
+      for (const i of [0, 1, 2, 1, 3, 2]) faces.push(at[i][0], fx[i], at[i][1]);
+    }
+    const wire = up ? out.upWire : out.downWire;
+    // A cell's top and left edges are lines when they lie on a 16 elmo line or
+    // have no cell beyond them. Its bottom and right edges only when there is no
+    // cell beyond.
+    const edge = (a: number, b: number, onLine: boolean, beyond: boolean) => {
+      if (!onLine && beyond) return;
+      if (shown) {
+        wire.push(at[a][0], fx[a], at[a][1], at[b][0], fx[b], at[b][1]);
+      }
+      out.grid.push(
+        at[a][0],
+        gx[a] + GROUND_LIFT,
+        at[a][1],
+        at[b][0],
+        gx[b] + GROUND_LIFT,
+        at[b][1],
+      );
+    };
+    edge(0, 1, z % GRID === 0, has(x, z - SQUARE_SIZE));
+    edge(0, 2, x % GRID === 0, has(x - SQUARE_SIZE, z));
+    if (!has(x, z + SQUARE_SIZE)) edge(2, 3, false, false);
+    if (!has(x + SQUARE_SIZE, z)) edge(1, 3, false, false);
+  }
+  return out;
+}
+
+export interface TerrainLayer {
+  /** Draw these marks, with one highlighted, replacing what was drawn before. */
+  draw: (marks: readonly TerrainMark[], selected: number | null) => void;
+  dispose: () => void;
+}
+
+export function createTerrainLayer(deps: {
+  handle: MapScene3D;
+  worldWidth: number;
+  worldHeight: number;
+  /** The ground the steps are on, as it stands now. */
+  relief: () => Relief | null;
+}): TerrainLayer {
   const { handle } = deps;
   const root = new THREE.Group();
-  root.name = ROOT_NAME;
   handle.scene.add(root);
-  const disc = discTexture();
-  const raycaster = new THREE.Raycaster();
+  const owned: { dispose(): void }[] = [];
 
-  let view: TerrainView | null = null;
-  const keys = new Set<string>();
-  let owned: { dispose: () => void }[] = [];
-  /** The handles of the selected step, for the right click. */
-  let corners: THREE.Object3D[] = [];
-
-  /** A point of the layout in scene units, `lift` elmos over the ground. */
-  const sceneAt = (origin: Point, offset: Point, lift = 0): THREE.Vector3 => {
-    const world = { x: origin.x + offset.x, z: origin.z + offset.z };
-    const at = worldToScene(
-      world,
-      deps.worldWidth,
-      deps.worldHeight,
-      handle.scale,
-    );
-    return new THREE.Vector3(
-      at.x,
-      (deps.groundAt(world) + LIFT_ELMOS + lift) * handle.scale,
-      at.z,
-    );
+  const clear = () => {
+    for (const child of [...root.children]) root.remove(child);
+    for (const one of owned) one.dispose();
+    owned.length = 0;
   };
 
-  const pickMesh = (origin: Point, flat: number[], lift: number) => {
-    const positions = new Float32Array((flat.length / 2) * 3);
-    for (let i = 0; i < flat.length; i += 2) {
-      const at = sceneAt(origin, { x: flat[i], z: flat[i + 1] }, lift);
-      positions.set([at.x, at.y, at.z], (i / 2) * 3);
+  /** Map elmos with a height to scene units. */
+  const toScene = (flat: readonly number[]): Float32Array => {
+    const out = new Float32Array(flat.length);
+    for (let i = 0; i < flat.length; i += 3) {
+      const s = worldToScene(
+        { x: flat[i], z: flat[i + 2] },
+        deps.worldWidth,
+        deps.worldHeight,
+        handle.scale,
+      );
+      out[i] = s.x;
+      out[i + 1] = flat[i + 1] * handle.scale;
+      out[i + 2] = s.z;
     }
-    const geometry = new THREE.BufferGeometry();
-    geometry.setAttribute("position", new THREE.BufferAttribute(positions, 3));
-    geometry.computeBoundingSphere();
-    const material = new THREE.MeshBasicMaterial({
-      transparent: true,
-      opacity: 0,
-      side: THREE.DoubleSide,
-      depthWrite: false,
-      colorWrite: false,
-    });
-    owned.push(geometry, material);
-    return new THREE.Mesh(geometry, material);
+    return out;
   };
 
-  const thinLine = (
-    origin: Point,
-    points: readonly Point[],
-    lift: number,
-    closed: boolean,
-    color: THREE.ColorRepresentation,
+  const add = (
+    flat: readonly number[],
+    kind: "faces" | "lines",
+    color: number,
+    alpha: number,
+    depthTest: boolean,
   ) => {
-    const geometry = new THREE.BufferGeometry().setFromPoints(
-      points.map((p) => sceneAt(origin, p, lift)),
+    if (flat.length === 0) return;
+    const geometry = new THREE.BufferGeometry();
+    geometry.setAttribute(
+      "position",
+      new THREE.BufferAttribute(toScene(flat), 3),
     );
+    owned.push(geometry);
+    if (kind === "faces") {
+      const material = new THREE.MeshBasicMaterial({
+        color,
+        transparent: true,
+        opacity: alpha,
+        side: THREE.DoubleSide,
+        depthWrite: false,
+        depthTest,
+      });
+      owned.push(material);
+      const mesh = new THREE.Mesh(geometry, material);
+      mesh.renderOrder = 1;
+      root.add(mesh);
+      return;
+    }
     const material = new THREE.LineBasicMaterial({
       color,
       transparent: true,
-      opacity: 0.95,
-      depthTest: false,
-    });
-    owned.push(geometry, material);
-    const line = closed
-      ? new THREE.LineLoop(geometry, material)
-      : new THREE.Line(geometry, material);
-    line.renderOrder = 4;
-    return line;
-  };
-
-  const sprite = (
-    position: THREE.Vector3,
-    map: THREE.Texture,
-    width: number,
-    height: number,
-    color: THREE.ColorRepresentation = 0xffffff,
-  ) => {
-    const material = new THREE.SpriteMaterial({
-      map,
-      color,
-      sizeAttenuation: false,
-      depthTest: false,
-      transparent: true,
+      opacity: alpha,
+      depthWrite: false,
+      depthTest,
     });
     owned.push(material);
-    const one = new THREE.Sprite(material);
-    one.position.copy(position);
-    one.scale.set(width, height, 1);
-    one.renderOrder = 6;
-    return one;
-  };
-
-  const handleSprite = (
-    origin: Point,
-    at: Point,
-    lift: number,
-    key: string,
-    size: number,
-    color: THREE.ColorRepresentation,
-  ) => {
-    const one = sprite(sceneAt(origin, at, lift), disc, size, size, color);
-    one.userData = { placementKey: key };
-    keys.add(key);
-    return one;
-  };
-
-  /** How far above the ground a step's top is, for its handles and outline.
-   *  A ramp's are on the ground, since its top slopes. */
-  const topOf = (step: TerrainStep) =>
-    step.kind === "raise" || step.kind === "level"
-      ? Math.max(0, step.height ?? 0)
-      : 0;
-
-  const render = (shown: TerrainView, steps: readonly TerrainStep[]) => {
-    root.clear();
-    for (const spent of owned) spent.dispose();
-    owned = [];
-    keys.clear();
-    corners = [];
-    const { origin } = shown;
-
-    steps.forEach((step, index) => {
-      if (shown.hidden?.has(index) || step.points.length === 0) return;
-      const top = topOf(step);
-      const outline = step.kind === "ramp" ? rampBand(step) : step.points;
-      if (shown.pickable) {
-        const flat =
-          step.kind === "ramp"
-            ? fillTriangles(outline)
-            : step.shape === "wall"
-              ? bandTriangles(step.points, WALL_PICK_ELMOS)
-              : fillTriangles(step.points);
-        const pick = pickMesh(origin, flat, top);
-        pick.userData = { placementKey: stepKey(index) };
-        keys.add(stepKey(index));
-        root.add(pick);
-      }
-      if (index !== shown.selected) return;
-      root.add(
-        thinLine(
-          origin,
-          outline,
-          top,
-          step.shape === "area" || step.kind === "ramp",
-          SELECTED_COLOR,
-        ),
-      );
-      if (!shown.pickable) return;
-      for (const edge of stepEdges(step)) {
-        root.add(
-          handleSprite(
-            origin,
-            edgeMiddle(step, edge),
-            top,
-            partKey(index, "edge", edge),
-            EDGE_HANDLE_SIZE,
-            SELECTED_COLOR,
-          ),
-        );
-      }
-      step.points.forEach((p, at) => {
-        const one = handleSprite(
-          origin,
-          p,
-          top,
-          partKey(index, "corner", at),
-          HANDLE_SIZE,
-          SELECTED_COLOR,
-        );
-        corners.push(one);
-        root.add(one);
-      });
-    });
-
-    const guide = shown.guide;
-    if (guide) {
-      const run = guide.hover ? [...guide.points, guide.hover] : guide.points;
-      if (run.length >= 2) {
-        root.add(thinLine(origin, run, 0, guide.closed, GUIDE_COLOR));
-      }
-      for (const p of guide.points) {
-        root.add(
-          sprite(
-            sceneAt(origin, p),
-            disc,
-            EDGE_HANDLE_SIZE,
-            EDGE_HANDLE_SIZE,
-            GUIDE_COLOR,
-          ),
-        );
-      }
-      if (guide.hover) {
-        root.add(
-          sprite(
-            sceneAt(origin, guide.hover),
-            disc,
-            EDGE_HANDLE_SIZE,
-            EDGE_HANDLE_SIZE,
-            GUIDE_COLOR,
-          ),
-        );
-      }
-    }
-
-    handle.render();
+    const lines = new THREE.LineSegments(geometry, material);
+    lines.renderOrder = 2;
+    root.add(lines);
   };
 
   return {
-    root,
-    has: (key) => keys.has(key),
-    drag: (key, delta) => {
-      const ref = parseTerrainKey(key);
-      if (!view || !ref) return;
-      const steps = view.steps.map((step, index) =>
-        index === ref.index ? draggedStep(step, ref, delta) : step,
-      );
-      render(view, steps);
-    },
-    draw: (next) => {
-      view = next;
-      render(next, next.steps);
-    },
-    cornerAt: (clientX, clientY) => {
-      if (corners.length === 0) return null;
-      const rect = handle.renderer.domElement.getBoundingClientRect();
-      const ndc = new THREE.Vector2(
-        ((clientX - rect.left) / rect.width) * 2 - 1,
-        -((clientY - rect.top) / rect.height) * 2 + 1,
-      );
-      raycaster.setFromCamera(ndc, handle.camera);
-      const hit = raycaster.intersectObjects(corners, false)[0];
-      const key = hit?.object.userData?.placementKey;
-      return typeof key === "string" ? parseTerrainKey(key) : null;
+    draw: (marks, selected) => {
+      clear();
+      const relief = deps.relief();
+      if (!relief) {
+        handle.render();
+        return;
+      }
+      for (const mark of marks) {
+        const chosen = mark.index === selected;
+        if (mark.corners) {
+          const mesh = overlayMesh(
+            mark.corners,
+            (x, z) => relief.heightAt(x, z),
+            (x, z) => relief.baseAt(x, z),
+          );
+          const face = chosen ? SELECTED_FACE_ALPHA : FACE_ALPHA;
+          const wire = (a: number) => (chosen ? 1 : a);
+          add(mesh.upFaces, "faces", RAISE, face, true);
+          add(mesh.downFaces, "faces", DIG, face, false);
+          add(
+            mesh.upWire,
+            "lines",
+            WIRE_RAISE.color,
+            wire(WIRE_RAISE.alpha),
+            true,
+          );
+          add(
+            mesh.downWire,
+            "lines",
+            WIRE_DIG.color,
+            wire(WIRE_DIG.alpha),
+            false,
+          );
+          add(mesh.grid, "lines", GROUND_GRID.color, GROUND_GRID.alpha, true);
+        } else {
+          // Not on the ground: the step as drawn, as thin lines on the ground.
+          const flat: number[] = [];
+          for (const run of mark.drawn) {
+            for (let i = 0; i + 1 < run.length; i++) {
+              for (const p of [run[i], run[i + 1]]) {
+                flat.push(p.x, relief.heightAt(p.x, p.z) + GROUND_LIFT, p.z);
+              }
+            }
+          }
+          add(
+            flat,
+            "lines",
+            GROUND_GRID.color,
+            chosen ? 1 : GROUND_GRID.alpha,
+            false,
+          );
+        }
+      }
+      handle.render();
     },
     dispose: () => {
-      root.clear();
-      for (const spent of owned) spent.dispose();
-      owned = [];
-      keys.clear();
-      disc.dispose();
+      clear();
       root.removeFromParent();
-      handle.render();
     },
   };
 }

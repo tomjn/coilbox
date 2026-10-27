@@ -98,6 +98,15 @@ export interface GroundHeights {
   height: number;
   /** Row-major, row 0 at the map's north, in elmos. */
   heights: Float32Array;
+  /**
+   * For a block cut out of a larger map: the map's corner this block's first
+   * corner is. Positions stay in the map's own elmos, so a result does not
+   * differ from the whole map's by a rounding of the sums, and a read or write
+   * outside the block is clamped or dropped as one outside the map is. 0, 0 if
+   * absent.
+   */
+  col?: number;
+  row?: number;
 }
 
 /** Where a layout stands, the way the widget's `place.lua` takes it: turned
@@ -275,6 +284,8 @@ export function terraform(
     ground: {
       width: ground.width,
       height: ground.height,
+      col: ground.col,
+      row: ground.row,
       heights: current.heights,
     },
     metal,
@@ -310,7 +321,7 @@ export function stepRefusal(step: TerrainStep): StepLimit | null {
 }
 
 /** A point of a step with the height it is ordered to. */
-export interface Target {
+interface Target {
   x: number;
   z: number;
   aim: number;
@@ -330,18 +341,23 @@ function mod(a: number, b: number): number {
  *  clamped to the map. */
 class Reader {
   constructor(
-    readonly dims: { width: number; height: number },
+    readonly dims: {
+      width: number;
+      height: number;
+      col?: number;
+      row?: number;
+    },
     readonly heights: Float32Array,
   ) {}
 
   private index(x: number, z: number): number {
     const c = Math.min(
       this.dims.width - 1,
-      Math.max(0, Math.round(x / SQUARE)),
+      Math.max(0, Math.round(x / SQUARE) - (this.dims.col ?? 0)),
     );
     const r = Math.min(
       this.dims.height - 1,
-      Math.max(0, Math.round(z / SQUARE)),
+      Math.max(0, Math.round(z / SQUARE) - (this.dims.row ?? 0)),
     );
     return r * this.dims.width + c;
   }
@@ -352,8 +368,8 @@ class Reader {
 
   /** A write off the map goes nowhere, as `Spring.SetHeightMap`'s does. */
   set(x: number, z: number, h: number): void {
-    const c = x / SQUARE;
-    const r = z / SQUARE;
+    const c = x / SQUARE - (this.dims.col ?? 0);
+    const r = z / SQUARE - (this.dims.row ?? 0);
     if (!Number.isInteger(c) || !Number.isInteger(r)) return;
     if (c < 0 || r < 0 || c >= this.dims.width || r >= this.dims.height) {
       return;
@@ -384,38 +400,6 @@ function addStructure(blocked: Set<number>, rect: Rect): void {
   for (let x = cx - hx; x <= cx + hx; x += SQUARE) {
     for (let z = cz - hz; z <= cz + hz; z += SQUARE) blocked.add(key(x, z));
   }
-}
-
-/**
- * The heightmap corners a step sets and the height each is aimed at, once
- * each, or null when the gadget refuses the step (issue #4793). `pivot` is
- * where the layout is held, which level and ramp heights are measured from.
- * The editor draws a step's volume from these, as the widget's
- * `terrain.lua` `M.corners` does.
- */
-export function stepCorners(
-  step: TerrainStep,
-  ground: GroundHeights,
-  pivot: Point,
-): Target[] | null {
-  const reader = new Reader(ground, ground.heights);
-  const segments = stepSegments(
-    step,
-    reader,
-    reader.bilinear(pivot.x, pivot.z),
-  );
-  if (!segments) return null;
-  const seen = new Set<number>();
-  const out: Target[] = [];
-  for (const segment of segments) {
-    for (const corner of segment) {
-      const at = key(corner.x, corner.z);
-      if (seen.has(at)) continue;
-      seen.add(at);
-      out.push(corner);
-    }
-  }
-  return out;
 }
 
 /** A step's points as the gadget splits them into terraunits, each with its

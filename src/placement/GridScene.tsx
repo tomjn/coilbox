@@ -21,9 +21,10 @@ import { useEffect, useRef } from "react";
 import * as THREE from "three";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
 
-import { BUILD_SQUARE } from "@/blueprint/footprint";
+import { BUILD_SQUARE, SQUARE_SIZE } from "@/blueprint/footprint";
 import type { MapScene3D } from "@/lib/mapScene";
 import { useCanvas3D } from "@/lib/useCanvas3D";
+import { GRID_RELIEF } from "./ground";
 
 /** Scene units the longer side is normalised to, the same figure the map
  *  preview uses, so the camera's limits mean the same thing on both. */
@@ -83,6 +84,34 @@ function buildGridTexture(): THREE.Texture {
 }
 
 /**
+ * The ground's heights as a displacement texture, all at the floor, `side`
+ * samples across.
+ *
+ * Float, and not clamped to the range, because a wall can stand above the top of
+ * it and a trench go below the bottom. A sample is the height's place between
+ * {@link GRID_RELIEF}'s ends, which `terrainRelief.ts` writes.
+ */
+function reliefTexture(side: number): THREE.DataTexture {
+  const floor = (0 - GRID_RELIEF.min) / (GRID_RELIEF.max - GRID_RELIEF.min);
+  const data = new Float32Array(side * side).fill(floor);
+  const texture = new THREE.DataTexture(
+    data,
+    side,
+    side,
+    THREE.RedFormat,
+    THREE.FloatType,
+  );
+  texture.wrapS = THREE.ClampToEdgeWrapping;
+  texture.wrapT = THREE.ClampToEdgeWrapping;
+  texture.generateMipmaps = false;
+  texture.minFilter = THREE.NearestFilter;
+  texture.magFilter = THREE.NearestFilter;
+  texture.colorSpace = THREE.NoColorSpace;
+  texture.needsUpdate = true;
+  return texture;
+}
+
+/**
  * A square of flat ground to place buildings on.
  *
  * `extent` is how many elmos it is across, which is what the surface's own
@@ -130,14 +159,33 @@ export function GridScene({
         extent / (BUILD_SQUARE * SQUARES_PER_TILE),
       );
 
-      const geometry = new THREE.PlaneGeometry(plane, plane);
+      // A vertex for every corner of the engine's 8 elmo heightmap grid, so
+      // ground the blueprint's terrain steps raise or dig is drawn at the
+      // resolution it is worked out at (issue #4794). Flat until a step moves
+      // it, and then the ground is changed through the displacement texture
+      // below, a few corners at a time.
+      const segments = Math.max(1, Math.round(extent / SQUARE_SIZE));
+      const geometry = new THREE.PlaneGeometry(
+        plane,
+        plane,
+        segments,
+        segments,
+      );
       geometry.rotateX(-Math.PI / 2);
+      const relief = reliefTexture(segments + 1);
       const material = new THREE.MeshStandardMaterial({
         map: texture,
+        displacementMap: relief,
+        displacementScale: (GRID_RELIEF.max - GRID_RELIEF.min) * scale,
+        displacementBias: GRID_RELIEF.min * scale,
+        // Lit by the shape it has now, so a raised wall reads as one. The
+        // normals the flat plane came with all point up.
+        flatShading: true,
         roughness: 1,
         metalness: 0,
       });
-      scene.add(new THREE.Mesh(geometry, material));
+      const terrain = new THREE.Mesh(geometry, material);
+      scene.add(terrain);
 
       // Enough fill that a model's underside is not black, and one raking light
       // so its shape reads. Nothing map-derived, because there is no map.
@@ -191,6 +239,7 @@ export function GridScene({
           scale,
           planeWidth: plane,
           planeDepth: plane,
+          terrain,
         });
       }
 
@@ -207,6 +256,7 @@ export function GridScene({
           geometry.dispose();
           material.dispose();
           texture.dispose();
+          relief.dispose();
         },
       };
     },

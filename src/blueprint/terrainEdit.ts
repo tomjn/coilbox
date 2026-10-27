@@ -184,11 +184,11 @@ export function withKind(
 }
 
 /* -------------------------------------------------------------------------- *
- * The build order. Steps sit among the buildings by `before`, so the order an
- * author sees is one list: the steps before building 0, building 0, the steps
- * before building 1, and so on, with the steps that come after every building
- * last. Steps with the same `before` go in the order the `terrain` array holds
- * them.
+ * The build order. A structure cannot be raised or lowered once it is built,
+ * so every terrain step comes before every building (issue #4817): the order
+ * an author sees is the steps, in the order the `terrain` array holds them,
+ * then the buildings. A step read in with a `before` above 0 is shown first
+ * all the same, and is written back with 0 the next time the steps change.
  * -------------------------------------------------------------------------- */
 
 /** One place in the build order. */
@@ -201,87 +201,44 @@ export function buildSequence(
   buildings: number,
   terrain: readonly TerrainStep[],
 ): BuildEntry[] {
-  const out: BuildEntry[] = [];
-  for (let at = 0; at <= buildings; at++) {
-    terrain.forEach((step, index) => {
-      if (Math.min(step.before, buildings) === at) {
-        out.push({ kind: "step", index });
-      }
-    });
-    if (at < buildings) out.push({ kind: "building", index: at });
-  }
-  return out;
+  return [
+    ...terrain.map((_, index): BuildEntry => ({ kind: "step", index })),
+    ...Array.from(
+      { length: buildings },
+      (_, index): BuildEntry => ({ kind: "building", index }),
+    ),
+  ];
 }
 
-/**
- * A step put at one end of the steps that share its `before`: `first` puts it
- * straight after the building before them, otherwise it goes straight before
- * the building after them. Its index in `terrain` moves with it, so the order
- * of steps that share a `before` is still the array's.
- */
-function placedInGroup(
-  terrain: readonly TerrainStep[],
-  step: TerrainStep,
-  first: boolean,
-): { terrain: TerrainStep[]; index: number } {
-  const out = terrain.slice();
-  const sharing = out.flatMap((one, i) =>
-    one.before === step.before ? [i] : [],
+/** Every step before every building, which is the only place a step goes. */
+export function stepsFirst(terrain: readonly TerrainStep[]): TerrainStep[] {
+  return terrain.map((step) =>
+    step.before === 0 ? step : { ...step, before: 0 },
   );
-  let index = 0;
-  if (sharing.length > 0) {
-    index = first ? sharing[0] : sharing[sharing.length - 1] + 1;
-  } else {
-    // Nothing shares it, so it goes after every step that comes sooner.
-    out.forEach((one, i) => {
-      if (one.before < step.before) index = i + 1;
-    });
-  }
-  out.splice(index, 0, step);
-  return { terrain: out, index };
 }
 
-/** A new step, after the steps already before every building, so it is the
- *  last of them and still before every building. */
+/** A new step, after the steps already there and before every building. */
 export function stepAdded(
   terrain: readonly TerrainStep[],
   step: TerrainStep,
 ): { terrain: TerrainStep[]; index: number } {
-  return placedInGroup(terrain, { ...step, before: 0 }, false);
-}
-
-/** The steps after a building is taken out of the layout: each that came
- *  after it keeps its place among the rest. */
-export function stepsWithoutBuilding(
-  terrain: readonly TerrainStep[],
-  building: number,
-): TerrainStep[] {
-  return terrain.map((step) =>
-    step.before > building ? { ...step, before: step.before - 1 } : step,
-  );
-}
-
-/** One step given a new `before`, at the end of its new group nearest where it
- *  came from. */
-function regrouped(
-  terrain: readonly TerrainStep[],
-  index: number,
-  before: number,
-  first: boolean,
-): { terrain: TerrainStep[]; index: number } {
-  const rest = terrain.filter((_, i) => i !== index);
-  return placedInGroup(rest, { ...terrain[index], before }, first);
+  return {
+    terrain: [...stepsFirst(terrain), { ...step, before: 0 }],
+    index: terrain.length,
+  };
 }
 
 /**
- * What moving one place in the build order `delta` places (1 or -1) changes.
+ * What moving one place in the build order `delta` places (1 or -1) changes,
+ * or null when it cannot move that way.
  *
- * - `steps`: the new `terrain` when only steps change, which is a step moving
- *   past a building or past another step, or a building moving past a step.
- *   `index` is where the step that moved is now, for keeping it selected.
+ * - `steps`: two steps swapped, and `index` is where the one that moved is now,
+ *   for keeping it selected.
  * - `buildings`: a building moving past another building, which is the
- *   buildings' own move and leaves the steps where they are.
- * - null at either end of the list.
+ *   buildings' own move.
+ *
+ * A step never moves below a building and a building never above a step, so
+ * the last step and the first building stop there.
  */
 export function movedInSequence(
   buildings: number,
@@ -292,35 +249,15 @@ export function movedInSequence(
   | { steps: TerrainStep[]; index: number }
   | { buildings: { index: number; delta: 1 | -1 } }
   | null {
-  const sequence = buildSequence(buildings, terrain);
-  const at = sequence.findIndex(
-    (one) => one.kind === entry.kind && one.index === entry.index,
-  );
-  const other = sequence[at + delta];
-  if (at < 0 || !other) return null;
-
-  if (entry.kind === "building" && other.kind === "building") {
-    return { buildings: { index: entry.index, delta } };
+  const to = entry.index + delta;
+  if (entry.kind === "building") {
+    return to >= 0 && to < buildings
+      ? { buildings: { index: entry.index, delta } }
+      : null;
   }
-  if (entry.kind === "step" && other.kind === "step") {
-    // Two steps with the same `before`: their order is the array's.
-    const steps = terrain.slice();
-    steps[entry.index] = terrain[other.index];
-    steps[other.index] = terrain[entry.index];
-    return { steps, index: other.index };
-  }
-  if (entry.kind === "step") {
-    // Past a building: up it comes just before it, down just after it.
-    const moved =
-      delta < 0
-        ? regrouped(terrain, entry.index, other.index, false)
-        : regrouped(terrain, entry.index, other.index + 1, true);
-    return { steps: moved.terrain, index: moved.index };
-  }
-  // A building past a step moves the step the other way round it.
-  const moved =
-    delta < 0
-      ? regrouped(terrain, other.index, entry.index + 1, true)
-      : regrouped(terrain, other.index, entry.index, false);
-  return { steps: moved.terrain, index: moved.index };
+  if (to < 0 || to >= terrain.length || !terrain[entry.index]) return null;
+  const steps = stepsFirst(terrain);
+  steps[entry.index] = steps[to];
+  steps[to] = stepsFirst([terrain[entry.index]])[0];
+  return { steps, index: to };
 }

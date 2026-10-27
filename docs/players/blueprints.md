@@ -72,7 +72,7 @@ The toolbar sets what the change is made with, before you start drawing or while
 - Height, in elmos. A negative raise digs. A wall starts at 40 and an area at 0.
 - Width, Low end and High end, for ramps. A ramp starts 64 elmos wide and climbs 40 elmos.
 
-Each change is drawn the way the widget previews it in a match: a see-through green volume for raised ground and red for dug ground, with a wire grid on it and a cyan grid on the ground it covers. Buildings stand on the ground the changes leave. The slopes Zero-K adds round a change are not drawn yet.
+The grid rises and dips the way the changes leave it, slopes included, and a change you are drawing shows on it before you finish. Buildings stand on the ground the changes leave.
 
 Select a change to show its buttons beside it: Raise or Level, Height, the ramp's Width and ends, and Delete. Drag a change to move it, and drag a corner to reshape it. Click the dot in the middle of a side to add a corner there, and right click a corner to remove it.
 
@@ -90,7 +90,7 @@ At first the buildings are in the order you clicked them. To say what gets built
 2. Turn on Build these in this order.
 3. Use the arrows beside each building to build it sooner or later.
 
-A blueprint with terrain changes lists them among the buildings, each with a mountain icon. A new change goes before every building, because the ground is normally changed before anything stands on it. The same arrows move a change sooner or later.
+A blueprint with terrain changes lists them first, each with a mountain icon, because a building cannot be raised or lowered once it is built. The arrows move a change sooner or later among the changes, and a building among the buildings.
 
 Watch it go up plays the layout being built one step at a time, terrain changes included. Copy as a build order copies the buildings.
 
