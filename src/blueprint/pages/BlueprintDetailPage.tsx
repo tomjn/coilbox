@@ -66,7 +66,10 @@ import {
   saveBlueprint,
   useBlueprintLibrary,
 } from "../store";
+import { useTerrainChanges } from "../terrainSwitch";
+import { terrainRefusal } from "../units";
 import { useWidgetFiles } from "../useWidgetFiles";
+import { TerrainSwitch } from "./components/TerrainSwitch";
 
 /** How long after the last change the layout is written. Long enough that a
  *  drag is one write rather than several, short enough that nobody has to think
@@ -100,6 +103,7 @@ export default function BlueprintDetailPage() {
   const { units, archive, resolved } = useGameUnits(claimedGame, shortname);
   const gameName = resolved ?? claimedGame;
   const footprints = useMemo(() => footprintsFromUnits(units), [units]);
+  const terrainChanges = useTerrainChanges(archive, units);
 
   // Offer the hub pictures of the units this layout names, once, and only when
   // the user has turned picture uploads on (issues #1636, #1679). The stored
@@ -194,10 +198,12 @@ export default function BlueprintDetailPage() {
     ? formatDate(new Date(record.source.at))
     : "";
   const gameLine = claimedGame || t`No game named`;
-  const buildingCount = countLine(
-    buildings,
-    record.layout.terrain?.length ?? 0,
-  );
+  const terrain = record.layout.terrain?.length ?? 0;
+  const buildingCount = countLine(buildings, terrain);
+  const cannotTerrain =
+    terrainChanges.enabled === false
+      ? terrainRefusal(terrain, buildings)
+      : null;
 
   return (
     <div className="flex flex-col gap-4 p-4">
@@ -215,6 +221,13 @@ export default function BlueprintDetailPage() {
             {gameLine} · {buildingCount}
             {record.layout.ordered ? ` · ${t`build order`}` : ""}
           </p>
+          {/* Kept and shared as they are, so this only says what the game
+              cannot do with them (issue #4792). */}
+          {cannotTerrain && (
+            <p className="text-xs text-amber-600 dark:text-amber-400">
+              {cannotTerrain}
+            </p>
+          )}
           {/* Said rather than done quietly, because the units below came out of
               a build this layout was not drawn on and one of them may have
               moved since. The editor names any that have. */}
@@ -276,6 +289,9 @@ export default function BlueprintDetailPage() {
         </div>
 
         <div className="flex items-center gap-3">
+          {terrain > 0 && (
+            <TerrainSwitch gameName={claimedGame} shortname={shortname} />
+          )}
           <SaveState saving={saving} error={saveError} />
           <SubstituteButton
             record={record}

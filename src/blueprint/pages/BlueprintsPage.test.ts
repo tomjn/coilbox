@@ -50,6 +50,12 @@ vi.mock("@/content/config", () => ({
   useUnitsyncGameHeaders: () => ({ headers: new Map(), loading: false }),
 }));
 vi.mock("@/play/config", () => ({ usePreferredTarget: () => ({}) }));
+// The Terrain changes switch and a card's terrain line read the game's units,
+// which is tested in `./BlueprintsPage.dom.test.tsx`.
+vi.mock("@/content/useGameUnits", async () => ({
+  ...(await vi.importActual<Record<string, unknown>>("@/content/useGameUnits")),
+  useGameUnits: () => ({ units: [], loading: false, gameMissing: false }),
+}));
 // The card's thumbnail colours its buildings from the game's units, a read
 // this page test does not stand up. It is tested in `../role.test.ts`.
 vi.mock("../useBuildingRoles", () => ({ useBuildingRoles: () => undefined }));

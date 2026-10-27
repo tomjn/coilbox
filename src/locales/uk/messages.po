@@ -1844,6 +1844,10 @@ msgstr "Змінено: {changed}"
 msgid "{changed} of {buildings, plural, one {# building} other {# buildings}} said in {toSide}."
 msgstr "{changed} з {buildings, plural, one {# будівлі} few {# будівель} many {# будівель} other {# будівлі}} переведено на будівлі фракції {toSide}."
 
+#: src/blueprint/units.ts
+msgid "{changes}, so nothing in it can be placed"
+msgstr ""
+
 #: src/runlite/pages/RunPage.tsx
 #, fuzzy
 msgid "{cheapest} salvage"
@@ -6459,6 +6463,10 @@ msgstr "Команд: {teams}, гравців у команді: {size}"
 #, fuzzy
 msgid "{teams} teams of {size}, ranked"
 msgstr "Команд: {teams}, гравців у команді: {size}, рейтинговий"
+
+#: src/blueprint/units.ts
+msgid "{terrain, plural, one {# terrain change this game cannot make} other {# terrain changes this game cannot make}}"
+msgstr ""
 
 #: src/blueprint/countLine.ts
 msgid "{terrain, plural, one {# terrain change} other {# terrain changes}}"
@@ -44890,6 +44898,10 @@ msgstr "Швидкість тераформування"
 #, fuzzy
 msgid "Terrain"
 msgstr "Рельєф"
+
+#: src/blueprint/pages/components/TerrainSwitch.tsx
+msgid "Terrain changes"
+msgstr ""
 
 #: src/mapconv/pages/components/AdvancedOptions.tsx
 #, fuzzy
