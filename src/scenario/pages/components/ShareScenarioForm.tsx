@@ -95,6 +95,7 @@ export function ShareScenarioForm({
       {result.ok ? (
         <ChallengeCodeView
           code={result.code}
+          title={scenario.name}
           helpText={t`Anyone who pastes this into Scenarios → Import gets this mission, its dialogue clips and an offer to download the game and map it is played on.`}
           onExportFile={saveFile}
         />

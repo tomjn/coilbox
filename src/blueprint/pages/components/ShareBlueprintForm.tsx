@@ -60,6 +60,7 @@ export function ShareBlueprintForm({ record }: { record: StoredBlueprint }) {
     return (
       <ChallengeCodeView
         code={code.code}
+        title={record.layout.name}
         helpText={t`Anyone who pastes this into Blueprints → Import gets this blueprint, and coilbox tells them there whether their game has the units it names.`}
         onExportFile={saveFile}
       />
