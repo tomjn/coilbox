@@ -203,6 +203,51 @@ describe("sceneContents", () => {
   });
 });
 
+describe("a layout of terrain steps alone (issue #4829)", () => {
+  const ring: Pick<Registries, "bases" | "blueprints"> = {
+    blueprints: [
+      {
+        id: "ring",
+        name: "Wall ring",
+        buildings: [],
+        terrain: [
+          {
+            kind: "raise",
+            shape: "wall",
+            points: [
+              { x: -200, z: 0 },
+              { x: 300, z: 100 },
+            ],
+            height: 16,
+            before: 0,
+          },
+        ],
+      },
+    ],
+    bases: [
+      {
+        id: "b1",
+        blueprint: "ring",
+        team: "p0",
+        origin: { x: 1000, z: 1000 },
+        buildings: [],
+      },
+    ],
+  };
+
+  it("lists the base with its terrain changes and a span that reaches them", () => {
+    const [entry] = sceneContents({ ...empty, ...ring });
+    expect(entry.detail).toBe("No buildings, 1 terrain change");
+    expect(entry.span).toBe(300);
+  });
+
+  it("can be placed from the unplaced list", () => {
+    const [entry] = unplacedLayouts({ blueprints: ring.blueprints, bases: [] });
+    expect(entry.empty).toBe(false);
+    expect(entry.detail).toBe("No buildings, 1 terrain change");
+  });
+});
+
 describe("unplacedLayouts", () => {
   it("lists the layouts no base is placed from", () => {
     const placed = placedBase("p1");

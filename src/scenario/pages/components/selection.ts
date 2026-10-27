@@ -281,6 +281,8 @@ export function entryKeys(
     const base = scenario.bases.find((one) => one.id === entry.id);
     if (!base) return [entry.key];
     const buildings = baseBuildings(scenario.blueprints, base);
+    // A base of terrain steps alone is selected by its anchor (issue #4829).
+    if (buildings.length === 0) return [entry.key];
     return buildings.map((_, at) => placementKey("base", entry.id, at));
   }
   return [entry.key];

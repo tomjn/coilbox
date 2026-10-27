@@ -390,7 +390,11 @@ export function nudgeToFit(
   standingOf?: (mark: Omit<FootprintMark, "standing">) => Standing,
   limit = NUDGE_LIMIT,
 ): Nudge | null {
-  if (buildings.length === 0) return null;
+  // Nothing to clash with, so a layout of terrain steps alone fits where it is
+  // (issue #4829).
+  if (buildings.length === 0) {
+    return { delta: { x: 0, z: 0 }, squares: { x: 0, z: 0 } };
+  }
   for (const squares of nudgeCandidates(limit)) {
     const delta = { x: squares.x * BUILD_SQUARE, z: squares.z * BUILD_SQUARE };
     if (fitsAt(buildings, delta, footprintOf, occupied, standingOf)) {

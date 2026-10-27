@@ -573,6 +573,26 @@ describe("duplicatePlacement", () => {
     expect(made.key).toBe(`base:${copy.id}#0`);
   });
 
+  it("deletes a base made of terrain steps alone, and keeps its layout (issue #4829)", () => {
+    const wall = {
+      kind: "raise" as const,
+      shape: "wall" as const,
+      points: [
+        { x: 0, z: 0 },
+        { x: 64, z: 0 },
+      ],
+      height: 16,
+      before: 0,
+    };
+    const doc: Scenario = {
+      ...document(),
+      blueprints: [{ id: "bp1", name: "Ring", buildings: [], terrain: [wall] }],
+    };
+    const next = removePlacement(doc, "base:b1#0");
+    expect(next.bases).toEqual([]);
+    expect(next.blueprints).toEqual(doc.blueprints);
+  });
+
   it("makes nothing of a base with no buildings", () => {
     const empty: Scenario = {
       ...document(),

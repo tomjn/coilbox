@@ -7,7 +7,10 @@ import {
   type Standing,
 } from "@/blueprint/footprint";
 import { recordEdit, undoEdit } from "@/lib/scenarioEditing/history";
-import { scenarioPlacements } from "@/lib/scenarioEditing/placements";
+import {
+  anchorPlacements,
+  scenarioPlacements,
+} from "@/lib/scenarioEditing/placements";
 import { newScenario } from "../../create";
 import type { Scenario, ScenarioOrder, ScenarioZone } from "../../model";
 import { sceneContents } from "./contents";
@@ -180,6 +183,46 @@ describe("the selection as a set", () => {
     expect(stillThere(MIXED, scenarioPlacements(after), after)).toContain(
       "zone:z1",
     );
+  });
+
+  it("keeps the selected base of a layout with terrain steps alone (issue #4829)", () => {
+    const doc: Scenario = {
+      ...document(),
+      blueprints: [
+        {
+          id: "ring",
+          name: "Ring",
+          buildings: [],
+          terrain: [
+            {
+              kind: "raise",
+              shape: "wall",
+              points: [
+                { x: 0, z: 0 },
+                { x: 64, z: 0 },
+              ],
+              height: 16,
+              before: 0,
+            },
+          ],
+        },
+      ],
+      bases: [
+        {
+          id: "b1",
+          blueprint: "ring",
+          team: "p0",
+          origin: { x: 512, z: 256 },
+          buildings: [],
+        },
+      ],
+    };
+    const key = "base:b1#0";
+    const held = [...scenarioPlacements(doc), ...anchorPlacements(doc)];
+    expect(stillThere([key], held, doc)).toEqual([key]);
+    // The contents row for it selects it, where it used to select nothing.
+    const [row] = sceneContents(doc).filter((entry) => entry.kind === "base");
+    expect(entryKeys(doc, row)).toEqual([key]);
   });
 
   it("drops a zone that has gone", () => {
