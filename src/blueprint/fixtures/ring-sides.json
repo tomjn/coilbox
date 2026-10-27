@@ -1,0 +1,62 @@
+[
+  {
+    "name": "a square ring is four sides, in the order of its points",
+    "points": [
+      { "x": 0, "z": 0 },
+      { "x": 384, "z": 0 },
+      { "x": 384, "z": 384 },
+      { "x": 0, "z": 384 },
+      { "x": 0, "z": 0 }
+    ],
+    "sides": [
+      [{ "x": 0, "z": 0 }, { "x": 384, "z": 0 }],
+      [{ "x": 384, "z": 0 }, { "x": 384, "z": 384 }],
+      [{ "x": 384, "z": 384 }, { "x": 0, "z": 384 }],
+      [{ "x": 0, "z": 384 }, { "x": 0, "z": 0 }]
+    ]
+  },
+  {
+    "name": "a ring that closes within an elmo is a ring, and its sides keep the points as given",
+    "points": [
+      { "x": 0, "z": 0 },
+      { "x": 100, "z": 0 },
+      { "x": 0, "z": 100 },
+      { "x": 0.5, "z": 0.5 }
+    ],
+    "sides": [
+      [{ "x": 0, "z": 0 }, { "x": 100, "z": 0 }],
+      [{ "x": 100, "z": 0 }, { "x": 0, "z": 100 }],
+      [{ "x": 0, "z": 100 }, { "x": 0.5, "z": 0.5 }]
+    ]
+  },
+  {
+    "name": "a side of no length is dropped",
+    "points": [
+      { "x": 0, "z": 0 },
+      { "x": 0, "z": 0 },
+      { "x": 100, "z": 0 },
+      { "x": 100, "z": 100 },
+      { "x": 0, "z": 0 }
+    ],
+    "sides": [
+      [{ "x": 0, "z": 0 }, { "x": 100, "z": 0 }],
+      [{ "x": 100, "z": 0 }, { "x": 100, "z": 100 }],
+      [{ "x": 100, "z": 100 }, { "x": 0, "z": 0 }]
+    ]
+  },
+  {
+    "name": "a wall that does not come back to its start is not a ring",
+    "points": [
+      { "x": 0, "z": 0 },
+      { "x": 384, "z": 0 },
+      { "x": 384, "z": 384 },
+      { "x": 0, "z": 384 }
+    ],
+    "sides": null
+  },
+  {
+    "name": "three points that come back are a line out and back, not a ring",
+    "points": [{ "x": 0, "z": 0 }, { "x": 100, "z": 0 }, { "x": 0, "z": 0 }],
+    "sides": null
+  }
+]
