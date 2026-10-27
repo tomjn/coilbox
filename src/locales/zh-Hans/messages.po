@@ -12122,6 +12122,10 @@ msgid "Barrel lift"
 msgstr "炮管抬起"
 
 #: src/scenario/validate.ts
+msgid "base"
+msgstr ""
+
+#: src/scenario/validate.ts
 #, fuzzy
 msgid "Base"
 msgstr "基地"
@@ -30100,6 +30104,10 @@ msgid "Needs {name}"
 msgstr "需要 {name}"
 
 #: src/scenario/pages/components/triggers.ts
+msgid "Needs a base that appears from a trigger"
+msgstr ""
+
+#: src/scenario/pages/components/triggers.ts
 #, fuzzy
 msgid "Needs a dialogue line"
 msgstr "需要台词"
@@ -35757,6 +35765,10 @@ msgstr "放置的单位"
 #, fuzzy
 msgid "Placeholder amounts. Set your game's."
 msgstr "占位数值。请设置你的游戏的数值。"
+
+#: src/scenario/triggerTypes.ts
+msgid "Places a base that appears from a trigger: its terrain changes, then its buildings."
+msgstr ""
 
 #: src/scenario/triggerTypes.ts
 #, fuzzy
@@ -52507,6 +52519,10 @@ msgstr "正在等待你的浏览器"
 #, fuzzy
 msgid "Waits"
 msgstr "等待"
+
+#: src/scenario/pages/components/BaseControls.tsx
+msgid "Waits for a trigger to place it"
+msgstr ""
 
 #: src/scenario/pages/components/GroupControls.tsx
 #, fuzzy

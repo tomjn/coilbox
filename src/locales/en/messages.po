@@ -9776,6 +9776,10 @@ msgid "Barrel lift"
 msgstr "Barrel lift"
 
 #: src/scenario/validate.ts
+msgid "base"
+msgstr "base"
+
+#: src/scenario/validate.ts
 msgid "Base"
 msgstr "Base"
 
@@ -24366,6 +24370,10 @@ msgid "Needs {name}"
 msgstr "Needs {name}"
 
 #: src/scenario/pages/components/triggers.ts
+msgid "Needs a base that appears from a trigger"
+msgstr "Needs a base that appears from a trigger"
+
+#: src/scenario/pages/components/triggers.ts
 msgid "Needs a dialogue line"
 msgstr "Needs a dialogue line"
 
@@ -28927,6 +28935,10 @@ msgstr "placed unit"
 #: src/lego/pages/components/WorthSection.tsx
 msgid "Placeholder amounts. Set your game's."
 msgstr "Placeholder amounts. Set your game's."
+
+#: src/scenario/triggerTypes.ts
+msgid "Places a base that appears from a trigger: its terrain changes, then its buildings."
+msgstr "Places a base that appears from a trigger: its terrain changes, then its buildings."
 
 #: src/scenario/triggerTypes.ts
 msgid "Places a group on the map if it isn't there yet, and sends it off on its orders."
@@ -42476,6 +42488,10 @@ msgstr "Waiting for your browser"
 #: src/scenario/pages/components/TriggerPanel.tsx
 msgid "Waits"
 msgstr "Waits"
+
+#: src/scenario/pages/components/BaseControls.tsx
+msgid "Waits for a trigger to place it"
+msgstr "Waits for a trigger to place it"
 
 #: src/scenario/pages/components/GroupControls.tsx
 msgid "Waits for a trigger to spawn it"
