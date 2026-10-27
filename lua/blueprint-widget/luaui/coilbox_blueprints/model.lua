@@ -524,6 +524,12 @@ end
 -- the website draw it (src/hub/terrainDraw.ts).
 local BUILD_SQUARE = 16
 M.WALL_THICKNESS = 0.6 * BUILD_SQUARE
+-- The least a wall is drawn across and the least a building is drawn on a
+-- side, in pixels at scale 1. A layout map is about 40 pixels across, and a
+-- layout of several hundred elmos has walls under a pixel thick and turrets of
+-- two, which read as a dot or as nothing.
+M.MIN_WALL = 2
+M.MIN_BUILDING = 4
 -- The size of an uphill arrow's head at most, in elmos.
 local ARROW_HEAD = 0.8 * BUILD_SQUARE
 
@@ -1043,10 +1049,13 @@ function M.layout(state, measure, view)
 		elseif mark.shape == "wall" then
 			local alpha = moves and M.TERRAIN_OUTLINE * 0.75 or M.TERRAIN_FILL
 			local color = faded(base, alpha, dim)
+			-- a wall in a small map is a fraction of a pixel across, so it is
+			-- drawn no thinner than a line that can be seen
+			local thickness = math.max(mark.thickness, M.MIN_WALL * S)
 			if #mark.points == 1 then
-				line(mark.points[1], mark.points[1], mark.thickness, mark.thickness / 2, color, ox, oy)
+				line(mark.points[1], mark.points[1], thickness, thickness / 2, color, ox, oy)
 			else
-				outline(mark.points, false, mark.thickness, color, ox, oy)
+				outline(mark.points, false, thickness, color, ox, oy)
 			end
 		else
 			if moves then
@@ -1067,12 +1076,13 @@ function M.layout(state, measure, view)
 		end
 		-- a pixel's gap between neighbours, so touching buildings stay apart
 		for n, box in ipairs(boxes) do
-			local w, h = math.max(1, box.w - S), math.max(1, box.h - S)
+			local w, h = math.max(M.MIN_BUILDING * S, box.w - S), math.max(M.MIN_BUILDING * S, box.h - S)
 			local fill = M.categoryColor(item.resolved.buildings[n].def)
 			if never then
 				fill = { fill[1] * 0.45, fill[2] * 0.45, fill[3] * 0.45, fill[4] }
 			end
-			rect(x + edge + box.x, y + edge + box.y, w, h, fill, "building", { radius = math.min(w, h) / 4 })
+			-- a building smaller than the least shown grows about its middle
+			rect(x + edge + box.x + (box.w - S - w) / 2, y + edge + box.y + (box.h - S - h) / 2, w, h, fill, "building", { radius = math.min(w, h) / 4 })
 		end
 	end
 	-- a list row: the map, the name and what it holds, and build pictures
