@@ -69,7 +69,6 @@ describe("the blueprint map surface on a failed scan", () => {
         <BlueprintOnMap
           blueprint={{ buildings: [], designedFor: undefined } as never}
           gameName="Some Game"
-          onClose={() => {}}
         />
       </MemoryRouter>,
     );

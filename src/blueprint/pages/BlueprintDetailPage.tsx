@@ -17,18 +17,27 @@
  */
 
 import { Trans, useLingui } from "@lingui/react/macro";
-import { Button, useDrawer } from "@picoframe/frame";
+import { Button, Input, useDrawer } from "@picoframe/frame";
 import {
   ArrowLeft,
   Copy,
   Loader2,
   MapPin,
+  Pencil,
   Repeat,
   Share2,
   Trash2,
 } from "lucide-react";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  type ReactNode,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import { Link, useNavigate, useParams } from "react-router";
+import { PageHeader } from "@/components/PageHeader";
 import {
   Popover,
   PopoverContent,
@@ -46,7 +55,10 @@ import { hubItemRoute, isHubItemPageReachable } from "@/hub/config";
 import { describeError } from "@/i18n/uiError";
 import { formatDate } from "@/lib/format";
 import { notify } from "@/notify/notify";
-import { BlueprintEditor } from "@/placement/BlueprintEditor";
+import {
+  BlueprintEditor,
+  type BlueprintEditorHandle,
+} from "@/placement/BlueprintEditor";
 import { BlueprintOnMap } from "@/placement/BlueprintOnMap";
 import { scenarioRoute } from "@/scenario/scenarios";
 import { countLine } from "../countLine";
@@ -139,6 +151,7 @@ export default function BlueprintDetailPage() {
   // opening a layout reads no map: a blueprint is not made for one map, and map
   // reading is the slowest thing in coilbox.
   const [onMap, setOnMap] = useState(false);
+  const editor = useRef<BlueprintEditorHandle>(null);
 
   const [revision, setRevision] = useState(0);
   const [saving, setSaving] = useState(false);
@@ -215,17 +228,71 @@ export default function BlueprintDetailPage() {
     : null;
 
   return (
-    <div className="flex flex-col gap-4 p-4">
-      <BackLink />
-
-      <header className="flex flex-wrap items-end justify-between gap-3">
-        <div className="flex min-w-0 flex-col gap-1.5">
-          {/* Named rather than renamed here: the one name field is the
-              editor's, so a rename is a step the history holds like any other
-              edit (issue #1454). */}
-          <h1 className="truncate text-lg font-semibold">
-            {record.layout.name}
-          </h1>
+    // The page's height and no more, so the header stays put and the editor
+    // takes the rest of the window.
+    <div className="flex h-full min-h-0 flex-col gap-3 p-4">
+      <PageHeader
+        back={<BackLink />}
+        // Renamed through the editor, so a rename is a step its history holds
+        // like any other edit (issue #1454). Not while the map check is up,
+        // because the editor is not mounted then.
+        title={
+          <TitleField
+            name={record.layout.name}
+            onRename={
+              onMap ? undefined : (name) => editor.current?.rename(name)
+            }
+          />
+        }
+        actions={
+          <>
+            <SaveState saving={saving} error={saveError} />
+            {claimedGame && (
+              <TerrainSwitch
+                gameName={claimedGame}
+                shortname={shortname}
+                compact
+              />
+            )}
+            <Button
+              type="button"
+              size="sm"
+              variant={onMap ? "secondary" : "outline"}
+              className="gap-1.5"
+              aria-pressed={onMap}
+              title={t`Test it on a map`}
+              onClick={() => setOnMap((on) => !on)}
+            >
+              <MapPin className="size-4" />
+              <ActionLabel>
+                <Trans>Test</Trans>
+              </ActionLabel>
+            </Button>
+            <SubstituteButton
+              record={record}
+              onApply={(layout) =>
+                edit(recordWithLayout(record, layout, footprints))
+              }
+            />
+            <DuplicateBlueprintButton
+              record={record}
+              taken={records.map((entry) => entry.layout.name)}
+            />
+            <ShareBlueprintButton record={record} />
+            <DeleteBlueprintButton
+              name={record.layout.name}
+              onDelete={async () => {
+                // Nothing left to write, and a write after the delete would put
+                // the layout straight back.
+                pending.current = null;
+                await deleteBlueprint(record.id);
+                navigate("/library/blueprints");
+              }}
+            />
+          </>
+        }
+      >
+        <div className="flex min-w-0 flex-col gap-1">
           <p className="truncate text-xs text-muted-foreground">
             {gameLine} · {buildingCount}
             {record.layout.ordered ? ` · ${t`build order`}` : ""}
@@ -296,81 +363,107 @@ export default function BlueprintDetailPage() {
             </p>
           )}
         </div>
-
-        <div className="flex items-center gap-3">
-          {terrain > 0 && (
-            <TerrainSwitch gameName={claimedGame} shortname={shortname} />
-          )}
-          <SaveState saving={saving} error={saveError} />
-          <SubstituteButton
-            record={record}
-            onApply={(layout) =>
-              edit(recordWithLayout(record, layout, footprints))
-            }
-          />
-          <DuplicateBlueprintButton
-            record={record}
-            taken={records.map((entry) => entry.layout.name)}
-          />
-          <ShareBlueprintButton record={record} />
-          <DeleteBlueprintButton
-            name={record.layout.name}
-            onDelete={async () => {
-              // Nothing left to write, and a write after the delete would put
-              // the layout straight back.
-              pending.current = null;
-              await deleteBlueprint(record.id);
-              navigate("/library/blueprints");
-            }}
-          />
-        </div>
-      </header>
+      </PageHeader>
 
       {saveError && <ErrorBanner message={t`Not saved: ${saveError}`} />}
 
-      {/* Keyed by the blueprint, so opening another one starts with nothing
-          selected, no tool in hand and the camera on the new layout. */}
-      <BlueprintEditor
-        key={record.id}
-        blueprint={layout}
-        gameName={gameName}
-        terrainTools
-        onChange={(layout) =>
-          edit(recordWithLayout(record, layout, footprints))
-        }
-      />
-
-      {/* The optional step (issue #1457). Mounted only once it is asked for, so
-          a page that nobody asks reads no map at all and the editor above it
-          still needs none. */}
+      {/* The map check (issue #1457) stands in for the editor while Test is on.
+          Mounted only once it is asked for, so a page that nobody asks reads no
+          map at all. */}
       {onMap ? (
-        <BlueprintOnMap
-          blueprint={shownLayout(layout, terrainChanges.enabled)}
-          gameName={gameName}
-          onClose={() => setOnMap(false)}
-        />
+        <div className="flex min-h-0 flex-1 flex-col gap-2">
+          <BlueprintOnMap
+            blueprint={shownLayout(layout, terrainChanges.enabled)}
+            gameName={gameName}
+            fill
+          />
+        </div>
       ) : (
-        <Button
-          type="button"
-          size="sm"
-          variant="outline"
-          className="w-fit gap-1.5"
-          onClick={() => setOnMap(true)}
-        >
-          <MapPin className="size-4" /> <Trans>Try it on a map</Trans>
-        </Button>
+        // Keyed by the blueprint, so opening another one starts with nothing
+        // selected, no tool in hand and the camera on the new layout.
+        <BlueprintEditor
+          key={record.id}
+          ref={editor}
+          blueprint={layout}
+          gameName={gameName}
+          terrainTools
+          nameField={false}
+          fill
+          onChange={(layout) =>
+            edit(recordWithLayout(record, layout, footprints))
+          }
+        />
       )}
-
-      <p className="text-xs text-muted-foreground">
-        <Trans>
-          A blueprint is a shape rather than a place, so there is no map here
-          and no team. Try it on a map to see which of its buildings a real
-          terrain would refuse. Put it down in a mission from the scenario
-          builder, or send it to a game's own blueprint file from there.
-        </Trans>
-      </p>
     </div>
   );
+}
+
+/**
+ * The layout's name as the page title, which becomes a field when clicked.
+ * Read only when there is nothing to rename it through.
+ */
+function TitleField({
+  name,
+  onRename,
+}: {
+  name: string;
+  onRename?: (name: string) => void;
+}) {
+  const { t } = useLingui();
+  const [editing, setEditing] = useState(false);
+  const [text, setText] = useState(name);
+  // Escape puts the field away without the blur that follows saving it.
+  const cancelled = useRef(false);
+
+  if (!onRename) return <span className="truncate">{name}</span>;
+
+  if (editing) {
+    const commit = () => {
+      setEditing(false);
+      if (cancelled.current) return;
+      if (text.trim() && text !== name) onRename(text);
+    };
+    return (
+      <Input
+        autoFocus
+        aria-label={t`Blueprint name`}
+        value={text}
+        onChange={(e) => setText(e.target.value)}
+        onFocus={(e) => e.currentTarget.select()}
+        onBlur={commit}
+        onKeyDown={(e) => {
+          if (e.key === "Enter") e.currentTarget.blur();
+          if (e.key === "Escape") {
+            cancelled.current = true;
+            setEditing(false);
+          }
+        }}
+        className="h-8 w-80 text-lg font-semibold"
+      />
+    );
+  }
+
+  return (
+    <button
+      type="button"
+      className="group flex min-w-0 items-center gap-2 rounded text-left hover:text-foreground/80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+      title={t`Rename`}
+      onClick={() => {
+        cancelled.current = false;
+        setText(name);
+        setEditing(true);
+      }}
+    >
+      <span className="truncate">{name}</span>
+      <Pencil className="size-3.5 shrink-0 text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100 group-focus-visible:opacity-100" />
+    </button>
+  );
+}
+
+/** A header button's words, which go on a window too narrow for them beside the
+ *  title, leaving the icon. Still read out, so the button keeps its name. */
+function ActionLabel({ children }: { children: ReactNode }) {
+  return <span className="max-xl:sr-only">{children}</span>;
 }
 
 function BackLink() {
@@ -430,8 +523,12 @@ function ShareBlueprintButton({ record }: { record: StoredBlueprint }) {
       variant="outline"
       className="gap-1.5"
       onClick={() => void share()}
+      title={t`Share`}
     >
-      <Share2 className="size-4" /> <Trans>Share</Trans>
+      <Share2 className="size-4" />
+      <ActionLabel>
+        <Trans>Share</Trans>
+      </ActionLabel>
     </Button>
   );
 }
@@ -487,13 +584,16 @@ function DuplicateBlueprintButton({
       className="gap-1.5"
       disabled={busy}
       onClick={() => void duplicate()}
+      title={t`Duplicate`}
     >
       {busy ? (
         <Loader2 className="size-4 animate-spin" />
       ) : (
         <Copy className="size-4" />
       )}
-      <Trans>Duplicate</Trans>
+      <ActionLabel>
+        <Trans>Duplicate</Trans>
+      </ActionLabel>
     </Button>
   );
 }
@@ -543,8 +643,12 @@ function SubstituteButton({
       variant="outline"
       className="gap-1.5"
       onClick={() => void open()}
+      title={t`Convert to another side's buildings`}
     >
-      <Repeat className="size-4" /> <Trans>Convert</Trans>
+      <Repeat className="size-4" />
+      <ActionLabel>
+        <Trans>Convert</Trans>
+      </ActionLabel>
     </Button>
   );
 }
@@ -556,6 +660,7 @@ function DeleteBlueprintButton({
   name: string;
   onDelete: () => Promise<void>;
 }) {
+  const { t } = useLingui();
   const [open, setOpen] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -574,8 +679,17 @@ function DeleteBlueprintButton({
   return (
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
-        <Button type="button" size="sm" variant="outline" className="gap-1.5">
-          <Trash2 className="size-4" /> <Trans>Delete</Trans>
+        <Button
+          type="button"
+          size="sm"
+          variant="outline"
+          className="gap-1.5 border-destructive/40 text-destructive hover:bg-destructive/10 hover:text-destructive"
+          title={t`Delete`}
+        >
+          <Trash2 className="size-4" />
+          <ActionLabel>
+            <Trans>Delete</Trans>
+          </ActionLabel>
         </Button>
       </PopoverTrigger>
       <PopoverContent align="end" className="flex w-80 flex-col gap-3">

@@ -137,8 +137,12 @@ describe("BlueprintDetailPage", () => {
     });
   });
 
-  it("offers no name field of its own, so a rename is an editor edit", () => {
-    expect(markup()).not.toContain("<input");
+  /** The title becomes a field only once clicked, and what it types goes
+   *  through the editor's history. The one input on the page is the terrain
+   *  switch's hidden checkbox. */
+  it("offers no name field of its own until the title is clicked", () => {
+    expect(markup()).not.toMatch(/<input(?![^>]*type="checkbox")/);
+    expect(markup()).toContain('title="Rename"');
   });
 
   /** The way to a variant of a layout, rather than drawing it again (issue
@@ -157,7 +161,7 @@ describe("BlueprintDetailPage", () => {
    */
   it("offers a check against a real map, and does not run one", () => {
     const html = markup();
-    expect(html).toContain("Try it on a map");
+    expect(html).toContain("Test");
     expect(html).not.toContain("the map check");
   });
 

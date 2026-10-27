@@ -27,7 +27,6 @@ import type { TerrainStep } from "@/blueprint/model";
 import type { StepLimit } from "@/blueprint/terraform";
 import type { DraftSettings } from "@/blueprint/terrainDraft";
 import type { TerrainTool } from "@/blueprint/terrainEdit";
-import { Switch } from "@/components/ui/switch";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import type { StepPatch } from "@/lib/scenarioEditing/terrain";
 import { useFieldText } from "@/lib/useFieldText";
@@ -265,14 +264,12 @@ export function TerrainStepBar({
 
 /**
  * The terrain toolbar, shown while the Terrain button is on: the four tools,
- * what the step being drawn will be made with, Done and Cancel, and the
- * game's Terrain changes switch. No tool is pressed until one is picked. The
- * settings apply to the step being drawn, so they can be set before the first
- * click and changed part way through.
+ * what the step being drawn will be made with, and Done and Cancel. No tool is
+ * pressed until one is picked. The settings apply to the step being drawn, so
+ * they can be set before the first click and changed part way through.
  *
- * The switch is here so it can be found from a blueprint. Turning it off
- * takes the Terrain button away, and the library's game list has the switch to
- * turn it back on.
+ * The game's Terrain changes switch is in the blueprint page's header, the
+ * one place it is offered there.
  */
 export function TerrainDraftBar({
   tool,
@@ -282,8 +279,6 @@ export function TerrainDraftBar({
   drawing,
   onDone,
   onCancel,
-  enabled,
-  onEnabled,
 }: {
   tool: TerrainTool | null;
   onTool: (tool: TerrainTool | null) => void;
@@ -293,10 +288,6 @@ export function TerrainDraftBar({
   drawing: boolean;
   onDone: () => void;
   onCancel: () => void;
-  enabled: boolean;
-  /** Absent leaves the game's switch off the bar, for a mission, which sets
-   *  the ground itself in every game (issue #4799). */
-  onEnabled?: (on: boolean) => void;
 }) {
   const { t } = useLingui();
   // With no tool picked, Raise or Level and Height show disabled, so the bar
@@ -375,39 +366,39 @@ export function TerrainDraftBar({
           />
         </>
       )}
-      <Button
-        size="sm"
-        variant="secondary"
-        className="h-7 gap-1.5 px-2 text-xs"
-        onClick={onDone}
-        disabled={!tool}
-      >
-        <Check className="size-3.5" />
-        {drawing ? t`Done` : t`Close tool`}
-      </Button>
-      <Button
-        size="sm"
-        variant="ghost"
-        className="h-7 gap-1.5 px-2 text-xs"
-        onClick={onCancel}
-        disabled={!tool}
-      >
-        <X className="size-3.5" /> <Trans>Cancel</Trans>
-      </Button>
-      {onEnabled && (
-        <span className="flex items-center gap-1.5 border-l border-border/60 pl-2">
-          <Switch
-            id="blueprint-terrain-changes"
-            checked={enabled}
-            onCheckedChange={onEnabled}
-          />
-          <label
-            htmlFor="blueprint-terrain-changes"
-            className="text-[11px] text-muted-foreground"
+      {/* Done and Cancel only mean different things while a step is being
+          drawn. Before the first click both put the tool down, so that is the
+          one button. */}
+      {drawing ? (
+        <>
+          <Button
+            size="sm"
+            variant="secondary"
+            className="h-7 gap-1.5 px-2 text-xs"
+            onClick={onDone}
           >
-            <Trans>Terrain changes in this game</Trans>
-          </label>
-        </span>
+            <Check className="size-3.5" /> <Trans>Done</Trans>
+          </Button>
+          <Button
+            size="sm"
+            variant="ghost"
+            className="h-7 gap-1.5 px-2 text-xs"
+            onClick={onCancel}
+          >
+            <X className="size-3.5" /> <Trans>Cancel</Trans>
+          </Button>
+        </>
+      ) : (
+        tool && (
+          <Button
+            size="sm"
+            variant="ghost"
+            className="h-7 gap-1.5 px-2 text-xs"
+            onClick={onCancel}
+          >
+            <X className="size-3.5" /> <Trans>Close tool</Trans>
+          </Button>
+        )
       )}
     </div>
   );

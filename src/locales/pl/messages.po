@@ -2139,6 +2139,10 @@ msgstr "{count, plural, one {# aktualizacja} few {# aktualizacje} many {# aktual
 msgid "{count, plural, one {# zone} other {# zones}}"
 msgstr "{count, plural, one {# strefa} few {# strefy} many {# stref} other {# strefy}}"
 
+#: src/blueprint/OffGridNote.tsx
+msgid "{count, plural, one {Building {places} is saved off the build grid. It is drawn where the engine will build it.} other {Buildings {places} are saved off the build grid. They are drawn where the engine will build them.}}"
+msgstr ""
+
 #: src/lego/pages/components/DetailPanel.tsx
 #, fuzzy
 msgid "{count, plural, one {Built in · # piece} other {Built in · # pieces}}"
@@ -4151,11 +4155,6 @@ msgstr "{mapName} · {gameName} · {opponents}"
 #, fuzzy
 msgid "{mapName} · {modeHint} · middle-drag to pan · drag a unit to move it · drag a zone's middle handle to move it · right-drag to turn the view"
 msgstr "{mapName} · {modeHint} · przeciągnij środkowym przyciskiem, aby przesunąć · przeciągnij jednostkę, aby ją przenieść · przeciągnij środkowy uchwyt strefy, aby ją przenieść · przeciągnij prawym przyciskiem, aby obrócić widok"
-
-#: src/placement/BlueprintOnMap.tsx
-#, fuzzy
-msgid "{mapName} · click or drag to stand the layout somewhere else · this changes the layout in no way · right-drag to turn the view"
-msgstr "{mapName} · kliknij lub przeciągnij, aby ustawić układ w innym miejscu · nie zmienia to w żaden sposób układu · przeciągnij prawym przyciskiem, aby obrócić widok"
 
 #: src/multiplayer/battles/HostZerokBattlePopover.tsx
 #, fuzzy
@@ -8197,16 +8196,6 @@ msgstr "Plan budowy w tym scenariuszu nazywa się już „{wasCalled}”, więc 
 #, fuzzy
 msgid "A blueprint in your library is already called \"{wasCalled}\", so this one is kept as \"{name}\"."
 msgstr "Plan budowy w twojej bibliotece nazywa się już „{wasCalled}”, więc ten zostaje zapisany jako „{name}”."
-
-#: src/placement/BlueprintEditor.tsx
-#, fuzzy
-msgid "A blueprint is a shape rather than a place, so there is no map here and no team. Every building sits at an offset from the blueprint's own middle, and the squares under them are the ground the engine will give them."
-msgstr "Plan budowy to kształt, a nie miejsce, więc nie ma tu mapy ani drużyny. Każdy budynek stoi w pewnym przesunięciu od środka planu, a pola pod nim to teren, który przydzieli mu silnik."
-
-#: src/blueprint/pages/BlueprintDetailPage.tsx
-#, fuzzy
-msgid "A blueprint is a shape rather than a place, so there is no map here and no team. Try it on a map to see which of its buildings a real terrain would refuse. Put it down in a mission from the scenario builder, or send it to a game's own blueprint file from there."
-msgstr "Plan budowy to kształt, a nie miejsce, więc nie ma tu mapy ani drużyny. Wypróbuj go na mapie, aby zobaczyć, które budynki prawdziwy teren by odrzucił. Umieść go w misji z edytora scenariuszy albo wyślij stamtąd do pliku planów budowy gry."
 
 #: src/scenario/pages/components/BlueprintPanel.tsx
 #, fuzzy
@@ -12634,6 +12623,7 @@ msgstr "niebieski olbrzym"
 msgid "Blueprint"
 msgstr "Plan budowy"
 
+#: src/blueprint/pages/BlueprintDetailPage.tsx
 #: src/blueprint/pages/components/RenameBlueprintForm.tsx
 #: src/placement/LayoutControls.tsx
 #, fuzzy
@@ -15003,9 +14993,8 @@ msgid "Click the ground to add points."
 msgstr "Kliknij teren, aby dodać punkty."
 
 #: src/placement/BlueprintEditor.tsx
-#, fuzzy
-msgid "Click the ground to put one down. Escape stops placing. Drag a building to move it within the blueprint."
-msgstr "Kliknij teren, aby postawić budynek. Escape kończy umieszczanie. Przeciągnij budynek, aby przesunąć go w obrębie planu."
+msgid "Click the ground to put one down. Escape stops placing."
+msgstr ""
 
 #: src/placement/BlueprintOnMap.tsx
 #, fuzzy
@@ -16660,6 +16649,10 @@ msgstr "Konwertuj BOS na Lua i pracuj ze skryptami COB."
 #, fuzzy
 msgid "Convert models"
 msgstr "Konwertuj modele"
+
+#: src/blueprint/pages/BlueprintDetailPage.tsx
+msgid "Convert to another side's buildings"
+msgstr ""
 
 #: src/lego/pages/components/GameScriptPanel.tsx
 #, fuzzy
@@ -19143,11 +19136,6 @@ msgstr "Gotowe"
 #, fuzzy
 msgid "Done · {finished}"
 msgstr "Gotowe · {finished}"
-
-#: src/placement/BlueprintOnMap.tsx
-#, fuzzy
-msgid "Done with the map"
-msgstr "Koniec z mapą"
 
 #: src/multiplayer/admin/AdminRequestStatus.tsx
 #: src/multiplayer/admin/StaffSection.tsx
@@ -25141,9 +25129,8 @@ msgid "Imported challenge"
 msgstr "Zaimportowane wyzwanie"
 
 #: src/blueprint/library.ts
-#, fuzzy
-msgid "Imported from a code somebody shared. A code carries the blueprint and nothing about where it came from, so that is the whole of what is known about it."
-msgstr "Zaimportowano z kodu, który ktoś udostępnił. Kod zawiera plan budowy i nic o jego pochodzeniu, więc to wszystko, co o nim wiadomo."
+msgid "Imported from a code somebody shared."
+msgstr ""
 
 #: src/blueprint/library.ts
 #, fuzzy
@@ -31326,11 +31313,6 @@ msgstr "brak mapy"
 msgid "No map"
 msgstr "Brak mapy"
 
-#: src/placement/BlueprintEditor.tsx
-#, fuzzy
-msgid "no map · a build grid, {GRID_EXTENT} elmos square · drag or middle-drag to pan · right-drag to turn the view · scroll to zoom"
-msgstr "brak mapy · siatka budowy, kwadrat {GRID_EXTENT} elmo · przeciągnij lub przeciągnij środkowym przyciskiem, aby przesunąć · przeciągnij prawym, aby obrócić widok · przewiń, aby przybliżyć"
-
 #: src/lego/pages/components/TestDrawer.tsx
 #: src/workshop/pages/components/PlayLocallyButton.tsx
 #, fuzzy
@@ -35457,11 +35439,6 @@ msgstr "Wybierz plan budowy…"
 msgid "Pick a building and click the map. Clicks add to the base you have selected. Stop placing with the button beside the picker, or Escape. A base is the building half: mobile units belong in a group."
 msgstr "Wybierz budynek i kliknij mapę. Kliknięcia dodają do zaznaczonej bazy. Zakończ umieszczanie przyciskiem obok wyboru albo klawiszem Escape. Baza to część z budynkami: jednostki mobilne należą do grupy."
 
-#: src/placement/BlueprintEditor.tsx
-#, fuzzy
-msgid "Pick a building to start placing. Drag one to move it, click bare ground to deselect."
-msgstr "Wybierz budynek, aby zacząć umieszczanie. Przeciągnij budynek, aby go przesunąć, kliknij pusty teren, aby odznaczyć."
-
 #: src/workshop/pages/components/RandomModDrawer.tsx
 #, fuzzy
 msgid "Pick a collection"
@@ -36812,11 +36789,6 @@ msgstr "Przywróć broń z gry"
 #, fuzzy
 msgid "Put it in the game"
 msgstr "Umieść w grze"
-
-#: src/blueprint/OffGridNote.tsx
-#, fuzzy
-msgid "Put the blueprint on the build grid"
-msgstr "Umieść plan budowy na siatce budowy"
 
 #: src/workshop/pages/components/CheckpointsDrawer.tsx
 #, fuzzy
@@ -38748,6 +38720,7 @@ msgstr "Usuwanie {name}…"
 msgid "Removing…"
 msgstr "Usuwanie…"
 
+#: src/blueprint/pages/BlueprintDetailPage.tsx
 #: src/blueprint/pages/components/BlueprintCardMenu.tsx
 #: src/blueprint/pages/components/RenameBlueprintForm.tsx
 #: src/lego/pages/components/ScriptTab.tsx
@@ -40132,6 +40105,10 @@ msgstr "Zapisz tabelę"
 #, fuzzy
 msgid "Save the .glb"
 msgstr "Zapisz .glb"
+
+#: src/blueprint/OffGridNote.tsx
+msgid "Save the drawn positions"
+msgstr ""
 
 #: src/lego/pages/components/SaveModelPopover.tsx
 #, fuzzy
@@ -44990,10 +44967,6 @@ msgid "Terrain changes"
 msgstr ""
 
 #: src/placement/TerrainControls.tsx
-msgid "Terrain changes in this game"
-msgstr ""
-
-#: src/placement/TerrainControls.tsx
 msgid "Terrain tools"
 msgstr ""
 
@@ -45017,6 +44990,7 @@ msgstr "Tekstura trzeciorzędna"
 msgid "Tertiary texture (old name)"
 msgstr "Tekstura trzeciorzędna (stara nazwa)"
 
+#: src/blueprint/pages/BlueprintDetailPage.tsx
 #: src/workshop/pages/components/CommandPalette.tsx
 #: src/workshop/pages/components/PlayLocallyButton.tsx
 #, fuzzy
@@ -45045,6 +45019,10 @@ msgstr "Testuj {unitName} w grze"
 #, fuzzy
 msgid "Test in game"
 msgstr "Testuj w grze"
+
+#: src/blueprint/pages/BlueprintDetailPage.tsx
+msgid "Test it on a map"
+msgstr ""
 
 #: src/notify/NotificationsSettings.tsx
 #, fuzzy
@@ -48491,11 +48469,6 @@ msgstr "Ten plan budowy jest dla {wanted}. Nie udało się odczytać Twoich gier
 msgid "This blueprint's game is not installed, so nothing can be drawn with its models."
 msgstr "Gra tego planu budowy nie jest zainstalowana, więc nic nie może zostać narysowane jej modelami."
 
-#: src/blueprint/OffGridNote.tsx
-#, fuzzy
-msgid "This blueprint's numbers do not agree with the build grid. {count, plural, one {Building {places} is drawn where the engine will build it, which is not the position the blueprint holds for it.} other {Buildings {places} are drawn where the engine will build them, which is not the position the blueprint holds for them.}} Nothing has been changed."
-msgstr "Liczby tego planu budowy nie zgadzają się z siatką budowy. {count, plural, one {Budynek {places} jest narysowany tam, gdzie zbuduje go silnik, a nie w pozycji zapisanej dla niego w planie.} few {Budynki {places} są narysowane tam, gdzie zbuduje je silnik, a nie w pozycjach zapisanych dla nich w planie.} many {Budynki {places} są narysowane tam, gdzie zbuduje je silnik, a nie w pozycjach zapisanych dla nich w planie.} other {Budynki {places} są narysowane tam, gdzie zbuduje je silnik, a nie w pozycjach zapisanych dla nich w planie.}} Niczego nie zmieniono."
-
 #: src/game-updates/pages/GameUpdatesSection.tsx
 #, fuzzy
 msgid "This build has no game-update source configured."
@@ -50625,11 +50598,6 @@ msgstr "Spróbuj ponownie"
 msgid "Try again, or download an engine instead."
 msgstr "Spróbuj ponownie albo zamiast tego pobierz silnik."
 
-#: src/blueprint/pages/BlueprintDetailPage.tsx
-#, fuzzy
-msgid "Try it on a map"
-msgstr "Wypróbuj na mapie"
-
 #: src/downloads/activityRows.ts
 #, fuzzy
 msgid "Try next mirror"
@@ -50823,11 +50791,6 @@ msgstr "obrócony o pół obrotu, tak jak umieszcza go gra"
 #, fuzzy
 msgid "turned three quarters of a turn, the way the game places it"
 msgstr "obrócony o trzy czwarte obrotu, tak jak umieszcza go gra"
-
-#: src/placement/SurfaceBars.tsx
-#, fuzzy
-msgid "Turning it leaves it on the same squares. Its footprint is square, so there is nowhere for it to move."
-msgstr "Obrót zostawia go na tych samych polach. Jego obrys jest kwadratowy, więc nie ma dokąd się przesunąć."
 
 #: src/placement/SurfaceBars.tsx
 #, fuzzy

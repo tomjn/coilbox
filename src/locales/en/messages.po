@@ -1750,6 +1750,10 @@ msgstr "{count, plural, one {# update} other {# updates}}"
 msgid "{count, plural, one {# zone} other {# zones}}"
 msgstr "{count, plural, one {# zone} other {# zones}}"
 
+#: src/blueprint/OffGridNote.tsx
+msgid "{count, plural, one {Building {places} is saved off the build grid. It is drawn where the engine will build it.} other {Buildings {places} are saved off the build grid. They are drawn where the engine will build them.}}"
+msgstr "{count, plural, one {Building {places} is saved off the build grid. It is drawn where the engine will build it.} other {Buildings {places} are saved off the build grid. They are drawn where the engine will build them.}}"
+
 #: src/lego/pages/components/DetailPanel.tsx
 msgid "{count, plural, one {Built in · # piece} other {Built in · # pieces}}"
 msgstr "{count, plural, one {Built in · # piece} other {Built in · # pieces}}"
@@ -3365,10 +3369,6 @@ msgstr "{mapName} · {gameName} · {opponents}"
 #: src/scenario/pages/components/ScenarioMapScene.tsx
 msgid "{mapName} · {modeHint} · middle-drag to pan · drag a unit to move it · drag a zone's middle handle to move it · right-drag to turn the view"
 msgstr "{mapName} · {modeHint} · middle-drag to pan · drag a unit to move it · drag a zone's middle handle to move it · right-drag to turn the view"
-
-#: src/placement/BlueprintOnMap.tsx
-msgid "{mapName} · click or drag to stand the layout somewhere else · this changes the layout in no way · right-drag to turn the view"
-msgstr "{mapName} · click or drag to stand the layout somewhere else · this changes the layout in no way · right-drag to turn the view"
 
 #: src/multiplayer/battles/HostZerokBattlePopover.tsx
 msgid "{mapName} (not installed)"
@@ -6611,14 +6611,6 @@ msgstr "A blueprint in this scenario is already called \"{wasCalled}\", so this 
 #: src/blueprint/arrival.ts
 msgid "A blueprint in your library is already called \"{wasCalled}\", so this one is kept as \"{name}\"."
 msgstr "A blueprint in your library is already called \"{wasCalled}\", so this one is kept as \"{name}\"."
-
-#: src/placement/BlueprintEditor.tsx
-msgid "A blueprint is a shape rather than a place, so there is no map here and no team. Every building sits at an offset from the blueprint's own middle, and the squares under them are the ground the engine will give them."
-msgstr "A blueprint is a shape rather than a place, so there is no map here and no team. Every building sits at an offset from the blueprint's own middle, and the squares under them are the ground the engine will give them."
-
-#: src/blueprint/pages/BlueprintDetailPage.tsx
-msgid "A blueprint is a shape rather than a place, so there is no map here and no team. Try it on a map to see which of its buildings a real terrain would refuse. Put it down in a mission from the scenario builder, or send it to a game's own blueprint file from there."
-msgstr "A blueprint is a shape rather than a place, so there is no map here and no team. Try it on a map to see which of its buildings a real terrain would refuse. Put it down in a mission from the scenario builder, or send it to a game's own blueprint file from there."
 
 #: src/scenario/pages/components/BlueprintPanel.tsx
 msgid "A blueprint is a shape rather than a place, so this draws on a build grid and loads no map. Editing it here edits the blueprint itself, so every base placed from it changes. To change one base only, drag its buildings on the map above."
@@ -10190,6 +10182,7 @@ msgstr "blue giant"
 msgid "Blueprint"
 msgstr "Blueprint"
 
+#: src/blueprint/pages/BlueprintDetailPage.tsx
 #: src/blueprint/pages/components/RenameBlueprintForm.tsx
 #: src/placement/LayoutControls.tsx
 msgid "Blueprint name"
@@ -12124,8 +12117,8 @@ msgid "Click the ground to add points."
 msgstr "Click the ground to add points."
 
 #: src/placement/BlueprintEditor.tsx
-msgid "Click the ground to put one down. Escape stops placing. Drag a building to move it within the blueprint."
-msgstr "Click the ground to put one down. Escape stops placing. Drag a building to move it within the blueprint."
+msgid "Click the ground to put one down. Escape stops placing."
+msgstr "Click the ground to put one down. Escape stops placing."
 
 #: src/placement/BlueprintOnMap.tsx
 msgid "Click the ground to stand it somewhere else."
@@ -13470,6 +13463,10 @@ msgstr "Convert BOS to Lua, and work with COB scripts."
 #: src/content/pages/GameDetailPage.tsx
 msgid "Convert models"
 msgstr "Convert models"
+
+#: src/blueprint/pages/BlueprintDetailPage.tsx
+msgid "Convert to another side's buildings"
+msgstr "Convert to another side's buildings"
 
 #: src/lego/pages/components/GameScriptPanel.tsx
 msgid "Convert to Lua"
@@ -15488,10 +15485,6 @@ msgstr "Done"
 #: src/downloads/pages/ActivityPage.tsx
 msgid "Done · {finished}"
 msgstr "Done · {finished}"
-
-#: src/placement/BlueprintOnMap.tsx
-msgid "Done with the map"
-msgstr "Done with the map"
 
 #: src/multiplayer/admin/AdminRequestStatus.tsx
 #: src/multiplayer/admin/StaffSection.tsx
@@ -20349,8 +20342,8 @@ msgid "Imported challenge"
 msgstr "Imported challenge"
 
 #: src/blueprint/library.ts
-msgid "Imported from a code somebody shared. A code carries the blueprint and nothing about where it came from, so that is the whole of what is known about it."
-msgstr "Imported from a code somebody shared. A code carries the blueprint and nothing about where it came from, so that is the whole of what is known about it."
+msgid "Imported from a code somebody shared."
+msgstr "Imported from a code somebody shared."
 
 #: src/blueprint/library.ts
 msgid "Imported from a file of blueprints, {file}."
@@ -25358,10 +25351,6 @@ msgstr "no map"
 msgid "No map"
 msgstr "No map"
 
-#: src/placement/BlueprintEditor.tsx
-msgid "no map · a build grid, {GRID_EXTENT} elmos square · drag or middle-drag to pan · right-drag to turn the view · scroll to zoom"
-msgstr "no map · a build grid, {GRID_EXTENT} elmos square · drag or middle-drag to pan · right-drag to turn the view · scroll to zoom"
-
 #: src/lego/pages/components/TestDrawer.tsx
 #: src/workshop/pages/components/PlayLocallyButton.tsx
 msgid "No map installed"
@@ -28689,10 +28678,6 @@ msgstr "Pick a blueprint…"
 msgid "Pick a building and click the map. Clicks add to the base you have selected. Stop placing with the button beside the picker, or Escape. A base is the building half: mobile units belong in a group."
 msgstr "Pick a building and click the map. Clicks add to the base you have selected. Stop placing with the button beside the picker, or Escape. A base is the building half: mobile units belong in a group."
 
-#: src/placement/BlueprintEditor.tsx
-msgid "Pick a building to start placing. Drag one to move it, click bare ground to deselect."
-msgstr "Pick a building to start placing. Drag one to move it, click bare ground to deselect."
-
 #: src/workshop/pages/components/RandomModDrawer.tsx
 msgid "Pick a collection"
 msgstr "Pick a collection"
@@ -29789,10 +29774,6 @@ msgstr "Put back the game's weapon"
 #: src/scenario/pages/components/MissionHomeActions.tsx
 msgid "Put it in the game"
 msgstr "Put it in the game"
-
-#: src/blueprint/OffGridNote.tsx
-msgid "Put the blueprint on the build grid"
-msgstr "Put the blueprint on the build grid"
 
 #: src/workshop/pages/components/CheckpointsDrawer.tsx
 msgid "Put the project back to how it was at this checkpoint, as one undo step"
@@ -31365,6 +31346,7 @@ msgstr "Removing {name}…"
 msgid "Removing…"
 msgstr "Removing…"
 
+#: src/blueprint/pages/BlueprintDetailPage.tsx
 #: src/blueprint/pages/components/BlueprintCardMenu.tsx
 #: src/blueprint/pages/components/RenameBlueprintForm.tsx
 #: src/lego/pages/components/ScriptTab.tsx
@@ -32486,6 +32468,10 @@ msgstr "Save table"
 #: src/lego/pages/components/ExportDrawer.tsx
 msgid "Save the .glb"
 msgstr "Save the .glb"
+
+#: src/blueprint/OffGridNote.tsx
+msgid "Save the drawn positions"
+msgstr "Save the drawn positions"
 
 #: src/lego/pages/components/SaveModelPopover.tsx
 msgid "Save the model"
@@ -36424,10 +36410,6 @@ msgid "Terrain changes"
 msgstr "Terrain changes"
 
 #: src/placement/TerrainControls.tsx
-msgid "Terrain changes in this game"
-msgstr "Terrain changes in this game"
-
-#: src/placement/TerrainControls.tsx
 msgid "Terrain tools"
 msgstr "Terrain tools"
 
@@ -36447,6 +36429,7 @@ msgstr "Tertiary texture"
 msgid "Tertiary texture (old name)"
 msgstr "Tertiary texture (old name)"
 
+#: src/blueprint/pages/BlueprintDetailPage.tsx
 #: src/workshop/pages/components/CommandPalette.tsx
 #: src/workshop/pages/components/PlayLocallyButton.tsx
 msgid "Test"
@@ -36470,6 +36453,10 @@ msgstr "Test {unitName} in game"
 #: src/scenario/pages/ScenarioEditPage.tsx
 msgid "Test in game"
 msgstr "Test in game"
+
+#: src/blueprint/pages/BlueprintDetailPage.tsx
+msgid "Test it on a map"
+msgstr "Test it on a map"
 
 #: src/notify/NotificationsSettings.tsx
 msgid "Test notification"
@@ -39238,10 +39225,6 @@ msgstr "This blueprint is for {wanted}. Your games could not be read, so it has 
 msgid "This blueprint's game is not installed, so nothing can be drawn with its models."
 msgstr "This blueprint's game is not installed, so nothing can be drawn with its models."
 
-#: src/blueprint/OffGridNote.tsx
-msgid "This blueprint's numbers do not agree with the build grid. {count, plural, one {Building {places} is drawn where the engine will build it, which is not the position the blueprint holds for it.} other {Buildings {places} are drawn where the engine will build them, which is not the position the blueprint holds for them.}} Nothing has been changed."
-msgstr "This blueprint's numbers do not agree with the build grid. {count, plural, one {Building {places} is drawn where the engine will build it, which is not the position the blueprint holds for it.} other {Buildings {places} are drawn where the engine will build them, which is not the position the blueprint holds for them.}} Nothing has been changed."
-
 #: src/game-updates/pages/GameUpdatesSection.tsx
 msgid "This build has no game-update source configured."
 msgstr "This build has no game-update source configured."
@@ -40955,10 +40938,6 @@ msgstr "Try again"
 msgid "Try again, or download an engine instead."
 msgstr "Try again, or download an engine instead."
 
-#: src/blueprint/pages/BlueprintDetailPage.tsx
-msgid "Try it on a map"
-msgstr "Try it on a map"
-
 #: src/downloads/activityRows.ts
 msgid "Try next mirror"
 msgstr "Try next mirror"
@@ -41114,10 +41093,6 @@ msgstr "turned half way round, the way the game places it"
 #: src/scenario/pages/components/BlueprintPanel.tsx
 msgid "turned three quarters of a turn, the way the game places it"
 msgstr "turned three quarters of a turn, the way the game places it"
-
-#: src/placement/SurfaceBars.tsx
-msgid "Turning it leaves it on the same squares. Its footprint is square, so there is nowhere for it to move."
-msgstr "Turning it leaves it on the same squares. Its footprint is square, so there is nowhere for it to move."
 
 #: src/placement/SurfaceBars.tsx
 msgid "Turning it stands it on the outlined squares. Its sides swap, so it moves half a build square."

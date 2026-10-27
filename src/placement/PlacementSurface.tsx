@@ -149,6 +149,7 @@ export function PlacementSurface({
   note,
   footer,
   keyboard,
+  fill = false,
 }: {
   ground: SurfaceGround;
   /** Handed the built scene, and null when it goes. */
@@ -184,6 +185,9 @@ export function PlacementSurface({
   footer?: ReactNode;
   /** What the keys do here, for a surface that answers them (issue #2269). */
   keyboard?: SurfaceKeyboard;
+  /** Take whatever height the page's flex column leaves, with no handle to
+   *  drag, for a page whose whole point is the surface. */
+  fill?: boolean;
 }) {
   const { t } = useLingui();
   const sceneRef = useRef<MapScene3D | null>(null);
@@ -245,6 +249,7 @@ export function PlacementSurface({
   return (
     <Surface
       expanded={expanded}
+      fill={fill}
       height={surfaceHeight.height}
       dragging={surfaceHeight.dragging}
     >
@@ -270,9 +275,13 @@ export function PlacementSurface({
 
             {bars && (
               <div
-                className={`absolute top-2 flex max-w-[calc(100%-21rem)] flex-col items-start gap-1.5 ${
-                  rail ? "left-12" : "left-2"
-                }`}
+                className={cn(
+                  "absolute top-2 flex flex-col items-start gap-1.5",
+                  rail ? "left-12" : "left-2",
+                  // Room for the chrome in the top right corner, when there is
+                  // any. Without it the bars can run the width of the surface.
+                  chrome ? "max-w-[calc(100%-21rem)]" : "right-2",
+                )}
               >
                 {bars}
               </div>
@@ -335,7 +344,7 @@ export function PlacementSurface({
           working area itself, not about what is currently drawn in it. Left
           out of the expanded view - `fixed inset-0` already fills the window,
           which has no bottom edge of its own to drag (issue #2320). */}
-      {!expanded && (
+      {!expanded && !fill && (
         <SurfaceResizeHandle
           height={surfaceHeight.height}
           onDrag={surfaceHeight.onDrag}
@@ -665,11 +674,13 @@ function useExpanded(): [boolean, (on: boolean) => void] {
  */
 function Surface({
   expanded,
+  fill,
   height,
   dragging,
   children,
 }: {
   expanded: boolean;
+  fill: boolean;
   height: number;
   dragging: boolean;
   children: ReactNode;
@@ -686,16 +697,18 @@ function Surface({
         // `aria-valuenow`. shrink-0 makes the page scroll for the difference
         // instead, which is what stacking more panels under the map already
         // relies on.
-        "flex shrink-0 flex-col overflow-hidden bg-gradient-to-b from-muted/20 to-muted/40",
+        "flex flex-col overflow-hidden bg-gradient-to-b from-muted/20 to-muted/40",
+        fill && !expanded ? "min-h-0 flex-1" : "shrink-0",
         expanded
           ? "fixed inset-0 z-50 border-0"
           : "relative rounded-lg border border-border/50",
         !expanded &&
+          !fill &&
           !dragging &&
           !reduceMotion &&
           "transition-[height] duration-150 ease-out",
       )}
-      style={expanded ? undefined : { height }}
+      style={expanded || fill ? undefined : { height }}
     >
       {children}
     </section>

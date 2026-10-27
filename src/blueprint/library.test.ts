@@ -240,8 +240,8 @@ describe("the other ways a layout arrives (issue #1473)", () => {
 
   it("admits that a code knows nothing but when it arrived", () => {
     expect(codeSource(undefined, at)).toEqual({ kind: "code", at: when });
-    expect(sourceSummary(codeSource())).toContain(
-      "nothing about where it came from",
+    expect(sourceSummary(codeSource())).toBe(
+      "Imported from a code somebody shared.",
     );
     expect(sourceLabel(codeSource())).toBe("From a shared code");
   });

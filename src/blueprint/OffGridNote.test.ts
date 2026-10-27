@@ -43,13 +43,15 @@ describe("OffGridNote", () => {
     expect(markup([off(1)])).toContain("Building 2");
   });
 
-  /** The point of the note is that the file has not been touched. An author who
-   *  reads a position out of it is reading what is still in it. */
-  it("says the layout has not been changed", () => {
-    expect(markup([off(0)])).toContain("Nothing has been changed");
+  /** The surface already shows the engine's positions, so the note says the
+   *  difference is in what is saved rather than what is on screen. */
+  it("says the saved position differs from the drawn one", () => {
+    const html = markup([off(0)]);
+    expect(html).toContain("saved off the build grid");
+    expect(html).toContain("drawn where the engine will build it");
   });
 
-  it("offers to put the layout on the grid", () => {
-    expect(markup([off(0)])).toContain("Put the blueprint on the build grid");
+  it("offers to save the drawn positions", () => {
+    expect(markup([off(0)])).toContain("Save the drawn positions");
   });
 });

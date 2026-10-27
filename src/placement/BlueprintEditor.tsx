@@ -21,11 +21,18 @@
  */
 
 import { plural } from "@lingui/core/macro";
-import { Trans, useLingui } from "@lingui/react/macro";
+import { useLingui } from "@lingui/react/macro";
 import { Button } from "@picoframe/frame";
 import { Blocks } from "lucide-react";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { countLine } from "@/blueprint/countLine";
+import {
+  type Ref,
+  useCallback,
+  useEffect,
+  useImperativeHandle,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import {
   buildGridSnap,
   buildingFootprints,
@@ -33,7 +40,7 @@ import {
   SQUARE_SIZE,
 } from "@/blueprint/footprint";
 import type { BaseBlueprint, TerrainStep } from "@/blueprint/model";
-import { offGridBuildings, onBuildGrid } from "@/blueprint/offGrid";
+import { onBuildGrid } from "@/blueprint/offGrid";
 import { buildingColors } from "@/blueprint/role";
 import { type BuildEntry, buildSequence } from "@/blueprint/terrainEdit";
 import { useTerrainChanges } from "@/blueprint/terrainSwitch";
@@ -52,7 +59,6 @@ import type { MapScene3D } from "@/lib/mapScene";
 import {
   addBuilding,
   buildingUnits,
-  editBaseLayout,
   moveBuilding,
   renameBlueprint,
   setBlueprintOrdered,
@@ -100,7 +106,7 @@ import {
   HistoryControls,
   PlaybackBar,
   SelectionBar,
-  TurnNote,
+  turnNoteText,
 } from "./SurfaceBars";
 import { focusCamera, focusDistance, worldToScene } from "./scene";
 import {
@@ -151,12 +157,21 @@ function pickedStepOf(selected: string | null, steps: number): number | null {
   return ref?.part === "step" && ref.index < steps ? ref.index : null;
 }
 
+/** What a page around the editor can do to the layout through the editor's own
+ *  history, so the step back from it is a step like any other. */
+export interface BlueprintEditorHandle {
+  rename: (name: string) => void;
+}
+
 export function BlueprintEditor({
   blueprint,
   gameName,
   onChange,
   history = "own",
   terrainTools = false,
+  nameField = true,
+  fill = false,
+  ref,
 }: {
   blueprint: BaseBlueprint;
   /** The game whose units this layout is built from, which is what its models
@@ -183,6 +198,12 @@ export function BlueprintEditor({
    * (issue #4799). Steps are drawn either way.
    */
   terrainTools?: boolean | "mission";
+  /** Whether the toolbar offers a button that opens the name field. Off for a
+   *  page that names the layout itself, through {@link BlueprintEditorHandle}. */
+  nameField?: boolean;
+  /** Fill the page's flex column rather than take a height of its own. */
+  fill?: boolean;
+  ref?: Ref<BlueprintEditorHandle>;
 }) {
   const { t } = useLingui();
   const [handle, setHandle] = useState<MapScene3D | null>(null);
@@ -207,7 +228,32 @@ export function BlueprintEditor({
     onChange,
   });
 
+  const rename = useCallback(
+    (name: string) =>
+      applyEdit((current) => renameBlueprint(current, BLUEPRINT_BASE_ID, name)),
+    [applyEdit],
+  );
+  useImperativeHandle(ref, () => ({ rename }), [rename]);
+
   const { units, loading: unitsLoading, archive } = useGameUnits(gameName);
+
+  // A building stands where the engine's build grid puts it, so a layout that
+  // arrived with positions between grid points has them moved there as soon as
+  // the game's footprints are known (issue #1479). Every placement and drag
+  // already lands on the grid, so this only ever changes an imported layout.
+  // Straight to `onChange` rather than through the history, because it is not
+  // an edit anybody made and undoing it would put the layout off the grid.
+  const onChangeRef = useRef(onChange);
+  onChangeRef.current = onChange;
+  useEffect(() => {
+    if (units.length === 0) return;
+    const snapped = onBuildGrid(
+      blueprint.buildings,
+      buildingFootprints(units),
+      GRID_ORIGIN,
+    );
+    if (snapped) onChangeRef.current({ ...blueprint, buildings: snapped });
+  }, [units, blueprint]);
   const terrainChanges = useTerrainChanges(archive, units);
   const mission = terrainTools === "mission";
   const showTerrain =
@@ -553,19 +599,6 @@ export function BlueprintEditor({
     : undefined;
   const absent = absentIn(drawn.placements, footprints, BLUEPRINT_BASE_ID);
   const strays = strayDefs(units, blueprint.buildings);
-  // Which of them the engine will not build where the layout says (issue
-  // #1479). The same question a base on a map asks, asked here because a layout
-  // arriving from a game file or a pack is most likely to be opened here.
-  // Only once the game's units have been read: without them every building
-  // looks like one square, and half of a layout that is fine would be accused.
-  const offGrid =
-    units.length > 0
-      ? offGridBuildings(
-          blueprint.buildings,
-          buildingFootprints(units),
-          GRID_ORIGIN,
-        )
-      : [];
 
   return (
     // The unit field in the toolbar picks from this blueprint's game, so it can
@@ -573,10 +606,10 @@ export function BlueprintEditor({
     <UnitGameProvider gameName={gameName}>
       <PlacementSurface
         ground={{ kind: "grid", extent: GRID_EXTENT }}
+        fill={fill}
         onScene={setHandle}
         frame={frame}
         frameLabel={t`Frame blueprint`}
-        chrome={undoRedo && <HistoryControls {...undoRedo} />}
         bars={
           <>
             <div className="flex flex-wrap items-center gap-1.5 rounded-md border border-border/60 bg-card/80 p-1 backdrop-blur">
@@ -600,67 +633,32 @@ export function BlueprintEditor({
                 />
               )}
 
-              <Popover>
-                <PopoverTrigger asChild>
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    className="h-8 max-w-52 gap-1.5 px-2 text-xs"
-                  >
-                    <Blocks className="size-3.5 shrink-0" />
-                    <span className="truncate">
-                      {layoutTriggerLabel(
-                        blueprint.name,
-                        blueprint.buildings.length,
-                      )}
-                    </span>
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent align="start" className="w-80 space-y-3">
-                  <LayoutNameField
-                    id="blueprint-layout-name"
-                    name={blueprint.name}
-                    onRename={(name) =>
-                      applyEdit((current) =>
-                        renameBlueprint(current, BLUEPRINT_BASE_ID, name),
-                      )
-                    }
-                  />
-                  <p className="text-xs text-muted-foreground">
-                    <Trans>
-                      A blueprint is a shape rather than a place, so there is no
-                      map here and no team. Every building sits at an offset
-                      from the blueprint's own middle, and the squares under
-                      them are the ground the engine will give them.
-                    </Trans>
-                  </p>
-                  <LayoutNotes
-                    overlaps={overlaps}
-                    noSlope={noSlope}
-                    absent={absent}
-                    buildings={blueprint.buildings.length}
-                    strays={strays}
-                    offGrid={offGrid}
-                    // A layout edit like a drag, so the history holds it and the
-                    // library writes it a moment later like any other change.
-                    onSnapToGrid={() =>
-                      applyEdit((current) =>
-                        editBaseLayout(
-                          current,
-                          BLUEPRINT_BASE_ID,
-                          "own",
-                          (buildings) =>
-                            onBuildGrid(
-                              buildings,
-                              buildingFootprints(units),
-                              GRID_ORIGIN,
-                            ),
-                        ),
-                      )
-                    }
-                  />
-                </PopoverContent>
-              </Popover>
+              {nameField && (
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      className="h-8 max-w-52 gap-1.5 px-2 text-xs"
+                    >
+                      <Blocks className="size-3.5 shrink-0" />
+                      <span className="truncate">
+                        {layoutTriggerLabel(
+                          blueprint.name,
+                          blueprint.buildings.length,
+                        )}
+                      </span>
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent align="start" className="w-80">
+                    <LayoutNameField
+                      id="blueprint-layout-name"
+                      name={blueprint.name}
+                      onRename={rename}
+                    />
+                  </PopoverContent>
+                </Popover>
+              )}
 
               <BuildOrderPopover
                 buildings={blueprint.buildings}
@@ -703,6 +701,12 @@ export function BlueprintEditor({
                   }
                 }}
               />
+
+              {undoRedo && (
+                <div className="ml-1 border-l border-border/60 pl-1.5">
+                  <HistoryControls {...undoRedo} />
+                </div>
+              )}
             </div>
 
             {showTerrain && terrainOpen && (
@@ -717,19 +721,30 @@ export function BlueprintEditor({
                 drawing={terrainEditing.drawing}
                 onDone={terrainEditing.finish}
                 onCancel={terrainEditing.cancel}
-                enabled={terrainChanges.enabled === true}
-                onEnabled={mission ? undefined : terrainChanges.setEnabled}
               />
             )}
-            {!terrainTool && (
-              <p className="w-fit rounded bg-card/70 px-2 py-1 text-[11px] text-muted-foreground backdrop-blur">
-                {unitDef
-                  ? t`Click the ground to put one down. Escape stops placing. Drag a building to move it within the blueprint.`
-                  : pickedStep !== null && showTerrain
-                    ? t`Drag the change to move it, or a corner to reshape it. Click a side to add a corner, right click a corner to remove it.`
-                    : t`Pick a building to start placing. Drag one to move it, click bare ground to deselect.`}
-              </p>
-            )}
+            {/* Only while a click on the ground means something new: a building
+                being placed, or a step whose corners can be dragged. */}
+            {!terrainTool &&
+              (unitDef || (pickedStep !== null && showTerrain)) && (
+                <p className="w-fit rounded bg-card/70 px-2 py-1 text-[11px] text-muted-foreground backdrop-blur">
+                  {unitDef
+                    ? t`Click the ground to put one down. Escape stops placing.`
+                    : t`Drag the change to move it, or a corner to reshape it. Click a side to add a corner, right click a corner to remove it.`}
+                </p>
+              )}
+
+            {/* What the engine will make of the layout, on the surface rather
+                than in a popover, because each one is something to fix. */}
+            <div className="flex max-w-md flex-col gap-1.5">
+              <LayoutNotes
+                overlaps={overlaps}
+                noSlope={noSlope}
+                absent={absent}
+                buildings={blueprint.buildings.length}
+                strays={strays}
+              />
+            </div>
 
             {terrainEditing.refused && (
               <p className="w-fit rounded bg-amber-950/70 px-2 py-1 text-[11px] text-amber-200 backdrop-blur">
@@ -750,6 +765,7 @@ export function BlueprintEditor({
                 def={picked.def}
                 what={t`building ${{ number: picked.index + 1 }}`}
                 turnable
+                turnNote={turnNoteText(turning ? turned.length > 0 : null)}
                 onTurn={() =>
                   applyEdit((current) => turnPlacement(current, picked.key, 1))
                 }
@@ -760,12 +776,6 @@ export function BlueprintEditor({
                 }}
               />
             )}
-
-            {/* Below the bar rather than above it (issue #1716). The note
-              appears while the pointer is on the Turn button, and a note above
-              the bar pushes that button out from under the pointer, which takes
-              the note away, which puts the button back. */}
-            <TurnNote moves={turning && picked ? turned.length > 0 : null} />
 
             {pickedStep !== null && showTerrain && (
               <TerrainStepBar
@@ -823,18 +833,7 @@ export function BlueprintEditor({
             missing={drawn.missing}
             drawing={drawn.drawing}
             placed={drawn.placed}
-            terrain={terrain.length}
           />
-        }
-        // What the ground is and how to move the camera over it. What a click
-        // does is the line above the layout, which is about the mode rather than
-        // about the surface, and saying it twice made the two look like
-        // different statements (issue #1716).
-        footer={
-          <Trans>
-            no map · a build grid, {GRID_EXTENT} elmos square · drag or
-            middle-drag to pan · right-drag to turn the view · scroll to zoom
-          </Trans>
         }
       />
     </UnitGameProvider>
@@ -847,7 +846,8 @@ export function BlueprintEditor({
  * A layout names units by their internal name, so it binds to a game. Opened
  * against a game that does not have one of them, that building is drawn as a
  * marker box, which looks deliberate enough to be mistaken for a feature. The
- * count says plainly that it is not.
+ * count says plainly that it is not. How many buildings the layout has is the
+ * page's to say, so it is only counted here while they are still being drawn.
  */
 function DrawnNote({
   gameName,
@@ -855,18 +855,15 @@ function DrawnNote({
   missing,
   drawing,
   placed,
-  terrain,
 }: {
   gameName: string;
   gameMissing: boolean;
   missing: string[];
   drawing: boolean;
   placed: number;
-  /** How many terrain steps the layout has, said after the buildings. */
-  terrain: number;
 }) {
   const { t } = useLingui();
-  if (placed === 0 && terrain === 0) return null;
+  if (placed === 0) return null;
   const missingList = missing.join(", ");
   const missingCount = missing.length;
   const problem = gameMissing
@@ -888,14 +885,14 @@ function DrawnNote({
           {problem}
         </p>
       )}
-      <p className="rounded bg-card/70 px-2 py-1 font-mono text-[11px] text-muted-foreground backdrop-blur">
-        {drawing
-          ? plural(placed, {
-              one: "drawing # building",
-              other: "drawing # buildings",
-            })
-          : countLine(placed, terrain)}
-      </p>
+      {drawing && (
+        <p className="rounded bg-card/70 px-2 py-1 font-mono text-[11px] text-muted-foreground backdrop-blur">
+          {plural(placed, {
+            one: "drawing # building",
+            other: "drawing # buildings",
+          })}
+        </p>
+      )}
     </>
   );
 }

@@ -25,7 +25,7 @@
 
 import { Trans, useLingui } from "@lingui/react/macro";
 import { Button } from "@picoframe/frame";
-import { Loader2, MapPin, MountainSnow, Unplug, X } from "lucide-react";
+import { Loader2, MapPin, MountainSnow, Unplug } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router";
 
@@ -95,14 +95,14 @@ const NO_STEPS: TerrainStep[] = [];
 export function BlueprintOnMap({
   blueprint,
   gameName,
-  onClose,
+  fill = false,
 }: {
   blueprint: BaseBlueprint;
   /** The game whose units this layout is built from, which is what its models
    *  and its footprints come out of. */
   gameName: string;
-  /** Put the map away again, back to a page that has read none. */
-  onClose: () => void;
+  /** Fill the page's flex column, as `PlacementSurface` does. */
+  fill?: boolean;
 }) {
   const { t } = useLingui();
   const { target, loading: enginesLoading } = usePreferredTarget();
@@ -418,31 +418,21 @@ export function BlueprintOnMap({
   return (
     <>
       {/* Above the surface rather than on it, because a surface with no map on
-          it yet shows a stand-in instead of its chrome, and the two ways out of
-          that state are the two buttons here. */}
-      <div className="flex flex-wrap items-center gap-2">
-        <Button
-          type="button"
-          size="sm"
-          variant="outline"
-          className="gap-1.5"
-          disabled={scan.loading && maps.length === 0}
-          onClick={() => setPicking(true)}
-        >
-          <MapPin className="size-4" /> {mapName || t`Choose a map`}
-        </Button>
-        <Button
-          type="button"
-          size="sm"
-          variant="ghost"
-          className="gap-1.5"
-          onClick={onClose}
-        >
-          <X className="size-4" /> <Trans>Done with the map</Trans>
-        </Button>
-      </div>
+          it yet shows a stand-in instead of its chrome. Putting the map away is
+          the page's Test button. */}
+      <Button
+        type="button"
+        size="sm"
+        variant="outline"
+        className="w-fit gap-1.5"
+        disabled={scan.loading && maps.length === 0}
+        onClick={() => setPicking(true)}
+      >
+        <MapPin className="size-4" /> {mapName || t`Choose a map`}
+      </Button>
 
       <PlacementSurface
+        fill={fill}
         ground={{
           kind: "map",
           heightSrc: assets.heightSrc,
@@ -539,12 +529,6 @@ export function BlueprintOnMap({
             />
             <WaterlessNote floor={waterless} />
           </>
-        }
-        footer={
-          <Trans>
-            {mapName} · click or drag to stand the layout somewhere else · this
-            changes the layout in no way · right-drag to turn the view
-          </Trans>
         }
       />
 
