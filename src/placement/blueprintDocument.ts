@@ -81,5 +81,14 @@ export function documentLayout(
   const layout = base
     ? doc.blueprints.find((entry) => entry.id === base.blueprint)
     : undefined;
-  return layout ?? { ...previous, buildings: [] };
+  if (layout) return layout;
+  // Its terrain steps stay (issue #4793), and with no buildings left every one
+  // of them comes before the first building there will be.
+  return {
+    ...previous,
+    buildings: [],
+    ...(previous.terrain
+      ? { terrain: previous.terrain.map((step) => ({ ...step, before: 0 })) }
+      : {}),
+  };
 }

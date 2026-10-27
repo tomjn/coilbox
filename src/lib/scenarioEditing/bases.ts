@@ -54,6 +54,7 @@ import {
   type SubstitutionPlan,
   substituteQueue,
 } from "@/blueprint/substitution";
+import { stepsWithoutBuilding } from "@/blueprint/terrainEdit";
 import type { UnitDatasetEntry } from "@/content/bindings";
 import type {
   BaseBuildingRole,
@@ -251,6 +252,33 @@ export function editBaseLayout(
   const buildings = update(layout.buildings);
   if (!buildings) return scenario;
   return writeLayout(scenario, base, layout, how, { buildings });
+}
+
+/**
+ * The document with one base's terrain steps changed, as {@link LayoutEdit}
+ * says (issue #4793). The same as {@link editBaseLayout}, for the steps rather
+ * than the buildings: the update returns `null` for an edit that lands on
+ * nothing, and the field goes when the last step does.
+ */
+export function editBaseTerrain(
+  scenario: Scenario,
+  id: string,
+  how: LayoutEdit,
+  update: (
+    terrain: TerrainStep[],
+    layout: BaseBlueprint,
+  ) => TerrainStep[] | null,
+): Scenario {
+  const base = scenario.bases.find((entry) => entry.id === id);
+  const layout = base
+    ? scenario.blueprints.find((b) => b.id === base.blueprint)
+    : undefined;
+  if (!base || !layout) return scenario;
+  const terrain = update(layout.terrain ?? [], layout);
+  if (!terrain) return scenario;
+  return writeLayout(scenario, base, layout, how, {
+    terrain: terrain.length > 0 ? terrain : undefined,
+  });
 }
 
 /**
@@ -573,7 +601,15 @@ export function removeBuilding(
   const next = editBaseLayout(scenario, id, how, (buildings) =>
     buildings.filter((_, i) => i !== index),
   );
-  return editBase(next, id, {
+  // The steps that came after it keep their place among the buildings left
+  // (issue #4793). A copy made by the edit above is only this base's, so the
+  // same `how` edits that copy rather than making another.
+  const stepped = layout.terrain?.length
+    ? editBaseTerrain(next, id, how, (terrain) =>
+        stepsWithoutBuilding(terrain, index),
+      )
+    : next;
+  return editBase(stepped, id, {
     buildings: base.buildings.filter((_, i) => i !== index),
   });
 }
