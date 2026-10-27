@@ -53,7 +53,9 @@ export type PlacedStep = TerrainDraw & {
   reach: number;
 };
 
-function toneOf(step: PayloadTerrainStep): TerrainTone {
+export function toneOf(
+  step: Pick<PayloadTerrainStep, "kind" | "heights" | "height">,
+): TerrainTone {
   const height =
     step.kind === "ramp" && step.heights
       ? (step.heights[0] + step.heights[1]) / 2
