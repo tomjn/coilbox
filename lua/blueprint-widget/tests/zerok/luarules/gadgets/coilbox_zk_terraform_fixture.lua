@@ -18,7 +18,14 @@ function gadget:GetInfo()
 	}
 end
 
-local CASES = 14
+local CASES = 16
+-- The case whose builder Zero-K's gadget stops checking. Zero-K v1.14.10.3's
+-- unit_terraform.lua moves the last constructor into a dead one's slot without
+-- telling it its new index (UnitDestroyed). When that one dies too, it moves the
+-- one before it past the end of the list, and the gadget never looks at that
+-- builder's queue again, so nothing keeps its queued terraform alive.
+local UNCHECKED_CASE = 16
+local SPARES_DIE_FRAME = 33
 -- Cases with more than one builder, which share the terraform and the turret.
 local BUILDERS = { [10] = 2, [13] = 2 }
 -- Lanes run east to west along the middle of the map, side by side, this far
@@ -41,6 +48,15 @@ if gadgetHandler:IsSyncedCode() then
 	local caseOfBuilder = {}
 	local terraunitDefID = UnitDefNames.terraunit.id
 	local turretDefID = UnitDefNames.turretlaser.id
+	local heavyDefID = UnitDefNames.turretheavylaser.id
+	local spares = {}
+
+	-- A constructor that belongs to no case, there to be killed.
+	local function spare(x, z)
+		local unitID = Spring.CreateUnit("cloakcon", x, Spring.GetGroundHeight(x, z), z, "east", TEAM)
+		spares[#spares + 1] = unitID
+		Spring.Echo(string.format("FIXTURE spare id=%s", tostring(unitID)))
+	end
 
 	local function caseAt(x, z)
 		local best, bestDistance
@@ -72,6 +88,10 @@ if gadgetHandler:IsSyncedCode() then
 	end
 
 	function gadget:UnitFinished(unitID, unitDefID)
+		if unitDefID == heavyDefID then
+			local x, _, z = Spring.GetUnitPosition(unitID)
+			Spring.Echo(string.format("FIXTURE finished case=%d frame=%d unit=turretheavylaser id=%d", caseAt(x, z), Spring.GetGameFrame(), unitID))
+		end
 		if unitDefID == turretDefID then
 			local x, y, z = Spring.GetUnitPosition(unitID)
 			Spring.Echo(string.format("FIXTURE finished case=%d frame=%d unit=turretlaser id=%d x=%.1f y=%.1f z=%.1f ground=%.1f orig=%.1f",
@@ -109,6 +129,8 @@ if gadgetHandler:IsSyncedCode() then
 
 	function gadget:GameFrame(frame)
 		if frame == CREATE_FRAME then
+			local mx, mz = lane(1)
+			spare(mx - 256, mz - 256)
 			for i = 1, CASES do
 				local cx, cz = lane(i)
 				local lo, hi = math.huge, -math.huge
@@ -129,6 +151,15 @@ if gadgetHandler:IsSyncedCode() then
 					Spring.Echo(string.format("FIXTURE builder case=%d id=%s lane=%d,%d ground=%.1f..%.1f",
 						i, tostring(unitID), cx, cz, lo, hi))
 				end
+				if i == UNCHECKED_CASE then
+					-- straight after the case's builder, so it is the last constructor
+					spare(cx - 256, cz - 256)
+				end
+			end
+		end
+		if frame == SPARES_DIE_FRAME then
+			for _, unitID in ipairs(spares) do
+				Spring.DestroyUnit(unitID, false, true)
 			end
 		end
 		if frame % 30 == 0 then
