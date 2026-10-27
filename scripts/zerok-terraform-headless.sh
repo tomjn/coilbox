@@ -55,8 +55,9 @@
 #                            zk:stable.
 #   COILBOX_ZK_MAP           the map archive's filename under maps/.
 #   COILBOX_ZK_MAP_NAME      the name that archive declares.
-#   COILBOX_ZK_ONLY          "ground" to play only the save ground matches, or
-#                            "only" to play only the only raise or lower match.
+#   COILBOX_ZK_ONLY          "ground" to play only the save ground matches,
+#                            "only" to play only the only raise or lower match,
+#                            or "default" to play only the default match.
 #   COILBOX_ZK_KEEP          set to keep the logs when everything passes.
 set -euo pipefail
 
@@ -332,11 +333,8 @@ leave() { # log
   expect "builders that had not finished their orders" "$(grep -E 'FIXTURE leave-start ' "$log" | grep -vc ' queued=0$' || true)" 0
   grep -E 'FIXTURE leave-start ' "$log" | grep -v ' queued=0$' | sed 's/^.*FIXTURE /    /' || true
   local stuck
-  # Known failing (#4834): on the 112 wall, a builder of case 24 is left on the
-  # slope of a block. It is listed, and does not count, until that is fixed.
-  stuck="$(grep -E 'FIXTURE leave-end ' "$log" | awk '{ for (i = 1; i <= NF; i++) { split($i, kv, "="); v[kv[1]] = kv[2] } if (v["away"] + 0 > 32 && v["case"] != 24) printf "case %s unit %s %s away; ", v["case"], v["unit"], v["away"] }')"
+  stuck="$(grep -E 'FIXTURE leave-end ' "$log" | awk '{ for (i = 1; i <= NF; i++) { split($i, kv, "="); v[kv[1]] = kv[2] } if (v["away"] + 0 > 32) printf "case %s unit %s %s away; ", v["case"], v["unit"], v["away"] }')"
   expect "builders that could not walk away" "${stuck:-none}" none
-  grep -E 'FIXTURE leave-end case=24 ' "$log" | awk '{ for (i = 1; i <= NF; i++) { split($i, kv, "="); v[kv[1]] = kv[2] } if (v["away"] + 0 > 32) printf "  known failing (#4834): case 24 unit %s %s away\n", v["unit"], v["away"] }' || true
 }
 
 # What Zero-K estimated for a case's terraform units, added up.
@@ -394,6 +392,7 @@ expect "Zero-K's terraform widget was on" "$(field "$(line "$LOG" 'PROBE at-orde
 expect "WG.Terraform_GetNextTag was there" "$(field "$(line "$LOG" 'PROBE at-orders ')" GetNextTag)" "function"
 check_common "$LOG" 112 "$KNOWN_PROFILE_112" WG
 
+if [ "${COILBOX_ZK_ONLY:-}" != default ]; then
 echo
 echo "== the lasso widget off, a wall raised by 70, the probe's own tags"
 play lasso-off 70 1 1
@@ -402,8 +401,9 @@ expect "Zero-K's terraform widget was off" "$(field "$(line "$LOG" 'PROBE at-ord
 expect "WG.Terraform_GetNextTag was still there" "$(field "$(line "$LOG" 'PROBE at-orders ')" GetNextTag)" "function"
 check_common "$LOG" 70 "$KNOWN_PROFILE_70" own
 fi
+fi
 
-if [ "${COILBOX_ZK_ONLY:-}" != only ]; then
+if [ "${COILBOX_ZK_ONLY:-}" != only ] && [ "${COILBOX_ZK_ONLY:-}" != default ]; then
 echo
 echo "== save the ground: build and save, then place the saved selection and save again"
 play ground-build 112 0 0 ground_build
