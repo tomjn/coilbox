@@ -299,6 +299,10 @@ check_common() { # log, height, profile, tag source
       "$(awk -v y="$(field "$(line "$log" "FIXTURE finished case=$case .*unit=energysolar ")" y)" -v o="$(field "$(line "$log" "FIXTURE finished case=$case .*unit=energysolar ")" orig)" 'BEGIN { if (y == "") print "none"; else printf "%.1f", y - o }')" "0.0"
     expect "case $case: the solar collector was started before the ring" \
       "$(awk -v s="$(field "$(line "$log" "FIXTURE created case=$case .*unit=energysolar")" frame)" -v t="$(field "$(line "$log" "FIXTURE created case=$case .*unit=terraunit")" frame)" 'BEGIN { print (s != "" && t != "" && s + 0 < t + 0) ? "yes" : "no (" s " against " t ")" }')" yes
+    # The builder that put up the solar collector inside left with the other
+    # before the ring started to rise (#4816).
+    expect "case $case: builders outside the ring when it starts to rise" \
+      "$(grep -E "FIXTURE ring-start case=$case " "$log" | grep -c 'inside=false' || true) of $(grep -cE "FIXTURE ring-start case=$case " "$log" || true)" "2 of 2"
   done
   leave "$log"
   expect "case 9 ground across the long wall" "$(profile "$log" 9)" "$3"

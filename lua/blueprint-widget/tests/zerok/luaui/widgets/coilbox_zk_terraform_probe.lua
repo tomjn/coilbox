@@ -124,6 +124,18 @@ local function model(case, steps, foot)
 	Spring.SendLuaRulesMsg("coilbox_model " .. case .. " " .. serialise({ steps = steps, foot = plain }))
 end
 
+--- The middle of some builders, which the widget sweeps the work towards.
+local function middleOf(units)
+	local sx, sz, n = 0, 0, 0
+	for _, unitID in ipairs(units) do
+		local x, _, z = Spring.GetUnitPosition(unitID)
+		if x then
+			sx, sz, n = sx + x, sz + z, n + 1
+		end
+	end
+	return n > 0 and { x = sx / n, z = sz / n } or nil
+end
+
 -- The case being ordered, for the log.
 local ordering = 0
 
@@ -149,7 +161,7 @@ local function blueprint(builders, cx, cz, shift, mode, withTurret, case, terrai
 	for i, p in ipairs(foot) do
 		p.seq = i
 	end
-	local steps = PLACE.laySteps(resolved, 0, nil, origin, { { x = ax, z = az } }, foot)
+	local steps = PLACE.laySteps(resolved, 0, nil, origin, { { x = ax, z = az } }, foot, middleOf(builders))
 	if case then
 		model(case, steps, foot)
 	end
@@ -346,12 +358,16 @@ local function shots(frame)
 	if not (list and list[1]) or frame < ORDER_FRAME then
 		return
 	end
-	if frame == ORDER_FRAME then
+	-- the camera is set again before each shot, since the game's own camera
+	-- can move it after the match starts
+	if frame % SHOT_EVERY == SHOT_EVERY - 20 then
 		local cx, cz = lane(list[1])
 		local state = Spring.GetCameraState()
 		state.px, state.py, state.pz = cx, Spring.GetGroundHeight(cx, cz), cz
-		state.dist, state.height = 900, 900
+		state.dist, state.height = 800, 800
 		Spring.SetCameraState(state, 0)
+		-- which Zero-K's camera does not always take, so point it there as well
+		Spring.SetCameraTarget(cx, Spring.GetGroundHeight(cx, cz), cz, 0)
 	elseif frame % SHOT_EVERY == 0 then
 		Spring.SendCommands("screenshot png")
 	end

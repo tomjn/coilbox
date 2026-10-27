@@ -42,6 +42,9 @@ local REPORT_EVERY = 300
 -- The builders have until coilbox_end_frame for their orders. Then the
 -- blueprint cases' builders get 30 seconds to walk away, far more than the few
 -- hundred elmos take a Conjurer at its speed of 54, and the match ends.
+-- Where the team's starting commander is put, out of every lane's way: the
+-- flat east end of the map, far north of the lanes.
+local COMMANDER_AT = { x = 11700, z = 250 }
 local LEAVE_FRAME = tonumber((Spring.GetModOptions() or {}).coilbox_end_frame) or 9000
 local END_FRAME = LEAVE_FRAME + 900
 local TEAM = 0
@@ -82,6 +85,33 @@ end
 if gadgetHandler:IsSyncedCode() then
 	local builders = {}
 	local caseOfBuilder = {}
+	-- The walled outposts' rings, which run 160 each way from the lane's middle.
+	-- When the ground along a ring first rises, the fixture says where each of
+	-- the case's builders is, inside the ring or out (#4816).
+	local OUTPOST_HALF = 160
+	local ringStarted = {}
+	local function watchRing(case)
+		if ringStarted[case] then
+			return
+		end
+		-- the ground along the ring, at its corners and the middles of its sides
+		local cx, cz = lane(case)
+		for _, d in ipairs({ { -1, -1 }, { 0, -1 }, { 1, -1 }, { 1, 0 }, { 1, 1 }, { 0, 1 }, { -1, 1 }, { -1, 0 } }) do
+			local x, z = cx + d[1] * OUTPOST_HALF, cz + d[2] * OUTPOST_HALF
+			if Spring.GetGroundHeight(x, z) > Spring.GetGroundOrigHeight(x, z) then
+				ringStarted[case] = true
+				for _, b in ipairs(builders) do
+					if caseOfBuilder[b] == case and Spring.ValidUnitID(b) then
+						local x, _, z = Spring.GetUnitPosition(b)
+						local inside = math.abs(x - cx) < OUTPOST_HALF and math.abs(z - cz) < OUTPOST_HALF
+						Spring.Echo(string.format("FIXTURE ring-start case=%d frame=%d unit=%d at=%.0f,%.0f inside=%s", case, Spring.GetGameFrame(), b, x - cx, z - cz, tostring(inside)))
+					end
+				end
+				return
+			end
+		end
+	end
+
 	-- where each builder is sent at LEAVE_FRAME, its own spot west of its lane
 	local leaveTo = {}
 
@@ -264,6 +294,16 @@ if gadgetHandler:IsSyncedCode() then
 			end
 		end
 		if frame == CREATE_FRAME then
+			-- The team's starting commander stands at one of the map's start
+			-- positions, which can be inside a case's lane: in the ring of the
+			-- walled outpost it was shut in by walls it had nothing to do with.
+			-- It is moved where no lane reaches, before any builder is made.
+			for _, unitID in ipairs(Spring.GetTeamUnits(TEAM) or {}) do
+				local x, _, z = Spring.GetUnitPosition(unitID)
+				Spring.SetUnitPosition(unitID, COMMANDER_AT.x, COMMANDER_AT.z)
+				Spring.GiveOrderToUnit(unitID, CMD.STOP, {}, 0)
+				Spring.Echo(string.format("FIXTURE start-unit moved id=%d unit=%s from=%.0f,%.0f nearest=%d", unitID, UnitDefs[Spring.GetUnitDefID(unitID)].name, x, z, caseAt(x, z)))
+			end
 			local mx, mz = lane(1)
 			spare(mx - 256, mz - 256)
 			for _, i in ipairs(CREATE_ORDER) do
@@ -280,7 +320,9 @@ if gadgetHandler:IsSyncedCode() then
 					local unitID = Spring.CreateUnit("cloakcon", bx, Spring.GetGroundHeight(bx, bz), bz, "east", TEAM)
 					builders[#builders + 1] = unitID
 					caseOfBuilder[unitID] = i
-					leaveTo[unitID] = { x = cx - LANE_GAP / 2, z = cz - 128 + (n - 1) * 48 }
+					-- the ring cases have room, so their spots are well clear of the slope
+					local out = WIDE_LANES[i] and 384 or LANE_GAP / 2
+					leaveTo[unitID] = { x = cx - out, z = cz - 128 + (n - 1) * 48 }
 					Spring.SetUnitRulesParam(unitID, "coilbox_case", i)
 					Spring.SetUnitRulesParam(unitID, "coilbox_lane_x", cx)
 					Spring.SetUnitRulesParam(unitID, "coilbox_lane_z", cz)
@@ -315,6 +357,8 @@ if gadgetHandler:IsSyncedCode() then
 				end
 			end
 		end
+		watchRing(21)
+		watchRing(22)
 		if frame == LEAVE_FRAME then
 			for _, unitID in ipairs(builders) do
 				local case = caseOfBuilder[unitID]

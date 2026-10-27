@@ -110,6 +110,18 @@ local function orderBuild()
 	build("energysolar", cx - 960, cz)
 end
 
+--- The middle of some builders, which the widget sweeps the work towards.
+local function middleOf(units)
+	local sx, sz, n = 0, 0, 0
+	for _, unitID in ipairs(units) do
+		local x, _, z = Spring.GetUnitPosition(unitID)
+		if x then
+			sx, sz, n = sx + x, sz + z, n + 1
+		end
+	end
+	return n > 0 and { x = sx / n, z = sz / n } or nil
+end
+
 local function orderPlace()
 	local ok, saved = pcall(VFS.Include, "LuaUI/coilbox_ground_steps.lua")
 	if not ok or type(saved) ~= "table" then
@@ -125,7 +137,7 @@ local function orderPlace()
 	for i, p in ipairs(foot) do
 		p.seq = i
 	end
-	local steps = PLACE.laySteps(resolved, 0, nil, nil, { { x = ax, z = az } }, foot)
+	local steps = PLACE.laySteps(resolved, 0, nil, nil, { { x = ax, z = az } }, foot, middleOf(builders))
 	local ground = TERRAFORM.session({ heightAt = Spring.GetGroundHeight, corners = { x = Game.mapSizeX / 8 + 1, z = Game.mapSizeZ / 8 + 1 }, structures = {} }).apply(steps, foot)
 	local plan = PLACE.plan(foot, PLACE.capabilities(builders), false, "help", { steps = steps, on = true, ground = ground })
 	PLACE.issue(plan, LATER, CLEAR)
