@@ -12781,6 +12781,10 @@ msgstr "机器人标志以及协管员或管理员级别会在 365 天未登录�
 msgid "Both buttons open on <0>{gameFile}</0>, where {engine} writes. Pick another file if you keep your games somewhere else. A player who has never saved a base in game has no file there yet, and sending one writes it."
 msgstr "两个按钮都会在 <0>{gameFile}</0> 打开，这是 {engine} 写入的位置。如果你的游戏放在别处，请另选文件。从未在游戏中保存过基地的玩家在那里还没有文件，发送时会创建它。"
 
+#: src/placement/TerrainControls.tsx
+msgid "Both ways"
+msgstr ""
+
 #: src/multiplayer/admin/tools.tsx
 #, fuzzy
 msgid "Bots"
@@ -34046,6 +34050,10 @@ msgstr "最低难度"
 msgid "Only has an effect on a unit that flies. The engine drops it for anything else."
 msgstr "只对飞行单位有效。其他单位的此设置会被引擎丢弃。"
 
+#: src/placement/TerrainControls.tsx
+msgid "Only lower"
+msgstr ""
+
 #: src/content/unitFieldNotes.ts
 #, fuzzy
 msgid "Only matters for a fighter."
@@ -34070,6 +34078,10 @@ msgstr "仅限自有地图：隐藏生成的地图风格"
 #, fuzzy
 msgid "Only produced while the unit is switched on and its upkeep was paid that tick."
 msgstr "仅在单位开启且该刻已支付维持消耗时产出。"
+
+#: src/placement/TerrainControls.tsx
+msgid "Only raise"
+msgstr ""
 
 #: src/content/unitFieldNotes.ts
 #, fuzzy
@@ -53428,6 +53440,10 @@ msgstr "获胜的队伍"
 #, fuzzy
 msgid "Which units this mod touches."
 msgstr "此模组影响的单位。"
+
+#: src/placement/TerrainControls.tsx
+msgid "Which way the ground changes"
+msgstr ""
 
 #: src/workshop/pages/components/WeaponLibraryPanel.tsx
 #, fuzzy

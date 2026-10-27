@@ -12781,6 +12781,10 @@ msgstr "Les indicateurs bot, et les niveaux modérateur ou administrateur, sont 
 msgid "Both buttons open on <0>{gameFile}</0>, where {engine} writes. Pick another file if you keep your games somewhere else. A player who has never saved a base in game has no file there yet, and sending one writes it."
 msgstr "Les deux boutons s’ouvrent sur <0>{gameFile}</0>, là où {engine} écrit. Choisissez un autre fichier si vous gardez vos jeux ailleurs. Un joueur qui n’a jamais enregistré de base en jeu n’y a pas encore de fichier, et en envoyer un l’écrit."
 
+#: src/placement/TerrainControls.tsx
+msgid "Both ways"
+msgstr ""
+
 #: src/multiplayer/admin/tools.tsx
 #, fuzzy
 msgid "Bots"
@@ -34046,6 +34050,10 @@ msgstr "Seulement à partir de"
 msgid "Only has an effect on a unit that flies. The engine drops it for anything else."
 msgstr "N’a d’effet que sur une unité volante. Le moteur l’ignore pour le reste."
 
+#: src/placement/TerrainControls.tsx
+msgid "Only lower"
+msgstr ""
+
 #: src/content/unitFieldNotes.ts
 #, fuzzy
 msgid "Only matters for a fighter."
@@ -34070,6 +34078,10 @@ msgstr "Cartes propres uniquement : les styles de cartes générées sont masqu
 #, fuzzy
 msgid "Only produced while the unit is switched on and its upkeep was paid that tick."
 msgstr "Produit uniquement quand l’unité est en marche et que son entretien a été payé à ce tick."
+
+#: src/placement/TerrainControls.tsx
+msgid "Only raise"
+msgstr ""
 
 #: src/content/unitFieldNotes.ts
 #, fuzzy
@@ -53428,6 +53440,10 @@ msgstr "Quelle équipe a gagné"
 #, fuzzy
 msgid "Which units this mod touches."
 msgstr "Les unités que ce mod touche."
+
+#: src/placement/TerrainControls.tsx
+msgid "Which way the ground changes"
+msgstr ""
 
 #: src/workshop/pages/components/WeaponLibraryPanel.tsx
 #, fuzzy

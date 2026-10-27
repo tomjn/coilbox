@@ -10308,6 +10308,10 @@ msgstr ""
 msgid "Both buttons open on <0>{gameFile}</0>, where {engine} writes. Pick another file if you keep your games somewhere else. A player who has never saved a base in game has no file there yet, and sending one writes it."
 msgstr ""
 
+#: src/placement/TerrainControls.tsx
+msgid "Both ways"
+msgstr ""
+
 #: src/multiplayer/admin/tools.tsx
 msgid "Bots"
 msgstr ""
@@ -27544,6 +27548,10 @@ msgstr ""
 msgid "Only has an effect on a unit that flies. The engine drops it for anything else."
 msgstr ""
 
+#: src/placement/TerrainControls.tsx
+msgid "Only lower"
+msgstr ""
+
 #: src/content/unitFieldNotes.ts
 msgid "Only matters for a fighter."
 msgstr ""
@@ -27562,6 +27570,10 @@ msgstr ""
 
 #: src/content/unitFieldNotes.ts
 msgid "Only produced while the unit is switched on and its upkeep was paid that tick."
+msgstr ""
+
+#: src/placement/TerrainControls.tsx
+msgid "Only raise"
 msgstr ""
 
 #: src/content/unitFieldNotes.ts
@@ -43216,6 +43228,10 @@ msgstr ""
 
 #: src/workshop/pages/components/RandomModDrawer.tsx
 msgid "Which units this mod touches."
+msgstr ""
+
+#: src/placement/TerrainControls.tsx
+msgid "Which way the ground changes"
 msgstr ""
 
 #: src/workshop/pages/components/WeaponLibraryPanel.tsx

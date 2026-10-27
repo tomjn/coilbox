@@ -132,6 +132,37 @@ describe("terrain step edits", () => {
     });
   });
 
+  it("sets and clears which way a level or ramp changes the ground (#4804)", () => {
+    const only = edited(layout([pad]), (doc) =>
+      setStep(doc, ID, 0, { only: "raise" }),
+    );
+    expect(only.terrain?.[0].only).toBe("raise");
+    const both = edited(layout([{ ...pad, only: "lower" }]), (doc) =>
+      setStep(doc, ID, 0, { only: "both" }),
+    );
+    expect(both.terrain?.[0]).not.toHaveProperty("only");
+
+    const ramp = newStep("ramp", [
+      { x: 0, z: 0 },
+      { x: 0, z: 128 },
+    ]);
+    const ramped = edited(layout([ramp]), (doc) =>
+      setStep(doc, ID, 0, { only: "lower" }),
+    );
+    expect(ramped.terrain?.[0].only).toBe("lower");
+  });
+
+  it("leaves a raise or smooth step without a choice, and drops it on a switch to raise", () => {
+    const raise = edited(layout([wallStep()]), (doc) =>
+      setStep(doc, ID, 0, { only: "raise" }),
+    );
+    expect(raise.terrain?.[0]).not.toHaveProperty("only");
+    const switched = edited(layout([{ ...pad, only: "raise" }]), (doc) =>
+      setStep(doc, ID, 0, { kind: "raise" }),
+    );
+    expect(switched.terrain?.[0]).not.toHaveProperty("only");
+  });
+
   it("deletes a step, and the field with the last one", () => {
     const out = edited(layout([pad]), (doc) => removeStep(doc, ID, 0));
     expect(out.terrain).toBeUndefined();

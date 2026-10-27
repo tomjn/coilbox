@@ -12781,6 +12781,10 @@ msgstr "ボットフラグとモデレーターや管理者のレベルは、365
 msgid "Both buttons open on <0>{gameFile}</0>, where {engine} writes. Pick another file if you keep your games somewhere else. A player who has never saved a base in game has no file there yet, and sending one writes it."
 msgstr "どちらのボタンも、{engine} が書き込む <0>{gameFile}</0> で開きます。ゲームを別の場所に置いている場合は、別のファイルを選択してください。ゲーム内でベースを保存したことのないプレイヤーにはまだファイルがなく、送信するとファイルが作られます。"
 
+#: src/placement/TerrainControls.tsx
+msgid "Both ways"
+msgstr ""
+
 #: src/multiplayer/admin/tools.tsx
 #, fuzzy
 msgid "Bots"
@@ -34046,6 +34050,10 @@ msgstr "最低難易度"
 msgid "Only has an effect on a unit that flies. The engine drops it for anything else."
 msgstr "飛行ユニットにのみ効果があります。それ以外ではエンジンが無視します。"
 
+#: src/placement/TerrainControls.tsx
+msgid "Only lower"
+msgstr ""
+
 #: src/content/unitFieldNotes.ts
 #, fuzzy
 msgid "Only matters for a fighter."
@@ -34070,6 +34078,10 @@ msgstr "独自マップのみ：生成されたマップスタイルは非表示
 #, fuzzy
 msgid "Only produced while the unit is switched on and its upkeep was paid that tick."
 msgstr "ユニットがオンで、そのティックの維持コストが支払われた場合にのみ生産されます。"
+
+#: src/placement/TerrainControls.tsx
+msgid "Only raise"
+msgstr ""
 
 #: src/content/unitFieldNotes.ts
 #, fuzzy
@@ -53428,6 +53440,10 @@ msgstr "勝ったチーム"
 #, fuzzy
 msgid "Which units this mod touches."
 msgstr "この MOD が変更するユニット。"
+
+#: src/placement/TerrainControls.tsx
+msgid "Which way the ground changes"
+msgstr ""
 
 #: src/workshop/pages/components/WeaponLibraryPanel.tsx
 #, fuzzy
