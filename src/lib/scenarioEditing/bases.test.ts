@@ -731,7 +731,7 @@ describe("a layout edited as a layout", () => {
     expect(replaceBlueprint(doc, { ...layout, id: "other" })).toBe(doc);
   });
 
-  it("keeps a layout emptied of buildings that still has terrain steps (issue #4790)", () => {
+  it("keeps a layout, and the bases placed from it, when it is emptied of buildings but still has terrain steps (issues #4790, #4829)", () => {
     const wall = {
       kind: "raise" as const,
       shape: "wall" as const,
@@ -749,8 +749,9 @@ describe("a layout edited as a layout", () => {
     });
     expect(next.blueprints).toHaveLength(1);
     expect(next.blueprints[0].terrain).toEqual([wall]);
-    // No base can be drawn from a layout with nothing standing in it.
-    expect(next.bases).toEqual([]);
+    // A mission applies the steps with no building standing (issue #4829), so
+    // the bases placed from it stay.
+    expect(next.bases).toEqual(document().bases);
   });
 
   it("carries a layout's terrain steps into a copy of its base (issue #4790)", () => {

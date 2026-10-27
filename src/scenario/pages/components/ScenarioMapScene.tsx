@@ -25,6 +25,7 @@ import {
 } from "@/lib/scenarioEditing/editing";
 import { isTypingTarget } from "@/lib/scenarioEditing/history";
 import type { LayoutChoice } from "@/lib/scenarioEditing/layoutPlacing";
+import { anchorPlacements } from "@/lib/scenarioEditing/placements";
 import { MapLoadIndicator } from "@/placement/MapLoadIndicator";
 import { PlacementSurface, SurfaceMessage } from "@/placement/PlacementSurface";
 import { dragKeys, placementKey } from "@/placement/placements";
@@ -346,7 +347,12 @@ export const ScenarioMapScene = forwardRef<
     [onChange, setSelected],
   );
 
-  const picked = units.placements.find((p) => p.key === selected) ?? null;
+  // A base of terrain steps alone has no model to draw, so it is selected by an
+  // anchor at its origin (issue #4829).
+  const picked =
+    units.placements.find((p) => p.key === selected) ??
+    anchorPlacements(scenario).find((p) => p.key === selected) ??
+    null;
 
   // The zones sheet, the paths drawn over the ground and the start position
   // markers: the map's own decorations, and what is currently being worked on

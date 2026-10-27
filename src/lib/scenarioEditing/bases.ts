@@ -344,10 +344,10 @@ export function renameBlueprint(
  * solar moved. Copy on write is for an edit made through one base, which cannot
  * be told from a write through by looking at the base in front of you.
  *
- * A layout emptied of buildings takes its bases with it, and the layout itself
- * unless it has terrain steps left (issue #4790). A base with nothing in
- * it draws nothing and can never be clicked on again, so it would be a thing the
- * document held and the author could not reach.
+ * A layout emptied of buildings and terrain steps takes its bases with it, and
+ * the layout itself. A base with nothing in it draws nothing and can never be
+ * selected again, so it would be a thing the document held and the author could
+ * not reach. One with terrain steps left stays (issues #4790, #4829).
  */
 export function replaceBlueprint(
   scenario: Scenario,
@@ -355,18 +355,10 @@ export function replaceBlueprint(
 ): Scenario {
   if (!scenario.blueprints.some((b) => b.id === layout.id)) return scenario;
   if (layout.buildings.length === 0) {
-    // A layout of terrain steps alone is still a layout (issue #4790), but no
-    // base can be drawn from it, so the bases placed from it still go.
+    // A layout of terrain steps alone is still a layout (issue #4790), and a
+    // mission applies its steps with nothing standing (issue #4829), so the
+    // bases placed from it stay.
     if (!layout.terrain?.length) return removeBlueprint(scenario, layout.id);
-    return {
-      ...scenario,
-      blueprints: edit<BaseBlueprint>(
-        scenario.blueprints,
-        layout.id,
-        () => layout,
-      ),
-      bases: scenario.bases.filter((base) => base.blueprint !== layout.id),
-    };
   }
   return {
     ...scenario,
@@ -600,7 +592,13 @@ export function removeBuilding(
   const layout = base
     ? scenario.blueprints.find((b) => b.id === base.blueprint)
     : undefined;
-  if (!base || !layout?.buildings[index]) return scenario;
+  if (!base || !layout) return scenario;
+  // A base of terrain steps alone is selected by an anchor at index 0 (issue
+  // #4829), and deleting it deletes the base.
+  if (layout.buildings.length === 0 && index === 0) {
+    return removeBase(scenario, id);
+  }
+  if (!layout.buildings[index]) return scenario;
   if (layout.buildings.length === 1) return removeBase(scenario, id);
 
   const next = editBaseLayout(scenario, id, how, (buildings) =>

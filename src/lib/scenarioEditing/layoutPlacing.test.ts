@@ -194,7 +194,7 @@ describe("what a base can be placed from", () => {
 
   /** A base with no buildings is a thing the document holds and the author can
    *  never see, select or delete. */
-  it("greys out a layout with nothing in it rather than hiding it", () => {
+  it("greys out a layout with no buildings and no terrain rather than hiding it", () => {
     const options = layoutOptions(
       document(),
       [stored("Empty", "BA 12.34")],
@@ -203,6 +203,47 @@ describe("what a base can be placed from", () => {
     expect(options[0].disabled).toBeUndefined();
     expect(options[1].label).toBe("Kept");
     expect(options[1].disabled).toBe(true);
+  });
+
+  /** A mission applies a base's terrain steps (issue #4799), so a layout of
+   *  steps alone is a base an author can place (issue #4829). */
+  it("offers a layout of terrain steps alone, from the scenario and the library", () => {
+    const wall = {
+      kind: "raise" as const,
+      shape: "wall" as const,
+      points: [
+        { x: 0, z: 0 },
+        { x: 64, z: 0 },
+      ],
+      height: 16,
+      before: 0,
+    };
+    const doc = document();
+    const options = layoutOptions(
+      {
+        ...doc,
+        blueprints: [
+          ...doc.blueprints,
+          { id: "bp3", name: "Wall ring", buildings: [], terrain: [wall] },
+        ],
+      },
+      [
+        {
+          ...stored("Ring", "BA 12.34"),
+          layout: {
+            ...stored("Ring", "BA 12.34").layout,
+            buildings: [],
+            terrain: [wall],
+          },
+        },
+      ],
+      "BA 12.34",
+    );
+    expect(options.find((o) => o.label === "Wall ring")?.disabled).toBe(
+      undefined,
+    );
+    expect(options.find((o) => o.label === "Ring")?.disabled).toBeUndefined();
+    expect(options.find((o) => o.label === "Kept")?.disabled).toBe(true);
   });
 
   it("sorts nothing by game when the scenario has not picked one", () => {

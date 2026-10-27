@@ -48,6 +48,34 @@ export function groupFormationOffset(
 }
 
 /**
+ * One anchor for each base made of terrain steps alone (issue #4829).
+ *
+ * Such a base has no building to click, and a selection names a placement, so
+ * this is the placement that stands for it: at the base's origin, with no def.
+ * It is kept out of {@link scenarioPlacements} because that list is what the
+ * map draws models and footprints from, and this has neither.
+ */
+export function anchorPlacements(
+  scenario: Pick<Scenario, "bases" | "blueprints">,
+): Placement[] {
+  const out: Placement[] = [];
+  for (const base of scenario.bases) {
+    if (baseBuildings(scenario.blueprints, base).length > 0) continue;
+    out.push({
+      key: placementKey("base", base.id, 0),
+      kind: "base",
+      id: base.id,
+      index: 0,
+      def: "",
+      team: base.team,
+      pos: base.origin,
+      facing: 0,
+    });
+  }
+  return out;
+}
+
+/**
  * Every unit the document places, in document order: actors, then groups, then
  * bases.
  *

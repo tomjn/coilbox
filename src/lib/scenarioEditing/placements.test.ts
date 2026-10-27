@@ -2,7 +2,11 @@ import { describe, expect, it } from "vitest";
 import { buildGridSnap } from "@/blueprint/footprint";
 import { baseFootprints } from "@/placement/placements";
 import type { Scenario } from "@/scenario/model";
-import { groupFormationOffset, scenarioPlacements } from "./placements";
+import {
+  anchorPlacements,
+  groupFormationOffset,
+  scenarioPlacements,
+} from "./placements";
 
 type Registries = Pick<Scenario, "actors" | "groups" | "bases" | "blueprints">;
 
@@ -284,5 +288,69 @@ describe("groupFormationOffset", () => {
       seen.add(`${x},${z}`);
     }
     expect(seen.size).toBe(17);
+  });
+});
+
+/** A base made of terrain steps alone has no building to click, so it has one
+ *  anchor at its origin for a selection to name (issue #4829). */
+describe("anchorPlacements", () => {
+  const wall = {
+    kind: "raise" as const,
+    shape: "wall" as const,
+    points: [
+      { x: 0, z: 0 },
+      { x: 64, z: 0 },
+    ],
+    height: 16,
+    before: 0,
+  };
+  const doc: Pick<Scenario, "actors" | "groups" | "blueprints" | "bases"> = {
+    actors: [],
+    groups: [],
+    blueprints: [
+      { id: "ring", name: "Ring", buildings: [], terrain: [wall] },
+      {
+        id: "keep",
+        name: "Keep",
+        buildings: [{ def: "armsolar", offset: { x: 0, z: 0 }, facing: 0 }],
+      },
+    ],
+    bases: [
+      {
+        id: "b1",
+        blueprint: "ring",
+        team: "p1",
+        origin: { x: 512, z: 256 },
+        buildings: [],
+      },
+      {
+        id: "b2",
+        blueprint: "keep",
+        team: "p1",
+        origin: { x: 0, z: 0 },
+        buildings: [],
+      },
+    ],
+  };
+
+  it("anchors a base with no buildings at its origin", () => {
+    expect(anchorPlacements(doc)).toEqual([
+      {
+        key: "base:b1#0",
+        kind: "base",
+        id: "b1",
+        index: 0,
+        def: "",
+        team: "p1",
+        pos: { x: 512, z: 256 },
+        facing: 0,
+      },
+    ]);
+  });
+
+  it("draws no model for it", () => {
+    expect(scenarioPlacements(doc).map((one) => one.key)).toEqual([
+      "base:b2#0",
+    ]);
   });
 });
