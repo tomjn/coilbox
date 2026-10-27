@@ -291,6 +291,32 @@ check("steps that are damaged or of an unknown kind are dropped and the rest rea
 local spooled2 = STORE.parseSpool(json.encode({ version = 1, blueprints = { { name = "Saved", buildings = {}, terrain = { WALL } } } }))
 check("the spool reads terrain the same way", #spooled2[1].terrain == 1, show(spooled2))
 
+-- only raise or only lower (issue #4804)
+local function only(step, value)
+	local copy = {}
+	for k, v in pairs(step) do
+		copy[k] = v
+	end
+	copy.only = value
+	return copy
+end
+local choosing = STORE.parseLibrary(json.encode({
+	version = 1,
+	blueprints = {
+		{
+			id = "c",
+			name = "Choosing",
+			buildings = {},
+			terrain = { only(PAD, "raise"), only(RAMP, "lower"), only(PAD, "both"), only(PAD, 2), only(WALL, "raise"), only(SMOOTH, "lower"), PAD },
+		},
+	},
+}))
+local chosen = choosing[1].terrain
+check("a level keeps only raise and a ramp keeps only lower", chosen[1].only == "raise" and chosen[2].only == "lower", show(chosen))
+check("a value that is not raise or lower reads as both ways", chosen[3].only == nil and chosen[4].only == nil)
+check("a raise or smooth step carries no choice", chosen[5].only == nil and chosen[6].only == nil)
+check("a step with no choice has none", chosen[7].only == nil and chosen[7].height == PAD.height)
+
 local barOnly = STORE.parseBar(BAR)
 check("BAR's file holds no terrain", same(barOnly[1].terrain, {}), show(barOnly[1]))
 

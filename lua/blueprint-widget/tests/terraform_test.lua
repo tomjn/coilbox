@@ -159,6 +159,44 @@ do
 end
 
 --------------------------------------------------------------------------------
+-- a level or ramp that only raises or only lowers (issue #4804)
+--------------------------------------------------------------------------------
+
+do
+	-- checkPointCreation, lines 523-535: a point that would move the other way
+	-- is never made. A rock of 30 stands in the pad's south-east, clear of the pivot.
+	local rock = ground(function(x, z)
+		return (x >= 520 and x <= 584 and z >= 520 and z <= 584) and 30 or 0
+	end)
+	local function plaza(only)
+		return laid({ kind = "level", shape = "area", points = { { x = -96, z = -96 }, { x = 96, z = -96 }, { x = 96, z = 96 }, { x = -96, z = 96 } }, height = 5, only = only }, 0, 0)
+	end
+	local both = run(rock, { plaza() })
+	check("a level with no choice cuts the rock down to the plaza", both.at(552, 552) == 5 and both.at(480, 480) == 5, show({ both.at(552, 552), both.at(480, 480) }))
+	local raise = run(rock, { plaza("raise") })
+	check("only raise fills the low ground and leaves the rock standing", raise.at(480, 480) == 5 and raise.at(512, 512) == 5 and raise.at(552, 552) == 30, show({ raise.at(480, 480), raise.at(512, 512), raise.at(552, 552) }))
+	local lower = run(rock, { plaza("lower") })
+	check("only lower cuts the rock and leaves the low ground alone", lower.at(552, 552) == 5 and lower.at(480, 480) == 0 and lower.at(512, 512) == 0, show({ lower.at(552, 552), lower.at(480, 480), lower.at(512, 512) }))
+	local five = ground(function()
+		return 5
+	end)
+	local flatRaise, flatLower = run(five, { plaza("raise") }), run(five, { plaza("lower") })
+	check("a point already at the height is skipped, and costs nothing", flatRaise.metal == 0 and flatLower.metal == 0 and #flatRaise.session.changed() == 0 and #flatLower.session.changed() == 0)
+	check("a choice costs only the ground it changes", raise.metal < both.metal and lower.metal < both.metal, show({ both.metal, raise.metal, lower.metal }))
+
+	local hill = ground(function(x)
+		return x >= 560 and 100 or 40
+	end)
+	local function ramp(only)
+		return laid({ kind = "ramp", shape = "wall", points = { { x = -128, z = 0 }, { x = 128, z = 0 } }, heights = { 0, 64 }, width = 64, only = only }, 0, 40)
+	end
+	local rBoth, rRaise, rLower = run(hill, { ramp() }), run(hill, { ramp("raise") }), run(hill, { ramp("lower") })
+	check("a ramp with no choice cuts the hill to its height", near({ rBoth.at(576, 512), rBoth.at(448, 512) }, { 88, 56 }), show({ rBoth.at(576, 512), rBoth.at(448, 512) }))
+	check("a ramp that only raises leaves the hill it would cut", near({ rRaise.at(576, 512), rRaise.at(448, 512) }, { 100, 56 }), show({ rRaise.at(576, 512), rRaise.at(448, 512) }))
+	check("a ramp that only lowers leaves the low ground it would raise", near({ rLower.at(576, 512), rLower.at(448, 512) }, { 88, 40 }), show({ rLower.at(576, 512), rLower.at(448, 512) }))
+end
+
+--------------------------------------------------------------------------------
 -- ramp
 --------------------------------------------------------------------------------
 

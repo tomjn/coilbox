@@ -169,7 +169,7 @@ check("one label for each step", #PLACE.labels({ { kind = "raise", shape = "wall
 --------------------------------------------------------------------------------
 
 local function laidStep(step)
-	local s = { kind = step.kind, shape = step.shape, points = step.points, height = step.height, heights = step.heights, width = step.width, base = step.base or 100, after = step.after or 0 }
+	local s = { kind = step.kind, shape = step.shape, points = step.points, height = step.height, heights = step.heights, width = step.width, only = step.only, base = step.base or 100, after = step.after or 0 }
 	return s
 end
 
@@ -194,6 +194,29 @@ check(
 	same(PLACE.terraformParams(ramp, { 200 }, 9, 3), { 4, 3, 100, 250, 9, 0, 32, 2, 1, 0, 100, 100, 200, 100, 124, 300, 200 }),
 	show(PLACE.terraformParams(ramp, { 200 }, 9, 3))
 )
+
+-- the volume selection, the order's tenth parameter (issue #4804)
+local function volumeOf(step)
+	return PLACE.terraformParams(laidStep(step), { 200 }, 1, 3)[10]
+end
+local padPoints = { { x = 0, z = 0 }, { x = 96, z = 0 }, { x = 96, z = 96 } }
+check("a level or ramp with no choice changes ground both ways, volume 0", volumeOf({ kind = "level", shape = "area", points = padPoints, height = 5 }) == 0 and volumeOf(ramp) == 0)
+check("only raise is volume 1 and only lower is 2, on a level", volumeOf({ kind = "level", shape = "area", points = padPoints, height = 5, only = "raise" }) == 1 and volumeOf({ kind = "level", shape = "area", points = padPoints, height = 5, only = "lower" }) == 2)
+check("and on a ramp", volumeOf({ kind = "ramp", shape = "wall", points = ramp.points, heights = ramp.heights, width = 64, only = "raise" }) == 1 and volumeOf({ kind = "ramp", shape = "wall", points = ramp.points, heights = ramp.heights, width = 64, only = "lower" }) == 2)
+check("a raise or smooth step ignores a choice it should not carry", volumeOf({ kind = "raise", shape = "wall", points = wall.points, height = 8, only = "raise" }) == 0 and volumeOf({ kind = "smooth", shape = "area", points = padPoints, only = "lower" }) == 0)
+check("the rest of the order is the same with a choice", same(PLACE.terraformParams(laidStep({ kind = "level", shape = "wall", points = level.points, height = -12, base = 130, only = "raise" }), { 200 }, 1, 3), (function()
+	local plain = PLACE.terraformParams(level, { 200 }, 1, 3)
+	plain[10] = 1
+	return plain
+end)()))
+local carried = PLACE.laySteps(PLACE.resolve({
+	buildings = {},
+	terrain = {
+		{ kind = "level", shape = "area", points = padPoints, height = 5, before = 0, only = "raise" },
+		{ kind = "level", shape = "area", points = padPoints, height = 5, before = 0 },
+	},
+}), 0, nil, nil, { { x = 512, z = 512 } }, {})
+check("a laid step keeps its choice", carried[1].only == "raise" and carried[2].only == nil, show(carried))
 
 --------------------------------------------------------------------------------
 -- plans with steps

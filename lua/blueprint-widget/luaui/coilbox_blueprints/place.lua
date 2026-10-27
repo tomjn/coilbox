@@ -41,6 +41,7 @@ M.LEVEL_ACTION = "levelground"
 M.TAG_BASE = 1000000
 
 local TERRAFORM_TYPE = { level = 1, raise = 2, smooth = 3, ramp = 4 }
+local VOLUME = { raise = 1, lower = 2 }
 
 --- Whether a footprint reaches past the edge of the map.
 local function offMap(x, z, hw, hd)
@@ -186,6 +187,7 @@ function M.terrain(steps, rotation, ax, az, flip, origin)
 			height = step.height,
 			heights = step.heights and { step.heights[1], step.heights[2] } or nil,
 			width = step.width,
+			only = step.only,
 		}
 	end
 	return out
@@ -280,7 +282,13 @@ function M.terraformParams(step, builders, tag, team)
 		-- sends half, and the gadget doubles it (unit_terraform.lua, AllowCommand)
 		height = step.width / 2
 	end
-	local out = { TERRAFORM_TYPE[step.kind], team, cx, cz, tag, step.shape == "area" and 1 or 0, height, #step.points, #builders, 0 }
+	-- the volume selection, as the lasso widget's: 0 both ways, 1 only raise, 2
+	-- only lower. Only a level or a ramp has the choice.
+	local volume = 0
+	if step.kind == "level" or step.kind == "ramp" then
+		volume = VOLUME[step.only] or 0
+	end
+	local out = { TERRAFORM_TYPE[step.kind], team, cx, cz, tag, step.shape == "area" and 1 or 0, height, #step.points, #builders, volume }
 	for i, p in ipairs(step.points) do
 		out[#out + 1] = p.x
 		if step.kind == "ramp" then
