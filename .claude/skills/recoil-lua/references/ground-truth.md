@@ -2,6 +2,8 @@
 
 Models confidently misremember the Spring and Recoil Lua API. Old Spring wiki pages, forum posts and other games' code disagree with each other and with the current engine. When a question matters, settle it from one of these sources, in this order.
 
+Do not plan on reading the old Spring wiki at springrts.com, even where the Recoil docs link to it. It sits behind Anubis, a proof-of-work bot check, so a fetch returns a challenge page instead of the article. On 28 October 2026 it returned HTTP 500 with a MediaWiki error. Its content also describes older Spring behaviour. Use the sources below instead.
+
 ## 1. The engine binary
 
 The binary describes itself and exits without starting a game, so these flags work even where a game will not run:

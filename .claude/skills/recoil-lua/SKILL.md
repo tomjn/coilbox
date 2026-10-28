@@ -12,7 +12,7 @@ Every claim here was read from the engine source at RecoilEngine commit `4282724
 ## Rules
 
 1. Do not restart the engine to test a Lua change. A running game reloads LuaUI with `/luaui reload`. The other handlers have their own reload commands, and some need cheats. See [iteration.md](references/iteration.md).
-2. Settle engine behaviour from the source, not from memory. The engine is open source at https://github.com/beyond-all-reason/RecoilEngine, and the Lua bindings are in `rts/Lua/`. The binary can also list its own commands, config vars and def tags. See [ground-truth.md](references/ground-truth.md).
+2. Settle engine behaviour from the source, not from memory. The engine is open source at https://github.com/beyond-all-reason/RecoilEngine, and the Lua bindings are in `rts/Lua/`. The binary can also list its own commands, config vars and def tags. The old Spring wiki at springrts.com is behind a bot check that agents cannot pass, so do not plan on reading it. See [ground-truth.md](references/ground-truth.md).
 3. Lua numbers are 32-bit floats. Recoil runs Lua 5.1.4 with `lua_Number` defined as `float` (`rts/lib/lua/include/luaconf.h:514`). Integers above 2^24 (16777216) lose precision, so do not use large ids, timestamps or packed bit fields as numbers. Tests run under LuaJIT or stock Lua use doubles and will not catch this.
 4. There is no `require`. No Lua state opens the `package` library. Load files with `VFS.Include` or `VFS.LoadFile`.
 5. Synced code must be deterministic. It gets only `base`, `math`, `table` and `string`. See [lua-environment.md](references/lua-environment.md) for what is missing, what is replaced and what will desync a multiplayer game.
