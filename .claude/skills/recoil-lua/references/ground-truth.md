@@ -53,6 +53,7 @@ The game decides everything above the engine: its widget and gadget handlers, it
 ## Misleading errors
 
 - `GAME-section missing from setup-script` on a start script that has a `[GAME]` section has meant that the engine could not open its base content (`springcontent.sdz`). Look earlier in `infolog.txt` for a failure to open the "Spring content" archive.
+- `duplicate base content detected` (`rts/System/FileSystem/ArchiveScanner.cpp:900`) means two data directories both hold the base archives. It usually follows pointing `SPRING_DATADIR` at a folder with its own `base/`, since that variable adds a directory rather than replacing the engine's. Use `--isolation-dir`, or `SPRING_ISOLATED` for unitsync.
 
 ## Testing Lua outside the engine
 

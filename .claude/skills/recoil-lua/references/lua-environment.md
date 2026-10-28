@@ -12,6 +12,8 @@ Recoil embeds Lua 5.1.4 with engine patches (`rts/lib/lua/`). No Lua 5.2+ syntax
 
 Store large values as strings, or split them into two numbers.
 
+For bit operations the engine adds `math.bit_or`, `math.bit_and`, `math.bit_xor`, `math.bit_inv` and `math.bit_bits` (`rts/Lua/LuaMathExtra.cpp:45-49`). They are exact only for values up to 24 bits, for the same float reason. There is no LuaJIT `bit` library and no shift function. Shift by multiplying or dividing by a power of 2.
+
 ## What each state can reach
 
 | State | Runs | Standard libraries | Reads the simulation |
@@ -51,4 +53,11 @@ New code builds geometry with `gl.GetVBO` and `gl.GetVAO` and draws it with a sh
 
 In `spring-headless` every rendering call does nothing, and `gl.GetVBO` returns nothing. Drawing code must handle a missing buffer rather than error, or a headless test will fail on a path it cannot exercise. A green headless run says nothing about whether the drawing works.
 
+Geometry shaders are not available everywhere, and not only on one platform. Any shader that uses a geometry stage needs a fallback without one, for example expanding points into quads in the vertex shader with instancing. Do not drop the fallback because a target platform seems out of scope. Some drivers also report geometry shader support they do not have, as the macOS driver on Metal does, so a capability check or a successful compile does not prove the stage works. Prefer the fallback as the default path where it costs little.
+
 RmlUi, an HTML and CSS style UI library, is built in as an alternative to drawing UI by hand. See https://recoilengine.org/docs/guides/getting-started/getting-started-with-rmlui/.
+
+### Debugging a drawing bug
+
+- Read the whole widget first. Find what marks it dirty and what rebuilds its display lists or buffers. An artefact that only appears on a rebuild will not show in a frozen scene. In one build menu widget, `widget:MouseWheel` set the flag that recompiled the panel, so comparing two still frames measured two identical clean images.
+- Recolour before you measure. Give every drawn element its own saturated colour and set every alpha to 1. "The backdrop drew white, the colour the icon pass set before it" names both the broken draw and the state it inherited. A translucent dark UI hides this. Revert the widget afterwards.

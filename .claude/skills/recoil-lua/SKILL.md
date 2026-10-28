@@ -1,13 +1,13 @@
 ---
 name: recoil-lua
-description: Use when writing, testing or debugging Lua for a Recoil (Spring) RTS engine game, such as widgets, gadgets, LuaUI, LuaRules, unit scripts or start scripts, or when deciding how to run the engine to check a Lua change. Covers the pitfalls models hit most often, like not knowing that a running game can reload its widgets.
+description: Use when writing, testing or debugging Lua for a Recoil (Spring) RTS engine game, such as widgets, gadgets, LuaUI, LuaRules, unit scripts or start scripts, or when deciding how to run the engine to check a Lua change.
 ---
 
 # Recoil engine Lua
 
 Recoil is the engine behind Beyond All Reason, Zero-K and other games, forked from Spring. Most of what a model remembers about "Spring Lua" still applies, but a few facts it gets wrong will cost hours. Read the rules below before writing any code. Open a reference file when the task touches its topic.
 
-Every claim here was read from the engine source at RecoilEngine commit `4282724f71` (October 2026). If something looks wrong for the engine in front of you, check the source rather than trusting this file.
+Claims that cite a file were read from the engine source at RecoilEngine commit `4282724f71` (October 2026). Claims without a citation were observed in real runs, and say on which engine or platform. If something looks wrong for the engine in front of you, check the source rather than trusting this file.
 
 ## Rules
 
@@ -20,7 +20,7 @@ Every claim here was read from the engine source at RecoilEngine commit `4282724
 7. Do not draw with immediate-mode GL. `gl.BeginEnd`, `gl.Vertex`, `gl.Color`, `gl.PushMatrix`, `gl.CreateList` and similar calls still exist but are deprecated. New drawing code uses vertex buffers and shaders. See [lua-environment.md](references/lua-environment.md#drawing).
 8. A headless run proves logic, not drawing. `spring-headless` runs widgets, but every rendering call does nothing.
 9. Widget and gadget handlers belong to the game, not the engine. The engine ships a base handler, and many games replace it with their own. Check the game's `luaui/` and `luarules/` folders before assuming a handler method or chat command exists.
-10. Always bound an engine run. Wrap it in `timeout`, have the test end the match itself, and run one engine at a time. See [iteration.md](references/iteration.md#running-the-engine-from-a-script).
+10. Always bound an engine run. Wrap it in `timeout`, have the test end the match itself, and run one engine at a time. Ask the user before launching a windowed engine, because a run can take more than half a machine's memory. See [iteration.md](references/iteration.md#running-the-engine-from-a-script).
 
 ## Things the engine cannot do
 
@@ -30,6 +30,6 @@ Every claim here was read from the engine source at RecoilEngine commit `4282724
 
 ## References
 
-- [iteration.md](references/iteration.md) covers reload commands, toggling single widgets and gadgets, and running the engine from a script.
-- [lua-environment.md](references/lua-environment.md) covers what each Lua state can do, synced determinism and drawing.
+- [iteration.md](references/iteration.md) covers reload commands, toggling single widgets and gadgets, where loose files load from, Lua dev mode, and running the engine from a script.
+- [lua-environment.md](references/lua-environment.md) covers what each Lua state can do, bit operations, synced determinism, drawing and debugging drawing bugs.
 - [ground-truth.md](references/ground-truth.md) covers where to look things up, the engine's self-describing flags, and testing Lua outside the engine.
