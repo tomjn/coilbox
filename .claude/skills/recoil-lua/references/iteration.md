@@ -1,6 +1,6 @@
 # Iterating on Lua in a running game
 
-An engine launch costs a full load of the game and map, and a scripted match may add a spawn or faction-picking phase on top. Start one game and reload the Lua inside it for each change.
+An engine launch costs a full load of the game and map, and a scripted match may add a spawn or faction-picking phase on top. A running game can reload its Lua instead, which is often faster. A restart can still be simpler, for example when the change is to defs, to the start script, or to state that only builds up from the start of a match.
 
 ## Reload commands
 
