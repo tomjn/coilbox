@@ -425,6 +425,21 @@ pub fn isolation_env(portable: bool, engine_dir: &std::path::Path) -> Option<(St
     portable.then(|| ("SPRING_ISOLATED".into(), engine_dir.display().to_string()))
 }
 
+/// The file that marks a content folder as a Zero-K install.
+const ZEROK_LAUNCHER: &str = "Zero-K.exe";
+
+/// The env that makes a Zero-K install's own folder the write dir, for an
+/// engine or unitsync run from it.
+///
+/// Zero-K's launcher writes settings there, but its engine folder also holds a
+/// `springsettings.cfg`, so an engine started without a write dir saves to its
+/// own folder and the player's Zero-K settings go unread. A portable coilbox
+/// keeps its isolation instead.
+pub fn write_dir_env(portable: bool, content_root: &std::path::Path) -> Option<(String, String)> {
+    (!portable && content_root.join(ZEROK_LAUNCHER).is_file())
+        .then(|| ("SPRING_WRITEDIR".into(), content_root.display().to_string()))
+}
+
 fn join_extras(primary: &str, roots: &[String]) -> String {
     roots
         .iter()
@@ -496,6 +511,32 @@ mod datadirs {
     #[test]
     fn an_installed_coilbox_leaves_the_engine_its_usual_folders() {
         assert_eq!(isolation_env(false, std::path::Path::new("/e")), None);
+    }
+
+    #[test]
+    fn a_zerok_install_is_its_own_write_dir() {
+        let root = tempfile::tempdir().unwrap();
+        std::fs::write(root.path().join("Zero-K.exe"), b"").unwrap();
+        assert_eq!(
+            write_dir_env(false, root.path()),
+            Some((
+                "SPRING_WRITEDIR".to_string(),
+                root.path().display().to_string()
+            ))
+        );
+    }
+
+    #[test]
+    fn a_portable_coilbox_keeps_a_zerok_install_isolated() {
+        let root = tempfile::tempdir().unwrap();
+        std::fs::write(root.path().join("Zero-K.exe"), b"").unwrap();
+        assert_eq!(write_dir_env(true, root.path()), None);
+    }
+
+    #[test]
+    fn any_other_folder_leaves_the_write_dir_to_the_engine() {
+        let root = tempfile::tempdir().unwrap();
+        assert_eq!(write_dir_env(false, root.path()), None);
     }
 }
 

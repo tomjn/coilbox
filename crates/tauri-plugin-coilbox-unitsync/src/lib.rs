@@ -228,6 +228,10 @@ fn loader_envs(engine_dir: &Path, datadir: &str) -> Vec<(String, String)> {
         coilbox_portable::is_portable(),
         engine_dir,
     ));
+    envs.extend(coilbox_proc::write_dir_env(
+        coilbox_portable::is_portable(),
+        Path::new(datadir),
+    ));
     envs
 }
 

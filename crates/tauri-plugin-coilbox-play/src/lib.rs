@@ -242,6 +242,10 @@ fn launch_blocking_with(
             engine_dir,
         ));
     }
+    cmd.envs(coilbox_proc::write_dir_env(
+        coilbox_portable::is_portable(),
+        Path::new(&data_dir),
+    ));
 
     let child = cmd
         .spawn()
