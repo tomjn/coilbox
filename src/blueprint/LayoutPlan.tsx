@@ -40,7 +40,6 @@
  * because the same drawing is used by a card, by a drawer and by the hub page.
  */
 
-import { cn } from "@picoframe/frame";
 import { useEffect, useRef, useState } from "react";
 
 import type { PlanPicture } from "@/hub/assets/unitPictures";
@@ -55,7 +54,7 @@ import {
   type TerrainDraw,
   WALL_THICKNESS,
 } from "@/hub/preview";
-import { type BuildingRole, roleCss } from "./role";
+import { BUILDING_CSS, type BuildingRole, roleCss } from "./role";
 
 /** How much colour each layer takes, in the illustration's order: a grid the eye
  *  skims, then a tinted fill under a stronger outline. */
@@ -166,7 +165,7 @@ export function LayoutPlan({
   }, []);
 
   return (
-    <div ref={frame} className={cn("text-primary", className)}>
+    <div ref={frame} className={className} style={{ color: BUILDING_CSS }}>
       <Sheet
         shape={shape}
         box={box ?? nominalBox(shape)}
@@ -206,7 +205,7 @@ function Sheet({
     <svg
       viewBox={`${sheet.left} ${sheet.top} ${sheet.width} ${sheet.height}`}
       // `text-inherit` is what the plan already does, said out loud: everything
-      // here draws in `currentColor` from the wrapper's `text-primary`. It is
+      // here draws in `currentColor` from the wrapper's building colour. It is
       // written on the element because a container can carry a rule painting
       // any svg inside it that has not named a colour, which the dropdown row
       // in `select.tsx` does, and this plan is not an icon.

@@ -3,6 +3,8 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 import {
+  BUILDING_CSS,
+  BUILDING_RGB,
   type BuildingRole,
   buildingRole,
   buildingRoles,
@@ -110,5 +112,13 @@ describe("role colours", () => {
       const [r, g, b] = (line?.[1] ?? "").split(",").map(Number);
       expect([r, g, b], role).toEqual(ROLE_RGB[role]);
     }
+    const building = lua.match(/^\s*building\s*=\s*\{([^}]*)\}/m);
+    expect(building).not.toBeNull();
+    const [r, g, b] = (building?.[1] ?? "").split(",").map(Number);
+    expect([r, g, b]).toEqual(BUILDING_RGB);
+  });
+
+  it("writes the building colour as CSS", () => {
+    expect(BUILDING_CSS).toBe("#73a8bd");
   });
 });

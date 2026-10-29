@@ -29,6 +29,19 @@ export const ROLE_RGB: Record<Exclude<BuildingRole, "other">, number[]> = {
   energy: [0.95, 0.8, 0.25],
 };
 
+/** The widget's colour for a building that is none of the three. A drawing that
+ *  fell back to the theme's accent would draw a solar red under a red accent and
+ *  read as turrets (issue #4781). */
+export const BUILDING_RGB = [0.45, 0.66, 0.74];
+
+/** {@link BUILDING_RGB} as CSS. */
+export const BUILDING_CSS = rgbCss(BUILDING_RGB);
+
+function rgbCss(rgb: number[]): string {
+  const [r, g, b] = rgb.map((part) => Math.round(part * 255));
+  return `#${((r << 16) | (g << 8) | b).toString(16).padStart(6, "0")}`;
+}
+
 function declared(stats: Record<string, unknown>, key: string): number {
   const value = stats[key];
   return typeof value === "number" ? value : 0;
