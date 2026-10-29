@@ -14,7 +14,7 @@ import { RENDER_BLEED_SQUARES, renderFrame } from "@/hub/assets/vocabulary";
 import { BUILDING_GAP, blueprintShape } from "@/hub/preview";
 import { LayoutPlan } from "./LayoutPlan";
 import type { BlueprintPayload } from "./payload";
-import { buildingRoles } from "./role";
+import { BUILDING_CSS, buildingRoles } from "./role";
 
 /** A solar collector on one square and a lab on six, four squares apart. */
 const LAYOUT: BlueprintPayload = {
@@ -172,6 +172,12 @@ describe("LayoutPlan", () => {
     expect(rects[0]).toContain('stroke="#f2cc40"');
     // The lab is not in the game's units, so it keeps the plan's colour.
     expect(rects[1]).toContain('fill="currentColor"');
+  });
+
+  it("draws in the widget's building colour, not the theme accent (#4781)", () => {
+    const html = markup();
+    expect(html).toContain(`color:${BUILDING_CSS}`);
+    expect(html).not.toContain("text-primary");
   });
 
   describe("terrain steps", () => {
