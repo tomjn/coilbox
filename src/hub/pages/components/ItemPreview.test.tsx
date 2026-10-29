@@ -11,6 +11,7 @@
 import { memoryStorage, PersistentStoreProvider } from "@picoframe/frame";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
+import { BUILDING_CSS } from "@/blueprint/role";
 import type { Container } from "@/container/container";
 import { readPreview } from "../../preview";
 import { ItemPreview } from "./ItemPreview";
@@ -83,7 +84,7 @@ describe("ItemPreview, for a blueprint", () => {
     // which on a card came to less than the screen can draw (issue #1508). A
     // build square is eight pixels before anything measures the box.
     expect(html).toContain('rx="0.25"');
-    expect(html).toContain("text-primary");
+    expect(html).toContain(`color:${BUILDING_CSS}`);
   });
 
   it("draws the base on a grid, with clear ground round it", () => {
