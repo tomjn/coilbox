@@ -75,6 +75,7 @@ permissions = [
   "allow-content-widget-status",
   "allow-content-widget-install",
   "allow-content-widget-remove",
+  "allow-content-player-widgets",
   "allow-content-install-3do-conversion",
   "allow-content-undo-3do-install",
   "allow-content-3do-install-status",

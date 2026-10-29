@@ -25,6 +25,7 @@ mod metrics;
 mod model;
 mod path_validity;
 mod paths;
+mod player_widgets;
 mod rapid_pool;
 mod savegame;
 mod scan;
@@ -1326,6 +1327,7 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
             widget::content_widget_status,
             widget::content_widget_install,
             widget::content_widget_remove,
+            player_widgets::content_player_widgets,
             install3do::content_install_3do_conversion,
             install3do::content_undo_3do_install,
             install3do::content_3do_install_status,
