@@ -110,6 +110,9 @@ export default function WidgetsPage() {
       )}
 
       {list.error && <ErrorBanner message={list.error} />}
+      {list.folderErrors.map((e) => (
+        <ErrorBanner key={e} message={e} />
+      ))}
 
       {game && game.handler === null && (
         <p role="status" className="text-sm text-muted-foreground">
@@ -137,7 +140,13 @@ export default function WidgetsPage() {
           }
         />
       ) : (
-        shown && <WidgetTable rows={shown} showGames={!game} />
+        shown && (
+          <WidgetTable
+            rows={shown}
+            showGames={!game}
+            someUnknown={!!list.games?.some((g) => g.handler === null)}
+          />
+        )
       )}
     </div>
   );
@@ -150,9 +159,13 @@ function fileName(path: string): string {
 function WidgetTable({
   rows,
   showGames,
+  someUnknown,
 }: {
   rows: readonly WidgetRow[];
   showGames: boolean;
+  /** Some installed game's handler is not recognised, so a file no recognised
+   *  game loads may still load in that one. */
+  someUnknown: boolean;
 }) {
   const { t } = useLingui();
   return (
@@ -217,7 +230,11 @@ function WidgetTable({
                   row.loadedBy.join(", ")
                 ) : (
                   <span className="text-muted-foreground">
-                    <Trans>No installed game</Trans>
+                    {someUnknown ? (
+                      <Trans>No game coilbox recognises</Trans>
+                    ) : (
+                      <Trans>No installed game</Trans>
+                    )}
                   </span>
                 )}
               </TableCell>

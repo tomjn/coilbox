@@ -31115,6 +31115,10 @@ msgstr "немає гри"
 msgid "No game"
 msgstr "Немає гри"
 
+#: src/widgets/pages/WidgetsPage.tsx
+msgid "No game coilbox recognises"
+msgstr ""
+
 #: src/profile/health.ts
 #, fuzzy
 msgid "No game filter set"

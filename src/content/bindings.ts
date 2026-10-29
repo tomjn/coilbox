@@ -2282,6 +2282,8 @@ export interface PlayerWidgetScan {
   /** The scanned folders that exist, relative to the write folder. */
   folders: string[];
   files: PlayerWidgetFile[];
+  /** Folders that are there and could not be read. */
+  errors: string[];
 }
 
 /**

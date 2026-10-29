@@ -50,6 +50,7 @@ describe("widgetRows", () => {
         file("LuaUI/widgets/pack/b.lua", "LuaUI/widgets", true),
         file("LuaUI/RmlWidgets/c.lua", "LuaUI/RmlWidgets"),
       ],
+      errors: [],
     };
     expect(widgetRows(scan, games).map((r) => r.loadedBy)).toEqual([
       ["Metal Factions v2.58", "Splinter Faction 0.1.96", "Beyond All Reason"],
@@ -66,6 +67,7 @@ describe("widgetRows", () => {
         file("LuaUI/Widgets/a.lua", "LuaUI/Widgets"),
         file("LuaUI/widgets/b.lua", "LuaUI/widgets"),
       ],
+      errors: [],
     };
     expect(widgetRows(scan, games).map((r) => r.loadedBy)).toEqual([
       ["Metal Factions v2.58", "Beyond All Reason"],
@@ -82,6 +84,7 @@ describe("rowsForGame", () => {
       file("LuaUI/Widgets/a.lua", "LuaUI/Widgets"),
       file("LuaUI/widgets/b.lua", "LuaUI/widgets"),
     ],
+    errors: [],
   };
   const rows = widgetRows(scan, games);
 
@@ -101,6 +104,7 @@ describe("folderToOpen", () => {
     caseSensitive: false,
     folders: ["LuaUI/RmlWidgets", "LuaUI/widgets"],
     files: [],
+    errors: [],
   };
 
   it("opens the game's first folder that is there, as spelled on disk", () => {

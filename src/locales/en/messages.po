@@ -25197,6 +25197,10 @@ msgstr "no game"
 msgid "No game"
 msgstr "No game"
 
+#: src/widgets/pages/WidgetsPage.tsx
+msgid "No game coilbox recognises"
+msgstr "No game coilbox recognises"
+
 #: src/profile/health.ts
 msgid "No game filter set"
 msgstr "No game filter set"

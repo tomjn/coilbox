@@ -3,7 +3,7 @@
  * the widget files in it, and the handler each installed game runs.
  */
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   contentPlayerWidgets,
   type GameItem,
@@ -23,8 +23,9 @@ import { HANDLER_FOLDERS, recogniseHandler } from "./handlers";
 import { type GameHandler, widgetRows } from "./widgetList";
 
 /** Handlers already recognised this session, keyed by
- *  `dataDir::enginePath::primary archive`. An archive's files do not change
- *  under a name. */
+ *  `dataDir::enginePath::` and every archive the game reads, because the
+ *  handler can come from any of them. An archive's files do not change under a
+ *  name. */
 const handlerCache = new Map<string, GameHandler["handler"]>();
 
 async function handlerOf(
@@ -32,12 +33,12 @@ async function handlerOf(
   dataDir: string,
   game: GameItem,
 ): Promise<GameHandler["handler"]> {
-  const key = `${dataDir}::${enginePath}::${game.primaryArchive.name}`;
-  const cached = handlerCache.get(key);
-  if (cached !== undefined) return cached;
   // The game's own archive and the ones it depends on are one tree to the
   // engine, and a game built on another can take its handler from that one.
   const archives = [game.primaryArchive, ...game.dependencyArchives];
+  const key = `${dataDir}::${enginePath}::${archives.map((a) => a.name).join("::")}`;
+  const cached = handlerCache.get(key);
+  if (cached !== undefined) return cached;
   const owner = new Map<string, string>();
   for (const archive of archives) {
     const tree = await unitsyncArchiveTree({
@@ -68,10 +69,11 @@ export function useWidgetList() {
   const { targets, selected } = useScanTargetSelection();
   const enginePath = selected?.enginePath;
   const dataDir = selected?.rootPath;
-  const { data: scanData, error: scanError } = useUnitsyncScan(
-    enginePath,
-    dataDir,
-  );
+  const {
+    data: scanData,
+    error: scanError,
+    run: runScan,
+  } = useUnitsyncScan(enginePath, dataDir);
   const { data: engineConfig, loading: configLoading } =
     useUnitsyncEngineConfig(enginePath, dataDir);
   const writeDir = engineConfigDir(engineConfig?.configPath);
@@ -87,26 +89,40 @@ export function useWidgetList() {
   const [widgets, setWidgets] = useState<PlayerWidgetScan | null>(null);
   const [widgetsError, setWidgetsError] = useState<string | null>(null);
   const [reading, setReading] = useState(false);
+  // Only the latest read may land, so a slow read of a folder the page has
+  // moved away from cannot replace the current one.
+  const latest = useRef(0);
   const read = useCallback(async () => {
+    const id = ++latest.current;
     if (!writeDir) return;
     setReading(true);
     try {
-      setWidgets(
-        await contentPlayerWidgets({ writeDir, folders: HANDLER_FOLDERS }),
-      );
+      const found = await contentPlayerWidgets({
+        writeDir,
+        folders: HANDLER_FOLDERS,
+      });
+      if (id !== latest.current) return;
+      setWidgets(found);
       setWidgetsError(null);
     } catch (e) {
-      setWidgetsError(errorText(e));
+      if (id === latest.current) setWidgetsError(errorText(e));
     } finally {
-      setReading(false);
+      if (id === latest.current) setReading(false);
     }
   }, [writeDir]);
   useEffect(() => {
+    setWidgets(null);
     void read();
   }, [read]);
 
   const [games, setGames] = useState<GameHandler[] | null>(null);
   useEffect(() => {
+    // With no game list there is nothing to say which games load a file, but
+    // the files are still worth listing.
+    if (scanError && !scanData) {
+      setGames([]);
+      return;
+    }
     if (!enginePath || !dataDir || !scanData) return;
     let cancelled = false;
     setGames(null);
@@ -128,7 +144,7 @@ export function useWidgetList() {
     return () => {
       cancelled = true;
     };
-  }, [enginePath, dataDir, scanData, installed]);
+  }, [enginePath, dataDir, scanData, scanError, installed]);
 
   const rows = useMemo(
     () => (widgets && games ? widgetRows(widgets, games) : null),
@@ -145,6 +161,11 @@ export function useWidgetList() {
     rows,
     reading,
     error: widgetsError ?? scanError,
-    reload: read,
+    /** Folders that are there and could not be read. */
+    folderErrors: widgets?.errors ?? [],
+    reload: async () => {
+      if (scanError) void runScan(true);
+      await read();
+    },
   };
 }

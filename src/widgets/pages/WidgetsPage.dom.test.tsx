@@ -50,9 +50,10 @@ const scan: PlayerWidgetScan = {
       nested: true,
       coilbox: false,
       info: null,
-      error: "runtime error: the file defines no GetInfo function",
+      error: "runtime error: attempt to perform arithmetic on a nil value",
     },
   ],
+  errors: [],
 };
 
 const games: GameHandler[] = [
@@ -70,6 +71,7 @@ vi.mock("../useWidgetList", () => ({
     rows: widgetRows(scan, games),
     reading: false,
     error: null,
+    folderErrors: [],
     reload: async () => {},
   }),
 }));
@@ -91,15 +93,18 @@ describe("WidgetsPage", () => {
     expect(screen.getByText("BuildWatch")).toBeTruthy();
     expect(screen.getByText("Watches builds")).toBeTruthy();
     expect(screen.getByText("GPLv2")).toBeTruthy();
+    expect(screen.getByText("someone")).toBeTruthy();
+    expect(screen.getByText("2")).toBeTruthy();
     expect(screen.getByText("Coilbox")).toBeTruthy();
     expect(
       screen.getByText(
-        "Could not read: runtime error: the file defines no GetInfo function",
+        "Could not read: runtime error: attempt to perform arithmetic on a nil value",
       ),
     ).toBeTruthy();
     // The nested file loads in no game, the other two in Metal Factions.
     expect(screen.getAllByText("Metal Factions v2.58")).toHaveLength(2);
-    expect(screen.getByText("No installed game")).toBeTruthy();
+    // Mystery's handler is not recognised, so it may still load that file.
+    expect(screen.getByText("No game coilbox recognises")).toBeTruthy();
   });
 
   it("shows a picked game only the files it loads", () => {
