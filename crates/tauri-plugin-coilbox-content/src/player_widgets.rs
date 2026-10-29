@@ -49,68 +49,91 @@ pub struct WidgetScan {
     /// as on disk.
     pub folders: Vec<String>,
     pub files: Vec<WidgetFile>,
+    /// Folders that are there and could not be read.
+    pub errors: Vec<String>,
 }
 
 fn key(rel: &Path) -> String {
     rel.to_string_lossy().replace('\\', "/")
 }
 
-/// The children of `dir` whose names fold to one of `names`, as they are spelled.
-fn children_named(dir: &Path, names: &[String]) -> Vec<PathBuf> {
-    let Ok(entries) = std::fs::read_dir(dir) else {
-        return Vec::new();
-    };
-    let mut out: Vec<PathBuf> = entries
-        .flatten()
-        .map(|e| e.path())
+/// The entries of `dir`, sorted. A folder that is not there is empty. One that
+/// is there and cannot be read says so in `errors`, so its widgets do not
+/// vanish from the list without a word.
+fn entries(dir: &Path, errors: &mut Vec<String>) -> Vec<PathBuf> {
+    match std::fs::read_dir(dir) {
+        Ok(entries) => {
+            let mut out: Vec<PathBuf> = entries.flatten().map(|e| e.path()).collect();
+            out.sort();
+            out
+        }
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => Vec::new(),
+        Err(e) => {
+            errors.push(format!("could not read {}: {e}", dir.display()));
+            Vec::new()
+        }
+    }
+}
+
+/// The child folders of `dir` whose names fold to one of `names`, as they are
+/// spelled.
+fn children_named(dir: &Path, names: &[String], errors: &mut Vec<String>) -> Vec<PathBuf> {
+    entries(dir, errors)
+        .into_iter()
         .filter(|p| p.is_dir())
         .filter(|p| {
             p.file_name()
                 .map(|n| n.to_string_lossy().to_lowercase())
                 .is_some_and(|n| names.contains(&n))
         })
-        .collect();
-    out.sort();
-    out
+        .collect()
 }
 
-fn lua_files(dir: &Path) -> Vec<PathBuf> {
-    let Ok(entries) = std::fs::read_dir(dir) else {
-        return Vec::new();
-    };
-    let mut out: Vec<PathBuf> = entries
-        .flatten()
-        .map(|e| e.path())
+fn lua_files(dir: &Path, errors: &mut Vec<String>) -> Vec<PathBuf> {
+    entries(dir, errors)
+        .into_iter()
         .filter(|p| p.is_file())
         .filter(|p| {
             p.extension()
                 .is_some_and(|e| e.to_string_lossy().eq_ignore_ascii_case("lua"))
         })
-        .collect();
-    out.sort();
-    out
+        .collect()
 }
 
-fn subfolders(dir: &Path) -> Vec<PathBuf> {
-    let Ok(entries) = std::fs::read_dir(dir) else {
-        return Vec::new();
-    };
-    let mut out: Vec<PathBuf> = entries
-        .flatten()
-        .map(|e| e.path())
+fn subfolders(dir: &Path, errors: &mut Vec<String>) -> Vec<PathBuf> {
+    entries(dir, errors)
+        .into_iter()
         .filter(|p| p.is_dir())
-        .collect();
-    out.sort();
-    out
+        .collect()
+}
+
+/// Whether two paths name one file. By device and inode where there are such
+/// things, because two folders whose names differ only in case can both exist
+/// on a filesystem that tells them apart.
+#[cfg(unix)]
+fn same_file(a: &Path, b: &Path) -> bool {
+    use std::os::unix::fs::MetadataExt;
+    match (std::fs::metadata(a), std::fs::metadata(b)) {
+        (Ok(a), Ok(b)) => a.dev() == b.dev() && a.ino() == b.ino(),
+        _ => false,
+    }
+}
+
+/// Windows filesystems fold case unless a folder is set otherwise, so a path
+/// that answers under the other case is the same folder.
+#[cfg(not(unix))]
+fn same_file(_a: &Path, b: &Path) -> bool {
+    b.exists()
 }
 
 /// Whether `dir`'s filesystem tells names apart by case, found by asking for
-/// `dir` under its own name in the other case. A name with no letters to
-/// swap cannot answer, so that falls back to the platform's usual filesystem.
+/// `dir` under its own name in the other case and checking whether that is
+/// `dir` itself. A name with no letters to swap cannot answer, so that falls
+/// back to the platform's usual filesystem.
 fn case_sensitive(dir: &Path) -> bool {
-    let swapped = dir.file_name().map(|name| {
-        name.to_string_lossy()
-            .chars()
+    let name = dir.file_name().map(|n| n.to_string_lossy().to_string());
+    let swapped = name.as_ref().map(|name| {
+        name.chars()
             .map(|c| {
                 if c.is_lowercase() {
                     c.to_uppercase().next().unwrap_or(c)
@@ -121,22 +144,24 @@ fn case_sensitive(dir: &Path) -> bool {
             .collect::<String>()
     });
     match (swapped, dir.parent()) {
-        (Some(swapped), Some(parent))
-            if Some(swapped.as_str()) != dir.file_name().and_then(|n| n.to_str()) =>
-        {
-            !parent.join(swapped).exists()
+        (Some(swapped), Some(parent)) if Some(&swapped) != name.as_ref() => {
+            !same_file(dir, &parent.join(swapped))
         }
         _ => cfg!(target_os = "linux"),
     }
 }
 
+/// Read one file. `None` for a file in a subfolder that runs and declares
+/// nothing, because that is a helper a widget includes rather than a widget.
+/// Directly in a widget folder, a handler tries to load every file, so one
+/// with no `GetInfo` is listed as a widget that will not load.
 fn read_file(
     write_dir: &Path,
     luaui: &Path,
     folder: &str,
     path: &Path,
     nested: bool,
-) -> WidgetFile {
+) -> Option<WidgetFile> {
     let rel = path.strip_prefix(write_dir).map(key).unwrap_or_default();
     let under_luaui = path.strip_prefix(luaui).map(key).unwrap_or_default();
     let read = match std::fs::read(path) {
@@ -149,34 +174,40 @@ fn read_file(
         Err(e) => Err(format!("could not read the file: {e}")),
     };
     let (info, error) = match read {
-        Ok(info) => (Some(info), None),
+        Ok(Some(info)) => (Some(info), None),
+        Ok(None) if nested => return None,
+        Ok(None) => (
+            None,
+            Some("the file defines no GetInfo function".to_string()),
+        ),
         Err(e) => (None, Some(e)),
     };
-    WidgetFile {
+    Some(WidgetFile {
         path: rel,
         folder: folder.to_string(),
         nested,
         coilbox: widget_owned(&under_luaui),
         info,
         error,
-    }
+    })
 }
 
 /// List and read every widget file in `folders` (names under `LuaUI/`, any
 /// case) of `write_dir`.
 pub fn scan(write_dir: &Path, folders: &[String]) -> WidgetScan {
     let names: Vec<String> = folders.iter().map(|f| f.to_lowercase()).collect();
+    let mut errors = Vec::new();
     let mut scanned = Vec::new();
     let mut files = Vec::new();
-    for luaui in children_named(write_dir, &[LUAUI.to_string()]) {
-        for dir in children_named(&luaui, &names) {
+    for luaui in children_named(write_dir, &[LUAUI.to_string()], &mut errors) {
+        for dir in children_named(&luaui, &names, &mut errors) {
             let folder = dir.strip_prefix(write_dir).map(key).unwrap_or_default();
-            for path in lua_files(&dir) {
-                files.push(read_file(write_dir, &luaui, &folder, &path, false));
+            for path in lua_files(&dir, &mut errors) {
+                files.extend(read_file(write_dir, &luaui, &folder, &path, false));
             }
-            for sub in subfolders(&dir) {
-                for path in lua_files(&sub) {
-                    files.push(read_file(write_dir, &luaui, &folder, &path, true));
+            for sub in subfolders(&dir, &mut errors) {
+                for path in lua_files(&sub, &mut errors) {
+                    files.extend(read_file(write_dir, &luaui, &folder, &path, true));
                 }
             }
             scanned.push(folder);
@@ -186,6 +217,7 @@ pub fn scan(write_dir: &Path, folders: &[String]) -> WidgetScan {
         case_sensitive: case_sensitive(write_dir),
         folders: scanned,
         files,
+        errors,
     }
 }
 
@@ -238,10 +270,22 @@ mod tests {
             "LuaUI/Widgets/pack/b.lua",
             r#"function widget:GetInfo() return { name = "B" } end"#,
         );
+        write(
+            &dir,
+            "LuaUI/Widgets/pack/helper.lua",
+            "local M = {} return M",
+        );
+        write(&dir, "LuaUI/Widgets/plain.lua", "local x = 1");
         write(&dir, "LuaUI/Widgets/readme.txt", "not a widget");
         write(&dir, "LuaUI/Config/x.lua", "return {}");
         let scan = scan(&dir, &names());
         assert_eq!(scan.folders, vec!["LuaUI/Widgets"]);
+        assert!(scan.errors.is_empty());
+        let plain = scan.files.iter().find(|f| f.path.ends_with("plain.lua"));
+        assert_eq!(
+            plain.and_then(|f| f.error.as_deref()),
+            Some("the file defines no GetInfo function")
+        );
         let got: Vec<_> = scan
             .files
             .iter()
@@ -257,9 +301,21 @@ mod tests {
             got,
             vec![
                 ("LuaUI/Widgets/a.lua", false, Some("A".to_string())),
+                ("LuaUI/Widgets/plain.lua", false, None),
                 ("LuaUI/Widgets/pack/b.lua", true, Some("B".to_string())),
             ]
         );
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn two_folders_are_not_one_because_both_exist() {
+        let dir = temp_dir("same");
+        std::fs::create_dir_all(dir.join("one")).unwrap();
+        std::fs::create_dir_all(dir.join("two")).unwrap();
+        assert!(same_file(&dir.join("one"), &dir.join("one")));
+        assert!(!same_file(&dir.join("one"), &dir.join("two")));
         let _ = std::fs::remove_dir_all(&dir);
     }
 

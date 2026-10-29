@@ -58,6 +58,8 @@ local engine = { Spring = true, VFS = true, Game = true }
 return function()
   local env = {}
   env.widget = env
+  -- Its own _G too, or `_G.VFS` would reach past the stand-ins.
+  env._G = env
   setmetatable(env, {
     __index = function(_, key)
       if not engine[key] then
@@ -93,13 +95,19 @@ fn text(table: &Table, key: &str) -> Option<String> {
 
 impl SpringLua {
     /// Run widget source `src` and return what its `GetInfo()` returned.
-    /// `name` labels the chunk in error messages. An error is the message to
-    /// show beside the file, one line, with no traceback.
-    pub fn widget_info(&self, src: &str, name: &str) -> std::result::Result<WidgetInfo, String> {
+    /// `None` when the file ran without an error and defines no `GetInfo`,
+    /// which is what a helper file a widget includes looks like. `name` labels
+    /// the chunk in error messages. An error is the message to show beside the
+    /// file, one line, with no traceback.
+    pub fn widget_info(
+        &self,
+        src: &str,
+        name: &str,
+    ) -> std::result::Result<Option<WidgetInfo>, String> {
         self.read_widget(src, name).map_err(|e| message(&e))
     }
 
-    fn read_widget(&self, src: &str, name: &str) -> Result<WidgetInfo> {
+    fn read_widget(&self, src: &str, name: &str) -> Result<Option<WidgetInfo>> {
         let make_env: Function = self
             .lua
             .load(WIDGET_ENV)
@@ -114,9 +122,7 @@ impl SpringLua {
             .into_function()?;
         let ran = chunk.call::<()>(());
         let Value::Function(get_info) = env.raw_get::<Value>("GetInfo")? else {
-            return Err(ran.err().unwrap_or_else(|| {
-                Error::RuntimeError("the file defines no GetInfo function".into())
-            }));
+            return ran.map(|()| None);
         };
         let info = match get_info.call::<Value>(env) {
             Ok(info) => info,
@@ -127,7 +133,7 @@ impl SpringLua {
                 .err()
                 .unwrap_or_else(|| Error::RuntimeError("GetInfo did not return a table".into())));
         };
-        Ok(WidgetInfo {
+        Ok(Some(WidgetInfo {
             name: text(&info, "name"),
             desc: text(&info, "desc"),
             author: text(&info, "author"),
@@ -143,7 +149,7 @@ impl SpringLua {
                 Value::Boolean(b) => Some(b),
                 _ => None,
             },
-        })
+        }))
     }
 }
 
@@ -151,9 +157,13 @@ impl SpringLua {
 mod tests {
     use super::*;
 
-    fn read(src: &str) -> std::result::Result<WidgetInfo, String> {
+    fn read_raw(src: &str) -> std::result::Result<Option<WidgetInfo>, String> {
         let dir = std::env::temp_dir();
         SpringLua::new(dir).unwrap().widget_info(src, "test.lua")
+    }
+
+    fn read(src: &str) -> std::result::Result<WidgetInfo, String> {
+        read_raw(src)?.ok_or_else(|| "no GetInfo".to_string())
     }
 
     #[test]
@@ -235,9 +245,27 @@ mod tests {
     }
 
     #[test]
-    fn a_file_with_no_get_info_says_so() {
-        let err = read("local x = 1").unwrap_err();
-        assert!(err.contains("GetInfo"), "{err}");
+    fn a_file_that_runs_and_defines_no_get_info_is_not_a_widget() {
+        assert_eq!(read_raw("local x = 1"), Ok(None));
+    }
+
+    #[test]
+    fn a_file_that_fails_and_defines_no_get_info_reports_the_error() {
+        let err = read_raw("local x = nil + 1").unwrap_err();
+        assert!(err.contains("arithmetic"), "{err}");
+    }
+
+    #[test]
+    fn underscore_g_is_the_widget_environment() {
+        let info = read(
+            r#"
+            local loaded = _G.VFS.LoadFile("anything.lua")
+            function widget:GetInfo() return { name = type(loaded), desc = tostring(_G == widget) } end
+            "#,
+        )
+        .unwrap();
+        assert_eq!(info.name.as_deref(), Some("nil"));
+        assert_eq!(info.desc.as_deref(), Some("true"));
     }
 
     #[test]
