@@ -1304,6 +1304,11 @@ msgstr "{0} {resourceName}"
 msgid "{0} from the newest release"
 msgstr "{0} depuis la dernière version"
 
+#. placeholder {0}: game.game
+#: src/widgets/pages/WidgetsPage.tsx
+msgid "{0} loads none of your widgets."
+msgstr ""
+
 #. placeholder {0}: formatRate(value)
 #: src/content/pages/components/PlayerMatchFigures.tsx
 #, fuzzy
@@ -10269,6 +10274,7 @@ msgid "all Game options"
 msgstr "toutes les options de jeu"
 
 #: src/hub/pages/components/GamePicturesControl.tsx
+#: src/widgets/pages/WidgetsPage.tsx
 #, fuzzy
 msgid "All games"
 msgstr "Tous les jeux"
@@ -11620,6 +11626,10 @@ msgstr "Tentative enregistrée sur {name}."
 #, fuzzy
 msgid "Audio"
 msgstr "Audio"
+
+#: src/widgets/pages/WidgetsPage.tsx
+msgid "Author"
+msgstr ""
 
 #: src/scenario/pages/ScenarioBuilderPage.tsx
 #, fuzzy
@@ -15254,6 +15264,7 @@ msgstr "Code"
 #: src/main.tsx
 #: src/onboarding/pages/GamesPage.tsx
 #: src/sound/library.ts
+#: src/widgets/pages/WidgetsPage.tsx
 #, fuzzy
 msgid "Coilbox"
 msgstr "Coilbox"
@@ -15509,6 +15520,11 @@ msgstr "Coilbox ne sait pas où ce moteur écrit, il ne peut donc pas distinguer
 #, fuzzy
 msgid "Coilbox does not know which side you play, so they are kept as they are unless you say otherwise."
 msgstr "Coilbox ne sait pas quel camp vous jouez, ils sont donc conservés tels quels sauf indication contraire."
+
+#. placeholder {0}: game.game
+#: src/widgets/pages/WidgetsPage.tsx
+msgid "Coilbox does not recognise {0}'s widget handler, so it cannot tell which of these the game loads."
+msgstr ""
 
 #: src/deeplink/readImport.ts
 #, fuzzy
@@ -17356,6 +17372,11 @@ msgstr "Impossible de lire les données d’unités"
 #, fuzzy
 msgid "Could not read your saved models: {error}"
 msgstr "Impossible de lire vos modèles enregistrés : {error}"
+
+#. placeholder {0}: row.error
+#: src/widgets/pages/WidgetsPage.tsx
+msgid "Could not read: {0}"
+msgstr ""
 
 #: src/lego/pages/components/SaveModelPopover.tsx
 #, fuzzy
@@ -22845,6 +22866,7 @@ msgstr "jeu"
 #: src/play/presetParts.ts
 #: src/runlite/pages/components/EncounterOverlay.tsx
 #: src/runlite/pages/components/RunSetupForm.tsx
+#: src/widgets/pages/WidgetsPage.tsx
 #: src/workshop/pages/components/DecodeTweakSetDrawer.tsx
 #: src/workshop/pages/components/ProjectDetailsDrawer.tsx
 #: src/workshop/pages/components/RandomModDrawer.tsx
@@ -27262,6 +27284,10 @@ msgstr "Arme de bibliothèque {weaponKey}"
 msgid "libwebp refused the picture."
 msgstr "libwebp a refusé l’image."
 
+#: src/widgets/pages/WidgetsPage.tsx
+msgid "Licence"
+msgstr ""
+
 #: src/workshop/explosionGenerators.ts
 #, fuzzy
 msgid "Lifetime"
@@ -27481,6 +27507,10 @@ msgstr "{loadedName} chargé"
 #, fuzzy
 msgid "Loaded {loadedName}, with parts missing"
 msgstr "{loadedName} chargé, avec des éléments manquants"
+
+#: src/widgets/pages/WidgetsPage.tsx
+msgid "Loaded by"
+msgstr ""
 
 #: src/play/pages/SkirmishPage.tsx
 #, fuzzy
@@ -31224,6 +31254,10 @@ msgstr "Aucun utilisateur ignoré. Ajoutez-en un ci-dessus, ou utilisez l’acti
 msgid "No image files matched in this game's archive."
 msgstr "Aucun fichier image correspondant dans l’archive de ce jeu."
 
+#: src/widgets/pages/WidgetsPage.tsx
+msgid "No installed game"
+msgstr ""
+
 #: src/content/pages/components/RemixPanel.tsx
 #, fuzzy
 msgid "No installed games found to target."
@@ -32348,6 +32382,10 @@ msgstr "Aucune arme ne correspond."
 #, fuzzy
 msgid "No weapons to change"
 msgstr "Aucune arme à modifier"
+
+#: src/widgets/pages/WidgetsPage.tsx
+msgid "No widgets."
+msgstr ""
 
 #: src/content/pages/components/MapRecords.tsx
 #, fuzzy
@@ -34279,6 +34317,7 @@ msgstr "Ouvrir Contenu > Jeux"
 #: src/content/pages/components/Convert3doDrawer.tsx
 #: src/content/pages/GameDetailPage.tsx
 #: src/uberstress/pages/HistoryPage.tsx
+#: src/widgets/pages/WidgetsPage.tsx
 #, fuzzy
 msgid "Open folder"
 msgstr "Ouvrir le dossier"
@@ -39115,6 +39154,7 @@ msgstr "Remettre à l’échelle sur {mapName}"
 #: src/multiplayer/battle/MissingContentCard.tsx
 #: src/multiplayer/battle/MissingMapBox.tsx
 #: src/scenario/pages/ScenarioBuilderPage.tsx
+#: src/widgets/pages/WidgetsPage.tsx
 #, fuzzy
 msgid "Rescan"
 msgstr "Réanalyser"
@@ -48096,6 +48136,10 @@ msgstr "Toute la partie, de {matchStart} à {matchEnd}."
 msgid "The whole selection swung a quarter turn about its own middle, so it keeps its shape. Press R to turn each thing where it stands instead."
 msgstr "Toute la sélection a pivoté d’un quart de tour autour de son propre centre, elle garde donc sa forme. Appuyez sur R pour tourner chaque élément sur place à la place."
 
+#: src/widgets/pages/WidgetsPage.tsx
+msgid "The widgets you have added to your games, and which games load each one."
+msgstr ""
+
 #: src/content/pages/components/MapAggregate.tsx
 #, fuzzy
 msgid "The window is {when} of each match by its own clock, in whole minutes."
@@ -48687,6 +48731,10 @@ msgstr "Ce moteur n’a pas pu lire vos jeux"
 #, fuzzy
 msgid "This engine could not read your games. Try another from <0>Settings → Engines</0>, or see what it found in <1>Content → Games</1>."
 msgstr "Ce moteur n’a pas pu lire vos jeux. Essayez-en un autre dans <0>Paramètres → Moteurs</0>, ou voyez ce qu’il a trouvé dans <1>Contenu → Jeux</1>."
+
+#: src/widgets/pages/WidgetsPage.tsx
+msgid "This engine does not say where it keeps its settings, so coilbox cannot find its widget folder."
+msgstr ""
 
 #: src/content/pages/components/DeleteEngineButton.tsx
 #, fuzzy
@@ -52227,6 +52275,7 @@ msgstr "Polyvalent"
 
 #: src/content/pages/components/GameVersionsTab.tsx
 #: src/multiplayer/admin/MaintenanceSection.tsx
+#: src/widgets/pages/WidgetsPage.tsx
 #, fuzzy
 msgid "Version"
 msgstr "Version"
@@ -53582,6 +53631,7 @@ msgid "Why?"
 msgstr "Pourquoi ?"
 
 #: src/blueprint/pages/components/BlueprintWidgetButton.tsx
+#: src/widgets/pages/WidgetsPage.tsx
 #, fuzzy
 msgid "Widget"
 msgstr "Widget"
@@ -53592,6 +53642,9 @@ msgid "widget config"
 msgstr "configuration des widgets"
 
 #: src/content/commandRates.ts
+#: src/content/index.ts
+#: src/content/pages/GameDetailPage.tsx
+#: src/widgets/pages/WidgetsPage.tsx
 #, fuzzy
 msgid "Widgets"
 msgstr "Widgets"

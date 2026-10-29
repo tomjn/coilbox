@@ -1077,6 +1077,11 @@ msgstr "{0} {resourceName}"
 msgid "{0} from the newest release"
 msgstr "{0} from the newest release"
 
+#. placeholder {0}: game.game
+#: src/widgets/pages/WidgetsPage.tsx
+msgid "{0} loads none of your widgets."
+msgstr "{0} loads none of your widgets."
+
 #. placeholder {0}: formatRate(value)
 #: src/content/pages/components/PlayerMatchFigures.tsx
 msgid "{0} per minute"
@@ -8282,6 +8287,7 @@ msgid "all Game options"
 msgstr "all Game options"
 
 #: src/hub/pages/components/GamePicturesControl.tsx
+#: src/widgets/pages/WidgetsPage.tsx
 msgid "All games"
 msgstr "All games"
 
@@ -9370,6 +9376,10 @@ msgstr "Attempt recorded on {name}."
 #: src/scenario/pages/components/DialoguePanel.tsx
 msgid "Audio"
 msgstr "Audio"
+
+#: src/widgets/pages/WidgetsPage.tsx
+msgid "Author"
+msgstr "Author"
 
 #: src/scenario/pages/ScenarioBuilderPage.tsx
 msgid "Author a mission's in-engine content: what spawns, what the triggers watch for, and what wins it. A scenario stands alone, so you can play one on its own or attach it to a campaign mission later."
@@ -12338,6 +12348,7 @@ msgstr "Code"
 #: src/main.tsx
 #: src/onboarding/pages/GamesPage.tsx
 #: src/sound/library.ts
+#: src/widgets/pages/WidgetsPage.tsx
 msgid "Coilbox"
 msgstr "Coilbox"
 
@@ -12543,6 +12554,11 @@ msgstr "Coilbox does not know where this engine writes, so it cannot tell that f
 #: src/blueprint/pages/components/ArrivingPack.tsx
 msgid "Coilbox does not know which side you play, so they are kept as they are unless you say otherwise."
 msgstr "Coilbox does not know which side you play, so they are kept as they are unless you say otherwise."
+
+#. placeholder {0}: game.game
+#: src/widgets/pages/WidgetsPage.tsx
+msgid "Coilbox does not recognise {0}'s widget handler, so it cannot tell which of these the game loads."
+msgstr "Coilbox does not recognise {0}'s widget handler, so it cannot tell which of these the game loads."
 
 #: src/deeplink/readImport.ts
 msgid "Coilbox does not recognise that. Paste a coilbox link, a share code, or the contents of a coilbox .json file."
@@ -14039,6 +14055,11 @@ msgstr "Could not read unit data"
 #: src/lego/pages/ProjectsPage.tsx
 msgid "Could not read your saved models: {error}"
 msgstr "Could not read your saved models: {error}"
+
+#. placeholder {0}: row.error
+#: src/widgets/pages/WidgetsPage.tsx
+msgid "Could not read: {0}"
+msgstr "Could not read: {0}"
 
 #: src/lego/pages/components/SaveModelPopover.tsx
 msgid "Could not save the model"
@@ -18493,6 +18514,7 @@ msgstr "game"
 #: src/play/presetParts.ts
 #: src/runlite/pages/components/EncounterOverlay.tsx
 #: src/runlite/pages/components/RunSetupForm.tsx
+#: src/widgets/pages/WidgetsPage.tsx
 #: src/workshop/pages/components/DecodeTweakSetDrawer.tsx
 #: src/workshop/pages/components/ProjectDetailsDrawer.tsx
 #: src/workshop/pages/components/RandomModDrawer.tsx
@@ -22068,6 +22090,10 @@ msgstr "Library weapon {weaponKey}"
 msgid "libwebp refused the picture."
 msgstr "libwebp refused the picture."
 
+#: src/widgets/pages/WidgetsPage.tsx
+msgid "Licence"
+msgstr "Licence"
+
 #: src/workshop/explosionGenerators.ts
 msgid "Lifetime"
 msgstr "Lifetime"
@@ -22244,6 +22270,10 @@ msgstr "Loaded {loadedName}"
 #: src/lego/moduleFileIo.ts
 msgid "Loaded {loadedName}, with parts missing"
 msgstr "Loaded {loadedName}, with parts missing"
+
+#: src/widgets/pages/WidgetsPage.tsx
+msgid "Loaded by"
+msgstr "Loaded by"
 
 #: src/play/pages/SkirmishPage.tsx
 msgid "Loaded the preset \"{loadedName}\"."
@@ -25279,6 +25309,10 @@ msgstr "No ignored users. Add one above, or use the ignore action next to a user
 msgid "No image files matched in this game's archive."
 msgstr "No image files matched in this game's archive."
 
+#: src/widgets/pages/WidgetsPage.tsx
+msgid "No installed game"
+msgstr "No installed game"
+
 #: src/content/pages/components/RemixPanel.tsx
 msgid "No installed games found to target."
 msgstr "No installed games found to target."
@@ -26182,6 +26216,10 @@ msgstr "No weapon matches that."
 #: src/workshop/pages/components/ReferenceBulkEdit.tsx
 msgid "No weapons to change"
 msgstr "No weapons to change"
+
+#: src/widgets/pages/WidgetsPage.tsx
+msgid "No widgets."
+msgstr "No widgets."
 
 #: src/content/pages/components/MapRecords.tsx
 msgid "No."
@@ -27743,6 +27781,7 @@ msgstr "Open Content > Games"
 #: src/content/pages/components/Convert3doDrawer.tsx
 #: src/content/pages/GameDetailPage.tsx
 #: src/uberstress/pages/HistoryPage.tsx
+#: src/widgets/pages/WidgetsPage.tsx
 msgid "Open folder"
 msgstr "Open folder"
 
@@ -31667,6 +31706,7 @@ msgstr "Rescale onto {mapName}"
 #: src/multiplayer/battle/MissingContentCard.tsx
 #: src/multiplayer/battle/MissingMapBox.tsx
 #: src/scenario/pages/ScenarioBuilderPage.tsx
+#: src/widgets/pages/WidgetsPage.tsx
 msgid "Rescan"
 msgstr "Rescan"
 
@@ -38926,6 +38966,10 @@ msgstr "The whole match, {matchStart} to {matchEnd}."
 msgid "The whole selection swung a quarter turn about its own middle, so it keeps its shape. Press R to turn each thing where it stands instead."
 msgstr "The whole selection swung a quarter turn about its own middle, so it keeps its shape. Press R to turn each thing where it stands instead."
 
+#: src/widgets/pages/WidgetsPage.tsx
+msgid "The widgets you have added to your games, and which games load each one."
+msgstr "The widgets you have added to your games, and which games load each one."
+
 #: src/content/pages/components/MapAggregate.tsx
 msgid "The window is {when} of each match by its own clock, in whole minutes."
 msgstr "The window is {when} of each match by its own clock, in whole minutes."
@@ -39400,6 +39444,10 @@ msgstr "This engine could not read your games"
 #: src/runlite/pages/RunListPage.tsx
 msgid "This engine could not read your games. Try another from <0>Settings → Engines</0>, or see what it found in <1>Content → Games</1>."
 msgstr "This engine could not read your games. Try another from <0>Settings → Engines</0>, or see what it found in <1>Content → Games</1>."
+
+#: src/widgets/pages/WidgetsPage.tsx
+msgid "This engine does not say where it keeps its settings, so coilbox cannot find its widget folder."
+msgstr "This engine does not say where it keeps its settings, so coilbox cannot find its widget folder."
 
 #: src/content/pages/components/DeleteEngineButton.tsx
 msgid "This engine recorded {replayBytes} of replays into its own folder, which go with it. Move them out first with Gather replays on the <0>Replays screen</0>."
@@ -42260,6 +42308,7 @@ msgstr "Versatile"
 
 #: src/content/pages/components/GameVersionsTab.tsx
 #: src/multiplayer/admin/MaintenanceSection.tsx
+#: src/widgets/pages/WidgetsPage.tsx
 msgid "Version"
 msgstr "Version"
 
@@ -43354,6 +43403,7 @@ msgid "Why?"
 msgstr "Why?"
 
 #: src/blueprint/pages/components/BlueprintWidgetButton.tsx
+#: src/widgets/pages/WidgetsPage.tsx
 msgid "Widget"
 msgstr "Widget"
 
@@ -43362,6 +43412,9 @@ msgid "widget config"
 msgstr "widget config"
 
 #: src/content/commandRates.ts
+#: src/content/index.ts
+#: src/content/pages/GameDetailPage.tsx
+#: src/widgets/pages/WidgetsPage.tsx
 msgid "Widgets"
 msgstr "Widgets"
 

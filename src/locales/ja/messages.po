@@ -1304,6 +1304,11 @@ msgstr "{0} {resourceName}"
 msgid "{0} from the newest release"
 msgstr "最新リリースの {0}"
 
+#. placeholder {0}: game.game
+#: src/widgets/pages/WidgetsPage.tsx
+msgid "{0} loads none of your widgets."
+msgstr ""
+
 #. placeholder {0}: formatRate(value)
 #: src/content/pages/components/PlayerMatchFigures.tsx
 #, fuzzy
@@ -10269,6 +10274,7 @@ msgid "all Game options"
 msgstr "すべてのゲームオプション"
 
 #: src/hub/pages/components/GamePicturesControl.tsx
+#: src/widgets/pages/WidgetsPage.tsx
 #, fuzzy
 msgid "All games"
 msgstr "すべてのゲーム"
@@ -11620,6 +11626,10 @@ msgstr "{name} に挑戦を記録しました。"
 #, fuzzy
 msgid "Audio"
 msgstr "音声"
+
+#: src/widgets/pages/WidgetsPage.tsx
+msgid "Author"
+msgstr ""
 
 #: src/scenario/pages/ScenarioBuilderPage.tsx
 #, fuzzy
@@ -15254,6 +15264,7 @@ msgstr "コード"
 #: src/main.tsx
 #: src/onboarding/pages/GamesPage.tsx
 #: src/sound/library.ts
+#: src/widgets/pages/WidgetsPage.tsx
 #, fuzzy
 msgid "Coilbox"
 msgstr "Coilbox"
@@ -15509,6 +15520,11 @@ msgstr "Coilbox はこのエンジンの書き込み先を知らないため、�
 #, fuzzy
 msgid "Coilbox does not know which side you play, so they are kept as they are unless you say otherwise."
 msgstr "Coilbox はプレイする勢力を知らないため、指定がない限りそのままにします。"
+
+#. placeholder {0}: game.game
+#: src/widgets/pages/WidgetsPage.tsx
+msgid "Coilbox does not recognise {0}'s widget handler, so it cannot tell which of these the game loads."
+msgstr ""
 
 #: src/deeplink/readImport.ts
 #, fuzzy
@@ -17356,6 +17372,11 @@ msgstr "ユニットデータを読み込めませんでした"
 #, fuzzy
 msgid "Could not read your saved models: {error}"
 msgstr "保存したモデルを読み込めませんでした：{error}"
+
+#. placeholder {0}: row.error
+#: src/widgets/pages/WidgetsPage.tsx
+msgid "Could not read: {0}"
+msgstr ""
 
 #: src/lego/pages/components/SaveModelPopover.tsx
 #, fuzzy
@@ -22845,6 +22866,7 @@ msgstr "ゲーム"
 #: src/play/presetParts.ts
 #: src/runlite/pages/components/EncounterOverlay.tsx
 #: src/runlite/pages/components/RunSetupForm.tsx
+#: src/widgets/pages/WidgetsPage.tsx
 #: src/workshop/pages/components/DecodeTweakSetDrawer.tsx
 #: src/workshop/pages/components/ProjectDetailsDrawer.tsx
 #: src/workshop/pages/components/RandomModDrawer.tsx
@@ -27262,6 +27284,10 @@ msgstr "ライブラリの武器 {weaponKey}"
 msgid "libwebp refused the picture."
 msgstr "libwebp が画像を拒否しました。"
 
+#: src/widgets/pages/WidgetsPage.tsx
+msgid "Licence"
+msgstr ""
+
 #: src/workshop/explosionGenerators.ts
 #, fuzzy
 msgid "Lifetime"
@@ -27481,6 +27507,10 @@ msgstr "{loadedName} を読み込みました"
 #, fuzzy
 msgid "Loaded {loadedName}, with parts missing"
 msgstr "{loadedName} を読み込みましたが、パーツが不足しています"
+
+#: src/widgets/pages/WidgetsPage.tsx
+msgid "Loaded by"
+msgstr ""
 
 #: src/play/pages/SkirmishPage.tsx
 #, fuzzy
@@ -31224,6 +31254,10 @@ msgstr "無視中のユーザーはいません。上で追加するか、チャ
 msgid "No image files matched in this game's archive."
 msgstr "このゲームのアーカイブに一致する画像ファイルはありません。"
 
+#: src/widgets/pages/WidgetsPage.tsx
+msgid "No installed game"
+msgstr ""
+
 #: src/content/pages/components/RemixPanel.tsx
 #, fuzzy
 msgid "No installed games found to target."
@@ -32348,6 +32382,10 @@ msgstr "一致する武器はありません。"
 #, fuzzy
 msgid "No weapons to change"
 msgstr "変更する武器はありません"
+
+#: src/widgets/pages/WidgetsPage.tsx
+msgid "No widgets."
+msgstr ""
 
 #: src/content/pages/components/MapRecords.tsx
 #, fuzzy
@@ -34279,6 +34317,7 @@ msgstr "コンテンツ > ゲームを開く"
 #: src/content/pages/components/Convert3doDrawer.tsx
 #: src/content/pages/GameDetailPage.tsx
 #: src/uberstress/pages/HistoryPage.tsx
+#: src/widgets/pages/WidgetsPage.tsx
 #, fuzzy
 msgid "Open folder"
 msgstr "フォルダーを開く"
@@ -39115,6 +39154,7 @@ msgstr "{mapName} に合わせて拡大縮小"
 #: src/multiplayer/battle/MissingContentCard.tsx
 #: src/multiplayer/battle/MissingMapBox.tsx
 #: src/scenario/pages/ScenarioBuilderPage.tsx
+#: src/widgets/pages/WidgetsPage.tsx
 #, fuzzy
 msgid "Rescan"
 msgstr "再スキャン"
@@ -48096,6 +48136,10 @@ msgstr "試合全体（{matchStart} から {matchEnd}）。"
 msgid "The whole selection swung a quarter turn about its own middle, so it keeps its shape. Press R to turn each thing where it stands instead."
 msgstr "選択全体をそれ自体の中心で 90 度回転させたため、形は保たれています。各ものをその場で回転させるには R を押してください。"
 
+#: src/widgets/pages/WidgetsPage.tsx
+msgid "The widgets you have added to your games, and which games load each one."
+msgstr ""
+
 #: src/content/pages/components/MapAggregate.tsx
 #, fuzzy
 msgid "The window is {when} of each match by its own clock, in whole minutes."
@@ -48687,6 +48731,10 @@ msgstr "このエンジンはゲームを読み込めませんでした"
 #, fuzzy
 msgid "This engine could not read your games. Try another from <0>Settings → Engines</0>, or see what it found in <1>Content → Games</1>."
 msgstr "このエンジンはゲームを読み込めませんでした。<0>設定 → エンジン</0>で別のエンジンを試すか、<1>コンテンツ → ゲーム</1>で見つかったものを確認してください。"
+
+#: src/widgets/pages/WidgetsPage.tsx
+msgid "This engine does not say where it keeps its settings, so coilbox cannot find its widget folder."
+msgstr ""
 
 #: src/content/pages/components/DeleteEngineButton.tsx
 #, fuzzy
@@ -52227,6 +52275,7 @@ msgstr "万能"
 
 #: src/content/pages/components/GameVersionsTab.tsx
 #: src/multiplayer/admin/MaintenanceSection.tsx
+#: src/widgets/pages/WidgetsPage.tsx
 #, fuzzy
 msgid "Version"
 msgstr "バージョン"
@@ -53582,6 +53631,7 @@ msgid "Why?"
 msgstr "理由は？"
 
 #: src/blueprint/pages/components/BlueprintWidgetButton.tsx
+#: src/widgets/pages/WidgetsPage.tsx
 #, fuzzy
 msgid "Widget"
 msgstr "ウィジェット"
@@ -53592,6 +53642,9 @@ msgid "widget config"
 msgstr "ウィジェットの設定"
 
 #: src/content/commandRates.ts
+#: src/content/index.ts
+#: src/content/pages/GameDetailPage.tsx
+#: src/widgets/pages/WidgetsPage.tsx
 #, fuzzy
 msgid "Widgets"
 msgstr "ウィジェット"

@@ -61,7 +61,10 @@ function pluginPaths(): string[] {
  * - `games/:name/units/reference` (issue #1316): added straight under
  *   `library/`, after the `content/` → `library/` move.
  */
-const NEW_LIBRARY_ROUTES: readonly string[] = ["games/:name/units/reference"];
+const NEW_LIBRARY_ROUTES: readonly string[] = [
+  "games/:name/units/reference",
+  "widgets",
+];
 
 describe("the content to library move", () => {
   it("kept a retired twin for every renamed path", () => {
