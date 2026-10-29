@@ -25,8 +25,9 @@ import {
 import { useWidgetList } from "../useWidgetList";
 import { folderToOpen, rowsForGame, type WidgetRow } from "../widgetList";
 
-/** The picker's value for the list of every widget file. */
-const ALL = "";
+/** The picker's value for the list of every widget file. Not empty, because
+ *  the select treats an empty value as nothing picked. */
+const ALL = "all-games";
 
 /**
  * Library > Widgets (issue #1284): the widget files a player has added under
@@ -49,11 +50,10 @@ export default function WidgetsPage() {
     () => [
       { value: ALL, label: t`All games` },
       ...(list.games ?? []).map((g) => ({ value: g.game, label: g.game })),
-      // A link can name a game that is not installed here. Keep it pickable
-      // so the trigger shows what was asked for, rather than going blank.
-      ...(picked !== ALL && list.games && !game
-        ? [{ value: picked, label: picked }]
-        : []),
+      // A link can name a game that is not installed here, or not read yet.
+      // Keep it pickable so the trigger shows what was asked for, rather than
+      // going blank.
+      ...(picked !== ALL && !game ? [{ value: picked, label: picked }] : []),
     ],
     [list.games, game, picked, t],
   );
@@ -131,7 +131,9 @@ export default function WidgetsPage() {
         <EmptyState
           icon={Puzzle}
           label={
-            game ? t`${game.game} loads none of your widgets.` : t`No widgets.`
+            game?.handler
+              ? t`${game.game} loads none of your widgets.`
+              : t`No widgets.`
           }
         />
       ) : (
