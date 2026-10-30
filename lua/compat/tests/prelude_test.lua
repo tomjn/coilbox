@@ -1241,4 +1241,56 @@ do
 	check("synced: no GetHasLag, as GetGameState is unsynced", synced.env.Spring.GetHasLag == nil)
 end
 
+--------------------------------------------------------------------------------
+-- LOG in a game's own System table, which Complete Annihilation's lacks (issue #4687)
+--------------------------------------------------------------------------------
+
+for _, synced in ipairs({ true, false }) do
+	local state = synced and "synced" or "unsynced"
+
+	local before = newEngine({ synced = synced, manifest = 17 })
+	prelude(before)
+	local system = { Spring = before.env.Spring }
+	before.env.System = system
+	check(state .. ": manifest 17 leaves System without LOG", system.LOG == nil)
+
+	local engine = newEngine({ synced = synced, manifest = 18 })
+	prelude(engine)
+	local env = engine.env
+	check(state .. ": no System until the game sets one", env.System == nil)
+
+	-- What a gadget handler does: set System once, then copy it into each gadget.
+	local game = { Spring = env.Spring }
+	env.System = game
+	check(state .. ": the game's System is the global", env.System == game)
+	check(state .. ": a game's System gets LOG", game.LOG == env.LOG)
+	local gadget = {}
+	for k, v in pairs(env.System) do
+		gadget[k] = v
+	end
+	-- LuaGadgets/Gadgets/unit_script.lua, line 532.
+	local ok, err = pcall(function() return gadget.LOG.INFO end)
+	check(state .. ": a gadget can read LOG", ok, tostring(err))
+
+	local own = {}
+	local mine = newEngine({ synced = synced, manifest = 18 })
+	prelude(mine)
+	mine.env.System = { LOG = own }
+	check(state .. ": a System with its own LOG keeps it", mine.env.System.LOG == own)
+
+	mine.env.Other = {}
+	check(state .. ": any other global gets no LOG", mine.env.Other.LOG == nil)
+
+	check(state .. ": no fix failed", #engine.logs == 0, table.concat(engine.logs, "; "))
+end
+
+do
+	local bare = newEngine({ manifest = 18 })
+	bare.env.LOG = nil
+	prelude(bare)
+	bare.env.System = {}
+	check("with no LOG to give, System is left alone", bare.env.System.LOG == nil)
+	check("with no LOG to give, no fix failed", #bare.logs == 0, table.concat(bare.logs, "; "))
+end
+
 support.report()
