@@ -301,12 +301,6 @@ export default defineConfig({
     pageData.frontmatter.hero.actions.unshift(
       {
         theme: "brand",
-        text: "macOS (Apple Silicon)",
-        link: downloads.macos,
-        target: "_self",
-      },
-      {
-        theme: "brand",
         text: "Windows",
         link: downloads.windows,
         target: "_self",
@@ -315,6 +309,12 @@ export default defineConfig({
         theme: "brand",
         text: "Linux",
         link: downloads.linux,
+        target: "_self",
+      },
+      {
+        theme: "brand",
+        text: "macOS (Apple Silicon)",
+        link: downloads.macos,
         target: "_self",
       },
     );

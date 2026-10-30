@@ -624,29 +624,58 @@ mod free_space_tests {
 mod leftover_tests {
     use super::*;
 
-    /// A long sleep with an argument nothing else on the machine has.
-    fn sleeper(marker: &str) -> std::process::Child {
-        Command::new("sleep").arg(marker).spawn().unwrap()
+    /// A running `sleep`, killed and reaped on drop so a failed assertion does
+    /// not leave it behind.
+    struct Sleeper(std::process::Child);
+
+    impl Drop for Sleeper {
+        fn drop(&mut self) {
+            let _ = self.0.kill();
+            let _ = self.0.wait();
+        }
+    }
+
+    /// A long sleep with an argument nothing else on the machine has, returned
+    /// once its command line shows that argument.
+    ///
+    /// `spawn` returns when the child has started to exec, not when the kernel
+    /// has filled in its arguments. On Linux the command line reads as empty in
+    /// between, and `ps` then shows `[sleep]`.
+    fn sleeper(marker: &str) -> Sleeper {
+        let sleeper = Sleeper(Command::new("sleep").arg(marker).spawn().unwrap());
+        let pid = sleeper.0.id();
+        let deadline = std::time::Instant::now() + std::time::Duration::from_secs(10);
+        loop {
+            let line = command_line(pid);
+            if line.as_deref().is_some_and(|l| l.contains(marker)) {
+                return sleeper;
+            }
+            assert!(
+                std::time::Instant::now() < deadline,
+                "sleep {marker} never showed its arguments, last command line {line:?}"
+            );
+            std::thread::sleep(std::time::Duration::from_millis(5));
+        }
     }
 
     #[test]
     fn a_process_is_killed_only_when_its_command_line_has_every_needle() {
-        let mut child = sleeper("4242.5");
-        let pid = child.id();
+        let mut sleeper = sleeper("4242.5");
+        let pid = sleeper.0.id();
 
         assert!(!kill_if_command_line_has(pid, &["4242.5", "not-there"]));
-        assert!(child.try_wait().unwrap().is_none(), "still running");
+        assert!(sleeper.0.try_wait().unwrap().is_none(), "still running");
 
         assert!(kill_if_command_line_has(pid, &["sleep", "4242.5"]));
-        assert!(!child.wait().unwrap().success());
+        assert!(!sleeper.0.wait().unwrap().success());
     }
 
     #[test]
     fn a_pid_with_no_process_is_left_alone() {
-        let mut child = sleeper("4242.6");
-        let pid = child.id();
-        child.kill().unwrap();
-        child.wait().unwrap();
+        let mut sleeper = sleeper("4242.6");
+        let pid = sleeper.0.id();
+        sleeper.0.kill().unwrap();
+        sleeper.0.wait().unwrap();
 
         assert_eq!(command_line(pid), None);
         assert!(!kill_if_command_line_has(pid, &[""]));

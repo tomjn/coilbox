@@ -16,6 +16,7 @@ import {
   fireEvent,
   render,
   screen,
+  waitFor,
 } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { FileDiff } from "../../inPlace";
@@ -90,8 +91,21 @@ function draw() {
   );
 }
 
+/**
+ * The toolbar buttons are on screen from the first render but stay disabled
+ * until the diff has loaded, and a click on a disabled button does nothing. So
+ * wait for the button to be enabled, not just present.
+ */
+async function enabledButton(name: string): Promise<HTMLButtonElement> {
+  const button = (await screen.findByRole("button", {
+    name,
+  })) as HTMLButtonElement;
+  await waitFor(() => expect(button.disabled).toBe(false));
+  return button;
+}
+
 async function openAccept() {
-  fireEvent.click(await screen.findByRole("button", { name: "Accept" }));
+  fireEvent.click(await enabledButton("Accept"));
 }
 
 afterEach(() => {
@@ -117,7 +131,7 @@ describe("the disk diff drawer's plurals", () => {
   ])("says the right English after undoing %i file(s)", async (count, sentence) => {
     diffsResponse = files(count);
     draw();
-    fireEvent.click(await screen.findByRole("button", { name: "Undo" }));
+    fireEvent.click(await enabledButton("Undo"));
     expect(await screen.findByText(sentence)).toBeTruthy();
   });
 

@@ -13,6 +13,7 @@ const FILE_ENDINGS = {
 
 type Os = keyof typeof FILE_ENDINGS;
 export type Downloads = Record<Os, string>;
+export type ResolvedDownloads = Downloads & { label: string };
 type ReleaseFile = { name: string; browser_download_url: string };
 
 export function pickDownloads(files: ReleaseFile[]): Downloads {
@@ -37,7 +38,7 @@ export function pickDownloads(files: ReleaseFile[]): Downloads {
 // publishing a broken button. Only a local build with no token skips the lookup.
 export async function resolveDownloads(
   env: Record<string, string | undefined> = process.env,
-): Promise<Downloads> {
+): Promise<ResolvedDownloads> {
   if (!env.GH_TOKEN) {
     if (env.GITHUB_ACTIONS) {
       throw new Error(
@@ -46,6 +47,7 @@ export async function resolveDownloads(
     }
     // Distinct addresses, because the hero uses each button's link as its Vue key.
     return {
+      label: "Download:",
       macos: `${RELEASE_PAGE}#macos`,
       windows: `${RELEASE_PAGE}#windows`,
       linux: `${RELEASE_PAGE}#linux`,
@@ -62,6 +64,12 @@ export async function resolveDownloads(
       `reading the latest release failed: HTTP ${response.status}`,
     );
   }
-  const release = (await response.json()) as { assets: ReleaseFile[] };
-  return pickDownloads(release.assets);
+  const release = (await response.json()) as {
+    tag_name: string;
+    assets: ReleaseFile[];
+  };
+  return {
+    label: `Download v${release.tag_name}:`,
+    ...pickDownloads(release.assets),
+  };
 }
