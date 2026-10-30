@@ -28,6 +28,7 @@ function file(
     folder: "LuaUI/Widgets",
     nested: path.split("/").length > 3,
     coilbox: false,
+    givesOrders: false,
     info,
     error,
   };

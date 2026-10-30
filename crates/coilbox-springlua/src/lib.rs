@@ -28,7 +28,7 @@ pub mod unitscript;
 mod vfs;
 mod widget;
 
-pub use widget::WidgetInfo;
+pub use widget::{gives_orders, WidgetInfo};
 
 /// The path the engine would read for a VFS-relative one, spelled as the folder
 /// on disk spells it. Public because installing into a game folder has to write

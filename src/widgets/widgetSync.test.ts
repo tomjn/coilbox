@@ -30,6 +30,7 @@ const rows: WidgetRow[] = [
     folder: "LuaUI/Widgets",
     nested: false,
     coilbox: false,
+    givesOrders: false,
     info: { name: "Minimap" },
     error: null,
     loadedBy: [game.game],
