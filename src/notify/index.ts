@@ -7,12 +7,12 @@ import NotificationsSettings from "./NotificationsSettings";
 import { NotifyProvider } from "./NotifyProvider";
 
 /**
- * Frame-level notifications plugin. Mounts the app-wide sonner toast host,
- * contributes a topbar history bell (recent notifications survive the toast
- * vanishing) and a "Notifications" settings section (OS toggle + permission
- * grant + test). Notification triggers live at their event sources and call the
- * imperative `notify()` helper directly; that helper records each one into the
- * bell's history at a single interception point.
+ * Frame-level notifications plugin. Contributes a topbar history bell (recent
+ * notifications survive the toast vanishing) and a "Notifications" settings
+ * section (OS toggle + permission grant + test). It mounts no toast host, because
+ * picoframe's layout mounts the one. Notification triggers live at their event
+ * sources and call the imperative `notify()` helper directly. That helper
+ * records each one into the bell's history at a single interception point.
  */
 const notifyPlugin: FramePlugin = {
   id: "notify",

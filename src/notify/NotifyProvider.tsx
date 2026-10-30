@@ -1,16 +1,16 @@
 import { useSetting } from "@picoframe/frame";
 import { isPermissionGranted } from "@tauri-apps/plugin-notification";
 import { type ReactNode, useEffect } from "react";
-import { Toaster } from "@/components/ui/sonner";
 import { setOsEnabled, setOsSound, setPermGranted } from "./prefs";
 
 export const NOTIFY_OS_ENABLED_KEY = "notifications.os.enabled";
 export const NOTIFY_OS_SOUND_KEY = "notifications.os.sound";
 
 /**
- * App-wide: mounts the sonner toast host and mirrors the user's OS-notification
- * toggle and the current OS permission grant into the prefs bridge, so the
- * imperative notify() helper can read them synchronously from anywhere.
+ * App-wide: mirrors the user's OS-notification toggle and the current OS
+ * permission grant into the prefs bridge, so the imperative notify() helper can
+ * read them synchronously from anywhere. It mounts no toast host: picoframe's
+ * layout mounts the one, and a second would draw every toast twice.
  */
 export function NotifyProvider({ children }: { children: ReactNode }) {
   const [osEnabled] = useSetting<boolean>(NOTIFY_OS_ENABLED_KEY, true);
@@ -30,10 +30,5 @@ export function NotifyProvider({ children }: { children: ReactNode }) {
       .catch(() => setPermGranted(false));
   }, []);
 
-  return (
-    <>
-      {children}
-      <Toaster />
-    </>
-  );
+  return <>{children}</>;
 }
