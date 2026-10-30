@@ -23,10 +23,19 @@ import {
   ErrorBanner,
   SkeletonList,
 } from "@/content/pages/components/states";
+import { useGameFiles } from "../useGameFiles";
 import { useWidgetList } from "../useWidgetList";
-import { useWidgetSwitches } from "../useWidgetSwitches";
 import { folderToOpen, rowsForGame, type WidgetRow } from "../widgetList";
-import { savedUnder } from "../widgetNames";
+import {
+  appliedSet,
+  dropOverride,
+  entry,
+  setKey,
+  switchIn,
+  updateSets,
+  useWidgetSets,
+  type WidgetStates,
+} from "../widgetSets";
 
 /** The picker's value for the list of every widget file. Not empty, because
  *  the select treats an empty value as nothing picked. */
@@ -36,6 +45,10 @@ const ALL = "all-games";
  * Library > Widgets (issue #1284): the widget files a player has added under
  * the engine's write folder, what each one declares, and which installed games
  * load it. `?game=` picks one game, which is how a game's page links here.
+ *
+ * Its switches change the widget sets (#4844): with "All games" picked, the set
+ * every game uses, and with a game picked, that game's own set, which it gets
+ * on its first change.
  */
 export default function WidgetsPage() {
   const { t } = useLingui();
@@ -43,7 +56,12 @@ export default function WidgetsPage() {
   const list = useWidgetList();
   const picked = params.get("game") ?? ALL;
   const game = list.games?.find((g) => g.game === picked);
-  const switches = useWidgetSwitches(list.writeDir, game);
+  const files = useGameFiles(list.writeDir, list.games, list.rows);
+  const sets = useWidgetSets();
+  const file = game ? files.files?.get(game.game) : undefined;
+  // A game whose handler is not recognised has no file to write, so no set.
+  const key = game?.handler ? setKey(game) : null;
+  const ownSet = key !== null && !!entry(sets.overrides, key);
 
   const shown = useMemo(() => {
     if (!list.rows) return null;
@@ -95,7 +113,7 @@ export default function WidgetsPage() {
                 size="sm"
                 onClick={() => {
                   void list.reload();
-                  void switches.reload();
+                  void files.reload();
                 }}
                 disabled={list.reading}
               >
@@ -132,19 +150,37 @@ export default function WidgetsPage() {
         </p>
       )}
 
-      {switches.error && <ErrorBanner message={switches.error} />}
-      {game && switches.state.kind === "missing" && (
+      {file?.kind === "error" && <ErrorBanner message={file.error} />}
+      {picked === ALL &&
+        [...(files.files ?? [])].map(
+          ([name, f]) =>
+            f.kind === "error" && (
+              <ErrorBanner key={name} message={`${name}: ${f.error}`} />
+            ),
+        )}
+      {game && file?.kind === "missing" && (
         <p role="status" className="text-sm text-muted-foreground">
           <Trans>
-            {game.game} has not saved its widget settings yet. Start it once to
-            switch widgets on or off here.
+            {game.game} has not saved its widget settings yet, so these apply
+            from the launch after it first does.
           </Trans>
         </p>
       )}
-      {switches.state.kind === "ready" && switches.running && (
-        <p role="status" className="text-sm text-muted-foreground">
-          <Trans>Close the game to switch widgets on or off.</Trans>
-        </p>
+      {game && key !== null && ownSet && (
+        <div className="flex items-center gap-3">
+          <p role="status" className="text-sm text-muted-foreground">
+            <Trans>
+              {game.game} uses its own widgets, not the ones for all games.
+            </Trans>
+          </p>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => updateSets((s) => dropOverride(s, key))}
+          >
+            <Trans>Use the widgets for all games</Trans>
+          </Button>
+        </div>
       )}
 
       {list.targets.length === 0 ? null : !list.locating && !list.writeDir ? (
@@ -170,15 +206,21 @@ export default function WidgetsPage() {
             showGames={!game && list.gamesKnown}
             someUnknown={!!list.games?.some((g) => g.handler === null)}
             switches={
-              switches.state.kind === "ready"
+              picked === ALL
                 ? {
-                    game: picked,
-                    order: switches.state.order,
-                    disabled: switches.running,
-                    writing: switches.writing,
-                    toggle: (name, on) => void switches.toggle(name, on),
+                    game: null,
+                    set: sets.global,
+                    toggle: (name, on) =>
+                      updateSets((s) => switchIn(s, null, name, on)),
                   }
-                : undefined
+                : game && key !== null
+                  ? {
+                      game: game.game,
+                      set: appliedSet(sets, key),
+                      toggle: (name, on) =>
+                        updateSets((s) => switchIn(s, key, name, on)),
+                    }
+                  : undefined
             }
           />
         )
@@ -191,34 +233,40 @@ function fileName(path: string): string {
   return path.slice(path.lastIndexOf("/") + 1);
 }
 
-/** What the table needs to show a switch on each widget of one game. */
+/** What the table needs to show a switch on each widget in one set. */
 interface TableSwitches {
-  /** The game whose file it is. */
-  game: string;
-  /** The game's order table: `0` is off, anything else on. */
-  order: ReadonlyMap<string, number>;
-  disabled: boolean;
-  /** The widget being written, whose switch waits for it. */
-  writing: string | null;
+  /** The game shown, or null for the set every game uses. */
+  game: string | null;
+  /** The set shown. A widget it says nothing about is off. */
+  set: WidgetStates;
   toggle: (name: string, on: boolean) => void;
 }
 
-/** The name a row's switch writes under, when it has a switch in this game:
- *  the game loads the file and its saved name is certain (#1290). */
-function switchName(row: WidgetRow, game: string): string | null {
-  if (row.switch.kind !== "ready" || !row.loadedBy.includes(game)) return null;
+/** The name a row's switch sets, when it has a switch: its saved name is
+ *  certain (#1290) and, with a game shown, the game loads it. */
+function switchName(row: WidgetRow, game: string | null): string | null {
+  if (row.switch.kind !== "ready") return null;
+  if (game !== null && !row.loadedBy.includes(game)) return null;
   return row.switch.name;
 }
 
-/** Whether the game loads a widget, from the entry its handler reads, or
- *  when it has none from what the widget declares, as the handler decides
- *  for a widget it has not seen. */
-function isOn(row: WidgetRow, order: ReadonlyMap<string, number>): boolean {
-  if (row.switch.kind !== "ready") return false;
-  const saved = savedUnder(row.switch, (n) => order.has(n));
-  return saved === null
-    ? row.info?.enabled === true
-    : (order.get(saved) ?? 0) > 0;
+function RowSwitch({
+  row,
+  switches,
+}: {
+  row: WidgetRow;
+  switches: TableSwitches;
+}) {
+  const { t } = useLingui();
+  const name = switchName(row, switches.game);
+  if (name === null) return null;
+  return (
+    <Switch
+      checked={switches.set[name] === true}
+      onCheckedChange={(on) => switches.toggle(name, on)}
+      aria-label={t`${name} on`}
+    />
+  );
 }
 
 /** A field the widget's `GetInfo()` gave, shown as written. A file that could
@@ -249,7 +297,7 @@ function WidgetTable({
   /** Some installed game's handler is not recognised, so a file no recognised
    *  game loads may still load in that one. */
   someUnknown: boolean;
-  /** Set when one game is shown and its config file was read. */
+  /** Absent for a game whose handler is not recognised. */
   switches?: TableSwitches;
 }) {
   const { t } = useLingui();
@@ -286,16 +334,7 @@ function WidgetTable({
           <TableRow key={row.path} className="align-top">
             {switches && (
               <TableCell>
-                {switchName(row, switches.game) !== null && (
-                  <Switch
-                    checked={isOn(row, switches.order)}
-                    disabled={switches.disabled || switches.writing !== null}
-                    onCheckedChange={(on) =>
-                      switches.toggle(switchName(row, switches.game) ?? "", on)
-                    }
-                    aria-label={t`${switchName(row, switches.game)} on`}
-                  />
-                )}
+                <RowSwitch row={row} switches={switches} />
               </TableCell>
             )}
             <TableCell className="max-w-md whitespace-normal">

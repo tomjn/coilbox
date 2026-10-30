@@ -5,8 +5,8 @@ import {
   type ConfigFileIO,
   configCandidates,
   readOrder,
-  switchWidget,
   writeOrder,
+  writeWidgetStates,
 } from "./widgetConfig";
 
 /**
@@ -238,13 +238,14 @@ describe("configCandidates", () => {
     };
     expect(configCandidates(config, "../../evil")).toEqual([]);
     expect(configCandidates(config, "a\\b")).toEqual([]);
+    expect(configCandidates(config, "")).toEqual([]);
     expect(
       configCandidates({ files: ["BYAR.lua"], shape: "nested" }, "../x"),
     ).toEqual(["LuaUI/Config/BYAR.lua"]);
   });
 });
 
-describe("switchWidget", () => {
+describe("writeWidgetStates", () => {
   const config: WidgetConfigFile = { files: ["{short}.lua"], shape: "nested" };
   const path = "/home/player/.spring/LuaUI/Config/MF.lua";
 
@@ -267,75 +268,86 @@ describe("switchWidget", () => {
     writeDir: "/home/player/.spring",
     config,
     shortName: "MF",
-    gameRunning: false,
     now: new Date(Date.UTC(2026, 9, 30, 9, 5, 30)),
   };
 
-  it("switches a widget on at the front of its layer, after a copy", async () => {
+  it("writes every entry after one copy, and keeps the rest of the file", async () => {
     const { io, written } = memoryIO({ [path]: ENGINE_FILE });
-    const out = await switchWidget({
+    const out = await writeWidgetStates({
       ...request,
       io,
-      name: "Minimap",
-      on: true,
+      states: new Map([
+        ["Minimap", true],
+        ['Say "when"', false],
+        ["New One", false],
+      ]),
     });
-    expect(out.backup).toBe(`${path}.20261030-090530.bak`);
+    expect(out?.backup).toBe(`${path}.20261030-090530.bak`);
     expect(written[`${path}.20261030-090530.bak`]).toBe(ENGINE_FILE);
-    expect(written[path]).toContain("Minimap = 1,");
-    expect(out.order.get("Minimap")).toBe(1);
+    expect(Object.keys(written)).toHaveLength(2);
+    expect(out?.order).toEqual(
+      new Map([
+        ["Build Watch", 14],
+        ["Minimap", 1],
+        ['Say "when"', 0],
+        ["New One", 0],
+      ]),
+    );
+    const back = readBack(written[path]) as Record<string, unknown>;
+    expect(back["string:data"]).toEqual(readBack(ENGINE_FILE)["string:data"]);
   });
 
-  it("keeps a widget that is already on where it is", async () => {
+  it("keeps a widget that is already on where it is, and writes nothing", async () => {
     const { io, written } = memoryIO({ [path]: ENGINE_FILE });
-    const out = await switchWidget({
+    const out = await writeWidgetStates({
       ...request,
       io,
-      name: "Build Watch",
-      on: true,
+      states: new Map([
+        ["Build Watch", true],
+        ["Minimap", false],
+      ]),
     });
     expect(written).toEqual({});
-    expect(out.order.get("Build Watch")).toBe(14);
+    expect(out?.backup).toBeUndefined();
+    expect(out?.order.get("Build Watch")).toBe(14);
   });
 
-  it("keeps the first copy when two switches land in one second", async () => {
+  it("keeps the first copy when two writes land in one second", async () => {
     const { io, written } = memoryIO({ [path]: ENGINE_FILE });
-    await switchWidget({ ...request, io, name: "Minimap", on: true });
-    const second = await switchWidget({
+    await writeWidgetStates({
       ...request,
       io,
-      name: "Build Watch",
-      on: false,
+      states: new Map([["Minimap", true]]),
     });
-    expect(second.backup).toBe(`${path}.20261030-090530-2.bak`);
+    const second = await writeWidgetStates({
+      ...request,
+      io,
+      states: new Map([["Build Watch", false]]),
+    });
+    expect(second?.backup).toBe(`${path}.20261030-090530-2.bak`);
     expect(written[`${path}.20261030-090530.bak`]).toBe(ENGINE_FILE);
-  });
-
-  it("refuses while a game is running", async () => {
-    const { io, written } = memoryIO({ [path]: ENGINE_FILE });
-    await expect(
-      switchWidget({
-        ...request,
-        io,
-        gameRunning: true,
-        name: "Minimap",
-        on: true,
-      }),
-    ).rejects.toThrow(/game is running/);
-    expect(written).toEqual({});
   });
 
   it("does not create a file the game has not saved", async () => {
     const { io, written } = memoryIO({});
-    await expect(
-      switchWidget({ ...request, io, name: "Minimap", on: true }),
-    ).rejects.toThrow(/not saved its widget settings/);
+    expect(
+      await writeWidgetStates({
+        ...request,
+        io,
+        states: new Map([["Minimap", true]]),
+      }),
+    ).toBeNull();
     expect(written).toEqual({});
   });
 
   it("writes nothing, not even a copy, over a file it cannot read", async () => {
     const { io, written } = memoryIO({ [path]: "return { order = " });
     await expect(
-      switchWidget({ ...request, io, name: "Minimap", on: false }),
+      writeWidgetStates({
+        ...request,
+        io,
+        states: new Map([["Minimap", false]]),
+      }),
     ).rejects.toThrow(/could not read/);
     expect(written).toEqual({});
   });
@@ -350,7 +362,11 @@ describe("switchWidget", () => {
       },
     };
     await expect(
-      switchWidget({ ...request, io, name: "Minimap", on: false }),
+      writeWidgetStates({
+        ...request,
+        io,
+        states: new Map([["Minimap", false]]),
+      }),
     ).rejects.toThrow("permission denied");
   });
 });

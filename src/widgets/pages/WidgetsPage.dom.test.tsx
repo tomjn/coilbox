@@ -8,9 +8,14 @@ import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { MemoryRouter } from "react-router";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { PlayerWidgetScan } from "@/content/bindings";
+import {
+  installSettingsStorage,
+  memorySettingsStorage,
+} from "@/lib/storedSetting";
 import type { WidgetHandler } from "../handlers";
-import type { SwitchesState } from "../useWidgetSwitches";
 import { type GameHandler, widgetRows } from "../widgetList";
+import { readSets, resetSets, updateSets } from "../widgetSets";
+import type { GameFile } from "../widgetSync";
 
 const engine: WidgetHandler = {
   id: "engine",
@@ -76,7 +81,7 @@ const scan: PlayerWidgetScan = {
 };
 
 const games: GameHandler[] = [
-  { game: "Metal Factions v2.58", handler: engine },
+  { game: "Metal Factions v2.58", shortName: "MF", handler: engine },
   { game: "Mystery 1.0", handler: null },
 ];
 
@@ -96,23 +101,21 @@ vi.mock("../useWidgetList", () => ({
   }),
 }));
 
-const switches = {
-  state: { kind: "none" } as SwitchesState,
-  error: null as string | null,
-  running: false,
-  writing: null as string | null,
-  toggle: vi.fn(async (_name: string, _on: boolean) => {}),
+const files = {
+  files: new Map<string, GameFile>(),
   reload: async () => {},
 };
 
-vi.mock("../useWidgetSwitches", () => ({
-  useWidgetSwitches: () => switches,
+vi.mock("../useGameFiles", () => ({
+  useGameFiles: () => files,
 }));
 
 beforeEach(() => {
-  switches.state = { kind: "none" };
-  switches.running = false;
-  switches.toggle.mockClear();
+  installSettingsStorage(memorySettingsStorage());
+  resetSets();
+  files.files = new Map([
+    ["Metal Factions v2.58", { kind: "ready", path: "/x/MF.lua" }],
+  ]);
 });
 
 const { default: WidgetsPage } = await import("./WidgetsPage");
@@ -182,55 +185,77 @@ describe("WidgetsPage", () => {
     expect(screen.getByText("helper.lua")).toBeTruthy();
   });
 
-  it("switches a widget in the picked game's file", () => {
-    switches.state = {
-      kind: "ready",
-      path: "/home/player/.spring/LuaUI/Config/MF.lua",
-      order: new Map([["BuildWatch", 0]]),
-    };
-    page("/library/widgets?game=Metal%20Factions%20v2.58");
+  it("switches a widget on for every game", () => {
+    page();
     const buildWatch = screen.getByRole("switch", { name: "BuildWatch on" });
     expect(buildWatch.getAttribute("aria-checked")).toBe("false");
     fireEvent.click(buildWatch);
-    expect(switches.toggle).toHaveBeenCalledWith("BuildWatch", true);
+    expect(readSets().global).toEqual({ BuildWatch: true });
+    expect(readSets().overrides).toEqual({});
+    // Two files share a name, so neither has a switch.
+    expect(screen.queryByRole("switch", { name: "Twin on" })).toBeNull();
   });
 
-  it("reads a widget's state under the name it had before", () => {
-    switches.state = {
-      kind: "ready",
-      path: "/home/player/.spring/LuaUI/Config/MF.lua",
-      order: new Map([["Old Watch", 4]]),
-    };
+  it("gives a game its own set on its first change, and drops it again", () => {
+    updateSets((s) => ({ ...s, global: { BuildWatch: true } }));
     page("/library/widgets?game=Metal%20Factions%20v2.58");
     const buildWatch = screen.getByRole("switch", { name: "BuildWatch on" });
     expect(buildWatch.getAttribute("aria-checked")).toBe("true");
     fireEvent.click(buildWatch);
-    // Written under its own name, which the handler reads first.
-    expect(switches.toggle).toHaveBeenCalledWith("BuildWatch", false);
+    expect(readSets().global).toEqual({ BuildWatch: true });
+    expect(readSets().overrides.MF).toEqual({ BuildWatch: false });
+    expect(
+      screen.getByText(
+        "Metal Factions v2.58 uses its own widgets, not the ones for all games.",
+      ),
+    ).toBeTruthy();
+    fireEvent.click(
+      screen.getByRole("button", { name: "Use the widgets for all games" }),
+    );
+    expect(readSets().overrides).toEqual({});
+    expect(
+      screen
+        .getByRole("switch", { name: "BuildWatch on" })
+        .getAttribute("aria-checked"),
+    ).toBe("true");
   });
 
-  it("offers no switch while a game is running", () => {
-    switches.state = { kind: "ready", path: "x", order: new Map() };
-    switches.running = true;
-    page("/library/widgets?game=Metal%20Factions%20v2.58");
-    expect(
-      screen.getByText("Close the game to switch widgets on or off."),
-    ).toBeTruthy();
-    expect(
-      (
-        screen.getByRole("switch", {
-          name: "BuildWatch on",
-        }) as HTMLButtonElement
-      ).disabled,
-    ).toBe(true);
+  it("offers no switch in a game whose handler is not recognised", () => {
+    page("/library/widgets?game=Mystery%201.0");
+    expect(screen.queryByRole("switch")).toBeNull();
+  });
+
+  it("offers no switch for a linked game that is not installed", () => {
+    page("/library/widgets?game=Gone%201.0");
+    expect(screen.queryByRole("switch")).toBeNull();
+  });
+
+  it("shows every game's unreadable file with all games picked", () => {
+    files.files = new Map([
+      ["Metal Factions v2.58", { kind: "error", error: "bad file" }],
+    ]);
+    page();
+    expect(screen.getByText("Metal Factions v2.58: bad file")).toBeTruthy();
   });
 
   it("says when the game has not saved a file yet", () => {
-    switches.state = { kind: "missing" };
+    files.files = new Map([["Metal Factions v2.58", { kind: "missing" }]]);
     page("/library/widgets?game=Metal%20Factions%20v2.58");
-    expect(screen.queryByRole("switch")).toBeNull();
     expect(screen.getByRole("status").textContent).toContain(
       "has not saved its widget settings yet",
     );
+  });
+
+  it("shows a file it could not read", () => {
+    files.files = new Map([
+      [
+        "Metal Factions v2.58",
+        { kind: "error", error: "Coilbox could not read this file: x" },
+      ],
+    ]);
+    page("/library/widgets?game=Metal%20Factions%20v2.58");
+    expect(
+      screen.getByText("Coilbox could not read this file: x"),
+    ).toBeTruthy();
   });
 });
