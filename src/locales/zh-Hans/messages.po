@@ -2400,6 +2400,7 @@ msgstr "已下载 {done} / {total}"
 
 #: src/content/pages/components/CompatMode.tsx
 #: src/multiplayer/battle/CompatBattleCard.tsx
+#: src/multiplayer/battles/HostCompatChoice.tsx
 msgid "{done} of {total, plural, one {# model} other {# models}}"
 msgstr ""
 
@@ -13171,6 +13172,10 @@ msgstr "预算（{total}）"
 msgid "Budget left"
 msgstr "剩余预算"
 
+#: src/multiplayer/battles/HostCompatChoice.tsx
+msgid "Build"
+msgstr ""
+
 #: src/placement/LayoutControls.tsx
 #, fuzzy
 msgid "Build {def} later"
@@ -13355,6 +13360,7 @@ msgstr "建造单位、工厂、传感器和运输单位"
 #: src/lego/buildingPlans.ts
 #: src/lego/pages/components/TextureBuilderPanel.tsx
 #: src/multiplayer/battle/compatBattle.ts
+#: src/multiplayer/battles/HostCompatChoice.tsx
 #: src/scenario/pages/components/RestrictionPanel.tsx
 #: src/scenario/validate.ts
 #, fuzzy
@@ -16319,6 +16325,7 @@ msgid "Compatibility gadgets a build turns on"
 msgstr "版本启用的兼容 gadget"
 
 #: src/content/pages/components/CompatMode.tsx
+#: src/multiplayer/battles/HostCompatChoice.tsx
 #, fuzzy
 msgid "Compatibility mode"
 msgstr "兼容模式"
@@ -21212,6 +21219,7 @@ msgid "Export"
 msgstr "导出"
 
 #: src/content/pages/components/CompatMode.tsx
+#: src/multiplayer/battle/CompatHostExport.tsx
 #, fuzzy
 msgid "Export .sdz"
 msgstr "导出 .sdz"
@@ -21265,7 +21273,7 @@ msgstr "导出战役"
 msgid "Export challenge"
 msgstr "导出挑战"
 
-#: src/content/pages/components/CompatMode.tsx
+#: src/compat/pickSdzPath.ts
 #, fuzzy
 msgid "Export compatibility mutator"
 msgstr "导出兼容变异器"
@@ -21378,6 +21386,10 @@ msgstr "已将 {0, plural, other {# 个文件}}导出到 <0>{1}</0>"
 #, fuzzy
 msgid "Exported {writtenX}x{writtenZ}, now {nowX}x{nowZ}. The exported definition is not updated by a re-export."
 msgstr "导出时为 {writtenX}x{writtenZ}，现在为 {nowX}x{nowZ}。重新导出不会更新已导出的定义。"
+
+#: src/multiplayer/battle/CompatHostExport.tsx
+msgid "Exported to <0>{exportedTo}</0>"
+msgstr ""
 
 #: src/workshop/pages/UnitPage.tsx
 #, fuzzy
@@ -29456,6 +29468,7 @@ msgstr "模型"
 
 #: src/content/pages/components/CompatMode.tsx
 #: src/multiplayer/battle/CompatBattleCard.tsx
+#: src/multiplayer/battles/HostCompatChoice.tsx
 msgid "Models converted"
 msgstr ""
 
@@ -29964,7 +29977,7 @@ msgstr "音乐来源"
 msgid "Music was turned off because the last attempt to play it stopped Coilbox responding."
 msgstr "上次尝试播放音乐时 Coilbox 失去响应，因此音乐已关闭。"
 
-#: src/content/pages/components/CompatMode.tsx
+#: src/compat/pickSdzPath.ts
 #: src/workshop/deliveryRoutes.ts
 #: src/workshop/pages/components/PackagePanel.tsx
 #, fuzzy
@@ -32859,6 +32872,11 @@ msgstr "当前未关联"
 msgid "Not brought up to date:"
 msgstr "未更新："
 
+#: src/multiplayer/battle/CompatHostExport.tsx
+#: src/multiplayer/battles/useHostCompat.ts
+msgid "Not built"
+msgstr ""
+
 #: src/multiplayer/battles/HostBattleForm.tsx
 #, fuzzy
 msgid "Not checked, because every battle you host goes through the server's relay."
@@ -35011,6 +35029,10 @@ msgstr "防御放置命令"
 msgid "orders to place an economy building"
 msgstr "经济建筑放置命令"
 
+#: src/multiplayer/battles/HostCompatChoice.tsx
+msgid "Original game"
+msgstr ""
+
 #: src/uberstress/pages/HistoryPage.tsx
 #, fuzzy
 msgid "other"
@@ -35068,6 +35090,10 @@ msgstr "我们的 Tachyon 支持尚不完整。请改用 Beyond All Reason 条�
 #, fuzzy
 msgid "Out of date"
 msgstr "已过期"
+
+#: src/multiplayer/battles/useHostCompat.ts
+msgid "Out of date: {reasons}"
+msgstr ""
 
 #: src/multiplayer/battle/SyncStatusPill.tsx
 #, fuzzy
@@ -36395,6 +36421,10 @@ msgstr "玩家自行选择阵营，房间由你来设置。"
 #, fuzzy
 msgid "Players together against the chickens."
 msgstr "玩家一起对抗鸡群。"
+
+#: src/multiplayer/battle/CompatHostExport.tsx
+msgid "Players without coilbox need the .sdz"
+msgstr ""
 
 #: src/play/pages/components/CrashDrawer.tsx
 #, fuzzy
@@ -38061,6 +38091,7 @@ msgid "Reason (optional)"
 msgstr "原因（可选）"
 
 #: src/content/pages/components/CompatMode.tsx
+#: src/multiplayer/battles/HostCompatChoice.tsx
 #, fuzzy
 msgid "Rebuild"
 msgstr "重新构建"
@@ -39739,6 +39770,7 @@ msgstr "立即更换目标"
 #: src/downloads/pages/components/RapidBrowser.tsx
 #: src/home/zones/SuggestedMap.tsx
 #: src/multiplayer/battles/HostBattleForm.tsx
+#: src/multiplayer/battles/HostCompatChoice.tsx
 #: src/workshop/pages/UnitPage.tsx
 #, fuzzy
 msgid "Retry"
@@ -46135,6 +46167,10 @@ msgstr "检查完成前引擎因信号 {signal} 崩溃。"
 msgid "The engine crashed. It was killed by signal {sig}."
 msgstr "引擎崩溃了。它被信号 {sig} 终止。"
 
+#: src/multiplayer/battles/useHostCompat.ts
+msgid "The engine did not find {folder}"
+msgstr ""
+
 #: src/multiplayer/battle/useCompatBattle.ts
 #, fuzzy
 msgid "the engine did not find it once built"
@@ -46480,6 +46516,11 @@ msgstr "游戏 {game} 已不再带有这场征服所用的地图。游戏更新�
 #, fuzzy
 msgid "The game changes this field as it loads. Its files say {fileValue} and it loads as {loadedValue}."
 msgstr "游戏加载时会更改此字段。其文件中为 {fileValue}，加载后为 {loadedValue}。"
+
+#: src/multiplayer/battle/CompatHostExport.tsx
+#: src/multiplayer/battles/useHostCompat.ts
+msgid "The game could not be read"
+msgstr ""
 
 #: src/i18n/uiError.ts
 #, fuzzy
@@ -53796,6 +53837,10 @@ msgstr "获胜的队伍"
 #, fuzzy
 msgid "Which units this mod touches."
 msgstr "此模组影响的单位。"
+
+#: src/multiplayer/battles/HostCompatChoice.tsx
+msgid "Which version to run"
+msgstr ""
 
 #: src/placement/TerrainControls.tsx
 msgid "Which way the ground changes"

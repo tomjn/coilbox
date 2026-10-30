@@ -29,6 +29,11 @@ export interface CompatGameName {
   version: number;
 }
 
+/** The name a mutator of `baseName` built from manifest `version` has. */
+export function compatGameName(baseName: string, version: number): string {
+  return `${baseName} (compat ${version})`;
+}
+
 /** The base game and manifest version a mutator's name carries, or null for any other name. */
 export function parseCompatGameName(gameName: string): CompatGameName | null {
   const m = COMPAT_GAME_NAME.exec(gameName);

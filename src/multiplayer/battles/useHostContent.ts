@@ -129,6 +129,7 @@ export function useHostContent(
     noEngine: !target && !scan.loading,
     gameName,
     setGameName: pickGame,
+    selectedGame,
     mapName,
     setMapName: pickMap,
     gameInfo,

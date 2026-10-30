@@ -15,7 +15,7 @@
  * does, so the test drives a fixed map list rather than a real content scan.
  */
 
-import { DrawerProvider } from "@picoframe/frame";
+import { DrawerProvider, PersistentStoreProvider } from "@picoframe/frame";
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { HostRoomForm, type StartRoomArgs } from "./HostRoomForm";
@@ -68,15 +68,17 @@ function stubContent() {
 
 function form() {
   render(
-    <DrawerProvider>
-      <HostRoomForm
-        blocked={null}
-        defaultName="alice"
-        onStart={vi.fn<(args: StartRoomArgs) => Promise<string | undefined>>(
-          async () => undefined,
-        )}
-      />
-    </DrawerProvider>,
+    <PersistentStoreProvider>
+      <DrawerProvider>
+        <HostRoomForm
+          blocked={null}
+          defaultName="alice"
+          onStart={vi.fn<(args: StartRoomArgs) => Promise<string | undefined>>(
+            async () => undefined,
+          )}
+        />
+      </DrawerProvider>
+    </PersistentStoreProvider>,
   );
 }
 

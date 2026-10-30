@@ -1,16 +1,12 @@
 import { t } from "@lingui/core/macro";
-import { Channel } from "@tauri-apps/api/core";
-import {
-  useCallback,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-  useSyncExternalStore,
-} from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { describeError } from "@/i18n/uiError";
-import { compatBuild, compatStatus } from "../../compat/bindings";
-import type { Convert3doProgress } from "../../content/bindings";
+import { compatStatus } from "../../compat/bindings";
+import {
+  buildCompatOnce,
+  compatBuildKey,
+  useCompatBuild,
+} from "../../compat/buildStore";
 import { primeGameInfo } from "../../content/config";
 import {
   type CompatBattleState,
@@ -27,27 +23,6 @@ const msg = (e: unknown): string => describeError(e);
 
 /** Builds under way, so leaving a room and coming back does not start a second write of one folder. */
 const inFlight = new Map<string, Promise<CompatBattleState | null>>();
-
-/**
- * The newest progress line of each build in `inFlight`, by the same token. A
- * `Channel` belongs to the one call that made it, so a component that mounts
- * mid build reads the count here instead of subscribing to the channel.
- */
-const progressOf = new Map<string, Convert3doProgress>();
-const progressListeners = new Set<() => void>();
-
-function setProgress(token: string, progress: Convert3doProgress | null) {
-  if (progress) progressOf.set(token, progress);
-  else progressOf.delete(token);
-  for (const listener of progressListeners) listener();
-}
-
-function subscribeProgress(listener: () => void) {
-  progressListeners.add(listener);
-  return () => {
-    progressListeners.delete(listener);
-  };
-}
 
 /**
  * Build the compat mutator a battle names when this machine has its base game
@@ -91,9 +66,9 @@ export function useCompatBattle(opts: {
   const startedRef = useRef<string | null>(null);
   const key = `${dataDir}::${gameName}`;
   const token = `${key}#${attempt}`;
-  const progress = useSyncExternalStore(subscribeProgress, () =>
-    progressOf.get(token),
-  );
+  const progress = useCompatBuild(
+    needs ? compatBuildKey(dataDir, plan.archiveName, plan.version) : null,
+  )?.progress;
 
   useEffect(() => {
     const p = planRef.current;
@@ -128,16 +103,13 @@ export function useCompatBattle(opts: {
             latest,
           };
         }
-        const onProgress = new Channel<Convert3doProgress>();
-        onProgress.onmessage = (line) => setProgress(token, line);
-        await compatBuild({
+        await buildCompatOnce({
           dataDir,
           enginePath,
           archiveName: p.archiveName,
           gameName: p.baseName,
           baseChecksum: info.checksum,
           manifestVersion: p.version,
-          onProgress,
         });
         const found = await rescanRef.current();
         if (found?.some((g) => g.name === gameName)) return null;
@@ -151,7 +123,6 @@ export function useCompatBattle(opts: {
     if (!running) {
       running = run().finally(() => {
         inFlight.delete(token);
-        setProgress(token, null);
       });
       inFlight.set(token, running);
     }

@@ -39,6 +39,7 @@ import { BattleOptionsDrawer } from "../battle/BattleOptionsDrawer";
 import { BattleRoomHeader } from "../battle/BattleRoomHeader";
 import { filterOptionTags } from "../battle/battleOptions";
 import { CompatBattleCard } from "../battle/CompatBattleCard";
+import { CompatHostExport } from "../battle/CompatHostExport";
 import { alliesFromRows } from "../battle/config";
 import { launchBlock, startedWithoutYou } from "../battle/contentBlock";
 import { draftToHostSeed, hostSeedAiNotice } from "../battle/fromSkirmish";
@@ -836,6 +837,17 @@ function BattleRoomPage() {
             />
           )}
           <CompatBattleCard state={room.compat} onRetry={room.retryCompat} />
+          {room.isFounder &&
+            room.compat.status === "idle" &&
+            room.compatBaseArchive &&
+            room.enginePath &&
+            room.dataDir && (
+              <CompatHostExport
+                enginePath={room.enginePath}
+                dataDir={room.dataDir}
+                baseArchive={room.compatBaseArchive}
+              />
+            )}
           {/* Game-type presets + Balance (issue #344): unlike AutohostControls
               this works self-hosted too (founder-direct force calls), so it
               renders regardless of `selfHost` and only hides itself where the
