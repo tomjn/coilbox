@@ -318,8 +318,13 @@ impl Lane {
     ///
     /// `Err` is a read that got no answer, with the reason: cancelled, timed
     /// out, or a worker that died or stopped making sense. Each of those leaves
-    /// the lane without a worker, and the next call starts one.
-    pub fn run(self: &Arc<Self>, job: &Job) -> Result<Ran, String> {
+    /// the lane without a worker, and the next call starts one. Each line of
+    /// progress the read sends goes to `on_progress` as it arrives.
+    pub fn run(
+        self: &Arc<Self>,
+        job: &Job,
+        on_progress: &mut dyn FnMut(&[u8]),
+    ) -> Result<Ran, String> {
         let cancelled = || job.cancel.is_some_and(|c| c.load(Ordering::Relaxed));
         let Some(mut turn) = self.wait_for_turn(job.cancel, job.patience) else {
             if cancelled() {
@@ -347,7 +352,7 @@ impl Lane {
         // Out of the turn while it is asked, so that an `Err` drops it, which
         // kills it. Only a worker that answered is handed back.
         let mut worker = turn.worker.take().expect("the turn has a worker");
-        let (head, output) = worker.ask(job)?;
+        let (head, output) = worker.ask(job, on_progress)?;
         turn.worker = Some(worker);
         Ok(Ran::Served(Served {
             code: head.code,
@@ -545,7 +550,11 @@ impl Worker {
 
     /// Send `job` and wait for its reply. After an `Err` the worker is of no
     /// further use and the caller drops it, which kills it.
-    fn ask(&mut self, job: &Job) -> Result<(ReplyHead, Vec<u8>), String> {
+    fn ask(
+        &mut self,
+        job: &Job,
+        on_progress: &mut dyn FnMut(&[u8]),
+    ) -> Result<(ReplyHead, Vec<u8>), String> {
         let id = self.next_id;
         self.next_id += 1;
         self.stderr
@@ -578,6 +587,9 @@ impl Worker {
                 None => left,
             };
             match self.events.recv_timeout(wait) {
+                Ok(Event::Reply(head, line)) if head.id == id && head.progress => {
+                    on_progress(&line);
+                }
                 Ok(Event::Reply(head, output)) if head.id == id => return Ok((head, output)),
                 Ok(Event::Reply(head, _)) => {
                     return Err(format!(
@@ -708,6 +720,7 @@ mod tests {
                 code: 0,
                 init: None,
                 mount_ms: Vec::new(),
+                progress: false,
             };
             protocol::write_reply(out, token, &head, text.as_bytes()).unwrap();
         };
@@ -765,6 +778,20 @@ mod tests {
                     out.flush().unwrap();
                     std::process::exit(0);
                 }
+                // Two lines of progress, then the answer.
+                "progress" => {
+                    for line in ["first", "second"] {
+                        let head = ReplyHead {
+                            id: request.id,
+                            code: 0,
+                            init: None,
+                            mount_ms: Vec::new(),
+                            progress: true,
+                        };
+                        protocol::write_reply(&mut out, &token, &head, line.as_bytes()).unwrap();
+                    }
+                    reply(&mut out, request.id, &token, &echo);
+                }
                 "answer-then-die" => {
                     reply(&mut out, request.id, &token, &echo);
                     std::process::exit(0);
@@ -796,6 +823,35 @@ mod tests {
 
     const LONG: Duration = Duration::from_secs(30);
 
+    #[test]
+    fn progress_reaches_the_caller_ahead_of_the_answer() {
+        let lane = fake_lane(LONG);
+        let args = vec!["progress".to_string(), "done".to_string()];
+        let mut lines = Vec::new();
+        let ran = lane
+            .run(
+                &Job {
+                    args: &args,
+                    timeout: LONG,
+                    what: "test read",
+                    cancel: None,
+                    patience: Duration::MAX,
+                },
+                &mut |line| lines.push(String::from_utf8(line.to_vec()).unwrap()),
+            )
+            .unwrap();
+        assert_eq!(lines, ["first", "second"]);
+        match ran {
+            Ran::Served(served) => {
+                let output = String::from_utf8(served.output).unwrap();
+                assert!(output.ends_with(" done"), "got: {output}");
+            }
+            Ran::Busy => panic!("nothing was ahead of it"),
+        }
+        // The worker is left ready for the next read.
+        assert!(ask_for(&lane, "echo", "next", LONG, None).is_ok());
+    }
+
     fn ask_for(
         lane: &Arc<Lane>,
         how: &str,
@@ -818,13 +874,16 @@ mod tests {
         cancel: Option<&AtomicBool>,
         patience: Duration,
     ) -> Result<Ran, String> {
-        lane.run(&Job {
-            args,
-            timeout,
-            what: "test read",
-            cancel,
-            patience,
-        })
+        lane.run(
+            &Job {
+                args,
+                timeout,
+                what: "test read",
+                cancel,
+                patience,
+            },
+            &mut |_| {},
+        )
     }
 
     /// A read on a thread of its own that takes `ms` to answer, and the moment

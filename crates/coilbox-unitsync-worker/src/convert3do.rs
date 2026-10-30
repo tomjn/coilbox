@@ -180,7 +180,7 @@ struct Progress<'a> {
 /// needs a sentinel prefix.
 fn report(progress: Progress<'_>) {
     if let Ok(line) = serde_json::to_string(&serde_json::json!({ "progress": progress })) {
-        println!("{line}");
+        crate::out::progress(&line);
     }
 }
 

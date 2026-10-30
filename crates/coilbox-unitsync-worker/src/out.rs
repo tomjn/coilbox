@@ -14,8 +14,12 @@ use std::cell::RefCell;
 use std::fmt::Arguments;
 use std::io::Write;
 
+/// Where a request's progress goes.
+type Sink = Box<dyn FnMut(&str)>;
+
 thread_local! {
     static COLLECTING: RefCell<Option<Vec<u8>>> = const { RefCell::new(None) };
+    static PROGRESS: RefCell<Option<Sink>> = const { RefCell::new(None) };
 }
 
 /// Print one line, to the buffer when [`collect`] is running on this thread and
@@ -31,6 +35,30 @@ pub fn line(args: Arguments) {
     if !collected {
         std::println!("{args}");
     }
+}
+
+/// Print one line of progress: to the sink [`with_progress`] set on this thread,
+/// or as any other line when there is none. A mode's output is collected until
+/// it ends, and progress is no use by then.
+pub fn progress(text: &str) {
+    let sent = PROGRESS.with(|p| match p.borrow_mut().as_mut() {
+        Some(sink) => {
+            sink(text);
+            true
+        }
+        None => false,
+    });
+    if !sent {
+        line(format_args!("{text}"));
+    }
+}
+
+/// Run `f` with its progress going to `sink`.
+pub fn with_progress<T>(sink: Sink, f: impl FnOnce() -> T) -> T {
+    PROGRESS.with(|p| *p.borrow_mut() = Some(sink));
+    let result = f();
+    PROGRESS.with(|p| *p.borrow_mut() = None);
+    result
 }
 
 /// Run `f`, returning what it returned and everything it printed.
@@ -56,6 +84,28 @@ mod tests {
         });
         assert_eq!(code, 7);
         assert_eq!(printed, b"{\"maps\":[]}\nsecond 2\n");
+    }
+
+    #[test]
+    fn progress_goes_to_its_sink_and_not_into_the_output() {
+        use std::rc::Rc;
+        let seen = Rc::new(RefCell::new(Vec::new()));
+        let keep = seen.clone();
+        let sink = Box::new(move |text: &str| keep.borrow_mut().push(text.to_string()));
+        let (_, printed) = collect(|| {
+            with_progress(sink, || {
+                progress("a line of progress");
+                println!("the answer");
+            })
+        });
+        assert_eq!(*seen.borrow(), ["a line of progress"]);
+        assert_eq!(printed, b"the answer\n");
+    }
+
+    #[test]
+    fn progress_with_no_sink_is_a_line_like_any_other() {
+        let (_, printed) = collect(|| progress("a line of progress"));
+        assert_eq!(printed, b"a line of progress\n");
     }
 
     #[test]

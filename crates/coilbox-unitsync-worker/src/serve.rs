@@ -20,8 +20,12 @@
 //!
 //! `--config` and `--config-set` set unitsync's config handler up themselves,
 //! in place of `Init`, which under a live `Init` would swap the handler out
-//! from under it. `--convert-3do` prints progress as it goes, and `--seed` is a
-//! maintainer's tool. All four stay one-shot.
+//! from under it, and `--seed` is a maintainer's tool. All three stay one-shot.
+//!
+//! # Progress
+//!
+//! A reply is collected until the read ends, so `--convert-3do` sends each line
+//! of progress in a frame of its own as it goes (`protocol` describes the frame).
 
 use crate::ffi::Unitsync;
 use crate::{out, session, Args};
@@ -68,8 +72,12 @@ pub fn run(raw: &[String]) -> i32 {
         &gate,
         &token,
         &mut stdout,
-        |args| {
-            let code = answer(&base, args);
+        |id, args| {
+            let token = token.clone();
+            let sink = Box::new(move |line: &str| {
+                let _ = write_progress(&mut std::io::stdout(), &token, id, line);
+            });
+            let code = out::with_progress(sink, || answer(&base, args));
             if let Some(us) = &library {
                 us.reset();
             }
@@ -86,6 +94,18 @@ pub fn run(raw: &[String]) -> i32 {
         us.shutdown();
     }
     0
+}
+
+/// Write one line of progress on request `id`.
+fn write_progress(out: &mut impl Write, token: &str, id: u64, line: &str) -> std::io::Result<()> {
+    let head = ReplyHead {
+        id,
+        code: 0,
+        init: None,
+        mount_ms: Vec::new(),
+        progress: true,
+    };
+    protocol::write_reply(out, token, &head, line.as_bytes())
 }
 
 /// Read requests on a thread of their own, so the input closing is noticed
@@ -119,8 +139,8 @@ fn read_requests(gate: Arc<Mutex<Gate>>) -> Receiver<Request> {
 }
 
 /// Answer each request in turn until there are no more, writing one frame per
-/// request to `out`. `answer` prints the answer and returns the exit code a
-/// one-shot worker would have ended with.
+/// request to `out`. `answer` is given the request's id and arguments, prints the
+/// answer, and returns the exit code a one-shot worker would have ended with.
 ///
 /// A request that is `protocol::RELEASE_FLAG` alone runs `release` and gets no
 /// frame.
@@ -129,7 +149,7 @@ fn answer_all(
     gate: &Mutex<Gate>,
     token: &str,
     out: &mut impl Write,
-    mut answer: impl FnMut(&[String]) -> i32,
+    mut answer: impl FnMut(u64, &[String]) -> i32,
     mut release: impl FnMut(),
 ) {
     while let Ok(request) = requests.recv() {
@@ -144,12 +164,13 @@ fn answer_all(
             }
             gate.busy = true;
         }
-        let (code, payload) = out::collect(|| answer(&request.args));
+        let (code, payload) = out::collect(|| answer(request.id, &request.args));
         let head = ReplyHead {
             id: request.id,
             code,
             init: session::take_init(),
             mount_ms: session::take_mounts(),
+            progress: false,
         };
         // Not busy before the reply goes out. The reader has no way to tell the
         // answer is done, and a client that closes the input on seeing the
@@ -183,8 +204,7 @@ fn answer(base: &Args, raw: &[String]) -> i32 {
         ));
         return 1;
     }
-    if args.config.is_some() || args.config_set.is_some() || args.convert_3do.is_some() || args.seed
-    {
+    if args.config.is_some() || args.config_set.is_some() || args.seed {
         crate::emit_error("this read is not answered by a running worker, start one for it".into());
         return 1;
     }
@@ -208,7 +228,7 @@ mod tests {
     /// Answer `requests` with `answer` and read the frames back.
     fn served(
         requests: Vec<Request>,
-        answer: impl FnMut(&[String]) -> i32,
+        mut answer: impl FnMut(&[String]) -> i32,
     ) -> Vec<(ReplyHead, String)> {
         let (tx, rx) = mpsc::channel();
         for request in requests {
@@ -221,7 +241,7 @@ mod tests {
             &Mutex::new(Gate::default()),
             TOKEN,
             &mut wire,
-            answer,
+            |_, args| answer(args),
             || {},
         );
         let mut input = Cursor::new(wire);
@@ -289,7 +309,7 @@ mod tests {
             &gate,
             TOKEN,
             &mut wire,
-            |_| {
+            |_, _| {
                 answered += 1;
                 0
             },
@@ -317,7 +337,7 @@ mod tests {
             &Mutex::new(Gate::default()),
             TOKEN,
             &mut wire,
-            |args| {
+            |_, args| {
                 order.borrow_mut().push(args[1].clone());
                 0
             },
@@ -345,6 +365,17 @@ mod tests {
         assert_eq!(code, 1);
         let printed = String::from_utf8(printed).unwrap();
         assert!(printed.contains("/engines/b/lib"), "got: {printed}");
+    }
+
+    #[test]
+    fn a_line_of_progress_is_a_frame_marked_as_progress() {
+        let mut wire = Vec::new();
+        write_progress(&mut wire, TOKEN, 5, "{\"progress\":{}}").unwrap();
+        let (head, line) = protocol::read_reply(&mut Cursor::new(wire), TOKEN)
+            .unwrap()
+            .unwrap();
+        assert_eq!((head.id, head.progress), (5, true));
+        assert_eq!(line, b"{\"progress\":{}}");
     }
 
     #[test]

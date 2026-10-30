@@ -280,6 +280,29 @@ fn a_map_added_while_the_worker_runs_is_seen_at_the_cost_of_one_init() {
     assert_eq!(world.calls("Init end"), 2);
 }
 
+/// The compat build shares one `Init` between its reads and its conversion
+/// (issue #4895).
+#[test]
+fn a_conversion_shares_the_init_of_the_reads_around_it() {
+    let world = World::new("convert");
+    let mut worker = world.serve(&[]);
+    let (head, _) = worker.scan();
+    assert_eq!(head.code, 0);
+    let out_dir = world.dir.join("converted");
+    let out_dir = out_dir.to_string_lossy();
+    let head = worker.ask(&[
+        "--convert-3do",
+        "--game",
+        "a-game.sdz",
+        "--out-dir",
+        &out_dir,
+    ]);
+    assert_eq!(head.code, 0, "a running worker answers a conversion");
+    let (head, _) = worker.scan();
+    assert_eq!(head.code, 0);
+    assert_eq!(world.calls("Init end"), 1);
+}
+
 #[test]
 fn a_one_shot_run_still_inits_reads_and_uninits() {
     let world = World::new("one-shot");

@@ -9,7 +9,7 @@
 mod common;
 
 use std::collections::BTreeMap;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 use common::setup;
 
@@ -60,6 +60,48 @@ fn bytes_of(built: &tauri_plugin_coilbox_compat::Built) -> BTreeMap<String, Vec<
         .iter()
         .map(|f| (f.clone(), std::fs::read(dir.join(f)).expect("read")))
         .collect()
+}
+
+/// The conversion runs on the worker that stays running, which sends its progress
+/// in frames of their own (issue #4895).
+#[test]
+#[ignore = "needs xta-9.65.sd7 (or COILBOX_COMPAT_GAME) in ~/.spring/games, an installed engine with libunitsync, a built coilbox-unitsync-worker in target/debug"]
+fn a_build_reports_each_model_as_it_converts_it() {
+    let (engine, archive) = match setup() {
+        Ok(v) => v,
+        Err(why) => {
+            eprintln!("{why}, so this checks nothing");
+            return;
+        }
+    };
+    let root = tempfile::tempdir().unwrap();
+    std::fs::create_dir_all(root.path().join("games")).unwrap();
+    let data = dirs_home().join(".spring/games").join(&archive);
+    std::fs::copy(&data, root.path().join("games").join(&archive)).unwrap();
+    let name = game_name(&engine, root.path(), &archive);
+    let seen = std::sync::Arc::new(std::sync::Mutex::new(0usize));
+    let counted = seen.clone();
+    let built = tauri_plugin_coilbox_compat::build_reporting(
+        &root.path().to_string_lossy(),
+        &engine.to_string_lossy(),
+        &archive,
+        &name,
+        "0",
+        coilbox_compat::latest(),
+        "0.0.0",
+        move |line| {
+            if line["phase"] == "model" {
+                *counted.lock().unwrap() += 1;
+            }
+        },
+    )
+    .expect("build");
+    assert!(built.models.models_written > 0);
+    assert_eq!(*seen.lock().unwrap(), built.models.models_found);
+}
+
+fn dirs_home() -> PathBuf {
+    PathBuf::from(std::env::var_os("HOME").expect("HOME"))
 }
 
 #[test]

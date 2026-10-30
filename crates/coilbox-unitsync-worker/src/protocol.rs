@@ -21,6 +21,9 @@
 //! reply's bytes by length. The token is made up by the plugin for each worker
 //! it starts and handed over in [`TOKEN_ENV`], so text an archive manages to get
 //! printed cannot pass for a frame. The id says which request the reply answers.
+//!
+//! A frame whose header says `"progress":true` is not the reply. It is one line
+//! of progress on the request with that id, which still has its reply to come.
 
 use serde::{Deserialize, Serialize};
 use std::io::{self, BufRead, Write};
@@ -75,6 +78,9 @@ pub struct ReplyHead {
     /// dev log (issue #3728).
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub mount_ms: Vec<u64>,
+    /// This frame is a line of progress, and the reply is still to come.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub progress: bool,
 }
 
 /// The header as it is written, with the length of the bytes that follow.
@@ -238,6 +244,7 @@ mod tests {
             code: 0,
             init: None,
             mount_ms: Vec::new(),
+            progress: false,
         }
     }
 
@@ -281,6 +288,7 @@ mod tests {
                 call_ms: 190,
             }),
             mount_ms: vec![41, 3],
+            progress: false,
         };
         let payload = b"{\"errors\":[]}\n";
         let mut input = Cursor::new(frame(TOKEN, &sent, payload));
