@@ -1306,7 +1306,17 @@ msgstr "最新リリースの {0}"
 
 #. placeholder {0}: game.game
 #: src/widgets/pages/WidgetsPage.tsx
+msgid "{0} has not saved its widget settings yet. Start it once to switch widgets on or off here."
+msgstr ""
+
+#. placeholder {0}: game.game
+#: src/widgets/pages/WidgetsPage.tsx
 msgid "{0} loads none of your widgets."
+msgstr ""
+
+#. placeholder {0}: switchName(row, switches.game)
+#: src/widgets/pages/WidgetsPage.tsx
+msgid "{0} on"
 msgstr ""
 
 #. placeholder {0}: formatRate(value)
@@ -8523,6 +8533,10 @@ msgstr "ゲームが実行中で、このファイルはゲームが書き込む
 msgid "A game is running, and coilbox does not know where this engine writes, so it cannot tell whether the game will write this file back over. {label} writes its whole blueprints file back when it saves or exits, so anything written now would be thrown away. Close the game and try again."
 msgstr "ゲームが実行中ですが、coilbox はこのエンジンの書き込み先を知らないため、ゲームがこのファイルを上書きするかどうか判断できません。{label} は保存時や終了時に設計図ファイル全体を書き戻すため、今書き込んだ内容は破棄されます。ゲームを閉じてから再試行してください。"
 
+#: src/widgets/widgetConfig.ts
+msgid "A game is running, and it writes this file back when it exits, so anything written now would be lost. Close the game and try again."
+msgstr ""
+
 #: src/scenario/pages/components/BlueprintPanel.tsx
 #, fuzzy
 msgid "A game is running. {gameLabel} writes its whole blueprints file back when it saves or exits, so coilbox will not write into it until the game is closed."
@@ -15207,6 +15221,10 @@ msgstr "モデル表示を閉じる"
 msgid "Close protocol console"
 msgstr "プロトコルコンソールを閉じる"
 
+#: src/widgets/pages/WidgetsPage.tsx
+msgid "Close the game to switch widgets on or off."
+msgstr ""
+
 #: src/multiplayer/DebriefingDrawer.tsx
 #, fuzzy
 msgid "Close the match result"
@@ -15435,6 +15453,10 @@ msgstr "coilbox が読み込めませんでした"
 #, fuzzy
 msgid "Coilbox could not read {game}: {said}"
 msgstr "Coilbox は {game} を読み込めませんでした：{said}"
+
+#: src/widgets/widgetConfig.ts
+msgid "Coilbox could not read this file: {reason}"
+msgstr ""
 
 #: src/runlite/unitLimit.ts
 #, fuzzy
@@ -33839,6 +33861,7 @@ msgstr "古い順"
 
 #: src/play/modOptions.ts
 #: src/profile/SettingsSection.tsx
+#: src/widgets/pages/WidgetsPage.tsx
 #, fuzzy
 msgid "On"
 msgstr "オン"
@@ -48878,6 +48901,10 @@ msgstr "このゲームにはその名前のユニットがないため、ボタ
 #, fuzzy
 msgid "This game has none of its units: {list}. Nothing in it can be placed here, so it belongs to another game or another version of this one."
 msgstr "このゲームにはそのユニットが 1 つもありません：{list}。ここに配置できるものはないため、別のゲームか、このゲームの別バージョン用です。"
+
+#: src/widgets/widgetConfig.ts
+msgid "This game has not saved its widget settings yet. Start it once, then try again."
+msgstr ""
 
 #: src/content/pages/components/states.tsx
 #, fuzzy

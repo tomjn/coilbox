@@ -8,18 +8,21 @@ const upper: WidgetHandler = {
   family: "engine",
   folders: ["LuaUI/Widgets"],
   subfolders: false,
+  config: { files: ["{short}.lua"], shape: "nested" },
 };
 const lower: WidgetHandler = {
   id: "sf",
   family: "engine",
   folders: ["LuaUI/widgets"],
   subfolders: false,
+  config: { files: ["{short}.lua"], shape: "nested" },
 };
 const bar: WidgetHandler = {
   id: "bar",
   family: "ba",
   folders: ["LuaUI/Widgets", "LuaUI/RmlWidgets"],
   subfolders: true,
+  config: { files: ["{short}.lua"], shape: "nested" },
 };
 
 function file(path: string, folder: string, nested = false): PlayerWidgetFile {

@@ -3,8 +3,10 @@ import {
   HANDLER_FOLDERS,
   loads,
   recogniseHandler,
+  type WidgetConfigFile,
   type WidgetHandler,
 } from "./handlers";
+import { configCandidates } from "./widgetConfig";
 
 const none = async () => null;
 
@@ -18,6 +20,23 @@ describe("recogniseHandler", () => {
   ])("recognises %s as %s", async (marker, id) => {
     const handler = await recogniseHandler(["luaui.lua", marker], none);
     expect(handler?.id).toBe(id);
+  });
+
+  // The file names each game's own handler saves to, under LuaUI/Config.
+  it.each([
+    ["luaui/barwidgets.lua", "BYAR", ["BYAR.lua"]],
+    ["luaui/bawidgets.lua", "BA", ["BA.lua"]],
+    ["luaui/cawidgets.lua", "ZK", ["ZK_order.lua"]],
+    ["luaui/cawidgets.lua", "ca", ["CA_order.lua", "ca_order.lua"]],
+    ["luaui/mfwidgets.lua", "MF", ["MF.lua"]],
+    ["LuaUI/widgets_custom.lua", "sf", ["SF_data.lua"]],
+  ])("%s with short name %s saves to %j", async (marker, short, files) => {
+    const handler = await recogniseHandler(["luaui.lua", marker], none);
+    expect(
+      configCandidates(handler?.config as WidgetConfigFile, short).map((f) =>
+        f.replace("LuaUI/Config/", ""),
+      ),
+    ).toEqual(files);
   });
 
   it("tells the pre-0.83 handler from the default one by what it saves", async () => {
@@ -88,12 +107,14 @@ describe("loads", () => {
     family: "engine",
     folders: ["LuaUI/widgets"],
     subfolders: false,
+    config: { files: ["{short}.lua"], shape: "nested" },
   };
   const bar: WidgetHandler = {
     id: "bar",
     family: "ba",
     folders: ["LuaUI/Widgets", "LuaUI/RmlWidgets"],
     subfolders: true,
+    config: { files: ["{short}.lua"], shape: "nested" },
   };
 
   it("folds case where the filesystem does", () => {

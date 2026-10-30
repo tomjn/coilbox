@@ -59,7 +59,7 @@ export interface MergeOutcome extends Omit<MergePlan, "text"> {
 
 /** `20260813-090530`, so copies of one file sort in the order they were made
  *  and none of them lands on the name of another. */
-function stamp(now: Date): string {
+export function stamp(now: Date): string {
   const pad = (n: number) => `${n}`.padStart(2, "0");
   const date = [
     now.getUTCFullYear(),
