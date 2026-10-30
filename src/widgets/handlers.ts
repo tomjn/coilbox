@@ -45,6 +45,9 @@ export interface WidgetHandler {
   /** Whether it also loads widgets one subfolder down. */
   subfolders: boolean;
   config: WidgetConfigFile;
+  /** The file in the game's archives it was recognised by, lower case, which a
+   *  new config file is modelled on. Absent for the engine's own handler. */
+  source?: string;
   /** What can stop it loading a player's widgets. Absent for a handler that
    *  always loads them. */
   userWidgets?: UserWidgetGates;
@@ -128,6 +131,21 @@ const RULES: readonly Rule[] = [
     userWidgets: {
       option: { key: "mo_allowuserwidgets", loads: true, unset: true },
       configFlag: true,
+    },
+  },
+  {
+    // Complete Annihilation's before it took the game's short name, which saves
+    // to the same shared pair of files as the handler from before engine 0.83.
+    id: "ca-old",
+    family: "ca",
+    marker: "luaui/cawidgets.lua",
+    contains: "Config/widget_order.lua",
+    folders: ["LuaUI/Widgets"],
+    subfolders: false,
+    config: {
+      files: ["widget_order.lua"],
+      shape: "flat",
+      dataFiles: ["widget_data.lua"],
     },
   },
   {
@@ -292,6 +310,7 @@ function strip(rule: Rule): WidgetHandler {
     folders: rule.folders,
     subfolders: rule.subfolders,
     config: rule.config,
+    source: rule.marker,
     ...(rule.userWidgets && { userWidgets: rule.userWidgets }),
   };
 }
