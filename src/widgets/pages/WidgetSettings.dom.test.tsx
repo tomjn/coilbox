@@ -14,9 +14,10 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { WidgetHandler } from "../handlers";
 import type { WidgetRow } from "../widgetList";
 
-const DIR = "/home/player/.spring";
+const DIR = "/home/player/.spring/engine/2026.09.01";
+const CONTENT = "/home/player/.spring";
 const FILE = `${DIR}/LuaUI/Config/MF.lua`;
-const WIDGET = `${DIR}/LuaUI/Widgets/watch.lua`;
+const WIDGET = `${CONTENT}/LuaUI/Widgets/watch.lua`;
 
 const DATA = `return {
 \tdata = {
@@ -72,6 +73,7 @@ const open = (name = "Build Watch") =>
   render(
     <WidgetSettingsDrawer
       writeDir={DIR}
+      widgetDir={CONTENT}
       onClose={() => {}}
       target={{
         row,

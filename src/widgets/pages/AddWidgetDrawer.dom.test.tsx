@@ -71,6 +71,7 @@ const flat: WidgetPlan = {
 const render_ = (props: { game?: GameHandler; setKey?: string | null } = {}) =>
   render(
     <AddWidgetDrawer
+      widgetDir="/content"
       writeDir="/spring"
       games={games}
       caseSensitive={false}
@@ -131,13 +132,16 @@ describe("AddWidgetDrawer", () => {
     await choose("Choose a file or zip");
     fireEvent.click(screen.getByRole("button", { name: "Add widget" }));
     await screen.findByText("Added to LuaUI/Widgets.");
+    // The widget goes under the content root, and the games' config files in
+    // the engine's write folder (issue #4856).
     expect(add).toHaveBeenCalledWith({
-      writeDir: "/spring",
+      writeDir: "/content",
       source: "/downloads/gui_radar.lua",
       folders: ["LuaUI/Widgets"],
       replace: false,
     });
     expect(switchAdded).toHaveBeenCalledWith({
+      widgetDir: "/content",
       writeDir: "/spring",
       games,
       key: null,

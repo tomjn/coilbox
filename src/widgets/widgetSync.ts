@@ -98,8 +98,10 @@ export async function writeSetForLaunch({
     shortName: item.info.shortname?.trim() || undefined,
     handler,
   };
+  // The widgets are under the content root, which every engine reads, and the
+  // game's config is in the engine's write folder (issue #4856).
   const widgets = await contentPlayerWidgets({
-    writeDir,
+    writeDir: dataDir,
     folders: HANDLER_FOLDERS,
   });
   await writeGameFile(writeDir, entry, widgetRows(widgets, [entry]));
@@ -143,11 +145,15 @@ async function writeGameFile(
  * written, one line per game.
  */
 export async function switchAddedWidgets({
+  widgetDir,
   writeDir,
   games,
   key,
   names,
 }: {
+  /** The folder the widgets' `LuaUI/` is in. */
+  widgetDir: string;
+  /** The engine's write folder, where the games keep their config. */
   writeDir: string;
   games: readonly GameHandler[];
   key: string | null;
@@ -155,7 +161,7 @@ export async function switchAddedWidgets({
 }): Promise<string[]> {
   if (names.length === 0) return [];
   updateSets((sets) => addWidgets(sets, key, names));
-  return writeSwitched({ writeDir, games, names });
+  return writeSwitched({ widgetDir, writeDir, games, names });
 }
 
 /**
@@ -165,17 +171,21 @@ export async function switchAddedWidgets({
  * line per game.
  */
 export async function switchRestoredWidgets({
+  widgetDir,
   writeDir,
   games,
   names,
 }: {
+  /** The folder the widgets' `LuaUI/` is in. */
+  widgetDir: string;
+  /** The engine's write folder, where the games keep their config. */
   writeDir: string;
   games: readonly GameHandler[];
   names: readonly string[];
 }): Promise<string[]> {
   if (names.length === 0) return [];
   updateSets((sets) => switchOff(sets, names));
-  return writeSwitched({ writeDir, games, names });
+  return writeSwitched({ widgetDir, writeDir, games, names });
 }
 
 /** Write the sets' answer for `names` into each game's config file. Called
@@ -185,16 +195,18 @@ export async function switchRestoredWidgets({
  *  back, because one a removed copy of the widget left behind would otherwise
  *  undo the choice. */
 async function writeSwitched({
+  widgetDir,
   writeDir,
   games,
   names,
 }: {
+  widgetDir: string;
   writeDir: string;
   games: readonly GameHandler[];
   names: readonly string[];
 }): Promise<string[]> {
   const scan = await contentPlayerWidgets({
-    writeDir,
+    writeDir: widgetDir,
     folders: HANDLER_FOLDERS,
   });
   const rows = widgetRows(scan, games);

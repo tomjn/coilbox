@@ -191,9 +191,11 @@ function Branch({
 function SettingsBody({
   target,
   writeDir,
+  widgetDir,
 }: {
   target: SettingsTarget;
   writeDir: string;
+  widgetDir: string;
 }) {
   const { t } = useLingui();
   const { running } = usePlay();
@@ -217,13 +219,17 @@ function SettingsBody({
   const load = useCallback(async () => {
     try {
       setLoaded(
-        await loadWidgetSettings({ ...request, widgetPath: target.row.path }),
+        await loadWidgetSettings({
+          ...request,
+          widgetDir,
+          widgetPath: target.row.path,
+        }),
       );
       setError(null);
     } catch (e) {
       setError(errorText(e));
     }
-  }, [request, target.row.path]);
+  }, [request, widgetDir, target.row.path]);
 
   useEffect(() => {
     void load();
@@ -339,25 +345,30 @@ function SettingsBody({
 export function WidgetSettingsDrawer({
   target,
   writeDir,
+  widgetDir,
   onClose,
 }: {
   target: SettingsTarget | null;
+  /** The engine's write folder, where the game keeps the settings. */
   writeDir: string | undefined;
+  /** The folder the widget's `LuaUI/` is in. */
+  widgetDir: string | undefined;
   onClose: () => void;
 }) {
   const { t } = useLingui();
   const name = target?.sw.name ?? "";
   return (
     <SlideDrawer
-      open={target !== null && !!writeDir}
+      open={target !== null && !!writeDir && !!widgetDir}
       title={t`${name} settings`}
       onClose={onClose}
     >
-      {target && writeDir && (
+      {target && writeDir && widgetDir && (
         <SettingsBody
           key={`${target.game}\u0000${target.row.path}`}
           target={target}
           writeDir={writeDir}
+          widgetDir={widgetDir}
         />
       )}
     </SlideDrawer>

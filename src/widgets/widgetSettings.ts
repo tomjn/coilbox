@@ -271,7 +271,7 @@ export interface SettingsRequest {
 }
 
 /** Read a widget's saved settings. `widgetPath` is the widget's file relative
- *  to the write folder. Throws when the game's file is there and cannot be
+ *  to `widgetDir`, the folder its `LuaUI/` is in. Throws when the game's file is there and cannot be
  *  read. */
 export async function loadWidgetSettings({
   io,
@@ -279,12 +279,16 @@ export async function loadWidgetSettings({
   config,
   shortName,
   sw,
+  widgetDir,
   widgetPath,
-}: SettingsRequest & { widgetPath: string }): Promise<WidgetSettings> {
+}: SettingsRequest & {
+  widgetDir: string;
+  widgetPath: string;
+}): Promise<WidgetSettings> {
   const found = await findData(io, writeDir, config, shortName);
   const saved = found && readSettings(found.text, config, sw);
   if (found && saved) return { kind: "ready", path: found.path, ...saved };
-  const source = await io.read(underConfigDir(writeDir, widgetPath));
+  const source = await io.read(underConfigDir(widgetDir, widgetPath));
   return source !== null && !mentionsGetConfigData(source)
     ? { kind: "none" }
     : { kind: "unsaved" };

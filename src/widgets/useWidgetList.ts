@@ -1,6 +1,12 @@
 /**
- * Everything the Widgets page reads (issue #1284): the engine's write folder,
- * the widget files in it, and the handler each installed game runs.
+ * Everything the Widgets page reads (issue #1284): the widget files under the
+ * content root's `LuaUI/`, the engine's write folder, and the handler each
+ * installed game runs.
+ *
+ * The two folders are apart because an engine with a `springsettings.cfg`
+ * beside its binary writes to its own folder (issue #4856). Every engine
+ * coilbox starts reads the content root through `SPRING_DATADIR`, so widgets go
+ * there, and the games write their widget config to the write folder.
  */
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -46,9 +52,9 @@ export function useWidgetList() {
     error: scanError,
     run: runScan,
   } = useUnitsyncScan(enginePath, dataDir);
-  const { data: engineConfig, loading: configLoading } =
-    useUnitsyncEngineConfig(enginePath, dataDir);
-  const writeDir = engineConfigDir(engineConfig?.configPath);
+  const { data: engineConfig } = useUnitsyncEngineConfig(enginePath, dataDir);
+  const widgetDir = dataDir;
+  const configDir = engineConfigDir(engineConfig?.configPath);
 
   const installed = useMemo(
     () =>
@@ -66,11 +72,11 @@ export function useWidgetList() {
   const latest = useRef(0);
   const read = useCallback(async () => {
     const id = ++latest.current;
-    if (!writeDir) return;
+    if (!widgetDir) return;
     setReading(true);
     try {
       const found = await contentPlayerWidgets({
-        writeDir,
+        writeDir: widgetDir,
         folders: HANDLER_FOLDERS,
       });
       if (id !== latest.current) return;
@@ -81,7 +87,7 @@ export function useWidgetList() {
     } finally {
       if (id === latest.current) setReading(false);
     }
-  }, [writeDir]);
+  }, [widgetDir]);
   useEffect(() => {
     setWidgets(null);
     void read();
@@ -131,9 +137,10 @@ export function useWidgetList() {
 
   return {
     targets,
-    writeDir,
-    /** Still finding out where the write folder is. */
-    locating: !!selected && !engineConfig && configLoading,
+    /** The content root, which the widget folders are under. */
+    widgetDir,
+    /** The engine's write folder, where the games keep their widget config. */
+    configDir,
     widgets,
     games,
     rows,

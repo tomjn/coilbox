@@ -357,7 +357,7 @@ function gameIsRunning(): Error {
 // ---------------------------------------------------------------------------
 
 export interface RemovalResult {
-  /** The files removed, relative to the write folder. */
+  /** The files removed, relative to the content root. */
   files: string[];
   /** The folder the files were copied to first. */
   backup: string;
@@ -376,6 +376,7 @@ export interface RemovalResult {
  */
 export async function removeWidget({
   io = appFileIO,
+  widgetDir,
   writeDir,
   removal,
   rows,
@@ -384,6 +385,9 @@ export async function removeWidget({
   gameRunning,
 }: {
   io?: ConfigFileIO;
+  /** The content root, whose `LuaUI/` the files are removed from. */
+  widgetDir: string;
+  /** The engine's write folder, where the games keep their config files. */
   writeDir: string;
   removal: Removal;
   rows: readonly WidgetRow[];
@@ -394,7 +398,7 @@ export async function removeWidget({
   if (gameRunning) throw gameIsRunning();
   const targets = entries ? entryTargets(removal, rows, games) : [];
   const done = await contentWidgetDelete({
-    writeDir,
+    writeDir: widgetDir,
     files: removal.copies.map((c) => c.path),
     folders: removal.folders,
     label: removal.name,

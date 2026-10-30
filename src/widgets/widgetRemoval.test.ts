@@ -419,8 +419,12 @@ describe("removeEntries", () => {
 });
 
 describe("removeWidget", () => {
+  // The files are under the content root and the config files in the engine's
+  // write folder, which are two folders for an engine that keeps its own
+  // springsettings.cfg (issue #4856).
   const request = {
     io,
+    widgetDir: "/content",
     writeDir: "/spring",
     rows,
     games,
@@ -441,7 +445,7 @@ describe("removeWidget", () => {
     });
     expect(deleted).toEqual([
       {
-        writeDir: "/spring",
+        writeDir: "/content",
         files: ["LuaUI/Widgets/radar.lua", "LuaUI/Widgets_TAP/radar.lua"],
         folders: [],
         label: "Radar",

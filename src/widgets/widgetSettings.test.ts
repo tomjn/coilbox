@@ -342,6 +342,9 @@ const DIR = "/home/p/.spring";
 const NOW = new Date(Date.UTC(2026, 9, 30, 9, 5, 30));
 
 describe("loadWidgetSettings", () => {
+  // Apart from the write folder, as it is for an engine that keeps its own
+  // springsettings.cfg (issue #4856).
+  const WIDGETS = "/home/p/content";
   const widgetPath = "LuaUI/Widgets/watch.lua";
   const base = (io: ConfigFileIO) => ({
     io,
@@ -349,6 +352,7 @@ describe("loadWidgetSettings", () => {
     config: nested,
     shortName: "MF",
     sw: sw("Build Watch"),
+    widgetDir: WIDGETS,
     widgetPath,
   });
 
@@ -365,7 +369,8 @@ describe("loadWidgetSettings", () => {
   it("says nothing is saved yet for a widget that saves through GetConfigData", async () => {
     const io = memory({
       [`${DIR}/LuaUI/Config/MF.lua`]: "return {\n\tdata = {},\n}",
-      [`${DIR}/${widgetPath}`]: "function widget:GetConfigData() return {} end",
+      [`${WIDGETS}/${widgetPath}`]:
+        "function widget:GetConfigData() return {} end",
     });
     expect(await loadWidgetSettings(base(io))).toEqual({ kind: "unsaved" });
     // And when the game has no file at all yet.
@@ -376,7 +381,7 @@ describe("loadWidgetSettings", () => {
   it("says a widget that never implements GetConfigData has no saved settings", async () => {
     const io = memory({
       [`${DIR}/LuaUI/Config/MF.lua`]: "return {\n\tdata = {},\n}",
-      [`${DIR}/${widgetPath}`]:
+      [`${WIDGETS}/${widgetPath}`]:
         "local size = 12 -- GetConfigData is not here\nfunction widget:GetInfo() return {} end",
     });
     expect(await loadWidgetSettings(base(io))).toEqual({ kind: "none" });

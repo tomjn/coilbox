@@ -30,8 +30,10 @@ function fileName(path: string): string {
 /** What the page remembers of a removal, so the player can undo it. */
 export interface RemovedWidget extends RemovalResult {
   name: string;
-  /** The write folder it was removed from and the games installed for it,
-   *  which the engine picked on the page may no longer be. */
+  /** The content root it was removed from, the engine's write folder and the
+   *  games installed for it, which the engine picked on the page may no longer
+   *  be. */
+  widgetDir: string;
   writeDir: string;
   games: readonly GameHandler[];
 }
@@ -47,6 +49,7 @@ export function RemoveWidgetButton({
   row,
   rows,
   games,
+  widgetDir,
   writeDir,
   running,
   onRemoved,
@@ -54,6 +57,9 @@ export function RemoveWidgetButton({
   row: WidgetRow;
   rows: readonly WidgetRow[];
   games: readonly GameHandler[];
+  /** The content root, whose `LuaUI/` the files are in. */
+  widgetDir: string;
+  /** The engine's write folder, where the games keep their config files. */
   writeDir: string;
   /** A game is running, which would write the widget back when it exits. */
   running: boolean;
@@ -92,6 +98,7 @@ export function RemoveWidgetButton({
     setError(null);
     try {
       const result = await removeWidget({
+        widgetDir,
         writeDir,
         removal,
         rows,
@@ -100,7 +107,7 @@ export function RemoveWidgetButton({
         gameRunning: running,
       });
       setOpen(false);
-      onRemoved({ ...result, name, writeDir, games });
+      onRemoved({ ...result, name, widgetDir, writeDir, games });
     } catch (e) {
       setError(describeError(e));
     } finally {
@@ -220,7 +227,7 @@ export function RemovedNotice({
   const [error, setError] = useState<string | null>(null);
   /** The games whose config file could not be written, once restored. */
   const [restored, setRestored] = useState<string[] | null>(null);
-  const { name, backup, entries, writeDir, games } = removed;
+  const { name, backup, entries, widgetDir, writeDir, games } = removed;
 
   /** The files are back, so a retry only has the switching left to do. */
   const [filesBack, setFilesBack] = useState(false);
@@ -230,7 +237,7 @@ export function RemovedNotice({
     setError(null);
     try {
       if (!filesBack) {
-        await contentWidgetRestore({ writeDir, backup });
+        await contentWidgetRestore({ writeDir: widgetDir, backup });
         setFilesBack(true);
         onRestored();
       }
@@ -239,6 +246,7 @@ export function RemovedNotice({
       // run it, so it comes back off.
       setRestored(
         await switchRestoredWidgets({
+          widgetDir,
           writeDir,
           games,
           names: removed.forgotten,

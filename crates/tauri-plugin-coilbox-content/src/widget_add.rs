@@ -1,4 +1,5 @@
-//! Adding a widget to the engine's write folder (issue #1286).
+//! Adding a widget to a content root, which every engine coilbox starts reads
+//! (issues #1286 and #4856). `write_dir` names that folder.
 //!
 //! The player picks a `.lua` file, a folder or a zip. The files keep the layout
 //! they came with, because a widget that includes other files names their paths

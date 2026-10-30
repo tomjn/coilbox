@@ -101,11 +101,16 @@ const games: GameHandler[] = [
   { game: "Mystery 1.0", handler: null },
 ];
 
+/** What the page is told about the engine's write folder. */
+const list: { configDir: string | undefined } = {
+  configDir: "/home/player/.spring/engine/2026.09.01",
+};
+
 vi.mock("../useWidgetList", () => ({
   useWidgetList: () => ({
     targets: [{}],
-    writeDir: "/home/player/.spring",
-    locating: false,
+    widgetDir: "/home/player/.spring",
+    configDir: list.configDir,
     widgets: scan,
     games,
     rows: widgetRows(scan, games),
@@ -126,6 +131,7 @@ vi.mock("../useGameFiles", () => ({
   useGameFiles: () => files,
 }));
 
+const openPath = vi.fn(async (_: { path: string }) => ({}));
 const play = { running: false };
 vi.mock("@/play/PlayProvider", () => ({
   usePlay: () => play,
@@ -154,10 +160,12 @@ vi.mock("@/content/bindings", async () => {
     },
     contentWidgetRestore: async () => ["LuaUI/Widgets/gui_build_watch.lua"],
     contentPlayerWidgets: async () => scan,
+    contentOpenPath: (args: { path: string }) => openPath(args),
   };
 });
 
 beforeEach(() => {
+  list.configDir = "/home/player/.spring/engine/2026.09.01";
   play.running = false;
   removeCalls.length = 0;
   installSettingsStorage(memorySettingsStorage());
@@ -285,6 +293,27 @@ describe("WidgetsPage", () => {
         .getByRole("switch", { name: "BuildWatch on" })
         .getAttribute("aria-checked"),
     ).toBe("true");
+  });
+
+  it("opens the widget folder under the content root, not the engine's folder", () => {
+    page();
+    fireEvent.click(screen.getByRole("button", { name: "Open folder" }));
+    expect(openPath).toHaveBeenCalledWith({
+      path: "/home/player/.spring/LuaUI/Widgets",
+    });
+  });
+
+  it("offers no settings when the engine does not say where its config is", () => {
+    page("/library/widgets?game=Metal Factions v2.58");
+    expect(
+      screen.queryAllByRole("button", { name: /^Settings of / }).length,
+    ).toBeGreaterThan(0);
+    cleanup();
+    list.configDir = undefined;
+    page("/library/widgets?game=Metal Factions v2.58");
+    expect(screen.queryAllByRole("button", { name: /^Settings of / })).toEqual(
+      [],
+    );
   });
 
   it("opens the drawer that adds a widget", () => {

@@ -63,7 +63,7 @@ const ALL = "all-games";
 
 /**
  * Library > Widgets (issue #1284): the widget files a player has added under
- * the engine's write folder, what each one declares, and which installed games
+ * the content root's `LuaUI/`, what each one declares, and which installed games
  * load it. `?game=` picks one game, by name or by the full name of one of its
  * versions, which is how a game's page links here.
  *
@@ -77,7 +77,7 @@ export default function WidgetsPage() {
   const list = useWidgetList();
   const picked = params.get("game") ?? ALL;
   const game = findGame(list.games, picked);
-  const files = useGameFiles(list.writeDir, list.games, list.rows);
+  const files = useGameFiles(list.configDir, list.games, list.rows);
   const sets = useWidgetSets();
   const [adding, setAdding] = useState(false);
   // Every removal since the page opened, each with its own way back.
@@ -132,17 +132,17 @@ export default function WidgetsPage() {
   }, [shown, settingsPath, game]);
 
   const openFolder = () => {
-    if (!list.writeDir) return;
+    if (!list.widgetDir) return;
     const folder = list.widgets
       ? folderToOpen(list.widgets, game?.handler)
       : null;
-    const path = folder ? underConfigDir(list.writeDir, folder) : list.writeDir;
+    const path = folder
+      ? underConfigDir(list.widgetDir, folder)
+      : list.widgetDir;
     contentOpenPath({ path }).catch(() => {});
   };
 
-  const busy =
-    list.locating ||
-    (!!list.writeDir && ((!shown && !list.error) || list.reading));
+  const busy = !!list.widgetDir && ((!shown && !list.error) || list.reading);
 
   return (
     <div className="flex flex-col gap-4 p-4">
@@ -150,14 +150,17 @@ export default function WidgetsPage() {
         title={t`Widgets`}
         description={t`The widgets you have added to your games, and which games load each one.`}
         actions={
-          list.writeDir && (
+          list.widgetDir && (
             <div className="flex gap-2">
               <Button
                 variant="outline"
                 size="sm"
                 onClick={() => setAdding(true)}
                 disabled={
-                  !list.games || !list.widgets || (picked !== ALL && !game)
+                  !list.configDir ||
+                  !list.games ||
+                  !list.widgets ||
+                  (picked !== ALL && !game)
                 }
               >
                 <Plus />
@@ -253,12 +256,7 @@ export default function WidgetsPage() {
         </div>
       )}
 
-      {list.targets.length === 0 ? null : !list.locating && !list.writeDir ? (
-        <EmptyState
-          icon={Puzzle}
-          label={t`This engine does not say where it keeps its settings, so coilbox cannot find its widget folder.`}
-        />
-      ) : busy ? (
+      {list.targets.length === 0 ? null : busy ? (
         <SkeletonList />
       ) : shown && shown.length === 0 ? (
         <EmptyState
@@ -276,17 +274,20 @@ export default function WidgetsPage() {
             showGames={!game && list.gamesKnown}
             someUnknown={!!list.games?.some((g) => g.handler === null)}
             onSettings={
-              game?.handler ? (row) => setSettingsPath(row.path) : undefined
+              game?.handler && list.configDir
+                ? (row) => setSettingsPath(row.path)
+                : undefined
             }
             canSettings={(row) => !!game && !!settingsSwitch(row, game.game)}
             renderRemove={
-              list.writeDir && list.games && shown
+              list.widgetDir && list.configDir && list.games && shown
                 ? (row) => (
                     <RemoveWidgetButton
                       row={row}
                       rows={list.rows ?? []}
                       games={list.games ?? []}
-                      writeDir={list.writeDir ?? ""}
+                      widgetDir={list.widgetDir ?? ""}
+                      writeDir={list.configDir ?? ""}
                       running={running}
                       onRemoved={(done) => {
                         setRemoved((all) => [...all, done]);
@@ -322,9 +323,10 @@ export default function WidgetsPage() {
         title={t`Add a widget`}
         onClose={() => setAdding(false)}
       >
-        {list.writeDir && list.games && list.widgets && (
+        {list.widgetDir && list.configDir && list.games && list.widgets && (
           <AddWidgetDrawer
-            writeDir={list.writeDir}
+            widgetDir={list.widgetDir}
+            writeDir={list.configDir}
             games={list.games}
             caseSensitive={list.widgets.caseSensitive}
             game={game}
@@ -338,7 +340,8 @@ export default function WidgetsPage() {
       </SlideDrawer>
       <WidgetSettingsDrawer
         target={settingsTarget}
-        writeDir={list.writeDir}
+        writeDir={list.configDir}
+        widgetDir={list.widgetDir}
         onClose={() => setSettingsPath(null)}
       />
     </div>

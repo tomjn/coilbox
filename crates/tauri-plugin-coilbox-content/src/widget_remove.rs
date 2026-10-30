@@ -1,5 +1,5 @@
-//! Removing a widget from the engine's write folder, and putting it back (issue
-//! #1288).
+//! Removing a widget from a content root, and putting it back (issues #1288 and
+//! #4856). `write_dir` names that folder.
 //!
 //! The caller says which widget files to remove and which of their subfolders
 //! to take with them (the frontend knows which widgets share a subfolder). All
