@@ -759,6 +759,23 @@ describe("WidgetsPage", () => {
     expect(screen.getByText("Metal Factions's own widgets")).toBeTruthy();
   });
 
+  it("will not switch a player's widget while a game is running", () => {
+    play.running = true;
+    const all = page();
+    expect(
+      screen
+        .getByRole("switch", { name: "BuildWatch on" })
+        .hasAttribute("disabled"),
+    ).toBe(true);
+    all.unmount();
+    page("/library/widgets?game=Metal%20Factions");
+    expect(
+      screen
+        .getByRole("switch", { name: "BuildWatch on" })
+        .hasAttribute("disabled"),
+    ).toBe(true);
+  });
+
   it("will not switch a game's own widget while a game is running", () => {
     play.running = true;
     shipped.widgets = [

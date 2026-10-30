@@ -331,6 +331,7 @@ export default function WidgetsPage() {
           <Button
             variant="outline"
             size="sm"
+            disabled={running}
             onClick={() => updateSets((s) => dropOverride(s, key))}
           >
             <Trans>Use the widgets for all games</Trans>
@@ -405,6 +406,7 @@ export default function WidgetsPage() {
                           set: sets.global,
                           toggle: (name, on) =>
                             updateSets((s) => switchIn(s, null, name, on)),
+                          disabled: running,
                         }
                       : game && key !== null
                         ? {
@@ -420,6 +422,7 @@ export default function WidgetsPage() {
                                 : appliedSet(sets, key),
                             toggle: (name, on) =>
                               updateSets((s) => switchIn(s, key, name, on)),
+                            disabled: running,
                           }
                         : undefined
                   }
