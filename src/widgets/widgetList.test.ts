@@ -163,6 +163,19 @@ describe("oneEntryPerGame", () => {
     ]);
     expect(entries.map((e) => e.game)).toEqual(["Zero-K", "Zero-K (ZKB)"]);
   });
+
+  it("keeps names unique when the fallback name is taken too", () => {
+    const entries = oneEntryPerGame([
+      install("Zero-K v1.14", "Zero-K", "v1.14", "ZK"),
+      install("Zero-K Benchmark v3", "Zero-K", "v3", "ZKB"),
+      install("Zero-K (ZKB)", "Zero-K (ZKB)", "1", undefined),
+    ]);
+    expect(entries.map((e) => e.game)).toEqual([
+      "Zero-K",
+      "Zero-K (ZKB 2)",
+      "Zero-K (ZKB)",
+    ]);
+  });
 });
 
 describe("findGame", () => {

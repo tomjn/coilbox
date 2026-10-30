@@ -60,9 +60,10 @@ export function oneEntryPerGame(
     members.sort((a, b) => compareGameVersions(b.version, a.version));
     const newest = members[0];
     // Two games can share a name without a version, such as a test branch.
-    const name = taken.has(newest.title)
-      ? `${newest.title} (${shortName})`
-      : newest.title;
+    let name = newest.title;
+    for (let n = 1; taken.has(name); n++) {
+      name = `${newest.title} (${n === 1 ? shortName : `${shortName} ${n}`})`;
+    }
     taken.add(name);
     entries.push({
       game: name,
