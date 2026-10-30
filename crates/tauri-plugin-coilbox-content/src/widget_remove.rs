@@ -148,11 +148,7 @@ pub fn remove(
 /// Copy a removed widget's files back from `backup`, a folder directly under
 /// `backup_root` that [`remove`] made for this `write_dir`. Writes nothing when
 /// any of the files is back already.
-pub fn restore(
-    write_dir: &Path,
-    backup: &Path,
-    backup_root: &Path,
-) -> Result<Vec<String>, String> {
+pub fn restore(write_dir: &Path, backup: &Path, backup_root: &Path) -> Result<Vec<String>, String> {
     if !write_dir.is_dir() {
         return Err(format!("{} is not a folder", write_dir.display()));
     }
@@ -165,8 +161,12 @@ pub fn restore(
     if backup.parent() != Some(root.as_path()) {
         return Err(format!("{} is not a widget backup", backup.display()));
     }
-    let manifest = std::fs::read(backup.join("backup.json"))
-        .map_err(|e| format!("could not read {}: {e}", backup.join("backup.json").display()))?;
+    let manifest = std::fs::read(backup.join("backup.json")).map_err(|e| {
+        format!(
+            "could not read {}: {e}",
+            backup.join("backup.json").display()
+        )
+    })?;
     let manifest: serde_json::Value =
         serde_json::from_slice(&manifest).map_err(|e| format!("backup.json is not valid: {e}"))?;
     if manifest["reason"] != "removed" {
@@ -305,7 +305,11 @@ mod tests {
         assert!(write.join("LuaUI/Widgets/gui_b.lua").is_file());
         let backup = PathBuf::from(&out.backup);
         assert!(backup.starts_with(&backups));
-        assert!(backup.file_name().unwrap().to_string_lossy().ends_with("widget-a"));
+        assert!(backup
+            .file_name()
+            .unwrap()
+            .to_string_lossy()
+            .ends_with("widget-a"));
         assert_eq!(
             std::fs::read_to_string(backup.join("files/LuaUI/Widgets/gui_a.lua")).unwrap(),
             "a"
@@ -363,7 +367,10 @@ mod tests {
             "Other/Widgets/gui_a.lua",
         ] {
             let files = strings(&["LuaUI/Widgets/gui_a.lua", bad]);
-            assert!(remove(&write, &files, &[], None, &backups).is_err(), "{bad}");
+            assert!(
+                remove(&write, &files, &[], None, &backups).is_err(),
+                "{bad}"
+            );
         }
         let folders = strings(&["LuaUI/Config"]);
         let files = strings(&["LuaUI/Widgets/gui_a.lua"]);
@@ -461,14 +468,8 @@ mod tests {
         let (tmp, write, backups) = setup();
         put(&write, "LuaUI/Widgets/a.lua", "a");
         // A backup of a replaced file, which restoring would clobber with.
-        let replaced = back_up_files(
-            &write,
-            &backups,
-            None,
-            "replaced",
-            &["LuaUI/Widgets/a.lua"],
-        )
-        .unwrap();
+        let replaced =
+            back_up_files(&write, &backups, None, "replaced", &["LuaUI/Widgets/a.lua"]).unwrap();
         assert!(restore(&write, &replaced, &backups)
             .unwrap_err()
             .contains("removed widget"));
