@@ -213,6 +213,9 @@ pub fn scan(write_dir: &Path, folders: &[String]) -> WidgetScan {
             scanned.push(folder);
         }
     }
+    // A folder is listed once for its files and once for its subfolders, so
+    // one that cannot be read says so twice in a row.
+    errors.dedup();
     WidgetScan {
         case_sensitive: case_sensitive(write_dir),
         folders: scanned,
