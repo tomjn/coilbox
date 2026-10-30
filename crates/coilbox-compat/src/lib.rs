@@ -61,6 +61,7 @@ const MANIFESTS: &[(u32, &str)] = &[
     (16, include_str!("../../../lua/compat/manifests/16.json")),
     (17, include_str!("../../../lua/compat/manifests/17.json")),
     (18, include_str!("../../../lua/compat/manifests/18.json")),
+    (19, include_str!("../../../lua/compat/manifests/19.json")),
 ];
 
 /// Every fix file, by id.
@@ -228,6 +229,10 @@ const FIXES: &[(&str, &str)] = &[
     (
         "weapon-defs-lua-consts-87",
         include_str!("../../../lua/compat/weapon-defs-lua-consts-87.lua"),
+    ),
+    (
+        "weapon-defs-lua-consts-87-v2",
+        include_str!("../../../lua/compat/weapon-defs-lua-consts-87-v2.lua"),
     ),
 ];
 
@@ -1956,6 +1961,35 @@ mod tests {
         }
     }
 
+    /// Issue #4661: manifest 19 swaps the fix that put weapon def values back
+    /// with rawset, unsynced only, for one that runs in both states, and keeps
+    /// the writer of manifest 18.
+    #[test]
+    fn manifest_19_is_manifest_18_with_weapon_def_values_in_both_states() {
+        let (eighteen, nineteen) = (manifest(18).unwrap(), manifest(19).unwrap());
+        let expected: Vec<String> = eighteen
+            .fixes
+            .iter()
+            .map(|id| match id.as_str() {
+                "weapon-defs-lua-consts-87" => "weapon-defs-lua-consts-87-v2".to_string(),
+                other => other.to_string(),
+            })
+            .collect();
+        assert_eq!(nineteen.fixes, expected);
+        assert_eq!(
+            (&nineteen.converter, nineteen.writer),
+            (&eighteen.converter, eighteen.writer)
+        );
+        for state in [LuaState::Synced, LuaState::Unsynced] {
+            let ids: Vec<&str> = prelude_fixes(&nineteen, state)
+                .iter()
+                .map(|(id, _)| *id)
+                .collect();
+            assert!(ids.contains(&"weapon-defs-lua-consts-87-v2"));
+            assert!(!ids.contains(&"weapon-defs-lua-consts-87"));
+        }
+    }
+
     /// Issues #4700 and #4699: manifest 14 stores a numeric string given to a
     /// rules param as a number, and reads an icon type the game does not
     /// define as "default", as 104.0 did, and keeps the writer of manifest 13.
@@ -2146,14 +2180,14 @@ mod tests {
         }
     }
 
-    /// The preludes for manifests 9, 11, 12, 14, 15, 16, 17 and 18, as the Lua tests in
+    /// The preludes for manifests 9, 11, 12, 14, 15, 16, 17, 18 and 19, as the Lua tests in
     /// `lua/compat/tests/` load them. Earlier manifests' synced preludes call
     /// `rawget`, which the tests' synced state lacks, so they are not kept.
     /// `COILBOX_WRITE_FIXTURE=1` writes them again after a deliberate change to
     /// how a prelude is built.
     #[test]
     fn the_lua_tests_load_the_preludes_this_crate_builds() {
-        for n in [9, 11, 12, 14, 15, 16, 17, 18] {
+        for n in [9, 11, 12, 14, 15, 16, 17, 18, 19] {
             let m = manifest(n).unwrap();
             for state in [LuaState::Synced, LuaState::Unsynced] {
                 let built = prelude(&m, state).unwrap();
