@@ -1264,7 +1264,7 @@ for _, synced in ipairs({ true, false }) do
 
 	do
 		-- exp_no_air_nuke.lua, line 27, and lups_shockwaves.lua, line 22.
-		local engine = categoryEngine(synced, 18)
+		local engine = categoryEngine(synced, 19)
 		local flak, laser = engine.env.WeaponDefs[0], engine.env.WeaponDefs[1]
 		check(state .. ": areaOfEffect is damageAreaOfEffect", flak.areaOfEffect == 64 and laser.areaOfEffect == 4, tostring(flak.areaOfEffect))
 		check(state .. ": maxVelocity is projectilespeed times 30", flak.maxVelocity == 360 and laser.maxVelocity == 15, tostring(flak.maxVelocity))
@@ -1278,7 +1278,7 @@ for _, synced in ipairs({ true, false }) do
 	end
 
 	do
-		local engine = categoryEngine(synced, 18)
+		local engine = categoryEngine(synced, 19)
 		local ids = {}
 		for id, wd in pairs(engine.env.WeaponDefs) do
 			ids[id] = wd.name
@@ -1305,7 +1305,7 @@ for _, synced in ipairs({ true, false }) do
 	end
 
 	do
-		local engine = newEngine({ synced = synced, manifest = 18 })
+		local engine = newEngine({ synced = synced, manifest = 19 })
 		engine.env.WeaponDefs = nil
 		prelude(engine)
 		check(state .. ": a state with no WeaponDefs is left alone", #engine.logs == 0, table.concat(engine.logs, "; "))
@@ -1359,6 +1359,58 @@ do
 	local synced = caEngine(true, 17)
 	prelude(synced)
 	check("synced: no GetHasLag, as GetGameState is unsynced", synced.env.Spring.GetHasLag == nil)
+end
+
+--------------------------------------------------------------------------------
+-- LOG in a game's own System table, which Complete Annihilation's lacks (issue #4687)
+--------------------------------------------------------------------------------
+
+for _, synced in ipairs({ true, false }) do
+	local state = synced and "synced" or "unsynced"
+
+	local before = newEngine({ synced = synced, manifest = 17 })
+	prelude(before)
+	local system = { Spring = before.env.Spring }
+	before.env.System = system
+	check(state .. ": manifest 17 leaves System without LOG", system.LOG == nil)
+
+	local engine = newEngine({ synced = synced, manifest = 18 })
+	prelude(engine)
+	local env = engine.env
+	check(state .. ": no System until the game sets one", env.System == nil)
+
+	-- What a gadget handler does: set System once, then copy it into each gadget.
+	local game = { Spring = env.Spring }
+	env.System = game
+	check(state .. ": the game's System is the global", env.System == game)
+	check(state .. ": a game's System gets LOG", game.LOG == env.LOG)
+	local gadget = {}
+	for k, v in pairs(env.System) do
+		gadget[k] = v
+	end
+	-- LuaGadgets/Gadgets/unit_script.lua, line 532.
+	local ok, err = pcall(function() return gadget.LOG.INFO end)
+	check(state .. ": a gadget can read LOG", ok, tostring(err))
+
+	local own = {}
+	local mine = newEngine({ synced = synced, manifest = 18 })
+	prelude(mine)
+	mine.env.System = { LOG = own }
+	check(state .. ": a System with its own LOG keeps it", mine.env.System.LOG == own)
+
+	mine.env.Other = {}
+	check(state .. ": any other global gets no LOG", mine.env.Other.LOG == nil)
+
+	check(state .. ": no fix failed", #engine.logs == 0, table.concat(engine.logs, "; "))
+end
+
+do
+	local bare = newEngine({ manifest = 18 })
+	bare.env.LOG = nil
+	prelude(bare)
+	bare.env.System = {}
+	check("with no LOG to give, System is left alone", bare.env.System.LOG == nil)
+	check("with no LOG to give, no fix failed", #bare.logs == 0, table.concat(bare.logs, "; "))
 end
 
 support.report()

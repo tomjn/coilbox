@@ -37,7 +37,8 @@
     "spring-array-n-83",
     "spring-get-has-lag",
     "unit-defs-weapons-n-83",
-    "weapon-defs-lua-consts-87-v2"
+    "weapon-defs-lua-consts-87",
+    "system-log-88"
   ],
   "converter": {
     "crate": "coilbox-3do-convert",

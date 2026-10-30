@@ -130,7 +130,7 @@ If one of the fixes fails while the game runs, the game still loads. The engine'
 
 ## What it changes
 
-This is compatibility version 17, the newest.
+This is compatibility version 19, the newest.
 
 Lua functions it puts back:
 
@@ -143,6 +143,7 @@ Lua functions it puts back:
 - `Spring.MakeFont`, last in Spring 0.81.2.1. It makes no font and returns nil.
 - `snext`, `spairs` and `sipairs`, removed in Recoil 2025.01.1. In a game's unsynced gadgets they are `next`, `pairs` and `ipairs` again, as they were from Spring 97.0.
 - `Spring.GetHasLag`, removed in Spring 105.0. It says whether the game has fallen behind, which the engine now gives as the 4th result of `Spring.GetGameState`.
+- `LOG`, for a game whose own gadget handler does not give it to its gadgets. The engine's `unit_script` gadget, which Complete Annihilation includes, has needed it since Spring 89.0.1.
 
 Call-ins whose arguments moved:
 
