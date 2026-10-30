@@ -484,10 +484,31 @@ pub fn add(
             })
         })
         .collect();
-    for dest in &dests {
-        for rel in &stage.files {
-            copy_file(&stage.widgets().join(rel), &dest.join(rel))?;
+    let mut created: Vec<PathBuf> = Vec::new();
+    let copied = dests.iter().try_for_each(|dest| {
+        stage.files.iter().try_for_each(|rel| {
+            let to = dest.join(rel);
+            if !to.exists() {
+                created.push(to.clone());
+            }
+            copy_file(&stage.widgets().join(rel), &to)
+        })
+    });
+    if let Err(e) = copied {
+        // Leave what was there as it was: drop the files this add made and put
+        // back the ones it overwrote.
+        for path in &created {
+            let _ = std::fs::remove_file(path);
         }
+        if let Some(backup) = &backup {
+            for c in &clashes {
+                let _ = copy_file(
+                    &backup.join("files").join(&c.path),
+                    &write_dir.join(&c.path),
+                );
+            }
+        }
+        return Err(e);
     }
     for path in stale {
         std::fs::remove_file(&path)
@@ -747,8 +768,15 @@ mod tests {
         put(&write, "LuaUI/Widgets/pack", "in the way");
         let src = tmp.path().join("src");
         put(&src, "pack/new_name.lua", &widget("Same"));
+        // Copied before the one that fails, so it has to be taken back out.
+        put(&src, "a.lua", &widget("Other"));
         assert!(add(&write, &src, &folders(), true, &backups).is_err());
         assert!(write.join("LuaUI/Widgets/old_name.lua").is_file());
+        assert!(!write.join("LuaUI/Widgets/a.lua").exists());
+        assert_eq!(
+            std::fs::read_to_string(write.join("LuaUI/Widgets/pack")).unwrap(),
+            "in the way"
+        );
     }
 
     #[test]
