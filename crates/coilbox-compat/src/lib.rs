@@ -60,6 +60,7 @@ const MANIFESTS: &[(u32, &str)] = &[
     (15, include_str!("../../../lua/compat/manifests/15.json")),
     (16, include_str!("../../../lua/compat/manifests/16.json")),
     (17, include_str!("../../../lua/compat/manifests/17.json")),
+    (18, include_str!("../../../lua/compat/manifests/18.json")),
 ];
 
 /// Every fix file, by id.
@@ -215,6 +216,10 @@ const FIXES: &[(&str, &str)] = &[
     (
         "spring-update-info-texture",
         include_str!("../../../lua/compat/spring-update-info-texture.lua"),
+    ),
+    (
+        "system-log-88",
+        include_str!("../../../lua/compat/system-log-88.lua"),
     ),
     (
         "unit-defs-weapons-n-83",
@@ -2122,14 +2127,33 @@ mod tests {
         }
     }
 
-    /// The preludes for manifests 9, 11, 12, 14, 15, 16 and 17, as the Lua tests in
+    /// Issue #4687: manifest 18 adds the fix that puts LOG in a game's own
+    /// System table, in both Lua states, and keeps the writer of manifest 17.
+    #[test]
+    fn manifest_18_is_manifest_17_with_log_in_the_system_table() {
+        let (seventeen, eighteen) = (manifest(17).unwrap(), manifest(18).unwrap());
+        let mut expected = seventeen.fixes.clone();
+        expected.push("system-log-88".into());
+        assert_eq!(eighteen.fixes, expected);
+        assert_eq!(
+            (&eighteen.converter, eighteen.writer),
+            (&seventeen.converter, seventeen.writer)
+        );
+        for state in [LuaState::Synced, LuaState::Unsynced] {
+            assert!(prelude_fixes(&eighteen, state)
+                .iter()
+                .any(|(id, _)| *id == "system-log-88"));
+        }
+    }
+
+    /// The preludes for manifests 9, 11, 12, 14, 15, 16, 17 and 18, as the Lua tests in
     /// `lua/compat/tests/` load them. Earlier manifests' synced preludes call
     /// `rawget`, which the tests' synced state lacks, so they are not kept.
     /// `COILBOX_WRITE_FIXTURE=1` writes them again after a deliberate change to
     /// how a prelude is built.
     #[test]
     fn the_lua_tests_load_the_preludes_this_crate_builds() {
-        for n in [9, 11, 12, 14, 15, 16, 17] {
+        for n in [9, 11, 12, 14, 15, 16, 17, 18] {
             let m = manifest(n).unwrap();
             for state in [LuaState::Synced, LuaState::Unsynced] {
                 let built = prelude(&m, state).unwrap();
