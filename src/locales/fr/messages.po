@@ -2400,6 +2400,7 @@ msgstr "{done} / {total} téléchargés"
 
 #: src/content/pages/components/CompatMode.tsx
 #: src/multiplayer/battle/CompatBattleCard.tsx
+#: src/multiplayer/battles/HostCompatChoice.tsx
 msgid "{done} of {total, plural, one {# model} other {# models}}"
 msgstr ""
 
@@ -13171,6 +13172,10 @@ msgstr "Budget ({total})"
 msgid "Budget left"
 msgstr "Budget restant"
 
+#: src/multiplayer/battles/HostCompatChoice.tsx
+msgid "Build"
+msgstr ""
+
 #: src/placement/LayoutControls.tsx
 #, fuzzy
 msgid "Build {def} later"
@@ -13355,6 +13360,7 @@ msgstr "Constructeurs, usines, capteurs et transports"
 #: src/lego/buildingPlans.ts
 #: src/lego/pages/components/TextureBuilderPanel.tsx
 #: src/multiplayer/battle/compatBattle.ts
+#: src/multiplayer/battles/HostCompatChoice.tsx
 #: src/scenario/pages/components/RestrictionPanel.tsx
 #: src/scenario/validate.ts
 #, fuzzy
@@ -16319,6 +16325,7 @@ msgid "Compatibility gadgets a build turns on"
 msgstr "Gadgets de compatibilité qu’une construction active"
 
 #: src/content/pages/components/CompatMode.tsx
+#: src/multiplayer/battles/HostCompatChoice.tsx
 #, fuzzy
 msgid "Compatibility mode"
 msgstr "Mode compatibilité"
@@ -21212,6 +21219,7 @@ msgid "Export"
 msgstr "Exporter"
 
 #: src/content/pages/components/CompatMode.tsx
+#: src/multiplayer/battle/CompatHostExport.tsx
 #, fuzzy
 msgid "Export .sdz"
 msgstr "Exporter en .sdz"
@@ -21265,7 +21273,7 @@ msgstr "Exporter la campagne"
 msgid "Export challenge"
 msgstr "Exporter le défi"
 
-#: src/content/pages/components/CompatMode.tsx
+#: src/compat/pickSdzPath.ts
 #, fuzzy
 msgid "Export compatibility mutator"
 msgstr "Exporter le mutateur de compatibilité"
@@ -21378,6 +21386,10 @@ msgstr "{0, plural, one {# fichier exporté} other {# fichiers exportés}} vers 
 #, fuzzy
 msgid "Exported {writtenX}x{writtenZ}, now {nowX}x{nowZ}. The exported definition is not updated by a re-export."
 msgstr "Exportée en {writtenX}x{writtenZ}, maintenant {nowX}x{nowZ}. La définition exportée n’est pas mise à jour par un nouvel export."
+
+#: src/multiplayer/battle/CompatHostExport.tsx
+msgid "Exported to <0>{exportedTo}</0>"
+msgstr ""
 
 #: src/workshop/pages/UnitPage.tsx
 #, fuzzy
@@ -29456,6 +29468,7 @@ msgstr "Modèles"
 
 #: src/content/pages/components/CompatMode.tsx
 #: src/multiplayer/battle/CompatBattleCard.tsx
+#: src/multiplayer/battles/HostCompatChoice.tsx
 msgid "Models converted"
 msgstr ""
 
@@ -29964,7 +29977,7 @@ msgstr "Source musicale"
 msgid "Music was turned off because the last attempt to play it stopped Coilbox responding."
 msgstr "La musique a été coupée car la dernière tentative de lecture a bloqué Coilbox."
 
-#: src/content/pages/components/CompatMode.tsx
+#: src/compat/pickSdzPath.ts
 #: src/workshop/deliveryRoutes.ts
 #: src/workshop/pages/components/PackagePanel.tsx
 #, fuzzy
@@ -32859,6 +32872,11 @@ msgstr "Pas relié pour l’instant"
 msgid "Not brought up to date:"
 msgstr "Non mis à jour :"
 
+#: src/multiplayer/battle/CompatHostExport.tsx
+#: src/multiplayer/battles/useHostCompat.ts
+msgid "Not built"
+msgstr ""
+
 #: src/multiplayer/battles/HostBattleForm.tsx
 #, fuzzy
 msgid "Not checked, because every battle you host goes through the server's relay."
@@ -35011,6 +35029,10 @@ msgstr "ordres de placer une défense"
 msgid "orders to place an economy building"
 msgstr "ordres de placer un bâtiment économique"
 
+#: src/multiplayer/battles/HostCompatChoice.tsx
+msgid "Original game"
+msgstr ""
+
 #: src/uberstress/pages/HistoryPage.tsx
 #, fuzzy
 msgid "other"
@@ -35068,6 +35090,10 @@ msgstr "Notre prise en charge de Tachyon est incomplète. Utilisez plutôt l’e
 #, fuzzy
 msgid "Out of date"
 msgstr "Obsolète"
+
+#: src/multiplayer/battles/useHostCompat.ts
+msgid "Out of date: {reasons}"
+msgstr ""
 
 #: src/multiplayer/battle/SyncStatusPill.tsx
 #, fuzzy
@@ -36395,6 +36421,10 @@ msgstr "Les joueurs choisissent leur camp et le salon est à vous de configurer.
 #, fuzzy
 msgid "Players together against the chickens."
 msgstr "Les joueurs ensemble contre les poulets."
+
+#: src/multiplayer/battle/CompatHostExport.tsx
+msgid "Players without coilbox need the .sdz"
+msgstr ""
 
 #: src/play/pages/components/CrashDrawer.tsx
 #, fuzzy
@@ -38061,6 +38091,7 @@ msgid "Reason (optional)"
 msgstr "Raison (facultatif)"
 
 #: src/content/pages/components/CompatMode.tsx
+#: src/multiplayer/battles/HostCompatChoice.tsx
 #, fuzzy
 msgid "Rebuild"
 msgstr "Reconstruire"
@@ -39739,6 +39770,7 @@ msgstr "Change de cible immédiatement"
 #: src/downloads/pages/components/RapidBrowser.tsx
 #: src/home/zones/SuggestedMap.tsx
 #: src/multiplayer/battles/HostBattleForm.tsx
+#: src/multiplayer/battles/HostCompatChoice.tsx
 #: src/workshop/pages/UnitPage.tsx
 #, fuzzy
 msgid "Retry"
@@ -46135,6 +46167,10 @@ msgstr "Le moteur a planté avec le signal {signal} avant la fin de la vérifica
 msgid "The engine crashed. It was killed by signal {sig}."
 msgstr "Le moteur a planté. Il a été tué par le signal {sig}."
 
+#: src/multiplayer/battles/useHostCompat.ts
+msgid "The engine did not find {folder}"
+msgstr ""
+
 #: src/multiplayer/battle/useCompatBattle.ts
 #, fuzzy
 msgid "the engine did not find it once built"
@@ -46480,6 +46516,11 @@ msgstr "Le jeu {game} ne contient plus la carte de cette conquête. Une mise à 
 #, fuzzy
 msgid "The game changes this field as it loads. Its files say {fileValue} and it loads as {loadedValue}."
 msgstr "Le jeu modifie ce champ au chargement. Ses fichiers indiquent {fileValue} et il est chargé comme {loadedValue}."
+
+#: src/multiplayer/battle/CompatHostExport.tsx
+#: src/multiplayer/battles/useHostCompat.ts
+msgid "The game could not be read"
+msgstr ""
 
 #: src/i18n/uiError.ts
 #, fuzzy
@@ -53796,6 +53837,10 @@ msgstr "Quelle équipe a gagné"
 #, fuzzy
 msgid "Which units this mod touches."
 msgstr "Les unités que ce mod touche."
+
+#: src/multiplayer/battles/HostCompatChoice.tsx
+msgid "Which version to run"
+msgstr ""
 
 #: src/placement/TerrainControls.tsx
 msgid "Which way the ground changes"

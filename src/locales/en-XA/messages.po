@@ -1972,6 +1972,7 @@ msgstr ""
 
 #: src/content/pages/components/CompatMode.tsx
 #: src/multiplayer/battle/CompatBattleCard.tsx
+#: src/multiplayer/battles/HostCompatChoice.tsx
 msgid "{done} of {total, plural, one {# model} other {# models}}"
 msgstr ""
 
@@ -10647,6 +10648,10 @@ msgstr ""
 msgid "Budget left"
 msgstr ""
 
+#: src/multiplayer/battles/HostCompatChoice.tsx
+msgid "Build"
+msgstr ""
+
 #: src/placement/LayoutControls.tsx
 msgid "Build {def} later"
 msgstr ""
@@ -10798,6 +10803,7 @@ msgstr ""
 #: src/lego/buildingPlans.ts
 #: src/lego/pages/components/TextureBuilderPanel.tsx
 #: src/multiplayer/battle/compatBattle.ts
+#: src/multiplayer/battles/HostCompatChoice.tsx
 #: src/scenario/pages/components/RestrictionPanel.tsx
 #: src/scenario/validate.ts
 msgid "Building"
@@ -13227,6 +13233,7 @@ msgid "Compatibility gadgets a build turns on"
 msgstr ""
 
 #: src/content/pages/components/CompatMode.tsx
+#: src/multiplayer/battles/HostCompatChoice.tsx
 msgid "Compatibility mode"
 msgstr ""
 
@@ -17210,6 +17217,7 @@ msgid "Export"
 msgstr ""
 
 #: src/content/pages/components/CompatMode.tsx
+#: src/multiplayer/battle/CompatHostExport.tsx
 msgid "Export .sdz"
 msgstr ""
 
@@ -17253,7 +17261,7 @@ msgstr ""
 msgid "Export challenge"
 msgstr ""
 
-#: src/content/pages/components/CompatMode.tsx
+#: src/compat/pickSdzPath.ts
 msgid "Export compatibility mutator"
 msgstr ""
 
@@ -17343,6 +17351,10 @@ msgstr ""
 
 #: src/lego/footprint.ts
 msgid "Exported {writtenX}x{writtenZ}, now {nowX}x{nowZ}. The exported definition is not updated by a re-export."
+msgstr ""
+
+#: src/multiplayer/battle/CompatHostExport.tsx
+msgid "Exported to <0>{exportedTo}</0>"
 msgstr ""
 
 #: src/workshop/pages/UnitPage.tsx
@@ -23889,6 +23901,7 @@ msgstr ""
 
 #: src/content/pages/components/CompatMode.tsx
 #: src/multiplayer/battle/CompatBattleCard.tsx
+#: src/multiplayer/battles/HostCompatChoice.tsx
 msgid "Models converted"
 msgstr ""
 
@@ -24298,7 +24311,7 @@ msgstr ""
 msgid "Music was turned off because the last attempt to play it stopped Coilbox responding."
 msgstr ""
 
-#: src/content/pages/components/CompatMode.tsx
+#: src/compat/pickSdzPath.ts
 #: src/workshop/deliveryRoutes.ts
 #: src/workshop/pages/components/PackagePanel.tsx
 msgid "Mutator archive"
@@ -26640,6 +26653,11 @@ msgstr ""
 msgid "Not brought up to date:"
 msgstr ""
 
+#: src/multiplayer/battle/CompatHostExport.tsx
+#: src/multiplayer/battles/useHostCompat.ts
+msgid "Not built"
+msgstr ""
+
 #: src/multiplayer/battles/HostBattleForm.tsx
 msgid "Not checked, because every battle you host goes through the server's relay."
 msgstr ""
@@ -28384,6 +28402,10 @@ msgstr ""
 msgid "orders to place an economy building"
 msgstr ""
 
+#: src/multiplayer/battles/HostCompatChoice.tsx
+msgid "Original game"
+msgstr ""
+
 #: src/uberstress/pages/HistoryPage.tsx
 msgid "other"
 msgstr ""
@@ -28429,6 +28451,10 @@ msgstr ""
 
 #: src/campaign/pages/components/StaleScenarioBadge.tsx
 msgid "Out of date"
+msgstr ""
+
+#: src/multiplayer/battles/useHostCompat.ts
+msgid "Out of date: {reasons}"
 msgstr ""
 
 #: src/multiplayer/battle/SyncStatusPill.tsx
@@ -29505,6 +29531,10 @@ msgstr ""
 
 #: src/multiplayer/battles/zerokBattle.ts
 msgid "Players together against the chickens."
+msgstr ""
+
+#: src/multiplayer/battle/CompatHostExport.tsx
+msgid "Players without coilbox need the .sdz"
 msgstr ""
 
 #: src/play/pages/components/CrashDrawer.tsx
@@ -30862,6 +30892,7 @@ msgid "Reason (optional)"
 msgstr ""
 
 #: src/content/pages/components/CompatMode.tsx
+#: src/multiplayer/battles/HostCompatChoice.tsx
 msgid "Rebuild"
 msgstr ""
 
@@ -32230,6 +32261,7 @@ msgstr ""
 #: src/downloads/pages/components/RapidBrowser.tsx
 #: src/home/zones/SuggestedMap.tsx
 #: src/multiplayer/battles/HostBattleForm.tsx
+#: src/multiplayer/battles/HostCompatChoice.tsx
 #: src/workshop/pages/UnitPage.tsx
 msgid "Retry"
 msgstr ""
@@ -37418,6 +37450,10 @@ msgstr ""
 msgid "The engine crashed. It was killed by signal {sig}."
 msgstr ""
 
+#: src/multiplayer/battles/useHostCompat.ts
+msgid "The engine did not find {folder}"
+msgstr ""
+
 #: src/multiplayer/battle/useCompatBattle.ts
 msgid "the engine did not find it once built"
 msgstr ""
@@ -37694,6 +37730,11 @@ msgstr ""
 
 #: src/workshop/pages/components/UnitFieldRow.tsx
 msgid "The game changes this field as it loads. Its files say {fileValue} and it loads as {loadedValue}."
+msgstr ""
+
+#: src/multiplayer/battle/CompatHostExport.tsx
+#: src/multiplayer/battles/useHostCompat.ts
+msgid "The game could not be read"
 msgstr ""
 
 #: src/i18n/uiError.ts
@@ -43596,6 +43637,10 @@ msgstr ""
 
 #: src/workshop/pages/components/RandomModDrawer.tsx
 msgid "Which units this mod touches."
+msgstr ""
+
+#: src/multiplayer/battles/HostCompatChoice.tsx
+msgid "Which version to run"
 msgstr ""
 
 #: src/placement/TerrainControls.tsx

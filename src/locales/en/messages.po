@@ -1972,6 +1972,7 @@ msgstr "{done} / {total} downloaded"
 
 #: src/content/pages/components/CompatMode.tsx
 #: src/multiplayer/battle/CompatBattleCard.tsx
+#: src/multiplayer/battles/HostCompatChoice.tsx
 msgid "{done} of {total, plural, one {# model} other {# models}}"
 msgstr "{done} of {total, plural, one {# model} other {# models}}"
 
@@ -10648,6 +10649,10 @@ msgstr "Budget ({total})"
 msgid "Budget left"
 msgstr "Budget left"
 
+#: src/multiplayer/battles/HostCompatChoice.tsx
+msgid "Build"
+msgstr "Build"
+
 #: src/placement/LayoutControls.tsx
 msgid "Build {def} later"
 msgstr "Build {def} later"
@@ -10799,6 +10804,7 @@ msgstr "Builders, factories, sensors and transports"
 #: src/lego/buildingPlans.ts
 #: src/lego/pages/components/TextureBuilderPanel.tsx
 #: src/multiplayer/battle/compatBattle.ts
+#: src/multiplayer/battles/HostCompatChoice.tsx
 #: src/scenario/pages/components/RestrictionPanel.tsx
 #: src/scenario/validate.ts
 msgid "Building"
@@ -13228,6 +13234,7 @@ msgid "Compatibility gadgets a build turns on"
 msgstr "Compatibility gadgets a build turns on"
 
 #: src/content/pages/components/CompatMode.tsx
+#: src/multiplayer/battles/HostCompatChoice.tsx
 msgid "Compatibility mode"
 msgstr "Compatibility mode"
 
@@ -17211,6 +17218,7 @@ msgid "Export"
 msgstr "Export"
 
 #: src/content/pages/components/CompatMode.tsx
+#: src/multiplayer/battle/CompatHostExport.tsx
 msgid "Export .sdz"
 msgstr "Export .sdz"
 
@@ -17254,7 +17262,7 @@ msgstr "Export campaign"
 msgid "Export challenge"
 msgstr "Export challenge"
 
-#: src/content/pages/components/CompatMode.tsx
+#: src/compat/pickSdzPath.ts
 msgid "Export compatibility mutator"
 msgstr "Export compatibility mutator"
 
@@ -17345,6 +17353,10 @@ msgstr "Exported {0, plural, one {# file} other {# files}} to <0>{1}</0>"
 #: src/lego/footprint.ts
 msgid "Exported {writtenX}x{writtenZ}, now {nowX}x{nowZ}. The exported definition is not updated by a re-export."
 msgstr "Exported {writtenX}x{writtenZ}, now {nowX}x{nowZ}. The exported definition is not updated by a re-export."
+
+#: src/multiplayer/battle/CompatHostExport.tsx
+msgid "Exported to <0>{exportedTo}</0>"
+msgstr "Exported to <0>{exportedTo}</0>"
 
 #: src/workshop/pages/UnitPage.tsx
 msgid "Exported value"
@@ -23890,6 +23902,7 @@ msgstr "Models"
 
 #: src/content/pages/components/CompatMode.tsx
 #: src/multiplayer/battle/CompatBattleCard.tsx
+#: src/multiplayer/battles/HostCompatChoice.tsx
 msgid "Models converted"
 msgstr "Models converted"
 
@@ -24299,7 +24312,7 @@ msgstr "Music source"
 msgid "Music was turned off because the last attempt to play it stopped Coilbox responding."
 msgstr "Music was turned off because the last attempt to play it stopped Coilbox responding."
 
-#: src/content/pages/components/CompatMode.tsx
+#: src/compat/pickSdzPath.ts
 #: src/workshop/deliveryRoutes.ts
 #: src/workshop/pages/components/PackagePanel.tsx
 msgid "Mutator archive"
@@ -26641,6 +26654,11 @@ msgstr "Not bridged in now"
 msgid "Not brought up to date:"
 msgstr "Not brought up to date:"
 
+#: src/multiplayer/battle/CompatHostExport.tsx
+#: src/multiplayer/battles/useHostCompat.ts
+msgid "Not built"
+msgstr "Not built"
+
 #: src/multiplayer/battles/HostBattleForm.tsx
 msgid "Not checked, because every battle you host goes through the server's relay."
 msgstr "Not checked, because every battle you host goes through the server's relay."
@@ -28385,6 +28403,10 @@ msgstr "orders to place a defence"
 msgid "orders to place an economy building"
 msgstr "orders to place an economy building"
 
+#: src/multiplayer/battles/HostCompatChoice.tsx
+msgid "Original game"
+msgstr "Original game"
+
 #: src/uberstress/pages/HistoryPage.tsx
 msgid "other"
 msgstr "other"
@@ -28431,6 +28453,10 @@ msgstr "Our Tachyon support is incomplete. Use the Beyond All Reason entry inste
 #: src/campaign/pages/components/StaleScenarioBadge.tsx
 msgid "Out of date"
 msgstr "Out of date"
+
+#: src/multiplayer/battles/useHostCompat.ts
+msgid "Out of date: {reasons}"
+msgstr "Out of date: {reasons}"
 
 #: src/multiplayer/battle/SyncStatusPill.tsx
 msgid "Out of sync"
@@ -29507,6 +29533,10 @@ msgstr "Players pick their own sides and the room is yours to set up."
 #: src/multiplayer/battles/zerokBattle.ts
 msgid "Players together against the chickens."
 msgstr "Players together against the chickens."
+
+#: src/multiplayer/battle/CompatHostExport.tsx
+msgid "Players without coilbox need the .sdz"
+msgstr "Players without coilbox need the .sdz"
 
 #: src/play/pages/components/CrashDrawer.tsx
 msgid "Playing"
@@ -30863,6 +30893,7 @@ msgid "Reason (optional)"
 msgstr "Reason (optional)"
 
 #: src/content/pages/components/CompatMode.tsx
+#: src/multiplayer/battles/HostCompatChoice.tsx
 msgid "Rebuild"
 msgstr "Rebuild"
 
@@ -32231,6 +32262,7 @@ msgstr "Retargets immediately"
 #: src/downloads/pages/components/RapidBrowser.tsx
 #: src/home/zones/SuggestedMap.tsx
 #: src/multiplayer/battles/HostBattleForm.tsx
+#: src/multiplayer/battles/HostCompatChoice.tsx
 #: src/workshop/pages/UnitPage.tsx
 msgid "Retry"
 msgstr "Retry"
@@ -37419,6 +37451,10 @@ msgstr "The engine crashed with signal {signal} before the check finished."
 msgid "The engine crashed. It was killed by signal {sig}."
 msgstr "The engine crashed. It was killed by signal {sig}."
 
+#: src/multiplayer/battles/useHostCompat.ts
+msgid "The engine did not find {folder}"
+msgstr "The engine did not find {folder}"
+
 #: src/multiplayer/battle/useCompatBattle.ts
 msgid "the engine did not find it once built"
 msgstr "the engine did not find it once built"
@@ -37696,6 +37732,11 @@ msgstr "The game {game} no longer carries the map this conquest is played on. A 
 #: src/workshop/pages/components/UnitFieldRow.tsx
 msgid "The game changes this field as it loads. Its files say {fileValue} and it loads as {loadedValue}."
 msgstr "The game changes this field as it loads. Its files say {fileValue} and it loads as {loadedValue}."
+
+#: src/multiplayer/battle/CompatHostExport.tsx
+#: src/multiplayer/battles/useHostCompat.ts
+msgid "The game could not be read"
+msgstr "The game could not be read"
 
 #: src/i18n/uiError.ts
 msgid "The game did not answer within {seconds} seconds. Its infolog says why."
@@ -43598,6 +43639,10 @@ msgstr "Which team won"
 #: src/workshop/pages/components/RandomModDrawer.tsx
 msgid "Which units this mod touches."
 msgstr "Which units this mod touches."
+
+#: src/multiplayer/battles/HostCompatChoice.tsx
+msgid "Which version to run"
+msgstr "Which version to run"
 
 #: src/placement/TerrainControls.tsx
 msgid "Which way the ground changes"
