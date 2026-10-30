@@ -65,7 +65,11 @@ import {
   staleMapOptionTags,
 } from "./battleOptions";
 import { battleRoomHref } from "./battleRoomKey";
-import { type CompatBattleState, requiredGameName } from "./compatBattle";
+import {
+  type CompatBattleState,
+  parseCompatGameName,
+  requiredGameName,
+} from "./compatBattle";
 import {
   battleStartable,
   clampBonus,
@@ -223,6 +227,8 @@ export interface BattleRoomView {
   compat: CompatBattleState;
   /** Build the compat mutator again after a failure. */
   retryCompat: () => void;
+  /** The archive of the game the battle's compat mutator wraps, if it names one. */
+  compatBaseArchive: string | undefined;
   /** True once local content presence is known (scan settled). */
   contentKnown: boolean;
   /**
@@ -639,6 +645,11 @@ export function useBattleRoom(serverKey: string | null): BattleRoomView {
     rescan: async () => (await scan.runWithReason(true)).data?.games ?? null,
   });
   const compatPending = compat.state.status !== "idle";
+  // The archive of the game this battle's mutator wraps, when it names one.
+  const compatName = battle ? parseCompatGameName(battle.modname) : null;
+  const compatBaseArchive = compatName
+    ? games.find((g) => g.name === compatName.baseName)?.primaryArchive.name
+    : undefined;
 
   const rows = useMemo(
     () => (battle ? membersToRows(battle, me, state?.users) : []),
@@ -1470,6 +1481,7 @@ export function useBattleRoom(serverKey: string | null): BattleRoomView {
     requiredGame,
     compat: compat.state,
     retryCompat: compat.retry,
+    compatBaseArchive,
     contentKnown,
     contentUnreadable,
     contentUnreadableReason,
