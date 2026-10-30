@@ -193,7 +193,6 @@ export default function WidgetsPage() {
         <RemovedNotice
           key={r.backup}
           removed={r}
-          games={list.games ?? []}
           onRestored={reread}
           onDismiss={() =>
             setRemoved((all) => all.filter((o) => o.backup !== r.backup))

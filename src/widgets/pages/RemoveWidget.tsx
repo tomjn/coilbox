@@ -30,9 +30,10 @@ function fileName(path: string): string {
 /** What the page remembers of a removal, so the player can undo it. */
 export interface RemovedWidget extends RemovalResult {
   name: string;
-  /** The write folder it was removed from, which the engine picked on the
-   *  page may no longer be. */
+  /** The write folder it was removed from and the games installed for it,
+   *  which the engine picked on the page may no longer be. */
   writeDir: string;
+  games: readonly GameHandler[];
 }
 
 /**
@@ -99,7 +100,7 @@ export function RemoveWidgetButton({
         gameRunning: running,
       });
       setOpen(false);
-      onRemoved({ ...result, name, writeDir });
+      onRemoved({ ...result, name, writeDir, games });
     } catch (e) {
       setError(describeError(e));
     } finally {
@@ -206,12 +207,10 @@ export function RemoveWidgetButton({
  */
 export function RemovedNotice({
   removed,
-  games,
   onRestored,
   onDismiss,
 }: {
   removed: RemovedWidget;
-  games: readonly GameHandler[];
   /** The files are back, so the page reads them. */
   onRestored: () => void;
   onDismiss: () => void;
@@ -221,7 +220,7 @@ export function RemovedNotice({
   const [error, setError] = useState<string | null>(null);
   /** The games whose config file could not be written, once restored. */
   const [restored, setRestored] = useState<string[] | null>(null);
-  const { name, backup, entries, writeDir } = removed;
+  const { name, backup, entries, writeDir, games } = removed;
 
   /** The files are back, so a retry only has the switching left to do. */
   const [filesBack, setFilesBack] = useState(false);
