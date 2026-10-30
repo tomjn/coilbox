@@ -142,7 +142,10 @@ vi.mock("@/content/bindings", async () => {
       folders: string[];
     }) => {
       removeCalls.push(args);
-      return { files: args.files, backup: "/data/widget-backups/1-buildwatch" };
+      return {
+        files: args.files,
+        backup: `/data/widget-backups/${removeCalls.length}-buildwatch`,
+      };
     },
     contentWidgetRestore: async () => ["LuaUI/Widgets/gui_build_watch.lua"],
     contentPlayerWidgets: async () => scan,
@@ -370,6 +373,35 @@ describe("WidgetsPage", () => {
       ).toBeTruthy(),
     );
     expect(readSets().global).toEqual({ BuildWatch: false, Other: true });
+  });
+
+  it("keeps a way back for every removal, not only the last", async () => {
+    page();
+    for (let n = 1; n <= 2; n++) {
+      fireEvent.click(
+        screen.getByRole("button", { name: "Remove BuildWatch" }),
+      );
+      const confirm = await waitFor(() => {
+        const button = screen
+          .getAllByRole("button", { name: "Remove" })
+          .find((b) => b.className.includes("destructive"));
+        if (!button || button.hasAttribute("disabled")) throw new Error("wait");
+        return button;
+      });
+      fireEvent.click(confirm);
+      await waitFor(() =>
+        expect(screen.getAllByText("Removed BuildWatch.")).toHaveLength(n),
+      );
+    }
+    expect(screen.getAllByRole("button", { name: "Restore" })).toHaveLength(2);
+    // Restoring one leaves the other's button.
+    fireEvent.click(screen.getAllByRole("button", { name: "Restore" })[0]);
+    await waitFor(() =>
+      expect(
+        screen.getByText("Restored BuildWatch, switched off."),
+      ).toBeTruthy(),
+    );
+    expect(screen.getAllByRole("button", { name: "Restore" })).toHaveLength(1);
   });
 
   it("offers no way to remove coilbox's own widget", () => {

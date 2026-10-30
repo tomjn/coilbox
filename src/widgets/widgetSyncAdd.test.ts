@@ -121,6 +121,10 @@ describe("switchAddedWidgets", () => {
       MF,
       "return {\n\torder = {\n\t\tMinimap = 1,\n\t\tRadar = 1,\n\t},\n}\n",
     );
+    files.set(
+      SF,
+      "return {\n\torder = {\n\t\tMinimap = 1,\n\t\tRadar = 1,\n\t},\n}\n",
+    );
     updateSets((s) => ({ ...s, overrides: { SF: { Minimap: true } } }));
     expect(
       await switchRestoredWidgets({
@@ -132,7 +136,7 @@ describe("switchAddedWidgets", () => {
     expect(readSets().global).toMatchObject({ Radar: false });
     expect(readSets().overrides.SF).toMatchObject({ Radar: false });
     expect(files.get(MF)).toContain("Radar = 0");
-    expect(files.get(SF)).toContain('["Radar"] = 0');
+    expect(files.get(SF)).toContain("Radar = 0");
   });
 
   it("changes nothing when no widget has a name to switch", async () => {

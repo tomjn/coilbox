@@ -247,6 +247,7 @@ export function dropWidgets(
   sets: WidgetSets,
   names: readonly string[],
 ): WidgetSets {
+  if (names.length === 0) return sets;
   const without = (states: WidgetStates): WidgetStates =>
     Object.fromEntries(
       Object.entries(states).filter(([name]) => !names.includes(name)),

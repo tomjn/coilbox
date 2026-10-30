@@ -74,7 +74,8 @@ export default function WidgetsPage() {
   const files = useGameFiles(list.writeDir, list.games, list.rows);
   const sets = useWidgetSets();
   const [adding, setAdding] = useState(false);
-  const [removed, setRemoved] = useState<RemovedWidget | null>(null);
+  // Every removal since the page opened, each with its own way back.
+  const [removed, setRemoved] = useState<RemovedWidget[]>([]);
   const { running } = usePlay();
   const reread = () => {
     void list.reload();
@@ -188,15 +189,17 @@ export default function WidgetsPage() {
         />
       )}
 
-      {removed && list.writeDir && (
+      {removed.map((r) => (
         <RemovedNotice
-          removed={removed}
-          writeDir={list.writeDir}
+          key={r.backup}
+          removed={r}
           games={list.games ?? []}
           onRestored={reread}
-          onDismiss={() => setRemoved(null)}
+          onDismiss={() =>
+            setRemoved((all) => all.filter((o) => o.backup !== r.backup))
+          }
         />
-      )}
+      ))}
 
       {list.error && <ErrorBanner message={list.error} />}
       {list.folderErrors.map((e) => (
@@ -281,7 +284,7 @@ export default function WidgetsPage() {
                       writeDir={list.writeDir ?? ""}
                       running={running}
                       onRemoved={(done) => {
-                        setRemoved(done);
+                        setRemoved((all) => [...all, done]);
                         setSettingsPath(null);
                         reread();
                       }}

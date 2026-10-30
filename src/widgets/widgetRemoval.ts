@@ -321,13 +321,20 @@ export async function removeEntries({
   now?: Date;
 }): Promise<EntryRemoval> {
   if (gameRunning) throw gameIsRunning();
-  const plan = await planEntryRemoval(io, writeDir, targets);
-  const out: EntryRemoval = {
-    files: [],
-    backups: [],
-    failed: [...plan.failed],
-  };
-  for (const file of plan.files) {
+  const out: EntryRemoval = { files: [], backups: [], failed: [] };
+  // One file at a time, planned again after each write. Two games can name one
+  // file by paths that differ only in case, which is one file on a filesystem
+  // that folds case, and a plan made before the first write would put back
+  // what that write took out.
+  const written = new Set<string>();
+  for (;;) {
+    const plan = await planEntryRemoval(io, writeDir, targets);
+    for (const line of plan.failed) {
+      if (!out.failed.includes(line)) out.failed.push(line);
+    }
+    const file = plan.files.find((f) => !written.has(f.path));
+    if (!file) return out;
+    written.add(file.path);
     try {
       out.backups.push(
         await writeWithBackup(io, file.path, file.before, file.after, now),
@@ -337,7 +344,6 @@ export async function removeEntries({
       out.failed.push(`${file.games.join(", ")}: ${errorText(e)}`);
     }
   }
-  return out;
 }
 
 function gameIsRunning(): Error {

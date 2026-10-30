@@ -340,6 +340,54 @@ describe("removeEntries", () => {
     expect(files.get(backup ?? "")).toBe(nestedFile);
   });
 
+  it("keeps what each game took out of one file that two paths name on a filesystem that folds case", async () => {
+    const folded = new Map<string, string>();
+    const foldingIo = {
+      read: async (path: string) => folded.get(path.toLowerCase()) ?? null,
+      write: async (path: string, text: string) => {
+        folded.set(path.toLowerCase(), text);
+      },
+    };
+    folded.set(
+      MF_FILE.toLowerCase(),
+      nestedFile.replace(
+        '\t\t["Other"] = 2,',
+        '\t\t["Other"] = 2,\n\t\t["Old Radar"] = 3,',
+      ),
+    );
+    const upper: GameHandler = {
+      game: "Upper 1.0",
+      shortName: "MF",
+      handler: nested,
+    };
+    // Each game keeps the entry a widget it loads reads, so each takes out a
+    // different one: Radar in the first, Old Radar in the second.
+    const keepsOld = row("LuaUI/Widgets/old.lua", "Old Radar", [MF]);
+    const keepsRadar = row("LuaUI/Widgets/keep.lua", "Radar", ["Upper 1.0"], {
+      folder: "LuaUI/Widgets",
+    });
+    const both = [
+      row("LuaUI/Widgets/radar.lua", "Radar", [MF, "Upper 1.0"], {
+        previous: ["Old Radar"],
+      }),
+      keepsOld,
+      keepsRadar,
+    ];
+    const removal = removalFor(both, both[0]);
+    const out = await removeEntries({
+      io: foldingIo,
+      writeDir: "/spring",
+      targets: entryTargets(removal, both, [games[0], upper]),
+      gameRunning: false,
+      now: new Date(2026, 9, 30, 12, 0, 0),
+    });
+    expect(out.failed).toEqual([]);
+    expect(out.files.length).toBeGreaterThan(0);
+    const left = folded.get(MF_FILE.toLowerCase()) ?? "";
+    expect(left).not.toContain("Radar");
+    expect(left).toContain("Other");
+  });
+
   it("refuses while a game is running and writes nothing", async () => {
     await expect(
       removeEntries({
