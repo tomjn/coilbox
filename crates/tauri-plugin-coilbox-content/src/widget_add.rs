@@ -405,7 +405,7 @@ fn conflicts(
         for rel in &stage.files {
             let target = dest.join(rel);
             if target.is_file() {
-                let path = key(target.strip_prefix(write_dir).unwrap_or(&target));
+                let path = rel_key(target.strip_prefix(write_dir).unwrap_or(&target));
                 push(Conflict {
                     path,
                     name: None,
@@ -717,6 +717,31 @@ mod tests {
         put(&src, "data\\helper.lua", "return {}");
         add(&write, &src, &folders(), false, &tmp.path().join("b")).unwrap();
         assert!(write.join("LuaUI/Widgets/data\\helper.lua").is_file());
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn a_file_with_a_backslash_in_its_name_can_be_replaced() {
+        let tmp = tempfile::tempdir().unwrap();
+        let (write, src, backups) = (
+            tmp.path().join("write"),
+            tmp.path().join("src"),
+            tmp.path().join("b"),
+        );
+        put(&write, "LuaUI/Widgets/data\\helper.lua", "old");
+        put(&src, "gui_a.lua", &widget("A"));
+        put(&src, "data\\helper.lua", "new");
+        let AddOutcome::Conflicts { conflicts } =
+            add(&write, &src, &folders(), false, &backups).unwrap()
+        else {
+            panic!("expected a conflict");
+        };
+        assert_eq!(conflicts[0].path, "LuaUI/Widgets/data\\helper.lua");
+        add(&write, &src, &folders(), true, &backups).unwrap();
+        assert_eq!(
+            std::fs::read_to_string(write.join("LuaUI/Widgets/data\\helper.lua")).unwrap(),
+            "new"
+        );
     }
 
     #[test]
