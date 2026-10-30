@@ -12,6 +12,7 @@ import {
   Map as MapIcon,
   Monitor,
   MousePointer2,
+  Puzzle,
   Save,
   SlidersHorizontal,
   Sparkles,
@@ -125,6 +126,14 @@ const contentPlugin: FramePlugin = {
           icon: Blocks,
         },
         {
+          // The widgets a player has added to their games (issue #1284).
+          id: "library.widgets",
+          label: lazyText(msg`Widgets`),
+          to: "/library/widgets",
+          order: 1.75,
+          icon: Puzzle,
+        },
+        {
           // Archive explorer is a modding tool — gated behind advanced mode,
           // unlike the player-facing Maps/Games in this same group.
           id: "library.archives",
@@ -214,6 +223,13 @@ const contentPlugin: FramePlugin = {
       crumb: (c) =>
         (c.params.id && cachedBlueprint(c.params.id)?.layout.name) ||
         "Blueprint",
+    },
+    {
+      // The page lives under `../widgets/` with the handler table and list
+      // model the rest of the Widget manager milestone builds on.
+      path: "library/widgets",
+      lazy: () => import("../widgets/pages/WidgetsPage"),
+      crumb: lazyText(msg`Widgets`),
     },
     {
       path: "library/archives",

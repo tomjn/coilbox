@@ -1304,6 +1304,11 @@ msgstr "{0} {resourceName}"
 msgid "{0} from the newest release"
 msgstr "最新发行版中的 {0}"
 
+#. placeholder {0}: game.game
+#: src/widgets/pages/WidgetsPage.tsx
+msgid "{0} loads none of your widgets."
+msgstr ""
+
 #. placeholder {0}: formatRate(value)
 #: src/content/pages/components/PlayerMatchFigures.tsx
 #, fuzzy
@@ -10269,6 +10274,7 @@ msgid "all Game options"
 msgstr "所有游戏选项"
 
 #: src/hub/pages/components/GamePicturesControl.tsx
+#: src/widgets/pages/WidgetsPage.tsx
 #, fuzzy
 msgid "All games"
 msgstr "所有游戏"
@@ -11620,6 +11626,10 @@ msgstr "已在 {name} 上记录一次挑战。"
 #, fuzzy
 msgid "Audio"
 msgstr "音频"
+
+#: src/widgets/pages/WidgetsPage.tsx
+msgid "Author"
+msgstr ""
 
 #: src/scenario/pages/ScenarioBuilderPage.tsx
 #, fuzzy
@@ -15254,6 +15264,7 @@ msgstr "验证码"
 #: src/main.tsx
 #: src/onboarding/pages/GamesPage.tsx
 #: src/sound/library.ts
+#: src/widgets/pages/WidgetsPage.tsx
 #, fuzzy
 msgid "Coilbox"
 msgstr "Coilbox"
@@ -15509,6 +15520,11 @@ msgstr "Coilbox 不知道此引擎写入哪里，因此无法将该文件与其�
 #, fuzzy
 msgid "Coilbox does not know which side you play, so they are kept as they are unless you say otherwise."
 msgstr "Coilbox 不知道你玩哪个阵营，因此除非你另行指定，否则它们保持原样。"
+
+#. placeholder {0}: game.game
+#: src/widgets/pages/WidgetsPage.tsx
+msgid "Coilbox does not recognise {0}'s widget handler, so it cannot tell which of these the game loads."
+msgstr ""
 
 #: src/deeplink/readImport.ts
 #, fuzzy
@@ -17356,6 +17372,11 @@ msgstr "无法读取单位数据"
 #, fuzzy
 msgid "Could not read your saved models: {error}"
 msgstr "无法读取你保存的模型：{error}"
+
+#. placeholder {0}: row.error
+#: src/widgets/pages/WidgetsPage.tsx
+msgid "Could not read: {0}"
+msgstr ""
 
 #: src/lego/pages/components/SaveModelPopover.tsx
 #, fuzzy
@@ -22845,6 +22866,7 @@ msgstr "游戏"
 #: src/play/presetParts.ts
 #: src/runlite/pages/components/EncounterOverlay.tsx
 #: src/runlite/pages/components/RunSetupForm.tsx
+#: src/widgets/pages/WidgetsPage.tsx
 #: src/workshop/pages/components/DecodeTweakSetDrawer.tsx
 #: src/workshop/pages/components/ProjectDetailsDrawer.tsx
 #: src/workshop/pages/components/RandomModDrawer.tsx
@@ -27262,6 +27284,10 @@ msgstr "库武器 {weaponKey}"
 msgid "libwebp refused the picture."
 msgstr "libwebp 拒绝了该图片。"
 
+#: src/widgets/pages/WidgetsPage.tsx
+msgid "Licence"
+msgstr ""
+
 #: src/workshop/explosionGenerators.ts
 #, fuzzy
 msgid "Lifetime"
@@ -27481,6 +27507,10 @@ msgstr "已加载 {loadedName}"
 #, fuzzy
 msgid "Loaded {loadedName}, with parts missing"
 msgstr "已加载 {loadedName}，但缺少零件"
+
+#: src/widgets/pages/WidgetsPage.tsx
+msgid "Loaded by"
+msgstr ""
 
 #: src/play/pages/SkirmishPage.tsx
 #, fuzzy
@@ -31085,6 +31115,10 @@ msgstr "无游戏"
 msgid "No game"
 msgstr "无游戏"
 
+#: src/widgets/pages/WidgetsPage.tsx
+msgid "No game coilbox recognises"
+msgstr ""
+
 #: src/profile/health.ts
 #, fuzzy
 msgid "No game filter set"
@@ -31223,6 +31257,10 @@ msgstr "没有被忽略的用户。在上方添加，或使用聊天中用户旁
 #, fuzzy
 msgid "No image files matched in this game's archive."
 msgstr "此游戏的归档中没有匹配的图片文件。"
+
+#: src/widgets/pages/WidgetsPage.tsx
+msgid "No installed game"
+msgstr ""
 
 #: src/content/pages/components/RemixPanel.tsx
 #, fuzzy
@@ -32348,6 +32386,10 @@ msgstr "没有匹配的武器。"
 #, fuzzy
 msgid "No weapons to change"
 msgstr "没有可更改的武器"
+
+#: src/widgets/pages/WidgetsPage.tsx
+msgid "No widgets."
+msgstr ""
 
 #: src/content/pages/components/MapRecords.tsx
 #, fuzzy
@@ -34279,6 +34321,7 @@ msgstr "打开“内容 > 游戏”"
 #: src/content/pages/components/Convert3doDrawer.tsx
 #: src/content/pages/GameDetailPage.tsx
 #: src/uberstress/pages/HistoryPage.tsx
+#: src/widgets/pages/WidgetsPage.tsx
 #, fuzzy
 msgid "Open folder"
 msgstr "打开文件夹"
@@ -39115,6 +39158,7 @@ msgstr "按 {mapName} 重新缩放"
 #: src/multiplayer/battle/MissingContentCard.tsx
 #: src/multiplayer/battle/MissingMapBox.tsx
 #: src/scenario/pages/ScenarioBuilderPage.tsx
+#: src/widgets/pages/WidgetsPage.tsx
 #, fuzzy
 msgid "Rescan"
 msgstr "重新扫描"
@@ -48096,6 +48140,10 @@ msgstr "整场对局，{matchStart} 到 {matchEnd}。"
 msgid "The whole selection swung a quarter turn about its own middle, so it keeps its shape. Press R to turn each thing where it stands instead."
 msgstr "整个选择围绕自身中心转动了四分之一圈，所以形状保持不变。按 R 可改为让每个对象原地旋转。"
 
+#: src/widgets/pages/WidgetsPage.tsx
+msgid "The widgets you have added to your games, and which games load each one."
+msgstr ""
+
 #: src/content/pages/components/MapAggregate.tsx
 #, fuzzy
 msgid "The window is {when} of each match by its own clock, in whole minutes."
@@ -48687,6 +48735,10 @@ msgstr "此引擎无法读取你的游戏"
 #, fuzzy
 msgid "This engine could not read your games. Try another from <0>Settings → Engines</0>, or see what it found in <1>Content → Games</1>."
 msgstr "此引擎无法读取你的游戏。请从<0>设置 → 引擎</0>尝试其他引擎，或在<1>内容 → 游戏</1>中查看它找到了什么。"
+
+#: src/widgets/pages/WidgetsPage.tsx
+msgid "This engine does not say where it keeps its settings, so coilbox cannot find its widget folder."
+msgstr ""
 
 #: src/content/pages/components/DeleteEngineButton.tsx
 #, fuzzy
@@ -52227,6 +52279,7 @@ msgstr "多面手"
 
 #: src/content/pages/components/GameVersionsTab.tsx
 #: src/multiplayer/admin/MaintenanceSection.tsx
+#: src/widgets/pages/WidgetsPage.tsx
 #, fuzzy
 msgid "Version"
 msgstr "版本"
@@ -53582,6 +53635,7 @@ msgid "Why?"
 msgstr "为什么？"
 
 #: src/blueprint/pages/components/BlueprintWidgetButton.tsx
+#: src/widgets/pages/WidgetsPage.tsx
 #, fuzzy
 msgid "Widget"
 msgstr "小部件"
@@ -53592,6 +53646,9 @@ msgid "widget config"
 msgstr "小部件配置"
 
 #: src/content/commandRates.ts
+#: src/content/index.ts
+#: src/content/pages/GameDetailPage.tsx
+#: src/widgets/pages/WidgetsPage.tsx
 #, fuzzy
 msgid "Widgets"
 msgstr "小部件"

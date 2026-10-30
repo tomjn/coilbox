@@ -30,6 +30,7 @@ These appear in the sidebar for every user (unless hidden). The **nav id** colum
 | Library       | Maps          | `#/library/maps`     | `library.maps`     | no       |
 | Library       | Games         | `#/library/games`    | `library.games`    | **yes**  |
 | Library       | Blueprints    | `#/library/blueprints` | `library.blueprints` | no    |
+| Library       | Widgets       | `#/library/widgets`  | `library.widgets`  | no       |
 | Library       | Community     | `#/hub`              | `hub.browse`       | **yes**  |
 | Library       | Downloads     | `#/library/downloads` | `library.downloads` | no      |
 | Settings⁴     | Appearance    | `#/settings/frame.appearance` | `settings.appearance` | no³ |

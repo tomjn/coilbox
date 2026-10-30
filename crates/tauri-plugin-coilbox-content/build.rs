@@ -75,6 +75,7 @@ const COMMANDS: &[&str] = &[
     "content_widget_status",
     "content_widget_install",
     "content_widget_remove",
+    "content_player_widgets",
     "content_install_3do_conversion",
     "content_undo_3do_install",
     "content_3do_install_status",

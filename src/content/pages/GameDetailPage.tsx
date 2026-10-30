@@ -7,7 +7,7 @@ import {
   useDrawer,
   useSetting,
 } from "@picoframe/frame";
-import { Boxes, FolderOpen, Loader2, Trophy } from "lucide-react";
+import { Boxes, FolderOpen, Loader2, Puzzle, Trophy } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate, useParams, useSearchParams } from "react-router";
 import { GameEquivalents } from "@/blueprint/pages/components/GameEquivalents";
@@ -482,6 +482,18 @@ export default function GameDetailPage() {
           </div>
 
           {brand && <BrandingLinks entry={brand} />}
+          {/* The widgets this game loads, on the Widgets page (issue #1284). */}
+          <div>
+            <Link
+              to={`/library/widgets?game=${encodeURIComponent(game.name)}`}
+              className={cn(
+                buttonVariants({ variant: "outline", size: "sm" }),
+                "gap-1.5",
+              )}
+            >
+              <Puzzle className="size-4" /> <Trans>Widgets</Trans>
+            </Link>
+          </div>
           {brand?.screenshots?.length ? (
             <BrandingScreenshots shots={brand.screenshots} />
           ) : null}

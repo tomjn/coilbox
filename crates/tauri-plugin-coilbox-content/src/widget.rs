@@ -89,7 +89,7 @@ pub struct WidgetStatus {
 /// module directory, and its widget files. `Config/coilbox_blueprints*.json`
 /// shares the name and is data, the library coilbox writes and the spool the
 /// widget writes, and neither is an install's to touch.
-fn widget_owned(rel: &str) -> bool {
+pub(crate) fn widget_owned(rel: &str) -> bool {
     let lower = rel.to_lowercase();
     lower.starts_with("coilbox_blueprints/")
         || (lower.starts_with("widgets/")

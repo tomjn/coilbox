@@ -2250,6 +2250,52 @@ export const contentKeybindsRead = defineCommand<
   { path: string; exists: boolean; text: string; ours: boolean }
 >("coilbox-content", "content_keybinds_read");
 
+/** What a widget file's `GetInfo()` declared. A field it left out is absent. */
+export interface PlayerWidgetInfo {
+  name?: string | null;
+  desc?: string | null;
+  author?: string | null;
+  date?: string | null;
+  version?: string | null;
+  license?: string | null;
+  layer?: number | null;
+  enabled?: boolean | null;
+}
+
+/** One `.lua` file in a player widget folder (issue #1284). */
+export interface PlayerWidgetFile {
+  /** Relative to the write folder, spelled as on disk. */
+  path: string;
+  /** The scanned folder it is in or under, such as `LuaUI/Widgets`. */
+  folder: string;
+  /** In a subfolder of `folder` rather than directly in it. */
+  nested: boolean;
+  /** Coilbox's own blueprint widget. */
+  coilbox: boolean;
+  /** Set exactly when `error` is not. */
+  info: PlayerWidgetInfo | null;
+  error: string | null;
+}
+
+export interface PlayerWidgetScan {
+  caseSensitive: boolean;
+  /** The scanned folders that exist, relative to the write folder. */
+  folders: string[];
+  files: PlayerWidgetFile[];
+  /** Folders that are there and could not be read. */
+  errors: string[];
+}
+
+/**
+ * Every widget file in the named folders under `LuaUI/` of the engine's write
+ * folder, with what each one's `GetInfo()` declares, read in the springlua
+ * sandbox. `folders` are names under `LuaUI/`, matched without regard to case.
+ */
+export const contentPlayerWidgets = defineCommand<
+  { writeDir: string; folders: readonly string[] },
+  PlayerWidgetScan
+>("coilbox-content", "content_player_widgets");
+
 /**
  * Replace that `uikeys.txt`. The first write over a file coilbox did not author
  * copies it to `uikeys.txt.bak`, reported as `backedUp`.

@@ -1304,6 +1304,11 @@ msgstr "{0} {resourceName}"
 msgid "{0} from the newest release"
 msgstr "{0} de la última versión"
 
+#. placeholder {0}: game.game
+#: src/widgets/pages/WidgetsPage.tsx
+msgid "{0} loads none of your widgets."
+msgstr ""
+
 #. placeholder {0}: formatRate(value)
 #: src/content/pages/components/PlayerMatchFigures.tsx
 #, fuzzy
@@ -10269,6 +10274,7 @@ msgid "all Game options"
 msgstr "todas las opciones de juego"
 
 #: src/hub/pages/components/GamePicturesControl.tsx
+#: src/widgets/pages/WidgetsPage.tsx
 #, fuzzy
 msgid "All games"
 msgstr "Todos los juegos"
@@ -11620,6 +11626,10 @@ msgstr "Intento registrado en {name}."
 #, fuzzy
 msgid "Audio"
 msgstr "Audio"
+
+#: src/widgets/pages/WidgetsPage.tsx
+msgid "Author"
+msgstr ""
 
 #: src/scenario/pages/ScenarioBuilderPage.tsx
 #, fuzzy
@@ -15254,6 +15264,7 @@ msgstr "Código"
 #: src/main.tsx
 #: src/onboarding/pages/GamesPage.tsx
 #: src/sound/library.ts
+#: src/widgets/pages/WidgetsPage.tsx
 #, fuzzy
 msgid "Coilbox"
 msgstr "Coilbox"
@@ -15509,6 +15520,11 @@ msgstr "Coilbox no sabe dónde escribe este motor, así que no puede distinguir 
 #, fuzzy
 msgid "Coilbox does not know which side you play, so they are kept as they are unless you say otherwise."
 msgstr "Coilbox no sabe con qué facción juegas, así que se quedan como están salvo que indiques otra cosa."
+
+#. placeholder {0}: game.game
+#: src/widgets/pages/WidgetsPage.tsx
+msgid "Coilbox does not recognise {0}'s widget handler, so it cannot tell which of these the game loads."
+msgstr ""
 
 #: src/deeplink/readImport.ts
 #, fuzzy
@@ -17356,6 +17372,11 @@ msgstr "No se pudieron leer los datos de unidades"
 #, fuzzy
 msgid "Could not read your saved models: {error}"
 msgstr "No se pudieron leer tus modelos guardados: {error}"
+
+#. placeholder {0}: row.error
+#: src/widgets/pages/WidgetsPage.tsx
+msgid "Could not read: {0}"
+msgstr ""
 
 #: src/lego/pages/components/SaveModelPopover.tsx
 #, fuzzy
@@ -22845,6 +22866,7 @@ msgstr "juego"
 #: src/play/presetParts.ts
 #: src/runlite/pages/components/EncounterOverlay.tsx
 #: src/runlite/pages/components/RunSetupForm.tsx
+#: src/widgets/pages/WidgetsPage.tsx
 #: src/workshop/pages/components/DecodeTweakSetDrawer.tsx
 #: src/workshop/pages/components/ProjectDetailsDrawer.tsx
 #: src/workshop/pages/components/RandomModDrawer.tsx
@@ -27262,6 +27284,10 @@ msgstr "Arma de la biblioteca {weaponKey}"
 msgid "libwebp refused the picture."
 msgstr "libwebp rechazó la imagen."
 
+#: src/widgets/pages/WidgetsPage.tsx
+msgid "Licence"
+msgstr ""
+
 #: src/workshop/explosionGenerators.ts
 #, fuzzy
 msgid "Lifetime"
@@ -27481,6 +27507,10 @@ msgstr "Se cargó {loadedName}"
 #, fuzzy
 msgid "Loaded {loadedName}, with parts missing"
 msgstr "Se cargó {loadedName}, con piezas que faltan"
+
+#: src/widgets/pages/WidgetsPage.tsx
+msgid "Loaded by"
+msgstr ""
 
 #: src/play/pages/SkirmishPage.tsx
 #, fuzzy
@@ -31085,6 +31115,10 @@ msgstr "sin juego"
 msgid "No game"
 msgstr "Sin juego"
 
+#: src/widgets/pages/WidgetsPage.tsx
+msgid "No game coilbox recognises"
+msgstr ""
+
 #: src/profile/health.ts
 #, fuzzy
 msgid "No game filter set"
@@ -31223,6 +31257,10 @@ msgstr "No hay usuarios ignorados. Añade uno arriba o usa la acción de ignorar
 #, fuzzy
 msgid "No image files matched in this game's archive."
 msgstr "No se encontraron archivos de imagen en el archivo comprimido de este juego."
+
+#: src/widgets/pages/WidgetsPage.tsx
+msgid "No installed game"
+msgstr ""
 
 #: src/content/pages/components/RemixPanel.tsx
 #, fuzzy
@@ -32348,6 +32386,10 @@ msgstr "Ningún arma coincide."
 #, fuzzy
 msgid "No weapons to change"
 msgstr "No hay armas que cambiar"
+
+#: src/widgets/pages/WidgetsPage.tsx
+msgid "No widgets."
+msgstr ""
 
 #: src/content/pages/components/MapRecords.tsx
 #, fuzzy
@@ -34279,6 +34321,7 @@ msgstr "Abrir Contenido > Juegos"
 #: src/content/pages/components/Convert3doDrawer.tsx
 #: src/content/pages/GameDetailPage.tsx
 #: src/uberstress/pages/HistoryPage.tsx
+#: src/widgets/pages/WidgetsPage.tsx
 #, fuzzy
 msgid "Open folder"
 msgstr "Abrir carpeta"
@@ -39115,6 +39158,7 @@ msgstr "Reescalar a {mapName}"
 #: src/multiplayer/battle/MissingContentCard.tsx
 #: src/multiplayer/battle/MissingMapBox.tsx
 #: src/scenario/pages/ScenarioBuilderPage.tsx
+#: src/widgets/pages/WidgetsPage.tsx
 #, fuzzy
 msgid "Rescan"
 msgstr "Volver a analizar"
@@ -48096,6 +48140,10 @@ msgstr "Toda la partida, de {matchStart} a {matchEnd}."
 msgid "The whole selection swung a quarter turn about its own middle, so it keeps its shape. Press R to turn each thing where it stands instead."
 msgstr "Toda la selección giró un cuarto de vuelta alrededor de su propio centro, así que conserva su forma. Pulsa R para girar cada cosa donde está."
 
+#: src/widgets/pages/WidgetsPage.tsx
+msgid "The widgets you have added to your games, and which games load each one."
+msgstr ""
+
 #: src/content/pages/components/MapAggregate.tsx
 #, fuzzy
 msgid "The window is {when} of each match by its own clock, in whole minutes."
@@ -48687,6 +48735,10 @@ msgstr "Este motor no pudo leer tus juegos"
 #, fuzzy
 msgid "This engine could not read your games. Try another from <0>Settings → Engines</0>, or see what it found in <1>Content → Games</1>."
 msgstr "Este motor no pudo leer tus juegos. Prueba otro en <0>Ajustes → Motores</0> o mira lo que encontró en <1>Contenido → Juegos</1>."
+
+#: src/widgets/pages/WidgetsPage.tsx
+msgid "This engine does not say where it keeps its settings, so coilbox cannot find its widget folder."
+msgstr ""
 
 #: src/content/pages/components/DeleteEngineButton.tsx
 #, fuzzy
@@ -52227,6 +52279,7 @@ msgstr "Versátil"
 
 #: src/content/pages/components/GameVersionsTab.tsx
 #: src/multiplayer/admin/MaintenanceSection.tsx
+#: src/widgets/pages/WidgetsPage.tsx
 #, fuzzy
 msgid "Version"
 msgstr "Versión"
@@ -53582,6 +53635,7 @@ msgid "Why?"
 msgstr "¿Por qué?"
 
 #: src/blueprint/pages/components/BlueprintWidgetButton.tsx
+#: src/widgets/pages/WidgetsPage.tsx
 #, fuzzy
 msgid "Widget"
 msgstr "Widget"
@@ -53592,6 +53646,9 @@ msgid "widget config"
 msgstr "configuración de widgets"
 
 #: src/content/commandRates.ts
+#: src/content/index.ts
+#: src/content/pages/GameDetailPage.tsx
+#: src/widgets/pages/WidgetsPage.tsx
 #, fuzzy
 msgid "Widgets"
 msgstr "Widgets"
