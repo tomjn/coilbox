@@ -647,6 +647,46 @@ describe("WidgetsPage", () => {
     expect(readSets().global).toEqual({});
   });
 
+  it("shows a game's own widgets as their defaults, unswitchable, until it has a config file", () => {
+    files.files = new Map([["Metal Factions", { kind: "missing" }]]);
+    const shippedWidget = (name: string, enabled: boolean): GameWidget => ({
+      path: `luaui/widgets/${name}.lua`,
+      archive: "mf.sdz",
+      folder: "LuaUI/Widgets",
+      nested: false,
+      info: { name, enabled },
+      error: null,
+    });
+    shipped.widgets = [
+      shippedWidget("Glow", true),
+      shippedWidget("Radar", false),
+    ];
+    page("/library/widgets?game=Metal%20Factions");
+    const glow = screen.getByRole("switch", { name: "Glow on" });
+    expect(glow.getAttribute("aria-checked")).toBe("true");
+    expect(glow.hasAttribute("disabled")).toBe(true);
+    const radar = screen.getByRole("switch", { name: "Radar on" });
+    expect(radar.getAttribute("aria-checked")).toBe("false");
+    expect(radar.hasAttribute("disabled")).toBe(true);
+  });
+
+  it("lines a game's own widgets up with the player's by using one table", () => {
+    shipped.widgets = [
+      {
+        path: "luaui/widgets/radar.lua",
+        archive: "mf.sdz",
+        folder: "LuaUI/Widgets",
+        nested: false,
+        info: { name: "Radar" },
+        error: null,
+      },
+    ];
+    page("/library/widgets?game=Metal%20Factions");
+    expect(screen.getAllByRole("table")).toHaveLength(1);
+    expect(screen.getByText("Your widgets")).toBeTruthy();
+    expect(screen.getByText("Metal Factions's own widgets")).toBeTruthy();
+  });
+
   it("will not switch a game's own widget while a game is running", () => {
     play.running = true;
     shipped.widgets = [
