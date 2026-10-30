@@ -1,7 +1,8 @@
-import { Trans, useLingui } from "@lingui/react/macro";
+import { Plural, Trans, useLingui } from "@lingui/react/macro";
 import { Button } from "@picoframe/frame";
 import { AlertTriangle, Download, Loader2, RefreshCw } from "lucide-react";
 import { useNavigate } from "react-router";
+import { Progress } from "@/components/ui/progress";
 import { type CompatBattleState, compatLaunchBlock } from "./compatBattle";
 
 /**
@@ -21,19 +22,38 @@ export function CompatBattleCard({
   const navigate = useNavigate();
   const baseName = state.status === "building" ? state.baseName : "";
   const version = state.status === "building" ? state.version : 0;
+  const progress = state.status === "building" ? state.progress : undefined;
+  const total = progress?.total ?? 0;
+  const done = progress ? Math.min(progress.done, total) : 0;
   const block = compatLaunchBlock(state);
   if (!block) return null;
 
   if (state.status === "building") {
     return (
-      <div className="flex items-center gap-1.5 rounded-lg border p-4 text-sm text-muted-foreground">
-        <Loader2 className="size-3.5 animate-spin" />{" "}
-        <Trans>
-          Building{" "}
-          <span className="font-medium text-foreground">
-            {baseName} (compat {version})
-          </span>
-        </Trans>
+      <div className="flex flex-col gap-2 rounded-lg border p-4 text-sm text-muted-foreground">
+        <div className="flex items-center gap-1.5">
+          <Loader2 className="size-3.5 animate-spin" />{" "}
+          <Trans>
+            Building{" "}
+            <span className="font-medium text-foreground">
+              {baseName} (compat {version})
+            </span>
+          </Trans>
+          {total > 0 && (
+            <span className="ml-auto text-xs">
+              <Trans>
+                {done} of{" "}
+                <Plural value={total} one="# model" other="# models" />
+              </Trans>
+            </span>
+          )}
+        </div>
+        {total > 0 && (
+          <Progress
+            value={(done / total) * 100}
+            aria-label={t`Models converted`}
+          />
+        )}
       </div>
     );
   }

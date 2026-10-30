@@ -1971,6 +1971,7 @@ msgid "{done} / {total} downloaded"
 msgstr ""
 
 #: src/content/pages/components/CompatMode.tsx
+#: src/multiplayer/battle/CompatBattleCard.tsx
 msgid "{done} of {total, plural, one {# model} other {# models}}"
 msgstr ""
 
@@ -23887,6 +23888,7 @@ msgid "Models"
 msgstr ""
 
 #: src/content/pages/components/CompatMode.tsx
+#: src/multiplayer/battle/CompatBattleCard.tsx
 msgid "Models converted"
 msgstr ""
 

@@ -73,6 +73,43 @@ describe("useCompatBattle", () => {
     });
   });
 
+  it("carries the build's count to the card, and to a remount mid build", async () => {
+    let finish: (v: unknown) => void = () => {};
+    build.mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          finish = resolve;
+        }),
+    );
+    const first = setup("XTA 9.65 (compat 4)", [xta]);
+    await waitFor(() => expect(build).toHaveBeenCalledTimes(1));
+    const channel = build.mock.calls[0][0].onProgress;
+
+    act(() => channel.onmessage({ phase: "model", done: 40, total: 300 }));
+    expect(first.result.current.state).toMatchObject({
+      status: "building",
+      progress: { done: 40, total: 300 },
+    });
+
+    first.unmount();
+    const second = setup("XTA 9.65 (compat 4)", [xta]);
+    expect(second.result.current.state).toMatchObject({
+      status: "building",
+      progress: { done: 40, total: 300 },
+    });
+    await act(async () => {});
+    expect(build).toHaveBeenCalledTimes(1);
+
+    act(() => channel.onmessage({ phase: "model", done: 41, total: 300 }));
+    expect(second.result.current.state).toMatchObject({
+      progress: { done: 41, total: 300 },
+    });
+
+    await act(async () => finish({}));
+    await waitFor(() => expect(first.rescan).toHaveBeenCalled());
+    expect(second.result.current.state).not.toHaveProperty("progress.done");
+  });
+
   it("builds a version below the latest and says nothing about it", async () => {
     const { result } = setup(
       "XTA 9.65 (compat 1)",

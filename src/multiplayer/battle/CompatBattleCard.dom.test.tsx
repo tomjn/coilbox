@@ -31,6 +31,40 @@ describe("CompatBattleCard", () => {
     expect(screen.getByText(/XTA 9\.65 \(compat 4\)/)).toBeTruthy();
   });
 
+  it("shows how many models are done out of the total while it builds", () => {
+    render(
+      <CompatBattleCard
+        state={{
+          status: "building",
+          baseName: "XTA 9.65",
+          version: 4,
+          progress: { done: 40, total: 300 },
+        }}
+        onRetry={() => {}}
+      />,
+    );
+    expect(screen.getByText(/40 of/)).toBeTruthy();
+    expect(screen.getByText(/300 models/)).toBeTruthy();
+    expect(
+      screen.getByRole("progressbar", { name: /Models converted/ }),
+    ).toBeTruthy();
+  });
+
+  it("shows no count before the build has counted its models", () => {
+    render(
+      <CompatBattleCard
+        state={{
+          status: "building",
+          baseName: "XTA 9.65",
+          version: 4,
+          progress: { done: 0, total: 0 },
+        }}
+        onRetry={() => {}}
+      />,
+    );
+    expect(screen.queryByRole("progressbar")).toBeNull();
+  });
+
   it("says the host is on a newer coilbox and opens the updater", () => {
     render(
       <CompatBattleCard
