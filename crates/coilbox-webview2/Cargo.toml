@@ -1,0 +1,16 @@
+[package]
+name = "coilbox-webview2"
+version = "0.0.0"
+description = "Windows: tell the player when the WebView2 runtime is missing, before Tauri opens a blank window."
+edition = "2021"
+license = "MIT"
+
+# `windows-sys` 0.61 is already in the tree under tauri, mio and the app crate.
+# `Win32_UI_WindowsAndMessaging` is for the message box and `Win32_UI_Shell` for
+# opening the download in the browser.
+[target.'cfg(target_os = "windows")'.dependencies]
+windows-sys = { version = "0.61", features = [
+  "Win32_Foundation",
+  "Win32_UI_Shell",
+  "Win32_UI_WindowsAndMessaging",
+] }

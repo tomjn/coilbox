@@ -36,7 +36,7 @@
     "cmd-removed-ids",
     "spring-array-n-83",
     "spring-get-has-lag",
-    "unit-defs-weapons-n-83",
+    "unit-defs-weapons-n-83-v2",
     "weapon-defs-lua-consts-87-v2",
     "system-log-88",
     "callin-game-frame-sync-action-97",
@@ -46,5 +46,5 @@
     "crate": "coilbox-3do-convert",
     "version": "0.1.0"
   },
-  "writer": 4
+  "writer": 3
 }

@@ -130,7 +130,7 @@ If one of the fixes fails while the game runs, the game still loads. The engine'
 
 ## What it changes
 
-This is compatibility version 22, the newest.
+This is compatibility version 23, the newest.
 
 Lua functions it puts back:
 
@@ -156,7 +156,7 @@ Call-ins whose arguments moved:
 Values Lua can read again:
 
 - `CMD.AISELECT` and `CMD.SET_WANTED_MAX_SPEED`, removed in Recoil 2025.01.1 and Spring 105.0. The names are back with their old numbers, 30 and 70. An order given with either does nothing.
-- The `n` key that Spring 83.0 took off lists such as the units `Spring.GetTeamUnits` returns, and off each unit's `weapons` in `UnitDefs`. It holds how many entries the list has. A game that walks the list with `pairs` does not see it. Gadgets do not get the `weapons` one.
+- The `n` key that Spring 83.0 took off lists such as the units `Spring.GetTeamUnits` returns, and off each unit's `weapons` in `UnitDefs`. It holds how many entries the list has. A game that walks the list with `pairs` does not see it. The `weapons` one is in widgets and gadgets alike, and a walk over a unit def with `ud:pairs()` still ends.
 - `WeaponDefs[id].areaOfEffect`, `maxVelocity` and `onlyTargetCategories`, which Lua lost in Spring 87.0. Widgets and gadgets can read them again. `onlyTargetCategories` lists every category, as it did for every weapon in 86.0.
 
 Values the engine now keeps differently:

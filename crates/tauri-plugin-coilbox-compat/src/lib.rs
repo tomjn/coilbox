@@ -1537,7 +1537,11 @@ mod tests {
         ),
         (
             22,
-            "4713b035062583d5a86cccf1605f1a75f215b1591c3ac9b06d83b973ba7e3e87",
+            "8da4ae7e814e44d94344efd9adb0fff9286e5f51dd15b8553789611f12290aae",
+        ),
+        (
+            23,
+            "9cbc1ccfc4a6f588ace6ac13d1b5af86d16ed1e15d1eae84bbe50865ff7d99df",
         ),
     ];
 
@@ -1683,7 +1687,7 @@ mod tests {
             (keep, built)
         };
 
-        let (_keep, new) = build(22);
+        let (_keep, new) = build(23);
         assert!(new.files.iter().any(|f| f == models::WEAPONDEFS));
         assert!(!new.files.iter().any(|f| f == models::DEFS_POST));
         assert!(!new
@@ -1700,7 +1704,7 @@ mod tests {
         assert!(text.contains("-- fix: defs-commander-85\n"), "{text}");
         assert!(!text.contains("defs-manual-bomb-settings-92"), "{text}");
 
-        let (_keep, old) = build(21);
+        let (_keep, old) = build(22);
         assert!(!old.files.iter().any(|f| f == models::WEAPONDEFS));
         assert_eq!(old.models.models_written, 0);
         assert!(noted(&old, "its models are not converted"));

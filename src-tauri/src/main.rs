@@ -143,6 +143,12 @@ fn main() {
         return;
     }
 
+    // Windows: name the missing WebView2 runtime ourselves instead of leaving
+    // Tauri's dialog and a blank window (issue #4873). The closure is the call
+    // Tauri makes to decide the same thing. Swap mode above opens no window, so
+    // it does not need the runtime. A no-op elsewhere.
+    coilbox_webview2::exit_if_runtime_missing(|| tauri::webview_version().is_ok());
+
     // Clear a staging folder the update we just applied left behind. Before the
     // window opens so it is gone by the time anyone could look, and best effort
     // because the process that did the copy may still be running out of it.

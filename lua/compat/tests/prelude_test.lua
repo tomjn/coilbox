@@ -1591,4 +1591,85 @@ for _, synced in ipairs({ true, false }) do
 	check(state .. ": the missing names are no failure", #many.logs == 0, table.concat(many.logs, "; "))
 end
 
+--------------------------------------------------------------------------------
+-- ud:pairs() and ud.weapons.n (issue #4866)
+--------------------------------------------------------------------------------
+
+do
+	local engine = caEngine(false, 17)
+	prelude(engine)
+	local _, ended = walk(engine.env.UnitDefs[1], 1000)
+	check("manifest 17: a walk with ud:pairs() never ends", not ended)
+end
+
+for _, synced in ipairs({ true, false }) do
+	local state = synced and "synced" or "unsynced"
+
+	do
+		-- unit_healthbars.lua, line 209.
+		local engine = caEngine(synced, 22)
+		prelude(engine)
+		local ud = engine.env.UnitDefs[1]
+		check(state .. ": ud.weapons.n is the count", ud.weapons.n == 2, tostring(ud.weapons.n))
+		local seen = 0
+		for i = 1, ud.weapons.n do
+			seen = seen + (ud.weapons[i].weaponDef and 1 or 0)
+		end
+		check(state .. ": unit_healthbars' loop runs over every weapon", seen == 2)
+		check(state .. ": a unit def with no weapons has n 0", engine.env.UnitDefs[2].weapons.n == 0)
+		check(state .. ": every read gives the same weapons table", ud.weapons == ud.weapons)
+		local keys = 0
+		for _ in pairs(ud.weapons) do
+			keys = keys + 1
+		end
+		check(state .. ": pairs sees only the weapons", keys == 2, tostring(keys))
+		check(state .. ": the fix does not need rawset", synced == (engine.env.rawset == nil))
+		check(state .. ": no fix failed", #engine.logs == 0, table.concat(engine.logs, "; "))
+	end
+
+	do
+		local engine = caEngine(synced, 22)
+		prelude(engine)
+		local ud = engine.env.UnitDefs[1]
+		local seen, ended = walk(ud, 1000)
+		check(state .. ": a walk with ud:pairs() ends", ended)
+		check(state .. ": ud:pairs() gives the engine's values", seen.name == "armcom")
+		check(state .. ": ud:pairs() gives the weapons with their count", type(seen.weapons) == "table" and seen.weapons == ud.weapons and seen.weapons.n == 2)
+		local firstKey = ud:next()
+		check(state .. ": ud:next() starts the walk", firstKey == "name")
+		local ids = {}
+		for id, def in pairs(engine.env.UnitDefs) do
+			ids[id] = def.name
+		end
+		check(state .. ": pairs(UnitDefs) reaches every entry", ids[1] == "armcom" and ids[2] == "armsolar")
+
+		ud.reloadTime = 0
+		check(state .. ": a game can set a key of its own and read it", ud.reloadTime == 0)
+		check(state .. ": ud:pairs() gives a key of the game's own", walk(ud, 1000).reloadTime == 0)
+		check(state .. ": writing an engine value is still refused", not pcall(function()
+			ud.name = "other"
+		end))
+		check(state .. ": the metatable is still protected", type(getmetatable(ud)) == "function" and not pcall(setmetatable, ud, {}))
+		check(state .. ": no fix failed", #engine.logs == 0, table.concat(engine.logs, "; "))
+	end
+
+	do
+		-- A key the game's setupdefs.lua set before the prelude ran stays in the walk.
+		local engine = caEngine(synced, 22)
+		engine.env.UnitDefs[1].cost = 50
+		prelude(engine)
+		local ud = engine.env.UnitDefs[1]
+		local seen, ended = walk(ud, 1000)
+		check(state .. ": a key set before the fix is still read", ud.cost == 50)
+		check(state .. ": ud:pairs() still gives it, and ends", ended and seen.cost == 50 and seen.weapons.n == 2)
+	end
+
+	do
+		local engine = newEngine({ synced = synced, manifest = 22 })
+		engine.env.UnitDefs = nil
+		prelude(engine)
+		check(state .. ": a state with no UnitDefs is left alone", #engine.logs == 0, table.concat(engine.logs, "; "))
+	end
+end
+
 support.report()
