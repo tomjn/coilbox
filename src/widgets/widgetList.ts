@@ -9,6 +9,7 @@
 
 import type { PlayerWidgetFile, PlayerWidgetScan } from "@/content/bindings";
 import { loads, type WidgetHandler } from "./handlers";
+import { type WidgetSwitch, widgetNames } from "./widgetNames";
 
 /** An installed game and the handler it runs, `null` when not recognised. */
 export interface GameHandler {
@@ -22,19 +23,27 @@ export interface GameHandler {
 export interface WidgetRow extends PlayerWidgetFile {
   /** The games whose recognised handler loads this file, in `games` order. */
   loadedBy: string[];
+  /** Whether the file can have a switch, and the name its state is saved
+   *  under (issue #1290). */
+  switch: WidgetSwitch;
 }
 
 export function widgetRows(
   scan: PlayerWidgetScan,
   games: readonly GameHandler[],
 ): WidgetRow[] {
-  return scan.files.map((file) => ({
-    ...file,
-    loadedBy: games
+  const loadedBy = scan.files.map((file) =>
+    games
       .filter(
         (g) => g.handler !== null && loads(g.handler, file, scan.caseSensitive),
       )
       .map((g) => g.game),
+  );
+  const switches = widgetNames(scan.files, loadedBy, games);
+  return scan.files.map((file, i) => ({
+    ...file,
+    loadedBy: loadedBy[i],
+    switch: switches[i],
   }));
 }
 

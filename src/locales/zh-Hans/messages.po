@@ -8552,6 +8552,10 @@ msgstr "游戏正在运行。它在保存或退出时会写回整个蓝图文件
 msgid "A game is running. The engine reads the widget when a match starts, so a change now lands in the next one."
 msgstr "游戏正在运行。引擎在对局开始时读取小部件，因此现在的更改会在下一场对局中生效。"
 
+#: src/widgets/pages/WidgetsPage.tsx
+msgid "A game saves this under a name that depends on its version."
+msgstr ""
+
 #: src/profile/health.ts
 #, fuzzy
 msgid "A game with no hand-made map to offer keeps them, so there is always something to pick."
@@ -23746,6 +23750,11 @@ msgstr "有巡逻命令"
 #, fuzzy
 msgid "Has the repeat toggle"
 msgstr "有重复开关"
+
+#. placeholder {0}: row.switch.others.join(", ")
+#: src/widgets/pages/WidgetsPage.tsx
+msgid "Has the same name as {0}, so they share one setting."
+msgstr ""
 
 #: src/content/unitFieldNotes.ts
 #, fuzzy
