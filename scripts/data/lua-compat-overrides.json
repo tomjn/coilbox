@@ -24,6 +24,14 @@
     "changelog": "make Spring.Get{Unit,Factory}Commands always expect a second argument"
   },
   {
+    "id": "signature:Spring.GetCommandQueue@105.0",
+    "kind": "signature",
+    "name": "Spring.GetCommandQueue",
+    "since": "105.0",
+    "note": "The count argument is required, as for Spring.GetUnitCommands, which it calls. Calling Spring.GetCommandQueue(unitID) with no count raises a Lua error. Pass -1 for the whole queue, or use Spring.GetUnitCommandCount for the length.",
+    "commit": "1109bef03e990a952394b3349e208ab719e33adb"
+  },
+  {
     "id": "removed:snext",
     "kind": "removed",
     "name": "snext",
