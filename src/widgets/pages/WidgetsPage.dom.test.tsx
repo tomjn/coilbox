@@ -52,6 +52,22 @@ const scan: PlayerWidgetScan = {
       info: null,
       error: "runtime error: attempt to perform arithmetic on a nil value",
     },
+    {
+      path: "LuaUI/Widgets/twin_a.lua",
+      folder: "LuaUI/Widgets",
+      nested: false,
+      coilbox: false,
+      info: { name: "Twin" },
+      error: null,
+    },
+    {
+      path: "LuaUI/Widgets/twin_b.lua",
+      folder: "LuaUI/Widgets",
+      nested: false,
+      coilbox: false,
+      info: { name: "Twin" },
+      error: null,
+    },
   ],
   errors: [],
 };
@@ -102,17 +118,32 @@ describe("WidgetsPage", () => {
         "Could not read: runtime error: attempt to perform arithmetic on a nil value",
       ),
     ).toBeTruthy();
-    // The nested file loads in no game, the other two in Metal Factions.
-    expect(screen.getAllByText("Metal Factions v2.58")).toHaveLength(2);
+    // The nested file loads in no game, the other four in Metal Factions.
+    expect(screen.getAllByText("Metal Factions v2.58")).toHaveLength(4);
     // Mystery's handler is not recognised, so it may still load that file.
     expect(screen.getByText("No game coilbox recognises")).toBeTruthy();
   });
 
   it("says so when a widget states no author or licence, and not when it could not be read", () => {
     page();
-    // Only the coilbox row declares neither. The unreadable row says nothing.
-    expect(screen.getAllByText("No author stated")).toHaveLength(1);
-    expect(screen.getAllByText("No licence stated")).toHaveLength(1);
+    // The coilbox row and the two Twin rows declare neither. The unreadable
+    // row says nothing.
+    expect(screen.getAllByText("No author stated")).toHaveLength(3);
+    expect(screen.getAllByText("No licence stated")).toHaveLength(3);
+  });
+
+  it("says which files share a name, and so a setting", () => {
+    page();
+    expect(
+      screen.getByText(
+        "Has the same name as LuaUI/Widgets/twin_b.lua, so they share one setting.",
+      ),
+    ).toBeTruthy();
+    expect(
+      screen.getByText(
+        "Has the same name as LuaUI/Widgets/twin_a.lua, so they share one setting.",
+      ),
+    ).toBeTruthy();
   });
 
   it("shows a picked game only the files it loads", () => {
