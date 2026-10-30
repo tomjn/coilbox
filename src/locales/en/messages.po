@@ -6887,6 +6887,10 @@ msgstr "A game is running. It writes its whole blueprints file back when it save
 msgid "A game is running. The engine reads the widget when a match starts, so a change now lands in the next one."
 msgstr "A game is running. The engine reads the widget when a match starts, so a change now lands in the next one."
 
+#: src/widgets/pages/WidgetsPage.tsx
+msgid "A game saves this under a name that depends on its version."
+msgstr "A game saves this under a name that depends on its version."
+
 #: src/profile/health.ts
 msgid "A game with no hand-made map to offer keeps them, so there is always something to pick."
 msgstr "A game with no hand-made map to offer keeps them, so there is always something to pick."
@@ -19210,6 +19214,11 @@ msgstr "Has the patrol order"
 #: src/content/unitFieldNotes.ts
 msgid "Has the repeat toggle"
 msgstr "Has the repeat toggle"
+
+#. placeholder {0}: row.switch.others.join(", ")
+#: src/widgets/pages/WidgetsPage.tsx
+msgid "Has the same name as {0}, so they share one setting."
+msgstr "Has the same name as {0}, so they share one setting."
 
 #: src/content/unitFieldNotes.ts
 msgid "Has the self destruct order"

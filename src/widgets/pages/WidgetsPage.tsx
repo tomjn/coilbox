@@ -218,6 +218,18 @@ function WidgetTable({
                   {t`Could not read: ${row.error}`}
                 </p>
               )}
+              {row.switch.kind === "none" &&
+                row.switch.reason === "duplicate" && (
+                  <p className="break-words text-xs text-destructive">
+                    {t`Has the same name as ${row.switch.others.join(", ")}, so they share one setting.`}
+                  </p>
+                )}
+              {row.switch.kind === "none" &&
+                row.switch.reason === "experimental" && (
+                  <p className="break-words text-xs text-muted-foreground">
+                    {t`A game saves this under a name that depends on its version.`}
+                  </p>
+                )}
             </TableCell>
             <TableCell>{row.info?.version ?? ""}</TableCell>
             <TableCell className="whitespace-normal">
