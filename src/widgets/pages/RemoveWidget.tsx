@@ -223,12 +223,18 @@ export function RemovedNotice({
   const [restored, setRestored] = useState<string[] | null>(null);
   const { name, backup, entries, writeDir } = removed;
 
+  /** The files are back, so a retry only has the switching left to do. */
+  const [filesBack, setFilesBack] = useState(false);
+
   const restore = async () => {
     setBusy(true);
     setError(null);
     try {
-      await contentWidgetRestore({ writeDir, backup });
-      onRestored();
+      if (!filesBack) {
+        await contentWidgetRestore({ writeDir, backup });
+        setFilesBack(true);
+        onRestored();
+      }
       // Its state was forgotten when it went. Left alone, a game would read
       // what the config file still holds, or the widget's own default, and may
       // run it, so it comes back off.
@@ -250,7 +256,11 @@ export function RemovedNotice({
   return (
     <div className="flex flex-col gap-2 rounded-md border border-border p-3 text-sm">
       <p role="status">
-        {restored ? t`Restored ${name}, switched off.` : t`Removed ${name}.`}
+        {restored
+          ? restored.length === 0 && removed.forgotten.length > 0
+            ? t`Restored ${name}, switched off.`
+            : t`Restored ${name}.`
+          : t`Removed ${name}.`}
       </p>
       {restored?.map((line) => (
         <p key={line} className="break-words text-xs text-destructive">

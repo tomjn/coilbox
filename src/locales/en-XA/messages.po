@@ -32134,6 +32134,10 @@ msgstr ""
 msgid "Restored {name}, switched off."
 msgstr ""
 
+#: src/widgets/pages/RemoveWidget.tsx
+msgid "Restored {name}."
+msgstr ""
+
 #: src/content/pages/components/Convert3doDrawer.tsx
 msgid "Restored {restored, plural, one {# file} other {# files}} to how they were before the install."
 msgstr ""

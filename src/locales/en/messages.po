@@ -32135,6 +32135,10 @@ msgstr "Restored {archive}'s original models and unit definitions."
 msgid "Restored {name}, switched off."
 msgstr "Restored {name}, switched off."
 
+#: src/widgets/pages/RemoveWidget.tsx
+msgid "Restored {name}."
+msgstr "Restored {name}."
+
 #: src/content/pages/components/Convert3doDrawer.tsx
 msgid "Restored {restored, plural, one {# file} other {# files}} to how they were before the install."
 msgstr "Restored {restored, plural, one {# file} other {# files}} to how they were before the install."
