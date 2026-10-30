@@ -313,9 +313,10 @@ describe("writeSettings", () => {
     expect(() =>
       write([stale], NESTED_FILE.replace("size = 12", "size = 13")),
     ).toThrow(/changed after/);
-    // A reordering that leaves it in place is fine.
-    expect(write([stale], NESTED_FILE.replace("size = 12", "size = 12"))).toBe(
-      NESTED_FILE.replace("size = 12", "size = 20"),
+    // A file that differs only in spacing still holds the setting that was shown.
+    const spaced = NESTED_FILE.replace("size = 12", "size   =   12");
+    expect(write([stale], spaced)).toBe(
+      spaced.replace("size   =   12", "size   =   20"),
     );
   });
 });
