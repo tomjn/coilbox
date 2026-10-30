@@ -33,7 +33,8 @@ import {
 } from "@/content/pages/components/states";
 import { errorText } from "@/lib/helpers";
 import { usePlay } from "@/play/PlayProvider";
-import { gameWidgetRows, gameWidgetStates } from "../gameWidgets";
+import { newConfigText } from "../gameHandler";
+import { gameWidgetRows, gameWidgetStates, resetNames } from "../gameWidgets";
 import { useGameFiles } from "../useGameFiles";
 import { useGameWidgets } from "../useGameWidgets";
 import { useWidgetList } from "../useWidgetList";
@@ -45,6 +46,7 @@ import {
   rowsForGame,
   type WidgetRow,
 } from "../widgetList";
+import { resetEntries } from "../widgetRemoval";
 import {
   appliedSet,
   dropOverride,
@@ -61,6 +63,7 @@ import {
   type RemovedWidget,
   RemoveWidgetButton,
 } from "./RemoveWidget";
+import { ResetGameWidgets } from "./ResetGameWidgets";
 import { type SettingsTarget, WidgetSettingsDrawer } from "./WidgetSettings";
 
 /** The picker's value for the list of every widget file. Not empty, because
@@ -69,8 +72,9 @@ const ALL = "all-games";
 
 /**
  * Library > Widgets (issue #1284): the widget files a player has added under
- * `LuaUI/` of any content root, what each one declares, and which installed
- * games load it. With more than one root, each row shows where its file is.
+ * `LuaUI/` of any content root and what each one declares. A row says so when
+ * no installed game loads it. With more than one root, each row shows where its
+ * file is.
  * `?game=` picks one game, by name or by the full name of one of its versions,
  * which is how a game's page links here.
  *
@@ -118,18 +122,58 @@ export default function WidgetsPage() {
   );
   const switchOwn = async (name: string, on: boolean) => {
     if (!game?.handler || !list.configDir) return;
+    const { handler } = game;
+    const { enginePath, widgetDir: dataDir } = list;
+    const item = list.installed?.find(
+      (g) => g.name === (game.versions?.[0] ?? game.game),
+    );
     try {
-      await writeWidgetStates({
+      const out = await writeWidgetStates({
         io: appFileIO,
         writeDir: list.configDir,
-        config: game.handler.config,
+        config: handler.config,
         shortName: game.shortName ?? "",
         states: new Map([[name, on]]),
+        create:
+          enginePath && dataDir && item
+            ? () => newConfigText(enginePath, dataDir, item, handler)
+            : undefined,
       });
-      setOwnError(null);
+      setOwnError(
+        out ? null : t`Coilbox could not create ${game.game}'s settings file.`,
+      );
     } catch (e) {
       setOwnError(errorText(e));
     }
+    await files.reload();
+  };
+  const ownStates = useMemo(
+    () =>
+      ownRows && (file?.kind === "ready" || file?.kind === "missing")
+        ? gameWidgetStates(
+            ownRows,
+            file.kind === "ready" ? file.order : new Map(),
+          )
+        : null,
+    [ownRows, file],
+  );
+  // Only a widget the file has moved away from its default has anything to
+  // reset. A game saves every widget it knows, so most entries match it.
+  const ownChanged = useMemo(() => {
+    if (!ownRows || !ownStates) return false;
+    const defaults = gameWidgetStates(ownRows, new Map());
+    return Object.keys(ownStates).some((n) => ownStates[n] !== defaults[n]);
+  }, [ownRows, ownStates]);
+  const resetOwn = async () => {
+    if (!game?.handler || !list.configDir || !ownRows) return;
+    await resetEntries({
+      io: appFileIO,
+      writeDir: list.configDir,
+      game: { ...game, handler: game.handler },
+      names: resetNames(ownRows, game.game, list.rows ?? []),
+      gameRunning: running,
+    });
+    setOwnError(null);
     await files.reload();
   };
 
@@ -184,12 +228,17 @@ export default function WidgetsPage() {
   };
 
   const busy = !!list.widgetDir && ((!shown && !list.error) || list.reading);
+  const columns: TableColumns = {
+    on: picked === ALL || key !== null,
+    settings: !!game?.handler && !!list.configDir,
+    remove: !!list.widgetDir && !!list.configDir && !!list.games && !!shown,
+  };
 
   return (
     <div className="flex flex-col gap-4 p-4">
       <PageHeader
         title={t`Widgets`}
-        description={t`The widgets you have added to your games, and which games load each one.`}
+        description={t`The widgets you have added to your games.`}
         actions={
           list.widgetDir && (
             <div className="flex gap-2">
@@ -272,14 +321,6 @@ export default function WidgetsPage() {
               <ErrorBanner key={name} message={`${name}: ${f.error}`} />
             ),
         )}
-      {game && file?.kind === "missing" && (
-        <p role="status" className="text-sm text-muted-foreground">
-          <Trans>
-            {game.game} has not saved its widget settings yet, so these apply
-            from the launch after it first does.
-          </Trans>
-        </p>
-      )}
       {game && key !== null && ownSet && (
         <div className="flex items-center gap-3">
           <p role="status" className="text-sm text-muted-foreground">
@@ -290,6 +331,7 @@ export default function WidgetsPage() {
           <Button
             variant="outline"
             size="sm"
+            disabled={running}
             onClick={() => updateSets((s) => dropOverride(s, key))}
           >
             <Trans>Use the widgets for all games</Trans>
@@ -297,113 +339,161 @@ export default function WidgetsPage() {
         </div>
       )}
 
-      {game?.handler && (
-        <h2 className="text-sm font-medium">
-          <Trans>Your widgets</Trans>
-        </h2>
-      )}
-      {list.targets.length === 0 ? null : busy ? (
-        <SkeletonList />
-      ) : shown && shown.length === 0 ? (
-        <EmptyState
-          icon={Puzzle}
-          label={
-            game?.handler
-              ? t`${game.game} loads none of your widgets.`
-              : t`No widgets.`
-          }
-        />
-      ) : (
-        shown && (
-          <WidgetTable
-            rows={shown}
-            showGames={!game && list.gamesKnown}
-            someUnknown={!!list.games?.some((g) => g.handler === null)}
-            showRoot={list.roots.length > 1}
-            onSettings={
-              game?.handler && list.configDir
-                ? (row) => setSettingsFile(fileKey(row))
-                : undefined
-            }
-            canSettings={(row) => !!game && !!settingsSwitch(row, game.game)}
-            renderRemove={
-              list.widgetDir && list.configDir && list.games && shown
-                ? (row) => (
-                    <RemoveWidgetButton
-                      row={row}
-                      rows={list.rows ?? []}
-                      games={list.games ?? []}
-                      writeDir={list.configDir ?? ""}
+      {list.targets.length > 0 && (
+        <WidgetTable
+          columns={columns}
+          showHeader={!!shown?.length || !!(game?.handler && ownRows?.length)}
+        >
+          <TableBody>
+            {game?.handler && (
+              <SectionHeading columns={columns}>
+                <Trans>Your widgets</Trans>
+              </SectionHeading>
+            )}
+            {busy ? (
+              <SectionMessage columns={columns}>
+                <SkeletonList />
+              </SectionMessage>
+            ) : shown && shown.length === 0 ? (
+              <SectionMessage columns={columns}>
+                <EmptyState
+                  icon={Puzzle}
+                  label={
+                    game?.handler
+                      ? t`${game.game} loads none of your widgets.`
+                      : t`No widgets.`
+                  }
+                />
+              </SectionMessage>
+            ) : (
+              shown && (
+                <WidgetRows
+                  rows={shown}
+                  columns={columns}
+                  flagUnloaded={!game && list.gamesKnown}
+                  someUnknown={!!list.games?.some((g) => g.handler === null)}
+                  showRoot={list.roots.length > 1}
+                  onSettings={
+                    columns.settings
+                      ? (row) => setSettingsFile(fileKey(row))
+                      : undefined
+                  }
+                  canSettings={(row) =>
+                    !!game && !!settingsSwitch(row, game.game)
+                  }
+                  renderRemove={
+                    columns.remove
+                      ? (row) => (
+                          <RemoveWidgetButton
+                            row={row}
+                            rows={list.rows ?? []}
+                            games={list.games ?? []}
+                            writeDir={list.configDir ?? ""}
+                            running={running}
+                            onRemoved={(done) => {
+                              setRemoved((all) => [...all, done]);
+                              setSettingsFile(null);
+                              reread();
+                            }}
+                          />
+                        )
+                      : undefined
+                  }
+                  switches={
+                    picked === ALL
+                      ? {
+                          game: null,
+                          set: sets.global,
+                          toggle: (name, on) =>
+                            updateSets((s) => switchIn(s, null, name, on)),
+                          disabled: running,
+                        }
+                      : game && key !== null
+                        ? {
+                            game: game.game,
+                            // With no file, an unchosen widget takes its
+                            // default in the handler.
+                            set:
+                              file?.kind === "missing"
+                                ? {
+                                    ...gameWidgetStates(shown, new Map()),
+                                    ...appliedSet(sets, key),
+                                  }
+                                : appliedSet(sets, key),
+                            toggle: (name, on) =>
+                              updateSets((s) => switchIn(s, key, name, on)),
+                            disabled: running,
+                          }
+                        : undefined
+                  }
+                />
+              )
+            )}
+          </TableBody>
+          {game?.handler && (
+            <TableBody>
+              <SectionHeading
+                columns={columns}
+                action={
+                  ownChanged && (
+                    <ResetGameWidgets
+                      game={game.game}
                       running={running}
-                      onRemoved={(done) => {
-                        setRemoved((all) => [...all, done]);
-                        setSettingsFile(null);
-                        reread();
-                      }}
+                      onReset={resetOwn}
                     />
                   )
-                : undefined
-            }
-            switches={
-              picked === ALL
-                ? {
-                    game: null,
-                    set: sets.global,
-                    toggle: (name, on) =>
-                      updateSets((s) => switchIn(s, null, name, on)),
-                  }
-                : game && key !== null
-                  ? {
-                      game: game.game,
-                      set: appliedSet(sets, key),
-                      toggle: (name, on) =>
-                        updateSets((s) => switchIn(s, key, name, on)),
-                    }
-                  : undefined
-            }
-          />
-        )
-      )}
-      {game?.handler && (
-        <section className="flex flex-col gap-4">
-          <h2 className="text-sm font-medium">
-            <Trans>{game.game}'s own widgets</Trans>
-          </h2>
-          {own.errors.map((e) => (
-            <ErrorBanner key={e} message={e} />
-          ))}
-          {ownError && <ErrorBanner message={ownError} />}
-          {own.reading || (!ownRows && own.errors.length === 0) ? (
-            <SkeletonList />
-          ) : ownRows && ownRows.length === 0 ? (
-            <EmptyState
-              icon={Puzzle}
-              label={t`${game.game} ships no widgets.`}
-            />
-          ) : (
-            ownRows && (
-              <WidgetTable
-                rows={ownRows}
-                showGames={false}
-                someUnknown={false}
-                showRoot={false}
-                canSettings={() => false}
-                switches={
-                  file?.kind === "ready"
-                    ? {
-                        game: game.game,
-                        set: gameWidgetStates(ownRows, file.order),
-                        toggle: (name, on) => void switchOwn(name, on),
-                        // The game saves its own file when it exits, over
-                        // anything written while it runs.
-                        disabled: running,
-                      }
-                    : undefined
                 }
-              />
-            )
+              >
+                <Trans>{game.game}'s own widgets</Trans>
+              </SectionHeading>
+              {(own.errors.length > 0 || ownError) && (
+                <SectionMessage columns={columns}>
+                  <div className="flex flex-col gap-4">
+                    {own.errors.map((e) => (
+                      <ErrorBanner key={e} message={e} />
+                    ))}
+                    {ownError && <ErrorBanner message={ownError} />}
+                  </div>
+                </SectionMessage>
+              )}
+              {own.reading || (!ownRows && own.errors.length === 0) ? (
+                <SectionMessage columns={columns}>
+                  <SkeletonList />
+                </SectionMessage>
+              ) : ownRows && ownRows.length === 0 ? (
+                <SectionMessage columns={columns}>
+                  <EmptyState
+                    icon={Puzzle}
+                    label={t`${game.game} ships no widgets.`}
+                  />
+                </SectionMessage>
+              ) : (
+                ownRows && (
+                  <WidgetRows
+                    rows={ownRows}
+                    columns={columns}
+                    flagUnloaded={false}
+                    someUnknown={false}
+                    showRoot={false}
+                    canSettings={() => false}
+                    switches={
+                      ownStates
+                        ? {
+                            game: game.game,
+                            set: ownStates,
+                            toggle: (name, on) => void switchOwn(name, on),
+                            // The game saves its own file when it exits, over
+                            // anything written while it runs.
+                            disabled: running,
+                          }
+                        : undefined
+                    }
+                  />
+                )
+              )}
+            </TableBody>
           )}
-        </section>
+        </WidgetTable>
       )}
       <SlideDrawer
         open={adding}
@@ -503,9 +593,115 @@ function Declared({
   return <span className="text-muted-foreground">{missing}</span>;
 }
 
+/** The optional columns of the table, the same for every section of it. */
+interface TableColumns {
+  on: boolean;
+  settings: boolean;
+  remove: boolean;
+}
+
+function columnCount({ on, settings, remove }: TableColumns): number {
+  return 3 + Number(on) + Number(settings) + Number(remove);
+}
+
+/** One table for a player's widgets and the game's own, so their columns line
+ *  up whatever each section holds. */
 function WidgetTable({
+  columns,
+  showHeader,
+  children,
+}: {
+  columns: TableColumns;
+  showHeader: boolean;
+  children: ReactNode;
+}) {
+  return (
+    <Table>
+      {showHeader && (
+        <TableHeader>
+          <TableRow>
+            {columns.on && (
+              <TableHead className="w-0">
+                <Trans>On</Trans>
+              </TableHead>
+            )}
+            <TableHead className="w-full">
+              <Trans>Widget</Trans>
+            </TableHead>
+            <TableHead className="w-0">
+              <Trans>Version</Trans>
+            </TableHead>
+            <TableHead className="w-0">
+              <Trans>Author</Trans>
+            </TableHead>
+            {columns.settings && (
+              <TableHead className="w-0">
+                <span className="sr-only">
+                  <Trans>Settings</Trans>
+                </span>
+              </TableHead>
+            )}
+            {columns.remove && (
+              <TableHead className="w-0">
+                <span className="sr-only">
+                  <Trans>Remove</Trans>
+                </span>
+              </TableHead>
+            )}
+          </TableRow>
+        </TableHeader>
+      )}
+      {children}
+    </Table>
+  );
+}
+
+function SectionHeading({
+  columns,
+  action,
+  children,
+}: {
+  columns: TableColumns;
+  action?: ReactNode;
+  children: ReactNode;
+}) {
+  return (
+    <TableRow className="hover:bg-transparent">
+      <TableHead
+        scope="rowgroup"
+        colSpan={columnCount(columns)}
+        className="h-12 align-bottom text-sm font-medium"
+      >
+        <div className="flex items-center justify-between gap-2">
+          {children}
+          {action}
+        </div>
+      </TableHead>
+    </TableRow>
+  );
+}
+
+/** Something in place of a section's rows, as wide as the table. */
+function SectionMessage({
+  columns,
+  children,
+}: {
+  columns: TableColumns;
+  children: ReactNode;
+}) {
+  return (
+    <TableRow className="hover:bg-transparent">
+      <TableCell colSpan={columnCount(columns)} className="whitespace-normal">
+        {children}
+      </TableCell>
+    </TableRow>
+  );
+}
+
+function WidgetRows({
   rows,
-  showGames,
+  columns,
+  flagUnloaded,
   someUnknown,
   showRoot,
   switches,
@@ -514,7 +710,9 @@ function WidgetTable({
   renderRemove,
 }: {
   rows: readonly WidgetRow[];
-  showGames: boolean;
+  columns: TableColumns;
+  /** Say so on a row that no game loads. */
+  flagUnloaded: boolean;
   /** More than one content root is read, so each row says which it is in. */
   showRoot: boolean;
   /** Some installed game's handler is not recognised, so a file no recognised
@@ -530,141 +728,92 @@ function WidgetTable({
 }) {
   const { t } = useLingui();
   return (
-    <Table>
-      <TableHeader>
-        <TableRow>
-          {switches && (
-            <TableHead className="w-0">
-              <Trans>On</Trans>
-            </TableHead>
+    <>
+      {rows.map((row) => (
+        <TableRow key={fileKey(row)} className="align-top">
+          {columns.on && (
+            <TableCell>
+              {switches && <RowSwitch row={row} switches={switches} />}
+            </TableCell>
           )}
-          <TableHead>
-            <Trans>Widget</Trans>
-          </TableHead>
-          <TableHead>
-            <Trans>Version</Trans>
-          </TableHead>
-          <TableHead>
-            <Trans>Author</Trans>
-          </TableHead>
-          <TableHead>
-            <Trans>Licence</Trans>
-          </TableHead>
-          {showGames && (
-            <TableHead>
-              <Trans>Loaded by</Trans>
-            </TableHead>
-          )}
-          {onSettings && (
-            <TableHead className="w-0">
-              <span className="sr-only">
-                <Trans>Settings</Trans>
+          <TableCell className="whitespace-normal">
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="font-medium">
+                {row.info?.name || fileName(row.path)}
               </span>
-            </TableHead>
-          )}
-          {renderRemove && (
-            <TableHead className="w-0">
-              <span className="sr-only">
-                <Trans>Remove</Trans>
-              </span>
-            </TableHead>
-          )}
-        </TableRow>
-      </TableHeader>
-      <TableBody>
-        {rows.map((row) => (
-          <TableRow key={fileKey(row)} className="align-top">
-            {switches && (
-              <TableCell>
-                <RowSwitch row={row} switches={switches} />
-              </TableCell>
-            )}
-            <TableCell className="max-w-md whitespace-normal">
-              <div className="flex flex-wrap items-center gap-2">
-                <span className="font-medium">
-                  {row.info?.name || fileName(row.path)}
-                </span>
-                {row.coilbox && (
-                  <Badge variant="secondary">
-                    <Trans>Coilbox</Trans>
-                  </Badge>
-                )}
-              </div>
-              {row.info?.desc && (
-                <p className="text-sm text-muted-foreground">{row.info.desc}</p>
+              {row.coilbox && (
+                <Badge variant="secondary">
+                  <Trans>Coilbox</Trans>
+                </Badge>
               )}
-              <p className="break-all font-mono text-xs text-muted-foreground">
-                {showRoot ? fullPath(row) : row.path}
+            </div>
+            {row.info?.desc && (
+              <p className="text-sm text-muted-foreground">{row.info.desc}</p>
+            )}
+            <p className="break-all font-mono text-xs text-muted-foreground">
+              {showRoot ? fullPath(row) : row.path}
+            </p>
+            {row.error && (
+              <p className="break-words text-xs text-destructive">
+                {t`Could not read: ${row.error}`}
               </p>
-              {row.error && (
+            )}
+            {row.switch.kind === "none" &&
+              row.switch.reason === "duplicate" && (
                 <p className="break-words text-xs text-destructive">
-                  {t`Could not read: ${row.error}`}
+                  {t`Has the same name as ${row.switch.others.join(", ")}, so they share one setting.`}
                 </p>
               )}
-              {row.switch.kind === "none" &&
-                row.switch.reason === "duplicate" && (
-                  <p className="break-words text-xs text-destructive">
-                    {t`Has the same name as ${row.switch.others.join(", ")}, so they share one setting.`}
-                  </p>
+            {row.switch.kind === "none" &&
+              row.switch.reason === "experimental" && (
+                <p className="break-words text-xs text-muted-foreground">
+                  {t`A game saves this under a name that depends on its version.`}
+                </p>
+              )}
+            {flagUnloaded && row.loadedBy.length === 0 && (
+              <p className="text-xs text-muted-foreground">
+                {someUnknown ? (
+                  <Trans>No game coilbox recognises loads this.</Trans>
+                ) : (
+                  <Trans>No installed game loads this.</Trans>
                 )}
-              {row.switch.kind === "none" &&
-                row.switch.reason === "experimental" && (
-                  <p className="break-words text-xs text-muted-foreground">
-                    {t`A game saves this under a name that depends on its version.`}
-                  </p>
-                )}
-            </TableCell>
-            <TableCell>{row.info?.version ?? ""}</TableCell>
-            <TableCell className="whitespace-normal">
+              </p>
+            )}
+          </TableCell>
+          <TableCell>
+            <div className="w-24 whitespace-normal [overflow-wrap:anywhere]">
+              {row.info?.version ?? ""}
+            </div>
+          </TableCell>
+          <TableCell>
+            <div className="w-48 whitespace-normal [overflow-wrap:anywhere]">
               <Declared
                 value={row.info?.author}
                 known={!!row.info}
                 missing={t`No author stated`}
               />
+            </div>
+          </TableCell>
+          {columns.settings && (
+            <TableCell>
+              {onSettings && canSettings(row) && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => onSettings(row)}
+                  aria-label={t`Settings of ${row.info?.name || fileName(row.path)}`}
+                >
+                  <SlidersHorizontal />
+                  <Trans>Settings</Trans>
+                </Button>
+              )}
             </TableCell>
-            <TableCell className="whitespace-normal">
-              <Declared
-                value={row.info?.license}
-                known={!!row.info}
-                missing={t`No licence stated`}
-              />
-            </TableCell>
-            {showGames && (
-              <TableCell className="whitespace-normal text-sm">
-                {row.loadedBy.length > 0 ? (
-                  row.loadedBy.join(", ")
-                ) : (
-                  <span className="text-muted-foreground">
-                    {someUnknown ? (
-                      <Trans>No game coilbox recognises</Trans>
-                    ) : (
-                      <Trans>No installed game</Trans>
-                    )}
-                  </span>
-                )}
-              </TableCell>
-            )}
-            {onSettings && (
-              <TableCell>
-                {canSettings(row) && (
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => onSettings(row)}
-                    aria-label={t`Settings of ${row.info?.name || fileName(row.path)}`}
-                  >
-                    <SlidersHorizontal />
-                    <Trans>Settings</Trans>
-                  </Button>
-                )}
-              </TableCell>
-            )}
-            {renderRemove && (
-              <TableCell>{!row.coilbox && renderRemove(row)}</TableCell>
-            )}
-          </TableRow>
-        ))}
-      </TableBody>
-    </Table>
+          )}
+          {columns.remove && (
+            <TableCell>{!row.coilbox && renderRemove?.(row)}</TableCell>
+          )}
+        </TableRow>
+      ))}
+    </>
   );
 }

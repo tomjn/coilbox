@@ -1336,11 +1336,6 @@ msgstr ""
 
 #. placeholder {0}: game.game
 #: src/widgets/pages/WidgetsPage.tsx
-msgid "{0} has not saved its widget settings yet, so these apply from the launch after it first does."
-msgstr ""
-
-#. placeholder {0}: game.game
-#: src/widgets/pages/WidgetsPage.tsx
 msgid "{0} loads none of your widgets."
 msgstr ""
 
@@ -13918,6 +13913,7 @@ msgstr "Kann der eigenen Einheit nicht schaden"
 #: src/uberstress/pages/RunPage.tsx
 #: src/widgets/pages/AddWidgetDrawer.tsx
 #: src/widgets/pages/RemoveWidget.tsx
+#: src/widgets/pages/ResetGameWidgets.tsx
 #: src/workshop/pages/components/CloneActions.tsx
 #: src/workshop/pages/components/DiskDiffDrawer.tsx
 #: src/workshop/pages/components/InPlaceWrite.tsx
@@ -15523,6 +15519,15 @@ msgstr "Coilbox konnte es nicht schließen: {reason}."
 #, fuzzy
 msgid "Coilbox could not close it: {reason}. Stop it from the Battles page."
 msgstr "Coilbox konnte es nicht schließen: {reason}. Beenden Sie es auf der Seite „Partien“."
+
+#. placeholder {0}: game.game
+#: src/widgets/pages/WidgetsPage.tsx
+msgid "Coilbox could not create {0}'s settings file."
+msgstr ""
+
+#: src/widgets/widgetSync.ts
+msgid "Coilbox could not create the game's settings file."
+msgstr ""
 
 #: src/multiplayer/battles/joinBattle.ts
 #, fuzzy
@@ -27463,10 +27468,6 @@ msgstr "Bibliothekswaffe {weaponKey}"
 msgid "libwebp refused the picture."
 msgstr "libwebp hat das Bild abgelehnt."
 
-#: src/widgets/pages/WidgetsPage.tsx
-msgid "Licence"
-msgstr ""
-
 #: src/workshop/explosionGenerators.ts
 #, fuzzy
 msgid "Lifetime"
@@ -27686,10 +27687,6 @@ msgstr "{loadedName} geladen"
 #, fuzzy
 msgid "Loaded {loadedName}, with parts missing"
 msgstr "{loadedName} geladen, mit fehlenden Bauteilen"
-
-#: src/widgets/pages/WidgetsPage.tsx
-msgid "Loaded by"
-msgstr ""
 
 #: src/play/pages/SkirmishPage.tsx
 #, fuzzy
@@ -31299,7 +31296,7 @@ msgid "No game"
 msgstr "Kein Spiel"
 
 #: src/widgets/pages/WidgetsPage.tsx
-msgid "No game coilbox recognises"
+msgid "No game coilbox recognises loads this."
 msgstr ""
 
 #: src/profile/health.ts
@@ -31442,7 +31439,7 @@ msgid "No image files matched in this game's archive."
 msgstr "Im Archiv dieses Spiels passten keine Bilddateien."
 
 #: src/widgets/pages/WidgetsPage.tsx
-msgid "No installed game"
+msgid "No installed game loads this."
 msgstr ""
 
 #: src/widgets/pages/AddWidgetDrawer.tsx
@@ -31479,10 +31476,6 @@ msgstr "Kein Einladungslink für diese Partie. {inviteProblem}"
 #, fuzzy
 msgid "No leftover dialogue clips - nothing to reclaim."
 msgstr "Keine übrig gebliebenen Dialog-Clips – nichts freizugeben."
-
-#: src/widgets/pages/WidgetsPage.tsx
-msgid "No licence stated"
-msgstr ""
 
 #: src/content/pages/components/LivingValueChart.tsx
 #, fuzzy
@@ -37004,6 +36997,10 @@ msgstr "Pulsar"
 msgid "Purple"
 msgstr "Lila"
 
+#: src/widgets/pages/ResetGameWidgets.tsx
+msgid "Put {game}'s own widgets back to their defaults?"
+msgstr ""
+
 #: src/multiplayer/chat/PartySection.tsx
 #, fuzzy
 msgid "Put {name} out of the party"
@@ -39427,6 +39424,7 @@ msgstr "Bestätigungs-E-Mail erneut senden"
 #: src/lego/pages/components/AnimationPanel.tsx
 #: src/lego/pages/components/ProportionsPanel.tsx
 #: src/play/pages/components/GameOptionsPanel.tsx
+#: src/widgets/pages/ResetGameWidgets.tsx
 #, fuzzy
 msgid "Reset"
 msgstr "Zurücksetzen"
@@ -39435,6 +39433,10 @@ msgstr "Zurücksetzen"
 #, fuzzy
 msgid "Reset {eventLabel} to {defaultSoundLabel}"
 msgstr "{eventLabel} auf {defaultSoundLabel} zurücksetzen"
+
+#: src/widgets/pages/ResetGameWidgets.tsx
+msgid "Reset {game}'s own widgets"
+msgstr ""
 
 #: src/play/pages/components/GameOptionsPanel.tsx
 #, fuzzy
@@ -48429,7 +48431,7 @@ msgid "The whole selection swung a quarter turn about its own middle, so it keep
 msgstr "Die ganze Auswahl wurde um ihre eigene Mitte eine Vierteldrehung gedreht und behält so ihre Form. Drücken Sie R, um stattdessen jedes Element an Ort und Stelle zu drehen."
 
 #: src/widgets/pages/WidgetsPage.tsx
-msgid "The widgets you have added to your games, and which games load each one."
+msgid "The widgets you have added to your games."
 msgstr ""
 
 #: src/content/pages/components/MapAggregate.tsx

@@ -28,6 +28,7 @@ import {
   findData,
   LuaSyntaxError,
   returnedTable,
+  rewriteConfig,
   type Table,
   unreadable,
   writeWithBackup,
@@ -352,6 +353,32 @@ export async function removeEntries({
       out.failed.push(`${file.games.join(", ")}: ${errorText(e)}`);
     }
   }
+}
+
+/**
+ * Take `names` out of the game's order table, which puts those widgets back to
+ * their defaults, and leaves their saved settings alone. The file is copied
+ * first. Refuses while a game is running, which writes the file back.
+ */
+export async function resetEntries({
+  io,
+  writeDir,
+  game,
+  names,
+  gameRunning,
+}: {
+  io: ConfigFileIO;
+  writeDir: string;
+  game: RecognisedGame;
+  names: readonly string[];
+  gameRunning: boolean;
+}): Promise<void> {
+  if (gameRunning) throw gameIsRunning();
+  const { config } = game.handler;
+  await rewriteConfig(
+    { io, writeDir, config, shortName: game.shortName ?? "" },
+    (text) => dropEntries(text, config, "order", names).text,
+  );
 }
 
 function gameIsRunning(): Error {

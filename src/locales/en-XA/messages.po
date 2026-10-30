@@ -1109,11 +1109,6 @@ msgstr ""
 
 #. placeholder {0}: game.game
 #: src/widgets/pages/WidgetsPage.tsx
-msgid "{0} has not saved its widget settings yet, so these apply from the launch after it first does."
-msgstr ""
-
-#. placeholder {0}: game.game
-#: src/widgets/pages/WidgetsPage.tsx
 msgid "{0} loads none of your widgets."
 msgstr ""
 
@@ -11262,6 +11257,7 @@ msgstr ""
 #: src/uberstress/pages/RunPage.tsx
 #: src/widgets/pages/AddWidgetDrawer.tsx
 #: src/widgets/pages/RemoveWidget.tsx
+#: src/widgets/pages/ResetGameWidgets.tsx
 #: src/workshop/pages/components/CloneActions.tsx
 #: src/workshop/pages/components/DiskDiffDrawer.tsx
 #: src/workshop/pages/components/InPlaceWrite.tsx
@@ -12579,6 +12575,15 @@ msgstr ""
 
 #: src/multiplayer/pages/BattleRoomPage.tsx
 msgid "Coilbox could not close it: {reason}. Stop it from the Battles page."
+msgstr ""
+
+#. placeholder {0}: game.game
+#: src/widgets/pages/WidgetsPage.tsx
+msgid "Coilbox could not create {0}'s settings file."
+msgstr ""
+
+#: src/widgets/widgetSync.ts
+msgid "Coilbox could not create the game's settings file."
 msgstr ""
 
 #: src/multiplayer/battles/joinBattle.ts
@@ -22268,10 +22273,6 @@ msgstr ""
 msgid "libwebp refused the picture."
 msgstr ""
 
-#: src/widgets/pages/WidgetsPage.tsx
-msgid "Licence"
-msgstr ""
-
 #: src/workshop/explosionGenerators.ts
 msgid "Lifetime"
 msgstr ""
@@ -22447,10 +22448,6 @@ msgstr ""
 
 #: src/lego/moduleFileIo.ts
 msgid "Loaded {loadedName}, with parts missing"
-msgstr ""
-
-#: src/widgets/pages/WidgetsPage.tsx
-msgid "Loaded by"
 msgstr ""
 
 #: src/play/pages/SkirmishPage.tsx
@@ -25380,7 +25377,7 @@ msgid "No game"
 msgstr ""
 
 #: src/widgets/pages/WidgetsPage.tsx
-msgid "No game coilbox recognises"
+msgid "No game coilbox recognises loads this."
 msgstr ""
 
 #: src/profile/health.ts
@@ -25496,7 +25493,7 @@ msgid "No image files matched in this game's archive."
 msgstr ""
 
 #: src/widgets/pages/WidgetsPage.tsx
-msgid "No installed game"
+msgid "No installed game loads this."
 msgstr ""
 
 #: src/widgets/pages/AddWidgetDrawer.tsx
@@ -25526,10 +25523,6 @@ msgstr ""
 
 #: src/scenario/pages/components/ReclaimClipsForm.tsx
 msgid "No leftover dialogue clips - nothing to reclaim."
-msgstr ""
-
-#: src/widgets/pages/WidgetsPage.tsx
-msgid "No licence stated"
 msgstr ""
 
 #: src/content/pages/components/LivingValueChart.tsx
@@ -29999,6 +29992,10 @@ msgstr ""
 msgid "Purple"
 msgstr ""
 
+#: src/widgets/pages/ResetGameWidgets.tsx
+msgid "Put {game}'s own widgets back to their defaults?"
+msgstr ""
+
 #: src/multiplayer/chat/PartySection.tsx
 msgid "Put {name} out of the party"
 msgstr ""
@@ -31973,11 +31970,16 @@ msgstr ""
 #: src/lego/pages/components/AnimationPanel.tsx
 #: src/lego/pages/components/ProportionsPanel.tsx
 #: src/play/pages/components/GameOptionsPanel.tsx
+#: src/widgets/pages/ResetGameWidgets.tsx
 msgid "Reset"
 msgstr ""
 
 #: src/sound/SoundSettings.tsx
 msgid "Reset {eventLabel} to {defaultSoundLabel}"
+msgstr ""
+
+#: src/widgets/pages/ResetGameWidgets.tsx
+msgid "Reset {game}'s own widgets"
 msgstr ""
 
 #: src/play/pages/components/GameOptionsPanel.tsx
@@ -39258,7 +39260,7 @@ msgid "The whole selection swung a quarter turn about its own middle, so it keep
 msgstr ""
 
 #: src/widgets/pages/WidgetsPage.tsx
-msgid "The widgets you have added to your games, and which games load each one."
+msgid "The widgets you have added to your games."
 msgstr ""
 
 #: src/content/pages/components/MapAggregate.tsx

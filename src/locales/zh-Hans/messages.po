@@ -1336,11 +1336,6 @@ msgstr ""
 
 #. placeholder {0}: game.game
 #: src/widgets/pages/WidgetsPage.tsx
-msgid "{0} has not saved its widget settings yet, so these apply from the launch after it first does."
-msgstr ""
-
-#. placeholder {0}: game.game
-#: src/widgets/pages/WidgetsPage.tsx
 msgid "{0} loads none of your widgets."
 msgstr ""
 
@@ -13918,6 +13913,7 @@ msgstr "不会伤害自己的单位"
 #: src/uberstress/pages/RunPage.tsx
 #: src/widgets/pages/AddWidgetDrawer.tsx
 #: src/widgets/pages/RemoveWidget.tsx
+#: src/widgets/pages/ResetGameWidgets.tsx
 #: src/workshop/pages/components/CloneActions.tsx
 #: src/workshop/pages/components/DiskDiffDrawer.tsx
 #: src/workshop/pages/components/InPlaceWrite.tsx
@@ -15523,6 +15519,15 @@ msgstr "Coilbox 无法关闭它：{reason}。"
 #, fuzzy
 msgid "Coilbox could not close it: {reason}. Stop it from the Battles page."
 msgstr "Coilbox 无法关闭它：{reason}。请在“对局”页面停止它。"
+
+#. placeholder {0}: game.game
+#: src/widgets/pages/WidgetsPage.tsx
+msgid "Coilbox could not create {0}'s settings file."
+msgstr ""
+
+#: src/widgets/widgetSync.ts
+msgid "Coilbox could not create the game's settings file."
+msgstr ""
 
 #: src/multiplayer/battles/joinBattle.ts
 #, fuzzy
@@ -27463,10 +27468,6 @@ msgstr "库武器 {weaponKey}"
 msgid "libwebp refused the picture."
 msgstr "libwebp 拒绝了该图片。"
 
-#: src/widgets/pages/WidgetsPage.tsx
-msgid "Licence"
-msgstr ""
-
 #: src/workshop/explosionGenerators.ts
 #, fuzzy
 msgid "Lifetime"
@@ -27686,10 +27687,6 @@ msgstr "已加载 {loadedName}"
 #, fuzzy
 msgid "Loaded {loadedName}, with parts missing"
 msgstr "已加载 {loadedName}，但缺少零件"
-
-#: src/widgets/pages/WidgetsPage.tsx
-msgid "Loaded by"
-msgstr ""
 
 #: src/play/pages/SkirmishPage.tsx
 #, fuzzy
@@ -31299,7 +31296,7 @@ msgid "No game"
 msgstr "无游戏"
 
 #: src/widgets/pages/WidgetsPage.tsx
-msgid "No game coilbox recognises"
+msgid "No game coilbox recognises loads this."
 msgstr ""
 
 #: src/profile/health.ts
@@ -31442,7 +31439,7 @@ msgid "No image files matched in this game's archive."
 msgstr "此游戏的归档中没有匹配的图片文件。"
 
 #: src/widgets/pages/WidgetsPage.tsx
-msgid "No installed game"
+msgid "No installed game loads this."
 msgstr ""
 
 #: src/widgets/pages/AddWidgetDrawer.tsx
@@ -31479,10 +31476,6 @@ msgstr "此房间没有邀请链接。{inviteProblem}"
 #, fuzzy
 msgid "No leftover dialogue clips - nothing to reclaim."
 msgstr "没有遗留的对白片段，无可释放。"
-
-#: src/widgets/pages/WidgetsPage.tsx
-msgid "No licence stated"
-msgstr ""
 
 #: src/content/pages/components/LivingValueChart.tsx
 #, fuzzy
@@ -37004,6 +36997,10 @@ msgstr "脉冲星"
 msgid "Purple"
 msgstr "紫色"
 
+#: src/widgets/pages/ResetGameWidgets.tsx
+msgid "Put {game}'s own widgets back to their defaults?"
+msgstr ""
+
 #: src/multiplayer/chat/PartySection.tsx
 #, fuzzy
 msgid "Put {name} out of the party"
@@ -39427,6 +39424,7 @@ msgstr "重新发送验证邮件"
 #: src/lego/pages/components/AnimationPanel.tsx
 #: src/lego/pages/components/ProportionsPanel.tsx
 #: src/play/pages/components/GameOptionsPanel.tsx
+#: src/widgets/pages/ResetGameWidgets.tsx
 #, fuzzy
 msgid "Reset"
 msgstr "重置"
@@ -39435,6 +39433,10 @@ msgstr "重置"
 #, fuzzy
 msgid "Reset {eventLabel} to {defaultSoundLabel}"
 msgstr "将 {eventLabel} 重置为 {defaultSoundLabel}"
+
+#: src/widgets/pages/ResetGameWidgets.tsx
+msgid "Reset {game}'s own widgets"
+msgstr ""
 
 #: src/play/pages/components/GameOptionsPanel.tsx
 #, fuzzy
@@ -48429,7 +48431,7 @@ msgid "The whole selection swung a quarter turn about its own middle, so it keep
 msgstr "整个选择围绕自身中心转动了四分之一圈，所以形状保持不变。按 R 可改为让每个对象原地旋转。"
 
 #: src/widgets/pages/WidgetsPage.tsx
-msgid "The widgets you have added to your games, and which games load each one."
+msgid "The widgets you have added to your games."
 msgstr ""
 
 #: src/content/pages/components/MapAggregate.tsx

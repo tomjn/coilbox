@@ -343,3 +343,22 @@ describe("loads", () => {
     ).toBe(false);
   });
 });
+
+describe("Complete Annihilation's handlers", () => {
+  it("tells the one that saves to the shared files from the later one", async () => {
+    const old = await recogniseHandler(
+      ["luaui/cawidgets.lua"],
+      async () =>
+        "local ORDER_FILENAME = LUAUI_DIRNAME .. 'Config/widget_order.lua'",
+    );
+    expect(old?.id).toBe("ca-old");
+    expect(old?.config.files).toEqual(["widget_order.lua"]);
+    const later = await recogniseHandler(
+      ["luaui/cawidgets.lua"],
+      async () =>
+        "local ORDER_FILENAME = LUAUI_DIRNAME .. 'Config/ZK_order.lua'",
+    );
+    expect(later?.id).toBe("ca");
+    expect(later?.source).toBe("luaui/cawidgets.lua");
+  });
+});

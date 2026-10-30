@@ -4,6 +4,8 @@ import type { WidgetConfigFile } from "./handlers";
 import {
   type ConfigFileIO,
   configCandidates,
+  detailLevelIn,
+  newConfigFile,
   readFlag,
   readLocalWidgets,
   readOrder,
@@ -432,6 +434,43 @@ describe("writeWidgetStates", () => {
     expect(written[`${path}.20261030-090530.bak`]).toBe(ENGINE_FILE);
   });
 
+  it("creates a file from what the caller says a new one holds, with no copy", async () => {
+    const { io, written } = memoryIO({});
+    const out = await writeWidgetStates({
+      ...request,
+      io,
+      states: new Map([["Minimap", false]]),
+      create: async () => newConfigFile(request.config, null, 2),
+    });
+    expect(out?.backup).toBeUndefined();
+    expect(out?.order).toEqual(new Map([["Minimap", 0]]));
+    expect(Object.keys(written)).toHaveLength(1);
+    expect(readBack(Object.values(written)[0])).toEqual(
+      readBack('return { order = { ["Minimap"] = 0 } }'),
+    );
+  });
+
+  it("creates no file when there is nothing to write or the caller cannot say", async () => {
+    const { io, written } = memoryIO({});
+    expect(
+      await writeWidgetStates({
+        ...request,
+        io,
+        states: new Map(),
+        create: async () => "return {}",
+      }),
+    ).toBeNull();
+    expect(
+      await writeWidgetStates({
+        ...request,
+        io,
+        states: new Map([["Minimap", true]]),
+        create: async () => null,
+      }),
+    ).toBeNull();
+    expect(written).toEqual({});
+  });
+
   it("does not create a file the game has not saved", async () => {
     const { io, written } = memoryIO({});
     expect(
@@ -472,5 +511,61 @@ describe("writeWidgetStates", () => {
         states: new Map([["Minimap", false]]),
       }),
     ).rejects.toThrow("permission denied");
+  });
+});
+
+describe("newConfigFile", () => {
+  const flat: WidgetConfigFile = { files: ["x_order.lua"], shape: "flat" };
+
+  it("gives a nested file an order table, whatever the handler", () => {
+    expect(newConfigFile({ files: ["x.lua"], shape: "nested" }, null, 2)).toBe(
+      "return {\n\torder = {\n\t},\n}\n",
+    );
+  });
+
+  it("gives a flat file the version and detail level its handler checks", () => {
+    const zeroK = `
+      local ORDER_VERSION = 8 --- change this to reset enabled/disabled widgets
+      if (self.orderList.version or 0) < ORDER_VERSION then
+        self.orderList.version = ORDER_VERSION
+      end
+      if (self.orderList.lastWidgetDetailLevel ~= detailLevel) then
+      end`;
+    expect(newConfigFile(flat, zeroK, 3)).toBe(
+      "return {\n\tversion = 8,\n\tlastWidgetDetailLevel = 3,\n}\n",
+    );
+  });
+
+  it("gives a flat file nothing its handler does not read", () => {
+    expect(newConfigFile(flat, "self.orderList = chunk()", 2)).toBe(
+      "return {\n}\n",
+    );
+  });
+
+  it("refuses when the handler checks a version it does not state", () => {
+    expect(
+      newConfigFile(flat, "if self.orderList.version < V then end", 2),
+    ).toBeNull();
+    expect(newConfigFile(flat, null, 2)).toBeNull();
+  });
+
+  it("makes a flat file that takes an entry and still reads back", () => {
+    const made = newConfigFile(
+      flat,
+      "local ORDER_VERSION = 8\nself.orderList.version = ORDER_VERSION",
+      2,
+    );
+    expect(made).not.toBeNull();
+    expect(readBack(writeOrder(made ?? "", "flat", "Radar", 0))).toEqual(
+      readBack('return { version = 8, ["Radar"] = 0 }'),
+    );
+  });
+});
+
+describe("detailLevelIn", () => {
+  it("reads the setting and falls back on the handlers' default", () => {
+    expect(detailLevelIn("a = 1\nwidgetDetailLevel = 4\n")).toBe(4);
+    expect(detailLevelIn("a = 1\n")).toBe(2);
+    expect(detailLevelIn(null)).toBe(2);
   });
 });

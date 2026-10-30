@@ -15,9 +15,10 @@
  * already on keeps its place. Which widgets to switch comes from the sets in
  * `widgetSets.ts` (#4844).
  *
- * A missing file is not created. Zero-K's handler throws away an order table
- * with no `version` key, so a file coilbox wrote from nothing could switch
- * every widget back to its default.
+ * A missing file is created only when the caller says what a new one holds
+ * ({@link newConfigFile}). Zero-K's handler throws away an order table with no
+ * `version` key, so a file written from nothing could switch every widget back
+ * to its default.
  */
 
 import { t } from "@lingui/core/macro";
@@ -627,6 +628,43 @@ export async function writeWithBackup(
   return backup;
 }
 
+/**
+ * What a new config file starts as, read from the source of the handler that
+ * will load it, so a game update that changes the format cannot make it wrong.
+ * A widget with no entry keeps its default, so it holds only what the handler
+ * needs in order to keep the entries. Null when that cannot be worked out.
+ *
+ * A flat file needs `version` where the handler checks it, or the handler throws
+ * the table away, and `lastWidgetDetailLevel` where it reads that, or the
+ * handler treats the load as a change of detail level and resets widgets that
+ * have a `detailsDefault`.
+ */
+export function newConfigFile(
+  config: WidgetConfigFile,
+  source: string | null,
+  detailLevel: number,
+): string | null {
+  if (config.shape === "nested") return "return {\n\torder = {\n\t},\n}\n";
+  if (source === null) return null;
+  let fields = "";
+  if (/\borderList\.version\b/.test(source)) {
+    const version = /\bORDER_VERSION\s*=\s*(\d+)/.exec(source)?.[1];
+    if (!version) return null;
+    fields += `\tversion = ${version},\n`;
+  }
+  if (source.includes("lastWidgetDetailLevel")) {
+    fields += `\tlastWidgetDetailLevel = ${detailLevel},\n`;
+  }
+  return `return {\n${fields}}\n`;
+}
+
+/** The `widgetDetailLevel` in an engine's settings file, or the 2 that handlers
+ *  fall back on when it has none. */
+export function detailLevelIn(settings: string | null): number {
+  const level = /^\s*widgetDetailLevel\s*=\s*(\d+)/m.exec(settings ?? "")?.[1];
+  return level ? Number(level) : 2;
+}
+
 export interface WriteRequest {
   io: ConfigFileIO;
   writeDir: string;
@@ -634,6 +672,9 @@ export interface WriteRequest {
   shortName: string;
   /** On or off for each widget, by its `GetInfo().name`. */
   states: ReadonlyMap<string, boolean>;
+  /** What a new file starts as, when the game has none yet. Without this, or
+   *  when it gives null, no file is created. */
+  create?: () => Promise<string | null>;
   /** When this is happening, which names the copy. Passed in so a test can say. */
   now?: Date;
 }
@@ -648,8 +689,8 @@ export interface WriteOutcome {
 
 /**
  * Give each widget in `states` an on or off entry in the game's config file.
- * Null, with nothing written, when the game has no file yet. Throws before
- * writing anything when the file cannot be read.
+ * Null, with nothing written, when the game has no file yet and none can be
+ * created. Throws before writing anything when the file cannot be read.
  */
 export function writeWidgetStates(
   request: WriteRequest,
@@ -669,11 +710,18 @@ async function writeStates({
   config,
   shortName,
   states,
+  create,
   now = new Date(),
 }: WriteRequest): Promise<WriteOutcome | null> {
   const found = await findConfig(io, writeDir, config, shortName);
-  if (!found) return null;
-  let text = found.text;
+  // The handler tries its names in order, so the first is the one it will read.
+  const first = configCandidates(config, shortName)[0];
+  const made =
+    !found && create && first && states.size > 0 ? await create() : null;
+  const start = found?.text ?? made;
+  if (start === null) return null;
+  const path = found?.path ?? underConfigDir(writeDir, first);
+  let text = start;
   let order = readOrder(text, config.shape);
   for (const [name, on] of states) {
     const current = order.get(name);
@@ -682,8 +730,38 @@ async function writeStates({
     text = writeOrder(text, config.shape, name, on ? 1 : 0);
     order = readOrder(text, config.shape);
   }
-  if (text === found.text) return { path: found.path, order };
+  if (!found) {
+    await io.write(path, text);
+    return { path, order };
+  }
+  if (text === found.text) return { path, order };
 
-  const backup = await writeWithBackup(io, found.path, found.text, text, now);
-  return { path: found.path, backup, order };
+  const backup = await writeWithBackup(io, path, found.text, text, now);
+  return { path, backup, order };
+}
+
+/**
+ * Change the game's config file with `change`, after the writes before it. The
+ * file is copied first. Null, with nothing written, when the game has no file.
+ */
+export function rewriteConfig(
+  {
+    io,
+    writeDir,
+    config,
+    shortName,
+    now = new Date(),
+  }: Omit<WriteRequest, "states" | "create">,
+  change: (text: string) => string,
+): Promise<{ path: string; backup?: string } | null> {
+  const next = writing.then(async () => {
+    const found = await findConfig(io, writeDir, config, shortName);
+    if (!found) return null;
+    const text = change(found.text);
+    if (text === found.text) return { path: found.path };
+    const backup = await writeWithBackup(io, found.path, found.text, text, now);
+    return { path: found.path, backup };
+  });
+  writing = next.catch(() => {});
+  return next;
 }

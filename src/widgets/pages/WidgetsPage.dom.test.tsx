@@ -141,6 +141,8 @@ vi.mock("../useWidgetList", () => ({
       : scan;
     return {
       targets: [{}],
+      enginePath: "/engines/2026.09.01",
+      installed: [{ name: "Metal Factions v2.58" }],
       widgetDir: ROOT,
       roots: list.second ? [ROOT, SECOND] : [ROOT],
       configDir: list.configDir,
@@ -255,7 +257,8 @@ describe("WidgetsPage", () => {
     page();
     expect(screen.getByText("BuildWatch")).toBeTruthy();
     expect(screen.getByText("Watches builds")).toBeTruthy();
-    expect(screen.getByText("GPLv2")).toBeTruthy();
+    // A licence matters to game developers, not to players.
+    expect(screen.queryByText("GPLv2")).toBeNull();
     expect(screen.getByText("someone")).toBeTruthy();
     expect(screen.getByText("2")).toBeTruthy();
     expect(screen.getByText("Coilbox")).toBeTruthy();
@@ -264,18 +267,20 @@ describe("WidgetsPage", () => {
         "Could not read: runtime error: attempt to perform arithmetic on a nil value",
       ),
     ).toBeTruthy();
-    // The nested file loads in no game, the other four in Metal Factions.
-    expect(screen.getAllByText("Metal Factions")).toHaveLength(4);
-    // Mystery's handler is not recognised, so it may still load that file.
-    expect(screen.getByText("No game coilbox recognises")).toBeTruthy();
+    // The nested file loads in no game, the other four in Metal Factions, which
+    // only the nested file's row needs to say anything about. Mystery's handler
+    // is not recognised, so it may still load that file.
+    expect(
+      screen.getAllByText("No game coilbox recognises loads this."),
+    ).toHaveLength(1);
+    expect(screen.queryByText("Metal Factions")).toBeNull();
   });
 
-  it("says so when a widget states no author or licence, and not when it could not be read", () => {
+  it("says so when a widget states no author, and not when it could not be read", () => {
     page();
-    // The coilbox row and the two Twin rows declare neither. The unreadable
-    // row says nothing.
+    // The coilbox row and the two Twin rows declare none. The unreadable row
+    // says nothing.
     expect(screen.getAllByText("No author stated")).toHaveLength(3);
-    expect(screen.getAllByText("No licence stated")).toHaveLength(3);
   });
 
   it("says which files share a name, and so a setting", () => {
@@ -419,14 +424,6 @@ describe("WidgetsPage", () => {
     ]);
     page();
     expect(screen.getByText("Metal Factions: bad file")).toBeTruthy();
-  });
-
-  it("says when the game has not saved a file yet", () => {
-    files.files = new Map([["Metal Factions", { kind: "missing" }]]);
-    page("/library/widgets?game=Metal%20Factions");
-    expect(screen.getByRole("status").textContent).toContain(
-      "has not saved its widget settings yet",
-    );
   });
 
   it("asks before removing a widget, naming the games that lose it", async () => {
@@ -642,6 +639,141 @@ describe("WidgetsPage", () => {
     );
     // A game widget is no set's business.
     expect(readSets().global).toEqual({});
+  });
+
+  it("creates the config file when a game's own widget is switched before the game has saved one", async () => {
+    files.files = new Map([["Metal Factions", { kind: "missing" }]]);
+    const shippedWidget = (name: string, enabled: boolean): GameWidget => ({
+      path: `luaui/widgets/${name}.lua`,
+      archive: "mf.sdz",
+      folder: "LuaUI/Widgets",
+      nested: false,
+      info: { name, enabled },
+      error: null,
+    });
+    shipped.widgets = [
+      shippedWidget("Glow", true),
+      shippedWidget("Radar", false),
+    ];
+    page("/library/widgets?game=Metal%20Factions");
+    // With no file, each widget is as its `GetInfo()` says.
+    const glow = screen.getByRole("switch", { name: "Glow on" });
+    expect(glow.getAttribute("aria-checked")).toBe("true");
+    expect(
+      screen
+        .getByRole("switch", { name: "Radar on" })
+        .getAttribute("aria-checked"),
+    ).toBe("false");
+    fireEvent.click(glow);
+    await waitFor(() => expect(disk.size).toBe(1));
+    expect([...disk.values()]).toEqual([
+      'return {\n\torder = {\n\t\t["Glow"] = 0,\n\t},\n}\n',
+    ]);
+  });
+
+  it("offers a reset only when a game's own widget is away from its default, and resets it", async () => {
+    const config = `${list.configDir}/LuaUI/Config/MF.lua`;
+    const text =
+      'return {\n\tdata = {\n\t\tGlow = { size = 3 },\n\t},\n\torder = {\n\t\t["Glow"] = 0,\n\t\t["Radar"] = 4,\n\t\t["Theirs"] = 5,\n\t},\n}\n';
+    disk.set(config, text);
+    shipped.widgets = [
+      {
+        path: "luaui/widgets/glow.lua",
+        archive: "mf.sdz",
+        folder: "LuaUI/Widgets",
+        nested: false,
+        info: { name: "Glow", enabled: true },
+        error: null,
+      },
+    ];
+    const reset = { name: "Reset Metal Factions's own widgets" };
+    files.files = new Map([
+      [
+        "Metal Factions",
+        { kind: "ready", path: config, order: new Map([["Glow", 1]]) },
+      ],
+    ]);
+    const first = page("/library/widgets?game=Metal%20Factions");
+    expect(screen.queryByRole("button", reset)).toBeNull();
+    first.unmount();
+
+    files.files = new Map([
+      [
+        "Metal Factions",
+        { kind: "ready", path: config, order: new Map([["Glow", 0]]) },
+      ],
+    ]);
+    page("/library/widgets?game=Metal%20Factions");
+    fireEvent.click(screen.getByRole("button", reset));
+    fireEvent.click(screen.getByRole("button", { name: "Reset" }));
+    await waitFor(() =>
+      expect(disk.get(config)).toBe(
+        'return {\n\tdata = {\n\t\tGlow = { size = 3 },\n\t},\n\torder = {\n\t\t["Radar"] = 4,\n\t\t["Theirs"] = 5,\n\t},\n}\n',
+      ),
+    );
+    // The file as it was is kept beside it.
+    expect([...disk.values()]).toContain(text);
+  });
+
+  it("shows a player's unchosen widget at its default until the game has a file", () => {
+    const info = scan.files[0].info;
+    if (!info) throw new Error("the fixture's first widget declares nothing");
+    info.enabled = true;
+    try {
+      const on = () =>
+        screen
+          .getByRole("switch", { name: "BuildWatch on" })
+          .getAttribute("aria-checked");
+      files.files = new Map([["Metal Factions", { kind: "missing" }]]);
+      const missing = page("/library/widgets?game=Metal%20Factions");
+      expect(on()).toBe("true");
+      missing.unmount();
+      // With a file, the set says, and the set has no choice for it.
+      files.files = new Map([
+        [
+          "Metal Factions",
+          { kind: "ready", path: "/x/MF.lua", order: new Map() },
+        ],
+      ]);
+      page("/library/widgets?game=Metal%20Factions");
+      expect(on()).toBe("false");
+    } finally {
+      delete info.enabled;
+    }
+  });
+
+  it("lines a game's own widgets up with the player's by using one table", () => {
+    shipped.widgets = [
+      {
+        path: "luaui/widgets/radar.lua",
+        archive: "mf.sdz",
+        folder: "LuaUI/Widgets",
+        nested: false,
+        info: { name: "Radar" },
+        error: null,
+      },
+    ];
+    page("/library/widgets?game=Metal%20Factions");
+    expect(screen.getAllByRole("table")).toHaveLength(1);
+    expect(screen.getByText("Your widgets")).toBeTruthy();
+    expect(screen.getByText("Metal Factions's own widgets")).toBeTruthy();
+  });
+
+  it("will not switch a player's widget while a game is running", () => {
+    play.running = true;
+    const all = page();
+    expect(
+      screen
+        .getByRole("switch", { name: "BuildWatch on" })
+        .hasAttribute("disabled"),
+    ).toBe(true);
+    all.unmount();
+    page("/library/widgets?game=Metal%20Factions");
+    expect(
+      screen
+        .getByRole("switch", { name: "BuildWatch on" })
+        .hasAttribute("disabled"),
+    ).toBe(true);
   });
 
   it("will not switch a game's own widget while a game is running", () => {

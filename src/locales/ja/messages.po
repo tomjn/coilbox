@@ -1336,11 +1336,6 @@ msgstr ""
 
 #. placeholder {0}: game.game
 #: src/widgets/pages/WidgetsPage.tsx
-msgid "{0} has not saved its widget settings yet, so these apply from the launch after it first does."
-msgstr ""
-
-#. placeholder {0}: game.game
-#: src/widgets/pages/WidgetsPage.tsx
 msgid "{0} loads none of your widgets."
 msgstr ""
 
@@ -13918,6 +13913,7 @@ msgstr "自身のユニットにダメージを与えない"
 #: src/uberstress/pages/RunPage.tsx
 #: src/widgets/pages/AddWidgetDrawer.tsx
 #: src/widgets/pages/RemoveWidget.tsx
+#: src/widgets/pages/ResetGameWidgets.tsx
 #: src/workshop/pages/components/CloneActions.tsx
 #: src/workshop/pages/components/DiskDiffDrawer.tsx
 #: src/workshop/pages/components/InPlaceWrite.tsx
@@ -15523,6 +15519,15 @@ msgstr "Coilbox は閉じられませんでした：{reason}。"
 #, fuzzy
 msgid "Coilbox could not close it: {reason}. Stop it from the Battles page."
 msgstr "Coilbox は閉じられませんでした：{reason}。試合ページから停止してください。"
+
+#. placeholder {0}: game.game
+#: src/widgets/pages/WidgetsPage.tsx
+msgid "Coilbox could not create {0}'s settings file."
+msgstr ""
+
+#: src/widgets/widgetSync.ts
+msgid "Coilbox could not create the game's settings file."
+msgstr ""
 
 #: src/multiplayer/battles/joinBattle.ts
 #, fuzzy
@@ -27463,10 +27468,6 @@ msgstr "ライブラリの武器 {weaponKey}"
 msgid "libwebp refused the picture."
 msgstr "libwebp が画像を拒否しました。"
 
-#: src/widgets/pages/WidgetsPage.tsx
-msgid "Licence"
-msgstr ""
-
 #: src/workshop/explosionGenerators.ts
 #, fuzzy
 msgid "Lifetime"
@@ -27686,10 +27687,6 @@ msgstr "{loadedName} を読み込みました"
 #, fuzzy
 msgid "Loaded {loadedName}, with parts missing"
 msgstr "{loadedName} を読み込みましたが、パーツが不足しています"
-
-#: src/widgets/pages/WidgetsPage.tsx
-msgid "Loaded by"
-msgstr ""
 
 #: src/play/pages/SkirmishPage.tsx
 #, fuzzy
@@ -31299,7 +31296,7 @@ msgid "No game"
 msgstr "ゲームなし"
 
 #: src/widgets/pages/WidgetsPage.tsx
-msgid "No game coilbox recognises"
+msgid "No game coilbox recognises loads this."
 msgstr ""
 
 #: src/profile/health.ts
@@ -31442,7 +31439,7 @@ msgid "No image files matched in this game's archive."
 msgstr "このゲームのアーカイブに一致する画像ファイルはありません。"
 
 #: src/widgets/pages/WidgetsPage.tsx
-msgid "No installed game"
+msgid "No installed game loads this."
 msgstr ""
 
 #: src/widgets/pages/AddWidgetDrawer.tsx
@@ -31479,10 +31476,6 @@ msgstr "この試合の招待リンクはありません。{inviteProblem}"
 #, fuzzy
 msgid "No leftover dialogue clips - nothing to reclaim."
 msgstr "残っているセリフのクリップはありません — 解放するものはありません。"
-
-#: src/widgets/pages/WidgetsPage.tsx
-msgid "No licence stated"
-msgstr ""
 
 #: src/content/pages/components/LivingValueChart.tsx
 #, fuzzy
@@ -37004,6 +36997,10 @@ msgstr "パルサー"
 msgid "Purple"
 msgstr "パープル"
 
+#: src/widgets/pages/ResetGameWidgets.tsx
+msgid "Put {game}'s own widgets back to their defaults?"
+msgstr ""
+
 #: src/multiplayer/chat/PartySection.tsx
 #, fuzzy
 msgid "Put {name} out of the party"
@@ -39427,6 +39424,7 @@ msgstr "確認メールを再送信"
 #: src/lego/pages/components/AnimationPanel.tsx
 #: src/lego/pages/components/ProportionsPanel.tsx
 #: src/play/pages/components/GameOptionsPanel.tsx
+#: src/widgets/pages/ResetGameWidgets.tsx
 #, fuzzy
 msgid "Reset"
 msgstr "リセット"
@@ -39435,6 +39433,10 @@ msgstr "リセット"
 #, fuzzy
 msgid "Reset {eventLabel} to {defaultSoundLabel}"
 msgstr "{eventLabel} を {defaultSoundLabel} にリセット"
+
+#: src/widgets/pages/ResetGameWidgets.tsx
+msgid "Reset {game}'s own widgets"
+msgstr ""
 
 #: src/play/pages/components/GameOptionsPanel.tsx
 #, fuzzy
@@ -48429,7 +48431,7 @@ msgid "The whole selection swung a quarter turn about its own middle, so it keep
 msgstr "選択全体をそれ自体の中心で 90 度回転させたため、形は保たれています。各ものをその場で回転させるには R を押してください。"
 
 #: src/widgets/pages/WidgetsPage.tsx
-msgid "The widgets you have added to your games, and which games load each one."
+msgid "The widgets you have added to your games."
 msgstr ""
 
 #: src/content/pages/components/MapAggregate.tsx

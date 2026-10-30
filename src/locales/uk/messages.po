@@ -1336,11 +1336,6 @@ msgstr ""
 
 #. placeholder {0}: game.game
 #: src/widgets/pages/WidgetsPage.tsx
-msgid "{0} has not saved its widget settings yet, so these apply from the launch after it first does."
-msgstr ""
-
-#. placeholder {0}: game.game
-#: src/widgets/pages/WidgetsPage.tsx
 msgid "{0} loads none of your widgets."
 msgstr ""
 
@@ -13918,6 +13913,7 @@ msgstr "Не може пошкодити власний юніт"
 #: src/uberstress/pages/RunPage.tsx
 #: src/widgets/pages/AddWidgetDrawer.tsx
 #: src/widgets/pages/RemoveWidget.tsx
+#: src/widgets/pages/ResetGameWidgets.tsx
 #: src/workshop/pages/components/CloneActions.tsx
 #: src/workshop/pages/components/DiskDiffDrawer.tsx
 #: src/workshop/pages/components/InPlaceWrite.tsx
@@ -15523,6 +15519,15 @@ msgstr "Не вдалося закрити: {reason}."
 #, fuzzy
 msgid "Coilbox could not close it: {reason}. Stop it from the Battles page."
 msgstr "Не вдалося закрити: {reason}. Зупиніть це зі сторінки «Матчі»."
+
+#. placeholder {0}: game.game
+#: src/widgets/pages/WidgetsPage.tsx
+msgid "Coilbox could not create {0}'s settings file."
+msgstr ""
+
+#: src/widgets/widgetSync.ts
+msgid "Coilbox could not create the game's settings file."
+msgstr ""
 
 #: src/multiplayer/battles/joinBattle.ts
 #, fuzzy
@@ -27463,10 +27468,6 @@ msgstr "Зброя з бібліотеки {weaponKey}"
 msgid "libwebp refused the picture."
 msgstr "libwebp відхилила зображення."
 
-#: src/widgets/pages/WidgetsPage.tsx
-msgid "Licence"
-msgstr ""
-
 #: src/workshop/explosionGenerators.ts
 #, fuzzy
 msgid "Lifetime"
@@ -27686,10 +27687,6 @@ msgstr "Завантажено {loadedName}"
 #, fuzzy
 msgid "Loaded {loadedName}, with parts missing"
 msgstr "Завантажено {loadedName}, деяких деталей бракує"
-
-#: src/widgets/pages/WidgetsPage.tsx
-msgid "Loaded by"
-msgstr ""
 
 #: src/play/pages/SkirmishPage.tsx
 #, fuzzy
@@ -31299,7 +31296,7 @@ msgid "No game"
 msgstr "Немає гри"
 
 #: src/widgets/pages/WidgetsPage.tsx
-msgid "No game coilbox recognises"
+msgid "No game coilbox recognises loads this."
 msgstr ""
 
 #: src/profile/health.ts
@@ -31442,7 +31439,7 @@ msgid "No image files matched in this game's archive."
 msgstr "В архіві цієї гри не знайдено відповідних зображень."
 
 #: src/widgets/pages/WidgetsPage.tsx
-msgid "No installed game"
+msgid "No installed game loads this."
 msgstr ""
 
 #: src/widgets/pages/AddWidgetDrawer.tsx
@@ -31479,10 +31476,6 @@ msgstr "Для цього матчу немає посилання-запрош�
 #, fuzzy
 msgid "No leftover dialogue clips - nothing to reclaim."
 msgstr "Немає залишених кліпів діалогу – нічого звільняти."
-
-#: src/widgets/pages/WidgetsPage.tsx
-msgid "No licence stated"
-msgstr ""
 
 #: src/content/pages/components/LivingValueChart.tsx
 #, fuzzy
@@ -37004,6 +36997,10 @@ msgstr "пульсар"
 msgid "Purple"
 msgstr "Фіолетовий"
 
+#: src/widgets/pages/ResetGameWidgets.tsx
+msgid "Put {game}'s own widgets back to their defaults?"
+msgstr ""
+
 #: src/multiplayer/chat/PartySection.tsx
 #, fuzzy
 msgid "Put {name} out of the party"
@@ -39427,6 +39424,7 @@ msgstr "Надіслати лист підтвердження ще раз"
 #: src/lego/pages/components/AnimationPanel.tsx
 #: src/lego/pages/components/ProportionsPanel.tsx
 #: src/play/pages/components/GameOptionsPanel.tsx
+#: src/widgets/pages/ResetGameWidgets.tsx
 #, fuzzy
 msgid "Reset"
 msgstr "Скинути"
@@ -39435,6 +39433,10 @@ msgstr "Скинути"
 #, fuzzy
 msgid "Reset {eventLabel} to {defaultSoundLabel}"
 msgstr "Скинути {eventLabel} на {defaultSoundLabel}"
+
+#: src/widgets/pages/ResetGameWidgets.tsx
+msgid "Reset {game}'s own widgets"
+msgstr ""
 
 #: src/play/pages/components/GameOptionsPanel.tsx
 #, fuzzy
@@ -48429,7 +48431,7 @@ msgid "The whole selection swung a quarter turn about its own middle, so it keep
 msgstr "Усе виділене повернуто на чверть оберту навколо власного центру, тож воно зберігає форму. Натисніть R, щоб натомість повернути кожен об’єкт на його місці."
 
 #: src/widgets/pages/WidgetsPage.tsx
-msgid "The widgets you have added to your games, and which games load each one."
+msgid "The widgets you have added to your games."
 msgstr ""
 
 #: src/content/pages/components/MapAggregate.tsx

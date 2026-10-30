@@ -71,9 +71,8 @@ vi.mock("@/content/contentState", () => ({
 const { readSets, recordWrite, resetSets, updateSets } = await import(
   "./widgetSets"
 );
-const { switchAddedWidgets, switchRestoredWidgets } = await import(
-  "./widgetSync"
-);
+const { switchAddedWidgets, switchRestoredWidgets, writeGameFile } =
+  await import("./widgetSync");
 
 const handler: WidgetHandler = {
   id: "engine",
@@ -197,5 +196,61 @@ describe("switchAddedWidgets", () => {
       }),
     ).toEqual([]);
     expect(readSets().global).toEqual({});
+  });
+});
+
+describe("writeGameFile, for a game with no config file", () => {
+  const game = { game: "Not saved yet 1.0", shortName: "NS", handler };
+  const row = (name: string, enabled: boolean) =>
+    ({
+      info: { name, enabled },
+      loadedBy: [game.game],
+      switch: { kind: "ready", name, previousNames: [] },
+    }) as never;
+  const rows = [row("Radar", true), row("Minimap", false), row("Glow", true)];
+  const NS = "/spring/LuaUI/Config/NS.lua";
+  const empty = async () => "return {\n\torder = {\n\t},\n}\n";
+
+  it("holds only the player's choices, leaving the rest to their defaults", async () => {
+    updateSets((s) => ({ ...s, global: { Glow: false } }));
+    await writeGameFile("/spring", game, rows, [], empty);
+    expect(files.get(NS)).toBe(
+      'return {\n\torder = {\n\t\t["Glow"] = 0,\n\t},\n}\n',
+    );
+    expect(readSets().global).toEqual({ Glow: false });
+  });
+
+  it("creates no file when the player has chosen nothing", async () => {
+    await writeGameFile("/spring", game, rows, [], empty);
+    expect(files.has(NS)).toBe(false);
+    expect(readSets().global).toEqual({});
+  });
+
+  it("does not let an unplayed game fill in what a played game saved", async () => {
+    const played = { game: "Played 1.0", shortName: "PL", handler };
+    const both = [
+      { ...(row("Radar", true) as object), loadedBy: [game.game, played.game] },
+    ] as never[];
+    files.set(
+      "/spring/LuaUI/Config/PL.lua",
+      'return {\n\torder = {\n\t\t["Radar"] = 0,\n\t},\n}\n',
+    );
+    await writeGameFile("/spring", game, both, [], empty);
+    await writeGameFile("/spring", played, both);
+    expect(readSets().global).toEqual({ Radar: false });
+  });
+
+  it("creates nothing unless told what a new file starts as", async () => {
+    updateSets((s) => ({ ...s, global: { Glow: false } }));
+    await writeGameFile("/spring", game, rows);
+    expect(files.has(NS)).toBe(false);
+  });
+
+  it("says so when a new file cannot be made", async () => {
+    updateSets((s) => ({ ...s, global: { Glow: false } }));
+    await expect(
+      writeGameFile("/spring", game, rows, [], async () => null),
+    ).rejects.toThrow("could not create");
+    expect(files.has(NS)).toBe(false);
   });
 });

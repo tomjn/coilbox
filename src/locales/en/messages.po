@@ -1109,11 +1109,6 @@ msgstr "{0} has no folder for RmlUi widgets."
 
 #. placeholder {0}: game.game
 #: src/widgets/pages/WidgetsPage.tsx
-msgid "{0} has not saved its widget settings yet, so these apply from the launch after it first does."
-msgstr "{0} has not saved its widget settings yet, so these apply from the launch after it first does."
-
-#. placeholder {0}: game.game
-#: src/widgets/pages/WidgetsPage.tsx
 msgid "{0} loads none of your widgets."
 msgstr "{0} loads none of your widgets."
 
@@ -11263,6 +11258,7 @@ msgstr "Can't damage its own unit"
 #: src/uberstress/pages/RunPage.tsx
 #: src/widgets/pages/AddWidgetDrawer.tsx
 #: src/widgets/pages/RemoveWidget.tsx
+#: src/widgets/pages/ResetGameWidgets.tsx
 #: src/workshop/pages/components/CloneActions.tsx
 #: src/workshop/pages/components/DiskDiffDrawer.tsx
 #: src/workshop/pages/components/InPlaceWrite.tsx
@@ -12581,6 +12577,15 @@ msgstr "Coilbox could not close it: {reason}."
 #: src/multiplayer/pages/BattleRoomPage.tsx
 msgid "Coilbox could not close it: {reason}. Stop it from the Battles page."
 msgstr "Coilbox could not close it: {reason}. Stop it from the Battles page."
+
+#. placeholder {0}: game.game
+#: src/widgets/pages/WidgetsPage.tsx
+msgid "Coilbox could not create {0}'s settings file."
+msgstr "Coilbox could not create {0}'s settings file."
+
+#: src/widgets/widgetSync.ts
+msgid "Coilbox could not create the game's settings file."
+msgstr "Coilbox could not create the game's settings file."
 
 #: src/multiplayer/battles/joinBattle.ts
 msgid "Coilbox could not leave it: {reason}."
@@ -22269,10 +22274,6 @@ msgstr "Library weapon {weaponKey}"
 msgid "libwebp refused the picture."
 msgstr "libwebp refused the picture."
 
-#: src/widgets/pages/WidgetsPage.tsx
-msgid "Licence"
-msgstr "Licence"
-
 #: src/workshop/explosionGenerators.ts
 msgid "Lifetime"
 msgstr "Lifetime"
@@ -22449,10 +22450,6 @@ msgstr "Loaded {loadedName}"
 #: src/lego/moduleFileIo.ts
 msgid "Loaded {loadedName}, with parts missing"
 msgstr "Loaded {loadedName}, with parts missing"
-
-#: src/widgets/pages/WidgetsPage.tsx
-msgid "Loaded by"
-msgstr "Loaded by"
 
 #: src/play/pages/SkirmishPage.tsx
 msgid "Loaded the preset \"{loadedName}\"."
@@ -25381,8 +25378,8 @@ msgid "No game"
 msgstr "No game"
 
 #: src/widgets/pages/WidgetsPage.tsx
-msgid "No game coilbox recognises"
-msgstr "No game coilbox recognises"
+msgid "No game coilbox recognises loads this."
+msgstr "No game coilbox recognises loads this."
 
 #: src/profile/health.ts
 msgid "No game filter set"
@@ -25497,8 +25494,8 @@ msgid "No image files matched in this game's archive."
 msgstr "No image files matched in this game's archive."
 
 #: src/widgets/pages/WidgetsPage.tsx
-msgid "No installed game"
-msgstr "No installed game"
+msgid "No installed game loads this."
+msgstr "No installed game loads this."
 
 #: src/widgets/pages/AddWidgetDrawer.tsx
 msgid "No installed game with a folder for this widget."
@@ -25528,10 +25525,6 @@ msgstr "No invite link for this battle. {inviteProblem}"
 #: src/scenario/pages/components/ReclaimClipsForm.tsx
 msgid "No leftover dialogue clips - nothing to reclaim."
 msgstr "No leftover dialogue clips - nothing to reclaim."
-
-#: src/widgets/pages/WidgetsPage.tsx
-msgid "No licence stated"
-msgstr "No licence stated"
 
 #: src/content/pages/components/LivingValueChart.tsx
 msgid "No line is on the chart above."
@@ -30000,6 +29993,10 @@ msgstr "pulsar"
 msgid "Purple"
 msgstr "Purple"
 
+#: src/widgets/pages/ResetGameWidgets.tsx
+msgid "Put {game}'s own widgets back to their defaults?"
+msgstr "Put {game}'s own widgets back to their defaults?"
+
 #: src/multiplayer/chat/PartySection.tsx
 msgid "Put {name} out of the party"
 msgstr "Put {name} out of the party"
@@ -31974,12 +31971,17 @@ msgstr "Resend verification email"
 #: src/lego/pages/components/AnimationPanel.tsx
 #: src/lego/pages/components/ProportionsPanel.tsx
 #: src/play/pages/components/GameOptionsPanel.tsx
+#: src/widgets/pages/ResetGameWidgets.tsx
 msgid "Reset"
 msgstr "Reset"
 
 #: src/sound/SoundSettings.tsx
 msgid "Reset {eventLabel} to {defaultSoundLabel}"
 msgstr "Reset {eventLabel} to {defaultSoundLabel}"
+
+#: src/widgets/pages/ResetGameWidgets.tsx
+msgid "Reset {game}'s own widgets"
+msgstr "Reset {game}'s own widgets"
 
 #: src/play/pages/components/GameOptionsPanel.tsx
 msgid "Reset {label}"
@@ -39259,8 +39261,8 @@ msgid "The whole selection swung a quarter turn about its own middle, so it keep
 msgstr "The whole selection swung a quarter turn about its own middle, so it keeps its shape. Press R to turn each thing where it stands instead."
 
 #: src/widgets/pages/WidgetsPage.tsx
-msgid "The widgets you have added to your games, and which games load each one."
-msgstr "The widgets you have added to your games, and which games load each one."
+msgid "The widgets you have added to your games."
+msgstr "The widgets you have added to your games."
 
 #: src/content/pages/components/MapAggregate.tsx
 msgid "The window is {when} of each match by its own clock, in whole minutes."
