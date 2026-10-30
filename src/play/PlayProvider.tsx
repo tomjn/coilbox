@@ -11,8 +11,11 @@ import {
 } from "react";
 import { contentReplayPlaybackLaunch } from "@/content/bindings";
 import { refreshContentState } from "@/content/contentState";
+import { errorText } from "@/lib/helpers";
+import { notify } from "@/notify/notify";
 import { setMusicSuspended } from "@/sound/music";
 import { playEvent } from "@/sound/play";
+import { writeSetForLaunch } from "@/widgets/widgetSync";
 import {
   type BattleConfig,
   type LaunchEvent,
@@ -151,16 +154,40 @@ export function usePlay(): PlayContextValue {
   return ctx;
 }
 
-/** Refresh the content state from disk and refuse an engine it no longer lists. */
-async function assertEngineInstalled(executable?: string): Promise<void> {
+/** Refresh the content state from disk and refuse an engine it no longer
+ *  lists. Answers the engine's folder, when the state could be read. */
+async function assertEngineInstalled(
+  executable?: string,
+): Promise<string | undefined> {
   // A read that fails says nothing about the engine, so the launch goes ahead.
   const state = await refreshContentState().catch(() => null);
-  if (!state || !executable) return;
-  const listed = state.roots.some((r) =>
-    r.engines.some((e) => e.executable === executable),
-  );
-  if (!listed) {
+  if (!state || !executable) return undefined;
+  const engine = state.roots
+    .flatMap((r) => r.engines)
+    .find((e) => e.executable === executable);
+  if (!engine) {
     throw new Error(t`The engine at ${executable} is no longer installed.`);
+  }
+  return engine.path;
+}
+
+/** Write the player's widget set into the game's config file (#4844). A
+ *  failure is said and the launch goes ahead, because the game still runs
+ *  with the widgets it had. */
+async function writeWidgetSet(
+  enginePath: string,
+  dataDir: string,
+  game: string,
+): Promise<void> {
+  try {
+    await writeSetForLaunch({ enginePath, dataDir, game });
+  } catch (e) {
+    console.warn(`could not write ${game}'s widget settings`, e);
+    void notify({
+      level: "warning",
+      title: t`Coilbox could not write your widget settings for ${game}`,
+      body: errorText(e),
+    });
   }
 }
 
@@ -215,11 +242,15 @@ export function PlayProvider({ children }: { children: ReactNode }) {
       runningRef.current = true;
       // The engine folder can be deleted while coilbox runs. Check the disk now
       // rather than start a process that cannot exist.
+      let enginePath: string | undefined;
       try {
-        await assertEngineInstalled(ctx.engine);
+        enginePath = await assertEngineInstalled(ctx.engine);
       } catch (e) {
         runningRef.current = false;
         throw e;
+      }
+      if (enginePath && ctx.game) {
+        await writeWidgetSet(enginePath, ctx.dataDir, ctx.game);
       }
       const runId = crypto.randomUUID();
       activeRunIdRef.current = runId;

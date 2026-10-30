@@ -6,13 +6,14 @@
  * belongs to the game, which rewrites it whenever it starts, saves or exits,
  * so this changes one entry in place and leaves every other byte alone, rather
  * than reading the file into a model and writing it all back. The rules are
- * the blueprint merge's (`src/blueprint/gameFile.ts`): refuse while a game is
- * running, copy the file first, and never write over a file that could not be
- * read.
+ * the blueprint merge's (`src/blueprint/gameFile.ts`): copy the file first, and
+ * never write over a file that could not be read. Coilbox writes it just before
+ * it launches a game, when no game of its own is running.
  *
  * Switching on writes `1`, which is what every handler's own `EnableWidget`
  * writes when a player switches a widget on in the game's list. A widget
- * already on keeps its place.
+ * already on keeps its place. Which widgets to switch comes from the sets in
+ * `widgetSets.ts` (#4844).
  *
  * A missing file is not created. Zero-K's handler throws away an order table
  * with no `version` key, so a file coilbox wrote from nothing could switch
@@ -461,7 +462,8 @@ export function configCandidates(
   config: WidgetConfigFile,
   shortName: string,
 ): string[] {
-  const safe = !/[/\\]/.test(shortName) && !shortName.includes("..");
+  const safe =
+    shortName !== "" && !/[/\\]/.test(shortName) && !shortName.includes("..");
   return [
     ...new Set(
       config.files
@@ -496,20 +498,18 @@ export async function findConfig(
   return null;
 }
 
-export interface SwitchRequest {
+export interface WriteRequest {
   io: ConfigFileIO;
   writeDir: string;
   config: WidgetConfigFile;
   shortName: string;
-  /** The widget's `GetInfo().name`. */
-  name: string;
-  on: boolean;
-  gameRunning: boolean;
+  /** On or off for each widget, by its `GetInfo().name`. */
+  states: ReadonlyMap<string, boolean>;
   /** When this is happening, which names the copy. Passed in so a test can say. */
   now?: Date;
 }
 
-export interface SwitchOutcome {
+export interface WriteOutcome {
   path: string;
   /** Where the file was copied to first, absent when nothing needed writing. */
   backup?: string;
@@ -518,41 +518,32 @@ export interface SwitchOutcome {
 }
 
 /**
- * Switch one widget on or off in the game's config file. Throws before writing
- * anything when a game is running, when the game has no file yet, or when the
- * file cannot be read.
+ * Give each widget in `states` an on or off entry in the game's config file.
+ * Null, with nothing written, when the game has no file yet. Throws before
+ * writing anything when the file cannot be read.
  */
-export async function switchWidget({
+export async function writeWidgetStates({
   io,
   writeDir,
   config,
   shortName,
-  name,
-  on,
-  gameRunning,
+  states,
   now = new Date(),
-}: SwitchRequest): Promise<SwitchOutcome> {
-  if (gameRunning) {
-    throw new Error(
-      t`A game is running, and it writes this file back when it exits, so anything written now would be lost. Close the game and try again.`,
-    );
-  }
+}: WriteRequest): Promise<WriteOutcome | null> {
   const found = await findConfig(io, writeDir, config, shortName);
-  if (!found) {
-    throw new Error(
-      t`This game has not saved its widget settings yet. Start it once, then try again.`,
-    );
+  if (!found) return null;
+  let text = found.text;
+  let order = readOrder(text, config.shape);
+  for (const [name, on] of states) {
+    const current = order.get(name);
+    // A widget already on keeps its place.
+    if (current !== undefined && current > 0 === on) continue;
+    text = writeOrder(text, config.shape, name, on ? 1 : 0);
+    order = readOrder(text, config.shape);
   }
-  const before = readOrder(found.text, config.shape);
-  const current = before.get(name);
-  const wasOn = current !== undefined && current > 0;
-  if (on === wasOn && current !== undefined) {
-    return { path: found.path, order: before };
-  }
-  const text = writeOrder(found.text, config.shape, name, on ? 1 : 0);
-  const order = readOrder(text, config.shape);
+  if (text === found.text) return { path: found.path, order };
 
-  // Two switches in one second would otherwise share a name, and the second
+  // Two writes in one second would otherwise share a name, and the second
   // copy would replace the one from before the first.
   let backup = `${found.path}.${stamp(now)}.bak`;
   for (let n = 2; (await io.read(backup)) !== null; n++) {
