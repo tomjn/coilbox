@@ -69,6 +69,32 @@ pub fn build(
     manifest_version: u32,
     coilbox_version: &str,
 ) -> Result<Built, String> {
+    build_reporting(
+        data_dir,
+        engine_path,
+        archive_name,
+        game_name,
+        base_checksum,
+        manifest_version,
+        coilbox_version,
+        |_| {},
+    )
+}
+
+/// [`build`], handing each progress line the model conversion prints to
+/// `on_progress` as it arrives, on another thread. It carries `phase`, `done`
+/// and `total`, as the conversion drawer's does.
+#[allow(clippy::too_many_arguments)]
+pub fn build_reporting(
+    data_dir: &str,
+    engine_path: &str,
+    archive_name: &str,
+    game_name: &str,
+    base_checksum: &str,
+    manifest_version: u32,
+    coilbox_version: &str,
+    on_progress: impl FnMut(serde_json::Value) + Send + 'static,
+) -> Result<Built, String> {
     let manifest = coilbox_compat::manifest(manifest_version)
         .ok_or_else(|| format!("there is no compat manifest {manifest_version}"))?;
     // The models are converted as the writer the manifest names converts them.
@@ -108,7 +134,16 @@ pub fn build(
                 file,
             )
         },
-        || models::convert(engine_path, data_dir, archive_name, staging.path(), writer),
+        || {
+            models::convert(
+                engine_path,
+                data_dir,
+                archive_name,
+                staging.path(),
+                writer,
+                on_progress,
+            )
+        },
         || tauri_plugin_coilbox_unitsync::unit_defs_blocking(engine_path, data_dir, archive_name),
         |source| {
             tauri_plugin_coilbox_unitsync::lua_exec_blocking(
@@ -537,6 +572,7 @@ fn envelope<T: Serialize>(result: Result<T, String>) -> CliResult {
 /// [`build`], recording the running coilbox's version in the marker. On a
 /// blocking task, since converting a game's models takes seconds.
 #[tauri::command]
+#[allow(clippy::too_many_arguments)]
 async fn compat_build<R: Runtime>(
     app: AppHandle<R>,
     data_dir: String,
@@ -545,10 +581,11 @@ async fn compat_build<R: Runtime>(
     game_name: String,
     base_checksum: String,
     manifest_version: u32,
+    on_progress: tauri::ipc::Channel<serde_json::Value>,
 ) -> CliResult {
     let version = app.package_info().version.to_string();
     let result = tauri::async_runtime::spawn_blocking(move || {
-        build(
+        build_reporting(
             &data_dir,
             &engine_path,
             &archive_name,
@@ -556,6 +593,9 @@ async fn compat_build<R: Runtime>(
             &base_checksum,
             manifest_version,
             &version,
+            move |value| {
+                let _ = on_progress.send(value);
+            },
         )
     })
     .await

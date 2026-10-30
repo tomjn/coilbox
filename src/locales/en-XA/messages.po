@@ -1970,6 +1970,10 @@ msgstr ""
 msgid "{done} / {total} downloaded"
 msgstr ""
 
+#: src/content/pages/components/CompatMode.tsx
+msgid "{done} of {total, plural, one {# model} other {# models}}"
+msgstr ""
+
 #: src/content/pages/components/Convert3doDrawer.tsx
 msgid "{done} of {total}"
 msgstr ""
@@ -23880,6 +23884,10 @@ msgstr ""
 #: src/lego/index.ts
 #: src/lego/pages/ProjectsPage.tsx
 msgid "Models"
+msgstr ""
+
+#: src/content/pages/components/CompatMode.tsx
+msgid "Models converted"
 msgstr ""
 
 #: src/multiplayer/admin/AdminToolNav.tsx

@@ -1970,6 +1970,10 @@ msgstr "{diverged, plural, one {# was analysed and the playback did not reproduc
 msgid "{done} / {total} downloaded"
 msgstr "{done} / {total} downloaded"
 
+#: src/content/pages/components/CompatMode.tsx
+msgid "{done} of {total, plural, one {# model} other {# models}}"
+msgstr "{done} of {total, plural, one {# model} other {# models}}"
+
 #: src/content/pages/components/Convert3doDrawer.tsx
 msgid "{done} of {total}"
 msgstr "{done} of {total}"
@@ -23882,6 +23886,10 @@ msgstr "Model saved"
 #: src/lego/pages/ProjectsPage.tsx
 msgid "Models"
 msgstr "Models"
+
+#: src/content/pages/components/CompatMode.tsx
+msgid "Models converted"
+msgstr "Models converted"
 
 #: src/multiplayer/admin/AdminToolNav.tsx
 msgid "Moderation"

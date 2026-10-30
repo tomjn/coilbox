@@ -1,4 +1,6 @@
 import { defineCommand } from "@picoframe/plugin-sdk";
+import type { Channel } from "@tauri-apps/api/core";
+import type { Convert3doProgress } from "../content/bindings";
 
 /**
  * Typed bindings to `plugin:coilbox-compat|*` (crate
@@ -63,7 +65,9 @@ export interface CompatStatus {
 /**
  * Write the compat mutator for a game under `dataDir`'s `games/`, replacing
  * what the folder held. `baseChecksum` is the archive's checksum as unitsync
- * reports it.
+ * reports it. `onProgress` gets the model conversion's progress lines, the same
+ * ones the conversion drawer shows. It must be a `Channel` made for this call,
+ * since a channel reused across commands stops delivering after the first.
  */
 export const compatBuild = defineCommand<
   {
@@ -73,6 +77,7 @@ export const compatBuild = defineCommand<
     gameName: string;
     baseChecksum: string;
     manifestVersion: number;
+    onProgress: Channel<Convert3doProgress>;
   },
   CompatBuilt
 >("coilbox-compat", "compat_build");

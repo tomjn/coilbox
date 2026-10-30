@@ -342,7 +342,7 @@ fn run_worker_streaming(
     timeout: Duration,
     what: String,
     cancel: Option<Arc<AtomicBool>>,
-    on_progress: tauri::ipc::Channel<serde_json::Value>,
+    on_progress: impl FnMut(serde_json::Value) + Send + 'static,
 ) -> Result<String, String> {
     let mut cmd = coilbox_proc::command(&bin);
     cmd.args(&args)
@@ -364,27 +364,9 @@ fn run_worker_streaming(
 
     let stdout = child.stdout.take();
     let stderr = child.stderr.take();
-    let out_handle = std::thread::spawn(move || {
-        let mut result = String::new();
-        let Some(stdout) = stdout else { return result };
-        for line in std::io::BufReader::new(stdout)
-            .lines()
-            .map_while(Result::ok)
-        {
-            if line.trim().is_empty() {
-                continue;
-            }
-            match serde_json::from_str::<serde_json::Value>(&line) {
-                Ok(value) if value.get("progress").is_some() => {
-                    let _ = on_progress.send(value["progress"].clone());
-                }
-                // Anything else is the result, or a line from a worker that
-                // died mid-write. Keeping the last one either way means a
-                // partial line cannot be mistaken for the answer.
-                _ => result = line,
-            }
-        }
-        result
+    let out_handle = std::thread::spawn(move || match stdout {
+        Some(stdout) => split_progress(std::io::BufReader::new(stdout), on_progress),
+        None => String::new(),
     });
     let err_handle = std::thread::spawn(move || read_to_string(stderr));
 
@@ -435,6 +417,27 @@ fn run_worker_streaming(
         ));
     }
     Ok(out)
+}
+
+/// Hand each progress line of `reader` to `on_progress` as it arrives, and
+/// answer with the last line that is not progress.
+fn split_progress(reader: impl BufRead, mut on_progress: impl FnMut(serde_json::Value)) -> String {
+    let mut result = String::new();
+    for line in reader.lines().map_while(Result::ok) {
+        if line.trim().is_empty() {
+            continue;
+        }
+        match serde_json::from_str::<serde_json::Value>(&line) {
+            Ok(value) if value.get("progress").is_some() => {
+                on_progress(value["progress"].clone());
+            }
+            // Anything else is the result, or a line from a worker that
+            // died mid-write. Keeping the last one either way means a
+            // partial line cannot be mistaken for the answer.
+            _ => result = line,
+        }
+    }
+    result
 }
 
 fn read_to_string<R: Read>(reader: Option<R>) -> String {
@@ -1693,7 +1696,9 @@ async fn unitsync_map_catalog<R: Runtime>(
             SCAN_TIMEOUT,
             "map catalog".to_string(),
             None,
-            on_progress,
+            move |value| {
+                let _ = on_progress.send(value);
+            },
         )
     })
     .await;
@@ -2321,16 +2326,18 @@ pub fn compat_palette_blocking(
 }
 
 /// Convert every `.3do` in `archive` into `out_dir`, as `unitsync_convert_3do`
-/// does, and answer with the worker's result line. Blocking, with no progress
-/// and no cancel: the compat plugin calls it from a blocking task to put a
-/// game's models into its mutator (issue #4557), as the compat writer `writer`
-/// its manifest names converts them.
+/// does, and answer with the worker's result line. Blocking, with no cancel:
+/// the compat plugin calls it from a blocking task to put a game's models into
+/// its mutator (issue #4557), as the compat writer `writer` its manifest names
+/// converts them. Each progress line the worker prints goes to `on_progress`
+/// as it arrives, on another thread.
 pub fn convert_3do_blocking(
     engine_path: &str,
     data_dir: &str,
     archive: &str,
     out_dir: &str,
     writer: u32,
+    on_progress: impl FnMut(serde_json::Value) + Send + 'static,
 ) -> Result<String, String> {
     let (bin, libpath, engine_dir) = prepare(engine_path)?;
     let args = build_convert_3do_args(
@@ -2341,29 +2348,15 @@ pub fn convert_3do_blocking(
         Some(writer),
     );
     let envs = loader_envs(&engine_dir, data_dir);
-    let out = run_worker_blocking(
+    run_worker_streaming(
         bin,
         args,
         envs,
         CONVERT_TIMEOUT,
         "3do conversion".into(),
         None,
-    )?;
-    last_result_line(&out)
-}
-
-/// The last line of a streaming mode's output that is not a progress line,
-/// which is its result. See [`run_worker_streaming`].
-fn last_result_line(out: &str) -> Result<String, String> {
-    out.lines()
-        .rev()
-        .filter(|line| !line.trim().is_empty())
-        .find(|line| {
-            serde_json::from_str::<serde_json::Value>(line)
-                .map_or(true, |value| value.get("progress").is_none())
-        })
-        .map(str::to_string)
-        .ok_or_else(|| "the unitsync worker printed progress but no result".to_string())
+        on_progress,
+    )
 }
 
 /// A file inside the archive `archive` as its own bytes, or `None` when the
@@ -2763,7 +2756,9 @@ async fn unitsync_convert_3do(
             CONVERT_TIMEOUT,
             "3do conversion".to_string(),
             cancel,
-            on_progress,
+            move |value| {
+                let _ = on_progress.send(value);
+            },
         )
     })
     .await;
@@ -2911,8 +2906,55 @@ mod tests {
     #[test]
     fn a_conversion_answers_with_its_last_line_that_is_not_progress() {
         let out = "{\"progress\":{\"phase\":\"scan\"}}\n{\"modelsFound\":2}\n\n{\"progress\":{\"phase\":\"model\"}}\n";
-        assert_eq!(last_result_line(out).unwrap(), "{\"modelsFound\":2}");
-        assert!(last_result_line("{\"progress\":{}}\n").is_err());
+        let mut seen = 0;
+        assert_eq!(
+            split_progress(out.as_bytes(), |_| seen += 1),
+            "{\"modelsFound\":2}"
+        );
+        assert_eq!(seen, 2);
+        assert_eq!(split_progress("{\"progress\":{}}\n".as_bytes(), |_| {}), "");
+    }
+
+    #[test]
+    fn progress_reaches_the_total_in_the_order_the_worker_printed_it() {
+        let mut out = String::from(
+            "{\"progress\":{\"phase\":\"scan\",\"done\":0,\"total\":3,\"folder\":\"\",\"member\":\"\"}}\n",
+        );
+        for done in 1..=3 {
+            out.push_str(&format!(
+                "{{\"progress\":{{\"phase\":\"model\",\"done\":{done},\"total\":3,\"folder\":\"units\",\"member\":\"m{done}.3do\"}}}}\n"
+            ));
+        }
+        out.push_str("{\"modelsFound\":3,\"modelsWritten\":3}\n");
+        let mut seen = Vec::new();
+        let result = split_progress(out.as_bytes(), |p| {
+            seen.push((p["done"].as_u64().unwrap(), p["total"].as_u64().unwrap()));
+        });
+        assert_eq!(seen, [(0, 3), (1, 3), (2, 3), (3, 3)]);
+        assert_eq!(result, "{\"modelsFound\":3,\"modelsWritten\":3}");
+    }
+
+    /// The real process path: a stand-in worker that prints progress lines and a
+    /// result, read through `run_worker_streaming` as the compat build reads the
+    /// 3do conversion.
+    #[cfg(unix)]
+    #[test]
+    fn a_worker_process_streams_progress_to_the_callback() {
+        let (tx, rx) = std::sync::mpsc::channel();
+        let script = "printf '%s\\n' '{\"progress\":{\"done\":1,\"total\":2}}' '{\"progress\":{\"done\":2,\"total\":2}}' '{\"modelsFound\":2}'";
+        let result = run_worker_streaming(
+            PathBuf::from("sh"),
+            vec!["-c".into(), script.into()],
+            Vec::new(),
+            Duration::from_secs(30),
+            "test".into(),
+            None,
+            move |p| {
+                let _ = tx.send(p["done"].as_u64().unwrap());
+            },
+        );
+        assert_eq!(result.unwrap().trim(), "{\"modelsFound\":2}");
+        assert_eq!(rx.try_iter().collect::<Vec<_>>(), [1, 2]);
     }
 
     const SCAN: &str = r#"{"maps":[],"games":[

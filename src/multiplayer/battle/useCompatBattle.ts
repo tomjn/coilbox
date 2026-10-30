@@ -1,4 +1,5 @@
 import { t } from "@lingui/core/macro";
+import { Channel } from "@tauri-apps/api/core";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { describeError } from "@/i18n/uiError";
 import { compatBuild, compatStatus } from "../../compat/bindings";
@@ -102,6 +103,8 @@ export function useCompatBattle(opts: {
           gameName: p.baseName,
           baseChecksum: info.checksum,
           manifestVersion: p.version,
+          // The battle card shows no count, so nothing listens.
+          onProgress: new Channel(),
         });
         const found = await rescanRef.current();
         if (found?.some((g) => g.name === gameName)) return null;

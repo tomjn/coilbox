@@ -5,6 +5,7 @@
  * Rebuild, that Remove deletes, and that the setting survives a remount.
  */
 import {
+  act,
   cleanup,
   fireEvent,
   render,
@@ -40,6 +41,11 @@ vi.mock("@picoframe/frame", async () => {
   };
 });
 
+vi.mock("@tauri-apps/api/core", () => ({
+  Channel: class {
+    onmessage: (message: unknown) => void = () => {};
+  },
+}));
 vi.mock("../../../compat/bindings", () => ({
   compatBuild: (args: unknown) => build(args),
   compatStatus: (args: unknown) => status(args),
@@ -120,6 +126,7 @@ describe("CompatMode", () => {
       gameName: "XTA 9.65",
       baseChecksum: "1234abcd",
       manifestVersion: 2,
+      onProgress: expect.anything(),
     });
     await screen.findByText("10 models converted of 12");
     screen.getByText("3 prelude functions");
@@ -129,6 +136,44 @@ describe("CompatMode", () => {
     expect(store.get("content.compat")).toEqual({
       "xta-9.65.sd7": { enabled: true, version: 2 },
     });
+  });
+
+  it("counts the models done out of the total while the build runs", async () => {
+    status.mockResolvedValueOnce(NONE).mockResolvedValue(CURRENT);
+    let finish: (built: CompatBuilt) => void = () => {};
+    let onProgress: { onmessage: (message: unknown) => void } | undefined;
+    build.mockImplementation((args: { onProgress: typeof onProgress }) => {
+      onProgress = args.onProgress;
+      return new Promise<CompatBuilt>((resolve) => {
+        finish = resolve;
+      });
+    });
+    render(view());
+    await waitFor(() =>
+      expect((compatSwitch() as HTMLButtonElement).disabled).toBe(false),
+    );
+    fireEvent.click(compatSwitch());
+    await screen.findByText("Building");
+    const message = (done: number, total: number) => ({
+      phase: "model",
+      done,
+      total,
+      folder: "units",
+      member: "units/a.3do",
+    });
+    act(() => onProgress?.onmessage(message(0, 720)));
+    await screen.findByText("0 of 720 models");
+    act(() => onProgress?.onmessage(message(120, 720)));
+    await screen.findByText("120 of 720 models");
+    expect(screen.queryByText("Building")).toBeNull();
+    expect(
+      screen.getByRole("progressbar", { name: "Models converted" }),
+    ).toBeTruthy();
+    act(() => onProgress?.onmessage(message(1, 1)));
+    await screen.findByText("1 of 1 model");
+    await act(async () => finish(BUILT));
+    await screen.findByText("10 models converted of 12");
+    expect(screen.queryByRole("progressbar")).toBeNull();
   });
 
   it("turns off without building or deleting anything", async () => {

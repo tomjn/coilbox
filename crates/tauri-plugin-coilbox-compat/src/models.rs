@@ -182,6 +182,7 @@ pub fn convert(
     archive: &str,
     staging: &Path,
     writer: u32,
+    on_progress: impl FnMut(serde_json::Value) + Send + 'static,
 ) -> Result<Models, String> {
     convert_reading(
         writer,
@@ -200,6 +201,7 @@ pub fn convert(
                 archive,
                 &staging.to_string_lossy(),
                 writer,
+                on_progress,
             )
         },
         staging,
