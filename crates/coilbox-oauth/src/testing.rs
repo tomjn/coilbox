@@ -51,14 +51,29 @@ impl TokenServer {
             while let Ok((mut sock, _)) = listener.accept().await {
                 let mut buf = Vec::new();
                 let mut chunk = [0u8; 1024];
+                // Only a `POST` to the token route counts as a request. Other
+                // programs on a developer machine probe new local ports with a
+                // `GET /` or a TLS `ClientHello`, and a stand-in that counted or
+                // waited on those would fail every assertion on a request count.
+                // The bytes are checked as they arrive, so a probe that waits for
+                // a reply is let go at once and does not hold up the requests
+                // behind it.
+                const ROUTE: &[u8] = b"post /token";
                 let head_end = loop {
                     match sock.read(&mut chunk).await {
-                        Ok(0) | Err(_) => return,
+                        Ok(0) | Err(_) => break None,
                         Ok(n) => buf.extend_from_slice(&chunk[..n]),
                     }
-                    if let Some(p) = buf.windows(4).position(|w| w == b"\r\n\r\n") {
-                        break p + 4;
+                    let seen = buf.len().min(ROUTE.len());
+                    if !buf[..seen].eq_ignore_ascii_case(&ROUTE[..seen]) {
+                        break None;
                     }
+                    if let Some(p) = buf.windows(4).position(|w| w == b"\r\n\r\n") {
+                        break Some(p + 4);
+                    }
+                };
+                let Some(head_end) = head_end else {
+                    continue;
                 };
                 let head = String::from_utf8_lossy(&buf[..head_end]).to_ascii_lowercase();
                 let len: usize = head
@@ -115,5 +130,48 @@ impl TokenServer {
     /// callers asked for a token.
     pub fn requests(&self) -> usize {
         self.seen.lock().unwrap().requests
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// Send `bytes` to the stand-in and read until it lets go, so what it did
+    /// with them is settled when this returns.
+    async fn send_and_read_to_end(server: &TokenServer, bytes: &[u8]) -> Vec<u8> {
+        let address = server
+            .url()
+            .strip_prefix("http://")
+            .and_then(|rest| rest.split('/').next().map(str::to_owned))
+            .unwrap();
+        let mut sock = tokio::net::TcpStream::connect(address).await.unwrap();
+        sock.write_all(bytes).await.unwrap();
+        let mut answer = Vec::new();
+        let _ = sock.read_to_end(&mut answer).await;
+        answer
+    }
+
+    /// Other programs on a developer machine probe new local ports with a
+    /// `GET /` and a TLS `ClientHello`. Neither is a request to the token route,
+    /// and the request behind them must still be answered and counted once.
+    #[tokio::test]
+    async fn connections_that_are_not_a_token_request_are_let_go_and_not_counted() {
+        let server = TokenServer::answering(serde_json::json!({ "access_token": "a" }));
+
+        let get = send_and_read_to_end(&server, b"GET / HTTP/1.1\r\nhost: localhost\r\n\r\n").await;
+        assert!(get.is_empty(), "a stray GET was answered");
+        let hello = send_and_read_to_end(&server, &[0x16, 0x03, 0x01, 0x05, 0xc8, 0x01]).await;
+        assert!(hello.is_empty(), "a TLS probe was answered");
+        assert_eq!(server.requests(), 0);
+
+        let real = send_and_read_to_end(
+            &server,
+            b"POST /token HTTP/1.1\r\nhost: localhost\r\ncontent-length: 3\r\n\r\nabc",
+        )
+        .await;
+        assert!(String::from_utf8_lossy(&real).starts_with("HTTP/1.1 200"));
+        assert_eq!(server.requests(), 1);
+        assert_eq!(server.last_body(), "abc");
     }
 }
