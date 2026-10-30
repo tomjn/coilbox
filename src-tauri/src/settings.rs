@@ -18,7 +18,7 @@
 //! through `plugin:<id>|<command>`.
 
 use std::collections::BTreeMap;
-use std::fs::File;
+use std::fs::{File, Permissions};
 use std::io::Write;
 use std::path::{Path, PathBuf};
 use std::sync::Mutex;
@@ -69,15 +69,14 @@ fn load_settings(path: &Path) -> Result<LoadedSettings, String> {
 /// may have caused the damage.
 fn recover(path: &Path, bytes: &[u8]) -> Result<LoadedSettings, String> {
     let entries = valid_entries(bytes);
+    let permissions = file_permissions(path);
     let copy = corrupt_copy_path(path);
     std::fs::rename(path, &copy).map_err(|e| format!("could not move bad settings aside: {e}"))?;
     // Written now because no save may follow, and a missing file next launch
     // would look like a new install. A failure here costs nothing yet: the
     // frontend holds these values and every later save writes them all.
-    if !entries.is_empty() {
-        if let Err(e) = save_settings(path, &entries) {
-            eprintln!("settings: could not write the recovered values: {e}");
-        }
+    if let Err(e) = write_settings(path, &entries, permissions) {
+        eprintln!("settings: could not write the recovered values: {e}");
     }
     Ok(LoadedSettings {
         entries,
@@ -109,25 +108,42 @@ fn corrupt_copy_path(path: &Path) -> PathBuf {
 
 /// Write the full settings map to `path`, creating the parent dir if needed.
 fn save_settings(path: &Path, settings: &Settings) -> Result<(), String> {
+    write_settings(path, settings, file_permissions(path))
+}
+
+fn write_settings(
+    path: &Path,
+    settings: &Settings,
+    permissions: Option<Permissions>,
+) -> Result<(), String> {
     if let Some(parent) = path.parent() {
         std::fs::create_dir_all(parent)
             .map_err(|e| format!("could not create settings dir: {e}"))?;
     }
     let json = serde_json::to_string_pretty(settings).map_err(|e| e.to_string())?;
     let _saving = SAVING.lock().unwrap_or_else(|e| e.into_inner());
-    replace_file(path, |file| file.write_all(json.as_bytes()))
+    replace_file(path, permissions, |file| file.write_all(json.as_bytes()))
         .map_err(|e| format!("could not write settings: {e}"))
 }
 
+fn file_permissions(path: &Path) -> Option<Permissions> {
+    std::fs::metadata(path).ok().map(|m| m.permissions())
+}
+
 /// Replace `path` with what `write` puts in a temporary file beside it, so a
-/// failure or a crash at any point leaves the previous file whole.
+/// failure or a crash at any point leaves the previous file whole. `permissions`
+/// go on before any data does, so a private file is never briefly readable.
 fn replace_file(
     path: &Path,
+    permissions: Option<Permissions>,
     write: impl FnOnce(&mut File) -> std::io::Result<()>,
 ) -> std::io::Result<()> {
     let name = path.file_name().unwrap_or_default().to_string_lossy();
     let temp = path.with_file_name(format!("{name}.tmp-{}", std::process::id()));
     let result = File::create(&temp).and_then(|mut file| {
+        if let Some(permissions) = permissions {
+            file.set_permissions(permissions)?;
+        }
         write(&mut file)?;
         file.sync_all()?;
         drop(file);
@@ -236,7 +252,7 @@ mod tests {
     }
 
     /// Each of these is a file a crash, a full disk or a hand edit can leave. None
-    /// has values to keep, and a new settings file would be a claim that it did.
+    /// has values to keep.
     #[test]
     fn a_file_with_no_usable_values_is_moved_aside_whole() {
         let cases: [&[u8]; 5] = [b"", b"{\"a\":\"tru", b"[1,2]", b"null", b"\xff\xfe{}"];
@@ -251,7 +267,7 @@ mod tests {
                 std::fs::read(loaded.recovered_copy.unwrap()).unwrap(),
                 original
             );
-            assert!(!path.exists());
+            assert_eq!(std::fs::read(&path).unwrap(), b"{}");
         }
     }
 
@@ -284,7 +300,7 @@ mod tests {
         let path = settings_in(dir.path());
         std::fs::write(&path, "previous").unwrap();
 
-        let result = replace_file(&path, |file| {
+        let result = replace_file(&path, None, |file| {
             file.write_all(b"half")?;
             Err(std::io::Error::other("disk full"))
         });
@@ -303,6 +319,28 @@ mod tests {
 
         assert!(save_settings(&path, &Settings::new()).is_err());
         assert_eq!(files_in(dir.path()), ["settings.json"]);
+    }
+
+    /// Lobby accounts are in this file, so a player who made it private keeps it
+    /// private through a save and through a recovery.
+    #[cfg(unix)]
+    #[test]
+    fn a_private_file_stays_private() {
+        use std::os::unix::fs::PermissionsExt;
+        let mode = |path: &Path| std::fs::metadata(path).unwrap().permissions().mode() & 0o777;
+        let dir = tempfile::tempdir().unwrap();
+        let path = settings_in(dir.path());
+        let private = || Permissions::from_mode(0o600);
+
+        std::fs::write(&path, "{}").unwrap();
+        std::fs::set_permissions(&path, private()).unwrap();
+        save_settings(&path, &Settings::new()).unwrap();
+        assert_eq!(mode(&path), 0o600);
+
+        std::fs::write(&path, r#"{"a":true}"#).unwrap();
+        let copy = load_settings(&path).unwrap().recovered_copy.unwrap();
+        assert_eq!(mode(&path), 0o600);
+        assert_eq!(mode(&copy), 0o600);
     }
 
     #[test]
