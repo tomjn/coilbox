@@ -4872,6 +4872,10 @@ msgstr "{name} は {holds} を所有しています。"
 msgid "{name} preview"
 msgstr "{name} のプレビュー"
 
+#: src/widgets/pages/WidgetSettings.tsx
+msgid "{name} settings"
+msgstr ""
+
 #: src/scenario/saveIntoGame.ts
 #, fuzzy
 msgid "{name} ships inside {gameName}, which is packaged, so it cannot be saved there."
@@ -8571,10 +8575,18 @@ msgstr "ゲームが実行中ですが、coilbox はこのエンジンの書き�
 msgid "A game is running. {gameLabel} writes its whole blueprints file back when it saves or exits, so coilbox will not write into it until the game is closed."
 msgstr "ゲームが実行中です。{gameLabel} は保存時や終了時に設計図ファイル全体を書き戻すため、ゲームが閉じられるまで coilbox は書き込みません。"
 
+#: src/widgets/pages/WidgetSettings.tsx
+msgid "A game is running. Close it to change these settings."
+msgstr ""
+
 #: src/blueprint/pages/components/LeavingPack.tsx
 #, fuzzy
 msgid "A game is running. It writes its whole blueprints file back when it saves or exits, so anything written into that file now could be thrown away without a word."
 msgstr "ゲームが実行中です。ゲームは保存時や終了時に設計図ファイル全体を書き戻すため、今そのファイルに書き込んだ内容は何の通知もなく破棄される可能性があります。"
+
+#: src/widgets/widgetSettings.ts
+msgid "A game is running. It writes its widget settings back when it saves or exits, so anything written now would be thrown away. Close the game and try again."
+msgstr ""
 
 #: src/blueprint/pages/components/WidgetPanel.tsx
 #, fuzzy
@@ -9025,6 +9037,10 @@ msgstr "セットはリプレイをまとめるものです。ここで追加や
 #, fuzzy
 msgid "A set is a named group of replays, such as a tournament or a night of games. Deleting a set never deletes the replays in it. To delete replays, use the replay's own page."
 msgstr "セットは、トーナメントや一晩の試合など、リプレイに名前を付けてまとめたものです。セットを削除しても、中のリプレイは削除されません。リプレイを削除するには、リプレイ自身のページを使ってください。"
+
+#: src/widgets/widgetSettings.ts
+msgid "A setting must be a finite number."
+msgstr ""
 
 #: src/lego/scriptPlayback.ts
 #, fuzzy
@@ -19077,6 +19093,10 @@ msgstr "無効"
 #, fuzzy
 msgid "Disarms a trigger until something enables it again."
 msgstr "何かが再び有効にするまで、トリガーを無効にします。"
+
+#: src/widgets/pages/WidgetSettings.tsx
+msgid "Discard changes"
+msgstr ""
 
 #: src/lego/pages/components/ScriptTab.tsx
 #, fuzzy
@@ -32814,6 +32834,10 @@ msgstr "接続していません。"
 msgid "Not decoded"
 msgstr "未デコード"
 
+#: src/widgets/pages/WidgetSettings.tsx
+msgid "not edited"
+msgstr ""
+
 #: src/workshop/pages/components/WeaponLibraryPanel.tsx
 #, fuzzy
 msgid "Not equipped anywhere."
@@ -33183,6 +33207,10 @@ msgstr "現在、移動できるものはありません。"
 msgid "Nothing changed yet"
 msgstr "まだ何も変更されていません"
 
+#: src/widgets/pages/WidgetSettings.tsx
+msgid "Nothing changed."
+msgstr ""
+
 #: src/lego/pages/components/ExportDrawer.tsx
 #, fuzzy
 msgid "Nothing chosen"
@@ -33479,6 +33507,11 @@ msgstr "理由は示されませんでした。よくある原因は、ルーム
 msgid "Nothing saved for this map yet. Draw a layout and keep it here."
 msgstr "このマップにはまだ何も保存されていません。レイアウトを描いてここに保存してください。"
 
+#. placeholder {0}: target.game
+#: src/widgets/pages/WidgetSettings.tsx
+msgid "Nothing saved yet. {0} saves this widget's settings after the widget has run."
+msgstr ""
+
 #: src/play/PresetPartsView.tsx
 #, fuzzy
 msgid "Nothing selected"
@@ -33702,6 +33735,10 @@ msgstr "今"
 #, fuzzy
 msgid "nowhere yet"
 msgstr "まだ未指定"
+
+#: src/widgets/pages/WidgetSettings.tsx
+msgid "number"
+msgstr ""
 
 #: src/lego/pages/components/AnimationPanel.tsx
 #, fuzzy
@@ -37524,6 +37561,7 @@ msgstr "読み取り専用です。試合のオプションを変更できるの
 #: src/hub/pages/components/GamePicturesControl.tsx
 #: src/lego/pages/components/ScriptTab.tsx
 #: src/play/pages/EngineLogSection.tsx
+#: src/widgets/pages/WidgetSettings.tsx
 #, fuzzy
 msgid "Reading"
 msgstr "読み込み中"
@@ -40161,6 +40199,7 @@ msgstr "デフォルトと同じ"
 #: src/multiplayer/NoteButton.tsx
 #: src/play/pages/components/NewPresetFromReplayButton.tsx
 #: src/play/pages/components/SaveAsPresetButton.tsx
+#: src/widgets/pages/WidgetSettings.tsx
 #: src/workshop/pages/components/ProjectDetailsDrawer.tsx
 #, fuzzy
 msgid "Save"
@@ -40477,6 +40516,10 @@ msgstr "ユニットに保存しました。"
 #, fuzzy
 msgid "Saved to your Singleplayer presets to replay later."
 msgstr "後で再プレイできるよう、シングルプレイのプリセットに保存しました。"
+
+#: src/widgets/pages/WidgetSettings.tsx
+msgid "Saved. The file as it was is at {saved}."
+msgstr ""
 
 #: src/play/PlayProvider.tsx
 #, fuzzy
@@ -42045,9 +42088,15 @@ msgstr "設定"
 
 #: src/general/index.ts
 #: src/i18n/frameStrings.ts
+#: src/widgets/pages/WidgetsPage.tsx
 #, fuzzy
 msgid "Settings"
 msgstr "設定"
+
+#. placeholder {0}: row.info?.name || fileName(row.path)
+#: src/widgets/pages/WidgetsPage.tsx
+msgid "Settings of {0}"
+msgstr ""
 
 #: src/content/pages/components/ConfigProfilesPanel.tsx
 #, fuzzy
@@ -44839,6 +44888,11 @@ msgstr "システム"
 msgid "Table"
 msgstr "表"
 
+#. placeholder {0}: node.children.length
+#: src/widgets/pages/WidgetSettings.tsx
+msgid "table of {0}"
+msgstr ""
+
 #: src/hub/pages/BrowsePage.tsx
 #, fuzzy
 msgid "Tag"
@@ -45222,6 +45276,10 @@ msgstr "テスト通知"
 #, fuzzy
 msgid "Testing a scenario here leaves its compiled mission in the game folder. Removing one takes the folder and its dialogue clips, and nothing else. The mission runtime stays, and testing that scenario again writes it back."
 msgstr "ここでシナリオをテストすると、コンパイルしたミッションがゲームのフォルダーに残ります。削除すると、そのフォルダーとセリフのクリップだけが削除されます。ミッションランタイムは残り、そのシナリオを再度テストすると書き戻されます。"
+
+#: src/widgets/pages/WidgetSettings.tsx
+msgid "text"
+msgstr ""
 
 #: src/mapconv/pages/components/AdvancedOptions.tsx
 #, fuzzy
@@ -47899,6 +47957,10 @@ msgstr "ログインできるサーバーと、そのアカウント。"
 msgid "The servers you play on, and who you hear from there."
 msgstr "プレイするサーバーと、そこでやり取りする相手。"
 
+#: src/widgets/widgetSettings.ts
+msgid "The settings changed after coilbox read them, so nothing was saved. Close this and open it again."
+msgstr ""
+
 #: src/lego/pages/components/ImportResult.tsx
 #, fuzzy
 msgid "The shading map, {shadingMap}, was not found. The unit looks the same here either way, but the export will have no glow or shine to write out."
@@ -50206,6 +50268,10 @@ msgstr "このウォーパスにはゲーム <0>{name}</0> が必要ですが、
 msgid "This was made by a newer version of coilbox. Update coilbox to open it."
 msgstr "これは新しいバージョンの coilbox で作成されています。開くには coilbox をアップデートしてください。"
 
+#: src/widgets/pages/WidgetSettings.tsx
+msgid "This widget has no saved settings."
+msgstr ""
+
 #: src/conquest/pages/components/ThreatLevelSelect.tsx
 #, fuzzy
 msgid "Threat level"
@@ -50790,6 +50856,10 @@ msgstr "ミッション開始から設定した秒数が経過すると成立し
 #, fuzzy
 msgid "True once an actor changes hands, whether captured or gifted away."
 msgstr "アクターの所有者が変わると成立します。捕獲でも譲渡でも同じです。"
+
+#: src/widgets/pages/WidgetSettings.tsx
+msgid "true or false"
+msgstr ""
 
 #: src/downloads/activityRows.ts
 #, fuzzy

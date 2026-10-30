@@ -4872,6 +4872,10 @@ msgstr "{name} 拥有 {holds}。"
 msgid "{name} preview"
 msgstr "{name} 预览"
 
+#: src/widgets/pages/WidgetSettings.tsx
+msgid "{name} settings"
+msgstr ""
+
 #: src/scenario/saveIntoGame.ts
 #, fuzzy
 msgid "{name} ships inside {gameName}, which is packaged, so it cannot be saved there."
@@ -8571,10 +8575,18 @@ msgstr "游戏正在运行，而 coilbox 不知道此引擎会写入哪里，因
 msgid "A game is running. {gameLabel} writes its whole blueprints file back when it saves or exits, so coilbox will not write into it until the game is closed."
 msgstr "游戏正在运行。{gameLabel} 在保存或退出时会写回整个蓝图文件，因此在游戏关闭之前，coilbox 不会写入它。"
 
+#: src/widgets/pages/WidgetSettings.tsx
+msgid "A game is running. Close it to change these settings."
+msgstr ""
+
 #: src/blueprint/pages/components/LeavingPack.tsx
 #, fuzzy
 msgid "A game is running. It writes its whole blueprints file back when it saves or exits, so anything written into that file now could be thrown away without a word."
 msgstr "游戏正在运行。它在保存或退出时会写回整个蓝图文件，因此现在写入该文件的内容可能会被悄无声息地丢弃。"
+
+#: src/widgets/widgetSettings.ts
+msgid "A game is running. It writes its widget settings back when it saves or exits, so anything written now would be thrown away. Close the game and try again."
+msgstr ""
 
 #: src/blueprint/pages/components/WidgetPanel.tsx
 #, fuzzy
@@ -9025,6 +9037,10 @@ msgstr "回放集用于将回放分组。在此添加或移除不会更改回放
 #, fuzzy
 msgid "A set is a named group of replays, such as a tournament or a night of games. Deleting a set never deletes the replays in it. To delete replays, use the replay's own page."
 msgstr "回放集是一组命名的回放，例如一场锦标赛或一晚的对局。删除回放集永远不会删除其中的回放。要删除回放，请使用回放自己的页面。"
+
+#: src/widgets/widgetSettings.ts
+msgid "A setting must be a finite number."
+msgstr ""
 
 #: src/lego/scriptPlayback.ts
 #, fuzzy
@@ -19077,6 +19093,10 @@ msgstr "已停用"
 #, fuzzy
 msgid "Disarms a trigger until something enables it again."
 msgstr "停用触发器，直到有其他内容重新启用它。"
+
+#: src/widgets/pages/WidgetSettings.tsx
+msgid "Discard changes"
+msgstr ""
 
 #: src/lego/pages/components/ScriptTab.tsx
 #, fuzzy
@@ -32814,6 +32834,10 @@ msgstr "未连接。"
 msgid "Not decoded"
 msgstr "未解码"
 
+#: src/widgets/pages/WidgetSettings.tsx
+msgid "not edited"
+msgstr ""
+
 #: src/workshop/pages/components/WeaponLibraryPanel.tsx
 #, fuzzy
 msgid "Not equipped anywhere."
@@ -33183,6 +33207,10 @@ msgstr "目前没有可以移动的内容。"
 msgid "Nothing changed yet"
 msgstr "还没有任何更改"
 
+#: src/widgets/pages/WidgetSettings.tsx
+msgid "Nothing changed."
+msgstr ""
+
 #: src/lego/pages/components/ExportDrawer.tsx
 #, fuzzy
 msgid "Nothing chosen"
@@ -33479,6 +33507,11 @@ msgstr "没有给出原因。常见原因有：你不是房间的首领、自动
 msgid "Nothing saved for this map yet. Draw a layout and keep it here."
 msgstr "还没有为这张地图保存任何内容。画一个布局并保存在这里。"
 
+#. placeholder {0}: target.game
+#: src/widgets/pages/WidgetSettings.tsx
+msgid "Nothing saved yet. {0} saves this widget's settings after the widget has run."
+msgstr ""
+
 #: src/play/PresetPartsView.tsx
 #, fuzzy
 msgid "Nothing selected"
@@ -33702,6 +33735,10 @@ msgstr "现在"
 #, fuzzy
 msgid "nowhere yet"
 msgstr "尚未指定"
+
+#: src/widgets/pages/WidgetSettings.tsx
+msgid "number"
+msgstr ""
 
 #: src/lego/pages/components/AnimationPanel.tsx
 #, fuzzy
@@ -37524,6 +37561,7 @@ msgstr "只读。只有主机能更改对局选项。"
 #: src/hub/pages/components/GamePicturesControl.tsx
 #: src/lego/pages/components/ScriptTab.tsx
 #: src/play/pages/EngineLogSection.tsx
+#: src/widgets/pages/WidgetSettings.tsx
 #, fuzzy
 msgid "Reading"
 msgstr "读取中"
@@ -40161,6 +40199,7 @@ msgstr "与默认相同"
 #: src/multiplayer/NoteButton.tsx
 #: src/play/pages/components/NewPresetFromReplayButton.tsx
 #: src/play/pages/components/SaveAsPresetButton.tsx
+#: src/widgets/pages/WidgetSettings.tsx
 #: src/workshop/pages/components/ProjectDetailsDrawer.tsx
 #, fuzzy
 msgid "Save"
@@ -40477,6 +40516,10 @@ msgstr "已保存到单位。"
 #, fuzzy
 msgid "Saved to your Singleplayer presets to replay later."
 msgstr "已保存到你的单人游戏预设，可稍后再玩。"
+
+#: src/widgets/pages/WidgetSettings.tsx
+msgid "Saved. The file as it was is at {saved}."
+msgstr ""
 
 #: src/play/PlayProvider.tsx
 #, fuzzy
@@ -42045,9 +42088,15 @@ msgstr "设置"
 
 #: src/general/index.ts
 #: src/i18n/frameStrings.ts
+#: src/widgets/pages/WidgetsPage.tsx
 #, fuzzy
 msgid "Settings"
 msgstr "设置"
+
+#. placeholder {0}: row.info?.name || fileName(row.path)
+#: src/widgets/pages/WidgetsPage.tsx
+msgid "Settings of {0}"
+msgstr ""
 
 #: src/content/pages/components/ConfigProfilesPanel.tsx
 #, fuzzy
@@ -44839,6 +44888,11 @@ msgstr "系统"
 msgid "Table"
 msgstr "表格"
 
+#. placeholder {0}: node.children.length
+#: src/widgets/pages/WidgetSettings.tsx
+msgid "table of {0}"
+msgstr ""
+
 #: src/hub/pages/BrowsePage.tsx
 #, fuzzy
 msgid "Tag"
@@ -45222,6 +45276,10 @@ msgstr "测试通知"
 #, fuzzy
 msgid "Testing a scenario here leaves its compiled mission in the game folder. Removing one takes the folder and its dialogue clips, and nothing else. The mission runtime stays, and testing that scenario again writes it back."
 msgstr "在这里测试场景会把编译后的任务留在游戏文件夹中。移除时只会删除该文件夹及其对白片段，不会删除其他内容。任务运行时会保留，再次测试该场景时会重新写入。"
+
+#: src/widgets/pages/WidgetSettings.tsx
+msgid "text"
+msgstr ""
 
 #: src/mapconv/pages/components/AdvancedOptions.tsx
 #, fuzzy
@@ -47899,6 +47957,10 @@ msgstr "你可以登录的服务器，以及你在其上的账号。"
 msgid "The servers you play on, and who you hear from there."
 msgstr "你游玩的服务器，以及你在那里能收到谁的消息。"
 
+#: src/widgets/widgetSettings.ts
+msgid "The settings changed after coilbox read them, so nothing was saved. Close this and open it again."
+msgstr ""
+
 #: src/lego/pages/components/ImportResult.tsx
 #, fuzzy
 msgid "The shading map, {shadingMap}, was not found. The unit looks the same here either way, but the export will have no glow or shine to write out."
@@ -50206,6 +50268,10 @@ msgstr "此征途需要游戏 <0>{name}</0>，但它未安装。"
 msgid "This was made by a newer version of coilbox. Update coilbox to open it."
 msgstr "这是由更新版本的 coilbox 创建的。请更新 coilbox 后再打开。"
 
+#: src/widgets/pages/WidgetSettings.tsx
+msgid "This widget has no saved settings."
+msgstr ""
+
 #: src/conquest/pages/components/ThreatLevelSelect.tsx
 #, fuzzy
 msgid "Threat level"
@@ -50790,6 +50856,10 @@ msgstr "从任务开始经过设定的秒数后成立。"
 #, fuzzy
 msgid "True once an actor changes hands, whether captured or gifted away."
 msgstr "参与者易手后成立，无论是被占领还是被赠送。"
+
+#: src/widgets/pages/WidgetSettings.tsx
+msgid "true or false"
+msgstr ""
 
 #: src/downloads/activityRows.ts
 #, fuzzy

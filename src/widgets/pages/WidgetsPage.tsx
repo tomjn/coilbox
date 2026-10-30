@@ -1,6 +1,12 @@
 import { Trans, useLingui } from "@lingui/react/macro";
 import { Button } from "@picoframe/frame";
-import { FolderOpen, Plus, Puzzle, RefreshCw } from "lucide-react";
+import {
+  FolderOpen,
+  Plus,
+  Puzzle,
+  RefreshCw,
+  SlidersHorizontal,
+} from "lucide-react";
 import { useMemo, useState } from "react";
 import { useSearchParams } from "react-router";
 import { OptionSelect } from "@/components/OptionSelect";
@@ -38,6 +44,7 @@ import {
   type WidgetStates,
 } from "../widgetSets";
 import { AddWidgetDrawer } from "./AddWidgetDrawer";
+import { type SettingsTarget, WidgetSettingsDrawer } from "./WidgetSettings";
 
 /** The picker's value for the list of every widget file. Not empty, because
  *  the select treats an empty value as nothing picked. */
@@ -65,6 +72,7 @@ export default function WidgetsPage() {
   // A game whose handler is not recognised has no file to write, so no set.
   const key = game?.handler ? setKey(game) : null;
   const ownSet = key !== null && !!entry(sets.overrides, key);
+  const [settingsPath, setSettingsPath] = useState<string | null>(null);
 
   const shown = useMemo(() => {
     if (!list.rows) return null;
@@ -83,8 +91,26 @@ export default function WidgetsPage() {
     [list.games, game, picked, t],
   );
 
-  const pick = (value: string) =>
+  const pick = (value: string) => {
+    setSettingsPath(null);
     setParams(value === ALL ? {} : { game: value }, { replace: true });
+  };
+
+  /** What the settings drawer shows, when a row of the picked game is open. */
+  const settingsTarget = useMemo((): SettingsTarget | null => {
+    const row = shown?.find((r) => r.path === settingsPath);
+    if (!row || !game?.handler) return null;
+    const sw = settingsSwitch(row, game.game);
+    return sw
+      ? {
+          row,
+          sw,
+          game: game.game,
+          shortName: game.shortName,
+          handler: game.handler,
+        }
+      : null;
+  }, [shown, settingsPath, game]);
 
   const openFolder = () => {
     if (!list.writeDir) return;
@@ -217,6 +243,10 @@ export default function WidgetsPage() {
             rows={shown}
             showGames={!game && list.gamesKnown}
             someUnknown={!!list.games?.some((g) => g.handler === null)}
+            onSettings={
+              game?.handler ? (row) => setSettingsPath(row.path) : undefined
+            }
+            canSettings={(row) => !!game && !!settingsSwitch(row, game.game)}
             switches={
               picked === ALL
                 ? {
@@ -256,6 +286,11 @@ export default function WidgetsPage() {
           />
         )}
       </SlideDrawer>
+      <WidgetSettingsDrawer
+        target={settingsTarget}
+        writeDir={list.writeDir}
+        onClose={() => setSettingsPath(null)}
+      />
     </div>
   );
 }
@@ -279,6 +314,16 @@ function switchName(row: WidgetRow, game: string | null): string | null {
   if (row.switch.kind !== "ready") return null;
   if (game !== null && !row.loadedBy.includes(game)) return null;
   return row.switch.name;
+}
+
+/** The switch of a row whose saved settings can be shown for `game`: it has a
+ *  certain saved name and the game loads it. */
+function settingsSwitch(
+  row: WidgetRow,
+  game: string,
+): SettingsTarget["sw"] | null {
+  if (row.switch.kind !== "ready" || !row.loadedBy.includes(game)) return null;
+  return row.switch;
 }
 
 function RowSwitch({
@@ -322,6 +367,8 @@ function WidgetTable({
   showGames,
   someUnknown,
   switches,
+  onSettings,
+  canSettings,
 }: {
   rows: readonly WidgetRow[];
   showGames: boolean;
@@ -330,6 +377,9 @@ function WidgetTable({
   someUnknown: boolean;
   /** Absent for a game whose handler is not recognised. */
   switches?: TableSwitches;
+  /** Present with a recognised game picked. */
+  onSettings?: (row: WidgetRow) => void;
+  canSettings: (row: WidgetRow) => boolean;
 }) {
   const { t } = useLingui();
   return (
@@ -356,6 +406,13 @@ function WidgetTable({
           {showGames && (
             <TableHead>
               <Trans>Loaded by</Trans>
+            </TableHead>
+          )}
+          {onSettings && (
+            <TableHead className="w-0">
+              <span className="sr-only">
+                <Trans>Settings</Trans>
+              </span>
             </TableHead>
           )}
         </TableRow>
@@ -430,6 +487,21 @@ function WidgetTable({
                       <Trans>No installed game</Trans>
                     )}
                   </span>
+                )}
+              </TableCell>
+            )}
+            {onSettings && (
+              <TableCell>
+                {canSettings(row) && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => onSettings(row)}
+                    aria-label={t`Settings of ${row.info?.name || fileName(row.path)}`}
+                  >
+                    <SlidersHorizontal />
+                    <Trans>Settings</Trans>
+                  </Button>
                 )}
               </TableCell>
             )}

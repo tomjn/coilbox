@@ -6,7 +6,7 @@ import {
   type WidgetConfigFile,
   type WidgetHandler,
 } from "./handlers";
-import { configCandidates } from "./widgetConfig";
+import { configCandidates, dataCandidates } from "./widgetConfig";
 
 const none = async () => null;
 
@@ -229,6 +229,61 @@ describe("userWidgets", () => {
         "ZK",
       ),
     ).toEqual(["LuaUI/Config/ZK_data.lua"]);
+  });
+});
+
+describe("dataCandidates", () => {
+  const markers = [
+    [
+      "luaui/cawidgets.lua",
+      ["LuaUI/Config/ZK_data.lua", "LuaUI/Config/Zk_data.lua"],
+    ],
+    ["luaui/jauriawidgets.lua", ["LuaUI/Config/ZK_data.lua"]],
+    ["luaui/main.lua", ["LuaUI/Config/Zk_data.lua"]],
+    ["luaui/barwidgets.lua", ["LuaUI/Config/BYAR.lua"]],
+    ["luaui/widgets_custom.lua", ["LuaUI/Config/ZK_data.lua"]],
+    ["luaui/mosaicwidgets.lua", ["LuaUI/configs/ZK_data.lua"]],
+  ] as const;
+
+  it.each(
+    markers,
+  )("%s keeps widgets' saved settings in %j", async (marker, expected) => {
+    const handler = await recogniseHandler(
+      ["luaui.lua", marker],
+      async () => "LuaHandler/handler.lua",
+    );
+    expect(dataCandidates(handler?.config as WidgetConfigFile, "Zk")).toEqual(
+      expected,
+    );
+  });
+
+  it("gives only a handler that keeps its order apart a data file of its own", async () => {
+    const own = ["ca", "jauria", "jk", "legacy"];
+    for (const [marker] of [
+      ["luaui/cawidgets.lua"],
+      ["luaui/jauriawidgets.lua"],
+      ["luaui/main.lua"],
+      ["luaui/barwidgets.lua"],
+      ["luaui/bawidgets.lua"],
+      ["luaui/mfwidgets.lua"],
+      ["luaui/widgets_evo.lua"],
+      ["luaui/tapwidgets.lua"],
+      ["luaui/config/iwui.config.lua"],
+    ]) {
+      const handler = await recogniseHandler(
+        ["luaui.lua", marker],
+        async () => "LuaHandler/handler.lua",
+      );
+      expect(!!handler?.config.dataFiles).toBe(own.includes(handler?.id ?? ""));
+      expect(!!handler?.config.dataFiles).toBe(
+        handler?.config.shape === "flat",
+      );
+    }
+    const legacy = await recogniseHandler(
+      ["luaui/widgets.lua"],
+      async () => "Config/widget_order.lua",
+    );
+    expect(legacy?.config.dataFiles).toEqual(["widget_data.lua"]);
   });
 });
 
