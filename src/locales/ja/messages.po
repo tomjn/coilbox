@@ -2398,6 +2398,10 @@ msgstr "{diverged, plural, other {# 件は分析しましたが、再生で試�
 msgid "{done} / {total} downloaded"
 msgstr "{done} / {total} をダウンロード済み"
 
+#: src/content/pages/components/CompatMode.tsx
+msgid "{done} of {total, plural, one {# model} other {# models}}"
+msgstr ""
+
 #: src/content/pages/components/Convert3doDrawer.tsx
 #, fuzzy
 msgid "{done} of {total}"
@@ -29448,6 +29452,10 @@ msgstr "モデルを保存しました"
 #, fuzzy
 msgid "Models"
 msgstr "モデル"
+
+#: src/content/pages/components/CompatMode.tsx
+msgid "Models converted"
+msgstr ""
 
 #: src/multiplayer/admin/AdminToolNav.tsx
 #, fuzzy

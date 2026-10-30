@@ -2398,6 +2398,10 @@ msgstr "{diverged, plural, one {# повтор проаналізовано, а�
 msgid "{done} / {total} downloaded"
 msgstr "Завантажено {done} / {total}"
 
+#: src/content/pages/components/CompatMode.tsx
+msgid "{done} of {total, plural, one {# model} other {# models}}"
+msgstr ""
+
 #: src/content/pages/components/Convert3doDrawer.tsx
 #, fuzzy
 msgid "{done} of {total}"
@@ -29448,6 +29452,10 @@ msgstr "Модель збережено"
 #, fuzzy
 msgid "Models"
 msgstr "Моделі"
+
+#: src/content/pages/components/CompatMode.tsx
+msgid "Models converted"
+msgstr ""
 
 #: src/multiplayer/admin/AdminToolNav.tsx
 #, fuzzy

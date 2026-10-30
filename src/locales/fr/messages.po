@@ -2398,6 +2398,10 @@ msgstr "{diverged, plural, one {# a été analysée et la lecture n’a pas repr
 msgid "{done} / {total} downloaded"
 msgstr "{done} / {total} téléchargés"
 
+#: src/content/pages/components/CompatMode.tsx
+msgid "{done} of {total, plural, one {# model} other {# models}}"
+msgstr ""
+
 #: src/content/pages/components/Convert3doDrawer.tsx
 #, fuzzy
 msgid "{done} of {total}"
@@ -29448,6 +29452,10 @@ msgstr "Modèle enregistré"
 #, fuzzy
 msgid "Models"
 msgstr "Modèles"
+
+#: src/content/pages/components/CompatMode.tsx
+msgid "Models converted"
+msgstr ""
 
 #: src/multiplayer/admin/AdminToolNav.tsx
 #, fuzzy
