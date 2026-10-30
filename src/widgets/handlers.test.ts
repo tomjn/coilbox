@@ -43,12 +43,15 @@ describe("recogniseHandler", () => {
     ).toEqual(["LuaUI/configs/MOSAIC_data.lua"]);
   });
 
-  it("does not take MOSAIC's or Total Annihilation Prime's main.lua for jK's", async () => {
+  it.each([
+    ["LuaUI/mosaicwidgets.lua", "mosaic", "mosaicmain.lua"],
+    ["LuaUI/tapwidgets.lua", "tap", "tapmain.lua"],
+  ])("does not take %s's main.lua for jK's", async (marker, id, main) => {
     const handler = await recogniseHandler(
-      ["luaui.lua", "LuaUI/main.lua", "LuaUI/tapwidgets.lua"],
-      async () => "VFS.Include(LUAUI_DIRNAME .. 'tapmain.lua')",
+      ["luaui.lua", "LuaUI/main.lua", marker],
+      async () => `VFS.Include(LUAUI_DIRNAME .. '${main}')`,
     );
-    expect(handler?.id).toBe("tap");
+    expect(handler?.id).toBe(id);
   });
 
   // The file names each game's own handler saves to, under LuaUI/Config.
