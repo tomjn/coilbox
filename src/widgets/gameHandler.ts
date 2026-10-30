@@ -3,14 +3,17 @@
  * read from its archives through unitsync and kept for the session.
  */
 
+import { appFileIO } from "@/blueprint/fileIO";
 import {
   type GameItem,
   unitsyncArchiveFile,
   unitsyncArchiveTree,
   unitsyncArchiveWidgets,
+  unitsyncEngineConfig,
 } from "@/content/bindings";
 import { type GameWidget, readWidgets, widgetMembers } from "./gameWidgets";
 import { recogniseHandler, type WidgetHandler } from "./handlers";
+import { detailLevelIn, newConfigFile } from "./widgetConfig";
 import type { GameHandler } from "./widgetList";
 
 /** Handlers already recognised this session, keyed by
@@ -83,6 +86,40 @@ export async function handlerOf(
   });
   handlerCache.set(key, handler);
   return handler;
+}
+
+/**
+ * What a new config file for `game` starts as, from the source of its handler.
+ * Null when the handler's needs cannot be worked out.
+ */
+export async function newConfigText(
+  enginePath: string,
+  dataDir: string,
+  game: GameItem,
+  handler: WidgetHandler,
+): Promise<string | null> {
+  if (handler.config.shape === "nested") {
+    return newConfigFile(handler.config, null, 2);
+  }
+  const owner = await fileOwners(enginePath, dataDir, game);
+  const entry = [...owner].find(
+    ([path]) => path.toLowerCase() === handler.source,
+  );
+  if (!entry) return null;
+  const [file, archive] = entry;
+  const read = await unitsyncArchiveFile({
+    enginePath,
+    dataDir,
+    archive,
+    file,
+  });
+  const source = read.kind === "text" ? (read.text ?? null) : null;
+  if (!source?.includes("lastWidgetDetailLevel")) {
+    return newConfigFile(handler.config, source, 2);
+  }
+  const { configPath } = await unitsyncEngineConfig({ enginePath, dataDir });
+  const settings = configPath ? await appFileIO.read(configPath) : null;
+  return newConfigFile(handler.config, source, detailLevelIn(settings));
 }
 
 /** Game widgets already read this session, keyed like {@link handlerCache}

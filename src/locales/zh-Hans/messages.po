@@ -1336,11 +1336,6 @@ msgstr ""
 
 #. placeholder {0}: game.game
 #: src/widgets/pages/WidgetsPage.tsx
-msgid "{0} has not saved its widget settings yet, so these apply from the launch after it first does."
-msgstr ""
-
-#. placeholder {0}: game.game
-#: src/widgets/pages/WidgetsPage.tsx
 msgid "{0} loads none of your widgets."
 msgstr ""
 
@@ -13918,6 +13913,7 @@ msgstr "不会伤害自己的单位"
 #: src/uberstress/pages/RunPage.tsx
 #: src/widgets/pages/AddWidgetDrawer.tsx
 #: src/widgets/pages/RemoveWidget.tsx
+#: src/widgets/pages/ResetGameWidgets.tsx
 #: src/workshop/pages/components/CloneActions.tsx
 #: src/workshop/pages/components/DiskDiffDrawer.tsx
 #: src/workshop/pages/components/InPlaceWrite.tsx
@@ -15523,6 +15519,11 @@ msgstr "Coilbox 无法关闭它：{reason}。"
 #, fuzzy
 msgid "Coilbox could not close it: {reason}. Stop it from the Battles page."
 msgstr "Coilbox 无法关闭它：{reason}。请在“对局”页面停止它。"
+
+#. placeholder {0}: game.game
+#: src/widgets/pages/WidgetsPage.tsx
+msgid "Coilbox could not create {0}'s settings file."
+msgstr ""
 
 #: src/multiplayer/battles/joinBattle.ts
 #, fuzzy
@@ -36992,6 +36993,10 @@ msgstr "脉冲星"
 msgid "Purple"
 msgstr "紫色"
 
+#: src/widgets/pages/ResetGameWidgets.tsx
+msgid "Put {game}'s own widgets back to their defaults?"
+msgstr ""
+
 #: src/multiplayer/chat/PartySection.tsx
 #, fuzzy
 msgid "Put {name} out of the party"
@@ -39415,6 +39420,7 @@ msgstr "重新发送验证邮件"
 #: src/lego/pages/components/AnimationPanel.tsx
 #: src/lego/pages/components/ProportionsPanel.tsx
 #: src/play/pages/components/GameOptionsPanel.tsx
+#: src/widgets/pages/ResetGameWidgets.tsx
 #, fuzzy
 msgid "Reset"
 msgstr "重置"
@@ -39423,6 +39429,10 @@ msgstr "重置"
 #, fuzzy
 msgid "Reset {eventLabel} to {defaultSoundLabel}"
 msgstr "将 {eventLabel} 重置为 {defaultSoundLabel}"
+
+#: src/widgets/pages/ResetGameWidgets.tsx
+msgid "Reset {game}'s own widgets"
+msgstr ""
 
 #: src/play/pages/components/GameOptionsPanel.tsx
 #, fuzzy

@@ -8,7 +8,7 @@ import { unitsyncEngineConfig } from "@/content/bindings";
 import { primeScan } from "@/content/config";
 import { engineConfigDir } from "@/content/enginePaths";
 import { errorText } from "@/lib/helpers";
-import { handlerOf } from "./gameHandler";
+import { handlerOf, newConfigText } from "./gameHandler";
 import {
   type ConfigFileIO,
   findConfig,
@@ -72,10 +72,9 @@ export async function absorbGame(
 
 /**
  * Write the set that applies to `game` into its config file, after taking in
- * anything changed there since coilbox last wrote it. Does nothing for a game
- * whose handler coilbox does not recognise, or that has not saved a file yet:
- * a file coilbox made from nothing could be thrown away whole (see
- * `widgetConfig.ts`), and the game saves one when it first exits.
+ * anything changed there since coilbox last wrote it. Creates the file for a
+ * game that has not saved one yet, so the set applies from its first launch.
+ * Does nothing for a game whose handler coilbox does not recognise.
  */
 export async function writeSetForLaunch({
   enginePath,
@@ -102,22 +101,25 @@ export async function writeSetForLaunch({
   // The widgets are under every content root, which every engine reads, and
   // the game's config is in the engine's write folder (issues #4856, #4861).
   const widgets = await scanWidgets(dataDir);
-  await writeGameFile(writeDir, entry, widgetRows(widgets, [entry]));
+  await writeGameFile(writeDir, entry, widgetRows(widgets, [entry]), [], () =>
+    newConfigText(enginePath, dataDir, item, handler),
+  );
 }
 
 /**
  * Take what changed in `game`'s config file since coilbox last wrote it into
  * its set, then write the set back, so a change made in the game is kept and
- * the rest is as the set says. Does nothing when the game has not saved a file.
+ * the rest is as the set says. A game that has not saved a file gets one only
+ * when `create` says what it starts as.
  */
 async function writeGameFile(
   writeDir: string,
   entry: GameHandler & { handler: NonNullable<GameHandler["handler"]> },
   rows: readonly WidgetRow[],
   skip: readonly string[] = [],
+  create?: () => Promise<string | null>,
 ): Promise<void> {
-  const file = await absorbGame(appFileIO, writeDir, entry, rows, skip);
-  if (file.kind !== "ready") return;
+  await absorbGame(appFileIO, writeDir, entry, rows, skip);
   // Read after the absorb above, so a change made in the game is written back
   // rather than undone.
   const states = statesToWrite(
@@ -131,6 +133,7 @@ async function writeGameFile(
     config: entry.handler.config,
     shortName: entry.shortName ?? "",
     states,
+    create,
   });
   if (out) updateSets((sets) => recordWrite(sets, out.path, states));
 }

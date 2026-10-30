@@ -141,6 +141,8 @@ vi.mock("../useWidgetList", () => ({
       : scan;
     return {
       targets: [{}],
+      enginePath: "/engines/2026.09.01",
+      installed: [{ name: "Metal Factions v2.58" }],
       widgetDir: ROOT,
       roots: list.second ? [ROOT, SECOND] : [ROOT],
       configDir: list.configDir,
@@ -424,14 +426,6 @@ describe("WidgetsPage", () => {
     expect(screen.getByText("Metal Factions: bad file")).toBeTruthy();
   });
 
-  it("says when the game has not saved a file yet", () => {
-    files.files = new Map([["Metal Factions", { kind: "missing" }]]);
-    page("/library/widgets?game=Metal%20Factions");
-    expect(screen.getByRole("status").textContent).toContain(
-      "has not saved its widget settings yet",
-    );
-  });
-
   it("asks before removing a widget, naming the games that lose it", async () => {
     page();
     fireEvent.click(screen.getByRole("button", { name: "Remove BuildWatch" }));
@@ -647,7 +641,7 @@ describe("WidgetsPage", () => {
     expect(readSets().global).toEqual({});
   });
 
-  it("shows a game's own widgets as their defaults, unswitchable, until it has a config file", () => {
+  it("creates the config file when a game's own widget is switched before the game has saved one", async () => {
     files.files = new Map([["Metal Factions", { kind: "missing" }]]);
     const shippedWidget = (name: string, enabled: boolean): GameWidget => ({
       path: `luaui/widgets/${name}.lua`,
@@ -662,12 +656,63 @@ describe("WidgetsPage", () => {
       shippedWidget("Radar", false),
     ];
     page("/library/widgets?game=Metal%20Factions");
+    // With no file, each widget is as its `GetInfo()` says.
     const glow = screen.getByRole("switch", { name: "Glow on" });
     expect(glow.getAttribute("aria-checked")).toBe("true");
-    expect(glow.hasAttribute("disabled")).toBe(true);
-    const radar = screen.getByRole("switch", { name: "Radar on" });
-    expect(radar.getAttribute("aria-checked")).toBe("false");
-    expect(radar.hasAttribute("disabled")).toBe(true);
+    expect(
+      screen
+        .getByRole("switch", { name: "Radar on" })
+        .getAttribute("aria-checked"),
+    ).toBe("false");
+    fireEvent.click(glow);
+    await waitFor(() => expect(disk.size).toBe(1));
+    expect([...disk.values()]).toEqual([
+      'return {\n\torder = {\n\t\t["Glow"] = 0,\n\t},\n}\n',
+    ]);
+  });
+
+  it("offers a reset only when a game's own widget is away from its default, and resets it", async () => {
+    const config = `${list.configDir}/LuaUI/Config/MF.lua`;
+    const text =
+      'return {\n\tdata = {\n\t\tGlow = { size = 3 },\n\t},\n\torder = {\n\t\t["Glow"] = 0,\n\t\t["Radar"] = 4,\n\t\t["Theirs"] = 5,\n\t},\n}\n';
+    disk.set(config, text);
+    shipped.widgets = [
+      {
+        path: "luaui/widgets/glow.lua",
+        archive: "mf.sdz",
+        folder: "LuaUI/Widgets",
+        nested: false,
+        info: { name: "Glow", enabled: true },
+        error: null,
+      },
+    ];
+    const reset = { name: "Reset Metal Factions's own widgets" };
+    files.files = new Map([
+      [
+        "Metal Factions",
+        { kind: "ready", path: config, order: new Map([["Glow", 1]]) },
+      ],
+    ]);
+    const first = page("/library/widgets?game=Metal%20Factions");
+    expect(screen.queryByRole("button", reset)).toBeNull();
+    first.unmount();
+
+    files.files = new Map([
+      [
+        "Metal Factions",
+        { kind: "ready", path: config, order: new Map([["Glow", 0]]) },
+      ],
+    ]);
+    page("/library/widgets?game=Metal%20Factions");
+    fireEvent.click(screen.getByRole("button", reset));
+    fireEvent.click(screen.getByRole("button", { name: "Reset" }));
+    await waitFor(() =>
+      expect(disk.get(config)).toBe(
+        'return {\n\tdata = {\n\t\tGlow = { size = 3 },\n\t},\n\torder = {\n\t\t["Radar"] = 4,\n\t\t["Theirs"] = 5,\n\t},\n}\n',
+      ),
+    );
+    // The file as it was is kept beside it.
+    expect([...disk.values()]).toContain(text);
   });
 
   it("lines a game's own widgets up with the player's by using one table", () => {

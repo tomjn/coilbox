@@ -1109,11 +1109,6 @@ msgstr "{0} has no folder for RmlUi widgets."
 
 #. placeholder {0}: game.game
 #: src/widgets/pages/WidgetsPage.tsx
-msgid "{0} has not saved its widget settings yet, so these apply from the launch after it first does."
-msgstr "{0} has not saved its widget settings yet, so these apply from the launch after it first does."
-
-#. placeholder {0}: game.game
-#: src/widgets/pages/WidgetsPage.tsx
 msgid "{0} loads none of your widgets."
 msgstr "{0} loads none of your widgets."
 
@@ -11263,6 +11258,7 @@ msgstr "Can't damage its own unit"
 #: src/uberstress/pages/RunPage.tsx
 #: src/widgets/pages/AddWidgetDrawer.tsx
 #: src/widgets/pages/RemoveWidget.tsx
+#: src/widgets/pages/ResetGameWidgets.tsx
 #: src/workshop/pages/components/CloneActions.tsx
 #: src/workshop/pages/components/DiskDiffDrawer.tsx
 #: src/workshop/pages/components/InPlaceWrite.tsx
@@ -12581,6 +12577,11 @@ msgstr "Coilbox could not close it: {reason}."
 #: src/multiplayer/pages/BattleRoomPage.tsx
 msgid "Coilbox could not close it: {reason}. Stop it from the Battles page."
 msgstr "Coilbox could not close it: {reason}. Stop it from the Battles page."
+
+#. placeholder {0}: game.game
+#: src/widgets/pages/WidgetsPage.tsx
+msgid "Coilbox could not create {0}'s settings file."
+msgstr "Coilbox could not create {0}'s settings file."
 
 #: src/multiplayer/battles/joinBattle.ts
 msgid "Coilbox could not leave it: {reason}."
@@ -29988,6 +29989,10 @@ msgstr "pulsar"
 msgid "Purple"
 msgstr "Purple"
 
+#: src/widgets/pages/ResetGameWidgets.tsx
+msgid "Put {game}'s own widgets back to their defaults?"
+msgstr "Put {game}'s own widgets back to their defaults?"
+
 #: src/multiplayer/chat/PartySection.tsx
 msgid "Put {name} out of the party"
 msgstr "Put {name} out of the party"
@@ -31962,12 +31967,17 @@ msgstr "Resend verification email"
 #: src/lego/pages/components/AnimationPanel.tsx
 #: src/lego/pages/components/ProportionsPanel.tsx
 #: src/play/pages/components/GameOptionsPanel.tsx
+#: src/widgets/pages/ResetGameWidgets.tsx
 msgid "Reset"
 msgstr "Reset"
 
 #: src/sound/SoundSettings.tsx
 msgid "Reset {eventLabel} to {defaultSoundLabel}"
 msgstr "Reset {eventLabel} to {defaultSoundLabel}"
+
+#: src/widgets/pages/ResetGameWidgets.tsx
+msgid "Reset {game}'s own widgets"
+msgstr "Reset {game}'s own widgets"
 
 #: src/play/pages/components/GameOptionsPanel.tsx
 msgid "Reset {label}"

@@ -33,6 +33,7 @@ import {
 } from "@/content/pages/components/states";
 import { errorText } from "@/lib/helpers";
 import { usePlay } from "@/play/PlayProvider";
+import { newConfigText } from "../gameHandler";
 import { gameWidgetRows, gameWidgetStates } from "../gameWidgets";
 import { useGameFiles } from "../useGameFiles";
 import { useGameWidgets } from "../useGameWidgets";
@@ -45,6 +46,7 @@ import {
   rowsForGame,
   type WidgetRow,
 } from "../widgetList";
+import { resetEntries } from "../widgetRemoval";
 import {
   appliedSet,
   dropOverride,
@@ -61,6 +63,7 @@ import {
   type RemovedWidget,
   RemoveWidgetButton,
 } from "./RemoveWidget";
+import { ResetGameWidgets } from "./ResetGameWidgets";
 import { type SettingsTarget, WidgetSettingsDrawer } from "./WidgetSettings";
 
 /** The picker's value for the list of every widget file. Not empty, because
@@ -119,18 +122,62 @@ export default function WidgetsPage() {
   );
   const switchOwn = async (name: string, on: boolean) => {
     if (!game?.handler || !list.configDir) return;
+    const { handler } = game;
+    const { enginePath, widgetDir: dataDir } = list;
+    const item = list.installed?.find(
+      (g) => g.name === (game.versions?.[0] ?? game.game),
+    );
     try {
-      await writeWidgetStates({
+      const out = await writeWidgetStates({
         io: appFileIO,
         writeDir: list.configDir,
-        config: game.handler.config,
+        config: handler.config,
         shortName: game.shortName ?? "",
         states: new Map([[name, on]]),
+        create:
+          enginePath && dataDir && item
+            ? () => newConfigText(enginePath, dataDir, item, handler)
+            : undefined,
       });
-      setOwnError(null);
+      setOwnError(
+        out ? null : t`Coilbox could not create ${game.game}'s settings file.`,
+      );
     } catch (e) {
       setOwnError(errorText(e));
     }
+    await files.reload();
+  };
+  const ownStates = useMemo(
+    () =>
+      ownRows && (file?.kind === "ready" || file?.kind === "missing")
+        ? gameWidgetStates(
+            ownRows,
+            file.kind === "ready" ? file.order : new Map(),
+          )
+        : null,
+    [ownRows, file],
+  );
+  // Only a widget the file has moved away from its default has anything to
+  // reset. A game saves every widget it knows, so most entries match it.
+  const ownChanged = useMemo(() => {
+    if (!ownRows || !ownStates) return false;
+    const defaults = gameWidgetStates(ownRows, new Map());
+    return Object.keys(ownStates).some((n) => ownStates[n] !== defaults[n]);
+  }, [ownRows, ownStates]);
+  const resetOwn = async () => {
+    if (!game?.handler || !list.configDir || !ownRows) return;
+    await resetEntries({
+      io: appFileIO,
+      writeDir: list.configDir,
+      game: { ...game, handler: game.handler },
+      names: ownRows.flatMap((r) =>
+        r.switch.kind === "ready"
+          ? [r.switch.name, ...r.switch.previousNames]
+          : [],
+      ),
+      gameRunning: running,
+    });
+    setOwnError(null);
     await files.reload();
   };
 
@@ -278,14 +325,6 @@ export default function WidgetsPage() {
               <ErrorBanner key={name} message={`${name}: ${f.error}`} />
             ),
         )}
-      {game && file?.kind === "missing" && (
-        <p role="status" className="text-sm text-muted-foreground">
-          <Trans>
-            {game.game} has not saved its widget settings yet, so these apply
-            from the launch after it first does.
-          </Trans>
-        </p>
-      )}
       {game && key !== null && ownSet && (
         <div className="flex items-center gap-3">
           <p role="status" className="text-sm text-muted-foreground">
@@ -386,7 +425,18 @@ export default function WidgetsPage() {
           </TableBody>
           {game?.handler && (
             <TableBody>
-              <SectionHeading columns={columns}>
+              <SectionHeading
+                columns={columns}
+                action={
+                  ownChanged && (
+                    <ResetGameWidgets
+                      game={game.game}
+                      running={running}
+                      onReset={resetOwn}
+                    />
+                  )
+                }
+              >
                 <Trans>{game.game}'s own widgets</Trans>
               </SectionHeading>
               {(own.errors.length > 0 || ownError) && (
@@ -420,20 +470,14 @@ export default function WidgetsPage() {
                     showRoot={false}
                     canSettings={() => false}
                     switches={
-                      file?.kind === "ready" || file?.kind === "missing"
+                      ownStates
                         ? {
                             game: game.game,
-                            // With no file yet, each widget is as its
-                            // `GetInfo()` says, and there is nothing to write
-                            // a change into.
-                            set: gameWidgetStates(
-                              ownRows,
-                              file.kind === "ready" ? file.order : new Map(),
-                            ),
+                            set: ownStates,
                             toggle: (name, on) => void switchOwn(name, on),
                             // The game saves its own file when it exits, over
                             // anything written while it runs.
-                            disabled: running || file.kind === "missing",
+                            disabled: running,
                           }
                         : undefined
                     }
@@ -607,9 +651,11 @@ function WidgetTable({
 
 function SectionHeading({
   columns,
+  action,
   children,
 }: {
   columns: TableColumns;
+  action?: ReactNode;
   children: ReactNode;
 }) {
   return (
@@ -619,7 +665,10 @@ function SectionHeading({
         colSpan={columnCount(columns)}
         className="h-12 align-bottom text-sm font-medium"
       >
-        {children}
+        <div className="flex items-center justify-between gap-2">
+          {children}
+          {action}
+        </div>
       </TableHead>
     </TableRow>
   );

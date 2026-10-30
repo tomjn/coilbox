@@ -1336,11 +1336,6 @@ msgstr ""
 
 #. placeholder {0}: game.game
 #: src/widgets/pages/WidgetsPage.tsx
-msgid "{0} has not saved its widget settings yet, so these apply from the launch after it first does."
-msgstr ""
-
-#. placeholder {0}: game.game
-#: src/widgets/pages/WidgetsPage.tsx
 msgid "{0} loads none of your widgets."
 msgstr ""
 
@@ -13918,6 +13913,7 @@ msgstr "Ne peut pas endommager sa propre unité"
 #: src/uberstress/pages/RunPage.tsx
 #: src/widgets/pages/AddWidgetDrawer.tsx
 #: src/widgets/pages/RemoveWidget.tsx
+#: src/widgets/pages/ResetGameWidgets.tsx
 #: src/workshop/pages/components/CloneActions.tsx
 #: src/workshop/pages/components/DiskDiffDrawer.tsx
 #: src/workshop/pages/components/InPlaceWrite.tsx
@@ -15523,6 +15519,11 @@ msgstr "Coilbox n’a pas pu le fermer : {reason}."
 #, fuzzy
 msgid "Coilbox could not close it: {reason}. Stop it from the Battles page."
 msgstr "Coilbox n’a pas pu le fermer : {reason}. Arrêtez-le depuis la page Parties."
+
+#. placeholder {0}: game.game
+#: src/widgets/pages/WidgetsPage.tsx
+msgid "Coilbox could not create {0}'s settings file."
+msgstr ""
 
 #: src/multiplayer/battles/joinBattle.ts
 #, fuzzy
@@ -36992,6 +36993,10 @@ msgstr "pulsar"
 msgid "Purple"
 msgstr "Violet"
 
+#: src/widgets/pages/ResetGameWidgets.tsx
+msgid "Put {game}'s own widgets back to their defaults?"
+msgstr ""
+
 #: src/multiplayer/chat/PartySection.tsx
 #, fuzzy
 msgid "Put {name} out of the party"
@@ -39415,6 +39420,7 @@ msgstr "Renvoyer l’e-mail de vérification"
 #: src/lego/pages/components/AnimationPanel.tsx
 #: src/lego/pages/components/ProportionsPanel.tsx
 #: src/play/pages/components/GameOptionsPanel.tsx
+#: src/widgets/pages/ResetGameWidgets.tsx
 #, fuzzy
 msgid "Reset"
 msgstr "Réinitialiser"
@@ -39423,6 +39429,10 @@ msgstr "Réinitialiser"
 #, fuzzy
 msgid "Reset {eventLabel} to {defaultSoundLabel}"
 msgstr "Réinitialiser {eventLabel} sur {defaultSoundLabel}"
+
+#: src/widgets/pages/ResetGameWidgets.tsx
+msgid "Reset {game}'s own widgets"
+msgstr ""
 
 #: src/play/pages/components/GameOptionsPanel.tsx
 #, fuzzy
