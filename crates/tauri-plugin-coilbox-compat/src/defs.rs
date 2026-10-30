@@ -16,7 +16,14 @@
 //!
 //! A mutator's file covers up the base game's file of the same name, so a game
 //! that ships its own copy of one of the two, or whose own loader never loads
-//! it, gets no def fixes in that file, and the build says so.
+//! it, gets no def fixes in that file, and the build says so. From writer 4 the
+//! fixes of `defs_post.lua` go in `gamedata/weapondefs.lua` for such a game when
+//! they can (see `models::Hook`).
+//!
+//! The fixes of `weapondefs_post.lua` do not follow them there. Balanced
+//! Annihilation 15.9.8 ships its own copy of that file, and each of its seven
+//! bombs gives its own burst with no `manualBombSettings`, so the bomb fix would
+//! replace each with the old engine's burst of 2.
 
 use std::collections::BTreeSet;
 
@@ -32,6 +39,8 @@ use crate::models;
 pub struct Plan {
     /// The block of def fixes for `gamedata/defs_post.lua`.
     pub defs_post: Option<String>,
+    /// Which file of the mutator [`Plan::defs_post`] goes in.
+    pub hook: models::Hook,
     /// `gamedata/weapondefs_post.lua`.
     pub weapondefs_post: Option<CompiledFile>,
     /// The def files that hold def fixes.
@@ -89,8 +98,20 @@ pub fn plan(
         let own_loader = read(loader(file))?;
         let own = read(file.path())?;
         if let Some(why) = hook_problem(file, own_loader.as_deref(), own.as_deref()) {
-            plan.notes.push(why);
-            continue;
+            let hook = match file {
+                DefsFile::DefsPost => models::hook(
+                    manifest.writer,
+                    own_loader.as_deref(),
+                    own.as_deref(),
+                    || read(models::WEAPONDEFS),
+                )?,
+                DefsFile::WeaponDefsPost => models::Hook::Nowhere(why.clone()),
+            };
+            if hook != models::Hook::WeaponDefs {
+                plan.notes.push(why);
+                continue;
+            }
+            plan.hook = hook;
         }
         plan.written.push(file);
         match file {
@@ -362,6 +383,31 @@ mod tests {
         )];
         let plan = super::plan(&manifest(5), read_from(&loads, &asked)).unwrap();
         assert_eq!(plan.written.len(), 2);
+    }
+
+    /// Balanced Annihilation 15.9.8's shape: its own defs.lua never loads
+    /// defs_post.lua, and it ships its own weapondefs_post.lua.
+    #[test]
+    fn writer_4_carries_the_defs_post_fixes_to_weapondefs_and_leaves_the_bomb_fix_out() {
+        let asked = std::cell::RefCell::new(Vec::new());
+        let own = [
+            (
+                "gamedata/defs.lua",
+                "DEFS.unitDefs = LoadDefs('unitDefs')\n\
+                 DEFS.featureDefs = LoadDefs('featureDefs')\n\
+                 DEFS.weaponDefs = LoadDefs('weaponDefs')\n",
+            ),
+            ("gamedata/weapondefs_post.lua", "-- the game's own\n"),
+        ];
+        let latest = manifest(coilbox_compat::latest());
+        assert!(coilbox_compat::hooks_weapondefs(latest.writer));
+        let plan = plan(&latest, read_from(&own, &asked)).unwrap();
+        assert_eq!(plan.written, [DefsFile::DefsPost]);
+        assert_eq!(plan.hook, models::Hook::WeaponDefs);
+        assert!(plan.defs_post.unwrap().contains("defs-commander-85"));
+        assert!(plan.weapondefs_post.is_none());
+        assert_eq!(plan.notes.len(), 1);
+        assert!(plan.notes[0].contains("ships its own gamedata/weapondefs_post.lua"));
     }
 
     #[test]

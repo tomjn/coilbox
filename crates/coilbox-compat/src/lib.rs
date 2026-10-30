@@ -64,6 +64,7 @@ const MANIFESTS: &[(u32, &str)] = &[
     (19, include_str!("../../../lua/compat/manifests/19.json")),
     (20, include_str!("../../../lua/compat/manifests/20.json")),
     (21, include_str!("../../../lua/compat/manifests/21.json")),
+    (22, include_str!("../../../lua/compat/manifests/22.json")),
 ];
 
 /// Every fix file, by id.
@@ -280,7 +281,7 @@ pub struct Converter {
 /// the bytes keeps the old behaviour for the writers that had it and puts the
 /// new one behind a new writer: move this, add a manifest that names it, and
 /// record the new writer's hashes beside the old ones.
-pub const WRITER: u32 = 3;
+pub const WRITER: u32 = 4;
 
 /// Whether this build can write a manifest that names `writer`.
 pub fn knows_writer(writer: u32) -> bool {
@@ -306,6 +307,14 @@ pub fn copies_entry_bytes(writer: u32) -> bool {
 /// it, and the converted file covered up the game's own model.
 pub fn keeps_game_s3o(writer: u32) -> bool {
     writer >= 3
+}
+
+/// Whether `writer` covers up the engine's `gamedata/weapondefs.lua` to name a
+/// game's converted models and run its def fixes, when the game never reaches
+/// `gamedata/defs_post.lua` (issue #4628). Writer 3 converted no models for such
+/// a game and ran none of those fixes.
+pub fn hooks_weapondefs(writer: u32) -> bool {
+    writer >= 4
 }
 
 /// The writer of manifests 1 and 2, which predate the `writer` field.
@@ -2229,6 +2238,17 @@ mod tests {
                 .iter()
                 .any(|(id, _)| *id == "spring-command-queue-count-105"));
         }
+    }
+
+    /// Issue #4628: manifest 22 is manifest 21 built with the writer that
+    /// hooks a game that never reaches defs_post.lua at weapondefs.lua.
+    #[test]
+    fn manifest_22_is_manifest_21_with_a_new_writer() {
+        let (twenty_one, twenty_two) = (manifest(21).unwrap(), manifest(22).unwrap());
+        assert_eq!(twenty_two.fixes, twenty_one.fixes);
+        assert_eq!(twenty_two.converter, twenty_one.converter);
+        assert!(!hooks_weapondefs(twenty_one.writer));
+        assert!(hooks_weapondefs(twenty_two.writer));
     }
 
     /// The preludes for manifests 9, 11, 12, 14, 15, 16, 17, 18, 19, 20 and 21, as the Lua tests in

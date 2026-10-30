@@ -85,19 +85,23 @@ fn the_models_are_converted_the_same_twice_and_the_units_name_them() {
         first.notes,
     );
     // XTA names a wreck model it does not have, which the build says it draws
-    // as a box (issue #4686). Nothing else is noted.
+    // as a box (issue #4686). Balanced Annihilation's own weapondefs_post.lua
+    // leaves it without the weapon def fixes (issue #4628). Nothing else is noted.
     assert!(
-        first
-            .notes
-            .iter()
-            .all(|n| n.contains("a model the game does not have")),
+        first.notes.iter().all(|n| {
+            n.contains("a model the game does not have")
+                || n.contains("ships its own gamedata/weapondefs_post.lua")
+        }),
         "{:?}",
         first.notes
     );
     assert!(first.models.models_written > 0, "{:?}", first.models);
-    assert!(first
-        .files
-        .contains(&tauri_plugin_coilbox_compat::models::DEFS_POST.to_string()));
+    let hook = if archive == "balanced_annihilation-v15.9.8.sdz" {
+        tauri_plugin_coilbox_compat::models::WEAPONDEFS
+    } else {
+        tauri_plugin_coilbox_compat::models::DEFS_POST
+    };
+    assert!(first.files.contains(&hook.to_string()));
     assert_eq!(first.files, second.files);
     let (x, y) = (bytes_of(&first), bytes_of(&second));
     for (file, bytes) in &x {

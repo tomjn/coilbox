@@ -2,9 +2,9 @@
 //! def pipeline then carries what they put back (issue #4560): every unit with
 //! the `commander` tag has `customparams.iscommander`, a bomb that sets
 //! `manualBombSettings` keeps the burst its file gives, and a unit with no
-//! tag is as the base game has it. A game whose own def loading the mutator
-//! cannot reach, as Balanced Annihilation 15.9.8's, gets no def fixes, a note
-//! saying why, and defs unchanged.
+//! tag is as the base game has it. A game that never loads the mutator's
+//! `defs_post.lua`, as Balanced Annihilation 15.9.8 does not, gets those fixes
+//! from `gamedata/weapondefs.lua` (issue #4628).
 //!
 //! Like `converts_the_models`, it writes only into fresh content roots under
 //! the system's temporary folder, which `TMPDIR` moves, and reads the base game
@@ -122,14 +122,25 @@ fn the_commanders_get_iscommander_and_the_bombs_keep_their_burst_where_the_game_
         built.notes
     );
     // defs_post.lua also carries the converted models, so it can be written
-    // with no def fixes in it, but never left out without a note.
-    assert!(written(post) || noted(post), "{:?}", built.notes);
+    // with no def fixes in it, but never left out without a note, unless
+    // weapondefs.lua does its work.
+    let hook = tauri_plugin_coilbox_compat::models::WEAPONDEFS;
+    assert!(
+        written(post) != written(hook) || noted(post),
+        "{:?}",
+        built.notes
+    );
     match archive.as_str() {
         "xta-9.65.sd7" => assert!(fixes_in_post && written(weapons_post), "{:?}", built.notes),
-        // Its own defs.lua never loads defs_post.lua, and it ships its own
-        // weapondefs_post.lua, so it gets no def fixes (#4628).
+        // Its own defs.lua never loads defs_post.lua, so those fixes run from
+        // weapondefs.lua. It ships its own weapondefs_post.lua, and its bombs
+        // give their own bursts, so the bomb fix is left out (#4628).
         "balanced_annihilation-v15.9.8.sdz" => {
-            assert!(!fixes_in_post && noted(weapons_post), "{:?}", built.notes)
+            assert!(
+                fixes_in_post && written(hook) && !written(post) && noted(weapons_post),
+                "{:?}",
+                built.notes
+            )
         }
         _ => {}
     }
@@ -175,7 +186,9 @@ fn the_commanders_get_iscommander_and_the_bombs_keep_their_burst_where_the_game_
         assert_eq!(built.def_overrides, models);
         return;
     }
-    assert!(!commanders.is_empty());
+    // Balanced Annihilation's two commanders already carry the parameter.
+    let balanced_annihilation = archive == "balanced_annihilation-v15.9.8.sdz";
+    assert!(balanced_annihilation || !commanders.is_empty());
 
     // XTA's bombers set manualBombSettings with a burst of their own, which
     // the engine's weapondefs_post.lua replaces with 2 at 0.4.
@@ -193,6 +206,10 @@ fn the_commanders_get_iscommander_and_the_bombs_keep_their_burst_where_the_game_
         assert_eq!(burst(&weapons["corbomb"]), Some(3.0));
         assert!(field(&weapons["armbomb"], "manualbombsettings").is_none());
     }
+    if balanced_annihilation {
+        // The bomb fix is left out, so its bombs keep the burst they give.
+        assert_eq!(burst(&weapons["armthund_armbomb"]), Some(5.0));
+    }
     let with_area = weapons
         .as_object()
         .unwrap()
@@ -206,12 +223,12 @@ fn the_commanders_get_iscommander_and_the_bombs_keep_their_burst_where_the_game_
     eprintln!("{with_area} weapons keep areaOfEffect in customparams");
     assert!(with_area > 0);
 
-    let counted = tauri_plugin_coilbox_compat::defs::changed(
-        &manifest,
-        &coilbox_compat::DefsFile::ALL,
-        &base_text,
-    )
-    .unwrap();
+    let files: Vec<coilbox_compat::DefsFile> = coilbox_compat::DefsFile::ALL
+        .into_iter()
+        .filter(|f| !noted(f.path()))
+        .collect();
+    let counted =
+        tauri_plugin_coilbox_compat::defs::changed(&manifest, &files, &base_text).unwrap();
     eprintln!(
         "{counted} defs counted as changed by the def fixes, defOverrides {}",
         built.def_overrides
