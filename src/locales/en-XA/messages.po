@@ -6934,8 +6934,16 @@ msgstr ""
 msgid "A game is running. Close it to change these settings."
 msgstr ""
 
+#: src/widgets/pages/RemoveWidget.tsx
+msgid "A game is running. Close it to remove widgets."
+msgstr ""
+
 #: src/blueprint/pages/components/LeavingPack.tsx
 msgid "A game is running. It writes its whole blueprints file back when it saves or exits, so anything written into that file now could be thrown away without a word."
+msgstr ""
+
+#: src/widgets/widgetRemoval.ts
+msgid "A game is running. It writes its widget settings back when it saves or exits, so a widget removed now would come back. Close the game and try again."
 msgstr ""
 
 #: src/widgets/widgetSettings.ts
@@ -8549,6 +8557,10 @@ msgstr ""
 
 #: src/content/pages/FoldersSection.tsx
 msgid "Also check Steam install locations for Zero-K during a rescan."
+msgstr ""
+
+#: src/widgets/pages/RemoveWidget.tsx
+msgid "Also delete its entries from the config files"
 msgstr ""
 
 #: src/lego/pages/components/ActionsDrawer.tsx
@@ -11239,6 +11251,7 @@ msgstr ""
 #: src/scenario/pages/components/SetupPanel.tsx
 #: src/uberstress/pages/RunPage.tsx
 #: src/widgets/pages/AddWidgetDrawer.tsx
+#: src/widgets/pages/RemoveWidget.tsx
 #: src/workshop/pages/components/CloneActions.tsx
 #: src/workshop/pages/components/DiskDiffDrawer.tsx
 #: src/workshop/pages/components/InPlaceWrite.tsx
@@ -12519,6 +12532,11 @@ msgstr ""
 msgid "Coilbox cannot read this unit's build pic. The game ships one, in a format the decoder does not handle."
 msgstr ""
 
+#. placeholder {0}: unknown.join(", ")
+#: src/widgets/pages/RemoveWidget.tsx
+msgid "Coilbox cannot tell whether these games load it too: {0}"
+msgstr ""
+
 #: src/workshop/pages/components/UnitFieldRow.tsx
 msgid "Coilbox cannot write {label} into the game's own file"
 msgstr ""
@@ -13315,6 +13333,11 @@ msgstr ""
 msgid "Config file: {configPath}"
 msgstr ""
 
+#. placeholder {0}: entries.backups.join(", ")
+#: src/widgets/pages/RemoveWidget.tsx
+msgid "Config files as they were: {0}"
+msgstr ""
+
 #: src/uberstress/pages/components/ReportDetail.tsx
 msgid "Configuration"
 msgstr ""
@@ -14082,6 +14105,10 @@ msgstr ""
 msgid "could not read model {file}: {status}"
 msgstr ""
 
+#: src/widgets/pages/RemoveWidget.tsx
+msgid "Could not read the config file: {line}"
+msgstr ""
+
 #. placeholder {0}: message(e)
 #: src/workshop/pages/components/DiskDiffDrawer.tsx
 msgid "Could not read the disk diff: {0}"
@@ -14174,6 +14201,10 @@ msgstr ""
 msgid "Could not read: {0}"
 msgstr ""
 
+#: src/widgets/pages/RemoveWidget.tsx
+msgid "Could not remove its entries: {line}"
+msgstr ""
+
 #: src/lego/pages/components/SaveModelPopover.tsx
 msgid "Could not save the model"
 msgstr ""
@@ -14187,6 +14218,7 @@ msgid "Could not save the module"
 msgstr ""
 
 #: src/widgets/pages/AddWidgetDrawer.tsx
+#: src/widgets/pages/RemoveWidget.tsx
 msgid "Could not save the setting for {line}"
 msgstr ""
 
@@ -15525,6 +15557,7 @@ msgstr ""
 #: src/multiplayer/LobbyStatusButton.tsx
 #: src/multiplayer/RejoinOfferPanel.tsx
 #: src/play/pages/SkirmishPage.tsx
+#: src/widgets/pages/RemoveWidget.tsx
 msgid "Dismiss"
 msgstr ""
 
@@ -21090,6 +21123,11 @@ msgstr ""
 
 #: src/scenario/validate.ts
 msgid "it is only there from {atLeast} up and only up to {atMost}, which is no difficulty at all, so it never appears"
+msgstr ""
+
+#. placeholder {0}: removal.games.join(", ")
+#: src/widgets/pages/RemoveWidget.tsx
+msgid "It is removed from every game that loads it: {0}"
 msgstr ""
 
 #: src/deeplink/actions.ts
@@ -27922,6 +27960,10 @@ msgstr ""
 msgid "Open another file"
 msgstr ""
 
+#: src/widgets/pages/RemoveWidget.tsx
+msgid "Open backup"
+msgstr ""
+
 #: src/multiplayer/DebriefingDrawer.tsx
 msgid "Open chat"
 msgstr ""
@@ -31300,6 +31342,8 @@ msgstr ""
 #: src/lego/pages/components/BuiltBySection.tsx
 #: src/lego/pages/components/ProportionsPanel.tsx
 #: src/multiplayer/battle/MemberRow.tsx
+#: src/widgets/pages/RemoveWidget.tsx
+#: src/widgets/pages/WidgetsPage.tsx
 #: src/workshop/pages/components/ExplosionGeneratorEditor.tsx
 msgid "Remove"
 msgstr ""
@@ -31355,6 +31399,7 @@ msgstr ""
 #: src/campaign/pages/components/StartingUnits.tsx
 #: src/campaign/pages/components/UnitRestrictions.tsx
 #: src/uberstress/pages/SettingsSection.tsx
+#: src/widgets/pages/RemoveWidget.tsx
 msgid "Remove {name}"
 msgstr ""
 
@@ -31368,6 +31413,10 @@ msgstr ""
 
 #: src/workshop/pages/components/UnitCompareDrawer.tsx
 msgid "Remove {name} from the comparison"
+msgstr ""
+
+#: src/widgets/pages/RemoveWidget.tsx
+msgid "Remove {name}?"
 msgstr ""
 
 #: src/play/pages/components/ParticipantsTable.tsx
@@ -31512,6 +31561,10 @@ msgstr ""
 
 #: src/content/pages/components/MissionRuntimeSection.tsx
 msgid "Removed {missionName} from the game."
+msgstr ""
+
+#: src/widgets/pages/RemoveWidget.tsx
+msgid "Removed {name}."
 msgstr ""
 
 #: src/lego/pages/BuilderPage.tsx
@@ -32061,6 +32114,7 @@ msgid "Restarts every time the target is hit again."
 msgstr ""
 
 #: src/content/pages/components/ConfigProfilesPanel.tsx
+#: src/widgets/pages/RemoveWidget.tsx
 msgid "Restore"
 msgstr ""
 
@@ -32074,6 +32128,14 @@ msgstr ""
 
 #: src/content/pages/components/Convert3doDrawer.tsx
 msgid "Restored {archive}'s original models and unit definitions."
+msgstr ""
+
+#: src/widgets/pages/RemoveWidget.tsx
+msgid "Restored {name}, switched off."
+msgstr ""
+
+#: src/widgets/pages/RemoveWidget.tsx
+msgid "Restored {name}."
 msgstr ""
 
 #: src/content/pages/components/Convert3doDrawer.tsx

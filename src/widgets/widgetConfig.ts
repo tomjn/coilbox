@@ -167,6 +167,9 @@ export interface Field {
   start: number;
   valueStart: number;
   valueEnd: number;
+  /** Where the field ends, after the `,` or `;` that follows it when it has
+   *  one. */
+  end: number;
   /** The value's tokens, and the table it is, when it is one. */
   value: Token[];
   table?: Table;
@@ -247,22 +250,27 @@ class Parser {
         value = this.expression([",", ";", "}"]);
       }
       if (value.length === 0) throw new LuaSyntaxError("expected a value");
+      const valueEnd = value[value.length - 1].end;
+      let end = valueEnd;
+      trailingSeparator = false;
+      const separator = this.peek();
+      if (isSymbol(separator, ",") || isSymbol(separator, ";")) {
+        this.i++;
+        trailingSeparator = true;
+        end = (separator as Token).end;
+      } else if (!isSymbol(this.peek(), "}")) {
+        throw new LuaSyntaxError('expected "," or "}"');
+      }
       fields.push({
         key,
         label,
         start,
         valueStart: value[0].start,
-        valueEnd: value[value.length - 1].end,
+        valueEnd,
+        end,
         value,
         table,
       });
-      trailingSeparator = false;
-      if (isSymbol(this.peek(), ",") || isSymbol(this.peek(), ";")) {
-        this.i++;
-        trailingSeparator = true;
-      } else if (!isSymbol(this.peek(), "}")) {
-        throw new LuaSyntaxError('expected "," or "}"');
-      }
     }
     const close = this.expect("}").start;
     return { open, close, fields, trailingSeparator };

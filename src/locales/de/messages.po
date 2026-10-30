@@ -8584,10 +8584,18 @@ msgstr "Ein Spiel läuft. {gameLabel} schreibt beim Speichern oder Beenden die g
 msgid "A game is running. Close it to change these settings."
 msgstr ""
 
+#: src/widgets/pages/RemoveWidget.tsx
+msgid "A game is running. Close it to remove widgets."
+msgstr ""
+
 #: src/blueprint/pages/components/LeavingPack.tsx
 #, fuzzy
 msgid "A game is running. It writes its whole blueprints file back when it saves or exits, so anything written into that file now could be thrown away without a word."
 msgstr "Ein Spiel läuft. Es schreibt beim Speichern oder Beenden die ganze Bauplandatei zurück, daher könnte alles, was jetzt in diese Datei geschrieben wird, kommentarlos verworfen werden."
+
+#: src/widgets/widgetRemoval.ts
+msgid "A game is running. It writes its widget settings back when it saves or exits, so a widget removed now would come back. Close the game and try again."
+msgstr ""
 
 #: src/widgets/widgetSettings.ts
 msgid "A game is running. It writes its widget settings back when it saves or exits, so anything written now would be thrown away. Close the game and try again."
@@ -10582,6 +10590,10 @@ msgstr "Auch baubar von"
 #, fuzzy
 msgid "Also check Steam install locations for Zero-K during a rescan."
 msgstr "Beim neuen Scannen auch die Steam-Installationsorte von Zero-K prüfen."
+
+#: src/widgets/pages/RemoveWidget.tsx
+msgid "Also delete its entries from the config files"
+msgstr ""
 
 #: src/lego/pages/components/ActionsDrawer.tsx
 #, fuzzy
@@ -13895,6 +13907,7 @@ msgstr "Kann der eigenen Einheit nicht schaden"
 #: src/scenario/pages/components/SetupPanel.tsx
 #: src/uberstress/pages/RunPage.tsx
 #: src/widgets/pages/AddWidgetDrawer.tsx
+#: src/widgets/pages/RemoveWidget.tsx
 #: src/workshop/pages/components/CloneActions.tsx
 #: src/workshop/pages/components/DiskDiffDrawer.tsx
 #: src/workshop/pages/components/InPlaceWrite.tsx
@@ -15454,6 +15467,11 @@ msgstr "Coilbox kann die Skybox dieser Karte nicht lesen. Die Karte bringt eine 
 msgid "Coilbox cannot read this unit's build pic. The game ships one, in a format the decoder does not handle."
 msgstr "Coilbox kann das Baubild dieser Einheit nicht lesen. Das Spiel bringt eines mit, in einem Format, das der Decoder nicht unterstützt."
 
+#. placeholder {0}: unknown.join(", ")
+#: src/widgets/pages/RemoveWidget.tsx
+msgid "Coilbox cannot tell whether these games load it too: {0}"
+msgstr ""
+
 #: src/workshop/pages/components/UnitFieldRow.tsx
 #, fuzzy
 msgid "Coilbox cannot write {label} into the game's own file"
@@ -16438,6 +16456,11 @@ msgstr "Kegel"
 msgid "Config file: {configPath}"
 msgstr "Konfigurationsdatei: {configPath}"
 
+#. placeholder {0}: entries.backups.join(", ")
+#: src/widgets/pages/RemoveWidget.tsx
+msgid "Config files as they were: {0}"
+msgstr ""
+
 #: src/uberstress/pages/components/ReportDetail.tsx
 #, fuzzy
 msgid "Configuration"
@@ -17381,6 +17404,10 @@ msgstr "Das Skript von {unit} aus {gameName} konnte nicht gelesen werden: {reaso
 msgid "could not read model {file}: {status}"
 msgstr "Modell {file} konnte nicht gelesen werden: {status}"
 
+#: src/widgets/pages/RemoveWidget.tsx
+msgid "Could not read the config file: {line}"
+msgstr ""
+
 #. placeholder {0}: message(e)
 #: src/workshop/pages/components/DiskDiffDrawer.tsx
 #, fuzzy
@@ -17492,6 +17519,10 @@ msgstr "Ihre gespeicherten Modelle konnten nicht gelesen werden: {error}"
 msgid "Could not read: {0}"
 msgstr ""
 
+#: src/widgets/pages/RemoveWidget.tsx
+msgid "Could not remove its entries: {line}"
+msgstr ""
+
 #: src/lego/pages/components/SaveModelPopover.tsx
 #, fuzzy
 msgid "Could not save the model"
@@ -17508,6 +17539,7 @@ msgid "Could not save the module"
 msgstr "Modul konnte nicht gespeichert werden"
 
 #: src/widgets/pages/AddWidgetDrawer.tsx
+#: src/widgets/pages/RemoveWidget.tsx
 msgid "Could not save the setting for {line}"
 msgstr ""
 
@@ -19155,6 +19187,7 @@ msgstr "Speicherplatz für Spuren (MB)"
 #: src/multiplayer/LobbyStatusButton.tsx
 #: src/multiplayer/RejoinOfferPanel.tsx
 #: src/play/pages/SkirmishPage.tsx
+#: src/widgets/pages/RemoveWidget.tsx
 #, fuzzy
 msgid "Dismiss"
 msgstr "Verwerfen"
@@ -26019,6 +26052,11 @@ msgstr "es ist kein Objekt"
 #, fuzzy
 msgid "it is only there from {atLeast} up and only up to {atMost}, which is no difficulty at all, so it never appears"
 msgstr "es ist nur ab {atLeast} und nur bis {atMost} vorhanden, also bei keiner Schwierigkeit, daher erscheint es nie"
+
+#. placeholder {0}: removal.games.join(", ")
+#: src/widgets/pages/RemoveWidget.tsx
+msgid "It is removed from every game that loads it: {0}"
+msgstr ""
 
 #: src/deeplink/actions.ts
 #, fuzzy
@@ -34454,6 +34492,10 @@ msgstr "Bildschirm öffnen"
 msgid "Open another file"
 msgstr "Andere Datei öffnen"
 
+#: src/widgets/pages/RemoveWidget.tsx
+msgid "Open backup"
+msgstr ""
+
 #: src/multiplayer/DebriefingDrawer.tsx
 #, fuzzy
 msgid "Open chat"
@@ -38610,6 +38652,8 @@ msgstr "Geremixt aus"
 #: src/lego/pages/components/BuiltBySection.tsx
 #: src/lego/pages/components/ProportionsPanel.tsx
 #: src/multiplayer/battle/MemberRow.tsx
+#: src/widgets/pages/RemoveWidget.tsx
+#: src/widgets/pages/WidgetsPage.tsx
 #: src/workshop/pages/components/ExplosionGeneratorEditor.tsx
 #, fuzzy
 msgid "Remove"
@@ -38678,6 +38722,7 @@ msgstr "{mapTitle} entfernen?"
 #: src/campaign/pages/components/StartingUnits.tsx
 #: src/campaign/pages/components/UnitRestrictions.tsx
 #: src/uberstress/pages/SettingsSection.tsx
+#: src/widgets/pages/RemoveWidget.tsx
 #, fuzzy
 msgid "Remove {name}"
 msgstr "{name} entfernen"
@@ -38696,6 +38741,10 @@ msgstr "{name} aus Projekten entfernen"
 #, fuzzy
 msgid "Remove {name} from the comparison"
 msgstr "{name} aus dem Vergleich entfernen"
+
+#: src/widgets/pages/RemoveWidget.tsx
+msgid "Remove {name}?"
+msgstr ""
 
 #: src/play/pages/components/ParticipantsTable.tsx
 #, fuzzy
@@ -38876,6 +38925,10 @@ msgstr "entfernt"
 #, fuzzy
 msgid "Removed {missionName} from the game."
 msgstr "{missionName} aus dem Spiel entfernt."
+
+#: src/widgets/pages/RemoveWidget.tsx
+msgid "Removed {name}."
+msgstr ""
 
 #: src/lego/pages/BuilderPage.tsx
 #, fuzzy
@@ -39552,6 +39605,7 @@ msgid "Restarts every time the target is hit again."
 msgstr "Beginnt bei jedem erneuten Treffer auf das Ziel von vorn."
 
 #: src/content/pages/components/ConfigProfilesPanel.tsx
+#: src/widgets/pages/RemoveWidget.tsx
 #, fuzzy
 msgid "Restore"
 msgstr "Wiederherstellen"
@@ -39570,6 +39624,14 @@ msgstr "Originale wiederherstellen"
 #, fuzzy
 msgid "Restored {archive}'s original models and unit definitions."
 msgstr "Originalmodelle und Einheitendefinitionen von {archive} wiederhergestellt."
+
+#: src/widgets/pages/RemoveWidget.tsx
+msgid "Restored {name}, switched off."
+msgstr ""
+
+#: src/widgets/pages/RemoveWidget.tsx
+msgid "Restored {name}."
+msgstr ""
 
 #: src/content/pages/components/Convert3doDrawer.tsx
 #, fuzzy

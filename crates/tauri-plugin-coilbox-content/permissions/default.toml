@@ -78,6 +78,8 @@ permissions = [
   "allow-content-player-widgets",
   "allow-content-widget-plan",
   "allow-content-widget-add",
+  "allow-content-widget-delete",
+  "allow-content-widget-restore",
   "allow-content-install-3do-conversion",
   "allow-content-undo-3do-install",
   "allow-content-3do-install-status",

@@ -2369,6 +2369,39 @@ export const contentWidgetAdd = defineCommand<
   WidgetAddOutcome
 >("coilbox-content", "content_widget_add");
 
+/** A widget taken out of the write folder (issue #1288). */
+export interface WidgetRemoved {
+  /** Every file deleted, relative to the write folder. */
+  files: string[];
+  /** The widget backups folder holding a copy of them. */
+  backup: string;
+}
+
+/**
+ * Delete widget `files` and the whole of `folders`, relative to the write
+ * folder, after copying them into the app's widget backups. Refuses a path
+ * outside a widget folder and coilbox's own widget.
+ */
+export const contentWidgetDelete = defineCommand<
+  {
+    writeDir: string;
+    files: readonly string[];
+    folders: readonly string[];
+    /** Names the backup folder. */
+    label: string | null;
+  },
+  WidgetRemoved
+>("coilbox-content", "content_widget_delete");
+
+/**
+ * Copy the files of a removed widget back from its backup folder. Writes
+ * nothing when any of them is there already. Answers with the files restored.
+ */
+export const contentWidgetRestore = defineCommand<
+  { writeDir: string; backup: string },
+  string[]
+>("coilbox-content", "content_widget_restore");
+
 /**
  * Replace that `uikeys.txt`. The first write over a file coilbox did not author
  * copies it to `uikeys.txt.bak`, reported as `backedUp`.

@@ -129,7 +129,7 @@ fn skipped(rel: &Path) -> bool {
         .any(|c| SKIPPED.contains(&c.as_os_str().to_string_lossy().as_ref()))
 }
 
-fn copy_file(from: &Path, to: &Path) -> Result<(), String> {
+pub(crate) fn copy_file(from: &Path, to: &Path) -> Result<(), String> {
     if let Some(parent) = to.parent() {
         std::fs::create_dir_all(parent)
             .map_err(|e| format!("could not create {}: {e}", parent.display()))?;
@@ -432,10 +432,23 @@ fn back_up(
     conflicts: &[Conflict],
     widgets: &[PlannedWidget],
 ) -> Result<PathBuf, String> {
+    let label = widgets.iter().find_map(|w| w.name.as_deref());
+    let paths: Vec<&str> = conflicts.iter().map(|c| c.path.as_str()).collect();
+    back_up_files(write_dir, backup_root, label, "replaced", &paths)
+}
+
+/// Copy `paths` (relative to `write_dir`) to a new folder under `backup_root`,
+/// laid out as they are under the write folder. `label` names the folder, and
+/// `reason` is written to its `backup.json`.
+pub(crate) fn back_up_files(
+    write_dir: &Path,
+    backup_root: &Path,
+    label: Option<&str>,
+    reason: &str,
+    paths: &[&str],
+) -> Result<PathBuf, String> {
     let at = now_ms();
-    let label = widgets
-        .iter()
-        .find_map(|w| w.name.as_deref())
+    let label = label
         .and_then(crate::settings_backup::slug)
         .unwrap_or_else(|| "widget".to_string());
     std::fs::create_dir_all(backup_root)
@@ -456,14 +469,14 @@ fn back_up(
             Err(e) => return Err(format!("could not create {}: {e}", dir.display())),
         }
     };
-    for c in conflicts {
-        copy_file(&write_dir.join(&c.path), &dir.join("files").join(&c.path))?;
+    for path in paths {
+        copy_file(&write_dir.join(path), &dir.join("files").join(path))?;
     }
     let manifest = json!({
         "savedAt": at,
         "writeDir": write_dir.to_string_lossy(),
-        "reason": "replaced",
-        "files": conflicts.iter().map(|c| &c.path).collect::<Vec<_>>(),
+        "reason": reason,
+        "files": paths,
     });
     std::fs::write(
         dir.join("backup.json"),
