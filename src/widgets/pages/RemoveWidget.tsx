@@ -115,13 +115,19 @@ export function RemoveWidgetButton({
           <Trans>Remove</Trans>
         </Button>
       </PopoverTrigger>
-      <PopoverContent align="end" className="flex w-96 flex-col gap-3">
+      <PopoverContent
+        align="end"
+        className="flex max-h-[80vh] w-96 flex-col gap-3 overflow-y-auto"
+      >
         <div className="flex flex-col gap-2">
           <h3 className="break-words text-sm font-medium">
-            {removal.games.length > 0
-              ? t`Remove ${name} from ${removal.games.join(", ")}?`
-              : t`Remove ${name}?`}
+            {t`Remove ${name}?`}
           </h3>
+          {removal.games.length > 0 && (
+            <p className="max-h-32 overflow-y-auto break-words text-xs">
+              {t`It is removed from every game that loads it: ${removal.games.join(", ")}`}
+            </p>
+          )}
           <ul className="flex flex-col gap-0.5">
             {files.map((f) => (
               <li

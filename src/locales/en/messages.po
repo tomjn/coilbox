@@ -21120,6 +21120,11 @@ msgstr "it is not an object"
 msgid "it is only there from {atLeast} up and only up to {atMost}, which is no difficulty at all, so it never appears"
 msgstr "it is only there from {atLeast} up and only up to {atMost}, which is no difficulty at all, so it never appears"
 
+#. placeholder {0}: removal.games.join(", ")
+#: src/widgets/pages/RemoveWidget.tsx
+msgid "It is removed from every game that loads it: {0}"
+msgstr "It is removed from every game that loads it: {0}"
+
 #: src/deeplink/actions.ts
 msgid "It is saved to Unit tweaks and opened, which needs Advanced mode turned on in Settings."
 msgstr "It is saved to Unit tweaks and opened, which needs Advanced mode turned on in Settings."
@@ -31392,11 +31397,6 @@ msgstr "Remove {mapTitle}?"
 #: src/widgets/pages/RemoveWidget.tsx
 msgid "Remove {name}"
 msgstr "Remove {name}"
-
-#. placeholder {0}: removal.games.join(", ")
-#: src/widgets/pages/RemoveWidget.tsx
-msgid "Remove {name} from {0}?"
-msgstr "Remove {name} from {0}?"
 
 #: src/multiplayer/chat/ConversationSidebar.tsx
 msgid "Remove {name} from friends"

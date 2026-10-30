@@ -26047,6 +26047,11 @@ msgstr "它不是对象"
 msgid "it is only there from {atLeast} up and only up to {atMost}, which is no difficulty at all, so it never appears"
 msgstr "它只在 {atLeast} 及以上、{atMost} 及以下出现，而这个范围不包含任何难度，因此永远不会出现"
 
+#. placeholder {0}: removal.games.join(", ")
+#: src/widgets/pages/RemoveWidget.tsx
+msgid "It is removed from every game that loads it: {0}"
+msgstr ""
+
 #: src/deeplink/actions.ts
 #, fuzzy
 msgid "It is saved to Unit tweaks and opened, which needs Advanced mode turned on in Settings."
@@ -38715,11 +38720,6 @@ msgstr "移除 {mapTitle}？"
 #, fuzzy
 msgid "Remove {name}"
 msgstr "移除 {name}"
-
-#. placeholder {0}: removal.games.join(", ")
-#: src/widgets/pages/RemoveWidget.tsx
-msgid "Remove {name} from {0}?"
-msgstr ""
 
 #: src/multiplayer/chat/ConversationSidebar.tsx
 #, fuzzy

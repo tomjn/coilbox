@@ -312,8 +312,11 @@ describe("WidgetsPage", () => {
   it("asks before removing a widget, naming the games that lose it", async () => {
     page();
     fireEvent.click(screen.getByRole("button", { name: "Remove BuildWatch" }));
+    expect(screen.getByText("Remove BuildWatch?")).toBeTruthy();
     expect(
-      screen.getByText("Remove BuildWatch from Metal Factions v2.58?"),
+      screen.getByText(
+        "It is removed from every game that loads it: Metal Factions v2.58",
+      ),
     ).toBeTruthy();
     expect(removeCalls).toEqual([]);
     // Nothing in a config file to offer to delete.
