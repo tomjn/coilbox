@@ -6,6 +6,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   contentPlayerWidgets,
+  type GameItem,
   type PlayerWidgetScan,
 } from "@/content/bindings";
 import {
@@ -14,11 +15,27 @@ import {
   useUnitsyncScan,
 } from "@/content/config";
 import { engineConfigDir } from "@/content/enginePaths";
+import { stripVersionSuffix } from "@/content/resolveContent";
 import { withoutGeneratedGames } from "@/lib/generatedGames";
 import { errorText } from "@/lib/helpers";
 import { handlerOf } from "./gameHandler";
 import { HANDLER_FOLDERS } from "./handlers";
-import { type GameHandler, widgetRows } from "./widgetList";
+import {
+  type GameHandler,
+  type InstalledGame,
+  oneEntryPerGame,
+  widgetRows,
+} from "./widgetList";
+
+/** `info.name_pure` is the modinfo name before unitsync appends the version.
+ *  A game that never set it, or left `$VERSION` unsubstituted in its name,
+ *  falls back to its archive name with a trailing version dropped. */
+function nameWithoutVersion(game: GameItem): string {
+  const pure = game.info.name_pure?.trim();
+  return pure && !pure.includes("$VERSION")
+    ? pure
+    : stripVersionSuffix(game.name);
+}
 
 export function useWidgetList() {
   const { targets, selected } = useScanTargetSelection();
@@ -82,7 +99,7 @@ export function useWidgetList() {
     let cancelled = false;
     setGames(null);
     (async () => {
-      const found: GameHandler[] = [];
+      const found: InstalledGame[] = [];
       // One at a time, because every read goes through the one unitsync worker.
       for (const game of installed) {
         let handler: GameHandler["handler"] = null;
@@ -96,9 +113,11 @@ export function useWidgetList() {
           game: game.name,
           shortName: game.info.shortname?.trim() || undefined,
           handler,
+          version: game.info.version ?? "",
+          title: nameWithoutVersion(game),
         });
       }
-      setGames(found);
+      setGames(oneEntryPerGame(found));
     })();
     return () => {
       cancelled = true;
