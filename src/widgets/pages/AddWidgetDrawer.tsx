@@ -147,6 +147,7 @@ export function AddWidgetDrawer({
     !!plan &&
     !!where &&
     where.destinations.length > 0 &&
+    plan.widgets.length > 0 &&
     !added &&
     !conflicts &&
     !busy;
@@ -208,6 +209,17 @@ export function AddWidgetDrawer({
               </li>
             ))}
           </ul>
+
+          {plan.tooDeep.length > 0 && (
+            <p role="status" className="break-words text-xs text-destructive">
+              <Plural
+                value={plan.tooDeep.length}
+                one="# file is more than one folder down, which no game loads:"
+                other="# files are more than one folder down, which no game loads:"
+              />{" "}
+              {plan.tooDeep.join(", ")}
+            </p>
+          )}
 
           {where.destinations.length > 0 ? (
             <ul className="flex flex-col gap-1">

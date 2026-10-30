@@ -545,6 +545,11 @@ msgstr ""
 msgid "{0, plural, one {# field} other {# fields}}"
 msgstr ""
 
+#. placeholder {0}: plan.tooDeep.length
+#: src/widgets/pages/AddWidgetDrawer.tsx
+msgid "{0, plural, one {# file is more than one folder down, which no game loads:} other {# files are more than one folder down, which no game loads:}}"
+msgstr ""
+
 #. placeholder {0}: finished.unknown
 #: src/content/pages/components/ReplayEventLayers.tsx
 msgid "{0, plural, one {# finished unit has no definition in the installed game and is not drawn.} other {# finished units have no definition in the installed game and are not drawn.}}"

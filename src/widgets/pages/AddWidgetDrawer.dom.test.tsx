@@ -65,6 +65,7 @@ const flat: WidgetPlan = {
     { path: "gui_radar.lua", name: "Radar", nested: false, error: null },
   ],
   rml: false,
+  tooDeep: [],
 };
 
 const render_ = (props: { game?: GameHandler; setKey?: string | null } = {}) =>
@@ -172,6 +173,7 @@ describe("AddWidgetDrawer", () => {
         },
       ],
       rml: false,
+      tooDeep: [],
     });
     openDialog.mockResolvedValue("/downloads/pack");
     render_();
@@ -230,6 +232,26 @@ describe("AddWidgetDrawer", () => {
     );
     await screen.findByRole("alert");
     expect(screen.queryByRole("button", { name: "Add widget" })).toBeNull();
+  });
+
+  it("says when a file is too deep for any game and offers no add when no widget is left", async () => {
+    plan.mockResolvedValue({
+      files: ["repo-main/widgets/gui_radar.lua"],
+      widgets: [],
+      rml: false,
+      tooDeep: ["repo-main/widgets/gui_radar.lua"],
+    });
+    render_();
+    fireEvent.click(
+      screen.getByRole("button", { name: "Choose a file or zip" }),
+    );
+    await screen.findByText(/more than one folder down, which no game loads/);
+    expect(screen.getByText(/repo-main\/widgets\/gui_radar.lua/)).toBeTruthy();
+    expect(
+      screen
+        .getByRole("button", { name: "Add widget" })
+        .hasAttribute("disabled"),
+    ).toBe(true);
   });
 
   it("offers nothing to add for a game whose handler is not recognised", async () => {

@@ -40,6 +40,7 @@ const planOf = (...widgets: PlannedWidget[]): WidgetPlan => ({
   files: widgets.map((w) => w.path),
   widgets,
   rml: false,
+  tooDeep: [],
 });
 
 describe("destinationsFor", () => {

@@ -2321,6 +2321,8 @@ export interface WidgetPlan {
   widgets: PlannedWidget[];
   /** Built on RmlUi, which a game reads from its own folder. */
   rml: boolean;
+  /** `.lua` files more than one folder down, which no game loads. */
+  tooDeep: string[];
 }
 
 /** What is in a `.lua` file, folder or zip, without adding it anywhere. */
