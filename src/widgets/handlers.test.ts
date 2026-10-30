@@ -127,6 +127,94 @@ describe("recogniseHandler", () => {
   });
 });
 
+// What can stop each game loading a player's widgets, as read from the
+// handlers and mod options in the games' own archives (#1292).
+describe("userWidgets", () => {
+  const gates = async (marker: string) =>
+    (await recogniseHandler(["luaui.lua", marker], none))?.userWidgets;
+
+  it("gives Beyond All Reason its option, flag, colour mode, spectator rule and unit control option", async () => {
+    expect(await gates("luaui/barwidgets.lua")).toEqual({
+      option: { key: "allowuserwidgets", loads: true, unset: true },
+      configFlag: true,
+      anonymousColours: true,
+      spectators: "all",
+      unitControlOption: "allowunitcontrolwidgets",
+    });
+  });
+
+  it("gives Splinter Faction an option that is off until the room turns it on", async () => {
+    expect((await gates("luaui/widgets_custom.lua"))?.option).toEqual({
+      key: "allowuserwidgets",
+      loads: true,
+      unset: false,
+    });
+  });
+
+  it("names Balanced Annihilation's option with its prefix", async () => {
+    expect((await gates("luaui/bawidgets.lua"))?.option?.key).toBe(
+      "mo_allowuserwidgets",
+    );
+  });
+
+  it("gives the Complete Annihilation family the local widgets entry and Zero-K's option", async () => {
+    expect(await gates("luaui/cawidgets.lua")).toMatchObject({
+      option: { key: "disable_local_widgets", loads: false },
+      localWidgetsFile: "{SHORT}_data.lua",
+    });
+  });
+
+  it("gives Jauria RTS the local widgets entry and no option", async () => {
+    expect(await gates("luaui/jauriawidgets.lua")).toEqual({
+      localWidgetsFile: "{SHORT}_data.lua",
+    });
+  });
+
+  it("gives MOSAIC an option and a flag, and Total Annihilation Prime only the flag", async () => {
+    expect(await gates("luaui/mosaicwidgets.lua")).toMatchObject({
+      option: { key: "allowuserwidgets" },
+      configFlag: true,
+    });
+    expect(await gates("luaui/tapwidgets.lua")).toEqual({ configFlag: true });
+  });
+
+  it.each([
+    "luaui/mfwidgets.lua",
+    "luaui/widgets_evo.lua",
+    "luaui/config/iwui.config.lua",
+  ])("gives %s no gates", async (marker) => {
+    expect(await gates(marker)).toBeUndefined();
+  });
+
+  it("gives the engine's own handler, Spring 1944 and the pre-0.83 handler no gates", async () => {
+    expect(
+      (await recogniseHandler(["luaui.lua"], none))?.userWidgets,
+    ).toBeUndefined();
+    expect((await recogniseHandler([], none))?.userWidgets).toBeUndefined();
+    expect(
+      (
+        await recogniseHandler(
+          ["LuaUI/main.lua"],
+          async () => 'include "LuaHandler/handler.lua"',
+        )
+      )?.userWidgets,
+    ).toBeUndefined();
+  });
+
+  it("keeps a data file where the handler saves it, beside the config", async () => {
+    const handler = await recogniseHandler(["luaui/cawidgets.lua"], none);
+    expect(
+      configCandidates(
+        {
+          ...(handler?.config as WidgetConfigFile),
+          files: [handler?.userWidgets?.localWidgetsFile ?? ""],
+        },
+        "ZK",
+      ),
+    ).toEqual(["LuaUI/Config/ZK_data.lua"]);
+  });
+});
+
 describe("HANDLER_FOLDERS", () => {
   it("is every folder any handler reads, once, lower case", () => {
     expect([...HANDLER_FOLDERS].sort()).toEqual([
