@@ -119,11 +119,14 @@ fn same_file(a: &Path, b: &Path) -> bool {
     }
 }
 
-/// Windows filesystems fold case unless a folder is set otherwise, so a path
-/// that answers under the other case is the same folder.
+/// Elsewhere by the path each one resolves to, which on Windows is spelled as
+/// on disk, so a folder set to tell case apart is not taken for its sibling.
 #[cfg(not(unix))]
-fn same_file(_a: &Path, b: &Path) -> bool {
-    b.exists()
+fn same_file(a: &Path, b: &Path) -> bool {
+    match (std::fs::canonicalize(a), std::fs::canonicalize(b)) {
+        (Ok(a), Ok(b)) => a == b,
+        _ => false,
+    }
 }
 
 /// Whether `dir`'s filesystem tells names apart by case, found by asking for
