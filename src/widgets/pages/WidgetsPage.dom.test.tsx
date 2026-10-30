@@ -92,7 +92,12 @@ const scan: PlayerWidgetScan = {
 };
 
 const games: GameHandler[] = [
-  { game: "Metal Factions v2.58", shortName: "MF", handler: engine },
+  {
+    game: "Metal Factions",
+    shortName: "MF",
+    handler: engine,
+    versions: ["Metal Factions v2.58", "Metal Factions v2.57"],
+  },
   { game: "Mystery 1.0", handler: null },
 ];
 
@@ -166,7 +171,7 @@ beforeEach(() => {
   installSettingsStorage(memorySettingsStorage());
   resetSets();
   files.files = new Map([
-    ["Metal Factions v2.58", { kind: "ready", path: "/x/MF.lua" }],
+    ["Metal Factions", { kind: "ready", path: "/x/MF.lua" }],
   ]);
 });
 
@@ -196,7 +201,7 @@ describe("WidgetsPage", () => {
       ),
     ).toBeTruthy();
     // The nested file loads in no game, the other four in Metal Factions.
-    expect(screen.getAllByText("Metal Factions v2.58")).toHaveLength(4);
+    expect(screen.getAllByText("Metal Factions")).toHaveLength(4);
     // Mystery's handler is not recognised, so it may still load that file.
     expect(screen.getByText("No game coilbox recognises")).toBeTruthy();
   });
@@ -224,9 +229,27 @@ describe("WidgetsPage", () => {
   });
 
   it("shows a picked game only the files it loads", () => {
-    page("/library/widgets?game=Metal%20Factions%20v2.58");
+    page("/library/widgets?game=Metal%20Factions");
     expect(screen.getByText("BuildWatch")).toBeTruthy();
     expect(screen.queryByText("helper.lua")).toBeNull();
+  });
+
+  it("lists each game once, whatever versions are installed", () => {
+    page();
+    fireEvent.click(screen.getByRole("combobox", { name: "Game" }));
+    expect(screen.getAllByRole("option").map((o) => o.textContent)).toEqual([
+      "All games",
+      "Metal Factions",
+      "Mystery 1.0",
+    ]);
+  });
+
+  it("lands on the game's entry from a link naming one of its versions", () => {
+    page("/library/widgets?game=Metal%20Factions%20v2.57");
+    expect(
+      screen.getByRole("combobox", { name: "Game" }).textContent,
+    ).toContain("Metal Factions");
+    expect(screen.getByRole("switch", { name: "BuildWatch on" })).toBeTruthy();
   });
 
   it("shows a game with an unknown handler every file, and says why", () => {
@@ -250,7 +273,7 @@ describe("WidgetsPage", () => {
 
   it("gives a game its own set on its first change, and drops it again", () => {
     updateSets((s) => ({ ...s, global: { BuildWatch: true } }));
-    page("/library/widgets?game=Metal%20Factions%20v2.58");
+    page("/library/widgets?game=Metal%20Factions");
     const buildWatch = screen.getByRole("switch", { name: "BuildWatch on" });
     expect(buildWatch.getAttribute("aria-checked")).toBe("true");
     fireEvent.click(buildWatch);
@@ -258,7 +281,7 @@ describe("WidgetsPage", () => {
     expect(readSets().overrides.MF).toEqual({ BuildWatch: false });
     expect(
       screen.getByText(
-        "Metal Factions v2.58 uses its own widgets, not the ones for all games.",
+        "Metal Factions uses its own widgets, not the ones for all games.",
       ),
     ).toBeTruthy();
     fireEvent.click(
@@ -328,15 +351,15 @@ describe("WidgetsPage", () => {
 
   it("shows every game's unreadable file with all games picked", () => {
     files.files = new Map([
-      ["Metal Factions v2.58", { kind: "error", error: "bad file" }],
+      ["Metal Factions", { kind: "error", error: "bad file" }],
     ]);
     page();
-    expect(screen.getByText("Metal Factions v2.58: bad file")).toBeTruthy();
+    expect(screen.getByText("Metal Factions: bad file")).toBeTruthy();
   });
 
   it("says when the game has not saved a file yet", () => {
-    files.files = new Map([["Metal Factions v2.58", { kind: "missing" }]]);
-    page("/library/widgets?game=Metal%20Factions%20v2.58");
+    files.files = new Map([["Metal Factions", { kind: "missing" }]]);
+    page("/library/widgets?game=Metal%20Factions");
     expect(screen.getByRole("status").textContent).toContain(
       "has not saved its widget settings yet",
     );
@@ -348,7 +371,7 @@ describe("WidgetsPage", () => {
     expect(screen.getByText("Remove BuildWatch?")).toBeTruthy();
     expect(
       screen.getByText(
-        "It is removed from every game that loads it: Metal Factions v2.58",
+        "It is removed from every game that loads it: Metal Factions",
       ),
     ).toBeTruthy();
     expect(
@@ -459,11 +482,11 @@ describe("WidgetsPage", () => {
   it("shows a file it could not read", () => {
     files.files = new Map([
       [
-        "Metal Factions v2.58",
+        "Metal Factions",
         { kind: "error", error: "Coilbox could not read this file: x" },
       ],
     ]);
-    page("/library/widgets?game=Metal%20Factions%20v2.58");
+    page("/library/widgets?game=Metal%20Factions");
     expect(
       screen.getByText("Coilbox could not read this file: x"),
     ).toBeTruthy();
