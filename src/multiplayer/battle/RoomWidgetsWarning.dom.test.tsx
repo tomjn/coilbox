@@ -26,7 +26,7 @@ function row(
     nested: false,
     coilbox: false,
     givesOrders: more.givesOrders ?? false,
-    info: { name, control: more.control },
+    info: { name, control: more.control, enabled: true },
     error: null,
     loadedBy: ["Game"],
     switch: { kind: "ready", name, previousNames: [] },

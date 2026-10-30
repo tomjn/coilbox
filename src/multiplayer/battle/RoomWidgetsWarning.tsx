@@ -112,7 +112,7 @@ function Group({ sentences, names }: { sentences: string[]; names: string[] }) {
         </CollapsibleTrigger>
       </p>
       <CollapsibleContent>
-        <ul className="list-inside list-disc">
+        <ul className="max-h-40 list-inside list-disc overflow-y-auto">
           {names.map((n) => (
             <li key={n}>{n}</li>
           ))}

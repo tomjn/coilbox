@@ -101,7 +101,10 @@ function names(rows: readonly WidgetRow[]): string[] {
 /**
  * What the room costs the player, or null when it costs nothing. Counts the
  * widgets `game` would load: its own handler's folders, not coilbox's own
- * widget, and not one the player's widget set already has off.
+ * widget, and not one that would be off anyway. That is a widget the player's
+ * widget set has off, or one the set says nothing about whose `GetInfo()`
+ * leaves it disabled, which is what a handler does with a widget it has no
+ * saved state for.
  */
 export function roomWidgetWarning(
   verdict: RoomWidgetVerdict,
@@ -116,7 +119,8 @@ export function roomWidgetWarning(
       r.loadedBy.includes(game.game) &&
       !r.coilbox &&
       r.info !== null &&
-      (r.switch.kind !== "ready" || entry(set, r.switch.name) !== false),
+      (r.switch.kind !== "ready" ||
+        (entry(set, r.switch.name) ?? r.info.enabled === true)),
   );
   const blocked = verdict.off ? names(loaded) : [];
   const skipped = verdict.noUnitControl

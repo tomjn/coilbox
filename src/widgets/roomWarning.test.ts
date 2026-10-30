@@ -176,7 +176,7 @@ function row(
     nested: false,
     coilbox: false,
     givesOrders: false,
-    info: { name, control },
+    info: { name, control, enabled: true },
     error: null,
     loadedBy: ["Game"],
     switch: { kind: "ready", name, previousNames: [] },
@@ -235,6 +235,20 @@ describe("roomWidgetWarning", () => {
     expect(warning?.blocked).toEqual(["New"]);
   });
 
+  it("leaves out a widget nothing has switched on whose own info leaves it off", () => {
+    const rows = [
+      row("Quiet", { info: { name: "Quiet", enabled: false } }),
+      row("Chosen", { info: { name: "Chosen", enabled: false } }),
+    ];
+    const warning = roomWidgetWarning(
+      { off: "option", noUnitControl: false },
+      rows,
+      game,
+      { ...EMPTY_SETS, global: { Chosen: true } },
+    );
+    expect(warning?.blocked).toEqual(["Chosen"]);
+  });
+
   it("uses the game's own set in place of the global one", () => {
     const warning = roomWidgetWarning(
       { off: "option", noUnitControl: false },
@@ -281,7 +295,7 @@ describe("roomWidgetWarning", () => {
   it("names a widget without a name by its file", () => {
     const warning = roomWidgetWarning(
       { off: "option", noUnitControl: false },
-      [row("x", { info: { name: null } })],
+      [row("x", { info: { name: null, enabled: true } })],
       game,
       EMPTY_SETS,
     );
