@@ -34,7 +34,7 @@ import {
 import { errorText } from "@/lib/helpers";
 import { usePlay } from "@/play/PlayProvider";
 import { newConfigText } from "../gameHandler";
-import { gameWidgetRows, gameWidgetStates } from "../gameWidgets";
+import { gameWidgetRows, gameWidgetStates, resetNames } from "../gameWidgets";
 import { useGameFiles } from "../useGameFiles";
 import { useGameWidgets } from "../useGameWidgets";
 import { useWidgetList } from "../useWidgetList";
@@ -170,11 +170,7 @@ export default function WidgetsPage() {
       io: appFileIO,
       writeDir: list.configDir,
       game: { ...game, handler: game.handler },
-      names: ownRows.flatMap((r) =>
-        r.switch.kind === "ready"
-          ? [r.switch.name, ...r.switch.previousNames]
-          : [],
-      ),
+      names: resetNames(ownRows, game.game, list.rows ?? []),
       gameRunning: running,
     });
     setOwnError(null);

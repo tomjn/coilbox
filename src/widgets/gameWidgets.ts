@@ -148,6 +148,26 @@ export function gameWidgetRows(
 }
 
 /**
+ * The entries that reset `game`'s own widgets: each switch's name and the names
+ * it had before, leaving out any a player widget the game loads still uses.
+ */
+export function resetNames(
+  rows: readonly WidgetRow[],
+  game: string,
+  playerRows: readonly WidgetRow[],
+): string[] {
+  const kept = new Set(
+    playerRows
+      .filter((r) => r.loadedBy.includes(game))
+      .flatMap((r) => [nameOf(r), ...(r.info?.previousNames ?? [])]),
+  );
+  const names = rows.flatMap((r) =>
+    r.switch.kind === "ready" ? [r.switch.name, ...r.switch.previousNames] : [],
+  );
+  return [...new Set(names)].filter((n) => !kept.has(n));
+}
+
+/**
  * On or off for each game widget with a switch, as the handler will read it:
  * its entry in the order table, or with none, what its `GetInfo()` says.
  */

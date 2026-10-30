@@ -3,6 +3,7 @@
  * applies back into it before a launch (issue #4844).
  */
 
+import { t } from "@lingui/core/macro";
 import { appFileIO } from "@/blueprint/fileIO";
 import { unitsyncEngineConfig } from "@/content/bindings";
 import { primeScan } from "@/content/config";
@@ -59,11 +60,18 @@ export async function absorbGame(
     written = readSets().written;
     found = await findConfig(io, writeDir, config, shortName);
   }
-  if (!found) return { kind: "missing" };
-  const order = readOrder(found.text, config.shape);
   const widgets = gameWidgets(rows, game.game).filter(
     (w) => !skip.includes(w.name),
   );
+  if (!found) {
+    // No entries, so an unset widget learns its default, as one with no entry
+    // in a file does. The set would otherwise read it as off.
+    updateSets((sets) =>
+      absorbFile(sets, setKey(game), "", new Map(), widgets),
+    );
+    return { kind: "missing" };
+  }
+  const order = readOrder(found.text, config.shape);
   updateSets((sets) =>
     absorbFile(sets, setKey(game), found.path, order, widgets),
   );
@@ -110,9 +118,10 @@ export async function writeSetForLaunch({
  * Take what changed in `game`'s config file since coilbox last wrote it into
  * its set, then write the set back, so a change made in the game is kept and
  * the rest is as the set says. A game that has not saved a file gets one only
- * when `create` says what it starts as.
+ * when `create` says what it starts as. Throws when `create` cannot, so the
+ * player hears that their choices were not saved.
  */
-async function writeGameFile(
+export async function writeGameFile(
   writeDir: string,
   entry: GameHandler & { handler: NonNullable<GameHandler["handler"]> },
   rows: readonly WidgetRow[],
@@ -136,6 +145,9 @@ async function writeGameFile(
     create,
   });
   if (out) updateSets((sets) => recordWrite(sets, out.path, states));
+  else if (create && states.size > 0) {
+    throw new Error(t`Coilbox could not create the game's settings file.`);
+  }
 }
 
 /**

@@ -5,6 +5,7 @@ import {
   gameWidgetRows,
   gameWidgetStates,
   readWidgets,
+  resetNames,
   widgetMembers,
 } from "./gameWidgets";
 import type { WidgetHandler } from "./handlers";
@@ -190,5 +191,41 @@ describe("gameWidgetStates", () => {
       Default: true,
       Unset: false,
     });
+  });
+});
+
+describe("resetNames", () => {
+  const own = (name: string, previousNames: string[]) =>
+    ({ switch: { kind: "ready", name, previousNames } }) as never;
+  const player = (name: string, loadedBy: string[], previous: string[] = []) =>
+    ({
+      path: `LuaUI/Widgets/${name}.lua`,
+      info: { name, previousNames: previous },
+      loadedBy,
+    }) as never;
+
+  it("takes each switch's names, without any a player's widget still uses", () => {
+    expect(
+      resetNames(
+        [own("Radar", ["OldRadar", "OlderRadar"]), own("Glow", [])],
+        "MF",
+        [
+          player("OldRadar", ["MF"]),
+          player("Mine", ["MF"], ["OlderRadar"]),
+          // Loaded by another game, so this game's entry is not its own.
+          player("Glow", ["SF"]),
+        ],
+      ),
+    ).toEqual(["Radar", "Glow"]);
+  });
+
+  it("leaves out a row with no switch", () => {
+    expect(
+      resetNames(
+        [{ switch: { kind: "none", reason: "duplicate" } } as never],
+        "MF",
+        [],
+      ),
+    ).toEqual([]);
   });
 });

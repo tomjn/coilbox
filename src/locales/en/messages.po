@@ -12583,6 +12583,10 @@ msgstr "Coilbox could not close it: {reason}. Stop it from the Battles page."
 msgid "Coilbox could not create {0}'s settings file."
 msgstr "Coilbox could not create {0}'s settings file."
 
+#: src/widgets/widgetSync.ts
+msgid "Coilbox could not create the game's settings file."
+msgstr "Coilbox could not create the game's settings file."
+
 #: src/multiplayer/battles/joinBattle.ts
 msgid "Coilbox could not leave it: {reason}."
 msgstr "Coilbox could not leave it: {reason}."

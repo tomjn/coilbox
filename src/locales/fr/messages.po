@@ -15525,6 +15525,10 @@ msgstr "Coilbox n’a pas pu le fermer : {reason}. Arrêtez-le depuis la page P
 msgid "Coilbox could not create {0}'s settings file."
 msgstr ""
 
+#: src/widgets/widgetSync.ts
+msgid "Coilbox could not create the game's settings file."
+msgstr ""
+
 #: src/multiplayer/battles/joinBattle.ts
 #, fuzzy
 msgid "Coilbox could not leave it: {reason}."

@@ -15525,6 +15525,10 @@ msgstr "Не вдалося закрити: {reason}. Зупиніть це зі
 msgid "Coilbox could not create {0}'s settings file."
 msgstr ""
 
+#: src/widgets/widgetSync.ts
+msgid "Coilbox could not create the game's settings file."
+msgstr ""
+
 #: src/multiplayer/battles/joinBattle.ts
 #, fuzzy
 msgid "Coilbox could not leave it: {reason}."

@@ -71,9 +71,8 @@ vi.mock("@/content/contentState", () => ({
 const { readSets, recordWrite, resetSets, updateSets } = await import(
   "./widgetSets"
 );
-const { switchAddedWidgets, switchRestoredWidgets } = await import(
-  "./widgetSync"
-);
+const { switchAddedWidgets, switchRestoredWidgets, writeGameFile } =
+  await import("./widgetSync");
 
 const handler: WidgetHandler = {
   id: "engine",
@@ -197,5 +196,40 @@ describe("switchAddedWidgets", () => {
       }),
     ).toEqual([]);
     expect(readSets().global).toEqual({});
+  });
+});
+
+describe("writeGameFile, for a game with no config file", () => {
+  const game = { game: "Not saved yet 1.0", shortName: "NS", handler };
+  const row = (name: string, enabled: boolean) =>
+    ({
+      info: { name, enabled },
+      loadedBy: [game.game],
+      switch: { kind: "ready", name, previousNames: [] },
+    }) as never;
+  const rows = [row("Radar", true), row("Minimap", false), row("Glow", true)];
+  const NS = "/spring/LuaUI/Config/NS.lua";
+  const empty = async () => "return {\n\torder = {\n\t},\n}\n";
+
+  it("keeps each widget's default where the player has made no choice", async () => {
+    updateSets((s) => ({ ...s, global: { Glow: false } }));
+    await writeGameFile("/spring", game, rows, [], empty);
+    const text = files.get(NS);
+    expect(text).toContain('["Radar"] = 1');
+    expect(text).toContain('["Minimap"] = 0');
+    // The player's own choice beats the default.
+    expect(text).toContain('["Glow"] = 0');
+  });
+
+  it("creates nothing unless told what a new file starts as", async () => {
+    await writeGameFile("/spring", game, rows);
+    expect(files.has(NS)).toBe(false);
+  });
+
+  it("says so when a new file cannot be made", async () => {
+    await expect(
+      writeGameFile("/spring", game, rows, [], async () => null),
+    ).rejects.toThrow("could not create");
+    expect(files.has(NS)).toBe(false);
   });
 });

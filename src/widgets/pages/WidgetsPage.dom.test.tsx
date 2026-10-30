@@ -485,7 +485,12 @@ describe("WidgetsPage", () => {
         screen.getByText("Restored BuildWatch, switched off."),
       ).toBeTruthy(),
     );
-    expect(readSets().global).toEqual({ BuildWatch: false, Other: true });
+    // Reading the game's missing file gives an unset widget its default.
+    expect(readSets().global).toEqual({
+      BuildWatch: false,
+      Other: true,
+      "Coilbox blueprints": false,
+    });
   });
 
   it("shows where each widget is when there is more than one content root, and removes from that root", async () => {
