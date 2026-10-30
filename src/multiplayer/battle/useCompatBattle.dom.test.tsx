@@ -12,6 +12,7 @@ const build = vi.hoisted(() => vi.fn());
 const status = vi.hoisted(() => vi.fn());
 const info = vi.hoisted(() => vi.fn());
 
+vi.mock("@tauri-apps/api/core", () => ({ Channel: class {} }));
 vi.mock("../../compat/bindings", () => ({
   compatBuild: (args: unknown) => build(args),
   compatStatus: (args: unknown) => status(args),
@@ -68,6 +69,7 @@ describe("useCompatBattle", () => {
       gameName: "XTA 9.65",
       baseChecksum: "abc",
       manifestVersion: 4,
+      onProgress: expect.anything(),
     });
   });
 

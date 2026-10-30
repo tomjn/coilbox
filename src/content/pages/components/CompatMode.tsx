@@ -1,8 +1,10 @@
 import { Plural, Trans, useLingui } from "@lingui/react/macro";
 import { Button } from "@picoframe/frame";
+import { Channel } from "@tauri-apps/api/core";
 import { save } from "@tauri-apps/plugin-dialog";
 import { FileArchive, Loader2, Trash2, Wrench } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
+import { Progress } from "@/components/ui/progress";
 import { Switch } from "@/components/ui/switch";
 import { describeError } from "@/i18n/uiError";
 import {
@@ -15,6 +17,7 @@ import {
   compatStatus,
 } from "../../../compat/bindings";
 import { staleReason } from "../../../compat/staleReason";
+import type { Convert3doProgress } from "../../bindings";
 import {
   useCompatSettings,
   withCompatEntry,
@@ -52,6 +55,7 @@ export function CompatMode({
   const [busy, setBusy] = useState<"build" | "remove" | "export" | null>(null);
   const [exported, setExported] = useState<CompatExported | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [progress, setProgress] = useState<Convert3doProgress | null>(null);
 
   const refresh = useCallback(async () => {
     if (!checksum) return null;
@@ -82,6 +86,9 @@ export function CompatMode({
     if (!checksum || !status) return;
     setBusy("build");
     setError(null);
+    setProgress(null);
+    const onProgress = new Channel<Convert3doProgress>();
+    onProgress.onmessage = setProgress;
     try {
       const result = await compatBuild({
         dataDir,
@@ -90,6 +97,7 @@ export function CompatMode({
         gameName,
         baseChecksum: checksum,
         manifestVersion: status.latest,
+        onProgress,
       });
       setBuilt(result);
       setExported(null);
@@ -173,6 +181,9 @@ export function CompatMode({
     }
   };
 
+  const total = progress?.total ?? 0;
+  const done = progress ? Math.min(progress.done, total) : 0;
+  const counted = total > 0;
   const staleReasons = stale.map(staleReason).join("; ");
   const label = t`Compatibility mode`;
   return (
@@ -192,7 +203,14 @@ export function CompatMode({
           {busy === "build" && (
             <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
               <Loader2 className="size-3.5 animate-spin" />{" "}
-              <Trans>Building</Trans>
+              {counted ? (
+                <Trans>
+                  {done} of{" "}
+                  <Plural value={total} one="# model" other="# models" />
+                </Trans>
+              ) : (
+                <Trans>Building</Trans>
+              )}
             </span>
           )}
         </div>
@@ -243,6 +261,13 @@ export function CompatMode({
           </Button>
         )}
       </div>
+
+      {busy === "build" && counted && (
+        <Progress
+          value={(done / total) * 100}
+          aria-label={t`Models converted`}
+        />
+      )}
 
       {status?.folder && (
         <p className="text-xs text-muted-foreground">
