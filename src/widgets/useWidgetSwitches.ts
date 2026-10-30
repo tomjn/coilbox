@@ -55,6 +55,14 @@ export function useWidgetSwitches(
     void read();
   }, [read]);
 
+  // The game rewrites the file when it exits, and may have saved it for the
+  // first time, so what was read before is out of date.
+  const wasRunning = useRef(running);
+  useEffect(() => {
+    if (wasRunning.current && !running) void read();
+    wasRunning.current = running;
+  }, [running, read]);
+
   const toggle = useCallback(
     async (name: string, on: boolean) => {
       if (!writeDir || !config || !shortName) return;
@@ -83,5 +91,16 @@ export function useWidgetSwitches(
     [writeDir, config, shortName, running],
   );
 
-  return { state, error, running, writing, toggle, reload: read };
+  return {
+    state,
+    error,
+    running,
+    writing,
+    toggle,
+    // Not while a switch is writing, or the read could see the file from
+    // before it and replace the switch's result.
+    reload: async () => {
+      if (writing === null) await read();
+    },
+  };
 }

@@ -15,7 +15,8 @@ import { type WidgetSwitch, widgetNames } from "./widgetNames";
 export interface GameHandler {
   /** The game's name as unitsync reports it, version and all. */
   game: string;
-  /** Its modinfo short name, which names the file its handler saves to. */
+  /** Its modinfo short name, which most handlers build their config file
+   *  name from. */
   shortName?: string;
   handler: WidgetHandler | null;
 }

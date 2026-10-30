@@ -454,17 +454,22 @@ export function writeOrder(
 // ---------------------------------------------------------------------------
 
 /** The file names a handler could be using for a game, relative to the write
- *  folder, in the order the handler tries them. */
+ *  folder, in the order the handler tries them. A short name that would reach
+ *  outside `LuaUI/Config/` names no file, because it comes from the game's
+ *  archive. */
 export function configCandidates(
   config: WidgetConfigFile,
   shortName: string,
 ): string[] {
+  const safe = !/[/\\]/.test(shortName) && !shortName.includes("..");
   return [
     ...new Set(
-      config.files.map(
-        (f) =>
-          `LuaUI/Config/${f.replace("{short}", shortName).replace("{SHORT}", shortName.toUpperCase())}`,
-      ),
+      config.files
+        .filter((f) => safe || !/\{short\}/i.test(f))
+        .map(
+          (f) =>
+            `LuaUI/Config/${f.replace("{short}", shortName).replace("{SHORT}", shortName.toUpperCase())}`,
+        ),
     ),
   ];
 }
@@ -547,7 +552,12 @@ export async function switchWidget({
   const text = writeOrder(found.text, config.shape, name, on ? 1 : 0);
   const order = readOrder(text, config.shape);
 
-  const backup = `${found.path}.${stamp(now)}.bak`;
+  // Two switches in one second would otherwise share a name, and the second
+  // copy would replace the one from before the first.
+  let backup = `${found.path}.${stamp(now)}.bak`;
+  for (let n = 2; (await io.read(backup)) !== null; n++) {
+    backup = `${found.path}.${stamp(now)}-${n}.bak`;
+  }
   await io.write(backup, found.text);
   await io.write(found.path, text);
   return { path: found.path, backup, order };

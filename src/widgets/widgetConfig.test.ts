@@ -210,6 +210,7 @@ return {
 \t},
 }`;
     const after = writeOrder(before, nested, "real", 0);
+    expect(after).toBe(before.replace("real = 1", "real = 0"));
     expectOnlyChanged(before, after, nested, "real", 0);
   });
 });
@@ -228,6 +229,18 @@ describe("configCandidates", () => {
         "ZK",
       ),
     ).toEqual(["LuaUI/Config/ZK_order.lua"]);
+  });
+
+  it("names no file for a short name that leaves the folder", () => {
+    const config: WidgetConfigFile = {
+      files: ["{short}.lua"],
+      shape: "nested",
+    };
+    expect(configCandidates(config, "../../evil")).toEqual([]);
+    expect(configCandidates(config, "a\\b")).toEqual([]);
+    expect(
+      configCandidates({ files: ["BYAR.lua"], shape: "nested" }, "../x"),
+    ).toEqual(["LuaUI/Config/BYAR.lua"]);
   });
 });
 
@@ -282,6 +295,19 @@ describe("switchWidget", () => {
     });
     expect(written).toEqual({});
     expect(out.order.get("Build Watch")).toBe(14);
+  });
+
+  it("keeps the first copy when two switches land in one second", async () => {
+    const { io, written } = memoryIO({ [path]: ENGINE_FILE });
+    await switchWidget({ ...request, io, name: "Minimap", on: true });
+    const second = await switchWidget({
+      ...request,
+      io,
+      name: "Build Watch",
+      on: false,
+    });
+    expect(second.backup).toBe(`${path}.20261030-090530-2.bak`);
+    expect(written[`${path}.20261030-090530.bak`]).toBe(ENGINE_FILE);
   });
 
   it("refuses while a game is running", async () => {
