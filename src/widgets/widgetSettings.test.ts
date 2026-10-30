@@ -178,10 +178,10 @@ describe("readSettings", () => {
     "\\255",
     "\\x80",
     "\\xff",
-  ])("will not offer a string holding the byte escape %s", (escape) => {
-    const src = `return {\n\tdata = {\n\t\tA = {\n\t\t\ts = "a${escape}b",\n\t\t},\n\t},\n}`;
+  ])("will not offer a string holding the byte escape %s", (byte) => {
+    const src = `return {\n\tdata = {\n\t\tA = {\n\t\t\ts = "a${byte}b",\n\t\t},\n\t},\n}`;
     const root = readSettings(src, nested, sw("A"))?.root as SettingNode;
-    expect(find(root, "s").kind).toBe(escape === "\\127" ? "string" : "other");
+    expect(find(root, "s").kind).toBe(byte === "\\127" ? "string" : "other");
   });
 
   it("reads a separate data file as a table keyed by widget name", () => {
