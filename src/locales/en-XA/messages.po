@@ -1087,7 +1087,7 @@ msgstr ""
 msgid "{0} loads none of your widgets."
 msgstr ""
 
-#. placeholder {0}: row.info.name
+#. placeholder {0}: switchName(row, switches.game)
 #: src/widgets/pages/WidgetsPage.tsx
 msgid "{0} on"
 msgstr ""

@@ -26,6 +26,7 @@ import {
 import { useWidgetList } from "../useWidgetList";
 import { useWidgetSwitches } from "../useWidgetSwitches";
 import { folderToOpen, rowsForGame, type WidgetRow } from "../widgetList";
+import { savedUnder } from "../widgetNames";
 
 /** The picker's value for the list of every widget file. Not empty, because
  *  the select treats an empty value as nothing picked. */
@@ -171,6 +172,7 @@ export default function WidgetsPage() {
             switches={
               switches.state.kind === "ready"
                 ? {
+                    game: picked,
                     order: switches.state.order,
                     disabled: switches.running,
                     writing: switches.writing,
@@ -191,6 +193,8 @@ function fileName(path: string): string {
 
 /** What the table needs to show a switch on each widget of one game. */
 interface TableSwitches {
+  /** The game whose file it is. */
+  game: string;
   /** The game's order table: `0` is off, anything else on. */
   order: ReadonlyMap<string, number>;
   disabled: boolean;
@@ -199,13 +203,22 @@ interface TableSwitches {
   toggle: (name: string, on: boolean) => void;
 }
 
-/** Whether the game loads a widget, from its entry in the order table, or
+/** The name a row's switch writes under, when it has a switch in this game:
+ *  the game loads the file and its saved name is certain (#1290). */
+function switchName(row: WidgetRow, game: string): string | null {
+  if (row.switch.kind !== "ready" || !row.loadedBy.includes(game)) return null;
+  return row.switch.name;
+}
+
+/** Whether the game loads a widget, from the entry its handler reads, or
  *  when it has none from what the widget declares, as the handler decides
  *  for a widget it has not seen. */
 function isOn(row: WidgetRow, order: ReadonlyMap<string, number>): boolean {
-  const name = row.info?.name;
-  const entry = name ? order.get(name) : undefined;
-  return entry === undefined ? row.info?.enabled === true : entry > 0;
+  if (row.switch.kind !== "ready") return false;
+  const saved = savedUnder(row.switch, (n) => order.has(n));
+  return saved === null
+    ? row.info?.enabled === true
+    : (order.get(saved) ?? 0) > 0;
 }
 
 function WidgetTable({
@@ -256,14 +269,14 @@ function WidgetTable({
           <TableRow key={row.path} className="align-top">
             {switches && (
               <TableCell>
-                {row.info?.name && (
+                {switchName(row, switches.game) !== null && (
                   <Switch
                     checked={isOn(row, switches.order)}
                     disabled={switches.disabled || switches.writing !== null}
                     onCheckedChange={(on) =>
-                      switches.toggle(row.info?.name ?? "", on)
+                      switches.toggle(switchName(row, switches.game) ?? "", on)
                     }
-                    aria-label={t`${row.info.name} on`}
+                    aria-label={t`${switchName(row, switches.game)} on`}
                   />
                 )}
               </TableCell>

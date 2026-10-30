@@ -1087,7 +1087,7 @@ msgstr "{0} has not saved its widget settings yet. Start it once to switch widge
 msgid "{0} loads none of your widgets."
 msgstr "{0} loads none of your widgets."
 
-#. placeholder {0}: row.info.name
+#. placeholder {0}: switchName(row, switches.game)
 #: src/widgets/pages/WidgetsPage.tsx
 msgid "{0} on"
 msgstr "{0} on"

@@ -35,6 +35,7 @@ const scan: PlayerWidgetScan = {
         author: "someone",
         version: "2",
         license: "GPLv2",
+        previousNames: ["Old Watch"],
       },
       error: null,
     },
@@ -184,6 +185,20 @@ describe("WidgetsPage", () => {
     expect(buildWatch.getAttribute("aria-checked")).toBe("false");
     fireEvent.click(buildWatch);
     expect(switches.toggle).toHaveBeenCalledWith("BuildWatch", true);
+  });
+
+  it("reads a widget's state under the name it had before", () => {
+    switches.state = {
+      kind: "ready",
+      path: "/home/player/.spring/LuaUI/Config/MF.lua",
+      order: new Map([["Old Watch", 4]]),
+    };
+    page("/library/widgets?game=Metal%20Factions%20v2.58");
+    const buildWatch = screen.getByRole("switch", { name: "BuildWatch on" });
+    expect(buildWatch.getAttribute("aria-checked")).toBe("true");
+    fireEvent.click(buildWatch);
+    // Written under its own name, which the handler reads first.
+    expect(switches.toggle).toHaveBeenCalledWith("BuildWatch", false);
   });
 
   it("offers no switch while a game is running", () => {

@@ -8,6 +8,7 @@ const engine: WidgetHandler = {
   family: "engine",
   folders: ["LuaUI/Widgets"],
   subfolders: true,
+  config: { files: ["{short}.lua"], shape: "nested" },
 };
 const games = [
   { game: "E", handler: engine },
