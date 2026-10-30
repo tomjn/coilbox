@@ -137,7 +137,9 @@ export default function WidgetsPage() {
                 variant="outline"
                 size="sm"
                 onClick={() => setAdding(true)}
-                disabled={!list.games || (picked !== ALL && !game)}
+                disabled={
+                  !list.games || !list.widgets || (picked !== ALL && !game)
+                }
               >
                 <Plus />
                 <Trans>Add widget</Trans>
@@ -272,11 +274,11 @@ export default function WidgetsPage() {
         title={t`Add a widget`}
         onClose={() => setAdding(false)}
       >
-        {list.writeDir && list.games && (
+        {list.writeDir && list.games && list.widgets && (
           <AddWidgetDrawer
             writeDir={list.writeDir}
             games={list.games}
-            caseSensitive={list.widgets?.caseSensitive ?? false}
+            caseSensitive={list.widgets.caseSensitive}
             game={game}
             setKey={picked === ALL ? null : key}
             onAdded={() => {
