@@ -8584,10 +8584,18 @@ msgstr "游戏正在运行。{gameLabel} 在保存或退出时会写回整个蓝
 msgid "A game is running. Close it to change these settings."
 msgstr ""
 
+#: src/widgets/pages/RemoveWidget.tsx
+msgid "A game is running. Close it to remove widgets."
+msgstr ""
+
 #: src/blueprint/pages/components/LeavingPack.tsx
 #, fuzzy
 msgid "A game is running. It writes its whole blueprints file back when it saves or exits, so anything written into that file now could be thrown away without a word."
 msgstr "游戏正在运行。它在保存或退出时会写回整个蓝图文件，因此现在写入该文件的内容可能会被悄无声息地丢弃。"
+
+#: src/widgets/widgetRemoval.ts
+msgid "A game is running. It writes its widget settings back when it saves or exits, so a widget removed now would come back. Close the game and try again."
+msgstr ""
 
 #: src/widgets/widgetSettings.ts
 msgid "A game is running. It writes its widget settings back when it saves or exits, so anything written now would be thrown away. Close the game and try again."
@@ -10582,6 +10590,10 @@ msgstr "也可由以下单位建造"
 #, fuzzy
 msgid "Also check Steam install locations for Zero-K during a rescan."
 msgstr "重新扫描时也检查 Zero-K 的 Steam 安装位置。"
+
+#: src/widgets/pages/RemoveWidget.tsx
+msgid "Also delete its entries from the config files"
+msgstr ""
 
 #: src/lego/pages/components/ActionsDrawer.tsx
 #, fuzzy
@@ -13895,6 +13907,7 @@ msgstr "不会伤害自己的单位"
 #: src/scenario/pages/components/SetupPanel.tsx
 #: src/uberstress/pages/RunPage.tsx
 #: src/widgets/pages/AddWidgetDrawer.tsx
+#: src/widgets/pages/RemoveWidget.tsx
 #: src/workshop/pages/components/CloneActions.tsx
 #: src/workshop/pages/components/DiskDiffDrawer.tsx
 #: src/workshop/pages/components/InPlaceWrite.tsx
@@ -15454,6 +15467,11 @@ msgstr "Coilbox 无法读取此地图的天空盒。地图附带了天空盒，�
 msgid "Coilbox cannot read this unit's build pic. The game ships one, in a format the decoder does not handle."
 msgstr "Coilbox 无法读取此单位的建造图片。游戏附带了一张，但其格式解码器无法处理。"
 
+#. placeholder {0}: unknown.join(", ")
+#: src/widgets/pages/RemoveWidget.tsx
+msgid "Coilbox cannot tell whether these games load it too: {0}"
+msgstr ""
+
 #: src/workshop/pages/components/UnitFieldRow.tsx
 #, fuzzy
 msgid "Coilbox cannot write {label} into the game's own file"
@@ -16438,6 +16456,11 @@ msgstr "圆锥"
 msgid "Config file: {configPath}"
 msgstr "配置文件：{configPath}"
 
+#. placeholder {0}: entries.backups.join(", ")
+#: src/widgets/pages/RemoveWidget.tsx
+msgid "Config files as they were: {0}"
+msgstr ""
+
 #: src/uberstress/pages/components/ReportDetail.tsx
 #, fuzzy
 msgid "Configuration"
@@ -17381,6 +17404,10 @@ msgstr "无法从 {gameName} 读取 {unit} 的脚本：{reason}"
 msgid "could not read model {file}: {status}"
 msgstr "无法读取模型 {file}：{status}"
 
+#: src/widgets/pages/RemoveWidget.tsx
+msgid "Could not read the config file: {line}"
+msgstr ""
+
 #. placeholder {0}: message(e)
 #: src/workshop/pages/components/DiskDiffDrawer.tsx
 #, fuzzy
@@ -17492,6 +17519,10 @@ msgstr "无法读取你保存的模型：{error}"
 msgid "Could not read: {0}"
 msgstr ""
 
+#: src/widgets/pages/RemoveWidget.tsx
+msgid "Could not remove its entries: {line}"
+msgstr ""
+
 #: src/lego/pages/components/SaveModelPopover.tsx
 #, fuzzy
 msgid "Could not save the model"
@@ -17508,6 +17539,7 @@ msgid "Could not save the module"
 msgstr "无法保存模块"
 
 #: src/widgets/pages/AddWidgetDrawer.tsx
+#: src/widgets/pages/RemoveWidget.tsx
 msgid "Could not save the setting for {line}"
 msgstr ""
 
@@ -19155,6 +19187,7 @@ msgstr "录制轨道的磁盘空间（MB）"
 #: src/multiplayer/LobbyStatusButton.tsx
 #: src/multiplayer/RejoinOfferPanel.tsx
 #: src/play/pages/SkirmishPage.tsx
+#: src/widgets/pages/RemoveWidget.tsx
 #, fuzzy
 msgid "Dismiss"
 msgstr "关闭"
@@ -26019,6 +26052,11 @@ msgstr "它不是对象"
 #, fuzzy
 msgid "it is only there from {atLeast} up and only up to {atMost}, which is no difficulty at all, so it never appears"
 msgstr "它只在 {atLeast} 及以上、{atMost} 及以下出现，而这个范围不包含任何难度，因此永远不会出现"
+
+#. placeholder {0}: removal.games.join(", ")
+#: src/widgets/pages/RemoveWidget.tsx
+msgid "It is removed from every game that loads it: {0}"
+msgstr ""
 
 #: src/deeplink/actions.ts
 #, fuzzy
@@ -34454,6 +34492,10 @@ msgstr "打开页面"
 msgid "Open another file"
 msgstr "打开其他文件"
 
+#: src/widgets/pages/RemoveWidget.tsx
+msgid "Open backup"
+msgstr ""
+
 #: src/multiplayer/DebriefingDrawer.tsx
 #, fuzzy
 msgid "Open chat"
@@ -38610,6 +38652,8 @@ msgstr "改编自"
 #: src/lego/pages/components/BuiltBySection.tsx
 #: src/lego/pages/components/ProportionsPanel.tsx
 #: src/multiplayer/battle/MemberRow.tsx
+#: src/widgets/pages/RemoveWidget.tsx
+#: src/widgets/pages/WidgetsPage.tsx
 #: src/workshop/pages/components/ExplosionGeneratorEditor.tsx
 #, fuzzy
 msgid "Remove"
@@ -38678,6 +38722,7 @@ msgstr "移除 {mapTitle}？"
 #: src/campaign/pages/components/StartingUnits.tsx
 #: src/campaign/pages/components/UnitRestrictions.tsx
 #: src/uberstress/pages/SettingsSection.tsx
+#: src/widgets/pages/RemoveWidget.tsx
 #, fuzzy
 msgid "Remove {name}"
 msgstr "移除 {name}"
@@ -38696,6 +38741,10 @@ msgstr "从项目中移除 {name}"
 #, fuzzy
 msgid "Remove {name} from the comparison"
 msgstr "从比较中移除 {name}"
+
+#: src/widgets/pages/RemoveWidget.tsx
+msgid "Remove {name}?"
+msgstr ""
 
 #: src/play/pages/components/ParticipantsTable.tsx
 #, fuzzy
@@ -38876,6 +38925,10 @@ msgstr "已移除"
 #, fuzzy
 msgid "Removed {missionName} from the game."
 msgstr "已从游戏中移除 {missionName}。"
+
+#: src/widgets/pages/RemoveWidget.tsx
+msgid "Removed {name}."
+msgstr ""
 
 #: src/lego/pages/BuilderPage.tsx
 #, fuzzy
@@ -39552,6 +39605,7 @@ msgid "Restarts every time the target is hit again."
 msgstr "每次再次命中目标时重新开始计时。"
 
 #: src/content/pages/components/ConfigProfilesPanel.tsx
+#: src/widgets/pages/RemoveWidget.tsx
 #, fuzzy
 msgid "Restore"
 msgstr "恢复"
@@ -39570,6 +39624,14 @@ msgstr "恢复原始文件"
 #, fuzzy
 msgid "Restored {archive}'s original models and unit definitions."
 msgstr "已恢复 {archive} 的原始模型和单位定义。"
+
+#: src/widgets/pages/RemoveWidget.tsx
+msgid "Restored {name}, switched off."
+msgstr ""
+
+#: src/widgets/pages/RemoveWidget.tsx
+msgid "Restored {name}."
+msgstr ""
 
 #: src/content/pages/components/Convert3doDrawer.tsx
 #, fuzzy

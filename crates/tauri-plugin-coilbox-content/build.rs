@@ -78,6 +78,8 @@ const COMMANDS: &[&str] = &[
     "content_player_widgets",
     "content_widget_plan",
     "content_widget_add",
+    "content_widget_delete",
+    "content_widget_restore",
     "content_install_3do_conversion",
     "content_undo_3do_install",
     "content_3do_install_status",

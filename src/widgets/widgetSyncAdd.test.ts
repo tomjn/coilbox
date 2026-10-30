@@ -45,7 +45,9 @@ vi.mock("@/content/bindings", async () => {
 const { readSets, recordWrite, resetSets, updateSets } = await import(
   "./widgetSets"
 );
-const { switchAddedWidgets } = await import("./widgetSync");
+const { switchAddedWidgets, switchRestoredWidgets } = await import(
+  "./widgetSync"
+);
 
 const handler: WidgetHandler = {
   id: "engine",
@@ -111,6 +113,30 @@ describe("switchAddedWidgets", () => {
     // Writing a file keeps a dated copy of what it replaced beside it.
     const written = [...files.keys()].filter((p) => !p.includes(".bak"));
     expect(written.sort()).toEqual([MF, SF]);
+  });
+
+  it("switches a restored widget off, whatever its old entry says", async () => {
+    // It was on when removed, and the entry in each file still says so.
+    files.set(
+      MF,
+      "return {\n\torder = {\n\t\tMinimap = 1,\n\t\tRadar = 1,\n\t},\n}\n",
+    );
+    files.set(
+      SF,
+      "return {\n\torder = {\n\t\tMinimap = 1,\n\t\tRadar = 1,\n\t},\n}\n",
+    );
+    updateSets((s) => ({ ...s, overrides: { SF: { Minimap: true } } }));
+    expect(
+      await switchRestoredWidgets({
+        writeDir: "/spring",
+        games,
+        names: ["Radar"],
+      }),
+    ).toEqual([]);
+    expect(readSets().global).toMatchObject({ Radar: false });
+    expect(readSets().overrides.SF).toMatchObject({ Radar: false });
+    expect(files.get(MF)).toContain("Radar = 0");
+    expect(files.get(SF)).toContain("Radar = 0");
   });
 
   it("changes nothing when no widget has a name to switch", async () => {

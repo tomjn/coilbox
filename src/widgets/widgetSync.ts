@@ -25,6 +25,7 @@ import {
   recordWrite,
   setKey,
   statesToWrite,
+  switchOff,
   updateSets,
 } from "./widgetSets";
 
@@ -153,11 +154,45 @@ export async function switchAddedWidgets({
   names: readonly string[];
 }): Promise<string[]> {
   if (names.length === 0) return [];
-  // Before the files are read, so that a widget no file has an entry for takes
-  // this answer rather than what its `GetInfo()` says. The files' own entries
-  // for these names are left out of what is read back, because one a removed
-  // copy of the widget left behind would otherwise undo the choice.
   updateSets((sets) => addWidgets(sets, key, names));
+  return writeSwitched({ writeDir, games, names });
+}
+
+/**
+ * Switch widgets that were just restored off in every set, and write that into
+ * the config file of each game that has one, so none runs in the next game
+ * without the player turning it on. Returns what could not be written, one
+ * line per game.
+ */
+export async function switchRestoredWidgets({
+  writeDir,
+  games,
+  names,
+}: {
+  writeDir: string;
+  games: readonly GameHandler[];
+  names: readonly string[];
+}): Promise<string[]> {
+  if (names.length === 0) return [];
+  updateSets((sets) => switchOff(sets, names));
+  return writeSwitched({ writeDir, games, names });
+}
+
+/** Write the sets' answer for `names` into each game's config file. Called
+ *  after the sets are changed, and before the files are read, so that a widget
+ *  no file has an entry for takes this answer rather than what its `GetInfo()`
+ *  says. The files' own entries for these names are left out of what is read
+ *  back, because one a removed copy of the widget left behind would otherwise
+ *  undo the choice. */
+async function writeSwitched({
+  writeDir,
+  games,
+  names,
+}: {
+  writeDir: string;
+  games: readonly GameHandler[];
+  names: readonly string[];
+}): Promise<string[]> {
   const scan = await contentPlayerWidgets({
     writeDir,
     folders: HANDLER_FOLDERS,
