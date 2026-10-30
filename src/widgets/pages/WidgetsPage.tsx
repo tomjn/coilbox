@@ -268,7 +268,9 @@ export default function WidgetsPage() {
             showGames={!game && list.gamesKnown}
             someUnknown={!!list.games?.some((g) => g.handler === null)}
             onSettings={
-              game?.handler ? (row) => setSettingsPath(row.path) : undefined
+              game?.handler && list.configDir
+                ? (row) => setSettingsPath(row.path)
+                : undefined
             }
             canSettings={(row) => !!game && !!settingsSwitch(row, game.game)}
             renderRemove={

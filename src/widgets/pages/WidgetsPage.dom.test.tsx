@@ -96,11 +96,16 @@ const games: GameHandler[] = [
   { game: "Mystery 1.0", handler: null },
 ];
 
+/** What the page is told about the engine's write folder. */
+const list: { configDir: string | undefined } = {
+  configDir: "/home/player/.spring/engine/2026.09.01",
+};
+
 vi.mock("../useWidgetList", () => ({
   useWidgetList: () => ({
     targets: [{}],
     widgetDir: "/home/player/.spring",
-    configDir: "/home/player/.spring/engine/2026.09.01",
+    configDir: list.configDir,
     widgets: scan,
     games,
     rows: widgetRows(scan, games),
@@ -155,6 +160,7 @@ vi.mock("@/content/bindings", async () => {
 });
 
 beforeEach(() => {
+  list.configDir = "/home/player/.spring/engine/2026.09.01";
   play.running = false;
   removeCalls.length = 0;
   installSettingsStorage(memorySettingsStorage());
@@ -272,6 +278,19 @@ describe("WidgetsPage", () => {
     expect(openPath).toHaveBeenCalledWith({
       path: "/home/player/.spring/LuaUI/Widgets",
     });
+  });
+
+  it("offers no settings when the engine does not say where its config is", () => {
+    page("/library/widgets?game=Metal Factions v2.58");
+    expect(
+      screen.queryAllByRole("button", { name: /^Settings of / }).length,
+    ).toBeGreaterThan(0);
+    cleanup();
+    list.configDir = undefined;
+    page("/library/widgets?game=Metal Factions v2.58");
+    expect(screen.queryAllByRole("button", { name: /^Settings of / })).toEqual(
+      [],
+    );
   });
 
   it("opens the drawer that adds a widget", () => {
