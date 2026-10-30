@@ -151,10 +151,11 @@ describe("userWidgets", () => {
     });
   });
 
-  it("names Balanced Annihilation's option with its prefix", async () => {
-    expect((await gates("luaui/bawidgets.lua"))?.option?.key).toBe(
-      "mo_allowuserwidgets",
-    );
+  it("gives Balanced Annihilation its prefixed option and the flag in BA.lua", async () => {
+    expect(await gates("luaui/bawidgets.lua")).toEqual({
+      option: { key: "mo_allowuserwidgets", loads: true, unset: true },
+      configFlag: true,
+    });
   });
 
   it("gives the Complete Annihilation family the local widgets entry and Zero-K's option", async () => {
