@@ -2443,13 +2443,21 @@ mod download_to_tests {
                 // race the client still sending its GET.
                 let mut buf = Vec::new();
                 let mut chunk = [0u8; 512];
+                // The bytes are checked as they arrive, so a TLS `ClientHello`
+                // that waits for a reply is let go at once and does not hold up
+                // the request behind it.
+                const REQUEST: &[u8] = b"GET /short.bin ";
                 let ours = loop {
                     match sock.read(&mut chunk) {
                         Ok(0) | Err(_) => break false,
                         Ok(n) => buf.extend_from_slice(&chunk[..n]),
                     }
+                    let seen = buf.len().min(REQUEST.len());
+                    if buf[..seen] != REQUEST[..seen] {
+                        break false;
+                    }
                     if buf.windows(4).any(|w| w == b"\r\n\r\n") {
-                        break buf.starts_with(b"GET /short.bin ");
+                        break true;
                     }
                 };
                 if !ours {
@@ -2491,6 +2499,17 @@ mod download_to_tests {
         let stray = ask(&url, b"GET / HTTP/1.1\r\nhost: localhost\r\n\r\n");
         assert!(stray.is_empty(), "a stray GET was answered");
         assert_eq!(answered.load(Ordering::SeqCst), 0);
+
+        // A TLS probe sends a `ClientHello` and waits for a reply, so it is
+        // still open when the real request arrives.
+        let address = url
+            .strip_prefix("http://")
+            .and_then(|rest| rest.split('/').next())
+            .expect("an http url");
+        let mut probe = std::net::TcpStream::connect(address).expect("connect");
+        probe
+            .write_all(&[0x16, 0x03, 0x01, 0x05, 0xc8, 0x01])
+            .expect("send");
 
         let real = ask(&url, b"GET /short.bin HTTP/1.1\r\nhost: localhost\r\n\r\n");
         assert!(real.starts_with(b"HTTP/1.1 200"));
