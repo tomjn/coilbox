@@ -22,6 +22,10 @@ The folder holds:
 
 A game that ships its own `gamedata/defs_post.lua` or `gamedata/weapondefs_post.lua` would have it covered up by the generated one. So coilbox writes neither file for such a game, and the player's build result says so. The same happens when the game's own `gamedata/defs.lua` or `gamedata/weapondefs.lua` never loads the file.
 
+From writer 4, a game that never reaches `gamedata/defs_post.lua` gets its work done in `gamedata/weapondefs.lua` instead. That file runs the engine's own copy, which it covers up, then points the defs at the converted models and runs the `defs_post` fixes. Balanced Annihilation 15.9.8 works this way. It needs the game not to ship `gamedata/weapondefs.lua`, and any `gamedata/defs.lua` of its own to load that file by name, into `DEFS.weaponDefs`, after `DEFS.unitDefs` and `DEFS.featureDefs`. Otherwise the build result says what was skipped. The engine's own `defs_post.lua` is not run, because the game's `defs.lua` never ran it and the move defs are not loaded yet.
+
+The `weapondefs_post` fixes do not follow. Each of Balanced Annihilation 15.9.8's seven bombs gives its own burst with no `manualBombSettings`, and `defs-manual-bomb-settings-92` would replace each with a burst of 2. The note in the fix's own header that a game with its own `weapondefs_post.lua` does not run it is still true.
+
 ## The same bytes on every computer
 
 Players in a multiplayer battle compare archive checksums. Coilbox writes the folder the same way on every computer from the same game and manifest: files sorted by path, LF line endings, and no timestamps or paths. A player on a different compatibility version then has a missing archive rather than a game that desyncs.
@@ -138,7 +142,7 @@ A line that moves for a manifest that already shipped is a bug, never a hash to 
 
 The 3do converter follows the same rule. A manifest's `converter` records the `coilbox-3do-convert` version it was made with, but coilbox does not check that version when it builds, so raising the crate's version leaves every manifest buildable. A change to what the converter writes for a model or a sheet is a writer change like any other. Keep the old output for the older writers by passing the writer down to the converter, and put the new output behind a check beside `WRITER`. Two more golden tests fail when the converter's output moves, `a_fixed_conversion_writes_the_same_bytes` and `the_sheet_png_is_the_same_bytes` in `crates/coilbox-3do-convert/src/lib.rs`.
 
-The test `the_lua_tests_load_the_preludes_this_crate_builds` checks the preludes for manifests 9, 11, 12, 14, 15, 16, 17, 18, 19, 20, 21 and 22 that the Lua tests load from `lua/compat/tests/fixtures/`. After a deliberate change to how a prelude is built, run it with `COILBOX_WRITE_FIXTURE=1` to write them again.
+The test `the_lua_tests_load_the_preludes_this_crate_builds` checks the preludes for manifests 9, 11, 12, 14, 15, 16, 17, 18, 19, 20, 21, 22 and 23 that the Lua tests load from `lua/compat/tests/fixtures/`. After a deliberate change to how a prelude is built, run it with `COILBOX_WRITE_FIXTURE=1` to write them again.
 
 ## Run the tests
 

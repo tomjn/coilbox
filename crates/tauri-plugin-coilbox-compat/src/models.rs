@@ -20,6 +20,13 @@
 //! def table is built, and the engine's own copy of it, which drops unused move
 //! classes, is still reachable through `VFS.BASE` because it lives in the base
 //! content rather than in a game.
+//!
+//! A game whose own `defs.lua` never loads `defs_post.lua`, as Balanced
+//! Annihilation 15.9.8's does not, or that ships its own, still loads the
+//! engine's `gamedata/weapondefs.lua` by name, and no game checked ships that
+//! file. From writer 4 the mutator covers it up for such a game, runs the
+//! engine's copy, and does the same work there (see [`Hook`]). Nothing the game
+//! ships is covered up.
 
 use std::collections::{BTreeMap, BTreeSet};
 use std::path::{Path, PathBuf};
@@ -29,6 +36,10 @@ use tauri_plugin_coilbox_workshop::{lua_string, CompiledFile};
 
 /// The file the converted models are named in.
 pub const DEFS_POST: &str = "gamedata/defs_post.lua";
+
+/// The file that does the work of [`DEFS_POST`] for a game that never reaches
+/// it, from writer 4.
+pub const WEAPONDEFS: &str = "gamedata/weapondefs.lua";
 
 /// The folder the converter writes models under, matching
 /// `coilbox_unitsync_worker::unitmodel::MODEL_DIR`.
@@ -87,6 +98,60 @@ pub struct Models {
     /// Why the models are not used, when they cannot be. Empty is the ordinary
     /// case.
     pub notes: Vec<String>,
+    /// Which file of the mutator names them.
+    pub hook: Hook,
+}
+
+/// Where a mutator can point a game's defs at converted models and run the def
+/// fixes of `defs_post`.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub enum Hook {
+    /// [`DEFS_POST`], which the game's def loading reaches.
+    #[default]
+    DefsPost,
+    /// [`WEAPONDEFS`], which runs the engine's copy of itself first.
+    WeaponDefs,
+    /// Neither, and why.
+    Nowhere(String),
+}
+
+/// Where the mutator of writer `writer` can hook a game with these copies of
+/// `gamedata/defs.lua` and `gamedata/defs_post.lua`. `weapondefs` reads its
+/// copy of `gamedata/weapondefs.lua`, and is called only when that decides it.
+pub fn hook(
+    writer: u32,
+    defs: Option<&str>,
+    defs_post: Option<&str>,
+    weapondefs: impl FnOnce() -> Result<Option<String>, String>,
+) -> Result<Hook, String> {
+    let Some(why) = hook_problem(defs, defs_post) else {
+        return Ok(Hook::DefsPost);
+    };
+    if coilbox_compat::hooks_weapondefs(writer)
+        && weapondefs()?.is_none()
+        && defs.is_none_or(loads_weapons_after_units_and_features)
+    {
+        return Ok(Hook::WeaponDefs);
+    }
+    Ok(Hook::Nowhere(why))
+}
+
+/// Whether a game's own `gamedata/defs.lua` loads `gamedata/weapondefs.lua`
+/// with the unit and feature defs already in `DEFS`, so all three are there for
+/// [`weapondefs`] to change. Splinter Faction's loads its weapons before its
+/// features.
+fn loads_weapons_after_units_and_features(defs: &str) -> bool {
+    let text = defs.to_ascii_lowercase();
+    let names_the_file = ["'weapondefs'", "\"weapondefs\"", "weapondefs.lua"]
+        .iter()
+        .any(|name| text.contains(name));
+    let table = |name: &str| text.find(&format!("defs.{name}"));
+    match (table("unitdefs"), table("featuredefs"), table("weapondefs")) {
+        (Some(units), Some(features), Some(weapons)) => {
+            names_the_file && units < weapons && features < weapons
+        }
+        _ => false,
+    }
 }
 
 /// Why `gamedata/defs_post.lua` in the mutator could not point the game's defs
@@ -109,8 +174,8 @@ pub fn hook_problem(defs: Option<&str>, defs_post: Option<&str>) -> Option<Strin
 /// Convert the `.3do` models in `archive` into `staging`, through the worker,
 /// as compat writer `writer` does.
 ///
-/// Reads the base game's two def entry points first, and converts nothing when
-/// [`hook_problem`] says the converted models could not be used.
+/// Reads the base game's def entry points first, and converts nothing when
+/// [`hook`] finds nowhere that could use the converted models.
 pub fn convert(
     engine_path: &str,
     data_dir: &str,
@@ -119,6 +184,7 @@ pub fn convert(
     writer: u32,
 ) -> Result<Models, String> {
     convert_reading(
+        writer,
         |file| {
             tauri_plugin_coilbox_unitsync::archive_text_blocking(
                 engine_path,
@@ -140,17 +206,21 @@ pub fn convert(
     )
 }
 
-/// [`convert`], with `read` returning a file of the base game by path and
+/// [`convert`], from writer `writer`, with `read` returning a file of the base game by path and
 /// `run` converting its models into `staging` and answering with the
 /// converter's result line.
 pub fn convert_reading(
+    writer: u32,
     read: impl Fn(&str) -> Result<Option<String>, String>,
     run: impl FnOnce() -> Result<String, String>,
     staging: &Path,
 ) -> Result<Models, String> {
     let defs = read("gamedata/defs.lua")?;
     let defs_post = read(DEFS_POST)?;
-    if let Some(why) = hook_problem(defs.as_deref(), defs_post.as_deref()) {
+    let hook = hook(writer, defs.as_deref(), defs_post.as_deref(), || {
+        read(WEAPONDEFS)
+    })?;
+    if let Hook::Nowhere(why) = hook {
         return Ok(Models {
             notes: vec![why],
             ..Models::default()
@@ -162,6 +232,7 @@ pub fn convert_reading(
         conversion,
         palette,
         notes: Vec::new(),
+        hook,
     })
 }
 
@@ -304,6 +375,43 @@ pub fn defs_post(models: &BTreeSet<String>, fixes: Option<&str>, n: u32) -> Opti
     ));
     Some(CompiledFile {
         path: DEFS_POST.into(),
+        contents,
+    })
+}
+
+/// `gamedata/weapondefs.lua` for a game whose [`hook`] is [`Hook::WeaponDefs`]:
+/// the engine's own copy of the file, which this one covers up, then what
+/// [`defs_post`] would have done, or `None` when there is nothing to do. The
+/// armour and move defs are not loaded yet, and no def fix reads them.
+pub fn weapondefs(models: &BTreeSet<String>, fixes: Option<&str>, n: u32) -> Option<CompiledFile> {
+    if models.is_empty() && fixes.is_none() {
+        return None;
+    }
+    let mut contents = format!(
+        "-- Written by coilbox's compatibility mode. Rebuilt from compat manifest {n}, so do not edit it.\n\
+         -- license: {license}\n\
+         --\n\
+         -- This game never reaches a defs_post.lua of the mutator, and it loads this\n\
+         -- file once its unit and feature defs are built. Not a tail call, for the\n\
+         -- reason given in defs_post.lua: VFS.Include reads its caller's environment.\n\
+         \n\
+         local base = VFS.BASE or \"b\"\n\
+         local weapon_defs = VFS.Include({path}, nil, base)\n\
+         DEFS.weaponDefs = weapon_defs\n\
+         \n",
+        license = coilbox_compat::LICENSE,
+        path = lua_string(WEAPONDEFS),
+    );
+    if !models.is_empty() {
+        contents.push_str(&repoint(models));
+    }
+    if let Some(fixes) = fixes {
+        contents.push('\n');
+        contents.push_str(fixes);
+    }
+    contents.push_str("\nreturn weapon_defs\n");
+    Some(CompiledFile {
+        path: WEAPONDEFS.into(),
         contents,
     })
 }
@@ -491,6 +599,94 @@ mod tests {
         );
         assert!(hook_problem(None, Some("return {}")).is_some());
         assert!(hook_problem(Some("LoadDefs('unitDefs')"), None).is_some());
+    }
+
+    const OWN_DEFS: &str = "DEFS.unitDefs = LoadDefs('unitDefs')\n\
+                            DEFS.featureDefs = LoadDefs('featureDefs')\n\
+                            DEFS.weaponDefs = LoadDefs('weaponDefs')\n";
+
+    fn none() -> Result<Option<String>, String> {
+        Ok(None)
+    }
+
+    fn hook_of(writer: u32, defs: Option<&str>, defs_post: Option<&str>) -> Hook {
+        hook(writer, defs, defs_post, none).unwrap()
+    }
+
+    #[test]
+    fn writer_4_hooks_a_game_that_skips_defs_post_at_weapondefs() {
+        assert_eq!(hook_of(4, None, None), Hook::DefsPost);
+        assert_eq!(hook_of(4, Some(OWN_DEFS), None), Hook::WeaponDefs);
+        assert_eq!(hook_of(4, None, Some("return {}")), Hook::WeaponDefs);
+    }
+
+    #[test]
+    fn writer_3_keeps_its_answer_and_does_not_read_weapondefs() {
+        let unread = || -> Result<Option<String>, String> { panic!("read") };
+        let got = hook(3, Some(OWN_DEFS), None, unread).unwrap();
+        assert!(matches!(got, Hook::Nowhere(why) if why.contains("never loads")));
+    }
+
+    #[test]
+    fn writer_4_finds_no_hook_when_weapondefs_would_miss_the_other_tables() {
+        let own_copy = hook(4, Some(OWN_DEFS), None, || Ok(Some("return {}".into()))).unwrap();
+        assert!(matches!(own_copy, Hook::Nowhere(_)));
+        // Splinter Faction's order.
+        let features_after = "DEFS.unitDefs = LoadDefs('unitDefs')\n\
+                              DEFS.weaponDefs = LoadDefs('weaponDefs')\n\
+                              DEFS.featureDefs = LoadDefs('featureDefs')\n";
+        assert!(matches!(
+            hook_of(4, Some(features_after), None),
+            Hook::Nowhere(_)
+        ));
+        let other_file = "DEFS.unitDefs = LoadDefs('unitDefs')\n\
+                          DEFS.featureDefs = LoadDefs('featureDefs')\n\
+                          DEFS.weaponDefs = LoadDefs('guns')\n";
+        assert!(matches!(
+            hook_of(4, Some(other_file), None),
+            Hook::Nowhere(_)
+        ));
+        assert!(matches!(
+            hook_of(4, Some("return LoadDefs('weaponDefs')"), None),
+            Hook::Nowhere(_)
+        ));
+    }
+
+    /// Runs the written file with a stand in for the engine's `weapondefs.lua`,
+    /// over the unit and feature defs a game's `defs.lua` has built by then.
+    #[test]
+    fn the_written_weapondefs_runs_the_engine_s_then_points_all_three_tables_at_the_models() {
+        let block = "-- fix: stand in\nDEFS.weaponDefs.gun.fixed = true\n";
+        let file = weapondefs(&keys(&["objects3d/armcom.s3o"]), Some(block), 1).expect("a file");
+        assert_eq!(file.path, WEAPONDEFS);
+        assert!(!file.contents.contains('\r'));
+        let root = tempfile::tempdir().unwrap();
+        let base = BTreeMap::from([(
+            root.path().join(WEAPONDEFS),
+            "BASE_RAN = true\nreturn { gun = { model = \"armcom\" } }\n".to_string(),
+        )]);
+        let lua = coilbox_springlua::SpringLua::with_files(root.path(), base).unwrap();
+        lua.eval_value(
+            "DEFS = { unitDefs = { a = { objectname = \"ARMCOM.3do\" } },\n\
+             featureDefs = { b = { object = \"armcom\" } } }\nreturn {}",
+            "setup",
+        )
+        .unwrap();
+        let returned = lua.eval_value_raw(&file.contents, WEAPONDEFS).unwrap();
+        assert_eq!(returned["gun"]["model"], "armcom.s3o");
+        assert_eq!(returned["gun"]["fixed"], true);
+        let after = lua
+            .eval_value_raw("return { defs = DEFS, base = BASE_RAN }", "check")
+            .unwrap();
+        assert_eq!(after["base"], true);
+        assert_eq!(after["defs"]["unitDefs"]["a"]["objectname"], "ARMCOM.s3o");
+        assert_eq!(after["defs"]["featureDefs"]["b"]["object"], "armcom.s3o");
+        assert_eq!(after["defs"]["weaponDefs"]["gun"]["model"], "armcom.s3o");
+    }
+
+    #[test]
+    fn nothing_to_do_at_weapondefs_writes_no_file() {
+        assert!(weapondefs(&BTreeSet::new(), None, 1).is_none());
     }
 
     #[test]

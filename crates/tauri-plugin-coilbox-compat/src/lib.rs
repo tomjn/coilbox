@@ -48,8 +48,7 @@ pub struct Built {
     /// The names of the polyfill gadgets written. Each decides when it loads
     /// whether the game needs it.
     pub gadgets: Vec<String>,
-    /// How many converted models `gamedata/defs_post.lua` points the game's
-    /// defs at, plus how many of the base game's unit and weapon defs the def
+    /// How many converted models the mutator points the game's defs at, plus how many of the base game's unit and weapon defs the def
     /// fixes change, counted on a read of its defs (see `defs::changed`).
     pub def_overrides: usize,
 }
@@ -334,11 +333,15 @@ fn write_with_models(
         Some(from) => models::list(from)?,
         None => Vec::new(),
     };
-    let post = models::defs_post(
-        &models::model_keys(&converted),
-        defs.defs_post.as_deref(),
-        manifest_version,
-    );
+    let keys = models::model_keys(&converted);
+    let fixes = defs.defs_post.as_deref();
+    let in_weapondefs =
+        models.hook == models::Hook::WeaponDefs || defs.hook == models::Hook::WeaponDefs;
+    let post = if in_weapondefs {
+        models::weapondefs(&keys, fixes, manifest_version)
+    } else {
+        models::defs_post(&keys, fixes, manifest_version)
+    };
     files.extend(
         post.into_iter()
             .chain(defs.weapondefs_post.clone())
@@ -1264,7 +1267,14 @@ mod tests {
             &handlers,
             read,
             |file| Ok(read(file)?.map(String::into_bytes)),
-            || models::convert_reading(read, || run_converter(staging.path()), staging.path()),
+            || {
+                models::convert_reading(
+                    manifest.writer,
+                    read,
+                    || run_converter(staging.path()),
+                    staging.path(),
+                )
+            },
             no_defs,
             |_| Ok(standins_answer(GOLDEN_STANDINS)),
         )
@@ -1529,6 +1539,10 @@ mod tests {
             22,
             "8da4ae7e814e44d94344efd9adb0fff9286e5f51dd15b8553789611f12290aae",
         ),
+        (
+            23,
+            "9cbc1ccfc4a6f588ace6ac13d1b5af86d16ed1e15d1eae84bbe50865ff7d99df",
+        ),
     ];
 
     #[test]
@@ -1581,6 +1595,7 @@ mod tests {
             },
             palette: Some(a_palette()),
             notes: Vec::new(),
+            hook: models::Hook::DefsPost,
         })
     }
 
@@ -1628,6 +1643,71 @@ mod tests {
         assert!(post.contains(r#"["armcom"] = true,"#), "{post}");
         assert_eq!(built.models.models_written, 1);
         assert!(mutator::read_marker(dir).is_some());
+    }
+
+    /// Issue #4628: a game whose own defs.lua never loads defs_post.lua gets its
+    /// models named and its def fixes run from weapondefs.lua, and the build of
+    /// the manifest before keeps its old answer.
+    #[test]
+    fn a_game_that_skips_defs_post_is_hooked_at_weapondefs_from_writer_4() {
+        const OWN_DEFS: &str = "DEFS.unitDefs = LoadDefs('unitDefs')\n\
+                                DEFS.featureDefs = LoadDefs('featureDefs')\n\
+                                DEFS.weaponDefs = LoadDefs('weaponDefs')\n";
+        let read = |file: &str| -> Result<Option<String>, String> {
+            Ok(match file {
+                "gamedata/defs.lua" => Some(OWN_DEFS.to_string()),
+                "gamedata/weapondefs_post.lua" => Some("-- the game's own\n".to_string()),
+                _ => None,
+            })
+        };
+        let build = |n: u32| {
+            let (keep, data) = root();
+            let staging = tempfile::tempdir().unwrap();
+            let writer = coilbox_compat::manifest(n).unwrap().writer;
+            let run = || {
+                some_models(staging.path()).map(|_| {
+                    r#"{"modelsFound":1,"modelsWritten":1,"palette":{"source":null,"sha256":null}}"#
+                        .to_string()
+                })
+            };
+            let built = build_reading(
+                &data,
+                "ba.sdz",
+                "BA",
+                &DeclaredGame::default(),
+                "1234abcd",
+                n,
+                "1.2.3",
+                &[],
+                read,
+                || models::convert_reading(writer, read, run, staging.path()),
+                no_defs,
+            )
+            .unwrap();
+            (keep, built)
+        };
+
+        let (_keep, new) = build(23);
+        assert!(new.files.iter().any(|f| f == models::WEAPONDEFS));
+        assert!(!new.files.iter().any(|f| f == models::DEFS_POST));
+        assert!(!new
+            .files
+            .iter()
+            .any(|f| f == "gamedata/weapondefs_post.lua"));
+        assert_eq!(new.models.models_written, 1);
+        let noted = |built: &Built, text: &str| built.notes.iter().any(|n| n.contains(text));
+        assert!(noted(&new, "ships its own gamedata/weapondefs_post.lua"));
+        assert!(!noted(&new, "never loads"), "{:?}", new.notes);
+        let text = std::fs::read_to_string(std::path::Path::new(&new.dir).join(models::WEAPONDEFS))
+            .unwrap();
+        assert!(text.contains(r#"["armcom"] = true,"#), "{text}");
+        assert!(text.contains("-- fix: defs-commander-85\n"), "{text}");
+        assert!(!text.contains("defs-manual-bomb-settings-92"), "{text}");
+
+        let (_keep, old) = build(22);
+        assert!(!old.files.iter().any(|f| f == models::WEAPONDEFS));
+        assert_eq!(old.models.models_written, 0);
+        assert!(noted(&old, "its models are not converted"));
     }
 
     /// Issue #4642: a build records the palette its models were coloured

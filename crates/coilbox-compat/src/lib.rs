@@ -65,6 +65,7 @@ const MANIFESTS: &[(u32, &str)] = &[
     (20, include_str!("../../../lua/compat/manifests/20.json")),
     (21, include_str!("../../../lua/compat/manifests/21.json")),
     (22, include_str!("../../../lua/compat/manifests/22.json")),
+    (23, include_str!("../../../lua/compat/manifests/23.json")),
 ];
 
 /// Every fix file, by id.
@@ -285,7 +286,7 @@ pub struct Converter {
 /// the bytes keeps the old behaviour for the writers that had it and puts the
 /// new one behind a new writer: move this, add a manifest that names it, and
 /// record the new writer's hashes beside the old ones.
-pub const WRITER: u32 = 3;
+pub const WRITER: u32 = 4;
 
 /// Whether this build can write a manifest that names `writer`.
 pub fn knows_writer(writer: u32) -> bool {
@@ -311,6 +312,14 @@ pub fn copies_entry_bytes(writer: u32) -> bool {
 /// it, and the converted file covered up the game's own model.
 pub fn keeps_game_s3o(writer: u32) -> bool {
     writer >= 3
+}
+
+/// Whether `writer` covers up the engine's `gamedata/weapondefs.lua` to name a
+/// game's converted models and run its def fixes, when the game never reaches
+/// `gamedata/defs_post.lua` (issue #4628). Writer 3 converted no models for such
+/// a game and ran none of those fixes.
+pub fn hooks_weapondefs(writer: u32) -> bool {
+    writer >= 4
 }
 
 /// The writer of manifests 1 and 2, which predate the `writer` field.
@@ -2266,14 +2275,25 @@ mod tests {
         }
     }
 
-    /// The preludes for manifests 9, 11, 12, 14, 15, 16, 17, 18, 19, 20, 21 and 22, as the Lua tests in
+    /// Issue #4628: manifest 23 is manifest 22 built with the writer that
+    /// hooks a game that never reaches defs_post.lua at weapondefs.lua.
+    #[test]
+    fn manifest_23_is_manifest_22_with_a_new_writer() {
+        let (twenty_two, twenty_three) = (manifest(22).unwrap(), manifest(23).unwrap());
+        assert_eq!(twenty_three.fixes, twenty_two.fixes);
+        assert_eq!(twenty_three.converter, twenty_two.converter);
+        assert!(!hooks_weapondefs(twenty_two.writer));
+        assert!(hooks_weapondefs(twenty_three.writer));
+    }
+
+    /// The preludes for manifests 9, 11, 12, 14, 15, 16, 17, 18, 19, 20, 21, 22 and 23, as the Lua tests in
     /// `lua/compat/tests/` load them. Earlier manifests' synced preludes call
     /// `rawget`, which the tests' synced state lacks, so they are not kept.
     /// `COILBOX_WRITE_FIXTURE=1` writes them again after a deliberate change to
     /// how a prelude is built.
     #[test]
     fn the_lua_tests_load_the_preludes_this_crate_builds() {
-        for n in [9, 11, 12, 14, 15, 16, 17, 18, 19, 20, 21, 22] {
+        for n in [9, 11, 12, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23] {
             let m = manifest(n).unwrap();
             for state in [LuaState::Synced, LuaState::Unsynced] {
                 let built = prelude(&m, state).unwrap();

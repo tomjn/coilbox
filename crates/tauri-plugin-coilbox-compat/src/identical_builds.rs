@@ -120,6 +120,7 @@ fn build_fixture(n: u32, game: &[(String, Vec<u8>)]) -> (tempfile::TempDir, Buil
         read,
         || {
             models::convert_reading(
+                coilbox_compat::manifest(n).unwrap().writer,
                 read,
                 || convert_into(game, staging.path()),
                 staging.path(),
