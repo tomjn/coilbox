@@ -20,6 +20,25 @@ describe("recogniseHandler", () => {
     expect(handler?.id).toBe(id);
   });
 
+  it.each([
+    ["LuaUI/widgets_evo.lua", "evo", "engine", ["LuaUI/Widgets_Evo"]],
+    ["luaui/jauriawidgets.lua", "jauria", "ca", ["LuaUI/Widgets"]],
+    ["luaui/mosaicwidgets.lua", "mosaic", "ba", ["LuaUI/widgets_mosaic"]],
+    ["luaui/tapwidgets.lua", "tap", "ba", ["LuaUI/Widgets_TAP"]],
+    ["LuaUI/config/iwui.config.lua", "iw", "engine", ["LuaUI/Widgets"]],
+  ])("recognises %s as %s", async (marker, id, family, folders) => {
+    const handler = await recogniseHandler(["luaui.lua", marker], none);
+    expect(handler).toEqual({ id, family, folders, subfolders: false });
+  });
+
+  it("does not take MOSAIC's or Total Annihilation Prime's main.lua for jK's", async () => {
+    const handler = await recogniseHandler(
+      ["luaui.lua", "LuaUI/main.lua", "LuaUI/tapwidgets.lua"],
+      async () => "VFS.Include(LUAUI_DIRNAME .. 'tapmain.lua')",
+    );
+    expect(handler?.id).toBe("tap");
+  });
+
   it("tells the pre-0.83 handler from the default one by what it saves", async () => {
     const files = ["LuaUI/widgets.lua"];
     const legacy = await recogniseHandler(
@@ -78,6 +97,9 @@ describe("HANDLER_FOLDERS", () => {
       "addons",
       "rmlwidgets",
       "widgets",
+      "widgets_evo",
+      "widgets_mosaic",
+      "widgets_tap",
     ]);
   });
 });

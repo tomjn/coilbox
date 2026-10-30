@@ -10,7 +10,8 @@
  * The markers and folders were read from the handlers in the games' own
  * archives: `bawidgets.lua`, `cawidgets.lua`, `mfwidgets.lua`,
  * `widgets_custom.lua`, Spring 1944's `config.lua` and the two `widgets.lua`
- * files. Beyond All Reason's come from the issue.
+ * files, plus `widgets_evo.lua`, `jauriawidgets.lua`, `mosaicwidgets.lua` and
+ * `tapwidgets.lua` (#4845). Beyond All Reason's come from the issue.
  *
  * Later issues in the Widget manager milestone add each handler's config file
  * (#1289) and its option that turns player widgets off (#1292) to
@@ -20,12 +21,13 @@
 
 /** The handlers that share one ancestor and work the same way. */
 export type HandlerFamily =
-  /** The engine's default handler: Metal Factions, Basically OTA, and
-   *  Splinter Faction's heavily changed fork. */
+  /** The engine's default handler: Metal Factions, Basically OTA, Evolution
+   *  RTS, Imperial Winter and Splinter Faction's heavily changed fork. */
   | "engine"
-  /** Balanced Annihilation's, which Beyond All Reason's grew from. */
+  /** Balanced Annihilation's, which Beyond All Reason's, MOSAIC's and Total
+   *  Annihilation Prime's grew from. */
   | "ba"
-  /** Complete Annihilation's, which Zero-K's grew from. */
+  /** Complete Annihilation's, which Zero-K's and Jauria RTS's grew from. */
   | "ca"
   /** jK's LuaHandler: Spring 1944. */
   | "jk"
@@ -85,6 +87,43 @@ const RULES: readonly Rule[] = [
     family: "engine",
     marker: "luaui/widgets_custom.lua",
     folders: ["LuaUI/widgets"],
+    subfolders: false,
+  },
+  {
+    id: "evo",
+    family: "engine",
+    marker: "luaui/widgets_evo.lua",
+    folders: ["LuaUI/Widgets_Evo"],
+    subfolders: false,
+  },
+  {
+    id: "jauria",
+    family: "ca",
+    marker: "luaui/jauriawidgets.lua",
+    folders: ["LuaUI/Widgets"],
+    subfolders: false,
+  },
+  {
+    id: "mosaic",
+    family: "ba",
+    marker: "luaui/mosaicwidgets.lua",
+    folders: ["LuaUI/widgets_mosaic"],
+    subfolders: false,
+  },
+  {
+    id: "tap",
+    family: "ba",
+    marker: "luaui/tapwidgets.lua",
+    folders: ["LuaUI/Widgets_TAP"],
+    subfolders: false,
+  },
+  {
+    // Ships a `luaui.lua` that starts the engine's own handler, so the only
+    // file that says it is Imperial Winter is its UI config.
+    id: "iw",
+    family: "engine",
+    marker: "luaui/config/iwui.config.lua",
+    folders: ["LuaUI/Widgets"],
     subfolders: false,
   },
   {
