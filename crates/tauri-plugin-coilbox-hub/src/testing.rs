@@ -130,7 +130,11 @@ async fn read_request(sock: &mut tokio::net::TcpStream) -> Option<(String, Strin
 /// Only a `POST` to the hub's `/api/v1/` routes counts as a request. Other
 /// programs on a developer machine probe new local ports with a `GET /`, and a
 /// stand-in that counted that would fail every assertion on a request count.
+/// The bytes are checked as they arrive, so a probe that sends a TLS
+/// `ClientHello` and waits for a reply is let go at once and does not hold up
+/// the requests behind it.
 async fn read_raw(sock: &mut tokio::net::TcpStream) -> Option<(String, Vec<u8>)> {
+    const ROUTES: &[u8] = b"post /api/v1/";
     let mut buf = Vec::new();
     let mut chunk = [0u8; 4096];
     let head_end = loop {
@@ -138,14 +142,15 @@ async fn read_raw(sock: &mut tokio::net::TcpStream) -> Option<(String, Vec<u8>)>
             Ok(0) | Err(_) => return None,
             Ok(n) => buf.extend_from_slice(&chunk[..n]),
         }
+        let seen = buf.len().min(ROUTES.len());
+        if !buf[..seen].eq_ignore_ascii_case(&ROUTES[..seen]) {
+            return None;
+        }
         if let Some(p) = buf.windows(4).position(|w| w == b"\r\n\r\n") {
             break p + 4;
         }
     };
     let head = String::from_utf8_lossy(&buf[..head_end]).to_ascii_lowercase();
-    if !head.starts_with("post /api/v1/") {
-        return None;
-    }
     let len: usize = head
         .lines()
         .find_map(|l| {

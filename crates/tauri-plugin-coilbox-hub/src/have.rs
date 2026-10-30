@@ -795,15 +795,32 @@ mod tests {
     /// `GET /` is no part of the have check, so it is not counted or answered.
     #[tokio::test]
     async fn a_stray_request_to_the_stand_in_hub_is_not_counted() {
+        use tokio::io::AsyncWriteExt as _;
         let hub = HaveServer::holding(&[]);
         let stray = reqwest::get(hub.url().replace("/api/v1/assets/have", "/")).await;
         assert!(stray.is_err(), "the stand-in answered a GET /");
 
-        ask_in_batches(&hub.url(), "a-token", &[unit("bar", "armsolar", "src-a")])
+        // A TLS ClientHello that is then held open, waiting for a reply.
+        let port = reqwest::Url::parse(&hub.url()).unwrap().port().unwrap();
+        let mut hello = tokio::net::TcpStream::connect(format!("127.0.0.1:{port}"))
+            .await
+            .unwrap();
+        hello
+            .write_all(&[0x16, 0x03, 0x01, 0x00, 0x04, 1, 2, 3, 4])
             .await
             .unwrap();
 
+        // The timeout only stops a hung stand-in from hanging the test run.
+        let asked = tokio::time::timeout(
+            std::time::Duration::from_secs(10),
+            ask_in_batches(&hub.url(), "a-token", &[unit("bar", "armsolar", "src-a")]),
+        )
+        .await
+        .expect("the stand-in was blocked by a connection that is not HTTP");
+        asked.unwrap();
+
         assert_eq!(hub.requests(), 1);
+        drop(hello);
     }
 
     #[tokio::test]
