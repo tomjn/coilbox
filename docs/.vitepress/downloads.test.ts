@@ -54,6 +54,7 @@ describe("resolveDownloads", () => {
     expect(found.macos.startsWith(RELEASE_PAGE)).toBe(true);
     expect(found.windows.startsWith(RELEASE_PAGE)).toBe(true);
     expect(found.linux.startsWith(RELEASE_PAGE)).toBe(true);
+    expect(found.label).toBe("Download:");
     expect(fetch).not.toHaveBeenCalled();
   });
 
@@ -74,9 +75,10 @@ describe("resolveDownloads", () => {
   it("reads the files of the latest release", async () => {
     vi.stubGlobal(
       "fetch",
-      vi.fn(async () => Response.json({ assets: RELEASE })),
+      vi.fn(async () => Response.json({ tag_name: "1.24.0", assets: RELEASE })),
     );
     const found = await resolveDownloads({ GH_TOKEN: "t" });
     expect(found.linux).toBe(url("Coilbox_1.24.0_amd64.AppImage"));
+    expect(found.label).toBe("Download v1.24.0:");
   });
 });
