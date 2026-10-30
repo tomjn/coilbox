@@ -21,6 +21,7 @@ import {
   removalFor,
   removeWidget,
 } from "../widgetRemoval";
+import { switchRestoredWidgets } from "../widgetSync";
 
 function fileName(path: string): string {
   return path.slice(path.lastIndexOf("/") + 1);
@@ -196,17 +197,22 @@ export function RemoveWidgetButton({
 export function RemovedNotice({
   removed,
   writeDir,
+  games,
   onRestored,
   onDismiss,
 }: {
   removed: RemovedWidget;
   writeDir: string;
+  games: readonly GameHandler[];
+  /** The files are back, so the page reads them. */
   onRestored: () => void;
   onDismiss: () => void;
 }) {
   const { t } = useLingui();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  /** The games whose config file could not be written, once restored. */
+  const [restored, setRestored] = useState<string[] | null>(null);
   const { name, backup, entries } = removed;
 
   const restore = async () => {
@@ -214,6 +220,17 @@ export function RemovedNotice({
     setError(null);
     try {
       await contentWidgetRestore({ writeDir, backup });
+      onRestored();
+      // Its state was forgotten when it went. Left alone, a game would read
+      // what the config file still holds, or the widget's own default, and may
+      // run it, so it comes back off.
+      setRestored(
+        await switchRestoredWidgets({
+          writeDir,
+          games,
+          names: removed.forgotten,
+        }),
+      );
       onRestored();
     } catch (e) {
       setError(describeError(e));
@@ -224,7 +241,14 @@ export function RemovedNotice({
 
   return (
     <div className="flex flex-col gap-2 rounded-md border border-border p-3 text-sm">
-      <p role="status">{t`Removed ${name}.`}</p>
+      <p role="status">
+        {restored ? t`Restored ${name}, switched off.` : t`Removed ${name}.`}
+      </p>
+      {restored?.map((line) => (
+        <p key={line} className="break-words text-xs text-destructive">
+          {t`Could not save the setting for ${line}`}
+        </p>
+      ))}
       <p className="break-all font-mono text-xs text-muted-foreground">
         {backup}
       </p>
@@ -244,16 +268,18 @@ export function RemovedNotice({
         </p>
       )}
       <div className="flex gap-2">
-        <Button
-          type="button"
-          variant="outline"
-          size="sm"
-          disabled={busy}
-          onClick={() => void restore()}
-        >
-          <Undo2 />
-          <Trans>Restore</Trans>
-        </Button>
+        {!restored && (
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            disabled={busy}
+            onClick={() => void restore()}
+          >
+            <Undo2 />
+            <Trans>Restore</Trans>
+          </Button>
+        )}
         <Button
           type="button"
           variant="outline"

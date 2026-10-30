@@ -159,6 +159,16 @@ describe("entryNames", () => {
       "Radar",
     ]);
   });
+
+  it("keeps a name a staying widget reads its state from as a previous name", () => {
+    const removal = removalFor([radar, radarTap], radar);
+    const renamed = row("LuaUI/Widgets/radar_new.lua", "Radar Mk2", [MF], {
+      previous: ["Radar"],
+    });
+    expect(entryNames(removal, [radar, radarTap, renamed], MF)).toEqual([
+      "Old Radar",
+    ]);
+  });
 });
 
 const nestedFile = [
@@ -383,6 +393,7 @@ describe("removeWidget", () => {
     ]);
     expect(out.backup).toBe("/data/widget-backups/1-radar");
     expect(out.entries).toBeNull();
+    expect(out.forgotten).toEqual(["Radar"]);
     expect(readSets()).toEqual({
       global: { Minimap: true },
       overrides: { mf: {} },

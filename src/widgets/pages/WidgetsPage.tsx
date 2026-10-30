@@ -192,10 +192,8 @@ export default function WidgetsPage() {
         <RemovedNotice
           removed={removed}
           writeDir={list.writeDir}
-          onRestored={() => {
-            setRemoved(null);
-            reread();
-          }}
+          games={list.games ?? []}
+          onRestored={reread}
           onDismiss={() => setRemoved(null)}
         />
       )}

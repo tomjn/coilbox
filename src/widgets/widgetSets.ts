@@ -225,6 +225,22 @@ export function addWidgets(
   };
 }
 
+/** Switch widgets off, said outright, in the global set and every game's own. */
+export function switchOff(
+  sets: WidgetSets,
+  names: readonly string[],
+): WidgetSets {
+  if (names.length === 0) return sets;
+  const off = Object.fromEntries(names.map((n) => [n, false]));
+  return {
+    ...sets,
+    global: { ...sets.global, ...off },
+    overrides: Object.fromEntries(
+      Object.entries(sets.overrides).map(([k, set]) => [k, { ...set, ...off }]),
+    ),
+  };
+}
+
 /** Forget removed widgets: take their names out of every set and out of what
  *  coilbox remembers writing to each config file. */
 export function dropWidgets(

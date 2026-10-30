@@ -17534,6 +17534,7 @@ msgid "Could not save the module"
 msgstr "无法保存模块"
 
 #: src/widgets/pages/AddWidgetDrawer.tsx
+#: src/widgets/pages/RemoveWidget.tsx
 msgid "Could not save the setting for {line}"
 msgstr ""
 
@@ -39618,6 +39619,10 @@ msgstr "恢复原始文件"
 #, fuzzy
 msgid "Restored {archive}'s original models and unit definitions."
 msgstr "已恢复 {archive} 的原始模型和单位定义。"
+
+#: src/widgets/pages/RemoveWidget.tsx
+msgid "Restored {name}, switched off."
+msgstr ""
 
 #: src/content/pages/components/Convert3doDrawer.tsx
 #, fuzzy

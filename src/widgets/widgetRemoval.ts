@@ -116,7 +116,9 @@ export function removalFor(
 // ---------------------------------------------------------------------------
 
 /** The names a game may hold an entry for this widget under: its own and the
- *  ones it had before, leaving out any that a widget staying installed uses. */
+ *  ones it had before, leaving out any that a widget staying installed uses,
+ *  by its name or by a name it had before, which it reads state from when its
+ *  own name has none. */
 export function entryNames(
   removal: Removal,
   rows: readonly WidgetRow[],
@@ -126,7 +128,7 @@ export function entryNames(
   const kept = new Set(
     rows
       .filter((r) => !removal.copies.includes(r) && r.loadedBy.includes(game))
-      .map(nameOf),
+      .flatMap((r) => [nameOf(r), ...(r.info?.previousNames ?? [])]),
   );
   return [removal.name, ...removal.previousNames]
     .filter((n, i, all) => all.indexOf(n) === i)
@@ -350,6 +352,9 @@ export interface RemovalResult {
   files: string[];
   /** The folder the files were copied to first. */
   backup: string;
+  /** The names taken out of the widget sets, which a restore switches off
+   *  again. */
+  forgotten: string[];
   /** The config files whose entries were removed. */
   entries: EntryRemoval | null;
 }
@@ -389,7 +394,8 @@ export async function removeWidget({
   const stays =
     name !== null &&
     rows.some((r) => !removal.copies.includes(r) && nameOf(r) === name);
-  if (name !== null && !stays) updateSets((s) => dropWidgets(s, [name]));
+  const forgotten = name !== null && !stays ? [name] : [];
+  updateSets((s) => dropWidgets(s, forgotten));
   let removed: EntryRemoval | null = null;
   if (entries) {
     try {
@@ -403,5 +409,10 @@ export async function removeWidget({
       removed = { files: [], backups: [], failed: [errorText(e)] };
     }
   }
-  return { files: done.files, backup: done.backup, entries: removed };
+  return {
+    files: done.files,
+    backup: done.backup,
+    forgotten,
+    entries: removed,
+  };
 }

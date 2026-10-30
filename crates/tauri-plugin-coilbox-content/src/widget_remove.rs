@@ -52,21 +52,31 @@ fn key(rel: &Path) -> String {
         .join("/")
 }
 
-/// The files under `dir` that can be copied, as paths relative to `write_dir`.
-/// A link to a folder is not followed.
+/// The files under `dir`, as paths relative to `write_dir`. A link to a file
+/// counts as that file. Anything that cannot be copied (a link to a folder or to
+/// nothing, an entry that cannot be read) is an error, because the folder is
+/// deleted whole and would lose it with no copy.
 fn files_under(write_dir: &Path, dir: &Path, out: &mut Vec<String>) -> Result<(), String> {
     let entries =
         std::fs::read_dir(dir).map_err(|e| format!("could not read {}: {e}", dir.display()))?;
-    let mut paths: Vec<PathBuf> = entries.flatten().map(|e| e.path()).collect();
+    let mut paths: Vec<PathBuf> = Vec::new();
+    for entry in entries {
+        let entry = entry.map_err(|e| format!("could not read {}: {e}", dir.display()))?;
+        paths.push(entry.path());
+    }
     paths.sort();
     for path in paths {
-        let Ok(meta) = std::fs::symlink_metadata(&path) else {
-            continue;
-        };
+        let meta = std::fs::symlink_metadata(&path)
+            .map_err(|e| format!("could not read {}: {e}", path.display()))?;
         if meta.is_dir() {
             files_under(write_dir, &path, out)?;
         } else if std::fs::metadata(&path).is_ok_and(|m| m.is_file()) {
             out.push(key(path.strip_prefix(write_dir).unwrap_or(&path)));
+        } else {
+            return Err(format!(
+                "{} cannot be copied to the backup, so nothing was removed",
+                path.display()
+            ));
         }
     }
     Ok(())
@@ -392,6 +402,27 @@ mod tests {
         let file = strings(&["LuaUI/Widgets/Pack/gui_p.lua"]);
         assert!(remove(&write, &file, &file, None, &backups).is_err());
         assert!(write.join("LuaUI/Widgets/readme.txt").is_file());
+        assert!(write.join("LuaUI/Widgets/Pack/gui_p.lua").is_file());
+        assert!(!backups.exists());
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn a_folder_holding_something_that_cannot_be_copied_is_not_removed() {
+        let (tmp, write, backups) = setup();
+        put(&write, "LuaUI/Widgets/Pack/gui_p.lua", "p");
+        let elsewhere = tmp.path().join("elsewhere");
+        std::fs::create_dir_all(&elsewhere).unwrap();
+        std::os::unix::fs::symlink(&elsewhere, write.join("LuaUI/Widgets/Pack/linked")).unwrap();
+        let err = remove(
+            &write,
+            &strings(&["LuaUI/Widgets/Pack/gui_p.lua"]),
+            &strings(&["LuaUI/Widgets/Pack"]),
+            None,
+            &backups,
+        )
+        .unwrap_err();
+        assert!(err.contains("linked"), "{err}");
         assert!(write.join("LuaUI/Widgets/Pack/gui_p.lua").is_file());
         assert!(!backups.exists());
     }

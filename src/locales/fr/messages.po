@@ -17534,6 +17534,7 @@ msgid "Could not save the module"
 msgstr "Impossible d’enregistrer le module"
 
 #: src/widgets/pages/AddWidgetDrawer.tsx
+#: src/widgets/pages/RemoveWidget.tsx
 msgid "Could not save the setting for {line}"
 msgstr ""
 
@@ -39618,6 +39619,10 @@ msgstr "Restaurer les originaux"
 #, fuzzy
 msgid "Restored {archive}'s original models and unit definitions."
 msgstr "Modèles d’origine et définitions d’unités de {archive} restaurés."
+
+#: src/widgets/pages/RemoveWidget.tsx
+msgid "Restored {name}, switched off."
+msgstr ""
 
 #: src/content/pages/components/Convert3doDrawer.tsx
 #, fuzzy

@@ -14214,6 +14214,7 @@ msgid "Could not save the module"
 msgstr "Could not save the module"
 
 #: src/widgets/pages/AddWidgetDrawer.tsx
+#: src/widgets/pages/RemoveWidget.tsx
 msgid "Could not save the setting for {line}"
 msgstr "Could not save the setting for {line}"
 
@@ -32124,6 +32125,10 @@ msgstr "Restore originals"
 #: src/content/pages/components/Convert3doDrawer.tsx
 msgid "Restored {archive}'s original models and unit definitions."
 msgstr "Restored {archive}'s original models and unit definitions."
+
+#: src/widgets/pages/RemoveWidget.tsx
+msgid "Restored {name}, switched off."
+msgstr "Restored {name}, switched off."
 
 #: src/content/pages/components/Convert3doDrawer.tsx
 msgid "Restored {restored, plural, one {# file} other {# files}} to how they were before the install."

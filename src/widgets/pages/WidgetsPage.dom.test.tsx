@@ -145,6 +145,7 @@ vi.mock("@/content/bindings", async () => {
       return { files: args.files, backup: "/data/widget-backups/1-buildwatch" };
     },
     contentWidgetRestore: async () => ["LuaUI/Widgets/gui_build_watch.lua"],
+    contentPlayerWidgets: async () => scan,
   };
 });
 
@@ -359,8 +360,11 @@ describe("WidgetsPage", () => {
     expect(screen.getByText("/data/widget-backups/1-buildwatch")).toBeTruthy();
     fireEvent.click(screen.getByRole("button", { name: "Restore" }));
     await waitFor(() =>
-      expect(screen.queryByText("Removed BuildWatch.")).toBeNull(),
+      expect(
+        screen.getByText("Restored BuildWatch, switched off."),
+      ).toBeTruthy(),
     );
+    expect(readSets().global).toEqual({ BuildWatch: false, Other: true });
   });
 
   it("offers no way to remove coilbox's own widget", () => {
