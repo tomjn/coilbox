@@ -10,10 +10,14 @@ import "./custom.css";
 // The backdrop goes in the `layout-top` slot, but it is fixed to the viewport,
 // so where it lands in the DOM decides only what it paints behind rather than
 // where it appears.
+//
+// The `home-hero-info-after` slot sits just above the hero's buttons, so the
+// top menu's Download item can scroll to them on a narrow screen.
 export default {
   extends: DefaultTheme,
   Layout: () =>
     h(DefaultTheme.Layout, null, {
       "layout-top": () => h(ArtBackdrop),
+      "home-hero-info-after": () => h("span", { id: "download" }),
     }),
 };

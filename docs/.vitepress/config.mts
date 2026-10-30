@@ -1,6 +1,9 @@
 import { writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { defineConfig } from "vitepress";
+import { resolveDownloads } from "./downloads";
+
+const downloads = await resolveDownloads();
 
 // The public gallery, where people share what they make in Coilbox. Kept as one
 // constant because it is linked from the nav, the sidebar and two places on the
@@ -86,10 +89,7 @@ export default defineConfig({
       },
       { text: "Reference", link: "/reference/", activeMatch: "^/reference/" },
       { text: "Hub", link: HUB_URL },
-      {
-        text: "Download",
-        link: "https://github.com/tomjn/coilbox/releases/latest",
-      },
+      { text: "Download", link: "/#download" },
     ],
     // One sidebar per kind of reader, chosen by the folder a page is in, so a
     // player never has to scan past file formats and a game developer never
@@ -292,6 +292,32 @@ export default defineConfig({
       copyright: "Coilbox",
     },
     search: { provider: "local" },
+  },
+  // Frontmatter is static, so the home page's download addresses arrive here.
+  // `_self` stops each download opening an empty tab.
+  transformPageData(pageData) {
+    if (pageData.relativePath !== "index.md") return;
+    pageData.frontmatter.downloads = downloads;
+    pageData.frontmatter.hero.actions.unshift(
+      {
+        theme: "brand",
+        text: "macOS (Apple Silicon)",
+        link: downloads.macos,
+        target: "_self",
+      },
+      {
+        theme: "brand",
+        text: "Windows",
+        link: downloads.windows,
+        target: "_self",
+      },
+      {
+        theme: "brand",
+        text: "Linux",
+        link: downloads.linux,
+        target: "_self",
+      },
+    );
   },
   buildEnd({ outDir, site }) {
     for (const [from, to] of Object.entries(MOVED)) {

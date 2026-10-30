@@ -1,4 +1,22 @@
 /*
+ * The hero's first three buttons are the downloads. An empty full-width flex
+ * item between them and the rest keeps them together on a row of their own.
+ */
+.VPHero .actions::after {
+  content: "";
+  flex-basis: 100%;
+  order: 1;
+}
+
+.VPHero .action:nth-child(n + 4) {
+  order: 2;
+}
+
+.VPHero .action:nth-child(-n + 3) a::before {
+  content: "\2193\00a0" / "";
+}
+
+/*
  * The illustration behind a page (see ArtBackdrop.vue). Fixed to the viewport
  * rather than the page, so it stays put while the content scrolls over it.
  *

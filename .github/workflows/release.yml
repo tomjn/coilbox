@@ -411,6 +411,10 @@ jobs:
   publish-release:
     needs: [prepare-release, build]
     runs-on: ubuntu-latest
+    # Job permissions replace the workflow's, so contents: write is repeated here.
+    permissions:
+      contents: write
+      actions: write
     env:
       GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       GH_REPO: ${{ github.repository }}
@@ -475,3 +479,10 @@ jobs:
 
       - name: Publish the release
         run: gh release edit "$VER" --draft=false
+
+      # Point the website's download buttons at the new files. A release published
+      # with GITHUB_TOKEN fires no release event, so this has to be an explicit
+      # start. The release is already public, so a failure here must not fail it.
+      - name: Deploy the website
+        continue-on-error: true
+        run: gh workflow run pages.yml --ref main
