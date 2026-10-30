@@ -16,10 +16,15 @@ export interface NotifyInput {
   level?: NotifyLevel;
   /** Optional in-app route the topbar history entry links to when clicked. */
   to?: string;
+  /** Keep the toast up until it is dismissed, rather than letting it time out. */
+  sticky?: boolean;
 }
 
-function showToast({ title, body, level = "info" }: NotifyInput): void {
-  const opts = body ? { description: body } : undefined;
+function showToast({ title, body, level = "info", sticky }: NotifyInput): void {
+  const opts = {
+    ...(body && { description: body }),
+    ...(sticky && { duration: Number.POSITIVE_INFINITY, closeButton: true }),
+  };
   if (level === "success") toast.success(title, opts);
   else if (level === "warning") toast.warning(title, opts);
   else if (level === "error") toast.error(title, opts);

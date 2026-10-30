@@ -22,6 +22,8 @@ const backend = vi.hoisted(() => {
   return {
     saved,
     waiting,
+    /** What the next load answers, or rejects with if it is an `Error`. */
+    loaded: { entries: {}, recoveredCopy: null } as unknown,
     /** Finish the oldest save in flight, then let what it unblocked start. */
     async releaseOne() {
       await tick();
@@ -38,7 +40,11 @@ const backend = vi.hoisted(() => {
 
 vi.mock("@tauri-apps/api/core", () => ({
   invoke: (command: string, args?: { entries: Record<string, string> }) => {
-    if (command === "app_settings_load") return Promise.resolve({});
+    if (command === "app_settings_load") {
+      return backend.loaded instanceof Error
+        ? Promise.reject(backend.loaded)
+        : Promise.resolve(backend.loaded);
+    }
     backend.saved.push({ ...args?.entries });
     return new Promise((resolve, reject) => {
       backend.waiting.push({
@@ -57,6 +63,7 @@ import { createTauriSettingsStorage } from "./settings-storage";
 beforeEach(() => {
   backend.saved.length = 0;
   backend.waiting.length = 0;
+  backend.loaded = { entries: {}, recoveredCopy: null };
   installSettingsStorage(null);
 });
 
@@ -124,5 +131,50 @@ describe("waiting for a settings write", () => {
     await backend.releaseOne();
     expect(await settled(written)).toBe(true);
     expect(backend.saved.at(-1)).toEqual({ "hub.assetUploads": "false" });
+  });
+});
+
+describe("a settings file that failed to load", () => {
+  it("starts from what was kept and saves over the moved file's place", async () => {
+    backend.loaded = {
+      entries: { "theme.accent": '"blue"' },
+      recoveredCopy: "/data/settings.corrupt-1.json",
+    };
+    const storage = await createTauriSettingsStorage();
+    expect(storage.loadProblem).toEqual({
+      copy: "/data/settings.corrupt-1.json",
+    });
+    expect(storage.hadSettings).toBe(true);
+
+    storage.set("hub.assetUploads", "true");
+    await backend.releaseOne();
+    expect(backend.saved).toEqual([
+      { "theme.accent": '"blue"', "hub.assetUploads": "true" },
+    ]);
+  });
+
+  it("counts as having had settings even with nothing kept", async () => {
+    backend.loaded = { entries: {}, recoveredCopy: "/data/copy.json" };
+    expect((await createTauriSettingsStorage()).hadSettings).toBe(true);
+  });
+
+  /** The file is still there and may be fine, so nothing may replace it. */
+  it("never saves when the file could not be moved aside", async () => {
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    backend.loaded = new Error("could not read settings");
+    const storage = await createTauriSettingsStorage();
+    expect(storage.loadProblem).toEqual({ copy: null });
+    expect(storage.hadSettings).toBe(true);
+
+    storage.set("hub.assetUploads", "true");
+    await storage.flush?.();
+    expect(backend.saved).toEqual([]);
+    expect(storage.get("hub.assetUploads")).toBe("true");
+  });
+
+  it("is not a problem on a new install or a good file", async () => {
+    const storage = await createTauriSettingsStorage();
+    expect(storage.loadProblem).toBeNull();
+    expect(storage.hadSettings).toBe(false);
   });
 });

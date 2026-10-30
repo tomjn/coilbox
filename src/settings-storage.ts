@@ -6,6 +6,11 @@ import {
 } from "./lib/storedSetting";
 import { notify } from "./notify/notify";
 
+/** A settings file that failed to load, and where it went if it was moved. */
+export interface SettingsLoadProblem {
+  copy: string | null;
+}
+
 /**
  * A Tauri-app-data-backed `SettingsStorage` for the frame's `useSetting`. The
  * frame's interface is synchronous (`get`/`set` return immediately), but Tauri
@@ -26,17 +31,32 @@ import { notify } from "./notify/notify";
  * already on. A notification is right here where it was wrong for a background
  * backfill (#1690): somebody changed a setting, so somebody is looking at the
  * screen, and the answer they were given is untrue until they are told.
+ *
+ * A file that failed to load must never be overwritten by a map that started
+ * from nothing (issue #4897). The backend moves a bad file aside before answering.
+ * If it could do neither, the file is still there and possibly fine, so this
+ * session keeps its changes in memory and writes nothing.
  */
 export async function createTauriSettingsStorage(): Promise<
-  FlushableSettingsStorage & { loadedKeyCount: number }
+  FlushableSettingsStorage & {
+    hadSettings: boolean;
+    loadProblem: SettingsLoadProblem | null;
+  }
 > {
   const cache = new Map<string, string>();
+  let loadProblem: SettingsLoadProblem | null = null;
   try {
-    const entries = await invoke<Record<string, string>>("app_settings_load");
+    const { entries, recoveredCopy } = await invoke<{
+      entries: Record<string, string>;
+      recoveredCopy: string | null;
+    }>("app_settings_load");
     for (const [k, v] of Object.entries(entries)) cache.set(k, v);
+    if (recoveredCopy !== null) loadProblem = { copy: recoveredCopy };
   } catch (e) {
-    console.error("settings: failed to load settings; starting empty", e);
+    console.error("settings: failed to load settings; not saving", e);
+    loadProblem = { copy: null };
   }
+  const canSave = loadProblem?.copy !== null;
 
   // Whether the save before this one failed, so a disk that has stopped taking
   // writes is said once rather than once per setting anybody touches.
@@ -68,7 +88,7 @@ export async function createTauriSettingsStorage(): Promise<
     get: (key) => cache.get(key) ?? null,
     set: (key, value) => {
       cache.set(key, value);
-      persist();
+      if (canSave) persist();
     },
     // The queue as it stands, so awaiting it waits for every write made before
     // the call and for none made after. Each write persists the whole map, so
@@ -78,7 +98,29 @@ export async function createTauriSettingsStorage(): Promise<
     flush: () => queue.then(() => undefined),
   };
   installSettingsStorage(storage);
-  // How many settings the file held, so onboarding can tell an existing
-  // install from a fresh one before anything writes.
-  return Object.assign(storage, { loadedKeyCount: cache.size });
+  // Whether a settings file was here, so onboarding can tell an existing install
+  // from a fresh one before anything writes. A file that failed to load counts,
+  // whatever could be kept from it.
+  return Object.assign(storage, {
+    hadSettings: cache.size > 0 || loadProblem !== null,
+    loadProblem,
+  });
+}
+
+/**
+ * Tell the player their settings could not be read. Separate from loading because
+ * the catalog is not loaded yet at that point, and this has to be in their language.
+ * It stays up until dismissed, because the path in it is the way back.
+ */
+export function announceSettingsLoadProblem({
+  copy,
+}: SettingsLoadProblem): void {
+  void notify({
+    level: "error",
+    sticky: true,
+    title:
+      copy === null
+        ? t`Your settings could not be read, so changes will not be saved until Coilbox restarts.`
+        : t`Your settings could not be read. The old file is kept at ${copy}`,
+  });
 }

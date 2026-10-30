@@ -56,9 +56,9 @@ export function addSettled(
  */
 export function seedExistingInstall(
   storage: { get(k: string): string | null; set(k: string, v: string): void },
-  loadedKeyCount: number,
+  hadSettings: boolean,
 ): void {
   if (storage.get(SETTLED_KEY) !== null) return;
-  const ids = loadedKeyCount > 0 ? [...PAGE_IDS, ...BACKGROUND_IDS] : [];
+  const ids = hadSettings ? [...PAGE_IDS, ...BACKGROUND_IDS] : [];
   storage.set(SETTLED_KEY, JSON.stringify(ids));
 }
