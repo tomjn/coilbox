@@ -1306,7 +1306,17 @@ msgstr "最新发行版中的 {0}"
 
 #. placeholder {0}: game.game
 #: src/widgets/pages/WidgetsPage.tsx
+msgid "{0} has not saved its widget settings yet. Start it once to switch widgets on or off here."
+msgstr ""
+
+#. placeholder {0}: game.game
+#: src/widgets/pages/WidgetsPage.tsx
 msgid "{0} loads none of your widgets."
+msgstr ""
+
+#. placeholder {0}: row.info.name
+#: src/widgets/pages/WidgetsPage.tsx
+msgid "{0} on"
 msgstr ""
 
 #. placeholder {0}: formatRate(value)
@@ -8523,6 +8533,10 @@ msgstr "游戏正在运行，而此文件是它会写入的文件。{label} 在�
 msgid "A game is running, and coilbox does not know where this engine writes, so it cannot tell whether the game will write this file back over. {label} writes its whole blueprints file back when it saves or exits, so anything written now would be thrown away. Close the game and try again."
 msgstr "游戏正在运行，而 coilbox 不知道此引擎会写入哪里，因此无法判断游戏是否会覆盖此文件。{label} 在保存或退出时会写回整个蓝图文件，因此现在写入的内容都会被丢弃。请关闭游戏后重试。"
 
+#: src/widgets/widgetConfig.ts
+msgid "A game is running, and it writes this file back when it exits, so anything written now would be lost. Close the game and try again."
+msgstr ""
+
 #: src/scenario/pages/components/BlueprintPanel.tsx
 #, fuzzy
 msgid "A game is running. {gameLabel} writes its whole blueprints file back when it saves or exits, so coilbox will not write into it until the game is closed."
@@ -15203,6 +15217,10 @@ msgstr "关闭模型视图"
 msgid "Close protocol console"
 msgstr "关闭协议控制台"
 
+#: src/widgets/pages/WidgetsPage.tsx
+msgid "Close the game to switch widgets on or off."
+msgstr ""
+
 #: src/multiplayer/DebriefingDrawer.tsx
 #, fuzzy
 msgid "Close the match result"
@@ -15431,6 +15449,10 @@ msgstr "coilbox 无法读取"
 #, fuzzy
 msgid "Coilbox could not read {game}: {said}"
 msgstr "Coilbox 无法读取 {game}：{said}"
+
+#: src/widgets/widgetConfig.ts
+msgid "Coilbox could not read this file: {reason}"
+msgstr ""
 
 #: src/runlite/unitLimit.ts
 #, fuzzy
@@ -33822,6 +33844,7 @@ msgstr "最早优先"
 
 #: src/play/modOptions.ts
 #: src/profile/SettingsSection.tsx
+#: src/widgets/pages/WidgetsPage.tsx
 #, fuzzy
 msgid "On"
 msgstr "开"
@@ -48861,6 +48884,10 @@ msgstr "此游戏没有该名称的单位，所以按钮不会起作用。"
 #, fuzzy
 msgid "This game has none of its units: {list}. Nothing in it can be placed here, so it belongs to another game or another version of this one."
 msgstr "此游戏中没有以下单位：{list}。其中没有任何内容可以放置在这里，所以它属于另一款游戏或此游戏的另一个版本。"
+
+#: src/widgets/widgetConfig.ts
+msgid "This game has not saved its widget settings yet. Start it once, then try again."
+msgstr ""
 
 #: src/content/pages/components/states.tsx
 #, fuzzy

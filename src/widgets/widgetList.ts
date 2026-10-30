@@ -14,6 +14,8 @@ import { loads, type WidgetHandler } from "./handlers";
 export interface GameHandler {
   /** The game's name as unitsync reports it, version and all. */
   game: string;
+  /** Its modinfo short name, which names the file its handler saves to. */
+  shortName?: string;
   handler: WidgetHandler | null;
 }
 

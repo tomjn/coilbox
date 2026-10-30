@@ -1306,7 +1306,17 @@ msgstr "{0} з найновішого випуску"
 
 #. placeholder {0}: game.game
 #: src/widgets/pages/WidgetsPage.tsx
+msgid "{0} has not saved its widget settings yet. Start it once to switch widgets on or off here."
+msgstr ""
+
+#. placeholder {0}: game.game
+#: src/widgets/pages/WidgetsPage.tsx
 msgid "{0} loads none of your widgets."
+msgstr ""
+
+#. placeholder {0}: row.info.name
+#: src/widgets/pages/WidgetsPage.tsx
+msgid "{0} on"
 msgstr ""
 
 #. placeholder {0}: formatRate(value)
@@ -8523,6 +8533,10 @@ msgstr "Гра запущена, і цей файл вона записує. {la
 msgid "A game is running, and coilbox does not know where this engine writes, so it cannot tell whether the game will write this file back over. {label} writes its whole blueprints file back when it saves or exits, so anything written now would be thrown away. Close the game and try again."
 msgstr "Гра запущена, а coilbox не знає, куди пише цей рушій, тож не може сказати, чи гра перезапише цей файл. {label} записує весь свій файл креслень під час збереження чи виходу, тому все, що записано зараз, буде втрачено. Закрийте гру й спробуйте знову."
 
+#: src/widgets/widgetConfig.ts
+msgid "A game is running, and it writes this file back when it exits, so anything written now would be lost. Close the game and try again."
+msgstr ""
+
 #: src/scenario/pages/components/BlueprintPanel.tsx
 #, fuzzy
 msgid "A game is running. {gameLabel} writes its whole blueprints file back when it saves or exits, so coilbox will not write into it until the game is closed."
@@ -15203,6 +15217,10 @@ msgstr "Закрити перегляд моделі"
 msgid "Close protocol console"
 msgstr "Закрити консоль протоколу"
 
+#: src/widgets/pages/WidgetsPage.tsx
+msgid "Close the game to switch widgets on or off."
+msgstr ""
+
 #: src/multiplayer/DebriefingDrawer.tsx
 #, fuzzy
 msgid "Close the match result"
@@ -15431,6 +15449,10 @@ msgstr "не вдалося прочитати"
 #, fuzzy
 msgid "Coilbox could not read {game}: {said}"
 msgstr "Не вдалося прочитати {game}: {said}"
+
+#: src/widgets/widgetConfig.ts
+msgid "Coilbox could not read this file: {reason}"
+msgstr ""
 
 #: src/runlite/unitLimit.ts
 #, fuzzy
@@ -33822,6 +33844,7 @@ msgstr "Найстаріші"
 
 #: src/play/modOptions.ts
 #: src/profile/SettingsSection.tsx
+#: src/widgets/pages/WidgetsPage.tsx
 #, fuzzy
 msgid "On"
 msgstr "Увімкнено"
@@ -48861,6 +48884,10 @@ msgstr "Ця гра не має юніта з такою назвою, тож к
 #, fuzzy
 msgid "This game has none of its units: {list}. Nothing in it can be placed here, so it belongs to another game or another version of this one."
 msgstr "Ця гра не має жодного з його юнітів: {list}. Тут нічого з нього не можна розмістити, тож він належить іншій грі або іншій версії цієї."
+
+#: src/widgets/widgetConfig.ts
+msgid "This game has not saved its widget settings yet. Start it once, then try again."
+msgstr ""
 
 #: src/content/pages/components/states.tsx
 #, fuzzy

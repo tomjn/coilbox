@@ -151,7 +151,11 @@ export function useWidgetList() {
           console.warn(`could not read ${game.name}'s widget handler`, e);
         }
         if (cancelled) return;
-        found.push({ game: game.name, handler });
+        found.push({
+          game: game.name,
+          shortName: game.info.shortname?.trim() || undefined,
+          handler,
+        });
       }
       setGames(found);
     })();

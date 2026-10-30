@@ -1079,7 +1079,17 @@ msgstr ""
 
 #. placeholder {0}: game.game
 #: src/widgets/pages/WidgetsPage.tsx
+msgid "{0} has not saved its widget settings yet. Start it once to switch widgets on or off here."
+msgstr ""
+
+#. placeholder {0}: game.game
+#: src/widgets/pages/WidgetsPage.tsx
 msgid "{0} loads none of your widgets."
+msgstr ""
+
+#. placeholder {0}: row.info.name
+#: src/widgets/pages/WidgetsPage.tsx
+msgid "{0} on"
 msgstr ""
 
 #. placeholder {0}: formatRate(value)
@@ -6874,6 +6884,10 @@ msgstr ""
 msgid "A game is running, and coilbox does not know where this engine writes, so it cannot tell whether the game will write this file back over. {label} writes its whole blueprints file back when it saves or exits, so anything written now would be thrown away. Close the game and try again."
 msgstr ""
 
+#: src/widgets/widgetConfig.ts
+msgid "A game is running, and it writes this file back when it exits, so anything written now would be lost. Close the game and try again."
+msgstr ""
+
 #: src/scenario/pages/components/BlueprintPanel.tsx
 msgid "A game is running. {gameLabel} writes its whole blueprints file back when it saves or exits, so coilbox will not write into it until the game is closed."
 msgstr ""
@@ -12296,6 +12310,10 @@ msgstr ""
 msgid "Close protocol console"
 msgstr ""
 
+#: src/widgets/pages/WidgetsPage.tsx
+msgid "Close the game to switch widgets on or off."
+msgstr ""
+
 #: src/multiplayer/DebriefingDrawer.tsx
 msgid "Close the match result"
 msgstr ""
@@ -12480,6 +12498,10 @@ msgstr ""
 
 #: src/hub/pages/components/GamePicturesControl.tsx
 msgid "Coilbox could not read {game}: {said}"
+msgstr ""
+
+#: src/widgets/widgetConfig.ts
+msgid "Coilbox could not read this file: {reason}"
 msgstr ""
 
 #: src/runlite/unitLimit.ts
@@ -27379,6 +27401,7 @@ msgstr ""
 
 #: src/play/modOptions.ts
 #: src/profile/SettingsSection.tsx
+#: src/widgets/pages/WidgetsPage.tsx
 msgid "On"
 msgstr ""
 
@@ -39548,6 +39571,10 @@ msgstr ""
 
 #: src/blueprint/units.ts
 msgid "This game has none of its units: {list}. Nothing in it can be placed here, so it belongs to another game or another version of this one."
+msgstr ""
+
+#: src/widgets/widgetConfig.ts
+msgid "This game has not saved its widget settings yet. Start it once, then try again."
 msgstr ""
 
 #: src/content/pages/components/states.tsx

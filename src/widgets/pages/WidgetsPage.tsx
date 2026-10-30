@@ -6,6 +6,7 @@ import { useSearchParams } from "react-router";
 import { OptionSelect } from "@/components/OptionSelect";
 import { PageHeader } from "@/components/PageHeader";
 import { Badge } from "@/components/ui/badge";
+import { Switch } from "@/components/ui/switch";
 import {
   Table,
   TableBody,
@@ -23,6 +24,7 @@ import {
   SkeletonList,
 } from "@/content/pages/components/states";
 import { useWidgetList } from "../useWidgetList";
+import { useWidgetSwitches } from "../useWidgetSwitches";
 import { folderToOpen, rowsForGame, type WidgetRow } from "../widgetList";
 
 /** The picker's value for the list of every widget file. Not empty, because
@@ -40,6 +42,7 @@ export default function WidgetsPage() {
   const list = useWidgetList();
   const picked = params.get("game") ?? ALL;
   const game = list.games?.find((g) => g.game === picked);
+  const switches = useWidgetSwitches(list.writeDir, game);
 
   const shown = useMemo(() => {
     if (!list.rows) return null;
@@ -89,7 +92,10 @@ export default function WidgetsPage() {
               <Button
                 variant="outline"
                 size="sm"
-                onClick={() => void list.reload()}
+                onClick={() => {
+                  void list.reload();
+                  void switches.reload();
+                }}
                 disabled={list.reading}
               >
                 <RefreshCw />
@@ -125,6 +131,21 @@ export default function WidgetsPage() {
         </p>
       )}
 
+      {switches.error && <ErrorBanner message={switches.error} />}
+      {game && switches.state.kind === "missing" && (
+        <p role="status" className="text-sm text-muted-foreground">
+          <Trans>
+            {game.game} has not saved its widget settings yet. Start it once to
+            switch widgets on or off here.
+          </Trans>
+        </p>
+      )}
+      {switches.state.kind === "ready" && switches.running && (
+        <p role="status" className="text-sm text-muted-foreground">
+          <Trans>Close the game to switch widgets on or off.</Trans>
+        </p>
+      )}
+
       {list.targets.length === 0 ? null : !list.locating && !list.writeDir ? (
         <EmptyState
           icon={Puzzle}
@@ -147,6 +168,16 @@ export default function WidgetsPage() {
             rows={shown}
             showGames={!game && list.gamesKnown}
             someUnknown={!!list.games?.some((g) => g.handler === null)}
+            switches={
+              switches.state.kind === "ready"
+                ? {
+                    order: switches.state.order,
+                    disabled: switches.running,
+                    writing: switches.writing,
+                    toggle: (name, on) => void switches.toggle(name, on),
+                  }
+                : undefined
+            }
           />
         )
       )}
@@ -158,22 +189,49 @@ function fileName(path: string): string {
   return path.slice(path.lastIndexOf("/") + 1);
 }
 
+/** What the table needs to show a switch on each widget of one game. */
+interface TableSwitches {
+  /** The game's order table: `0` is off, anything else on. */
+  order: ReadonlyMap<string, number>;
+  disabled: boolean;
+  /** The widget being written, whose switch waits for it. */
+  writing: string | null;
+  toggle: (name: string, on: boolean) => void;
+}
+
+/** Whether the game loads a widget, from its entry in the order table, or
+ *  when it has none from what the widget declares, as the handler decides
+ *  for a widget it has not seen. */
+function isOn(row: WidgetRow, order: ReadonlyMap<string, number>): boolean {
+  const name = row.info?.name;
+  const entry = name ? order.get(name) : undefined;
+  return entry === undefined ? row.info?.enabled === true : entry > 0;
+}
+
 function WidgetTable({
   rows,
   showGames,
   someUnknown,
+  switches,
 }: {
   rows: readonly WidgetRow[];
   showGames: boolean;
   /** Some installed game's handler is not recognised, so a file no recognised
    *  game loads may still load in that one. */
   someUnknown: boolean;
+  /** Set when one game is shown and its config file was read. */
+  switches?: TableSwitches;
 }) {
   const { t } = useLingui();
   return (
     <Table>
       <TableHeader>
         <TableRow>
+          {switches && (
+            <TableHead className="w-0">
+              <Trans>On</Trans>
+            </TableHead>
+          )}
           <TableHead>
             <Trans>Widget</Trans>
           </TableHead>
@@ -196,6 +254,20 @@ function WidgetTable({
       <TableBody>
         {rows.map((row) => (
           <TableRow key={row.path} className="align-top">
+            {switches && (
+              <TableCell>
+                {row.info?.name && (
+                  <Switch
+                    checked={isOn(row, switches.order)}
+                    disabled={switches.disabled || switches.writing !== null}
+                    onCheckedChange={(on) =>
+                      switches.toggle(row.info?.name ?? "", on)
+                    }
+                    aria-label={t`${row.info.name} on`}
+                  />
+                )}
+              </TableCell>
+            )}
             <TableCell className="max-w-md whitespace-normal">
               <div className="flex flex-wrap items-center gap-2">
                 <span className="font-medium">

@@ -1306,7 +1306,17 @@ msgstr "{0} de la última versión"
 
 #. placeholder {0}: game.game
 #: src/widgets/pages/WidgetsPage.tsx
+msgid "{0} has not saved its widget settings yet. Start it once to switch widgets on or off here."
+msgstr ""
+
+#. placeholder {0}: game.game
+#: src/widgets/pages/WidgetsPage.tsx
 msgid "{0} loads none of your widgets."
+msgstr ""
+
+#. placeholder {0}: row.info.name
+#: src/widgets/pages/WidgetsPage.tsx
+msgid "{0} on"
 msgstr ""
 
 #. placeholder {0}: formatRate(value)
@@ -8523,6 +8533,10 @@ msgstr "Hay un juego en marcha y este es un archivo que escribe. {label} vuelve 
 msgid "A game is running, and coilbox does not know where this engine writes, so it cannot tell whether the game will write this file back over. {label} writes its whole blueprints file back when it saves or exits, so anything written now would be thrown away. Close the game and try again."
 msgstr "Hay un juego en marcha, y coilbox no sabe dónde escribe este motor, así que no puede saber si el juego sobrescribirá este archivo. {label} vuelve a escribir su archivo de planos entero al guardar o salir, así que se perdería todo lo que se escriba ahora. Cierra el juego y vuelve a intentarlo."
 
+#: src/widgets/widgetConfig.ts
+msgid "A game is running, and it writes this file back when it exits, so anything written now would be lost. Close the game and try again."
+msgstr ""
+
 #: src/scenario/pages/components/BlueprintPanel.tsx
 #, fuzzy
 msgid "A game is running. {gameLabel} writes its whole blueprints file back when it saves or exits, so coilbox will not write into it until the game is closed."
@@ -15203,6 +15217,10 @@ msgstr "Cerrar la vista del modelo"
 msgid "Close protocol console"
 msgstr "Cerrar la consola de protocolo"
 
+#: src/widgets/pages/WidgetsPage.tsx
+msgid "Close the game to switch widgets on or off."
+msgstr ""
+
 #: src/multiplayer/DebriefingDrawer.tsx
 #, fuzzy
 msgid "Close the match result"
@@ -15431,6 +15449,10 @@ msgstr "coilbox no pudo leer"
 #, fuzzy
 msgid "Coilbox could not read {game}: {said}"
 msgstr "Coilbox no pudo leer {game}: {said}"
+
+#: src/widgets/widgetConfig.ts
+msgid "Coilbox could not read this file: {reason}"
+msgstr ""
 
 #: src/runlite/unitLimit.ts
 #, fuzzy
@@ -33822,6 +33844,7 @@ msgstr "Más antiguas"
 
 #: src/play/modOptions.ts
 #: src/profile/SettingsSection.tsx
+#: src/widgets/pages/WidgetsPage.tsx
 #, fuzzy
 msgid "On"
 msgstr "Activado"
@@ -48861,6 +48884,10 @@ msgstr "Este juego no tiene ninguna unidad con ese nombre, así que el botón no
 #, fuzzy
 msgid "This game has none of its units: {list}. Nothing in it can be placed here, so it belongs to another game or another version of this one."
 msgstr "Este juego no tiene ninguna de sus unidades: {list}. No se puede colocar nada de él aquí, así que pertenece a otro juego o a otra versión de este."
+
+#: src/widgets/widgetConfig.ts
+msgid "This game has not saved its widget settings yet. Start it once, then try again."
+msgstr ""
 
 #: src/content/pages/components/states.tsx
 #, fuzzy
