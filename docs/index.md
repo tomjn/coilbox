@@ -9,10 +9,8 @@ hero:
     light: /coil-mark-light.svg
     dark: /coil-mark-dark.svg
     alt: Coilbox
+  # The three download buttons go first. config.mts adds them when the site is built.
   actions:
-    - theme: brand
-      text: Download
-      link: https://github.com/tomjn/coilbox/releases/latest
     - theme: alt
       text: Player guides
       link: /players/
@@ -97,11 +95,9 @@ Click any shot to enlarge.
 
 ## Install
 
-Download the build for your OS from [Releases](https://github.com/tomjn/coilbox/releases/latest).
-
 ### macOS
 
-The app is ad-hoc signed but **not notarized** (no Apple Developer account), so Gatekeeper blocks it on first launch. After copying Coilbox to Applications, clear the download quarantine:
+Download the <a :href="$frontmatter.downloads.macos">macOS disk image</a>. The app is ad-hoc signed but **not notarized** (no Apple Developer account), so Gatekeeper blocks it on first launch. After copying Coilbox to Applications, clear the download quarantine:
 
 ```sh
 xattr -dr com.apple.quarantine /Applications/Coilbox.app
@@ -111,7 +107,11 @@ xattr -dr com.apple.quarantine /Applications/Coilbox.app
 
 ### Windows & Linux
 
-Download and run the installer / AppImage from the [latest release](https://github.com/tomjn/coilbox/releases/latest).
+Download and run the <a :href="$frontmatter.downloads.windows">Windows installer</a> or the <a :href="$frontmatter.downloads.linux">Linux AppImage</a>.
+
+### Other files
+
+The [release page](https://github.com/tomjn/coilbox/releases/latest) has every file, including the Windows portable zip.
 
 ## Documentation
 
