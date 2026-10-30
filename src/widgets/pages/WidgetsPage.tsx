@@ -409,7 +409,15 @@ export default function WidgetsPage() {
                       : game && key !== null
                         ? {
                             game: game.game,
-                            set: appliedSet(sets, key),
+                            // With no file, an unchosen widget takes its
+                            // default in the handler.
+                            set:
+                              file?.kind === "missing"
+                                ? {
+                                    ...gameWidgetStates(shown, new Map()),
+                                    ...appliedSet(sets, key),
+                                  }
+                                : appliedSet(sets, key),
                             toggle: (name, on) =>
                               updateSets((s) => switchIn(s, key, name, on)),
                           }

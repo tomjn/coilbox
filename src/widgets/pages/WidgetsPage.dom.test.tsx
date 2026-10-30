@@ -485,12 +485,7 @@ describe("WidgetsPage", () => {
         screen.getByText("Restored BuildWatch, switched off."),
       ).toBeTruthy(),
     );
-    // Reading the game's missing file gives an unset widget its default.
-    expect(readSets().global).toEqual({
-      BuildWatch: false,
-      Other: true,
-      "Coilbox blueprints": false,
-    });
+    expect(readSets().global).toEqual({ BuildWatch: false, Other: true });
   });
 
   it("shows where each widget is when there is more than one content root, and removes from that root", async () => {
@@ -718,6 +713,33 @@ describe("WidgetsPage", () => {
     );
     // The file as it was is kept beside it.
     expect([...disk.values()]).toContain(text);
+  });
+
+  it("shows a player's unchosen widget at its default until the game has a file", () => {
+    const info = scan.files[0].info;
+    if (!info) throw new Error("the fixture's first widget declares nothing");
+    info.enabled = true;
+    try {
+      const on = () =>
+        screen
+          .getByRole("switch", { name: "BuildWatch on" })
+          .getAttribute("aria-checked");
+      files.files = new Map([["Metal Factions", { kind: "missing" }]]);
+      const missing = page("/library/widgets?game=Metal%20Factions");
+      expect(on()).toBe("true");
+      missing.unmount();
+      // With a file, the set says, and the set has no choice for it.
+      files.files = new Map([
+        [
+          "Metal Factions",
+          { kind: "ready", path: "/x/MF.lua", order: new Map() },
+        ],
+      ]);
+      page("/library/widgets?game=Metal%20Factions");
+      expect(on()).toBe("false");
+    } finally {
+      delete info.enabled;
+    }
   });
 
   it("lines a game's own widgets up with the player's by using one table", () => {

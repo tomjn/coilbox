@@ -21,9 +21,11 @@ import { scanWidgets } from "./widgetRoots";
 import {
   absorbFile,
   addWidgets,
+  appliedSet,
   gameWidgets,
   readSets,
   recordWrite,
+  entry as setEntry,
   setKey,
   statesToWrite,
   switchOff,
@@ -60,18 +62,11 @@ export async function absorbGame(
     written = readSets().written;
     found = await findConfig(io, writeDir, config, shortName);
   }
+  if (!found) return { kind: "missing" };
+  const order = readOrder(found.text, config.shape);
   const widgets = gameWidgets(rows, game.game).filter(
     (w) => !skip.includes(w.name),
   );
-  if (!found) {
-    // No entries, so an unset widget learns its default, as one with no entry
-    // in a file does. The set would otherwise read it as off.
-    updateSets((sets) =>
-      absorbFile(sets, setKey(game), "", new Map(), widgets),
-    );
-    return { kind: "missing" };
-  }
-  const order = readOrder(found.text, config.shape);
   updateSets((sets) =>
     absorbFile(sets, setKey(game), found.path, order, widgets),
   );
@@ -128,14 +123,23 @@ export async function writeGameFile(
   skip: readonly string[] = [],
   create?: () => Promise<string | null>,
 ): Promise<void> {
-  await absorbGame(appFileIO, writeDir, entry, rows, skip);
+  const file = await absorbGame(appFileIO, writeDir, entry, rows, skip);
   // Read after the absorb above, so a change made in the game is written back
   // rather than undone.
-  const states = statesToWrite(
-    readSets(),
-    setKey(entry),
-    gameWidgets(rows, entry.game),
-  );
+  const sets = readSets();
+  const key = setKey(entry);
+  const all = statesToWrite(sets, key, gameWidgets(rows, entry.game));
+  // A new file holds only what the player has chosen. A widget with no entry
+  // takes its default in the handler, and the set stays unset so a game that
+  // has saved a file can still fill it in.
+  const states =
+    file.kind === "missing"
+      ? new Map(
+          [...all].filter(
+            ([name]) => setEntry(appliedSet(sets, key), name) !== undefined,
+          ),
+        )
+      : all;
   const out = await writeWidgetStates({
     io: appFileIO,
     writeDir,
