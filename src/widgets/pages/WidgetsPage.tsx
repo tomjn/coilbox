@@ -70,7 +70,9 @@ export default function WidgetsPage() {
     contentOpenPath({ path }).catch(() => {});
   };
 
-  const busy = list.locating || (!!list.writeDir && (!shown || list.reading));
+  const busy =
+    list.locating ||
+    (!!list.writeDir && ((!shown && !list.error) || list.reading));
 
   return (
     <div className="flex flex-col gap-4 p-4">

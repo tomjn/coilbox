@@ -28,6 +28,25 @@ import { type GameHandler, widgetRows } from "./widgetList";
  *  name. */
 const handlerCache = new Map<string, GameHandler["handler"]>();
 
+/** Archive file lists already read this session, keyed by
+ *  `dataDir::enginePath::archive`, because most games share their dependency
+ *  archives and each needs listing only once. */
+const treeCache = new Map<string, readonly string[]>();
+
+async function archiveFiles(
+  enginePath: string,
+  dataDir: string,
+  archive: string,
+): Promise<readonly string[]> {
+  const key = `${dataDir}::${enginePath}::${archive}`;
+  const cached = treeCache.get(key);
+  if (cached) return cached;
+  const tree = await unitsyncArchiveTree({ enginePath, dataDir, archive });
+  const files = tree.files.map((f) => f.path);
+  treeCache.set(key, files);
+  return files;
+}
+
 async function handlerOf(
   enginePath: string,
   dataDir: string,
@@ -41,13 +60,8 @@ async function handlerOf(
   if (cached !== undefined) return cached;
   const owner = new Map<string, string>();
   for (const archive of archives) {
-    const tree = await unitsyncArchiveTree({
-      enginePath,
-      dataDir,
-      archive: archive.name,
-    });
-    for (const f of tree.files) {
-      if (!owner.has(f.path)) owner.set(f.path, archive.name);
+    for (const f of await archiveFiles(enginePath, dataDir, archive.name)) {
+      if (!owner.has(f)) owner.set(f, archive.name);
     }
   }
   const handler = await recogniseHandler([...owner.keys()], async (file) => {
