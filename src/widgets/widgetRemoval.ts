@@ -107,7 +107,10 @@ export function removalFor(
     folders,
     games,
     name,
-    previousNames: row.info?.previousNames ?? [],
+    // Copies are one widget, but each file says its own, so all of them count.
+    previousNames: [
+      ...new Set(copies.flatMap((c) => c.info?.previousNames ?? [])),
+    ],
   };
 }
 

@@ -15467,6 +15467,11 @@ msgstr "Coilbox はこのマップのスカイボックスを読み込めませ�
 msgid "Coilbox cannot read this unit's build pic. The game ships one, in a format the decoder does not handle."
 msgstr "Coilbox はこのユニットの建設画像を読み込めません。ゲームには同梱されていますが、デコーダーが対応していない形式です。"
 
+#. placeholder {0}: unknown.join(", ")
+#: src/widgets/pages/RemoveWidget.tsx
+msgid "Coilbox cannot tell whether these games load it too: {0}"
+msgstr ""
+
 #: src/workshop/pages/components/UnitFieldRow.tsx
 #, fuzzy
 msgid "Coilbox cannot write {label} into the game's own file"

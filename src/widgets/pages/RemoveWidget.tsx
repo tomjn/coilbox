@@ -65,6 +65,8 @@ export function RemoveWidgetButton({
   const removal = removalFor(rows, row);
   const name = row.info?.name || fileName(row.path);
   const files = [...removal.copies.map((c) => c.path), ...removal.folders];
+  // A game whose handler is not recognised may load the files too.
+  const unknown = games.filter((g) => g.handler === null).map((g) => g.game);
 
   const change = (next: boolean) => {
     setOpen(next);
@@ -127,6 +129,11 @@ export function RemoveWidgetButton({
           {removal.games.length > 0 && (
             <p className="max-h-32 overflow-y-auto break-words text-xs">
               {t`It is removed from every game that loads it: ${removal.games.join(", ")}`}
+            </p>
+          )}
+          {unknown.length > 0 && (
+            <p className="max-h-24 overflow-y-auto break-words text-xs text-muted-foreground">
+              {t`Coilbox cannot tell whether these games load it too: ${unknown.join(", ")}`}
             </p>
           )}
           <ul className="flex flex-col gap-0.5">

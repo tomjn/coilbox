@@ -15467,6 +15467,11 @@ msgstr "Coilbox kann die Skybox dieser Karte nicht lesen. Die Karte bringt eine 
 msgid "Coilbox cannot read this unit's build pic. The game ships one, in a format the decoder does not handle."
 msgstr "Coilbox kann das Baubild dieser Einheit nicht lesen. Das Spiel bringt eines mit, in einem Format, das der Decoder nicht unterstützt."
 
+#. placeholder {0}: unknown.join(", ")
+#: src/widgets/pages/RemoveWidget.tsx
+msgid "Coilbox cannot tell whether these games load it too: {0}"
+msgstr ""
+
 #: src/workshop/pages/components/UnitFieldRow.tsx
 #, fuzzy
 msgid "Coilbox cannot write {label} into the game's own file"

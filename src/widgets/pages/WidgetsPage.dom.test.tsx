@@ -319,6 +319,11 @@ describe("WidgetsPage", () => {
         "It is removed from every game that loads it: Metal Factions v2.58",
       ),
     ).toBeTruthy();
+    expect(
+      screen.getByText(
+        "Coilbox cannot tell whether these games load it too: Mystery 1.0",
+      ),
+    ).toBeTruthy();
     expect(removeCalls).toEqual([]);
     // Nothing in a config file to offer to delete.
     await waitFor(() =>

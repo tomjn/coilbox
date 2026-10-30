@@ -15467,6 +15467,11 @@ msgstr "Coilbox nie potrafi odczytać skyboxa tej mapy. Mapa go zawiera, ale w f
 msgid "Coilbox cannot read this unit's build pic. The game ships one, in a format the decoder does not handle."
 msgstr "Coilbox nie potrafi odczytać obrazka do menu budowy tej jednostki. Gra go zawiera, ale w formacie, którego dekoder nie obsługuje."
 
+#. placeholder {0}: unknown.join(", ")
+#: src/widgets/pages/RemoveWidget.tsx
+msgid "Coilbox cannot tell whether these games load it too: {0}"
+msgstr ""
+
 #: src/workshop/pages/components/UnitFieldRow.tsx
 #, fuzzy
 msgid "Coilbox cannot write {label} into the game's own file"

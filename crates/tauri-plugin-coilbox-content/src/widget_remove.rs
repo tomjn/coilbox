@@ -25,6 +25,15 @@ pub struct Removed {
     pub backup: String,
 }
 
+/// Whether a folder under `LuaUI/` is one a game's widget handler reads
+/// (`Widgets`, `RmlWidgets`, `Widgets_TAP`, `widgets_mosaic` and the like, and
+/// jK's `Addons`), as opposed to `Config` and the rest, which hold the games'
+/// own files. The handler table in `src/widgets/handlers.ts` is the source.
+fn widget_root(name: &str) -> bool {
+    let lower = name.to_lowercase();
+    lower.contains("widgets") || lower == "addons"
+}
+
 /// `rel` as a path under the write folder: plain names only, in a folder under
 /// `LuaUI/`, at least `depth` of them. Coilbox's own widget is refused.
 fn checked(rel: &str, depth: usize) -> Result<PathBuf, String> {
@@ -41,6 +50,9 @@ fn checked(rel: &str, depth: usize) -> Result<PathBuf, String> {
     }
     if widget_owned(&parts[1..].join("/")) {
         return Err(format!("{rel} is coilbox's own widget"));
+    }
+    if !widget_root(&parts[1]) {
+        return Err(format!("{rel} is not in a widget folder"));
     }
     Ok(path.to_path_buf())
 }
@@ -375,6 +387,8 @@ mod tests {
             "/etc/hosts",
             "other.lua",
             "Other/Widgets/gui_a.lua",
+            "LuaUI/Config/BYAR.lua",
+            "LuaUI/Fonts/gui_a.lua",
         ] {
             let files = strings(&["LuaUI/Widgets/gui_a.lua", bad]);
             assert!(

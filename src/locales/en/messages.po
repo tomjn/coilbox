@@ -12533,6 +12533,11 @@ msgstr "Coilbox cannot read this map's skybox. The map ships one, in a DDS forma
 msgid "Coilbox cannot read this unit's build pic. The game ships one, in a format the decoder does not handle."
 msgstr "Coilbox cannot read this unit's build pic. The game ships one, in a format the decoder does not handle."
 
+#. placeholder {0}: unknown.join(", ")
+#: src/widgets/pages/RemoveWidget.tsx
+msgid "Coilbox cannot tell whether these games load it too: {0}"
+msgstr "Coilbox cannot tell whether these games load it too: {0}"
+
 #: src/workshop/pages/components/UnitFieldRow.tsx
 msgid "Coilbox cannot write {label} into the game's own file"
 msgstr "Coilbox cannot write {label} into the game's own file"

@@ -119,6 +119,14 @@ describe("removalFor", () => {
     expect(removal.games).toEqual([MF, TAP]);
     expect(removal.name).toBe("Radar");
     expect(removal.previousNames).toEqual(["Old Radar"]);
+    const aliased = row("LuaUI/Widgets_TAP/radar.lua", "Radar", [TAP], {
+      folder: "LuaUI/Widgets_TAP",
+      previous: ["Ancient Radar"],
+    });
+    expect(removalFor([radar, aliased], radar).previousNames).toEqual([
+      "Old Radar",
+      "Ancient Radar",
+    ]);
     expect(removalFor(rows, radarTap).copies).toEqual([radarTap, radar]);
   });
 
