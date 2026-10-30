@@ -115,6 +115,17 @@ When you join a battle whose game is named like `XTA 9.65 (compat 5)`:
 
 So everyone needs the same version of coilbox as the host, or a newer one.
 
+### Host a battle
+
+1. Turn on the game's switch.
+2. Open the Host a battle or Host on LAN form and choose the game.
+3. Under the game, keep Compatibility mode selected. The form names the version the battle will use, such as `XTA 9.65 (compat 24)`. Select Original game to host the old game instead.
+4. If the form says "Not built" or "Out of date", select Build or Rebuild and wait for the count of models. You cannot start until the compatibility version is current.
+
+If the game's switch is off, the form offers only the old game. Quick room always opens on the old game.
+
+Your battle room shows the line "Players without coilbox need the .sdz". Export .sdz beside it saves a file you can send them. It goes in their `games` folder.
+
 ## What it cannot fix
 
 - Only what is listed in [What it changes](#what-it-changes). The report can show Lua calls and def tags that have no fix.
