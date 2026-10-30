@@ -35,13 +35,13 @@ export interface ConfigFileIO {
 // Reading just enough Lua to find a table's fields
 // ---------------------------------------------------------------------------
 
-type Token =
+export type Token =
   | { kind: "name"; text: string; start: number; end: number }
   | { kind: "string"; value: string; start: number; end: number }
   | { kind: "number"; text: string; start: number; end: number }
   | { kind: "symbol"; text: string; start: number; end: number };
 
-class LuaSyntaxError extends Error {}
+export class LuaSyntaxError extends Error {}
 
 /** The level of a long bracket opening at `i` (`[[` is 0, `[==[` is 2), or -1
  *  when there is none. */
@@ -111,7 +111,7 @@ function readQuoted(src: string, i: number): { value: string; end: number } {
   throw new LuaSyntaxError("unfinished string");
 }
 
-function tokenize(src: string): Token[] {
+export function tokenize(src: string): Token[] {
   const tokens: Token[] = [];
   let i = 0;
   while (i < src.length) {
@@ -159,8 +159,10 @@ function tokenize(src: string): Token[] {
 
 /** One field of a table constructor. `key` is a string key's value, or null
  *  for a positional field or one keyed by anything else. */
-interface Field {
+export interface Field {
   key: string | null;
+  /** The key as the file spells it, or the place of a positional field. */
+  label: string;
   /** Where the field starts, and where its value starts and ends. */
   start: number;
   valueStart: number;
@@ -170,7 +172,7 @@ interface Field {
   table?: Table;
 }
 
-interface Table {
+export interface Table {
   /** The offsets of `{` and `}`. */
   open: number;
   close: number;
@@ -179,8 +181,12 @@ interface Table {
   trailingSeparator: boolean;
 }
 
-function isSymbol(tok: Token | undefined, text: string): boolean {
+export function isSymbol(tok: Token | undefined, text: string): boolean {
   return tok?.kind === "symbol" && tok.text === text;
+}
+
+function tokenText(tok: Token): string {
+  return tok.kind === "string" ? tok.value : tok.text;
 }
 
 class Parser {
@@ -205,10 +211,12 @@ class Parser {
     const open = this.expect("{").start;
     const fields: Field[] = [];
     let trailingSeparator = false;
+    let positional = 0;
     while (!isSymbol(this.peek(), "}")) {
       if (!this.peek()) throw new LuaSyntaxError('expected "}"');
       const start = (this.peek() as Token).start;
       let key: string | null = null;
+      let label: string;
       if (isSymbol(this.peek(), "[")) {
         this.i++;
         const keyTokens = this.expression(["]"]);
@@ -216,9 +224,13 @@ class Parser {
         this.expect("=");
         const only = keyTokens.length === 1 ? keyTokens[0] : undefined;
         key = only?.kind === "string" ? only.value : null;
+        label = key ?? keyTokens.map(tokenText).join("");
       } else if (this.peek()?.kind === "name" && isSymbol(this.peek(1), "=")) {
         key = (this.peek() as { text: string }).text;
+        label = key;
         this.i += 2;
+      } else {
+        label = String(++positional);
       }
       const first = this.peek();
       if (!first) throw new LuaSyntaxError("expected a value");
@@ -237,6 +249,7 @@ class Parser {
       if (value.length === 0) throw new LuaSyntaxError("expected a value");
       fields.push({
         key,
+        label,
         start,
         valueStart: value[0].start,
         valueEnd: value[value.length - 1].end,
@@ -291,7 +304,7 @@ class Parser {
 
 /** The table the file returns, which is how every handler's `table.save`
  *  writes it. */
-function returnedTable(src: string): Table {
+export function returnedTable(src: string): Table {
   const tokens = tokenize(src);
   const at = tokens.findIndex(
     (tok) => tok.kind === "name" && tok.text === "return",
@@ -307,7 +320,7 @@ function returnedTable(src: string): Table {
 }
 
 /** The last field with `key`, which is the one Lua keeps. */
-function field(table: Table, key: string): Field | undefined {
+export function field(table: Table, key: string): Field | undefined {
   return table.fields.findLast((f) => f.key === key);
 }
 
@@ -325,7 +338,7 @@ function orderTable(
 }
 
 /** A number literal, with or without a sign, or null for anything else. */
-function numberOf(value: readonly Token[]): number | null {
+export function numberOf(value: readonly Token[]): number | null {
   const [a, b] = value;
   if (value.length === 1 && a.kind === "number") return Number(a.text);
   if (value.length === 2 && isSymbol(a, "-") && b.kind === "number") {
@@ -334,7 +347,7 @@ function numberOf(value: readonly Token[]): number | null {
   return null;
 }
 
-function unreadable(e: unknown): Error {
+export function unreadable(e: unknown): Error {
   if (e instanceof LuaSyntaxError) {
     const reason = e.message;
     return new Error(t`Coilbox could not read this file: ${reason}`);
@@ -365,7 +378,7 @@ export function readOrder(
 }
 
 /** `true` or `false` when the value is that literal, otherwise null. */
-function booleanOf(value: readonly Token[]): boolean | null {
+export function booleanOf(value: readonly Token[]): boolean | null {
   const [a] = value;
   if (value.length !== 1 || a.kind !== "name") return null;
   if (a.text === "true") return true;
@@ -504,19 +517,19 @@ export function writeOrder(
 // The file on disk
 // ---------------------------------------------------------------------------
 
-/** The file names a handler could be using for a game, relative to the write
- *  folder, in the order the handler tries them. A short name that would reach
- *  outside `LuaUI/Config/` names no file, because it comes from the game's
- *  archive. */
-export function configCandidates(
+/** The paths `files` name for a game, relative to the write folder. A short
+ *  name that would reach outside `LuaUI/Config/` names no file, because it
+ *  comes from the game's archive. */
+function candidatePaths(
   config: WidgetConfigFile,
+  files: readonly string[],
   shortName: string,
 ): string[] {
   const safe =
     shortName !== "" && !/[/\\]/.test(shortName) && !shortName.includes("..");
   return [
     ...new Set(
-      config.files
+      files
         .filter((f) => safe || !/\{short\}/i.test(f))
         .map(
           (f) =>
@@ -524,6 +537,25 @@ export function configCandidates(
         ),
     ),
   ];
+}
+
+/** The file names a handler could be using for a game, relative to the write
+ *  folder, in the order the handler tries them. */
+export function configCandidates(
+  config: WidgetConfigFile,
+  shortName: string,
+): string[] {
+  return candidatePaths(config, config.files, shortName);
+}
+
+/** The same for the file that holds the widgets' saved `GetConfigData()`
+ *  tables, which is the order file itself for a handler that keeps them in its
+ *  `data` table. */
+export function dataCandidates(
+  config: WidgetConfigFile,
+  shortName: string,
+): string[] {
+  return candidatePaths(config, config.dataFiles ?? config.files, shortName);
 }
 
 export interface FoundConfig {
@@ -540,12 +572,51 @@ export async function findConfig(
   config: WidgetConfigFile,
   shortName: string,
 ): Promise<FoundConfig | null> {
-  for (const relative of configCandidates(config, shortName)) {
+  return firstFile(io, writeDir, configCandidates(config, shortName));
+}
+
+/** The game's file of saved widget settings and what is in it, or null when it
+ *  has none yet. A file that is there and cannot be read throws. */
+export async function findData(
+  io: ConfigFileIO,
+  writeDir: string,
+  config: WidgetConfigFile,
+  shortName: string,
+): Promise<FoundConfig | null> {
+  return firstFile(io, writeDir, dataCandidates(config, shortName));
+}
+
+async function firstFile(
+  io: ConfigFileIO,
+  writeDir: string,
+  relatives: readonly string[],
+): Promise<FoundConfig | null> {
+  for (const relative of relatives) {
     const path = underConfigDir(writeDir, relative);
     const text = await io.read(path);
     if (text !== null) return { path, text };
   }
   return null;
+}
+
+/** Copy `path` to a `.bak` beside it, then write `text` over it. Returns the
+ *  copy's path. `before` is what the file held when it was read. */
+export async function writeWithBackup(
+  io: ConfigFileIO,
+  path: string,
+  before: string,
+  text: string,
+  now: Date,
+): Promise<string> {
+  // Two writes in one second would otherwise share a name, and the second
+  // copy would replace the one from before the first.
+  let backup = `${path}.${stamp(now)}.bak`;
+  for (let n = 2; (await io.read(backup)) !== null; n++) {
+    backup = `${path}.${stamp(now)}-${n}.bak`;
+  }
+  await io.write(backup, before);
+  await io.write(path, text);
+  return backup;
 }
 
 export interface WriteRequest {
@@ -593,13 +664,6 @@ export async function writeWidgetStates({
   }
   if (text === found.text) return { path: found.path, order };
 
-  // Two writes in one second would otherwise share a name, and the second
-  // copy would replace the one from before the first.
-  let backup = `${found.path}.${stamp(now)}.bak`;
-  for (let n = 2; (await io.read(backup)) !== null; n++) {
-    backup = `${found.path}.${stamp(now)}-${n}.bak`;
-  }
-  await io.write(backup, found.text);
-  await io.write(found.path, text);
+  const backup = await writeWithBackup(io, found.path, found.text, text, now);
   return { path: found.path, backup, order };
 }

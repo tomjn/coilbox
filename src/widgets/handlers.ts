@@ -14,7 +14,8 @@
  * `tapwidgets.lua` (#4845). Beyond All Reason's come from the issue.
  *
  * Each handler also names the file it saves widgets' on or off state to
- * (#1289), and what can stop it loading a player's widgets at all (#1292).
+ * (#1289) and the file it saves their settings to (#1291), and what can stop
+ * it loading a player's widgets at all (#1292).
  * A game whose handler is not recognised gets `null` and so is never written
  * for.
  */
@@ -82,9 +83,15 @@ export interface WidgetConfigFile {
    *  game's short name and `{SHORT}` the same in capitals. With more than one,
    *  the handler uses the first that is there. */
   files: readonly string[];
-  /** `nested`: one table whose `order` field holds the order. `flat`: the
-   *  file's table is the order. */
+  /** `nested`: one table whose `order` field holds the order and whose `data`
+   *  field holds each widget's `GetConfigData()` table. `flat`: the file's
+   *  table is the order. */
   shape: "nested" | "flat";
+  /** The files the saved `GetConfigData()` tables are in, named like `files`,
+   *  for a `flat` handler that keeps them apart from the order (#1291). Each is
+   *  a table keyed by widget name. Absent for `nested`, which keeps them in
+   *  `data`. */
+  dataFiles?: readonly string[];
 }
 
 interface Rule extends WidgetHandler {
@@ -132,6 +139,7 @@ const RULES: readonly Rule[] = [
     config: {
       files: ["{SHORT}_order.lua", "{short}_order.lua"],
       shape: "flat",
+      dataFiles: ["{SHORT}_data.lua", "{short}_data.lua"],
     },
     userWidgets: {
       // Only Zero-K's handler reads the option. Complete Annihilation's
@@ -174,7 +182,11 @@ const RULES: readonly Rule[] = [
     marker: "luaui/jauriawidgets.lua",
     folders: ["LuaUI/Widgets"],
     subfolders: false,
-    config: { files: ["{SHORT}_order.lua"], shape: "flat" },
+    config: {
+      files: ["{SHORT}_order.lua"],
+      shape: "flat",
+      dataFiles: ["{SHORT}_data.lua"],
+    },
     // It lists `LuaUI/Widgets` from its archive only, unless the player has
     // turned local widgets on, and the option Zero-K adds is not in its source.
     userWidgets: { localWidgetsFile: "{SHORT}_data.lua" },
@@ -218,7 +230,11 @@ const RULES: readonly Rule[] = [
     contains: "LuaHandler/handler.lua",
     folders: ["LuaUI/Widgets", "LuaUI/Addons"],
     subfolders: false,
-    config: { files: ["{short}_order.lua"], shape: "flat" },
+    config: {
+      files: ["{short}_order.lua"],
+      shape: "flat",
+      dataFiles: ["{short}_data.lua"],
+    },
   },
   {
     // Before engine 0.83 every game's handler saved to one shared pair of
@@ -230,7 +246,11 @@ const RULES: readonly Rule[] = [
     contains: "Config/widget_order.lua",
     folders: ["LuaUI/Widgets"],
     subfolders: false,
-    config: { files: ["widget_order.lua"], shape: "flat" },
+    config: {
+      files: ["widget_order.lua"],
+      shape: "flat",
+      dataFiles: ["widget_data.lua"],
+    },
   },
   {
     id: "engine",
