@@ -1038,6 +1038,11 @@ msgstr "{0, plural, one {# amélioration} other {# améliorations}}"
 msgid "{0, plural, one {# warning} other {# warnings}}"
 msgstr "{0, plural, one {# avertissement} other {# avertissements}}"
 
+#. placeholder {0}: nested.widgets.length
+#: src/widgets/pages/AddWidgetDrawer.tsx
+msgid "{0, plural, one {# widget sits in a subfolder, which these games do not load:} other {# widgets sit in a subfolder, which these games do not load:}}"
+msgstr ""
+
 #. placeholder {0}: record.wins
 #: src/play/presetRecord.ts
 #, fuzzy
@@ -1335,6 +1340,16 @@ msgstr "Unités de {0}"
 #. placeholder {0}: game.game
 #: src/widgets/pages/WidgetsPage.tsx
 msgid "{0} uses its own widgets, not the ones for all games."
+msgstr ""
+
+#. placeholder {0}: s.game
+#: src/widgets/pages/AddWidgetDrawer.tsx
+msgid "{0}: coilbox does not recognise its widget handler, so nothing is added for it."
+msgstr ""
+
+#. placeholder {0}: s.game
+#: src/widgets/pages/AddWidgetDrawer.tsx
+msgid "{0}: has no folder for RmlUi widgets."
 msgstr ""
 
 #: src/placement/preview.ts
@@ -9734,6 +9749,10 @@ msgstr "Ajouter une arme"
 msgid "Add a weapon from {gameName}"
 msgstr "Ajouter une arme de {gameName}"
 
+#: src/widgets/pages/WidgetsPage.tsx
+msgid "Add a widget"
+msgstr ""
+
 #: src/multiplayer/battle/BattleMembersTable.tsx
 #, fuzzy
 msgid "Add AI"
@@ -9915,6 +9934,11 @@ msgstr "Ajouter à ce scénario"
 msgid "Add unit"
 msgstr "Ajouter une unité"
 
+#: src/widgets/pages/AddWidgetDrawer.tsx
+#: src/widgets/pages/WidgetsPage.tsx
+msgid "Add widget"
+msgstr ""
+
 #: src/multiplayer/pages/HighlightsSettings.tsx
 #, fuzzy
 msgid "Add word"
@@ -9980,6 +10004,10 @@ msgstr "ajouté avec la valeur {value}"
 #, fuzzy
 msgid "Added on top of the impulse from impulseFactor."
 msgstr "S’ajoute à l’impulsion de impulseFactor."
+
+#: src/widgets/pages/AddWidgetDrawer.tsx
+msgid "Added to {folderList}."
+msgstr ""
 
 #: src/content/unitFieldNotes.ts
 #, fuzzy
@@ -10292,6 +10320,7 @@ msgid "all Game options"
 msgstr "toutes les options de jeu"
 
 #: src/hub/pages/components/GamePicturesControl.tsx
+#: src/widgets/pages/AddWidgetDrawer.tsx
 #: src/widgets/pages/WidgetsPage.tsx
 #, fuzzy
 msgid "All games"
@@ -13830,6 +13859,7 @@ msgstr "Ne peut pas endommager sa propre unité"
 #: src/scenario/pages/components/ReclaimClipsForm.tsx
 #: src/scenario/pages/components/SetupPanel.tsx
 #: src/uberstress/pages/RunPage.tsx
+#: src/widgets/pages/AddWidgetDrawer.tsx
 #: src/workshop/pages/components/CloneActions.tsx
 #: src/workshop/pages/components/DiskDiffDrawer.tsx
 #: src/workshop/pages/components/InPlaceWrite.tsx
@@ -14632,6 +14662,14 @@ msgstr "Choisissez d’abord un calque de densité."
 msgid "Choose a file"
 msgstr "Choisir un fichier"
 
+#: src/widgets/pages/AddWidgetDrawer.tsx
+msgid "Choose a file or zip"
+msgstr ""
+
+#: src/widgets/pages/AddWidgetDrawer.tsx
+msgid "Choose a folder"
+msgstr ""
+
 #: src/content/pages/components/Convert3doDrawer.tsx
 #, fuzzy
 msgid "Choose a folder for the converted models"
@@ -14728,6 +14766,14 @@ msgstr "Choisir une texture"
 #, fuzzy
 msgid "Choose a tool to get started."
 msgstr "Choisissez un outil pour commencer."
+
+#: src/widgets/pages/AddWidgetDrawer.tsx
+msgid "Choose a widget"
+msgstr ""
+
+#: src/widgets/pages/AddWidgetDrawer.tsx
+msgid "Choose a widget folder"
+msgstr ""
 
 #: src/multiplayer/battles/HostBattleForm.tsx
 #, fuzzy
@@ -17400,6 +17446,8 @@ msgid "Could not read your saved models: {error}"
 msgstr "Impossible de lire vos modèles enregistrés : {error}"
 
 #. placeholder {0}: row.error
+#. placeholder {0}: w.error
+#: src/widgets/pages/AddWidgetDrawer.tsx
 #: src/widgets/pages/WidgetsPage.tsx
 msgid "Could not read: {0}"
 msgstr ""
@@ -17418,6 +17466,10 @@ msgstr "Impossible d’enregistrer le modèle : {reason}"
 #, fuzzy
 msgid "Could not save the module"
 msgstr "Impossible d’enregistrer le module"
+
+#: src/widgets/pages/AddWidgetDrawer.tsx
+msgid "Could not save the setting for {line}"
+msgstr ""
 
 #: src/lego/pages/OpenFromArchivePage.tsx
 #, fuzzy
@@ -25268,6 +25320,10 @@ msgstr "En chacun pour soi, chaque joueur est une équipe d’un seul, il n’y 
 msgid "in a loose working folder"
 msgstr "dans un dossier de travail décompressé"
 
+#: src/widgets/pages/AddWidgetDrawer.tsx
+msgid "in a subfolder"
+msgstr ""
+
 #: src/content/pages/components/MapRecords.tsx
 #, fuzzy
 msgid "In a team game a position's record depends on the team it was on and on who else was on it. It is split by team here, and it is not controlled for anything else."
@@ -31297,6 +31353,10 @@ msgstr "Aucun fichier image correspondant dans l’archive de ce jeu."
 msgid "No installed game"
 msgstr ""
 
+#: src/widgets/pages/AddWidgetDrawer.tsx
+msgid "No installed game with a folder for this widget."
+msgstr ""
+
 #: src/content/pages/components/RemixPanel.tsx
 #, fuzzy
 msgid "No installed games found to target."
@@ -34226,6 +34286,7 @@ msgstr "Opcodes"
 #: src/hub/pages/ItemPage.tsx
 #: src/lobby-servers/PasswordRecoveryForm.tsx
 #: src/multiplayer/battles/BattleList.tsx
+#: src/widgets/pages/AddWidgetDrawer.tsx
 #, fuzzy
 msgid "Open"
 msgstr "Ouvrir"
@@ -38960,6 +39021,7 @@ msgstr "se répète · {cooldown} s"
 #: src/campaign/pages/components/MissionMediaFields.tsx
 #: src/lego/moduleFileIo.ts
 #: src/lego/pages/components/ScriptTab.tsx
+#: src/widgets/pages/AddWidgetDrawer.tsx
 #, fuzzy
 msgid "Replace"
 msgstr "Remplacer"
@@ -39003,6 +39065,10 @@ msgstr "Remplacer ce script ?"
 #, fuzzy
 msgid "Replace this unit's table with the saved one"
 msgstr "Remplacer la table de cette unité par celle enregistrée"
+
+#: src/widgets/pages/AddWidgetDrawer.tsx
+msgid "Replace what is already there?"
+msgstr ""
 
 #: src/lego/pages/components/AnimationPanel.tsx
 #, fuzzy
@@ -44674,6 +44740,10 @@ msgstr "Son à l’arrêt"
 msgid "Switched on"
 msgstr "En marche"
 
+#: src/widgets/pages/AddWidgetDrawer.tsx
+msgid "Switched on for {target}, off everywhere else."
+msgstr ""
+
 #: src/content/unitFieldNotes.ts
 #, fuzzy
 msgid "Switched on sound"
@@ -47221,6 +47291,14 @@ msgstr "Le nombre d’équipes"
 #, fuzzy
 msgid "The number the unit's own script reads back from GET COB_ID. Only the game's scripts give it meaning."
 msgstr "Le nombre que le script de l’unité relit avec GET COB_ID. Seuls les scripts du jeu lui donnent un sens."
+
+#: src/widgets/pages/AddWidgetDrawer.tsx
+msgid "The old files are copied to the widget backups first."
+msgstr ""
+
+#: src/widgets/pages/AddWidgetDrawer.tsx
+msgid "The old files are in {backupPath}"
+msgstr ""
 
 #: src/scenario/pages/components/SetupPanel.tsx
 #, fuzzy
@@ -53679,6 +53757,7 @@ msgid "Why?"
 msgstr "Pourquoi ?"
 
 #: src/blueprint/pages/components/BlueprintWidgetButton.tsx
+#: src/widgets/pages/AddWidgetDrawer.tsx
 #: src/widgets/pages/WidgetsPage.tsx
 #, fuzzy
 msgid "Widget"

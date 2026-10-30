@@ -855,6 +855,11 @@ msgstr ""
 msgid "{0, plural, one {# warning} other {# warnings}}"
 msgstr ""
 
+#. placeholder {0}: nested.widgets.length
+#: src/widgets/pages/AddWidgetDrawer.tsx
+msgid "{0, plural, one {# widget sits in a subfolder, which these games do not load:} other {# widgets sit in a subfolder, which these games do not load:}}"
+msgstr ""
+
 #. placeholder {0}: record.wins
 #: src/play/presetRecord.ts
 msgid "{0, plural, one {# win} other {# wins}}"
@@ -1105,6 +1110,16 @@ msgstr ""
 #. placeholder {0}: game.game
 #: src/widgets/pages/WidgetsPage.tsx
 msgid "{0} uses its own widgets, not the ones for all games."
+msgstr ""
+
+#. placeholder {0}: s.game
+#: src/widgets/pages/AddWidgetDrawer.tsx
+msgid "{0}: coilbox does not recognise its widget handler, so nothing is added for it."
+msgstr ""
+
+#. placeholder {0}: s.game
+#: src/widgets/pages/AddWidgetDrawer.tsx
+msgid "{0}: has no folder for RmlUi widgets."
 msgstr ""
 
 #: src/placement/preview.ts
@@ -7853,6 +7868,10 @@ msgstr ""
 msgid "Add a weapon from {gameName}"
 msgstr ""
 
+#: src/widgets/pages/WidgetsPage.tsx
+msgid "Add a widget"
+msgstr ""
+
 #: src/multiplayer/battle/BattleMembersTable.tsx
 msgid "Add AI"
 msgstr ""
@@ -7999,6 +8018,11 @@ msgstr ""
 msgid "Add unit"
 msgstr ""
 
+#: src/widgets/pages/AddWidgetDrawer.tsx
+#: src/widgets/pages/WidgetsPage.tsx
+msgid "Add widget"
+msgstr ""
+
 #: src/multiplayer/pages/HighlightsSettings.tsx
 msgid "Add word"
 msgstr ""
@@ -8050,6 +8074,10 @@ msgstr ""
 
 #: src/content/unitFieldNotes.ts
 msgid "Added on top of the impulse from impulseFactor."
+msgstr ""
+
+#: src/widgets/pages/AddWidgetDrawer.tsx
+msgid "Added to {folderList}."
 msgstr ""
 
 #: src/content/unitFieldNotes.ts
@@ -8304,6 +8332,7 @@ msgid "all Game options"
 msgstr ""
 
 #: src/hub/pages/components/GamePicturesControl.tsx
+#: src/widgets/pages/AddWidgetDrawer.tsx
 #: src/widgets/pages/WidgetsPage.tsx
 msgid "All games"
 msgstr ""
@@ -11174,6 +11203,7 @@ msgstr ""
 #: src/scenario/pages/components/ReclaimClipsForm.tsx
 #: src/scenario/pages/components/SetupPanel.tsx
 #: src/uberstress/pages/RunPage.tsx
+#: src/widgets/pages/AddWidgetDrawer.tsx
 #: src/workshop/pages/components/CloneActions.tsx
 #: src/workshop/pages/components/DiskDiffDrawer.tsx
 #: src/workshop/pages/components/InPlaceWrite.tsx
@@ -11827,6 +11857,14 @@ msgstr ""
 msgid "Choose a file"
 msgstr ""
 
+#: src/widgets/pages/AddWidgetDrawer.tsx
+msgid "Choose a file or zip"
+msgstr ""
+
+#: src/widgets/pages/AddWidgetDrawer.tsx
+msgid "Choose a folder"
+msgstr ""
+
 #: src/content/pages/components/Convert3doDrawer.tsx
 msgid "Choose a folder for the converted models"
 msgstr ""
@@ -11904,6 +11942,14 @@ msgstr ""
 #: src/home/zones/Greeting.tsx
 #: src/i18n/frameStrings.ts
 msgid "Choose a tool to get started."
+msgstr ""
+
+#: src/widgets/pages/AddWidgetDrawer.tsx
+msgid "Choose a widget"
+msgstr ""
+
+#: src/widgets/pages/AddWidgetDrawer.tsx
+msgid "Choose a widget folder"
 msgstr ""
 
 #: src/multiplayer/battles/HostBattleForm.tsx
@@ -14082,6 +14128,8 @@ msgid "Could not read your saved models: {error}"
 msgstr ""
 
 #. placeholder {0}: row.error
+#. placeholder {0}: w.error
+#: src/widgets/pages/AddWidgetDrawer.tsx
 #: src/widgets/pages/WidgetsPage.tsx
 msgid "Could not read: {0}"
 msgstr ""
@@ -14096,6 +14144,10 @@ msgstr ""
 
 #: src/lego/moduleFileIo.ts
 msgid "Could not save the module"
+msgstr ""
+
+#: src/widgets/pages/AddWidgetDrawer.tsx
+msgid "Could not save the setting for {line}"
 msgstr ""
 
 #: src/lego/pages/OpenFromArchivePage.tsx
@@ -20464,6 +20516,10 @@ msgstr ""
 msgid "in a loose working folder"
 msgstr ""
 
+#: src/widgets/pages/AddWidgetDrawer.tsx
+msgid "in a subfolder"
+msgstr ""
+
 #: src/content/pages/components/MapRecords.tsx
 msgid "In a team game a position's record depends on the team it was on and on who else was on it. It is split by team here, and it is not controlled for anything else."
 msgstr ""
@@ -25351,6 +25407,10 @@ msgstr ""
 msgid "No installed game"
 msgstr ""
 
+#: src/widgets/pages/AddWidgetDrawer.tsx
+msgid "No installed game with a folder for this widget."
+msgstr ""
+
 #: src/content/pages/components/RemixPanel.tsx
 msgid "No installed games found to target."
 msgstr ""
@@ -27714,6 +27774,7 @@ msgstr ""
 #: src/hub/pages/ItemPage.tsx
 #: src/lobby-servers/PasswordRecoveryForm.tsx
 #: src/multiplayer/battles/BattleList.tsx
+#: src/widgets/pages/AddWidgetDrawer.tsx
 msgid "Open"
 msgstr ""
 
@@ -31556,6 +31617,7 @@ msgstr ""
 #: src/campaign/pages/components/MissionMediaFields.tsx
 #: src/lego/moduleFileIo.ts
 #: src/lego/pages/components/ScriptTab.tsx
+#: src/widgets/pages/AddWidgetDrawer.tsx
 msgid "Replace"
 msgstr ""
 
@@ -31589,6 +31651,10 @@ msgstr ""
 
 #: src/lego/pages/components/WorthSection.tsx
 msgid "Replace this unit's table with the saved one"
+msgstr ""
+
+#: src/widgets/pages/AddWidgetDrawer.tsx
+msgid "Replace what is already there?"
 msgstr ""
 
 #: src/lego/pages/components/AnimationPanel.tsx
@@ -36187,6 +36253,10 @@ msgstr ""
 msgid "Switched on"
 msgstr ""
 
+#: src/widgets/pages/AddWidgetDrawer.tsx
+msgid "Switched on for {target}, off everywhere else."
+msgstr ""
+
 #: src/content/unitFieldNotes.ts
 msgid "Switched on sound"
 msgstr ""
@@ -38239,6 +38309,14 @@ msgstr ""
 
 #: src/content/unitFieldNotes.ts
 msgid "The number the unit's own script reads back from GET COB_ID. Only the game's scripts give it meaning."
+msgstr ""
+
+#: src/widgets/pages/AddWidgetDrawer.tsx
+msgid "The old files are copied to the widget backups first."
+msgstr ""
+
+#: src/widgets/pages/AddWidgetDrawer.tsx
+msgid "The old files are in {backupPath}"
 msgstr ""
 
 #: src/scenario/pages/components/SetupPanel.tsx
@@ -43450,6 +43528,7 @@ msgid "Why?"
 msgstr ""
 
 #: src/blueprint/pages/components/BlueprintWidgetButton.tsx
+#: src/widgets/pages/AddWidgetDrawer.tsx
 #: src/widgets/pages/WidgetsPage.tsx
 msgid "Widget"
 msgstr ""

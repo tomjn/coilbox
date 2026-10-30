@@ -7,6 +7,7 @@ import { appFileIO } from "@/blueprint/fileIO";
 import { contentPlayerWidgets, unitsyncEngineConfig } from "@/content/bindings";
 import { primeScan } from "@/content/config";
 import { engineConfigDir } from "@/content/enginePaths";
+import { errorText } from "@/lib/helpers";
 import { handlerOf } from "./gameHandler";
 import { HANDLER_FOLDERS } from "./handlers";
 import {
@@ -18,6 +19,7 @@ import {
 import { type GameHandler, type WidgetRow, widgetRows } from "./widgetList";
 import {
   absorbFile,
+  addWidgets,
   gameWidgets,
   readSets,
   recordWrite,
@@ -95,7 +97,19 @@ export async function writeSetForLaunch({
     writeDir,
     folders: HANDLER_FOLDERS,
   });
-  const rows = widgetRows(widgets, [entry]);
+  await writeGameFile(writeDir, entry, widgetRows(widgets, [entry]));
+}
+
+/**
+ * Take what changed in `game`'s config file since coilbox last wrote it into
+ * its set, then write the set back, so a change made in the game is kept and
+ * the rest is as the set says. Does nothing when the game has not saved a file.
+ */
+async function writeGameFile(
+  writeDir: string,
+  entry: GameHandler & { handler: NonNullable<GameHandler["handler"]> },
+  rows: readonly WidgetRow[],
+): Promise<void> {
   const file = await absorbGame(appFileIO, writeDir, entry, rows);
   if (file.kind !== "ready") return;
   // Read after the absorb above, so a change made in the game is written back
@@ -103,14 +117,53 @@ export async function writeSetForLaunch({
   const states = statesToWrite(
     readSets(),
     setKey(entry),
-    gameWidgets(rows, game),
+    gameWidgets(rows, entry.game),
   );
   const out = await writeWidgetStates({
     io: appFileIO,
     writeDir,
-    config: handler.config,
+    config: entry.handler.config,
     shortName: entry.shortName ?? "",
     states,
   });
   if (out) updateSets((sets) => recordWrite(sets, out.path, states));
+}
+
+/**
+ * Switch widgets that were just added on in the set the player was looking at
+ * and off in every other, and write that into the config file of each game
+ * that has one, so a game launched without coilbox keeps them off too. `key` is
+ * the set shown, `null` for the one every game uses. Returns what could not be
+ * written, one line per game.
+ */
+export async function switchAddedWidgets({
+  writeDir,
+  games,
+  key,
+  names,
+}: {
+  writeDir: string;
+  games: readonly GameHandler[];
+  key: string | null;
+  names: readonly string[];
+}): Promise<string[]> {
+  if (names.length === 0) return [];
+  // Before the files are read, so that a widget no file has an entry for takes
+  // this answer rather than what its `GetInfo()` says.
+  updateSets((sets) => addWidgets(sets, key, names));
+  const scan = await contentPlayerWidgets({
+    writeDir,
+    folders: HANDLER_FOLDERS,
+  });
+  const rows = widgetRows(scan, games);
+  const failed: string[] = [];
+  for (const game of games) {
+    if (!game.handler) continue;
+    try {
+      await writeGameFile(writeDir, { ...game, handler: game.handler }, rows);
+    } catch (e) {
+      failed.push(`${game.game}: ${errorText(e)}`);
+    }
+  }
+  return failed;
 }

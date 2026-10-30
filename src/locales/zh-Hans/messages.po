@@ -1038,6 +1038,11 @@ msgstr "{0, plural, other {# 个升级}}"
 msgid "{0, plural, one {# warning} other {# warnings}}"
 msgstr "{0, plural, other {# 个警告}}"
 
+#. placeholder {0}: nested.widgets.length
+#: src/widgets/pages/AddWidgetDrawer.tsx
+msgid "{0, plural, one {# widget sits in a subfolder, which these games do not load:} other {# widgets sit in a subfolder, which these games do not load:}}"
+msgstr ""
+
 #. placeholder {0}: record.wins
 #: src/play/presetRecord.ts
 #, fuzzy
@@ -1335,6 +1340,16 @@ msgstr "{0} 的单位"
 #. placeholder {0}: game.game
 #: src/widgets/pages/WidgetsPage.tsx
 msgid "{0} uses its own widgets, not the ones for all games."
+msgstr ""
+
+#. placeholder {0}: s.game
+#: src/widgets/pages/AddWidgetDrawer.tsx
+msgid "{0}: coilbox does not recognise its widget handler, so nothing is added for it."
+msgstr ""
+
+#. placeholder {0}: s.game
+#: src/widgets/pages/AddWidgetDrawer.tsx
+msgid "{0}: has no folder for RmlUi widgets."
 msgstr ""
 
 #: src/placement/preview.ts
@@ -9734,6 +9749,10 @@ msgstr "添加武器"
 msgid "Add a weapon from {gameName}"
 msgstr "从 {gameName} 添加武器"
 
+#: src/widgets/pages/WidgetsPage.tsx
+msgid "Add a widget"
+msgstr ""
+
 #: src/multiplayer/battle/BattleMembersTable.tsx
 #, fuzzy
 msgid "Add AI"
@@ -9915,6 +9934,11 @@ msgstr "添加到此场景"
 msgid "Add unit"
 msgstr "添加单位"
 
+#: src/widgets/pages/AddWidgetDrawer.tsx
+#: src/widgets/pages/WidgetsPage.tsx
+msgid "Add widget"
+msgstr ""
+
 #: src/multiplayer/pages/HighlightsSettings.tsx
 #, fuzzy
 msgid "Add word"
@@ -9980,6 +10004,10 @@ msgstr "已添加为 {value}"
 #, fuzzy
 msgid "Added on top of the impulse from impulseFactor."
 msgstr "在 impulseFactor 产生的冲量之上额外添加。"
+
+#: src/widgets/pages/AddWidgetDrawer.tsx
+msgid "Added to {folderList}."
+msgstr ""
 
 #: src/content/unitFieldNotes.ts
 #, fuzzy
@@ -10292,6 +10320,7 @@ msgid "all Game options"
 msgstr "所有游戏选项"
 
 #: src/hub/pages/components/GamePicturesControl.tsx
+#: src/widgets/pages/AddWidgetDrawer.tsx
 #: src/widgets/pages/WidgetsPage.tsx
 #, fuzzy
 msgid "All games"
@@ -13830,6 +13859,7 @@ msgstr "不会伤害自己的单位"
 #: src/scenario/pages/components/ReclaimClipsForm.tsx
 #: src/scenario/pages/components/SetupPanel.tsx
 #: src/uberstress/pages/RunPage.tsx
+#: src/widgets/pages/AddWidgetDrawer.tsx
 #: src/workshop/pages/components/CloneActions.tsx
 #: src/workshop/pages/components/DiskDiffDrawer.tsx
 #: src/workshop/pages/components/InPlaceWrite.tsx
@@ -14632,6 +14662,14 @@ msgstr "请先选择一个密度图层。"
 msgid "Choose a file"
 msgstr "选择文件"
 
+#: src/widgets/pages/AddWidgetDrawer.tsx
+msgid "Choose a file or zip"
+msgstr ""
+
+#: src/widgets/pages/AddWidgetDrawer.tsx
+msgid "Choose a folder"
+msgstr ""
+
 #: src/content/pages/components/Convert3doDrawer.tsx
 #, fuzzy
 msgid "Choose a folder for the converted models"
@@ -14728,6 +14766,14 @@ msgstr "选择纹理"
 #, fuzzy
 msgid "Choose a tool to get started."
 msgstr "选择一个工具开始吧。"
+
+#: src/widgets/pages/AddWidgetDrawer.tsx
+msgid "Choose a widget"
+msgstr ""
+
+#: src/widgets/pages/AddWidgetDrawer.tsx
+msgid "Choose a widget folder"
+msgstr ""
 
 #: src/multiplayer/battles/HostBattleForm.tsx
 #, fuzzy
@@ -17400,6 +17446,8 @@ msgid "Could not read your saved models: {error}"
 msgstr "无法读取你保存的模型：{error}"
 
 #. placeholder {0}: row.error
+#. placeholder {0}: w.error
+#: src/widgets/pages/AddWidgetDrawer.tsx
 #: src/widgets/pages/WidgetsPage.tsx
 msgid "Could not read: {0}"
 msgstr ""
@@ -17418,6 +17466,10 @@ msgstr "无法保存模型：{reason}"
 #, fuzzy
 msgid "Could not save the module"
 msgstr "无法保存模块"
+
+#: src/widgets/pages/AddWidgetDrawer.tsx
+msgid "Could not save the setting for {line}"
+msgstr ""
 
 #: src/lego/pages/OpenFromArchivePage.tsx
 #, fuzzy
@@ -25268,6 +25320,10 @@ msgstr "在混战中每名玩家都是一人一队，所以无法按队伍划分
 msgid "in a loose working folder"
 msgstr "张位于未打包的工作文件夹中"
 
+#: src/widgets/pages/AddWidgetDrawer.tsx
+msgid "in a subfolder"
+msgstr ""
+
 #: src/content/pages/components/MapRecords.tsx
 #, fuzzy
 msgid "In a team game a position's record depends on the team it was on and on who else was on it. It is split by team here, and it is not controlled for anything else."
@@ -31297,6 +31353,10 @@ msgstr "此游戏的归档中没有匹配的图片文件。"
 msgid "No installed game"
 msgstr ""
 
+#: src/widgets/pages/AddWidgetDrawer.tsx
+msgid "No installed game with a folder for this widget."
+msgstr ""
+
 #: src/content/pages/components/RemixPanel.tsx
 #, fuzzy
 msgid "No installed games found to target."
@@ -34226,6 +34286,7 @@ msgstr "操作码"
 #: src/hub/pages/ItemPage.tsx
 #: src/lobby-servers/PasswordRecoveryForm.tsx
 #: src/multiplayer/battles/BattleList.tsx
+#: src/widgets/pages/AddWidgetDrawer.tsx
 #, fuzzy
 msgid "Open"
 msgstr "打开"
@@ -38960,6 +39021,7 @@ msgstr "重复 · {cooldown} 秒"
 #: src/campaign/pages/components/MissionMediaFields.tsx
 #: src/lego/moduleFileIo.ts
 #: src/lego/pages/components/ScriptTab.tsx
+#: src/widgets/pages/AddWidgetDrawer.tsx
 #, fuzzy
 msgid "Replace"
 msgstr "替换"
@@ -39003,6 +39065,10 @@ msgstr "替换此脚本？"
 #, fuzzy
 msgid "Replace this unit's table with the saved one"
 msgstr "用已保存的表替换此单位的表"
+
+#: src/widgets/pages/AddWidgetDrawer.tsx
+msgid "Replace what is already there?"
+msgstr ""
 
 #: src/lego/pages/components/AnimationPanel.tsx
 #, fuzzy
@@ -44674,6 +44740,10 @@ msgstr "关闭时的音效"
 msgid "Switched on"
 msgstr "开启"
 
+#: src/widgets/pages/AddWidgetDrawer.tsx
+msgid "Switched on for {target}, off everywhere else."
+msgstr ""
+
 #: src/content/unitFieldNotes.ts
 #, fuzzy
 msgid "Switched on sound"
@@ -47221,6 +47291,14 @@ msgstr "队伍数量"
 #, fuzzy
 msgid "The number the unit's own script reads back from GET COB_ID. Only the game's scripts give it meaning."
 msgstr "单位自身脚本通过 GET COB_ID 读回的数字。只有游戏的脚本赋予它意义。"
+
+#: src/widgets/pages/AddWidgetDrawer.tsx
+msgid "The old files are copied to the widget backups first."
+msgstr ""
+
+#: src/widgets/pages/AddWidgetDrawer.tsx
+msgid "The old files are in {backupPath}"
+msgstr ""
 
 #: src/scenario/pages/components/SetupPanel.tsx
 #, fuzzy
@@ -53679,6 +53757,7 @@ msgid "Why?"
 msgstr "为什么？"
 
 #: src/blueprint/pages/components/BlueprintWidgetButton.tsx
+#: src/widgets/pages/AddWidgetDrawer.tsx
 #: src/widgets/pages/WidgetsPage.tsx
 #, fuzzy
 msgid "Widget"
