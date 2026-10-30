@@ -33,7 +33,12 @@ import {
 import { usePlay } from "@/play/PlayProvider";
 import { useGameFiles } from "../useGameFiles";
 import { useWidgetList } from "../useWidgetList";
-import { folderToOpen, rowsForGame, type WidgetRow } from "../widgetList";
+import {
+  findGame,
+  folderToOpen,
+  rowsForGame,
+  type WidgetRow,
+} from "../widgetList";
 import {
   appliedSet,
   dropOverride,
@@ -59,7 +64,8 @@ const ALL = "all-games";
 /**
  * Library > Widgets (issue #1284): the widget files a player has added under
  * the engine's write folder, what each one declares, and which installed games
- * load it. `?game=` picks one game, which is how a game's page links here.
+ * load it. `?game=` picks one game, by name or by the full name of one of its
+ * versions, which is how a game's page links here.
  *
  * Its switches change the widget sets (#4844): with "All games" picked, the set
  * every game uses, and with a game picked, that game's own set, which it gets
@@ -70,7 +76,7 @@ export default function WidgetsPage() {
   const [params, setParams] = useSearchParams();
   const list = useWidgetList();
   const picked = params.get("game") ?? ALL;
-  const game = list.games?.find((g) => g.game === picked);
+  const game = findGame(list.games, picked);
   const files = useGameFiles(list.writeDir, list.games, list.rows);
   const sets = useWidgetSets();
   const [adding, setAdding] = useState(false);
@@ -182,7 +188,7 @@ export default function WidgetsPage() {
       {list.targets.length > 0 && (
         <OptionSelect
           className="w-72"
-          value={picked}
+          value={game?.game ?? picked}
           onValueChange={pick}
           options={options}
           ariaLabel={t`Game`}

@@ -1,7 +1,14 @@
 import { describe, expect, it } from "vitest";
 import type { PlayerWidgetFile, PlayerWidgetScan } from "@/content/bindings";
 import type { WidgetHandler } from "./handlers";
-import { folderToOpen, rowsForGame, widgetRows } from "./widgetList";
+import {
+  findGame,
+  folderToOpen,
+  type InstalledGame,
+  oneEntryPerGame,
+  rowsForGame,
+  widgetRows,
+} from "./widgetList";
 
 const upper: WidgetHandler = {
   id: "engine",
@@ -100,6 +107,90 @@ describe("rowsForGame", () => {
 
   it("shows a game with an unknown handler every file", () => {
     expect(rowsForGame(rows, games[3])).toHaveLength(2);
+  });
+});
+
+describe("oneEntryPerGame", () => {
+  const install = (
+    game: string,
+    title: string,
+    version: string,
+    shortName: string | undefined,
+    handler: WidgetHandler | null = lower,
+  ): InstalledGame => ({ game, title, version, shortName, handler });
+
+  it("makes one entry of the versions of a game, named without a version", () => {
+    const entries = oneEntryPerGame([
+      install("Splinter Faction 0.1.93", "Splinter Faction", "0.1.93", "SF"),
+      install("Splinter Faction 0.1.96", "Splinter Faction", "0.1.96", "SF"),
+      install("Splinter Faction 0.1.95", "Splinter Faction", "0.1.95", "SF"),
+    ]);
+    expect(entries).toEqual([
+      {
+        game: "Splinter Faction",
+        shortName: "SF",
+        handler: lower,
+        versions: [
+          "Splinter Faction 0.1.96",
+          "Splinter Faction 0.1.95",
+          "Splinter Faction 0.1.93",
+        ],
+      },
+    ]);
+  });
+
+  it("uses the newest version's handler", () => {
+    const [entry] = oneEntryPerGame([
+      install("Game 1.9", "Game", "1.9", "G", upper),
+      install("Game 1.10", "Game", "1.10", "G", lower),
+    ]);
+    expect(entry.handler).toBe(lower);
+  });
+
+  it("keeps a game with no short name as an entry per version", () => {
+    const entries = oneEntryPerGame([
+      install("Odd 1", "Odd", "1", undefined),
+      install("Odd 2", "Odd", "2", undefined),
+    ]);
+    expect(entries.map((e) => e.game)).toEqual(["Odd 1", "Odd 2"]);
+    expect(entries.every((e) => e.versions === undefined)).toBe(true);
+  });
+
+  it("tells apart two games that share a name without a version", () => {
+    const entries = oneEntryPerGame([
+      install("Zero-K v1.14", "Zero-K", "v1.14", "ZK"),
+      install("Zero-K Benchmark v3", "Zero-K", "v3", "ZKB"),
+    ]);
+    expect(entries.map((e) => e.game)).toEqual(["Zero-K", "Zero-K (ZKB)"]);
+  });
+});
+
+describe("findGame", () => {
+  const entries = oneEntryPerGame([
+    {
+      game: "Splinter Faction 0.1.96",
+      title: "Splinter Faction",
+      version: "0.1.96",
+      shortName: "SF",
+      handler: lower,
+    },
+    {
+      game: "Odd 1",
+      title: "Odd",
+      version: "1",
+      handler: null,
+    },
+  ]);
+
+  it("finds an entry by its name or by the full name of one of its versions", () => {
+    expect(findGame(entries, "Splinter Faction")?.shortName).toBe("SF");
+    expect(findGame(entries, "Splinter Faction 0.1.96")?.shortName).toBe("SF");
+    expect(findGame(entries, "Odd 1")?.game).toBe("Odd 1");
+  });
+
+  it("finds nothing for a game that is not installed", () => {
+    expect(findGame(entries, "Gone 1.0")).toBeUndefined();
+    expect(findGame(null, "Gone 1.0")).toBeUndefined();
   });
 });
 
