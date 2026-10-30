@@ -1090,7 +1090,7 @@ mod tests {
                                 .contains("authorization: bearer an-access-token")
                                 .then_some("Tom on the hub"),
                         })
-                    } else {
+                    } else if head.starts_with("POST /auth/v1/token") {
                         recorded
                             .lock()
                             .unwrap()
@@ -1104,6 +1104,11 @@ mod tests {
                                 "user_metadata": { "full_name": "Tom" },
                             },
                         })
+                    } else {
+                        // Not one of the three requests. Other programs on a
+                        // developer machine probe new local ports with a `GET /`,
+                        // and that must not be taken for the token request.
+                        return;
                     };
                     let answer = answer.to_string();
                     let response = format!(
@@ -1213,6 +1218,24 @@ mod tests {
         let sent: Value = serde_json::from_str(body).unwrap();
         assert_eq!(sent["auth_code"], "an-authorization-code");
         assert_eq!(sent["code_verifier"].as_str().unwrap().len(), 43);
+    }
+
+    /// Other programs on a developer machine probe new local ports with a
+    /// `GET /`. The stand-in must let that go rather than take it for the token
+    /// request, or the sign-in test reads the wrong request as its first.
+    #[tokio::test]
+    async fn the_stand_in_hub_lets_a_stray_request_go_without_recording_it() {
+        let (base, seen) = stand_in_hub().await;
+        let mut sock = tokio::net::TcpStream::connect(base.trim_start_matches("http://"))
+            .await
+            .unwrap();
+        sock.write_all(b"GET / HTTP/1.1\r\nhost: localhost\r\n\r\n")
+            .await
+            .unwrap();
+        let mut answer = Vec::new();
+        let _ = sock.read_to_end(&mut answer).await;
+        assert!(answer.is_empty(), "a stray GET was answered");
+        assert!(seen.lock().unwrap().is_empty());
     }
 
     // ------------------------------------------------------------------- live
