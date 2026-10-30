@@ -576,35 +576,99 @@ fn flag_value<'a>(args: &'a [String], flag: &str) -> Option<&'a str> {
 fn run_served_blocking(
     bin: PathBuf,
     args: Vec<String>,
-    #[cfg_attr(not(debug_assertions), allow(unused_mut))] mut envs: Vec<(String, String)>,
+    envs: Vec<(String, String)>,
     timeout: Duration,
     what: String,
     cancel: Option<Arc<AtomicBool>>,
-    (kind, patience): (pool::Kind, Duration),
+    queue: (pool::Kind, Duration),
 ) -> Result<String, String> {
-    let (Some(lib), Some(datadir)) = (flag_value(&args, "--lib"), flag_value(&args, "--datadir"))
+    let served = ask_lane(
+        &bin,
+        &args,
+        &envs,
+        timeout,
+        &what,
+        cancel.as_ref(),
+        queue,
+        &mut |_| {},
+    )?;
+    match served {
+        Some(output) => Ok(output),
+        None => run_worker_blocking(bin, args, envs, timeout, what, cancel),
+    }
+}
+
+/// [`run_served_blocking`], handing each line of progress the read prints to
+/// `on_progress` as it arrives, as [`run_worker_streaming`] does, and answering
+/// with the last line that is not progress.
+fn run_served_streaming(
+    bin: PathBuf,
+    args: Vec<String>,
+    envs: Vec<(String, String)>,
+    timeout: Duration,
+    what: String,
+    queue: (pool::Kind, Duration),
+    mut on_progress: impl FnMut(serde_json::Value) + Send + 'static,
+) -> Result<String, String> {
+    let served = ask_lane(
+        &bin,
+        &args,
+        &envs,
+        timeout,
+        &what,
+        None,
+        queue,
+        &mut |line| {
+            split_progress(line, &mut on_progress);
+        },
+    )?;
+    match served {
+        Some(output) => Ok(split_progress(output.as_bytes(), |_| {})),
+        None => run_worker_streaming(bin, args, envs, timeout, what, None, on_progress),
+    }
+}
+
+/// Send one read to the lane `queue` names. `Ok(None)` when the read ahead of it
+/// has held the worker too long, so the caller has to start a worker of its own.
+#[allow(clippy::too_many_arguments)]
+fn ask_lane(
+    bin: &Path,
+    args: &[String],
+    envs: &[(String, String)],
+    timeout: Duration,
+    what: &str,
+    cancel: Option<&Arc<AtomicBool>>,
+    (kind, patience): (pool::Kind, Duration),
+    on_progress: &mut dyn FnMut(&[u8]),
+) -> Result<Option<String>, String> {
+    let (Some(lib), Some(datadir)) = (flag_value(args, "--lib"), flag_value(args, "--datadir"))
     else {
-        return run_worker_blocking(bin, args, envs, timeout, what, cancel);
+        return Ok(None);
     };
     #[cfg(debug_assertions)]
-    envs.push((devstats::TIMINGS_ENV.into(), "1".into()));
+    let envs = &[
+        envs,
+        &[(devstats::TIMINGS_ENV.to_string(), "1".to_string())],
+    ]
+    .concat();
     #[cfg(debug_assertions)]
-    let mut dev_run = devstats::WorkerRun::start(&what);
+    let mut dev_run = devstats::WorkerRun::start(what);
 
-    let ran = pool::lane(&bin, lib, datadir, &envs, kind).run(&pool::Job {
-        args: &args,
+    let job = pool::Job {
+        args,
         timeout,
-        what: &what,
-        cancel: cancel.as_deref(),
+        what,
+        cancel: cancel.map(Arc::as_ref),
         patience,
-    })?;
+    };
+    let ran = pool::lane(bin, lib, datadir, envs, kind).run(&job, on_progress)?;
     let served = match ran {
         pool::Ran::Served(served) => served,
         pool::Ran::Busy => {
             // The one-shot run logs this read itself.
             #[cfg(debug_assertions)]
             dev_run.handed_on(kind.name());
-            return run_worker_blocking(bin, args, envs, timeout, what, cancel);
+            return Ok(None);
         }
     };
     #[cfg(debug_assertions)]
@@ -625,7 +689,22 @@ fn run_served_blocking(
         ));
     }
     String::from_utf8(served.output)
+        .map(Some)
         .map_err(|e| format!("unitsync worker output is not valid UTF-8: {e}"))
+}
+
+/// [`run_served_blocking`] on the engine's page worker, for a blocking caller
+/// that makes many reads in a row, such as a compat build (issue #4895). Each one
+/// started its own worker before, and `Init` was most of what each one took.
+fn run_page_blocking(
+    bin: PathBuf,
+    args: Vec<String>,
+    envs: Vec<(String, String)>,
+    timeout: Duration,
+    what: &str,
+) -> Result<String, String> {
+    let queue = (pool::Kind::Page, HELD_TOO_LONG);
+    run_served_blocking(bin, args, envs, timeout, what.to_string(), None, queue)
 }
 
 /// Have a worker answer one read and parse its JSON into a `CliResult`. `what`
@@ -2267,14 +2346,7 @@ pub fn game_declared_blocking(
     let (bin, libpath, engine_dir) = prepare(engine_path)?;
     let args = build_args(&libpath.to_string_lossy(), data_dir);
     let envs = loader_envs(&engine_dir, data_dir);
-    let out = run_worker_blocking(
-        bin,
-        args,
-        envs,
-        SCAN_TIMEOUT,
-        "game short name".into(),
-        None,
-    )?;
+    let out = run_page_blocking(bin, args, envs, SCAN_TIMEOUT, "game short name")?;
     declared_game_in_scan(&out, game)
 }
 
@@ -2300,14 +2372,7 @@ pub fn lua_compat_scan_blocking(
     let (bin, libpath, engine_dir) = prepare(engine_path)?;
     let args = build_lua_compat_args(&libpath.to_string_lossy(), data_dir, archive);
     let envs = loader_envs(&engine_dir, data_dir);
-    run_worker_blocking(
-        bin,
-        args,
-        envs,
-        SCAN_TIMEOUT,
-        "lua compat scan".into(),
-        None,
-    )
+    run_page_blocking(bin, args, envs, SCAN_TIMEOUT, "lua compat scan")
 }
 
 /// The palette a 3do conversion of `archive` would read now, as the worker's
@@ -2330,7 +2395,8 @@ pub fn compat_palette_blocking(
 /// the compat plugin calls it from a blocking task to put a game's models into
 /// its mutator (issue #4557), as the compat writer `writer` its manifest names
 /// converts them. Each progress line the worker prints goes to `on_progress`
-/// as it arrives, on another thread.
+/// as it arrives. The running worker answers it, so a build's reads and its
+/// conversion share one `Init` (issue #4895).
 pub fn convert_3do_blocking(
     engine_path: &str,
     data_dir: &str,
@@ -2348,13 +2414,13 @@ pub fn convert_3do_blocking(
         Some(writer),
     );
     let envs = loader_envs(&engine_dir, data_dir);
-    run_worker_streaming(
+    run_served_streaming(
         bin,
         args,
         envs,
         CONVERT_TIMEOUT,
         "3do conversion".into(),
-        None,
+        (pool::Kind::Page, HELD_TOO_LONG),
         on_progress,
     )
 }
@@ -2372,14 +2438,7 @@ pub fn archive_bytes_blocking(
     let (bin, libpath, engine_dir) = prepare(engine_path)?;
     let args = build_archive_file_args(&libpath.to_string_lossy(), data_dir, archive, file, true);
     let envs = loader_envs(&engine_dir, data_dir);
-    let out = run_worker_blocking(
-        bin,
-        args,
-        envs,
-        MINIMAP_TIMEOUT,
-        "archive bytes".into(),
-        None,
-    )?;
+    let out = run_page_blocking(bin, args, envs, MINIMAP_TIMEOUT, "archive bytes")?;
     bytes_in_archive_output(&out, archive, file)
 }
 
@@ -2430,7 +2489,7 @@ pub fn unit_defs_blocking(
     let (bin, libpath, engine_dir) = prepare(engine_path)?;
     let args = build_unit_defs_args(&libpath.to_string_lossy(), data_dir, archive, None);
     let envs = loader_envs(&engine_dir, data_dir);
-    run_worker_blocking(bin, args, envs, SCAN_TIMEOUT, "unit defs".into(), None)
+    run_page_blocking(bin, args, envs, SCAN_TIMEOUT, "unit defs")
 }
 
 /// The game environment a def script expects under unitsync, for a script
@@ -2457,7 +2516,7 @@ pub fn lua_exec_blocking(
         &script.to_string_lossy(),
     );
     let envs = loader_envs(&engine_dir, data_dir);
-    let out = run_worker_blocking(bin, args, envs, SCAN_TIMEOUT, "lua exec".into(), None);
+    let out = run_page_blocking(bin, args, envs, SCAN_TIMEOUT, "lua exec");
     let _ = std::fs::remove_file(&script);
     out
 }
@@ -2527,14 +2586,7 @@ pub fn archive_text_blocking(
     let (bin, libpath, engine_dir) = prepare(engine_path)?;
     let args = build_archive_file_args(&libpath.to_string_lossy(), data_dir, archive, file, false);
     let envs = loader_envs(&engine_dir, data_dir);
-    let out = run_worker_blocking(
-        bin,
-        args,
-        envs,
-        MINIMAP_TIMEOUT,
-        "archive text".into(),
-        None,
-    )?;
+    let out = run_page_blocking(bin, args, envs, MINIMAP_TIMEOUT, "archive text")?;
     text_in_archive_output(&out, archive, file)
 }
 
