@@ -120,7 +120,7 @@ Coilbox cannot host a compatibility mode battle yet. A battle you host uses the 
 
 - Only what is listed in [What it changes](#what-it-changes). The report can show Lua calls and def tags that have no fix.
 - Maps.
-- A game that ships its own `gamedata/defs_post.lua`, or whose own `gamedata/defs.lua` never loads it, gets no converted models and none of the def fixes that run there. Issue #4628 covers converting those models.
+- A game that never reaches `gamedata/defs_post.lua` gets its converted models and def fixes through `gamedata/weapondefs.lua` instead. If it ships that file too, or its own `gamedata/defs.lua` loads its weapon defs before its unit or feature defs, it gets no converted models and none of those def fixes.
 - A game that ships its own `gamedata/weapondefs_post.lua`, or whose own `gamedata/weapondefs.lua` never loads it, gets none of the weapon def fixes.
 - A `.3do` face that names a colour from the Total Annihilation palette is drawn flat grey when no `palette.pal` can be found.
 
@@ -130,7 +130,7 @@ If one of the fixes fails while the game runs, the game still loads. The engine'
 
 ## What it changes
 
-This is compatibility version 21, the newest.
+This is compatibility version 22, the newest.
 
 Lua functions it puts back:
 

@@ -22,6 +22,10 @@ The folder holds:
 
 A game that ships its own `gamedata/defs_post.lua` or `gamedata/weapondefs_post.lua` would have it covered up by the generated one. So coilbox writes neither file for such a game, and the player's build result says so. The same happens when the game's own `gamedata/defs.lua` or `gamedata/weapondefs.lua` never loads the file.
 
+From writer 4, a game that never reaches `gamedata/defs_post.lua` gets its work done in `gamedata/weapondefs.lua` instead. That file runs the engine's own copy, which it covers up, then points the defs at the converted models and runs the `defs_post` fixes. Balanced Annihilation 15.9.8 works this way. It needs the game not to ship `gamedata/weapondefs.lua`, and any `gamedata/defs.lua` of its own to load that file by name, into `DEFS.weaponDefs`, after `DEFS.unitDefs` and `DEFS.featureDefs`. Otherwise the build result says what was skipped. The engine's own `defs_post.lua` is not run, because the game's `defs.lua` never ran it and the move defs are not loaded yet.
+
+The `weapondefs_post` fixes do not follow. Each of Balanced Annihilation 15.9.8's seven bombs gives its own burst with no `manualBombSettings`, and `defs-manual-bomb-settings-92` would replace each with a burst of 2. The note in the fix's own header that a game with its own `weapondefs_post.lua` does not run it is still true.
+
 ## The same bytes on every computer
 
 Players in a multiplayer battle compare archive checksums. Coilbox writes the folder the same way on every computer from the same game and manifest: files sorted by path, LF line endings, and no timestamps or paths. A player on a different compatibility version then has a missing archive rather than a game that desyncs.
