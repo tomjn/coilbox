@@ -369,7 +369,8 @@ describe("loadWidgetSettings", () => {
   it("says nothing is saved yet for a widget that saves through GetConfigData", async () => {
     const io = memory({
       [`${DIR}/LuaUI/Config/MF.lua`]: "return {\n\tdata = {},\n}",
-      [`${WIDGETS}/${widgetPath}`]: "function widget:GetConfigData() return {} end",
+      [`${WIDGETS}/${widgetPath}`]:
+        "function widget:GetConfigData() return {} end",
     });
     expect(await loadWidgetSettings(base(io))).toEqual({ kind: "unsaved" });
     // And when the game has no file at all yet.
