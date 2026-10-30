@@ -406,6 +406,10 @@ mod tests {
         write(&target.join("coilbox.exe"), "old");
         write(&target.join(".coilbox/profile.json"), "{}");
         write(&target.join(".coilbox/data/settings.json"), "mine");
+        write(
+            &target.join(".coilbox/data/uberstress/settings.corrupt-1.json"),
+            "moved aside",
+        );
         write(&target.join(".coilbox/cache/thumb.png"), "cached");
         write(&target.join(".coilbox/legoparts/parts.lua"), "distribution");
 
@@ -415,6 +419,10 @@ mod tests {
         assert_eq!(read(&target.join(".coilbox/uberstress.exe")), "new");
         assert_eq!(read(&target.join(".coilbox/profile.json")), "{}");
         assert_eq!(read(&target.join(".coilbox/data/settings.json")), "mine");
+        assert_eq!(
+            read(&target.join(".coilbox/data/uberstress/settings.corrupt-1.json")),
+            "moved aside"
+        );
         assert_eq!(read(&target.join(".coilbox/cache/thumb.png")), "cached");
         assert_eq!(
             read(&target.join(".coilbox/legoparts/parts.lua")),
