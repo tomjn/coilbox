@@ -2303,6 +2303,72 @@ export const contentPlayerWidgets = defineCommand<
   PlayerWidgetScan
 >("coilbox-content", "content_player_widgets");
 
+/** A widget file in a `.lua` file, folder or zip a player picked (issue
+ *  #1286). */
+export interface PlannedWidget {
+  /** Relative to the picked folder or zip. */
+  path: string;
+  /** The name a game saves its state under. Null when the file did not run. */
+  name: string | null;
+  /** In a subfolder, which only some games load. */
+  nested: boolean;
+  error: string | null;
+}
+
+export interface WidgetPlan {
+  /** Every file that would be copied, relative to the picked folder or zip. */
+  files: string[];
+  widgets: PlannedWidget[];
+  /** Built on RmlUi, which a game reads from its own folder. */
+  rml: boolean;
+  /** `.lua` files more than one folder down, which no game loads. */
+  tooDeep: string[];
+}
+
+/** What is in a `.lua` file, folder or zip, without adding it anywhere. */
+export const contentWidgetPlan = defineCommand<{ source: string }, WidgetPlan>(
+  "coilbox-content",
+  "content_widget_plan",
+);
+
+/** Something already in a folder that adding would clash with. */
+export interface WidgetConflict {
+  /** Relative to the write folder. */
+  path: string;
+  name: string | null;
+  /** `name`: a widget with the same name. `path`: a file the new files would
+   *  overwrite. */
+  reason: "name" | "path";
+}
+
+export type WidgetAddOutcome =
+  /** Nothing was written. */
+  | { kind: "conflicts"; conflicts: WidgetConflict[] }
+  | {
+      kind: "added";
+      /** The folders written to, relative to the write folder. */
+      folders: string[];
+      widgets: PlannedWidget[];
+      /** Where the replaced files were copied to, when any were. */
+      backup: string | null;
+    };
+
+/**
+ * Copy the picked widget into each of `folders` under the write folder, keeping
+ * its layout. Without `replace`, answers with what it would clash with and
+ * writes nothing. With it, copies the clashing files into the app's widget
+ * backups first.
+ */
+export const contentWidgetAdd = defineCommand<
+  {
+    writeDir: string;
+    source: string;
+    folders: readonly string[];
+    replace: boolean;
+  },
+  WidgetAddOutcome
+>("coilbox-content", "content_widget_add");
+
 /**
  * Replace that `uikeys.txt`. The first write over a file coilbox did not author
  * copies it to `uikeys.txt.bak`, reported as `backedUp`.

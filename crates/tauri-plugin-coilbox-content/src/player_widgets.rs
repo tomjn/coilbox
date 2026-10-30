@@ -135,7 +135,7 @@ fn same_file(a: &Path, b: &Path) -> bool {
 /// `dir` under its own name in the other case and checking whether that is
 /// `dir` itself. A name with no letters to swap cannot answer, so that falls
 /// back to the platform's usual filesystem.
-fn case_sensitive(dir: &Path) -> bool {
+pub(crate) fn case_sensitive(dir: &Path) -> bool {
     let name = dir.file_name().map(|n| n.to_string_lossy().to_string());
     let swapped = name.as_ref().map(|name| {
         name.chars()

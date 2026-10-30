@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   absorbFile,
+  addWidgets,
   appliedSet,
   dropOverride,
   EMPTY_SETS,
@@ -145,5 +146,50 @@ describe("widget sets", () => {
         ["Minimap", true],
       ]),
     );
+  });
+
+  describe("addWidgets", () => {
+    const sets: WidgetSets = {
+      global: { Minimap: true },
+      overrides: { MF: { Minimap: false } },
+      written: {},
+    };
+
+    it("switches a new widget on for every game and says off in each game's own set", () => {
+      const next = addWidgets(sets, null, ["Radar"]);
+      expect(next.global).toEqual({ Minimap: true, Radar: true });
+      expect(next.overrides.MF).toEqual({ Minimap: false, Radar: false });
+    });
+
+    it("switches it on in one game's set and off in the rest", () => {
+      const next = addWidgets(sets, "MF", ["Radar"]);
+      expect(next.global).toEqual({ Minimap: true, Radar: false });
+      expect(next.overrides.MF).toEqual({ Minimap: false, Radar: true });
+    });
+
+    it("gives a game without a set of its own one that copies the global set", () => {
+      const next = addWidgets(sets, "SF", ["Radar"]);
+      expect(next.global).toEqual({ Minimap: true, Radar: false });
+      expect(next.overrides.SF).toEqual({ Minimap: true, Radar: true });
+      expect(next.overrides.MF).toEqual({ Minimap: false, Radar: false });
+    });
+
+    it("changes nothing for no widgets", () => {
+      expect(addWidgets(sets, null, [])).toBe(sets);
+    });
+
+    it("writes the new widget as off to a file that has no entry for it", () => {
+      const next = addWidgets(sets, "SF", ["Radar"]);
+      const radar = widget("Radar", [], true);
+      // A handler would switch on a widget its file has no entry for. Absorbing
+      // that file leaves the sets' answer alone.
+      const absorbed = absorbFile(next, "MF", PATH, new Map(), [radar]);
+      expect(statesToWrite(absorbed, "MF", [radar])).toEqual(
+        new Map([["Radar", false]]),
+      );
+      expect(statesToWrite(absorbed, "SF", [radar])).toEqual(
+        new Map([["Radar", true]]),
+      );
+    });
   });
 });

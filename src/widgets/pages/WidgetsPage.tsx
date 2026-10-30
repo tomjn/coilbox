@@ -1,10 +1,17 @@
 import { Trans, useLingui } from "@lingui/react/macro";
 import { Button } from "@picoframe/frame";
-import { FolderOpen, Puzzle, RefreshCw, SlidersHorizontal } from "lucide-react";
+import {
+  FolderOpen,
+  Plus,
+  Puzzle,
+  RefreshCw,
+  SlidersHorizontal,
+} from "lucide-react";
 import { useMemo, useState } from "react";
 import { useSearchParams } from "react-router";
 import { OptionSelect } from "@/components/OptionSelect";
 import { PageHeader } from "@/components/PageHeader";
+import { SlideDrawer } from "@/components/SlideDrawer";
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
 import {
@@ -36,6 +43,7 @@ import {
   useWidgetSets,
   type WidgetStates,
 } from "../widgetSets";
+import { AddWidgetDrawer } from "./AddWidgetDrawer";
 import { type SettingsTarget, WidgetSettingsDrawer } from "./WidgetSettings";
 
 /** The picker's value for the list of every widget file. Not empty, because
@@ -59,6 +67,7 @@ export default function WidgetsPage() {
   const game = list.games?.find((g) => g.game === picked);
   const files = useGameFiles(list.writeDir, list.games, list.rows);
   const sets = useWidgetSets();
+  const [adding, setAdding] = useState(false);
   const file = game ? files.files?.get(game.game) : undefined;
   // A game whose handler is not recognised has no file to write, so no set.
   const key = game?.handler ? setKey(game) : null;
@@ -124,6 +133,17 @@ export default function WidgetsPage() {
         actions={
           list.writeDir && (
             <div className="flex gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setAdding(true)}
+                disabled={
+                  !list.games || !list.widgets || (picked !== ALL && !game)
+                }
+              >
+                <Plus />
+                <Trans>Add widget</Trans>
+              </Button>
               <Button variant="outline" size="sm" onClick={openFolder}>
                 <FolderOpen />
                 <Trans>Open folder</Trans>
@@ -249,6 +269,25 @@ export default function WidgetsPage() {
           />
         )
       )}
+      <SlideDrawer
+        open={adding}
+        title={t`Add a widget`}
+        onClose={() => setAdding(false)}
+      >
+        {list.writeDir && list.games && list.widgets && (
+          <AddWidgetDrawer
+            writeDir={list.writeDir}
+            games={list.games}
+            caseSensitive={list.widgets.caseSensitive}
+            game={game}
+            setKey={picked === ALL ? null : key}
+            onAdded={() => {
+              void list.reload();
+              void files.reload();
+            }}
+          />
+        )}
+      </SlideDrawer>
       <WidgetSettingsDrawer
         target={settingsTarget}
         writeDir={list.writeDir}

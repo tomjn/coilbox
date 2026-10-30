@@ -191,6 +191,40 @@ export function switchIn(
   };
 }
 
+/**
+ * Record newly added widgets: on in the set the player was looking at (the
+ * global one when `key` is null, otherwise that game's own, made if it had
+ * none), and off, said outright, in every other set. A set that says nothing
+ * about a widget is written as off too, but a handler can switch on a widget
+ * its file has no entry for, so the sets spell it out.
+ */
+export function addWidgets(
+  sets: WidgetSets,
+  key: string | null,
+  names: readonly string[],
+): WidgetSets {
+  if (names.length === 0) return sets;
+  const off = Object.fromEntries(names.map((n) => [n, false]));
+  const on = Object.fromEntries(names.map((n) => [n, true]));
+  const existing = Object.fromEntries(
+    Object.entries(sets.overrides).map(([k, set]) => [
+      k,
+      { ...set, ...(k === key ? on : off) },
+    ]),
+  );
+  // A computed key in a literal makes an own property even when it is
+  // `__proto__`, which assigning to it would not.
+  const overrides =
+    key !== null && !entry(existing, key)
+      ? { ...existing, [key]: { ...sets.global, ...on } }
+      : existing;
+  return {
+    ...sets,
+    global: { ...sets.global, ...(key === null ? on : off) },
+    overrides,
+  };
+}
+
 /** Send a game back to the global set. */
 export function dropOverride(sets: WidgetSets, key: string): WidgetSets {
   if (!entry(sets.overrides, key)) return sets;

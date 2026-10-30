@@ -225,6 +225,29 @@ describe("WidgetsPage", () => {
     ).toBe("true");
   });
 
+  it("opens the drawer that adds a widget", () => {
+    page();
+    expect(
+      screen.queryByRole("button", { name: "Choose a folder" }),
+    ).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "Add widget" }));
+    expect(
+      screen.getByRole("button", { name: "Choose a file or zip" }),
+    ).toBeTruthy();
+    expect(
+      screen.getByRole("button", { name: "Choose a folder" }),
+    ).toBeTruthy();
+  });
+
+  it("does not add a widget for a linked game that is not installed", () => {
+    page("/library/widgets?game=Gone%201.0");
+    expect(
+      screen
+        .getByRole("button", { name: "Add widget" })
+        .hasAttribute("disabled"),
+    ).toBe(true);
+  });
+
   it("offers no switch in a game whose handler is not recognised", () => {
     page("/library/widgets?game=Mystery%201.0");
     expect(screen.queryByRole("switch")).toBeNull();
