@@ -52,14 +52,21 @@ function editsOf(
   for (const node of leaves(root)) {
     const draft = drafts[key(node.path)];
     if (draft === undefined) continue;
+    const { path, trail } = node;
     if (node.kind === "number" && typeof draft === "string") {
       const n = Number(draft);
       if (draft.trim() === "" || !Number.isFinite(n)) invalid = true;
-      else if (n !== node.value) edits.push({ path: node.path, value: n });
+      else if (n !== node.value) {
+        edits.push({ path, trail, was: node.value, value: n });
+      }
     } else if (node.kind === "string" && typeof draft === "string") {
-      if (draft !== node.value) edits.push({ path: node.path, value: draft });
+      if (draft !== node.value) {
+        edits.push({ path, trail, was: node.value, value: draft });
+      }
     } else if (node.kind === "boolean" && typeof draft === "boolean") {
-      if (draft !== node.value) edits.push({ path: node.path, value: draft });
+      if (draft !== node.value) {
+        edits.push({ path, trail, was: node.value, value: draft });
+      }
     }
   }
   return { edits, invalid };
@@ -348,7 +355,7 @@ export function WidgetSettingsDrawer({
     >
       {target && writeDir && (
         <SettingsBody
-          key={target.row.path}
+          key={`${target.game}\u0000${target.row.path}`}
           target={target}
           writeDir={writeDir}
         />

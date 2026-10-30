@@ -7,6 +7,7 @@ import {
   loadWidgetSettings,
   mentionsGetConfigData,
   readSettings,
+  type SettingEdit,
   type SettingNode,
   saveWidgetSettings,
   writeSettings,
@@ -108,6 +109,24 @@ return {
 }
 `;
 
+/** The edit the page makes to the setting at `labels` of a widget's table. */
+function editOf(
+  src: string,
+  config: WidgetConfigFile,
+  name: string,
+  labels: string[],
+  value: SettingEdit["value"],
+): SettingEdit {
+  const root = readSettings(src, config, sw(name))?.root as SettingNode;
+  const node = find(root, ...labels);
+  return {
+    path: node.path,
+    trail: node.trail,
+    was: "value" in node ? node.value : 0,
+    value,
+  };
+}
+
 function find(root: SettingNode, ...labels: string[]): SettingNode {
   let node = root;
   for (const label of labels) {
@@ -151,6 +170,20 @@ describe("readSettings", () => {
     expect(find(root, "name").kind).toBe("other");
   });
 
+  it.each([
+    "\\127",
+    "\\128",
+    "\\129",
+    "\\130",
+    "\\255",
+    "\\x80",
+    "\\xff",
+  ])("will not offer a string holding the byte escape %s", (escape) => {
+    const src = `return {\n\tdata = {\n\t\tA = {\n\t\t\ts = "a${escape}b",\n\t\t},\n\t},\n}`;
+    const root = readSettings(src, nested, sw("A"))?.root as SettingNode;
+    expect(find(root, "s").kind).toBe(escape === "\\127" ? "string" : "other");
+  });
+
   it("reads a separate data file as a table keyed by widget name", () => {
     const got = readSettings(FLAT_DATA, separate, sw("Chili Minimap"));
     expect(find(got?.root as SettingNode, "size")).toMatchObject({
@@ -168,9 +201,8 @@ describe("readSettings", () => {
     expect(readSettings("return {\n\torder = {},\n}", nested, sw("A"))).toBe(
       null,
     );
-    expect(readSettings(FLAT_DATA, separate, sw("version"))).toMatchObject({
-      root: { kind: "number", value: 6 },
-    });
+    // The format's own `version` is no widget's entry.
+    expect(readSettings(FLAT_DATA, separate, sw("version"))).toBeNull();
   });
 
   it("keeps the last copy of a key, as Lua does", () => {
@@ -191,20 +223,17 @@ describe("readSettings", () => {
 });
 
 describe("writeSettings", () => {
-  const path = (...labels: string[]): number[] => {
-    const root = readSettings(NESTED_FILE, nested, sw("Build Watch"))
-      ?.root as SettingNode;
-    let node = root;
-    for (const label of labels) node = find(node, label);
-    return [...node.path];
-  };
+  const edit = (labels: string[], value: SettingEdit["value"]) =>
+    editOf(NESTED_FILE, nested, "Build Watch", labels, value);
+  const write = (edits: SettingEdit[], src = NESTED_FILE) =>
+    writeSettings(src, nested, sw("Build Watch"), edits);
 
   it("changes the values it is given and nothing else", () => {
-    const out = writeSettings(NESTED_FILE, nested, sw("Build Watch"), [
-      { path: path("size"), value: 18.5 },
-      { path: path("enabled"), value: false },
-      { path: path("label"), value: 'a "b"\\c\nd' },
-      { path: path("colours", "1"), value: 0.25 },
+    const out = write([
+      edit(["size"], 18.5),
+      edit(["enabled"], false),
+      edit(["label"], 'a "b"\\c\nd'),
+      edit(["colours", "1"], 0.25),
     ]);
     const before = readBack(NESTED_FILE) as Record<string, any>;
     const after = readBack(out) as Record<string, any>;
@@ -227,61 +256,67 @@ describe("writeSettings", () => {
   });
 
   it("writes a negative or exponent number Lua reads back", () => {
-    const out = writeSettings(NESTED_FILE, nested, sw("Build Watch"), [
-      { path: path("size"), value: -1e-7 },
-    ]);
-    const got = readBack(out) as Record<string, any>;
+    const got = readBack(write([edit(["size"], -1e-7)])) as Record<string, any>;
     expect(got["string:data"]["string:Build Watch"]["string:size"]).toBe(-1e-7);
   });
 
   it("writes a string with control characters Lua reads back", () => {
     const value = "tab\there\u0001\u007f and \u00e9";
-    const out = writeSettings(NESTED_FILE, nested, sw("Build Watch"), [
-      { path: path("label"), value },
-    ]);
-    const got = readBack(out) as Record<string, any>;
+    const got = readBack(write([edit(["label"], value)])) as Record<
+      string,
+      any
+    >;
     expect(got["string:data"]["string:Build Watch"]["string:label"]).toBe(
       value,
     );
   });
 
   it("edits a separate data file in place", () => {
-    const root = readSettings(FLAT_DATA, separate, sw("Chili Minimap"))
-      ?.root as SettingNode;
     const out = writeSettings(FLAT_DATA, separate, sw("Chili Minimap"), [
-      { path: [...find(root, "size").path], value: 4 },
+      editOf(FLAT_DATA, separate, "Chili Minimap", ["size"], 4),
     ]);
     expect(out).toBe(FLAT_DATA.replace("size = 3", "size = 4"));
   });
 
   it("will not turn a value into another type, or edit what is not there", () => {
-    const run = (edit: { path: number[]; value: number | string | boolean }) =>
-      writeSettings(NESTED_FILE, nested, sw("Build Watch"), [edit]);
-    expect(() => run({ path: path("size"), value: "12" })).toThrow(
-      /changed after/,
-    );
-    expect(() => run({ path: path("colours"), value: 1 })).toThrow(
-      /changed after/,
-    );
-    expect(() => run({ path: [99], value: 1 })).toThrow(/changed after/);
-    expect(() => run({ path: path("size"), value: Number.NaN })).toThrow(
-      /finite/,
-    );
+    expect(() => write([edit(["size"], "12")])).toThrow(/changed after/);
+    expect(() => write([edit(["colours"], 1)])).toThrow(/changed after/);
+    expect(() =>
+      write([{ path: [99], trail: ["x"], was: 1, value: 1 }]),
+    ).toThrow(/changed after/);
+    expect(() => write([edit(["size"], Number.NaN)])).toThrow(/finite/);
     expect(() =>
       writeSettings(NESTED_FILE, nested, sw("Never Run"), [
-        { path: [0], value: 1 },
+        { path: [0], trail: ["size"], was: 1, value: 1 },
       ]),
     ).toThrow(/changed after/);
   });
 
   it("will not edit a value it shows as written", () => {
-    const root = readSettings(NESTED_FILE, nested, sw("odd-name.v2"))
-      ?.root as SettingNode;
     expect(() =>
       writeSettings(NESTED_FILE, nested, sw("odd-name.v2"), [
-        { path: [...find(root, "limit").path], value: 1 },
+        editOf(NESTED_FILE, nested, "odd-name.v2", ["limit"], 1),
       ]),
     ).toThrow(/changed after/);
+  });
+
+  it("refuses an edit once the game has changed the file under it", () => {
+    const stale = edit(["size"], 20);
+    // The game saved again: another number sits where `size` was, and `size`
+    // moved, so the same position now holds a different setting.
+    const moved = NESTED_FILE.replace(
+      "\t\t\tenabled = true,\n",
+      "\t\t\tenabled = true,\n\t\t\talpha = 3,\n",
+    );
+    expect(() => write([stale], moved)).toThrow(/changed after/);
+    // The same field with another value is also not what was shown.
+    expect(() =>
+      write([stale], NESTED_FILE.replace("size = 12", "size = 13")),
+    ).toThrow(/changed after/);
+    // A reordering that leaves it in place is fine.
+    expect(write([stale], NESTED_FILE.replace("size = 12", "size = 12"))).toBe(
+      NESTED_FILE.replace("size = 12", "size = 20"),
+    );
   });
 });
 
@@ -377,22 +412,17 @@ describe("saveWidgetSettings", () => {
     config: nested,
     shortName: "MF",
     sw: sw("Build Watch"),
-    edits: [{ path: [0, 0], value: 1 }],
+    edits: [editOf(NESTED_FILE, nested, "Build Watch", ["colours", "1"], 1)],
     gameRunning: false,
     now: NOW,
     ...over,
   });
-  const sizePath = () => {
-    const root = readSettings(NESTED_FILE, nested, sw("Build Watch"))
-      ?.root as SettingNode;
-    return [...find(root, "size").path];
-  };
+  const size = (value: number) =>
+    editOf(NESTED_FILE, nested, "Build Watch", ["size"], value);
 
   it("copies the file, then changes only that value", async () => {
     const io = memory({ [file]: NESTED_FILE });
-    const out = await saveWidgetSettings(
-      request(io, { edits: [{ path: sizePath(), value: 20 }] }),
-    );
+    const out = await saveWidgetSettings(request(io, { edits: [size(20)] }));
     expect(out.backup).toBe(`${file}.20261030-090530.bak`);
     expect(io.files[`${file}.20261030-090530.bak`]).toBe(NESTED_FILE);
     expect(io.files[file]).toBe(NESTED_FILE.replace("size = 12", "size = 20"));
@@ -402,9 +432,7 @@ describe("saveWidgetSettings", () => {
 
   it("writes nothing when nothing changes", async () => {
     const io = memory({ [file]: NESTED_FILE });
-    const out = await saveWidgetSettings(
-      request(io, { edits: [{ path: sizePath(), value: 12 }] }),
-    );
+    const out = await saveWidgetSettings(request(io, { edits: [size(12)] }));
     expect(out).toEqual({});
     expect(io.writes).toEqual([]);
   });
@@ -415,7 +443,7 @@ describe("saveWidgetSettings", () => {
       saveWidgetSettings(
         request(io, {
           gameRunning: true,
-          edits: [{ path: sizePath(), value: 20 }],
+          edits: [size(20)],
         }),
       ),
     ).rejects.toThrow(/A game is running/);
@@ -447,7 +475,7 @@ describe("saveWidgetSettings", () => {
       config: separate,
       shortName: "ZK",
       sw: sw("Chili Minimap"),
-      edits: [{ path: [0], value: 9 }],
+      edits: [editOf(FLAT_DATA, separate, "Chili Minimap", ["size"], 9)],
       gameRunning: false,
       now: NOW,
     });

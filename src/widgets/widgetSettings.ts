@@ -47,6 +47,9 @@ export type SettingNode = {
   /** Which field it is at each level from the widget's table, counting every
    *  field of the table whatever its key. This is how an edit finds it. */
   path: readonly number[];
+  /** The labels of the fields on that path, which an edit checks so that a
+   *  file the game has rewritten since cannot redirect it to another field. */
+  trail: readonly string[];
 } & (
   | { kind: "number"; value: number }
   | { kind: "string"; value: string }
@@ -56,23 +59,32 @@ export type SettingNode = {
   | { kind: "other"; text: string }
 );
 
-/** A change to one value, which must stay the type it is. */
+/** A change to one value, which must stay the type it is. `path`, `trail` and
+ *  `was` are what the node showed, and the edit is refused if the file no
+ *  longer holds the same there. */
 export interface SettingEdit {
   path: readonly number[];
+  trail: readonly string[];
+  was: number | string | boolean;
   value: number | string | boolean;
 }
 
 /** A string escape that stands for a byte above 127, which does not survive
  *  being read as text and written back. */
-const BYTE_ESCAPE = /\\(?:1[3-9]\d|2\d\d|x[89a-fA-F][0-9a-fA-F])/;
+const BYTE_ESCAPE = /\\(?:12[89]|1[3-9]\d|2\d\d|x[89a-fA-F][0-9a-fA-F])/;
 
-function nodeOf(src: string, f: Field, path: readonly number[]): SettingNode {
-  const base = { label: f.label, path };
+function nodeOf(
+  src: string,
+  f: Field,
+  path: readonly number[],
+  trail: readonly string[],
+): SettingNode {
+  const base = { label: f.label, path, trail };
   if (f.table) {
     return {
       ...base,
       kind: "table",
-      children: childrenOf(src, f.table, path),
+      children: childrenOf(src, f.table, path, trail),
     };
   }
   const n = numberOf(f.value);
@@ -97,11 +109,12 @@ function childrenOf(
   src: string,
   table: Table,
   path: readonly number[],
+  trail: readonly string[],
 ): SettingNode[] {
   return table.fields.flatMap((f, i) =>
     f.key !== null && table.fields.findLastIndex((g) => g.key === f.key) !== i
       ? []
-      : [nodeOf(src, f, [...path, i])],
+      : [nodeOf(src, f, [...path, i], [...trail, f.label])],
   );
 }
 
@@ -127,7 +140,11 @@ function locate(
 ): { name: string; entry: Field } | null {
   const table = settingsTable(src, config);
   if (!table) return null;
-  const name = savedUnder(sw, (n) => field(table, n) !== undefined);
+  // Zero-K's and Complete Annihilation's data files carry the format's
+  // `version` beside the widgets, which is no widget's entry.
+  const has = (n: string) =>
+    !(config.dataFiles && n === "version") && field(table, n) !== undefined;
+  const name = savedUnder(sw, has);
   const entry = name === null ? undefined : field(table, name);
   return name !== null && entry ? { name, entry } : null;
 }
@@ -141,7 +158,9 @@ export function readSettings(
 ): { name: string; root: SettingNode } | null {
   try {
     const found = locate(src, config, sw);
-    return found && { name: found.name, root: nodeOf(src, found.entry, []) };
+    return (
+      found && { name: found.name, root: nodeOf(src, found.entry, [], []) }
+    );
   } catch (e) {
     throw unreadable(e);
   }
@@ -194,15 +213,17 @@ export function writeSettings(
     if (!found) throw changed();
     const spans = edits.map((edit) => {
       let f = found.entry;
-      for (const i of edit.path) {
+      edit.path.forEach((i, depth) => {
         const next = f.table?.fields[i];
-        if (!next) throw changed();
+        if (!next || next.label !== edit.trail[depth]) throw changed();
         f = next;
-      }
-      // A value keeps its type, so an edit never turns a number into text.
-      if (nodeOf(src, f, edit.path).kind !== typeof edit.value) {
-        throw changed();
-      }
+      });
+      // A value keeps its type, so an edit never turns a number into text, and
+      // it is the value that was shown.
+      const now = nodeOf(src, f, edit.path, edit.trail);
+      const kind: string = now.kind;
+      if (kind !== typeof edit.value || !("value" in now)) throw changed();
+      if (now.value !== edit.was) throw changed();
       return { f, text: literal(edit.value) };
     });
     // From the end, so each offset is still right when it is applied.
