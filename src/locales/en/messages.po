@@ -3944,6 +3944,10 @@ msgstr "{name} owns {holds}."
 msgid "{name} preview"
 msgstr "{name} preview"
 
+#: src/widgets/pages/WidgetSettings.tsx
+msgid "{name} settings"
+msgstr "{name} settings"
+
 #: src/scenario/saveIntoGame.ts
 msgid "{name} ships inside {gameName}, which is packaged, so it cannot be saved there."
 msgstr "{name} ships inside {gameName}, which is packaged, so it cannot be saved there."
@@ -6912,9 +6916,17 @@ msgstr "A game is running, and coilbox does not know where this engine writes, s
 msgid "A game is running. {gameLabel} writes its whole blueprints file back when it saves or exits, so coilbox will not write into it until the game is closed."
 msgstr "A game is running. {gameLabel} writes its whole blueprints file back when it saves or exits, so coilbox will not write into it until the game is closed."
 
+#: src/widgets/pages/WidgetSettings.tsx
+msgid "A game is running. Close it to change these settings."
+msgstr "A game is running. Close it to change these settings."
+
 #: src/blueprint/pages/components/LeavingPack.tsx
 msgid "A game is running. It writes its whole blueprints file back when it saves or exits, so anything written into that file now could be thrown away without a word."
 msgstr "A game is running. It writes its whole blueprints file back when it saves or exits, so anything written into that file now could be thrown away without a word."
+
+#: src/widgets/widgetSettings.ts
+msgid "A game is running. It writes its widget settings back when it saves or exits, so anything written now would be thrown away. Close the game and try again."
+msgstr "A game is running. It writes its widget settings back when it saves or exits, so anything written now would be thrown away. Close the game and try again."
 
 #: src/blueprint/pages/components/WidgetPanel.tsx
 msgid "A game is running. The engine reads the widget when a match starts, so a change now lands in the next one."
@@ -7276,6 +7288,10 @@ msgstr "A set groups replays. Adding or removing here never changes the replay f
 #: src/content/pages/components/ReplaySetsManager.tsx
 msgid "A set is a named group of replays, such as a tournament or a night of games. Deleting a set never deletes the replays in it. To delete replays, use the replay's own page."
 msgstr "A set is a named group of replays, such as a tournament or a night of games. Deleting a set never deletes the replays in it. To delete replays, use the replay's own page."
+
+#: src/widgets/widgetSettings.ts
+msgid "A setting must be a finite number."
+msgstr "A setting must be a finite number."
 
 #: src/lego/scriptPlayback.ts
 msgid "A ship, hovercraft or ground transport picking something up, then putting it back down where it found it. It is told what to load and reaches for it, and the script decides where it goes in between."
@@ -15405,6 +15421,10 @@ msgstr "disarmed"
 #: src/scenario/triggerTypes.ts
 msgid "Disarms a trigger until something enables it again."
 msgstr "Disarms a trigger until something enables it again."
+
+#: src/widgets/pages/WidgetSettings.tsx
+msgid "Discard changes"
+msgstr "Discard changes"
 
 #: src/lego/pages/components/ScriptTab.tsx
 msgid "Discard this script and use the presets"
@@ -26530,6 +26550,10 @@ msgstr "Not connected."
 msgid "Not decoded"
 msgstr "Not decoded"
 
+#: src/widgets/pages/WidgetSettings.tsx
+msgid "not edited"
+msgstr "not edited"
+
 #: src/workshop/pages/components/WeaponLibraryPanel.tsx
 msgid "Not equipped anywhere."
 msgstr "Not equipped anywhere."
@@ -26827,6 +26851,10 @@ msgstr "Nothing can move right now."
 msgid "Nothing changed yet"
 msgstr "Nothing changed yet"
 
+#: src/widgets/pages/WidgetSettings.tsx
+msgid "Nothing changed."
+msgstr "Nothing changed."
+
 #: src/lego/pages/components/ExportDrawer.tsx
 msgid "Nothing chosen"
 msgstr "Nothing chosen"
@@ -27066,6 +27094,11 @@ msgstr "Nothing said why. The usual causes are not being the room's boss, the au
 msgid "Nothing saved for this map yet. Draw a layout and keep it here."
 msgstr "Nothing saved for this map yet. Draw a layout and keep it here."
 
+#. placeholder {0}: target.game
+#: src/widgets/pages/WidgetSettings.tsx
+msgid "Nothing saved yet. {0} saves this widget's settings after the widget has run."
+msgstr "Nothing saved yet. {0} saves this widget's settings after the widget has run."
+
 #: src/play/PresetPartsView.tsx
 msgid "Nothing selected"
 msgstr "Nothing selected"
@@ -27245,6 +27278,10 @@ msgstr "now"
 #: src/scenario/pages/components/TriggerSteps.tsx
 msgid "nowhere yet"
 msgstr "nowhere yet"
+
+#: src/widgets/pages/WidgetSettings.tsx
+msgid "number"
+msgstr "number"
 
 #: src/lego/pages/components/AnimationPanel.tsx
 msgid "Numbers, comma separated. Call-ins that aim take radians, as the engine hands them."
@@ -30346,6 +30383,7 @@ msgstr "Read-only. Only the host can change battle options."
 #: src/hub/pages/components/GamePicturesControl.tsx
 #: src/lego/pages/components/ScriptTab.tsx
 #: src/play/pages/EngineLogSection.tsx
+#: src/widgets/pages/WidgetSettings.tsx
 msgid "Reading"
 msgstr "Reading"
 
@@ -32483,6 +32521,7 @@ msgstr "Same as default"
 #: src/multiplayer/NoteButton.tsx
 #: src/play/pages/components/NewPresetFromReplayButton.tsx
 #: src/play/pages/components/SaveAsPresetButton.tsx
+#: src/widgets/pages/WidgetSettings.tsx
 #: src/workshop/pages/components/ProjectDetailsDrawer.tsx
 msgid "Save"
 msgstr "Save"
@@ -32741,6 +32780,10 @@ msgstr "Saved to the unit."
 #: src/play/pages/components/SaveAsPresetButton.tsx
 msgid "Saved to your Singleplayer presets to replay later."
 msgstr "Saved to your Singleplayer presets to replay later."
+
+#: src/widgets/pages/WidgetSettings.tsx
+msgid "Saved. The file as it was is at {saved}."
+msgstr "Saved. The file as it was is at {saved}."
 
 #: src/play/PlayProvider.tsx
 msgid "Savegame"
@@ -34012,8 +34055,14 @@ msgstr "settings"
 
 #: src/general/index.ts
 #: src/i18n/frameStrings.ts
+#: src/widgets/pages/WidgetsPage.tsx
 msgid "Settings"
 msgstr "Settings"
+
+#. placeholder {0}: row.info?.name || fileName(row.path)
+#: src/widgets/pages/WidgetsPage.tsx
+msgid "Settings of {0}"
+msgstr "Settings of {0}"
 
 #: src/content/pages/components/ConfigProfilesPanel.tsx
 msgid "Settings profiles"
@@ -36271,6 +36320,11 @@ msgstr "System"
 msgid "Table"
 msgstr "Table"
 
+#. placeholder {0}: node.children.length
+#: src/widgets/pages/WidgetSettings.tsx
+msgid "table of {0}"
+msgstr "table of {0}"
+
 #: src/hub/pages/BrowsePage.tsx
 msgid "Tag"
 msgstr "Tag"
@@ -36584,6 +36638,10 @@ msgstr "Test notification"
 #: src/content/pages/components/MissionRuntimeSection.tsx
 msgid "Testing a scenario here leaves its compiled mission in the game folder. Removing one takes the folder and its dialogue clips, and nothing else. The mission runtime stays, and testing that scenario again writes it back."
 msgstr "Testing a scenario here leaves its compiled mission in the game folder. Removing one takes the folder and its dialogue clips, and nothing else. The mission runtime stays, and testing that scenario again writes it back."
+
+#: src/widgets/pages/WidgetSettings.tsx
+msgid "text"
+msgstr "text"
 
 #: src/mapconv/pages/components/AdvancedOptions.tsx
 msgid "text file; one feature per line: [tdfname] [x] [y] [z] [rotation]"
@@ -38729,6 +38787,10 @@ msgstr "The servers you can log in to, and your accounts on them."
 msgid "The servers you play on, and who you hear from there."
 msgstr "The servers you play on, and who you hear from there."
 
+#: src/widgets/widgetSettings.ts
+msgid "The settings changed after coilbox read them, so nothing was saved. Close this and open it again."
+msgstr "The settings changed after coilbox read them, so nothing was saved. Close this and open it again."
+
 #: src/lego/pages/components/ImportResult.tsx
 msgid "The shading map, {shadingMap}, was not found. The unit looks the same here either way, but the export will have no glow or shine to write out."
 msgstr "The shading map, {shadingMap}, was not found. The unit looks the same here either way, but the export will have no glow or shine to write out."
@@ -40585,6 +40647,10 @@ msgstr "This warpath needs the game <0>{name}</0>, which is not installed."
 msgid "This was made by a newer version of coilbox. Update coilbox to open it."
 msgstr "This was made by a newer version of coilbox. Update coilbox to open it."
 
+#: src/widgets/pages/WidgetSettings.tsx
+msgid "This widget has no saved settings."
+msgstr "This widget has no saved settings."
+
 #: src/conquest/pages/components/ThreatLevelSelect.tsx
 msgid "Threat level"
 msgstr "Threat level"
@@ -41055,6 +41121,10 @@ msgstr "True once a set number of seconds has passed since the mission began."
 #: src/scenario/triggerTypes.ts
 msgid "True once an actor changes hands, whether captured or gifted away."
 msgstr "True once an actor changes hands, whether captured or gifted away."
+
+#: src/widgets/pages/WidgetSettings.tsx
+msgid "true or false"
+msgstr "true or false"
 
 #: src/downloads/activityRows.ts
 msgid "Try {label}"
