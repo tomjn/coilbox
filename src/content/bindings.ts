@@ -2294,8 +2294,8 @@ export interface PlayerWidgetScan {
 }
 
 /**
- * Every widget file in the named folders under `LuaUI/` of the engine's write
- * folder, with what each one's `GetInfo()` declares, read in the springlua
+ * Every widget file in the named folders under `LuaUI/` of `writeDir`, which
+ * is the content root rather than the engine's write folder (issue #4856), with what each one's `GetInfo()` declares, read in the springlua
  * sandbox. `folders` are names under `LuaUI/`, matched without regard to case.
  */
 export const contentPlayerWidgets = defineCommand<
@@ -2354,8 +2354,8 @@ export type WidgetAddOutcome =
     };
 
 /**
- * Copy the picked widget into each of `folders` under the write folder, keeping
- * its layout. Without `replace`, answers with what it would clash with and
+ * Copy the picked widget into each of `folders` under `writeDir`, the content
+ * root, keeping its layout. Without `replace`, answers with what it would clash with and
  * writes nothing. With it, copies the clashing files into the app's widget
  * backups first.
  */

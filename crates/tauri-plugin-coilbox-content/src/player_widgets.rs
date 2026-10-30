@@ -1,5 +1,11 @@
-//! The widget files a player has added under the engine's write folder (issue
-//! #1284).
+//! The widget files a player has added under a content root (issue #1284).
+//!
+//! Every engine coilbox starts reads the content root through `SPRING_DATADIR`,
+//! and the engine lists a widget folder across all its data folders, so a file
+//! there loads whichever engine runs. An engine with a `springsettings.cfg`
+//! beside its binary writes to its own folder instead, which is why the folder
+//! scanned is not the engine's write folder (issue #4856). `write_dir` names
+//! the folder scanned.
 //!
 //! Each game's widget handler reads its own folders under `LuaUI/` (the list of
 //! which lives in `src/widgets/handlers.ts`). This lists every `.lua` file in
@@ -233,7 +239,7 @@ pub fn scan(write_dir: &Path, folders: &[String]) -> WidgetScan {
 }
 
 /// `content_player_widgets`, every widget file in the named `LuaUI/` folders of
-/// the engine's write folder, with what each one's `GetInfo()` declares.
+/// the content root, with what each one's `GetInfo()` declares.
 #[tauri::command]
 pub(crate) async fn content_player_widgets(write_dir: String, folders: Vec<String>) -> CliResult {
     let res =

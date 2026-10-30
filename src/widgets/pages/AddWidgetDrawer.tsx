@@ -27,6 +27,7 @@ type Added = Extract<WidgetAddOutcome, { kind: "added" }>;
  * says so, with the old files copied aside.
  */
 export function AddWidgetDrawer({
+  widgetDir,
   writeDir,
   games,
   caseSensitive,
@@ -34,6 +35,9 @@ export function AddWidgetDrawer({
   setKey,
   onAdded,
 }: {
+  /** The content root, whose `LuaUI/` the widget is copied into. */
+  widgetDir: string;
+  /** The engine's write folder, where the games keep their widget config. */
   writeDir: string;
   games: readonly GameHandler[];
   caseSensitive: boolean;
@@ -109,7 +113,7 @@ export function AddWidgetDrawer({
     setError(null);
     try {
       const outcome = await contentWidgetAdd({
-        writeDir,
+        writeDir: widgetDir,
         source,
         folders: where.destinations.map((d) => d.folder),
         replace,
@@ -126,6 +130,7 @@ export function AddWidgetDrawer({
       onAdded();
       setUnwritten(
         await switchAddedWidgets({
+          widgetDir,
           writeDir,
           games,
           key: setKey,

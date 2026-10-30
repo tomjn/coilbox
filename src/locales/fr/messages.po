@@ -48952,10 +48952,6 @@ msgstr "Ce moteur n’a pas pu lire vos jeux"
 msgid "This engine could not read your games. Try another from <0>Settings → Engines</0>, or see what it found in <1>Content → Games</1>."
 msgstr "Ce moteur n’a pas pu lire vos jeux. Essayez-en un autre dans <0>Paramètres → Moteurs</0>, ou voyez ce qu’il a trouvé dans <1>Contenu → Jeux</1>."
 
-#: src/widgets/pages/WidgetsPage.tsx
-msgid "This engine does not say where it keeps its settings, so coilbox cannot find its widget folder."
-msgstr ""
-
 #: src/content/pages/components/DeleteEngineButton.tsx
 #, fuzzy
 msgid "This engine recorded {replayBytes} of replays into its own folder, which go with it. Move them out first with Gather replays on the <0>Replays screen</0>."

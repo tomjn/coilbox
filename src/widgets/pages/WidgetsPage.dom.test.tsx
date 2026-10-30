@@ -93,8 +93,8 @@ const games: GameHandler[] = [
 vi.mock("../useWidgetList", () => ({
   useWidgetList: () => ({
     targets: [{}],
-    writeDir: "/home/player/.spring",
-    locating: false,
+    widgetDir: "/home/player/.spring",
+    configDir: "/home/player/.spring/engine/2026.09.01",
     widgets: scan,
     games,
     rows: widgetRows(scan, games),
@@ -113,6 +113,12 @@ const files = {
 
 vi.mock("../useGameFiles", () => ({
   useGameFiles: () => files,
+}));
+
+const openPath = vi.fn(async (_: { path: string }) => ({}));
+vi.mock("@/content/bindings", async () => ({
+  ...(await vi.importActual<Record<string, unknown>>("@/content/bindings")),
+  contentOpenPath: (args: { path: string }) => openPath(args),
 }));
 
 beforeEach(() => {
@@ -223,6 +229,14 @@ describe("WidgetsPage", () => {
         .getByRole("switch", { name: "BuildWatch on" })
         .getAttribute("aria-checked"),
     ).toBe("true");
+  });
+
+  it("opens the widget folder under the content root, not the engine's folder", () => {
+    page();
+    fireEvent.click(screen.getByRole("button", { name: "Open folder" }));
+    expect(openPath).toHaveBeenCalledWith({
+      path: "/home/player/.spring/LuaUI/Widgets",
+    });
   });
 
   it("opens the drawer that adds a widget", () => {

@@ -39664,10 +39664,6 @@ msgstr ""
 msgid "This engine could not read your games. Try another from <0>Settings → Engines</0>, or see what it found in <1>Content → Games</1>."
 msgstr ""
 
-#: src/widgets/pages/WidgetsPage.tsx
-msgid "This engine does not say where it keeps its settings, so coilbox cannot find its widget folder."
-msgstr ""
-
 #: src/content/pages/components/DeleteEngineButton.tsx
 msgid "This engine recorded {replayBytes} of replays into its own folder, which go with it. Move them out first with Gather replays on the <0>Replays screen</0>."
 msgstr ""

@@ -12,6 +12,8 @@ import type { WidgetHandler } from "./handlers";
 import type { GameHandler } from "./widgetList";
 
 const files = new Map<string, string>();
+/** The folder each scan was asked to read. */
+const scanned: string[] = [];
 const scan: PlayerWidgetScan = {
   caseSensitive: false,
   folders: ["LuaUI/Widgets"],
@@ -39,7 +41,13 @@ vi.mock("@/blueprint/fileIO", () => ({
 vi.mock("@/content/bindings", async () => {
   const actual =
     await vi.importActual<Record<string, unknown>>("@/content/bindings");
-  return { ...actual, contentPlayerWidgets: async () => scan };
+  return {
+    ...actual,
+    contentPlayerWidgets: async (args: { writeDir: string }) => {
+      scanned.push(args.writeDir);
+      return scan;
+    },
+  };
 });
 
 const { readSets, recordWrite, resetSets, updateSets } = await import(
@@ -67,15 +75,23 @@ const saved = "return {\n\torder = {\n\t\tMinimap = 1,\n\t},\n}\n";
 beforeEach(() => {
   installSettingsStorage(memorySettingsStorage());
   resetSets();
+  scanned.length = 0;
   files.clear();
   files.set(MF, saved);
   files.set(SF, saved);
 });
 
 // `writeDir` is where the games' config files are looked for, so the files
-// above sit in its `LuaUI/Config`.
+// above sit in its `LuaUI/Config`. The widgets are under `widgetDir`, which is
+// another folder for an engine that keeps its own springsettings.cfg.
 const run = (key: string | null) =>
-  switchAddedWidgets({ writeDir: "/spring", games, key, names: ["Radar"] });
+  switchAddedWidgets({
+    widgetDir: "/content",
+    writeDir: "/spring",
+    games,
+    key,
+    names: ["Radar"],
+  });
 
 describe("switchAddedWidgets", () => {
   it("writes the new widget as off in the file of each game it was not added for", async () => {
@@ -84,6 +100,11 @@ describe("switchAddedWidgets", () => {
     expect(readSets().global).toMatchObject({ Radar: false });
     expect(files.get(MF)).toContain('["Radar"] = 0');
     expect(files.get(SF)).toContain('["Radar"] = 1');
+  });
+
+  it("reads the widgets from the widget folder, not the write folder", async () => {
+    await run(null);
+    expect(scanned).toEqual(["/content"]);
   });
 
   it("writes it as on everywhere when added for all games", async () => {
@@ -116,6 +137,7 @@ describe("switchAddedWidgets", () => {
   it("changes nothing when no widget has a name to switch", async () => {
     expect(
       await switchAddedWidgets({
+        widgetDir: "/content",
         writeDir: "/spring",
         games,
         key: null,

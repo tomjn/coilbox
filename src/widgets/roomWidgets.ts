@@ -61,8 +61,10 @@ export async function loadRoomWidgets({
     shortName: game.info.shortname?.trim() || undefined,
     handler,
   };
+  // The widgets are under the content root, and the config files are in the
+  // engine's write folder (issue #4856).
   const scan = await contentPlayerWidgets({
-    writeDir,
+    writeDir: dataDir,
     folders: HANDLER_FOLDERS,
   });
   const short = entry.shortName ?? "";

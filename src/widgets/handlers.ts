@@ -39,8 +39,8 @@ export interface WidgetHandler {
   /** Which rule recognised it, stable across releases. */
   id: string;
   family: HandlerFamily;
-  /** The folders it loads player widgets from, relative to the engine's write
-   *  folder and spelled as the handler spells them. */
+  /** The folders it loads player widgets from, relative to a data folder such
+   *  as the content root and spelled as the handler spells them. */
   folders: readonly string[];
   /** Whether it also loads widgets one subfolder down. */
   subfolders: boolean;

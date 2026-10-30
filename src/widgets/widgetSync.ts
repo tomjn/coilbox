@@ -97,8 +97,10 @@ export async function writeSetForLaunch({
     shortName: item.info.shortname?.trim() || undefined,
     handler,
   };
+  // The widgets are under the content root, which every engine reads, and the
+  // game's config is in the engine's write folder (issue #4856).
   const widgets = await contentPlayerWidgets({
-    writeDir,
+    writeDir: dataDir,
     folders: HANDLER_FOLDERS,
   });
   await writeGameFile(writeDir, entry, widgetRows(widgets, [entry]));
@@ -142,11 +144,15 @@ async function writeGameFile(
  * written, one line per game.
  */
 export async function switchAddedWidgets({
+  widgetDir,
   writeDir,
   games,
   key,
   names,
 }: {
+  /** The folder the widgets' `LuaUI/` is in. */
+  widgetDir: string;
+  /** The engine's write folder, where the games keep their config. */
   writeDir: string;
   games: readonly GameHandler[];
   key: string | null;
@@ -159,7 +165,7 @@ export async function switchAddedWidgets({
   // copy of the widget left behind would otherwise undo the choice.
   updateSets((sets) => addWidgets(sets, key, names));
   const scan = await contentPlayerWidgets({
-    writeDir,
+    writeDir: widgetDir,
     folders: HANDLER_FOLDERS,
   });
   const rows = widgetRows(scan, games);
