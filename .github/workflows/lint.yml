@@ -243,6 +243,30 @@ jobs:
       - name: Cargo nextest
         run: cargo nextest run --workspace
 
+  # The message for a missing WebView2 runtime is Win32 code that only compiles
+  # on Windows, and none of the jobs above build the app there, so a compile
+  # error in it would first show in a release. It lives in a crate of its own
+  # (issue #4873) so this job builds just that crate, with no Tauri and no
+  # sidecars.
+  windows-webview2:
+    needs: changes
+    if: needs.changes.outputs.rust == 'true'
+    runs-on: windows-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: windows-webview2
+          save-if: ${{ github.ref == 'refs/heads/main' }}
+      - name: Clippy
+        run: cargo clippy -p coilbox-webview2 --all-targets -- -D warnings
+      - name: Test
+        run: cargo test -p coilbox-webview2
+
   # Multiplayer on a compat mutator rests on every player writing the same
   # files (issue #4563). This builds the checked-in fixture game into a mutator
   # twice, from every manifest, compares the two builds file by file, and

@@ -13,6 +13,7 @@ tauri = { version = "2", features = [] }
 picoframe-core = "0.0.4"
 coilbox-portable = { path = "../crates/coilbox-portable" }
 coilbox-proc = { path = "../crates/coilbox-proc" }
+coilbox-webview2 = { path = "../crates/coilbox-webview2" }
 tauri-plugin-coilbox-downloads = { path = "../crates/tauri-plugin-coilbox-downloads" }
 tauri-plugin-coilbox-uberstress = { path = "../crates/tauri-plugin-coilbox-uberstress" }
 tauri-plugin-coilbox-mapconv = { path = "../crates/tauri-plugin-coilbox-mapconv" }
