@@ -27463,10 +27463,6 @@ msgstr "Зброя з бібліотеки {weaponKey}"
 msgid "libwebp refused the picture."
 msgstr "libwebp відхилила зображення."
 
-#: src/widgets/pages/WidgetsPage.tsx
-msgid "Licence"
-msgstr ""
-
 #: src/workshop/explosionGenerators.ts
 #, fuzzy
 msgid "Lifetime"
@@ -27686,10 +27682,6 @@ msgstr "Завантажено {loadedName}"
 #, fuzzy
 msgid "Loaded {loadedName}, with parts missing"
 msgstr "Завантажено {loadedName}, деяких деталей бракує"
-
-#: src/widgets/pages/WidgetsPage.tsx
-msgid "Loaded by"
-msgstr ""
 
 #: src/play/pages/SkirmishPage.tsx
 #, fuzzy
@@ -31299,7 +31291,7 @@ msgid "No game"
 msgstr "Немає гри"
 
 #: src/widgets/pages/WidgetsPage.tsx
-msgid "No game coilbox recognises"
+msgid "No game coilbox recognises loads this."
 msgstr ""
 
 #: src/profile/health.ts
@@ -31442,7 +31434,7 @@ msgid "No image files matched in this game's archive."
 msgstr "В архіві цієї гри не знайдено відповідних зображень."
 
 #: src/widgets/pages/WidgetsPage.tsx
-msgid "No installed game"
+msgid "No installed game loads this."
 msgstr ""
 
 #: src/widgets/pages/AddWidgetDrawer.tsx
@@ -31479,10 +31471,6 @@ msgstr "Для цього матчу немає посилання-запрош�
 #, fuzzy
 msgid "No leftover dialogue clips - nothing to reclaim."
 msgstr "Немає залишених кліпів діалогу – нічого звільняти."
-
-#: src/widgets/pages/WidgetsPage.tsx
-msgid "No licence stated"
-msgstr ""
 
 #: src/content/pages/components/LivingValueChart.tsx
 #, fuzzy
@@ -48429,7 +48417,7 @@ msgid "The whole selection swung a quarter turn about its own middle, so it keep
 msgstr "Усе виділене повернуто на чверть оберту навколо власного центру, тож воно зберігає форму. Натисніть R, щоб натомість повернути кожен об’єкт на його місці."
 
 #: src/widgets/pages/WidgetsPage.tsx
-msgid "The widgets you have added to your games, and which games load each one."
+msgid "The widgets you have added to your games."
 msgstr ""
 
 #: src/content/pages/components/MapAggregate.tsx

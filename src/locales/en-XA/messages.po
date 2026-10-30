@@ -22268,10 +22268,6 @@ msgstr ""
 msgid "libwebp refused the picture."
 msgstr ""
 
-#: src/widgets/pages/WidgetsPage.tsx
-msgid "Licence"
-msgstr ""
-
 #: src/workshop/explosionGenerators.ts
 msgid "Lifetime"
 msgstr ""
@@ -22447,10 +22443,6 @@ msgstr ""
 
 #: src/lego/moduleFileIo.ts
 msgid "Loaded {loadedName}, with parts missing"
-msgstr ""
-
-#: src/widgets/pages/WidgetsPage.tsx
-msgid "Loaded by"
 msgstr ""
 
 #: src/play/pages/SkirmishPage.tsx
@@ -25380,7 +25372,7 @@ msgid "No game"
 msgstr ""
 
 #: src/widgets/pages/WidgetsPage.tsx
-msgid "No game coilbox recognises"
+msgid "No game coilbox recognises loads this."
 msgstr ""
 
 #: src/profile/health.ts
@@ -25496,7 +25488,7 @@ msgid "No image files matched in this game's archive."
 msgstr ""
 
 #: src/widgets/pages/WidgetsPage.tsx
-msgid "No installed game"
+msgid "No installed game loads this."
 msgstr ""
 
 #: src/widgets/pages/AddWidgetDrawer.tsx
@@ -25526,10 +25518,6 @@ msgstr ""
 
 #: src/scenario/pages/components/ReclaimClipsForm.tsx
 msgid "No leftover dialogue clips - nothing to reclaim."
-msgstr ""
-
-#: src/widgets/pages/WidgetsPage.tsx
-msgid "No licence stated"
 msgstr ""
 
 #: src/content/pages/components/LivingValueChart.tsx
@@ -39258,7 +39246,7 @@ msgid "The whole selection swung a quarter turn about its own middle, so it keep
 msgstr ""
 
 #: src/widgets/pages/WidgetsPage.tsx
-msgid "The widgets you have added to your games, and which games load each one."
+msgid "The widgets you have added to your games."
 msgstr ""
 
 #: src/content/pages/components/MapAggregate.tsx

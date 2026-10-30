@@ -27463,10 +27463,6 @@ msgstr "Bibliothekswaffe {weaponKey}"
 msgid "libwebp refused the picture."
 msgstr "libwebp hat das Bild abgelehnt."
 
-#: src/widgets/pages/WidgetsPage.tsx
-msgid "Licence"
-msgstr ""
-
 #: src/workshop/explosionGenerators.ts
 #, fuzzy
 msgid "Lifetime"
@@ -27686,10 +27682,6 @@ msgstr "{loadedName} geladen"
 #, fuzzy
 msgid "Loaded {loadedName}, with parts missing"
 msgstr "{loadedName} geladen, mit fehlenden Bauteilen"
-
-#: src/widgets/pages/WidgetsPage.tsx
-msgid "Loaded by"
-msgstr ""
 
 #: src/play/pages/SkirmishPage.tsx
 #, fuzzy
@@ -31299,7 +31291,7 @@ msgid "No game"
 msgstr "Kein Spiel"
 
 #: src/widgets/pages/WidgetsPage.tsx
-msgid "No game coilbox recognises"
+msgid "No game coilbox recognises loads this."
 msgstr ""
 
 #: src/profile/health.ts
@@ -31442,7 +31434,7 @@ msgid "No image files matched in this game's archive."
 msgstr "Im Archiv dieses Spiels passten keine Bilddateien."
 
 #: src/widgets/pages/WidgetsPage.tsx
-msgid "No installed game"
+msgid "No installed game loads this."
 msgstr ""
 
 #: src/widgets/pages/AddWidgetDrawer.tsx
@@ -31479,10 +31471,6 @@ msgstr "Kein Einladungslink für diese Partie. {inviteProblem}"
 #, fuzzy
 msgid "No leftover dialogue clips - nothing to reclaim."
 msgstr "Keine übrig gebliebenen Dialog-Clips – nichts freizugeben."
-
-#: src/widgets/pages/WidgetsPage.tsx
-msgid "No licence stated"
-msgstr ""
 
 #: src/content/pages/components/LivingValueChart.tsx
 #, fuzzy
@@ -48429,7 +48417,7 @@ msgid "The whole selection swung a quarter turn about its own middle, so it keep
 msgstr "Die ganze Auswahl wurde um ihre eigene Mitte eine Vierteldrehung gedreht und behält so ihre Form. Drücken Sie R, um stattdessen jedes Element an Ort und Stelle zu drehen."
 
 #: src/widgets/pages/WidgetsPage.tsx
-msgid "The widgets you have added to your games, and which games load each one."
+msgid "The widgets you have added to your games."
 msgstr ""
 
 #: src/content/pages/components/MapAggregate.tsx

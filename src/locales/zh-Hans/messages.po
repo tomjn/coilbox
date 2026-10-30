@@ -27463,10 +27463,6 @@ msgstr "库武器 {weaponKey}"
 msgid "libwebp refused the picture."
 msgstr "libwebp 拒绝了该图片。"
 
-#: src/widgets/pages/WidgetsPage.tsx
-msgid "Licence"
-msgstr ""
-
 #: src/workshop/explosionGenerators.ts
 #, fuzzy
 msgid "Lifetime"
@@ -27686,10 +27682,6 @@ msgstr "已加载 {loadedName}"
 #, fuzzy
 msgid "Loaded {loadedName}, with parts missing"
 msgstr "已加载 {loadedName}，但缺少零件"
-
-#: src/widgets/pages/WidgetsPage.tsx
-msgid "Loaded by"
-msgstr ""
 
 #: src/play/pages/SkirmishPage.tsx
 #, fuzzy
@@ -31299,7 +31291,7 @@ msgid "No game"
 msgstr "无游戏"
 
 #: src/widgets/pages/WidgetsPage.tsx
-msgid "No game coilbox recognises"
+msgid "No game coilbox recognises loads this."
 msgstr ""
 
 #: src/profile/health.ts
@@ -31442,7 +31434,7 @@ msgid "No image files matched in this game's archive."
 msgstr "此游戏的归档中没有匹配的图片文件。"
 
 #: src/widgets/pages/WidgetsPage.tsx
-msgid "No installed game"
+msgid "No installed game loads this."
 msgstr ""
 
 #: src/widgets/pages/AddWidgetDrawer.tsx
@@ -31479,10 +31471,6 @@ msgstr "此房间没有邀请链接。{inviteProblem}"
 #, fuzzy
 msgid "No leftover dialogue clips - nothing to reclaim."
 msgstr "没有遗留的对白片段，无可释放。"
-
-#: src/widgets/pages/WidgetsPage.tsx
-msgid "No licence stated"
-msgstr ""
 
 #: src/content/pages/components/LivingValueChart.tsx
 #, fuzzy
@@ -48429,7 +48417,7 @@ msgid "The whole selection swung a quarter turn about its own middle, so it keep
 msgstr "整个选择围绕自身中心转动了四分之一圈，所以形状保持不变。按 R 可改为让每个对象原地旋转。"
 
 #: src/widgets/pages/WidgetsPage.tsx
-msgid "The widgets you have added to your games, and which games load each one."
+msgid "The widgets you have added to your games."
 msgstr ""
 
 #: src/content/pages/components/MapAggregate.tsx

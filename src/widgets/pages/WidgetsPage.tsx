@@ -69,8 +69,9 @@ const ALL = "all-games";
 
 /**
  * Library > Widgets (issue #1284): the widget files a player has added under
- * `LuaUI/` of any content root, what each one declares, and which installed
- * games load it. With more than one root, each row shows where its file is.
+ * `LuaUI/` of any content root and what each one declares. A row says so when
+ * no installed game loads it. With more than one root, each row shows where its
+ * file is.
  * `?game=` picks one game, by name or by the full name of one of its versions,
  * which is how a game's page links here.
  *
@@ -189,7 +190,7 @@ export default function WidgetsPage() {
     <div className="flex flex-col gap-4 p-4">
       <PageHeader
         title={t`Widgets`}
-        description={t`The widgets you have added to your games, and which games load each one.`}
+        description={t`The widgets you have added to your games.`}
         actions={
           list.widgetDir && (
             <div className="flex gap-2">
@@ -317,7 +318,7 @@ export default function WidgetsPage() {
         shown && (
           <WidgetTable
             rows={shown}
-            showGames={!game && list.gamesKnown}
+            flagUnloaded={!game && list.gamesKnown}
             someUnknown={!!list.games?.some((g) => g.handler === null)}
             showRoot={list.roots.length > 1}
             onSettings={
@@ -384,7 +385,7 @@ export default function WidgetsPage() {
             ownRows && (
               <WidgetTable
                 rows={ownRows}
-                showGames={false}
+                flagUnloaded={false}
                 someUnknown={false}
                 showRoot={false}
                 canSettings={() => false}
@@ -505,7 +506,7 @@ function Declared({
 
 function WidgetTable({
   rows,
-  showGames,
+  flagUnloaded,
   someUnknown,
   showRoot,
   switches,
@@ -514,7 +515,8 @@ function WidgetTable({
   renderRemove,
 }: {
   rows: readonly WidgetRow[];
-  showGames: boolean;
+  /** Say so on a row that no game loads. */
+  flagUnloaded: boolean;
   /** More than one content root is read, so each row says which it is in. */
   showRoot: boolean;
   /** Some installed game's handler is not recognised, so a file no recognised
@@ -547,14 +549,6 @@ function WidgetTable({
           <TableHead>
             <Trans>Author</Trans>
           </TableHead>
-          <TableHead>
-            <Trans>Licence</Trans>
-          </TableHead>
-          {showGames && (
-            <TableHead>
-              <Trans>Loaded by</Trans>
-            </TableHead>
-          )}
           {onSettings && (
             <TableHead className="w-0">
               <span className="sr-only">
@@ -613,6 +607,15 @@ function WidgetTable({
                     {t`A game saves this under a name that depends on its version.`}
                   </p>
                 )}
+              {flagUnloaded && row.loadedBy.length === 0 && (
+                <p className="text-xs text-muted-foreground">
+                  {someUnknown ? (
+                    <Trans>No game coilbox recognises loads this.</Trans>
+                  ) : (
+                    <Trans>No installed game loads this.</Trans>
+                  )}
+                </p>
+              )}
             </TableCell>
             <TableCell>{row.info?.version ?? ""}</TableCell>
             <TableCell className="whitespace-normal">
@@ -622,28 +625,6 @@ function WidgetTable({
                 missing={t`No author stated`}
               />
             </TableCell>
-            <TableCell className="whitespace-normal">
-              <Declared
-                value={row.info?.license}
-                known={!!row.info}
-                missing={t`No licence stated`}
-              />
-            </TableCell>
-            {showGames && (
-              <TableCell className="whitespace-normal text-sm">
-                {row.loadedBy.length > 0 ? (
-                  row.loadedBy.join(", ")
-                ) : (
-                  <span className="text-muted-foreground">
-                    {someUnknown ? (
-                      <Trans>No game coilbox recognises</Trans>
-                    ) : (
-                      <Trans>No installed game</Trans>
-                    )}
-                  </span>
-                )}
-              </TableCell>
-            )}
             {onSettings && (
               <TableCell>
                 {canSettings(row) && (

@@ -22269,10 +22269,6 @@ msgstr "Library weapon {weaponKey}"
 msgid "libwebp refused the picture."
 msgstr "libwebp refused the picture."
 
-#: src/widgets/pages/WidgetsPage.tsx
-msgid "Licence"
-msgstr "Licence"
-
 #: src/workshop/explosionGenerators.ts
 msgid "Lifetime"
 msgstr "Lifetime"
@@ -22449,10 +22445,6 @@ msgstr "Loaded {loadedName}"
 #: src/lego/moduleFileIo.ts
 msgid "Loaded {loadedName}, with parts missing"
 msgstr "Loaded {loadedName}, with parts missing"
-
-#: src/widgets/pages/WidgetsPage.tsx
-msgid "Loaded by"
-msgstr "Loaded by"
 
 #: src/play/pages/SkirmishPage.tsx
 msgid "Loaded the preset \"{loadedName}\"."
@@ -25381,8 +25373,8 @@ msgid "No game"
 msgstr "No game"
 
 #: src/widgets/pages/WidgetsPage.tsx
-msgid "No game coilbox recognises"
-msgstr "No game coilbox recognises"
+msgid "No game coilbox recognises loads this."
+msgstr "No game coilbox recognises loads this."
 
 #: src/profile/health.ts
 msgid "No game filter set"
@@ -25497,8 +25489,8 @@ msgid "No image files matched in this game's archive."
 msgstr "No image files matched in this game's archive."
 
 #: src/widgets/pages/WidgetsPage.tsx
-msgid "No installed game"
-msgstr "No installed game"
+msgid "No installed game loads this."
+msgstr "No installed game loads this."
 
 #: src/widgets/pages/AddWidgetDrawer.tsx
 msgid "No installed game with a folder for this widget."
@@ -25528,10 +25520,6 @@ msgstr "No invite link for this battle. {inviteProblem}"
 #: src/scenario/pages/components/ReclaimClipsForm.tsx
 msgid "No leftover dialogue clips - nothing to reclaim."
 msgstr "No leftover dialogue clips - nothing to reclaim."
-
-#: src/widgets/pages/WidgetsPage.tsx
-msgid "No licence stated"
-msgstr "No licence stated"
 
 #: src/content/pages/components/LivingValueChart.tsx
 msgid "No line is on the chart above."
@@ -39259,8 +39247,8 @@ msgid "The whole selection swung a quarter turn about its own middle, so it keep
 msgstr "The whole selection swung a quarter turn about its own middle, so it keeps its shape. Press R to turn each thing where it stands instead."
 
 #: src/widgets/pages/WidgetsPage.tsx
-msgid "The widgets you have added to your games, and which games load each one."
-msgstr "The widgets you have added to your games, and which games load each one."
+msgid "The widgets you have added to your games."
+msgstr "The widgets you have added to your games."
 
 #: src/content/pages/components/MapAggregate.tsx
 msgid "The window is {when} of each match by its own clock, in whole minutes."

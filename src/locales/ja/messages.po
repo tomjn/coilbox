@@ -27463,10 +27463,6 @@ msgstr "ライブラリの武器 {weaponKey}"
 msgid "libwebp refused the picture."
 msgstr "libwebp が画像を拒否しました。"
 
-#: src/widgets/pages/WidgetsPage.tsx
-msgid "Licence"
-msgstr ""
-
 #: src/workshop/explosionGenerators.ts
 #, fuzzy
 msgid "Lifetime"
@@ -27686,10 +27682,6 @@ msgstr "{loadedName} を読み込みました"
 #, fuzzy
 msgid "Loaded {loadedName}, with parts missing"
 msgstr "{loadedName} を読み込みましたが、パーツが不足しています"
-
-#: src/widgets/pages/WidgetsPage.tsx
-msgid "Loaded by"
-msgstr ""
 
 #: src/play/pages/SkirmishPage.tsx
 #, fuzzy
@@ -31299,7 +31291,7 @@ msgid "No game"
 msgstr "ゲームなし"
 
 #: src/widgets/pages/WidgetsPage.tsx
-msgid "No game coilbox recognises"
+msgid "No game coilbox recognises loads this."
 msgstr ""
 
 #: src/profile/health.ts
@@ -31442,7 +31434,7 @@ msgid "No image files matched in this game's archive."
 msgstr "このゲームのアーカイブに一致する画像ファイルはありません。"
 
 #: src/widgets/pages/WidgetsPage.tsx
-msgid "No installed game"
+msgid "No installed game loads this."
 msgstr ""
 
 #: src/widgets/pages/AddWidgetDrawer.tsx
@@ -31479,10 +31471,6 @@ msgstr "この試合の招待リンクはありません。{inviteProblem}"
 #, fuzzy
 msgid "No leftover dialogue clips - nothing to reclaim."
 msgstr "残っているセリフのクリップはありません — 解放するものはありません。"
-
-#: src/widgets/pages/WidgetsPage.tsx
-msgid "No licence stated"
-msgstr ""
 
 #: src/content/pages/components/LivingValueChart.tsx
 #, fuzzy
@@ -48429,7 +48417,7 @@ msgid "The whole selection swung a quarter turn about its own middle, so it keep
 msgstr "選択全体をそれ自体の中心で 90 度回転させたため、形は保たれています。各ものをその場で回転させるには R を押してください。"
 
 #: src/widgets/pages/WidgetsPage.tsx
-msgid "The widgets you have added to your games, and which games load each one."
+msgid "The widgets you have added to your games."
 msgstr ""
 
 #: src/content/pages/components/MapAggregate.tsx

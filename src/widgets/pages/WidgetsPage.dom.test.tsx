@@ -255,7 +255,8 @@ describe("WidgetsPage", () => {
     page();
     expect(screen.getByText("BuildWatch")).toBeTruthy();
     expect(screen.getByText("Watches builds")).toBeTruthy();
-    expect(screen.getByText("GPLv2")).toBeTruthy();
+    // A licence matters to game developers, not to players.
+    expect(screen.queryByText("GPLv2")).toBeNull();
     expect(screen.getByText("someone")).toBeTruthy();
     expect(screen.getByText("2")).toBeTruthy();
     expect(screen.getByText("Coilbox")).toBeTruthy();
@@ -264,18 +265,20 @@ describe("WidgetsPage", () => {
         "Could not read: runtime error: attempt to perform arithmetic on a nil value",
       ),
     ).toBeTruthy();
-    // The nested file loads in no game, the other four in Metal Factions.
-    expect(screen.getAllByText("Metal Factions")).toHaveLength(4);
-    // Mystery's handler is not recognised, so it may still load that file.
-    expect(screen.getByText("No game coilbox recognises")).toBeTruthy();
+    // The nested file loads in no game, the other four in Metal Factions, which
+    // only the nested file's row needs to say anything about. Mystery's handler
+    // is not recognised, so it may still load that file.
+    expect(
+      screen.getAllByText("No game coilbox recognises loads this."),
+    ).toHaveLength(1);
+    expect(screen.queryByText("Metal Factions")).toBeNull();
   });
 
-  it("says so when a widget states no author or licence, and not when it could not be read", () => {
+  it("says so when a widget states no author, and not when it could not be read", () => {
     page();
-    // The coilbox row and the two Twin rows declare neither. The unreadable
-    // row says nothing.
+    // The coilbox row and the two Twin rows declare none. The unreadable row
+    // says nothing.
     expect(screen.getAllByText("No author stated")).toHaveLength(3);
-    expect(screen.getAllByText("No licence stated")).toHaveLength(3);
   });
 
   it("says which files share a name, and so a setting", () => {
