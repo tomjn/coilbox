@@ -3,44 +3,35 @@
 /**
  * One toast host, not two (issue #4901).
  *
- * picoframe's `AppLayout` mounts a sonner host. A second one here drew every
- * toast twice, on top of itself, with two live regions for a screen reader. The
- * layout's host is stood in for by the frame's own `Toaster`, mounted beside
- * `NotifyProvider`, so a host coming back in the provider makes the counts 2.
+ * picoframe's `AppLayout` mounts a sonner host. A second one in the notify
+ * plugin drew every toast twice, on top of itself, with two live regions for a
+ * screen reader. This renders the real frame with the real plugin, so a host
+ * coming back in either place makes the counts 2, and a release that stops
+ * mounting one makes them 0.
  */
 
-import {
-  memoryStorage,
-  PersistentStoreProvider,
-  ThemeProvider,
-  Toaster,
-  toast,
-} from "@picoframe/frame";
+import { AppFrame, toast } from "@picoframe/frame";
 import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
+
+vi.mock("@tauri-apps/api/event", () => ({
+  listen: () => Promise.resolve(() => {}),
+}));
 
 vi.mock("@tauri-apps/plugin-notification", () => ({
   isPermissionGranted: () => Promise.resolve(false),
 }));
 
-import { NotifyProvider } from "./NotifyProvider";
+import notifyPlugin from "./index";
 
 afterEach(() => {
   cleanup();
   toast.dismiss();
 });
 
-describe("the notify provider", () => {
+describe("the app frame with the notify plugin", () => {
   it("draws each toast once", async () => {
-    render(
-      <PersistentStoreProvider storage={memoryStorage()}>
-        <ThemeProvider>
-          <NotifyProvider>
-            <Toaster />
-          </NotifyProvider>
-        </ThemeProvider>
-      </PersistentStoreProvider>,
-    );
+    render(<AppFrame plugins={[notifyPlugin]} />);
 
     toast.error("Your settings could not be read");
 
