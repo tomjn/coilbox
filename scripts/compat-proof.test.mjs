@@ -6,7 +6,9 @@ import { fileURLToPath } from "node:url";
 
 import { afterAll, describe, expect, it } from "vitest";
 
-const RULE = fileURLToPath(new URL("./compat-proof-errors.awk", import.meta.url));
+const RULE = fileURLToPath(
+  new URL("./compat-proof-errors.awk", import.meta.url),
+);
 const dir = mkdtempSync(join(tmpdir(), "compat-proof-"));
 afterAll(() => rmSync(dir, { recursive: true, force: true }));
 
@@ -25,7 +27,8 @@ describe("compat-proof error rule", () => {
   });
 
   it("counts a Failed to load line behind a log tag", () => {
-    const line = "[t=00:00:09.1][f=-000001] [LuaUI] Failed to load: gui_thing.lua";
+    const line =
+      "[t=00:00:09.1][f=-000001] [LuaUI] Failed to load: gui_thing.lua";
     expect(errorLines([line])).toEqual([line]);
   });
 
