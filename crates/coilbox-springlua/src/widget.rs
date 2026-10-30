@@ -34,6 +34,13 @@ pub struct WidgetInfo {
     pub license: Option<String>,
     pub layer: Option<f64>,
     pub enabled: Option<bool>,
+    /// The names the widget had before, which a handler that reads them
+    /// carries saved state across from (issue #1290). Only the text entries of
+    /// the list are kept, in order. Empty when it declares none.
+    pub previous_names: Vec<String>,
+    /// Complete Annihilation saves an experimental widget under its name with
+    /// " (experimental)" added, on its stable builds.
+    pub experimental: Option<bool>,
 }
 
 /// Builds the widget's environment. A function rather than one table, so each
@@ -149,6 +156,21 @@ impl SpringLua {
                 Value::Boolean(b) => Some(b),
                 _ => None,
             },
+            previous_names: match info.raw_get::<Value>("previousNames")? {
+                Value::Table(list) => list
+                    .sequence_values::<Value>()
+                    .map_while(|v| v.ok())
+                    .filter_map(|v| match v {
+                        Value::String(s) => Some(s.to_string_lossy()),
+                        _ => None,
+                    })
+                    .collect(),
+                _ => Vec::new(),
+            },
+            experimental: match info.raw_get::<Value>("experimental")? {
+                Value::Boolean(b) => Some(b),
+                _ => None,
+            },
         }))
     }
 }
@@ -184,6 +206,34 @@ mod tests {
         assert_eq!(info.license.as_deref(), Some("GPLv2"));
         assert_eq!(info.layer, Some(-5.0));
         assert_eq!(info.enabled, Some(true));
+    }
+
+    #[test]
+    fn reads_the_previous_names_a_widget_declares() {
+        let info = read(
+            r#"
+            function widget:GetInfo()
+              return { name = "New", previousNames = { "Old", 7, "Older" }, experimental = true }
+            end
+            "#,
+        )
+        .unwrap();
+        assert_eq!(info.previous_names, vec!["Old", "Older"]);
+        assert_eq!(info.experimental, Some(true));
+    }
+
+    #[test]
+    fn a_widget_that_declares_no_previous_names_has_none() {
+        assert!(
+            read(r#"function widget:GetInfo() return { name = "A" } end"#)
+                .unwrap()
+                .previous_names
+                .is_empty()
+        );
+        let info =
+            read(r#"function widget:GetInfo() return { name = "A", previousNames = "Old" } end"#)
+                .unwrap();
+        assert!(info.previous_names.is_empty());
     }
 
     #[test]
