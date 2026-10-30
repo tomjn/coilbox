@@ -110,6 +110,55 @@ fn a_function_the_engine_still_has_is_left_alone() {
     assert_eq!(got["same"], true);
 }
 
+/// Issue #4661: the newest prelude loads in both states, and with a stand-in for
+/// the engine's weapon defs it gives the sandbox's Lua the old names.
+#[test]
+fn the_newest_prelude_puts_the_old_weapon_def_values_back_in_both_states() {
+    for state in [LuaState::Synced, LuaState::Unsynced] {
+        let dir = tempfile::tempdir().unwrap();
+        let m = manifest(coilbox_compat::latest()).unwrap();
+        let files = BTreeMap::from([
+            (
+                dir.path().join(state.prelude_path()),
+                prelude(&m, state).unwrap(),
+            ),
+            (dir.path().join("modinfo.lua"), "return {}".to_string()),
+        ]);
+        let got = run(
+            dir.path(),
+            files,
+            &format!(
+                r#"
+                gl = {{}}
+                Spring.Echo = function(message) FAILED = message end
+                Game = Game or {{}}
+                Game.springCategories = {{ air = 0 }}
+                WeaponDefs = {{
+                    [1] = setmetatable({{}}, {{
+                        __index = {{ damageAreaOfEffect = 64, projectilespeed = 12 }},
+                    }}),
+                }}
+                VFS.Include("{path}")
+                local wd = WeaponDefs[1]
+                return {{
+                    failed = FAILED,
+                    area = wd.areaOfEffect,
+                    velocity = wd.maxVelocity,
+                    air = wd.onlyTargetCategories.air,
+                    engine = wd.projectilespeed,
+                }}
+                "#,
+                path = state.prelude_path(),
+            ),
+        );
+        assert_eq!(got["failed"], Value::Null, "a fix failed");
+        assert_eq!(got["area"], 64.0);
+        assert_eq!(got["velocity"], 360.0);
+        assert_eq!(got["air"], true);
+        assert_eq!(got["engine"], 12.0);
+    }
+}
+
 fn ee_archive() -> PathBuf {
     std::env::var_os("COILBOX_COMPAT_EE").map_or_else(
         || {
