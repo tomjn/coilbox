@@ -1,8 +1,16 @@
 import { t } from "@lingui/core/macro";
 import { Channel } from "@tauri-apps/api/core";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  useSyncExternalStore,
+} from "react";
 import { describeError } from "@/i18n/uiError";
 import { compatBuild, compatStatus } from "../../compat/bindings";
+import type { Convert3doProgress } from "../../content/bindings";
 import { primeGameInfo } from "../../content/config";
 import {
   type CompatBattleState,
@@ -19,6 +27,27 @@ const msg = (e: unknown): string => describeError(e);
 
 /** Builds under way, so leaving a room and coming back does not start a second write of one folder. */
 const inFlight = new Map<string, Promise<CompatBattleState | null>>();
+
+/**
+ * The newest progress line of each build in `inFlight`, by the same token. A
+ * `Channel` belongs to the one call that made it, so a component that mounts
+ * mid build reads the count here instead of subscribing to the channel.
+ */
+const progressOf = new Map<string, Convert3doProgress>();
+const progressListeners = new Set<() => void>();
+
+function setProgress(token: string, progress: Convert3doProgress | null) {
+  if (progress) progressOf.set(token, progress);
+  else progressOf.delete(token);
+  for (const listener of progressListeners) listener();
+}
+
+function subscribeProgress(listener: () => void) {
+  progressListeners.add(listener);
+  return () => {
+    progressListeners.delete(listener);
+  };
+}
 
 /**
  * Build the compat mutator a battle names when this machine has its base game
@@ -61,12 +90,15 @@ export function useCompatBattle(opts: {
   const [attempt, setAttempt] = useState(0);
   const startedRef = useRef<string | null>(null);
   const key = `${dataDir}::${gameName}`;
+  const token = `${key}#${attempt}`;
+  const progress = useSyncExternalStore(subscribeProgress, () =>
+    progressOf.get(token),
+  );
 
   useEffect(() => {
     const p = planRef.current;
     if (p.kind !== "needs-mutator" || !contentKnown) return;
     if (!enginePath || !dataDir || !gameName) return;
-    const token = `${key}#${attempt}`;
     if (startedRef.current === token) return;
     startedRef.current = token;
 
@@ -96,6 +128,8 @@ export function useCompatBattle(opts: {
             latest,
           };
         }
+        const onProgress = new Channel<Convert3doProgress>();
+        onProgress.onmessage = (line) => setProgress(token, line);
         await compatBuild({
           dataDir,
           enginePath,
@@ -103,8 +137,7 @@ export function useCompatBattle(opts: {
           gameName: p.baseName,
           baseChecksum: info.checksum,
           manifestVersion: p.version,
-          // The battle card shows no count, so nothing listens.
-          onProgress: new Channel(),
+          onProgress,
         });
         const found = await rescanRef.current();
         if (found?.some((g) => g.name === gameName)) return null;
@@ -116,13 +149,16 @@ export function useCompatBattle(opts: {
 
     let running = inFlight.get(token);
     if (!running) {
-      running = run().finally(() => inFlight.delete(token));
+      running = run().finally(() => {
+        inFlight.delete(token);
+        setProgress(token, null);
+      });
       inFlight.set(token, running);
     }
     void running.then((state) => {
       if (state) setOutcome({ key: token, state });
     });
-  }, [contentKnown, enginePath, dataDir, gameName, key, attempt]);
+  }, [contentKnown, enginePath, dataDir, gameName, token]);
 
   const retry = useCallback(() => {
     startedRef.current = null;
@@ -131,13 +167,13 @@ export function useCompatBattle(opts: {
   }, []);
 
   if (!needs) return { state: { status: "idle" }, retry };
-  const token = `${key}#${attempt}`;
   if (outcome?.key === token) return { state: outcome.state, retry };
   return {
     state: {
       status: "building",
       baseName: plan.baseName,
       version: plan.version,
+      progress: progress && { done: progress.done, total: progress.total },
     },
     retry,
   };

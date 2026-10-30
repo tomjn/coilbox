@@ -107,7 +107,13 @@ export function compatBuildable(
 /** Where the mutator a battle names stands on this machine. */
 export type CompatBattleState =
   | { status: "idle" }
-  | { status: "building"; baseName: string; version: number }
+  | {
+      status: "building";
+      baseName: string;
+      version: number;
+      /** Models converted out of the total, once the build has counted them. */
+      progress?: { done: number; total: number };
+    }
   | { status: "update"; baseName: string; version: number; latest: number }
   | { status: "failed"; baseName: string; version: number; error: string };
 
