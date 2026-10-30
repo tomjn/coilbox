@@ -19,6 +19,8 @@ An archive's page in Library > Archives has a Convert models button for a game w
 
 Each row is one kind of finding. The number on the right is how many there are, where counting them means something. A row with an arrow opens to show the details, such as each file and line behind a count of Lua calls.
 
+![The report for XTA 9.65 with the row for Lua calls to removed or changed APIs open. Under each Lua file it lists the line and column of each call and what changed, such as spairs, removed in Recoil 2025.01.1.](/screenshots/compat-mode-report-lua-calls.jpg)
+
 A warning triangle is a problem: something the current engine no longer does. An info icon is worth knowing and changes nothing on its own.
 
 Engine versions in the details name the engine as it was called at the time. Up to 105.0 that is Spring, for example "removed in Spring 105.0". From 105.1.1 on it is Recoil.
@@ -27,7 +29,7 @@ Engine versions in the details name the engine as it was called at the time. Up 
 
 | Row | What it means | What compatibility mode does |
 | --- | --- | --- |
-| .3do models | Models in Total Annihilation's format, with a count | Converts them to `.s3o` and points the game's units, features and weapons at the copies. A model the game also ships as an `.s3o` of the same name is left as the game has it |
+| .3do models | Models in Total Annihilation's format, with a count | Converts them to `.s3o` and points the game's units, features and weapons at the copies. A model the game also ships as an `.s3o` of the same name is left as the game has it, so the build can convert fewer than this row counts. The row's Convert models button opens a drawer that converts the models on their own |
 | .fbi or .tdf unit definitions | Unit files in the old text formats | Leaves the files alone. The def fixes still run on the units they define |
 | Lua calls to removed or changed APIs | Calls to functions the engine removed or renamed. The details give each file, line and the change | Puts back the functions listed in [What it changes](#what-it-changes). Calls to anything else stay broken |
 | Removed def tags in use | Unit or weapon definitions that set a tag the engine stopped reading, with the units that set it | Puts back the tags listed in [What it changes](#what-it-changes) |
@@ -40,7 +42,7 @@ Engine versions in the details name the engine as it was called at the time. Up 
 | Row | What it means |
 | --- | --- |
 | Lua calls to functions whose behaviour changed | Calls to a function whose arguments changed. Only some calls are affected, such as one that leaves an argument out |
-| Compatibility gadgets a build turns on | The fix gadgets that would run for this game, with the units or weapons each would act on. The aircraft gadget's list can name planes it then leaves alone, because it checks more when the game loads than the report can |
+| Compatibility gadgets a build turns on | The fix gadgets that would run for this game, with the units or weapons each would act on. The aircraft gadget's list can name planes it then leaves alone, because it checks more when the game loads than the report can. The build result can name a gadget this row leaves out |
 | Dependencies not scanned for Lua | Games this one depends on that are not installed, so their Lua was not checked |
 | Could not check everything | A read failed. The details say which |
 
@@ -51,15 +53,19 @@ A map's page has a Compatibility section on its page rather than a tab of its ow
 ## Turn it on
 
 1. On the game's Compatibility tab, turn on Compatibility mode.
-2. Wait while it shows Building.
+2. Wait for the build. It shows Building, then a count of the models converted so far.
 
-When the build ends, the section shows the folder it wrote and what is in it: how many models were converted, how many prelude functions and def overrides were written, and which gadgets are enabled. If something could not be done, a line under that says why.
+When the build ends, the section shows the folder it wrote and what is in it: how many models were converted, how many prelude functions and def overrides were written, and which gadgets are enabled. If something could not be done, a line under that says why. This result goes when you leave the page. The folder's name stays.
+
+![The Compatibility tab for XTA 9.65 with the switch on. Beside the switch are Export .sdz and Remove. Under it are the folder coilbox-compat-xta-9.65-24.sdd, 747 models converted, 29 prelude functions, the gadgets enabled, 1,118 def overrides and a note about one missing model. The report follows.](/screenshots/compat-mode-build-result.jpg)
+
+Export .sdz saves a copy of the folder as one `.sdz` file, in a place you choose.
 
 The switch cannot be used until coilbox has read the game's checksum, which takes a moment after the page opens.
 
-The new game is a folder in the `games` folder of your content folder. Its name is `coilbox-compat-`, the old game's file name in lower case without its extension, and the compatibility version. For example, `xta-9.65.sd7` at version 5 becomes `coilbox-compat-xta-9.65-5.sdd`.
+The new game is a folder in the `games` folder of your content folder. Its name is `coilbox-compat-`, the old game's file name in lower case without its extension, and the compatibility version. For example, `xta-9.65.sd7` at version 24 becomes `coilbox-compat-xta-9.65-24.sdd`.
 
-Library > Games lists that folder as a game of its own, with a note saying coilbox wrote it. The places where you pick a game to play do not list it. Pick the old game, and coilbox uses the compatibility version for you.
+After a rescan, the old game's page has a Mutators tab that lists the folder, for example as XTA 9.65 (compat 24). To rescan, select Rescan on Library > Games. The games grid and the places where you pick a game to play do not list it. Pick the old game, and coilbox uses the compatibility version for you.
 
 ## Play with it
 
@@ -67,16 +73,11 @@ With the switch on, these launch the compatibility version in place of the old g
 
 - A [singleplayer battle](singleplayer.md).
 - Play when you [test a Unit tweaks project](../developers/unit-tweaks.md#test-a-project).
-
-These still launch the old game without fixes, even with the switch on:
-
 - Campaigns, Galactic conquest and Warpath.
 - Scenarios.
 - The unit builder's test game.
-- Refight from a replay.
-- A multiplayer battle you host.
 
-Issue #4664 covers those.
+Refight from a replay still launches the old game without fixes, even with the switch on.
 
 If the compatibility version is missing or out of date, the launch stops and says why, for example "Compatibility mode is on for XTA 9.65, but its mutator is out of date". Coilbox never launches the old game without its fixes while the switch is on. Rebuild it from the game's page.
 
@@ -107,14 +108,12 @@ Every player in a battle needs the same compatibility version of the game. Coilb
 When you join a battle whose game is named like `XTA 9.65 (compat 5)`:
 
 - If you do not have the old game, coilbox gets it as it would any missing game. See [Get the map and game](multiplayer.md#get-the-map-and-game).
-- If you have the old game, coilbox builds version 5 for you, and the room shows Building until it is done. Your own switch for the game does not change.
+- If you have the old game, coilbox builds version 5 for you, and the room shows Building and a count of the models converted until it is done. Your own switch for the game does not change.
 - If your coilbox is newer than the host's, it builds the host's older version.
 - If the host's coilbox is newer than yours, the room says "Host is on a newer coilbox" and you cannot start. Update coilbox opens the updater.
 - If the build fails, the room says why and offers Try again.
 
 So everyone needs the same version of coilbox as the host, or a newer one.
-
-Coilbox cannot host a compatibility mode battle yet. A battle you host uses the old game, and the host's game list does not offer the compatibility version.
 
 ## What it cannot fix
 
