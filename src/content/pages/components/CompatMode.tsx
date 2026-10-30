@@ -1,7 +1,6 @@
 import { Plural, Trans, useLingui } from "@lingui/react/macro";
 import { Button } from "@picoframe/frame";
 import { Channel } from "@tauri-apps/api/core";
-import { save } from "@tauri-apps/plugin-dialog";
 import { FileArchive, Loader2, Trash2, Wrench } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Progress } from "@/components/ui/progress";
@@ -16,6 +15,7 @@ import {
   compatRemove,
   compatStatus,
 } from "../../../compat/bindings";
+import { pickSdzPath } from "../../../compat/pickSdzPath";
 import { staleReason } from "../../../compat/staleReason";
 import type { Convert3doProgress } from "../../bindings";
 import {
@@ -158,11 +158,7 @@ export function CompatMode({
     if (!checksum || !status?.folder) return;
     setError(null);
     try {
-      const dest = await save({
-        title: t`Export compatibility mutator`,
-        defaultPath: status.folder.replace(/\.sdd$/i, ".sdz"),
-        filters: [{ name: t`Mutator archive`, extensions: ["sdz"] }],
-      });
+      const dest = await pickSdzPath(status.folder);
       if (!dest) return;
       setBusy("export");
       setExported(

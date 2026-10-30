@@ -38,6 +38,74 @@ interface Launchable {
   primaryArchive: { name: string };
 }
 
+/** Where a game's mutator stands. Skirmish and hosting both read it from here. */
+export type CompatMutatorReading =
+  /** The base game gave no checksum to compare the mutator against. */
+  | { kind: "unreadable" }
+  | { kind: "missing"; latest: number; baseChecksum: string }
+  | { kind: "stale"; latest: number; baseChecksum: string; reasons: string }
+  /** Built and current, and the engine does not list it. */
+  | {
+      kind: "unscanned";
+      latest: number;
+      baseChecksum: string;
+      folder: string;
+    }
+  | { kind: "current"; latest: number; gameType: string; gameArchive: string }
+  | { kind: "failed"; reason: string };
+
+/** Read whether `game`'s mutator can be launched. Never builds anything. */
+export async function readCompatMutator(opts: {
+  target: Pick<PlayTarget, "enginePath" | "dataDir">;
+  game: Launchable;
+}): Promise<CompatMutatorReading> {
+  const { target, game } = opts;
+  try {
+    const info = await primeGameInfo(
+      target.enginePath,
+      target.dataDir,
+      game.primaryArchive.name,
+    );
+    if (!info.checksum) return { kind: "unreadable" };
+    const baseChecksum = info.checksum;
+    const status = await compatStatus({
+      dataDir: target.dataDir,
+      enginePath: target.enginePath,
+      archiveName: game.primaryArchive.name,
+      baseChecksum,
+    });
+    const { latest } = status;
+    if (!status.folder) return { kind: "missing", latest, baseChecksum };
+    if (status.stale.length > 0) {
+      const reasons = status.stale.map(staleReason).join("; ");
+      return { kind: "stale", latest, baseChecksum, reasons };
+    }
+    const folder = status.folder.toLowerCase();
+    const named = (games: Launchable[]) =>
+      games.find((g) => g.primaryArchive.name.toLowerCase() === folder);
+    // A mutator built since the last scan is not in the cached list yet.
+    const found =
+      named((await primeScan(target.enginePath, target.dataDir)).games) ??
+      named((await primeScan(target.enginePath, target.dataDir, true)).games);
+    if (!found) {
+      return {
+        kind: "unscanned",
+        latest,
+        baseChecksum,
+        folder: status.folder,
+      };
+    }
+    return {
+      kind: "current",
+      latest,
+      gameType: found.name,
+      gameArchive: found.primaryArchive.name,
+    };
+  } catch (e) {
+    return { kind: "failed", reason: describeError(e) };
+  }
+}
+
 /**
  * Resolve the game a launch should name. `game` is the game the player picked.
  * `settings` is `content.compat`.
@@ -56,56 +124,40 @@ export async function resolveCompatTarget(opts: {
     message,
   });
 
-  try {
-    const info = await primeGameInfo(
-      target.enginePath,
-      target.dataDir,
-      game.primaryArchive.name,
-    );
-    if (!info.checksum) {
+  const reading = await readCompatMutator({ target, game });
+  switch (reading.kind) {
+    case "unreadable":
       return blocked(
         t`Compatibility mode is on for ${gameName}, but the game could not be read to check its mutator. Open ${gameName} under Library > Games and choose Rebuild.`,
       );
-    }
-    const status = await compatStatus({
-      dataDir: target.dataDir,
-      enginePath: target.enginePath,
-      archiveName: game.primaryArchive.name,
-      baseChecksum: info.checksum,
-    });
-    if (!status.folder)
+    case "missing":
       return blocked(
         t`Compatibility mode is on for ${gameName}, but its mutator has not been built. Open ${gameName} under Library > Games and choose Rebuild.`,
       );
-    if (status.stale.length > 0) {
-      const staleReasons = status.stale.map(staleReason).join("; ");
+    case "stale": {
+      const staleReasons = reading.reasons;
       return blocked(
         t`Compatibility mode is on for ${gameName}, but its mutator is out of date: ${staleReasons}. Open ${gameName} under Library > Games and choose Rebuild.`,
       );
     }
-    const folder = status.folder.toLowerCase();
-    const named = (games: Launchable[]) =>
-      games.find((g) => g.primaryArchive.name.toLowerCase() === folder);
-    // A mutator built since the last scan is not in the cached list yet.
-    const found =
-      named((await primeScan(target.enginePath, target.dataDir)).games) ??
-      named((await primeScan(target.enginePath, target.dataDir, true)).games);
-    if (!found) {
-      const folderName = status.folder;
+    case "unscanned": {
+      const folderName = reading.folder;
       return blocked(
         t`Compatibility mode is on for ${gameName}, but the engine did not find ${folderName}. Open ${gameName} under Library > Games and choose Rebuild.`,
       );
     }
-    return {
-      kind: "use",
-      gameType: found.name,
-      gameArchive: found.primaryArchive.name,
-      baseName: game.name,
-    };
-  } catch (e) {
-    const reason = describeError(e);
-    return blocked(
-      t`Compatibility mode is on for ${gameName}, but its mutator could not be checked (${reason}). Open ${gameName} under Library > Games and choose Rebuild.`,
-    );
+    case "failed": {
+      const { reason } = reading;
+      return blocked(
+        t`Compatibility mode is on for ${gameName}, but its mutator could not be checked (${reason}). Open ${gameName} under Library > Games and choose Rebuild.`,
+      );
+    }
+    case "current":
+      return {
+        kind: "use",
+        gameType: reading.gameType,
+        gameArchive: reading.gameArchive,
+        baseName: game.name,
+      };
   }
 }
