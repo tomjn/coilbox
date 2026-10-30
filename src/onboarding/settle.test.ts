@@ -112,7 +112,7 @@ describe("addSettled", () => {
 describe("seedExistingInstall", () => {
   it("seeds every id on an existing install", () => {
     const { m, storage } = memoryStorage();
-    seedExistingInstall(storage, 3);
+    seedExistingInstall(storage, true);
     expect(JSON.parse(m.get(SETTLED_KEY) as string)).toEqual([
       ...PAGE_IDS,
       ...BACKGROUND_IDS,
@@ -120,14 +120,14 @@ describe("seedExistingInstall", () => {
   });
   it("writes an empty list on a fresh install at once", () => {
     const { m, storage } = memoryStorage();
-    seedExistingInstall(storage, 0);
+    seedExistingInstall(storage, false);
     expect(m.get(SETTLED_KEY)).toBe("[]");
   });
   it("keeps a fresh install's empty list on the next launch", () => {
     const { m, storage } = memoryStorage();
-    seedExistingInstall(storage, 0);
+    seedExistingInstall(storage, false);
     // Other code wrote settings before the app closed.
-    seedExistingInstall(storage, 4);
+    seedExistingInstall(storage, true);
     expect(m.get(SETTLED_KEY)).toBe("[]");
   });
   it("leaves every page unsettled when the list is empty", () => {
@@ -145,7 +145,7 @@ describe("seedExistingInstall", () => {
   });
   it("does not overwrite an existing list", () => {
     const { m, storage } = memoryStorage('["hub"]');
-    seedExistingInstall(storage, 3);
+    seedExistingInstall(storage, true);
     expect(m.get(SETTLED_KEY)).toBe('["hub"]');
   });
 });

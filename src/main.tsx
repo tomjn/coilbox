@@ -32,7 +32,10 @@ import {
   resolveWelcome,
 } from "./profile/profile";
 import Splash from "./profile/Splash";
-import { createTauriSettingsStorage } from "./settings-storage";
+import {
+  announceSettingsLoadProblem,
+  createTauriSettingsStorage,
+} from "./settings-storage";
 import "./index.css";
 
 const root = document.getElementById("root");
@@ -47,9 +50,10 @@ if (import.meta.env.DEV) performance.mark("coilbox:boot:start");
 // Hydrate the settings cache from app-data before first render, so useSetting
 // reads return persisted values synchronously on mount.
 const settingsStorage = await createTauriSettingsStorage();
-// An install that already had settings when onboarding shipped skips it. This
-// runs before anything else writes a setting, so the count is exact.
-seedExistingInstall(settingsStorage, settingsStorage.loadedKeyCount);
+// An install that already had settings when onboarding shipped skips it, and so
+// does one whose settings file failed to load, which is no new install. This runs
+// before anything else writes a setting, so the answer is exact.
+seedExistingInstall(settingsStorage, settingsStorage.hadSettings);
 if (import.meta.env.DEV) performance.mark("coilbox:boot:settings");
 
 // Load the distribution profile (a bundler-supplied .coilbox/profile.json) before
@@ -62,6 +66,9 @@ if (import.meta.env.DEV) performance.mark("coilbox:boot:profile");
 // player's language: the Language setting, or the system's when it is unset.
 await loadLocale(bootLocale(settingsStorage.get(LANGUAGE_KEY)));
 if (import.meta.env.DEV) performance.mark("coilbox:boot:locale");
+if (settingsStorage.loadProblem) {
+  announceSettingsLoadProblem(settingsStorage.loadProblem);
+}
 const appTitle = profile.title ?? t`Coilbox`;
 
 // Paint the profile's boot background immediately (ending any white flash this

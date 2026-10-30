@@ -55197,6 +55197,14 @@ msgstr "Własny adres Twojego routera to {0}, do którego internet nie kieruje r
 msgid "Your saved password has been left as it was."
 msgstr "Zapisane hasło pozostało bez zmian."
 
+#: src/settings-storage.ts
+msgid "Your settings could not be read, so changes will not be saved until Coilbox restarts."
+msgstr ""
+
+#: src/settings-storage.ts
+msgid "Your settings could not be read. The old file is kept at {copy}"
+msgstr ""
+
 #: src/runlite/pages/components/RunEndScreen.tsx
 #, fuzzy
 msgid "Your ship gave out. The warpath is over."

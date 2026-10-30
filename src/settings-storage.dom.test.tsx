@@ -46,7 +46,9 @@ const backend = vi.hoisted(() => {
 
 vi.mock("@tauri-apps/api/core", () => ({
   invoke: (command: string) => {
-    if (command === "app_settings_load") return Promise.resolve({});
+    if (command === "app_settings_load") {
+      return Promise.resolve({ entries: {}, recoveredCopy: null });
+    }
     return new Promise((resolve, reject) => {
       backend.waiting.push({
         release: () => resolve(undefined),
@@ -57,7 +59,10 @@ vi.mock("@tauri-apps/api/core", () => ({
 }));
 
 import { installSettingsStorage } from "./lib/storedSetting";
-import { createTauriSettingsStorage } from "./settings-storage";
+import {
+  announceSettingsLoadProblem,
+  createTauriSettingsStorage,
+} from "./settings-storage";
 
 const TITLE = "Coilbox could not save your settings";
 
@@ -160,5 +165,33 @@ describe("a setting that would not save", () => {
     await backend.failOne();
 
     await waitFor(() => expect(readHistory().entries).toHaveLength(2));
+  });
+});
+
+describe("settings that could not be read", () => {
+  it("says where the old file is, on screen and in the bell", async () => {
+    announceSettingsLoadProblem({ copy: "/data/settings.corrupt-1.json" });
+    mountToasts();
+
+    const line =
+      "Your settings could not be read. The old file is kept at /data/settings.corrupt-1.json";
+    await waitFor(() => expect(screen.getByText(line)).toBeTruthy());
+    expect(readHistory().entries[0]).toMatchObject({
+      title: line,
+      level: "error",
+    });
+  });
+
+  it("says saving is off when the file could not be moved", async () => {
+    mountToasts();
+    announceSettingsLoadProblem({ copy: null });
+
+    await waitFor(() =>
+      expect(
+        screen.getByText(
+          "Your settings could not be read, so changes will not be saved until Coilbox restarts.",
+        ),
+      ).toBeTruthy(),
+    );
   });
 });
