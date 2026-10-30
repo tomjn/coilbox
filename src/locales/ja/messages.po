@@ -8584,10 +8584,18 @@ msgstr "ゲームが実行中です。{gameLabel} は保存時や終了時に設
 msgid "A game is running. Close it to change these settings."
 msgstr ""
 
+#: src/widgets/pages/RemoveWidget.tsx
+msgid "A game is running. Close it to remove widgets."
+msgstr ""
+
 #: src/blueprint/pages/components/LeavingPack.tsx
 #, fuzzy
 msgid "A game is running. It writes its whole blueprints file back when it saves or exits, so anything written into that file now could be thrown away without a word."
 msgstr "ゲームが実行中です。ゲームは保存時や終了時に設計図ファイル全体を書き戻すため、今そのファイルに書き込んだ内容は何の通知もなく破棄される可能性があります。"
+
+#: src/widgets/widgetRemoval.ts
+msgid "A game is running. It writes its widget settings back when it saves or exits, so a widget removed now would come back. Close the game and try again."
+msgstr ""
 
 #: src/widgets/widgetSettings.ts
 msgid "A game is running. It writes its widget settings back when it saves or exits, so anything written now would be thrown away. Close the game and try again."
@@ -10582,6 +10590,10 @@ msgstr "建設できる他のユニット"
 #, fuzzy
 msgid "Also check Steam install locations for Zero-K during a rescan."
 msgstr "再スキャン時に Zero-K の Steam のインストール場所も確認する。"
+
+#: src/widgets/pages/RemoveWidget.tsx
+msgid "Also delete its entries from the config files"
+msgstr ""
 
 #: src/lego/pages/components/ActionsDrawer.tsx
 #, fuzzy
@@ -13895,6 +13907,7 @@ msgstr "自身のユニットにダメージを与えない"
 #: src/scenario/pages/components/SetupPanel.tsx
 #: src/uberstress/pages/RunPage.tsx
 #: src/widgets/pages/AddWidgetDrawer.tsx
+#: src/widgets/pages/RemoveWidget.tsx
 #: src/workshop/pages/components/CloneActions.tsx
 #: src/workshop/pages/components/DiskDiffDrawer.tsx
 #: src/workshop/pages/components/InPlaceWrite.tsx
@@ -16438,6 +16451,11 @@ msgstr "円錐"
 msgid "Config file: {configPath}"
 msgstr "設定ファイル：{configPath}"
 
+#. placeholder {0}: entries.backups.join(", ")
+#: src/widgets/pages/RemoveWidget.tsx
+msgid "Config files as they were: {0}"
+msgstr ""
+
 #: src/uberstress/pages/components/ReportDetail.tsx
 #, fuzzy
 msgid "Configuration"
@@ -17381,6 +17399,10 @@ msgstr "{gameName} から {unit} のスクリプトを読み込めませんで�
 msgid "could not read model {file}: {status}"
 msgstr "モデル {file} を読み込めませんでした：{status}"
 
+#: src/widgets/pages/RemoveWidget.tsx
+msgid "Could not read the config file: {line}"
+msgstr ""
+
 #. placeholder {0}: message(e)
 #: src/workshop/pages/components/DiskDiffDrawer.tsx
 #, fuzzy
@@ -17490,6 +17512,10 @@ msgstr "保存したモデルを読み込めませんでした：{error}"
 #: src/widgets/pages/AddWidgetDrawer.tsx
 #: src/widgets/pages/WidgetsPage.tsx
 msgid "Could not read: {0}"
+msgstr ""
+
+#: src/widgets/pages/RemoveWidget.tsx
+msgid "Could not remove its entries: {line}"
 msgstr ""
 
 #: src/lego/pages/components/SaveModelPopover.tsx
@@ -19155,6 +19181,7 @@ msgstr "トラック用のディスク容量（MB）"
 #: src/multiplayer/LobbyStatusButton.tsx
 #: src/multiplayer/RejoinOfferPanel.tsx
 #: src/play/pages/SkirmishPage.tsx
+#: src/widgets/pages/RemoveWidget.tsx
 #, fuzzy
 msgid "Dismiss"
 msgstr "閉じる"
@@ -34454,6 +34481,10 @@ msgstr "画面を開く"
 msgid "Open another file"
 msgstr "別のファイルを開く"
 
+#: src/widgets/pages/RemoveWidget.tsx
+msgid "Open backup"
+msgstr ""
+
 #: src/multiplayer/DebriefingDrawer.tsx
 #, fuzzy
 msgid "Open chat"
@@ -38610,6 +38641,8 @@ msgstr "リミックス元"
 #: src/lego/pages/components/BuiltBySection.tsx
 #: src/lego/pages/components/ProportionsPanel.tsx
 #: src/multiplayer/battle/MemberRow.tsx
+#: src/widgets/pages/RemoveWidget.tsx
+#: src/widgets/pages/WidgetsPage.tsx
 #: src/workshop/pages/components/ExplosionGeneratorEditor.tsx
 #, fuzzy
 msgid "Remove"
@@ -38678,9 +38711,15 @@ msgstr "{mapTitle} を削除しますか？"
 #: src/campaign/pages/components/StartingUnits.tsx
 #: src/campaign/pages/components/UnitRestrictions.tsx
 #: src/uberstress/pages/SettingsSection.tsx
+#: src/widgets/pages/RemoveWidget.tsx
 #, fuzzy
 msgid "Remove {name}"
 msgstr "{name} を外す"
+
+#. placeholder {0}: removal.games.join(", ")
+#: src/widgets/pages/RemoveWidget.tsx
+msgid "Remove {name} from {0}?"
+msgstr ""
 
 #: src/multiplayer/chat/ConversationSidebar.tsx
 #, fuzzy
@@ -38696,6 +38735,10 @@ msgstr "{name} をプロジェクトから外す"
 #, fuzzy
 msgid "Remove {name} from the comparison"
 msgstr "{name} を比較から外す"
+
+#: src/widgets/pages/RemoveWidget.tsx
+msgid "Remove {name}?"
+msgstr ""
 
 #: src/play/pages/components/ParticipantsTable.tsx
 #, fuzzy
@@ -38876,6 +38919,10 @@ msgstr "削除済み"
 #, fuzzy
 msgid "Removed {missionName} from the game."
 msgstr "{missionName} をゲームから削除しました。"
+
+#: src/widgets/pages/RemoveWidget.tsx
+msgid "Removed {name}."
+msgstr ""
 
 #: src/lego/pages/BuilderPage.tsx
 #, fuzzy
@@ -39552,6 +39599,7 @@ msgid "Restarts every time the target is hit again."
 msgstr "目標に再び当たるたびにやり直します。"
 
 #: src/content/pages/components/ConfigProfilesPanel.tsx
+#: src/widgets/pages/RemoveWidget.tsx
 #, fuzzy
 msgid "Restore"
 msgstr "復元"

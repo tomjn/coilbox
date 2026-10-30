@@ -4,7 +4,13 @@
  * with what it declares, coilbox's own marked, a broken one with its error,
  * and the games that load each one.
  */
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import {
+  cleanup,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+} from "@testing-library/react";
 import { MemoryRouter } from "react-router";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { PlayerWidgetScan } from "@/content/bindings";
@@ -115,7 +121,36 @@ vi.mock("../useGameFiles", () => ({
   useGameFiles: () => files,
 }));
 
+const play = { running: false };
+vi.mock("@/play/PlayProvider", () => ({
+  usePlay: () => play,
+}));
+
+// The games have saved no config file here.
+vi.mock("@/blueprint/fileIO", () => ({
+  appFileIO: { read: async () => null, write: async () => {} },
+}));
+
+const removeCalls: { files: string[]; folders: string[] }[] = [];
+vi.mock("@/content/bindings", async () => {
+  const actual =
+    await vi.importActual<Record<string, unknown>>("@/content/bindings");
+  return {
+    ...actual,
+    contentWidgetDelete: async (args: {
+      files: string[];
+      folders: string[];
+    }) => {
+      removeCalls.push(args);
+      return { files: args.files, backup: "/data/widget-backups/1-buildwatch" };
+    },
+    contentWidgetRestore: async () => ["LuaUI/Widgets/gui_build_watch.lua"],
+  };
+});
+
 beforeEach(() => {
+  play.running = false;
+  removeCalls.length = 0;
   installSettingsStorage(memorySettingsStorage());
   resetSets();
   files.files = new Map([
@@ -272,6 +307,80 @@ describe("WidgetsPage", () => {
     expect(screen.getByRole("status").textContent).toContain(
       "has not saved its widget settings yet",
     );
+  });
+
+  it("asks before removing a widget, naming the games that lose it", async () => {
+    page();
+    fireEvent.click(screen.getByRole("button", { name: "Remove BuildWatch" }));
+    expect(
+      screen.getByText("Remove BuildWatch from Metal Factions v2.58?"),
+    ).toBeTruthy();
+    expect(removeCalls).toEqual([]);
+    // Nothing in a config file to offer to delete.
+    await waitFor(() =>
+      expect(
+        screen
+          .getAllByRole("button", { name: "Remove" })
+          .every((b) => !b.hasAttribute("disabled")),
+      ).toBe(true),
+    );
+    expect(
+      screen.queryByText("Also delete its entries from the config files"),
+    ).toBeNull();
+  });
+
+  it("removes a widget when confirmed, forgets it in the sets, and can restore it", async () => {
+    updateSets((s) => ({ ...s, global: { BuildWatch: true, Other: true } }));
+    page();
+    fireEvent.click(screen.getByRole("button", { name: "Remove BuildWatch" }));
+    const confirm = await waitFor(() => {
+      const button = screen
+        .getAllByRole("button", { name: "Remove" })
+        .find((b) => b.className.includes("destructive"));
+      if (!button || button.hasAttribute("disabled")) throw new Error("wait");
+      return button;
+    });
+    fireEvent.click(confirm);
+    await waitFor(() =>
+      expect(screen.getByText("Removed BuildWatch.")).toBeTruthy(),
+    );
+    expect(removeCalls).toEqual([
+      {
+        writeDir: "/home/player/.spring",
+        files: ["LuaUI/Widgets/gui_build_watch.lua"],
+        folders: [],
+        label: "BuildWatch",
+      },
+    ]);
+    expect(readSets().global).toEqual({ Other: true });
+    expect(screen.getByText("/data/widget-backups/1-buildwatch")).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "Restore" }));
+    await waitFor(() =>
+      expect(screen.queryByText("Removed BuildWatch.")).toBeNull(),
+    );
+  });
+
+  it("offers no way to remove coilbox's own widget", () => {
+    page();
+    expect(
+      screen.queryByRole("button", { name: "Remove Coilbox blueprints" }),
+    ).toBeNull();
+    expect(
+      screen.getByRole("button", { name: "Remove BuildWatch" }),
+    ).toBeTruthy();
+  });
+
+  it("will not remove while a game is running", async () => {
+    play.running = true;
+    page();
+    fireEvent.click(screen.getByRole("button", { name: "Remove BuildWatch" }));
+    expect(
+      screen.getByText("A game is running. Close it to remove widgets."),
+    ).toBeTruthy();
+    const confirm = screen
+      .getAllByRole("button", { name: "Remove" })
+      .find((b) => b.className.includes("destructive"));
+    expect(confirm?.hasAttribute("disabled")).toBe(true);
   });
 
   it("shows a file it could not read", () => {

@@ -225,6 +225,27 @@ export function addWidgets(
   };
 }
 
+/** Forget removed widgets: take their names out of every set and out of what
+ *  coilbox remembers writing to each config file. */
+export function dropWidgets(
+  sets: WidgetSets,
+  names: readonly string[],
+): WidgetSets {
+  const without = (states: WidgetStates): WidgetStates =>
+    Object.fromEntries(
+      Object.entries(states).filter(([name]) => !names.includes(name)),
+    );
+  const each = (record: Readonly<Record<string, WidgetStates>>) =>
+    Object.fromEntries(
+      Object.entries(record).map(([key, states]) => [key, without(states)]),
+    );
+  return {
+    global: without(sets.global),
+    overrides: each(sets.overrides),
+    written: each(sets.written),
+  };
+}
+
 /** Send a game back to the global set. */
 export function dropOverride(sets: WidgetSets, key: string): WidgetSets {
   if (!entry(sets.overrides, key)) return sets;

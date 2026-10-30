@@ -7,7 +7,7 @@ import {
   RefreshCw,
   SlidersHorizontal,
 } from "lucide-react";
-import { useMemo, useState } from "react";
+import { type ReactNode, useMemo, useState } from "react";
 import { useSearchParams } from "react-router";
 import { OptionSelect } from "@/components/OptionSelect";
 import { PageHeader } from "@/components/PageHeader";
@@ -30,6 +30,7 @@ import {
   ErrorBanner,
   SkeletonList,
 } from "@/content/pages/components/states";
+import { usePlay } from "@/play/PlayProvider";
 import { useGameFiles } from "../useGameFiles";
 import { useWidgetList } from "../useWidgetList";
 import { folderToOpen, rowsForGame, type WidgetRow } from "../widgetList";
@@ -44,6 +45,11 @@ import {
   type WidgetStates,
 } from "../widgetSets";
 import { AddWidgetDrawer } from "./AddWidgetDrawer";
+import {
+  RemovedNotice,
+  type RemovedWidget,
+  RemoveWidgetButton,
+} from "./RemoveWidget";
 import { type SettingsTarget, WidgetSettingsDrawer } from "./WidgetSettings";
 
 /** The picker's value for the list of every widget file. Not empty, because
@@ -68,6 +74,12 @@ export default function WidgetsPage() {
   const files = useGameFiles(list.writeDir, list.games, list.rows);
   const sets = useWidgetSets();
   const [adding, setAdding] = useState(false);
+  const [removed, setRemoved] = useState<RemovedWidget | null>(null);
+  const { running } = usePlay();
+  const reread = () => {
+    void list.reload();
+    void files.reload();
+  };
   const file = game ? files.files?.get(game.game) : undefined;
   // A game whose handler is not recognised has no file to write, so no set.
   const key = game?.handler ? setKey(game) : null;
@@ -176,6 +188,18 @@ export default function WidgetsPage() {
         />
       )}
 
+      {removed && list.writeDir && (
+        <RemovedNotice
+          removed={removed}
+          writeDir={list.writeDir}
+          onRestored={() => {
+            setRemoved(null);
+            reread();
+          }}
+          onDismiss={() => setRemoved(null)}
+        />
+      )}
+
       {list.error && <ErrorBanner message={list.error} />}
       {list.folderErrors.map((e) => (
         <ErrorBanner key={e} message={e} />
@@ -249,6 +273,24 @@ export default function WidgetsPage() {
               game?.handler ? (row) => setSettingsPath(row.path) : undefined
             }
             canSettings={(row) => !!game && !!settingsSwitch(row, game.game)}
+            renderRemove={
+              list.writeDir && list.games && shown
+                ? (row) => (
+                    <RemoveWidgetButton
+                      row={row}
+                      rows={list.rows ?? []}
+                      games={list.games ?? []}
+                      writeDir={list.writeDir ?? ""}
+                      running={running}
+                      onRemoved={(done) => {
+                        setRemoved(done);
+                        setSettingsPath(null);
+                        reread();
+                      }}
+                    />
+                  )
+                : undefined
+            }
             switches={
               picked === ALL
                 ? {
@@ -371,6 +413,7 @@ function WidgetTable({
   switches,
   onSettings,
   canSettings,
+  renderRemove,
 }: {
   rows: readonly WidgetRow[];
   showGames: boolean;
@@ -382,6 +425,8 @@ function WidgetTable({
   /** Present with a recognised game picked. */
   onSettings?: (row: WidgetRow) => void;
   canSettings: (row: WidgetRow) => boolean;
+  /** The remove button for a row. Not offered for coilbox's own widget. */
+  renderRemove?: (row: WidgetRow) => ReactNode;
 }) {
   const { t } = useLingui();
   return (
@@ -414,6 +459,13 @@ function WidgetTable({
             <TableHead className="w-0">
               <span className="sr-only">
                 <Trans>Settings</Trans>
+              </span>
+            </TableHead>
+          )}
+          {renderRemove && (
+            <TableHead className="w-0">
+              <span className="sr-only">
+                <Trans>Remove</Trans>
               </span>
             </TableHead>
           )}
@@ -506,6 +558,9 @@ function WidgetTable({
                   </Button>
                 )}
               </TableCell>
+            )}
+            {renderRemove && (
+              <TableCell>{!row.coilbox && renderRemove(row)}</TableCell>
             )}
           </TableRow>
         ))}
