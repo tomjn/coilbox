@@ -22,6 +22,38 @@ describe("recogniseHandler", () => {
     expect(handler?.id).toBe(id);
   });
 
+  it.each([
+    ["LuaUI/widgets_evo.lua", "evo", "engine", ["LuaUI/Widgets_Evo"]],
+    ["luaui/jauriawidgets.lua", "jauria", "ca", ["LuaUI/Widgets"]],
+    ["luaui/mosaicwidgets.lua", "mosaic", "ba", ["LuaUI/widgets_mosaic"]],
+    ["luaui/tapwidgets.lua", "tap", "ba", ["LuaUI/Widgets_TAP"]],
+    ["LuaUI/config/iwui.config.lua", "iw", "engine", ["LuaUI/Widgets"]],
+  ])("recognises %s as %s", async (marker, id, family, folders) => {
+    const handler = await recogniseHandler(["luaui.lua", marker], none);
+    expect(handler).toMatchObject({ id, family, folders, subfolders: false });
+  });
+
+  it("finds MOSAIC's file in its own configs folder, not Config", async () => {
+    const handler = await recogniseHandler(
+      ["luaui.lua", "luaui/mosaicwidgets.lua"],
+      none,
+    );
+    expect(
+      configCandidates(handler?.config as WidgetConfigFile, "mosaic"),
+    ).toEqual(["LuaUI/configs/MOSAIC_data.lua"]);
+  });
+
+  it.each([
+    ["LuaUI/mosaicwidgets.lua", "mosaic", "mosaicmain.lua"],
+    ["LuaUI/tapwidgets.lua", "tap", "tapmain.lua"],
+  ])("does not take %s's main.lua for jK's", async (marker, id, main) => {
+    const handler = await recogniseHandler(
+      ["luaui.lua", "LuaUI/main.lua", marker],
+      async () => `VFS.Include(LUAUI_DIRNAME .. '${main}')`,
+    );
+    expect(handler?.id).toBe(id);
+  });
+
   // The file names each game's own handler saves to, under LuaUI/Config.
   it.each([
     ["luaui/barwidgets.lua", "BYAR", ["BYAR.lua"]],
@@ -30,6 +62,10 @@ describe("recogniseHandler", () => {
     ["luaui/cawidgets.lua", "ca", ["CA_order.lua", "ca_order.lua"]],
     ["luaui/mfwidgets.lua", "MF", ["MF.lua"]],
     ["LuaUI/widgets_custom.lua", "sf", ["SF_data.lua"]],
+    ["luaui/widgets_evo.lua", "evo", ["EVO_data.lua"]],
+    ["luaui/jauriawidgets.lua", "jauria", ["JAURIA_order.lua"]],
+    ["luaui/tapwidgets.lua", "tap", ["tap.lua"]],
+    ["luaui/config/iwui.config.lua", "iw", ["iw.lua"]],
   ])("%s with short name %s saves to %j", async (marker, short, files) => {
     const handler = await recogniseHandler(["luaui.lua", marker], none);
     expect(
@@ -97,6 +133,9 @@ describe("HANDLER_FOLDERS", () => {
       "addons",
       "rmlwidgets",
       "widgets",
+      "widgets_evo",
+      "widgets_mosaic",
+      "widgets_tap",
     ]);
   });
 });
