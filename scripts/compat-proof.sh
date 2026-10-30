@@ -261,12 +261,7 @@ echo
 
 # The lines of a log that count as errors.
 error_lines() { # infolog
-  awk '{
-    line = $0
-    sub(/^(\[[tf]=[^]]*\])+ */, "", line)
-    if (line ~ /^(\[[^]]*\] )?Warning:/) next
-    if (/Error/ || ((/LuaRules/ || /LuaUI/) && tolower($0) ~ /error/)) print
-  }' "$1"
+  awk -f "$ROOT/scripts/compat-proof-errors.awk" "$1"
 }
 
 # A log line without its time and frame.
