@@ -93,6 +93,7 @@ function row(
   const folder = options.folder ?? "LuaUI/Widgets";
   return {
     root: options.root ?? root,
+    caseSensitive: false,
     path,
     folder,
     nested: options.nested ?? false,

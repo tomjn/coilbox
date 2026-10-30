@@ -32,9 +32,16 @@ const bar: WidgetHandler = {
   config: { files: ["{short}.lua"], shape: "nested" },
 };
 
-function file(path: string, folder: string, nested = false): PlayerWidgetFile {
+function file(
+  path: string,
+  folder: string,
+  nested = false,
+  caseSensitive = false,
+  root = "/data",
+): PlayerWidgetFile {
   return {
-    root: "/data",
+    root,
+    caseSensitive,
     path,
     folder,
     nested,
@@ -76,14 +83,30 @@ describe("widgetRows", () => {
       caseSensitive: true,
       folders: ["LuaUI/Widgets", "LuaUI/widgets"],
       files: [
-        file("LuaUI/Widgets/a.lua", "LuaUI/Widgets"),
-        file("LuaUI/widgets/b.lua", "LuaUI/widgets"),
+        file("LuaUI/Widgets/a.lua", "LuaUI/Widgets", false, true),
+        file("LuaUI/widgets/b.lua", "LuaUI/widgets", false, true),
       ],
       errors: [],
     };
     expect(widgetRows(scan, games).map((r) => r.loadedBy)).toEqual([
       ["Metal Factions v2.58", "Beyond All Reason"],
       ["Splinter Faction 0.1.96"],
+    ]);
+  });
+
+  it("applies each file's own root's case rules when roots differ", () => {
+    const scan: PlayerWidgetScan = {
+      caseSensitive: true,
+      folders: ["LuaUI/Widgets"],
+      files: [
+        file("LuaUI/widgets/a.lua", "LuaUI/widgets", false, true, "/ext4"),
+        file("LuaUI/widgets/b.lua", "LuaUI/widgets", false, false, "/apfs"),
+      ],
+      errors: [],
+    };
+    expect(widgetRows(scan, games).map((r) => r.loadedBy)).toEqual([
+      ["Splinter Faction 0.1.96"],
+      ["Metal Factions v2.58", "Splinter Faction 0.1.96", "Beyond All Reason"],
     ]);
   });
 });
@@ -93,8 +116,8 @@ describe("rowsForGame", () => {
     caseSensitive: true,
     folders: ["LuaUI/Widgets", "LuaUI/widgets"],
     files: [
-      file("LuaUI/Widgets/a.lua", "LuaUI/Widgets"),
-      file("LuaUI/widgets/b.lua", "LuaUI/widgets"),
+      file("LuaUI/Widgets/a.lua", "LuaUI/Widgets", false, true),
+      file("LuaUI/widgets/b.lua", "LuaUI/widgets", false, true),
     ],
     errors: [],
   };

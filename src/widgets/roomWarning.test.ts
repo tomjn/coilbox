@@ -172,6 +172,7 @@ function row(
   const { control, ...rest } = more;
   return {
     root: "/data",
+    caseSensitive: false,
     path: `LuaUI/Widgets/${name}.lua`,
     folder: "LuaUI/Widgets",
     nested: false,

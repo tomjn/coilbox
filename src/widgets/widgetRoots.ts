@@ -36,7 +36,7 @@ export async function loadWidgetRoots(primary: string): Promise<string[]> {
 /**
  * Scan the widget folders of every root and join the results. `folders` and
  * `caseSensitive` are the first root's, because those serve the root widgets
- * are added to. A root other than the first that cannot be scanned is said in
+ * are added to. Each file carries its own root's case rules. A root other than the first that cannot be scanned is said in
  * `errors` and the rest still list, but the first failing throws.
  */
 export async function scanWidgetRoots(

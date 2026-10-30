@@ -41,6 +41,7 @@ const scan: PlayerWidgetScan = {
   files: [
     {
       root: ROOT,
+      caseSensitive: false,
       path: "LuaUI/Widgets/gui_build_watch.lua",
       folder: "LuaUI/Widgets",
       nested: false,
@@ -58,6 +59,7 @@ const scan: PlayerWidgetScan = {
     },
     {
       root: ROOT,
+      caseSensitive: false,
       path: "LuaUI/Widgets/coilbox_blueprints.lua",
       folder: "LuaUI/Widgets",
       nested: false,
@@ -68,6 +70,7 @@ const scan: PlayerWidgetScan = {
     },
     {
       root: ROOT,
+      caseSensitive: false,
       path: "LuaUI/Widgets/pack/helper.lua",
       folder: "LuaUI/Widgets",
       nested: true,
@@ -78,6 +81,7 @@ const scan: PlayerWidgetScan = {
     },
     {
       root: ROOT,
+      caseSensitive: false,
       path: "LuaUI/Widgets/twin_a.lua",
       folder: "LuaUI/Widgets",
       nested: false,
@@ -88,6 +92,7 @@ const scan: PlayerWidgetScan = {
     },
     {
       root: ROOT,
+      caseSensitive: false,
       path: "LuaUI/Widgets/twin_b.lua",
       folder: "LuaUI/Widgets",
       nested: false,
@@ -119,6 +124,7 @@ const list: { configDir: string | undefined; second: boolean } = {
 
 const secondFile: PlayerWidgetFile = {
   root: SECOND,
+  caseSensitive: false,
   path: "LuaUI/Widgets/gui_build_watch.lua",
   folder: "LuaUI/Widgets",
   nested: false,

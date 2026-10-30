@@ -2271,6 +2271,8 @@ export interface PlayerWidgetInfo {
 export interface PlayerWidgetFile {
   /** The content root it was scanned in. The same `path` can be in several. */
   root: string;
+  /** Whether that root's filesystem tells `Widgets` and `widgets` apart. */
+  caseSensitive: boolean;
   /** Relative to the write folder, spelled as on disk. */
   path: string;
   /** The scanned folder it is in or under, such as `LuaUI/Widgets`. */

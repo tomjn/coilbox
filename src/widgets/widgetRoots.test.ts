@@ -28,6 +28,7 @@ const { scanWidgetRoots, widgetRoots } = await import("./widgetRoots");
 function file(root: string): PlayerWidgetFile {
   return {
     root,
+    caseSensitive: false,
     path: "LuaUI/Widgets/a.lua",
     folder: "LuaUI/Widgets",
     nested: false,

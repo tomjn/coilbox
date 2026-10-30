@@ -22,6 +22,7 @@ function row(
 ): WidgetRow {
   return {
     root: "/data",
+    caseSensitive: false,
     path: `LuaUI/Widgets/${name}.lua`,
     folder: "LuaUI/Widgets",
     nested: false,

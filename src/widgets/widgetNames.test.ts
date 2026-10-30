@@ -25,6 +25,7 @@ function file(
 ): PlayerWidgetFile {
   return {
     root: "/data",
+    caseSensitive: false,
     path,
     folder: "LuaUI/Widgets",
     nested: path.split("/").length > 3,

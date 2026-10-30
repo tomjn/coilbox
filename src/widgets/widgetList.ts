@@ -102,7 +102,7 @@ export function widgetRows(
   const loadedBy = scan.files.map((file) =>
     games
       .filter(
-        (g) => g.handler !== null && loads(g.handler, file, scan.caseSensitive),
+        (g) => g.handler !== null && loads(g.handler, file, file.caseSensitive),
       )
       .map((g) => g.game),
   );

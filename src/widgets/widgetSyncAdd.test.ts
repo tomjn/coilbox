@@ -19,6 +19,7 @@ const scan: PlayerWidgetScan = {
   folders: ["LuaUI/Widgets"],
   files: ["Minimap", "Radar"].map((name) => ({
     root: "",
+    caseSensitive: false,
     path: `LuaUI/Widgets/${name.toLowerCase()}.lua`,
     folder: "LuaUI/Widgets",
     nested: false,
