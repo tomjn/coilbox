@@ -30614,6 +30614,10 @@ msgstr "Aucune tentative enregistrée."
 msgid "No audio clip files matched in this game's archive."
 msgstr "Aucun fichier audio correspondant dans l’archive de ce jeu."
 
+#: src/widgets/pages/WidgetsPage.tsx
+msgid "No author stated"
+msgstr ""
+
 #: src/runlite/pages/RunPage.tsx
 #, fuzzy
 msgid "no battle"
@@ -31292,6 +31296,10 @@ msgstr "Aucun lien d’invitation pour cette partie. {inviteProblem}"
 #, fuzzy
 msgid "No leftover dialogue clips - nothing to reclaim."
 msgstr "Aucun clip de dialogue restant : rien à récupérer."
+
+#: src/widgets/pages/WidgetsPage.tsx
+msgid "No licence stated"
+msgstr ""
 
 #: src/content/pages/components/LivingValueChart.tsx
 #, fuzzy

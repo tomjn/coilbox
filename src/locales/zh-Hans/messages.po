@@ -30614,6 +30614,10 @@ msgstr "还没有挑战记录。"
 msgid "No audio clip files matched in this game's archive."
 msgstr "此游戏的归档中没有匹配的音频片段文件。"
 
+#: src/widgets/pages/WidgetsPage.tsx
+msgid "No author stated"
+msgstr ""
+
 #: src/runlite/pages/RunPage.tsx
 #, fuzzy
 msgid "no battle"
@@ -31292,6 +31296,10 @@ msgstr "此房间没有邀请链接。{inviteProblem}"
 #, fuzzy
 msgid "No leftover dialogue clips - nothing to reclaim."
 msgstr "没有遗留的对白片段，无可释放。"
+
+#: src/widgets/pages/WidgetsPage.tsx
+msgid "No licence stated"
+msgstr ""
 
 #: src/content/pages/components/LivingValueChart.tsx
 #, fuzzy

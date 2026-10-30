@@ -108,6 +108,13 @@ describe("WidgetsPage", () => {
     expect(screen.getByText("No game coilbox recognises")).toBeTruthy();
   });
 
+  it("says so when a widget states no author or licence, and not when it could not be read", () => {
+    page();
+    // Only the coilbox row declares neither. The unreadable row says nothing.
+    expect(screen.getAllByText("No author stated")).toHaveLength(1);
+    expect(screen.getAllByText("No licence stated")).toHaveLength(1);
+  });
+
   it("shows a picked game only the files it loads", () => {
     page("/library/widgets?game=Metal%20Factions%20v2.58");
     expect(screen.getByText("BuildWatch")).toBeTruthy();
