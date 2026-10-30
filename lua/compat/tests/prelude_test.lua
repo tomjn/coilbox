@@ -1006,8 +1006,50 @@ end
 -- read. `removed` are the names it still knows but logs an error for. Writing a
 -- known name raises an error, as with editing defs off, and anything else is
 -- set raw.
+--
+-- Its next walks as LuaUtils::Next does: the known names, then the raw keys. A
+-- raw key with a known name sends it back into the known names, so a walk over a
+-- proxy holding one never ends.
 local function defProxy(engine, kind, params, removed)
-	local proxy = { pairs = pairs, next = next }
+	local names, position = {}, {}
+	for name in pairs(params) do
+		names[#names + 1] = name
+	end
+	table.sort(names)
+	local removedNames = {}
+	for name in pairs(removed) do
+		removedNames[#removedNames + 1] = name
+	end
+	table.sort(removedNames)
+	for _, name in ipairs(removedNames) do
+		names[#names + 1] = name
+	end
+	for i, name in ipairs(names) do
+		position[name] = i
+	end
+	local function engineNext(t, key)
+		if key == nil then
+			return names[1], t[names[1]]
+		end
+		local at = position[key]
+		if at ~= nil then
+			at = at + 1
+			while removed[names[at]] do
+				at = at + 1
+			end
+			if names[at] ~= nil then
+				return names[at], t[names[at]]
+			end
+			key = nil
+		end
+		return next(t, key)
+	end
+	local proxy = {
+		pairs = function(t)
+			return engineNext, t, nil
+		end,
+		next = engineNext,
+	}
 	setmetatable(proxy, {
 		__index = function(t, key)
 			if removed[key] then
@@ -1033,8 +1075,8 @@ end
 
 local weaponRemoved = { areaOfEffect = true, maxVelocity = true, onlyTargetCategories = true }
 
-local function caEngine(synced, manifest)
-	local engine = newEngine({ synced = synced, manifest = manifest })
+local function caEngine(synced, manifest, game)
+	local engine = newEngine({ synced = synced, manifest = manifest, game = game, modinfo = game and {} })
 	local env = engine.env
 	env.WeaponDefs = {
 		[0] = defProxy(engine, "WeaponDefs", { name = "flak", damageAreaOfEffect = 64, projectilespeed = 12 }, weaponRemoved),
@@ -1192,6 +1234,84 @@ do
 	check("synced: only the read of areaOfEffect is logged", #engine.logs == 1, table.concat(engine.logs, "; "))
 end
 
+-- Issue #4661.
+local function walk(entry, limit)
+	local seen, steps = {}, 0
+	local iterator, state, key = entry:pairs()
+	while steps < limit do
+		local nextKey, value = iterator(state, key)
+		if nextKey == nil then
+			return seen, true
+		end
+		seen[nextKey], key, steps = value, nextKey, steps + 1
+	end
+	return seen, false
+end
+
+local function categoryEngine(synced, manifest)
+	local engine = caEngine(synced, manifest, { springCategories = { air = 0, land = 1, notsub = 2 } })
+	prelude(engine)
+	return engine
+end
+
+do
+	local _, ended = walk(categoryEngine(false, 17).env.WeaponDefs[0], 1000)
+	check("manifest 17: a walk with wd:pairs() never ends", not ended)
+end
+
+for _, synced in ipairs({ true, false }) do
+	local state = synced and "synced" or "unsynced"
+
+	do
+		-- exp_no_air_nuke.lua, line 27, and lups_shockwaves.lua, line 22.
+		local engine = categoryEngine(synced, 19)
+		local flak, laser = engine.env.WeaponDefs[0], engine.env.WeaponDefs[1]
+		check(state .. ": areaOfEffect is damageAreaOfEffect", flak.areaOfEffect == 64 and laser.areaOfEffect == 4, tostring(flak.areaOfEffect))
+		check(state .. ": maxVelocity is projectilespeed times 30", flak.maxVelocity == 360 and laser.maxVelocity == 15, tostring(flak.maxVelocity))
+		for _, wd in ipairs({ flak, laser }) do
+			local categories = wd.onlyTargetCategories
+			check(state .. ": onlyTargetCategories names every category", categories.air == true and categories.land == true and categories.notsub == true)
+		end
+		check(state .. ": the other values are the engine's", flak.name == "flak" and flak.damageAreaOfEffect == 64)
+		check(state .. ": no ERROR_TYPE line is logged", #engine.logs == 0, table.concat(engine.logs, "; "))
+		check(state .. ": the fix does not need rawset", synced == (engine.env.rawset == nil))
+	end
+
+	do
+		local engine = categoryEngine(synced, 19)
+		local ids = {}
+		for id, wd in pairs(engine.env.WeaponDefs) do
+			ids[id] = wd.name
+		end
+		check(state .. ": pairs(WeaponDefs) reaches every entry", ids[0] == "flak" and ids[1] == "laser")
+
+		local flak = engine.env.WeaponDefs[0]
+		local seen, ended = walk(flak, 1000)
+		check(state .. ": a walk with wd:pairs() ends", ended)
+		check(state .. ": wd:pairs() gives the engine's values and the old ones", seen.name == "flak" and seen.damageAreaOfEffect == 64 and seen.areaOfEffect == 64 and seen.maxVelocity == 360 and seen.onlyTargetCategories ~= nil)
+		check(state .. ": wd:next() starts the walk", flak:next() == "damageAreaOfEffect")
+
+		flak.ownKey = "mine"
+		check(state .. ": a key of the game's own can be set and read", flak.ownKey == "mine")
+		local afterWrite = walk(flak, 1000)
+		check(state .. ": wd:pairs() gives a key of the game's own", afterWrite.ownKey == "mine")
+		flak.areaOfEffect = 128
+		check(state .. ": wd:pairs() gives a value the game changed", walk(flak, 1000).areaOfEffect == 128 and flak.areaOfEffect == 128)
+		check(state .. ": writing an engine value is still refused", not pcall(function()
+			flak.name = "other"
+		end))
+		check(state .. ": the metatable is still protected", type(getmetatable(flak)) == "function" and not pcall(setmetatable, flak, {}))
+		check(state .. ": no fix failed", #engine.logs == 0, table.concat(engine.logs, "; "))
+	end
+
+	do
+		local engine = newEngine({ synced = synced, manifest = 19 })
+		engine.env.WeaponDefs = nil
+		prelude(engine)
+		check(state .. ": a state with no WeaponDefs is left alone", #engine.logs == 0, table.concat(engine.logs, "; "))
+	end
+end
+
 do
 	-- unit_healthbars.lua, line 209.
 	local engine = caEngine(false, 17)
@@ -1328,7 +1448,7 @@ local function gadgetHandlerFor(env)
 end
 
 do
-	local before = newEngine({ synced = false, manifest = 18 })
+	local before = newEngine({ synced = false, manifest = 19 })
 	prelude(before)
 	local gh = gadgetHandlerFor(before.env)
 	local got = {}
@@ -1336,9 +1456,9 @@ do
 	gh.GameFrameList[1] = nano
 	gh.actionHandler.AddSyncAction(nano, "nano_GameFrame", nano.GameFrame)
 	gh:GameFrame(30)
-	check("manifest 18 calls a sync action with the frame number", got[1] == 30)
+	check("manifest 19 calls a sync action with the frame number", got[1] == 30)
 
-	local engine = newEngine({ synced = false, manifest = 19 })
+	local engine = newEngine({ synced = false, manifest = 20 })
 	prelude(engine)
 	local handler, syncActions = gadgetHandlerFor(engine.env)
 	check("the game's gadgetHandler is the global", engine.env.gadgetHandler == handler)
@@ -1376,13 +1496,13 @@ end
 
 do
 	-- A handler without the parts the fix uses is left alone.
-	local engine = newEngine({ synced = false, manifest = 19 })
+	local engine = newEngine({ synced = false, manifest = 20 })
 	prelude(engine)
 	local bare = {}
 	engine.env.gadgetHandler = bare
 	check("a handler with no actionHandler is kept", engine.env.gadgetHandler == bare)
 
-	local noRemove = newEngine({ synced = false, manifest = 19 })
+	local noRemove = newEngine({ synced = false, manifest = 20 })
 	prelude(noRemove)
 	local calls = 0
 	local actions = { AddSyncAction = function() calls = calls + 1 end }
@@ -1391,7 +1511,7 @@ do
 	actions.AddSyncAction(g, "x", g.GameFrame)
 	check("a handler with no RemoveGadgetCallIn still adds the action", calls == 1)
 
-	local synced = newEngine({ manifest = 19 })
+	local synced = newEngine({ manifest = 20 })
 	prelude(synced)
 	local syncedActions = {}
 	local add = function() end

@@ -1016,55 +1016,107 @@ end, compat)
 if not ok then failed("unit-defs-weapons-n-83", err) end
 end
 
--- fix: weapon-defs-lua-consts-87
+-- fix: weapon-defs-lua-consts-87-v2
 do
 local ok, err = pcall(function(...)
--- id: weapon-defs-lua-consts-87
+-- id: weapon-defs-lua-consts-87-v2
 -- catalogue:
--- states: unsynced
+-- states: synced, unsynced
 -- license: MIT or GNU GPL, v2 or later
 
--- WeaponDefs[id].areaOfEffect and WeaponDefs[id].maxVelocity in unsynced Lua.
+-- WeaponDefs[id].areaOfEffect, maxVelocity and onlyTargetCategories in every Lua
+-- state. This takes over from weapon-defs-lua-consts-87, which ran unsynced only
+-- and did not cover onlyTargetCategories.
 --
 -- Changelog, 87.0: "remove the following Lua consts: wdef[id].areaOfEffect,
--- wdef[id].maxVelocity & wdef[id].onlyTargetCategories". The engine still
--- knows the two names, so reading one logs "ERROR_TYPE for key" and gives nil
--- (rts/Lua/LuaWeaponDefs.cpp, ADD_DEPRECATED_LUADEF_KEY). Complete
--- Annihilation stable-8405's gui_attack_aoe.lua compares areaOfEffect with a
--- number and stops.
+-- wdef[id].maxVelocity & wdef[id].onlyTargetCategories". The engine still knows
+-- the three names, so reading one logs "ERROR_TYPE for key" and gives nil
+-- (rts/Lua/LuaWeaponDefs.cpp, ADD_DEPRECATED_LUADEF_KEY). Complete Annihilation
+-- stable-8405's synced exp_no_air_nuke.lua and lups_shockwaves.lua compare
+-- areaOfEffect with a number and stop.
 --
 -- In 86.0 (rts/Lua/LuaWeaponDefs.cpp and rts/Sim/Weapons/WeaponDefHandler.cpp)
--- areaOfEffect was damageAreaOfEffect, half the def's areaOfEffect tag, and
--- maxVelocity was projectilespeed times 30, the game's frames per second. A
--- current engine still gives Lua both damageAreaOfEffect and projectilespeed,
--- worked out from the same tags, so this copies them under the old names.
+-- areaOfEffect was damageAreaOfEffect, maxVelocity was projectilespeed times 30,
+-- the game's frames per second, and onlyTargetCategories was every category,
+-- since every weapon def set its bits to 0xffffffff. Game.springCategories has
+-- every category name (rts/Lua/LuaConstGame.cpp).
 --
--- Each entry of WeaponDefs is a proxy whose __newindex refuses both names, so
--- the values are written with rawset, and a raw value means __index is never
--- asked. The synced state has no rawset (rts/Lua/LuaHandleSynced.cpp), so it is
--- not given this fix. onlyTargetCategories is not put back either.
+-- The synced state has no rawset (rts/Lua/LuaHandleSynced.cpp), an entry's
+-- __newindex refuses the three names, and its metatable is protected. WeaponDefs
+-- itself is a plain table, so each entry is replaced by a table holding the old
+-- values, which passes anything else to the engine's entry. A game takes its
+-- entries from WeaponDefs after the prelude has run, so it never sees the old
+-- ones.
+--
+-- The new table has pairs and next of its own. The engine's Next starts its walk
+-- of the known names again when it reaches a raw key with a known name
+-- (LuaUtils::Next), so it would never end on this table.
 
-local WeaponDefs = WeaponDefs
-if type(WeaponDefs) ~= "table" or type(rawset) ~= "function" or type(rawget) ~= "function" then
+local WeaponDefs, Game = WeaponDefs, Game
+if type(WeaponDefs) ~= "table" then
 	return
 end
 
-local type, pairs, rawget, rawset = type, pairs, rawget, rawset
+local type, pairs, next = type, pairs, next
+local getmetatable, setmetatable = getmetatable, setmetatable
 
-for _, wd in pairs(WeaponDefs) do
-	if type(wd) == "table" then
-		local area = wd.damageAreaOfEffect
-		if type(area) == "number" and rawget(wd, "areaOfEffect") == nil then
-			rawset(wd, "areaOfEffect", area)
+local categories = {}
+local names = type(Game) == "table" and Game.springCategories
+if type(names) == "table" then
+	for name in pairs(names) do
+		categories[name] = true
+	end
+end
+
+local function withOldValues(def)
+	local old = { onlyTargetCategories = categories }
+	local area, speed = def.damageAreaOfEffect, def.projectilespeed
+	if type(area) == "number" then
+		old.areaOfEffect = area
+	end
+	if type(speed) == "number" then
+		old.maxVelocity = speed * 30
+	end
+
+	local entry
+	local defNext = def.next
+	local function entryNext(_, key)
+		if key == nil or old[key] == nil then
+			local nextKey, value = defNext(def, key)
+			if nextKey ~= nil then
+				return nextKey, value
+			end
+			key = nil
 		end
-		local speed = wd.projectilespeed
-		if type(speed) == "number" and rawget(wd, "maxVelocity") == nil then
-			rawset(wd, "maxVelocity", speed * 30)
+		local nextKey = next(old, key)
+		if nextKey ~= nil then
+			return nextKey, entry[nextKey]
 		end
+	end
+
+	entry = {
+		pairs = function(self)
+			return entryNext, self, nil
+		end,
+		next = entryNext,
+	}
+	for name, value in pairs(old) do
+		entry[name] = value
+	end
+	return setmetatable(entry, {
+		__index = def,
+		__newindex = def,
+		__metatable = getmetatable(def),
+	})
+end
+
+for id, def in pairs(WeaponDefs) do
+	if type(def) == "table" then
+		WeaponDefs[id] = withOldValues(def)
 	end
 end
 end, compat)
-if not ok then failed("weapon-defs-lua-consts-87", err) end
+if not ok then failed("weapon-defs-lua-consts-87-v2", err) end
 end
 
 -- fix: system-log-88
@@ -1105,66 +1157,4 @@ if type(LOG) == "table" and type(meta) == "table" and type(meta.__newindex) == "
 end
 end, compat)
 if not ok then failed("system-log-88", err) end
-end
-
--- fix: callin-game-frame-sync-action-97
-do
-local ok, err = pcall(function(...)
--- id: callin-game-frame-sync-action-97
--- catalogue:
--- states: unsynced
--- license: MIT or GNU GPL, v2 or later
-
--- A function an unsynced gadget gives to AddSyncAction as well as naming it
--- GameFrame does not also run as the GameFrame call-in.
---
--- Up to Spring 96.0 the engine looked for GameFrame only in the synced half of
--- LuaRules and LuaGaia. Since 97.0 each half has its own Lua state, and the
--- unsynced one gets the call-in too. An old gadget could name a function
--- GameFrame in its unsynced half and run it only when its synced half sent a
--- message. A gadget's environment is its own table, so that function is also
--- gadget.GameFrame, and the handler now calls it on every frame with the frame
--- number where the message's value belongs. Complete Annihilation's nano spray
--- gadget uses that number as a key from 0 to 29, and fails on every frame from
--- frame 30.
---
--- The two kinds of function take the same arguments, so what tells them apart
--- is the registration. A function that is a sync action gets (cmd, value), and
--- one that is a call-in gets (self, frame), so no gadget can mean to be both. A
--- gadget's own gadget:GameFrame, which is not a sync action, keeps the call-in.
---
--- Handlers keep their actions in a table they put in gadgetHandler.actionHandler
--- and read AddSyncAction from it on each call. A game's gadgets.lua runs after
--- the prelude and sets gadgetHandler once, so this wraps AddSyncAction in the
--- global table's __newindex that compat-callin-hooks-v2 put there. The gadget's
--- function stays in its table, because its own code may still call it.
-
-local type = type
-local meta = getmetatable(_G)
-
-local function watch(handler)
-	local actions = handler.actionHandler
-	if type(actions) ~= "table" or type(actions.AddSyncAction) ~= "function" then
-		return
-	end
-	local add = actions.AddSyncAction
-	actions.AddSyncAction = function(gadget, cmd, func, help)
-		if func ~= nil and gadget.GameFrame == func and type(handler.RemoveGadgetCallIn) == "function" then
-			handler:RemoveGadgetCallIn("GameFrame", gadget)
-		end
-		return add(gadget, cmd, func, help)
-	end
-end
-
-if type(meta) == "table" and type(meta.__newindex) == "function" then
-	local newindex = meta.__newindex
-	meta.__newindex = function(t, name, value)
-		if name == "gadgetHandler" and type(value) == "table" then
-			watch(value)
-		end
-		return newindex(t, name, value)
-	end
-end
-end, compat)
-if not ok then failed("callin-game-frame-sync-action-97", err) end
 end
