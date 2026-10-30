@@ -1306,17 +1306,12 @@ msgstr "最新发行版中的 {0}"
 
 #. placeholder {0}: game.game
 #: src/widgets/pages/WidgetsPage.tsx
-msgid "{0} has not saved its widget settings yet. Start it once to switch widgets on or off here."
+msgid "{0} has not saved its widget settings yet, so these apply from the launch after it first does."
 msgstr ""
 
 #. placeholder {0}: game.game
 #: src/widgets/pages/WidgetsPage.tsx
 msgid "{0} loads none of your widgets."
-msgstr ""
-
-#. placeholder {0}: switchName(row, switches.game)
-#: src/widgets/pages/WidgetsPage.tsx
-msgid "{0} on"
 msgstr ""
 
 #. placeholder {0}: formatRate(value)
@@ -1336,6 +1331,11 @@ msgstr "{0} 已就绪。"
 #, fuzzy
 msgid "{0} units"
 msgstr "{0} 的单位"
+
+#. placeholder {0}: game.game
+#: src/widgets/pages/WidgetsPage.tsx
+msgid "{0} uses its own widgets, not the ones for all games."
+msgstr ""
 
 #: src/placement/preview.ts
 #, fuzzy
@@ -4828,6 +4828,10 @@ msgstr "{name} 将作为建筑启动：它的副本早于移动类型。请从�
 #, fuzzy
 msgid "{name} launches as a building: the movement classes of {gameName} could not be read."
 msgstr "{name} 将作为建筑启动：无法读取 {gameName} 的移动类型。"
+
+#: src/widgets/pages/WidgetsPage.tsx
+msgid "{name} on"
+msgstr ""
 
 #: src/scenario/pages/components/SetupPanel.tsx
 #, fuzzy
@@ -8532,10 +8536,6 @@ msgstr "游戏正在运行，而此文件是它会写入的文件。{label} 在�
 #, fuzzy
 msgid "A game is running, and coilbox does not know where this engine writes, so it cannot tell whether the game will write this file back over. {label} writes its whole blueprints file back when it saves or exits, so anything written now would be thrown away. Close the game and try again."
 msgstr "游戏正在运行，而 coilbox 不知道此引擎会写入哪里，因此无法判断游戏是否会覆盖此文件。{label} 在保存或退出时会写回整个蓝图文件，因此现在写入的内容都会被丢弃。请关闭游戏后重试。"
-
-#: src/widgets/widgetConfig.ts
-msgid "A game is running, and it writes this file back when it exits, so anything written now would be lost. Close the game and try again."
-msgstr ""
 
 #: src/scenario/pages/components/BlueprintPanel.tsx
 #, fuzzy
@@ -15221,10 +15221,6 @@ msgstr "关闭模型视图"
 msgid "Close protocol console"
 msgstr "关闭协议控制台"
 
-#: src/widgets/pages/WidgetsPage.tsx
-msgid "Close the game to switch widgets on or off."
-msgstr ""
-
 #: src/multiplayer/DebriefingDrawer.tsx
 #, fuzzy
 msgid "Close the match result"
@@ -15516,6 +15512,10 @@ msgstr "Coilbox 无法判断结果如何。"
 #, fuzzy
 msgid "Coilbox could not tell whether you are signed in."
 msgstr "Coilbox 无法判断你是否已登录。"
+
+#: src/play/PlayProvider.tsx
+msgid "Coilbox could not write your widget settings for {game}"
+msgstr ""
 
 #: src/hub/pages/ItemPage.tsx
 #, fuzzy
@@ -48902,10 +48902,6 @@ msgstr "此游戏没有该名称的单位，所以按钮不会起作用。"
 msgid "This game has none of its units: {list}. Nothing in it can be placed here, so it belongs to another game or another version of this one."
 msgstr "此游戏中没有以下单位：{list}。其中没有任何内容可以放置在这里，所以它属于另一款游戏或此游戏的另一个版本。"
 
-#: src/widgets/widgetConfig.ts
-msgid "This game has not saved its widget settings yet. Start it once, then try again."
-msgstr ""
-
 #: src/content/pages/components/states.tsx
 #, fuzzy
 msgid "This game is missing something it depends on"
@@ -52109,6 +52105,10 @@ msgstr "使用占地作为体积"
 #, fuzzy
 msgid "Use the measured box"
 msgstr "使用测量的碰撞盒"
+
+#: src/widgets/pages/WidgetsPage.tsx
+msgid "Use the widgets for all games"
+msgstr ""
 
 #: src/content/pages/components/GameSourcesTab.tsx
 #, fuzzy

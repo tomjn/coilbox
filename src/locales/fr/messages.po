@@ -1306,17 +1306,12 @@ msgstr "{0} depuis la dernière version"
 
 #. placeholder {0}: game.game
 #: src/widgets/pages/WidgetsPage.tsx
-msgid "{0} has not saved its widget settings yet. Start it once to switch widgets on or off here."
+msgid "{0} has not saved its widget settings yet, so these apply from the launch after it first does."
 msgstr ""
 
 #. placeholder {0}: game.game
 #: src/widgets/pages/WidgetsPage.tsx
 msgid "{0} loads none of your widgets."
-msgstr ""
-
-#. placeholder {0}: switchName(row, switches.game)
-#: src/widgets/pages/WidgetsPage.tsx
-msgid "{0} on"
 msgstr ""
 
 #. placeholder {0}: formatRate(value)
@@ -1336,6 +1331,11 @@ msgstr "{0} prêt."
 #, fuzzy
 msgid "{0} units"
 msgstr "Unités de {0}"
+
+#. placeholder {0}: game.game
+#: src/widgets/pages/WidgetsPage.tsx
+msgid "{0} uses its own widgets, not the ones for all games."
+msgstr ""
 
 #: src/placement/preview.ts
 #, fuzzy
@@ -4828,6 +4828,10 @@ msgstr "{name} est lancé comme bâtiment : sa copie est antérieure aux classe
 #, fuzzy
 msgid "{name} launches as a building: the movement classes of {gameName} could not be read."
 msgstr "{name} est lancé comme bâtiment : les classes de déplacement de {gameName} n’ont pas pu être lues."
+
+#: src/widgets/pages/WidgetsPage.tsx
+msgid "{name} on"
+msgstr ""
 
 #: src/scenario/pages/components/SetupPanel.tsx
 #, fuzzy
@@ -8532,10 +8536,6 @@ msgstr "Un jeu est en cours et ce fichier est l’un de ceux qu’il écrit. {la
 #, fuzzy
 msgid "A game is running, and coilbox does not know where this engine writes, so it cannot tell whether the game will write this file back over. {label} writes its whole blueprints file back when it saves or exits, so anything written now would be thrown away. Close the game and try again."
 msgstr "Un jeu est en cours, et coilbox ne sait pas où ce moteur écrit, il ne peut donc pas dire si le jeu réécrira ce fichier. {label} réécrit tout son fichier de plans quand il enregistre ou quitte, tout ce qui serait écrit maintenant serait donc perdu. Fermez le jeu et réessayez."
-
-#: src/widgets/widgetConfig.ts
-msgid "A game is running, and it writes this file back when it exits, so anything written now would be lost. Close the game and try again."
-msgstr ""
 
 #: src/scenario/pages/components/BlueprintPanel.tsx
 #, fuzzy
@@ -15221,10 +15221,6 @@ msgstr "Fermer la vue du modèle"
 msgid "Close protocol console"
 msgstr "Fermer la console du protocole"
 
-#: src/widgets/pages/WidgetsPage.tsx
-msgid "Close the game to switch widgets on or off."
-msgstr ""
-
 #: src/multiplayer/DebriefingDrawer.tsx
 #, fuzzy
 msgid "Close the match result"
@@ -15516,6 +15512,10 @@ msgstr "Coilbox n’a pas pu déterminer comment cela s’est terminé."
 #, fuzzy
 msgid "Coilbox could not tell whether you are signed in."
 msgstr "Coilbox n’a pas pu savoir si vous êtes connecté."
+
+#: src/play/PlayProvider.tsx
+msgid "Coilbox could not write your widget settings for {game}"
+msgstr ""
 
 #: src/hub/pages/ItemPage.tsx
 #, fuzzy
@@ -48902,10 +48902,6 @@ msgstr "Ce jeu n’a pas d’unité de ce nom, le bouton ne ferait donc rien."
 msgid "This game has none of its units: {list}. Nothing in it can be placed here, so it belongs to another game or another version of this one."
 msgstr "Ce jeu n’a aucune de ses unités : {list}. Rien ici ne peut y être placé, il appartient donc à un autre jeu ou à une autre version de celui-ci."
 
-#: src/widgets/widgetConfig.ts
-msgid "This game has not saved its widget settings yet. Start it once, then try again."
-msgstr ""
-
 #: src/content/pages/components/states.tsx
 #, fuzzy
 msgid "This game is missing something it depends on"
@@ -52109,6 +52105,10 @@ msgstr "Utiliser l’emprise comme volume"
 #, fuzzy
 msgid "Use the measured box"
 msgstr "Utiliser la boîte mesurée"
+
+#: src/widgets/pages/WidgetsPage.tsx
+msgid "Use the widgets for all games"
+msgstr ""
 
 #: src/content/pages/components/GameSourcesTab.tsx
 #, fuzzy

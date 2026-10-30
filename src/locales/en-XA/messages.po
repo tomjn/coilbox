@@ -1079,17 +1079,12 @@ msgstr ""
 
 #. placeholder {0}: game.game
 #: src/widgets/pages/WidgetsPage.tsx
-msgid "{0} has not saved its widget settings yet. Start it once to switch widgets on or off here."
+msgid "{0} has not saved its widget settings yet, so these apply from the launch after it first does."
 msgstr ""
 
 #. placeholder {0}: game.game
 #: src/widgets/pages/WidgetsPage.tsx
 msgid "{0} loads none of your widgets."
-msgstr ""
-
-#. placeholder {0}: switchName(row, switches.game)
-#: src/widgets/pages/WidgetsPage.tsx
-msgid "{0} on"
 msgstr ""
 
 #. placeholder {0}: formatRate(value)
@@ -1105,6 +1100,11 @@ msgstr ""
 #. placeholder {0}: game.name
 #: src/content/pages/GameUnitPage.tsx
 msgid "{0} units"
+msgstr ""
+
+#. placeholder {0}: game.game
+#: src/widgets/pages/WidgetsPage.tsx
+msgid "{0} uses its own widgets, not the ones for all games."
 msgstr ""
 
 #: src/placement/preview.ts
@@ -3910,6 +3910,10 @@ msgstr ""
 
 #: src/campaign/units.ts
 msgid "{name} launches as a building: the movement classes of {gameName} could not be read."
+msgstr ""
+
+#: src/widgets/pages/WidgetsPage.tsx
+msgid "{name} on"
 msgstr ""
 
 #: src/scenario/pages/components/SetupPanel.tsx
@@ -6882,10 +6886,6 @@ msgstr ""
 
 #: src/blueprint/gameFile.ts
 msgid "A game is running, and coilbox does not know where this engine writes, so it cannot tell whether the game will write this file back over. {label} writes its whole blueprints file back when it saves or exits, so anything written now would be thrown away. Close the game and try again."
-msgstr ""
-
-#: src/widgets/widgetConfig.ts
-msgid "A game is running, and it writes this file back when it exits, so anything written now would be lost. Close the game and try again."
 msgstr ""
 
 #: src/scenario/pages/components/BlueprintPanel.tsx
@@ -12314,10 +12314,6 @@ msgstr ""
 msgid "Close protocol console"
 msgstr ""
 
-#: src/widgets/pages/WidgetsPage.tsx
-msgid "Close the game to switch widgets on or off."
-msgstr ""
-
 #: src/multiplayer/DebriefingDrawer.tsx
 msgid "Close the match result"
 msgstr ""
@@ -12554,6 +12550,10 @@ msgstr ""
 
 #: src/hub/pages/components/AccountControl.tsx
 msgid "Coilbox could not tell whether you are signed in."
+msgstr ""
+
+#: src/play/PlayProvider.tsx
+msgid "Coilbox could not write your widget settings for {game}"
 msgstr ""
 
 #: src/hub/pages/ItemPage.tsx
@@ -39590,10 +39590,6 @@ msgstr ""
 msgid "This game has none of its units: {list}. Nothing in it can be placed here, so it belongs to another game or another version of this one."
 msgstr ""
 
-#: src/widgets/widgetConfig.ts
-msgid "This game has not saved its widget settings yet. Start it once, then try again."
-msgstr ""
-
 #: src/content/pages/components/states.tsx
 msgid "This game is missing something it depends on"
 msgstr ""
@@ -42180,6 +42176,10 @@ msgstr ""
 
 #: src/lego/pages/components/PieceCollisionFields.tsx
 msgid "Use the measured box"
+msgstr ""
+
+#: src/widgets/pages/WidgetsPage.tsx
+msgid "Use the widgets for all games"
 msgstr ""
 
 #: src/content/pages/components/GameSourcesTab.tsx
