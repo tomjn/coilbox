@@ -540,13 +540,13 @@ function WidgetTable({
               <Trans>On</Trans>
             </TableHead>
           )}
-          <TableHead>
+          <TableHead className="w-full">
             <Trans>Widget</Trans>
           </TableHead>
-          <TableHead>
+          <TableHead className="w-0">
             <Trans>Version</Trans>
           </TableHead>
-          <TableHead>
+          <TableHead className="w-0">
             <Trans>Author</Trans>
           </TableHead>
           {onSettings && (
@@ -573,7 +573,7 @@ function WidgetTable({
                 <RowSwitch row={row} switches={switches} />
               </TableCell>
             )}
-            <TableCell className="max-w-md whitespace-normal">
+            <TableCell className="whitespace-normal">
               <div className="flex flex-wrap items-center gap-2">
                 <span className="font-medium">
                   {row.info?.name || fileName(row.path)}
@@ -617,13 +617,19 @@ function WidgetTable({
                 </p>
               )}
             </TableCell>
-            <TableCell>{row.info?.version ?? ""}</TableCell>
-            <TableCell className="whitespace-normal">
-              <Declared
-                value={row.info?.author}
-                known={!!row.info}
-                missing={t`No author stated`}
-              />
+            <TableCell>
+              <div className="w-24 whitespace-normal [overflow-wrap:anywhere]">
+                {row.info?.version ?? ""}
+              </div>
+            </TableCell>
+            <TableCell>
+              <div className="w-48 whitespace-normal [overflow-wrap:anywhere]">
+                <Declared
+                  value={row.info?.author}
+                  known={!!row.info}
+                  missing={t`No author stated`}
+                />
+              </div>
             </TableCell>
             {onSettings && (
               <TableCell>
