@@ -2260,6 +2260,9 @@ export interface PlayerWidgetInfo {
   license?: string | null;
   layer?: number | null;
   enabled?: boolean | null;
+  /** The names it had before, newest first as the widget wrote them. */
+  previousNames?: string[];
+  experimental?: boolean | null;
 }
 
 /** One `.lua` file in a player widget folder (issue #1284). */
