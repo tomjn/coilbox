@@ -124,7 +124,13 @@ export function gameWidgetsOf(
     return { widgets, errors };
   })();
   widgetCache.set(key, read);
-  // A read that failed is tried again next time rather than kept.
-  read.catch(() => widgetCache.delete(key));
+  // A read that failed, or found an archive it could not open, is tried again
+  // next time rather than kept.
+  read.then(
+    ({ errors }) => {
+      if (errors.length > 0) widgetCache.delete(key);
+    },
+    () => widgetCache.delete(key),
+  );
   return read;
 }

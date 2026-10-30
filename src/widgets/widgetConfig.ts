@@ -651,7 +651,19 @@ export interface WriteOutcome {
  * Null, with nothing written, when the game has no file yet. Throws before
  * writing anything when the file cannot be read.
  */
-export async function writeWidgetStates({
+export function writeWidgetStates(
+  request: WriteRequest,
+): Promise<WriteOutcome | null> {
+  // One write at a time, so each reads the file the one before it wrote. Two
+  // that read the same text would each put back what the other changed.
+  const next = writing.then(() => writeStates(request));
+  writing = next.catch(() => {});
+  return next;
+}
+
+let writing: Promise<unknown> = Promise.resolve();
+
+async function writeStates({
   io,
   writeDir,
   config,
