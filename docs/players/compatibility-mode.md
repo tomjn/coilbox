@@ -130,7 +130,7 @@ If one of the fixes fails while the game runs, the game still loads. The engine'
 
 ## What it changes
 
-This is compatibility version 19, the newest.
+This is compatibility version 20, the newest.
 
 Lua functions it puts back:
 
@@ -150,6 +150,7 @@ Call-ins whose arguments moved:
 - `UnitDamaged`, changed in Spring 95.0, and `AllowCommand`, changed in Spring 105.0. The game's handlers get the arguments in the old order. Coilbox reads the game's Lua first, and leaves this out for a game whose handlers already take the new order.
 - `Spring.GetTeamInfo`, changed in Spring 105.0. The game gets the team's custom keys 7th and its income multiplier 8th, as before. Coilbox leaves this out for a game whose Lua already reads them the new way round.
 - `Spring.GetSelectedUnitsCounts` and `Spring.GetSelectedUnitsSorted`, whose tables lost their `n` key in BAR105 1544. The tables have it again, holding the number of unit types selected, and are all the functions return, as before. Coilbox leaves this out for a game whose Lua already takes that number as the second result.
+- `GameFrame` in a game's unsynced gadgets, which the engine has run since Spring 97.0. A gadget that also uses its `GameFrame` function as a message from its synced half, as Complete Annihilation's nano spray does, no longer gets the call-in. Other unsynced gadgets still do.
 
 Values Lua can read again:
 

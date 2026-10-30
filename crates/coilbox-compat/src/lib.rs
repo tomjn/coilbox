@@ -62,6 +62,7 @@ const MANIFESTS: &[(u32, &str)] = &[
     (17, include_str!("../../../lua/compat/manifests/17.json")),
     (18, include_str!("../../../lua/compat/manifests/18.json")),
     (19, include_str!("../../../lua/compat/manifests/19.json")),
+    (20, include_str!("../../../lua/compat/manifests/20.json")),
 ];
 
 /// Every fix file, by id.
@@ -69,6 +70,10 @@ const FIXES: &[(&str, &str)] = &[
     (
         "callin-allow-command-105",
         include_str!("../../../lua/compat/callin-allow-command-105.lua"),
+    ),
+    (
+        "callin-game-frame-sync-action-97",
+        include_str!("../../../lua/compat/callin-game-frame-sync-action-97.lua"),
     ),
     (
         "callin-unit-damaged-95",
@@ -2180,14 +2185,35 @@ mod tests {
         }
     }
 
-    /// The preludes for manifests 9, 11, 12, 14, 15, 16, 17, 18 and 19, as the Lua tests in
+    /// Issue #4867: manifest 20 adds the fix that stops a sync action named
+    /// GameFrame running as the call-in, in the unsynced state only, and keeps
+    /// the writer of manifest 19.
+    #[test]
+    fn manifest_20_is_manifest_19_with_sync_actions_out_of_game_frame() {
+        let (nineteen, twenty) = (manifest(19).unwrap(), manifest(20).unwrap());
+        let mut expected = nineteen.fixes.clone();
+        expected.push("callin-game-frame-sync-action-97".into());
+        assert_eq!(twenty.fixes, expected);
+        assert_eq!(
+            (&twenty.converter, twenty.writer),
+            (&nineteen.converter, nineteen.writer)
+        );
+        assert!(prelude_fixes(&twenty, LuaState::Unsynced)
+            .iter()
+            .any(|(id, _)| *id == "callin-game-frame-sync-action-97"));
+        assert!(!prelude_fixes(&twenty, LuaState::Synced)
+            .iter()
+            .any(|(id, _)| *id == "callin-game-frame-sync-action-97"));
+    }
+
+    /// The preludes for manifests 9, 11, 12, 14, 15, 16, 17, 18, 19 and 20, as the Lua tests in
     /// `lua/compat/tests/` load them. Earlier manifests' synced preludes call
     /// `rawget`, which the tests' synced state lacks, so they are not kept.
     /// `COILBOX_WRITE_FIXTURE=1` writes them again after a deliberate change to
     /// how a prelude is built.
     #[test]
     fn the_lua_tests_load_the_preludes_this_crate_builds() {
-        for n in [9, 11, 12, 14, 15, 16, 17, 18, 19] {
+        for n in [9, 11, 12, 14, 15, 16, 17, 18, 19, 20] {
             let m = manifest(n).unwrap();
             for state in [LuaState::Synced, LuaState::Unsynced] {
                 let built = prelude(&m, state).unwrap();
