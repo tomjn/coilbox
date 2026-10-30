@@ -725,6 +725,9 @@ mod tests {
         let expected: Vec<String> = gadgets
             .into_iter()
             .chain([
+                "compat/coilbox-licence/COPYING".to_string(),
+                "compat/coilbox-licence/LICENSE-MIT".to_string(),
+                "compat/coilbox-licence/NOTICE.md".to_string(),
                 "compat/models/standin-1x1.s3o".to_string(),
                 "compat/models/standin-3x2.s3o".to_string(),
                 "compat/models/standin.tga".to_string(),
@@ -1543,6 +1546,10 @@ mod tests {
             23,
             "9cbc1ccfc4a6f588ace6ac13d1b5af86d16ed1e15d1eae84bbe50865ff7d99df",
         ),
+        (
+            24,
+            "72236236adcec8842ddf819a1e881a35f22b00c42dd1340ce61451ae0842ab8b",
+        ),
     ];
 
     #[test]
@@ -1559,6 +1566,48 @@ mod tests {
              the change behind a new coilbox_compat::WRITER and add a compat manifest \
              that names it:\n{built:#?}"
         );
+    }
+
+    /// Issue #4623: manifest 24 writes the licence notice beside the prelude,
+    /// with the bytes of the files in `lua/compat/licence-5/`, for every game.
+    /// No manifest before it writes the folder, whose bytes are fixed.
+    #[test]
+    fn only_manifests_from_24_write_the_licence_notice_folder() {
+        let dir =
+            std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../lua/compat/licence-5");
+        let notice = |built: &[(String, Vec<u8>)]| -> Vec<(String, Vec<u8>)> {
+            built
+                .iter()
+                .filter(|(path, _)| path.starts_with("compat/coilbox-licence"))
+                .cloned()
+                .collect()
+        };
+        for fixture in FIXTURES {
+            // The golden build writes every path in lower case, as the engine reads it.
+            let from_24 = notice(&golden_build(24, fixture));
+            let files = ["COPYING", "LICENSE-MIT", "NOTICE.md"];
+            assert_eq!(
+                from_24.iter().map(|(p, _)| p.as_str()).collect::<Vec<_>>(),
+                files.map(|name| format!("compat/coilbox-licence/{}", name.to_lowercase())),
+                "{}",
+                fixture.archive
+            );
+            for ((path, bytes), name) in from_24.iter().zip(files) {
+                assert_eq!(
+                    bytes,
+                    &std::fs::read(dir.join(name)).unwrap(),
+                    "{} {path}",
+                    fixture.archive
+                );
+            }
+            for n in 1..=23 {
+                assert!(
+                    notice(&golden_build(n, fixture)).is_empty(),
+                    "manifest {n} {}",
+                    fixture.archive
+                );
+            }
+        }
     }
 
     /// Issue #4678: once `coilbox-3do-convert` moves past the version a manifest
@@ -1625,6 +1674,9 @@ mod tests {
                 "LuaRules/Gadgets/coilbox_compat_model_center_offset.lua",
                 "LuaRules/Gadgets/coilbox_compat_only_forward_aim.lua",
                 "Objects3D/armcom.s3o",
+                "compat/coilbox-licence/COPYING",
+                "compat/coilbox-licence/LICENSE-MIT",
+                "compat/coilbox-licence/NOTICE.md",
                 "compat/models/standin-1x1.s3o",
                 "compat/models/standin.tga",
                 models::DEFS_POST,
