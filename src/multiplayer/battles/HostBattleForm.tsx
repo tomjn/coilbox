@@ -43,10 +43,12 @@ import { VpnWarning } from "../../direct/VpnWarning";
 import { useEngineVersionCheck } from "../battle/useEngineVersionCheck";
 import { mpLeftoverRelayAgent, type mpOpenBattle } from "../bindings";
 import { relayPingLabel, useRelayPing } from "../relayPing";
+import { HostCompatChoice } from "./HostCompatChoice";
 import { hostBattleFailure } from "./hostBattle";
 import { hostEngineVersion } from "./hostEngineVersion";
 import { LeftoverRelayAgent } from "./LeftoverRelayAgent";
 import { leaveAndLabel } from "./oneBattle";
+import { useHostCompat } from "./useHostCompat";
 import { hashFailureMessage, useHostContent } from "./useHostContent";
 import { WindowsFirewall } from "./WindowsFirewall";
 
@@ -174,6 +176,7 @@ export function HostBattleForm({
     gameFailed,
     mapFailed,
   } = content;
+  const compat = useHostCompat(target, content.selectedGame);
   // Every engine is asked for its version as the form opens, so the picker
   // offers versions and never folder names.
   const unverified = targets.filter((t) => !t.syncVersion);
@@ -275,7 +278,7 @@ export function HostBattleForm({
   const passwordProblem = battlePasswordProblem(password);
   // The button and `submit` both read this, so a live button is never one whose
   // press is swallowed. `target` is part of it because `submit` needs one.
-  const canHost = !!target && content.ready && !passwordProblem;
+  const canHost = !!target && content.ready && compat.ready && !passwordProblem;
   // Why Host is not live, when the form has not said so already. The password
   // problem sits under its own field, a failed hash has its own row, and a hash
   // still running is in the button's label.
@@ -319,14 +322,14 @@ export function HostBattleForm({
         port: advertisedGamePort(route, reachability, port),
         relay: route === "relay",
         maxPlayers,
-        modhash,
+        modhash: compat.battleGame?.modhash ?? modhash,
         rank: 0,
         maphash,
         engine: "spring",
         version,
         map: mapName,
         title: title.trim() || hostedTitle(gameName),
-        modname: gameName,
+        modname: compat.battleGame?.name ?? gameName,
       });
       // Only once the battle is actually open, so nothing downstream describes a
       // route for a battle that never happened. Read back by the battle room
@@ -481,6 +484,8 @@ export function HostBattleForm({
               onClick={() => setPickingGame(true)}
             />
           </div>
+
+          <HostCompatChoice compat={compat} />
 
           <div className="flex flex-col gap-1 text-sm">
             <span className="font-medium">

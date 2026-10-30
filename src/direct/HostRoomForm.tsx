@@ -34,8 +34,10 @@ import {
   DEFAULT_HOST_PORT,
   type OpenBattleArgs,
 } from "../multiplayer/battles/HostBattleForm";
+import { HostCompatChoice } from "../multiplayer/battles/HostCompatChoice";
 import { hostEngineVersion } from "../multiplayer/battles/hostEngineVersion";
 import { leaveAndLabel } from "../multiplayer/battles/oneBattle";
+import { useHostCompat } from "../multiplayer/battles/useHostCompat";
 import {
   hashFailureMessage,
   useHostContent,
@@ -144,6 +146,7 @@ export function HostRoomForm({
     draft?.gameName || undefined,
     draft?.mapName || undefined,
   );
+  const compat = useHostCompat(content.target, content.selectedGame);
   const { thumbs } = useUnitsyncThumbnails(
     content.target?.enginePath,
     content.target?.dataDir,
@@ -201,6 +204,7 @@ export function HostRoomForm({
   const passwordProblem = roomPasswordProblem(password);
   const canStart =
     content.ready &&
+    compat.ready &&
     !nameProblem &&
     !portProblem &&
     !passwordProblem &&
@@ -230,9 +234,9 @@ export function HostRoomForm({
           host: trimmedName,
           route,
           version,
-          gameName: content.gameName,
+          gameName: compat.battleGame?.name ?? content.gameName,
           mapName: content.mapName,
-          modhash: content.modhash,
+          modhash: compat.battleGame?.modhash ?? content.modhash,
           maphash: content.maphash,
         }),
         draft,
@@ -370,6 +374,8 @@ export function HostRoomForm({
           onClick={() => setPickingGame(true)}
         />
       </div>
+
+      <HostCompatChoice compat={compat} />
 
       <div className="flex flex-col gap-1 text-sm">
         <span className="font-medium">

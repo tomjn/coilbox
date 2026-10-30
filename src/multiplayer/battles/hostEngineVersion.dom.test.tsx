@@ -105,9 +105,11 @@ describe("the engine version a hosted battle advertises", () => {
       async () => undefined,
     );
     render(
-      <DrawerProvider>
-        <HostRoomForm blocked={null} defaultName="alice" onStart={onStart} />
-      </DrawerProvider>,
+      <PersistentStoreProvider>
+        <DrawerProvider>
+          <HostRoomForm blocked={null} defaultName="alice" onStart={onStart} />
+        </DrawerProvider>
+      </PersistentStoreProvider>,
     );
     fireEvent.click(screen.getByRole("button", { name: /start/i }));
 

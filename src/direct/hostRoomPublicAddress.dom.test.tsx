@@ -18,7 +18,7 @@
  * content half is the same in both branches and answered by its own tests.
  */
 
-import { DrawerProvider } from "@picoframe/frame";
+import { DrawerProvider, PersistentStoreProvider } from "@picoframe/frame";
 import {
   cleanup,
   fireEvent,
@@ -105,9 +105,11 @@ async function startedWith(
   );
   // The form reads the drawer it lives in, for its Cancel button.
   render(
-    <DrawerProvider>
-      <HostRoomForm blocked={null} defaultName="alice" onStart={onStart} />
-    </DrawerProvider>,
+    <PersistentStoreProvider>
+      <DrawerProvider>
+        <HostRoomForm blocked={null} defaultName="alice" onStart={onStart} />
+      </DrawerProvider>
+    </PersistentStoreProvider>,
   );
 
   if (report) {
