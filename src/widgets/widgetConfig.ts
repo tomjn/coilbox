@@ -470,7 +470,7 @@ export function configCandidates(
         .filter((f) => safe || !/\{short\}/i.test(f))
         .map(
           (f) =>
-            `LuaUI/Config/${f.replace("{short}", shortName).replace("{SHORT}", shortName.toUpperCase())}`,
+            `LuaUI/${config.dir ?? "Config"}/${f.replace("{short}", shortName).replace("{SHORT}", shortName.toUpperCase())}`,
         ),
     ),
   ];
