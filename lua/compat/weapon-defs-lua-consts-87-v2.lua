@@ -57,6 +57,7 @@ local function withOldValues(def)
 		old.maxVelocity = speed * 30
 	end
 
+	local entry
 	local defNext = def.next
 	local function entryNext(_, key)
 		if key == nil or old[key] == nil then
@@ -66,10 +67,13 @@ local function withOldValues(def)
 			end
 			key = nil
 		end
-		return next(old, key)
+		local nextKey = next(old, key)
+		if nextKey ~= nil then
+			return nextKey, entry[nextKey]
+		end
 	end
 
-	local entry = {
+	entry = {
 		pairs = function(self)
 			return entryNext, self, nil
 		end,

@@ -1295,6 +1295,8 @@ for _, synced in ipairs({ true, false }) do
 		check(state .. ": a key of the game's own can be set and read", flak.ownKey == "mine")
 		local afterWrite = walk(flak, 1000)
 		check(state .. ": wd:pairs() gives a key of the game's own", afterWrite.ownKey == "mine")
+		flak.areaOfEffect = 128
+		check(state .. ": wd:pairs() gives a value the game changed", walk(flak, 1000).areaOfEffect == 128 and flak.areaOfEffect == 128)
 		check(state .. ": writing an engine value is still refused", not pcall(function()
 			flak.name = "other"
 		end))
