@@ -572,6 +572,7 @@ fn envelope<T: Serialize>(result: Result<T, String>) -> CliResult {
 /// [`build`], recording the running coilbox's version in the marker. On a
 /// blocking task, since converting a game's models takes seconds.
 #[tauri::command]
+#[allow(clippy::too_many_arguments)]
 async fn compat_build<R: Runtime>(
     app: AppHandle<R>,
     data_dir: String,
