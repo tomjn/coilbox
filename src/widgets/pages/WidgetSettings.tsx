@@ -8,6 +8,7 @@ import { Switch } from "@/components/ui/switch";
 import { errorText } from "@/lib/helpers";
 import { usePlay } from "@/play/PlayProvider";
 import type { WidgetHandler } from "../handlers";
+import { fileKey } from "../widgetFiles";
 import type { WidgetRow } from "../widgetList";
 import {
   type WidgetSettings as Loaded,
@@ -191,11 +192,9 @@ function Branch({
 function SettingsBody({
   target,
   writeDir,
-  widgetDir,
 }: {
   target: SettingsTarget;
   writeDir: string;
-  widgetDir: string;
 }) {
   const { t } = useLingui();
   const { running } = usePlay();
@@ -221,7 +220,7 @@ function SettingsBody({
       setLoaded(
         await loadWidgetSettings({
           ...request,
-          widgetDir,
+          widgetDir: target.row.root,
           widgetPath: target.row.path,
         }),
       );
@@ -229,7 +228,7 @@ function SettingsBody({
     } catch (e) {
       setError(errorText(e));
     }
-  }, [request, widgetDir, target.row.path]);
+  }, [request, target.row.root, target.row.path]);
 
   useEffect(() => {
     void load();
@@ -345,30 +344,26 @@ function SettingsBody({
 export function WidgetSettingsDrawer({
   target,
   writeDir,
-  widgetDir,
   onClose,
 }: {
   target: SettingsTarget | null;
   /** The engine's write folder, where the game keeps the settings. */
   writeDir: string | undefined;
-  /** The folder the widget's `LuaUI/` is in. */
-  widgetDir: string | undefined;
   onClose: () => void;
 }) {
   const { t } = useLingui();
   const name = target?.sw.name ?? "";
   return (
     <SlideDrawer
-      open={target !== null && !!writeDir && !!widgetDir}
+      open={target !== null && !!writeDir}
       title={t`${name} settings`}
       onClose={onClose}
     >
-      {target && writeDir && widgetDir && (
+      {target && writeDir && (
         <SettingsBody
-          key={`${target.game}\u0000${target.row.path}`}
+          key={`${target.game}\u0000${fileKey(target.row)}`}
           target={target}
           writeDir={writeDir}
-          widgetDir={widgetDir}
         />
       )}
     </SlideDrawer>

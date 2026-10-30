@@ -9,6 +9,7 @@
  */
 
 import type { UserWidgetGates } from "./handlers";
+import { fullPath } from "./widgetFiles";
 import type { GameHandler, WidgetRow } from "./widgetList";
 import { appliedSet, entry, setKey, type WidgetSets } from "./widgetSets";
 
@@ -95,14 +96,16 @@ function fileName(path: string): string {
 }
 
 /** One entry per file. Files that share a name are told apart by file name,
- *  since the player has that many widgets to lose. */
+ *  since the player has that many widgets to lose, and by where they are on
+ *  disk when two content roots hold the same path. */
 function names(rows: readonly WidgetRow[]): string[] {
   const named = rows.map((r) => r.info?.name ?? fileName(r.path));
-  return rows.map((r, i) =>
-    named.indexOf(named[i]) === named.lastIndexOf(named[i])
-      ? named[i]
-      : `${named[i]} (${r.path})`,
-  );
+  return rows.map((r, i) => {
+    if (named.indexOf(named[i]) === named.lastIndexOf(named[i]))
+      return named[i];
+    const samePath = rows.some((o) => o !== r && o.path === r.path);
+    return `${named[i]} (${samePath ? fullPath(r) : r.path})`;
+  });
 }
 
 /**

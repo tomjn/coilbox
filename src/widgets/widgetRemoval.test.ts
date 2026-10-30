@@ -77,14 +77,23 @@ const games: GameHandler[] = [
   { game: "Mystery 1.0", handler: null },
 ];
 
+const root = "/content";
+
 function row(
   path: string,
   name: string | null,
   loadedBy: string[],
-  options: { folder?: string; nested?: boolean; previous?: string[] } = {},
+  options: {
+    folder?: string;
+    nested?: boolean;
+    previous?: string[];
+    root?: string;
+  } = {},
 ): WidgetRow {
   const folder = options.folder ?? "LuaUI/Widgets";
   return {
+    root: options.root ?? root,
+    caseSensitive: false,
     path,
     folder,
     nested: options.nested ?? false,
@@ -112,6 +121,25 @@ const radarTap = row("LuaUI/Widgets_TAP/radar.lua", "Radar", [TAP], {
 const minimap = row("LuaUI/Widgets/minimap.lua", "Minimap", [MF]);
 
 describe("removalFor", () => {
+  it("leaves a widget of the same name in another content root", () => {
+    const elsewhere = row("LuaUI/Widgets/radar.lua", "Radar", [MF], {
+      root: "/second",
+    });
+    const removal = removalFor([radar, elsewhere], radar);
+    expect(removal.root).toBe("/content");
+    expect(removal.copies).toEqual([radar]);
+    expect(removalFor([radar, elsewhere], elsewhere).root).toBe("/second");
+  });
+
+  it("only counts a subfolder as shared by a widget in the same root", () => {
+    const a = row("LuaUI/Widgets/Pack/a.lua", "A", [MF], { nested: true });
+    const b = row("LuaUI/Widgets/Pack/b.lua", "B", [MF], {
+      nested: true,
+      root: "/second",
+    });
+    expect(removalFor([a, b], a).folders).toEqual(["LuaUI/Widgets/Pack"]);
+  });
+
   it("takes the copy in every folder the widget was added to", () => {
     const rows = [radar, radarTap, minimap];
     const removal = removalFor(rows, radar);
@@ -424,7 +452,6 @@ describe("removeWidget", () => {
   // springsettings.cfg (issue #4856).
   const request = {
     io,
-    widgetDir: "/content",
     writeDir: "/spring",
     rows,
     games,

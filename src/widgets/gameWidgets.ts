@@ -117,6 +117,9 @@ export function gameWidgetRows(
   playerRows: readonly WidgetRow[],
 ): WidgetRow[] {
   const files: PlayerWidgetFile[] = widgets.map((w) => ({
+    // Not a content root: the archive is what tells two of these apart.
+    root: w.archive,
+    caseSensitive: false,
     path: w.path,
     folder: w.folder,
     nested: w.nested,

@@ -54,6 +54,9 @@ function inFolder(row: WidgetRow): string {
 
 /** What removing one row takes out. */
 export interface Removal {
+  /** The content root the files are in. A widget of the same name in another
+   *  root is another widget, which stays. */
+  root: string;
   /** The widget's file in each folder it was added to, the picked row first. */
   copies: WidgetRow[];
   /** Subfolders holding only those copies, which go whole. */
@@ -66,9 +69,9 @@ export interface Removal {
 }
 
 /**
- * What removing `row` takes out. The copies are the rows with the same name at
- * the same path below their folder, which is how adding one widget for all
- * games leaves it. A file that did not run has no name to match, so it is
+ * What removing `row` takes out. The copies are the rows in the same content
+ * root with the same name at the same path below their folder, which is how
+ * adding one widget for all games leaves it. A file that did not run has no name to match, so it is
  * removed alone.
  */
 export function removalFor(
@@ -84,6 +87,7 @@ export function removalFor(
           ...rows.filter(
             (r) =>
               r !== row &&
+              r.root === row.root &&
               !r.coilbox &&
               nameOf(r) === name &&
               inFolder(r) === inFolder(row),
@@ -94,7 +98,10 @@ export function removalFor(
     if (!copy.nested) continue;
     const folder = `${copy.folder}/${inFolder(copy).split("/")[0]}`;
     const shared = rows.some(
-      (r) => r.path.startsWith(`${folder}/`) && !copies.includes(r),
+      (r) =>
+        r.root === row.root &&
+        r.path.startsWith(`${folder}/`) &&
+        !copies.includes(r),
     );
     if (!shared && !folders.includes(folder)) folders.push(folder);
   }
@@ -103,6 +110,7 @@ export function removalFor(
     .flatMap((r) => r.loadedBy)
     .filter((g, i, all) => all.indexOf(g) === i);
   return {
+    root: row.root,
     copies,
     folders,
     games,
@@ -357,7 +365,7 @@ function gameIsRunning(): Error {
 // ---------------------------------------------------------------------------
 
 export interface RemovalResult {
-  /** The files removed, relative to the content root. */
+  /** The files removed, relative to the content root they were in. */
   files: string[];
   /** The folder the files were copied to first. */
   backup: string;
@@ -376,7 +384,6 @@ export interface RemovalResult {
  */
 export async function removeWidget({
   io = appFileIO,
-  widgetDir,
   writeDir,
   removal,
   rows,
@@ -385,8 +392,6 @@ export async function removeWidget({
   gameRunning,
 }: {
   io?: ConfigFileIO;
-  /** The content root, whose `LuaUI/` the files are removed from. */
-  widgetDir: string;
   /** The engine's write folder, where the games keep their config files. */
   writeDir: string;
   removal: Removal;
@@ -398,7 +403,7 @@ export async function removeWidget({
   if (gameRunning) throw gameIsRunning();
   const targets = entries ? entryTargets(removal, rows, games) : [];
   const done = await contentWidgetDelete({
-    writeDir: widgetDir,
+    writeDir: removal.root,
     files: removal.copies.map((c) => c.path),
     folders: removal.folders,
     label: removal.name,

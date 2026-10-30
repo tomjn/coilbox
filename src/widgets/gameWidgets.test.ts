@@ -115,6 +115,8 @@ const scan: PlayerWidgetScan = {
   folders: ["LuaUI/Widgets"],
   files: [
     {
+      root: "/data",
+      caseSensitive: false,
       path: "LuaUI/Widgets/my_minimap.lua",
       folder: "LuaUI/Widgets",
       nested: false,

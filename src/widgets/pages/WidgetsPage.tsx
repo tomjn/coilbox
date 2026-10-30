@@ -38,6 +38,7 @@ import { useGameFiles } from "../useGameFiles";
 import { useGameWidgets } from "../useGameWidgets";
 import { useWidgetList } from "../useWidgetList";
 import { writeWidgetStates } from "../widgetConfig";
+import { fileKey, fullPath } from "../widgetFiles";
 import {
   findGame,
   folderToOpen,
@@ -68,9 +69,10 @@ const ALL = "all-games";
 
 /**
  * Library > Widgets (issue #1284): the widget files a player has added under
- * the content root's `LuaUI/`, what each one declares, and which installed games
- * load it. `?game=` picks one game, by name or by the full name of one of its
- * versions, which is how a game's page links here.
+ * `LuaUI/` of any content root, what each one declares, and which installed
+ * games load it. With more than one root, each row shows where its file is.
+ * `?game=` picks one game, by name or by the full name of one of its versions,
+ * which is how a game's page links here.
  *
  * Its switches change the widget sets (#4844): with "All games" picked, the set
  * every game uses, and with a game picked, that game's own set, which it gets
@@ -99,7 +101,7 @@ export default function WidgetsPage() {
   // A game whose handler is not recognised has no file to write, so no set.
   const key = game?.handler ? setKey(game) : null;
   const ownSet = key !== null && !!entry(sets.overrides, key);
-  const [settingsPath, setSettingsPath] = useState<string | null>(null);
+  const [settingsFile, setSettingsFile] = useState<string | null>(null);
   const own = useGameWidgets(
     list.enginePath,
     list.widgetDir,
@@ -149,14 +151,14 @@ export default function WidgetsPage() {
   );
 
   const pick = (value: string) => {
-    setSettingsPath(null);
+    setSettingsFile(null);
     setOwnError(null);
     setParams(value === ALL ? {} : { game: value }, { replace: true });
   };
 
   /** What the settings drawer shows, when a row of the picked game is open. */
   const settingsTarget = useMemo((): SettingsTarget | null => {
-    const row = shown?.find((r) => r.path === settingsPath);
+    const row = shown?.find((r) => fileKey(r) === settingsFile);
     if (!row || !game?.handler) return null;
     const sw = settingsSwitch(row, game.game);
     return sw
@@ -168,7 +170,7 @@ export default function WidgetsPage() {
           handler: game.handler,
         }
       : null;
-  }, [shown, settingsPath, game]);
+  }, [shown, settingsFile, game]);
 
   const openFolder = () => {
     if (!list.widgetDir) return;
@@ -317,9 +319,10 @@ export default function WidgetsPage() {
             rows={shown}
             showGames={!game && list.gamesKnown}
             someUnknown={!!list.games?.some((g) => g.handler === null)}
+            showRoot={list.roots.length > 1}
             onSettings={
               game?.handler && list.configDir
-                ? (row) => setSettingsPath(row.path)
+                ? (row) => setSettingsFile(fileKey(row))
                 : undefined
             }
             canSettings={(row) => !!game && !!settingsSwitch(row, game.game)}
@@ -330,12 +333,11 @@ export default function WidgetsPage() {
                       row={row}
                       rows={list.rows ?? []}
                       games={list.games ?? []}
-                      widgetDir={list.widgetDir ?? ""}
                       writeDir={list.configDir ?? ""}
                       running={running}
                       onRemoved={(done) => {
                         setRemoved((all) => [...all, done]);
-                        setSettingsPath(null);
+                        setSettingsFile(null);
                         reread();
                       }}
                     />
@@ -384,6 +386,7 @@ export default function WidgetsPage() {
                 rows={ownRows}
                 showGames={false}
                 someUnknown={false}
+                showRoot={false}
                 canSettings={() => false}
                 switches={
                   file?.kind === "ready"
@@ -425,8 +428,7 @@ export default function WidgetsPage() {
       <WidgetSettingsDrawer
         target={settingsTarget}
         writeDir={list.configDir}
-        widgetDir={list.widgetDir}
-        onClose={() => setSettingsPath(null)}
+        onClose={() => setSettingsFile(null)}
       />
     </div>
   );
@@ -505,6 +507,7 @@ function WidgetTable({
   rows,
   showGames,
   someUnknown,
+  showRoot,
   switches,
   onSettings,
   canSettings,
@@ -512,6 +515,8 @@ function WidgetTable({
 }: {
   rows: readonly WidgetRow[];
   showGames: boolean;
+  /** More than one content root is read, so each row says which it is in. */
+  showRoot: boolean;
   /** Some installed game's handler is not recognised, so a file no recognised
    *  game loads may still load in that one. */
   someUnknown: boolean;
@@ -568,7 +573,7 @@ function WidgetTable({
       </TableHeader>
       <TableBody>
         {rows.map((row) => (
-          <TableRow key={row.path} className="align-top">
+          <TableRow key={fileKey(row)} className="align-top">
             {switches && (
               <TableCell>
                 <RowSwitch row={row} switches={switches} />
@@ -589,7 +594,7 @@ function WidgetTable({
                 <p className="text-sm text-muted-foreground">{row.info.desc}</p>
               )}
               <p className="break-all font-mono text-xs text-muted-foreground">
-                {row.path}
+                {showRoot ? fullPath(row) : row.path}
               </p>
               {row.error && (
                 <p className="break-words text-xs text-destructive">

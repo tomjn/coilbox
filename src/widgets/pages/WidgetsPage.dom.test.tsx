@@ -13,7 +13,7 @@ import {
 } from "@testing-library/react";
 import { MemoryRouter } from "react-router";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import type { PlayerWidgetScan } from "@/content/bindings";
+import type { PlayerWidgetFile, PlayerWidgetScan } from "@/content/bindings";
 import {
   installSettingsStorage,
   memorySettingsStorage,
@@ -32,11 +32,16 @@ const engine: WidgetHandler = {
   config: { files: ["{short}.lua"], shape: "nested" },
 };
 
+const ROOT = "/home/player/.spring";
+const SECOND = "/mnt/games/spring";
+
 const scan: PlayerWidgetScan = {
   caseSensitive: false,
   folders: ["LuaUI/Widgets"],
   files: [
     {
+      root: ROOT,
+      caseSensitive: false,
       path: "LuaUI/Widgets/gui_build_watch.lua",
       folder: "LuaUI/Widgets",
       nested: false,
@@ -53,6 +58,8 @@ const scan: PlayerWidgetScan = {
       error: null,
     },
     {
+      root: ROOT,
+      caseSensitive: false,
       path: "LuaUI/Widgets/coilbox_blueprints.lua",
       folder: "LuaUI/Widgets",
       nested: false,
@@ -62,6 +69,8 @@ const scan: PlayerWidgetScan = {
       error: null,
     },
     {
+      root: ROOT,
+      caseSensitive: false,
       path: "LuaUI/Widgets/pack/helper.lua",
       folder: "LuaUI/Widgets",
       nested: true,
@@ -71,6 +80,8 @@ const scan: PlayerWidgetScan = {
       error: "runtime error: attempt to perform arithmetic on a nil value",
     },
     {
+      root: ROOT,
+      caseSensitive: false,
       path: "LuaUI/Widgets/twin_a.lua",
       folder: "LuaUI/Widgets",
       nested: false,
@@ -80,6 +91,8 @@ const scan: PlayerWidgetScan = {
       error: null,
     },
     {
+      root: ROOT,
+      caseSensitive: false,
       path: "LuaUI/Widgets/twin_b.lua",
       folder: "LuaUI/Widgets",
       nested: false,
@@ -102,31 +115,62 @@ const games: GameHandler[] = [
   { game: "Mystery 1.0", handler: null },
 ];
 
-/** What the page is told about the engine's write folder. */
-const list: { configDir: string | undefined } = {
+/** What the page is told about the engine's write folder, and whether a second
+ *  content root holds a widget too. */
+const list: { configDir: string | undefined; second: boolean } = {
   configDir: "/home/player/.spring/engine/2026.09.01",
+  second: false,
+};
+
+const secondFile: PlayerWidgetFile = {
+  root: SECOND,
+  caseSensitive: false,
+  path: "LuaUI/Widgets/gui_build_watch.lua",
+  folder: "LuaUI/Widgets",
+  nested: false,
+  coilbox: false,
+  givesOrders: false,
+  info: { name: "BuildWatch" },
+  error: null,
 };
 
 vi.mock("../useWidgetList", () => ({
-  useWidgetList: () => ({
-    targets: [{}],
-    widgetDir: "/home/player/.spring",
-    configDir: list.configDir,
-    widgets: scan,
-    games,
-    rows: widgetRows(scan, games),
-    reading: false,
-    error: null,
-    folderErrors: [],
-    gamesKnown: true,
-    reload: async () => {},
-  }),
+  useWidgetList: () => {
+    const shown = list.second
+      ? { ...scan, files: [...scan.files, secondFile] }
+      : scan;
+    return {
+      targets: [{}],
+      widgetDir: ROOT,
+      roots: list.second ? [ROOT, SECOND] : [ROOT],
+      configDir: list.configDir,
+      widgets: shown,
+      games,
+      rows: widgetRows(shown, games),
+      reading: false,
+      error: null,
+      folderErrors: [],
+      gamesKnown: true,
+      reload: async () => {},
+    };
+  },
 }));
 
 const files = {
   files: new Map<string, GameFile>(),
   reload: async () => {},
 };
+
+vi.mock("@/content/contentState", () => ({
+  loadContentState: async () => ({
+    schemaVersion: 1,
+    roots: (list.second ? [ROOT, SECOND] : [ROOT]).map((path) => ({
+      path,
+      exists: true,
+      valid: true,
+    })),
+  }),
+}));
 
 vi.mock("../useGameFiles", () => ({
   useGameFiles: () => files,
@@ -183,6 +227,7 @@ vi.mock("@/content/bindings", async () => {
 
 beforeEach(() => {
   list.configDir = "/home/player/.spring/engine/2026.09.01";
+  list.second = false;
   play.running = false;
   removeCalls.length = 0;
   disk.clear();
@@ -444,6 +489,39 @@ describe("WidgetsPage", () => {
       ).toBeTruthy(),
     );
     expect(readSets().global).toEqual({ BuildWatch: false, Other: true });
+  });
+
+  it("shows where each widget is when there is more than one content root, and removes from that root", async () => {
+    list.second = true;
+    page();
+    expect(
+      screen.getByText(`${ROOT}/LuaUI/Widgets/gui_build_watch.lua`),
+    ).toBeTruthy();
+    expect(
+      screen.getByText(`${SECOND}/LuaUI/Widgets/gui_build_watch.lua`),
+    ).toBeTruthy();
+    // Each says the other is the same widget, by where it is.
+    expect(
+      screen.getByText(
+        `Has the same name as ${SECOND}/LuaUI/Widgets/gui_build_watch.lua, so they share one setting.`,
+      ),
+    ).toBeTruthy();
+    fireEvent.click(
+      screen.getAllByRole("button", { name: "Remove BuildWatch" })[1],
+    );
+    const confirm = await waitFor(() => {
+      const button = screen
+        .getAllByRole("button", { name: "Remove" })
+        .find((b) => b.className.includes("destructive"));
+      if (!button || button.hasAttribute("disabled")) throw new Error("wait");
+      return button;
+    });
+    fireEvent.click(confirm);
+    await waitFor(() => expect(removeCalls).toHaveLength(1));
+    expect(removeCalls[0]).toMatchObject({
+      writeDir: SECOND,
+      files: ["LuaUI/Widgets/gui_build_watch.lua"],
+    });
   });
 
   it("keeps a way back for every removal, not only the last", async () => {

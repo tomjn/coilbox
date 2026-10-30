@@ -26,6 +26,8 @@ const game = { game: "Metal Factions v2.58", shortName: "MF", handler };
 const PATH = "/spring/LuaUI/Config/MF.lua";
 const rows: WidgetRow[] = [
   {
+    root: "/data",
+    caseSensitive: false,
     path: "LuaUI/Widgets/minimap.lua",
     folder: "LuaUI/Widgets",
     nested: false,

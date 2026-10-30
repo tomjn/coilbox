@@ -31,6 +31,12 @@ const LUAUI: &str = "luaui";
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct WidgetFile {
+    /// The content root scanned, as the caller spelled it. A player can have
+    /// several, and the same relative `path` can be in more than one.
+    pub root: String,
+    /// Whether that root's filesystem tells `Widgets` and `widgets` apart. Roots
+    /// can be on different filesystems, so each file carries its own.
+    pub case_sensitive: bool,
     /// Relative to the write folder, with forward slashes, spelled as on disk.
     pub path: String,
     /// The scanned folder it is in or under, relative to the write folder and
@@ -172,6 +178,7 @@ fn read_file(
     folder: &str,
     path: &Path,
     nested: bool,
+    case_sensitive: bool,
 ) -> Option<WidgetFile> {
     let rel = path.strip_prefix(write_dir).map(key).unwrap_or_default();
     let under_luaui = path.strip_prefix(luaui).map(key).unwrap_or_default();
@@ -196,6 +203,8 @@ fn read_file(
         Err(e) => (None, Some(e)),
     };
     Some(WidgetFile {
+        root: write_dir.to_string_lossy().into_owned(),
+        case_sensitive,
         path: rel,
         folder: folder.to_string(),
         nested,
@@ -213,15 +222,30 @@ pub fn scan(write_dir: &Path, folders: &[String]) -> WidgetScan {
     let mut errors = Vec::new();
     let mut scanned = Vec::new();
     let mut files = Vec::new();
+    let case_sensitive = case_sensitive(write_dir);
     for luaui in children_named(write_dir, &[LUAUI.to_string()], &mut errors) {
         for dir in children_named(&luaui, &names, &mut errors) {
             let folder = dir.strip_prefix(write_dir).map(key).unwrap_or_default();
             for path in lua_files(&dir, &mut errors) {
-                files.extend(read_file(write_dir, &luaui, &folder, &path, false));
+                files.extend(read_file(
+                    write_dir,
+                    &luaui,
+                    &folder,
+                    &path,
+                    false,
+                    case_sensitive,
+                ));
             }
             for sub in subfolders(&dir, &mut errors) {
                 for path in lua_files(&sub, &mut errors) {
-                    files.extend(read_file(write_dir, &luaui, &folder, &path, true));
+                    files.extend(read_file(
+                        write_dir,
+                        &luaui,
+                        &folder,
+                        &path,
+                        true,
+                        case_sensitive,
+                    ));
                 }
             }
             scanned.push(folder);
@@ -231,7 +255,7 @@ pub fn scan(write_dir: &Path, folders: &[String]) -> WidgetScan {
     // one that cannot be read says so twice in a row.
     errors.dedup();
     WidgetScan {
-        case_sensitive: case_sensitive(write_dir),
+        case_sensitive,
         folders: scanned,
         files,
         errors,
@@ -400,6 +424,20 @@ mod tests {
                 ("LuaUI/Widgets/other.lua", false)
             ]
         );
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn each_file_names_the_root_it_was_scanned_in() {
+        let dir = temp_dir("root");
+        write(
+            &dir,
+            "LuaUI/Widgets/a.lua",
+            r#"function widget:GetInfo() return { name = "A" } end"#,
+        );
+        let scan = scan(&dir, &names());
+        assert_eq!(scan.files[0].root, dir.to_string_lossy());
+        assert_eq!(scan.files[0].case_sensitive, scan.case_sensitive);
         let _ = std::fs::remove_dir_all(&dir);
     }
 

@@ -49,7 +49,6 @@ export function RemoveWidgetButton({
   row,
   rows,
   games,
-  widgetDir,
   writeDir,
   running,
   onRemoved,
@@ -57,8 +56,6 @@ export function RemoveWidgetButton({
   row: WidgetRow;
   rows: readonly WidgetRow[];
   games: readonly GameHandler[];
-  /** The content root, whose `LuaUI/` the files are in. */
-  widgetDir: string;
   /** The engine's write folder, where the games keep their config files. */
   writeDir: string;
   /** A game is running, which would write the widget back when it exits. */
@@ -98,7 +95,6 @@ export function RemoveWidgetButton({
     setError(null);
     try {
       const result = await removeWidget({
-        widgetDir,
         writeDir,
         removal,
         rows,
@@ -107,7 +103,7 @@ export function RemoveWidgetButton({
         gameRunning: running,
       });
       setOpen(false);
-      onRemoved({ ...result, name, widgetDir, writeDir, games });
+      onRemoved({ ...result, name, widgetDir: removal.root, writeDir, games });
     } catch (e) {
       setError(describeError(e));
     } finally {
@@ -147,6 +143,9 @@ export function RemoveWidgetButton({
               {t`Coilbox cannot tell whether these games load it too: ${unknown.join(", ")}`}
             </p>
           )}
+          <p className="break-all font-mono text-xs text-muted-foreground">
+            {removal.root}
+          </p>
           <ul className="flex flex-col gap-0.5">
             {files.map((f) => (
               <li

@@ -171,6 +171,8 @@ function row(
 ): WidgetRow {
   const { control, ...rest } = more;
   return {
+    root: "/data",
+    caseSensitive: false,
     path: `LuaUI/Widgets/${name}.lua`,
     folder: "LuaUI/Widgets",
     nested: false,
@@ -307,6 +309,19 @@ describe("roomWidgetWarning", () => {
       "Same (LuaUI/Widgets/a.lua)",
       "Same (LuaUI/Widgets/b.lua)",
       "Other",
+    ]);
+  });
+
+  it("tells two files with one path apart by their content root", () => {
+    const warning = roomWidgetWarning(
+      { off: "option", noUnitControl: false },
+      [row("Same", { root: "/one" }), row("Same", { root: "/two" })],
+      game,
+      EMPTY_SETS,
+    );
+    expect(warning?.blocked).toEqual([
+      "Same (/one/LuaUI/Widgets/Same.lua)",
+      "Same (/two/LuaUI/Widgets/Same.lua)",
     ]);
   });
 

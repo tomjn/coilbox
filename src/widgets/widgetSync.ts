@@ -4,12 +4,11 @@
  */
 
 import { appFileIO } from "@/blueprint/fileIO";
-import { contentPlayerWidgets, unitsyncEngineConfig } from "@/content/bindings";
+import { unitsyncEngineConfig } from "@/content/bindings";
 import { primeScan } from "@/content/config";
 import { engineConfigDir } from "@/content/enginePaths";
 import { errorText } from "@/lib/helpers";
 import { handlerOf } from "./gameHandler";
-import { HANDLER_FOLDERS } from "./handlers";
 import {
   type ConfigFileIO,
   findConfig,
@@ -17,6 +16,7 @@ import {
   writeWidgetStates,
 } from "./widgetConfig";
 import { type GameHandler, type WidgetRow, widgetRows } from "./widgetList";
+import { scanWidgets } from "./widgetRoots";
 import {
   absorbFile,
   addWidgets,
@@ -99,12 +99,9 @@ export async function writeSetForLaunch({
     shortName: item.info.shortname?.trim() || undefined,
     handler,
   };
-  // The widgets are under the content root, which every engine reads, and the
-  // game's config is in the engine's write folder (issue #4856).
-  const widgets = await contentPlayerWidgets({
-    writeDir: dataDir,
-    folders: HANDLER_FOLDERS,
-  });
+  // The widgets are under every content root, which every engine reads, and
+  // the game's config is in the engine's write folder (issues #4856, #4861).
+  const widgets = await scanWidgets(dataDir);
   await writeGameFile(writeDir, entry, widgetRows(widgets, [entry]));
 }
 
@@ -152,7 +149,7 @@ export async function switchAddedWidgets({
   key,
   names,
 }: {
-  /** The folder the widgets' `LuaUI/` is in. */
+  /** The selected content root, which the other roots are listed after. */
   widgetDir: string;
   /** The engine's write folder, where the games keep their config. */
   writeDir: string;
@@ -177,7 +174,7 @@ export async function switchRestoredWidgets({
   games,
   names,
 }: {
-  /** The folder the widgets' `LuaUI/` is in. */
+  /** The selected content root, which the other roots are listed after. */
   widgetDir: string;
   /** The engine's write folder, where the games keep their config. */
   writeDir: string;
@@ -206,10 +203,7 @@ async function writeSwitched({
   games: readonly GameHandler[];
   names: readonly string[];
 }): Promise<string[]> {
-  const scan = await contentPlayerWidgets({
-    writeDir: widgetDir,
-    folders: HANDLER_FOLDERS,
-  });
+  const scan = await scanWidgets(widgetDir);
   const rows = widgetRows(scan, games);
   const failed: string[] = [];
   for (const game of games) {

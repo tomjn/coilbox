@@ -1,37 +1,35 @@
 /**
- * Everything the Widgets page reads (issue #1284): the widget files under the
- * content root's `LuaUI/`, the engine's write folder, and the handler each
- * installed game runs.
+ * Everything the Widgets page reads (issue #1284): the widget files under
+ * `LuaUI/` of every content root, the engine's write folder, and the handler
+ * each installed game runs.
  *
  * The two folders are apart because an engine with a `springsettings.cfg`
  * beside its binary writes to its own folder (issue #4856). Every engine
- * coilbox starts reads the content root through `SPRING_DATADIR`, so widgets go
- * there, and the games write their widget config to the write folder.
+ * coilbox starts reads every content root through `SPRING_DATADIR`, so a widget
+ * in any of them loads (issue #4861). Widgets are added to the selected root,
+ * and the games write their widget config to the write folder.
  */
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import {
-  contentPlayerWidgets,
-  type GameItem,
-  type PlayerWidgetScan,
-} from "@/content/bindings";
+import { type GameItem, type PlayerWidgetScan } from "@/content/bindings";
 import {
   useScanTargetSelection,
   useUnitsyncEngineConfig,
   useUnitsyncScan,
 } from "@/content/config";
+import { useContentState } from "@/content/contentState";
 import { engineConfigDir } from "@/content/enginePaths";
 import { stripVersionSuffix } from "@/content/resolveContent";
 import { withoutGeneratedGames } from "@/lib/generatedGames";
 import { errorText } from "@/lib/helpers";
 import { handlerOf } from "./gameHandler";
-import { HANDLER_FOLDERS } from "./handlers";
 import {
   type GameHandler,
   type InstalledGame,
   oneEntryPerGame,
   widgetRows,
 } from "./widgetList";
+import { scanWidgetRoots, widgetRoots } from "./widgetRoots";
 
 /** `info.name_pure` is the modinfo name before unitsync appends the version.
  *  A game that never set it, or left `$VERSION` unsubstituted in its name,
@@ -54,6 +52,13 @@ export function useWidgetList() {
   } = useUnitsyncScan(enginePath, dataDir);
   const { data: engineConfig } = useUnitsyncEngineConfig(enginePath, dataDir);
   const widgetDir = dataDir;
+  const { state: contentState } = useContentState();
+  // A key rather than the array, so a new state with the same roots does not
+  // read the folders again.
+  const rootsKey = JSON.stringify(
+    widgetDir ? widgetRoots(contentState, widgetDir) : [],
+  );
+  const roots = useMemo<string[]>(() => JSON.parse(rootsKey), [rootsKey]);
   const configDir = engineConfigDir(engineConfig?.configPath);
 
   const installed = useMemo(
@@ -72,13 +77,10 @@ export function useWidgetList() {
   const latest = useRef(0);
   const read = useCallback(async () => {
     const id = ++latest.current;
-    if (!widgetDir) return;
+    if (roots.length === 0) return;
     setReading(true);
     try {
-      const found = await contentPlayerWidgets({
-        writeDir: widgetDir,
-        folders: HANDLER_FOLDERS,
-      });
+      const found = await scanWidgetRoots(roots);
       if (id !== latest.current) return;
       setWidgets(found);
       setWidgetsError(null);
@@ -87,7 +89,7 @@ export function useWidgetList() {
     } finally {
       if (id === latest.current) setReading(false);
     }
-  }, [widgetDir]);
+  }, [roots]);
   useEffect(() => {
     setWidgets(null);
     void read();
@@ -141,8 +143,10 @@ export function useWidgetList() {
     /** The installed games, a version each, which the game widgets are read
      *  from. */
     installed,
-    /** The content root, which the widget folders are under. */
+    /** The selected content root, where a widget is added. */
     widgetDir,
+    /** Every content root the engine reads, the selected one first. */
+    roots,
     /** The engine's write folder, where the games keep their widget config. */
     configDir,
     widgets,
