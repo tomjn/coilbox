@@ -249,7 +249,9 @@ export function PlayProvider({ children }: { children: ReactNode }) {
         runningRef.current = false;
         throw e;
       }
-      if (enginePath && ctx.game) {
+      // Not for a replay, which mostly does not name its game, so writing for
+      // the one that does would make replays differ by how they were opened.
+      if (enginePath && ctx.game && runKind !== "replay") {
         await writeWidgetSet(enginePath, ctx.dataDir, ctx.game);
       }
       const runId = crypto.randomUUID();

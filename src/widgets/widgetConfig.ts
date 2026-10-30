@@ -1,10 +1,10 @@
 /**
- * Switching a widget on or off in a game's own config file (issue #1289).
+ * Switching widgets on or off in a game's own config file (issue #1289).
  *
  * Every handler keeps an order table keyed by `GetInfo().name`, where `0` is
  * off and any other number is the widget's place in the load order. The file
  * belongs to the game, which rewrites it whenever it starts, saves or exits,
- * so this changes one entry in place and leaves every other byte alone, rather
+ * so this changes each entry in place and leaves every other byte alone, rather
  * than reading the file into a model and writing it all back. The rules are
  * the blueprint merge's (`src/blueprint/gameFile.ts`): copy the file first, and
  * never write over a file that could not be read. Coilbox writes it just before
