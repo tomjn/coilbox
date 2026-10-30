@@ -1051,6 +1051,13 @@
       "note": "LuaSyncedRead::GetAIInfo now returns \"UNKNOWN\" for non-local AI's, not \"UKNOWN\""
     },
     {
+      "id": "signature:Spring.GetCommandQueue@105.0",
+      "kind": "signature",
+      "name": "Spring.GetCommandQueue",
+      "since": "105.0",
+      "note": "The count argument is required, as for Spring.GetUnitCommands, which it calls. Calling Spring.GetCommandQueue(unitID) with no count raises a Lua error. Pass -1 for the whole queue, or use Spring.GetUnitCommandCount for the length."
+    },
+    {
       "id": "signature:Spring.GetConfigFloat@BAR105 1544",
       "kind": "signature",
       "name": "Spring.GetConfigFloat",

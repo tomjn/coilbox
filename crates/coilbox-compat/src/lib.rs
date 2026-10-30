@@ -63,6 +63,7 @@ const MANIFESTS: &[(u32, &str)] = &[
     (18, include_str!("../../../lua/compat/manifests/18.json")),
     (19, include_str!("../../../lua/compat/manifests/19.json")),
     (20, include_str!("../../../lua/compat/manifests/20.json")),
+    (21, include_str!("../../../lua/compat/manifests/21.json")),
 ];
 
 /// Every fix file, by id.
@@ -174,6 +175,10 @@ const FIXES: &[(&str, &str)] = &[
     (
         "spring-array-n-83",
         include_str!("../../../lua/compat/spring-array-n-83.lua"),
+    ),
+    (
+        "spring-command-queue-count-105",
+        include_str!("../../../lua/compat/spring-command-queue-count-105.lua"),
     ),
     (
         "spring-get-has-lag",
@@ -2206,14 +2211,34 @@ mod tests {
             .any(|(id, _)| *id == "callin-game-frame-sync-action-97"));
     }
 
-    /// The preludes for manifests 9, 11, 12, 14, 15, 16, 17, 18, 19 and 20, as the Lua tests in
+    /// Issue #4868: manifest 21 adds the fix that gives Spring.GetCommandQueue,
+    /// GetUnitCommands and GetFactoryCommands a count of -1 when a game passes
+    /// none, in both Lua states, and keeps the writer of manifest 20.
+    #[test]
+    fn manifest_21_is_manifest_20_with_a_default_command_queue_count() {
+        let (twenty, twenty_one) = (manifest(20).unwrap(), manifest(21).unwrap());
+        let mut expected = twenty.fixes.clone();
+        expected.push("spring-command-queue-count-105".into());
+        assert_eq!(twenty_one.fixes, expected);
+        assert_eq!(
+            (&twenty_one.converter, twenty_one.writer),
+            (&twenty.converter, twenty.writer)
+        );
+        for state in [LuaState::Synced, LuaState::Unsynced] {
+            assert!(prelude_fixes(&twenty_one, state)
+                .iter()
+                .any(|(id, _)| *id == "spring-command-queue-count-105"));
+        }
+    }
+
+    /// The preludes for manifests 9, 11, 12, 14, 15, 16, 17, 18, 19, 20 and 21, as the Lua tests in
     /// `lua/compat/tests/` load them. Earlier manifests' synced preludes call
     /// `rawget`, which the tests' synced state lacks, so they are not kept.
     /// `COILBOX_WRITE_FIXTURE=1` writes them again after a deliberate change to
     /// how a prelude is built.
     #[test]
     fn the_lua_tests_load_the_preludes_this_crate_builds() {
-        for n in [9, 11, 12, 14, 15, 16, 17, 18, 19, 20] {
+        for n in [9, 11, 12, 14, 15, 16, 17, 18, 19, 20, 21] {
             let m = manifest(n).unwrap();
             for state in [LuaState::Synced, LuaState::Unsynced] {
                 let built = prelude(&m, state).unwrap();
