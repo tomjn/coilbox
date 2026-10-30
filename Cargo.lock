@@ -739,6 +739,7 @@ dependencies = [
  "base64 0.22.1",
  "coilbox-portable",
  "coilbox-proc",
+ "coilbox-webview2",
  "minisign-verify",
  "picoframe-core",
  "reqwest 0.12.28",
@@ -1039,6 +1040,13 @@ dependencies = [
  "serde_json",
  "sha2 0.11.0",
  "webp",
+]
+
+[[package]]
+name = "coilbox-webview2"
+version = "0.0.0"
+dependencies = [
+ "windows-sys 0.61.2",
 ]
 
 [[package]]
