@@ -6693,6 +6693,7 @@ dependencies = [
  "base64 0.22.1",
  "coilbox-portable",
  "coilbox-proc",
+ "coilbox-springlua",
  "coilbox-thumb-cache",
  "coilbox-unitsync-worker",
  "picoframe-core",

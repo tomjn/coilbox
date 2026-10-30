@@ -1868,6 +1868,10 @@ pub struct ArchiveArgs {
     /// Where a tree listing is saved, so the next listing of the archive needs
     /// no worker (issue #3736). A preview or an extract does not use it.
     pub cache_dir: Option<String>,
+    /// Members to read whole as text in one session, one `--member` flag each.
+    /// A game's own widgets are hundreds of files, and a worker per file would
+    /// mount the archive hundreds of times (issue #4857).
+    pub members: Vec<String>,
 }
 
 impl ArchiveArgs {
@@ -1890,6 +1894,10 @@ impl ArchiveArgs {
             args.push("--cache-dir".to_string());
             args.push(dir.clone());
         }
+        for m in &self.members {
+            args.push("--member".to_string());
+            args.push(m.clone());
+        }
         args
     }
 
@@ -1903,10 +1911,12 @@ impl ArchiveArgs {
         let mut extract = None;
         let mut raw = false;
         let mut cache_dir = None;
+        let mut members = Vec::new();
         let mut it = args.iter();
         while let Some(a) = it.next() {
             match a.as_str() {
                 "--archive" => archive = it.next().cloned(),
+                "--member" => members.extend(it.next().cloned()),
                 "--file" => file = it.next().cloned(),
                 "--extract" => extract = it.next().cloned(),
                 "--raw" => raw = true,
@@ -1920,6 +1930,7 @@ impl ArchiveArgs {
             extract,
             raw,
             cache_dir,
+            members,
         })
     }
 }
@@ -2963,6 +2974,7 @@ mod tests {
             extract: Some("/out/x.smd".into()),
             raw: false,
             cache_dir: Some("/cache/info".into()),
+            members: Vec::new(),
         }
     }
 
@@ -3003,6 +3015,18 @@ mod tests {
     }
 
     /// A bare tree listing (neither file nor extract) has to round trip too.
+    /// A read of several members keeps each one, spaces and all.
+    #[test]
+    fn archive_members_round_trip_through_to_args_and_from_args() {
+        let original = ArchiveArgs {
+            archive: "Game.sdz".into(),
+            members: vec!["LuaUI/Widgets/a.lua".into(), "LuaUI/Widgets/b c.lua".into()],
+            ..Default::default()
+        };
+        let recovered = ArchiveArgs::from_args(&original.to_args()).expect("valid argv");
+        assert_eq!(recovered, original);
+    }
+
     #[test]
     fn archive_tree_listing_round_trips_through_to_args_and_from_args() {
         let original = ArchiveArgs {

@@ -6,8 +6,8 @@
 use crate::ffi::Unitsync;
 use crate::infocache;
 use crate::model::{
-    ArchiveExtractOutput, ArchiveFileEntry, ArchiveFileOutput, ArchiveTreeOutput, GameHeaderItem,
-    GameHeadersOutput, MapSkyboxOutput,
+    ArchiveExtractOutput, ArchiveFileEntry, ArchiveFileOutput, ArchiveMember, ArchiveMembersOutput,
+    ArchiveTreeOutput, GameHeaderItem, GameHeadersOutput, MapSkyboxOutput,
 };
 use base64::Engine;
 use coilbox_unitsync_worker::cached::{self, read_header_cache, HeaderState};
@@ -598,6 +598,65 @@ pub fn file(lib: &str, archive_name: &str, inner: &str, raw: bool) -> ArchiveFil
     us.uninit();
 
     ArchiveFileOutput { errors, ..out }
+}
+
+/// Read each of `members` whole as text, in one session with the archive opened
+/// once (issue #4857). A member is matched the way the VFS matches it, and one
+/// over [`RAW_CAP`] or not in the archive says so in its own `error`.
+pub fn members(lib: &str, archive_name: &str, members: &[String]) -> ArchiveMembersOutput {
+    let us = match unsafe { Unitsync::load(Path::new(lib)) } {
+        Ok(u) => u,
+        Err(e) => {
+            return ArchiveMembersOutput {
+                errors: vec![e],
+                ..Default::default()
+            }
+        }
+    };
+    us.init(false, 0);
+    let mut errors = us.drain_errors();
+    let open_path = resolve_open_path(&us, archive_name);
+    let _ = us.drain_errors();
+    let mut files = Vec::new();
+    match open_path.and_then(|p| us.open_archive(&p)) {
+        Some(handle) => {
+            let listed: HashMap<String, String> = us
+                .list_archive_files(handle)
+                .into_iter()
+                .map(|(path, _)| (path.to_lowercase(), path))
+                .collect();
+            for member in members {
+                let read = listed
+                    .get(&member.to_lowercase())
+                    .ok_or_else(|| format!("{member} is not in the archive"))
+                    .and_then(|inner| {
+                        us.read_archive_member(handle, inner, RAW_CAP)
+                            .ok_or_else(|| format!("could not read member {member}"))
+                    })
+                    .and_then(|(size, bytes)| {
+                        if size > RAW_CAP as u64 {
+                            Err(format!("{member} is too large to read"))
+                        } else {
+                            Ok(String::from_utf8_lossy(&bytes).into_owned())
+                        }
+                    });
+                let (text, error) = match read {
+                    Ok(text) => (Some(text), None),
+                    Err(e) => (None, Some(e)),
+                };
+                files.push(ArchiveMember {
+                    path: member.clone(),
+                    text,
+                    error,
+                });
+            }
+            us.close_archive(handle);
+        }
+        None => errors.push(format!("could not open archive {archive_name}")),
+    }
+    errors.extend(us.drain_errors());
+    us.uninit();
+    ArchiveMembersOutput { files, errors }
 }
 
 /// Classify by extension, read up to the matching cap, and build the output.
@@ -1249,7 +1308,16 @@ pub fn emit_tree_error(msg: String) {
     println!("{}", serde_json::to_string(&out).unwrap_or_default());
 }
 
-/// Print a file error envelope to stdout (used on panic).
+/// Print a members error envelope to stdout (used on panic).
+pub fn emit_members_error(msg: String) {
+    let out = ArchiveMembersOutput {
+        errors: vec![msg],
+        ..Default::default()
+    };
+    println!("{}", serde_json::to_string(&out).unwrap_or_default());
+}
+
+/// Print a preview error envelope to stdout (used on panic).
 pub fn emit_file_error(msg: String) {
     let out = ArchiveFileOutput {
         kind: "binary".into(),

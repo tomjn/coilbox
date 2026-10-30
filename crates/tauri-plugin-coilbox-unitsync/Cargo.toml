@@ -19,6 +19,7 @@ serde_json = { workspace = true }
 picoframe-core = "0.0.4"
 coilbox-portable = { path = "../coilbox-portable" }
 coilbox-proc = { path = "../coilbox-proc" }
+coilbox-springlua = { path = "../coilbox-springlua" }
 coilbox-thumb-cache = { path = "../coilbox-thumb-cache" }
 # The `Mode`/`UnitRenderArgs` contract the worker's `parse_args` also builds
 # from, so a migrated mode's flags are defined once rather than written by

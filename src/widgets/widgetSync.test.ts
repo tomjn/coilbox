@@ -79,6 +79,7 @@ describe("absorbGame", () => {
     expect(await absorbGame(io, "/spring", game, rows)).toEqual({
       kind: "ready",
       path: PATH,
+      order: new Map([["Minimap", 1]]),
     });
     expect(reads).toBe(2);
     expect(readSets().global).toEqual({ Minimap: true });

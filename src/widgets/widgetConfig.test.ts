@@ -393,6 +393,29 @@ describe("writeWidgetStates", () => {
     expect(out?.order.get("Build Watch")).toBe(14);
   });
 
+  it("keeps both of two writes started together", async () => {
+    const { io, written } = memoryIO({ [path]: ENGINE_FILE });
+    await Promise.all([
+      writeWidgetStates({
+        ...request,
+        io,
+        states: new Map([["Minimap", true]]),
+      }),
+      writeWidgetStates({
+        ...request,
+        io,
+        states: new Map([["Build Watch", false]]),
+      }),
+    ]);
+    const back = readBack(written[path]) as Record<string, unknown>;
+    expect(back["string:order"]).toEqual(
+      expect.objectContaining({
+        "string:Minimap": 1,
+        "string:Build Watch": 0,
+      }),
+    );
+  });
+
   it("keeps the first copy when two writes land in one second", async () => {
     const { io, written } = memoryIO({ [path]: ENGINE_FILE });
     await writeWidgetStates({
