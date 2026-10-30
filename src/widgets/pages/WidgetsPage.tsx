@@ -221,6 +221,23 @@ function isOn(row: WidgetRow, order: ReadonlyMap<string, number>): boolean {
     : (order.get(saved) ?? 0) > 0;
 }
 
+/** A field the widget's `GetInfo()` gave, shown as written. A file that could
+ *  not be read (`known` false) says nothing either way, so its cell stays
+ *  blank; its error is already on the row. */
+function Declared({
+  value,
+  known,
+  missing,
+}: {
+  value: string | null | undefined;
+  known: boolean;
+  missing: string;
+}) {
+  if (value?.trim()) return <>{value}</>;
+  if (!known) return null;
+  return <span className="text-muted-foreground">{missing}</span>;
+}
+
 function WidgetTable({
   rows,
   showGames,
@@ -318,10 +335,18 @@ function WidgetTable({
             </TableCell>
             <TableCell>{row.info?.version ?? ""}</TableCell>
             <TableCell className="whitespace-normal">
-              {row.info?.author ?? ""}
+              <Declared
+                value={row.info?.author}
+                known={!!row.info}
+                missing={t`No author stated`}
+              />
             </TableCell>
             <TableCell className="whitespace-normal">
-              {row.info?.license ?? ""}
+              <Declared
+                value={row.info?.license}
+                known={!!row.info}
+                missing={t`No licence stated`}
+              />
             </TableCell>
             {showGames && (
               <TableCell className="whitespace-normal text-sm">

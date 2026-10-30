@@ -30645,6 +30645,10 @@ msgstr "まだ挑戦の記録はありません。"
 msgid "No audio clip files matched in this game's archive."
 msgstr "このゲームのアーカイブに一致する音声クリップファイルはありません。"
 
+#: src/widgets/pages/WidgetsPage.tsx
+msgid "No author stated"
+msgstr ""
+
 #: src/runlite/pages/RunPage.tsx
 #, fuzzy
 msgid "no battle"
@@ -31323,6 +31327,10 @@ msgstr "この試合の招待リンクはありません。{inviteProblem}"
 #, fuzzy
 msgid "No leftover dialogue clips - nothing to reclaim."
 msgstr "残っているセリフのクリップはありません — 解放するものはありません。"
+
+#: src/widgets/pages/WidgetsPage.tsx
+msgid "No licence stated"
+msgstr ""
 
 #: src/content/pages/components/LivingValueChart.tsx
 #, fuzzy
