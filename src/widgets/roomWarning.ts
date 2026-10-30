@@ -94,8 +94,15 @@ function fileName(path: string): string {
   return path.slice(path.lastIndexOf("/") + 1);
 }
 
+/** One entry per file. Files that share a name are told apart by file name,
+ *  since the player has that many widgets to lose. */
 function names(rows: readonly WidgetRow[]): string[] {
-  return [...new Set(rows.map((r) => r.info?.name ?? fileName(r.path)))];
+  const named = rows.map((r) => r.info?.name ?? fileName(r.path));
+  return rows.map((r, i) =>
+    named.indexOf(named[i]) === named.lastIndexOf(named[i])
+      ? named[i]
+      : `${named[i]} (${r.path})`,
+  );
 }
 
 /**

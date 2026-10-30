@@ -404,12 +404,11 @@ const LOCAL_WIDGET_KEYS = [
 export function readLocalWidgets(src: string): boolean {
   try {
     const entry = field(returnedTable(src), "Local Widgets Config")?.table;
-    return (entry?.fields ?? []).some(
-      (f) =>
-        f.key !== null &&
-        LOCAL_WIDGET_KEYS.includes(f.key) &&
-        booleanOf(f.value) === true,
-    );
+    // The last copy of a key is the one Lua keeps.
+    return LOCAL_WIDGET_KEYS.some((key) => {
+      const f = entry && field(entry, key);
+      return !!f && booleanOf(f.value) === true;
+    });
   } catch (e) {
     throw unreadable(e);
   }

@@ -15,7 +15,12 @@ export function useRoomWidgets(
   game: GameItem | undefined,
 ): RoomWidgets | null {
   const { running } = usePlay();
-  const [found, setFound] = useState<RoomWidgets | null>(null);
+  // What was read is kept with who it was read for, so a change of game or
+  // engine shows nothing until the new read lands rather than the old game's.
+  const [found, setFound] = useState<{
+    key: string;
+    widgets: RoomWidgets | null;
+  } | null>(null);
   const [exits, setExits] = useState(0);
   const wasRunning = useRef(running);
   useEffect(() => {
@@ -23,7 +28,8 @@ export function useRoomWidgets(
     wasRunning.current = running;
   }, [running]);
 
-  // biome-ignore lint/correctness/useExhaustiveDependencies: `exits` only triggers a new read.
+  const key = `${enginePath}::${dataDir}::${game?.primaryArchive.name}`;
+  // biome-ignore lint/correctness/useExhaustiveDependencies: `exits` only triggers a new read, and `key` stands for the game's identity.
   useEffect(() => {
     if (!enginePath || !dataDir || !game) {
       setFound(null);
@@ -32,17 +38,17 @@ export function useRoomWidgets(
     let cancelled = false;
     loadRoomWidgets({ enginePath, dataDir, game }).then(
       (widgets) => {
-        if (!cancelled) setFound(widgets);
+        if (!cancelled) setFound({ key, widgets });
       },
       (e) => {
         console.warn("could not read the widgets for this room", e);
-        if (!cancelled) setFound(null);
+        if (!cancelled) setFound({ key, widgets: null });
       },
     );
     return () => {
       cancelled = true;
     };
-  }, [enginePath, dataDir, game, exits]);
+  }, [key, exits]);
 
-  return found;
+  return found?.key === key ? found.widgets : null;
 }

@@ -292,6 +292,24 @@ describe("roomWidgetWarning", () => {
     ).toBeNull();
   });
 
+  it("counts two files that share a name as two widgets, told apart by path", () => {
+    const warning = roomWidgetWarning(
+      { off: "option", noUnitControl: false },
+      [
+        row("Same", { path: "LuaUI/Widgets/a.lua" }),
+        row("Same", { path: "LuaUI/Widgets/b.lua" }),
+        row("Other"),
+      ],
+      game,
+      EMPTY_SETS,
+    );
+    expect(warning?.blocked).toEqual([
+      "Same (LuaUI/Widgets/a.lua)",
+      "Same (LuaUI/Widgets/b.lua)",
+      "Other",
+    ]);
+  });
+
   it("names a widget without a name by its file", () => {
     const warning = roomWidgetWarning(
       { off: "option", noUnitControl: false },

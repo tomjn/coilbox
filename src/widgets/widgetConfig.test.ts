@@ -179,6 +179,19 @@ describe("readLocalWidgets", () => {
     );
   });
 
+  it("goes by the last copy of a key, as Lua does", () => {
+    expect(
+      readLocalWidgets(
+        entry('\t\t["localWidgets"] = true,\n\t\t["localWidgets"] = false,'),
+      ),
+    ).toBe(false);
+    expect(
+      readLocalWidgets(
+        entry('\t\t["localWidgets"] = false,\n\t\t["localWidgets"] = true,'),
+      ),
+    ).toBe(true);
+  });
+
   it("refuses a file that is not a table", () => {
     expect(() => readLocalWidgets("garbage")).toThrow(/could not read/);
   });

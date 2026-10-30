@@ -46,18 +46,24 @@ pub struct WidgetInfo {
     pub control: Option<bool>,
 }
 
-/// Whether widget source calls a function whose name starts with `GiveOrder`
-/// through a field, as `Spring.GiveOrder` and the rest of that family are
-/// called. Comments and strings are skipped. Beyond All Reason replaces every
-/// `Spring` function with that prefix by one that raises an error when its
-/// room turns user unit control widgets off (issue #1292). Only this file is
-/// read, so a widget that gives its orders from a file it includes is missed.
+/// Whether widget source calls a function of `Spring` whose name starts with
+/// `GiveOrder`, written `Spring.GiveOrder` or `Spring["GiveOrder"]`. Comments
+/// and strings are skipped. Beyond All Reason replaces every `Spring` function
+/// with that prefix by one that raises an error when its room turns user unit
+/// control widgets off (issue #1292). Only this file is read, and only the
+/// name `Spring` counts as the table, so a widget that gives its orders from a
+/// file it includes, or through another name for `Spring`, is missed.
 pub fn gives_orders(src: &str) -> bool {
+    const PREFIX: &[u8] = b"GiveOrder";
     let b = src.as_bytes();
     let mut i = 0;
-    // The last byte that was not a space, which is how `.` before a name is
-    // seen through `Spring . GiveOrder`.
+    // The last token that was not a space or comment: `a` for a name, else its
+    // first byte. This is how `.` is seen through `Spring . GiveOrder`.
     let mut prev = 0u8;
+    // The name, when the last token is one.
+    let mut word: &[u8] = b"";
+    // `.` or `[` when the last token reached into `Spring`.
+    let mut into_spring: Option<u8> = None;
     while i < b.len() {
         let c = b[i];
         if c.is_ascii_whitespace() {
@@ -71,27 +77,32 @@ pub fn gives_orders(src: &str) -> bool {
                     .map_or(b.len(), |n| i + n),
             };
         } else if c == b'"' || c == b'\'' {
+            if into_spring == Some(b'[') && b[i + 1..].starts_with(PREFIX) {
+                return true;
+            }
             i += 1;
             while i < b.len() && b[i] != c && b[i] != b'\n' {
                 i += if b[i] == b'\\' { 2 } else { 1 };
             }
             i += 1;
-            prev = c;
+            (prev, word, into_spring) = (c, b"", None);
         } else if let Some(level) = long_bracket(b, i) {
             i = skip_long(b, i, level);
-            prev = b']';
+            (prev, word, into_spring) = (b']', b"", None);
         } else if c.is_ascii_alphabetic() || c == b'_' {
             let end = b[i..]
                 .iter()
                 .position(|x| !(x.is_ascii_alphanumeric() || *x == b'_'))
                 .map_or(b.len(), |n| i + n);
-            if prev == b'.' && b[i..end].starts_with(b"GiveOrder") {
+            if into_spring == Some(b'.') && b[i..end].starts_with(PREFIX) {
                 return true;
             }
-            prev = b'a';
+            (prev, word, into_spring) = (b'a', &b[i..end], None);
             i = end;
         } else {
-            prev = c;
+            into_spring =
+                ((c == b'.' || c == b'[') && prev == b'a' && word == b"Spring").then_some(c);
+            (prev, word) = (c, b"");
             i += 1;
         }
     }
@@ -332,6 +343,9 @@ mod tests {
             "Spring.GiveOrderArrayToUnitArray(units, orders)",
             "local x = 1\nSpring.GiveOrder(1, {}, 0)",
             "--[[ a comment ]] Spring.GiveOrder(1, {}, 0)",
+            r#"Spring["GiveOrder"](1, {}, 0)"#,
+            "local give = Spring['GiveOrderToUnit']",
+            "Spring --[[ note ]] .GiveOrder(1)",
         ] {
             assert!(gives_orders(src), "{src}");
         }
@@ -348,6 +362,11 @@ mod tests {
             "local s = [[ Spring.GiveOrder ]]",
             "local function GiveOrderLater() end GiveOrderLater()",
             "Spring.GetUnitCommands(1)",
+            "planner.GiveOrder(1, {}, 0)",
+            "Spring.Utilities.GiveOrder(1)",
+            r#"Spring["GetUnitCommands"](1)"#,
+            r#"local t = { "GiveOrder" } Spring[1]"#,
+            "local sp = Spring sp.GiveOrder(1)",
             "local gave = Spring.GaveOrder",
         ] {
             assert!(!gives_orders(src), "{src}");

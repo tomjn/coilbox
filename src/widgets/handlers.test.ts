@@ -186,19 +186,35 @@ describe("userWidgets", () => {
     expect(await gates(marker)).toBeUndefined();
   });
 
-  it("gives the engine's own handler, Spring 1944 and the pre-0.83 handler no gates", async () => {
-    expect(
-      (await recogniseHandler(["luaui.lua"], none))?.userWidgets,
-    ).toBeUndefined();
-    expect((await recogniseHandler([], none))?.userWidgets).toBeUndefined();
-    expect(
-      (
+  it("gives the engine's own handler, the default handler, Spring 1944 and the pre-0.83 handler no gates", async () => {
+    const recognised = [
+      ["engine's own", await recogniseHandler(["units/a.lua"], none), "engine"],
+      [
+        "default",
+        await recogniseHandler(["LuaUI/widgets.lua"], none),
+        "engine",
+      ],
+      [
+        "Spring 1944",
         await recogniseHandler(
           ["LuaUI/main.lua"],
           async () => 'include "LuaHandler/handler.lua"',
-        )
-      )?.userWidgets,
-    ).toBeUndefined();
+        ),
+        "jk",
+      ],
+      [
+        "pre-0.83",
+        await recogniseHandler(
+          ["LuaUI/widgets.lua"],
+          async () => "local ORDER_FILENAME = 'Config/widget_order.lua'",
+        ),
+        "legacy",
+      ],
+    ] as const;
+    for (const [, handler, family] of recognised) {
+      expect(handler?.family).toBe(family);
+      expect(handler?.userWidgets).toBeUndefined();
+    }
   });
 
   it("keeps a data file where the handler saves it, beside the config", async () => {
