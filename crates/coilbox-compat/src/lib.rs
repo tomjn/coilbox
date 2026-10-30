@@ -64,6 +64,7 @@ const MANIFESTS: &[(u32, &str)] = &[
     (19, include_str!("../../../lua/compat/manifests/19.json")),
     (20, include_str!("../../../lua/compat/manifests/20.json")),
     (21, include_str!("../../../lua/compat/manifests/21.json")),
+    (22, include_str!("../../../lua/compat/manifests/22.json")),
 ];
 
 /// Every fix file, by id.
@@ -235,6 +236,10 @@ const FIXES: &[(&str, &str)] = &[
     (
         "unit-defs-weapons-n-83",
         include_str!("../../../lua/compat/unit-defs-weapons-n-83.lua"),
+    ),
+    (
+        "unit-defs-weapons-n-83-v2",
+        include_str!("../../../lua/compat/unit-defs-weapons-n-83-v2.lua"),
     ),
     (
         "weapon-defs-lua-consts-87",
@@ -2231,14 +2236,44 @@ mod tests {
         }
     }
 
-    /// The preludes for manifests 9, 11, 12, 14, 15, 16, 17, 18, 19, 20 and 21, as the Lua tests in
+    /// Issue #4866: manifest 22 swaps the fix that stored each unit def's
+    /// weapons table with rawset, unsynced only and making `ud:pairs()` run
+    /// forever, for one that runs in both states, and keeps the writer of
+    /// manifest 21.
+    #[test]
+    fn manifest_22_is_manifest_21_with_unit_def_weapons_counted_in_both_states() {
+        let (twenty_one, twenty_two) = (manifest(21).unwrap(), manifest(22).unwrap());
+        let expected: Vec<String> = twenty_one
+            .fixes
+            .iter()
+            .map(|id| match id.as_str() {
+                "unit-defs-weapons-n-83" => "unit-defs-weapons-n-83-v2".to_string(),
+                other => other.to_string(),
+            })
+            .collect();
+        assert_eq!(twenty_two.fixes, expected);
+        assert_eq!(
+            (&twenty_two.converter, twenty_two.writer),
+            (&twenty_one.converter, twenty_one.writer)
+        );
+        for state in [LuaState::Synced, LuaState::Unsynced] {
+            let ids: Vec<&str> = prelude_fixes(&twenty_two, state)
+                .iter()
+                .map(|(id, _)| *id)
+                .collect();
+            assert!(ids.contains(&"unit-defs-weapons-n-83-v2"));
+            assert!(!ids.contains(&"unit-defs-weapons-n-83"));
+        }
+    }
+
+    /// The preludes for manifests 9, 11, 12, 14, 15, 16, 17, 18, 19, 20, 21 and 22, as the Lua tests in
     /// `lua/compat/tests/` load them. Earlier manifests' synced preludes call
     /// `rawget`, which the tests' synced state lacks, so they are not kept.
     /// `COILBOX_WRITE_FIXTURE=1` writes them again after a deliberate change to
     /// how a prelude is built.
     #[test]
     fn the_lua_tests_load_the_preludes_this_crate_builds() {
-        for n in [9, 11, 12, 14, 15, 16, 17, 18, 19, 20, 21] {
+        for n in [9, 11, 12, 14, 15, 16, 17, 18, 19, 20, 21, 22] {
             let m = manifest(n).unwrap();
             for state in [LuaState::Synced, LuaState::Unsynced] {
                 let built = prelude(&m, state).unwrap();
