@@ -240,8 +240,9 @@ fn build_reading_with_lua(
 /// the call-in handlers the base game's Lua defines, `convert` its converted
 /// models, and `read_defs` its defs as `unitsync_unit_defs` reads them.
 /// `convert` runs once the request is known to be sound, and before anything is
-/// written. `read_defs` runs only when def fixes were written, to count the
-/// defs they change. `run_lua` runs a script through the worker with the game
+/// written. `read_defs` runs only when def fixes are written, to count the defs
+/// they change, and before the write, because a new folder under `games/` costs
+/// the running worker another `Init` (issue #4895). `run_lua` runs a script through the worker with the game
 /// mounted, and only when the def fix for missing models is written, to find
 /// the defs it changes (see `standins`).
 ///
@@ -326,9 +327,7 @@ fn build_with(
     let mut notes = models.notes.clone();
     notes.extend(defs.notes.iter().cloned());
     notes.extend(standins::note(&standins));
-    let files = write_with_models(&dir, &mut files, &models, &defs, manifest_version)?;
-    let mut def_overrides =
-        models::model_keys(&files).len() + standins.standins.len() + standins.icons.len();
+    let mut def_overrides = standins.standins.len() + standins.icons.len();
     if !defs.written.is_empty() {
         match read_defs().and_then(|read| defs::changed(&manifest, &defs.written, &read)) {
             Ok(n) => def_overrides += n,
@@ -337,6 +336,8 @@ fn build_with(
             )),
         }
     }
+    let files = write_with_models(&dir, &mut files, &models, &defs, manifest_version)?;
+    def_overrides += models::model_keys(&files).len();
     Ok(Built {
         dir: dir.to_string_lossy().into_owned(),
         folder,
@@ -1930,6 +1931,35 @@ mod tests {
         assert_eq!(built.def_overrides, 0);
         assert_eq!(built.notes.len(), 1);
         assert!(built.notes[0].contains("no defs in this test"));
+    }
+
+    /// A new folder under `games/` costs the running worker another `Init`
+    /// (issue #4895).
+    #[test]
+    fn the_defs_are_read_before_the_mutator_is_written() {
+        let (_keep, data) = root();
+        let folder = mutator::folder("xta-9.65.sd7", coilbox_compat::latest()).unwrap();
+        let dir = mutator::games_dir(&data).unwrap().join(folder);
+        let was_written = std::cell::Cell::new(None);
+        build_reading(
+            &data,
+            "xta-9.65.sd7",
+            "XTA 9.65",
+            &DeclaredGame::default(),
+            "1234abcd",
+            coilbox_compat::latest(),
+            "1.2.3",
+            &[],
+            no_file,
+            no_models,
+            || {
+                was_written.set(Some(dir.exists()));
+                no_defs()
+            },
+        )
+        .unwrap();
+        assert_eq!(was_written.get(), Some(false));
+        assert!(dir.join(mutator::MARKER).is_file());
     }
 
     #[test]
