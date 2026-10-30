@@ -2269,6 +2269,8 @@ export interface PlayerWidgetInfo {
 
 /** One `.lua` file in a player widget folder (issue #1284). */
 export interface PlayerWidgetFile {
+  /** The content root it was scanned in. The same `path` can be in several. */
+  root: string;
   /** Relative to the write folder, spelled as on disk. */
   path: string;
   /** The scanned folder it is in or under, such as `LuaUI/Widgets`. */

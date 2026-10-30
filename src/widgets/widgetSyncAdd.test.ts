@@ -18,6 +18,7 @@ const scan: PlayerWidgetScan = {
   caseSensitive: false,
   folders: ["LuaUI/Widgets"],
   files: ["Minimap", "Radar"].map((name) => ({
+    root: "",
     path: `LuaUI/Widgets/${name.toLowerCase()}.lua`,
     folder: "LuaUI/Widgets",
     nested: false,
@@ -45,10 +46,26 @@ vi.mock("@/content/bindings", async () => {
     ...actual,
     contentPlayerWidgets: async (args: { writeDir: string }) => {
       scanned.push(args.writeDir);
-      return scan;
+      return {
+        ...scan,
+        files: scan.files.map((f) => ({ ...f, root: args.writeDir })),
+      };
     },
   };
 });
+
+/** The content roots coilbox knows, besides the one the widgets were added to. */
+let otherRoots: string[] = [];
+vi.mock("@/content/contentState", () => ({
+  loadContentState: async () => ({
+    schemaVersion: 1,
+    roots: ["/content", ...otherRoots].map((path) => ({
+      path,
+      exists: true,
+      valid: true,
+    })),
+  }),
+}));
 
 const { readSets, recordWrite, resetSets, updateSets } = await import(
   "./widgetSets"
@@ -78,6 +95,7 @@ beforeEach(() => {
   installSettingsStorage(memorySettingsStorage());
   resetSets();
   scanned.length = 0;
+  otherRoots = [];
   files.clear();
   files.set(MF, saved);
   files.set(SF, saved);
@@ -107,6 +125,12 @@ describe("switchAddedWidgets", () => {
   it("reads the widgets from the widget folder, not the write folder", async () => {
     await run(null);
     expect(scanned).toEqual(["/content"]);
+  });
+
+  it("reads the widgets in every content root, the one added to first", async () => {
+    otherRoots = ["/second"];
+    await run(null);
+    expect(scanned).toEqual(["/content", "/second"]);
   });
 
   it("writes it as on everywhere when added for all games", async () => {

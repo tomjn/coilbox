@@ -21,6 +21,7 @@ function row(
   more: { control?: boolean; givesOrders?: boolean } = {},
 ): WidgetRow {
   return {
+    root: "/data",
     path: `LuaUI/Widgets/${name}.lua`,
     folder: "LuaUI/Widgets",
     nested: false,

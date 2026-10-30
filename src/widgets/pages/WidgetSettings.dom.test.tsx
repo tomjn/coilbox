@@ -65,6 +65,7 @@ const handler: WidgetHandler = {
 };
 
 const row = {
+  root: CONTENT,
   path: "LuaUI/Widgets/watch.lua",
   info: { name: "Build Watch" },
 } as WidgetRow;
@@ -73,7 +74,6 @@ const open = (name = "Build Watch") =>
   render(
     <WidgetSettingsDrawer
       writeDir={DIR}
-      widgetDir={CONTENT}
       onClose={() => {}}
       target={{
         row,

@@ -34,6 +34,7 @@ const bar: WidgetHandler = {
 
 function file(path: string, folder: string, nested = false): PlayerWidgetFile {
   return {
+    root: "/data",
     path,
     folder,
     nested,

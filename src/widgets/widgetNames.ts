@@ -10,6 +10,7 @@
 
 import type { PlayerWidgetFile } from "@/content/bindings";
 import type { WidgetHandler } from "./handlers";
+import { fullPath } from "./widgetFiles";
 
 /** What the switch for one widget file can do. The switch itself is #1289. */
 export type WidgetSwitch =
@@ -28,7 +29,8 @@ export type WidgetSwitch =
       kind: "none";
       reason: "duplicate";
       name: string;
-      /** The other files with that name, as `path`. */
+      /** The other files with that name: `path` for one in the same content
+       *  root, and where it is on disk for one in another. */
       others: readonly string[];
     }
   /** A game saves it under a name with text added, which depends on the
@@ -76,7 +78,9 @@ export function widgetNames(
           names[j] === name &&
           loadedBy[j].some((g) => loadedBy[i].includes(g)),
       )
-      .map((other) => other.path);
+      .map((other) =>
+        other.root === file.root ? other.path : fullPath(other),
+      );
     if (others.length > 0)
       return { kind: "none", reason: "duplicate", name, others };
     if (

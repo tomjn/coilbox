@@ -31,6 +31,9 @@ const LUAUI: &str = "luaui";
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct WidgetFile {
+    /// The content root scanned, as the caller spelled it. A player can have
+    /// several, and the same relative `path` can be in more than one.
+    pub root: String,
     /// Relative to the write folder, with forward slashes, spelled as on disk.
     pub path: String,
     /// The scanned folder it is in or under, relative to the write folder and
@@ -196,6 +199,7 @@ fn read_file(
         Err(e) => (None, Some(e)),
     };
     Some(WidgetFile {
+        root: write_dir.to_string_lossy().into_owned(),
         path: rel,
         folder: folder.to_string(),
         nested,
@@ -400,6 +404,19 @@ mod tests {
                 ("LuaUI/Widgets/other.lua", false)
             ]
         );
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn each_file_names_the_root_it_was_scanned_in() {
+        let dir = temp_dir("root");
+        write(
+            &dir,
+            "LuaUI/Widgets/a.lua",
+            r#"function widget:GetInfo() return { name = "A" } end"#,
+        );
+        let scan = scan(&dir, &names());
+        assert_eq!(scan.files[0].root, dir.to_string_lossy());
         let _ = std::fs::remove_dir_all(&dir);
     }
 

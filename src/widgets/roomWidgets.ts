@@ -5,16 +5,13 @@
  */
 
 import { appFileIO } from "@/blueprint/fileIO";
-import {
-  contentPlayerWidgets,
-  type GameItem,
-  unitsyncEngineConfig,
-} from "@/content/bindings";
+import { type GameItem, unitsyncEngineConfig } from "@/content/bindings";
 import { engineConfigDir } from "@/content/enginePaths";
 import { handlerOf } from "./gameHandler";
-import { HANDLER_FOLDERS, type UserWidgetGates } from "./handlers";
+import type { UserWidgetGates } from "./handlers";
 import { findConfig, readFlag, readLocalWidgets } from "./widgetConfig";
 import { type GameHandler, type WidgetRow, widgetRows } from "./widgetList";
+import { scanWidgets } from "./widgetRoots";
 
 export interface RoomWidgets {
   game: GameHandler;
@@ -61,12 +58,9 @@ export async function loadRoomWidgets({
     shortName: game.info.shortname?.trim() || undefined,
     handler,
   };
-  // The widgets are under the content root, and the config files are in the
-  // engine's write folder (issue #4856).
-  const scan = await contentPlayerWidgets({
-    writeDir: dataDir,
-    folders: HANDLER_FOLDERS,
-  });
+  // The widgets are under every content root, and the config files are in the
+  // engine's write folder (issues #4856, #4861).
+  const scan = await scanWidgets(dataDir);
   const short = entry.shortName ?? "";
 
   let configFlag: boolean | null = null;

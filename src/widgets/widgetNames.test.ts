@@ -24,6 +24,7 @@ function file(
   error: string | null = null,
 ): PlayerWidgetFile {
   return {
+    root: "/data",
     path,
     folder: "LuaUI/Widgets",
     nested: path.split("/").length > 3,
@@ -66,6 +67,25 @@ describe("widgetNames", () => {
       { kind: "none", reason: "duplicate", name: "Same", others: [b.path] },
       { kind: "none", reason: "duplicate", name: "Same", others: [a.path] },
       { kind: "ready", name: "Other", previousNames: [] },
+    ]);
+  });
+
+  it("names a file with the same name in another content root by where it is", () => {
+    const a = file("LuaUI/Widgets/a.lua", { name: "Same" });
+    const b = { ...a, root: "/second" };
+    expect(widgetNames([a, b], [["E"], ["E"]], games)).toEqual([
+      {
+        kind: "none",
+        reason: "duplicate",
+        name: "Same",
+        others: ["/second/LuaUI/Widgets/a.lua"],
+      },
+      {
+        kind: "none",
+        reason: "duplicate",
+        name: "Same",
+        others: [`${a.root}/LuaUI/Widgets/a.lua`],
+      },
     ]);
   });
 
