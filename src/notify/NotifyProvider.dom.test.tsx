@@ -14,9 +14,9 @@ import {
   PersistentStoreProvider,
   ThemeProvider,
   Toaster,
+  toast,
 } from "@picoframe/frame";
 import { cleanup, render, screen, waitFor } from "@testing-library/react";
-import { toast } from "sonner";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("@tauri-apps/plugin-notification", () => ({
