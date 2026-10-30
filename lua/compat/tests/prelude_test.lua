@@ -1521,4 +1521,74 @@ do
 	check("synced: no fix failed", #synced.logs == 0, table.concat(synced.logs, "; "))
 end
 
+--------------------------------------------------------------------------------
+-- The command queue functions with no count, which a current engine refuses
+-- (issue #4868)
+--------------------------------------------------------------------------------
+
+-- A stand-in for one of the three, shaped as luaL_checkint(L, 2) has it: a
+-- missing or nil count raises, and it records what it was given.
+local function countingGetter(calls)
+	return function(unitID, count, ...)
+		if type(count) ~= "number" then
+			error("bad argument #2 (number expected, got " .. (count == nil and "no value" or type(count)) .. ")")
+		end
+		calls[#calls + 1] = { unitID, count, select("#", ...), (...) }
+		return "queue"
+	end
+end
+
+for _, synced in ipairs({ true, false }) do
+	local state = synced and "synced" or "unsynced"
+	local names = { "GetCommandQueue", "GetUnitCommands", "GetFactoryCommands" }
+
+	local calls = {}
+	local spring = {}
+	for _, name in ipairs(names) do
+		spring[name] = countingGetter(calls)
+	end
+
+	local before = newEngine({ synced = synced, manifest = 20, spring = spring })
+	prelude(before)
+	check(state .. ": manifest 20 still refuses a missing count", not pcall(before.env.Spring.GetCommandQueue, 5))
+
+	local engine = newEngine({ synced = synced, manifest = 21, spring = spring })
+	prelude(engine)
+	local Spring = engine.env.Spring
+	for _, name in ipairs(names) do
+		local n = #calls
+		check(state .. ": " .. name .. " with no count returns the queue", Spring[name](5) == "queue")
+		check(state .. ": " .. name .. " with no count asks for all of it", calls[n + 1][2] == -1 and calls[n + 1][1] == 5)
+		check(state .. ": " .. name .. " with a nil count asks for all of it", Spring[name](6, nil) == "queue" and calls[n + 2][2] == -1)
+		Spring[name](7, 0)
+		check(state .. ": " .. name .. " keeps a count of 0", calls[n + 3][2] == 0)
+		Spring[name](8, 3)
+		check(state .. ": " .. name .. " keeps a count of 3", calls[n + 4][2] == 3 and calls[n + 4][1] == 8)
+		Spring[name](9, -1)
+		check(state .. ": " .. name .. " keeps a count of -1", calls[n + 5][2] == -1)
+		Spring[name](10, 2, false)
+		check(state .. ": " .. name .. " passes the third argument on", calls[n + 6][3] == 1 and calls[n + 6][4] == false)
+		Spring[name](11, nil, false)
+		check(state .. ": " .. name .. " passes it on after a default count", calls[n + 7][2] == -1 and calls[n + 7][4] == false)
+		Spring[name](12, 4)
+		check(state .. ": " .. name .. " passes no third argument when there is none", calls[n + 8][3] == 0)
+	end
+	check(state .. ": no fix failed", #engine.logs == 0, table.concat(engine.logs, "; "))
+
+	-- The results of the engine's function go back as they are.
+	local many = newEngine({
+		synced = synced,
+		manifest = 21,
+		spring = {
+			GetUnitCommands = function()
+				return 1, 2, 3
+			end,
+		},
+	})
+	prelude(many)
+	check(state .. ": every result comes back", select("#", many.env.Spring.GetUnitCommands(1)) == 3)
+	check(state .. ": a name the engine lacks is not added", many.env.Spring.GetCommandQueue == nil and many.env.Spring.GetFactoryCommands == nil)
+	check(state .. ": the missing names are no failure", #many.logs == 0, table.concat(many.logs, "; "))
+end
+
 support.report()
