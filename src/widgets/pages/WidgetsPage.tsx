@@ -145,7 +145,7 @@ export default function WidgetsPage() {
         shown && (
           <WidgetTable
             rows={shown}
-            showGames={!game}
+            showGames={!game && list.gamesKnown}
             someUnknown={!!list.games?.some((g) => g.handler === null)}
           />
         )

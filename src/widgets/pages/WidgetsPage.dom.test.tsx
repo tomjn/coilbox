@@ -72,6 +72,7 @@ vi.mock("../useWidgetList", () => ({
     reading: false,
     error: null,
     folderErrors: [],
+    gamesKnown: true,
     reload: async () => {},
   }),
 }));

@@ -177,6 +177,8 @@ export function useWidgetList() {
     error: widgetsError ?? scanError,
     /** Folders that are there and could not be read. */
     folderErrors: widgets?.errors ?? [],
+    /** The game list was read, so the rows can say which games load them. */
+    gamesKnown: !!scanData,
     reload: async () => {
       if (scanError) void runScan(true);
       await read();
