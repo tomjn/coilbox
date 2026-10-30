@@ -124,6 +124,14 @@ describe("WidgetsPage", () => {
     expect(screen.getByText("No game coilbox recognises")).toBeTruthy();
   });
 
+  it("says so when a widget states no author or licence, and not when it could not be read", () => {
+    page();
+    // The coilbox row and the two Twin rows declare neither. The unreadable
+    // row says nothing.
+    expect(screen.getAllByText("No author stated")).toHaveLength(3);
+    expect(screen.getAllByText("No licence stated")).toHaveLength(3);
+  });
+
   it("says which files share a name, and so a setting", () => {
     page();
     expect(

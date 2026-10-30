@@ -24800,6 +24800,10 @@ msgstr ""
 msgid "No audio clip files matched in this game's archive."
 msgstr ""
 
+#: src/widgets/pages/WidgetsPage.tsx
+msgid "No author stated"
+msgstr ""
+
 #: src/runlite/pages/RunPage.tsx
 msgid "no battle"
 msgstr ""
@@ -25348,6 +25352,10 @@ msgstr ""
 
 #: src/scenario/pages/components/ReclaimClipsForm.tsx
 msgid "No leftover dialogue clips - nothing to reclaim."
+msgstr ""
+
+#: src/widgets/pages/WidgetsPage.tsx
+msgid "No licence stated"
 msgstr ""
 
 #: src/content/pages/components/LivingValueChart.tsx

@@ -24801,6 +24801,10 @@ msgstr "No attempts recorded yet."
 msgid "No audio clip files matched in this game's archive."
 msgstr "No audio clip files matched in this game's archive."
 
+#: src/widgets/pages/WidgetsPage.tsx
+msgid "No author stated"
+msgstr "No author stated"
+
 #: src/runlite/pages/RunPage.tsx
 msgid "no battle"
 msgstr "no battle"
@@ -25350,6 +25354,10 @@ msgstr "No invite link for this battle. {inviteProblem}"
 #: src/scenario/pages/components/ReclaimClipsForm.tsx
 msgid "No leftover dialogue clips - nothing to reclaim."
 msgstr "No leftover dialogue clips - nothing to reclaim."
+
+#: src/widgets/pages/WidgetsPage.tsx
+msgid "No licence stated"
+msgstr "No licence stated"
 
 #: src/content/pages/components/LivingValueChart.tsx
 msgid "No line is on the chart above."
