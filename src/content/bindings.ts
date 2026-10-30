@@ -2295,8 +2295,8 @@ export interface PlayerWidgetScan {
 
 /**
  * Every widget file in the named folders under `LuaUI/` of `writeDir`, which
- * is the content root rather than the engine's write folder (issue #4856), with what each one's `GetInfo()` declares, read in the springlua
- * sandbox. `folders` are names under `LuaUI/`, matched without regard to case.
+ * is the content root rather than the engine's write folder (issue #4856),
+ * with what each one's `GetInfo()` declares, read in the springlua sandbox. `folders` are names under `LuaUI/`, matched without regard to case.
  */
 export const contentPlayerWidgets = defineCommand<
   { writeDir: string; folders: readonly string[] },
