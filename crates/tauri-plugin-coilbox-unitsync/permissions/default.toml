@@ -34,6 +34,7 @@ permissions = [
   "allow-unitsync-engine-config-set",
   "allow-unitsync-archive-tree",
   "allow-unitsync-archive-file",
+  "allow-unitsync-archive-widgets",
   "allow-unitsync-game-headers",
   "allow-unitsync-lua-exec",
   "allow-unitsync-lua-repl-exec",

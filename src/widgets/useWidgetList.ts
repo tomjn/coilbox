@@ -137,6 +137,10 @@ export function useWidgetList() {
 
   return {
     targets,
+    enginePath,
+    /** The installed games, a version each, which the game widgets are read
+     *  from. */
+    installed,
     /** The content root, which the widget folders are under. */
     widgetDir,
     /** The engine's write folder, where the games keep their widget config. */

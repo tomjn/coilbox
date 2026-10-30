@@ -33,7 +33,8 @@ import {
 export type GameFile =
   /** The game has not saved one yet. */
   | { kind: "missing" }
-  | { kind: "ready"; path: string }
+  /** `order` is its order table, by widget name. */
+  | { kind: "ready"; path: string; order: ReadonlyMap<string, number> }
   /** It is there and could not be read. */
   | { kind: "error"; error: string };
 
@@ -66,7 +67,7 @@ export async function absorbGame(
   updateSets((sets) =>
     absorbFile(sets, setKey(game), found.path, order, widgets),
   );
-  return { kind: "ready", path: found.path };
+  return { kind: "ready", path: found.path, order };
 }
 
 /**

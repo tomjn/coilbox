@@ -18,6 +18,7 @@ import {
   installSettingsStorage,
   memorySettingsStorage,
 } from "@/lib/storedSetting";
+import type { GameWidget } from "../gameWidgets";
 import type { WidgetHandler } from "../handlers";
 import { type GameHandler, widgetRows } from "../widgetList";
 import { readSets, resetSets, updateSets } from "../widgetSets";
@@ -137,9 +138,25 @@ vi.mock("@/play/PlayProvider", () => ({
   usePlay: () => play,
 }));
 
-// The games have saved no config file here.
+// The games have saved no config file here unless a test puts one in.
+const disk = new Map<string, string>();
 vi.mock("@/blueprint/fileIO", () => ({
-  appFileIO: { read: async () => null, write: async () => {} },
+  appFileIO: {
+    read: async (path: string) => disk.get(path) ?? null,
+    write: async (path: string, text: string) => {
+      disk.set(path, text);
+    },
+  },
+}));
+
+/** The widgets the picked game ships. */
+const shipped: { widgets: GameWidget[] | null } = { widgets: null };
+vi.mock("../useGameWidgets", () => ({
+  useGameWidgets: () => ({
+    widgets: shipped.widgets,
+    reading: false,
+    errors: [],
+  }),
 }));
 
 const removeCalls: { files: string[]; folders: string[] }[] = [];
@@ -168,10 +185,12 @@ beforeEach(() => {
   list.configDir = "/home/player/.spring/engine/2026.09.01";
   play.running = false;
   removeCalls.length = 0;
+  disk.clear();
+  shipped.widgets = [];
   installSettingsStorage(memorySettingsStorage());
   resetSets();
   files.files = new Map([
-    ["Metal Factions", { kind: "ready", path: "/x/MF.lua" }],
+    ["Metal Factions", { kind: "ready", path: "/x/MF.lua", order: new Map() }],
   ]);
 });
 
@@ -490,5 +509,78 @@ describe("WidgetsPage", () => {
     expect(
       screen.getByText("Coilbox could not read this file: x"),
     ).toBeTruthy();
+  });
+
+  it("lists a game's own widgets and switches one in its config file", async () => {
+    const config = "/home/player/.spring/engine/2026.09.01/LuaUI/Config/MF.lua";
+    disk.set(
+      config,
+      'return {\n\torder = {\n\t\t["Unit Glow"] = 5,\n\t\tRadar = 0,\n\t},\n}\n',
+    );
+    files.files = new Map([
+      [
+        "Metal Factions",
+        {
+          kind: "ready",
+          path: config,
+          order: new Map([
+            ["Unit Glow", 5],
+            ["Radar", 0],
+          ]),
+        },
+      ],
+    ]);
+    const shippedWidget = (path: string, name: string): GameWidget => ({
+      path,
+      archive: "mf.sdz",
+      folder: "LuaUI/Widgets",
+      nested: false,
+      info: { name },
+      error: null,
+    });
+    shipped.widgets = [
+      shippedWidget("luaui/widgets/unit_glow.lua", "Unit Glow"),
+      shippedWidget("luaui/widgets/radar.lua", "Radar"),
+      shippedWidget("luaui/widgets/watch.lua", "BuildWatch"),
+    ];
+    page("/library/widgets?game=Metal%20Factions");
+    expect(screen.getByText("Metal Factions's own widgets")).toBeTruthy();
+    const glow = screen.getByRole("switch", { name: "Unit Glow on" });
+    expect(glow.getAttribute("aria-checked")).toBe("true");
+    expect(
+      screen
+        .getByRole("switch", { name: "Radar on" })
+        .getAttribute("aria-checked"),
+    ).toBe("false");
+    // The player's BuildWatch has the name, so only its switch sets it.
+    expect(
+      screen.getAllByRole("switch", { name: "BuildWatch on" }),
+    ).toHaveLength(1);
+    fireEvent.click(glow);
+    await waitFor(() =>
+      expect(disk.get(config)).toBe(
+        'return {\n\torder = {\n\t\t["Unit Glow"] = 0,\n\t\tRadar = 0,\n\t},\n}\n',
+      ),
+    );
+    // A game widget is no set's business.
+    expect(readSets().global).toEqual({});
+  });
+
+  it("will not switch a game's own widget while a game is running", () => {
+    play.running = true;
+    shipped.widgets = [
+      {
+        path: "luaui/widgets/radar.lua",
+        archive: "mf.sdz",
+        folder: "LuaUI/Widgets",
+        nested: false,
+        info: { name: "Radar" },
+        error: null,
+      },
+    ];
+    page("/library/widgets?game=Metal%20Factions");
+    expect(
+      screen.getByRole("switch", { name: "Radar on" }).hasAttribute("disabled"),
+    ).toBe(true);
   });
 });

@@ -1356,6 +1356,11 @@ msgstr "{0} na minutę"
 msgid "{0} ready."
 msgstr "Gotowe: {0}."
 
+#. placeholder {0}: game.game
+#: src/widgets/pages/WidgetsPage.tsx
+msgid "{0} ships no widgets."
+msgstr ""
+
 #. placeholder {0}: game.name
 #: src/content/pages/GameUnitPage.tsx
 #, fuzzy
@@ -1365,6 +1370,11 @@ msgstr "Jednostki gry {0}"
 #. placeholder {0}: game.game
 #: src/widgets/pages/WidgetsPage.tsx
 msgid "{0} uses its own widgets, not the ones for all games."
+msgstr ""
+
+#. placeholder {0}: game.game
+#: src/widgets/pages/WidgetsPage.tsx
+msgid "{0}'s own widgets"
 msgstr ""
 
 #: src/placement/preview.ts
@@ -55159,6 +55169,10 @@ msgstr "Nie udało się odczytać wypraw Ścieżki wojennej. Nic nie zostało zm
 #, fuzzy
 msgid "Your warpath runs could not be read. Nothing has been changed. {runsError}"
 msgstr "Nie udało się odczytać wypraw Ścieżki wojennej. Nic nie zostało zmienione. {runsError}"
+
+#: src/widgets/pages/WidgetsPage.tsx
+msgid "Your widgets"
+msgstr ""
 
 #: src/content/pages/components/BindingList.tsx
 #: src/workshop/pages/components/BuildMenuPanel.tsx

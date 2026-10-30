@@ -1127,6 +1127,11 @@ msgstr "{0} per minute"
 msgid "{0} ready."
 msgstr "{0} ready."
 
+#. placeholder {0}: game.game
+#: src/widgets/pages/WidgetsPage.tsx
+msgid "{0} ships no widgets."
+msgstr "{0} ships no widgets."
+
 #. placeholder {0}: game.name
 #: src/content/pages/GameUnitPage.tsx
 msgid "{0} units"
@@ -1136,6 +1141,11 @@ msgstr "{0} units"
 #: src/widgets/pages/WidgetsPage.tsx
 msgid "{0} uses its own widgets, not the ones for all games."
 msgstr "{0} uses its own widgets, not the ones for all games."
+
+#. placeholder {0}: game.game
+#: src/widgets/pages/WidgetsPage.tsx
+msgid "{0}'s own widgets"
+msgstr "{0}'s own widgets"
 
 #: src/placement/preview.ts
 msgid "{absent, plural, one {# is a unit this game has not got, in violet.} other {# are units this game has not got, in violet.}}"
@@ -44693,6 +44703,10 @@ msgstr "Your warpath runs could not be read. Nothing has been changed. {loadErro
 #: src/runlite/pages/RunListPage.tsx
 msgid "Your warpath runs could not be read. Nothing has been changed. {runsError}"
 msgstr "Your warpath runs could not be read. Nothing has been changed. {runsError}"
+
+#: src/widgets/pages/WidgetsPage.tsx
+msgid "Your widgets"
+msgstr "Your widgets"
 
 #: src/content/pages/components/BindingList.tsx
 #: src/workshop/pages/components/BuildMenuPanel.tsx

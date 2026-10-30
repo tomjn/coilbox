@@ -9,6 +9,7 @@ import {
 } from "lucide-react";
 import { type ReactNode, useMemo, useState } from "react";
 import { useSearchParams } from "react-router";
+import { appFileIO } from "@/blueprint/fileIO";
 import { OptionSelect } from "@/components/OptionSelect";
 import { PageHeader } from "@/components/PageHeader";
 import { SlideDrawer } from "@/components/SlideDrawer";
@@ -30,9 +31,13 @@ import {
   ErrorBanner,
   SkeletonList,
 } from "@/content/pages/components/states";
+import { errorText } from "@/lib/helpers";
 import { usePlay } from "@/play/PlayProvider";
+import { gameWidgetRows, gameWidgetStates } from "../gameWidgets";
 import { useGameFiles } from "../useGameFiles";
+import { useGameWidgets } from "../useGameWidgets";
 import { useWidgetList } from "../useWidgetList";
+import { writeWidgetStates } from "../widgetConfig";
 import {
   findGame,
   folderToOpen,
@@ -70,6 +75,9 @@ const ALL = "all-games";
  * Its switches change the widget sets (#4844): with "All games" picked, the set
  * every game uses, and with a game picked, that game's own set, which it gets
  * on its first change.
+ *
+ * A picked game also lists the widgets it ships (#4857). Their switches write
+ * the game's config file straight away, because no set holds them.
  */
 export default function WidgetsPage() {
   const { t } = useLingui();
@@ -92,6 +100,36 @@ export default function WidgetsPage() {
   const key = game?.handler ? setKey(game) : null;
   const ownSet = key !== null && !!entry(sets.overrides, key);
   const [settingsPath, setSettingsPath] = useState<string | null>(null);
+  const own = useGameWidgets(
+    list.enginePath,
+    list.widgetDir,
+    list.installed ?? [],
+    game,
+  );
+  const [ownError, setOwnError] = useState<string | null>(null);
+  const ownRows = useMemo(
+    () =>
+      game && own.widgets && list.rows
+        ? gameWidgetRows(own.widgets, game, list.rows)
+        : null,
+    [game, own.widgets, list.rows],
+  );
+  const switchOwn = async (name: string, on: boolean) => {
+    if (!game?.handler || !list.configDir) return;
+    try {
+      await writeWidgetStates({
+        io: appFileIO,
+        writeDir: list.configDir,
+        config: game.handler.config,
+        shortName: game.shortName ?? "",
+        states: new Map([[name, on]]),
+      });
+      setOwnError(null);
+    } catch (e) {
+      setOwnError(errorText(e));
+    }
+    await files.reload();
+  };
 
   const shown = useMemo(() => {
     if (!list.rows) return null;
@@ -112,6 +150,7 @@ export default function WidgetsPage() {
 
   const pick = (value: string) => {
     setSettingsPath(null);
+    setOwnError(null);
     setParams(value === ALL ? {} : { game: value }, { replace: true });
   };
 
@@ -256,6 +295,11 @@ export default function WidgetsPage() {
         </div>
       )}
 
+      {game?.handler && (
+        <h2 className="text-sm font-medium">
+          <Trans>Your widgets</Trans>
+        </h2>
+      )}
       {list.targets.length === 0 ? null : busy ? (
         <SkeletonList />
       ) : shown && shown.length === 0 ? (
@@ -318,6 +362,46 @@ export default function WidgetsPage() {
           />
         )
       )}
+      {game?.handler && (
+        <section className="flex flex-col gap-4">
+          <h2 className="text-sm font-medium">
+            <Trans>{game.game}'s own widgets</Trans>
+          </h2>
+          {own.errors.map((e) => (
+            <ErrorBanner key={e} message={e} />
+          ))}
+          {ownError && <ErrorBanner message={ownError} />}
+          {own.reading || (!ownRows && own.errors.length === 0) ? (
+            <SkeletonList />
+          ) : ownRows && ownRows.length === 0 ? (
+            <EmptyState
+              icon={Puzzle}
+              label={t`${game.game} ships no widgets.`}
+            />
+          ) : (
+            ownRows && (
+              <WidgetTable
+                rows={ownRows}
+                showGames={false}
+                someUnknown={false}
+                canSettings={() => false}
+                switches={
+                  file?.kind === "ready"
+                    ? {
+                        game: game.game,
+                        set: gameWidgetStates(ownRows, file.order),
+                        toggle: (name, on) => void switchOwn(name, on),
+                        // The game saves its own file when it exits, over
+                        // anything written while it runs.
+                        disabled: running,
+                      }
+                    : undefined
+                }
+              />
+            )
+          )}
+        </section>
+      )}
       <SlideDrawer
         open={adding}
         title={t`Add a widget`}
@@ -359,6 +443,7 @@ interface TableSwitches {
   /** The set shown. A widget it says nothing about is off. */
   set: WidgetStates;
   toggle: (name: string, on: boolean) => void;
+  disabled?: boolean;
 }
 
 /** The name a row's switch sets, when it has a switch: its saved name is
@@ -393,6 +478,7 @@ function RowSwitch({
     <Switch
       checked={switches.set[name] === true}
       onCheckedChange={(on) => switches.toggle(name, on)}
+      disabled={switches.disabled}
       aria-label={t`${name} on`}
     />
   );

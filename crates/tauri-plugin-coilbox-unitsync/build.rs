@@ -34,6 +34,7 @@ const COMMANDS: &[&str] = &[
     "unitsync_engine_config_set",
     "unitsync_archive_tree",
     "unitsync_archive_file",
+    "unitsync_archive_widgets",
     "unitsync_game_headers",
     "unitsync_lua_exec",
     "unitsync_lua_repl_exec",
