@@ -1513,6 +1513,10 @@ mod tests {
             18,
             "3283ed8244eff82dbdf147123c04b8d505896a75df5b1bfdf6dd9f161fc3a3f1",
         ),
+        (
+            19,
+            "b84071a6d5ca499e09777e64f5a29160dc77935650285ceb97aa8f2d5100a782",
+        ),
     ];
 
     #[test]
