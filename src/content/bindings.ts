@@ -4293,6 +4293,26 @@ export const unitsyncArchiveFile = defineCommand<
   ArchiveFileResult
 >("coilbox-unitsync", "unitsync_archive_file");
 
+/** One widget file inside a game archive and what its `GetInfo()` declares. */
+export interface ArchiveWidgetFile {
+  path: string;
+  /** Null for a file that runs and defines no `GetInfo`, and when `error` is
+   *  set. */
+  info: PlayerWidgetInfo | null;
+  /** Why the file could not be read or run. */
+  error: string | null;
+}
+
+/**
+ * What each of `files` in `archive` declares in its `GetInfo()`, for a game's
+ * own widgets (issue #4857). One worker run reads them all, and the sandbox
+ * that reads a player's widgets reads these.
+ */
+export const unitsyncArchiveWidgets = defineCommand<
+  { enginePath: string; dataDir: string; archive: string; files: string[] },
+  { files: ArchiveWidgetFile[]; errors: string[] }
+>("coilbox-unitsync", "unitsync_archive_widgets");
+
 /** One of the start boxes a Zero-K map or game file declares. */
 export interface StartBoxTeam {
   /** The box's id, counted from 0. Zero-K deals boxes out to ally teams at

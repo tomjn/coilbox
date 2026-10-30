@@ -1356,6 +1356,11 @@ msgstr "1 分あたり {0}"
 msgid "{0} ready."
 msgstr "{0} の準備ができました。"
 
+#. placeholder {0}: game.game
+#: src/widgets/pages/WidgetsPage.tsx
+msgid "{0} ships no widgets."
+msgstr ""
+
 #. placeholder {0}: game.name
 #: src/content/pages/GameUnitPage.tsx
 #, fuzzy
@@ -1365,6 +1370,11 @@ msgstr "{0} のユニット"
 #. placeholder {0}: game.game
 #: src/widgets/pages/WidgetsPage.tsx
 msgid "{0} uses its own widgets, not the ones for all games."
+msgstr ""
+
+#. placeholder {0}: game.game
+#: src/widgets/pages/WidgetsPage.tsx
+msgid "{0}'s own widgets"
 msgstr ""
 
 #: src/placement/preview.ts
@@ -55159,6 +55169,10 @@ msgstr "ウォーパスのランを読み込めませんでした。何も変更
 #, fuzzy
 msgid "Your warpath runs could not be read. Nothing has been changed. {runsError}"
 msgstr "ウォーパスのランを読み込めませんでした。何も変更されていません。{runsError}"
+
+#: src/widgets/pages/WidgetsPage.tsx
+msgid "Your widgets"
+msgstr ""
 
 #: src/content/pages/components/BindingList.tsx
 #: src/workshop/pages/components/BuildMenuPanel.tsx
