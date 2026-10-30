@@ -43,7 +43,16 @@ export async function absorbGame(
   rows: readonly WidgetRow[],
 ): Promise<GameFile> {
   const { config } = game.handler;
-  const found = await findConfig(io, writeDir, config, game.shortName ?? "");
+  const shortName = game.shortName ?? "";
+  let written = readSets().written;
+  let found = await findConfig(io, writeDir, config, shortName);
+  // A launch that wrote the file while it was being read leaves this copy
+  // older than its record, and the difference would read as an edit made in
+  // the game. Read it again.
+  while (found && readSets().written[found.path] !== written[found.path]) {
+    written = readSets().written;
+    found = await findConfig(io, writeDir, config, shortName);
+  }
   if (!found) return { kind: "missing" };
   const order = readOrder(found.text, config.shape);
   const widgets = gameWidgets(rows, game.game);

@@ -51,7 +51,11 @@ export function appliedSet(sets: WidgetSets, key: string | null): WidgetStates {
 }
 
 /** A widget with a switch, which is one a set can say something about. */
-export type SwitchableWidget = Extract<WidgetSwitch, { kind: "ready" }>;
+export type SwitchableWidget = Extract<WidgetSwitch, { kind: "ready" }> & {
+  /** Its `GetInfo().enabled`, which a handler goes by for a widget its file
+   *  has no entry for. */
+  enabled: boolean;
+};
 
 /** The widgets `game` loads whose saved name is certain (#1290). The rest
  *  cannot be written without guessing, so they are left alone. */
@@ -62,7 +66,7 @@ export function gameWidgets(
   const found: SwitchableWidget[] = [];
   for (const row of rows) {
     if (row.switch.kind === "ready" && row.loadedBy.includes(game)) {
-      found.push(row.switch);
+      found.push({ ...row.switch, enabled: row.info?.enabled === true });
     }
   }
   return found;
@@ -91,7 +95,9 @@ function withSet(
  * outside coilbox, so the set takes the file's answer. A widget coilbox has
  * never written there takes the file's answer only when the set has none, so
  * the first read of each game fills an empty set in rather than one game's
- * file overruling what another's already said.
+ * file overruling what another's already said. With no entry in the file
+ * either, the set takes what the widget declares, which is what the game
+ * would have done with it.
  */
 export function absorbFile(
   sets: WidgetSets,
@@ -102,20 +108,27 @@ export function absorbFile(
 ): WidgetSets {
   const last = sets.written[path] ?? {};
   const changes: Record<string, boolean> = {};
+  const defaults: Record<string, boolean> = {};
   const set = appliedSet(sets, key);
   for (const w of widgets) {
     const saved = savedUnder(w, (n) => order.has(n));
-    // No entry says nothing: the handler decides from the widget itself, and
-    // the next launch writes one.
-    if (saved === null) continue;
+    if (saved === null) {
+      // No entry to compare with what was written, so only an unset widget
+      // learns anything from it.
+      if (set[w.name] === undefined) defaults[w.name] = w.enabled;
+      continue;
+    }
     const inFile = (order.get(saved) ?? 0) > 0;
     const wrote = last[w.name];
     if (wrote === undefined ? set[w.name] === undefined : inFile !== wrote) {
       changes[w.name] = inFile;
     }
   }
-  if (Object.keys(changes).length === 0) return sets;
-  const next = withSet(sets, key, (s) => ({ ...s, ...changes }));
+  if (Object.keys(changes).length === 0 && Object.keys(defaults).length === 0) {
+    return sets;
+  }
+  const next = withSet(sets, key, (s) => ({ ...s, ...defaults, ...changes }));
+  if (Object.keys(changes).length === 0) return next;
   return {
     ...next,
     written: { ...next.written, [path]: { ...last, ...changes } },

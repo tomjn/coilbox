@@ -15,7 +15,8 @@ import {
 const widget = (
   name: string,
   previousNames: string[] = [],
-): SwitchableWidget => ({ kind: "ready", name, previousNames });
+  enabled = false,
+): SwitchableWidget => ({ kind: "ready", name, previousNames, enabled });
 
 const watch = widget("Build Watch", ["Old Watch"]);
 const minimap = widget("Minimap");
@@ -42,9 +43,22 @@ describe("widget sets", () => {
       [watch, minimap],
     );
     // Read under its old name, kept under its own. Minimap has no entry, so
-    // the file says nothing about it.
-    expect(sets.global).toEqual({ "Build Watch": true });
+    // it takes what it declares, and nothing is recorded as written for it.
+    expect(sets.global).toEqual({ "Build Watch": true, Minimap: false });
     expect(sets.written[PATH]).toEqual({ "Build Watch": true });
+  });
+
+  it("keeps a widget on that the game would switch on for itself", () => {
+    const radar = widget("Radar", [], true);
+    const sets = absorbFile(EMPTY_SETS, "MF", PATH, new Map(), [radar]);
+    expect(sets.global).toEqual({ Radar: true });
+    expect(sets.written).toEqual({});
+    expect(statesToWrite(sets, "MF", [radar])).toEqual(
+      new Map([["Radar", true]]),
+    );
+    // Once the set says, a missing entry changes nothing.
+    const off = switchIn(sets, null, "Radar", false);
+    expect(absorbFile(off, "MF", PATH, new Map(), [radar])).toBe(off);
   });
 
   it("does not let a file coilbox never wrote overrule the set", () => {
