@@ -12,10 +12,10 @@
  * `widgets_custom.lua`, Spring 1944's `config.lua` and the two `widgets.lua`
  * files. Beyond All Reason's come from the issue.
  *
- * Later issues in the Widget manager milestone add each handler's config file
- * (#1289) and its option that turns player widgets off (#1292) to
- * {@link WidgetHandler}. A game whose handler is not recognised gets `null` and
- * so is never written for.
+ * Each handler also names the file it saves widgets' on or off state to
+ * (#1289). A later issue adds its option that turns player widgets off (#1292).
+ * A game whose handler is not recognised gets `null` and so is never written
+ * for.
  */
 
 /** The handlers that share one ancestor and work the same way. */
@@ -41,6 +41,19 @@ export interface WidgetHandler {
   folders: readonly string[];
   /** Whether it also loads widgets one subfolder down. */
   subfolders: boolean;
+  config: WidgetConfigFile;
+}
+
+/** Where a handler saves which widgets are on, read from each handler's own
+ *  `ORDER_FILENAME` or `CONFIG_FILENAME`. */
+export interface WidgetConfigFile {
+  /** Under `LuaUI/Config/` of the write folder. `{short}` is the game's short
+   *  name and `{SHORT}` the same in capitals. With more than one, the handler
+   *  uses the first that is there. */
+  files: readonly string[];
+  /** `nested`: one table whose `order` field holds the order. `flat`: the
+   *  file's table is the order. */
+  shape: "nested" | "flat";
 }
 
 interface Rule extends WidgetHandler {
@@ -58,6 +71,7 @@ const RULES: readonly Rule[] = [
     marker: "luaui/barwidgets.lua",
     folders: ["LuaUI/Widgets", "LuaUI/RmlWidgets"],
     subfolders: true,
+    config: { files: ["BYAR.lua"], shape: "nested" },
   },
   {
     id: "ba",
@@ -65,6 +79,7 @@ const RULES: readonly Rule[] = [
     marker: "luaui/bawidgets.lua",
     folders: ["LuaUI/widgets"],
     subfolders: false,
+    config: { files: ["{short}.lua"], shape: "nested" },
   },
   {
     id: "ca",
@@ -72,6 +87,10 @@ const RULES: readonly Rule[] = [
     marker: "luaui/cawidgets.lua",
     folders: ["LuaUI/Widgets"],
     subfolders: false,
+    config: {
+      files: ["{SHORT}_order.lua", "{short}_order.lua"],
+      shape: "flat",
+    },
   },
   {
     id: "mf",
@@ -79,6 +98,7 @@ const RULES: readonly Rule[] = [
     marker: "luaui/mfwidgets.lua",
     folders: ["LuaUI/Widgets"],
     subfolders: false,
+    config: { files: ["{short}.lua"], shape: "nested" },
   },
   {
     id: "sf",
@@ -86,6 +106,7 @@ const RULES: readonly Rule[] = [
     marker: "luaui/widgets_custom.lua",
     folders: ["LuaUI/widgets"],
     subfolders: false,
+    config: { files: ["{SHORT}_data.lua"], shape: "nested" },
   },
   {
     id: "jk",
@@ -94,6 +115,7 @@ const RULES: readonly Rule[] = [
     contains: "LuaHandler/handler.lua",
     folders: ["LuaUI/Widgets", "LuaUI/Addons"],
     subfolders: false,
+    config: { files: ["{short}_order.lua"], shape: "flat" },
   },
   {
     // Before engine 0.83 every game's handler saved to one shared pair of
@@ -105,6 +127,7 @@ const RULES: readonly Rule[] = [
     contains: "Config/widget_order.lua",
     folders: ["LuaUI/Widgets"],
     subfolders: false,
+    config: { files: ["widget_order.lua"], shape: "flat" },
   },
   {
     id: "engine",
@@ -112,6 +135,7 @@ const RULES: readonly Rule[] = [
     marker: "luaui/widgets.lua",
     folders: ["LuaUI/Widgets"],
     subfolders: false,
+    config: { files: ["{short}.lua"], shape: "nested" },
   },
 ];
 
@@ -122,6 +146,7 @@ const ENGINE_OWN: WidgetHandler = {
   family: "engine",
   folders: ["LuaUI/Widgets"],
   subfolders: false,
+  config: { files: ["{short}.lua"], shape: "nested" },
 };
 
 /** Files whose presence says the game starts a handler of its own. */
@@ -143,6 +168,7 @@ function strip(rule: Rule): WidgetHandler {
     family: rule.family,
     folders: rule.folders,
     subfolders: rule.subfolders,
+    config: rule.config,
   };
 }
 
