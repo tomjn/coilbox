@@ -21,6 +21,10 @@ On **macOS** the `.coilbox` folder sits **beside `Coilbox.app`**, not inside it.
 
 > The leading dot matters: the folder must be exactly `.coilbox`. On Windows, Explorer will let you create it if you type `.coilbox` with the trailing dot as well (`.coilbox.`) and it'll drop the trailing one; or create it from a terminal with `mkdir .coilbox`.
 
+## Windows needs the WebView2 runtime
+
+Coilbox on Windows needs Microsoft's WebView2 runtime. Most Windows 10 and 11 machines already have it. The installer adds it if it is missing, but the portable zip installs nothing, so on a machine without it coilbox says so and offers Microsoft's download. Run that installer, then start coilbox again.
+
 ## What is in the `.coilbox` folder
 
 Once portable mode is on, coilbox keeps its own settings and caches in the `.coilbox` folder:
