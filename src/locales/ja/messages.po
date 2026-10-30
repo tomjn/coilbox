@@ -1309,6 +1309,11 @@ msgstr "{0} {resourceName}"
 msgid "{0} from the newest release"
 msgstr "最新リリースの {0}"
 
+#. placeholder {0}: s.game
+#: src/widgets/pages/AddWidgetDrawer.tsx
+msgid "{0} has no folder for RmlUi widgets."
+msgstr ""
+
 #. placeholder {0}: game.game
 #: src/widgets/pages/WidgetsPage.tsx
 msgid "{0} has not saved its widget settings yet, so these apply from the launch after it first does."
@@ -1340,16 +1345,6 @@ msgstr "{0} のユニット"
 #. placeholder {0}: game.game
 #: src/widgets/pages/WidgetsPage.tsx
 msgid "{0} uses its own widgets, not the ones for all games."
-msgstr ""
-
-#. placeholder {0}: s.game
-#: src/widgets/pages/AddWidgetDrawer.tsx
-msgid "{0}: coilbox does not recognise its widget handler, so nothing is added for it."
-msgstr ""
-
-#. placeholder {0}: s.game
-#: src/widgets/pages/AddWidgetDrawer.tsx
-msgid "{0}: has no folder for RmlUi widgets."
 msgstr ""
 
 #: src/placement/preview.ts
@@ -15596,6 +15591,11 @@ msgstr "Coilbox はプレイする勢力を知らないため、指定がない�
 #. placeholder {0}: game.game
 #: src/widgets/pages/WidgetsPage.tsx
 msgid "Coilbox does not recognise {0}'s widget handler, so it cannot tell which of these the game loads."
+msgstr ""
+
+#. placeholder {0}: s.game
+#: src/widgets/pages/AddWidgetDrawer.tsx
+msgid "Coilbox does not recognise {0}'s widget handler, so nothing is added for it."
 msgstr ""
 
 #: src/deeplink/readImport.ts

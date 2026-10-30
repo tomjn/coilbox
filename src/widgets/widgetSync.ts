@@ -43,6 +43,8 @@ export async function absorbGame(
   writeDir: string,
   game: GameHandler & { handler: NonNullable<GameHandler["handler"]> },
   rows: readonly WidgetRow[],
+  /** Widgets whose entry in the file is not to be taken into the set. */
+  skip: readonly string[] = [],
 ): Promise<GameFile> {
   const { config } = game.handler;
   const shortName = game.shortName ?? "";
@@ -57,7 +59,9 @@ export async function absorbGame(
   }
   if (!found) return { kind: "missing" };
   const order = readOrder(found.text, config.shape);
-  const widgets = gameWidgets(rows, game.game);
+  const widgets = gameWidgets(rows, game.game).filter(
+    (w) => !skip.includes(w.name),
+  );
   updateSets((sets) =>
     absorbFile(sets, setKey(game), found.path, order, widgets),
   );
@@ -109,8 +113,9 @@ async function writeGameFile(
   writeDir: string,
   entry: GameHandler & { handler: NonNullable<GameHandler["handler"]> },
   rows: readonly WidgetRow[],
+  skip: readonly string[] = [],
 ): Promise<void> {
-  const file = await absorbGame(appFileIO, writeDir, entry, rows);
+  const file = await absorbGame(appFileIO, writeDir, entry, rows, skip);
   if (file.kind !== "ready") return;
   // Read after the absorb above, so a change made in the game is written back
   // rather than undone.
@@ -149,7 +154,9 @@ export async function switchAddedWidgets({
 }): Promise<string[]> {
   if (names.length === 0) return [];
   // Before the files are read, so that a widget no file has an entry for takes
-  // this answer rather than what its `GetInfo()` says.
+  // this answer rather than what its `GetInfo()` says. The files' own entries
+  // for these names are left out of what is read back, because one a removed
+  // copy of the widget left behind would otherwise undo the choice.
   updateSets((sets) => addWidgets(sets, key, names));
   const scan = await contentPlayerWidgets({
     writeDir,
@@ -160,7 +167,12 @@ export async function switchAddedWidgets({
   for (const game of games) {
     if (!game.handler) continue;
     try {
-      await writeGameFile(writeDir, { ...game, handler: game.handler }, rows);
+      await writeGameFile(
+        writeDir,
+        { ...game, handler: game.handler },
+        rows,
+        names,
+      );
     } catch (e) {
       failed.push(`${game.game}: ${errorText(e)}`);
     }

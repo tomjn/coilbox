@@ -206,15 +206,18 @@ export function addWidgets(
   if (names.length === 0) return sets;
   const off = Object.fromEntries(names.map((n) => [n, false]));
   const on = Object.fromEntries(names.map((n) => [n, true]));
-  const overrides = Object.fromEntries(
+  const existing = Object.fromEntries(
     Object.entries(sets.overrides).map(([k, set]) => [
       k,
       { ...set, ...(k === key ? on : off) },
     ]),
   );
-  if (key !== null && !entry(overrides, key)) {
-    overrides[key] = { ...sets.global, ...on };
-  }
+  // A computed key in a literal makes an own property even when it is
+  // `__proto__`, which assigning to it would not.
+  const overrides =
+    key !== null && !entry(existing, key)
+      ? { ...existing, [key]: { ...sets.global, ...on } }
+      : existing;
   return {
     ...sets,
     global: { ...sets.global, ...(key === null ? on : off) },

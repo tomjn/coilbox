@@ -398,7 +398,24 @@ fn back_up(
         .find_map(|w| w.name.as_deref())
         .and_then(crate::settings_backup::slug)
         .unwrap_or_else(|| "widget".to_string());
-    let dir = backup_root.join(format!("{at}-{label}"));
+    std::fs::create_dir_all(backup_root)
+        .map_err(|e| format!("could not create {}: {e}", backup_root.display()))?;
+    // Made with `create_dir`, which fails on a folder that is there, so two
+    // backups of one widget never share a folder and overwrite each other.
+    let mut taken = 0;
+    let dir = loop {
+        let name = if taken == 0 {
+            format!("{at}-{label}")
+        } else {
+            format!("{at}-{label}-{taken}")
+        };
+        let dir = backup_root.join(name);
+        match std::fs::create_dir(&dir) {
+            Ok(()) => break dir,
+            Err(e) if e.kind() == io::ErrorKind::AlreadyExists => taken += 1,
+            Err(e) => return Err(format!("could not create {}: {e}", dir.display())),
+        }
+    };
     for c in conflicts {
         copy_file(&write_dir.join(&c.path), &dir.join("files").join(&c.path))?;
     }
@@ -452,25 +469,29 @@ pub fn add(
         Some(back_up(write_dir, backup_root, &clashes, &plan.widgets)?)
     };
     // A widget with the same name but another file name would otherwise load
-    // beside the new one and share its setting. A file the new files overwrite
-    // is replaced by the copy below.
-    for c in clashes.iter().filter(|c| c.reason == "name") {
-        let path = write_dir.join(&c.path);
-        let overwritten = dests.iter().any(|d| {
-            stage
-                .files
-                .iter()
-                .any(|f| same_path(&d.join(f), &path, sensitive))
-        });
-        if !overwritten {
-            std::fs::remove_file(&path)
-                .map_err(|e| format!("could not remove {}: {e}", path.display()))?;
-        }
-    }
+    // beside the new one and share its setting, so it goes once the new files
+    // are in. A file the new files overwrite is replaced by the copy instead.
+    let stale: Vec<PathBuf> = clashes
+        .iter()
+        .filter(|c| c.reason == "name")
+        .map(|c| write_dir.join(&c.path))
+        .filter(|path| {
+            !dests.iter().any(|d| {
+                stage
+                    .files
+                    .iter()
+                    .any(|f| same_path(&d.join(f), path, sensitive))
+            })
+        })
+        .collect();
     for dest in &dests {
         for rel in &stage.files {
             copy_file(&stage.widgets().join(rel), &dest.join(rel))?;
         }
+    }
+    for path in stale {
+        std::fs::remove_file(&path)
+            .map_err(|e| format!("could not remove {}: {e}", path.display()))?;
     }
     Ok(AddOutcome::Added {
         folders: dests
@@ -504,6 +525,9 @@ pub(crate) async fn content_widget_add<R: Runtime>(
     folders: Vec<String>,
     replace: bool,
 ) -> CliResult {
+    if let Err(e) = coilbox_portable::refuse_read_only(Path::new(&write_dir)) {
+        return CliResult::err(e);
+    }
     let backups = match coilbox_portable::data_dir(&app) {
         Ok(d) => d.join(BACKUPS),
         Err(e) => return CliResult::err(e),
@@ -712,6 +736,39 @@ mod tests {
                 .unwrap()
                 .contains("New E")
         );
+    }
+
+    #[test]
+    fn a_replacement_that_cannot_be_written_leaves_the_old_widget() {
+        let tmp = tempfile::tempdir().unwrap();
+        let (write, backups) = (tmp.path().join("write"), tmp.path().join("backups"));
+        put(&write, "LuaUI/Widgets/old_name.lua", &widget("Same"));
+        // A file where the new widget needs a folder.
+        put(&write, "LuaUI/Widgets/pack", "in the way");
+        let src = tmp.path().join("src");
+        put(&src, "pack/new_name.lua", &widget("Same"));
+        assert!(add(&write, &src, &folders(), true, &backups).is_err());
+        assert!(write.join("LuaUI/Widgets/old_name.lua").is_file());
+    }
+
+    #[test]
+    fn two_backups_in_one_millisecond_do_not_share_a_folder() {
+        let tmp = tempfile::tempdir().unwrap();
+        let (write, backups) = (tmp.path().join("write"), tmp.path().join("backups"));
+        put(&write, "LuaUI/Widgets/a.lua", "x");
+        let clashes = vec![Conflict {
+            path: "LuaUI/Widgets/a.lua".to_string(),
+            name: None,
+            reason: "path",
+        }];
+        // Fast enough that several land in one millisecond.
+        let made: std::collections::HashSet<PathBuf> = (0..20)
+            .map(|_| back_up(&write, &backups, &clashes, &[]).unwrap())
+            .collect();
+        assert_eq!(made.len(), 20);
+        assert!(made
+            .iter()
+            .all(|d| d.join("files/LuaUI/Widgets/a.lua").is_file()));
     }
 
     #[test]

@@ -72,14 +72,20 @@ export function AddWidgetDrawer({
   );
 
   const pick = async (directory: boolean) => {
-    const picked = await open({
-      directory,
-      multiple: false,
-      title: directory ? t`Choose a widget folder` : t`Choose a widget`,
-      filters: directory
-        ? undefined
-        : [{ name: t`Widget`, extensions: ["lua", "zip"] }],
-    });
+    let picked: string | string[] | null;
+    try {
+      picked = await open({
+        directory,
+        multiple: false,
+        title: directory ? t`Choose a widget folder` : t`Choose a widget`,
+        filters: directory
+          ? undefined
+          : [{ name: t`Widget`, extensions: ["lua", "zip"] }],
+      });
+    } catch (e) {
+      setError(describeError(e));
+      return;
+    }
     if (typeof picked !== "string") return;
     setSource(picked);
     setPlan(null);
@@ -227,8 +233,8 @@ export function AddWidgetDrawer({
               className="break-words text-xs text-muted-foreground"
             >
               {s.reason === "unknown-handler"
-                ? t`${s.game}: coilbox does not recognise its widget handler, so nothing is added for it.`
-                : t`${s.game}: has no folder for RmlUi widgets.`}
+                ? t`Coilbox does not recognise ${s.game}'s widget handler, so nothing is added for it.`
+                : t`${s.game} has no folder for RmlUi widgets.`}
             </p>
           ))}
 

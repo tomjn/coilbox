@@ -180,7 +180,7 @@ describe("widget sets", () => {
 
     it("writes the new widget as off to a file that has no entry for it", () => {
       const next = addWidgets(sets, "SF", ["Radar"]);
-      const radar = widget("Radar");
+      const radar = widget("Radar", [], true);
       // A handler would switch on a widget its file has no entry for. Absorbing
       // that file leaves the sets' answer alone.
       const absorbed = absorbFile(next, "MF", PATH, new Map(), [radar]);

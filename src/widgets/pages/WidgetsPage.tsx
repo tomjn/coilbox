@@ -111,7 +111,7 @@ export default function WidgetsPage() {
                 variant="outline"
                 size="sm"
                 onClick={() => setAdding(true)}
-                disabled={!list.games}
+                disabled={!list.games || (picked !== ALL && !game)}
               >
                 <Plus />
                 <Trans>Add widget</Trans>

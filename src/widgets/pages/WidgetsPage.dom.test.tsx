@@ -234,6 +234,15 @@ describe("WidgetsPage", () => {
     ).toBeTruthy();
   });
 
+  it("does not add a widget for a linked game that is not installed", () => {
+    page("/library/widgets?game=Gone%201.0");
+    expect(
+      screen
+        .getByRole("button", { name: "Add widget" })
+        .hasAttribute("disabled"),
+    ).toBe(true);
+  });
+
   it("offers no switch in a game whose handler is not recognised", () => {
     page("/library/widgets?game=Mystery%201.0");
     expect(screen.queryByRole("switch")).toBeNull();

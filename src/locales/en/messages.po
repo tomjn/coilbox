@@ -1082,6 +1082,11 @@ msgstr "{0} {resourceName}"
 msgid "{0} from the newest release"
 msgstr "{0} from the newest release"
 
+#. placeholder {0}: s.game
+#: src/widgets/pages/AddWidgetDrawer.tsx
+msgid "{0} has no folder for RmlUi widgets."
+msgstr "{0} has no folder for RmlUi widgets."
+
 #. placeholder {0}: game.game
 #: src/widgets/pages/WidgetsPage.tsx
 msgid "{0} has not saved its widget settings yet, so these apply from the launch after it first does."
@@ -1111,16 +1116,6 @@ msgstr "{0} units"
 #: src/widgets/pages/WidgetsPage.tsx
 msgid "{0} uses its own widgets, not the ones for all games."
 msgstr "{0} uses its own widgets, not the ones for all games."
-
-#. placeholder {0}: s.game
-#: src/widgets/pages/AddWidgetDrawer.tsx
-msgid "{0}: coilbox does not recognise its widget handler, so nothing is added for it."
-msgstr "{0}: coilbox does not recognise its widget handler, so nothing is added for it."
-
-#. placeholder {0}: s.game
-#: src/widgets/pages/AddWidgetDrawer.tsx
-msgid "{0}: has no folder for RmlUi widgets."
-msgstr "{0}: has no folder for RmlUi widgets."
 
 #: src/placement/preview.ts
 msgid "{absent, plural, one {# is a unit this game has not got, in violet.} other {# are units this game has not got, in violet.}}"
@@ -12631,6 +12626,11 @@ msgstr "Coilbox does not know which side you play, so they are kept as they are 
 #: src/widgets/pages/WidgetsPage.tsx
 msgid "Coilbox does not recognise {0}'s widget handler, so it cannot tell which of these the game loads."
 msgstr "Coilbox does not recognise {0}'s widget handler, so it cannot tell which of these the game loads."
+
+#. placeholder {0}: s.game
+#: src/widgets/pages/AddWidgetDrawer.tsx
+msgid "Coilbox does not recognise {0}'s widget handler, so nothing is added for it."
+msgstr "Coilbox does not recognise {0}'s widget handler, so nothing is added for it."
 
 #: src/deeplink/readImport.ts
 msgid "Coilbox does not recognise that. Paste a coilbox link, a share code, or the contents of a coilbox .json file."

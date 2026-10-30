@@ -115,7 +115,9 @@ describe("AddWidgetDrawer", () => {
       screen.getByText("Metal Factions v2.58, Splinter Faction 0.1"),
     ).toBeTruthy();
     expect(
-      screen.getByText(/Mystery 1.0: coilbox does not recognise/),
+      screen.getByText(
+        /Coilbox does not recognise Mystery 1.0's widget handler/,
+      ),
     ).toBeTruthy();
     expect(
       screen.getByText("Switched on for All games, off everywhere else."),

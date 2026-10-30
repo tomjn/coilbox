@@ -41,7 +41,9 @@ vi.mock("@/content/bindings", async () => {
   return { ...actual, contentPlayerWidgets: async () => scan };
 });
 
-const { readSets, resetSets } = await import("./widgetSets");
+const { readSets, recordWrite, resetSets, updateSets } = await import(
+  "./widgetSets"
+);
 const { switchAddedWidgets } = await import("./widgetSync");
 
 const handler: WidgetHandler = {
@@ -88,6 +90,19 @@ describe("switchAddedWidgets", () => {
     expect(readSets().global).toMatchObject({ Radar: true });
     expect(files.get(MF)).toContain('["Radar"] = 1');
     expect(files.get(SF)).toContain('["Radar"] = 1');
+  });
+
+  it("is not undone by an entry a removed copy of the widget left in a file", async () => {
+    // Coilbox once wrote Radar on, the player switched it off in the game and
+    // removed the widget. Adding it again for all games still switches it on.
+    updateSets((s) => recordWrite(s, MF, new Map([["Radar", true]])));
+    files.set(
+      MF,
+      "return {\n\torder = {\n\t\tMinimap = 1,\n\t\tRadar = 0,\n\t},\n}\n",
+    );
+    await run(null);
+    expect(readSets().global).toMatchObject({ Radar: true });
+    expect(files.get(MF)).toContain("Radar = 1");
   });
 
   it("leaves a game that has saved no file without one", async () => {
