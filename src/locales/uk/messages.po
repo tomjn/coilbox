@@ -4862,6 +4862,10 @@ msgstr "{name} володіє: {holds}."
 msgid "{name} preview"
 msgstr "Перегляд: {name}"
 
+#: src/widgets/pages/WidgetSettings.tsx
+msgid "{name} settings"
+msgstr ""
+
 #: src/scenario/saveIntoGame.ts
 #, fuzzy
 msgid "{name} ships inside {gameName}, which is packaged, so it cannot be saved there."
@@ -8561,10 +8565,18 @@ msgstr "Гра запущена, а coilbox не знає, куди пише ц�
 msgid "A game is running. {gameLabel} writes its whole blueprints file back when it saves or exits, so coilbox will not write into it until the game is closed."
 msgstr "Гра запущена. {gameLabel} записує весь свій файл креслень під час збереження чи виходу, тому coilbox не записуватиме в нього, доки гру не закрито."
 
+#: src/widgets/pages/WidgetSettings.tsx
+msgid "A game is running. Close it to change these settings."
+msgstr ""
+
 #: src/blueprint/pages/components/LeavingPack.tsx
 #, fuzzy
 msgid "A game is running. It writes its whole blueprints file back when it saves or exits, so anything written into that file now could be thrown away without a word."
 msgstr "Гра запущена. Вона записує весь свій файл креслень під час збереження чи виходу, тож усе, що записано в цей файл зараз, може зникнути без попередження."
+
+#: src/widgets/widgetSettings.ts
+msgid "A game is running. It writes its widget settings back when it saves or exits, so anything written now would be thrown away. Close the game and try again."
+msgstr ""
 
 #: src/blueprint/pages/components/WidgetPanel.tsx
 #, fuzzy
@@ -9015,6 +9027,10 @@ msgstr "Набір групує повтори. Додавання чи приб
 #, fuzzy
 msgid "A set is a named group of replays, such as a tournament or a night of games. Deleting a set never deletes the replays in it. To delete replays, use the replay's own page."
 msgstr "Набір – це названа група повторів, як-от турнір чи вечір ігор. Видалення набору ніколи не видаляє повтори в ньому. Щоб видалити повтори, скористайтеся сторінкою самого повтору."
+
+#: src/widgets/widgetSettings.ts
+msgid "A setting must be a finite number."
+msgstr ""
 
 #: src/lego/scriptPlayback.ts
 #, fuzzy
@@ -19025,6 +19041,10 @@ msgstr "деактивовано"
 #, fuzzy
 msgid "Disarms a trigger until something enables it again."
 msgstr "Деактивує тригер, доки щось знову його не ввімкне."
+
+#: src/widgets/pages/WidgetSettings.tsx
+msgid "Discard changes"
+msgstr ""
 
 #: src/lego/pages/components/ScriptTab.tsx
 #, fuzzy
@@ -32754,6 +32774,10 @@ msgstr "Не підключено."
 msgid "Not decoded"
 msgstr "Не розкодовано"
 
+#: src/widgets/pages/WidgetSettings.tsx
+msgid "not edited"
+msgstr ""
+
 #: src/workshop/pages/components/WeaponLibraryPanel.tsx
 #, fuzzy
 msgid "Not equipped anywhere."
@@ -33123,6 +33147,10 @@ msgstr "Зараз нічого не можна перемістити."
 msgid "Nothing changed yet"
 msgstr "Ще нічого не змінено"
 
+#: src/widgets/pages/WidgetSettings.tsx
+msgid "Nothing changed."
+msgstr ""
+
 #: src/lego/pages/components/ExportDrawer.tsx
 #, fuzzy
 msgid "Nothing chosen"
@@ -33419,6 +33447,11 @@ msgstr "Причину не повідомлено. Зазвичай причи�
 msgid "Nothing saved for this map yet. Draw a layout and keep it here."
 msgstr "Для цієї мапи ще нічого не збережено. Намалюйте розташування й збережіть його тут."
 
+#. placeholder {0}: target.game
+#: src/widgets/pages/WidgetSettings.tsx
+msgid "Nothing saved yet. {0} saves this widget's settings after the widget has run."
+msgstr ""
+
 #: src/play/PresetPartsView.tsx
 #, fuzzy
 msgid "Nothing selected"
@@ -33642,6 +33675,10 @@ msgstr "зараз"
 #, fuzzy
 msgid "nowhere yet"
 msgstr "ще ніде"
+
+#: src/widgets/pages/WidgetSettings.tsx
+msgid "number"
+msgstr ""
 
 #: src/lego/pages/components/AnimationPanel.tsx
 #, fuzzy
@@ -37463,6 +37500,7 @@ msgstr "Лише для читання. Лише хост може змінюв�
 #: src/hub/pages/components/GamePicturesControl.tsx
 #: src/lego/pages/components/ScriptTab.tsx
 #: src/play/pages/EngineLogSection.tsx
+#: src/widgets/pages/WidgetSettings.tsx
 #, fuzzy
 msgid "Reading"
 msgstr "Читання"
@@ -40095,6 +40133,7 @@ msgstr "За замовчуванням"
 #: src/multiplayer/NoteButton.tsx
 #: src/play/pages/components/NewPresetFromReplayButton.tsx
 #: src/play/pages/components/SaveAsPresetButton.tsx
+#: src/widgets/pages/WidgetSettings.tsx
 #: src/workshop/pages/components/ProjectDetailsDrawer.tsx
 #, fuzzy
 msgid "Save"
@@ -40411,6 +40450,10 @@ msgstr "Збережено в юніт."
 #, fuzzy
 msgid "Saved to your Singleplayer presets to replay later."
 msgstr "Збережено у ваші шаблони одиночної гри, щоб зіграти пізніше."
+
+#: src/widgets/pages/WidgetSettings.tsx
+msgid "Saved. The file as it was is at {saved}."
+msgstr ""
 
 #: src/play/PlayProvider.tsx
 #, fuzzy
@@ -41979,9 +42022,15 @@ msgstr "налаштування"
 
 #: src/general/index.ts
 #: src/i18n/frameStrings.ts
+#: src/widgets/pages/WidgetsPage.tsx
 #, fuzzy
 msgid "Settings"
 msgstr "Налаштування"
+
+#. placeholder {0}: row.info?.name || fileName(row.path)
+#: src/widgets/pages/WidgetsPage.tsx
+msgid "Settings of {0}"
+msgstr ""
 
 #: src/content/pages/components/ConfigProfilesPanel.tsx
 #, fuzzy
@@ -44769,6 +44818,11 @@ msgstr "Система"
 msgid "Table"
 msgstr "Таблиця"
 
+#. placeholder {0}: node.children.length
+#: src/widgets/pages/WidgetSettings.tsx
+msgid "table of {0}"
+msgstr ""
+
 #: src/hub/pages/BrowsePage.tsx
 #, fuzzy
 msgid "Tag"
@@ -45152,6 +45206,10 @@ msgstr "Тестове сповіщення"
 #, fuzzy
 msgid "Testing a scenario here leaves its compiled mission in the game folder. Removing one takes the folder and its dialogue clips, and nothing else. The mission runtime stays, and testing that scenario again writes it back."
 msgstr "Тестування сценарію тут залишає скомпільовану місію в папці гри. Видалення місії забирає папку та її кліпи діалогу й більше нічого. Середовище місій залишається, а повторне тестування того сценарію записує його знову."
+
+#: src/widgets/pages/WidgetSettings.tsx
+msgid "text"
+msgstr ""
 
 #: src/mapconv/pages/components/AdvancedOptions.tsx
 #, fuzzy
@@ -47821,6 +47879,10 @@ msgstr "Сервери, на які можна увійти, і ваші обл�
 msgid "The servers you play on, and who you hear from there."
 msgstr "Сервери, на яких ви граєте, і від кого ви там отримуєте повідомлення."
 
+#: src/widgets/widgetSettings.ts
+msgid "The settings changed after coilbox read them, so nothing was saved. Close this and open it again."
+msgstr ""
+
 #: src/lego/pages/components/ImportResult.tsx
 #, fuzzy
 msgid "The shading map, {shadingMap}, was not found. The unit looks the same here either way, but the export will have no glow or shine to write out."
@@ -50128,6 +50190,10 @@ msgstr "Цей похід Шляхом війни потребує гри <0>{na
 msgid "This was made by a newer version of coilbox. Update coilbox to open it."
 msgstr "Це створено новішою версією coilbox. Оновіть coilbox, щоб відкрити."
 
+#: src/widgets/pages/WidgetSettings.tsx
+msgid "This widget has no saved settings."
+msgstr ""
+
 #: src/conquest/pages/components/ThreatLevelSelect.tsx
 #, fuzzy
 msgid "Threat level"
@@ -50712,6 +50778,10 @@ msgstr "Істинна, щойно минула задана кількість 
 #, fuzzy
 msgid "True once an actor changes hands, whether captured or gifted away."
 msgstr "Істинна, щойно актор переходить до іншого власника – захоплений чи подарований."
+
+#: src/widgets/pages/WidgetSettings.tsx
+msgid "true or false"
+msgstr ""
 
 #: src/downloads/activityRows.ts
 #, fuzzy

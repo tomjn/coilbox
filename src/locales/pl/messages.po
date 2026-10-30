@@ -4862,6 +4862,10 @@ msgstr "{name} posiada {holds}."
 msgid "{name} preview"
 msgstr "Podgląd: {name}"
 
+#: src/widgets/pages/WidgetSettings.tsx
+msgid "{name} settings"
+msgstr ""
+
 #: src/scenario/saveIntoGame.ts
 #, fuzzy
 msgid "{name} ships inside {gameName}, which is packaged, so it cannot be saved there."
@@ -8561,10 +8565,18 @@ msgstr "Gra działa, a coilbox nie wie, gdzie zapisuje ten silnik, więc nie mo�
 msgid "A game is running. {gameLabel} writes its whole blueprints file back when it saves or exits, so coilbox will not write into it until the game is closed."
 msgstr "Gra działa. {gameLabel} zapisuje cały plik planów budowy przy zapisie lub wyjściu, więc coilbox nie zapisze do niego, dopóki gra nie zostanie zamknięta."
 
+#: src/widgets/pages/WidgetSettings.tsx
+msgid "A game is running. Close it to change these settings."
+msgstr ""
+
 #: src/blueprint/pages/components/LeavingPack.tsx
 #, fuzzy
 msgid "A game is running. It writes its whole blueprints file back when it saves or exits, so anything written into that file now could be thrown away without a word."
 msgstr "Gra działa. Zapisuje cały plik planów budowy przy zapisie lub wyjściu, więc wszystko, co zostanie teraz do niego zapisane, może bez słowa przepaść."
+
+#: src/widgets/widgetSettings.ts
+msgid "A game is running. It writes its widget settings back when it saves or exits, so anything written now would be thrown away. Close the game and try again."
+msgstr ""
 
 #: src/blueprint/pages/components/WidgetPanel.tsx
 #, fuzzy
@@ -9015,6 +9027,10 @@ msgstr "Zestaw grupuje powtórki. Dodawanie lub usuwanie tutaj nigdy nie zmienia
 #, fuzzy
 msgid "A set is a named group of replays, such as a tournament or a night of games. Deleting a set never deletes the replays in it. To delete replays, use the replay's own page."
 msgstr "Zestaw to nazwana grupa powtórek, np. turniej albo wieczór grania. Usunięcie zestawu nigdy nie usuwa zawartych w nim powtórek. Aby usunąć powtórki, użyj strony danej powtórki."
+
+#: src/widgets/widgetSettings.ts
+msgid "A setting must be a finite number."
+msgstr ""
 
 #: src/lego/scriptPlayback.ts
 #, fuzzy
@@ -19025,6 +19041,10 @@ msgstr "rozbrojony"
 #, fuzzy
 msgid "Disarms a trigger until something enables it again."
 msgstr "Rozbraja wyzwalacz, dopóki coś go ponownie nie włączy."
+
+#: src/widgets/pages/WidgetSettings.tsx
+msgid "Discard changes"
+msgstr ""
 
 #: src/lego/pages/components/ScriptTab.tsx
 #, fuzzy
@@ -32754,6 +32774,10 @@ msgstr "Brak połączenia."
 msgid "Not decoded"
 msgstr "Nie zdekodowano"
 
+#: src/widgets/pages/WidgetSettings.tsx
+msgid "not edited"
+msgstr ""
+
 #: src/workshop/pages/components/WeaponLibraryPanel.tsx
 #, fuzzy
 msgid "Not equipped anywhere."
@@ -33123,6 +33147,10 @@ msgstr "Teraz nic nie może zostać przeniesione."
 msgid "Nothing changed yet"
 msgstr "Jeszcze nic nie zmieniono"
 
+#: src/widgets/pages/WidgetSettings.tsx
+msgid "Nothing changed."
+msgstr ""
+
 #: src/lego/pages/components/ExportDrawer.tsx
 #, fuzzy
 msgid "Nothing chosen"
@@ -33419,6 +33447,11 @@ msgstr "Nie podano powodu. Typowe przyczyny to brak roli szefa pokoju, ignorowan
 msgid "Nothing saved for this map yet. Draw a layout and keep it here."
 msgstr "Nic jeszcze nie zapisano dla tej mapy. Narysuj układ i zachowaj go tutaj."
 
+#. placeholder {0}: target.game
+#: src/widgets/pages/WidgetSettings.tsx
+msgid "Nothing saved yet. {0} saves this widget's settings after the widget has run."
+msgstr ""
+
 #: src/play/PresetPartsView.tsx
 #, fuzzy
 msgid "Nothing selected"
@@ -33642,6 +33675,10 @@ msgstr "teraz"
 #, fuzzy
 msgid "nowhere yet"
 msgstr "jeszcze nigdzie"
+
+#: src/widgets/pages/WidgetSettings.tsx
+msgid "number"
+msgstr ""
 
 #: src/lego/pages/components/AnimationPanel.tsx
 #, fuzzy
@@ -37463,6 +37500,7 @@ msgstr "Tylko do odczytu. Tylko host może zmieniać opcje meczu."
 #: src/hub/pages/components/GamePicturesControl.tsx
 #: src/lego/pages/components/ScriptTab.tsx
 #: src/play/pages/EngineLogSection.tsx
+#: src/widgets/pages/WidgetSettings.tsx
 #, fuzzy
 msgid "Reading"
 msgstr "Odczytywanie"
@@ -40095,6 +40133,7 @@ msgstr "Tak jak domyślnie"
 #: src/multiplayer/NoteButton.tsx
 #: src/play/pages/components/NewPresetFromReplayButton.tsx
 #: src/play/pages/components/SaveAsPresetButton.tsx
+#: src/widgets/pages/WidgetSettings.tsx
 #: src/workshop/pages/components/ProjectDetailsDrawer.tsx
 #, fuzzy
 msgid "Save"
@@ -40411,6 +40450,10 @@ msgstr "Zapisano w jednostce."
 #, fuzzy
 msgid "Saved to your Singleplayer presets to replay later."
 msgstr "Zapisano w szablonach gry jednoosobowej, aby zagrać później ponownie."
+
+#: src/widgets/pages/WidgetSettings.tsx
+msgid "Saved. The file as it was is at {saved}."
+msgstr ""
 
 #: src/play/PlayProvider.tsx
 #, fuzzy
@@ -41979,9 +42022,15 @@ msgstr "ustawienia"
 
 #: src/general/index.ts
 #: src/i18n/frameStrings.ts
+#: src/widgets/pages/WidgetsPage.tsx
 #, fuzzy
 msgid "Settings"
 msgstr "Ustawienia"
+
+#. placeholder {0}: row.info?.name || fileName(row.path)
+#: src/widgets/pages/WidgetsPage.tsx
+msgid "Settings of {0}"
+msgstr ""
 
 #: src/content/pages/components/ConfigProfilesPanel.tsx
 #, fuzzy
@@ -44769,6 +44818,11 @@ msgstr "System"
 msgid "Table"
 msgstr "Tabela"
 
+#. placeholder {0}: node.children.length
+#: src/widgets/pages/WidgetSettings.tsx
+msgid "table of {0}"
+msgstr ""
+
 #: src/hub/pages/BrowsePage.tsx
 #, fuzzy
 msgid "Tag"
@@ -45152,6 +45206,10 @@ msgstr "Testowe powiadomienie"
 #, fuzzy
 msgid "Testing a scenario here leaves its compiled mission in the game folder. Removing one takes the folder and its dialogue clips, and nothing else. The mission runtime stays, and testing that scenario again writes it back."
 msgstr "Testowanie scenariusza tutaj zostawia jego skompilowaną misję w folderze gry. Usunięcie jej zabiera folder i jego klipy dialogowe, i nic więcej. Środowisko misji zostaje, a ponowne testowanie tego scenariusza zapisuje ją z powrotem."
+
+#: src/widgets/pages/WidgetSettings.tsx
+msgid "text"
+msgstr ""
 
 #: src/mapconv/pages/components/AdvancedOptions.tsx
 #, fuzzy
@@ -47821,6 +47879,10 @@ msgstr "Serwery, na które można się zalogować, i Twoje konta na nich."
 msgid "The servers you play on, and who you hear from there."
 msgstr "Serwery, na których grasz, i od kogo tam otrzymujesz wiadomości."
 
+#: src/widgets/widgetSettings.ts
+msgid "The settings changed after coilbox read them, so nothing was saved. Close this and open it again."
+msgstr ""
+
 #: src/lego/pages/components/ImportResult.tsx
 #, fuzzy
 msgid "The shading map, {shadingMap}, was not found. The unit looks the same here either way, but the export will have no glow or shine to write out."
@@ -50128,6 +50190,10 @@ msgstr "Ta ścieżka wojenna wymaga gry <0>{name}</0>, która nie jest zainstalo
 msgid "This was made by a newer version of coilbox. Update coilbox to open it."
 msgstr "To utworzyła nowsza wersja coilbox. Zaktualizuj coilbox, aby to otworzyć."
 
+#: src/widgets/pages/WidgetSettings.tsx
+msgid "This widget has no saved settings."
+msgstr ""
+
 #: src/conquest/pages/components/ThreatLevelSelect.tsx
 #, fuzzy
 msgid "Threat level"
@@ -50712,6 +50778,10 @@ msgstr "Prawdziwe po upływie ustalonej liczby sekund od początku misji."
 #, fuzzy
 msgid "True once an actor changes hands, whether captured or gifted away."
 msgstr "Prawdziwe, gdy aktor zmieni właściciela, przez przejęcie lub oddanie."
+
+#: src/widgets/pages/WidgetSettings.tsx
+msgid "true or false"
+msgstr ""
 
 #: src/downloads/activityRows.ts
 #, fuzzy
