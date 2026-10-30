@@ -20,6 +20,7 @@ const scan: PlayerWidgetScan = {
     folder: "LuaUI/Widgets",
     nested: false,
     coilbox: false,
+    givesOrders: false,
     info: { name },
     error: null,
   })),
