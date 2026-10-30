@@ -1610,6 +1610,10 @@ mod tests {
             4,
             "438e539e2546638f9a29237044b9f3d99a779f14f9dbdbc7fae5dddc4475bc09",
         ),
+        (
+            5,
+            "438e539e2546638f9a29237044b9f3d99a779f14f9dbdbc7fae5dddc4475bc09",
+        ),
     ];
 
     #[test]

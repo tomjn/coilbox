@@ -168,6 +168,10 @@ fn modinfo(
 /// writes once it knows which the game can take (see `defs`). A manifest that
 /// lists a fix of no kind this coilbox knows is refused rather than built
 /// without it.
+///
+/// A manifest of writer 5 or later also gets the licence notice for that Lua in
+/// `compat/coilbox-licence/` (issue #4623), whether or not the game has an entry
+/// file to wrap. The gadgets and the def files are coilbox's Lua too.
 pub fn files(
     manifest: &coilbox_compat::Manifest,
     game_name: &str,
@@ -200,6 +204,9 @@ pub fn files(
             path,
             contents: contents.into_bytes(),
         });
+    }
+    for (path, contents) in coilbox_compat::licence_files(manifest.writer) {
+        files.push(File { path, contents });
     }
     files.sort_by(|a, b| a.path.cmp(&b.path));
     files.push(marker_file(marker)?);

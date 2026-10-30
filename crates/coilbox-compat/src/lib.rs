@@ -66,6 +66,7 @@ const MANIFESTS: &[(u32, &str)] = &[
     (21, include_str!("../../../lua/compat/manifests/21.json")),
     (22, include_str!("../../../lua/compat/manifests/22.json")),
     (23, include_str!("../../../lua/compat/manifests/23.json")),
+    (24, include_str!("../../../lua/compat/manifests/24.json")),
 ];
 
 /// Every fix file, by id.
@@ -286,7 +287,7 @@ pub struct Converter {
 /// the bytes keeps the old behaviour for the writers that had it and puts the
 /// new one behind a new writer: move this, add a manifest that names it, and
 /// record the new writer's hashes beside the old ones.
-pub const WRITER: u32 = 4;
+pub const WRITER: u32 = 5;
 
 /// Whether this build can write a manifest that names `writer`.
 pub fn knows_writer(writer: u32) -> bool {
@@ -320,6 +321,53 @@ pub fn keeps_game_s3o(writer: u32) -> bool {
 /// a game and ran none of those fixes.
 pub fn hooks_weapondefs(writer: u32) -> bool {
     writer >= 4
+}
+
+/// Where a mutator of writer 5 or later keeps the licence notice for the Lua it
+/// writes (issue #4623). It sits in `compat/`, beside the prelude, and not at
+/// the root as the mission runtime's does, because a base game that has the
+/// runtime installed already has a `coilbox-licence/` there and the mutator
+/// would cover its files.
+pub const LICENCE_DIR: &str = "compat/coilbox-licence";
+
+/// The notice and licence texts writer 5 puts in [`LICENCE_DIR`]. They are
+/// copies kept in `lua/compat/licence-5/`, not the repo's `LICENSE`,
+/// `lua/COPYING` and `lua/GAME-NOTICE.md`, so a later edit to those cannot change
+/// the bytes of a manifest players may already have built. A change to what a
+/// mutator says about its licence is a new folder and a new writer. A test pins
+/// each file's hash.
+const LICENCE_5: [(&str, &[u8]); 3] = [
+    (
+        "COPYING",
+        include_bytes!("../../../lua/compat/licence-5/COPYING"),
+    ),
+    (
+        "LICENSE-MIT",
+        include_bytes!("../../../lua/compat/licence-5/LICENSE-MIT"),
+    ),
+    (
+        "NOTICE.md",
+        include_bytes!("../../../lua/compat/licence-5/NOTICE.md"),
+    ),
+];
+
+/// Whether `writer` writes the licence notice into a mutator (issue #4623).
+/// Writers 1 to 4 wrote none.
+pub fn ships_licence_notice(writer: u32) -> bool {
+    writer >= 5
+}
+
+/// The files a mutator of writer `writer` holds in [`LICENCE_DIR`], as their
+/// path in the mutator and their bytes, sorted by path. Empty for a writer that
+/// writes none.
+pub fn licence_files(writer: u32) -> Vec<(String, Vec<u8>)> {
+    if !ships_licence_notice(writer) {
+        return Vec::new();
+    }
+    LICENCE_5
+        .iter()
+        .map(|(name, bytes)| (format!("{LICENCE_DIR}/{name}"), bytes.to_vec()))
+        .collect()
 }
 
 /// The writer of manifests 1 and 2, which predate the `writer` field.
@@ -2284,6 +2332,69 @@ mod tests {
         assert_eq!(twenty_three.converter, twenty_two.converter);
         assert!(!hooks_weapondefs(twenty_two.writer));
         assert!(hooks_weapondefs(twenty_three.writer));
+    }
+
+    /// Issue #4623: manifest 24 is manifest 23 built with the writer that adds
+    /// the licence notice folder.
+    #[test]
+    fn manifest_24_is_manifest_23_with_a_new_writer() {
+        let (twenty_three, twenty_four) = (manifest(23).unwrap(), manifest(24).unwrap());
+        assert_eq!(twenty_four.fixes, twenty_three.fixes);
+        assert_eq!(twenty_four.converter, twenty_three.converter);
+        assert!(!ships_licence_notice(twenty_three.writer));
+        assert!(ships_licence_notice(twenty_four.writer));
+    }
+
+    /// The notice and licence texts of writer 5 are immutable, as a fix is: a
+    /// change would change the bytes of manifest 24 and of any later manifest
+    /// that names writer 5. These are the SHA-256 of each file.
+    #[test]
+    fn the_licence_files_of_writer_5_are_pinned() {
+        let want = [
+            (
+                "compat/coilbox-licence/COPYING",
+                "ab15fd526bd8dd18a9e77ebc139656bf4d33e97fc7238cd11bf60e2b9b8666c6",
+            ),
+            (
+                "compat/coilbox-licence/LICENSE-MIT",
+                "1434f465becc7a3ffd949786366c2386a89351c9f5d3a9db09a3a389488dd92f",
+            ),
+            (
+                "compat/coilbox-licence/NOTICE.md",
+                "2c54c43903ced7c2a3ee392963972d381b8e0368b52e5981b5fcde1655e15a41",
+            ),
+        ];
+        let got: Vec<(String, String)> = licence_files(5)
+            .into_iter()
+            .map(|(path, bytes)| (path, hex(&Sha256::digest(&bytes))))
+            .collect();
+        let want: Vec<(String, String)> = want
+            .iter()
+            .map(|(p, h)| (p.to_string(), h.to_string()))
+            .collect();
+        assert!(
+            got == want,
+            "lua/compat/licence-5/ changed. Writer 5 keeps its bytes: put the change in \
+             a new folder behind a new writer, as a new fix gets a new id:\n{got:#?}"
+        );
+    }
+
+    #[test]
+    fn the_licence_folder_is_written_from_writer_5_and_not_before() {
+        for writer in 1..=4 {
+            assert!(licence_files(writer).is_empty(), "writer {writer}");
+        }
+        assert_eq!(
+            licence_files(WRITER)
+                .iter()
+                .map(|(path, _)| path.as_str())
+                .collect::<Vec<_>>(),
+            [
+                "compat/coilbox-licence/COPYING",
+                "compat/coilbox-licence/LICENSE-MIT",
+                "compat/coilbox-licence/NOTICE.md"
+            ]
+        );
     }
 
     /// The preludes for manifests 9, 11, 12, 14, 15, 16, 17, 18, 19, 20, 21, 22 and 23, as the Lua tests in

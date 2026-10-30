@@ -130,7 +130,7 @@ If one of the fixes fails while the game runs, the game still loads. The engine'
 
 ## What it changes
 
-This is compatibility version 23, the newest.
+This is compatibility version 24, the newest. It changes nothing in the game. It adds a `compat/coilbox-licence/` folder with the licence notice for the Lua coilbox writes.
 
 Lua functions it puts back:
 
