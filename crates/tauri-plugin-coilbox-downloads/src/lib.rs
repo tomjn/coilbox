@@ -2421,39 +2421,99 @@ mod download_to_tests {
     use super::*;
     use std::io::{Read, Write};
     use std::net::TcpListener;
+    use std::sync::atomic::AtomicUsize;
 
-    /// A one-shot HTTP/1.1 server that answers with a `Content-Length` of
-    /// `total` bytes but writes only `sent` of them before closing the
-    /// connection. Returns the URL to hit it at.
-    fn truncating_server(total: usize, sent: usize) -> String {
+    /// An HTTP/1.1 server that answers `GET /short.bin` with a `Content-Length`
+    /// of `total` bytes but writes only `sent` of them before closing the
+    /// connection, and stops after that one answer. Returns the URL to hit it at
+    /// and a count of the requests it answered.
+    ///
+    /// Anything else is let go without an answer and the server keeps accepting.
+    /// Other programs on a developer machine probe new local ports with a
+    /// `GET /`, and a server that took the first connection as the request would
+    /// answer the probe, leaving the real request to a closed port.
+    fn truncating_server(total: usize, sent: usize) -> (String, Arc<AtomicUsize>) {
         let listener = TcpListener::bind("127.0.0.1:0").expect("bind a local port");
         let port = listener.local_addr().expect("local addr").port();
+        let answered = Arc::new(AtomicUsize::new(0));
+        let counted = answered.clone();
         std::thread::spawn(move || {
-            let Ok((mut sock, _)) = listener.accept() else {
+            while let Ok((mut sock, _)) = listener.accept() {
+                // Drain the request headers first, so writing the response can't
+                // race the client still sending its GET.
+                let mut buf = Vec::new();
+                let mut chunk = [0u8; 512];
+                // The bytes are checked as they arrive, so a TLS `ClientHello`
+                // that waits for a reply is let go at once and does not hold up
+                // the request behind it.
+                const REQUEST: &[u8] = b"GET /short.bin ";
+                let ours = loop {
+                    match sock.read(&mut chunk) {
+                        Ok(0) | Err(_) => break false,
+                        Ok(n) => buf.extend_from_slice(&chunk[..n]),
+                    }
+                    let seen = buf.len().min(REQUEST.len());
+                    if buf[..seen] != REQUEST[..seen] {
+                        break false;
+                    }
+                    if buf.windows(4).any(|w| w == b"\r\n\r\n") {
+                        break true;
+                    }
+                };
+                if !ours {
+                    continue;
+                }
+                let header = format!(
+                    "HTTP/1.1 200 OK\r\nContent-Length: {total}\r\nConnection: close\r\n\r\n"
+                );
+                let _ = sock.write_all(header.as_bytes());
+                let _ = sock.write_all(&vec![b'a'; sent]);
+                let _ = sock.flush();
+                counted.fetch_add(1, Ordering::SeqCst);
+                // Dropping `sock` here closes the connection with `total - sent`
+                // bytes still outstanding against the declared length.
                 return;
-            };
-            // Drain the request headers first, so writing the response can't
-            // race the client still sending its GET.
-            let mut buf = Vec::new();
-            let mut chunk = [0u8; 512];
-            loop {
-                match sock.read(&mut chunk) {
-                    Ok(0) | Err(_) => return,
-                    Ok(n) => buf.extend_from_slice(&chunk[..n]),
-                }
-                if buf.windows(4).position(|w| w == b"\r\n\r\n").is_some() {
-                    break;
-                }
             }
-            let header =
-                format!("HTTP/1.1 200 OK\r\nContent-Length: {total}\r\nConnection: close\r\n\r\n");
-            let _ = sock.write_all(header.as_bytes());
-            let _ = sock.write_all(&vec![b'a'; sent]);
-            let _ = sock.flush();
-            // Dropping `sock` here closes the connection with `total - sent`
-            // bytes still outstanding against the declared length.
         });
-        format!("http://127.0.0.1:{port}/short.bin")
+        (format!("http://127.0.0.1:{port}/short.bin"), answered)
+    }
+
+    /// Send `request` and read until the server lets go.
+    fn ask(url: &str, request: &[u8]) -> Vec<u8> {
+        let address = url
+            .strip_prefix("http://")
+            .and_then(|rest| rest.split('/').next())
+            .expect("an http url");
+        let mut sock = std::net::TcpStream::connect(address).expect("connect");
+        sock.write_all(request).expect("send");
+        let mut answer = Vec::new();
+        let _ = sock.read_to_end(&mut answer);
+        answer
+    }
+
+    /// A probe that arrives first must not use up the server's one answer.
+    #[test]
+    fn a_stray_request_does_not_use_up_the_truncating_server() {
+        let (url, answered) = truncating_server(1000, 500);
+
+        let stray = ask(&url, b"GET / HTTP/1.1\r\nhost: localhost\r\n\r\n");
+        assert!(stray.is_empty(), "a stray GET was answered");
+        assert_eq!(answered.load(Ordering::SeqCst), 0);
+
+        // A TLS probe sends a `ClientHello` and waits for a reply, so it is
+        // still open when the real request arrives.
+        let address = url
+            .strip_prefix("http://")
+            .and_then(|rest| rest.split('/').next())
+            .expect("an http url");
+        let mut probe = std::net::TcpStream::connect(address).expect("connect");
+        probe
+            .write_all(&[0x16, 0x03, 0x01, 0x05, 0xc8, 0x01])
+            .expect("send");
+
+        let real = ask(&url, b"GET /short.bin HTTP/1.1\r\nhost: localhost\r\n\r\n");
+        assert!(real.starts_with(b"HTTP/1.1 200"));
+        assert_eq!(answered.load(Ordering::SeqCst), 1);
     }
 
     /// With this client (HTTP/1.1 only, see the doc comment on `download_to`)
@@ -2462,7 +2522,7 @@ mod download_to_tests {
     /// `download_to` removes the partial file before returning it.
     #[test]
     fn a_body_that_ends_short_of_its_content_length_errors_and_cleans_up() {
-        let url = truncating_server(1000, 500);
+        let (url, answered) = truncating_server(1000, 500);
         let tmp = tempfile::tempdir().expect("tempdir");
         let dest_dir = tmp.path().join("dest");
         let on_progress: Channel<DownloadProgress> = Channel::new(|_| Ok(()));
@@ -2476,6 +2536,11 @@ mod download_to_tests {
             &cancel,
         ));
 
+        assert_eq!(
+            answered.load(Ordering::SeqCst),
+            1,
+            "the server never saw a request for the file"
+        );
         assert!(
             result.is_err(),
             "a short length-delimited body should surface as an error, not a success"
