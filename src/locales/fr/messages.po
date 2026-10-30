@@ -1038,6 +1038,21 @@ msgstr "{0, plural, one {# amélioration} other {# améliorations}}"
 msgid "{0, plural, one {# warning} other {# warnings}}"
 msgstr "{0, plural, one {# avertissement} other {# avertissements}}"
 
+#. placeholder {0}: warning.failing.length
+#: src/multiplayer/battle/RoomWidgetsWarning.tsx
+msgid "{0, plural, one {# widget gives orders without saying so. It will load, then raise an error each time it does.} other {# widgets give orders without saying so. They will load, then raise an error each time they do.}}"
+msgstr ""
+
+#. placeholder {0}: warning.blocked.length
+#: src/multiplayer/battle/RoomWidgetsWarning.tsx
+msgid "{0, plural, one {# widget of yours will not load.} other {# widgets of yours will not load.}}"
+msgstr ""
+
+#. placeholder {0}: warning.skipped.length
+#: src/multiplayer/battle/RoomWidgetsWarning.tsx
+msgid "{0, plural, one {# widget says it gives orders, so the game skips it.} other {# widgets say they give orders, so the game skips them.}}"
+msgstr ""
+
 #. placeholder {0}: nested.widgets.length
 #: src/widgets/pages/AddWidgetDrawer.tsx
 msgid "{0, plural, one {# widget sits in a subfolder, which these games do not load:} other {# widgets sit in a subfolder, which these games do not load:}}"
@@ -2806,6 +2821,10 @@ msgstr "{game} n’est pas installé, les unités ne peuvent donc pas être nomm
 #, fuzzy
 msgid "{game} is the exact version this mission was made for, and it could not be downloaded. It may no longer be published, or the download failed ({failure}). Another version will not run this mission."
 msgstr "{game} est la version exacte pour laquelle cette mission a été créée, et elle n’a pas pu être téléchargée. Elle n’est peut-être plus publiée, ou le téléchargement a échoué ({failure}). Une autre version ne lancera pas cette mission."
+
+#: src/multiplayer/battle/RoomWidgetsWarning.tsx
+msgid "{game} loads player widgets only when Local Widgets Config is on in its widget list."
+msgstr ""
 
 #: src/hub/assets/UploadRunBadge.tsx
 #, fuzzy
@@ -34578,6 +34597,10 @@ msgstr "Ouvrir Sentier de la guerre"
 msgid "Open Warpath."
 msgstr "Ouvrir Sentier de la guerre."
 
+#: src/multiplayer/battle/RoomWidgetsWarning.tsx
+msgid "Open your widgets"
+msgstr ""
+
 #: src/lego/pages/ProjectsPage.tsx
 #, fuzzy
 msgid "Opened from a file"
@@ -36217,6 +36240,10 @@ msgstr "Nom du joueur"
 #, fuzzy
 msgid "Player stats"
 msgstr "Statistiques"
+
+#: src/multiplayer/battle/RoomWidgetsWarning.tsx
+msgid "Player widgets are switched off in the widget list of {game}."
+msgstr ""
 
 #: src/content/commandRates.ts
 #, fuzzy
@@ -42785,6 +42812,10 @@ msgstr "Afficher la valeur des unités vivantes par type"
 #, fuzzy
 msgid "Show what ran"
 msgstr "Afficher ce qui s’est exécuté"
+
+#: src/multiplayer/battle/RoomWidgetsWarning.tsx
+msgid "Show which"
+msgstr ""
 
 #: src/content/pages/components/ReplaySetsManager.tsx
 #, fuzzy
@@ -49758,6 +49789,10 @@ msgstr "La carte de cette rediffusion n’est pas installée. Téléchargez-la d
 msgid "This replay's order stream holds no orders to count."
 msgstr "Le flux d’ordres de cette rediffusion ne contient aucun ordre à compter."
 
+#: src/multiplayer/battle/RoomWidgetsWarning.tsx
+msgid "This room does not allow player widgets."
+msgstr ""
+
 #: src/direct/share.ts
 #, fuzzy
 msgid "This room has no address another computer can reach, because this machine is on no network."
@@ -49772,6 +49807,10 @@ msgstr "Ce salon n’a pas d’adresse à rejoindre."
 #, fuzzy
 msgid "This room has no port to join on."
 msgstr "Ce salon n’a pas de port à rejoindre."
+
+#: src/multiplayer/battle/RoomWidgetsWarning.tsx
+msgid "This room hides team colours, which turns off player widgets."
+msgstr ""
 
 #: src/deeplink/parse.ts
 #, fuzzy
@@ -49792,6 +49831,10 @@ msgstr "L’adresse de ce lien de salon n’est pas une adresse."
 #, fuzzy
 msgid "This room link's port is not a port."
 msgstr "Le port de ce lien de salon n’est pas un port."
+
+#: src/multiplayer/battle/RoomWidgetsWarning.tsx
+msgid "This room turns off widgets that give orders."
+msgstr ""
 
 #: src/multiplayer/battle/useBattleRoom.ts
 #, fuzzy

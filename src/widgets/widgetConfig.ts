@@ -364,6 +364,56 @@ export function readOrder(
   }
 }
 
+/** `true` or `false` when the value is that literal, otherwise null. */
+function booleanOf(value: readonly Token[]): boolean | null {
+  const [a] = value;
+  if (value.length !== 1 || a.kind !== "name") return null;
+  if (a.text === "true") return true;
+  return a.text === "false" ? false : null;
+}
+
+/**
+ * A boolean at the top of the file, such as the `allowUserWidgets` the
+ * Balanced Annihilation family's handlers save beside their order table (issue
+ * #1292). Null when the file has no such entry. Throws when the file is not a
+ * table the handler wrote.
+ */
+export function readFlag(src: string, key: string): boolean | null {
+  try {
+    const f = field(returnedTable(src), key);
+    return f ? booleanOf(f.value) : null;
+  } catch (e) {
+    throw unreadable(e);
+  }
+}
+
+/** The fields of the "Local Widgets Config" entry that turn local widgets on,
+ *  as Complete Annihilation's and Zero-K's widget of that name saves them. */
+const LOCAL_WIDGET_KEYS = [
+  "localWidgets",
+  "localWidgetsFirst",
+  "useLocalWidgets",
+  "useLocalWidgetsFirst",
+];
+
+/**
+ * Whether the "Local Widgets Config" entry of a Complete Annihilation family
+ * data file turns local widgets on (issue #1292). Throws when the file is not a
+ * table the handler wrote.
+ */
+export function readLocalWidgets(src: string): boolean {
+  try {
+    const entry = field(returnedTable(src), "Local Widgets Config")?.table;
+    // The last copy of a key is the one Lua keeps.
+    return LOCAL_WIDGET_KEYS.some((key) => {
+      const f = entry && field(entry, key);
+      return !!f && booleanOf(f.value) === true;
+    });
+  } catch (e) {
+    throw unreadable(e);
+  }
+}
+
 /** A key as `table.save` would never misread it, whatever is in the name. */
 function luaKey(name: string): string {
   const escaped = name

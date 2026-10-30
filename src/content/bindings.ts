@@ -2263,6 +2263,8 @@ export interface PlayerWidgetInfo {
   /** The names it had before, newest first as the widget wrote them. */
   previousNames?: string[];
   experimental?: boolean | null;
+  /** Declares that it gives orders to units. */
+  control?: boolean | null;
 }
 
 /** One `.lua` file in a player widget folder (issue #1284). */
@@ -2275,6 +2277,8 @@ export interface PlayerWidgetFile {
   nested: boolean;
   /** Coilbox's own blueprint widget. */
   coilbox: boolean;
+  /** Its source calls `Spring.GiveOrder` or one of its siblings. */
+  givesOrders: boolean;
   /** Set exactly when `error` is not. */
   info: PlayerWidgetInfo | null;
   error: string | null;

@@ -1038,6 +1038,21 @@ msgstr "{0, plural, one {# покращення} few {# покращення} ma
 msgid "{0, plural, one {# warning} other {# warnings}}"
 msgstr "{0, plural, one {# попередження} few {# попередження} many {# попереджень} other {# попередження}}"
 
+#. placeholder {0}: warning.failing.length
+#: src/multiplayer/battle/RoomWidgetsWarning.tsx
+msgid "{0, plural, one {# widget gives orders without saying so. It will load, then raise an error each time it does.} other {# widgets give orders without saying so. They will load, then raise an error each time they do.}}"
+msgstr ""
+
+#. placeholder {0}: warning.blocked.length
+#: src/multiplayer/battle/RoomWidgetsWarning.tsx
+msgid "{0, plural, one {# widget of yours will not load.} other {# widgets of yours will not load.}}"
+msgstr ""
+
+#. placeholder {0}: warning.skipped.length
+#: src/multiplayer/battle/RoomWidgetsWarning.tsx
+msgid "{0, plural, one {# widget says it gives orders, so the game skips it.} other {# widgets say they give orders, so the game skips them.}}"
+msgstr ""
+
 #. placeholder {0}: nested.widgets.length
 #: src/widgets/pages/AddWidgetDrawer.tsx
 msgid "{0, plural, one {# widget sits in a subfolder, which these games do not load:} other {# widgets sit in a subfolder, which these games do not load:}}"
@@ -2806,6 +2821,10 @@ msgstr "Гру {game} не встановлено, тому юніти немо�
 #, fuzzy
 msgid "{game} is the exact version this mission was made for, and it could not be downloaded. It may no longer be published, or the download failed ({failure}). Another version will not run this mission."
 msgstr "{game} – це саме та версія, для якої створено цю місію, і її не вдалося завантажити. Можливо, її більше не публікують або завантаження не вдалося ({failure}). Інша версія цю місію не запустить."
+
+#: src/multiplayer/battle/RoomWidgetsWarning.tsx
+msgid "{game} loads player widgets only when Local Widgets Config is on in its widget list."
+msgstr ""
 
 #: src/hub/assets/UploadRunBadge.tsx
 #, fuzzy
@@ -34578,6 +34597,10 @@ msgstr "Відкрити Шлях війни"
 msgid "Open Warpath."
 msgstr "Відкрити Шлях війни."
 
+#: src/multiplayer/battle/RoomWidgetsWarning.tsx
+msgid "Open your widgets"
+msgstr ""
+
 #: src/lego/pages/ProjectsPage.tsx
 #, fuzzy
 msgid "Opened from a file"
@@ -36217,6 +36240,10 @@ msgstr "Ім’я гравця"
 #, fuzzy
 msgid "Player stats"
 msgstr "Статистика"
+
+#: src/multiplayer/battle/RoomWidgetsWarning.tsx
+msgid "Player widgets are switched off in the widget list of {game}."
+msgstr ""
 
 #: src/content/commandRates.ts
 #, fuzzy
@@ -42785,6 +42812,10 @@ msgstr "Показати вартість живих юнітів за типо�
 #, fuzzy
 msgid "Show what ran"
 msgstr "Показати, що виконалося"
+
+#: src/multiplayer/battle/RoomWidgetsWarning.tsx
+msgid "Show which"
+msgstr ""
 
 #: src/content/pages/components/ReplaySetsManager.tsx
 #, fuzzy
@@ -49758,6 +49789,10 @@ msgstr "Мапу цього повтору не встановлено. Споч
 msgid "This replay's order stream holds no orders to count."
 msgstr "Потік наказів цього повтору не містить наказів для підрахунку."
 
+#: src/multiplayer/battle/RoomWidgetsWarning.tsx
+msgid "This room does not allow player widgets."
+msgstr ""
+
 #: src/direct/share.ts
 #, fuzzy
 msgid "This room has no address another computer can reach, because this machine is on no network."
@@ -49772,6 +49807,10 @@ msgstr "Ця кімната не має адреси для приєднання
 #, fuzzy
 msgid "This room has no port to join on."
 msgstr "Ця кімната не має порту для приєднання."
+
+#: src/multiplayer/battle/RoomWidgetsWarning.tsx
+msgid "This room hides team colours, which turns off player widgets."
+msgstr ""
 
 #: src/deeplink/parse.ts
 #, fuzzy
@@ -49792,6 +49831,10 @@ msgstr "Адреса в посиланні на кімнату – не адре
 #, fuzzy
 msgid "This room link's port is not a port."
 msgstr "Порт у посиланні на кімнату – не порт."
+
+#: src/multiplayer/battle/RoomWidgetsWarning.tsx
+msgid "This room turns off widgets that give orders."
+msgstr ""
 
 #: src/multiplayer/battle/useBattleRoom.ts
 #, fuzzy

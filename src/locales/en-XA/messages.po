@@ -855,6 +855,21 @@ msgstr ""
 msgid "{0, plural, one {# warning} other {# warnings}}"
 msgstr ""
 
+#. placeholder {0}: warning.failing.length
+#: src/multiplayer/battle/RoomWidgetsWarning.tsx
+msgid "{0, plural, one {# widget gives orders without saying so. It will load, then raise an error each time it does.} other {# widgets give orders without saying so. They will load, then raise an error each time they do.}}"
+msgstr ""
+
+#. placeholder {0}: warning.blocked.length
+#: src/multiplayer/battle/RoomWidgetsWarning.tsx
+msgid "{0, plural, one {# widget of yours will not load.} other {# widgets of yours will not load.}}"
+msgstr ""
+
+#. placeholder {0}: warning.skipped.length
+#: src/multiplayer/battle/RoomWidgetsWarning.tsx
+msgid "{0, plural, one {# widget says it gives orders, so the game skips it.} other {# widgets say they give orders, so the game skips them.}}"
+msgstr ""
+
 #. placeholder {0}: nested.widgets.length
 #: src/widgets/pages/AddWidgetDrawer.tsx
 msgid "{0, plural, one {# widget sits in a subfolder, which these games do not load:} other {# widgets sit in a subfolder, which these games do not load:}}"
@@ -2290,6 +2305,10 @@ msgstr ""
 
 #: src/campaign/missionNeeds.ts
 msgid "{game} is the exact version this mission was made for, and it could not be downloaded. It may no longer be published, or the download failed ({failure}). Another version will not run this mission."
+msgstr ""
+
+#: src/multiplayer/battle/RoomWidgetsWarning.tsx
+msgid "{game} loads player widgets only when Local Widgets Config is on in its widget list."
 msgstr ""
 
 #: src/hub/assets/UploadRunBadge.tsx
@@ -28011,6 +28030,10 @@ msgstr ""
 msgid "Open Warpath."
 msgstr ""
 
+#: src/multiplayer/battle/RoomWidgetsWarning.tsx
+msgid "Open your widgets"
+msgstr ""
+
 #: src/lego/pages/ProjectsPage.tsx
 msgid "Opened from a file"
 msgstr ""
@@ -29337,6 +29360,10 @@ msgstr ""
 #: src/content/pages/PlayerDossierPage.tsx
 #: src/multiplayer/index.tsx
 msgid "Player stats"
+msgstr ""
+
+#: src/multiplayer/battle/RoomWidgetsWarning.tsx
+msgid "Player widgets are switched off in the widget list of {game}."
 msgstr ""
 
 #: src/content/commandRates.ts
@@ -34667,6 +34694,10 @@ msgstr ""
 
 #: src/lego/pages/components/ScriptTab.tsx
 msgid "Show what ran"
+msgstr ""
+
+#: src/multiplayer/battle/RoomWidgetsWarning.tsx
+msgid "Show which"
 msgstr ""
 
 #: src/content/pages/components/ReplaySetsManager.tsx
@@ -40293,6 +40324,10 @@ msgstr ""
 msgid "This replay's order stream holds no orders to count."
 msgstr ""
 
+#: src/multiplayer/battle/RoomWidgetsWarning.tsx
+msgid "This room does not allow player widgets."
+msgstr ""
+
 #: src/direct/share.ts
 msgid "This room has no address another computer can reach, because this machine is on no network."
 msgstr ""
@@ -40303,6 +40338,10 @@ msgstr ""
 
 #: src/deeplink/build.ts
 msgid "This room has no port to join on."
+msgstr ""
+
+#: src/multiplayer/battle/RoomWidgetsWarning.tsx
+msgid "This room hides team colours, which turns off player widgets."
 msgstr ""
 
 #: src/deeplink/parse.ts
@@ -40319,6 +40358,10 @@ msgstr ""
 
 #: src/deeplink/parse.ts
 msgid "This room link's port is not a port."
+msgstr ""
+
+#: src/multiplayer/battle/RoomWidgetsWarning.tsx
+msgid "This room turns off widgets that give orders."
 msgstr ""
 
 #: src/multiplayer/battle/useBattleRoom.ts

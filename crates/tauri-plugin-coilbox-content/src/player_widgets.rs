@@ -34,6 +34,8 @@ pub struct WidgetFile {
     pub nested: bool,
     /// Coilbox's own blueprint widget.
     pub coilbox: bool,
+    /// The file calls `Spring.GiveOrder` or one of its siblings (issue #1292).
+    pub gives_orders: bool,
     pub info: Option<coilbox_springlua::WidgetInfo>,
     /// Why the file's `GetInfo()` could not be read. Set exactly when `info` is
     /// not.
@@ -167,9 +169,11 @@ fn read_file(
 ) -> Option<WidgetFile> {
     let rel = path.strip_prefix(write_dir).map(key).unwrap_or_default();
     let under_luaui = path.strip_prefix(luaui).map(key).unwrap_or_default();
+    let mut gives_orders = false;
     let read = match std::fs::read(path) {
         Ok(bytes) => {
             let src = String::from_utf8_lossy(&bytes);
+            gives_orders = coilbox_springlua::gives_orders(&src);
             coilbox_springlua::SpringLua::new(write_dir)
                 .map_err(|e| e.to_string())
                 .and_then(|lua| lua.widget_info(&src, &rel))
@@ -190,6 +194,7 @@ fn read_file(
         folder: folder.to_string(),
         nested,
         coilbox: widget_owned(&under_luaui),
+        gives_orders,
         info,
         error,
     })
@@ -311,6 +316,33 @@ mod tests {
                 ("LuaUI/Widgets/pack/b.lua", true, Some("B".to_string())),
             ]
         );
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn reports_a_widget_that_gives_orders_and_one_that_declares_control() {
+        let dir = temp_dir("orders");
+        write(
+            &dir,
+            "LuaUI/Widgets/orders.lua",
+            "function widget:GetInfo() return { name = \"Orders\" } end\nSpring.GiveOrder(1, {}, 0)",
+        );
+        write(
+            &dir,
+            "LuaUI/Widgets/declared.lua",
+            "function widget:GetInfo() return { name = \"Declared\", control = true } end",
+        );
+        let scan = scan(&dir, &names());
+        let find = |name: &str| {
+            scan.files
+                .iter()
+                .find(|f| f.info.as_ref().and_then(|i| i.name.as_deref()) == Some(name))
+                .unwrap()
+        };
+        assert!(find("Orders").gives_orders);
+        assert_eq!(find("Orders").info.as_ref().unwrap().control, None);
+        assert!(!find("Declared").gives_orders);
+        assert_eq!(find("Declared").info.as_ref().unwrap().control, Some(true));
         let _ = std::fs::remove_dir_all(&dir);
     }
 
