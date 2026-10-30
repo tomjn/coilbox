@@ -723,6 +723,17 @@ fn dispatch(args: &Args) -> i32 {
     // Archive browsing: list a member tree, read one member for preview, or
     // extract one member to a destination path (download).
     if let Some(Mode::Archive(mode)) = &args.archive {
+        if !mode.members.is_empty() {
+            return run_mode(
+                || archive::members(&args.lib, &mode.archive, &mode.members),
+                print_ok,
+                || {
+                    archive::emit_members_error(
+                        "worker panicked while reading archive members".into(),
+                    )
+                },
+            );
+        }
         if let (Some(inner), Some(dest)) = (mode.file.as_deref(), mode.extract.as_deref()) {
             return run_mode(
                 || archive::extract(&args.lib, &mode.archive, inner, dest),
@@ -1137,7 +1148,7 @@ fn parse_args(raw: &[String]) -> Result<Args, String> {
             "--archive" => archive = it.next(),
             // Consumed by `Mode::Archive`'s `from_args` below, not stored
             // here.
-            "--file" | "--extract" => {
+            "--file" | "--extract" | "--member" => {
                 it.next();
             }
             "--raw" => {}

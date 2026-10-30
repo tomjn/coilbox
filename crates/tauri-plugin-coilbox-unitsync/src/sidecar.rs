@@ -827,6 +827,7 @@ pub fn build_archive_tree_args(
             extract: None,
             raw: false,
             cache_dir: cache_dir.map(String::from),
+            members: Vec::new(),
         })
         .to_args(),
     );
@@ -850,6 +851,27 @@ pub fn build_archive_file_args(
             extract: None,
             raw,
             cache_dir: None,
+            members: Vec::new(),
+        })
+        .to_args(),
+    );
+    args
+}
+
+/// Build args for reading several members of one archive whole as text, in one
+/// worker run (issue #4857).
+pub fn build_archive_members_args(
+    lib: &str,
+    datadir: &str,
+    archive: &str,
+    members: &[String],
+) -> Vec<String> {
+    let mut args = build_args(lib, datadir);
+    args.extend(
+        coilbox_unitsync_worker::Mode::Archive(coilbox_unitsync_worker::ArchiveArgs {
+            archive: archive.into(),
+            members: members.to_vec(),
+            ..Default::default()
         })
         .to_args(),
     );
@@ -913,6 +935,7 @@ pub fn build_archive_extract_args(
             extract: Some(dest.into()),
             raw: false,
             cache_dir: None,
+            members: Vec::new(),
         })
         .to_args(),
     );
@@ -1387,6 +1410,7 @@ mod tests {
                 extract: None,
                 raw: false,
                 cache_dir: Some("/cache/info".into()),
+                members: Vec::new(),
             }
         );
 
@@ -1405,6 +1429,7 @@ mod tests {
                 extract: None,
                 raw: false,
                 cache_dir: None,
+                members: Vec::new(),
             }
         );
 
@@ -1423,6 +1448,7 @@ mod tests {
                 extract: None,
                 raw: true,
                 cache_dir: None,
+                members: Vec::new(),
             }
         );
 
@@ -1441,6 +1467,7 @@ mod tests {
                 extract: Some("/out/x.smd".into()),
                 raw: false,
                 cache_dir: None,
+                members: Vec::new(),
             }
         );
     }

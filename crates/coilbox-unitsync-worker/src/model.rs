@@ -1574,6 +1574,27 @@ pub struct ArchiveFileOutput {
     pub errors: Vec<String>,
 }
 
+/// One member [`ArchiveMembersOutput`] read.
+#[derive(Serialize, Default)]
+#[serde(rename_all = "camelCase")]
+pub struct ArchiveMember {
+    pub path: String,
+    /// Its contents, decoded as UTF-8 with bad bytes replaced. Set exactly when
+    /// `error` is not.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub text: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub error: Option<String>,
+}
+
+/// `--archive` with `--member` flags: each named member read whole as text.
+#[derive(Serialize, Default)]
+#[serde(rename_all = "camelCase")]
+pub struct ArchiveMembersOutput {
+    pub files: Vec<ArchiveMember>,
+    pub errors: Vec<String>,
+}
+
 /// `--lua` mode output. `result` is the pretty-printed value the script returned
 /// (set on success); `error` is a compile/runtime error from the Lua parser (set
 /// on failure). Exactly one of the two is normally set. `errors` carries

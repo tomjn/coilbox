@@ -25,15 +25,16 @@ use coilbox_unitsync_worker::matchsetup::MatchSetup;
 use coilbox_unitsync_worker::{cached, RenderSource};
 use picoframe_core::CliResult;
 use sidecar::{
-    build_archive_extract_args, build_archive_file_args, build_archive_tree_args, build_args,
-    build_compat_palette_args, build_config_args, build_config_set_args, build_convert_3do_args,
-    build_custom_params_args, build_defs_probe_args, build_faction_logos_args, build_game_args,
-    build_game_headers_args, build_height_field_args, build_heightmap_args, build_lua_args,
-    build_lua_compat_args, build_lua_repl_args, build_map_info_args, build_map_meta_args,
-    build_map_skybox_args, build_metalmap_args, build_minimap_args, build_skirmish_ai_args,
-    build_thumbnails_args, build_unit_buildpics_args, build_unit_dataset_args,
-    build_unit_defs_args, build_unit_model_args, build_unit_models_args, build_unit_render_args,
-    build_unit_render_keys_args, build_unit_script_args, find_unitsync, resolve_sidecar,
+    build_archive_extract_args, build_archive_file_args, build_archive_members_args,
+    build_archive_tree_args, build_args, build_compat_palette_args, build_config_args,
+    build_config_set_args, build_convert_3do_args, build_custom_params_args, build_defs_probe_args,
+    build_faction_logos_args, build_game_args, build_game_headers_args, build_height_field_args,
+    build_heightmap_args, build_lua_args, build_lua_compat_args, build_lua_repl_args,
+    build_map_info_args, build_map_meta_args, build_map_skybox_args, build_metalmap_args,
+    build_minimap_args, build_skirmish_ai_args, build_thumbnails_args, build_unit_buildpics_args,
+    build_unit_dataset_args, build_unit_defs_args, build_unit_model_args, build_unit_models_args,
+    build_unit_render_args, build_unit_render_keys_args, build_unit_script_args, find_unitsync,
+    resolve_sidecar,
 };
 use std::collections::HashMap;
 use std::io::{BufRead, Read};
@@ -2015,6 +2016,112 @@ async fn unitsync_archive_file(
     run_worker(bin, args, envs, MINIMAP_TIMEOUT, "archive file", None).await
 }
 
+/// What a worker's `--member` read sends back.
+#[derive(serde::Deserialize)]
+struct MembersRead {
+    files: Vec<MemberRead>,
+    errors: Vec<String>,
+}
+
+#[derive(serde::Deserialize)]
+struct MemberRead {
+    path: String,
+    text: Option<String>,
+    error: Option<String>,
+}
+
+/// One widget file inside an archive and what its `GetInfo()` declares.
+#[derive(serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+struct ArchiveWidget {
+    path: String,
+    /// `None` for a file that runs and defines no `GetInfo`, and when `error`
+    /// is set.
+    info: Option<coilbox_springlua::WidgetInfo>,
+    /// Why the file could not be read or run.
+    error: Option<String>,
+}
+
+#[derive(serde::Serialize)]
+struct ArchiveWidgets {
+    files: Vec<ArchiveWidget>,
+    errors: Vec<String>,
+}
+
+/// Read each file's `GetInfo()` in the springlua sandbox, as the widget page
+/// does for a player's own files. `root` is what the sandbox's `VFS` reads
+/// from disk, which an archive's widget does not need to declare itself.
+fn archive_widget_infos(root: &Path, read: MembersRead) -> ArchiveWidgets {
+    let files = read
+        .files
+        .into_iter()
+        .map(|m| {
+            let got = match (m.text, m.error) {
+                (Some(src), None) => coilbox_springlua::SpringLua::new(root)
+                    .map_err(|e| e.to_string())
+                    .and_then(|lua| lua.widget_info(&src, &m.path)),
+                (_, Some(e)) => Err(e),
+                (None, None) => Err("the worker sent no text".to_string()),
+            };
+            let (info, error) = match got {
+                Ok(info) => (info, None),
+                Err(e) => (None, Some(e)),
+            };
+            ArchiveWidget {
+                path: m.path,
+                info,
+                error,
+            }
+        })
+        .collect();
+    ArchiveWidgets {
+        files,
+        errors: read.errors,
+    }
+}
+
+/// `unitsync_archive_widgets` — what each of `files` in `archive` declares in
+/// its `GetInfo()`, for a game's own widgets (issue #4857). The worker reads
+/// them all in one run, and only the declarations come back, not the source.
+#[tauri::command]
+async fn unitsync_archive_widgets(
+    engine_path: String,
+    data_dir: String,
+    archive: String,
+    files: Vec<String>,
+) -> CliResult {
+    if files.is_empty() {
+        return CliResult::ok(serde_json::json!({ "files": [], "errors": [] }));
+    }
+    let (bin, libpath, engine_dir) = match prepare(&engine_path) {
+        Ok(v) => v,
+        Err(e) => return CliResult::err(e),
+    };
+    let args = build_archive_members_args(&libpath.to_string_lossy(), &data_dir, &archive, &files);
+    let envs = loader_envs(&engine_dir, &data_dir);
+    let root = PathBuf::from(&data_dir);
+    let result = tauri::async_runtime::spawn_blocking(move || {
+        let out = run_served_blocking(
+            bin,
+            args,
+            envs,
+            SCAN_TIMEOUT,
+            "archive widgets".to_string(),
+            None,
+            (pool::Kind::Page, HELD_TOO_LONG),
+        )?;
+        let read: MembersRead = serde_json::from_str(&out)
+            .map_err(|e| format!("could not parse unitsync output: {e}"))?;
+        Ok::<_, String>(archive_widget_infos(&root, read))
+    })
+    .await;
+    match result {
+        Ok(Ok(widgets)) => CliResult::ok(serde_json::json!(widgets)),
+        Ok(Err(e)) => CliResult::err(e),
+        Err(e) => CliResult::err(format!("archive widgets task failed: {e}")),
+    }
+}
+
 /// `unitsync_game_headers` — batch-resolve loading-screen art for every game in
 /// one session, for the Games grid. Disk-cached under the app cache dir, keyed on
 /// cheap file identity (not sync-checksum), so it needs no per-game checksum.
@@ -2751,6 +2858,7 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
             unitsync_engine_config_set,
             unitsync_archive_tree,
             unitsync_archive_file,
+            unitsync_archive_widgets,
             unitsync_game_headers,
             unitsync_lua_exec,
             unitsync_lua_repl_exec,
@@ -2765,6 +2873,40 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn reads_each_archive_widget_info_and_keeps_errors_apart() {
+        let read = MembersRead {
+            files: vec![
+                MemberRead {
+                    path: "LuaUI/Widgets/a.lua".into(),
+                    text: Some(
+                        r#"function widget:GetInfo() return { name = "A", enabled = true } end"#
+                            .into(),
+                    ),
+                    error: None,
+                },
+                MemberRead {
+                    path: "LuaUI/Widgets/helper.lua".into(),
+                    text: Some("local M = {} return M".into()),
+                    error: None,
+                },
+                MemberRead {
+                    path: "LuaUI/Widgets/big.lua".into(),
+                    text: None,
+                    error: Some("too large".into()),
+                },
+            ],
+            errors: vec!["warning".into()],
+        };
+        let out = archive_widget_infos(&std::env::temp_dir(), read);
+        let a = &out.files[0];
+        assert_eq!(a.info.as_ref().and_then(|i| i.name.as_deref()), Some("A"));
+        assert_eq!(a.info.as_ref().and_then(|i| i.enabled), Some(true));
+        assert!(out.files[1].info.is_none() && out.files[1].error.is_none());
+        assert_eq!(out.files[2].error.as_deref(), Some("too large"));
+        assert_eq!(out.errors, vec!["warning"]);
+    }
 
     #[test]
     fn a_conversion_answers_with_its_last_line_that_is_not_progress() {
