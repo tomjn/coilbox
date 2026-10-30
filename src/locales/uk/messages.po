@@ -1306,7 +1306,17 @@ msgstr "{0} з найновішого випуску"
 
 #. placeholder {0}: game.game
 #: src/widgets/pages/WidgetsPage.tsx
+msgid "{0} has not saved its widget settings yet. Start it once to switch widgets on or off here."
+msgstr ""
+
+#. placeholder {0}: game.game
+#: src/widgets/pages/WidgetsPage.tsx
 msgid "{0} loads none of your widgets."
+msgstr ""
+
+#. placeholder {0}: switchName(row, switches.game)
+#: src/widgets/pages/WidgetsPage.tsx
+msgid "{0} on"
 msgstr ""
 
 #. placeholder {0}: formatRate(value)
@@ -8523,6 +8533,10 @@ msgstr "Гра запущена, і цей файл вона записує. {la
 msgid "A game is running, and coilbox does not know where this engine writes, so it cannot tell whether the game will write this file back over. {label} writes its whole blueprints file back when it saves or exits, so anything written now would be thrown away. Close the game and try again."
 msgstr "Гра запущена, а coilbox не знає, куди пише цей рушій, тож не може сказати, чи гра перезапише цей файл. {label} записує весь свій файл креслень під час збереження чи виходу, тому все, що записано зараз, буде втрачено. Закрийте гру й спробуйте знову."
 
+#: src/widgets/widgetConfig.ts
+msgid "A game is running, and it writes this file back when it exits, so anything written now would be lost. Close the game and try again."
+msgstr ""
+
 #: src/scenario/pages/components/BlueprintPanel.tsx
 #, fuzzy
 msgid "A game is running. {gameLabel} writes its whole blueprints file back when it saves or exits, so coilbox will not write into it until the game is closed."
@@ -8537,6 +8551,10 @@ msgstr "Гра запущена. Вона записує весь свій фа�
 #, fuzzy
 msgid "A game is running. The engine reads the widget when a match starts, so a change now lands in the next one."
 msgstr "Гра запущена. Рушій читає віджет на початку матчу, тому зміна зараз потрапить у наступний."
+
+#: src/widgets/pages/WidgetsPage.tsx
+msgid "A game saves this under a name that depends on its version."
+msgstr ""
 
 #: src/profile/health.ts
 #, fuzzy
@@ -15203,6 +15221,10 @@ msgstr "Закрити перегляд моделі"
 msgid "Close protocol console"
 msgstr "Закрити консоль протоколу"
 
+#: src/widgets/pages/WidgetsPage.tsx
+msgid "Close the game to switch widgets on or off."
+msgstr ""
+
 #: src/multiplayer/DebriefingDrawer.tsx
 #, fuzzy
 msgid "Close the match result"
@@ -15431,6 +15453,10 @@ msgstr "не вдалося прочитати"
 #, fuzzy
 msgid "Coilbox could not read {game}: {said}"
 msgstr "Не вдалося прочитати {game}: {said}"
+
+#: src/widgets/widgetConfig.ts
+msgid "Coilbox could not read this file: {reason}"
+msgstr ""
 
 #: src/runlite/unitLimit.ts
 #, fuzzy
@@ -23725,6 +23751,11 @@ msgstr "Має наказ патрулювання"
 msgid "Has the repeat toggle"
 msgstr "Має перемикач повторення"
 
+#. placeholder {0}: row.switch.others.join(", ")
+#: src/widgets/pages/WidgetsPage.tsx
+msgid "Has the same name as {0}, so they share one setting."
+msgstr ""
+
 #: src/content/unitFieldNotes.ts
 #, fuzzy
 msgid "Has the self destruct order"
@@ -30614,6 +30645,10 @@ msgstr "Спроб ще не записано."
 msgid "No audio clip files matched in this game's archive."
 msgstr "В архіві цієї гри не знайдено відповідних аудіокліпів."
 
+#: src/widgets/pages/WidgetsPage.tsx
+msgid "No author stated"
+msgstr ""
+
 #: src/runlite/pages/RunPage.tsx
 #, fuzzy
 msgid "no battle"
@@ -31292,6 +31327,10 @@ msgstr "Для цього матчу немає посилання-запрош�
 #, fuzzy
 msgid "No leftover dialogue clips - nothing to reclaim."
 msgstr "Немає залишених кліпів діалогу – нічого звільняти."
+
+#: src/widgets/pages/WidgetsPage.tsx
+msgid "No licence stated"
+msgstr ""
 
 #: src/content/pages/components/LivingValueChart.tsx
 #, fuzzy
@@ -33822,6 +33861,7 @@ msgstr "Найстаріші"
 
 #: src/play/modOptions.ts
 #: src/profile/SettingsSection.tsx
+#: src/widgets/pages/WidgetsPage.tsx
 #, fuzzy
 msgid "On"
 msgstr "Увімкнено"
@@ -48861,6 +48901,10 @@ msgstr "Ця гра не має юніта з такою назвою, тож к
 #, fuzzy
 msgid "This game has none of its units: {list}. Nothing in it can be placed here, so it belongs to another game or another version of this one."
 msgstr "Ця гра не має жодного з його юнітів: {list}. Тут нічого з нього не можна розмістити, тож він належить іншій грі або іншій версії цієї."
+
+#: src/widgets/widgetConfig.ts
+msgid "This game has not saved its widget settings yet. Start it once, then try again."
+msgstr ""
 
 #: src/content/pages/components/states.tsx
 #, fuzzy

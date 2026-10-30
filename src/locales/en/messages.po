@@ -1079,8 +1079,18 @@ msgstr "{0} from the newest release"
 
 #. placeholder {0}: game.game
 #: src/widgets/pages/WidgetsPage.tsx
+msgid "{0} has not saved its widget settings yet. Start it once to switch widgets on or off here."
+msgstr "{0} has not saved its widget settings yet. Start it once to switch widgets on or off here."
+
+#. placeholder {0}: game.game
+#: src/widgets/pages/WidgetsPage.tsx
 msgid "{0} loads none of your widgets."
 msgstr "{0} loads none of your widgets."
+
+#. placeholder {0}: switchName(row, switches.game)
+#: src/widgets/pages/WidgetsPage.tsx
+msgid "{0} on"
+msgstr "{0} on"
 
 #. placeholder {0}: formatRate(value)
 #: src/content/pages/components/PlayerMatchFigures.tsx
@@ -6875,6 +6885,10 @@ msgstr "A game is running and this file is one it writes. {label} writes its who
 msgid "A game is running, and coilbox does not know where this engine writes, so it cannot tell whether the game will write this file back over. {label} writes its whole blueprints file back when it saves or exits, so anything written now would be thrown away. Close the game and try again."
 msgstr "A game is running, and coilbox does not know where this engine writes, so it cannot tell whether the game will write this file back over. {label} writes its whole blueprints file back when it saves or exits, so anything written now would be thrown away. Close the game and try again."
 
+#: src/widgets/widgetConfig.ts
+msgid "A game is running, and it writes this file back when it exits, so anything written now would be lost. Close the game and try again."
+msgstr "A game is running, and it writes this file back when it exits, so anything written now would be lost. Close the game and try again."
+
 #: src/scenario/pages/components/BlueprintPanel.tsx
 msgid "A game is running. {gameLabel} writes its whole blueprints file back when it saves or exits, so coilbox will not write into it until the game is closed."
 msgstr "A game is running. {gameLabel} writes its whole blueprints file back when it saves or exits, so coilbox will not write into it until the game is closed."
@@ -6886,6 +6900,10 @@ msgstr "A game is running. It writes its whole blueprints file back when it save
 #: src/blueprint/pages/components/WidgetPanel.tsx
 msgid "A game is running. The engine reads the widget when a match starts, so a change now lands in the next one."
 msgstr "A game is running. The engine reads the widget when a match starts, so a change now lands in the next one."
+
+#: src/widgets/pages/WidgetsPage.tsx
+msgid "A game saves this under a name that depends on its version."
+msgstr "A game saves this under a name that depends on its version."
 
 #: src/profile/health.ts
 msgid "A game with no hand-made map to offer keeps them, so there is always something to pick."
@@ -12297,6 +12315,10 @@ msgstr "Close model view"
 msgid "Close protocol console"
 msgstr "Close protocol console"
 
+#: src/widgets/pages/WidgetsPage.tsx
+msgid "Close the game to switch widgets on or off."
+msgstr "Close the game to switch widgets on or off."
+
 #: src/multiplayer/DebriefingDrawer.tsx
 msgid "Close the match result"
 msgstr "Close the match result"
@@ -12482,6 +12504,10 @@ msgstr "coilbox could not read"
 #: src/hub/pages/components/GamePicturesControl.tsx
 msgid "Coilbox could not read {game}: {said}"
 msgstr "Coilbox could not read {game}: {said}"
+
+#: src/widgets/widgetConfig.ts
+msgid "Coilbox could not read this file: {reason}"
+msgstr "Coilbox could not read this file: {reason}"
 
 #: src/runlite/unitLimit.ts
 msgid "Coilbox could not read this game's unit data, so it cannot limit your units. Rewards will offer perks only and every unit will be available from the first battle."
@@ -19211,6 +19237,11 @@ msgstr "Has the patrol order"
 msgid "Has the repeat toggle"
 msgstr "Has the repeat toggle"
 
+#. placeholder {0}: row.switch.others.join(", ")
+#: src/widgets/pages/WidgetsPage.tsx
+msgid "Has the same name as {0}, so they share one setting."
+msgstr "Has the same name as {0}, so they share one setting."
+
 #: src/content/unitFieldNotes.ts
 msgid "Has the self destruct order"
 msgstr "Has the self destruct order"
@@ -24792,6 +24823,10 @@ msgstr "No attempts recorded yet."
 msgid "No audio clip files matched in this game's archive."
 msgstr "No audio clip files matched in this game's archive."
 
+#: src/widgets/pages/WidgetsPage.tsx
+msgid "No author stated"
+msgstr "No author stated"
+
 #: src/runlite/pages/RunPage.tsx
 msgid "no battle"
 msgstr "no battle"
@@ -25341,6 +25376,10 @@ msgstr "No invite link for this battle. {inviteProblem}"
 #: src/scenario/pages/components/ReclaimClipsForm.tsx
 msgid "No leftover dialogue clips - nothing to reclaim."
 msgstr "No leftover dialogue clips - nothing to reclaim."
+
+#: src/widgets/pages/WidgetsPage.tsx
+msgid "No licence stated"
+msgstr "No licence stated"
 
 #: src/content/pages/components/LivingValueChart.tsx
 msgid "No line is on the chart above."
@@ -27380,6 +27419,7 @@ msgstr "Oldest"
 
 #: src/play/modOptions.ts
 #: src/profile/SettingsSection.tsx
+#: src/widgets/pages/WidgetsPage.tsx
 msgid "On"
 msgstr "On"
 
@@ -39550,6 +39590,10 @@ msgstr "This game has no unit of that name, so the button would do nothing."
 #: src/blueprint/units.ts
 msgid "This game has none of its units: {list}. Nothing in it can be placed here, so it belongs to another game or another version of this one."
 msgstr "This game has none of its units: {list}. Nothing in it can be placed here, so it belongs to another game or another version of this one."
+
+#: src/widgets/widgetConfig.ts
+msgid "This game has not saved its widget settings yet. Start it once, then try again."
+msgstr "This game has not saved its widget settings yet. Start it once, then try again."
 
 #: src/content/pages/components/states.tsx
 msgid "This game is missing something it depends on"

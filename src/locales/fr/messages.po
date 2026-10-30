@@ -1306,7 +1306,17 @@ msgstr "{0} depuis la dernière version"
 
 #. placeholder {0}: game.game
 #: src/widgets/pages/WidgetsPage.tsx
+msgid "{0} has not saved its widget settings yet. Start it once to switch widgets on or off here."
+msgstr ""
+
+#. placeholder {0}: game.game
+#: src/widgets/pages/WidgetsPage.tsx
 msgid "{0} loads none of your widgets."
+msgstr ""
+
+#. placeholder {0}: switchName(row, switches.game)
+#: src/widgets/pages/WidgetsPage.tsx
+msgid "{0} on"
 msgstr ""
 
 #. placeholder {0}: formatRate(value)
@@ -8523,6 +8533,10 @@ msgstr "Un jeu est en cours et ce fichier est l’un de ceux qu’il écrit. {la
 msgid "A game is running, and coilbox does not know where this engine writes, so it cannot tell whether the game will write this file back over. {label} writes its whole blueprints file back when it saves or exits, so anything written now would be thrown away. Close the game and try again."
 msgstr "Un jeu est en cours, et coilbox ne sait pas où ce moteur écrit, il ne peut donc pas dire si le jeu réécrira ce fichier. {label} réécrit tout son fichier de plans quand il enregistre ou quitte, tout ce qui serait écrit maintenant serait donc perdu. Fermez le jeu et réessayez."
 
+#: src/widgets/widgetConfig.ts
+msgid "A game is running, and it writes this file back when it exits, so anything written now would be lost. Close the game and try again."
+msgstr ""
+
 #: src/scenario/pages/components/BlueprintPanel.tsx
 #, fuzzy
 msgid "A game is running. {gameLabel} writes its whole blueprints file back when it saves or exits, so coilbox will not write into it until the game is closed."
@@ -8537,6 +8551,10 @@ msgstr "Un jeu est en cours. Il réécrit tout son fichier de plans quand il enr
 #, fuzzy
 msgid "A game is running. The engine reads the widget when a match starts, so a change now lands in the next one."
 msgstr "Un jeu est en cours. Le moteur lit le widget au début d’une partie, une modification maintenant s’appliquera donc à la suivante."
+
+#: src/widgets/pages/WidgetsPage.tsx
+msgid "A game saves this under a name that depends on its version."
+msgstr ""
 
 #: src/profile/health.ts
 #, fuzzy
@@ -15203,6 +15221,10 @@ msgstr "Fermer la vue du modèle"
 msgid "Close protocol console"
 msgstr "Fermer la console du protocole"
 
+#: src/widgets/pages/WidgetsPage.tsx
+msgid "Close the game to switch widgets on or off."
+msgstr ""
+
 #: src/multiplayer/DebriefingDrawer.tsx
 #, fuzzy
 msgid "Close the match result"
@@ -15431,6 +15453,10 @@ msgstr "illisible par coilbox"
 #, fuzzy
 msgid "Coilbox could not read {game}: {said}"
 msgstr "Coilbox n’a pas pu lire {game} : {said}"
+
+#: src/widgets/widgetConfig.ts
+msgid "Coilbox could not read this file: {reason}"
+msgstr ""
 
 #: src/runlite/unitLimit.ts
 #, fuzzy
@@ -23725,6 +23751,11 @@ msgstr "A l’ordre de patrouille"
 msgid "Has the repeat toggle"
 msgstr "A l’interrupteur de répétition"
 
+#. placeholder {0}: row.switch.others.join(", ")
+#: src/widgets/pages/WidgetsPage.tsx
+msgid "Has the same name as {0}, so they share one setting."
+msgstr ""
+
 #: src/content/unitFieldNotes.ts
 #, fuzzy
 msgid "Has the self destruct order"
@@ -30614,6 +30645,10 @@ msgstr "Aucune tentative enregistrée."
 msgid "No audio clip files matched in this game's archive."
 msgstr "Aucun fichier audio correspondant dans l’archive de ce jeu."
 
+#: src/widgets/pages/WidgetsPage.tsx
+msgid "No author stated"
+msgstr ""
+
 #: src/runlite/pages/RunPage.tsx
 #, fuzzy
 msgid "no battle"
@@ -31292,6 +31327,10 @@ msgstr "Aucun lien d’invitation pour cette partie. {inviteProblem}"
 #, fuzzy
 msgid "No leftover dialogue clips - nothing to reclaim."
 msgstr "Aucun clip de dialogue restant : rien à récupérer."
+
+#: src/widgets/pages/WidgetsPage.tsx
+msgid "No licence stated"
+msgstr ""
 
 #: src/content/pages/components/LivingValueChart.tsx
 #, fuzzy
@@ -33822,6 +33861,7 @@ msgstr "Plus ancien"
 
 #: src/play/modOptions.ts
 #: src/profile/SettingsSection.tsx
+#: src/widgets/pages/WidgetsPage.tsx
 #, fuzzy
 msgid "On"
 msgstr "Activé"
@@ -48861,6 +48901,10 @@ msgstr "Ce jeu n’a pas d’unité de ce nom, le bouton ne ferait donc rien."
 #, fuzzy
 msgid "This game has none of its units: {list}. Nothing in it can be placed here, so it belongs to another game or another version of this one."
 msgstr "Ce jeu n’a aucune de ses unités : {list}. Rien ici ne peut y être placé, il appartient donc à un autre jeu ou à une autre version de celui-ci."
+
+#: src/widgets/widgetConfig.ts
+msgid "This game has not saved its widget settings yet. Start it once, then try again."
+msgstr ""
 
 #: src/content/pages/components/states.tsx
 #, fuzzy

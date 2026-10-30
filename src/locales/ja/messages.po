@@ -1306,7 +1306,17 @@ msgstr "最新リリースの {0}"
 
 #. placeholder {0}: game.game
 #: src/widgets/pages/WidgetsPage.tsx
+msgid "{0} has not saved its widget settings yet. Start it once to switch widgets on or off here."
+msgstr ""
+
+#. placeholder {0}: game.game
+#: src/widgets/pages/WidgetsPage.tsx
 msgid "{0} loads none of your widgets."
+msgstr ""
+
+#. placeholder {0}: switchName(row, switches.game)
+#: src/widgets/pages/WidgetsPage.tsx
+msgid "{0} on"
 msgstr ""
 
 #. placeholder {0}: formatRate(value)
@@ -8523,6 +8533,10 @@ msgstr "ゲームが実行中で、このファイルはゲームが書き込む
 msgid "A game is running, and coilbox does not know where this engine writes, so it cannot tell whether the game will write this file back over. {label} writes its whole blueprints file back when it saves or exits, so anything written now would be thrown away. Close the game and try again."
 msgstr "ゲームが実行中ですが、coilbox はこのエンジンの書き込み先を知らないため、ゲームがこのファイルを上書きするかどうか判断できません。{label} は保存時や終了時に設計図ファイル全体を書き戻すため、今書き込んだ内容は破棄されます。ゲームを閉じてから再試行してください。"
 
+#: src/widgets/widgetConfig.ts
+msgid "A game is running, and it writes this file back when it exits, so anything written now would be lost. Close the game and try again."
+msgstr ""
+
 #: src/scenario/pages/components/BlueprintPanel.tsx
 #, fuzzy
 msgid "A game is running. {gameLabel} writes its whole blueprints file back when it saves or exits, so coilbox will not write into it until the game is closed."
@@ -8537,6 +8551,10 @@ msgstr "ゲームが実行中です。ゲームは保存時や終了時に設計
 #, fuzzy
 msgid "A game is running. The engine reads the widget when a match starts, so a change now lands in the next one."
 msgstr "ゲームが実行中です。エンジンは試合開始時にウィジェットを読み込むため、今の変更は次の試合から反映されます。"
+
+#: src/widgets/pages/WidgetsPage.tsx
+msgid "A game saves this under a name that depends on its version."
+msgstr ""
 
 #: src/profile/health.ts
 #, fuzzy
@@ -15203,6 +15221,10 @@ msgstr "モデル表示を閉じる"
 msgid "Close protocol console"
 msgstr "プロトコルコンソールを閉じる"
 
+#: src/widgets/pages/WidgetsPage.tsx
+msgid "Close the game to switch widgets on or off."
+msgstr ""
+
 #: src/multiplayer/DebriefingDrawer.tsx
 #, fuzzy
 msgid "Close the match result"
@@ -15431,6 +15453,10 @@ msgstr "coilbox が読み込めませんでした"
 #, fuzzy
 msgid "Coilbox could not read {game}: {said}"
 msgstr "Coilbox は {game} を読み込めませんでした：{said}"
+
+#: src/widgets/widgetConfig.ts
+msgid "Coilbox could not read this file: {reason}"
+msgstr ""
 
 #: src/runlite/unitLimit.ts
 #, fuzzy
@@ -23725,6 +23751,11 @@ msgstr "パトロール命令あり"
 msgid "Has the repeat toggle"
 msgstr "リピート切り替えあり"
 
+#. placeholder {0}: row.switch.others.join(", ")
+#: src/widgets/pages/WidgetsPage.tsx
+msgid "Has the same name as {0}, so they share one setting."
+msgstr ""
+
 #: src/content/unitFieldNotes.ts
 #, fuzzy
 msgid "Has the self destruct order"
@@ -30614,6 +30645,10 @@ msgstr "まだ挑戦の記録はありません。"
 msgid "No audio clip files matched in this game's archive."
 msgstr "このゲームのアーカイブに一致する音声クリップファイルはありません。"
 
+#: src/widgets/pages/WidgetsPage.tsx
+msgid "No author stated"
+msgstr ""
+
 #: src/runlite/pages/RunPage.tsx
 #, fuzzy
 msgid "no battle"
@@ -31292,6 +31327,10 @@ msgstr "この試合の招待リンクはありません。{inviteProblem}"
 #, fuzzy
 msgid "No leftover dialogue clips - nothing to reclaim."
 msgstr "残っているセリフのクリップはありません — 解放するものはありません。"
+
+#: src/widgets/pages/WidgetsPage.tsx
+msgid "No licence stated"
+msgstr ""
 
 #: src/content/pages/components/LivingValueChart.tsx
 #, fuzzy
@@ -33822,6 +33861,7 @@ msgstr "古い順"
 
 #: src/play/modOptions.ts
 #: src/profile/SettingsSection.tsx
+#: src/widgets/pages/WidgetsPage.tsx
 #, fuzzy
 msgid "On"
 msgstr "オン"
@@ -48861,6 +48901,10 @@ msgstr "このゲームにはその名前のユニットがないため、ボタ
 #, fuzzy
 msgid "This game has none of its units: {list}. Nothing in it can be placed here, so it belongs to another game or another version of this one."
 msgstr "このゲームにはそのユニットが 1 つもありません：{list}。ここに配置できるものはないため、別のゲームか、このゲームの別バージョン用です。"
+
+#: src/widgets/widgetConfig.ts
+msgid "This game has not saved its widget settings yet. Start it once, then try again."
+msgstr ""
 
 #: src/content/pages/components/states.tsx
 #, fuzzy
