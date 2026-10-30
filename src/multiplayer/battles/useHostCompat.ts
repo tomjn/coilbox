@@ -12,10 +12,7 @@ import {
   compatBuildKey,
   useCompatBuild,
 } from "../../compat/buildStore";
-import {
-  useCompatSettings,
-  withCompatEntry,
-} from "../../content/compatSettings";
+import { useCompatSettings } from "../../content/compatSettings";
 import { compatGameName } from "../battle/compatBattle";
 import { hexToI32 } from "../battle/config";
 import { hashFailureMessage } from "./useHostContent";
@@ -107,9 +104,7 @@ export function useHostCompat(
   target: Pick<PlayTarget, "enginePath" | "dataDir"> | null,
   game: HostableGame | undefined,
 ): HostCompat {
-  const [settings, setSettings] = useCompatSettings();
-  const settingsRef = useRef(settings);
-  settingsRef.current = settings;
+  const [settings] = useCompatSettings();
 
   const enginePath = target?.enginePath;
   const dataDir = target?.dataDir;
@@ -181,16 +176,7 @@ export function useHostCompat(
       gameName,
       baseChecksum,
       manifestVersion: version,
-    }).then(
-      () =>
-        setSettings(
-          withCompatEntry(settingsRef.current, archive, {
-            enabled: true,
-            version,
-          }),
-        ),
-      (e) => setBuildError(describeError(e)),
-    );
+    }).catch((e) => setBuildError(describeError(e)));
   };
 
   const mutatorName =
