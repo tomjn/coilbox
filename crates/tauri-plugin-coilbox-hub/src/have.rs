@@ -791,6 +791,21 @@ mod tests {
         assert_eq!(answers[1199].identity, keys[1199].identity);
     }
 
+    /// Another program on the machine can probe the stand-in hub's port. Its
+    /// `GET /` is no part of the have check, so it is not counted or answered.
+    #[tokio::test]
+    async fn a_stray_request_to_the_stand_in_hub_is_not_counted() {
+        let hub = HaveServer::holding(&[]);
+        let stray = reqwest::get(hub.url().replace("/api/v1/assets/have", "/")).await;
+        assert!(stray.is_err(), "the stand-in answered a GET /");
+
+        ask_in_batches(&hub.url(), "a-token", &[unit("bar", "armsolar", "src-a")])
+            .await
+            .unwrap();
+
+        assert_eq!(hub.requests(), 1);
+    }
+
     #[tokio::test]
     async fn a_hub_that_speaks_a_newer_version_is_not_guessed_at() {
         let hub = HaveServer::answering(

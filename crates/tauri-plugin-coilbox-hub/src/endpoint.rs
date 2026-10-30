@@ -233,18 +233,33 @@ mod tests {
     /// what the frontend translates, so the test pins it and not the sentence.
     #[tokio::test]
     async fn an_answer_past_the_cap_is_refused_as_not_a_hub() {
-        use tokio::io::AsyncWriteExt;
+        use tokio::io::{AsyncReadExt, AsyncWriteExt};
         let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
         let port = listener.local_addr().unwrap().port();
+        // Every connection gets the answer, because another program on the
+        // machine can probe the port before the client connects. The request is
+        // read first: closing a socket with the request unread resets the
+        // connection, and the client then loses the answer.
         tokio::spawn(async move {
-            let (mut socket, _) = listener.accept().await.unwrap();
-            let body = "x".repeat(64);
-            let head = format!(
-                "HTTP/1.1 200 OK\r\nContent-Length: {}\r\nConnection: close\r\n\r\n",
-                body.len()
-            );
-            let _ = socket.write_all(head.as_bytes()).await;
-            let _ = socket.write_all(body.as_bytes()).await;
+            while let Ok((mut socket, _)) = listener.accept().await {
+                tokio::spawn(async move {
+                    let mut request = Vec::new();
+                    let mut chunk = [0u8; 1024];
+                    while !request.windows(4).any(|w| w == b"\r\n\r\n") {
+                        match socket.read(&mut chunk).await {
+                            Ok(0) | Err(_) => return,
+                            Ok(n) => request.extend_from_slice(&chunk[..n]),
+                        }
+                    }
+                    let body = "x".repeat(64);
+                    let head = format!(
+                        "HTTP/1.1 200 OK\r\nContent-Length: {}\r\nConnection: close\r\n\r\n",
+                        body.len()
+                    );
+                    let _ = socket.write_all(head.as_bytes()).await;
+                    let _ = socket.write_all(body.as_bytes()).await;
+                });
+            }
         });
         let response = reqwest::Client::new()
             .get(format!("http://127.0.0.1:{port}/"))

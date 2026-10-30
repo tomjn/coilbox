@@ -226,7 +226,8 @@ pub(crate) mod tests {
     }
 
     /// Accept TLS connections with the test certificate, and hand each one to
-    /// `serve`.
+    /// `serve`. A connection whose handshake fails is dropped, because other
+    /// programs on a developer machine probe new local ports.
     pub(crate) async fn tls_server<F, Fut>(serve: F) -> SocketAddr
     where
         F: Fn(tokio_rustls::server::TlsStream<TcpStream>) -> Fut + Send + Sync + 'static,
@@ -247,11 +248,16 @@ pub(crate) mod tests {
             .await
             .expect("a free loopback port");
         let addr = listener.local_addr().expect("a bound address");
+        let serve = Arc::new(serve);
         tokio::spawn(async move {
             while let Ok((tcp, _)) = listener.accept().await {
                 let acceptor = acceptor.clone();
-                let served = serve(acceptor.accept(tcp).await.expect("a TLS handshake"));
-                tokio::spawn(served);
+                let serve = serve.clone();
+                tokio::spawn(async move {
+                    if let Ok(stream) = acceptor.accept(tcp).await {
+                        serve(stream).await;
+                    }
+                });
             }
         });
         addr
@@ -334,6 +340,38 @@ pub(crate) mod tests {
         conn.send_to(&message, addr).await.expect("sent");
 
         assert_eq!(hears.recv().await, Some(message));
+    }
+
+    /// Another program on the machine can connect to the test server and speak
+    /// something other than TLS. The server drops that connection and still
+    /// serves the next one.
+    #[tokio::test]
+    async fn a_connection_that_is_not_tls_does_not_stop_the_server() {
+        let stun = stun_message(0);
+        let sent = stun.clone();
+        let addr = tls_server(move |mut stream| {
+            let sent = sent.clone();
+            async move {
+                stream.write_all(&sent).await.expect("the client is there");
+                stream.flush().await.expect("the client is there");
+                std::future::pending::<()>().await;
+            }
+        })
+        .await;
+
+        let mut stray = TcpStream::connect(addr).await.expect("the server is up");
+        stray
+            .write_all(b"GET / HTTP/1.1\r\n\r\n")
+            .await
+            .expect("sent");
+        drop(stray);
+
+        let conn = TlsConn::connect(&addr.to_string(), trusting_the_test_ca())
+            .await
+            .expect("a TLS connection the test CA vouches for");
+        let mut buf = vec![0u8; 1500];
+        let (read, _) = conn.recv_from(&mut buf).await.expect("the STUN message");
+        assert_eq!(&buf[..read], &stun[..]);
     }
 
     /// A stream that has lost its place cannot find it again, so it has to

@@ -126,6 +126,10 @@ async fn read_request(sock: &mut tokio::net::TcpStream) -> Option<(String, Strin
 }
 
 /// The same, with the body left as bytes, which is what a multipart body is.
+///
+/// Only a `POST` to the hub's `/api/v1/` routes counts as a request. Other
+/// programs on a developer machine probe new local ports with a `GET /`, and a
+/// stand-in that counted that would fail every assertion on a request count.
 async fn read_raw(sock: &mut tokio::net::TcpStream) -> Option<(String, Vec<u8>)> {
     let mut buf = Vec::new();
     let mut chunk = [0u8; 4096];
@@ -139,6 +143,9 @@ async fn read_raw(sock: &mut tokio::net::TcpStream) -> Option<(String, Vec<u8>)>
         }
     };
     let head = String::from_utf8_lossy(&buf[..head_end]).to_ascii_lowercase();
+    if !head.starts_with("post /api/v1/") {
+        return None;
+    }
     let len: usize = head
         .lines()
         .find_map(|l| {
