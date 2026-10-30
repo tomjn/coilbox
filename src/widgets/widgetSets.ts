@@ -45,9 +45,18 @@ export function setKey(game: Pick<GameHandler, "game" | "shortName">): string {
   return game.shortName ?? game.game;
 }
 
+/** `record[key]`, not counting what every object inherits, so a widget or
+ *  game named `constructor` reads as unset. */
+export function entry<T>(
+  record: Readonly<Record<string, T>>,
+  key: string,
+): T | undefined {
+  return Object.hasOwn(record, key) ? record[key] : undefined;
+}
+
 /** The set a game uses: its own when it has one, otherwise the global one. */
 export function appliedSet(sets: WidgetSets, key: string | null): WidgetStates {
-  return (key !== null && sets.overrides[key]) || sets.global;
+  return (key !== null && entry(sets.overrides, key)) || sets.global;
 }
 
 /** A widget with a switch, which is one a set can say something about. */
@@ -77,7 +86,7 @@ function withSet(
   key: string,
   change: (set: WidgetStates) => WidgetStates,
 ): WidgetSets {
-  const own = sets.overrides[key];
+  const own = entry(sets.overrides, key);
   if (own) {
     const next = change(own);
     return next === own
@@ -106,7 +115,7 @@ export function absorbFile(
   order: ReadonlyMap<string, number>,
   widgets: readonly SwitchableWidget[],
 ): WidgetSets {
-  const last = sets.written[path] ?? {};
+  const last = entry(sets.written, path) ?? {};
   const changes: Record<string, boolean> = {};
   const defaults: Record<string, boolean> = {};
   const set = appliedSet(sets, key);
@@ -115,12 +124,14 @@ export function absorbFile(
     if (saved === null) {
       // No entry to compare with what was written, so only an unset widget
       // learns anything from it.
-      if (set[w.name] === undefined) defaults[w.name] = w.enabled;
+      if (entry(set, w.name) === undefined) defaults[w.name] = w.enabled;
       continue;
     }
     const inFile = (order.get(saved) ?? 0) > 0;
-    const wrote = last[w.name];
-    if (wrote === undefined ? set[w.name] === undefined : inFile !== wrote) {
+    const wrote = entry(last, w.name);
+    if (
+      wrote === undefined ? entry(set, w.name) === undefined : inFile !== wrote
+    ) {
       changes[w.name] = inFile;
     }
   }
@@ -156,7 +167,7 @@ export function recordWrite(
     ...sets,
     written: {
       ...sets.written,
-      [path]: { ...sets.written[path], ...Object.fromEntries(states) },
+      [path]: { ...entry(sets.written, path), ...Object.fromEntries(states) },
     },
   };
 }
@@ -173,7 +184,7 @@ export function switchIn(
   on: boolean,
 ): WidgetSets {
   if (key === null) return { ...sets, global: { ...sets.global, [name]: on } };
-  const own = sets.overrides[key] ?? sets.global;
+  const own = entry(sets.overrides, key) ?? sets.global;
   return {
     ...sets,
     overrides: { ...sets.overrides, [key]: { ...own, [name]: on } },
@@ -182,7 +193,7 @@ export function switchIn(
 
 /** Send a game back to the global set. */
 export function dropOverride(sets: WidgetSets, key: string): WidgetSets {
-  if (!sets.overrides[key]) return sets;
+  if (!entry(sets.overrides, key)) return sets;
   const { [key]: _dropped, ...rest } = sets.overrides;
   return { ...sets, overrides: rest };
 }

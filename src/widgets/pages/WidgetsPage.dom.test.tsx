@@ -225,6 +225,19 @@ describe("WidgetsPage", () => {
     expect(screen.queryByRole("switch")).toBeNull();
   });
 
+  it("offers no switch for a linked game that is not installed", () => {
+    page("/library/widgets?game=Gone%201.0");
+    expect(screen.queryByRole("switch")).toBeNull();
+  });
+
+  it("shows every game's unreadable file with all games picked", () => {
+    files.files = new Map([
+      ["Metal Factions v2.58", { kind: "error", error: "bad file" }],
+    ]);
+    page();
+    expect(screen.getByText("Metal Factions v2.58: bad file")).toBeTruthy();
+  });
+
   it("says when the game has not saved a file yet", () => {
     files.files = new Map([["Metal Factions v2.58", { kind: "missing" }]]);
     page("/library/widgets?game=Metal%20Factions%20v2.58");

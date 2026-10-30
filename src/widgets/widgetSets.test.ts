@@ -129,6 +129,14 @@ describe("widget sets", () => {
     expect(appliedSet(sets, "MF")).toBe(sets.global);
   });
 
+  it("does not take an inherited property for a set or a setting", () => {
+    expect(appliedSet(EMPTY_SETS, "constructor")).toBe(EMPTY_SETS.global);
+    const ctor = widget("constructor", [], true);
+    expect(
+      absorbFile(EMPTY_SETS, "MF", PATH, new Map(), [ctor]).global,
+    ).toEqual({ constructor: true });
+  });
+
   it("writes every widget the game loads, and one the set leaves out as off", () => {
     const sets = { ...EMPTY_SETS, global: { Minimap: true, Radar: true } };
     expect(statesToWrite(sets, "MF", [watch, minimap])).toEqual(

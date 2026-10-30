@@ -29,6 +29,7 @@ import { folderToOpen, rowsForGame, type WidgetRow } from "../widgetList";
 import {
   appliedSet,
   dropOverride,
+  entry,
   setKey,
   switchIn,
   updateSets,
@@ -60,7 +61,7 @@ export default function WidgetsPage() {
   const file = game ? files.files?.get(game.game) : undefined;
   // A game whose handler is not recognised has no file to write, so no set.
   const key = game?.handler ? setKey(game) : null;
-  const ownSet = key !== null && !!sets.overrides[key];
+  const ownSet = key !== null && !!entry(sets.overrides, key);
 
   const shown = useMemo(() => {
     if (!list.rows) return null;
@@ -150,6 +151,13 @@ export default function WidgetsPage() {
       )}
 
       {file?.kind === "error" && <ErrorBanner message={file.error} />}
+      {picked === ALL &&
+        [...(files.files ?? [])].map(
+          ([name, f]) =>
+            f.kind === "error" && (
+              <ErrorBanner key={name} message={`${name}: ${f.error}`} />
+            ),
+        )}
       {game && file?.kind === "missing" && (
         <p role="status" className="text-sm text-muted-foreground">
           <Trans>
@@ -198,14 +206,14 @@ export default function WidgetsPage() {
             showGames={!game && list.gamesKnown}
             someUnknown={!!list.games?.some((g) => g.handler === null)}
             switches={
-              !game
+              picked === ALL
                 ? {
                     game: null,
                     set: sets.global,
                     toggle: (name, on) =>
                       updateSets((s) => switchIn(s, null, name, on)),
                   }
-                : key !== null
+                : game && key !== null
                   ? {
                       game: game.game,
                       set: appliedSet(sets, key),
