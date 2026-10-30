@@ -1293,4 +1293,112 @@ do
 	check("with no LOG to give, no fix failed", #bare.logs == 0, table.concat(bare.logs, "; "))
 end
 
+--------------------------------------------------------------------------------
+-- A sync action named GameFrame is not the call-in, which Complete Annihilation's
+-- nano spray gadget relied on (issue #4867)
+--------------------------------------------------------------------------------
+
+-- The parts of a gadget handler this needs, shaped as Complete Annihilation's
+-- gadgets.lua and the engine's LuaGadgets/gadgets.lua have them: the action
+-- table read on each AddSyncAction, a call-in list, and the call-in it removes
+-- a gadget from.
+local function gadgetHandlerFor(env)
+	local actions = {}
+	local syncActions = {}
+	function actions.AddSyncAction(gadget, cmd, func)
+		syncActions[cmd] = func
+		return true
+	end
+	local gh = { actionHandler = actions, GameFrameList = {} }
+	function gh:RemoveGadgetCallIn(name, g)
+		local list = self[name .. "List"]
+		for i, v in ipairs(list) do
+			if v == g then
+				table.remove(list, i)
+			end
+		end
+	end
+	function gh:GameFrame(frame)
+		for _, g in ipairs(self.GameFrameList) do
+			g:GameFrame(frame)
+		end
+	end
+	env.gadgetHandler = gh
+	return env.gadgetHandler, syncActions
+end
+
+do
+	local before = newEngine({ synced = false, manifest = 18 })
+	prelude(before)
+	local gh = gadgetHandlerFor(before.env)
+	local got = {}
+	local nano = { GameFrame = function(_, offset) got[#got + 1] = offset end }
+	gh.GameFrameList[1] = nano
+	gh.actionHandler.AddSyncAction(nano, "nano_GameFrame", nano.GameFrame)
+	gh:GameFrame(30)
+	check("manifest 18 calls a sync action with the frame number", got[1] == 30)
+
+	local engine = newEngine({ synced = false, manifest = 19 })
+	prelude(engine)
+	local handler, syncActions = gadgetHandlerFor(engine.env)
+	check("the game's gadgetHandler is the global", engine.env.gadgetHandler == handler)
+
+	-- A function that is both gadget.GameFrame and a sync action, as in nano spray.
+	local nanoOffsets = {}
+	local nanoSpray = { GameFrame = function(_, offset) nanoOffsets[#nanoOffsets + 1] = offset end }
+	-- A gadget that wants the call-in, with a sync action of another name.
+	local frames = {}
+	local wants = { GameFrame = function(_, frame) frames[#frames + 1] = frame end }
+	local other = function() end
+	-- A sync action named GameFrame only in a local, as in lups_napalm.
+	local localOne = { GameFrame = nil }
+
+	handler.GameFrameList[1] = nanoSpray
+	handler.GameFrameList[2] = wants
+
+	-- The gadgets call this from gadget:Initialize, once they are in the list.
+	local added = handler.actionHandler.AddSyncAction(nanoSpray, "nano_GameFrame", nanoSpray.GameFrame)
+	check("AddSyncAction still returns what the handler's does", added == true)
+	handler.actionHandler.AddSyncAction(wants, "wants_message", other)
+	handler.actionHandler.AddSyncAction(localOne, "napalm_GameFrame", other)
+
+	check("the sync action is still registered", syncActions.nano_GameFrame == nanoSpray.GameFrame)
+	check("the other gadget's sync action is registered", syncActions.wants_message == other)
+	check("the function stays in the gadget's table", type(nanoSpray.GameFrame) == "function")
+
+	handler:GameFrame(30)
+	check("a sync action does not get the frame number", #nanoOffsets == 0)
+	check("a gadget that wants the call-in gets it", frames[1] == 30)
+	syncActions.nano_GameFrame("nano_GameFrame", 7)
+	check("the sync action still gets its message", nanoOffsets[1] == 7)
+	check("no fix failed", #engine.logs == 0, table.concat(engine.logs, "; "))
+end
+
+do
+	-- A handler without the parts the fix uses is left alone.
+	local engine = newEngine({ synced = false, manifest = 19 })
+	prelude(engine)
+	local bare = {}
+	engine.env.gadgetHandler = bare
+	check("a handler with no actionHandler is kept", engine.env.gadgetHandler == bare)
+
+	local noRemove = newEngine({ synced = false, manifest = 19 })
+	prelude(noRemove)
+	local calls = 0
+	local actions = { AddSyncAction = function() calls = calls + 1 end }
+	noRemove.env.gadgetHandler = { actionHandler = actions }
+	local g = { GameFrame = function() end }
+	actions.AddSyncAction(g, "x", g.GameFrame)
+	check("a handler with no RemoveGadgetCallIn still adds the action", calls == 1)
+
+	local synced = newEngine({ manifest = 19 })
+	prelude(synced)
+	local syncedActions = {}
+	local add = function() end
+	syncedActions.AddSyncAction = add
+	synced.env.gadgetHandler = { actionHandler = syncedActions }
+	check("synced: the handler is not touched", syncedActions.AddSyncAction == add)
+	check("synced: no fix failed", #synced.logs == 0, table.concat(synced.logs, "; "))
+end
+
 support.report()
