@@ -1038,6 +1038,21 @@ msgstr "{0, plural, other {# 个升级}}"
 msgid "{0, plural, one {# warning} other {# warnings}}"
 msgstr "{0, plural, other {# 个警告}}"
 
+#. placeholder {0}: warning.failing.length
+#: src/multiplayer/battle/RoomWidgetsWarning.tsx
+msgid "{0, plural, one {# widget gives orders without saying so. It will load, then raise an error each time it does.} other {# widgets give orders without saying so. They will load, then raise an error each time they do.}}"
+msgstr ""
+
+#. placeholder {0}: warning.blocked.length
+#: src/multiplayer/battle/RoomWidgetsWarning.tsx
+msgid "{0, plural, one {# widget of yours will not load.} other {# widgets of yours will not load.}}"
+msgstr ""
+
+#. placeholder {0}: warning.skipped.length
+#: src/multiplayer/battle/RoomWidgetsWarning.tsx
+msgid "{0, plural, one {# widget says it gives orders, so the game skips it.} other {# widgets say they give orders, so the game skips them.}}"
+msgstr ""
+
 #. placeholder {0}: record.wins
 #: src/play/presetRecord.ts
 #, fuzzy
@@ -2796,6 +2811,10 @@ msgstr "{game} 未安装，因此无法为单位命名。每个命令显示回�
 #, fuzzy
 msgid "{game} is the exact version this mission was made for, and it could not be downloaded. It may no longer be published, or the download failed ({failure}). Another version will not run this mission."
 msgstr "{game} 是此任务所针对的确切版本，但无法下载。它可能已不再发布，或下载失败（{failure}）。其他版本无法运行此任务。"
+
+#: src/multiplayer/battle/RoomWidgetsWarning.tsx
+msgid "{game} loads player widgets only when Local Widgets Config is on in its widget list."
+msgstr ""
 
 #: src/hub/assets/UploadRunBadge.tsx
 #, fuzzy
@@ -34517,6 +34536,10 @@ msgstr "打开征途"
 msgid "Open Warpath."
 msgstr "打开征途。"
 
+#: src/multiplayer/battle/RoomWidgetsWarning.tsx
+msgid "Open your widgets"
+msgstr ""
+
 #: src/lego/pages/ProjectsPage.tsx
 #, fuzzy
 msgid "Opened from a file"
@@ -36156,6 +36179,10 @@ msgstr "玩家名称"
 #, fuzzy
 msgid "Player stats"
 msgstr "玩家统计"
+
+#: src/multiplayer/battle/RoomWidgetsWarning.tsx
+msgid "Player widgets are switched off in the widget list of {game}."
+msgstr ""
 
 #: src/content/commandRates.ts
 #, fuzzy
@@ -42719,6 +42746,10 @@ msgstr "按种类显示存活单位的价值"
 #, fuzzy
 msgid "Show what ran"
 msgstr "显示运行内容"
+
+#: src/multiplayer/battle/RoomWidgetsWarning.tsx
+msgid "Show which"
+msgstr ""
 
 #: src/content/pages/components/ReplaySetsManager.tsx
 #, fuzzy
@@ -49680,6 +49711,10 @@ msgstr "此回放的地图未安装。请先在下方下载。"
 msgid "This replay's order stream holds no orders to count."
 msgstr "此回放的命令流中没有可统计的命令。"
 
+#: src/multiplayer/battle/RoomWidgetsWarning.tsx
+msgid "This room does not allow player widgets."
+msgstr ""
+
 #: src/direct/share.ts
 #, fuzzy
 msgid "This room has no address another computer can reach, because this machine is on no network."
@@ -49694,6 +49729,10 @@ msgstr "此房间没有可加入的地址。"
 #, fuzzy
 msgid "This room has no port to join on."
 msgstr "此房间没有可加入的端口。"
+
+#: src/multiplayer/battle/RoomWidgetsWarning.tsx
+msgid "This room hides team colours, which turns off player widgets."
+msgstr ""
 
 #: src/deeplink/parse.ts
 #, fuzzy
@@ -49714,6 +49753,10 @@ msgstr "此房间链接中的地址不是有效地址。"
 #, fuzzy
 msgid "This room link's port is not a port."
 msgstr "此房间链接中的端口不是有效端口。"
+
+#: src/multiplayer/battle/RoomWidgetsWarning.tsx
+msgid "This room turns off widgets that give orders."
+msgstr ""
 
 #: src/multiplayer/battle/useBattleRoom.ts
 #, fuzzy

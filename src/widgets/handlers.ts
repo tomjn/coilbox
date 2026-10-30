@@ -14,7 +14,7 @@
  * `tapwidgets.lua` (#4845). Beyond All Reason's come from the issue.
  *
  * Each handler also names the file it saves widgets' on or off state to
- * (#1289). A later issue adds its option that turns player widgets off (#1292).
+ * (#1289), and what can stop it loading a player's widgets at all (#1292).
  * A game whose handler is not recognised gets `null` and so is never written
  * for.
  */
@@ -44,6 +44,33 @@ export interface WidgetHandler {
   /** Whether it also loads widgets one subfolder down. */
   subfolders: boolean;
   config: WidgetConfigFile;
+  /** What can stop it loading a player's widgets. Absent for a handler that
+   *  always loads them. */
+  userWidgets?: UserWidgetGates;
+}
+
+/**
+ * What stops a handler loading the widgets a player has added (issue #1292),
+ * read from each handler's own source. Each field is one way, and a handler
+ * has the ones it checks.
+ */
+export interface UserWidgetGates {
+  /** A mod option the room sets. Widgets load when it reads as `loads`, and
+   *  `unset` is what the handler does when the room does not set it. */
+  option?: { key: string; loads: boolean; unset: boolean };
+  /** `allowUserWidgets` at the top of the handler's config file, which the
+   *  game's widget list switches. */
+  configFlag?: boolean;
+  /** Widgets load only when the "Local Widgets Config" entry in this data file
+   *  turns them on. Under `LuaUI/Config/` like `config`. */
+  localWidgetsFile?: string;
+  /** Any team colour mode but `disabled` turns them off. */
+  anonymousColours?: boolean;
+  /** Who the room's rules do not apply to. `all`: a spectator or a replay
+   *  loads every widget. `option`: only the mod option stops applying. */
+  spectators?: "all" | "option";
+  /** The mod option that turns off widgets that give orders. */
+  unitControlOption?: string;
 }
 
 /** Where a handler saves which widgets are on, read from each handler's own
@@ -76,6 +103,13 @@ const RULES: readonly Rule[] = [
     folders: ["LuaUI/Widgets", "LuaUI/RmlWidgets"],
     subfolders: true,
     config: { files: ["BYAR.lua"], shape: "nested" },
+    userWidgets: {
+      option: { key: "allowuserwidgets", loads: true, unset: true },
+      configFlag: true,
+      anonymousColours: true,
+      spectators: "all",
+      unitControlOption: "allowunitcontrolwidgets",
+    },
   },
   {
     id: "ba",
@@ -84,6 +118,10 @@ const RULES: readonly Rule[] = [
     folders: ["LuaUI/widgets"],
     subfolders: false,
     config: { files: ["{short}.lua"], shape: "nested" },
+    userWidgets: {
+      option: { key: "mo_allowuserwidgets", loads: true, unset: true },
+      configFlag: true,
+    },
   },
   {
     id: "ca",
@@ -94,6 +132,13 @@ const RULES: readonly Rule[] = [
     config: {
       files: ["{SHORT}_order.lua", "{short}_order.lua"],
       shape: "flat",
+    },
+    userWidgets: {
+      // Only Zero-K's handler reads the option. Complete Annihilation's
+      // never sets it, so it reads as unset there.
+      option: { key: "disable_local_widgets", loads: false, unset: false },
+      localWidgetsFile: "{SHORT}_data.lua",
+      spectators: "option",
     },
   },
   {
@@ -111,6 +156,9 @@ const RULES: readonly Rule[] = [
     folders: ["LuaUI/widgets"],
     subfolders: false,
     config: { files: ["{SHORT}_data.lua"], shape: "nested" },
+    userWidgets: {
+      option: { key: "allowuserwidgets", loads: true, unset: false },
+    },
   },
   {
     id: "evo",
@@ -127,6 +175,9 @@ const RULES: readonly Rule[] = [
     folders: ["LuaUI/Widgets"],
     subfolders: false,
     config: { files: ["{SHORT}_order.lua"], shape: "flat" },
+    // It lists `LuaUI/Widgets` from its archive only, unless the player has
+    // turned local widgets on, and the option Zero-K adds is not in its source.
+    userWidgets: { localWidgetsFile: "{SHORT}_data.lua" },
   },
   {
     id: "mosaic",
@@ -135,6 +186,10 @@ const RULES: readonly Rule[] = [
     folders: ["LuaUI/widgets_mosaic"],
     subfolders: false,
     config: { dir: "configs", files: ["{SHORT}_data.lua"], shape: "nested" },
+    userWidgets: {
+      option: { key: "allowuserwidgets", loads: true, unset: true },
+      configFlag: true,
+    },
   },
   {
     id: "tap",
@@ -143,6 +198,8 @@ const RULES: readonly Rule[] = [
     folders: ["LuaUI/Widgets_TAP"],
     subfolders: false,
     config: { files: ["{short}.lua"], shape: "nested" },
+    // The check of the room's option is commented out in its handler.
+    userWidgets: { configFlag: true },
   },
   {
     // Ships a `luaui.lua` that starts the engine's own handler, so the only
@@ -215,6 +272,7 @@ function strip(rule: Rule): WidgetHandler {
     folders: rule.folders,
     subfolders: rule.subfolders,
     config: rule.config,
+    ...(rule.userWidgets && { userWidgets: rule.userWidgets }),
   };
 }
 

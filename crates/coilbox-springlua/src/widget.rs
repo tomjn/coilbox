@@ -41,6 +41,91 @@ pub struct WidgetInfo {
     /// Complete Annihilation saves an experimental widget under its name with
     /// " (experimental)" added, on its stable builds.
     pub experimental: Option<bool>,
+    /// Beyond All Reason skips a user widget that declares `control = true`
+    /// when its room turns user unit control widgets off (issue #1292).
+    pub control: Option<bool>,
+}
+
+/// Whether widget source calls a function of `Spring` whose name starts with
+/// `GiveOrder`, written `Spring.GiveOrder` or `Spring["GiveOrder"]`. Comments
+/// and strings are skipped. Beyond All Reason replaces every `Spring` function
+/// with that prefix by one that raises an error when its room turns user unit
+/// control widgets off (issue #1292). Only this file is read, and only the
+/// name `Spring` counts as the table, so a widget that gives its orders from a
+/// file it includes, or through another name for `Spring`, is missed.
+pub fn gives_orders(src: &str) -> bool {
+    const PREFIX: &[u8] = b"GiveOrder";
+    let b = src.as_bytes();
+    let mut i = 0;
+    // The last token that was not a space or comment: `a` for a name, else its
+    // first byte. This is how `.` is seen through `Spring . GiveOrder`.
+    let mut prev = 0u8;
+    // The name, when the last token is one.
+    let mut word: &[u8] = b"";
+    // `.` or `[` when the last token reached into `Spring`.
+    let mut into_spring: Option<u8> = None;
+    while i < b.len() {
+        let c = b[i];
+        if c.is_ascii_whitespace() {
+            i += 1;
+        } else if b[i..].starts_with(b"--") {
+            i = match long_bracket(b, i + 2) {
+                Some(level) => skip_long(b, i + 2, level),
+                None => b[i..]
+                    .iter()
+                    .position(|&x| x == b'\n')
+                    .map_or(b.len(), |n| i + n),
+            };
+        } else if c == b'"' || c == b'\'' {
+            if into_spring == Some(b'[') && b[i + 1..].starts_with(PREFIX) {
+                return true;
+            }
+            i += 1;
+            while i < b.len() && b[i] != c && b[i] != b'\n' {
+                i += if b[i] == b'\\' { 2 } else { 1 };
+            }
+            i += 1;
+            (prev, word, into_spring) = (c, b"", None);
+        } else if let Some(level) = long_bracket(b, i) {
+            i = skip_long(b, i, level);
+            (prev, word, into_spring) = (b']', b"", None);
+        } else if c.is_ascii_alphabetic() || c == b'_' {
+            let end = b[i..]
+                .iter()
+                .position(|x| !(x.is_ascii_alphanumeric() || *x == b'_'))
+                .map_or(b.len(), |n| i + n);
+            if into_spring == Some(b'.') && b[i..end].starts_with(PREFIX) {
+                return true;
+            }
+            (prev, word, into_spring) = (b'a', &b[i..end], None);
+            i = end;
+        } else {
+            into_spring =
+                ((c == b'.' || c == b'[') && prev == b'a' && word == b"Spring").then_some(c);
+            (prev, word) = (c, b"");
+            i += 1;
+        }
+    }
+    false
+}
+
+/// The level of a long bracket opening at `i` (`[[` is 0, `[==[` is 2).
+fn long_bracket(b: &[u8], i: usize) -> Option<usize> {
+    if b.get(i) != Some(&b'[') {
+        return None;
+    }
+    let level = b[i + 1..].iter().take_while(|&&x| x == b'=').count();
+    (b.get(i + 1 + level) == Some(&b'[')).then_some(level)
+}
+
+/// The offset after the long bracket of `level` that opens at `i`, or the end
+/// of the source when it never closes.
+fn skip_long(b: &[u8], i: usize, level: usize) -> usize {
+    let close = format!("]{}]", "=".repeat(level)).into_bytes();
+    let from = i + level + 2;
+    b.get(from..)
+        .and_then(|rest| rest.windows(close.len()).position(|w| w == close))
+        .map_or(b.len(), |n| from + n + close.len())
 }
 
 /// Builds the widget's environment. A function rather than one table, so each
@@ -171,6 +256,10 @@ impl SpringLua {
                 Value::Boolean(b) => Some(b),
                 _ => None,
             },
+            control: match info.raw_get::<Value>("control")? {
+                Value::Boolean(b) => Some(b),
+                _ => None,
+            },
         }))
     }
 }
@@ -234,6 +323,66 @@ mod tests {
             read(r#"function widget:GetInfo() return { name = "A", previousNames = "Old" } end"#)
                 .unwrap();
         assert!(info.previous_names.is_empty());
+    }
+
+    #[test]
+    fn reads_whether_a_widget_declares_unit_control() {
+        let info =
+            read(r#"function widget:GetInfo() return { name = "A", control = true } end"#).unwrap();
+        assert_eq!(info.control, Some(true));
+        let info = read(r#"function widget:GetInfo() return { name = "A" } end"#).unwrap();
+        assert_eq!(info.control, None);
+    }
+
+    #[test]
+    fn finds_the_order_functions_a_widget_calls() {
+        for src in [
+            "Spring.GiveOrder(CMD.STOP, {}, 0)",
+            "local give = Spring.GiveOrderToUnit",
+            "Spring . GiveOrderToUnitMap(map, cmd, {}, 0)",
+            "Spring.GiveOrderArrayToUnitArray(units, orders)",
+            "local x = 1\nSpring.GiveOrder(1, {}, 0)",
+            "--[[ a comment ]] Spring.GiveOrder(1, {}, 0)",
+            r#"Spring["GiveOrder"](1, {}, 0)"#,
+            "local give = Spring['GiveOrderToUnit']",
+            "Spring --[[ note ]] .GiveOrder(1)",
+        ] {
+            assert!(gives_orders(src), "{src}");
+        }
+    }
+
+    #[test]
+    fn ignores_order_functions_in_comments_and_strings() {
+        for src in [
+            "-- Spring.GiveOrder(1, {}, 0)",
+            "--[[ Spring.GiveOrder(1, {}, 0) ]] local x = 1",
+            "--[==[ Spring.GiveOrder(1) ]] still a comment ]==] local x = 1",
+            r#"local s = "Spring.GiveOrder""#,
+            "local s = 'say \\' Spring.GiveOrder'",
+            "local s = [[ Spring.GiveOrder ]]",
+            "local function GiveOrderLater() end GiveOrderLater()",
+            "Spring.GetUnitCommands(1)",
+            "planner.GiveOrder(1, {}, 0)",
+            "Spring.Utilities.GiveOrder(1)",
+            r#"Spring["GetUnitCommands"](1)"#,
+            r#"local t = { "GiveOrder" } Spring[1]"#,
+            "local sp = Spring sp.GiveOrder(1)",
+            "local gave = Spring.GaveOrder",
+        ] {
+            assert!(!gives_orders(src), "{src}");
+        }
+    }
+
+    #[test]
+    fn a_call_after_a_comment_or_string_is_still_found() {
+        assert!(gives_orders("local s = 'x' -- note\nSpring.GiveOrder(1)"));
+        assert!(gives_orders("--[[ one ]]--[[ two ]]\nSpring.GiveOrder(1)"));
+    }
+
+    #[test]
+    fn an_unfinished_comment_or_string_ends_the_scan() {
+        assert!(!gives_orders("--[[ never closed Spring.GiveOrder(1)"));
+        assert!(!gives_orders("local s = 'never closed Spring.GiveOrder"));
     }
 
     #[test]

@@ -31,6 +31,7 @@ function file(path: string, folder: string, nested = false): PlayerWidgetFile {
     folder,
     nested,
     coilbox: false,
+    givesOrders: false,
     info: { name: path },
     error: null,
   };

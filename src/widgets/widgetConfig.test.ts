@@ -4,6 +4,8 @@ import type { WidgetConfigFile } from "./handlers";
 import {
   type ConfigFileIO,
   configCandidates,
+  readFlag,
+  readLocalWidgets,
   readOrder,
   writeOrder,
   writeWidgetStates,
@@ -113,6 +115,85 @@ describe("readOrder", () => {
       /could not read/,
     );
     expect(() => readOrder("garbage", nested)).toThrow(/could not read/);
+  });
+});
+
+describe("readFlag", () => {
+  const file = (flag: string) =>
+    `-- Widget Custom data and order\nreturn {\n\t["allowUserWidgets"] = ${flag},\n\t["order"] = {\n\t\t["A"] = 1,\n\t},\n}`;
+
+  it("reads the flag a Balanced Annihilation family handler saves", () => {
+    expect(readFlag(file("false"), "allowUserWidgets")).toBe(false);
+    expect(readFlag(file("true"), "allowUserWidgets")).toBe(true);
+  });
+
+  it("reads a flag written as a name", () => {
+    expect(
+      readFlag("return { allowUserWidgets = false }", "allowUserWidgets"),
+    ).toBe(false);
+  });
+
+  it("is null for a file with no such entry or a value that is not a boolean", () => {
+    expect(readFlag(ENGINE_FILE, "allowUserWidgets")).toBeNull();
+    expect(readFlag(file("1"), "allowUserWidgets")).toBeNull();
+  });
+
+  it("does not read the flag from inside the order table", () => {
+    expect(
+      readFlag(
+        "return { order = { allowUserWidgets = false } }",
+        "allowUserWidgets",
+      ),
+    ).toBeNull();
+  });
+
+  it("refuses a file that is not a table", () => {
+    expect(() => readFlag("garbage", "allowUserWidgets")).toThrow(
+      /could not read/,
+    );
+  });
+});
+
+describe("readLocalWidgets", () => {
+  const entry = (fields: string) =>
+    `return {\n\t["Local Widgets Config"] = {\n${fields}\n\t},\n\t["Other"] = { localWidgets = true },\n}`;
+
+  it("is on when the entry turns either kind of local widgets on", () => {
+    for (const key of [
+      "localWidgets",
+      "localWidgetsFirst",
+      "useLocalWidgets",
+      "useLocalWidgetsFirst",
+    ]) {
+      expect(readLocalWidgets(entry(`\t\t["${key}"] = true,`))).toBe(true);
+    }
+  });
+
+  it("is off when the entry has them off, has neither, or is missing", () => {
+    expect(readLocalWidgets(entry('\t\t["localWidgets"] = false,'))).toBe(
+      false,
+    );
+    expect(readLocalWidgets(entry(""))).toBe(false);
+    expect(readLocalWidgets("return { Other = { localWidgets = true } }")).toBe(
+      false,
+    );
+  });
+
+  it("goes by the last copy of a key, as Lua does", () => {
+    expect(
+      readLocalWidgets(
+        entry('\t\t["localWidgets"] = true,\n\t\t["localWidgets"] = false,'),
+      ),
+    ).toBe(false);
+    expect(
+      readLocalWidgets(
+        entry('\t\t["localWidgets"] = false,\n\t\t["localWidgets"] = true,'),
+      ),
+    ).toBe(true);
+  });
+
+  it("refuses a file that is not a table", () => {
+    expect(() => readLocalWidgets("garbage")).toThrow(/could not read/);
   });
 });
 
