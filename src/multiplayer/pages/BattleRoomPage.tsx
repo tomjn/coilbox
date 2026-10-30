@@ -25,6 +25,7 @@ import {
   StartBoxControls,
   useStartBoxAllies,
 } from "@/startbox/StartBoxControls";
+import { useRoomWidgets } from "@/widgets/useRoomWidgets";
 import { ApplySkirmishPresetDrawer } from "../battle/ApplySkirmishPresetDrawer";
 import { AutohostControls } from "../battle/AutohostControls";
 import { addHostSeedBots } from "../battle/applyHostSeed";
@@ -46,6 +47,7 @@ import { MissingContentCard } from "../battle/MissingContentCard";
 import { launchesOnItsOwn, matchAction } from "../battle/matchAction";
 import { matchStartAction } from "../battle/matchStart";
 import { RoomSplitHandle, useRoomSplit } from "../battle/RoomSplit";
+import { RoomWidgetsWarning } from "../battle/RoomWidgetsWarning";
 import { StartPosOptions } from "../battle/StartPosOptions";
 import { unsyncedPlayers } from "../battle/startBlockers";
 import { battleToSkirmishDraft } from "../battle/toSkirmish";
@@ -128,6 +130,13 @@ function BattleRoomPage() {
     gameName: room.requiredGame ?? room.battle?.modname ?? "",
   });
   const blockReason = block?.reason ?? null;
+  // The player's own widgets, for the strip that says which of them this
+  // room's options turn off (issue #1292).
+  const playerWidgets = useRoomWidgets(
+    room.enginePath,
+    room.dataDir,
+    room.localGame,
+  );
   const launch = useBattleLaunch(
     room.serverKey,
     room.target,
@@ -588,6 +597,13 @@ function BattleRoomPage() {
             : block.reason}
         </p>
       )}
+      {/* After the missing-content strip, which stops the match. This one only
+          costs the player some widgets (issue #1292). */}
+      <RoomWidgetsWarning
+        widgets={playerWidgets}
+        scriptTags={battle.scriptTags}
+        spectating={room.myStatus ? !room.myStatus.battleStatus.mode : false}
+      />
 
       <div className="flex min-h-0 flex-1 overflow-hidden">
         <div

@@ -1038,6 +1038,21 @@ msgstr "{0, plural, other {# 件のアップグレード}}"
 msgid "{0, plural, one {# warning} other {# warnings}}"
 msgstr "{0, plural, other {# 件の警告}}"
 
+#. placeholder {0}: warning.failing.length
+#: src/multiplayer/battle/RoomWidgetsWarning.tsx
+msgid "{0, plural, one {# widget gives orders without saying so. It will load, then raise an error each time it does.} other {# widgets give orders without saying so. They will load, then raise an error each time they do.}}"
+msgstr ""
+
+#. placeholder {0}: warning.blocked.length
+#: src/multiplayer/battle/RoomWidgetsWarning.tsx
+msgid "{0, plural, one {# widget of yours will not load.} other {# widgets of yours will not load.}}"
+msgstr ""
+
+#. placeholder {0}: warning.skipped.length
+#: src/multiplayer/battle/RoomWidgetsWarning.tsx
+msgid "{0, plural, one {# widget says it gives orders, so the game skips it.} other {# widgets say they give orders, so the game skips them.}}"
+msgstr ""
+
 #. placeholder {0}: record.wins
 #: src/play/presetRecord.ts
 #, fuzzy
@@ -2796,6 +2811,10 @@ msgstr "{game} がインストールされていないため、ユニットに�
 #, fuzzy
 msgid "{game} is the exact version this mission was made for, and it could not be downloaded. It may no longer be published, or the download failed ({failure}). Another version will not run this mission."
 msgstr "{game} はこのミッション用に作られた正確なバージョンですが、ダウンロードできませんでした。公開が終了しているか、ダウンロードに失敗した可能性があります（{failure}）。別のバージョンではこのミッションは動きません。"
+
+#: src/multiplayer/battle/RoomWidgetsWarning.tsx
+msgid "{game} loads player widgets only when Local Widgets Config is on in its widget list."
+msgstr ""
 
 #: src/hub/assets/UploadRunBadge.tsx
 #, fuzzy
@@ -34517,6 +34536,10 @@ msgstr "ウォーパスを開く"
 msgid "Open Warpath."
 msgstr "ウォーパスを開きます。"
 
+#: src/multiplayer/battle/RoomWidgetsWarning.tsx
+msgid "Open your widgets"
+msgstr ""
+
 #: src/lego/pages/ProjectsPage.tsx
 #, fuzzy
 msgid "Opened from a file"
@@ -36156,6 +36179,10 @@ msgstr "プレイヤー名"
 #, fuzzy
 msgid "Player stats"
 msgstr "プレイヤー統計"
+
+#: src/multiplayer/battle/RoomWidgetsWarning.tsx
+msgid "Player widgets are switched off in the widget list of {game}."
+msgstr ""
 
 #: src/content/commandRates.ts
 #, fuzzy
@@ -42719,6 +42746,10 @@ msgstr "生存ユニットの価値を種類別に表示"
 #, fuzzy
 msgid "Show what ran"
 msgstr "実行内容を表示"
+
+#: src/multiplayer/battle/RoomWidgetsWarning.tsx
+msgid "Show which"
+msgstr ""
 
 #: src/content/pages/components/ReplaySetsManager.tsx
 #, fuzzy
@@ -49680,6 +49711,10 @@ msgstr "このリプレイのマップがインストールされていません
 msgid "This replay's order stream holds no orders to count."
 msgstr "このリプレイの命令ストリームには、数える命令がありません。"
 
+#: src/multiplayer/battle/RoomWidgetsWarning.tsx
+msgid "This room does not allow player widgets."
+msgstr ""
+
 #: src/direct/share.ts
 #, fuzzy
 msgid "This room has no address another computer can reach, because this machine is on no network."
@@ -49694,6 +49729,10 @@ msgstr "このルームには参加するアドレスがありません。"
 #, fuzzy
 msgid "This room has no port to join on."
 msgstr "このルームには参加するポートがありません。"
+
+#: src/multiplayer/battle/RoomWidgetsWarning.tsx
+msgid "This room hides team colours, which turns off player widgets."
+msgstr ""
 
 #: src/deeplink/parse.ts
 #, fuzzy
@@ -49714,6 +49753,10 @@ msgstr "このルームリンクのアドレスは有効なアドレスではあ
 #, fuzzy
 msgid "This room link's port is not a port."
 msgstr "このルームリンクのポートは有効なポートではありません。"
+
+#: src/multiplayer/battle/RoomWidgetsWarning.tsx
+msgid "This room turns off widgets that give orders."
+msgstr ""
 
 #: src/multiplayer/battle/useBattleRoom.ts
 #, fuzzy

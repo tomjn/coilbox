@@ -1038,6 +1038,21 @@ msgstr "{0, plural, one {# Upgrade} other {# Upgrades}}"
 msgid "{0, plural, one {# warning} other {# warnings}}"
 msgstr "{0, plural, one {# Warnung} other {# Warnungen}}"
 
+#. placeholder {0}: warning.failing.length
+#: src/multiplayer/battle/RoomWidgetsWarning.tsx
+msgid "{0, plural, one {# widget gives orders without saying so. It will load, then raise an error each time it does.} other {# widgets give orders without saying so. They will load, then raise an error each time they do.}}"
+msgstr ""
+
+#. placeholder {0}: warning.blocked.length
+#: src/multiplayer/battle/RoomWidgetsWarning.tsx
+msgid "{0, plural, one {# widget of yours will not load.} other {# widgets of yours will not load.}}"
+msgstr ""
+
+#. placeholder {0}: warning.skipped.length
+#: src/multiplayer/battle/RoomWidgetsWarning.tsx
+msgid "{0, plural, one {# widget says it gives orders, so the game skips it.} other {# widgets say they give orders, so the game skips them.}}"
+msgstr ""
+
 #. placeholder {0}: record.wins
 #: src/play/presetRecord.ts
 #, fuzzy
@@ -2796,6 +2811,10 @@ msgstr "{game} ist nicht installiert, daher lassen sich die Einheiten nicht bene
 #, fuzzy
 msgid "{game} is the exact version this mission was made for, and it could not be downloaded. It may no longer be published, or the download failed ({failure}). Another version will not run this mission."
 msgstr "{game} ist genau die Version, für die diese Mission erstellt wurde, und sie konnte nicht heruntergeladen werden. Vielleicht wird sie nicht mehr veröffentlicht, oder der Download ist fehlgeschlagen ({failure}). Eine andere Version führt diese Mission nicht aus."
+
+#: src/multiplayer/battle/RoomWidgetsWarning.tsx
+msgid "{game} loads player widgets only when Local Widgets Config is on in its widget list."
+msgstr ""
 
 #: src/hub/assets/UploadRunBadge.tsx
 #, fuzzy
@@ -34517,6 +34536,10 @@ msgstr "Kriegspfad öffnen"
 msgid "Open Warpath."
 msgstr "Kriegspfad öffnen."
 
+#: src/multiplayer/battle/RoomWidgetsWarning.tsx
+msgid "Open your widgets"
+msgstr ""
+
 #: src/lego/pages/ProjectsPage.tsx
 #, fuzzy
 msgid "Opened from a file"
@@ -36156,6 +36179,10 @@ msgstr "Spielername"
 #, fuzzy
 msgid "Player stats"
 msgstr "Spielerstatistik"
+
+#: src/multiplayer/battle/RoomWidgetsWarning.tsx
+msgid "Player widgets are switched off in the widget list of {game}."
+msgstr ""
 
 #: src/content/commandRates.ts
 #, fuzzy
@@ -42719,6 +42746,10 @@ msgstr "Wert lebender Einheiten nach Art zeigen"
 #, fuzzy
 msgid "Show what ran"
 msgstr "Zeigen, was lief"
+
+#: src/multiplayer/battle/RoomWidgetsWarning.tsx
+msgid "Show which"
+msgstr ""
 
 #: src/content/pages/components/ReplaySetsManager.tsx
 #, fuzzy
@@ -49680,6 +49711,10 @@ msgstr "Die Karte dieser Wiederholung ist nicht installiert. Laden Sie sie zuers
 msgid "This replay's order stream holds no orders to count."
 msgstr "Der Befehlsstrom dieser Wiederholung enthält keine zählbaren Befehle."
 
+#: src/multiplayer/battle/RoomWidgetsWarning.tsx
+msgid "This room does not allow player widgets."
+msgstr ""
+
 #: src/direct/share.ts
 #, fuzzy
 msgid "This room has no address another computer can reach, because this machine is on no network."
@@ -49694,6 +49729,10 @@ msgstr "Dieser Raum hat keine Adresse zum Beitreten."
 #, fuzzy
 msgid "This room has no port to join on."
 msgstr "Dieser Raum hat keinen Port zum Beitreten."
+
+#: src/multiplayer/battle/RoomWidgetsWarning.tsx
+msgid "This room hides team colours, which turns off player widgets."
+msgstr ""
 
 #: src/deeplink/parse.ts
 #, fuzzy
@@ -49714,6 +49753,10 @@ msgstr "Die Adresse dieses Raumlinks ist keine Adresse."
 #, fuzzy
 msgid "This room link's port is not a port."
 msgstr "Der Port dieses Raumlinks ist kein Port."
+
+#: src/multiplayer/battle/RoomWidgetsWarning.tsx
+msgid "This room turns off widgets that give orders."
+msgstr ""
 
 #: src/multiplayer/battle/useBattleRoom.ts
 #, fuzzy
