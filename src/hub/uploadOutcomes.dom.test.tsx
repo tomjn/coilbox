@@ -19,11 +19,11 @@ import {
   memoryStorage,
   PersistentStoreProvider,
   ThemeProvider,
+  Toaster,
 } from "@picoframe/frame";
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { MemoryRouter } from "react-router";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { Toaster } from "@/components/ui/sonner";
 import { clearHistory, readHistory } from "@/notify/history";
 import NotificationsBell from "@/notify/NotificationsBell";
 import { type AssetOutcome, reportAssetUploadOutcomes } from "./uploadOutcomes";

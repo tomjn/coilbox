@@ -347,6 +347,44 @@ body,
   border-radius: 4px;
 }
 
+/* Typed toasts (success, info, warning, error) take sonner's tinted palette. The
+   only toast host is picoframe's, mounted by its layout, and it does not turn
+   sonner's `richColors` on, so these are sonner's own rich rules keyed on the type
+   alone. The `--*-bg/-border/-text` variables are sonner's and follow the theme. */
+[data-sonner-toast][data-styled="true"][data-type="success"],
+[data-sonner-toast][data-styled="true"][data-type="success"] [data-close-button] {
+  background: var(--success-bg);
+  border-color: var(--success-border);
+  color: var(--success-text);
+}
+[data-sonner-toast][data-styled="true"][data-type="info"],
+[data-sonner-toast][data-styled="true"][data-type="info"] [data-close-button] {
+  background: var(--info-bg);
+  border-color: var(--info-border);
+  color: var(--info-text);
+}
+[data-sonner-toast][data-styled="true"][data-type="warning"],
+[data-sonner-toast][data-styled="true"][data-type="warning"] [data-close-button] {
+  background: var(--warning-bg);
+  border-color: var(--warning-border);
+  color: var(--warning-text);
+}
+[data-sonner-toast][data-styled="true"][data-type="error"],
+[data-sonner-toast][data-styled="true"][data-type="error"] [data-close-button] {
+  background: var(--error-bg);
+  border-color: var(--error-border);
+  color: var(--error-text);
+}
+[data-sonner-toast][data-styled="true"]:is(
+    [data-type="success"],
+    [data-type="info"],
+    [data-type="warning"],
+    [data-type="error"]
+  )
+  [data-description] {
+  color: inherit;
+}
+
 /* shiki writes both themes at once: the light colours inline and the dark ones
    as custom properties. This swaps them under the dark ramp, so a code block
    follows the player's theme instead of being a dark island on a light page.

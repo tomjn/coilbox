@@ -18,11 +18,11 @@ import {
   memoryStorage,
   PersistentStoreProvider,
   ThemeProvider,
+  Toaster,
 } from "@picoframe/frame";
 import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import { toast } from "sonner";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { Toaster } from "@/components/ui/sonner";
 import { clearHistory, readHistory } from "@/notify/history";
 
 /** The Tauri commands, replaced by a save this test controls the outcome of. */
@@ -82,7 +82,7 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
-/** The app's toast host, mounted the way the notify plugin mounts it. */
+/** The app's toast host, the one picoframe's layout mounts. */
 function mountToasts() {
   render(
     <PersistentStoreProvider storage={memoryStorage()}>
