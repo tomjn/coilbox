@@ -37,6 +37,7 @@ mod steam;
 mod storage;
 mod unit_check;
 mod widget;
+mod widget_add;
 
 use model::{
     load_store, save_store, ContentRoot, ContentState, Engine, ReadOnlyOverride, RootCounts,
@@ -1328,6 +1329,8 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
             widget::content_widget_install,
             widget::content_widget_remove,
             player_widgets::content_player_widgets,
+            widget_add::content_widget_plan,
+            widget_add::content_widget_add,
             install3do::content_install_3do_conversion,
             install3do::content_undo_3do_install,
             install3do::content_3do_install_status,
