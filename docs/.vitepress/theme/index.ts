@@ -1,3 +1,4 @@
+import { useData } from "vitepress";
 import DefaultTheme from "vitepress/theme";
 import { h } from "vue";
 import ArtBackdrop from "./ArtBackdrop.vue";
@@ -12,12 +13,20 @@ import "./custom.css";
 // where it appears.
 //
 // The `home-hero-info-after` slot sits just above the hero's buttons, so the
-// top menu's Download item can scroll to them on a narrow screen.
+// downloads' label goes there. The top menu's Download item scrolls to it, which
+// brings the buttons into view on a narrow screen.
+const DownloadLabel = () =>
+  h(
+    "p",
+    { id: "download", class: "download-label" },
+    useData().frontmatter.value.downloads.label,
+  );
+
 export default {
   extends: DefaultTheme,
   Layout: () =>
     h(DefaultTheme.Layout, null, {
       "layout-top": () => h(ArtBackdrop),
-      "home-hero-info-after": () => h("span", { id: "download" }),
+      "home-hero-info-after": () => h(DownloadLabel),
     }),
 };

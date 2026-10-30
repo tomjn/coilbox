@@ -1,11 +1,33 @@
+.download-label {
+  margin: 24px 0 12px;
+  line-height: 28px;
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--vp-c-text-1);
+}
+
+@media (min-width: 640px) {
+  .download-label {
+    margin-top: 32px;
+  }
+}
+
+/* The label takes over the space the theme leaves above the buttons. */
+.VPHero .main .actions {
+  padding-top: 0;
+}
+
 /*
- * The hero's first three buttons are the downloads. An empty full-width flex
- * item between them and the rest keeps them together on a row of their own.
+ * The hero's first three buttons are the downloads. A full-width flex item
+ * between them and the rest keeps them on a row of their own and draws the rule.
  */
 .VPHero .actions::after {
   content: "";
   flex-basis: 100%;
   order: 1;
+  height: 1px;
+  margin-block: 16px;
+  background-color: var(--vp-c-divider);
 }
 
 .VPHero .action:nth-child(n + 4) {
