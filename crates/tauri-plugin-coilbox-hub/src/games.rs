@@ -1131,6 +1131,25 @@ mod tests {
         assert!(hub.last_headers().contains("authorization: bearer a-token"));
     }
 
+    /// Another program on the machine can probe the stand-in hub's port. Its
+    /// `GET /` is no part of the submission, so it is not counted.
+    #[tokio::test]
+    async fn a_stray_request_to_the_stand_in_hub_is_not_counted() {
+        let hub = GameHubServer::accepting();
+        let stray = reqwest::get(hub.base()).await;
+        assert!(stray.is_err(), "the stand-in answered a GET /");
+
+        send_facts(
+            &submit_url(&hub),
+            "a-token",
+            &check_and_build(&game()).unwrap(),
+        )
+        .await
+        .unwrap();
+
+        assert_eq!(hub.requests(), 1);
+    }
+
     /// Sending the same game twice writes nothing the second time, which is what
     /// makes a backfill safe to leave running.
     #[tokio::test]
