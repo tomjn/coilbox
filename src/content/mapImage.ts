@@ -48,7 +48,7 @@ const PAGE_MAP_WIDTH = 384;
  *  alpha 0.3 gives the same colours without needing `ctx.filter`. */
 export const MINIMAP_DIM_ALPHA = 0.3;
 
-const FONT_STACK =
+export const FONT_STACK =
   'system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif';
 
 /** Colours that do not follow the app's theme, so a picture is the same
