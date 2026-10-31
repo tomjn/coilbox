@@ -7,7 +7,13 @@
  * must not ride along in what loads just because it was ticked before.
  */
 
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import {
+  cleanup,
+  fireEvent,
+  render,
+  screen,
+  within,
+} from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { FollowedPack } from "../../followedPacks";
 import type { Participant } from "../../participants";
@@ -19,8 +25,14 @@ import { PresetsDrawer } from "./PresetsDrawer";
 // value that needs the app frame, and a bare render has none. A name not listed
 // is an unread game or map, which is the state that must warn about nothing.
 const unitsync = vi.hoisted(() => ({
-  games: {} as Record<string, { key: string; name: string }[]>,
-  mapOptions: {} as Record<string, { key: string; name: string }[]>,
+  games: {} as Record<
+    string,
+    { key: string; name: string; type?: string; default?: string }[]
+  >,
+  mapOptions: {} as Record<
+    string,
+    { key: string; name: string; type?: string; default?: string }[]
+  >,
   positions: {} as Record<string, number>,
 }));
 
@@ -45,6 +57,13 @@ vi.mock("@/content/config", async (importOriginal) => ({
 // settings store and has no provider in a bare render.
 vi.mock("@/workshop/project", () => ({
   useModProjects: () => ({ projects: [] }),
+}));
+
+// The decode command runs Lua in Rust, which a bare render has no way to reach.
+const decode = vi.hoisted(() => ({ run: vi.fn() }));
+vi.mock("@/workshop/decodeTweakSet", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/workshop/decodeTweakSet")>()),
+  workshopDecodeTweakSet: decode.run,
 }));
 
 // Which `optionsPresets.json` files the search finds. The face itself has a
@@ -84,6 +103,7 @@ afterEach(() => {
   unitsync.games = {};
   unitsync.mapOptions = {};
   unitsync.positions = {};
+  decode.run.mockReset();
 });
 
 const you: Participant = {
@@ -494,5 +514,168 @@ describe("a preset's panel, warning about what does not fit", () => {
     });
     openPanel();
     expect(screen.queryByText(/does not declare|start positions\./)).toBeNull();
+  });
+});
+
+describe("what a preset changes", () => {
+  const GAME = "Preset Game.sdz";
+  const schema = [
+    { key: "maxunits", name: "Max units", type: "number", default: "1000" },
+    { key: "fog", name: "Fog", type: "bool", default: "true" },
+    { key: "speed", name: "Speed", type: "number", default: "1" },
+  ];
+
+  /** Open the list under one part's row. */
+  const showChanges = (part: string) => {
+    const row = screen.getByText(part).closest("li");
+    if (!row) throw new Error(`no row for ${part}`);
+    fireEvent.click(
+      within(row).getByRole("button", { name: "What it changes" }),
+    );
+  };
+
+  const withOptions = (modOptionValues: Record<string, string>) => ({
+    presets: [{ ...preset, modOptionValues }],
+    archive: GAME,
+  });
+
+  it("shows one row for one option off its default, however many it stores", () => {
+    unitsync.games[GAME] = schema;
+    renderDrawer(withOptions({ maxunits: "8000", fog: "true", speed: "1" }));
+    openPanel();
+    showChanges("Mod options");
+    expect(screen.getByText("Max units")).toBeTruthy();
+    expect(screen.getByText("Preset 8000, default 1000")).toBeTruthy();
+    expect(screen.queryByText("Fog")).toBeNull();
+    expect(screen.queryByText("Speed")).toBeNull();
+  });
+
+  it("says a preset equal to the defaults changes nothing", () => {
+    unitsync.games[GAME] = schema;
+    renderDrawer(withOptions({ maxunits: "1000", speed: "1" }));
+    openPanel();
+    showChanges("Mod options");
+    expect(screen.getByText("Changes nothing from the defaults.")).toBeTruthy();
+  });
+
+  it("reads 1 as true for a bool whose default is true", () => {
+    unitsync.games[GAME] = schema;
+    renderDrawer(withOptions({ fog: "1" }));
+    openPanel();
+    showChanges("Mod options");
+    expect(screen.getByText("Changes nothing from the defaults.")).toBeTruthy();
+  });
+
+  it("says which changes the setup already has, and the value it has instead", () => {
+    unitsync.games[GAME] = schema;
+    renderDrawer({
+      ...withOptions({ maxunits: "8000", speed: "3" }),
+      currentOptions: {
+        modOptionValues: { maxunits: "8000.0", speed: "2" },
+        mapOptionValues: {},
+      },
+    });
+    openPanel();
+    showChanges("Mod options");
+    expect(screen.getByText("Already set this way")).toBeTruthy();
+    expect(screen.getByText("Now 2")).toBeTruthy();
+  });
+
+  it("lists options the game does not declare apart from the changes", () => {
+    unitsync.games[GAME] = schema;
+    renderDrawer(withOptions({ maxunits: "8000", bogus: "7" }));
+    openPanel();
+    showChanges("Mod options");
+    expect(
+      screen.getByText("Preset Game does not declare this option:"),
+    ).toBeTruthy();
+    expect(screen.getByText("bogus")).toBeTruthy();
+  });
+
+  it("says so when the game's options are not available, rather than listing every value", () => {
+    renderDrawer({
+      presets: [{ ...preset, modOptionValues: { maxunits: "1" } }],
+    });
+    openPanel();
+    showChanges("Mod options");
+    expect(
+      screen.getByText(/The options for Preset Game are not available/),
+    ).toBeTruthy();
+    expect(screen.queryByText(/^Preset 1,/)).toBeNull();
+  });
+
+  it("compares map options with the preset's map", () => {
+    unitsync.mapOptions["Preset Map"] = [
+      { key: "wind", name: "Wind", type: "number", default: "5" },
+    ];
+    renderDrawer({
+      presets: [{ ...preset, mapOptionValues: { wind: "9" } }],
+    });
+    openPanel();
+    showChanges("Map options");
+    expect(screen.getByText("Wind")).toBeTruthy();
+    expect(screen.getByText("Preset 9, default 5")).toBeTruthy();
+  });
+
+  it("lists a tweak slot's units and fields from the decode", async () => {
+    decode.run.mockResolvedValue({
+      tweakdefs: [],
+      tweakunits: [
+        {
+          key: "tweakunits",
+          kind: "tweakunits",
+          slot: 0,
+          lua: "",
+          manifest: null,
+          form: "table",
+          table: { armcom: { health: 5000 } },
+          error: null,
+        },
+      ],
+      unrecognised: [],
+    });
+    renderDrawer(withOptions({ tweakunits: "PAYLOAD" }));
+    openPanel();
+    showChanges("Unit tweaks");
+    expect(await screen.findByText("health = 5000")).toBeTruthy();
+    expect(screen.getByText("armcom")).toBeTruthy();
+    expect(decode.run).toHaveBeenCalledWith({
+      entries: { tweakunits: "PAYLOAD" },
+    });
+  });
+
+  it("says a slot cannot be read and offers its raw text", async () => {
+    decode.run.mockResolvedValue({
+      tweakdefs: [
+        {
+          key: "tweakdefs",
+          kind: "tweakdefs",
+          slot: 0,
+          lua: "for k in pairs(UnitDefs) do end",
+          manifest: null,
+          form: "block",
+          table: null,
+          error: null,
+        },
+      ],
+      tweakunits: [],
+      unrecognised: [],
+    });
+    renderDrawer(withOptions({ tweakdefs: "PAYLOAD" }));
+    openPanel();
+    showChanges("Unit tweaks");
+    expect(await screen.findByText(/Cannot be listed as changes/)).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "Raw text" }));
+    expect(screen.getByText("for k in pairs(UnitDefs) do end")).toBeTruthy();
+  });
+
+  it("offers the stored text of every slot when the decode itself fails", async () => {
+    decode.run.mockRejectedValue(new Error("decode is unavailable"));
+    renderDrawer(withOptions({ tweakdefs: "STORED-PAYLOAD" }));
+    openPanel();
+    showChanges("Unit tweaks");
+    expect(await screen.findByText(/decode is unavailable/)).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "Raw text" }));
+    expect(screen.getByText("STORED-PAYLOAD")).toBeTruthy();
   });
 });

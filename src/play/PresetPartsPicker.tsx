@@ -1,5 +1,5 @@
 import { useLingui } from "@lingui/react/macro";
-import { useId } from "react";
+import { type ReactNode, useId } from "react";
 import { Checkbox } from "@/components/ui/checkbox";
 import type { SkirmishDraft } from "./drafts";
 import {
@@ -29,6 +29,7 @@ export function PresetPartsPicker({
   omit = [],
   disabledReasons = {},
   warnings = {},
+  details = {},
 }: {
   /** The preset being applied, read for the per-row summaries. */
   preset: SkirmishDraft;
@@ -40,6 +41,9 @@ export function PresetPartsPicker({
   disabledReasons?: Partial<Record<PresetPart, string>>;
   /** A caution shown under a part that is being taken. */
   warnings?: Partial<Record<PresetPart, string>>;
+  /** What a part changes, opened under its row. Shown whether or not the part
+   *  is ticked, because it is what you read to decide. */
+  details?: Partial<Record<PresetPart, ReactNode>>;
 }) {
   const { t, i18n } = useLingui();
   const idPrefix = useId();
@@ -90,6 +94,8 @@ export function PresetPartsPicker({
                 )}
               </span>
             </div>
+
+            {summary !== null && details[part]}
 
             {mergeable && checked && (
               <div className="ml-7 mt-1.5 flex items-start gap-2.5">

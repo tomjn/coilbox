@@ -444,6 +444,11 @@ msgstr ""
 msgid "{0, plural, one {{shownCount} of # unit} other {{shownCount} of # units}}"
 msgstr ""
 
+#. placeholder {0}: undeclared.length
+#: src/play/PresetChanges.tsx
+msgid "{0, plural, one {{subject} does not declare this option:} other {{subject} does not declare these # options:}}"
+msgstr ""
+
 #. placeholder {0}: users.length
 #: src/workshop/weaponSlots.ts
 msgid "{0, plural, one {{unitName} carries it for {userList}, which names it.} other {{unitName} carries it for {userList}, which name it.}}"
@@ -550,7 +555,9 @@ msgstr ""
 msgid "{0, plural, one {# factory queue order has no position and is not drawn.} other {# factory queue orders have no position and are not drawn.}}"
 msgstr ""
 
+#. placeholder {0}: fields.length
 #. placeholder {0}: section.rows.length
+#: src/play/PresetChanges.tsx
 #: src/workshop/pages/components/UnitFieldGroups.tsx
 msgid "{0, plural, one {# field} other {# fields}}"
 msgstr ""
@@ -1112,6 +1119,11 @@ msgstr ""
 #. placeholder {0}: formatNumber(Math.round(Number(v)))
 #: src/content/pages/components/LivingValueChart.tsx
 msgid "{0} {resourceName}"
+msgstr ""
+
+#. placeholder {0}: found.unnamed
+#: src/content/pages/components/PlayerNamedStarts.tsx
+msgid "{0} at a position with no name."
 msgstr ""
 
 #. placeholder {0}: d.asset
@@ -3820,6 +3832,7 @@ msgstr ""
 
 #: src/content/matchupFormat.ts
 #: src/content/pages/components/PlayerMatchFigures.tsx
+#: src/content/pages/components/PlayerNamedStarts.tsx
 #: src/content/pages/components/PlayerUnitUsage.tsx
 msgid "{n, plural, one {# game} other {# games}}"
 msgstr ""
@@ -4395,6 +4408,7 @@ msgstr ""
 msgid "{pending, plural, one {This deletes the original coilbox kept of # file. After that, undo is not possible here, only through your own copy or version control.} other {This deletes the originals coilbox kept of # files. After that, undo is not possible here, only through your own copy or version control.}}"
 msgstr ""
 
+#: src/content/pages/components/PlayerNamedStarts.tsx
 #: src/content/pages/components/PlayerUnitUsage.tsx
 msgid "{pending} still being read."
 msgstr ""
@@ -5879,6 +5893,10 @@ msgstr ""
 
 #: src/blueprint/pages/components/ArrivingPack.tsx
 msgid "{unreadable, plural, one {# other entry is in this file that coilbox cannot read. Nothing here writes to the file, so it stays exactly as it is.} other {# other entries are in this file that coilbox cannot read. Nothing here writes to the file, so they stay exactly as they are.}}"
+msgstr ""
+
+#: src/content/pages/components/PlayerNamedStarts.tsx
+msgid "{unreadable} could not be read."
 msgstr ""
 
 #: src/scenario/pages/components/BlueprintPanel.tsx
@@ -8602,6 +8620,10 @@ msgstr ""
 
 #: src/multiplayer/battle/DeliveryProgressPanel.tsx
 msgid "already set"
+msgstr ""
+
+#: src/play/PresetChanges.tsx
+msgid "Already set this way"
 msgstr ""
 
 #: src/scenario/pages/components/registries.ts
@@ -11415,6 +11437,10 @@ msgstr ""
 msgid "Cannot be carried"
 msgstr ""
 
+#: src/play/PresetChanges.tsx
+msgid "Cannot be listed as changes to units. It is a program or a shape coilbox does not read."
+msgstr ""
+
 #: src/multiplayer/follow/FollowIndicator.tsx
 msgid "Cannot follow {name}"
 msgstr ""
@@ -11678,6 +11704,18 @@ msgstr ""
 
 #: src/workshop/pages/components/ReferenceBulkEdit.tsx
 msgid "Changes every one of a unit's weapons, each from its own current range."
+msgstr ""
+
+#: src/play/PresetChanges.tsx
+msgid "Changes no units."
+msgstr ""
+
+#: src/play/PresetChanges.tsx
+msgid "Changes nothing from the defaults."
+msgstr ""
+
+#: src/play/PresetChanges.tsx
+msgid "Changes nothing: every slot is empty."
 msgstr ""
 
 #: src/workshop/pages/components/ReferenceBulkEdit.tsx
@@ -14034,6 +14072,10 @@ msgstr ""
 
 #: src/multiplayer/battles/WindowsFirewall.tsx
 msgid "could not be checked"
+msgstr ""
+
+#: src/play/PresetChanges.tsx
+msgid "Could not be decoded: {error}"
 msgstr ""
 
 #: src/content/pages/components/Convert3doDrawer.tsx
@@ -18576,6 +18618,10 @@ msgstr ""
 
 #: src/scenario/pages/ScenarioBuilderPage.tsx
 msgid "From {originGame}"
+msgstr ""
+
+#: src/content/pages/components/PlayerNamedStarts.tsx
+msgid "From {placed} of {gameCount}."
 msgstr ""
 
 #: src/blueprint/library.ts
@@ -24633,6 +24679,10 @@ msgstr ""
 msgid "Named in {fileCount} of this game's Lua files, so no one of them is the answer."
 msgstr ""
 
+#: src/content/pages/components/PlayerNamedStarts.tsx
+msgid "Named start positions"
+msgstr ""
+
 #: src/workshop/pages/UnitPage.tsx
 msgid "Named states of the project, to go back to in one action"
 msgstr ""
@@ -25901,6 +25951,10 @@ msgstr ""
 
 #: src/multiplayer/battles/BattleList.tsx
 msgid "No open battles right now."
+msgstr ""
+
+#: src/play/PresetChanges.tsx
+msgid "No option it declares differs from its default."
 msgstr ""
 
 #: src/multiplayer/battle/BattleOptionsDrawer.tsx
@@ -27549,6 +27603,11 @@ msgstr ""
 
 #: src/notify/NotificationsBell.tsx
 msgid "now"
+msgstr ""
+
+#. placeholder {0}: current.value
+#: src/play/PresetChanges.tsx
+msgid "Now {0}"
 msgstr ""
 
 #: src/scenario/pages/components/TriggerSteps.tsx
@@ -29830,6 +29889,7 @@ msgstr ""
 msgid "position"
 msgstr ""
 
+#: src/content/pages/components/PlayerNamedStarts.tsx
 #: src/lego/pages/components/AnchorList.tsx
 #: src/lego/pages/components/TransformFields.tsx
 msgid "Position"
@@ -29896,6 +29956,10 @@ msgstr ""
 #: src/campaign/pages/components/MissionEditorDrawer.tsx
 #: src/scenario/triggerTypes.ts
 msgid "Presentation"
+msgstr ""
+
+#: src/play/PresetChanges.tsx
+msgid "Preset {value}, default {defaultValue}"
 msgstr ""
 
 #: src/multiplayer/pages/BattleRoomPage.tsx
@@ -30570,6 +30634,10 @@ msgstr ""
 msgid "Rating"
 msgstr ""
 
+#: src/play/PresetChanges.tsx
+msgid "Raw text"
+msgstr ""
+
 #: src/lego/pages/components/TexturePicker.tsx
 msgid "Re-read the texture file, to pick up an edit made elsewhere"
 msgstr ""
@@ -30873,6 +30941,10 @@ msgstr ""
 msgid "Reading the game's files…"
 msgstr ""
 
+#: src/content/pages/components/PlayerNamedStarts.tsx
+msgid "Reading the map."
+msgstr ""
+
 #: src/conquest/pages/ConquestListPage.tsx
 msgid "Reading the map…"
 msgstr ""
@@ -30899,6 +30971,10 @@ msgstr ""
 
 #: src/campaign/pages/MissionBriefingPage.tsx
 msgid "Reading the replay to see how the mission went."
+msgstr ""
+
+#: src/play/PresetChanges.tsx
+msgid "Reading the slots…"
 msgstr ""
 
 #: src/blueprint/pack.ts
@@ -32387,6 +32463,7 @@ msgstr ""
 
 #: src/content/pages/components/MapRecords.tsx
 #: src/content/pages/components/MatchStatsSection.tsx
+#: src/content/pages/components/PlayerNamedStarts.tsx
 #: src/content/pages/components/ReplayRoster.tsx
 #: src/content/pages/ReplayDetailPage.tsx
 msgid "Result"
@@ -36773,6 +36850,7 @@ msgid "Take this script over to edit it. The unit then keeps your version, an ex
 msgstr ""
 
 #: src/content/pages/components/MapRecords.tsx
+#: src/content/pages/components/PlayerNamedStarts.tsx
 #: src/runlite/galaxyAdapter.ts
 msgid "Taken"
 msgstr ""
@@ -38552,6 +38630,10 @@ msgstr ""
 msgid "The map could not be drawn."
 msgstr ""
 
+#: src/content/pages/components/PlayerNamedStarts.tsx
+msgid "The map could not be read, so its starts cannot be placed."
+msgstr ""
+
 #: src/runlite/pages/components/RunSetupForm.tsx
 msgid "The map decides how long this warpath is. This length crosses a map of {landLocationCount} {landLocationNoun}."
 msgstr ""
@@ -38787,6 +38869,10 @@ msgstr ""
 
 #: src/campaign/pages/components/MissionRemoveButton.tsx
 msgid "the only copy of the scenario \"{scenarioName}\", which is no longer in the scenario builder"
+msgstr ""
+
+#: src/play/PresetChanges.tsx
+msgid "The options for {subject} are not available, so this cannot be compared with its defaults. It may not be installed."
 msgstr ""
 
 #: src/content/pages/components/CommandRateChart.tsx
@@ -43504,6 +43590,10 @@ msgstr ""
 
 #: src/lego/pages/components/AnimationPanel.tsx
 msgid "What it builds with"
+msgstr ""
+
+#: src/play/PresetChanges.tsx
+msgid "What it changes"
 msgstr ""
 
 #: src/lego/pages/components/AimPointPanel.tsx

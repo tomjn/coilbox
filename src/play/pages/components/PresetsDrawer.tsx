@@ -24,7 +24,10 @@ import { FollowedPacksView } from "../../FollowedPacksView";
 import { presetForBattle, useFollowedPacks } from "../../followedPacks";
 import { PresetLibraryToolbar } from "../../PresetLibraryToolbar";
 import { PresetList } from "../../PresetList";
-import { PresetPartsView } from "../../PresetPartsView";
+import {
+  type CurrentOptionValues,
+  PresetPartsView,
+} from "../../PresetPartsView";
 import { PresetTweaksRow } from "../../PresetTweaksRow";
 import { PresetTweaksView, usePresetTweaks } from "../../PresetTweaksView";
 import type { PresetSelection } from "../../presetParts";
@@ -74,6 +77,7 @@ export function PresetsDrawer({
   disabled,
   currentMapName,
   currentStartPosType,
+  currentOptions,
   gameArchiveFor,
 }: {
   open: boolean;
@@ -128,6 +132,9 @@ export function PresetsDrawer({
   /** The setup's map and start position mode, for the fit warnings. */
   currentMapName: string;
   currentStartPosType: number;
+  /** The setup's option values, for saying which of a preset's changes are
+   *  already in place. */
+  currentOptions?: CurrentOptionValues;
   /** The archive a game's options are read from, for a preset naming a game
    *  other than the current one. */
   gameArchiveFor: (gameName: string) => string | undefined;
@@ -277,6 +284,7 @@ export function PresetsDrawer({
               currentGameName={currentGameName}
               verb={t`Load`}
               fit={fit}
+              current={currentOptions}
               disabled={disabled}
               onConfirm={(selection) => load(viewing, selection)}
               actions={

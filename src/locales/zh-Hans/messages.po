@@ -547,6 +547,11 @@ msgstr "{0, plural, other {{shown} / # 个单位}}"
 msgid "{0, plural, one {{shownCount} of # unit} other {{shownCount} of # units}}"
 msgstr "{0, plural, other {{shownCount} / # 个单位}}"
 
+#. placeholder {0}: undeclared.length
+#: src/play/PresetChanges.tsx
+msgid "{0, plural, one {{subject} does not declare this option:} other {{subject} does not declare these # options:}}"
+msgstr ""
+
 #. placeholder {0}: users.length
 #: src/workshop/weaponSlots.ts
 #, fuzzy
@@ -673,7 +678,9 @@ msgstr "{0, plural, other {# 个工厂命令指定了不会移动的单位}}"
 msgid "{0, plural, one {# factory queue order has no position and is not drawn.} other {# factory queue orders have no position and are not drawn.}}"
 msgstr "{0, plural, other {# 个工厂队列命令没有位置，未绘制。}}"
 
+#. placeholder {0}: fields.length
 #. placeholder {0}: section.rows.length
+#: src/play/PresetChanges.tsx
 #: src/workshop/pages/components/UnitFieldGroups.tsx
 #, fuzzy
 msgid "{0, plural, one {# field} other {# fields}}"
@@ -1339,6 +1346,11 @@ msgstr "{0}（未能重现此对局）"
 #, fuzzy
 msgid "{0} {resourceName}"
 msgstr "{0} {resourceName}"
+
+#. placeholder {0}: found.unnamed
+#: src/content/pages/components/PlayerNamedStarts.tsx
+msgid "{0} at a position with no name."
+msgstr ""
 
 #. placeholder {0}: d.asset
 #: src/content/gameSourceRows.ts
@@ -4695,6 +4707,7 @@ msgstr "{n, plural, other {# 个银河}}"
 
 #: src/content/matchupFormat.ts
 #: src/content/pages/components/PlayerMatchFigures.tsx
+#: src/content/pages/components/PlayerNamedStarts.tsx
 #: src/content/pages/components/PlayerUnitUsage.tsx
 #, fuzzy
 msgid "{n, plural, one {# game} other {# games}}"
@@ -5409,6 +5422,7 @@ msgstr "{pending, plural, other {此游戏中有 # 个文件包含 coilbox 所�
 msgid "{pending, plural, one {This deletes the original coilbox kept of # file. After that, undo is not possible here, only through your own copy or version control.} other {This deletes the originals coilbox kept of # files. After that, undo is not possible here, only through your own copy or version control.}}"
 msgstr "{pending, plural, other {这会删除 coilbox 为 # 个文件保留的原件。之后无法在此撤销，只能通过你自己的副本或版本控制恢复。}}"
 
+#: src/content/pages/components/PlayerNamedStarts.tsx
 #: src/content/pages/components/PlayerUnitUsage.tsx
 #, fuzzy
 msgid "{pending} still being read."
@@ -7257,6 +7271,10 @@ msgstr "{unread, plural, other {# 场对局的回放无法读取。}}"
 #, fuzzy
 msgid "{unreadable, plural, one {# other entry is in this file that coilbox cannot read. Nothing here writes to the file, so it stays exactly as it is.} other {# other entries are in this file that coilbox cannot read. Nothing here writes to the file, so they stay exactly as they are.}}"
 msgstr "{unreadable, plural, other {此文件中另有 # 个 coilbox 无法读取的条目。此处不会写入该文件，因此它们会保持原样。}}"
+
+#: src/content/pages/components/PlayerNamedStarts.tsx
+msgid "{unreadable} could not be read."
+msgstr ""
 
 #: src/scenario/pages/components/BlueprintPanel.tsx
 #, fuzzy
@@ -10630,6 +10648,10 @@ msgstr "已保存"
 #, fuzzy
 msgid "already set"
 msgstr "已设置"
+
+#: src/play/PresetChanges.tsx
+msgid "Already set this way"
+msgstr ""
 
 #: src/scenario/pages/components/registries.ts
 #, fuzzy
@@ -14090,6 +14112,10 @@ msgstr "无法在此建造：{list}。"
 msgid "Cannot be carried"
 msgstr "无法被运输"
 
+#: src/play/PresetChanges.tsx
+msgid "Cannot be listed as changes to units. It is a program or a shape coilbox does not read."
+msgstr ""
+
 #: src/multiplayer/follow/FollowIndicator.tsx
 #, fuzzy
 msgid "Cannot follow {name}"
@@ -14418,6 +14444,18 @@ msgstr "更改"
 #, fuzzy
 msgid "Changes every one of a unit's weapons, each from its own current range."
 msgstr "更改单位的每个武器，各自基于其当前射程。"
+
+#: src/play/PresetChanges.tsx
+msgid "Changes no units."
+msgstr ""
+
+#: src/play/PresetChanges.tsx
+msgid "Changes nothing from the defaults."
+msgstr ""
+
+#: src/play/PresetChanges.tsx
+msgid "Changes nothing: every slot is empty."
+msgstr ""
 
 #: src/workshop/pages/components/ReferenceBulkEdit.tsx
 #, fuzzy
@@ -17292,6 +17330,10 @@ msgstr "无法添加模块"
 #, fuzzy
 msgid "could not be checked"
 msgstr "无法检查"
+
+#: src/play/PresetChanges.tsx
+msgid "Could not be decoded: {error}"
+msgstr ""
 
 #: src/content/pages/components/Convert3doDrawer.tsx
 #, fuzzy
@@ -22882,6 +22924,10 @@ msgstr "来自 {name}"
 #, fuzzy
 msgid "From {originGame}"
 msgstr "来自 {originGame}"
+
+#: src/content/pages/components/PlayerNamedStarts.tsx
+msgid "From {placed} of {gameCount}."
+msgstr ""
 
 #: src/blueprint/library.ts
 #, fuzzy
@@ -30337,6 +30383,10 @@ msgstr "由脚本指定"
 msgid "Named in {fileCount} of this game's Lua files, so no one of them is the answer."
 msgstr "此游戏有 {fileCount} 个 Lua 文件提到它，所以无法确定是哪一个。"
 
+#: src/content/pages/components/PlayerNamedStarts.tsx
+msgid "Named start positions"
+msgstr ""
+
 #: src/workshop/pages/UnitPage.tsx
 #, fuzzy
 msgid "Named states of the project, to go back to in one action"
@@ -31906,6 +31956,10 @@ msgstr "频道 #{channel} 中没有被禁言的人。"
 #, fuzzy
 msgid "No open battles right now."
 msgstr "目前没有开放的对局。"
+
+#: src/play/PresetChanges.tsx
+msgid "No option it declares differs from its default."
+msgstr ""
 
 #: src/multiplayer/battle/BattleOptionsDrawer.tsx
 #, fuzzy
@@ -33947,6 +34001,11 @@ msgstr "通知：{unread} 条未读"
 #, fuzzy
 msgid "now"
 msgstr "现在"
+
+#. placeholder {0}: current.value
+#: src/play/PresetChanges.tsx
+msgid "Now {0}"
+msgstr ""
 
 #: src/scenario/pages/components/TriggerSteps.tsx
 #, fuzzy
@@ -36752,6 +36811,7 @@ msgstr "姿势"
 msgid "position"
 msgstr "位置"
 
+#: src/content/pages/components/PlayerNamedStarts.tsx
 #: src/lego/pages/components/AnchorList.tsx
 #: src/lego/pages/components/TransformFields.tsx
 #, fuzzy
@@ -36835,6 +36895,10 @@ msgstr "准备中…"
 #, fuzzy
 msgid "Presentation"
 msgstr "演出"
+
+#: src/play/PresetChanges.tsx
+msgid "Preset {value}, default {defaultValue}"
+msgstr ""
 
 #: src/multiplayer/pages/BattleRoomPage.tsx
 #, fuzzy
@@ -37657,6 +37721,10 @@ msgstr "比率"
 msgid "Rating"
 msgstr "评分"
 
+#: src/play/PresetChanges.tsx
+msgid "Raw text"
+msgstr ""
+
 #: src/lego/pages/components/TexturePicker.tsx
 #, fuzzy
 msgid "Re-read the texture file, to pick up an edit made elsewhere"
@@ -38031,6 +38099,10 @@ msgstr "正在读取游戏。"
 msgid "Reading the game's files…"
 msgstr "正在读取游戏的文件…"
 
+#: src/content/pages/components/PlayerNamedStarts.tsx
+msgid "Reading the map."
+msgstr ""
+
 #: src/conquest/pages/ConquestListPage.tsx
 #, fuzzy
 msgid "Reading the map…"
@@ -38065,6 +38137,10 @@ msgstr "正在读取回放列表…"
 #, fuzzy
 msgid "Reading the replay to see how the mission went."
 msgstr "正在读取回放，查看任务结果。"
+
+#: src/play/PresetChanges.tsx
+msgid "Reading the slots…"
+msgstr ""
 
 #: src/blueprint/pack.ts
 #, fuzzy
@@ -39887,6 +39963,7 @@ msgstr "受限对局 — {summary}"
 
 #: src/content/pages/components/MapRecords.tsx
 #: src/content/pages/components/MatchStatsSection.tsx
+#: src/content/pages/components/PlayerNamedStarts.tsx
 #: src/content/pages/components/ReplayRoster.tsx
 #: src/content/pages/ReplayDetailPage.tsx
 #, fuzzy
@@ -45288,6 +45365,7 @@ msgid "Take this script over to edit it. The unit then keeps your version, an ex
 msgstr "接管此脚本即可编辑。之后单位会保留你的版本，导出会写出你编写的内容，动画预设也不再生成它。你无需接管就能看到单位运行，因为动画面板已经在播放此脚本。之后可以交还，这会丢弃你的版本，重新由动画预设负责。"
 
 #: src/content/pages/components/MapRecords.tsx
+#: src/content/pages/components/PlayerNamedStarts.tsx
 #: src/runlite/galaxyAdapter.ts
 #, fuzzy
 msgid "Taken"
@@ -47483,6 +47561,10 @@ msgstr "coilbox 用来构建和拆解地图的地图编译器。"
 msgid "The map could not be drawn."
 msgstr "无法绘制地图。"
 
+#: src/content/pages/components/PlayerNamedStarts.tsx
+msgid "The map could not be read, so its starts cannot be placed."
+msgstr ""
+
 #: src/runlite/pages/components/RunSetupForm.tsx
 #, fuzzy
 msgid "The map decides how long this warpath is. This length crosses a map of {landLocationCount} {landLocationNoun}."
@@ -47776,6 +47858,10 @@ msgstr "最后开始的那个生效。"
 #, fuzzy
 msgid "the only copy of the scenario \"{scenarioName}\", which is no longer in the scenario builder"
 msgstr "场景“{scenarioName}”的唯一副本（已不在场景编辑器中）"
+
+#: src/play/PresetChanges.tsx
+msgid "The options for {subject} are not available, so this cannot be compared with its defaults. It may not be installed."
+msgstr ""
 
 #: src/content/pages/components/CommandRateChart.tsx
 #: src/content/pages/components/ReplayMap.tsx
@@ -53612,6 +53698,10 @@ msgstr "它能建造什么"
 #, fuzzy
 msgid "What it builds with"
 msgstr "它用什么建造"
+
+#: src/play/PresetChanges.tsx
+msgid "What it changes"
+msgstr ""
 
 #: src/lego/pages/components/AimPointPanel.tsx
 #, fuzzy

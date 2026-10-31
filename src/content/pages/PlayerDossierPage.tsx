@@ -34,6 +34,7 @@ import {
 } from "../stats";
 import { useMetricRegistry, useRatioRegistry } from "../useMetricRegistry";
 import { PlayerMatchFigures } from "./components/PlayerMatchFigures";
+import { PlayerNamedStarts } from "./components/PlayerNamedStarts";
 import { PlayerUnitUsage } from "./components/PlayerUnitUsage";
 import { StatCard, TallyRow } from "./components/StatWidgets";
 import { EmptyState, ErrorBanner, SkeletonList } from "./components/states";
@@ -295,6 +296,14 @@ export default function PlayerDossierPage() {
 
           {!statsHidden && (
             <PlayerUnitUsage
+              records={records}
+              playerName={playerName}
+              refightFilenames={refights}
+            />
+          )}
+
+          {!statsHidden && !isProfileHidden("analytics.mapInsight") && (
+            <PlayerNamedStarts
               records={records}
               playerName={playerName}
               refightFilenames={refights}

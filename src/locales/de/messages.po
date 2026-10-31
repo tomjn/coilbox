@@ -547,6 +547,11 @@ msgstr "{0, plural, one {{shown} von # Einheit} other {{shown} von # Einheiten}}
 msgid "{0, plural, one {{shownCount} of # unit} other {{shownCount} of # units}}"
 msgstr "{0, plural, one {{shownCount} von # Einheit} other {{shownCount} von # Einheiten}}"
 
+#. placeholder {0}: undeclared.length
+#: src/play/PresetChanges.tsx
+msgid "{0, plural, one {{subject} does not declare this option:} other {{subject} does not declare these # options:}}"
+msgstr ""
+
 #. placeholder {0}: users.length
 #: src/workshop/weaponSlots.ts
 #, fuzzy
@@ -673,7 +678,9 @@ msgstr "{0, plural, one {# Fabrikauftrag nennt eine Einheit, die nicht} other {#
 msgid "{0, plural, one {# factory queue order has no position and is not drawn.} other {# factory queue orders have no position and are not drawn.}}"
 msgstr "{0, plural, one {# Auftrag in der Fabrikwarteschlange hat keine Position und wird nicht gezeichnet.} other {# Aufträge in der Fabrikwarteschlange haben keine Position und werden nicht gezeichnet.}}"
 
+#. placeholder {0}: fields.length
 #. placeholder {0}: section.rows.length
+#: src/play/PresetChanges.tsx
 #: src/workshop/pages/components/UnitFieldGroups.tsx
 #, fuzzy
 msgid "{0, plural, one {# field} other {# fields}}"
@@ -1339,6 +1346,11 @@ msgstr "{0} (hat diese Partie nicht reproduziert)"
 #, fuzzy
 msgid "{0} {resourceName}"
 msgstr "{0} {resourceName}"
+
+#. placeholder {0}: found.unnamed
+#: src/content/pages/components/PlayerNamedStarts.tsx
+msgid "{0} at a position with no name."
+msgstr ""
 
 #. placeholder {0}: d.asset
 #: src/content/gameSourceRows.ts
@@ -4695,6 +4707,7 @@ msgstr "{n, plural, one {# Galaxie} other {# Galaxien}}"
 
 #: src/content/matchupFormat.ts
 #: src/content/pages/components/PlayerMatchFigures.tsx
+#: src/content/pages/components/PlayerNamedStarts.tsx
 #: src/content/pages/components/PlayerUnitUsage.tsx
 #, fuzzy
 msgid "{n, plural, one {# game} other {# games}}"
@@ -5409,6 +5422,7 @@ msgstr "{pending, plural, one {# Datei in diesem Spiel hat eine Änderung von co
 msgid "{pending, plural, one {This deletes the original coilbox kept of # file. After that, undo is not possible here, only through your own copy or version control.} other {This deletes the originals coilbox kept of # files. After that, undo is not possible here, only through your own copy or version control.}}"
 msgstr "{pending, plural, one {Dadurch wird das Original gelöscht, das coilbox von # Datei aufbewahrt hat. Danach ist Rückgängigmachen hier nicht mehr möglich, nur über Ihre eigene Kopie oder Versionsverwaltung.} other {Dadurch werden die Originale gelöscht, die coilbox von # Dateien aufbewahrt hat. Danach ist Rückgängigmachen hier nicht mehr möglich, nur über Ihre eigene Kopie oder Versionsverwaltung.}}"
 
+#: src/content/pages/components/PlayerNamedStarts.tsx
 #: src/content/pages/components/PlayerUnitUsage.tsx
 #, fuzzy
 msgid "{pending} still being read."
@@ -7257,6 +7271,10 @@ msgstr "{unread, plural, one {# Partie, deren Wiederholung nicht gelesen werden 
 #, fuzzy
 msgid "{unreadable, plural, one {# other entry is in this file that coilbox cannot read. Nothing here writes to the file, so it stays exactly as it is.} other {# other entries are in this file that coilbox cannot read. Nothing here writes to the file, so they stay exactly as they are.}}"
 msgstr "{unreadable, plural, one {In dieser Datei steht # weiterer Eintrag, den coilbox nicht lesen kann. Nichts hier schreibt in die Datei, daher bleibt er genau, wie er ist.} other {In dieser Datei stehen # weitere Einträge, die coilbox nicht lesen kann. Nichts hier schreibt in die Datei, daher bleiben sie genau, wie sie sind.}}"
+
+#: src/content/pages/components/PlayerNamedStarts.tsx
+msgid "{unreadable} could not be read."
+msgstr ""
 
 #: src/scenario/pages/components/BlueprintPanel.tsx
 #, fuzzy
@@ -10630,6 +10648,10 @@ msgstr "Bereits gespeichert"
 #, fuzzy
 msgid "already set"
 msgstr "bereits gesetzt"
+
+#: src/play/PresetChanges.tsx
+msgid "Already set this way"
+msgstr ""
 
 #: src/scenario/pages/components/registries.ts
 #, fuzzy
@@ -14090,6 +14112,10 @@ msgstr "Hier nicht baubar: {list}."
 msgid "Cannot be carried"
 msgstr "Kann nicht getragen werden"
 
+#: src/play/PresetChanges.tsx
+msgid "Cannot be listed as changes to units. It is a program or a shape coilbox does not read."
+msgstr ""
+
 #: src/multiplayer/follow/FollowIndicator.tsx
 #, fuzzy
 msgid "Cannot follow {name}"
@@ -14418,6 +14444,18 @@ msgstr "Änderungen"
 #, fuzzy
 msgid "Changes every one of a unit's weapons, each from its own current range."
 msgstr "Ändert jede Waffe einer Einheit, jeweils ausgehend von ihrer aktuellen Reichweite."
+
+#: src/play/PresetChanges.tsx
+msgid "Changes no units."
+msgstr ""
+
+#: src/play/PresetChanges.tsx
+msgid "Changes nothing from the defaults."
+msgstr ""
+
+#: src/play/PresetChanges.tsx
+msgid "Changes nothing: every slot is empty."
+msgstr ""
 
 #: src/workshop/pages/components/ReferenceBulkEdit.tsx
 #, fuzzy
@@ -17292,6 +17330,10 @@ msgstr "Modul konnte nicht hinzugefügt werden"
 #, fuzzy
 msgid "could not be checked"
 msgstr "konnte nicht geprüft werden"
+
+#: src/play/PresetChanges.tsx
+msgid "Could not be decoded: {error}"
+msgstr ""
 
 #: src/content/pages/components/Convert3doDrawer.tsx
 #, fuzzy
@@ -22882,6 +22924,10 @@ msgstr "Aus {name}"
 #, fuzzy
 msgid "From {originGame}"
 msgstr "Aus {originGame}"
+
+#: src/content/pages/components/PlayerNamedStarts.tsx
+msgid "From {placed} of {gameCount}."
+msgstr ""
 
 #: src/blueprint/library.ts
 #, fuzzy
@@ -30337,6 +30383,10 @@ msgstr "Vom Skript benannt"
 msgid "Named in {fileCount} of this game's Lua files, so no one of them is the answer."
 msgstr "In {fileCount} Lua-Dateien dieses Spiels genannt, also ist keine davon allein die Antwort."
 
+#: src/content/pages/components/PlayerNamedStarts.tsx
+msgid "Named start positions"
+msgstr ""
+
 #: src/workshop/pages/UnitPage.tsx
 #, fuzzy
 msgid "Named states of the project, to go back to in one action"
@@ -31906,6 +31956,10 @@ msgstr "Niemand ist in #{channel} stummgeschaltet."
 #, fuzzy
 msgid "No open battles right now."
 msgstr "Gerade keine offenen Partien."
+
+#: src/play/PresetChanges.tsx
+msgid "No option it declares differs from its default."
+msgstr ""
 
 #: src/multiplayer/battle/BattleOptionsDrawer.tsx
 #, fuzzy
@@ -33947,6 +34001,11 @@ msgstr "Benachrichtigungen: {unread} ungelesen"
 #, fuzzy
 msgid "now"
 msgstr "jetzt"
+
+#. placeholder {0}: current.value
+#: src/play/PresetChanges.tsx
+msgid "Now {0}"
+msgstr ""
 
 #: src/scenario/pages/components/TriggerSteps.tsx
 #, fuzzy
@@ -36752,6 +36811,7 @@ msgstr "Posen"
 msgid "position"
 msgstr "Position"
 
+#: src/content/pages/components/PlayerNamedStarts.tsx
 #: src/lego/pages/components/AnchorList.tsx
 #: src/lego/pages/components/TransformFields.tsx
 #, fuzzy
@@ -36835,6 +36895,10 @@ msgstr "Wird vorbereitet…"
 #, fuzzy
 msgid "Presentation"
 msgstr "Präsentation"
+
+#: src/play/PresetChanges.tsx
+msgid "Preset {value}, default {defaultValue}"
+msgstr ""
 
 #: src/multiplayer/pages/BattleRoomPage.tsx
 #, fuzzy
@@ -37657,6 +37721,10 @@ msgstr "Rate"
 msgid "Rating"
 msgstr "Wertung"
 
+#: src/play/PresetChanges.tsx
+msgid "Raw text"
+msgstr ""
+
 #: src/lego/pages/components/TexturePicker.tsx
 #, fuzzy
 msgid "Re-read the texture file, to pick up an edit made elsewhere"
@@ -38031,6 +38099,10 @@ msgstr "Spiel wird gelesen."
 msgid "Reading the game's files…"
 msgstr "Dateien des Spiels werden gelesen…"
 
+#: src/content/pages/components/PlayerNamedStarts.tsx
+msgid "Reading the map."
+msgstr ""
+
 #: src/conquest/pages/ConquestListPage.tsx
 #, fuzzy
 msgid "Reading the map…"
@@ -38065,6 +38137,10 @@ msgstr "Liste der Wiederholungen wird gelesen…"
 #, fuzzy
 msgid "Reading the replay to see how the mission went."
 msgstr "Wiederholung wird gelesen, um zu sehen, wie die Mission lief."
+
+#: src/play/PresetChanges.tsx
+msgid "Reading the slots…"
+msgstr ""
 
 #: src/blueprint/pack.ts
 #, fuzzy
@@ -39887,6 +39963,7 @@ msgstr "Eingeschränkte Partie – {summary}"
 
 #: src/content/pages/components/MapRecords.tsx
 #: src/content/pages/components/MatchStatsSection.tsx
+#: src/content/pages/components/PlayerNamedStarts.tsx
 #: src/content/pages/components/ReplayRoster.tsx
 #: src/content/pages/ReplayDetailPage.tsx
 #, fuzzy
@@ -45288,6 +45365,7 @@ msgid "Take this script over to edit it. The unit then keeps your version, an ex
 msgstr "Übernehmen Sie dieses Skript, um es zu bearbeiten. Die Einheit behält dann Ihre Version, ein Export schreibt, was Sie geschrieben haben, und die Vorlagen erzeugen es nicht mehr. Um die Einheit laufen zu sehen, müssen Sie es nicht übernehmen, weil das Animationsfeld dieses Skript bereits abspielt. Sie können es später zurückgeben, dann wird Ihre Version verworfen und die Vorlagen übernehmen wieder."
 
 #: src/content/pages/components/MapRecords.tsx
+#: src/content/pages/components/PlayerNamedStarts.tsx
 #: src/runlite/galaxyAdapter.ts
 #, fuzzy
 msgid "Taken"
@@ -47483,6 +47561,10 @@ msgstr "Der Karten-Compiler, mit dem coilbox Karten baut und zerlegt."
 msgid "The map could not be drawn."
 msgstr "Die Karte konnte nicht gezeichnet werden."
 
+#: src/content/pages/components/PlayerNamedStarts.tsx
+msgid "The map could not be read, so its starts cannot be placed."
+msgstr ""
+
 #: src/runlite/pages/components/RunSetupForm.tsx
 #, fuzzy
 msgid "The map decides how long this warpath is. This length crosses a map of {landLocationCount} {landLocationNoun}."
@@ -47776,6 +47858,10 @@ msgstr "Der zuletzt gestartete übernimmt."
 #, fuzzy
 msgid "the only copy of the scenario \"{scenarioName}\", which is no longer in the scenario builder"
 msgstr "die einzige Kopie des Szenarios „{scenarioName}“, das nicht mehr im Szenario-Editor ist"
+
+#: src/play/PresetChanges.tsx
+msgid "The options for {subject} are not available, so this cannot be compared with its defaults. It may not be installed."
+msgstr ""
 
 #: src/content/pages/components/CommandRateChart.tsx
 #: src/content/pages/components/ReplayMap.tsx
@@ -53612,6 +53698,10 @@ msgstr "Was sie baut"
 #, fuzzy
 msgid "What it builds with"
 msgstr "Womit sie baut"
+
+#: src/play/PresetChanges.tsx
+msgid "What it changes"
+msgstr ""
 
 #: src/lego/pages/components/AimPointPanel.tsx
 #, fuzzy

@@ -547,6 +547,11 @@ msgstr "{0, plural, one {{shown} sur # unité} other {{shown} sur # unités}}"
 msgid "{0, plural, one {{shownCount} of # unit} other {{shownCount} of # units}}"
 msgstr "{0, plural, one {{shownCount} sur # unité} other {{shownCount} sur # unités}}"
 
+#. placeholder {0}: undeclared.length
+#: src/play/PresetChanges.tsx
+msgid "{0, plural, one {{subject} does not declare this option:} other {{subject} does not declare these # options:}}"
+msgstr ""
+
 #. placeholder {0}: users.length
 #: src/workshop/weaponSlots.ts
 #, fuzzy
@@ -673,7 +678,9 @@ msgstr "{0, plural, one {# ordre d’usine nomme une unité qui ne} other {# ord
 msgid "{0, plural, one {# factory queue order has no position and is not drawn.} other {# factory queue orders have no position and are not drawn.}}"
 msgstr "{0, plural, one {# ordre de file d’usine n’a pas de position et n’est pas dessiné.} other {# ordres de file d’usine n’ont pas de position et ne sont pas dessinés.}}"
 
+#. placeholder {0}: fields.length
 #. placeholder {0}: section.rows.length
+#: src/play/PresetChanges.tsx
 #: src/workshop/pages/components/UnitFieldGroups.tsx
 #, fuzzy
 msgid "{0, plural, one {# field} other {# fields}}"
@@ -1339,6 +1346,11 @@ msgstr "{0} (n’a pas reproduit cette partie)"
 #, fuzzy
 msgid "{0} {resourceName}"
 msgstr "{0} {resourceName}"
+
+#. placeholder {0}: found.unnamed
+#: src/content/pages/components/PlayerNamedStarts.tsx
+msgid "{0} at a position with no name."
+msgstr ""
 
 #. placeholder {0}: d.asset
 #: src/content/gameSourceRows.ts
@@ -4695,6 +4707,7 @@ msgstr "{n, plural, one {# galaxie} other {# galaxies}}"
 
 #: src/content/matchupFormat.ts
 #: src/content/pages/components/PlayerMatchFigures.tsx
+#: src/content/pages/components/PlayerNamedStarts.tsx
 #: src/content/pages/components/PlayerUnitUsage.tsx
 #, fuzzy
 msgid "{n, plural, one {# game} other {# games}}"
@@ -5409,6 +5422,7 @@ msgstr "{pending, plural, one {# fichier de ce jeu a une modification de coilbox
 msgid "{pending, plural, one {This deletes the original coilbox kept of # file. After that, undo is not possible here, only through your own copy or version control.} other {This deletes the originals coilbox kept of # files. After that, undo is not possible here, only through your own copy or version control.}}"
 msgstr "{pending, plural, one {Cela supprime l’original que coilbox avait gardé de # fichier. Ensuite, l’annulation n’est plus possible ici, seulement via votre propre copie ou votre gestionnaire de versions.} other {Cela supprime les originaux que coilbox avait gardés de # fichiers. Ensuite, l’annulation n’est plus possible ici, seulement via votre propre copie ou votre gestionnaire de versions.}}"
 
+#: src/content/pages/components/PlayerNamedStarts.tsx
 #: src/content/pages/components/PlayerUnitUsage.tsx
 #, fuzzy
 msgid "{pending} still being read."
@@ -7257,6 +7271,10 @@ msgstr "{unread, plural, one {# partie dont la rediffusion n’a pas pu être lu
 #, fuzzy
 msgid "{unreadable, plural, one {# other entry is in this file that coilbox cannot read. Nothing here writes to the file, so it stays exactly as it is.} other {# other entries are in this file that coilbox cannot read. Nothing here writes to the file, so they stay exactly as they are.}}"
 msgstr "{unreadable, plural, one {# autre entrée de ce fichier ne peut pas être lue par coilbox. Rien ici n’écrit dans le fichier, elle reste donc telle quelle.} other {# autres entrées de ce fichier ne peuvent pas être lues par coilbox. Rien ici n’écrit dans le fichier, elles restent donc telles quelles.}}"
+
+#: src/content/pages/components/PlayerNamedStarts.tsx
+msgid "{unreadable} could not be read."
+msgstr ""
 
 #: src/scenario/pages/components/BlueprintPanel.tsx
 #, fuzzy
@@ -10630,6 +10648,10 @@ msgstr "Déjà enregistré"
 #, fuzzy
 msgid "already set"
 msgstr "déjà défini"
+
+#: src/play/PresetChanges.tsx
+msgid "Already set this way"
+msgstr ""
 
 #: src/scenario/pages/components/registries.ts
 #, fuzzy
@@ -14090,6 +14112,10 @@ msgstr "Ne peut pas être construit ici : {list}."
 msgid "Cannot be carried"
 msgstr "Ne peut pas être transporté"
 
+#: src/play/PresetChanges.tsx
+msgid "Cannot be listed as changes to units. It is a program or a shape coilbox does not read."
+msgstr ""
+
 #: src/multiplayer/follow/FollowIndicator.tsx
 #, fuzzy
 msgid "Cannot follow {name}"
@@ -14418,6 +14444,18 @@ msgstr "Modifications"
 #, fuzzy
 msgid "Changes every one of a unit's weapons, each from its own current range."
 msgstr "Modifie toutes les armes d’une unité, chacune à partir de sa portée actuelle."
+
+#: src/play/PresetChanges.tsx
+msgid "Changes no units."
+msgstr ""
+
+#: src/play/PresetChanges.tsx
+msgid "Changes nothing from the defaults."
+msgstr ""
+
+#: src/play/PresetChanges.tsx
+msgid "Changes nothing: every slot is empty."
+msgstr ""
 
 #: src/workshop/pages/components/ReferenceBulkEdit.tsx
 #, fuzzy
@@ -17292,6 +17330,10 @@ msgstr "Impossible d’ajouter le module"
 #, fuzzy
 msgid "could not be checked"
 msgstr "n’a pas pu être vérifié"
+
+#: src/play/PresetChanges.tsx
+msgid "Could not be decoded: {error}"
+msgstr ""
 
 #: src/content/pages/components/Convert3doDrawer.tsx
 #, fuzzy
@@ -22882,6 +22924,10 @@ msgstr "De {name}"
 #, fuzzy
 msgid "From {originGame}"
 msgstr "De {originGame}"
+
+#: src/content/pages/components/PlayerNamedStarts.tsx
+msgid "From {placed} of {gameCount}."
+msgstr ""
 
 #: src/blueprint/library.ts
 #, fuzzy
@@ -30337,6 +30383,10 @@ msgstr "Nommé par le script"
 msgid "Named in {fileCount} of this game's Lua files, so no one of them is the answer."
 msgstr "Cité dans {fileCount} fichiers Lua de ce jeu, donc aucun d’eux n’est la réponse."
 
+#: src/content/pages/components/PlayerNamedStarts.tsx
+msgid "Named start positions"
+msgstr ""
+
 #: src/workshop/pages/UnitPage.tsx
 #, fuzzy
 msgid "Named states of the project, to go back to in one action"
@@ -31906,6 +31956,10 @@ msgstr "Personne n’est rendu muet dans #{channel}."
 #, fuzzy
 msgid "No open battles right now."
 msgstr "Aucune partie ouverte pour le moment."
+
+#: src/play/PresetChanges.tsx
+msgid "No option it declares differs from its default."
+msgstr ""
 
 #: src/multiplayer/battle/BattleOptionsDrawer.tsx
 #, fuzzy
@@ -33947,6 +34001,11 @@ msgstr "Notifications : {unread} non lues"
 #, fuzzy
 msgid "now"
 msgstr "maintenant"
+
+#. placeholder {0}: current.value
+#: src/play/PresetChanges.tsx
+msgid "Now {0}"
+msgstr ""
 
 #: src/scenario/pages/components/TriggerSteps.tsx
 #, fuzzy
@@ -36752,6 +36811,7 @@ msgstr "Poses"
 msgid "position"
 msgstr "position"
 
+#: src/content/pages/components/PlayerNamedStarts.tsx
 #: src/lego/pages/components/AnchorList.tsx
 #: src/lego/pages/components/TransformFields.tsx
 #, fuzzy
@@ -36835,6 +36895,10 @@ msgstr "Préparation…"
 #, fuzzy
 msgid "Presentation"
 msgstr "Présentation"
+
+#: src/play/PresetChanges.tsx
+msgid "Preset {value}, default {defaultValue}"
+msgstr ""
 
 #: src/multiplayer/pages/BattleRoomPage.tsx
 #, fuzzy
@@ -37657,6 +37721,10 @@ msgstr "Débit"
 msgid "Rating"
 msgstr "Classement"
 
+#: src/play/PresetChanges.tsx
+msgid "Raw text"
+msgstr ""
+
 #: src/lego/pages/components/TexturePicker.tsx
 #, fuzzy
 msgid "Re-read the texture file, to pick up an edit made elsewhere"
@@ -38031,6 +38099,10 @@ msgstr "Lecture du jeu."
 msgid "Reading the game's files…"
 msgstr "Lecture des fichiers du jeu…"
 
+#: src/content/pages/components/PlayerNamedStarts.tsx
+msgid "Reading the map."
+msgstr ""
+
 #: src/conquest/pages/ConquestListPage.tsx
 #, fuzzy
 msgid "Reading the map…"
@@ -38065,6 +38137,10 @@ msgstr "Lecture de la liste des rediffusions…"
 #, fuzzy
 msgid "Reading the replay to see how the mission went."
 msgstr "Lecture de la rediffusion pour voir comment s’est passée la mission."
+
+#: src/play/PresetChanges.tsx
+msgid "Reading the slots…"
+msgstr ""
 
 #: src/blueprint/pack.ts
 #, fuzzy
@@ -39887,6 +39963,7 @@ msgstr "Partie restreinte : {summary}"
 
 #: src/content/pages/components/MapRecords.tsx
 #: src/content/pages/components/MatchStatsSection.tsx
+#: src/content/pages/components/PlayerNamedStarts.tsx
 #: src/content/pages/components/ReplayRoster.tsx
 #: src/content/pages/ReplayDetailPage.tsx
 #, fuzzy
@@ -45288,6 +45365,7 @@ msgid "Take this script over to edit it. The unit then keeps your version, an ex
 msgstr "Prenez la main sur ce script pour le modifier. L’unité garde alors votre version, un export écrit ce que vous avez écrit, et les préréglages cessent de le générer. Inutile de le reprendre pour voir l’unité tourner, car le panneau Animation lit déjà ce script. Vous pourrez le rendre plus tard, ce qui supprime votre version et redonne la main aux préréglages."
 
 #: src/content/pages/components/MapRecords.tsx
+#: src/content/pages/components/PlayerNamedStarts.tsx
 #: src/runlite/galaxyAdapter.ts
 #, fuzzy
 msgid "Taken"
@@ -47483,6 +47561,10 @@ msgstr "Le compilateur de cartes avec lequel coilbox construit et démonte les c
 msgid "The map could not be drawn."
 msgstr "La carte n’a pas pu être dessinée."
 
+#: src/content/pages/components/PlayerNamedStarts.tsx
+msgid "The map could not be read, so its starts cannot be placed."
+msgstr ""
+
 #: src/runlite/pages/components/RunSetupForm.tsx
 #, fuzzy
 msgid "The map decides how long this warpath is. This length crosses a map of {landLocationCount} {landLocationNoun}."
@@ -47776,6 +47858,10 @@ msgstr "Le dernier démarré l’emporte."
 #, fuzzy
 msgid "the only copy of the scenario \"{scenarioName}\", which is no longer in the scenario builder"
 msgstr "la seule copie du scénario « {scenarioName} », qui n’est plus dans le créateur de scénarios"
+
+#: src/play/PresetChanges.tsx
+msgid "The options for {subject} are not available, so this cannot be compared with its defaults. It may not be installed."
+msgstr ""
 
 #: src/content/pages/components/CommandRateChart.tsx
 #: src/content/pages/components/ReplayMap.tsx
@@ -53612,6 +53698,10 @@ msgstr "Ce qu’elle construit"
 #, fuzzy
 msgid "What it builds with"
 msgstr "Ce avec quoi elle construit"
+
+#: src/play/PresetChanges.tsx
+msgid "What it changes"
+msgstr ""
 
 #: src/lego/pages/components/AimPointPanel.tsx
 #, fuzzy
