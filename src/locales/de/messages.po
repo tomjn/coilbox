@@ -2360,6 +2360,10 @@ msgstr ""
 msgid "{currentName} (not installed)"
 msgstr "{currentName} (nicht installiert)"
 
+#: src/content/pages/components/MapAggregate.tsx
+msgid "{damageOtherGrid, plural, one {# match recorded its damage on a map of another size and is left out.} other {# matches recorded their damage on a map of another size and are left out.}}"
+msgstr ""
+
 #: src/notify/NotificationsBell.tsx
 #, fuzzy
 msgid "{days}d"
@@ -5017,6 +5021,10 @@ msgstr "{next} min"
 #, fuzzy
 msgid "{noAttacker, plural, one {# death has no attacker recorded, such as a cancelled build, and is counted like the rest.} other {# deaths have no attacker recorded, such as a cancelled build, and are counted like the rest.}}"
 msgstr "{noAttacker, plural, one {# Verlust hat keinen aufgezeichneten Angreifer, etwa ein abgebrochener Bau, und wird wie die übrigen gezählt.} other {# Verluste haben keinen aufgezeichneten Angreifer, etwa ein abgebrochener Bau, und werden wie die übrigen gezählt.}}"
+
+#: src/content/pages/components/MapAggregate.tsx
+msgid "{noDamage, plural, one {# analysed match has no damage recorded and is left out. Analyse it again to record damage.} other {# analysed matches have no damage recorded and are left out. Analyse them again to record damage.}}"
+msgstr ""
 
 #: src/conquest/pages/components/BattleOverlay.tsx
 #, fuzzy
@@ -18189,6 +18197,11 @@ msgstr "Schaden"
 msgid "Damage against {armourClass}"
 msgstr "Schaden gegen {armourClass}"
 
+#: src/content/pages/components/MapAggregate.tsx
+msgid "Damage comes from playing a match back, which is run from a replay's own page. It is added up in each cell and each minute and rounded to a whole point. Damage past a unit's last health, paralysis and healing are not in it. Where it landed counts every hit. Where it came from counts only damage an attacker dealt."
+msgstr ""
+
+#: src/content/mapAggregate.ts
 #: src/content/pages/components/ReplayMap.tsx
 #, fuzzy
 msgid "Damage dealt"
@@ -31821,6 +31834,10 @@ msgid "No match on this map in the picture has been analysed, so there are no de
 msgstr "Keine Partie auf dieser Karte im Bild wurde analysiert, also gibt es keine Verluste zu zeichnen."
 
 #: src/content/pages/components/MapAggregate.tsx
+msgid "No match on this map in the picture has been analysed, so there is no damage to draw."
+msgstr ""
+
+#: src/content/pages/components/MapAggregate.tsx
 #, fuzzy
 msgid "No match on this map is in your library yet."
 msgstr "Noch keine Partie auf dieser Karte in Ihrer Bibliothek."
@@ -36712,10 +36729,18 @@ msgstr "Zeigen Sie auf eine Einheit, um ihren Namen zu sehen. Ein Klick hält de
 msgid "Point at or focus a mark to read it. Select a chat mark to open the chat log at that line."
 msgstr "Zeigen Sie auf eine Markierung oder fokussieren Sie sie, um sie zu lesen. Eine Chat-Markierung öffnet das Chatprotokoll an dieser Zeile."
 
+#: src/content/mapAggregate.ts
+msgid "point of damage"
+msgstr ""
+
 #: src/lego/animPresets.ts
 #, fuzzy
 msgid "Points at whatever the unit is building, which no fixed pose can hold."
 msgstr "Zeigt auf das, was die Einheit baut, was keine feste Pose halten kann."
+
+#: src/content/mapAggregate.ts
+msgid "points of damage"
+msgstr ""
 
 #: src/lego/animPresets.ts
 #, fuzzy
@@ -53905,11 +53930,13 @@ msgstr "Wenn Sie einer Partie beitreten, deren Spiel oder Karte Ihnen fehlt, den
 msgid "Where buildings were ordered"
 msgstr "Wo Gebäude bestellt wurden"
 
+#: src/content/mapAggregate.ts
 #: src/content/replayDamage.ts
 #, fuzzy
 msgid "Where damage came from"
 msgstr "Woher Schaden kam"
 
+#: src/content/mapAggregate.ts
 #: src/content/replayDamage.ts
 #, fuzzy
 msgid "Where damage landed"
@@ -53940,6 +53967,7 @@ msgstr "Woher"
 msgid "Where games and maps come from."
 msgstr "Woher Spiele und Karten kommen."
 
+#: src/content/pages/components/MapAggregate.tsx
 #: src/content/pages/components/ReplayEventLayers.tsx
 #, fuzzy
 msgid "Where it came from"
@@ -53950,6 +53978,7 @@ msgstr "Woher es kam"
 msgid "Where it can be built"
 msgstr "Wo es gebaut werden kann"
 
+#: src/content/pages/components/MapAggregate.tsx
 #: src/content/pages/components/ReplayEventLayers.tsx
 #, fuzzy
 msgid "Where it landed"
@@ -54072,6 +54101,7 @@ msgstr "Ob die Drahtgitter-Bauanimation gezeichnet wird, während diese Einheit 
 msgid "Whether this row would record a rule that follows the game, or a fixed number, once follow game updates is ticked."
 msgstr "Ob diese Zeile eine Regel speichern würde, die dem Spiel folgt, oder einen festen Wert, sobald „Spiel-Updates folgen“ angehakt ist."
 
+#: src/content/pages/components/MapAggregate.tsx
 #: src/content/pages/components/ReplayEventLayers.tsx
 #, fuzzy
 msgid "Which end of the damage is drawn"

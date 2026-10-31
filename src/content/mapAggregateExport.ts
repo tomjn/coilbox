@@ -3,6 +3,7 @@ import { msg, plural, t } from "@lingui/core/macro";
 import {
   type AggregateFilters,
   type AggregateMatch,
+  DAMAGE_MODE_LABEL,
   FORMAT_LABEL,
   type HeatLayerId,
   LAYER_LABEL,
@@ -15,6 +16,7 @@ import {
 import type { StartRecords } from "./mapRecords";
 import { countBy } from "./mapVersions";
 import { csvNumber, csvText, EOL, slug } from "./matchStatsCsv";
+import type { DamageMode } from "./replayDamage";
 import type { StartRow } from "./startNames";
 
 /**
@@ -174,6 +176,8 @@ function float32(value: number): number {
 export interface LayerCsvInput {
   info: MapExportInfo;
   layer: HeatLayerId;
+  /** Which end of a hit the damage layer counts. Read for that layer only. */
+  damageMode?: DamageMode;
   normalise: Normalise;
   window: MatchWindow;
   /** Matches with something on this layer in the window. */
@@ -196,7 +200,14 @@ export function layerCsv(input: LayerCsvInput): string {
   const tail: Column[] = [
     ...infoColumns(info, [
       ["matches_in_layer", csvNumber(input.contributing)],
-      ["layer", csvText(LAYER_LABEL[input.layer])],
+      [
+        "layer",
+        csvText(
+          input.layer === "damage"
+            ? `${LAYER_LABEL.damage}: ${DAMAGE_MODE_LABEL[input.damageMode ?? "at"]}`
+            : LAYER_LABEL[input.layer],
+        ),
+      ],
       ["scaling", csvText(NORMALISE_LABEL[input.normalise])],
       ["window", csvText(windowLabel(input.window))],
     ]),
@@ -334,14 +345,24 @@ const LAYER_FILE_PART: Record<HeatLayerId, string> = {
   economy: "economy",
   orders: "order-density",
   deaths: "deaths",
+  damage: "damage-landed",
 };
+
+/** The damage layer has a file for each end of a hit. */
+const filePart = (layer: HeatLayerId, damageMode?: DamageMode) =>
+  layer === "damage" && damageMode === "origin"
+    ? "damage-origin"
+    : LAYER_FILE_PART[layer];
 
 /** A name from the map and the layer, slugged as the match CSV's is. */
 export function layerCsvFileName(
   info: MapExportInfo,
   layer: HeatLayerId,
+  damageMode?: DamageMode,
 ): string {
-  const parts = [slug(info.mapName), LAYER_FILE_PART[layer]].filter(Boolean);
+  const parts = [slug(info.mapName), filePart(layer, damageMode)].filter(
+    Boolean,
+  );
   return `${parts.length > 0 ? parts.join("-") : "map-density"}.csv`;
 }
 
@@ -355,10 +376,11 @@ export function startsCsvFileName(info: MapExportInfo): string {
 export function layerImageFileName(
   info: MapExportInfo,
   layer: HeatLayerId | "",
+  damageMode?: DamageMode,
 ): string {
   const parts = [
     slug(info.mapName),
-    layer ? LAYER_FILE_PART[layer] : "",
+    layer ? filePart(layer, damageMode) : "",
   ].filter(Boolean);
   return `${parts.length > 0 ? parts.join("-") : "map-density"}.png`;
 }
