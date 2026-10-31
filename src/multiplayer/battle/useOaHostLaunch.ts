@@ -81,11 +81,12 @@ export function useOaHostLaunch({
         }),
         battle: { serverKey, battleId },
         onEvent: (event) => {
-          if (
-            event.kind === "screen" &&
-            event.name === OA_BATTLE_ROOM_SCREEN &&
-            !flagRaised
-          ) {
+          // A match that starts without the room screen having been seen still
+          // means the host is in game.
+          const inGame =
+            (event.kind === "screen" && event.name === OA_BATTLE_ROOM_SCREEN) ||
+            (event.kind === "match" && event.change === "started");
+          if (inGame && !flagRaised) {
             flagRaised = true;
             setIngame(true);
           }

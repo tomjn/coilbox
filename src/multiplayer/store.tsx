@@ -116,6 +116,7 @@ import {
 } from "./loginRefused";
 import { MatchFoundPanel } from "./MatchFoundPanel";
 import { initialMirror, type LobbyMirror, type MirrorAction } from "./mirror";
+import { OaMatchKeeper } from "./OaMatchKeeper";
 import { observeOaAutoLaunch, observeOaBattle } from "./oaRun";
 import { protocolForKey } from "./protocol";
 import { RejoinOfferPanel } from "./RejoinOfferPanel";
@@ -2600,6 +2601,7 @@ export function MultiplayerProvider({ children }: { children: ReactNode }) {
           manualAway={manualAwayWanted}
         />
       ))}
+      <OaMatchKeeper />
       <VerificationCodeDialog />
       <MatchFoundPanel />
       <RejoinOfferPanel />
