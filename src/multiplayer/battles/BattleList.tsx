@@ -40,6 +40,7 @@ export function BattleList({
   onJoin,
   onLeave,
   onOpenJoined,
+  waitingForHost,
   enginePath,
   dataDir,
   serverAddress,
@@ -65,6 +66,8 @@ export function BattleList({
   onLeave: () => void;
   /** Goes back to the room of the battle the user is in. */
   onOpenJoined?: () => void;
+  /** The joined row says its Open Annihilation battle waits for the host. */
+  waitingForHost?: boolean;
   enginePath?: string;
   dataDir?: string;
   /** This connection's `host:port` (issue #498), threaded down to each row's
@@ -168,6 +171,7 @@ export function BattleList({
             joined
             friendsHere={friendsHere.get(joinedBattle.id)}
             onOpen={onOpenJoined}
+            waitingForHost={waitingForHost}
             {...rowProps}
           />
         </ul>

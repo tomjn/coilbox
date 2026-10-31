@@ -82,6 +82,10 @@ vi.mock("../MatchFoundPanel", () => ({ MatchFoundPanel: () => null }));
 vi.mock("../ServerMessageBoxDialog", () => ({
   ServerMessageBoxDialog: () => null,
 }));
+vi.mock("../OaBattleKeeper", () => ({ OaBattleKeeper: () => null }));
+vi.mock("../openAnnihilation", () => ({
+  useOpenAnnihilation: () => [{ path: "/oa", version: "OA" }],
+}));
 vi.mock("../VerificationCodeDialog", () => ({
   VerificationCodeDialog: () => null,
 }));
@@ -127,7 +131,10 @@ vi.mock("../battles/HostBattleButton", () => ({
     onHost: (args: { engine: string; key: string }) => Promise<void>;
   }) => (
     <>
-      <button type="button">
+      <button
+        type="button"
+        onClick={() => void onHost({ engine: "", key: "*" })}
+      >
         Host a battle
         {autoOpen && initialTitle ? ` (seeded: ${initialTitle})` : ""}
       </button>
@@ -339,6 +346,63 @@ describe("the Battles page with two connections", () => {
     });
 
     expect(location).toBe(`/battle?server=${encodeURIComponent(KEY_B)}`);
+  });
+});
+
+describe("an Open Annihilation battle (issue #4972)", () => {
+  const oaBattle = (host = "Host") => ({
+    ...battle(9, "[OA] Skirmish"),
+    engine: "Open Annihilation",
+    host,
+  });
+
+  async function lands(state: LobbyState) {
+    wire.states.set(KEY_A, state);
+    await fire(KEY_A, {
+      kind: "delta",
+      delta: { kind: "battleInfoChanged", id: 9 },
+    });
+    await act(async () => {
+      await new Promise((r) => setTimeout(r, 80));
+    });
+  }
+
+  beforeEach(() => {
+    wire.activeKeys = [KEY_A];
+    wire.states.set(KEY_A, lobbyState("AF", [oaBattle()], null));
+  });
+
+  it("stays on the battle list after joining, with Leave and the wait shown", async () => {
+    await openPage();
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: "Join" }));
+    });
+    expect(wire.calls).toEqual([`join ${KEY_A} 9`]);
+    await lands(lobbyState("AF", [oaBattle()], 9));
+    expect(location).toBe("/battles");
+    expect(screen.getByRole("button", { name: "Leave battle" })).toBeTruthy();
+    expect(screen.getByText("Waiting for host")).toBeTruthy();
+  });
+
+  it("stays on the battle list after hosting, with no wait shown", async () => {
+    await openPage();
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: /Host a battle/ }));
+    });
+    await lands(lobbyState("AF", [oaBattle("AF")], 9));
+    expect(location).toBe("/battles");
+    expect(screen.getByRole("button", { name: "Leave battle" })).toBeTruthy();
+    expect(screen.queryByText("Waiting for host")).toBeNull();
+  });
+
+  it("still opens the room of a Recoil battle after hosting", async () => {
+    wire.states.set(KEY_A, lobbyState("AF", [battle(9, "Recoil")], null));
+    await openPage();
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: /Host a battle/ }));
+    });
+    await lands(lobbyState("AF", [battle(9, "Recoil")], 9));
+    expect(location).toBe(`/battle?server=${encodeURIComponent(KEY_A)}`);
   });
 });
 

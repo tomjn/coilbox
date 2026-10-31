@@ -14788,7 +14788,6 @@ msgstr "確認中…"
 #: src/deeplink/pages/ImportSection.tsx
 #: src/game-updates/pages/GameUpdatesSection.tsx
 #: src/multiplayer/battle/BattleEngineCard.tsx
-#: src/multiplayer/battle/OaEngineCard.tsx
 #: src/packs/pages/components/ImportPackForm.tsx
 #: src/scenario/pages/components/ImportScenarioForm.tsx
 #: src/scenario/pages/ScenarioEditPage.tsx
@@ -15708,6 +15707,10 @@ msgstr ""
 msgid "Coilbox could not leave it: {reason}."
 msgstr "Coilbox は退出できませんでした：{reason}。"
 
+#: src/multiplayer/OaBattleKeeper.tsx
+msgid "Coilbox could not leave it: {why}."
+msgstr ""
+
 #: src/workshop/loadsAs.ts
 #, fuzzy
 msgid "Coilbox could not load the game to check typed values, so they are written as typed: {reason}"
@@ -16087,6 +16090,10 @@ msgstr "ゲームを読み込むには、エンジンのインストールが必
 #, fuzzy
 msgid "Coilbox needs an engine installed before it can read your maps."
 msgstr "マップを読み込むには、エンジンのインストールが必要です。"
+
+#: src/multiplayer/OaBattleKeeper.tsx
+msgid "Coilbox no longer has this battle's password, so Open Annihilation's room would have none. Host the battle again."
+msgstr ""
 
 #: src/general/pages/AboutCoilbox.tsx
 #, fuzzy
@@ -20780,7 +20787,6 @@ msgstr "エンジン"
 #: src/downloads/DownloadQueueBadge.tsx
 #: src/hub/pages/components/SetupPackContents.tsx
 #: src/multiplayer/battle/BattleEngineCard.tsx
-#: src/multiplayer/battle/OaEngineCard.tsx
 #: src/multiplayer/battles/HostBattleForm.tsx
 #: src/onboarding/useBackgroundDownloads.ts
 #: src/play/pages/components/CrashDrawer.tsx
@@ -23698,7 +23704,7 @@ msgid "Get IP"
 msgstr "IP を取得"
 
 #: src/home/zones/OpenAnnihilationCard.tsx
-#: src/multiplayer/battle/OaEngineCard.tsx
+#: src/multiplayer/battles/BattleRow.tsx
 msgid "Get Open Annihilation"
 msgstr ""
 
@@ -24810,8 +24816,6 @@ msgstr "横"
 #: src/lobby-servers/pages/SettingsSection.tsx
 #: src/multiplayer/battle/BattleEngineCard.tsx
 #: src/multiplayer/battle/MemberRow.tsx
-#: src/multiplayer/battle/OaEngineCard.tsx
-#: src/multiplayer/battle/OaPlayerList.tsx
 #: src/play/pages/SkirmishPage.tsx
 #, fuzzy
 msgid "Host"
@@ -25726,10 +25730,6 @@ msgstr "ゲーム中"
 #, fuzzy
 msgid "In game widget"
 msgstr "ゲーム内ウィジェット"
-
-#: src/multiplayer/battle/BattleRoomHeader.tsx
-msgid "In OA"
-msgstr ""
 
 #: src/lego/pages/BuilderPage.tsx
 #, fuzzy
@@ -26679,10 +26679,6 @@ msgstr "アドレスで参加"
 msgid "Join failed: {lastJoinError}"
 msgstr "参加に失敗しました：{lastJoinError}"
 
-#: src/multiplayer/battle/BattleRoomHeader.tsx
-msgid "Join in OA"
-msgstr ""
-
 #: src/multiplayer/chat/ChannelBrowser.tsx
 #, fuzzy
 msgid "Join or create a channel…"
@@ -26692,10 +26688,6 @@ msgstr "チャンネルに参加または作成…"
 #, fuzzy
 msgid "Join room"
 msgstr "ルームに参加"
-
-#: src/multiplayer/battle/BattleRoomHeader.tsx
-msgid "Join the host's room in Open Annihilation"
-msgstr ""
 
 #: src/multiplayer/chat/PartySection.tsx
 #, fuzzy
@@ -27654,6 +27646,10 @@ msgstr "除外：データが記録されていない {noTotals}（古いリプ�
 
 #: src/play/ChobbyPresetsView.tsx
 msgid "Left out: {sections}"
+msgstr ""
+
+#: src/multiplayer/OaBattleKeeper.tsx
+msgid "Left the Open Annihilation battle"
 msgstr ""
 
 #: src/multiplayer/chat/ChatPane.tsx
@@ -33002,7 +32998,6 @@ msgstr "なし"
 #: src/lego/pages/components/LoadoutFamilyDrawer.tsx
 #: src/lego/pages/components/StatsSection.tsx
 #: src/multiplayer/battle/BattleEngineCard.tsx
-#: src/multiplayer/battle/OaEngineCard.tsx
 #: src/profile/SettingsSection.tsx
 #, fuzzy
 msgid "None"
@@ -33266,7 +33261,6 @@ msgid "not found"
 msgstr "見つかりません"
 
 #: src/multiplayer/battle/BattleEngineCard.tsx
-#: src/multiplayer/battle/OaEngineCard.tsx
 #, fuzzy
 msgid "Not given by the lobby"
 msgstr "ロビーから提供されていません"
@@ -34888,7 +34882,7 @@ msgstr ""
 msgid "Open Annihilation exited with code {code}."
 msgstr ""
 
-#: src/multiplayer/battle/useOaJoinLaunch.ts
+#: src/multiplayer/OaBattleKeeper.tsx
 msgid "Open Annihilation is already running."
 msgstr ""
 
@@ -34896,16 +34890,12 @@ msgstr ""
 msgid "Open Annihilation is not in its usual place. Choose the open-annihilation file instead."
 msgstr ""
 
-#: src/multiplayer/battle/BattleRoomHeader.tsx
-msgid "Open Annihilation is running"
-msgstr ""
-
-#: src/multiplayer/battle/useOaJoinLaunch.ts
+#: src/multiplayer/OaBattleKeeper.tsx
 msgid "Open Annihilation refused to join this battle."
 msgstr ""
 
-#: src/multiplayer/battle/BattleRoomHeader.tsx
-msgid "Open Annihilation starts when the host's room is open"
+#: src/multiplayer/OaBattleKeeper.tsx
+msgid "Open Annihilation refused to open this battle."
 msgstr ""
 
 #: src/multiplayer/battles/HostBattleForm.tsx
@@ -42627,8 +42617,7 @@ msgstr "このシナリオを設定"
 msgid "Set version"
 msgstr "バージョンを設定"
 
-#: src/multiplayer/battle/useOaHostLaunch.ts
-#: src/multiplayer/pages/BattleRoomPage.tsx
+#: src/multiplayer/OaBattleKeeper.tsx
 msgid "Set where Open Annihilation is in Settings first."
 msgstr ""
 
@@ -44770,18 +44759,10 @@ msgstr "開始ミッション \"{missionId}\" はキャンペーン「{campaignT
 msgid "Start muted"
 msgstr "ミュートで開始"
 
-#: src/multiplayer/battle/BattleRoomHeader.tsx
-msgid "Start OA"
-msgstr ""
-
 #: src/lego/pages/ProjectsPage.tsx
 #, fuzzy
 msgid "Start one, then drop parts into it. Browse what is available under Lego Parts."
 msgstr "作成してから、パーツを入れてください。使えるパーツは Lego パーツで確認できます。"
-
-#: src/multiplayer/battle/BattleRoomHeader.tsx
-msgid "Start Open Annihilation for this battle"
-msgstr ""
 
 #: src/onboarding/Wizard.tsx
 msgid "Start playing"
@@ -52576,7 +52557,6 @@ msgstr "不明"
 #: src/content/replaySideLabel.ts
 #: src/content/stats.ts
 #: src/multiplayer/battle/BattleEngineCard.tsx
-#: src/multiplayer/battle/OaEngineCard.tsx
 #: src/multiplayer/UserBadges.tsx
 #, fuzzy
 msgid "Unknown"
@@ -53269,7 +53249,6 @@ msgstr "万能"
 
 #: src/content/pages/components/GameVersionsTab.tsx
 #: src/multiplayer/admin/MaintenanceSection.tsx
-#: src/multiplayer/battle/OaEngineCard.tsx
 #: src/multiplayer/pages/OpenAnnihilationSettings.tsx
 #: src/widgets/pages/WidgetsPage.tsx
 #, fuzzy
@@ -53494,7 +53473,7 @@ msgstr "待つ"
 msgid "Waiting for a slot…"
 msgstr "スロットを待っています…"
 
-#: src/multiplayer/battle/BattleRoomHeader.tsx
+#: src/multiplayer/battles/BattleRow.tsx
 msgid "Waiting for host"
 msgstr ""
 
@@ -55332,7 +55311,6 @@ msgstr "自分"
 #: src/conquest/pages/GalaxyPage.tsx
 #: src/hub/preview.ts
 #: src/multiplayer/battle/MemberRow.tsx
-#: src/multiplayer/battle/OaPlayerList.tsx
 #: src/multiplayer/NameMarkIcon.tsx
 #: src/play/pages/components/ParticipantsTable.tsx
 #: src/runlite/galaxyAdapter.ts
@@ -55432,6 +55410,10 @@ msgstr "まだ試合中です"
 #, fuzzy
 msgid "You are still in a running match"
 msgstr "まだ進行中の試合にいます"
+
+#: src/multiplayer/OaBattleKeeper.tsx
+msgid "You are still in the Open Annihilation battle"
+msgstr ""
 
 #: src/multiplayer/battles/joinBattle.ts
 #, fuzzy
@@ -55916,7 +55898,6 @@ msgid "yours"
 msgstr "自分のもの"
 
 #: src/multiplayer/battle/BattleEngineCard.tsx
-#: src/multiplayer/battle/OaEngineCard.tsx
 #, fuzzy
 msgid "Yours"
 msgstr "自分のもの"
