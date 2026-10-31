@@ -72,8 +72,12 @@ use std::path::{Path, PathBuf};
 /// classifier would read as a game whose units make nothing. v24: the unit-defs
 /// read now carries the game's movement classes from `gamedata/movedefs.lua`
 /// (#3255), and a blob cached under v23 has none, which reads as a game that
-/// declares no classes rather than as a field that was never asked for.
-pub const INFO_CACHE_VERSION: u32 = 24;
+/// declares no classes rather than as a field that was never asked for. v25: the
+/// def-script shim now gives `math.random` a fixed answer (#4929), and a unit
+/// list cached under v24 lacks every definition whose script draws a number,
+/// which for Beyond All Reason is the 36 `lootboxnano` units and moves every id
+/// after them.
+pub const INFO_CACHE_VERSION: u32 = 25;
 
 /// Salts the unit model cache's keys and file names. Bump when the way a model
 /// is flattened or a texture is transcoded changes, so every entry is read again.
@@ -403,9 +407,9 @@ mod tests {
 
     #[test]
     fn a_game_s_keys_are_the_ones_the_worker_wrote_before() {
-        assert_eq!(game_key(&game()), "d3845a01c0d1a1f8");
-        assert_eq!(dataset_key(&game()), "133c5e5e864d370b");
-        assert_eq!(archive_hash_key(&game()), "99882e00c06a3b89");
+        assert_eq!(game_key(&game()), "85bf35c6d9d67321");
+        assert_eq!(dataset_key(&game()), "d16c9b1d3f118972");
+        assert_eq!(archive_hash_key(&game()), "f0a41919ca8642e2");
         assert_eq!(model_key(&game()), "d74c5de2934710cb");
         assert_eq!(buildpic_key(&game()), "cfd53b8ab59cbad7");
         assert_eq!(faction_logo_key(&game()), "3424bfae2fdee0a1");
@@ -417,11 +421,11 @@ mod tests {
         let map = map();
         assert_eq!(
             map_info_key(Some(&map), MAP_NAME, Some(MAP_FILE)).as_deref(),
-            Some("0d224be311ad7098")
+            Some("c6b12bd8bf720a44")
         );
         assert_eq!(
             map_meta_key(Some(&map), MAP_NAME, Some(MAP_FILE)).as_deref(),
-            Some("c56983293a436954")
+            Some("40e4f7001eb09d91")
         );
         assert_eq!(
             thumb_key(Some(&map), MAP_NAME, Some(MAP_FILE)).as_deref(),
@@ -433,11 +437,11 @@ mod tests {
     fn a_map_with_no_archive_path_keys_on_its_name_and_file() {
         assert_eq!(
             map_info_key(None, MAP_NAME, Some(MAP_FILE)).as_deref(),
-            Some("n212da54275fc7344")
+            Some("n7c95e2fd46d2911f")
         );
         assert_eq!(
             map_meta_key(None, MAP_NAME, Some(MAP_FILE)).as_deref(),
-            Some("n124f9491d56f88ac")
+            Some("n76772968e4ddb2ea")
         );
         assert_eq!(
             thumb_key(None, MAP_NAME, Some(MAP_FILE)).as_deref(),
@@ -509,8 +513,8 @@ mod tests {
             13,
             1_700_000_000,
         );
-        assert_eq!(skirmish_key(&engine, Some(&game())), "ab29c551257322ae7");
-        assert_eq!(skirmish_key(&engine, None), "a9c6cc44db315cafd");
+        assert_eq!(skirmish_key(&engine, Some(&game())), "addeee25113e77783");
+        assert_eq!(skirmish_key(&engine, None), "aa582ebb6c926eec4");
     }
 
     #[test]

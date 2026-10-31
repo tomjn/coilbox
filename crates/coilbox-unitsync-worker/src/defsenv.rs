@@ -5,7 +5,7 @@
 /// `gamedata/defs.lua` through unitsync's parser.
 ///
 /// unitsync's parser is the engine's own `LuaParser` compiled with `UNITSYNC`
-/// defined, and that switch takes three things away from it. Reading
+/// defined, and that switch takes four things away from it. Reading
 /// `rts/Lua/LuaParser.cpp` (`SetupEnv`) and `rts/Game/Game.cpp` (`CGame::LoadDefs`)
 /// gives the whole list, so this is a closed gap rather than an open-ended one:
 ///
@@ -14,6 +14,10 @@
 ///  2. the `VFS` mode constants (`VFS.MOD` and friends), behind the same switch.
 ///  3. sixteen `Spring` team, player and option queries the engine adds to its
 ///     defs parser by hand, none of which unitsync installs.
+///  4. `math.random`, which unitsync's parser replaces with `DummyRandom`, a
+///     function that returns no value. `lua/defs-env/math_random.lua` is the
+///     stand-in, appended to this text, so the game's own unit list and the list
+///     read for a replay's match draw the same number (#4929).
 ///
 /// A def script that touches any of them raises, and the whole game then reads as
 /// having no units. Supplying a *partial* `Game` is worse than supplying none:
@@ -40,7 +44,8 @@
 /// build that fills one in wins over the stand-in. `Spring.TimeCheck` is the
 /// exception and is always replaced: builds up to 2026.06 compile it to a no-op
 /// under `UNITSYNC` that never runs its callback, which loads no defs at all.
-pub const DEFS_ENV_SHIM: &str = r#"
+pub const DEFS_ENV_SHIM: &str = concat!(
+    r#"
 if type(Spring) == 'table' then
   Spring.TimeCheck = function(_, fn, ...)
     if type(fn) == 'function' then return fn(...) end
@@ -92,4 +97,6 @@ if type(Game) ~= 'table' then
     textColorCodes = (type(Engine) == 'table') and Engine.textColorCodes or nil,
   }
 end
-"#;
+"#,
+    include_str!("../../../lua/defs-env/math_random.lua")
+);
