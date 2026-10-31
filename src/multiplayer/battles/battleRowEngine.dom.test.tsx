@@ -66,10 +66,44 @@ describe("battle row engine", () => {
     expect(screen.queryByTestId("minimap")).toBeNull();
   });
 
+  it("holds the thumbnail's place with the OA icon in a same-sized square", () => {
+    row(oa);
+    const square = screen.getByTestId("oa-row-icon").parentElement;
+    expect(square?.className).toContain("w-14");
+    expect(square?.className).toContain("aspect-square");
+  });
+
   it("shows a Recoil battle with its minimap and no badge", () => {
     row(recoil);
     expect(screen.getByTestId("minimap")).toBeTruthy();
+    expect(screen.queryByTestId("oa-row-icon")).toBeNull();
     expect(screen.queryByText("spring")).toBeNull();
     expect(screen.queryByText("Open Annihilation")).toBeNull();
+  });
+
+  it("gives a battle on some other engine a badge and neither picture", () => {
+    row({ ...recoil, engine: "Another Engine" });
+    expect(screen.getByText("Another Engine")).toBeTruthy();
+    expect(screen.queryByTestId("minimap")).toBeNull();
+    expect(screen.queryByTestId("oa-row-icon")).toBeNull();
+  });
+});
+
+describe("battle row title", () => {
+  it("drops the [OA] mark from an Open Annihilation battle", () => {
+    row({ ...oa, title: "[OA] Test Game" });
+    expect(screen.getByText("Test Game")).toBeTruthy();
+    expect(screen.queryByText(/\[OA\]/)).toBeNull();
+    expect(screen.getByRole("button", { name: "Join Test Game" })).toBeTruthy();
+  });
+
+  it("names an Open Annihilation battle with only the mark by its id", () => {
+    row({ ...oa, title: "[OA]" });
+    expect(screen.getByText("battle 5")).toBeTruthy();
+  });
+
+  it("keeps the mark on a Recoil battle", () => {
+    row({ ...recoil, title: "[OA] Something" });
+    expect(screen.getByText("[OA] Something")).toBeTruthy();
   });
 });

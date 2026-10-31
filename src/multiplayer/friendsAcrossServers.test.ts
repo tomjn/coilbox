@@ -269,3 +269,26 @@ describe("battleOf on a lobby list with no member names", () => {
     expect(battleOf(s, "amy")).toEqual({ id: 1, title: "One" });
   });
 });
+
+describe("battleOf titles", () => {
+  const stateWith = (engine: string, title: string) =>
+    ({
+      users: {},
+      battles: {
+        "1": { id: 1, title, engine, host: "amy", members: {} },
+      },
+    }) as unknown as LobbyState;
+
+  it("drops the [OA] mark from an Open Annihilation battle", () => {
+    expect(
+      battleOf(stateWith("Open Annihilation", "[OA] Test Game"), "amy"),
+    ).toEqual({ id: 1, title: "Test Game" });
+  });
+
+  it("keeps it on a Recoil battle", () => {
+    expect(battleOf(stateWith("spring", "[OA] Something"), "amy")).toEqual({
+      id: 1,
+      title: "[OA] Something",
+    });
+  });
+});

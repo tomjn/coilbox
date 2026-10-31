@@ -1,5 +1,6 @@
 import type { LobbyState } from "./bindings";
 import { type Presence, userPresence } from "./chat/presence";
+import { shownBattleTitle } from "./oaHost";
 
 /**
  * A friend's presence on one server. `unknown` means the server is not
@@ -33,13 +34,13 @@ export function battleOf(
   const battles = Object.values(state.battles);
   for (const battle of battles) {
     if (battle.host === name || name in battle.members) {
-      return { id: battle.id, title: battle.title };
+      return { id: battle.id, title: shownBattleTitle(battle) };
     }
   }
   const lobby = state.users[name]?.currentLobby;
   if (!lobby) return null;
   const battle = battles.find((b) => b.tachyonId === lobby);
-  return battle ? { id: battle.id, title: battle.title } : null;
+  return battle ? { id: battle.id, title: shownBattleTitle(battle) } : null;
 }
 
 /** Whether `name` is a friend on one server: on that server's own friend list,

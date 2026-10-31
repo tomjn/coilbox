@@ -9,6 +9,7 @@ import { JoinBattlePopover } from "../battles/JoinBattlePopover";
 import { joinBattle } from "../battles/joinBattle";
 import { useOneBattleRule } from "../battles/oneBattle";
 import type { FriendStatus } from "../friendsAcrossServers";
+import { shownBattleTitle } from "../oaHost";
 import { protocolForKey } from "../protocol";
 import { useConnection, useMultiplayer, useProtocolServers } from "../store";
 import { friendBattleAction } from "./friendBattleAction";
@@ -94,13 +95,13 @@ export function FriendBattleButton({
       ? t`Joins the battle, where you can watch the running game`
       : undefined);
   const actionLabel = action.label;
-  const battleTitle = battle.title;
+  const battleTitle = shownBattleTitle(battle) || t`battle ${battleId}`;
   const asks = !action.disabled && (action.asksPassword || !!leaves);
 
   if (asks) {
     return (
       <JoinBattlePopover
-        title={battle.title}
+        title={battleTitle}
         disabled={waiting}
         onSubmit={(key) => join(action.asksPassword ? key : undefined)}
         open={open}

@@ -22,7 +22,8 @@ import { CORE_PRIME_URL } from "../../home/zones/OpenAnnihilationCard";
 import type { LobbyProtocol } from "../../lobby-servers/config";
 import { startedAgo, useNow } from "../battle/runningMatch";
 import type { Battle } from "../bindings";
-import { isOaBattle } from "../oaHost";
+import { OpenAnnihilationIcon } from "../OpenAnnihilationIcon";
+import { isOaBattle, shownBattleTitle } from "../oaHost";
 import { useOpenAnnihilation } from "../openAnnihilation";
 import { BattleRowMapThumb } from "./BattleRowMapThumb";
 import { battleRowAction, occupancy, otherEngineName } from "./battleFilters";
@@ -127,12 +128,14 @@ function BattleRowBody({
   needsOa?: boolean;
 }) {
   const { t } = useLingui();
-  const battleTitle = battle.title;
+  const battleId = battle.id;
+  const battleTitle = shownBattleTitle(battle) || t`battle ${battleId}`;
   const spectatorCount = battle.spectatorCount;
   const players = occupancy(battle);
   const restricted = battle.passworded || battle.locked;
-  // A battle on another engine (Open Annihilation) gets a badge, and no minimap:
-  // the thumbnail comes from local unitsync, which cannot read its map.
+  // A battle on another engine gets a badge, and no minimap: the thumbnail
+  // comes from local unitsync, which cannot read its map. An Open Annihilation
+  // battle holds that place with its icon, so its text lines up with the rest.
   const otherEngine = otherEngineName(battle);
   const oa = isOaBattle(battle);
   // Join an open battle, or watch a running one live as a spectator. The joined
@@ -192,10 +195,10 @@ function BattleRowBody({
           />
         )}
         <span
-          title={battle.title}
+          title={battleTitle}
           className="truncate transition-colors group-hover/row:text-primary"
         >
-          {battle.title}
+          {battleTitle}
         </span>
       </p>
       <p title={subtitle} className="truncate text-xs text-muted-foreground">
@@ -213,12 +216,22 @@ function BattleRowBody({
       } ${focused ? "ring-2 ring-primary" : ""}`}
     >
       <div className="flex min-w-0 items-center gap-3">
-        {!otherEngine && (
-          <BattleRowMapThumb
-            battle={battle}
-            enginePath={enginePath}
-            dataDir={dataDir}
-          />
+        {oa ? (
+          <div className="flex aspect-square w-14 shrink-0 items-center justify-center overflow-hidden rounded-md border border-border bg-muted text-muted-foreground">
+            <OpenAnnihilationIcon
+              className="size-6"
+              aria-hidden
+              data-testid="oa-row-icon"
+            />
+          </div>
+        ) : (
+          !otherEngine && (
+            <BattleRowMapThumb
+              battle={battle}
+              enginePath={enginePath}
+              dataDir={dataDir}
+            />
+          )
         )}
         {!titleAction ? (
           <div className="flex min-w-0 flex-1 items-center">{details}</div>
@@ -292,7 +305,7 @@ function BattleRowBody({
           </Button>
         ) : asks ? (
           <JoinBattlePopover
-            title={battle.title}
+            title={battleTitle}
             disabled={disabled}
             onSubmit={(key) =>
               battle.passworded ? onJoin(battle, key) : onJoin(battle)

@@ -8,6 +8,7 @@ import {
   oaMapArgument,
   oaPasswordTooLong,
   oaPlayerName,
+  shownBattleTitle,
 } from "./oaHost";
 
 describe("oaBattleTitle", () => {
@@ -161,5 +162,47 @@ describe("isOaBattle", () => {
     "Another Engine",
   ])("is false for %j", (engine) => {
     expect(isOaBattle({ engine })).toBe(false);
+  });
+});
+
+describe("shownBattleTitle", () => {
+  const oa = "Open Annihilation";
+
+  it("drops the mark from an OA battle's title", () => {
+    expect(shownBattleTitle({ engine: oa, title: "[OA] Test Game" })).toBe(
+      "Test Game",
+    );
+  });
+
+  it("reads back what oaBattleTitle sends", () => {
+    expect(
+      shownBattleTitle({
+        engine: oa,
+        title: oaBattleTitle("  Friday night ", "fallback"),
+      }),
+    ).toBe("Friday night");
+  });
+
+  it("leaves an OA title with no mark alone", () => {
+    expect(shownBattleTitle({ engine: oa, title: "Test Game" })).toBe(
+      "Test Game",
+    );
+  });
+
+  it("drops the mark only at the start", () => {
+    expect(shownBattleTitle({ engine: oa, title: "Game [OA] two" })).toBe(
+      "Game [OA] two",
+    );
+  });
+
+  it("is empty when the title is only the mark", () => {
+    expect(shownBattleTitle({ engine: oa, title: "[OA]" })).toBe("");
+    expect(shownBattleTitle({ engine: oa, title: "[OA]   " })).toBe("");
+  });
+
+  it("keeps the mark on a Recoil battle's title", () => {
+    expect(
+      shownBattleTitle({ engine: "spring", title: "[OA] Something" }),
+    ).toBe("[OA] Something");
   });
 });
