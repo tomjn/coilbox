@@ -1,9 +1,16 @@
 import { t } from "@lingui/core/macro";
 import { effectiveTeams, type Participant } from "@/play/participants";
 import {
+  isMapVote,
+  isSetVote,
+  type VoteState,
+  voteStateOf,
+} from "./autohostVote";
+import {
   AUTOHOST_COMMAND_GAP_MS,
   CONFIRM_POLL_MS,
   confirmTimeoutMs,
+  VOTE_WAIT_MS,
 } from "./tweakDelivery";
 
 /**
@@ -119,13 +126,12 @@ function quoted(lines: string[]): string {
   return first.length > 200 ? `${first.slice(0, 200)}…` : first;
 }
 
-/** Wait for `check` to hold, for as long as a short command is given to echo. */
-async function until(
+/** Wait up to `timeout` for `check` to hold. */
+async function waitFor(
   io: HostStepsIo,
-  line: string,
+  timeout: number,
   check: () => boolean,
 ): Promise<boolean> {
-  const timeout = confirmTimeoutMs(line.length, true);
   const startedAt = io.now();
   while (io.here() && io.now() - startedAt < timeout) {
     if (check()) return true;
@@ -135,13 +141,50 @@ async function until(
 }
 
 /**
+ * Wait for `check` to hold, for as long as a short command is given to echo, and
+ * for as long as SPADS gives a vote when the host answers by calling one.
+ *
+ * Returns where the vote on the command stands, which is "none" when the host
+ * never called one. A vote that passes runs the command at once, so `check` is
+ * given a short wait again after it.
+ */
+async function settle(
+  io: HostStepsIo,
+  line: string,
+  sentAt: number,
+  isVote: (command: string) => boolean,
+  check: () => boolean,
+): Promise<VoteState> {
+  const vote = () => voteStateOf(io.hostSaidSince(sentAt), isVote);
+  const echoMs = confirmTimeoutMs(line.length, true);
+  await waitFor(io, echoMs, () => check() || vote() !== "none");
+  if (check() || vote() === "none") return vote();
+  if (vote() === "open")
+    await waitFor(io, VOTE_WAIT_MS, () => check() || vote() !== "open");
+  if (vote() === "passed") await waitFor(io, echoMs, check);
+  return vote();
+}
+
+/** Why a step with no answer did not take, when a vote is the reason. */
+function voteReason(state: VoteState): string | null {
+  if (state === "failed") return t`The room's vote on it did not pass.`;
+  if (state === "open") {
+    const seconds = Math.round(VOTE_WAIT_MS / 1000);
+    return t`The room's vote on it was still open after ${seconds}s.`;
+  }
+  return null;
+}
+
+/**
  * Send each step to the autohost and say which did not take.
  *
  * Steps go one at a time, at the gap an autohost needs between commands (see
  * `AUTOHOST_COMMAND_GAP_MS`), and the wait for each answer is the one a short
- * `!bSet` already gets from `confirmTimeoutMs`. A step that fails is recorded
- * and the next still goes, because refusing one setting says nothing about the
- * others.
+ * `!bSet` already gets from `confirmTimeoutMs`. When the host answers by calling
+ * a vote (`autohostVote.ts`), the step waits for the vote's result instead, and
+ * a vote that fails is reported as that and not as a refusal. A step that fails
+ * is recorded and the next still goes, because refusing one setting says nothing
+ * about the others.
  */
 export async function runHostSteps(
   steps: HostSteps,
@@ -161,14 +204,14 @@ export async function runHostSteps(
     if (!io.here()) return stopped();
     const sentAt = io.now();
     await io.send(line);
-    const landed = await until(
-      io,
-      line,
-      () => io.currentMap()?.toLowerCase() === want,
-    );
+    const landed = () => io.currentMap()?.toLowerCase() === want;
+    const vote = await settle(io, line, sentAt, isMapVote, landed);
     if (!io.here()) return stopped();
-    if (!landed)
-      failures.push({ step: "map", reason: quoted(io.hostSaidSince(sentAt)) });
+    if (!landed())
+      failures.push({
+        step: "map",
+        reason: voteReason(vote) ?? quoted(io.hostSaidSince(sentAt)),
+      });
     await pace(sentAt);
   }
 
@@ -180,13 +223,19 @@ export async function runHostSteps(
     const sentAt = io.now();
     await io.send(line);
     const read = () => settingAnswer(io.hostSaidSince(sentAt), setting, value);
-    await until(io, line, () => read() !== null);
+    const vote = await settle(
+      io,
+      line,
+      sentAt,
+      isSetVote(setting, value),
+      () => read() !== null,
+    );
     if (!io.here()) return stopped();
     const answer = read();
     if (answer === null) {
       failures.push({
         step: setting,
-        reason: quoted(io.hostSaidSince(sentAt)),
+        reason: voteReason(vote) ?? quoted(io.hostSaidSince(sentAt)),
       });
     } else if (!answer.took) {
       const holds = answer.holds;
