@@ -1149,6 +1149,7 @@ export default function SkirmishPage() {
         currentGameName={gameName}
         currentMapName={mapName}
         currentStartPosType={startPosType}
+        currentOptions={{ modOptionValues, mapOptionValues }}
         gameArchiveFor={(name) =>
           games.find((g) => g.name === name)?.primaryArchive.name
         }

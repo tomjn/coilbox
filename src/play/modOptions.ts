@@ -102,7 +102,11 @@ function parseNumber(v: string): number | undefined {
  * "1.0" is the default of a "1" number and "true" the default of a "1" bool.
  * Anything that does not parse as its type falls back to exact comparison.
  */
-function sameOptionValue(o: ConfigOption, a: string, b: string): boolean {
+export function sameOptionValue(
+  o: ConfigOption,
+  a: string,
+  b: string,
+): boolean {
   if (o.type === "bool") {
     const pa = parseBool(a);
     const pb = parseBool(b);
@@ -160,15 +164,24 @@ export function resetOptionValues(
 }
 
 /**
- * An option's declared default as a reader would say it: On or Off for a bool,
- * the item's name for a list, "empty" for an empty one, otherwise as written.
+ * An option's value as a reader would say it: On or Off for a bool, the item's
+ * name for a list, "empty" for an empty one, otherwise as written.
  */
-export function defaultLabel(o: ConfigOption): string {
-  const d = o.default ?? "";
-  if (o.type === "bool") return parseBool(d) ? t`On` : t`Off`;
+export function valueLabel(o: ConfigOption, value: string): string {
+  if (o.type === "bool") {
+    const on = parseBool(value);
+    if (on !== undefined) return on ? t`On` : t`Off`;
+  }
   if (o.type === "list")
-    return o.listItems?.find((it) => it.key === d)?.name ?? (d || t`empty`);
-  return d === "" ? t`empty` : d;
+    return (
+      o.listItems?.find((it) => it.key === value)?.name ?? (value || t`empty`)
+    );
+  return value === "" ? t`empty` : value;
+}
+
+/** An option's declared default as a reader would say it. */
+export function defaultLabel(o: ConfigOption): string {
+  return valueLabel(o, o.default ?? "");
 }
 
 /**
