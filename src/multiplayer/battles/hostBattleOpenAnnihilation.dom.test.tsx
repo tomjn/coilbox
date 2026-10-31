@@ -75,7 +75,13 @@ vi.mock("@/components/OptionSelect", () => ({
 }));
 
 vi.mock("../../direct/ReachablePorts", () => ({
-  ReachablePorts: () => null,
+  ReachablePorts: () => <div data-testid="recoil-ports" />,
+}));
+
+const reachability = vi.hoisted(() => ({ directClosePorts: vi.fn() }));
+vi.mock("../../direct/reachability", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("../../direct/reachability")>()),
+  ...reachability,
 }));
 
 vi.mock("../../direct/bindings", async (importOriginal) => ({
@@ -146,6 +152,7 @@ beforeEach(() => {
   i18n.loadAndActivate({ locale: "en", messages: {} });
   for (const key of Object.keys(settings)) delete settings[key];
   settings["multiplayer.openAnnihilation"] = OA;
+  reachability.directClosePorts.mockReset().mockResolvedValue({ closed: true });
   bindings.playOaCheck
     .mockReset()
     .mockResolvedValue({ path: OA.path, version: OA_NOW });
@@ -190,6 +197,51 @@ describe("Open Annihilation as an engine choice", () => {
     expect(limit.max).toBe("10");
     fireEvent.change(limit, { target: { value: "20" } });
     expect(limit.value).toBe("10");
+  });
+});
+
+describe("the ports an Open Annihilation host forwards (issue #4950)", () => {
+  it("names the three ranges and offers no relay", () => {
+    settings["multiplayer.relayMode"] = "always";
+    form();
+    expect(screen.getByTestId("recoil-ports")).toBeTruthy();
+    expect(screen.getByText("Server relay")).toBeTruthy();
+
+    chooseOa();
+
+    expect(screen.queryByTestId("recoil-ports")).toBeNull();
+    expect(screen.getByText("Ports to forward")).toBeTruthy();
+    expect(screen.getByText("UDP 47624")).toBeTruthy();
+    expect(screen.getByText("TCP 2300-2400")).toBeTruthy();
+    expect(screen.getByText("UDP 2350-2400")).toBeTruthy();
+    expect(screen.queryByText("Server relay")).toBeNull();
+    expect(screen.queryByText(/relay/i)).toBeNull();
+  });
+
+  it("hands back a Recoil port opened before the switch", () => {
+    form();
+    reachability.directClosePorts.mockClear();
+    chooseOa();
+    expect(reachability.directClosePorts).toHaveBeenCalledTimes(1);
+  });
+
+  it("brings the Recoil panel back when the host switches engine again", () => {
+    form();
+    chooseOa();
+    fireEvent.change(engineSelect(), { target: { value: "105.1.1" } });
+    expect(screen.getByTestId("recoil-ports")).toBeTruthy();
+    expect(screen.queryByText("Ports to forward")).toBeNull();
+  });
+
+  it("never advertises a relayed battle, even when the relay is set to always", async () => {
+    settings["multiplayer.relayMode"] = "always";
+    const opened = form();
+    chooseOa();
+    host();
+
+    await waitFor(() => expect(opened).toHaveLength(1));
+    expect(opened[0].relay).toBe(false);
+    expect(opened[0].port).toBe(8452);
   });
 });
 

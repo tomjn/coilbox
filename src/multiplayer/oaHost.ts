@@ -36,6 +36,29 @@ export const OA_PLAYER_NAME_MAX = 16;
 /** What OA's status stream calls the screen of its battle room. */
 export const OA_BATTLE_ROOM_SCREEN = "mp_battleroom";
 
+/** What an OA port range carries. */
+export type OaPortKind = "discovery" | "stream" | "datagram";
+
+/** A run of ports OA's room listens on, `first` to `last` inclusive. */
+export interface OaPortRange {
+  kind: OaPortKind;
+  transport: "tcp" | "udp";
+  first: number;
+  last: number;
+}
+
+/**
+ * The ports an OA host forwards on their router: session discovery, stream
+ * messages and datagrams. A joiner's connections are outbound, so only the host
+ * needs these open (issue #4950). They are named and not opened through UPnP:
+ * the ranges are over a hundred mappings, where a Recoil battle asks for one.
+ */
+export const OA_PORTS: readonly OaPortRange[] = [
+  { kind: "discovery", transport: "udp", first: 47624, last: 47624 },
+  { kind: "stream", transport: "tcp", first: 2300, last: 2400 },
+  { kind: "datagram", transport: "udp", first: 2350, last: 2400 },
+];
+
 const TITLE_PREFIX = "[OA]";
 
 /** The lobby title of an OA battle: the host's title marked as OA's. */
