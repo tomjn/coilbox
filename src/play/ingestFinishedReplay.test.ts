@@ -28,7 +28,15 @@ function replay(path: string): ReplayFile {
 }
 
 function summary(over: Partial<Record<string, number>> = {}) {
-  return { added: 1, updated: 0, skipped: 4, failed: 0, total: 5, ...over };
+  return {
+    added: 1,
+    updated: 0,
+    skipped: 4,
+    failed: 0,
+    removed: 0,
+    total: 5,
+    ...over,
+  };
 }
 
 beforeEach(() => {
@@ -84,6 +92,15 @@ describe("ingestFinishedReplay", () => {
   it("announces an update when a record was updated", async () => {
     ingest.mockResolvedValue({
       summary: summary({ added: 0, updated: 1 }),
+      records: [],
+    });
+    await ingestFinishedReplay(target, replay("/data/demos/a.sdfz"));
+    expect(emit).toHaveBeenCalledTimes(1);
+  });
+
+  it("announces an update when a pass only removed records", async () => {
+    ingest.mockResolvedValue({
+      summary: summary({ added: 0, updated: 0, removed: 1 }),
       records: [],
     });
     await ingestFinishedReplay(target, replay("/data/demos/a.sdfz"));

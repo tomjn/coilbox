@@ -51,7 +51,14 @@ function opts() {
   };
 }
 
-const summary = { added: 1, updated: 0, skipped: 0, failed: 0, total: 1 };
+const summary = {
+  added: 1,
+  updated: 0,
+  skipped: 0,
+  failed: 0,
+  removed: 0,
+  total: 1,
+};
 
 beforeEach(() => {
   ingest.mockReset();

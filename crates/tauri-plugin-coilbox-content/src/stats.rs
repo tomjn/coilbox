@@ -28,7 +28,7 @@
 
 use picoframe_core::CliResult;
 use serde_json::json;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::path::{Path, PathBuf};
 use std::time::{SystemTime, UNIX_EPOCH};
 use tauri::{AppHandle, Runtime};
@@ -176,6 +176,9 @@ pub struct IngestSummary {
     pub skipped: u32,
     /// Files that couldn't be decoded (corrupt/truncated) — skipped, not fatal.
     pub failed: u32,
+    /// Records dropped because their replay file is gone from the folders the
+    /// pass walked. Records on a folder that could not be reached are kept.
+    pub removed: u32,
     /// Total records in the store after the pass.
     pub total: u32,
 }
@@ -294,7 +297,8 @@ fn unchanged(existing: &StatRecord, entry: &DemoFileEntry) -> bool {
 /// map/players/game either way (with `winners_known = false` when neither path
 /// could answer). A file that fails to decode is skipped and
 /// counted in `failed`, never aborting the pass. Records are keyed by filename, so
-/// re-ingesting the same library is idempotent.
+/// re-ingesting the same library is idempotent. Records whose file has been
+/// deleted are dropped at the end of the pass, see [`remove_deleted`].
 ///
 /// The store carries one `schema_version` for every record in it, not a per-record
 /// version. A store written under an older version may be missing fields added
@@ -321,8 +325,11 @@ pub fn ingest(roots: &[PathBuf], engine_dir: &Path, store: &mut StatsStore) -> I
         .collect();
 
     let mut summary = IngestSummary::default();
+    // Every file name the walk saw, whether or not it decoded.
+    let mut seen: HashSet<String> = HashSet::new();
     for root in roots {
         for entry in demo::demo_file_entries(root) {
+            seen.insert(entry.filename.clone());
             if let Some(&i) = index.get(&entry.filename) {
                 if !force_reingest && unchanged(&store.records[i], &entry) {
                     summary.skipped += 1;
@@ -347,8 +354,40 @@ pub fn ingest(roots: &[PathBuf], engine_dir: &Path, store: &mut StatsStore) -> I
             }
         }
     }
+    summary.removed = remove_deleted(roots, &seen, store);
     summary.total = store.records.len() as u32;
     summary
+}
+
+/// Drop the records whose replay file is gone, returning how many went.
+///
+/// A record is gone when the walk did not see its file name. The name is what
+/// counts and not the stored `path`, which is out of date for a replay moved
+/// between content folders, because an unchanged file is skipped before its
+/// `path` is updated. A file that failed to decode was still seen, so it stays.
+///
+/// A record is kept when this pass cannot vouch for it:
+/// - Some root is not a directory right now, such as an unplugged drive. The
+///   file may be on it, so nothing is removed.
+/// - Its stored `path` is not under a root this pass walked. A pass over one
+///   root, like the one after a match ends, says nothing about the others.
+/// - The folder holding its stored `path` is missing, as with a mount point
+///   that exists while the drive is out.
+fn remove_deleted(roots: &[PathBuf], seen: &HashSet<String>, store: &mut StatsStore) -> u32 {
+    if roots.is_empty() || roots.iter().any(|r| !r.is_dir()) {
+        return 0;
+    }
+    let before = store.records.len();
+    store.records.retain(|r| {
+        if seen.contains(&r.filename) {
+            return true;
+        }
+        let path = Path::new(&r.path);
+        let walked = roots.iter().any(|root| path.starts_with(root));
+        let folder_present = path.parent().is_some_and(|p| p.is_dir());
+        !(walked && folder_present)
+    });
+    (before - store.records.len()) as u32
 }
 
 /// The replay-stats store, alongside the content `state.json` under app-data.
@@ -371,7 +410,7 @@ fn ingest_and_save(
     let mut store = load(path)?;
     let was_behind = store.schema_version < STATS_SCHEMA_VERSION;
     let summary = ingest(roots, engine_dir, &mut store);
-    if !dry_run && (was_behind || summary.added > 0 || summary.updated > 0) {
+    if !dry_run && (was_behind || summary.added > 0 || summary.updated > 0 || summary.removed > 0) {
         save(path, &store)?;
     }
     Ok((summary, store))
@@ -1120,6 +1159,174 @@ mod tests {
             ingest_and_save(&store_path, std::slice::from_ref(&dir), engine, false).unwrap();
         assert_eq!(summary.added, 1);
         assert_eq!(load(&store_path).unwrap().records.len(), 2);
+
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    // ---- deleted replays (#1202) -----------------------------------------
+
+    const NO_ENGINE: &str = "/no/such/engine";
+
+    fn fresh_dir(name: &str) -> PathBuf {
+        let dir = std::env::temp_dir().join(name);
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        dir
+    }
+
+    fn filenames(store: &StatsStore) -> Vec<&str> {
+        let mut names: Vec<&str> = store.records.iter().map(|r| r.filename.as_str()).collect();
+        names.sort_unstable();
+        names
+    }
+
+    #[test]
+    fn ingest_and_save_drops_a_deleted_replay_and_rewrites_the_store() {
+        let dir = fresh_dir("coilbox_stats_deleted");
+        write_test_demo(&dir, "a.sdfz");
+        write_test_demo(&dir, "b.sdfz");
+        let store_path = dir.join("stats.json");
+        let roots = std::slice::from_ref(&dir);
+        let engine = Path::new(NO_ENGINE);
+        ingest_and_save(&store_path, roots, engine, false).unwrap();
+
+        std::fs::remove_file(dir.join("demos").join("a.sdfz")).unwrap();
+        let (summary, store) = ingest_and_save(&store_path, roots, engine, false).unwrap();
+
+        assert_eq!(summary.removed, 1);
+        assert_eq!(summary.skipped, 1);
+        assert_eq!(summary.total, 1);
+        assert_eq!(filenames(&store), ["b.sdfz"]);
+        // The removal alone was enough to rewrite the file.
+        assert_eq!(filenames(&load(&store_path).unwrap()), ["b.sdfz"]);
+
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn ingest_keeps_the_record_of_a_replay_moved_between_content_folders() {
+        let one = fresh_dir("coilbox_stats_moved_one");
+        let two = fresh_dir("coilbox_stats_moved_two");
+        write_test_demo(&one, "a.sdfz");
+        let roots = [one.clone(), two.clone()];
+        let mut store = StatsStore::default();
+        ingest(&roots, Path::new(NO_ENGINE), &mut store);
+        assert_eq!(store.records.len(), 1);
+
+        std::fs::create_dir_all(two.join("demos")).unwrap();
+        std::fs::rename(
+            one.join("demos").join("a.sdfz"),
+            two.join("demos").join("a.sdfz"),
+        )
+        .unwrap();
+        let summary = ingest(&roots, Path::new(NO_ENGINE), &mut store);
+
+        assert_eq!(summary.removed, 0);
+        assert_eq!(filenames(&store), ["a.sdfz"]);
+
+        let _ = std::fs::remove_dir_all(&one);
+        let _ = std::fs::remove_dir_all(&two);
+    }
+
+    #[test]
+    fn ingest_keeps_every_record_while_a_content_folder_is_unavailable() {
+        let here = fresh_dir("coilbox_stats_drive_here");
+        let drive = fresh_dir("coilbox_stats_drive_away");
+        write_test_demo(&here, "a.sdfz");
+        write_test_demo(&drive, "b.sdfz");
+        let roots = [here.clone(), drive.clone()];
+        let mut store = StatsStore::default();
+        ingest(&roots, Path::new(NO_ENGINE), &mut store);
+        assert_eq!(store.records.len(), 2);
+
+        // Unplug the drive. A replay deleted from the folder that is still there
+        // stays recorded too, because it may have been moved onto the drive.
+        std::fs::remove_dir_all(&drive).unwrap();
+        std::fs::remove_file(here.join("demos").join("a.sdfz")).unwrap();
+        let summary = ingest(&roots, Path::new(NO_ENGINE), &mut store);
+        assert_eq!(summary.removed, 0);
+        assert_eq!(filenames(&store), ["a.sdfz", "b.sdfz"]);
+
+        // Plug it back in and the pass can tell what is gone.
+        write_test_demo(&drive, "b.sdfz");
+        let summary = ingest(&roots, Path::new(NO_ENGINE), &mut store);
+        assert_eq!(summary.removed, 1);
+        assert_eq!(filenames(&store), ["b.sdfz"]);
+
+        let _ = std::fs::remove_dir_all(&here);
+        let _ = std::fs::remove_dir_all(&drive);
+    }
+
+    #[test]
+    fn ingest_keeps_a_record_whose_folder_is_missing_under_a_root_that_exists() {
+        // A mount point exists while the drive is out, so the root is a directory
+        // but the demos folder inside it is not there.
+        let dir = fresh_dir("coilbox_stats_mount_point");
+        write_test_demo(&dir, "a.sdfz");
+        let mut store = StatsStore::default();
+        ingest(std::slice::from_ref(&dir), Path::new(NO_ENGINE), &mut store);
+
+        std::fs::remove_dir_all(dir.join("demos")).unwrap();
+        let summary = ingest(std::slice::from_ref(&dir), Path::new(NO_ENGINE), &mut store);
+
+        assert_eq!(summary.removed, 0);
+        assert_eq!(filenames(&store), ["a.sdfz"]);
+
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn a_pass_over_one_root_leaves_the_records_of_the_other_roots_alone() {
+        let one = fresh_dir("coilbox_stats_partial_one");
+        let two = fresh_dir("coilbox_stats_partial_two");
+        write_test_demo(&one, "a.sdfz");
+        write_test_demo(&two, "b.sdfz");
+        let mut store = StatsStore::default();
+        ingest(
+            &[one.clone(), two.clone()],
+            Path::new(NO_ENGINE),
+            &mut store,
+        );
+
+        let summary = ingest(std::slice::from_ref(&one), Path::new(NO_ENGINE), &mut store);
+
+        assert_eq!(summary.removed, 0);
+        assert_eq!(filenames(&store), ["a.sdfz", "b.sdfz"]);
+
+        let _ = std::fs::remove_dir_all(&one);
+        let _ = std::fs::remove_dir_all(&two);
+    }
+
+    #[test]
+    fn ingest_keeps_the_record_of_a_replay_that_no_longer_decodes() {
+        let dir = fresh_dir("coilbox_stats_undecodable");
+        write_test_demo(&dir, "a.sdfz");
+        let mut store = StatsStore::default();
+        ingest(std::slice::from_ref(&dir), Path::new(NO_ENGINE), &mut store);
+
+        // Same name, different size, so the file counts as changed and is
+        // decoded again.
+        std::fs::write(dir.join("demos").join("a.sdfz"), b"not a replay at all").unwrap();
+        let summary = ingest(std::slice::from_ref(&dir), Path::new(NO_ENGINE), &mut store);
+
+        assert_eq!(summary.failed, 1);
+        assert_eq!(summary.removed, 0);
+        assert_eq!(filenames(&store), ["a.sdfz"]);
+
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn ingest_with_no_roots_removes_nothing() {
+        let dir = fresh_dir("coilbox_stats_no_roots");
+        write_test_demo(&dir, "a.sdfz");
+        let mut store = StatsStore::default();
+        ingest(std::slice::from_ref(&dir), Path::new(NO_ENGINE), &mut store);
+
+        let summary = ingest(&[], Path::new(NO_ENGINE), &mut store);
+
+        assert_eq!(summary.removed, 0);
+        assert_eq!(summary.total, 1);
 
         let _ = std::fs::remove_dir_all(&dir);
     }
