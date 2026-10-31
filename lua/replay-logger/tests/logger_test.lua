@@ -935,6 +935,113 @@ do
 end
 
 --------------------------------------------------------------------------------
+-- The fixtures scripts/replay-logger-headless.sh plays in a real engine, played
+-- here against the stub, so a mistake in one shows before an engine is started.
+--------------------------------------------------------------------------------
+
+do
+	local headless = support.root() .. "/tests/headless/"
+	local checks = dofile(headless .. "check_fixture.lua")
+
+	local function playFixture(fixture, files, teamUnits)
+		local defs = {
+			[1] = { name = "odd", isBuilding = true, xsize = 6, zsize = 6, speed = 0 },
+			[2] = { name = "even", isBuilding = true, xsize = 4, zsize = 4, speed = 0 },
+			[3] = { name = "plane", xsize = 2, zsize = 2, speed = 5, canFly = true },
+			[4] = { name = "walker", xsize = 2, zsize = 2, speed = 1 },
+			[5] = { name = "runner", xsize = 2, zsize = 2, speed = 2 },
+		}
+		local byName = {}
+		for id, def in pairs(defs) do
+			byName[def.name] = id
+		end
+		local engine = newEngine({ teams = { 0, 1 }, gaiaTeam = 2, unitDefs = defs })
+		for team, count in pairs(teamUnits or {}) do
+			for _ = 1, count do
+				engine.create(4, team, 500 + team * 1000, 5, 500)
+			end
+		end
+
+		-- The calls a fixture makes that the logger may not.
+		local spring = {
+			Echo = function() end,
+			GetGroundHeight = function()
+				return 5
+			end,
+			GiveOrderToUnit = function() end,
+			SetUnitBlocking = function() end,
+			SetUnitPosition = engine.move,
+			GameOver = function() end,
+			GetUnitBasePosition = function(unitID)
+				local unit = engine.units[unitID]
+				return unit.x, unit.y, unit.z
+			end,
+			GetTeamUnits = function(team)
+				local found = {}
+				for unitID = 1, engine.nextUnitID - 1 do
+					if engine.units[unitID] and engine.units[unitID].team == team then
+						found[#found + 1] = unitID
+					end
+				end
+				return found
+			end,
+			CreateUnit = function(name, x, y, z, _, team)
+				return engine.create(byName[name], team, x, y, z)
+			end,
+			DestroyUnit = function(unitID)
+				engine.destroy(unitID, nil, KILLED_BY_SCRIPT)
+			end,
+		}
+
+		-- Loads each file the way a gadget handler does, in an environment of its
+		-- own whose "gadget" is itself, and calls them lowest layer first.
+		local gadgets = {}
+		local shared = {}
+		for _, file in ipairs(files) do
+			local environment = setmetatable({
+				Spring = spring,
+				UnitDefs = defs,
+				Game = { mapSizeX = 4096, mapSizeZ = 2048 },
+				CMD = { FIRE_STATE = 45 },
+				GG = shared,
+				gadgetHandler = {
+					IsSyncedCode = function()
+						return true
+					end,
+				},
+			}, { __index = _G })
+			environment.gadget = environment
+			local chunk = assert(loadfile(headless .. file))
+			setfenv(chunk, environment)
+			chunk()
+			gadgets[#gadgets + 1] = environment
+		end
+		table.sort(gadgets, function(a, b)
+			return a:GetInfo().layer < b:GetInfo().layer
+		end)
+
+		while engine.frame < 360 do
+			engine.runTo(engine.frame + 1)
+			for _, one in ipairs(gadgets) do
+				one:GameFrame(engine.frame)
+			end
+		end
+
+		for _, claim in ipairs(checks.claims(fixture, engine.lines, support.json)) do
+			check(fixture .. ": " .. claim.name, claim.actual == claim.expected,
+				"expected " .. tostring(claim.expected) .. ", got " .. tostring(claim.actual))
+		end
+		return engine
+	end
+
+	playFixture("building", { "fixture_building.lua" })
+	local spawned = { "fixture_two_gadgets_morph.lua", "fixture_two_gadgets_spawner.lua" }
+	playFixture("two_gadgets", spawned)
+	-- As on a game that has already made each team's start unit.
+	playFixture("two_gadgets", spawned, { [0] = 1, [1] = 1 })
+end
+
+--------------------------------------------------------------------------------
 -- Damage.
 --------------------------------------------------------------------------------
 
