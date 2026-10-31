@@ -11,6 +11,10 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import type { Battle } from "../bindings";
 import { BattleRow } from "./BattleRow";
 
+vi.mock("../openAnnihilation", () => ({
+  useOpenAnnihilation: () => [{ path: "/oa", version: "OA" }],
+}));
+
 vi.mock("./BattleRowMapThumb", () => ({
   BattleRowMapThumb: () => <div data-testid="minimap" />,
 }));

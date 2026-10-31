@@ -6,6 +6,7 @@ import { useScanTargetSelection } from "../../content/config";
 import { leaveBattle } from "../battle/leaveBattle";
 import type { Battle } from "../bindings";
 import { favouritesFor, useFavourites } from "../friends";
+import { isOaBattle } from "../oaHost";
 import { protocolForKey } from "../protocol";
 import {
   initialMirror,
@@ -144,6 +145,12 @@ function FriendBattleRow({
     <BattleRow
       battle={battle}
       joined={battle.id === joinedId}
+      waitingForHost={
+        battle.id === joinedId &&
+        isOaBattle(battle) &&
+        battle.host !== mirror.state?.myUsername &&
+        group !== "running"
+      }
       canJoin={ready && !busy && joinedId == null}
       linkable={ready}
       inProgress={group === "running"}

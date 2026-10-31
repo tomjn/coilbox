@@ -5,7 +5,7 @@ import type { Battle } from "./bindings";
 /**
  * Hosting an Open Annihilation (OA) battle on a lobby server (issue #4946). The
  * lobby only advertises the battle. OA's own room does the rest, so everything
- * the host form and the battle room need to know about it is here.
+ * the host form and `OaBattleKeeper` need to know about it is here.
  */
 
 /** The engine name an OA host sends. `otherEngineName` reads it back. */

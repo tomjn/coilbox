@@ -26,6 +26,7 @@ import type { ConquestStateFile, GalaxyDoc } from "../conquest/model";
 import { mostRecentOpen } from "../lib/recency";
 import { useInBattleKey } from "../multiplayer/battle/useBattleRoomKey";
 import type { Battle, LobbyState } from "../multiplayer/bindings";
+import { isOaBattle } from "../multiplayer/oaHost";
 import { initialMirror, useConnection } from "../multiplayer/store";
 import type { StoredSkirmishDraft } from "../play/drafts";
 import { useSkirmishDraft } from "../play/drafts";
@@ -308,7 +309,7 @@ export function conquestCandidate(
  * `LobbyState` satisfies it, and a test writes four fields rather than forty.
  */
 export type LobbySnapshot = Pick<LobbyState, "myUsername" | "currentBattle"> & {
-  battles: Record<string, Pick<Battle, "host" | "title">>;
+  battles: Record<string, Pick<Battle, "host" | "title" | "engine">>;
   users: Record<string, { status: { ingame: boolean } }>;
 };
 
@@ -332,6 +333,8 @@ export function battleCandidate(
   if (!state || state.currentBattle == null) return undefined;
   const battle = state.battles[String(state.currentBattle)];
   if (!battle) return undefined;
+  // Open Annihilation started by itself and has no room to go back to.
+  if (isOaBattle(battle)) return undefined;
   // Hosting it ourselves means we start the match rather than rejoin it.
   if (battle.host === state.myUsername) return undefined;
   if (!state.users[battle.host]?.status.ingame) return undefined;

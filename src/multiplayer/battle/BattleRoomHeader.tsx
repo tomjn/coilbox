@@ -76,7 +76,6 @@ export function BattleRoomHeader({
   directRoom,
   sharedRoom = null,
   connectionLabel = null,
-  oaJoin = null,
 }: {
   battle: Battle;
   myStatus: MemberStatus | undefined;
@@ -120,11 +119,6 @@ export function BattleRoomHeader({
    * only while several connections are live, which is when a player can lose
    * track of which one they are in. */
   connectionLabel?: string | null;
-  /** Set for somebody in an Open Annihilation battle (issue #4947), whose
-   * one button waits for the host, joins in OA, starts OA (the host, once it has
-   * closed), or shows that OA is up. OA's own room does readiness, so the
-   * switches for it are not drawn. */
-  oaJoin?: "waiting" | "join" | "start" | "inOa" | null;
 }) {
   const { t } = useLingui();
   const battleId = battle.id;
@@ -188,23 +182,11 @@ export function BattleRoomHeader({
   // The one thing worth asking before the click goes ahead: leaving somebody
   // behind at a start.
   const warning = action === "start" ? startWarning : null;
-  const go =
-    (action === "start" && !oaJoin) || oaJoin === "start"
-      ? onStart
-      : onJoinMatch;
+  const go = action === "start" ? onStart : onJoinMatch;
   const mainDisabled =
-    action === "ingame" ||
-    !!blockReason ||
-    oaJoin === "waiting" ||
-    (action === "start" && !allReady);
+    action === "ingame" || !!blockReason || (action === "start" && !allReady);
   const mainTitle = (() => {
     if (blockReason) return blockReason;
-    if (oaJoin === "waiting") {
-      return t`Open Annihilation starts when the host's room is open`;
-    }
-    if (oaJoin === "inOa") return t`Open Annihilation is running`;
-    if (oaJoin === "join") return t`Join the host's room in Open Annihilation`;
-    if (oaJoin === "start") return t`Start Open Annihilation for this battle`;
     if (action === "ingame") return t`The match is already running`;
     if (action === "rejoin") return t`Return to the running match`;
     if (action === "watch") return t`Join the running match to watch`;
@@ -229,21 +211,13 @@ export function BattleRoomHeader({
       ) : (
         <Play className="size-4 fill-current" />
       )}
-      {oaJoin === "waiting"
-        ? t`Waiting for host`
-        : oaJoin === "inOa"
-          ? t`In OA`
-          : oaJoin === "join"
-            ? t`Join in OA`
-            : oaJoin === "start"
-              ? t`Start OA`
-              : action === "start"
-                ? startButtonLabel(canStartDirectly)
-                : action === "rejoin"
-                  ? t`Rejoin`
-                  : action === "watch"
-                    ? t`Watch`
-                    : t`In game`}
+      {action === "start"
+        ? startButtonLabel(canStartDirectly)
+        : action === "rejoin"
+          ? t`Rejoin`
+          : action === "watch"
+            ? t`Watch`
+            : t`In game`}
     </Button>
   );
 
@@ -346,21 +320,19 @@ export function BattleRoomHeader({
       </div>
 
       <div className="flex shrink-0 items-center gap-4">
-        {!oaJoin && (
-          <label
-            htmlFor="battle-spectate"
-            className="flex cursor-pointer items-center gap-2 text-sm text-muted-foreground"
-          >
-            <Switch
-              id="battle-spectate"
-              checked={spectator}
-              disabled={!myStatus}
-              onCheckedChange={(v) => onToggleSpectate(v === true)}
-            />
-            <Trans>Spectate</Trans>
-          </label>
-        )}
-        {!spectator && !oaJoin && (
+        <label
+          htmlFor="battle-spectate"
+          className="flex cursor-pointer items-center gap-2 text-sm text-muted-foreground"
+        >
+          <Switch
+            id="battle-spectate"
+            checked={spectator}
+            disabled={!myStatus}
+            onCheckedChange={(v) => onToggleSpectate(v === true)}
+          />
+          <Trans>Spectate</Trans>
+        </label>
+        {!spectator && (
           <label
             htmlFor="battle-ready"
             className="flex cursor-pointer items-center gap-2 text-sm"

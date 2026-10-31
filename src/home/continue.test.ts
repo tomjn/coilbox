@@ -363,13 +363,22 @@ function lobby(over: Partial<LobbySnapshot> = {}): LobbySnapshot {
   return {
     myUsername: "Zephyr",
     currentBattle: 7,
-    battles: { "7": { host: "Autohost", title: "[A] Team Game" } },
+    battles: {
+      "7": { host: "Autohost", title: "[A] Team Game", engine: "spring" },
+    },
     users: { Autohost: { status: { ingame: true } } },
     ...over,
   };
 }
 
 describe("battleCandidate", () => {
+  it("offers nothing for an Open Annihilation battle, which has no room", () => {
+    const state = lobby();
+    const id = String(state.currentBattle);
+    state.battles[id] = { ...state.battles[id], engine: "Open Annihilation" };
+    expect(battleCandidate(state, NOW)).toBeUndefined();
+  });
+
   it("finds nothing when logged out", () => {
     expect(battleCandidate(null, NOW)).toBeUndefined();
   });

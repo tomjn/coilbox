@@ -80,6 +80,7 @@ import {
   mpZerokOpenBattle,
 } from "../bindings";
 import { favouritesFor, useFavourites } from "../friends";
+import { isOaBattle } from "../oaHost";
 import { protocolForKey, relayHostingAvailable } from "../protocol";
 import { newScriptPassword } from "../scriptPassword";
 import {
@@ -178,19 +179,22 @@ function ServerBattles({
   // distinguishes "we just opened this from a preset's Host as battle" from an
   // ordinary join (including a join of someone *else's* battle made while a
   // hostDraft happens to be sitting in this page's state), so the draft is only
-  // ever forwarded to the room we actually hosted from it.
+  // ever forwarded to the room we actually hosted from it. An Open Annihilation
+  // battle has no room, so it stays here and OA opens (`OaBattleKeeper`).
+  const joinedBattle =
+    joinedId != null ? mirror.state?.battles[String(joinedId)] : undefined;
+  const joinedOa = !!joinedBattle && isOaBattle(joinedBattle);
   useEffect(() => {
     const entry = pending.current;
     if (joinedId == null || entry?.serverKey !== serverKey) return;
     pending.current = null;
+    if (joinedOa) return;
     const carried = entry.draft ?? (entry.seeded ? hostDraft : undefined);
     navigate(
       battleRoomHref(serverKey),
       carried ? { state: { hostDraft: carried } } : undefined,
     );
-  }, [joinedId, navigate, hostDraft, serverKey, pending]);
-  const joinedBattle =
-    joinedId != null ? mirror.state?.battles[String(joinedId)] : undefined;
+  }, [joinedId, joinedOa, navigate, hostDraft, serverKey, pending]);
 
   const awaitLanding = useCallback(
     (seeded: boolean) => {
@@ -385,6 +389,11 @@ function ServerBattles({
       totalCount={totalCount}
       joinedBattle={joinedBattle}
       joinedId={joinedId}
+      waitingForHost={
+        joinedOa &&
+        joinedBattle?.host !== mirror.state?.myUsername &&
+        !inProgressIds.has(joinedId ?? -1)
+      }
       inProgressIds={inProgressIds}
       friendsHere={friendsHere}
       canJoin={canJoin}

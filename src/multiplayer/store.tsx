@@ -116,8 +116,8 @@ import {
 } from "./loginRefused";
 import { MatchFoundPanel } from "./MatchFoundPanel";
 import { initialMirror, type LobbyMirror, type MirrorAction } from "./mirror";
+import { OaBattleKeeper } from "./OaBattleKeeper";
 import { OaMatchKeeper } from "./OaMatchKeeper";
-import { observeOaAutoLaunch, observeOaBattle } from "./oaRun";
 import { protocolForKey } from "./protocol";
 import { RejoinOfferPanel } from "./RejoinOfferPanel";
 import { triggerRing } from "./ringEffect";
@@ -1896,44 +1896,6 @@ export function MultiplayerProvider({ children }: { children: ReactNode }) {
     forgetBattleMovedUnless(inBattle);
   }, [inBattle]);
 
-  // End the Open Annihilation started for a battle when the lobby shows the
-  // player left it, whichever page they are on and however they left. Read from
-  // every connection rather than the focused one, because a battle room can be
-  // on another connection (issue #2844, issue #4946). A drop or a reconnect is
-  // not a leave: OA's game does not use this connection.
-  useEffect(() => {
-    observeOaBattle((serverKey) => {
-      const c = connections[serverKey];
-      return c
-        ? {
-            connected: c.live && c.mirror.connected,
-            battleId: c.mirror.state?.currentBattle ?? null,
-          }
-        : null;
-    });
-    // The room that launched OA for a battle may be off the screen by the time
-    // the host stops being in game or the player leaves (issue #4961).
-    observeOaAutoLaunch((serverKey) => {
-      const c = connections[serverKey];
-      if (!c) return null;
-      const state = c.mirror.state;
-      const battle =
-        state?.currentBattle != null
-          ? state.battles[String(state.currentBattle)]
-          : undefined;
-      const hostIngame =
-        !!battle &&
-        (protocolForKey(serverKey, protocolServers) === "zerok"
-          ? battle.inProgress
-          : !!state?.users[battle.host]?.status.ingame);
-      return {
-        connected: c.live && c.mirror.connected,
-        battleId: state?.currentBattle ?? null,
-        hostIngame,
-      };
-    });
-  }, [connections, protocolServers]);
-
   // Register a new account: open a throwaway connection that sends REGISTER, then
   // resolve on the `registered` phase / reject on `disconnected` (denial). The
   // connection is torn down before returning so a subsequent login can reuse the
@@ -2602,6 +2564,7 @@ export function MultiplayerProvider({ children }: { children: ReactNode }) {
         />
       ))}
       <OaMatchKeeper />
+      <OaBattleKeeper />
       <VerificationCodeDialog />
       <MatchFoundPanel />
       <RejoinOfferPanel />

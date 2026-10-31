@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import { isProfileHidden } from "../profile/hidden";
 import { useInBattleKey } from "./battle/useBattleRoomKey";
 import { mpChatLogs } from "./bindings";
+import { isOaBattle } from "./oaHost";
 import { liveTachyonKeys } from "./protocol";
 import { serverAdminKeys } from "./serverAdmin";
 import { useConnection, useMultiplayer, useProtocolServers } from "./store";
@@ -68,12 +69,18 @@ export function useMpMatchmaking(): boolean {
 }
 
 /**
- * Nav/route predicate: is the user currently in a battle, on any connection?
- * Gates the Battle Room sidebar item + route so it appears on join and vanishes
- * on leave.
+ * Nav/route predicate: is the user currently in a battle with a room, on any
+ * connection? Gates the Battle Room sidebar item + route so it appears on join
+ * and vanishes on leave. An Open Annihilation battle has no room (issue #4972).
  */
 export function useMpInBattle(): boolean {
-  return useInBattleKey() != null;
+  const key = useInBattleKey();
+  const state = useConnection(key)?.mirror.state;
+  const battle =
+    state?.currentBattle != null
+      ? state.battles[String(state.currentBattle)]
+      : undefined;
+  return key != null && !(battle && isOaBattle(battle));
 }
 
 /**

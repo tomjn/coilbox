@@ -1,6 +1,14 @@
 import { Plural, Trans, useLingui } from "@lingui/react/macro";
 import { Button } from "@picoframe/frame";
-import { Link as LinkIcon, Lock, LogOut, UserCheck, Users } from "lucide-react";
+import { openUrl } from "@tauri-apps/plugin-opener";
+import {
+  ExternalLink,
+  Link as LinkIcon,
+  Lock,
+  LogOut,
+  UserCheck,
+  Users,
+} from "lucide-react";
 import { memo, useEffect, useRef, useState } from "react";
 import {
   Tooltip,
@@ -10,9 +18,12 @@ import {
 } from "@/components/ui/tooltip";
 import { copyDeepLink } from "../../deeplink/copyLink";
 import { inviteLink } from "../../direct/invite";
+import { CORE_PRIME_URL } from "../../home/zones/OpenAnnihilationCard";
 import type { LobbyProtocol } from "../../lobby-servers/config";
 import { startedAgo, useNow } from "../battle/runningMatch";
 import type { Battle } from "../bindings";
+import { isOaBattle } from "../oaHost";
+import { useOpenAnnihilation } from "../openAnnihilation";
 import { BattleRowMapThumb } from "./BattleRowMapThumb";
 import { battleRowAction, occupancy, otherEngineName } from "./battleFilters";
 import { JoinBattlePopover } from "./JoinBattlePopover";
@@ -37,6 +48,9 @@ export const BATTLE_GRID =
  * Passworded battles act via a password popover. Others act via a plain button.
  * `onJoin`'s optional `key` carries the popover password.
  *
+ * An Open Annihilation battle has no room (issue #4972). Its joined row stays
+ * here with Leave, and a player with no OA set gets a link to it in place of Join.
+ *
  * The minimap renders from the LOCAL unitsync copy only (`enginePath`/`dataDir`
  * come from the selected scan target), in `BattleRowMapThumb`. Maps the user
  * hasn't installed fall through to a blank result there, which doubles as the
@@ -44,7 +58,7 @@ export const BATTLE_GRID =
  * (issue #2373), so it sits outside the title's join button rather than inside
  * it: a button cannot nest inside another button.
  */
-function BattleRowInner({
+function BattleRowBody({
   battle,
   joined,
   canJoin,
@@ -62,6 +76,8 @@ function BattleRowInner({
   leaves = null,
   focused = false,
   protocol,
+  waitingForHost = false,
+  needsOa = false,
 }: {
   battle: Battle;
   joined: boolean;
@@ -103,6 +119,12 @@ function BattleRowInner({
   /** The protocol of this connection's saved server entry, which decides what
    * a battle password may hold (issue #3524). */
   protocol?: LobbyProtocol;
+  /** The player is in this Open Annihilation battle and OA starts when its host
+   * goes in game. */
+  waitingForHost?: boolean;
+  /** An Open Annihilation battle the player has no OA for, so they get a link
+   * to it and cannot join. */
+  needsOa?: boolean;
 }) {
   const { t } = useLingui();
   const battleTitle = battle.title;
@@ -112,6 +134,7 @@ function BattleRowInner({
   // A battle on another engine (Open Annihilation) gets a badge, and no minimap:
   // the thumbnail comes from local unitsync, which cannot read its map.
   const otherEngine = otherEngineName(battle);
+  const oa = isOaBattle(battle);
   // Join an open battle, or watch a running one live as a spectator. The joined
   // row shows Leave instead and ignores this action.
   const action = battleRowAction(battle, { canJoin, inProgress });
@@ -139,8 +162,14 @@ function BattleRowInner({
     if (asks) setPwOpen(true);
     else onJoin(battle);
   };
-  // The joined row's title goes back to the room instead.
-  const titleAction = joined ? onOpen : disabled ? undefined : activate;
+  // The joined row's title goes back to the room instead, if it has one.
+  const titleAction = joined
+    ? oa
+      ? undefined
+      : onOpen
+    : disabled || needsOa
+      ? undefined
+      : activate;
   const titleLabel = joined
     ? t`Open ${battleTitle}`
     : t`${actionLabel} ${battleTitle}`;
@@ -210,6 +239,11 @@ function BattleRowInner({
             {otherEngine}
           </span>
         )}
+        {waitingForHost && (
+          <span className="shrink-0 text-xs text-muted-foreground">
+            <Trans>Waiting for host</Trans>
+          </span>
+        )}
         {friendsHere && <FriendsBadge names={friendsHere} />}
         <div className="mr-auto flex shrink-0 items-center gap-1 text-xs text-muted-foreground">
           {started !== null && (
@@ -247,6 +281,15 @@ function BattleRowInner({
             <LogOut className="size-4" />
             <Trans>Leave</Trans>
           </Button>
+        ) : needsOa ? (
+          <Button
+            variant="outline"
+            className="h-8 shrink-0 gap-1 px-3"
+            onClick={() => void openUrl(CORE_PRIME_URL).catch(() => {})}
+          >
+            <ExternalLink className="size-4" />
+            <Trans>Get Open Annihilation</Trans>
+          </Button>
         ) : asks ? (
           <JoinBattlePopover
             title={battle.title}
@@ -272,6 +315,22 @@ function BattleRowInner({
         )}
       </div>
     </li>
+  );
+}
+
+type BattleRowProps = Omit<Parameters<typeof BattleRowBody>[0], "needsOa">;
+
+function OaBattleRow(props: BattleRowProps) {
+  const [program] = useOpenAnnihilation();
+  return <BattleRowBody {...props} needsOa={!program && !props.joined} />;
+}
+
+/** Only an Open Annihilation row reads where OA is, which other rows never need. */
+function BattleRowInner(props: BattleRowProps) {
+  return isOaBattle(props.battle) ? (
+    <OaBattleRow {...props} />
+  ) : (
+    <BattleRowBody {...props} />
   );
 }
 
