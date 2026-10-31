@@ -8270,6 +8270,7 @@ msgid "A {shape} lobby, with a start box for each side."
 msgstr "一个 {shape} 大厅，每方各有一个出生区域。"
 
 #: src/content/mapImageExport.ts
+#: src/content/matchStatsImageExport.ts
 #, fuzzy
 msgid "A 2D canvas is not available."
 msgstr "2D 画布不可用。"
@@ -18039,6 +18040,7 @@ msgstr "抗碾压"
 msgid "CSV"
 msgstr "CSV"
 
+#: src/content/matchStatsImage.ts
 #: src/content/pages/components/MatchStatsChart.tsx
 #, fuzzy
 msgid "Cumulative"
@@ -18246,6 +18248,10 @@ msgstr "数据不是 JSON：{reason}"
 #, fuzzy
 msgid "Data table"
 msgstr "数据表"
+
+#: src/content/matchStatsImage.ts
+msgid "Date"
+msgstr ""
 
 #: src/workshop/pages/ProjectsPage.tsx
 #, fuzzy
@@ -21407,6 +21413,7 @@ msgstr "导出 CSV"
 #: src/content/pages/components/CommandRateExportButton.tsx
 #: src/content/pages/components/MapExportButtons.tsx
 #: src/content/pages/components/MatchStatsExportButton.tsx
+#: src/content/pages/components/MatchStatsImageButton.tsx
 #, fuzzy
 msgid "Export failed: {reason}"
 msgstr "导出失败：{reason}"
@@ -21415,6 +21422,10 @@ msgstr "导出失败：{reason}"
 #, fuzzy
 msgid "Export HTML"
 msgstr "导出 HTML"
+
+#: src/content/pages/components/MatchStatsImageButton.tsx
+msgid "Export image"
+msgstr ""
 
 #: src/lego/pages/components/BuildMenuSection.tsx
 #, fuzzy
@@ -21435,6 +21446,10 @@ msgstr "导出图层 CSV"
 #, fuzzy
 msgid "Export match statistics"
 msgstr "导出对局统计"
+
+#: src/content/pages/components/MatchStatsImageButton.tsx
+msgid "Export match statistics image"
+msgstr ""
 
 #: src/lego/pages/BuilderPage.tsx
 #, fuzzy
@@ -23240,6 +23255,10 @@ msgstr "已解码项目的游戏"
 #, fuzzy
 msgid "Game for the new project"
 msgstr "新项目的游戏"
+
+#: src/content/matchStatsImage.ts
+msgid "Game id"
+msgstr ""
 
 #: src/multiplayer/nav/navBadges.tsx
 #, fuzzy
@@ -28570,6 +28589,7 @@ msgstr "地图"
 
 #: src/campaign/pages/components/MissionNeedsPanel.tsx
 #: src/content/index.ts
+#: src/content/matchStatsImage.ts
 #: src/content/pages/components/ArchiveTypeBadge.tsx
 #: src/content/pages/components/ResolveContentDrawer.tsx
 #: src/direct/HostRoomForm.tsx
@@ -28973,6 +28993,10 @@ msgstr "对局统计"
 #, fuzzy
 msgid "Match statistics exported."
 msgstr "已导出对局统计。"
+
+#: src/content/pages/components/MatchStatsImageButton.tsx
+msgid "Match statistics image exported."
+msgstr ""
 
 #: src/content/pages/components/ReplayTimeWindowControl.tsx
 #, fuzzy
@@ -35836,6 +35860,7 @@ msgstr "此网络上的人无需地址即可看到你的房间。关闭后，他
 msgid "People whose messages coilbox hides from you."
 msgstr "coilbox 会对你隐藏其消息的人。"
 
+#: src/content/matchStatsImage.ts
 #: src/content/pages/components/MatchStatsChart.tsx
 #, fuzzy
 msgid "Per minute"
@@ -36557,6 +36582,7 @@ msgstr ""
 msgid "Player's own"
 msgstr "玩家自身"
 
+#: src/content/matchStatsImage.ts
 #: src/content/pages/components/MatchStatsChart.tsx
 #: src/content/pages/components/MatchStatsSection.tsx
 #: src/content/pages/components/ReplayRoster.tsx
@@ -36671,6 +36697,7 @@ msgid "Playtime"
 msgstr "游玩时间"
 
 #: src/content/pages/components/MapExportButtons.tsx
+#: src/content/pages/components/MatchStatsImageButton.tsx
 #, fuzzy
 msgid "PNG image"
 msgstr "PNG 图片"
@@ -40867,6 +40894,10 @@ msgstr "存档"
 #, fuzzy
 msgid "savegames"
 msgstr "存档"
+
+#: src/content/pages/components/MatchStatsImageButton.tsx
+msgid "Saves the chart as a PNG with the map, date, players, metric and game id written on it."
+msgstr ""
 
 #: src/content/pages/components/MapExportButtons.tsx
 #, fuzzy
@@ -45505,6 +45536,7 @@ msgstr ""
 msgid "Team-colour mask (greyscale, optional)"
 msgstr "队伍颜色遮罩（灰度，可选）"
 
+#: src/content/matchStatsImage.ts
 #: src/content/pages/components/MatchStatsChart.tsx
 #: src/hub/preview.ts
 #: src/multiplayer/battles/zerokBattle.ts
@@ -46103,6 +46135,10 @@ msgstr "每枚来袭导弹被诱骗去追击诱饵弹的概率，从 0 到 1。"
 #, fuzzy
 msgid "The change ledger could not be built: {error}"
 msgstr "无法构建更改账本：{error}"
+
+#: src/content/matchStatsImageExport.ts
+msgid "The chart could not be drawn as a picture."
+msgstr ""
 
 #: src/lego/pages/components/ExportDrawer.tsx
 #, fuzzy
@@ -52824,6 +52860,10 @@ msgstr "游戏中的数值"
 msgid "Value of living units by kind"
 msgstr "按种类统计的存活单位价值"
 
+#: src/content/matchStatsImage.ts
+msgid "Values"
+msgstr ""
+
 #: src/scenario/triggerTypes.ts
 #: src/scenario/validate.ts
 #, fuzzy
@@ -52974,6 +53014,7 @@ msgstr "视频"
 msgid "Video from game files"
 msgstr "来自游戏文件的视频"
 
+#: src/content/matchStatsImage.ts
 #: src/lego/pages/components/ShortcutSheet.tsx
 #: src/runlite/pages/RunListPage.tsx
 #, fuzzy

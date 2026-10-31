@@ -8270,6 +8270,7 @@ msgid "A {shape} lobby, with a start box for each side."
 msgstr "{shape} のロビー。各勢力に開始エリアがあります。"
 
 #: src/content/mapImageExport.ts
+#: src/content/matchStatsImageExport.ts
 #, fuzzy
 msgid "A 2D canvas is not available."
 msgstr "2D キャンバスが使えません。"
@@ -18039,6 +18040,7 @@ msgstr "粉砕への耐性"
 msgid "CSV"
 msgstr "CSV"
 
+#: src/content/matchStatsImage.ts
 #: src/content/pages/components/MatchStatsChart.tsx
 #, fuzzy
 msgid "Cumulative"
@@ -18246,6 +18248,10 @@ msgstr "データが JSON ではありません：{reason}"
 #, fuzzy
 msgid "Data table"
 msgstr "データテーブル"
+
+#: src/content/matchStatsImage.ts
+msgid "Date"
+msgstr ""
 
 #: src/workshop/pages/ProjectsPage.tsx
 #, fuzzy
@@ -21407,6 +21413,7 @@ msgstr "CSV をエクスポート"
 #: src/content/pages/components/CommandRateExportButton.tsx
 #: src/content/pages/components/MapExportButtons.tsx
 #: src/content/pages/components/MatchStatsExportButton.tsx
+#: src/content/pages/components/MatchStatsImageButton.tsx
 #, fuzzy
 msgid "Export failed: {reason}"
 msgstr "エクスポートに失敗しました：{reason}"
@@ -21415,6 +21422,10 @@ msgstr "エクスポートに失敗しました：{reason}"
 #, fuzzy
 msgid "Export HTML"
 msgstr "HTML をエクスポート"
+
+#: src/content/pages/components/MatchStatsImageButton.tsx
+msgid "Export image"
+msgstr ""
 
 #: src/lego/pages/components/BuildMenuSection.tsx
 #, fuzzy
@@ -21435,6 +21446,10 @@ msgstr "レイヤーの CSV をエクスポート"
 #, fuzzy
 msgid "Export match statistics"
 msgstr "試合の統計をエクスポート"
+
+#: src/content/pages/components/MatchStatsImageButton.tsx
+msgid "Export match statistics image"
+msgstr ""
 
 #: src/lego/pages/BuilderPage.tsx
 #, fuzzy
@@ -23240,6 +23255,10 @@ msgstr "デコードしたプロジェクトのゲーム"
 #, fuzzy
 msgid "Game for the new project"
 msgstr "新しいプロジェクトのゲーム"
+
+#: src/content/matchStatsImage.ts
+msgid "Game id"
+msgstr ""
 
 #: src/multiplayer/nav/navBadges.tsx
 #, fuzzy
@@ -28570,6 +28589,7 @@ msgstr "マップ"
 
 #: src/campaign/pages/components/MissionNeedsPanel.tsx
 #: src/content/index.ts
+#: src/content/matchStatsImage.ts
 #: src/content/pages/components/ArchiveTypeBadge.tsx
 #: src/content/pages/components/ResolveContentDrawer.tsx
 #: src/direct/HostRoomForm.tsx
@@ -28973,6 +28993,10 @@ msgstr "試合の統計"
 #, fuzzy
 msgid "Match statistics exported."
 msgstr "試合の統計をエクスポートしました。"
+
+#: src/content/pages/components/MatchStatsImageButton.tsx
+msgid "Match statistics image exported."
+msgstr ""
 
 #: src/content/pages/components/ReplayTimeWindowControl.tsx
 #, fuzzy
@@ -35836,6 +35860,7 @@ msgstr "このネットワーク上の人は、アドレスを教わらなくて
 msgid "People whose messages coilbox hides from you."
 msgstr "coilbox がメッセージを非表示にする人。"
 
+#: src/content/matchStatsImage.ts
 #: src/content/pages/components/MatchStatsChart.tsx
 #, fuzzy
 msgid "Per minute"
@@ -36557,6 +36582,7 @@ msgstr ""
 msgid "Player's own"
 msgstr "プレイヤー自身"
 
+#: src/content/matchStatsImage.ts
 #: src/content/pages/components/MatchStatsChart.tsx
 #: src/content/pages/components/MatchStatsSection.tsx
 #: src/content/pages/components/ReplayRoster.tsx
@@ -36671,6 +36697,7 @@ msgid "Playtime"
 msgstr "プレイ時間"
 
 #: src/content/pages/components/MapExportButtons.tsx
+#: src/content/pages/components/MatchStatsImageButton.tsx
 #, fuzzy
 msgid "PNG image"
 msgstr "PNG 画像"
@@ -40867,6 +40894,10 @@ msgstr "セーブデータ"
 #, fuzzy
 msgid "savegames"
 msgstr "セーブデータ"
+
+#: src/content/pages/components/MatchStatsImageButton.tsx
+msgid "Saves the chart as a PNG with the map, date, players, metric and game id written on it."
+msgstr ""
 
 #: src/content/pages/components/MapExportButtons.tsx
 #, fuzzy
@@ -45505,6 +45536,7 @@ msgstr ""
 msgid "Team-colour mask (greyscale, optional)"
 msgstr "チームカラーのマスク（グレースケール、任意）"
 
+#: src/content/matchStatsImage.ts
 #: src/content/pages/components/MatchStatsChart.tsx
 #: src/hub/preview.ts
 #: src/multiplayer/battles/zerokBattle.ts
@@ -46103,6 +46135,10 @@ msgstr "飛来するミサイルが、代わりにフレアを追うよう欺か
 #, fuzzy
 msgid "The change ledger could not be built: {error}"
 msgstr "変更台帳を作成できませんでした：{error}"
+
+#: src/content/matchStatsImageExport.ts
+msgid "The chart could not be drawn as a picture."
+msgstr ""
 
 #: src/lego/pages/components/ExportDrawer.tsx
 #, fuzzy
@@ -52824,6 +52860,10 @@ msgstr "ゲームでの値"
 msgid "Value of living units by kind"
 msgstr "生存ユニットの種類別の価値"
 
+#: src/content/matchStatsImage.ts
+msgid "Values"
+msgstr ""
+
 #: src/scenario/triggerTypes.ts
 #: src/scenario/validate.ts
 #, fuzzy
@@ -52974,6 +53014,7 @@ msgstr "動画"
 msgid "Video from game files"
 msgstr "ゲームファイルの動画"
 
+#: src/content/matchStatsImage.ts
 #: src/lego/pages/components/ShortcutSheet.tsx
 #: src/runlite/pages/RunListPage.tsx
 #, fuzzy
