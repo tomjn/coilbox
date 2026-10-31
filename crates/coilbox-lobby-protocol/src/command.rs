@@ -812,7 +812,7 @@ mod tests {
     #[test]
     fn script_tag_refusal_refuses_what_changes_how_a_line_is_read() {
         let key = "game/modoptions/maxunits";
-        for value in ["1\n2", "1\r2", "1\02", "1;2"] {
+        for value in ["1\n2", "1\r2", "1\u{0}2", "1;2"] {
             assert!(script_tag_refusal(key, value).is_some(), "{value:?}");
         }
         for key in [
