@@ -34,6 +34,7 @@
 --   start_unit_position  frame, unit, team, x, z
 --   start_unit_replaced  frame, unit, by, team, x, z
 --   damage               frame, team, target, at, origin, off
+--   unit_damage          frame, unit, def, team, dealt, taken
 --   game_over            frame, winners, teams
 --
 -- The game over line is the last one. The engine is told to quit as soon as it
@@ -99,6 +100,17 @@
 -- Damage is what the engine hands UnitDamaged, less whatever went past the
 -- unit's last health, so a hit far larger than its target counts for what the
 -- target had left. Paralysis and healing are not counted.
+--
+-- "unit_damage" is what one unit dealt and took while "team" held it. It is
+-- written once the unit is dead, when it changes team, and at game over for
+-- every unit still alive, and only for a unit with something to say. A unit can
+-- have several: one for each team that held it, and another for an explosion
+-- that lands after its first. "dealt" and "taken" are left out when nothing.
+-- Each hit counts for at most the target's maximum health, whatever it had
+-- left, so a weapon that overkills is not credited with its whole damage.
+-- "taken" holds every hit. "dealt" leaves out a hit on the unit itself or on an
+-- ally, and a hit with no attacker: water, or a shot that lands after the unit
+-- that fired it has been removed. Paralysis and healing are not counted.
 
 -- Raised when a line gains or loses a field a reader depends on. Adding a kind
 -- or an optional field does not raise it.
@@ -217,6 +229,7 @@ if gadgetHandler:IsSyncedCode() then
 	local GetUnitPosition = Spring.GetUnitPosition
 	local GetUnitHealth = Spring.GetUnitHealth
 	local GetTeamUnitStats = Spring.GetTeamUnitStats
+	local AreTeamsAllied = Spring.AreTeamsAllied
 	local floor = math.floor
 
 	local GAIA = Spring.GetGaiaTeamID()
@@ -272,6 +285,85 @@ if gadgetHandler:IsSyncedCode() then
 			return nil
 		end
 		return '"x":' .. coordinate(x) .. ',"z":' .. coordinate(z)
+	end
+
+	-- Damage to a tenth, as a whole number when it is one.
+	local function amount(value)
+		local text = string.format("%.1f", value)
+		if text:sub(-2) == ".0" then
+			return text:sub(1, -3)
+		end
+		return text
+	end
+
+	----------------------------------------------------------------------------
+	-- What each unit dealt and took.
+	----------------------------------------------------------------------------
+
+	-- The engine calls UnitDestroyed before it sets off the unit's death
+	-- explosion, and names the dying unit as that explosion's attacker. The
+	-- blast can land frames later (CGameHelper's waitingDamages). So a dead
+	-- unit's line waits for the next frame, and a hit after that starts another.
+
+	-- unit -> what is being added up for it and has not been written.
+	local tallies = {}
+	-- Every tally in the order it was started, so game over writes them in an
+	-- order that does not depend on how a table happens to be laid out.
+	local tallied = {}
+	-- Tallies of dead units, to be written on the next frame.
+	local dying = {}
+	-- Units the engine has destroyed, until it hands out the id again.
+	local dead = {}
+
+	local function tallyOf(unitID, unitDefID, unitTeam)
+		local tally = tallies[unitID]
+		if not tally then
+			tally = { unit = unitID, def = unitDefID, team = unitTeam, dealt = 0, taken = 0 }
+			tallies[unitID] = tally
+			tallied[#tallied + 1] = tally
+			if dead[unitID] then
+				dying[#dying + 1] = tally
+			end
+		end
+		return tally
+	end
+
+	local function writeTally(tally)
+		if tally.written then
+			return
+		end
+		tally.written = true
+		if tallies[tally.unit] == tally then
+			tallies[tally.unit] = nil
+		end
+		local line = '{"kind":"unit_damage","frame":' .. number(GetGameFrame())
+			.. ',"unit":' .. number(tally.unit)
+			.. ',"def":' .. number(tally.def)
+			.. ',"team":' .. number(tally.team)
+		if tally.dealt > 0 then
+			line = line .. ',"dealt":' .. amount(tally.dealt)
+		end
+		if tally.taken > 0 then
+			line = line .. ',"taken":' .. amount(tally.taken)
+		end
+		send(line .. "}")
+	end
+
+	local function writeHeld(unitID)
+		local tally = tallies[unitID]
+		if tally then
+			writeTally(tally)
+		end
+	end
+
+	local function recordHit(unitID, unitDefID, unitTeam, damage, attackerID, attackerDefID, attackerTeam)
+		local target = tallyOf(unitID, unitDefID, unitTeam)
+		target.taken = target.taken + damage
+		if attackerID and attackerID ~= unitID and attackerTeam ~= unitTeam
+			and not AreTeamsAllied(attackerTeam, unitTeam) then
+			local attacker = tallyOf(attackerID, attackerDefID, attackerTeam)
+			attacker.dealt = attacker.dealt + damage
+		end
 	end
 
 	function gadget:GameStart()
@@ -352,6 +444,9 @@ if gadgetHandler:IsSyncedCode() then
 
 	function gadget:UnitCreated(unitID, unitDefID, unitTeam, builderID)
 		local frame = GetGameFrame()
+		-- A new unit under the id of a dead one starts from nothing.
+		writeHeld(unitID)
+		dead[unitID] = nil
 		if firstFrame[unitTeam] == nil then
 			firstFrame[unitTeam] = frame
 		end
@@ -378,6 +473,7 @@ if gadgetHandler:IsSyncedCode() then
 	-- for a gift and a capture alike, and tells neither apart. What differs is
 	-- which of the new team's counters it raised, so that is what is read.
 	function gadget:UnitGiven(unitID, unitDefID, newTeam, oldTeam)
+		writeHeld(unitID)
 		if firstFrame[newTeam] == nil then
 			firstFrame[newTeam] = false
 		end
@@ -395,6 +491,10 @@ if gadgetHandler:IsSyncedCode() then
 	end
 
 	function gadget:GameFrame(frame)
+		for index = 1, #dying do
+			writeTally(dying[index])
+		end
+		dying = {}
 		if frame % POSITION_FRAMES ~= 0 then
 			return
 		end
@@ -453,6 +553,11 @@ if gadgetHandler:IsSyncedCode() then
 	end
 
 	function gadget:UnitDestroyed(unitID, unitDefID, unitTeam, attackerID, attackerDefID, attackerTeam, weaponDefID)
+		if tallies[unitID] then
+			dying[#dying + 1] = tallies[unitID]
+		end
+		dead[unitID] = true
+
 		-- A unit that could have been a successor and died first is not one.
 		local old = successorOf[unitID]
 		if old then
@@ -510,15 +615,6 @@ if gadgetHandler:IsSyncedCode() then
 		return row * GRID_WIDTH + col
 	end
 
-	-- A cell's damage to a tenth, as a whole number when it is one.
-	local function amount(value)
-		local text = string.format("%.1f", value)
-		if text:sub(-2) == ".0" then
-			return text:sub(1, -3)
-		end
-		return text
-	end
-
 	local function cellList(order, byCell)
 		local parts = {}
 		for index = 1, #order do
@@ -564,9 +660,12 @@ if gadgetHandler:IsSyncedCode() then
 		if paralyzer or not (damage > 0) then
 			return
 		end
+		local health, maxHealth = GetUnitHealth(unitID)
+		recordHit(unitID, unitDefID, unitTeam, maxHealth and damage > maxHealth and maxHealth or damage,
+			attackerID, attackerDefID, attackerTeam)
+
 		-- The engine has already taken the damage off, so health below nothing
 		-- is how far the hit went past what the unit had left.
-		local health = GetUnitHealth(unitID)
 		if health and health < 0 then
 			damage = damage + health
 			if not (damage > 0) then
@@ -642,6 +741,9 @@ if gadgetHandler:IsSyncedCode() then
 	end
 
 	function gadget:GameOver(winningAllyTeams)
+		for index = 1, #tallied do
+			writeTally(tallied[index])
+		end
 		flushDamage()
 
 		local winners = {}

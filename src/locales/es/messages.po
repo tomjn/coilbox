@@ -1538,6 +1538,10 @@ msgid "{amount} over"
 msgstr "Sobran {amount}"
 
 #: src/content/pages/components/PlayerUnitUsage.tsx
+msgid "{analysedNoDamageGames} analysed before the recorder kept damage for each unit, so they are not in damage per metal. Analysing them again adds them."
+msgstr ""
+
+#: src/content/pages/components/PlayerUnitUsage.tsx
 #, fuzzy
 msgid "{analysedNoTeamGames} analysed with no team recorded for {name} in the library, so their events are not counted."
 msgstr "{analysedNoTeamGames} analizadas sin equipo registrado para {name} en la biblioteca, así que sus eventos no se cuentan."
@@ -18263,6 +18267,14 @@ msgstr "Daño desde el lado protegido"
 #, fuzzy
 msgid "Damage increases with range"
 msgstr "El daño aumenta con la distancia"
+
+#: src/content/pages/components/PlayerUnitUsage.tsx
+msgid "Damage per metal"
+msgstr ""
+
+#: src/content/pages/components/PlayerUnitUsage.tsx
+msgid "Damage per metal is the damage a kind of unit dealt divided by what the units of that kind finished by {name}'s team cost, in the same analysed games. Units still alive when the game ended count. Each hit counts for at most its target's maximum health. A hit on an ally or on the unit itself is not counted, and nor is one with no attacker."
+msgstr ""
 
 #: src/workshop/derivedStats.ts
 #, fuzzy
