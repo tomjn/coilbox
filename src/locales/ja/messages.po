@@ -444,6 +444,7 @@ msgid "(no username)"
 msgstr "（ユーザー名なし）"
 
 #: src/mapconv/pages/components/PathField.tsx
+#: src/multiplayer/pages/OpenAnnihilationSettings.tsx
 #, fuzzy
 msgid "(none)"
 msgstr "（なし）"
@@ -5372,6 +5373,10 @@ msgstr "{path} をコピーできません：{detail}"
 msgid "{path} cannot be copied."
 msgstr "{path} をコピーできません。"
 
+#: src/i18n/uiError.ts
+msgid "{path} did not answer within {seconds} seconds."
+msgstr ""
+
 #: src/content/bundle.ts
 #, fuzzy
 msgid "{path} is a loose .sdd game. It is read in place, but coilbox does not write into this folder, so scenario missions cannot be installed into it. Ship the game as .sdz or .sd7, or keep the .sdd in the app folder's games/ instead."
@@ -5382,15 +5387,31 @@ msgstr "{path} は展開済みの .sdd ゲームです。その場で読み込�
 msgid "{path} is not a platform folder, so its engine is never used. Use one of {platforms}."
 msgstr "{path} はプラットフォームフォルダーではないため、そのエンジンは使われません。{platforms} のいずれかを使ってください。"
 
+#: src/i18n/uiError.ts
+msgid "{path} is not a program. Choose the open-annihilation file itself."
+msgstr ""
+
+#: src/i18n/uiError.ts
+msgid "{path} is not Open Annihilation. Choose the open-annihilation file."
+msgstr ""
+
 #: src/content/bundle.ts
 #, fuzzy
 msgid "{path} is not part of a Spring data directory, so nothing reads it. The folder holds engine/, games/, maps/, packages/ and pool/."
 msgstr "{path} は Spring のデータディレクトリの一部ではないため、何も読み込みません。このフォルダーには engine/、games/、maps/、packages/、pool/ が入ります。"
 
+#: src/i18n/uiError.ts
+msgid "{path} ran but failed when asked for its version."
+msgstr ""
+
 #: src/content/bundle.ts
 #, fuzzy
 msgid "{path} sits at the top of the folder. Move it into games/ or maps/, or nothing will find it."
 msgstr "{path} はフォルダーの最上位にあります。games/ か maps/ に移動しないと、見つけられません。"
+
+#: src/i18n/uiError.ts
+msgid "{path} would not run: {reason}"
+msgstr ""
 
 #: src/scenario/pages/components/ScenarioMapScene.tsx
 #, fuzzy
@@ -14823,6 +14844,7 @@ msgstr ""
 
 #: src/lego/pages/components/ExportDrawer.tsx
 #: src/lego/pages/components/TexturePicker.tsx
+#: src/multiplayer/pages/OpenAnnihilationSettings.tsx
 #, fuzzy
 msgid "Choose"
 msgstr "選択"
@@ -22081,6 +22103,10 @@ msgstr "フィルターと並べ替え"
 #, fuzzy
 msgid "Filters: {filters}"
 msgstr "フィルター：{filters}"
+
+#: src/multiplayer/pages/OpenAnnihilationSettings.tsx
+msgid "Find"
+msgstr ""
 
 #: src/animation/pages/Bos2LuaPage.tsx
 #: src/scenario/pages/components/MissionLuaView.tsx
@@ -34814,7 +34840,12 @@ msgid "Open a screen"
 msgstr "画面を開く"
 
 #: src/multiplayer/battles/BattleFilterPopover.tsx
+#: src/multiplayer/index.tsx
 msgid "Open Annihilation"
+msgstr ""
+
+#: src/multiplayer/pages/OpenAnnihilationSettings.tsx
+msgid "Open Annihilation is not in its usual place. Choose the open-annihilation file instead."
 msgstr ""
 
 #: src/blueprint/pages/components/ImportPackForm.tsx
@@ -37233,6 +37264,10 @@ msgstr "{profileSource} からプロファイルを読み込みました"
 #, fuzzy
 msgid "profile.json failed to parse"
 msgstr "profile.json の解析に失敗しました"
+
+#: src/multiplayer/pages/OpenAnnihilationSettings.tsx
+msgid "Program"
+msgstr ""
 
 #: src/workshop/pages/components/DecodedSlotCard.tsx
 #, fuzzy
@@ -41942,6 +41977,10 @@ msgstr "モデルのピースで選択"
 #, fuzzy
 msgid "Select player"
 msgstr "プレイヤーを選択"
+
+#: src/multiplayer/pages/OpenAnnihilationSettings.tsx
+msgid "Select the Open Annihilation program"
+msgstr ""
 
 #: src/content/pages/components/UnitPicker.tsx
 #: src/scenario/pages/components/ContentsList.tsx
@@ -53132,6 +53171,7 @@ msgstr "万能"
 
 #: src/content/pages/components/GameVersionsTab.tsx
 #: src/multiplayer/admin/MaintenanceSection.tsx
+#: src/multiplayer/pages/OpenAnnihilationSettings.tsx
 #: src/widgets/pages/WidgetsPage.tsx
 #, fuzzy
 msgid "Version"
@@ -54192,6 +54232,10 @@ msgstr "{when} に最も多くの試合がそれぞれ最も活発だった場�
 #, fuzzy
 msgid "where the most matches were at their own busiest, {over}. Each match is scaled to its busiest spot, so this is not a count"
 msgstr "最も多くの試合がそれぞれ最も活発だった場所、{over}。各試合はその最も活発な地点を基準に調整されているため、これは件数ではありません"
+
+#: src/multiplayer/index.tsx
+msgid "Where the Open Annihilation program is, and which version it is."
+msgstr ""
 
 #: src/content/pages/components/SectionHelp.tsx
 #, fuzzy

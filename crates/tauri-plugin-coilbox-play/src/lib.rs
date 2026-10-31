@@ -12,6 +12,7 @@ mod chobby_presets;
 mod focus;
 mod infolog;
 mod launch;
+pub mod oa;
 mod oa_launch;
 pub mod script;
 mod sysinfo;
@@ -685,6 +686,39 @@ async fn play_system_info() -> CliResult {
     CliResult::ok(json!(sysinfo::read()))
 }
 
+/// `play_oa_find` looks for Open Annihilation where its installer puts it
+/// (issue #4943). It answers `{ found: null }` when OA is not there, which is
+/// not an error: Linux has no place to look and a player may not have OA at all.
+#[tauri::command]
+async fn play_oa_find() -> CliResult {
+    let found = tauri::async_runtime::spawn_blocking(|| oa::find_in(&oa::default_paths())).await;
+    match found {
+        Ok(found) => CliResult::ok(json!({
+            "found": found.map(|(path, version)| json!({
+                "path": path.display().to_string(),
+                "version": version,
+            })),
+        })),
+        Err(e) => CliResult::err(format!("Open Annihilation search failed: {e}")),
+    }
+}
+
+/// `play_oa_check` runs the program at `path` with `--version` and answers its
+/// version line, or rejects with why it is not a working Open Annihilation. The
+/// frontend stores a path only after this accepts it.
+#[tauri::command]
+async fn play_oa_check(path: String) -> CliResult {
+    let result = tauri::async_runtime::spawn_blocking(move || {
+        oa::check_with_default_wait(Path::new(&path)).map(|version| (path, version))
+    })
+    .await;
+    match result {
+        Ok(Ok((path, version))) => CliResult::ok(json!({ "path": path, "version": version })),
+        Ok(Err(e)) => CliResult::err(e),
+        Err(e) => CliResult::err(format!("Open Annihilation check failed: {e}")),
+    }
+}
+
 /// Build the plugin. Registered as `"coilbox-play"` (crate name minus the
 /// `tauri-plugin-` prefix); the frontend invokes `plugin:coilbox-play|<cmd>`.
 pub fn init<R: Runtime>() -> TauriPlugin<R> {
@@ -711,6 +745,8 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
             play_focus,
             play_infolog,
             play_system_info,
+            play_oa_find,
+            play_oa_check,
             oa_launch::play_oa_launch,
             oa_launch::play_oa_cancel
         ])

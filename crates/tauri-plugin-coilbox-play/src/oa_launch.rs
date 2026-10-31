@@ -17,7 +17,7 @@
 //! characters, a game name over 16 and a password over 10. Coilbox does not
 //! repeat those checks, so OA's own refusal is what the player reads.
 
-use crate::{launch_result, ExitOutcome, POLL_INTERVAL};
+use crate::{launch_result, oa, ExitOutcome, POLL_INTERVAL};
 use picoframe_core::CliResult;
 use serde::Serialize;
 use serde_json::{json, Map, Value};
@@ -368,6 +368,9 @@ pub async fn play_oa_launch(
     }
     let reg = reg.inner().clone();
     let result = tauri::async_runtime::spawn_blocking(move || {
+        // The stored path may have gone stale since the player chose it, and
+        // running it would otherwise start whatever is there now.
+        oa::check_with_default_wait(&bin)?;
         run_blocking(&bin, &args, &run_id, &reg, |event| {
             let _ = on_event.send(event);
         })
