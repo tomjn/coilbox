@@ -16256,6 +16256,10 @@ msgstr "Commandant"
 msgid "Commands per minute"
 msgstr "Commandes par minute"
 
+#: src/content/pages/components/CommandRateExportButton.tsx
+msgid "Commands per minute exported."
+msgstr ""
+
 #: src/scenario/pages/components/RestrictionPanel.tsx
 #, fuzzy
 msgid "Commands withheld"
@@ -17919,6 +17923,7 @@ msgstr "Altitude de croisière, en elmos"
 msgid "Crush resistance"
 msgstr "Résistance à l’écrasement"
 
+#: src/content/pages/components/CommandRateExportButton.tsx
 #: src/content/pages/components/MatchStatsExportButton.tsx
 #, fuzzy
 msgid "CSV"
@@ -21273,17 +21278,23 @@ msgstr "Exporter la campagne"
 msgid "Export challenge"
 msgstr "Exporter le défi"
 
+#: src/content/pages/components/CommandRateExportButton.tsx
+msgid "Export commands per minute"
+msgstr ""
+
 #: src/compat/pickSdzPath.ts
 #, fuzzy
 msgid "Export compatibility mutator"
 msgstr "Exporter le mutateur de compatibilité"
 
+#: src/content/pages/components/CommandRateExportButton.tsx
 #: src/content/pages/components/MatchStatsExportButton.tsx
 #, fuzzy
 msgid "Export CSV"
 msgstr "Exporter en CSV"
 
 #: src/content/pages/components/BuildTreeExportButton.tsx
+#: src/content/pages/components/CommandRateExportButton.tsx
 #: src/content/pages/components/MapExportButtons.tsx
 #: src/content/pages/components/MatchStatsExportButton.tsx
 #, fuzzy

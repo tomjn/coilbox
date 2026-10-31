@@ -2,6 +2,8 @@ import { describe, expect, it } from "vitest";
 import type { DemoInfo, Metric, MetricKey } from "./bindings";
 import type { ChartRow, ChartSeries } from "./matchStats";
 import {
+  commandRatesCsv,
+  commandRatesCsvFileName,
   csvNumber,
   csvText,
   matchStatsCsv,
@@ -303,5 +305,53 @@ describe("matchStatsCsvFileName", () => {
   it("drops a part that slugs to nothing and a date the file lacks", () => {
     const odd = { ...info, mapName: "地図", startTimeMs: 0 } as DemoInfo;
     expect(matchStatsCsvFileName(odd, metric)).toBe("some-metric.csv");
+  });
+});
+
+describe("commandRatesCsv", () => {
+  const rows: ChartRow[] = [
+    { timeSec: 30, a: 12, b: 0 },
+    { timeSec: 60, a: 7.5, b: 3 },
+  ];
+  const series = [line("a", "Alice"), line("b", "=Bob")];
+  const csv = commandRatesCsv({ info, source: "lua", series, rows });
+  const out = csv.trimEnd().split("\r\n");
+
+  it("writes one row per line per period under a header", () => {
+    expect(out).toHaveLength(1 + 2 * 2);
+    expect(out[0]).toBe(
+      "match_time_sec,line,teams,sender,commands_per_minute,unit,game_id,map,started_utc",
+    );
+  });
+
+  it("says the unit on every row", () => {
+    for (const row of out.slice(1))
+      expect(row).toContain(",commands per minute,");
+  });
+
+  it("names the sender with the bindings key on every row", () => {
+    for (const row of out.slice(1)) expect(row.split(",")[3]).toBe("lua");
+  });
+
+  it("keeps the rate untouched and neutralises a formula name", () => {
+    expect(out[1]).toMatch(/^30,Alice,,lua,12,/);
+    expect(out[2]).toMatch(/^30,'=Bob,,lua,0,/);
+    expect(out[3]).toMatch(/^60,Alice,,lua,7.5,/);
+  });
+
+  it("skips a line the row has no value for", () => {
+    const sparse = commandRatesCsv({
+      info,
+      source: "ai",
+      series,
+      rows: [{ timeSec: 30, a: 1 }],
+    }).trimEnd();
+    expect(sparse.split("\r\n")).toHaveLength(2);
+  });
+
+  it("names the file after the map, date and sender", () => {
+    expect(commandRatesCsvFileName(info, "ai")).toBe(
+      "tabula-2-1-2026-10-10-commands-per-minute-ai.csv",
+    );
   });
 });

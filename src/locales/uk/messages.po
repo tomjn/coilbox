@@ -16256,6 +16256,10 @@ msgstr "Командир"
 msgid "Commands per minute"
 msgstr "Команд за хвилину"
 
+#: src/content/pages/components/CommandRateExportButton.tsx
+msgid "Commands per minute exported."
+msgstr ""
+
 #: src/scenario/pages/components/RestrictionPanel.tsx
 #, fuzzy
 msgid "Commands withheld"
@@ -17919,6 +17923,7 @@ msgstr "Крейсерська висота, ельмо"
 msgid "Crush resistance"
 msgstr "Опір розчавлюванню"
 
+#: src/content/pages/components/CommandRateExportButton.tsx
 #: src/content/pages/components/MatchStatsExportButton.tsx
 #, fuzzy
 msgid "CSV"
@@ -21273,17 +21278,23 @@ msgstr "Експортувати кампанію"
 msgid "Export challenge"
 msgstr "Експортувати виклик"
 
+#: src/content/pages/components/CommandRateExportButton.tsx
+msgid "Export commands per minute"
+msgstr ""
+
 #: src/compat/pickSdzPath.ts
 #, fuzzy
 msgid "Export compatibility mutator"
 msgstr "Експортувати мутатор сумісності"
 
+#: src/content/pages/components/CommandRateExportButton.tsx
 #: src/content/pages/components/MatchStatsExportButton.tsx
 #, fuzzy
 msgid "Export CSV"
 msgstr "Експортувати CSV"
 
 #: src/content/pages/components/BuildTreeExportButton.tsx
+#: src/content/pages/components/CommandRateExportButton.tsx
 #: src/content/pages/components/MapExportButtons.tsx
 #: src/content/pages/components/MatchStatsExportButton.tsx
 #, fuzzy

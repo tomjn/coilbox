@@ -13177,6 +13177,10 @@ msgstr ""
 msgid "Commands per minute"
 msgstr ""
 
+#: src/content/pages/components/CommandRateExportButton.tsx
+msgid "Commands per minute exported."
+msgstr ""
+
 #: src/scenario/pages/components/RestrictionPanel.tsx
 msgid "Commands withheld"
 msgstr ""
@@ -14530,6 +14534,7 @@ msgstr ""
 msgid "Crush resistance"
 msgstr ""
 
+#: src/content/pages/components/CommandRateExportButton.tsx
 #: src/content/pages/components/MatchStatsExportButton.tsx
 msgid "CSV"
 msgstr ""
@@ -17261,15 +17266,21 @@ msgstr ""
 msgid "Export challenge"
 msgstr ""
 
+#: src/content/pages/components/CommandRateExportButton.tsx
+msgid "Export commands per minute"
+msgstr ""
+
 #: src/compat/pickSdzPath.ts
 msgid "Export compatibility mutator"
 msgstr ""
 
+#: src/content/pages/components/CommandRateExportButton.tsx
 #: src/content/pages/components/MatchStatsExportButton.tsx
 msgid "Export CSV"
 msgstr ""
 
 #: src/content/pages/components/BuildTreeExportButton.tsx
+#: src/content/pages/components/CommandRateExportButton.tsx
 #: src/content/pages/components/MapExportButtons.tsx
 #: src/content/pages/components/MatchStatsExportButton.tsx
 msgid "Export failed: {reason}"
