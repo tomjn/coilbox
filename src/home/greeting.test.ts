@@ -40,6 +40,7 @@ vi.mock("@tauri-apps/plugin-opener", () => ({ openUrl: async () => {} }));
 vi.mock("./zones/OpenAnnihilationCard", async () => ({
   default: () => null,
   OA_CARD_ID: (await import("./openAnnihilationArt")).OA_CARD_ID,
+  useOpenAnnihilationOffer: () => ({ card: false, link: null }),
 }));
 
 type LobbyConnection = {

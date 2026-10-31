@@ -12,23 +12,47 @@ import { ToolCard } from "./ToolCards";
 
 export { OA_CARD_ID };
 
-/** Where the card goes when Open Annihilation is not set up. */
+/** Where the Get Open Annihilation link goes when OA is not set up. */
 export const CORE_PRIME_URL = "https://play.coreprime.net";
+
+/**
+ * Which shape Open Annihilation takes on the home page (issue #4973): a `card`
+ * once the program path is set, a `link` out to Core Prime until then, and
+ * neither under a profile's game filter. The grid reads it so the row's height
+ * counts the card's picture only while the card is showing.
+ */
+export function useOpenAnnihilationOffer(): {
+  card: boolean;
+  link: NavItem | null;
+} {
+  const { t } = useLingui();
+  const [program] = useOpenAnnihilation();
+  if (getGameMatcher() !== null) return { card: false, link: null };
+  if (program) return { card: true, link: null };
+  return {
+    card: false,
+    link: {
+      id: OA_CARD_ID,
+      label: t`Get Open Annihilation`,
+      icon: OpenAnnihilationIcon,
+      href: CORE_PRIME_URL,
+    },
+  };
+}
 
 /**
  * A welcome card for Open Annihilation (issue #4945), in the Play group beside
  * the other cards (issue #4966).
  *
  * With the program path from #4943 set, pressing it starts OA with no arguments
- * of its own, so its intro plays. Without one it opens Core Prime's page in the
- * browser, which `ToolCard` already does for an item with an `href`. The two
- * states are the card's label and action, with no explanation on the card.
+ * of its own, so its intro plays. Without one it draws nothing: the group shows
+ * a Get Open Annihilation link chip in its links card instead (issue #4973), so
+ * a game the player has not installed does not take a picture's footprint.
  *
  * It is {@link ToolCard} with a synthetic nav item, so it has the same shell,
- * art, focus ring and external-link mark as the cards around it. Its art is the
- * picture of `openAnnihilationArt.ts` in both states, unless a distribution
- * overrides it. The group hands it `compact` for the same reason it hands it to
- * the other cards.
+ * art and focus ring as the cards around it, and its picture is that of
+ * `openAnnihilationArt.ts` unless a distribution overrides it. The group hands
+ * it `compact` for the same reason it hands it to the other cards.
  *
  * ## A profile narrowed to a game hides it
  *
@@ -50,10 +74,9 @@ export default function OpenAnnihilationCard({
   const { t } = useLingui();
   const [program] = useOpenAnnihilation();
   const [error, setError] = useState<string | null>(null);
-  if (getGameMatcher() !== null) return null;
+  if (getGameMatcher() !== null || !program) return null;
 
   const launch = async () => {
-    if (!program) return;
     setError(null);
     try {
       // One channel per call: a channel reused across commands stops delivering.
@@ -70,20 +93,13 @@ export default function OpenAnnihilationCard({
 
   const item: NavItem = {
     id: OA_CARD_ID,
-    label: program ? t`Play Open Annihilation` : t`Get Open Annihilation`,
+    label: t`Play Open Annihilation`,
     icon: OpenAnnihilationIcon,
-    // Set only without a program: `ToolCard` opens it in the browser and marks
-    // the card as external. With a program the card runs `launch` instead.
-    href: program ? undefined : CORE_PRIME_URL,
   };
 
   return (
     <div className="flex w-full flex-col gap-2 sm:w-64">
-      <ToolCard
-        item={item}
-        compact={compact}
-        onPress={program ? launch : undefined}
-      />
+      <ToolCard item={item} compact={compact} onPress={launch} />
       {error && (
         <p role="alert" className="break-words text-xs text-destructive">
           {error}
