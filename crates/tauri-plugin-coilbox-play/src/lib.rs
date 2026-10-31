@@ -12,6 +12,7 @@ mod chobby_presets;
 mod focus;
 mod infolog;
 mod launch;
+mod oa_launch;
 pub mod script;
 mod sysinfo;
 
@@ -79,7 +80,7 @@ pub fn engine_pid<R: Runtime>(app: &AppHandle<R>, run_id: &str) -> Option<u32> {
 /// a signal, so `ExitStatus::code()` answers `None` and flattening it to 0 reports
 /// a segfault as a clean exit (issue #379). Windows has no signals, so `signal` is
 /// always `None` there and a failure shows up in `code`.
-#[derive(Clone, Copy, Default, Serialize)]
+#[derive(Clone, Copy, Debug, Default, Serialize)]
 #[serde(rename_all = "camelCase")]
 struct ExitOutcome {
     code: Option<i32>,
@@ -691,6 +692,7 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
         .setup(|app, _api| {
             app.manage(RunRegistry::default());
             app.manage(AutohostRegistry::default());
+            app.manage(oa_launch::OaRegistry::default());
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
@@ -708,7 +710,9 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
             play_ask_lua_rules,
             play_focus,
             play_infolog,
-            play_system_info
+            play_system_info,
+            oa_launch::play_oa_launch,
+            oa_launch::play_oa_cancel
         ])
         .build()
 }

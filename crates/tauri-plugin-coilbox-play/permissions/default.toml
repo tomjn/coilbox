@@ -18,4 +18,6 @@ permissions = [
   "allow-play-focus",
   "allow-play-infolog",
   "allow-play-system-info",
+  "allow-play-oa-launch",
+  "allow-play-oa-cancel",
 ]
