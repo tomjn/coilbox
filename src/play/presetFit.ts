@@ -23,8 +23,8 @@ const NAMED_IN_WARNING = 3;
  * Both the current and the preset's side are carried, because which one applies
  * depends on whether the game and the map are being taken, and that is decided
  * by the ticks inside the panel. Anything not known yet is left out, and a fact
- * left out never produces a warning: an empty schema means the game has not been
- * read, not that it declares nothing.
+ * left out never produces a warning. A schema that is present but empty is a
+ * game or map that was read and declares no options.
  */
 export interface PresetFitFacts {
   /** The game the setup or room is on now. */
@@ -43,19 +43,17 @@ export interface PresetFitFacts {
  * The keys among `keys` that `schema` does not declare, compared without regard
  * to case because SPADS lowercases a setting before it sets it.
  *
- * Empty when the schema has no options, since that means "not read yet" and
- * flagging every key against it would warn about a game that is fine.
+ * An `undefined` schema is a game or map not read yet, so nothing is flagged
+ * against it. An empty one was read and declares no options, so every key is.
  */
 export function undeclaredOptions(
   keys: Iterable<string>,
   schema: ConfigOption[] | undefined,
 ): string[] {
+  if (!schema) return [];
   const declared = new Set(
-    (schema ?? [])
-      .filter((o) => o.type !== "section")
-      .map((o) => o.key.toLowerCase()),
+    schema.filter((o) => o.type !== "section").map((o) => o.key.toLowerCase()),
   );
-  if (declared.size === 0) return [];
   return [...keys].filter((key) => !declared.has(key.toLowerCase()));
 }
 

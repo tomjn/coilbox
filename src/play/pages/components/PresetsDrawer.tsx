@@ -130,7 +130,7 @@ export function PresetsDrawer({
     enginePath,
     dataDir,
     currentGameName,
-    currentModOptions: modOptionsSchema,
+    currentGameArchive: archive,
     currentMapName,
     currentStartPosType,
     gameArchiveFor,

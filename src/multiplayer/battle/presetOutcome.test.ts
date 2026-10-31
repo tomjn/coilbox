@@ -58,10 +58,19 @@ describe("dropUndeclared", () => {
 
   it("drops nothing against a schema that is not read yet", () => {
     const tags = { "game/modoptions/anything": "1" };
-    expect(dropUndeclared(tags, { mod: [], map: [] })).toEqual({
+    expect(dropUndeclared(tags, { mod: undefined, map: undefined })).toEqual({
       kept: tags,
       notTaken: [],
     });
+  });
+
+  it("drops everything against a game that was read and declares no options", () => {
+    const { kept, notTaken } = dropUndeclared(
+      { "game/modoptions/anything": "1" },
+      { mod: [], map: [] },
+    );
+    expect(kept).toEqual({});
+    expect(notTaken).toHaveLength(1);
   });
 });
 
@@ -132,6 +141,7 @@ describe("applyRoomSteps", () => {
     over: {
       hostFailures?: Parameters<typeof hostStepNotTaken>[0];
       delivery?: DeliveryProgress | null;
+      left?: boolean;
     } = {},
   ) {
     const calls: string[] = [];
@@ -141,7 +151,7 @@ describe("applyRoomSteps", () => {
       sentTags,
       runHostSteps: async () => {
         calls.push("host");
-        return over.hostFailures ?? [];
+        return { failures: over.hostFailures ?? [], left: over.left ?? false };
       },
       applyOptionTags: async (tags: Record<string, string>) => {
         calls.push("options");
@@ -212,6 +222,37 @@ describe("applyRoomSteps", () => {
     expect(notTakenMessage(entries, label)).toBe(
       "Mod options: bogus (Not declared)",
     );
+  });
+
+  it("sends no options or boxes once the player has left the room", async () => {
+    const room = fakeRoom({
+      left: true,
+      hostFailures: [{ step: "map", reason: "The room did not answer." }],
+    });
+    const entries = await applyRoomSteps({ ...args, ...room });
+    expect(room.calls).toEqual(["host"]);
+    expect(entries.map((e) => e.what)).toEqual(["map"]);
+  });
+
+  it("drops nothing against a schema that is not read yet, and everything against an empty one", async () => {
+    const unread = fakeRoom();
+    await applyRoomSteps({
+      ...args,
+      ...unread,
+      schemas: { mod: undefined, map: undefined },
+    });
+    expect(unread.sentTags).toEqual([args.tags]);
+    const empty = fakeRoom();
+    const entries = await applyRoomSteps({
+      ...args,
+      ...empty,
+      schemas: { mod: [], map: [] },
+    });
+    expect(empty.sentTags).toEqual([{}]);
+    expect(entries.map((e) => [e.what, e.items])).toContainEqual([
+      "modOptions",
+      ["maxunits"],
+    ]);
   });
 
   it("sends the boxes even when an option failed", async () => {

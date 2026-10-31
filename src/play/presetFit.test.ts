@@ -53,9 +53,12 @@ describe("undeclaredOptions", () => {
     ).toEqual(["bogus"]);
   });
 
-  it("flags nothing against a schema that is empty or absent", () => {
-    expect(undeclaredOptions(["a"], [])).toEqual([]);
+  it("flags nothing against a schema that has not been read", () => {
     expect(undeclaredOptions(["a"], undefined)).toEqual([]);
+  });
+
+  it("flags everything against a schema that was read and is empty", () => {
+    expect(undeclaredOptions(["a"], [])).toEqual(["a"]);
   });
 
   it("does not count a section as an option", () => {

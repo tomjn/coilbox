@@ -3,7 +3,12 @@ import type { ConfigOption } from "@/content/bindings";
 import { undeclaredOptions } from "@/play/presetFit";
 import type { PresetPart } from "@/play/presetParts";
 import { MAPOPT_PREFIX, MODOPT_PREFIX, partForTag } from "./battleOptions";
-import type { HostStep, HostStepFailure, HostSteps } from "./hostSteps";
+import type {
+  HostStep,
+  HostStepFailure,
+  HostSteps,
+  HostStepsResult,
+} from "./hostSteps";
 import type { DeliveryProgress } from "./tweakDelivery";
 
 /**
@@ -30,11 +35,15 @@ export interface NotTaken {
  *
  * An autohost refuses an option the game does not declare, and the paced run
  * stops at the first refusal, so leaving one in would cost the options after it
- * too. A schema that is empty is not read yet, so nothing is dropped against it.
+ * too. A schema that is undefined is not read yet, so nothing is dropped against
+ * it, while an empty one is a game or map that declares no options.
  */
 export function dropUndeclared(
   tags: Record<string, string>,
-  schemas: { mod: ConfigOption[]; map: ConfigOption[] },
+  schemas: {
+    mod: ConfigOption[] | undefined;
+    map: ConfigOption[] | undefined;
+  },
 ): { kept: Record<string, string>; notTaken: NotTaken[] } {
   const byPart = new Map<PresetPart, string[]>();
   const kept: Record<string, string> = {};
@@ -135,16 +144,22 @@ export async function applyRoomSteps({
 }: {
   hostSteps: HostSteps;
   tags: Record<string, string>;
-  schemas: { mod: ConfigOption[]; map: ConfigOption[] };
+  schemas: {
+    mod: ConfigOption[] | undefined;
+    map: ConfigOption[] | undefined;
+  };
   mapName: string;
-  runHostSteps: (steps: HostSteps) => Promise<HostStepFailure[]>;
+  runHostSteps: (steps: HostSteps) => Promise<HostStepsResult>;
   applyOptionTags: (
     tags: Record<string, string>,
   ) => Promise<DeliveryProgress | null>;
   afterOptions: () => void;
 }): Promise<NotTaken[]> {
   const { kept, notTaken: undeclared } = dropUndeclared(tags, schemas);
-  const hostFailures = await runHostSteps(hostSteps);
+  const { failures: hostFailures, left } = await runHostSteps(hostSteps);
+  // Leaving the room ends the apply. The options and boxes are for the room the
+  // player was in, and the run would start them in whichever one they are in now.
+  if (left) return hostStepNotTaken(hostFailures, mapName);
   const delivery = await applyOptionTags(kept);
   afterOptions();
   return [

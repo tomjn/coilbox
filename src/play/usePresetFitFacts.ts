@@ -8,6 +8,18 @@ import {
 import type { SkirmishDraft } from "./drafts";
 import type { PresetFitFacts } from "./presetFit";
 
+/**
+ * The options a finished read declared, or undefined while it is unread, failed
+ * or could not be synced. An empty list is a real answer, a game or map that
+ * declares none, and a failed read must not pass for it.
+ */
+function declaredOptions(read: {
+  status: string;
+  info: { options?: ConfigOption[] } | null;
+}): ConfigOption[] | undefined {
+  return read.status === "ready" ? read.info?.options : undefined;
+}
+
 /** A start position count, or undefined while unread or when the map defines
  *  none, so neither case warns about a roster. */
 function positionCount(
@@ -31,7 +43,7 @@ export function usePresetFitFacts({
   enginePath,
   dataDir,
   currentGameName,
-  currentModOptions,
+  currentGameArchive,
   currentMapName,
   currentStartPosType,
   gameArchiveFor,
@@ -41,14 +53,19 @@ export function usePresetFitFacts({
   enginePath?: string;
   dataDir?: string;
   currentGameName: string;
-  /** The current game's declared options, which the caller already holds. */
-  currentModOptions: ConfigOption[];
+  /** The current game's primary archive, to read its declared options from. */
+  currentGameArchive?: string;
   currentMapName: string;
   currentStartPosType: number;
   /** The archive to read a game's options from, for a preset naming another
    *  game. A surface that cannot change game does not need it. */
   gameArchiveFor?: (gameName: string) => string | undefined;
 }): PresetFitFacts | undefined {
+  const currentGame = useUnitsyncGameInfo(
+    enginePath,
+    dataDir,
+    currentGameArchive,
+  );
   const otherGame =
     preset && preset.gameName !== currentGameName ? preset.gameName : undefined;
   const presetGame = useUnitsyncGameInfo(
@@ -82,12 +99,12 @@ export function usePresetFitFacts({
     currentMapName,
     currentStartPosType,
     modOptions: {
-      current: currentModOptions,
-      preset: presetGame.info?.options,
+      current: declaredOptions(currentGame),
+      preset: declaredOptions(presetGame),
     },
     mapOptions: {
-      current: currentMap.info?.options,
-      preset: presetMap.info?.options,
+      current: declaredOptions(currentMap),
+      preset: declaredOptions(presetMap),
     },
     startPositions: {
       current: positionCount(currentPositions),

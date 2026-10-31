@@ -24,6 +24,7 @@ const mapStatus = vi.hoisted(() => ({ value: "ready" as string }));
 // What unitsync would say about each map, by name. A map not listed has no
 // options and no start positions, which is what an unread one looks like.
 const maps = vi.hoisted(() => ({
+  games: {} as Record<string, { key: string; name: string }[]>,
   options: {} as Record<string, { key: string; name: string }[]>,
   positions: {} as Record<string, number>,
 }));
@@ -31,7 +32,15 @@ const maps = vi.hoisted(() => ({
 vi.mock("@/content/config", () => ({
   THUMB_MINIMAP_MIP: 3,
   useUnitsyncThumbnails: () => ({ thumbs: new Map() }),
-  useUnitsyncGameInfo: () => ({ info: null, status: "idle", loading: false }),
+  useUnitsyncGameInfo: (
+    _engine?: string,
+    _data?: string,
+    archive?: string,
+  ) => ({
+    info: archive ? { options: maps.games[archive] ?? [] } : null,
+    status: archive ? "ready" : "idle",
+    loading: false,
+  }),
   useUnitsyncMapInfo: (_engine?: string, _data?: string, map?: string) => ({
     status: mapStatus.value,
     info:
@@ -54,6 +63,7 @@ vi.mock("@/workshop/project", () => ({
 afterEach(() => {
   cleanup();
   mapStatus.value = "ready";
+  maps.games = {};
   maps.options = {};
   maps.positions = {};
 });
@@ -254,8 +264,9 @@ describe("the room's preset panel, warning about what does not fit", () => {
   ];
 
   it("names a mod option the game does not declare", () => {
+    maps.games["a-game.sdz"] = [{ key: "maxunits", name: "Max units" }];
     renderDrawer({
-      modOptionsSchema: [{ key: "maxunits", name: "Max units" }],
+      archive: "a-game.sdz",
       presets: [
         preset({ modOptionValues: { maxunits: "8000", bogus: "1", odd: "2" } }),
       ],
@@ -311,8 +322,9 @@ describe("the room's preset panel, warning about what does not fit", () => {
   it("shows no warning for a preset that fits", () => {
     maps.positions["Preset Map"] = 2;
     maps.options["Preset Map"] = [{ key: "fog", name: "Fog" }];
+    maps.games["a-game.sdz"] = [{ key: "maxunits", name: "Max units" }];
     renderDrawer({
-      modOptionsSchema: [{ key: "maxunits", name: "Max units" }],
+      archive: "a-game.sdz",
       presets: [
         preset({
           startPosType: 0,

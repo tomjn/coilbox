@@ -68,8 +68,17 @@ export interface HostStepsIo {
   hostSaidSince(at: number): string[];
   /** The map the battle is on now. */
   currentMap(): string | undefined;
+  /** False once the player has left the room the run began in, or moved to
+   *  another. A command sent after that would land in the wrong battle. */
+  here(): boolean;
   sleep(ms: number): Promise<void>;
   now(): number;
+}
+
+export interface HostStepsResult {
+  failures: HostStepFailure[];
+  /** True when the run stopped because the player left the room. */
+  left: boolean;
 }
 
 /**
@@ -118,7 +127,7 @@ async function until(
 ): Promise<boolean> {
   const timeout = confirmTimeoutMs(line.length, true);
   const startedAt = io.now();
-  while (io.now() - startedAt < timeout) {
+  while (io.here() && io.now() - startedAt < timeout) {
     if (check()) return true;
     await io.sleep(CONFIRM_POLL_MS);
   }
@@ -137,8 +146,9 @@ async function until(
 export async function runHostSteps(
   steps: HostSteps,
   io: HostStepsIo,
-): Promise<HostStepFailure[]> {
+): Promise<HostStepsResult> {
   const failures: HostStepFailure[] = [];
+  const stopped = (): HostStepsResult => ({ failures, left: true });
 
   const pace = async (sentAt: number) => {
     const owed = AUTOHOST_COMMAND_GAP_MS - (io.now() - sentAt);
@@ -148,6 +158,7 @@ export async function runHostSteps(
   if (steps.map) {
     const want = steps.map.toLowerCase();
     const line = `!map ${steps.map}`;
+    if (!io.here()) return stopped();
     const sentAt = io.now();
     await io.send(line);
     const landed = await until(
@@ -155,6 +166,7 @@ export async function runHostSteps(
       line,
       () => io.currentMap()?.toLowerCase() === want,
     );
+    if (!io.here()) return stopped();
     if (!landed)
       failures.push({ step: "map", reason: quoted(io.hostSaidSince(sentAt)) });
     await pace(sentAt);
@@ -164,10 +176,12 @@ export async function runHostSteps(
     const value = steps[setting];
     if (value === undefined) continue;
     const line = `!set ${setting} ${value}`;
+    if (!io.here()) return stopped();
     const sentAt = io.now();
     await io.send(line);
     const read = () => settingAnswer(io.hostSaidSince(sentAt), setting, value);
     await until(io, line, () => read() !== null);
+    if (!io.here()) return stopped();
     const answer = read();
     if (answer === null) {
       failures.push({
@@ -184,5 +198,5 @@ export async function runHostSteps(
     await pace(sentAt);
   }
 
-  return failures;
+  return io.here() ? { failures, left: false } : stopped();
 }

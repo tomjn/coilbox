@@ -108,6 +108,7 @@ describe("settingAnswer", () => {
 function fakeRoom(
   reply: (line: string, at: number) => string | null,
   map = "Old Map",
+  leavesAfterSends = Number.POSITIVE_INFINITY,
 ) {
   let clock = 1000;
   const said: { at: number; text: string }[] = [];
@@ -126,6 +127,7 @@ function fakeRoom(
         .filter((m) => m.at >= at && m.text !== "map changed")
         .map((m) => m.text),
     currentMap: () => state.map,
+    here: () => sent.length < leavesAfterSends,
     async sleep(ms) {
       clock += ms;
     },
@@ -141,7 +143,7 @@ describe("runHostSteps", () => {
         ? "map changed"
         : `Global setting changed by Tom (${line.split(" ")[1]}=${line.split(" ")[2]})`,
     );
-    const failures = await runHostSteps(
+    const { failures } = await runHostSteps(
       { map: "New Map", teamSize: 4, nbTeams: 2 },
       room.io,
     );
@@ -174,7 +176,10 @@ describe("runHostSteps", () => {
           ? "Global setting changed by Tom (nbTeams=2)"
           : null,
     );
-    const failures = await runHostSteps({ teamSize: 40, nbTeams: 2 }, room.io);
+    const { failures } = await runHostSteps(
+      { teamSize: 40, nbTeams: 2 },
+      room.io,
+    );
     expect(failures).toEqual([
       {
         step: "teamSize",
@@ -191,7 +196,7 @@ describe("runHostSteps", () => {
   it("waits the confirmation timeout a short !bSet gets, then calls a silent room a failure", async () => {
     const room = fakeRoom(() => null);
     const start = 1000;
-    const failures = await runHostSteps({ nbTeams: 2 }, room.io);
+    const { failures } = await runHostSteps({ nbTeams: 2 }, room.io);
     expect(failures).toHaveLength(1);
     expect(failures[0].step).toBe("nbTeams");
     const waited = (await room.io.now()) - start;
@@ -204,7 +209,7 @@ describe("runHostSteps", () => {
     const room = fakeRoom((line) =>
       line.startsWith("!map ") ? "Could not find matching map" : null,
     );
-    const failures = await runHostSteps({ map: "New Map" }, room.io);
+    const { failures } = await runHostSteps({ map: "New Map" }, room.io);
     expect(failures).toEqual([
       { step: "map", reason: "Could not find matching map" },
     ]);
@@ -212,12 +217,34 @@ describe("runHostSteps", () => {
 
   it("takes a map the room already shows, whatever its case", async () => {
     const room = fakeRoom(() => null, "new map");
-    expect(await runHostSteps({ map: "New Map" }, room.io)).toEqual([]);
+    expect((await runHostSteps({ map: "New Map" }, room.io)).failures).toEqual(
+      [],
+    );
   });
 
   it("sends nothing when there are no steps", async () => {
     const room = fakeRoom(() => null);
-    expect(await runHostSteps({}, room.io)).toEqual([]);
+    expect((await runHostSteps({}, room.io)).failures).toEqual([]);
+    expect(room.sent).toEqual([]);
+  });
+
+  it("stops sending when the player has left the room, and says so", async () => {
+    // The room is gone after the first command, so neither setting may be sent
+    // to whichever battle the player is in now.
+    const room = fakeRoom(() => null, "Old Map", 1);
+    const result = await runHostSteps(
+      { map: "New Map", teamSize: 4, nbTeams: 2 },
+      room.io,
+    );
+    expect(result.left).toBe(true);
+    expect(room.sent.map((s) => s.line)).toEqual(["!map New Map"]);
+    expect(result.failures).toEqual([]);
+  });
+
+  it("sends nothing at all if the player is already gone", async () => {
+    const room = fakeRoom(() => null, "Old Map", 0);
+    const result = await runHostSteps({ teamSize: 4 }, room.io);
+    expect(result.left).toBe(true);
     expect(room.sent).toEqual([]);
   });
 });

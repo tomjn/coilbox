@@ -86,8 +86,8 @@ import {
 import { battleRequirements } from "./contentBlock";
 import { type EngineMatch, engineMatch } from "./engineMatch";
 import {
-  type HostStepFailure,
   type HostSteps,
+  type HostStepsResult,
   runHostSteps,
 } from "./hostSteps";
 import { leaveBattle } from "./leaveBattle";
@@ -182,7 +182,7 @@ export interface BattleRoomView {
    * time, and say which did not take. Resolves with none for a room that has no
    * autohost.
    */
-  runHostSteps: (steps: HostSteps) => Promise<HostStepFailure[]>;
+  runHostSteps: (steps: HostSteps) => Promise<HostStepsResult>;
   /**
    * Progress of the paced autohost delivery `applyOptionTags` starts on a
    * SPADS battle (issue #2761). Stays empty on a battle we founded, where
@@ -1264,10 +1264,24 @@ export function useBattleRoom(serverKey: string | null): BattleRoomView {
   const autohost = hostIsBot && !isFounder;
   const roomRef = useRef({ state, battle });
   roomRef.current = { state, battle };
+  const mountedRef = useRef(true);
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+    };
+  }, []);
   const runHostStepsOnRoom = useCallback(
-    async (steps: HostSteps): Promise<HostStepFailure[]> => {
-      if (!autohost || !activeKey) return [];
+    async (steps: HostSteps): Promise<HostStepsResult> => {
+      if (!autohost || !activeKey) return { failures: [], left: false };
+      // `mp_say_battle` sends to whichever battle the connection is in, so a
+      // command sent after the player moves on would land in the new one.
+      const battleIdAtStart = roomRef.current.battle?.id;
       return runHostSteps(steps, {
+        here: () =>
+          mountedRef.current &&
+          battleIdAtStart !== undefined &&
+          roomRef.current.battle?.id === battleIdAtStart,
         send: autohostSend,
         hostSaidSince(at) {
           const { state: live, battle: liveBattle } = roomRef.current;

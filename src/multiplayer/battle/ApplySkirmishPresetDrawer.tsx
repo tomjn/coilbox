@@ -127,7 +127,7 @@ export function ApplySkirmishPresetDrawer({
     enginePath,
     dataDir,
     currentGameName: gameName,
-    currentModOptions: modOptionsSchema,
+    currentGameArchive: archive,
     currentMapName,
     currentStartPosType,
   });

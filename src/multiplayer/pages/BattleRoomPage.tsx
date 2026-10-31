@@ -344,8 +344,8 @@ function BattleRoomPage() {
       hostSteps,
       tags: filterOptionTags(seed.scriptTags, selection),
       schemas: {
-        mod: room.modOptionsSchema,
-        map: mapChange ? (fit?.mapOptions.preset ?? []) : room.mapOptionsSchema,
+        mod: fit?.modOptions.current,
+        map: mapChange ? fit?.mapOptions.preset : fit?.mapOptions.current,
       },
       mapName: preset.mapName,
       runHostSteps: room.runHostSteps,

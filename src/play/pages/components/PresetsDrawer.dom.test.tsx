@@ -278,8 +278,11 @@ describe("a preset's panel, warning about what does not fit", () => {
   });
 
   it("names a mod option the game does not declare", () => {
+    unitsync.games["Preset Game.sdz"] = [
+      { key: "maxunits", name: "Max units" },
+    ];
     renderDrawer({
-      modOptionsSchema: [{ key: "maxunits", name: "Max units" }],
+      archive: "Preset Game.sdz",
       presets: [{ ...preset, modOptionValues: { maxunits: "1", bogus: "2" } }],
     });
     openPanel();
@@ -290,9 +293,12 @@ describe("a preset's panel, warning about what does not fit", () => {
 
   it("reads the options of the preset's own game when the game is taken", () => {
     unitsync.games["Other Game.sdz"] = [{ key: "bogus", name: "Bogus" }];
+    unitsync.games["Current Game.sdz"] = [
+      { key: "maxunits", name: "Max units" },
+    ];
     renderDrawer({
       currentGameName: "Current Game",
-      modOptionsSchema: [{ key: "maxunits", name: "Max units" }],
+      archive: "Current Game.sdz",
       presets: [
         {
           ...preset,
@@ -327,8 +333,11 @@ describe("a preset's panel, warning about what does not fit", () => {
   it("shows no warning for a preset that fits", () => {
     unitsync.positions["Preset Map"] = 2;
     unitsync.mapOptions["Preset Map"] = [{ key: "fog", name: "Fog" }];
+    unitsync.games["Preset Game.sdz"] = [
+      { key: "maxunits", name: "Max units" },
+    ];
     renderDrawer({
-      modOptionsSchema: [{ key: "maxunits", name: "Max units" }],
+      archive: "Preset Game.sdz",
       presets: [
         {
           ...preset,
