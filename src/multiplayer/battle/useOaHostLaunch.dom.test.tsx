@@ -41,6 +41,7 @@ vi.mock("../openAnnihilation", () => ({
   useOpenAnnihilation: () => [program.value],
 }));
 
+import { endOaRunUnlessIn } from "../oaRun";
 import { useOaHostLaunch } from "./useOaHostLaunch";
 
 type Launch = {
@@ -57,6 +58,7 @@ const setIngame = vi.fn();
 function mount(battleMap = "Host chooses in OA") {
   return renderHook(() =>
     useOaHostLaunch({
+      serverKey: "me@server:8200",
       battleId: 4021,
       battleMap,
       maxPlayers: 6,
@@ -81,7 +83,14 @@ beforeEach(() => {
       }),
   );
 });
-afterEach(cleanup);
+afterEach(async () => {
+  cleanup();
+  // The run is held outside the hook, so a test that left OA running would
+  // block the next one. Every launch ends here.
+  await act(async () => {
+    for (const l of launched) l.finish({ exitCode: 0, signal: null });
+  });
+});
 
 const screen = (name: string): OaEvent => ({ kind: "screen", name });
 
@@ -168,5 +177,79 @@ describe("starting Open Annihilation for the host", () => {
     await waitFor(() => expect(launched).toHaveLength(1));
     act(() => result.current.cancel());
     expect(bindings.playOaCancel).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("the run outlives the battle room page", () => {
+  it("is still running, and cancellable, when the page comes back", async () => {
+    const first = mount();
+    act(() => void first.result.current.start());
+    await waitFor(() => expect(launched).toHaveLength(1));
+    first.unmount();
+
+    const second = mount();
+    expect(second.result.current.running).toBe(true);
+    act(() => second.result.current.cancel());
+    expect(bindings.playOaCancel).toHaveBeenCalledTimes(1);
+    expect(bindings.playOaCancel.mock.calls[0][0].runId).toBeTruthy();
+  });
+
+  it("does not start a second OA from the page that came back", async () => {
+    const first = mount();
+    act(() => void first.result.current.start());
+    await waitFor(() => expect(launched).toHaveLength(1));
+    first.unmount();
+
+    const second = mount();
+    await act(async () => second.result.current.start());
+    expect(launched).toHaveLength(1);
+  });
+
+  it("keeps the in game flag right after the page that started OA is gone", async () => {
+    const first = mount();
+    act(() => void first.result.current.start());
+    await waitFor(() => expect(launched).toHaveLength(1));
+    first.unmount();
+
+    act(() => launched[0].onEvent.onmessage(screen("mp_battleroom")));
+    expect(setIngame.mock.calls).toEqual([[true]]);
+
+    const second = mount();
+    await act(async () => launched[0].finish({ exitCode: 0, signal: null }));
+    expect(setIngame.mock.calls).toEqual([[true], [false]]);
+    expect(second.result.current.running).toBe(false);
+  });
+});
+
+describe("the run ends with its battle", () => {
+  it("ends OA when the host is no longer in the battle it was started for", async () => {
+    const { result } = mount();
+    act(() => void result.current.start());
+    await waitFor(() => expect(launched).toHaveLength(1));
+
+    act(() => endOaRunUnlessIn(() => 4021));
+    expect(bindings.playOaCancel).not.toHaveBeenCalled();
+    act(() => endOaRunUnlessIn(() => null));
+    expect(bindings.playOaCancel).toHaveBeenCalledTimes(1);
+  });
+
+  it("looks at the connection the battle is on", async () => {
+    const { result } = mount();
+    act(() => void result.current.start());
+    await waitFor(() => expect(launched).toHaveLength(1));
+
+    const asked: string[] = [];
+    act(() =>
+      endOaRunUnlessIn((serverKey) => {
+        asked.push(serverKey);
+        return 4021;
+      }),
+    );
+    expect(asked).toEqual(["me@server:8200"]);
+  });
+
+  it("does nothing while no OA runs", () => {
+    endOaRunUnlessIn(() => null);
+    expect(bindings.playOaCancel).not.toHaveBeenCalled();
   });
 });
