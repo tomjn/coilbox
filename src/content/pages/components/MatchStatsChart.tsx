@@ -67,6 +67,7 @@ import { useSeriesEmphasis } from "../../useSeriesEmphasis";
 import { CommandRateChart } from "./CommandRateChart";
 import { LivingValueChart } from "./LivingValueChart";
 import { MatchStatsExportButton } from "./MatchStatsExportButton";
+import { MatchStatsImageButton } from "./MatchStatsImageButton";
 import { MatchStatsPicker } from "./MatchStatsPicker";
 import { MatchStatsTable } from "./MatchStatsTable";
 import { type LegendEntry, SeriesLegend } from "./SeriesLegend";
@@ -424,6 +425,37 @@ export function MatchStatsChart({
     [series, info, chartedTeams, hidden],
   );
   const noneDrawn = drawn.length === 0;
+  // The exported picture is always on white, so its lines are coloured for the
+  // light card whatever theme the app is in.
+  const imageSeries = useMemo(
+    () =>
+      theme === "light"
+        ? drawn
+        : shownSeries(
+            colorSeries(
+              view === "teams" ? sides : players,
+              trailer,
+              info,
+              storedMode ?? autoColorMode(players, sides, info, "light"),
+              "light",
+            ),
+            info,
+            chartedTeams,
+            hidden,
+          ),
+    [
+      theme,
+      drawn,
+      view,
+      sides,
+      players,
+      trailer,
+      info,
+      storedMode,
+      chartedTeams,
+      hidden,
+    ],
+  );
   const partial = useMemo(
     () => partlyHidden(drawn, info, chartedTeams, hidden),
     [drawn, info, chartedTeams, hidden],
@@ -540,7 +572,17 @@ export function MatchStatsChart({
             onChange={setHighlightMe}
           />
         )}
-        <div className="ml-auto">
+        <div className="ml-auto flex flex-wrap items-center gap-2">
+          <MatchStatsImageButton
+            input={{
+              info,
+              metric,
+              mode,
+              view,
+              series: imageSeries,
+              rows,
+            }}
+          />
           <MatchStatsExportButton
             input={{
               info,
