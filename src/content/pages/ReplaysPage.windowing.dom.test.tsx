@@ -80,6 +80,8 @@ const { memorySettingsStorage } = await import("@/lib/storedSetting");
 const { default: ReplaysPage } = await import("./ReplaysPage");
 
 let storage = memorySettingsStorage();
+/** Times the page measured the scroller while the list had no rows in it. */
+let emptyListReads = 0;
 
 const realHeight = (row: Element) =>
   row.textContent?.includes(GAME_TYPE) ? GAME_TYPE_ROW : PLAIN_ROW;
@@ -137,6 +139,9 @@ beforeEach(() => {
   });
   vi.spyOn(Element.prototype, "getBoundingClientRect").mockImplementation(
     function (this: Element) {
+      if (this.tagName === "MAIN" && rowsInPage().length === 0) {
+        emptyListReads += 1;
+      }
       if (this.tagName === "UL" && this.querySelector("li[data-row-index]")) {
         return rect(LIST_TOP - scroller().scrollTop, 0);
       }
@@ -221,6 +226,23 @@ describe("sorting and filtering", () => {
     });
     await waitFor(() => expect(rowsInPage()).toHaveLength(1));
     expect(rowsInPage()[0]?.textContent).toContain(name(7));
+  });
+});
+
+describe("a filter that leaves fewer rows than the window started at", () => {
+  it("never lays out an empty list, which would reset the scroll position", async () => {
+    renderPage();
+    scrollTo(300_000);
+    // Row 3000 or so was at the top of the window, and this leaves 1000 rows.
+    expect(rowIndices()[0]).toBeGreaterThan(1000);
+    emptyListReads = 0;
+    fireEvent.change(screen.getByLabelText("Filter replays"), {
+      target: { value: "r0" },
+    });
+    await waitFor(() =>
+      expect(rowsInPage()[0]?.getAttribute("aria-setsize")).toBe("1000"),
+    );
+    expect(emptyListReads).toBe(0);
   });
 });
 

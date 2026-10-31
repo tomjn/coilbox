@@ -186,8 +186,11 @@ export function MeasuredRowList<T>({
   }, []);
 
   const rendered = useMemo(() => {
-    const start = Math.min(range.start, keys.length);
-    const end = Math.min(range.end, keys.length);
+    // A filter can leave fewer rows than the old window started at. The last row
+    // keeps the list at its full height until the window catches up, because an
+    // empty list would let the browser reset the scroll position.
+    const start = Math.min(range.start, Math.max(0, keys.length - 1));
+    const end = Math.min(Math.max(range.end, start + 1), keys.length);
     const indices = new Set<number>();
     for (let i = start; i < end; i++) indices.add(i);
     const focused = focusedKey === null ? -1 : keys.indexOf(focusedKey);
