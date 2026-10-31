@@ -130,6 +130,7 @@ export function ApplySkirmishPresetDrawer({
     currentGameArchive: archive,
     currentMapName,
     currentStartPosType,
+    checkMapInstalled: true,
   });
   const [tweaksOpen, setTweaksOpen] = useState(false);
   // Read here as well as in the panel, so the row says up front when there is
