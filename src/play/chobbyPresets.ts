@@ -112,6 +112,14 @@ function toRect(v: unknown): StartRect | undefined {
 }
 
 /**
+ * The most ally teams a game can have: `MAX_TEAMS` in RecoilEngine's
+ * `rts/Sim/Misc/GlobalConstants.h`. A box for a team past it is not one the
+ * engine could use, and a record with a huge key must not decide how big the
+ * array written back is.
+ */
+const MAX_ALLY_TEAMS = 255;
+
+/**
  * Start boxes keyed by 0-based ally team, from either shape Lua's encoder
  * makes. Chobby holds them 1-based. A table with every index becomes an array,
  * with `null` where an ally team has no box. A table that came back from an
@@ -122,11 +130,12 @@ function boxesByAlly(section: unknown): Record<string, unknown> {
   if (Array.isArray(section)) {
     section.forEach((v, i) => {
       const rect = toRect(v);
-      if (rect) out[String(i)] = rect;
+      if (rect && i < MAX_ALLY_TEAMS) out[String(i)] = rect;
     });
   } else if (isTable(section)) {
     for (const [key, v] of Object.entries(section)) {
       if (!/^\d+$/.test(key) || Number(key) < 1) continue;
+      if (Number(key) > MAX_ALLY_TEAMS) continue;
       const rect = toRect(v);
       if (rect) out[String(Number(key) - 1)] = rect;
     }
@@ -167,13 +176,15 @@ export function chobbyRecordToDraft(
 ): { draft: SkirmishDraft; dropped: string[] } {
   const r = isTable(record) ? record : {};
 
-  const modOptionValues: Record<string, string> = {};
-  if (isTable(r.Modoptions)) {
-    for (const [key, v] of Object.entries(r.Modoptions)) {
-      const text = optionText(v);
-      if (text !== undefined) modOptionValues[key] = text;
-    }
-  }
+  // `fromEntries` makes every name an ordinary key, `__proto__` included.
+  const modOptionValues: Record<string, string> = Object.fromEntries(
+    Object.entries(isTable(r.Modoptions) ? r.Modoptions : {}).flatMap(
+      ([key, v]) => {
+        const text = optionText(v);
+        return text === undefined ? [] : [[key, text] as const];
+      },
+    ),
+  );
 
   const participants: Participant[] = [initialParticipants()[0]];
   if (isTable(r.Bots)) {
@@ -254,27 +265,35 @@ export function presetToChobbyRecord(
     const index = sides.indexOf(named ?? "");
     return index >= 0 ? index : undefined;
   };
-  const bots: Record<string, unknown> = {};
   const names: string[] = [];
+  const bots: [string, unknown][] = [];
   for (const p of draft.participants) {
     if (p.kind !== "ai" || !p.ai) continue;
     const name = dedupePresetName(names, p.name);
     names.push(name);
     const side = sideIndex(p.side);
-    bots[name] = {
-      aiLib: p.ai.shortName,
-      allyNumber: p.allyTeam,
-      aiOptions: {},
-      teamColor: [...p.color],
-      ...(side !== undefined ? { side } : {}),
-      ...(p.handicap ? { handicap: p.handicap } : {}),
-    };
+    bots.push([
+      name,
+      {
+        aiLib: p.ai.shortName,
+        allyNumber: p.allyTeam,
+        aiOptions: {},
+        teamColor: [...p.color],
+        ...(side !== undefined ? { side } : {}),
+        ...(p.handicap ? { handicap: p.handicap } : {}),
+      },
+    ]);
   }
-  record.Bots = bots;
+  // `fromEntries` makes every name an ordinary key, `__proto__` included.
+  record.Bots = Object.fromEntries(bots);
 
   const rects: Record<string, StartRect> =
     draft.startPosType === 2 ? (draft.startRects ?? {}) : {};
-  const allies = Object.keys(rects).map(Number);
+  const allies = Object.keys(rects)
+    .map(Number)
+    .filter(
+      (ally) => Number.isInteger(ally) && ally >= 0 && ally < MAX_ALLY_TEAMS,
+    );
   const whole = { left: 0, top: 0, right: GRID, bottom: GRID };
   record["Start Boxes"] = Array.from(
     { length: allies.length > 0 ? Math.max(...allies) + 1 : 0 },

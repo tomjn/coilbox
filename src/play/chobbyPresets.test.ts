@@ -102,6 +102,24 @@ describe("chobbyRecordToDraft", () => {
     });
   });
 
+  it("drops a box under a team number no game could have", () => {
+    const { draft } = chobbyRecordToDraft(
+      JSON.parse(
+        '{"Start Boxes":{"1000000001":{"left":0,"top":0,"right":100,"bottom":200},"1":{"left":0,"top":0,"right":50,"bottom":200}}}',
+      ),
+      ctx,
+    );
+    expect(Object.keys(draft.startRects ?? {})).toEqual(["0"]);
+  });
+
+  it("keeps a mod option named __proto__ as an option", () => {
+    const { draft } = chobbyRecordToDraft(
+      JSON.parse('{"Modoptions":{"__proto__":"x","a":"1"}}'),
+      ctx,
+    );
+    expect(Object.keys(draft.modOptionValues)).toEqual(["__proto__", "a"]);
+  });
+
   it("keeps fixed start positions when the record has no boxes", () => {
     const { draft } = chobbyRecordToDraft({ Map: "A map" }, ctx);
     expect(draft.startPosType).toBe(0);
@@ -271,6 +289,27 @@ describe("presetToChobbyRecord", () => {
     const bots = presetToChobbyRecord(draft, ["Armada", "Cortex"])
       .Bots as Record<string, Record<string, unknown>>;
     expect(bots["AI 1"]).not.toHaveProperty("side");
+  });
+
+  it("ignores a box for a team no game could have, rather than building an array that long", () => {
+    const rect = { left: 0, top: 0, right: 100, bottom: 200 };
+    const out = presetToChobbyRecord(
+      { ...draft, startRects: { "0": rect, "1000000001": rect } },
+      SIDES,
+    );
+    expect(out["Start Boxes"]).toEqual([rect]);
+  });
+
+  it("keeps a bot named __proto__ as a bot", () => {
+    const named = {
+      ...draft,
+      participants: draft.participants.map((p) =>
+        p.id === "a" ? { ...p, name: "__proto__" } : p,
+      ),
+    };
+    const bots = presetToChobbyRecord(named, SIDES).Bots as object;
+    expect(Object.keys(bots)).toContain("__proto__");
+    expect(JSON.stringify(bots)).toContain('"__proto__":{"aiLib":"BARb"');
   });
 
   it("leaves out boxes the preset keeps but does not use", () => {
