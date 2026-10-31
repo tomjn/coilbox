@@ -142,25 +142,27 @@ function BattleRoomPage() {
   // A battle someone else hosts on Open Annihilation (issue #4947). OA's own
   // room enforces the engine, game, map and hashes, so none of them is checked.
   const oaJoiner = !room.selfHost && !!room.battle && isOaBattle(room.battle);
-  const block =
-    oaHost || oaJoiner
-      ? null
-      : launchBlock({
-          hasTarget: !!room.target,
-          targetLoading: room.targetLoading,
-          engineMissing:
-            engine.verdict === "mismatch" ? engine.hostLabel : null,
-          engineUnreadable: room.engineUnreadable,
-          unreadable: room.contentUnreadable,
-          unreadableReason: room.contentUnreadableReason,
-          contentKnown: room.contentKnown,
-          mapMissing: room.mapMissing,
-          gameMissing: room.gameMissing,
-          dependencyBlock: room.dependencyBlock,
-          compat: room.compat,
-          mapName: room.battle?.map ?? "",
-          gameName: room.requiredGame ?? room.battle?.modname ?? "",
-        });
+  // Both sides get the same thin room: players, chat and OA's version. The
+  // team table, map and options are the Recoil room's, and OA's own room owns
+  // them.
+  const oaRoom = oaHost || oaJoiner;
+  const block = oaRoom
+    ? null
+    : launchBlock({
+        hasTarget: !!room.target,
+        targetLoading: room.targetLoading,
+        engineMissing: engine.verdict === "mismatch" ? engine.hostLabel : null,
+        engineUnreadable: room.engineUnreadable,
+        unreadable: room.contentUnreadable,
+        unreadableReason: room.contentUnreadableReason,
+        contentKnown: room.contentKnown,
+        mapMissing: room.mapMissing,
+        gameMissing: room.gameMissing,
+        dependencyBlock: room.dependencyBlock,
+        compat: room.compat,
+        mapName: room.battle?.map ?? "",
+        gameName: room.requiredGame ?? room.battle?.modname ?? "",
+      });
   const blockReason = block?.reason ?? null;
   // The player's own widgets, for the strip that says which of them this
   // room's options turn off (issue #1292).
@@ -190,6 +192,7 @@ function BattleRoomPage() {
     maxPlayers: room.battle?.maxPlayers ?? 0,
     username: room.me,
     setIngame: room.setIngame,
+    autoStart: oaHost,
   });
   // People waiting to be let into a room we are hosting ourselves, with approval
   // switched on. Read off the shared room source, which holds nothing at all
@@ -539,17 +542,19 @@ function BattleRoomPage() {
   const action =
     oaRun.running || oaJoin.running
       ? "ingame"
-      : oaJoiner
-        ? room.hostIngame
-          ? "rejoin"
-          : "start"
-        : matchAction({
-            selfHost: room.selfHost,
-            hostIngame: room.hostIngame,
-            presentAtStart: room.presentAtStart,
-            launching,
-            running: launch.running,
-          });
+      : oaHost
+        ? "start"
+        : oaJoiner
+          ? room.hostIngame
+            ? "rejoin"
+            : "start"
+          : matchAction({
+              selfHost: room.selfHost,
+              hostIngame: room.hostIngame,
+              presentAtStart: room.presentAtStart,
+              launching,
+              running: launch.running,
+            });
 
   // Host start: flip our in-game flag (so joiners' clients auto-launch and connect),
   // launch the engine in host mode, then clear the flag once it exits. A joined
@@ -646,10 +651,10 @@ function BattleRoomPage() {
             ? t`Set where Open Annihilation is in Settings first.`
             : null)
         }
-        unsynced={oaHost || oaJoiner ? [] : unsyncedPlayers(room.rows)}
+        unsynced={oaRoom ? [] : unsyncedPlayers(room.rows)}
         action={action}
         // Readiness is for the engine's own room. OA's has its own.
-        allReady={oaHost || oaJoiner || room.allReady}
+        allReady={oaRoom || room.allReady}
         onToggleReady={room.setReady}
         onToggleSpectate={room.setSpectator}
         onLeave={onLeave}
@@ -677,13 +682,17 @@ function BattleRoomPage() {
           servers,
         )}
         oaJoin={
-          !oaJoiner
-            ? null
-            : oaJoin.running
+          oaHost
+            ? oaRun.running
               ? "inOa"
-              : room.hostIngame
-                ? "join"
-                : "waiting"
+              : "start"
+            : !oaJoiner
+              ? null
+              : oaJoin.running
+                ? "inOa"
+                : room.hostIngame
+                  ? "join"
+                  : "waiting"
         }
       />
 
@@ -754,7 +763,7 @@ function BattleRoomPage() {
               split.tableClass,
             )}
           >
-            {oaJoiner ? (
+            {oaRoom ? (
               <OaPlayerList rows={room.rows} />
             ) : (
               <BattleMembersTable
@@ -800,7 +809,7 @@ function BattleRoomPage() {
             enginePath={room.enginePath}
             dataDir={room.dataDir}
             maps={room.maps}
-            canChangeMap={room.canChangeMap}
+            canChangeMap={!oaRoom && room.canChangeMap}
             onChangeMap={room.setMap}
             selfHost={room.selfHost}
             directRoom={room.directRoom}
@@ -811,9 +820,9 @@ function BattleRoomPage() {
           />
         </div>
 
-        {oaJoiner ? (
+        {oaRoom ? (
           <aside className="w-[var(--battle-sidebar-width)] shrink-0 space-y-4 overflow-y-auto border-l border-border p-4">
-            <OaEngineCard hostVersion={battle.version} />
+            <OaEngineCard hostVersion={battle.version} hosting={oaHost} />
           </aside>
         ) : (
           <aside className="w-[var(--battle-sidebar-width)] shrink-0 space-y-4 overflow-y-auto border-l border-border p-4">
@@ -1025,24 +1034,20 @@ function BattleRoomPage() {
               onCommand={room.autohostSend}
               onRing={() => room.hostControls.ring()}
             />
-            {!oaHost && (
-              <>
-                <BattleGameCard
-                  enginePath={room.enginePath}
-                  dataDir={room.dataDir}
-                  game={room.localGame}
-                  gameName={battle.modname}
-                />
-                <BattleEngineCard
-                  battleId={battle.id}
-                  match={engine}
-                  version={battle.version}
-                  target={room.target}
-                  onInstalled={room.refreshTarget}
-                  unreadable={room.engineUnreadable}
-                />
-              </>
-            )}
+            <BattleGameCard
+              enginePath={room.enginePath}
+              dataDir={room.dataDir}
+              game={room.localGame}
+              gameName={battle.modname}
+            />
+            <BattleEngineCard
+              battleId={battle.id}
+              match={engine}
+              version={battle.version}
+              target={room.target}
+              onInstalled={room.refreshTarget}
+              unreadable={room.engineUnreadable}
+            />
           </aside>
         )}
       </div>

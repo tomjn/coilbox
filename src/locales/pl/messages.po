@@ -34178,6 +34178,10 @@ msgstr "numparticles, na pojawienie się."
 msgid "NW-SE"
 msgstr "NW-SE"
 
+#: src/multiplayer/battles/BattleFilterPopover.tsx
+msgid "OA"
+msgstr ""
+
 #: src/scenario/listing.ts
 #: src/scenario/validate.ts
 #, fuzzy
@@ -44762,10 +44766,18 @@ msgstr "misji startowej \"{missionId}\" nie ma w kampanii „{campaignTitle}”"
 msgid "Start muted"
 msgstr "Zaczynaj wyciszone"
 
+#: src/multiplayer/battle/BattleRoomHeader.tsx
+msgid "Start OA"
+msgstr ""
+
 #: src/lego/pages/ProjectsPage.tsx
 #, fuzzy
 msgid "Start one, then drop parts into it. Browse what is available under Lego Parts."
 msgstr "Utwórz go, a potem wrzuć do niego części. Dostępne części przejrzysz w Lego Parts."
+
+#: src/multiplayer/battle/BattleRoomHeader.tsx
+msgid "Start Open Annihilation for this battle"
+msgstr ""
 
 #: src/onboarding/Wizard.tsx
 msgid "Start playing"
@@ -53253,6 +53265,7 @@ msgstr "Wszechstronność"
 
 #: src/content/pages/components/GameVersionsTab.tsx
 #: src/multiplayer/admin/MaintenanceSection.tsx
+#: src/multiplayer/battle/OaEngineCard.tsx
 #: src/multiplayer/pages/OpenAnnihilationSettings.tsx
 #: src/widgets/pages/WidgetsPage.tsx
 #, fuzzy
