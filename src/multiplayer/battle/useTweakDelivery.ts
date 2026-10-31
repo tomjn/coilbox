@@ -24,8 +24,9 @@ import {
 export interface TweakDelivery {
   progress: DeliveryProgress | null;
   running: boolean;
-  /** Send a set. Resolves when the run stops, however it stopped. */
-  start: (slots: TweakSlot[]) => Promise<void>;
+  /** Send a set. Resolves when the run stops, however it stopped, with how it
+   *  ended. Null when there was nothing to run. */
+  start: (slots: TweakSlot[]) => Promise<DeliveryProgress | null>;
   /** Ask the run to stop before its next slot. It never abandons one mid-flight,
    *  so what has been sent stays reported honestly. */
   cancel: () => void;
@@ -70,12 +71,12 @@ export function useTweakDelivery({
   const clear = useCallback(() => setProgress(null), []);
 
   const start = useCallback(
-    async (slots: TweakSlot[]) => {
-      if (!serverKey || battleId == null || slots.length === 0) return;
+    async (slots: TweakSlot[]): Promise<DeliveryProgress | null> => {
+      if (!serverKey || battleId == null || slots.length === 0) return null;
       cancelRef.current = false;
       setRunning(true);
       try {
-        await runDelivery(
+        return await runDelivery(
           slots,
           {
             async send(slot) {

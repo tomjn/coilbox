@@ -2933,6 +2933,10 @@ msgstr "Gra {gameName} deklaruje typy wyzwalaczy, których nie udało się odczy
 msgid "{gameName} depends on it, and coilbox cannot download an archive by this name. Find it in <0>game downloads</0>, then try again."
 msgstr "Gra {gameName} od niego zależy, a coilbox nie może pobrać archiwum o tej nazwie. Znajdź je w <0>pobieraniu gier</0> i spróbuj ponownie."
 
+#: src/play/presetFit.ts
+msgid "{gameName} does not declare {names}."
+msgstr ""
+
 #: src/workshop/pages/components/PlayLocallyButton.tsx
 #, fuzzy
 msgid "{gameName} does not declare a tweakdefs mod option, so this route is not on offer."
@@ -4226,6 +4230,10 @@ msgstr "{mapName} (nie zainstalowano)"
 #, fuzzy
 msgid "{mapName} could not be read. It is most likely not installed for the engine coilbox is using."
 msgstr "Nie udało się odczytać mapy {mapName}. Najpewniej nie jest zainstalowana dla silnika, którego używa coilbox."
+
+#: src/play/presetFit.ts
+msgid "{mapName} does not declare {names}."
+msgstr ""
 
 #: src/lego/sandbox.ts
 #, fuzzy
@@ -5558,6 +5566,10 @@ msgstr "{pointCount, plural, one {# punkt} few {# punkty} many {# punktów} othe
 msgid "{position} of {count}"
 msgstr "{position} z {count}"
 
+#: src/play/presetFit.ts
+msgid "{positions, plural, one {# start position} other {# start positions}}"
+msgstr ""
+
 #: src/content/pages/components/CommandRateChart.tsx
 #, fuzzy
 msgid "{pregameCount} orders before the game started are left out."
@@ -6050,6 +6062,7 @@ msgid "{shown, plural, one {# part} other {# parts}}"
 msgstr "{shown, plural, one {# część} few {# części} many {# części} other {# części}}"
 
 #: src/blueprint/units.ts
+#: src/play/presetFit.ts
 #, fuzzy
 msgid "{shown} and {more} more"
 msgstr "{shown} i jeszcze {more}"
@@ -6511,6 +6524,14 @@ msgstr "{teamCount, plural, one {grający: {playing}, # drużyna} few {grający:
 #, fuzzy
 msgid "{teamCount, plural, one {team {teamNames}} other {teams {teamNames}}}"
 msgstr "{teamCount, plural, one {drużyna {teamNames}} few {drużyny {teamNames}} many {drużyny {teamNames}} other {drużyny {teamNames}}}"
+
+#: src/play/presetFit.ts
+msgid "{teamCount}, but {mapName} has {positionCount}."
+msgstr ""
+
+#: src/play/presetFit.ts
+msgid "{teams, plural, one {# team} other {# teams}}"
+msgstr ""
 
 #: src/multiplayer/matchmaking.ts
 #, fuzzy
@@ -28428,6 +28449,7 @@ msgstr "mapa"
 #: src/multiplayer/battles/CreateLobbyPopover.tsx
 #: src/multiplayer/battles/HostBattleForm.tsx
 #: src/multiplayer/battles/HostZerokBattlePopover.tsx
+#: src/multiplayer/pages/BattleRoomPage.tsx
 #: src/play/pages/components/CrashDrawer.tsx
 #: src/play/pages/components/MapOverlay.tsx
 #: src/play/presetParts.ts
@@ -32902,6 +32924,10 @@ msgstr "Jeszcze nie połączono"
 #, fuzzy
 msgid "Not connected."
 msgstr "Brak połączenia."
+
+#: src/multiplayer/battle/presetOutcome.ts
+msgid "Not declared"
+msgstr ""
 
 #: src/workshop/pages/components/DecodedSlotCard.tsx
 #, fuzzy
@@ -43661,6 +43687,10 @@ msgstr "Część potrzebnej zawartości nie jest zainstalowana. Pobierz ją poni
 msgid "Some engines record into their own folder, so deleting that engine deletes those replays. This moves them into the demos folder alongside the rest."
 msgstr "Niektóre silniki nagrywają do własnego folderu, więc usunięcie silnika usuwa te powtórki. To przenosi je do folderu demos razem z resztą."
 
+#: src/multiplayer/pages/BattleRoomPage.tsx
+msgid "Some of \"{presetName}\" did not take"
+msgstr ""
+
 #: src/lego/pages/components/ModuleUpdateBanner.tsx
 #, fuzzy
 msgid "Some parts of this unit are not tracked."
@@ -45262,10 +45292,18 @@ msgstr "Drużyna {team}"
 msgid "Team 1 is the team with the lower number in the match, so the team record does not say which slot or which side of the map is stronger."
 msgstr "Drużyna 1 to drużyna z niższym numerem w meczu, więc bilans drużyn nie mówi, które miejsce ani która strona mapy jest silniejsza."
 
+#: src/multiplayer/pages/BattleRoomPage.tsx
+msgid "Team count"
+msgstr ""
+
 #: src/multiplayer/battle/GameTypePresetsControls.tsx
 #, fuzzy
 msgid "Team setup"
 msgstr "Układ drużyn"
+
+#: src/multiplayer/pages/BattleRoomPage.tsx
+msgid "Team size"
+msgstr ""
 
 #: src/lego/pages/components/TextureBuilderPanel.tsx
 #, fuzzy
@@ -47807,6 +47845,10 @@ msgstr "Ponowne skanowanie nie mogło odczytać zainstalowanej zawartości."
 msgid "The rest of \"{presetName}\" was loaded onto {gameName}. Install the game to load it whole."
 msgstr "Resztę „{presetName}” wczytano na {gameName}. Zainstaluj grę, aby wczytać całość."
 
+#: src/multiplayer/battle/hostSteps.ts
+msgid "The room did not answer."
+msgstr ""
+
 #: src/direct/room.ts
 #, fuzzy
 msgid "The room hands joiners {ip} for the game itself, which points back at their own machine rather than yours."
@@ -47816,6 +47858,10 @@ msgstr "Pokój podaje dołączającym adres {ip} dla samej gry, który wskazuje 
 #, fuzzy
 msgid "The room hands joiners {ip} for the game itself."
 msgstr "Pokój podaje dołączającym adres {ip} dla samej gry."
+
+#: src/multiplayer/battle/hostSteps.ts
+msgid "The room is set to {holds}."
+msgstr ""
 
 #: src/multiplayer/pages/BattleRoomPage.tsx
 #, fuzzy

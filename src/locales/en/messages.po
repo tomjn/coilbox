@@ -2401,6 +2401,10 @@ msgstr "{gameName} declares trigger types coilbox could not read, so they are no
 msgid "{gameName} depends on it, and coilbox cannot download an archive by this name. Find it in <0>game downloads</0>, then try again."
 msgstr "{gameName} depends on it, and coilbox cannot download an archive by this name. Find it in <0>game downloads</0>, then try again."
 
+#: src/play/presetFit.ts
+msgid "{gameName} does not declare {names}."
+msgstr "{gameName} does not declare {names}."
+
 #: src/workshop/pages/components/PlayLocallyButton.tsx
 msgid "{gameName} does not declare a tweakdefs mod option, so this route is not on offer."
 msgstr "{gameName} does not declare a tweakdefs mod option, so this route is not on offer."
@@ -3438,6 +3442,10 @@ msgstr "{mapName} (not installed)"
 #: src/scenario/pages/components/ScenarioMapScene.tsx
 msgid "{mapName} could not be read. It is most likely not installed for the engine coilbox is using."
 msgstr "{mapName} could not be read. It is most likely not installed for the engine coilbox is using."
+
+#: src/play/presetFit.ts
+msgid "{mapName} does not declare {names}."
+msgstr "{mapName} does not declare {names}."
 
 #: src/lego/sandbox.ts
 msgid "{mapName} has no start positions, so there is nowhere to put the targets. Pick another map."
@@ -4508,6 +4516,10 @@ msgstr "{pointCount, plural, one {# point} other {# points}}"
 msgid "{position} of {count}"
 msgstr "{position} of {count}"
 
+#: src/play/presetFit.ts
+msgid "{positions, plural, one {# start position} other {# start positions}}"
+msgstr "{positions, plural, one {# start position} other {# start positions}}"
+
 #: src/content/pages/components/CommandRateChart.tsx
 msgid "{pregameCount} orders before the game started are left out."
 msgstr "{pregameCount} orders before the game started are left out."
@@ -4902,6 +4914,7 @@ msgid "{shown, plural, one {# part} other {# parts}}"
 msgstr "{shown, plural, one {# part} other {# parts}}"
 
 #: src/blueprint/units.ts
+#: src/play/presetFit.ts
 msgid "{shown} and {more} more"
 msgstr "{shown} and {more} more"
 
@@ -5272,6 +5285,14 @@ msgstr "{teamCount, plural, one {{playing} playing across # team} other {{playin
 #: src/content/matchStatsCsv.ts
 msgid "{teamCount, plural, one {team {teamNames}} other {teams {teamNames}}}"
 msgstr "{teamCount, plural, one {team {teamNames}} other {teams {teamNames}}}"
+
+#: src/play/presetFit.ts
+msgid "{teamCount}, but {mapName} has {positionCount}."
+msgstr "{teamCount}, but {mapName} has {positionCount}."
+
+#: src/play/presetFit.ts
+msgid "{teams, plural, one {# team} other {# teams}}"
+msgstr "{teams, plural, one {# team} other {# teams}}"
 
 #: src/multiplayer/matchmaking.ts
 msgid "{teams} teams of {size}"
@@ -23056,6 +23077,7 @@ msgstr "map"
 #: src/multiplayer/battles/CreateLobbyPopover.tsx
 #: src/multiplayer/battles/HostBattleForm.tsx
 #: src/multiplayer/battles/HostZerokBattlePopover.tsx
+#: src/multiplayer/pages/BattleRoomPage.tsx
 #: src/play/pages/components/CrashDrawer.tsx
 #: src/play/pages/components/MapOverlay.tsx
 #: src/play/presetParts.ts
@@ -26679,6 +26701,10 @@ msgstr "Not connected yet"
 #: src/multiplayer/store.tsx
 msgid "Not connected."
 msgstr "Not connected."
+
+#: src/multiplayer/battle/presetOutcome.ts
+msgid "Not declared"
+msgstr "Not declared"
 
 #: src/workshop/pages/components/DecodedSlotCard.tsx
 msgid "Not decoded"
@@ -35421,6 +35447,10 @@ msgstr "Some content this needs isn't installed. Download it below, or cancel â€
 msgid "Some engines record into their own folder, so deleting that engine deletes those replays. This moves them into the demos folder alongside the rest."
 msgstr "Some engines record into their own folder, so deleting that engine deletes those replays. This moves them into the demos folder alongside the rest."
 
+#: src/multiplayer/pages/BattleRoomPage.tsx
+msgid "Some of \"{presetName}\" did not take"
+msgstr "Some of \"{presetName}\" did not take"
+
 #: src/lego/pages/components/ModuleUpdateBanner.tsx
 msgid "Some parts of this unit are not tracked."
 msgstr "Some parts of this unit are not tracked."
@@ -36717,9 +36747,17 @@ msgstr "Team {team}"
 msgid "Team 1 is the team with the lower number in the match, so the team record does not say which slot or which side of the map is stronger."
 msgstr "Team 1 is the team with the lower number in the match, so the team record does not say which slot or which side of the map is stronger."
 
+#: src/multiplayer/pages/BattleRoomPage.tsx
+msgid "Team count"
+msgstr "Team count"
+
 #: src/multiplayer/battle/GameTypePresetsControls.tsx
 msgid "Team setup"
 msgstr "Team setup"
+
+#: src/multiplayer/pages/BattleRoomPage.tsx
+msgid "Team size"
+msgstr "Team size"
 
 #: src/lego/pages/components/TextureBuilderPanel.tsx
 msgid "Team-colour mask (greyscale, optional)"
@@ -38770,6 +38808,10 @@ msgstr "The rescan could not read what is installed."
 msgid "The rest of \"{presetName}\" was loaded onto {gameName}. Install the game to load it whole."
 msgstr "The rest of \"{presetName}\" was loaded onto {gameName}. Install the game to load it whole."
 
+#: src/multiplayer/battle/hostSteps.ts
+msgid "The room did not answer."
+msgstr "The room did not answer."
+
 #: src/direct/room.ts
 msgid "The room hands joiners {ip} for the game itself, which points back at their own machine rather than yours."
 msgstr "The room hands joiners {ip} for the game itself, which points back at their own machine rather than yours."
@@ -38777,6 +38819,10 @@ msgstr "The room hands joiners {ip} for the game itself, which points back at th
 #: src/direct/room.ts
 msgid "The room hands joiners {ip} for the game itself."
 msgstr "The room hands joiners {ip} for the game itself."
+
+#: src/multiplayer/battle/hostSteps.ts
+msgid "The room is set to {holds}."
+msgstr "The room is set to {holds}."
 
 #: src/multiplayer/pages/BattleRoomPage.tsx
 msgid "The room is still running"
