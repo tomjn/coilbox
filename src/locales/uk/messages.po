@@ -378,6 +378,10 @@ msgstr "\"{pieceName}\" обертається навколо своєї сер�
 msgid "\"{presetName}\" replaces the game, the map, the participants and the game options with {game} on {map}."
 msgstr "Шаблон «{presetName}» замінить гру, мапу, учасників і параметри гри: {game} на мапі {map}."
 
+#: src/multiplayer/pages/BattleRoomPage.tsx
+msgid "\"{presetName}\" was not applied"
+msgstr ""
+
 #: src/workshop/pages/components/ShareProjectForm.tsx
 #, fuzzy
 msgid "\"{projectName}\" is {sizeKb} KB, over the {limitKb} KB a code can carry. Export it as a file instead."
@@ -15770,6 +15774,10 @@ msgstr ""
 msgid "Coilbox deletes it from this computer. It stays on the hub, so you can import it again."
 msgstr "Coilbox видалить це з цього комп’ютера. На хабі воно лишиться, тож його можна імпортувати знову."
 
+#: src/multiplayer/battle/battleOptions.ts
+msgid "Coilbox did not send the room's options: {name}. {reason}."
+msgstr ""
+
 #: src/i18n/uiError.ts
 msgid "Coilbox does not follow packs from {host}. That host is not on its list."
 msgstr ""
@@ -16831,6 +16839,14 @@ msgstr "Контакт! Рейдери наближаються з північ�
 #, fuzzy
 msgid "Contacting {fetching} and checking what it sends back."
 msgstr "Зв’язок із {fetching} і перевірка того, що він надсилає у відповідь."
+
+#: src/multiplayer/battle/battleOptions.ts
+msgid "Contains a line break or another control character"
+msgstr ""
+
+#: src/multiplayer/battle/battleOptions.ts
+msgid "Contains a semicolon"
+msgstr ""
 
 #: src/campaign/pages/components/MissionEditorDrawer.tsx
 #: src/content/pages/StorageSection.tsx
@@ -30345,6 +30361,10 @@ msgstr "Назва нового проєкту"
 #, fuzzy
 msgid "Name in game"
 msgstr "Назва в грі"
+
+#: src/multiplayer/battle/battleOptions.ts
+msgid "Name is not only letters, digits and underscores"
+msgstr ""
 
 #: src/lego/pages/components/GuidesPopover.tsx
 #, fuzzy

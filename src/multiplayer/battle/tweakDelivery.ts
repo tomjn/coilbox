@@ -32,7 +32,7 @@
 import { plural, t } from "@lingui/core/macro";
 import { describeError } from "@/i18n/uiError";
 import type { TweakSlotPack } from "@/workshop/tweakPack";
-import { MODOPT_PREFIX } from "./battleOptions";
+import { MODOPT_PREFIX, optionTagRefusal } from "./battleOptions";
 
 /** One packed slot, ready to send. */
 export interface TweakSlot {
@@ -244,6 +244,25 @@ export async function runDelivery(
   io: DeliveryIo,
   { viaAutohost }: { viaAutohost: boolean },
 ): Promise<DeliveryProgress> {
+  // Checked here because `!bSet` is only chat to the Rust side, which cannot tell
+  // an option from something a player typed. All of it before any of it, since a
+  // run stopped half way is the outcome this function exists to avoid.
+  const refusals = slots.map((s) => optionTagRefusal(s.tagKey, s.value));
+  if (refusals.some((reason) => reason !== null)) {
+    const refused = snapshot(
+      slots.map((slot, i): SlotProgress => {
+        const reason = refusals[i];
+        return reason === null
+          ? { slot, state: "skipped" }
+          : { slot, state: "failed", reason };
+      }),
+      true,
+      refusals.findIndex((reason) => reason !== null),
+    );
+    io.report(refused);
+    return refused;
+  }
+
   const progress: SlotProgress[] = slots.map((slot) => ({
     slot,
     state: "waiting",

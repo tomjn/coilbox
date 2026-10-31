@@ -1,3 +1,4 @@
+import { t } from "@lingui/core/macro";
 import type { ConfigOption } from "@/content/bindings";
 import { changedOptions, effectiveOptions, isChanged } from "@/play/modOptions";
 import type { PresetPart, PresetSelection } from "@/play/presetParts";
@@ -17,6 +18,64 @@ const prefixFor = (scope: OptionScope) =>
 /** The full script-tag key for a scoped option, e.g. `game/modoptions/maxunits`. */
 export const scriptTagKey = (scope: OptionScope, key: string) =>
   `${prefixFor(scope)}${key}`;
+
+/** A mod or map option's bare name, or null for any other tag. */
+function scopedName(tagKey: string): string | null {
+  const low = tagKey.toLowerCase();
+  return low.startsWith(MODOPT_PREFIX) || low.startsWith(MAPOPT_PREFIX)
+    ? tagKey.slice(MODOPT_PREFIX.length)
+    : null;
+}
+
+/**
+ * Whether a tag's key can go on a line as it stands: parts of letters, digits and
+ * underscores, the rule `option_refusal` in the play plugin's `script.rs` applies,
+ * with one name after a mod or map option's prefix. A longer name would be a mod
+ * option to the parts picker and its last part to the `!bSet` route, which sends
+ * only that. `script_tag_refusal` in `coilbox-lobby-protocol` is the same check,
+ * and the last one before the wire.
+ */
+function tagKeyFits(tagKey: string): boolean {
+  const parts = tagKey.split("/");
+  if (!parts.every((part) => /^[A-Za-z0-9_]+$/.test(part))) return false;
+  return scopedName(tagKey) === null || parts.length === 3;
+}
+
+/**
+ * Why a tag cannot be sent, or null when it can.
+ *
+ * A `SETSCRIPTTAGS` line is pairs split at tabs and nothing escapes them, so a tab
+ * in a key or value adds a tag no option listed, which can be a tweak slot. On the
+ * `!bSet` route SPADS puts the value on that line itself. A semicolon is refused
+ * because the host script refuses it anyway, and SPADS cannot write one beside a
+ * quote mark.
+ */
+export function optionTagRefusal(tagKey: string, value: string): string | null {
+  if (!tagKeyFits(tagKey))
+    return t`Name is not only letters, digits and underscores`;
+  if (value.includes(";")) return t`Contains a semicolon`;
+  if (/\p{Cc}/u.test(value))
+    return t`Contains a line break or another control character`;
+  return null;
+}
+
+/** A tag's option name for a message, quoted when the name is the problem so a
+ *  tab in it can be seen. */
+export function optionTagLabel(tagKey: string): string {
+  const name = scopedName(tagKey) ?? tagKey;
+  return tagKeyFits(tagKey) ? name : JSON.stringify(name);
+}
+
+/** One sentence for the first tag that cannot be sent, or null when all can. */
+export function optionTagsRefusal(tags: Record<string, string>): string | null {
+  for (const [tagKey, value] of Object.entries(tags)) {
+    const reason = optionTagRefusal(tagKey, value);
+    if (reason === null) continue;
+    const name = optionTagLabel(tagKey);
+    return t`Coilbox did not send the room's options: ${name}. ${reason}.`;
+  }
+  return null;
+}
 
 /** Case-insensitive lookup of a script tag (SPADS lowercases; engine is CI). */
 export function lookupTag(

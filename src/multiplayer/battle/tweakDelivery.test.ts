@@ -192,6 +192,49 @@ describe("ledgerKeyFor", () => {
 });
 
 describe("runDelivery", () => {
+  it("sends nothing at all when any slot would change how a line is read", async () => {
+    const { io, sent } = fakeLobby({});
+    const slots = optionTagSlots({
+      "game/modoptions/first": "1",
+      "game/modoptions/maxunits": "1\tgame/modoptions/tweakdefs=bHVh",
+      "game/modoptions/last": "1",
+    });
+
+    const result = await runDelivery(slots, io, { viaAutohost: true });
+
+    expect(sent).toEqual([]);
+    expect(result.slots.map((s) => s.state)).toEqual([
+      "skipped",
+      "failed",
+      "skipped",
+    ]);
+    expect(result.slots[1].reason).toBeTruthy();
+    expect(result.stoppedAt).toBe(1);
+    expect(result.done).toBe(true);
+  });
+
+  it("refuses a key whose name is not what the !bSet line would ask for", async () => {
+    const { io, sent } = fakeLobby({});
+    const slots = optionTagSlots({ "game/modoptions/x/tweakdefs": "bHVh" });
+    expect(slots[0].name).toBe("tweakdefs");
+
+    const result = await runDelivery(slots, io, { viaAutohost: true });
+
+    expect(sent).toEqual([]);
+    expect(result.slots[0].state).toBe("failed");
+  });
+
+  // SPADS reads `!bSet` as `split(/ +/, params, 2)` (`bset => 2` in
+  // `SPADS_CORE_CMDS_CUSTOM_PARAM_PARSING`), so a space inside a value stays in it.
+  it("sends a value with a space, which SPADS reads as one value", async () => {
+    const { io, sent } = fakeLobby({});
+    const slots = optionTagSlots({ "game/modoptions/motd": "two words" });
+
+    await runDelivery(slots, io, { viaAutohost: true });
+
+    expect(sent.map((s) => s.value)).toEqual(["two words"]);
+  });
+
   it("sends every slot and confirms each one off the battle's tags", async () => {
     const { io, sent } = fakeLobby({});
     const slots = [slot({ name: "tweakdefs" }), slot({ name: "tweakdefs1" })];

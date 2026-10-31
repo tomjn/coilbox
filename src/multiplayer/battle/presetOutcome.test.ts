@@ -7,6 +7,7 @@ import {
   hostStepNotTaken,
   type NotTakenWhat,
   notTakenMessage,
+  refusedOptions,
 } from "./presetOutcome";
 import type { DeliveryProgress, SlotState } from "./tweakDelivery";
 
@@ -32,6 +33,45 @@ const labels: Record<string, string> = {
   mapOptions: "Map options",
 };
 const label = (what: NotTakenWhat) => labels[what] ?? what;
+
+describe("refusedOptions", () => {
+  it("finds nothing in tags that can all be sent", () => {
+    expect(
+      refusedOptions({
+        "game/modoptions/maxunits": "2000",
+        "game/mapoptions/fog": "1",
+      }),
+    ).toEqual([]);
+  });
+
+  it("names an option whose value holds a tab, under its own part", () => {
+    const entries = refusedOptions({
+      "game/modoptions/fine": "1",
+      "game/modoptions/maxunits": "1\tgame/modoptions/tweakdefs=bHVh",
+    });
+    expect(entries).toHaveLength(1);
+    expect(entries[0].what).toBe("modOptions");
+    expect(entries[0].items).toEqual(["maxunits"]);
+    expect(notTakenMessage(entries, label)).toContain("Mod options: maxunits");
+  });
+
+  it("shows a refused key so its tab can be seen", () => {
+    const entries = refusedOptions({
+      "game/modoptions/x\tgame/modoptions/tweakdefs": "1",
+    });
+    expect(entries[0].items).toEqual(['"x\\tgame/modoptions/tweakdefs"']);
+  });
+
+  it("gives each reason its own entry", () => {
+    const entries = refusedOptions({
+      "game/modoptions/a": "1;2",
+      "game/modoptions/b": "1\t2",
+      "game/mapoptions/c": "1;2",
+    });
+    expect(entries.map((e) => e.items)).toEqual([["a"], ["b"], ["c"]]);
+    expect(entries[0].reason).not.toBe(entries[1].reason);
+  });
+});
 
 describe("dropUndeclared", () => {
   it("keeps declared options and drops the rest, naming them by part", () => {
