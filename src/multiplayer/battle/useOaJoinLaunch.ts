@@ -1,6 +1,7 @@
 import { t } from "@lingui/core/macro";
 import { useCallback, useState } from "react";
 import { oaJoinArguments } from "../oaHost";
+import { oaPasswordFor } from "../oaPassword";
 import { cancelOaRun, startOaRun, useOaRun } from "../oaRun";
 import { useOpenAnnihilation } from "../openAnnihilation";
 import { checkHostAddress } from "./hostAddress";
@@ -11,7 +12,8 @@ import { checkHostAddress } from "./hostAddress";
  * match is on.
  *
  * Only what the lobby carries goes to OA: the host's address as the lobby gave
- * it, the player's name and the room's name. OA's own room does the seating, the
+ * it, the player's name and the room's name, plus the password the player typed
+ * to join, if any (issue #4955). OA's own room does the seating, the
  * map, the rules and readiness. `canRun` is whether a launch could go ahead, and
  * is false until a program path is set.
  *
@@ -67,7 +69,12 @@ export function useOaJoinLaunch({
     let flagRaised = false;
     await startOaRun({
       executable: program.path,
-      args: oaJoinArguments({ battleId, username, hostIp }),
+      args: oaJoinArguments({
+        battleId,
+        username,
+        hostIp,
+        password: oaPasswordFor(serverKey, battleId),
+      }),
       battle: { serverKey, battleId },
       onEvent: (event) => {
         if (event.kind === "match" && event.change === "started") {

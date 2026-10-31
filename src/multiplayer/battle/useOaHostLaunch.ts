@@ -7,6 +7,7 @@ import {
   oaHostArguments,
   oaMapArgument,
 } from "../oaHost";
+import { oaPasswordFor } from "../oaPassword";
 import {
   cancelOaRun,
   noteOaAutoLaunch,
@@ -32,6 +33,8 @@ import { useOpenAnnihilation } from "../openAnnihilation";
  *
  * With `autoStart`, the first time the host is in the room of a battle, OA is
  * started without a click (issue #4964).
+ *
+ * OA's room takes the lobby battle's password (issue #4955).
  */
 export function useOaHostLaunch({
   serverKey,
@@ -78,6 +81,7 @@ export function useOaHostLaunch({
           username,
           map: oaMapArgument(battleMap, maps),
           maxPlayers,
+          password: oaPasswordFor(serverKey, battleId),
         }),
         battle: { serverKey, battleId },
         onEvent: (event) => {

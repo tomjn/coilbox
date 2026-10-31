@@ -6,6 +6,7 @@ import {
   oaHostArguments,
   oaJoinArguments,
   oaMapArgument,
+  oaPasswordTooLong,
   oaPlayerName,
 } from "./oaHost";
 
@@ -59,6 +60,7 @@ describe("oaHostArguments", () => {
     username: "abcdefghijklmnopqrst",
     map: null,
     maxPlayers: 8,
+    password: null,
   };
 
   it("hosts a room named after the battle, with the name cut", () => {
@@ -71,6 +73,17 @@ describe("oaHostArguments", () => {
       "--player-limit",
       "8",
     ]);
+  });
+
+  it("gives the room the battle's password", () => {
+    expect(oaHostArguments({ ...base, password: "s3cret" }).slice(-2)).toEqual([
+      "--game-password",
+      "s3cret",
+    ]);
+  });
+
+  it("has no password option for an open battle", () => {
+    expect(oaHostArguments(base)).not.toContain("--game-password");
   });
 
   it("adds the map when one was picked", () => {
@@ -91,21 +104,48 @@ describe("oaHostArguments", () => {
 });
 
 describe("oaJoinArguments", () => {
+  const base = {
+    battleId: 4021,
+    username: "abcdefghijklmnopqrst",
+    hostIp: "203.0.113.9",
+    password: null,
+  };
+  const noPassword = [
+    "--join",
+    "203.0.113.9",
+    "--player-name",
+    "abcdefghijklmnop",
+    "--game-name",
+    "CB4021",
+  ];
+
   it("joins the lobby's address under the battle's room name", () => {
-    expect(
-      oaJoinArguments({
-        battleId: 4021,
-        username: "abcdefghijklmnopqrst",
-        hostIp: "203.0.113.9",
-      }),
-    ).toEqual([
-      "--join",
-      "203.0.113.9",
-      "--player-name",
-      "abcdefghijklmnop",
-      "--game-name",
-      "CB4021",
+    expect(oaJoinArguments(base)).toEqual(noPassword);
+  });
+
+  it("passes the key the player typed", () => {
+    expect(oaJoinArguments({ ...base, password: "s3cret" })).toEqual([
+      ...noPassword,
+      "--game-password",
+      "s3cret",
     ]);
+  });
+
+  it("leaves out a key OA would refuse, which no OA room can have", () => {
+    expect(oaJoinArguments({ ...base, password: "12345678901" })).toEqual(
+      noPassword,
+    );
+  });
+});
+
+describe("oaPasswordTooLong", () => {
+  it("allows 10 characters and refuses 11", () => {
+    expect(oaPasswordTooLong("1234567890")).toBe(false);
+    expect(oaPasswordTooLong("12345678901")).toBe(true);
+  });
+
+  it("counts what the form sends, without the outer spaces", () => {
+    expect(oaPasswordTooLong("  1234567890  ")).toBe(false);
   });
 });
 

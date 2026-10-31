@@ -40,6 +40,7 @@ vi.mock("../openAnnihilation", () => ({
   useOpenAnnihilation: () => [program.value],
 }));
 
+import { forgetOaPassword, holdOaJoinPassword } from "../oaPassword";
 import { useOaJoinLaunch } from "./useOaJoinLaunch";
 
 type Launch = {
@@ -80,6 +81,7 @@ beforeEach(() => {
 });
 afterEach(async () => {
   cleanup();
+  forgetOaPassword();
   // The run is held outside the hook, so one a test left up would block the next.
   await act(async () => {
     for (const l of launched) l.finish({ exitCode: 0, signal: null });
@@ -103,6 +105,18 @@ describe("joining an Open Annihilation battle", () => {
       "CB4021",
     ]);
     expect(result.current.running).toBe(true);
+  });
+
+  it("passes the key the player joined with", async () => {
+    holdOaJoinPassword(
+      "server",
+      { id: 4021, engine: "Open Annihilation" },
+      "s3cret",
+    );
+    const { result } = mount();
+    act(() => void result.current.join());
+    await waitFor(() => expect(launched).toHaveLength(1));
+    expect(launched[0].args.slice(-2)).toEqual(["--game-password", "s3cret"]);
   });
 
   it("sets the in game flag when the match starts, once, and clears it on exit", async () => {
