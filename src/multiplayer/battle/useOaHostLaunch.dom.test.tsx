@@ -41,6 +41,7 @@ vi.mock("../openAnnihilation", () => ({
   useOpenAnnihilation: () => [program.value],
 }));
 
+import { forgetOaPassword, holdOaHostPassword } from "../oaPassword";
 import { observeOaAutoLaunch, observeOaBattle } from "../oaRun";
 import { useOaHostLaunch } from "./useOaHostLaunch";
 
@@ -89,6 +90,7 @@ beforeEach(() => {
 });
 afterEach(async () => {
   cleanup();
+  forgetOaPassword();
   // The once-per-battle memory is held outside the hook as well.
   act(() => observeOaAutoLaunch(() => GONE));
   // The run is held outside the hook, so a test that left OA running would
@@ -115,6 +117,33 @@ describe("starting Open Annihilation for the host", () => {
       "6",
     ]);
     expect(result.current.running).toBe(true);
+  });
+
+  it("gives OA's room the password kept from the form", async () => {
+    holdOaHostPassword("me@server:8200", null, {
+      engine: "Open Annihilation",
+      key: "s3cret",
+    });
+    const { result } = mount();
+    act(() => void result.current.start());
+    await waitFor(() => expect(launched).toHaveLength(1));
+    expect(launched[0].args.slice(-2)).toEqual(["--game-password", "s3cret"]);
+  });
+
+  it("does not echo the password when OA fails", async () => {
+    holdOaHostPassword("me@server:8200", null, {
+      engine: "Open Annihilation",
+      key: "s3cret",
+    });
+    bindings.playOaLaunch.mockRejectedValue(
+      new Error(
+        "open-annihilation: --game-password: is longer than 10 characters",
+      ),
+    );
+    const { result } = mount();
+    await act(async () => result.current.start());
+    expect(result.current.error).toContain("--game-password");
+    expect(result.current.error).not.toContain("s3cret");
   });
 
   it("passes the key of the map the lobby shows", async () => {

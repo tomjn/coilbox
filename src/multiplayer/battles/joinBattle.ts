@@ -2,6 +2,7 @@ import { t } from "@lingui/core/macro";
 import { describeError } from "@/i18n/uiError";
 import { notify } from "../../notify/notify";
 import { type Battle, mpJoinBattle } from "../bindings";
+import { forgetOaPassword, holdOaJoinPassword } from "../oaPassword";
 import { newScriptPassword } from "../scriptPassword";
 
 /**
@@ -35,6 +36,7 @@ export async function joinBattle(args: {
     return;
   }
   awaitLanding();
+  holdOaJoinPassword(serverKey, battle, key);
   try {
     await mpJoinBattle({
       serverKey,
@@ -44,6 +46,7 @@ export async function joinBattle(args: {
     });
   } catch {
     // Wire-level failures surface via lastJoinError or a disconnect.
+    forgetOaPassword();
     giveUp();
   }
 }

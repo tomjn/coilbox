@@ -117,6 +117,7 @@ import {
 import { MatchFoundPanel } from "./MatchFoundPanel";
 import { initialMirror, type LobbyMirror, type MirrorAction } from "./mirror";
 import { OaMatchKeeper } from "./OaMatchKeeper";
+import { observeOaPassword } from "./oaPassword";
 import { observeOaAutoLaunch, observeOaBattle } from "./oaRun";
 import { protocolForKey } from "./protocol";
 import { RejoinOfferPanel } from "./RejoinOfferPanel";
@@ -1931,6 +1932,18 @@ export function MultiplayerProvider({ children }: { children: ReactNode }) {
         battleId: state?.currentBattle ?? null,
         hostIngame,
       };
+    });
+    // A held battle password goes with its battle (issue #4955).
+    observeOaPassword((serverKey) => {
+      const c = connections[serverKey];
+      return c
+        ? {
+            connected: c.live && c.mirror.connected,
+            ready: c.mirror.phase === "ready",
+            battleId: c.mirror.state?.currentBattle ?? null,
+            joinError: c.mirror.lastJoinError,
+          }
+        : null;
     });
   }, [connections, protocolServers]);
 

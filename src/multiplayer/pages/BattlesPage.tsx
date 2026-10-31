@@ -80,6 +80,7 @@ import {
   mpZerokOpenBattle,
 } from "../bindings";
 import { favouritesFor, useFavourites } from "../friends";
+import { forgetOaPassword, holdOaHostPassword } from "../oaPassword";
 import { protocolForKey, relayHostingAvailable } from "../protocol";
 import { newScriptPassword } from "../scriptPassword";
 import {
@@ -262,9 +263,11 @@ function ServerBattles({
   async function onHost(args: OpenBattleArgs) {
     await leaveOther();
     awaitLanding(!!hostDraft);
+    holdOaHostPassword(serverKey, mirror.state?.currentBattle ?? null, args);
     try {
       await mpOpenBattle({ serverKey, ...args });
     } catch (e) {
+      forgetOaPassword();
       giveUp();
       // Thrown on rather than dropped. A refusal that never reached the wire has
       // no join error and no disconnect behind it, so the popover the host

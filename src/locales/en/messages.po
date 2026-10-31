@@ -28380,6 +28380,10 @@ msgstr "Open Annihilation refused to join this battle."
 msgid "Open Annihilation starts when the host's room is open"
 msgstr "Open Annihilation starts when the host's room is open"
 
+#: src/multiplayer/battles/HostBattleForm.tsx
+msgid "Open Annihilation takes a password of up to {OA_PASSWORD_MAX} characters."
+msgstr "Open Annihilation takes a password of up to {OA_PASSWORD_MAX} characters."
+
 #: src/blueprint/pages/components/ImportPackForm.tsx
 msgid "Open another file"
 msgstr "Open another file"

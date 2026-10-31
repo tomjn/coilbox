@@ -35,6 +35,9 @@ export const OA_MAX_PLAYERS = 10;
 /** The longest player name OA takes. It refuses a longer one. */
 export const OA_PLAYER_NAME_MAX = 16;
 
+/** The longest room password OA takes. It refuses a longer one and exits. */
+export const OA_PASSWORD_MAX = 10;
+
 /** What OA's status stream calls the screen of its battle room. */
 export const OA_BATTLE_ROOM_SCREEN = "mp_battleroom";
 
@@ -94,22 +97,29 @@ export function oaMapArgument(
   return maps.find((m) => m.shownName === lobbyMap)?.key ?? lobbyMap;
 }
 
+/** Whether OA would refuse this password, counted as the host form sends it. */
+export function oaPasswordTooLong(typed: string): boolean {
+  return [...typed.trim()].length > OA_PASSWORD_MAX;
+}
+
 /**
  * The arguments that start OA hosting this battle: its own room named after
- * the battle, with the host's size. The password stays on the lobby: the room
- * does not know it, and OA is never given one. Not `--dplay-guid` or
- * `--dplay-port`, which are for a game found on the local network.
+ * the battle, with the host's size and the lobby battle's password. Not
+ * `--dplay-guid` or `--dplay-port`, which are for a game found on the local
+ * network.
  */
 export function oaHostArguments({
   battleId,
   username,
   map,
   maxPlayers,
+  password,
 }: {
   battleId: number;
   username: string;
   map: string | null;
   maxPlayers: number;
+  password: string | null;
 }): string[] {
   const args = [
     "--host",
@@ -121,23 +131,28 @@ export function oaHostArguments({
     String(Math.min(maxPlayers, OA_MAX_PLAYERS)),
   ];
   if (map) args.push("--map", map);
+  if (password) args.push("--game-password", password);
   return args;
 }
 
 /**
  * The arguments that start OA joining the room the host of this battle opened.
  * `hostIp` is the address the lobby gave for the battle, as it gave it.
+ * `password` is the key the player typed to join. One OA would refuse cannot be
+ * the room's password, as no OA room can have it, so it is left out.
  */
 export function oaJoinArguments({
   battleId,
   username,
   hostIp,
+  password,
 }: {
   battleId: number;
   username: string;
   hostIp: string;
+  password: string | null;
 }): string[] {
-  return [
+  const args = [
     "--join",
     hostIp,
     "--player-name",
@@ -145,6 +160,10 @@ export function oaJoinArguments({
     "--game-name",
     oaGameName(battleId),
   ];
+  if (password && !oaPasswordTooLong(password)) {
+    args.push("--game-password", password);
+  }
+  return args;
 }
 
 /** Whether a battle is hosted on Open Annihilation, by the engine name it sends. */
