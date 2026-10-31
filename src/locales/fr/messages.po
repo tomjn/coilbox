@@ -6060,6 +6060,10 @@ msgid "{serverName} does not offer password recovery in Coilbox. Reset it on the
 msgstr "{serverName} ne propose pas la récupération de mot de passe dans Coilbox. Réinitialisez-le plutôt sur la page du serveur :"
 
 #: src/multiplayer/store.tsx
+msgid "{serverName} refused the login for {username}"
+msgstr ""
+
+#: src/multiplayer/store.tsx
 msgid "{serverName} refused the password for {username}"
 msgstr ""
 
@@ -28294,6 +28298,10 @@ msgstr "Identifiant ajouté"
 #, fuzzy
 msgid "Login failed: {loginError}"
 msgstr "Échec de la connexion : {loginError}"
+
+#: src/multiplayer/LobbyStatusButton.tsx
+msgid "Login refused"
+msgstr ""
 
 #: src/multiplayer/LobbyStatusButton.tsx
 #, fuzzy

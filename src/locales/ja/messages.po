@@ -6060,6 +6060,10 @@ msgid "{serverName} does not offer password recovery in Coilbox. Reset it on the
 msgstr "{serverName} は Coilbox でのパスワード再設定に対応していません。代わりにサーバー自身のページで再設定してください："
 
 #: src/multiplayer/store.tsx
+msgid "{serverName} refused the login for {username}"
+msgstr ""
+
+#: src/multiplayer/store.tsx
 msgid "{serverName} refused the password for {username}"
 msgstr ""
 
@@ -28294,6 +28298,10 @@ msgstr "ログイン情報を追加しました"
 #, fuzzy
 msgid "Login failed: {loginError}"
 msgstr "ログインに失敗しました：{loginError}"
+
+#: src/multiplayer/LobbyStatusButton.tsx
+msgid "Login refused"
+msgstr ""
 
 #: src/multiplayer/LobbyStatusButton.tsx
 #, fuzzy

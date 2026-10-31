@@ -590,7 +590,7 @@ describe("the login panel after a refused password", () => {
   it("marks each of two refused logins with its own server's reason", () => {
     connectAs(
       refusedAlice(),
-      connection(CAROL_KEY, { live: false, loginError: "bad credentials" }),
+      connection(CAROL_KEY, { live: false, loginError: "Invalid password" }),
     );
     draw();
 
@@ -598,7 +598,27 @@ describe("the login panel after a refused password", () => {
       screen.getAllByRole("link", { name: "Change password" }),
     ).toHaveLength(2);
     expect(account("alice").textContent).toContain("invalid password");
-    expect(account("carol").textContent).toContain("bad credentials");
+    expect(account("carol").textContent).toContain("Invalid password");
+  });
+
+  it("marks a refusal for another reason as a refused login, with no password link", () => {
+    connectAs(
+      connection(ALICE_KEY, { live: false, loginError: "Already logged in." }),
+    );
+    draw();
+
+    expect(account("alice").textContent).toContain("Login refused");
+    expect(account("alice").textContent).not.toContain("Password refused");
+    expect(account("alice").textContent).toContain("Already logged in.");
+    expect(screen.queryByRole("link", { name: "Change password" })).toBeNull();
+  });
+
+  it("marks a refusal that gave no reason as a refused login, with no password link", () => {
+    connectAs(connection(ALICE_KEY, { live: false, loginError: "" }));
+    draw();
+
+    expect(account("alice").textContent).toContain("Login refused");
+    expect(screen.queryByRole("link", { name: "Change password" })).toBeNull();
   });
 
   it("shows no second message for the refusal a connect threw", async () => {
@@ -640,6 +660,19 @@ describe("the login panel after a refused password", () => {
     ).toBeTruthy();
     expect(
       within(rowFor("carol")).queryByRole("link", { name: "Change password" }),
+    ).toBeNull();
+  });
+
+  it("lists a login refused for another reason beside a working one, with no password link", () => {
+    connectAs(
+      connection(CAROL_KEY),
+      connection(ALICE_KEY, { live: false, loginError: "Already logged in." }),
+    );
+    draw();
+
+    expect(rowFor("alice").textContent).toContain("Already logged in.");
+    expect(
+      within(rowFor("alice")).queryByRole("link", { name: "Change password" }),
     ).toBeNull();
   });
 });

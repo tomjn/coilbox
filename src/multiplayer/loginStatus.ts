@@ -1,4 +1,5 @@
 import type { Connections } from "./connections";
+import { isPasswordRefusal } from "./loginRefused";
 
 /** What the top bar's multiplayer dot shows. */
 export type DotStatus =
@@ -31,8 +32,9 @@ export function refusedReason(
  * dropped server beside a working one does not turn the dot red, and neither
  * does a refused password beside a working login: the refusal has its own
  * notification and its own mark in the popover. When every login left was
- * refused the dot says so ("refused") rather than "error", so a wrong password
- * is not read as a network problem. A room
+ * refused for its password the dot says so ("refused") rather than "error", so
+ * a wrong password is not read as a network problem. A refusal for another
+ * reason, such as being logged in already, stays "error". A room
  * (`direct`) is not a login and is left out, so a LAN or direct-address room
  * open with no lobby login does not turn the dot on.
  */
@@ -50,7 +52,9 @@ export function lobbyDotStatus(
   const failed = (c: (typeof entries)[number]) =>
     c.mirror.error != null || refusedReason(c) != null;
   if (entries.length > 0 && entries.every(failed)) {
-    return entries.every((c) => refusedReason(c) != null) ? "refused" : "error";
+    return entries.every((c) => isPasswordRefusal(refusedReason(c)))
+      ? "refused"
+      : "error";
   }
   return "off";
 }

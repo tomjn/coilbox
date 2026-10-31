@@ -116,6 +116,30 @@ describe("a refused password", () => {
     ).toBe("refused");
   });
 
+  it("is an error when the refusal was for another reason than the password", () => {
+    expect(
+      lobbyDotStatus(
+        all(entry(A, { loginError: "Already logged in." })),
+        false,
+      ),
+    ).toBe("error");
+    expect(
+      lobbyDotStatus(
+        all(
+          entry(A, { loginError: "invalid password" }),
+          entry(B, { loginError: "Already logged in." }),
+        ),
+        false,
+      ),
+    ).toBe("error");
+  });
+
+  it("is an error when the server refused without giving a reason", () => {
+    expect(lobbyDotStatus(all(entry(A, { phase: "denied" })), false)).toBe(
+      "error",
+    );
+  });
+
   it("is still an error when one login failed another way beside a refusal", () => {
     expect(
       lobbyDotStatus(

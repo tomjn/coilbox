@@ -43,7 +43,7 @@ import { PasswordRecoveryForm } from "../lobby-servers/PasswordRecoveryForm";
 import { RegisterForm } from "../lobby-servers/RegisterForm";
 import type { LoginPhase } from "./bindings";
 import type { ConnectionState } from "./connections";
-import { LoginRefusedError } from "./loginRefused";
+import { isPasswordRefusal, LoginRefusedError } from "./loginRefused";
 import { type DotStatus, lobbyDotStatus, refusedReason } from "./loginStatus";
 import {
   liveConnectionKeys,
@@ -329,8 +329,8 @@ export function LoginPanel({ onNavigate }: { onNavigate: () => void }) {
     : null;
   const disconnectError = mirror.error;
 
-  // The logins whose password the server refused, by account id, with the
-  // server's reason. A login is refused until its next attempt starts.
+  // The logins the server refused, by account id, with its reason (empty when
+  // it gave none). A login is refused until its next attempt starts.
   const refused = new Map<string, string>();
   const accountByKey = new Map<string, LobbyAccount>();
   for (const a of accounts) {
@@ -366,12 +366,13 @@ export function LoginPanel({ onNavigate }: { onNavigate: () => void }) {
                     {serverNameFor(key, servers)}
                   </p>
                   <ConnectionLine entry={entry} opening={opening} />
-                  {refusedReason(entry) != null && accountByKey.has(key) && (
-                    <ChangePasswordLink
-                      account={accountByKey.get(key) as LobbyAccount}
-                      onNavigate={onNavigate}
-                    />
-                  )}
+                  {isPasswordRefusal(refusedReason(entry)) &&
+                    accountByKey.has(key) && (
+                      <ChangePasswordLink
+                        account={accountByKey.get(key) as LobbyAccount}
+                        onNavigate={onNavigate}
+                      />
+                    )}
                 </div>
                 {several && (
                   <Button
@@ -664,7 +665,7 @@ function AccountList({
   customServers: LobbyServer[];
   /** Account ids `rememberedLogins` names, badged "Open last time" below. */
   remembered: ReadonlySet<string>;
-  /** Server's reason by account id, for each login whose password it refused. */
+  /** Server's reason by account id, for each login it refused. */
   refused: ReadonlyMap<string, string>;
   liveKeys: string[];
   replacedBy: (account: LobbyAccount) => string | null;
@@ -704,7 +705,11 @@ function AccountList({
                   </span>
                 ) : refusal != null ? (
                   <span className="ml-auto rounded bg-destructive/15 px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide text-destructive">
-                    <Trans>Password refused</Trans>
+                    {isPasswordRefusal(refusal) ? (
+                      <Trans>Password refused</Trans>
+                    ) : (
+                      <Trans>Login refused</Trans>
+                    )}
                   </span>
                 ) : (
                   remembered.has(a.id) && (
@@ -739,7 +744,7 @@ function AccountList({
                 <span className="text-xs text-destructive">{refusal}</span>
               )}
             </button>
-            {refusal != null && (
+            {isPasswordRefusal(refusal) && (
               <div className="px-2 pb-1">
                 <ChangePasswordLink account={a} onNavigate={onNavigate} />
               </div>
