@@ -53,8 +53,12 @@ export interface TweakSlotCounts {
  * shape Zero-K's and BAR's `modoptions.lua` declare: bare for the one slot
  * in the main options list, and numbered for the ones a loop adds after it.
  * A game that copies the convention for its own slots reads the same way.
+ *
+ * Any case, because the engine lowers every key in a start script
+ * (`TdfSection::add_name_value`), so `TweakDefs` reaches the game as `tweakdefs`
+ * and has to be treated as the tweak slot it is.
  */
-const TWEAK_KEY = /^tweak(defs|units)(\d+)?$/;
+const TWEAK_KEY = /^tweak(defs|units)(\d+)?$/i;
 
 /**
  * Whether a bare mod option key is a tweak slot, by key shape alone.
@@ -77,7 +81,7 @@ export function tweakSlotCounts(options: ConfigOption[]): TweakSlotCounts {
   for (const o of options) {
     const m = TWEAK_KEY.exec(o.key);
     if (!m) continue;
-    if (m[1] === "defs") defs += 1;
+    if (m[1].toLowerCase() === "defs") defs += 1;
     else units += 1;
   }
   return { defs, units };

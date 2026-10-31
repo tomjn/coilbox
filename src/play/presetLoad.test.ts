@@ -83,6 +83,12 @@ describe("withoutGame", () => {
 });
 
 describe("takenOptionKeys", () => {
+  it("takes a tweak slot in another case with the tweak slots", () => {
+    const values = { maxunits: "100", TweakDefs: "x" };
+    expect(takenOptionKeys(values, only("modOptions"))).toEqual(["maxunits"]);
+    expect(takenOptionKeys(values, only("tweakSlots"))).toEqual(["TweakDefs"]);
+  });
+
   it("returns the plain and tweak keys the selection takes", () => {
     const values = { maxunits: "1", tweakdefs: "x" };
     expect(takenOptionKeys(values, only("modOptions"))).toEqual(["maxunits"]);

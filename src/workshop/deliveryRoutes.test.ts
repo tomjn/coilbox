@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import type { ConfigOption } from "@/content/bindings";
 import {
   deliveryRoutes,
+  isTweakSlotKey,
   tweakSlotCounts,
   tweakSlotOptions,
   tweakSlotsChecked,
@@ -13,7 +14,34 @@ function opt(key: string): ConfigOption {
   return { key, name: key };
 }
 
+describe("isTweakSlotKey", () => {
+  it("matches in any case, because the engine lowers every script key", () => {
+    for (const key of [
+      "tweakdefs",
+      "TweakDefs",
+      "TWEAKDEFS",
+      "tweakDefs3",
+      "TweakUnits12",
+    ])
+      expect(isTweakSlotKey(key), key).toBe(true);
+  });
+
+  it("still matches only the shape", () => {
+    for (const key of ["tweak", "tweakdefsx", "xtweakdefs", "tweakdefs_1", ""])
+      expect(isTweakSlotKey(key), key).toBe(false);
+  });
+});
+
 describe("tweakSlotCounts", () => {
+  it("counts a slot by its kind whatever its case", () => {
+    const options = [
+      { key: "TweakDefs" },
+      { key: "TWEAKDEFS1" },
+      { key: "TweakUnits" },
+    ] as ConfigOption[];
+    expect(tweakSlotCounts(options)).toEqual({ defs: 2, units: 1 });
+  });
+
   it("counts nothing for a game with no mod options at all", () => {
     expect(tweakSlotCounts([])).toEqual({ defs: 0, units: 0 });
   });

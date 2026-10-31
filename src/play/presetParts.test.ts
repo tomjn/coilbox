@@ -4,6 +4,7 @@ import type { Participant } from "./participants";
 import {
   ALL_PARTS,
   applySelection,
+  optionCounts,
   PRESET_PARTS,
   type PresetSelection,
   partSummary,
@@ -55,6 +56,29 @@ const select = (over: Partial<PresetSelection> = {}): PresetSelection => ({
   modOptions: "replace",
   tweakSlots: "replace",
   ...over,
+});
+
+describe("a tweak slot spelled in another case", () => {
+  const preset = {
+    participants: [],
+    gameName: "G",
+    mapName: "M",
+    startPosType: 0,
+    modOptionValues: { maxunits: "8000", TweakDefs: "bHVh" },
+  };
+  const current = { ...preset, modOptionValues: {} };
+
+  it("is counted under unit tweaks, not mod options", () => {
+    expect(optionCounts(preset)).toEqual({ plain: 1, tweak: 1 });
+  });
+
+  it("stays behind when unit tweaks are unticked", () => {
+    const taken = applySelection(current, preset, {
+      ...ALL_PARTS,
+      parts: PRESET_PARTS.filter((part) => part !== "tweakSlots"),
+    });
+    expect(taken.modOptionValues).toEqual({ maxunits: "8000" });
+  });
 });
 
 describe("applySelection", () => {
