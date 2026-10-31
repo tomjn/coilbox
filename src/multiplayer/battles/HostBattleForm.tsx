@@ -16,6 +16,7 @@ import {
 } from "@/content/config";
 import { ScanFailed } from "@/content/pages/components/states";
 import { battlePasswordProblem } from "@/deeplink/parse";
+import { playOaCheck } from "@/play/bindings";
 import type { PlayTarget } from "@/play/config";
 import { GamePickerButton } from "@/play/pages/components/GamePickerButton";
 import { GamePickerPanel } from "@/play/pages/components/GamePickerPanel";
@@ -42,12 +43,23 @@ import {
 import { VpnWarning } from "../../direct/VpnWarning";
 import { useEngineVersionCheck } from "../battle/useEngineVersionCheck";
 import { mpLeftoverRelayAgent, type mpOpenBattle } from "../bindings";
+import {
+  OA_ENGINE_CHOICE,
+  OA_ENGINE_NAME,
+  OA_HASH,
+  OA_MAX_PLAYERS,
+  OA_MODNAME,
+  OA_UNPICKED_MAP,
+  oaBattleTitle,
+} from "../oaHost";
+import { useOpenAnnihilation } from "../openAnnihilation";
 import { relayPingLabel, useRelayPing } from "../relayPing";
 import { HostCompatChoice } from "./HostCompatChoice";
 import { battleTitleProblem, hostBattleFailure } from "./hostBattle";
 import { hostEngineVersion } from "./hostEngineVersion";
 import { LeftoverRelayAgent } from "./LeftoverRelayAgent";
 import { leaveAndLabel } from "./oneBattle";
+import { OaMapChoice } from "./OaMapChoice";
 import { useHostCompat } from "./useHostCompat";
 import { hashFailureMessage, useHostContent } from "./useHostContent";
 import { WindowsFirewall } from "./WindowsFirewall";
@@ -151,12 +163,23 @@ export function HostBattleForm({
   const [lastPort, setLastPort] = useSetting(LAST_PORT_KEY, DEFAULT_HOST_PORT);
   const [lastEngine, setLastEngine] = useSetting(LAST_ENGINE_KEY, "");
   // Empty means the preferred engine. A remembered version that has since been
-  // uninstalled falls back the same way.
-  const [engineVersion, setEngineVersion] = useState(lastEngine);
+  // uninstalled falls back the same way. A jump that names a game or a map is
+  // for a Recoil battle, so it does not start on a remembered Open Annihilation.
+  const [engineVersion, setEngineVersion] = useState(
+    lastEngine === OA_ENGINE_CHOICE && (initialGame || initialMap)
+      ? ""
+      : lastEngine,
+  );
+  // Open Annihilation is offered as an engine once its program is set (issue
+  // #4946). Choosing it replaces the game, the map and the way the battle is
+  // reached with OA's own room, so the form below leaves those out.
+  const [oaProgram] = useOpenAnnihilation();
+  const oaChosen = !!oaProgram && engineVersion === OA_ENGINE_CHOICE;
+  const [oaMap, setOaMap] = useState("");
   const content = useHostContent(
     initialGame ?? lastGame,
     initialMap ?? lastMap,
-    engineVersion,
+    engineVersion === OA_ENGINE_CHOICE ? "" : engineVersion,
   );
   const {
     target,
@@ -263,6 +286,7 @@ export function HostBattleForm({
 
   function hostButtonLabel(): string {
     if (hosting) return t`Hosting…`;
+    if (oaChosen) return leaves ? leaveAndLabel("host") : t`Host battle`;
     if (checking) return t`Checking your router…`;
     if (!gameName || !mapName || checksumsReady)
       return leaves ? leaveAndLabel("host") : t`Host battle`;
@@ -280,24 +304,30 @@ export function HostBattleForm({
   const titleProblem = battleTitleProblem(title);
   // The button and `submit` both read this, so a live button is never one whose
   // press is swallowed. `target` is part of it because `submit` needs one.
-  const canHost =
-    !!target &&
-    content.ready &&
-    compat.ready &&
-    !passwordProblem &&
-    !titleProblem;
+  const canHost = oaChosen
+    ? !passwordProblem && !titleProblem
+    : !!target &&
+      content.ready &&
+      compat.ready &&
+      !passwordProblem &&
+      !titleProblem;
+  // The router check says how a Recoil battle is reached. An Open Annihilation
+  // battle is reached through OA's own room, so there is nothing to wait for.
+  const waitingOnRouter = checking && !oaChosen;
   // Why Host is not live, when the form has not said so already. The password
   // problem sits under its own field, a failed hash has its own row, and a hash
   // still running is in the button's label.
-  const whyNotHost = !target
-    ? checkingEngines
-      ? t`Reading engine versions…`
-      : t`Choose an engine to host with.`
-    : !gameName
-      ? t`Choose a game.`
-      : !mapName
-        ? t`Choose a map.`
-        : null;
+  const whyNotHost = oaChosen
+    ? null
+    : !target
+      ? checkingEngines
+        ? t`Reading engine versions…`
+        : t`Choose an engine to host with.`
+      : !gameName
+        ? t`Choose a game.`
+        : !mapName
+          ? t`Choose a map.`
+          : null;
   const route = hostingRoute(reachability, relayAvailable, relayMode);
   // Only when there was a relay to refuse. On a server with none the host's
   // answer changed nothing, and crediting them for an outcome that was never
@@ -307,8 +337,49 @@ export function HostBattleForm({
   // the battle would never use.
   const relayAlways = relayAvailable && relayMode === "always";
 
+  // Open Annihilation's version line is read again here, because OA updates
+  // itself and the stored line goes stale.
+  async function submitOa() {
+    if (!oaProgram) return;
+    setError(null);
+    setLeftover(null);
+    setHosting(true);
+    if (serverKey) recordHostingRoute(serverKey, null);
+    try {
+      const { version } = await playOaCheck({ path: oaProgram.path });
+      await onHost({
+        battleType: 0,
+        natType: NAT_TYPE_DIRECT,
+        key: password.trim() || "*",
+        port: DEFAULT_HOST_PORT,
+        relay: false,
+        maxPlayers: Math.min(maxPlayers, OA_MAX_PLAYERS),
+        modhash: OA_HASH,
+        rank: 0,
+        maphash: OA_HASH,
+        engine: OA_ENGINE_NAME,
+        version,
+        map: oaMap || OA_UNPICKED_MAP,
+        title: oaBattleTitle(title, t`Open Annihilation battle`),
+        modname: OA_MODNAME,
+      });
+      setLastEngine(OA_ENGINE_CHOICE);
+      setLastTitle(title);
+      setLastMaxPlayers(maxPlayers);
+      drawer.close();
+    } catch (err) {
+      setError(hostBattleFailure(err));
+    } finally {
+      setHosting(false);
+    }
+  }
+
   async function submit(e: React.FormEvent) {
     e.preventDefault();
+    if (oaChosen) {
+      if (canHost && !hosting) await submitOa();
+      return;
+    }
     if (!canHost || !target || hosting || checking) return;
     setError(null);
     setLeftover(null);
@@ -425,7 +496,7 @@ export function HostBattleForm({
 
   return (
     <form className="flex flex-col gap-3" onSubmit={submit}>
-      {noEngine ? (
+      {noEngine && !oaProgram ? (
         <p className="text-sm text-muted-foreground">
           <Trans>
             No engine found. Add a content folder with an engine in{" "}
@@ -440,7 +511,7 @@ export function HostBattleForm({
         </p>
       ) : (
         <>
-          {content.scanError && (
+          {!oaChosen && content.scanError && (
             <ScanFailed noun={t`games or maps`} reason={content.scanError} />
           )}
 
@@ -465,9 +536,14 @@ export function HostBattleForm({
               <Trans>Engine</Trans>
             </span>
             <OptionSelect
-              value={target?.syncVersion ?? ""}
+              value={oaChosen ? OA_ENGINE_CHOICE : (target?.syncVersion ?? "")}
               onValueChange={setEngineVersion}
-              options={engineOptions(targets)}
+              options={[
+                ...engineOptions(targets),
+                ...(oaProgram
+                  ? [{ value: OA_ENGINE_CHOICE, label: OA_ENGINE_NAME }]
+                  : []),
+              ]}
               placeholder={
                 checkingEngines
                   ? t`Reading engine versions…`
@@ -475,53 +551,68 @@ export function HostBattleForm({
               }
               size="sm"
             />
-            <span className="text-xs text-muted-foreground">
-              <Trans>
-                Everybody who joins has to have exactly this version.
-              </Trans>
-            </span>
+            {!oaChosen && (
+              <span className="text-xs text-muted-foreground">
+                <Trans>
+                  Everybody who joins has to have exactly this version.
+                </Trans>
+              </span>
+            )}
           </label>
 
-          <div className="flex flex-col gap-1 text-sm">
-            <span className="font-medium">
-              <Trans>Game</Trans>
-            </span>
-            <GamePickerButton
-              value={gameName}
-              games={games}
-              headers={gameHeaders}
-              placeholder={content.scanning ? t`Scanning…` : t`Select a game`}
-              onClick={() => setPickingGame(true)}
+          {oaChosen && oaProgram ? (
+            <OaMapChoice
+              path={oaProgram.path}
+              value={oaMap}
+              onChange={setOaMap}
             />
-          </div>
+          ) : (
+            <>
+              <div className="flex flex-col gap-1 text-sm">
+                <span className="font-medium">
+                  <Trans>Game</Trans>
+                </span>
+                <GamePickerButton
+                  value={gameName}
+                  games={games}
+                  headers={gameHeaders}
+                  placeholder={
+                    content.scanning ? t`Scanning…` : t`Select a game`
+                  }
+                  onClick={() => setPickingGame(true)}
+                />
+              </div>
 
-          <HostCompatChoice compat={compat} />
+              <HostCompatChoice compat={compat} />
 
-          <div className="flex flex-col gap-1 text-sm">
-            <span className="font-medium">
-              <Trans>Map</Trans>
-            </span>
-            <button
-              type="button"
-              onClick={() => setPickingMap(true)}
-              className="flex h-11 items-center gap-2 rounded-md border border-input bg-transparent px-2 text-left text-sm shadow-xs transition-colors hover:bg-accent/50 focus-visible:border-ring focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50 dark:bg-input/30 dark:hover:bg-input/50"
-            >
-              <span className="flex size-8 shrink-0 items-center justify-center overflow-hidden rounded bg-muted/40">
-                {thumbs.get(mapName) ? (
-                  <img
-                    src={thumbs.get(mapName)?.url}
-                    alt=""
-                    className="size-full object-contain"
-                  />
-                ) : (
-                  <ImageOff className="size-4 text-muted-foreground" />
-                )}
-              </span>
-              <span className="min-w-0 flex-1 truncate">
-                {mapName || (content.scanning ? t`Scanning…` : t`Select a map`)}
-              </span>
-            </button>
-          </div>
+              <div className="flex flex-col gap-1 text-sm">
+                <span className="font-medium">
+                  <Trans>Map</Trans>
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setPickingMap(true)}
+                  className="flex h-11 items-center gap-2 rounded-md border border-input bg-transparent px-2 text-left text-sm shadow-xs transition-colors hover:bg-accent/50 focus-visible:border-ring focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50 dark:bg-input/30 dark:hover:bg-input/50"
+                >
+                  <span className="flex size-8 shrink-0 items-center justify-center overflow-hidden rounded bg-muted/40">
+                    {thumbs.get(mapName) ? (
+                      <img
+                        src={thumbs.get(mapName)?.url}
+                        alt=""
+                        className="size-full object-contain"
+                      />
+                    ) : (
+                      <ImageOff className="size-4 text-muted-foreground" />
+                    )}
+                  </span>
+                  <span className="min-w-0 flex-1 truncate">
+                    {mapName ||
+                      (content.scanning ? t`Scanning…` : t`Select a map`)}
+                  </span>
+                </button>
+              </div>
+            </>
+          )}
 
           <div className="flex gap-2">
             {/* biome-ignore lint/a11y/noLabelWithoutControl: wraps the control (implicit label association) */}
@@ -532,28 +623,38 @@ export function HostBattleForm({
               <Input
                 type="number"
                 min={2}
-                max={32}
-                value={maxPlayers}
+                max={oaChosen ? OA_MAX_PLAYERS : 32}
+                value={
+                  oaChosen ? Math.min(maxPlayers, OA_MAX_PLAYERS) : maxPlayers
+                }
                 onChange={(e) =>
                   setMaxPlayers(
-                    Math.max(2, Math.min(32, Number(e.target.value) || 2)),
+                    Math.max(
+                      2,
+                      Math.min(
+                        oaChosen ? OA_MAX_PLAYERS : 32,
+                        Number(e.target.value) || 2,
+                      ),
+                    ),
                   )
                 }
               />
             </label>
-            {/* biome-ignore lint/a11y/noLabelWithoutControl: wraps the control (implicit label association) */}
-            <label className="flex flex-1 flex-col gap-1 text-sm">
-              <span className="font-medium">
-                <Trans>Port</Trans>
-              </span>
-              <Input
-                type="number"
-                value={port}
-                onChange={(e) =>
-                  setPort(Number(e.target.value) || DEFAULT_HOST_PORT)
-                }
-              />
-            </label>
+            {!oaChosen && (
+              // biome-ignore lint/a11y/noLabelWithoutControl: wraps the control (implicit label association)
+              <label className="flex flex-1 flex-col gap-1 text-sm">
+                <span className="font-medium">
+                  <Trans>Port</Trans>
+                </span>
+                <Input
+                  type="number"
+                  value={port}
+                  onChange={(e) =>
+                    setPort(Number(e.target.value) || DEFAULT_HOST_PORT)
+                  }
+                />
+              </label>
+            )}
           </div>
 
           {/* biome-ignore lint/a11y/noLabelWithoutControl: wraps the control (implicit label association) */}
@@ -593,7 +694,7 @@ export function HostBattleForm({
               This is the one place the relay's cost is written down, because
               somebody choosing needs the price and somebody reading the outcome
               has already paid it (issue #2023). */}
-          {relayAvailable && (
+          {relayAvailable && !oaChosen && (
             <div className="flex flex-col gap-1.5 text-sm">
               <span className="font-medium">
                 <Trans>Server relay</Trans>
@@ -656,7 +757,7 @@ export function HostBattleForm({
               anybody gets in. Draws nothing off Windows, and the engine goes
               with it because Windows remembers an answer per program file
               (issue #2799). */}
-          <WindowsFirewall engine={target?.executable ?? null} />
+          {!oaChosen && <WindowsFirewall engine={target?.executable ?? null} />}
 
           {/* A VPN carrying this machine's internet traffic, next to the
               sentence about what hosting will do, because it changes the
@@ -671,7 +772,7 @@ export function HostBattleForm({
               is the host, before they commit to anything. */}
           {/* Held back while the check runs, because until it answers the
               sentence would describe a route nobody has picked. */}
-          {!checking && (
+          {!checking && !oaChosen && (
             <p className="text-xs text-muted-foreground">
               {hostingRouteSummary(route, {
                 lanRoom: false,
@@ -681,7 +782,7 @@ export function HostBattleForm({
             </p>
           )}
 
-          {(gameFailed || mapFailed) && (
+          {!oaChosen && (gameFailed || mapFailed) && (
             <div className="flex flex-col gap-2 rounded-md border border-destructive/50 bg-destructive/10 p-2 text-xs text-destructive">
               {gameFailed && (
                 <div className="flex items-center justify-between gap-2">
@@ -755,9 +856,9 @@ export function HostBattleForm({
             <Button
               type="submit"
               className="h-9"
-              disabled={!canHost || hosting || checking}
+              disabled={!canHost || hosting || waitingOnRouter}
             >
-              {(hosting || checking) && (
+              {(hosting || waitingOnRouter) && (
                 <Loader2
                   className="size-4 motion-safe:animate-spin"
                   aria-hidden

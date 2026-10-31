@@ -65,10 +65,12 @@ import { StartPosOptions } from "../battle/StartPosOptions";
 import { unsyncedPlayers } from "../battle/startBlockers";
 import { battleToSkirmishDraft } from "../battle/toSkirmish";
 import { useBattleLaunch } from "../battle/useBattleLaunch";
+import { useOaHostLaunch } from "../battle/useOaHostLaunch";
 import { useBattleRoom } from "../battle/useBattleRoom";
 import { useBattleRoomKey } from "../battle/useBattleRoomKey";
 import { useRejoinRequest } from "../battle/useRejoinRequest";
 import { VotePanel } from "../battle/VotePanel";
+import { otherEngineName } from "../battles/battleFilters";
 import { useMpRevealed } from "../navPredicates";
 import { useNoteActions } from "../notes";
 import { useStatsRelations } from "../statsRelation";
@@ -127,21 +129,28 @@ function BattleRoomPage() {
   // hashes in the LAN beacon to warn before the join (issue #1572). The battle
   // itself carries the map and game names, so the room can say it straight away.
   const engine = room.engine;
-  const block = launchBlock({
-    hasTarget: !!room.target,
-    targetLoading: room.targetLoading,
-    engineMissing: engine.verdict === "mismatch" ? engine.hostLabel : null,
-    engineUnreadable: room.engineUnreadable,
-    unreadable: room.contentUnreadable,
-    unreadableReason: room.contentUnreadableReason,
-    contentKnown: room.contentKnown,
-    mapMissing: room.mapMissing,
-    gameMissing: room.gameMissing,
-    dependencyBlock: room.dependencyBlock,
-    compat: room.compat,
-    mapName: room.battle?.map ?? "",
-    gameName: room.requiredGame ?? room.battle?.modname ?? "",
-  });
+  // A battle this client hosts on Open Annihilation (issue #4946). Its Start
+  // runs OA, which has no use for a Recoil engine, game or map, so the
+  // checks below that ask for one do not apply.
+  const oaHost =
+    room.selfHost && !!room.battle && otherEngineName(room.battle) !== null;
+  const block = oaHost
+    ? null
+    : launchBlock({
+        hasTarget: !!room.target,
+        targetLoading: room.targetLoading,
+        engineMissing: engine.verdict === "mismatch" ? engine.hostLabel : null,
+        engineUnreadable: room.engineUnreadable,
+        unreadable: room.contentUnreadable,
+        unreadableReason: room.contentUnreadableReason,
+        contentKnown: room.contentKnown,
+        mapMissing: room.mapMissing,
+        gameMissing: room.gameMissing,
+        dependencyBlock: room.dependencyBlock,
+        compat: room.compat,
+        mapName: room.battle?.map ?? "",
+        gameName: room.requiredGame ?? room.battle?.modname ?? "",
+      });
   const blockReason = block?.reason ?? null;
   // The player's own widgets, for the strip that says which of them this
   // room's options turn off (issue #1292).
@@ -156,6 +165,13 @@ function BattleRoomPage() {
     room.selfHost,
     blockReason,
   );
+  const oaRun = useOaHostLaunch({
+    battleId: room.battle?.id ?? null,
+    battleMap: room.battle?.map ?? "",
+    maxPlayers: room.battle?.maxPlayers ?? 0,
+    username: room.me,
+    setIngame: room.setIngame,
+  });
   // People waiting to be let into a room we are hosting ourselves, with approval
   // switched on. Read off the shared room source, which holds nothing at all
   // unless this client is hosting, so a battle on a real server asks nothing.
@@ -484,18 +500,24 @@ function BattleRoomPage() {
   // What the header's main button does. Getting into a running match is never
   // automatic past the first launch: an engine that exited may have exited on
   // purpose, so going back has to be a deliberate click.
-  const action = matchAction({
-    selfHost: room.selfHost,
-    hostIngame: room.hostIngame,
-    presentAtStart: room.presentAtStart,
-    launching,
-    running: launch.running,
-  });
+  const action = oaRun.running
+    ? "ingame"
+    : matchAction({
+        selfHost: room.selfHost,
+        hostIngame: room.hostIngame,
+        presentAtStart: room.presentAtStart,
+        launching,
+        running: launch.running,
+      });
 
   // Host start: flip our in-game flag (so joiners' clients auto-launch and connect),
   // launch the engine in host mode, then clear the flag once it exits. A joined
   // battle just asks its autohost to start.
   async function onStart() {
+    if (oaHost) {
+      await oaRun.start();
+      return;
+    }
     if (!room.selfHost) {
       await room.startGame();
       return;
@@ -537,6 +559,7 @@ function BattleRoomPage() {
   });
 
   async function onLeave() {
+    oaRun.cancel();
     // A battle in this client's own LAN room is the room, so the button that
     // closes one closes both (issue #2057). Not a leave followed by a stop: the
     // room's own "Stop room" drops this client first on purpose, and the two
@@ -578,7 +601,8 @@ function BattleRoomPage() {
         blockReason={blockReason}
         unsynced={unsyncedPlayers(room.rows)}
         action={action}
-        allReady={room.allReady}
+        // Readiness is for the engine's own room. OA's has its own.
+        allReady={oaHost || room.allReady}
         onToggleReady={room.setReady}
         onToggleSpectate={room.setSpectator}
         onLeave={onLeave}
@@ -625,9 +649,9 @@ function BattleRoomPage() {
         <VotePanel vote={room.currentVote} onVote={room.castVote} />
       )}
 
-      {launch.error && (
+      {(launch.error ?? oaRun.error) && (
         <p className="border-b border-destructive/40 bg-destructive/10 px-4 py-2 text-sm text-destructive">
-          {launch.error}
+          {launch.error ?? oaRun.error}
         </p>
       )}
       {room.actionError && (
@@ -934,20 +958,24 @@ function BattleRoomPage() {
             onCommand={room.autohostSend}
             onRing={() => room.hostControls.ring()}
           />
-          <BattleGameCard
-            enginePath={room.enginePath}
-            dataDir={room.dataDir}
-            game={room.localGame}
-            gameName={battle.modname}
-          />
-          <BattleEngineCard
-            battleId={battle.id}
-            match={engine}
-            version={battle.version}
-            target={room.target}
-            onInstalled={room.refreshTarget}
-            unreadable={room.engineUnreadable}
-          />
+          {!oaHost && (
+            <>
+              <BattleGameCard
+                enginePath={room.enginePath}
+                dataDir={room.dataDir}
+                game={room.localGame}
+                gameName={battle.modname}
+              />
+              <BattleEngineCard
+                battleId={battle.id}
+                match={engine}
+                version={battle.version}
+                target={room.target}
+                onInstalled={room.refreshTarget}
+                unreadable={room.engineUnreadable}
+              />
+            </>
+          )}
         </aside>
       </div>
     </main>
