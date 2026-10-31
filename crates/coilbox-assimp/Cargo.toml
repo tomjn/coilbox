@@ -7,6 +7,7 @@ license = "MIT"
 
 [dependencies]
 # Static, so the worker sidecar carries Assimp rather than asking the machine it
-# runs on for a copy. See the workspace `[patch.crates-io]` entry for why
-# russimp-sys comes from git: the published package ships no Assimp source.
-russimp = { version = "3.2.1", features = ["static-link"] }
+# runs on for a copy. `build-assimp` compiles the source inside the published
+# package, so the build downloads nothing. See `.cargo/config.toml` for what a
+# Homebrew minizip would otherwise do to that build.
+asset-importer = { version = "0.8.0", features = ["build-assimp", "static-link"] }
