@@ -19,7 +19,10 @@ import { homeToolGroups, splitGroupItems } from "../nav";
 import { openExternal, useResolvedNavItem } from "../navItem";
 import { accentHueRotate, useThemeColor } from "../useThemeColor";
 import LinkCard from "./LinkCard";
-import OpenAnnihilationCard, { OA_CARD_ID } from "./OpenAnnihilationCard";
+import OpenAnnihilationCard, {
+  OA_CARD_ID,
+  useOpenAnnihilationOffer,
+} from "./OpenAnnihilationCard";
 
 /**
  * Every navigable route as a card, grouped exactly as the sidebar groups them.
@@ -68,6 +71,7 @@ export default function ToolCards({ suggested }: { suggested?: ReactNode }) {
   // The scheme the cards will be drawn for, so the row asks the chain the same
   // question its cards will. See `ToolCard` for why it comes from the theme.
   const { resolved } = useTheme();
+  const { card: oaCard, link: oaLink } = useOpenAnnihilationOffer();
   // Groups as composeNav sorted them, minus Home and anything left empty, so the
   // grid mirrors the sidebar. Shared with the Greeting, which needs the same
   // answer to decide whether to say there are no tools.
@@ -77,12 +81,15 @@ export default function ToolCards({ suggested }: { suggested?: ReactNode }) {
   return (
     <div className="mt-6 space-y-8">
       {groups.map((group) => {
-        const { tools, links } = splitGroupItems(group.items);
+        const { tools, links: groupLinks } = splitGroupItems(group.items);
         const description = groupDescription(group.id);
         // The suggested map's card is a picture of a map, so a group holding it
         // has a picture in it whatever its tools resolved to.
         const withSuggested = group.id === SUGGESTED_MAP_GROUP && suggested;
-        const withOa = group.id === OPEN_ANNIHILATION_GROUP;
+        const inOaGroup = group.id === OPEN_ANNIHILATION_GROUP;
+        const withOa = inOaGroup && oaCard;
+        const links =
+          inOaGroup && oaLink ? [...groupLinks, oaLink] : groupLinks;
         const compact =
           !withSuggested &&
           tools.every((item) => cardIsIconOnly(item.id, undefined, resolved)) &&
@@ -133,14 +140,12 @@ export default function ToolCards({ suggested }: { suggested?: ReactNode }) {
 const SUGGESTED_MAP_GROUP = "library";
 
 /**
- * The nav group the Open Annihilation card joins: Play, where the other cards
- * for playing the game are. The card hides itself under a profile's game filter
- * (see {@link OpenAnnihilationCard}). Like the suggested map's card it is
- * counted for the row's height even then, which errs towards a taller row, as
- * the grid's own note says.
- *
- * Its picture makes the row a row with a picture in it, so the group is only
- * compact when a distribution has set `art: false` on the card too.
+ * The nav group Open Annihilation joins: Play, where the other cards for playing
+ * the game are. With a program set it is a card (see
+ * {@link OpenAnnihilationCard}), and its picture makes the row a row with a
+ * picture in it, so the group is only compact when a distribution has set
+ * `art: false` on the card too. Without one it is a link chip in the group's
+ * links card, which has no picture to count. A profile's game filter hides both.
  */
 const OPEN_ANNIHILATION_GROUP = "play";
 

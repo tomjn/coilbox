@@ -30,16 +30,17 @@ vi.mock("@tauri-apps/plugin-opener", () => ({ openUrl: async () => {} }));
 
 // The Open Annihilation card reads a setting and the lobby bindings, which this
 // file has no frame for. It has its own tests in openAnnihilationCard.dom.test.tsx.
+const oa = vi.hoisted(() => ({ card: false }));
 vi.mock("./zones/OpenAnnihilationCard", async () => ({
   default: () => null,
   OA_CARD_ID: (await import("./openAnnihilationArt")).OA_CARD_ID,
+  useOpenAnnihilationOffer: () => ({ card: oa.card, link: null }),
 }));
 
 import type { NavItem } from "@picoframe/plugin-sdk";
 import { Rocket } from "lucide-react";
 import { type CardArtStep, registerCardArtSource } from "./art";
 import { ART_BAND_CLASS, ART_CARD_CLASS } from "./cardShell";
-import { OA_CARD_ID } from "./openAnnihilationArt";
 import { proceduralCardArt } from "./proceduralArt";
 import ToolCards, { cardArtUrl, ToolCard } from "./zones/ToolCards";
 
@@ -76,6 +77,7 @@ afterEach(() => {
   while (registered.length) registered.pop()?.();
   theme.resolved = "dark";
   frame.nav = [];
+  oa.card = false;
 });
 
 /** One card as the markup a browser would get. */
@@ -299,12 +301,8 @@ describe("how tall a row of pictureless cards is", () => {
     // The design's original case, and still right: nothing is wrong with a row
     // of icon cards not being full height. Only reachable through a
     // distribution, because the procedural floor never fails. The Open
-    // Annihilation card lives in this group, so it has to be switched off too.
-    registerByTool("override", {
-      skirmish: false,
-      "play.replays": false,
-      [OA_CARD_ID]: false,
-    });
+    // Annihilation card is not showing here, so its picture is not counted.
+    registerByTool("override", { skirmish: false, "play.replays": false });
     const play = section(grid(), "Play");
     expect(play.match(new RegExp(CHIP, "g"))).toHaveLength(2);
     expect(play).not.toContain("min-h-28");
@@ -313,6 +311,7 @@ describe("how tall a row of pictureless cards is", () => {
   it("keeps the Play row at full height for the Open Annihilation picture", () => {
     // Every tool is switched off, but the card's own picture is a picture in
     // the row, as the suggested map's is in Library.
+    oa.card = true;
     registerByTool("override", { skirmish: false, "play.replays": false });
     const play = section(grid(), "Play");
     expect(play).not.toContain(CHIP);
