@@ -743,6 +743,8 @@ export interface IngestSummary {
   skipped: number;
   /** Files that couldn't be decoded (corrupt/truncated) — skipped, not fatal. */
   failed: number;
+  /** Records dropped because their replay file was deleted. */
+  removed: number;
   total: number;
 }
 

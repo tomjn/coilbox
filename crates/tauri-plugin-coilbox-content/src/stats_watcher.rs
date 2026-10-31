@@ -381,7 +381,7 @@ fn run_ingest<R: Runtime>(app: &AppHandle<R>, target: &IngestTarget) {
             return None;
         };
         let summary = stats::ingest(&target.roots, &target.engine_dir, &mut store);
-        if summary.added == 0 && summary.updated == 0 {
+        if summary.added == 0 && summary.updated == 0 && summary.removed == 0 {
             return None;
         }
         stats::save(&target.stats_path, &store).ok()?;
