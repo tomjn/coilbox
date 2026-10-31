@@ -56,6 +56,11 @@ vi.mock("../notify/notify", () => ({ notify: mocks.notify }));
 vi.mock("./battle/leaveBattle", () => ({ leaveBattle: mocks.leaveBattle }));
 
 import { OaBattleKeeper } from "./OaBattleKeeper";
+import {
+  forgetOaPassword,
+  holdOaHostPassword,
+  holdOaJoinPassword,
+} from "./oaPassword";
 
 type Launch = {
   args: string[];
@@ -114,6 +119,7 @@ const finish = (exitCode: number | null = 0) =>
   act(async () => launches.at(-1)?.finish({ exitCode, signal: null }));
 
 beforeEach(() => {
+  forgetOaPassword();
   launches = [];
   mocks.program = OA;
   mocks.setIngame.mockReset();
@@ -385,6 +391,62 @@ describe("a failure", () => {
     await waitFor(() => expect(mocks.leaveBattle).toHaveBeenCalledOnce());
     expect(mocks.notify).toHaveBeenCalledOnce();
     expect(launches).toHaveLength(0);
+  });
+});
+
+describe("a battle with a password", () => {
+  const hosted = () => battle({ host: ME, passworded: true });
+
+  it("gives the host's room the password", async () => {
+    holdOaHostPassword(KEY, null, {
+      engine: "Open Annihilation",
+      key: "s3cret",
+    });
+    show(connection(hosted()));
+    await waitFor(() => expect(launches).toHaveLength(1));
+    expect(launches[0].args.slice(-2)).toEqual(["--game-password", "s3cret"]);
+  });
+
+  it("gives a joiner the key they typed, once the host is in game", async () => {
+    holdOaJoinPassword(
+      KEY,
+      { id: 4021, engine: "Open Annihilation" },
+      "s3cret",
+    );
+    const view = show(connection(battle({ passworded: true })));
+    await update(
+      view,
+      connection(battle({ passworded: true }), { hostIngame: true }),
+    );
+    await waitFor(() => expect(launches).toHaveLength(1));
+    expect(launches[0].args.slice(-2)).toEqual(["--game-password", "s3cret"]);
+  });
+
+  it("starts a joiner with no key, as OA's room is the one to refuse", async () => {
+    show(connection(battle({ passworded: true }), { hostIngame: true }));
+    await waitFor(() => expect(launches).toHaveLength(1));
+    expect(launches[0].args).not.toContain("--game-password");
+  });
+
+  it("refuses to host when the password is gone, rather than open an unprotected room", async () => {
+    show(connection(hosted()));
+    await waitFor(() => expect(mocks.leaveBattle).toHaveBeenCalledOnce());
+    expect(mocks.notify).toHaveBeenCalledWith(
+      expect.objectContaining({
+        title: "Left the Open Annihilation battle",
+        body: expect.stringContaining("password"),
+        level: "error",
+      }),
+    );
+    expect(bindings.playOaLaunch).not.toHaveBeenCalled();
+    expect(bindings.playOaMaps).not.toHaveBeenCalled();
+  });
+
+  it("hosts a battle with no password without asking for one", async () => {
+    show(connection(battle({ host: ME, passworded: false })));
+    await waitFor(() => expect(launches).toHaveLength(1));
+    expect(launches[0].args).not.toContain("--game-password");
+    expect(mocks.notify).not.toHaveBeenCalled();
   });
 });
 

@@ -14,6 +14,7 @@ import {
   oaJoinArguments,
   oaMapArgument,
 } from "./oaHost";
+import { oaPasswordFor } from "./oaPassword";
 import { oaRunBattle, observeOaBattle, startOaRun } from "./oaRun";
 import { useOpenAnnihilation } from "./openAnnihilation";
 import { protocolForKey } from "./protocol";
@@ -57,8 +58,9 @@ function joinedOaBattle(
 /**
  * Start Open Annihilation for the battle, and leave the battle when OA is gone.
  *
- * Only what the lobby carries goes to OA. OA's own room does the seating, the
- * map, the rules and readiness. The host's in game flag means its room is up and
+ * Only what the lobby carries goes to OA, plus the battle's password if this
+ * client holds it (issue #4955). OA's own room does the seating, the map, the
+ * rules and readiness. The host's in game flag means its room is up and
  * taking joiners, so it is raised on the battle room screen and not when the
  * process starts. A joiner's means the match is on. Both drop when OA exits.
  *
@@ -107,8 +109,15 @@ async function openOa(
     return leave(t`Set where Open Annihilation is in Settings first.`);
   }
 
+  const password = oaPasswordFor(serverKey, battleId);
   let args: string[];
   if (hosting) {
+    // OA's room would take anybody while the lobby says it has a password.
+    if (battle.passworded && password === null) {
+      return leave(
+        t`Coilbox no longer has this battle's password, so Open Annihilation's room would have none. Host the battle again.`,
+      );
+    }
     // The key `--map` takes is not always the name the lobby carries. A list
     // that will not load leaves the lobby's name to be tried as it stands.
     const maps = await playOaMaps({ path: program.path })
@@ -120,12 +129,18 @@ async function openOa(
       username,
       map: oaMapArgument(battle.map, maps),
       maxPlayers: battle.maxPlayers,
+      password,
     });
   } else {
     // OA reads no port, so one the lobby left out is not a reason to refuse.
     const verdict = checkHostAddress(battle.ip, Number(battle.port) || 1);
     if (verdict.kind === "blocked") return leave(verdict.reason);
-    args = oaJoinArguments({ battleId, username, hostIp: battle.ip });
+    args = oaJoinArguments({
+      battleId,
+      username,
+      hostIp: battle.ip,
+      password,
+    });
   }
 
   let flagRaised = false;

@@ -128,12 +128,23 @@ vi.mock("../battles/HostBattleButton", () => ({
   }: {
     initialTitle?: string;
     autoOpen?: boolean;
-    onHost: (args: object) => Promise<void>;
+    onHost: (args: { engine: string; key: string }) => Promise<void>;
   }) => (
-    <button type="button" onClick={() => void onHost({})}>
-      Host a battle
-      {autoOpen && initialTitle ? ` (seeded: ${initialTitle})` : ""}
-    </button>
+    <>
+      <button
+        type="button"
+        onClick={() => void onHost({ engine: "", key: "*" })}
+      >
+        Host a battle
+        {autoOpen && initialTitle ? ` (seeded: ${initialTitle})` : ""}
+      </button>
+      <button
+        type="button"
+        onClick={() => onHost({ engine: "Open Annihilation", key: "s3cret" })}
+      >
+        Open with a password
+      </button>
+    </>
   ),
 }));
 
@@ -181,6 +192,7 @@ vi.mock("../../lobby-servers/bindings", () => ({
   lsGetCredential: async () => ({ secret: "hunter2" }),
 }));
 
+import { oaPasswordFor } from "../oaPassword";
 import { MultiplayerProvider } from "../store";
 import BattlesRoute from "./BattlesPage";
 
@@ -372,7 +384,7 @@ describe("an Open Annihilation battle (issue #4972)", () => {
     expect(screen.getByText("Waiting for host")).toBeTruthy();
   });
 
-  it("stays on the battle list after hosting, and waits for nobody", async () => {
+  it("stays on the battle list after hosting, with no wait shown", async () => {
     await openPage();
     await act(async () => {
       fireEvent.click(screen.getByRole("button", { name: /Host a battle/ }));
@@ -470,6 +482,40 @@ describe("Host as battle: which server gets the seeded draft", () => {
       "Host a battle",
       "Host a battle (seeded: My hosted skirmish)",
     ]);
+  });
+});
+
+describe("the password of an Open Annihilation battle opened here (issue #4955)", () => {
+  it("is held for the battle that opens, and goes when the battle does", async () => {
+    wire.activeKeys = [KEY_B];
+    await openPage();
+    await fire(KEY_B, { kind: "connected" } as LobbyEvent);
+    await act(async () => {
+      fireEvent.click(
+        screen.getByRole("button", { name: "Open with a password" }),
+      );
+    });
+
+    const lobbyShows = async (currentBattle: number | null) => {
+      wire.states.set(
+        KEY_B,
+        lobbyState("Zeta", [battle(7, "Battle on B")], currentBattle),
+      );
+      await fire(KEY_B, {
+        kind: "delta",
+        delta: { kind: "battleInfoChanged", id: 7 },
+      });
+      await act(async () => {
+        await new Promise((r) => setTimeout(r, 80));
+      });
+    };
+
+    await lobbyShows(7);
+    expect(oaPasswordFor(KEY_B, 7)).toBe("s3cret");
+    expect(oaPasswordFor(KEY_B, 8)).toBeNull();
+
+    await lobbyShows(null);
+    expect(oaPasswordFor(KEY_B, 7)).toBeNull();
   });
 });
 

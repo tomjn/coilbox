@@ -118,6 +118,7 @@ import { MatchFoundPanel } from "./MatchFoundPanel";
 import { initialMirror, type LobbyMirror, type MirrorAction } from "./mirror";
 import { OaBattleKeeper } from "./OaBattleKeeper";
 import { OaMatchKeeper } from "./OaMatchKeeper";
+import { observeOaPassword } from "./oaPassword";
 import { protocolForKey } from "./protocol";
 import { RejoinOfferPanel } from "./RejoinOfferPanel";
 import { triggerRing } from "./ringEffect";
@@ -1895,6 +1896,21 @@ export function MultiplayerProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     forgetBattleMovedUnless(inBattle);
   }, [inBattle]);
+
+  // A held Open Annihilation battle password goes with its battle (issue #4955).
+  useEffect(() => {
+    observeOaPassword((serverKey) => {
+      const c = connections[serverKey];
+      return c
+        ? {
+            connected: c.live && c.mirror.connected,
+            ready: c.mirror.phase === "ready",
+            battleId: c.mirror.state?.currentBattle ?? null,
+            joinError: c.mirror.lastJoinError,
+          }
+        : null;
+    });
+  }, [connections]);
 
   // Register a new account: open a throwaway connection that sends REGISTER, then
   // resolve on the `registered` phase / reject on `disconnected` (denial). The

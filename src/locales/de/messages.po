@@ -16091,6 +16091,10 @@ msgstr "Coilbox braucht eine installierte Engine, bevor es Ihre Spiele lesen kan
 msgid "Coilbox needs an engine installed before it can read your maps."
 msgstr "Coilbox braucht eine installierte Engine, bevor es Ihre Karten lesen kann."
 
+#: src/multiplayer/OaBattleKeeper.tsx
+msgid "Coilbox no longer has this battle's password, so Open Annihilation's room would have none. Host the battle again."
+msgstr ""
+
 #: src/general/pages/AboutCoilbox.tsx
 #, fuzzy
 msgid "Coilbox on GitHub"
@@ -34892,6 +34896,10 @@ msgstr ""
 
 #: src/multiplayer/OaBattleKeeper.tsx
 msgid "Open Annihilation refused to open this battle."
+msgstr ""
+
+#: src/multiplayer/battles/HostBattleForm.tsx
+msgid "Open Annihilation takes a password of up to {OA_PASSWORD_MAX} characters."
 msgstr ""
 
 #: src/blueprint/pages/components/ImportPackForm.tsx
