@@ -1772,6 +1772,43 @@ mod tests {
         assert_eq!(names(&unlisted), ["armcom", "armsolar"]);
     }
 
+    /// What `math.random` gives once a read's script has run as far as the end
+    /// of the shim, with `prelude` ahead of it, in a parser whose own
+    /// `math.random` returns no value, as unitsync's does (#4929). The last
+    /// answer indexes a table with a draw the way Beyond All Reason's
+    /// `lootboxnano` script does.
+    fn draws_after(prelude: &str) -> String {
+        let lua = mlua::Lua::new();
+        let script = format!(
+            "math.random = function() end\n\
+             Spring = {{}}\n\
+             return (function()\n{prelude}{}\n\
+             local models = {{ 'one', 'two' }}\n\
+             return table.concat({{ tostring(math.random()), tostring(math.random(6)),\n\
+               tostring(math.random(3, 9)), models[math.random(1, #models)] }}, ',')\n\
+             end)()",
+            crate::lua::DEFS_ENV_SHIM,
+        );
+        lua.load(script)
+            .eval()
+            .expect("the draw script did not run")
+    }
+
+    /// The game's own read has no prelude and a match's read has one, and both
+    /// run the same shim, so a definition script that draws a number gets the
+    /// same answer in each. A copy kept in only one of them is what let the unit
+    /// pages lose the 36 `lootboxnano` units while a replay's list kept them.
+    #[test]
+    fn the_games_own_read_and_a_match_read_draw_the_same_number() {
+        let own = draws_after("");
+        assert_eq!(own, "0,1,3,one");
+
+        let setup: MatchSetup =
+            serde_json::from_str(include_str!("../tests/fixtures/match_setup.json")).unwrap();
+        assert_eq!(draws_after(&MatchSetup::default().prelude(&[])), own);
+        assert_eq!(draws_after(&setup.prelude(&[])), own);
+    }
+
     /// The unit list read for one match's setup against the list the engine
     /// built for that match, id by id and name by name.
     ///
