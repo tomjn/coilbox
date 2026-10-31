@@ -322,3 +322,41 @@ export const playOaCheck = defineCommand<{ path: string }, OaProgram>(
   "coilbox-play",
   "play_oa_check",
 );
+
+/**
+ * One line of Open Annihilation's status stream. Fields coilbox reads are named.
+ * `seq`, `frame` and `tick` are on every kind but `hello` and `unreadable`, and
+ * anything else OA wrote on the line (a screen's `previous`, an exit's `code`)
+ * arrives alongside them.
+ */
+export type OaEvent =
+  | { kind: "hello"; version: string; pid: number }
+  | { kind: "screen"; name: string }
+  | { kind: "match"; change: string }
+  | { kind: "gameOver"; results: unknown[] }
+  | { kind: "exit"; reason: string }
+  | { kind: "unknown"; event: string }
+  | { kind: "unreadable"; line: string };
+
+/**
+ * Start the Open Annihilation at `executable` with `args`, always adding
+ * `--status-stdout`, and stream what it reports down `onEvent`. Resolves when
+ * the process exits, with both `exitCode` and `signal` null when `playOaCancel`
+ * ended it. Rejects with OA's own words when it refuses an option, and while
+ * another OA runs.
+ */
+export const playOaLaunch = defineCommand<
+  {
+    executable: string;
+    args: string[];
+    runId: string;
+    onEvent: Channel<OaEvent>;
+  },
+  LaunchOutcome
+>("coilbox-play", "play_oa_launch");
+
+/** End the Open Annihilation a launch started, by run id. */
+export const playOaCancel = defineCommand<
+  { runId: string },
+  { cancelled: boolean }
+>("coilbox-play", "play_oa_cancel");
