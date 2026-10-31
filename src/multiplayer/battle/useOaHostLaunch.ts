@@ -1,18 +1,13 @@
 import { t } from "@lingui/core/macro";
-import { Channel } from "@tauri-apps/api/core";
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useState } from "react";
 import { describeError } from "@/i18n/uiError";
-import {
-  type OaEvent,
-  playOaCancel,
-  playOaLaunch,
-  playOaMaps,
-} from "../../play/bindings";
+import { playOaMaps } from "../../play/bindings";
 import {
   OA_BATTLE_ROOM_SCREEN,
   oaHostArguments,
   oaMapArgument,
 } from "../oaHost";
+import { cancelOaRun, startOaRun, useOaRun } from "../oaRun";
 import { useOpenAnnihilation } from "../openAnnihilation";
 
 /**
@@ -25,17 +20,19 @@ import { useOpenAnnihilation } from "../openAnnihilation";
  * exits, however it exits. The battle itself stays open the whole time, so a
  * late joiner can still be seated until the host presses START in OA.
  *
- * Leaving the battle ends OA too, through `cancel`: a battle that no longer
- * exists has no room to host. Moving to another page does not, because the
- * battle is still open.
+ * The run is held by `oaRun`, not by the page, so it survives the host moving
+ * to another page and back, and it ends when the battle does. `setIngame` is
+ * the multiplayer provider's, which does not depend on the page either.
  */
 export function useOaHostLaunch({
+  serverKey,
   battleId,
   battleMap,
   maxPlayers,
   username,
   setIngame,
 }: {
+  serverKey: string | null;
   battleId: number | null;
   /** The lobby's map field for this battle. */
   battleMap: string;
@@ -44,39 +41,25 @@ export function useOaHostLaunch({
   setIngame: (ingame: boolean) => void;
 }) {
   const [program] = useOpenAnnihilation();
-  const [running, setRunning] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const runId = useRef<string | null>(null);
+  const run = useOaRun();
+  // Why Start could not even try, which the run's own error cannot say.
+  const [startError, setStartError] = useState<string | null>(null);
 
   const start = useCallback(async () => {
-    if (battleId === null || !username || runId.current) return;
+    if (!serverKey || battleId === null || !username) return;
     if (!program) {
-      setError(t`Set where Open Annihilation is in Settings first.`);
+      setStartError(t`Set where Open Annihilation is in Settings first.`);
       return;
     }
-    setError(null);
-    const id = crypto.randomUUID();
-    runId.current = id;
-    setRunning(true);
+    setStartError(null);
     let flagRaised = false;
-    const onEvent = new Channel<OaEvent>();
-    onEvent.onmessage = (event) => {
-      if (
-        event.kind === "screen" &&
-        event.name === OA_BATTLE_ROOM_SCREEN &&
-        !flagRaised
-      ) {
-        flagRaised = true;
-        setIngame(true);
-      }
-    };
     try {
       // The key `--map` takes is not always the name the lobby carries. A list
       // that will not load leaves the lobby's name to be tried as it stands.
       const maps = await playOaMaps({ path: program.path })
         .then((r) => r.maps)
         .catch(() => []);
-      const outcome = await playOaLaunch({
+      await startOaRun({
         executable: program.path,
         args: oaHostArguments({
           battleId,
@@ -84,26 +67,38 @@ export function useOaHostLaunch({
           map: oaMapArgument(battleMap, maps),
           maxPlayers,
         }),
-        runId: id,
-        onEvent,
+        battle: { serverKey, battleId },
+        onEvent: (event) => {
+          if (
+            event.kind === "screen" &&
+            event.name === OA_BATTLE_ROOM_SCREEN &&
+            !flagRaised
+          ) {
+            flagRaised = true;
+            setIngame(true);
+          }
+        },
+        onEnd: () => {
+          if (flagRaised) setIngame(false);
+        },
       });
-      if (outcome.exitCode) {
-        const code = outcome.exitCode;
-        setError(t`Open Annihilation exited with code ${code}.`);
-      }
     } catch (e) {
-      setError(describeError(e));
-    } finally {
-      if (flagRaised) setIngame(false);
-      runId.current = null;
-      setRunning(false);
+      setStartError(describeError(e));
     }
-  }, [battleId, battleMap, maxPlayers, username, program, setIngame]);
+  }, [
+    serverKey,
+    battleId,
+    battleMap,
+    maxPlayers,
+    username,
+    program,
+    setIngame,
+  ]);
 
-  /** Ends OA, for a host who is leaving the battle. */
-  const cancel = useCallback(() => {
-    if (runId.current) void playOaCancel({ runId: runId.current });
-  }, []);
-
-  return { running, error, start, cancel };
+  return {
+    running: run.running,
+    error: startError ?? run.error,
+    start,
+    cancel: cancelOaRun,
+  };
 }

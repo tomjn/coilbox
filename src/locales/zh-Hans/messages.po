@@ -34853,7 +34853,7 @@ msgstr ""
 msgid "Open Annihilation battle"
 msgstr ""
 
-#: src/multiplayer/battle/useOaHostLaunch.ts
+#: src/multiplayer/oaRun.ts
 msgid "Open Annihilation exited with code {code}."
 msgstr ""
 

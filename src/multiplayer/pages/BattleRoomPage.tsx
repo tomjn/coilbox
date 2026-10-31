@@ -166,6 +166,7 @@ function BattleRoomPage() {
     blockReason,
   );
   const oaRun = useOaHostLaunch({
+    serverKey: room.serverKey,
     battleId: room.battle?.id ?? null,
     battleMap: room.battle?.map ?? "",
     maxPlayers: room.battle?.maxPlayers ?? 0,
