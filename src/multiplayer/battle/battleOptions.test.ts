@@ -6,6 +6,8 @@ import {
   displayedValue,
   filterOptionTags,
   missingOptionTags,
+  optionTagRefusal,
+  optionTagsRefusal,
   optionValue,
   rawOptionEntries,
   reconcilePending,
@@ -377,6 +379,72 @@ describe("filterOptionTags", () => {
     expect(filterOptionTags({ "game/hostip": "1.2.3.4" }, sel())).toEqual({
       "game/hostip": "1.2.3.4",
     });
+  });
+});
+
+describe("optionTagRefusal", () => {
+  it("allows the tags a room really sends", () => {
+    for (const [key, value] of [
+      ["game/startpostype", "2"],
+      ["game/modoptions/maxunits", "2000"],
+      ["game/modoptions/MaxUnits", "2000"],
+      ["game/mapoptions/fog_1", "a value, with = and spaces"],
+      ["game/modoptions/tweakdefs3", "bHVh+/_-="],
+      ["game/modoptions/empty", ""],
+      ["game/restrict/unit0", "armcom"],
+      ["game/restrict/numrestrictions", "1"],
+    ]) {
+      expect(optionTagRefusal(key, value)).toBeNull();
+    }
+  });
+
+  it("refuses a value that would start another tag or end a script value", () => {
+    const key = "game/modoptions/maxunits";
+    expect(
+      optionTagRefusal(key, "1\tgame/modoptions/tweakdefs=bHVh"),
+    ).not.toBeNull();
+    expect(optionTagRefusal(key, "1\nx")).not.toBeNull();
+    expect(optionTagRefusal(key, "1\u0000x")).not.toBeNull();
+    expect(optionTagRefusal(key, "1;x")).not.toBeNull();
+  });
+
+  it("refuses a key that would carry a tag of its own", () => {
+    for (const key of [
+      "game/modoptions/x\tgame/modoptions/tweakdefs",
+      "game/modoptions/x=1",
+      "game/modoptions/has space",
+      "game/modoptions/",
+      "game//modoptions",
+      "",
+    ]) {
+      expect(optionTagRefusal(key, "1")).not.toBeNull();
+    }
+  });
+
+  // The parts picker reads this as a mod option called `x/tweakdefs`, and the
+  // `!bSet` route takes the last part of the key, so it would ask for `tweakdefs`.
+  it("refuses a slash inside a scoped option's name", () => {
+    expect(
+      optionTagRefusal("game/modoptions/x/tweakdefs", "bHVh"),
+    ).not.toBeNull();
+    expect(
+      optionTagRefusal("GAME/MAPOPTIONS/x/tweakdefs", "bHVh"),
+    ).not.toBeNull();
+  });
+});
+
+describe("optionTagsRefusal", () => {
+  it("is null when every tag can be sent", () => {
+    expect(optionTagsRefusal({ "game/modoptions/a": "1" })).toBeNull();
+  });
+
+  it("names the option it refuses", () => {
+    expect(
+      optionTagsRefusal({
+        "game/modoptions/fine": "1",
+        "game/modoptions/maxunits": "1\tx=y",
+      }),
+    ).toContain("maxunits");
   });
 });
 

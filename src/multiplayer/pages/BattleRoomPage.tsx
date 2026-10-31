@@ -57,6 +57,7 @@ import {
   applyRoomSteps,
   type NotTakenWhat,
   notTakenMessage,
+  refusedOptions,
 } from "../battle/presetOutcome";
 import { RoomSplitHandle, useRoomSplit } from "../battle/RoomSplit";
 import { RoomWidgetsWarning } from "../battle/RoomWidgetsWarning";
@@ -288,6 +289,32 @@ function BattleRoomPage() {
       return;
     }
     setHostSeedError(null);
+    const seed = draftToHostSeed({
+      draft: preset,
+      sides: room.sides,
+      ais: room.addableAis,
+    });
+    const presetName = preset.name;
+    const labelFor = (what: NotTakenWhat) =>
+      what === "map"
+        ? t`Map`
+        : what === "teamSize"
+          ? t`Team size`
+          : what === "nbTeams"
+            ? t`Team count`
+            : i18n._(PART_LABELS[what]);
+    const tags = filterOptionTags(seed.scriptTags, selection);
+    // Before the first command of any kind, so a preset holding an option that
+    // cannot be sent leaves the room as it was.
+    const refused = notTakenMessage(refusedOptions(tags), labelFor);
+    if (refused) {
+      notify({
+        title: t`"${presetName}" was not applied`,
+        body: refused,
+        level: "warning",
+      });
+      return;
+    }
     // Changing the map is `UPDATEBATTLEINFO` when we run the game ourselves and
     // `!map` when a bot does. The second needs no checksum, which is why the
     // panel only waits on unitsync for the first. With an autohost the command
@@ -303,11 +330,6 @@ function BattleRoomPage() {
       ...(mapChange && room.autohost ? { map: preset.mapName } : {}),
       ...(shape ?? {}),
     };
-    const seed = draftToHostSeed({
-      draft: preset,
-      sides: room.sides,
-      ais: room.addableAis,
-    });
     if (take("teams")) {
       const applyNotice = hostSeedAiNotice(seed);
       if (applyNotice) {
@@ -331,18 +353,9 @@ function BattleRoomPage() {
       take("startPositions") && preset.startPosType === 2 && preset.startRects
         ? Object.entries(preset.startRects)
         : [];
-    const presetName = preset.name;
-    const labelFor = (what: NotTakenWhat) =>
-      what === "map"
-        ? t`Map`
-        : what === "teamSize"
-          ? t`Team size`
-          : what === "nbTeams"
-            ? t`Team count`
-            : i18n._(PART_LABELS[what]);
     void applyRoomSteps({
       hostSteps,
-      tags: filterOptionTags(seed.scriptTags, selection),
+      tags,
       schemas: {
         mod: fit?.modOptions.current,
         map: mapChange ? fit?.mapOptions.preset : fit?.mapOptions.current,

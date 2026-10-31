@@ -32,6 +32,47 @@ pub fn fits_one_field(value: &str) -> bool {
     !value.chars().any(char::is_whitespace)
 }
 
+/// Why a script tag cannot be sent, or `None` when it can.
+///
+/// A `SETSCRIPTTAGS` line is pairs split at tabs and each pair at its first `=`,
+/// and nothing escapes either. A tab in a key or value therefore adds a tag no
+/// option listed, which can be a tweak slot, and that is Lua the game runs. The
+/// key rule is the one `option_refusal` applies in the play plugin's `script.rs`,
+/// part by part since a tag is a path, with one name after a mod or map option's
+/// prefix. A longer name is a mod option to the parts picker and its last part to
+/// the `!bSet` route. A semicolon is refused too: the host script refuses it, and
+/// SPADS cannot write one beside a quote mark (`_encodeEntry` in `TDF.pm`), which
+/// stops its match starting.
+pub fn script_tag_refusal(key: &str, value: &str) -> Option<String> {
+    let plain = key.split('/').all(|part| {
+        !part.is_empty() && part.chars().all(|c| c.is_ascii_alphanumeric() || c == '_')
+    });
+    let lower = key.to_ascii_lowercase();
+    let scoped = lower.starts_with("game/modoptions/") || lower.starts_with("game/mapoptions/");
+    if !plain || (scoped && key.matches('/').count() != 2) {
+        return Some(format!(
+            "Coilbox did not send the room's options: the option {key:?} has a name that is not only letters, digits and underscores."
+        ));
+    }
+    let reason = if value.contains(';') {
+        "contains a semicolon"
+    } else if value.chars().any(char::is_control) {
+        "contains a line break or another control character"
+    } else {
+        return None;
+    };
+    Some(format!(
+        "Coilbox did not send the room's options: the option {key} {reason}."
+    ))
+}
+
+/// The first refusal among `tags` (see [`script_tag_refusal`]), so one bad tag
+/// stops the whole set before any of it is sent.
+pub fn script_tags_refusal(tags: &BTreeMap<String, String>) -> Option<String> {
+    tags.iter()
+        .find_map(|(key, value)| script_tag_refusal(key, value))
+}
+
 /// `LOGIN <user> <pass> <cpu> <local_ip> <agent>\t<client_id>\t<flags>`.
 ///
 /// `pw_hash` is the already-computed `BASE64(MD5(password))`. `cpu` is fixed at
@@ -716,6 +757,76 @@ mod tests {
         assert!(fits_one_field("letmein"));
         // The empty key a room with no password sends.
         assert!(fits_one_field("*"));
+    }
+
+    fn one_tag(key: &str, value: &str) -> BTreeMap<String, String> {
+        BTreeMap::from([(key.to_string(), value.to_string())])
+    }
+
+    /// The hazard itself: what the builder writes for a tab in a value or a key
+    /// reads back as a tag nobody named, and the refusal catches both.
+    #[test]
+    fn a_tab_in_a_script_tag_value_or_key_is_refused() {
+        for tags in [
+            one_tag(
+                "game/modoptions/maxunits",
+                "1\tgame/modoptions/tweakdefs=bHVh",
+            ),
+            one_tag("game/modoptions/x=1\tgame/modoptions/tweakdefs", "bHVh"),
+        ] {
+            let line = &set_script_tags(&tags)[0];
+            let crate::message::ServerMessage::SetScriptTags { tags: read } =
+                crate::message::parse_line(line)
+            else {
+                panic!("not read as script tags: {line}");
+            };
+            assert!(read.iter().any(|(k, _)| k == "game/modoptions/tweakdefs"));
+            assert!(script_tags_refusal(&tags).is_some());
+        }
+    }
+
+    #[test]
+    fn script_tag_refusal_names_the_option() {
+        let refused = script_tag_refusal("game/modoptions/maxunits", "1\t2").unwrap();
+        assert!(refused.contains("game/modoptions/maxunits"));
+        let refused = script_tag_refusal("game/modoptions/a\tb", "1").unwrap();
+        assert!(refused.contains(r"a\tb"));
+    }
+
+    #[test]
+    fn script_tag_refusal_takes_the_tags_a_room_really_sends() {
+        for (key, value) in [
+            ("game/startpostype", "2"),
+            ("game/modoptions/maxunits", "2000"),
+            ("game/modoptions/MaxUnits", "2000"),
+            ("game/mapoptions/fog_1", "a value, with = and spaces"),
+            ("game/modoptions/tweakdefs3", "bHVh+/_-="),
+            ("game/modoptions/empty", ""),
+            ("game/restrict/unit0", "armcom"),
+            ("game/restrict/numrestrictions", "1"),
+        ] {
+            assert_eq!(script_tag_refusal(key, value), None, "{key}");
+        }
+    }
+
+    #[test]
+    fn script_tag_refusal_refuses_what_changes_how_a_line_is_read() {
+        let key = "game/modoptions/maxunits";
+        for value in ["1\n2", "1\r2", "1\u{0}2", "1;2"] {
+            assert!(script_tag_refusal(key, value).is_some(), "{value:?}");
+        }
+        for key in [
+            "game/modoptions/x=1",
+            "game/modoptions/has space",
+            "game/modoptions/",
+            "game//modoptions",
+            "",
+            // A mod option to the parts picker, `tweakdefs` to the `!bSet` route.
+            "game/modoptions/x/tweakdefs",
+            "GAME/MAPOPTIONS/x/tweakdefs",
+        ] {
+            assert!(script_tag_refusal(key, "1").is_some(), "{key:?}");
+        }
     }
 
     #[test]

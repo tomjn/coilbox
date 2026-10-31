@@ -306,6 +306,10 @@ msgstr "\"{pieceName}\" turns about its middle, not its joint."
 msgid "\"{presetName}\" replaces the game, the map, the participants and the game options with {game} on {map}."
 msgstr "\"{presetName}\" replaces the game, the map, the participants and the game options with {game} on {map}."
 
+#: src/multiplayer/pages/BattleRoomPage.tsx
+msgid "\"{presetName}\" was not applied"
+msgstr "\"{presetName}\" was not applied"
+
 #: src/workshop/pages/components/ShareProjectForm.tsx
 msgid "\"{projectName}\" is {sizeKb} KB, over the {limitKb} KB a code can carry. Export it as a file instead."
 msgstr "\"{projectName}\" is {sizeKb} KB, over the {limitKb} KB a code can carry. Export it as a file instead."
@@ -12809,6 +12813,10 @@ msgstr "Coilbox could not write your widget settings for {game}"
 msgid "Coilbox deletes it from this computer. It stays on the hub, so you can import it again."
 msgstr "Coilbox deletes it from this computer. It stays on the hub, so you can import it again."
 
+#: src/multiplayer/battle/battleOptions.ts
+msgid "Coilbox did not send the room's options: {name}. {reason}."
+msgstr "Coilbox did not send the room's options: {name}. {reason}."
+
 #: src/i18n/uiError.ts
 msgid "Coilbox does not follow packs from {host}. That host is not on its list."
 msgstr "Coilbox does not follow packs from {host}. That host is not on its list."
@@ -13668,6 +13676,14 @@ msgstr "Contact! Raiders inbound from the north pass."
 #: src/deeplink/DeepLinkHandler.tsx
 msgid "Contacting {fetching} and checking what it sends back."
 msgstr "Contacting {fetching} and checking what it sends back."
+
+#: src/multiplayer/battle/battleOptions.ts
+msgid "Contains a line break or another control character"
+msgstr "Contains a line break or another control character"
+
+#: src/multiplayer/battle/battleOptions.ts
+msgid "Contains a semicolon"
+msgstr "Contains a semicolon"
 
 #: src/campaign/pages/components/MissionEditorDrawer.tsx
 #: src/content/pages/StorageSection.tsx
@@ -24657,6 +24673,10 @@ msgstr "Name for the new project"
 #: src/workshop/pages/components/CloneActions.tsx
 msgid "Name in game"
 msgstr "Name in game"
+
+#: src/multiplayer/battle/battleOptions.ts
+msgid "Name is not only letters, digits and underscores"
+msgstr "Name is not only letters, digits and underscores"
 
 #: src/lego/pages/components/GuidesPopover.tsx
 msgid "Name of {guideLabel}"

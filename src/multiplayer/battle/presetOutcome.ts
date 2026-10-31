@@ -2,7 +2,13 @@ import { t } from "@lingui/core/macro";
 import type { ConfigOption } from "@/content/bindings";
 import { undeclaredOptions } from "@/play/presetFit";
 import type { PresetPart } from "@/play/presetParts";
-import { MAPOPT_PREFIX, MODOPT_PREFIX, partForTag } from "./battleOptions";
+import {
+  MAPOPT_PREFIX,
+  MODOPT_PREFIX,
+  optionTagLabel,
+  optionTagRefusal,
+  partForTag,
+} from "./battleOptions";
 import type {
   HostStep,
   HostStepFailure,
@@ -71,6 +77,25 @@ export function dropUndeclared(
     kept,
     notTaken: [...byPart].map(([what, items]) => ({ what, items, reason })),
   };
+}
+
+/**
+ * The options in a set of tags that cannot be sent at all, grouped by part and
+ * reason. A preset comes from a shared file or a followed pack as easily as from
+ * the player, and any of these means none of it is applied.
+ */
+export function refusedOptions(tags: Record<string, string>): NotTaken[] {
+  const entries = new Map<string, NotTaken>();
+  for (const [tagKey, value] of Object.entries(tags)) {
+    const reason = optionTagRefusal(tagKey, value);
+    if (reason === null) continue;
+    const what = partForTag(tagKey) ?? "modOptions";
+    const id = `${what} ${reason}`;
+    const entry = entries.get(id) ?? { what, items: [], reason };
+    entry.items.push(optionTagLabel(tagKey));
+    entries.set(id, entry);
+  }
+  return [...entries.values()];
 }
 
 /** The options a paced run left unset, grouped by the part they belong to. A

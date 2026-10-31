@@ -62,6 +62,7 @@ import {
   canEditBattleOptions,
   missingOptionTags,
   type OptionEdit,
+  optionTagsRefusal,
   staleMapOptionTags,
 } from "./battleOptions";
 import { battleRoomHref } from "./battleRoomKey";
@@ -1163,6 +1164,11 @@ export function useBattleRoom(serverKey: string | null): BattleRoomView {
   const sendOption = useCallback(
     (tagKey: string, spadsName: string, value: string) => {
       if (!activeKey) return;
+      const refusal = optionTagsRefusal({ [tagKey]: value });
+      if (refusal) {
+        setErr(refusal);
+        return;
+      }
       if (isFounder) {
         mpSetScriptTags({
           serverKey: activeKey,
@@ -1214,6 +1220,13 @@ export function useBattleRoom(serverKey: string | null): BattleRoomView {
           ...missingOptionTags("mod", modOptionsSchema, tags),
           ...missingOptionTags("map", mapOptionsSchema, tags),
         };
+        // Before the removal below as well, which would otherwise strip the room
+        // of options the refused write was meant to replace.
+        const refusal = optionTagsRefusal(filled);
+        if (refusal) {
+          setErr(refusal);
+          return null;
+        }
         const writes: Promise<unknown>[] = [];
         if (Object.keys(filled).length > 0) {
           writes.push(
