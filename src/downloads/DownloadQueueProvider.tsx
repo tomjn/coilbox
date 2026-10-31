@@ -39,6 +39,7 @@ import { indexTick } from "./mirrorIndex";
 import { type ProgressSink, progressChannel } from "./progressChannel";
 import { laneOf, type QueueLane, startable } from "./queueLanes";
 import { type SourceStep, SourceWalkError } from "./sourceWalk";
+import { taskbarProgress, useTaskbarProgress } from "./taskbarProgress";
 import { installEngine } from "./warmEngineCache";
 
 /**
@@ -273,6 +274,12 @@ interface DownloadQueueValue {
   itemFor: (identity: string) => QueueItem | null;
   /** Subscribe to items completing (done). Returns an unsubscribe fn. */
   onComplete: (fn: (item: QueueItem) => void) => () => void;
+  /**
+   * Say the player has seen the queue, which ends the error state on the
+   * taskbar or dock icon after a failure (issue #359). Call it when they open
+   * the queue popover or the downloads page.
+   */
+  acknowledgeFailures: () => void;
 }
 
 const DownloadQueueContext = createContext<DownloadQueueValue | null>(null);
@@ -311,6 +318,14 @@ export function DownloadQueueProvider({ children }: { children: ReactNode }) {
   itemsRef.current = items;
 
   const [reported, setReported] = useState<ReportedDownload[]>([]);
+
+  /**
+   * A download has failed and the player has not seen it yet. It drives the
+   * error state on the taskbar or dock icon. Set when a download fails, and
+   * cleared when the next download starts or the player opens the queue.
+   */
+  const [failureUnseen, setFailureUnseen] = useState(false);
+  const acknowledgeFailures = useCallback(() => setFailureUnseen(false), []);
 
   /**
    * The last failure for each request identity, kept beside the queue rather
@@ -589,6 +604,7 @@ export function DownloadQueueProvider({ children }: { children: ReactNode }) {
         patch(item.id, meta);
         if (next) setNexts((n) => ({ ...n, [item.identity]: next }));
         if (!canceled) {
+          setFailureUnseen(true);
           setFailures((f) => ({ ...f, [item.identity]: msg }));
           remember(raw);
         }
@@ -630,6 +646,7 @@ export function DownloadQueueProvider({ children }: { children: ReactNode }) {
         startedAt: Date.now(),
       } as const;
       patch(next.id, meta);
+      setFailureUnseen(false);
       // The started item, so what it records knows how long it ran.
       void run({ ...next, ...meta } as QueueItem);
     }
@@ -844,6 +861,8 @@ export function DownloadQueueProvider({ children }: { children: ReactNode }) {
     return () => clearInterval(timer);
   }, [anyRunning, patch]);
 
+  useTaskbarProgress(taskbarProgress([...running, ...reported], failureUnseen));
+
   const value: DownloadQueueValue = useMemo(
     () => ({
       items,
@@ -862,6 +881,7 @@ export function DownloadQueueProvider({ children }: { children: ReactNode }) {
       completedFor,
       itemFor,
       onComplete,
+      acknowledgeFailures,
     }),
     [
       items,
@@ -880,6 +900,7 @@ export function DownloadQueueProvider({ children }: { children: ReactNode }) {
       completedFor,
       itemFor,
       onComplete,
+      acknowledgeFailures,
     ],
   );
 

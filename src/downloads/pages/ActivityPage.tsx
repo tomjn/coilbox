@@ -3,7 +3,7 @@ import { msg } from "@lingui/core/macro";
 import { Trans, useLingui } from "@lingui/react/macro";
 import { Button, buttonVariants, useDrawer } from "@picoframe/frame";
 import { Download } from "lucide-react";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router";
 import {
   Table,
@@ -389,7 +389,11 @@ export function DownloadsActivity({
  * order the download walks, a pinned source included.
  */
 export default function ActivityPage() {
-  const { items, settled, cancel, enqueue } = useDownloadQueue();
+  const { items, settled, cancel, enqueue, acknowledgeFailures } =
+    useDownloadQueue();
+  // This page is the queue, so a failure that lands while it is open is seen.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: `settled` is the trigger, a download stopping while the page is open, and is not read in the body
+  useEffect(() => acknowledgeFailures(), [acknowledgeFailures, settled]);
   const history = useDownloadHistory();
   const drawer = useDrawer();
   const rows = useMemo(
