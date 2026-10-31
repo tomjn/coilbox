@@ -3100,6 +3100,10 @@ fn mp_set_script_tags(
     server_key: String,
     tags: BTreeMap<String, String>,
 ) -> CliResult {
+    // Every route below starts here, so nothing in the app can get around it.
+    if let Some(refused) = command::script_tags_refusal(&tags) {
+        return CliResult::err(refused);
+    }
     // Zero-K splits this in two. `SetModOptions` and `SetMapOptions` assign the
     // dictionary they are handed, so the caller's tags are laid over the room's
     // current options before they go. It has nothing for a start position type
@@ -3155,6 +3159,14 @@ fn mp_remove_script_tags(
     server_key: String,
     tags: Vec<String>,
 ) -> CliResult {
+    // Space separated, so a key holding a space names two other tags. Only that is
+    // refused: these keys are read from the room, and one a server set under a
+    // looser rule still has to be removable.
+    if let Some(key) = tags.iter().find(|key| !command::fits_one_field(key)) {
+        return CliResult::err(format!(
+            "Coilbox did not change the room's options: the option {key:?} has a space or tab in its name."
+        ));
+    }
     let refs: Vec<&str> = tags.iter().map(String::as_str).collect();
     enqueue_all(
         registry.inner(),
