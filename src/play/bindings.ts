@@ -157,6 +157,35 @@ export const playImportPreset = defineCommand<
   { json: string }
 >("coilbox-play", "play_import_preset");
 
+/** The content folders among `roots` that hold BYAR-Chobby's
+ *  `optionsPresets.json`, as the path to the file in each. */
+export const playChobbyPresetsFind = defineCommand<
+  { roots: string[] },
+  { files: string[] }
+>("coilbox-play", "play_chobby_presets_find");
+
+/** The records of an `optionsPresets.json` as one JSON object. Errors when
+ *  the file is one Chobby could not decode. */
+export const playChobbyPresetsRead = defineCommand<
+  { path: string },
+  { json: string }
+>("coilbox-play", "play_chobby_presets_read");
+
+/** One change to an `optionsPresets.json`. */
+export type ChobbyPresetEdit =
+  | { op: "set"; name: string; record: unknown }
+  | { op: "remove"; name: string };
+
+/**
+ * Apply edits to an `optionsPresets.json`. The file is read again inside the
+ * command, so a change Chobby made meanwhile is kept, and copied beside itself
+ * before it is replaced. Returns the file as it now is and the copy's path.
+ */
+export const playChobbyPresetsWrite = defineCommand<
+  { path: string; edits: ChobbyPresetEdit[] },
+  { json: string; backup: string }
+>("coilbox-play", "play_chobby_presets_write");
+
 /**
  * Write the start script and launch the engine, resolving when the engine
  * process exits (the UI's unfreeze signal). `executable` is the engine binary;

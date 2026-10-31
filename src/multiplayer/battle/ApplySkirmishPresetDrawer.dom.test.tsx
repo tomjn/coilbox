@@ -27,10 +27,17 @@ const maps = vi.hoisted(() => ({
   games: {} as Record<string, { key: string; name: string }[]>,
   options: {} as Record<string, { key: string; name: string }[]>,
   positions: {} as Record<string, number>,
+  // The maps the player has, or null while the install has not been read.
+  installed: null as string[] | null,
 }));
 
 vi.mock("@/content/config", () => ({
   THUMB_MINIMAP_MIP: 3,
+  useUnitsyncScan: () => ({
+    data: maps.installed
+      ? { maps: maps.installed.map((name) => ({ name })) }
+      : null,
+  }),
   useUnitsyncThumbnails: () => ({ thumbs: new Map() }),
   useUnitsyncGameInfo: (
     _engine?: string,
@@ -66,6 +73,7 @@ afterEach(() => {
   maps.games = {};
   maps.options = {};
   maps.positions = {};
+  maps.installed = null;
 });
 
 const _idleDelivery = (): TweakDelivery => ({
@@ -317,6 +325,26 @@ describe("the room's preset panel, warning about what does not fit", () => {
     });
     openPanel();
     expect(screen.queryByText(/start positions\./)).toBeNull();
+  });
+
+  it("warns on the map before it is sent when the player does not have it", () => {
+    maps.installed = ["Room Map"];
+    renderDrawer();
+    openPanel();
+    expect(screen.getByText("You do not have Preset Map.")).toBeTruthy();
+  });
+
+  it("makes no map check when the map is left out or already installed", () => {
+    maps.installed = ["Room Map"];
+    renderDrawer();
+    openPanel();
+    fireEvent.click(checkbox("Map"));
+    expect(screen.queryByText(/You do not have/)).toBeNull();
+    cleanup();
+    maps.installed = ["Room Map", "Preset Map"];
+    renderDrawer();
+    openPanel();
+    expect(screen.queryByText(/You do not have/)).toBeNull();
   });
 
   it("shows no warning for a preset that fits", () => {

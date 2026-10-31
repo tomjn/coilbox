@@ -225,3 +225,35 @@ describe("presetFitWarnings", () => {
     ).toEqual({});
   });
 });
+
+describe("presetFitWarnings for a map the player lacks", () => {
+  it("warns on the map part before it is sent", () => {
+    const out = presetFitWarnings(
+      draft({ mapName: "Far Map" }),
+      only("map"),
+      facts({ presetMapInstalled: false }),
+    );
+    expect(out.map).toBe("You do not have Far Map.");
+  });
+
+  it("says nothing when the map is installed or the install is unread", () => {
+    const preset = draft({ mapName: "Far Map" });
+    expect(
+      presetFitWarnings(
+        preset,
+        only("map"),
+        facts({ presetMapInstalled: true }),
+      ).map,
+    ).toBeUndefined();
+    expect(presetFitWarnings(preset, only("map"), facts()).map).toBeUndefined();
+  });
+
+  it("makes no check when the map part is not ticked", () => {
+    const out = presetFitWarnings(
+      draft({ mapName: "Far Map" }),
+      only("modOptions"),
+      facts({ presetMapInstalled: false }),
+    );
+    expect(out.map).toBeUndefined();
+  });
+});

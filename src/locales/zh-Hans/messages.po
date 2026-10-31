@@ -107,6 +107,11 @@ msgstr "仅限 \"Large\" BeamLaser。光束消失再恢复的速度。"
 msgid "'Large' BeamLaser only. Regular BeamLaser stretches a single tile instead of repeating it."
 msgstr "仅限 \"Large\" BeamLaser。普通 BeamLaser 会拉伸单个图块，而不是重复它。"
 
+#. placeholder {0}: writing.name
+#: src/play/ChobbyPresetsView.tsx
+msgid "\"{0}\" is already in Chobby."
+msgstr ""
+
 #: src/lego/pack.ts
 #, fuzzy
 msgid "\"{baseId}\" states a unit of {baseUnit}, which is not a positive number. The unit is {fallback} instead."
@@ -578,6 +583,11 @@ msgstr "{0, plural, other {# 个阻碍项会导致玩家拿到损坏的内容：
 msgid "{0, plural, one {# blueprint added to your library.} other {# blueprints added to your library.}}"
 msgstr "{0, plural, other {已将 # 个蓝图添加到你的库。}}"
 
+#. placeholder {0}: sum.bots
+#: src/play/ChobbyPresetsView.tsx
+msgid "{0, plural, one {# bot} other {# bots}}"
+msgstr ""
+
 #. placeholder {0}: dead.length
 #. placeholder {0}: ops.length
 #: src/workshop/compatibility.ts
@@ -767,6 +777,8 @@ msgid "{0, plural, one {# of them has a stored analysis, which is deleted too an
 msgstr "{0, plural, other {其中 # 个有已存储的分析，也会一并删除，再释放 {analysisFreed}。}}"
 
 #. placeholder {0}: counts.plain
+#. placeholder {0}: sum.options
+#: src/play/ChobbyPresetsView.tsx
 #: src/play/presetParts.ts
 #, fuzzy
 msgid "{0, plural, one {# option} other {# options}}"
@@ -1140,6 +1152,11 @@ msgstr "{0, plural, other {隐藏列表：# 个 id，全部匹配可隐藏的功
 #, fuzzy
 msgid "{0, plural, one {Hide settings: # id, which matches a section} other {Hide settings: # ids, all match a section}}"
 msgstr "{0, plural, other {隐藏设置：# 个 id，全部匹配某个部分}}"
+
+#. placeholder {0}: picked.size
+#: src/play/ChobbyPresetsView.tsx
+msgid "{0, plural, one {Import # preset} other {Import # presets}}"
+msgstr ""
 
 #. placeholder {0}: data.sharedTeamGames
 #: src/content/pages/components/PlayerMatchFigures.tsx
@@ -2218,6 +2235,10 @@ msgstr "{count, plural, other {# 位好友在对局中}}"
 msgid "{count, plural, one {Game filter matches # installed game} other {Game filter matches # installed games}}"
 msgstr "{count, plural, other {游戏筛选匹配 # 个已安装的游戏}}"
 
+#: src/play/ChobbyPresetsView.tsx
+msgid "{count, plural, one {Imported # preset from Chobby} other {Imported # presets from Chobby}}"
+msgstr ""
+
 #: src/lego/pages/BuilderPage.tsx
 #, fuzzy
 msgid "{count, plural, one {Pasted, but # piece isn't in this pack and won't show geometry until reassigned.} other {Pasted, but # pieces aren't in this pack and won't show geometry until reassigned.}}"
@@ -2822,6 +2843,10 @@ msgstr "{front} 和 {last}"
 #, fuzzy
 msgid "{game} brought by this game's own published table"
 msgstr "{game} 由此游戏自己发布的对照表提供"
+
+#: src/play/pages/SkirmishPage.tsx
+msgid "{game} does not declare {names}."
+msgstr ""
 
 #: src/content/pages/components/LivingValueChart.tsx
 #, fuzzy
@@ -12108,6 +12133,10 @@ msgstr "背景色"
 msgid "Background set, no icon"
 msgstr "已设置背景，无图标"
 
+#: src/play/ChobbyPresetsView.tsx
+msgid "Backup: {backup}"
+msgstr ""
+
 #: src/content/buildPicMissing.ts
 #, fuzzy
 msgid "bad pic"
@@ -13948,6 +13977,7 @@ msgstr "不会伤害自己的单位"
 #: src/multiplayer/LobbyStatusButton.tsx
 #: src/multiplayer/RelayIndicator.tsx
 #: src/placement/TerrainControls.tsx
+#: src/play/ChobbyPresetsView.tsx
 #: src/play/pages/components/GameOptionsPanel.tsx
 #: src/play/pages/SavegamesPage.tsx
 #: src/play/PresetLibraryToolbar.tsx
@@ -14717,6 +14747,15 @@ msgstr "每帧检查炮口"
 msgid "checksum {checksum}"
 msgstr "校验和 {checksum}"
 
+#: src/play/ChobbyPresetsView.tsx
+msgid "Chobby file"
+msgstr ""
+
+#: src/play/ChobbyPresetsRow.tsx
+#: src/play/pages/components/PresetsDrawer.tsx
+msgid "Chobby presets"
+msgstr ""
+
 #: src/lego/pages/components/ExportDrawer.tsx
 #: src/lego/pages/components/TexturePicker.tsx
 #, fuzzy
@@ -14832,6 +14871,10 @@ msgstr "请选择地图。"
 #, fuzzy
 msgid "Choose a model"
 msgstr "选择模型"
+
+#: src/play/ChobbyPresetsView.tsx
+msgid "Choose a preset to write"
+msgstr ""
 
 #: src/workshop/pages/components/CollectionsPanel.tsx
 #, fuzzy
@@ -17531,6 +17574,10 @@ msgstr "无法读取此游戏的归档。"
 #, fuzzy
 msgid "Could not read this game's archive. Use the file picker instead."
 msgstr "无法读取此游戏的归档。请改用文件选择器。"
+
+#: src/play/ChobbyPresetsView.tsx
+msgid "Could not read this game's factions and AIs. Close the sheet and open it again to retry."
+msgstr ""
 
 #: src/content/pages/GameDetailPage.tsx
 #, fuzzy
@@ -25210,6 +25257,7 @@ msgstr "命中音效音量（水下）"
 #: src/deeplink/pages/ImportSection.tsx
 #: src/hub/pages/ItemPage.tsx
 #: src/lego/pages/components/ScriptTab.tsx
+#: src/play/ChobbyPresetsView.tsx
 #: src/play/PresetLibraryToolbar.tsx
 #: src/scenario/pages/components/ScenarioImportButton.tsx
 #: src/uberstress/pages/HistoryPage.tsx
@@ -25222,6 +25270,10 @@ msgstr "导入"
 #, fuzzy
 msgid "Import .sdd folder…"
 msgstr "导入 .sdd 文件夹…"
+
+#: src/play/ChobbyPresetsView.tsx
+msgid "Import {name}"
+msgstr ""
 
 #: src/deeplink/pages/ImportSection.tsx
 #, fuzzy
@@ -25325,6 +25377,10 @@ msgstr "从链接导入"
 #, fuzzy
 msgid "Import from file…"
 msgstr "从文件导入…"
+
+#: src/play/ChobbyPresetsRow.tsx
+msgid "Import from or write to optionsPresets.json"
+msgstr ""
 
 #: src/content/pages/components/KeymapsPanel.tsx
 #, fuzzy
@@ -27407,6 +27463,10 @@ msgstr "已排除：{noTotals} 场没有记录数据（较旧或未测量的回�
 msgid "Left out: {noTotals} with no figures recorded (older or unmeasured replays)."
 msgstr "已排除：{noTotals} 场没有记录数据（较旧或未测量的回放）。"
 
+#: src/play/ChobbyPresetsView.tsx
+msgid "Left out: {sections}"
+msgstr ""
+
 #: src/multiplayer/chat/ChatPane.tsx
 #, fuzzy
 msgid "left: {leaveReason}"
@@ -27737,10 +27797,26 @@ msgstr "从文件加载"
 msgid "Load map, game and engine lists after launch. Turn this off on a metered connection."
 msgstr "启动后加载地图、游戏和引擎列表。使用按流量计费的网络时请关闭。"
 
+#: src/play/PresetLoadGate.tsx
+msgid "Load onto {game}"
+msgstr ""
+
 #: src/downloads/pages/components/RapidBrowser.tsx
 #, fuzzy
 msgid "Load repos"
 msgstr "加载仓库"
+
+#: src/play/PresetLoadGate.tsx
+msgid "Load this preset"
+msgstr ""
+
+#: src/play/PresetLoadGate.tsx
+msgid "Load without the game"
+msgstr ""
+
+#: src/play/pages/SkirmishPage.tsx
+msgid "Loaded \"{presetName}\" onto {game}"
+msgstr ""
 
 #: src/lego/moduleFileIo.ts
 #, fuzzy
@@ -34937,6 +35013,18 @@ msgstr "可选。Zero-K 会将其保存在你的账号中，不会发送验证�
 msgid "Options"
 msgstr "选项"
 
+#: src/play/chobbyPresets.ts
+msgid "optionsPresets.json is empty."
+msgstr ""
+
+#: src/play/chobbyPresets.ts
+msgid "optionsPresets.json is not a table of presets."
+msgstr ""
+
+#: src/play/chobbyPresets.ts
+msgid "optionsPresets.json is not valid JSON: {reason}"
+msgstr ""
+
 #: src/workshop/pages/components/EquipWeaponPopover.tsx
 #, fuzzy
 msgid "Or equip one from the library"
@@ -36745,6 +36833,10 @@ msgstr "已调整预设 AI"
 #, fuzzy
 msgid "Preset name"
 msgstr "预设名称"
+
+#: src/play/ChobbyPresetsView.tsx
+msgid "Preset to write"
+msgstr ""
 
 #: src/multiplayer/battle/ApplySkirmishPresetDrawer.tsx
 #: src/multiplayer/pages/BattleRoomPage.tsx
@@ -38761,6 +38853,7 @@ msgstr "改编自"
 #: src/lego/pages/components/BuiltBySection.tsx
 #: src/lego/pages/components/ProportionsPanel.tsx
 #: src/multiplayer/battle/MemberRow.tsx
+#: src/play/ChobbyPresetsView.tsx
 #: src/widgets/pages/RemoveWidget.tsx
 #: src/widgets/pages/WidgetsPage.tsx
 #: src/workshop/pages/components/ExplosionGeneratorEditor.tsx
@@ -38835,6 +38928,10 @@ msgstr "移除 {mapTitle}？"
 #, fuzzy
 msgid "Remove {name}"
 msgstr "移除 {name}"
+
+#: src/play/ChobbyPresetsView.tsx
+msgid "Remove {name} from Chobby"
+msgstr ""
 
 #: src/multiplayer/chat/ConversationSidebar.tsx
 #, fuzzy
@@ -39029,6 +39126,10 @@ msgstr "移除词"
 #, fuzzy
 msgid "removed"
 msgstr "已移除"
+
+#: src/play/ChobbyPresetsView.tsx
+msgid "Removed \"{name}\" from Chobby"
+msgstr ""
 
 #: src/content/pages/components/MissionRuntimeSection.tsx
 #, fuzzy
@@ -39253,6 +39354,7 @@ msgstr "重复 · {cooldown} 秒"
 #: src/campaign/pages/components/MissionMediaFields.tsx
 #: src/lego/moduleFileIo.ts
 #: src/lego/pages/components/ScriptTab.tsx
+#: src/play/ChobbyPresetsView.tsx
 #: src/widgets/pages/AddWidgetDrawer.tsx
 #, fuzzy
 msgid "Replace"
@@ -43717,6 +43819,10 @@ msgstr "所需的部分内容未安装，而且 coilbox 无法下载。安装之
 #, fuzzy
 msgid "Some content this needs isn't installed. Download it below, or cancel — nothing is imported until everything's ready."
 msgstr "所需的部分内容未安装。请在下方下载，或取消。在一切就绪之前不会导入任何内容。"
+
+#: src/play/PresetLoadGate.tsx
+msgid "Some content this preset needs isn't installed. Download it below, or cancel to leave your setup as it is."
+msgstr ""
 
 #: src/content/pages/components/GatherReplaysButton.tsx
 #, fuzzy
@@ -54504,6 +54610,10 @@ msgstr "残骸"
 msgid "Wreck pose"
 msgstr "残骸姿势"
 
+#: src/play/ChobbyPresetsView.tsx
+msgid "Write"
+msgstr ""
+
 #: src/workshop/pages/components/PackagePanel.tsx
 #, fuzzy
 msgid "Write {projectName} out as a .sdz for {gameName}, ready to hand to somebody else or upload."
@@ -54654,6 +54764,10 @@ msgstr "导出时写入你导出到的游戏中的 <0>{scriptPath}</0>，不会�
 #, fuzzy
 msgid "Written:"
 msgstr "已写出："
+
+#: src/play/ChobbyPresetsView.tsx
+msgid "Wrote \"{name}\" to Chobby"
+msgstr ""
 
 #. placeholder {0}: result.groups.length
 #: src/content/pages/components/Convert3doDrawer.tsx
@@ -54873,6 +54987,10 @@ msgstr "你无法在这里注册新账号。此服务器的验证邮件无法送
 #, fuzzy
 msgid "you changed this"
 msgstr "你已更改"
+
+#: src/play/presetFit.ts
+msgid "You do not have {mapName}."
+msgstr ""
 
 #: src/play/pages/SkirmishPage.tsx
 #, fuzzy
