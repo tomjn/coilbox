@@ -64,7 +64,13 @@ export async function startOaRun({
   const channel = new Channel<OaEvent>();
   let version: string | null = null;
   let matches = 0;
+  // OA's own words when it refuses after its stream began. They say more than
+  // the exit code that goes with them.
+  let refusal: string | null = null;
   channel.onmessage = (event) => {
+    if (event.kind === "exit" && event.reason === "refused" && event.message) {
+      refusal = event.message;
+    }
     // A finished match is kept here, as it arrives: a cancel gives no `exit`
     // event, and the page that started the run may be gone.
     try {
@@ -94,7 +100,9 @@ export async function startOaRun({
       runId: id,
       onEvent: channel,
     });
-    if (outcome.exitCode) {
+    if (refusal) {
+      error = refusal;
+    } else if (outcome.exitCode) {
       const code = outcome.exitCode;
       error = t`Open Annihilation exited with code ${code}.`;
     }
