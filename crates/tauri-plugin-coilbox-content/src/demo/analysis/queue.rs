@@ -779,6 +779,7 @@ fn settle_list(
                 game: &run.base_game,
                 game_differs,
                 taken_at_ms: now_ms(),
+                list_version: 0,
             },
         ) {
             Ok(_) => Outcome::Stored,
