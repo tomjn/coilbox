@@ -22,6 +22,7 @@ import {
 import { type ChartSeries, formatRate, seriesTeams } from "../../matchStats";
 import { useReplayCommandRates } from "../../useReplayCommandRates";
 import { useSeriesEmphasis } from "../../useSeriesEmphasis";
+import { CommandRateExportButton } from "./CommandRateExportButton";
 import { SectionHelp } from "./SectionHelp";
 
 /**
@@ -206,6 +207,11 @@ export function CommandRateChart({
               })}
             </LineChart>
           </ResponsiveContainer>
+        )}
+        {shown.length > 0 && built && (
+          <CommandRateExportButton
+            input={{ info, source, series: shown, rows: built.rows }}
+          />
         )}
         {rates.incomplete && (
           <p className="text-xs text-muted-foreground">

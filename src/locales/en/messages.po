@@ -13178,6 +13178,10 @@ msgstr "Commander"
 msgid "Commands per minute"
 msgstr "Commands per minute"
 
+#: src/content/pages/components/CommandRateExportButton.tsx
+msgid "Commands per minute exported."
+msgstr "Commands per minute exported."
+
 #: src/scenario/pages/components/RestrictionPanel.tsx
 msgid "Commands withheld"
 msgstr "Commands withheld"
@@ -14531,6 +14535,7 @@ msgstr "Cruise altitude, elmos"
 msgid "Crush resistance"
 msgstr "Crush resistance"
 
+#: src/content/pages/components/CommandRateExportButton.tsx
 #: src/content/pages/components/MatchStatsExportButton.tsx
 msgid "CSV"
 msgstr "CSV"
@@ -17262,15 +17267,21 @@ msgstr "Export campaign"
 msgid "Export challenge"
 msgstr "Export challenge"
 
+#: src/content/pages/components/CommandRateExportButton.tsx
+msgid "Export commands per minute"
+msgstr "Export commands per minute"
+
 #: src/compat/pickSdzPath.ts
 msgid "Export compatibility mutator"
 msgstr "Export compatibility mutator"
 
+#: src/content/pages/components/CommandRateExportButton.tsx
 #: src/content/pages/components/MatchStatsExportButton.tsx
 msgid "Export CSV"
 msgstr "Export CSV"
 
 #: src/content/pages/components/BuildTreeExportButton.tsx
+#: src/content/pages/components/CommandRateExportButton.tsx
 #: src/content/pages/components/MapExportButtons.tsx
 #: src/content/pages/components/MatchStatsExportButton.tsx
 msgid "Export failed: {reason}"

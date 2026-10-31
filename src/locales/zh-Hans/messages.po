@@ -16256,6 +16256,10 @@ msgstr "指挥官"
 msgid "Commands per minute"
 msgstr "每分钟命令数"
 
+#: src/content/pages/components/CommandRateExportButton.tsx
+msgid "Commands per minute exported."
+msgstr ""
+
 #: src/scenario/pages/components/RestrictionPanel.tsx
 #, fuzzy
 msgid "Commands withheld"
@@ -17919,6 +17923,7 @@ msgstr "巡航高度，elmo"
 msgid "Crush resistance"
 msgstr "抗碾压"
 
+#: src/content/pages/components/CommandRateExportButton.tsx
 #: src/content/pages/components/MatchStatsExportButton.tsx
 #, fuzzy
 msgid "CSV"
@@ -21273,17 +21278,23 @@ msgstr "导出战役"
 msgid "Export challenge"
 msgstr "导出挑战"
 
+#: src/content/pages/components/CommandRateExportButton.tsx
+msgid "Export commands per minute"
+msgstr ""
+
 #: src/compat/pickSdzPath.ts
 #, fuzzy
 msgid "Export compatibility mutator"
 msgstr "导出兼容变异器"
 
+#: src/content/pages/components/CommandRateExportButton.tsx
 #: src/content/pages/components/MatchStatsExportButton.tsx
 #, fuzzy
 msgid "Export CSV"
 msgstr "导出 CSV"
 
 #: src/content/pages/components/BuildTreeExportButton.tsx
+#: src/content/pages/components/CommandRateExportButton.tsx
 #: src/content/pages/components/MapExportButtons.tsx
 #: src/content/pages/components/MatchStatsExportButton.tsx
 #, fuzzy

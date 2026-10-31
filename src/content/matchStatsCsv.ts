@@ -1,5 +1,5 @@
 import { plural } from "@lingui/core/macro";
-import type { DemoInfo, Metric } from "./bindings";
+import type { DemoInfo, Metric, OrderSource } from "./bindings";
 import {
   type ChartMode,
   type ChartRow,
@@ -173,4 +173,77 @@ export function matchStatsCsvFileName(info: DemoInfo, metric: Metric): string {
   const date = startedAt(info).slice(0, 10);
   const parts = [slug(info.mapName), date, slug(metric.label)].filter(Boolean);
   return `${parts.length > 0 ? parts.join("-") : "match-statistics"}.csv`;
+}
+
+export interface CommandRatesCsvInput {
+  info: DemoInfo;
+  /** The sender the chart shows, as the bindings name it: `selection`, `lua` or `ai`. */
+  source: OrderSource;
+  /** The lines the chart draws, in its order. */
+  series: ChartSeries[];
+  /** `commandRows(...).rows` for the same lines and sender. */
+  rows: ChartRow[];
+}
+
+/**
+ * The commands per minute chart as CSV (#3875). One row per line per period,
+ * holding the rate the chart draws, with the unit and the sender written on
+ * every row so the file cannot be mistaken for one of the trailer's metrics.
+ * The sender is the bindings' own key and not the translated button text, so
+ * the file reads the same in every language.
+ */
+export function commandRatesCsv(input: CommandRatesCsvInput): string {
+  const { info, source, series, rows } = input;
+  const header = [
+    "match_time_sec",
+    "line",
+    "teams",
+    "sender",
+    "commands_per_minute",
+    "unit",
+    "game_id",
+    "map",
+    "started_utc",
+  ];
+  const sender = csvText(source);
+  const unit = csvText("commands per minute");
+  const provenance = [
+    csvText(info.gameId ?? ""),
+    csvText(info.mapName),
+    csvText(startedAt(info)),
+  ];
+  const lines: string[] = [];
+  for (const row of rows) {
+    for (const s of series) {
+      const rate = row[s.id];
+      if (typeof rate !== "number") continue;
+      lines.push(
+        [
+          csvNumber(row.timeSec),
+          csvText(s.label),
+          csvText(seriesTeams(s, info).join(" ")),
+          sender,
+          csvNumber(rate),
+          unit,
+          ...provenance,
+        ].join(","),
+      );
+    }
+  }
+  return [header.join(","), ...lines].join(EOL) + EOL;
+}
+
+/** A default file name from the map, the date and the sender. */
+export function commandRatesCsvFileName(
+  info: DemoInfo,
+  source: OrderSource,
+): string {
+  const date = startedAt(info).slice(0, 10);
+  const parts = [
+    slug(info.mapName),
+    date,
+    "commands-per-minute",
+    source,
+  ].filter(Boolean);
+  return `${parts.join("-")}.csv`;
 }
