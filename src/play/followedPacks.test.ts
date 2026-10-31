@@ -84,6 +84,20 @@ describe("readPack", () => {
     expect(reading).toMatchObject({ ok: true, title: "Community pack" });
   });
 
+  it("reads a preset with a well formed AI in it", () => {
+    const bot = {
+      ...you,
+      kind: "ai",
+      team: 1,
+      handicap: 10,
+      ai: { kind: "lua", shortName: "Bot", name: "A bot" },
+    };
+    const text = JSON.stringify(
+      manifest([rawPreset("A", { participants: [you, bot] })]),
+    );
+    expect(readPack(text)).toMatchObject({ ok: true });
+  });
+
   it("reads a pack exported from coilbox", () => {
     const code = encodeContainerCode(
       "setup-pack",
@@ -120,6 +134,36 @@ describe("readPack", () => {
         manifest([
           rawPreset("A", { participants: [{ ...you, kind: "host" }] }),
         ]),
+      ),
+    ],
+    [
+      "an AI with a number for its name",
+      JSON.stringify(
+        manifest([
+          rawPreset("A", {
+            participants: [
+              { ...you, kind: "ai", ai: { kind: "native", shortName: 7 } },
+            ],
+          }),
+        ]),
+      ),
+    ],
+    [
+      "an AI of an unknown kind",
+      JSON.stringify(
+        manifest([
+          rawPreset("A", {
+            participants: [
+              { ...you, kind: "ai", ai: { kind: "cheat", shortName: "Bot" } },
+            ],
+          }),
+        ]),
+      ),
+    ],
+    [
+      "a participant with text for a team",
+      JSON.stringify(
+        manifest([rawPreset("A", { participants: [{ ...you, team: "1" }] })]),
       ),
     ],
     [
@@ -333,6 +377,27 @@ describe("useFollowedPacks", () => {
     answering(manifest([rawPreset("A")]));
     await useFollowedPacks().refreshAll();
     expect(stored()[0].lastError).toBeNull();
+  });
+
+  it("shares a refresh under way, so an older answer cannot land last", async () => {
+    await follow();
+    fetchPack.mockClear();
+    let answer: (value: { text: string }) => void = () => {};
+    fetchPack.mockReturnValue(
+      new Promise((resolve) => {
+        answer = resolve;
+      }),
+    );
+    const first = useFollowedPacks().refreshAll();
+    const second = useFollowedPacks().refreshAll();
+    expect(fetchPack).toHaveBeenCalledTimes(1);
+    answer({ text: JSON.stringify(manifest([rawPreset("A")])) });
+    await Promise.all([first, second]);
+
+    answering(manifest([rawPreset("A", { mapName: "Elsewhere" })]));
+    await useFollowedPacks().refreshAll();
+    expect(fetchPack).toHaveBeenCalledTimes(2);
+    expect(stored()[0].presets[0].preset.mapName).toBe("Elsewhere");
   });
 
   it("does not bring back a pack unfollowed while its refresh was out", async () => {

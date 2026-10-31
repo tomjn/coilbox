@@ -74,19 +74,36 @@ export function presetForBattle(entry: FollowedPreset): SkirmishPreset {
 function isSoundPreset(preset: SetupPackPreset): boolean {
   return (
     isStringMap(preset.modOptionValues) &&
-    preset.participants.every((raw: unknown) => {
-      if (typeof raw !== "object" || raw === null) return false;
-      const p = raw as Record<string, unknown>;
-      return (
-        (p.kind === "you" || p.kind === "ai") &&
-        typeof p.name === "string" &&
-        typeof p.side === "string" &&
-        typeof p.allyTeam === "number" &&
-        Array.isArray(p.color) &&
-        p.color.length === 3 &&
-        p.color.every((c) => typeof c === "number")
-      );
-    })
+    preset.participants.every(isSoundParticipant)
+  );
+}
+
+function isSoundParticipant(raw: unknown): boolean {
+  if (typeof raw !== "object" || raw === null) return false;
+  const p = raw as Record<string, unknown>;
+  const optionalNumber = (v: unknown) =>
+    v === undefined || typeof v === "number";
+  return (
+    (p.kind === "you" || p.kind === "ai") &&
+    typeof p.name === "string" &&
+    typeof p.side === "string" &&
+    typeof p.allyTeam === "number" &&
+    Array.isArray(p.color) &&
+    p.color.length === 3 &&
+    p.color.every((c) => typeof c === "number") &&
+    optionalNumber(p.handicap) &&
+    optionalNumber(p.team) &&
+    (p.ai === undefined || isSoundAi(p.ai))
+  );
+}
+
+function isSoundAi(raw: unknown): boolean {
+  if (typeof raw !== "object" || raw === null) return false;
+  const ai = raw as Record<string, unknown>;
+  return (
+    typeof ai.shortName === "string" &&
+    (ai.kind === "native" || ai.kind === "lua") &&
+    (ai.name === undefined || typeof ai.name === "string")
   );
 }
 
@@ -217,6 +234,13 @@ function hostOf(url: string): string {
   }
 }
 
+/**
+ * The refresh under way, shared by everything that asks for one. The start refresh
+ * can overlap the button, and two at once could let the older answer land last and
+ * replace the newer presets.
+ */
+let refreshing: Promise<void> | null = null;
+
 export function useFollowedPacks() {
   const [packs, setPacks] = useSetting<FollowedPack[]>(FOLLOWED_PACKS_KEY, []);
 
@@ -252,14 +276,19 @@ export function useFollowedPacks() {
   }
 
   /** Refresh every pack. A failed one keeps its cached copy and says why. */
-  async function refreshAll(): Promise<void> {
-    await Promise.all(
+  function refreshAll(): Promise<void> {
+    refreshing ??= Promise.all(
       packs.map(async (pack) => {
         const reading = await fetchPack(pack.url);
         const now = new Date().toISOString();
         write((prev) => applyRefresh(prev, pack.id, reading, now));
       }),
-    );
+    )
+      .then(() => {})
+      .finally(() => {
+        refreshing = null;
+      });
+    return refreshing;
   }
 
   /** Drop a pack and its presets. Copies a player saved are in `play.presets`. */
