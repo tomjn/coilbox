@@ -2954,6 +2954,10 @@ msgstr "{gameName} déclare des types de déclencheurs que coilbox n’a pas pu 
 msgid "{gameName} depends on it, and coilbox cannot download an archive by this name. Find it in <0>game downloads</0>, then try again."
 msgstr "{gameName} en dépend, et coilbox ne peut pas télécharger d’archive de ce nom. Trouvez-la dans <0>Téléchargements de jeux</0>, puis réessayez."
 
+#: src/play/presetFit.ts
+msgid "{gameName} does not declare {names}."
+msgstr ""
+
 #: src/workshop/pages/components/PlayLocallyButton.tsx
 #, fuzzy
 msgid "{gameName} does not declare a tweakdefs mod option, so this route is not on offer."
@@ -4247,6 +4251,10 @@ msgstr "{mapName} (non installée)"
 #, fuzzy
 msgid "{mapName} could not be read. It is most likely not installed for the engine coilbox is using."
 msgstr "{mapName} n’a pas pu être lue. Elle n’est probablement pas installée pour le moteur utilisé par coilbox."
+
+#: src/play/presetFit.ts
+msgid "{mapName} does not declare {names}."
+msgstr ""
 
 #: src/lego/sandbox.ts
 #, fuzzy
@@ -5579,6 +5587,10 @@ msgstr "{pointCount, plural, one {# point} other {# points}}"
 msgid "{position} of {count}"
 msgstr "{position} sur {count}"
 
+#: src/play/presetFit.ts
+msgid "{positions, plural, one {# start position} other {# start positions}}"
+msgstr ""
+
 #: src/content/pages/components/CommandRateChart.tsx
 #, fuzzy
 msgid "{pregameCount} orders before the game started are left out."
@@ -6071,6 +6083,7 @@ msgid "{shown, plural, one {# part} other {# parts}}"
 msgstr "{shown, plural, one {# élément} other {# éléments}}"
 
 #: src/blueprint/units.ts
+#: src/play/presetFit.ts
 #, fuzzy
 msgid "{shown} and {more} more"
 msgstr "{shown} et {more} de plus"
@@ -6532,6 +6545,14 @@ msgstr "{teamCount, plural, one {{playing} jouent sur # équipe} other {{playing
 #, fuzzy
 msgid "{teamCount, plural, one {team {teamNames}} other {teams {teamNames}}}"
 msgstr "{teamCount, plural, one {équipe {teamNames}} other {équipes {teamNames}}}"
+
+#: src/play/presetFit.ts
+msgid "{teamCount}, but {mapName} has {positionCount}."
+msgstr ""
+
+#: src/play/presetFit.ts
+msgid "{teams, plural, one {# team} other {# teams}}"
+msgstr ""
 
 #: src/multiplayer/matchmaking.ts
 #, fuzzy
@@ -16295,6 +16316,10 @@ msgstr "Commandant"
 msgid "Commands per minute"
 msgstr "Commandes par minute"
 
+#: src/content/pages/components/CommandRateExportButton.tsx
+msgid "Commands per minute exported."
+msgstr ""
+
 #: src/scenario/pages/components/RestrictionPanel.tsx
 #, fuzzy
 msgid "Commands withheld"
@@ -17962,6 +17987,7 @@ msgstr "Altitude de croisière, en elmos"
 msgid "Crush resistance"
 msgstr "Résistance à l’écrasement"
 
+#: src/content/pages/components/CommandRateExportButton.tsx
 #: src/content/pages/components/MatchStatsExportButton.tsx
 #, fuzzy
 msgid "CSV"
@@ -21316,17 +21342,23 @@ msgstr "Exporter la campagne"
 msgid "Export challenge"
 msgstr "Exporter le défi"
 
+#: src/content/pages/components/CommandRateExportButton.tsx
+msgid "Export commands per minute"
+msgstr ""
+
 #: src/compat/pickSdzPath.ts
 #, fuzzy
 msgid "Export compatibility mutator"
 msgstr "Exporter le mutateur de compatibilité"
 
+#: src/content/pages/components/CommandRateExportButton.tsx
 #: src/content/pages/components/MatchStatsExportButton.tsx
 #, fuzzy
 msgid "Export CSV"
 msgstr "Exporter en CSV"
 
 #: src/content/pages/components/BuildTreeExportButton.tsx
+#: src/content/pages/components/CommandRateExportButton.tsx
 #: src/content/pages/components/MapExportButtons.tsx
 #: src/content/pages/components/MatchStatsExportButton.tsx
 #, fuzzy
@@ -28484,6 +28516,7 @@ msgstr "carte"
 #: src/multiplayer/battles/CreateLobbyPopover.tsx
 #: src/multiplayer/battles/HostBattleForm.tsx
 #: src/multiplayer/battles/HostZerokBattlePopover.tsx
+#: src/multiplayer/pages/BattleRoomPage.tsx
 #: src/play/pages/components/CrashDrawer.tsx
 #: src/play/pages/components/MapOverlay.tsx
 #: src/play/presetParts.ts
@@ -32958,6 +32991,10 @@ msgstr "Pas encore connecté"
 #, fuzzy
 msgid "Not connected."
 msgstr "Non connecté."
+
+#: src/multiplayer/battle/presetOutcome.ts
+msgid "Not declared"
+msgstr ""
 
 #: src/workshop/pages/components/DecodedSlotCard.tsx
 #, fuzzy
@@ -43743,6 +43780,10 @@ msgstr "Du contenu nécessaire n’est pas installé. Téléchargez-le ci-dessou
 msgid "Some engines record into their own folder, so deleting that engine deletes those replays. This moves them into the demos folder alongside the rest."
 msgstr "Certains moteurs enregistrent dans leur propre dossier, donc supprimer ce moteur supprime ces rediffusions. Ceci les déplace dans le dossier demos avec les autres."
 
+#: src/multiplayer/pages/BattleRoomPage.tsx
+msgid "Some of \"{presetName}\" did not take"
+msgstr ""
+
 #: src/lego/pages/components/ModuleUpdateBanner.tsx
 #, fuzzy
 msgid "Some parts of this unit are not tracked."
@@ -45344,10 +45385,18 @@ msgstr "Équipe {team}"
 msgid "Team 1 is the team with the lower number in the match, so the team record does not say which slot or which side of the map is stronger."
 msgstr "L’équipe 1 est celle qui a le plus petit numéro dans la partie, donc le bilan par équipe n’indique pas quel emplacement ou quel côté de la carte est le plus fort."
 
+#: src/multiplayer/pages/BattleRoomPage.tsx
+msgid "Team count"
+msgstr ""
+
 #: src/multiplayer/battle/GameTypePresetsControls.tsx
 #, fuzzy
 msgid "Team setup"
 msgstr "Configuration des équipes"
+
+#: src/multiplayer/pages/BattleRoomPage.tsx
+msgid "Team size"
+msgstr ""
 
 #: src/lego/pages/components/TextureBuilderPanel.tsx
 #, fuzzy
@@ -47889,6 +47938,10 @@ msgstr "La nouvelle analyse n’a pas pu lire ce qui est installé."
 msgid "The rest of \"{presetName}\" was loaded onto {gameName}. Install the game to load it whole."
 msgstr "Le reste de « {presetName} » a été chargé sur {gameName}. Installez le jeu pour le charger en entier."
 
+#: src/multiplayer/battle/hostSteps.ts
+msgid "The room did not answer."
+msgstr ""
+
 #: src/direct/room.ts
 #, fuzzy
 msgid "The room hands joiners {ip} for the game itself, which points back at their own machine rather than yours."
@@ -47898,6 +47951,10 @@ msgstr "Le salon donne {ip} à ceux qui rejoignent pour la partie elle-même, ce
 #, fuzzy
 msgid "The room hands joiners {ip} for the game itself."
 msgstr "Le salon donne {ip} à ceux qui rejoignent pour la partie elle-même."
+
+#: src/multiplayer/battle/hostSteps.ts
+msgid "The room is set to {holds}."
+msgstr ""
 
 #: src/multiplayer/pages/BattleRoomPage.tsx
 #, fuzzy

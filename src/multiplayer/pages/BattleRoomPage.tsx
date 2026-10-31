@@ -16,8 +16,13 @@ import { notify } from "@/notify/notify";
 import { useSkirmishAis } from "@/play/config";
 import type { SkirmishDraft } from "@/play/drafts";
 import { mergeGameAi } from "@/play/gameAi";
+import type { PresetFitFacts } from "@/play/presetFit";
 import { PresetImportGate, usePresetImport } from "@/play/presetImport";
-import type { PresetPart, PresetSelection } from "@/play/presetParts";
+import {
+  PART_LABELS,
+  type PresetPart,
+  type PresetSelection,
+} from "@/play/presetParts";
 import { type SkirmishPreset, useSkirmishPresets } from "@/play/presets";
 import { getProfile } from "@/profile/profile";
 import { startPosNote } from "@/startbox/mode";
@@ -44,9 +49,15 @@ import { alliesFromRows } from "../battle/config";
 import { launchBlock, startedWithoutYou } from "../battle/contentBlock";
 import { draftToHostSeed, hostSeedAiNotice } from "../battle/fromSkirmish";
 import { GameTypePresetsControls } from "../battle/GameTypePresetsControls";
+import { type HostSteps, teamShape } from "../battle/hostSteps";
 import { MissingContentCard } from "../battle/MissingContentCard";
 import { launchesOnItsOwn, matchAction } from "../battle/matchAction";
 import { matchStartAction } from "../battle/matchStart";
+import {
+  applyRoomSteps,
+  type NotTakenWhat,
+  notTakenMessage,
+} from "../battle/presetOutcome";
 import { RoomSplitHandle, useRoomSplit } from "../battle/RoomSplit";
 import { RoomWidgetsWarning } from "../battle/RoomWidgetsWarning";
 import { StartPosOptions } from "../battle/StartPosOptions";
@@ -87,7 +98,7 @@ function botFailure(failed: number, total: number, names: string): string {
  * match our engine dropped out of, or in to watch one we walked in on.
  */
 function BattleRoomPage() {
-  const { t } = useLingui();
+  const { t, i18n } = useLingui();
   const room = useBattleRoom(useBattleRoomKey());
   const split = useRoomSplit();
   const { disconnect, connections } = useMultiplayer();
@@ -264,6 +275,7 @@ function BattleRoomPage() {
     preset: SkirmishPreset,
     maphash: number,
     selection: PresetSelection,
+    fit?: PresetFitFacts,
   ) {
     if (!room.battle) return;
     const take = (part: PresetPart) => selection.parts.includes(part);
@@ -278,11 +290,19 @@ function BattleRoomPage() {
     setHostSeedError(null);
     // Changing the map is `UPDATEBATTLEINFO` when we run the game ourselves and
     // `!map` when a bot does. The second needs no checksum, which is why the
-    // panel only waits on unitsync for the first.
-    if (take("map") && preset.mapName !== room.battle.map) {
-      if (room.selfHost) room.setMap(preset.mapName, maphash);
-      else room.suggestMap(preset.mapName);
-    }
+    // panel only waits on unitsync for the first. With an autohost the command
+    // goes out below, where the room's answer is checked.
+    const mapChange = take("map") && preset.mapName !== room.battle.map;
+    if (mapChange && room.selfHost) room.setMap(preset.mapName, maphash);
+    else if (mapChange && !room.autohost) room.suggestMap(preset.mapName);
+    // A preset holds participants, not a team size, so the room's size and count
+    // come from them. Only an autohost has them to set.
+    const shape =
+      take("teams") && room.autohost ? teamShape(preset.participants) : null;
+    const hostSteps: HostSteps = {
+      ...(mapChange && room.autohost ? { map: preset.mapName } : {}),
+      ...(shape ?? {}),
+    };
     const seed = draftToHostSeed({
       draft: preset,
       sides: room.sides,
@@ -305,24 +325,45 @@ function BattleRoomPage() {
         spectator: seed.self.spectator,
       });
     }
-    // The boxes wait for the options, because `!addbox` is refused until the
-    // room is in choose-in-game mode and the tag that sets it is in this run.
-    // Sending both at once had every box rejected on a bot-hosted room.
-    const options = room.applyOptionTags(
-      filterOptionTags(seed.scriptTags, selection),
-    );
-    // The preset's own boxes, the ones saved with it, rather than whatever was
-    // last saved against the map.
-    if (
-      take("startPositions") &&
-      preset.startPosType === 2 &&
-      preset.startRects
-    ) {
-      const rects = Object.entries(preset.startRects);
-      void options.then(() => {
+    // A map that is changing is not the one the room's schema describes, so the
+    // panel's read of the preset's map stands in for it.
+    const rects =
+      take("startPositions") && preset.startPosType === 2 && preset.startRects
+        ? Object.entries(preset.startRects)
+        : [];
+    const presetName = preset.name;
+    const labelFor = (what: NotTakenWhat) =>
+      what === "map"
+        ? t`Map`
+        : what === "teamSize"
+          ? t`Team size`
+          : what === "nbTeams"
+            ? t`Team count`
+            : i18n._(PART_LABELS[what]);
+    void applyRoomSteps({
+      hostSteps,
+      tags: filterOptionTags(seed.scriptTags, selection),
+      schemas: {
+        mod: fit?.modOptions.current,
+        map: mapChange ? fit?.mapOptions.preset : fit?.mapOptions.current,
+      },
+      mapName: preset.mapName,
+      runHostSteps: room.runHostSteps,
+      applyOptionTags: room.applyOptionTags,
+      // The preset's own boxes, the ones saved with it, rather than whatever was
+      // last saved against the map.
+      afterOptions: () => {
         for (const [ally, rect] of rects) room.setStartBox(Number(ally), rect);
-      });
-    }
+      },
+    }).then((entries) => {
+      const message = notTakenMessage(entries, labelFor);
+      if (message)
+        notify({
+          title: t`Some of "${presetName}" did not take`,
+          body: message,
+          level: "warning",
+        });
+    });
     skirmishPresets.touchPreset(preset.id);
     if (!take("teams") || seed.bots.length === 0 || !room.serverKey) return;
     const serverKey = room.serverKey;
@@ -733,6 +774,8 @@ function BattleRoomPage() {
                 }}
                 selfHost={room.selfHost}
                 delivery={room.presetDelivery}
+                currentMapName={battle.map}
+                currentStartPosType={room.startPosType}
                 onApply={applySkirmishPresetInPlace}
                 saveLabel={t`Save this battle`}
                 onSave={(name) => {

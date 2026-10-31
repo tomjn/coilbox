@@ -2954,6 +2954,10 @@ msgstr "{gameName} が宣言しているトリガーの種類のうち、coilbox
 msgid "{gameName} depends on it, and coilbox cannot download an archive by this name. Find it in <0>game downloads</0>, then try again."
 msgstr "{gameName} はこれに依存していますが、coilbox はこの名前のアーカイブをダウンロードできません。<0>ゲームのダウンロード</0>で探してから、もう一度お試しください。"
 
+#: src/play/presetFit.ts
+msgid "{gameName} does not declare {names}."
+msgstr ""
+
 #: src/workshop/pages/components/PlayLocallyButton.tsx
 #, fuzzy
 msgid "{gameName} does not declare a tweakdefs mod option, so this route is not on offer."
@@ -4247,6 +4251,10 @@ msgstr "{mapName}（未インストール）"
 #, fuzzy
 msgid "{mapName} could not be read. It is most likely not installed for the engine coilbox is using."
 msgstr "{mapName} を読み込めませんでした。coilbox が使っているエンジンにインストールされていない可能性が高いです。"
+
+#: src/play/presetFit.ts
+msgid "{mapName} does not declare {names}."
+msgstr ""
 
 #: src/lego/sandbox.ts
 #, fuzzy
@@ -5579,6 +5587,10 @@ msgstr "{pointCount, plural, other {# 個のポイント}}"
 msgid "{position} of {count}"
 msgstr "{position} / {count}"
 
+#: src/play/presetFit.ts
+msgid "{positions, plural, one {# start position} other {# start positions}}"
+msgstr ""
+
 #: src/content/pages/components/CommandRateChart.tsx
 #, fuzzy
 msgid "{pregameCount} orders before the game started are left out."
@@ -6071,6 +6083,7 @@ msgid "{shown, plural, one {# part} other {# parts}}"
 msgstr "{shown, plural, other {# 個のパーツ}}"
 
 #: src/blueprint/units.ts
+#: src/play/presetFit.ts
 #, fuzzy
 msgid "{shown} and {more} more"
 msgstr "{shown} ほか {more} 件"
@@ -6532,6 +6545,14 @@ msgstr "{teamCount, plural, other {# チームで {playing} がプレイ}}"
 #, fuzzy
 msgid "{teamCount, plural, one {team {teamNames}} other {teams {teamNames}}}"
 msgstr "{teamCount, plural, other {チーム {teamNames}}}"
+
+#: src/play/presetFit.ts
+msgid "{teamCount}, but {mapName} has {positionCount}."
+msgstr ""
+
+#: src/play/presetFit.ts
+msgid "{teams, plural, one {# team} other {# teams}}"
+msgstr ""
 
 #: src/multiplayer/matchmaking.ts
 #, fuzzy
@@ -16295,6 +16316,10 @@ msgstr "コマンダー"
 msgid "Commands per minute"
 msgstr "1 分あたりのコマンド数"
 
+#: src/content/pages/components/CommandRateExportButton.tsx
+msgid "Commands per minute exported."
+msgstr ""
+
 #: src/scenario/pages/components/RestrictionPanel.tsx
 #, fuzzy
 msgid "Commands withheld"
@@ -17962,6 +17987,7 @@ msgstr "巡航高度（elmo）"
 msgid "Crush resistance"
 msgstr "粉砕への耐性"
 
+#: src/content/pages/components/CommandRateExportButton.tsx
 #: src/content/pages/components/MatchStatsExportButton.tsx
 #, fuzzy
 msgid "CSV"
@@ -21316,17 +21342,23 @@ msgstr "キャンペーンをエクスポート"
 msgid "Export challenge"
 msgstr "チャレンジをエクスポート"
 
+#: src/content/pages/components/CommandRateExportButton.tsx
+msgid "Export commands per minute"
+msgstr ""
+
 #: src/compat/pickSdzPath.ts
 #, fuzzy
 msgid "Export compatibility mutator"
 msgstr "互換ミューテーターをエクスポート"
 
+#: src/content/pages/components/CommandRateExportButton.tsx
 #: src/content/pages/components/MatchStatsExportButton.tsx
 #, fuzzy
 msgid "Export CSV"
 msgstr "CSV をエクスポート"
 
 #: src/content/pages/components/BuildTreeExportButton.tsx
+#: src/content/pages/components/CommandRateExportButton.tsx
 #: src/content/pages/components/MapExportButtons.tsx
 #: src/content/pages/components/MatchStatsExportButton.tsx
 #, fuzzy
@@ -28484,6 +28516,7 @@ msgstr "マップ"
 #: src/multiplayer/battles/CreateLobbyPopover.tsx
 #: src/multiplayer/battles/HostBattleForm.tsx
 #: src/multiplayer/battles/HostZerokBattlePopover.tsx
+#: src/multiplayer/pages/BattleRoomPage.tsx
 #: src/play/pages/components/CrashDrawer.tsx
 #: src/play/pages/components/MapOverlay.tsx
 #: src/play/presetParts.ts
@@ -32958,6 +32991,10 @@ msgstr "まだ接続していません"
 #, fuzzy
 msgid "Not connected."
 msgstr "接続していません。"
+
+#: src/multiplayer/battle/presetOutcome.ts
+msgid "Not declared"
+msgstr ""
 
 #: src/workshop/pages/components/DecodedSlotCard.tsx
 #, fuzzy
@@ -43743,6 +43780,10 @@ msgstr "必要なコンテンツの一部がインストールされていませ
 msgid "Some engines record into their own folder, so deleting that engine deletes those replays. This moves them into the demos folder alongside the rest."
 msgstr "一部のエンジンは独自のフォルダーに記録するため、そのエンジンを削除するとリプレイも削除されます。これは、それらを他のリプレイと一緒に demos フォルダーへ移動します。"
 
+#: src/multiplayer/pages/BattleRoomPage.tsx
+msgid "Some of \"{presetName}\" did not take"
+msgstr ""
+
 #: src/lego/pages/components/ModuleUpdateBanner.tsx
 #, fuzzy
 msgid "Some parts of this unit are not tracked."
@@ -45344,10 +45385,18 @@ msgstr "チーム {team}"
 msgid "Team 1 is the team with the lower number in the match, so the team record does not say which slot or which side of the map is stronger."
 msgstr "チーム 1 は試合内で番号が小さいほうのチームなので、チームの戦績からは、どのスロットやマップのどちら側が有利かはわかりません。"
 
+#: src/multiplayer/pages/BattleRoomPage.tsx
+msgid "Team count"
+msgstr ""
+
 #: src/multiplayer/battle/GameTypePresetsControls.tsx
 #, fuzzy
 msgid "Team setup"
 msgstr "チームの設定"
+
+#: src/multiplayer/pages/BattleRoomPage.tsx
+msgid "Team size"
+msgstr ""
 
 #: src/lego/pages/components/TextureBuilderPanel.tsx
 #, fuzzy
@@ -47889,6 +47938,10 @@ msgstr "再スキャンでインストール済みのものを読み込めませ
 msgid "The rest of \"{presetName}\" was loaded onto {gameName}. Install the game to load it whole."
 msgstr "「{presetName}」の残りは {gameName} に読み込みました。すべてを読み込むには、そのゲームをインストールしてください。"
 
+#: src/multiplayer/battle/hostSteps.ts
+msgid "The room did not answer."
+msgstr ""
+
 #: src/direct/room.ts
 #, fuzzy
 msgid "The room hands joiners {ip} for the game itself, which points back at their own machine rather than yours."
@@ -47898,6 +47951,10 @@ msgstr "ルームは参加者にゲーム用として {ip} を渡しますが、
 #, fuzzy
 msgid "The room hands joiners {ip} for the game itself."
 msgstr "ルームは参加者にゲーム用として {ip} を渡します。"
+
+#: src/multiplayer/battle/hostSteps.ts
+msgid "The room is set to {holds}."
+msgstr ""
 
 #: src/multiplayer/pages/BattleRoomPage.tsx
 #, fuzzy
