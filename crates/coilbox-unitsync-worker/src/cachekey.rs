@@ -216,7 +216,11 @@ pub fn dataset_key(stamp: &ArchiveStamp) -> String {
 /// when the Lua that stands in for the engine's team and option functions
 /// changes, or the rules for refusing a definition do, so a list read under the
 /// old ones is read again. The unit dataset's own key does not carry it.
-pub const MATCH_LIST_VERSION: u32 = 1;
+///
+/// 2: the read now gives `math.random` a fixed answer (#4926), and a list kept
+/// under 1 lacks every definition whose script draws a number, which for Beyond
+/// All Reason is 36 and moves every id after them.
+pub const MATCH_LIST_VERSION: u32 = 2;
 
 /// The unit list a game gives for one match setup. `setup` is the setup's
 /// canonical text (`MatchSetup::canonical`). Apart from [`dataset_key`], which
