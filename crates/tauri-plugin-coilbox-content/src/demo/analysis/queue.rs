@@ -28,6 +28,10 @@
 //!   the run ended.
 //! - A match with a current analysis and a current track is not run again
 //!   unless the job says to. One with only one of the two is run for both.
+//! - A job can instead ask only for the engine's unit list (issue #3906). The
+//!   engine is stopped as soon as the list is written, nothing is analysed or
+//!   recorded, and the list is kept as an analysis's is. It queues, yields to a
+//!   game and cancels like any other job.
 //!
 //! This is separate from the play launch's `RunRegistry` on purpose. That one
 //! refuses a second game. This one queues.
@@ -51,8 +55,8 @@ use super::super::track_store;
 use super::launch::RunControl;
 use super::RecordingOutcome;
 use super::{
-    analyse_replay, divergence, now_ms, run_timeout, store, AnalysisRequest, AnalysisRun,
-    AnalysisStatus, RunPhase, RunProgress, SCRATCH_DIR,
+    analyse_replay, divergence, now_ms, read_unit_list, run_timeout, store, AnalysisRequest,
+    AnalysisRun, AnalysisStatus, RunPhase, RunProgress, UnitListRun, SCRATCH_DIR,
 };
 
 /// The event every window is sent when the queue changes. Its payload is a
@@ -74,9 +78,21 @@ const RECORDINGS_DIR: &str = "replay-recording";
 
 const EXIT_TIDY_WAIT: Duration = Duration::from_secs(2);
 
-/// One replay to analyse and record.
+/// What a job asks of the engine.
+#[derive(Serialize, Clone, Copy, Debug, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub enum JobKind {
+    /// Play the match back, analyse it and record it as a track.
+    Analyse,
+    /// Start the match, keep the engine's own unit list and stop the engine
+    /// (issue #3906). It needs no recorded outcome, and it plays no match.
+    UnitList,
+}
+
+/// One replay to analyse and record, or to read the unit list of.
 #[derive(Clone, Debug)]
 pub struct JobSpec {
+    pub kind: JobKind,
     pub replay: PathBuf,
     pub engine_dir: PathBuf,
     pub data_dirs: Vec<PathBuf>,
@@ -105,6 +121,17 @@ pub trait Engine: Send + Sync + 'static {
         control: &RunControl,
         on_poll: &dyn Fn(RunProgress),
     ) -> Result<AnalysisRun, String>;
+
+    /// Start the match, keep the engine's unit list and stop. See
+    /// [`read_unit_list`]. An engine that cannot do this says so.
+    fn list(
+        &self,
+        _job: &JobSpec,
+        _control: &RunControl,
+        _on_poll: &dyn Fn(RunProgress),
+    ) -> Result<UnitListRun, String> {
+        Err("this engine cannot read a unit list".into())
+    }
 
     /// Thin a dump into a track. Blocks for as long as that takes, and gives up
     /// with [`ThinError::Cancelled`] soon after `cancelled` answers true.
@@ -154,6 +181,31 @@ impl Engine for HeadlessEngine {
         )
     }
 
+    fn list(
+        &self,
+        job: &JobSpec,
+        control: &RunControl,
+        on_poll: &dyn Fn(RunProgress),
+    ) -> Result<UnitListRun, String> {
+        sweep_scratch(&self.scratch_root);
+        read_unit_list(
+            &AnalysisRequest {
+                replay: job.replay.clone(),
+                engine_dir: job.engine_dir.clone(),
+                data_dirs: job.data_dirs.clone(),
+                game: job.game.clone(),
+                game_short_name: None,
+                scratch_root: self.scratch_root.clone(),
+                // The analysis run's own limit, until a measured load time
+                // says a shorter one is safe.
+                timeout: run_timeout(job.match_seconds),
+                record: None,
+            },
+            control,
+            on_poll,
+        )
+    }
+
     fn game_running(&self) -> bool {
         coilbox_proc::game_running()
     }
@@ -170,6 +222,9 @@ pub enum FailureReason {
     EngineFailed,
     /// The run could not be started, or its result could not be stored.
     CouldNotRun,
+    /// A run that reads only the unit list did not get one. The message says
+    /// whether the engine ran out of time or stopped first.
+    ListFailed,
     /// The playback was good and its recording could not be made into a track.
     ThinFailed,
 }
@@ -195,6 +250,7 @@ pub struct Failure {
 #[serde(rename_all = "camelCase")]
 pub struct RunningJob {
     pub id: u64,
+    pub kind: JobKind,
     pub game_id: String,
     pub name: String,
     pub replay_path: String,
@@ -212,6 +268,7 @@ pub struct RunningJob {
 #[serde(rename_all = "camelCase")]
 pub struct QueuedJob {
     pub id: u64,
+    pub kind: JobKind,
     pub game_id: String,
     pub name: String,
     pub replay_path: String,
@@ -282,6 +339,7 @@ impl QueueState {
         QueueSnapshot {
             running: self.running.as_ref().map(|running| RunningJob {
                 id: running.job.id,
+                kind: running.job.spec.kind,
                 game_id: running.job.spec.game_id.clone(),
                 name: running.job.spec.name.clone(),
                 replay_path: running.job.spec.replay.to_string_lossy().into_owned(),
@@ -297,6 +355,7 @@ impl QueueState {
                 .iter()
                 .map(|job| QueuedJob {
                     id: job.id,
+                    kind: job.spec.kind,
                     game_id: job.spec.game_id.clone(),
                     name: job.spec.name.clone(),
                     replay_path: job.spec.replay.to_string_lossy().into_owned(),
@@ -350,9 +409,25 @@ impl Shared {
     /// track are both current. A match with only one of them is run again,
     /// because one run makes both.
     fn is_current(&self, spec: &JobSpec) -> bool {
+        if spec.kind == JobKind::UnitList {
+            return self.has_engine_list(&spec.game_id);
+        }
         store::is_current(&self.analyses, &spec.game_id)
             && track_store::state(&self.tracks, &spec.game_id)
                 .is_ok_and(|state| state == Some(track_store::TrackState::Current))
+    }
+
+    /// Whether a unit list run has nothing to do: the replay has an engine list
+    /// already, or a reproduced analysis whose events a new list could renumber
+    /// (issue #3906). A diverged analysis keeps no events, so it does not count.
+    fn has_engine_list(&self, game_id: &str) -> bool {
+        let reproduced = matches!(
+            store::read(&self.analyses, game_id),
+            Ok(Some(stored)) if stored.provenance.outcome == store::StoredOutcome::Reproduced
+        );
+        reproduced
+            || def_sets::links_for(&def_sets::dir_beside(&self.analyses), game_id)
+                .is_ok_and(|links| links.iter().any(|l| l.origin == def_sets::Origin::Engine))
     }
 
     fn lock(&self) -> MutexGuard<'_, QueueState> {
@@ -665,6 +740,95 @@ fn settle(
     )
 }
 
+/// Work out what a unit list run came to, keeping the list when it got one.
+///
+/// The list is kept as an analysis's is: as the engine's own, linked to the
+/// replay, with whether the run used a game other than the recorded one (see
+/// [`keep_engine_unit_defs`]). A run that was stopped for a game starting goes
+/// back in the queue, and one that was cancelled keeps nothing.
+fn settle_list(
+    analyses: &Path,
+    job: &JobSpec,
+    result: &Result<UnitListRun, String>,
+    preempted: bool,
+) -> Outcome {
+    let failed = |message: String, log_excerpt: Vec<String>| {
+        Outcome::Failed(Failure {
+            game_id: job.game_id.clone(),
+            name: job.name.clone(),
+            reason: FailureReason::ListFailed,
+            message,
+            limit_seconds: None,
+            log_excerpt,
+        })
+    };
+    let run = match result {
+        Ok(run) => run,
+        Err(e) => return failed(e.clone(), Vec::new()),
+    };
+    if let Some(units) = &run.units {
+        let game_differs =
+            (!run.recorded_game.is_empty()).then(|| run.base_game != run.recorded_game);
+        return match def_sets::record(
+            &def_sets::dir_beside(analyses),
+            &job.game_id,
+            units,
+            &def_sets::Source {
+                origin: def_sets::Origin::Engine,
+                game: &run.base_game,
+                game_differs,
+                taken_at_ms: now_ms(),
+            },
+        ) {
+            Ok(_) => Outcome::Stored,
+            Err(e) => failed(e, Vec::new()),
+        };
+    }
+    let exit = &run.exit;
+    if exit.cancelled {
+        return if preempted {
+            Outcome::Requeue
+        } else {
+            Outcome::Nothing
+        };
+    }
+    let how = if exit.timed_out {
+        format!(
+            "the engine had not written the unit list after {} seconds",
+            run_timeout(job.match_seconds).as_secs()
+        )
+    } else {
+        match (exit.code, exit.signal) {
+            (Some(code), _) => {
+                format!("the engine exited with status {code} before it wrote the unit list")
+            }
+            (None, Some(signal)) => {
+                format!("the engine was ended by signal {signal} before it wrote the unit list")
+            }
+            (None, None) => "the engine stopped before it wrote the unit list".to_string(),
+        }
+    };
+    failed(how, run.log_excerpt.clone())
+}
+
+/// Run a unit list job: the engine is started, the list is kept and the engine
+/// is stopped. Never twice, as for an analysis: the replay may have been given
+/// a list since the job was queued.
+fn unit_list_job(shared: &Shared, job_id: u64, spec: &JobSpec, control: &RunControl) -> Outcome {
+    if shared.is_current(spec) {
+        return Outcome::Nothing;
+    }
+    let result = shared.engine.list(spec, control, &|progress| {
+        on_poll(shared, job_id, control, progress)
+    });
+    let preempted = shared
+        .lock()
+        .running
+        .as_ref()
+        .is_some_and(|running| running.preempted);
+    settle_list(&shared.analyses, spec, &result, preempted)
+}
+
 /// What became of the track a job was to make.
 enum Recorded {
     Stored,
@@ -835,6 +999,11 @@ fn work(shared: &Arc<Shared>) {
             (id, spec, control)
         };
         shared.announce();
+        if spec.kind == JobKind::UnitList {
+            let outcome = unit_list_job(shared, job_id, &spec, &control);
+            finish(shared, outcome, Recorded::Nothing);
+            continue;
+        }
         let began = Instant::now();
 
         // Never twice: it may have been analysed and recorded since it was
@@ -870,34 +1039,40 @@ fn work(shared: &Arc<Shared>) {
         if matches!(recorded, Recorded::Stored) {
             keep_cost(shared, &spec, &result, began.elapsed());
         }
-        {
-            let mut state = shared.lock();
-            let running = state.running.take().expect("this worker's job");
-            match outcome {
-                Outcome::Stored => state.stored += 1,
-                Outcome::Nothing => {}
-                Outcome::Requeue => {
-                    if !state.closed {
-                        state.queued.push_front(running.job);
-                    }
-                }
-                Outcome::Failed(failure) => {
-                    state.failures.retain(|f| f.game_id != failure.game_id);
-                    state.failures.push(failure);
+        finish(shared, outcome, recorded);
+    }
+}
+
+/// Take the finished job off the running slot, apply what it came to and tell
+/// the windows.
+fn finish(shared: &Shared, outcome: Outcome, recorded: Recorded) {
+    {
+        let mut state = shared.lock();
+        let running = state.running.take().expect("this worker's job");
+        match outcome {
+            Outcome::Stored => state.stored += 1,
+            Outcome::Nothing => {}
+            Outcome::Requeue => {
+                if !state.closed {
+                    state.queued.push_front(running.job);
                 }
             }
-            match recorded {
-                Recorded::Stored => state.tracks += 1,
-                Recorded::Nothing => {}
-                Recorded::Failed(failure) => {
-                    state.failures.retain(|f| f.game_id != failure.game_id);
-                    state.failures.push(failure);
-                }
+            Outcome::Failed(failure) => {
+                state.failures.retain(|f| f.game_id != failure.game_id);
+                state.failures.push(failure);
             }
         }
-        shared.changed.notify_all();
-        shared.announce();
+        match recorded {
+            Recorded::Stored => state.tracks += 1,
+            Recorded::Nothing => {}
+            Recorded::Failed(failure) => {
+                state.failures.retain(|f| f.game_id != failure.game_id);
+                state.failures.push(failure);
+            }
+        }
     }
+    shared.changed.notify_all();
+    shared.announce();
 }
 
 /// Keep what a stored recording cost, for the page's estimate (#3788). The
@@ -1094,6 +1269,12 @@ impl CannotAnalyse {
 /// or why it cannot be. Reads the replay and nothing else, so a page can ask
 /// before it offers the button.
 pub fn check_replay(replay: &Path) -> Result<(String, u32), CannotAnalyse> {
+    check_replay_for(replay, JobKind::Analyse)
+}
+
+/// [`check_replay`] for a kind of job. A unit list run compares nothing with
+/// the replay's result, so it does not need one.
+fn check_replay_for(replay: &Path, kind: JobKind) -> Result<(String, u32), CannotAnalyse> {
     let raw =
         super::super::read_header_and_script(replay).map_err(|_| CannotAnalyse::Unreadable)?;
     let game = super::super::find_game(&super::super::parse_tdf(&raw.script));
@@ -1106,7 +1287,7 @@ pub fn check_replay(replay: &Path) -> Result<(String, u32), CannotAnalyse> {
     let game_id = store::valid_game_id(&raw.game_id).map_err(|_| CannotAnalyse::NoGameId)?;
     let finished = super::super::read_trailer(replay)
         .is_ok_and(|trailer| divergence::has_recorded_outcome(&trailer));
-    if !finished {
+    if kind == JobKind::Analyse && !finished {
         return Err(CannotAnalyse::NoGameOver);
     }
     Ok((game_id, raw.game_time))
@@ -1121,11 +1302,42 @@ pub fn job_for(
     game: Option<String>,
     force: bool,
 ) -> Result<JobSpec, String> {
-    let (game_id, match_seconds) = check_replay(replay).map_err(|why| why.message().to_string())?;
+    spec_for(replay, engine_dir, data_dirs, game, force, JobKind::Analyse)
+}
+
+/// A job that reads only the engine's unit list, or the reason it cannot, in
+/// words a page can show. It never forces: a replay that has its list is done.
+pub fn unit_list_job_for(
+    replay: &Path,
+    engine_dir: &Path,
+    data_dirs: Vec<PathBuf>,
+    game: Option<String>,
+) -> Result<JobSpec, String> {
+    spec_for(
+        replay,
+        engine_dir,
+        data_dirs,
+        game,
+        false,
+        JobKind::UnitList,
+    )
+}
+
+fn spec_for(
+    replay: &Path,
+    engine_dir: &Path,
+    data_dirs: Vec<PathBuf>,
+    game: Option<String>,
+    force: bool,
+    kind: JobKind,
+) -> Result<JobSpec, String> {
+    let (game_id, match_seconds) =
+        check_replay_for(replay, kind).map_err(|why| why.message().to_string())?;
     if !super::launch::headless_binary(engine_dir).is_file() {
         return Err(format!("no headless engine in {}", engine_dir.display()));
     }
     Ok(JobSpec {
+        kind,
         replay: replay.to_path_buf(),
         engine_dir: engine_dir.to_path_buf(),
         data_dirs,
@@ -1158,6 +1370,11 @@ const NO_QUEUE: &str = "replay analysis is not available: the app's folders coul
 /// analysed: a remix, one with no game id, one with no recorded game over, or
 /// an engine folder with no headless engine in it. The time limit is not the
 /// caller's to choose: see `run_timeout`.
+///
+/// `unitListOnly` asks for a shorter run (issue #3906): the engine is started,
+/// its own unit list is kept and it is stopped. That needs no recorded game
+/// over, never forces, and answers `alreadyDone` for a replay that has an engine
+/// list or a reproduced analysis.
 #[tauri::command]
 pub(crate) async fn content_analysis_enqueue<R: Runtime>(
     app: AppHandle<R>,
@@ -1166,6 +1383,7 @@ pub(crate) async fn content_analysis_enqueue<R: Runtime>(
     data_dir: String,
     game: Option<String>,
     force: Option<bool>,
+    unit_list_only: Option<bool>,
 ) -> CliResult {
     let Some(queue) = app.try_state::<AnalysisQueue>().map(|q| q.inner().clone()) else {
         return CliResult::err(NO_QUEUE);
@@ -1178,13 +1396,22 @@ pub(crate) async fn content_analysis_enqueue<R: Runtime>(
             .map(PathBuf::from),
     );
     let asked = tauri::async_runtime::spawn_blocking(move || {
-        let spec = job_for(
-            Path::new(&replay_path),
-            Path::new(&engine_path),
-            data_dirs,
-            game,
-            force.unwrap_or(false),
-        )?;
+        let spec = if unit_list_only.unwrap_or(false) {
+            unit_list_job_for(
+                Path::new(&replay_path),
+                Path::new(&engine_path),
+                data_dirs,
+                game,
+            )?
+        } else {
+            job_for(
+                Path::new(&replay_path),
+                Path::new(&engine_path),
+                data_dirs,
+                game,
+                force.unwrap_or(false),
+            )?
+        };
         let outcome = queue.enqueue(spec)?;
         Ok::<_, String>((outcome, queue.snapshot()))
     })
@@ -1571,6 +1798,36 @@ mod tests {
             }
         }
 
+        fn list(
+            &self,
+            _job: &JobSpec,
+            _control: &RunControl,
+            _on_poll: &dyn Fn(RunProgress),
+        ) -> Result<UnitListRun, String> {
+            let script = *self.script.lock().unwrap();
+            self.started.fetch_add(1, Ordering::SeqCst);
+            let (units, timed_out, code) = match script {
+                Script::Finish(_) => (Some(def_sets::tests::known()), false, None),
+                Script::TimeOut => (None, true, None),
+                Script::Crash => (None, false, Some(3)),
+                _ => return Err("no headless engine in /nowhere".into()),
+            };
+            Ok(UnitListRun {
+                units,
+                base_game: "Some Game 1.0".into(),
+                recorded_game: "Some Game 1.0".into(),
+                exit: EngineExit {
+                    code,
+                    signal: None,
+                    timed_out,
+                    cancelled: false,
+                    wall_seconds: 1.0,
+                },
+                header: None,
+                log_excerpt: Vec::new(),
+            })
+        }
+
         fn game_running(&self) -> bool {
             self.game.load(Ordering::SeqCst)
         }
@@ -1671,6 +1928,7 @@ mod tests {
 
     fn job(game_id: &str, force: bool) -> JobSpec {
         JobSpec {
+            kind: JobKind::Analyse,
             replay: PathBuf::from(format!("/replays/{game_id}.sdfz")),
             engine_dir: PathBuf::from("/engines/1"),
             data_dirs: Vec::new(),
@@ -1796,6 +2054,164 @@ mod tests {
         let sets = def_sets::dir_beside(&analyses);
         assert_eq!(def_sets::for_replay(&sets, ID).unwrap().links, Vec::new());
         assert_eq!(def_sets::usage(&sets).sets, 0);
+    }
+
+    fn list_job(game_id: &str) -> JobSpec {
+        JobSpec {
+            kind: JobKind::UnitList,
+            ..job(game_id, false)
+        }
+    }
+
+    /// The engine's list is kept as an analysis's is, with nothing analysed, and
+    /// a replay that has it is not run again.
+    #[test]
+    fn a_unit_list_job_keeps_the_engines_list_and_nothing_else() {
+        let world = World::new(Script::Finish(AnalysisStatus::Reproduced));
+
+        assert_eq!(world.queue.enqueue(list_job(ID)).unwrap(), Enqueued::Queued);
+        let idle = world.until_idle();
+
+        assert_eq!(world.started(), 1);
+        assert_eq!(idle.stored, 1);
+        assert_eq!(idle.tracks, 0);
+        assert!(idle.failures.is_empty());
+        assert!(store::read(&world.analyses(), ID).unwrap().is_none());
+        let sets = def_sets::dir_beside(&world.analyses());
+        let found = def_sets::for_replay(&sets, ID).unwrap();
+        let link = found.events.expect("a list for the events");
+        assert_eq!(link.origin, def_sets::Origin::Engine);
+        assert_eq!(link.game, "Some Game 1.0");
+        assert_eq!(link.game_differs, Some(false));
+        assert_eq!(
+            found.sets[&link.digest].len(),
+            def_sets::tests::known().len()
+        );
+
+        assert_eq!(
+            world.queue.enqueue(list_job(ID)).unwrap(),
+            Enqueued::AlreadyDone
+        );
+        assert_eq!(world.started(), 1);
+    }
+
+    /// A reproduced analysis's events are numbered by its own run's list, which
+    /// a new list from another run could renumber.
+    #[test]
+    fn a_unit_list_job_leaves_a_reproduced_analysis_alone() {
+        let world = World::new(Script::Finish(AnalysisStatus::Reproduced));
+        world.ask(ID);
+        world.until_idle();
+
+        assert_eq!(
+            world.queue.enqueue(list_job(ID)).unwrap(),
+            Enqueued::AlreadyDone
+        );
+        assert_eq!(world.started(), 1);
+    }
+
+    #[test]
+    fn a_unit_list_job_that_timed_out_is_a_failure_and_keeps_nothing() {
+        let world = World::new(Script::TimeOut);
+
+        world.queue.enqueue(list_job(ID)).unwrap();
+        let idle = world.until_idle();
+
+        assert_eq!(idle.stored, 0);
+        assert_eq!(idle.failures.len(), 1);
+        assert_eq!(idle.failures[0].reason, FailureReason::ListFailed);
+        assert!(
+            idle.failures[0]
+                .message
+                .contains("had not written the unit list"),
+            "{}",
+            idle.failures[0].message
+        );
+        let sets = def_sets::dir_beside(&world.analyses());
+        assert_eq!(def_sets::for_replay(&sets, ID).unwrap().links, Vec::new());
+    }
+
+    #[test]
+    fn a_unit_list_job_whose_engine_exited_early_says_so() {
+        let world = World::new(Script::Crash);
+
+        world.queue.enqueue(list_job(ID)).unwrap();
+        let idle = world.until_idle();
+
+        assert_eq!(idle.failures.len(), 1);
+        assert_eq!(
+            idle.failures[0].message,
+            "the engine exited with status 3 before it wrote the unit list"
+        );
+    }
+
+    #[test]
+    fn a_unit_list_job_that_was_cancelled_or_stood_aside_for_a_game_keeps_nothing() {
+        let dir = tempfile::tempdir().unwrap();
+        let analyses = store::store_dir(dir.path());
+        let cancelled = || {
+            Ok::<_, String>(UnitListRun {
+                units: None,
+                base_game: "Some Game 1.0".into(),
+                recorded_game: "Some Game 1.0".into(),
+                exit: EngineExit {
+                    code: None,
+                    signal: None,
+                    timed_out: false,
+                    cancelled: true,
+                    wall_seconds: 1.0,
+                },
+                header: None,
+                log_excerpt: Vec::new(),
+            })
+        };
+
+        assert!(matches!(
+            settle_list(&analyses, &list_job(ID), &cancelled(), false),
+            Outcome::Nothing
+        ));
+        assert!(matches!(
+            settle_list(&analyses, &list_job(ID), &cancelled(), true),
+            Outcome::Requeue
+        ));
+        assert_eq!(
+            def_sets::for_replay(&def_sets::dir_beside(&analyses), ID)
+                .unwrap()
+                .links,
+            Vec::new()
+        );
+    }
+
+    #[test]
+    fn a_run_that_differs_from_the_recorded_game_says_so_beside_its_list() {
+        let dir = tempfile::tempdir().unwrap();
+        let analyses = store::store_dir(dir.path());
+        let run = Ok::<_, String>(UnitListRun {
+            units: Some(def_sets::tests::known()),
+            base_game: "Some Game 1.1".into(),
+            recorded_game: "Some Game 1.0".into(),
+            exit: EngineExit {
+                code: None,
+                signal: Some(9),
+                timed_out: false,
+                cancelled: true,
+                wall_seconds: 1.0,
+            },
+            header: None,
+            log_excerpt: Vec::new(),
+        });
+
+        assert!(matches!(
+            settle_list(&analyses, &list_job(ID), &run, false),
+            Outcome::Stored
+        ));
+
+        let found = def_sets::for_replay(&def_sets::dir_beside(&analyses), ID).unwrap();
+        let link = found.events.expect("a list for the events");
+        assert_eq!(link.game, "Some Game 1.1");
+        assert_eq!(link.game_differs, Some(true));
+        // It names the events of its own run and not the replay's orders.
+        assert_eq!(found.stream, None);
     }
 
     #[test]
@@ -3353,6 +3769,25 @@ mod tests {
             assert_eq!(spec.name, "match.sdfz");
             assert_eq!(spec.match_seconds, 50);
             assert!(!spec.force);
+            assert_eq!(spec.kind, JobKind::Analyse);
+        }
+
+        /// An analysis compares the run with the replay's result, so it refuses
+        /// a replay with none. A unit list run keeps nothing but the list.
+        #[test]
+        fn a_replay_with_no_recorded_game_over_can_still_be_read_for_its_unit_list() {
+            let unfinished = DemoFixture {
+                script: SCRIPT.into(),
+                ..Default::default()
+            };
+            let (_dir, replay, engine) = world(unfinished.gzipped());
+
+            let spec = unit_list_job_for(&replay, &engine, Vec::new(), None).unwrap();
+
+            assert_eq!(spec.kind, JobKind::UnitList);
+            assert_eq!(spec.game_id, super::ID);
+            assert!(!spec.force);
+            assert!(job_for(&replay, &engine, Vec::new(), None, false).is_err());
         }
 
         /// A replay binds to its game by name, so one recorded on the playback
