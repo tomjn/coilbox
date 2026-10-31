@@ -1,8 +1,10 @@
 import { describe, expect, it } from "vitest";
 import {
+  isOaBattle,
   OA_UNPICKED_MAP,
   oaBattleTitle,
   oaHostArguments,
+  oaJoinArguments,
   oaMapArgument,
   oaPlayerName,
 } from "./oaHost";
@@ -85,5 +87,39 @@ describe("oaHostArguments", () => {
     const args = oaHostArguments({ ...base, map: "Comet Catcher" });
     expect(args).not.toContain("--dplay-guid");
     expect(args).not.toContain("--dplay-port");
+  });
+});
+
+describe("oaJoinArguments", () => {
+  it("joins the lobby's address under the battle's room name", () => {
+    expect(
+      oaJoinArguments({
+        battleId: 4021,
+        username: "abcdefghijklmnopqrst",
+        hostIp: "203.0.113.9",
+      }),
+    ).toEqual([
+      "--join",
+      "203.0.113.9",
+      "--player-name",
+      "abcdefghijklmnop",
+      "--game-name",
+      "CB4021",
+    ]);
+  });
+});
+
+describe("isOaBattle", () => {
+  it("is true for the engine name an OA host sends", () => {
+    expect(isOaBattle({ engine: "Open Annihilation" })).toBe(true);
+  });
+
+  it.each([
+    "spring",
+    "recoil",
+    "",
+    "Another Engine",
+  ])("is false for %j", (engine) => {
+    expect(isOaBattle({ engine })).toBe(false);
   });
 });
