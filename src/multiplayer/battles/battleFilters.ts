@@ -8,8 +8,38 @@ export interface BattleFilters {
   hideEmpty: boolean;
   hideLockedPassworded: boolean;
   hideFull: boolean;
+  /** Hide battles on an engine other than Spring or Recoil (Open Annihilation). */
+  hideOpenAnnihilation: boolean;
   sortKey: BattleSortKey;
   sortDir: "asc" | "desc";
+}
+
+/**
+ * The engine name of a battle that runs on neither Spring nor Recoil, or null.
+ * An Open Annihilation host sends `Open Annihilation` here. Recoil hosts send
+ * `spring`, and a lobby that names no engine (Tachyon) reads as Recoil.
+ */
+export function otherEngineName(b: Pick<Battle, "engine">): string | null {
+  const name = b.engine?.trim();
+  if (!name) return null;
+  const lower = name.toLowerCase();
+  return lower === "spring" || lower === "recoil" ? null : name;
+}
+
+/**
+ * Apply the profile's game filter to a battle list. Recoil battles are matched
+ * on their game name. A battle on another engine is dropped outright, because a
+ * profile narrowed to a game is narrowed to a Recoil game and a loose pattern
+ * could otherwise match the game name an Open Annihilation host sends.
+ */
+export function scopeToProfileGame(
+  battles: Battle[],
+  matcher: ((name: string) => boolean) | null,
+): Battle[] {
+  if (!matcher) return battles;
+  return battles.filter(
+    (b) => otherEngineName(b) === null && matcher(b.modname),
+  );
 }
 
 /**
@@ -130,6 +160,7 @@ export function filterSortBattles(
     if (f.hideEmpty && occupancy(b) <= 1) return false;
     if (f.hideLockedPassworded && (b.locked || b.passworded)) return false;
     if (f.hideFull && occupancy(b) >= b.maxPlayers) return false;
+    if (f.hideOpenAnnihilation && otherEngineName(b) !== null) return false;
     return true;
   });
   const dir = f.sortDir === "asc" ? 1 : -1;
